@@ -1,5 +1,5 @@
 [package]
-name = "alpen-nero-primitives"
+name = "alpen-vertex-primitives"
 version = "0.1.0"
 edition = "2021"
 

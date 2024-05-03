@@ -1,4 +1,4 @@
-# Nero Functional Tests
+# Vertex Functional Tests
 
 Tests will be added here when I split out the test framework from a project I'm
 working on into a standalone library so I can relicense it as MIT and we can use

@@ -1,5 +1,5 @@
 [package]
-name = "alpen-nero-rpc-api"
+name = "alpen-vertex-rpc-api"
 version = "0.1.0"
 edition = "2021"
 

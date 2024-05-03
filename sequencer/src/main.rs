@@ -1,6 +1,6 @@
 use tracing::*;
 
-use alpen_nero_common::logging;
+use alpen_vertex_common::logging;
 
 fn main() {
     logging::init();

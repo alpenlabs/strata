@@ -1,16 +1,16 @@
 [package]
-name = "alpen-nero-sequencer"
+name = "alpen-vertex-sequencer"
 version = "0.1.0"
 edition = "2021"
 
 [[bin]]
-name = "alpen-nero-sequencer"
+name = "alpen-vertex-sequencer"
 path = "src/main.rs"
 
 [dependencies]
-alpen-nero-common = { workspace = true }
-alpen-nero-primitives = { workspace = true }
-alpen-nero-rpc-api = { workspace = true }
+alpen-vertex-common = { workspace = true }
+alpen-vertex-primitives = { workspace = true }
+alpen-vertex-rpc-api = { workspace = true }
 
 reth-ipc = { workspace = true }
 reth-rpc-api = { workspace = true } 

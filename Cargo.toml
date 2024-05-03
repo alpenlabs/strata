@@ -13,9 +13,9 @@ default-members = [
 resolver = "2"
 
 [workspace.dependencies]
-alpen-nero-common = { path = "crates/common" }
-alpen-nero-primitives = { path = "crates/primitives" }
-alpen-nero-rpc-api = { path = "crates/rpc/api" }
+alpen-vertex-common = { path = "crates/common" }
+alpen-vertex-primitives = { path = "crates/primitives" }
+alpen-vertex-rpc-api = { path = "crates/rpc/api" }
 
 jsonrpsee = "0.22"
 jsonrpsee-core = "0.22"
