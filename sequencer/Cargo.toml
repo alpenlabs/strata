@@ -9,5 +9,9 @@ path = "src/main.rs"
 
 [dependencies]
 alpen-nero-common = { workspace = true }
+alpen-nero-primitives = { workspace = true }
+alpen-nero-rpc-api = { workspace = true }
 
+reth-ipc = { workspace = true }
+reth-rpc-api = { workspace = true } 
 tracing = { workspace = true }

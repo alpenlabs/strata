@@ -1,6 +1,8 @@
 [workspace]
 members = [
         "crates/common",
+        "crates/primitives",
+        "crates/rpc/api",
         "sequencer",
 ]
 
@@ -12,6 +14,14 @@ resolver = "2"
 
 [workspace.dependencies]
 alpen-nero-common = { path = "crates/common" }
+alpen-nero-primitives = { path = "crates/primitives" }
+alpen-nero-rpc-api = { path = "crates/rpc/api" }
 
+jsonrpsee = "0.22"
+jsonrpsee-core = "0.22"
+jsonrpsee-types = "0.22"
+reth-ipc = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.2.0-beta.6" }
+reth-revm = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.2.0-beta.6" }
+reth-rpc-api = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.2.0-beta.6" }
 tracing = "0.1"
 tracing-subscriber = "0.3"

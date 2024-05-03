@@ -1,0 +1,7 @@
+[package]
+name = "alpen-nero-rpc-api"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+jsonrpsee = { workspace = true, features = ["server", "macros"] }
