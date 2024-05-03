@@ -1,0 +1,13 @@
+[package]
+name = "alpen-nero-sequencer"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "alpen-nero-sequencer"
+path = "src/main.rs"
+
+[dependencies]
+alpen-nero-common = { workspace = true }
+
+tracing = { workspace = true }
