@@ -1,8 +1,10 @@
 [workspace]
 members = [
         "crates/common",
+        "crates/consensus-logic", "crates/db", "crates/evmexec",
         "crates/primitives",
         "crates/rpc/api",
+        "crates/state",
         "sequencer",
 ]
 
@@ -21,6 +23,7 @@ async-trait = "0.1"
 jsonrpsee = "0.22"
 jsonrpsee-core = "0.22"
 jsonrpsee-types = "0.22"
+reth-db = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.2.0-beta.6" }
 reth-ipc = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.2.0-beta.6" }
 reth-primitives = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.2.0-beta.6" }
 reth-revm = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.2.0-beta.6" }
