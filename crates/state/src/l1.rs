@@ -14,3 +14,18 @@ pub struct L1HeaderPayload {
     /// Serialized header.  For Bitcoin this is always 80 bytes.
     buf: Vec<u8>,
 }
+
+/// Merkle proof for a TXID within a block.
+// TODO rework this, make it possible to generate proofs, etc.
+#[derive(Clone, Debug)]
+pub struct L1TxProof {
+    position: u32,
+    cohashes: Vec<Buf32>,
+}
+
+/// Tx body with a proof.
+#[derive(Clone, Debug)]
+pub struct L1Tx {
+    proof: L1TxProof,
+    tx: Vec<u8>,
+}
