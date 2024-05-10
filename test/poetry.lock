@@ -1,0 +1,22 @@
+[[package]]
+name = "flexitest"
+version = "0.1.0"
+description = "Flexible functional test framework for multi-agent scenarios"
+category = "main"
+optional = false
+python-versions = "^3.10"
+develop = false
+
+[package.source]
+type = "git"
+url = "https://codeberg.org/treyd/flexitest.git"
+reference = "master"
+resolved_reference = "e083cdbfb0c4dbdad994b6f4fa4f686725073181"
+
+[metadata]
+lock-version = "1.1"
+python-versions = "^3.10"
+content-hash = "f3db78e02633ed1639b97a2cdfdedbcfe0dfbbeb0263d3efdae98f0da9d17cd3"
+
+[metadata.files]
+flexitest = []

@@ -1,6 +1,15 @@
 # Vertex Functional Tests
 
-Tests will be added here when I split out the test framework from a project I'm
-working on into a standalone library so I can relicense it as MIT and we can use
-it.  Wait a couple of weeks.  Maybe we'll decide to take a different path in the
-meantime.
+Tests will be added here when we have more functionality to test.
+
+We use Poetry for managing the test dependencies.  Make sure you have that
+installed along with Python 3.10 or higher.
+
+## Running tests
+
+```
+poetry shell
+./entry.py
+```
+
+The test harness script will be extended with more functionality as we need it.
