@@ -1,10 +1,13 @@
 [workspace]
 members = [
         "crates/common",
-        "crates/consensus-logic", "crates/db", "crates/evmexec",
+        "crates/consensus-logic",
+	"crates/db",
+	"crates/evmexec",
         "crates/primitives",
         "crates/rpc/api",
         "crates/state",
+	"crates/vtxjmt",
         "sequencer",
 ]
 
