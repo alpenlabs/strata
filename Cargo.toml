@@ -22,8 +22,10 @@ resolver = "2"
 
 [workspace.dependencies]
 alpen-vertex-common = { path = "crates/common" }
+alpen-vertex-mmr = { path = "crates/util/mmr" }
 alpen-vertex-primitives = { path = "crates/primitives" }
 alpen-vertex-rpc-api = { path = "crates/rpc/api" }
+alpen-vertex-state = { path = "crates/state" }
 
 async-trait = "0.1"
 jsonrpsee = "0.22"

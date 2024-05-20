@@ -4,9 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+alpen-vertex-state = { workspace = true }
+alpen-vertex-primitives = { workspace = true }
+alpen-vertex-mmr = { workspace = true }
+
 reth-db = { workspace = true }
 rocksdb = { workspace = true }
 thiserror = { workspace = true }
-
-alpen-vertex-state = { workspace = true }
-alpen-vertex-primitives = { workspace = true }

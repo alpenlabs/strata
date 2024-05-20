@@ -1,6 +1,7 @@
 //! Trait definitions for low level database interfaces.  This borrows some of
 //! its naming conventions from reth.
 
+use alpen_vertex_mmr::CompactMmr;
 use alpen_vertex_primitives::{l1::*, prelude::*};
 use alpen_vertex_state::consensus::ConsensusState;
 use alpen_vertex_state::sync_event::{SyncAction, SyncEvent};
@@ -24,14 +25,19 @@ pub trait Database {
 /// Storage interface to control our view of L1 data.
 pub trait L1DataStore {
     /// Atomically extends the chain with a new block, providing the manifest
-    /// and a list of transactions we find interesting.
+    /// and a list of transactions we find interesting.  Returns error if
+    /// provided out-of-order.
     fn put_block_data(&self, idx: u64, mf: L1BlockManifest, txs: Vec<L1Tx>) -> DbResult<()>;
+
+    /// Stores an MMR checkpoint so we have to query less far back.  If the
+    /// provided height does not match the entries in the MMR, will return an
+    /// error.
+    fn put_mmr_checkpoint(&self, idx: u64, mmr: CompactMmr) -> DbResult<()>;
 
     /// Resets the L1 chain tip to the specified block index.  The provided
     /// index will be the new chain tip that we store.
     fn revert_to_height(&self, idx: u64) -> DbResult<()>;
 
-    // TODO MMR checkpointing
     // TODO DA scraping storage
 }
 
@@ -43,21 +49,29 @@ pub trait L1DataProvider {
     /// Gets the block manifest for a block index.
     fn get_block_manifest(&self, idx: u64) -> DbResult<L1BlockManifest>;
 
+    /// Returns a half-open interval of block hashes, if we have all of them
+    /// present.  Otherwise, returns error.
+    fn get_blockid_range(&self, start_idx: u64, end_idx: u64) -> DbResult<Vec<Buf32>>;
+
     /// Gets the interesting txs we stored in a block.
-    fn get_block_txs(&self, idx: u64) -> DbResult<Vec<L1TxRef>>;
+    fn get_block_txs(&self, idx: u64) -> DbResult<Option<Vec<L1TxRef>>>;
 
-    /// Gets the tx with proof given a tx ref.
-    fn get_tx(&self, tx_ref: L1TxRef) -> DbResult<L1Tx>;
+    /// Gets the tx with proof given a tx ref, if present.
+    fn get_tx(&self, tx_ref: L1TxRef) -> DbResult<Option<L1Tx>>;
 
-    // TODO MMR queries
+    /// Gets the last MMR checkpoint we stored before the given block height.
+    /// Up to the caller to advance the MMR the rest of the way to the desired
+    /// state.
+    fn get_last_mmr_to(&self, idx: u64) -> DbResult<Option<CompactMmr>>;
+
     // TODO DA queries
 }
 
 /// Describes an L1 block and associated data that we need to keep around.
 #[derive(Clone, Debug)]
 pub struct L1BlockManifest {
-    /// Block ID, kept here so we don't have to be aware of the hash function
-    /// here.
+    /// Block hash/ID, kept here so we don't have to be aware of the hash function
+    /// here.  This is what we use in the MMR.
     blockid: Buf32,
 
     /// Block header and whatever additional data we might want to query.

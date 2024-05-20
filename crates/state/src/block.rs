@@ -1,6 +1,7 @@
+use alpen_vertex_primitives::l1::L1Tx;
 use alpen_vertex_primitives::prelude::*;
 
-use crate::l1::{L1HeaderPayload, L1Tx};
+use crate::l1::L1HeaderPayload;
 
 /// ID of an L2 block, usually the hash of its root header.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
