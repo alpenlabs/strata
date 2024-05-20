@@ -5,3 +5,8 @@ edition = "2021"
 
 [dependencies]
 reth-db = { workspace = true }
+rocksdb = { workspace = true }
+thiserror = { workspace = true }
+
+alpen-vertex-state = { workspace = true }
+alpen-vertex-primitives = { workspace = true }
