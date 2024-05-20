@@ -3,6 +3,7 @@
 
 use alpen_vertex_mmr::CompactMmr;
 use alpen_vertex_primitives::{l1::*, prelude::*};
+use alpen_vertex_state::block::{L2Block, L2BlockId};
 use alpen_vertex_state::consensus::ConsensusState;
 use alpen_vertex_state::sync_event::{SyncAction, SyncEvent};
 
@@ -14,6 +15,8 @@ use crate::errors::*;
 pub trait Database {
     type L1Store: L1DataStore;
     type L1Prov: L1DataProvider;
+    type L2Store: L2DataStore;
+    type L2Prov: L2DataProvider;
     type SeStore: SyncEventStore;
     type SeProv: SyncEventProvider;
     type CsStore: ConsensusStateStore;
@@ -101,10 +104,13 @@ pub trait SyncEventStore {
 /// Provider to query sync events.  This does not provide notifications, that
 /// should be handled at a higher level.
 pub trait SyncEventProvider {
-    /// Returns the sync event, if we have one at the given index.
+    /// Returns the index of the most recently written sync event.
+    fn get_last_idx(&self) -> DbResult<u64>;
+
+    /// Gets the sync event with some index, if it exists.x
     fn get_sync_event(&self, idx: u64) -> DbResult<Option<SyncEvent>>;
 
-    /// Returns the unix timestamp that a sync event was inserted.
+    /// Gets the unix millis timestamp that a sync event was inserted.
     fn get_event_timestamp(&self, idx: u64) -> DbResult<Option<u64>>;
 }
 
@@ -119,6 +125,10 @@ pub trait ConsensusStateStore {
 }
 
 pub trait ConsensusStateProvider {
+    /// Gets the idx of the last written state.  Or returns error if a bootstrap
+    /// state has not been written yet.
+    fn get_last_idx(&self) -> DbResult<u64>;
+
     /// Gets the output consensus state for some input index.
     fn get_consensus_state(&self, idx: u64) -> DbResult<Option<ConsensusOutput>>;
 
@@ -136,4 +146,26 @@ pub struct ConsensusOutput {
 
 impl ConsensusOutput {
     // TODO accessors as needed
+}
+
+/// L2 data store for CL blocks.  Does not store anything about what we think
+/// the L2 chain tip is, that's controlled by the consensus state.
+pub trait L2DataStore {
+    /// Stores an L2 block, does not care about the block height of the L2 block.
+    fn put_block_data(&self, block: L2Block) -> DbResult<()>;
+
+    /// Tries to delete an L2 block from the store, returning if it really
+    /// existed or not.  This should only be used for blocks well before some
+    /// buried L1 finalization horizon.
+    fn del_block_data(&self, id: L2BlockId) -> DbResult<bool>;
+}
+
+pub trait L2DataProvider {
+    /// Gets the L2 block by its ID, if we have it.
+    fn get_block_data(&self, id: L2BlockId) -> DbResult<Option<L2Block>>;
+
+    /// Gets the L2 block IDs that we have at some height, in case there's more
+    /// than one on competing forks.
+    // TODO do we even want to permit this as being a possible thing?
+    fn get_blocks_at_height(&self, idx: u64) -> DbResult<Vec<L2BlockId>>;
 }
