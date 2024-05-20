@@ -5,3 +5,4 @@ edition = "2021"
 
 [dependencies]
 reth-primitives = { workspace = true }
+borsh = { workspace = true }

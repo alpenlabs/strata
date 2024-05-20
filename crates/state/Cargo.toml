@@ -8,3 +8,4 @@ edition = "2021"
 
 [dependencies]
 alpen-vertex-primitives = { workspace = true }
+borsh = { workspace = true }
