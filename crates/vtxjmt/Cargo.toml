@@ -4,4 +4,18 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-jmt = "0.10.0"
+# Dependencies maintained by Sovereign
+jmt = { git = "https://github.com/penumbra-zone/jmt.git", rev = "1d007e11cb68aa5ca13e9a5af4a12e6439d5f7b6" }
+rockbound = { git = "https://github.com/sovereign-Labs/rockbound", rev = "6febf63f61bc775324b96dc1d1a0290b8a3d9e41" }
+
+# External dependencies
+anyhow = "1.0.86"
+bincode = "1.3.3"
+rocksdb = { version = "0.21.0", features = ["lz4"] }
+borsh = { version = "0.10.3", default-features = true, features = ["bytes", "rc"] }
+serde = { workspace = true }
+byteorder = "1.5.0"
+
+[dev-dependencies]
+tempfile = "3.10.1"
+sha2 = "0.10.8"
