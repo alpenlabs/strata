@@ -1,3 +1,4 @@
+use rockbound::CodecError;
 use thiserror::Error;
 
 /// Simple result type used across database interface.
@@ -23,6 +24,12 @@ pub enum DbError {
 
 impl From<anyhow::Error> for DbError {
     fn from(value: anyhow::Error) -> Self {
+        Self::Other(value.to_string())
+    }
+}
+
+impl From<CodecError> for DbError {
+    fn from(value: CodecError) -> Self {
         Self::Other(value.to_string())
     }
 }

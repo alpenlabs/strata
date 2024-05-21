@@ -1,4 +1,6 @@
-use rockbound::{Schema, SchemaBatch, DB};
+use anyhow::anyhow;
+use reth_db::table::Encode;
+use rockbound::{schema::KeyEncoder, Schema, SchemaBatch, DB};
 use rocksdb::{Options, ReadOptions};
 use std::path::Path;
 
@@ -20,9 +22,6 @@ const DB_NAME: &str = "l1_db";
 
 pub struct L1Db {
     db: DB,
-    block_schema: L1BlockSchema,
-    txn_schema: TxnSchema,
-    mmr_schema: MmrSchema,
 }
 
 fn get_db_opts() -> Options {
@@ -43,9 +42,6 @@ impl L1Db {
         ];
         let store = Self {
             db: DB::open(path, DB_NAME, column_families, &db_opts)?,
-            block_schema: L1BlockSchema,
-            txn_schema: TxnSchema,
-            mmr_schema: MmrSchema,
         };
         Ok(store)
     }
@@ -98,18 +94,52 @@ impl L1DataStore for L1Db {
     }
 }
 
-// TODO: Data provider should have readonly db instance. L1Db can write to it as well
+// TODO: Data provider should have readonly db instance. Currently, L1Db has write access, which is
+// not desiarable for provider implementation
 impl L1DataProvider for L1Db {
-    fn get_tx(&self, tx_ref: alpen_vertex_primitives::l1::L1TxRef) -> DbResult<Option<L1Tx>> {
-        todo!()
+    fn get_tx(&self, tx_ref: L1TxRef) -> DbResult<Option<L1Tx>> {
+        let (block_height, txindex) = tx_ref.into();
+        let tx = self
+            .db
+            .get::<L1BlockSchema>(&(block_height as u64))
+            .and_then(|mf_opt| match mf_opt {
+                Some(mf) => {
+                    let txs_opt = self.db.get::<TxnSchema>(&mf.block_hash())?;
+                    let tx = txs_opt.and_then(|txs| txs.get(txindex as usize).cloned());
+                    Ok(tx)
+                }
+                None => Err(anyhow!("Cound not find")),
+            });
+        Ok(tx?)
     }
 
     fn get_chain_tip(&self) -> DbResult<u64> {
-        todo!()
+        let mut iterator = self.db.iter::<L1BlockSchema>()?.into_iter().rev();
+        if let Some(res) = iterator.next() {
+            let (tip, _) = res?.into_tuple();
+            return Ok(tip);
+        } else {
+            return Err(DbError::Other("Could not find the tip".to_string()));
+        }
     }
 
     fn get_block_txs(&self, idx: u64) -> DbResult<Option<Vec<L1TxRef>>> {
-        todo!()
+        let txs = self
+            .db
+            .get::<L1BlockSchema>(&idx)
+            .and_then(|mf_opt| match mf_opt {
+                Some(mf) => {
+                    let txs_opt = self.db.get::<TxnSchema>(&mf.block_hash())?;
+                    Ok(txs_opt.map(|txs| {
+                        txs.into_iter()
+                            .enumerate()
+                            .map(|(i, _)| L1TxRef::from((idx.clone().into(), i as u32)))
+                            .collect()
+                    }))
+                }
+                None => Err(anyhow!("Cound not find block txns")),
+            });
+        Ok(txs?)
     }
 
     fn get_last_mmr_to(&self, idx: u64) -> DbResult<Option<CompactMmr>> {
@@ -117,10 +147,21 @@ impl L1DataProvider for L1Db {
     }
 
     fn get_blockid_range(&self, start_idx: u64, end_idx: u64) -> DbResult<Vec<Buf32>> {
-        todo!()
+        let mut options = ReadOptions::default();
+        options.set_iterate_lower_bound(KeyEncoder::<L1BlockSchema>::encode_key(&start_idx)?);
+        options.set_iterate_lower_bound(KeyEncoder::<L1BlockSchema>::encode_key(&end_idx)?);
+
+        let result = self
+            .db
+            .iter_with_opts::<L1BlockSchema>(options)?
+            .map(|item_result| item_result.map(|item| item.into_tuple().1.block_hash()))
+            .collect::<Result<Vec<Buf32>, anyhow::Error>>();
+        Ok(result?)
     }
 
     fn get_block_manifest(&self, idx: u64) -> DbResult<L1BlockManifest> {
-        todo!()
+        self.db
+            .get::<L1BlockSchema>(&idx)?
+            .ok_or(DbError::Other("Could not find block manifest".to_string()))
     }
 }
