@@ -6,8 +6,9 @@ use alpen_vertex_primitives::{l1::*, prelude::*};
 use alpen_vertex_state::block::{L2Block, L2BlockId};
 use alpen_vertex_state::consensus::{ConsensusState, ConsensusWrite};
 use alpen_vertex_state::sync_event::{SyncAction, SyncEvent};
+use borsh::{BorshDeserialize, BorshSerialize};
 
-use crate::errors::*;
+use crate::DbResult;
 
 /// Common database interface that we can parameterize worker tasks over if
 /// parameterizing them over each individual trait gets cumbersome or if we need
@@ -71,7 +72,7 @@ pub trait L1DataProvider {
 }
 
 /// Describes an L1 block and associated data that we need to keep around.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct L1BlockManifest {
     /// Block hash/ID, kept here so we don't have to be aware of the hash function
     /// here.  This is what we use in the MMR.
@@ -87,7 +88,9 @@ pub struct L1BlockManifest {
 }
 
 impl L1BlockManifest {
-    // TODO accessors as needed
+    pub fn block_hash(&self) -> Buf32 {
+        self.blockid
+    }
 }
 
 /// Store to write new sync events.

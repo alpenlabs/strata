@@ -1,7 +1,6 @@
 use thiserror::Error;
 
 /// Simple result type used across database interface.
-pub type DbResult<T> = Result<T, DbError>;
 
 #[derive(Debug, Error)]
 pub enum DbError {
@@ -20,4 +19,10 @@ pub enum DbError {
 
     #[error("{0}")]
     Other(String),
+}
+
+impl From<anyhow::Error> for DbError {
+    fn from(value: anyhow::Error) -> Self {
+        Self::Other(value.to_string())
+    }
 }
