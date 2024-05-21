@@ -2,7 +2,7 @@
 
 use core::fmt::Debug;
 
-use borsh::maybestd::io::Cursor;
+use std::io::Cursor;
 use borsh::{BorshDeserialize, BorshSerialize};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use jmt::storage::{NibblePath, Node, NodeKey};
@@ -68,7 +68,7 @@ impl<N: Namespace> Schema for JmtNodes<N> {
 
 impl<N: Namespace> KeyEncoder<KeyHashToKey<N>> for [u8; 32] {
     fn encode_key(&self) -> Result<Vec<u8>, CodecError> {
-        BorshSerialize::try_to_vec(self).map_err(Into::into)
+        borsh::to_vec(self).map_err(Into::into)
     }
 }
 
@@ -80,7 +80,7 @@ impl<N: Namespace> KeyDecoder<KeyHashToKey<N>> for [u8; 32] {
 
 impl<N: Namespace> ValueCodec<KeyHashToKey<N>> for SchemaKey {
     fn encode_value(&self) -> Result<Vec<u8>, CodecError> {
-        BorshSerialize::try_to_vec(self).map_err(Into::into)
+        borsh::to_vec(self).map_err(Into::into)
     }
 
     fn decode_value(data: &[u8]) -> Result<Self, CodecError> {
@@ -117,7 +117,7 @@ impl<N: Namespace> KeyDecoder<JmtNodes<N>> for NodeKey {
 
 impl<N: Namespace> ValueCodec<JmtNodes<N>> for Node {
     fn encode_value(&self) -> Result<Vec<u8>, CodecError> {
-        self.try_to_vec().map_err(CodecError::from)
+        borsh::to_vec(self).map_err(CodecError::from)
     }
 
     fn decode_value(data: &[u8]) -> Result<Self, CodecError> {
@@ -156,7 +156,7 @@ impl<N: Namespace> KeyDecoder<JmtValues<N>> for (SchemaKey, Version) {
 
 impl<N: Namespace> ValueCodec<JmtValues<N>> for Option<SchemaValue> {
     fn encode_value(&self) -> Result<Vec<u8>, CodecError> {
-        self.try_to_vec().map_err(CodecError::from)
+        borsh::to_vec(self).map_err(CodecError::from)
     }
 
     fn decode_value(data: &[u8]) -> Result<Self, CodecError> {
