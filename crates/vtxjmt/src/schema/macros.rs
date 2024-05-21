@@ -25,33 +25,6 @@
 //! Module Accessory State Table:
 //! - `(ModuleIdBytes, Key) -> Value`
 
-use borsh::{maybestd, BorshDeserialize, BorshSerialize};
-use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use jmt::Version;
-use rockbound::schema::{ColumnFamilyName, KeyDecoder, KeyEncoder, ValueCodec};
-use rockbound::{CodecError, SeekKeyEncoder};
-
-use super::types::{
-    AccessoryKey, AccessoryStateValue, BatchNumber, DbHash, EventNumber, ProofUniqueId, SlotNumber,
-    StoredSlot, TxNumber,
-};
-
-/* Other tables used by the Rollup */
-
-/// A list of all tables used by the LedgerDb. These tables store rollup "history" - meaning
-/// transaction, events, receipts, etc.
-pub const LEDGER_TABLES: &[ColumnFamilyName] = &[
-    SlotByNumber::table_name(),
-    SlotByHash::table_name(),
-    BatchByHash::table_name(),
-    TxByHash::table_name(),
-];
-
-/// A list of all tables used by the AccessoryDB. These tables store
-/// "accessory" state only accessible from a native execution context, to be
-/// used for JSON-RPC and other tooling.
-pub const ACCESSORY_TABLES: &[ColumnFamilyName] = &[ModuleAccessoryState::table_name()];
-
 /// Macro to define a table that implements [`rockbound::Schema`].
 /// `KeyCodec<Schema>` and `ValueCodec<Schema>` must be implemented separately.
 ///
@@ -194,70 +167,4 @@ macro_rules! define_table_with_seek_key_codec {
 
         impl_borsh_value_codec!($table_name, $value);
     };
-}
-
-define_table_with_seek_key_codec!(
-    /// The primary source for slot data
-    (SlotByNumber) SlotNumber => StoredSlot
-);
-
-define_table_with_default_codec!(
-    /// A "secondary index" for slot data by hash
-    (SlotByHash) DbHash => SlotNumber
-);
-
-define_table_with_default_codec!(
-    /// A "secondary index" for batch data by hash
-    (BatchByHash) DbHash => BatchNumber
-);
-
-define_table_with_seek_key_codec!(
-    /// A "secondary index" for transaction data by hash
-    /// Since the same tx hash might appear in multiple blocks,
-    /// we store the tx number as part of the key.
-    (TxByHash) (DbHash, TxNumber) => ()
-);
-
-define_table_without_codec!(
-    /// Non-JMT state stored by a module for JSON-RPC use.
-    (ModuleAccessoryState) (AccessoryKey, Version) => AccessoryStateValue
-);
-
-impl KeyEncoder<ModuleAccessoryState> for (AccessoryKey, Version) {
-    fn encode_key(&self) -> rockbound::schema::Result<Vec<u8>> {
-        let mut out = Vec::with_capacity(self.0.len() + std::mem::size_of::<Version>() + 8);
-        self.0
-            .as_slice()
-            .serialize(&mut out)
-            .map_err(CodecError::from)?;
-        // Write the version in big-endian order so that sorting order is based on the most-significant bytes of the key
-        out.write_u64::<BigEndian>(self.1)
-            .expect("serialization to vec is infallible");
-        Ok(out)
-    }
-}
-
-impl SeekKeyEncoder<ModuleAccessoryState> for (AccessoryKey, Version) {
-    fn encode_seek_key(&self) -> rockbound::schema::Result<Vec<u8>> {
-        <(Vec<u8>, u64) as KeyEncoder<ModuleAccessoryState>>::encode_key(self)
-    }
-}
-
-impl KeyDecoder<ModuleAccessoryState> for (AccessoryKey, Version) {
-    fn decode_key(data: &[u8]) -> rockbound::schema::Result<Self> {
-        let mut cursor = maybestd::io::Cursor::new(data);
-        let key = Vec::<u8>::deserialize_reader(&mut cursor)?;
-        let version = cursor.read_u64::<BigEndian>()?;
-        Ok((key, version))
-    }
-}
-
-impl ValueCodec<ModuleAccessoryState> for AccessoryStateValue {
-    fn encode_value(&self) -> rockbound::schema::Result<Vec<u8>> {
-        self.try_to_vec().map_err(CodecError::from)
-    }
-
-    fn decode_value(data: &[u8]) -> rockbound::schema::Result<Self> {
-        Ok(Self::deserialize_reader(&mut &data[..])?)
-    }
 }
