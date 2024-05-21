@@ -10,7 +10,7 @@ rockbound = { git = "https://github.com/sovereign-Labs/rockbound", rev = "6febf6
 # External dependencies
 anyhow = "1.0.86"
 bincode = "1.3.3"
-borsh = "1.3.0"
+borsh = {workspace = true}
 jmt = "0.10.0"
 rocksdb = { version = "0.21.0", features = ["lz4"] }
 serde = { workspace = true }
