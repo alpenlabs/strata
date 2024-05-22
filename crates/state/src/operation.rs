@@ -18,6 +18,10 @@ impl ConsensusOutput {
         Self { writes, actions }
     }
 
+    pub fn into_parts(self) -> (Vec<ConsensusWrite>, Vec<SyncAction>) {
+        (self.writes, self.actions)
+    }
+
     // TODO accessors as needed
 }
 
@@ -51,6 +55,13 @@ pub enum SyncAction {
     /// Reverts out externally-facing tip to a new block ID, directing the EL
     /// engine to roll back changes.
     RevertTip(L2BlockId),
+
+    /// Marks an L2 blockid as invalid and we won't follow any chain that has
+    /// it, and will reject it from our peers.
+    // TODO possibly we should have some way of marking a block invalid through
+    // preliminary checks before writing a sync event we then have to check,
+    // this should be investigated more
+    MarkInvalid(L2BlockId),
 }
 
 /// Applies consensus writes to an existing consensus state instance.
