@@ -1,3 +1,4 @@
+use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use reth_primitives::alloy_primitives::FixedBytes;
 
@@ -26,5 +27,13 @@ impl BorshDeserialize for Buf32 {
         let mut array = [0u8; 32];
         reader.read_exact(&mut array)?;
         Ok(Self(array.into()))
+    }
+}
+
+impl<'a> Arbitrary<'a> for Buf32 {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let mut array = [0u8; 32];
+        u.fill_buffer(&mut array)?;
+        Ok(Buf32(array.into()))
     }
 }
