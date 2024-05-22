@@ -16,11 +16,23 @@ pub struct L1TxProof {
     cohashes: Vec<Buf32>,
 }
 
+impl L1TxProof {
+    pub fn new(position: u32, cohashes: Vec<Buf32>) -> Self {
+        Self { position, cohashes }
+    }
+}
+
 /// Tx body with a proof.
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct L1Tx {
     proof: L1TxProof,
     tx: Vec<u8>,
+}
+
+impl L1Tx {
+    pub fn new(proof: L1TxProof, tx: Vec<u8>) -> Self {
+        Self { proof, tx }
+    }
 }
 
 impl Into<(u64, u32)> for L1TxRef {

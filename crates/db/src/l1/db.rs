@@ -32,6 +32,12 @@ fn get_db_opts() -> Options {
 }
 
 impl L1Db {
+    // NOTE: It would be ideal to have just db handle as argument in the new method.
+    // However, I want to ensure correct column families being set for db handle. The L1Store
+    // implementation below uses *Schema column family name. And if db handle is to be passed from
+    // outside, there's no way which stops the handle to be initialized with wrong cf names.
+    // I tried fiddling with the types but could not succeed, so I've left it as is for now. Can be
+    // enhanced later.
     pub fn new(path: &Path) -> anyhow::Result<Self> {
         let db_opts = get_db_opts();
         let column_families = vec![
@@ -134,7 +140,7 @@ impl L1DataProvider for L1Db {
                     let tx = txs_opt.and_then(|txs| txs.get(txindex as usize).cloned());
                     Ok(tx)
                 }
-                None => Err(anyhow!("Cound not find")),
+                None => Err(anyhow!("Cound not find tx")),
             });
         Ok(tx?)
     }
@@ -169,7 +175,7 @@ impl L1DataProvider for L1Db {
     fn get_blockid_range(&self, start_idx: u64, end_idx: u64) -> DbResult<Vec<Buf32>> {
         let mut options = ReadOptions::default();
         options.set_iterate_lower_bound(KeyEncoder::<L1BlockSchema>::encode_key(&start_idx)?);
-        options.set_iterate_lower_bound(KeyEncoder::<L1BlockSchema>::encode_key(&end_idx)?);
+        options.set_iterate_upper_bound(KeyEncoder::<L1BlockSchema>::encode_key(&end_idx)?);
 
         let result = self
             .db
@@ -189,6 +195,7 @@ impl L1DataProvider for L1Db {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alpen_vertex_primitives::l1::L1TxProof;
     use arbitrary::{Arbitrary, Unstructured};
     use tempfile::TempDir;
 
@@ -204,7 +211,12 @@ mod tests {
 
     fn insert_block_data(idx: u64, db: &L1Db) -> (L1BlockManifest, Vec<L1Tx>) {
         let mf: L1BlockManifest = generate_arbitrary();
-        let txs: Vec<L1Tx> = (0..10).map(|_| generate_arbitrary()).collect();
+        // TODO: Use arbitrary generation for txs as well.
+        // The txs are unique just by the position of the proof
+        let txs: Vec<L1Tx> = (0..10)
+            .map(|i| L1Tx::new(L1TxProof::new(i, vec![]), vec![]))
+            .collect();
+
         // Insert block data
         let res = db.put_block_data(idx, mf.clone(), txs.clone());
         assert!(res.is_ok());
@@ -217,6 +229,8 @@ mod tests {
         let db = L1Db::new(temp_dir.path());
         assert!(db.is_ok());
     }
+
+    // TEST STORE METHODS
 
     #[test]
     fn test_insert_into_empty_db() {
@@ -251,28 +265,6 @@ mod tests {
     }
 
     #[test]
-    fn test_get_block_data() {
-        let mut db = setup_db();
-        let idx = 1;
-
-        // insert
-        let (mf, txs) = insert_block_data(idx, &mut db);
-
-        // fetch and check
-        let observed_mf = db.get_block_manifest(idx).expect("Could not fetch from db");
-        assert_eq!(observed_mf, mf);
-
-        // Fetch txs
-        for (i, tx) in txs.iter().enumerate() {
-            let tx_from_db = db
-                .get_tx((idx, i as u32).into())
-                .expect("Can't fetch from db")
-                .unwrap();
-            assert_eq!(*tx, tx_from_db, "Txns do not match at index");
-        }
-    }
-
-    #[test]
     fn test_revert_to_invalid_height() {
         let db = setup_db();
         // First insert a couple of manifests
@@ -287,10 +279,6 @@ mod tests {
             let res = db.revert_to_height(inv_h);
             assert!(res.is_err(), "Should fail to revert to height {}", inv_h);
         }
-
-        let valid_revert_height = 0;
-        let res = db.revert_to_height(valid_revert_height);
-        assert!(res.is_ok(), "Should succeed to revert to height 0");
     }
 
     #[test]
@@ -317,5 +305,110 @@ mod tests {
 
         let res = db.revert_to_height(3);
         assert!(res.is_ok(), "Should succeed to revert to non-zero height");
+    }
+
+    // TEST PROVIDER METHODS
+
+    #[test]
+    fn test_get_block_data() {
+        let mut db = setup_db();
+        let idx = 1;
+
+        // insert
+        let (mf, txs) = insert_block_data(idx, &mut db);
+
+        // fetch and check
+        let observed_mf = db.get_block_manifest(idx).expect("Could not fetch from db");
+        assert_eq!(observed_mf, mf);
+
+        // Fetch txs
+        for (i, tx) in txs.iter().enumerate() {
+            let tx_from_db = db
+                .get_tx((idx, i as u32).into())
+                .expect("Can't fetch from db")
+                .unwrap();
+            assert_eq!(*tx, tx_from_db, "Txns should match at index {}", i);
+        }
+    }
+
+    #[test]
+    fn test_get_tx() {
+        let db = setup_db();
+        let idx = 1; // block number
+                     // Insert a block
+        let (_, txns) = insert_block_data(idx, &db);
+        let txidx: u32 = 3; // some tx index
+        assert!(txns.len() > txidx as usize);
+        let tx_ref: L1TxRef = (1, txidx).into();
+        let tx = db.get_tx(tx_ref);
+        assert!(tx.as_ref().unwrap().is_some());
+        let tx = tx.unwrap().unwrap().clone();
+        assert_eq!(
+            tx,
+            *txns.get(txidx as usize).unwrap(),
+            "Should fetch correct transaction"
+        );
+        // Check txn at different index. It should not match
+        assert_ne!(
+            tx,
+            *txns.get(txidx as usize + 1).unwrap(),
+            "Txn at different index should not match"
+        );
+    }
+
+    #[test]
+    fn test_get_chain_tip() {
+        let db = setup_db();
+        assert_eq!(
+            db.get_chain_tip().unwrap(),
+            0,
+            "Chain tip of empty db should be zero"
+        );
+
+        // Insert some block data
+        insert_block_data(1, &db);
+        assert_eq!(db.get_chain_tip().unwrap(), 1);
+        insert_block_data(2, &db);
+        assert_eq!(db.get_chain_tip().unwrap(), 2);
+    }
+
+    #[test]
+    fn test_get_block_txs() {
+        let db = setup_db();
+
+        insert_block_data(1, &db);
+        insert_block_data(2, &db);
+        insert_block_data(3, &db);
+
+        let block_txs = db.get_block_txs(2).unwrap().unwrap();
+        let expected: Vec<_> = (0..10).map(|i| (2, i).into()).collect(); // 10 because insert_block_data inserts 10 txs
+        assert_eq!(block_txs, expected);
+    }
+
+    #[test]
+    fn test_get_blockid_invalid_range() {
+        let db = setup_db();
+
+        let _ = insert_block_data(1, &db);
+        let _ = insert_block_data(2, &db);
+        let _ = insert_block_data(3, &db);
+
+        let range = db.get_blockid_range(3, 1).unwrap();
+        assert_eq!(range.len(), 0);
+    }
+
+    #[test]
+    fn test_get_blockid_range() {
+        let db = setup_db();
+
+        let (mf1, _) = insert_block_data(1, &db);
+        let (mf2, _) = insert_block_data(2, &db);
+        let (mf3, _) = insert_block_data(3, &db);
+
+        let range = db.get_blockid_range(1, 4).unwrap();
+        assert_eq!(range.len(), 3);
+        for (exp, obt) in vec![mf1, mf2, mf3].iter().zip(range) {
+            assert_eq!(exp.block_hash(), obt);
+        }
     }
 }
