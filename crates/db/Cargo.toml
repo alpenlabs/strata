@@ -10,6 +10,12 @@ alpen-vertex-state = { workspace = true }
 anyhow = { workspace = true }
 borsh = { workspace = true }
 reth-db = { workspace = true }
-rockbound = { git = "https://github.com/sovereign-Labs/rockbound", tag = "v2.0.1" }
 rocksdb = { workspace = true }
 thiserror = { workspace = true }
+arbitrary = { workspace = true }
+
+# From sovereign-labs
+rockbound = { git = "https://github.com/sovereign-Labs/rockbound", tag = "v2.0.1" }
+
+[dev-dependencies]
+tempfile = "3.10.1"

@@ -1,5 +1,4 @@
 use anyhow::anyhow;
-use reth_db::table::Encode;
 use rockbound::{schema::KeyEncoder, Schema, SchemaBatch, DB};
 use rocksdb::{Options, ReadOptions};
 use std::path::Path;
@@ -45,13 +44,31 @@ impl L1Db {
         };
         Ok(store)
     }
+
+    pub fn latest_block_number(&self) -> DbResult<Option<u64>> {
+        let mut iterator = self.db.iter::<L1BlockSchema>()?;
+        iterator.seek_to_last();
+        let mut rev_iterator = iterator.rev();
+        if let Some(res) = rev_iterator.next() {
+            let (tip, _) = res?.into_tuple();
+            return Ok(Some(tip));
+        } else {
+            Ok(None)
+        }
+    }
 }
 
 impl L1DataStore for L1Db {
     fn put_block_data(&self, idx: u64, mf: L1BlockManifest, txs: Vec<L1Tx>) -> DbResult<()> {
-        // Atomically insert into Block table and txns table. First create batch and then write the
-        // batch
-        // TODO: check order and throw error accordingly
+        // If there is latest block then expect the idx to be 1 greater than the block number, else
+        // allow arbitrary block number to be inserted
+        match self.latest_block_number()? {
+            Some(num) if num + 1 != idx => {
+                println!("latest: {}, obtained: {}", num, idx);
+                return Err(DbError::OooInsert("Block store", idx));
+            }
+            _ => {}
+        }
         let mut batch = SchemaBatch::new();
         batch.put::<L1BlockSchema>(&idx, &mf)?;
         batch.put::<TxnSchema>(&mf.block_hash(), &txs)?;
@@ -68,9 +85,19 @@ impl L1DataStore for L1Db {
     fn revert_to_height(&self, idx: u64) -> DbResult<()> {
         // Get latest height, iterate backwards upto the idx, get blockhash and delete txns and
         // blockmanifest data at each iteration
-        let iterator = self.db.iter::<L1BlockSchema>()?.into_iter().rev();
+        let mut iterator = self.db.iter::<L1BlockSchema>()?;
+        iterator.seek_to_last();
+        let rev_iterator = iterator.rev();
+
+        let last_block_num = self.latest_block_number()?.unwrap_or(0);
+        if idx > last_block_num {
+            return Err(DbError::Other(
+                "Invalid block number to revert to".to_string(),
+            ));
+        }
+
         let mut batch = SchemaBatch::new();
-        for res in iterator {
+        for res in rev_iterator {
             let (height, blk_manifest) = res?.into_tuple();
 
             if height < idx {
@@ -94,8 +121,7 @@ impl L1DataStore for L1Db {
     }
 }
 
-// TODO: Data provider should have readonly db instance. Currently, L1Db has write access, which is
-// not desiarable for provider implementation
+// Note: Ideally Data Provider should ensure it has only read-only db access.
 impl L1DataProvider for L1Db {
     fn get_tx(&self, tx_ref: L1TxRef) -> DbResult<Option<L1Tx>> {
         let (block_height, txindex) = tx_ref.into();
@@ -114,13 +140,7 @@ impl L1DataProvider for L1Db {
     }
 
     fn get_chain_tip(&self) -> DbResult<u64> {
-        let mut iterator = self.db.iter::<L1BlockSchema>()?.into_iter().rev();
-        if let Some(res) = iterator.next() {
-            let (tip, _) = res?.into_tuple();
-            return Ok(tip);
-        } else {
-            return Err(DbError::Other("Could not find the tip".to_string()));
-        }
+        self.latest_block_number().map(|x| x.unwrap_or_default())
     }
 
     fn get_block_txs(&self, idx: u64) -> DbResult<Option<Vec<L1TxRef>>> {
@@ -142,7 +162,7 @@ impl L1DataProvider for L1Db {
         Ok(txs?)
     }
 
-    fn get_last_mmr_to(&self, idx: u64) -> DbResult<Option<CompactMmr>> {
+    fn get_last_mmr_to(&self, _idx: u64) -> DbResult<Option<CompactMmr>> {
         todo!()
     }
 
@@ -163,5 +183,139 @@ impl L1DataProvider for L1Db {
         self.db
             .get::<L1BlockSchema>(&idx)?
             .ok_or(DbError::Other("Could not find block manifest".to_string()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use arbitrary::{Arbitrary, Unstructured};
+    use tempfile::TempDir;
+
+    fn generate_arbitrary<'a, T: Arbitrary<'a> + Clone>() -> T {
+        let mut u = Unstructured::new(&[1, 2, 3]);
+        T::arbitrary(&mut u).expect("failed to generate arbitrary instance")
+    }
+
+    fn setup_db() -> L1Db {
+        let temp_dir = TempDir::new().expect("failed to create temp dir");
+        L1Db::new(temp_dir.path()).expect("failed to create L1Db")
+    }
+
+    fn insert_block_data(idx: u64, db: &L1Db) -> (L1BlockManifest, Vec<L1Tx>) {
+        let mf: L1BlockManifest = generate_arbitrary();
+        let txs: Vec<L1Tx> = (0..10).map(|_| generate_arbitrary()).collect();
+        // Insert block data
+        let res = db.put_block_data(idx, mf.clone(), txs.clone());
+        assert!(res.is_ok());
+        (mf, txs)
+    }
+
+    #[test]
+    fn test_initialization() {
+        let temp_dir = TempDir::new().expect("failed to create temp dir");
+        let db = L1Db::new(temp_dir.path());
+        assert!(db.is_ok());
+    }
+
+    #[test]
+    fn test_insert_into_empty_db() {
+        let db = setup_db();
+        let idx = 1;
+        insert_block_data(idx, &db);
+        drop(db);
+
+        // insert another block with arbitrary id
+        let db = setup_db();
+        let idx = 200011;
+        insert_block_data(idx, &db);
+    }
+
+    #[test]
+    fn test_insert_into_non_empty_db() {
+        let mut db = setup_db();
+        let idx = 1000;
+        insert_block_data(idx, &mut db); // first insertion
+
+        let invalid_idxs = vec![1, 2, 5000, 1000, 1002, 999]; // basically any id beside idx + 1
+        for invalid_idx in invalid_idxs {
+            let txs: Vec<L1Tx> = (0..10).map(|_| generate_arbitrary()).collect();
+            let res = db.put_block_data(invalid_idx, generate_arbitrary::<L1BlockManifest>(), txs);
+            assert!(res.is_err(), "Should fail to insert to db");
+        }
+
+        let valid_idx = idx + 1;
+        let txs: Vec<L1Tx> = (0..10).map(|_| generate_arbitrary()).collect();
+        let res = db.put_block_data(valid_idx, generate_arbitrary(), txs);
+        assert!(res.is_ok(), "Should successfully insert to db");
+    }
+
+    #[test]
+    fn test_get_block_data() {
+        let mut db = setup_db();
+        let idx = 1;
+
+        // insert
+        let (mf, txs) = insert_block_data(idx, &mut db);
+
+        // fetch and check
+        let observed_mf = db.get_block_manifest(idx).expect("Could not fetch from db");
+        assert_eq!(observed_mf, mf);
+
+        // Fetch txs
+        for (i, tx) in txs.iter().enumerate() {
+            let tx_from_db = db
+                .get_tx((idx, i as u32).into())
+                .expect("Can't fetch from db")
+                .unwrap();
+            assert_eq!(*tx, tx_from_db, "Txns do not match at index");
+        }
+    }
+
+    #[test]
+    fn test_revert_to_invalid_height() {
+        let db = setup_db();
+        // First insert a couple of manifests
+        let _ = insert_block_data(1, &db);
+        let _ = insert_block_data(2, &db);
+        let _ = insert_block_data(3, &db);
+        let _ = insert_block_data(4, &db);
+
+        // Try reverting to an invalid height, which should fail
+        let invalid_heights = [5, 6, 10];
+        for inv_h in invalid_heights {
+            let res = db.revert_to_height(inv_h);
+            assert!(res.is_err(), "Should fail to revert to height {}", inv_h);
+        }
+
+        let valid_revert_height = 0;
+        let res = db.revert_to_height(valid_revert_height);
+        assert!(res.is_ok(), "Should succeed to revert to height 0");
+    }
+
+    #[test]
+    fn test_revert_to_zero_height() {
+        let db = setup_db();
+        // First insert a couple of manifests
+        let _ = insert_block_data(1, &db);
+        let _ = insert_block_data(2, &db);
+        let _ = insert_block_data(3, &db);
+        let _ = insert_block_data(4, &db);
+
+        let res = db.revert_to_height(0);
+        assert!(res.is_ok(), "Should succeed to revert to height 0");
+    }
+
+    #[test]
+    fn test_revert_to_non_zero_height() {
+        let db = setup_db();
+        // First insert a couple of manifests
+        let _ = insert_block_data(1, &db);
+        let _ = insert_block_data(2, &db);
+        let _ = insert_block_data(3, &db);
+        let _ = insert_block_data(4, &db);
+
+        let res = db.revert_to_height(3);
+        assert!(res.is_ok(), "Should succeed to revert to non-zero height");
     }
 }

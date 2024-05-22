@@ -6,6 +6,7 @@ use alpen_vertex_primitives::{l1::*, prelude::*};
 use alpen_vertex_state::block::{L2Block, L2BlockId};
 use alpen_vertex_state::consensus::{ConsensusState, ConsensusWrite};
 use alpen_vertex_state::sync_event::{SyncAction, SyncEvent};
+use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::DbResult;
@@ -72,7 +73,7 @@ pub trait L1DataProvider {
 }
 
 /// Describes an L1 block and associated data that we need to keep around.
-#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct L1BlockManifest {
     /// Block hash/ID, kept here so we don't have to be aware of the hash function
     /// here.  This is what we use in the MMR.
@@ -88,6 +89,13 @@ pub struct L1BlockManifest {
 }
 
 impl L1BlockManifest {
+    pub fn new(blockid: Buf32, header: Vec<u8>, txs_root: Buf32) -> Self {
+        Self {
+            blockid,
+            header,
+            txs_root,
+        }
+    }
     pub fn block_hash(&self) -> Buf32 {
         self.blockid
     }
