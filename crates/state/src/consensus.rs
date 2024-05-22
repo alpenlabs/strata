@@ -52,6 +52,7 @@ impl ConsensusChainState {
     }
 }
 
+/// Transfer from L1 into L2.
 #[derive(Clone, Debug)]
 pub struct PendingDeposit {
     /// Deposit index.
@@ -64,6 +65,7 @@ pub struct PendingDeposit {
     dest: Vec<u8>,
 }
 
+/// Transfer from L2 back to L1.
 #[derive(Clone, Debug)]
 pub struct PendingWithdraw {
     /// Withdraw index.
@@ -91,4 +93,26 @@ pub enum ConsensusWrite {
     /// Queue an L2 block for verification.
     QueueL2Block(L2BlockId),
     // TODO
+}
+
+/// Applies consensus writes to an existing consensus state instance.
+// FIXME should this be moved to the consensus-logic crate?
+fn compute_new_state(
+    mut state: ConsensusState,
+    writes: impl Iterator<Item = ConsensusWrite>,
+) -> ConsensusState {
+    apply_writes_to_state(&mut state, writes);
+    state
+}
+
+fn apply_writes_to_state(state: &mut ConsensusState, writes: impl Iterator<Item = ConsensusWrite>) {
+    for w in writes {
+        use ConsensusWrite::*;
+        match w {
+            Replace(cs) => *state = *cs,
+            ReplaceChainState(ccs) => state.chain_state = *ccs,
+            QueueL2Block(blkid) => state.pending_l2_blocks.push_back(blkid),
+            // TODO
+        }
+    }
 }

@@ -174,6 +174,7 @@ pub trait L2DataStore {
     fn del_block_data(&self, id: L2BlockId) -> DbResult<bool>;
 }
 
+/// Data provider for L2 blocks.
 pub trait L2DataProvider {
     /// Gets the L2 block by its ID, if we have it.
     fn get_block_data(&self, id: L2BlockId) -> DbResult<Option<L2Block>>;
