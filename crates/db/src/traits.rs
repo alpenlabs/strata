@@ -8,6 +8,7 @@ use alpen_vertex_mmr::CompactMmr;
 use alpen_vertex_primitives::{l1::*, prelude::*};
 use alpen_vertex_state::block::{L2Block, L2BlockId};
 use alpen_vertex_state::consensus::{ConsensusState, ConsensusWrite};
+use alpen_vertex_state::operation::*;
 use alpen_vertex_state::sync_event::{SyncAction, SyncEvent};
 
 use crate::errors::*;
@@ -161,24 +162,6 @@ pub trait ConsensusStateProvider {
     /// saved checkpoint, which may be the same as the given idx (if we didn't
     /// receive any sync events since the last checkpoint.
     fn get_prev_checkpoint_at(&self, idx: u64) -> DbResult<u64>;
-}
-
-/// Output of a consensus state transition.  Both the consensus state writes and
-/// sync actions.
-#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
-pub struct ConsensusOutput {
-    writes: Vec<ConsensusWrite>,
-    actions: Vec<SyncAction>,
-}
-
-impl ConsensusOutput {
-    pub fn writes(&self) -> &Vec<ConsensusWrite> {
-        &self.writes
-    }
-
-    pub fn actions(&self) -> &Vec<SyncAction> {
-        &self.actions
-    }
 }
 
 /// L2 data store for CL blocks.  Does not store anything about what we think

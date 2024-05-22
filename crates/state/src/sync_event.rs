@@ -16,18 +16,3 @@ pub enum SyncEvent {
     /// Finished executing an L2 block with a status.
     L2BlockExec(L2BlockId, bool),
 }
-
-/// Actions the consensus state machine directs the node to take to update its
-/// own bookkeeping.  These should not be able to fail.
-#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
-pub enum SyncAction {
-    /// Directs the EL engine to try to check a block ID.
-    TryCheckBlock(L2BlockId),
-
-    /// Extends our externally-facing tip to a new block ID.
-    ExtendTip(L2BlockId),
-
-    /// Reverts out externally-facing tip to a new block ID, directing the EL
-    /// engine to roll back changes.
-    RevertTip(L2BlockId),
-}

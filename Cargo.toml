@@ -22,6 +22,7 @@ resolver = "2"
 
 [workspace.dependencies]
 alpen-vertex-common = { path = "crates/common" }
+alpen-vertex-db = { path = "crates/db" }
 alpen-vertex-mmr = { path = "crates/util/mmr" }
 alpen-vertex-primitives = { path = "crates/primitives" }
 alpen-vertex-rpc-api = { path = "crates/rpc/api" }
