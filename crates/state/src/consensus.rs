@@ -1,3 +1,7 @@
+//! Consensus types that track node behavior as we receive messages from the L1
+//! chain and the p2p network.  These will be expanded further as we actually
+//! implement the consensus logic.
+
 use std::collections::*;
 
 use alpen_vertex_primitives::buf::Buf64;
@@ -70,4 +74,21 @@ pub struct PendingWithdraw {
 
     /// Schnorr pubkey for the taproot output we're going to generate.
     dest: Buf64,
+}
+
+/// Describes possible writes to chain state that we can make.  We use this
+/// instead of directly modifying the chain state to reduce the volume of data
+/// that we have to clone and save to disk with each sync event.
+#[derive(Clone, Debug)]
+pub enum ConsensusWrite {
+    /// Completely replace the full state with a new instance.
+    Replace(Box<ConsensusState>),
+
+    /// Replace just the L2 blockchain consensus-layer state with a new
+    /// instance.
+    ReplaceChainState(Box<ConsensusChainState>),
+
+    /// Queue an L2 block for verification.
+    QueueL2Block(L2BlockId),
+    // TODO
 }
