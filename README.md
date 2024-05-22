@@ -16,10 +16,15 @@ at a future point, on the roadmap to decentralizing sequencing.
 
 These exist in `crates/`.
 
+* `btcio` - L1 reader/writer infra
 * `common` - utils for services
 * `consensus-logic` - consensus state machine impl
 * `db` - Database abstractions
+* `evmctl` - EL exec control infra
 * `evmexec` - utils relating to EVM execution via REVM
 * `primitives` - common types used throughout project, mostly re-exports
 * `rpc/api` - Alpen rollup RPC defs
 * `state` - type defs relating to rollup data strctures
+* `util/` - independent utility libraries
+  * `mmr` - "merkle mountain range" util
+* `vtxjmt` - extensions to JMT crate for our purposes
