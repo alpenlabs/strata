@@ -70,7 +70,6 @@ impl L1DataStore for L1Db {
         // allow arbitrary block number to be inserted
         match self.latest_block_number()? {
             Some(num) if num + 1 != idx => {
-                println!("latest: {}, obtained: {}", num, idx);
                 return Err(DbError::OooInsert("Block store", idx));
             }
             _ => {}
@@ -140,7 +139,7 @@ impl L1DataProvider for L1Db {
                     let tx = txs_opt.and_then(|txs| txs.get(txindex as usize).cloned());
                     Ok(tx)
                 }
-                None => Err(anyhow!("Cound not find tx")),
+                None => Ok(None),
             });
         Ok(tx?)
     }
@@ -185,10 +184,8 @@ impl L1DataProvider for L1Db {
         Ok(result?)
     }
 
-    fn get_block_manifest(&self, idx: u64) -> DbResult<L1BlockManifest> {
-        self.db
-            .get::<L1BlockSchema>(&idx)?
-            .ok_or(DbError::Other("Could not find block manifest".to_string()))
+    fn get_block_manifest(&self, idx: u64) -> DbResult<Option<L1BlockManifest>> {
+        Ok(self.db.get::<L1BlockSchema>(&idx)?)
     }
 }
 
@@ -317,9 +314,16 @@ mod tests {
         // insert
         let (mf, txs) = insert_block_data(idx, &mut db);
 
-        // fetch and check
+        // fetch non existent block
+        let non_idx = 200;
+        let observed_mf = db
+            .get_block_manifest(non_idx)
+            .expect("Could not fetch from db");
+        assert_eq!(observed_mf, None);
+
+        // fetch and check, existent block
         let observed_mf = db.get_block_manifest(idx).expect("Could not fetch from db");
-        assert_eq!(observed_mf, mf);
+        assert_eq!(observed_mf, Some(mf));
 
         // Fetch txs
         for (i, tx) in txs.iter().enumerate() {

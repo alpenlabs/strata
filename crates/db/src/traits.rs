@@ -52,7 +52,7 @@ pub trait L1DataProvider {
     fn get_chain_tip(&self) -> DbResult<u64>;
 
     /// Gets the block manifest for a block index.
-    fn get_block_manifest(&self, idx: u64) -> DbResult<L1BlockManifest>;
+    fn get_block_manifest(&self, idx: u64) -> DbResult<Option<L1BlockManifest>>;
 
     /// Returns a half-open interval of block hashes, if we have all of them
     /// present.  Otherwise, returns error.

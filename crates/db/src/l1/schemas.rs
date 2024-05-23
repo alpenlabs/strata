@@ -24,5 +24,5 @@ define_table_with_default_codec!(
 // Mmr Schema and corresponding codecs implementation
 define_table_with_default_codec!(
     /// A table to store L1 Headers mmr
-    (MmrSchema) u64 => CompactMmr // TODO: Properly define what the key should be
+    (MmrSchema) u64 => CompactMmr
 );
