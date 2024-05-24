@@ -1,14 +1,8 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
+//! Infrastructure for controlling EVM execution.  This operates on similar
+//! principles to the Ethereum engine API used for CL clients to control their
+//! corresponding EL client.
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+pub mod engine;
+pub mod messages;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+pub mod errors;
