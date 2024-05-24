@@ -1,3 +1,7 @@
+//! Consensus types that track node behavior as we receive messages from the L1
+//! chain and the p2p network.  These will be expanded further as we actually
+//! implement the consensus logic.
+
 use std::collections::*;
 
 use alpen_vertex_primitives::buf::Buf64;
@@ -48,6 +52,7 @@ impl ConsensusChainState {
     }
 }
 
+/// Transfer from L1 into L2.
 #[derive(Clone, Debug)]
 pub struct PendingDeposit {
     /// Deposit index.
@@ -60,6 +65,7 @@ pub struct PendingDeposit {
     dest: Vec<u8>,
 }
 
+/// Transfer from L2 back to L1.
 #[derive(Clone, Debug)]
 pub struct PendingWithdraw {
     /// Withdraw index.
@@ -70,4 +76,43 @@ pub struct PendingWithdraw {
 
     /// Schnorr pubkey for the taproot output we're going to generate.
     dest: Buf64,
+}
+
+/// Describes possible writes to chain state that we can make.  We use this
+/// instead of directly modifying the chain state to reduce the volume of data
+/// that we have to clone and save to disk with each sync event.
+#[derive(Clone, Debug)]
+pub enum ConsensusWrite {
+    /// Completely replace the full state with a new instance.
+    Replace(Box<ConsensusState>),
+
+    /// Replace just the L2 blockchain consensus-layer state with a new
+    /// instance.
+    ReplaceChainState(Box<ConsensusChainState>),
+
+    /// Queue an L2 block for verification.
+    QueueL2Block(L2BlockId),
+    // TODO
+}
+
+/// Applies consensus writes to an existing consensus state instance.
+// FIXME should this be moved to the consensus-logic crate?
+fn compute_new_state(
+    mut state: ConsensusState,
+    writes: impl Iterator<Item = ConsensusWrite>,
+) -> ConsensusState {
+    apply_writes_to_state(&mut state, writes);
+    state
+}
+
+fn apply_writes_to_state(state: &mut ConsensusState, writes: impl Iterator<Item = ConsensusWrite>) {
+    for w in writes {
+        use ConsensusWrite::*;
+        match w {
+            Replace(cs) => *state = *cs,
+            ReplaceChainState(ccs) => state.chain_state = *ccs,
+            QueueL2Block(blkid) => state.pending_l2_blocks.push_back(blkid),
+            // TODO
+        }
+    }
 }

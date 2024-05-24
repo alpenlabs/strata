@@ -4,7 +4,7 @@
 use alpen_vertex_mmr::CompactMmr;
 use alpen_vertex_primitives::{l1::*, prelude::*};
 use alpen_vertex_state::block::{L2Block, L2BlockId};
-use alpen_vertex_state::consensus::ConsensusState;
+use alpen_vertex_state::consensus::{ConsensusState, ConsensusWrite};
 use alpen_vertex_state::sync_event::{SyncAction, SyncEvent};
 
 use crate::errors::*;
@@ -107,14 +107,14 @@ pub trait SyncEventProvider {
     /// Returns the index of the most recently written sync event.
     fn get_last_idx(&self) -> DbResult<u64>;
 
-    /// Gets the sync event with some index, if it exists.x
+    /// Gets the sync event with some index, if it exists.
     fn get_sync_event(&self, idx: u64) -> DbResult<Option<SyncEvent>>;
 
     /// Gets the unix millis timestamp that a sync event was inserted.
     fn get_event_timestamp(&self, idx: u64) -> DbResult<Option<u64>>;
 }
 
-/// Writes consensus states
+/// Writes consensus updates and checkpoints.
 pub trait ConsensusStateStore {
     /// Writes a new consensus output for a given input index.  These input
     /// indexes correspond to indexes in [``SyncEventStore``] and
@@ -122,25 +122,39 @@ pub trait ConsensusStateStore {
     /// `idx` is 0) or if trying to overwrite a state, as this is almost
     /// certainly a bug.
     fn write_consensus_output(&self, idx: u64, output: ConsensusOutput) -> DbResult<()>;
+
+    /// Writes a new consensus checkpoint that we can cheaply resume from.  Will
+    /// error if trying to overwrite a state.
+    fn write_consensus_checkpoint(&self, idx: u64, state: ConsensusState) -> DbResult<()>;
 }
 
+/// Provides consensus state writes and checkpoints.
 pub trait ConsensusStateProvider {
     /// Gets the idx of the last written state.  Or returns error if a bootstrap
     /// state has not been written yet.
-    fn get_last_idx(&self) -> DbResult<u64>;
+    fn get_last_write_idx(&self) -> DbResult<u64>;
 
-    /// Gets the output consensus state for some input index.
-    fn get_consensus_state(&self, idx: u64) -> DbResult<Option<ConsensusOutput>>;
+    /// Gets the output consensus writes for some input index.
+    fn get_consensus_writes(&self, idx: u64) -> DbResult<Option<Vec<ConsensusWrite>>>;
 
     /// Gets the actions output from a consensus state transition.
     fn get_consensus_actions(&self, idx: u64) -> DbResult<Option<Vec<SyncAction>>>;
+
+    /// Gets the last consensus checkpoint idx.
+    fn get_last_checkpoint_idx(&self) -> DbResult<u64>;
+
+    /// Gets the idx of the last checkpoint up to the given input idx.  This is
+    /// the idx we should resume at when playing out consensus writes since the
+    /// saved checkpoint, which may be the same as the given idx (if we didn't
+    /// receive any sync events since the last checkpoint.
+    fn get_prev_checkpoint_at(&self, idx: u64) -> DbResult<u64>;
 }
 
-/// Output of a consensus state transition.  Both the consensus state and sync
-/// actions.
+/// Output of a consensus state transition.  Both the consensus state writes and
+/// sync actions.
 #[derive(Clone, Debug)]
 pub struct ConsensusOutput {
-    state: ConsensusState,
+    writes: Vec<ConsensusWrite>,
     actions: Vec<SyncAction>,
 }
 
@@ -160,6 +174,7 @@ pub trait L2DataStore {
     fn del_block_data(&self, id: L2BlockId) -> DbResult<bool>;
 }
 
+/// Data provider for L2 blocks.
 pub trait L2DataProvider {
     /// Gets the L2 block by its ID, if we have it.
     fn get_block_data(&self, id: L2BlockId) -> DbResult<Option<L2Block>>;
