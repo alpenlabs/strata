@@ -56,6 +56,12 @@ pub struct L2BlockHeader {
     signature: Buf64,
 }
 
+impl L2BlockHeader {
+    pub fn parent(&self) -> &L2BlockId {
+        &self.prev_block
+    }
+}
+
 /// Contains the additional payloads within the L2 block.
 #[derive(Clone, Debug)]
 pub struct L2BlockBody {

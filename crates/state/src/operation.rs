@@ -22,6 +22,14 @@ impl ConsensusOutput {
         (self.writes, self.actions)
     }
 
+    pub fn writes(&self) -> &[ConsensusWrite] {
+        &self.writes
+    }
+
+    pub fn actions(&self) -> &[SyncAction] {
+        &self.actions
+    }
+
     // TODO accessors as needed
 }
 
@@ -62,6 +70,9 @@ pub enum SyncAction {
     // preliminary checks before writing a sync event we then have to check,
     // this should be investigated more
     MarkInvalid(L2BlockId),
+
+    /// Finalizes a block, indicating that it won't be reverted.
+    FinalizeBlock(L2BlockId),
 }
 
 /// Applies consensus writes to an existing consensus state instance.

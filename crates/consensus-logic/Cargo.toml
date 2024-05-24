@@ -8,4 +8,5 @@ alpen-vertex-db = { workspace = true }
 alpen-vertex-state = { workspace = true }
 
 thiserror = { workspace = true }
+tokio = { workspace = true }
 tracing = { workspace = true }

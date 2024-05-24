@@ -1,6 +1,6 @@
 //! Consensus logic worker task.
 
-use std::sync::mpsc;
+use std::sync::{mpsc, Arc};
 
 use tracing::*;
 
@@ -12,7 +12,7 @@ use alpen_vertex_state::{
     sync_event::SyncEvent,
 };
 
-use crate::{errors::Error, message::Message, transition};
+use crate::{errors::Error, message::CsmMessage, transition};
 
 /// Mutatble worker state that we modify in the consensus worker task.
 ///
@@ -28,7 +28,7 @@ pub struct WorkerState<D: Database> {
     cur_state_idx: u64,
 
     /// Current consensus state we use when performing updates.
-    cur_consensus_state: ConsensusState,
+    cur_consensus_state: Arc<ConsensusState>,
 
     /// Current hard chain tip.
     cur_chain_tip: L2BlockId,
@@ -65,7 +65,7 @@ impl<D: Database> WorkerState<D> {
 /// Receives messages from channel to update consensus state with.
 fn consensus_worker_task<D: Database>(
     mut state: WorkerState<D>,
-    inp_msg_ch: mpsc::Receiver<Message>,
+    inp_msg_ch: mpsc::Receiver<CsmMessage>,
 ) -> Result<(), Error> {
     while let Some(msg) = inp_msg_ch.recv().ok() {
         if let Err(e) = process_msg(&mut state, &msg) {
@@ -78,9 +78,9 @@ fn consensus_worker_task<D: Database>(
     Ok(())
 }
 
-fn process_msg<D: Database>(state: &mut WorkerState<D>, msg: &Message) -> Result<(), Error> {
+fn process_msg<D: Database>(state: &mut WorkerState<D>, msg: &CsmMessage) -> Result<(), Error> {
     match msg {
-        Message::EventInput(idx) => {
+        CsmMessage::EventInput(idx) => {
             let ev = state
                 .get_sync_event(*idx)?
                 .ok_or(Error::MissingSyncEvent(*idx))?;
