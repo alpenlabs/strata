@@ -1,9 +1,11 @@
+use arbitrary::Arbitrary;
+use borsh::{BorshDeserialize, BorshSerialize};
 use alpen_vertex_primitives::prelude::*;
 
 use crate::block::L2BlockId;
 
 /// Sync event that updates our consensus state.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize)]
 pub enum SyncEvent {
     /// A new L2 block was posted to L1.
     L1BlockPosted(Vec<L2BlockId>),

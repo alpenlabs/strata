@@ -116,7 +116,7 @@ pub trait SyncEventStore {
 /// should be handled at a higher level.
 pub trait SyncEventProvider {
     /// Returns the index of the most recently written sync event.
-    fn get_last_idx(&self) -> DbResult<u64>;
+    fn get_last_idx(&self) -> DbResult<Option<u64>>;
 
     /// Gets the sync event with some index, if it exists.
     fn get_sync_event(&self, idx: u64) -> DbResult<Option<SyncEvent>>;
