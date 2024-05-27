@@ -59,6 +59,7 @@ impl ConsensusStateStore for CsDb {
     fn write_consensus_checkpoint(&self, idx: u64, state: alpen_vertex_state::consensus::ConsensusState) -> crate::DbResult<()> {
         todo!()
     }
+
 }
 
 impl ConsensusStateProvider for CsDb {
@@ -75,12 +76,19 @@ impl ConsensusStateProvider for CsDb {
     }
 
     fn get_consensus_writes(&self, idx: u64) -> crate::DbResult<Option<Vec<alpen_vertex_state::consensus::ConsensusWrite>>> {
-        todo!()
+        let output = self.db.get::<ConsensusStateSchema>(&idx)?;
+        match output {
+            Some(out) => Ok(Some(out.writes)),
+            None => Ok(None)
+        }
     }
 
-
     fn get_consensus_actions(&self, idx: u64) -> crate::DbResult<Option<Vec<alpen_vertex_state::sync_event::SyncAction>>> {
-        todo!()
+        let output = self.db.get::<ConsensusStateSchema>(&idx)?;
+        match output {
+            Some(out) => Ok(Some(out.actions)),
+            None => Ok(None)
+        }
     }
 
     fn get_last_checkpoint_idx(&self) -> crate::DbResult<u64> {

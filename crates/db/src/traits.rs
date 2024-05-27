@@ -165,8 +165,8 @@ pub trait ConsensusStateProvider {
 /// sync actions.
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct ConsensusOutput {
-    writes: Vec<ConsensusWrite>,
-    actions: Vec<SyncAction>,
+    pub writes: Vec<ConsensusWrite>,
+    pub actions: Vec<SyncAction>,
 }
 
 impl ConsensusOutput {
