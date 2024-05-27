@@ -2,7 +2,7 @@ use alpen_vertex_primitives::prelude::*;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 /// ID of an L1 block, usually the hash of its header.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, BorshSerialize, BorshDeserialize)]
 pub struct L1BlockId(Buf32);
 
 /// Represents a serialized L1 header.

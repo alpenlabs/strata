@@ -1,4 +1,5 @@
 use alpen_vertex_primitives::prelude::*;
+use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::block::L2BlockId;
 
@@ -18,7 +19,7 @@ pub enum SyncEvent {
 
 /// Actions the consensus state machine directs the node to take to update its
 /// own bookkeeping.  These should not be able to fail.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub enum SyncAction {
     /// Directs the EL engine to try to check a block ID.
     TryCheckBlock(L2BlockId),

@@ -4,9 +4,11 @@ use l1::schemas::{L1BlockSchema, MmrSchema, TxnSchema};
 use rockbound::{schema::ColumnFamilyName, Schema};
 
 pub mod errors;
-pub mod l1;
 pub mod macros;
 pub mod traits;
+
+pub mod cs;
+pub mod l1;
 
 pub type DbResult<T> = anyhow::Result<T, crate::errors::DbError>;
 
