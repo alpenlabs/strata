@@ -163,7 +163,7 @@ pub trait ConsensusStateProvider {
 
 /// Output of a consensus state transition.  Both the consensus state writes and
 /// sync actions.
-#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct ConsensusOutput {
     writes: Vec<ConsensusWrite>,
     actions: Vec<SyncAction>,

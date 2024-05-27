@@ -5,7 +5,7 @@ use rocksdb::{Options, ReadOptions};
 
 use std::path::Path;
 
-use crate::traits::{ConsensusStateProvider, ConsensusStateStore};
+use crate::{errors::DbError, traits::{ConsensusStateProvider, ConsensusStateStore}};
 
 use super::schemas::ConsensusStateSchema;
 
@@ -38,7 +38,22 @@ impl CsDb {
 
 impl ConsensusStateStore for CsDb {
     fn write_consensus_output(&self, idx: u64, output: crate::traits::ConsensusOutput) -> crate::DbResult<()> {
-        todo!()
+        match self.get_last_write_idx()? {
+            Some(last_idx) => {
+                if last_idx + 1 != idx {
+                    return Err(DbError::OooInsert("Consensus store", idx));
+                }
+            },
+            None => {
+                if idx != 1{
+                    return Err(DbError::OooInsert("Consensus store", idx));
+                }
+            }
+        }
+        let mut batch = SchemaBatch::new();
+        batch.put::<ConsensusStateSchema>(&idx, &output)?;
+        self.db.write_schemas(batch)?;
+        Ok(())
     }
 
     fn write_consensus_checkpoint(&self, idx: u64, state: alpen_vertex_state::consensus::ConsensusState) -> crate::DbResult<()> {
@@ -80,13 +95,21 @@ impl ConsensusStateProvider for CsDb {
 
 #[cfg(test)]
 mod tests {
+    use arbitrary::{Arbitrary, Unstructured};
     use tempfile::TempDir;
+
+    use crate::traits::ConsensusOutput;
 
     use super::*;
 
     fn setup_db() -> CsDb {
         let temp_dir = TempDir::new().expect("failed to create temp dir");
         CsDb::new(temp_dir.path()).expect("failed to create CsDb")
+    }
+
+    fn generate_arbitrary<'a, T: Arbitrary<'a> + Clone>() -> T {
+        let mut u = Unstructured::new(&[1, 2, 3]);
+        T::arbitrary(&mut u).expect("failed to generate arbitrary instance")
     }
 
     #[test]
@@ -101,6 +124,17 @@ mod tests {
         let db = setup_db();
         let idx = db.get_last_write_idx().unwrap();
         assert_eq!(idx, None);
+    }
+
+    #[test]
+    fn test_write_consensus_output() {
+        let output: ConsensusOutput = generate_arbitrary();
+        let db = setup_db();
+        let _ = db.write_consensus_output(1, output);
+
+        let idx = db.get_last_write_idx().unwrap().unwrap();
+        assert_eq!(idx, 1);
+
     }
 
 

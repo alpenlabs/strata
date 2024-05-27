@@ -53,3 +53,12 @@ impl<'a> Arbitrary<'a> for Buf32 {
         Ok(Buf32(array.into()))
     }
 }
+
+impl<'a> Arbitrary<'a> for Buf64 {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let mut array = [0u8; 64];
+        u.fill_buffer(&mut array)?;
+        Ok(Buf64(array.into()))
+    }
+}
+
