@@ -1,5 +1,5 @@
 use rockbound::{Schema, SchemaBatch, DB};
-use rocksdb::{Options};
+use rocksdb::Options;
 use std::path::Path;
 
 use alpen_vertex_state::sync_event::SyncEvent;
@@ -34,16 +34,26 @@ impl SeDb {
         };
         Ok(store)
     }
+
+    fn last_idx(&self) -> DbResult<Option<u64>> {
+        let mut iterator = self.db.iter::<SyncEventSchema>()?;
+        iterator.seek_to_last();
+        match iterator.rev().next() {
+            Some(res) => {
+                let (tip, _) = res?.into_tuple();
+                Ok(Some(tip))
+            },
+            None => Ok(None)
+        }
+    }
 }
 
 impl SyncEventStore for SeDb {
     fn write_sync_event(&self, ev: SyncEvent) -> DbResult<u64> {
-        let last_id = self.get_last_idx()?.unwrap_or_else(|| 0);
+        let last_id = self.get_last_idx()?.unwrap_or(0);
         let id = last_id + 1;
         let event = SyncEventWithTimestamp::new(ev);
-        let mut batch = SchemaBatch::new();
-        batch.put::<SyncEventSchema>(&id, &event)?;
-        self.db.write_schemas(batch)?;
+        self.db.put::<SyncEventSchema>(&id, &event)?;
         Ok(id)
     }
 
@@ -53,6 +63,7 @@ impl SyncEventStore for SeDb {
         // TODO: determine if the expectation behaviour for this is to clear early events or clear late events
         // The implementation is based for early events
         let mut batch = SchemaBatch::new();
+
         for res in iterator {
             let (id, _) = res?.into_tuple();
             if id > end_idx {
@@ -71,15 +82,7 @@ impl SyncEventStore for SeDb {
 
 impl SyncEventProvider for SeDb {
     fn get_last_idx(&self) -> DbResult<Option<u64>> {
-        let mut iterator = self.db.iter::<SyncEventSchema>()?;
-        iterator.seek_to_last();
-        match iterator.rev().next() {
-            Some(res) => {
-                let (tip, _) = res?.into_tuple();
-                Ok(Some(tip))
-            },
-            None => Ok(None)
-        }
+        self.last_idx()
     }
 
     fn get_sync_event(&self, idx: u64) -> DbResult<Option<SyncEvent>> {
@@ -131,7 +134,6 @@ mod tests {
         assert!(db.is_ok());
     }
 
-    // TEST STORE METHODS
     #[test]
     fn test_get_sync_event() {
         let db = setup_db();
