@@ -143,7 +143,7 @@ pub trait ConsensusStateStore {
 pub trait ConsensusStateProvider {
     /// Gets the idx of the last written state.  Or returns error if a bootstrap
     /// state has not been written yet.
-    fn get_last_write_idx(&self) -> DbResult<u64>;
+    fn get_last_write_idx(&self) -> DbResult<Option<u64>>;
 
     /// Gets the output consensus writes for some input index.
     fn get_consensus_writes(&self, idx: u64) -> DbResult<Option<Vec<ConsensusWrite>>>;
