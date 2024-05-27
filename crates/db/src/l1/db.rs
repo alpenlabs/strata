@@ -99,7 +99,6 @@ impl L1DataStore for L1Db {
         // blockmanifest data at each iteration
 
         let last_block_num = self.latest_block_number()?.unwrap_or(0);
-        println!("LASTEST block num {}", last_block_num);
         if idx > last_block_num {
             return Err(DbError::Other(
                 "Invalid block number to revert to".to_string(),
@@ -108,7 +107,6 @@ impl L1DataStore for L1Db {
 
         let mut batch = SchemaBatch::new();
         for height in ((idx + 1)..=last_block_num).rev() {
-            println!("HEIGHT: {}", height);
             let blk_manifest = self
                 .db
                 .get::<L1BlockSchema>(&height)?
@@ -124,7 +122,6 @@ impl L1DataStore for L1Db {
 
             // Delete Block manifest data
             batch.delete::<L1BlockSchema>(&height)?;
-            println!("batches: {:?}", batch);
         }
         // Execute the batch
         self.db.write_schemas(batch)?;
@@ -207,9 +204,10 @@ mod tests {
     }
 
     impl ArbitraryGenerator {
-        fn new(size: usize) -> Self {
+        fn new() -> Self {
             let mut rng = rand::thread_rng();
-            let buffer: Vec<u8> = (0..size).map(|_| rng.gen()).collect();
+            // NOTE: 128 should be enough for testing purposes. Change to 256 as needed
+            let buffer: Vec<u8> = (0..128).map(|_| rng.gen()).collect();
             ArbitraryGenerator { buffer }
         }
 
@@ -224,20 +222,20 @@ mod tests {
         L1Db::new(temp_dir.path()).expect("failed to create L1Db")
     }
 
-    fn insert_block_data(idx: u64, db: &L1Db) -> (L1BlockManifest, Vec<L1Tx>) {
-        let mf: L1BlockManifest = ArbitraryGenerator::new(128).generate();
+    fn insert_block_data(idx: u64, db: &L1Db) -> (L1BlockManifest, Vec<L1Tx>, CompactMmr) {
+        let mf: L1BlockManifest = ArbitraryGenerator::new().generate();
         let txs: Vec<L1Tx> = (0..10)
-            .map(|_| ArbitraryGenerator::new(128).generate())
+            .map(|_| ArbitraryGenerator::new().generate())
             .collect();
-        let mmr: CompactMmr = ArbitraryGenerator::new(128).generate();
+        let mmr: CompactMmr = ArbitraryGenerator::new().generate();
 
         // Insert block data
         let res = db.put_block_data(idx, mf.clone(), txs.clone());
         assert!(res.is_ok());
 
         // Insert mmr data
-        db.put_mmr_checkpoint(idx, mmr).unwrap();
-        (mf, txs)
+        db.put_mmr_checkpoint(idx, mmr.clone()).unwrap();
+        (mf, txs, mmr)
     }
 
     #[test]
@@ -271,11 +269,11 @@ mod tests {
         let invalid_idxs = vec![1, 2, 5000, 1000, 1002, 999]; // basically any id beside idx + 1
         for invalid_idx in invalid_idxs {
             let txs: Vec<L1Tx> = (0..10)
-                .map(|_| ArbitraryGenerator::new(128).generate())
+                .map(|_| ArbitraryGenerator::new().generate())
                 .collect();
             let res = db.put_block_data(
                 invalid_idx,
-                ArbitraryGenerator::new(128).generate::<L1BlockManifest>(),
+                ArbitraryGenerator::new().generate::<L1BlockManifest>(),
                 txs,
             );
             assert!(res.is_err(), "Should fail to insert to db");
@@ -283,9 +281,9 @@ mod tests {
 
         let valid_idx = idx + 1;
         let txs: Vec<L1Tx> = (0..10)
-            .map(|_| ArbitraryGenerator::new(128).generate())
+            .map(|_| ArbitraryGenerator::new().generate())
             .collect();
-        let res = db.put_block_data(valid_idx, ArbitraryGenerator::new(128).generate(), txs);
+        let res = db.put_block_data(valid_idx, ArbitraryGenerator::new().generate(), txs);
         assert!(res.is_ok(), "Should successfully insert to db");
     }
 
@@ -348,12 +346,23 @@ mod tests {
 
     #[test]
     fn test_put_mmr_checkpoint_invalid() {
-        todo!()
+        let db = setup_db();
+        let _ = insert_block_data(1, &db);
+        let mmr: CompactMmr = ArbitraryGenerator::new().generate();
+        let invalid_idxs = vec![0, 2, 4, 5, 6, 100, 1000]; // any idx except 1
+        for idx in invalid_idxs {
+            let res = db.put_mmr_checkpoint(idx, mmr.clone());
+            assert!(res.is_err());
+        }
     }
 
     #[test]
     fn test_put_mmr_checkpoint_valid() {
-        todo!()
+        let db = setup_db();
+        let _ = insert_block_data(1, &db);
+        let mmr: CompactMmr = ArbitraryGenerator::new().generate();
+        let res = db.put_mmr_checkpoint(1, mmr);
+        assert!(res.is_ok());
     }
 
     // TEST PROVIDER METHODS
@@ -364,7 +373,7 @@ mod tests {
         let idx = 1;
 
         // insert
-        let (mf, txs) = insert_block_data(idx, &mut db);
+        let (mf, txs, _) = insert_block_data(idx, &mut db);
 
         // fetch non existent block
         let non_idx = 200;
@@ -392,7 +401,7 @@ mod tests {
         let db = setup_db();
         let idx = 1; // block number
                      // Insert a block
-        let (_, txns) = insert_block_data(idx, &db);
+        let (_, txns, _) = insert_block_data(idx, &db);
         let txidx: u32 = 3; // some tx index
         assert!(txns.len() > txidx as usize);
         let tx_ref: L1TxRef = (1, txidx).into();
@@ -457,14 +466,30 @@ mod tests {
     fn test_get_blockid_range() {
         let db = setup_db();
 
-        let (mf1, _) = insert_block_data(1, &db);
-        let (mf2, _) = insert_block_data(2, &db);
-        let (mf3, _) = insert_block_data(3, &db);
+        let (mf1, _, _) = insert_block_data(1, &db);
+        let (mf2, _, _) = insert_block_data(2, &db);
+        let (mf3, _, _) = insert_block_data(3, &db);
 
         let range = db.get_blockid_range(1, 4).unwrap();
         assert_eq!(range.len(), 3);
         for (exp, obt) in vec![mf1, mf2, mf3].iter().zip(range) {
             assert_eq!(exp.block_hash(), obt);
         }
+    }
+
+    #[test]
+    fn test_get_last_mmr_to() {
+        let db = setup_db();
+
+        let inexistent_idx = 3;
+        let mmr = db.get_last_mmr_to(inexistent_idx).unwrap();
+        assert!(mmr.is_none());
+        let (_, _, mmr) = insert_block_data(1, &db);
+        let mmr_res = db.get_last_mmr_to(inexistent_idx).unwrap();
+        assert!(mmr_res.is_none());
+
+        // existent mmr
+        let observed_mmr = db.get_last_mmr_to(1).unwrap();
+        assert_eq!(Some(mmr), observed_mmr);
     }
 }
