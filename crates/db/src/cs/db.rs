@@ -1,7 +1,7 @@
 
 use anyhow::anyhow;
-use rockbound::{schema::KeyEncoder, Schema, SchemaBatch, DB};
-use rocksdb::{Options, ReadOptions};
+use rockbound::{Schema, DB};
+use rocksdb::Options;
 
 use std::path::Path;
 
@@ -34,36 +34,8 @@ impl CsDb {
         };
         Ok(store)
     }
-}
 
-impl ConsensusStateStore for CsDb {
-    fn write_consensus_output(&self, idx: u64, output: crate::traits::ConsensusOutput) -> crate::DbResult<()> {
-        match self.get_last_write_idx()? {
-            Some(last_idx) => {
-                if last_idx + 1 != idx {
-                    return Err(DbError::OooInsert("Consensus store", idx));
-                }
-            },
-            None => {
-                if idx != 1{
-                    return Err(DbError::OooInsert("Consensus store", idx));
-                }
-            }
-        }
-        let mut batch = SchemaBatch::new();
-        batch.put::<ConsensusStateSchema>(&idx, &output)?;
-        self.db.write_schemas(batch)?;
-        Ok(())
-    }
-
-    fn write_consensus_checkpoint(&self, idx: u64, state: alpen_vertex_state::consensus::ConsensusState) -> crate::DbResult<()> {
-        todo!()
-    }
-
-}
-
-impl ConsensusStateProvider for CsDb {
-    fn get_last_write_idx(&self) -> crate::DbResult<Option<u64>> {
+    fn last_idx(&self) -> crate::DbResult<Option<u64>> {
         let mut iterator = self.db.iter::<ConsensusStateSchema>()?;
         iterator.seek_to_last();
         match iterator.rev().next() {
@@ -74,11 +46,39 @@ impl ConsensusStateProvider for CsDb {
             None => Ok(None)
         }
     }
+}
+
+impl ConsensusStateStore for CsDb {
+    fn write_consensus_output(&self, idx: u64, output: crate::traits::ConsensusOutput) -> crate::DbResult<()> {
+        let expected_idx = match self.last_idx()? {
+            Some(last_idx) => last_idx + 1,
+            None => 1 
+        };
+        if idx != expected_idx {
+            return Err(DbError::OooInsert("Consensus store", idx));
+        }
+        self.db.put::<ConsensusStateSchema>(&idx, &output)?;
+        Ok(())
+    }
+
+    fn write_consensus_checkpoint(&self, idx: u64, state: alpen_vertex_state::consensus::ConsensusState) -> crate::DbResult<()> {
+        todo!()
+    }
+
+}
+
+impl ConsensusStateProvider for CsDb {
+    fn get_last_write_idx(&self) -> crate::DbResult<u64> {
+        match self.last_idx()? {
+            Some(idx) => Ok(idx),
+            None => Err(DbError::NotBootstrapped)
+        }
+    }
 
     fn get_consensus_writes(&self, idx: u64) -> crate::DbResult<Option<Vec<alpen_vertex_state::consensus::ConsensusWrite>>> {
         let output = self.db.get::<ConsensusStateSchema>(&idx)?;
         match output {
-            Some(out) => Ok(Some(out.writes)),
+            Some(out) => Ok(Some(out.writes().to_owned())),
             None => Ok(None)
         }
     }
@@ -86,7 +86,7 @@ impl ConsensusStateProvider for CsDb {
     fn get_consensus_actions(&self, idx: u64) -> crate::DbResult<Option<Vec<alpen_vertex_state::sync_event::SyncAction>>> {
         let output = self.db.get::<ConsensusStateSchema>(&idx)?;
         match output {
-            Some(out) => Ok(Some(out.actions)),
+            Some(out) => Ok(Some(out.actions().to_owned())),
             None => Ok(None)
         }
     }
@@ -128,10 +128,17 @@ mod tests {
     }
 
     #[test]
+    fn test_last_idx() {
+        let db = setup_db();
+        let idx = db.last_idx().unwrap();
+        assert_eq!(idx, None);
+    }
+
+    #[test]
     fn test_get_last_idx() {
         let db = setup_db();
-        let idx = db.get_last_write_idx().unwrap();
-        assert_eq!(idx, None);
+        let idx = db.get_last_write_idx();
+        assert!(idx.is_err_and(|x| matches!(x, DbError::NotBootstrapped)));
     }
 
     #[test]
@@ -140,11 +147,33 @@ mod tests {
         let db = setup_db();
         let _ = db.write_consensus_output(1, output);
 
-        let idx = db.get_last_write_idx().unwrap().unwrap();
+        let idx = db.get_last_write_idx().unwrap();
         assert_eq!(idx, 1);
-
     }
 
+    #[test]
+    fn test_get_consensus_writes() {
+        let output: ConsensusOutput = generate_arbitrary();
+
+        let db = setup_db();
+        let _ = db.write_consensus_output(1, output.clone());
+
+        let writes = db.get_consensus_writes(1).unwrap().unwrap();
+        assert_eq!(&writes, output.writes());
+    }
+
+
+    #[test]
+    fn test_get_consensus_actions() {
+        let output: ConsensusOutput = generate_arbitrary();
+
+        let db = setup_db();
+        let _ = db.write_consensus_output(1, output.clone());
+
+        let actions = db.get_consensus_actions(1).unwrap().unwrap();
+        assert_eq!(&actions, output.actions());
+
+    }
 
 
 }

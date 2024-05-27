@@ -143,7 +143,7 @@ pub trait ConsensusStateStore {
 pub trait ConsensusStateProvider {
     /// Gets the idx of the last written state.  Or returns error if a bootstrap
     /// state has not been written yet.
-    fn get_last_write_idx(&self) -> DbResult<Option<u64>>;
+    fn get_last_write_idx(&self) -> DbResult<u64>;
 
     /// Gets the output consensus writes for some input index.
     fn get_consensus_writes(&self, idx: u64) -> DbResult<Option<Vec<ConsensusWrite>>>;
@@ -165,12 +165,18 @@ pub trait ConsensusStateProvider {
 /// sync actions.
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct ConsensusOutput {
-    pub writes: Vec<ConsensusWrite>,
-    pub actions: Vec<SyncAction>,
+    writes: Vec<ConsensusWrite>,
+    actions: Vec<SyncAction>,
 }
 
 impl ConsensusOutput {
-    // TODO accessors as needed
+    pub fn writes(&self) -> &Vec<ConsensusWrite> {
+        &self.writes
+    }
+
+    pub fn actions(&self) -> &Vec<SyncAction> {
+        &self.actions
+    }
 }
 
 /// L2 data store for CL blocks.  Does not store anything about what we think

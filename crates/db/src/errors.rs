@@ -18,6 +18,9 @@ pub enum DbError {
     #[error("not yet implemented")]
     Unimplemented,
 
+    #[error("not yet bootstrapped")]
+    NotBootstrapped,
+
     #[error("{0}")]
     Other(String),
 }
