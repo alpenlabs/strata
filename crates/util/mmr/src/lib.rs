@@ -1,5 +1,6 @@
 //! Merkle mountain range implementation crate.
 
+use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 pub type Hash = [u8; 32];
@@ -13,7 +14,7 @@ fn is_zero(h: Hash) -> bool {
 }
 
 /// Compact representation of the MMR that should be borsh serializable easily.
-#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct CompactMmr {
     entries: u64,
     cap_log2: u8,

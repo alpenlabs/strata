@@ -18,3 +18,4 @@ rockbound = { git = "https://github.com/sovereign-Labs/rockbound", tag = "v2.0.1
 
 [dev-dependencies]
 tempfile = "3.10.1"
+rand = "0.8.5"
