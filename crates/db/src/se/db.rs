@@ -50,7 +50,7 @@ impl SeDb {
 
 impl SyncEventStore for SeDb {
     fn write_sync_event(&self, ev: SyncEvent) -> DbResult<u64> {
-        let last_id = self.get_last_idx()?.unwrap_or(0);
+        let last_id = self.last_idx()?.unwrap_or(0);
         let id = last_id + 1;
         let event = SyncEventWithTimestamp::new(ev);
         self.db.put::<SyncEventSchema>(&id, &event)?;
