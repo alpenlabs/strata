@@ -1,7 +1,6 @@
 use anyhow::anyhow;
-use rockbound::{schema::KeyEncoder, Schema, SchemaBatch, DB};
-use rocksdb::{Options, ReadOptions};
-use std::path::Path;
+use rockbound::{schema::KeyEncoder, SchemaBatch, DB};
+use rocksdb::ReadOptions;
 
 use alpen_vertex_mmr::CompactMmr;
 use alpen_vertex_primitives::{
@@ -17,41 +16,18 @@ use crate::{
 
 use super::schemas::{L1BlockSchema, MmrSchema, TxnSchema};
 
-const DB_NAME: &str = "l1_db";
-
 pub struct L1Db {
     db: DB,
 }
 
-fn get_db_opts() -> Options {
-    // TODO: add other options as appropriate.
-    let mut db_opts = Options::default();
-    db_opts.create_missing_column_families(true);
-    db_opts.create_if_missing(true);
-    db_opts
-}
-
 impl L1Db {
-    // NOTE: It would be ideal to have just db handle as argument in the new method.
-    // However, I want to ensure correct column families being set for db handle. The L1Store
-    // implementation below uses *Schema column family name. And if db handle is to be passed from
-    // outside, there's no way which stops the handle to be initialized with wrong cf names.
-    // I tried fiddling with the types but could not succeed, so I've left it as is for now. Can be
-    // enhanced later.
-    pub fn new(path: &Path) -> anyhow::Result<Self> {
-        let db_opts = get_db_opts();
-        let column_families = vec![
-            L1BlockSchema::COLUMN_FAMILY_NAME,
-            TxnSchema::COLUMN_FAMILY_NAME,
-            MmrSchema::COLUMN_FAMILY_NAME,
-        ];
-        let store = Self {
-            db: DB::open(path, DB_NAME, column_families, &db_opts)?,
-        };
-        Ok(store)
+    // NOTE: db is expected to open all the column families defined in STORE_COLUMN_FAMILIES.
+    // FIXME: Make it better/generic.
+    pub fn new(db: DB) -> Self {
+        Self { db }
     }
 
-    pub fn latest_block_number(&self) -> DbResult<Option<u64>> {
+    pub fn get_latest_block_number(&self) -> DbResult<Option<u64>> {
         let mut iterator = self.db.iter::<L1BlockSchema>()?;
         iterator.seek_to_last();
         let mut rev_iterator = iterator.rev();
@@ -68,7 +44,7 @@ impl L1DataStore for L1Db {
     fn put_block_data(&self, idx: u64, mf: L1BlockManifest, txs: Vec<L1Tx>) -> DbResult<()> {
         // If there is latest block then expect the idx to be 1 greater than the block number, else
         // allow arbitrary block number to be inserted
-        match self.latest_block_number()? {
+        match self.get_latest_block_number()? {
             Some(num) if num + 1 != idx => {
                 return Err(DbError::OooInsert("Block store", idx));
             }
@@ -84,7 +60,7 @@ impl L1DataStore for L1Db {
     fn put_mmr_checkpoint(&self, idx: u64, mmr: CompactMmr) -> DbResult<()> {
         // NOTE: mmr idx should correspond to the latest block number. This means block data
         // corresponding to the idx(block_number) is to be inserted before the mmr
-        match self.latest_block_number()? {
+        match self.get_latest_block_number()? {
             Some(num) if num != idx => {
                 return Err(DbError::OooInsert("Invalid mmr checkpoint", idx));
             }
@@ -98,7 +74,7 @@ impl L1DataStore for L1Db {
         // Get latest height, iterate backwards upto the idx, get blockhash and delete txns and
         // blockmanifest data at each iteration
 
-        let last_block_num = self.latest_block_number()?.unwrap_or(0);
+        let last_block_num = self.get_latest_block_number()?.unwrap_or(0);
         if idx > last_block_num {
             return Err(DbError::Other(
                 "Invalid block number to revert to".to_string(),
@@ -148,7 +124,8 @@ impl L1DataProvider for L1Db {
     }
 
     fn get_chain_tip(&self) -> DbResult<u64> {
-        self.latest_block_number().map(|x| x.unwrap_or_default())
+        self.get_latest_block_number()
+            .map(|x| x.unwrap_or_default())
     }
 
     fn get_block_txs(&self, idx: u64) -> DbResult<Option<Vec<L1TxRef>>> {
@@ -194,14 +171,22 @@ impl L1DataProvider for L1Db {
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
+    use crate::STORE_COLUMN_FAMILIES;
+
     use super::*;
     use arbitrary::{Arbitrary, Unstructured};
     use rand::Rng;
+    use rockbound::schema::ColumnFamilyName;
+    use rocksdb::Options;
     use tempfile::TempDir;
 
     struct ArbitraryGenerator {
         buffer: Vec<u8>,
     }
+    const DB_NAME: &str = "l1_db";
+
 
     impl ArbitraryGenerator {
         fn new() -> Self {
@@ -217,9 +202,26 @@ mod tests {
         }
     }
 
+    fn get_new_db(path: &Path) -> anyhow::Result<DB> {
+        // TODO: add other options as appropriate.
+        let mut db_opts = Options::default();
+        db_opts.create_missing_column_families(true);
+        db_opts.create_if_missing(true);
+        DB::open(
+            path,
+            DB_NAME,
+            STORE_COLUMN_FAMILIES
+                .iter()
+                .cloned()
+                .collect::<Vec<ColumnFamilyName>>(),
+            &db_opts,
+        )
+    }
+
     fn setup_db() -> L1Db {
         let temp_dir = TempDir::new().expect("failed to create temp dir");
-        L1Db::new(temp_dir.path()).expect("failed to create L1Db")
+        let db = get_new_db(&temp_dir.into_path()).unwrap();
+        L1Db::new(db)
     }
 
     fn insert_block_data(idx: u64, db: &L1Db) -> (L1BlockManifest, Vec<L1Tx>, CompactMmr) {
@@ -236,13 +238,6 @@ mod tests {
         // Insert mmr data
         db.put_mmr_checkpoint(idx, mmr.clone()).unwrap();
         (mf, txs, mmr)
-    }
-
-    #[test]
-    fn test_initialization() {
-        let temp_dir = TempDir::new().expect("failed to create temp dir");
-        let db = L1Db::new(temp_dir.path());
-        assert!(db.is_ok());
     }
 
     // TEST STORE METHODS
