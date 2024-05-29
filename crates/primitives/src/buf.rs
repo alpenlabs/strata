@@ -6,13 +6,31 @@ use reth_primitives::alloy_primitives::FixedBytes;
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct Buf20(pub FixedBytes<20>);
 
+impl From<[u8; 20]> for Buf20 {
+    fn from(value: [u8; 20]) -> Self {
+        Self(FixedBytes::from(value))
+    }
+}
+
 // 32-byte buf, useful for hashes and schnorr pubkeys
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct Buf32(pub FixedBytes<32>);
 
+impl From<[u8; 32]> for Buf32 {
+    fn from(value: [u8; 32]) -> Self {
+        Self(FixedBytes::from(value))
+    }
+}
+
 // 64-byte buf, useful for schnorr signatures
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct Buf64(pub FixedBytes<64>);
+
+impl From<[u8; 64]> for Buf64 {
+    fn from(value: [u8; 64]) -> Self {
+        Self(FixedBytes::from(value))
+    }
+}
 
 impl BorshSerialize for Buf32 {
     fn serialize<W: std::io::prelude::Write>(&self, writer: &mut W) -> std::io::Result<()> {

@@ -16,6 +16,16 @@ pub struct ExecPayloadData {
     new_el_withdrawals: Vec<WithdrawData>,
 }
 
+impl ExecPayloadData {
+    pub fn new_bare(payload_commitment: Buf32, state_root: Buf32) -> Self {
+        Self {
+            payload_commitment,
+            state_root,
+            new_el_withdrawals: Vec::new(),
+        }
+    }
+}
+
 /// L1 withdrawal data.
 #[derive(Clone, Debug)]
 pub struct WithdrawData {
