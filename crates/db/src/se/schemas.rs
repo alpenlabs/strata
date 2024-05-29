@@ -15,7 +15,6 @@ pub struct SyncEventWithTimestamp {
 
 impl SyncEventWithTimestamp {
     pub fn new(event: SyncEvent) -> Self {
-        // TODO: confirm if we want to use u64 or u128
         let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as u64;
         SyncEventWithTimestamp {
             event,

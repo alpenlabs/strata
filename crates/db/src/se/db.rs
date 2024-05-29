@@ -1,17 +1,17 @@
+use std::path::Path;
+
 use rockbound::{Schema, SchemaBatch, DB};
 use rocksdb::Options;
-use std::path::Path;
 
 use alpen_vertex_state::sync_event::SyncEvent;
 
 use crate::{DbResult, traits::SyncEventStore};
 use crate::traits::SyncEventProvider;
-
 use super::schemas::{SyncEventSchema, SyncEventWithTimestamp};
 
-const DB_NAME: &str = "se_db";
+const DB_NAME: &str = "sync_event_db";
 
-pub struct SeDb {
+pub struct SyncEventDB {
     db: DB
 }
 
@@ -23,7 +23,7 @@ fn get_db_opts() -> Options {
     db_opts
 }
 
-impl SeDb {
+impl SyncEventDB {
     pub fn new(path: &Path) -> anyhow::Result<Self> {
         let db_opts = get_db_opts();
         let column_families = vec![
@@ -48,7 +48,7 @@ impl SeDb {
     }
 }
 
-impl SyncEventStore for SeDb {
+impl SyncEventStore for SyncEventDB {
     fn write_sync_event(&self, ev: SyncEvent) -> DbResult<u64> {
         let last_id = self.last_idx()?.unwrap_or(0);
         let id = last_id + 1;
@@ -66,7 +66,7 @@ impl SyncEventStore for SeDb {
 
         for res in iterator {
             let (id, _) = res?.into_tuple();
-            if id > end_idx {
+            if id >= end_idx {
                 break;
             }
 
@@ -80,7 +80,7 @@ impl SyncEventStore for SeDb {
 
 }
 
-impl SyncEventProvider for SeDb {
+impl SyncEventProvider for SyncEventDB {
     fn get_last_idx(&self) -> DbResult<Option<u64>> {
         self.last_idx()
     }
@@ -108,19 +108,18 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
     use arbitrary::{Arbitrary, Unstructured};
     use tempfile::TempDir;
-    use SeDb;
 
     fn generate_arbitrary<'a, T: Arbitrary<'a> + Clone>() -> T {
         let mut u = Unstructured::new(&[1, 2, 3]);
         T::arbitrary(&mut u).expect("failed to generate arbitrary instance")
     }
 
-    fn setup_db() -> SeDb {
+    fn setup_db() -> SyncEventDB {
         let temp_dir = TempDir::new().expect("failed to create temp dir");
-        SeDb::new(temp_dir.path()).expect("failed to create L1Db")
+        SyncEventDB::new(temp_dir.path()).expect("failed to create L1Db")
     }
 
-    fn insert_event(db: &SeDb) -> SyncEvent {
+    fn insert_event(db: &SyncEventDB) -> SyncEvent {
         let ev: SyncEvent = generate_arbitrary();
         let res = db.write_sync_event(ev.clone());
         assert!(res.is_ok());
@@ -130,7 +129,7 @@ mod tests {
     #[test]
     fn test_initialization() {
         let temp_dir = TempDir::new().expect("failed to create temp dir");
-        let db = SeDb::new(temp_dir.path());
+        let db = SyncEventDB::new(temp_dir.path());
         assert!(db.is_ok());
     }
 
@@ -184,7 +183,7 @@ mod tests {
         for _ in 1..=n {
             let _ = insert_event(&db);
         }
-        // Delete events 2..=4
+        // Delete events 2..4
         let res = db.clear_sync_event(2,4);
         assert!(res.is_ok());
 
@@ -197,7 +196,7 @@ mod tests {
         assert!(ev1.is_some());
         assert!(ev2.is_none());
         assert!(ev3.is_none());
-        assert!(ev4.is_none());
+        assert!(ev4.is_some());
         assert!(ev5.is_some());
     }
 
@@ -234,7 +233,7 @@ mod tests {
         for _ in 1..=n {
             let _ = insert_event(&db);
         }
-        let res = db.clear_sync_event(3,5);
+        let res = db.clear_sync_event(3, 6);
         assert!(res.is_ok());
 
         let new_idx = db.get_last_idx().unwrap().unwrap();
