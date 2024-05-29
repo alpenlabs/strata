@@ -44,10 +44,10 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
 ) -> Result<(), Error> {
     match ctm {
         ChainTipMessage::NewState(cs, output) => {
+            let l1_tip = cs.chain_state().chain_tip_blockid();
+
             // Update the new state.
             state.cur_state = cs;
-
-            let l1_tip = cs.chain_state().chain_tip_blockid();
 
             // TODO use output actions to clear out dangling states now
             for act in output.actions() {

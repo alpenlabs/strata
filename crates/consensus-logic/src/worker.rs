@@ -4,7 +4,7 @@ use std::sync::{mpsc, Arc};
 
 use tracing::*;
 
-use alpen_vertex_db::{errors::DbResult, traits::*};
+use alpen_vertex_db::{traits::*, DbResult};
 use alpen_vertex_state::{
     block::L2BlockId,
     consensus::ConsensusState,
@@ -95,17 +95,15 @@ fn handle_sync_event<D: Database>(
     event: &SyncEvent,
 ) -> Result<(), Error> {
     // Perform the main step of deciding what the output we're operating on.
-    let outp = transition::process_event(&state.cur_consensus_state, event);
+    let db = state.database.as_ref();
+    let outp = transition::process_event(&state.cur_consensus_state, event, db)?;
     let (writes, actions) = outp.into_parts();
     state.apply_consensus_writes(writes)?;
 
     for action in actions {
         match action {
-            SyncAction::ExtendTip(blkid) => {
+            SyncAction::UpdateTip(blkid) => {
                 state.extend_tip(blkid)?;
-            }
-            SyncAction::RevertTip(blkid) => {
-                state.rollback_to_block(blkid)?;
             }
             SyncAction::MarkInvalid(blkid) => {
                 // TODO not sure what this should entail yet
