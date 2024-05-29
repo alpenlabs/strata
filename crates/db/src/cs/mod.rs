@@ -1,2 +1,2 @@
-mod db;
-mod schemas;
+pub mod db;
+pub mod schemas;

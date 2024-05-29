@@ -1,8 +1,7 @@
-use anyhow::anyhow;
+use std::path::Path;
+
 use rockbound::{Schema, DB};
 use rocksdb::Options;
-
-use std::path::Path;
 
 use crate::{
     errors::DbError,
@@ -11,31 +10,17 @@ use crate::{
 
 use super::schemas::{ConsensusOutputSchema, ConsensusStateSchema};
 
-const DB_NAME: &str = "cs_db";
+const DB_NAME: &str = "consensus_state_db";
 
-pub struct CsDb {
+pub struct ConsensusStateDB {
     db: DB,
 }
 
-fn get_db_opts() -> Options {
-    // TODO: add other options as appropriate.
-    let mut db_opts = Options::default();
-    db_opts.create_missing_column_families(true);
-    db_opts.create_if_missing(true);
-    db_opts
-}
-
-impl CsDb {
-    pub fn new(path: &Path) -> anyhow::Result<Self> {
-        let db_opts = get_db_opts();
-        let column_families = vec![
-            crate::cs::schemas::ConsensusOutputSchema::COLUMN_FAMILY_NAME,
-            crate::cs::schemas::ConsensusStateSchema::COLUMN_FAMILY_NAME,
-        ];
-        let store = Self {
-            db: rockbound::DB::open(path, DB_NAME, column_families, &db_opts)?,
-        };
-        Ok(store)
+impl ConsensusStateDB {
+    // NOTE: db is expected to open all the column families defined in STORE_COLUMN_FAMILIES.
+    // FIXME: Make it better/generic.
+    pub fn new(db: DB) -> Self {
+        Self { db }
     }
 
     fn get_last_idx<T>(&self) -> crate::DbResult<Option<u64>>
@@ -54,7 +39,7 @@ impl CsDb {
     }
 }
 
-impl ConsensusStateStore for CsDb {
+impl ConsensusStateStore for ConsensusStateDB {
     fn write_consensus_output(
         &self,
         idx: u64,
@@ -84,7 +69,7 @@ impl ConsensusStateStore for CsDb {
     }
 }
 
-impl ConsensusStateProvider for CsDb {
+impl ConsensusStateProvider for ConsensusStateDB {
     fn get_last_write_idx(&self) -> crate::DbResult<u64> {
         match self.get_last_idx::<ConsensusOutputSchema>()? {
             Some(idx) => Ok(idx),
@@ -147,28 +132,40 @@ impl ConsensusStateProvider for CsDb {
 mod tests {
     use alpen_vertex_state::consensus::ConsensusState;
     use arbitrary::{Arbitrary, Unstructured};
+    use rockbound::schema::ColumnFamilyName;
     use tempfile::TempDir;
 
-    use crate::traits::ConsensusOutput;
+    use crate::{traits::ConsensusOutput, STORE_COLUMN_FAMILIES};
 
     use super::*;
 
-    fn setup_db() -> CsDb {
-        let temp_dir = TempDir::new().expect("failed to create temp dir");
-        CsDb::new(temp_dir.path()).expect("failed to create CsDb")
+    fn get_new_db(path: &Path) -> anyhow::Result<DB> {
+        // TODO: add other options as appropriate.
+        let mut db_opts = Options::default();
+        db_opts.create_missing_column_families(true);
+        db_opts.create_if_missing(true);
+        DB::open(
+            path,
+            DB_NAME,
+            STORE_COLUMN_FAMILIES
+                .iter()
+                .cloned()
+                .collect::<Vec<ColumnFamilyName>>(),
+            &db_opts,
+        )
     }
+
+    fn setup_db() -> ConsensusStateDB {
+        let temp_dir = TempDir::new().expect("failed to create temp dir");
+        let db = get_new_db(&temp_dir.into_path()).unwrap();
+        ConsensusStateDB::new(db)
+    }
+
 
     fn generate_arbitrary<'a, T: Arbitrary<'a> + Clone>(bytes: &'a [u8]) -> T {
         // Create an Unstructured instance and generate the arbitrary value
         let mut u = Unstructured::new(bytes);
         T::arbitrary(&mut u).expect("failed to generate arbitrary instance")
-    }
-
-    #[test]
-    fn test_initialization() {
-        let temp_dir = TempDir::new().expect("failed to create temp dir");
-        let db = CsDb::new(temp_dir.path());
-        assert!(db.is_ok());
     }
 
     #[test]
