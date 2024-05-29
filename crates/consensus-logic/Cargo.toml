@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 alpen-vertex-db = { workspace = true }
 alpen-vertex-evmctl = { workspace = true }
+alpen-vertex-primitives = { workspace = true }
 alpen-vertex-state = { workspace = true }
 
 thiserror = { workspace = true }

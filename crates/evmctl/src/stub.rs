@@ -10,6 +10,7 @@ use std::sync::Mutex;
 use std::time;
 
 use alpen_vertex_primitives::prelude::*;
+use alpen_vertex_state::block::*;
 
 use crate::engine::*;
 use crate::errors::*;
@@ -44,12 +45,8 @@ impl StubController {
 }
 
 impl ExecEngineCtl for StubController {
-    fn update_head_block(&self, _id: Buf32) -> EngineResult<BlockStatus> {
+    fn submit_payload(&self, _payload: ExecPayloadData) -> EngineResult<BlockStatus> {
         Ok(BlockStatus::Valid)
-    }
-
-    fn update_finalized_block(&self, _id: Buf32) -> EngineResult<()> {
-        Ok(())
     }
 
     fn prepare_payload(&self, _env: PayloadEnv) -> EngineResult<u64> {
@@ -73,10 +70,20 @@ impl ExecEngineCtl for StubController {
             Ok(PayloadStatus::Working)
         } else {
             // TODO make up a more plausible payload
-            let payload = Buf32::from([42; 32]);
-            let state = Buf32::from([43; 32]);
-            let exec = ExecPayloadData::new_bare(payload, state);
+            let exec = ExecPayloadData::new_simple(Vec::new());
             Ok(PayloadStatus::Ready(exec))
         }
+    }
+
+    fn update_head_block(&self, _id: L2BlockId) -> EngineResult<()> {
+        Ok(())
+    }
+
+    fn update_safe_block(&self, _id: L2BlockId) -> EngineResult<()> {
+        Ok(())
+    }
+
+    fn update_finalized_block(&self, _id: L2BlockId) -> EngineResult<()> {
+        Ok(())
     }
 }

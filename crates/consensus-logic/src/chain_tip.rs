@@ -3,19 +3,24 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::{mpsc, Arc};
 
+use alpen_vertex_db::traits::L2DataProvider;
+use alpen_vertex_primitives::params::Params;
 use tracing::*;
 
 use alpen_vertex_db::{errors::DbError, traits::Database};
 use alpen_vertex_evmctl::engine::*;
-use alpen_vertex_state::block::L2BlockHeader;
+use alpen_vertex_state::block::{L2Block, L2BlockHeader};
 use alpen_vertex_state::operation::SyncAction;
 use alpen_vertex_state::{block::L2BlockId, consensus::ConsensusState};
 
-use crate::errors::*;
 use crate::message::{ChainTipMessage, CsmMessage};
+use crate::{credential, errors::*};
 
 /// Tracks the parts of the chain that haven't been finalized on-chain yet.
 pub struct ChainTipTrackerState<D: Database> {
+    /// Consensus parameters.
+    params: Arc<Params>,
+
     /// Underlying state database.
     database: Arc<D>,
 
@@ -64,8 +69,13 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
         }
 
         ChainTipMessage::NewBlock(blkid) => {
+            let l2prov = state.database.l2_provider();
+            let block = l2prov
+                .get_block_data(blkid)?
+                .ok_or(Error::MissingL2Block(blkid))?;
+
             let cstate = state.cur_state.clone();
-            let should_attach = consider_new_block(&blkid, &cstate, state)?;
+            let should_attach = consider_new_block(&blkid, &block, &cstate, state)?;
             if should_attach {
                 // TODO insert block into pending block tracker
                 // TODO get block header/parentid
@@ -77,17 +87,39 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
     Ok(())
 }
 
-/// Considers if we should update the chain head with a new block.  If that's
-/// successful then we'll emit a new sync event to update the consensus state.
+/// Considers if the block is plausibly valid and if we should attach it to the
+/// pending unfinalized blocks tree.
 fn consider_new_block<D: Database>(
     blkid: &L2BlockId,
+    block: &L2Block,
     cstate: &ConsensusState,
     state: &mut ChainTipTrackerState<D>,
-) -> Result<bool, DbError> {
-    // TODO query if the block has been marked invalid in the database
+) -> Result<bool, Error> {
+    let params = state.params.as_ref();
+
+    // Check that the block is correctly signed.
+    let cred_ok = credential::check_block_credential(block.header(), cstate.chain_state(), params);
+    if !cred_ok {
+        error!(?blkid, "block has invalid credential");
+        return Ok(false);
+    }
+
+    // Check that we haven't already marked the block as invalid.
+    let l2prov = state.database.l2_provider();
+    if let Some(status) = l2prov.get_block_status(*blkid)? {
+        if status == alpen_vertex_db::traits::BlockStatus::Invalid {
+            warn!(?blkid, "rejecting invalid block");
+            return Ok(false);
+        }
+    }
+
+    // TODO more stuff
+
     Ok(true)
 }
 
+/// Entry in block tracker table we use to relate a block with its immediate
+/// relatives.
 struct BlockEntry {
     parent: L2BlockId,
     children: HashSet<L2BlockId>,

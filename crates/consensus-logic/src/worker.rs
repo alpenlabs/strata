@@ -2,9 +2,11 @@
 
 use std::sync::{mpsc, Arc};
 
+use alpen_vertex_evmctl::engine::ExecEngineCtl;
 use tracing::*;
 
 use alpen_vertex_db::{traits::*, DbResult};
+use alpen_vertex_primitives::prelude::*;
 use alpen_vertex_state::{
     block::L2BlockId,
     consensus::ConsensusState,
@@ -16,8 +18,12 @@ use crate::{errors::Error, message::CsmMessage, transition};
 
 /// Mutatble worker state that we modify in the consensus worker task.
 ///
-/// Not meant to be shared across threads.
+/// Unable to be shared across threads.  Any data we want to export we'll do
+/// through another handle.
 pub struct WorkerState<D: Database> {
+    /// Consensus parameters.
+    params: Arc<Params>,
+
     /// Underlying database hierarchy that writes ultimately end up on.
     // TODO should we move this out?
     database: Arc<D>,
@@ -61,12 +67,13 @@ impl<D: Database> WorkerState<D> {
 }
 
 /// Receives messages from channel to update consensus state with.
-fn consensus_worker_task<D: Database>(
+fn consensus_worker_task<D: Database, E: ExecEngineCtl>(
     mut state: WorkerState<D>,
+    engine: Arc<E>,
     inp_msg_ch: mpsc::Receiver<CsmMessage>,
 ) -> Result<(), Error> {
     while let Some(msg) = inp_msg_ch.recv().ok() {
-        if let Err(e) = process_msg(&mut state, &msg) {
+        if let Err(e) = process_msg(&mut state, engine.as_ref(), &msg) {
             error!(err = %e, "failed to process sync message");
         }
     }
@@ -76,27 +83,33 @@ fn consensus_worker_task<D: Database>(
     Ok(())
 }
 
-fn process_msg<D: Database>(state: &mut WorkerState<D>, msg: &CsmMessage) -> Result<(), Error> {
+fn process_msg<D: Database, E: ExecEngineCtl>(
+    state: &mut WorkerState<D>,
+    engine: &E,
+    msg: &CsmMessage,
+) -> Result<(), Error> {
     match msg {
         CsmMessage::EventInput(idx) => {
             let ev = state
                 .get_sync_event(*idx)?
                 .ok_or(Error::MissingSyncEvent(*idx))?;
 
-            handle_sync_event(state, *idx, &ev)?;
+            handle_sync_event(state, engine, *idx, &ev)?;
             Ok(())
         }
     }
 }
 
-fn handle_sync_event<D: Database>(
+fn handle_sync_event<D: Database, E: ExecEngineCtl>(
     state: &mut WorkerState<D>,
+    engine: &E,
     idx: u64,
     event: &SyncEvent,
 ) -> Result<(), Error> {
     // Perform the main step of deciding what the output we're operating on.
+    let params = state.params.as_ref();
     let db = state.database.as_ref();
-    let outp = transition::process_event(&state.cur_consensus_state, event, db)?;
+    let outp = transition::process_event(&state.cur_consensus_state, event, db, params)?;
     let (writes, actions) = outp.into_parts();
     state.apply_consensus_writes(writes)?;
 
