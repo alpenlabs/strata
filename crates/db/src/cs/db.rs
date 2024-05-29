@@ -2,7 +2,7 @@ use anyhow::anyhow;
 use rockbound::{Schema, DB};
 use rocksdb::Options;
 
-use std::{path::Path};
+use std::path::Path;
 
 use crate::{
     errors::DbError,
@@ -138,7 +138,7 @@ impl ConsensusStateProvider for CsDb {
             }
         }
 
-        Err(DbError::Other("Checkpoint not found".to_string()))
+        Err(DbError::NotBootstrapped)
     }
 
 }
@@ -172,43 +172,43 @@ mod tests {
     }
 
     #[test]
-    fn test_last_idx() {
+    fn test_get_last_idx() {
         let db = setup_db();
         let idx = db.get_last_idx::<ConsensusOutputSchema>().unwrap();
         assert_eq!(idx, None);
     }
 
     #[test]
-    fn test_get_last_idx() {
-        let db = setup_db();
-        let idx = db.get_last_write_idx();
-        assert!(idx.is_err_and(|x| matches!(x, DbError::NotBootstrapped)));
-    }
-
-    #[test]
     fn test_write_consensus_output() {
         let output: ConsensusOutput = generate_arbitrary(&[1,2,3]);
         let db = setup_db();
-        let _ = db.write_consensus_output(1, output);
 
-        let idx = db.get_last_write_idx().unwrap();
-        assert_eq!(idx, 1);
+        let res = db.write_consensus_output(2, output.clone());
+        assert!(res.is_err_and(|x| matches!(x, DbError::OooInsert("Consensus store", 2))));
+
+        let res = db.write_consensus_output(1, output.clone());
+        assert!(res.is_ok());
+
+        let res = db.write_consensus_output(1, output.clone());
+        assert!(res.is_err_and(|x| matches!(x, DbError::OooInsert("Consensus store", 1))));
+
+        let res = db.write_consensus_output(3, output.clone());
+        assert!(res.is_err_and(|x| matches!(x, DbError::OooInsert("Consensus store", 3))));
     }
 
     #[test]
-    fn test_write_consensus_checkpoint() {
-        let state: ConsensusState = generate_arbitrary(&[1,2,3]);
+    fn test_get_last_write_idx() {
         let db = setup_db();
 
-        let _ = db.write_consensus_checkpoint(1, state.clone());
+        let idx = db.get_last_write_idx();
+        assert!(idx.is_err_and(|x| matches!(x, DbError::NotBootstrapped)));
 
-        let idx = db.get_last_checkpoint_idx().unwrap();
-        assert_eq!(idx, 1);
+        let output: ConsensusOutput = generate_arbitrary(&[1,2,3]);
+        let _ = db.write_consensus_output(1, output.clone());
 
-        let res = db.write_consensus_checkpoint(1, state);
-        assert!(res.is_err_and(|x| matches!(x, DbError::DuplicateKey(1))));
+        let idx = db.get_last_write_idx();
+        assert!(idx.is_ok_and(|x| matches!(x, 1)));
     }
-
 
     #[test]
     fn test_get_consensus_writes() {
@@ -230,6 +230,67 @@ mod tests {
 
         let actions = db.get_consensus_actions(1).unwrap().unwrap();
         assert_eq!(&actions, output.actions());
+    }
+
+    #[test]
+    fn test_write_consensus_checkpoint() {
+        let state: ConsensusState = generate_arbitrary(&[1,2,3]);
+        let db = setup_db();
+
+        let _ = db.write_consensus_checkpoint(3, state.clone());
+
+        let idx = db.get_last_checkpoint_idx().unwrap();
+        assert_eq!(idx, 3);
+
+        let res = db.write_consensus_checkpoint(3, state.clone());
+        assert!(res.is_err_and(|x| matches!(x, DbError::DuplicateKey(3))));
+
+        // TODO: verify if it is possible to write checkpoint in any order
+        let res = db.write_consensus_checkpoint(1, state);
+        assert!(res.is_ok());
+
+        // Note: The ordering is managed by rocksdb. So might be alright..
+        let idx = db.get_last_checkpoint_idx().unwrap();
+        assert_eq!(idx, 3);
+    }
+
+
+    #[test]
+    fn test_get_previous_checkpoint_at() {
+        let state: ConsensusState = generate_arbitrary(&[1,2,3]);
+        
+        let db = setup_db();
+
+        let res = db.get_prev_checkpoint_at(1);
+        assert!(res.is_err_and(|x| matches!(x, DbError::NotBootstrapped)));
+
+        // Add a checkpoint
+        _ = db.write_consensus_checkpoint(1, state.clone());
+
+        let res = db.get_prev_checkpoint_at(1);
+        assert!(res.is_ok_and(|x| matches!(x, 1)));
+
+        let res = db.get_prev_checkpoint_at(2);
+        assert!(res.is_ok_and(|x| matches!(x, 1)));
+
+        let res = db.get_prev_checkpoint_at(100);
+        assert!(res.is_ok_and(|x| matches!(x, 1)));
+
+        // Add a new checkpoint
+        _ = db.write_consensus_checkpoint(5, state.clone());
+
+        let res = db.get_prev_checkpoint_at(1);
+        assert!(res.is_ok_and(|x| matches!(x, 1)));
+
+        let res = db.get_prev_checkpoint_at(2);
+        assert!(res.is_ok_and(|x| matches!(x, 1)));
+
+        let res = db.get_prev_checkpoint_at(5);
+        assert!(res.is_ok_and(|x| matches!(x, 5)));
+
+        let res = db.get_prev_checkpoint_at(100);
+        assert!(res.is_ok_and(|x| matches!(x, 5)));
+
     }
 
 }
