@@ -6,8 +6,10 @@ use alpen_vertex_primitives::{l1::*, prelude::*};
 use alpen_vertex_state::block::{L2Block, L2BlockId};
 use alpen_vertex_state::consensus::{ConsensusState, ConsensusWrite};
 use alpen_vertex_state::sync_event::{SyncAction, SyncEvent};
+use arbitrary::Arbitrary;
+use borsh::{BorshDeserialize, BorshSerialize};
 
-use crate::errors::*;
+use crate::DbResult;
 
 /// Common database interface that we can parameterize worker tasks over if
 /// parameterizing them over each individual trait gets cumbersome or if we need
@@ -50,7 +52,7 @@ pub trait L1DataProvider {
     fn get_chain_tip(&self) -> DbResult<u64>;
 
     /// Gets the block manifest for a block index.
-    fn get_block_manifest(&self, idx: u64) -> DbResult<L1BlockManifest>;
+    fn get_block_manifest(&self, idx: u64) -> DbResult<Option<L1BlockManifest>>;
 
     /// Returns a half-open interval of block hashes, if we have all of them
     /// present.  Otherwise, returns error.
@@ -71,7 +73,7 @@ pub trait L1DataProvider {
 }
 
 /// Describes an L1 block and associated data that we need to keep around.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct L1BlockManifest {
     /// Block hash/ID, kept here so we don't have to be aware of the hash function
     /// here.  This is what we use in the MMR.
@@ -87,7 +89,16 @@ pub struct L1BlockManifest {
 }
 
 impl L1BlockManifest {
-    // TODO accessors as needed
+    pub fn new(blockid: Buf32, header: Vec<u8>, txs_root: Buf32) -> Self {
+        Self {
+            blockid,
+            header,
+            txs_root,
+        }
+    }
+    pub fn block_hash(&self) -> Buf32 {
+        self.blockid
+    }
 }
 
 /// Store to write new sync events.

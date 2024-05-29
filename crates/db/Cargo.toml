@@ -4,10 +4,18 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-alpen-vertex-state = { workspace = true }
-alpen-vertex-primitives = { workspace = true }
 alpen-vertex-mmr = { workspace = true }
-
+alpen-vertex-primitives = { workspace = true }
+alpen-vertex-state = { workspace = true }
+anyhow = { workspace = true }
+arbitrary = { workspace = true }
+borsh = { workspace = true }
 reth-db = { workspace = true }
+rockbound = { git = "https://github.com/sovereign-Labs/rockbound", tag = "v2.0.1" }
 rocksdb = { workspace = true }
 thiserror = { workspace = true }
+
+
+[dev-dependencies]
+tempfile = "3.10.1"
+rand = "0.8.5"
