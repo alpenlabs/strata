@@ -15,27 +15,14 @@ pub struct SyncEventDB {
     db: DB
 }
 
-fn get_db_opts() -> Options {
-    // TODO: add other options as appropriate.
-    let mut db_opts = Options::default();
-    db_opts.create_missing_column_families(true);
-    db_opts.create_if_missing(true);
-    db_opts
-}
-
 impl SyncEventDB {
-    pub fn new(path: &Path) -> anyhow::Result<Self> {
-        let db_opts = get_db_opts();
-        let column_families = vec![
-            SyncEventSchema::COLUMN_FAMILY_NAME
-        ];
-        let store = Self {
-            db: DB::open(path, DB_NAME, column_families, &db_opts)?
-        };
-        Ok(store)
+    // NOTE: db is expected to open all the column families defined in STORE_COLUMN_FAMILIES.
+    // FIXME: Make it better/generic.
+    pub fn new(db: DB) -> Self {
+        Self { db }
     }
 
-    fn last_idx(&self) -> DbResult<Option<u64>> {
+    fn get_last_key(&self) -> DbResult<Option<u64>> {
         let mut iterator = self.db.iter::<SyncEventSchema>()?;
         iterator.seek_to_last();
         match iterator.rev().next() {
@@ -50,7 +37,7 @@ impl SyncEventDB {
 
 impl SyncEventStore for SyncEventDB {
     fn write_sync_event(&self, ev: SyncEvent) -> DbResult<u64> {
-        let last_id = self.last_idx()?.unwrap_or(0);
+        let last_id = self.get_last_key()?.unwrap_or(0);
         let id = last_id + 1;
         let event = SyncEventWithTimestamp::new(ev);
         self.db.put::<SyncEventSchema>(&id, &event)?;
@@ -82,7 +69,7 @@ impl SyncEventStore for SyncEventDB {
 
 impl SyncEventProvider for SyncEventDB {
     fn get_last_idx(&self) -> DbResult<Option<u64>> {
-        self.last_idx()
+        self.get_last_key()
     }
 
     fn get_sync_event(&self, idx: u64) -> DbResult<Option<SyncEvent>> {
@@ -104,9 +91,12 @@ impl SyncEventProvider for SyncEventDB {
 
 #[cfg(test)]
 mod tests {
+    use crate::STORE_COLUMN_FAMILIES;
+
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
     use arbitrary::{Arbitrary, Unstructured};
+    use rockbound::schema::ColumnFamilyName;
     use tempfile::TempDir;
 
     fn generate_arbitrary<'a, T: Arbitrary<'a> + Clone>() -> T {
@@ -114,9 +104,26 @@ mod tests {
         T::arbitrary(&mut u).expect("failed to generate arbitrary instance")
     }
 
+    fn get_new_db(path: &Path) -> anyhow::Result<DB> {
+        // TODO: add other options as appropriate.
+        let mut db_opts = Options::default();
+        db_opts.create_missing_column_families(true);
+        db_opts.create_if_missing(true);
+        DB::open(
+            path,
+            DB_NAME,
+            STORE_COLUMN_FAMILIES
+                .iter()
+                .cloned()
+                .collect::<Vec<ColumnFamilyName>>(),
+            &db_opts,
+        )
+    }
+
     fn setup_db() -> SyncEventDB {
         let temp_dir = TempDir::new().expect("failed to create temp dir");
-        SyncEventDB::new(temp_dir.path()).expect("failed to create L1Db")
+        let db = get_new_db(&temp_dir.into_path()).unwrap();
+        SyncEventDB::new(db)
     }
 
     fn insert_event(db: &SyncEventDB) -> SyncEvent {
@@ -124,13 +131,6 @@ mod tests {
         let res = db.write_sync_event(ev.clone());
         assert!(res.is_ok());
         ev
-    }
-
-    #[test]
-    fn test_initialization() {
-        let temp_dir = TempDir::new().expect("failed to create temp dir");
-        let db = SyncEventDB::new(temp_dir.path());
-        assert!(db.is_ok());
     }
 
     #[test]
