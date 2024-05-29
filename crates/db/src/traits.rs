@@ -176,13 +176,17 @@ pub trait ConsensusStateProvider {
 /// L2 data store for CL blocks.  Does not store anything about what we think
 /// the L2 chain tip is, that's controlled by the consensus state.
 pub trait L2DataStore {
-    /// Stores an L2 block, does not care about the block height of the L2 block.
+    /// Stores an L2 bloc=k, does not care about the block height of the L2
+    /// block.  Also sets the block's status to "unchecked".
     fn put_block_data(&self, block: L2Block) -> DbResult<()>;
 
     /// Tries to delete an L2 block from the store, returning if it really
     /// existed or not.  This should only be used for blocks well before some
     /// buried L1 finalization horizon.
     fn del_block_data(&self, id: L2BlockId) -> DbResult<bool>;
+
+    /// Sets the block's validity status.
+    fn set_block_status(&self, id: L2BlockId, status: BlockStatus) -> DbResult<()>;
 }
 
 /// Data provider for L2 blocks.
@@ -194,4 +198,21 @@ pub trait L2DataProvider {
     /// than one on competing forks.
     // TODO do we even want to permit this as being a possible thing?
     fn get_blocks_at_height(&self, idx: u64) -> DbResult<Vec<L2BlockId>>;
+
+    /// Gets the validity status of a block.
+    fn get_block_status(&self, id: L2BlockId) -> DbResult<Option<BlockStatus>>;
+}
+
+/// Gets the status of a block.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub enum BlockStatus {
+    /// Block's validity hasn't been checked yet.
+    Unchecked,
+
+    /// Block is valid, although this doesn't mean it's in the canonical chain.
+    Valid,
+
+    /// Block is invalid, for no particular reason.  We'd have to look somewhere
+    /// else for that.
+    Invalid,
 }

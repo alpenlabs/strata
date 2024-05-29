@@ -45,24 +45,28 @@ pub enum ConsensusWrite {
     /// instance.
     ReplaceChainState(Box<ConsensusChainState>),
 
-    /// Queue an L2 block for verification.
-    QueueL2Block(L2BlockId),
-    // TODO
+    /// Queue an L2 block to be accepted.
+    AcceptL2Block(L2BlockId),
+
+    /// Rolls back L1 blocks to this block ID.
+    RollbackL1BlocksTo(L1BlockId),
+
+    /// Insert L1 blocks into the pending queue.
+    AcceptL1Block(L1BlockId),
+
+    /// Updates the buried block index to a higher index.
+    UpdateBuried(u64),
 }
 
 /// Actions the consensus state machine directs the node to take to update its
 /// own bookkeeping.  These should not be able to fail.
 #[derive(Clone, Debug)]
 pub enum SyncAction {
-    /// Directs the EL engine to try to check a block ID.
-    TryCheckBlock(L2BlockId),
-
-    /// Extends our externally-facing tip to a new block ID.
-    ExtendTip(L2BlockId),
-
-    /// Reverts out externally-facing tip to a new block ID, directing the EL
-    /// engine to roll back changes.
-    RevertTip(L2BlockId),
+    /// Extends our externally-facing tip to a new block ID.  This might trigger
+    /// a reorg of some unfinalized blocks.  We probably won't roll this block
+    /// back but we haven't seen it proven on-chain yet.  This is also where
+    /// we'd build a new block if it's our turn to.
+    UpdateTip(L2BlockId),
 
     /// Marks an L2 blockid as invalid and we won't follow any chain that has
     /// it, and will reject it from our peers.
@@ -91,8 +95,36 @@ fn apply_writes_to_state(state: &mut ConsensusState, writes: impl Iterator<Item 
         match w {
             Replace(cs) => *state = *cs,
             ReplaceChainState(ccs) => state.chain_state = *ccs,
-            QueueL2Block(blkid) => state.pending_l2_blocks.push_back(blkid),
-            // TODO
+            RollbackL1BlocksTo(l1blkid) => {
+                let pos = state.recent_l1_blocks.iter().position(|b| *b == l1blkid);
+                let Some(pos) = pos else {
+                    // TODO better logging, maybe make this an actual error
+                    panic!("operation: emitted invalid write");
+                };
+                state.recent_l1_blocks.truncate(pos);
+            }
+            AcceptL1Block(l1blkid) => state.recent_l1_blocks.push(l1blkid),
+            AcceptL2Block(blkid) => state.pending_l2_blocks.push_back(blkid),
+            UpdateBuried(new_idx) => {
+                // Check that it's increasing.
+                let old_idx = state.buried_l1_height;
+                if old_idx >= new_idx {
+                    panic!("operation: emitted non-greater buried height");
+                }
+
+                // Check that it's not higher than what we know about.
+                let diff = (new_idx - old_idx) as usize;
+                if diff > state.recent_l1_blocks.len() {
+                    panic!("operation: new buried height above known L1 tip");
+                }
+
+                // If everything checks out we can just remove them.
+                let blocks = state.recent_l1_blocks.drain(..diff).collect::<Vec<_>>();
+                state.buried_l1_height = new_idx;
+
+                // TODO merge these blocks into the L1 MMR in the chain state if
+                // we haven't already
+            }
         }
     }
 }

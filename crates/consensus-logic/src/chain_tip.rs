@@ -3,7 +3,10 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::{mpsc, Arc};
 
+use tracing::*;
+
 use alpen_vertex_db::{errors::DbError, traits::Database};
+use alpen_vertex_evmctl::engine::*;
 use alpen_vertex_state::block::L2BlockHeader;
 use alpen_vertex_state::operation::SyncAction;
 use alpen_vertex_state::{block::L2BlockId, consensus::ConsensusState};
@@ -14,7 +17,7 @@ use crate::message::{ChainTipMessage, CsmMessage};
 /// Tracks the parts of the chain that haven't been finalized on-chain yet.
 pub struct ChainTipTrackerState<D: Database> {
     /// Underlying state database.
-    database: D,
+    database: Arc<D>,
 
     /// Current consensus state we're considering blocks against.
     cur_state: Arc<ConsensusState>,
@@ -26,14 +29,25 @@ pub struct ChainTipTrackerState<D: Database> {
     sync_ev_tx: mpsc::Sender<CsmMessage>,
 }
 
-fn process_ct_msg<D: Database>(
+impl<D: Database> ChainTipTrackerState<D> {
+    fn submit_csm_message(&self, msg: CsmMessage) {
+        if !self.sync_ev_tx.send(msg).is_ok() {
+            error!("unable to submit csm message");
+        }
+    }
+}
+
+fn process_ct_msg<D: Database, E: ExecEngineCtl>(
     ctm: ChainTipMessage,
     state: &mut ChainTipTrackerState<D>,
+    engine: &E,
 ) -> Result<(), Error> {
     match ctm {
         ChainTipMessage::NewState(cs, output) => {
             // Update the new state.
             state.cur_state = cs;
+
+            let l1_tip = cs.chain_state().chain_tip_blockid();
 
             // TODO use output actions to clear out dangling states now
             for act in output.actions() {

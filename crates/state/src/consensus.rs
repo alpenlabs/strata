@@ -21,11 +21,21 @@ pub struct ConsensusState {
     pub(super) chain_state: ConsensusChainState,
 
     /// Recent L1 blocks that we might still reorg.
+    // TODO replace with a tracker that we can reorg
     pub(super) recent_l1_blocks: Vec<L1BlockId>,
+
+    /// L1 block index we treat as being "buried" and won't reorg.
+    pub(super) buried_l1_height: u64,
 
     /// Blocks we've received that appear to be on the chain tip but have not
     /// fully executed yet.
     pub(super) pending_l2_blocks: VecDeque<L2BlockId>,
+}
+
+impl ConsensusState {
+    pub fn chain_state(&self) -> &ConsensusChainState {
+        &self.chain_state
+    }
 }
 
 /// L2 blockchain consensus state.

@@ -4,7 +4,7 @@ use std::sync::{mpsc, Arc};
 
 use tracing::*;
 
-use alpen_vertex_db::{errors::DbResult, traits::Database};
+use alpen_vertex_db::{errors::DbResult, traits::*};
 use alpen_vertex_state::{
     block::L2BlockId,
     consensus::ConsensusState,
@@ -19,7 +19,8 @@ use crate::{errors::Error, message::CsmMessage, transition};
 /// Not meant to be shared across threads.
 pub struct WorkerState<D: Database> {
     /// Underlying database hierarchy that writes ultimately end up on.
-    database: D,
+    // TODO should we move this out?
+    database: Arc<D>,
 
     /// Last event idx we've processed.
     last_processed_event: u64,
@@ -29,9 +30,6 @@ pub struct WorkerState<D: Database> {
 
     /// Current consensus state we use when performing updates.
     cur_consensus_state: Arc<ConsensusState>,
-
-    /// Current hard chain tip.
-    cur_chain_tip: L2BlockId,
 }
 
 impl<D: Database> WorkerState<D> {
@@ -103,9 +101,6 @@ fn handle_sync_event<D: Database>(
 
     for action in actions {
         match action {
-            SyncAction::TryCheckBlock(blkid) => {
-                // TODO trigger call to update engine controller
-            }
             SyncAction::ExtendTip(blkid) => {
                 state.extend_tip(blkid)?;
             }
@@ -114,6 +109,15 @@ fn handle_sync_event<D: Database>(
             }
             SyncAction::MarkInvalid(blkid) => {
                 // TODO not sure what this should entail yet
+                let store = state.database.l2_store();
+                store.set_block_status(blkid, BlockStatus::Invalid)?;
+            }
+            SyncAction::FinalizeBlock(blkid) => {
+                // For the tip tracker this gets picked up later.  We don't have
+                // to do anything here *necessarily*.
+                // TODO we should probably emit a state checkpoint here if we
+                // aren't already
+                info!(?blkid, "finalizing block");
             }
         }
     }
