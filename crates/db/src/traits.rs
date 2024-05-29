@@ -1,6 +1,8 @@
 //! Trait definitions for low level database interfaces.  This borrows some of
 //! its naming conventions from reth.
 
+use std::sync::Arc;
+
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
@@ -26,7 +28,14 @@ pub trait Database {
     type CsStore: ConsensusStateStore;
     type CsProv: ConsensusStateProvider;
 
-    // TODO accessors as needed
+    fn l1_store(&self) -> &Arc<Self::L1Store>;
+    fn l1_provider(&self) -> &Arc<Self::L1Prov>;
+    fn l2_store(&self) -> &Arc<Self::L2Store>;
+    fn l2_provider(&self) -> &Arc<Self::L2Prov>;
+    fn sync_event_store(&self) -> &Arc<Self::SeStore>;
+    fn sync_event_provider(&self) -> &Arc<Self::SeProv>;
+    fn consensus_state_store(&self) -> &Arc<Self::CsStore>;
+    fn consensus_state_provider(&self) -> &Arc<Self::CsProv>;
 }
 
 /// Storage interface to control our view of L1 data.

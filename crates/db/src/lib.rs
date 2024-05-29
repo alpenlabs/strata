@@ -7,12 +7,15 @@ use crate::l1::schemas::{L1BlockSchema, MmrSchema, TxnSchema};
 use crate::sync_event::schemas::SyncEventSchema;
 
 pub mod consensus_state;
+pub mod database;
 pub mod l1;
 pub mod sync_event;
 
 pub mod errors;
 pub mod macros;
 pub mod traits;
+
+pub type DbResult<T> = anyhow::Result<T, errors::DbError>;
 
 pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
     ConsensusOutputSchema::COLUMN_FAMILY_NAME,
