@@ -1,6 +1,7 @@
 //! Consensus validation logic and core state machine
 
 pub mod chain_tip;
+pub mod credential;
 pub mod message;
 pub mod status;
 pub mod transition;
