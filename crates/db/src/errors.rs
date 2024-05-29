@@ -21,6 +21,9 @@ pub enum DbError {
     #[error("not yet bootstrapped")]
     NotBootstrapped,
 
+    #[error("duplicate key {0} not allowed")]
+    DuplicateKey(u64),
+
     #[error("{0}")]
     Other(String),
 }
