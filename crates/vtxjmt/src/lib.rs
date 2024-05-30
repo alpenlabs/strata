@@ -7,16 +7,16 @@
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 
+use rockbound::schema::ColumnFamilyName;
+
 /// Implements helpers for configuring RocksDB.
 pub mod rocks_db_config;
 /// Defines the tables used by the Sovereign SDK.
-pub mod schema;
+pub mod schemas;
 /// Implements a wrapper around [RocksDB](https://rocksdb.org/) meant for storing rollup state.
 /// This is primarily used as the backing store for the [JMT(JellyfishMerkleTree)](https://docs.rs/jmt/latest/jmt/).
 pub mod state_db;
 
-/// Define namespaces at the database level
-pub mod namespaces;
 #[cfg(test)]
 mod test_utils;
 

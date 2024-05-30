@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
-use crate::schema::{CacheContainer, CacheDb, ChangeSet, SchemaBatch};
+use crate::schemas::{CacheContainer, CacheDb, ChangeSet, SchemaBatch};
 use crate::DbOptions;
 
 const MAGIC_SNAPSHOT_ID: u64 = u64::MAX - 2;

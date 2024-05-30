@@ -26,6 +26,7 @@ alpen-vertex-mmr = { path = "crates/util/mmr" }
 alpen-vertex-primitives = { path = "crates/primitives" }
 alpen-vertex-rpc-api = { path = "crates/rpc/api" }
 alpen-vertex-state = { path = "crates/state" }
+alpen-vertex-db = { path = "crates/db" }
 
 async-trait = "0.1"
 jsonrpsee = "0.22"

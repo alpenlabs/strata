@@ -7,6 +7,8 @@ edition = "2021"
 # Dependencies maintained by Sovereign
 rockbound = { git = "https://github.com/sovereign-Labs/rockbound", rev = "6febf63f61bc775324b96dc1d1a0290b8a3d9e41" }
 
+alpen-vertex-db = { workspace = true }
+
 # External dependencies
 anyhow = "1.0.86"
 bincode = "1.3.3"
