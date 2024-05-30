@@ -1,4 +1,5 @@
-pub mod rocks_db_config;
+use alpen_vertex_db::rocks_db_config;
+
 pub mod schemas;
 pub mod state_db;
 

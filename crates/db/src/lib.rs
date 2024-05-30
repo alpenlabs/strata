@@ -6,6 +6,7 @@ use rockbound::{schema::ColumnFamilyName, Schema};
 pub mod errors;
 pub mod l1;
 pub mod macros;
+pub mod rocks_db_config;
 pub mod traits;
 
 pub type DbResult<T> = anyhow::Result<T, crate::errors::DbError>;
