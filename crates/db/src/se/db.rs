@@ -1,7 +1,4 @@
-use std::path::Path;
-
-use rockbound::{Schema, SchemaBatch, DB};
-use rocksdb::Options;
+use rockbound::{SchemaBatch, DB};
 
 use alpen_vertex_state::sync_event::SyncEvent;
 
@@ -9,7 +6,6 @@ use crate::{DbResult, traits::SyncEventStore};
 use crate::traits::SyncEventProvider;
 use super::schemas::{SyncEventSchema, SyncEventWithTimestamp};
 
-const DB_NAME: &str = "sync_event_db";
 
 pub struct SyncEventDB {
     db: DB
@@ -91,13 +87,18 @@ impl SyncEventProvider for SyncEventDB {
 
 #[cfg(test)]
 mod tests {
-    use crate::STORE_COLUMN_FAMILIES;
-
-    use super::*;
+    use std::path::Path;
     use std::time::{SystemTime, UNIX_EPOCH};
+
     use arbitrary::{Arbitrary, Unstructured};
     use rockbound::schema::ColumnFamilyName;
+    use rocksdb::Options;
     use tempfile::TempDir;
+
+    use crate::STORE_COLUMN_FAMILIES;
+    use super::*;
+
+    const DB_NAME: &str = "sync_event_db";
 
     fn generate_arbitrary<'a, T: Arbitrary<'a> + Clone>() -> T {
         let mut u = Unstructured::new(&[1, 2, 3]);
