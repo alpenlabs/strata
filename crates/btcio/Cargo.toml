@@ -4,3 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+anyhow = { workspace = true }
+bitcoin = { version = "0.32.1" }
+bytes =  { version = "1.6.0" }
+tracing = { workspace = true }
+zeromq = { version = "0.3.5" }

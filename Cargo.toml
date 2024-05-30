@@ -29,6 +29,7 @@ alpen-vertex-mmr = { path = "crates/util/mmr" }
 alpen-vertex-primitives = { path = "crates/primitives" }
 alpen-vertex-rpc-api = { path = "crates/rpc/api" }
 alpen-vertex-state = { path = "crates/state" }
+alpen-vertex-btcio = { path = "crates/btcio" }
 
 anyhow = "1.0.86"
 arbitrary = { version = "1.3.2", features = ["derive"] }

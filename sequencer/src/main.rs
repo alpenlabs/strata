@@ -11,6 +11,7 @@ use thiserror::Error;
 use tokio::sync::{mpsc, oneshot, watch};
 use tracing::*;
 
+use alpen_vertex_btcio::L1Reader;
 use alpen_vertex_common::logging;
 use alpen_vertex_consensus_logic::ctl::CsmController;
 use alpen_vertex_consensus_logic::message::{ChainTipMessage, CsmMessage};
@@ -121,7 +122,18 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn main_task(args: Args) -> anyhow::Result<()> {
+async fn l1_reader_task() -> Result<(), InitError> {
+    let mut reader = L1Reader::new("tcp://127.0.0.1:29000")
+        .await
+        .expect("L1 reader could not be spawned");
+    let msg = reader.run().await;
+    warn!("{:?}", msg);
+    Ok(())
+}
+
+async fn main_task() -> Result<(), InitError> {
+    tokio::spawn(l1_reader_task());
+
     let (stop_tx, stop_rx) = oneshot::channel();
 
     // Init RPC methods.
