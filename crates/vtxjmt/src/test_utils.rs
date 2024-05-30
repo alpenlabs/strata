@@ -1,7 +1,13 @@
+//! Adapted from sov-sdk
+
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
-use crate::schemas::{CacheContainer, CacheDb, ChangeSet, SchemaBatch};
+use rockbound::cache::cache_container::CacheContainer;
+use rockbound::cache::cache_db::CacheDb;
+use rockbound::cache::change_set::ChangeSet;
+use rockbound::SchemaBatch;
+
 use crate::DbOptions;
 
 const MAGIC_SNAPSHOT_ID: u64 = u64::MAX - 2;

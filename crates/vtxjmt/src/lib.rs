@@ -1,20 +1,5 @@
-//! Defines the database used by the Sovereign SDK.
-//!
-//! - Types and traits for storing and retrieving ledger data can be found in the [`ledger_db`] module
-//! - DB "Table" definitions can be found in the [`schema`] module
-//! - Types and traits for storing state data can be found in the [`state_db`] module
-//! - The default db configuration is generated in the [`rocks_db_config`] module
-#![forbid(unsafe_code)]
-#![deny(missing_docs)]
-
-use rockbound::schema::ColumnFamilyName;
-
-/// Implements helpers for configuring RocksDB.
 pub mod rocks_db_config;
-/// Defines the tables used by the Sovereign SDK.
 pub mod schemas;
-/// Implements a wrapper around [RocksDB](https://rocksdb.org/) meant for storing rollup state.
-/// This is primarily used as the backing store for the [JMT(JellyfishMerkleTree)](https://docs.rs/jmt/latest/jmt/).
 pub mod state_db;
 
 #[cfg(test)]

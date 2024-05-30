@@ -1,24 +1,18 @@
-use jmt::storage::{Node, NodeKey};
-use jmt::Version;
-use rockbound::{SchemaKey, SchemaValue};
-use alpen_vertex_db::define_table_with_default_codec;
-use alpen_vertex_db::define_table_without_codec;
-use alpen_vertex_db::impl_borsh_value_codec;
-
-pub use rockbound::cache::cache_container::CacheContainer;
-pub use rockbound::cache::cache_db::CacheDb;
-pub use rockbound::cache::change_set::ChangeSet;
-pub use rockbound::SchemaBatch;
+//! Defines the tables used by JMT
+//! Adapted from sov-sdk
 
 use core::fmt::Debug;
-
 use std::io::Cursor;
+
+use alpen_vertex_db::define_table_without_codec;
+
 use borsh::{BorshDeserialize, BorshSerialize};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use jmt::storage::{NibblePath};
+use jmt::Version;
+use jmt::storage::{NibblePath, Node, NodeKey};
 use rockbound::schema::{KeyDecoder, KeyEncoder, ValueCodec};
-use rockbound::{CodecError, Schema, SeekKeyEncoder};
-
+use rockbound::{CodecError, SeekKeyEncoder};
+use rockbound::{SchemaKey, SchemaValue};
 
 define_table_without_codec!(
     /// A table to store mapping from node hash to JMT node
@@ -106,9 +100,7 @@ impl<T: Debug + PartialEq + AsRef<[u8]>> KeyEncoder<JmtValues> for (T, Version) 
     }
 }
 
-impl<T: AsRef<[u8]> + PartialEq + Debug> SeekKeyEncoder<JmtValues>
-    for (T, Version)
-{
+impl<T: AsRef<[u8]> + PartialEq + Debug> SeekKeyEncoder<JmtValues> for (T, Version) {
     fn encode_seek_key(&self) -> Result<Vec<u8>, CodecError> {
         <(T, Version) as KeyEncoder<JmtValues>>::encode_key(self)
     }

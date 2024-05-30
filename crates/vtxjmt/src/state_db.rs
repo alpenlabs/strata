@@ -1,3 +1,7 @@
+//! Implements a wrapper around [RocksDB](https://rocksdb.org/) meant for storing rollup state.
+//! This is primarily used as the backing store for the [JMT(JellyfishMerkleTree)](https://docs.rs/jmt/latest/jmt/).
+//! Adapted from sov-sdk
+
 use std::fmt::Debug;
 use std::sync::Arc;
 
@@ -26,14 +30,7 @@ impl StateDb {
     const DB_PATH_SUFFIX: &'static str = "state";
     const DB_NAME: &'static str = "state-db";
 
-
-    const JMT_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
-        KeyHashToKey::COLUMN_FAMILY_NAME,
-        JmtNodes::COLUMN_FAMILY_NAME,
-        JmtValues::COLUMN_FAMILY_NAME,
-    ];
-
-    /// Returns the table names.
+    /// Returns the table names used in JMT
     fn get_column_names() -> [ColumnFamilyName; 3] {
         [
             KeyHashToKey::COLUMN_FAMILY_NAME,
@@ -200,7 +197,7 @@ impl<'a> HasPreimage for JmtHandler<'a> {
 #[cfg(test)]
 mod state_db_tests {
     use jmt::storage::{NodeBatch, TreeReader};
-    use jmt::{JellyfishMerkleTree, KeyHash};
+    use jmt::KeyHash;
     use sha2::Sha256;
 
     use crate::state_db::{JmtHandler, StateDb};

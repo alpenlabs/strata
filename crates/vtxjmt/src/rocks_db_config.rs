@@ -1,5 +1,6 @@
-// Adapted from Aptos-Core.
-// Modified to remove serde dependency
+//! Implements helpers for configuring RocksDB.
+//! Adapted from Aptos-Core.
+//! Modified to remove serde dependency
 
 use rocksdb::Options;
 
