@@ -1,7 +1,4 @@
-use std::path::Path;
-
 use rockbound::{Schema, DB};
-use rocksdb::Options;
 
 use crate::{
     errors::DbError,
@@ -9,8 +6,6 @@ use crate::{
 };
 
 use super::schemas::{ConsensusOutputSchema, ConsensusStateSchema};
-
-const DB_NAME: &str = "consensus_state_db";
 
 pub struct ConsensusStateDB {
     db: DB,
@@ -130,14 +125,19 @@ impl ConsensusStateProvider for ConsensusStateDB {
 
 #[cfg(test)]
 mod tests {
-    use alpen_vertex_state::consensus::ConsensusState;
+    use std::path::Path;
+
     use arbitrary::{Arbitrary, Unstructured};
     use rockbound::schema::ColumnFamilyName;
     use tempfile::TempDir;
+    use rocksdb::Options;
+
+    use alpen_vertex_state::consensus::ConsensusState;
 
     use crate::{traits::ConsensusOutput, STORE_COLUMN_FAMILIES};
-
     use super::*;
+
+    const DB_NAME: &str = "consensus_state_db";
 
     fn get_new_db(path: &Path) -> anyhow::Result<DB> {
         // TODO: add other options as appropriate.
