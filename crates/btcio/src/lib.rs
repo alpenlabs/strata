@@ -18,8 +18,25 @@ const RAW_TX: &str = "rawtx";
 
 const SUBSCRIPTION_TOPICS: &[&'static str] = &[HASH_BLOCK, RAW_BLOCK, RAW_TX];
 
-pub enum L1Data {
-    L1Block(Block),
+type Index = u32;
+/// Store the bitcoin block and references to the relevant transactions within the block
+pub struct BlockData<'a> {
+    block: Block,
+    relevant_txns: Vec<(Index, &'a Transaction)>,
+}
+
+impl<'a> BlockData<'a> {
+    pub fn block(&self) -> &Block {
+        &self.block
+    }
+
+    pub fn relevant_txns(&self) -> &Vec<(Index, &'a Transaction)> {
+        &self.relevant_txns
+    }
+}
+
+pub enum L1Data<'a> {
+    BlockData(BlockData<'a>),
     // TODO: add other as needed
 }
 
@@ -58,18 +75,13 @@ impl BtcIO {
     fn parse_l1_data(&self, topic: &str, msg: &bytes::Bytes) -> anyhow::Result<L1Data> {
         // TODO: clean this
         match topic {
-            HASH_BLOCK => {
-                let parsed_hash: BlockHash = deserialize(&msg.to_vec())?;
-                info!("HASH BLOCK RECEIVED: {:?}", parsed_hash);
-            }
             RAW_BLOCK => {
                 let block: Block = deserialize(&msg.to_vec())?;
-                return Ok(L1Data::L1Block(block));
-            }
-            RAW_TX => {
-                let _tx: Transaction =
-                    deserialize(&msg.to_vec()).expect("could not parse transaction");
-                return Err(anyhow!("Inalid data"));
+                // TODO: extract relevant txns
+                return Ok(L1Data::BlockData(BlockData {
+                    block,
+                    relevant_txns: vec![],
+                }));
             }
             _ => {
                 warn!("Something else obtained");

@@ -1,4 +1,5 @@
 use arbitrary::Arbitrary;
+use bitcoin::{consensus::serialize, Block, Transaction};
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::buf::Buf32;
@@ -56,5 +57,17 @@ impl L1Tx {
 
     pub fn tx_data(&self) -> &[u8] {
         &self.tx
+    }
+}
+
+impl From<((u32, &Transaction), &Block)> for L1Tx {
+    fn from(((idx, tx), block): ((u32, &Transaction), &Block)) -> Self {
+        let tx = serialize(tx);
+        // TODO: construct cohashes properly
+        let proof = L1TxProof {
+            position: idx,
+            cohashes: vec![],
+        };
+        Self { proof, tx }
     }
 }
