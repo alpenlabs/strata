@@ -129,8 +129,8 @@ mod tests {
 
     use arbitrary::{Arbitrary, Unstructured};
     use rockbound::schema::ColumnFamilyName;
-    use tempfile::TempDir;
     use rocksdb::Options;
+    use tempfile::TempDir;
 
     use alpen_vertex_state::consensus::ConsensusState;
 
