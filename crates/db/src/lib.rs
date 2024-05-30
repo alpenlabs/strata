@@ -3,14 +3,14 @@
 use rockbound::{schema::ColumnFamilyName, Schema};
 
 use l1::schemas::{L1BlockSchema, MmrSchema, TxnSchema};
-use se::schemas::SyncEventSchema;
+use sync_event::schemas::SyncEventSchema;
 
 pub mod errors;
 pub mod macros;
 pub mod traits;
 
 pub mod l1;
-pub mod se;
+pub mod sync_event;
 
 pub type DbResult<T> = anyhow::Result<T, crate::errors::DbError>;
 
