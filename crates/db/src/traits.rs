@@ -4,16 +4,19 @@
 use std::sync::Arc;
 
 use arbitrary::Arbitrary;
+use bitcoin::consensus::serialize;
+use bitcoin::hashes::Hash;
+use bitcoin::opcodes::all::OP_RETURN;
+use bitcoin::{Amount, Block};
 use borsh::{BorshDeserialize, BorshSerialize};
 
+use crate::errors::*;
 use alpen_vertex_mmr::CompactMmr;
 use alpen_vertex_primitives::{l1::*, prelude::*};
 use alpen_vertex_state::block::{L2Block, L2BlockId};
 use alpen_vertex_state::consensus::ConsensusState;
 use alpen_vertex_state::operation::*;
 use alpen_vertex_state::sync_event::SyncEvent;
-
-use crate::errors::*;
 
 /// Common database interface that we can parameterize worker tasks over if
 /// parameterizing them over each individual trait gets cumbersome or if we need
@@ -110,6 +113,34 @@ impl L1BlockManifest {
 
     pub fn block_hash(&self) -> Buf32 {
         self.blockid
+    }
+}
+
+impl From<Block> for L1BlockManifest {
+    fn from(block: Block) -> Self {
+        let blockid = Buf32(block.block_hash().to_raw_hash().to_byte_array().into());
+        let coinbase = &block.txdata[0];
+        let wtx_root_utxo = coinbase
+            .output
+            .iter()
+            .rev()
+            .filter(|x| {
+                x.value == Amount::ZERO && x.script_pubkey.as_bytes()[0] == OP_RETURN.to_u8()
+            })
+            .next();
+        let txs_root: [u8; 32] = wtx_root_utxo
+            .map(|x| {
+                let mut arr = [0u8; 32];
+                arr.copy_from_slice(&x.script_pubkey.as_bytes()[5..37]);
+                arr
+            })
+            .unwrap_or_default();
+        let header = serialize(&block.header);
+        Self {
+            blockid,
+            txs_root: Buf32(txs_root.into()),
+            header,
+        }
     }
 }
 

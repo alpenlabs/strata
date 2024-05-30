@@ -5,7 +5,8 @@ edition = "2021"
 
 [dependencies]
 anyhow = { workspace = true }
-bitcoin = { version = "0.32.1" }
+bitcoin = { workspace = true }
 bytes =  { version = "1.6.0" }
+tokio = { workspace = true }
 tracing = { workspace = true }
 zeromq = { version = "0.3.5" }

@@ -181,20 +181,19 @@ impl L1DataProvider for L1Db {
 mod tests {
     use std::path::Path;
 
-    use crate::STORE_COLUMN_FAMILIES;
-
-    use super::*;
-    use alpen_vertex_primitives::l1::L1TxProof;
     use arbitrary::{Arbitrary, Unstructured};
     use rand::Rng;
     use rockbound::schema::ColumnFamilyName;
     use rocksdb::Options;
     use tempfile::TempDir;
 
+    use crate::l1::utils::get_db_for_l1_store;
+
+    use super::*;
+
     struct ArbitraryGenerator {
         buffer: Vec<u8>,
     }
-    const DB_NAME: &str = "l1_db";
 
     impl ArbitraryGenerator {
         fn new() -> Self {
@@ -210,26 +209,9 @@ mod tests {
         }
     }
 
-    fn get_new_db(path: &Path) -> anyhow::Result<Arc<DB>> {
-        // TODO: add other options as appropriate.
-        let mut db_opts = Options::default();
-        db_opts.create_missing_column_families(true);
-        db_opts.create_if_missing(true);
-        DB::open(
-            path,
-            DB_NAME,
-            STORE_COLUMN_FAMILIES
-                .iter()
-                .cloned()
-                .collect::<Vec<ColumnFamilyName>>(),
-            &db_opts,
-        )
-        .map(Arc::new)
-    }
-
     fn setup_db() -> L1Db {
         let temp_dir = TempDir::new().expect("failed to create temp dir");
-        let db = get_new_db(&temp_dir.into_path()).unwrap();
+        let db = get_db_for_l1_store(&temp_dir.into_path()).unwrap();
         L1Db::new(db)
     }
 

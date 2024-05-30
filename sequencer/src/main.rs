@@ -11,7 +11,6 @@ use thiserror::Error;
 use tokio::sync::{mpsc, oneshot, watch};
 use tracing::*;
 
-use alpen_vertex_btcio::L1Reader;
 use alpen_vertex_common::logging;
 use alpen_vertex_consensus_logic::ctl::CsmController;
 use alpen_vertex_consensus_logic::message::{ChainTipMessage, CsmMessage};
@@ -25,7 +24,10 @@ use alpen_vertex_state::operation;
 use crate::args::Args;
 
 mod args;
+mod l1_reader;
 mod rpc_server;
+
+use l1_reader::l1_reader_task;
 
 #[derive(Debug, Error)]
 pub enum InitError {
@@ -119,15 +121,6 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     }
 
     info!("exiting");
-    Ok(())
-}
-
-async fn l1_reader_task() -> Result<(), InitError> {
-    let mut reader = L1Reader::new("tcp://127.0.0.1:29000")
-        .await
-        .expect("L1 reader could not be spawned");
-    let msg = reader.run().await;
-    warn!("{:?}", msg);
     Ok(())
 }
 

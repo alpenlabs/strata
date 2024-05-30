@@ -3,13 +3,11 @@
 use std::str::from_utf8;
 
 use anyhow::anyhow;
-use bitcoin::{
-    consensus::deserialize, opcodes::all::OP_RETURN, Amount, Block, BlockHash, Transaction,
-};
+use bitcoin::{consensus::deserialize, Block, BlockHash, Transaction};
 use tracing::*;
 use zeromq::{Socket, SocketRecv, SubSocket};
 
-pub struct L1Reader {
+pub struct BtcIO {
     zmq_socket: SubSocket,
     // rpc_client: Client,
 }
@@ -20,7 +18,12 @@ const RAW_TX: &str = "rawtx";
 
 const SUBSCRIPTION_TOPICS: &[&'static str] = &[HASH_BLOCK, RAW_BLOCK, RAW_TX];
 
-impl L1Reader {
+pub enum L1Data {
+    L1Block(Block),
+    // TODO: add other as needed
+}
+
+impl BtcIO {
     pub async fn new(addr: &str) -> anyhow::Result<Self> {
         let mut zmq_socket = SubSocket::new();
         info!("Connecting to zmq socket");
@@ -32,45 +35,46 @@ impl L1Reader {
         Ok(Self { zmq_socket })
     }
 
-    pub async fn run(&mut self) -> anyhow::Result<()> {
+    pub async fn run<F>(&mut self, handler: F) -> anyhow::Result<()>
+    where
+        F: Fn(L1Data) -> anyhow::Result<()>,
+    {
         info!("Running zmq");
         while let Some(msg) = self.zmq_socket.recv().await.ok() {
             // info!("msg {:?}", msg);
-            msg.get(0).map(|topic_bytes| {
-                self.handle_topic_message(from_utf8(topic_bytes).unwrap(), msg.get(1))
-            });
+            match msg.into_vec().as_slice() {
+                [topic_bytes, data_bytes, _rest @ ..] => {
+                    let data = self.parse_l1_data(from_utf8(topic_bytes).unwrap(), data_bytes)?;
+                    handler(data)?;
+                }
+                _ => {
+                    warn!("Invalid message received from zmq");
+                }
+            };
         }
         Err(anyhow!("Failed to receive message from zmq socket"))
     }
 
-    fn handle_topic_message(&self, topic: &str, msg: Option<&bytes::Bytes>) -> anyhow::Result<()> {
+    fn parse_l1_data(&self, topic: &str, msg: &bytes::Bytes) -> anyhow::Result<L1Data> {
+        // TODO: clean this
         match topic {
             HASH_BLOCK => {
-                let parsed_hash: BlockHash = deserialize(&msg.unwrap().to_vec())?;
+                let parsed_hash: BlockHash = deserialize(&msg.to_vec())?;
                 info!("HASH BLOCK RECEIVED: {:?}", parsed_hash);
             }
             RAW_BLOCK => {
-                let block: Block =
-                    deserialize(&msg.unwrap().to_vec()).expect("could not parse block");
-                let coinbase_wtx_utxo = &block.txdata[0]
-                    .output
-                    .iter()
-                    .filter(|&x| {
-                        x.value == Amount::ZERO
-                            && x.script_pubkey.as_bytes()[0] == OP_RETURN.to_u8()
-                    })
-                    .next();
-                info!("Coinbase RECEIVED: {:?}", coinbase_wtx_utxo);
+                let block: Block = deserialize(&msg.to_vec())?;
+                return Ok(L1Data::L1Block(block));
             }
             RAW_TX => {
-                let tx: Transaction =
-                    deserialize(&msg.unwrap().to_vec()).expect("could not parse transaction");
-                // info!("RAW TX RECEIVED: {:?}", tx);
+                let _tx: Transaction =
+                    deserialize(&msg.to_vec()).expect("could not parse transaction");
+                return Err(anyhow!("Inalid data"));
             }
             _ => {
                 warn!("Something else obtained");
             }
         }
-        Ok(())
+        Err(anyhow!("Inalid data"))
     }
 }
