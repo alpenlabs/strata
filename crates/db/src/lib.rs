@@ -2,14 +2,14 @@
 
 use rockbound::{schema::ColumnFamilyName, Schema};
 
-use cs::schemas::{ConsensusOutputSchema, ConsensusStateSchema};
+use consensus_state::schemas::{ConsensusOutputSchema, ConsensusStateSchema};
 use l1::schemas::{L1BlockSchema, MmrSchema, TxnSchema};
 
 pub mod errors;
 pub mod macros;
 pub mod traits;
 
-pub mod cs;
+pub mod consensus_state;
 pub mod l1;
 
 pub type DbResult<T> = anyhow::Result<T, crate::errors::DbError>;
