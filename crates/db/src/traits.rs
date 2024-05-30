@@ -119,26 +119,14 @@ impl L1BlockManifest {
 impl From<Block> for L1BlockManifest {
     fn from(block: Block) -> Self {
         let blockid = Buf32(block.block_hash().to_raw_hash().to_byte_array().into());
-        let coinbase = &block.txdata[0];
-        let wtx_root_utxo = coinbase
-            .output
-            .iter()
-            .rev()
-            .filter(|x| {
-                x.value == Amount::ZERO && x.script_pubkey.as_bytes()[0] == OP_RETURN.to_u8()
-            })
-            .next();
-        let txs_root: [u8; 32] = wtx_root_utxo
-            .map(|x| {
-                let mut arr = [0u8; 32];
-                arr.copy_from_slice(&x.script_pubkey.as_bytes()[5..37]);
-                arr
-            })
+        let root = block
+            .witness_root()
+            .map(|x| x.to_byte_array())
             .unwrap_or_default();
         let header = serialize(&block.header);
         Self {
             blockid,
-            txs_root: Buf32(txs_root.into()),
+            txs_root: Buf32(root.into()),
             header,
         }
     }

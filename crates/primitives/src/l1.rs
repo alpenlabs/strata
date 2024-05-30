@@ -1,5 +1,5 @@
 use arbitrary::Arbitrary;
-use bitcoin::{consensus::serialize, Block, Transaction};
+use bitcoin::{consensus::serialize, Block, MerkleBlock, Transaction};
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::buf::Buf32;
@@ -62,12 +62,15 @@ impl L1Tx {
 
 impl From<((u32, &Transaction), &Block)> for L1Tx {
     fn from(((idx, tx), block): ((u32, &Transaction), &Block)) -> Self {
-        let tx = serialize(tx);
         // TODO: construct cohashes properly
+        let _merkleblock =
+            MerkleBlock::from_block_with_predicate(block, |&x| x == tx.compute_txid());
+        // TODO: continue
         let proof = L1TxProof {
             position: idx,
             cohashes: vec![],
         };
+        let tx = serialize(tx);
         Self { proof, tx }
     }
 }
