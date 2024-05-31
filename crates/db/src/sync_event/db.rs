@@ -2,6 +2,7 @@ use rockbound::{SchemaBatch, DB};
 
 use alpen_vertex_state::sync_event::SyncEvent;
 
+use crate::errors::DbError;
 use crate::{DbResult, traits::SyncEventStore};
 use crate::traits::SyncEventProvider;
 use super::schemas::{SyncEventSchema, SyncEventWithTimestamp};
@@ -41,6 +42,19 @@ impl SyncEventStore for SyncEventDB {
     }
 
     fn clear_sync_event(&self, start_idx: u64, end_idx: u64) -> DbResult<()> {
+        if !(start_idx < end_idx) {
+            return Err(DbError::Other("start_idx must be less than end_idx".to_string()))
+        }
+
+        match self.get_last_key()? {
+            Some(last_key) => {
+                if !(end_idx <= last_key) {
+                    return Err(DbError::Other("end_idx must be less than or equal to last_key".to_string()))
+                }
+            },
+            None => return Err(DbError::Other("cannot clear empty db".to_string()))
+        }
+
         let iterator = self.db.iter::<SyncEventSchema>()?;
 
         // TODO: determine if the expectation behaviour for this is to clear early events or clear late events
@@ -209,7 +223,7 @@ mod tests {
             let _ = insert_event(&db);
         }
         let res = db.clear_sync_event(6, 7);
-        assert!(res.is_ok());
+        assert!(res.is_err_and(|x| matches!(x, DbError::Other(ref msg) if msg == "end_idx must be less than or equal to last_key")));
     }
 
 
@@ -225,20 +239,6 @@ mod tests {
 
         let new_idx = db.get_last_idx().unwrap().unwrap();
         assert_eq!(new_idx, 5);
-    }
-
-    #[test]
-    fn test_get_last_idx_3() {
-        let db = setup_db();
-        let n = 5;
-        for _ in 1..=n {
-            let _ = insert_event(&db);
-        }
-        let res = db.clear_sync_event(3, 6);
-        assert!(res.is_ok());
-
-        let new_idx = db.get_last_idx().unwrap().unwrap();
-        assert_eq!(new_idx, 2);
     }
 
 }
