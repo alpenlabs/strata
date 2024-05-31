@@ -3,9 +3,6 @@ use alpen_vertex_db::rocks_db_config;
 pub mod schemas;
 pub mod state_db;
 
-#[cfg(test)]
-mod test_utils;
-
 /// Options on how to setup [`rockbound::DB`] or any other persistence
 pub struct DbOptions {
     /// Name of the database.
