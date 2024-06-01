@@ -12,3 +12,6 @@ alpen-vertex-state = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
+
+[dev-dependencies]
+rand = { version = "*", features = ["getrandom"] }

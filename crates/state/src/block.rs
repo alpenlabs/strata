@@ -1,3 +1,5 @@
+use std::fmt::{self, Debug};
+
 use alpen_vertex_primitives::l1::L1Tx;
 use alpen_vertex_primitives::prelude::*;
 use arbitrary::Arbitrary;
@@ -7,19 +9,21 @@ use crate::l1::L1HeaderPayload;
 
 /// ID of an L2 block, usually the hash of its root header.
 #[derive(
-    Copy,
-    Clone,
-    Debug,
-    Eq,
-    PartialEq,
-    Ord,
-    PartialOrd,
-    Hash,
-    Arbitrary,
-    BorshSerialize,
-    BorshDeserialize,
+    Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Arbitrary, BorshSerialize, BorshDeserialize,
 )]
 pub struct L2BlockId(Buf32);
+
+impl From<Buf32> for L2BlockId {
+    fn from(value: Buf32) -> Self {
+        Self(value)
+    }
+}
+
+impl fmt::Debug for L2BlockId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(&self.0, f)
+    }
+}
 
 /// Full contents of the bare L2 block.
 #[derive(Clone, Debug)]
@@ -128,6 +132,16 @@ pub struct L1Segment {
 pub struct ExecSegment {
     /// Header of the EL data.
     el_payload: Vec<u8>,
+}
+
+impl ExecSegment {
+    pub fn new(el_payload: Vec<u8>) -> Self {
+        Self { el_payload }
+    }
+
+    pub fn payload(&self) -> &[u8] {
+        &self.el_payload
+    }
 }
 
 /// Data emitted by EL exec for a withdraw request.

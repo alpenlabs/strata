@@ -1,3 +1,4 @@
+use alpen_vertex_evmctl::errors::EngineError;
 use thiserror::Error;
 
 use alpen_vertex_state::block::L2BlockId;
@@ -14,8 +15,14 @@ pub enum Error {
     #[error("L1 blkid {0:?} missing from database")]
     MissingL1Block(L1BlockId),
 
+    #[error("unable to find reorg {0:?} -> {1:?})")]
+    UnableToFindReorg(L2BlockId, L2BlockId),
+
     #[error("chaintip: {0}")]
     ChainTip(#[from] ChainTipError),
+
+    #[error("engine: {0}")]
+    Engine(#[from] EngineError),
 
     #[error("db: {0}")]
     Db(#[from] alpen_vertex_db::errors::DbError),
