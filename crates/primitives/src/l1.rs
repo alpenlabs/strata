@@ -1,5 +1,6 @@
 use arbitrary::Arbitrary;
-use bitcoin::{consensus::serialize, Block, MerkleBlock, Transaction};
+use bitcoin::hashes::Hash;
+use bitcoin::{consensus::serialize, Block};
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::buf::Buf32;
@@ -60,17 +61,47 @@ impl L1Tx {
     }
 }
 
-impl From<((u32, &Transaction), &Block)> for L1Tx {
-    fn from(((idx, tx), block): ((u32, &Transaction), &Block)) -> Self {
-        // TODO: construct cohashes properly
-        let _merkleblock =
-            MerkleBlock::from_block_with_predicate(block, |&x| x == tx.compute_txid());
-        // TODO: continue
-        let proof = L1TxProof {
-            position: idx,
-            cohashes: vec![],
-        };
-        let tx = serialize(tx);
-        Self { proof, tx }
+/// Describes an L1 block and associated data that we need to keep around.
+#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
+pub struct L1BlockManifest {
+    /// Block hash/ID, kept here so we don't have to be aware of the hash function
+    /// here.  This is what we use in the MMR.
+    blockid: Buf32,
+
+    /// Block header and whatever additional data we might want to query.
+    header: Vec<u8>,
+
+    /// Merkle root for the transactions in the block.  For Bitcoin, this is
+    /// actually the witness transactions root, since we care about the witness
+    /// data.
+    txs_root: Buf32,
+}
+
+impl L1BlockManifest {
+    pub fn new(blockid: Buf32, header: Vec<u8>, txs_root: Buf32) -> Self {
+        Self {
+            blockid,
+            header,
+            txs_root,
+        }
+    }
+    pub fn block_hash(&self) -> Buf32 {
+        self.blockid
+    }
+}
+
+impl From<Block> for L1BlockManifest {
+    fn from(block: Block) -> Self {
+        let blockid = Buf32(block.block_hash().to_raw_hash().to_byte_array().into());
+        let root = block
+            .witness_root()
+            .map(|x| x.to_byte_array())
+            .unwrap_or_default();
+        let header = serialize(&block.header);
+        Self {
+            blockid,
+            txs_root: Buf32(root.into()),
+            header,
+        }
     }
 }

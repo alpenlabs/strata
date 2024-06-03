@@ -1,13 +1,13 @@
 use std::path::Path;
 
-use alpen_vertex_db::{
-    l1::{db::L1Db, utils::get_db_for_l1_store},
-    traits::{L1BlockManifest, L1DataStore},
-};
-use alpen_vertex_primitives::l1::L1Tx;
 use tracing::*;
 
-use alpen_vertex_btcio::{BtcIO, L1Data};
+use alpen_vertex_btcio::reader::{BtcReader, L1Data};
+use alpen_vertex_db::{
+    l1::{db::L1Db, utils::get_db_for_l1_store},
+    traits::L1DataStore,
+};
+use alpen_vertex_primitives::{l1::L1BlockManifest, utils::btc_tx_data_to_l1tx};
 
 pub fn handler(db: &L1Db, data: L1Data) -> anyhow::Result<()> {
     match data {
@@ -17,7 +17,7 @@ pub fn handler(db: &L1Db, data: L1Data) -> anyhow::Result<()> {
             let txns = blockdata
                 .relevant_txns()
                 .iter()
-                .map(|&x| L1Tx::from((x, blockdata.block())))
+                .map(|&x| btc_tx_data_to_l1tx(x, blockdata.block()))
                 .collect(); // TODO: create this appropriately
 
             // TODO: insert appropriate values
@@ -28,7 +28,7 @@ pub fn handler(db: &L1Db, data: L1Data) -> anyhow::Result<()> {
 }
 
 pub async fn l1_reader_task() -> anyhow::Result<()> {
-    let mut btcio = BtcIO::new("tcp://127.0.0.1:29000")
+    let mut btcio = BtcReader::new("tcp://127.0.0.1:29000")
         .await
         .expect("Could not connect to btc zmq");
 

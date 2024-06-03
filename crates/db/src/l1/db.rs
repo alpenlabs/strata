@@ -7,12 +7,14 @@ use tracing::*;
 use alpen_vertex_mmr::CompactMmr;
 use alpen_vertex_primitives::{
     buf::Buf32,
-    l1::{L1Tx, L1TxRef},
+    l1::{L1BlockManifest, L1Tx, L1TxRef},
 };
 
 use super::schemas::{L1BlockSchema, MmrSchema, TxnSchema};
 use crate::errors::*;
-use crate::traits::{L1BlockManifest, L1DataProvider, L1DataStore};
+use crate::{
+    traits::{L1DataProvider, L1DataStore},
+};
 
 pub struct L1Db {
     db: Arc<DB>,
@@ -179,12 +181,8 @@ impl L1DataProvider for L1Db {
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
-
     use arbitrary::{Arbitrary, Unstructured};
     use rand::Rng;
-    use rockbound::schema::ColumnFamilyName;
-    use rocksdb::Options;
     use tempfile::TempDir;
 
     use crate::l1::utils::get_db_for_l1_store;

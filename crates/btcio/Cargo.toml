@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+alpen-vertex-primitives = { workspace = true }
 anyhow = { workspace = true }
 bitcoin = { workspace = true }
 bytes =  { version = "1.6.0" }
