@@ -3,6 +3,8 @@
 //! implement the consensus logic.
 
 use std::collections::*;
+use arbitrary::Arbitrary;
+use borsh::{BorshDeserialize, BorshSerialize};
 
 use alpen_vertex_primitives::buf::Buf64;
 
@@ -13,7 +15,7 @@ use crate::{block::L2BlockId, l1::L1BlockId};
 /// This is updated when we see a consensus-relevant message.  This is L2 blocks
 /// but also L1 blocks being published with interesting things in them, and
 /// various other events.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct ConsensusState {
     /// Important consensus state.
     chain_state: ConsensusChainState,
@@ -30,7 +32,7 @@ pub struct ConsensusState {
 ///
 /// This is updated when we get a new L2 block and is kept more precisely
 /// synchronized across all nodes.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct ConsensusChainState {
     /// Accepted and valid L2 blocks that we might still reorg.  The last of
     /// these is the chain tip.
@@ -53,7 +55,7 @@ impl ConsensusChainState {
 }
 
 /// Transfer from L1 into L2.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct PendingDeposit {
     /// Deposit index.
     idx: u64,
@@ -66,7 +68,7 @@ pub struct PendingDeposit {
 }
 
 /// Transfer from L2 back to L1.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct PendingWithdraw {
     /// Withdraw index.
     idx: u64,
@@ -81,7 +83,7 @@ pub struct PendingWithdraw {
 /// Describes possible writes to chain state that we can make.  We use this
 /// instead of directly modifying the chain state to reduce the volume of data
 /// that we have to clone and save to disk with each sync event.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub enum ConsensusWrite {
     /// Completely replace the full state with a new instance.
     Replace(Box<ConsensusState>),

@@ -2,22 +2,26 @@
 
 use rockbound::{schema::ColumnFamilyName, Schema};
 
-use l1::schemas::{L1BlockSchema, MmrSchema, TxnSchema};
-use sync_event::schemas::SyncEventSchema;
+use crate::consensus_state::schemas::{ConsensusOutputSchema, ConsensusStateSchema};
+use crate::l1::schemas::{L1BlockSchema, MmrSchema, TxnSchema};
+use crate::sync_event::schemas::SyncEventSchema;
+
+pub mod consensus_state;
+pub mod l1;
+pub mod sync_event;
 
 pub mod errors;
 pub mod macros;
 pub mod traits;
 
-pub mod l1;
-pub mod sync_event;
-
 pub type DbResult<T> = anyhow::Result<T, crate::errors::DbError>;
 
-const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
+pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
+    ConsensusOutputSchema::COLUMN_FAMILY_NAME,
+    ConsensusStateSchema::COLUMN_FAMILY_NAME,
     L1BlockSchema::COLUMN_FAMILY_NAME,
-    TxnSchema::COLUMN_FAMILY_NAME,
     MmrSchema::COLUMN_FAMILY_NAME,
-    SyncEventSchema::COLUMN_FAMILY_NAME
-    // TODO: add col families for other store types
+    SyncEventSchema::COLUMN_FAMILY_NAME,
+    TxnSchema::COLUMN_FAMILY_NAME,
+    // TODO add col families for other store types
 ];

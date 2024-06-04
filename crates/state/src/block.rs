@@ -6,7 +6,19 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use crate::l1::L1HeaderPayload;
 
 /// ID of an L2 block, usually the hash of its root header.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Arbitrary, BorshSerialize, BorshDeserialize)]
+#[derive(
+    Copy,
+    Clone,
+    Debug,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    Arbitrary,
+    BorshSerialize,
+    BorshDeserialize,
+)]
 pub struct L2BlockId(Buf32);
 
 /// Full contents of the bare L2 block.

@@ -163,14 +163,20 @@ pub trait ConsensusStateProvider {
 
 /// Output of a consensus state transition.  Both the consensus state writes and
 /// sync actions.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct ConsensusOutput {
     writes: Vec<ConsensusWrite>,
     actions: Vec<SyncAction>,
 }
 
 impl ConsensusOutput {
-    // TODO accessors as needed
+    pub fn writes(&self) -> &Vec<ConsensusWrite> {
+        &self.writes
+    }
+
+    pub fn actions(&self) -> &Vec<SyncAction> {
+        &self.actions
+    }
 }
 
 /// L2 data store for CL blocks.  Does not store anything about what we think
