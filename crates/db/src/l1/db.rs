@@ -182,6 +182,7 @@ mod tests {
     use crate::STORE_COLUMN_FAMILIES;
 
     use super::*;
+    use alpen_vertex_primitives::l1::L1TxProof;
     use arbitrary::{Arbitrary, Unstructured};
     use rand::Rng;
     use rockbound::schema::ColumnFamilyName;
@@ -230,11 +231,17 @@ mod tests {
     }
 
     fn insert_block_data(idx: u64, db: &L1Db) -> (L1BlockManifest, Vec<L1Tx>, CompactMmr) {
-        let mf: L1BlockManifest = ArbitraryGenerator::new().generate();
+        let arb = ArbitraryGenerator::new();
+
+        // TODO maybe tweak this to make it a bit more realistic?
+        let mf: L1BlockManifest = arb.generate();
         let txs: Vec<L1Tx> = (0..10)
-            .map(|_| ArbitraryGenerator::new().generate())
+            .map(|i| {
+                let proof = L1TxProof::new(i, arb.generate());
+                L1Tx::new(proof, arb.generate())
+            })
             .collect();
-        let mmr: CompactMmr = ArbitraryGenerator::new().generate();
+        let mmr: CompactMmr = arb.generate();
 
         // Insert block data
         let res = db.put_block_data(idx, mf.clone(), txs.clone());
