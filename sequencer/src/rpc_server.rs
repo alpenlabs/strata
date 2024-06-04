@@ -16,10 +16,10 @@ use reth_rpc_types::{
     TransactionRequest, Work,
 };
 use thiserror::Error;
+use tokio::sync::{oneshot, Mutex};
 use tracing::*;
 
-use alpen_vertex_rpc_api::AlpenApiServer;
-use tokio::sync::{oneshot, Mutex};
+use alpen_vertex_rpc_api::{AlpenApiServer, L1Status};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -90,5 +90,15 @@ impl AlpenApiServer for AlpenRpcImpl {
             }
         }
         Ok(())
+    }
+
+    async fn get_l1_status(&self) -> RpcResult<L1Status> {
+        // TODO implement this
+        warn!("alp_l1status not yet implemented");
+        Ok(L1Status {
+            cur_height: 0,
+            cur_tip_blkid: String::new(),
+            last_update: 0,
+        })
     }
 }
