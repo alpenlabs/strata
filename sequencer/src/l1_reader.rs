@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{path::Path, sync::Arc};
 
 use anyhow::anyhow;
 use tracing::*;
@@ -9,6 +9,8 @@ use alpen_vertex_db::{
     traits::L1DataStore,
 };
 use alpen_vertex_primitives::{l1::L1BlockManifest, utils::btc_tx_data_to_l1tx};
+
+use crate::config::RollupConfig;
 
 pub fn handler(db: &L1Db, data: BlockData) -> anyhow::Result<()> {
     match data {
@@ -31,20 +33,23 @@ pub fn handler(db: &L1Db, data: BlockData) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub async fn l1_reader_task() -> anyhow::Result<()> {
+pub async fn l1_reader_task(config: RollupConfig) -> anyhow::Result<()> {
     let db = get_db_for_l1_store(Path::new("storage-data"))?;
-    let l1db = L1Db::new(db);
+    let l1db = L1Db::new(Arc::new(db));
 
-    let rollup_start_block_height = 1; // TODO: this should come from config
     let last_block_height = l1db
         .get_latest_block_number()?
-        .unwrap_or(rollup_start_block_height - 1);
+        .unwrap_or(config.l1_start_block_height - 1);
 
     // TODO: think about thread safety
     let handler = |data| handler(&l1db, data);
-    let mut btcreader = BtcReader::new("tcp://127.0.0.1:29000", last_block_height, handler)
-        .await
-        .expect("Could not connect to btc zmq");
+    let mut btcreader = BtcReader::new(
+        &config.l1_rpc_config.zmq_endpoint,
+        last_block_height,
+        handler,
+    )
+    .await
+    .expect("Could not connect to btc zmq");
 
     let msg = btcreader.run().await;
     warn!("{:?}", msg);

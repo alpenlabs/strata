@@ -15,7 +15,6 @@ use alpen_vertex_common::logging;
 use alpen_vertex_consensus_logic::ctl::CsmController;
 use alpen_vertex_consensus_logic::message::{ChainTipMessage, CsmMessage};
 use alpen_vertex_consensus_logic::worker;
-use alpen_vertex_db::traits::*;
 use alpen_vertex_primitives::{block_credential, params::*};
 use alpen_vertex_rpc_api::AlpenApiServer;
 use alpen_vertex_state::consensus::ConsensusState;
@@ -24,10 +23,13 @@ use alpen_vertex_state::operation;
 use crate::args::Args;
 
 mod args;
+mod config;
 mod l1_reader;
 mod rpc_server;
 
 use l1_reader::l1_reader_task;
+
+use crate::config::RollupConfig;
 
 #[derive(Debug, Error)]
 pub enum InitError {
@@ -124,8 +126,9 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn main_task() -> Result<(), InitError> {
-    tokio::spawn(l1_reader_task());
+async fn main_task(args: Args) -> Result<(), InitError> {
+    let config = RollupConfig::default();
+    tokio::spawn(l1_reader_task(config));
 
     let (stop_tx, stop_rx) = oneshot::channel();
 
