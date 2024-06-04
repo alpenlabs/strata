@@ -1,8 +1,5 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
-use alpen_vertex_primitives::prelude::*;
-use arbitrary::Arbitrary;
-use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::block::L2BlockId;
 

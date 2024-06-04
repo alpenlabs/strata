@@ -8,6 +8,18 @@ use crate::buf::Buf32;
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub struct L1TxRef(u64, u32);
 
+impl Into<(u64, u32)> for L1TxRef {
+    fn into(self) -> (u64, u32) {
+        (self.0, self.1)
+    }
+}
+
+impl From<(u64, u32)> for L1TxRef {
+    fn from(value: (u64, u32)) -> Self {
+        Self(value.0, value.1)
+    }
+}
+
 /// Merkle proof for a TXID within a block.
 // TODO rework this, make it possible to generate proofs, etc.
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
@@ -19,6 +31,10 @@ pub struct L1TxProof {
 impl L1TxProof {
     pub fn new(position: u32, cohashes: Vec<Buf32>) -> Self {
         Self { position, cohashes }
+    }
+
+    pub fn position(&self) -> u32 {
+        self.position
     }
 }
 
@@ -33,16 +49,12 @@ impl L1Tx {
     pub fn new(proof: L1TxProof, tx: Vec<u8>) -> Self {
         Self { proof, tx }
     }
-}
 
-impl Into<(u64, u32)> for L1TxRef {
-    fn into(self) -> (u64, u32) {
-        (self.0, self.1)
+    pub fn proof(&self) -> &L1TxProof {
+        &self.proof
     }
-}
 
-impl From<(u64, u32)> for L1TxRef {
-    fn from(value: (u64, u32)) -> Self {
-        Self(value.0, value.1)
+    pub fn tx_data(&self) -> &[u8] {
+        &self.tx
     }
 }

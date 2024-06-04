@@ -1,15 +1,16 @@
 //! Trait definitions for low level database interfaces.  This borrows some of
 //! its naming conventions from reth.
 
+use arbitrary::Arbitrary;
+use borsh::{BorshDeserialize, BorshSerialize};
+
 use alpen_vertex_mmr::CompactMmr;
 use alpen_vertex_primitives::{l1::*, prelude::*};
 use alpen_vertex_state::block::{L2Block, L2BlockId};
 use alpen_vertex_state::consensus::{ConsensusState, ConsensusWrite};
 use alpen_vertex_state::sync_event::{SyncAction, SyncEvent};
-use arbitrary::Arbitrary;
-use borsh::{BorshDeserialize, BorshSerialize};
 
-use crate::DbResult;
+use crate::errors::*;
 
 /// Common database interface that we can parameterize worker tasks over if
 /// parameterizing them over each individual trait gets cumbersome or if we need
@@ -96,6 +97,7 @@ impl L1BlockManifest {
             txs_root,
         }
     }
+
     pub fn block_hash(&self) -> Buf32 {
         self.blockid
     }

@@ -2,14 +2,13 @@ use rockbound::{SchemaBatch, DB};
 
 use alpen_vertex_state::sync_event::SyncEvent;
 
-use crate::errors::DbError;
-use crate::{DbResult, traits::SyncEventStore};
-use crate::traits::SyncEventProvider;
 use super::schemas::{SyncEventSchema, SyncEventWithTimestamp};
-
+use crate::errors::{DbError, DbResult};
+use crate::traits::SyncEventProvider;
+use crate::traits::SyncEventStore;
 
 pub struct SyncEventDB {
-    db: DB
+    db: DB,
 }
 
 impl SyncEventDB {
@@ -26,8 +25,8 @@ impl SyncEventDB {
             Some(res) => {
                 let (tip, _) = res?.into_tuple();
                 Ok(Some(tip))
-            },
-            None => Ok(None)
+            }
+            None => Ok(None),
         }
     }
 }
@@ -43,16 +42,20 @@ impl SyncEventStore for SyncEventDB {
 
     fn clear_sync_event(&self, start_idx: u64, end_idx: u64) -> DbResult<()> {
         if !(start_idx < end_idx) {
-            return Err(DbError::Other("start_idx must be less than end_idx".to_string()))
+            return Err(DbError::Other(
+                "start_idx must be less than end_idx".to_string(),
+            ));
         }
 
         match self.get_last_key()? {
             Some(last_key) => {
                 if !(end_idx <= last_key) {
-                    return Err(DbError::Other("end_idx must be less than or equal to last_key".to_string()))
+                    return Err(DbError::Other(
+                        "end_idx must be less than or equal to last_key".to_string(),
+                    ));
                 }
-            },
-            None => return Err(DbError::Other("cannot clear empty db".to_string()))
+            }
+            None => return Err(DbError::Other("cannot clear empty db".to_string())),
         }
 
         let iterator = self.db.iter::<SyncEventSchema>()?;
@@ -74,7 +77,6 @@ impl SyncEventStore for SyncEventDB {
         self.db.write_schemas(batch)?;
         Ok(())
     }
-
 }
 
 impl SyncEventProvider for SyncEventDB {
@@ -86,7 +88,7 @@ impl SyncEventProvider for SyncEventDB {
         let event = self.db.get::<SyncEventSchema>(&idx)?;
         match event {
             Some(ev) => Ok(Some(ev.event())),
-            None => Ok(None)
+            None => Ok(None),
         }
     }
 
@@ -94,7 +96,7 @@ impl SyncEventProvider for SyncEventDB {
         let event = self.db.get::<SyncEventSchema>(&idx)?;
         match event {
             Some(ev) => Ok(Some(ev.timestamp())),
-            None => Ok(None)
+            None => Ok(None),
         }
     }
 }
@@ -109,8 +111,8 @@ mod tests {
     use rocksdb::Options;
     use tempfile::TempDir;
 
-    use crate::STORE_COLUMN_FAMILIES;
     use super::*;
+    use crate::STORE_COLUMN_FAMILIES;
 
     const DB_NAME: &str = "sync_event_db";
 
@@ -181,7 +183,10 @@ mod tests {
     #[test]
     fn test_get_timestamp() {
         let db = setup_db();
-        let mut timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as u64;
+        let mut timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
         let n = 5;
         for i in 1..=n {
             let _ = insert_event(&db);
@@ -199,7 +204,7 @@ mod tests {
             let _ = insert_event(&db);
         }
         // Delete events 2..4
-        let res = db.clear_sync_event(2,4);
+        let res = db.clear_sync_event(2, 4);
         assert!(res.is_ok());
 
         let ev1 = db.get_sync_event(1).unwrap();
@@ -226,7 +231,6 @@ mod tests {
         assert!(res.is_err_and(|x| matches!(x, DbError::Other(ref msg) if msg == "end_idx must be less than or equal to last_key")));
     }
 
-
     #[test]
     fn test_get_last_idx_2() {
         let db = setup_db();
@@ -234,11 +238,10 @@ mod tests {
         for _ in 1..=n {
             let _ = insert_event(&db);
         }
-        let res = db.clear_sync_event(2,3);
+        let res = db.clear_sync_event(2, 3);
         assert!(res.is_ok());
 
         let new_idx = db.get_last_idx().unwrap().unwrap();
         assert_eq!(new_idx, 5);
     }
-
 }

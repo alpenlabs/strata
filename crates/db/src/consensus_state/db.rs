@@ -1,24 +1,23 @@
 use rockbound::{Schema, DB};
 
-use crate::{
-    errors::DbError,
-    traits::{ConsensusStateProvider, ConsensusStateStore},
-};
-
 use super::schemas::{ConsensusOutputSchema, ConsensusStateSchema};
+use crate::errors::*;
+use crate::traits::*;
 
 pub struct ConsensusStateDB {
     db: DB,
 }
 
 impl ConsensusStateDB {
-    // NOTE: db is expected to open all the column families defined in STORE_COLUMN_FAMILIES.
-    // FIXME: Make it better/generic.
+    /// Wraps an existing database handle.
+    ///
+    /// Assumes it was opened with column families as defined in `STORE_COLUMN_FAMILIES`.
+    // FIXME Make it better/generic.
     pub fn new(db: DB) -> Self {
         Self { db }
     }
 
-    fn get_last_idx<T>(&self) -> crate::DbResult<Option<u64>>
+    fn get_last_idx<T>(&self) -> DbResult<Option<u64>>
     where
         T: Schema<Key = u64>,
     {
@@ -35,17 +34,13 @@ impl ConsensusStateDB {
 }
 
 impl ConsensusStateStore for ConsensusStateDB {
-    fn write_consensus_output(
-        &self,
-        idx: u64,
-        output: crate::traits::ConsensusOutput,
-    ) -> crate::DbResult<()> {
+    fn write_consensus_output(&self, idx: u64, output: ConsensusOutput) -> DbResult<()> {
         let expected_idx = match self.get_last_idx::<ConsensusOutputSchema>()? {
             Some(last_idx) => last_idx + 1,
             None => 1,
         };
         if idx != expected_idx {
-            return Err(DbError::OooInsert("Consensus store", idx));
+            return Err(DbError::OooInsert("consensus_store", idx));
         }
         self.db.put::<ConsensusOutputSchema>(&idx, &output)?;
         Ok(())
@@ -55,9 +50,10 @@ impl ConsensusStateStore for ConsensusStateDB {
         &self,
         idx: u64,
         state: alpen_vertex_state::consensus::ConsensusState,
-    ) -> crate::DbResult<()> {
+    ) -> DbResult<()> {
+        // FIXME this should probably be a transaction
         if self.db.get::<ConsensusStateSchema>(&idx)?.is_some() {
-            return Err(DbError::DuplicateKey(idx));
+            return Err(DbError::OverwriteConsensusCheckpoint(idx));
         }
         self.db.put::<ConsensusStateSchema>(&idx, &state)?;
         Ok(())
@@ -65,7 +61,7 @@ impl ConsensusStateStore for ConsensusStateDB {
 }
 
 impl ConsensusStateProvider for ConsensusStateDB {
-    fn get_last_write_idx(&self) -> crate::DbResult<u64> {
+    fn get_last_write_idx(&self) -> DbResult<u64> {
         match self.get_last_idx::<ConsensusOutputSchema>()? {
             Some(idx) => Ok(idx),
             None => Err(DbError::NotBootstrapped),
@@ -75,7 +71,7 @@ impl ConsensusStateProvider for ConsensusStateDB {
     fn get_consensus_writes(
         &self,
         idx: u64,
-    ) -> crate::DbResult<Option<Vec<alpen_vertex_state::consensus::ConsensusWrite>>> {
+    ) -> DbResult<Option<Vec<alpen_vertex_state::consensus::ConsensusWrite>>> {
         let output = self.db.get::<ConsensusOutputSchema>(&idx)?;
         match output {
             Some(out) => Ok(Some(out.writes().to_owned())),
@@ -86,7 +82,7 @@ impl ConsensusStateProvider for ConsensusStateDB {
     fn get_consensus_actions(
         &self,
         idx: u64,
-    ) -> crate::DbResult<Option<Vec<alpen_vertex_state::sync_event::SyncAction>>> {
+    ) -> DbResult<Option<Vec<alpen_vertex_state::sync_event::SyncAction>>> {
         let output = self.db.get::<ConsensusOutputSchema>(&idx)?;
         match output {
             Some(out) => Ok(Some(out.actions().to_owned())),
@@ -94,14 +90,14 @@ impl ConsensusStateProvider for ConsensusStateDB {
         }
     }
 
-    fn get_last_checkpoint_idx(&self) -> crate::DbResult<u64> {
+    fn get_last_checkpoint_idx(&self) -> DbResult<u64> {
         match self.get_last_idx::<ConsensusStateSchema>()? {
             Some(idx) => Ok(idx),
             None => Err(DbError::NotBootstrapped),
         }
     }
 
-    fn get_prev_checkpoint_at(&self, idx: u64) -> crate::DbResult<u64> {
+    fn get_prev_checkpoint_at(&self, idx: u64) -> DbResult<u64> {
         let mut iterator = self.db.iter::<ConsensusStateSchema>()?;
         iterator.seek_to_last();
         let rev_iterator = iterator.rev();
@@ -113,14 +109,13 @@ impl ConsensusStateProvider for ConsensusStateDB {
                     if tip <= idx {
                         return Ok(tip);
                     }
-                },
+                }
                 Err(e) => return Err(DbError::Other(e.to_string())),
             }
         }
 
         Err(DbError::NotBootstrapped)
     }
-
 }
 
 #[cfg(test)]
@@ -134,8 +129,8 @@ mod tests {
 
     use alpen_vertex_state::consensus::ConsensusState;
 
-    use crate::{traits::ConsensusOutput, STORE_COLUMN_FAMILIES};
     use super::*;
+    use crate::{traits::ConsensusOutput, STORE_COLUMN_FAMILIES};
 
     const DB_NAME: &str = "consensus_state_db";
 
@@ -161,7 +156,6 @@ mod tests {
         ConsensusStateDB::new(db)
     }
 
-
     fn generate_arbitrary<'a, T: Arbitrary<'a> + Clone>(bytes: &'a [u8]) -> T {
         // Create an Unstructured instance and generate the arbitrary value
         let mut u = Unstructured::new(bytes);
@@ -177,20 +171,20 @@ mod tests {
 
     #[test]
     fn test_write_consensus_output() {
-        let output: ConsensusOutput = generate_arbitrary(&[1,2,3]);
+        let output: ConsensusOutput = generate_arbitrary(&[1, 2, 3]);
         let db = setup_db();
 
         let res = db.write_consensus_output(2, output.clone());
-        assert!(res.is_err_and(|x| matches!(x, DbError::OooInsert("Consensus store", 2))));
+        assert!(res.is_err_and(|x| matches!(x, DbError::OooInsert("consensus_store", 2))));
 
         let res = db.write_consensus_output(1, output.clone());
         assert!(res.is_ok());
 
         let res = db.write_consensus_output(1, output.clone());
-        assert!(res.is_err_and(|x| matches!(x, DbError::OooInsert("Consensus store", 1))));
+        assert!(res.is_err_and(|x| matches!(x, DbError::OooInsert("consensus_store", 1))));
 
         let res = db.write_consensus_output(3, output.clone());
-        assert!(res.is_err_and(|x| matches!(x, DbError::OooInsert("Consensus store", 3))));
+        assert!(res.is_err_and(|x| matches!(x, DbError::OooInsert("consensus_store", 3))));
     }
 
     #[test]
@@ -200,7 +194,7 @@ mod tests {
         let idx = db.get_last_write_idx();
         assert!(idx.is_err_and(|x| matches!(x, DbError::NotBootstrapped)));
 
-        let output: ConsensusOutput = generate_arbitrary(&[1,2,3]);
+        let output: ConsensusOutput = generate_arbitrary(&[1, 2, 3]);
         let _ = db.write_consensus_output(1, output.clone());
 
         let idx = db.get_last_write_idx();
@@ -209,7 +203,7 @@ mod tests {
 
     #[test]
     fn test_get_consensus_writes() {
-        let output: ConsensusOutput = generate_arbitrary(&[1,2,3]);
+        let output: ConsensusOutput = generate_arbitrary(&[1, 2, 3]);
 
         let db = setup_db();
         let _ = db.write_consensus_output(1, output.clone());
@@ -220,7 +214,7 @@ mod tests {
 
     #[test]
     fn test_get_consensus_actions() {
-        let output: ConsensusOutput = generate_arbitrary(&[1,2,3]);
+        let output: ConsensusOutput = generate_arbitrary(&[1, 2, 3]);
 
         let db = setup_db();
         let _ = db.write_consensus_output(1, output.clone());
@@ -231,7 +225,7 @@ mod tests {
 
     #[test]
     fn test_write_consensus_checkpoint() {
-        let state: ConsensusState = generate_arbitrary(&[1,2,3]);
+        let state: ConsensusState = generate_arbitrary(&[1, 2, 3]);
         let db = setup_db();
 
         let _ = db.write_consensus_checkpoint(3, state.clone());
@@ -240,7 +234,7 @@ mod tests {
         assert_eq!(idx, 3);
 
         let res = db.write_consensus_checkpoint(3, state.clone());
-        assert!(res.is_err_and(|x| matches!(x, DbError::DuplicateKey(3))));
+        assert!(res.is_err_and(|x| matches!(x, DbError::OverwriteConsensusCheckpoint(3))));
 
         // TODO: verify if it is possible to write checkpoint in any order
         let res = db.write_consensus_checkpoint(1, state);
@@ -251,11 +245,10 @@ mod tests {
         assert_eq!(idx, 3);
     }
 
-
     #[test]
     fn test_get_previous_checkpoint_at() {
-        let state: ConsensusState = generate_arbitrary(&[1,2,3]);
-        
+        let state: ConsensusState = generate_arbitrary(&[1, 2, 3]);
+
         let db = setup_db();
 
         let res = db.get_prev_checkpoint_at(1);
@@ -287,7 +280,5 @@ mod tests {
 
         let res = db.get_prev_checkpoint_at(100);
         assert!(res.is_ok_and(|x| matches!(x, 5)));
-
     }
-
 }

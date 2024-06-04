@@ -1,6 +1,6 @@
-use anyhow::anyhow;
 use rockbound::{schema::KeyEncoder, SchemaBatch, DB};
 use rocksdb::ReadOptions;
+use tracing::*;
 
 use alpen_vertex_mmr::CompactMmr;
 use alpen_vertex_primitives::{
@@ -8,13 +8,9 @@ use alpen_vertex_primitives::{
     l1::{L1Tx, L1TxRef},
 };
 
-use crate::{
-    errors::DbError,
-    traits::{L1BlockManifest, L1DataProvider, L1DataStore},
-    DbResult,
-};
-
 use super::schemas::{L1BlockSchema, MmrSchema, TxnSchema};
+use crate::errors::*;
+use crate::traits::{L1BlockManifest, L1DataProvider, L1DataStore};
 
 pub struct L1Db {
     db: DB,
@@ -33,7 +29,7 @@ impl L1Db {
         let mut rev_iterator = iterator.rev();
         if let Some(res) = rev_iterator.next() {
             let (tip, _) = res?.into_tuple();
-            return Ok(Some(tip));
+            Ok(Some(tip))
         } else {
             Ok(None)
         }
@@ -46,7 +42,7 @@ impl L1DataStore for L1Db {
         // allow arbitrary block number to be inserted
         match self.get_latest_block_number()? {
             Some(num) if num + 1 != idx => {
-                return Err(DbError::OooInsert("Block store", idx));
+                return Err(DbError::OooInsert("l1_store", idx));
             }
             _ => {}
         }
@@ -62,7 +58,7 @@ impl L1DataStore for L1Db {
         // corresponding to the idx(block_number) is to be inserted before the mmr
         match self.get_latest_block_number()? {
             Some(num) if num != idx => {
-                return Err(DbError::OooInsert("Invalid mmr checkpoint", idx));
+                return Err(DbError::OooInsert("l1_store", idx));
             }
             _ => {}
         }
@@ -73,7 +69,6 @@ impl L1DataStore for L1Db {
     fn revert_to_height(&self, idx: u64) -> DbResult<()> {
         // Get latest height, iterate backwards upto the idx, get blockhash and delete txns and
         // blockmanifest data at each iteration
-
         let last_block_num = self.get_latest_block_number()?.unwrap_or(0);
         if idx > last_block_num {
             return Err(DbError::Other(
@@ -90,6 +85,7 @@ impl L1DataStore for L1Db {
 
             // Get corresponding block hash
             let blockhash = blk_manifest.block_hash();
+
             // Delete txn data
             batch.delete::<TxnSchema>(&blockhash)?;
 
@@ -99,13 +95,19 @@ impl L1DataStore for L1Db {
             // Delete Block manifest data
             batch.delete::<L1BlockSchema>(&height)?;
         }
+
         // Execute the batch
         self.db.write_schemas(batch)?;
         Ok(())
     }
 }
 
-// Note: Ideally Data Provider should ensure it has only read-only db access.
+// Note: Ideally Data Provider should ensure it has only read-only db access,
+// this isn't really doable since we're usually opening the database here in
+// conjunction with a store instance so we just have to be good about ourselves.
+//
+// TODO add a test that ensures all the functions still behave as expected when
+// opened in read-only mode
 impl L1DataProvider for L1Db {
     fn get_tx(&self, tx_ref: L1TxRef) -> DbResult<Option<L1Tx>> {
         let (block_height, txindex) = tx_ref.into();
@@ -129,22 +131,25 @@ impl L1DataProvider for L1Db {
     }
 
     fn get_block_txs(&self, idx: u64) -> DbResult<Option<Vec<L1TxRef>>> {
-        let txs = self
-            .db
-            .get::<L1BlockSchema>(&idx)
-            .and_then(|mf_opt| match mf_opt {
-                Some(mf) => {
-                    let txs_opt = self.db.get::<TxnSchema>(&mf.block_hash())?;
-                    Ok(txs_opt.map(|txs| {
-                        txs.into_iter()
-                            .enumerate()
-                            .map(|(i, _)| L1TxRef::from((idx.clone().into(), i as u32)))
-                            .collect()
-                    }))
-                }
-                None => Err(anyhow!("Cound not find block txns")),
-            });
-        Ok(txs?)
+        // TODO eventually change how this is stored so we keep a list of the tx
+        // indexes with the smaller manifest so we don't have to load all the
+        // interesting transactions twice if we want to look at all of them
+
+        let Some(mf) = self.db.get::<L1BlockSchema>(&idx)? else {
+            return Ok(None);
+        };
+
+        let Some(txs) = self.db.get::<TxnSchema>(&mf.block_hash())? else {
+            warn!(%idx, "missing L1 block body");
+            return Err(DbError::MissingL1BlockBody(idx));
+        };
+
+        let txs_refs = txs
+            .into_iter()
+            .map(|tx| L1TxRef::from((idx, tx.proof().position())))
+            .collect::<Vec<L1TxRef>>();
+
+        Ok(Some(txs_refs))
     }
 
     fn get_last_mmr_to(&self, idx: u64) -> DbResult<Option<CompactMmr>> {
@@ -156,12 +161,13 @@ impl L1DataProvider for L1Db {
         options.set_iterate_lower_bound(KeyEncoder::<L1BlockSchema>::encode_key(&start_idx)?);
         options.set_iterate_upper_bound(KeyEncoder::<L1BlockSchema>::encode_key(&end_idx)?);
 
-        let result = self
+        let res = self
             .db
             .iter_with_opts::<L1BlockSchema>(options)?
             .map(|item_result| item_result.map(|item| item.into_tuple().1.block_hash()))
-            .collect::<Result<Vec<Buf32>, anyhow::Error>>();
-        Ok(result?)
+            .collect::<Result<Vec<Buf32>, anyhow::Error>>()?;
+
+        Ok(res)
     }
 
     fn get_block_manifest(&self, idx: u64) -> DbResult<Option<L1BlockManifest>> {
@@ -186,7 +192,6 @@ mod tests {
         buffer: Vec<u8>,
     }
     const DB_NAME: &str = "l1_db";
-
 
     impl ArbitraryGenerator {
         fn new() -> Self {

@@ -14,8 +14,6 @@ pub mod errors;
 pub mod macros;
 pub mod traits;
 
-pub type DbResult<T> = anyhow::Result<T, crate::errors::DbError>;
-
 pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
     ConsensusOutputSchema::COLUMN_FAMILY_NAME,
     ConsensusStateSchema::COLUMN_FAMILY_NAME,
