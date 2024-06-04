@@ -3,6 +3,7 @@
 import os
 import sys
 
+from bitcoinlib.services.bitcoind import BitcoindClient
 import flexitest
 
 class BitcoinFactory(flexitest.Factory):
@@ -10,8 +11,31 @@ class BitcoinFactory(flexitest.Factory):
         super().__init__(datadir_pfx, port_range)
 
     def create_regtest_bitcoin(self) -> flexitest.Service:
-        # TODO
-        raise NotImplementedError()
+        datadir = self.create_datadir("bitcoin")
+        p2p_port = self.next_port()
+        rpc_port = self.next_port()
+        logfile = os.path.join(datadir, "service.log")
+
+        cmd = [
+            "bitcoind", "-regtest",
+            "-printtoconsole",
+            "-datadir=%s" % datadir,
+            "-port=%s" % p2p_port,
+            "-rpcport=%s" % rpc_port,
+            "-rpcuser=alpen",
+            "-rpcpassword=alpen",
+        ]
+
+        base_url = "http://alpen:alpen@localhost:%s" % rpc_port
+
+        with open(logfile_path, "w") as f:
+            svc = flexitest.service.ProcService(props, cmd, stdout=f)
+
+            def _create_rpc():
+                return BitcoindClient(base_url)
+            setattr(svc, "create_rpc", _create_rpc)
+
+            return svc
 
 class VertexFactory(flexitest.Factory):
     def __init__(self, datadir_pfx: str, port_range: list[int]):

@@ -7,6 +7,7 @@ authors = []
 [tool.poetry.dependencies]
 python = "^3.10"
 flexitest = {git = "https://codeberg.org/treyd/flexitest.git"}
+bitcoinlib = "^0.6.15"
 
 [tool.poetry.dev-dependencies]
 
