@@ -15,12 +15,12 @@ pub fn handler(db: &L1Db, data: L1Data) -> anyhow::Result<()> {
             let block_height = 0; // TODO: get the block height. But from where???
             let manifest = L1BlockManifest::from(blockdata.block().clone());
             let txns = blockdata
-                .relevant_txns()
+                .relevant_txn_indices()
                 .iter()
-                .map(|&x| btc_tx_data_to_l1tx(x.0, blockdata.block()))
-                .collect(); // TODO: create this appropriately
+                .map(|&x| btc_tx_data_to_l1tx(x, blockdata.block()))
+                .collect();
 
-            // TODO: insert appropriate values
+            // TODO: make async call
             db.put_block_data(block_height, manifest, txns)?;
         }
     }
@@ -28,14 +28,14 @@ pub fn handler(db: &L1Db, data: L1Data) -> anyhow::Result<()> {
 }
 
 pub async fn l1_reader_task() -> anyhow::Result<()> {
-    let mut btcio = BtcReader::new("tcp://127.0.0.1:29000")
+    let mut btcreader = BtcReader::new("tcp://127.0.0.1:29000")
         .await
         .expect("Could not connect to btc zmq");
 
     let db = get_db_for_l1_store(Path::new("storage-data"))?;
     let l1db = L1Db::new(db);
 
-    let msg = btcio.run(|data| handler(&l1db, data)).await;
+    let msg = btcreader.run(|data| handler(&l1db, data)).await;
     warn!("{:?}", msg);
     Ok(())
 }

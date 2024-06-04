@@ -1,7 +1,7 @@
 use std::str::from_utf8;
 
 use anyhow::anyhow;
-use bitcoin::{consensus::deserialize, Block, Transaction};
+use bitcoin::{consensus::deserialize, Block};
 use tracing::*;
 use zeromq::{Socket, SocketRecv, SubSocket, ZmqMessage};
 
@@ -11,26 +11,24 @@ const RAW_TX: &str = "rawtx";
 
 const SUBSCRIPTION_TOPICS: &[&'static str] = &[HASH_BLOCK, RAW_BLOCK, RAW_TX];
 
-type Index = u32;
-
 pub struct BtcReader {
     zmq_socket: SubSocket,
     // rpc_client: Client,
 }
 
 /// Store the bitcoin block and references to the relevant transactions within the block
-pub struct BlockData<'a> {
+pub struct BlockData {
     block: Block,
-    relevant_txns: Vec<(Index, &'a Transaction)>,
+    relevant_txn_indices: Vec<u32>,
 }
 
-impl<'a> BlockData<'a> {
+impl BlockData {
     pub fn block(&self) -> &Block {
         &self.block
     }
 
-    pub fn relevant_txns(&self) -> &Vec<(Index, &'a Transaction)> {
-        &self.relevant_txns
+    pub fn relevant_txn_indices(&self) -> &Vec<u32> {
+        &self.relevant_txn_indices
     }
 }
 
@@ -96,7 +94,7 @@ impl BtcReader {
                 // TODO: extract relevant txns
                 return Ok(L1Data::BlockData(BlockData {
                     block,
-                    relevant_txns: vec![],
+                    relevant_txn_indices: vec![],
                 }));
             }
             _ => {
@@ -107,7 +105,7 @@ impl BtcReader {
     }
 }
 
-pub enum L1Data<'a> {
-    BlockData(BlockData<'a>),
+pub enum L1Data {
+    BlockData(BlockData),
     // TODO: add other as needed
 }
