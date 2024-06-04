@@ -11,60 +11,61 @@ use crate::{
 
 fn get_cohashes_from_txids(txids: &[Txid], index: u32) -> Vec<Buf32> {
     assert!((index as usize) < txids.len());
+
     let mut curr_level: Vec<_> = txids.iter().cloned().map(|x| x.to_byte_array()).collect();
     let mut curr_index = index;
     let mut proof = Vec::new();
-    loop {
+
+    while curr_level.len() > 1 {
         let len = curr_level.len();
-        if len == 1 {
-            break;
-        }
         if len % 2 != 0 {
             curr_level.push(curr_level[len - 1].clone());
         }
+
         let proof_item_index = if curr_index % 2 == 0 {
             curr_index + 1
         } else {
             curr_index - 1
         };
+
         let mut item = curr_level[proof_item_index as usize];
-        item.reverse();
+        item.reverse(); // hash is stored in reverse order, so need to reverse here
         let proof_item = Buf32(item.into());
         proof.push(proof_item);
 
         // construct pairwise hash
-        let mut new_level = Vec::new();
-        for pair in curr_level.chunks(2) {
-            let [a, b] = pair else {
-                panic!("should be pair");
-            };
-            let mut arr = [0u8; 64];
-            arr[..32].copy_from_slice(a);
-            arr[32..].copy_from_slice(b);
-            let parent = sha256d::Hash::hash(&arr);
-            new_level.push(parent.as_byte_array().clone());
-        }
-        curr_level = new_level;
+        curr_level = curr_level
+            .chunks(2)
+            .map(|pair| {
+                let [a, b] = pair else {
+                    panic!("should be pair");
+                };
+                let mut arr = [0u8; 64];
+                arr[..32].copy_from_slice(a);
+                arr[32..].copy_from_slice(b);
+                sha256d::Hash::hash(&arr).as_byte_array().clone()
+            })
+            .collect::<Vec<_>>();
         curr_index = curr_index >> 1;
     }
     proof
 }
 
-pub fn btc_tx_data_to_l1tx(idx: u32, block: &Block) -> L1Tx {
-    let tx = block.txdata[idx as usize].clone();
-    let proof = L1TxProof::new(
+pub fn btc_tx_data_to_l1tx(idx: u32, block: &Block) -> Option<L1Tx> {
+    let tx = &block.txdata.get(idx as usize)?;
+
+    let cohashes = get_cohashes_from_txids(
+        &block
+            .txdata
+            .iter()
+            .map(|x| x.compute_txid())
+            .collect::<Vec<_>>(),
         idx,
-        get_cohashes_from_txids(
-            &block
-                .txdata
-                .iter()
-                .map(|x| x.compute_txid())
-                .collect::<Vec<_>>(),
-            idx,
-        ),
     );
-    let tx = serialize(&tx);
-    L1Tx::new(proof, tx)
+
+    let proof = L1TxProof::new(idx, cohashes);
+    let tx = serialize(tx);
+    Some(L1Tx::new(proof, tx))
 }
 
 #[cfg(test)]
@@ -94,7 +95,7 @@ mod tests {
     fn test_txdata_to_l1tx() {
         let block: Block = get_block();
         let idx = 7; // corresponding to 5bc67f1d847b4f232b8ad385e59264ae5ee8da2e3eeb4ac0aee283c5ba241864
-        let l1_tx = btc_tx_data_to_l1tx(idx, &block);
+        let l1_tx = btc_tx_data_to_l1tx(idx, &block).unwrap();
         let exp_cohashes: Vec<_> = [
             "9d0ea944cdae406f656a3d277c7ad1b7914e2e760458ac40cd68a8a936ad7054",
             "b4b33efa721b091ae146ce7ce93d81f6d7974587ab0f566b03019fefe58c86c7",
