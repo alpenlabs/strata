@@ -7,11 +7,12 @@ edition = "2021"
 alpen-vertex-mmr = { workspace = true }
 alpen-vertex-primitives = { workspace = true }
 alpen-vertex-state = { workspace = true }
+
 anyhow = { workspace = true }
 arbitrary = { workspace = true }
 borsh = { workspace = true }
 reth-db = { workspace = true }
-rockbound = { git = "https://github.com/sovereign-Labs/rockbound", tag = "v2.0.1" }
+rockbound = { workspace = true }
 rocksdb = { workspace = true }
 thiserror = { workspace = true }
 
