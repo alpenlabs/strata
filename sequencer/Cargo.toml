@@ -12,6 +12,7 @@ alpen-vertex-common = { workspace = true }
 alpen-vertex-primitives = { workspace = true }
 alpen-vertex-rpc-api = { workspace = true }
 
+argh = { workspace = true }
 async-trait = { workspace = true }
 jsonrpsee = { workspace = true, features = ["server", "macros"] }
 reth-ipc = { workspace = true }

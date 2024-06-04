@@ -1,6 +1,5 @@
 use std::process;
 
-use reth_rpc_api::EthApiServer;
 use thiserror::Error;
 use tokio::sync::oneshot;
 use tracing::*;
@@ -8,6 +7,9 @@ use tracing::*;
 use alpen_vertex_common::logging;
 use alpen_vertex_rpc_api::AlpenApiServer;
 
+use crate::args::Args;
+
+mod args;
 mod rpc_server;
 
 #[derive(Debug, Error)]
@@ -19,13 +21,15 @@ pub enum InitError {
 fn main() {
     logging::init();
 
+    let args = argh::from_env();
+
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .thread_name("vertex")
         .build()
         .expect("init: build rt");
 
-    if let Err(e) = rt.block_on(main_task()) {
+    if let Err(e) = rt.block_on(main_task(args)) {
         error!(err = %e, "main task exited");
         process::exit(0);
     }
@@ -33,18 +37,14 @@ fn main() {
     info!("exiting");
 }
 
-async fn main_task() -> Result<(), InitError> {
+async fn main_task(args: Args) -> Result<(), InitError> {
     let (stop_tx, stop_rx) = oneshot::channel();
 
     // Init RPC methods.
     let alp_rpc = rpc_server::AlpenRpcImpl::new(stop_tx);
-    let eth_rpc = rpc_server::EthRpcImpl::new();
-    let mut methods = alp_rpc.into_rpc();
-    methods
-        .merge(eth_rpc.into_rpc())
-        .expect("init: add eth methods");
+    let methods = alp_rpc.into_rpc();
 
-    let rpc_port = 12345; // TODO make configurable
+    let rpc_port = args.rpc_port; // TODO make configurable
     let rpc_server = jsonrpsee::server::ServerBuilder::new()
         .build(format!("127.0.0.1:{rpc_port}"))
         .await
