@@ -17,7 +17,7 @@ pub fn handler(db: &L1Db, data: L1Data) -> anyhow::Result<()> {
             let txns = blockdata
                 .relevant_txns()
                 .iter()
-                .map(|&x| btc_tx_data_to_l1tx(x, blockdata.block()))
+                .map(|&x| btc_tx_data_to_l1tx(x.0, blockdata.block()))
                 .collect(); // TODO: create this appropriately
 
             // TODO: insert appropriate values

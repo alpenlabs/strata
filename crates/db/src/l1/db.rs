@@ -12,9 +12,7 @@ use alpen_vertex_primitives::{
 
 use super::schemas::{L1BlockSchema, MmrSchema, TxnSchema};
 use crate::errors::*;
-use crate::{
-    traits::{L1DataProvider, L1DataStore},
-};
+use crate::traits::{L1DataProvider, L1DataStore};
 
 pub struct L1Db {
     db: Arc<DB>,

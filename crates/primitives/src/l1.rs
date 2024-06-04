@@ -35,6 +35,10 @@ impl L1TxProof {
         Self { position, cohashes }
     }
 
+    pub fn cohashes(&self) -> &Vec<Buf32> {
+        &self.cohashes
+    }
+
     pub fn position(&self) -> u32 {
         self.position
     }
