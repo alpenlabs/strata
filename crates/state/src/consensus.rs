@@ -7,6 +7,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use std::collections::*;
 
 use alpen_vertex_primitives::buf::Buf64;
+use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::{block::L2BlockId, l1::L1BlockId};
 
@@ -15,10 +16,17 @@ use crate::{block::L2BlockId, l1::L1BlockId};
 /// This is updated when we see a consensus-relevant message.  This is L2 blocks
 /// but also L1 blocks being published with interesting things in them, and
 /// various other events.
+<<<<<<< HEAD
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
+=======
+#[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
+>>>>>>> b70fef1 (state: tweak to consensus state, added Borsh serde derives)
 pub struct ConsensusState {
     /// Important consensus state.
     pub(super) chain_state: ConsensusChainState,
+
+    /// L2 block that's been finalized and proven on L1.
+    pub(super) finalized_tip: L2BlockId,
 
     /// Recent L1 blocks that we might still reorg.
     // TODO replace with a tracker that we can reorg
@@ -42,7 +50,11 @@ impl ConsensusState {
 ///
 /// This is updated when we get a new L2 block and is kept more precisely
 /// synchronized across all nodes.
+<<<<<<< HEAD
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
+=======
+#[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
+>>>>>>> b70fef1 (state: tweak to consensus state, added Borsh serde derives)
 pub struct ConsensusChainState {
     /// Accepted and valid L2 blocks that we might still reorg.  The last of
     /// these is the chain tip.
@@ -65,7 +77,7 @@ impl ConsensusChainState {
 }
 
 /// Transfer from L1 into L2.
-#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
+#[derive(Clone, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct PendingDeposit {
     /// Deposit index.
     idx: u64,
@@ -78,7 +90,7 @@ pub struct PendingDeposit {
 }
 
 /// Transfer from L2 back to L1.
-#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
+#[derive(Clone, Debug, Eq, PartialEq BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct PendingWithdraw {
     /// Withdraw index.
     idx: u64,
