@@ -1,13 +1,16 @@
 //! Operations that a state transition emits to update the new state and control
 //! the client's high level state.
 
+use arbitrary::Arbitrary;
+use borsh::{BorshDeserialize, BorshSerialize};
+
 use crate::block::L2BlockId;
 use crate::consensus::{ConsensusChainState, ConsensusState};
 use crate::l1::L1BlockId;
 
 /// Output of a consensus state transition.  Both the consensus state writes and
 /// sync actions.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
 pub struct ConsensusOutput {
     writes: Vec<ConsensusWrite>,
     actions: Vec<SyncAction>,
@@ -36,7 +39,7 @@ impl ConsensusOutput {
 /// Describes possible writes to chain state that we can make.  We use this
 /// instead of directly modifying the chain state to reduce the volume of data
 /// that we have to clone and save to disk with each sync event.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
 pub enum ConsensusWrite {
     /// Completely replace the full state with a new instance.
     Replace(Box<ConsensusState>),
@@ -60,7 +63,7 @@ pub enum ConsensusWrite {
 
 /// Actions the consensus state machine directs the node to take to update its
 /// own bookkeeping.  These should not be able to fail.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
 pub enum SyncAction {
     /// Extends our externally-facing tip to a new block ID.  This might trigger
     /// a reorg of some unfinalized blocks.  We probably won't roll this block

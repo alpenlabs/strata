@@ -1,5 +1,8 @@
 use rockbound::{Schema, DB};
 
+use alpen_vertex_state::operation::*;
+use alpen_vertex_state::sync_event::*;
+
 use super::schemas::{ConsensusOutputSchema, ConsensusStateSchema};
 use crate::errors::*;
 use crate::traits::*;
@@ -68,10 +71,7 @@ impl ConsensusStateProvider for ConsensusStateDB {
         }
     }
 
-    fn get_consensus_writes(
-        &self,
-        idx: u64,
-    ) -> DbResult<Option<Vec<alpen_vertex_state::consensus::ConsensusWrite>>> {
+    fn get_consensus_writes(&self, idx: u64) -> DbResult<Option<Vec<ConsensusWrite>>> {
         let output = self.db.get::<ConsensusOutputSchema>(&idx)?;
         match output {
             Some(out) => Ok(Some(out.writes().to_owned())),
@@ -79,10 +79,7 @@ impl ConsensusStateProvider for ConsensusStateDB {
         }
     }
 
-    fn get_consensus_actions(
-        &self,
-        idx: u64,
-    ) -> DbResult<Option<Vec<alpen_vertex_state::sync_event::SyncAction>>> {
+    fn get_consensus_actions(&self, idx: u64) -> DbResult<Option<Vec<SyncAction>>> {
         let output = self.db.get::<ConsensusOutputSchema>(&idx)?;
         match output {
             Some(out) => Ok(Some(out.actions().to_owned())),
@@ -130,7 +127,7 @@ mod tests {
     use alpen_vertex_state::consensus::ConsensusState;
 
     use super::*;
-    use crate::{traits::ConsensusOutput, STORE_COLUMN_FAMILIES};
+    use crate::STORE_COLUMN_FAMILIES;
 
     const DB_NAME: &str = "consensus_state_db";
 
