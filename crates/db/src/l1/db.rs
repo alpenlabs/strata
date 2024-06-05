@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use rockbound::{schema::KeyEncoder, SchemaBatch, DB};
 use rocksdb::ReadOptions;
 use tracing::*;
@@ -13,13 +15,13 @@ use crate::errors::*;
 use crate::traits::{L1BlockManifest, L1DataProvider, L1DataStore};
 
 pub struct L1Db {
-    db: DB,
+    db: Arc<DB>,
 }
 
 impl L1Db {
     // NOTE: db is expected to open all the column families defined in STORE_COLUMN_FAMILIES.
     // FIXME: Make it better/generic.
-    pub fn new(db: DB) -> Self {
+    pub fn new(db: Arc<DB>) -> Self {
         Self { db }
     }
 
@@ -208,7 +210,7 @@ mod tests {
         }
     }
 
-    fn get_new_db(path: &Path) -> anyhow::Result<DB> {
+    fn get_new_db(path: &Path) -> anyhow::Result<Arc<DB>> {
         // TODO: add other options as appropriate.
         let mut db_opts = Options::default();
         db_opts.create_missing_column_families(true);
@@ -222,6 +224,7 @@ mod tests {
                 .collect::<Vec<ColumnFamilyName>>(),
             &db_opts,
         )
+        .map(Arc::new)
     }
 
     fn setup_db() -> L1Db {

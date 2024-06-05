@@ -17,6 +17,8 @@ pub mod traits;
 
 pub type DbResult<T> = anyhow::Result<T, errors::DbError>;
 
+pub const ROCKSDB_NAME: &str = "vertex";
+
 pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
     ConsensusOutputSchema::COLUMN_FAMILY_NAME,
     ConsensusStateSchema::COLUMN_FAMILY_NAME,
@@ -26,3 +28,8 @@ pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
     TxnSchema::COLUMN_FAMILY_NAME,
     // TODO add col families for other store types
 ];
+
+// Re-exports
+pub use consensus_state::db::ConsensusStateDb;
+pub use l1::db::L1Db;
+pub use sync_event::db::SyncEventDb;
