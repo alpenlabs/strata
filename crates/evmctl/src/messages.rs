@@ -40,16 +40,16 @@ pub struct WithdrawData {
 #[derive(Clone, Debug)]
 pub struct PayloadEnv {
     /// Timestamp we're attesting this block was created on.
-    timestamp: u64,
+    pub timestamp: u64,
 
     /// State root of the previous CL block.
-    prev_global_state_root: Buf32,
+    pub prev_global_state_root: Buf32,
 
     /// Safe L1 block we're exposing into the EL that's not likely to reorg.
-    safe_l1_block: Buf32,
+    pub safe_l1_block: Buf32,
 
     /// Operations we're pushing into the EL for processing.
-    el_ops: Vec<Op>,
+    pub el_ops: Vec<Op>,
 }
 
 /// Operation the CL pushes into the EL to perform as part of the block it's
@@ -63,9 +63,9 @@ pub enum Op {
 #[derive(Clone, Debug)]
 pub struct ELDepositData {
     /// Amount in L1 native asset.  For Bitcoin this is sats.
-    amt: u64,
+    pub amt: u64,
 
     /// Dest addr encoded in a portable format, assumed to be valid but must be
     /// checked by EL before committing to building block.
-    dest_addr: Vec<u8>,
+    pub dest_addr: Vec<u8>,
 }
