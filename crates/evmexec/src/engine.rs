@@ -13,6 +13,7 @@ use reth_rpc_api::EngineApiClient;
 use reth_rpc_types::{ExecutionPayloadV1, Withdrawal};
 use reth_rpc_types::engine::{ExecutionPayloadEnvelopeV2, ExecutionPayloadFieldV2, ForkchoiceState, PayloadAttributes, PayloadId, PayloadStatusEnum};
 use reth_rpc::JwtSecret;
+use tokio::sync::Mutex;
 
 
 fn http_client(http_url: &str, secret_hex: &str) -> HttpClient<AuthClientService<HttpBackend>> {
@@ -45,16 +46,28 @@ impl Into<ElPayloadHeader> for ExecutionPayloadV1 {
     }
 }
 
+
+#[derive(Debug, Default)]
+pub struct ForkchoiceStatePartial {
+    /// Hash of the head block.
+    pub head_block_hash: Option<B256>,
+    /// Hash of the safe block.
+    pub safe_block_hash: Option<B256>,
+    /// Hash of finalized block.
+    pub finalized_block_hash: Option<B256>,
+}
+
+
 pub struct RpcExecEngineCtl {
     client: HttpClient<AuthClientService<HttpBackend>>,
-    fork_choice_state: ForkchoiceState,
+    fork_choice_state: Mutex<ForkchoiceState>,
 }
 
 impl RpcExecEngineCtl {
     pub fn new(http_url: &str, secret: &str, fork_choice_state: ForkchoiceState) -> Self {
         Self {
             client: http_client(http_url, secret),
-            fork_choice_state,
+            fork_choice_state: Mutex::new(fork_choice_state),
         }
     }
     
@@ -62,13 +75,21 @@ impl RpcExecEngineCtl {
         &self.client
     }
 
-    async fn update_block_state(&mut self, fork_choice_state: ForkchoiceState) -> EngineResult<BlockStatus> {
+    async fn update_block_state(&self, fcs_partial: ForkchoiceStatePartial) -> EngineResult<BlockStatus> {
+        let fork_choice_state = {
+            let default = self.fork_choice_state.lock().await;
+            ForkchoiceState {
+                head_block_hash: fcs_partial.head_block_hash.unwrap_or(default.head_block_hash), 
+                safe_block_hash: fcs_partial.safe_block_hash.unwrap_or(default.safe_block_hash), 
+                finalized_block_hash: fcs_partial.finalized_block_hash.unwrap_or(default.finalized_block_hash), 
+            }
+        };
         let fork_choice_result = self.engine_api_client().fork_choice_updated_v2(fork_choice_state, None).await;
         match fork_choice_result {
             Ok(update_status) => {
                 match update_status.payload_status.status {
                     PayloadStatusEnum::Valid => {
-                        self.fork_choice_state = fork_choice_state;
+                        *self.fork_choice_state.lock().await = fork_choice_state;
                         EngineResult::Ok(BlockStatus::Valid)
                     },
                     PayloadStatusEnum::Syncing => EngineResult::Ok(BlockStatus::Syncing),
@@ -99,7 +120,7 @@ impl RpcExecEngineCtl {
             parent_beacon_block_root: None,
             suggested_fee_recipient: Address::ZERO,
         };
-        let forkchoice_result = self.engine_api_client().fork_choice_updated_v2(self.fork_choice_state, Some(payload_attributes)).await;
+        let forkchoice_result = self.engine_api_client().fork_choice_updated_v2(self.fork_choice_state.lock().await.clone(), Some(payload_attributes)).await;
         match forkchoice_result {
             Ok(update_status) => {
                 if let Some(_payload_id) = update_status.payload_id {
@@ -150,25 +171,41 @@ impl ExecEngineCtl for RpcExecEngineCtl {
     }
 
     fn prepare_payload(&self, env: PayloadEnv) -> EngineResult<u64> {
-        let rt = get_runtime();
-        rt.block_on(self.build_block_from_mempool(env))
+        get_runtime().block_on(self.build_block_from_mempool(env))
     }
 
     fn get_payload_status(&self, id: u64) -> EngineResult<PayloadStatus> {
-        let rt = get_runtime();
-        rt.block_on(self.get_payload_status(id))
+        get_runtime().block_on(self.get_payload_status(id))
     }
 
     fn update_head_block(&self, id: L2BlockId) -> EngineResult<()> {
-        todo!()
+        get_runtime().block_on(async {
+            let fork_choice_state = ForkchoiceStatePartial {
+                head_block_hash: Some(id.0.0),
+                ..Default::default()
+            };
+            self.update_block_state(fork_choice_state).await.map(|_| ())
+        })
     }
 
     fn update_safe_block(&self, id: L2BlockId) -> EngineResult<()> {
-        todo!()
+        get_runtime().block_on(async {
+            let fork_choice_state = ForkchoiceStatePartial {
+                safe_block_hash: Some(id.0.0),
+                ..Default::default()
+            };
+            self.update_block_state(fork_choice_state).await.map(|_| ())
+        })
     }
 
     fn update_finalized_block(&self, id: L2BlockId) -> EngineResult<()> {
-        todo!()
+        get_runtime().block_on(async {
+            let fork_choice_state = ForkchoiceStatePartial {
+                finalized_block_hash: Some(id.0.0),
+                ..Default::default()
+            };
+            self.update_block_state(fork_choice_state).await.map(|_| ())
+        })
     }
 }
 
