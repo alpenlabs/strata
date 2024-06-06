@@ -1,12 +1,11 @@
-// TODO: remove and use reth_rpc_layer::AuthClientLayer once we update reth version
+// TODO: remove and use reth_rpc_layer::AuthClientLayer once we update reth version (>= 0.2.0-beta.8)
 
-use reth_rpc::{JwtSecret, Claims};
+use std::task::{Context, Poll};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
 use http::HeaderValue;
 use hyper::{header::AUTHORIZATION, service::Service};
-use std::{
-    task::{Context, Poll},
-    time::{Duration, SystemTime, UNIX_EPOCH},
-};
+use reth_rpc::{JwtSecret, Claims};
 use tower::Layer;
 
 /// A layer that adds a new JWT token to every request using AuthClientService.
