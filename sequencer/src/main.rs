@@ -3,7 +3,6 @@ use std::process;
 use std::sync::Arc;
 
 use anyhow::Context;
-use reth_rpc_types::ParseBlockHashOrNumberError;
 use thiserror::Error;
 use tokio::sync::oneshot;
 use tracing::*;

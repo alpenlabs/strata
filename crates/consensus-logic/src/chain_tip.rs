@@ -1,20 +1,20 @@
 //! Chain tip tracking.  Used to talk to the EL and pick the new chain tip.
 
 use std::collections::*;
-use std::sync::{mpsc, Arc};
+use std::sync::Arc;
 
-use alpen_vertex_db::errors::DbError;
-use alpen_vertex_state::sync_event::SyncEvent;
+use tokio::sync::mpsc;
 use tracing::*;
 
-use alpen_vertex_db::traits::{BlockStatus, Database, SyncEventStore};
-use alpen_vertex_db::traits::{L2DataProvider, L2DataStore};
+use alpen_vertex_db::errors::DbError;
+use alpen_vertex_db::traits::{BlockStatus, Database, L2DataProvider, L2DataStore, SyncEventStore};
 use alpen_vertex_evmctl::engine::ExecEngineCtl;
 use alpen_vertex_evmctl::messages::ExecPayloadData;
 use alpen_vertex_primitives::params::Params;
-use alpen_vertex_state::block::L2Block;
+use alpen_vertex_state::block::{L2Block, L2BlockId};
+use alpen_vertex_state::consensus::ConsensusState;
 use alpen_vertex_state::operation::SyncAction;
-use alpen_vertex_state::{block::L2BlockId, consensus::ConsensusState};
+use alpen_vertex_state::sync_event::SyncEvent;
 
 use crate::message::{ChainTipMessage, CsmMessage};
 use crate::{credential, errors::*, reorg, unfinalized_tracker};
@@ -41,14 +41,29 @@ pub struct ChainTipTrackerState<D: Database> {
 }
 
 impl<D: Database> ChainTipTrackerState<D> {
-    fn finalized_tip(&self) -> &L2BlockId {
-        self.chain_tracker.finalized_tip()
+    /// Constructs a new instance we can run the tracker with.
+    // TODO should we not include the sync event channel here?  this feels like
+    // it should go in some IO type that contains the other channels
+    pub fn new(
+        params: Arc<Params>,
+        database: Arc<D>,
+        cur_state: Arc<ConsensusState>,
+        chain_tracker: unfinalized_tracker::UnfinalizedBlockTracker,
+        cur_best_block: L2BlockId,
+        sync_ev_tx: mpsc::Sender<CsmMessage>,
+    ) -> Self {
+        Self {
+            params,
+            database,
+            cur_state,
+            chain_tracker,
+            cur_best_block,
+            sync_ev_tx,
+        }
     }
 
-    fn submit_csm_message(&self, msg: CsmMessage) {
-        if !self.sync_ev_tx.send(msg).is_ok() {
-            error!("unable to submit csm message");
-        }
+    fn finalized_tip(&self) -> &L2BlockId {
+        self.chain_tracker.finalized_tip()
     }
 
     fn set_block_status(&self, id: &L2BlockId, status: BlockStatus) -> Result<(), DbError> {
@@ -57,12 +72,48 @@ impl<D: Database> ChainTipTrackerState<D> {
         Ok(())
     }
 
+    // TODO move this?
+    fn submit_csm_message(&self, msg: CsmMessage) {
+        if !self.sync_ev_tx.blocking_send(msg).is_ok() {
+            error!("unable to submit csm message");
+        }
+    }
+
+    // TODO move this?
     fn submit_sync_event(&self, ev: SyncEvent) -> Result<(), DbError> {
         let ev_store = self.database.sync_event_store();
         let idx = ev_store.write_sync_event(ev)?;
         self.submit_csm_message(CsmMessage::EventInput(idx));
         Ok(())
     }
+}
+
+/// Main tracker task that takes a ready chain tip tracker and some IO stuff.
+pub fn tracker_task<D: Database, E: ExecEngineCtl>(
+    state: ChainTipTrackerState<D>,
+    engine: Arc<E>,
+    ctm_rx: mpsc::Receiver<ChainTipMessage>,
+) {
+    if let Err(e) = tracker_task_inner(state, engine.as_ref(), ctm_rx) {
+        error!(err = %e, "tracker aborted");
+    }
+}
+
+fn tracker_task_inner<D: Database, E: ExecEngineCtl>(
+    mut state: ChainTipTrackerState<D>,
+    engine: &E,
+    mut ctm_rx: mpsc::Receiver<ChainTipMessage>,
+) -> Result<(), Error> {
+    loop {
+        let Some(m) = ctm_rx.blocking_recv() else {
+            break;
+        };
+
+        // TODO decide when errors are actually failures vs when they're okay
+        process_ct_msg(m, &mut state, engine)?;
+    }
+
+    Ok(())
 }
 
 fn process_ct_msg<D: Database, E: ExecEngineCtl>(
