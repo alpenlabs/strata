@@ -42,14 +42,14 @@ jsonrpsee = "0.22"
 jsonrpsee-core = "0.22"
 jsonrpsee-types = "0.22"
 parking_lot = "0.12.3"
-reth-db = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.2.0-beta.6" }
-reth-ipc = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.2.0-beta.6" }
-reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.2.0-beta.6" }
-reth-primitives = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.2.0-beta.6" }
-reth-revm = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.2.0-beta.6" }
-reth-rpc = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.2.0-beta.6" }
-reth-rpc-api = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.2.0-beta.6" }
-reth-rpc-types = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.2.0-beta.6" }
+reth-db = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.2.0-beta.7" }
+reth-ipc = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.2.0-beta.7" }
+reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.2.0-beta.7" }
+reth-primitives = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.2.0-beta.7" }
+reth-revm = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.2.0-beta.7" }
+reth-rpc = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.2.0-beta.7" }
+reth-rpc-api = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.2.0-beta.7" }
+reth-rpc-types = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.2.0-beta.7" }
 rockbound = { git = "https://github.com/sovereign-Labs/rockbound", tag = "v2.0.1" }
 rocksdb = "0.21"
 serde = "1.0"

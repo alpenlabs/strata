@@ -123,10 +123,8 @@ impl RpcExecEngineCtl {
         let forkchoice_result = self.engine_api_client().fork_choice_updated_v2(self.fork_choice_state.lock().await.clone(), Some(payload_attributes)).await;
         match forkchoice_result {
             Ok(update_status) => {
-                if let Some(_payload_id) = update_status.payload_id {
-                    // FIXME: update dependency where payload id is public
-                    // Ok(payload_id.0)
-                    Ok(0)
+                if let Some(payload_id) = update_status.payload_id {
+                    Ok(payload_id.0.into())
                 } else {
                     Err(EngineError::Other("".into()))
                 }
