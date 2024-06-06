@@ -2,6 +2,7 @@
 
 pub mod chain_tip;
 pub mod credential;
+pub mod ctl;
 pub mod message;
 pub mod reorg;
 pub mod status;

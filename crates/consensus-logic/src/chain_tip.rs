@@ -16,7 +16,8 @@ use alpen_vertex_state::consensus::ConsensusState;
 use alpen_vertex_state::operation::SyncAction;
 use alpen_vertex_state::sync_event::SyncEvent;
 
-use crate::message::{ChainTipMessage, CsmMessage};
+use crate::ctl::CsmController;
+use crate::message::ChainTipMessage;
 use crate::{credential, errors::*, reorg, unfinalized_tracker};
 
 /// Tracks the parts of the chain that haven't been finalized on-chain yet.
@@ -35,22 +36,16 @@ pub struct ChainTipTrackerState<D: Database> {
 
     /// Current best block.
     cur_best_block: L2BlockId,
-
-    /// Channel to send new sync messages to be persisted and executed.
-    sync_ev_tx: mpsc::Sender<CsmMessage>,
 }
 
 impl<D: Database> ChainTipTrackerState<D> {
     /// Constructs a new instance we can run the tracker with.
-    // TODO should we not include the sync event channel here?  this feels like
-    // it should go in some IO type that contains the other channels
     pub fn new(
         params: Arc<Params>,
         database: Arc<D>,
         cur_state: Arc<ConsensusState>,
         chain_tracker: unfinalized_tracker::UnfinalizedBlockTracker,
         cur_best_block: L2BlockId,
-        sync_ev_tx: mpsc::Sender<CsmMessage>,
     ) -> Self {
         Self {
             params,
@@ -58,7 +53,6 @@ impl<D: Database> ChainTipTrackerState<D> {
             cur_state,
             chain_tracker,
             cur_best_block,
-            sync_ev_tx,
         }
     }
 
@@ -71,21 +65,6 @@ impl<D: Database> ChainTipTrackerState<D> {
         l2store.set_block_status(*id, status)?;
         Ok(())
     }
-
-    // TODO move this?
-    fn submit_csm_message(&self, msg: CsmMessage) {
-        if !self.sync_ev_tx.blocking_send(msg).is_ok() {
-            error!("unable to submit csm message");
-        }
-    }
-
-    // TODO move this?
-    fn submit_sync_event(&self, ev: SyncEvent) -> Result<(), DbError> {
-        let ev_store = self.database.sync_event_store();
-        let idx = ev_store.write_sync_event(ev)?;
-        self.submit_csm_message(CsmMessage::EventInput(idx));
-        Ok(())
-    }
 }
 
 /// Main tracker task that takes a ready chain tip tracker and some IO stuff.
@@ -93,8 +72,9 @@ pub fn tracker_task<D: Database, E: ExecEngineCtl>(
     state: ChainTipTrackerState<D>,
     engine: Arc<E>,
     ctm_rx: mpsc::Receiver<ChainTipMessage>,
+    csm_ctl: Arc<CsmController<D>>,
 ) {
-    if let Err(e) = tracker_task_inner(state, engine.as_ref(), ctm_rx) {
+    if let Err(e) = tracker_task_inner(state, engine.as_ref(), ctm_rx, &csm_ctl) {
         error!(err = %e, "tracker aborted");
     }
 }
@@ -103,14 +83,15 @@ fn tracker_task_inner<D: Database, E: ExecEngineCtl>(
     mut state: ChainTipTrackerState<D>,
     engine: &E,
     mut ctm_rx: mpsc::Receiver<ChainTipMessage>,
-) -> Result<(), Error> {
+    csm_ctl: &CsmController<D>,
+) -> anyhow::Result<()> {
     loop {
         let Some(m) = ctm_rx.blocking_recv() else {
             break;
         };
 
         // TODO decide when errors are actually failures vs when they're okay
-        process_ct_msg(m, &mut state, engine)?;
+        process_ct_msg(m, &mut state, engine, csm_ctl)?;
     }
 
     Ok(())
@@ -120,7 +101,8 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
     ctm: ChainTipMessage,
     state: &mut ChainTipTrackerState<D>,
     engine: &E,
-) -> Result<(), Error> {
+    csm_ctl: &CsmController<D>,
+) -> anyhow::Result<()> {
     match ctm {
         ChainTipMessage::NewState(cs, output) => {
             let l1_tip = cs.chain_state().chain_tip_blockid();
@@ -133,6 +115,7 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
                 match act {
                     SyncAction::FinalizeBlock(blkid) => {
                         let fin_report = state.chain_tracker.update_finalized_tip(blkid)?;
+                        info!(?blkid, ?fin_report, "finalized block")
                         // TODO do something with the finalization report
                     }
 
@@ -204,7 +187,7 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
 
             // Insert the sync event and submit it to the executor.
             let ev = SyncEvent::NewTipBlock(*reorg.new_tip());
-            state.submit_sync_event(ev)?;
+            csm_ctl.submit_event(ev)?;
 
             // Apply the changes to our state.
             state.cur_best_block = *reorg.new_tip();
@@ -213,7 +196,6 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
         }
     }
 
-    // TODO
     Ok(())
 }
 
@@ -225,13 +207,13 @@ fn check_new_block<D: Database>(
     block: &L2Block,
     cstate: &ConsensusState,
     state: &mut ChainTipTrackerState<D>,
-) -> Result<bool, Error> {
+) -> anyhow::Result<bool, Error> {
     let params = state.params.as_ref();
 
     // Check that the block is correctly signed.
     let cred_ok = credential::check_block_credential(block.header(), cstate.chain_state(), params);
     if !cred_ok {
-        error!(?blkid, "block has invalid credential");
+        warn!(?blkid, "block has invalid credential");
         return Ok(false);
     }
 
@@ -239,7 +221,7 @@ fn check_new_block<D: Database>(
     let l2prov = state.database.l2_provider();
     if let Some(status) = l2prov.get_block_status(*blkid)? {
         if status == alpen_vertex_db::traits::BlockStatus::Invalid {
-            warn!(?blkid, "rejecting invalid block");
+            warn!(?blkid, "rejecting block that fails EL validation");
             return Ok(false);
         }
     }
