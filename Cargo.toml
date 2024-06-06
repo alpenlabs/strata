@@ -52,7 +52,7 @@ reth-rpc-types = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.2.
 rockbound = { git = "https://github.com/sovereign-Labs/rockbound", tag = "v2.0.1" }
 rocksdb = "0.21"
 serde = "1.0"
-serde_json = "1.0"
+serde_json = { version = "1.0", default-features = false, features = [ "alloc", "raw_value" ] }
 sha2 = "0.10"
 thiserror = "1.0"
 tokio = { version = "1.37", features = ["full"] }

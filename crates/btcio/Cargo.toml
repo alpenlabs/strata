@@ -6,8 +6,13 @@ edition = "2021"
 [dependencies]
 alpen-vertex-primitives = { workspace = true }
 anyhow = { workspace = true }
+base64 = "0.22.1"
 bitcoin = { workspace = true }
 bytes =  { version = "1.6.0" }
+hex = "0.4.3"
 tokio = { workspace = true }
+reqwest = { version = "0.12.4", features = ["json"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
 tracing = { workspace = true }
 zeromq = { version = "0.3.5" }
