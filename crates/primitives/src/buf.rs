@@ -61,6 +61,23 @@ impl From<[u8; 64]> for Buf64 {
     }
 }
 
+impl BorshSerialize for Buf20 {
+    fn serialize<W: std::io::prelude::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        let bytes = self.0.as_ref();
+        let _ = writer.write(&bytes)?;
+        Ok(())
+    }
+}
+
+impl BorshDeserialize for Buf20 {
+    fn deserialize_reader<R: std::io::prelude::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let mut array = [0u8; 20];
+        reader.read_exact(&mut array)?;
+        Ok(Self(array.into()))
+    }
+}
+
+
 impl BorshSerialize for Buf32 {
     fn serialize<W: std::io::prelude::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         let bytes = self.0.as_ref();
@@ -92,6 +109,15 @@ impl BorshDeserialize for Buf64 {
         Ok(Self(array.into()))
     }
 }
+
+impl<'a> Arbitrary<'a> for Buf20 {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let mut array = [0u8; 20];
+        u.fill_buffer(&mut array)?;
+        Ok(Buf20(array.into()))
+    }
+}
+
 
 impl<'a> Arbitrary<'a> for Buf32 {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {

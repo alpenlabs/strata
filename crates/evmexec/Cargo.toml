@@ -7,6 +7,7 @@ edition = "2021"
 alpen-vertex-evmctl = { workspace = true }
 alpen-vertex-primitives = { workspace = true }
 alpen-vertex-state = { workspace = true }
+arbitrary = { workspace = true }
 borsh = { workspace = true }
 reth-primitives = { workspace = true }
 reth-node-ethereum = { workspace = true }
@@ -19,3 +20,6 @@ http = "0.2.8"
 hyper = "0.14.25"
 tower = "0.4"
 serde = { workspace = true }
+
+[dev-dependencies]
+rand = { workspace = true }

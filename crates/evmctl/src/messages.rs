@@ -6,12 +6,12 @@ use alpen_vertex_primitives::prelude::*;
 #[derive(Clone, Debug)]
 pub struct ExecPayloadData {
     /// Encoded EL payload, minus any operations we push to it.
-    el_payload: Vec<u8>,
+    pub el_payload: Vec<u8>,
 
     /// CL operations pushed into the EL, such as deposits from L1.  This
     /// corresponds to the "withdrawals" field in the `ExecutionPayloadVX`
     /// type(s), but is seperated here because we control it ourselves.
-    ops: Vec<Op>,
+    pub ops: Vec<Op>,
 }
 
 impl ExecPayloadData {

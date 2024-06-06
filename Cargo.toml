@@ -42,6 +42,7 @@ jsonrpsee = "0.22"
 jsonrpsee-core = "0.22"
 jsonrpsee-types = "0.22"
 parking_lot = "0.12.3"
+rand = "0.8.5"
 reth-db = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.2.0-beta.7" }
 reth-ipc = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.2.0-beta.7" }
 reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.2.0-beta.7" }

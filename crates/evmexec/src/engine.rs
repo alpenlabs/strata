@@ -1,21 +1,20 @@
 use crate::auth_client_layer::{AuthClientLayer, AuthClientService};
+use crate::el_payload::ElPayload;
 use crate::get_runtime;
 
 use alpen_vertex_evmctl::engine::{BlockStatus, ExecEngineCtl, PayloadStatus};
 use alpen_vertex_evmctl::errors::{EngineError, EngineResult};
 use alpen_vertex_evmctl::messages::{ELDepositData, ExecPayloadData, Op, PayloadEnv};
 use alpen_vertex_state::block::L2BlockId;
-use borsh::{BorshDeserialize, BorshSerialize};
 use jsonrpsee::http_client::{transport::HttpBackend, HttpClient, HttpClientBuilder};
 use reth_node_ethereum::EthEngineTypes;
 use reth_primitives::{Address, B256};
 use reth_rpc::JwtSecret;
 use reth_rpc_api::EngineApiClient;
 use reth_rpc_types::engine::{
-    ExecutionPayloadEnvelopeV2, ExecutionPayloadFieldV2, ForkchoiceState, PayloadAttributes,
-    PayloadId, PayloadStatusEnum,
+    ExecutionPayloadEnvelopeV2, ExecutionPayloadFieldV2, ExecutionPayloadInputV2, ForkchoiceState, PayloadAttributes, PayloadId, PayloadStatusEnum
 };
-use reth_rpc_types::{ExecutionPayloadV1, Withdrawal};
+use reth_rpc_types::Withdrawal;
 use tokio::sync::Mutex;
 
 fn http_client(http_url: &str, secret_hex: &str) -> HttpClient<AuthClientService<HttpBackend>> {
@@ -31,21 +30,6 @@ fn http_client(http_url: &str, secret_hex: &str) -> HttpClient<AuthClientService
 fn address_from_vec(vec: Vec<u8>) -> Option<Address> {
     let slice: Option<[u8; 20]> = vec.try_into().ok();
     slice.map(Address::from)
-}
-
-#[derive(Debug, BorshSerialize, BorshDeserialize)]
-struct ElPayloadHeader {
-    // TODO
-    pub block_number: u64,
-}
-
-impl Into<ElPayloadHeader> for ExecutionPayloadV1 {
-    fn into(self) -> ElPayloadHeader {
-        // TODO
-        ElPayloadHeader {
-            block_number: self.block_number,
-        }
-    }
 }
 
 #[derive(Debug, Default)]
@@ -93,10 +77,12 @@ impl RpcExecEngineCtl {
                     .unwrap_or(default.finalized_block_hash),
             }
         };
+
         let fork_choice_result = self
             .engine_api_client()
             .fork_choice_updated_v2(fork_choice_state, None)
             .await;
+
         match fork_choice_result {
             Ok(update_status) => {
                 match update_status.payload_status.status {
@@ -168,7 +154,7 @@ impl RpcExecEngineCtl {
 
         let execution_payload_data = match payload.execution_payload {
             ExecutionPayloadFieldV2::V1(payload) => {
-                let el_payload: ElPayloadHeader = payload.into();
+                let el_payload: ElPayload = payload.into();
                 ExecPayloadData::new_simple(borsh::to_vec(&el_payload).unwrap())
             }
             ExecutionPayloadFieldV2::V2(payload) => {
@@ -183,18 +169,49 @@ impl RpcExecEngineCtl {
                     })
                     .collect();
 
-                let el_payload: ElPayloadHeader = payload.payload_inner.into();
+                let el_payload: ElPayload = payload.payload_inner.into();
                 ExecPayloadData::new(borsh::to_vec(&el_payload).unwrap(), ops)
             }
         };
 
         Ok(PayloadStatus::Ready(execution_payload_data))
     }
+
+    async fn submit_new_payload(&self, payload: ExecPayloadData) -> EngineResult<BlockStatus> {
+        let el_payload = borsh::from_slice::<ElPayload>(&payload.el_payload).map_err(|_| EngineError::Other("Invalid payload".to_string()))?;
+
+        let withdrawals: Vec<Withdrawal> = payload.ops
+            .iter()
+            .filter_map(|op| match op {
+                Op::Deposit(deposit_data) => Some(Withdrawal {
+                    address: address_from_vec(deposit_data.dest_addr.clone())?,
+                    amount: deposit_data.amt,
+                    ..Default::default()
+                }),
+            })
+            .collect();
+
+        let v2_payload = ExecutionPayloadInputV2 {
+            execution_payload: el_payload.into(),
+            withdrawals: if withdrawals.is_empty() { None } else { Some(withdrawals) }
+        };
+        
+        let payload_status_result = self.engine_api_client().new_payload_v2(v2_payload).await;
+
+        let payload_status = payload_status_result.map_err(|err| EngineError::Other(err.to_string()))?;
+
+        match payload_status.status {
+            PayloadStatusEnum::Valid => EngineResult::Ok(BlockStatus::Valid),
+            PayloadStatusEnum::Syncing => EngineResult::Ok(BlockStatus::Syncing),
+            PayloadStatusEnum::Invalid { .. } => EngineResult::Ok(BlockStatus::Invalid),
+            PayloadStatusEnum::Accepted => EngineResult::Err(EngineError::Unimplemented), // TODO
+        }
+    }
 }
 
 impl ExecEngineCtl for RpcExecEngineCtl {
     fn submit_payload(&self, payload: ExecPayloadData) -> EngineResult<BlockStatus> {
-        todo!()
+        get_runtime().block_on(self.submit_new_payload(payload))
     }
 
     fn prepare_payload(&self, env: PayloadEnv) -> EngineResult<u64> {
