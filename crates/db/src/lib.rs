@@ -9,6 +9,7 @@ use crate::sync_event::schemas::SyncEventSchema;
 pub mod consensus_state;
 pub mod database;
 pub mod l1;
+pub mod stubs;
 pub mod sync_event;
 
 pub mod errors;

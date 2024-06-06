@@ -51,7 +51,7 @@ impl L2Block {
 }
 
 /// Block header that forms the chain we use to reach consensus.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
 pub struct L2BlockHeader {
     /// Block index, obviously.
     block_idx: u64,
@@ -105,6 +105,14 @@ impl L2BlockHeader {
 
     pub fn sig(&self) -> &Buf64 {
         &self.signature
+    }
+
+    /// Computes the blockid with SHA256.
+    // TODO should this be poseidon?
+    pub fn get_blockid(&self) -> L2BlockId {
+        let buf = borsh::to_vec(self).expect("block: compute blkid");
+        let h = <sha2::Sha256 as digest::Digest>::digest(&buf);
+        L2BlockId::from(Buf32::from(<[u8; 32]>::from(h)))
     }
 }
 
