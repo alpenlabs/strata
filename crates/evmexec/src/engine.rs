@@ -1,4 +1,5 @@
 use crate::auth_client_layer::{AuthClientLayer, AuthClientService};
+use crate::get_runtime;
 
 use alpen_vertex_evmctl::engine::{BlockStatus, ExecEngineCtl, PayloadStatus};
 use alpen_vertex_evmctl::errors::{EngineError, EngineResult};
@@ -16,8 +17,7 @@ use reth_rpc::JwtSecret;
 
 fn http_client(http_url: &str, secret_hex: &str) -> HttpClient<AuthClientService<HttpBackend>> {
     let secret = JwtSecret::from_hex(secret_hex).unwrap();
-    let middleware =
-    tower::ServiceBuilder::new().layer(AuthClientLayer::new(secret));
+    let middleware = tower::ServiceBuilder::new().layer(AuthClientLayer::new(secret));
     
     HttpClientBuilder::default()
         .set_http_middleware(middleware)
@@ -150,12 +150,12 @@ impl ExecEngineCtl for RpcExecEngineCtl {
     }
 
     fn prepare_payload(&self, env: PayloadEnv) -> EngineResult<u64> {
-        let rt = tokio::runtime::Runtime::new().unwrap();
+        let rt = get_runtime();
         rt.block_on(self.build_block_from_mempool(env))
     }
 
     fn get_payload_status(&self, id: u64) -> EngineResult<PayloadStatus> {
-        let rt = tokio::runtime::Runtime::new().unwrap();
+        let rt = get_runtime();
         rt.block_on(self.get_payload_status(id))
     }
 
