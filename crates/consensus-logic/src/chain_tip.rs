@@ -35,6 +35,7 @@ pub struct ChainTipTrackerState<D: Database> {
     chain_tracker: unfinalized_tracker::UnfinalizedBlockTracker,
 
     /// Current best block.
+    // TODO make sure we actually want to have this
     cur_best_block: L2BlockId,
 }
 

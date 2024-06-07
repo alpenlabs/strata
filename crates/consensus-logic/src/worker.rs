@@ -52,6 +52,11 @@ impl<D: Database> WorkerState<D> {
             state_tracker,
         })
     }
+
+    /// Gets a ref to the consensus state from the inner state tracker.
+    pub fn cur_state(&self) -> &Arc<ConsensusState> {
+        self.state_tracker.cur_state()
+    }
 }
 
 /// Receives messages from channel to update consensus state with.
@@ -62,7 +67,7 @@ pub fn consensus_worker_task<D: Database, E: ExecEngineCtl>(
 ) -> Result<(), Error> {
     while let Some(msg) = inp_msg_ch.blocking_recv() {
         if let Err(e) = process_msg(&mut state, engine.as_ref(), &msg) {
-            error!(err = %e, "failed to process sync message");
+            error!(err = %e, "failed to process sync message, skipping");
         }
     }
 
@@ -100,7 +105,7 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
                 debug!(?blkid, "updating EL safe block");
                 engine.update_safe_block(*blkid)?;
 
-                // TODO update the external tip
+                // TODO update the tip we report in RPCs and whatnot
             }
 
             SyncAction::MarkInvalid(blkid) => {
@@ -119,6 +124,8 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
             }
         }
     }
+
+    // TODO broadcast the new state somehow
 
     Ok(())
 }

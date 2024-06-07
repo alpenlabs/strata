@@ -5,6 +5,7 @@ use std::thread;
 use std::time;
 
 use alpen_vertex_consensus_logic::chain_tip;
+use alpen_vertex_consensus_logic::unfinalized_tracker;
 use anyhow::Context;
 use thiserror::Error;
 use tokio::sync::{mpsc, oneshot, watch};
@@ -68,13 +69,21 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         l1_db, l2_db, sync_ev_db, cs_db,
     ));
 
-    // Fetch current states of things.
-    let cur_sync_idx = database
-        .sync_event_provider()
-        .get_last_idx()?
-        .unwrap_or_default();
+    // Init the consensus worker state and get the current state from it.
+    let cw_state = worker::WorkerState::open(params.clone(), database.clone())?;
+    let cur_state = cw_state.cur_state().clone();
+    let cur_chain_tip = cur_state.chain_state().chain_tip_blockid();
 
-    let cw_state = worker::WorkerState::open(params, database.clone())?;
+    // Init the chain tracker from the state we figured out.
+    let chain_tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(cur_chain_tip);
+    let ct_state = chain_tip::ChainTipTrackerState::new(
+        params,
+        database.clone(),
+        cur_state,
+        chain_tracker,
+        cur_chain_tip,
+    );
+    // TODO load unfinalized blocks into block tracker
 
     // Create dataflow channels.
     let (ctm_tx, ctm_rx) = mpsc::channel::<ChainTipMessage>(64);
@@ -82,13 +91,19 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let csm_ctl = Arc::new(CsmController::new(database.clone(), csm_tx));
     let (cout_tx, cout_rx) = mpsc::channel::<operation::ConsensusOutput>(64);
     let (cur_state_tx, cur_state_rx) = watch::channel::<Option<ConsensusState>>(None);
+    // TODO connect up these other channels
 
     // Init engine controller.
     let eng_ctl = alpen_vertex_evmctl::stub::StubController::new(time::Duration::from_millis(100));
     let eng_ctl = Arc::new(eng_ctl);
+    let eng_ctl_cw = eng_ctl.clone();
+    let eng_ctl_ct = eng_ctl.clone();
 
     // Start worker threads.
-    let cw_handle = thread::spawn(|| worker::consensus_worker_task(cw_state, eng_ctl, csm_rx));
+    // TODO set up watchdog for these things
+    let cw_handle = thread::spawn(|| worker::consensus_worker_task(cw_state, eng_ctl_cw, csm_rx));
+    let ct_handle =
+        thread::spawn(|| chain_tip::tracker_task(ct_state, eng_ctl_ct, ctm_rx, csm_ctl));
 
     // Start runtime for async IO tasks.
     let rt = tokio::runtime::Builder::new_multi_thread()
