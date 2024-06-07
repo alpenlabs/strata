@@ -20,6 +20,7 @@ alpen-vertex-btcio = { workspace = true }
 anyhow = { workspace = true }
 argh = { workspace = true }
 async-trait = { workspace = true }
+bitcoin = { workspace = true }
 jsonrpsee = { workspace = true, features = ["server", "macros"] }
 parking_lot = { workspace = true }
 reth-ipc = { workspace = true }

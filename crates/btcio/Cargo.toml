@@ -5,6 +5,8 @@ edition = "2021"
 
 [dependencies]
 alpen-vertex-primitives = { workspace = true }
+alpen-vertex-db = { workspace = true }
+
 anyhow = { workspace = true }
 base64 = "0.22.1"
 bitcoin = { workspace = true }

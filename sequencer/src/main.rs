@@ -128,7 +128,9 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
 async fn main_task(args: Args) -> Result<(), InitError> {
     let config = RollupConfig::default();
-    tokio::spawn(l1_reader_task(config));
+    l1_reader_task(config)
+        .await
+        .map_err(|e| InitError::Other(e.to_string()))?;
 
     let (stop_tx, stop_rx) = oneshot::channel();
 

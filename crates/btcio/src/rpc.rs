@@ -38,15 +38,15 @@ struct Response<R = String> {
     pub id: String,
 }
 
-// BitcoinNode is a struct that represents a connection to a Bitcoin RPC node
+// BitcoinClient is a struct that represents a connection to a Bitcoin RPC node
 #[derive(Debug, Clone)]
-pub struct BitcoinNode {
+pub struct BitcoinClient {
     url: String,
     client: reqwest::Client,
     network: Network,
 }
 
-impl BitcoinNode {
+impl BitcoinClient {
     pub fn new(url: String, username: String, password: String, network: Network) -> Self {
         let mut headers = HeaderMap::new();
         headers.insert(
@@ -150,6 +150,12 @@ impl BitcoinNode {
     pub async fn get_block_hash(&self, height: u64) -> Result<String, anyhow::Error> {
         self.call::<String>("getblockhash", vec![to_value(height)?])
             .await
+    }
+
+    pub async fn get_block_at(&self, height: u64) -> Result<Block, anyhow::Error> {
+        let height = self.get_block_hash(height).await?;
+        let block = self.get_block(height).await?;
+        Ok(block)
     }
 
     // get_mempool_txids returns a list of txids in the current mempool
