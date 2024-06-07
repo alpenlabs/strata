@@ -4,7 +4,7 @@ use tokio::sync::mpsc;
 
 use alpen_vertex_btcio::{
     handlers::bitcoin_data_handler,
-    reader::{bitcoin_data_reader, BlockData},
+    reader::{bitcoin_data_reader, L1Data},
     rpc::BitcoinClient,
 };
 use alpen_vertex_db::l1::{db::L1Db, utils::get_db_for_l1_store};
@@ -22,8 +22,9 @@ pub async fn l1_reader_task(config: RollupConfig) -> anyhow::Result<()> {
     let db = get_db_for_l1_store(Path::new("storage-data"))?;
     let l1db = Arc::new(L1Db::new(Arc::new(db)));
 
-    let (sender, receiver) = mpsc::channel::<BlockData>(1000); // TODO: think about the buffer size
+    let (sender, receiver) = mpsc::channel::<L1Data>(1000); // TODO: think about the buffer size
 
+    // TODO: handle gracefully when the spawned tasks fail
     tokio::spawn(bitcoin_data_reader(l1db.clone(), rpc_client, sender));
 
     tokio::spawn(bitcoin_data_handler(l1db.clone(), receiver));

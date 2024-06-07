@@ -2,5 +2,6 @@
 
 pub mod handlers;
 pub mod reader;
+pub(crate) mod reorg;
 pub mod rpc;
 pub(crate) mod rpc_types;

@@ -9,6 +9,7 @@ use crate::{
     prelude::Buf32,
 };
 
+// TODO: this should probably be proof for witness, it is proof for txns right now
 fn get_cohashes_from_txids(txids: &[Txid], index: u32) -> Vec<Buf32> {
     assert!((index as usize) < txids.len());
 
