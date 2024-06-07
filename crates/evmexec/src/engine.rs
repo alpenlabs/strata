@@ -83,19 +83,16 @@ impl RpcExecEngineCtl {
             .fork_choice_updated_v2(fork_choice_state, None)
             .await;
 
-        match fork_choice_result {
-            Ok(update_status) => {
-                match update_status.payload_status.status {
-                    PayloadStatusEnum::Valid => {
-                        *self.fork_choice_state.lock().await = fork_choice_state;
-                        EngineResult::Ok(BlockStatus::Valid)
-                    }
-                    PayloadStatusEnum::Syncing => EngineResult::Ok(BlockStatus::Syncing),
-                    PayloadStatusEnum::Invalid { .. } => EngineResult::Ok(BlockStatus::Invalid),
-                    PayloadStatusEnum::Accepted => EngineResult::Err(EngineError::Unimplemented), // should not be called; panic ?
-                }
+        let update_status = fork_choice_result.map_err(|err| EngineError::Other(err.to_string()))?;
+
+        match update_status.payload_status.status {
+            PayloadStatusEnum::Valid => {
+                *self.fork_choice_state.lock().await = fork_choice_state;
+                EngineResult::Ok(BlockStatus::Valid)
             }
-            Err(err) => EngineResult::Err(EngineError::Other(err.to_string())),
+            PayloadStatusEnum::Syncing => EngineResult::Ok(BlockStatus::Syncing),
+            PayloadStatusEnum::Invalid { .. } => EngineResult::Ok(BlockStatus::Invalid),
+            PayloadStatusEnum::Accepted => EngineResult::Err(EngineError::Unimplemented), // should not be called; panic ?
         }
     }
 
