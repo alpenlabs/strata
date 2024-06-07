@@ -11,6 +11,7 @@ alpen-vertex-state = { workspace = true }
 anyhow = { workspace = true }
 arbitrary = { workspace = true }
 borsh = { workspace = true }
+parking_lot = { workspace = true }
 reth-db = { workspace = true }
 rockbound = { workspace = true }
 rocksdb = { workspace = true }

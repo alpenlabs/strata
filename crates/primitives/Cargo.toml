@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-borsh = { workspace = true }
 arbitrary = { workspace = true }
+borsh = { workspace = true }
+hex = { workspace = true }
 reth-primitives = { workspace = true }

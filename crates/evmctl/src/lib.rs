@@ -4,5 +4,6 @@
 
 pub mod engine;
 pub mod messages;
+pub mod stub;
 
 pub mod errors;

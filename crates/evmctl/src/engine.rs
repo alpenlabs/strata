@@ -9,6 +9,7 @@
 // inconsistent with the remote state.
 
 use alpen_vertex_primitives::buf::Buf32;
+use alpen_vertex_state::block::L2BlockId;
 
 use crate::errors::*;
 use crate::messages::*;
@@ -17,13 +18,11 @@ use crate::messages::*;
 /// Vertex semantics which will be produced inside the EL impl according to
 /// whatever semantics it has.
 pub trait ExecEngineCtl {
-    /// Updates the EL payload chain tip that we should be trying to execute to
-    /// determine validity.
-    fn update_head_block(&self, id: Buf32) -> EngineResult<BlockStatus>;
-
-    /// Updates the block that we've considered full buried.  This means it's
-    /// been proven on-chain sufficiently that it will never be rolled back.
-    fn update_finalized_block(&self, id: Buf32) -> EngineResult<()>;
+    /// Execute a block payload to determine its validity and if it extends the
+    /// current chain tip.
+    ///
+    /// Corresponds to `engine_newPayloadVX`.
+    fn submit_payload(&self, payload: ExecPayloadData) -> EngineResult<BlockStatus>;
 
     /// Tries to prepare a payload using the current state of the chain,
     /// returning an ID to query pending payload build jobs.  If this completes
@@ -34,8 +33,17 @@ pub trait ExecEngineCtl {
     /// Tries to get a payload that we were working on.
     fn get_payload_status(&self, id: u64) -> EngineResult<PayloadStatus>;
 
-    // TODO more stuff to ensure that the EL actually gets the payloads and the
-    // CL context it needs to execute the blocks
+    /// Updates the (L2) block that we treat as the chain tip and build new
+    /// blocks on.
+    fn update_head_block(&self, id: L2BlockId) -> EngineResult<()>;
+
+    /// Updates the (L2) block that we treat as the safe chain tip that we
+    /// respond to RPCs with.
+    fn update_safe_block(&self, id: L2BlockId) -> EngineResult<()>;
+
+    /// Updates the (L2) block that we treat as being deeply buried and won't
+    /// reorg.
+    fn update_finalized_block(&self, id: L2BlockId) -> EngineResult<()>;
 }
 
 /// The status of a block that we've just set fork choice fork.

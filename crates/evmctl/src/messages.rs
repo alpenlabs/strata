@@ -5,15 +5,24 @@ use alpen_vertex_primitives::prelude::*;
 // should we consolidate?
 #[derive(Clone, Debug)]
 pub struct ExecPayloadData {
-    /// Payload commitment, probably a hash of the EL block header.
-    payload_commitment: Buf32,
+    /// Encoded EL payload, minus any operations we push to it.
+    el_payload: Vec<u8>,
 
-    /// Payload state root that we can make commitments to and whatnot.
-    state_root: Buf32,
+    /// CL operations pushed into the EL, such as deposits from L1.  This
+    /// corresponds to the "withdrawals" field in the `ExecutionPayloadVX`
+    /// type(s), but is seperated here because we control it ourselves.
+    ops: Vec<Op>,
+}
 
-    /// Withdrawals initiated from within EL to L1.  This might be generalized
-    /// to permit more types of EL->L1 operations.
-    new_el_withdrawals: Vec<WithdrawData>,
+impl ExecPayloadData {
+    pub fn new(el_payload: Vec<u8>, ops: Vec<Op>) -> Self {
+        Self { el_payload, ops }
+    }
+
+    /// Creates a new instance with some specific payload no ops.
+    pub fn new_simple(el_payload: Vec<u8>) -> Self {
+        Self::new(el_payload, Vec::new())
+    }
 }
 
 /// L1 withdrawal data.
@@ -34,7 +43,7 @@ pub struct PayloadEnv {
     timestamp: u64,
 
     /// State root of the previous CL block.
-    prev_state_root: Buf32,
+    prev_global_state_root: Buf32,
 
     /// Safe L1 block we're exposing into the EL that's not likely to reorg.
     safe_l1_block: Buf32,

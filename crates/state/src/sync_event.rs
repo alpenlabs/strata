@@ -1,33 +1,19 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use crate::block::L2BlockId;
+use crate::{block::L2BlockId, l1::L1BlockId};
 
 /// Sync event that updates our consensus state.
 #[derive(Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize)]
 pub enum SyncEvent {
-    /// A new L2 block was posted to L1.
-    L1BlockPosted(Vec<L2BlockId>),
+    /// We've observed a valid L1 block.
+    L1Block(u64, L1BlockId),
 
-    /// Received a new L2 block from somewhere, maybe the p2p network, maybe we
-    /// just made it.
-    L2BlockRecv(L2BlockId),
+    /// New L2 blocks were posted to L1 in a DA batch.
+    L1DABatch(Vec<L2BlockId>),
 
-    /// Finished executing an L2 block with a status.
-    L2BlockExec(L2BlockId, bool),
-}
-
-/// Actions the consensus state machine directs the node to take to update its
-/// own bookkeeping.  These should not be able to fail.
-#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
-pub enum SyncAction {
-    /// Directs the EL engine to try to check a block ID.
-    TryCheckBlock(L2BlockId),
-
-    /// Extends our externally-facing tip to a new block ID.
-    ExtendTip(L2BlockId),
-
-    /// Reverts out externally-facing tip to a new block ID, directing the EL
-    /// engine to roll back changes.
-    RevertTip(L2BlockId),
+    /// Chain tip tracker found a new valid chain tip block.  At this point
+    /// we've already asked the EL to check if it's valid and know we *could*
+    /// accept it.
+    NewTipBlock(L2BlockId),
 }

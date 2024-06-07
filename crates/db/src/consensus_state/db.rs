@@ -1,19 +1,23 @@
+use std::sync::Arc;
+
 use rockbound::{Schema, DB};
+
+use alpen_vertex_state::operation::*;
 
 use super::schemas::{ConsensusOutputSchema, ConsensusStateSchema};
 use crate::errors::*;
 use crate::traits::*;
 
-pub struct ConsensusStateDB {
-    db: DB,
+pub struct ConsensusStateDb {
+    db: Arc<DB>,
 }
 
-impl ConsensusStateDB {
+impl ConsensusStateDb {
     /// Wraps an existing database handle.
     ///
     /// Assumes it was opened with column families as defined in `STORE_COLUMN_FAMILIES`.
     // FIXME Make it better/generic.
-    pub fn new(db: DB) -> Self {
+    pub fn new(db: Arc<DB>) -> Self {
         Self { db }
     }
 
@@ -33,7 +37,7 @@ impl ConsensusStateDB {
     }
 }
 
-impl ConsensusStateStore for ConsensusStateDB {
+impl ConsensusStateStore for ConsensusStateDb {
     fn write_consensus_output(&self, idx: u64, output: ConsensusOutput) -> DbResult<()> {
         let expected_idx = match self.get_last_idx::<ConsensusOutputSchema>()? {
             Some(last_idx) => last_idx + 1,
@@ -60,7 +64,7 @@ impl ConsensusStateStore for ConsensusStateDB {
     }
 }
 
-impl ConsensusStateProvider for ConsensusStateDB {
+impl ConsensusStateProvider for ConsensusStateDb {
     fn get_last_write_idx(&self) -> DbResult<u64> {
         match self.get_last_idx::<ConsensusOutputSchema>()? {
             Some(idx) => Ok(idx),
@@ -68,10 +72,7 @@ impl ConsensusStateProvider for ConsensusStateDB {
         }
     }
 
-    fn get_consensus_writes(
-        &self,
-        idx: u64,
-    ) -> DbResult<Option<Vec<alpen_vertex_state::consensus::ConsensusWrite>>> {
+    fn get_consensus_writes(&self, idx: u64) -> DbResult<Option<Vec<ConsensusWrite>>> {
         let output = self.db.get::<ConsensusOutputSchema>(&idx)?;
         match output {
             Some(out) => Ok(Some(out.writes().to_owned())),
@@ -79,10 +80,7 @@ impl ConsensusStateProvider for ConsensusStateDB {
         }
     }
 
-    fn get_consensus_actions(
-        &self,
-        idx: u64,
-    ) -> DbResult<Option<Vec<alpen_vertex_state::sync_event::SyncAction>>> {
+    fn get_consensus_actions(&self, idx: u64) -> DbResult<Option<Vec<SyncAction>>> {
         let output = self.db.get::<ConsensusOutputSchema>(&idx)?;
         match output {
             Some(out) => Ok(Some(out.actions().to_owned())),
@@ -116,6 +114,13 @@ impl ConsensusStateProvider for ConsensusStateDB {
 
         Err(DbError::NotBootstrapped)
     }
+
+    fn get_state_checkpoint(
+        &self,
+        idx: u64,
+    ) -> DbResult<Option<alpen_vertex_state::consensus::ConsensusState>> {
+        Ok(self.db.get::<ConsensusStateSchema>(&idx)?)
+    }
 }
 
 #[cfg(test)]
@@ -130,11 +135,11 @@ mod tests {
     use alpen_vertex_state::consensus::ConsensusState;
 
     use super::*;
-    use crate::{traits::ConsensusOutput, STORE_COLUMN_FAMILIES};
+    use crate::STORE_COLUMN_FAMILIES;
 
     const DB_NAME: &str = "consensus_state_db";
 
-    fn get_new_db(path: &Path) -> anyhow::Result<DB> {
+    fn get_new_db(path: &Path) -> anyhow::Result<Arc<DB>> {
         // TODO: add other options as appropriate.
         let mut db_opts = Options::default();
         db_opts.create_missing_column_families(true);
@@ -148,12 +153,13 @@ mod tests {
                 .collect::<Vec<ColumnFamilyName>>(),
             &db_opts,
         )
+        .map(Arc::new)
     }
 
-    fn setup_db() -> ConsensusStateDB {
+    fn setup_db() -> ConsensusStateDb {
         let temp_dir = TempDir::new().expect("failed to create temp dir");
         let db = get_new_db(&temp_dir.into_path()).unwrap();
-        ConsensusStateDB::new(db)
+        ConsensusStateDb::new(db)
     }
 
     fn generate_arbitrary<'a, T: Arbitrary<'a> + Clone>(bytes: &'a [u8]) -> T {

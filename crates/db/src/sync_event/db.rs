@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use rockbound::{SchemaBatch, DB};
 
 use alpen_vertex_state::sync_event::SyncEvent;
@@ -7,14 +9,14 @@ use crate::errors::{DbError, DbResult};
 use crate::traits::SyncEventProvider;
 use crate::traits::SyncEventStore;
 
-pub struct SyncEventDB {
-    db: DB,
+pub struct SyncEventDb {
+    db: Arc<DB>,
 }
 
-impl SyncEventDB {
+impl SyncEventDb {
     // NOTE: db is expected to open all the column families defined in STORE_COLUMN_FAMILIES.
     // FIXME: Make it better/generic.
-    pub fn new(db: DB) -> Self {
+    pub fn new(db: Arc<DB>) -> Self {
         Self { db }
     }
 
@@ -31,7 +33,7 @@ impl SyncEventDB {
     }
 }
 
-impl SyncEventStore for SyncEventDB {
+impl SyncEventStore for SyncEventDb {
     fn write_sync_event(&self, ev: SyncEvent) -> DbResult<u64> {
         let last_id = self.get_last_key()?.unwrap_or(0);
         let id = last_id + 1;
@@ -79,7 +81,7 @@ impl SyncEventStore for SyncEventDB {
     }
 }
 
-impl SyncEventProvider for SyncEventDB {
+impl SyncEventProvider for SyncEventDb {
     fn get_last_idx(&self) -> DbResult<Option<u64>> {
         self.get_last_key()
     }
@@ -121,7 +123,7 @@ mod tests {
         T::arbitrary(&mut u).expect("failed to generate arbitrary instance")
     }
 
-    fn get_new_db(path: &Path) -> anyhow::Result<DB> {
+    fn get_new_db(path: &Path) -> anyhow::Result<Arc<DB>> {
         // TODO: add other options as appropriate.
         let mut db_opts = Options::default();
         db_opts.create_missing_column_families(true);
@@ -135,15 +137,16 @@ mod tests {
                 .collect::<Vec<ColumnFamilyName>>(),
             &db_opts,
         )
+        .map(Arc::new)
     }
 
-    fn setup_db() -> SyncEventDB {
+    fn setup_db() -> SyncEventDb {
         let temp_dir = TempDir::new().expect("failed to create temp dir");
         let db = get_new_db(&temp_dir.into_path()).unwrap();
-        SyncEventDB::new(db)
+        SyncEventDb::new(db)
     }
 
-    fn insert_event(db: &SyncEventDB) -> SyncEvent {
+    fn insert_event(db: &SyncEventDb) -> SyncEvent {
         let ev: SyncEvent = generate_arbitrary();
         let res = db.write_sync_event(ev.clone());
         assert!(res.is_ok());

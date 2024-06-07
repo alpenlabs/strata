@@ -6,4 +6,5 @@
 pub mod block;
 pub mod consensus;
 pub mod l1;
+pub mod operation;
 pub mod sync_event;

@@ -9,15 +9,24 @@ path = "src/main.rs"
 
 [dependencies]
 alpen-vertex-common = { workspace = true }
+alpen-vertex-consensus-logic = { workspace = true }
+alpen-vertex-evmctl = { workspace = true }
+alpen-vertex-db = { workspace = true }
 alpen-vertex-primitives = { workspace = true }
 alpen-vertex-rpc-api = { workspace = true }
+alpen-vertex-state = { workspace = true }
 
+anyhow = { workspace = true }
+argh = { workspace = true }
 async-trait = { workspace = true }
 jsonrpsee = { workspace = true, features = ["server", "macros"] }
+parking_lot = { workspace = true }
 reth-ipc = { workspace = true }
 reth-primitives = { workspace = true }
 reth-rpc-api = { workspace = true }
 reth-rpc-types = { workspace = true }
+rockbound = { workspace = true }
+rocksdb = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

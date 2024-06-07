@@ -6,6 +6,12 @@ use borsh::{BorshDeserialize, BorshSerialize};
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct L1BlockId(Buf32);
 
+impl From<Buf32> for L1BlockId {
+    fn from(value: Buf32) -> Self {
+        Self(value)
+    }
+}
+
 /// Represents a serialized L1 header.
 #[derive(Clone, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
 pub struct L1HeaderPayload {

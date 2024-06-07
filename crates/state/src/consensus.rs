@@ -3,6 +3,7 @@
 //! implement the consensus logic.
 
 use std::collections::*;
+
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
@@ -15,34 +16,47 @@ use crate::{block::L2BlockId, l1::L1BlockId};
 /// This is updated when we see a consensus-relevant message.  This is L2 blocks
 /// but also L1 blocks being published with interesting things in them, and
 /// various other events.
-#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
+#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize)]
 pub struct ConsensusState {
     /// Important consensus state.
-    chain_state: ConsensusChainState,
+    pub(super) chain_state: ConsensusChainState,
+
+    /// L2 block that's been finalized and proven on L1.
+    pub(super) finalized_tip: L2BlockId,
 
     /// Recent L1 blocks that we might still reorg.
-    recent_l1_blocks: Vec<L1BlockId>,
+    // TODO replace with a tracker that we can reorg
+    pub(super) recent_l1_blocks: Vec<L1BlockId>,
+
+    /// L1 block index we treat as being "buried" and won't reorg.
+    pub(super) buried_l1_height: u64,
 
     /// Blocks we've received that appear to be on the chain tip but have not
     /// fully executed yet.
-    pending_l2_blocks: VecDeque<L2BlockId>,
+    pub(super) pending_l2_blocks: VecDeque<L2BlockId>,
+}
+
+impl ConsensusState {
+    pub fn chain_state(&self) -> &ConsensusChainState {
+        &self.chain_state
+    }
 }
 
 /// L2 blockchain consensus state.
 ///
 /// This is updated when we get a new L2 block and is kept more precisely
 /// synchronized across all nodes.
-#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
+#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize)]
 pub struct ConsensusChainState {
     /// Accepted and valid L2 blocks that we might still reorg.  The last of
     /// these is the chain tip.
-    accepted_l2_blocks: Vec<L2BlockId>,
+    pub(super) accepted_l2_blocks: Vec<L2BlockId>,
 
     /// Pending deposits that have been acknowledged in an EL block.
-    pending_deposits: Vec<PendingDeposit>,
+    pub(super) pending_deposits: Vec<PendingDeposit>,
 
     /// Pending withdrawals that have been initiated but haven't been sent out.
-    pending_withdraws: Vec<PendingWithdraw>,
+    pub(super) pending_withdraws: Vec<PendingWithdraw>,
 }
 
 impl ConsensusChainState {
@@ -55,7 +69,7 @@ impl ConsensusChainState {
 }
 
 /// Transfer from L1 into L2.
-#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
+#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
 pub struct PendingDeposit {
     /// Deposit index.
     idx: u64,
@@ -68,7 +82,7 @@ pub struct PendingDeposit {
 }
 
 /// Transfer from L2 back to L1.
-#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
+#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
 pub struct PendingWithdraw {
     /// Withdraw index.
     idx: u64,
@@ -78,43 +92,4 @@ pub struct PendingWithdraw {
 
     /// Schnorr pubkey for the taproot output we're going to generate.
     dest: Buf64,
-}
-
-/// Describes possible writes to chain state that we can make.  We use this
-/// instead of directly modifying the chain state to reduce the volume of data
-/// that we have to clone and save to disk with each sync event.
-#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
-pub enum ConsensusWrite {
-    /// Completely replace the full state with a new instance.
-    Replace(Box<ConsensusState>),
-
-    /// Replace just the L2 blockchain consensus-layer state with a new
-    /// instance.
-    ReplaceChainState(Box<ConsensusChainState>),
-
-    /// Queue an L2 block for verification.
-    QueueL2Block(L2BlockId),
-    // TODO
-}
-
-/// Applies consensus writes to an existing consensus state instance.
-// FIXME should this be moved to the consensus-logic crate?
-fn compute_new_state(
-    mut state: ConsensusState,
-    writes: impl Iterator<Item = ConsensusWrite>,
-) -> ConsensusState {
-    apply_writes_to_state(&mut state, writes);
-    state
-}
-
-fn apply_writes_to_state(state: &mut ConsensusState, writes: impl Iterator<Item = ConsensusWrite>) {
-    for w in writes {
-        use ConsensusWrite::*;
-        match w {
-            Replace(cs) => *state = *cs,
-            ReplaceChainState(ccs) => state.chain_state = *ccs,
-            QueueL2Block(blkid) => state.pending_l2_blocks.push_back(blkid),
-            // TODO
-        }
-    }
 }

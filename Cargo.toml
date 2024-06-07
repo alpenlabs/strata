@@ -22,6 +22,9 @@ resolver = "2"
 
 [workspace.dependencies]
 alpen-vertex-common = { path = "crates/common" }
+alpen-vertex-consensus-logic = { path = "crates/consensus-logic" }
+alpen-vertex-evmctl = { path = "crates/evmctl" }
+alpen-vertex-db = { path = "crates/db" }
 alpen-vertex-mmr = { path = "crates/util/mmr" }
 alpen-vertex-primitives = { path = "crates/primitives" }
 alpen-vertex-rpc-api = { path = "crates/rpc/api" }
@@ -29,11 +32,15 @@ alpen-vertex-state = { path = "crates/state" }
 
 anyhow = "1.0.86"
 arbitrary = { version = "1.3.2", features = ["derive"] }
+argh = "0.1"
 async-trait = "0.1"
 borsh = { version = "1.5.0", features = ["derive"] }
+digest = "0.10"
+hex = { version = "0.4", features = ["serde"] }
 jsonrpsee = "0.22"
 jsonrpsee-core = "0.22"
 jsonrpsee-types = "0.22"
+parking_lot = "0.12.3"
 reth-db = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.2.0-beta.6" }
 reth-ipc = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.2.0-beta.6" }
 reth-primitives = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.2.0-beta.6" }
@@ -44,6 +51,7 @@ rockbound = { git = "https://github.com/sovereign-Labs/rockbound", tag = "v2.0.1
 rocksdb = "0.21"
 serde = "1.0"
 serde_json = "1.0"
+sha2 = "0.10"
 thiserror = "1.0"
 tokio = { version = "1.37", features = ["full"] }
 tracing = "0.1"

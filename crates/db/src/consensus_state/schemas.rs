@@ -1,5 +1,5 @@
 use alpen_vertex_state::consensus::ConsensusState;
-use crate::traits::ConsensusOutput;
+use alpen_vertex_state::operation::ConsensusOutput;
 
 use crate::define_table_with_default_codec;
 use crate::define_table_without_codec;

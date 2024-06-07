@@ -7,12 +7,18 @@ use crate::l1::schemas::{L1BlockSchema, MmrSchema, TxnSchema};
 use crate::sync_event::schemas::SyncEventSchema;
 
 pub mod consensus_state;
+pub mod database;
 pub mod l1;
+pub mod stubs;
 pub mod sync_event;
 
 pub mod errors;
 pub mod macros;
 pub mod traits;
+
+pub type DbResult<T> = anyhow::Result<T, errors::DbError>;
+
+pub const ROCKSDB_NAME: &str = "vertex";
 
 pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
     ConsensusOutputSchema::COLUMN_FAMILY_NAME,
@@ -23,3 +29,8 @@ pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
     TxnSchema::COLUMN_FAMILY_NAME,
     // TODO add col families for other store types
 ];
+
+// Re-exports
+pub use consensus_state::db::ConsensusStateDb;
+pub use l1::db::L1Db;
+pub use sync_event::db::SyncEventDb;

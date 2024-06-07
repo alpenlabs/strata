@@ -1,14 +1,17 @@
 //! Trait definitions for low level database interfaces.  This borrows some of
 //! its naming conventions from reth.
 
+use std::sync::Arc;
+
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use alpen_vertex_mmr::CompactMmr;
 use alpen_vertex_primitives::{l1::*, prelude::*};
 use alpen_vertex_state::block::{L2Block, L2BlockId};
-use alpen_vertex_state::consensus::{ConsensusState, ConsensusWrite};
-use alpen_vertex_state::sync_event::{SyncAction, SyncEvent};
+use alpen_vertex_state::consensus::ConsensusState;
+use alpen_vertex_state::operation::*;
+use alpen_vertex_state::sync_event::SyncEvent;
 
 use crate::errors::*;
 
@@ -25,7 +28,14 @@ pub trait Database {
     type CsStore: ConsensusStateStore;
     type CsProv: ConsensusStateProvider;
 
-    // TODO accessors as needed
+    fn l1_store(&self) -> &Arc<Self::L1Store>;
+    fn l1_provider(&self) -> &Arc<Self::L1Prov>;
+    fn l2_store(&self) -> &Arc<Self::L2Store>;
+    fn l2_provider(&self) -> &Arc<Self::L2Prov>;
+    fn sync_event_store(&self) -> &Arc<Self::SeStore>;
+    fn sync_event_provider(&self) -> &Arc<Self::SeProv>;
+    fn consensus_state_store(&self) -> &Arc<Self::CsStore>;
+    fn consensus_state_provider(&self) -> &Arc<Self::CsProv>;
 }
 
 /// Storage interface to control our view of L1 data.
@@ -161,36 +171,25 @@ pub trait ConsensusStateProvider {
     /// saved checkpoint, which may be the same as the given idx (if we didn't
     /// receive any sync events since the last checkpoint.
     fn get_prev_checkpoint_at(&self, idx: u64) -> DbResult<u64>;
-}
 
-/// Output of a consensus state transition.  Both the consensus state writes and
-/// sync actions.
-#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
-pub struct ConsensusOutput {
-    writes: Vec<ConsensusWrite>,
-    actions: Vec<SyncAction>,
-}
-
-impl ConsensusOutput {
-    pub fn writes(&self) -> &Vec<ConsensusWrite> {
-        &self.writes
-    }
-
-    pub fn actions(&self) -> &Vec<SyncAction> {
-        &self.actions
-    }
+    /// Gets a state checkpoint at a previously written index, if it exists.
+    fn get_state_checkpoint(&self, idx: u64) -> DbResult<Option<ConsensusState>>;
 }
 
 /// L2 data store for CL blocks.  Does not store anything about what we think
 /// the L2 chain tip is, that's controlled by the consensus state.
 pub trait L2DataStore {
-    /// Stores an L2 block, does not care about the block height of the L2 block.
+    /// Stores an L2 bloc=k, does not care about the block height of the L2
+    /// block.  Also sets the block's status to "unchecked".
     fn put_block_data(&self, block: L2Block) -> DbResult<()>;
 
     /// Tries to delete an L2 block from the store, returning if it really
     /// existed or not.  This should only be used for blocks well before some
     /// buried L1 finalization horizon.
     fn del_block_data(&self, id: L2BlockId) -> DbResult<bool>;
+
+    /// Sets the block's validity status.
+    fn set_block_status(&self, id: L2BlockId, status: BlockStatus) -> DbResult<()>;
 }
 
 /// Data provider for L2 blocks.
@@ -202,4 +201,21 @@ pub trait L2DataProvider {
     /// than one on competing forks.
     // TODO do we even want to permit this as being a possible thing?
     fn get_blocks_at_height(&self, idx: u64) -> DbResult<Vec<L2BlockId>>;
+
+    /// Gets the validity status of a block.
+    fn get_block_status(&self, id: L2BlockId) -> DbResult<Option<BlockStatus>>;
+}
+
+/// Gets the status of a block.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub enum BlockStatus {
+    /// Block's validity hasn't been checked yet.
+    Unchecked,
+
+    /// Block is valid, although this doesn't mean it's in the canonical chain.
+    Valid,
+
+    /// Block is invalid, for no particular reason.  We'd have to look somewhere
+    /// else for that.
+    Invalid,
 }
