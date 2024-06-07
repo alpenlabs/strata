@@ -1,11 +1,12 @@
 //! Consensus logic worker task.
 
-use std::sync::{mpsc, Arc};
+use std::sync::Arc;
 
-use alpen_vertex_evmctl::engine::ExecEngineCtl;
+use tokio::sync::mpsc;
 use tracing::*;
 
 use alpen_vertex_db::{traits::*, DbResult};
+use alpen_vertex_evmctl::engine::ExecEngineCtl;
 use alpen_vertex_primitives::prelude::*;
 use alpen_vertex_state::{
     block::L2BlockId,
@@ -14,7 +15,7 @@ use alpen_vertex_state::{
     sync_event::SyncEvent,
 };
 
-use crate::{errors::Error, message::CsmMessage, transition};
+use crate::{errors::Error, message::CsmMessage, state_tracker, transition};
 
 /// Mutatble worker state that we modify in the consensus worker task.
 ///
@@ -28,51 +29,38 @@ pub struct WorkerState<D: Database> {
     // TODO should we move this out?
     database: Arc<D>,
 
-    /// Last event idx we've processed.
-    last_processed_event: u64,
-
-    /// Current state idx, corresponding to events.
-    cur_state_idx: u64,
-
-    /// Current consensus state we use when performing updates.
-    cur_consensus_state: Arc<ConsensusState>,
+    /// Tracker used to remember the current consensus state.
+    state_tracker: state_tracker::StateTracker<D>,
 }
 
 impl<D: Database> WorkerState<D> {
-    fn get_sync_event(&self, ev_idx: u64) -> DbResult<Option<SyncEvent>> {
-        // TODO add an accessor to the database type to get the syncevent
-        // provider and then call that
-        unimplemented!()
-    }
+    /// Constructs a new instance by reconstructing the current consensus state
+    /// from the provided database layer.
+    pub fn open(params: Arc<Params>, database: Arc<D>) -> anyhow::Result<Self> {
+        let cs_prov = database.consensus_state_provider().as_ref();
+        let (cur_state_idx, cur_state) = state_tracker::reconstruct_cur_state(cs_prov)?;
+        let state_tracker = state_tracker::StateTracker::new(
+            params.clone(),
+            database.clone(),
+            cur_state_idx,
+            Arc::new(cur_state),
+        );
 
-    /// Tries to apply the consensus output to the current state, storing things
-    /// in the database.
-    fn apply_consensus_writes(&mut self, outp: Vec<ConsensusWrite>) -> Result<(), Error> {
-        // TODO
-        Ok(())
-    }
-
-    /// Extends the chain tip by a block.  The referenced block must have the
-    /// current chain tip as its parent.
-    fn extend_tip(&mut self, blkid: L2BlockId) -> Result<(), Error> {
-        // TODO
-        Ok(())
-    }
-
-    /// Rolls up back to the specified block.
-    fn rollback_to_block(&mut self, blkid: L2BlockId) -> Result<(), Error> {
-        // TODO
-        Ok(())
+        Ok(Self {
+            params,
+            database,
+            state_tracker,
+        })
     }
 }
 
 /// Receives messages from channel to update consensus state with.
-fn consensus_worker_task<D: Database, E: ExecEngineCtl>(
+pub fn consensus_worker_task<D: Database, E: ExecEngineCtl>(
     mut state: WorkerState<D>,
     engine: Arc<E>,
-    inp_msg_ch: mpsc::Receiver<CsmMessage>,
+    mut inp_msg_ch: mpsc::Receiver<CsmMessage>,
 ) -> Result<(), Error> {
-    while let Some(msg) = inp_msg_ch.recv().ok() {
+    while let Some(msg) = inp_msg_ch.blocking_recv() {
         if let Err(e) = process_msg(&mut state, engine.as_ref(), &msg) {
             error!(err = %e, "failed to process sync message");
         }
@@ -87,14 +75,11 @@ fn process_msg<D: Database, E: ExecEngineCtl>(
     state: &mut WorkerState<D>,
     engine: &E,
     msg: &CsmMessage,
-) -> Result<(), Error> {
+) -> anyhow::Result<()> {
     match msg {
         CsmMessage::EventInput(idx) => {
-            let ev = state
-                .get_sync_event(*idx)?
-                .ok_or(Error::MissingSyncEvent(*idx))?;
-
-            handle_sync_event(state, engine, *idx, &ev)?;
+            // TODO ensure correct event index ordering
+            handle_sync_event(state, engine, *idx)?;
             Ok(())
         }
     }
@@ -103,26 +88,28 @@ fn process_msg<D: Database, E: ExecEngineCtl>(
 fn handle_sync_event<D: Database, E: ExecEngineCtl>(
     state: &mut WorkerState<D>,
     engine: &E,
-    idx: u64,
-    event: &SyncEvent,
-) -> Result<(), Error> {
+    ev_idx: u64,
+) -> anyhow::Result<()> {
     // Perform the main step of deciding what the output we're operating on.
-    let params = state.params.as_ref();
-    let db = state.database.as_ref();
-    let outp = transition::process_event(&state.cur_consensus_state, event, db, params)?;
-    let (writes, actions) = outp.into_parts();
-    state.apply_consensus_writes(writes)?;
+    let outp = state.state_tracker.advance_consensus_state(ev_idx)?;
 
-    for action in actions {
+    for action in outp.actions() {
         match action {
             SyncAction::UpdateTip(blkid) => {
-                state.extend_tip(blkid)?;
+                // Tell the EL that this block does indeed look good.
+                debug!(?blkid, "updating EL safe block");
+                engine.update_safe_block(*blkid)?;
+
+                // TODO update the external tip
             }
+
             SyncAction::MarkInvalid(blkid) => {
                 // TODO not sure what this should entail yet
+                warn!(?blkid, "marking block invalid!");
                 let store = state.database.l2_store();
-                store.set_block_status(blkid, BlockStatus::Invalid)?;
+                store.set_block_status(*blkid, BlockStatus::Invalid)?;
             }
+
             SyncAction::FinalizeBlock(blkid) => {
                 // For the tip tracker this gets picked up later.  We don't have
                 // to do anything here *necessarily*.

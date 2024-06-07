@@ -15,8 +15,19 @@ pub enum Error {
     #[error("L1 blkid {0:?} missing from database")]
     MissingL1Block(L1BlockId),
 
+    #[error("missing expected consensus writes at {0}")]
+    MissingConsensusWrites(u64),
+
+    // This probably shouldn't happen, it would suggest the database is
+    // misbehaving.
+    #[error("missing expected state checkpoint at {0}")]
+    MissingCheckpoint(u64),
+
     #[error("unable to find reorg {0:?} -> {1:?})")]
     UnableToFindReorg(L2BlockId, L2BlockId),
+
+    #[error("tried to skip event index {0} (cur state idx {1})")]
+    SkippedEventIdx(u64, u64),
 
     #[error("chaintip: {0}")]
     ChainTip(#[from] ChainTipError),

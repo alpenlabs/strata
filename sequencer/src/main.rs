@@ -1,14 +1,24 @@
 use std::io;
 use std::process;
 use std::sync::Arc;
+use std::thread;
+use std::time;
 
+use alpen_vertex_consensus_logic::chain_tip;
 use anyhow::Context;
 use thiserror::Error;
-use tokio::sync::oneshot;
+use tokio::sync::{mpsc, oneshot, watch};
 use tracing::*;
 
 use alpen_vertex_common::logging;
+use alpen_vertex_consensus_logic::ctl::CsmController;
+use alpen_vertex_consensus_logic::message::{ChainTipMessage, CsmMessage};
+use alpen_vertex_consensus_logic::worker;
+use alpen_vertex_db::traits::*;
+use alpen_vertex_primitives::{block_credential, params::*};
 use alpen_vertex_rpc_api::AlpenApiServer;
+use alpen_vertex_state::consensus::ConsensusState;
+use alpen_vertex_state::operation;
 
 use crate::args::Args;
 
@@ -37,11 +47,50 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     // Open the database.
     let rbdb = open_rocksdb_database(&args)?;
 
-    // Initialize stubs.
-    let sync_ev_db = alpen_vertex_db::SyncEventDb::new(rbdb.clone());
-    let cs_db = alpen_vertex_db::ConsensusStateDb::new(rbdb.clone());
-    let l1_db = alpen_vertex_db::L1Db::new(rbdb.clone());
+    // Set up block params.
+    let params = Params {
+        rollup: RollupParams {
+            block_time: 1000,
+            cred_rule: block_credential::CredRule::Unchecked,
+        },
+        run: RunParams {
+            l1_follow_distance: 6,
+        },
+    };
+    let params = Arc::new(params);
 
+    // Initialize databases.
+    let l1_db = Arc::new(alpen_vertex_db::L1Db::new(rbdb.clone()));
+    let l2_db = Arc::new(alpen_vertex_db::stubs::l2::StubL2Db::new()); // FIXME stub
+    let sync_ev_db = Arc::new(alpen_vertex_db::SyncEventDb::new(rbdb.clone()));
+    let cs_db = Arc::new(alpen_vertex_db::ConsensusStateDb::new(rbdb.clone()));
+    let database = Arc::new(alpen_vertex_db::database::CommonDatabase::new(
+        l1_db, l2_db, sync_ev_db, cs_db,
+    ));
+
+    // Fetch current states of things.
+    let cur_sync_idx = database
+        .sync_event_provider()
+        .get_last_idx()?
+        .unwrap_or_default();
+
+    let cw_state = worker::WorkerState::open(params, database.clone())?;
+
+    // Create dataflow channels.
+    let (ctm_tx, ctm_rx) = mpsc::channel::<ChainTipMessage>(64);
+    let (csm_tx, csm_rx) = mpsc::channel::<CsmMessage>(64);
+    let csm_ctl = Arc::new(CsmController::new(database.clone(), csm_tx));
+    let (cout_tx, cout_rx) = mpsc::channel::<operation::ConsensusOutput>(64);
+    let (cur_state_tx, cur_state_rx) = watch::channel::<Option<ConsensusState>>(None);
+
+    // Init engine controller.
+    let eng_ctl = alpen_vertex_evmctl::stub::StubController::new(time::Duration::from_millis(100));
+    let eng_ctl = Arc::new(eng_ctl);
+
+    // Start worker threads.
+    let cw_handle = thread::spawn(|| worker::consensus_worker_task(cw_state, eng_ctl, csm_rx));
+
+    // Start runtime for async IO tasks.
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .thread_name("vertex")

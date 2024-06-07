@@ -16,6 +16,7 @@ pub fn check_block_credential(
 ) -> bool {
     let sigcom = compute_header_sig_commitment(header);
     match &params.rollup().cred_rule {
+        CredRule::Unchecked => true,
         CredRule::SchnorrKey(pubkey) => verify_schnorr_sig(header.sig(), &sigcom, pubkey),
     }
 }

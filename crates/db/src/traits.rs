@@ -171,6 +171,9 @@ pub trait ConsensusStateProvider {
     /// saved checkpoint, which may be the same as the given idx (if we didn't
     /// receive any sync events since the last checkpoint.
     fn get_prev_checkpoint_at(&self, idx: u64) -> DbResult<u64>;
+
+    /// Gets a state checkpoint at a previously written index, if it exists.
+    fn get_state_checkpoint(&self, idx: u64) -> DbResult<Option<ConsensusState>>;
 }
 
 /// L2 data store for CL blocks.  Does not store anything about what we think

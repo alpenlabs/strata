@@ -34,6 +34,7 @@ pub fn process_event<D: Database>(
             // TODO if we have some number of L1 blocks finalized, also emit an
             // `UpdateBuried` write
         }
+
         SyncEvent::L1DABatch(blkids) => {
             // TODO load it up and figure out what's there, see if we have to
             // load diffs from L1 or something
@@ -47,6 +48,7 @@ pub fn process_event<D: Database>(
                 // TODO do whatever changes we have to to accept the new block
             }
         }
+
         SyncEvent::NewTipBlock(blkid) => {
             let l2prov = database.l2_provider();
             let block = l2prov

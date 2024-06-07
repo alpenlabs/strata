@@ -114,6 +114,13 @@ impl ConsensusStateProvider for ConsensusStateDb {
 
         Err(DbError::NotBootstrapped)
     }
+
+    fn get_state_checkpoint(
+        &self,
+        idx: u64,
+    ) -> DbResult<Option<alpen_vertex_state::consensus::ConsensusState>> {
+        Ok(self.db.get::<ConsensusStateSchema>(&idx)?)
+    }
 }
 
 #[cfg(test)]

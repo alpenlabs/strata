@@ -7,7 +7,7 @@ use crate::block_credential::CredRule;
 #[derive(Clone, Debug)]
 pub struct RollupParams {
     /// Block time in milliseconds.
-    block_time: u64,
+    pub block_time: u64,
 
     /// Rule we use to decide if a block is correctly signed.
     pub cred_rule: CredRule,
@@ -19,14 +19,14 @@ pub struct RollupParams {
 #[derive(Clone, Debug)]
 pub struct RunParams {
     /// Number of blocks that we follow the L1 from.
-    l1_follow_distance: usize,
+    pub l1_follow_distance: usize,
 }
 
 /// Combined set of parameters across all the consensus logic.
 #[derive(Clone, Debug)]
 pub struct Params {
-    rollup: RollupParams,
-    run: RunParams,
+    pub rollup: RollupParams,
+    pub run: RunParams,
 }
 
 impl Params {

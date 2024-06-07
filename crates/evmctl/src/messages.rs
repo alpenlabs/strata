@@ -5,7 +5,7 @@ use alpen_vertex_primitives::prelude::*;
 // should we consolidate?
 #[derive(Clone, Debug)]
 pub struct ExecPayloadData {
-    /// Encoded EL payload header.
+    /// Encoded EL payload, minus any operations we push to it.
     el_payload: Vec<u8>,
 
     /// CL operations pushed into the EL, such as deposits from L1.  This

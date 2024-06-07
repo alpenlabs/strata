@@ -82,17 +82,11 @@ pub enum SyncAction {
     FinalizeBlock(L2BlockId),
 }
 
-/// Applies consensus writes to an existing consensus state instance.
-// FIXME should this be moved to the consensus-logic crate?
-fn compute_new_state(
-    mut state: ConsensusState,
+/// Applies consensus writes to the provided consensus state.
+pub fn apply_writes_to_state(
+    state: &mut ConsensusState,
     writes: impl Iterator<Item = ConsensusWrite>,
-) -> ConsensusState {
-    apply_writes_to_state(&mut state, writes);
-    state
-}
-
-fn apply_writes_to_state(state: &mut ConsensusState, writes: impl Iterator<Item = ConsensusWrite>) {
+) {
     for w in writes {
         use ConsensusWrite::*;
         match w {

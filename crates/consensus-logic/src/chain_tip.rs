@@ -105,7 +105,7 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
 ) -> anyhow::Result<()> {
     match ctm {
         ChainTipMessage::NewState(cs, output) => {
-            let l1_tip = cs.chain_state().chain_tip_blockid();
+            let l2_tip = cs.chain_state().chain_tip_blockid();
 
             // Update the new state.
             state.cur_state = cs;
