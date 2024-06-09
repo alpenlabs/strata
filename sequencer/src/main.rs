@@ -117,7 +117,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         .build()
         .expect("init: build rt");
 
-    if let Err(e) = rt.block_on(main_task(args)) {
+    if let Err(e) = rt.block_on(main_task(args, rbdb)) {
         error!(err = %e, "main task exited");
         process::exit(0); // special case exit once we've gotten to this point
     }
@@ -126,9 +126,8 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn main_task(args: Args) -> Result<(), InitError> {
-    let config = RollupConfig::default();
-    l1_reader_task(config)
+async fn main_task(args: Args, rbdb: Arc<rockbound::DB>) -> Result<(), InitError> {
+    l1_reader_task(args.clone(), rbdb)
         .await
         .map_err(|e| InitError::Other(e.to_string()))?;
 

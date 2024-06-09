@@ -1,4 +1,4 @@
-use std::{path::Path, sync::Arc};
+use std::{str::FromStr, sync::Arc};
 
 use tokio::sync::mpsc;
 
@@ -7,31 +7,30 @@ use alpen_vertex_btcio::{
     reader::{bitcoin_data_reader, BlockData},
     rpc::BitcoinClient,
 };
-use alpen_vertex_db::{
-    l1::{db::L1Db, utils::get_db_for_l1_store},
-    traits::L1DataProvider,
-};
+use alpen_vertex_db::l1::db::L1Db;
 
-use crate::config::RollupConfig;
+use crate::args::Args;
 
-pub async fn l1_reader_task(config: RollupConfig) -> anyhow::Result<()> {
+pub async fn l1_reader_task(args: Args, rbdb: Arc<rockbound::DB>) -> anyhow::Result<()> {
     let rpc_client = BitcoinClient::new(
-        config.l1_rpc_config.rpc_url,
-        config.l1_rpc_config.rpc_user,
-        config.l1_rpc_config.rpc_password,
-        config.l1_rpc_config.network,
+        args.bitcoin_rpc_url,
+        args.bitcoin_rpc_user,
+        args.bitcoin_rpc_password,
+        bitcoin::Network::from_str(&args.bitcoin_rpc_network)?,
     );
 
-    let db = get_db_for_l1_store(Path::new("storage-data"))?;
-    let l1db = Arc::new(L1Db::new(Arc::new(db)));
+    let l1db = Arc::new(L1Db::new(rbdb));
 
     let (sender, receiver) = mpsc::channel::<BlockData>(1000); // TODO: think about the buffer size
 
-    let start_block_number = L1DataProvider::get_chain_tip(l1db.as_ref())? + 1;
-
     // TODO: handle gracefully when the spawned tasks fail
-    tokio::spawn(bitcoin_data_reader(rpc_client, sender, start_block_number));
+    tokio::spawn(bitcoin_data_reader(
+        l1db.clone(),
+        rpc_client,
+        sender,
+        args.l1_start_block_height,
+    ));
 
-    tokio::spawn(bitcoin_data_handler(l1db.clone(), receiver));
+    tokio::spawn(bitcoin_data_handler(l1db, receiver));
     Ok(())
 }
