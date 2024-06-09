@@ -9,7 +9,8 @@ use bitcoin::hashes::Hash;
 use tokio::sync::mpsc;
 use tracing::warn;
 
-use crate::reader::{BlockData, L1Data};
+use crate::reader::BlockData;
+use crate::reorg::detect_reorg;
 
 fn block_data_to_manifest(blockdata: BlockData) -> L1BlockManifest {
     let blockid = Buf32(
@@ -32,27 +33,26 @@ fn block_data_to_manifest(blockdata: BlockData) -> L1BlockManifest {
 
 pub async fn bitcoin_data_handler<D>(
     l1db: Arc<D>,
-    mut receiver: mpsc::Receiver<L1Data>,
+    mut receiver: mpsc::Receiver<BlockData>,
 ) -> anyhow::Result<()>
 where
     D: L1DataProvider + L1DataStore,
 {
     loop {
-        if let Some(data) = receiver.recv().await {
-            match data {
-                L1Data::BlockData(blockdata) => {
-                    let manifest = block_data_to_manifest(blockdata.clone());
-                    let l1txs: Vec<_> = blockdata
-                        .relevant_txn_indices()
-                        .iter()
-                        .enumerate()
-                        .map(|(i, _)| generate_l1_tx(i as u32, blockdata.block()))
-                        .collect();
-                    l1db.put_block_data(blockdata.block_num(), manifest, l1txs)?;
-                }
-
-                L1Data::Reorg(revert_to) => {}
+        if let Some(blockdata) = receiver.recv().await {
+            // TODO: possibly handle when reorg depth is too big
+            if let Some(reorg_block_num) = detect_reorg(&l1db, &blockdata.block()) {
+                l1db.revert_to_height(reorg_block_num)?;
+                continue;
             }
+            let manifest = block_data_to_manifest(blockdata.clone());
+            let l1txs: Vec<_> = blockdata
+                .relevant_txn_indices()
+                .iter()
+                .enumerate()
+                .map(|(i, _)| generate_l1_tx(i as u32, blockdata.block()))
+                .collect();
+            l1db.put_block_data(blockdata.block_num(), manifest, l1txs)?;
         } else {
             warn!("Bitcoin reader sent None blockdata");
         }
