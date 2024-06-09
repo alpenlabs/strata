@@ -16,7 +16,7 @@ pub enum L1Data {
     /// Bitcoin block data obtained in normal operation when there's no reorg
     BlockData(BlockData),
 
-    /// Reorg is detected at forked block number
+    /// Reorg happened, revert to the specified block number
     Reorg(u64),
 }
 

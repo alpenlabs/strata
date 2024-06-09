@@ -9,7 +9,6 @@ pub struct BitcoinConfig {
     pub rpc_url: String,
     pub rpc_user: String,
     pub rpc_password: String,
-    pub zmq_endpoint: String,
     pub network: Network,
     // TODO: network
 }
@@ -21,7 +20,6 @@ impl Default for BitcoinConfig {
             rpc_url: "http://127.0.0.1:18444".to_string(),
             rpc_user: "rpcuser".to_string(),
             rpc_password: "rpcpassword".to_string(),
-            zmq_endpoint: "tcp://127.0.0.1:29000".to_string(),
             network: Network::Regtest,
         }
     }
