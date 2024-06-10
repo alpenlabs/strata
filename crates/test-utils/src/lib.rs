@@ -25,7 +25,9 @@ impl ArbitraryGenerator {
 pub fn get_rocksdb_tmp_instance() -> anyhow::Result<Arc<rockbound::DB>> {
     let dbname = alpen_vertex_db::ROCKSDB_NAME;
     let cfs = alpen_vertex_db::STORE_COLUMN_FAMILIES;
-    let opts = rocksdb::Options::default();
+    let mut opts = rocksdb::Options::default();
+    opts.create_missing_column_families(true);
+    opts.create_if_missing(true);
 
     let temp_dir = TempDir::new().expect("failed to create temp dir");
 

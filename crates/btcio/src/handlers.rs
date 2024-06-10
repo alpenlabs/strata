@@ -6,6 +6,7 @@ use alpen_vertex_primitives::{l1::L1BlockManifest, utils::generate_l1_tx};
 
 use bitcoin::consensus::serialize;
 use bitcoin::hashes::Hash;
+use bitcoin::Block;
 use tokio::sync::mpsc;
 use tracing::warn;
 
@@ -13,21 +14,13 @@ use crate::reader::BlockData;
 use crate::reorg::detect_reorg;
 use crate::rpc::BitcoinClient;
 
-fn block_data_to_manifest(blockdata: BlockData) -> L1BlockManifest {
-    let blockid = Buf32(
-        blockdata
-            .block()
-            .block_hash()
-            .to_raw_hash()
-            .to_byte_array()
-            .into(),
-    );
-    let root = blockdata
-        .block()
+pub fn block_to_manifest(block: Block) -> L1BlockManifest {
+    let blockid = Buf32(block.block_hash().to_raw_hash().to_byte_array().into());
+    let root = block
         .witness_root()
         .map(|x| x.to_byte_array())
         .unwrap_or_default();
-    let header = serialize(&blockdata.block().header);
+    let header = serialize(&block.header);
 
     L1BlockManifest::new(blockid, header, Buf32(root.into()))
 }
@@ -47,7 +40,7 @@ where
                 l1db.revert_to_height(reorg_block_num)?;
                 continue;
             }
-            let manifest = block_data_to_manifest(blockdata.clone());
+            let manifest = block_to_manifest(blockdata.block().clone());
             let l1txs: Vec<_> = blockdata
                 .relevant_txn_indices()
                 .iter()
