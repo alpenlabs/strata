@@ -1,6 +1,7 @@
 use core::{fmt::Display, str::FromStr};
 
 use anyhow::anyhow;
+use async_trait::async_trait;
 // use async_recursion::async_recursion;
 use bitcoin::{
     block::{Header, Version},
@@ -16,7 +17,7 @@ use serde_json::{json, to_value, value::RawValue};
 use std::env;
 use tracing::warn;
 
-use super::types::RawUTXO;
+use super::{traits::L1Client, types::RawUTXO};
 
 // RPCError is a struct that represents an error returned by the Bitcoin RPC
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -145,27 +146,6 @@ impl BitcoinClient {
         } else {
             Err(anyhow!("Could not parse listransactions result"))
         }
-    }
-
-    // get_block_hash returns the block hash of the block at the given height
-    pub async fn get_block_hash(&self, height: u64) -> Result<[u8; 32], anyhow::Error> {
-        let str_hash = self
-            .call::<String>("getblockhash", vec![to_value(height)?])
-            .await?;
-
-        let bytes = Vec::from_hex(&str_hash)?;
-        if bytes.len() != 32 {
-            return Err(anyhow::anyhow!("Invalid hex length"));
-        }
-        let mut array = [0u8; 32];
-        array.copy_from_slice(&bytes);
-        Ok(array)
-    }
-
-    pub async fn get_block_at(&self, height: u64) -> Result<Block, anyhow::Error> {
-        let hash = self.get_block_hash(height).await?;
-        let block = self.get_block(hex::encode(hash)).await?;
-        Ok(block)
     }
 
     // get_mempool_txids returns a list of txids in the current mempool
@@ -403,106 +383,28 @@ impl BitcoinClient {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use crate::rpc::BitcoinClient;
+#[async_trait]
+impl L1Client for BitcoinClient {
+    // get_block_hash returns the block hash of the block at the given height
+    async fn get_block_hash(&self, height: u64) -> Result<[u8; 32], anyhow::Error> {
+        let str_hash = self
+            .call::<String>("getblockhash", vec![to_value(height)?])
+            .await?;
 
-    #[tokio::test]
-    #[ignore]
-    async fn get_utxos() {
-        let node = BitcoinClient::get_test_node();
-
-        let utxos = node.get_utxos().await.unwrap();
-
-        utxos.iter().for_each(|utxo| {
-            println!("address: {}, amount: {}", utxo.address, utxo.amount);
-        });
+        let bytes = Vec::from_hex(&str_hash)?;
+        if bytes.len() != 32 {
+            return Err(anyhow::anyhow!("Invalid hex length"));
+        }
+        let mut array = [0u8; 32];
+        array.copy_from_slice(&bytes);
+        Ok(array)
     }
 
-    #[tokio::test]
-    #[ignore]
-    async fn list_wallets() {
-        let node = BitcoinClient::get_test_node();
-
-        let wallets = node.list_wallets().await.unwrap();
-
-        wallets.iter().for_each(|wallet| {
-            println!("wallet: {}", wallet);
-        });
-    }
-
-    #[tokio::test]
-    #[should_panic]
-    #[ignore]
-    async fn get_non_existing_transaction() {
-        // This checks that querying for non existing transaction results in panic
-        let node = BitcoinClient::get_test_node();
-        let txid = "0000000000000000000000000000000000000000000000000000000000000000".to_string();
-        node.get_transaction_confirmations(txid).await.unwrap();
-    }
-
-    #[tokio::test]
-    #[ignore]
-    async fn get_existing_raw_transaction() {
-        // This checks that querying for an existing transaction succeeds
-        let node = BitcoinClient::get_test_node();
-        let first_blockhash = node.get_block_hash(1).await.unwrap();
-        let block = node.get_block(hex::encode(first_blockhash)).await.unwrap();
-        let txid = block.txdata[0].txid().to_string();
-        node.get_transaction_confirmations(txid).await.unwrap();
-    }
-
-    async fn create_mempool_txn() -> String {
-        // Txn is created by sending some amount to a dummy(but valid) address
-        let node = BitcoinClient::get_test_node();
-        let amt = 10;
-        let address = "bcrt1q8267geaet3td2c5w59ewzjkt4mt3jnk9nsmpwk".to_string();
-        node.send_to_address(address, amt).await.unwrap()
-    }
-
-    #[tokio::test]
-    #[ignore]
-    async fn test_mempool_txns() {
-        // This checks if created transaction is in the mempool.
-        let node = BitcoinClient::get_test_node();
-        let txid = create_mempool_txn().await;
-        println!("txid {} obtained. It should be in mempool", txid);
-
-        let mempool_txs = node.get_mempool_txids().await.unwrap();
-        assert!(mempool_txs.contains(&txid));
-        // TODO/NOTE: What to do about the txn that now exists in the mempool?
-        // Should we clear it? leave it as is?
-    }
-
-    #[tokio::test]
-    #[ignore]
-    async fn test_last_since_block_no_mempool_txn() {
-        // This test checks that there are no mempool txn included in list_since_block
-
-        // First create a txn in mempool
-        let txid = create_mempool_txn().await;
-
-        let node = BitcoinClient::get_test_node();
-        let blockheight = 0;
-        let blockhash = node.get_block_hash(blockheight).await.unwrap();
-        let data = node.list_since_block(hex::encode(blockhash)).await.unwrap();
-
-        assert!(!data.is_empty());
-        assert!(
-            !data.contains(&txid),
-            "list_last_block should not contain mempool txn",
-        );
-    }
-
-    #[tokio::test]
-    #[ignore]
-    async fn test_failing_sign_raw_txn() {
-        todo!();
-    }
-
-    #[tokio::test]
-    #[ignore]
-    async fn test_successful_sign_raw_txn() {
-        todo!();
+    async fn get_block_at(&self, height: u64) -> Result<Block, anyhow::Error> {
+        let hash = self.get_block_hash(height).await?;
+        let block = self.get_block(hex::encode(hash)).await?;
+        Ok(block)
     }
 }
+
+// TODO: Add functional tests

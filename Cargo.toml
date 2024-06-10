@@ -34,7 +34,7 @@ alpen-vertex-btcio = { path = "crates/btcio" }
 anyhow = "1.0.86"
 arbitrary = { version = "1.3.2", features = ["derive"] }
 argh = "0.1"
-async-trait = "0.1"
+async-trait = "0.1.80"
 base64 = "0.22.1"
 bitcoin = { version = "0.32.1" }
 borsh = { version = "1.5.0", features = ["derive"] }

@@ -4,7 +4,7 @@ use alpen_vertex_db::traits::L1DataProvider;
 use bitcoin::Block;
 use tokio::sync::mpsc;
 
-use crate::rpc::BitcoinClient;
+use crate::rpc::traits::L1Client;
 
 /// Store the bitcoin block and references to the relevant transactions within the block
 #[derive(Clone, Debug)]
@@ -40,7 +40,7 @@ fn filter_relevant_txns(block: &Block) -> Vec<u32> {
 
 pub async fn bitcoin_data_reader<D>(
     l1db: Arc<D>,
-    client: BitcoinClient,
+    client: impl L1Client,
     sender: mpsc::Sender<BlockData>,
     l1_start_block_height: u64,
 ) -> anyhow::Result<()>

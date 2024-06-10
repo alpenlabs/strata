@@ -3,12 +3,15 @@ use std::sync::Arc;
 use alpen_vertex_db::traits::L1DataProvider;
 use alpen_vertex_primitives::buf::Buf32;
 
-use crate::{reader::BlockData, rpc::BitcoinClient};
+use crate::{
+    reader::BlockData,
+    rpc::{traits::L1Client, BitcoinClient},
+};
 
 pub async fn detect_reorg<D>(
     db: &Arc<D>,
     blockdata: &BlockData,
-    rpc_client: &BitcoinClient,
+    rpc_client: &impl L1Client,
 ) -> anyhow::Result<Option<u64>>
 where
     D: L1DataProvider,
@@ -40,7 +43,7 @@ const MAX_REORG_DEPTH: u64 = 6;
 async fn find_fork_point_before<D>(
     db: &Arc<D>,
     blk_num: u64,
-    rpc_client: &BitcoinClient,
+    rpc_client: &impl L1Client,
 ) -> anyhow::Result<Option<u64>>
 where
     D: L1DataProvider,
