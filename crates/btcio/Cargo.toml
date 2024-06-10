@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 alpen-vertex-primitives = { workspace = true }
 alpen-vertex-db = { workspace = true }
+alpen-vertex-state = { workspace = true }
 
 anyhow = { workspace = true }
 async-trait = { workspace = true }

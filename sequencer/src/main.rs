@@ -4,8 +4,12 @@ use std::sync::Arc;
 use std::thread;
 use std::time;
 
-use alpen_vertex_consensus_logic::chain_tip;
-use alpen_vertex_consensus_logic::unfinalized_tracker;
+use alpen_vertex_consensus_logic::{chain_tip, unfinalized_tracker};
+use alpen_vertex_db::database::CommonDatabase;
+use alpen_vertex_db::stubs::l2::StubL2Db;
+use alpen_vertex_db::ConsensusStateDb;
+use alpen_vertex_db::L1Db;
+use alpen_vertex_db::SyncEventDb;
 use anyhow::Context;
 use thiserror::Error;
 use tokio::sync::{mpsc, oneshot, watch};
@@ -28,8 +32,6 @@ mod l1_reader;
 mod rpc_server;
 
 use l1_reader::l1_reader_task;
-
-use crate::config::RollupConfig;
 
 #[derive(Debug, Error)]
 pub enum InitError {
@@ -117,7 +119,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         .build()
         .expect("init: build rt");
 
-    if let Err(e) = rt.block_on(main_task(args, rbdb)) {
+    if let Err(e) = rt.block_on(main_task(args, database.clone())) {
         error!(err = %e, "main task exited");
         process::exit(0); // special case exit once we've gotten to this point
     }
@@ -126,10 +128,11 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn main_task(args: Args, rbdb: Arc<rockbound::DB>) -> Result<(), InitError> {
-    l1_reader_task(args.clone(), rbdb)
-        .await
-        .map_err(|e| InitError::Other(e.to_string()))?;
+async fn main_task(
+    args: Args,
+    database: Arc<CommonDatabase<L1Db, StubL2Db, SyncEventDb, ConsensusStateDb>>,
+) -> anyhow::Result<()> {
+    l1_reader_task(args.clone(), database.clone()).await?;
 
     let (stop_tx, stop_rx) = oneshot::channel();
 
