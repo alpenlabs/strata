@@ -20,5 +20,4 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
-tempfile = "3.10.1"
-rand = "0.8.5"
+alpen-test-utils = { workspace = true }

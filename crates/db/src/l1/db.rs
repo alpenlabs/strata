@@ -179,35 +179,14 @@ impl L1DataProvider for L1Db {
 
 #[cfg(test)]
 mod tests {
-    use arbitrary::{Arbitrary, Unstructured};
-    use rand::Rng;
-    use tempfile::TempDir;
+    use alpen_vertex_primitives::l1::L1TxProof;
 
-    use crate::l1::utils::get_db_for_l1_store;
+    use alpen_test_utils::{get_rocksdb_tmp_instance, ArbitraryGenerator};
 
     use super::*;
 
-    struct ArbitraryGenerator {
-        buffer: Vec<u8>,
-    }
-
-    impl ArbitraryGenerator {
-        fn new() -> Self {
-            let mut rng = rand::thread_rng();
-            // NOTE: 128 should be enough for testing purposes. Change to 256 as needed
-            let buffer: Vec<u8> = (0..128).map(|_| rng.gen()).collect();
-            ArbitraryGenerator { buffer }
-        }
-
-        fn generate<'a, T: Arbitrary<'a> + Clone>(&'a self) -> T {
-            let mut u = Unstructured::new(&self.buffer);
-            T::arbitrary(&mut u).expect("failed to generate arbitrary instance")
-        }
-    }
-
     fn setup_db() -> L1Db {
-        let temp_dir = TempDir::new().expect("failed to create temp dir");
-        let db = get_db_for_l1_store(&temp_dir.into_path()).unwrap();
+        let db = get_rocksdb_tmp_instance().unwrap();
         L1Db::new(db)
     }
 
