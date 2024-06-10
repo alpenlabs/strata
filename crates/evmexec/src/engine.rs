@@ -1,5 +1,4 @@
 use std::future::Future;
-use std::pin::Pin;
 
 use crate::auth_client_layer::{AuthClientLayer, AuthClientService};
 use crate::el_payload::ElPayload;
@@ -23,35 +22,21 @@ use reth_rpc_types::Withdrawal;
 use tokio::sync::Mutex;
 
 pub trait HttpClientWrap {
-    fn fork_choice_updated_v2<'a>(
-        &'a self,
+    fn fork_choice_updated_v2(
+        &self,
         fork_choice_state: ForkchoiceState,
         payload_attributes: Option<PayloadAttributes>,
-    ) -> Pin<Box<dyn Future<Output = Result<ForkchoiceUpdated, jsonrpsee::core::ClientError>> + 'a>>;
+    ) -> impl Future<Output = Result<ForkchoiceUpdated, jsonrpsee::core::ClientError>>;
 
-    fn get_payload_v2<'a>(
-        &'a self,
+    fn get_payload_v2(
+        &self,
         payload_id: PayloadId,
-    ) -> Pin<
-        Box<
-            dyn Future<Output = Result<ExecutionPayloadEnvelopeV2, jsonrpsee::core::ClientError>>
-                + 'a,
-        >,
-    >;
+    ) -> impl Future<Output = Result<ExecutionPayloadEnvelopeV2, jsonrpsee::core::ClientError>>;
 
-    fn new_payload_v2<'a>(
-        &'a self,
+    fn new_payload_v2(
+        &self,
         payload: ExecutionPayloadInputV2,
-    ) -> Pin<
-        Box<
-            dyn Future<
-                    Output = Result<
-                        reth_rpc_types::engine::PayloadStatus,
-                        jsonrpsee::core::ClientError,
-                    >,
-                > + 'a,
-        >,
-    >;
+    ) -> impl Future<Output = Result<reth_rpc_types::engine::PayloadStatus, jsonrpsee::core::ClientError>>;
 }
 
 pub struct HttpClientWrapper {
@@ -59,40 +44,27 @@ pub struct HttpClientWrapper {
 }
 
 impl HttpClientWrap for HttpClientWrapper {
-    fn fork_choice_updated_v2<'a>(
-        &'a self,
+    fn fork_choice_updated_v2(
+        &self,
         fork_choice_state: ForkchoiceState,
         payload_attributes: Option<PayloadAttributes>,
-    ) -> Pin<Box<dyn Future<Output = Result<ForkchoiceUpdated, jsonrpsee::core::ClientError>> + 'a>>
-    {
+    ) -> impl Future<Output = Result<ForkchoiceUpdated, jsonrpsee::core::ClientError>> {
         <HttpClient<AuthClientService<HttpBackend>> as EngineApiClient<EthEngineTypes>>::fork_choice_updated_v2::<'_, '_>(&self.client, fork_choice_state, payload_attributes)
     }
 
     fn get_payload_v2<'a>(
         &'a self,
         payload_id: PayloadId,
-    ) -> Pin<
-        Box<
-            dyn Future<Output = Result<ExecutionPayloadEnvelopeV2, jsonrpsee::core::ClientError>>
-                + 'a,
-        >,
-    > {
+    ) -> impl Future<Output = Result<ExecutionPayloadEnvelopeV2, jsonrpsee::core::ClientError>>
+    {
         <HttpClient<AuthClientService<HttpBackend>> as EngineApiClient<EthEngineTypes>>::get_payload_v2::<'_, '_>(&self.client, payload_id)
     }
 
-    fn new_payload_v2<'a>(
-        &'a self,
+    fn new_payload_v2(
+        &self,
         payload: ExecutionPayloadInputV2,
-    ) -> Pin<
-        Box<
-            dyn Future<
-                    Output = Result<
-                        reth_rpc_types::engine::PayloadStatus,
-                        jsonrpsee::core::ClientError,
-                    >,
-                > + 'a,
-        >,
-    > {
+    ) -> impl Future<Output = Result<reth_rpc_types::engine::PayloadStatus, jsonrpsee::core::ClientError>>
+    {
         <HttpClient<AuthClientService<HttpBackend>> as EngineApiClient<EthEngineTypes>>::new_payload_v2::<'_, '_>(&self.client, payload)
     }
 }
@@ -357,21 +329,21 @@ mod tests {
     mock! {
         HttpClient {}
         impl HttpClientWrap for HttpClient {
-            fn fork_choice_updated_v2<'a>(
-                &'a self,
+            fn fork_choice_updated_v2(
+                &self,
                 fork_choice_state: ForkchoiceState,
                 payload_attributes: Option<PayloadAttributes>,
-            ) -> Pin<Box<dyn Future<Output = Result<ForkchoiceUpdated, jsonrpsee::core::ClientError>> + 'a>>;
+            ) -> impl Future<Output = Result<ForkchoiceUpdated, jsonrpsee::core::ClientError>>;
 
-            fn get_payload_v2<'a>(
-                &'a self,
+            fn get_payload_v2(
+                &self,
                 payload_id: PayloadId,
-            ) -> Pin<Box<dyn Future<Output = Result<ExecutionPayloadEnvelopeV2, jsonrpsee::core::ClientError>> + 'a>>;
+            ) -> impl Future<Output = Result<ExecutionPayloadEnvelopeV2, jsonrpsee::core::ClientError>>;
 
-            fn new_payload_v2<'a>(
-                &'a self,
+            fn new_payload_v2(
+                &self,
                 payload: ExecutionPayloadInputV2,
-            ) -> Pin<Box<dyn Future<Output = Result<reth_rpc_types::engine::PayloadStatus, jsonrpsee::core::ClientError>> + 'a>>;
+            ) -> impl Future<Output = Result<reth_rpc_types::engine::PayloadStatus, jsonrpsee::core::ClientError>>;
         }
     }
 
