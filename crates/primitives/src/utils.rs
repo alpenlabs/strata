@@ -98,7 +98,7 @@ mod tests {
     fn test_txdata_to_l1tx() {
         let block: Block = get_block();
         let idx = 7; // corresponding to 5bc67f1d847b4f232b8ad385e59264ae5ee8da2e3eeb4ac0aee283c5ba241864
-        let l1_tx = generate_l1_tx(idx, &block).unwrap();
+        let l1_tx = generate_l1_tx(idx, &block);
         let exp_cohashes: Vec<_> = [
             "9d0ea944cdae406f656a3d277c7ad1b7914e2e760458ac40cd68a8a936ad7054",
             "b4b33efa721b091ae146ce7ce93d81f6d7974587ab0f566b03019fefe58c86c7",

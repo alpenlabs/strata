@@ -11,4 +11,4 @@ hex = { workspace = true }
 reth-primitives = { workspace = true }
 
 [dev-dependencies]
-hex = "0.4.3"
+hex = { workspace = true }

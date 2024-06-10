@@ -121,15 +121,15 @@ mod tests {
         }
     }
 
-    fn setup_db() -> L1Db {
+    fn setup_db() -> Arc<L1Db> {
         let db = get_rocksdb_tmp_instance().unwrap();
-        L1Db::new(db)
+        Arc::new(L1Db::new(db))
     }
 
     #[tokio::test]
     async fn test_forkpoint() {
         let forkpoint_depth = 2;
-        let db = Arc::new(setup_db());
+        let db = setup_db();
         let client = TestL1Client::new();
 
         // Insert blocks to db that match with what rpc provides, but only upto forkpoint depth

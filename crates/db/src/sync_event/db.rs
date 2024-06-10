@@ -105,49 +105,19 @@ impl SyncEventProvider for SyncEventDb {
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    use arbitrary::{Arbitrary, Unstructured};
-    use rockbound::schema::ColumnFamilyName;
-    use rocksdb::Options;
-    use tempfile::TempDir;
+    use alpen_test_utils::*;
 
     use super::*;
-    use crate::STORE_COLUMN_FAMILIES;
-
-    const DB_NAME: &str = "sync_event_db";
-
-    fn generate_arbitrary<'a, T: Arbitrary<'a> + Clone>() -> T {
-        let mut u = Unstructured::new(&[1, 2, 3]);
-        T::arbitrary(&mut u).expect("failed to generate arbitrary instance")
-    }
-
-    fn get_new_db(path: &Path) -> anyhow::Result<Arc<DB>> {
-        // TODO: add other options as appropriate.
-        let mut db_opts = Options::default();
-        db_opts.create_missing_column_families(true);
-        db_opts.create_if_missing(true);
-        DB::open(
-            path,
-            DB_NAME,
-            STORE_COLUMN_FAMILIES
-                .iter()
-                .cloned()
-                .collect::<Vec<ColumnFamilyName>>(),
-            &db_opts,
-        )
-        .map(Arc::new)
-    }
 
     fn setup_db() -> SyncEventDb {
-        let temp_dir = TempDir::new().expect("failed to create temp dir");
-        let db = get_new_db(&temp_dir.into_path()).unwrap();
+        let db = get_rocksdb_tmp_instance().unwrap();
         SyncEventDb::new(db)
     }
 
     fn insert_event(db: &SyncEventDb) -> SyncEvent {
-        let ev: SyncEvent = generate_arbitrary();
+        let ev: SyncEvent = ArbitraryGenerator::new().generate();
         let res = db.write_sync_event(ev.clone());
         assert!(res.is_ok());
         ev

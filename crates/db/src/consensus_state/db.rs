@@ -125,47 +125,14 @@ impl ConsensusStateProvider for ConsensusStateDb {
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
-
-    use arbitrary::{Arbitrary, Unstructured};
-    use rockbound::schema::ColumnFamilyName;
-    use rocksdb::Options;
-    use tempfile::TempDir;
-
+    use alpen_test_utils::*;
     use alpen_vertex_state::consensus::ConsensusState;
 
     use super::*;
-    use crate::STORE_COLUMN_FAMILIES;
-
-    const DB_NAME: &str = "consensus_state_db";
-
-    fn get_new_db(path: &Path) -> anyhow::Result<Arc<DB>> {
-        // TODO: add other options as appropriate.
-        let mut db_opts = Options::default();
-        db_opts.create_missing_column_families(true);
-        db_opts.create_if_missing(true);
-        DB::open(
-            path,
-            DB_NAME,
-            STORE_COLUMN_FAMILIES
-                .iter()
-                .cloned()
-                .collect::<Vec<ColumnFamilyName>>(),
-            &db_opts,
-        )
-        .map(Arc::new)
-    }
 
     fn setup_db() -> ConsensusStateDb {
-        let temp_dir = TempDir::new().expect("failed to create temp dir");
-        let db = get_new_db(&temp_dir.into_path()).unwrap();
+        let db = get_rocksdb_tmp_instance().unwrap();
         ConsensusStateDb::new(db)
-    }
-
-    fn generate_arbitrary<'a, T: Arbitrary<'a> + Clone>(bytes: &'a [u8]) -> T {
-        // Create an Unstructured instance and generate the arbitrary value
-        let mut u = Unstructured::new(bytes);
-        T::arbitrary(&mut u).expect("failed to generate arbitrary instance")
     }
 
     #[test]
@@ -177,7 +144,7 @@ mod tests {
 
     #[test]
     fn test_write_consensus_output() {
-        let output: ConsensusOutput = generate_arbitrary(&[1, 2, 3]);
+        let output: ConsensusOutput = ArbitraryGenerator::new().generate();
         let db = setup_db();
 
         let res = db.write_consensus_output(2, output.clone());
@@ -200,7 +167,7 @@ mod tests {
         let idx = db.get_last_write_idx();
         assert!(idx.is_err_and(|x| matches!(x, DbError::NotBootstrapped)));
 
-        let output: ConsensusOutput = generate_arbitrary(&[1, 2, 3]);
+        let output: ConsensusOutput = ArbitraryGenerator::new().generate();
         let _ = db.write_consensus_output(1, output.clone());
 
         let idx = db.get_last_write_idx();
@@ -209,7 +176,7 @@ mod tests {
 
     #[test]
     fn test_get_consensus_writes() {
-        let output: ConsensusOutput = generate_arbitrary(&[1, 2, 3]);
+        let output: ConsensusOutput = ArbitraryGenerator::new().generate();
 
         let db = setup_db();
         let _ = db.write_consensus_output(1, output.clone());
@@ -220,7 +187,7 @@ mod tests {
 
     #[test]
     fn test_get_consensus_actions() {
-        let output: ConsensusOutput = generate_arbitrary(&[1, 2, 3]);
+        let output: ConsensusOutput = ArbitraryGenerator::new().generate();
 
         let db = setup_db();
         let _ = db.write_consensus_output(1, output.clone());
@@ -231,7 +198,7 @@ mod tests {
 
     #[test]
     fn test_write_consensus_checkpoint() {
-        let state: ConsensusState = generate_arbitrary(&[1, 2, 3]);
+        let state: ConsensusState = ArbitraryGenerator::new().generate();
         let db = setup_db();
 
         let _ = db.write_consensus_checkpoint(3, state.clone());
@@ -253,7 +220,7 @@ mod tests {
 
     #[test]
     fn test_get_previous_checkpoint_at() {
-        let state: ConsensusState = generate_arbitrary(&[1, 2, 3]);
+        let state: ConsensusState = ArbitraryGenerator::new().generate();
 
         let db = setup_db();
 
