@@ -2,6 +2,8 @@ use std::fmt;
 use std::str;
 
 use arbitrary::Arbitrary;
+use bitcoin::hashes::Hash;
+use bitcoin::BlockHash;
 use borsh::{BorshDeserialize, BorshSerialize};
 use reth_primitives::alloy_primitives::FixedBytes;
 
@@ -34,6 +36,12 @@ impl Buf32 {
 impl From<[u8; 32]> for Buf32 {
     fn from(value: [u8; 32]) -> Self {
         Self(FixedBytes::from(value))
+    }
+}
+
+impl From<BlockHash> for Buf32 {
+    fn from(value: BlockHash) -> Self {
+        (*value.as_raw_hash().as_byte_array()).into()
     }
 }
 
@@ -108,4 +116,3 @@ impl<'a> Arbitrary<'a> for Buf64 {
         Ok(Buf64(array.into()))
     }
 }
-

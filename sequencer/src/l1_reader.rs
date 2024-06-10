@@ -26,11 +26,11 @@ pub async fn l1_reader_task(args: Args, rbdb: Arc<rockbound::DB>) -> anyhow::Res
     // TODO: handle gracefully when the spawned tasks fail
     tokio::spawn(bitcoin_data_reader(
         l1db.clone(),
-        rpc_client,
+        rpc_client.clone(),
         sender,
         args.l1_start_block_height,
     ));
 
-    tokio::spawn(bitcoin_data_handler(l1db, receiver));
+    tokio::spawn(bitcoin_data_handler(l1db, receiver, rpc_client));
     Ok(())
 }

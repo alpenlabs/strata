@@ -6,6 +6,7 @@ use bitcoin::{
     block::{Header, Version},
     consensus::deserialize,
     hash_types::TxMerkleNode,
+    hex::FromHex,
     Address, Block, BlockHash, CompactTarget, Network, Transaction,
 };
 use reqwest::header::HeaderMap;
@@ -15,7 +16,7 @@ use serde_json::{json, to_value, value::RawValue};
 use std::env;
 use tracing::warn;
 
-use crate::rpc_types::RawUTXO;
+use super::types::RawUTXO;
 
 // RPCError is a struct that represents an error returned by the Bitcoin RPC
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -147,14 +148,23 @@ impl BitcoinClient {
     }
 
     // get_block_hash returns the block hash of the block at the given height
-    pub async fn get_block_hash(&self, height: u64) -> Result<String, anyhow::Error> {
-        self.call::<String>("getblockhash", vec![to_value(height)?])
-            .await
+    pub async fn get_block_hash(&self, height: u64) -> Result<[u8; 32], anyhow::Error> {
+        let str_hash = self
+            .call::<String>("getblockhash", vec![to_value(height)?])
+            .await?;
+
+        let bytes = Vec::from_hex(&str_hash)?;
+        if bytes.len() != 32 {
+            return Err(anyhow::anyhow!("Invalid hex length"));
+        }
+        let mut array = [0u8; 32];
+        array.copy_from_slice(&bytes);
+        Ok(array)
     }
 
     pub async fn get_block_at(&self, height: u64) -> Result<Block, anyhow::Error> {
-        let height = self.get_block_hash(height).await?;
-        let block = self.get_block(height).await?;
+        let hash = self.get_block_hash(height).await?;
+        let block = self.get_block(hex::encode(hash)).await?;
         Ok(block)
     }
 
@@ -384,7 +394,7 @@ impl BitcoinClient {
         let host = env::var("REGTEST_HOST").unwrap_or("http://localhost".to_string());
         let port = env::var("REGTEST_PORT").unwrap_or("8333".to_string());
         let url = format!("{}:{}", host, port);
-        BitcoinNode::new(
+        BitcoinClient::new(
             url,
             env::var("REGTEST_USER").unwrap_or("rpcuser".to_string()),
             env::var("REGTEST_PASSWORD").unwrap_or("rpcpassword".to_string()),
@@ -395,12 +405,12 @@ impl BitcoinClient {
 
 #[cfg(test)]
 mod tests {
-    use crate::rpc::BitcoinNode;
+    use crate::rpc::BitcoinClient;
 
     #[tokio::test]
     #[ignore]
     async fn get_utxos() {
-        let node = BitcoinNode::get_test_node();
+        let node = BitcoinClient::get_test_node();
 
         let utxos = node.get_utxos().await.unwrap();
 
@@ -412,7 +422,7 @@ mod tests {
     #[tokio::test]
     #[ignore]
     async fn list_wallets() {
-        let node = BitcoinNode::get_test_node();
+        let node = BitcoinClient::get_test_node();
 
         let wallets = node.list_wallets().await.unwrap();
 
@@ -426,7 +436,7 @@ mod tests {
     #[ignore]
     async fn get_non_existing_transaction() {
         // This checks that querying for non existing transaction results in panic
-        let node = BitcoinNode::get_test_node();
+        let node = BitcoinClient::get_test_node();
         let txid = "0000000000000000000000000000000000000000000000000000000000000000".to_string();
         node.get_transaction_confirmations(txid).await.unwrap();
     }
@@ -435,16 +445,16 @@ mod tests {
     #[ignore]
     async fn get_existing_raw_transaction() {
         // This checks that querying for an existing transaction succeeds
-        let node = BitcoinNode::get_test_node();
+        let node = BitcoinClient::get_test_node();
         let first_blockhash = node.get_block_hash(1).await.unwrap();
-        let block = node.get_block(first_blockhash).await.unwrap();
+        let block = node.get_block(hex::encode(first_blockhash)).await.unwrap();
         let txid = block.txdata[0].txid().to_string();
         node.get_transaction_confirmations(txid).await.unwrap();
     }
 
     async fn create_mempool_txn() -> String {
         // Txn is created by sending some amount to a dummy(but valid) address
-        let node = BitcoinNode::get_test_node();
+        let node = BitcoinClient::get_test_node();
         let amt = 10;
         let address = "bcrt1q8267geaet3td2c5w59ewzjkt4mt3jnk9nsmpwk".to_string();
         node.send_to_address(address, amt).await.unwrap()
@@ -454,7 +464,7 @@ mod tests {
     #[ignore]
     async fn test_mempool_txns() {
         // This checks if created transaction is in the mempool.
-        let node = BitcoinNode::get_test_node();
+        let node = BitcoinClient::get_test_node();
         let txid = create_mempool_txn().await;
         println!("txid {} obtained. It should be in mempool", txid);
 
@@ -472,10 +482,10 @@ mod tests {
         // First create a txn in mempool
         let txid = create_mempool_txn().await;
 
-        let node = BitcoinNode::get_test_node();
+        let node = BitcoinClient::get_test_node();
         let blockheight = 0;
         let blockhash = node.get_block_hash(blockheight).await.unwrap();
-        let data = node.list_since_block(blockhash).await.unwrap();
+        let data = node.list_since_block(hex::encode(blockhash)).await.unwrap();
 
         assert!(!data.is_empty());
         assert!(

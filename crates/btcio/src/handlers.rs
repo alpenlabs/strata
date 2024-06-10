@@ -11,6 +11,7 @@ use tracing::warn;
 
 use crate::reader::BlockData;
 use crate::reorg::detect_reorg;
+use crate::rpc::BitcoinClient;
 
 fn block_data_to_manifest(blockdata: BlockData) -> L1BlockManifest {
     let blockid = Buf32(
@@ -31,17 +32,18 @@ fn block_data_to_manifest(blockdata: BlockData) -> L1BlockManifest {
     L1BlockManifest::new(blockid, header, Buf32(root.into()))
 }
 
+/// This consumes data passed through channel by bitcoin_data_reader() task
 pub async fn bitcoin_data_handler<D>(
     l1db: Arc<D>,
     mut receiver: mpsc::Receiver<BlockData>,
+    rpc_client: BitcoinClient,
 ) -> anyhow::Result<()>
 where
     D: L1DataProvider + L1DataStore,
 {
     loop {
         if let Some(blockdata) = receiver.recv().await {
-            // TODO: possibly handle when reorg depth is too big
-            if let Some(reorg_block_num) = detect_reorg(&l1db, &blockdata.block()) {
+            if let Some(reorg_block_num) = detect_reorg(&l1db, &blockdata, &rpc_client).await? {
                 l1db.revert_to_height(reorg_block_num)?;
                 continue;
             }
