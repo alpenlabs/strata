@@ -1,4 +1,5 @@
 use core::{fmt::Display, str::FromStr};
+use std::time::Duration;
 
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -18,6 +19,8 @@ use std::env;
 use tracing::warn;
 
 use super::{traits::L1Client, types::RawUTXO};
+
+const MAX_RETRIES: u32 = 3;
 
 // RPCError is a struct that represents an error returned by the Bitcoin RPC
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -78,44 +81,69 @@ impl BitcoinClient {
         }
     }
 
-    // TODO: add max retries
-    // #[async_recursion]
     async fn call<T: serde::de::DeserializeOwned>(
         &self,
         method: &str,
         params: Vec<serde_json::Value>,
     ) -> Result<T, anyhow::Error> {
-        let response = self
-            .client
-            .post(&self.url)
-            .json(&json!({
-                "jsonrpc": "1.0",
-                "id": method,
-                "method": method,
-                "params": params
-            }))
-            .send()
-            .await;
+        let mut retries = 0;
+        loop {
+            let response = self
+                .client
+                .post(&self.url)
+                .json(&json!({
+                    "jsonrpc": "1.0",
+                    "id": method,
+                    "method": method,
+                    "params": params
+                }))
+                .send()
+                .await;
 
-        // sometimes requests to bitcoind are dropped without a reason
-        // so impl. recursive retry
-        // TODO: add max retries
-        if let Err(error) = response {
-            // TODO: maybe remove is_request() check?
-            // if error.is_connect() || error.is_timeout() || error.is_request() {
-            //     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-            //     return self.call(method, params).await;
-            // }
-            return Err(anyhow!(error));
+            match response {
+                Ok(resp) => {
+                    let data = resp.json::<Response<T>>().await?;
+                    if let Some(err) = data.error {
+                        return Err(anyhow::anyhow!(err));
+                    }
+                    return Ok(data.result.ok_or(anyhow!("Empty data received"))?);
+                }
+                Err(err) => {
+                    warn!(err = %err, "Error calling bitcoin client");
+                    if err.is_body() {
+                        // Body error, unlikely to be recoverable by retrying
+                        return Err(anyhow::anyhow!(err));
+                    } else if err.is_status() {
+                        // HTTP status error, not retryable
+                        return Err(anyhow::anyhow!(err));
+                    } else if err.is_decode() {
+                        // Error decoding the response, retry might not help
+                        return Err(anyhow::anyhow!(err));
+                    } else if err.is_connect() {
+                        // Connection error, retry might help
+                    } else if err.is_timeout() {
+                        // Timeout error, retry might help
+                    } else if err.is_request() {
+                        // General request error, retry might help
+                    } else if err.is_builder() {
+                        // Error building the request, unlikely to be recoverable
+                        return Err(anyhow::anyhow!(err));
+                    } else if err.is_redirect() {
+                        // Redirect error, not retryable
+                        return Err(anyhow::anyhow!(err));
+                    } else {
+                        // Unknown error, unlikely to be recoverable
+                        return Err(anyhow::anyhow!(err));
+                    }
+
+                    retries += 1;
+                    if retries >= MAX_RETRIES {
+                        return Err(anyhow::anyhow!("Max retries exceeded: {}", err));
+                    }
+                    tokio::time::sleep(Duration::from_millis(200)).await;
+                }
+            };
         }
-
-        let response = response.unwrap().json::<Response<T>>().await?;
-
-        if let Some(error) = response.error {
-            return Err(anyhow!(error));
-        }
-
-        Ok(response.result.unwrap())
     }
 
     // get_block_count returns the current block height
