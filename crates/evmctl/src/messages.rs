@@ -24,11 +24,11 @@ impl ExecPayloadData {
         Self::new(el_payload, Vec::new())
     }
 
-    pub fn el_payload(&self) -> &Vec<u8> {
+    pub fn el_payload(&self) -> &[u8] {
         &self.el_payload
     }
 
-    pub fn ops(&self) -> &Vec<Op> {
+    pub fn ops(&self) -> &[Op] {
         &self.ops
     }
 }
@@ -65,7 +65,7 @@ impl PayloadEnv {
         self.timestamp
     }
 
-    pub fn el_ops(&self) -> &Vec<Op> {
+    pub fn el_ops(&self) -> &[Op] {
         &self.el_ops
     }
 }
@@ -108,7 +108,7 @@ impl ELDepositData {
         self.amt
     }
 
-    pub fn dest_addr(&self) -> &Vec<u8> {
+    pub fn dest_addr(&self) -> &[u8] {
         &self.dest_addr
     }
 }

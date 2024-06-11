@@ -93,8 +93,8 @@ fn http_client(http_url: &str, secret_hex: &str) -> HttpClient<AuthClientService
         .expect("Failed to create http client")
 }
 
-fn address_from_vec(vec: Vec<u8>) -> Option<Address> {
-    let slice: Option<[u8; 20]> = vec.try_into().ok();
+fn address_from_slice(slice: &[u8]) -> Option<Address> {
+    let slice: Option<[u8; 20]> = slice.try_into().ok();
     slice.map(Address::from)
 }
 
@@ -170,7 +170,7 @@ impl<T: HttpClientWrap> RpcExecEngineCtl<T> {
             .iter()
             .filter_map(|op| match op {
                 Op::Deposit(deposit_data) => Some(Withdrawal {
-                    address: address_from_vec(deposit_data.dest_addr().clone())?,
+                    address: address_from_slice(deposit_data.dest_addr())?,
                     amount: deposit_data.amt(),
                     ..Default::default()
                 }),
@@ -247,7 +247,7 @@ impl<T: HttpClientWrap> RpcExecEngineCtl<T> {
             .iter()
             .filter_map(|op| match op {
                 Op::Deposit(deposit_data) => Some(Withdrawal {
-                    address: address_from_vec(deposit_data.dest_addr().clone())?,
+                    address: address_from_slice(deposit_data.dest_addr())?,
                     amount: deposit_data.amt(),
                     ..Default::default()
                 }),
