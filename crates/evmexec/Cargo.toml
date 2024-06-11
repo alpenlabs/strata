@@ -16,11 +16,11 @@ reth-rpc-api = { workspace = true }
 reth-rpc-types = { workspace = true }
 jsonrpsee = { workspace = true }
 tokio = { workspace = true }
-http = "0.2.8"
-hyper = "0.14.25"
-tower = "0.4"
+http = { workspace = true }
+hyper = { workspace = true }
+tower = { workspace = true }
 serde = { workspace = true }
 
 [dev-dependencies]
 rand = { workspace = true }
-mockall = "0.11"
+mockall = { workspace = true }
