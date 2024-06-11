@@ -36,6 +36,11 @@ impl From<[u8; 32]> for Buf32 {
         Self(FixedBytes::from(value))
     }
 }
+impl From<Buf32> for FixedBytes<32> {
+    fn from(value: Buf32) -> Self {
+        value.0
+    }
+}
 
 impl fmt::Debug for Buf32 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

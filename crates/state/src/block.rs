@@ -11,11 +11,17 @@ use crate::l1::L1HeaderPayload;
 #[derive(
     Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Arbitrary, BorshSerialize, BorshDeserialize,
 )]
-pub struct L2BlockId(pub Buf32);
+pub struct L2BlockId(Buf32);
 
 impl From<Buf32> for L2BlockId {
     fn from(value: Buf32) -> Self {
         Self(value)
+    }
+}
+
+impl From<L2BlockId> for Buf32 {
+    fn from(value: L2BlockId) -> Self {
+        value.0
     }
 }
 
