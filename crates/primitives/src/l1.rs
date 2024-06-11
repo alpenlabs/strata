@@ -92,6 +92,10 @@ impl L1BlockManifest {
     pub fn block_hash(&self) -> Buf32 {
         self.blockid
     }
+
+    pub fn txs_root(&self) -> Buf32 {
+        self.txs_root
+    }
 }
 
 impl From<Block> for L1BlockManifest {

@@ -3,7 +3,6 @@ use std::sync::Arc;
 use alpen_vertex_db::traits::{L1DataProvider, L1DataStore, SyncEventStore};
 use alpen_vertex_primitives::buf::Buf32;
 use alpen_vertex_primitives::{l1::L1BlockManifest, utils::generate_l1_tx};
-use alpen_vertex_state::l1::L1BlockId;
 use alpen_vertex_state::sync_event::SyncEvent;
 
 use bitcoin::consensus::serialize;
