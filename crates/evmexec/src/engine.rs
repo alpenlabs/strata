@@ -23,7 +23,22 @@ use alpen_vertex_state::block::L2BlockId;
 use crate::auth_client_layer::{AuthClientLayer, AuthClientService};
 use crate::el_payload::ElPayload;
 
-pub trait HttpClientWrap {
+fn address_from_slice(slice: &[u8]) -> Option<Address> {
+    let slice: Option<[u8; 20]> = slice.try_into().ok();
+    slice.map(Address::from)
+}
+
+fn http_client(http_url: &str, secret_hex: &str) -> HttpClient<AuthClientService<HttpBackend>> {
+    let secret = JwtSecret::from_hex(secret_hex).unwrap();
+    let middleware = tower::ServiceBuilder::new().layer(AuthClientLayer::new(secret));
+
+    HttpClientBuilder::default()
+        .set_http_middleware(middleware)
+        .build(http_url)
+        .expect("Failed to create http client")
+}
+
+pub trait ELHttpClient {
     fn fork_choice_updated_v2(
         &self,
         fork_choice_state: ForkchoiceState,
@@ -41,13 +56,13 @@ pub trait HttpClientWrap {
     ) -> impl Future<Output = Result<reth_rpc_types::engine::PayloadStatus, jsonrpsee::core::ClientError>>;
 }
 
-pub struct HttpClientWrapper {
+pub struct ELHttpClientImpl {
     client: HttpClient<AuthClientService<HttpBackend>>,
 }
 
-impl HttpClientWrapper {
+impl ELHttpClientImpl {
     pub fn from_url_secret(http_url: &str, secret_hex: &str) -> Self {
-        HttpClientWrapper {
+        ELHttpClientImpl {
             client: http_client(http_url, secret_hex),
         }
     }
@@ -57,7 +72,7 @@ impl HttpClientWrapper {
     }
 }
 
-impl HttpClientWrap for HttpClientWrapper {
+impl ELHttpClient for ELHttpClientImpl {
     fn fork_choice_updated_v2(
         &self,
         fork_choice_state: ForkchoiceState,
@@ -81,21 +96,6 @@ impl HttpClientWrap for HttpClientWrapper {
     {
         <HttpClient<AuthClientService<HttpBackend>> as EngineApiClient<EthEngineTypes>>::new_payload_v2::<'_, '_>(&self.client, payload)
     }
-}
-
-fn http_client(http_url: &str, secret_hex: &str) -> HttpClient<AuthClientService<HttpBackend>> {
-    let secret = JwtSecret::from_hex(secret_hex).unwrap();
-    let middleware = tower::ServiceBuilder::new().layer(AuthClientLayer::new(secret));
-
-    HttpClientBuilder::default()
-        .set_http_middleware(middleware)
-        .build(http_url)
-        .expect("Failed to create http client")
-}
-
-fn address_from_slice(slice: &[u8]) -> Option<Address> {
-    let slice: Option<[u8; 20]> = slice.try_into().ok();
-    slice.map(Address::from)
 }
 
 #[derive(Debug, Default)]
@@ -124,7 +124,7 @@ impl<T> RpcExecEngineCtl<T> {
     }
 }
 
-impl<T: HttpClientWrap> RpcExecEngineCtl<T> {
+impl<T: ELHttpClient> RpcExecEngineCtl<T> {
     async fn update_block_state(
         &self,
         fcs_partial: ForkchoiceStatePartial,
@@ -159,7 +159,7 @@ impl<T: HttpClientWrap> RpcExecEngineCtl<T> {
             }
             PayloadStatusEnum::Syncing => EngineResult::Ok(BlockStatus::Syncing),
             PayloadStatusEnum::Invalid { .. } => EngineResult::Ok(BlockStatus::Invalid),
-            PayloadStatusEnum::Accepted => EngineResult::Err(EngineError::Unimplemented),   // should not be possible
+            PayloadStatusEnum::Accepted => EngineResult::Err(EngineError::Unimplemented), // should not be possible
         }
     }
 
@@ -277,7 +277,7 @@ impl<T: HttpClientWrap> RpcExecEngineCtl<T> {
     }
 }
 
-impl<T: HttpClientWrap> ExecEngineCtl for RpcExecEngineCtl<T> {
+impl<T: ELHttpClient> ExecEngineCtl for RpcExecEngineCtl<T> {
     fn submit_payload(&self, payload: ExecPayloadData) -> EngineResult<BlockStatus> {
         self.handle.block_on(self.submit_new_payload(payload))
     }
@@ -326,10 +326,10 @@ mod tests {
     use arbitrary::{Arbitrary, Unstructured};
     use mockall::{mock, predicate::*};
     use rand::{Rng, RngCore};
-    use reth_primitives::{Bloom, Bytes, U256};
     use reth_primitives::revm_primitives::FixedBytes;
+    use reth_primitives::{Bloom, Bytes, U256};
     use reth_rpc_types::ExecutionPayloadV1;
-    
+
     use alpen_vertex_evmctl::errors::EngineResult;
     use alpen_vertex_evmctl::messages::PayloadEnv;
     use alpen_vertex_primitives::buf::Buf32;
@@ -338,7 +338,7 @@ mod tests {
 
     mock! {
         HttpClient {}
-        impl HttpClientWrap for HttpClient {
+        impl ELHttpClient for HttpClient {
             fn fork_choice_updated_v2(
                 &self,
                 fork_choice_state: ForkchoiceState,
