@@ -192,10 +192,18 @@ h2 = ["h2 (>=4,<5)"]
 socks = ["pysocks (>=1.5.6,!=1.5.7,<2.0)"]
 zstd = ["zstandard (>=0.18.0)"]
 
+[[package]]
+name = "websockets"
+version = "12.0"
+description = "An implementation of the WebSocket Protocol (RFC 6455 & 7692)"
+category = "main"
+optional = false
+python-versions = ">=3.8"
+
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.10"
-content-hash = "dfe821f8951dff7291c7b8d4d85a223b6c0d76e3cd2f937c72e522f9c1a34ae0"
+content-hash = "47031a47e1510808f9e6b02ee9dfae781a74578127e0a69286749cb74ab8664e"
 
 [metadata.files]
 bitcoinlib = []
@@ -213,3 +221,4 @@ six = []
 sqlalchemy = []
 typing-extensions = []
 urllib3 = []
+websockets = []

@@ -6,6 +6,11 @@ import sys
 from bitcoinlib.services.bitcoind import BitcoindClient
 import flexitest
 
+import seqrpc
+
+BD_USERNAME = "alpen"
+BD_PASSWORD = "alpen"
+
 class BitcoinFactory(flexitest.Factory):
     def __init__(self, datadir_pfx: str, port_range: list[int]):
         super().__init__(datadir_pfx, port_range)
@@ -22,28 +27,59 @@ class BitcoinFactory(flexitest.Factory):
             "-datadir=%s" % datadir,
             "-port=%s" % p2p_port,
             "-rpcport=%s" % rpc_port,
-            "-rpcuser=alpen",
-            "-rpcpassword=alpen",
+            "-rpcuser=%s" % BD_USERNAME,
+            "-rpcpassword=%s" % BD_PASSWORD,
         ]
 
-        base_url = "http://alpen:alpen@localhost:%s" % rpc_port
+        props = {
+            "rpc_port": rpc_port,
+            "rpc_user": BD_USERNAME,
+            "rpc_password": BD_PASSWORD
+        }
 
-        with open(logfile_path, "w") as f:
+        with open(logfile, "w") as f:
             svc = flexitest.service.ProcService(props, cmd, stdout=f)
 
             def _create_rpc():
-                return BitcoindClient(base_url)
+                return BitcoindClient(rpc_url)
             setattr(svc, "create_rpc", _create_rpc)
 
             return svc
 
 class VertexFactory(flexitest.Factory):
     def __init__(self, datadir_pfx: str, port_range: list[int]):
+
         super().__init__(datadir_pfx, port_range)
 
-    def create_sequencer(self, bitcoin_rpc: str) -> flexitest.Service:
-        # TODO
-        raise NotImplementedError()
+    def create_sequencer(self, bitcoind_host: str, bitcoind_user: str, bitcoind_pass: str) -> flexitest.Service:
+        datadir = self.create_datadir("seq")
+        rpc_port = self.next_port()
+        logfile = os.path.join(datadir, "service.log")
+
+        # TODO EL setup, this is actually two services running coupled
+
+        cmd = [
+            "alpen-vertex-sequencer",
+            "--datadir=%s" % datadir,
+            "--bitcoind-host=%s" % bitcoind_host,
+            "--bitcoind-user=%s" % bitcoind_user,
+            "--bitcoind-password=%s" % bitcoind_password,
+            "--network=regtest",
+        ]
+        props = {
+            "rpc_port": rpc_port,
+        }
+
+        rpc_url = "http://localhost:%s" % rpc_port
+
+        with open(logfile, "w") as f:
+            svc = flexitest.service.ProcService(props, cmd, stdout=f)
+
+            def _create_rpc():
+                return seqrpc.JsonrpcClient(rpc_url)
+            setattr(svc, "create_rpc", _create_rpc)
+
+            return svc
 
 class BasicEnvConfig(flexitest.EnvConfig):
     def __init__(self):
@@ -54,8 +90,9 @@ class BasicEnvConfig(flexitest.EnvConfig):
         seq_fac = facs["sequencer"]
 
         bitcoind = btc_fac.create_regtest_bitcoin()
-        bitcoin_rpc = "// TODO"
-        sequencer = seq_fac.create_sequencer(bitcoin_rpc)
+        rpc_user = bitcoind.get_prop("rpc_user")
+        rpc_pass = bitcoind.get_prop("rpc_password")
+        sequencer = seq_fac.create_sequencer("localhost", rpc_user, rpc_pass)
 
         svcs = {"bitcoin": bitcoind, "sequencer": sequencer}
         return flexitest.LiveEnv(svcs)
