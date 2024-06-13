@@ -2,3 +2,4 @@
 
 pub mod reader;
 pub mod rpc;
+pub mod writer;
