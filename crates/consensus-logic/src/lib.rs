@@ -4,6 +4,7 @@ pub mod block_assembly;
 pub mod chain_tip;
 pub mod credential;
 pub mod ctl;
+pub mod duties;
 pub mod message;
 pub mod reorg;
 pub mod state_tracker;
