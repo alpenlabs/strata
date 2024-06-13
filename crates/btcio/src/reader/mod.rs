@@ -1,10 +1,13 @@
+pub mod handler;
+mod reorg;
+
 use std::{sync::Arc, time::Duration};
 
 use alpen_vertex_db::traits::L1DataProvider;
 use bitcoin::Block;
 use tokio::sync::mpsc;
 
-use crate::{reorg::detect_reorg, rpc::traits::L1Client};
+use crate::{reader::reorg::detect_reorg, rpc::traits::L1Client};
 
 /// Store the bitcoin block and references to the relevant transactions within the block
 #[derive(Clone, Debug)]

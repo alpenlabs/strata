@@ -3,7 +3,7 @@ use std::{str::FromStr, sync::Arc};
 use tokio::sync::mpsc;
 
 use alpen_vertex_btcio::{
-    handlers::bitcoin_data_handler,
+    reader::handler::bitcoin_data_handler,
     reader::{bitcoin_data_reader, L1Data},
     rpc::BitcoinClient,
 };
