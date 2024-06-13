@@ -127,9 +127,8 @@ impl L1DataProvider for L1Db {
         Ok(tx?)
     }
 
-    fn get_chain_tip(&self) -> DbResult<u64> {
+    fn get_chain_tip(&self) -> DbResult<Option<u64>> {
         self.get_latest_block_number()
-            .map(|x| x.unwrap_or_default())
     }
 
     fn get_block_txs(&self, idx: u64) -> DbResult<Option<Vec<L1TxRef>>> {
@@ -393,15 +392,15 @@ mod tests {
         let db = setup_db();
         assert_eq!(
             db.get_chain_tip().unwrap(),
-            0,
+            None,
             "Chain tip of empty db should be zero"
         );
 
         // Insert some block data
         insert_block_data(1, &db);
-        assert_eq!(db.get_chain_tip().unwrap(), 1);
+        assert_eq!(db.get_chain_tip().unwrap(), Some(1));
         insert_block_data(2, &db);
-        assert_eq!(db.get_chain_tip().unwrap(), 2);
+        assert_eq!(db.get_chain_tip().unwrap(), Some(2));
     }
 
     #[test]

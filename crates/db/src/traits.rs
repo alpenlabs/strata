@@ -63,7 +63,7 @@ pub trait L1DataStore {
 /// Provider interface to view L1 data.
 pub trait L1DataProvider {
     /// Gets the current chain tip index.
-    fn get_chain_tip(&self) -> DbResult<u64>;
+    fn get_chain_tip(&self) -> DbResult<Option<u64>>;
 
     /// Gets the block manifest for a block index.
     fn get_block_manifest(&self, idx: u64) -> DbResult<Option<L1BlockManifest>>;

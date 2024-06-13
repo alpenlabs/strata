@@ -4,7 +4,7 @@ use alpen_vertex_db::traits::L1DataProvider;
 use bitcoin::Block;
 use tokio::sync::mpsc;
 
-use crate::rpc::traits::L1Client;
+use crate::{reorg::detect_reorg, rpc::traits::L1Client};
 
 /// Store the bitcoin block and references to the relevant transactions within the block
 #[derive(Clone, Debug)]
@@ -12,6 +12,14 @@ pub struct BlockData {
     block_num: u64,
     block: Block,
     relevant_txn_indices: Vec<u32>,
+}
+
+pub enum L1Data {
+    /// Data that contains block number, block and relevent transactions
+    BlockData(BlockData),
+
+    /// Revert to the provided block height
+    RevertTo(u64),
 }
 
 impl BlockData {
@@ -41,33 +49,31 @@ fn filter_relevant_txns(block: &Block) -> Vec<u32> {
 pub async fn bitcoin_data_reader<D>(
     l1db: Arc<D>,
     client: impl L1Client,
-    sender: mpsc::Sender<BlockData>,
-    l1_start_block_height: u64,
+    sender: mpsc::Sender<L1Data>,
+    current_block_height: u64,
 ) -> anyhow::Result<()>
 where
     D: L1DataProvider,
 {
+    let mut curr_block_num = current_block_height + 1;
     loop {
-        // Get next block num to fetch, if it's 0 start with l1_start_block_height
-        // Since reorg is handled by handler function, it's best to get the current best height from
-        // l1db.
-        let curr_block_num = l1db.get_chain_tip()?;
-        let next_block_num = if curr_block_num == 0 {
-            l1_start_block_height
-        } else {
-            curr_block_num + 1
-        };
+        let block = client.get_block_at(curr_block_num).await?;
 
-        let next_block = client.get_block_at(next_block_num).await?;
+        if let Some(reorg_block_num) = detect_reorg(&l1db, curr_block_num, &block, &client).await? {
+            sender.send(L1Data::RevertTo(reorg_block_num)).await?;
+            curr_block_num = reorg_block_num + 1;
+            continue;
+        }
 
-        let filtered_block_indices = filter_relevant_txns(&next_block);
+        let filtered_block_indices = filter_relevant_txns(&block);
 
         let block_data = BlockData {
-            block_num: next_block_num,
-            block: next_block,
+            block_num: curr_block_num,
+            block,
             relevant_txn_indices: filtered_block_indices,
         };
-        let _ = sender.send(block_data).await?;
+        let _ = sender.send(L1Data::BlockData(block_data)).await?;
+        curr_block_num += 1;
 
         let _ = tokio::time::sleep(Duration::new(1, 0));
     }

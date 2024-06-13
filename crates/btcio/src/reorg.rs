@@ -2,9 +2,10 @@ use std::sync::Arc;
 
 use alpen_vertex_db::traits::L1DataProvider;
 use alpen_vertex_primitives::buf::Buf32;
+use bitcoin::Block;
 use tracing::warn;
 
-use crate::{reader::BlockData, rpc::traits::L1Client};
+use crate::rpc::traits::L1Client;
 
 // FIXME: This could possibly be arg or through config
 #[cfg(not(test))]
@@ -14,19 +15,21 @@ const MAX_REORG_DEPTH: u64 = 3;
 
 pub async fn detect_reorg<D>(
     db: &Arc<D>,
-    blockdata: &BlockData,
+    block_num: u64,
+    block: &Block,
+    // blockdata: &BlockData,
     rpc_client: &impl L1Client,
 ) -> anyhow::Result<Option<u64>>
 where
     D: L1DataProvider,
 {
-    let exp_prev_hash: Buf32 = blockdata.block().header.prev_blockhash.into();
-    let prev_hash = get_block_hash(blockdata.block_num() - 1, db)?;
+    let exp_prev_hash: Buf32 = block.header.prev_blockhash.into();
+    let prev_hash = get_block_hash(block_num - 1, db)?;
     if let Some(hash) = prev_hash {
         if exp_prev_hash == hash {
             Ok(None)
         } else {
-            find_fork_point_until(blockdata.block_num(), db, rpc_client).await
+            find_fork_point_until(block_num, db, rpc_client).await
         }
     } else {
         Ok(None)
