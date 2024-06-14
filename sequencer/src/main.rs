@@ -7,7 +7,12 @@ use std::process;
 use std::sync::Arc;
 use std::thread;
 
-use alpen_express_primitives::l1::L1Status;
+use alpen_vertex_btcio::writer::config::WriterConfig;
+use alpen_vertex_btcio::writer::writer_control_task;
+use alpen_vertex_db::sequencer::db::SequencerDB;
+use alpen_vertex_db::SeqDb;
+use alpen_vertex_primitives::l1::L1Status;
+use alpen_vertex_state::da_blob::BlobIntent;
 use anyhow::Context;
 use bitcoin::Network;
 use config::Config;
@@ -151,6 +156,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         config.bitcoind_rpc.rpc_password.clone(),
         bitcoin::Network::Regtest,
     );
+    let btc_rpc = Arc::new(btc_rpc);
 
     // TODO remove this
     if config.bitcoind_rpc.network == Network::Regtest {
@@ -195,6 +201,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         let db2 = database.clone();
         let eng_ctl_de = eng_ctl.clone();
         let pool = pool.clone();
+        let (l1wr_tx, l1wr_rx) = tokio::sync::mpsc::channel::<BlobIntent>(8);
 
         // Spawn the two tasks.
         thread::spawn(move || {
@@ -208,6 +215,15 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
                 duties_rx, idata.key, sm, db2, eng_ctl_de, pool, d_params,
             )
         });
+
+        // TODO: Load from toml
+        let writer_config = WriterConfig::default();
+
+        // Initialize SequencerDatabase
+        let seqdb = Arc::new(SeqDb::new(rbdb.clone()));
+        let dbseq = Arc::new(SequencerDB::new(seqdb));
+        let rpc = btc_rpc.clone();
+        thread::spawn(move || writer_control_task(l1wr_rx, rpc, writer_config, dbseq));
     }
 
     let main_fut = main_task(&config, sync_man, btc_rpc, database.clone(), l1_status);
@@ -220,10 +236,10 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn main_task<D: Database + Send + Sync + 'static>(
+async fn main_task<D: Database + Send + Sync + 'static, L: L1Client>(
     config: &Config,
     sync_man: Arc<SyncManager>,
-    l1_rpc_client: impl L1Client,
+    l1_rpc_client: Arc<L>,
     database: Arc<D>,
     l1_status: Arc<RwLock<L1Status>>,
 ) -> anyhow::Result<()>

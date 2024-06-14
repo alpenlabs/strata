@@ -8,11 +8,11 @@ use bitcoin::Txid;
 use base64::engine::general_purpose;
 use base64::Engine;
 use bitcoin::hashes::Hash as _;
-// use async_recursion::async_recursion;
 use bitcoin::{
     block::{Header, Version},
     consensus::deserialize,
     hash_types::TxMerkleNode,
+    hashes::Hash as _,
     Address, Block, BlockHash, CompactTarget, Network, Transaction,
 };
 use reqwest::header::HeaderMap;
@@ -34,7 +34,8 @@ pub fn to_val<T>(value: T) -> ClientResult<Value>
 where
     T: Serialize,
 {
-    to_value(value).map_err(|e| ClientError::ParamError(format!("Error creating value: {}", e)))
+    to_value(value)
+        .map_err(|e| ClientError::Param(format!("Error creating value: {}", e.to_string())))
 }
 
 // Represents a JSON-RPC error.
@@ -70,29 +71,29 @@ pub struct BitcoinClient {
 
 #[derive(Debug, Error)]
 pub enum ClientError {
-    #[error("Network Error: {0}")]
-    NetworkError(String),
+    #[error("Network: {0}")]
+    Network(String),
 
-    #[error("Error calling rpc: {0}")]
-    RPCError(String),
+    #[error("RPC server returned error '{1}' (code {0})")]
+    Server(i32, String),
 
     #[error("Error parsing rpc response: {0}")]
-    ParseError(String),
+    Parse(String),
 
-    #[error("Error creating RPC Param")]
-    ParamError(String),
+    #[error("Could not create RPC Param")]
+    Param(String),
 
-    #[error("BodyError: {0}")]
-    BodyError(String),
+    #[error("{0}")]
+    Body(String),
 
-    #[error("StatusError({0}): {1}")]
-    StatusError(StatusCode, String),
+    #[error("Obtained failure status({0}): {1}")]
+    Status(StatusCode, String),
 
     #[error("Malformed Response: {0}")]
     MalformedResponse(String),
 
-    #[error("ConnectionError: {0}")]
-    ConnectionError(String),
+    #[error("Could not connect: {0}")]
+    Connection(String),
 
     #[error("Timeout")]
     Timeout,
@@ -100,20 +101,20 @@ pub enum ClientError {
     #[error("HttpRedirect: {0}")]
     HttpRedirect(String),
 
-    #[error("Request Builder Error: {0}")]
-    ReqBuilderError(String),
+    #[error("Could not build request: {0}")]
+    ReqBuilder(String),
 
     #[error("Max retries {0} exceeded")]
     MaxRetriesExceeded(u32),
 
-    #[error("RequestError: {0}")]
-    RequestError(String),
+    #[error("Could not create request: {0}")]
+    Request(String),
 
-    #[error("Wrong Network Address: {0}")]
+    #[error("Network address: {0}")]
     WrongNetworkAddress(Network),
 
-    #[error("Signing Error")]
-    SigningError(Vec<String>),
+    #[error("Could not sign")]
+    Signing(Vec<String>),
 
     #[error("{0}")]
     Other(String),
@@ -121,7 +122,7 @@ pub enum ClientError {
 
 impl From<serde_json::error::Error> for ClientError {
     fn from(value: serde_json::error::Error) -> Self {
-        Self::Other(value.to_string())
+        Self::Parse(format!("Could not parse {}", value.to_string()))
     }
 }
 
@@ -159,6 +160,10 @@ impl BitcoinClient {
         }
     }
 
+    pub fn network(&self) -> Network {
+        self.network
+    }
+
     fn next_id(&self) -> u64 {
         self.next_id
             .fetch_add(1, std::sync::atomic::Ordering::AcqRel)
@@ -189,10 +194,9 @@ impl BitcoinClient {
                     let data = resp
                         .json::<Response<T>>()
                         .await
-                        .map_err(|e| ClientError::RPCError(e.to_string()))?;
-
+                        .map_err(|e| ClientError::Parse(e.to_string()))?;
                     if let Some(err) = data.error {
-                        return Err(ClientError::RPCError(err.to_string()));
+                        return Err(ClientError::Server(err.code, err.message));
                     }
                     return data
                         .result
@@ -203,11 +207,11 @@ impl BitcoinClient {
 
                     if err.is_body() {
                         // Body error, unlikely to be recoverable by retrying
-                        return Err(ClientError::BodyError(err.to_string()));
+                        return Err(ClientError::Body(err.to_string()));
                     } else if err.is_status() {
                         // HTTP status error, not retryable
                         let e = match err.status() {
-                            Some(code) => ClientError::StatusError(code, err.to_string()),
+                            Some(code) => ClientError::Status(code, err.to_string()),
                             _ => ClientError::Other(err.to_string()),
                         };
                         return Err(e);
@@ -216,7 +220,7 @@ impl BitcoinClient {
                         return Err(ClientError::MalformedResponse(err.to_string()));
                     } else if err.is_connect() {
                         // Connection error, retry might help
-                        let e = ClientError::ConnectionError(err.to_string());
+                        let e = ClientError::Connection(err.to_string());
                         warn!(%e, "connection error, retrying...");
                     } else if err.is_timeout() {
                         let e = ClientError::Timeout;
@@ -224,11 +228,11 @@ impl BitcoinClient {
                         warn!(%e, "timeout error, retrying...");
                     } else if err.is_request() {
                         // General request error, retry might help
-                        let e = ClientError::RequestError(err.to_string());
+                        let e = ClientError::Request(err.to_string());
                         warn!(%e, "request error, retrying...");
                     } else if err.is_builder() {
                         // Error building the request, unlikely to be recoverable
-                        return Err(ClientError::ReqBuilderError(err.to_string()));
+                        return Err(ClientError::ReqBuilder(err.to_string()));
                     } else if err.is_redirect() {
                         // Redirect error, not retryable
                         return Err(ClientError::HttpRedirect(err.to_string()));
@@ -396,7 +400,7 @@ impl BitcoinClient {
                 // errors. So in future, we might need to handle that particular case where error
                 // message is "CHECK(MULTI)SIG failing with non-zero signature (possibly need more
                 // signatures)"
-                Err(ClientError::SigningError(errs))
+                Err(ClientError::Signing(errs))
             }
         }
     }

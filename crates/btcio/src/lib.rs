@@ -4,3 +4,4 @@
 pub mod reader;
 pub mod rpc;
 pub mod status;
+pub mod writer;

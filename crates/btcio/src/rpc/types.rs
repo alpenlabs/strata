@@ -1,3 +1,5 @@
+#[cfg(test)]
+use arbitrary::Arbitrary;
 use bitcoin::BlockHash;
 use serde::{de::Visitor, Deserialize, Deserializer, Serialize};
 
@@ -29,7 +31,8 @@ pub struct GetTransactionResponse {
     // NOTE: "details" field omitted as not used, add it when used
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
+#[cfg_attr(test, derive(Arbitrary))]
 pub struct RawUTXO {
     pub txid: String,
     pub vout: u32,
@@ -44,6 +47,7 @@ pub struct RawUTXO {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[cfg_attr(test, derive(Arbitrary))]
 pub struct RpcBlockchainInfo {
     pub blocks: u64,
     pub headers: u64,

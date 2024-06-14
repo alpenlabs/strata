@@ -5,7 +5,7 @@ use rockbound::{OptimisticTransactionDB as DB, Schema, SchemaBatch, SchemaDBOper
 
 use alpen_express_db::{
     errors::DbError,
-    traits::{SeqDataProvider, SeqDataStore},
+    traits::{SeqDataProvider, SeqDataStore, SequencerDatabase},
     types::TxnStatusEntry,
     DbResult,
 };
@@ -49,8 +49,10 @@ impl SeqDataStore for SeqDb {
             )));
         }
         // TODO: wrap these in a db transaction
-        let last_idx = self.get_last_idx::<SeqBlobIdSchema>()?.unwrap_or(0);
-        let idx = last_idx + 1;
+        let idx = self
+            .get_last_idx::<SeqBlobIdSchema>()?
+            .map(|x| x + 1)
+            .unwrap_or(0);
 
         let mut batch = SchemaBatch::new();
 
@@ -63,6 +65,7 @@ impl SeqDataStore for SeqDb {
         Ok(idx)
     }
 
+    /// Store commit reveal txns associated with the blobid.
     fn put_commit_reveal_txns(
         &self,
         blobid: Buf32,
@@ -75,8 +78,10 @@ impl SeqDataStore for SeqDb {
             )));
         }
 
-        let last_reveal_idx = self.get_last_idx::<SeqL1TxnSchema>()?.unwrap_or(0);
-        let commit_idx = last_reveal_idx + 1;
+        let commit_idx = self
+            .get_last_idx::<SeqL1TxnSchema>()?
+            .map(|x| x + 1) // new idx is last reveal idx + 1
+            .unwrap_or(0);
         let reveal_idx = commit_idx + 1;
 
         let mut batch = SchemaBatch::new();
@@ -125,6 +130,29 @@ impl SeqDataProvider for SeqDb {
 
     fn get_blobid_for_blob_idx(&self, blobidx: u64) -> DbResult<Option<Buf32>> {
         Ok(self.db.get::<SeqBlobIdSchema>(&blobidx)?)
+    }
+}
+
+pub struct SequencerDB<D> {
+    db: Arc<D>,
+}
+
+impl<D> SequencerDB<D> {
+    pub fn new(db: Arc<D>) -> Self {
+        Self { db }
+    }
+}
+
+impl<D: SeqDataStore + SeqDataProvider> SequencerDatabase for SequencerDB<D> {
+    type SeqStore = D;
+    type SeqProv = D;
+
+    fn sequencer_store(&self) -> &Arc<Self::SeqStore> {
+        &self.db
+    }
+
+    fn sequencer_provider(&self) -> &Arc<Self::SeqProv> {
+        &self.db
     }
 }
 

@@ -132,7 +132,7 @@ impl ReaderState {
 }
 
 pub async fn bitcoin_data_reader_task(
-    client: impl L1Client,
+    client: Arc<impl L1Client>,
     event_tx: mpsc::Sender<L1Event>,
     target_next_block: u64,
     config: Arc<ReaderConfig>,
@@ -140,7 +140,7 @@ pub async fn bitcoin_data_reader_task(
 ) {
     let mut status_updates = Vec::new();
     if let Err(e) = do_reader_task(
-        &client,
+        client.as_ref(),
         &event_tx,
         target_next_block,
         config,
@@ -180,9 +180,10 @@ async fn do_reader_task(
         let cur_best_height = state.best_block_idx();
         let poll_span = debug_span!("l1poll", %cur_best_height);
 
-        if let Err(err) = poll_for_new_blocks(client, event_tx, &config, &mut state, status_updates)
-            .instrument(poll_span)
-            .await
+        if let Err(err) =
+            poll_for_new_blocks(client, &event_tx, &config, &mut state, status_updates)
+                .instrument(poll_span)
+                .await
         {
             warn!(%cur_best_height, err = %err, "failed to poll Bitcoin client");
             status_updates.push(StatusUpdate::RpcError(err.to_string()));

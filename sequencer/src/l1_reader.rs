@@ -18,7 +18,7 @@ use crate::config::Config;
 pub async fn start_reader_tasks<D: Database>(
     params: Arc<Params>,
     config: &Config,
-    rpc_client: impl L1Client,
+    rpc_client: Arc<impl L1Client>,
     db: Arc<D>,
     csm_ctl: Arc<CsmController>,
     l1_status: Arc<RwLock<L1Status>>,
