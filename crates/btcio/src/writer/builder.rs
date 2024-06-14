@@ -5,6 +5,7 @@ use bitcoin::absolute::LockTime;
 use bitcoin::consensus::deserialize;
 use bitcoin::key::UntweakedKeypair;
 use bitcoin::sighash::Prevouts;
+use bitcoin::taproot::TaprootSpendInfo;
 use bitcoin::Amount;
 use bitcoin::{
     blockdata::{
@@ -76,6 +77,91 @@ impl TryFrom<RawUTXO> for UTXO {
             solvable: value.solvable,
         })
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn create_inscription_transactions(
+    rollup_name: &str,
+    write_intent: L1WriteIntent,
+    sequencer_public_key: Vec<u8>,
+    utxos: Vec<UTXO>,
+    recipient: Address,
+    reveal_value: u64,
+    fee_rate: f64,
+    network: Network,
+) -> Result<(Transaction, Transaction), anyhow::Error> {
+    // Create commit key
+    let secp256k1 = Secp256k1::new();
+    let key_pair = generate_key_pair(&secp256k1)?;
+    let public_key = XOnlyPublicKey::from_keypair(&key_pair).0;
+
+    // Start creating inscription content
+    let reveal_script = build_reveal_script(
+        &public_key,
+        rollup_name,
+        &write_intent,
+        sequencer_public_key,
+    )?;
+
+    // Create spend info for tapscript
+    let taproot_spend_info = create_taproot_spend_info(&secp256k1, &public_key, &reveal_script)?;
+
+    // Create commit tx address
+    let commit_tx_address =
+        create_commit_tx_address(&secp256k1, &public_key, &taproot_spend_info, network);
+
+    // Calculate commit value
+    let commit_value = calculate_commit_value(
+        &recipient,
+        reveal_value,
+        fee_rate,
+        &reveal_script,
+        &taproot_spend_info,
+    );
+
+    // Build commit tx
+    let (unsigned_commit_tx, _) = build_commit_transaction(
+        utxos,
+        commit_tx_address.clone(),
+        recipient.clone(),
+        commit_value,
+        fee_rate,
+    )?;
+
+    let output_to_reveal = unsigned_commit_tx.output[0].clone();
+
+    // Build reveal tx
+    let (mut reveal_tx, _) = build_reveal_transaction(
+        unsigned_commit_tx.clone(),
+        recipient,
+        reveal_value,
+        fee_rate,
+        &reveal_script,
+        &taproot_spend_info
+            .control_block(&(reveal_script.clone(), LeafVersion::TapScript))
+            .ok_or(anyhow!("Cannot create control block"))?,
+    )?;
+
+    // Sign reveal tx
+    sign_reveal_transaction(
+        &secp256k1,
+        &mut reveal_tx,
+        &output_to_reveal,
+        &reveal_script,
+        &taproot_spend_info,
+        &key_pair,
+    )?;
+
+    // Check if inscription is locked to the correct address
+    assert_correct_address(
+        &secp256k1,
+        &key_pair,
+        &taproot_spend_info,
+        &commit_tx_address,
+        network,
+    );
+
+    Ok((unsigned_commit_tx, reveal_tx))
 }
 
 // Signs a message with a private key
@@ -345,108 +431,87 @@ fn build_reveal_transaction(
 
     Ok((tx, commit_produced_utxos))
 }
-
-// TODO: parametrize hardness
-// so tests are easier
-// Creates the inscription transactions (commit and reveal)
-#[allow(clippy::too_many_arguments)]
-pub fn create_inscription_transactions(
-    rollup_name: &str,
-    write_intent: L1WriteIntent,
-    sequencer_public_key: Vec<u8>,
-    utxos: Vec<UTXO>,
-    recipient: Address,
-    reveal_value: u64,
-    fee_rate: f64,
-    network: Network,
-) -> Result<(Transaction, Transaction), anyhow::Error> {
-    // Create commit key
-    let secp256k1 = Secp256k1::new();
-
+fn generate_key_pair(
+    secp256k1: &Secp256k1<secp256k1::All>,
+) -> Result<UntweakedKeypair, anyhow::Error> {
     let mut rand_bytes = [0; 32];
     rand::thread_rng().fill_bytes(&mut rand_bytes);
-    let key_pair = UntweakedKeypair::from_seckey_slice(&secp256k1, &mut rand_bytes)?;
-    let (public_key, _parity) = XOnlyPublicKey::from_keypair(&key_pair);
+    Ok(UntweakedKeypair::from_seckey_slice(
+        secp256k1,
+        &mut rand_bytes,
+    )?)
+}
 
-    // start creating inscription content
-    let reveal_script_builder = script::Builder::new()
-        .push_x_only_key(&public_key)
+fn build_reveal_script(
+    public_key: &XOnlyPublicKey,
+    rollup_name: &str,
+    write_intent: &L1WriteIntent,
+    sequencer_public_key: Vec<u8>,
+) -> Result<script::ScriptBuf, anyhow::Error> {
+    let mut builder = script::Builder::new()
+        .push_x_only_key(public_key)
         .push_opcode(OP_CHECKSIG)
         .push_opcode(OP_FALSE)
         .push_opcode(OP_IF)
-        .push_slice(PushBytesBuf::try_from(ROLLUP_NAME_TAG.to_vec()).expect("Cannot push tag"))
-        .push_slice(
-            PushBytesBuf::try_from(rollup_name.as_bytes().to_vec())
-                .expect("Cannot push rollup name"),
-        )
-        .push_slice(
-            PushBytesBuf::try_from(SIGNATURE_TAG.to_vec()).expect("Cannot push signature tag"),
-        )
-        .push_slice(
-            PushBytesBuf::try_from(write_intent.batch_signature).expect("Cannot push signature"),
-        )
-        .push_slice(
-            PushBytesBuf::try_from(PUBLICKEY_TAG.to_vec()).expect("Cannot push public key tag"),
-        )
-        .push_slice(
-            PushBytesBuf::try_from(sequencer_public_key).expect("Cannot push sequencer public key"),
-        );
-
-    let mut reveal_script_builder = reveal_script_builder.clone();
-    // PUSH batch and proofs. First push tag and their corresponding size and then chunks of body
-    reveal_script_builder = reveal_script_builder
-        .push_slice(
-            PushBytesBuf::try_from(BATCH_DATA_TAG.to_vec()).expect("Cannot push batch data tag"),
-        )
-        // Push batch size
+        .push_slice(PushBytesBuf::try_from(ROLLUP_NAME_TAG.to_vec())?)
+        .push_slice(PushBytesBuf::try_from(rollup_name.as_bytes().to_vec())?)
+        .push_slice(PushBytesBuf::try_from(SIGNATURE_TAG.to_vec())?)
+        .push_slice(PushBytesBuf::try_from(
+            write_intent.batch_signature.clone(),
+        )?)
+        .push_slice(PushBytesBuf::try_from(PUBLICKEY_TAG.to_vec())?)
+        .push_slice(PushBytesBuf::try_from(sequencer_public_key)?)
+        .push_slice(PushBytesBuf::try_from(BATCH_DATA_TAG.to_vec())?)
         .push_int(write_intent.batch_data.len() as i64);
 
-    // push body in chunks of 520 bytes
     for chunk in write_intent.batch_data.chunks(520) {
-        reveal_script_builder = reveal_script_builder
-            .push_slice(PushBytesBuf::try_from(chunk.to_vec()).expect("Cannot push body chunk"));
+        builder = builder.push_slice(PushBytesBuf::try_from(chunk.to_vec())?);
     }
 
-    reveal_script_builder = reveal_script_builder
-        .push_slice(
-            PushBytesBuf::try_from(PROOF_DATA_TAG.to_vec()).expect("Cannot push proof data tag"),
-        )
-        // push proof size
+    builder = builder
+        .push_slice(PushBytesBuf::try_from(PROOF_DATA_TAG.to_vec())?)
         .push_int(write_intent.proof_data.len() as i64);
 
-    // push body in chunks of 520 bytes
     for chunk in write_intent.proof_data.chunks(520) {
-        reveal_script_builder = reveal_script_builder
-            .push_slice(PushBytesBuf::try_from(chunk.to_vec()).expect("Cannot push body chunk"));
+        builder = builder.push_slice(PushBytesBuf::try_from(chunk.to_vec())?);
     }
 
-    // push end if
-    reveal_script_builder = reveal_script_builder.push_opcode(OP_ENDIF);
+    Ok(builder.push_opcode(OP_ENDIF).into_script())
+}
 
-    // finalize reveal script
-    let reveal_script = reveal_script_builder.into_script();
+fn create_taproot_spend_info(
+    secp256k1: &Secp256k1<secp256k1::All>,
+    public_key: &XOnlyPublicKey,
+    reveal_script: &script::ScriptBuf,
+) -> Result<TaprootSpendInfo, anyhow::Error> {
+    Ok(TaprootBuilder::new()
+        .add_leaf(0, reveal_script.clone())?
+        .finalize(secp256k1, *public_key)
+        .map_err(|_| anyhow::anyhow!("Could not build taproot"))?)
+}
 
-    // create spend info for tapscript
-    let taproot_spend_info = TaprootBuilder::new()
-        .add_leaf(0, reveal_script.clone())
-        .expect("Cannot add reveal script to taptree")
-        .finalize(&secp256k1, public_key)
-        .expect("Cannot finalize taptree");
-
-    // create control block for tapscript
-    let control_block = taproot_spend_info
-        .control_block(&(reveal_script.clone(), LeafVersion::TapScript))
-        .expect("Cannot create control block");
-
-    // create commit tx address
-    let commit_tx_address = Address::p2tr(
-        &secp256k1,
-        public_key,
+fn create_commit_tx_address(
+    secp256k1: &Secp256k1<secp256k1::All>,
+    public_key: &XOnlyPublicKey,
+    taproot_spend_info: &TaprootSpendInfo,
+    network: Network,
+) -> Address {
+    Address::p2tr(
+        secp256k1,
+        *public_key,
         taproot_spend_info.merkle_root(),
         network,
-    );
+    )
+}
 
-    let commit_value = (get_size(
+fn calculate_commit_value(
+    recipient: &Address,
+    reveal_value: u64,
+    fee_rate: f64,
+    reveal_script: &script::ScriptBuf,
+    taproot_spend_info: &TaprootSpendInfo,
+) -> u64 {
+    (get_size(
         &[TxIn {
             previous_output: OutPoint {
                 txid: Txid::from_str(
@@ -460,78 +525,75 @@ pub fn create_inscription_transactions(
             sequence: Sequence::ENABLE_RBF_NO_LOCKTIME,
         }],
         &[TxOut {
-            script_pubkey: recipient.clone().script_pubkey(),
+            script_pubkey: recipient.script_pubkey(),
             value: Amount::from_sat(reveal_value),
         }],
-        Some(&reveal_script),
-        Some(&control_block),
+        Some(reveal_script),
+        Some(
+            &taproot_spend_info
+                .control_block(&(reveal_script.clone(), LeafVersion::TapScript))
+                .expect("Cannot create control block"),
+        ),
     ) as f64
         * fee_rate
         + reveal_value as f64)
-        .ceil() as u64;
+        .ceil() as u64
+}
 
-    // build commit tx
-    let (unsigned_commit_tx, consumed_utxos) = build_commit_transaction(
-        utxos,
-        commit_tx_address.clone(),
-        recipient.clone(),
-        commit_value,
-        fee_rate,
+fn sign_reveal_transaction(
+    secp256k1: &Secp256k1<secp256k1::All>,
+    reveal_tx: &mut Transaction,
+    output_to_reveal: &TxOut,
+    reveal_script: &script::ScriptBuf,
+    taproot_spend_info: &TaprootSpendInfo,
+    key_pair: &UntweakedKeypair,
+) -> Result<(), anyhow::Error> {
+    let mut sighash_cache = SighashCache::new(reveal_tx);
+    let signature_hash = sighash_cache.taproot_script_spend_signature_hash(
+        0,
+        &Prevouts::All(&[output_to_reveal]),
+        TapLeafHash::from_script(reveal_script, LeafVersion::TapScript),
+        bitcoin::sighash::TapSighashType::Default,
     )?;
 
-    let output_to_reveal = unsigned_commit_tx.output[0].clone();
-
-    let (mut reveal_tx, produced_utxos) = build_reveal_transaction(
-        unsigned_commit_tx.clone(),
-        recipient,
-        reveal_value,
-        fee_rate,
-        &reveal_script,
-        &control_block,
-    )?;
-
-    // start signing reveal tx
-    let mut sighash_cache = SighashCache::new(&mut reveal_tx);
-
-    // create data to sign
-    let signature_hash = sighash_cache
-        .taproot_script_spend_signature_hash(
-            0,
-            &Prevouts::All(&[output_to_reveal]),
-            TapLeafHash::from_script(&reveal_script, LeafVersion::TapScript),
-            bitcoin::sighash::TapSighashType::Default,
-        )
-        .expect("Cannot create hash for signature");
-
-    // sign reveal tx data
     let mut randbytes = [0; 32];
     rand::thread_rng().fill_bytes(&mut randbytes);
 
     let signature = secp256k1.sign_schnorr_with_aux_rand(
-        &secp256k1::Message::from_digest_slice(signature_hash.as_byte_array())
-            .expect("should be cryptographically secure hash"),
-        &key_pair,
+        &secp256k1::Message::from_digest_slice(signature_hash.as_byte_array())?,
+        key_pair,
         &randbytes,
     );
 
-    // add signature to witness and finalize reveal tx
     let witness = sighash_cache.witness_mut(0).unwrap();
     witness.push(signature.as_ref());
     witness.push(reveal_script);
-    witness.push(&control_block.serialize());
+    witness.push(
+        &taproot_spend_info
+            .control_block(&(reveal_script.clone(), LeafVersion::TapScript))
+            .ok_or(anyhow!("Could not create control block"))?
+            .serialize(),
+    );
 
-    // check if inscription locked to the correct address
-    let recovery_key_pair = key_pair.tap_tweak(&secp256k1, taproot_spend_info.merkle_root());
-    let (x_only_pub_key, _parity) = recovery_key_pair.to_inner().x_only_public_key();
+    Ok(())
+}
+
+fn assert_correct_address(
+    secp256k1: &Secp256k1<secp256k1::All>,
+    key_pair: &UntweakedKeypair,
+    taproot_spend_info: &TaprootSpendInfo,
+    commit_tx_address: &Address,
+    network: Network,
+) {
+    let recovery_key_pair = key_pair.tap_tweak(secp256k1, taproot_spend_info.merkle_root());
+    let x_only_pub_key = recovery_key_pair.to_inner().x_only_public_key().0;
     assert_eq!(
         Address::p2tr_tweaked(
             TweakedPublicKey::dangerous_assume_tweaked(x_only_pub_key),
             network,
         ),
-        commit_tx_address
+        *commit_tx_address
     );
-
-    return Ok((unsigned_commit_tx, reveal_tx)); // , utxo_change_log));
 }
 
 // #[cfg(test)]

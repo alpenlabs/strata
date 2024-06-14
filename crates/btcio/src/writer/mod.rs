@@ -2,7 +2,6 @@ mod builder;
 
 use std::{str::FromStr, sync::Arc};
 
-use anyhow::anyhow;
 use bitcoin::Address;
 use tokio::sync::{broadcast::Receiver, mpsc};
 
