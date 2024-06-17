@@ -1,16 +1,15 @@
 use crate::define_table_with_default_codec;
-use crate::impl_borsh_value_codec;
 use crate::define_table_without_codec;
+use crate::impl_borsh_value_codec;
 use crate::traits::BlockStatus;
 use alpen_vertex_state::block::L2Block;
 use alpen_vertex_state::block::L2BlockId;
 use borsh::BorshDeserialize;
 use borsh::BorshSerialize;
 
-
 #[derive(Clone, Debug, PartialEq, BorshSerialize, BorshDeserialize)]
-pub struct SomeBlock{
-    name:String
+pub struct SomeBlock {
+    name: String,
 }
 
 define_table_with_default_codec!(
