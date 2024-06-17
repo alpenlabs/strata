@@ -207,7 +207,7 @@ pub trait L2DataProvider {
 }
 
 /// Gets the status of a block.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, BorshSerialize, BorshDeserialize)]
 pub enum BlockStatus {
     /// Block's validity hasn't been checked yet.
     Unchecked,
