@@ -65,8 +65,8 @@ pub enum ClientError {
     #[error("Network Error: {0}")]
     NetworkError(String),
 
-    #[error("Error calling rpc: {0}")]
-    RPCError(String),
+    #[error("Error calling rpc. Code {0}, message: {1}")]
+    RPCError(i32, String),
 
     #[error("Error parsing rpc response: {0}")]
     ParseError(String),
@@ -145,9 +145,9 @@ impl BitcoinClient {
                     let data = resp
                         .json::<Response<T>>()
                         .await
-                        .map_err(|e| ClientError::RPCError(e.to_string()))?;
+                        .map_err(|e| ClientError::ParseError(e.to_string()))?;
                     if let Some(err) = data.error {
-                        return Err(ClientError::RPCError(err.to_string()));
+                        return Err(ClientError::RPCError(err.code, err.message));
                     }
                     return Ok(data
                         .result
@@ -215,7 +215,7 @@ impl BitcoinClient {
                 })
                 .collect())
         } else {
-            Err(ClientError::Other(
+            Err(ClientError::ParseError(
                 "Could not parse listransactions result".to_string(),
             ))
         }

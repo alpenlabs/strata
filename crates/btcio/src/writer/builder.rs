@@ -172,7 +172,7 @@ pub fn sign_blob_with_private_key(
     let message = sha256d::Hash::hash(blob).to_byte_array();
     let secp = Secp256k1::new();
     let public_key = secp256k1::PublicKey::from_secret_key(&secp, private_key);
-    let msg = secp256k1::Message::from_slice(&message).unwrap();
+    let msg = secp256k1::Message::from_digest_slice(&message).unwrap();
     let sig = secp.sign_ecdsa(&msg, private_key);
     Ok((
         sig.serialize_compact().to_vec(),
@@ -201,7 +201,6 @@ fn get_size(
         );
     }
 
-    #[allow(clippy::unnecessary_unwrap)]
     if tx.input.len() == 1 && script.is_some() && control_block.is_some() {
         tx.input[0].witness.push(script.unwrap());
         tx.input[0].witness.push(control_block.unwrap().serialize());
@@ -300,7 +299,7 @@ fn build_commit_transaction(
 
         let res = choose_utxos(&utxos, input_total)?;
 
-        let (mut chosen_utxos, mut sum) = res;
+        let (chosen_utxos, sum) = res;
 
         let mut outputs: Vec<TxOut> = vec![];
         outputs.push(TxOut {
