@@ -6,11 +6,11 @@ use jsonrpsee::{
     types::{ErrorObject, ErrorObjectOwned},
 };
 use reth_primitives::{
-    serde_helper::JsonStorageKey, Address, BlockId, BlockNumberOrTag, Bytes, B256, B64, U256, U64,
+    Address, BlockId, BlockNumberOrTag, Bytes, B256, B64, U256, U64,
 };
 use reth_rpc_api::EthApiServer;
 use reth_rpc_types::{
-    serde_helpers::U64HexOrNumber, state::StateOverride, AccessListWithGasUsed,
+    state::StateOverride, AccessListWithGasUsed,
     AnyTransactionReceipt, BlockOverrides, Bundle, EIP1186AccountProofResponse, EthCallResponse,
     FeeHistory, Header, Index, RichBlock, StateContext, SyncInfo, SyncStatus, Transaction,
     TransactionRequest, Work,

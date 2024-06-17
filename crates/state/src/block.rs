@@ -19,6 +19,12 @@ impl From<Buf32> for L2BlockId {
     }
 }
 
+impl From<L2BlockId> for Buf32 {
+    fn from(value: L2BlockId) -> Self {
+        value.0
+    }
+}
+
 impl fmt::Debug for L2BlockId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(&self.0, f)

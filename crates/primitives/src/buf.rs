@@ -1,4 +1,5 @@
 use std::fmt;
+use std::io::{self, Read, Write};
 use std::str;
 
 use arbitrary::Arbitrary;
@@ -36,6 +37,11 @@ impl From<[u8; 32]> for Buf32 {
         Self(FixedBytes::from(value))
     }
 }
+impl From<Buf32> for FixedBytes<32> {
+    fn from(value: Buf32) -> Self {
+        value.0
+    }
+}
 
 impl fmt::Debug for Buf32 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -61,8 +67,24 @@ impl From<[u8; 64]> for Buf64 {
     }
 }
 
+impl BorshSerialize for Buf20 {
+    fn serialize<W: Write>(&self, writer: &mut W) -> io::Result<()> {
+        let bytes = self.0.as_ref();
+        let _ = writer.write(&bytes)?;
+        Ok(())
+    }
+}
+
+impl BorshDeserialize for Buf20 {
+    fn deserialize_reader<R: Read>(reader: &mut R) -> io::Result<Self> {
+        let mut array = [0u8; 20];
+        reader.read_exact(&mut array)?;
+        Ok(Self(array.into()))
+    }
+}
+
 impl BorshSerialize for Buf32 {
-    fn serialize<W: std::io::prelude::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+    fn serialize<W: Write>(&self, writer: &mut W) -> io::Result<()> {
         let bytes = self.0.as_ref();
         let _ = writer.write(&bytes)?;
         Ok(())
@@ -70,7 +92,7 @@ impl BorshSerialize for Buf32 {
 }
 
 impl BorshDeserialize for Buf32 {
-    fn deserialize_reader<R: std::io::prelude::Read>(reader: &mut R) -> std::io::Result<Self> {
+    fn deserialize_reader<R: Read>(reader: &mut R) -> io::Result<Self> {
         let mut array = [0u8; 32];
         reader.read_exact(&mut array)?;
         Ok(Self(array.into()))
@@ -78,7 +100,7 @@ impl BorshDeserialize for Buf32 {
 }
 
 impl BorshSerialize for Buf64 {
-    fn serialize<W: std::io::prelude::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+    fn serialize<W: Write>(&self, writer: &mut W) -> io::Result<()> {
         let bytes = self.0.as_ref();
         let _ = writer.write(&bytes)?;
         Ok(())
@@ -86,10 +108,18 @@ impl BorshSerialize for Buf64 {
 }
 
 impl BorshDeserialize for Buf64 {
-    fn deserialize_reader<R: std::io::prelude::Read>(reader: &mut R) -> std::io::Result<Self> {
+    fn deserialize_reader<R: Read>(reader: &mut R) -> io::Result<Self> {
         let mut array = [0u8; 64];
         reader.read_exact(&mut array)?;
         Ok(Self(array.into()))
+    }
+}
+
+impl<'a> Arbitrary<'a> for Buf20 {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let mut array = [0u8; 20];
+        u.fill_buffer(&mut array)?;
+        Ok(Buf20(array.into()))
     }
 }
 
@@ -108,4 +138,3 @@ impl<'a> Arbitrary<'a> for Buf64 {
         Ok(Buf64(array.into()))
     }
 }
-
