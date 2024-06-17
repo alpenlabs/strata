@@ -1,5 +1,6 @@
 //! Database abstraction layers, building on what Reth supports.
 
+use l2::schemas::L2BlockSchema;
 use rockbound::{schema::ColumnFamilyName, Schema};
 
 use crate::consensus_state::schemas::{ConsensusOutputSchema, ConsensusStateSchema};
@@ -9,6 +10,7 @@ use crate::sync_event::schemas::SyncEventSchema;
 pub mod consensus_state;
 pub mod database;
 pub mod l1;
+pub mod l2;
 pub mod stubs;
 pub mod sync_event;
 
@@ -27,6 +29,7 @@ pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
     MmrSchema::COLUMN_FAMILY_NAME,
     SyncEventSchema::COLUMN_FAMILY_NAME,
     TxnSchema::COLUMN_FAMILY_NAME,
+    L2BlockSchema::COLUMN_FAMILY_NAME
     // TODO add col families for other store types
 ];
 
