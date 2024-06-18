@@ -1,10 +1,11 @@
 //! Executes duties.
 
+use std::collections::HashMap;
 use std::sync::Arc;
-use std::time;
+use std::{thread, time};
 
 use borsh::{BorshDeserialize, BorshSerialize};
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, mpsc};
 use tracing::*;
 
 use alpen_vertex_db::traits::{Database, L2DataProvider};
@@ -12,7 +13,7 @@ use alpen_vertex_evmctl::engine::ExecEngineCtl;
 use alpen_vertex_primitives::buf::Buf32;
 use alpen_vertex_state::consensus::ConsensusState;
 
-use crate::duties::{self, Duty, Identity};
+use crate::duties::{self, Duty, DutyBatch, Identity};
 use crate::duty_extractor;
 use crate::errors::Error;
 use crate::message::ConsensusUpdateNotif;
@@ -28,11 +29,11 @@ pub struct IdentityData {
     key: IdentityKey,
 }
 
-fn duty_executor_task<D: Database, E: ExecEngineCtl>(
+pub fn duty_tracker_task<D: Database, E: ExecEngineCtl>(
     mut state: broadcast::Receiver<ConsensusUpdateNotif>,
-    ident: IdentityData,
+    batch_queue: broadcast::Sender<DutyBatch>,
+    ident: Identity,
     database: Arc<D>,
-    engine: Arc<E>,
 ) {
     let mut duties_tracker = duties::DutyTracker::new_empty();
 
@@ -50,44 +51,34 @@ fn duty_executor_task<D: Database, E: ExecEngineCtl>(
         };
 
         let ev_idx = update.sync_event_idx();
-        debug!(%ev_idx, "new consensus state");
-    }
+        trace!(%ev_idx, "new consensus state, updating duties");
 
-    info!("duty executor exiting");
-}
+        if let Err(e) = update_tracker(
+            &mut duties_tracker,
+            update.new_state(),
+            &ident,
+            database.as_ref(),
+        ) {
+            error!(err = %e, "failed to update duties tracker");
+        }
 
-fn handle_new_state<D: Database, E: ExecEngineCtl>(
-    update: &ConsensusUpdateNotif,
-    tracker: &mut duties::DutyTracker,
-    ident: &IdentityData,
-    database: &D,
-    engine: &E,
-) -> Result<(), Error> {
-    update_tracker(tracker, update.new_state(), ident, database)?;
-
-    // TODO replace this check with something based on if we think we're fully
-    // synced or not
-    let should_exec = true;
-
-    if should_exec {
-        for duty in tracker.duties_iter() {
-            // TODO don't perform duties we're still in the process of performing
-            if let Err(e) = perform_duty(duty, update.new_state(), &ident.key, database, engine) {
-                error!(err = %e, "failed to perform sequencer duty");
-            }
+        // Publish the new batch.
+        let batch = DutyBatch::new(ev_idx, duties_tracker.duties().to_vec());
+        if !batch_queue.send(batch).is_ok() {
+            warn!("failed to publish new duties batch");
         }
     }
 
-    Ok(())
+    info!("duty extractor task exiting");
 }
 
 fn update_tracker<D: Database>(
     tracker: &mut duties::DutyTracker,
     state: &ConsensusState,
-    ident: &IdentityData,
+    ident: &Identity,
     database: &D,
 ) -> Result<(), Error> {
-    let new_duties = duty_extractor::extract_duties(state, &ident.ident, database)?;
+    let new_duties = duty_extractor::extract_duties(state, &ident, database)?;
     // TODO update the tracker with the new duties and state data
 
     // Figure out the block slot from the tip blockid.
@@ -105,12 +96,77 @@ fn update_tracker<D: Database>(
     let tracker_update = duties::StateUpdate::new(block_idx, ts, newly_finalized);
     tracker.update(&tracker_update);
 
+    // Now actually insert the new duties.
+    tracker.add_duties(tip_blkid, block_idx, new_duties.into_iter());
+
     Ok(())
+}
+
+pub fn duty_dispatch_task<
+    D: Database + Sync + Send + 'static,
+    E: ExecEngineCtl + Sync + Send + 'static,
+>(
+    mut updates: broadcast::Receiver<DutyBatch>,
+    ident: IdentityData,
+    database: Arc<D>,
+    engine: Arc<E>,
+) {
+    let mut pending_duties: HashMap<u64, thread::JoinHandle<()>> = HashMap::new();
+
+    // TODO still need some stuff here to decide if we're fully synced and
+    // *should* dispatch duties
+
+    loop {
+        let update = match updates.blocking_recv() {
+            Ok(u) => u,
+            Err(broadcast::error::RecvError::Closed) => {
+                break;
+            }
+            Err(broadcast::error::RecvError::Lagged(skipped)) => {
+                warn!(%skipped, "overloaded, skipping dispatching some duties");
+                continue;
+            }
+        };
+
+        // TODO check pending_duties to remove any completed duties
+
+        for duty in update.duties() {
+            let id = duty.id();
+
+            // Skip any duties we've already dispatched.
+            if pending_duties.contains_key(&id) {
+                continue;
+            }
+
+            // Clone some things, spawn the task, then remember the join handle.
+            // TODO make this use a thread pool
+            let d = duty.duty().clone();
+            let ik = ident.key.clone();
+            let db = database.clone();
+            let e = engine.clone();
+            let join = thread::spawn(move || duty_exec_task(d, ik, db, e));
+            pending_duties.insert(id, join);
+        }
+    }
+
+    info!("duty dispatcher task exiting");
+}
+
+fn duty_exec_task<D: Database, E: ExecEngineCtl>(
+    duty: Duty,
+    ik: IdentityKey,
+    database: Arc<D>,
+    engine: Arc<E>,
+) {
+    if let Err(e) = perform_duty(&duty, &ik, database.as_ref(), engine.as_ref()) {
+        error!(err = %e, "error performing duty");
+    } else {
+        debug!("completed duty successfully");
+    }
 }
 
 fn perform_duty<D: Database, E: ExecEngineCtl>(
     duty: &Duty,
-    state: &ConsensusState,
     ik: &IdentityKey,
     database: &D,
     engine: &E,
@@ -118,7 +174,7 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
     match duty {
         Duty::SignBlock(data) => {
             let slot = data.slot();
-            sign_block(slot, state, ik, database, engine)?;
+            sign_block(slot, ik, database, engine)?;
             Ok(())
         }
     }
@@ -126,7 +182,6 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
 
 fn sign_block<D: Database, E: ExecEngineCtl>(
     slot: u64,
-    state: &ConsensusState,
     ik: &IdentityKey,
     database: &D,
     engine: &E,
