@@ -1,63 +1,49 @@
-use std::sync::Arc;
+use std::collections::{vec_deque::Iter, VecDeque};
 
-use alpen_vertex_db::traits::L1DataProvider;
-use alpen_vertex_primitives::buf::Buf32;
-use bitcoin::Block;
+use bitcoin::{hashes::Hash, Block, BlockHash};
 use tracing::warn;
 
 use crate::rpc::traits::L1Client;
 
 // FIXME: This could possibly be arg or through config
 #[cfg(not(test))]
-const MAX_REORG_DEPTH: u64 = 6;
+pub const MAX_REORG_DEPTH: u64 = 6;
 #[cfg(test)]
-const MAX_REORG_DEPTH: u64 = 3;
+pub const MAX_REORG_DEPTH: u64 = 3;
 
-pub async fn detect_reorg<D>(
-    db: &Arc<D>,
+pub async fn detect_reorg(
+    latest_seen_blocks: &VecDeque<BlockHash>,
     block_num: u64,
     block: &Block,
-    // blockdata: &BlockData,
     rpc_client: &impl L1Client,
-) -> anyhow::Result<Option<u64>>
-where
-    D: L1DataProvider,
-{
-    let exp_prev_hash: Buf32 = block.header.prev_blockhash.into();
-    let prev_hash = get_block_hash(block_num - 1, db)?;
+) -> anyhow::Result<Option<u64>> {
+    let exp_prev_hash = block.header.prev_blockhash;
+
+    let mut iter = latest_seen_blocks.iter();
+    let prev_hash = iter.next();
     if let Some(hash) = prev_hash {
-        if exp_prev_hash == hash {
+        if exp_prev_hash == *hash {
             Ok(None)
         } else {
-            find_fork_point_until(block_num, db, rpc_client).await
+            find_fork_point_until(block_num, &mut iter, rpc_client).await
         }
     } else {
         Ok(None)
     }
 }
 
-fn get_block_hash<D>(blk_num: u64, db: &Arc<D>) -> anyhow::Result<Option<Buf32>>
-where
-    D: L1DataProvider,
-{
-    let block_mf = db.get_block_manifest(blk_num)?;
-    Ok(block_mf.map(|x| x.block_hash()))
-}
-
-async fn find_fork_point_until<D>(
+async fn find_fork_point_until<'a>(
     blk_num: u64,
-    db: &Arc<D>,
+    prev_blockhashes_iter: &'a mut Iter<'a, BlockHash>,
     rpc_client: &impl L1Client,
-) -> anyhow::Result<Option<u64>>
-where
-    D: L1DataProvider,
-{
+) -> anyhow::Result<Option<u64>> {
     let fork_range_start = blk_num - MAX_REORG_DEPTH;
 
     for height in (fork_range_start..=blk_num).rev() {
         let l1_blk_hash = rpc_client.get_block_hash(height).await?;
-        if let Some(block_hash) = get_block_hash(height, db)? {
-            if block_hash == l1_blk_hash.into() {
+
+        if let Some(block_hash) = prev_blockhashes_iter.next() {
+            if *block_hash.as_raw_hash().as_byte_array() == l1_blk_hash {
                 return Ok(Some(height));
             }
         } else {
@@ -77,10 +63,7 @@ mod tests {
     use async_trait::async_trait;
     use bitcoin::{consensus::deserialize, hashes::Hash, Block};
 
-    use alpen_test_utils::{get_rocksdb_tmp_instance, ArbitraryGenerator};
-    use alpen_vertex_db::{traits::L1DataStore, L1Db};
-
-    use crate::handlers::block_to_manifest;
+    use alpen_test_utils::ArbitraryGenerator;
 
     use super::*;
 
@@ -121,35 +104,30 @@ mod tests {
         }
     }
 
-    fn setup_db() -> Arc<L1Db> {
-        let db = get_rocksdb_tmp_instance().unwrap();
-        Arc::new(L1Db::new(db))
-    }
-
     #[tokio::test]
     async fn test_forkpoint() {
         let forkpoint_depth = 2;
-        let db = setup_db();
         let client = TestL1Client::new();
+
+        let mut seen_blocks = VecDeque::with_capacity(MAX_REORG_DEPTH as usize);
 
         // Insert blocks to db that match with what rpc provides, but only upto forkpoint depth
         // The rest will not match with what rpc has
         let total_blocks = client.blocks.len();
-        let mut height = 1;
         for block in client.blocks[..total_blocks - forkpoint_depth].iter() {
-            let mf = block_to_manifest(block.clone());
-            let _ = db.put_block_data(height, mf, vec![]).unwrap();
-            height += 1;
+            let _ = seen_blocks.push_front(block.block_hash());
         }
 
         for _ in 0..forkpoint_depth {
             let mf: L1BlockManifest = ArbitraryGenerator::new().generate();
-            let _ = db.put_block_data(height, mf, vec![]).unwrap();
-            height += 1;
+            let _ = seen_blocks
+                .push_front(BlockHash::from_slice(&mf.block_hash().0.as_slice()).unwrap());
         }
 
         // Now, db and client have same blocks until height 2 and different onwards(until 4)
-        let fp = find_fork_point_until(4, &db, &client).await.unwrap();
+        let fp = find_fork_point_until(4, &mut seen_blocks.iter(), &client)
+            .await
+            .unwrap();
         assert_eq!(fp, Some(2));
     }
 }

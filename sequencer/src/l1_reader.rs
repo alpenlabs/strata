@@ -34,7 +34,6 @@ where
 
     // TODO: handle gracefully when the spawned tasks fail
     tokio::spawn(bitcoin_data_reader(
-        l1prov,
         rpc_client.clone(),
         sender,
         current_block_height,

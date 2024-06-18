@@ -1,13 +1,14 @@
 pub mod handler;
 mod reorg;
 
-use std::{sync::Arc, time::Duration};
+use std::{collections::VecDeque, time::Duration};
 
-use alpen_vertex_db::traits::L1DataProvider;
 use bitcoin::Block;
 use tokio::sync::mpsc;
 
 use crate::{reader::reorg::detect_reorg, rpc::traits::L1Client};
+
+use self::reorg::MAX_REORG_DEPTH;
 
 /// Store the bitcoin block and references to the relevant transactions within the block
 #[derive(Clone, Debug)]
@@ -49,20 +50,24 @@ fn filter_relevant_txns(block: &Block) -> Vec<u32> {
         .collect()
 }
 
-pub async fn bitcoin_data_reader<D>(
-    l1db: Arc<D>,
+pub async fn bitcoin_data_reader(
     client: impl L1Client,
     sender: mpsc::Sender<L1Data>,
     current_block_height: u64,
-) -> anyhow::Result<()>
-where
-    D: L1DataProvider,
-{
+) -> anyhow::Result<()> {
     let mut curr_block_num = current_block_height + 1;
+
+    // TODO: this should probably be initialized with what's present in the l1db upto MAX_REORG_DEPTH
+    let mut seen_blocks: VecDeque<_> = VecDeque::with_capacity(MAX_REORG_DEPTH as usize);
+
+    // NOTE: This function will return when reorg happens when there are not enough elements in the
+    // vec deque, probably during startup
     loop {
         let block = client.get_block_at(curr_block_num).await?;
 
-        if let Some(reorg_block_num) = detect_reorg(&l1db, curr_block_num, &block, &client).await? {
+        if let Some(reorg_block_num) =
+            detect_reorg(&seen_blocks, curr_block_num, &block, &client).await?
+        {
             sender.send(L1Data::RevertTo(reorg_block_num)).await?;
             curr_block_num = reorg_block_num + 1;
             continue;
@@ -75,7 +80,15 @@ where
             block,
             relevant_txn_indices: filtered_block_indices,
         };
+        let block_hash = block_data.block().block_hash();
+
         let _ = sender.send(L1Data::BlockData(block_data)).await?;
+
+        // insert to seen_blocks and increment curr_block_num
+        if seen_blocks.len() == seen_blocks.capacity() {
+            seen_blocks.pop_back();
+        }
+        seen_blocks.push_front(block_hash);
         curr_block_num += 1;
 
         let _ = tokio::time::sleep(Duration::new(1, 0));
