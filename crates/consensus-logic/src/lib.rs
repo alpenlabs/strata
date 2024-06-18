@@ -5,6 +5,8 @@ pub mod chain_tip;
 pub mod credential;
 pub mod ctl;
 pub mod duties;
+pub mod duty_executor;
+pub mod duty_extractor;
 pub mod message;
 pub mod reorg;
 pub mod state_tracker;

@@ -2,6 +2,9 @@
 
 use std::time;
 
+use borsh::{BorshDeserialize, BorshSerialize};
+
+use alpen_vertex_primitives::buf::Buf32;
 use alpen_vertex_state::block::L2BlockId;
 
 /// Describes when we'll stop working to fulfill a duty.
@@ -40,6 +43,16 @@ pub struct BlockSigningDuty {
     slot: u64,
 }
 
+impl BlockSigningDuty {
+    pub fn new_simple(slot: u64) -> Self {
+        Self { slot }
+    }
+
+    pub fn slot(&self) -> u64 {
+        self.slot
+    }
+}
+
 /// Manages a set of duties we need to carry out.
 #[derive(Clone, Debug)]
 pub struct DutyTracker {
@@ -47,6 +60,12 @@ pub struct DutyTracker {
 }
 
 impl DutyTracker {
+    /// Creates a new instance that has nothing in it.
+    pub fn new_empty() -> Self {
+        Self { duties: Vec::new() }
+    }
+
+    /// Returns the number of duties we still have to service.
     pub fn num_pending_duties(&self) -> usize {
         self.duties.len()
     }
@@ -127,4 +146,11 @@ impl StateUpdate {
     pub fn is_finalized(&self, id: &L2BlockId) -> bool {
         self.newly_finalized_blocks.binary_search(id).is_ok()
     }
+}
+
+/// Describes an identity that might be assigned duties.
+#[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
+pub enum Identity {
+    /// Sequencer with an identity key.
+    Sequencer(Buf32),
 }
