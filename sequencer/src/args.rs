@@ -32,7 +32,4 @@ pub struct Args {
         default = "\"regtest\".to_owned()"
     )]
     pub network: String,
-
-    #[argh(option, description = "l1 start block height")]
-    pub l1_start_block_height: u64,
 }

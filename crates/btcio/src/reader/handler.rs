@@ -39,8 +39,7 @@ where
             match l1data {
                 L1Data::RevertTo(revert_block_num) => {
                     l1db.revert_to_height(revert_block_num)?;
-                    // TODO: We shouldn't probably clear any sync events
-                    // TODO: Write sync event, possibly send reorg event. How??
+                    // NOTE: l1 reorgs will be handled in L2 STF
                 }
                 L1Data::BlockData(blockdata) => {
                     let manifest = block_to_manifest(blockdata.block().clone());
@@ -54,11 +53,11 @@ where
 
                     // Write to sync db
                     let blkid: Buf32 = blockdata.block().block_hash().into();
-                    let idx = syncdb.write_sync_event(SyncEvent::L1Block(
+                    let _idx = syncdb.write_sync_event(SyncEvent::L1Block(
                         blockdata.block_num(),
                         blkid.into(),
                     ))?;
-                    // TODO: Should send idx to any receivers?
+                    // NOTE: Send idx to any receivers that might be listening to this
                 }
             }
         } else {

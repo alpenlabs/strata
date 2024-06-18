@@ -60,6 +60,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         rollup: RollupParams {
             block_time: 1000,
             cred_rule: block_credential::CredRule::Unchecked,
+            l1_start_block_height: 4,
         },
         run: RunParams {
             l1_follow_distance: 6,
@@ -84,7 +85,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     // Init the chain tracker from the state we figured out.
     let chain_tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(cur_chain_tip);
     let ct_state = chain_tip::ChainTipTrackerState::new(
-        params,
+        params.clone(),
         database.clone(),
         cur_state,
         chain_tracker,
@@ -119,7 +120,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         .build()
         .expect("init: build rt");
 
-    if let Err(e) = rt.block_on(main_task(args, database.clone())) {
+    if let Err(e) = rt.block_on(main_task(args, params.rollup.clone(), database.clone())) {
         error!(err = %e, "main task exited");
         process::exit(0); // special case exit once we've gotten to this point
     }
@@ -130,9 +131,10 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
 async fn main_task(
     args: Args,
+    params: RollupParams,
     database: Arc<CommonDatabase<L1Db, StubL2Db, SyncEventDb, ConsensusStateDb>>,
 ) -> anyhow::Result<()> {
-    l1_reader_task(args.clone(), database.clone()).await?;
+    l1_reader_task(&params, args.clone(), database.clone()).await?;
 
     let (stop_tx, stop_rx) = oneshot::channel();
 

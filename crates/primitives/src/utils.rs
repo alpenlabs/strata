@@ -9,10 +9,24 @@ use crate::{
     prelude::Buf32,
 };
 
-fn get_cohashes_from_wtxids(txids: &[Wtxid], index: u32) -> (Vec<Buf32>, Buf32) {
-    assert!((index as usize) < txids.len());
+/// Generates cohashes for an wtxid in particular index with in given slice of wtxids.
+///
+/// # Parameters
+/// - `wtxids`: The witness txids slice
+/// - `index`: The index of the txn for which we want the cohashes
+///
+/// # Returns
+/// - A tuple `(Vec<Buf32>, Buf32)` containing the cohashes and the merkle root
+///
+/// # Panics
+/// - If the `index` is out of bounds for the `wtxids` length
+fn get_cohashes_from_wtxids(wtxids: &[Wtxid], index: u32) -> (Vec<Buf32>, Buf32) {
+    assert!(
+        (index as usize) < wtxids.len(),
+        "The transaction index should be within the txids length"
+    );
 
-    let mut curr_level: Vec<_> = txids
+    let mut curr_level: Vec<_> = wtxids
         .iter()
         .cloned()
         .map(|x| x.to_raw_hash().to_byte_array())
@@ -53,8 +67,22 @@ fn get_cohashes_from_wtxids(txids: &[Wtxid], index: u32) -> (Vec<Buf32>, Buf32) 
     (proof, Buf32(curr_level[0].into()))
 }
 
+/// Generates an L1 transaction with proof for a given transaction index in a block.
+///
+/// # Parameters
+/// - `idx`: The index of the transaction within the block's transaction data.
+/// - `block`: The block containing the transactions.
+///
+/// # Returns
+/// - An `L1Tx` struct containing the proof and the serialized transaction.
+///
+/// # Panics
+/// - If the `idx` is out of bounds for the block's transaction data.
 pub fn generate_l1_tx(idx: u32, block: &Block) -> L1Tx {
-    assert!((idx as usize) < block.txdata.len());
+    assert!(
+        (idx as usize) < block.txdata.len(),
+        "The transaction idx should be within the range of block transactions length"
+    );
     let tx = &block.txdata[idx as usize];
 
     let (cohashes, _wtxroot) = get_cohashes_from_wtxids(

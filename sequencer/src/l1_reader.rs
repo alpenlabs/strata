@@ -1,5 +1,6 @@
 use std::{str::FromStr, sync::Arc};
 
+use alpen_vertex_primitives::params::RollupParams;
 use tokio::sync::mpsc;
 
 use alpen_vertex_btcio::{
@@ -11,7 +12,7 @@ use alpen_vertex_db::traits::{Database, L1DataProvider};
 
 use crate::args::Args;
 // CommonDatabase<L1Db, StubL2Db, SyncEventDb, ConsensusStateDb>
-pub async fn l1_reader_task<D>(args: Args, db: Arc<D>) -> anyhow::Result<()>
+pub async fn l1_reader_task<D>(params: &RollupParams, args: Args, db: Arc<D>) -> anyhow::Result<()>
 where
     D: Database,
     D::L1Prov: Sync + Send + 'static,
@@ -30,7 +31,7 @@ where
     let l1prov = db.l1_provider().clone();
     let current_block_height = l1prov
         .get_chain_tip()?
-        .unwrap_or(args.l1_start_block_height - 1);
+        .unwrap_or(params.l1_start_block_height - 1);
 
     // TODO: handle gracefully when the spawned tasks fail
     tokio::spawn(bitcoin_data_reader(

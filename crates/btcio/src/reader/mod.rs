@@ -10,6 +10,8 @@ use crate::{reader::reorg::detect_reorg, rpc::traits::L1Client};
 
 use self::reorg::MAX_REORG_DEPTH;
 
+const READER_TASK_SLEEP_DURATION: u64 = 1; // secs
+
 /// Store the bitcoin block and references to the relevant transactions within the block
 #[derive(Clone, Debug)]
 pub struct BlockData {
@@ -91,6 +93,6 @@ pub async fn bitcoin_data_reader(
         seen_blocks.push_front(block_hash);
         curr_block_num += 1;
 
-        let _ = tokio::time::sleep(Duration::new(1, 0));
+        let _ = tokio::time::sleep(Duration::from_secs(READER_TASK_SLEEP_DURATION));
     }
 }
