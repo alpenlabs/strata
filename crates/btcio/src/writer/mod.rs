@@ -1,17 +1,19 @@
 mod builder;
 
-use alpen_vertex_db::traits::L1DataProvider;
-use alpen_vertex_primitives::buf::Buf32;
 use std::{collections::VecDeque, str::FromStr, sync::Arc, time::Duration};
-use tokio::sync::Mutex;
 
+#[cfg(test)]
+use arbitrary::Arbitrary;
 use bitcoin::{consensus::serialize, Address, Transaction};
 use tokio::sync::broadcast::Receiver;
+use tokio::sync::Mutex;
 use tracing::{info, warn};
 
-use crate::rpc::{types::RawUTXO, BitcoinClient};
+use alpen_vertex_db::traits::L1DataProvider;
+use alpen_vertex_primitives::buf::Buf32;
 
 use self::builder::{create_inscription_transactions, UtxoParseError, UTXO};
+use crate::rpc::{types::RawUTXO, BitcoinClient};
 
 // TODO: this comes from config or inside L1WriteIntent
 const SEQUENCER_PUBKEY: &[u8] = &[];
@@ -25,12 +27,16 @@ const SEQUENCER_CHANGE_ADDRESS: &str = "00000000000"; // TODO: change this
 
 // TODO: this should be somewhere common to duty executor
 #[derive(Clone)]
+#[cfg_attr(test, derive(Arbitrary))]
 pub struct L1WriteIntent {
     /// The range of L2 blocks that the intent spans
-    pub block_range: (u64, u64),
+    pub l2_block_range: (u64, u64),
 
-    /// The block hashes corresponding to the block height range
-    pub block_hash_range: (Buf32, Buf32),
+    /// The range of L1 blocks that the intent spans
+    pub l1_block_range: (u64, u64),
+
+    /// The block hashes corresponding to the l1 block height range
+    pub l1_block_hash_range: (Buf32, Buf32),
 
     /// Proof of the batch execution
     pub proof_data: Vec<u8>, // TODO: maybe typed serializable data
@@ -141,8 +147,8 @@ async fn send_if_finalized<D>(
 where
     D: L1DataProvider,
 {
-    let block_height = intent.block_range.1;
-    let block_hash = intent.block_hash_range.1;
+    let block_height = intent.l1_block_range.1;
+    let block_hash = intent.l1_block_hash_range.1;
     let mf = db.get_block_manifest(block_height)?;
     if let Some(mf) = mf {
         if mf.block_hash() != block_hash {

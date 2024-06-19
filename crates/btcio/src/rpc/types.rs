@@ -8,7 +8,7 @@ pub struct RawUTXO {
     pub address: String,
     #[serde(rename = "scriptPubKey")]
     pub script_pub_key: String,
-    pub amount: f64,
+    pub amount: f64, // btcs not satoshis
     pub confirmations: u64,
     pub spendable: bool,
     pub solvable: bool,

@@ -24,3 +24,4 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 alpen-test-utils = { workspace = true }
+arbitrary = { workspace = true }

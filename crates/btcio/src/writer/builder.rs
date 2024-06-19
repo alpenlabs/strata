@@ -34,6 +34,7 @@ use crate::rpc::types::RawUTXO;
 use super::L1WriteIntent;
 
 const BITCOIN_DUST_LIMIT: u64 = 546;
+const BTC_TO_SATS: u64 = 100_000_000;
 
 const BATCH_DATA_TAG: &[u8] = &[1];
 const PROOF_DATA_TAG: &[u8] = &[2];
@@ -71,7 +72,7 @@ impl TryFrom<RawUTXO> for UTXO {
             vout: value.vout,
             address: value.address,
             script_pubkey: value.script_pub_key,
-            amount: (value.amount * 100_000_000.0) as u64,
+            amount: (value.amount * (BTC_TO_SATS as f64)) as u64,
             confirmations: value.confirmations,
             spendable: value.spendable,
             solvable: value.solvable,
@@ -100,14 +101,21 @@ pub fn create_inscription_transactions(
         build_reveal_script(&public_key, rollup_name, write_intent, sequencer_public_key)?;
 
     // Create spend info for tapscript
-    let taproot_spend_info = create_taproot_spend_info(&secp256k1, &public_key, &reveal_script)?;
+    let taproot_spend_info = TaprootBuilder::new()
+        .add_leaf(0, reveal_script.clone())?
+        .finalize(&secp256k1, public_key)
+        .map_err(|_| anyhow::anyhow!("Could not build taproot"))?;
 
     // Create commit tx address
-    let commit_tx_address =
-        create_commit_tx_address(&secp256k1, &public_key, &taproot_spend_info, network);
+    let commit_tx_address = Address::p2tr(
+        &secp256k1,
+        public_key,
+        taproot_spend_info.merkle_root(),
+        network,
+    );
 
     // Calculate commit value
-    let commit_value = calculate_commit_value(
+    let commit_value = calculate_commit_output_value(
         &recipient,
         reveal_value,
         fee_rate,
@@ -127,7 +135,7 @@ pub fn create_inscription_transactions(
     let output_to_reveal = unsigned_commit_tx.output[0].clone();
 
     // Build reveal tx
-    let (mut reveal_tx, _) = build_reveal_transaction(
+    let mut reveal_tx = build_reveal_transaction(
         unsigned_commit_tx.clone(),
         recipient,
         reveal_value,
@@ -205,6 +213,7 @@ fn get_size(
     tx.vsize()
 }
 
+/// Choose utxos almost naively.
 fn choose_utxos(utxos: &[UTXO], amount: u64) -> Result<(Vec<UTXO>, u64), anyhow::Error> {
     let mut bigger_utxos: Vec<&UTXO> = utxos.iter().filter(|utxo| utxo.amount >= amount).collect();
     let mut sum: u64 = 0;
@@ -246,7 +255,7 @@ fn choose_utxos(utxos: &[UTXO], amount: u64) -> Result<(Vec<UTXO>, u64), anyhow:
 }
 
 fn build_commit_transaction(
-    rest_utxos: Vec<UTXO>,
+    utxos: Vec<UTXO>,
     recipient: Address,
     change_address: Address,
     output_value: u64,
@@ -254,20 +263,9 @@ fn build_commit_transaction(
 ) -> Result<(Transaction, Vec<UTXO>), anyhow::Error> {
     // get single input single output transaction size
     let mut size = get_size(
-        &[TxIn {
-            previous_output: OutPoint {
-                txid: Txid::from_str(
-                    "0000000000000000000000000000000000000000000000000000000000000000",
-                )
-                .unwrap(),
-                vout: 0,
-            },
-            script_sig: script::Builder::new().into_script(),
-            witness: Witness::new(),
-            sequence: Sequence::ENABLE_RBF_NO_LOCKTIME,
-        }],
+        &default_txin(),
         &[TxOut {
-            script_pubkey: recipient.clone().script_pubkey(),
+            script_pubkey: recipient.script_pubkey(),
             value: Amount::from_sat(output_value),
         }],
         None,
@@ -275,7 +273,7 @@ fn build_commit_transaction(
     );
     let mut last_size = size;
 
-    let utxos: Vec<UTXO> = rest_utxos
+    let utxos: Vec<UTXO> = utxos
         .iter()
         .filter(|utxo| utxo.spendable && utxo.solvable && utxo.amount > BITCOIN_DUST_LIMIT)
         .cloned()
@@ -348,6 +346,21 @@ fn build_commit_transaction(
     Ok((commit_txn, consumed_utxo))
 }
 
+fn default_txin() -> Vec<TxIn> {
+    vec![TxIn {
+        previous_output: OutPoint {
+            txid: Txid::from_str(
+                "0000000000000000000000000000000000000000000000000000000000000000",
+            )
+            .unwrap(),
+            vout: 0,
+        },
+        script_sig: script::Builder::new().into_script(),
+        witness: Witness::new(),
+        sequence: Sequence::ENABLE_RBF_NO_LOCKTIME,
+    }]
+}
+
 fn build_reveal_transaction(
     input_transaction: Transaction,
     recipient: Address,
@@ -355,7 +368,7 @@ fn build_reveal_transaction(
     fee_rate: f64,
     reveal_script: &ScriptBuf,
     control_block: &ControlBlock,
-) -> Result<(Transaction, Vec<UTXO>), anyhow::Error> {
+) -> Result<Transaction, anyhow::Error> {
     let outputs: Vec<TxOut> = vec![TxOut {
         value: Amount::from_sat(output_value),
         script_pubkey: recipient.script_pubkey(),
@@ -387,45 +400,9 @@ fn build_reveal_transaction(
         output: outputs,
     };
 
-    // make the produced UTXO from reveal txn
-    let mut reveal_produced_utxos: Vec<UTXO> = tx
-        .output
-        .iter()
-        .enumerate()
-        .map(|(index, el)| UTXO {
-            txid: tx.compute_txid(),
-            vout: index as u32,
-            address: recipient.to_string(),
-            script_pubkey: recipient.script_pubkey().to_hex_string(),
-            amount: el.value.to_sat(),
-            confirmations: 0,
-            spendable: true,
-            solvable: true,
-        })
-        .collect();
-
-    // make the produced UTXO from the commit txn
-    // output index from `1` is taken as `0` is consumed by reveal txn
-    let mut commit_produced_utxos: Vec<UTXO> = input_transaction.output[1..]
-        .iter()
-        .enumerate()
-        .map(|(index, el)| UTXO {
-            txid: input_transaction.compute_txid(),
-            vout: (index + 1) as u32,
-            address: recipient.to_string(),
-            script_pubkey: recipient.script_pubkey().to_hex_string(),
-            amount: el.value.to_sat(),
-            confirmations: 0,
-            spendable: true,
-            solvable: true,
-        })
-        .collect();
-
-    // combine all produced utxos
-    commit_produced_utxos.append(&mut reveal_produced_utxos);
-
-    Ok((tx, commit_produced_utxos))
+    Ok(tx)
 }
+
 fn generate_key_pair(
     secp256k1: &Secp256k1<secp256k1::All>,
 ) -> Result<UntweakedKeypair, anyhow::Error> {
@@ -455,6 +432,7 @@ fn build_reveal_script(
             write_intent.batch_signature.clone(),
         )?)
         .push_slice(PushBytesBuf::try_from(PUBLICKEY_TAG.to_vec())?)
+        // pubkey corresponding to the above signature
         .push_slice(PushBytesBuf::try_from(sequencer_public_key)?)
         .push_slice(PushBytesBuf::try_from(BATCH_DATA_TAG.to_vec())?)
         .push_int(write_intent.batch_data.len() as i64);
@@ -474,32 +452,7 @@ fn build_reveal_script(
     Ok(builder.push_opcode(OP_ENDIF).into_script())
 }
 
-fn create_taproot_spend_info(
-    secp256k1: &Secp256k1<secp256k1::All>,
-    public_key: &XOnlyPublicKey,
-    reveal_script: &script::ScriptBuf,
-) -> Result<TaprootSpendInfo, anyhow::Error> {
-    Ok(TaprootBuilder::new()
-        .add_leaf(0, reveal_script.clone())?
-        .finalize(secp256k1, *public_key)
-        .map_err(|_| anyhow::anyhow!("Could not build taproot"))?)
-}
-
-fn create_commit_tx_address(
-    secp256k1: &Secp256k1<secp256k1::All>,
-    public_key: &XOnlyPublicKey,
-    taproot_spend_info: &TaprootSpendInfo,
-    network: Network,
-) -> Address {
-    Address::p2tr(
-        secp256k1,
-        *public_key,
-        taproot_spend_info.merkle_root(),
-        network,
-    )
-}
-
-fn calculate_commit_value(
+fn calculate_commit_output_value(
     recipient: &Address,
     reveal_value: u64,
     fee_rate: f64,
@@ -507,18 +460,7 @@ fn calculate_commit_value(
     taproot_spend_info: &TaprootSpendInfo,
 ) -> u64 {
     (get_size(
-        &[TxIn {
-            previous_output: OutPoint {
-                txid: Txid::from_str(
-                    "0000000000000000000000000000000000000000000000000000000000000000",
-                )
-                .unwrap(),
-                vout: 0,
-            },
-            script_sig: script::Builder::new().into_script(),
-            witness: Witness::new(),
-            sequence: Sequence::ENABLE_RBF_NO_LOCKTIME,
-        }],
+        &default_txin(),
         &[TxOut {
             script_pubkey: recipient.script_pubkey(),
             value: Amount::from_sat(reveal_value),
@@ -591,506 +533,281 @@ fn assert_correct_address(
     );
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use core::str::FromStr;
-//
-// use brotli::CompressorWriter;
-// use brotli::DecompressorWriter;
-//     use bitcoin::{
-//         absolute::LockTime,
-//         hashes::Hash,
-//         script,
-//         secp256k1::{constants::SCHNORR_SIGNATURE_SIZE, schnorr::Signature},
-//         taproot::ControlBlock,
-//         Address, OutPoint, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Txid, Witness,
-//     };
-//
-//     use crate::{
-//         helpers::{
-//             builders::{compress_blob, decompress_blob},
-//             parsers::parse_transaction,
-//             REVEAL_TX_HASH_PREFIX,
-//         },
-//         spec::utxo::UTXO,
-//         REVEAL_OUTPUT_AMOUNT,
-//     };
-//     pub fn compress_blob(blob: &[u8]) -> Vec<u8> {
-//         let mut writer = CompressorWriter::new(Vec::new(), 4096, 11, 22);
-//         writer.write_all(blob).unwrap();
-//         writer.into_inner()
-//     }
-//
-//     pub fn decompress_blob(blob: &[u8]) -> Vec<u8> {
-//         let mut writer = DecompressorWriter::new(Vec::new(), 4096);
-//         writer.write_all(blob).unwrap();
-//         writer.into_inner().expect("decompression failed")
-//     }
-//
+#[cfg(test)]
+mod tests {
+    use core::str::FromStr;
 
-//     #[test]
-//     fn compression_decompression() {
-//         let blob = std::fs::read("test_data/blob.txt").unwrap();
-//
-//         // compress and measure time
-//         let time = std::time::Instant::now();
-//         let compressed_blob = compress_blob(&blob);
-//         println!("compression time: {:?}", time.elapsed());
-//
-//         // decompress and measure time
-//         let time = std::time::Instant::now();
-//         let decompressed_blob = decompress_blob(&compressed_blob);
-//         println!("decompression time: {:?}", time.elapsed());
-//
-//         assert_eq!(blob, decompressed_blob);
-//
-//         // size
-//         println!("blob size: {}", blob.len());
-//         println!("compressed blob size: {}", compressed_blob.len());
-//         println!(
-//             "compression ratio: {}",
-//             (blob.len() as f64) / (compressed_blob.len() as f64)
-//         );
-//     }
-//
-//     #[allow(clippy::type_complexity)]
-//     fn get_mock_data() -> (
-//         &'static str,
-//         Vec<u8>,
-//         Vec<u8>,
-//         Vec<u8>,
-//         Address,
-//         Option<UTXO>,
-//         Vec<UTXO>,
-//     ) {
-//         let rollup_name = "test_rollup";
-//         let body = vec![100; 1000];
-//         let signature = vec![100; 64];
-//         let sequencer_public_key = vec![100; 33];
-//         let address =
-//             Address::from_str("bc1pp8qru0ve43rw9xffmdd8pvveths3cx6a5t6mcr0xfn9cpxx2k24qf70xq9")
-//                 .unwrap()
-//                 .require_network(bitcoin::Network::Bitcoin)
-//                 .unwrap();
-//
-//         let first_utxo = Some(UTXO {
-//             txid: Txid::from_str(
-//                 "4cfbec13cf1510545f285cceceb6229bd7b6a918a8f6eba1dbee64d26226a3b7",
-//             )
-//             .unwrap(),
-//             vout: 0,
-//             address: "bc1pp8qru0ve43rw9xffmdd8pvveths3cx6a5t6mcr0xfn9cpxx2k24qf70xq9".to_string(),
-//             script_pubkey: address.script_pubkey().to_hex_string(),
-//             amount: 1_000_000,
-//             confirmations: 100,
-//             spendable: true,
-//             solvable: true,
-//         });
-//
-//         let rest_utxos = vec![
-//             UTXO {
-//                 txid: Txid::from_str(
-//                     "44990141674ff56ed6fee38879e497b2a726cddefd5e4d9b7bf1c4e561de4347",
-//                 )
-//                 .unwrap(),
-//                 vout: 0,
-//                 address: "bc1pp8qru0ve43rw9xffmdd8pvveths3cx6a5t6mcr0xfn9cpxx2k24qf70xq9"
-//                     .to_string(),
-//                 script_pubkey: address.script_pubkey().to_hex_string(),
-//                 amount: 100_000,
-//                 confirmations: 100,
-//                 spendable: true,
-//                 solvable: true,
-//             },
-//             UTXO {
-//                 txid: Txid::from_str(
-//                     "4dbe3c10ee0d6bf16f9417c68b81e963b5bccef3924bbcb0885c9ea841912325",
-//                 )
-//                 .unwrap(),
-//                 vout: 0,
-//                 address: "bc1pp8qru0ve43rw9xffmdd8pvveths3cx6a5t6mcr0xfn9cpxx2k24qf70xq9"
-//                     .to_string(),
-//                 script_pubkey: address.script_pubkey().to_hex_string(),
-//                 amount: 10_000,
-//                 confirmations: 100,
-//                 spendable: true,
-//                 solvable: true,
-//             },
-//         ];
-//
-//         (
-//             rollup_name,
-//             body,
-//             signature,
-//             sequencer_public_key,
-//             address,
-//             first_utxo,
-//             rest_utxos,
-//         )
-//     }
-//
-//     #[test]
-//     fn choose_utxos() {
-//         let (_, _, _, _, _, first_utxo, mut rest_utxos) = get_mock_data();
-//         let mut utxos = Vec::with_capacity(rest_utxos.len() + 1);
-//         utxos.push(first_utxo.unwrap());
-//         utxos.append(&mut rest_utxos);
-//
-//         let (chosen_utxos, sum) = super::choose_utxos(&utxos, 105_000).unwrap();
-//
-//         assert_eq!(sum, 1_000_000);
-//         assert_eq!(chosen_utxos.len(), 1);
-//         assert_eq!(chosen_utxos[0], utxos[0]);
-//
-//         let (chosen_utxos, sum) = super::choose_utxos(&utxos, 1_005_000).unwrap();
-//
-//         assert_eq!(sum, 1_100_000);
-//         assert_eq!(chosen_utxos.len(), 2);
-//         assert_eq!(chosen_utxos[0], utxos[0]);
-//         assert_eq!(chosen_utxos[1], utxos[1]);
-//
-//         let (chosen_utxos, sum) = super::choose_utxos(&utxos, 100_000).unwrap();
-//
-//         assert_eq!(sum, 100_000);
-//         assert_eq!(chosen_utxos.len(), 1);
-//         assert_eq!(chosen_utxos[0], utxos[1]);
-//
-//         let (chosen_utxos, sum) = super::choose_utxos(&utxos, 90_000).unwrap();
-//
-//         assert_eq!(sum, 100_000);
-//         assert_eq!(chosen_utxos.len(), 1);
-//         assert_eq!(chosen_utxos[0], utxos[1]);
-//
-//         let res = super::choose_utxos(&utxos, 100_000_000);
-//
-//         assert!(res.is_err());
-//         assert_eq!(format!("{}", res.unwrap_err()), "not enough UTXOs");
-//     }
-//
-//     #[test]
-//     #[ignore = "fixme"]
-//     fn build_commit_transaction() {
-//         let (_, _, _, _, address, first_utxo, rest_utxos) = get_mock_data();
-//
-//         let recipient =
-//             Address::from_str("bc1p2e37kuhnsdc5zvc8zlj2hn6awv3ruavak6ayc8jvpyvus59j3mwqwdt0zc")
-//                 .unwrap()
-//                 .require_network(bitcoin::Network::Bitcoin)
-//                 .unwrap();
-//         let (mut tx, _) = super::build_commit_transaction(
-//             first_utxo.clone(),
-//             rest_utxos.clone(),
-//             recipient.clone(),
-//             address.clone(),
-//             5_000,
-//             8.0,
-//         )
-//         .unwrap();
-//
-//         tx.input[0].witness.push(
-//             Signature::from_slice(&[0; SCHNORR_SIGNATURE_SIZE])
-//                 .unwrap()
-//                 .as_ref(),
-//         );
-//
-//         // 154 vB * 8 sat/vB = 1232 sats
-//         // 5_000 + 1232 = 6232
-//         // input: 10000
-//         // outputs: 5_000 + 3.768
-//         assert_eq!(tx.vsize(), 154);
-//         assert_eq!(tx.input.len(), 1);
-//         assert_eq!(tx.output.len(), 2);
-//         assert_eq!(tx.output[0].value, 5_000);
-//         assert_eq!(tx.output[0].script_pubkey, recipient.script_pubkey());
-//         assert_eq!(tx.output[1].value, 3_768);
-//         assert_eq!(tx.output[1].script_pubkey, address.script_pubkey());
-//
-//         let (mut tx, _) = super::build_commit_transaction(
-//             first_utxo.clone(),
-//             rest_utxos.clone(),
-//             recipient.clone(),
-//             address.clone(),
-//             5_000,
-//             45.0,
-//         )
-//         .unwrap();
-//
-//         tx.input[0].witness.push(
-//             Signature::from_slice(&[0; SCHNORR_SIGNATURE_SIZE])
-//                 .unwrap()
-//                 .as_ref(),
-//         );
-//
-//         // 111 vB * 45 sat/vB = 4.995 sats
-//         // 5_000 + 4928 = 9995
-//         // input: 10000
-//         // outputs: 5_000
-//         assert_eq!(tx.vsize(), 111);
-//         assert_eq!(tx.input.len(), 1);
-//         assert_eq!(tx.output.len(), 1);
-//         assert_eq!(tx.output[0].value, 5_000);
-//         assert_eq!(tx.output[0].script_pubkey, recipient.script_pubkey());
-//
-//         let (mut tx, _) = super::build_commit_transaction(
-//             first_utxo.clone(),
-//             rest_utxos.clone(),
-//             recipient.clone(),
-//             address.clone(),
-//             5_000,
-//             32.0,
-//         )
-//         .unwrap();
-//
-//         tx.input[0].witness.push(
-//             Signature::from_slice(&[0; SCHNORR_SIGNATURE_SIZE])
-//                 .unwrap()
-//                 .as_ref(),
-//         );
-//
-//         // you expect
-//         // 154 vB * 32 sat/vB = 4.928 sats
-//         // 5_000 + 4928 = 9928
-//         // input: 10000
-//         // outputs: 5_000 72
-//         // instead do
-//         // input: 10000
-//         // outputs: 5_000
-//         // so size is actually 111
-//         assert_eq!(tx.vsize(), 111);
-//         assert_eq!(tx.input.len(), 1);
-//         assert_eq!(tx.output.len(), 1);
-//         assert_eq!(tx.output[0].value, 5_000);
-//         assert_eq!(tx.output[0].script_pubkey, recipient.script_pubkey());
-//
-//         let (mut tx, _) = super::build_commit_transaction(
-//             first_utxo.clone(),
-//             rest_utxos.clone(),
-//             recipient.clone(),
-//             address.clone(),
-//             1_050_000,
-//             5.0,
-//         )
-//         .unwrap();
-//
-//         tx.input[0].witness.push(
-//             Signature::from_slice(&[0; SCHNORR_SIGNATURE_SIZE])
-//                 .unwrap()
-//                 .as_ref(),
-//         );
-//         tx.input[1].witness.push(
-//             Signature::from_slice(&[0; SCHNORR_SIGNATURE_SIZE])
-//                 .unwrap()
-//                 .as_ref(),
-//         );
-//
-//         // 212 vB * 5 sat/vB = 1060 sats
-//         // 1_050_000 + 1060 = 1_051_060
-//         // inputs: 1_000_000 100_000
-//         // outputs: 1_050_000 8940
-//         assert_eq!(tx.vsize(), 212);
-//         assert_eq!(tx.input.len(), 2);
-//         assert_eq!(tx.output.len(), 2);
-//         assert_eq!(tx.output[0].value, 1_050_000);
-//         assert_eq!(tx.output[0].script_pubkey, recipient.script_pubkey());
-//         assert_eq!(tx.output[1].value, 48940);
-//         assert_eq!(tx.output[1].script_pubkey, address.script_pubkey());
-//
-//         let tx = super::build_commit_transaction(
-//             first_utxo.clone(),
-//             rest_utxos.clone(),
-//             recipient.clone(),
-//             address.clone(),
-//             100_000_000_000,
-//             32.0,
-//         );
-//
-//         assert!(tx.is_err());
-//         assert_eq!(format!("{}", tx.unwrap_err()), "not enough UTXOs");
-//
-//         let tx = super::build_commit_transaction(
-//             None,
-//             vec![UTXO {
-//                 txid: Txid::from_str(
-//                     "4cfbec13cf1510545f285cceceb6229bd7b6a918a8f6eba1dbee64d26226a3b7",
-//                 )
-//                 .unwrap(),
-//                 vout: 0,
-//                 address: "bc1pp8qru0ve43rw9xffmdd8pvveths3cx6a5t6mcr0xfn9cpxx2k24qf70xq9"
-//                     .to_string(),
-//                 script_pubkey: address.script_pubkey().to_hex_string(),
-//                 amount: 152,
-//                 confirmations: 100,
-//                 spendable: true,
-//                 solvable: true,
-//             }],
-//             recipient.clone(),
-//             address.clone(),
-//             100_000_000_000,
-//             32.0,
-//         );
-//
-//         assert!(tx.is_err());
-//         assert_eq!(format!("{}", tx.unwrap_err()), "no spendable UTXOs");
-//     }
-//
-//     fn get_txn_from_utxo(utxo: &UTXO, _address: &Address) -> Transaction {
-//         let inputs = vec![TxIn {
-//             previous_output: OutPoint {
-//                 txid: utxo.txid,
-//                 vout: utxo.vout,
-//             },
-//             script_sig: script::Builder::new().into_script(),
-//             witness: Witness::new(),
-//             sequence: Sequence::ENABLE_RBF_NO_LOCKTIME,
-//         }];
-//
-//         let outputs = vec![TxOut {
-//             value: utxo.amount,
-//             script_pubkey: ScriptBuf::from_hex(utxo.script_pubkey.as_str()).unwrap(),
-//         }];
-//
-//         Transaction {
-//             lock_time: LockTime::ZERO,
-//             version: bitcoin::transaction::Version(2),
-//             input: inputs,
-//             output: outputs,
-//         }
-//     }
-//
-//     #[test]
-//     #[ignore = "fixme"]
-//     fn build_reveal_transaction() {
-//         let (_, _, _, _, address, _, rest_utxos) = get_mock_data();
-//
-//         let utxo = rest_utxos.first().unwrap();
-//         let _script = ScriptBuf::from_hex("62a58f2674fd840b6144bea2e63ebd35c16d7fd40252a2f28b2a01a648df356343e47976d7906a0e688bf5e134b6fd21bd365c016b57b1ace85cf30bf1206e27").unwrap();
-//         let control_block = ControlBlock::decode(&[
-//             193, 165, 246, 250, 6, 222, 28, 9, 130, 28, 217, 67, 171, 11, 229, 62, 48, 206, 219,
-//             111, 155, 208, 6, 7, 119, 63, 146, 90, 227, 254, 231, 232, 249,
-//         ])
-//         .unwrap(); // should be 33 bytes
-//
-//         let inp_txn = get_txn_from_utxo(utxo, &address);
-//         let (mut tx, _) = super::build_reveal_transaction(
-//             inp_txn,
-//             address.clone(),
-//             REVEAL_OUTPUT_AMOUNT,
-//             8.0,
-//             &_script,
-//             &control_block,
-//         )
-//         .unwrap();
-//
-//         tx.input[0].witness.push([0; SCHNORR_SIGNATURE_SIZE]);
-//         tx.input[0].witness.push(_script.clone());
-//         tx.input[0].witness.push(control_block.serialize());
-//
-//         assert_eq!(tx.input.len(), 1);
-//         assert_eq!(tx.input[0].previous_output.txid, utxo.txid);
-//         assert_eq!(tx.input[0].previous_output.vout, utxo.vout);
-//
-//         assert_eq!(tx.output.len(), 1);
-//         assert_eq!(tx.output[0].value, REVEAL_OUTPUT_AMOUNT);
-//         assert_eq!(tx.output[0].script_pubkey, address.script_pubkey());
-//
-//         let utxo = rest_utxos.get(2).unwrap();
-//         let inp_txn = get_txn_from_utxo(utxo, &address);
-//         let tx = super::build_reveal_transaction(
-//             inp_txn,
-//             address.clone(),
-//             REVEAL_OUTPUT_AMOUNT,
-//             75.0,
-//             &_script,
-//             &control_block,
-//         );
-//
-//         assert!(tx.is_err());
-//         assert_eq!(format!("{}", tx.unwrap_err()), "input UTXO not big enough");
-//
-//         let utxo = rest_utxos.get(2).unwrap();
-//         let inp_txn = get_txn_from_utxo(utxo, &address);
-//         let tx = super::build_reveal_transaction(
-//             inp_txn,
-//             address.clone(),
-//             9999,
-//             1.0,
-//             &_script,
-//             &control_block,
-//         );
-//
-//         assert!(tx.is_err());
-//         assert_eq!(format!("{}", tx.unwrap_err()), "input UTXO not big enough");
-//     }
-//     #[test]
-//     #[ignore = "fixme"]
-//     fn create_inscription_transactions() {
-//         let (rollup_name, body, signature, sequencer_public_key, address, _first_utxo, rest_utxos) =
-//             get_mock_data();
-//
-//         let (first_utxo, rest_utxos) = rest_utxos.split_first().unwrap();
-//
-//         let (commit, reveal, _) = super::create_inscription_transactions(
-//             rollup_name,
-//             body.clone(),
-//             signature.clone(),
-//             sequencer_public_key.clone(),
-//             Some(first_utxo.clone()),
-//             rest_utxos.to_vec(),
-//             address.clone(),
-//             REVEAL_OUTPUT_AMOUNT,
-//             12.0,
-//             10.0,
-//             bitcoin::Network::Bitcoin,
-//         )
-//         .unwrap();
-//
-//         // check pow
-//         assert!(reveal
-//             .txid()
-//             .as_byte_array()
-//             .starts_with(REVEAL_TX_HASH_PREFIX));
-//
-//         // check outputs
-//         assert_eq!(commit.output.len(), 2, "commit tx should have 2 outputs");
-//
-//         assert_eq!(reveal.output.len(), 1, "reveal tx should have 1 output");
-//
-//         assert_eq!(
-//             commit.input[0].previous_output.txid, rest_utxos[2].txid,
-//             "utxo to inscribe should be chosen correctly"
-//         );
-//         assert_eq!(
-//             commit.input[0].previous_output.vout, rest_utxos[2].vout,
-//             "utxo to inscribe should be chosen correctly"
-//         );
-//
-//         assert_eq!(
-//             reveal.input[0].previous_output.txid,
-//             commit.txid(),
-//             "reveal should use commit as input"
-//         );
-//         assert_eq!(
-//             reveal.input[0].previous_output.vout, 0,
-//             "reveal should use commit as input"
-//         );
-//
-//         assert_eq!(
-//             reveal.output[0].script_pubkey,
-//             address.script_pubkey(),
-//             "reveal should pay to the correct address"
-//         );
-//
-//         // check inscription
-//         let inscription = parse_transaction(&reveal, rollup_name).unwrap();
-//
-//         assert_eq!(inscription.body, body, "body should be correct");
-//         assert_eq!(
-//             inscription.signature, signature,
-//             "signature should be correct"
-//         );
-//         assert_eq!(
-//             inscription.public_key, sequencer_public_key,
-//             "sequencer public key should be correct"
-//         );
-//     }
-// }
+    use alpen_test_utils::ArbitraryGenerator;
+    use bitcoin::{
+        absolute::LockTime,
+        script,
+        secp256k1::{constants::SCHNORR_SIGNATURE_SIZE, schnorr::Signature},
+        taproot::ControlBlock,
+        Address, Amount, OutPoint, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Witness,
+    };
+
+    use super::{BITCOIN_DUST_LIMIT, BTC_TO_SATS, UTXO};
+    use crate::{rpc::types::RawUTXO, writer::L1WriteIntent};
+
+    const REVEAL_OUTPUT_AMOUNT: u64 = BITCOIN_DUST_LIMIT;
+
+    #[allow(clippy::type_complexity)]
+    fn get_mock_data() -> (&'static str, Vec<u8>, Vec<u8>, Vec<u8>, Address, Vec<UTXO>) {
+        let rollup_name = "test_rollup";
+        let body = vec![100; 1000];
+        let signature = vec![100; 64];
+        let sequencer_public_key = vec![100; 33];
+        let address =
+            Address::from_str("bc1pp8qru0ve43rw9xffmdd8pvveths3cx6a5t6mcr0xfn9cpxx2k24qf70xq9")
+                .unwrap()
+                .require_network(bitcoin::Network::Bitcoin)
+                .unwrap();
+
+        let utxos = vec![
+            RawUTXO {
+                txid: "4cfbec13cf1510545f285cceceb6229bd7b6a918a8f6eba1dbee64d26226a3b7"
+                    .to_string(),
+                vout: 0,
+                address: "bc1pp8qru0ve43rw9xffmdd8pvveths3cx6a5t6mcr0xfn9cpxx2k24qf70xq9"
+                    .to_string(),
+                script_pub_key: address.script_pubkey().to_hex_string(),
+                amount: 100.0,
+                confirmations: 100,
+                spendable: true,
+                solvable: true,
+            }
+            .try_into()
+            .unwrap(),
+            RawUTXO {
+                txid: "44990141674ff56ed6fee38879e497b2a726cddefd5e4d9b7bf1c4e561de4347"
+                    .to_string(),
+                vout: 0,
+                address: "bc1pp8qru0ve43rw9xffmdd8pvveths3cx6a5t6mcr0xfn9cpxx2k24qf70xq9"
+                    .to_string(),
+                script_pub_key: address.script_pubkey().to_hex_string(),
+                amount: 50.0,
+                confirmations: 100,
+                spendable: true,
+                solvable: true,
+            }
+            .try_into()
+            .unwrap(),
+            RawUTXO {
+                txid: "4dbe3c10ee0d6bf16f9417c68b81e963b5bccef3924bbcb0885c9ea841912325"
+                    .to_string(),
+                vout: 0,
+                address: "bc1pp8qru0ve43rw9xffmdd8pvveths3cx6a5t6mcr0xfn9cpxx2k24qf70xq9"
+                    .to_string(),
+                script_pub_key: address.script_pubkey().to_hex_string(),
+                amount: 10.0,
+                confirmations: 100,
+                spendable: true,
+                solvable: true,
+            }
+            .try_into()
+            .unwrap(),
+        ];
+
+        (
+            rollup_name,
+            body,
+            signature,
+            sequencer_public_key,
+            address,
+            utxos,
+        )
+    }
+
+    #[test]
+    fn choose_utxos() {
+        let (_, _, _, _, _, utxos) = get_mock_data();
+
+        let (chosen_utxos, sum) = super::choose_utxos(&utxos, 5_00_000_000).unwrap();
+
+        assert_eq!(sum, 10_00_000_000);
+        assert_eq!(chosen_utxos.len(), 1);
+        assert_eq!(chosen_utxos[0], utxos[2]);
+
+        let (chosen_utxos, sum) = super::choose_utxos(&utxos, 10_00_000_000).unwrap();
+
+        assert_eq!(sum, 10_00_000_000);
+        assert_eq!(chosen_utxos.len(), 1);
+        assert_eq!(chosen_utxos[0], utxos[2]);
+
+        let (chosen_utxos, sum) = super::choose_utxos(&utxos, 20_00_000_000).unwrap();
+
+        assert_eq!(sum, 50_00_000_000);
+        assert_eq!(chosen_utxos.len(), 1);
+        assert_eq!(chosen_utxos[0], utxos[1]);
+
+        let (chosen_utxos, sum) = super::choose_utxos(&utxos, 155_00_000_000).unwrap();
+
+        assert_eq!(sum, 160_00_000_000);
+        assert_eq!(chosen_utxos.len(), 3);
+        assert_eq!(chosen_utxos[0], utxos[0]);
+        assert_eq!(chosen_utxos[1], utxos[1]);
+        assert_eq!(chosen_utxos[2], utxos[2]);
+
+        let res = super::choose_utxos(&utxos, 500_00_000_000);
+
+        assert!(res.is_err());
+        assert_eq!(format!("{}", res.unwrap_err()), "not enough UTXOs");
+    }
+
+    #[test]
+    fn build_commit_transaction() {
+        todo!()
+    }
+
+    fn get_txn_from_utxo(utxo: &UTXO, _address: &Address) -> Transaction {
+        let inputs = vec![TxIn {
+            previous_output: OutPoint {
+                txid: utxo.txid,
+                vout: utxo.vout,
+            },
+            script_sig: script::Builder::new().into_script(),
+            witness: Witness::new(),
+            sequence: Sequence::ENABLE_RBF_NO_LOCKTIME,
+        }];
+
+        let outputs = vec![TxOut {
+            value: Amount::from_sat(utxo.amount),
+            script_pubkey: ScriptBuf::from_hex(utxo.script_pubkey.as_str()).unwrap(),
+        }];
+
+        Transaction {
+            lock_time: LockTime::ZERO,
+            version: bitcoin::transaction::Version(2),
+            input: inputs,
+            output: outputs,
+        }
+    }
+
+    #[test]
+    #[ignore = "fixme"]
+    fn build_reveal_transaction() {
+        let (_, _, _, _, address, utxos) = get_mock_data();
+
+        let utxo = utxos.first().unwrap();
+        let _script = ScriptBuf::from_hex("62a58f2674fd840b6144bea2e63ebd35c16d7fd40252a2f28b2a01a648df356343e47976d7906a0e688bf5e134b6fd21bd365c016b57b1ace85cf30bf1206e27").unwrap();
+        let control_block = ControlBlock::decode(&[
+            193, 165, 246, 250, 6, 222, 28, 9, 130, 28, 217, 67, 171, 11, 229, 62, 48, 206, 219,
+            111, 155, 208, 6, 7, 119, 63, 146, 90, 227, 254, 231, 232, 249,
+        ])
+        .unwrap(); // should be 33 bytes
+
+        let inp_txn = get_txn_from_utxo(utxo, &address);
+        let mut tx = super::build_reveal_transaction(
+            inp_txn,
+            address.clone(),
+            REVEAL_OUTPUT_AMOUNT,
+            8.0,
+            &_script,
+            &control_block,
+        )
+        .unwrap();
+
+        tx.input[0].witness.push([0; SCHNORR_SIGNATURE_SIZE]);
+        tx.input[0].witness.push(_script.clone());
+        tx.input[0].witness.push(control_block.serialize());
+
+        assert_eq!(tx.input.len(), 1);
+        assert_eq!(tx.input[0].previous_output.txid, utxo.txid);
+        assert_eq!(tx.input[0].previous_output.vout, utxo.vout);
+
+        assert_eq!(tx.output.len(), 1);
+        assert_eq!(tx.output[0].value.to_sat(), REVEAL_OUTPUT_AMOUNT);
+        assert_eq!(tx.output[0].script_pubkey, address.script_pubkey());
+
+        let utxo = utxos.get(2).unwrap();
+        let inp_txn = get_txn_from_utxo(utxo, &address);
+        let tx = super::build_reveal_transaction(
+            inp_txn,
+            address.clone(),
+            REVEAL_OUTPUT_AMOUNT,
+            75.0,
+            &_script,
+            &control_block,
+        );
+
+        assert!(tx.is_err());
+        assert_eq!(format!("{}", tx.unwrap_err()), "input UTXO not big enough");
+
+        let utxo = utxos.get(2).unwrap();
+        let inp_txn = get_txn_from_utxo(utxo, &address);
+        let tx = super::build_reveal_transaction(
+            inp_txn,
+            address.clone(),
+            9999,
+            1.0,
+            &_script,
+            &control_block,
+        );
+
+        assert!(tx.is_err());
+        assert_eq!(format!("{}", tx.unwrap_err()), "input UTXO not big enough");
+    }
+    #[test]
+    #[ignore = "fixme"]
+    fn create_inscription_transactions() {
+        let (rollup_name, _, _, sequencer_public_key, address, utxos) = get_mock_data();
+
+        let (_, rest_utxos) = utxos.split_first().unwrap();
+
+        let write_intent: L1WriteIntent = ArbitraryGenerator::new().generate();
+        let (commit, reveal) = super::create_inscription_transactions(
+            rollup_name,
+            &write_intent,
+            sequencer_public_key.clone(),
+            rest_utxos.to_vec(),
+            address.clone(),
+            REVEAL_OUTPUT_AMOUNT,
+            10.0,
+            bitcoin::Network::Bitcoin,
+        )
+        .unwrap();
+
+        // check outputs
+        assert_eq!(commit.output.len(), 2, "commit tx should have 2 outputs");
+
+        assert_eq!(reveal.output.len(), 1, "reveal tx should have 1 output");
+
+        assert_eq!(
+            commit.input[0].previous_output.txid, rest_utxos[2].txid,
+            "utxo to inscribe should be chosen correctly"
+        );
+        assert_eq!(
+            commit.input[0].previous_output.vout, rest_utxos[2].vout,
+            "utxo to inscribe should be chosen correctly"
+        );
+
+        assert_eq!(
+            reveal.input[0].previous_output.txid,
+            commit.compute_txid(),
+            "reveal should use commit as input"
+        );
+        assert_eq!(
+            reveal.input[0].previous_output.vout, 0,
+            "reveal should use commit as input"
+        );
+
+        assert_eq!(
+            reveal.output[0].script_pubkey,
+            address.script_pubkey(),
+            "reveal should pay to the correct address"
+        );
+
+        // check inscription
+        // let inscription = parse_transaction(&reveal, rollup_name).unwrap();
+
+        // assert_eq!(inscription.body, body, "body should be correct");
+        // assert_eq!(
+        //     inscription.signature, signature,
+        //     "signature should be correct"
+        // );
+        // assert_eq!(
+        //     inscription.public_key, sequencer_public_key,
+        //     "sequencer public key should be correct"
+        // );
+    }
+}
