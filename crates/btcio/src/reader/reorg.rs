@@ -5,17 +5,14 @@ use tracing::warn;
 
 use crate::rpc::traits::L1Client;
 
-// FIXME: This could possibly be arg or through config
-#[cfg(not(test))]
-pub const MAX_REORG_DEPTH: u64 = 6;
-#[cfg(test)]
-pub const MAX_REORG_DEPTH: u64 = 3;
+use super::config::ReaderConfig;
 
 pub async fn detect_reorg(
     latest_seen_blocks: &VecDeque<BlockHash>,
     block_num: u64,
     block: &Block,
     rpc_client: &impl L1Client,
+    config: &ReaderConfig,
 ) -> anyhow::Result<Option<u64>> {
     let exp_prev_hash = block.header.prev_blockhash;
 
@@ -25,7 +22,7 @@ pub async fn detect_reorg(
         if exp_prev_hash == *hash {
             Ok(None)
         } else {
-            find_fork_point_until(block_num, &mut iter, rpc_client).await
+            find_fork_point_until(block_num, &mut iter, rpc_client, config).await
         }
     } else {
         Ok(None)
@@ -36,8 +33,9 @@ async fn find_fork_point_until<'a>(
     blk_num: u64,
     prev_blockhashes_iter: &'a mut Iter<'a, BlockHash>,
     rpc_client: &impl L1Client,
+    config: &ReaderConfig,
 ) -> anyhow::Result<Option<u64>> {
-    let fork_range_start = blk_num - MAX_REORG_DEPTH;
+    let fork_range_start = blk_num - config.max_reorg_depth as u64;
 
     for height in (fork_range_start..=blk_num).rev() {
         let l1_blk_hash = rpc_client.get_block_hash(height).await?;
@@ -61,7 +59,7 @@ async fn find_fork_point_until<'a>(
 mod tests {
     use alpen_vertex_primitives::l1::L1BlockManifest;
     use async_trait::async_trait;
-    use bitcoin::{consensus::deserialize, hashes::Hash, Block};
+    use bitcoin::consensus::deserialize;
 
     use alpen_test_utils::ArbitraryGenerator;
 
@@ -106,10 +104,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_forkpoint() {
+        let config = ReaderConfig::default();
         let forkpoint_depth = 2;
         let client = TestL1Client::new();
 
-        let mut seen_blocks = VecDeque::with_capacity(MAX_REORG_DEPTH as usize);
+        let mut seen_blocks = VecDeque::with_capacity(config.max_reorg_depth as usize);
 
         // Insert blocks to db that match with what rpc provides, but only upto forkpoint depth
         // The rest will not match with what rpc has
@@ -125,7 +124,7 @@ mod tests {
         }
 
         // Now, db and client have same blocks until height 2 and different onwards(until 4)
-        let fp = find_fork_point_until(4, &mut seen_blocks.iter(), &client)
+        let fp = find_fork_point_until(4, &mut seen_blocks.iter(), &client, &config)
             .await
             .unwrap();
         assert_eq!(fp, Some(2));

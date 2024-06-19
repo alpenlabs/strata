@@ -5,14 +5,26 @@ use super::traits::*;
 /// Shim database type that assumes that all the database impls are wrapped in
 /// `Arc`s and that the provider and stores are actually the same types.  We
 /// might actually use this in practice, it's just for testing.
-pub struct CommonDatabase<L1, L2, S, C> {
+pub struct CommonDatabase<L1, L2, S, C>
+where
+    L1: L1DataStore + L1DataProvider + Sync + Send + 'static,
+    L2: L2DataStore + L2DataProvider + Sync + Send + 'static,
+    S: SyncEventStore + SyncEventProvider + Sync + Send + 'static,
+    C: ConsensusStateStore + ConsensusStateProvider + Sync + Send + 'static,
+{
     l1db: Arc<L1>,
     l2db: Arc<L2>,
     sedb: Arc<S>,
     csdb: Arc<C>,
 }
 
-impl<L1, L2, S, C> CommonDatabase<L1, L2, S, C> {
+impl<L1, L2, S, C> CommonDatabase<L1, L2, S, C>
+where
+    L1: L1DataStore + L1DataProvider + Sync + Send + 'static,
+    L2: L2DataStore + L2DataProvider + Sync + Send + 'static,
+    S: SyncEventStore + SyncEventProvider + Sync + Send + 'static,
+    C: ConsensusStateStore + ConsensusStateProvider + Sync + Send + 'static,
+{
     pub fn new(l1db: Arc<L1>, l2db: Arc<L2>, sedb: Arc<S>, csdb: Arc<C>) -> Self {
         Self {
             l1db,
@@ -23,12 +35,12 @@ impl<L1, L2, S, C> CommonDatabase<L1, L2, S, C> {
     }
 }
 
-impl<
-        L1: L1DataStore + L1DataProvider,
-        L2: L2DataStore + L2DataProvider,
-        S: SyncEventStore + SyncEventProvider,
-        C: ConsensusStateStore + ConsensusStateProvider,
-    > Database for CommonDatabase<L1, L2, S, C>
+impl<L1, L2, S, C> Database for CommonDatabase<L1, L2, S, C>
+where
+    L1: L1DataStore + L1DataProvider + Sync + Send + 'static,
+    L2: L2DataStore + L2DataProvider + Sync + Send + 'static,
+    S: SyncEventStore + SyncEventProvider + Sync + Send + 'static,
+    C: ConsensusStateStore + ConsensusStateProvider + Sync + Send + 'static,
 {
     type L1Store = L1;
     type L1Prov = L1;

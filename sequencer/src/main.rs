@@ -4,9 +4,11 @@ use std::sync::Arc;
 use std::thread;
 use std::time;
 
+use alpen_vertex_btcio::rpc::traits::L1Client;
 use alpen_vertex_consensus_logic::{chain_tip, unfinalized_tracker};
 use alpen_vertex_db::database::CommonDatabase;
 use alpen_vertex_db::stubs::l2::StubL2Db;
+use alpen_vertex_db::traits::Database;
 use alpen_vertex_db::ConsensusStateDb;
 use alpen_vertex_db::L1Db;
 use alpen_vertex_db::SyncEventDb;
@@ -30,8 +32,6 @@ mod args;
 mod config;
 mod l1_reader;
 mod rpc_server;
-
-use l1_reader::l1_reader_task;
 
 #[derive(Debug, Error)]
 pub enum InitError {
@@ -68,6 +68,13 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     };
     let params = Arc::new(params);
 
+    // Start runtime for async IO tasks.
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .thread_name("vertex")
+        .build()
+        .expect("init: build rt");
+
     // Initialize databases.
     let l1_db = Arc::new(alpen_vertex_db::L1Db::new(rbdb.clone()));
     let l2_db = Arc::new(alpen_vertex_db::stubs::l2::StubL2Db::new()); // FIXME stub
@@ -76,6 +83,20 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let database = Arc::new(alpen_vertex_db::database::CommonDatabase::new(
         l1_db, l2_db, sync_ev_db, cs_db,
     ));
+
+    // Set up Bitcoin client RPC.
+    let bitcoind_url = format!("http://{}", args.bitcoind_host);
+    let btc_rpc = alpen_vertex_btcio::rpc::BitcoinClient::new(
+        bitcoind_url,
+        args.bitcoind_user.clone(),
+        args.bitcoind_password.clone(),
+        bitcoin::Network::Regtest,
+    );
+
+    // TODO remove this
+    if args.network != "regtest" {
+        warn!(network = %args.network, "network not set to regtest, ignoring");
+    }
 
     // Init the consensus worker state and get the current state from it.
     let cw_state = worker::WorkerState::open(params.clone(), database.clone())?;
@@ -113,14 +134,8 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let ct_handle =
         thread::spawn(|| chain_tip::tracker_task(ct_state, eng_ctl_ct, ctm_rx, csm_ctl));
 
-    // Start runtime for async IO tasks.
-    let rt = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .thread_name("vertex")
-        .build()
-        .expect("init: build rt");
-
-    if let Err(e) = rt.block_on(main_task(args, params.rollup.clone(), database.clone())) {
+    let main_fut = main_task(args, params.rollup.clone(), btc_rpc, database.clone());
+    if let Err(e) = rt.block_on(main_fut) {
         error!(err = %e, "main task exited");
         process::exit(0); // special case exit once we've gotten to this point
     }
@@ -129,12 +144,18 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn main_task(
+async fn main_task<D: Database>(
     args: Args,
     params: RollupParams,
-    database: Arc<CommonDatabase<L1Db, StubL2Db, SyncEventDb, ConsensusStateDb>>,
-) -> anyhow::Result<()> {
-    l1_reader_task(&params, args.clone(), database.clone()).await?;
+    l1_rpc_client: impl L1Client,
+    database: Arc<D>,
+) -> anyhow::Result<()>
+where
+    // TODO how are these not redundant trait bounds???
+    <D as alpen_vertex_db::traits::Database>::SeStore: Send + Sync + 'static,
+    <D as alpen_vertex_db::traits::Database>::L1Store: Send + Sync + 'static,
+{
+    l1_reader::start_reader_tasks(&params, l1_rpc_client, database.clone()).await?;
 
     let (stop_tx, stop_rx) = oneshot::channel();
 
