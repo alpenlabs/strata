@@ -82,7 +82,7 @@ impl TryFrom<RawUTXO> for UTXO {
 #[allow(clippy::too_many_arguments)]
 pub fn create_inscription_transactions(
     rollup_name: &str,
-    write_intent: L1WriteIntent,
+    write_intent: &L1WriteIntent,
     sequencer_public_key: Vec<u8>,
     utxos: Vec<UTXO>,
     recipient: Address,
@@ -96,12 +96,8 @@ pub fn create_inscription_transactions(
     let public_key = XOnlyPublicKey::from_keypair(&key_pair).0;
 
     // Start creating inscription content
-    let reveal_script = build_reveal_script(
-        &public_key,
-        rollup_name,
-        &write_intent,
-        sequencer_public_key,
-    )?;
+    let reveal_script =
+        build_reveal_script(&public_key, rollup_name, write_intent, sequencer_public_key)?;
 
     // Create spend info for tapscript
     let taproot_spend_info = create_taproot_spend_info(&secp256k1, &public_key, &reveal_script)?;
