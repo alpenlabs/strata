@@ -1,0 +1,14 @@
+[package]
+name = "alpen-test-utils"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+alpen-vertex-db = { workspace = true }
+
+anyhow = { workspace = true }
+arbitrary = { workspace = true }
+rand = { workspace = true }
+rockbound = { workspace = true }
+rocksdb = { workspace = true }
+tempfile = { workspace = true }

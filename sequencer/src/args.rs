@@ -2,9 +2,10 @@ use std::path::PathBuf;
 
 use argh::FromArgs;
 
-#[derive(FromArgs)]
+#[derive(Clone, FromArgs)]
 #[argh(description = "Alpen Vertex sequencer")]
 pub struct Args {
+    // TODO: add a rollup_config file arg
     #[argh(
         option,
         short = 'd',

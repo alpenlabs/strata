@@ -5,6 +5,10 @@ edition = "2021"
 
 [dependencies]
 arbitrary = { workspace = true }
+bitcoin = { workspace = true }
 borsh = { workspace = true }
 hex = { workspace = true }
 reth-primitives = { workspace = true }
+
+[dev-dependencies]
+hex = { workspace = true }

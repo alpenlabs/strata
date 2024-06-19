@@ -7,12 +7,12 @@ use tracing::*;
 use alpen_vertex_mmr::CompactMmr;
 use alpen_vertex_primitives::{
     buf::Buf32,
-    l1::{L1Tx, L1TxRef},
+    l1::{L1BlockManifest, L1Tx, L1TxRef},
 };
 
 use super::schemas::{L1BlockSchema, MmrSchema, TxnSchema};
 use crate::errors::*;
-use crate::traits::{L1BlockManifest, L1DataProvider, L1DataStore};
+use crate::traits::{L1DataProvider, L1DataStore};
 
 pub struct L1Db {
     db: Arc<DB>,
@@ -127,9 +127,8 @@ impl L1DataProvider for L1Db {
         Ok(tx?)
     }
 
-    fn get_chain_tip(&self) -> DbResult<u64> {
+    fn get_chain_tip(&self) -> DbResult<Option<u64>> {
         self.get_latest_block_number()
-            .map(|x| x.unwrap_or_default())
     }
 
     fn get_block_txs(&self, idx: u64) -> DbResult<Option<Vec<L1TxRef>>> {
@@ -179,57 +178,14 @@ impl L1DataProvider for L1Db {
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
+    use alpen_vertex_primitives::l1::L1TxProof;
 
-    use crate::STORE_COLUMN_FAMILIES;
+    use alpen_test_utils::{get_rocksdb_tmp_instance, ArbitraryGenerator};
 
     use super::*;
-    use alpen_vertex_primitives::l1::L1TxProof;
-    use arbitrary::{Arbitrary, Unstructured};
-    use rand::Rng;
-    use rockbound::schema::ColumnFamilyName;
-    use rocksdb::Options;
-    use tempfile::TempDir;
-
-    struct ArbitraryGenerator {
-        buffer: Vec<u8>,
-    }
-    const DB_NAME: &str = "l1_db";
-
-    impl ArbitraryGenerator {
-        fn new() -> Self {
-            let mut rng = rand::thread_rng();
-            // NOTE: 128 should be enough for testing purposes. Change to 256 as needed
-            let buffer: Vec<u8> = (0..128).map(|_| rng.gen()).collect();
-            ArbitraryGenerator { buffer }
-        }
-
-        fn generate<'a, T: Arbitrary<'a> + Clone>(&'a self) -> T {
-            let mut u = Unstructured::new(&self.buffer);
-            T::arbitrary(&mut u).expect("failed to generate arbitrary instance")
-        }
-    }
-
-    fn get_new_db(path: &Path) -> anyhow::Result<Arc<DB>> {
-        // TODO: add other options as appropriate.
-        let mut db_opts = Options::default();
-        db_opts.create_missing_column_families(true);
-        db_opts.create_if_missing(true);
-        DB::open(
-            path,
-            DB_NAME,
-            STORE_COLUMN_FAMILIES
-                .iter()
-                .cloned()
-                .collect::<Vec<ColumnFamilyName>>(),
-            &db_opts,
-        )
-        .map(Arc::new)
-    }
 
     fn setup_db() -> L1Db {
-        let temp_dir = TempDir::new().expect("failed to create temp dir");
-        let db = get_new_db(&temp_dir.into_path()).unwrap();
+        let db = get_rocksdb_tmp_instance().unwrap();
         L1Db::new(db)
     }
 
@@ -436,15 +392,15 @@ mod tests {
         let db = setup_db();
         assert_eq!(
             db.get_chain_tip().unwrap(),
-            0,
+            None,
             "Chain tip of empty db should be zero"
         );
 
         // Insert some block data
         insert_block_data(1, &db);
-        assert_eq!(db.get_chain_tip().unwrap(), 1);
+        assert_eq!(db.get_chain_tip().unwrap(), Some(1));
         insert_block_data(2, &db);
-        assert_eq!(db.get_chain_tip().unwrap(), 2);
+        assert_eq!(db.get_chain_tip().unwrap(), Some(2));
     }
 
     #[test]

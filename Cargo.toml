@@ -9,6 +9,7 @@ members = [
         "crates/primitives",
         "crates/rpc/api",
         "crates/state",
+        "crates/test-utils",
 	"crates/util/mmr",
 	"crates/vtxjmt",
         "sequencer",
@@ -21,10 +22,12 @@ default-members = [
 resolver = "2"
 
 [workspace.dependencies]
+alpen-test-utils = { path = "crates/test-utils" }
+alpen-vertex-btcio = { path = "crates/btcio" }
 alpen-vertex-common = { path = "crates/common" }
 alpen-vertex-consensus-logic = { path = "crates/consensus-logic" }
-alpen-vertex-evmctl = { path = "crates/evmctl" }
 alpen-vertex-db = { path = "crates/db" }
+alpen-vertex-evmctl = { path = "crates/evmctl" }
 alpen-vertex-mmr = { path = "crates/util/mmr" }
 alpen-vertex-primitives = { path = "crates/primitives" }
 alpen-vertex-rpc-api = { path = "crates/rpc/api" }
@@ -33,32 +36,37 @@ alpen-vertex-state = { path = "crates/state" }
 anyhow = "1.0.86"
 arbitrary = { version = "1.3.2", features = ["derive"] }
 argh = "0.1"
-async-trait = "0.1"
+async-trait = "0.1.80"
+base64 = "0.22.1"
+bitcoin = { version = "0.32.1" }
 borsh = { version = "1.5.0", features = ["derive"] }
+bytes =  { version = "1.6.0" }
 digest = "0.10"
 hex = { version = "0.4", features = ["serde"] }
 http = "0.2.8"
 hyper = "0.14.25"
 jmt = "0.10.0"
 jsonrpsee = "0.22"
-jsonrpsee-core = "0.22"
 jsonrpsee-types = "0.22"
 mockall = "0.11"
 parking_lot = "0.12.3"
 rand = "0.8.5"
+rand = "0.8.5"
+reqwest = { version = "0.12.4", features = ["json"] }
 reth-db = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.2.0-beta.7" }
 reth-ipc = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.2.0-beta.7" }
 reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.2.0-beta.7" }
 reth-primitives = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.2.0-beta.7" }
 reth-revm = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.2.0-beta.7" }
-reth-rpc = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.2.0-beta.7" }
 reth-rpc-api = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.2.0-beta.7" }
+reth-rpc = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.2.0-beta.7" }
 reth-rpc-types = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.2.0-beta.7" }
 rockbound = { git = "https://github.com/sovereign-Labs/rockbound", tag = "v2.0.1" }
 rocksdb = "0.21"
 serde = "1.0"
-serde_json = "1.0"
+serde_json = { version = "1.0", default-features = false, features = [ "alloc", "raw_value" ] }
 sha2 = "0.10"
+tempfile = "3.10.1"
 thiserror = "1.0"
 tokio = { version = "1.37", features = ["full"] }
 tower = "0.4"

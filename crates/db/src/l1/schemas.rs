@@ -1,10 +1,12 @@
 use alpen_vertex_mmr::CompactMmr;
-use alpen_vertex_primitives::{buf::Buf32, l1::L1Tx};
+use alpen_vertex_primitives::{
+    buf::Buf32,
+    l1::{L1BlockManifest, L1Tx},
+};
 
 use crate::define_table_with_default_codec;
 use crate::define_table_without_codec;
 use crate::impl_borsh_value_codec;
-use crate::traits::L1BlockManifest;
 
 // Readability for header hash
 type HeaderHash = Buf32;
