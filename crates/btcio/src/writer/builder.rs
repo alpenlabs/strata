@@ -37,7 +37,6 @@ const BITCOIN_DUST_LIMIT: u64 = 546;
 const BTC_TO_SATS: u64 = 100_000_000;
 
 const BATCH_DATA_TAG: &[u8] = &[1];
-const PROOF_DATA_TAG: &[u8] = &[2];
 const PUBLICKEY_TAG: &[u8] = &[3];
 const ROLLUP_NAME_TAG: &[u8] = &[6];
 const SIGNATURE_TAG: &[u8] = &[7];
@@ -84,7 +83,8 @@ impl TryFrom<RawUTXO> for UTXO {
 pub fn create_inscription_transactions(
     rollup_name: &str,
     write_intent: &L1WriteIntent,
-    sequencer_public_key: Vec<u8>,
+    seq_signature: Vec<u8>,
+    seq_public_key: Vec<u8>,
     utxos: Vec<UTXO>,
     recipient: Address,
     reveal_value: u64,
@@ -97,8 +97,13 @@ pub fn create_inscription_transactions(
     let public_key = XOnlyPublicKey::from_keypair(&key_pair).0;
 
     // Start creating inscription content
-    let reveal_script =
-        build_reveal_script(&public_key, rollup_name, write_intent, sequencer_public_key)?;
+    let reveal_script = build_reveal_script(
+        &public_key,
+        rollup_name,
+        write_intent,
+        seq_signature,
+        seq_public_key,
+    )?;
 
     // Create spend info for tapscript
     let taproot_spend_info = TaprootBuilder::new()
@@ -172,7 +177,7 @@ pub fn create_inscription_transactions(
 pub fn sign_blob_with_private_key(
     blob: &[u8],
     private_key: &SecretKey,
-) -> Result<(Vec<u8>, Vec<u8>), ()> {
+) -> anyhow::Result<(Vec<u8>, Vec<u8>)> {
     let message = sha256d::Hash::hash(blob).to_byte_array();
     let secp = Secp256k1::new();
     let public_key = secp256k1::PublicKey::from_secret_key(&secp, private_key);
@@ -403,7 +408,7 @@ fn build_reveal_transaction(
     Ok(tx)
 }
 
-fn generate_key_pair(
+pub fn generate_key_pair(
     secp256k1: &Secp256k1<secp256k1::All>,
 ) -> Result<UntweakedKeypair, anyhow::Error> {
     let mut rand_bytes = [0; 32];
@@ -415,37 +420,28 @@ fn generate_key_pair(
 }
 
 fn build_reveal_script(
-    public_key: &XOnlyPublicKey,
+    taproot_public_key: &XOnlyPublicKey,
     rollup_name: &str,
     write_intent: &L1WriteIntent,
-    sequencer_public_key: Vec<u8>,
+    seq_signature: Vec<u8>,
+    seq_public_key: Vec<u8>,
 ) -> Result<script::ScriptBuf, anyhow::Error> {
     let mut builder = script::Builder::new()
-        .push_x_only_key(public_key)
+        .push_x_only_key(taproot_public_key)
         .push_opcode(OP_CHECKSIG)
         .push_opcode(OP_FALSE)
         .push_opcode(OP_IF)
         .push_slice(PushBytesBuf::try_from(ROLLUP_NAME_TAG.to_vec())?)
         .push_slice(PushBytesBuf::try_from(rollup_name.as_bytes().to_vec())?)
         .push_slice(PushBytesBuf::try_from(SIGNATURE_TAG.to_vec())?)
-        .push_slice(PushBytesBuf::try_from(
-            write_intent.batch_signature.clone(),
-        )?)
+        .push_slice(PushBytesBuf::try_from(seq_signature)?)
         .push_slice(PushBytesBuf::try_from(PUBLICKEY_TAG.to_vec())?)
         // pubkey corresponding to the above signature
-        .push_slice(PushBytesBuf::try_from(sequencer_public_key)?)
+        .push_slice(PushBytesBuf::try_from(seq_public_key)?)
         .push_slice(PushBytesBuf::try_from(BATCH_DATA_TAG.to_vec())?)
-        .push_int(write_intent.batch_data.len() as i64);
+        .push_int(write_intent.len() as i64);
 
-    for chunk in write_intent.batch_data.chunks(520) {
-        builder = builder.push_slice(PushBytesBuf::try_from(chunk.to_vec())?);
-    }
-
-    builder = builder
-        .push_slice(PushBytesBuf::try_from(PROOF_DATA_TAG.to_vec())?)
-        .push_int(write_intent.proof_data.len() as i64);
-
-    for chunk in write_intent.proof_data.chunks(520) {
+    for chunk in write_intent.chunks(520) {
         builder = builder.push_slice(PushBytesBuf::try_from(chunk.to_vec())?);
     }
 
@@ -537,17 +533,14 @@ fn assert_correct_address(
 mod tests {
     use core::str::FromStr;
 
-    use alpen_test_utils::ArbitraryGenerator;
     use bitcoin::{
-        absolute::LockTime,
-        script,
-        secp256k1::{constants::SCHNORR_SIGNATURE_SIZE, schnorr::Signature},
-        taproot::ControlBlock,
-        Address, Amount, OutPoint, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Witness,
+        absolute::LockTime, script, secp256k1::constants::SCHNORR_SIGNATURE_SIZE,
+        taproot::ControlBlock, Address, Amount, OutPoint, ScriptBuf, Sequence, Transaction, TxIn,
+        TxOut, Witness,
     };
 
-    use super::{BITCOIN_DUST_LIMIT, BTC_TO_SATS, UTXO};
-    use crate::{rpc::types::RawUTXO, writer::L1WriteIntent};
+    use super::{BITCOIN_DUST_LIMIT, UTXO};
+    use crate::rpc::types::RawUTXO;
 
     const REVEAL_OUTPUT_AMOUNT: u64 = BITCOIN_DUST_LIMIT;
 
@@ -754,11 +747,13 @@ mod tests {
 
         let (_, rest_utxos) = utxos.split_first().unwrap();
 
-        let write_intent: L1WriteIntent = ArbitraryGenerator::new().generate();
+        let write_intent = vec![0u8; 100];
+        let sig = vec![1; 32];
         let (commit, reveal) = super::create_inscription_transactions(
             rollup_name,
             &write_intent,
             sequencer_public_key.clone(),
+            sig,
             rest_utxos.to_vec(),
             address.clone(),
             REVEAL_OUTPUT_AMOUNT,
