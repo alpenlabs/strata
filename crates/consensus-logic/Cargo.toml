@@ -10,6 +10,7 @@ alpen-vertex-primitives = { workspace = true }
 alpen-vertex-state = { workspace = true }
 
 anyhow = { workspace = true }
+borsh = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }

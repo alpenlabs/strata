@@ -6,6 +6,7 @@
 
 pub mod block_credential;
 pub mod buf;
+pub mod hash;
 pub mod l1;
 pub mod params;
 

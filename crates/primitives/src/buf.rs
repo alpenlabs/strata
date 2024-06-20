@@ -51,6 +51,12 @@ impl From<BlockHash> for Buf32 {
     }
 }
 
+impl AsRef<[u8; 32]> for Buf32 {
+    fn as_ref(&self) -> &[u8; 32] {
+        &self.0
+    }
+}
+
 impl fmt::Debug for Buf32 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut buf = [0; 64];

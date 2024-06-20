@@ -1,5 +1,6 @@
 //! Consensus validation logic and core state machine
 
+pub mod block_assembly;
 pub mod chain_tip;
 pub mod credential;
 pub mod ctl;
