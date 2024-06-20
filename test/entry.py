@@ -74,7 +74,7 @@ class VertexFactory(flexitest.Factory):
             "--datadir=%s" % datadir,
             "--bitcoind-host=%s" % bitcoind_host,
             "--bitcoind-user=%s" % bitcoind_user,
-            "--bitcoind-password=%s" % bitcoind_password,
+            "--bitcoind-password=%s" % bitcoind_pass,
             "--network=regtest",
             "--sequencer-key=%s" % keyfile
         ]
