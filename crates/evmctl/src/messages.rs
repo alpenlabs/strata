@@ -61,23 +61,26 @@ pub struct PayloadEnv {
 }
 
 impl PayloadEnv {
-    pub fn timestamp(&self) -> u64 {
-        self.timestamp
-    }
-
-    pub fn el_ops(&self) -> &[Op] {
-        &self.el_ops
-    }
-}
-
-impl PayloadEnv {
-    pub fn new(timestamp: u64, prev_global_state_root: Buf32, safe_l1_block: Buf32, el_ops: Vec<Op>) -> Self {
+    pub fn new(
+        timestamp: u64,
+        prev_global_state_root: Buf32,
+        safe_l1_block: Buf32,
+        el_ops: Vec<Op>,
+    ) -> Self {
         Self {
             timestamp,
             prev_global_state_root,
             safe_l1_block,
             el_ops,
         }
+    }
+
+    pub fn timestamp(&self) -> u64 {
+        self.timestamp
+    }
+
+    pub fn el_ops(&self) -> &[Op] {
+        &self.el_ops
     }
 }
 
@@ -93,7 +96,7 @@ pub enum Op {
 pub struct ELDepositData {
     /// Amount in L1 native asset.  For Bitcoin this is sats.
     amt: u64,
-    
+
     /// Dest addr encoded in a portable format, assumed to be valid but must be
     /// checked by EL before committing to building block.
     dest_addr: Vec<u8>,
