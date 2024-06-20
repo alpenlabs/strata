@@ -11,6 +11,12 @@ import seqrpc
 BD_USERNAME = "alpen"
 BD_PASSWORD = "alpen"
 
+def generate_seqkey() -> bytes:
+    # this is just for fun
+    buf = b"alpen" + b"_1337" * 5 + b"xx"
+    assert len(buf) == 32, "bad seqkey len"
+    return buf
+
 class BitcoinFactory(flexitest.Factory):
     def __init__(self, datadir_pfx: str, port_range: list[int]):
         super().__init__(datadir_pfx, port_range)
@@ -56,6 +62,11 @@ class VertexFactory(flexitest.Factory):
         rpc_port = self.next_port()
         logfile = os.path.join(datadir, "service.log")
 
+        keyfile = os.path.join(datadir, "seqkey.bin")
+        seqkey = generate_seqkey()
+        with open(keyfile, "wb") as f:
+            f.write(seqkey)
+
         # TODO EL setup, this is actually two services running coupled
 
         cmd = [
@@ -65,9 +76,11 @@ class VertexFactory(flexitest.Factory):
             "--bitcoind-user=%s" % bitcoind_user,
             "--bitcoind-password=%s" % bitcoind_password,
             "--network=regtest",
+            "--sequencer-key=%s" % keyfile
         ]
         props = {
             "rpc_port": rpc_port,
+            "seqkey": seqkey
         }
 
         rpc_url = "http://localhost:%s" % rpc_port
