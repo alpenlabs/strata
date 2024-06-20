@@ -32,4 +32,7 @@ pub struct Args {
         default = "\"regtest\".to_owned()"
     )]
     pub network: String,
+
+    #[argh(option, short = 'k', description = "path to sequencer root key")]
+    pub sequencer_key: Option<PathBuf>,
 }

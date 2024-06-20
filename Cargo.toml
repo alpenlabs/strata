@@ -67,6 +67,7 @@ serde_json = { version = "1.0", default-features = false, features = [ "alloc", 
 sha2 = "0.10"
 tempfile = "3.10.1"
 thiserror = "1.0"
+threadpool = "1.8"
 tokio = { version = "1.37", features = ["full"] }
 tower = "0.4"
 tracing = "0.1"

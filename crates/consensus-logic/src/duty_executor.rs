@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::{thread, time};
 
 use borsh::{BorshDeserialize, BorshSerialize};
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, mpsc};
 use tracing::*;
 
 use alpen_vertex_db::traits::{ConsensusStateProvider, Database, L2DataProvider, L2DataStore};
@@ -13,24 +13,33 @@ use alpen_vertex_evmctl::engine::{ExecEngineCtl, PayloadStatus};
 use alpen_vertex_evmctl::errors::EngineError;
 use alpen_vertex_evmctl::messages::{ExecPayloadData, PayloadEnv};
 use alpen_vertex_primitives::buf::{Buf32, Buf64};
-use alpen_vertex_state::block::{ExecSegment, L1Segment, L2Block, L2BlockBody};
+use alpen_vertex_state::block::{ExecSegment, L1Segment, L2Block, L2BlockBody, L2BlockId};
 use alpen_vertex_state::block_template;
 use alpen_vertex_state::consensus::ConsensusState;
 
 use crate::duties::{self, Duty, DutyBatch, Identity};
 use crate::duty_extractor;
 use crate::errors::Error;
-use crate::message::ConsensusUpdateNotif;
+use crate::message::{ChainTipMessage, ConsensusUpdateNotif};
 
 #[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
 pub enum IdentityKey {
     Sequencer(Buf32),
 }
 
+/// Contains both the identity key used for signing and the identity used for
+/// verifying signatures.  This is really just a stub that we should replace
+/// with real cryptographic signatures and putting keys in the rollup params.
 #[derive(Clone, Debug)]
 pub struct IdentityData {
-    ident: Identity,
-    key: IdentityKey,
+    pub ident: Identity,
+    pub key: IdentityKey,
+}
+
+impl IdentityData {
+    pub fn new(ident: Identity, key: IdentityKey) -> Self {
+        Self { ident, key }
+    }
 }
 
 pub fn duty_tracker_task<D: Database, E: ExecEngineCtl>(
@@ -111,9 +120,11 @@ pub fn duty_dispatch_task<
     E: ExecEngineCtl + Sync + Send + 'static,
 >(
     mut updates: broadcast::Receiver<DutyBatch>,
-    ident: IdentityData,
+    ident_key: IdentityKey,
     database: Arc<D>,
     engine: Arc<E>,
+    chain_tip_msg_tx: mpsc::Sender<ChainTipMessage>,
+    pool: Arc<threadpool::ThreadPool>,
 ) {
     let mut pending_duties: HashMap<u64, thread::JoinHandle<()>> = HashMap::new();
 
@@ -145,10 +156,11 @@ pub fn duty_dispatch_task<
             // Clone some things, spawn the task, then remember the join handle.
             // TODO make this use a thread pool
             let d = duty.duty().clone();
-            let ik = ident.key.clone();
+            let ik = ident_key.clone();
             let db = database.clone();
             let e = engine.clone();
-            let join = thread::spawn(move || duty_exec_task(d, ik, db, e));
+            let ctm_tx = chain_tip_msg_tx.clone();
+            let join = thread::spawn(move || duty_exec_task(d, ik, db, e, ctm_tx));
             pending_duties.insert(id, join);
         }
     }
@@ -156,13 +168,23 @@ pub fn duty_dispatch_task<
     info!("duty dispatcher task exiting");
 }
 
+/// Toplevel function that's actually performs a job.  This is spawned on a/
+/// thread pool so we don't have to worry about it blocking *too* much other
+/// work.
 fn duty_exec_task<D: Database, E: ExecEngineCtl>(
     duty: Duty,
     ik: IdentityKey,
     database: Arc<D>,
     engine: Arc<E>,
+    chain_tip_msg_tx: mpsc::Sender<ChainTipMessage>,
 ) {
-    if let Err(e) = perform_duty(&duty, &ik, database.as_ref(), engine.as_ref()) {
+    if let Err(e) = perform_duty(
+        &duty,
+        &ik,
+        database.as_ref(),
+        engine.as_ref(),
+        chain_tip_msg_tx,
+    ) {
         error!(err = %e, "error performing duty");
     } else {
         debug!("completed duty successfully");
@@ -174,11 +196,27 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
     ik: &IdentityKey,
     database: &D,
     engine: &E,
+    chain_tip_msg_tx: mpsc::Sender<ChainTipMessage>,
 ) -> Result<(), Error> {
     match duty {
         Duty::SignBlock(data) => {
             let slot = data.slot();
-            sign_block(slot, ik, database, engine)?;
+
+            let Some((blkid, _block)) = sign_block(slot, ik, database, engine)? else {
+                return Ok(());
+            };
+
+            // Submit it to the chain tip tracker to update the consensus state
+            // with it.
+            let ctm = ChainTipMessage::NewBlock(blkid);
+            if !chain_tip_msg_tx.blocking_send(ctm).is_ok() {
+                error!(?blkid, "failed to submit new block to chain tip tracker");
+            }
+
+            // TODO do we have to do something with _block?
+
+            // TODO eventually, send the block out to peers
+
             Ok(())
         }
     }
@@ -189,7 +227,7 @@ fn sign_block<D: Database, E: ExecEngineCtl>(
     ik: &IdentityKey,
     database: &D,
     engine: &E,
-) -> Result<(), Error> {
+) -> Result<Option<(L2BlockId, L2Block)>, Error> {
     debug!(%slot, "prepating to publish block");
 
     // Check the block we were supposed to build isn't already in the database,
@@ -198,8 +236,9 @@ fn sign_block<D: Database, E: ExecEngineCtl>(
     let l2prov = database.l2_provider();
     let blocks_at_slot = l2prov.get_blocks_at_height(slot)?;
     if !blocks_at_slot.is_empty() {
+        // FIXME Should we be more verbose about this?
         warn!(%slot, "was turn to propose block, but found block in database already");
-        return Ok(());
+        return Ok(None);
     }
 
     // TODO get the consensus state this duty was created in response to and
@@ -256,7 +295,7 @@ fn sign_block<D: Database, E: ExecEngineCtl>(
 
     // TODO push the block into the CSM and publish it for all to see
 
-    Ok(())
+    Ok(Some((blkid, final_block)))
 }
 
 /// Returns the current unix time as milliseconds.

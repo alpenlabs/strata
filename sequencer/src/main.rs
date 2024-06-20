@@ -1,26 +1,33 @@
+use std::fs;
 use std::io;
+use std::path::PathBuf;
 use std::process;
 use std::sync::Arc;
 use std::thread;
 use std::time;
 
-use alpen_vertex_btcio::rpc::traits::L1Client;
-use alpen_vertex_consensus_logic::{chain_tip, unfinalized_tracker};
-use alpen_vertex_db::database::CommonDatabase;
-use alpen_vertex_db::stubs::l2::StubL2Db;
-use alpen_vertex_db::traits::Database;
-use alpen_vertex_db::ConsensusStateDb;
-use alpen_vertex_db::L1Db;
-use alpen_vertex_db::SyncEventDb;
+use alpen_vertex_consensus_logic::duties::DutyBatch;
+use alpen_vertex_consensus_logic::duties::Identity;
+use alpen_vertex_consensus_logic::duty_executor;
+use alpen_vertex_consensus_logic::duty_executor::IdentityData;
+use alpen_vertex_consensus_logic::duty_executor::IdentityKey;
+use alpen_vertex_consensus_logic::message::ConsensusUpdateNotif;
+use alpen_vertex_primitives::buf::Buf32;
 use anyhow::Context;
 use thiserror::Error;
+use tokio::sync::broadcast;
 use tokio::sync::{mpsc, oneshot, watch};
 use tracing::*;
 
+use alpen_vertex_btcio::rpc::traits::L1Client;
 use alpen_vertex_common::logging;
 use alpen_vertex_consensus_logic::ctl::CsmController;
 use alpen_vertex_consensus_logic::message::{ChainTipMessage, CsmMessage};
-use alpen_vertex_consensus_logic::worker;
+use alpen_vertex_consensus_logic::{chain_tip, unfinalized_tracker, worker};
+use alpen_vertex_db::database::CommonDatabase;
+use alpen_vertex_db::stubs::l2::StubL2Db;
+use alpen_vertex_db::traits::Database;
+use alpen_vertex_db::{ConsensusStateDb, L1Db, SyncEventDb};
 use alpen_vertex_primitives::{block_credential, params::*};
 use alpen_vertex_rpc_api::AlpenApiServer;
 use alpen_vertex_state::consensus::ConsensusState;
@@ -71,9 +78,16 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     // Start runtime for async IO tasks.
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
-        .thread_name("vertex")
+        .thread_name("vertex-rt")
         .build()
         .expect("init: build rt");
+
+    // Init thread pool for batch jobs.
+    // TODO switch to num_cpus maybe?  we don't want to compete with tokio though
+    let pool = Arc::new(threadpool::ThreadPool::with_name(
+        "vertex-pool".to_owned(),
+        8,
+    ));
 
     // Initialize databases.
     let l1_db = Arc::new(alpen_vertex_db::L1Db::new(rbdb.clone()));
@@ -120,6 +134,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let csm_ctl = Arc::new(CsmController::new(database.clone(), csm_tx));
     let (cout_tx, cout_rx) = mpsc::channel::<operation::ConsensusOutput>(64);
     let (cur_state_tx, cur_state_rx) = watch::channel::<Option<ConsensusState>>(None);
+    let (cupdate_tx, cupdate_rx) = broadcast::channel::<ConsensusUpdateNotif>(64);
     // TODO connect up these other channels
 
     // Init engine controller.
@@ -128,11 +143,40 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let eng_ctl_cw = eng_ctl.clone();
     let eng_ctl_ct = eng_ctl.clone();
 
-    // Start worker threads.
+    // Start core threads.
     // TODO set up watchdog for these things
     let cw_handle = thread::spawn(|| worker::consensus_worker_task(cw_state, eng_ctl_cw, csm_rx));
     let ct_handle =
         thread::spawn(|| chain_tip::tracker_task(ct_state, eng_ctl_ct, ctm_rx, csm_ctl));
+
+    // If the sequencer key is set, start the sequencer duties task.
+    if let Some(seqkey_path) = &args.sequencer_key {
+        info!(?seqkey_path, "initing sequencer duties task");
+        let idata = load_seqkey(seqkey_path)?;
+
+        // Set up channel and clone some things.
+        let (duties_tx, duties_rx) = broadcast::channel::<DutyBatch>(8);
+        let cu_rx = cupdate_tx.subscribe();
+        let db = database.clone();
+        let db2 = database.clone();
+        let eng_ctl_de = eng_ctl.clone();
+        let ctm_tx = ctm_tx.clone();
+        let pool = pool.clone();
+
+        // Spawn the two tasks.
+        thread::spawn(move || {
+            // FIXME figure out why this can't infer the type, it's like *right there*
+            duty_executor::duty_tracker_task::<_, alpen_vertex_evmctl::stub::StubController>(
+                cu_rx,
+                duties_tx,
+                idata.ident,
+                db,
+            )
+        });
+        thread::spawn(move || {
+            duty_executor::duty_dispatch_task(duties_rx, idata.key, db2, eng_ctl_de, ctm_tx, pool)
+        });
+    }
 
     let main_fut = main_task(args, params.rollup.clone(), btc_rpc, database.clone());
     if let Err(e) = rt.block_on(main_fut) {
@@ -200,4 +244,20 @@ fn open_rocksdb_database(args: &Args) -> anyhow::Result<Arc<rockbound::DB>> {
     .context("opening database")?;
 
     Ok(Arc::new(rbdb))
+}
+
+fn load_seqkey(path: &PathBuf) -> anyhow::Result<IdentityData> {
+    let Ok(raw_key) = <[u8; 32]>::try_from(fs::read(path)?) else {
+        error!("malformed seqkey");
+        anyhow::bail!("malformed seqkey");
+    };
+
+    let key = Buf32::from(raw_key);
+
+    // FIXME all this needs to be changed to use actual cryptographic keys
+    let ik = IdentityKey::Sequencer(key);
+    let ident = Identity::Sequencer(key);
+    let idata = IdentityData::new(ident, ik);
+
+    Ok(idata)
 }
