@@ -92,15 +92,31 @@ impl<D: Database> StateTracker<D> {
 pub fn reconstruct_cur_state(
     cs_prov: &impl ConsensusStateProvider,
 ) -> anyhow::Result<(u64, ConsensusState)> {
-    let last_write_idx = cs_prov.get_last_write_idx()?;
     let last_ckpt_idx = cs_prov.get_last_checkpoint_idx()?;
-    debug!(%last_write_idx, %last_ckpt_idx, "reconstructing state from checkpoint");
-
     let mut state = cs_prov
         .get_state_checkpoint(last_ckpt_idx)?
         .ok_or(Error::MissingCheckpoint(last_ckpt_idx))?;
 
-    for i in last_ckpt_idx..=last_write_idx {
+    // Special case genesis since we don't have writes at that index.
+    if last_ckpt_idx == 0 {
+        debug!("starting from genesis");
+        return Ok((0, state));
+    }
+
+    // If we're not in genesis, then we probably have to replay some writes.
+    let last_write_idx = cs_prov.get_last_write_idx()?;
+
+    // But if the last written writes were for the last checkpoint, we can just
+    // return that directly.
+    if last_write_idx == last_ckpt_idx {
+        debug!(%last_ckpt_idx, "no writes to replay");
+        return Ok((last_ckpt_idx, state));
+    }
+
+    let write_replay_start = last_ckpt_idx + 1;
+    debug!(%last_write_idx, %last_ckpt_idx, "reconstructing state from checkpoint");
+
+    for i in write_replay_start..=last_write_idx {
         let writes = cs_prov
             .get_consensus_writes(i)?
             .ok_or(Error::MissingConsensusWrites(i))?;
