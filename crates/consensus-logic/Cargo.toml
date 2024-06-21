@@ -12,6 +12,7 @@ alpen-vertex-state = { workspace = true }
 anyhow = { workspace = true }
 borsh = { workspace = true }
 thiserror = { workspace = true }
+threadpool = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 

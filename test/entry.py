@@ -2,6 +2,7 @@
 
 import os
 import sys
+import time
 
 from bitcoinlib.services.bitcoind import BitcoindClient
 import flexitest
@@ -10,6 +11,12 @@ import seqrpc
 
 BD_USERNAME = "alpen"
 BD_PASSWORD = "alpen"
+
+def generate_seqkey() -> bytes:
+    # this is just for fun
+    buf = b"alpen" + b"_1337" * 5 + b"xx"
+    assert len(buf) == 32, "bad seqkey len"
+    return buf
 
 class BitcoinFactory(flexitest.Factory):
     def __init__(self, datadir_pfx: str, port_range: list[int]):
@@ -56,21 +63,29 @@ class VertexFactory(flexitest.Factory):
         rpc_port = self.next_port()
         logfile = os.path.join(datadir, "service.log")
 
+        keyfile = os.path.join(datadir, "seqkey.bin")
+        seqkey = generate_seqkey()
+        with open(keyfile, "wb") as f:
+            f.write(seqkey)
+
         # TODO EL setup, this is actually two services running coupled
 
         cmd = [
             "alpen-vertex-sequencer",
-            "--datadir=%s" % datadir,
-            "--bitcoind-host=%s" % bitcoind_host,
-            "--bitcoind-user=%s" % bitcoind_user,
-            "--bitcoind-password=%s" % bitcoind_password,
-            "--network=regtest",
+            "--datadir", datadir,
+            "--rpc-port", str(rpc_port),
+            "--bitcoind-host", bitcoind_host,
+            "--bitcoind-user", bitcoind_user,
+            "--bitcoind-password", bitcoind_pass,
+            "--network", "regtest",
+            "--sequencer-key", keyfile
         ]
         props = {
             "rpc_port": rpc_port,
+            "seqkey": seqkey
         }
 
-        rpc_url = "http://localhost:%s" % rpc_port
+        rpc_url = "ws://localhost:%s" % rpc_port
 
         with open(logfile, "w") as f:
             svc = flexitest.service.ProcService(props, cmd, stdout=f)
@@ -90,9 +105,11 @@ class BasicEnvConfig(flexitest.EnvConfig):
         seq_fac = facs["sequencer"]
 
         bitcoind = btc_fac.create_regtest_bitcoin()
+        time.sleep(0.5)
         rpc_user = bitcoind.get_prop("rpc_user")
         rpc_pass = bitcoind.get_prop("rpc_password")
         sequencer = seq_fac.create_sequencer("localhost", rpc_user, rpc_pass)
+        time.sleep(0.5)
 
         svcs = {"bitcoin": bitcoind, "sequencer": sequencer}
         return flexitest.LiveEnv(svcs)

@@ -4,6 +4,7 @@
 //! reusing any Reth types.
 
 pub mod block;
+pub mod block_template;
 pub mod consensus;
 pub mod l1;
 pub mod operation;
