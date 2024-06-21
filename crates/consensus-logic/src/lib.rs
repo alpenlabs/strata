@@ -11,6 +11,7 @@ pub mod message;
 pub mod reorg;
 pub mod state_tracker;
 pub mod status;
+pub mod sync_manager;
 pub mod transition;
 pub mod unfinalized_tracker;
 pub mod worker;

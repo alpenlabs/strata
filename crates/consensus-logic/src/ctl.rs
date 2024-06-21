@@ -20,6 +20,11 @@ impl<D: Database> CsmController<D> {
         Self { database, csm_tx }
     }
 
+    /// Returns a ref to the database, wrapped in an arc.
+    pub(crate) fn database(&self) -> &Arc<D> {
+        &self.database
+    }
+
     /// Writes a sync event to the database and updates the watch channel to
     /// trigger the CSM executor to process the event.
     pub fn submit_event(&self, sync_event: SyncEvent) -> anyhow::Result<()> {

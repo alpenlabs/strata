@@ -21,6 +21,7 @@ use crate::duties::{self, Duty, DutyBatch, Identity};
 use crate::duty_extractor;
 use crate::errors::Error;
 use crate::message::{ChainTipMessage, ConsensusUpdateNotif};
+use crate::sync_manager::SyncManager;
 
 #[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
 pub enum IdentityKey {
@@ -43,7 +44,7 @@ impl IdentityData {
 }
 
 pub fn duty_tracker_task<D: Database, E: ExecEngineCtl>(
-    mut state: broadcast::Receiver<ConsensusUpdateNotif>,
+    mut state: broadcast::Receiver<Arc<ConsensusUpdateNotif>>,
     batch_queue: broadcast::Sender<DutyBatch>,
     ident: Identity,
     database: Arc<D>,
@@ -121,9 +122,8 @@ pub fn duty_dispatch_task<
 >(
     mut updates: broadcast::Receiver<DutyBatch>,
     ident_key: IdentityKey,
-    database: Arc<D>,
     engine: Arc<E>,
-    chain_tip_msg_tx: mpsc::Sender<ChainTipMessage>,
+    sync_man: Arc<SyncManager<D>>,
     pool: Arc<threadpool::ThreadPool>,
 ) {
     let mut pending_duties: HashMap<u64, thread::JoinHandle<()>> = HashMap::new();
@@ -157,10 +157,9 @@ pub fn duty_dispatch_task<
             // TODO make this use a thread pool
             let d = duty.duty().clone();
             let ik = ident_key.clone();
-            let db = database.clone();
             let e = engine.clone();
-            let ctm_tx = chain_tip_msg_tx.clone();
-            let join = thread::spawn(move || duty_exec_task(d, ik, db, e, ctm_tx));
+            let sm = sync_man.clone();
+            let join = thread::spawn(move || duty_exec_task(d, ik, e, sm));
             pending_duties.insert(id, join);
         }
     }
@@ -174,17 +173,10 @@ pub fn duty_dispatch_task<
 fn duty_exec_task<D: Database, E: ExecEngineCtl>(
     duty: Duty,
     ik: IdentityKey,
-    database: Arc<D>,
     engine: Arc<E>,
-    chain_tip_msg_tx: mpsc::Sender<ChainTipMessage>,
+    sync_man: Arc<SyncManager<D>>,
 ) {
-    if let Err(e) = perform_duty(
-        &duty,
-        &ik,
-        database.as_ref(),
-        engine.as_ref(),
-        chain_tip_msg_tx,
-    ) {
+    if let Err(e) = perform_duty(&duty, &ik, &sync_man, engine.as_ref()) {
         error!(err = %e, "error performing duty");
     } else {
         debug!("completed duty successfully");
@@ -194,22 +186,22 @@ fn duty_exec_task<D: Database, E: ExecEngineCtl>(
 fn perform_duty<D: Database, E: ExecEngineCtl>(
     duty: &Duty,
     ik: &IdentityKey,
-    database: &D,
+    sync_man: &SyncManager<D>,
     engine: &E,
-    chain_tip_msg_tx: mpsc::Sender<ChainTipMessage>,
 ) -> Result<(), Error> {
     match duty {
         Duty::SignBlock(data) => {
             let slot = data.slot();
 
-            let Some((blkid, _block)) = sign_block(slot, ik, database, engine)? else {
+            let Some((blkid, _block)) = sign_block(slot, ik, sync_man.database().as_ref(), engine)?
+            else {
                 return Ok(());
             };
 
             // Submit it to the chain tip tracker to update the consensus state
             // with it.
             let ctm = ChainTipMessage::NewBlock(blkid);
-            if !chain_tip_msg_tx.blocking_send(ctm).is_ok() {
+            if !sync_man.submit_chain_tip_msg(ctm) {
                 error!(?blkid, "failed to submit new block to chain tip tracker");
             }
 
