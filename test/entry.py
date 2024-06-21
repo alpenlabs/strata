@@ -2,6 +2,7 @@
 
 import os
 import sys
+import time
 
 from bitcoinlib.services.bitcoind import BitcoindClient
 import flexitest
@@ -71,19 +72,20 @@ class VertexFactory(flexitest.Factory):
 
         cmd = [
             "alpen-vertex-sequencer",
-            "--datadir=%s" % datadir,
-            "--bitcoind-host=%s" % bitcoind_host,
-            "--bitcoind-user=%s" % bitcoind_user,
-            "--bitcoind-password=%s" % bitcoind_pass,
-            "--network=regtest",
-            "--sequencer-key=%s" % keyfile
+            "--datadir", datadir,
+            "--rpc-port", str(rpc_port),
+            "--bitcoind-host", bitcoind_host,
+            "--bitcoind-user", bitcoind_user,
+            "--bitcoind-password", bitcoind_pass,
+            "--network", "regtest",
+            "--sequencer-key", keyfile
         ]
         props = {
             "rpc_port": rpc_port,
             "seqkey": seqkey
         }
 
-        rpc_url = "http://localhost:%s" % rpc_port
+        rpc_url = "ws://localhost:%s" % rpc_port
 
         with open(logfile, "w") as f:
             svc = flexitest.service.ProcService(props, cmd, stdout=f)
@@ -103,9 +105,11 @@ class BasicEnvConfig(flexitest.EnvConfig):
         seq_fac = facs["sequencer"]
 
         bitcoind = btc_fac.create_regtest_bitcoin()
+        time.sleep(0.5)
         rpc_user = bitcoind.get_prop("rpc_user")
         rpc_pass = bitcoind.get_prop("rpc_password")
         sequencer = seq_fac.create_sequencer("localhost", rpc_user, rpc_pass)
+        time.sleep(0.5)
 
         svcs = {"bitcoin": bitcoind, "sequencer": sequencer}
         return flexitest.LiveEnv(svcs)

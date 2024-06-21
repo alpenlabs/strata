@@ -13,7 +13,7 @@ class RpcError(Exception):
 
 def _make_request(method: str, req_id: int, params) -> str:
     req = {"jsonrpc": "2.0", "method": method, "id": req_id, "params": params}
-    return json.dumps(res)
+    return json.dumps(req)
 
 def _handle_response(resp_str: str):
     resp = json.dumps(resp_str)

@@ -6,5 +6,9 @@ class HelloTest(flexitest.Test):
         ctx.set_env("basic")
 
     def main(self, ctx: flexitest.RunContext):
-        # TODO
-        print("hello!")
+        btc = ctx.get_service("bitcoin")
+        seq = ctx.get_service("sequencer")
+
+        seqrpc = seq.create_rpc()
+        proto_ver = seqrpc.alp_protocolVersion()
+        print(proto_ver)
