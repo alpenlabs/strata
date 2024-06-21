@@ -53,6 +53,7 @@ fn main() {
     let args: Args = argh::from_env();
     if let Err(e) = main_inner(args) {
         eprintln!("FATAL ERROR: {e}");
+        eprintln!("trace:\n{e:?}");
     }
 }
 
@@ -231,9 +232,15 @@ fn open_rocksdb_database(args: &Args) -> anyhow::Result<Arc<rockbound::DB>> {
     let mut database_dir = args.datadir.clone();
     database_dir.push("rocksdb");
 
+    if !database_dir.exists() {
+        fs::create_dir_all(&database_dir)?;
+    }
+
     let dbname = alpen_vertex_db::ROCKSDB_NAME;
     let cfs = alpen_vertex_db::STORE_COLUMN_FAMILIES;
-    let opts = rocksdb::Options::default();
+    let mut opts = rocksdb::Options::default();
+    opts.create_if_missing(true);
+    opts.create_missing_column_families(true);
 
     let rbdb = rockbound::DB::open(
         &database_dir,
