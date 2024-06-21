@@ -5,15 +5,16 @@
 use std::sync::Arc;
 use std::thread;
 
+use tokio::sync::{broadcast, mpsc};
+use tracing::*;
+
 use alpen_vertex_db::traits::Database;
 use alpen_vertex_evmctl::engine::ExecEngineCtl;
-use tokio::sync::{broadcast, mpsc};
-
 use alpen_vertex_primitives::params::Params;
 
 use crate::ctl::CsmController;
 use crate::message::{ChainTipMessage, ConsensusUpdateNotif, CsmMessage};
-use crate::{chain_tip, unfinalized_tracker, worker};
+use crate::{chain_tip, genesis, unfinalized_tracker, worker};
 
 pub struct SyncManager<D: Database> {
     params: Arc<Params>,
@@ -72,6 +73,12 @@ pub fn start_sync_tasks<
     let (csm_tx, csm_rx) = mpsc::channel::<CsmMessage>(64);
     let csm_ctl = Arc::new(CsmController::new(database.clone(), csm_tx));
     let (cupdate_tx, cupdate_rx) = broadcast::channel::<Arc<ConsensusUpdateNotif>>(64);
+
+    // Check if we have to do genesis.
+    if genesis::check_needs_genesis(database.as_ref())? {
+        info!("we need to do genesis!");
+        genesis::init_genesis_states(&params, database.as_ref())?;
+    }
 
     // Init the consensus worker state and get the current state from it.
     let cw_state = worker::WorkerState::open(params.clone(), database.clone(), cupdate_tx)?;
