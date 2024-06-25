@@ -1,4 +1,5 @@
 use core::{result::Result::Ok, str::FromStr};
+use std::cmp::Reverse;
 
 use anyhow::anyhow;
 use bitcoin::absolute::LockTime;
@@ -28,18 +29,19 @@ use bitcoin::{
     Address, Network, OutPoint, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Txid, Witness,
 };
 use rand::RngCore;
+use thiserror::Error;
 
 use crate::rpc::types::RawUTXO;
 
 use super::L1WriteIntent;
 
 const BITCOIN_DUST_LIMIT: u64 = 546;
-const BTC_TO_SATS: u64 = 100_000_000;
 
+// TODO: these might need to be in rollup params
 const BATCH_DATA_TAG: &[u8] = &[1];
-const PUBLICKEY_TAG: &[u8] = &[3];
-const ROLLUP_NAME_TAG: &[u8] = &[6];
-const SIGNATURE_TAG: &[u8] = &[7];
+const PUBLICKEY_TAG: &[u8] = &[2];
+const ROLLUP_NAME_TAG: &[u8] = &[3];
+const SIGNATURE_TAG: &[u8] = &[4];
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct UTXO {
@@ -71,12 +73,21 @@ impl TryFrom<RawUTXO> for UTXO {
             vout: value.vout,
             address: value.address,
             script_pubkey: value.script_pub_key,
-            amount: (value.amount * (BTC_TO_SATS as f64)) as u64,
+            amount: value.amount,
             confirmations: value.confirmations,
             spendable: value.spendable,
             solvable: value.solvable,
         })
     }
+}
+
+#[derive(Debug, Error)]
+pub enum InscriptionError {
+    #[error("Not enough UTXOs for transaction of {0} sats")]
+    NotEnoughUtxos(u64),
+
+    #[error("{0}")]
+    Other(String),
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -88,12 +99,15 @@ pub fn create_inscription_transactions(
     utxos: Vec<UTXO>,
     recipient: Address,
     reveal_value: u64,
-    fee_rate: f64,
+    fee_rate: u64,
     network: Network,
-) -> Result<(Transaction, Transaction), anyhow::Error> {
+) -> Result<(Transaction, Transaction), InscriptionError> {
+    fn to_inscription_error<E: std::fmt::Display>(e: E) -> InscriptionError {
+        InscriptionError::Other(format!("{:}", e))
+    }
     // Create commit key
     let secp256k1 = Secp256k1::new();
-    let key_pair = generate_key_pair(&secp256k1)?;
+    let key_pair = generate_key_pair(&secp256k1).map_err(to_inscription_error)?;
     let public_key = XOnlyPublicKey::from_keypair(&key_pair).0;
 
     // Start creating inscription content
@@ -103,13 +117,15 @@ pub fn create_inscription_transactions(
         write_intent,
         seq_signature,
         seq_public_key,
-    )?;
+    )
+    .map_err(to_inscription_error)?;
 
     // Create spend info for tapscript
     let taproot_spend_info = TaprootBuilder::new()
-        .add_leaf(0, reveal_script.clone())?
+        .add_leaf(0, reveal_script.clone())
+        .map_err(to_inscription_error)?
         .finalize(&secp256k1, public_key)
-        .map_err(|_| anyhow::anyhow!("Could not build taproot"))?;
+        .map_err(|_| InscriptionError::Other("Could not build taproot spend info".to_string()))?;
 
     // Create commit tx address
     let commit_tx_address = Address::p2tr(
@@ -148,7 +164,9 @@ pub fn create_inscription_transactions(
         &reveal_script,
         &taproot_spend_info
             .control_block(&(reveal_script.clone(), LeafVersion::TapScript))
-            .ok_or(anyhow!("Cannot create control block"))?,
+            .ok_or(InscriptionError::Other(
+                "Cannot create control block".to_string(),
+            ))?,
     )?;
 
     // Sign reveal tx
@@ -159,7 +177,8 @@ pub fn create_inscription_transactions(
         &reveal_script,
         &taproot_spend_info,
         &key_pair,
-    )?;
+    )
+    .map_err(to_inscription_error)?;
 
     // Check if inscription is locked to the correct address
     assert_correct_address(
@@ -219,13 +238,13 @@ fn get_size(
 }
 
 /// Choose utxos almost naively.
-fn choose_utxos(utxos: &[UTXO], amount: u64) -> Result<(Vec<UTXO>, u64), anyhow::Error> {
+fn choose_utxos(utxos: &[UTXO], amount: u64) -> Result<(Vec<UTXO>, u64), InscriptionError> {
     let mut bigger_utxos: Vec<&UTXO> = utxos.iter().filter(|utxo| utxo.amount >= amount).collect();
     let mut sum: u64 = 0;
 
     if !bigger_utxos.is_empty() {
         // sort vec by amount (small first)
-        bigger_utxos.sort_by(|a, b| a.amount.cmp(&b.amount));
+        bigger_utxos.sort_by_key(|&x| x.amount);
 
         // single utxo will be enough
         // so return the transaction
@@ -238,7 +257,7 @@ fn choose_utxos(utxos: &[UTXO], amount: u64) -> Result<(Vec<UTXO>, u64), anyhow:
             utxos.iter().filter(|utxo| utxo.amount < amount).collect();
 
         // sort vec by amount (large first)
-        smaller_utxos.sort_by(|a, b| b.amount.cmp(&a.amount));
+        smaller_utxos.sort_by_key(|x| Reverse(&x.amount));
 
         let mut chosen_utxos: Vec<UTXO> = vec![];
 
@@ -252,7 +271,7 @@ fn choose_utxos(utxos: &[UTXO], amount: u64) -> Result<(Vec<UTXO>, u64), anyhow:
         }
 
         if sum < amount {
-            return Err(anyhow!("not enough UTXOs"));
+            return Err(InscriptionError::NotEnoughUtxos(amount));
         }
 
         Ok((chosen_utxos, sum))
@@ -264,8 +283,8 @@ fn build_commit_transaction(
     recipient: Address,
     change_address: Address,
     output_value: u64,
-    fee_rate: f64,
-) -> Result<(Transaction, Vec<UTXO>), anyhow::Error> {
+    fee_rate: u64,
+) -> Result<(Transaction, Vec<UTXO>), InscriptionError> {
     // get single input single output transaction size
     let mut size = get_size(
         &default_txin(),
@@ -284,15 +303,8 @@ fn build_commit_transaction(
         .cloned()
         .collect();
 
-    if utxos.is_empty() {
-        return Err(anyhow::anyhow!(format!(
-            "no spendable UTXOs greater than dust ({})",
-            BITCOIN_DUST_LIMIT
-        )));
-    }
-
     let (commit_txn, consumed_utxo) = loop {
-        let fee = ((last_size as f64) * fee_rate).ceil() as u64;
+        let fee = (last_size as u64) * fee_rate;
 
         let input_total = output_value + fee;
 
@@ -370,10 +382,10 @@ fn build_reveal_transaction(
     input_transaction: Transaction,
     recipient: Address,
     output_value: u64,
-    fee_rate: f64,
+    fee_rate: u64,
     reveal_script: &ScriptBuf,
     control_block: &ControlBlock,
-) -> Result<Transaction, anyhow::Error> {
+) -> Result<Transaction, InscriptionError> {
     let outputs: Vec<TxOut> = vec![TxOut {
         value: Amount::from_sat(output_value),
         script_pubkey: recipient.script_pubkey(),
@@ -393,10 +405,10 @@ fn build_reveal_transaction(
         sequence: Sequence::ENABLE_RBF_NO_LOCKTIME,
     }];
     let size = get_size(&inputs, &outputs, Some(reveal_script), Some(control_block));
-    let fee = ((size as f64) * fee_rate).ceil() as u64;
+    let fee = (size as u64) * fee_rate;
     let input_total = Amount::from_sat(output_value + fee);
     if input_utxo.value < Amount::from_sat(BITCOIN_DUST_LIMIT) || input_utxo.value < input_total {
-        return Err(anyhow::anyhow!("input UTXO not big enough"));
+        return Err(InscriptionError::NotEnoughUtxos(input_total.to_sat()));
     }
     let tx = Transaction {
         lock_time: LockTime::ZERO,
@@ -451,11 +463,11 @@ fn build_reveal_script(
 fn calculate_commit_output_value(
     recipient: &Address,
     reveal_value: u64,
-    fee_rate: f64,
+    fee_rate: u64,
     reveal_script: &script::ScriptBuf,
     taproot_spend_info: &TaprootSpendInfo,
 ) -> u64 {
-    (get_size(
+    get_size(
         &default_txin(),
         &[TxOut {
             script_pubkey: recipient.script_pubkey(),
@@ -467,10 +479,9 @@ fn calculate_commit_output_value(
                 .control_block(&(reveal_script.clone(), LeafVersion::TapScript))
                 .expect("Cannot create control block"),
         ),
-    ) as f64
+    ) as u64
         * fee_rate
-        + reveal_value as f64)
-        .ceil() as u64
+        + reveal_value
 }
 
 fn sign_reveal_transaction(
@@ -539,8 +550,10 @@ mod tests {
         TxOut, Witness,
     };
 
+    const BTC_TO_SATS: u64 = 100_000_000;
+
     use super::{BITCOIN_DUST_LIMIT, UTXO};
-    use crate::rpc::types::RawUTXO;
+    use crate::{rpc::types::RawUTXO, writer::builder::InscriptionError};
 
     const REVEAL_OUTPUT_AMOUNT: u64 = BITCOIN_DUST_LIMIT;
 
@@ -564,7 +577,7 @@ mod tests {
                 address: "bc1pp8qru0ve43rw9xffmdd8pvveths3cx6a5t6mcr0xfn9cpxx2k24qf70xq9"
                     .to_string(),
                 script_pub_key: address.script_pubkey().to_hex_string(),
-                amount: 100.0,
+                amount: 100 * BTC_TO_SATS,
                 confirmations: 100,
                 spendable: true,
                 solvable: true,
@@ -578,7 +591,7 @@ mod tests {
                 address: "bc1pp8qru0ve43rw9xffmdd8pvveths3cx6a5t6mcr0xfn9cpxx2k24qf70xq9"
                     .to_string(),
                 script_pub_key: address.script_pubkey().to_hex_string(),
-                amount: 50.0,
+                amount: 50 * BTC_TO_SATS,
                 confirmations: 100,
                 spendable: true,
                 solvable: true,
@@ -592,7 +605,7 @@ mod tests {
                 address: "bc1pp8qru0ve43rw9xffmdd8pvveths3cx6a5t6mcr0xfn9cpxx2k24qf70xq9"
                     .to_string(),
                 script_pub_key: address.script_pubkey().to_hex_string(),
-                amount: 10.0,
+                amount: 10 * BTC_TO_SATS,
                 confirmations: 100,
                 spendable: true,
                 solvable: true,
@@ -643,8 +656,10 @@ mod tests {
 
         let res = super::choose_utxos(&utxos, 500_00_000_000);
 
-        assert!(res.is_err());
-        assert_eq!(format!("{}", res.unwrap_err()), "not enough UTXOs");
+        assert!(matches!(
+            res,
+            Err(InscriptionError::NotEnoughUtxos(500_00_000_000))
+        ));
     }
 
     #[test]
@@ -694,7 +709,7 @@ mod tests {
             inp_txn,
             address.clone(),
             REVEAL_OUTPUT_AMOUNT,
-            8.0,
+            8,
             &_script,
             &control_block,
         )
@@ -718,7 +733,7 @@ mod tests {
             inp_txn,
             address.clone(),
             REVEAL_OUTPUT_AMOUNT,
-            75.0,
+            75,
             &_script,
             &control_block,
         );
@@ -732,7 +747,7 @@ mod tests {
             inp_txn,
             address.clone(),
             9999,
-            1.0,
+            1,
             &_script,
             &control_block,
         );
@@ -757,7 +772,7 @@ mod tests {
             rest_utxos.to_vec(),
             address.clone(),
             REVEAL_OUTPUT_AMOUNT,
-            10.0,
+            10,
             bitcoin::Network::Bitcoin,
         )
         .unwrap();

@@ -2,34 +2,37 @@ use std::sync::atomic::AtomicU64;
 use std::time::Duration;
 use std::{fmt::Display, str::FromStr};
 
-#[cfg(test)]
-use std::env;
-
-use anyhow::anyhow;
 use async_trait::async_trait;
-use bitcoin::hashes::sha256d::Hash;
-use bitcoin::hashes::Hash as _;
 // use async_recursion::async_recursion;
 use bitcoin::{
     block::{Header, Version},
     consensus::deserialize,
     hash_types::TxMerkleNode,
-    hex::FromHex,
     Address, Block, BlockHash, CompactTarget, Network, Transaction,
 };
 use reqwest::header::HeaderMap;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, to_value, value::RawValue};
+use serde_json::{json, to_value, value::RawValue, Value};
 use tracing::*;
 
-use super::traits::L1Client;
-use super::types::{RawUTXO, RpcBlockchainInfo};
-use super::{traits::L1Client, types::RawUTXO};
+use super::{
+    traits::L1Client,
+    types::{GetTransactionResponse, RawUTXO, RpcBlockchainInfo},
+};
+
 use thiserror::Error;
 
 const MAX_RETRIES: u32 = 3;
 
-// Represents a JSON-RPC error.
+pub fn to_val<T>(value: T) -> ClientResult<Value>
+where
+    T: Serialize,
+{
+    to_value(value)
+        .map_err(|e| ClientError::ParamError(format!("Error creating value: {}", e.to_string())))
+}
+
+// RPCError is a struct that represents an error returned by the Bitcoin RPC
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct RpcError {
     pub code: i32,
@@ -71,13 +74,16 @@ pub enum ClientError {
     #[error("Error parsing rpc response: {0}")]
     ParseError(String),
 
+    #[error("Error creating RPC Param")]
+    ParamError(String),
+
     #[error("{0}")]
     Other(String),
 }
 
 impl From<serde_json::error::Error> for ClientError {
     fn from(value: serde_json::error::Error) -> Self {
-        Self::Other(value.to_string())
+        Self::ParseError(format!("Could not parse {}", value.to_string()))
     }
 }
 
@@ -166,7 +172,6 @@ impl BitcoinClient {
                         return Err(ClientError::Other(err.to_string()));
                     } else if err.is_connect() {
                         // Connection error, retry might help
-                        return Err(ClientError::Other(err.to_string()));
                     } else if err.is_timeout() {
                         // Timeout error, retry might help
                     } else if err.is_request() {
@@ -291,14 +296,10 @@ impl BitcoinClient {
     /// 0 confirmations means tx is still in mempool
     pub async fn get_transaction_confirmations(&self, txid: String) -> ClientResult<u64> {
         let result = self
-            .call::<Box<RawValue>>("gettransaction", &[to_value(txid)?])
-            .await?
-            .to_string();
-        let result: serde_json::Value = serde_json::from_str(&result)?;
+            .call::<GetTransactionResponse>("gettransaction", &[to_val(txid)?])
+            .await?;
 
-        let confirmations = result.get("confirmations").unwrap().as_u64().unwrap();
-
-        Ok(confirmations)
+        Ok(result.confirmations)
     }
 
     pub async fn list_since_block(&self, blockhash: String) -> ClientResult<Vec<String>> {
@@ -332,7 +333,7 @@ impl BitcoinClient {
     }
 
     // estimate_smart_fee estimates the fee to confirm a transaction in the next block
-    pub async fn estimate_smart_fee(&self) -> ClientResult<f64> {
+    pub async fn estimate_smart_fee(&self) -> ClientResult<u64> {
         let result = self
             .call::<Box<RawValue>>("estimatesmartfee", &[to_value(1)?])
             .await?
@@ -340,7 +341,6 @@ impl BitcoinClient {
 
         let result_map: serde_json::Value = serde_json::from_str(&result)?;
 
-        // Issue: https://github.com/chainwayxyz/bitcoin-da/issues/3
         let btc_vkb = result_map
             .get("feerate")
             .unwrap_or(&serde_json::Value::from_str("0.00001").unwrap())
@@ -348,7 +348,7 @@ impl BitcoinClient {
             .unwrap();
 
         // convert to sat/vB and round up
-        Ok((btc_vkb * 100_000_000.0 / 1000.0).ceil())
+        Ok((btc_vkb * 100_000_000.0 / 1000.0).ceil() as u64)
     }
 
     // sign_raw_transaction_with_wallet signs a raw transaction with the wallet of bitcoind
@@ -397,14 +397,27 @@ impl BitcoinClient {
     }
 
     // send_raw_transaction sends a raw transaction to the network
-    pub async fn send_raw_transaction(&self, tx: String) -> ClientResult<Vec<u8>> {
+    pub async fn send_raw_transaction<T: AsRef<[u8]>>(&self, tx: T) -> ClientResult<[u8; 32]> {
+        let txstr = hex::encode(tx);
         let resp = self
-            .call::<String>("sendrawtransaction", &[to_value(tx)?])
+            .call::<String>("sendrawtransaction", &[to_value(txstr)?])
             .await?;
-        let hex = hex::decode(resp);
+
+        let hex = hex::decode(resp.clone());
         match hex {
-            Ok(hx) => Ok(hx),
-            Err(e) => Err(ClientError::Other(e.to_string())),
+            Ok(hx) => {
+                if hx.len() != 32 {
+                    return Err(ClientError::Other(format!(
+                        "Invalid hex response from client"
+                    )));
+                }
+                let mut arr: [u8; 32] = [0; 32];
+                arr.copy_from_slice(&hx);
+                Ok(arr)
+            }
+            Err(e) => Err(ClientError::ParseError(format!(
+                "{e}: Could not parse sendrawtransaction response: {resp}"
+            ))),
         }
     }
 
@@ -434,7 +447,9 @@ impl BitcoinClient {
                 .await;
             Ok(result.unwrap().to_string())
         } else {
-            Err(anyhow!("Cannot send_to_address on non-regtest network"))
+            Err(anyhow::anyhow!(
+                "Cannot send_to_address on non-regtest network"
+            ))
         }
     }
     pub async fn list_wallets(&self) -> ClientResult<Vec<String>> {
@@ -445,10 +460,9 @@ impl BitcoinClient {
 #[async_trait]
 impl L1Client for BitcoinClient {
     async fn get_blockchain_info(&self) -> anyhow::Result<RpcBlockchainInfo> {
-        let res = self
+        Ok(self
             .call::<RpcBlockchainInfo>("getblockchaininfo", &[])
-            .await?;
-        Ok(res)
+            .await?)
     }
 
     // get_block_hash returns the block hash of the block at the given height
@@ -461,7 +475,7 @@ impl L1Client for BitcoinClient {
 
     async fn get_block_at(&self, height: u64) -> anyhow::Result<Block> {
         let hash = self.get_block_hash(height).await?;
-        let block = self.get_block(&hash).await?;
+        let block = self.get_block(hash.to_string()).await?;
         Ok(block)
     }
 }

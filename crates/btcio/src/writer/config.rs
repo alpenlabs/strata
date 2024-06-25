@@ -13,4 +13,16 @@ pub struct WriterConfig {
 
     /// Time between each processing queue item, in millis
     pub(super) poll_duration_ms: u64,
+
+    /// How should the inscription fee be determined
+    pub(super) inscription_fee_policy: InscriptionFeePolicy,
+}
+
+#[derive(Debug, Clone)]
+pub enum InscriptionFeePolicy {
+    /// Use estimatesmartfee.
+    Smart,
+
+    /// Fixed fee in sat/vB.
+    Fixed(u64),
 }

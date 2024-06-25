@@ -14,7 +14,7 @@ use alpen_vertex_db::traits::L1DataProvider;
 
 use super::{
     builder::{create_inscription_transactions, sign_blob_with_private_key, UtxoParseError, UTXO},
-    config::WriterConfig,
+    config::{InscriptionFeePolicy, WriterConfig},
 };
 use crate::rpc::{types::RawUTXO, BitcoinClient};
 
@@ -32,11 +32,13 @@ pub struct TxnWithStatus {
 
 impl TxnWithStatus {
     /// Create a new object corresponding a transaction sent to mempool
+    pub fn new(txn: Transaction, status: BitcoinTxnStatus) -> Self {
+        Self { txn, status }
+    }
+
+    /// Create a new object corresponding a transaction sent to mempool
     pub fn new_mempool_txn(txn: Transaction) -> Self {
-        Self {
-            txn,
-            status: BitcoinTxnStatus::InMempool,
-        }
+        Self::new(txn, BitcoinTxnStatus::InMempool)
     }
 
     pub fn txn(&self) -> &Transaction {
@@ -113,7 +115,10 @@ async fn create_inscriptions_from_intent(
         .collect::<Result<Vec<UTXO>, UtxoParseError>>()
         .map_err(|e| anyhow::anyhow!("{:?}", e))?;
 
-    let fee_rate = rpc_client.estimate_smart_fee().await?;
+    let fee_rate = match config.inscription_fee_policy {
+        InscriptionFeePolicy::Smart => rpc_client.estimate_smart_fee().await?,
+        InscriptionFeePolicy::Fixed(val) => val,
+    };
     create_inscription_transactions(
         &config.rollup_name,
         &write_intent,
@@ -125,6 +130,7 @@ async fn create_inscriptions_from_intent(
         fee_rate,
         rpc_client.network(),
     )
+    .map_err(|e| anyhow::anyhow!(e.to_string()))
 }
 
 async fn send_commit_reveal(
@@ -132,12 +138,8 @@ async fn send_commit_reveal(
     reveal: &Transaction,
     rpc_client: &Arc<BitcoinClient>,
 ) -> anyhow::Result<()> {
-    rpc_client
-        .send_raw_transaction(hex::encode(serialize(&commit)))
-        .await?;
-    rpc_client
-        .send_raw_transaction(hex::encode(serialize(&reveal)))
-        .await?;
+    rpc_client.send_raw_transaction(serialize(&commit)).await?;
+    rpc_client.send_raw_transaction(serialize(&reveal)).await?;
     Ok(())
 }
 
