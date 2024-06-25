@@ -6,7 +6,6 @@ use std::marker::PhantomData;
 
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
-use sha2::Sha256;
 
 use error::MerkleError;
 use hasher::{Hash, MerkleHasher};
@@ -128,17 +127,17 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
             return;
         }
 
-        let new_chunk_index = self.num;
+        let new_leaf_index = self.num;
         let peak_mask = self.num;
         let mut current_node = next;
         let mut current_height = 0;
         while (peak_mask >> current_height) & 1 == 1 {
             let prev_node = self.peaks[current_height];
-            let next_node: Hash = Sha256::hash_node(prev_node, current_node);
-            let chunk_parent_tree = new_chunk_index >> (current_height + 1);
+            let next_node: Hash = H::hash_node(prev_node, current_node);
+            let leaf_parent_tree = new_leaf_index >> (current_height + 1);
             self.update_single_proof(
                 proof,
-                chunk_parent_tree,
+                leaf_parent_tree,
                 current_height,
                 prev_node,
                 current_node,
@@ -159,14 +158,14 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
     fn update_single_proof(
         &mut self,
         proof: &mut MerkleProof<H>,
-        chunk_parent_tree: u64,
+        leaf_parent_tree: u64,
         current_height: usize,
         prev_node: Hash,
         current_node: Hash,
     ) {
         let proof_index = proof.index;
         let proof_parent_tree = proof_index >> (current_height + 1);
-        if chunk_parent_tree == proof_parent_tree {
+        if leaf_parent_tree == proof_parent_tree {
             if current_height >= proof.cohashes.len() {
                 proof.cohashes.resize(current_height + 1, [0; 32]);
             }
@@ -200,19 +199,19 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
             return;
         }
 
-        let new_chunk_index = self.num;
+        let new_leaf_index = self.num;
         let peak_mask = self.num;
         let mut current_node = next;
         let mut current_height = 0;
         while (peak_mask >> current_height) & 1 == 1 {
             let prev_node = self.peaks[current_height];
-            let next_node: Hash = Sha256::hash_node(prev_node, current_node);
-            let chunk_parent_tree = new_chunk_index >> (current_height + 1);
+            let next_node: Hash = H::hash_node(prev_node, current_node);
+            let leaf_parent_tree = new_leaf_index >> (current_height + 1);
 
             for proof in proof_list.iter_mut() {
                 self.update_single_proof(
                     proof,
-                    chunk_parent_tree,
+                    leaf_parent_tree,
                     current_height,
                     prev_node,
                     current_node,
@@ -231,31 +230,28 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
         self.num += 1;
     }
 
-    /// verifies if the hash of the element at particular index is present as a proof  
-    pub fn verify(&self, proof: &MerkleProof<H>, hash: Hash) -> Result<bool, MerkleError> {
-        if proof.index as usize >= self.num as usize {
-            return Err(MerkleError::IndexOutOfBounds);
+      pub fn verify(&self, cohashes: &[Hash],leaf_index: u64, leaf_hash: Hash) -> bool {
+        let root = self.peaks[cohashes.len()];
+        if cohashes.len() == 0 {
+            return root == leaf_hash;
         }
 
-        Ok(proof.proof_verify(self, hash))
+        let mut cur_hash = leaf_hash;
+        let mut side_flags = leaf_index;
+
+        for i in 0..cohashes.len(){
+            let node_hash = if side_flags & 1 == 1 {
+                H::hash_node(cohashes[i], cur_hash)
+            } else {
+                H::hash_node(cur_hash, cohashes[i])
+            };
+
+            side_flags >>= 1;
+            cur_hash = node_hash;
+        }
+        cur_hash == root
     }
 
-    /// constructs a MerkleProof and then verifies it
-    pub fn verify_with_cohashes(
-        &self,
-        index: u64,
-        hash: Hash,
-        cohashes: Vec<Hash>,
-    ) -> Result<bool, MerkleError> {
-        let proof: MerkleProof<H> = MerkleProof {
-            prooflen: cohashes.len(),
-            cohashes,
-            index,
-            _pd: PhantomData,
-        };
-
-        self.verify(&proof, hash)
-    }
 
     pub fn gen_proof(
         &self,
@@ -304,19 +300,19 @@ impl<H: MerkleHasher + Clone> MerkleProof<H> {
     }
 
     /// verifies the hash against the current proof for given mmr
-    pub fn proof_verify(&self, mmr: &MerkleMr<H>, chunk_hash: Hash) -> bool {
+    pub fn proof_verify(&self, mmr: &MerkleMr<H>, leaf_hash: Hash) -> bool {
         let root = mmr.peaks[self.prooflen];
         if self.prooflen == 0 {
-            return root == chunk_hash;
+            return root == leaf_hash;
         }
-        let mut cur_hash = chunk_hash;
+        let mut cur_hash = leaf_hash;
         let mut side_flags = self.index;
 
         for i in 0..self.prooflen {
             let node_hash = if side_flags & 1 == 1 {
-                Sha256::hash_node(self.cohashes[i], cur_hash)
+                H::hash_node(self.cohashes[i], cur_hash)
             } else {
-                Sha256::hash_node(cur_hash, self.cohashes[i])
+                H::hash_node(cur_hash, self.cohashes[i])
             };
 
             side_flags >>= 1;
@@ -370,7 +366,7 @@ mod test {
             .collect();
 
         (0..specific_nodes.len()).for_each(|i| {
-            assert!(mmr.verify(&proof[i], hash[i]).is_ok());
+            assert!(mmr.verify(&proof[i].cohashes,proof[i].index,hash[i]));
         });
     }
 
@@ -395,7 +391,7 @@ mod test {
             .expect("cannot generate proof");
 
         let hash = Sha256::hash_leaves(0_usize.to_be_bytes().to_vec());
-        assert!(mmr.verify(&proof, hash).expect("merkle error"));
+        assert!(mmr.verify(&proof.cohashes,proof.index, hash));
     }
 
     #[test]
@@ -462,8 +458,8 @@ mod test {
         let hash = Sha256::hash_leaves(6_usize.to_be_bytes().to_vec());
 
         assert!(matches!(
-            mmr.verify(&invalid_proof, hash),
-            Err(MerkleError::IndexOutOfBounds)
+            mmr.verify(&invalid_proof.cohashes,0, hash),
+            false 
         ));
     }
 
