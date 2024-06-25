@@ -9,3 +9,4 @@ borsh = { workspace = true }
 sha2 = {workspace = true}
 thiserror = {workspace = true}
 digest = {workspace = true}
+hex = {workspace = true}

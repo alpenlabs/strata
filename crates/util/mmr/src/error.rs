@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-#[derive(Error,Debug,PartialEq)]
+#[derive(Error, Debug, PartialEq)]
 pub enum MerkleError {
     #[error("No Elements present in MerkleTree")]
     NoElements,
@@ -12,6 +12,4 @@ pub enum MerkleError {
     ChunkSizeTooBig,
     #[error("Generic Error for unimplmented error")]
     Unknown,
-
 }
-
