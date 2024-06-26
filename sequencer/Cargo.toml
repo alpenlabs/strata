@@ -34,4 +34,3 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
-generic-array = "1.0.0"

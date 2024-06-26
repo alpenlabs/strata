@@ -31,7 +31,7 @@ pub struct MerkleMr<H: MerkleHasher + Clone> {
     // number of elements inserted into mmr
     pub num: u64,
     // Buffer of all possible peaks in mmr. only some of them will be valid at a time
-    pub peaks: Vec<Hash>,
+    pub peaks: Box<[Hash]>,
     // phantom data for hasher
     pub hasher: PhantomData<H>,
 }
@@ -40,7 +40,7 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
     pub fn new(cap_log2: usize) -> Self {
         Self {
             num: 0,
-            peaks: Vec::with_capacity(cap_log2),
+            peaks: vec![[0; 32]; cap_log2].into_boxed_slice(),
             hasher: PhantomData,
         }
     }
@@ -59,7 +59,7 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
 
         Self {
             num: compact.entries,
-            peaks: roots,
+            peaks: roots.into(),
             hasher: PhantomData,
         }
     }
@@ -79,7 +79,7 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
 
     pub fn add_leaf(&mut self, hash_arr: Hash) {
         if self.num == 0 {
-            self.peaks.push(hash_arr);
+            self.peaks[0] = hash_arr;
             self.num += 1;
             return;
         }
@@ -101,16 +101,11 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
             current_height += 1;
         }
 
-        if current_height >= self.peaks.len() {
-            self.peaks.resize(current_height + 1, [0; 32]);
-        }
         self.peaks[current_height] = current_node;
         self.num += 1;
     }
 
     pub fn get_single_root(&self) -> Result<Hash, MerkleError> {
-        println!("{}", self.num);
-        println!("{}", self.num.is_power_of_two());
         if self.num == 0 {
             return Err(MerkleError::NoElements);
         }
@@ -120,12 +115,17 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
 
         Ok(self.peaks[(self.num.ilog2()) as usize])
     }
-    pub fn add_leaf_updating_proof(&mut self, next: Hash, proof: &mut MerkleProof<H>) {
+
+    pub fn add_leaf_updating_proof(
+        &mut self,
+        next: Hash,
+        proof: &MerkleProof<H>,
+    ) -> MerkleProof<H> {
         if self.num == 0 {
             self.add_leaf(next);
-            *proof = MerkleProof::new(self.num);
-            return;
+            return MerkleProof::new(self.num);
         }
+        let mut updated_proof = proof.clone();
 
         let new_leaf_index = self.num;
         let peak_mask = self.num;
@@ -136,7 +136,7 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
             let next_node: Hash = H::hash_node(prev_node, current_node);
             let leaf_parent_tree = new_leaf_index >> (current_height + 1);
             self.update_single_proof(
-                proof,
+                &mut updated_proof,
                 leaf_parent_tree,
                 current_height,
                 prev_node,
@@ -148,11 +148,10 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
             current_height += 1;
         }
 
-        if current_height >= self.peaks.len() {
-            self.peaks.resize(current_height + 1, [0; 32]);
-        }
         self.peaks[current_height] = current_node;
         self.num += 1;
+
+        return updated_proof;
     }
 
     fn update_single_proof(
@@ -171,10 +170,8 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
             }
             if (proof_index >> current_height) & 1 == 1 {
                 proof.cohashes[current_height] = prev_node;
-                proof.prooflen += 1;
             } else {
                 proof.cohashes[current_height] = current_node;
-                proof.prooflen += 1;
             }
         }
     }
@@ -182,22 +179,13 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
     pub fn add_leaf_updating_proof_list(
         &mut self,
         next: Hash,
-        proof_list: &mut Vec<MerkleProof<H>>,
-    ) {
-        // the proof list assumes that from the position you start maintaining proof, all other
-        // subsequent proofs for next elements are also maintained so we create proof ready to be
-        // worked on next pass
-        if proof_list.is_empty() {
-            proof_list.push(MerkleProof::new(self.num));
-            proof_list.push(MerkleProof::new(self.num + 1));
-        } else {
-            proof_list.push(MerkleProof::new(self.num + 1));
-        }
-
+        proof_list: &mut [MerkleProof<H>],
+    ) -> MerkleProof<H> {
         if self.num == 0 {
             self.add_leaf(next);
-            return;
+            return MerkleProof::new(0);
         }
+        let mut new_proof = MerkleProof::new(self.num);
 
         let new_leaf_index = self.num;
         let peak_mask = self.num;
@@ -207,7 +195,6 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
             let prev_node = self.peaks[current_height];
             let next_node: Hash = H::hash_node(prev_node, current_node);
             let leaf_parent_tree = new_leaf_index >> (current_height + 1);
-
             for proof in proof_list.iter_mut() {
                 self.update_single_proof(
                     proof,
@@ -218,20 +205,28 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
                 );
             }
 
+            self.update_single_proof(
+                &mut new_proof,
+                leaf_parent_tree,
+                current_height,
+                prev_node,
+                current_node,
+            );
+            // the peaks value is no longer needed
             self.peaks[current_height] = [0; 32];
             current_node = next_node;
             current_height += 1;
         }
 
-        if current_height >= self.peaks.len() {
-            self.peaks.resize(current_height + 1, [0; 32]);
-        }
         self.peaks[current_height] = current_node;
         self.num += 1;
+
+        return new_proof;
     }
 
-      pub fn verify(&self, cohashes: &[Hash],leaf_index: u64, leaf_hash: Hash) -> bool {
+    pub fn verify(&self, cohashes: &[Hash], leaf_index: u64, leaf_hash: Hash) -> bool {
         let root = self.peaks[cohashes.len()];
+
         if cohashes.len() == 0 {
             return root == leaf_hash;
         }
@@ -239,7 +234,7 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
         let mut cur_hash = leaf_hash;
         let mut side_flags = leaf_index;
 
-        for i in 0..cohashes.len(){
+        for i in 0..cohashes.len() {
             let node_hash = if side_flags & 1 == 1 {
                 H::hash_node(cohashes[i], cur_hash)
             } else {
@@ -252,16 +247,19 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
         cur_hash == root
     }
 
-
     pub fn gen_proof(
         &self,
         proof_list: &[MerkleProof<H>],
-        index: usize,
-    ) -> Result<MerkleProof<H>, MerkleError> {
-        if index > self.num as usize {
+        index: u64,
+    ) -> Result<Option<MerkleProof<H>>, MerkleError> {
+        if index > self.num {
             return Err(MerkleError::IndexOutOfBounds);
         }
-        Ok(proof_list[index].clone())
+
+        match proof_list.iter().find(|proof| proof.index == index) {
+            Some(proof) => return Ok(Some(proof.clone())),
+            None => return Ok(None),
+        }
     }
 }
 
@@ -272,18 +270,15 @@ where
 {
     // sibling hashes required for proof
     pub cohashes: Vec<Hash>,
-    // length of proof
-    pub prooflen: usize,
     // the index of the element for which this proof is for
     pub index: u64,
     pub _pd: PhantomData<H>,
 }
 
 impl<H: MerkleHasher + Clone> MerkleProof<H> {
-    pub fn new(index: u64) -> Self {
+    fn new(index: u64) -> Self {
         Self {
-            cohashes: vec![[0; 32]],
-            prooflen: 0,
+            cohashes: vec![],
             index,
             _pd: PhantomData,
         }
@@ -292,7 +287,6 @@ impl<H: MerkleHasher + Clone> MerkleProof<H> {
     /// builds the new MerkleProof from the provided Data
     pub fn from_cohashes(cohashes: Vec<Hash>, index: u64) -> Self {
         Self {
-            prooflen: cohashes.len(),
             cohashes,
             index,
             _pd: PhantomData,
@@ -300,15 +294,15 @@ impl<H: MerkleHasher + Clone> MerkleProof<H> {
     }
 
     /// verifies the hash against the current proof for given mmr
-    pub fn proof_verify(&self, mmr: &MerkleMr<H>, leaf_hash: Hash) -> bool {
-        let root = mmr.peaks[self.prooflen];
-        if self.prooflen == 0 {
+    pub fn verify_against_mmr(&self, mmr: &MerkleMr<H>, leaf_hash: Hash) -> bool {
+        let root = mmr.peaks[self.cohashes.len()];
+        if self.cohashes.len() == 0 {
             return root == leaf_hash;
         }
         let mut cur_hash = leaf_hash;
         let mut side_flags = self.index;
 
-        for i in 0..self.prooflen {
+        for i in 0..self.cohashes.len() {
             let node_hash = if side_flags & 1 == 1 {
                 H::hash_node(self.cohashes[i], cur_hash)
             } else {
@@ -324,49 +318,49 @@ impl<H: MerkleHasher + Clone> MerkleProof<H> {
 
 #[cfg(test)]
 mod test {
-    use sha2::Sha256;
+    use sha2::{Digest, Sha256};
 
     use crate::error::MerkleError;
 
-    use super::{
-        hasher::{Hash, MerkleHasher},
-        MerkleMr, MerkleProof,
-    };
+    use super::{hasher::Hash, MerkleMr, MerkleProof};
 
     fn generate_for_n_integers(n: usize) -> (MerkleMr<Sha256>, Vec<MerkleProof<Sha256>>) {
-        let mut mmr: MerkleMr<Sha256> = MerkleMr::new(1);
+        let mut mmr: MerkleMr<Sha256> = MerkleMr::new(14);
 
         let mut proof = Vec::new();
         let list_of_hashes = generate_hashes_for_n_integers(n);
 
-        (0..n).for_each(|i| mmr.add_leaf_updating_proof_list(list_of_hashes[i], &mut proof));
+        (0..n).for_each(|i| {
+            let new_proof = mmr.add_leaf_updating_proof_list(list_of_hashes[i], &mut proof);
+            proof.push(new_proof);
+        });
         (mmr, proof)
     }
 
     fn generate_hashes_for_n_integers(n: usize) -> Vec<Hash> {
         (0..n)
-            .map(|i| Sha256::hash_leaves(i.to_be_bytes().to_vec()))
+            .map(|i| Sha256::digest(&i.to_be_bytes()).into())
             .collect::<Vec<Hash>>()
     }
 
-    fn mmr_proof_for_specific_nodes(n: usize, specific_nodes: Vec<usize>) {
-        //[0]
+    fn mmr_proof_for_specific_nodes(n: usize, specific_nodes: Vec<u64>) {
         let (mmr, proof_list) = generate_for_n_integers(n);
-
         let proof: Vec<MerkleProof<Sha256>> = specific_nodes
             .iter()
             .map(|i| {
-                mmr.gen_proof(&proof_list, if *i == 0 { *i } else { *i - 1 })
-                    .expect("cannot generate proof")
+                mmr.gen_proof(&proof_list, *i)
+                    .unwrap()
+                    .expect("cannot find proof for the given index")
             })
             .collect();
+
         let hash: Vec<Hash> = specific_nodes
             .iter()
-            .map(|i| Sha256::hash_leaves(i.to_be_bytes().to_vec()))
+            .map(|i| Sha256::digest(&i.to_be_bytes()).into())
             .collect();
 
         (0..specific_nodes.len()).for_each(|i| {
-            assert!(mmr.verify(&proof[i].cohashes,proof[i].index,hash[i]));
+            assert!(mmr.verify(&proof[i].cohashes, proof[i].index, hash[i]));
         });
     }
 
@@ -383,15 +377,15 @@ mod test {
 
     #[test]
     fn check_single_element() {
-        //[0]
         let (mmr, proof_list) = generate_for_n_integers(1);
 
         let proof = mmr
             .gen_proof(&proof_list, 0)
-            .expect("cannot generate proof");
+            .unwrap()
+            .expect("Didn't find proof for given index");
 
-        let hash = Sha256::hash_leaves(0_usize.to_be_bytes().to_vec());
-        assert!(mmr.verify(&proof.cohashes,proof.index, hash));
+        let hash = Sha256::digest(&0_usize.to_be_bytes()).into();
+        assert!(mmr.verify(&proof.cohashes, proof.index, hash));
     }
 
     #[test]
@@ -406,9 +400,9 @@ mod test {
 
     #[test]
     fn check_peak_for_mmr_single_leaf() {
-        let hashed1 = Sha256::hash_leaves(b"first".to_vec());
+        let hashed1: Hash = Sha256::digest(b"first").into();
 
-        let mut mmr: MerkleMr<Sha256> = MerkleMr::new(2);
+        let mut mmr: MerkleMr<Sha256> = MerkleMr::new(14);
         mmr.add_leaf(hashed1.try_into().unwrap());
 
         assert_eq!(
@@ -422,9 +416,9 @@ mod test {
 
     #[test]
     fn check_peak_for_mmr_three_leaves() {
-        let hashed1 = Sha256::hash_leaves(b"first".to_vec());
+        let hashed1: Hash = Sha256::digest(b"first").into();
 
-        let mut mmr: MerkleMr<Sha256> = MerkleMr::new(1);
+        let mut mmr: MerkleMr<Sha256> = MerkleMr::new(14);
         mmr.add_leaf(hashed1.try_into().unwrap());
         mmr.add_leaf(hashed1.try_into().unwrap());
         mmr.add_leaf(hashed1.try_into().unwrap());
@@ -434,9 +428,9 @@ mod test {
 
     #[test]
     fn check_peak_for_mmr_four_leaves() {
-        let hashed1 = Sha256::hash_leaves(b"first".to_vec());
+        let hashed1: Hash = Sha256::digest(b"first").into();
 
-        let mut mmr: MerkleMr<Sha256> = MerkleMr::new(1);
+        let mut mmr: MerkleMr<Sha256> = MerkleMr::new(14);
         mmr.add_leaf(hashed1.try_into().unwrap());
         mmr.add_leaf(hashed1.try_into().unwrap());
         mmr.add_leaf(hashed1.try_into().unwrap());
@@ -455,36 +449,45 @@ mod test {
     fn check_invalid_proof() {
         let (mmr, _) = generate_for_n_integers(5);
         let invalid_proof = MerkleProof::<Sha256>::new(6);
-        let hash = Sha256::hash_leaves(6_usize.to_be_bytes().to_vec());
+        let hash = Sha256::digest(&6_usize.to_be_bytes()).into();
 
         assert!(matches!(
-            mmr.verify(&invalid_proof.cohashes,0, hash),
-            false 
+            mmr.verify(&invalid_proof.cohashes, 0, hash),
+            false
         ));
     }
 
     #[test]
     fn check_add_node_and_update() {
-        let mut mmr: MerkleMr<Sha256> = MerkleMr::new(3);
+        let mut mmr: MerkleMr<Sha256> = MerkleMr::new(14);
         let mut proof_list = Vec::new();
 
-        let hashed0: Hash = Sha256::hash_leaves(b"first".to_vec());
-        let hashed1: Hash = Sha256::hash_leaves(b"second".to_vec());
-        let hashed2: Hash = Sha256::hash_leaves(b"third".to_vec());
-        let hashed3: Hash = Sha256::hash_leaves(b"fourth".to_vec());
-        let hashed4: Hash = Sha256::hash_leaves(b"fifth".to_vec());
+        let hashed0: Hash = Sha256::digest(b"first").into();
+        let hashed1: Hash = Sha256::digest(b"second").into();
+        let hashed2: Hash = Sha256::digest(b"third").into();
+        let hashed3: Hash = Sha256::digest(b"fourth").into();
+        let hashed4: Hash = Sha256::digest(b"fifth").into();
 
-        mmr.add_leaf_updating_proof_list(hashed0, &mut proof_list);
-        mmr.add_leaf_updating_proof_list(hashed1, &mut proof_list);
-        mmr.add_leaf_updating_proof_list(hashed2, &mut proof_list);
-        mmr.add_leaf_updating_proof_list(hashed3, &mut proof_list);
-        mmr.add_leaf_updating_proof_list(hashed4, &mut proof_list);
+        let new_proof = mmr.add_leaf_updating_proof_list(hashed0, &mut proof_list);
+        proof_list.push(new_proof);
 
-        assert!(proof_list[0].proof_verify(&mmr, hashed0));
-        assert!(proof_list[1].proof_verify(&mmr, hashed1));
-        assert!(proof_list[2].proof_verify(&mmr, hashed2));
-        assert!(proof_list[3].proof_verify(&mmr, hashed3));
-        assert!(proof_list[4].proof_verify(&mmr, hashed4));
+        let new_proof = mmr.add_leaf_updating_proof_list(hashed1, &mut proof_list);
+        proof_list.push(new_proof);
+
+        let new_proof = mmr.add_leaf_updating_proof_list(hashed2, &mut proof_list);
+        proof_list.push(new_proof);
+
+        let new_proof = mmr.add_leaf_updating_proof_list(hashed3, &mut proof_list);
+        proof_list.push(new_proof);
+
+        let new_proof = mmr.add_leaf_updating_proof_list(hashed4, &mut proof_list);
+        proof_list.push(new_proof);
+
+        assert!(proof_list[0].verify_against_mmr(&mmr, hashed0));
+        assert!(proof_list[1].verify_against_mmr(&mmr, hashed1));
+        assert!(proof_list[2].verify_against_mmr(&mmr, hashed2));
+        assert!(proof_list[3].verify_against_mmr(&mmr, hashed3));
+        assert!(proof_list[4].verify_against_mmr(&mmr, hashed4));
     }
 
     #[test]
@@ -509,10 +512,11 @@ mod test {
         let num_hash = generate_hashes_for_n_integers(elem);
 
         for i in 0..elem {
-            mmr.add_leaf_updating_proof(num_hash[i], &mut proof);
+            let new_proof = mmr.add_leaf_updating_proof(num_hash[i], &proof);
+            proof = new_proof;
         }
 
-        assert!(proof.proof_verify(&mmr, num_hash[0].try_into().unwrap()));
+        assert!(proof.verify_against_mmr(&mmr, num_hash[0].try_into().unwrap()));
     }
 
     #[test]
@@ -526,11 +530,12 @@ mod test {
         let num_hash = generate_hashes_for_n_integers(elem);
 
         for i in 0..elem {
-            mmr.add_leaf_updating_proof_list(num_hash[i], &mut proof_list);
+            let new_proof = mmr.add_leaf_updating_proof_list(num_hash[i], &mut proof_list);
+            proof_list.push(new_proof);
         }
 
         for i in 0..elem {
-            assert!(proof_list[i].proof_verify(&mmr, num_hash[i].try_into().unwrap()));
+            assert!(proof_list[i].verify_against_mmr(&mmr, num_hash[i].try_into().unwrap()));
         }
     }
 }
