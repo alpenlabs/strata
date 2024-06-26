@@ -5,20 +5,15 @@ use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc};
 use tracing::*;
 
-use alpen_vertex_db::{traits::*, DbResult};
+use alpen_vertex_db::traits::*;
 use alpen_vertex_evmctl::engine::ExecEngineCtl;
 use alpen_vertex_primitives::prelude::*;
-use alpen_vertex_state::{
-    block::L2BlockId,
-    consensus::ConsensusState,
-    operation::{ConsensusOutput, ConsensusWrite, SyncAction},
-    sync_event::SyncEvent,
-};
+use alpen_vertex_state::{consensus::ConsensusState, operation::SyncAction};
 
 use crate::{
     errors::Error,
     message::{ConsensusUpdateNotif, CsmMessage},
-    state_tracker, transition,
+    state_tracker,
 };
 
 /// Mutatble worker state that we modify in the consensus worker task.
@@ -138,7 +133,12 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
     }
 
     // TODO broadcast the new state somehow
-    let update = ConsensusUpdateNotif::new(ev_idx, Arc::new(outp), unimplemented!());
+    assert_eq!(state.state_tracker.cur_state_idx(), ev_idx);
+    let new_state = state.state_tracker.cur_state().clone();
+    let update = ConsensusUpdateNotif::new(ev_idx, Arc::new(outp), new_state);
+    if state.cupdate_tx.send(Arc::new(update)).is_err() {
+        warn!(%ev_idx, "failed to send broadcast for new CSM update");
+    }
 
     Ok(())
 }

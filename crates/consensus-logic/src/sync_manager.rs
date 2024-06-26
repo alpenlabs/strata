@@ -16,15 +16,15 @@ use crate::ctl::CsmController;
 use crate::message::{ChainTipMessage, ConsensusUpdateNotif, CsmMessage};
 use crate::{chain_tip, genesis, unfinalized_tracker, worker};
 
-pub struct SyncManager<D: Database> {
+pub struct SyncManager {
     params: Arc<Params>,
 
     chain_tip_msg_tx: mpsc::Sender<ChainTipMessage>,
-    csm_ctl: Arc<CsmController<D>>,
+    csm_ctl: Arc<CsmController>,
     cupdate_rx: broadcast::Receiver<Arc<ConsensusUpdateNotif>>,
 }
 
-impl<D: Database> SyncManager<D> {
+impl SyncManager {
     pub fn params(&self) -> &Params {
         &self.params
     }
@@ -33,11 +33,7 @@ impl<D: Database> SyncManager<D> {
         self.params.clone()
     }
 
-    pub fn database(&self) -> &Arc<D> {
-        self.csm_ctl.database()
-    }
-
-    pub fn csm_controller(&self) -> &CsmController<D> {
+    pub fn csm_controller(&self) -> &CsmController {
         &self.csm_ctl
     }
 
@@ -66,12 +62,16 @@ pub fn start_sync_tasks<
 >(
     database: Arc<D>,
     engine: Arc<E>,
+    pool: Arc<threadpool::ThreadPool>,
     params: Arc<Params>,
-) -> anyhow::Result<SyncManager<D>> {
+) -> anyhow::Result<SyncManager> {
     // Create channels.
     let (ctm_tx, ctm_rx) = mpsc::channel::<ChainTipMessage>(64);
     let (csm_tx, csm_rx) = mpsc::channel::<CsmMessage>(64);
-    let csm_ctl = Arc::new(CsmController::new(database.clone(), csm_tx));
+    let csm_ctl = Arc::new(CsmController::new(database.clone(), pool, csm_tx));
+
+    // TODO should this be in an `Arc`?  it's already fairly compact so we might
+    // not be benefitting from the reduced cloning
     let (cupdate_tx, cupdate_rx) = broadcast::channel::<Arc<ConsensusUpdateNotif>>(64);
 
     // Check if we have to do genesis.

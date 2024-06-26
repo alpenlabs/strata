@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::{thread, time};
 
+use alpen_vertex_db::database;
 use borsh::{BorshDeserialize, BorshSerialize};
 use tokio::sync::{broadcast, mpsc};
 use tracing::*;
@@ -122,11 +123,13 @@ pub fn duty_dispatch_task<
 >(
     mut updates: broadcast::Receiver<DutyBatch>,
     ident_key: IdentityKey,
+    sync_man: Arc<SyncManager>,
+    database: Arc<D>,
     engine: Arc<E>,
-    sync_man: Arc<SyncManager<D>>,
     pool: Arc<threadpool::ThreadPool>,
 ) {
-    let mut pending_duties: HashMap<u64, thread::JoinHandle<()>> = HashMap::new();
+    // TODO make this actually work
+    let mut pending_duties: HashMap<u64, ()> = HashMap::new();
 
     // TODO still need some stuff here to decide if we're fully synced and
     // *should* dispatch duties
@@ -157,10 +160,11 @@ pub fn duty_dispatch_task<
             // TODO make this use a thread pool
             let d = duty.duty().clone();
             let ik = ident_key.clone();
-            let e = engine.clone();
             let sm = sync_man.clone();
-            let join = thread::spawn(move || duty_exec_task(d, ik, e, sm));
-            pending_duties.insert(id, join);
+            let db = database.clone();
+            let e = engine.clone();
+            let _join = pool.execute(move || duty_exec_task(d, ik, sm, db, e));
+            pending_duties.insert(id, ());
         }
     }
 
@@ -173,10 +177,11 @@ pub fn duty_dispatch_task<
 fn duty_exec_task<D: Database, E: ExecEngineCtl>(
     duty: Duty,
     ik: IdentityKey,
+    sync_man: Arc<SyncManager>,
+    database: Arc<D>,
     engine: Arc<E>,
-    sync_man: Arc<SyncManager<D>>,
 ) {
-    if let Err(e) = perform_duty(&duty, &ik, &sync_man, engine.as_ref()) {
+    if let Err(e) = perform_duty(&duty, &ik, &sync_man, database.as_ref(), engine.as_ref()) {
         error!(err = %e, "error performing duty");
     } else {
         debug!("completed duty successfully");
@@ -186,15 +191,15 @@ fn duty_exec_task<D: Database, E: ExecEngineCtl>(
 fn perform_duty<D: Database, E: ExecEngineCtl>(
     duty: &Duty,
     ik: &IdentityKey,
-    sync_man: &SyncManager<D>,
+    sync_man: &SyncManager,
+    database: &D,
     engine: &E,
 ) -> Result<(), Error> {
     match duty {
         Duty::SignBlock(data) => {
             let slot = data.slot();
 
-            let Some((blkid, _block)) = sign_block(slot, ik, sync_man.database().as_ref(), engine)?
-            else {
+            let Some((blkid, _block)) = sign_block(slot, ik, database, engine)? else {
                 return Ok(());
             };
 
