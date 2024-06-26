@@ -1,0 +1,40 @@
+### Consensus Worker Task
+
+cwt: Consensus Worker Task
+
+cwt -> csmp: process
+csmp: Process Consensus State Message
+
+csmp -> csmev: CsmMessage::EventInput(evid)
+csmev -> adv: 1. call with SyncEvent
+csmev: handle sync event
+adv: Advance consensus state
+adv -> pevlb: SyncEvent::L1Block(height, blkid)
+pevlb: "TODO: consensus checks\n\
+      writes.add(ConsensusWrite::AcceptL1Block(blkid))\n\
+      TODO: if l1 finalized, update buried"
+adv -> pevlda: SyncEvent::L1DABatch(l2blkids)
+pevlda: "TODO: see what to do with L1DABach\n\
+        "
+adv -> pevntb: SyncEvent::NewTipBlock(l2blkid)
+pevntb: "TODO: better checks\n\
+        writes.add(ConsensusWrite::AcceptL2Block(blkid))\n\
+        actions.add(SyncAction::UpdateTip(blkid))"
+
+adv -> csmev: 2. ConsensusOutput(writes, actions)
+
+csmev -> app_act: 3. Actions
+app_act: Apply Each Action
+csmev -> dtt: 4. UpdateNotif(ev_idx,out, st) :
+dtt: Duty Tracker Task
+
+app_act -> act_ut: SyncAction::UpdateTip(l2blkid)
+act_ut: "1. tell EL that this block is good\n\
+        engine.update_safe_block(blkid)\n\
+        2. TODO: update tip in RPCs"
+
+app_act -> act_mi: SyncAction::MarkInvalid(l2blkid)
+act_mi: "mark block as invalid in db"
+
+app_act -> act_fb: SyncAction::FinalizeBlock(l2blkid)
+act_fb: TODO: probably emit state checkpoint

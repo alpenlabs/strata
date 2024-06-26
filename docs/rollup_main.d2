@@ -1,0 +1,51 @@
+r: Rollup
+ctt: ChainTipTracker Task
+cwt: ConsensusWorker Task(... expanded below)
+st_syn: Start Sync tasks
+ddt: Seq. Duty Dispatch task(... expanded below)
+dtt: Seq. Duty tracker task(... expanded below)
+det: Duty exec task(... expanded below)
+lrt: l1 reader task
+rps: RPC Server
+
+r -> r : 1. Initialize db and rpc clients
+r -> st_syn: 2. Call
+
+st_syn -> st_syn: 3. Check and init genesis
+st_syn -> ctt: 4. Spawn
+st_syn -> cwt: 5. Spawn
+st_syn -> r: 6. returns SyncManager
+
+r -> sq: 7: if Sequencer
+sq: "Load sequencer keys"
+sq -> dtt: spawns
+sq -> ddt: spawns
+r -> lrt: 8. spawns
+r -> rps: 9. starts
+
+ddt -> det: spawns
+
+det -> ctt: ChainTipMessage
+ctt -> ctmp: process
+
+ctmp: Process Chain Tip message
+ctmp -> ctmns: Ctm::NewState(state, op)
+ctmns: "update state"
+ctmns -> acth: 1. Send op.actions
+acth -> ctmns: 2. return FinalizedReport
+acth: Action handler
+acth -> fba: action == FinalizeBlock(blkid)
+fba: "1. check block sequence\n \
+        2. reject irrelevant blocks in tree"
+acth -> "..." : TODO: other actions
+
+ctmp -> ctmnb: Ctm::NewBlk(blkid)
+ctmnb: "1. check if blk in db\n \
+        2. check signature\n\
+        3. execute blk payload and validate\n\
+        4. insert blk to pending tracker\n\
+        5. Check for reorgs\n\
+        6. evid <- create SyncEvent(new_tip)\n\
+        7. CsmMessage::EventInput(evid)\n\
+        "
+ctmnb -> cwt: CsmMessage

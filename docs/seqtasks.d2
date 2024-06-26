@@ -1,0 +1,39 @@
+ConsensusState Worker task -> dtt: ConsensusUpdateNotif
+
+dtt: Duty Tracker Task
+
+dtt -> ut: 1. call with update.new_state and tracker
+ut: Update tracker
+ut -> ed: 1.1. call with state and db
+ed: "get tip block from state and db\n\
+     create SigningDuty for next block after the tip"
+ed -> ut: "1.2. returns duties as vec[SigningDuty]"
+ut -> Update tracker duties: 1.3
+dtt -> ddt: 2. DutyBatch(duties)
+
+
+ddt: Duty Dispatch Task
+ddt -> ddtl
+ddtl: For each duty it receives in batch
+ddtl -> action
+action: "1. skip if duty already pending\n\
+        2. call duty_exec_task\n\
+        3. insert duty to pending duties queue"
+action -> det: calls with duty and other
+det: Duty Exec Task
+
+det -> pd: call
+pd: "Perform Duty"
+pd -> sb: 1. call with block, etc
+sb: "Sign block\n\n\
+    check if already in db\n\
+    prev_block <- get previous block a/c consensus state\n\
+    safe_l1_block <- TODO\n\
+    payloadenv <- Create PayloadEnv from prev st root, safe_l1_block, deposits\n\
+    pid <- engine.prepare_payload(payloadenv)\n\
+    payload <- poll_payload_status(pid)\n\
+    (blk, blkid) <- create and sign l2 block from payload\n\
+    store in db"
+sb -> pd: 2. (blkid, block)
+pd -> ctt: ChainTipMessage::NewBlock(blkid)
+ctt: ChainTipTracker Task
