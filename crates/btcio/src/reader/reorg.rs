@@ -16,13 +16,13 @@ pub async fn detect_reorg(
 ) -> anyhow::Result<Option<u64>> {
     let exp_prev_hash = block.header.prev_blockhash;
 
-    let mut iter = latest_seen_blocks.iter();
+    let mut iter = latest_seen_blocks.iter().rev();
     let prev_hash = iter.next();
     if let Some(hash) = prev_hash {
         if exp_prev_hash == *hash {
             Ok(None)
         } else {
-            find_fork_point_until(block_num, &mut iter, rpc_client, config).await
+            find_fork_point_until(block_num, iter, rpc_client, config).await
         }
     } else {
         Ok(None)
@@ -31,7 +31,7 @@ pub async fn detect_reorg(
 
 async fn find_fork_point_until<'a>(
     blk_num: u64,
-    prev_blockhashes_iter: &'a mut Iter<'a, BlockHash>,
+    mut prev_blockhashes_iter: impl Iterator<Item = &BlockHash>,
     rpc_client: &impl L1Client,
     config: &ReaderConfig,
 ) -> anyhow::Result<Option<u64>> {
