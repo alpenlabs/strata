@@ -5,7 +5,7 @@ use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc};
 use tracing::*;
 
-use alpen_vertex_db::traits::*;
+use alpen_vertex_db::{database, traits::*};
 use alpen_vertex_evmctl::engine::ExecEngineCtl;
 use alpen_vertex_primitives::prelude::*;
 use alpen_vertex_state::{consensus::ConsensusState, operation::SyncAction};
@@ -103,7 +103,7 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
     ev_idx: u64,
 ) -> anyhow::Result<()> {
     // Perform the main step of deciding what the output we're operating on.
-    let outp = state.state_tracker.advance_consensus_state(ev_idx)?;
+    let (outp, new_state) = state.state_tracker.advance_consensus_state(ev_idx)?;
 
     for action in outp.actions() {
         match action {
@@ -132,9 +132,15 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
         }
     }
 
-    // TODO broadcast the new state somehow
+    // Get the newly computed state.
     assert_eq!(state.state_tracker.cur_state_idx(), ev_idx);
-    let new_state = state.state_tracker.cur_state().clone();
+
+    // Write the state checkpoint.
+    // TODO Don't do this on every update.
+    let css = state.database.consensus_state_store();
+    css.write_consensus_checkpoint(ev_idx, new_state.as_ref().clone())?;
+
+    // Broadcast the update.
     let update = ConsensusUpdateNotif::new(ev_idx, Arc::new(outp), new_state);
     if state.cupdate_tx.send(Arc::new(update)).is_err() {
         warn!(%ev_idx, "failed to send broadcast for new CSM update");

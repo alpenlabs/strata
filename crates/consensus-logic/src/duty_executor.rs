@@ -199,7 +199,7 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
         Duty::SignBlock(data) => {
             let slot = data.slot();
 
-            let Some((blkid, _block)) = sign_block(slot, ik, database, engine)? else {
+            let Some((blkid, _block)) = sign_and_store_block(slot, ik, database, engine)? else {
                 return Ok(());
             };
 
@@ -210,7 +210,9 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
                 error!(?blkid, "failed to submit new block to chain tip tracker");
             }
 
-            // TODO do we have to do something with _block?
+            // TODO push the block into the CSM and publish it for all to see
+
+            // TODO do we have to do something with _block right now?
 
             // TODO eventually, send the block out to peers
 
@@ -219,7 +221,7 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
     }
 }
 
-fn sign_block<D: Database, E: ExecEngineCtl>(
+fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     slot: u64,
     ik: &IdentityKey,
     database: &D,
@@ -242,7 +244,7 @@ fn sign_block<D: Database, E: ExecEngineCtl>(
     // pull out the current tip block from it
     // XXX this is really bad as-is
     let cs_prov = database.consensus_state_provider();
-    let ckpt_idx = cs_prov.get_last_checkpoint_idx()?; // FIXME this isn't what this is for
+    let ckpt_idx = cs_prov.get_last_checkpoint_idx()?; // FIXME this isn't what this is for, it only works because we're checkpointing on every state right now
     let last_cstate = cs_prov
         .get_state_checkpoint(ckpt_idx)?
         .expect("dutyexec: get state checkpoint");
@@ -289,8 +291,6 @@ fn sign_block<D: Database, E: ExecEngineCtl>(
     let l2store = database.l2_store();
     l2store.put_block_data(final_block.clone())?;
     debug!(?blkid, "wrote block to datastore");
-
-    // TODO push the block into the CSM and publish it for all to see
 
     Ok(Some((blkid, final_block)))
 }
