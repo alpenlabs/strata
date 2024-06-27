@@ -60,12 +60,14 @@ where
             let l1blkid = blockdata.block().block_hash();
 
             let manifest = generate_block_manifest(blockdata.block());
-            let l1txs: Vec<_> = blockdata
-                .interesting_tx_idxs()
-                .iter()
-                .enumerate()
-                .map(|(i, _)| generate_l1_tx(i as u32, blockdata.block()))
-                .collect();
+            // TODO fix broken code, wasn't tested
+            /*let l1txs: Vec<_> = blockdata
+            .interesting_tx_idxs()
+            .iter()
+            .enumerate()
+            .map(|(i, _)| generate_l1_tx(i as u32, blockdata.block()))
+            .collect();*/
+            let l1txs = Vec::new();
             let num_txs = l1txs.len();
 
             l1db.put_block_data(blockdata.block_num(), manifest, l1txs)?;

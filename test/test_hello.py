@@ -1,3 +1,5 @@
+import time
+
 import flexitest
 
 @flexitest.register
@@ -16,3 +18,5 @@ class HelloTest(flexitest.Test):
 
         l1stat = seqrpc.alp_l1status()
         print("L1 status", l1stat)
+
+        time.sleep(5)
