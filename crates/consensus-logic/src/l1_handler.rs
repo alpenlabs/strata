@@ -6,31 +6,25 @@ use bitcoin::Block;
 use tokio::sync::mpsc;
 use tracing::*;
 
-use alpen_vertex_db::traits::{L1DataStore, SyncEventStore};
+use alpen_vertex_btcio::reader::messages::L1Event;
+use alpen_vertex_db::traits::L1DataStore;
 use alpen_vertex_primitives::buf::Buf32;
 use alpen_vertex_primitives::{l1::L1BlockManifest, utils::generate_l1_tx};
 use alpen_vertex_state::sync_event::SyncEvent;
 
-use super::config::ReaderConfig;
-use crate::reader::messages::L1Event;
+use crate::ctl::CsmController;
 
 /// Consumes L1 events and reflects them in the database.
-pub fn bitcoin_data_handler_task<L1D, SD>(
+pub fn bitcoin_data_handler_task<L1D>(
     l1db: Arc<L1D>,
-    sdb: Arc<SD>,
+    csm_ctl: Arc<CsmController>,
     mut event_rx: mpsc::Receiver<L1Event>,
-    _config: Arc<ReaderConfig>,
 ) -> anyhow::Result<()>
 where
     L1D: L1DataStore + Sync + Send + 'static,
-    SD: SyncEventStore + Sync + Send + 'static,
 {
-    loop {
-        let Some(event) = event_rx.blocking_recv() else {
-            break;
-        };
-
-        if let Err(e) = handle_event(event, l1db.as_ref(), sdb.as_ref()) {
+    while let Some(event) = event_rx.blocking_recv() {
+        if let Err(e) = handle_event(event, l1db.as_ref(), csm_ctl.as_ref()) {
             error!(err = %e, "failed to handle L1 event");
         }
     }
@@ -39,10 +33,9 @@ where
     Ok(())
 }
 
-fn handle_event<L1D, SD>(event: L1Event, l1db: &L1D, syncdb: &SD) -> anyhow::Result<()>
+fn handle_event<L1D>(event: L1Event, l1db: &L1D, csm_ctl: &CsmController) -> anyhow::Result<()>
 where
     L1D: L1DataStore + Sync + Send + 'static,
-    SD: SyncEventStore + Sync + Send + 'static,
 {
     match event {
         L1Event::RevertTo(revert_blk_num) => {
@@ -51,7 +44,9 @@ where
             l1db.revert_to_height(revert_blk_num)?;
             debug!(%revert_blk_num, "wrote revert");
 
-            // TODO emit revert sync event
+            // Write to sync event db.
+            let ev = SyncEvent::L1Revert(revert_blk_num);
+            csm_ctl.submit_event(ev)?;
 
             Ok(())
         }
@@ -75,9 +70,8 @@ where
 
             // Write to sync event db.
             let blkid: Buf32 = blockdata.block().block_hash().into();
-            let _idx =
-                syncdb.write_sync_event(SyncEvent::L1Block(blockdata.block_num(), blkid.into()))?;
-            // TODO Send idx to any receivers that might be listening to this
+            let ev = SyncEvent::L1Block(blockdata.block_num(), blkid.into());
+            csm_ctl.submit_event(ev)?;
 
             Ok(())
         }

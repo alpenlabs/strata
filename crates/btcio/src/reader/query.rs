@@ -2,8 +2,10 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Duration;
 
+use anyhow::bail;
 use bitcoin::{Block, BlockHash};
 use tokio::sync::mpsc;
+use tracing::instrument::WithSubscriber;
 use tracing::*;
 
 use super::config::ReaderConfig;
@@ -17,6 +19,7 @@ fn filter_interesting_txs(block: &Block) -> Vec<u32> {
 }
 
 /// State we use in various parts of the reader.
+#[derive(Debug)]
 struct ReaderState {
     /// The highest block in the chain, at `.back()` of queue.
     cur_height: u64,
@@ -64,12 +67,13 @@ impl ReaderState {
             return None;
         }
 
-        let off = self.recent_blocks.len() as u64 - height;
-        Some(&self.recent_blocks[off as usize])
+        let back_off = self.cur_height - height;
+        let idx = self.recent_blocks.len() as u64 - back_off - 1;
+        Some(&self.recent_blocks[idx as usize])
     }
 
     fn deepest_block(&self) -> u64 {
-        self.cur_height - self.recent_blocks.len() as u64
+        self.cur_height - self.recent_blocks.len() as u64 - 1
     }
 
     fn revert_tip(&mut self) -> Option<BlockHash> {
@@ -88,7 +92,7 @@ impl ReaderState {
         }
 
         let rollback_cnt = self.cur_height - new_height;
-        if rollback_cnt > self.recent_blocks.len() as u64 {
+        if rollback_cnt >= self.recent_blocks.len() as u64 {
             panic!("reader: tried to rollback past deepest block");
         }
 
@@ -97,6 +101,10 @@ impl ReaderState {
             let blkhash = self.revert_tip().expect("reader: rollback tip");
             buf.push(blkhash);
         }
+
+        // More sanity checks.
+        assert!(!self.recent_blocks.is_empty());
+        assert_eq!(self.cur_height, new_height);
 
         buf
     }
@@ -178,6 +186,8 @@ async fn init_reader_state(
     let end_height = u64::min(target_block, chain_info.blocks);
     debug!(%start_height, %end_height, "queried L1 client, have init range");
 
+    // Loop through the range we've determined to be okay and pull the blocks
+    // in.
     let mut real_cur_height = start_height;
     for height in start_height..=end_height {
         let blkid = client.get_block_hash(height).await?;
@@ -216,12 +226,17 @@ async fn poll_for_new_blocks(
                 warn!("unable to submit L1 reorg event, did persistence task exit?");
             }
         }
+    } else {
+        // TODO make this case a bit more structured
+        error!("unable to find common block with client chain, something is seriously wrong here!");
+        bail!("things are broken");
     }
 
     debug!(%client_height, "have new blocks");
 
     // Now process each block we missed.
-    for fetch_height in state.cur_height..=client_height {
+    let scan_start_height = state.cur_height + 1;
+    for fetch_height in scan_start_height..=client_height {
         let blkid = match fetch_and_process_block(fetch_height, client, event_tx, state).await {
             Ok(b) => b,
             Err(e) => {
@@ -248,6 +263,7 @@ async fn find_pivot_block(
         }
 
         let queried_blkid = client.get_block_hash(height).await?;
+        trace!(%height, %blkid, %queried_blkid, "comparing blocks to find pivot");
         if queried_blkid == *blkid {
             return Ok(Some((height, *blkid)));
         }

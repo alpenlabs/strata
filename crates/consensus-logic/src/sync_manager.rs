@@ -33,8 +33,14 @@ impl SyncManager {
         self.params.clone()
     }
 
+    /// Gets a ref to the CSM controller.
     pub fn csm_controller(&self) -> &CsmController {
         &self.csm_ctl
+    }
+
+    /// Gets a clone of the CSM controller.
+    pub fn get_csm_ctl(&self) -> Arc<CsmController> {
+        self.csm_ctl.clone()
     }
 
     /// Returns a new broadcast `Receiver` handle to the consensus update

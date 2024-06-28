@@ -179,7 +179,10 @@ where
     <D as alpen_vertex_db::traits::Database>::SeStore: Send + Sync + 'static,
     <D as alpen_vertex_db::traits::Database>::L1Store: Send + Sync + 'static,
 {
-    l1_reader::start_reader_tasks(sync_man.params(), l1_rpc_client, database.clone()).await?;
+    // Start the L1 tasks to get that going.
+    let csm_ctl = sync_man.get_csm_ctl();
+    l1_reader::start_reader_tasks(sync_man.params(), l1_rpc_client, database.clone(), csm_ctl)
+        .await?;
 
     let (stop_tx, stop_rx) = oneshot::channel();
 

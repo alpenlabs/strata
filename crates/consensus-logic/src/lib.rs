@@ -8,6 +8,7 @@ pub mod duties;
 pub mod duty_executor;
 pub mod duty_extractor;
 pub mod genesis;
+pub mod l1_handler;
 pub mod message;
 pub mod reorg;
 pub mod state_tracker;
