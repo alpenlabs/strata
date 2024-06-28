@@ -1,5 +1,9 @@
-use core::{fmt::Display, str::FromStr};
+use std::sync::atomic::AtomicU64;
 use std::time::Duration;
+use std::{fmt::Display, str::FromStr};
+
+#[cfg(test)]
+use std::env;
 
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -14,41 +18,42 @@ use bitcoin::{
 use reqwest::header::HeaderMap;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, to_value, value::RawValue};
-#[cfg(test)]
-use std::env;
 use tracing::warn;
 
-use super::{traits::L1Client, types::RawUTXO};
+use super::traits::L1Client;
+use super::types::{RawUTXO, RpcBlockchainInfo};
 
 const MAX_RETRIES: u32 = 3;
 
-// RPCError is a struct that represents an error returned by the Bitcoin RPC
+// Represents a JSON-RPC error.
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
-pub struct RPCError {
+pub struct RpcError {
     pub code: i32,
     pub message: String,
 }
-impl Display for RPCError {
+
+impl Display for RpcError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "RPCError {}: {}", self.code, self.message)
+        write!(f, "RPCError code {}: {}", self.code, self.message)
     }
 }
 
 // Response is a struct that represents a response returned by the Bitcoin RPC
 // It is generic over the type of the result field, which is usually a String in Bitcoin Core
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
-struct Response<R = String> {
+struct Response<R> {
     pub result: Option<R>,
-    pub error: Option<RPCError>,
-    pub id: String,
+    pub error: Option<RpcError>,
+    pub id: u64,
 }
 
 // BitcoinClient is a struct that represents a connection to a Bitcoin RPC node
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct BitcoinClient {
     url: String,
     client: reqwest::Client,
     network: Network,
+    next_id: AtomicU64,
 }
 
 impl BitcoinClient {
@@ -69,6 +74,7 @@ impl BitcoinClient {
                 .parse()
                 .expect("Failed to parse content type header!"),
         );
+
         let client = reqwest::Client::builder()
             .default_headers(headers)
             .build()
@@ -78,22 +84,30 @@ impl BitcoinClient {
             url,
             client,
             network,
+            next_id: AtomicU64::new(0),
         }
+    }
+
+    fn next_id(&self) -> u64 {
+        self.next_id
+            .fetch_add(1, std::sync::atomic::Ordering::AcqRel)
     }
 
     async fn call<T: serde::de::DeserializeOwned>(
         &self,
         method: &str,
-        params: Vec<serde_json::Value>,
-    ) -> Result<T, anyhow::Error> {
+        params: &[serde_json::Value],
+    ) -> anyhow::Result<T> {
         let mut retries = 0;
+
         loop {
+            let id = self.next_id();
             let response = self
                 .client
                 .post(&self.url)
                 .json(&json!({
                     "jsonrpc": "1.0",
-                    "id": method,
+                    "id": id,
                     "method": method,
                     "params": params
                 }))
@@ -146,18 +160,18 @@ impl BitcoinClient {
         }
     }
 
-    // get_block_count returns the current block height
-    pub async fn get_block_count(&self) -> Result<u64, anyhow::Error> {
-        self.call::<u64>("getblockcount", vec![]).await
+    /// get_block_count returns the current block height
+    pub async fn get_block_count(&self) -> anyhow::Result<u64> {
+        self.call::<u64>("getblockcount", &[]).await
     }
 
-    // This returns [(txid, timestamp)]
+    /// This returns [(txid, timestamp)]
     pub async fn list_transactions(
         &self,
         confirmations: u32,
-    ) -> Result<Vec<(String, u64)>, anyhow::Error> {
+    ) -> anyhow::Result<Vec<(String, u64)>> {
         let res = self
-            .call::<serde_json::Value>("listtransactions", vec![to_value(confirmations)?])
+            .call::<serde_json::Value>("listtransactions", &[to_value(confirmations)?])
             .await?;
         if let serde_json::Value::Array(array) = res {
             Ok(array
@@ -176,20 +190,20 @@ impl BitcoinClient {
         }
     }
 
-    // get_mempool_txids returns a list of txids in the current mempool
-    pub async fn get_mempool_txids(&self) -> Result<Vec<String>, anyhow::Error> {
+    /// get_mempool_txids returns a list of txids in the current mempool
+    pub async fn get_mempool_txids(&self) -> anyhow::Result<Vec<String>> {
         let result = self
-            .call::<Box<RawValue>>("getrawmempool", vec![])
+            .call::<Box<RawValue>>("getrawmempool", &[])
             .await?
             .to_string();
 
         serde_json::from_str::<Vec<String>>(&result).map_err(anyhow::Error::from)
     }
 
-    // get_block returns the block at the given hash
-    pub async fn get_block(&self, hash: String) -> Result<Block, anyhow::Error> {
+    /// get_block returns the block at the given hash
+    pub async fn get_block(&self, hash: String) -> anyhow::Result<Block> {
         let result = self
-            .call::<Box<RawValue>>("getblock", vec![to_value(hash.clone())?, to_value(3)?])
+            .call::<Box<RawValue>>("getblock", &[to_value(hash)?, to_value(3)?])
             .await?
             .to_string();
 
@@ -213,7 +227,6 @@ impl BitcoinClient {
             .iter()
             .map(|tx| {
                 let tx_hex = tx["hex"].as_str().unwrap();
-
                 deserialize(&hex::decode(tx_hex).unwrap()).unwrap()
                 // parse_hex_transaction(tx_hex).unwrap() // hex from rpc cannot be invalid
             })
@@ -226,9 +239,9 @@ impl BitcoinClient {
     }
 
     // get_utxos returns all unspent transaction outputs for the wallets of bitcoind
-    pub async fn get_utxos(&self) -> Result<Vec<RawUTXO>, anyhow::Error> {
+    pub async fn get_utxos(&self) -> anyhow::Result<Vec<RawUTXO>> {
         let utxos = self
-            .call::<Vec<RawUTXO>>("listunspent", vec![to_value(0)?, to_value(9999999)?])
+            .call::<Vec<RawUTXO>>("listunspent", &[to_value(0)?, to_value(9999999)?])
             .await?;
 
         if utxos.is_empty() {
@@ -242,7 +255,7 @@ impl BitcoinClient {
     /// 0 confirmations means tx is still in mempool
     pub async fn get_transaction_confirmations(&self, txid: String) -> anyhow::Result<u64> {
         let result = self
-            .call::<Box<RawValue>>("gettransaction", vec![to_value(txid)?])
+            .call::<Box<RawValue>>("gettransaction", &[to_value(txid)?])
             .await?
             .to_string();
         let result: serde_json::Value = serde_json::from_str(&result)?;
@@ -254,7 +267,7 @@ impl BitcoinClient {
 
     pub async fn list_since_block(&self, blockhash: String) -> anyhow::Result<Vec<String>> {
         let result = self
-            .call::<Box<RawValue>>("listsinceblock", vec![to_value(blockhash)?])
+            .call::<Box<RawValue>>("listsinceblock", &[to_value(blockhash)?])
             .await?
             .to_string();
 
@@ -268,13 +281,13 @@ impl BitcoinClient {
         Ok(txids)
     }
 
-    // get_change_address returns a change address for the wallet of bitcoind
-    async fn get_change_address(&self) -> Result<Address, anyhow::Error> {
-        let address_string = self.call::<String>("getrawchangeaddress", vec![]).await?;
+    /// get_change_address returns a change address for the wallet of bitcoind
+    async fn get_change_address(&self) -> anyhow::Result<Address> {
+        let address_string = self.call::<String>("getrawchangeaddress", &[]).await?;
         Ok(Address::from_str(&address_string)?.require_network(self.network)?)
     }
 
-    pub async fn get_change_addresses(&self) -> Result<[Address; 2], anyhow::Error> {
+    pub async fn get_change_addresses(&self) -> anyhow::Result<[Address; 2]> {
         let change_address = self.get_change_address().await?;
         let change_address_2 = self.get_change_address().await?;
 
@@ -282,9 +295,9 @@ impl BitcoinClient {
     }
 
     // estimate_smart_fee estimates the fee to confirm a transaction in the next block
-    pub async fn estimate_smart_fee(&self) -> Result<f64, anyhow::Error> {
+    pub async fn estimate_smart_fee(&self) -> anyhow::Result<f64> {
         let result = self
-            .call::<Box<RawValue>>("estimatesmartfee", vec![to_value(1)?])
+            .call::<Box<RawValue>>("estimatesmartfee", &[to_value(1)?])
             .await?
             .to_string();
 
@@ -302,10 +315,7 @@ impl BitcoinClient {
     }
 
     // sign_raw_transaction_with_wallet signs a raw transaction with the wallet of bitcoind
-    pub async fn sign_raw_transaction_with_wallet(
-        &self,
-        tx: String,
-    ) -> Result<String, anyhow::Error> {
+    pub async fn sign_raw_transaction_with_wallet(&self, tx: String) -> anyhow::Result<String> {
         #[derive(Serialize, Deserialize, Debug)]
         struct SignError {
             txid: String,
@@ -316,14 +326,16 @@ impl BitcoinClient {
             sequence: u32,
             error: String,
         }
+
         #[derive(Serialize, Deserialize, Debug)]
         struct SignRPCResponse {
             hex: String,
             complete: bool,
             errors: Option<Vec<SignError>>,
         }
+
         let res = self
-            .call::<SignRPCResponse>("signrawtransactionwithwallet", vec![to_value(tx)?])
+            .call::<SignRPCResponse>("signrawtransactionwithwallet", &[to_value(tx)?])
             .await?;
 
         match res.errors {
@@ -348,9 +360,9 @@ impl BitcoinClient {
     }
 
     // send_raw_transaction sends a raw transaction to the network
-    pub async fn send_raw_transaction(&self, tx: String) -> Result<Vec<u8>, anyhow::Error> {
+    pub async fn send_raw_transaction(&self, tx: String) -> anyhow::Result<Vec<u8>> {
         let resp = self
-            .call::<String>("sendrawtransaction", vec![to_value(tx)?])
+            .call::<String>("sendrawtransaction", &[to_value(tx)?])
             .await?;
         let hex = hex::decode(resp);
         match hex {
@@ -359,21 +371,17 @@ impl BitcoinClient {
         }
     }
 
-    pub async fn list_wallets(&self) -> Result<Vec<String>, anyhow::Error> {
-        self.call::<Vec<String>>("listwallets", vec![]).await
+    pub async fn list_wallets(&self) -> anyhow::Result<Vec<String>> {
+        self.call::<Vec<String>>("listwallets", &[]).await
     }
 
     #[cfg(test)]
-    pub async fn send_to_address(
-        &self,
-        address: String,
-        amt: u32,
-    ) -> Result<String, anyhow::Error> {
+    pub async fn send_to_address(&self, address: String, amt: u32) -> anyhow::Result<String> {
         if self.network == Network::Regtest {
             let result = self
                 .call::<Box<RawValue>>(
                     "sendtoaddress",
-                    vec![
+                    &[
                         to_value(address)?,
                         to_value(amt)?,
                         // All the following items are needed to pass the fee-rate and fee-rate
@@ -396,27 +404,21 @@ impl BitcoinClient {
             Err(anyhow!("Cannot send_to_address on non-regtest network"))
         }
     }
-
-    #[cfg(test)]
-    pub fn get_test_node() -> Self {
-        let host = env::var("REGTEST_HOST").unwrap_or("http://localhost".to_string());
-        let port = env::var("REGTEST_PORT").unwrap_or("8333".to_string());
-        let url = format!("{}:{}", host, port);
-        BitcoinClient::new(
-            url,
-            env::var("REGTEST_USER").unwrap_or("rpcuser".to_string()),
-            env::var("REGTEST_PASSWORD").unwrap_or("rpcpassword".to_string()),
-            bitcoin::Network::Regtest,
-        )
-    }
 }
 
 #[async_trait]
 impl L1Client for BitcoinClient {
+    async fn get_blockchain_info(&self) -> anyhow::Result<RpcBlockchainInfo> {
+        let res = self
+            .call::<RpcBlockchainInfo>("getblockchaininfo", &[])
+            .await?;
+        Ok(res)
+    }
+
     // get_block_hash returns the block hash of the block at the given height
-    async fn get_block_hash(&self, height: u64) -> Result<[u8; 32], anyhow::Error> {
+    async fn get_block_hash(&self, height: u64) -> anyhow::Result<[u8; 32]> {
         let str_hash = self
-            .call::<String>("getblockhash", vec![to_value(height)?])
+            .call::<String>("getblockhash", &[to_value(height)?])
             .await?;
 
         let bytes = Vec::from_hex(&str_hash)?;
@@ -428,7 +430,7 @@ impl L1Client for BitcoinClient {
         Ok(array)
     }
 
-    async fn get_block_at(&self, height: u64) -> Result<Block, anyhow::Error> {
+    async fn get_block_at(&self, height: u64) -> anyhow::Result<Block> {
         let hash = self.get_block_hash(height).await?;
         let block = self.get_block(hex::encode(hash)).await?;
         Ok(block)

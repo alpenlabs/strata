@@ -64,6 +64,7 @@ mod tests {
     use alpen_test_utils::ArbitraryGenerator;
 
     use super::*;
+    use crate::rpc::types::RpcBlockchainInfo;
 
     pub struct TestL1Client {
         pub hashes: Vec<[u8; 32]>,
@@ -93,6 +94,10 @@ mod tests {
 
     #[async_trait]
     impl L1Client for TestL1Client {
+        async fn get_blockchain_info(&self) -> anyhow::Result<RpcBlockchainInfo> {
+            unimplemented!()
+        }
+
         async fn get_block_at(&self, height: u64) -> anyhow::Result<Block> {
             Ok(self.blocks[height as usize - 1].clone())
         }

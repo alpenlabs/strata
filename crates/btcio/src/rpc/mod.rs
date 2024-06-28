@@ -1,5 +1,5 @@
-pub mod rpc;
+pub mod client;
 pub mod traits;
-mod types;
+pub mod types;
 
-pub use rpc::*;
+pub use client::*;

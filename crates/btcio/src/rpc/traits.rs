@@ -1,8 +1,13 @@
 use async_trait::async_trait;
 use bitcoin::Block;
 
+use super::types::RpcBlockchainInfo;
+
 #[async_trait]
 pub trait L1Client: Sync + Send + 'static {
+    /// Corresponds to `getblockchaininfo`.
+    async fn get_blockchain_info(&self) -> anyhow::Result<RpcBlockchainInfo>;
+
     /// Fetches the block at given height
     async fn get_block_at(&self, height: u64) -> anyhow::Result<Block>;
 
