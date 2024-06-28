@@ -7,6 +7,8 @@ use std::env;
 
 use anyhow::anyhow;
 use async_trait::async_trait;
+use bitcoin::hashes::sha256d::Hash;
+use bitcoin::hashes::Hash as _;
 // use async_recursion::async_recursion;
 use bitcoin::{
     block::{Header, Version},
@@ -18,7 +20,7 @@ use bitcoin::{
 use reqwest::header::HeaderMap;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, to_value, value::RawValue};
-use tracing::warn;
+use tracing::*;
 
 use super::traits::L1Client;
 use super::types::{RawUTXO, RpcBlockchainInfo};
@@ -99,7 +101,6 @@ impl BitcoinClient {
         params: &[serde_json::Value],
     ) -> anyhow::Result<T> {
         let mut retries = 0;
-
         loop {
             let id = self.next_id();
             let response = self
@@ -201,9 +202,9 @@ impl BitcoinClient {
     }
 
     /// get_block returns the block at the given hash
-    pub async fn get_block(&self, hash: String) -> anyhow::Result<Block> {
+    pub async fn get_block(&self, hash: &BlockHash) -> anyhow::Result<Block> {
         let result = self
-            .call::<Box<RawValue>>("getblock", &[to_value(hash)?, to_value(3)?])
+            .call::<Box<RawValue>>("getblock", &[to_value(hash.to_string())?, to_value(3)?])
             .await?
             .to_string();
 
@@ -216,7 +217,10 @@ impl BitcoinClient {
             )?),
             merkle_root: TxMerkleNode::from_str(full_block["merkleroot"].as_str().unwrap())?,
             nonce: full_block["nonce"].as_u64().unwrap() as u32,
-            prev_blockhash: BlockHash::from_str(full_block["previousblockhash"].as_str().unwrap())?,
+            prev_blockhash: full_block["previousblockhash"]
+                .as_str()
+                .and_then(|s| BlockHash::from_str(s).ok())
+                .unwrap_or_else(|| BlockHash::from_raw_hash(Hash::all_zeros())),
             time: full_block["time"].as_u64().unwrap() as u32,
             version: Version::from_consensus(full_block["version"].as_u64().unwrap() as i32),
         };
@@ -417,16 +421,15 @@ impl L1Client for BitcoinClient {
 
     // get_block_hash returns the block hash of the block at the given height
     async fn get_block_hash(&self, height: u64) -> anyhow::Result<BlockHash> {
-        let str_hash = self
+        let hash = self
             .call::<String>("getblockhash", &[to_value(height)?])
             .await?;
-        let blkid = BlockHash::from_str(&str_hash)?;
-        Ok(blkid)
+        Ok(BlockHash::from_str(&hash)?)
     }
 
     async fn get_block_at(&self, height: u64) -> anyhow::Result<Block> {
         let hash = self.get_block_hash(height).await?;
-        let block = self.get_block(hex::encode(hash)).await?;
+        let block = self.get_block(&hash).await?;
         Ok(block)
     }
 }

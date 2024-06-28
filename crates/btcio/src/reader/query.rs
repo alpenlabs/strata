@@ -117,6 +117,17 @@ pub async fn bitcoin_data_reader_task(
     event_tx: mpsc::Sender<L1Event>,
     cur_block_height: u64,
     config: Arc<ReaderConfig>,
+) {
+    if let Err(e) = do_reader_task(&client, &event_tx, cur_block_height, config).await {
+        error!(err = %e, "reader task exited");
+    }
+}
+
+async fn do_reader_task(
+    client: &impl L1Client,
+    event_tx: &mpsc::Sender<L1Event>,
+    cur_block_height: u64,
+    config: Arc<ReaderConfig>,
 ) -> anyhow::Result<()> {
     info!(%cur_block_height, "started L1 reader task!");
 
@@ -125,7 +136,7 @@ pub async fn bitcoin_data_reader_task(
     let mut state = init_reader_state(
         cur_block_height,
         config.max_reorg_depth as usize * 2,
-        &client,
+        client,
     )
     .await?;
     let best_blkid = state.best_block();
@@ -134,10 +145,16 @@ pub async fn bitcoin_data_reader_task(
     // FIXME This function will return when reorg happens when there are not
     // enough elements in the vec deque, probably during startup.
     loop {
-        match poll_for_new_blocks(&client, &event_tx, &config, &mut state).await {
+        let cur_height = state.cur_height;
+        let poll_span = debug_span!("l1poll", %cur_height);
+
+        match poll_for_new_blocks(client, &event_tx, &config, &mut state)
+            .instrument(poll_span)
+            .await
+        {
             Ok(_) => {}
             Err(e) => {
-                warn!(err = %e, "failed to poll Bitcoin client");
+                warn!(%cur_height, err = %e, "failed to poll Bitcoin client");
             }
         }
 
@@ -147,17 +164,22 @@ pub async fn bitcoin_data_reader_task(
 
 /// Inits the reader state by trying to backfill blocks up to a target height.
 async fn init_reader_state(
-    target_blk_height: u64,
+    target_block: u64,
     lookback: usize,
     client: &impl L1Client,
 ) -> anyhow::Result<ReaderState> {
     // Init the reader state using the blockid we were given, fill in a few blocks back.
-    debug!(%target_blk_height, "initializing reader state");
+    debug!(%target_block, "initializing reader state");
     let mut init_queue = VecDeque::new();
 
-    let start_block = i64::max(target_blk_height as i64 - lookback as i64, 0) as u64;
-    let mut real_cur_height = start_block;
-    for height in start_block..=target_blk_height {
+    // Do some math to figure out where our start and end are.
+    let chain_info = client.get_blockchain_info().await?;
+    let start_height = i64::max(target_block as i64 - lookback as i64, 0) as u64;
+    let end_height = u64::min(target_block, chain_info.blocks);
+    debug!(%start_height, %end_height, "queried L1 client, have init range");
+
+    let mut real_cur_height = start_height;
+    for height in start_height..=end_height {
         let blkid = client.get_block_hash(height).await?;
         debug!(%height, %blkid, "loaded recent L1 block");
         init_queue.push_back(blkid);
@@ -177,8 +199,9 @@ async fn poll_for_new_blocks(
     state: &mut ReaderState,
 ) -> anyhow::Result<()> {
     let chain_info = client.get_blockchain_info().await?;
-    let best_block = chain_info.bestblockhash();
-    if best_block == *state.best_block() {
+    let client_height = chain_info.blocks;
+    let fresh_best_block = chain_info.bestblockhash();
+    if fresh_best_block == *state.best_block() {
         trace!("polled client, nothing to do");
         return Ok(());
     }
@@ -195,10 +218,18 @@ async fn poll_for_new_blocks(
         }
     }
 
+    debug!(%client_height, "have new blocks");
+
     // Now process each block we missed.
-    for ck_height in state.cur_height..=chain_info.blocks {
-        let blkid = fetch_and_process_block(ck_height, client, event_tx, state).await?;
-        info!(%ck_height, %blkid, "accepted new block");
+    for fetch_height in state.cur_height..=client_height {
+        let blkid = match fetch_and_process_block(fetch_height, client, event_tx, state).await {
+            Ok(b) => b,
+            Err(e) => {
+                warn!(%fetch_height, err = %e, "failed to fetch new block");
+                break;
+            }
+        };
+        info!(%fetch_height, %blkid, "accepted new block");
     }
 
     Ok(())
@@ -211,6 +242,11 @@ async fn find_pivot_block(
     state: &ReaderState,
 ) -> anyhow::Result<Option<(u64, BlockHash)>> {
     for (height, blkid) in state.iter_blocks_back() {
+        // If at genesis, we can't reorg any farther.
+        if height == 0 {
+            return Ok(Some((height, *blkid)));
+        }
+
         let queried_blkid = client.get_block_hash(height).await?;
         if queried_blkid == *blkid {
             return Ok(Some((height, *blkid)));
