@@ -81,7 +81,7 @@ fn get_cohashes_from_wtxids(wtxids: &[Wtxid], index: u32) -> (Vec<Buf32>, Buf32)
 pub fn generate_l1_tx(idx: u32, block: &Block) -> L1Tx {
     assert!(
         (idx as usize) < block.txdata.len(),
-        "The transaction idx should be within the range of block transactions length"
+        "utils: tx idx out of range of block txs"
     );
     let tx = &block.txdata[idx as usize];
 

@@ -6,13 +6,6 @@ use std::sync::Arc;
 use std::thread;
 use std::time;
 
-use alpen_vertex_consensus_logic::duties::DutyBatch;
-use alpen_vertex_consensus_logic::duties::Identity;
-use alpen_vertex_consensus_logic::duty_executor;
-use alpen_vertex_consensus_logic::duty_executor::IdentityData;
-use alpen_vertex_consensus_logic::duty_executor::IdentityKey;
-use alpen_vertex_consensus_logic::message::ConsensusUpdateNotif;
-use alpen_vertex_primitives::buf::Buf32;
 use anyhow::Context;
 use thiserror::Error;
 use tokio::sync::broadcast;
@@ -22,12 +15,17 @@ use tracing::*;
 use alpen_vertex_btcio::rpc::traits::L1Client;
 use alpen_vertex_common::logging;
 use alpen_vertex_consensus_logic::ctl::CsmController;
-use alpen_vertex_consensus_logic::message::{ChainTipMessage, CsmMessage};
+use alpen_vertex_consensus_logic::duties::{DutyBatch, Identity};
+use alpen_vertex_consensus_logic::duty_executor::{self, IdentityData, IdentityKey};
+use alpen_vertex_consensus_logic::message::{ChainTipMessage, ConsensusUpdateNotif, CsmMessage};
+use alpen_vertex_consensus_logic::sync_manager;
+use alpen_vertex_consensus_logic::sync_manager::SyncManager;
 use alpen_vertex_consensus_logic::{chain_tip, unfinalized_tracker, worker};
 use alpen_vertex_db::database::CommonDatabase;
 use alpen_vertex_db::stubs::l2::StubL2Db;
 use alpen_vertex_db::traits::Database;
 use alpen_vertex_db::{ConsensusStateDb, L1Db, SyncEventDb};
+use alpen_vertex_primitives::buf::Buf32;
 use alpen_vertex_primitives::{block_credential, params::*};
 use alpen_vertex_rpc_api::AlpenApiServer;
 use alpen_vertex_state::consensus::ConsensusState;
@@ -113,42 +111,23 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         warn!(network = %args.network, "network not set to regtest, ignoring");
     }
 
-    // Init the consensus worker state and get the current state from it.
-    let cw_state = worker::WorkerState::open(params.clone(), database.clone())?;
-    let cur_state = cw_state.cur_state().clone();
-    let cur_chain_tip = cur_state.chain_state().chain_tip_blockid();
-
-    // Init the chain tracker from the state we figured out.
-    let chain_tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(cur_chain_tip);
-    let ct_state = chain_tip::ChainTipTrackerState::new(
-        params.clone(),
-        database.clone(),
-        cur_state,
-        chain_tracker,
-        cur_chain_tip,
-    );
-    // TODO load unfinalized blocks into block tracker
-
     // Create dataflow channels.
-    let (ctm_tx, ctm_rx) = mpsc::channel::<ChainTipMessage>(64);
-    let (csm_tx, csm_rx) = mpsc::channel::<CsmMessage>(64);
-    let csm_ctl = Arc::new(CsmController::new(database.clone(), csm_tx));
     let (cout_tx, cout_rx) = mpsc::channel::<operation::ConsensusOutput>(64);
     let (cur_state_tx, cur_state_rx) = watch::channel::<Option<ConsensusState>>(None);
-    let (cupdate_tx, cupdate_rx) = broadcast::channel::<ConsensusUpdateNotif>(64);
     // TODO connect up these other channels
 
     // Init engine controller.
     let eng_ctl = alpen_vertex_evmctl::stub::StubController::new(time::Duration::from_millis(100));
     let eng_ctl = Arc::new(eng_ctl);
-    let eng_ctl_cw = eng_ctl.clone();
-    let eng_ctl_ct = eng_ctl.clone();
 
-    // Start core threads.
-    // TODO set up watchdog for these things
-    let cw_handle = thread::spawn(|| worker::consensus_worker_task(cw_state, eng_ctl_cw, csm_rx));
-    let ct_handle =
-        thread::spawn(|| chain_tip::tracker_task(ct_state, eng_ctl_ct, ctm_rx, csm_ctl));
+    // Start the sync manager.
+    let sync_man = sync_manager::start_sync_tasks(
+        database.clone(),
+        eng_ctl.clone(),
+        pool.clone(),
+        params.clone(),
+    )?;
+    let sync_man = Arc::new(sync_man);
 
     // If the sequencer key is set, start the sequencer duties task.
     if let Some(seqkey_path) = &args.sequencer_key {
@@ -156,12 +135,12 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         let idata = load_seqkey(seqkey_path)?;
 
         // Set up channel and clone some things.
+        let sm = sync_man.clone();
+        let cu_rx = sync_man.create_cstate_subscription();
         let (duties_tx, duties_rx) = broadcast::channel::<DutyBatch>(8);
-        let cu_rx = cupdate_tx.subscribe();
         let db = database.clone();
         let db2 = database.clone();
         let eng_ctl_de = eng_ctl.clone();
-        let ctm_tx = ctm_tx.clone();
         let pool = pool.clone();
 
         // Spawn the two tasks.
@@ -175,11 +154,11 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             )
         });
         thread::spawn(move || {
-            duty_executor::duty_dispatch_task(duties_rx, idata.key, db2, eng_ctl_de, ctm_tx, pool)
+            duty_executor::duty_dispatch_task(duties_rx, idata.key, sm, db2, eng_ctl_de, pool)
         });
     }
 
-    let main_fut = main_task(args, params.rollup.clone(), btc_rpc, database.clone());
+    let main_fut = main_task(args, sync_man, btc_rpc, database.clone());
     if let Err(e) = rt.block_on(main_fut) {
         error!(err = %e, "main task exited");
         process::exit(0); // special case exit once we've gotten to this point
@@ -191,7 +170,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
 async fn main_task<D: Database>(
     args: Args,
-    params: RollupParams,
+    sync_man: Arc<SyncManager>,
     l1_rpc_client: impl L1Client,
     database: Arc<D>,
 ) -> anyhow::Result<()>
@@ -200,7 +179,7 @@ where
     <D as alpen_vertex_db::traits::Database>::SeStore: Send + Sync + 'static,
     <D as alpen_vertex_db::traits::Database>::L1Store: Send + Sync + 'static,
 {
-    l1_reader::start_reader_tasks(&params, l1_rpc_client, database.clone()).await?;
+    l1_reader::start_reader_tasks(sync_man.params(), l1_rpc_client, database.clone()).await?;
 
     let (stop_tx, stop_rx) = oneshot::channel();
 

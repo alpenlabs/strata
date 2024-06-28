@@ -48,7 +48,8 @@ class BitcoinFactory(flexitest.Factory):
             svc = flexitest.service.ProcService(props, cmd, stdout=f)
 
             def _create_rpc():
-                return BitcoindClient(rpc_url)
+                url = "http://%s:%s@localhost:%s" % (BD_USERNAME, BD_PASSWORD, rpc_port)
+                return BitcoindClient(base_url=url)
             setattr(svc, "create_rpc", _create_rpc)
 
             return svc
@@ -58,7 +59,7 @@ class VertexFactory(flexitest.Factory):
 
         super().__init__(datadir_pfx, port_range)
 
-    def create_sequencer(self, bitcoind_host: str, bitcoind_user: str, bitcoind_pass: str) -> flexitest.Service:
+    def create_sequencer(self, bitcoind_sock: str, bitcoind_user: str, bitcoind_pass: str) -> flexitest.Service:
         datadir = self.create_datadir("seq")
         rpc_port = self.next_port()
         logfile = os.path.join(datadir, "service.log")
@@ -74,7 +75,7 @@ class VertexFactory(flexitest.Factory):
             "alpen-vertex-sequencer",
             "--datadir", datadir,
             "--rpc-port", str(rpc_port),
-            "--bitcoind-host", bitcoind_host,
+            "--bitcoind-host", bitcoind_sock,
             "--bitcoind-user", bitcoind_user,
             "--bitcoind-password", bitcoind_pass,
             "--network", "regtest",
@@ -106,9 +107,20 @@ class BasicEnvConfig(flexitest.EnvConfig):
 
         bitcoind = btc_fac.create_regtest_bitcoin()
         time.sleep(0.5)
+
+        brpc = bitcoind.create_rpc()
+        brpc.proxy.createwallet("dummy")
+        addr = brpc.proxy.getnewaddress()
+        print("dummy addr", addr)
+        for _ in range(3):
+            blk = brpc.proxy.generateblock(addr, [])
+            print("new block", blk)
+
+        rpc_port = bitcoind.get_prop("rpc_port")
         rpc_user = bitcoind.get_prop("rpc_user")
         rpc_pass = bitcoind.get_prop("rpc_password")
-        sequencer = seq_fac.create_sequencer("localhost", rpc_user, rpc_pass)
+        rpc_sock = "localhost:%s" % rpc_port
+        sequencer = seq_fac.create_sequencer(rpc_sock, rpc_user, rpc_pass)
         time.sleep(0.5)
 
         svcs = {"bitcoin": bitcoind, "sequencer": sequencer}

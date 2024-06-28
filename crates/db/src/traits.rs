@@ -3,20 +3,14 @@
 
 use std::sync::Arc;
 
-use arbitrary::Arbitrary;
-use bitcoin::consensus::serialize;
-use bitcoin::hashes::Hash;
-use bitcoin::opcodes::all::OP_RETURN;
-use bitcoin::{Amount, Block};
-use borsh::{BorshDeserialize, BorshSerialize};
-
-use crate::errors::*;
 use alpen_vertex_mmr::CompactMmr;
 use alpen_vertex_primitives::{l1::*, prelude::*};
 use alpen_vertex_state::block::{L2Block, L2BlockId};
 use alpen_vertex_state::consensus::ConsensusState;
 use alpen_vertex_state::operation::*;
 use alpen_vertex_state::sync_event::SyncEvent;
+
+use crate::errors::*;
 
 /// Common database interface that we can parameterize worker tasks over if
 /// parameterizing them over each individual trait gets cumbersome or if we need

@@ -8,10 +8,10 @@ use alpen_vertex_btcio::reader::{
 };
 use alpen_vertex_btcio::rpc::traits::L1Client;
 use alpen_vertex_db::traits::{Database, L1DataProvider};
-use alpen_vertex_primitives::params::RollupParams;
+use alpen_vertex_primitives::params::{Params, RollupParams};
 
 pub async fn start_reader_tasks<D: Database>(
-    params: &RollupParams,
+    params: &Params,
     rpc_client: impl L1Client,
     db: Arc<D>,
 ) -> anyhow::Result<()>
@@ -25,7 +25,7 @@ where
     let l1prov = db.l1_provider().clone();
     let current_block_height = l1prov
         .get_chain_tip()?
-        .unwrap_or(params.l1_start_block_height - 1);
+        .unwrap_or(params.rollup().l1_start_block_height - 1);
 
     let config = Arc::new(ReaderConfig::default());
 

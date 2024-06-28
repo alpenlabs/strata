@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::{thread, time};
 
+use alpen_vertex_db::database;
 use borsh::{BorshDeserialize, BorshSerialize};
 use tokio::sync::{broadcast, mpsc};
 use tracing::*;
@@ -21,6 +22,7 @@ use crate::duties::{self, Duty, DutyBatch, Identity};
 use crate::duty_extractor;
 use crate::errors::Error;
 use crate::message::{ChainTipMessage, ConsensusUpdateNotif};
+use crate::sync_manager::SyncManager;
 
 #[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
 pub enum IdentityKey {
@@ -43,7 +45,7 @@ impl IdentityData {
 }
 
 pub fn duty_tracker_task<D: Database, E: ExecEngineCtl>(
-    mut state: broadcast::Receiver<ConsensusUpdateNotif>,
+    mut state: broadcast::Receiver<Arc<ConsensusUpdateNotif>>,
     batch_queue: broadcast::Sender<DutyBatch>,
     ident: Identity,
     database: Arc<D>,
@@ -121,12 +123,13 @@ pub fn duty_dispatch_task<
 >(
     mut updates: broadcast::Receiver<DutyBatch>,
     ident_key: IdentityKey,
+    sync_man: Arc<SyncManager>,
     database: Arc<D>,
     engine: Arc<E>,
-    chain_tip_msg_tx: mpsc::Sender<ChainTipMessage>,
     pool: Arc<threadpool::ThreadPool>,
 ) {
-    let mut pending_duties: HashMap<u64, thread::JoinHandle<()>> = HashMap::new();
+    // TODO make this actually work
+    let mut pending_duties: HashMap<u64, ()> = HashMap::new();
 
     // TODO still need some stuff here to decide if we're fully synced and
     // *should* dispatch duties
@@ -157,11 +160,11 @@ pub fn duty_dispatch_task<
             // TODO make this use a thread pool
             let d = duty.duty().clone();
             let ik = ident_key.clone();
+            let sm = sync_man.clone();
             let db = database.clone();
             let e = engine.clone();
-            let ctm_tx = chain_tip_msg_tx.clone();
-            let join = thread::spawn(move || duty_exec_task(d, ik, db, e, ctm_tx));
-            pending_duties.insert(id, join);
+            let _join = pool.execute(move || duty_exec_task(d, ik, sm, db, e));
+            pending_duties.insert(id, ());
         }
     }
 
@@ -174,17 +177,11 @@ pub fn duty_dispatch_task<
 fn duty_exec_task<D: Database, E: ExecEngineCtl>(
     duty: Duty,
     ik: IdentityKey,
+    sync_man: Arc<SyncManager>,
     database: Arc<D>,
     engine: Arc<E>,
-    chain_tip_msg_tx: mpsc::Sender<ChainTipMessage>,
 ) {
-    if let Err(e) = perform_duty(
-        &duty,
-        &ik,
-        database.as_ref(),
-        engine.as_ref(),
-        chain_tip_msg_tx,
-    ) {
+    if let Err(e) = perform_duty(&duty, &ik, &sync_man, database.as_ref(), engine.as_ref()) {
         error!(err = %e, "error performing duty");
     } else {
         debug!("completed duty successfully");
@@ -194,26 +191,28 @@ fn duty_exec_task<D: Database, E: ExecEngineCtl>(
 fn perform_duty<D: Database, E: ExecEngineCtl>(
     duty: &Duty,
     ik: &IdentityKey,
+    sync_man: &SyncManager,
     database: &D,
     engine: &E,
-    chain_tip_msg_tx: mpsc::Sender<ChainTipMessage>,
 ) -> Result<(), Error> {
     match duty {
         Duty::SignBlock(data) => {
             let slot = data.slot();
 
-            let Some((blkid, _block)) = sign_block(slot, ik, database, engine)? else {
+            let Some((blkid, _block)) = sign_and_store_block(slot, ik, database, engine)? else {
                 return Ok(());
             };
 
             // Submit it to the chain tip tracker to update the consensus state
             // with it.
             let ctm = ChainTipMessage::NewBlock(blkid);
-            if !chain_tip_msg_tx.blocking_send(ctm).is_ok() {
+            if !sync_man.submit_chain_tip_msg(ctm) {
                 error!(?blkid, "failed to submit new block to chain tip tracker");
             }
 
-            // TODO do we have to do something with _block?
+            // TODO push the block into the CSM and publish it for all to see
+
+            // TODO do we have to do something with _block right now?
 
             // TODO eventually, send the block out to peers
 
@@ -222,7 +221,7 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
     }
 }
 
-fn sign_block<D: Database, E: ExecEngineCtl>(
+fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     slot: u64,
     ik: &IdentityKey,
     database: &D,
@@ -245,7 +244,7 @@ fn sign_block<D: Database, E: ExecEngineCtl>(
     // pull out the current tip block from it
     // XXX this is really bad as-is
     let cs_prov = database.consensus_state_provider();
-    let ckpt_idx = cs_prov.get_last_checkpoint_idx()?; // FIXME this isn't what this is for
+    let ckpt_idx = cs_prov.get_last_checkpoint_idx()?; // FIXME this isn't what this is for, it only works because we're checkpointing on every state right now
     let last_cstate = cs_prov
         .get_state_checkpoint(ckpt_idx)?
         .expect("dutyexec: get state checkpoint");
@@ -292,8 +291,6 @@ fn sign_block<D: Database, E: ExecEngineCtl>(
     let l2store = database.l2_store();
     l2store.put_block_data(final_block.clone())?;
     debug!(?blkid, "wrote block to datastore");
-
-    // TODO push the block into the CSM and publish it for all to see
 
     Ok(Some((blkid, final_block)))
 }

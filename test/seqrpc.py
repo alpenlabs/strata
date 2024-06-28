@@ -16,12 +16,12 @@ def _make_request(method: str, req_id: int, params) -> str:
     return json.dumps(req)
 
 def _handle_response(resp_str: str):
-    resp = json.dumps(resp_str)
+    resp = json.loads(resp_str)
     if "error" in resp:
         e = resp["error"]
         d = None
-        if "data" in e: data = e["data"]
-        raise RpcError(e["code"], e["msg"], data=d)
+        if "data" in e: d = e["data"]
+        raise RpcError(e["code"], e["message"], data=d)
     return resp["result"]
 
 def _send_single_ws_request(url: str, request: str) -> str:
