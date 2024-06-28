@@ -12,7 +12,7 @@ use alpen_vertex_primitives::{l1::L1BlockManifest, utils::generate_l1_tx};
 use alpen_vertex_state::sync_event::SyncEvent;
 
 use super::config::ReaderConfig;
-use crate::reader::L1Event;
+use crate::reader::messages::L1Event;
 
 /// Consumes L1 events and reflects them in the database.
 pub fn bitcoin_data_handler_task<L1D, SD>(

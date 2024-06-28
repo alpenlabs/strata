@@ -2,13 +2,15 @@ use std::sync::Arc;
 use std::thread;
 
 use tokio::sync::mpsc;
+use tracing::*;
 
 use alpen_vertex_btcio::reader::{
-    bitcoin_data_reader_task, config::ReaderConfig, handler::bitcoin_data_handler_task, L1Event,
+    config::ReaderConfig, handler::bitcoin_data_handler_task, messages::L1Event,
+    query::bitcoin_data_reader_task,
 };
 use alpen_vertex_btcio::rpc::traits::L1Client;
 use alpen_vertex_db::traits::{Database, L1DataProvider};
-use alpen_vertex_primitives::params::{Params, RollupParams};
+use alpen_vertex_primitives::params::Params;
 
 pub async fn start_reader_tasks<D: Database>(
     params: &Params,
@@ -30,7 +32,7 @@ where
     let config = Arc::new(ReaderConfig::default());
 
     // TODO set up watchdog to handle when the spawned tasks fail gracefully
-    let reader_handle = tokio::spawn(bitcoin_data_reader_task(
+    let _reader_handle = tokio::spawn(bitcoin_data_reader_task(
         rpc_client,
         ev_tx,
         current_block_height,
@@ -39,7 +41,7 @@ where
 
     let l1db = db.l1_store().clone();
     let sedb = db.sync_event_store().clone();
-    let handler_handle =
+    let _handler_handle =
         thread::spawn(move || bitcoin_data_handler_task(l1db, sedb, ev_rx, config));
 
     Ok(())

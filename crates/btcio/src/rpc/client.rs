@@ -416,18 +416,12 @@ impl L1Client for BitcoinClient {
     }
 
     // get_block_hash returns the block hash of the block at the given height
-    async fn get_block_hash(&self, height: u64) -> anyhow::Result<[u8; 32]> {
+    async fn get_block_hash(&self, height: u64) -> anyhow::Result<BlockHash> {
         let str_hash = self
             .call::<String>("getblockhash", &[to_value(height)?])
             .await?;
-
-        let bytes = Vec::from_hex(&str_hash)?;
-        if bytes.len() != 32 {
-            return Err(anyhow::anyhow!("Invalid hex length"));
-        }
-        let mut array = [0u8; 32];
-        array.copy_from_slice(&bytes);
-        Ok(array)
+        let blkid = BlockHash::from_str(&str_hash)?;
+        Ok(blkid)
     }
 
     async fn get_block_at(&self, height: u64) -> anyhow::Result<Block> {
