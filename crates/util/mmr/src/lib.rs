@@ -123,7 +123,11 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
     ) -> MerkleProof<H> {
         if self.num == 0 {
             self.add_leaf(next);
-            return MerkleProof::new(self.num);
+            return MerkleProof {
+                cohashes: vec![],
+                index: 0,
+                _pd: PhantomData,
+            };
         }
         let mut updated_proof = proof.clone();
 
@@ -183,9 +187,17 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
     ) -> MerkleProof<H> {
         if self.num == 0 {
             self.add_leaf(next);
-            return MerkleProof::new(0);
+            return MerkleProof {
+                cohashes: vec![],
+                index: 0,
+                _pd: PhantomData,
+            };
         }
-        let mut new_proof = MerkleProof::new(self.num);
+        let mut new_proof = MerkleProof {
+            cohashes: vec![],
+            index: self.num,
+            _pd: PhantomData,
+        };
 
         let new_leaf_index = self.num;
         let peak_mask = self.num;
@@ -224,14 +236,18 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
         return new_proof;
     }
 
-    pub fn verify(&self, cohashes: &[Hash], leaf_index: u64, leaf_hash: Hash) -> bool {
+    pub fn verify(&self, proof: &MerkleProof<H>, leaf: &Hash) -> bool {
+        self.verify_raw(&proof.cohashes, proof.index, &leaf)
+    }
+
+    fn verify_raw(&self, cohashes: &[Hash], leaf_index: u64, leaf_hash: &Hash) -> bool {
         let root = self.peaks[cohashes.len()];
 
         if cohashes.len() == 0 {
-            return root == leaf_hash;
+            return root == *leaf_hash;
         }
 
-        let mut cur_hash = leaf_hash;
+        let mut cur_hash = *leaf_hash;
         let mut side_flags = leaf_index;
 
         for i in 0..cohashes.len() {
@@ -276,14 +292,6 @@ where
 }
 
 impl<H: MerkleHasher + Clone> MerkleProof<H> {
-    fn new(index: u64) -> Self {
-        Self {
-            cohashes: vec![],
-            index,
-            _pd: PhantomData,
-        }
-    }
-
     /// builds the new MerkleProof from the provided Data
     pub fn from_cohashes(cohashes: Vec<Hash>, index: u64) -> Self {
         Self {
@@ -295,29 +303,14 @@ impl<H: MerkleHasher + Clone> MerkleProof<H> {
 
     /// verifies the hash against the current proof for given mmr
     pub fn verify_against_mmr(&self, mmr: &MerkleMr<H>, leaf_hash: Hash) -> bool {
-        let root = mmr.peaks[self.cohashes.len()];
-        if self.cohashes.len() == 0 {
-            return root == leaf_hash;
-        }
-        let mut cur_hash = leaf_hash;
-        let mut side_flags = self.index;
-
-        for i in 0..self.cohashes.len() {
-            let node_hash = if side_flags & 1 == 1 {
-                H::hash_node(self.cohashes[i], cur_hash)
-            } else {
-                H::hash_node(cur_hash, self.cohashes[i])
-            };
-
-            side_flags >>= 1;
-            cur_hash = node_hash;
-        }
-        cur_hash == root
+        mmr.verify(&self, &leaf_hash)
     }
 }
 
 #[cfg(test)]
 mod test {
+    use std::marker::PhantomData;
+
     use sha2::{Digest, Sha256};
 
     use crate::error::MerkleError;
@@ -360,7 +353,7 @@ mod test {
             .collect();
 
         (0..specific_nodes.len()).for_each(|i| {
-            assert!(mmr.verify(&proof[i].cohashes, proof[i].index, hash[i]));
+            assert!(mmr.verify(&proof[i], &hash[i]));
         });
     }
 
@@ -385,7 +378,7 @@ mod test {
             .expect("Didn't find proof for given index");
 
         let hash = Sha256::digest(&0_usize.to_be_bytes()).into();
-        assert!(mmr.verify(&proof.cohashes, proof.index, hash));
+        assert!(mmr.verify(&proof, &hash));
     }
 
     #[test]
@@ -448,13 +441,15 @@ mod test {
     #[test]
     fn check_invalid_proof() {
         let (mmr, _) = generate_for_n_integers(5);
-        let invalid_proof = MerkleProof::<Sha256>::new(6);
+        let invalid_proof = MerkleProof::<Sha256> {
+            cohashes: vec![],
+            index: 6,
+            _pd: PhantomData,
+        };
+
         let hash = Sha256::digest(&6_usize.to_be_bytes()).into();
 
-        assert!(matches!(
-            mmr.verify(&invalid_proof.cohashes, 0, hash),
-            false
-        ));
+        assert!(matches!(mmr.verify(&invalid_proof, &hash), false));
     }
 
     #[test]
@@ -505,7 +500,11 @@ mod test {
     fn arbitrary_index_proof() {
         let (mut mmr, _) = generate_for_n_integers(20);
         // update proof for 21st element
-        let mut proof: MerkleProof<Sha256> = MerkleProof::new(20);
+        let mut proof: MerkleProof<Sha256> = MerkleProof {
+            cohashes: vec![],
+            index: 20,
+            _pd: PhantomData,
+        };
 
         // add 4 elements into mmr  so 20 + 4 elements
         let elem = 4;
