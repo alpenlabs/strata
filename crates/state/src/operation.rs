@@ -101,7 +101,10 @@ pub fn apply_writes_to_state(
                 state.recent_l1_blocks.truncate(pos);
             }
             AcceptL1Block(l1blkid) => state.recent_l1_blocks.push(l1blkid),
-            AcceptL2Block(blkid) => state.pending_l2_blocks.push_back(blkid),
+            AcceptL2Block(blkid) => {
+                // TODO do any other bookkeeping
+                state.chain_state.accepted_l2_blocks.push(blkid);
+            }
             UpdateBuried(new_idx) => {
                 // Check that it's increasing.
                 let old_idx = state.buried_l1_height;

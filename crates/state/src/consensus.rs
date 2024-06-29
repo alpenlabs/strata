@@ -30,10 +30,6 @@ pub struct ConsensusState {
 
     /// L1 block index we treat as being "buried" and won't reorg.
     pub(super) buried_l1_height: u64,
-
-    /// Blocks we've received that appear to be on the chain tip but have not
-    /// fully executed yet.
-    pub(super) pending_l2_blocks: VecDeque<L2BlockId>,
 }
 
 impl ConsensusState {
@@ -44,7 +40,6 @@ impl ConsensusState {
             finalized_tip: gblkid,
             recent_l1_blocks: Vec::new(),
             buried_l1_height: genesis_l1_height,
-            pending_l2_blocks: VecDeque::new(),
         }
     }
 

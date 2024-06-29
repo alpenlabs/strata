@@ -45,7 +45,7 @@ impl IdentityData {
 }
 
 pub fn duty_tracker_task<D: Database, E: ExecEngineCtl>(
-    mut state: broadcast::Receiver<Arc<ConsensusUpdateNotif>>,
+    mut cupdate_rx: broadcast::Receiver<Arc<ConsensusUpdateNotif>>,
     batch_queue: broadcast::Sender<DutyBatch>,
     ident: Identity,
     database: Arc<D>,
@@ -53,7 +53,7 @@ pub fn duty_tracker_task<D: Database, E: ExecEngineCtl>(
     let mut duties_tracker = duties::DutyTracker::new_empty();
 
     loop {
-        let update = match state.blocking_recv() {
+        let update = match cupdate_rx.blocking_recv() {
             Ok(u) => u,
             Err(broadcast::error::RecvError::Closed) => {
                 break;
@@ -66,14 +66,11 @@ pub fn duty_tracker_task<D: Database, E: ExecEngineCtl>(
         };
 
         let ev_idx = update.sync_event_idx();
+        let new_state = update.new_state();
         trace!(%ev_idx, "new consensus state, updating duties");
+        trace!("STATE: {new_state:#?}");
 
-        if let Err(e) = update_tracker(
-            &mut duties_tracker,
-            update.new_state(),
-            &ident,
-            database.as_ref(),
-        ) {
+        if let Err(e) = update_tracker(&mut duties_tracker, new_state, &ident, database.as_ref()) {
             error!(err = %e, "failed to update duties tracker");
         }
 
@@ -94,7 +91,6 @@ fn update_tracker<D: Database>(
     database: &D,
 ) -> Result<(), Error> {
     let new_duties = duty_extractor::extract_duties(state, &ident, database)?;
-    // TODO update the tracker with the new duties and state data
 
     // Figure out the block slot from the tip blockid.
     // TODO include the block slot in the consensus state
@@ -109,7 +105,8 @@ fn update_tracker<D: Database>(
     // TODO figure out which blocks were finalized
     let newly_finalized = Vec::new();
     let tracker_update = duties::StateUpdate::new(block_idx, ts, newly_finalized);
-    tracker.update(&tracker_update);
+    let n_evicted = tracker.update(&tracker_update);
+    trace!(%n_evicted, "evicted old duties from new consensus state");
 
     // Now actually insert the new duties.
     tracker.add_duties(tip_blkid, block_idx, new_duties.into_iter());
@@ -164,6 +161,7 @@ pub fn duty_dispatch_task<
             let db = database.clone();
             let e = engine.clone();
             let _join = pool.execute(move || duty_exec_task(d, ik, sm, db, e));
+            trace!(%id, "dispatched duty exec task");
             pending_duties.insert(id, ());
         }
     }
@@ -197,9 +195,8 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
 ) -> Result<(), Error> {
     match duty {
         Duty::SignBlock(data) => {
-            let slot = data.slot();
-
-            let Some((blkid, _block)) = sign_and_store_block(slot, ik, database, engine)? else {
+            let target = data.target_slot();
+            let Some((blkid, _block)) = sign_and_store_block(target, ik, database, engine)? else {
                 return Ok(());
             };
 
@@ -209,8 +206,6 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
             if !sync_man.submit_chain_tip_msg(ctm) {
                 error!(?blkid, "failed to submit new block to chain tip tracker");
             }
-
-            // TODO push the block into the CSM and publish it for all to see
 
             // TODO do we have to do something with _block right now?
 

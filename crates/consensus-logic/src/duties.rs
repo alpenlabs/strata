@@ -48,7 +48,7 @@ impl BlockSigningDuty {
         Self { slot }
     }
 
-    pub fn slot(&self) -> u64 {
+    pub fn target_slot(&self) -> u64 {
         self.slot
     }
 }
@@ -75,7 +75,7 @@ impl DutyTracker {
     }
 
     /// Updates the tracker with a new world state, purging relevant duties.
-    pub fn update(&mut self, update: &StateUpdate) {
+    pub fn update(&mut self, update: &StateUpdate) -> usize {
         let mut kept_duties = Vec::new();
 
         for d in self.duties.drain(..) {
@@ -100,7 +100,9 @@ impl DutyTracker {
             kept_duties.push(d);
         }
 
-        self.duties = kept_duties
+        let old_cnt = self.duties.len();
+        self.duties = kept_duties;
+        self.duties.len() - old_cnt
     }
 
     /// Adds some more duties.
