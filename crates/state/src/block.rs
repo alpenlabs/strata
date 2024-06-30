@@ -1,4 +1,7 @@
-use std::fmt::{self, Debug};
+use std::{
+    fmt::{self, Debug},
+    hash::BuildHasherDefault,
+};
 
 use alpen_vertex_primitives::l1::L1Tx;
 use alpen_vertex_primitives::prelude::*;
@@ -16,6 +19,12 @@ pub struct L2BlockId(Buf32);
 impl From<Buf32> for L2BlockId {
     fn from(value: Buf32) -> Self {
         Self(value)
+    }
+}
+
+impl From<L2BlockId> for Buf32 {
+    fn from(value: L2BlockId) -> Self {
+        value.0
     }
 }
 
@@ -37,6 +46,10 @@ pub struct L2Block {
 }
 
 impl L2Block {
+    pub fn new(header: L2BlockHeader, body: L2BlockBody) -> Self {
+        Self { header, body }
+    }
+
     pub fn header(&self) -> &L2BlockHeader {
         &self.header
     }
@@ -54,28 +67,28 @@ impl L2Block {
 #[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize, Arbitrary)]
 pub struct L2BlockHeader {
     /// Block index, obviously.
-    block_idx: u64,
+    pub(crate) block_idx: u64,
 
     /// Timestamp the block was (intended to be) published at.
-    timestamp: u64,
+    pub(crate) timestamp: u64,
 
     /// Hash of the previous block, to form the blockchain.
-    prev_block: L2BlockId,
+    pub(crate) prev_block: L2BlockId,
 
     /// Hash of the L1 segment.
-    l1_segment_hash: Buf32,
+    pub(crate) l1_segment_hash: Buf32,
 
     /// Hash of the exec segment.
     // TODO ideally this is just the EL header hash, not the hash of the full payload
-    exec_segment_hash: Buf32,
+    pub(crate) exec_segment_hash: Buf32,
 
     /// State root that commits to the overall state of the rollup, commits to
     /// both the CL state and EL state.
     // TODO figure out the structure of this
-    state_root: Buf32,
+    pub(crate) state_root: Buf32,
 
     /// Signature from this block's proposer.
-    signature: Buf64,
+    pub(crate) signature: Buf64,
 }
 
 impl L2BlockHeader {
@@ -123,16 +136,42 @@ pub struct L2BlockBody {
     exec_segment: ExecSegment,
 }
 
+impl L2BlockBody {
+    pub fn new(l1_segment: L1Segment, exec_segment: ExecSegment) -> Self {
+        Self {
+            l1_segment,
+            exec_segment,
+        }
+    }
+
+    pub fn l1_segment(&self) -> &L1Segment {
+        &self.l1_segment
+    }
+
+    pub fn exec_segment(&self) -> &ExecSegment {
+        &self.exec_segment
+    }
+}
+
 /// Container for additional messages that we've observed from the L1, if there
 /// are any.
 #[derive(Clone, Debug,PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct L1Segment {
     /// New headers that we've seen from L1 that we didn't see in the previous
     /// L2 block.
-    new_l1_headers: Vec<L1HeaderPayload>,
+    new_l1_header: Vec<L1HeaderPayload>,
 
     /// Deposit initiation transactions.
     deposits: Vec<L1Tx>,
+}
+
+impl L1Segment {
+    pub fn new(new_l1_header: Vec<L1HeaderPayload>, deposits: Vec<L1Tx>) -> Self {
+        Self {
+            new_l1_header,
+            deposits,
+        }
+    }
 }
 
 /// Information relating to the EL data.

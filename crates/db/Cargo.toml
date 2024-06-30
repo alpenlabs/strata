@@ -10,6 +10,7 @@ alpen-vertex-state = { workspace = true }
 
 anyhow = { workspace = true }
 arbitrary = { workspace = true }
+bitcoin = { workspace = true }
 borsh = { workspace = true }
 parking_lot = { workspace = true }
 reth-db = { workspace = true }
@@ -19,5 +20,4 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
-tempfile = "3.10.1"
-rand = "0.8.5"
+alpen-test-utils = { workspace = true }

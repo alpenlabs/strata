@@ -23,6 +23,14 @@ impl ExecPayloadData {
     pub fn new_simple(el_payload: Vec<u8>) -> Self {
         Self::new(el_payload, Vec::new())
     }
+
+    pub fn el_payload(&self) -> &[u8] {
+        &self.el_payload
+    }
+
+    pub fn ops(&self) -> &[Op] {
+        &self.ops
+    }
 }
 
 /// L1 withdrawal data.
@@ -52,6 +60,30 @@ pub struct PayloadEnv {
     el_ops: Vec<Op>,
 }
 
+impl PayloadEnv {
+    pub fn new(
+        timestamp: u64,
+        prev_global_state_root: Buf32,
+        safe_l1_block: Buf32,
+        el_ops: Vec<Op>,
+    ) -> Self {
+        Self {
+            timestamp,
+            prev_global_state_root,
+            safe_l1_block,
+            el_ops,
+        }
+    }
+
+    pub fn timestamp(&self) -> u64 {
+        self.timestamp
+    }
+
+    pub fn el_ops(&self) -> &[Op] {
+        &self.el_ops
+    }
+}
+
 /// Operation the CL pushes into the EL to perform as part of the block it's
 /// producing.
 #[derive(Clone, Debug)]
@@ -68,4 +100,18 @@ pub struct ELDepositData {
     /// Dest addr encoded in a portable format, assumed to be valid but must be
     /// checked by EL before committing to building block.
     dest_addr: Vec<u8>,
+}
+
+impl ELDepositData {
+    pub fn new(amt: u64, dest_addr: Vec<u8>) -> Self {
+        Self { amt, dest_addr }
+    }
+
+    pub fn amt(&self) -> u64 {
+        self.amt
+    }
+
+    pub fn dest_addr(&self) -> &[u8] {
+        &self.dest_addr
+    }
 }

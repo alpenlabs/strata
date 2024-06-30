@@ -2,9 +2,10 @@ use std::path::PathBuf;
 
 use argh::FromArgs;
 
-#[derive(FromArgs)]
+#[derive(Clone, FromArgs)]
 #[argh(description = "Alpen Vertex sequencer")]
 pub struct Args {
+    // TODO: add a rollup_config file arg
     #[argh(
         option,
         short = 'd',
@@ -31,4 +32,7 @@ pub struct Args {
         default = "\"regtest\".to_owned()"
     )]
     pub network: String,
+
+    #[argh(option, short = 'k', description = "path to sequencer root key")]
+    pub sequencer_key: Option<PathBuf>,
 }

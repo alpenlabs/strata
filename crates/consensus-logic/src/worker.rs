@@ -2,20 +2,19 @@
 
 use std::sync::Arc;
 
-use tokio::sync::mpsc;
+use tokio::sync::{broadcast, mpsc};
 use tracing::*;
 
-use alpen_vertex_db::{traits::*, DbResult};
+use alpen_vertex_db::{database, traits::*};
 use alpen_vertex_evmctl::engine::ExecEngineCtl;
 use alpen_vertex_primitives::prelude::*;
-use alpen_vertex_state::{
-    block::L2BlockId,
-    consensus::ConsensusState,
-    operation::{ConsensusOutput, ConsensusWrite, SyncAction},
-    sync_event::SyncEvent,
-};
+use alpen_vertex_state::{consensus::ConsensusState, operation::SyncAction};
 
-use crate::{errors::Error, message::CsmMessage, state_tracker, transition};
+use crate::{
+    errors::Error,
+    message::{ConsensusUpdateNotif, CsmMessage},
+    state_tracker,
+};
 
 /// Mutatble worker state that we modify in the consensus worker task.
 ///
@@ -31,12 +30,19 @@ pub struct WorkerState<D: Database> {
 
     /// Tracker used to remember the current consensus state.
     state_tracker: state_tracker::StateTracker<D>,
+
+    /// Broadcast channel used to publish state updates.
+    cupdate_tx: broadcast::Sender<Arc<ConsensusUpdateNotif>>,
 }
 
 impl<D: Database> WorkerState<D> {
     /// Constructs a new instance by reconstructing the current consensus state
     /// from the provided database layer.
-    pub fn open(params: Arc<Params>, database: Arc<D>) -> anyhow::Result<Self> {
+    pub fn open(
+        params: Arc<Params>,
+        database: Arc<D>,
+        cupdate_tx: broadcast::Sender<Arc<ConsensusUpdateNotif>>,
+    ) -> anyhow::Result<Self> {
         let cs_prov = database.consensus_state_provider().as_ref();
         let (cur_state_idx, cur_state) = state_tracker::reconstruct_cur_state(cs_prov)?;
         let state_tracker = state_tracker::StateTracker::new(
@@ -50,6 +56,7 @@ impl<D: Database> WorkerState<D> {
             params,
             database,
             state_tracker,
+            cupdate_tx,
         })
     }
 
@@ -96,7 +103,7 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
     ev_idx: u64,
 ) -> anyhow::Result<()> {
     // Perform the main step of deciding what the output we're operating on.
-    let outp = state.state_tracker.advance_consensus_state(ev_idx)?;
+    let (outp, new_state) = state.state_tracker.advance_consensus_state(ev_idx)?;
 
     for action in outp.actions() {
         match action {
@@ -125,7 +132,19 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
         }
     }
 
-    // TODO broadcast the new state somehow
+    // Get the newly computed state.
+    assert_eq!(state.state_tracker.cur_state_idx(), ev_idx);
+
+    // Write the state checkpoint.
+    // TODO Don't do this on every update.
+    let css = state.database.consensus_state_store();
+    css.write_consensus_checkpoint(ev_idx, new_state.as_ref().clone())?;
+
+    // Broadcast the update.
+    let update = ConsensusUpdateNotif::new(ev_idx, Arc::new(outp), new_state);
+    if state.cupdate_tx.send(Arc::new(update)).is_err() {
+        warn!(%ev_idx, "failed to send broadcast for new CSM update");
+    }
 
     Ok(())
 }

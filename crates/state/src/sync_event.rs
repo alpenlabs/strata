@@ -9,6 +9,9 @@ pub enum SyncEvent {
     /// We've observed a valid L1 block.
     L1Block(u64, L1BlockId),
 
+    /// Revert to a recent-ish L1 block.
+    L1Revert(u64),
+
     /// New L2 blocks were posted to L1 in a DA batch.
     L1DABatch(Vec<L2BlockId>),
 

@@ -1,6 +1,8 @@
 //! Operations that a state transition emits to update the new state and control
 //! the client's high level state.
 
+use std::sync::Arc;
+
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
@@ -21,10 +23,6 @@ impl ConsensusOutput {
         Self { writes, actions }
     }
 
-    pub fn into_parts(self) -> (Vec<ConsensusWrite>, Vec<SyncAction>) {
-        (self.writes, self.actions)
-    }
-
     pub fn writes(&self) -> &[ConsensusWrite] {
         &self.writes
     }
@@ -33,7 +31,9 @@ impl ConsensusOutput {
         &self.actions
     }
 
-    // TODO accessors as needed
+    pub fn into_parts(self) -> (Vec<ConsensusWrite>, Vec<SyncAction>) {
+        (self.writes, self.actions)
+    }
 }
 
 /// Describes possible writes to chain state that we can make.  We use this
@@ -101,7 +101,10 @@ pub fn apply_writes_to_state(
                 state.recent_l1_blocks.truncate(pos);
             }
             AcceptL1Block(l1blkid) => state.recent_l1_blocks.push(l1blkid),
-            AcceptL2Block(blkid) => state.pending_l2_blocks.push_back(blkid),
+            AcceptL2Block(blkid) => {
+                // TODO do any other bookkeeping
+                state.chain_state.accepted_l2_blocks.push(blkid);
+            }
             UpdateBuried(new_idx) => {
                 // Check that it's increasing.
                 let old_idx = state.buried_l1_height;

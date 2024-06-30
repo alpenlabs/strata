@@ -15,10 +15,12 @@ alpen-vertex-db = { workspace = true }
 alpen-vertex-primitives = { workspace = true }
 alpen-vertex-rpc-api = { workspace = true }
 alpen-vertex-state = { workspace = true }
+alpen-vertex-btcio = { workspace = true }
 
 anyhow = { workspace = true }
 argh = { workspace = true }
 async-trait = { workspace = true }
+bitcoin = { workspace = true }
 jsonrpsee = { workspace = true, features = ["server", "macros"] }
 parking_lot = { workspace = true }
 reth-ipc = { workspace = true }
@@ -30,5 +32,6 @@ rocksdb = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
+threadpool = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }

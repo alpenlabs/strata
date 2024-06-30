@@ -73,7 +73,7 @@ pub fn tracker_task<D: Database, E: ExecEngineCtl>(
     state: ChainTipTrackerState<D>,
     engine: Arc<E>,
     ctm_rx: mpsc::Receiver<ChainTipMessage>,
-    csm_ctl: Arc<CsmController<D>>,
+    csm_ctl: Arc<CsmController>,
 ) {
     if let Err(e) = tracker_task_inner(state, engine.as_ref(), ctm_rx, &csm_ctl) {
         error!(err = %e, "tracker aborted");
@@ -84,7 +84,7 @@ fn tracker_task_inner<D: Database, E: ExecEngineCtl>(
     mut state: ChainTipTrackerState<D>,
     engine: &E,
     mut ctm_rx: mpsc::Receiver<ChainTipMessage>,
-    csm_ctl: &CsmController<D>,
+    csm_ctl: &CsmController,
 ) -> anyhow::Result<()> {
     loop {
         let Some(m) = ctm_rx.blocking_recv() else {
@@ -102,7 +102,7 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
     ctm: ChainTipMessage,
     state: &mut ChainTipTrackerState<D>,
     engine: &E,
-    csm_ctl: &CsmController<D>,
+    csm_ctl: &CsmController,
 ) -> anyhow::Result<()> {
     match ctm {
         ChainTipMessage::NewState(cs, output) => {

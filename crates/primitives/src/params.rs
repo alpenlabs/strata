@@ -11,6 +11,9 @@ pub struct RollupParams {
 
     /// Rule we use to decide if a block is correctly signed.
     pub cred_rule: CredRule,
+
+    /// Block height from which to watch for L1 transactions
+    pub l1_start_block_height: u64,
 }
 
 /// Client sync parameters that are used to make the network work but don't

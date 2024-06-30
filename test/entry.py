@@ -2,6 +2,8 @@
 
 import os
 import sys
+import threading
+import time
 
 from bitcoinlib.services.bitcoind import BitcoindClient
 import flexitest
@@ -10,6 +12,19 @@ import seqrpc
 
 BD_USERNAME = "alpen"
 BD_PASSWORD = "alpen"
+
+def generate_seqkey() -> bytes:
+    # this is just for fun
+    buf = b"alpen" + b"_1337" * 5 + b"xx"
+    assert len(buf) == 32, "bad seqkey len"
+    return buf
+
+def generate_task(rpc, wait_dur, addr):
+    print("generating to address", addr)
+    while True:
+        time.sleep(wait_dur)
+        blk = rpc.proxy.generatetoaddress(1, addr)
+        print("made block", blk)
 
 class BitcoinFactory(flexitest.Factory):
     def __init__(self, datadir_pfx: str, port_range: list[int]):
@@ -41,7 +56,8 @@ class BitcoinFactory(flexitest.Factory):
             svc = flexitest.service.ProcService(props, cmd, stdout=f)
 
             def _create_rpc():
-                return BitcoindClient(rpc_url)
+                url = "http://%s:%s@localhost:%s" % (BD_USERNAME, BD_PASSWORD, rpc_port)
+                return BitcoindClient(base_url=url)
             setattr(svc, "create_rpc", _create_rpc)
 
             return svc
@@ -51,26 +67,34 @@ class VertexFactory(flexitest.Factory):
 
         super().__init__(datadir_pfx, port_range)
 
-    def create_sequencer(self, bitcoind_host: str, bitcoind_user: str, bitcoind_pass: str) -> flexitest.Service:
+    def create_sequencer(self, bitcoind_sock: str, bitcoind_user: str, bitcoind_pass: str) -> flexitest.Service:
         datadir = self.create_datadir("seq")
         rpc_port = self.next_port()
         logfile = os.path.join(datadir, "service.log")
+
+        keyfile = os.path.join(datadir, "seqkey.bin")
+        seqkey = generate_seqkey()
+        with open(keyfile, "wb") as f:
+            f.write(seqkey)
 
         # TODO EL setup, this is actually two services running coupled
 
         cmd = [
             "alpen-vertex-sequencer",
-            "--datadir=%s" % datadir,
-            "--bitcoind-host=%s" % bitcoind_host,
-            "--bitcoind-user=%s" % bitcoind_user,
-            "--bitcoind-password=%s" % bitcoind_password,
-            "--network=regtest",
+            "--datadir", datadir,
+            "--rpc-port", str(rpc_port),
+            "--bitcoind-host", bitcoind_sock,
+            "--bitcoind-user", bitcoind_user,
+            "--bitcoind-password", bitcoind_pass,
+            "--network", "regtest",
+            "--sequencer-key", keyfile
         ]
         props = {
             "rpc_port": rpc_port,
+            "seqkey": seqkey
         }
 
-        rpc_url = "http://localhost:%s" % rpc_port
+        rpc_url = "ws://localhost:%s" % rpc_port
 
         with open(logfile, "w") as f:
             svc = flexitest.service.ProcService(props, cmd, stdout=f)
@@ -90,9 +114,21 @@ class BasicEnvConfig(flexitest.EnvConfig):
         seq_fac = facs["sequencer"]
 
         bitcoind = btc_fac.create_regtest_bitcoin()
+        time.sleep(0.5)
+
+        # Set up a thread to generate blocks.  We should abstract this out more.
+        brpc = bitcoind.create_rpc()
+        brpc.proxy.createwallet("dummy")
+        addr = brpc.proxy.getnewaddress()
+        thr = threading.Thread(target=generate_task, args=(brpc, 1, addr))
+        thr.start()
+
+        rpc_port = bitcoind.get_prop("rpc_port")
         rpc_user = bitcoind.get_prop("rpc_user")
         rpc_pass = bitcoind.get_prop("rpc_password")
-        sequencer = seq_fac.create_sequencer("localhost", rpc_user, rpc_pass)
+        rpc_sock = "localhost:%s" % rpc_port
+        sequencer = seq_fac.create_sequencer(rpc_sock, rpc_user, rpc_pass)
+        time.sleep(0.5)
 
         svcs = {"bitcoin": bitcoind, "sequencer": sequencer}
         return flexitest.LiveEnv(svcs)

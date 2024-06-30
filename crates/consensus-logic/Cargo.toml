@@ -4,13 +4,17 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+alpen-vertex-btcio = { workspace = true }
 alpen-vertex-db = { workspace = true }
 alpen-vertex-evmctl = { workspace = true }
 alpen-vertex-primitives = { workspace = true }
 alpen-vertex-state = { workspace = true }
 
 anyhow = { workspace = true }
+bitcoin = { workspace = true }
+borsh = { workspace = true }
 thiserror = { workspace = true }
+threadpool = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 

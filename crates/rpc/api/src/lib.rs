@@ -19,13 +19,13 @@ pub struct L1Status {
 #[cfg_attr(feature = "client", rpc(server, client, namespace = "alp"))]
 pub trait AlpenApi {
     // TODO the rest of these
-    #[method(name = "alp_protocolVersion")]
+    #[method(name = "protocolVersion")]
     async fn protocol_version(&self) -> RpcResult<u64>;
 
     // TODO make this under the admin RPC interface
-    #[method(name = "alp_stop")]
+    #[method(name = "stop")]
     async fn stop(&self) -> RpcResult<()>;
 
-    #[method(name = "alp_l1status")]
+    #[method(name = "l1status")]
     async fn get_l1_status(&self) -> RpcResult<L1Status>;
 }

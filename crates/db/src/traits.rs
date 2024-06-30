@@ -3,9 +3,6 @@
 
 use std::sync::Arc;
 
-use arbitrary::Arbitrary;
-use borsh::{BorshDeserialize, BorshSerialize};
-
 use alpen_vertex_mmr::CompactMmr;
 use alpen_vertex_primitives::{l1::*, prelude::*};
 use alpen_vertex_state::block::{L2Block, L2BlockId};
@@ -60,7 +57,7 @@ pub trait L1DataStore {
 /// Provider interface to view L1 data.
 pub trait L1DataProvider {
     /// Gets the current chain tip index.
-    fn get_chain_tip(&self) -> DbResult<u64>;
+    fn get_chain_tip(&self) -> DbResult<Option<u64>>;
 
     /// Gets the block manifest for a block index.
     fn get_block_manifest(&self, idx: u64) -> DbResult<Option<L1BlockManifest>>;
@@ -81,36 +78,6 @@ pub trait L1DataProvider {
     fn get_last_mmr_to(&self, idx: u64) -> DbResult<Option<CompactMmr>>;
 
     // TODO DA queries
-}
-
-/// Describes an L1 block and associated data that we need to keep around.
-#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
-pub struct L1BlockManifest {
-    /// Block hash/ID, kept here so we don't have to be aware of the hash function
-    /// here.  This is what we use in the MMR.
-    blockid: Buf32,
-
-    /// Block header and whatever additional data we might want to query.
-    header: Vec<u8>,
-
-    /// Merkle root for the transactions in the block.  For Bitcoin, this is
-    /// actually the witness transactions root, since we care about the witness
-    /// data.
-    txs_root: Buf32,
-}
-
-impl L1BlockManifest {
-    pub fn new(blockid: Buf32, header: Vec<u8>, txs_root: Buf32) -> Self {
-        Self {
-            blockid,
-            header,
-            txs_root,
-        }
-    }
-
-    pub fn block_hash(&self) -> Buf32 {
-        self.blockid
-    }
 }
 
 /// Store to write new sync events.

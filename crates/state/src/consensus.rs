@@ -2,12 +2,12 @@
 //! chain and the p2p network.  These will be expanded further as we actually
 //! implement the consensus logic.
 
-use std::collections::*;
+use std::{arch::global_asm, collections::*};
 
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use alpen_vertex_primitives::buf::Buf64;
+use alpen_vertex_primitives::{buf::Buf64, params::Params};
 
 use crate::{block::L2BlockId, l1::L1BlockId};
 
@@ -30,13 +30,19 @@ pub struct ConsensusState {
 
     /// L1 block index we treat as being "buried" and won't reorg.
     pub(super) buried_l1_height: u64,
-
-    /// Blocks we've received that appear to be on the chain tip but have not
-    /// fully executed yet.
-    pub(super) pending_l2_blocks: VecDeque<L2BlockId>,
 }
 
 impl ConsensusState {
+    pub fn from_genesis(genesis_chstate: ConsensusChainState, genesis_l1_height: u64) -> Self {
+        let gblkid = genesis_chstate.accepted_l2_blocks[0];
+        Self {
+            chain_state: genesis_chstate,
+            finalized_tip: gblkid,
+            recent_l1_blocks: Vec::new(),
+            buried_l1_height: genesis_l1_height,
+        }
+    }
+
     pub fn chain_state(&self) -> &ConsensusChainState {
         &self.chain_state
     }
@@ -60,6 +66,14 @@ pub struct ConsensusChainState {
 }
 
 impl ConsensusChainState {
+    pub fn from_genesis_blkid(genesis_blkid: L2BlockId) -> Self {
+        Self {
+            accepted_l2_blocks: vec![genesis_blkid],
+            pending_deposits: Vec::new(),
+            pending_withdraws: Vec::new(),
+        }
+    }
+
     pub fn chain_tip_blockid(&self) -> L2BlockId {
         self.accepted_l2_blocks
             .last()
