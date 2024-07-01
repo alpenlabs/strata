@@ -6,8 +6,10 @@ use std::sync::Arc;
 use alpen_vertex_mmr::CompactMmr;
 use alpen_vertex_primitives::{l1::*, prelude::*};
 use alpen_vertex_state::block::{L2Block, L2BlockId};
+use alpen_vertex_state::chain_state::ChainState;
 use alpen_vertex_state::client_state::ClientState;
 use alpen_vertex_state::operation::*;
+use alpen_vertex_state::state_op::WriteBatch;
 use alpen_vertex_state::sync_event::SyncEvent;
 use borsh::{BorshDeserialize, BorshSerialize};
 
@@ -186,4 +188,25 @@ pub enum BlockStatus {
     /// Block is invalid, for no particular reason.  We'd have to look somewhere
     /// else for that.
     Invalid,
+}
+
+pub trait ChainStateStore {
+    /// Stores a write batch in the database, possibly computing that state
+    /// under the hood from the writes.  Will not overwrite existing data,
+    /// previous writes must be purged first in order to be replaced.
+    fn write_chain_state_batch(&self, idx: u64, batch: &WriteBatch) -> DbResult<()>;
+
+    /// Tells the database to purge state before a certain block index (height).
+    fn purge_historical_state_before(&self, before_idx: u64) -> DbResult<()>;
+
+    /// Rolls back any writes and state checkpoints after a specified block.
+    fn rollback_writes_to(&self, new_tip_idx: u64) -> DbResult<()>;
+}
+
+pub trait ChainStateProvider {
+    /// Gets the write batch stored to compute a height.
+    fn get_writes_at(&self, idx: u64) -> DbResult<Option<WriteBatch>>;
+
+    /// Gets the toplevel chain state at a particular block index (height).
+    fn get_toplevel_chain_state(&self, idx: u64) -> DbResult<Option<ChainState>>;
 }

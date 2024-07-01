@@ -5,7 +5,9 @@
 
 pub mod block;
 pub mod block_template;
+pub mod chain_state;
 pub mod client_state;
 pub mod l1;
 pub mod operation;
+pub mod state_op;
 pub mod sync_event;

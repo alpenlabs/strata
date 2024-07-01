@@ -5,7 +5,7 @@ use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::block::L2BlockId;
-use crate::client_state::{ChainState, ClientState};
+use crate::client_state::ClientState;
 use crate::l1::L1BlockId;
 
 /// Output of a consensus state transition.  Both the consensus state writes and
@@ -42,11 +42,7 @@ pub enum ClientStateWrite {
     /// Completely replace the full state with a new instance.
     Replace(Box<ClientState>),
 
-    /// Replace just the L2 blockchain consensus-layer state with a new
-    /// instance.
-    ReplaceChainState(Box<ChainState>),
-
-    /// Queue an L2 block to be accepted.
+    /// Accept an L2 block and update tip state.
     AcceptL2Block(L2BlockId),
 
     /// Rolls back L1 blocks to this block ID.
@@ -89,7 +85,6 @@ pub fn apply_writes_to_state(
         use ClientStateWrite::*;
         match w {
             Replace(cs) => *state = *cs,
-            ReplaceChainState(ccs) => state.chain_state = *ccs,
             RollbackL1BlocksTo(l1blkid) => {
                 let pos = state.recent_l1_blocks.iter().position(|b| *b == l1blkid);
                 let Some(pos) = pos else {
@@ -101,7 +96,7 @@ pub fn apply_writes_to_state(
             AcceptL1Block(l1blkid) => state.recent_l1_blocks.push(l1blkid),
             AcceptL2Block(blkid) => {
                 // TODO do any other bookkeeping
-                state.chain_state.accepted_l2_blocks.push(blkid);
+                state.chain_tip = blkid;
             }
             UpdateBuried(new_idx) => {
                 // Check that it's increasing.
