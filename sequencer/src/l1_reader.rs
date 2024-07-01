@@ -11,9 +11,9 @@ use alpen_vertex_db::traits::{Database, L1DataProvider};
 use alpen_vertex_primitives::params::Params;
 use tokio::sync::mpsc;
 
-pub async fn start_reader_tasks<D: Database>(
+pub async fn start_reader_tasks<D: Database, L: L1Client>(
     params: &Params,
-    rpc_client: impl L1Client,
+    rpc_client: Arc<L>,
     db: Arc<D>,
     csm_ctl: Arc<CsmController>,
 ) -> anyhow::Result<()>

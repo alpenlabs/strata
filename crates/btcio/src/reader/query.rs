@@ -120,8 +120,8 @@ impl ReaderState {
     }
 }
 
-pub async fn bitcoin_data_reader_task(
-    client: impl L1Client,
+pub async fn bitcoin_data_reader_task<L: L1Client>(
+    client: Arc<L>,
     event_tx: mpsc::Sender<L1Event>,
     cur_block_height: u64,
     config: Arc<ReaderConfig>,
@@ -131,8 +131,8 @@ pub async fn bitcoin_data_reader_task(
     }
 }
 
-async fn do_reader_task(
-    client: &impl L1Client,
+async fn do_reader_task<L: L1Client>(
+    client: &Arc<L>,
     event_tx: &mpsc::Sender<L1Event>,
     cur_block_height: u64,
     config: Arc<ReaderConfig>,
@@ -171,10 +171,10 @@ async fn do_reader_task(
 }
 
 /// Inits the reader state by trying to backfill blocks up to a target height.
-async fn init_reader_state(
+async fn init_reader_state<L: L1Client>(
     target_block: u64,
     lookback: usize,
-    client: &impl L1Client,
+    client: &Arc<L>,
 ) -> anyhow::Result<ReaderState> {
     // Init the reader state using the blockid we were given, fill in a few blocks back.
     debug!(%target_block, "initializing reader state");
@@ -202,8 +202,8 @@ async fn init_reader_state(
 
 /// Polls the chain to see if there's new blocks to look at, possibly reorging
 /// if there's a mixup and we have to go back.
-async fn poll_for_new_blocks(
-    client: &impl L1Client,
+async fn poll_for_new_blocks<L: L1Client>(
+    client: &Arc<L>,
     event_tx: &mpsc::Sender<L1Event>,
     config: &ReaderConfig,
     state: &mut ReaderState,
@@ -252,8 +252,8 @@ async fn poll_for_new_blocks(
 
 /// Finds the highest block index where we do agree with the node.  If we never
 /// find one then we're really screwed.
-async fn find_pivot_block(
-    client: &impl L1Client,
+async fn find_pivot_block<L: L1Client>(
+    client: &Arc<L>,
     state: &ReaderState,
 ) -> anyhow::Result<Option<(u64, BlockHash)>> {
     for (height, blkid) in state.iter_blocks_back() {
@@ -272,9 +272,9 @@ async fn find_pivot_block(
     Ok(None)
 }
 
-async fn fetch_and_process_block(
+async fn fetch_and_process_block<L: L1Client>(
     height: u64,
-    client: &impl L1Client,
+    client: &Arc<L>,
     event_tx: &mpsc::Sender<L1Event>,
     state: &mut ReaderState,
 ) -> anyhow::Result<BlockHash> {

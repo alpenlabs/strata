@@ -20,7 +20,7 @@ use alpen_vertex_state::client_state::ClientState;
 use crate::duties::{self, Duty, DutyBatch, Identity};
 use crate::duty_extractor;
 use crate::errors::Error;
-use crate::message::{ForkChoiceMessage, ClientUpdateNotif};
+use crate::message::{ClientUpdateNotif, ForkChoiceMessage};
 use crate::sync_manager::SyncManager;
 
 #[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
@@ -122,6 +122,7 @@ pub fn duty_dispatch_task<
     sync_man: Arc<SyncManager>,
     database: Arc<D>,
     engine: Arc<E>,
+    l1wr_tx: mpsc::Sender<Vec<u8>>,
     pool: Arc<threadpool::ThreadPool>,
 ) {
     // TODO make this actually work
@@ -159,7 +160,8 @@ pub fn duty_dispatch_task<
             let sm = sync_man.clone();
             let db = database.clone();
             let e = engine.clone();
-            let _join = pool.execute(move || duty_exec_task(d, ik, sm, db, e));
+            let l1s = l1wr_tx.clone();
+            let _join = pool.execute(move || duty_exec_task(d, ik, sm, db, e, l1s));
             trace!(%id, "dispatched duty exec task");
             pending_duties.insert(id, ());
         }
@@ -177,8 +179,16 @@ fn duty_exec_task<D: Database, E: ExecEngineCtl>(
     sync_man: Arc<SyncManager>,
     database: Arc<D>,
     engine: Arc<E>,
+    l1s: mpsc::Sender<Vec<u8>>,
 ) {
-    if let Err(e) = perform_duty(&duty, &ik, &sync_man, database.as_ref(), engine.as_ref()) {
+    if let Err(e) = perform_duty(
+        duty,
+        &ik,
+        &sync_man,
+        database.as_ref(),
+        engine.as_ref(),
+        l1s,
+    ) {
         error!(err = %e, "error performing duty");
     } else {
         debug!("completed duty successfully");
@@ -186,11 +196,12 @@ fn duty_exec_task<D: Database, E: ExecEngineCtl>(
 }
 
 fn perform_duty<D: Database, E: ExecEngineCtl>(
-    duty: &Duty,
+    duty: Duty,
     ik: &IdentityKey,
     sync_man: &SyncManager,
     database: &D,
     engine: &E,
+    l1s: mpsc::Sender<Vec<u8>>,
 ) -> Result<(), Error> {
     match duty {
         Duty::SignBlock(data) => {
@@ -210,6 +221,13 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
 
             // TODO eventually, send the block out to peers
 
+            Ok(())
+        }
+        Duty::WriteL1(intent) => {
+            // Write to l1Writer receiver channel
+            l1s.blocking_send(intent.clone()).map_err(|e| {
+                Error::Other(format!("Could not send blobdata to l1 writer: {}", e))
+            })?;
             Ok(())
         }
     }

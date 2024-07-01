@@ -6,11 +6,11 @@ use std::{
 
 use bitcoin::{consensus::serialize, Transaction};
 use sha2::{Digest, Sha256};
-use tokio::sync::broadcast::Receiver;
+use tokio::sync::mpsc::Receiver;
 use tokio::sync::Mutex;
 use tracing::*;
 
-use alpen_vertex_db::traits::L1DataProvider;
+use alpen_vertex_db::traits::{Database, L1DataProvider};
 
 use super::{
     builder::{create_inscription_transactions, sign_blob_with_private_key, UtxoParseError, UTXO},
@@ -22,8 +22,6 @@ use crate::rpc::{types::RawUTXO, BitcoinClient};
 const AMOUNT_TO_REVEAL_TXN: u64 = 1000;
 
 const FINALITY_DEPTH: u64 = 6;
-
-pub type L1WriteIntent = Vec<u8>;
 
 pub struct TxnWithStatus {
     txn: Transaction,
@@ -57,13 +55,15 @@ pub enum BitcoinTxnStatus {
 }
 
 pub async fn writer_control_task<D>(
-    mut intent_rx: Receiver<L1WriteIntent>,
+    mut intent_rx: Receiver<Vec<u8>>,
     rpc_client: Arc<BitcoinClient>,
     config: WriterConfig,
+    db: Arc<D>,
 ) -> anyhow::Result<()>
 where
-    D: L1DataProvider,
+    D: Database,
 {
+    info!("Starting writer control task");
     let mut cache: HashSet<[u8; 32]> = HashSet::new();
 
     let queue: VecDeque<TxnWithStatus> = initialize_writer()?;
@@ -77,7 +77,10 @@ where
     ));
 
     loop {
-        let write_intent = intent_rx.recv().await?;
+        let write_intent = intent_rx
+            .recv()
+            .await
+            .ok_or(anyhow::anyhow!("Intent channel closed"))?;
 
         let hash: [u8; 32] = {
             let mut hasher = Sha256::new();
@@ -102,7 +105,7 @@ where
 }
 
 async fn create_inscriptions_from_intent(
-    write_intent: &L1WriteIntent,
+    write_intent: &[u8],
     rpc_client: &BitcoinClient,
     config: &WriterConfig,
 ) -> anyhow::Result<(Transaction, Transaction)> {

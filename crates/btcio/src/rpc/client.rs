@@ -121,6 +121,10 @@ impl BitcoinClient {
         }
     }
 
+    pub fn network(&self) -> Network {
+        self.network
+    }
+
     fn next_id(&self) -> u64 {
         self.next_id
             .fetch_add(1, std::sync::atomic::Ordering::AcqRel)

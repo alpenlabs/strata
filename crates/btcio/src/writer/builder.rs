@@ -33,8 +33,6 @@ use thiserror::Error;
 
 use crate::rpc::types::RawUTXO;
 
-use super::L1WriteIntent;
-
 const BITCOIN_DUST_LIMIT: u64 = 546;
 
 // TODO: these might need to be in rollup params
@@ -93,7 +91,7 @@ pub enum InscriptionError {
 #[allow(clippy::too_many_arguments)]
 pub fn create_inscription_transactions(
     rollup_name: &str,
-    write_intent: &L1WriteIntent,
+    write_intent: &[u8],
     seq_signature: Vec<u8>,
     seq_public_key: Vec<u8>,
     utxos: Vec<UTXO>,
@@ -434,7 +432,7 @@ pub fn generate_key_pair(
 fn build_reveal_script(
     taproot_public_key: &XOnlyPublicKey,
     rollup_name: &str,
-    write_intent: &L1WriteIntent,
+    write_intent: &[u8],
     seq_signature: Vec<u8>,
     seq_public_key: Vec<u8>,
 ) -> Result<script::ScriptBuf, anyhow::Error> {

@@ -6,6 +6,8 @@ use std::sync::Arc;
 use std::thread;
 use std::time;
 
+use alpen_vertex_btcio::writer::config::WriterConfig;
+use alpen_vertex_btcio::writer::writer_control_task;
 use anyhow::Context;
 use thiserror::Error;
 use tokio::sync::broadcast;
@@ -100,6 +102,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         args.bitcoind_password.clone(),
         bitcoin::Network::Regtest,
     );
+    let btc_rpc = Arc::new(btc_rpc);
 
     // TODO remove this
     if args.network != "regtest" {
@@ -137,6 +140,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         let db2 = database.clone();
         let eng_ctl_de = eng_ctl.clone();
         let pool = pool.clone();
+        let (l1wr_tx, l1wr_rx) = tokio::sync::mpsc::channel::<Vec<u8>>(8);
 
         // Spawn the two tasks.
         thread::spawn(move || {
@@ -149,11 +153,18 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             )
         });
         thread::spawn(move || {
-            duty_executor::duty_dispatch_task(duties_rx, idata.key, sm, db2, eng_ctl_de, pool)
+            duty_executor::duty_dispatch_task(
+                duties_rx, idata.key, sm, db2, eng_ctl_de, l1wr_tx, pool,
+            )
         });
+
+        let writer_config = WriterConfig::default();
+        let dbw = database.clone();
+        let rpc = btc_rpc.clone();
+        thread::spawn(move || writer_control_task(l1wr_rx, rpc, writer_config, dbw));
     }
 
-    let main_fut = main_task(args, sync_man, btc_rpc, database.clone());
+    let main_fut = main_task(args, sync_man, btc_rpc.clone(), database.clone());
     if let Err(e) = rt.block_on(main_fut) {
         error!(err = %e, "main task exited");
         process::exit(0); // special case exit once we've gotten to this point
@@ -163,10 +174,10 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn main_task<D: Database>(
+async fn main_task<D: Database, L: L1Client>(
     args: Args,
     sync_man: Arc<SyncManager>,
-    l1_rpc_client: impl L1Client,
+    l1_rpc_client: Arc<L>,
     database: Arc<D>,
 ) -> anyhow::Result<()>
 where
