@@ -1,4 +1,7 @@
-use std::sync::Arc;
+use std::{
+    sync::Arc,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use bitcoin::consensus::serialize;
 use bitcoin::hashes::Hash;
@@ -6,10 +9,10 @@ use bitcoin::Block;
 use tokio::sync::mpsc;
 use tracing::*;
 
-use alpen_vertex_btcio::reader::messages::L1Event;
+use alpen_vertex_btcio::{reader::messages::L1Event, L1_STATUS};
 use alpen_vertex_db::traits::L1DataStore;
 use alpen_vertex_primitives::buf::Buf32;
-use alpen_vertex_primitives::{l1::L1BlockManifest, utils::generate_l1_tx};
+use alpen_vertex_primitives::l1::L1BlockManifest;
 use alpen_vertex_state::sync_event::SyncEvent;
 
 use crate::ctl::CsmController;
@@ -37,6 +40,12 @@ fn handle_event<L1D>(event: L1Event, l1db: &L1D, csm_ctl: &CsmController) -> any
 where
     L1D: L1DataStore + Sync + Send + 'static,
 {
+    let mut l1_status_writer = L1_STATUS.write().expect("Failed to acquire lock");
+    l1_status_writer.last_update = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64;
+
     match event {
         L1Event::RevertTo(revert_blk_num) => {
             // L1 reorgs will be handled in L2 STF, we just have to reflect
@@ -64,10 +73,12 @@ where
             .collect();*/
             let l1txs = Vec::new();
             let num_txs = l1txs.len();
-
             l1db.put_block_data(blockdata.block_num(), manifest, l1txs)?;
             info!(%l1blkid, txs = %num_txs, "wrote L1 block manifest");
+            info!("block Number is {}", blockdata.block_num());
 
+            l1_status_writer.cur_tip_blkid = l1blkid.to_string();
+            l1_status_writer.cur_height = blockdata.block_num();
             // Write to sync event db.
             let blkid: Buf32 = blockdata.block().block_hash().into();
             let ev = SyncEvent::L1Block(blockdata.block_num(), blkid.into());

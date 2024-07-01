@@ -1,5 +1,6 @@
 #![allow(unused)]
 
+use alpen_vertex_btcio::{btcio_status::BtcioStatus, L1_STATUS};
 use async_trait::async_trait;
 use jsonrpsee::{
     core::RpcResult,
@@ -16,7 +17,7 @@ use thiserror::Error;
 use tokio::sync::{oneshot, Mutex};
 use tracing::*;
 
-use alpen_vertex_rpc_api::{AlpenApiServer, L1Status};
+use alpen_vertex_rpc_api::AlpenApiServer;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -89,13 +90,13 @@ impl AlpenApiServer for AlpenRpcImpl {
         Ok(())
     }
 
-    async fn get_l1_status(&self) -> RpcResult<L1Status> {
-        // TODO implement this
-        warn!("alp_l1status not yet implemented");
-        Ok(L1Status {
-            cur_height: 0,
-            cur_tip_blkid: String::new(),
-            last_update: 0,
-        })
+    async fn get_l1_status(&self) -> RpcResult<BtcioStatus> {
+        let l1_status_reader = L1_STATUS.read().expect("Failed to acquire Read lock");
+        Ok(l1_status_reader.clone())
+    }
+
+    async fn get_l1_connection_status(&self) -> RpcResult<bool> {
+        let reader_status = L1_STATUS.read().expect("Failed to acquire Read lock");
+        Ok(reader_status.bitcoin_rpc_connected)
     }
 }

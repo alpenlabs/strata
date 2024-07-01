@@ -6,3 +6,4 @@ edition = "2021"
 [dependencies]
 jsonrpsee = { workspace = true, features = ["server", "macros"] }
 serde = { workspace = true }
+alpen-vertex-btcio = { workspace = true }

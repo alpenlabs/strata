@@ -1,4 +1,3 @@
-#[derive(Clone, Debug)]
 pub struct ReaderConfig {
     /// This is the maximum depth we ever expect to reorg.
     pub(super) max_reorg_depth: u32,

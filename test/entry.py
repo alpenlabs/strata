@@ -19,13 +19,6 @@ def generate_seqkey() -> bytes:
     assert len(buf) == 32, "bad seqkey len"
     return buf
 
-def generate_task(rpc, wait_dur, addr):
-    print("generating to address", addr)
-    while True:
-        time.sleep(wait_dur)
-        blk = rpc.proxy.generatetoaddress(1, addr)
-        print("made block", blk)
-
 class BitcoinFactory(flexitest.Factory):
     def __init__(self, datadir_pfx: str, port_range: list[int]):
         super().__init__(datadir_pfx, port_range)
@@ -105,6 +98,8 @@ class VertexFactory(flexitest.Factory):
 
             return svc
 
+
+
 class BasicEnvConfig(flexitest.EnvConfig):
     def __init__(self):
         pass
@@ -116,12 +111,8 @@ class BasicEnvConfig(flexitest.EnvConfig):
         bitcoind = btc_fac.create_regtest_bitcoin()
         time.sleep(0.5)
 
-        # Set up a thread to generate blocks.  We should abstract this out more.
         brpc = bitcoind.create_rpc()
         brpc.proxy.createwallet("dummy")
-        addr = brpc.proxy.getnewaddress()
-        thr = threading.Thread(target=generate_task, args=(brpc, 1, addr))
-        thr.start()
 
         rpc_port = bitcoind.get_prop("rpc_port")
         rpc_user = bitcoind.get_prop("rpc_user")
@@ -147,7 +138,8 @@ def main(argv):
     envs = {"basic": BasicEnvConfig()}
     rt = flexitest.TestRuntime(envs, datadir_root, factories)
     rt.prepare_registered_tests()
-
+    if len(argv) > 1:
+        tests = [argv[1]]
     results = rt.run_tests(tests)
     flexitest.dump_results(results)
 

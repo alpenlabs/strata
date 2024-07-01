@@ -1,4 +1,5 @@
 use std::sync::atomic::AtomicU64;
+use std::thread;
 use std::time::Duration;
 use std::{fmt::Display, str::FromStr};
 
@@ -23,6 +24,10 @@ use super::{
 };
 
 use thiserror::Error;
+use crate::L1_STATUS;
+
+use super::traits::L1Client;
+use super::types::{RawUTXO, RpcBlockchainInfo};
 
 const MAX_RETRIES: u32 = 3;
 
@@ -187,6 +192,10 @@ impl BitcoinClient {
                         .json::<Response<T>>()
                         .await
                         .map_err(|e| ClientError::RPCError(e.to_string()))?;
+                    thread::spawn(|| {
+                        let mut status_write = L1_STATUS.write().expect("Failed to acquire lock");
+                        status_write.bitcoin_rpc_connected = true;
+                    });
                     if let Some(err) = data.error {
                         return Err(ClientError::RPCError(err.to_string()));
                     }
@@ -195,6 +204,11 @@ impl BitcoinClient {
                         .ok_or(ClientError::Other("Empty data received".to_string()))?);
                 }
                 Err(err) => {
+                    thread::spawn(|| {
+                        let mut status_write = L1_STATUS.write().expect("Failed to acquire lock");
+                        status_write.bitcoin_rpc_connected = false;
+                    });
+
                     warn!(err = %err, "Error calling bitcoin client");
 
                     if err.is_body() {
