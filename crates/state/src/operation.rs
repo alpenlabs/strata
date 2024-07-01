@@ -1,29 +1,27 @@
 //! Operations that a state transition emits to update the new state and control
 //! the client's high level state.
 
-use std::sync::Arc;
-
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::block::L2BlockId;
-use crate::consensus::{ConsensusChainState, ConsensusState};
+use crate::client_state::{ChainState, ClientState};
 use crate::l1::L1BlockId;
 
 /// Output of a consensus state transition.  Both the consensus state writes and
 /// sync actions.
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
-pub struct ConsensusOutput {
-    writes: Vec<ConsensusWrite>,
+pub struct ClientUpdateOutput {
+    writes: Vec<ClientStateWrite>,
     actions: Vec<SyncAction>,
 }
 
-impl ConsensusOutput {
-    pub fn new(writes: Vec<ConsensusWrite>, actions: Vec<SyncAction>) -> Self {
+impl ClientUpdateOutput {
+    pub fn new(writes: Vec<ClientStateWrite>, actions: Vec<SyncAction>) -> Self {
         Self { writes, actions }
     }
 
-    pub fn writes(&self) -> &[ConsensusWrite] {
+    pub fn writes(&self) -> &[ClientStateWrite] {
         &self.writes
     }
 
@@ -31,22 +29,22 @@ impl ConsensusOutput {
         &self.actions
     }
 
-    pub fn into_parts(self) -> (Vec<ConsensusWrite>, Vec<SyncAction>) {
+    pub fn into_parts(self) -> (Vec<ClientStateWrite>, Vec<SyncAction>) {
         (self.writes, self.actions)
     }
 }
 
-/// Describes possible writes to chain state that we can make.  We use this
-/// instead of directly modifying the chain state to reduce the volume of data
+/// Describes possible writes to client state that we can make.  We use this
+/// instead of directly modifying the client state to reduce the volume of data
 /// that we have to clone and save to disk with each sync event.
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
-pub enum ConsensusWrite {
+pub enum ClientStateWrite {
     /// Completely replace the full state with a new instance.
-    Replace(Box<ConsensusState>),
+    Replace(Box<ClientState>),
 
     /// Replace just the L2 blockchain consensus-layer state with a new
     /// instance.
-    ReplaceChainState(Box<ConsensusChainState>),
+    ReplaceChainState(Box<ChainState>),
 
     /// Queue an L2 block to be accepted.
     AcceptL2Block(L2BlockId),
@@ -61,8 +59,8 @@ pub enum ConsensusWrite {
     UpdateBuried(u64),
 }
 
-/// Actions the consensus state machine directs the node to take to update its
-/// own bookkeeping.  These should not be able to fail.
+/// Actions the client state machine directs the node to take to update its own
+/// bookkeeping.  These should not be able to fail.
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
 pub enum SyncAction {
     /// Extends our externally-facing tip to a new block ID.  This might trigger
@@ -82,13 +80,13 @@ pub enum SyncAction {
     FinalizeBlock(L2BlockId),
 }
 
-/// Applies consensus writes to the provided consensus state.
+/// Applies client state writes to a target state.
 pub fn apply_writes_to_state(
-    state: &mut ConsensusState,
-    writes: impl Iterator<Item = ConsensusWrite>,
+    state: &mut ClientState,
+    writes: impl Iterator<Item = ClientStateWrite>,
 ) {
     for w in writes {
-        use ConsensusWrite::*;
+        use ClientStateWrite::*;
         match w {
             Replace(cs) => *state = *cs,
             ReplaceChainState(ccs) => state.chain_state = *ccs,

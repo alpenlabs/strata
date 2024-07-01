@@ -3,7 +3,7 @@
 use alpen_vertex_db::errors::DbError;
 use alpen_vertex_db::traits::{Database, L1DataProvider, L2DataProvider};
 use alpen_vertex_primitives::prelude::*;
-use alpen_vertex_state::consensus::*;
+use alpen_vertex_state::client_state::*;
 use alpen_vertex_state::operation::*;
 use alpen_vertex_state::sync_event::SyncEvent;
 
@@ -12,11 +12,11 @@ use crate::errors::*;
 /// Processes the event given the current consensus state, producing some
 /// output.  This can return database errors.
 pub fn process_event<D: Database>(
-    state: &ConsensusState,
+    state: &ClientState,
     ev: &SyncEvent,
     database: &D,
     params: &Params,
-) -> Result<ConsensusOutput, Error> {
+) -> Result<ClientUpdateOutput, Error> {
     let mut writes = Vec::new();
     let mut actions = Vec::new();
 
@@ -29,7 +29,7 @@ pub fn process_event<D: Database>(
 
             // TODO do the consensus checks
 
-            writes.push(ConsensusWrite::AcceptL1Block(*l1blkid));
+            writes.push(ClientStateWrite::AcceptL1Block(*l1blkid));
 
             // TODO if we have some number of L1 blocks finalized, also emit an
             // `UpdateBuried` write
@@ -60,10 +60,10 @@ pub fn process_event<D: Database>(
                 .ok_or(Error::MissingL2Block(*blkid))?;
 
             // TODO better checks here
-            writes.push(ConsensusWrite::AcceptL2Block(*blkid));
+            writes.push(ClientStateWrite::AcceptL2Block(*blkid));
             actions.push(SyncAction::UpdateTip(*blkid));
         }
     }
 
-    Ok(ConsensusOutput::new(writes, actions))
+    Ok(ClientUpdateOutput::new(writes, actions))
 }

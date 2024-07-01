@@ -17,7 +17,7 @@ use alpen_vertex_common::logging;
 use alpen_vertex_consensus_logic::ctl::CsmController;
 use alpen_vertex_consensus_logic::duties::{DutyBatch, Identity};
 use alpen_vertex_consensus_logic::duty_executor::{self, IdentityData, IdentityKey};
-use alpen_vertex_consensus_logic::message::{ChainTipMessage, ConsensusUpdateNotif, CsmMessage};
+use alpen_vertex_consensus_logic::message::{ChainTipMessage, ClientUpdateNotif, CsmMessage};
 use alpen_vertex_consensus_logic::sync_manager;
 use alpen_vertex_consensus_logic::sync_manager::SyncManager;
 use alpen_vertex_consensus_logic::{chain_tip, unfinalized_tracker, worker};
@@ -28,7 +28,7 @@ use alpen_vertex_db::{ConsensusStateDb, L1Db, SyncEventDb};
 use alpen_vertex_primitives::buf::Buf32;
 use alpen_vertex_primitives::{block_credential, params::*};
 use alpen_vertex_rpc_api::AlpenApiServer;
-use alpen_vertex_state::consensus::ConsensusState;
+use alpen_vertex_state::client_state::ClientState;
 use alpen_vertex_state::operation;
 
 use crate::args::Args;
@@ -112,8 +112,8 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     }
 
     // Create dataflow channels.
-    let (cout_tx, cout_rx) = mpsc::channel::<operation::ConsensusOutput>(64);
-    let (cur_state_tx, cur_state_rx) = watch::channel::<Option<ConsensusState>>(None);
+    let (cout_tx, cout_rx) = mpsc::channel::<operation::ClientUpdateOutput>(64);
+    let (cur_state_tx, cur_state_rx) = watch::channel::<Option<ClientState>>(None);
     // TODO connect up these other channels
 
     // Init engine controller.

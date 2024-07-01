@@ -6,7 +6,7 @@ use std::sync::Arc;
 use alpen_vertex_mmr::CompactMmr;
 use alpen_vertex_primitives::{l1::*, prelude::*};
 use alpen_vertex_state::block::{L2Block, L2BlockId};
-use alpen_vertex_state::consensus::ConsensusState;
+use alpen_vertex_state::client_state::ClientState;
 use alpen_vertex_state::operation::*;
 use alpen_vertex_state::sync_event::SyncEvent;
 
@@ -22,8 +22,8 @@ pub trait Database {
     type L2Prov: L2DataProvider;
     type SeStore: SyncEventStore;
     type SeProv: SyncEventProvider;
-    type CsStore: ConsensusStateStore;
-    type CsProv: ConsensusStateProvider;
+    type CsStore: ClientStateStore;
+    type CsProv: ClientStateProvider;
 
     fn l1_store(&self) -> &Arc<Self::L1Store>;
     fn l1_provider(&self) -> &Arc<Self::L1Prov>;
@@ -31,8 +31,8 @@ pub trait Database {
     fn l2_provider(&self) -> &Arc<Self::L2Prov>;
     fn sync_event_store(&self) -> &Arc<Self::SeStore>;
     fn sync_event_provider(&self) -> &Arc<Self::SeProv>;
-    fn consensus_state_store(&self) -> &Arc<Self::CsStore>;
-    fn consensus_state_provider(&self) -> &Arc<Self::CsProv>;
+    fn client_state_store(&self) -> &Arc<Self::CsStore>;
+    fn client_state_provider(&self) -> &Arc<Self::CsProv>;
 }
 
 /// Storage interface to control our view of L1 data.
@@ -104,31 +104,31 @@ pub trait SyncEventProvider {
     fn get_event_timestamp(&self, idx: u64) -> DbResult<Option<u64>>;
 }
 
-/// Writes consensus updates and checkpoints.
-pub trait ConsensusStateStore {
+/// Writes client state updates and checkpoints.
+pub trait ClientStateStore {
     /// Writes a new consensus output for a given input index.  These input
     /// indexes correspond to indexes in [``SyncEventStore``] and
     /// [``SyncEventProvider``].  Will error if `idx - 1` does not exist (unless
     /// `idx` is 0) or if trying to overwrite a state, as this is almost
     /// certainly a bug.
-    fn write_consensus_output(&self, idx: u64, output: ConsensusOutput) -> DbResult<()>;
+    fn write_client_update_output(&self, idx: u64, output: ClientUpdateOutput) -> DbResult<()>;
 
     /// Writes a new consensus checkpoint that we can cheaply resume from.  Will
     /// error if trying to overwrite a state.
-    fn write_consensus_checkpoint(&self, idx: u64, state: ConsensusState) -> DbResult<()>;
+    fn write_client_state_checkpoint(&self, idx: u64, state: ClientState) -> DbResult<()>;
 }
 
-/// Provides consensus state writes and checkpoints.
-pub trait ConsensusStateProvider {
+/// Provides client state writes and checkpoints.
+pub trait ClientStateProvider {
     /// Gets the idx of the last written state.  Or returns error if a bootstrap
     /// state has not been written yet.
     fn get_last_write_idx(&self) -> DbResult<u64>;
 
-    /// Gets the output consensus writes for some input index.
-    fn get_consensus_writes(&self, idx: u64) -> DbResult<Option<Vec<ConsensusWrite>>>;
+    /// Gets the output client state writes for some input index.
+    fn get_client_state_writes(&self, idx: u64) -> DbResult<Option<Vec<ClientStateWrite>>>;
 
-    /// Gets the actions output from a consensus state transition.
-    fn get_consensus_actions(&self, idx: u64) -> DbResult<Option<Vec<SyncAction>>>;
+    /// Gets the actions output from a client state transition.
+    fn get_client_update_actions(&self, idx: u64) -> DbResult<Option<Vec<SyncAction>>>;
 
     /// Gets the last consensus checkpoint idx.
     fn get_last_checkpoint_idx(&self) -> DbResult<u64>;
@@ -140,7 +140,7 @@ pub trait ConsensusStateProvider {
     fn get_prev_checkpoint_at(&self, idx: u64) -> DbResult<u64>;
 
     /// Gets a state checkpoint at a previously written index, if it exists.
-    fn get_state_checkpoint(&self, idx: u64) -> DbResult<Option<ConsensusState>>;
+    fn get_state_checkpoint(&self, idx: u64) -> DbResult<Option<ClientState>>;
 }
 
 /// L2 data store for CL blocks.  Does not store anything about what we think

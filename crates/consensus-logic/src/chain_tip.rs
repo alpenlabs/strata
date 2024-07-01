@@ -12,7 +12,7 @@ use alpen_vertex_evmctl::engine::ExecEngineCtl;
 use alpen_vertex_evmctl::messages::ExecPayloadData;
 use alpen_vertex_primitives::params::Params;
 use alpen_vertex_state::block::{L2Block, L2BlockId};
-use alpen_vertex_state::consensus::ConsensusState;
+use alpen_vertex_state::client_state::ClientState;
 use alpen_vertex_state::operation::SyncAction;
 use alpen_vertex_state::sync_event::SyncEvent;
 
@@ -29,7 +29,7 @@ pub struct ChainTipTrackerState<D: Database> {
     database: Arc<D>,
 
     /// Current consensus state we're considering blocks against.
-    cur_state: Arc<ConsensusState>,
+    cur_state: Arc<ClientState>,
 
     /// Tracks unfinalized block tips.
     chain_tracker: unfinalized_tracker::UnfinalizedBlockTracker,
@@ -44,7 +44,7 @@ impl<D: Database> ChainTipTrackerState<D> {
     pub fn new(
         params: Arc<Params>,
         database: Arc<D>,
-        cur_state: Arc<ConsensusState>,
+        cur_state: Arc<ClientState>,
         chain_tracker: unfinalized_tracker::UnfinalizedBlockTracker,
         cur_best_block: L2BlockId,
     ) -> Self {
@@ -206,7 +206,7 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
 fn check_new_block<D: Database>(
     blkid: &L2BlockId,
     block: &L2Block,
-    cstate: &ConsensusState,
+    cstate: &ClientState,
     state: &mut ChainTipTrackerState<D>,
 ) -> anyhow::Result<bool, Error> {
     let params = state.params.as_ref();

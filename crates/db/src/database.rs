@@ -10,7 +10,7 @@ where
     L1: L1DataStore + L1DataProvider + Sync + Send + 'static,
     L2: L2DataStore + L2DataProvider + Sync + Send + 'static,
     S: SyncEventStore + SyncEventProvider + Sync + Send + 'static,
-    C: ConsensusStateStore + ConsensusStateProvider + Sync + Send + 'static,
+    C: ClientStateStore + ClientStateProvider + Sync + Send + 'static,
 {
     l1db: Arc<L1>,
     l2db: Arc<L2>,
@@ -23,7 +23,7 @@ where
     L1: L1DataStore + L1DataProvider + Sync + Send + 'static,
     L2: L2DataStore + L2DataProvider + Sync + Send + 'static,
     S: SyncEventStore + SyncEventProvider + Sync + Send + 'static,
-    C: ConsensusStateStore + ConsensusStateProvider + Sync + Send + 'static,
+    C: ClientStateStore + ClientStateProvider + Sync + Send + 'static,
 {
     pub fn new(l1db: Arc<L1>, l2db: Arc<L2>, sedb: Arc<S>, csdb: Arc<C>) -> Self {
         Self {
@@ -40,7 +40,7 @@ where
     L1: L1DataStore + L1DataProvider + Sync + Send + 'static,
     L2: L2DataStore + L2DataProvider + Sync + Send + 'static,
     S: SyncEventStore + SyncEventProvider + Sync + Send + 'static,
-    C: ConsensusStateStore + ConsensusStateProvider + Sync + Send + 'static,
+    C: ClientStateStore + ClientStateProvider + Sync + Send + 'static,
 {
     type L1Store = L1;
     type L1Prov = L1;
@@ -75,11 +75,11 @@ where
         &self.sedb
     }
 
-    fn consensus_state_store(&self) -> &Arc<Self::CsStore> {
+    fn client_state_store(&self) -> &Arc<Self::CsStore> {
         &self.csdb
     }
 
-    fn consensus_state_provider(&self) -> &Arc<Self::CsProv> {
+    fn client_state_provider(&self) -> &Arc<Self::CsProv> {
         &self.csdb
     }
 }

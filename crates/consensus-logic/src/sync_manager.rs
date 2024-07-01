@@ -13,7 +13,7 @@ use alpen_vertex_evmctl::engine::ExecEngineCtl;
 use alpen_vertex_primitives::params::Params;
 
 use crate::ctl::CsmController;
-use crate::message::{ChainTipMessage, ConsensusUpdateNotif, CsmMessage};
+use crate::message::{ChainTipMessage, ClientUpdateNotif, CsmMessage};
 use crate::{chain_tip, genesis, unfinalized_tracker, worker};
 
 pub struct SyncManager {
@@ -21,7 +21,7 @@ pub struct SyncManager {
 
     chain_tip_msg_tx: mpsc::Sender<ChainTipMessage>,
     csm_ctl: Arc<CsmController>,
-    cupdate_rx: broadcast::Receiver<Arc<ConsensusUpdateNotif>>,
+    cupdate_rx: broadcast::Receiver<Arc<ClientUpdateNotif>>,
 }
 
 impl SyncManager {
@@ -46,7 +46,7 @@ impl SyncManager {
     /// Returns a new broadcast `Receiver` handle to the consensus update
     /// notification queue.  Provides no guarantees about which position in the
     /// queue will be returned on the first receive.
-    pub fn create_cstate_subscription(&self) -> broadcast::Receiver<Arc<ConsensusUpdateNotif>> {
+    pub fn create_cstate_subscription(&self) -> broadcast::Receiver<Arc<ClientUpdateNotif>> {
         self.cupdate_rx.resubscribe()
     }
 
@@ -78,7 +78,7 @@ pub fn start_sync_tasks<
 
     // TODO should this be in an `Arc`?  it's already fairly compact so we might
     // not be benefitting from the reduced cloning
-    let (cupdate_tx, cupdate_rx) = broadcast::channel::<Arc<ConsensusUpdateNotif>>(64);
+    let (cupdate_tx, cupdate_rx) = broadcast::channel::<Arc<ClientUpdateNotif>>(64);
 
     // Check if we have to do genesis.
     if genesis::check_needs_genesis(database.as_ref())? {

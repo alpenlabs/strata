@@ -8,8 +8,8 @@ use tracing::*;
 use alpen_vertex_db::traits::*;
 use alpen_vertex_primitives::params::Params;
 use alpen_vertex_state::{
-    consensus::ConsensusState,
-    operation::{self, ConsensusOutput},
+    client_state::ClientState,
+    operation::{self, ClientUpdateOutput},
 };
 
 use crate::errors::Error;
@@ -21,7 +21,7 @@ pub struct StateTracker<D: Database> {
 
     cur_state_idx: u64,
 
-    cur_state: Arc<ConsensusState>,
+    cur_state: Arc<ClientState>,
 }
 
 impl<D: Database> StateTracker<D> {
@@ -29,7 +29,7 @@ impl<D: Database> StateTracker<D> {
         params: Arc<Params>,
         database: Arc<D>,
         cur_state_idx: u64,
-        cur_state: Arc<ConsensusState>,
+        cur_state: Arc<ClientState>,
     ) -> Self {
         Self {
             params,
@@ -43,7 +43,7 @@ impl<D: Database> StateTracker<D> {
         self.cur_state_idx
     }
 
-    pub fn cur_state(&self) -> &Arc<ConsensusState> {
+    pub fn cur_state(&self) -> &Arc<ClientState> {
         &self.cur_state
     }
 
@@ -52,7 +52,7 @@ impl<D: Database> StateTracker<D> {
     pub fn advance_consensus_state(
         &mut self,
         ev_idx: u64,
-    ) -> anyhow::Result<(ConsensusOutput, Arc<ConsensusState>)> {
+    ) -> anyhow::Result<(ClientUpdateOutput, Arc<ClientState>)> {
         if ev_idx != self.cur_state_idx + 1 {
             return Err(Error::SkippedEventIdx(ev_idx, self.cur_state_idx).into());
         }
@@ -60,7 +60,7 @@ impl<D: Database> StateTracker<D> {
         // Load the event from the database.
         let db = self.database.as_ref();
         let ev_prov = db.sync_event_provider();
-        let cs_store = db.consensus_state_store();
+        let cs_store = db.client_state_store();
         let ev = ev_prov
             .get_sync_event(ev_idx)?
             .ok_or(Error::MissingSyncEvent(ev_idx))?;
@@ -79,16 +79,16 @@ impl<D: Database> StateTracker<D> {
 
         // Store the outputs.
         // TODO ideally avoid clone
-        cs_store.write_consensus_output(ev_idx, outp.clone())?;
+        cs_store.write_client_update_output(ev_idx, outp.clone())?;
 
         Ok((outp, self.cur_state.clone()))
     }
 
     /// Writes the current state to the database as a new checkpoint.
     pub fn store_checkpoint(&self) -> anyhow::Result<()> {
-        let cs_store = self.database.consensus_state_store();
+        let cs_store = self.database.client_state_store();
         let state = self.cur_state.as_ref().clone(); // TODO avoid clone
-        cs_store.write_consensus_checkpoint(self.cur_state_idx, state)?;
+        cs_store.write_client_state_checkpoint(self.cur_state_idx, state)?;
         Ok(())
     }
 }
@@ -98,8 +98,8 @@ impl<D: Database> StateTracker<D> {
 /// prepare the state for the state tracker.
 // TODO tweak this to be able to reconstruct any state?
 pub fn reconstruct_cur_state(
-    cs_prov: &impl ConsensusStateProvider,
-) -> anyhow::Result<(u64, ConsensusState)> {
+    cs_prov: &impl ClientStateProvider,
+) -> anyhow::Result<(u64, ClientState)> {
     let last_ckpt_idx = cs_prov.get_last_checkpoint_idx()?;
     let mut state = cs_prov
         .get_state_checkpoint(last_ckpt_idx)?
@@ -126,7 +126,7 @@ pub fn reconstruct_cur_state(
 
     for i in write_replay_start..=last_write_idx {
         let writes = cs_prov
-            .get_consensus_writes(i)?
+            .get_client_state_writes(i)?
             .ok_or(Error::MissingConsensusWrites(i))?;
         operation::apply_writes_to_state(&mut state, writes.into_iter());
     }

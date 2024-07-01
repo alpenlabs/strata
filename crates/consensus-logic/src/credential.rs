@@ -7,13 +7,9 @@ use alpen_vertex_primitives::{
     buf::{Buf32, Buf64},
     params::Params,
 };
-use alpen_vertex_state::{block::L2BlockHeader, consensus::ConsensusChainState};
+use alpen_vertex_state::{block::L2BlockHeader, client_state::ChainState};
 
-pub fn check_block_credential(
-    header: &L2BlockHeader,
-    cs: &ConsensusChainState,
-    params: &Params,
-) -> bool {
+pub fn check_block_credential(header: &L2BlockHeader, cs: &ChainState, params: &Params) -> bool {
     let sigcom = compute_header_sig_commitment(header);
     match &params.rollup().cred_rule {
         CredRule::Unchecked => true,

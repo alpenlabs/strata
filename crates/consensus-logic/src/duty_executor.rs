@@ -9,19 +9,19 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use tokio::sync::{broadcast, mpsc};
 use tracing::*;
 
-use alpen_vertex_db::traits::{ConsensusStateProvider, Database, L2DataProvider, L2DataStore};
+use alpen_vertex_db::traits::{ClientStateProvider, Database, L2DataProvider, L2DataStore};
 use alpen_vertex_evmctl::engine::{ExecEngineCtl, PayloadStatus};
 use alpen_vertex_evmctl::errors::EngineError;
 use alpen_vertex_evmctl::messages::{ExecPayloadData, PayloadEnv};
 use alpen_vertex_primitives::buf::{Buf32, Buf64};
 use alpen_vertex_state::block::{ExecSegment, L1Segment, L2Block, L2BlockBody, L2BlockId};
 use alpen_vertex_state::block_template;
-use alpen_vertex_state::consensus::ConsensusState;
+use alpen_vertex_state::client_state::ClientState;
 
 use crate::duties::{self, Duty, DutyBatch, Identity};
 use crate::duty_extractor;
 use crate::errors::Error;
-use crate::message::{ChainTipMessage, ConsensusUpdateNotif};
+use crate::message::{ChainTipMessage, ClientUpdateNotif};
 use crate::sync_manager::SyncManager;
 
 #[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
@@ -45,7 +45,7 @@ impl IdentityData {
 }
 
 pub fn duty_tracker_task<D: Database, E: ExecEngineCtl>(
-    mut cupdate_rx: broadcast::Receiver<Arc<ConsensusUpdateNotif>>,
+    mut cupdate_rx: broadcast::Receiver<Arc<ClientUpdateNotif>>,
     batch_queue: broadcast::Sender<DutyBatch>,
     ident: Identity,
     database: Arc<D>,
@@ -86,7 +86,7 @@ pub fn duty_tracker_task<D: Database, E: ExecEngineCtl>(
 
 fn update_tracker<D: Database>(
     tracker: &mut duties::DutyTracker,
-    state: &ConsensusState,
+    state: &ClientState,
     ident: &Identity,
     database: &D,
 ) -> Result<(), Error> {
@@ -238,7 +238,7 @@ fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     // TODO get the consensus state this duty was created in response to and
     // pull out the current tip block from it
     // XXX this is really bad as-is
-    let cs_prov = database.consensus_state_provider();
+    let cs_prov = database.client_state_provider();
     let ckpt_idx = cs_prov.get_last_checkpoint_idx()?; // FIXME this isn't what this is for, it only works because we're checkpointing on every state right now
     let last_cstate = cs_prov
         .get_state_checkpoint(ckpt_idx)?
