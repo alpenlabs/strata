@@ -13,11 +13,13 @@ import seqrpc
 BD_USERNAME = "alpen"
 BD_PASSWORD = "alpen"
 
+
 def generate_seqkey() -> bytes:
     # this is just for fun
     buf = b"alpen" + b"_1337" * 5 + b"xx"
     assert len(buf) == 32, "bad seqkey len"
     return buf
+
 
 class BitcoinFactory(flexitest.Factory):
     def __init__(self, datadir_pfx: str, port_range: list[int]):
@@ -30,7 +32,8 @@ class BitcoinFactory(flexitest.Factory):
         logfile = os.path.join(datadir, "service.log")
 
         cmd = [
-            "bitcoind", "-regtest",
+            "bitcoind",
+            "-regtest",
             "-printtoconsole",
             "-datadir=%s" % datadir,
             "-port=%s" % p2p_port,
@@ -42,7 +45,7 @@ class BitcoinFactory(flexitest.Factory):
         props = {
             "rpc_port": rpc_port,
             "rpc_user": BD_USERNAME,
-            "rpc_password": BD_PASSWORD
+            "rpc_password": BD_PASSWORD,
         }
 
         with open(logfile, "w") as f:
@@ -51,16 +54,20 @@ class BitcoinFactory(flexitest.Factory):
             def _create_rpc():
                 url = "http://%s:%s@localhost:%s" % (BD_USERNAME, BD_PASSWORD, rpc_port)
                 return BitcoindClient(base_url=url)
+
             setattr(svc, "create_rpc", _create_rpc)
 
             return svc
+
 
 class VertexFactory(flexitest.Factory):
     def __init__(self, datadir_pfx: str, port_range: list[int]):
 
         super().__init__(datadir_pfx, port_range)
 
-    def create_sequencer(self, bitcoind_sock: str, bitcoind_user: str, bitcoind_pass: str) -> flexitest.Service:
+    def create_sequencer(
+        self, bitcoind_sock: str, bitcoind_user: str, bitcoind_pass: str
+    ) -> flexitest.Service:
         datadir = self.create_datadir("seq")
         rpc_port = self.next_port()
         logfile = os.path.join(datadir, "service.log")
@@ -74,18 +81,22 @@ class VertexFactory(flexitest.Factory):
 
         cmd = [
             "alpen-vertex-sequencer",
-            "--datadir", datadir,
-            "--rpc-port", str(rpc_port),
-            "--bitcoind-host", bitcoind_sock,
-            "--bitcoind-user", bitcoind_user,
-            "--bitcoind-password", bitcoind_pass,
-            "--network", "regtest",
-            "--sequencer-key", keyfile
+            "--datadir",
+            datadir,
+            "--rpc-port",
+            str(rpc_port),
+            "--bitcoind-host",
+            bitcoind_sock,
+            "--bitcoind-user",
+            bitcoind_user,
+            "--bitcoind-password",
+            bitcoind_pass,
+            "--network",
+            "regtest",
+            "--sequencer-key",
+            keyfile,
         ]
-        props = {
-            "rpc_port": rpc_port,
-            "seqkey": seqkey
-        }
+        props = {"rpc_port": rpc_port, "seqkey": seqkey}
 
         rpc_url = "ws://localhost:%s" % rpc_port
 
@@ -94,10 +105,10 @@ class VertexFactory(flexitest.Factory):
 
             def _create_rpc():
                 return seqrpc.JsonrpcClient(rpc_url)
+
             setattr(svc, "create_rpc", _create_rpc)
 
             return svc
-
 
 
 class BasicEnvConfig(flexitest.EnvConfig):
@@ -124,6 +135,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
         svcs = {"bitcoin": bitcoind, "sequencer": sequencer}
         return flexitest.LiveEnv(svcs)
 
+
 def main(argv):
     test_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -144,6 +156,7 @@ def main(argv):
     flexitest.dump_results(results)
 
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

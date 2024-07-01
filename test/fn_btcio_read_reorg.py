@@ -14,7 +14,7 @@ class L1ReadReorgTest(flexitest.Test):
 
         btcrpc = btc.create_rpc()
         seqrpc = seq.create_rpc()
-        
+
         # add 13 blocks
         generate_blocks(btcrpc, 0.05, 13)
         time.sleep(2)
@@ -31,8 +31,7 @@ class L1ReadReorgTest(flexitest.Test):
         l1stat = seqrpc.alp_l1status()
         print("L1 status", l1stat)
 
-        # check if current_height 18 
+        # check if current_height 18
         assert l1stat["cur_height"] == 18, "All Blocks were not read"
-        # total 21 blocks were read, but we invalidated 3 blocks so current_blkid should match 21st block   
+        # total 21 blocks were read, but we invalidated 3 blocks so current_blkid should match 21st block
         assert l1stat["cur_tip_blkid"] == block_list[20], "Block invalidation "
-

@@ -15,7 +15,7 @@ class L1StatusTest(flexitest.Test):
         # create both btc and sequencer RPC
         btcrpc = btc.create_rpc()
         seqrpc = seq.create_rpc()
-        
+
         # proto_ver = seqrpc.alp_protocolVersion()
         # print("protocol version", proto_ver)
         # assert proto_ver == 1, "query protocol version"
@@ -26,4 +26,3 @@ class L1StatusTest(flexitest.Test):
         print("L1 status", l1stat)
         # check if current_height > 0
         assert l1stat["cur_height"] > 0, "Sequencer is not seeing L1 blocks"
-

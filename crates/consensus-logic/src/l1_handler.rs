@@ -75,7 +75,6 @@ where
             let num_txs = l1txs.len();
             l1db.put_block_data(blockdata.block_num(), manifest, l1txs)?;
             info!(%l1blkid, txs = %num_txs, "wrote L1 block manifest");
-            info!("block Number is {}", blockdata.block_num());
 
             l1_status_writer.cur_tip_blkid = l1blkid.to_string();
             l1_status_writer.cur_height = blockdata.block_num();
