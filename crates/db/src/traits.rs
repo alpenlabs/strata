@@ -236,9 +236,12 @@ pub trait SeqDataStore {
     /// Store the blob
     fn put_blob(&self, blob_id: Buf32, blob: Vec<u8>) -> DbResult<u64>;
 
-    /// Store inscription transactions before sending to L1, should return the reveal txn idx
+    /// Store inscription transactions before sending to L1.
+    /// Associate the reveal txnidx with blob idx.
+    /// Should return the reveal txn idx
     fn put_commit_reveal_txns(
         &self,
+        blob_idx: u64,
         commit_txn: TxnWithStatus,
         reveal_txn: TxnWithStatus,
     ) -> DbResult<u64>;
@@ -256,4 +259,7 @@ pub trait SeqDataProvider {
 
     /// Get the last  blob idx
     fn get_last_blob_idx(&self) -> DbResult<u64>;
+
+    ///Get the reveal tx idx associated with blob idx
+    fn get_txidx_for_blob(&self, blobidx: u64) -> DbResult<u64>;
 }

@@ -24,3 +24,8 @@ define_table_with_default_codec!(
     /// A table to store blobid -> blob mapping
     (SequencerBlobSchema) Buf32 => Vec<u8>
 );
+
+define_table_with_default_codec!(
+    /// A table to store blobidx -> reveal tx idx
+    (SequencerBlobIdxTxIdx) u64 => u64
+);

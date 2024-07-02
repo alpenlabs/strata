@@ -45,6 +45,7 @@ impl SeqDataStore for SeqDb {
 
     fn put_commit_reveal_txns(
         &self,
+        blob_idx: u64,
         commit_txn: TxnWithStatus,
         reveal_txn: TxnWithStatus,
     ) -> DbResult<u64> {
@@ -67,6 +68,10 @@ impl SeqDataProvider for SeqDb {
     }
 
     fn get_last_blob_idx(&self) -> DbResult<u64> {
+        todo!()
+    }
+
+    fn get_txidx_for_blob(&self, blobidx: u64) -> crate::errors::DbResult<u64> {
         todo!()
     }
 }

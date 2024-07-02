@@ -298,7 +298,11 @@ impl BitcoinClient {
 
     /// get number of confirmations for txid
     /// 0 confirmations means tx is still in mempool
-    pub async fn get_transaction_confirmations(&self, txid: String) -> ClientResult<u64> {
+    pub async fn get_transaction_confirmations<T: AsRef<[u8]>>(
+        &self,
+        txid: T,
+    ) -> ClientResult<u64> {
+        let txid = hex::encode(txid);
         let result = self
             .call::<GetTransactionResponse>("gettransaction", &[to_val(txid)?])
             .await?;
