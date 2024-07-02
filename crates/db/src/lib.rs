@@ -13,6 +13,7 @@ pub mod consensus_state;
 pub mod database;
 pub mod l1;
 pub mod l2;
+pub mod sequencer;
 pub mod stubs;
 pub mod sync_event;
 
@@ -40,4 +41,5 @@ pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
 // Re-exports
 pub use consensus_state::db::ConsensusStateDb;
 pub use l1::db::L1Db;
+pub use sequencer::db::SeqDb;
 pub use sync_event::db::SyncEventDb;

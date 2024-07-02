@@ -1,5 +1,7 @@
 use arbitrary::Arbitrary;
+use bitcoin::consensus::Encodable;
 use bitcoin::hashes::Hash;
+use bitcoin::Transaction;
 use bitcoin::{consensus::serialize, Block};
 use borsh::{BorshDeserialize, BorshSerialize};
 
@@ -112,4 +114,49 @@ impl From<Block> for L1BlockManifest {
             header,
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize)]
+pub struct TxnWithStatus {
+    pub txid: Buf32,
+    pub txn_raw: Vec<u8>,
+    pub status: BitcoinTxnStatus,
+}
+
+impl TxnWithStatus {
+    /// Create a new object corresponding a transaction sent to mempool
+    pub fn new(txid: Buf32, txn_raw: Vec<u8>, status: BitcoinTxnStatus) -> Self {
+        Self {
+            txid,
+            txn_raw,
+            status,
+        }
+    }
+
+    /// Create a new object corresponding a transaction sent to mempool
+    pub fn new_unsent(txn: Transaction) -> Self {
+        let txid = Buf32(txn.compute_txid().as_byte_array().into());
+        let txn_raw = serialize(&txn);
+        Self::new(txid, txn_raw, BitcoinTxnStatus::Unsent)
+    }
+
+    pub fn txid(&self) -> &Buf32 {
+        &self.txid
+    }
+
+    pub fn txn_raw(&self) -> &[u8] {
+        &self.txn_raw
+    }
+
+    pub fn status(&self) -> &BitcoinTxnStatus {
+        &self.status
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize)]
+pub enum BitcoinTxnStatus {
+    Unsent,
+    InMempool,
+    Confirmed,
+    Finalized,
 }

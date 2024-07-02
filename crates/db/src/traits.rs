@@ -14,8 +14,6 @@ use alpen_vertex_state::state_op::WriteBatch;
 use alpen_vertex_state::sync_event::SyncEvent;
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use crate::errors::*;
-
 /// Common database interface that we can parameterize worker tasks over if
 /// parameterizing them over each individual trait gets cumbersome or if we need
 /// to use behavior that crosses different interfaces.
@@ -232,4 +230,30 @@ pub trait ChainstateProvider {
 
     /// Gets the toplevel chain state at a particular block index (height).
     fn get_toplevel_state(&self, idx: u64) -> DbResult<Option<ChainState>>;
+}
+
+pub trait SeqDataStore {
+    /// Store the blob
+    fn put_blob(&self, blob_id: Buf32, blob: Vec<u8>) -> DbResult<u64>;
+
+    /// Store inscription transactions before sending to L1, should return the reveal txn idx
+    fn put_commit_reveal_txns(
+        &self,
+        commit_txn: TxnWithStatus,
+        reveal_txn: TxnWithStatus,
+    ) -> DbResult<u64>;
+}
+
+pub trait SeqDataProvider {
+    /// Get the l1 inscription txn by idx
+    fn get_l1_txn(&self, idx: u64) -> DbResult<TxnWithStatus>;
+
+    /// Get blob by its hash
+    fn get_blob_by_id(&self, id: Buf32) -> DbResult<Option<Vec<u8>>>;
+
+    /// Get the last inscription idx
+    fn get_last_txn_idx(&self) -> DbResult<u64>;
+
+    /// Get the last  blob idx
+    fn get_last_blob_idx(&self) -> DbResult<u64>;
 }
