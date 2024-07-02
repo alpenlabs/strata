@@ -89,16 +89,16 @@ pub fn start_sync_tasks<
     // Init the consensus worker state and get the current state from it.
     let cw_state = worker::WorkerState::open(params.clone(), database.clone(), cupdate_tx)?;
     let cur_state = cw_state.cur_state().clone();
-    let cur_chain_tip = cur_state.chain_state().chain_tip_blockid();
+    let cur_tip_blkid = *cur_state.chain_tip_blkid();
 
     // Init the chain tracker from the state we figured out.
-    let chain_tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(cur_chain_tip);
+    let chain_tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(cur_tip_blkid);
     let ct_state = chain_tip::ChainTipTrackerState::new(
         params.clone(),
         database.clone(),
         cur_state,
         chain_tracker,
-        cur_chain_tip,
+        cur_tip_blkid,
     );
     // TODO load unfinalized blocks into block tracker
 

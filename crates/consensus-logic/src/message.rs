@@ -1,9 +1,7 @@
 use std::sync::Arc;
 
 use alpen_vertex_state::{
-    block::L2BlockId,
-    client_state::{ChainState, ClientState},
-    operation::{ClientUpdateOutput, SyncAction},
+    block::L2BlockId, client_state::ClientState, operation::ClientUpdateOutput,
 };
 
 /// Sync control message.
@@ -54,9 +52,5 @@ impl ClientUpdateNotif {
 
     pub fn new_state(&self) -> &ClientState {
         &self.new_state
-    }
-
-    pub fn new_chainstate(&self) -> &ChainState {
-        self.new_state().chain_state()
     }
 }

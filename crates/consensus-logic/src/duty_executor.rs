@@ -4,9 +4,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::{thread, time};
 
-use alpen_vertex_db::database;
 use borsh::{BorshDeserialize, BorshSerialize};
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::broadcast;
 use tracing::*;
 
 use alpen_vertex_db::traits::{ClientStateProvider, Database, L2DataProvider, L2DataStore};
@@ -94,7 +93,7 @@ fn update_tracker<D: Database>(
 
     // Figure out the block slot from the tip blockid.
     // TODO include the block slot in the consensus state
-    let tip_blkid = state.chain_state().chain_tip_blockid();
+    let tip_blkid = *state.chain_tip_blkid();
     let l2prov = database.l2_provider();
     let block = l2prov
         .get_block_data(tip_blkid)?
@@ -243,7 +242,7 @@ fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     let last_cstate = cs_prov
         .get_state_checkpoint(ckpt_idx)?
         .expect("dutyexec: get state checkpoint");
-    let prev_block = last_cstate.chain_state().chain_tip_blockid();
+    let prev_block_id = *last_cstate.chain_tip_blkid();
 
     // Start preparing the EL payload.
     let ts = now_millis();
@@ -275,7 +274,7 @@ fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     // Assemble the body and the header template.
     let body = L2BlockBody::new(l1_seg, exec_seg);
     let state_root = Buf32::zero(); // TODO compute this from the different parts
-    let tmplt = block_template::create_header_template(slot, ts, prev_block, &body, state_root);
+    let tmplt = block_template::create_header_template(slot, ts, prev_block_id, &body, state_root);
     let header_sig = Buf64::zero(); // TODO actually sign it
     let final_header = tmplt.complete_with(header_sig);
     let blkid = final_header.get_blockid();

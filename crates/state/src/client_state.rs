@@ -41,7 +41,7 @@ impl ClientState {
         }
     }
 
-    pub fn chain_tip(&self) -> &L2BlockId {
+    pub fn chain_tip_blkid(&self) -> &L2BlockId {
         &self.chain_tip
     }
 

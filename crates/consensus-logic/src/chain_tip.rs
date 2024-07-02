@@ -106,7 +106,7 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
 ) -> anyhow::Result<()> {
     match ctm {
         ChainTipMessage::NewState(cs, output) => {
-            let l2_tip = cs.chain_state().chain_tip_blockid();
+            let l2_tip = cs.chain_tip_blkid();
 
             // Update the new state.
             state.cur_state = cs;
@@ -165,7 +165,7 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
             // Insert block into pending block tracker and figure out if we
             // should switch to it as a potential head.  This returns if we
             // created a new tip instead of advancing an existing tip.
-            let cur_tip = cstate.chain_state().chain_tip_blockid();
+            let cur_tip = cstate.chain_tip_blkid();
             let new_tip = state.chain_tracker.attach_block(blkid, block.header())?;
             if new_tip {
                 debug!(?blkid, "created new pending chain tip");
@@ -179,8 +179,8 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
 
             // Figure out what our job is now.
             let depth = 100; // TODO change this
-            let reorg = reorg::compute_reorg(&cur_tip, best_block, depth, &state.chain_tracker)
-                .ok_or(Error::UnableToFindReorg(cur_tip, *best_block))?;
+            let reorg = reorg::compute_reorg(cur_tip, best_block, depth, &state.chain_tracker)
+                .ok_or(Error::UnableToFindReorg(*cur_tip, *best_block))?;
 
             // TODO this shouldn't be called "reorg" here, make the types
             // context aware so that we know we're not doing anything abnormal
@@ -212,7 +212,7 @@ fn check_new_block<D: Database>(
     let params = state.params.as_ref();
 
     // Check that the block is correctly signed.
-    let cred_ok = credential::check_block_credential(block.header(), cstate.chain_state(), params);
+    let cred_ok = credential::check_block_credential(block.header(), params);
     if !cred_ok {
         warn!(?blkid, "block has invalid credential");
         return Ok(false);
