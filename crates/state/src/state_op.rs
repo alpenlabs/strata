@@ -26,3 +26,25 @@ pub struct WriteBatch {
 }
 
 // TODO reversiblity stuff?
+
+/// On a given in-memory chainstate, applies a write batch.
+pub fn apply_write_batch_to_chainstate(
+    mut chainstate: ChainState,
+    batch: &WriteBatch,
+) -> ChainState {
+    for op in &batch.ops {
+        match op {
+            StateOp::Replace(new_state) => chainstate = new_state.as_ref().clone(),
+
+            StateOp::RevertL1Height(to_height) => {
+                // TODO
+            }
+
+            StateOp::AcceptL1Block(new_blkid) => {
+                // TODO
+            }
+        }
+    }
+
+    chainstate
+}

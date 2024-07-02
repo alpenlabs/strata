@@ -27,6 +27,8 @@ pub trait Database {
     type SeProv: SyncEventProvider;
     type CsStore: ClientStateStore;
     type CsProv: ClientStateProvider;
+    type ChsStore: ChainstateStore;
+    type ChsProv: ChainstateProvider;
 
     fn l1_store(&self) -> &Arc<Self::L1Store>;
     fn l1_provider(&self) -> &Arc<Self::L1Prov>;
@@ -36,6 +38,8 @@ pub trait Database {
     fn sync_event_provider(&self) -> &Arc<Self::SeProv>;
     fn client_state_store(&self) -> &Arc<Self::CsStore>;
     fn client_state_provider(&self) -> &Arc<Self::CsProv>;
+    fn chainstate_store(&self) -> &Arc<Self::ChsStore>;
+    fn chainstate_provider(&self) -> &Arc<Self::ChsProv>;
 }
 
 /// Storage interface to control our view of L1 data.
@@ -190,11 +194,20 @@ pub enum BlockStatus {
     Invalid,
 }
 
-pub trait ChainStateStore {
+/// Write trait for the (consensus layer) chain state database.  For now we only
+/// have a modestly sized "toplevel" chain state and no "large" state like the
+/// EL does.  This trait is designed to permit a change to storing larger state
+/// like that in the future without *too* much extra effort.  We decide new
+/// states by providing the database with a generic "write batch" and offloading
+/// the effort of deciding how to compute that write batch to the database impl.
+pub trait ChainstateStore {
+    /// Writes the genesis chainstate at index 0.
+    fn write_genesis_state(&self, toplevel: &ChainState) -> DbResult<()>;
+
     /// Stores a write batch in the database, possibly computing that state
     /// under the hood from the writes.  Will not overwrite existing data,
     /// previous writes must be purged first in order to be replaced.
-    fn write_chain_state_batch(&self, idx: u64, batch: &WriteBatch) -> DbResult<()>;
+    fn write_state_update(&self, idx: u64, batch: &WriteBatch) -> DbResult<()>;
 
     /// Tells the database to purge state before a certain block index (height).
     fn purge_historical_state_before(&self, before_idx: u64) -> DbResult<()>;
@@ -203,10 +216,19 @@ pub trait ChainStateStore {
     fn rollback_writes_to(&self, new_tip_idx: u64) -> DbResult<()>;
 }
 
-pub trait ChainStateProvider {
+/// Read trait corresponding to [``ChainstateStore``].  See that trait's doc for
+/// design explanation.
+pub trait ChainstateProvider {
+    /// Gets the last written state.
+    fn get_last_state_idx(&self) -> DbResult<u64>;
+
+    /// Gets the earliest written state.  This corresponds to calls to
+    /// `purge_historical_state_before`.
+    fn get_earliest_state_idx(&self) -> DbResult<u64>;
+
     /// Gets the write batch stored to compute a height.
     fn get_writes_at(&self, idx: u64) -> DbResult<Option<WriteBatch>>;
 
     /// Gets the toplevel chain state at a particular block index (height).
-    fn get_toplevel_chain_state(&self, idx: u64) -> DbResult<Option<ChainState>>;
+    fn get_toplevel_state(&self, idx: u64) -> DbResult<Option<ChainState>>;
 }

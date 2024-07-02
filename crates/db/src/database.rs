@@ -5,42 +5,47 @@ use super::traits::*;
 /// Shim database type that assumes that all the database impls are wrapped in
 /// `Arc`s and that the provider and stores are actually the same types.  We
 /// might actually use this in practice, it's just for testing.
-pub struct CommonDatabase<L1, L2, S, C>
+pub struct CommonDatabase<L1, L2, S, Cl, Ch>
 where
     L1: L1DataStore + L1DataProvider + Sync + Send + 'static,
     L2: L2DataStore + L2DataProvider + Sync + Send + 'static,
     S: SyncEventStore + SyncEventProvider + Sync + Send + 'static,
-    C: ClientStateStore + ClientStateProvider + Sync + Send + 'static,
+    Cl: ClientStateStore + ClientStateProvider + Sync + Send + 'static,
+    Ch: ChainstateStore + ChainstateProvider + Sync + Send + 'static,
 {
     l1db: Arc<L1>,
     l2db: Arc<L2>,
     sedb: Arc<S>,
-    csdb: Arc<C>,
+    csdb: Arc<Cl>,
+    chdb: Arc<Ch>,
 }
 
-impl<L1, L2, S, C> CommonDatabase<L1, L2, S, C>
+impl<L1, L2, S, Cl, Ch> CommonDatabase<L1, L2, S, Cl, Ch>
 where
     L1: L1DataStore + L1DataProvider + Sync + Send + 'static,
     L2: L2DataStore + L2DataProvider + Sync + Send + 'static,
     S: SyncEventStore + SyncEventProvider + Sync + Send + 'static,
-    C: ClientStateStore + ClientStateProvider + Sync + Send + 'static,
+    Cl: ClientStateStore + ClientStateProvider + Sync + Send + 'static,
+    Ch: ChainstateStore + ChainstateProvider + Sync + Send + 'static,
 {
-    pub fn new(l1db: Arc<L1>, l2db: Arc<L2>, sedb: Arc<S>, csdb: Arc<C>) -> Self {
+    pub fn new(l1db: Arc<L1>, l2db: Arc<L2>, sedb: Arc<S>, csdb: Arc<Cl>, chdb: Arc<Ch>) -> Self {
         Self {
             l1db,
             l2db,
             sedb,
             csdb,
+            chdb,
         }
     }
 }
 
-impl<L1, L2, S, C> Database for CommonDatabase<L1, L2, S, C>
+impl<L1, L2, S, Cl, Ch> Database for CommonDatabase<L1, L2, S, Cl, Ch>
 where
     L1: L1DataStore + L1DataProvider + Sync + Send + 'static,
     L2: L2DataStore + L2DataProvider + Sync + Send + 'static,
     S: SyncEventStore + SyncEventProvider + Sync + Send + 'static,
-    C: ClientStateStore + ClientStateProvider + Sync + Send + 'static,
+    Cl: ClientStateStore + ClientStateProvider + Sync + Send + 'static,
+    Ch: ChainstateStore + ChainstateProvider + Sync + Send + 'static,
 {
     type L1Store = L1;
     type L1Prov = L1;
@@ -48,8 +53,10 @@ where
     type L2Prov = L2;
     type SeStore = S;
     type SeProv = S;
-    type CsStore = C;
-    type CsProv = C;
+    type CsStore = Cl;
+    type CsProv = Cl;
+    type ChsStore = Ch;
+    type ChsProv = Ch;
 
     fn l1_store(&self) -> &Arc<Self::L1Store> {
         &self.l1db
@@ -81,5 +88,13 @@ where
 
     fn client_state_provider(&self) -> &Arc<Self::CsProv> {
         &self.csdb
+    }
+
+    fn chainstate_store(&self) -> &Arc<Self::ChsStore> {
+        &self.chdb
+    }
+
+    fn chainstate_provider(&self) -> &Arc<Self::ChsProv> {
+        &self.chdb
     }
 }
