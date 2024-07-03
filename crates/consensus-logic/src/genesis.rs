@@ -2,7 +2,7 @@ use tracing::*;
 
 use alpen_vertex_db::{
     errors::DbError,
-    traits::{ConsensusStateProvider, ConsensusStateStore, Database, L2DataProvider, L2DataStore},
+    traits::{ClientStateProvider, ClientStateStore, Database, L2DataProvider, L2DataStore},
 };
 use alpen_vertex_primitives::{
     buf::{Buf32, Buf64},
@@ -11,7 +11,7 @@ use alpen_vertex_primitives::{
 use alpen_vertex_state::{
     block::{ExecSegment, L1Segment, L2Block, L2BlockBody, L2BlockId},
     block_template,
-    consensus::{ConsensusChainState, ConsensusState},
+    client_state::{ChainState, ClientState},
 };
 
 /// Inserts approprate records into the database to prepare it for syncing the rollup.
@@ -26,9 +26,9 @@ pub fn init_genesis_states<D: Database>(params: &Params, database: &D) -> anyhow
 
     // Now insert things into the database.
     let l2store = database.l2_store();
-    let cs_store = database.consensus_state_store();
+    let cs_store = database.client_state_store();
     l2store.put_block_data(gblock)?;
-    cs_store.write_consensus_checkpoint(0, gcstate)?;
+    cs_store.write_client_state_checkpoint(0, gcstate)?;
 
     info!("finished genesis insertions");
     Ok(())
@@ -58,16 +58,16 @@ fn make_genesis_block(params: &Params) -> L2Block {
     L2Block::new(gheader, body)
 }
 
-fn make_genesis_cstate(gblock: &L2Block, params: &Params) -> ConsensusState {
+fn make_genesis_cstate(gblock: &L2Block, params: &Params) -> ClientState {
     // TODO this is totally going to change when we rework some things
     let gblkid = gblock.header().get_blockid();
-    let chstate = ConsensusChainState::from_genesis_blkid(gblkid);
-    ConsensusState::from_genesis(chstate, params.rollup().l1_start_block_height)
+    let chstate = ChainState::from_genesis_blkid(gblkid);
+    ClientState::from_genesis(chstate, params.rollup().l1_start_block_height)
 }
 
 /// Check if the database needs to have genesis done to it.
 pub fn check_needs_genesis<D: Database>(database: &D) -> anyhow::Result<bool> {
-    let cs_prov = database.consensus_state_provider();
+    let cs_prov = database.client_state_provider();
 
     // Check if we've written the genesis state checkpoint.  This should be the
     // only check we have to do, but it's possible we're in an inconsistent

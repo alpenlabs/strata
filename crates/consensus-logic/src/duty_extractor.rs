@@ -1,5 +1,5 @@
 use alpen_vertex_db::traits::{Database, L2DataProvider};
-use alpen_vertex_state::consensus::ConsensusState;
+use alpen_vertex_state::client_state::ClientState;
 
 use crate::{
     duties::{self, BlockSigningDuty},
@@ -8,7 +8,7 @@ use crate::{
 
 /// Extracts new duties given a consensus state and a identity.
 pub fn extract_duties<D: Database>(
-    state: &ConsensusState,
+    state: &ClientState,
     _ident: &duties::Identity,
     database: &D,
 ) -> Result<Vec<duties::Duty>, Error> {

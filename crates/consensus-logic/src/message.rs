@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use alpen_vertex_state::{
     block::L2BlockId,
-    consensus::{ConsensusChainState, ConsensusState},
-    operation::{ConsensusOutput, SyncAction},
+    client_state::{ChainState, ClientState},
+    operation::{ClientUpdateOutput, SyncAction},
 };
 
 /// Sync control message.
@@ -16,8 +16,8 @@ pub enum CsmMessage {
 /// Message about a new block the tip tracker might do something with.
 #[derive(Clone, Debug)]
 pub enum ChainTipMessage {
-    /// New consensus state with the output that produced it.
-    NewState(Arc<ConsensusState>, Arc<ConsensusOutput>),
+    /// New client state with the output that produced it.
+    NewState(Arc<ClientState>, Arc<ClientUpdateOutput>),
 
     /// New block coming in from over the network to be considered.
     NewBlock(L2BlockId),
@@ -25,17 +25,17 @@ pub enum ChainTipMessage {
 
 /// Package describing a new consensus state produced from a new synce event.
 #[derive(Clone, Debug)]
-pub struct ConsensusUpdateNotif {
+pub struct ClientUpdateNotif {
     sync_event_idx: u64,
-    tsn_output: Arc<ConsensusOutput>,
-    new_state: Arc<ConsensusState>,
+    tsn_output: Arc<ClientUpdateOutput>,
+    new_state: Arc<ClientState>,
 }
 
-impl ConsensusUpdateNotif {
+impl ClientUpdateNotif {
     pub fn new(
         sync_event_idx: u64,
-        tsn_output: Arc<ConsensusOutput>,
-        new_state: Arc<ConsensusState>,
+        tsn_output: Arc<ClientUpdateOutput>,
+        new_state: Arc<ClientState>,
     ) -> Self {
         Self {
             sync_event_idx,
@@ -48,15 +48,15 @@ impl ConsensusUpdateNotif {
         self.sync_event_idx
     }
 
-    pub fn tsn_output(&self) -> &ConsensusOutput {
+    pub fn tsn_output(&self) -> &ClientUpdateOutput {
         &self.tsn_output
     }
 
-    pub fn new_state(&self) -> &ConsensusState {
+    pub fn new_state(&self) -> &ClientState {
         &self.new_state
     }
 
-    pub fn new_chainstate(&self) -> &ConsensusChainState {
+    pub fn new_chainstate(&self) -> &ChainState {
         self.new_state().chain_state()
     }
 }

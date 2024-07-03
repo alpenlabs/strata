@@ -8,11 +8,11 @@ use tracing::*;
 use alpen_vertex_db::{database, traits::*};
 use alpen_vertex_evmctl::engine::ExecEngineCtl;
 use alpen_vertex_primitives::prelude::*;
-use alpen_vertex_state::{consensus::ConsensusState, operation::SyncAction};
+use alpen_vertex_state::{client_state::ClientState, operation::SyncAction};
 
 use crate::{
     errors::Error,
-    message::{ConsensusUpdateNotif, CsmMessage},
+    message::{ClientUpdateNotif, CsmMessage},
     state_tracker,
 };
 
@@ -32,7 +32,7 @@ pub struct WorkerState<D: Database> {
     state_tracker: state_tracker::StateTracker<D>,
 
     /// Broadcast channel used to publish state updates.
-    cupdate_tx: broadcast::Sender<Arc<ConsensusUpdateNotif>>,
+    cupdate_tx: broadcast::Sender<Arc<ClientUpdateNotif>>,
 }
 
 impl<D: Database> WorkerState<D> {
@@ -41,9 +41,9 @@ impl<D: Database> WorkerState<D> {
     pub fn open(
         params: Arc<Params>,
         database: Arc<D>,
-        cupdate_tx: broadcast::Sender<Arc<ConsensusUpdateNotif>>,
+        cupdate_tx: broadcast::Sender<Arc<ClientUpdateNotif>>,
     ) -> anyhow::Result<Self> {
-        let cs_prov = database.consensus_state_provider().as_ref();
+        let cs_prov = database.client_state_provider().as_ref();
         let (cur_state_idx, cur_state) = state_tracker::reconstruct_cur_state(cs_prov)?;
         let state_tracker = state_tracker::StateTracker::new(
             params.clone(),
@@ -61,7 +61,7 @@ impl<D: Database> WorkerState<D> {
     }
 
     /// Gets a ref to the consensus state from the inner state tracker.
-    pub fn cur_state(&self) -> &Arc<ConsensusState> {
+    pub fn cur_state(&self) -> &Arc<ClientState> {
         self.state_tracker.cur_state()
     }
 }
@@ -137,11 +137,11 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
 
     // Write the state checkpoint.
     // TODO Don't do this on every update.
-    let css = state.database.consensus_state_store();
-    css.write_consensus_checkpoint(ev_idx, new_state.as_ref().clone())?;
+    let css = state.database.client_state_store();
+    css.write_client_state_checkpoint(ev_idx, new_state.as_ref().clone())?;
 
     // Broadcast the update.
-    let update = ConsensusUpdateNotif::new(ev_idx, Arc::new(outp), new_state);
+    let update = ClientUpdateNotif::new(ev_idx, Arc::new(outp), new_state);
     if state.cupdate_tx.send(Arc::new(update)).is_err() {
         warn!(%ev_idx, "failed to send broadcast for new CSM update");
     }

@@ -11,15 +11,16 @@ use alpen_vertex_primitives::{buf::Buf64, params::Params};
 
 use crate::{block::L2BlockId, l1::L1BlockId};
 
-/// High level consensus state.
+/// High level client's state of the network.  This is local to the client, not
+/// coordinated as part of the L2 chain.
 ///
 /// This is updated when we see a consensus-relevant message.  This is L2 blocks
 /// but also L1 blocks being published with interesting things in them, and
 /// various other events.
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize)]
-pub struct ConsensusState {
-    /// Important consensus state.
-    pub(super) chain_state: ConsensusChainState,
+pub struct ClientState {
+    /// Blockchain state.
+    pub(super) chain_state: ChainState,
 
     /// L2 block that's been finalized and proven on L1.
     pub(super) finalized_tip: L2BlockId,
@@ -32,8 +33,8 @@ pub struct ConsensusState {
     pub(super) buried_l1_height: u64,
 }
 
-impl ConsensusState {
-    pub fn from_genesis(genesis_chstate: ConsensusChainState, genesis_l1_height: u64) -> Self {
+impl ClientState {
+    pub fn from_genesis(genesis_chstate: ChainState, genesis_l1_height: u64) -> Self {
         let gblkid = genesis_chstate.accepted_l2_blocks[0];
         Self {
             chain_state: genesis_chstate,
@@ -43,17 +44,18 @@ impl ConsensusState {
         }
     }
 
-    pub fn chain_state(&self) -> &ConsensusChainState {
+    pub fn chain_state(&self) -> &ChainState {
         &self.chain_state
     }
 }
 
-/// L2 blockchain consensus state.
+/// L2 blockchain state.  This is the state computed as a function of a
+/// pre-state and a block.
 ///
-/// This is updated when we get a new L2 block and is kept more precisely
-/// synchronized across all nodes.
+/// This corresponds to the beacon chain state.
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize)]
-pub struct ConsensusChainState {
+pub struct ChainState {
+    // all these fields are kinda dummies at the moment
     /// Accepted and valid L2 blocks that we might still reorg.  The last of
     /// these is the chain tip.
     pub(super) accepted_l2_blocks: Vec<L2BlockId>,
@@ -65,7 +67,7 @@ pub struct ConsensusChainState {
     pub(super) pending_withdraws: Vec<PendingWithdraw>,
 }
 
-impl ConsensusChainState {
+impl ChainState {
     pub fn from_genesis_blkid(genesis_blkid: L2BlockId) -> Self {
         Self {
             accepted_l2_blocks: vec![genesis_blkid],

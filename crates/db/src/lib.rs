@@ -3,7 +3,7 @@
 use l2::schemas::{L2BlockHeightSchema, L2BlockSchema, L2BlockStatusSchema};
 use rockbound::{schema::ColumnFamilyName, Schema};
 
-use crate::consensus_state::schemas::{ConsensusOutputSchema, ConsensusStateSchema};
+use crate::consensus_state::schemas::{ClientStateSchema, ClientUpdateOutputSchema};
 use crate::l1::schemas::{L1BlockSchema, MmrSchema, TxnSchema};
 use crate::sync_event::schemas::SyncEventSchema;
 
@@ -23,8 +23,8 @@ pub type DbResult<T> = anyhow::Result<T, errors::DbError>;
 pub const ROCKSDB_NAME: &str = "vertex";
 
 pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
-    ConsensusOutputSchema::COLUMN_FAMILY_NAME,
-    ConsensusStateSchema::COLUMN_FAMILY_NAME,
+    ClientUpdateOutputSchema::COLUMN_FAMILY_NAME,
+    ClientStateSchema::COLUMN_FAMILY_NAME,
     L1BlockSchema::COLUMN_FAMILY_NAME,
     MmrSchema::COLUMN_FAMILY_NAME,
     SyncEventSchema::COLUMN_FAMILY_NAME,
