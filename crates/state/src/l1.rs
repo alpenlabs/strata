@@ -13,7 +13,7 @@ impl From<Buf32> for L1BlockId {
 }
 
 /// Represents a serialized L1 header.
-#[derive(Clone, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct L1HeaderPayload {
     /// Index in the L1 chain.  This helps us in case there's reorgs that the L2
     /// chain observes.

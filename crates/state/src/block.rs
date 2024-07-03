@@ -35,7 +35,7 @@ impl fmt::Debug for L2BlockId {
 }
 
 /// Full contents of the bare L2 block.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct L2Block {
     /// Header that links the block into the L2 block chain and carries the
     /// block's credential from a sequencer.
@@ -64,7 +64,7 @@ impl L2Block {
 }
 
 /// Block header that forms the chain we use to reach consensus.
-#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
+#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize, Arbitrary)]
 pub struct L2BlockHeader {
     /// Block index, obviously.
     pub(crate) block_idx: u64,
@@ -130,7 +130,7 @@ impl L2BlockHeader {
 }
 
 /// Contains the additional payloads within the L2 block.
-#[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
+#[derive(Clone, Debug,PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct L2BlockBody {
     l1_segment: L1Segment,
     exec_segment: ExecSegment,
@@ -155,7 +155,7 @@ impl L2BlockBody {
 
 /// Container for additional messages that we've observed from the L1, if there
 /// are any.
-#[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
+#[derive(Clone, Debug,PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct L1Segment {
     /// New headers that we've seen from L1 that we didn't see in the previous
     /// L2 block.
@@ -175,7 +175,7 @@ impl L1Segment {
 }
 
 /// Information relating to the EL data.
-#[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
+#[derive(Clone, Debug, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct ExecSegment {
     /// Header of the EL data.
     el_payload: Vec<u8>,

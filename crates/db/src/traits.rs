@@ -9,6 +9,7 @@ use alpen_vertex_state::block::{L2Block, L2BlockId};
 use alpen_vertex_state::client_state::ClientState;
 use alpen_vertex_state::operation::*;
 use alpen_vertex_state::sync_event::SyncEvent;
+use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::errors::*;
 
@@ -174,7 +175,7 @@ pub trait L2DataProvider {
 }
 
 /// Gets the status of a block.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, BorshSerialize, BorshDeserialize)]
 pub enum BlockStatus {
     /// Block's validity hasn't been checked yet.
     Unchecked,
