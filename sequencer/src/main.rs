@@ -18,6 +18,7 @@ use alpen_vertex_consensus_logic::duties::{DutyBatch, Identity};
 use alpen_vertex_consensus_logic::duty_executor::{self, IdentityData, IdentityKey};
 use alpen_vertex_consensus_logic::sync_manager;
 use alpen_vertex_consensus_logic::sync_manager::SyncManager;
+use alpen_vertex_db::database::SeqDatabase;
 use alpen_vertex_db::traits::Database;
 use alpen_vertex_primitives::buf::Buf32;
 use alpen_vertex_primitives::{block_credential, params::*};

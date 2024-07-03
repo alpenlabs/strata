@@ -2,6 +2,7 @@
 //! its naming conventions from reth.
 
 use std::sync::Arc;
+use borsh::{BorshDeserialize, BorshSerialize};
 
 use borsh::{BorshDeserialize, BorshSerialize};
 
@@ -232,6 +233,14 @@ pub trait ChainstateProvider {
 
     /// Gets the toplevel chain state at a particular block index (height).
     fn get_toplevel_state(&self, idx: u64) -> DbResult<Option<ChainState>>;
+}
+
+pub trait SequencerDatabase {
+    type SeqStore: SeqDataStore;
+    type SeqProv: SeqDataProvider;
+
+    fn sequencer_store(&self) -> &Arc<Self::SeqStore>;
+    fn sequencer_provider(&self) -> &Arc<Self::SeqProv>;
 }
 
 pub trait SeqDataStore {
