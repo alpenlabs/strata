@@ -23,6 +23,6 @@ define_table_with_default_codec!(
 );
 
 define_table_with_default_codec!(
-    /// A table to store L2 Block data. Maps block id to BlockStatus
+    /// A table to store L2 Block data. Maps block id to BlockId
     (L2BlockHeightSchema) u64 => Vec<L2BlockId>
 );

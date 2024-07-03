@@ -1,6 +1,8 @@
-use alpen_vertex_state::block::{L2Block, L2BlockId};
-use rockbound::{SchemaBatch, DB};
 use std::sync::Arc;
+
+use rockbound::{SchemaBatch, DB};
+
+use alpen_vertex_state::block::{L2Block, L2BlockId};
 
 use crate::{
     l2::schemas::L2BlockHeightSchema,
@@ -92,35 +94,8 @@ impl L2DataProvider for L2Db {
 
 #[cfg(test)]
 mod tests {
-    use crate::STORE_COLUMN_FAMILIES;
-    use arbitrary::{Arbitrary, Unstructured};
-    use rand::Rng;
-    use rockbound::schema::ColumnFamilyName;
-    use rocksdb::Options;
-    use std::path::Path;
-    use tempfile::TempDir;
-
     use super::*;
-
-    const DB_NAME: &str = "l2_db";
-
-    struct ArbitraryGenerator {
-        buffer: Vec<u8>,
-    }
-
-    impl ArbitraryGenerator {
-        fn new() -> Self {
-            let mut rng = rand::thread_rng();
-            // NOTE: 128 should be enough for testing purposes. Change to 256 as needed
-            let buffer: Vec<u8> = (0..128).map(|_| rng.gen()).collect();
-            ArbitraryGenerator { buffer }
-        }
-
-        fn generate<'a, T: Arbitrary<'a> + Clone>(&'a self) -> T {
-            let mut u = Unstructured::new(&self.buffer);
-            T::arbitrary(&mut u).expect("failed to generate arbitrary instance")
-        }
-    }
+    use alpen_test_utils::{get_rocksdb_tmp_instance, ArbitraryGenerator};
 
     fn get_mock_data() -> L2Block {
         let arb = ArbitraryGenerator::new();
@@ -129,26 +104,8 @@ mod tests {
         l2_lock
     }
 
-    fn get_new_db(path: &Path) -> anyhow::Result<Arc<DB>> {
-        let mut db_opts = Options::default();
-        db_opts.create_missing_column_families(true);
-        db_opts.create_if_missing(true);
-
-        DB::open(
-            path,
-            DB_NAME,
-            STORE_COLUMN_FAMILIES
-                .iter()
-                .cloned()
-                .collect::<Vec<ColumnFamilyName>>(),
-            &db_opts,
-        )
-        .map(Arc::new)
-    }
-
     fn setup_db() -> L2Db {
-        let temp_dir = TempDir::new().expect("failed to create temp dir");
-        let db = get_new_db(&temp_dir.into_path()).unwrap();
+        let db = get_rocksdb_tmp_instance().unwrap();
         L2Db::new(db)
     }
 
