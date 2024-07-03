@@ -11,7 +11,7 @@ use tokio::sync::Mutex;
 use tracing::*;
 
 use alpen_vertex_db::{
-    traits::{Database, SeqDataProvider, SeqDataStore},
+    traits::{SeqDataProvider, SeqDataStore, SequencerDatabase},
     DbResult,
 };
 
@@ -38,7 +38,7 @@ struct WriterState<D> {
     db: Arc<D>,
 }
 
-impl<D: Database> WriterState<D> {
+impl<D: SequencerDatabase> WriterState<D> {
     pub fn new(db: Arc<D>, txns_queue: VecDeque<TxnWithStatus>, first_txn_idx: u64) -> Self {
         Self {
             db,
@@ -72,7 +72,7 @@ pub async fn writer_control_task<D>(
     db: Arc<D>,
 ) -> anyhow::Result<()>
 where
-    D: Database + Sync + Send + 'static,
+    D: SequencerDatabase + Sync + Send + 'static,
 {
     info!("Starting writer control task");
     let state = Arc::new(Mutex::new(initialize_writer_state(db.clone())?));
@@ -104,7 +104,7 @@ where
     }
 }
 
-async fn handle_intent<D: Database>(
+async fn handle_intent<D: SequencerDatabase>(
     intent: Vec<u8>,
     db: Arc<D>,
     rpc_client: &Arc<BitcoinClient>,
@@ -181,7 +181,7 @@ async fn create_inscriptions_from_intent(
     .map_err(|e| anyhow::anyhow!(e.to_string()))
 }
 
-fn initialize_writer_state<D: Database>(db: Arc<D>) -> anyhow::Result<WriterState<D>> {
+fn initialize_writer_state<D: SequencerDatabase>(db: Arc<D>) -> anyhow::Result<WriterState<D>> {
     // The idea here is to get the latest blob, corresponding l1 txidx, and loop backwards until we
     // have the finalized txns while we are collecting the visited txns in a queue.
     let seqprov = db.sequencer_provider();
@@ -211,7 +211,7 @@ fn initialize_writer_state<D: Database>(db: Arc<D>) -> anyhow::Result<WriterStat
 }
 
 /// Watches for inscription transactions status in bitcoin and resends if not in mempool, until they are confirmed
-async fn transactions_tracker_task<D: Database>(
+async fn transactions_tracker_task<D: SequencerDatabase>(
     state: Arc<Mutex<WriterState<D>>>,
     rpc_client: Arc<BitcoinClient>,
     config: WriterConfig,

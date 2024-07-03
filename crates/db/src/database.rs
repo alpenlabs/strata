@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use crate::traits::SequencerDatabase;
+
 use super::traits::*;
 
 /// Shim database type that assumes that all the database impls are wrapped in
@@ -96,5 +98,37 @@ where
 
     fn chainstate_provider(&self) -> &Arc<Self::ChsProv> {
         &self.chdb
+    }
+}
+
+pub struct SeqDatabase<S>
+where
+    S: SeqDataStore + SeqDataProvider + Sync + Send + 'static,
+{
+    seqdb: Arc<S>,
+}
+
+impl<S> SeqDatabase<S>
+where
+    S: SeqDataStore + SeqDataProvider + Sync + Send + 'static,
+{
+    pub fn new(seqdb: Arc<S>) -> Self {
+        Self { seqdb }
+    }
+}
+
+impl<S> SequencerDatabase for SeqDatabase<S>
+where
+    S: SeqDataStore + SeqDataProvider + Sync + Send + 'static,
+{
+    type SeqStore = S;
+    type SeqProv = S;
+
+    fn sequencer_store(&self) -> &Arc<Self::SeqStore> {
+        &self.seqdb
+    }
+
+    fn sequencer_provider(&self) -> &Arc<Self::SeqProv> {
+        &self.seqdb
     }
 }

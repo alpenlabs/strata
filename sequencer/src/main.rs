@@ -6,8 +6,6 @@ use std::sync::Arc;
 use std::thread;
 use std::time;
 
-use alpen_vertex_btcio::writer::config::WriterConfig;
-use alpen_vertex_btcio::writer::writer_control_task;
 use anyhow::Context;
 use thiserror::Error;
 use tokio::sync::broadcast;
@@ -15,11 +13,14 @@ use tokio::sync::{mpsc, oneshot, watch};
 use tracing::*;
 
 use alpen_vertex_btcio::rpc::traits::L1Client;
+use alpen_vertex_btcio::writer::config::WriterConfig;
+use alpen_vertex_btcio::writer::writer_control_task;
 use alpen_vertex_common::logging;
 use alpen_vertex_consensus_logic::duties::{DutyBatch, Identity};
 use alpen_vertex_consensus_logic::duty_executor::{self, IdentityData, IdentityKey};
 use alpen_vertex_consensus_logic::sync_manager;
 use alpen_vertex_consensus_logic::sync_manager::SyncManager;
+use alpen_vertex_db::database::SeqDatabase;
 use alpen_vertex_db::traits::Database;
 use alpen_vertex_primitives::buf::Buf32;
 use alpen_vertex_primitives::{block_credential, params::*};
@@ -89,15 +90,9 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let l2_db = Arc::new(alpen_vertex_db::stubs::l2::StubL2Db::new()); // FIXME stub
     let sync_ev_db = Arc::new(alpen_vertex_db::SyncEventDb::new(rbdb.clone()));
     let cs_db = Arc::new(alpen_vertex_db::ConsensusStateDb::new(rbdb.clone()));
-<<<<<<< HEAD
     let chst_db = Arc::new(alpen_vertex_db::stubs::chain_state::StubChainstateDb::new());
     let database = Arc::new(alpen_vertex_db::database::CommonDatabase::new(
         l1_db, l2_db, sync_ev_db, cs_db, chst_db,
-=======
-    let sq_db = Arc::new(alpen_vertex_db::SeqDb::new(rbdb.clone()));
-    let database = Arc::new(alpen_vertex_db::database::CommonDatabase::new(
-        l1_db, l2_db, sync_ev_db, cs_db, sq_db,
->>>>>>> aa8a273 (db: add sequencer db trait and todo implementations)
     ));
 
     // Set up Bitcoin client RPC.
@@ -165,9 +160,10 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         });
 
         let writer_config = WriterConfig::default();
-        let dbw = database.clone();
         let rpc = btc_rpc.clone();
-        thread::spawn(move || writer_control_task(l1wr_rx, rpc, writer_config, dbw));
+        let sq_db = Arc::new(alpen_vertex_db::SeqDb::new(rbdb.clone()));
+        let sdb = Arc::new(SeqDatabase::new(sq_db));
+        thread::spawn(move || writer_control_task(l1wr_rx, rpc, writer_config, sdb));
     }
 
     let main_fut = main_task(args, sync_man, btc_rpc.clone(), database.clone());

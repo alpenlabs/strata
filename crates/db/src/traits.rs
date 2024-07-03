@@ -232,6 +232,14 @@ pub trait ChainstateProvider {
     fn get_toplevel_state(&self, idx: u64) -> DbResult<Option<ChainState>>;
 }
 
+pub trait SequencerDatabase {
+    type SeqStore: SeqDataStore;
+    type SeqProv: SeqDataProvider;
+
+    fn sequencer_store(&self) -> &Arc<Self::SeqStore>;
+    fn sequencer_provider(&self) -> &Arc<Self::SeqProv>;
+}
+
 pub trait SeqDataStore {
     /// Store the blob
     fn put_blob(&self, blob_id: Buf32, blob: Vec<u8>) -> DbResult<u64>;
