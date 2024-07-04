@@ -8,7 +8,6 @@
 // errors as we'd be able to identify when our perspective on the state is
 // inconsistent with the remote state.
 
-use alpen_vertex_primitives::buf::Buf32;
 use alpen_vertex_state::block::L2BlockId;
 
 use crate::errors::*;

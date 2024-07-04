@@ -37,10 +37,10 @@ impl ExecPayloadData {
 #[derive(Clone, Debug)]
 pub struct WithdrawData {
     /// Amount in L1 native asset.  For Bitcoin this is sats.
-    amt: u64,
+    _amt: u64,
 
     /// Schnorr pubkey for the taproot output we're going to generate.
-    dest_addr: Buf64,
+    _dest_addr: Buf64,
 }
 
 /// Environment state from the CL that we pass into the EL for the payload we're
@@ -51,10 +51,10 @@ pub struct PayloadEnv {
     timestamp: u64,
 
     /// State root of the previous CL block.
-    prev_global_state_root: Buf32,
+    _prev_global_state_root: Buf32,
 
     /// Safe L1 block we're exposing into the EL that's not likely to reorg.
-    safe_l1_block: Buf32,
+    _safe_l1_block: Buf32,
 
     /// Operations we're pushing into the EL for processing.
     el_ops: Vec<Op>,
@@ -63,14 +63,14 @@ pub struct PayloadEnv {
 impl PayloadEnv {
     pub fn new(
         timestamp: u64,
-        prev_global_state_root: Buf32,
-        safe_l1_block: Buf32,
+        _prev_global_state_root: Buf32,
+        _safe_l1_block: Buf32,
         el_ops: Vec<Op>,
     ) -> Self {
         Self {
             timestamp,
-            prev_global_state_root,
-            safe_l1_block,
+            _prev_global_state_root,
+            _safe_l1_block,
             el_ops,
         }
     }
