@@ -28,18 +28,24 @@ impl L2DataStore for L2Db {
 
         // append to previous block height data
         let block_height = bundle.block().header().blockidx();
-        let mut block_height_data = self.get_blocks_at_height(block_height)?;
-        if !block_height_data.contains(&block_id) {
-            block_height_data.push(block_id);
-        }
 
-        let mut batch = SchemaBatch::new();
-        batch.put::<L2BlockSchema>(&block_id, &bundle)?;
-        batch.put::<L2BlockStatusSchema>(&block_id, &BlockStatus::Unchecked)?;
-        batch.put::<L2BlockHeightSchema>(&block_height, &block_height_data)?;
-        self.db.write_schemas(batch)?;
+        self.db
+            .with_optimistic_txn(rockbound::TransactionRetry::Count(5), |txn| {
+                let mut block_height_data = txn
+                    .get::<L2BlockHeightSchema>(&block_height)?
+                    .unwrap_or(Vec::new());
+                if !block_height_data.contains(&block_id) {
+                    block_height_data.push(block_id);
+                }
 
-        Ok(())
+                txn.put::<L2BlockSchema>(&block_id, &block)?;
+                txn.put::<L2BlockStatusSchema>(&block_id, &BlockStatus::Unchecked)?;
+                txn.put::<L2BlockHeightSchema>(&block_height, &block_height_data)?;
+
+                Ok::<_, anyhow::Error>(())
+            })
+            .map_err(Into::<anyhow::Error>::into)
+            .map_err(Into::into)
     }
 
     fn del_block_data(&self, id: L2BlockId) -> DbResult<bool> {
@@ -53,13 +59,21 @@ impl L2DataStore for L2Db {
         let mut block_height_data = self.get_blocks_at_height(block_height)?;
         block_height_data.retain(|&block_id| block_id != id);
 
-        let mut batch = SchemaBatch::new();
-        batch.delete::<L2BlockSchema>(&id)?;
-        batch.delete::<L2BlockStatusSchema>(&id)?;
-        batch.put::<L2BlockHeightSchema>(&block_height, &block_height_data)?;
-        self.db.write_schemas(batch)?;
+        self.db
+            .with_optimistic_txn(rockbound::TransactionRetry::Count(5), |txn| {
+                let mut block_height_data = txn
+                    .get::<L2BlockHeightSchema>(&block_height)?
+                    .unwrap_or(Vec::new());
+                block_height_data.retain(|&block_id| block_id != id);
 
-        Ok(true)
+                txn.delete::<L2BlockSchema>(&id)?;
+                txn.delete::<L2BlockStatusSchema>(&id)?;
+                txn.put::<L2BlockHeightSchema>(&block_height, &block_height_data)?;
+
+                Ok::<_, anyhow::Error>(true)
+            })
+            .map_err(Into::<anyhow::Error>::into)
+            .map_err(Into::into)
     }
 
     fn set_block_status(&self, id: L2BlockId, status: BlockStatus) -> DbResult<()> {
