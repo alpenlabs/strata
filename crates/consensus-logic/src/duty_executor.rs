@@ -225,6 +225,7 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
         }
         Duty::WriteL1(intent) => {
             // Write to l1Writer receiver channel
+            // TODO: Might need to explicitly serialize the intent
             l1s.blocking_send(intent.clone()).map_err(|e| {
                 Error::Other(format!("Could not send blobdata to l1 writer: {}", e))
             })?;

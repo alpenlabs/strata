@@ -24,6 +24,7 @@ impl From<(u64, u32)> for L1TxRef {
     }
 }
 
+/// TODO: This is duplicate with alpen_state::l1::L1TxProof
 /// Merkle proof for a TXID within a block.
 // TODO rework this, make it possible to generate proofs, etc.
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]

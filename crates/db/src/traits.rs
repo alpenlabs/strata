@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use crate::errors::*;
+use crate::{errors::*, DbResult};
 use alpen_vertex_mmr::CompactMmr;
 use alpen_vertex_primitives::{l1::*, prelude::*};
 use alpen_vertex_state::block::{L2Block, L2BlockId};
@@ -249,25 +249,31 @@ pub trait SeqDataStore {
     /// Should return the reveal txn idx
     fn put_commit_reveal_txns(
         &self,
-        blob_idx: u64,
+        blob_id: Buf32,
         commit_txn: TxnWithStatus,
         reveal_txn: TxnWithStatus,
     ) -> DbResult<u64>;
+
+    /// Update an existing transaction
+    fn update_txn(&self, txid: Buf32, txn: TxnWithStatus) -> DbResult<()>;
 }
 
 pub trait SeqDataProvider {
     /// Get the l1 inscription txn by idx
-    fn get_l1_txn(&self, idx: u64) -> DbResult<TxnWithStatus>;
+    fn get_l1_txn(&self, idx: u64) -> DbResult<Option<TxnWithStatus>>;
 
     /// Get blob by its hash
     fn get_blob_by_id(&self, id: Buf32) -> DbResult<Option<Vec<u8>>>;
 
     /// Get the last inscription idx
-    fn get_last_txn_idx(&self) -> DbResult<u64>;
+    fn get_last_txn_idx(&self) -> DbResult<Option<u64>>;
 
     /// Get the last  blob idx
-    fn get_last_blob_idx(&self) -> DbResult<u64>;
+    fn get_last_blob_idx(&self) -> DbResult<Option<u64>>;
 
     ///Get the reveal tx idx associated with blob idx
-    fn get_txidx_for_blob(&self, blobidx: u64) -> DbResult<u64>;
+    fn get_txidx_for_blob(&self, blobid: Buf32) -> DbResult<Option<u64>>;
+
+    /// Get the blob id for blob idx
+    fn get_blobid_for_blob_idx(&self, blobidx: u64) -> DbResult<Buf32>;
 }

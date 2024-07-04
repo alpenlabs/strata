@@ -20,6 +20,9 @@ pub struct WriterConfig {
 
     /// How should the inscription fee be determined
     pub(super) inscription_fee_policy: InscriptionFeePolicy,
+
+    /// How much amount(in sats) to send to reveal address
+    pub(super) amount_for_reveal_txn: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -52,6 +55,7 @@ impl Default for WriterConfig {
             rollup_name: "alpen".to_string(),
             inscription_fee_policy: InscriptionFeePolicy::Fixed(100),
             poll_duration_ms: 1000,
+            amount_for_reveal_txn: 1000,
         }
     }
 }

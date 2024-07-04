@@ -43,19 +43,24 @@ impl SeqDataStore for SeqDb {
         Ok(0)
     }
 
+    /// Store commit reveal txns associated with the blobid.
     fn put_commit_reveal_txns(
         &self,
-        blob_idx: u64,
+        blob_id: Buf32,
         commit_txn: TxnWithStatus,
         reveal_txn: TxnWithStatus,
     ) -> DbResult<u64> {
         // TODO: COMPLETE this
         Ok(1)
     }
+
+    fn update_txn(&self, txid: Buf32, txn: TxnWithStatus) -> DbResult<()> {
+        todo!()
+    }
 }
 
 impl SeqDataProvider for SeqDb {
-    fn get_l1_txn(&self, idx: u64) -> DbResult<TxnWithStatus> {
+    fn get_l1_txn(&self, idx: u64) -> DbResult<Option<TxnWithStatus>> {
         todo!()
     }
 
@@ -63,15 +68,19 @@ impl SeqDataProvider for SeqDb {
         todo!()
     }
 
-    fn get_last_txn_idx(&self) -> DbResult<u64> {
+    fn get_last_txn_idx(&self) -> DbResult<Option<u64>> {
         todo!()
     }
 
-    fn get_last_blob_idx(&self) -> DbResult<u64> {
+    fn get_last_blob_idx(&self) -> DbResult<Option<u64>> {
         todo!()
     }
 
-    fn get_txidx_for_blob(&self, blobidx: u64) -> crate::errors::DbResult<u64> {
+    fn get_txidx_for_blob(&self, blobid: Buf32) -> DbResult<Option<u64>> {
+        todo!()
+    }
+
+    fn get_blobid_for_blob_idx(&self, blobidx: u64) -> DbResult<Buf32> {
         todo!()
     }
 }

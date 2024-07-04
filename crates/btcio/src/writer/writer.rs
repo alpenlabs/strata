@@ -4,7 +4,7 @@ use alpen_vertex_primitives::{
     buf::Buf32,
     l1::{BitcoinTxnStatus, TxnWithStatus},
 };
-use bitcoin::{consensus::serialize, Transaction};
+use bitcoin::Transaction;
 use sha2::{Digest, Sha256};
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::Mutex;
@@ -18,55 +18,14 @@ use alpen_vertex_db::{
 use super::{
     builder::{create_inscription_transactions, sign_blob_with_private_key, UtxoParseError, UTXO},
     config::{InscriptionFeePolicy, WriterConfig},
+    state::WriterState,
 };
 use crate::rpc::{types::RawUTXO, BitcoinClient};
 
-// This probably should be in config, or we can just pay dust
-const AMOUNT_TO_REVEAL_TXN: u64 = 1000;
-
 const FINALITY_DEPTH: u64 = 6;
 
-#[derive(Default)]
-struct WriterState<D> {
-    /// The queue of transactions that need to be sent to L1 or whose status needs to be tracked
-    txns_queue: VecDeque<TxnWithStatus>,
-
-    /// The idx of the first transaction. This is set while the writer control_task is initialized
-    first_txn_idx: u64,
-
-    /// database to access the L1 transactions
-    db: Arc<D>,
-}
-
-impl<D: SequencerDatabase> WriterState<D> {
-    pub fn new(db: Arc<D>, txns_queue: VecDeque<TxnWithStatus>, first_txn_idx: u64) -> Self {
-        Self {
-            db,
-            txns_queue,
-            first_txn_idx,
-        }
-    }
-
-    pub fn new_empty(db: Arc<D>) -> Self {
-        Self::new(db, Default::default(), Default::default())
-    }
-
-    pub fn add_new_txn(&mut self, txn: TxnWithStatus) {
-        self.txns_queue.push_back(txn)
-    }
-
-    pub fn finalize_txn(&mut self, idx: usize) -> DbResult<()> {
-        todo!()
-    }
-
-    pub fn update_txn(&mut self, idx: usize, status: BitcoinTxnStatus) -> DbResult<()> {
-        //
-        todo!()
-    }
-}
-
 pub async fn writer_control_task<D>(
-    mut intent_rx: Receiver<Vec<u8>>,
+    intent_rx: Receiver<Vec<u8>>,
     rpc_client: Arc<BitcoinClient>,
     config: WriterConfig,
     db: Arc<D>,
@@ -75,7 +34,9 @@ where
     D: SequencerDatabase + Sync + Send + 'static,
 {
     info!("Starting writer control task");
-    let state = Arc::new(Mutex::new(initialize_writer_state(db.clone())?));
+
+    let state = initialize_writer_state(db.clone())?;
+    let state = Arc::new(Mutex::new(state));
     let st_clone = state.clone();
 
     tokio::spawn(transactions_tracker_task(
@@ -84,6 +45,21 @@ where
         config.clone(),
     ));
 
+    let _ = listen_for_write_intents(intent_rx, rpc_client, config, state, db).await;
+
+    Ok(())
+}
+
+async fn listen_for_write_intents<D>(
+    mut intent_rx: Receiver<Vec<u8>>,
+    rpc_client: Arc<BitcoinClient>,
+    config: WriterConfig,
+    state: Arc<Mutex<WriterState<D>>>,
+    db: Arc<D>,
+) -> anyhow::Result<()>
+where
+    D: SequencerDatabase + Sync + Send + 'static,
+{
     loop {
         let write_intent = intent_rx
             .recv()
@@ -111,36 +87,40 @@ async fn handle_intent<D: SequencerDatabase>(
     config: &WriterConfig,
     state: Arc<Mutex<WriterState<D>>>,
 ) -> anyhow::Result<()> {
-    // Check if it is already present, if so return
+    // If it is already present in the db and corresponding txns are created, return
+
     let hash: [u8; 32] = {
         let mut hasher = Sha256::new();
         hasher.update(&intent);
         hasher.finalize().into()
     };
+
     let blobid = Buf32(hash.into());
-    if db
-        .sequencer_provider()
-        .get_blob_by_id(blobid.clone())?
-        .is_some()
-    {
-        warn!("duplicate write intent {hash:?}");
-        return Ok(());
+    let seqprov = db.sequencer_provider();
+
+    match seqprov.get_blob_by_id(blobid.clone())? {
+        Some(_) => {
+            warn!("duplicate write intent {hash:?}. Checking if L1 transaction exits");
+            if seqprov.get_txidx_for_blob(blobid)?.is_some() {
+                warn!("L1 txn exists, ignoring the intent");
+                return Ok(());
+            }
+        }
+        None => {
+            // Store in db
+            let _ = db.sequencer_store().put_blob(blobid, intent.clone())?;
+        }
     }
 
-    // Store in db
-    let blobidx = db.sequencer_store().put_blob(blobid, intent.clone())?;
-
-    // Create commit reveal txns and store in db as well
+    // Create commit reveal txns and atomically store in db as well
     let (commit, reveal) = create_inscriptions_from_intent(&intent, &rpc_client, &config).await?;
 
     let commit_tx = TxnWithStatus::new_unsent(commit);
     let reveal_tx = TxnWithStatus::new_unsent(reveal);
 
-    let reveal_txidx =
+    let _reveal_txidx =
         db.sequencer_store()
-            .put_commit_reveal_txns(blobidx, commit_tx.clone(), reveal_tx.clone());
-
-    // TODO: associate reveal txidx with blob
+            .put_commit_reveal_txns(blobid, commit_tx.clone(), reveal_tx.clone());
 
     // Update the writer state by adding the txns which will be used by tracker
     state.lock().await.add_new_txn(commit_tx);
@@ -174,7 +154,7 @@ async fn create_inscriptions_from_intent(
         pub_key,
         utxos,
         config.change_address.clone(),
-        AMOUNT_TO_REVEAL_TXN,
+        config.amount_for_reveal_txn,
         fee_rate,
         rpc_client.network(),
     )
@@ -183,18 +163,38 @@ async fn create_inscriptions_from_intent(
 
 fn initialize_writer_state<D: SequencerDatabase>(db: Arc<D>) -> anyhow::Result<WriterState<D>> {
     // The idea here is to get the latest blob, corresponding l1 txidx, and loop backwards until we
-    // have the finalized txns while we are collecting the visited txns in a queue.
+    // reach upto the finalized txns while we are collecting the visited txns in a queue.
+
+    if let Some(last_idx) = db.sequencer_provider().get_last_blob_idx()? {
+        let blobid = db.sequencer_provider().get_blobid_for_blob_idx(last_idx)?;
+
+        // NOTE: This is the reveal txidx
+        if let Some(txidx) = db.sequencer_provider().get_txidx_for_blob(blobid)? {
+            let queue = create_txn_queue(txidx, db.clone())?;
+            return Ok(WriterState::new(db, queue));
+        }
+    }
+    return Ok(WriterState::new_empty(db));
+}
+
+fn create_txn_queue<D: SequencerDatabase>(
+    txidx: u64,
+    db: Arc<D>,
+) -> DbResult<VecDeque<TxnWithStatus>> {
     let seqprov = db.sequencer_provider();
-    let last_idx = seqprov.get_last_blob_idx()?;
-    let mut txidx = seqprov.get_txidx_for_blob(last_idx)?; // NOTE: this is the reveal txidx
     let mut queue = VecDeque::default();
+    let mut txidx = txidx;
     loop {
         if txidx <= 0 {
             break;
         }
         // fetch commit and reveal txns
-        let reveal_txn = seqprov.get_l1_txn(txidx)?;
-        let commit_txn = seqprov.get_l1_txn(txidx - 1)?;
+        let reveal_txn = seqprov
+            .get_l1_txn(txidx)?
+            .expect("Inconsistent existence of transactions");
+        let commit_txn = seqprov
+            .get_l1_txn(txidx - 1)?
+            .expect("Inconsistsent exisence of transactions");
 
         if *reveal_txn.status() == BitcoinTxnStatus::Finalized {
             break;
@@ -204,10 +204,7 @@ fn initialize_writer_state<D: SequencerDatabase>(db: Arc<D>) -> anyhow::Result<W
         }
         txidx -= 2;
     }
-
-    let first_txidx = txidx + 1; // txidx is the idx for finalized reveal txn, we want the next non
-                                 // finalized commit txns
-    Ok(WriterState::new(db, queue, first_txidx))
+    return Ok(queue);
 }
 
 /// Watches for inscription transactions status in bitcoin and resends if not in mempool, until they are confirmed
@@ -217,21 +214,24 @@ async fn transactions_tracker_task<D: SequencerDatabase>(
     config: WriterConfig,
 ) -> anyhow::Result<()> {
     // TODO: better interval values and placement in the loop
+
     let interval = tokio::time::interval(Duration::from_millis(config.poll_duration_ms));
     tokio::pin!(interval);
 
     loop {
         interval.as_mut().tick().await;
 
-        let txns = {
+        let txns: VecDeque<_> = {
             let st = state.lock().await;
-            st.txns_queue.clone()
+            st.txns_queue.iter().cloned().collect()
         };
+
         for (idx, txn) in txns.iter().enumerate() {
             let mut status = BitcoinTxnStatus::Unsent;
+
             match txn.status {
                 BitcoinTxnStatus::Unsent => {
-                    // FIXME: when sending errors, set it's status to unsent so that it is tried
+                    // NOTE: when sending errors, set it's status to unsent so that it is tried
                     // again later
                     if let Ok(_) = rpc_client.send_raw_transaction(txn.txn_raw.clone()).await {
                         status = BitcoinTxnStatus::InMempool;
@@ -239,9 +239,11 @@ async fn transactions_tracker_task<D: SequencerDatabase>(
                         status = BitcoinTxnStatus::Unsent;
                     }
                 }
+
                 BitcoinTxnStatus::InMempool | BitcoinTxnStatus::Confirmed => {
                     status = check_confirmations_and_resend_txn(&txn, &rpc_client).await;
                 }
+
                 BitcoinTxnStatus::Finalized => {
                     state.lock().await.finalize_txn(idx)?;
                     continue;
@@ -260,16 +262,20 @@ async fn check_confirmations_and_resend_txn(
     rpc_client: &Arc<BitcoinClient>,
 ) -> BitcoinTxnStatus {
     let confs = rpc_client.get_transaction_confirmations(txn.txid().0).await;
+
     match confs {
         Ok(confs) if confs > FINALITY_DEPTH => {
             info!(txn = %hex::encode(txn.txid().0), "Transaction finalized");
             BitcoinTxnStatus::Finalized
         }
+
         Ok(confs) if confs > 0 => BitcoinTxnStatus::Confirmed,
+
         Ok(_) => BitcoinTxnStatus::InMempool,
+
         Err(e) => {
             warn!(error = %e, "Error fetching txn confirmations");
-            // Resend
+
             // TODO: possibly resend with higher fees
             let _res = rpc_client
                 .send_raw_transaction(hex::encode(txn.txn_raw()))
