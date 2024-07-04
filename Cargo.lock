@@ -662,7 +662,6 @@ dependencies = [
  "bitcoin",
  "bytes",
  "hex",
- "lazy_static",
  "reqwest",
  "serde",
  "serde_json",

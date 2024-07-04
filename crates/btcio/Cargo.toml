@@ -20,7 +20,6 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
-lazy_static = { workspace = true }
 
 [dev-dependencies]
 alpen-test-utils = { workspace = true }

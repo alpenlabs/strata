@@ -1,6 +1,5 @@
 import time
 import flexitest
-from block_generator import generate_blocks, block_list
 
 
 @flexitest.register
@@ -16,22 +15,28 @@ class L1ReadReorgTest(flexitest.Test):
         seqrpc = seq.create_rpc()
 
         # add 13 blocks
-        generate_blocks(btcrpc, 0.05, 13)
+        btc.generate_blocks(btcrpc, 0.05, 13)
         time.sleep(2)
         l1stat = seqrpc.alp_l1status()
         print("L1 status", l1stat)
 
         # invalidate three blocks
-        btcrpc.proxy.invalidateblock(block_list[10])
+        recorded_10th_block = btc.block_list[10]
+        btcrpc.proxy.invalidateblock(btc.block_list[10])
         time.sleep(1)
 
         # generate eight more blocks
-        generate_blocks(btcrpc, 0.05, 8)
-        time.sleep(1)
+        btc.generate_blocks(btcrpc, 0.05, 1)
+        time.sleep(0.5)
+        assert (
+            recorded_10th_block == btc.block_list[10]
+        ), "The 10th block was not invalidated, which means the reorg didn't happen"
+        btc.generate_blocks(btcrpc, 0.05, 7)
+        time.sleep(2)
+
         l1stat = seqrpc.alp_l1status()
         print("L1 status", l1stat)
 
         # check if current_height 18
         assert l1stat["cur_height"] == 18, "All Blocks were not read"
-        # total 21 blocks were read, but we invalidated 3 blocks so current_blkid should match 21st block
-        assert l1stat["cur_tip_blkid"] == block_list[20], "Block invalidation "
+        assert l1stat["cur_tip_blkid"] == btc.block_list[17], "Block invalidation "

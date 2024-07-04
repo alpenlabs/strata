@@ -1,6 +1,5 @@
 import time
 import flexitest
-from block_generator import generate_blocks
 
 
 @flexitest.register
@@ -20,7 +19,7 @@ class L1StatusTest(flexitest.Test):
         # print("protocol version", proto_ver)
         # assert proto_ver == 1, "query protocol version"
         # add 5 blocks
-        generate_blocks(btcrpc, 0.05, 5)
+        btc.generate_blocks(btcrpc, 0.05, 5)
         time.sleep(1)
         l1stat = seqrpc.alp_l1status()
         print("L1 status", l1stat)

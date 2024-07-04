@@ -1,6 +1,8 @@
 #![allow(unused)]
 
-use alpen_vertex_btcio::{btcio_status::BtcioStatus, L1_STATUS};
+use std::sync::Arc;
+
+use alpen_vertex_btcio::btcio_status::BtcioStatus;
 use async_trait::async_trait;
 use jsonrpsee::{
     core::RpcResult,
@@ -14,7 +16,7 @@ use reth_rpc_types::{
     StateContext, SyncInfo, SyncStatus, Transaction, TransactionRequest, Work,
 };
 use thiserror::Error;
-use tokio::sync::{oneshot, Mutex};
+use tokio::sync::{oneshot, Mutex, RwLock};
 use tracing::*;
 
 use alpen_vertex_rpc_api::AlpenApiServer;
@@ -62,13 +64,15 @@ impl Into<ErrorObjectOwned> for Error {
 }
 
 pub struct AlpenRpcImpl {
+    l1_status: Arc<RwLock<BtcioStatus>>,
     // TODO
     stop_tx: Mutex<Option<oneshot::Sender<()>>>,
 }
 
 impl AlpenRpcImpl {
-    pub fn new(stop_tx: oneshot::Sender<()>) -> Self {
+    pub fn new(l1_status: Arc<RwLock<BtcioStatus>>,stop_tx: oneshot::Sender<()>) -> Self {
         Self {
+            l1_status,
             stop_tx: Mutex::new(Some(stop_tx)),
         }
     }
@@ -91,12 +95,10 @@ impl AlpenApiServer for AlpenRpcImpl {
     }
 
     async fn get_l1_status(&self) -> RpcResult<BtcioStatus> {
-        let l1_status_reader = L1_STATUS.read().expect("Failed to acquire Read lock");
-        Ok(l1_status_reader.clone())
+        Ok(self.l1_status.read().await.clone())
     }
 
     async fn get_l1_connection_status(&self) -> RpcResult<bool> {
-        let reader_status = L1_STATUS.read().expect("Failed to acquire Read lock");
-        Ok(reader_status.bitcoin_rpc_connected)
+        Ok(self.l1_status.read().await.bitcoin_rpc_connected)
     }
 }

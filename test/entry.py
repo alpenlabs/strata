@@ -21,6 +21,33 @@ def generate_seqkey() -> bytes:
     return buf
 
 
+def generate_task(
+    rpc: BitcoindClient, block_list, block_count, wait_dur, addr, infinite
+):
+    print("generating to address", addr)
+
+    def gen_to_addr():
+        time.sleep(wait_dur)
+        try:
+            blk = rpc.proxy.generatetoaddress(1, addr)
+            # check the height of the recently generated block, needed when reorg happens
+            block_height = rpc.proxy.getblockheader(blk[0])["height"]
+            if block_height > len(block_list):
+                block_list.append(blk[0])
+            else:
+                block_list[block_height] = blk[0]
+            print("made block", blk)
+        except:
+            return
+
+    if infinite:
+        while True:
+            gen_to_addr()
+    else:
+        for _ in range(0, block_count):
+            gen_to_addr()
+
+
 class BitcoinFactory(flexitest.Factory):
     def __init__(self, datadir_pfx: str, port_range: list[int]):
         super().__init__(datadir_pfx, port_range)
@@ -48,6 +75,7 @@ class BitcoinFactory(flexitest.Factory):
             "rpc_password": BD_PASSWORD,
         }
 
+        block_list = []
         with open(logfile, "w") as f:
             svc = flexitest.service.ProcService(props, cmd, stdout=f)
 
@@ -55,7 +83,27 @@ class BitcoinFactory(flexitest.Factory):
                 url = "http://%s:%s@localhost:%s" % (BD_USERNAME, BD_PASSWORD, rpc_port)
                 return BitcoindClient(base_url=url)
 
+            def _generate_blocks(
+                bitcoin_rpc: BitcoindClient, wait_dur, block_count=10, infinite=False
+            ) -> threading.Thread:
+                addr = bitcoin_rpc.proxy.getnewaddress()
+                thr = threading.Thread(
+                    target=generate_task,
+                    args=(
+                        bitcoin_rpc,
+                        block_list,
+                        block_count,
+                        wait_dur,
+                        addr,
+                        infinite,
+                    ),
+                )
+                thr.start()
+                return thr
+
             setattr(svc, "create_rpc", _create_rpc)
+            setattr(svc, "generate_blocks", _generate_blocks)
+            setattr(svc, "block_list", block_list)
 
             return svc
 
@@ -79,23 +127,19 @@ class VertexFactory(flexitest.Factory):
 
         # TODO EL setup, this is actually two services running coupled
 
+        # fmt: off
         cmd = [
             "alpen-vertex-sequencer",
-            "--datadir",
-            datadir,
-            "--rpc-port",
-            str(rpc_port),
-            "--bitcoind-host",
-            bitcoind_sock,
-            "--bitcoind-user",
-            bitcoind_user,
-            "--bitcoind-password",
-            bitcoind_pass,
+            "--datadir", datadir,
+            "--rpc-port", str(rpc_port),
+            "--bitcoind-host", bitcoind_sock,
+            "--bitcoind-user", bitcoind_user,
+            "--bitcoind-password", bitcoind_pass,
             "--network",
             "regtest",
-            "--sequencer-key",
-            keyfile,
+            "--sequencer-key", keyfile,
         ]
+        # fmt: on
         props = {"rpc_port": rpc_port, "seqkey": seqkey}
 
         rpc_url = "ws://localhost:%s" % rpc_port

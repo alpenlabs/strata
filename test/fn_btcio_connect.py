@@ -1,8 +1,6 @@
 from time import sleep
 import flexitest
 import time
-from bitcoinlib.services.bitcoind import BitcoindClient
-from block_generator import generate_blocks
 
 
 @flexitest.register
@@ -17,7 +15,7 @@ class L1ConnectTest(flexitest.Test):
         btcrpc = btc.create_rpc()
         seqrpc = seq.create_rpc()
 
-        generate_blocks(btcrpc, 1, block_count=1)
+        btc.generate_blocks(btcrpc, 1, block_count=1)
         # wait for block to be made
         time.sleep(0.5)
         l1stat = seqrpc.alp_l1connected()

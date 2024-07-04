@@ -9,10 +9,11 @@ use std::time;
 use anyhow::Context;
 use thiserror::Error;
 use tokio::sync::broadcast;
-use tokio::sync::{mpsc, oneshot, watch};
+use tokio::sync::{mpsc, oneshot, watch, RwLock};
 use tracing::*;
 
 use alpen_vertex_btcio::rpc::traits::L1Client;
+use alpen_vertex_btcio::btcio_status::BtcioStatus;
 use alpen_vertex_common::logging;
 use alpen_vertex_consensus_logic::duties::{DutyBatch, Identity};
 use alpen_vertex_consensus_logic::duty_executor::{self, IdentityData, IdentityKey};
@@ -92,6 +93,8 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         l1_db, l2_db, sync_ev_db, cs_db, chst_db,
     ));
 
+    // Set up btcio status to pass around cheaply 
+    let l1_status: Arc<RwLock<BtcioStatus>> = Arc::new(RwLock::new(BtcioStatus::default()));
     // Set up Bitcoin client RPC.
     let bitcoind_url = format!("http://{}", args.bitcoind_host);
     let btc_rpc = alpen_vertex_btcio::rpc::BitcoinClient::new(
@@ -99,6 +102,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         args.bitcoind_user.clone(),
         args.bitcoind_password.clone(),
         bitcoin::Network::Regtest,
+        l1_status.clone()
     );
 
     // TODO remove this
@@ -153,7 +157,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         });
     }
 
-    let main_fut = main_task(args, sync_man, btc_rpc, database.clone());
+    let main_fut = main_task(args, sync_man, btc_rpc, database.clone(), l1_status.clone());
     if let Err(e) = rt.block_on(main_fut) {
         error!(err = %e, "main task exited");
         process::exit(0); // special case exit once we've gotten to this point
@@ -168,21 +172,23 @@ async fn main_task<D: Database>(
     sync_man: Arc<SyncManager>,
     l1_rpc_client: impl L1Client,
     database: Arc<D>,
+    l1_status: Arc<RwLock<BtcioStatus>>
 ) -> anyhow::Result<()>
 where
     // TODO how are these not redundant trait bounds???
     <D as alpen_vertex_db::traits::Database>::SeStore: Send + Sync + 'static,
     <D as alpen_vertex_db::traits::Database>::L1Store: Send + Sync + 'static,
+    <D as alpen_vertex_db::traits::Database>::L1Prov: Send + Sync + 'static,
 {
     // Start the L1 tasks to get that going.
     let csm_ctl = sync_man.get_csm_ctl();
-    l1_reader::start_reader_tasks(sync_man.params(), l1_rpc_client, database.clone(), csm_ctl)
+    l1_reader::start_reader_tasks(sync_man.params(), l1_rpc_client, database.clone(), csm_ctl, l1_status.clone())
         .await?;
 
     let (stop_tx, stop_rx) = oneshot::channel();
 
     // Init RPC methods.
-    let alp_rpc = rpc_server::AlpenRpcImpl::new(stop_tx);
+    let alp_rpc = rpc_server::AlpenRpcImpl::new(l1_status.clone(),stop_tx);
     let methods = alp_rpc.into_rpc();
 
     let rpc_port = args.rpc_port; // TODO make configurable

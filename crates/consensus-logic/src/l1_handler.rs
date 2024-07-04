@@ -6,10 +6,10 @@ use std::{
 use bitcoin::consensus::serialize;
 use bitcoin::hashes::Hash;
 use bitcoin::Block;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, RwLock};
 use tracing::*;
 
-use alpen_vertex_btcio::{reader::messages::L1Event, L1_STATUS};
+use alpen_vertex_btcio::{btcio_status::BtcioStatus, reader::messages::L1Event};
 use alpen_vertex_db::traits::L1DataStore;
 use alpen_vertex_primitives::buf::Buf32;
 use alpen_vertex_primitives::l1::L1BlockManifest;
@@ -22,12 +22,13 @@ pub fn bitcoin_data_handler_task<L1D>(
     l1db: Arc<L1D>,
     csm_ctl: Arc<CsmController>,
     mut event_rx: mpsc::Receiver<L1Event>,
+    l1_status: Arc<RwLock<BtcioStatus>>
 ) -> anyhow::Result<()>
 where
     L1D: L1DataStore + Sync + Send + 'static,
 {
     while let Some(event) = event_rx.blocking_recv() {
-        if let Err(e) = handle_event(event, l1db.as_ref(), csm_ctl.as_ref()) {
+        if let Err(e) = handle_event(event, l1db.as_ref(), csm_ctl.as_ref(), l1_status.clone()) {
             error!(err = %e, "failed to handle L1 event");
         }
     }
@@ -36,11 +37,11 @@ where
     Ok(())
 }
 
-fn handle_event<L1D>(event: L1Event, l1db: &L1D, csm_ctl: &CsmController) -> anyhow::Result<()>
+fn handle_event<L1D>(event: L1Event, l1db: &L1D, csm_ctl: &CsmController, l1_status: Arc<RwLock<BtcioStatus>>) -> anyhow::Result<()>
 where
     L1D: L1DataStore + Sync + Send + 'static,
 {
-    let mut l1_status_writer = L1_STATUS.write().expect("Failed to acquire lock");
+    let mut l1_status_writer = l1_status.blocking_write();
     l1_status_writer.last_update = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
