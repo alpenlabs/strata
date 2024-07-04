@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use rockbound::{schema::KeyEncoder, SchemaBatch, DB};
+use rockbound::{schema::KeyEncoder, SchemaBatch, OptimisticTransactionDB as DB};
 use rocksdb::ReadOptions;
 use tracing::*;
 

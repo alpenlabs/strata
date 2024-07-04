@@ -294,7 +294,7 @@ fn open_rocksdb_database(config: &Config) -> anyhow::Result<Arc<rockbound::DB>> 
     opts.create_if_missing(true);
     opts.create_missing_column_families(true);
 
-    let rbdb = rockbound::DB::open(
+    let rbdb = rockbound::OptimisticTransactionDB::open(
         &database_dir,
         dbname,
         cfs.iter().map(|s| s.to_string()),

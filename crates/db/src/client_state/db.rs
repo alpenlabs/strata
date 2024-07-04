@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use rockbound::{Schema, DB};
+use rockbound::{Schema, OptimisticTransactionDB as DB};
 
 use alpen_vertex_state::operation::*;
 

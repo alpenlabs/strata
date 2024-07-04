@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use rockbound::{SchemaBatch, DB};
+use rockbound::{OptimisticTransactionDB as DB, SchemaBatch};
 
 use alpen_vertex_state::{block::L2BlockBundle, prelude::*};
 
