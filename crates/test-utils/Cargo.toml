@@ -8,6 +8,8 @@ alpen-vertex-db = { workspace = true }
 
 anyhow = { workspace = true }
 arbitrary = { workspace = true }
+bitcoin = { workspace = true }
+hex = { workspace = true }
 rand = { workspace = true }
 rockbound = { workspace = true }
 rocksdb = { workspace = true }
