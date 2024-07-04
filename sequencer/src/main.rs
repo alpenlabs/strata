@@ -159,6 +159,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             )
         });
 
+        // TODO: initialize properly
         let writer_config = WriterConfig::default();
         let rpc = btc_rpc.clone();
         let sq_db = Arc::new(alpen_vertex_db::SeqDb::new(rbdb.clone()));
