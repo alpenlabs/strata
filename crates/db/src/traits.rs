@@ -241,11 +241,12 @@ pub trait SequencerDatabase {
 }
 
 pub trait SeqDataStore {
-    /// Store the blob
+    /// Store the blob. Also create and store appropriate blob idx -> blobid mapping.
+    /// Returns new blobidx, and panics if entry already exists
     fn put_blob(&self, blob_id: Buf32, blob: Vec<u8>) -> DbResult<u64>;
 
-    /// Store inscription transactions before sending to L1.
-    /// Associate the reveal txnidx with blob idx.
+    /// Store commit-reveal transactions before sending to L1.
+    /// Also store blob_id, reveal_txn_idx. Everything happens atomically.
     /// Should return the reveal txn idx
     fn put_commit_reveal_txns(
         &self,
@@ -255,7 +256,7 @@ pub trait SeqDataStore {
     ) -> DbResult<u64>;
 
     /// Update an existing transaction
-    fn update_txn(&self, txid: Buf32, txn: TxnWithStatus) -> DbResult<()>;
+    fn update_txn(&self, txidx: u64, txn: TxnWithStatus) -> DbResult<()>;
 }
 
 pub trait SeqDataProvider {
@@ -265,9 +266,6 @@ pub trait SeqDataProvider {
     /// Get blob by its hash
     fn get_blob_by_id(&self, id: Buf32) -> DbResult<Option<Vec<u8>>>;
 
-    /// Get the last inscription idx
-    fn get_last_txn_idx(&self) -> DbResult<Option<u64>>;
-
     /// Get the last  blob idx
     fn get_last_blob_idx(&self) -> DbResult<Option<u64>>;
 
@@ -275,5 +273,5 @@ pub trait SeqDataProvider {
     fn get_txidx_for_blob(&self, blobid: Buf32) -> DbResult<Option<u64>>;
 
     /// Get the blob id for blob idx
-    fn get_blobid_for_blob_idx(&self, blobidx: u64) -> DbResult<Buf32>;
+    fn get_blobid_for_blob_idx(&self, blobidx: u64) -> DbResult<Option<Buf32>>;
 }

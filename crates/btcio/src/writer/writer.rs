@@ -166,12 +166,15 @@ fn initialize_writer_state<D: SequencerDatabase>(db: Arc<D>) -> anyhow::Result<W
     // reach upto the finalized txns while we are collecting the visited txns in a queue.
 
     if let Some(last_idx) = db.sequencer_provider().get_last_blob_idx()? {
-        let blobid = db.sequencer_provider().get_blobid_for_blob_idx(last_idx)?;
+        let blobid = db
+            .sequencer_provider()
+            .get_blobid_for_blob_idx(last_idx)?
+            .expect(&format!("Inexistent blobid for blobidx {last_idx}"));
 
         // NOTE: This is the reveal txidx
         if let Some(txidx) = db.sequencer_provider().get_txidx_for_blob(blobid)? {
-            let queue = create_txn_queue(txidx, db.clone())?;
-            return Ok(WriterState::new(db, queue));
+            let (queue, start_idx) = create_txn_queue(txidx, db.clone())?;
+            return Ok(WriterState::new(db, queue, start_idx));
         }
     }
     return Ok(WriterState::new_empty(db));
@@ -180,7 +183,7 @@ fn initialize_writer_state<D: SequencerDatabase>(db: Arc<D>) -> anyhow::Result<W
 fn create_txn_queue<D: SequencerDatabase>(
     txidx: u64,
     db: Arc<D>,
-) -> DbResult<VecDeque<TxnWithStatus>> {
+) -> DbResult<(VecDeque<TxnWithStatus>, u64)> {
     let seqprov = db.sequencer_provider();
     let mut queue = VecDeque::default();
     let mut txidx = txidx;
@@ -204,7 +207,7 @@ fn create_txn_queue<D: SequencerDatabase>(
         }
         txidx -= 2;
     }
-    return Ok(queue);
+    return Ok((queue, txidx + 1));
 }
 
 /// Watches for inscription transactions status in bitcoin and resends if not in mempool, until they are confirmed
@@ -213,8 +216,6 @@ async fn transactions_tracker_task<D: SequencerDatabase>(
     rpc_client: Arc<BitcoinClient>,
     config: WriterConfig,
 ) -> anyhow::Result<()> {
-    // TODO: better interval values and placement in the loop
-
     let interval = tokio::time::interval(Duration::from_millis(config.poll_duration_ms));
     tokio::pin!(interval);
 
