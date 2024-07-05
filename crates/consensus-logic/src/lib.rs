@@ -2,6 +2,8 @@
 
 pub mod block_assembly;
 pub mod chain_tip;
+pub mod chain_transition;
+pub mod client_transition;
 pub mod credential;
 pub mod ctl;
 pub mod duties;
@@ -14,7 +16,6 @@ pub mod reorg;
 pub mod state_tracker;
 pub mod status;
 pub mod sync_manager;
-pub mod transition;
 pub mod unfinalized_tracker;
 pub mod worker;
 

@@ -12,8 +12,8 @@ use alpen_vertex_state::{
     operation::{self, ClientUpdateOutput},
 };
 
+use crate::client_transition;
 use crate::errors::Error;
-use crate::transition;
 
 pub struct StateTracker<D: Database> {
     params: Arc<Params>,
@@ -66,7 +66,7 @@ impl<D: Database> StateTracker<D> {
             .ok_or(Error::MissingSyncEvent(ev_idx))?;
 
         // Compute the state transition.
-        let outp = transition::process_event(&self.cur_state, &ev, db, &self.params)?;
+        let outp = client_transition::process_event(&self.cur_state, &ev, db, &self.params)?;
 
         // Clone the state and apply the operations to it.
         let mut new_state = self.cur_state.as_ref().clone();

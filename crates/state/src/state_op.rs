@@ -25,6 +25,20 @@ pub struct WriteBatch {
     ops: Vec<StateOp>,
 }
 
+impl WriteBatch {
+    fn new(ops: Vec<StateOp>) -> Self {
+        Self { ops }
+    }
+
+    pub fn new_replace(new_state: ChainState) -> Self {
+        Self::new(vec![StateOp::Replace(Box::new(new_state))])
+    }
+
+    pub fn new_empty() -> Self {
+        Self::new(Vec::new())
+    }
+}
+
 // TODO reversiblity stuff?
 
 /// On a given in-memory chainstate, applies a write batch.

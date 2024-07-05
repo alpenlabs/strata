@@ -18,6 +18,12 @@ pub enum Error {
     #[error("missing expected consensus writes at {0}")]
     MissingConsensusWrites(u64),
 
+    #[error("missing expected chainstate for blockidx {0}")]
+    MissingIdxChainstate(u64),
+
+    #[error("missing expected chainstate for block {0:?}")]
+    MissingBlockChainstate(L2BlockId),
+
     // This probably shouldn't happen, it would suggest the database is
     // misbehaving.
     #[error("missing expected state checkpoint at {0}")]
@@ -28,6 +34,9 @@ pub enum Error {
 
     #[error("tried to skip event index {0} (cur state idx {1})")]
     SkippedEventIdx(u64, u64),
+
+    #[error("invalid state transition on block {0:?}: {1}")]
+    InvalidStateTsn(L2BlockId, TsnError),
 
     #[error("chaintip: {0}")]
     ChainTip(#[from] ChainTipError),
@@ -55,4 +64,14 @@ pub enum ChainTipError {
 
     #[error("tried to finalize unknown block {0:?}")]
     MissingBlock(L2BlockId),
+}
+
+/// Error with a block state transition.
+#[derive(Debug, Error)]
+pub enum TsnError {
+    #[error("skipped a block")]
+    SkippedBlock,
+
+    #[error("mismatch parent (head {0:?}, parent {1:?}")]
+    MismatchParent(L2BlockId, L2BlockId),
 }
