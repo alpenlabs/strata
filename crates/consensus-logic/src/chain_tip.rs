@@ -132,7 +132,8 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
 ) -> anyhow::Result<()> {
     match ctm {
         ChainTipMessage::NewState(cs, output) => {
-            let l2_tip = cs.chain_tip_blkid();
+            let csm_tip = cs.chain_tip_blkid();
+            debug!(?csm_tip, "got new CSM state");
 
             // Update the new state.
             state.cur_state = cs;
@@ -191,7 +192,7 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
             // Insert block into pending block tracker and figure out if we
             // should switch to it as a potential head.  This returns if we
             // created a new tip instead of advancing an existing tip.
-            let cur_tip = cstate.chain_tip_blkid();
+            let cur_tip = state.cur_best_block;
             let new_tip = state.chain_tracker.attach_block(blkid, block.header())?;
             if new_tip {
                 debug!(?blkid, "created new pending chain tip");
@@ -208,39 +209,43 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
             // context aware so that we know we're not doing anything abnormal
             // in the normal case
             let depth = 100; // TODO change this
-            let reorg = reorg::compute_reorg(cur_tip, best_block, depth, &state.chain_tracker)
-                .ok_or(Error::UnableToFindReorg(*cur_tip, *best_block))?;
+            let reorg = reorg::compute_reorg(&cur_tip, best_block, depth, &state.chain_tracker)
+                .ok_or(Error::UnableToFindReorg(cur_tip, *best_block))?;
 
             debug!("REORG {reorg:#?}");
 
-            // Apply the reorg.
-            if let Err(e) = apply_tip_update(&reorg, state) {
-                warn!("failed to compute CL STF");
+            // Only if the update actually does something should we try to
+            // change the chain tip.
+            if !reorg.is_identity() {
+                // Apply the reorg.
+                if let Err(e) = apply_tip_update(&reorg, state) {
+                    warn!("failed to compute CL STF");
 
-                // Specifically state transition errors we want to handle
-                // specially so that we can remember to not accept the block again.
-                if let Some(Error::InvalidStateTsn(inv_blkid, _)) = e.downcast_ref() {
-                    warn!(
-                        ?blkid,
-                        ?inv_blkid,
-                        "invalid block on seemingly good fork, rejecting block"
-                    );
+                    // Specifically state transition errors we want to handle
+                    // specially so that we can remember to not accept the block again.
+                    if let Some(Error::InvalidStateTsn(inv_blkid, _)) = e.downcast_ref() {
+                        warn!(
+                            ?blkid,
+                            ?inv_blkid,
+                            "invalid block on seemingly good fork, rejecting block"
+                        );
 
-                    state.set_block_status(inv_blkid, BlockStatus::Invalid)?;
-                    return Ok(());
+                        state.set_block_status(inv_blkid, BlockStatus::Invalid)?;
+                        return Ok(());
+                    }
+
+                    // Everything else we should fail on.
+                    return Err(e.into());
                 }
 
-                // Everything else we should fail on.
-                return Err(e.into());
+                // TODO also update engine tip block
+
+                // Insert the sync event and submit it to the executor.
+                let tip_blkid = *reorg.new_tip();
+                info!(?tip_blkid, "new chain tip block");
+                let ev = SyncEvent::NewTipBlock(tip_blkid);
+                csm_ctl.submit_event(ev)?;
             }
-
-            // TODO also update engine tip block
-
-            // Insert the sync event and submit it to the executor.
-            let tip_blkid = *reorg.new_tip();
-            info!(?tip_blkid, "new chain tip block");
-            let ev = SyncEvent::NewTipBlock(tip_blkid);
-            csm_ctl.submit_event(ev)?;
 
             // TODO is there anything else we have to do here?
         }
