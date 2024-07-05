@@ -9,18 +9,19 @@ alpen-vertex-primitives = { workspace = true }
 alpen-vertex-state = { workspace = true }
 arbitrary = { workspace = true }
 borsh = { workspace = true }
+futures = { workspace = true }
+jsonrpsee = { workspace = true }
+http = { workspace = true }
+hyper = { workspace = true }
 reth-primitives = { workspace = true }
 reth-node-ethereum = { workspace = true }
 reth-rpc = { workspace = true }
 reth-rpc-api = { workspace = true }
 reth-rpc-types = { workspace = true }
-jsonrpsee = { workspace = true }
-tokio = { workspace = true }
-http = { workspace = true }
-hyper = { workspace = true }
-tower = { workspace = true }
 serde = { workspace = true }
+tokio = { workspace = true }
+tower = { workspace = true }
 
 [dev-dependencies]
-rand = { workspace = true }
 mockall = { workspace = true }
+rand = { workspace = true }

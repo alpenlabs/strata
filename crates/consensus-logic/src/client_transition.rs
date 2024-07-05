@@ -1,6 +1,5 @@
 //! Core state transition function.
 
-use alpen_vertex_db::errors::DbError;
 use alpen_vertex_db::traits::{Database, L1DataProvider, L2DataProvider};
 use alpen_vertex_primitives::prelude::*;
 use alpen_vertex_state::client_state::*;

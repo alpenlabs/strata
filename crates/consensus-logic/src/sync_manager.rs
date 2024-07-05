@@ -8,13 +8,13 @@ use std::thread;
 use tokio::sync::{broadcast, mpsc};
 use tracing::*;
 
-use alpen_vertex_db::traits::Database;
+use alpen_vertex_db::traits::{Database, L2DataProvider};
 use alpen_vertex_evmctl::engine::ExecEngineCtl;
 use alpen_vertex_primitives::params::Params;
 
 use crate::ctl::CsmController;
 use crate::message::{ChainTipMessage, ClientUpdateNotif, CsmMessage};
-use crate::{chain_tip, genesis, unfinalized_tracker, worker};
+use crate::{chain_tip, errors, genesis, unfinalized_tracker, worker};
 
 pub struct SyncManager {
     params: Arc<Params>,
@@ -89,16 +89,24 @@ pub fn start_sync_tasks<
     // Init the consensus worker state and get the current state from it.
     let cw_state = worker::WorkerState::open(params.clone(), database.clone(), cupdate_tx)?;
     let cur_state = cw_state.cur_state().clone();
-    let cur_chain_tip = cur_state.chain_state().chain_tip_blockid();
+    let cur_tip_blkid = *cur_state.chain_tip_blkid();
+
+    // Get the block's index.
+    let l2_prov = database.l2_provider();
+    let tip_block = l2_prov
+        .get_block_data(cur_tip_blkid)?
+        .ok_or(errors::Error::MissingL2Block(cur_tip_blkid))?;
+    let cur_tip_index = tip_block.header().blockidx();
 
     // Init the chain tracker from the state we figured out.
-    let chain_tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(cur_chain_tip);
+    let chain_tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(cur_tip_blkid);
     let ct_state = chain_tip::ChainTipTrackerState::new(
         params.clone(),
         database.clone(),
         cur_state,
         chain_tracker,
-        cur_chain_tip,
+        cur_tip_blkid,
+        cur_tip_index,
     );
     // TODO load unfinalized blocks into block tracker
 

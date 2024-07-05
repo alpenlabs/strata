@@ -1,3 +1,5 @@
+#![feature(btree_extract_if)] // remove when we remove the stubs
+
 //! Database abstraction layers, building on what Reth supports.
 
 use l2::schemas::{L2BlockHeightSchema, L2BlockSchema, L2BlockStatusSchema};

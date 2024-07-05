@@ -2,7 +2,10 @@ use tracing::*;
 
 use alpen_vertex_db::{
     errors::DbError,
-    traits::{ClientStateProvider, ClientStateStore, Database, L2DataProvider, L2DataStore},
+    traits::{
+        ChainstateStore, ClientStateProvider, ClientStateStore, Database, L2DataProvider,
+        L2DataStore,
+    },
 };
 use alpen_vertex_primitives::{
     buf::{Buf32, Buf64},
@@ -11,24 +14,28 @@ use alpen_vertex_primitives::{
 use alpen_vertex_state::{
     block::{ExecSegment, L1Segment, L2Block, L2BlockBody, L2BlockId},
     block_template,
-    client_state::{ChainState, ClientState},
+    chain_state::ChainState,
+    client_state::ClientState,
 };
 
 /// Inserts approprate records into the database to prepare it for syncing the rollup.
 pub fn init_genesis_states<D: Database>(params: &Params, database: &D) -> anyhow::Result<()> {
     debug!("preparing database genesis state!");
 
-    // Build the genesis block and genesis consensus state.
+    // Build the genesis block and genesis consensus states.
     let gblock = make_genesis_block(params);
     let genesis_blkid = gblock.header().get_blockid();
     trace!(?genesis_blkid, "created genesis block");
-    let gcstate = make_genesis_cstate(&gblock, params);
+    let gchstate = ChainState::from_genesis_blkid(genesis_blkid);
+    let gclstate = make_genesis_client_state(&gblock, &gchstate, params);
 
     // Now insert things into the database.
     let l2store = database.l2_store();
     let cs_store = database.client_state_store();
+    let chs_store = database.chainstate_store();
     l2store.put_block_data(gblock)?;
-    cs_store.write_client_state_checkpoint(0, gcstate)?;
+    chs_store.write_genesis_state(&gchstate)?;
+    cs_store.write_client_state_checkpoint(0, gclstate)?;
 
     info!("finished genesis insertions");
     Ok(())
@@ -58,11 +65,13 @@ fn make_genesis_block(params: &Params) -> L2Block {
     L2Block::new(gheader, body)
 }
 
-fn make_genesis_cstate(gblock: &L2Block, params: &Params) -> ClientState {
-    // TODO this is totally going to change when we rework some things
-    let gblkid = gblock.header().get_blockid();
-    let chstate = ChainState::from_genesis_blkid(gblkid);
-    ClientState::from_genesis(chstate, params.rollup().l1_start_block_height)
+fn make_genesis_client_state(
+    gblock: &L2Block,
+    gchstate: &ChainState,
+    params: &Params,
+) -> ClientState {
+    // TODO this might rework some more things as we include the genesis block
+    ClientState::from_genesis(gchstate, params.rollup().l1_start_block_height)
 }
 
 /// Check if the database needs to have genesis done to it.

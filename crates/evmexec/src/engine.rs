@@ -1,5 +1,6 @@
 use std::future::Future;
 
+use futures::future::TryFutureExt;
 use jsonrpsee::http_client::HttpClient;
 use jsonrpsee::http_client::{transport::HttpBackend, HttpClientBuilder};
 use reth_node_ethereum::EthEngineTypes;
@@ -200,18 +201,22 @@ impl<T: ELHttpClient> RpcExecEngineCtl<T> {
         // TODO: correct error type
         let update_status = forkchoice_result.map_err(|err| EngineError::Other(err.to_string()))?;
 
-        let payload_id = update_status
+        let payload_id: PayloadId = update_status
             .payload_id
             .ok_or(EngineError::Other("payload_id missing".into()))?; // should never happen
 
-        Ok(payload_id.0.into())
+        // XXX fix this hack, it's pub now, this is just to make it compile
+        let raw_id: [u8; 8] = unsafe { std::mem::transmute(payload_id) };
+        Ok(u64::from_be_bytes(raw_id))
     }
 
     async fn get_payload_status(&self, payload_id: u64) -> EngineResult<PayloadStatus> {
-        let payload_id_bytes = PayloadId::new(payload_id.to_be_bytes());
-        let payload_result = self.client.get_payload_v2(payload_id_bytes).await;
-
-        let payload = payload_result.map_err(|_| EngineError::UnknownPayloadId(payload_id))?;
+        let pl_id = PayloadId::new(payload_id.to_be_bytes());
+        let payload = self
+            .client
+            .get_payload_v2(pl_id)
+            .map_err(|_| EngineError::UnknownPayloadId(payload_id))
+            .await?;
 
         let execution_payload_data = match payload.execution_payload {
             ExecutionPayloadFieldV2::V1(payload) => {

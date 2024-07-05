@@ -3,11 +3,15 @@
 use std::collections::*;
 use std::sync::Arc;
 
+use alpen_vertex_state::state_op;
 use tokio::sync::mpsc;
 use tracing::*;
 
 use alpen_vertex_db::errors::DbError;
-use alpen_vertex_db::traits::{BlockStatus, Database, L2DataProvider, L2DataStore, SyncEventStore};
+use alpen_vertex_db::traits::{
+    BlockStatus, ChainstateProvider, ChainstateStore, Database, L2DataProvider, L2DataStore,
+    SyncEventStore,
+};
 use alpen_vertex_evmctl::engine::ExecEngineCtl;
 use alpen_vertex_evmctl::messages::ExecPayloadData;
 use alpen_vertex_primitives::params::Params;
@@ -18,7 +22,7 @@ use alpen_vertex_state::sync_event::SyncEvent;
 
 use crate::ctl::CsmController;
 use crate::message::ChainTipMessage;
-use crate::{credential, errors::*, reorg, unfinalized_tracker};
+use crate::{chain_transition, credential, errors::*, reorg, unfinalized_tracker};
 
 /// Tracks the parts of the chain that haven't been finalized on-chain yet.
 pub struct ChainTipTrackerState<D: Database> {
@@ -37,6 +41,9 @@ pub struct ChainTipTrackerState<D: Database> {
     /// Current best block.
     // TODO make sure we actually want to have this
     cur_best_block: L2BlockId,
+
+    /// Current best block index.
+    cur_index: u64,
 }
 
 impl<D: Database> ChainTipTrackerState<D> {
@@ -47,6 +54,7 @@ impl<D: Database> ChainTipTrackerState<D> {
         cur_state: Arc<ClientState>,
         chain_tracker: unfinalized_tracker::UnfinalizedBlockTracker,
         cur_best_block: L2BlockId,
+        cur_index: u64,
     ) -> Self {
         Self {
             params,
@@ -54,6 +62,7 @@ impl<D: Database> ChainTipTrackerState<D> {
             cur_state,
             chain_tracker,
             cur_best_block,
+            cur_index,
         }
     }
 
@@ -65,6 +74,23 @@ impl<D: Database> ChainTipTrackerState<D> {
         let l2store = self.database.l2_store();
         l2store.set_block_status(*id, status)?;
         Ok(())
+    }
+
+    fn get_block_index(&self, blkid: &L2BlockId) -> anyhow::Result<u64> {
+        // FIXME this is horrible but it makes our current use case much faster, see below
+        if *blkid == self.cur_best_block {
+            return Ok(self.cur_index);
+        }
+
+        let l2prov = self.database.l2_provider();
+        // FIXME this is horrible, we're fully deserializing the block every
+        // time we fetch it just to get its height!  we should have some
+        // in-memory cache of blkid->index or at least be able to fetch just the
+        // header
+        let block = l2prov
+            .get_block_data(*blkid)?
+            .ok_or(Error::MissingL2Block(*blkid))?;
+        Ok(block.header().blockidx())
     }
 }
 
@@ -106,7 +132,8 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
 ) -> anyhow::Result<()> {
     match ctm {
         ChainTipMessage::NewState(cs, output) => {
-            let l2_tip = cs.chain_state().chain_tip_blockid();
+            let csm_tip = cs.chain_tip_blkid();
+            debug!(?csm_tip, "got new CSM state");
 
             // Update the new state.
             state.cur_state = cs;
@@ -165,7 +192,7 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
             // Insert block into pending block tracker and figure out if we
             // should switch to it as a potential head.  This returns if we
             // created a new tip instead of advancing an existing tip.
-            let cur_tip = cstate.chain_state().chain_tip_blockid();
+            let cur_tip = state.cur_best_block;
             let new_tip = state.chain_tracker.attach_block(blkid, block.header())?;
             if new_tip {
                 debug!(?blkid, "created new pending chain tip");
@@ -178,20 +205,47 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
             )?;
 
             // Figure out what our job is now.
+            // TODO this shouldn't be called "reorg" here, make the types
+            // context aware so that we know we're not doing anything abnormal
+            // in the normal case
             let depth = 100; // TODO change this
             let reorg = reorg::compute_reorg(&cur_tip, best_block, depth, &state.chain_tracker)
                 .ok_or(Error::UnableToFindReorg(cur_tip, *best_block))?;
 
-            // TODO this shouldn't be called "reorg" here, make the types
-            // context aware so that we know we're not doing anything abnormal
-            // in the normal case
+            debug!("REORG {reorg:#?}");
 
-            // Insert the sync event and submit it to the executor.
-            let ev = SyncEvent::NewTipBlock(*reorg.new_tip());
-            csm_ctl.submit_event(ev)?;
+            // Only if the update actually does something should we try to
+            // change the chain tip.
+            if !reorg.is_identity() {
+                // Apply the reorg.
+                if let Err(e) = apply_tip_update(&reorg, state) {
+                    warn!("failed to compute CL STF");
 
-            // Apply the changes to our state.
-            state.cur_best_block = *reorg.new_tip();
+                    // Specifically state transition errors we want to handle
+                    // specially so that we can remember to not accept the block again.
+                    if let Some(Error::InvalidStateTsn(inv_blkid, _)) = e.downcast_ref() {
+                        warn!(
+                            ?blkid,
+                            ?inv_blkid,
+                            "invalid block on seemingly good fork, rejecting block"
+                        );
+
+                        state.set_block_status(inv_blkid, BlockStatus::Invalid)?;
+                        return Ok(());
+                    }
+
+                    // Everything else we should fail on.
+                    return Err(e.into());
+                }
+
+                // TODO also update engine tip block
+
+                // Insert the sync event and submit it to the executor.
+                let tip_blkid = *reorg.new_tip();
+                info!(?tip_blkid, "new chain tip block");
+                let ev = SyncEvent::NewTipBlock(tip_blkid);
+                csm_ctl.submit_event(ev)?;
+            }
 
             // TODO is there anything else we have to do here?
         }
@@ -212,7 +266,7 @@ fn check_new_block<D: Database>(
     let params = state.params.as_ref();
 
     // Check that the block is correctly signed.
-    let cred_ok = credential::check_block_credential(block.header(), cstate.chain_state(), params);
+    let cred_ok = credential::check_block_credential(block.header(), params);
     if !cred_ok {
         warn!(?blkid, "block has invalid credential");
         return Ok(false);
@@ -269,4 +323,69 @@ fn pick_best_block<'t, D: Database>(
     }
 
     Ok(best_tip)
+}
+
+fn apply_tip_update<D: Database>(
+    reorg: &reorg::Reorg,
+    state: &mut ChainTipTrackerState<D>,
+) -> anyhow::Result<()> {
+    let l2_prov = state.database.l2_provider();
+    let chs_store = state.database.chainstate_store();
+    let chs_prov = state.database.chainstate_provider();
+
+    // See if we need to roll back recent changes.
+    let pivot_blkid = reorg.pivot();
+    let pivot_idx = state.get_block_index(pivot_blkid)?;
+
+    // Load the post-state of the pivot block as the block to start computing
+    // blocks going forwards with.
+    let mut pre_state = chs_prov
+        .get_toplevel_state(pivot_idx)?
+        .ok_or(Error::MissingIdxChainstate(pivot_idx))?;
+
+    let mut updates = Vec::new();
+
+    // Walk forwards with the blocks we're committing to, but just save the
+    // writes and new states in memory.  Eventually we'll replace this with a
+    // write cache thing that pretends to be the full state but lets us
+    // manipulate it efficiently, but right now our states are small and simple
+    // enough that we can just copy it around as needed.
+    for blkid in reorg.apply_iter() {
+        // Load the previous block and its post-state.
+        // TODO make this not load both of the full blocks, we might have them
+        // in memory anyways
+        let block = l2_prov
+            .get_block_data(*blkid)?
+            .ok_or(Error::MissingL2Block(*blkid))?;
+        let block_idx = block.header().blockidx();
+
+        // Compute the transition write batch, then compute the new state
+        // locally and update our going state.
+        let wb = chain_transition::process_block(&pre_state, &block)
+            .map_err(|e| Error::InvalidStateTsn(*blkid, e))?;
+        let post_state = state_op::apply_write_batch_to_chainstate(pre_state, &wb);
+        pre_state = post_state;
+
+        // After each application we update the chain tip data in case we fail
+        // to apply an update.
+        updates.push((block_idx, blkid, wb));
+    }
+
+    // Check to see if we need to roll back to a previous state in order to
+    // compute new states.
+    if pivot_idx < state.cur_index {
+        debug!(?pivot_blkid, %pivot_idx, "rolling back chainstate");
+        chs_store.rollback_writes_to(pivot_idx)?;
+    }
+
+    // Now that we've verified the new chain is really valid, we can go and
+    // apply the changes to commit to the new chain.
+    for (idx, blkid, writes) in updates {
+        debug!(?blkid, "applying CL state update");
+        chs_store.write_state_update(idx, &writes)?;
+        state.cur_best_block = *blkid;
+        state.cur_index = idx;
+    }
+
+    Ok(())
 }

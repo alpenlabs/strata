@@ -12,8 +12,7 @@ pub fn extract_duties<D: Database>(
     _ident: &duties::Identity,
     database: &D,
 ) -> Result<Vec<duties::Duty>, Error> {
-    let cstate = state.chain_state();
-    let tip_blkid = cstate.chain_tip_blockid();
+    let tip_blkid = *state.chain_tip_blkid();
 
     // Figure out the block slot from the tip blockid.
     // TODO include the block slot in the consensus state

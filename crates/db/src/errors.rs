@@ -22,6 +22,15 @@ pub enum DbError {
     #[error("tried to overwrite consensus checkpoint at idx {0}")]
     OverwriteConsensusCheckpoint(u64),
 
+    #[error("tried to purge data more recently than allowed")]
+    PurgeTooRecent,
+
+    #[error("unknown state index {0}")]
+    UnknownIdx(u64),
+
+    #[error("tried to revert to index above current tip")]
+    RevertAboveCurrent,
+
     #[error("rocksdb: {0}")]
     Rocksdb(#[from] rocksdb::Error),
 
