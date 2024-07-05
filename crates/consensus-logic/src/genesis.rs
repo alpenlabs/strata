@@ -1,3 +1,4 @@
+use tokio::sync::watch;
 use tracing::*;
 
 use alpen_vertex_db::{
@@ -22,9 +23,14 @@ use alpen_vertex_state::{
     prelude::*,
 };
 
+<<<<<<< HEAD
 /// Inserts approprate records into the database to prepare it for syncing the
 /// rollup.  Requires that the horizon block header is present in the database.
 pub fn init_genesis_states<D: Database>(params: &Params, database: &D) -> anyhow::Result<()> {
+=======
+/// Inserts approprate records into the database to prepare it for syncing the rollup.
+pub fn init_genesis_states<D: Database>(params: &Params, database: &D, cur_state_tx: watch::Sender<Option<ClientState>>) -> anyhow::Result<()> {
+>>>>>>> 6ffc2bd (feat: clientStatus RPC)
     debug!("preparing database genesis state!");
 
     let horizon_blk_height = params.rollup.l1_start_block_height;
@@ -52,6 +58,9 @@ pub fn init_genesis_states<D: Database>(params: &Params, database: &D) -> anyhow
 
     let gchstate = ChainState::from_genesis(genesis_blkid, l1vs, gees);
     let gclstate = make_genesis_client_state(&gblock, &gchstate, params);
+
+    // Update the client state
+    let _ = cur_state_tx.send(Some(gcstate.clone()));
 
     // Now insert things into the database.
     let l2store = database.l2_store();

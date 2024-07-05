@@ -121,6 +121,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         eng_ctl.clone(),
         pool.clone(),
         params.clone(),
+        cur_state_tx.clone()
     )?;
     let sync_man = Arc::new(sync_man);
 
@@ -148,12 +149,13 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
                 db,
             )
         });
+        let state = cur_state_tx.clone();
         thread::spawn(move || {
-            duty_executor::duty_dispatch_task(duties_rx, idata.key, sm, db2, eng_ctl_de, pool)
+            duty_executor::duty_dispatch_task(duties_rx, idata.key, sm, db2, eng_ctl_de, pool, state)
         });
     }
 
-    let main_fut = main_task(args, sync_man, btc_rpc, database.clone());
+    let main_fut = main_task(args, sync_man, btc_rpc, database.clone(), cur_state_tx.clone(), cur_state_rx);
     if let Err(e) = rt.block_on(main_fut) {
         error!(err = %e, "main task exited");
         process::exit(0); // special case exit once we've gotten to this point
@@ -168,6 +170,8 @@ async fn main_task<D: Database>(
     sync_man: Arc<SyncManager>,
     l1_rpc_client: impl L1Client,
     database: Arc<D>,
+    cur_state_tx: watch::Sender<Option<ClientState>>,
+    cur_state_rx: watch::Receiver<Option<ClientState>>
 ) -> anyhow::Result<()>
 where
     // TODO how are these not redundant trait bounds???
@@ -176,13 +180,13 @@ where
 {
     // Start the L1 tasks to get that going.
     let csm_ctl = sync_man.get_csm_ctl();
-    l1_reader::start_reader_tasks(sync_man.params(), l1_rpc_client, database.clone(), csm_ctl)
+    l1_reader::start_reader_tasks(sync_man.params(), l1_rpc_client, database.clone(), csm_ctl, cur_state_tx)
         .await?;
 
     let (stop_tx, stop_rx) = oneshot::channel();
 
     // Init RPC methods.
-    let alp_rpc = rpc_server::AlpenRpcImpl::new(stop_tx);
+    let alp_rpc = rpc_server::AlpenRpcImpl::new(stop_tx,cur_state_rx);
     let methods = alp_rpc.into_rpc();
 
     let rpc_port = args.rpc_port; // TODO make configurable

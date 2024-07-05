@@ -806,6 +806,7 @@ dependencies = [
 name = "alpen-vertex-rpc-api"
 version = "0.1.0"
 dependencies = [
+ "alpen-vertex-state",
  "jsonrpsee",
  "serde",
 ]

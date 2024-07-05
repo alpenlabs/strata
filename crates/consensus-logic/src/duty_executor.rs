@@ -6,7 +6,11 @@ use std::{thread, time};
 
 use alpen_vertex_state::exec_update::{ExecUpdate, UpdateInput, UpdateOutput};
 use borsh::{BorshDeserialize, BorshSerialize};
+<<<<<<< HEAD
 use tokio::sync::broadcast;
+=======
+use tokio::sync::{broadcast, mpsc, watch};
+>>>>>>> 6ffc2bd (feat: clientStatus RPC)
 use tracing::*;
 
 use alpen_vertex_db::traits::{ClientStateProvider, Database, L2DataProvider, L2DataStore};
@@ -125,6 +129,7 @@ pub fn duty_dispatch_task<
     database: Arc<D>,
     engine: Arc<E>,
     pool: Arc<threadpool::ThreadPool>,
+    cur_state_tx: watch::Sender<Option<ClientState>>
 ) {
     // TODO make this actually work
     let mut pending_duties: HashMap<u64, ()> = HashMap::new();
@@ -161,7 +166,8 @@ pub fn duty_dispatch_task<
             let sm = sync_man.clone();
             let db = database.clone();
             let e = engine.clone();
-            let _join = pool.execute(move || duty_exec_task(d, ik, sm, db, e));
+            let state_tx = cur_state_tx.clone();
+            let _join = pool.execute(move || duty_exec_task(d, ik, sm, db, e, state_tx));
             trace!(%id, "dispatched duty exec task");
             pending_duties.insert(id, ());
         }
@@ -179,8 +185,9 @@ fn duty_exec_task<D: Database, E: ExecEngineCtl>(
     sync_man: Arc<SyncManager>,
     database: Arc<D>,
     engine: Arc<E>,
+    cur_state_tx: watch::Sender<Option<ClientState>>
 ) {
-    if let Err(e) = perform_duty(&duty, &ik, &sync_man, database.as_ref(), engine.as_ref()) {
+    if let Err(e) = perform_duty(&duty, &ik, &sync_man, database.as_ref(), engine.as_ref(), cur_state_tx) {
         error!(err = %e, "error performing duty");
     } else {
         debug!("completed duty successfully");
@@ -193,11 +200,12 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
     sync_man: &SyncManager,
     database: &D,
     engine: &E,
+    cur_state_tx: watch::Sender<Option<ClientState>>
 ) -> Result<(), Error> {
     match duty {
         Duty::SignBlock(data) => {
             let target = data.target_slot();
-            let Some((blkid, _block)) = sign_and_store_block(target, ik, database, engine)? else {
+            let Some((blkid, _block)) = sign_and_store_block(target, ik, database, engine, cur_state_tx)? else {
                 return Ok(());
             };
 
@@ -222,6 +230,7 @@ fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     ik: &IdentityKey,
     database: &D,
     engine: &E,
+    cur_state_tx: watch::Sender<Option<ClientState>>
 ) -> Result<Option<(L2BlockId, L2Block)>, Error> {
     debug!(%slot, "prepating to publish block");
 
@@ -284,6 +293,13 @@ fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     let blkid = final_header.get_blockid();
     let final_block = L2Block::new(final_header, body);
     info!(%slot, ?blkid, "finished building new block");
+
+    //Update the ClientState 
+    let mut cur_state = cur_state_tx.borrow().clone().expect("Genesis state was not written to ClientState");
+    cur_state.chain_state.accepted_l2_blocks.push(blkid);
+    cur_state.finalized_tip = blkid;
+
+    let _ = cur_state_tx.send(Some(cur_state));
 
     // Store the block in the database.
     let l2store = database.l2_store();

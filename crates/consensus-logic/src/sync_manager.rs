@@ -5,7 +5,8 @@
 use std::sync::Arc;
 use std::thread;
 
-use tokio::sync::{broadcast, mpsc};
+use alpen_vertex_state::client_state::ClientState;
+use tokio::sync::{broadcast, mpsc, watch};
 use tracing::*;
 
 use alpen_vertex_db::traits::{Database, L2DataProvider};
@@ -70,6 +71,7 @@ pub fn start_sync_tasks<
     engine: Arc<E>,
     pool: Arc<threadpool::ThreadPool>,
     params: Arc<Params>,
+    cur_state_tx: watch::Sender<Option<ClientState>>
 ) -> anyhow::Result<SyncManager> {
     // Create channels.
     let (ctm_tx, ctm_rx) = mpsc::channel::<ForkChoiceMessage>(64);
@@ -83,7 +85,7 @@ pub fn start_sync_tasks<
     // Check if we have to do genesis.
     if genesis::check_needs_genesis(database.as_ref())? {
         info!("we need to do genesis!");
-        genesis::init_genesis_states(&params, database.as_ref())?;
+        genesis::init_genesis_states(&params, database.as_ref(),cur_state_tx)?;
     }
 
     // Init the consensus worker state and get the current state from it.
