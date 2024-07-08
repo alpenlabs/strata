@@ -5,11 +5,11 @@ use jsonrpsee::http_client::HttpClient;
 use jsonrpsee::http_client::{transport::HttpBackend, HttpClientBuilder};
 use reth_node_ethereum::EthEngineTypes;
 use reth_primitives::{Address, B256};
-use reth_rpc::JwtSecret;
 use reth_rpc_api::EngineApiClient;
+use reth_rpc_layer::{AuthClientLayer, AuthClientService};
 use reth_rpc_types::engine::{
     ExecutionPayloadEnvelopeV2, ExecutionPayloadFieldV2, ExecutionPayloadInputV2, ForkchoiceState,
-    ForkchoiceUpdated, PayloadAttributes, PayloadId, PayloadStatusEnum,
+    ForkchoiceUpdated, JwtSecret, PayloadAttributes, PayloadId, PayloadStatusEnum,
 };
 use reth_rpc_types::Withdrawal;
 use tokio::runtime::Handle;
@@ -21,7 +21,6 @@ use alpen_vertex_evmctl::messages::{ELDepositData, ExecPayloadData, Op, PayloadE
 use alpen_vertex_primitives::buf::Buf32;
 use alpen_vertex_state::block::L2BlockId;
 
-use crate::auth_client_layer::{AuthClientLayer, AuthClientService};
 use crate::el_payload::ElPayload;
 
 fn address_from_slice(slice: &[u8]) -> Option<Address> {
