@@ -21,16 +21,16 @@ class L1ReadReorgTest(flexitest.Test):
         print("L1 status", l1stat)
 
         # invalidate three blocks
-        recorded_10th_block = btc.block_list[10]
+        recorded_11th_block = btc.block_list[11]
         btcrpc.proxy.invalidateblock(btc.block_list[10])
         time.sleep(1)
 
         # generate eight more blocks
         btc.generate_blocks(btcrpc, 0.05, 1)
-        time.sleep(0.5)
+        time.sleep(1)
         assert (
-            recorded_10th_block == btc.block_list[10]
-        ), "The 10th block was not invalidated, which means the reorg didn't happen"
+            recorded_11th_block != btc.block_list[11]
+        ), "The 11th block was not invalidated, which means the reorg didn't happen"
         btc.generate_blocks(btcrpc, 0.05, 7)
         time.sleep(2)
 
