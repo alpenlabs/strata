@@ -4,10 +4,10 @@ use std::thread;
 use tracing::*;
 use tokio::sync::{mpsc, RwLock};
 
+use alpen_vertex_btcio::btcio_status::BtcioStatus;
 use alpen_vertex_btcio::reader::{
     config::ReaderConfig, messages::L1Event, query::bitcoin_data_reader_task,
 };
-use alpen_vertex_btcio::btcio_status::BtcioStatus;
 use alpen_vertex_btcio::rpc::traits::L1Client;
 use alpen_vertex_consensus_logic::ctl::CsmController;
 use alpen_vertex_consensus_logic::l1_handler::bitcoin_data_handler_task;
@@ -19,7 +19,7 @@ pub async fn start_reader_tasks<D: Database>(
     rpc_client: impl L1Client,
     db: Arc<D>,
     csm_ctl: Arc<CsmController>,
-    l1_status: Arc<RwLock<BtcioStatus>>
+    l1_status: Arc<RwLock<BtcioStatus>>,
 ) -> anyhow::Result<()>
 where
     // TODO how are these not redundant trait bounds???
@@ -46,7 +46,13 @@ where
 
     let l1db = db.l1_store().clone();
     let _sedb = db.sync_event_store().clone();
+<<<<<<< HEAD
     let _handler_handle = thread::spawn(move || bitcoin_data_handler_task(l1db, csm_ctl, ev_rx, l1_status.clone()));
+=======
+
+    let _handler_handle =
+        thread::spawn(move || bitcoin_data_handler_task(l1db, csm_ctl, ev_rx, l1_status.clone()));
+>>>>>>> b610002 (sequencer: formatting of l1_reader.rs and remove double tokio::mpsc import)
 
     Ok(())
 }
