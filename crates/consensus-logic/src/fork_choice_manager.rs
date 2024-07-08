@@ -1,4 +1,4 @@
-//! Chain tip tracking.  Used to talk to the EL and pick the new chain tip.
+//! Fork choice manager. Used to talk to the EL and pick the new fork choice.
 
 use std::collections::*;
 use std::sync::Arc;
@@ -21,11 +21,11 @@ use alpen_vertex_state::operation::SyncAction;
 use alpen_vertex_state::sync_event::SyncEvent;
 
 use crate::ctl::CsmController;
-use crate::message::ChainTipMessage;
+use crate::message::ForkChoiceMessage;
 use crate::{chain_transition, credential, errors::*, reorg, unfinalized_tracker};
 
 /// Tracks the parts of the chain that haven't been finalized on-chain yet.
-pub struct ChainTipTrackerState<D: Database> {
+pub struct ForkChoiceManager<D: Database> {
     /// Consensus parameters.
     params: Arc<Params>,
 
@@ -46,7 +46,7 @@ pub struct ChainTipTrackerState<D: Database> {
     cur_index: u64,
 }
 
-impl<D: Database> ChainTipTrackerState<D> {
+impl<D: Database> ForkChoiceManager<D> {
     /// Constructs a new instance we can run the tracker with.
     pub fn new(
         params: Arc<Params>,
@@ -94,11 +94,11 @@ impl<D: Database> ChainTipTrackerState<D> {
     }
 }
 
-/// Main tracker task that takes a ready chain tip tracker and some IO stuff.
+/// Main tracker task that takes a ready fork choice manager and some IO stuff.
 pub fn tracker_task<D: Database, E: ExecEngineCtl>(
-    state: ChainTipTrackerState<D>,
+    state: ForkChoiceManager<D>,
     engine: Arc<E>,
-    ctm_rx: mpsc::Receiver<ChainTipMessage>,
+    ctm_rx: mpsc::Receiver<ForkChoiceMessage>,
     csm_ctl: Arc<CsmController>,
 ) {
     if let Err(e) = tracker_task_inner(state, engine.as_ref(), ctm_rx, &csm_ctl) {
@@ -107,9 +107,9 @@ pub fn tracker_task<D: Database, E: ExecEngineCtl>(
 }
 
 fn tracker_task_inner<D: Database, E: ExecEngineCtl>(
-    mut state: ChainTipTrackerState<D>,
+    mut state: ForkChoiceManager<D>,
     engine: &E,
-    mut ctm_rx: mpsc::Receiver<ChainTipMessage>,
+    mut ctm_rx: mpsc::Receiver<ForkChoiceMessage>,
     csm_ctl: &CsmController,
 ) -> anyhow::Result<()> {
     loop {
@@ -125,13 +125,13 @@ fn tracker_task_inner<D: Database, E: ExecEngineCtl>(
 }
 
 fn process_ct_msg<D: Database, E: ExecEngineCtl>(
-    ctm: ChainTipMessage,
-    state: &mut ChainTipTrackerState<D>,
+    ctm: ForkChoiceMessage,
+    state: &mut ForkChoiceManager<D>,
     engine: &E,
     csm_ctl: &CsmController,
 ) -> anyhow::Result<()> {
     match ctm {
-        ChainTipMessage::NewState(cs, output) => {
+        ForkChoiceMessage::NewState(cs, output) => {
             let csm_tip = cs.chain_tip_blkid();
             debug!(?csm_tip, "got new CSM state");
 
@@ -156,7 +156,7 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
             // starting from the bottom up, putting into a new chain tracker
         }
 
-        ChainTipMessage::NewBlock(blkid) => {
+        ForkChoiceMessage::NewBlock(blkid) => {
             let l2prov = state.database.l2_provider();
             let block = l2prov
                 .get_block_data(blkid)?
@@ -195,7 +195,7 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
             let cur_tip = state.cur_best_block;
             let new_tip = state.chain_tracker.attach_block(blkid, block.header())?;
             if new_tip {
-                debug!(?blkid, "created new pending chain tip");
+                debug!(?blkid, "created new pending fork choice");
             }
 
             let best_block = pick_best_block(
@@ -215,7 +215,7 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
             debug!("REORG {reorg:#?}");
 
             // Only if the update actually does something should we try to
-            // change the chain tip.
+            // change the fork choice tip.
             if !reorg.is_identity() {
                 // Apply the reorg.
                 if let Err(e) = apply_tip_update(&reorg, state) {
@@ -242,7 +242,7 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
 
                 // Insert the sync event and submit it to the executor.
                 let tip_blkid = *reorg.new_tip();
-                info!(?tip_blkid, "new chain tip block");
+                info!(?tip_blkid, "new fork choice tip block");
                 let ev = SyncEvent::NewTipBlock(tip_blkid);
                 csm_ctl.submit_event(ev)?;
             }
@@ -261,7 +261,7 @@ fn check_new_block<D: Database>(
     blkid: &L2BlockId,
     block: &L2Block,
     cstate: &ClientState,
-    state: &mut ChainTipTrackerState<D>,
+    state: &mut ForkChoiceManager<D>,
 ) -> anyhow::Result<bool, Error> {
     let params = state.params.as_ref();
 
@@ -327,7 +327,7 @@ fn pick_best_block<'t, D: Database>(
 
 fn apply_tip_update<D: Database>(
     reorg: &reorg::Reorg,
-    state: &mut ChainTipTrackerState<D>,
+    state: &mut ForkChoiceManager<D>,
 ) -> anyhow::Result<()> {
     let l2_prov = state.database.l2_provider();
     let chs_store = state.database.chainstate_store();
@@ -366,7 +366,7 @@ fn apply_tip_update<D: Database>(
         let post_state = state_op::apply_write_batch_to_chainstate(pre_state, &wb);
         pre_state = post_state;
 
-        // After each application we update the chain tip data in case we fail
+        // After each application we update the fork choice tip data in case we fail
         // to apply an update.
         updates.push((block_idx, blkid, wb));
     }

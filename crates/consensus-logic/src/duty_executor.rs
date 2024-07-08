@@ -20,7 +20,7 @@ use alpen_vertex_state::client_state::ClientState;
 use crate::duties::{self, Duty, DutyBatch, Identity};
 use crate::duty_extractor;
 use crate::errors::Error;
-use crate::message::{ChainTipMessage, ClientUpdateNotif};
+use crate::message::{ForkChoiceMessage, ClientUpdateNotif};
 use crate::sync_manager::SyncManager;
 
 #[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
@@ -199,11 +199,11 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
                 return Ok(());
             };
 
-            // Submit it to the chain tip tracker to update the consensus state
+            // Submit it to the fork choice manager to update the consensus state
             // with it.
-            let ctm = ChainTipMessage::NewBlock(blkid);
+            let ctm = ForkChoiceMessage::NewBlock(blkid);
             if !sync_man.submit_chain_tip_msg(ctm) {
-                error!(?blkid, "failed to submit new block to chain tip tracker");
+                error!(?blkid, "failed to submit new block to fork choice manager");
             }
 
             // TODO do we have to do something with _block right now?

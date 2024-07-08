@@ -11,9 +11,9 @@ pub enum CsmMessage {
     EventInput(u64),
 }
 
-/// Message about a new block the tip tracker might do something with.
+/// Message about a new block the fork choice manager might do something with.
 #[derive(Clone, Debug)]
-pub enum ChainTipMessage {
+pub enum ForkChoiceMessage {
     /// New client state with the output that produced it.
     NewState(Arc<ClientState>, Arc<ClientUpdateOutput>),
 
