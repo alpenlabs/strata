@@ -5,7 +5,7 @@ use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc};
 use tracing::*;
 
-use alpen_vertex_db::{database, traits::*};
+use alpen_vertex_db::traits::*;
 use alpen_vertex_evmctl::engine::ExecEngineCtl;
 use alpen_vertex_primitives::prelude::*;
 use alpen_vertex_state::{client_state::ClientState, operation::SyncAction};
@@ -22,7 +22,7 @@ use crate::{
 /// through another handle.
 pub struct WorkerState<D: Database> {
     /// Consensus parameters.
-    params: Arc<Params>,
+    _params: Arc<Params>,
 
     /// Underlying database hierarchy that writes ultimately end up on.
     // TODO should we move this out?
@@ -53,7 +53,7 @@ impl<D: Database> WorkerState<D> {
         );
 
         Ok(Self {
-            params,
+            _params: params,
             database,
             state_tracker,
             cupdate_tx,

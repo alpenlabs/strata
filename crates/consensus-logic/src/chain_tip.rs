@@ -1,6 +1,5 @@
 //! Chain tip tracking.  Used to talk to the EL and pick the new chain tip.
 
-use std::collections::*;
 use std::sync::Arc;
 
 use tokio::sync::mpsc;

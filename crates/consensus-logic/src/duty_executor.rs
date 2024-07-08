@@ -4,9 +4,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::{thread, time};
 
-use alpen_vertex_db::database;
 use borsh::{BorshDeserialize, BorshSerialize};
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::broadcast;
 use tracing::*;
 
 use alpen_vertex_db::traits::{ClientStateProvider, Database, L2DataProvider, L2DataStore};
@@ -218,7 +217,7 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
 
 fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     slot: u64,
-    ik: &IdentityKey,
+    _ik: &IdentityKey,
     database: &D,
     engine: &E,
 ) -> Result<Option<(L2BlockId, L2Block)>, Error> {

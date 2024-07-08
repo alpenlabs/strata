@@ -9,7 +9,7 @@ use tracing::*;
 use alpen_vertex_btcio::reader::messages::L1Event;
 use alpen_vertex_db::traits::L1DataStore;
 use alpen_vertex_primitives::buf::Buf32;
-use alpen_vertex_primitives::{l1::L1BlockManifest, utils::generate_l1_tx};
+use alpen_vertex_primitives::l1::L1BlockManifest;
 use alpen_vertex_state::sync_event::SyncEvent;
 
 use crate::ctl::CsmController;

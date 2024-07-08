@@ -107,8 +107,8 @@ pub fn start_sync_tasks<
     let eng_ct = engine.clone();
     let eng_cw = engine.clone();
     let ctl_ct = csm_ctl.clone();
-    let ct_handle = thread::spawn(|| chain_tip::tracker_task(ct_state, eng_ct, ctm_rx, ctl_ct));
-    let cw_handle = thread::spawn(|| worker::consensus_worker_task(cw_state, eng_cw, csm_rx));
+    let _ct_handle = thread::spawn(|| chain_tip::tracker_task(ct_state, eng_ct, ctm_rx, ctl_ct));
+    let _cw_handle = thread::spawn(|| worker::consensus_worker_task(cw_state, eng_cw, csm_rx));
 
     // TODO do something with the handles
 

@@ -1,6 +1,5 @@
 //! Core state transition function.
 
-use alpen_vertex_db::errors::DbError;
 use alpen_vertex_db::traits::{Database, L1DataProvider, L2DataProvider};
 use alpen_vertex_primitives::prelude::*;
 use alpen_vertex_state::client_state::*;
@@ -12,10 +11,10 @@ use crate::errors::*;
 /// Processes the event given the current consensus state, producing some
 /// output.  This can return database errors.
 pub fn process_event<D: Database>(
-    state: &ClientState,
+    _state: &ClientState,
     ev: &SyncEvent,
     database: &D,
-    params: &Params,
+    _params: &Params,
 ) -> Result<ClientUpdateOutput, Error> {
     let mut writes = Vec::new();
     let mut actions = Vec::new();
@@ -25,7 +24,7 @@ pub fn process_event<D: Database>(
             // FIXME this doesn't do any SPV checks to make sure we only go to
             // a longer chain, it just does it unconditionally
             let l1prov = database.l1_provider();
-            let blkmf = l1prov.get_block_manifest(*height)?;
+            let _blkmf = l1prov.get_block_manifest(*height)?;
 
             // TODO do the consensus checks
 
@@ -35,7 +34,7 @@ pub fn process_event<D: Database>(
             // `UpdateBuried` write
         }
 
-        SyncEvent::L1Revert(to_height) => {
+        SyncEvent::L1Revert(_to_height) => {
             // TODO
         }
 
@@ -45,7 +44,7 @@ pub fn process_event<D: Database>(
             let l2prov = database.l2_provider();
 
             for id in blkids {
-                let block = l2prov
+                let _block = l2prov
                     .get_block_data(*id)?
                     .ok_or(Error::MissingL2Block(*id))?;
 
@@ -55,7 +54,7 @@ pub fn process_event<D: Database>(
 
         SyncEvent::NewTipBlock(blkid) => {
             let l2prov = database.l2_provider();
-            let block = l2prov
+            let _block = l2prov
                 .get_block_data(*blkid)?
                 .ok_or(Error::MissingL2Block(*blkid))?;
 
