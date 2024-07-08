@@ -45,7 +45,7 @@ pub trait ExecEngineCtl {
     fn update_finalized_block(&self, id: L2BlockId) -> EngineResult<()>;
 }
 
-/// The status of a block that we've just set fork choice fork.
+/// The status of a block that we've just set chain fork.
 ///
 /// Corresponds to `Forkchoice
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]

@@ -1,5 +1,5 @@
 //! High level sync manager which controls core sync tasks and manages sync
-//! status.  Exposes handles to interact with chain tip tracker and CSM
+//! status.  Exposes handles to interact with fork choice manager and CSM
 //! executor and other core sync pipeline tasks.
 
 use std::sync::Arc;
@@ -13,13 +13,13 @@ use alpen_vertex_evmctl::engine::ExecEngineCtl;
 use alpen_vertex_primitives::params::Params;
 
 use crate::ctl::CsmController;
-use crate::message::{ChainTipMessage, ClientUpdateNotif, CsmMessage};
-use crate::{chain_tip, errors, genesis, unfinalized_tracker, worker};
+use crate::message::{ForkChoiceMessage, ClientUpdateNotif, CsmMessage};
+use crate::{fork_choice_manager, errors, genesis, unfinalized_tracker, worker};
 
 pub struct SyncManager {
     params: Arc<Params>,
 
-    chain_tip_msg_tx: mpsc::Sender<ChainTipMessage>,
+    chain_tip_msg_tx: mpsc::Sender<ForkChoiceMessage>,
     csm_ctl: Arc<CsmController>,
     cupdate_rx: broadcast::Receiver<Arc<ClientUpdateNotif>>,
 }
@@ -50,13 +50,13 @@ impl SyncManager {
         self.cupdate_rx.resubscribe()
     }
 
-    /// Submits a chain tip message if possible. (synchronously)
-    pub fn submit_chain_tip_msg(&self, ctm: ChainTipMessage) -> bool {
+    /// Submits a fork choice message if possible. (synchronously)
+    pub fn submit_chain_tip_msg(&self, ctm: ForkChoiceMessage) -> bool {
         self.chain_tip_msg_tx.blocking_send(ctm).is_ok()
     }
 
-    /// Submits a chain tip message if possible. (asynchronously)
-    pub async fn submit_chain_tip_msg_async(&self, ctm: ChainTipMessage) -> bool {
+    /// Submits a fork choice message if possible. (asynchronously)
+    pub async fn submit_chain_tip_msg_async(&self, ctm: ForkChoiceMessage) -> bool {
         self.chain_tip_msg_tx.send(ctm).await.is_ok()
     }
 }
@@ -72,7 +72,7 @@ pub fn start_sync_tasks<
     params: Arc<Params>,
 ) -> anyhow::Result<SyncManager> {
     // Create channels.
-    let (ctm_tx, ctm_rx) = mpsc::channel::<ChainTipMessage>(64);
+    let (ctm_tx, ctm_rx) = mpsc::channel::<ForkChoiceMessage>(64);
     let (csm_tx, csm_rx) = mpsc::channel::<CsmMessage>(64);
     let csm_ctl = Arc::new(CsmController::new(database.clone(), pool, csm_tx));
 
@@ -100,7 +100,7 @@ pub fn start_sync_tasks<
 
     // Init the chain tracker from the state we figured out.
     let chain_tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(cur_tip_blkid);
-    let ct_state = chain_tip::ChainTipTrackerState::new(
+    let ct_state = fork_choice_manager::ForkChoiceManager::new(
         params.clone(),
         database.clone(),
         cur_state,
@@ -115,7 +115,7 @@ pub fn start_sync_tasks<
     let eng_ct = engine.clone();
     let eng_cw = engine.clone();
     let ctl_ct = csm_ctl.clone();
-    let ct_handle = thread::spawn(|| chain_tip::tracker_task(ct_state, eng_ct, ctm_rx, ctl_ct));
+    let ct_handle = thread::spawn(|| fork_choice_manager::tracker_task(ct_state, eng_ct, ctm_rx, ctl_ct));
     let cw_handle = thread::spawn(|| worker::consensus_worker_task(cw_state, eng_cw, csm_rx));
 
     // TODO do something with the handles

@@ -123,7 +123,7 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
             }
 
             SyncAction::FinalizeBlock(blkid) => {
-                // For the tip tracker this gets picked up later.  We don't have
+                // For the fork choice manager this gets picked up later.  We don't have
                 // to do anything here *necessarily*.
                 // TODO we should probably emit a state checkpoint here if we
                 // aren't already

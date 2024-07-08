@@ -1,7 +1,7 @@
 //! Consensus validation logic and core state machine
 
 pub mod block_assembly;
-pub mod chain_tip;
+pub mod fork_choice_manager;
 pub mod chain_transition;
 pub mod client_transition;
 pub mod credential;

@@ -40,7 +40,7 @@ pub fn process_event<D: Database>(
 
         SyncEvent::L1DABatch(blkids) => {
             // TODO load it up and figure out what's there, see if we have to
-            // load diffs from L1 or something
+            // load the state updates from L1 or something
             let l2prov = database.l2_provider();
 
             for id in blkids {
