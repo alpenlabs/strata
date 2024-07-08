@@ -18,7 +18,7 @@ use crate::messages::*;
 /// whatever semantics it has.
 pub trait ExecEngineCtl {
     /// Execute a block payload to determine its validity and if it extends the
-    /// current fork choice tip.
+    /// current chain tip.
     ///
     /// Corresponds to `engine_newPayloadVX`.
     fn submit_payload(&self, payload: ExecPayloadData) -> EngineResult<BlockStatus>;
@@ -32,11 +32,11 @@ pub trait ExecEngineCtl {
     /// Tries to get a payload that we were working on.
     fn get_payload_status(&self, id: u64) -> EngineResult<PayloadStatus>;
 
-    /// Updates the (L2) block that we treat as the fork choice tip and build new
+    /// Updates the (L2) block that we treat as the chain tip and build new
     /// blocks on.
     fn update_head_block(&self, id: L2BlockId) -> EngineResult<()>;
 
-    /// Updates the (L2) block that we treat as the safe fork choice tip that we
+    /// Updates the (L2) block that we treat as the safe chain tip that we
     /// respond to RPCs with.
     fn update_safe_block(&self, id: L2BlockId) -> EngineResult<()>;
 
@@ -45,7 +45,7 @@ pub trait ExecEngineCtl {
     fn update_finalized_block(&self, id: L2BlockId) -> EngineResult<()>;
 }
 
-/// The status of a block that we've just set fork choice fork.
+/// The status of a block that we've just set chain fork.
 ///
 /// Corresponds to `Forkchoice
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]

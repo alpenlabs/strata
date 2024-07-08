@@ -195,7 +195,7 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
             let cur_tip = state.cur_best_block;
             let new_tip = state.chain_tracker.attach_block(blkid, block.header())?;
             if new_tip {
-                debug!(?blkid, "created new pending fork choice message");
+                debug!(?blkid, "created new pending tip");
             }
 
             let best_block = pick_best_block(
@@ -242,7 +242,7 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
 
                 // Insert the sync event and submit it to the executor.
                 let tip_blkid = *reorg.new_tip();
-                info!(?tip_blkid, "new fork choice tip block");
+                info!(?tip_blkid, "new chain tip block");
                 let ev = SyncEvent::NewTipBlock(tip_blkid);
                 csm_ctl.submit_event(ev)?;
             }

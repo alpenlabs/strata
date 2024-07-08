@@ -393,7 +393,7 @@ mod tests {
         assert_eq!(
             db.get_chain_tip().unwrap(),
             None,
-            "Fork choice tip of empty db should be zero"
+            "chain tip of empty db should be unset"
         );
 
         // Insert some block data

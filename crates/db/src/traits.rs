@@ -54,8 +54,8 @@ pub trait L1DataStore {
     /// error.
     fn put_mmr_checkpoint(&self, idx: u64, mmr: CompactMmr) -> DbResult<()>;
 
-    /// Resets the L1 fork choice tip to the specified block index.  The provided
-    /// index will be the new fork choice tip that we store.
+    /// Resets the L1 chain tip to the specified block index.  The provided
+    /// index will be the new chain tip that we store.
     fn revert_to_height(&self, idx: u64) -> DbResult<()>;
 
     // TODO DA scraping storage
@@ -63,7 +63,7 @@ pub trait L1DataStore {
 
 /// Provider interface to view L1 data.
 pub trait L1DataProvider {
-    /// Gets the current fork choice tip index.
+    /// Gets the current chain tip index.
     fn get_chain_tip(&self) -> DbResult<Option<u64>>;
 
     /// Gets the block manifest for a block index.
@@ -151,7 +151,7 @@ pub trait ClientStateProvider {
 }
 
 /// L2 data store for CL blocks.  Does not store anything about what we think
-/// the L2 fork choice tip is, that's controlled by the consensus state.
+/// the L2 chain tip is, that's controlled by the consensus state.
 pub trait L2DataStore {
     /// Stores an L2 bloc=k, does not care about the block height of the L2
     /// block.  Also sets the block's status to "unchecked".

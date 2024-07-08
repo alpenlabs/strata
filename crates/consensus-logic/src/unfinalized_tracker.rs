@@ -23,7 +23,7 @@ pub struct UnfinalizedBlockTracker {
     /// Table of pending blocks near the tip of the block tree.
     pending_table: HashMap<L2BlockId, BlockEntry>,
 
-    /// Unfinalized fork choice tips.  This also includes the finalized tip if there's
+    /// Unfinalized chain tips.  This also includes the finalized tip if there's
     /// no pending blocks.
     unfinalized_tips: HashSet<L2BlockId>,
 }
@@ -64,7 +64,7 @@ impl UnfinalizedBlockTracker {
         self.pending_table.get(id).map(|ent| &ent.parent)
     }
 
-    /// Returns an iterator over the fork choice tips.
+    /// Returns an iterator over the chain tips.
     pub fn chain_tips_iter(&self) -> impl Iterator<Item = &L2BlockId> {
         self.unfinalized_tips.iter()
     }
@@ -226,7 +226,7 @@ impl FinalizeReport {
         &self.prev_tip
     }
 
-    /// The new fork choice tip that's finalized now.
+    /// The new chain tip that's finalized now.
     pub fn new_tip(&self) -> &L2BlockId {
         if self.finalized.is_empty() {
             &self.prev_tip
