@@ -1,9 +1,6 @@
 use std::sync::Arc;
 use std::thread;
 
-use tokio::sync::mpsc;
-use tracing::*;
-
 use alpen_vertex_btcio::reader::{
     config::ReaderConfig, messages::L1Event, query::bitcoin_data_reader_task,
 };
@@ -12,6 +9,7 @@ use alpen_vertex_consensus_logic::ctl::CsmController;
 use alpen_vertex_consensus_logic::l1_handler::bitcoin_data_handler_task;
 use alpen_vertex_db::traits::{Database, L1DataProvider};
 use alpen_vertex_primitives::params::Params;
+use tokio::sync::mpsc;
 
 pub async fn start_reader_tasks<D: Database>(
     params: &Params,
@@ -43,7 +41,7 @@ where
     ));
 
     let l1db = db.l1_store().clone();
-    let sedb = db.sync_event_store().clone();
+    let _sedb = db.sync_event_store().clone();
     let _handler_handle = thread::spawn(move || bitcoin_data_handler_task(l1db, csm_ctl, ev_rx));
 
     Ok(())
