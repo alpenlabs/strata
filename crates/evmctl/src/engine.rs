@@ -8,7 +8,6 @@
 // errors as we'd be able to identify when our perspective on the state is
 // inconsistent with the remote state.
 
-use alpen_vertex_primitives::buf::Buf32;
 use alpen_vertex_state::block::L2BlockId;
 
 use crate::errors::*;
@@ -19,7 +18,7 @@ use crate::messages::*;
 /// whatever semantics it has.
 pub trait ExecEngineCtl {
     /// Execute a block payload to determine its validity and if it extends the
-    /// currentfork choice tip.
+    /// current fork choice tip.
     ///
     /// Corresponds to `engine_newPayloadVX`.
     fn submit_payload(&self, payload: ExecPayloadData) -> EngineResult<BlockStatus>;
@@ -33,7 +32,7 @@ pub trait ExecEngineCtl {
     /// Tries to get a payload that we were working on.
     fn get_payload_status(&self, id: u64) -> EngineResult<PayloadStatus>;
 
-    /// Updates the (L2) block that we treat as thefork choice tip and build new
+    /// Updates the (L2) block that we treat as the fork choice tip and build new
     /// blocks on.
     fn update_head_block(&self, id: L2BlockId) -> EngineResult<()>;
 

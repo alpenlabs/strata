@@ -14,17 +14,11 @@ use tracing::*;
 
 use alpen_vertex_btcio::rpc::traits::L1Client;
 use alpen_vertex_common::logging;
-use alpen_vertex_consensus_logic::ctl::CsmController;
 use alpen_vertex_consensus_logic::duties::{DutyBatch, Identity};
 use alpen_vertex_consensus_logic::duty_executor::{self, IdentityData, IdentityKey};
-use alpen_vertex_consensus_logic::message::{ForkChoiceMessage, ClientUpdateNotif, CsmMessage};
 use alpen_vertex_consensus_logic::sync_manager;
 use alpen_vertex_consensus_logic::sync_manager::SyncManager;
-use alpen_vertex_consensus_logic::{fork_choice_manager, unfinalized_tracker, worker};
-use alpen_vertex_db::database::CommonDatabase;
-use alpen_vertex_db::stubs::l2::StubL2Db;
 use alpen_vertex_db::traits::Database;
-use alpen_vertex_db::{ConsensusStateDb, L1Db, SyncEventDb};
 use alpen_vertex_primitives::buf::Buf32;
 use alpen_vertex_primitives::{block_credential, params::*};
 use alpen_vertex_rpc_api::AlpenApiServer;
@@ -113,8 +107,8 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     }
 
     // Create dataflow channels.
-    let (cout_tx, cout_rx) = mpsc::channel::<operation::ClientUpdateOutput>(64);
-    let (cur_state_tx, cur_state_rx) = watch::channel::<Option<ClientState>>(None);
+    let (_cout_tx, _cout_rx) = mpsc::channel::<operation::ClientUpdateOutput>(64);
+    let (_cur_state_tx, _cur_state_rx) = watch::channel::<Option<ClientState>>(None);
     // TODO connect up these other channels
 
     // Init engine controller.

@@ -13,7 +13,7 @@ use crate::block::L2BlockId;
 pub struct ChainState {
     // all these fields are kinda dummies at the moment
     /// Accepted and valid L2 blocks that we might still reorg.  The last of
-    /// these is thefork choice tip.
+    /// these is the fork choice tip.
     pub(super) accepted_l2_blocks: Vec<L2BlockId>,
 
     /// Pending deposits that have been acknowledged in an EL block.

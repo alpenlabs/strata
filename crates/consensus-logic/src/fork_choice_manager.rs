@@ -195,7 +195,7 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
             let cur_tip = state.cur_best_block;
             let new_tip = state.chain_tracker.attach_block(blkid, block.header())?;
             if new_tip {
-                debug!(?blkid, "created new pending fork choice");
+                debug!(?blkid, "created new pending fork choice message");
             }
 
             let best_block = pick_best_block(
