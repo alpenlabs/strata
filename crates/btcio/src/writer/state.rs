@@ -12,7 +12,8 @@ pub struct WriterState<D> {
     /// The queue of transactions that need to be sent to L1 or whose status needs to be tracked
     pub txns_queue: VecDeque<TxnWithStatus>,
 
-    /// The storage idx of the first txn in the queue
+    /// The storage idx of the first txn in the queue. This is needed to derive the idx of a txn in
+    /// database based on its idx in txns_queue. This could probably also be done using hashmap.
     pub start_txn_idx: u64,
 
     /// database to access the L1 transactions

@@ -5,7 +5,7 @@ use rockbound::{Schema, SchemaBatch, DB};
 
 use crate::{
     errors::DbError,
-    traits::{SeqDataProvider, SeqDataStore},
+    traits::{SeqDataProvider, SeqDataStore, SequencerDatabase},
     DbResult,
 };
 
@@ -49,8 +49,11 @@ impl SeqDataStore for SeqDb {
                 "Entry already exists for blobid {blob_hash:?}"
             )));
         }
-        let last_idx = self.get_last_idx::<SequencerBlobIdSchema>()?.unwrap_or(0);
-        let idx = last_idx + 1;
+        // the idx should be incremented by 1 every time and start with zero
+        let idx = self
+            .get_last_idx::<SequencerBlobIdSchema>()?
+            .map(|x| x + 1)
+            .unwrap_or(0);
 
         let mut batch = SchemaBatch::new();
 
@@ -76,8 +79,11 @@ impl SeqDataStore for SeqDb {
             )));
         }
 
-        let last_reveal_idx = self.get_last_idx::<SequencerL1TxnSchema>()?.unwrap_or(0);
-        let commit_idx = last_reveal_idx + 1;
+        // The idx should satrt with zero and increment every time
+        let commit_idx = self
+            .get_last_idx::<SequencerL1TxnSchema>()?
+            .map(|x| x + 1)
+            .unwrap_or(0);
         let reveal_idx = commit_idx + 1;
 
         let mut batch = SchemaBatch::new();
@@ -126,6 +132,29 @@ impl SeqDataProvider for SeqDb {
 
     fn get_blobid_for_blob_idx(&self, blobidx: u64) -> DbResult<Option<Buf32>> {
         Ok(self.db.get::<SequencerBlobIdSchema>(&blobidx)?)
+    }
+}
+
+pub struct SequencerDB<D> {
+    db: Arc<D>,
+}
+
+impl<D> SequencerDB<D> {
+    pub fn new(db: Arc<D>) -> Self {
+        Self { db }
+    }
+}
+
+impl<D: SeqDataStore + SeqDataProvider> SequencerDatabase for SequencerDB<D> {
+    type SeqStore = D;
+    type SeqProv = D;
+
+    fn sequencer_store(&self) -> &Arc<Self::SeqStore> {
+        &self.db
+    }
+
+    fn sequencer_provider(&self) -> &Arc<Self::SeqProv> {
+        &self.db
     }
 }
 

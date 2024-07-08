@@ -126,7 +126,9 @@ pub struct TxnWithStatus {
 
 impl TxnWithStatus {
     /// Create a new object corresponding a transaction sent to mempool
-    pub fn new(txid: Buf32, txn_raw: Vec<u8>, status: BitcoinTxnStatus) -> Self {
+    pub fn new(txn: Transaction, status: BitcoinTxnStatus) -> Self {
+        let txid = Buf32(txn.compute_txid().as_byte_array().into());
+        let txn_raw = serialize(&txn);
         Self {
             txid,
             txn_raw,
@@ -136,9 +138,7 @@ impl TxnWithStatus {
 
     /// Create a new object corresponding a transaction sent to mempool
     pub fn new_unsent(txn: Transaction) -> Self {
-        let txid = Buf32(txn.compute_txid().as_byte_array().into());
-        let txn_raw = serialize(&txn);
-        Self::new(txid, txn_raw, BitcoinTxnStatus::Unsent)
+        Self::new(txn, BitcoinTxnStatus::Unsent)
     }
 
     pub fn txid(&self) -> &Buf32 {

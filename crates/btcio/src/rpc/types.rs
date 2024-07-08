@@ -1,3 +1,5 @@
+#[cfg(test)]
+use arbitrary::Arbitrary;
 use bitcoin::BlockHash;
 use serde::{de::Visitor, Deserialize, Deserializer, Serialize};
 
@@ -30,7 +32,7 @@ pub struct GetTransactionResponse {
 }
 
 #[derive(Deserialize, Debug)]
-struct TransactionDetail {
+pub struct TransactionDetail {
     #[serde(rename = "involvesWatchonly")]
     involves_watchonly: Option<bool>,
     address: Option<String>,
@@ -43,7 +45,8 @@ struct TransactionDetail {
     parent_descs: Option<Vec<String>>,
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
+#[cfg_attr(test, derive(Arbitrary))]
 pub struct RawUTXO {
     pub txid: String,
     pub vout: u32,
@@ -58,6 +61,7 @@ pub struct RawUTXO {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[cfg_attr(test, derive(Arbitrary))]
 pub struct RpcBlockchainInfo {
     pub blocks: u64,
     pub headers: u64,
@@ -108,8 +112,6 @@ where
             } else {
                 return Err(E::custom("Invalid amount representation"));
             };
-
-            println!("combined: {}", combined);
 
             combined.parse().map_err(E::custom)
         }

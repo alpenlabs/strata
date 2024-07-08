@@ -103,6 +103,7 @@ pub fn create_inscription_transactions(
     fn to_inscription_error<E: std::fmt::Display>(e: E) -> InscriptionError {
         InscriptionError::Other(format!("{:}", e))
     }
+
     // Create commit key
     let secp256k1 = Secp256k1::new();
     let key_pair = generate_key_pair(&secp256k1).map_err(to_inscription_error)?;
@@ -125,8 +126,8 @@ pub fn create_inscription_transactions(
         .finalize(&secp256k1, public_key)
         .map_err(|_| InscriptionError::Other("Could not build taproot spend info".to_string()))?;
 
-    // Create commit tx address
-    let commit_tx_address = Address::p2tr(
+    // Create reveal address
+    let reveal_address = Address::p2tr(
         &secp256k1,
         public_key,
         taproot_spend_info.merkle_root(),
@@ -145,7 +146,7 @@ pub fn create_inscription_transactions(
     // Build commit tx
     let (unsigned_commit_tx, _) = build_commit_transaction(
         utxos,
-        commit_tx_address.clone(),
+        reveal_address.clone(),
         recipient.clone(),
         commit_value,
         fee_rate,
@@ -183,7 +184,7 @@ pub fn create_inscription_transactions(
         &secp256k1,
         &key_pair,
         &taproot_spend_info,
-        &commit_tx_address,
+        &reveal_address,
         network,
     );
 
@@ -404,9 +405,10 @@ fn build_reveal_transaction(
     }];
     let size = get_size(&inputs, &outputs, Some(reveal_script), Some(control_block));
     let fee = (size as u64) * fee_rate;
-    let input_total = Amount::from_sat(output_value + fee);
-    if input_utxo.value < Amount::from_sat(BITCOIN_DUST_LIMIT) || input_utxo.value < input_total {
-        return Err(InscriptionError::NotEnoughUtxos(input_total.to_sat()));
+    let input_required = Amount::from_sat(output_value + fee);
+    if input_utxo.value < Amount::from_sat(BITCOIN_DUST_LIMIT) || input_utxo.value < input_required
+    {
+        return Err(InscriptionError::NotEnoughUtxos(input_required.to_sat()));
     }
     let tx = Transaction {
         lock_time: LockTime::ZERO,
@@ -660,11 +662,6 @@ mod tests {
         ));
     }
 
-    #[test]
-    fn build_commit_transaction() {
-        todo!()
-    }
-
     fn get_txn_from_utxo(utxo: &UTXO, _address: &Address) -> Transaction {
         let inputs = vec![TxIn {
             previous_output: OutPoint {
@@ -690,8 +687,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "fixme"]
-    fn build_reveal_transaction() {
+    fn test_build_reveal_transaction() {
         let (_, _, _, _, address, utxos) = get_mock_data();
 
         let utxo = utxos.first().unwrap();
@@ -718,47 +714,32 @@ mod tests {
         tx.input[0].witness.push(control_block.serialize());
 
         assert_eq!(tx.input.len(), 1);
-        assert_eq!(tx.input[0].previous_output.txid, utxo.txid);
         assert_eq!(tx.input[0].previous_output.vout, utxo.vout);
 
         assert_eq!(tx.output.len(), 1);
         assert_eq!(tx.output[0].value.to_sat(), REVEAL_OUTPUT_AMOUNT);
         assert_eq!(tx.output[0].script_pubkey, address.script_pubkey());
 
+        // Test not enough utxos
         let utxo = utxos.get(2).unwrap();
         let inp_txn = get_txn_from_utxo(utxo, &address);
+        let inp_required = 5000000000;
         let tx = super::build_reveal_transaction(
             inp_txn,
             address.clone(),
-            REVEAL_OUTPUT_AMOUNT,
-            75,
+            inp_required,
+            750,
             &_script,
             &control_block,
         );
 
         assert!(tx.is_err());
-        assert_eq!(format!("{}", tx.unwrap_err()), "input UTXO not big enough");
-
-        let utxo = utxos.get(2).unwrap();
-        let inp_txn = get_txn_from_utxo(utxo, &address);
-        let tx = super::build_reveal_transaction(
-            inp_txn,
-            address.clone(),
-            9999,
-            1,
-            &_script,
-            &control_block,
-        );
-
-        assert!(tx.is_err());
-        assert_eq!(format!("{}", tx.unwrap_err()), "input UTXO not big enough");
+        assert!(matches!(tx, Err(InscriptionError::NotEnoughUtxos(_))));
     }
-    #[test]
-    #[ignore = "fixme"]
-    fn create_inscription_transactions() {
-        let (rollup_name, _, _, sequencer_public_key, address, utxos) = get_mock_data();
 
-        let (_, rest_utxos) = utxos.split_first().unwrap();
+    #[test]
+    fn test_create_inscription_transactions() {
+        let (rollup_name, _, _, sequencer_public_key, address, utxos) = get_mock_data();
 
         let write_intent = vec![0u8; 100];
         let sig = vec![1; 32];
@@ -767,7 +748,7 @@ mod tests {
             &write_intent,
             sequencer_public_key.clone(),
             sig,
-            rest_utxos.to_vec(),
+            utxos.to_vec(),
             address.clone(),
             REVEAL_OUTPUT_AMOUNT,
             10,
@@ -781,11 +762,11 @@ mod tests {
         assert_eq!(reveal.output.len(), 1, "reveal tx should have 1 output");
 
         assert_eq!(
-            commit.input[0].previous_output.txid, rest_utxos[2].txid,
+            commit.input[0].previous_output.txid, utxos[2].txid,
             "utxo to inscribe should be chosen correctly"
         );
         assert_eq!(
-            commit.input[0].previous_output.vout, rest_utxos[2].vout,
+            commit.input[0].previous_output.vout, utxos[2].vout,
             "utxo to inscribe should be chosen correctly"
         );
 
@@ -804,18 +785,7 @@ mod tests {
             address.script_pubkey(),
             "reveal should pay to the correct address"
         );
-
-        // check inscription
-        // let inscription = parse_transaction(&reveal, rollup_name).unwrap();
-
-        // assert_eq!(inscription.body, body, "body should be correct");
-        // assert_eq!(
-        //     inscription.signature, signature,
-        //     "signature should be correct"
-        // );
-        // assert_eq!(
-        //     inscription.public_key, sequencer_public_key,
-        //     "sequencer public key should be correct"
-        // );
     }
+
+    // TODO: make the tests more comprehensive
 }
