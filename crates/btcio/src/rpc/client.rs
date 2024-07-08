@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, to_value, value::RawValue, Value};
 use tracing::*;
 
+use super::traits::SeqL1Client;
 use super::{
     traits::L1Client,
     types::{GetTransactionResponse, RawUTXO, RpcBlockchainInfo},
@@ -119,10 +120,6 @@ impl BitcoinClient {
             network,
             next_id: AtomicU64::new(0),
         }
-    }
-
-    pub fn network(&self) -> Network {
-        self.network
     }
 
     fn next_id(&self) -> u64 {
@@ -283,33 +280,6 @@ impl BitcoinClient {
         })
     }
 
-    // get_utxos returns all unspent transaction outputs for the wallets of bitcoind
-    pub async fn get_utxos(&self) -> ClientResult<Vec<RawUTXO>> {
-        let utxos = self
-            .call::<Vec<RawUTXO>>("listunspent", &[to_value(0)?, to_value(9999999)?])
-            .await?;
-
-        if utxos.is_empty() {
-            return Err(ClientError::Other("No UTXOs found".to_string()));
-        }
-
-        Ok(utxos)
-    }
-
-    /// get number of confirmations for txid
-    /// 0 confirmations means tx is still in mempool
-    pub async fn get_transaction_confirmations<T: AsRef<[u8]>>(
-        &self,
-        txid: T,
-    ) -> ClientResult<u64> {
-        let txid = hex::encode(txid);
-        let result = self
-            .call::<GetTransactionResponse>("gettransaction", &[to_val(txid)?])
-            .await?;
-
-        Ok(result.confirmations)
-    }
-
     pub async fn list_since_block(&self, blockhash: String) -> ClientResult<Vec<String>> {
         let result = self
             .call::<Box<RawValue>>("listsinceblock", &[to_value(blockhash)?])
@@ -338,25 +308,6 @@ impl BitcoinClient {
         let change_address_2 = self.get_change_address().await?;
 
         Ok([change_address, change_address_2])
-    }
-
-    // estimate_smart_fee estimates the fee to confirm a transaction in the next block
-    pub async fn estimate_smart_fee(&self) -> ClientResult<u64> {
-        let result = self
-            .call::<Box<RawValue>>("estimatesmartfee", &[to_value(1)?])
-            .await?
-            .to_string();
-
-        let result_map: serde_json::Value = serde_json::from_str(&result)?;
-
-        let btc_vkb = result_map
-            .get("feerate")
-            .unwrap_or(&serde_json::Value::from_str("0.00001").unwrap())
-            .as_f64()
-            .unwrap();
-
-        // convert to sat/vB and round up
-        Ok((btc_vkb * 100_000_000.0 / 1000.0).ceil() as u64)
     }
 
     // sign_raw_transaction_with_wallet signs a raw transaction with the wallet of bitcoind
@@ -404,31 +355,6 @@ impl BitcoinClient {
         }
     }
 
-    // send_raw_transaction sends a raw transaction to the network
-    pub async fn send_raw_transaction<T: AsRef<[u8]>>(&self, tx: T) -> ClientResult<[u8; 32]> {
-        let txstr = hex::encode(tx);
-        let resp = self
-            .call::<String>("sendrawtransaction", &[to_value(txstr)?])
-            .await?;
-
-        let hex = hex::decode(resp.clone());
-        match hex {
-            Ok(hx) => {
-                if hx.len() != 32 {
-                    return Err(ClientError::Other(format!(
-                        "Invalid hex response from client"
-                    )));
-                }
-                let mut arr: [u8; 32] = [0; 32];
-                arr.copy_from_slice(&hx);
-                Ok(arr)
-            }
-            Err(e) => Err(ClientError::ParseError(format!(
-                "{e}: Could not parse sendrawtransaction response: {resp}"
-            ))),
-        }
-    }
-
     #[cfg(test)]
     pub async fn send_to_address(&self, address: String, amt: u32) -> anyhow::Result<String> {
         if self.network == Network::Regtest {
@@ -467,24 +393,97 @@ impl BitcoinClient {
 
 #[async_trait]
 impl L1Client for BitcoinClient {
-    async fn get_blockchain_info(&self) -> anyhow::Result<RpcBlockchainInfo> {
+    async fn get_blockchain_info(&self) -> ClientResult<RpcBlockchainInfo> {
         Ok(self
             .call::<RpcBlockchainInfo>("getblockchaininfo", &[])
             .await?)
     }
 
     // get_block_hash returns the block hash of the block at the given height
-    async fn get_block_hash(&self, height: u64) -> anyhow::Result<BlockHash> {
+    async fn get_block_hash(&self, height: u64) -> ClientResult<BlockHash> {
         let hash = self
             .call::<String>("getblockhash", &[to_value(height)?])
             .await?;
-        Ok(BlockHash::from_str(&hash)?)
+        Ok(BlockHash::from_str(&hash).map_err(|e| ClientError::Other(e.to_string()))?)
     }
 
-    async fn get_block_at(&self, height: u64) -> anyhow::Result<Block> {
+    async fn get_block_at(&self, height: u64) -> ClientResult<Block> {
         let hash = self.get_block_hash(height).await?;
         let block = self.get_block(hash.to_string()).await?;
         Ok(block)
+    }
+
+    // send_raw_transaction sends a raw transaction to the network
+    async fn send_raw_transaction<T: AsRef<[u8]> + Send>(&self, tx: T) -> ClientResult<[u8; 32]> {
+        let txstr = hex::encode(tx);
+        let resp = self
+            .call::<String>("sendrawtransaction", &[to_value(txstr)?])
+            .await?;
+
+        let hex = hex::decode(resp.clone());
+        match hex {
+            Ok(hx) => {
+                if hx.len() != 32 {
+                    return Err(ClientError::Other(format!(
+                        "Invalid hex response from client"
+                    )));
+                }
+                let mut arr: [u8; 32] = [0; 32];
+                arr.copy_from_slice(&hx);
+                Ok(arr)
+            }
+            Err(e) => Err(ClientError::ParseError(format!(
+                "{e}: Could not parse sendrawtransaction response: {resp}"
+            ))),
+        }
+    }
+
+    async fn get_transaction_confirmations<T: AsRef<[u8]> + Send>(&self, txid: T) -> ClientResult<u64> {
+        let txid = hex::encode(txid);
+        let result = self
+            .call::<GetTransactionResponse>("gettransaction", &[to_val(txid)?])
+            .await?;
+
+        Ok(result.confirmations)
+    }
+}
+
+#[async_trait]
+impl SeqL1Client for BitcoinClient {
+    // get_utxos returns all unspent transaction outputs for the wallets of bitcoind
+    async fn get_utxos(&self) -> ClientResult<Vec<RawUTXO>> {
+        let utxos = self
+            .call::<Vec<RawUTXO>>("listunspent", &[to_value(0)?, to_value(9999999)?])
+            .await?;
+
+        if utxos.is_empty() {
+            return Err(ClientError::Other("No UTXOs found".to_string()));
+        }
+
+        Ok(utxos)
+    }
+
+    // estimate_smart_fee estimates the fee to confirm a transaction in the next block
+    async fn estimate_smart_fee(&self) -> ClientResult<u64> {
+        let result = self
+            .call::<Box<RawValue>>("estimatesmartfee", &[to_value(1)?])
+            .await?
+            .to_string();
+
+        let result_map: serde_json::Value = serde_json::from_str(&result)?;
+
+        let btc_vkb = result_map
+            .get("feerate")
+            .unwrap_or(&serde_json::Value::from_str("0.00001").unwrap())
+            .as_f64()
+            .unwrap();
+
+        // convert to sat/vB and round up
+        Ok((btc_vkb * 100_000_000.0 / 1000.0).ceil() as u64)
+    }
+
+    fn network(&self) -> Network {
+        self.network
     }
 }
 
