@@ -9,7 +9,7 @@ use crate::block::L2BlockId;
 /// pre-state and a block.
 ///
 /// This corresponds to the beacon chain state.
-#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize, Schema)]
 pub struct ChainState {
     // all these fields are kinda dummies at the moment
     /// Accepted and valid L2 blocks that we might still reorg.  The last of

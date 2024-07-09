@@ -15,6 +15,7 @@ pub mod l1;
 pub mod l2;
 pub mod stubs;
 pub mod sync_event;
+pub mod chain_state;
 
 pub mod errors;
 pub mod macros;

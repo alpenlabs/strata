@@ -59,7 +59,7 @@ impl ChainstateStore for StubChainstateDb {
         }
 
         let toplevel = st
-            .toplevels
+            .toplevel
             .get(&last_idx)
             .cloned()
             .expect("chainstatedb: nonsense");

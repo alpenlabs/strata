@@ -20,7 +20,7 @@ pub enum StateOp {
 }
 
 /// Collection of writes we're making to the state.
-#[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
+#[derive(Clone, Debug, PartialEq, Eq, BorshDeserialize, BorshSerialize)]
 pub struct WriteBatch {
     ops: Vec<StateOp>,
 }
