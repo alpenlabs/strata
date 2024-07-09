@@ -15,9 +15,9 @@ use alpen_vertex_db::traits::{
 use alpen_vertex_evmctl::engine::ExecEngineCtl;
 use alpen_vertex_evmctl::messages::ExecPayloadData;
 use alpen_vertex_primitives::params::Params;
-use alpen_vertex_state::block::{L2Block, L2BlockId};
 use alpen_vertex_state::client_state::ClientState;
 use alpen_vertex_state::operation::SyncAction;
+use alpen_vertex_state::prelude::*;
 use alpen_vertex_state::sync_event::SyncEvent;
 
 use crate::ctl::CsmController;

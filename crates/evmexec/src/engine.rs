@@ -19,7 +19,7 @@ use alpen_vertex_evmctl::engine::{BlockStatus, ExecEngineCtl, PayloadStatus};
 use alpen_vertex_evmctl::errors::{EngineError, EngineResult};
 use alpen_vertex_evmctl::messages::{ELDepositData, ExecPayloadData, Op, PayloadEnv};
 use alpen_vertex_primitives::buf::Buf32;
-use alpen_vertex_state::block::L2BlockId;
+use alpen_vertex_state::id::L2BlockId;
 
 use crate::el_payload::ElPayload;
 

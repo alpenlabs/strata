@@ -2,7 +2,7 @@ use std::collections::*;
 
 use parking_lot::Mutex;
 
-use alpen_vertex_state::block::*;
+use alpen_vertex_state::prelude::*;
 
 use crate::errors::*;
 use crate::traits::*;

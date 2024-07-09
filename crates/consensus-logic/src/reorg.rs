@@ -1,6 +1,6 @@
 //! Reorg planning types.
 
-use alpen_vertex_state::block::L2BlockId;
+use alpen_vertex_state::id::L2BlockId;
 
 use crate::unfinalized_tracker;
 
@@ -132,7 +132,7 @@ pub fn compute_reorg(
 
 #[cfg(test)]
 mod tests {
-    use alpen_vertex_state::block::L2BlockId;
+    use alpen_vertex_state::id::L2BlockId;
     use rand::RngCore;
 
     use crate::unfinalized_tracker;

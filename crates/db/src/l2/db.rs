@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use rockbound::{SchemaBatch, DB};
 
-use alpen_vertex_state::block::{L2Block, L2BlockId};
+use alpen_vertex_state::prelude::*;
 
 use crate::{
     l2::schemas::L2BlockHeightSchema,

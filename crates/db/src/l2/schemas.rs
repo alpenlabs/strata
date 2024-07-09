@@ -3,7 +3,7 @@ use crate::define_table_without_codec;
 use crate::impl_borsh_value_codec;
 use crate::traits::BlockStatus;
 use alpen_vertex_state::block::L2Block;
-use alpen_vertex_state::block::L2BlockId;
+use alpen_vertex_state::id::L2BlockId;
 use borsh::BorshDeserialize;
 use borsh::BorshSerialize;
 

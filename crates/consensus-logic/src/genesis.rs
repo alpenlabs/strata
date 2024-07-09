@@ -11,8 +11,9 @@ use alpen_vertex_primitives::{
     buf::{Buf32, Buf64},
     params::Params,
 };
+use alpen_vertex_state::prelude::*;
 use alpen_vertex_state::{
-    block::{ExecSegment, L1Segment, L2Block, L2BlockBody, L2BlockId},
+    block::{ExecSegment, L1Segment},
     block_template,
     chain_state::ChainState,
     client_state::ClientState,

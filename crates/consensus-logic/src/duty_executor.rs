@@ -13,9 +13,10 @@ use alpen_vertex_evmctl::engine::{ExecEngineCtl, PayloadStatus};
 use alpen_vertex_evmctl::errors::EngineError;
 use alpen_vertex_evmctl::messages::{ExecPayloadData, PayloadEnv};
 use alpen_vertex_primitives::buf::{Buf32, Buf64};
-use alpen_vertex_state::block::{ExecSegment, L1Segment, L2Block, L2BlockBody, L2BlockId};
+use alpen_vertex_state::block::{ExecSegment, L1Segment};
 use alpen_vertex_state::block_template;
 use alpen_vertex_state::client_state::ClientState;
+use alpen_vertex_state::prelude::*;
 
 use crate::duties::{self, Duty, DutyBatch, Identity};
 use crate::duty_extractor;

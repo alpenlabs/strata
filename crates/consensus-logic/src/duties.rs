@@ -5,7 +5,7 @@ use std::time;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use alpen_vertex_primitives::buf::Buf32;
-use alpen_vertex_state::block::L2BlockId;
+use alpen_vertex_state::id::L2BlockId;
 
 /// Describes when we'll stop working to fulfill a duty.
 #[derive(Clone, Debug)]
