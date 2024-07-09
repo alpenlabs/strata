@@ -15,4 +15,5 @@ pub mod forced_inclusion;
 pub mod l1;
 pub mod operation;
 pub mod state_op;
+pub mod state_queue;
 pub mod sync_event;
