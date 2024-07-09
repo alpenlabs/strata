@@ -15,11 +15,7 @@ class L1StatusTest(flexitest.Test):
         btcrpc = btc.create_rpc()
         seqrpc = seq.create_rpc()
 
-        # proto_ver = seqrpc.alp_protocolVersion()
-        # print("protocol version", proto_ver)
-        # assert proto_ver == 1, "query protocol version"
-        # add 5 blocks
-        btc.generate_blocks(btcrpc, 0.05, 5)
+        # add 1 blocks
         time.sleep(1)
         l1stat = seqrpc.alp_l1status()
         print("L1 status", l1stat)

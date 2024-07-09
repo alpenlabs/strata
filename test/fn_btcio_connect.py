@@ -9,14 +9,10 @@ class L1ConnectTest(flexitest.Test):
         ctx.set_env("basic")
 
     def main(self, ctx: flexitest.RunContext):
-        btc = ctx.get_service("bitcoin")
         seq = ctx.get_service("sequencer")
 
-        btcrpc = btc.create_rpc()
         seqrpc = seq.create_rpc()
 
-        btc.generate_blocks(btcrpc, 1, block_count=1)
-        # wait for block to be made
         time.sleep(0.5)
         l1stat = seqrpc.alp_l1connected()
         assert l1stat == True, "Error connecting to Bitcoin Rpc client"

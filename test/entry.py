@@ -2,7 +2,8 @@
 
 import os
 import sys
-import threading
+from threading import Thread
+import queue
 import time
 
 from bitcoinlib.services.bitcoind import BitcoindClient
@@ -20,32 +21,33 @@ def generate_seqkey() -> bytes:
     assert len(buf) == 32, "bad seqkey len"
     return buf
 
+def generate_blocks(
+    bitcoin_rpc: BitcoindClient, wait_dur, 
+) -> Thread:
+    addr = bitcoin_rpc.proxy.getnewaddress()
+    thr = Thread(
+        target=generate_task,
+        args=(
+            bitcoin_rpc,
+            wait_dur,
+            addr,
+        ),
+    )
+    thr.start()
+    return thr
 
 def generate_task(
-    rpc: BitcoindClient, block_list, block_count, wait_dur, addr, infinite
+    rpc: BitcoindClient, wait_dur, addr
 ):
     print("generating to address", addr)
-
-    def gen_to_addr():
+    while True:
         time.sleep(wait_dur)
         try:
             blk = rpc.proxy.generatetoaddress(1, addr)
-            # check the height of the recently generated block, needed when reorg happens
-            block_height = rpc.proxy.getblockheader(blk[0])["height"]
-            if block_height > len(block_list):
-                block_list.append(blk[0])
-            else:
-                block_list[block_height] = blk[0]
             print("made block", blk)
         except:
             return
 
-    if infinite:
-        while True:
-            gen_to_addr()
-    else:
-        for _ in range(0, block_count):
-            gen_to_addr()
 
 
 class BitcoinFactory(flexitest.Factory):
@@ -75,7 +77,6 @@ class BitcoinFactory(flexitest.Factory):
             "rpc_password": BD_PASSWORD,
         }
 
-        block_list = []
         with open(logfile, "w") as f:
             svc = flexitest.service.ProcService(props, cmd, stdout=f)
 
@@ -83,27 +84,8 @@ class BitcoinFactory(flexitest.Factory):
                 url = "http://%s:%s@localhost:%s" % (BD_USERNAME, BD_PASSWORD, rpc_port)
                 return BitcoindClient(base_url=url)
 
-            def _generate_blocks(
-                bitcoin_rpc: BitcoindClient, wait_dur, block_count=10, infinite=False
-            ) -> threading.Thread:
-                addr = bitcoin_rpc.proxy.getnewaddress()
-                thr = threading.Thread(
-                    target=generate_task,
-                    args=(
-                        bitcoin_rpc,
-                        block_list,
-                        block_count,
-                        wait_dur,
-                        addr,
-                        infinite,
-                    ),
-                )
-                thr.start()
-                return thr
 
             setattr(svc, "create_rpc", _create_rpc)
-            setattr(svc, "generate_blocks", _generate_blocks)
-            setattr(svc, "block_list", block_list)
 
             return svc
 
@@ -169,6 +151,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
         brpc = bitcoind.create_rpc()
         brpc.proxy.createwallet("dummy")
 
+        generate_blocks(brpc, 0.5)
         rpc_port = bitcoind.get_prop("rpc_port")
         rpc_user = bitcoind.get_prop("rpc_user")
         rpc_pass = bitcoind.get_prop("rpc_password")
