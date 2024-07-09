@@ -6,11 +6,16 @@ use alpen_vertex_primitives::prelude::*;
 #[derive(Clone, Debug)]
 pub struct ExecPayloadData {
     /// Encoded EL payload, minus any operations we push to it.
+    ///
+    /// This is the "explicit" input from the CL block.
+    // TODO replace this with the `UpdateInput` from the exec update, maybe some other stuff
     el_payload: Vec<u8>,
 
     /// CL operations pushed into the EL, such as deposits from L1.  This
     /// corresponds to the "withdrawals" field in the `ExecutionPayloadVX`
     /// type(s), but is seperated here because we control it ourselves.
+    ///
+    /// This is an "implicit" input from elsewhere in the CL STF.
     ops: Vec<Op>,
 }
 

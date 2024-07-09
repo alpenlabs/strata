@@ -66,6 +66,7 @@ impl L1Tx {
 }
 
 /// Describes an L1 block and associated data that we need to keep around.
+// TODO should we include the block index here?
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct L1BlockManifest {
     /// Block hash/ID, kept here so we don't have to be aware of the hash function
@@ -89,10 +90,16 @@ impl L1BlockManifest {
             txs_root,
         }
     }
+
     pub fn block_hash(&self) -> Buf32 {
         self.blockid
     }
 
+    pub fn header(&self) -> &[u8] {
+        &self.header
+    }
+
+    /// Witness transactions root.
     pub fn txs_root(&self) -> Buf32 {
         self.txs_root
     }

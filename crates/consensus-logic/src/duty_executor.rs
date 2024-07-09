@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::{thread, time};
 
+use alpen_vertex_state::exec_update::{ExecUpdate, UpdateInput, UpdateOutput};
 use borsh::{BorshDeserialize, BorshSerialize};
 use tokio::sync::broadcast;
 use tracing::*;
@@ -255,7 +256,7 @@ fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
 
     // TODO Pull data from CSM state that we've observed from L1, including new
     // headers or any headers needed to perform a reorg if necessary.
-    let l1_seg = L1Segment::new(Vec::new(), Vec::new());
+    let l1_seg = L1Segment::new(Vec::new());
 
     // Wait 2 seconds for the block to be finished.
     // TODO Pull data from state about the new safe L1 hash, prev state roots,
@@ -268,9 +269,11 @@ fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     };
     trace!(%slot, "finished EL payload job");
 
-    // TODO improve how we assemble the exec segment, since this is bodging out
+    // TODO correctly assemble the exec segment, since this is bodging out how
     // the inputs/outputs should be structured
-    let exec_seg = ExecSegment::new(payload_data.el_payload().to_owned());
+    let eui = UpdateInput::new(slot, Buf32::zero(), payload_data.el_payload().to_vec());
+    let exec_update = ExecUpdate::new(eui, UpdateOutput::new_from_state(Buf32::zero()));
+    let exec_seg = ExecSegment::new(exec_update);
 
     // Assemble the body and the header template.
     let body = L2BlockBody::new(l1_seg, exec_seg);

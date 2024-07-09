@@ -57,6 +57,15 @@ impl L1HeaderRecord {
     }
 }
 
+impl From<&alpen_vertex_primitives::l1::L1BlockManifest> for L1HeaderRecord {
+    fn from(value: &alpen_vertex_primitives::l1::L1BlockManifest) -> Self {
+        Self {
+            buf: value.header().to_vec(),
+            wtxs_root: value.txs_root(),
+        }
+    }
+}
+
 impl<'a> Arbitrary<'a> for L1HeaderRecord {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         // Bitcoin headers are always 80 bytes, so we generate it like that.

@@ -3,10 +3,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 
 use alpen_vertex_primitives::prelude::*;
 
-use crate::{exec_update, id::L2BlockId, l1};
-
-#[cfg(test)]
-use crate::block_template;
+use crate::{block_template, exec_update, id::L2BlockId, l1};
 
 /// Full contents of the bare L2 block.
 #[derive(Clone, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
@@ -39,7 +36,6 @@ impl L2Block {
 
 /// Careful impl that makes the header consistent with the body.  But the prev
 /// block is always 0 and the state root is random.
-#[cfg(test)]
 impl<'a> Arbitrary<'a> for L2Block {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         let body = L2BlockBody::arbitrary(u)?;
@@ -155,6 +151,10 @@ pub struct L1Segment {
 impl L1Segment {
     pub fn new(new_payloads: Vec<l1::L1HeaderPayload>) -> Self {
         Self { new_payloads }
+    }
+
+    pub fn new_empty() -> Self {
+        Self::new(Vec::new())
     }
 }
 

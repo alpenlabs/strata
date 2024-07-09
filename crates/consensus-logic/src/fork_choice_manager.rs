@@ -173,9 +173,12 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
             }
 
             // Try to execute the payload, seeing if *that's* valid.
+            // TODO take implicit input produced by the CL STF and include that in the payload data
+            // TODO include the full exec update input from the CL block
             let exec_hash = block.header().exec_payload_hash();
             let exec_seg = block.exec_segment();
-            let eng_payload = ExecPayloadData::new_simple(exec_seg.payload().to_vec());
+            let dummy_payload = exec_seg.update().input().extra_payload();
+            let eng_payload = ExecPayloadData::new_simple(dummy_payload.to_vec());
             debug!(?blkid, ?exec_hash, "submitting execution payload");
             let res = engine.submit_payload(eng_payload)?;
 

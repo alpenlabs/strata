@@ -3,31 +3,54 @@ use tracing::*;
 use alpen_vertex_db::{
     errors::DbError,
     traits::{
-        ChainstateStore, ClientStateProvider, ClientStateStore, Database, L2DataProvider,
-        L2DataStore,
+        ChainstateStore, ClientStateProvider, ClientStateStore, Database, L1DataProvider,
+        L2DataProvider, L2DataStore,
     },
 };
 use alpen_vertex_primitives::{
     buf::{Buf32, Buf64},
     params::Params,
 };
-use alpen_vertex_state::prelude::*;
 use alpen_vertex_state::{
     block::{ExecSegment, L1Segment},
     block_template,
     chain_state::ChainState,
     client_state::ClientState,
+    exec_env::ExecEnvState,
+    exec_update::{self, ExecUpdate, UpdateInput, UpdateOutput},
+    l1::L1HeaderRecord,
 };
+use alpen_vertex_state::{chain_state::L1ViewState, prelude::*};
 
-/// Inserts approprate records into the database to prepare it for syncing the rollup.
+/// Inserts approprate records into the database to prepare it for syncing the
+/// rollup.  Requires that the horizon block header is present in the database.
 pub fn init_genesis_states<D: Database>(params: &Params, database: &D) -> anyhow::Result<()> {
     debug!("preparing database genesis state!");
 
+    let horizon_blk_height = params.rollup.l1_start_block_height;
+
+    // Create a dummy exec state that we can build the rest of the genesis block
+    // around and insert into the genesis state.
+    // TODO this might need to talk to the EL to do the genesus setup *properly*
+    let geui = UpdateInput::new(0, Buf32::zero(), Vec::new());
+    let gees = ExecEnvState::from_base_input(geui.clone(), Buf32::zero());
+    let genesis_ee_state = Buf32::zero();
+    let geu = ExecUpdate::new(geui.clone(), UpdateOutput::new_from_state(genesis_ee_state));
+
     // Build the genesis block and genesis consensus states.
-    let gblock = make_genesis_block(params);
+    let gblock = make_genesis_block(params, geu);
     let genesis_blkid = gblock.header().get_blockid();
     trace!(?genesis_blkid, "created genesis block");
-    let gchstate = ChainState::from_genesis_blkid(genesis_blkid);
+
+    // Fetch the horizon L1 block to construct the genesis L1 segment.
+    let l1_prov = database.l1_provider();
+    let horizon_blkmf = l1_prov
+        .get_block_manifest(horizon_blk_height)?
+        .ok_or(anyhow::anyhow!("missing L1 horizon block manifest"))?;
+    let horizon_blk_rec = L1HeaderRecord::from(&horizon_blkmf);
+    let l1vs = L1ViewState::new_at_horizon(horizon_blk_height, horizon_blk_rec);
+
+    let gchstate = ChainState::from_genesis(genesis_blkid, l1vs, gees);
     let gclstate = make_genesis_client_state(&gblock, &gchstate, params);
 
     // Now insert things into the database.
@@ -42,12 +65,12 @@ pub fn init_genesis_states<D: Database>(params: &Params, database: &D) -> anyhow
     Ok(())
 }
 
-fn make_genesis_block(params: &Params) -> L2Block {
-    // TODO maybe fill in with things since the genesis height?
-    let l1_seg = L1Segment::new(Vec::new(), Vec::new());
+fn make_genesis_block(params: &Params, genesis_update: ExecUpdate) -> L2Block {
+    // This has to be empty since everyone should have an unambiguous view of the genesis block.
+    let l1_seg = L1Segment::new_empty();
 
     // TODO this is a total stub, we have to fill it in with something
-    let exec_seg = ExecSegment::new(Vec::new());
+    let exec_seg = ExecSegment::new(genesis_update);
 
     let body = L2BlockBody::new(l1_seg, exec_seg);
 
