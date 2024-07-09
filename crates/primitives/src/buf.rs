@@ -9,7 +9,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use reth_primitives::alloy_primitives::FixedBytes;
 
 // 20-byte buf
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct Buf20(pub FixedBytes<20>);
 
 impl Buf20 {
@@ -21,6 +21,26 @@ impl Buf20 {
 impl From<[u8; 20]> for Buf20 {
     fn from(value: [u8; 20]) -> Self {
         Self(FixedBytes::from(value))
+    }
+}
+
+impl fmt::Debug for Buf20 {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut buf = [0; 40];
+        hex::encode_to_slice(self.0, &mut buf).expect("buf: enc hex");
+        f.write_str(unsafe { str::from_utf8_unchecked(&buf) })
+    }
+}
+
+impl fmt::Display for Buf20 {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut buf = [0; 6];
+        hex::encode_to_slice(&self.0[..3], &mut buf).expect("buf: enc hex");
+        f.write_str(unsafe { str::from_utf8_unchecked(&buf) })?;
+        f.write_str("..")?;
+        hex::encode_to_slice(&self.0[17..], &mut buf).expect("buf: enc hex");
+        f.write_str(unsafe { str::from_utf8_unchecked(&buf) })?;
+        Ok(())
     }
 }
 
@@ -39,6 +59,7 @@ impl From<[u8; 32]> for Buf32 {
         Self(FixedBytes::from(value))
     }
 }
+
 impl From<Buf32> for FixedBytes<32> {
     fn from(value: Buf32) -> Self {
         value.0
@@ -65,13 +86,33 @@ impl fmt::Debug for Buf32 {
     }
 }
 
+impl fmt::Display for Buf32 {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut buf = [0; 6];
+        hex::encode_to_slice(&self.0[..3], &mut buf).expect("buf: enc hex");
+        f.write_str(unsafe { str::from_utf8_unchecked(&buf) })?;
+        f.write_str("..")?;
+        hex::encode_to_slice(&self.0[29..], &mut buf).expect("buf: enc hex");
+        f.write_str(unsafe { str::from_utf8_unchecked(&buf) })?;
+        Ok(())
+    }
+}
+
 // 64-byte buf, useful for schnorr signatures
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct Buf64(pub FixedBytes<64>);
 
 impl Buf64 {
     pub fn zero() -> Self {
         Self([0; 64].into())
+    }
+}
+
+impl fmt::Debug for Buf64 {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut buf = [0; 128];
+        hex::encode_to_slice(self.0, &mut buf).expect("buf: enc hex");
+        f.write_str(unsafe { str::from_utf8_unchecked(&buf) })
     }
 }
 
