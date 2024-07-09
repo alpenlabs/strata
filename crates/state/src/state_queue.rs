@@ -6,9 +6,10 @@
 //! *not* use `VecDeque` internally, as it's designed around being easily
 //! serializable.
 
+use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
-#[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
 pub struct StateQueue<T> {
     /// The front of the queue that we take entries out of.
     base_idx: u64,

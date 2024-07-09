@@ -5,7 +5,7 @@
 
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use crate::{block::L2BlockId, chain_state::ChainState, l1::L1BlockId};
+use crate::{chain_state::ChainState, l1::L1BlockId};
 
 #[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
 pub enum StateOp {

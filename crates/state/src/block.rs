@@ -1,41 +1,15 @@
-use std::{
-    fmt::{self, Debug},
-    hash::BuildHasherDefault,
-};
-
-use alpen_vertex_primitives::l1::L1Tx;
-use alpen_vertex_primitives::prelude::*;
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use crate::l1::L1HeaderPayload;
+use alpen_vertex_primitives::prelude::*;
 
-/// ID of an L2 block, usually the hash of its root header.
-#[derive(
-    Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Arbitrary, BorshSerialize, BorshDeserialize,
-)]
-pub struct L2BlockId(Buf32);
+use crate::{exec_update, id::L2BlockId, l1};
 
-impl From<Buf32> for L2BlockId {
-    fn from(value: Buf32) -> Self {
-        Self(value)
-    }
-}
-
-impl From<L2BlockId> for Buf32 {
-    fn from(value: L2BlockId) -> Self {
-        value.0
-    }
-}
-
-impl fmt::Debug for L2BlockId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Debug::fmt(&self.0, f)
-    }
-}
+#[cfg(test)]
+use crate::block_template;
 
 /// Full contents of the bare L2 block.
-#[derive(Clone, Debug, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
+#[derive(Clone, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
 pub struct L2Block {
     /// Header that links the block into the L2 block chain and carries the
     /// block's credential from a sequencer.
@@ -63,8 +37,24 @@ impl L2Block {
     }
 }
 
+/// Careful impl that makes the header consistent with the body.  But the prev
+/// block is always 0 and the state root is random.
+#[cfg(test)]
+impl<'a> Arbitrary<'a> for L2Block {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let body = L2BlockBody::arbitrary(u)?;
+        let idx = u64::arbitrary(u)?;
+        let ts = u64::arbitrary(u)?;
+        let prev = L2BlockId::from(Buf32::zero());
+        let sr = Buf32::arbitrary(u)?;
+        let tmplt = block_template::create_header_template(idx, ts, prev, &body, sr);
+        let header = tmplt.complete_with(Buf64::arbitrary(u)?);
+        Ok(Self::new(header, body))
+    }
+}
+
 /// Block header that forms the chain we use to reach consensus.
-#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize, Arbitrary)]
+#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
 pub struct L2BlockHeader {
     /// Block index, obviously.
     pub(crate) block_idx: u64,
@@ -130,7 +120,7 @@ impl L2BlockHeader {
 }
 
 /// Contains the additional payloads within the L2 block.
-#[derive(Clone, Debug,PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
+#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize)]
 pub struct L2BlockBody {
     l1_segment: L1Segment,
     exec_segment: ExecSegment,
@@ -155,48 +145,39 @@ impl L2BlockBody {
 
 /// Container for additional messages that we've observed from the L1, if there
 /// are any.
-#[derive(Clone, Debug,PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
+#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize)]
 pub struct L1Segment {
     /// New headers that we've seen from L1 that we didn't see in the previous
     /// L2 block.
-    new_l1_header: Vec<L1HeaderPayload>,
-
-    /// Deposit initiation transactions.
-    deposits: Vec<L1Tx>,
+    new_payloads: Vec<l1::L1HeaderPayload>,
 }
 
 impl L1Segment {
-    pub fn new(new_l1_header: Vec<L1HeaderPayload>, deposits: Vec<L1Tx>) -> Self {
-        Self {
-            new_l1_header,
-            deposits,
-        }
+    pub fn new(new_payloads: Vec<l1::L1HeaderPayload>) -> Self {
+        Self { new_payloads }
     }
 }
 
-/// Information relating to the EL data.
-#[derive(Clone, Debug, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
+/// Information relating to how to update the execution layer.
+///
+/// Right now this just contains a single execution update since we only have a
+/// single execution environment in our execution layer.
+#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize)]
 pub struct ExecSegment {
-    /// Header of the EL data.
-    el_payload: Vec<u8>,
+    /// Update payload for the single execution environment.
+    update: exec_update::ExecUpdate,
 }
 
 impl ExecSegment {
-    pub fn new(el_payload: Vec<u8>) -> Self {
-        Self { el_payload }
+    pub fn new(update: exec_update::ExecUpdate) -> Self {
+        Self { update }
     }
 
-    pub fn payload(&self) -> &[u8] {
-        &self.el_payload
+    /// The EE update payload.
+    ///
+    /// This might be replaced with a totally different scheme if we have
+    /// multiple EEs.
+    pub fn update(&self) -> &exec_update::ExecUpdate {
+        &self.update
     }
-}
-
-/// Data emitted by EL exec for a withdraw request.
-#[derive(Clone, Debug)]
-pub struct WithdrawData {
-    /// Amount in L1 native asset.  For Bitcoin this is sats.
-    amt: u64,
-
-    /// Schnorr pubkey for the taproot output we're going to generate.
-    dest_addr: Buf64,
 }
