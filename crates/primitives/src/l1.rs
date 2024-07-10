@@ -1,3 +1,5 @@
+use std::fmt;
+
 use arbitrary::Arbitrary;
 use bitcoin::hashes::Hash;
 use bitcoin::{consensus::serialize, Block};
@@ -118,5 +120,40 @@ impl From<Block> for L1BlockManifest {
             txs_root: Buf32(root.into()),
             header,
         }
+    }
+}
+
+/// L1 output reference.
+#[derive(
+    Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Arbitrary, BorshDeserialize, BorshSerialize,
+)]
+pub struct OutputRef {
+    txid: Buf32,
+    outidx: u16,
+}
+
+impl OutputRef {
+    pub fn new(txid: Buf32, outidx: u16) -> Self {
+        Self { txid, outidx }
+    }
+
+    pub fn txid(&self) -> &Buf32 {
+        &self.txid
+    }
+
+    pub fn outidx(&self) -> u16 {
+        self.outidx
+    }
+}
+
+impl Into<(Buf32, u16)> for OutputRef {
+    fn into(self) -> (Buf32, u16) {
+        (self.txid, self.outidx)
+    }
+}
+
+impl fmt::Debug for OutputRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_fmt(format_args!("{:?}:{}", self.txid, self.outidx))
     }
 }

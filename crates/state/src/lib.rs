@@ -1,3 +1,5 @@
+#![feature(is_sorted)] // TODO switch to using crate
+
 //! Rollup types relating to the consensus-layer state of the rollup.
 //!
 //! Types relating to the execution-layer state are kept generic, not
@@ -6,6 +8,7 @@
 pub mod block;
 pub mod block_template;
 pub mod bridge_ops;
+pub mod bridge_state;
 pub mod chain_state;
 pub mod client_state;
 pub mod da_blob;
