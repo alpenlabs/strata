@@ -5,11 +5,11 @@ use std::time::Duration;
 use anyhow::bail;
 use bitcoin::{Block, BlockHash};
 use tokio::sync::mpsc;
-use tracing::instrument::WithSubscriber;
 use tracing::*;
 
 use super::config::ReaderConfig;
 use super::messages::{BlockData, L1Event};
+use crate::btcio_status::{send_btcio_event, BtcioEvent};
 use crate::rpc::traits::L1Client;
 
 fn filter_interesting_txs(block: &Block) -> Vec<u32> {
@@ -125,8 +125,24 @@ pub async fn bitcoin_data_reader_task(
     event_tx: mpsc::Sender<L1Event>,
     cur_block_height: u64,
     config: Arc<ReaderConfig>,
+    l1_status_tx: mpsc::Sender<BtcioEvent>,
 ) {
-    if let Err(e) = do_reader_task(&client, &event_tx, cur_block_height, config).await {
+    if let Err(e) = do_reader_task(
+        &client,
+        &event_tx,
+        cur_block_height,
+        config,
+        l1_status_tx.clone(),
+    )
+    .await
+    {
+        if let Some(err) = e.downcast_ref::<reqwest::Error>() {
+            send_btcio_event(l1_status_tx.clone(), BtcioEvent::RpcError(err.to_string())).await;
+
+            if err.is_connect() {
+                send_btcio_event(l1_status_tx, BtcioEvent::RpcConnected(false)).await;
+            }
+        }
         error!(err = %e, "reader task exited");
     }
 }
@@ -136,8 +152,13 @@ async fn do_reader_task(
     event_tx: &mpsc::Sender<L1Event>,
     cur_block_height: u64,
     config: Arc<ReaderConfig>,
+    l1_status_tx: mpsc::Sender<BtcioEvent>,
 ) -> anyhow::Result<()> {
     info!(%cur_block_height, "started L1 reader task!");
+    // get blockchain info to check if we have connection or not
+    let _ = client.get_blockchain_info().await?;
+
+    send_btcio_event(l1_status_tx.clone(), BtcioEvent::RpcConnected(true)).await;
 
     let poll_dur = Duration::from_millis(config.client_poll_dur_ms as u64);
 
@@ -156,7 +177,7 @@ async fn do_reader_task(
         let cur_height = state.cur_height;
         let poll_span = debug_span!("l1poll", %cur_height);
 
-        match poll_for_new_blocks(client, &event_tx, &config, &mut state)
+        match poll_for_new_blocks(client, &event_tx, &config, &mut state, l1_status_tx.clone())
             .instrument(poll_span)
             .await
         {
@@ -205,8 +226,9 @@ async fn init_reader_state(
 async fn poll_for_new_blocks(
     client: &impl L1Client,
     event_tx: &mpsc::Sender<L1Event>,
-    config: &ReaderConfig,
+    _config: &ReaderConfig,
     state: &mut ReaderState,
+    l1_status_tx: mpsc::Sender<BtcioEvent>,
 ) -> anyhow::Result<()> {
     let chain_info = client.get_blockchain_info().await?;
     let client_height = chain_info.blocks;
@@ -225,6 +247,10 @@ async fn poll_for_new_blocks(
             if event_tx.send(revert_ev).await.is_err() {
                 warn!("unable to submit L1 reorg event, did persistence task exit?");
             }
+
+            send_btcio_event(l1_status_tx.clone(), BtcioEvent::CurHeight(pivot_height)).await;
+
+            send_btcio_event(l1_status_tx, BtcioEvent::CurTip(pivot_blkid.to_string())).await;
         }
     } else {
         // TODO make this case a bit more structured

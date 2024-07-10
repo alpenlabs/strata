@@ -6,10 +6,13 @@ use std::{
 use bitcoin::consensus::serialize;
 use bitcoin::hashes::Hash;
 use bitcoin::Block;
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::mpsc;
 use tracing::*;
 
-use alpen_vertex_btcio::{btcio_status::BtcioStatus, reader::messages::L1Event};
+use alpen_vertex_btcio::{
+    btcio_status::{blocking_send_btcio_event, BtcioEvent},
+    reader::messages::L1Event,
+};
 use alpen_vertex_db::traits::L1DataStore;
 use alpen_vertex_primitives::buf::Buf32;
 use alpen_vertex_primitives::l1::L1BlockManifest;
@@ -22,13 +25,13 @@ pub fn bitcoin_data_handler_task<L1D>(
     l1db: Arc<L1D>,
     csm_ctl: Arc<CsmController>,
     mut event_rx: mpsc::Receiver<L1Event>,
-    l1_status: Arc<RwLock<BtcioStatus>>
+    l1_status_tx: mpsc::Sender<BtcioEvent>,
 ) -> anyhow::Result<()>
 where
     L1D: L1DataStore + Sync + Send + 'static,
 {
     while let Some(event) = event_rx.blocking_recv() {
-        if let Err(e) = handle_event(event, l1db.as_ref(), csm_ctl.as_ref(), l1_status.clone()) {
+        if let Err(e) = handle_event(event, l1db.as_ref(), csm_ctl.as_ref(), l1_status_tx.clone()) {
             error!(err = %e, "failed to handle L1 event");
         }
     }
@@ -37,16 +40,15 @@ where
     Ok(())
 }
 
-fn handle_event<L1D>(event: L1Event, l1db: &L1D, csm_ctl: &CsmController, l1_status: Arc<RwLock<BtcioStatus>>) -> anyhow::Result<()>
+fn handle_event<L1D>(
+    event: L1Event,
+    l1db: &L1D,
+    csm_ctl: &CsmController,
+    l1_status_tx: mpsc::Sender<BtcioEvent>,
+) -> anyhow::Result<()>
 where
     L1D: L1DataStore + Sync + Send + 'static,
 {
-    let mut l1_status_writer = l1_status.blocking_write();
-    l1_status_writer.last_update = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_millis() as u64;
-
     match event {
         L1Event::RevertTo(revert_blk_num) => {
             // L1 reorgs will be handled in L2 STF, we just have to reflect
@@ -77,12 +79,22 @@ where
             l1db.put_block_data(blockdata.block_num(), manifest, l1txs)?;
             info!(%l1blkid, txs = %num_txs, "wrote L1 block manifest");
 
-            l1_status_writer.cur_tip_blkid = l1blkid.to_string();
-            l1_status_writer.cur_height = blockdata.block_num();
+            let _ = l1_status_tx.blocking_send(BtcioEvent::CurTip(l1blkid.to_string()));
+            let _ = l1_status_tx.blocking_send(BtcioEvent::CurHeight(blockdata.block_num()));
             // Write to sync event db.
             let blkid: Buf32 = blockdata.block().block_hash().into();
             let ev = SyncEvent::L1Block(blockdata.block_num(), blkid.into());
             csm_ctl.submit_event(ev)?;
+
+            blocking_send_btcio_event(
+                l1_status_tx,
+                BtcioEvent::LastUpdate(
+                    SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap()
+                        .as_millis() as u64,
+                ),
+            );
 
             Ok(())
         }

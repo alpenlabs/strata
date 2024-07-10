@@ -3,6 +3,8 @@
 use std::sync::Arc;
 
 use alpen_vertex_btcio::btcio_status::BtcioStatus;
+use alpen_vertex_db::traits::Database;
+use alpen_vertex_db::traits::L1DataProvider;
 use async_trait::async_trait;
 use jsonrpsee::{
     core::RpcResult,
@@ -19,7 +21,7 @@ use thiserror::Error;
 use tokio::sync::{oneshot, Mutex, RwLock};
 use tracing::*;
 
-use alpen_vertex_rpc_api::AlpenApiServer;
+use alpen_vertex_rpc_api::{AlpenApiServer, L1Status};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -63,23 +65,38 @@ impl Into<ErrorObjectOwned> for Error {
     }
 }
 
-pub struct AlpenRpcImpl {
+pub struct AlpenRpcImpl<D: Database + Send + Sync + 'static>
+where
+    <D as alpen_vertex_db::traits::Database>::L1Prov: Send + Sync + 'static,
+{
     l1_status: Arc<RwLock<BtcioStatus>>,
+    database: Arc<D>,
     // TODO
     stop_tx: Mutex<Option<oneshot::Sender<()>>>,
 }
 
-impl AlpenRpcImpl {
-    pub fn new(l1_status: Arc<RwLock<BtcioStatus>>,stop_tx: oneshot::Sender<()>) -> Self {
+impl<D: Database + Send + Sync + 'static> AlpenRpcImpl<D>
+where
+    <D as alpen_vertex_db::traits::Database>::L1Prov: Send + Sync + 'static,
+{
+    pub fn new(
+        l1_status: Arc<RwLock<BtcioStatus>>,
+        database: Arc<D>,
+        stop_tx: oneshot::Sender<()>,
+    ) -> Self {
         Self {
             l1_status,
+            database,
             stop_tx: Mutex::new(Some(stop_tx)),
         }
     }
 }
 
 #[async_trait]
-impl AlpenApiServer for AlpenRpcImpl {
+impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D>
+where
+    <D as alpen_vertex_db::traits::Database>::L1Prov: Send + Sync + 'static,
+{
     async fn protocol_version(&self) -> RpcResult<u64> {
         Ok(1)
     }
@@ -94,11 +111,30 @@ impl AlpenApiServer for AlpenRpcImpl {
         Ok(())
     }
 
-    async fn get_l1_status(&self) -> RpcResult<BtcioStatus> {
-        Ok(self.l1_status.read().await.clone())
+    async fn get_l1_status(&self) -> RpcResult<L1Status> {
+        let btcio_status = self.l1_status.read().await.clone();
+
+        Ok(L1Status {
+            bitcoin_rpc_connected: btcio_status.bitcoin_rpc_connected,
+            cur_height: btcio_status.cur_height,
+            cur_tip_blkid: btcio_status.cur_tip_blkid,
+            last_update: btcio_status.last_update,
+            last_rpc_error: btcio_status.last_rpc_error,
+        })
     }
 
     async fn get_l1_connection_status(&self) -> RpcResult<bool> {
         Ok(self.l1_status.read().await.bitcoin_rpc_connected)
+    }
+
+    async fn get_l1_block_hash(&self, height: u64) -> RpcResult<String> {
+        let block_manifest = self
+            .database
+            .l1_provider()
+            .get_block_manifest(height)
+            .unwrap()
+            .unwrap();
+
+        Ok(format!("{:?}", block_manifest.block_hash()))
     }
 }

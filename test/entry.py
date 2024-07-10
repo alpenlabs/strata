@@ -21,8 +21,10 @@ def generate_seqkey() -> bytes:
     assert len(buf) == 32, "bad seqkey len"
     return buf
 
+
 def generate_blocks(
-    bitcoin_rpc: BitcoindClient, wait_dur, 
+    bitcoin_rpc: BitcoindClient,
+    wait_dur,
 ) -> Thread:
     addr = bitcoin_rpc.proxy.getnewaddress()
     thr = Thread(
@@ -36,9 +38,8 @@ def generate_blocks(
     thr.start()
     return thr
 
-def generate_task(
-    rpc: BitcoindClient, wait_dur, addr
-):
+
+def generate_task(rpc: BitcoindClient, wait_dur, addr):
     print("generating to address", addr)
     while True:
         time.sleep(wait_dur)
@@ -47,7 +48,6 @@ def generate_task(
             print("made block", blk)
         except:
             return
-
 
 
 class BitcoinFactory(flexitest.Factory):
@@ -83,7 +83,6 @@ class BitcoinFactory(flexitest.Factory):
             def _create_rpc():
                 url = "http://%s:%s@localhost:%s" % (BD_USERNAME, BD_PASSWORD, rpc_port)
                 return BitcoindClient(base_url=url)
-
 
             setattr(svc, "create_rpc", _create_rpc)
 

@@ -812,6 +812,7 @@ dependencies = [
  "bitcoin",
  "jsonrpsee",
  "parking_lot 0.12.3",
+ "reqwest",
  "reth-ipc",
  "reth-primitives",
  "reth-rpc-api",
