@@ -18,9 +18,9 @@ use alpen_vertex_state::{
     client_state::ClientState,
     exec_env::ExecEnvState,
     exec_update::{self, ExecUpdate, UpdateInput, UpdateOutput},
-    l1::L1HeaderRecord,
+    l1::{L1HeaderRecord, L1ViewState},
+    prelude::*,
 };
-use alpen_vertex_state::{chain_state::L1ViewState, prelude::*};
 
 /// Inserts approprate records into the database to prepare it for syncing the
 /// rollup.  Requires that the horizon block header is present in the database.
