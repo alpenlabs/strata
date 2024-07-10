@@ -1,34 +1,50 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use alpen_vertex_primitives::prelude::*;
-
-use crate::block::L2BlockId;
+use crate::{bridge_ops, bridge_state, exec_env, l1};
+use crate::{id::L2BlockId, state_queue::StateQueue};
 
 /// L2 blockchain state.  This is the state computed as a function of a
 /// pre-state and a block.
 ///
 /// This corresponds to the beacon chain state.
-#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
 pub struct ChainState {
     // all these fields are kinda dummies at the moment
     /// Accepted and valid L2 blocks that we might still reorg.  The last of
     /// these is the chain tip.
-    pub(super) accepted_l2_blocks: Vec<L2BlockId>,
+    pub(crate) accepted_l2_blocks: Vec<L2BlockId>,
 
-    /// Pending deposits that have been acknowledged in an EL block.
-    pub(super) pending_deposits: Vec<PendingDeposit>,
+    /// Rollup's view of L1 state.
+    pub(crate) l1_state: l1::L1ViewState,
 
     /// Pending withdrawals that have been initiated but haven't been sent out.
-    pub(super) pending_withdraws: Vec<PendingWithdraw>,
+    pub(crate) pending_withdraws: StateQueue<bridge_ops::WithdrawalIntent>,
+
+    /// Execution environment state.  This is just for the single EE we support
+    /// right now.
+    pub(crate) exec_env_state: exec_env::ExecEnvState,
+
+    /// Operator table we store registered operators for.
+    pub(crate) operator_table: bridge_state::OperatorTable,
+
+    /// Deposits table tracking each deposit's state.
+    pub(crate) deposits_table: bridge_state::DepositsTable,
 }
 
 impl ChainState {
-    pub fn from_genesis_blkid(genesis_blkid: L2BlockId) -> Self {
+    pub fn from_genesis(
+        genesis_blkid: L2BlockId,
+        l1_state: l1::L1ViewState,
+        exec_state: exec_env::ExecEnvState,
+    ) -> Self {
         Self {
             accepted_l2_blocks: vec![genesis_blkid],
-            pending_deposits: Vec::new(),
-            pending_withdraws: Vec::new(),
+            l1_state,
+            pending_withdraws: StateQueue::new_empty(),
+            exec_env_state: exec_state,
+            operator_table: bridge_state::OperatorTable::new_empty(),
+            deposits_table: bridge_state::DepositsTable::new_empty(),
         }
     }
 
@@ -40,28 +56,11 @@ impl ChainState {
     }
 }
 
-/// Transfer from L1 into L2.
-#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
-pub struct PendingDeposit {
-    /// Deposit index.
-    idx: u64,
-
-    /// Amount in L1 native asset.  For Bitcoin this is sats.
-    amt: u64,
-
-    /// Destination data, presumably an address, to be interpreted by EL logic.
-    dest: Vec<u8>,
-}
-
-/// Transfer from L2 back to L1.
-#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
-pub struct PendingWithdraw {
-    /// Withdraw index.
-    idx: u64,
-
-    /// Amount in L1 native asset.  For Bitcoin this is sats.
-    amt: u64,
-
-    /// Schnorr pubkey for the taproot output we're going to generate.
-    dest: Buf64,
+impl<'a> Arbitrary<'a> for ChainState {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let genesis_blkid = L2BlockId::arbitrary(u)?;
+        let l1_state = l1::L1ViewState::arbitrary(u)?;
+        let exec_state = exec_env::ExecEnvState::arbitrary(u)?;
+        Ok(Self::from_genesis(genesis_blkid, l1_state, exec_state))
+    }
 }

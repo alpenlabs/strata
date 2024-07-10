@@ -1,7 +1,7 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use crate::{block::L2BlockId, l1::L1BlockId};
+use crate::{id::L2BlockId, l1::L1BlockId};
 
 /// Sync event that updates our consensus state.
 #[derive(Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize)]

@@ -13,3 +13,4 @@ arbitrary = { workspace = true }
 borsh = { workspace = true }
 digest = { workspace = true }
 sha2 = { workspace = true }
+num_enum = { workspace = true }

@@ -1,3 +1,5 @@
+use std::fmt;
+
 use arbitrary::Arbitrary;
 use bitcoin::hashes::Hash;
 use bitcoin::{consensus::serialize, Block};
@@ -7,7 +9,19 @@ use crate::buf::Buf32;
 
 /// Reference to a transaction in a block.  This is the block index and the
 /// position of the transaction in the block.
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(
+    Copy,
+    Clone,
+    Debug,
+    Hash,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Arbitrary,
+    BorshDeserialize,
+    BorshSerialize,
+)]
 pub struct L1TxRef(u64, u32);
 
 impl Into<(u64, u32)> for L1TxRef {
@@ -24,7 +38,7 @@ impl From<(u64, u32)> for L1TxRef {
 
 /// Merkle proof for a TXID within a block.
 // TODO rework this, make it possible to generate proofs, etc.
-#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
+#[derive(Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize)]
 pub struct L1TxProof {
     position: u32,
     cohashes: Vec<Buf32>,
@@ -66,6 +80,7 @@ impl L1Tx {
 }
 
 /// Describes an L1 block and associated data that we need to keep around.
+// TODO should we include the block index here?
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct L1BlockManifest {
     /// Block hash/ID, kept here so we don't have to be aware of the hash function
@@ -89,10 +104,16 @@ impl L1BlockManifest {
             txs_root,
         }
     }
+
     pub fn block_hash(&self) -> Buf32 {
         self.blockid
     }
 
+    pub fn header(&self) -> &[u8] {
+        &self.header
+    }
+
+    /// Witness transactions root.
     pub fn txs_root(&self) -> Buf32 {
         self.txs_root
     }
@@ -111,5 +132,40 @@ impl From<Block> for L1BlockManifest {
             txs_root: Buf32(root.into()),
             header,
         }
+    }
+}
+
+/// L1 output reference.
+#[derive(
+    Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Arbitrary, BorshDeserialize, BorshSerialize,
+)]
+pub struct OutputRef {
+    txid: Buf32,
+    outidx: u16,
+}
+
+impl OutputRef {
+    pub fn new(txid: Buf32, outidx: u16) -> Self {
+        Self { txid, outidx }
+    }
+
+    pub fn txid(&self) -> &Buf32 {
+        &self.txid
+    }
+
+    pub fn outidx(&self) -> u16 {
+        self.outidx
+    }
+}
+
+impl Into<(Buf32, u16)> for OutputRef {
+    fn into(self) -> (Buf32, u16) {
+        (self.txid, self.outidx)
+    }
+}
+
+impl fmt::Debug for OutputRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_fmt(format_args!("{:?}:{}", self.txid, self.outidx))
     }
 }

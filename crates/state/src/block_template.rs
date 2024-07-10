@@ -7,7 +7,8 @@ use alpen_vertex_primitives::{
     hash,
 };
 
-use crate::block::{L2BlockBody, L2BlockHeader, L2BlockId};
+use crate::block::{L2BlockBody, L2BlockHeader};
+use crate::id::L2BlockId;
 
 #[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
 pub struct BlockHeaderTemplate {

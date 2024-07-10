@@ -15,9 +15,9 @@ use alpen_vertex_db::traits::{
 use alpen_vertex_evmctl::engine::ExecEngineCtl;
 use alpen_vertex_evmctl::messages::ExecPayloadData;
 use alpen_vertex_primitives::params::Params;
-use alpen_vertex_state::block::{L2Block, L2BlockId};
 use alpen_vertex_state::client_state::ClientState;
 use alpen_vertex_state::operation::SyncAction;
+use alpen_vertex_state::prelude::*;
 use alpen_vertex_state::sync_event::SyncEvent;
 
 use crate::ctl::CsmController;
@@ -173,9 +173,12 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
             }
 
             // Try to execute the payload, seeing if *that's* valid.
+            // TODO take implicit input produced by the CL STF and include that in the payload data
+            // TODO include the full exec update input from the CL block
             let exec_hash = block.header().exec_payload_hash();
             let exec_seg = block.exec_segment();
-            let eng_payload = ExecPayloadData::new_simple(exec_seg.payload().to_vec());
+            let dummy_payload = exec_seg.update().input().extra_payload();
+            let eng_payload = ExecPayloadData::new_simple(dummy_payload.to_vec());
             debug!(?blkid, ?exec_hash, "submitting execution payload");
             let res = engine.submit_payload(eng_payload)?;
 

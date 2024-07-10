@@ -1,7 +1,7 @@
 use alpen_vertex_evmctl::errors::EngineError;
 use thiserror::Error;
 
-use alpen_vertex_state::block::L2BlockId;
+use alpen_vertex_state::id::L2BlockId;
 use alpen_vertex_state::l1::L1BlockId;
 
 #[derive(Debug, Error)]

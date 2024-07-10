@@ -9,7 +9,7 @@ use std::collections::*;
 use std::sync::Mutex;
 use std::time;
 
-use alpen_vertex_state::block::*;
+use alpen_vertex_state::prelude::*;
 
 use crate::engine::*;
 use crate::errors::*;

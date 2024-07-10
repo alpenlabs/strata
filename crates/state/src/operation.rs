@@ -4,8 +4,8 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use crate::block::L2BlockId;
 use crate::client_state::ClientState;
+use crate::id::L2BlockId;
 use crate::l1::L1BlockId;
 
 /// Output of a consensus state transition.  Both the consensus state writes and

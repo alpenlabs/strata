@@ -3,7 +3,7 @@
 use std::collections::*;
 
 use alpen_vertex_primitives::buf::Buf32;
-use alpen_vertex_state::block::{L2BlockHeader, L2BlockId};
+use alpen_vertex_state::prelude::*;
 
 use crate::errors::ChainTipError;
 
