@@ -26,7 +26,7 @@ pub struct OperatorEntry {
     wallet_pk: Buf32,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
 pub struct OperatorTable {
     /// Next unassigned operator index.
     next_idx: u32,
@@ -38,6 +38,13 @@ pub struct OperatorTable {
 }
 
 impl OperatorTable {
+    pub fn new_empty() -> Self {
+        Self {
+            next_idx: 0,
+            operators: Vec::new(),
+        }
+    }
+
     /// Sanity checks the operator table for sensibility.
     fn sanity_check(&self) {
         if !self.operators.is_sorted_by_key(|e| e.idx) {
@@ -74,14 +81,21 @@ pub struct DepositsTable {
 }
 
 impl DepositsTable {
+    pub fn new_empty() -> Self {
+        Self {
+            next_idx: 0,
+            deposits: Vec::new(),
+        }
+    }
+
     /// Sanity checks the operator table for sensibility.
     fn sanity_check(&self) {
-        if !self.deposits.is_sorted_by_key(|e| e.idx) {
+        if !self.deposits.is_sorted_by_key(|e| e.deposit_idx) {
             panic!("bridge_state: deposits list not sorted");
         }
 
         if let Some(e) = self.deposits.last() {
-            if self.next_idx <= e.idx {
+            if self.next_idx <= e.deposit_idx {
                 panic!("bridge_state: deposits next_idx before last entry");
             }
         }
@@ -90,18 +104,18 @@ impl DepositsTable {
     /// Gets a deposit from the table by its idx.
     ///
     /// Does a binary search.
-    pub fn get_deposit(&self, idx: u32) -> Option<&OperatorEntry> {
-        self.operators
-            .binary_search_by_key(&idx, |e| e.idx)
+    pub fn get_deposit(&self, idx: u32) -> Option<&DepositEntry> {
+        self.deposits
+            .binary_search_by_key(&idx, |e| e.deposit_idx)
             .ok()
-            .map(|i| &self.operators[i])
+            .map(|i| &self.deposits[i])
     }
 }
 
 /// Container for the state machine of a deposit factory.
 #[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
 pub struct DepositEntry {
-    deposit_idx: u64,
+    deposit_idx: u32,
 
     /// List of notary operators, by their indexes.
     // TODO convert this to a windowed bitmap or something
