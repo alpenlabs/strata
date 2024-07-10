@@ -116,6 +116,10 @@ impl SeqDataProvider for SeqDb {
         self.get_last_idx::<SequencerBlobIdSchema>()
     }
 
+    fn get_last_txn_idx(&self) -> DbResult<Option<u64>> {
+        self.get_last_idx::<SequencerL1TxnSchema>()
+    }
+
     fn get_txidx_for_blob(&self, blobid: Buf32) -> DbResult<Option<u64>> {
         Ok(self.db.get::<SequencerBlobIdTxnIdxSchema>(&blobid)?)
     }
@@ -404,5 +408,30 @@ mod tests {
         let result = seq_db.get_blobid_for_blob_idx(1);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), None);
+    }
+
+    #[test]
+    fn test_get_last_txn_idx_none() {
+        let db = setup_db();
+        let seq_db = SeqDb::new(db.clone());
+
+        let result = seq_db.get_last_txn_idx().unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_get_last_txn_idx_some() {
+        let db = setup_db();
+        let seq_db = SeqDb::new(db.clone());
+
+        let blob_hash = Buf32::from([0u8; 32]);
+        let blob = vec![1, 2, 3];
+        seq_db.put_blob(blob_hash, blob).unwrap();
+
+        let (ctxn, rtxn) = get_commit_reveal_txns();
+        seq_db.put_commit_reveal_txns(blob_hash, ctxn, rtxn);
+
+        let result = seq_db.get_last_txn_idx().unwrap();
+        assert_eq!(result, Some(2));
     }
 }

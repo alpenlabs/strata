@@ -266,8 +266,11 @@ pub trait SeqDataProvider {
     /// Get blob by its hash
     fn get_blob_by_id(&self, id: Buf32) -> DbResult<Option<Vec<u8>>>;
 
-    /// Get the last  blob idx
+    /// Get the last blob idx
     fn get_last_blob_idx(&self) -> DbResult<Option<u64>>;
+
+    /// Get the last txn idx
+    fn get_last_txn_idx(&self) -> DbResult<Option<u64>>;
 
     ///Get the reveal tx idx associated with blob idx
     fn get_txidx_for_blob(&self, blobid: Buf32) -> DbResult<Option<u64>>;
