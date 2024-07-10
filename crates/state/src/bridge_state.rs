@@ -3,12 +3,13 @@
 //! This just implements a very simple n-of-n multisig bridge.  It will be
 //! extended to a more sophisticated design when we have that specced out.
 
-use std::fmt;
-
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use alpen_vertex_primitives::{buf::Buf32, l1::OutputRef};
+use alpen_vertex_primitives::{
+    buf::Buf32,
+    l1::{self, OutputRef},
+};
 
 /// Global operator idx.
 pub type OperatorIdx = u32;
@@ -110,6 +111,16 @@ impl DepositsTable {
             .ok()
             .map(|i| &self.deposits[i])
     }
+
+    /// Gets a mut ref to a deposit from the table by its idx.
+    ///
+    /// Does a binary search.
+    pub fn get_deposit_mut(&mut self, idx: u32) -> Option<&mut DepositEntry> {
+        self.deposits
+            .binary_search_by_key(&idx, |e| e.deposit_idx)
+            .ok()
+            .map(|i| &mut self.deposits[i])
+    }
 }
 
 /// Container for the state machine of a deposit factory.
@@ -124,8 +135,29 @@ pub struct DepositEntry {
     /// Deposit amount, in the native asset.  For Bitcoin this is sats.
     amt: u64,
 
+    /// Refs to txs in the maturation queue that will update the deposit entry
+    /// when they mature.  This is here so that we don't have to scan a
+    /// potentially very large set of pending transactions to reason about the
+    /// state of the deposits.  This must be kept in sync when we do things
+    /// though.
+    pending_update_txs: Vec<l1::L1TxRef>,
+
     /// Deposit state.
     state: DepositState,
+}
+
+impl DepositEntry {
+    pub fn next_pending_update_tx(&self) -> Option<&l1::L1TxRef> {
+        self.pending_update_txs.first()
+    }
+
+    pub fn pop_next_pending_deposit(&mut self) -> Option<l1::L1TxRef> {
+        if !self.pending_update_txs.is_empty() {
+            Some(self.pending_update_txs.remove(0))
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]

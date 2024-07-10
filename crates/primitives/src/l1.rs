@@ -9,7 +9,19 @@ use crate::buf::Buf32;
 
 /// Reference to a transaction in a block.  This is the block index and the
 /// position of the transaction in the block.
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(
+    Copy,
+    Clone,
+    Debug,
+    Hash,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Arbitrary,
+    BorshDeserialize,
+    BorshSerialize,
+)]
 pub struct L1TxRef(u64, u32);
 
 impl Into<(u64, u32)> for L1TxRef {
@@ -26,7 +38,7 @@ impl From<(u64, u32)> for L1TxRef {
 
 /// Merkle proof for a TXID within a block.
 // TODO rework this, make it possible to generate proofs, etc.
-#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
+#[derive(Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize)]
 pub struct L1TxProof {
     position: u32,
     cohashes: Vec<Buf32>,

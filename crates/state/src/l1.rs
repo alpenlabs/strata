@@ -3,6 +3,8 @@ use borsh::{BorshDeserialize, BorshSerialize};
 
 use alpen_vertex_primitives::{l1, prelude::*};
 
+use crate::state_queue::StateQueue;
+
 /// ID of an L1 block, usually the hash of its header.
 #[derive(
     Copy,
@@ -86,8 +88,15 @@ pub struct L1HeaderPayload {
     /// Header record that contains the actual data.
     record: L1HeaderRecord,
 
-    /// Interesting txs included in this block.
-    interesting_txs: Vec<L1Tx>,
+    /// Txs related to deposits.
+    ///
+    /// MUST be sorted by tx index within block.
+    deposit_update_txs: Vec<DepositUpdateTx>,
+
+    /// Txs representing L1 DA.
+    ///
+    /// MUST be sorted by tx index within block.
+    da_txs: Vec<DaTx>,
 }
 
 impl L1HeaderPayload {
@@ -95,7 +104,8 @@ impl L1HeaderPayload {
         Self {
             idx,
             record,
-            interesting_txs: Vec::new(),
+            deposit_update_txs: Vec::new(),
+            da_txs: Vec::new(),
         }
     }
 
@@ -114,34 +124,130 @@ impl L1HeaderPayload {
     pub fn wtxs_root(&self) -> &Buf32 {
         self.record().wtxs_root()
     }
+}
 
-    pub fn interesting_txs(&self) -> &[L1Tx] {
-        &self.interesting_txs
+/// Describes state relating to the CL's view of L1.  Updated by entries in the
+/// L1 segment of CL blocks.
+#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
+pub struct L1ViewState {
+    /// The first block we decide we're able to look at.  This probably won't
+    /// change unless we want to do Bitcoin history expiry or something.
+    pub(crate) horizon_height: u64,
+
+    /// The "safe" L1 block.  This block is the last block inserted into the L1 MMR.
+    pub(crate) safe_block: L1HeaderRecord,
+
+    /// L1 blocks that might still be reorged.
+    pub(crate) maturation_queue: StateQueue<L1MaturationEntry>,
+    // TODO include L1 MMR state that we mature blocks into
+}
+
+impl L1ViewState {
+    pub fn new_at_horizon(horizon_height: u64, safe_block: L1HeaderRecord) -> Self {
+        Self {
+            horizon_height,
+            safe_block,
+            maturation_queue: StateQueue::new_at_index(horizon_height),
+        }
+    }
+
+    pub fn safe_block(&self) -> &L1HeaderRecord {
+        &self.safe_block
+    }
+
+    pub fn safe_height(&self) -> u64 {
+        self.maturation_queue.base_idx()
+    }
+
+    pub fn tip_height(&self) -> u64 {
+        self.maturation_queue.next_idx()
     }
 }
 
-/// Merkle proof for a TXID within a block.
-// TODO rework this, make it possible to generate proofs, etc.
-#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
-pub struct L1TxProof {
-    position: u32,
-    cohashes: Vec<Buf32>,
-}
-
-impl<'a> Arbitrary<'a> for L1TxProof {
+impl<'a> Arbitrary<'a> for L1ViewState {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        let pos = u32::arbitrary(u)?;
-        Ok(Self {
-            position: pos,
-            // TODO figure out how to generate these sensibly
-            cohashes: Vec::new(),
-        })
+        let blk = L1HeaderRecord::arbitrary(u)?;
+        Ok(Self::new_at_horizon(u64::arbitrary(u)?, blk))
     }
 }
 
-/// Tx body with a proof, including the witness data.
-#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize)]
-pub struct L1Tx {
-    proof: L1TxProof,
-    tx: Vec<u8>,
+/// Entry representing an L1 block that we've acknowledged seems to be on the
+/// longest chain but might still reorg.  We wait until the block is buried
+/// enough before accepting the block and acting on the interesting txs in it.
+///
+/// Height is implicit by its position in the maturation queue.
+#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
+pub struct L1MaturationEntry {
+    /// Header record that contains the important proof information.
+    record: L1HeaderRecord,
+
+    /// Txs related to deposits.
+    ///
+    /// MUST be sorted by tx index within block.
+    deposit_update_txs: Vec<DepositUpdateTx>,
+
+    /// Txs representing L1 DA.
+    ///
+    /// MUST be sorted by tx index within block.
+    da_txs: Vec<DaTx>,
+}
+
+impl L1MaturationEntry {
+    pub fn new(
+        record: L1HeaderRecord,
+        deposit_update_txs: Vec<DepositUpdateTx>,
+        da_txs: Vec<DaTx>,
+    ) -> Self {
+        Self {
+            record,
+            deposit_update_txs,
+            da_txs,
+        }
+    }
+
+    pub fn into_parts(self) -> (L1HeaderRecord, Vec<DepositUpdateTx>, Vec<DaTx>) {
+        (self.record, self.deposit_update_txs, self.da_txs)
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
+pub struct DepositUpdateTx {
+    /// The transaction in the block.
+    tx: l1::L1Tx,
+
+    /// The deposit ID that this corresponds to, so that we can update it when
+    /// we mature the L1 block.  A ref to this tx exists in `pending_update_txs`
+    /// in the `DepositEntry` structure in state.
+    deposit_idx: u32,
+}
+
+impl DepositUpdateTx {
+    pub fn new(tx: l1::L1Tx, deposit_idx: u32) -> Self {
+        Self { tx, deposit_idx }
+    }
+
+    pub fn tx(&self) -> &l1::L1Tx {
+        &self.tx
+    }
+
+    pub fn deposit_idx(&self) -> u32 {
+        self.deposit_idx
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
+pub struct DaTx {
+    // TODO other fields that we need to be able to identify the DA
+    /// The transaction in the block.
+    tx: l1::L1Tx,
+}
+
+impl DaTx {
+    pub fn new(tx: l1::L1Tx) -> Self {
+        Self { tx }
+    }
+
+    pub fn tx(&self) -> &l1::L1Tx {
+        &self.tx
+    }
 }

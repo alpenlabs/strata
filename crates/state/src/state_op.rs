@@ -5,18 +5,24 @@
 
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use crate::{chain_state::ChainState, l1::L1BlockId};
+use crate::chain_state::ChainState;
+use crate::l1;
 
 #[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
 pub enum StateOp {
     /// Replace the chain state with something completely different.
     Replace(Box<ChainState>),
 
-    /// Reverts L1 accepted height back to a previous height.
+    /// Reverts L1 accepted height back to a previous height, rolling back any
+    /// blocks that were there.
     RevertL1Height(u64),
 
-    /// Accepts a new L1 block.
-    AcceptL1Block(L1BlockId),
+    /// Accepts a new L1 block into the maturation queue.
+    AcceptL1Block(l1::L1MaturationEntry),
+
+    /// Matures the next L1 block, whose idx must match the one specified here
+    /// as a sanity check.
+    MatureL1Block(u64),
 }
 
 /// Collection of writes we're making to the state.
@@ -42,6 +48,8 @@ impl WriteBatch {
 // TODO reversiblity stuff?
 
 /// On a given in-memory chainstate, applies a write batch.
+///
+/// This must succeed.  Pancis if it does not.
 pub fn apply_write_batch_to_chainstate(
     mut chainstate: ChainState,
     batch: &WriteBatch,
@@ -55,6 +63,10 @@ pub fn apply_write_batch_to_chainstate(
             }
 
             StateOp::AcceptL1Block(new_blkid) => {
+                // TODO
+            }
+
+            StateOp::MatureL1Block(maturing_idx) => {
                 // TODO
             }
         }
