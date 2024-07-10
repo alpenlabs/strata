@@ -1,7 +1,6 @@
 //! Trait definitions for low level database interfaces.  This borrows some of
 //! its naming conventions from reth.
 
-use borsh::{BorshDeserialize, BorshSerialize};
 use std::sync::Arc;
 
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -245,11 +244,12 @@ pub trait SequencerDatabase {
 
 pub trait SeqDataStore {
     /// Store the blob. Also create and store appropriate blob idx -> blobid mapping.
-    /// Returns new blobidx, and panics if entry already exists
+    /// Returns new blobidx, and returns error if entry already exists
     fn put_blob(&self, blob_id: Buf32, blob: Vec<u8>) -> DbResult<u64>;
 
-    /// Also store blob_id, reveal_txn_idx. Everything happens atomically.
-    /// Should return the reveal txn idx
+    /// Store commit-reveal transactions, along with reveal txid -> blobid mapping, all of which
+    /// should happen atomically.
+    /// Returns the reveal txn idx
     fn put_commit_reveal_txns(
         &self,
         blobid: Buf32,
@@ -268,14 +268,14 @@ pub trait SeqDataProvider {
     /// Get blob by its hash
     fn get_blob_by_id(&self, id: Buf32) -> DbResult<Option<Vec<u8>>>;
 
-    /// Get the last inscription idx
-    fn get_last_txn_idx(&self) -> DbResult<Option<u64>>;
-
-    /// Get the last  blob idx
+    /// Get the last blob idx
     fn get_last_blob_idx(&self) -> DbResult<Option<u64>>;
 
+    /// Get the last txn idx
+    fn get_last_txn_idx(&self) -> DbResult<Option<u64>>;
+
     ///Get the reveal tx idx associated with blob idx
-    fn get_txidx_for_blob(&self, blobid: Buf32) -> DbResult<Option<u64>>;
+    fn get_reveal_txidx_for_blob(&self, blobid: Buf32) -> DbResult<Option<u64>>;
 
     /// Get the blob id for blob idx
     fn get_blobid_for_blob_idx(&self, blobidx: u64) -> DbResult<Option<Buf32>>;

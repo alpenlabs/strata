@@ -5,8 +5,8 @@
 use l2::schemas::{L2BlockHeightSchema, L2BlockSchema, L2BlockStatusSchema};
 use rockbound::{schema::ColumnFamilyName, Schema};
 use sequencer::schemas::{
-    SequencerBlobIdSchema, SequencerBlobIdTxnIdxSchema, SequencerBlobSchema, SequencerL1TxIdSchema,
-    SequencerL1TxnSchema,
+    SeqBlobIdSchema, SeqL1TxnSchema, SeqBIdRevTxnIdxSchema, SeqBlobSchema,
+    SeqL1TxIdSchema,
 };
 
 use crate::consensus_state::schemas::{ClientStateSchema, ClientUpdateOutputSchema};
@@ -40,11 +40,11 @@ pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
     L2BlockStatusSchema::COLUMN_FAMILY_NAME,
     L2BlockHeightSchema::COLUMN_FAMILY_NAME,
     // Sequencer db related schemas
-    SequencerL1TxnSchema::COLUMN_FAMILY_NAME,
-    SequencerL1TxIdSchema::COLUMN_FAMILY_NAME,
-    SequencerBlobSchema::COLUMN_FAMILY_NAME,
-    SequencerBlobIdSchema::COLUMN_FAMILY_NAME,
-    SequencerBlobIdTxnIdxSchema::COLUMN_FAMILY_NAME,
+    SeqL1TxnSchema::COLUMN_FAMILY_NAME,
+    SeqL1TxIdSchema::COLUMN_FAMILY_NAME,
+    SeqBlobSchema::COLUMN_FAMILY_NAME,
+    SeqBlobIdSchema::COLUMN_FAMILY_NAME,
+    SeqBIdRevTxnIdxSchema::COLUMN_FAMILY_NAME,
     // TODO add col families for other store types
 ];
 

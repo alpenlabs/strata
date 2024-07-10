@@ -10,7 +10,7 @@ use crate::{
 };
 
 use super::schemas::{
-    SequencerBlobIdSchema, SequencerBlobIdTxnIdxSchema, SequencerBlobSchema, SequencerL1TxnSchema,
+    SeqBlobIdSchema, SeqL1TxnSchema, SeqBIdRevTxnIdxSchema, SeqBlobSchema,
 };
 
 pub struct SeqDb {
@@ -44,19 +44,19 @@ impl SeqDb {
 
 impl SeqDataStore for SeqDb {
     fn put_blob(&self, blob_hash: Buf32, blob: Vec<u8>) -> DbResult<u64> {
-        if self.db.get::<SequencerBlobSchema>(&blob_hash)?.is_some() {
+        if self.db.get::<SeqBlobSchema>(&blob_hash)?.is_some() {
             return Err(DbError::Other(format!(
                 "Entry already exists for blobid {blob_hash:?}"
             )));
         }
-        let last_idx = self.get_last_idx::<SequencerBlobIdSchema>()?.unwrap_or(0);
+        let last_idx = self.get_last_idx::<SeqBlobIdSchema>()?.unwrap_or(0);
         let idx = last_idx + 1;
 
         let mut batch = SchemaBatch::new();
 
         // Atomically add the entries
-        batch.put::<SequencerBlobIdSchema>(&idx, &blob_hash)?;
-        batch.put::<SequencerBlobSchema>(&blob_hash, &blob)?;
+        batch.put::<SeqBlobIdSchema>(&idx, &blob_hash)?;
+        batch.put::<SeqBlobSchema>(&blob_hash, &blob)?;
 
         self.db.write_schemas(batch)?;
 
@@ -69,22 +69,22 @@ impl SeqDataStore for SeqDb {
         commit_txn: TxnWithStatus,
         reveal_txn: TxnWithStatus,
     ) -> DbResult<u64> {
-        if self.db.get::<SequencerBlobSchema>(&blobid)?.is_none() {
+        if self.db.get::<SeqBlobSchema>(&blobid)?.is_none() {
             return Err(DbError::Other(format!(
                 "Inexistent blobid {blobid:?} while storing commit reveal txn"
             )));
         }
 
-        let last_reveal_idx = self.get_last_idx::<SequencerL1TxnSchema>()?.unwrap_or(0);
+        let last_reveal_idx = self.get_last_idx::<SeqL1TxnSchema>()?.unwrap_or(0);
         let commit_idx = last_reveal_idx + 1;
         let reveal_idx = commit_idx + 1;
 
         let mut batch = SchemaBatch::new();
 
         // Atomically add entries
-        batch.put::<SequencerL1TxnSchema>(&commit_idx, &commit_txn)?;
-        batch.put::<SequencerL1TxnSchema>(&reveal_idx, &reveal_txn)?;
-        batch.put::<SequencerBlobIdTxnIdxSchema>(&blobid, &reveal_idx)?;
+        batch.put::<SeqL1TxnSchema>(&commit_idx, &commit_txn)?;
+        batch.put::<SeqL1TxnSchema>(&reveal_idx, &reveal_txn)?;
+        batch.put::<SeqBIdRevTxnIdxSchema>(&blobid, &reveal_idx)?;
 
         self.db.write_schemas(batch)?;
 
@@ -92,39 +92,39 @@ impl SeqDataStore for SeqDb {
     }
 
     fn update_txn(&self, txidx: u64, txn: TxnWithStatus) -> DbResult<()> {
-        if self.db.get::<SequencerL1TxnSchema>(&txidx)?.is_none() {
+        if self.db.get::<SeqL1TxnSchema>(&txidx)?.is_none() {
             return Err(DbError::Other(format!(
                 "Inexistent txn idx {txidx:?} while updating txn"
             )));
         }
-        self.db.put::<SequencerL1TxnSchema>(&txidx, &txn)?;
+        self.db.put::<SeqL1TxnSchema>(&txidx, &txn)?;
         Ok(())
     }
 }
 
 impl SeqDataProvider for SeqDb {
     fn get_l1_txn(&self, idx: u64) -> DbResult<Option<TxnWithStatus>> {
-        Ok(self.db.get::<SequencerL1TxnSchema>(&idx)?)
+        Ok(self.db.get::<SeqL1TxnSchema>(&idx)?)
     }
 
     fn get_blob_by_id(&self, id: Buf32) -> DbResult<Option<Vec<u8>>> {
-        Ok(self.db.get::<SequencerBlobSchema>(&id)?)
+        Ok(self.db.get::<SeqBlobSchema>(&id)?)
     }
 
     fn get_last_blob_idx(&self) -> DbResult<Option<u64>> {
-        self.get_last_idx::<SequencerBlobIdSchema>()
-    }
-
-    fn get_txidx_for_blob(&self, blobid: Buf32) -> DbResult<Option<u64>> {
-        Ok(self.db.get::<SequencerBlobIdTxnIdxSchema>(&blobid)?)
-    }
-
-    fn get_blobid_for_blob_idx(&self, blobidx: u64) -> DbResult<Option<Buf32>> {
-        Ok(self.db.get::<SequencerBlobIdSchema>(&blobidx)?)
+        self.get_last_idx::<SeqBlobIdSchema>()
     }
 
     fn get_last_txn_idx(&self) -> DbResult<Option<u64>> {
-        self.get_last_idx::<SequencerL1TxnSchema>()
+        self.get_last_idx::<SeqL1TxnSchema>()
+    }
+
+    fn get_reveal_txidx_for_blob(&self, blobid: Buf32) -> DbResult<Option<u64>> {
+        Ok(self.db.get::<SeqBIdRevTxnIdxSchema>(&blobid)?)
+    }
+
+    fn get_blobid_for_blob_idx(&self, blobidx: u64) -> DbResult<Option<Buf32>> {
+        Ok(self.db.get::<SeqBlobIdSchema>(&blobidx)?)
     }
 }
 
@@ -249,10 +249,7 @@ mod tests {
 
         let txn_idx = 1;
         let (txn, new_txn) = get_commit_reveal_txns();
-        seq_db
-            .db
-            .put::<SequencerL1TxnSchema>(&txn_idx, &txn)
-            .unwrap();
+        seq_db.db.put::<SeqL1TxnSchema>(&txn_idx, &txn).unwrap();
 
         let result = seq_db.update_txn(txn_idx, new_txn.clone());
 
@@ -285,10 +282,7 @@ mod tests {
 
         let txn_idx = 1;
         let (txn, _) = get_commit_reveal_txns();
-        seq_db
-            .db
-            .put::<SequencerL1TxnSchema>(&txn_idx, &txn)
-            .unwrap();
+        seq_db.db.put::<SeqL1TxnSchema>(&txn_idx, &txn).unwrap();
 
         let result = seq_db.get_l1_txn(txn_idx);
         assert!(result.is_ok());
@@ -407,5 +401,30 @@ mod tests {
         let result = seq_db.get_blobid_for_blob_idx(1);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), None);
+    }
+
+    #[test]
+    fn test_get_last_txn_idx_none() {
+        let db = setup_db();
+        let seq_db = SeqDb::new(db.clone());
+
+        let result = seq_db.get_last_txn_idx().unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_get_last_txn_idx_some() {
+        let db = setup_db();
+        let seq_db = SeqDb::new(db.clone());
+
+        let blob_hash = Buf32::from([0u8; 32]);
+        let blob = vec![1, 2, 3];
+        seq_db.put_blob(blob_hash, blob).unwrap();
+
+        let (ctxn, rtxn) = get_commit_reveal_txns();
+        seq_db.put_commit_reveal_txns(blob_hash, ctxn, rtxn);
+
+        let result = seq_db.get_last_txn_idx().unwrap();
+        assert_eq!(result, Some(2));
     }
 }

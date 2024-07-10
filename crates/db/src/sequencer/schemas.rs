@@ -7,25 +7,25 @@ use crate::impl_borsh_value_codec;
 
 define_table_with_default_codec!(
     /// A table to store L1 txns
-    (SequencerL1TxnSchema) u64 => TxnWithStatus
+    (SeqL1TxnSchema) u64 => TxnWithStatus
 );
 
 define_table_with_default_codec!(
     /// A table to store mapping of idx to L1 tx
-    (SequencerL1TxIdSchema) u64 => Buf32
+    (SeqL1TxIdSchema) u64 => Buf32
 );
 
 define_table_with_default_codec!(
     /// A table to store idx-> blobid mapping
-    (SequencerBlobIdSchema) u64 => Buf32
+    (SeqBlobIdSchema) u64 => Buf32
 );
 
 define_table_with_default_codec!(
     /// A table to store blobid -> blob mapping
-    (SequencerBlobSchema) Buf32 => Vec<u8>
+    (SeqBlobSchema) Buf32 => Vec<u8>
 );
 
 define_table_with_default_codec!(
     /// A table to store blobidx -> reveal tx idx
-    (SequencerBlobIdTxnIdxSchema) Buf32 => u64
+    (SeqBIdRevTxnIdxSchema) Buf32 => u64
 );
