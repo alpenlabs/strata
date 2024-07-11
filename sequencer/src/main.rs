@@ -86,7 +86,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let l1_db = Arc::new(alpen_vertex_db::L1Db::new(rbdb.clone()));
     let l2_db = Arc::new(alpen_vertex_db::stubs::l2::StubL2Db::new()); // FIXME stub
     let sync_ev_db = Arc::new(alpen_vertex_db::SyncEventDb::new(rbdb.clone()));
-    let cs_db = Arc::new(alpen_vertex_db::ConsensusStateDb::new(rbdb.clone()));
+    let cs_db = Arc::new(alpen_vertex_db::ClientStateDb::new(rbdb.clone()));
     let chst_db = Arc::new(alpen_vertex_db::stubs::chain_state::StubChainstateDb::new());
     let database = Arc::new(alpen_vertex_db::database::CommonDatabase::new(
         l1_db, l2_db, sync_ev_db, cs_db, chst_db,

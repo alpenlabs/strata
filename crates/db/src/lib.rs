@@ -8,11 +8,11 @@ use sequencer::schemas::{
     SeqBIdRevTxnIdxSchema, SeqBlobIdSchema, SeqBlobSchema, SeqL1TxIdSchema, SeqL1TxnSchema,
 };
 
-use crate::consensus_state::schemas::{ClientStateSchema, ClientUpdateOutputSchema};
+use crate::client_state::schemas::{ClientStateSchema, ClientUpdateOutputSchema};
 use crate::l1::schemas::{L1BlockSchema, MmrSchema, TxnSchema};
 use crate::sync_event::schemas::SyncEventSchema;
 
-pub mod consensus_state;
+pub mod client_state;
 pub mod database;
 pub mod l1;
 pub mod l2;
@@ -49,7 +49,7 @@ pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
 ];
 
 // Re-exports
-pub use consensus_state::db::ConsensusStateDb;
+pub use client_state::db::ClientStateDb;
 pub use l1::db::L1Db;
 pub use sequencer::db::SeqDb;
 pub use sync_event::db::SyncEventDb;
