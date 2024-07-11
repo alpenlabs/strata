@@ -44,8 +44,7 @@ impl L2DataStore for L2Db {
 
                 Ok::<_, anyhow::Error>(())
             })
-            .map_err(Into::<anyhow::Error>::into)
-            .map_err(Into::into)
+            .map_err(|err| anyhow::Error::from(err).into())
     }
 
     fn del_block_data(&self, id: L2BlockId) -> DbResult<bool> {
@@ -72,8 +71,7 @@ impl L2DataStore for L2Db {
 
                 Ok::<_, anyhow::Error>(true)
             })
-            .map_err(Into::<anyhow::Error>::into)
-            .map_err(Into::into)
+            .map_err(|err| anyhow::Error::from(err).into())
     }
 
     fn set_block_status(&self, id: L2BlockId, status: BlockStatus) -> DbResult<()> {
