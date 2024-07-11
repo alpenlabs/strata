@@ -73,7 +73,6 @@ reth-rpc-layer = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.
 reth-rpc-types = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
 reth-rpc-types-compat = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
 rockbound = { git = "https://github.com/alpenlabs/rockbound", rev = "d647fa31510dff0b" }
-rocksdb = "0.21"
 secp256k1 = "0.29.0"
 serde = "1.0"
 serde-hex = "0.1.0"

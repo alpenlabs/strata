@@ -17,6 +17,7 @@ use reth_rpc_types::engine::JwtSecret;
 use thiserror::Error;
 use tokio::sync::{broadcast, oneshot, RwLock};
 use tracing::*;
+use rockbound::rocksdb;
 
 use alpen_vertex_btcio::rpc::traits::L1Client;
 use alpen_vertex_common::logging;

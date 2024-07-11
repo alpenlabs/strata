@@ -7,6 +7,7 @@ use alpen_vertex_db::{
 };
 use arbitrary::{Arbitrary, Unstructured};
 use rand::Rng;
+use rockbound::rocksdb;
 use tempfile::TempDir;
 
 pub mod bitcoin;

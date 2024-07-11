@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
-use rockbound::{schema::KeyEncoder, SchemaBatch, OptimisticTransactionDB as DB};
-use rocksdb::ReadOptions;
+use rockbound::rocksdb::ReadOptions;
+use rockbound::schema::KeyEncoder;
+use rockbound::{CommonDB, OptimisticTransactionDB as DB, SchemaBatch};
 use tracing::*;
 
 use alpen_vertex_mmr::CompactMmr;
