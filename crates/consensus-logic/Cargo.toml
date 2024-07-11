@@ -20,3 +20,4 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 rand = { version = "*", features = ["getrandom"] }
+alpen-test-utils = { workspace = true }

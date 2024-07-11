@@ -115,6 +115,14 @@ impl L2BlockHeader {
     }
 }
 
+// TODO: add this behind a feature flag so that this can only be used for the testing purposes
+impl L2BlockHeader {
+    pub fn set_parent_and_idx(&mut self, parent: L2BlockId, idx: u64) {
+        self.prev_block = parent;
+        self.block_idx = idx;
+    }
+}
+
 /// Contains the additional payloads within the L2 block.
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize)]
 pub struct L2BlockBody {

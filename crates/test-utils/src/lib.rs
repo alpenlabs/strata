@@ -1,5 +1,10 @@
 use std::sync::Arc;
 
+use alpen_vertex_db::{
+    database::CommonDatabase,
+    stubs::{chain_state::StubChainstateDb, l2::StubL2Db},
+    ConsensusStateDb, L1Db, SyncEventDb,
+};
 use arbitrary::{Arbitrary, Unstructured};
 use rand::Rng;
 use tempfile::TempDir;
@@ -39,4 +44,18 @@ pub fn get_rocksdb_tmp_instance() -> anyhow::Result<Arc<rockbound::DB>> {
     )?;
 
     Ok(Arc::new(rbdb))
+}
+
+pub fn get_common_db(
+) -> Arc<CommonDatabase<L1Db, StubL2Db, SyncEventDb, ConsensusStateDb, StubChainstateDb>> {
+    let rbdb = get_rocksdb_tmp_instance().unwrap();
+    let l1_db = Arc::new(L1Db::new(rbdb.clone()));
+    let l2_db = Arc::new(StubL2Db::new());
+    let sync_ev_db = Arc::new(SyncEventDb::new(rbdb.clone()));
+    let cs_db = Arc::new(ConsensusStateDb::new(rbdb.clone()));
+    let chst_db = Arc::new(StubChainstateDb::new());
+
+    Arc::new(CommonDatabase::new(
+        l1_db, l2_db, sync_ev_db, cs_db, chst_db,
+    ))
 }

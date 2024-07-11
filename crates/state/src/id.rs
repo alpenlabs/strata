@@ -7,7 +7,17 @@ use alpen_vertex_primitives::buf::Buf32;
 
 /// ID of an L2 block, usually the hash of its root header.
 #[derive(
-    Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Arbitrary, BorshSerialize, BorshDeserialize,
+    Copy,
+    Clone,
+    Eq,
+    Default,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    Arbitrary,
+    BorshSerialize,
+    BorshDeserialize,
 )]
 pub struct L2BlockId(Buf32);
 

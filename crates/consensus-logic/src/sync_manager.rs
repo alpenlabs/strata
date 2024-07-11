@@ -136,6 +136,8 @@ pub fn start_sync_tasks<
     })
 }
 
+// TODO: sending only the l2_provider seems sufficient instead of passing the entire database
+// This can be moved to [`UnfinalizedBlockTracker`]
 pub fn load_unfinalized_blocks<D>(
     height: u64,
     database: Arc<D>,
@@ -159,4 +161,93 @@ where
         height += 1;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use alpen_test_utils::ArbitraryGenerator;
+    use alpen_vertex_db::traits::L2DataStore;
+    use alpen_vertex_state::{
+        block::{L2Block, L2BlockBody, L2BlockHeader},
+        id::L2BlockId,
+    };
+
+    use super::*;
+
+    fn get_genesis_block() -> L2Block {
+        let arb = ArbitraryGenerator::new();
+        let mut header: L2BlockHeader = arb.generate();
+        let empty_hash = L2BlockId::default();
+        let body: L2BlockBody = arb.generate();
+        header.set_parent_and_idx(empty_hash, 0);
+        L2Block::new(header, body)
+    }
+
+    fn get_mock_block_with_parent(parent: &L2BlockHeader) -> L2Block {
+        let arb = ArbitraryGenerator::new();
+        let mut header: L2BlockHeader = arb.generate();
+        let body: L2BlockBody = arb.generate();
+        header.set_parent_and_idx(parent.get_blockid(), parent.blockidx() + 1);
+        L2Block::new(header, body)
+    }
+
+    fn setup_test_chain(
+        l2_prov: &impl L2DataStore,
+    ) -> (L2BlockHeader, L2BlockHeader, L2BlockHeader, L2BlockHeader) {
+        let genesis = get_genesis_block();
+        let genesis_header = genesis.header().clone();
+
+        let block1 = get_mock_block_with_parent(genesis.header());
+        let block1_header = block1.header().clone();
+
+        let block2 = get_mock_block_with_parent(block1.header());
+        let block2_header = block2.header().clone();
+
+        let block2a = get_mock_block_with_parent(block1.header());
+        let block2a_header = block2a.header().clone();
+
+        l2_prov.put_block_data(genesis.clone()).unwrap();
+        l2_prov.put_block_data(block1.clone()).unwrap();
+        l2_prov.put_block_data(block2.clone()).unwrap();
+        l2_prov.put_block_data(block2a.clone()).unwrap();
+
+        (genesis_header, block1_header, block2_header, block2a_header)
+    }
+
+    #[test]
+    fn test_load_unfinalized_blocks() {
+        // b2   b2a (side chain)
+        // |   /
+        // | /
+        // b1 (finalized)
+        // |
+        // g1 (10)
+        // |
+
+        let db = alpen_test_utils::get_common_db();
+        let l2_prov = db.l2_store();
+
+        let (genesis, block1, block2, block2a) = setup_test_chain(l2_prov.as_ref());
+
+        // Init the chain tracker from the state we figured out.
+        let mut chain_tracker =
+            unfinalized_tracker::UnfinalizedBlockTracker::new_empty(genesis.get_blockid());
+
+        load_unfinalized_blocks(1, db, &mut chain_tracker).unwrap();
+
+        assert_eq!(
+            chain_tracker.get_parent(&block1.get_blockid()),
+            Some(&genesis.get_blockid())
+        );
+
+        assert_eq!(
+            chain_tracker.get_parent(&block2.get_blockid()),
+            Some(&block1.get_blockid())
+        );
+
+        assert_eq!(
+            chain_tracker.get_parent(&block2a.get_blockid()),
+            Some(&block1.get_blockid())
+        );
+    }
 }

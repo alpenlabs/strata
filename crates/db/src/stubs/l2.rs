@@ -12,7 +12,7 @@ use crate::traits::*;
 pub struct StubL2Db {
     blocks: Mutex<HashMap<L2BlockId, L2Block>>,
     statuses: Mutex<HashMap<L2BlockId, BlockStatus>>,
-    heights: Mutex<HashMap<u64, L2BlockId>>,
+    heights: Mutex<HashMap<u64, Vec<L2BlockId>>>,
 }
 
 impl StubL2Db {
@@ -37,7 +37,7 @@ impl L2DataStore for StubL2Db {
 
         {
             let mut tbl = self.heights.lock();
-            tbl.insert(idx, blkid);
+            tbl.entry(idx).or_insert_with(Vec::new).push(blkid);
         }
 
         Ok(())
@@ -61,11 +61,9 @@ impl L2DataProvider for StubL2Db {
         Ok(tbl.get(&id).cloned())
     }
 
-    /// This isn't compliant with what was intended because it only returns the
-    /// last block that was written for a height, *not* all of them.
     fn get_blocks_at_height(&self, idx: u64) -> DbResult<Vec<L2BlockId>> {
         let tbl = self.heights.lock();
-        Ok(tbl.get(&idx).map(|id| vec![*id]).unwrap_or_default())
+        Ok(tbl.get(&idx).cloned().unwrap_or_default())
     }
 
     fn get_block_status(&self, id: L2BlockId) -> DbResult<Option<BlockStatus>> {
