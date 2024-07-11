@@ -1,11 +1,8 @@
 #![allow(unused)]
 
-use std::ops::Deref;
-
-use alpen_vertex_state::client_state::ClientState;
 use async_trait::async_trait;
 use jsonrpsee::{
-    core::{client, RpcResult},
+    core::RpcResult,
     types::{ErrorObject, ErrorObjectOwned},
 };
 use reth_primitives::{Address, BlockId, BlockNumberOrTag, Bytes, B256, B64, U256, U64};
@@ -16,10 +13,10 @@ use reth_rpc_types::{
     StateContext, SyncInfo, SyncStatus, Transaction, TransactionRequest, Work,
 };
 use thiserror::Error;
-use tokio::sync::{oneshot, watch, Mutex};
+use tokio::sync::{oneshot, Mutex};
 use tracing::*;
 
-use alpen_vertex_rpc_api::{AlpenApiServer, L1Status, L2Status};
+use alpen_vertex_rpc_api::{AlpenApiServer, L1Status};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -64,15 +61,14 @@ impl Into<ErrorObjectOwned> for Error {
 }
 
 pub struct AlpenRpcImpl {
+    // TODO
     stop_tx: Mutex<Option<oneshot::Sender<()>>>,
-    l2_status_rx: watch::Receiver<Option<ClientState>>
 }
 
 impl AlpenRpcImpl {
-    pub fn new(stop_tx: oneshot::Sender<()>, l2_status_rx: watch::Receiver<Option<ClientState>>) -> Self {
+    pub fn new(stop_tx: oneshot::Sender<()>) -> Self {
         Self {
             stop_tx: Mutex::new(Some(stop_tx)),
-            l2_status_rx
         }
     }
 }
@@ -100,21 +96,6 @@ impl AlpenApiServer for AlpenRpcImpl {
             cur_height: 0,
             cur_tip_blkid: String::new(),
             last_update: 0,
-        })
-    }
-
-    async fn get_client_status(&self) -> RpcResult<L2Status> {
-        warn!("alp_clientStatus not yet implemented");
-        // borrow the current ClientState 
-        let client_state = self.l2_status_rx.borrow().clone().unwrap();
-
-        Ok(L2Status { 
-            latest_l1_block:  client_state.recent_l1_blocks.last().unwrap().to_string(), 
-            finalized_l2_tip: client_state.finalized_tip.to_string(), 
-            buried_l1_height: client_state.buried_l1_height, 
-            pending_deposits: client_state.chain_state.pending_deposits.len() as u64, 
-            pending_withdrawals: client_state.chain_state.pending_withdraws.len() as u64, 
-            accepted_l2_blocks: client_state.chain_state.accepted_l2_blocks.len() as u64
         })
     }
 }

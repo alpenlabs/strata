@@ -1,6 +1,12 @@
 use std::sync::Arc;
 use std::thread;
 
+<<<<<<< HEAD
+=======
+use tokio::sync::mpsc;
+use tracing::*;
+
+>>>>>>> 3b5399e (Revert "feat: clientStatus RPC")
 use alpen_vertex_btcio::reader::{
     config::ReaderConfig, messages::L1Event, query::bitcoin_data_reader_task,
 };
@@ -41,7 +47,11 @@ where
     ));
 
     let l1db = db.l1_store().clone();
+<<<<<<< HEAD
     let _sedb = db.sync_event_store().clone();
+=======
+    let sedb = db.sync_event_store().clone();
+>>>>>>> 3b5399e (Revert "feat: clientStatus RPC")
     let _handler_handle = thread::spawn(move || bitcoin_data_handler_task(l1db, csm_ctl, ev_rx));
 
     Ok(())

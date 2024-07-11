@@ -1,11 +1,9 @@
 use std::sync::Arc;
 
-use alpen_vertex_state::client_state::{self, ClientState};
-use alpen_vertex_state::l1::L1BlockId;
 use bitcoin::consensus::serialize;
-use bitcoin::hashes::{sha256, Hash};
+use bitcoin::hashes::Hash;
 use bitcoin::Block;
-use tokio::sync::{mpsc, watch};
+use tokio::sync::mpsc;
 use tracing::*;
 
 use alpen_vertex_btcio::reader::messages::L1Event;
@@ -21,13 +19,12 @@ pub fn bitcoin_data_handler_task<L1D>(
     l1db: Arc<L1D>,
     csm_ctl: Arc<CsmController>,
     mut event_rx: mpsc::Receiver<L1Event>,
-    cur_state_tx: watch::Sender<Option<ClientState>>
 ) -> anyhow::Result<()>
 where
     L1D: L1DataStore + Sync + Send + 'static,
 {
     while let Some(event) = event_rx.blocking_recv() {
-        if let Err(e) = handle_event(event, l1db.as_ref(), csm_ctl.as_ref(), cur_state_tx.clone()) {
+        if let Err(e) = handle_event(event, l1db.as_ref(), csm_ctl.as_ref()) {
             error!(err = %e, "failed to handle L1 event");
         }
     }
@@ -36,7 +33,7 @@ where
     Ok(())
 }
 
-fn handle_event<L1D>(event: L1Event, l1db: &L1D, csm_ctl: &CsmController, cur_state_tx: watch::Sender<Option<ClientState>>) -> anyhow::Result<()>
+fn handle_event<L1D>(event: L1Event, l1db: &L1D, csm_ctl: &CsmController) -> anyhow::Result<()>
 where
     L1D: L1DataStore + Sync + Send + 'static,
 {
@@ -67,12 +64,6 @@ where
             .collect();*/
             let l1txs = Vec::new();
             let num_txs = l1txs.len();
-
-            let mut cur_state = cur_state_tx.borrow().clone().expect("Genesis was not configured properly");
-            let blkid: Buf32 = l1blkid.into();
-            cur_state.recent_l1_blocks.push(blkid.into());
-
-            let _ = cur_state_tx.send(Some(cur_state));
 
             l1db.put_block_data(blockdata.block_num(), manifest, l1txs)?;
             info!(%l1blkid, txs = %num_txs, "wrote L1 block manifest");

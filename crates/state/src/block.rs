@@ -1,27 +1,9 @@
-<<<<<<< HEAD
-=======
-use std::{
-    fmt::{self, Debug},
-    str
-};
-
-use alpen_vertex_primitives::l1::L1Tx;
-use alpen_vertex_primitives::prelude::*;
->>>>>>> 6ffc2bd (feat: clientStatus RPC)
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use alpen_vertex_primitives::prelude::*;
 
 use crate::{block_template, exec_update, id::L2BlockId, l1};
-
-impl fmt::Display for L2BlockId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut buf = [0; 64];
-        hex::encode_to_slice(self.0.0, &mut buf).expect("buf: enc hex");
-        f.write_str(unsafe { str::from_utf8_unchecked(&buf) })
-    }
-}
 
 /// Full contents of the bare L2 block.
 #[derive(Clone, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
@@ -142,11 +124,7 @@ impl L2BlockHeader {
 }
 
 /// Contains the additional payloads within the L2 block.
-<<<<<<< HEAD
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize)]
-=======
-#[derive(Clone, Debug, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
->>>>>>> 6ffc2bd (feat: clientStatus RPC)
 pub struct L2BlockBody {
     l1_segment: L1Segment,
     exec_segment: ExecSegment,
@@ -171,11 +149,7 @@ impl L2BlockBody {
 
 /// Container for additional messages that we've observed from the L1, if there
 /// are any.
-<<<<<<< HEAD
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize)]
-=======
-#[derive(Clone, Debug, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
->>>>>>> 6ffc2bd (feat: clientStatus RPC)
 pub struct L1Segment {
     /// New headers that we've seen from L1 that we didn't see in the previous
     /// L2 block.
