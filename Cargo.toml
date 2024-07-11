@@ -54,15 +54,15 @@ mockall = "0.11"
 parking_lot = "0.12.3"
 rand = "0.8.5"
 reqwest = { version = "0.12.4", features = ["json"] }
-reth-db = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.0" }
-reth-ipc = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.0" }
-reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.0" }
-reth-primitives = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.0" }
-reth-revm = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.0" }
-reth-rpc-api = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.0" }
-reth-rpc = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.0" }
-reth-rpc-layer = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.0" }
-reth-rpc-types = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.0" }
+reth-db = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
+reth-ipc = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
+reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
+reth-primitives = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
+reth-revm = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
+reth-rpc-api = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
+reth-rpc = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
+reth-rpc-layer = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
+reth-rpc-types = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
 rockbound = { git = "https://github.com/sovereign-Labs/rockbound", tag = "v2.0.1" }
 rocksdb = "0.21"
 serde = "1.0"
