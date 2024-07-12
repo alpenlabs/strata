@@ -14,6 +14,7 @@ use alpen_vertex_state::prelude::*;
 use alpen_vertex_state::state_op::WriteBatch;
 use alpen_vertex_state::sync_event::SyncEvent;
 
+use crate::types::TxnStatusEntry;
 use crate::DbResult;
 
 /// Common database interface that we can parameterize worker tasks over if
@@ -253,17 +254,17 @@ pub trait SeqDataStore {
     fn put_commit_reveal_txns(
         &self,
         blobid: Buf32,
-        commit_txn: TxnWithStatus,
-        reveal_txn: TxnWithStatus,
+        commit_txn: TxnStatusEntry,
+        reveal_txn: TxnStatusEntry,
     ) -> DbResult<u64>;
 
     /// Update an existing transaction
-    fn update_txn(&self, txidx: u64, txn: TxnWithStatus) -> DbResult<()>;
+    fn update_txn(&self, txidx: u64, txn: TxnStatusEntry) -> DbResult<()>;
 }
 
 pub trait SeqDataProvider {
     /// Get the l1 inscription txn by idx
-    fn get_l1_txn(&self, idx: u64) -> DbResult<Option<TxnWithStatus>>;
+    fn get_l1_txn(&self, idx: u64) -> DbResult<Option<TxnStatusEntry>>;
 
     /// Get blob by its hash
     fn get_blob_by_id(&self, id: Buf32) -> DbResult<Option<Vec<u8>>>;

@@ -5,8 +5,7 @@
 use l2::schemas::{L2BlockHeightSchema, L2BlockSchema, L2BlockStatusSchema};
 use rockbound::{schema::ColumnFamilyName, Schema};
 use sequencer::schemas::{
-    SeqBlobIdSchema, SeqL1TxnSchema, SeqBIdRevTxnIdxSchema, SeqBlobSchema,
-    SeqL1TxIdSchema,
+    SeqBIdRevTxnIdxSchema, SeqBlobIdSchema, SeqBlobSchema, SeqL1TxIdSchema, SeqL1TxnSchema,
 };
 
 use crate::consensus_state::schemas::{ClientStateSchema, ClientUpdateOutputSchema};
@@ -24,6 +23,7 @@ pub mod sync_event;
 pub mod errors;
 pub mod macros;
 pub mod traits;
+pub mod types;
 
 pub type DbResult<T> = anyhow::Result<T, errors::DbError>;
 

@@ -1,17 +1,16 @@
 use std::sync::Arc;
 
-use alpen_vertex_primitives::{buf::Buf32, l1::TxnWithStatus};
+use alpen_vertex_primitives::buf::Buf32;
 use rockbound::{Schema, SchemaBatch, DB};
 
 use crate::{
     errors::DbError,
     traits::{SeqDataProvider, SeqDataStore},
+    types::TxnStatusEntry,
     DbResult,
 };
 
-use super::schemas::{
-    SeqBlobIdSchema, SeqL1TxnSchema, SeqBIdRevTxnIdxSchema, SeqBlobSchema,
-};
+use super::schemas::{SeqBIdRevTxnIdxSchema, SeqBlobIdSchema, SeqBlobSchema, SeqL1TxnSchema};
 
 pub struct SeqDb {
     db: Arc<DB>,
@@ -49,6 +48,7 @@ impl SeqDataStore for SeqDb {
                 "Entry already exists for blobid {blob_hash:?}"
             )));
         }
+        // TODO: wrap these in a db transaction
         let last_idx = self.get_last_idx::<SeqBlobIdSchema>()?.unwrap_or(0);
         let idx = last_idx + 1;
 
@@ -66,8 +66,8 @@ impl SeqDataStore for SeqDb {
     fn put_commit_reveal_txns(
         &self,
         blobid: Buf32,
-        commit_txn: TxnWithStatus,
-        reveal_txn: TxnWithStatus,
+        commit_txn: TxnStatusEntry,
+        reveal_txn: TxnStatusEntry,
     ) -> DbResult<u64> {
         if self.db.get::<SeqBlobSchema>(&blobid)?.is_none() {
             return Err(DbError::Other(format!(
@@ -91,7 +91,7 @@ impl SeqDataStore for SeqDb {
         Ok(reveal_idx)
     }
 
-    fn update_txn(&self, txidx: u64, txn: TxnWithStatus) -> DbResult<()> {
+    fn update_txn(&self, txidx: u64, txn: TxnStatusEntry) -> DbResult<()> {
         if self.db.get::<SeqL1TxnSchema>(&txidx)?.is_none() {
             return Err(DbError::Other(format!(
                 "Inexistent txn idx {txidx:?} while updating txn"
@@ -103,7 +103,7 @@ impl SeqDataStore for SeqDb {
 }
 
 impl SeqDataProvider for SeqDb {
-    fn get_l1_txn(&self, idx: u64) -> DbResult<Option<TxnWithStatus>> {
+    fn get_l1_txn(&self, idx: u64) -> DbResult<Option<TxnStatusEntry>> {
         Ok(self.db.get::<SeqL1TxnSchema>(&idx)?)
     }
 
@@ -135,7 +135,7 @@ mod tests {
     use crate::traits::{SeqDataProvider, SeqDataStore};
     use alpen_test_utils::bitcoin::get_test_bitcoin_txns;
     use alpen_test_utils::get_rocksdb_tmp_instance;
-    use alpen_vertex_primitives::{buf::Buf32, l1::TxnWithStatus};
+    use alpen_vertex_primitives::{buf::Buf32, l1::TxnStatusEntry};
     use rockbound::DB;
     use std::sync::Arc;
     use test;
@@ -144,13 +144,13 @@ mod tests {
         get_rocksdb_tmp_instance().unwrap()
     }
 
-    fn get_commit_reveal_txns() -> (TxnWithStatus, TxnWithStatus) {
+    fn get_commit_reveal_txns() -> (TxnStatusEntry, TxnStatusEntry) {
         let txns = get_test_bitcoin_txns();
 
         // NOTE that actually the commit reveal should be parent-child, but these are not.
         // This shouldn't matter here though.
-        let commit_txn = TxnWithStatus::new_unsent(txns[0].clone());
-        let reveal_txn = TxnWithStatus::new_unsent(txns[1].clone());
+        let commit_txn = TxnStatusEntry::from_txn_unsent(txns[0].clone());
+        let reveal_txn = TxnStatusEntry::from_txn_unsent(txns[1].clone());
         (commit_txn, reveal_txn)
     }
 

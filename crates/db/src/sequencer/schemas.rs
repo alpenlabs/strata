@@ -1,13 +1,13 @@
 use alpen_vertex_primitives::buf::Buf32;
-use alpen_vertex_primitives::l1::TxnWithStatus;
 
 use crate::define_table_with_default_codec;
 use crate::define_table_without_codec;
 use crate::impl_borsh_value_codec;
+use crate::types::TxnStatusEntry;
 
 define_table_with_default_codec!(
     /// A table to store L1 txns
-    (SeqL1TxnSchema) u64 => TxnWithStatus
+    (SeqL1TxnSchema) u64 => TxnStatusEntry
 );
 
 define_table_with_default_codec!(

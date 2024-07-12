@@ -2,7 +2,6 @@ use std::fmt;
 
 use arbitrary::Arbitrary;
 use bitcoin::hashes::Hash;
-use bitcoin::Transaction;
 use bitcoin::{consensus::serialize, Block};
 use borsh::{BorshDeserialize, BorshSerialize};
 
@@ -159,41 +158,6 @@ impl OutputRef {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize)]
-pub struct TxnWithStatus {
-    pub txid: Buf32,
-    pub txn_raw: Vec<u8>,
-    pub status: BitcoinTxnStatus,
-}
-
-impl TxnWithStatus {
-    pub fn new(txn: Transaction, status: BitcoinTxnStatus) -> Self {
-        let txid = Buf32(txn.compute_txid().as_byte_array().into());
-        let txn_raw = serialize(&txn);
-        Self {
-            txid,
-            txn_raw,
-            status,
-        }
-    }
-
-    pub fn new_unsent(txn: Transaction) -> Self {
-        Self::new(txn, BitcoinTxnStatus::Unsent)
-    }
-
-    pub fn txid(&self) -> &Buf32 {
-        &self.txid
-    }
-
-    pub fn txn_raw(&self) -> &[u8] {
-        &self.txn_raw
-    }
-
-    pub fn status(&self) -> &BitcoinTxnStatus {
-        &self.status
-    }
-}
-
 impl Into<(Buf32, u16)> for OutputRef {
     fn into(self) -> (Buf32, u16) {
         (self.txid, self.outidx)
@@ -204,12 +168,4 @@ impl fmt::Debug for OutputRef {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_fmt(format_args!("{:?}:{}", self.txid, self.outidx))
     }
-}
-
-#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize)]
-pub enum BitcoinTxnStatus {
-    Unsent,
-    InMempool,
-    Confirmed,
-    Finalized,
 }
