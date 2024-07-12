@@ -55,6 +55,14 @@ impl ExecEnvState {
     pub fn cur_state_root(&self) -> &Buf32 {
         &self.cur_state
     }
+
+    pub fn pending_deposits(&self) -> &StateQueue<bridge_ops::DepositIntent> {
+        &self.pending_deposits
+    }
+
+    pub fn pending_deposits_mut(&mut self) -> &mut StateQueue<bridge_ops::DepositIntent> {
+        &mut self.pending_deposits
+    }
 }
 
 impl<'a> Arbitrary<'a> for ExecEnvState {

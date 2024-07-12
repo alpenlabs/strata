@@ -16,6 +16,7 @@ use alpen_express_primitives::params::Params;
 use alpen_express_state::client_state::ClientState;
 use alpen_express_state::operation::SyncAction;
 use alpen_express_state::prelude::*;
+use alpen_express_state::state_op::StateCache;
 use alpen_express_state::sync_event::SyncEvent;
 
 use crate::ctl::CsmController;
@@ -565,9 +566,10 @@ fn apply_tip_update<D: Database>(
 
         // Compute the transition write batch, then compute the new state
         // locally and update our going state.
-        let wb = chain_transition::process_block(&pre_state, &block)
+        let mut prestate_cache = StateCache::new(pre_state);
+        chain_transition::process_block(&mut prestate_cache, &block)
             .map_err(|e| Error::InvalidStateTsn(*blkid, e))?;
-        let post_state = state_op::apply_write_batch_to_chainstate(pre_state, &wb);
+        let (post_state, wb) = prestate_cache.finalize();
         pre_state = post_state;
 
         // After each application we update the fork choice tip data in case we fail

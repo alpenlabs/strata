@@ -4,8 +4,8 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use alpen_express_primitives::buf::Buf32;
 use alpen_express_primitives::hash::compute_borsh_hash;
 
+use crate::prelude::*;
 use crate::{bridge_ops, bridge_state, exec_env, l1};
-use crate::{id::L2BlockId, state_queue::StateQueue};
 
 /// L2 blockchain state.  This is the state computed as a function of a
 /// pre-state and a block.
@@ -60,6 +60,7 @@ struct HashedChainState {
 }
 
 impl ChainState {
+    // TODO remove genesis blkid since apparently we don't need it anymore
     pub fn from_genesis(
         genesis_blkid: L2BlockId,
         l1_state: l1::L1ViewState,

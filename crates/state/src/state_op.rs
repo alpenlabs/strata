@@ -3,7 +3,7 @@
 //! decide to expand the chain state in the future such that we can't keep it
 //! entire in memory.
 
-use alpen_vertex_primitives::buf::Buf32;
+use alpen_express_primitives::buf::Buf32;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::chain_state::ChainState;
@@ -108,7 +108,8 @@ fn apply_op_to_chainstate(op: &StateOp, state: &mut ChainState) {
         }
 
         StateOp::EnqueueDepositIntent(intent) => {
-            state.exec_env_state.pending_deposits.push_back(intent.clone());
+            let deposits = state.exec_env_state.pending_deposits_mut();
+            deposits.push_back(intent.clone());
         }
 
         StateOp::CreateOperator(spk, wpk) => {
@@ -144,6 +145,12 @@ impl StateCache {
     /// that can be applied to the previous state to produce it.
     pub fn finalize(self) -> (ChainState, WriteBatch) {
         (self.state, WriteBatch::new(self.write_ops))
+    }
+
+    /// Returns if the state cache is empty, meaning that no writes have been
+    /// performed.
+    pub fn is_empty(&self) -> bool {
+        self.write_ops.is_empty()
     }
 
     /// Applies some operations to the state, including them in the write ops

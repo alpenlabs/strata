@@ -7,7 +7,7 @@ use alpen_express_primitives::prelude::*;
 
 use crate::{
     exec_update,
-    header::{L2BlockHeader, SignedL2BlockHeader},
+    header::{L2BlockHeader, SignedL2BlockHeader, L2Header},
     id::L2BlockId,
     l1,
 };
