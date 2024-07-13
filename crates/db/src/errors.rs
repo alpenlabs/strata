@@ -22,6 +22,9 @@ pub enum DbError {
     #[error("tried to overwrite consensus checkpoint at idx {0}")]
     OverwriteConsensusCheckpoint(u64),
 
+    #[error("tried to overwrite state update at idx{0}. must purge in order to be repaced")]
+    OverwriteStateUpdate(u64),
+
     #[error("tried to purge data more recently than allowed")]
     PurgeTooRecent,
 
