@@ -107,7 +107,7 @@ impl ChainstateStore for StubChainstateDb {
 
         let last_idx = st.find_last_write_batch();
         if new_tip_idx > last_idx {
-            return Err(DbError::RevertAboveCurrent);
+            return Err(DbError::RevertAboveCurrent(new_tip_idx, last_idx));
         }
 
         // We take a more sensitive approach to this since we don't want to have to
