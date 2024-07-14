@@ -2,11 +2,12 @@ use std::sync::Arc;
 
 use alpen_vertex_state::state_op;
 use rockbound::SchemaBatch;
-use rockbound::{Schema, DB};
+use rockbound::DB;
 
 use super::schemas::{ChainStateSchema, WriteBatchSchema};
 use crate::errors::*;
 use crate::traits::*;
+use crate::utils::{get_first_idx, get_last_idx};
 
 pub struct ChainStateDb {
     db: Arc<DB>,
@@ -17,50 +18,25 @@ impl ChainStateDb {
         Self { db }
     }
 
-    // TODO: maybe move this to common function since this is used in
-    // different places
-    fn get_last_idx<T>(&self) -> DbResult<Option<u64>>
-    where
-        T: Schema<Key = u64>,
-    {
-        let mut iterator = self.db.iter::<T>()?;
-        iterator.seek_to_last();
-        match iterator.rev().next() {
-            Some(res) => {
-                let (tip, _) = res?.into_tuple();
-                Ok(Some(tip))
-            }
-            None => Ok(None),
-        }
+    fn get_first_idx(&self) -> DbResult<Option<u64>> {
+        get_first_idx::<ChainStateSchema>(self.db.clone())
     }
 
-    // TODO: maybe move this to common function since this is used in
-    // different places
-    fn get_first_idx<T>(&self) -> DbResult<Option<u64>>
-    where
-        T: Schema<Key = u64>,
-    {
-        let mut iterator = self.db.iter::<T>()?;
-        match iterator.next() {
-            Some(res) => {
-                let (tip, _) = res?.into_tuple();
-                Ok(Some(tip))
-            }
-            None => Ok(None),
-        }
+    fn get_last_idx(&self) -> DbResult<Option<u64>> {
+        get_last_idx::<ChainStateSchema>(self.db.clone())
     }
 }
 
 impl ChainstateProvider for ChainStateDb {
     fn get_earliest_state_idx(&self) -> DbResult<u64> {
-        match self.get_first_idx::<ChainStateSchema>()? {
+        match self.get_first_idx()? {
             Some(idx) => Ok(idx),
             None => Err(DbError::NotBootstrapped),
         }
     }
 
     fn get_last_state_idx(&self) -> DbResult<u64> {
-        match self.get_last_idx::<ChainStateSchema>()? {
+        match self.get_last_idx()? {
             Some(idx) => Ok(idx),
             None => Err(DbError::NotBootstrapped),
         }
@@ -88,9 +64,7 @@ impl ChainstateStore for ChainStateDb {
         toplevel: &alpen_vertex_state::chain_state::ChainState,
     ) -> DbResult<()> {
         let genesis_key = 0;
-        if self.get_first_idx::<ChainStateSchema>()?.is_some()
-            || self.get_last_idx::<ChainStateSchema>()?.is_some()
-        {
+        if self.get_first_idx()?.is_some() || self.get_last_idx()?.is_some() {
             return Err(DbError::OverwriteStateUpdate(genesis_key));
         }
         self.db.put::<ChainStateSchema>(&genesis_key, toplevel)?;
@@ -122,7 +96,7 @@ impl ChainstateStore for ChainStateDb {
     }
 
     fn purge_historical_state_before(&self, before_idx: u64) -> DbResult<()> {
-        let first_idx = match self.get_first_idx::<ChainStateSchema>()? {
+        let first_idx = match self.get_first_idx()? {
             Some(idx) => idx,
             None => return Err(DbError::NotBootstrapped),
         };
@@ -140,12 +114,12 @@ impl ChainstateStore for ChainStateDb {
     }
 
     fn rollback_writes_to(&self, new_tip_idx: u64) -> DbResult<()> {
-        let last_idx = match self.get_last_idx::<ChainStateSchema>()? {
+        let last_idx = match self.get_last_idx()? {
             Some(idx) => idx,
             None => return Err(DbError::NotBootstrapped),
         };
 
-        let first_idx = match self.get_first_idx::<ChainStateSchema>()? {
+        let first_idx = match self.get_first_idx()? {
             Some(idx) => idx,
             None => return Err(DbError::NotBootstrapped),
         };
