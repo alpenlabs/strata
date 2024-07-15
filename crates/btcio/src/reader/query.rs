@@ -5,18 +5,14 @@ use std::time::{self, Duration};
 use alpen_vertex_primitives::l1::L1Status;
 use anyhow::bail;
 use bitcoin::{Block, BlockHash};
-<<<<<<< HEAD
 use tokio::sync::{mpsc, RwLock};
-=======
-use tokio::sync::mpsc;
->>>>>>> 0f3a2e7 (fix: apply fixes suggested by clippy)
 use tracing::*;
 
 use super::config::ReaderConfig;
 use super::messages::{BlockData, L1Event};
+use crate::rpc::traits::L1Client;
 use crate::rpc::types::RpcBlockchainInfo;
 use crate::status::{apply_status_updates, StatusUpdate};
-use crate::rpc::traits::L1Client;
 
 fn filter_interesting_txs(block: &Block) -> Vec<u32> {
     // TODO actually implement the filter logic. Now it returns everything
@@ -141,8 +137,7 @@ pub async fn bitcoin_data_reader_task(
         cur_block_height,
         config,
         &mut status_updates,
-        l1_status.clone()
-
+        l1_status.clone(),
     )
     .await
     {
@@ -156,10 +151,9 @@ async fn do_reader_task(
     cur_block_height: u64,
     config: Arc<ReaderConfig>,
     status_updates: &mut Vec<StatusUpdate>,
-    l1_status: Arc<RwLock<L1Status>>
+    l1_status: Arc<RwLock<L1Status>>,
 ) -> anyhow::Result<()> {
     info!(%cur_block_height, "started L1 reader task!");
-    
 
     let poll_dur = Duration::from_millis(config.client_poll_dur_ms as u64);
 
@@ -172,43 +166,38 @@ async fn do_reader_task(
     let best_blkid = state.best_block();
     info!(%best_blkid, "initialized L1 reader state");
 
-    let current_time = time::Instant::now(); 
+    let current_time = time::Instant::now();
     // FIXME This function will return when reorg happens when there are not
     // enough elements in the vec deque, probably during startup.
     loop {
         let cur_height = state.cur_height;
         let poll_span = debug_span!("l1poll", %cur_height);
 
-<<<<<<< HEAD
-
-        if let Err(err) = poll_for_new_blocks(client, &event_tx, &config, &mut state, status_updates)
-=======
-        match poll_for_new_blocks(client, event_tx, &config, &mut state)
->>>>>>> 0f3a2e7 (fix: apply fixes suggested by clippy)
-            .instrument(poll_span)
-            .await
+        if let Err(err) =
+            poll_for_new_blocks(client, &event_tx, &config, &mut state, status_updates)
+                .instrument(poll_span)
+                .await
         {
-                warn!(%cur_height, err = %err, "failed to poll Bitcoin client");
-                status_updates.push(StatusUpdate::RpcError(err.to_string()));
+            warn!(%cur_height, err = %err, "failed to poll Bitcoin client");
+            status_updates.push(StatusUpdate::RpcError(err.to_string()));
 
-                if let Some(err) = err.downcast_ref::<reqwest::Error>() {
-                    // recoverable errors 
-                    if err.is_connect() {
-                        status_updates.push(StatusUpdate::RpcConnected(false));
-                    }
-                    // unrecoverable errors
-                    if err.is_builder() {
-                        panic!("btcio: couldn't build the L1 client");
-                    }
+            if let Some(err) = err.downcast_ref::<reqwest::Error>() {
+                // recoverable errors
+                if err.is_connect() {
+                    status_updates.push(StatusUpdate::RpcConnected(false));
                 }
+                // unrecoverable errors
+                if err.is_builder() {
+                    panic!("btcio: couldn't build the L1 client");
+                }
+            }
         }
 
         tokio::time::sleep(poll_dur).await;
 
-        status_updates.push(
-            StatusUpdate::LastUpdate(
-                current_time.elapsed().as_millis() as u64
-            ));
+        status_updates.push(StatusUpdate::LastUpdate(
+            current_time.elapsed().as_millis() as u64
+        ));
 
         apply_status_updates(&status_updates, l1_status.clone()).await;
     }
@@ -253,7 +242,6 @@ async fn poll_for_new_blocks(
     state: &mut ReaderState,
     status_updates: &mut Vec<StatusUpdate>,
 ) -> anyhow::Result<()> {
-
     let chain_info = client.get_blockchain_info().await?;
     status_updates.push(StatusUpdate::RpcConnected(true));
     let client_height = chain_info.blocks;
@@ -288,13 +276,16 @@ async fn poll_for_new_blocks(
     // Now process each block we missed.
     let scan_start_height = state.cur_height + 1;
     for fetch_height in scan_start_height..=client_height {
-        let blkid = match fetch_and_process_block(fetch_height, client, event_tx, state, status_updates).await {
-            Ok(b) => b,
-            Err(e) => {
-                warn!(%fetch_height, err = %e, "failed to fetch new block");
-                break;
-            }
-        };
+        let blkid =
+            match fetch_and_process_block(fetch_height, client, event_tx, state, status_updates)
+                .await
+            {
+                Ok(b) => b,
+                Err(e) => {
+                    warn!(%fetch_height, err = %e, "failed to fetch new block");
+                    break;
+                }
+            };
         info!(%fetch_height, %blkid, "accepted new block");
     }
 
@@ -328,7 +319,7 @@ async fn fetch_and_process_block(
     client: &impl L1Client,
     event_tx: &mpsc::Sender<L1Event>,
     state: &mut ReaderState,
-    status_updates: &mut Vec<StatusUpdate>
+    status_updates: &mut Vec<StatusUpdate>,
 ) -> anyhow::Result<BlockHash> {
     let block = client.get_block_at(height).await?;
 

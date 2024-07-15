@@ -23,10 +23,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, to_value, value::RawValue, value::Value};
 use tracing::*;
 
-use super::{
-    traits::SeqL1Client,
-    types::GetTransactionResponse,
-};
+use super::{traits::SeqL1Client, types::GetTransactionResponse};
 
 use thiserror::Error;
 
@@ -138,15 +135,12 @@ impl BitcoinClient {
         let mut headers = HeaderMap::new();
         let mut user_pw = String::new();
         general_purpose::STANDARD.encode_string(format!("{}:{}", username, password), &mut user_pw);
-            
+
         headers.insert(
             "Authorization",
-            format!(
-                "Basic {}",
-                user_pw 
-            )
-            .parse()
-            .expect("Failed to parse auth header!"),
+            format!("Basic {}", user_pw)
+                .parse()
+                .expect("Failed to parse auth header!"),
         );
         headers.insert(
             "Content-Type",
