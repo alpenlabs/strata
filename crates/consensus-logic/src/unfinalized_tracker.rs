@@ -157,7 +157,6 @@ impl UnfinalizedBlockTracker {
         // going to, adding more on as we add them.
         let mut evicted = Vec::new();
         while let Some(evicting) = to_evict.pop() {
-            
             let ent = self
                 .pending_table
                 .remove(&evicting)
