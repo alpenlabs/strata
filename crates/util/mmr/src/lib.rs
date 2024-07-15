@@ -250,11 +250,11 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
         let mut cur_hash = *leaf_hash;
         let mut side_flags = leaf_index;
 
-        for i in 0..cohashes.len() {
+        for cohash in cohashes.iter() {
             let node_hash = if side_flags & 1 == 1 {
-                H::hash_node(cohashes[i], cur_hash)
+                H::hash_node(*cohash, cur_hash)
             } else {
-                H::hash_node(cur_hash, cohashes[i])
+                H::hash_node(cur_hash, *cohash)
             };
 
             side_flags >>= 1;
@@ -507,11 +507,11 @@ mod test {
         };
 
         // add 4 elements into mmr  so 20 + 4 elements
-        let elem = 4;
-        let num_hash = generate_hashes_for_n_integers(elem);
+        let num_elems = 4;
+        let num_hash = generate_hashes_for_n_integers(num_elems);
 
-        for i in 0..elem {
-            let new_proof = mmr.add_leaf_updating_proof(num_hash[i], &proof);
+        for elem in num_hash.iter().take(num_elems) {
+            let new_proof = mmr.add_leaf_updating_proof(*elem, &proof);
             proof = new_proof;
         }
 
@@ -525,15 +525,15 @@ mod test {
         let mut proof_list = Vec::new();
 
         // add 4 elements into mmr  so 20 + 4 elements
-        let elem = 4;
-        let num_hash = generate_hashes_for_n_integers(elem);
+        let num_elems = 4;
+        let num_hash = generate_hashes_for_n_integers(num_elems);
 
-        for i in 0..elem {
-            let new_proof = mmr.add_leaf_updating_proof_list(num_hash[i], &mut proof_list);
+        for elem in num_hash.iter().take(num_elems) {
+            let new_proof = mmr.add_leaf_updating_proof_list(*elem, &mut proof_list);
             proof_list.push(new_proof);
         }
 
-        for i in 0..elem {
+        for i in 0..num_elems {
             assert!(proof_list[i].verify_against_mmr(&mmr, num_hash[i]));
         }
     }
