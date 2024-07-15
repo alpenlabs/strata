@@ -1,10 +1,9 @@
 use std::sync::Arc;
 use std::thread;
 
-use tracing::*;
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::mpsc;
 
-use alpen_vertex_btcio::btcio_status::{BtcioEvent, BtcioStatus};
+use alpen_vertex_btcio::btcio_status::BtcioEvent;
 use alpen_vertex_btcio::reader::{
     config::ReaderConfig, messages::L1Event, query::bitcoin_data_reader_task,
 };

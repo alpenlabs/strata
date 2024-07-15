@@ -57,6 +57,7 @@ impl ReaderState {
         ret
     }
 
+    #[allow(unused)]
     /// Gets the blockhash of the given height, if we have it.
     pub fn get_height_blkid(&self, height: u64) -> Option<&BlockHash> {
         if height > self.cur_height {
@@ -71,7 +72,7 @@ impl ReaderState {
         let idx = self.recent_blocks.len() as u64 - back_off - 1;
         Some(&self.recent_blocks[idx as usize])
     }
-
+    #[allow(unused)]
     fn deepest_block(&self) -> u64 {
         self.cur_height - self.recent_blocks.len() as u64 - 1
     }

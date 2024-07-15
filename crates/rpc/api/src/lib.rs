@@ -1,15 +1,6 @@
 //! Macro trait def for the `alp_` RPC namespace using jsonrpsee.
+use alpen_vertex_primitives::l1::L1Status;
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct L1Status {
-    pub bitcoin_rpc_connected: bool,
-    pub cur_height: u64,
-    pub cur_tip_blkid: String,
-    pub last_update: u64,
-    pub last_rpc_error: Option<String>,
-}
 
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "alp"))]
 #[cfg_attr(feature = "client", rpc(server, client, namespace = "alp"))]

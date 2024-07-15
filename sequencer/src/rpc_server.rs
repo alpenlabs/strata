@@ -2,9 +2,9 @@
 
 use std::sync::Arc;
 
-use alpen_vertex_btcio::btcio_status::BtcioStatus;
 use alpen_vertex_db::traits::Database;
 use alpen_vertex_db::traits::L1DataProvider;
+use alpen_vertex_primitives::l1::L1Status;
 use async_trait::async_trait;
 use jsonrpsee::{
     core::RpcResult,
@@ -21,7 +21,8 @@ use thiserror::Error;
 use tokio::sync::{oneshot, Mutex, RwLock};
 use tracing::*;
 
-use alpen_vertex_rpc_api::{AlpenApiServer, L1Status};
+use alpen_vertex_rpc_api::AlpenApiServer;
+
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -69,7 +70,7 @@ pub struct AlpenRpcImpl<D: Database + Send + Sync + 'static>
 where
     <D as alpen_vertex_db::traits::Database>::L1Prov: Send + Sync + 'static,
 {
-    l1_status: Arc<RwLock<BtcioStatus>>,
+    l1_status: Arc<RwLock<L1Status>>,
     database: Arc<D>,
     // TODO
     stop_tx: Mutex<Option<oneshot::Sender<()>>>,
@@ -80,7 +81,7 @@ where
     <D as alpen_vertex_db::traits::Database>::L1Prov: Send + Sync + 'static,
 {
     pub fn new(
-        l1_status: Arc<RwLock<BtcioStatus>>,
+        l1_status: Arc<RwLock<L1Status>>,
         database: Arc<D>,
         stop_tx: oneshot::Sender<()>,
     ) -> Self {

@@ -1,18 +1,10 @@
 use std::sync::Arc;
-use tokio::sync::mpsc;
 
-use serde::{Deserialize, Serialize};
+use tokio::sync::mpsc;
 use tokio::sync::RwLock;
 use tracing::warn;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct BtcioStatus {
-    pub bitcoin_rpc_connected: bool,
-    pub cur_height: u64,
-    pub cur_tip_blkid: String,
-    pub last_update: u64,
-    pub last_rpc_error: Option<String>,
-}
+use alpen_vertex_primitives::l1::L1Status;
 
 pub enum BtcioEvent {
     CurHeight(u64),
@@ -36,7 +28,7 @@ pub fn blocking_send_btcio_event(l1_status_tx: mpsc::Sender<BtcioEvent>, event: 
 
 pub fn btcio_event_handler(
     mut event_rx: mpsc::Receiver<BtcioEvent>,
-    l1_status: Arc<RwLock<BtcioStatus>>,
+    l1_status: Arc<RwLock<L1Status>>,
 ) {
     while let Some(event) = event_rx.blocking_recv() {
         let mut l1_status_writer = l1_status.blocking_write();

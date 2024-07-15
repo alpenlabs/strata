@@ -3,12 +3,6 @@ from bitcoinlib.services.bitcoind import BitcoindClient
 import flexitest
 
 
-def block_hash_endian_reverse(blockhash):
-    hex_pairs = [blockhash[i : i + 2] for i in range(0, len(blockhash), 2)]
-    hex_pairs.reverse()
-    return "".join(hex_pairs)
-
-
 @flexitest.register
 class L1ReadReorgTest(flexitest.Test):
     def __init__(self, ctx: flexitest.InitContext):
@@ -26,22 +20,10 @@ class L1ReadReorgTest(flexitest.Test):
         height_to_invalidate_from = int(l1stat["cur_height"]) - 3
         block_to_invalidate_from = btcrpc.proxy.getblockhash(height_to_invalidate_from)
         to_be_invalid_block = seqrpc.alp_l1blockHash(height_to_invalidate_from + 1)
-        print(
-            "recorded third block before reorg :",
-            block_hash_endian_reverse(
-                seqrpc.alp_l1blockHash(height_to_invalidate_from - 2)
-            ),
-        )
         btcrpc.proxy.invalidateblock(block_to_invalidate_from)
         time.sleep(2)
         block_from_invalidated_height = seqrpc.alp_l1blockHash(
             height_to_invalidate_from + 1
-        )
-        print(
-            "recorded third block after reorg :",
-            block_hash_endian_reverse(
-                seqrpc.alp_l1blockHash(height_to_invalidate_from + 1)
-            ),
         )
         assert (
             to_be_invalid_block != block_from_invalidated_height

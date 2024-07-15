@@ -1,12 +1,16 @@
 use std::sync::atomic::AtomicU64;
-use std::sync::Arc;
-use std::thread;
 use std::time::Duration;
 use std::{fmt::Display, str::FromStr};
 
 use async_trait::async_trait;
-use bitcoin::hashes::Hash;
 use bitcoin::Txid;
+
+use anyhow::anyhow;
+use base64::engine::general_purpose;
+use base64::Engine;
+use bitcoin::hashes::sha256d::Hash;
+use bitcoin::hashes::Hash as _;
+// use async_recursion::async_recursion;
 use bitcoin::{
     block::{Header, Version},
     consensus::deserialize,
@@ -132,11 +136,14 @@ type ClientResult<T> = Result<T, ClientError>;
 impl BitcoinClient {
     pub fn new(url: String, username: String, password: String, network: Network) -> Self {
         let mut headers = HeaderMap::new();
+        let mut user_pw = String::new();
+        general_purpose::STANDARD.encode_string(format!("{}:{}", username, password), &mut user_pw);
+            
         headers.insert(
             "Authorization",
             format!(
                 "Basic {}",
-                base64::encode(format!("{}:{}", username, password))
+                user_pw 
             )
             .parse()
             .expect("Failed to parse auth header!"),

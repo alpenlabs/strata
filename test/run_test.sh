@@ -1,3 +1,5 @@
+#! /bin/bash
+
 source env.bash 
 
 if [ "$CARGO_RELEASE" = 1 ]; then

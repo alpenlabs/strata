@@ -6,13 +6,14 @@ use std::sync::Arc;
 use std::thread;
 use std::time;
 
+use alpen_vertex_primitives::l1::L1Status;
 use anyhow::Context;
 use thiserror::Error;
 use tokio::sync::broadcast;
 use tokio::sync::{mpsc, oneshot, watch, RwLock};
 use tracing::*;
 
-use alpen_vertex_btcio::btcio_status::{btcio_event_handler, BtcioEvent, BtcioStatus};
+use alpen_vertex_btcio::btcio_status::{btcio_event_handler, BtcioEvent};
 use alpen_vertex_btcio::rpc::traits::L1Client;
 use alpen_vertex_common::logging;
 use alpen_vertex_consensus_logic::duties::{DutyBatch, Identity};
@@ -94,7 +95,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     ));
 
     // Set up btcio status to pass around cheaply
-    let l1_status: Arc<RwLock<BtcioStatus>> = Arc::new(RwLock::new(BtcioStatus::default()));
+    let l1_status: Arc<RwLock<L1Status>> = Arc::new(RwLock::new(L1Status::default()));
     // Set up Bitcoin client RPC.
     let bitcoind_url = format!("http://{}", args.bitcoind_host);
     let btc_rpc = alpen_vertex_btcio::rpc::BitcoinClient::new(
@@ -171,7 +172,7 @@ async fn main_task<D: Database + Send + Sync + 'static>(
     sync_man: Arc<SyncManager>,
     l1_rpc_client: impl L1Client,
     database: Arc<D>,
-    l1_status: Arc<RwLock<BtcioStatus>>,
+    l1_status: Arc<RwLock<L1Status>>,
 ) -> anyhow::Result<()>
 where
     // TODO how are these not redundant trait bounds???

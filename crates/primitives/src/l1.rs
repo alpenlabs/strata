@@ -4,6 +4,7 @@ use arbitrary::Arbitrary;
 use bitcoin::hashes::Hash;
 use bitcoin::{consensus::serialize, Block};
 use borsh::{BorshDeserialize, BorshSerialize};
+use serde::{Deserialize, Serialize};
 
 use crate::buf::Buf32;
 
@@ -168,4 +169,13 @@ impl fmt::Debug for OutputRef {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_fmt(format_args!("{:?}:{}", self.txid, self.outidx))
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct L1Status {
+    pub bitcoin_rpc_connected: bool,
+    pub cur_height: u64,
+    pub cur_tip_blkid: String,
+    pub last_update: u64,
+    pub last_rpc_error: Option<String>,
 }

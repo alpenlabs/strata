@@ -782,6 +782,7 @@ dependencies = [
  "digest 0.10.7",
  "hex",
  "reth-primitives",
+ "serde",
  "sha2 0.10.8",
 ]
 
@@ -789,7 +790,7 @@ dependencies = [
 name = "alpen-vertex-rpc-api"
 version = "0.1.0"
 dependencies = [
- "alpen-vertex-btcio",
+ "alpen-vertex-primitives",
  "jsonrpsee",
  "serde",
 ]
