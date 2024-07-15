@@ -205,7 +205,7 @@ pub struct DispatchCommand {
     withdraw_outputs: Vec<WithdrawOutput>,
 }
 
-/// An output constructed from [``bridge_ops::WithdrawalIntent``].
+/// An output constructed from [`crate::bridge_ops::WithdrawalIntent`].
 #[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
 pub struct WithdrawOutput {
     /// Taproot pubkey.
