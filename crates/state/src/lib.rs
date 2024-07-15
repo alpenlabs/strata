@@ -1,4 +1,5 @@
-#![feature(is_sorted)] // TODO switch to using crate
+#![allow(dead_code)] // TODO: remove once the bridge state `sanity_check` fn is used.
+#![feature(is_sorted)] // TODO: switch to using crate
 
 //! Rollup types relating to the consensus-layer state of the rollup.
 //!
