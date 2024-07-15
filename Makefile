@@ -97,7 +97,11 @@ ensure-codespell:
 
 .PHONY: lint-codepsell
 lint-codespell: ensure-codespell # Runs `codespell` to check for spelling errors.
-	codespell --skip "*.json,target"
+	codespell
+
+.PHONY: lint-fix-codepsell
+lint-fix-codespell: ensure-codespell # Runs `codespell` to fix spelling errors if possible.
+	codespell -w
 
 .PHONY: lint
 lint: ## Runs all lints and checks for issues without trying to fix them.
@@ -105,9 +109,10 @@ lint: ## Runs all lints and checks for issues without trying to fix them.
 	make lint-codespell && \
 	make fmt-check-ws
 
-.PHONY: fix-lint
-fix-lint: ## Runs all lints and applies fixes where possible.
+.PHONY: lint-fix
+lint-fix: ## Runs all lints and applies fixes where possible.
 	make lint-fix-ws && \
+	make lint-fix-codespell && \
 	make fmt-ws
 
 .PHONY: rustdocs
