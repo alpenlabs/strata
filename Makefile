@@ -132,6 +132,6 @@ test: ## Runs all tests in the workspace including unit and docs tests.
 	make test-doc
 
 .PHONY: pr
-pr: ## Runs lints and unit tests (run this before creating a PR).
+pr: ## Runs lints (without fixing) and unit tests (run this before creating a PR).
 	make lint && \
 	make test-unit
