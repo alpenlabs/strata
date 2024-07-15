@@ -159,7 +159,7 @@ impl<T: ELHttpClient> RpcExecEngineCtl<T> {
             }
             PayloadStatusEnum::Syncing => EngineResult::Ok(BlockStatus::Syncing),
             PayloadStatusEnum::Invalid { .. } => EngineResult::Ok(BlockStatus::Invalid),
-            PayloadStatusEnum::Accepted => EngineResult::Err(EngineError::Unimplemented), // should not be possible
+            PayloadStatusEnum::Accepted => EngineResult::Err(EngineError::Unimplemented), /* should not be possible */
         }
     }
 

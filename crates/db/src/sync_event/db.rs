@@ -62,8 +62,8 @@ impl SyncEventStore for SyncEventDb {
 
         let iterator = self.db.iter::<SyncEventSchema>()?;
 
-        // TODO: determine if the expectation behaviour for this is to clear early events or clear late events
-        // The implementation is based for early events
+        // TODO: determine if the expectation behaviour for this is to clear early events or clear
+        // late events. The implementation is based for early events
         let mut batch = SchemaBatch::new();
 
         for res in iterator {

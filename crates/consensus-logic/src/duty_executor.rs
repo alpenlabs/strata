@@ -241,7 +241,8 @@ fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     // pull out the current tip block from it
     // XXX this is really bad as-is
     let cs_prov = database.client_state_provider();
-    let ckpt_idx = cs_prov.get_last_checkpoint_idx()?; // FIXME this isn't what this is for, it only works because we're checkpointing on every state right now
+    let ckpt_idx = cs_prov.get_last_checkpoint_idx()?; // FIXME this isn't what this is for, it only works because we're checkpointing on every state
+                                                       // right now
     let last_cstate = cs_prov
         .get_state_checkpoint(ckpt_idx)?
         .expect("dutyexec: get state checkpoint");
