@@ -13,8 +13,8 @@ use alpen_vertex_evmctl::engine::ExecEngineCtl;
 use alpen_vertex_primitives::params::Params;
 
 use crate::ctl::CsmController;
-use crate::message::{ForkChoiceMessage, ClientUpdateNotif, CsmMessage};
-use crate::{fork_choice_manager, errors, genesis, unfinalized_tracker, worker};
+use crate::message::{ClientUpdateNotif, CsmMessage, ForkChoiceMessage};
+use crate::{errors, fork_choice_manager, genesis, unfinalized_tracker, worker};
 
 pub struct SyncManager {
     params: Arc<Params>,
@@ -90,6 +90,7 @@ pub fn start_sync_tasks<
     let cw_state = worker::WorkerState::open(params.clone(), database.clone(), cupdate_tx)?;
     let cur_state = cw_state.cur_state().clone();
     let cur_tip_blkid = *cur_state.chain_tip_blkid();
+    let fin_tip_blkid = *cur_state.finalized_blkid();
 
     // Get the block's index.
     let l2_prov = database.l2_provider();
@@ -98,8 +99,14 @@ pub fn start_sync_tasks<
         .ok_or(errors::Error::MissingL2Block(cur_tip_blkid))?;
     let cur_tip_index = tip_block.header().blockidx();
 
+    let fin_block = l2_prov
+        .get_block_data(fin_tip_blkid)?
+        .ok_or(errors::Error::MissingL2Block(fin_tip_blkid))?;
+    let fin_tip_index = fin_block.header().blockidx();
+
     // Init the chain tracker from the state we figured out.
-    let chain_tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(cur_tip_blkid);
+    let mut chain_tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(fin_tip_blkid);
+    chain_tracker.load_unfinalized_blocks(fin_tip_index + 1, l2_prov.as_ref())?;
     let ct_state = fork_choice_manager::ForkChoiceManager::new(
         params.clone(),
         database.clone(),
@@ -108,14 +115,14 @@ pub fn start_sync_tasks<
         cur_tip_blkid,
         cur_tip_index,
     );
-    // TODO load unfinalized blocks into block tracker
 
     // Start core threads.
     // TODO set up watchdog for these things
     let eng_ct = engine.clone();
     let eng_cw = engine.clone();
     let ctl_ct = csm_ctl.clone();
-    let ct_handle = thread::spawn(|| fork_choice_manager::tracker_task(ct_state, eng_ct, ctm_rx, ctl_ct));
+    let ct_handle =
+        thread::spawn(|| fork_choice_manager::tracker_task(ct_state, eng_ct, ctm_rx, ctl_ct));
     let cw_handle = thread::spawn(|| worker::consensus_worker_task(cw_state, eng_cw, csm_rx));
 
     // TODO do something with the handles
