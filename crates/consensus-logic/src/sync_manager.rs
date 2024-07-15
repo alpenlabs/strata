@@ -79,12 +79,17 @@ pub fn start_sync_tasks<
     // TODO should this be in an `Arc`?  it's already fairly compact so we might
     // not be benefitting from the reduced cloning
     let (cupdate_tx, cupdate_rx) = broadcast::channel::<Arc<ClientUpdateNotif>>(64);
+    let my_db = database.clone();
+    let my_params = params.clone();
+    let my_csm_ctl = csm_ctl.clone();
 
-    // Check if we have to do genesis.
-    if genesis::check_needs_genesis(database.as_ref())? {
-        info!("we need to do genesis!");
-        genesis::init_genesis_states(&params, database.as_ref())?;
-    }
+    // Check for genesis, init consensus worker and init the chain tracker 
+    thread::spawn(move || -> anyhow::Result<()> {
+        // Check if we have to do genesis.
+        if genesis::check_needs_genesis(my_db.as_ref())? {
+            info!("we need to do genesis!");
+            genesis::init_genesis_states(&my_params, my_db.as_ref())?;
+        }
 
     // Init the consensus worker state and get the current state from it.
     let cw_state = worker::WorkerState::open(params.clone(), database.clone(), cupdate_tx)?;
@@ -92,12 +97,12 @@ pub fn start_sync_tasks<
     let cur_tip_blkid = *cur_state.chain_tip_blkid();
     let fin_tip_blkid = *cur_state.finalized_blkid();
 
-    // Get the block's index.
-    let l2_prov = database.l2_provider();
-    let tip_block = l2_prov
-        .get_block_data(cur_tip_blkid)?
-        .ok_or(errors::Error::MissingL2Block(cur_tip_blkid))?;
-    let cur_tip_index = tip_block.header().blockidx();
+        // Get the block's index.
+        let l2_prov = my_db.l2_provider();
+        let tip_block = l2_prov
+            .get_block_data(cur_tip_blkid)?
+            .ok_or(errors::Error::MissingL2Block(cur_tip_blkid))?;
+        let cur_tip_index = tip_block.header().blockidx();
 
     let fin_block = l2_prov
         .get_block_data(fin_tip_blkid)?
@@ -125,7 +130,9 @@ pub fn start_sync_tasks<
         thread::spawn(|| fork_choice_manager::tracker_task(ct_state, eng_ct, ctm_rx, ctl_ct));
     let cw_handle = thread::spawn(|| worker::consensus_worker_task(cw_state, eng_cw, csm_rx));
 
-    // TODO do something with the handles
+        // TODO do something with the handles
+        Ok(())
+    });
 
     Ok(SyncManager {
         params,

@@ -15,7 +15,7 @@ impl Default for ReaderConfig {
             #[cfg(test)]
             max_reorg_depth: 3,
 
-            client_poll_dur_ms: 1000,
+            client_poll_dur_ms: 100,
         }
     }
 }
