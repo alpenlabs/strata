@@ -93,9 +93,7 @@ pub fn compute_reorg(
             // to do it.
             if let Some((idx, pivot)) = up_blocks
                 .iter()
-                .enumerate()
-                .filter(|(_, id)| **id == down_parent)
-                .next()
+                .enumerate().find(|(_, id)| **id == down_parent)
             {
                 // Cool, now we have our pivot.
                 let pivot = **pivot;
@@ -115,9 +113,7 @@ pub fn compute_reorg(
             // Do this crazy thing again but in the other direction.
             if let Some((idx, pivot)) = down_blocks
                 .iter()
-                .enumerate()
-                .filter(|(_, id)| **id == up_parent)
-                .next()
+                .enumerate().find(|(_, id)| **id == up_parent)
             {
                 let pivot = **pivot;
                 let down = down_blocks.into_iter().take(idx).copied().collect();

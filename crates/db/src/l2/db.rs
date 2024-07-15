@@ -153,7 +153,7 @@ mod tests {
         let res = l2_db
             .del_block_data(block_hash)
             .expect("failed to remove the block");
-        assert!(res == false);
+        assert!(!res);
 
         // deleting existing block should return true
         l2_db
@@ -166,7 +166,7 @@ mod tests {
 
         // assert block is deleted from the db
         let received_block = l2_db
-            .get_block_data(block_hash.clone())
+            .get_block_data(block_hash)
             .expect("failed to retrieve block data");
         assert!(received_block.is_none());
 

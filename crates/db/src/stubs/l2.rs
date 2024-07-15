@@ -15,6 +15,12 @@ pub struct StubL2Db {
     heights: Mutex<HashMap<u64, Vec<L2BlockId>>>,
 }
 
+impl Default for StubL2Db {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl StubL2Db {
     pub fn new() -> Self {
         Self {

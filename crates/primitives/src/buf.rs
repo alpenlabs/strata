@@ -125,7 +125,7 @@ impl From<[u8; 64]> for Buf64 {
 impl BorshSerialize for Buf20 {
     fn serialize<W: Write>(&self, writer: &mut W) -> io::Result<()> {
         let bytes = self.0.as_ref();
-        let _ = writer.write(&bytes)?;
+        let _ = writer.write(bytes)?;
         Ok(())
     }
 }
@@ -141,7 +141,7 @@ impl BorshDeserialize for Buf20 {
 impl BorshSerialize for Buf32 {
     fn serialize<W: Write>(&self, writer: &mut W) -> io::Result<()> {
         let bytes = self.0.as_ref();
-        let _ = writer.write(&bytes)?;
+        let _ = writer.write(bytes)?;
         Ok(())
     }
 }
@@ -157,7 +157,7 @@ impl BorshDeserialize for Buf32 {
 impl BorshSerialize for Buf64 {
     fn serialize<W: Write>(&self, writer: &mut W) -> io::Result<()> {
         let bytes = self.0.as_ref();
-        let _ = writer.write(&bytes)?;
+        let _ = writer.write(bytes)?;
         Ok(())
     }
 }

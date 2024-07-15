@@ -144,7 +144,7 @@ impl<T> StateQueue<T> {
     }
 
     /// Iterates over the entries in the queue, from front to back.
-    pub fn iter_entries<'q>(&'q self) -> impl Iterator<Item = (u64, &'q T)> {
+    pub fn iter_entries(&self) -> impl Iterator<Item = (u64, &'_ T)> {
         self.entries
             .iter()
             .enumerate()

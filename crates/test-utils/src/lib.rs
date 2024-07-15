@@ -15,6 +15,12 @@ pub struct ArbitraryGenerator {
     buffer: Vec<u8>,
 }
 
+impl Default for ArbitraryGenerator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ArbitraryGenerator {
     pub fn new() -> Self {
         let mut rng = rand::thread_rng();
@@ -39,7 +45,7 @@ pub fn get_rocksdb_tmp_instance() -> anyhow::Result<Arc<rockbound::DB>> {
     let temp_dir = TempDir::new().expect("failed to create temp dir");
 
     let rbdb = rockbound::DB::open(
-        &temp_dir.into_path(),
+        temp_dir.into_path(),
         dbname,
         cfs.iter().map(|s| s.to_string()),
         &opts,

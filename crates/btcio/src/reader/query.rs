@@ -5,7 +5,11 @@ use std::time::{self, Duration};
 use alpen_vertex_primitives::l1::L1Status;
 use anyhow::bail;
 use bitcoin::{Block, BlockHash};
+<<<<<<< HEAD
 use tokio::sync::{mpsc, RwLock};
+=======
+use tokio::sync::mpsc;
+>>>>>>> 0f3a2e7 (fix: apply fixes suggested by clippy)
 use tracing::*;
 
 use super::config::ReaderConfig;
@@ -175,8 +179,12 @@ async fn do_reader_task(
         let cur_height = state.cur_height;
         let poll_span = debug_span!("l1poll", %cur_height);
 
+<<<<<<< HEAD
 
         if let Err(err) = poll_for_new_blocks(client, &event_tx, &config, &mut state, status_updates)
+=======
+        match poll_for_new_blocks(client, event_tx, &config, &mut state)
+>>>>>>> 0f3a2e7 (fix: apply fixes suggested by clippy)
             .instrument(poll_span)
             .await
         {

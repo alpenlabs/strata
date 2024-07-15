@@ -115,7 +115,7 @@ impl L1DataProvider for L1Db {
         let (block_height, txindex) = tx_ref.into();
         let tx = self
             .db
-            .get::<L1BlockSchema>(&(block_height as u64))
+            .get::<L1BlockSchema>(&{ block_height })
             .and_then(|mf_opt| match mf_opt {
                 Some(mf) => {
                     let txs_opt = self.db.get::<TxnSchema>(&mf.block_hash())?;

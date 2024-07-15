@@ -192,7 +192,7 @@ impl<T: ELHttpClient> RpcExecEngineCtl<T> {
         let forkchoice_result = self
             .client
             .fork_choice_updated_v2(
-                self.fork_choice_state.lock().await.clone(),
+                *self.fork_choice_state.lock().await,
                 Some(payload_attributes),
             )
             .await;

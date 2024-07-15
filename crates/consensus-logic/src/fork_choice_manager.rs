@@ -8,7 +8,7 @@ use tracing::*;
 
 use alpen_vertex_db::errors::DbError;
 use alpen_vertex_db::traits::{
-    BlockStatus, ChainstateProvider, ChainstateStore, Database, L2DataProvider, L2DataStore
+    BlockStatus, ChainstateProvider, ChainstateStore, Database, L2DataProvider, L2DataStore,
 };
 use alpen_vertex_evmctl::engine::ExecEngineCtl;
 use alpen_vertex_evmctl::messages::ExecPayloadData;
@@ -138,15 +138,10 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
 
             // TODO use output actions to clear out dangling states now
             for act in output.actions() {
-                match act {
-                    SyncAction::FinalizeBlock(blkid) => {
-                        let fin_report = state.chain_tracker.update_finalized_tip(blkid)?;
-                        info!(?blkid, ?fin_report, "finalized block")
-                        // TODO do something with the finalization report
-                    }
-
-                    // TODO
-                    _ => {}
+                if let SyncAction::FinalizeBlock(blkid) = act {
+                    let fin_report = state.chain_tracker.update_finalized_tip(blkid)?;
+                    info!(?blkid, ?fin_report, "finalized block")
+                    // TODO do something with the finalization report
                 }
             }
 
@@ -236,7 +231,7 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
                     }
 
                     // Everything else we should fail on.
-                    return Err(e.into());
+                    return Err(e);
                 }
 
                 // TODO also update engine tip block
@@ -292,7 +287,7 @@ fn check_new_block<D: Database>(
 /// to stay where we currently are unless there's a definitely-better fork.
 fn pick_best_block<'t, D: Database>(
     cur_tip: &'t L2BlockId,
-    mut tips_iter: impl Iterator<Item = &'t L2BlockId>,
+    tips_iter: impl Iterator<Item = &'t L2BlockId>,
     database: &D,
 ) -> Result<&'t L2BlockId, Error> {
     let l2prov = database.l2_provider();
@@ -305,7 +300,7 @@ fn pick_best_block<'t, D: Database>(
     // The implementation of this will only switch to a new tip if it's a higher
     // height than our current tip.  We'll make this more sophisticated in the
     // future if we have a more sophisticated consensus protocol.
-    while let Some(other_tip) = tips_iter.next() {
+    for other_tip in tips_iter {
         if other_tip == cur_tip {
             continue;
         }

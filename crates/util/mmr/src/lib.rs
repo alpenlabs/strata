@@ -155,7 +155,7 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
         self.peaks[current_height] = current_node;
         self.num += 1;
 
-        return updated_proof;
+        updated_proof
     }
 
     fn update_single_proof(
@@ -233,17 +233,17 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
         self.peaks[current_height] = current_node;
         self.num += 1;
 
-        return new_proof;
+        new_proof
     }
 
     pub fn verify(&self, proof: &MerkleProof<H>, leaf: &Hash) -> bool {
-        self.verify_raw(&proof.cohashes, proof.index, &leaf)
+        self.verify_raw(&proof.cohashes, proof.index, leaf)
     }
 
     fn verify_raw(&self, cohashes: &[Hash], leaf_index: u64, leaf_hash: &Hash) -> bool {
         let root = self.peaks[cohashes.len()];
 
-        if cohashes.len() == 0 {
+        if cohashes.is_empty() {
             return root == *leaf_hash;
         }
 
@@ -273,8 +273,8 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
         }
 
         match proof_list.iter().find(|proof| proof.index == index) {
-            Some(proof) => return Ok(Some(proof.clone())),
-            None => return Ok(None),
+            Some(proof) => Ok(Some(proof.clone())),
+            None => Ok(None),
         }
     }
 }
@@ -303,7 +303,7 @@ impl<H: MerkleHasher + Clone> MerkleProof<H> {
 
     /// verifies the hash against the current proof for given mmr
     pub fn verify_against_mmr(&self, mmr: &MerkleMr<H>, leaf_hash: Hash) -> bool {
-        mmr.verify(&self, &leaf_hash)
+        mmr.verify(self, &leaf_hash)
     }
 }
 
@@ -332,7 +332,7 @@ mod test {
 
     fn generate_hashes_for_n_integers(n: usize) -> Vec<Hash> {
         (0..n)
-            .map(|i| Sha256::digest(&i.to_be_bytes()).into())
+            .map(|i| Sha256::digest(i.to_be_bytes()).into())
             .collect::<Vec<Hash>>()
     }
 
@@ -349,7 +349,7 @@ mod test {
 
         let hash: Vec<Hash> = specific_nodes
             .iter()
-            .map(|i| Sha256::digest(&i.to_be_bytes()).into())
+            .map(|i| Sha256::digest(i.to_be_bytes()).into())
             .collect();
 
         (0..specific_nodes.len()).for_each(|i| {
@@ -377,7 +377,7 @@ mod test {
             .unwrap()
             .expect("Didn't find proof for given index");
 
-        let hash = Sha256::digest(&0_usize.to_be_bytes()).into();
+        let hash = Sha256::digest(0_usize.to_be_bytes()).into();
         assert!(mmr.verify(&proof, &hash));
     }
 
@@ -447,9 +447,9 @@ mod test {
             _pd: PhantomData,
         };
 
-        let hash = Sha256::digest(&6_usize.to_be_bytes()).into();
+        let hash = Sha256::digest(6_usize.to_be_bytes()).into();
 
-        assert!(matches!(mmr.verify(&invalid_proof, &hash), false));
+        assert!(!mmr.verify(&invalid_proof, &hash));
     }
 
     #[test]

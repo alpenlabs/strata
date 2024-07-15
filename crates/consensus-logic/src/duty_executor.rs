@@ -78,7 +78,7 @@ pub fn duty_tracker_task<D: Database, E: ExecEngineCtl>(
 
         // Publish the new batch.
         let batch = DutyBatch::new(ev_idx, duties_tracker.duties().to_vec());
-        if !batch_queue.send(batch).is_ok() {
+        if batch_queue.send(batch).is_err() {
             warn!("failed to publish new duties batch");
         }
     }
@@ -92,7 +92,7 @@ fn update_tracker<D: Database>(
     ident: &Identity,
     database: &D,
 ) -> Result<(), Error> {
-    let new_duties = duty_extractor::extract_duties(state, &ident, database)?;
+    let new_duties = duty_extractor::extract_duties(state, ident, database)?;
 
     // Figure out the block slot from the tip blockid.
     // TODO include the block slot in the consensus state
@@ -162,7 +162,7 @@ pub fn duty_dispatch_task<
             let sm = sync_man.clone();
             let db = database.clone();
             let e = engine.clone();
-            let _join = pool.execute(move || duty_exec_task(d, ik, sm, db, e));
+            pool.execute(move || duty_exec_task(d, ik, sm, db, e));
             trace!(%id, "dispatched duty exec task");
             pending_duties.insert(id, ());
         }

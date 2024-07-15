@@ -60,12 +60,12 @@ impl Error {
     }
 }
 
-impl Into<ErrorObjectOwned> for Error {
-    fn into(self) -> ErrorObjectOwned {
-        let code = self.code();
-        match self {
-            Self::OtherEx(m, b) => ErrorObjectOwned::owned::<_>(code, format!("{m}"), Some(b)),
-            _ => ErrorObjectOwned::owned::<serde_json::Value>(code, format!("{}", self), None),
+impl From<Error> for ErrorObjectOwned {
+    fn from(val: Error) -> Self {
+        let code = val.code();
+        match val {
+            Error::OtherEx(m, b) => ErrorObjectOwned::owned::<_>(code, m.to_string(), Some(b)),
+            _ => ErrorObjectOwned::owned::<serde_json::Value>(code, format!("{}", val), None),
         }
     }
 }

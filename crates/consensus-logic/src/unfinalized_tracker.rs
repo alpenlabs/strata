@@ -156,8 +156,8 @@ impl UnfinalizedBlockTracker {
         // Now actually go through and evict all the blocks we said we were
         // going to, adding more on as we add them.
         let mut evicted = Vec::new();
-        while !to_evict.is_empty() {
-            let evicting = to_evict.pop().unwrap();
+        while let Some(evicting) = to_evict.pop() {
+            
             let ent = self
                 .pending_table
                 .remove(&evicting)
