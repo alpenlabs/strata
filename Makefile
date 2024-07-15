@@ -52,19 +52,6 @@ cov-report-html: cov-unit ## Generate a HTML coverage report and open it in the 
 mutants-test: ## Runs `nextest` under `cargo-mutants`. Caution: This can take *really* long to run.
 	cargo mutants --workspace -j2
 
-.PHONY: activate
-activate: ## Activates `poetry` shell to work with python dependencies in the `test` directory.
-	cd test
-	poetry shell
-	poetry install
-	cd -
-
-.PHONY: test-functional
-test-functional: activate ## Runs functional tests.
-	cd test
-	./entry.py
-	cd -
-
 ##@ Code Quality
 
 .PHONY: fmt-ws
@@ -81,14 +68,6 @@ ensure-ruff:
 		exit 1; \
     fi
 
-.PHONY: fmt-functional-tests
-fmt-functional-tests: ensure-ruff # Formats the functional test files in the `test` directory.
-	cd test && ruff format && cd -
-
-.PHONY: fmt-check-functional-tests
-fmt-check-functional-tests: ensure-ruff # Reports files with formatting issues in the files in the `test` directory.
-	cd test && ruff format --check && cd -
- 
 .PHONY: lint-check-ws
 lint-check-ws: ## Checks for lint issues in the workspace.
 	cargo clippy \
@@ -98,7 +77,7 @@ lint-check-ws: ## Checks for lint issues in the workspace.
 	--tests \
 	--benches \
 	-- -D warnings
- 
+
 .PHONY: lint-fix-ws
 lint-fix-ws: ## Lints the workspace and applies fixes where possible.
 	cargo clippy \
@@ -124,15 +103,12 @@ lint-codespell: ensure-codespell # Runs `codespell` to check for spelling errors
 lint: ## Runs all lints and checks for issues without trying to fix them.
 	make lint-check-ws && \
 	make lint-codespell && \
-	make fmt-check-ws && \
-	make fmt-check-functional-tests
+	make fmt-check-ws
 
 .PHONY: fix-lint
 fix-lint: ## Runs all lints and applies fixes where possible.
 	make lint-fix-ws && \
-	make lint-fix-functional-tests && \
-	make fmt-ws && \
-	make fmt-functional-tests
+	make fmt-ws
 
 .PHONY: rustdocs
 rustdocs: ## Runs `cargo docs` to generate the Rust documents in the `target/doc` directory.
@@ -151,12 +127,11 @@ test-doc: ## Runs doctests on the workspace.
 	cargo test --doc --workspace
 
 .PHONY: test
-test: ## Runs all tests in the workspace including unit, docs and functional tests.
+test: ## Runs all tests in the workspace including unit and docs tests.
 	make test-unit && \
-	make test-functional && \
 	make test-doc
 
 .PHONY: pr
-pr: ## Runs lints and unit tests (run this before creating a PR). 
+pr: ## Runs lints and unit tests (run this before creating a PR).
 	make lint && \
 	make test-unit
