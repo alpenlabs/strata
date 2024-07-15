@@ -396,7 +396,7 @@ mod test {
         let hashed1: Hash = Sha256::digest(b"first").into();
 
         let mut mmr: MerkleMr<Sha256> = MerkleMr::new(14);
-        mmr.add_leaf(hashed1.try_into().unwrap());
+        mmr.add_leaf(hashed1);
 
         assert_eq!(
             mmr.get_single_root(),
@@ -412,9 +412,9 @@ mod test {
         let hashed1: Hash = Sha256::digest(b"first").into();
 
         let mut mmr: MerkleMr<Sha256> = MerkleMr::new(14);
-        mmr.add_leaf(hashed1.try_into().unwrap());
-        mmr.add_leaf(hashed1.try_into().unwrap());
-        mmr.add_leaf(hashed1.try_into().unwrap());
+        mmr.add_leaf(hashed1);
+        mmr.add_leaf(hashed1);
+        mmr.add_leaf(hashed1);
 
         assert_eq!(mmr.get_single_root(), Err(MerkleError::NotPowerOfTwo));
     }
@@ -424,10 +424,10 @@ mod test {
         let hashed1: Hash = Sha256::digest(b"first").into();
 
         let mut mmr: MerkleMr<Sha256> = MerkleMr::new(14);
-        mmr.add_leaf(hashed1.try_into().unwrap());
-        mmr.add_leaf(hashed1.try_into().unwrap());
-        mmr.add_leaf(hashed1.try_into().unwrap());
-        mmr.add_leaf(hashed1.try_into().unwrap());
+        mmr.add_leaf(hashed1);
+        mmr.add_leaf(hashed1);
+        mmr.add_leaf(hashed1);
+        mmr.add_leaf(hashed1);
 
         assert_eq!(
             mmr.get_single_root(),
@@ -515,7 +515,7 @@ mod test {
             proof = new_proof;
         }
 
-        assert!(proof.verify_against_mmr(&mmr, num_hash[0].try_into().unwrap()));
+        assert!(proof.verify_against_mmr(&mmr, num_hash[0]));
     }
 
     #[test]
@@ -534,7 +534,7 @@ mod test {
         }
 
         for i in 0..elem {
-            assert!(proof_list[i].verify_against_mmr(&mmr, num_hash[i].try_into().unwrap()));
+            assert!(proof_list[i].verify_against_mmr(&mmr, num_hash[i]));
         }
     }
 }
