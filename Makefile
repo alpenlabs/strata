@@ -27,7 +27,7 @@ help: ## Display this help.
 
 .PHONY: build
 build: ## Build the workspace into the `target` directory.
-	cargo build --workspace --features "$(FEATURES)" --profile "$(PROFILE)"
+	cargo build --workspace --bin "alpen-vertex-sequencer" --features "$(FEATURES)" --profile "$(PROFILE)"
 
 ##@ Test
 
@@ -72,6 +72,7 @@ ensure-ruff:
 lint-check-ws: ## Checks for lint issues in the workspace.
 	cargo clippy \
 	--workspace \
+	--bin "alpen-vertex-sequencer" \
 	--lib \
 	--examples \
 	--tests \
@@ -82,6 +83,7 @@ lint-check-ws: ## Checks for lint issues in the workspace.
 lint-fix-ws: ## Lints the workspace and applies fixes where possible.
 	cargo clippy \
 	--workspace \
+	--bin "alpen-vertex-sequencer" \
 	--lib \
 	--examples \
 	--tests \
