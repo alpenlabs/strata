@@ -4,6 +4,9 @@
 
 use l2::schemas::{L2BlockHeightSchema, L2BlockSchema, L2BlockStatusSchema};
 use rockbound::{schema::ColumnFamilyName, Schema};
+use sequencer::schemas::{
+    SeqBIdRevTxnIdxSchema, SeqBlobIdSchema, SeqBlobSchema, SeqL1TxIdSchema, SeqL1TxnSchema,
+};
 
 use crate::consensus_state::schemas::{ClientStateSchema, ClientUpdateOutputSchema};
 use crate::l1::schemas::{L1BlockSchema, MmrSchema, TxnSchema};
@@ -13,12 +16,14 @@ pub mod consensus_state;
 pub mod database;
 pub mod l1;
 pub mod l2;
+pub mod sequencer;
 pub mod stubs;
 pub mod sync_event;
 
 pub mod errors;
 pub mod macros;
 pub mod traits;
+pub mod types;
 
 pub type DbResult<T> = anyhow::Result<T, errors::DbError>;
 
@@ -34,10 +39,17 @@ pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
     L2BlockSchema::COLUMN_FAMILY_NAME,
     L2BlockStatusSchema::COLUMN_FAMILY_NAME,
     L2BlockHeightSchema::COLUMN_FAMILY_NAME,
+    // Sequencer db related schemas
+    SeqL1TxnSchema::COLUMN_FAMILY_NAME,
+    SeqL1TxIdSchema::COLUMN_FAMILY_NAME,
+    SeqBlobSchema::COLUMN_FAMILY_NAME,
+    SeqBlobIdSchema::COLUMN_FAMILY_NAME,
+    SeqBIdRevTxnIdxSchema::COLUMN_FAMILY_NAME,
     // TODO add col families for other store types
 ];
 
 // Re-exports
 pub use consensus_state::db::ConsensusStateDb;
 pub use l1::db::L1Db;
+pub use sequencer::db::SeqDb;
 pub use sync_event::db::SyncEventDb;
