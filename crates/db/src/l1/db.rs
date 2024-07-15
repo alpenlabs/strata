@@ -228,9 +228,9 @@ mod tests {
 
     #[test]
     fn test_insert_into_non_empty_db() {
-        let mut db = setup_db();
+        let db = setup_db();
         let idx = 1000;
-        insert_block_data(idx, &mut db); // first insertion
+        insert_block_data(idx, &db); // first insertion
 
         let invalid_idxs = vec![1, 2, 5000, 1000, 1002, 999]; // basically any id beside idx + 1
         for invalid_idx in invalid_idxs {
@@ -335,11 +335,11 @@ mod tests {
 
     #[test]
     fn test_get_block_data() {
-        let mut db = setup_db();
+        let db = setup_db();
         let idx = 1;
 
         // insert
-        let (mf, txs, _) = insert_block_data(idx, &mut db);
+        let (mf, txs, _) = insert_block_data(idx, &db);
 
         // fetch non existent block
         let non_idx = 200;
