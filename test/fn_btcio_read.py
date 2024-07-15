@@ -16,8 +16,7 @@ class L1StatusTest(flexitest.Test):
         btcrpc: BitcoindClient = btc.create_rpc()
         seqrpc = seq.create_rpc()
 
-        # add 1 blocks
-        time.sleep(2)
+        time.sleep(1)
         received_block = btcrpc.getblock(btcrpc.proxy.getbestblockhash())
         l1stat = seqrpc.alp_l1status()
 

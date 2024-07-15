@@ -150,6 +150,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
         brpc = bitcoind.create_rpc()
         brpc.proxy.createwallet("dummy")
 
+        # generate blocks every 500 millis
         generate_blocks(brpc, 0.5)
         rpc_port = bitcoind.get_prop("rpc_port")
         rpc_user = bitcoind.get_prop("rpc_user")
