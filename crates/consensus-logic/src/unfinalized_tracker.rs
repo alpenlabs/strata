@@ -50,7 +50,7 @@ impl UnfinalizedBlockTracker {
         }
     }
 
-    /// Returns the "fianlized tip", which is the base of the unfinalized tree.
+    /// Returns the "finalized tip", which is the base of the unfinalized tree.
     pub fn finalized_tip(&self) -> &L2BlockId {
         &self.finalized_tip
     }

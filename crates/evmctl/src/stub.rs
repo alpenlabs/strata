@@ -49,7 +49,7 @@ impl ExecEngineCtl for StubController {
     }
 
     fn prepare_payload(&self, _env: PayloadEnv) -> EngineResult<u64> {
-        // TODO do something with the payloads to make the status more belivable
+        // TODO do something with the payloads to make the status more believable
         let mut state = self.state.lock().unwrap();
         let idx = state.next_idx;
         state.next_idx += 1;

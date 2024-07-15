@@ -13,7 +13,7 @@ pub struct ExecPayloadData {
 
     /// CL operations pushed into the EL, such as deposits from L1.  This
     /// corresponds to the "withdrawals" field in the `ExecutionPayloadVX`
-    /// type(s), but is seperated here because we control it ourselves.
+    /// type(s), but is separated here because we control it ourselves.
     ///
     /// This is an "implicit" input from elsewhere in the CL STF.
     ops: Vec<Op>,
