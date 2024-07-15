@@ -56,7 +56,7 @@ mutants-test: ## Runs `nextest` under `cargo-mutants`. Caution: This can take *r
 
 .PHONY: fmt-ws
 fmt-ws: ## Format source code in the workspace.
-	cargo fmt --workspace
+	cargo fmt --all
 
 .PHONY: fmt-check-ws
 fmt-check-ws: ## Check formatting issues but do not fix automatically.
