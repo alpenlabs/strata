@@ -1,7 +1,4 @@
-use std::{
-    sync::Arc,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::sync::Arc;
 
 use bitcoin::consensus::serialize;
 use bitcoin::hashes::Hash;
@@ -9,10 +6,7 @@ use bitcoin::Block;
 use tokio::sync::mpsc;
 use tracing::*;
 
-use alpen_vertex_btcio::{
-    btcio_status::{blocking_send_btcio_event, BtcioEvent},
-    reader::messages::L1Event,
-};
+use alpen_vertex_btcio::reader::messages::L1Event;
 use alpen_vertex_db::traits::L1DataStore;
 use alpen_vertex_primitives::buf::Buf32;
 use alpen_vertex_primitives::l1::L1BlockManifest;
@@ -25,13 +19,12 @@ pub fn bitcoin_data_handler_task<L1D>(
     l1db: Arc<L1D>,
     csm_ctl: Arc<CsmController>,
     mut event_rx: mpsc::Receiver<L1Event>,
-    l1_status_tx: mpsc::Sender<BtcioEvent>,
 ) -> anyhow::Result<()>
 where
     L1D: L1DataStore + Sync + Send + 'static,
 {
     while let Some(event) = event_rx.blocking_recv() {
-        if let Err(e) = handle_event(event, l1db.as_ref(), csm_ctl.as_ref(), l1_status_tx.clone()) {
+        if let Err(e) = handle_event(event, l1db.as_ref(), csm_ctl.as_ref()) {
             error!(err = %e, "failed to handle L1 event");
         }
     }
@@ -44,7 +37,6 @@ fn handle_event<L1D>(
     event: L1Event,
     l1db: &L1D,
     csm_ctl: &CsmController,
-    l1_status_tx: mpsc::Sender<BtcioEvent>,
 ) -> anyhow::Result<()>
 where
     L1D: L1DataStore + Sync + Send + 'static,
@@ -79,22 +71,11 @@ where
             l1db.put_block_data(blockdata.block_num(), manifest, l1txs)?;
             info!(%l1blkid, txs = %num_txs, "wrote L1 block manifest");
 
-            let _ = l1_status_tx.blocking_send(BtcioEvent::CurTip(l1blkid.to_string()));
-            let _ = l1_status_tx.blocking_send(BtcioEvent::CurHeight(blockdata.block_num()));
             // Write to sync event db.
             let blkid: Buf32 = blockdata.block().block_hash().into();
             let ev = SyncEvent::L1Block(blockdata.block_num(), blkid.into());
             csm_ctl.submit_event(ev)?;
 
-            blocking_send_btcio_event(
-                l1_status_tx,
-                BtcioEvent::LastUpdate(
-                    SystemTime::now()
-                        .duration_since(UNIX_EPOCH)
-                        .unwrap()
-                        .as_millis() as u64,
-                ),
-            );
 
             Ok(())
         }

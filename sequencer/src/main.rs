@@ -13,7 +13,6 @@ use tokio::sync::broadcast;
 use tokio::sync::{mpsc, oneshot, watch, RwLock};
 use tracing::*;
 
-use alpen_vertex_btcio::btcio_status::{btcio_event_handler, BtcioEvent};
 use alpen_vertex_btcio::rpc::traits::L1Client;
 use alpen_vertex_common::logging;
 use alpen_vertex_consensus_logic::duties::{DutyBatch, Identity};
@@ -180,7 +179,6 @@ where
     <D as alpen_vertex_db::traits::Database>::L1Store: Send + Sync + 'static,
     <D as alpen_vertex_db::traits::Database>::L1Prov: Send + Sync + 'static,
 {
-    let (l1_status_tx, l1_status_rx) = mpsc::channel::<BtcioEvent>(100);
 
     // Start the L1 tasks to get that going.
     let csm_ctl = sync_man.get_csm_ctl();
@@ -189,7 +187,7 @@ where
         l1_rpc_client,
         database.clone(),
         csm_ctl,
-        l1_status_tx,
+        l1_status.clone(),
     )
     .await?;
 
@@ -208,7 +206,6 @@ where
     let rpc_handle = rpc_server.start(methods);
 
     // start a Btcio event handler
-    thread::spawn(move || btcio_event_handler(l1_status_rx, l1_status));
     info!("started RPC server");
 
     // Wait for a stop signal.

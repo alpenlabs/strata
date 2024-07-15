@@ -1,15 +1,16 @@
 use std::collections::VecDeque;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use alpen_vertex_primitives::l1::L1Status;
 use anyhow::bail;
 use bitcoin::{Block, BlockHash};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, RwLock};
 use tracing::*;
 
 use super::config::ReaderConfig;
 use super::messages::{BlockData, L1Event};
-use crate::btcio_status::{send_btcio_event, BtcioEvent};
+use crate::btcio_status::{btcio_event_handler, BtcioEvent};
 use crate::rpc::traits::L1Client;
 
 fn filter_interesting_txs(block: &Block) -> Vec<u32> {
@@ -126,26 +127,38 @@ pub async fn bitcoin_data_reader_task(
     event_tx: mpsc::Sender<L1Event>,
     cur_block_height: u64,
     config: Arc<ReaderConfig>,
-    l1_status_tx: mpsc::Sender<BtcioEvent>,
+    l1_status: Arc<RwLock<L1Status>>,
 ) {
+    let mut btcio_events = Vec::new();
     if let Err(e) = do_reader_task(
         &client,
         &event_tx,
         cur_block_height,
         config,
-        l1_status_tx.clone(),
+        &mut btcio_events,
+        l1_status.clone()
     )
     .await
     {
         if let Some(err) = e.downcast_ref::<reqwest::Error>() {
-            send_btcio_event(l1_status_tx.clone(), BtcioEvent::RpcError(err.to_string())).await;
+            btcio_events.push(BtcioEvent::RpcError(err.to_string()));
 
             if err.is_connect() {
-                send_btcio_event(l1_status_tx, BtcioEvent::RpcConnected(false)).await;
+                btcio_events.push(BtcioEvent::RpcConnected(false));
             }
         }
         error!(err = %e, "reader task exited");
     }
+
+    btcio_events.push(
+        BtcioEvent::LastUpdate(
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64,
+        ));
+
+    btcio_event_handler(&btcio_events, l1_status).await;
 }
 
 async fn do_reader_task(
@@ -153,20 +166,17 @@ async fn do_reader_task(
     event_tx: &mpsc::Sender<L1Event>,
     cur_block_height: u64,
     config: Arc<ReaderConfig>,
-    l1_status_tx: mpsc::Sender<BtcioEvent>,
+    btcio_events: &mut Vec<BtcioEvent>,
+    l1_status: Arc<RwLock<L1Status>>
 ) -> anyhow::Result<()> {
     info!(%cur_block_height, "started L1 reader task!");
-    // get blockchain info to check if we have connection or not
-    let _ = client.get_blockchain_info().await?;
-
-    send_btcio_event(l1_status_tx.clone(), BtcioEvent::RpcConnected(true)).await;
-
     let poll_dur = Duration::from_millis(config.client_poll_dur_ms as u64);
 
     let mut state = init_reader_state(
         cur_block_height,
         config.max_reorg_depth as usize * 2,
         client,
+        btcio_events
     )
     .await?;
     let best_blkid = state.best_block();
@@ -178,7 +188,7 @@ async fn do_reader_task(
         let cur_height = state.cur_height;
         let poll_span = debug_span!("l1poll", %cur_height);
 
-        match poll_for_new_blocks(client, &event_tx, &config, &mut state, l1_status_tx.clone())
+        match poll_for_new_blocks(client, &event_tx, &config, &mut state, btcio_events)
             .instrument(poll_span)
             .await
         {
@@ -189,6 +199,16 @@ async fn do_reader_task(
         }
 
         tokio::time::sleep(poll_dur).await;
+
+        btcio_events.push(
+            BtcioEvent::LastUpdate(
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis() as u64,
+            ));
+
+        btcio_event_handler(&btcio_events, l1_status.clone()).await;
     }
 }
 
@@ -197,6 +217,7 @@ async fn init_reader_state(
     target_block: u64,
     lookback: usize,
     client: &impl L1Client,
+    btcio_events: &mut Vec<BtcioEvent>
 ) -> anyhow::Result<ReaderState> {
     // Init the reader state using the blockid we were given, fill in a few blocks back.
     debug!(%target_block, "initializing reader state");
@@ -204,6 +225,7 @@ async fn init_reader_state(
 
     // Do some math to figure out where our start and end are.
     let chain_info = client.get_blockchain_info().await?;
+    btcio_events.push(BtcioEvent::RpcConnected(true));
     let start_height = i64::max(target_block as i64 - lookback as i64, 0) as u64;
     let end_height = u64::min(target_block, chain_info.blocks);
     debug!(%start_height, %end_height, "queried L1 client, have init range");
@@ -229,7 +251,7 @@ async fn poll_for_new_blocks(
     event_tx: &mpsc::Sender<L1Event>,
     _config: &ReaderConfig,
     state: &mut ReaderState,
-    l1_status_tx: mpsc::Sender<BtcioEvent>,
+    btcio_events: &mut Vec<BtcioEvent>,
 ) -> anyhow::Result<()> {
     let chain_info = client.get_blockchain_info().await?;
     let client_height = chain_info.blocks;
@@ -249,9 +271,8 @@ async fn poll_for_new_blocks(
                 warn!("unable to submit L1 reorg event, did persistence task exit?");
             }
 
-            send_btcio_event(l1_status_tx.clone(), BtcioEvent::CurHeight(pivot_height)).await;
-
-            send_btcio_event(l1_status_tx, BtcioEvent::CurTip(pivot_blkid.to_string())).await;
+            btcio_events.push(BtcioEvent::CurHeight(pivot_height));
+            btcio_events.push(BtcioEvent::CurTip(pivot_blkid.to_string()));
         }
     } else {
         // TODO make this case a bit more structured
@@ -264,7 +285,7 @@ async fn poll_for_new_blocks(
     // Now process each block we missed.
     let scan_start_height = state.cur_height + 1;
     for fetch_height in scan_start_height..=client_height {
-        let blkid = match fetch_and_process_block(fetch_height, client, event_tx, state).await {
+        let blkid = match fetch_and_process_block(fetch_height, client, event_tx, state, btcio_events).await {
             Ok(b) => b,
             Err(e) => {
                 warn!(%fetch_height, err = %e, "failed to fetch new block");
@@ -304,6 +325,7 @@ async fn fetch_and_process_block(
     client: &impl L1Client,
     event_tx: &mpsc::Sender<L1Event>,
     state: &mut ReaderState,
+    btcio_events: &mut Vec<BtcioEvent>
 ) -> anyhow::Result<BlockHash> {
     let block = client.get_block_at(height).await?;
 
@@ -311,6 +333,8 @@ async fn fetch_and_process_block(
     let block_data = BlockData::new(height, block, filtered_txs);
     let blkid = block_data.block().block_hash();
 
+    btcio_events.push(BtcioEvent::CurHeight(height));
+    btcio_events.push(BtcioEvent::CurTip(blkid.to_string()));
     if let Err(e) = event_tx.send(L1Event::BlockData(block_data)).await {
         error!("failed to submit L1 block event, did the persistence task crash?");
         return Err(e.into());
