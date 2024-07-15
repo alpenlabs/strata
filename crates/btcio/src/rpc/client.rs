@@ -3,6 +3,8 @@ use std::time::Duration;
 use std::{fmt::Display, str::FromStr};
 
 use async_trait::async_trait;
+use bitcoin::hashes::Hash;
+use bitcoin::Txid;
 use bitcoin::{
     block::{Header, Version},
     consensus::deserialize,
@@ -10,6 +12,7 @@ use bitcoin::{
     Address, Block, BlockHash, CompactTarget, Network, Transaction,
 };
 use reqwest::header::HeaderMap;
+use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, to_value, value::RawValue, value::Value};
 use tracing::*;
@@ -75,6 +78,39 @@ pub enum ClientError {
 
     #[error("Error creating RPC Param")]
     ParamError(String),
+
+    #[error("BodyError: {0}")]
+    BodyError(String),
+
+    #[error("StatusError({0}): {1}")]
+    StatusError(StatusCode, String),
+
+    #[error("Malformed Response: {0}")]
+    MalformedResponse(String),
+
+    #[error("ConnectionError: {0}")]
+    ConnectionError(String),
+
+    #[error("Timeout")]
+    Timeout,
+
+    #[error("HttpRedirect: {0}")]
+    HttpRedirect(String),
+
+    #[error("Request Builder Error: {0}")]
+    ReqBuilderError(String),
+
+    #[error("Max retries {0} exceeded")]
+    MaxRetriesExceeded(u32),
+
+    #[error("RequestError: {0}")]
+    RequestError(String),
+
+    #[error("Wrong Network Address: {0}")]
+    WrongNetworkAddress(Network),
+
+    #[error("Signing Error")]
+    SigningError(Vec<String>),
 
     #[error("{0}")]
     Other(String),
@@ -160,36 +196,46 @@ impl BitcoinClient {
                 }
                 Err(err) => {
                     warn!(err = %err, "Error calling bitcoin client");
+
                     if err.is_body() {
                         // Body error, unlikely to be recoverable by retrying
-                        return Err(ClientError::Other(err.to_string()));
+                        return Err(ClientError::BodyError(err.to_string()));
                     } else if err.is_status() {
                         // HTTP status error, not retryable
-                        return Err(ClientError::Other(err.to_string()));
+                        let e = match err.status() {
+                            Some(code) => ClientError::StatusError(code, err.to_string()),
+                            _ => ClientError::Other(err.to_string()),
+                        };
+                        return Err(e);
                     } else if err.is_decode() {
                         // Error decoding the response, retry might not help
-                        return Err(ClientError::Other(err.to_string()));
+                        return Err(ClientError::MalformedResponse(err.to_string()));
                     } else if err.is_connect() {
                         // Connection error, retry might help
-                        return Err(ClientError::Other(err.to_string()));
+                        let e = ClientError::ConnectionError(err.to_string());
+                        warn!(%e, "connection error, retrying...");
                     } else if err.is_timeout() {
+                        let e = ClientError::Timeout;
                         // Timeout error, retry might help
+                        warn!(%e, "timeout error, retrying...");
                     } else if err.is_request() {
                         // General request error, retry might help
+                        let e = ClientError::RequestError(err.to_string());
+                        warn!(%e, "request error, retrying...");
                     } else if err.is_builder() {
                         // Error building the request, unlikely to be recoverable
-                        return Err(ClientError::Other(err.to_string()));
+                        return Err(ClientError::ReqBuilderError(err.to_string()));
                     } else if err.is_redirect() {
                         // Redirect error, not retryable
-                        return Err(ClientError::Other(err.to_string()));
+                        return Err(ClientError::HttpRedirect(err.to_string()));
                     } else {
                         // Unknown error, unlikely to be recoverable
-                        return Err(ClientError::NetworkError(err.to_string()));
+                        return Err(ClientError::Other("Unknown error".to_string()));
                     }
 
                     retries += 1;
                     if retries >= MAX_RETRIES {
-                        return Err(ClientError::Other("Max retries exceeded".to_string()));
+                        return Err(ClientError::MaxRetriesExceeded(MAX_RETRIES));
                     }
                     tokio::time::sleep(Duration::from_millis(200)).await;
                 }
@@ -220,9 +266,7 @@ impl BitcoinClient {
                 })
                 .collect())
         } else {
-            Err(ClientError::Other(
-                "Could not parse listransactions result".to_string(),
-            ))
+            Err(ClientError::MalformedResponse(res.to_string()))
         }
     }
 
@@ -233,11 +277,12 @@ impl BitcoinClient {
             .await?
             .to_string();
 
-        serde_json::from_str::<Vec<String>>(&result).map_err(|e| ClientError::Other(e.to_string()))
+        serde_json::from_str::<Vec<String>>(&result)
+            .map_err(|e| ClientError::MalformedResponse(e.to_string()))
     }
 
     // get_block returns the block at the given hash
-    pub async fn get_block(&self, hash: String) -> ClientResult<Block> {
+    pub async fn get_block(&self, hash: BlockHash) -> ClientResult<Block> {
         let result = self
             .call::<Box<RawValue>>("getblock", &[to_value(hash.to_string())?, to_value(3)?])
             .await?
@@ -299,7 +344,7 @@ impl BitcoinClient {
     async fn get_change_address(&self) -> ClientResult<Address> {
         let address_string = self.call::<String>("getrawchangeaddress", &[]).await?;
         let addr = Address::from_str(&address_string).and_then(|x| x.require_network(self.network));
-        addr.map_err(|e| ClientError::Other(e.to_string()))
+        addr.map_err(|_| ClientError::WrongNetworkAddress(self.network))
     }
 
     pub async fn get_change_addresses(&self) -> ClientResult<[Address; 2]> {
@@ -337,19 +382,17 @@ impl BitcoinClient {
             None => Ok(res.hex),
             Some(ref errors) => {
                 warn!("Error while signing with wallet: {:?}", res.errors);
-                // concat all errors
-                let err = errors
+                let errs = errors
                     .iter()
                     .map(|x| x.error.clone())
-                    .collect::<Vec<String>>()
-                    .join(",");
+                    .collect::<Vec<String>>();
 
                 // TODO: This throws error even when a transaction is partially signed. There does
                 // not seem to be other way to distinguish partially signed error from other
                 // errors. So in future, we might need to handle that particular case where error
                 // message is "CHECK(MULTI)SIG failing with non-zero signature (possibly need more
                 // signatures)"
-                Err(ClientError::Other(err))
+                Err(ClientError::SigningError(errs))
             }
         }
     }
@@ -404,17 +447,20 @@ impl L1Client for BitcoinClient {
         let hash = self
             .call::<String>("getblockhash", &[to_value(height)?])
             .await?;
-        Ok(BlockHash::from_str(&hash).map_err(|e| ClientError::Other(e.to_string()))?)
+        Ok(
+            BlockHash::from_str(&hash)
+                .map_err(|e| ClientError::MalformedResponse(e.to_string()))?,
+        )
     }
 
     async fn get_block_at(&self, height: u64) -> ClientResult<Block> {
         let hash = self.get_block_hash(height).await?;
-        let block = self.get_block(hex::encode(hash)).await?;
+        let block = self.get_block(hash).await?;
         Ok(block)
     }
 
     // send_raw_transaction sends a raw transaction to the network
-    async fn send_raw_transaction<T: AsRef<[u8]> + Send>(&self, tx: T) -> ClientResult<[u8; 32]> {
+    async fn send_raw_transaction<T: AsRef<[u8]> + Send>(&self, tx: T) -> ClientResult<Txid> {
         let txstr = hex::encode(tx);
         let resp = self
             .call::<String>("sendrawtransaction", &[to_value(txstr)?])
@@ -424,17 +470,14 @@ impl L1Client for BitcoinClient {
         match hex {
             Ok(hx) => {
                 if hx.len() != 32 {
-                    return Err(ClientError::Other(format!(
-                        "Invalid hex response from client"
-                    )));
+                    return Err(ClientError::MalformedResponse(resp));
                 }
                 let mut arr: [u8; 32] = [0; 32];
                 arr.copy_from_slice(&hx);
-                Ok(arr)
+                Ok(Txid::from_slice(&arr)
+                    .map_err(|e| ClientError::MalformedResponse(e.to_string()))?)
             }
-            Err(e) => Err(ClientError::ParseError(format!(
-                "{e}: Could not parse sendrawtransaction response: {resp}"
-            ))),
+            Err(e) => Err(ClientError::MalformedResponse(e.to_string())),
         }
     }
 
