@@ -58,15 +58,15 @@ pub fn apply_write_batch_to_chainstate(
         match op {
             StateOp::Replace(new_state) => chainstate = new_state.as_ref().clone(),
 
-            StateOp::RevertL1Height(to_height) => {
+            StateOp::RevertL1Height(_to_height) => {
                 // TODO
             }
 
-            StateOp::AcceptL1Block(new_blkid) => {
+            StateOp::AcceptL1Block(_new_blkid) => {
                 // TODO
             }
 
-            StateOp::MatureL1Block(maturing_idx) => {
+            StateOp::MatureL1Block(_maturing_idx) => {
                 // TODO
             }
         }
