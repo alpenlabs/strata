@@ -120,17 +120,15 @@ lint-fix: ## Runs all lints and applies fixes where possible.
 .PHONY: rustdocs
 rustdocs: ## Runs `cargo docs` to generate the Rust documents in the `target/doc` directory.
 	RUSTDOCFLAGS="\
-	--cfg docsrs \
 	--show-type-layout \
-	--generate-link-to-definition \
-	--enable-index-page -Zunstable-options -D warnings" \
-	cargo docs \
+	--enable-index-page -Z unstable-options \
+	-D warnings" \
+	cargo doc \
 	--workspace \
 	--document-private-items
 
 .PHONY: test-doc
 test-doc: ## Runs doctests on the workspace.
-	cargo test --doc --workspace
 	cargo test --doc --workspace
 
 .PHONY: test
