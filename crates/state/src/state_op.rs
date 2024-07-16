@@ -8,7 +8,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use crate::chain_state::ChainState;
 use crate::l1;
 
-#[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
+#[derive(Clone, Debug, PartialEq, BorshDeserialize, BorshSerialize)]
 pub enum StateOp {
     /// Replace the chain state with something completely different.
     Replace(Box<ChainState>),
@@ -26,7 +26,7 @@ pub enum StateOp {
 }
 
 /// Collection of writes we're making to the state.
-#[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
+#[derive(Clone, Debug, PartialEq, BorshDeserialize, BorshSerialize)]
 pub struct WriteBatch {
     ops: Vec<StateOp>,
 }

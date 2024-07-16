@@ -16,11 +16,17 @@ pub enum DbError {
     #[error("missing L1 block body (idx {0})")]
     MissingL1BlockBody(u64),
 
+    #[error("missing L2 state (idx {0})")]
+    MissingL2State(u64),
+
     #[error("not yet bootstrapped")]
     NotBootstrapped,
 
     #[error("tried to overwrite consensus checkpoint at idx {0}")]
     OverwriteConsensusCheckpoint(u64),
+
+    #[error("tried to overwrite state update at idx{0}. must purge in order to be repaced")]
+    OverwriteStateUpdate(u64),
 
     #[error("tried to purge data more recently than allowed")]
     PurgeTooRecent,
@@ -28,8 +34,8 @@ pub enum DbError {
     #[error("unknown state index {0}")]
     UnknownIdx(u64),
 
-    #[error("tried to revert to index above current tip")]
-    RevertAboveCurrent,
+    #[error("tried to revert to index {0} above current tip {1}")]
+    RevertAboveCurrent(u64, u64),
 
     #[error("rocksdb: {0}")]
     Rocksdb(#[from] rocksdb::Error),

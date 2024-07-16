@@ -8,11 +8,11 @@ use super::schemas::{ClientStateSchema, ClientUpdateOutputSchema};
 use crate::errors::*;
 use crate::traits::*;
 
-pub struct ConsensusStateDb {
+pub struct ClientStateDb {
     db: Arc<DB>,
 }
 
-impl ConsensusStateDb {
+impl ClientStateDb {
     /// Wraps an existing database handle.
     ///
     /// Assumes it was opened with column families as defined in `STORE_COLUMN_FAMILIES`.
@@ -37,7 +37,7 @@ impl ConsensusStateDb {
     }
 }
 
-impl ClientStateStore for ConsensusStateDb {
+impl ClientStateStore for ClientStateDb {
     fn write_client_update_output(&self, idx: u64, output: ClientUpdateOutput) -> DbResult<()> {
         let expected_idx = match self.get_last_idx::<ClientUpdateOutputSchema>()? {
             Some(last_idx) => last_idx + 1,
@@ -64,7 +64,7 @@ impl ClientStateStore for ConsensusStateDb {
     }
 }
 
-impl ClientStateProvider for ConsensusStateDb {
+impl ClientStateProvider for ClientStateDb {
     fn get_last_write_idx(&self) -> DbResult<u64> {
         match self.get_last_idx::<ClientUpdateOutputSchema>()? {
             Some(idx) => Ok(idx),
@@ -130,9 +130,9 @@ mod tests {
 
     use super::*;
 
-    fn setup_db() -> ConsensusStateDb {
+    fn setup_db() -> ClientStateDb {
         let db = get_rocksdb_tmp_instance().unwrap();
-        ConsensusStateDb::new(db)
+        ClientStateDb::new(db)
     }
 
     #[test]
