@@ -640,6 +640,8 @@ dependencies = [
  "alpen-vertex-db",
  "anyhow",
  "arbitrary",
+ "bitcoin",
+ "hex",
  "rand 0.8.5",
  "rockbound",
  "rocksdb",
@@ -663,6 +665,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "thiserror",
  "tokio",
  "tracing",
 ]
@@ -679,6 +682,7 @@ dependencies = [
 name = "alpen-vertex-consensus-logic"
 version = "0.1.0"
 dependencies = [
+ "alpen-test-utils",
  "alpen-vertex-btcio",
  "alpen-vertex-db",
  "alpen-vertex-evmctl",

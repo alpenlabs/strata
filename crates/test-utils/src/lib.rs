@@ -9,6 +9,8 @@ use arbitrary::{Arbitrary, Unstructured};
 use rand::Rng;
 use tempfile::TempDir;
 
+pub mod bitcoin;
+
 pub struct ArbitraryGenerator {
     buffer: Vec<u8>,
 }
