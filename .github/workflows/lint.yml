@@ -67,15 +67,15 @@ jobs:
           cache-on-failure: true
       - run: cargo doc --document-private-items
         env:
-          # Keep in sync with ./book.yml:jobs.build
-          # This should only add `-D warnings`
           RUSTDOCFLAGS: --show-type-layout --enable-index-page -Zunstable-options -D warnings
+      - name: Compress docs artifacts
+        run: tar czf vertex-core-docs.tar.gz target/doc
       - name: Archive docs
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: docs
-          path: target/doc
+          path: vertex-core-docs.tar.gz
 
   fmt:
     name: Check code formatting
