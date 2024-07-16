@@ -43,7 +43,14 @@ pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
     L2BlockSchema::COLUMN_FAMILY_NAME,
     L2BlockStatusSchema::COLUMN_FAMILY_NAME,
     L2BlockHeightSchema::COLUMN_FAMILY_NAME,
-    WriteBatchSchema::COLUMN_FAMILY_NAME, // TODO add col families for other store types
+    WriteBatchSchema::COLUMN_FAMILY_NAME,
+    // Seqdb schemas
+    SeqBIdRevTxnIdxSchema::COLUMN_FAMILY_NAME,
+    SeqBlobIdSchema::COLUMN_FAMILY_NAME,
+    SeqBlobSchema::COLUMN_FAMILY_NAME,
+    SeqL1TxIdSchema::COLUMN_FAMILY_NAME,
+    SeqL1TxnSchema::COLUMN_FAMILY_NAME,
+    // TODO add col families for other store types
 ];
 
 // Re-exports
