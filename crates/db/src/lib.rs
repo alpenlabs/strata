@@ -4,9 +4,6 @@
 
 use l2::schemas::{L2BlockHeightSchema, L2BlockSchema, L2BlockStatusSchema};
 use rockbound::{schema::ColumnFamilyName, Schema};
-use sequencer::schemas::{
-    SeqBIdRevTxnIdxSchema, SeqBlobIdSchema, SeqBlobSchema, SeqL1TxIdSchema, SeqL1TxnSchema,
-};
 
 use crate::chain_state::schemas::{ChainStateSchema, WriteBatchSchema};
 use crate::client_state::schemas::{ClientStateSchema, ClientUpdateOutputSchema};
