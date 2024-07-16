@@ -1,5 +1,6 @@
 #![allow(unused)]
 
+use alpen_vertex_state::client_state::ClientState;
 use async_trait::async_trait;
 use jsonrpsee::{
     core::RpcResult,
@@ -13,10 +14,10 @@ use reth_rpc_types::{
     StateContext, SyncInfo, SyncStatus, Transaction, TransactionRequest, Work,
 };
 use thiserror::Error;
-use tokio::sync::{oneshot, Mutex};
+use tokio::sync::{oneshot, watch, Mutex};
 use tracing::*;
 
-use alpen_vertex_rpc_api::{AlpenApiServer, L1Status};
+use alpen_vertex_rpc_api::{AlpenApiServer, ClientStatus, L1Status};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -62,12 +63,14 @@ impl Into<ErrorObjectOwned> for Error {
 
 pub struct AlpenRpcImpl {
     // TODO
+    client_state_rx: watch::Receiver<Option<ClientState>>,
     stop_tx: Mutex<Option<oneshot::Sender<()>>>,
 }
 
 impl AlpenRpcImpl {
-    pub fn new(stop_tx: oneshot::Sender<()>) -> Self {
+    pub fn new(client_state_rx:watch::Receiver<Option<ClientState>> ,stop_tx: oneshot::Sender<()>) -> Self {
         Self {
+            client_state_rx,
             stop_tx: Mutex::new(Some(stop_tx)),
         }
     }
@@ -97,5 +100,21 @@ impl AlpenApiServer for AlpenRpcImpl {
             cur_tip_blkid: String::new(),
             last_update: 0,
         })
+    }
+
+    async fn get_client_status(&self) -> RpcResult<ClientStatus> {
+       let mut client_status = ClientStatus::default();
+       if let Some(status) = self.client_state_rx.borrow().clone() {
+           client_status.chain_tip = status.chain_tip_blkid().to_string();
+           client_status.finalized_blkid = status.finalized_blkid().to_string();
+           if let Some(l1_block) = status.recent_l1_block() {
+               client_status.last_l1_block = l1_block.to_string();;
+           }
+           client_status.buried_l1_height = status.buried_l1_height();
+
+       }
+
+
+       Ok(client_status)
     }
 }

@@ -5,7 +5,8 @@
 use std::sync::Arc;
 use std::thread;
 
-use tokio::sync::{broadcast, mpsc};
+use alpen_vertex_state::client_state::ClientState;
+use tokio::sync::{broadcast, mpsc, watch};
 use tracing::*;
 
 use alpen_vertex_db::traits::{Database, L2DataProvider};
@@ -70,6 +71,7 @@ pub fn start_sync_tasks<
     engine: Arc<E>,
     pool: Arc<threadpool::ThreadPool>,
     params: Arc<Params>,
+    cl_state_tx: watch::Sender<Option<ClientState>>
 ) -> anyhow::Result<SyncManager> {
     // Create channels.
     let (ctm_tx, ctm_rx) = mpsc::channel::<ForkChoiceMessage>(64);
@@ -87,7 +89,7 @@ pub fn start_sync_tasks<
     }
 
     // Init the consensus worker state and get the current state from it.
-    let cw_state = worker::WorkerState::open(params.clone(), database.clone(), cupdate_tx)?;
+    let cw_state = worker::WorkerState::open(params.clone(), database.clone(), cupdate_tx, cl_state_tx)?;
     let cur_state = cw_state.cur_state().clone();
     let cur_tip_blkid = *cur_state.chain_tip_blkid();
     let fin_tip_blkid = *cur_state.finalized_blkid();

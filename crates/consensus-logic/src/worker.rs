@@ -2,10 +2,10 @@
 
 use std::sync::Arc;
 
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::{broadcast, mpsc, watch};
 use tracing::*;
 
-use alpen_vertex_db::{database, traits::*};
+use alpen_vertex_db::traits::*;
 use alpen_vertex_evmctl::engine::ExecEngineCtl;
 use alpen_vertex_primitives::prelude::*;
 use alpen_vertex_state::{client_state::ClientState, operation::SyncAction};
@@ -20,6 +20,7 @@ use crate::{
 ///
 /// Unable to be shared across threads.  Any data we want to export we'll do
 /// through another handle.
+#[allow(unused)]
 pub struct WorkerState<D: Database> {
     /// Consensus parameters.
     params: Arc<Params>,
@@ -33,6 +34,8 @@ pub struct WorkerState<D: Database> {
 
     /// Broadcast channel used to publish state updates.
     cupdate_tx: broadcast::Sender<Arc<ClientUpdateNotif>>,
+
+    cl_state_tx: watch::Sender<Option<ClientState>>
 }
 
 impl<D: Database> WorkerState<D> {
@@ -42,6 +45,7 @@ impl<D: Database> WorkerState<D> {
         params: Arc<Params>,
         database: Arc<D>,
         cupdate_tx: broadcast::Sender<Arc<ClientUpdateNotif>>,
+        cl_state_tx: watch::Sender<Option<ClientState>>
     ) -> anyhow::Result<Self> {
         let cs_prov = database.client_state_provider().as_ref();
         let (cur_state_idx, cur_state) = state_tracker::reconstruct_cur_state(cs_prov)?;
@@ -57,6 +61,7 @@ impl<D: Database> WorkerState<D> {
             database,
             state_tracker,
             cupdate_tx,
+            cl_state_tx
         })
     }
 
@@ -104,6 +109,9 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
 ) -> anyhow::Result<()> {
     // Perform the main step of deciding what the output we're operating on.
     let (outp, new_state) = state.state_tracker.advance_consensus_state(ev_idx)?;
+
+    // publish the client status 
+    state.cl_state_tx.send(Some((*new_state).clone()))?;
 
     for action in outp.actions() {
         match action {

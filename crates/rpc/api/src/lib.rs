@@ -15,6 +15,22 @@ pub struct L1Status {
     pub last_update: u64,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize, Default)]
+pub struct ClientStatus {
+    /// Blockchain tip.
+    pub chain_tip: String,
+
+    /// L2 block that's been finalized and proven on L1.
+    pub finalized_blkid: String,
+
+    /// Recent L1 blocks that we might still reorg.
+    pub last_l1_block: String,
+
+    /// L1 block index we treat as being "buried" and won't reorg.
+    pub buried_l1_height: u64,
+}
+
+
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "alp"))]
 #[cfg_attr(feature = "client", rpc(server, client, namespace = "alp"))]
 pub trait AlpenApi {
@@ -28,4 +44,7 @@ pub trait AlpenApi {
 
     #[method(name = "l1status")]
     async fn get_l1_status(&self) -> RpcResult<L1Status>;
+
+    #[method(name = "clientStatus")]
+    async fn get_client_status(&self) -> RpcResult<ClientStatus>;
 }

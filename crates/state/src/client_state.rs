@@ -48,4 +48,13 @@ impl ClientState {
     pub fn finalized_blkid(&self) -> &L2BlockId {
         &self.finalized_blkid
     }
+
+    pub fn recent_l1_block(&self) -> Option<&L1BlockId> {
+        self.recent_l1_blocks.last()
+    }
+
+    pub fn buried_l1_height(&self) -> u64 {
+        self.buried_l1_height
+    }
+
 }

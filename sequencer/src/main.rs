@@ -108,7 +108,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     // Create dataflow channels.
     let (_cout_tx, _cout_rx) = mpsc::channel::<operation::ClientUpdateOutput>(64);
-    let (_cur_state_tx, _cur_state_rx) = watch::channel::<Option<ClientState>>(None);
+    let (cur_state_tx, cur_state_rx) = watch::channel::<Option<ClientState>>(None);
     // TODO connect up these other channels
 
     // Init engine controller.
@@ -121,6 +121,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         eng_ctl.clone(),
         pool.clone(),
         params.clone(),
+        cur_state_tx.clone()
     )?;
     let sync_man = Arc::new(sync_man);
 
@@ -153,7 +154,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         });
     }
 
-    let main_fut = main_task(args, sync_man, btc_rpc, database.clone());
+    let main_fut = main_task(args, sync_man, btc_rpc, database.clone(), cur_state_rx);
     if let Err(e) = rt.block_on(main_fut) {
         error!(err = %e, "main task exited");
         process::exit(0); // special case exit once we've gotten to this point
@@ -168,6 +169,7 @@ async fn main_task<D: Database>(
     sync_man: Arc<SyncManager>,
     l1_rpc_client: impl L1Client,
     database: Arc<D>,
+    cur_state_rx: watch::Receiver<Option<ClientState>>
 ) -> anyhow::Result<()>
 where
     // TODO how are these not redundant trait bounds???
@@ -182,7 +184,7 @@ where
     let (stop_tx, stop_rx) = oneshot::channel();
 
     // Init RPC methods.
-    let alp_rpc = rpc_server::AlpenRpcImpl::new(stop_tx);
+    let alp_rpc = rpc_server::AlpenRpcImpl::new(cur_state_rx,stop_tx);
     let methods = alp_rpc.into_rpc();
 
     let rpc_port = args.rpc_port; // TODO make configurable

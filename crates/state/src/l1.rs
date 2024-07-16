@@ -1,3 +1,5 @@
+use core::fmt;
+
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
@@ -9,7 +11,6 @@ use crate::state_queue::StateQueue;
 #[derive(
     Copy,
     Clone,
-    Debug,
     Eq,
     PartialEq,
     Ord,
@@ -24,6 +25,18 @@ pub struct L1BlockId(Buf32);
 impl From<Buf32> for L1BlockId {
     fn from(value: Buf32) -> Self {
         Self(value)
+    }
+}
+
+impl fmt::Debug for L1BlockId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(&self.0, f)
+    }
+}
+
+impl fmt::Display for L1BlockId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.0, f)
     }
 }
 
