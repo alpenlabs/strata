@@ -1,6 +1,5 @@
 //! Fork choice manager. Used to talk to the EL and pick the new fork choice.
 
-use std::collections::*;
 use std::sync::Arc;
 
 use alpen_vertex_state::state_op;
@@ -9,8 +8,7 @@ use tracing::*;
 
 use alpen_vertex_db::errors::DbError;
 use alpen_vertex_db::traits::{
-    BlockStatus, ChainstateProvider, ChainstateStore, Database, L2DataProvider, L2DataStore,
-    SyncEventStore,
+    BlockStatus, ChainstateProvider, ChainstateStore, Database, L2DataProvider, L2DataStore
 };
 use alpen_vertex_evmctl::engine::ExecEngineCtl;
 use alpen_vertex_evmctl::messages::ExecPayloadData;
@@ -263,7 +261,7 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
 fn check_new_block<D: Database>(
     blkid: &L2BlockId,
     block: &L2Block,
-    cstate: &ClientState,
+    _cstate: &ClientState,
     state: &mut ForkChoiceManager<D>,
 ) -> anyhow::Result<bool, Error> {
     let params = state.params.as_ref();

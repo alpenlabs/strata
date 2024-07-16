@@ -82,6 +82,7 @@ pub fn start_sync_tasks<
     let my_db = database.clone();
     let my_params = params.clone();
     let my_csm_ctl = csm_ctl.clone();
+    
 
     // Check for genesis, init consensus worker and init the chain tracker 
     thread::spawn(move || -> anyhow::Result<()> {
@@ -92,7 +93,7 @@ pub fn start_sync_tasks<
         }
 
     // Init the consensus worker state and get the current state from it.
-    let cw_state = worker::WorkerState::open(params.clone(), database.clone(), cupdate_tx)?;
+    let cw_state = worker::WorkerState::open(my_params.clone(), database.clone(), cupdate_tx)?;
     let cur_state = cw_state.cur_state().clone();
     let cur_tip_blkid = *cur_state.chain_tip_blkid();
     let fin_tip_blkid = *cur_state.finalized_blkid();
@@ -113,7 +114,7 @@ pub fn start_sync_tasks<
     let mut chain_tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(fin_tip_blkid);
     chain_tracker.load_unfinalized_blocks(fin_tip_index + 1, l2_prov.as_ref())?;
     let ct_state = fork_choice_manager::ForkChoiceManager::new(
-        params.clone(),
+        my_params.clone(),
         database.clone(),
         cur_state,
         chain_tracker,
@@ -125,10 +126,10 @@ pub fn start_sync_tasks<
     // TODO set up watchdog for these things
     let eng_ct = engine.clone();
     let eng_cw = engine.clone();
-    let ctl_ct = csm_ctl.clone();
-    let ct_handle =
+    let ctl_ct = my_csm_ctl.clone();
+    let _ct_handle =
         thread::spawn(|| fork_choice_manager::tracker_task(ct_state, eng_ct, ctm_rx, ctl_ct));
-    let cw_handle = thread::spawn(|| worker::consensus_worker_task(cw_state, eng_cw, csm_rx));
+    let _cw_handle = thread::spawn(|| worker::consensus_worker_task(cw_state, eng_cw, csm_rx));
 
         // TODO do something with the handles
         Ok(())
