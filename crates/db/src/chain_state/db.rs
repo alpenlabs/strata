@@ -108,6 +108,7 @@ impl ChainstateStore for ChainStateDb {
         let mut del_batch = SchemaBatch::new();
         for idx in first_idx..before_idx {
             del_batch.delete::<ChainStateSchema>(&idx)?;
+            del_batch.delete::<WriteBatchSchema>(&idx)?;
         }
         self.db.write_schemas(del_batch)?;
         Ok(())
@@ -135,7 +136,7 @@ impl ChainstateStore for ChainStateDb {
         let mut del_batch = SchemaBatch::new();
         for idx in new_tip_idx + 1..=last_idx {
             del_batch.delete::<ChainStateSchema>(&idx)?;
-            del_batch.delete::<ChainStateSchema>(&idx)?;
+            del_batch.delete::<WriteBatchSchema>(&idx)?;
         }
         self.db.write_schemas(del_batch)?;
         Ok(())
@@ -204,6 +205,34 @@ mod tests {
     }
 
     #[test]
+    fn test_get_toplevel_state() {
+        let db = setup_db();
+        let genesis_state: ChainState = ArbitraryGenerator::new().generate();
+        let batch = WriteBatch::new_empty();
+
+        db.write_genesis_state(&genesis_state).unwrap();
+        for i in 1..=5 {
+            assert!(db.get_toplevel_state(i).unwrap().is_none());
+            db.write_state_update(i, &batch).unwrap();
+            assert!(db.get_toplevel_state(i).unwrap().is_some());
+        }
+    }
+
+    #[test]
+    fn test_get_earliest_and_last_state_idx() {
+        let db = setup_db();
+        let genesis_state: ChainState = ArbitraryGenerator::new().generate();
+        let batch = WriteBatch::new_empty();
+
+        db.write_genesis_state(&genesis_state).unwrap();
+        for i in 1..=5 {
+            assert_eq!(db.get_earliest_state_idx().unwrap(), 0);
+            db.write_state_update(i, &batch).unwrap();
+            assert_eq!(db.get_last_state_idx().unwrap(), i);
+        }
+    }
+
+    #[test]
     fn test_purge() {
         let db = setup_db();
         let genesis_state: ChainState = ArbitraryGenerator::new().generate();
@@ -217,10 +246,21 @@ mod tests {
         }
 
         db.purge_historical_state_before(3).unwrap();
+        // Ensure that calling the purge again does not fail
         db.purge_historical_state_before(3).unwrap();
 
         assert_eq!(db.get_earliest_state_idx().unwrap(), 3);
         assert_eq!(db.get_last_state_idx().unwrap(), 5);
+
+        for i in 0..3 {
+            assert!(db.get_writes_at(i).unwrap().is_none());
+            assert!(db.get_toplevel_state(i).unwrap().is_none());
+        }
+
+        for i in 3..=5 {
+            assert!(db.get_writes_at(i).unwrap().is_some());
+            assert!(db.get_toplevel_state(i).unwrap().is_some());
+        }
 
         let res = db.purge_historical_state_before(2);
         assert!(res.is_err_and(|x| matches!(x, DbError::MissingL2State(2))));
@@ -241,7 +281,22 @@ mod tests {
         }
 
         db.rollback_writes_to(3).unwrap();
+        // Ensures that calling the rollback again does not fail
         db.rollback_writes_to(3).unwrap();
+
+        for i in 4..=5 {
+            assert!(db.get_writes_at(i).unwrap().is_none());
+            assert!(db.get_toplevel_state(i).unwrap().is_none());
+        }
+
+        for i in 0..=3 {
+            assert!(db.get_toplevel_state(i).unwrap().is_some());
+        }
+
+        // For genesis there is no BatchWrites
+        for i in 1..=3 {
+            assert!(db.get_writes_at(i).unwrap().is_some());
+        }
 
         assert_eq!(db.get_earliest_state_idx().unwrap(), 0);
         assert_eq!(db.get_last_state_idx().unwrap(), 3);
