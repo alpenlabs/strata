@@ -133,9 +133,10 @@ mod tests {
     use super::*;
     use crate::errors::DbError;
     use crate::traits::{SeqDataProvider, SeqDataStore};
+    use crate::types::TxnStatusEntry;
     use alpen_test_utils::bitcoin::get_test_bitcoin_txns;
     use alpen_test_utils::get_rocksdb_tmp_instance;
-    use alpen_vertex_primitives::{buf::Buf32, l1::TxnStatusEntry};
+    use alpen_vertex_primitives::buf::Buf32;
     use rockbound::DB;
     use std::sync::Arc;
     use test;
@@ -149,8 +150,8 @@ mod tests {
 
         // NOTE that actually the commit reveal should be parent-child, but these are not.
         // This shouldn't matter here though.
-        let commit_txn = TxnStatusEntry::from_txn_unsent(txns[0].clone());
-        let reveal_txn = TxnStatusEntry::from_txn_unsent(txns[1].clone());
+        let commit_txn = TxnStatusEntry::from_txn_unsent(&txns[0]);
+        let reveal_txn = TxnStatusEntry::from_txn_unsent(&txns[1]);
         (commit_txn, reveal_txn)
     }
 
@@ -221,7 +222,7 @@ mod tests {
 
         // Check if blobid -> txidx mapping is created
         assert_eq!(
-            seq_db.get_txidx_for_blob(blob_hash).unwrap(),
+            seq_db.get_reveal_txidx_for_blob(blob_hash).unwrap(),
             Some(reveal_idx)
         );
     }
@@ -350,7 +351,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_txidx_for_blob_existing() {
+    fn test_get_reveal_txidx_for_blob_existing() {
         let db = setup_db();
         let seq_db = SeqDb::new(db.clone());
 
@@ -363,18 +364,18 @@ mod tests {
             .put_commit_reveal_txns(blob_hash, commit_txn, reveal_txn)
             .unwrap();
 
-        let result = seq_db.get_txidx_for_blob(blob_hash);
+        let result = seq_db.get_reveal_txidx_for_blob(blob_hash);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), Some(2));
     }
 
     #[test]
-    fn test_get_txidx_for_blob_nonexistent() {
+    fn test_get_reveal_txidx_for_blob_nonexistent() {
         let db = setup_db();
         let seq_db = SeqDb::new(db.clone());
 
         let blob_hash = Buf32::from([0u8; 32]);
-        let result = seq_db.get_txidx_for_blob(blob_hash);
+        let result = seq_db.get_reveal_txidx_for_blob(blob_hash);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), None);
     }
@@ -422,7 +423,7 @@ mod tests {
         seq_db.put_blob(blob_hash, blob).unwrap();
 
         let (ctxn, rtxn) = get_commit_reveal_txns();
-        seq_db.put_commit_reveal_txns(blob_hash, ctxn, rtxn);
+        let _ = seq_db.put_commit_reveal_txns(blob_hash, ctxn, rtxn);
 
         let result = seq_db.get_last_txn_idx().unwrap();
         assert_eq!(result, Some(2));
