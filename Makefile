@@ -58,13 +58,13 @@ sec: ## Check for security advisories on any dependencies.
 
 ##@ Code Quality
 
-.PHONY: fmt-ws
-fmt-ws: ## Format source code in the workspace.
-	cargo fmt --all
-
 .PHONY: fmt-check-ws
 fmt-check-ws: ## Check formatting issues but do not fix automatically.
 	cargo fmt --check
+
+.PHONY: fmt-ws
+fmt-ws: ## Format source code in the workspace.
+	cargo fmt --all
 
 .PHONY: ensure-taplo
 ensure-taplo:
