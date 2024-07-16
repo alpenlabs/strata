@@ -25,7 +25,7 @@ dependencies = [
  "memmap2",
  "object 0.35.0",
  "rustc-demangle",
- "smallvec",
+ "smallvec 1.13.2",
 ]
 
 [[package]]
@@ -646,7 +646,7 @@ dependencies = [
  "hashbrown 0.14.5",
  "nybbles",
  "serde",
- "smallvec",
+ "smallvec 1.13.2",
  "tracing",
 ]
 
@@ -806,8 +806,11 @@ dependencies = [
 name = "alpen-vertex-rpc-api"
 version = "0.1.0"
 dependencies = [
+ "alpen-vertex-state",
  "jsonrpsee",
  "serde",
+ "serde-hex",
+ "thiserror",
 ]
 
 [[package]]
@@ -1210,6 +1213,15 @@ checksum = "94893f1e0c6eeab764ade8dc4c0db24caf4fe7cbbaafc0eba0a9030f447b5185"
 dependencies = [
  "num-traits",
  "rand 0.8.5",
+]
+
+[[package]]
+name = "array-init"
+version = "0.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "23589ecb866b460d3a0f1278834750268c607e8e28a1b982c907219f3178cd72"
+dependencies = [
+ "nodrop",
 ]
 
 [[package]]
@@ -2646,7 +2658,7 @@ dependencies = [
  "more-asserts",
  "parking_lot 0.11.2",
  "rand 0.8.5",
- "smallvec",
+ "smallvec 1.13.2",
  "socket2 0.4.10",
  "tokio",
  "tracing",
@@ -3580,7 +3592,7 @@ dependencies = [
  "httpdate",
  "itoa",
  "pin-project-lite",
- "smallvec",
+ "smallvec 1.13.2",
  "tokio",
  "want",
 ]
@@ -3752,7 +3764,7 @@ dependencies = [
  "icu_normalizer_data",
  "icu_properties",
  "icu_provider",
- "smallvec",
+ "smallvec 1.13.2",
  "utf16_iter",
  "utf8_iter",
  "write16",
@@ -4458,7 +4470,7 @@ dependencies = [
  "quick-protobuf",
  "rand 0.8.5",
  "rw-stream-sink",
- "smallvec",
+ "smallvec 1.13.2",
  "thiserror",
  "tracing",
  "unsigned-varint 0.8.0",
@@ -4503,7 +4515,7 @@ dependencies = [
  "multistream-select",
  "once_cell",
  "rand 0.8.5",
- "smallvec",
+ "smallvec 1.13.2",
  "tracing",
  "void",
 ]
@@ -4731,6 +4743,12 @@ dependencies = [
  "quote",
  "syn 2.0.70",
 ]
+
+[[package]]
+name = "maybe-uninit"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "60302e4db3a61da70c0cb7991976248362f30319e88850c487b9b95bbf059e00"
 
 [[package]]
 name = "memchr"
@@ -4966,7 +4984,7 @@ dependencies = [
  "futures",
  "log",
  "pin-project",
- "smallvec",
+ "smallvec 1.13.2",
  "unsigned-varint 0.7.2",
 ]
 
@@ -5007,8 +5025,14 @@ version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77a5d83df9f36fe23f0c3648c6bbb8b0298bb5f1939c8f2704431371f4b84d43"
 dependencies = [
- "smallvec",
+ "smallvec 1.13.2",
 ]
+
+[[package]]
+name = "nodrop"
+version = "0.1.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "72ef4a56884ca558e5ddb05a1d1e7e1bfd9a68d9ed024c21704cc98872dae1bb"
 
 [[package]]
 name = "nom"
@@ -5207,7 +5231,7 @@ dependencies = [
  "const-hex",
  "proptest",
  "serde",
- "smallvec",
+ "smallvec 1.13.2",
 ]
 
 [[package]]
@@ -5375,7 +5399,7 @@ dependencies = [
  "instant",
  "libc",
  "redox_syscall 0.2.16",
- "smallvec",
+ "smallvec 1.13.2",
  "winapi",
 ]
 
@@ -5388,7 +5412,7 @@ dependencies = [
  "cfg-if",
  "libc",
  "redox_syscall 0.5.2",
- "smallvec",
+ "smallvec 1.13.2",
  "windows-targets 0.52.6",
 ]
 
@@ -7012,7 +7036,7 @@ dependencies = [
  "secp256k1",
  "serde",
  "serde_json",
- "smallvec",
+ "smallvec 1.13.2",
  "thiserror",
  "tokio",
  "tokio-stream",
@@ -7917,7 +7941,7 @@ dependencies = [
  "rustc-hash 2.0.0",
  "schnellru",
  "serde",
- "smallvec",
+ "smallvec 1.13.2",
  "thiserror",
  "tokio",
  "tokio-stream",
@@ -8828,6 +8852,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde-hex"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ca37e3e4d1b39afd7ff11ee4e947efae85adfddf4841787bfa47c470e96dc26d"
+dependencies = [
+ "array-init",
+ "serde",
+ "smallvec 0.6.14",
+]
+
+[[package]]
 name = "serde_bytes"
 version = "0.11.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9045,6 +9080,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f92a496fb766b417c996b9c5e57daf2f7ad3b0bebe1ccfca4856390e3d3bb67"
 dependencies = [
  "autocfg",
+]
+
+[[package]]
+name = "smallvec"
+version = "0.6.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b97fcaeba89edba30f044a10c6a3cc39df9c3f17d7cd829dd1446cab35f890e0"
+dependencies = [
+ "maybe-uninit",
 ]
 
 [[package]]
@@ -9784,7 +9828,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sharded-slab",
- "smallvec",
+ "smallvec 1.13.2",
  "thread_local",
  "tracing",
  "tracing-core",
@@ -9809,7 +9853,7 @@ dependencies = [
  "ipnet",
  "once_cell",
  "rand 0.8.5",
- "smallvec",
+ "smallvec 1.13.2",
  "thiserror",
  "tinyvec",
  "tokio",
@@ -9831,7 +9875,7 @@ dependencies = [
  "parking_lot 0.12.3",
  "rand 0.8.5",
  "resolv-conf",
- "smallvec",
+ "smallvec 1.13.2",
  "thiserror",
  "tokio",
  "tracing",
