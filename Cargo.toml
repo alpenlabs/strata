@@ -44,7 +44,6 @@ bitcoin = { version = "0.32.1", features = ["serde"] }
 borsh = { version = "1.5.0", features = ["derive"] }
 bytes = { version = "1.6.0" }
 digest = "0.10"
-num_enum = "0.7"
 futures = "0.3"
 hex = { version = "0.4", features = ["serde"] }
 http = "1.0.0"
@@ -53,6 +52,7 @@ jmt = "0.10.0"
 jsonrpsee = { version = "0.23", features = ["jsonrpsee-http-client"] }
 jsonrpsee-types = "0.23"
 mockall = "0.11"
+num_enum = "0.7"
 parking_lot = "0.12.3"
 rand = "0.8.5"
 reqwest = { version = "0.12.4", features = ["json"] }
@@ -61,8 +61,8 @@ reth-ipc = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
 reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
 reth-primitives = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
 reth-revm = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
-reth-rpc-api = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
 reth-rpc = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
+reth-rpc-api = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
 reth-rpc-layer = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
 reth-rpc-types = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
 rockbound = { git = "https://github.com/sovereign-Labs/rockbound", tag = "v2.0.1" }

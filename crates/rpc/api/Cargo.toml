@@ -10,4 +10,7 @@ alpen-vertex-state = { workspace = true }
 hex = { workspace = true }
 jsonrpsee = { workspace = true, features = ["server", "macros"] }
 serde = { workspace = true }
+<<<<<<< HEAD
 thiserror = { workspace = true }
+=======
+>>>>>>> c9c6402 (chore: format TOML files with taplo)
