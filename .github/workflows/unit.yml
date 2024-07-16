@@ -56,6 +56,11 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     continue-on-error: true # FIXME: remove this if all mutants are covered
+    needs: [test]
+    strategy:
+      fail-fast: false # Collect all mutants even if some are missed
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -71,7 +76,7 @@ jobs:
           tool: cargo-mutants
       - name: Run `cargo-mutants`
         run: |
-          cargo mutants --no-shuffle -vV --in-diff git.diff
+          cargo mutants --no-shuffle -vV --in-diff git.diff --shard ${{ matrix.shard }}/8 --baseline=skip --timeout 300
       - name: Archive mutants.out
         uses: actions/upload-artifact@v4
         if: always()
