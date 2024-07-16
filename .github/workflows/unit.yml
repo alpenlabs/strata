@@ -1,6 +1,6 @@
 # Runs unit tests.
 
-name: unit
+name: Unit Tests
 
 on:
   pull_request:
@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   test:
-    name: Run tests and generate report
+    name: Test and generate report
     runs-on: ubuntu-latest
     # nightly rust might break from time to time
     continue-on-error: true
@@ -52,7 +52,7 @@ jobs:
           files: lcov.info
 
   mutants-test:
-    name: Run cargo-mutants on diff
+    name: Generate mutants on diff and test
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     continue-on-error: true # FIXME: remove this if all mutants are covered
@@ -69,7 +69,7 @@ jobs:
         name: Install `cargo-mutants`
         with:
           tool: cargo-mutants
-      - name: Mutants
+      - name: Run `cargo-mutants`
         run: |
           cargo mutants --no-shuffle -vV --in-diff git.diff
       - name: Archive mutants.out
@@ -80,7 +80,7 @@ jobs:
           path: mutants.out
 
   doc:
-    name: doc tests
+    name: Run doc tests
     runs-on: ubuntu-latest
     env:
       RUST_BACKTRACE: 1
@@ -95,7 +95,7 @@ jobs:
         run: cargo test --doc --workspace
 
   unit-success:
-    name: unit success
+    name: Check that unit tests pass
     runs-on: ubuntu-latest
     if: always()
     needs: [test, mutants-test, doc]

@@ -1,4 +1,4 @@
-name: security
+name: Security
 
 on:
   pull_request:
@@ -10,8 +10,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  security:
-    name: audit
+  supply-chain:
+    name: Run `cargo-audit`
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
