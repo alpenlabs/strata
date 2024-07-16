@@ -43,6 +43,7 @@ jobs:
           cargo llvm-cov --workspace nextest --profile ci --lcov --output-path lcov.info
       - name: Test Summary
         uses: test-summary/action@v2
+        if: always()
         with:
           paths: "target/nextest/ci/junit.xml"
       - name: Publish Test Coverage
