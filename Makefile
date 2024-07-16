@@ -66,6 +66,21 @@ fmt-ws: ## Format source code in the workspace.
 fmt-check-ws: ## Check formatting issues but do not fix automatically.
 	cargo fmt --check
 
+.PHONY: ensure-taplo
+ensure-taplo:
+	@if ! command -v ruff &> /dev/null; then \
+		echo "taplo not found. Please install it by running the command `cargo install taplo-cli --locked` or refer to the following link for more information: https://taplo.tamasfe.dev/cli/installation/binary.html" \
+		exit 1; \
+    fi
+
+.PHONY: fmt-check-toml
+fmt-check-toml: ensure-taplo ## Runs `taplo` to check that TOML files are properly formatted
+	taplo fmt --check
+
+.PHONY: fmt-toml
+fmt-toml: ensure-taplo ## Runs `taplo` to format TOML files
+	taplo fmt
+
 ensure-ruff:
 	@if ! command -v ruff &> /dev/null; then \
 		echo "ruff not found. Please install it by running the command `pip install ruff` or refer to the following link for more information: https://docs.astral.sh/ruff/installation/" \
@@ -102,23 +117,30 @@ ensure-codespell:
     fi
 
 .PHONY: lint-codepsell
-lint-codespell: ensure-codespell # Runs `codespell` to check for spelling errors.
+lint-check-codespell: ensure-codespell # Runs `codespell` to check for spelling errors.
 	codespell
 
 .PHONY: lint-fix-codepsell
 lint-fix-codespell: ensure-codespell # Runs `codespell` to fix spelling errors if possible.
 	codespell -w
 
+.PHONY: lint-toml
+lint-check-toml: ensure-taplo ## Lints TOML files
+	taplo lint
+
 .PHONY: lint
 lint: ## Runs all lints and checks for issues without trying to fix them.
 	make lint-check-ws && \
-	make lint-codespell && \
+	make lint-check-codespell && \
+	make lint-check-toml && \
+	make fmt-check-toml && \
 	make fmt-check-ws
 
 .PHONY: lint-fix
 lint-fix: ## Runs all lints and applies fixes where possible.
 	make lint-fix-ws && \
 	make lint-fix-codespell && \
+	make fmt-toml && \
 	make fmt-ws
 
 .PHONY: rustdocs
