@@ -56,5 +56,4 @@ impl ClientState {
     pub fn buried_l1_height(&self) -> u64 {
         self.buried_l1_height
     }
-
 }

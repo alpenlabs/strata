@@ -34,8 +34,6 @@ pub struct WorkerState<D: Database> {
 
     /// Broadcast channel used to publish state updates.
     cupdate_tx: broadcast::Sender<Arc<ClientUpdateNotif>>,
-
-    cl_state_tx: watch::Sender<Option<ClientState>>
 }
 
 impl<D: Database> WorkerState<D> {
@@ -45,7 +43,6 @@ impl<D: Database> WorkerState<D> {
         params: Arc<Params>,
         database: Arc<D>,
         cupdate_tx: broadcast::Sender<Arc<ClientUpdateNotif>>,
-        cl_state_tx: watch::Sender<Option<ClientState>>
     ) -> anyhow::Result<Self> {
         let cs_prov = database.client_state_provider().as_ref();
         let (cur_state_idx, cur_state) = state_tracker::reconstruct_cur_state(cs_prov)?;
@@ -61,7 +58,6 @@ impl<D: Database> WorkerState<D> {
             database,
             state_tracker,
             cupdate_tx,
-            cl_state_tx
         })
     }
 
@@ -76,9 +72,10 @@ pub fn consensus_worker_task<D: Database, E: ExecEngineCtl>(
     mut state: WorkerState<D>,
     engine: Arc<E>,
     mut inp_msg_ch: mpsc::Receiver<CsmMessage>,
+    cl_state_tx: watch::Sender<Option<ClientState>>,
 ) -> Result<(), Error> {
     while let Some(msg) = inp_msg_ch.blocking_recv() {
-        if let Err(e) = process_msg(&mut state, engine.as_ref(), &msg) {
+        if let Err(e) = process_msg(&mut state, engine.as_ref(), &msg, cl_state_tx.clone()) {
             error!(err = %e, "failed to process sync message, skipping");
         }
     }
@@ -92,11 +89,12 @@ fn process_msg<D: Database, E: ExecEngineCtl>(
     state: &mut WorkerState<D>,
     engine: &E,
     msg: &CsmMessage,
+    cl_state_tx: watch::Sender<Option<ClientState>>,
 ) -> anyhow::Result<()> {
     match msg {
         CsmMessage::EventInput(idx) => {
             // TODO ensure correct event index ordering
-            handle_sync_event(state, engine, *idx)?;
+            handle_sync_event(state, engine, *idx, cl_state_tx)?;
             Ok(())
         }
     }
@@ -106,12 +104,13 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
     state: &mut WorkerState<D>,
     engine: &E,
     ev_idx: u64,
+    cl_state_tx: watch::Sender<Option<ClientState>>,
 ) -> anyhow::Result<()> {
     // Perform the main step of deciding what the output we're operating on.
     let (outp, new_state) = state.state_tracker.advance_consensus_state(ev_idx)?;
 
-    // publish the client status 
-    state.cl_state_tx.send(Some((*new_state).clone()))?;
+    // publish the client status
+    cl_state_tx.send(Some((*new_state).clone()))?;
 
     for action in outp.actions() {
         match action {

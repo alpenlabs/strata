@@ -1,25 +1,24 @@
-use std::time::{SystemTime, UNIX_EPOCH};
-use borsh::{BorshDeserialize, BorshSerialize};
 use alpen_vertex_state::sync_event::SyncEvent;
+use borsh::{BorshDeserialize, BorshSerialize};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::define_table_with_default_codec;
 use crate::define_table_without_codec;
 use crate::impl_borsh_value_codec;
 
-
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct SyncEventWithTimestamp {
     event: SyncEvent,
-    timestamp: u64
+    timestamp: u64,
 }
 
 impl SyncEventWithTimestamp {
     pub fn new(event: SyncEvent) -> Self {
-        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as u64;
-        SyncEventWithTimestamp {
-            event,
-            timestamp
-        }
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+        SyncEventWithTimestamp { event, timestamp }
     }
 
     pub fn timestamp(self) -> u64 {

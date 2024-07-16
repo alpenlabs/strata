@@ -121,7 +121,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         eng_ctl.clone(),
         pool.clone(),
         params.clone(),
-        cur_state_tx.clone()
+        cur_state_tx.clone(),
     )?;
     let sync_man = Arc::new(sync_man);
 
@@ -169,7 +169,7 @@ async fn main_task<D: Database>(
     sync_man: Arc<SyncManager>,
     l1_rpc_client: impl L1Client,
     database: Arc<D>,
-    cur_state_rx: watch::Receiver<Option<ClientState>>
+    cur_state_rx: watch::Receiver<Option<ClientState>>,
 ) -> anyhow::Result<()>
 where
     // TODO how are these not redundant trait bounds???
@@ -184,7 +184,7 @@ where
     let (stop_tx, stop_rx) = oneshot::channel();
 
     // Init RPC methods.
-    let alp_rpc = rpc_server::AlpenRpcImpl::new(cur_state_rx,stop_tx);
+    let alp_rpc = rpc_server::AlpenRpcImpl::new(cur_state_rx, stop_tx);
     let methods = alp_rpc.into_rpc();
 
     let rpc_port = args.rpc_port; // TODO make configurable

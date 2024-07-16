@@ -68,7 +68,10 @@ pub struct AlpenRpcImpl {
 }
 
 impl AlpenRpcImpl {
-    pub fn new(client_state_rx:watch::Receiver<Option<ClientState>> ,stop_tx: oneshot::Sender<()>) -> Self {
+    pub fn new(
+        client_state_rx: watch::Receiver<Option<ClientState>>,
+        stop_tx: oneshot::Sender<()>,
+    ) -> Self {
         Self {
             client_state_rx,
             stop_tx: Mutex::new(Some(stop_tx)),
@@ -103,18 +106,16 @@ impl AlpenApiServer for AlpenRpcImpl {
     }
 
     async fn get_client_status(&self) -> RpcResult<ClientStatus> {
-       let mut client_status = ClientStatus::default();
-       if let Some(status) = self.client_state_rx.borrow().clone() {
-           client_status.chain_tip = format!("{:?}", status.chain_tip_blkid());
-           client_status.finalized_blkid = format!("{:?}", status.finalized_blkid());
-           if let Some(l1_block) = status.recent_l1_block() {
-               client_status.last_l1_block = format!("{:?}",l1_block.to_string());
-           }
-           client_status.buried_l1_height = status.buried_l1_height();
+        let mut client_status = ClientStatus::default();
+        if let Some(status) = self.client_state_rx.borrow().clone() {
+            client_status.chain_tip = format!("{:?}", status.chain_tip_blkid());
+            client_status.finalized_blkid = format!("{:?}", status.finalized_blkid());
+            if let Some(l1_block) = status.recent_l1_block() {
+                client_status.last_l1_block = format!("{:?}", l1_block.to_string());
+            }
+            client_status.buried_l1_height = status.buried_l1_height();
+        }
 
-       }
-
-
-       Ok(client_status)
+        Ok(client_status)
     }
 }

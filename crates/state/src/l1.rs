@@ -9,16 +9,7 @@ use crate::state_queue::StateQueue;
 
 /// ID of an L1 block, usually the hash of its header.
 #[derive(
-    Copy,
-    Clone,
-    Eq,
-    PartialEq,
-    Ord,
-    PartialOrd,
-    Hash,
-    BorshSerialize,
-    BorshDeserialize,
-    Arbitrary,
+    Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, BorshSerialize, BorshDeserialize, Arbitrary,
 )]
 pub struct L1BlockId(Buf32);
 

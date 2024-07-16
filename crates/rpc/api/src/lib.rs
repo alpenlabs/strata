@@ -30,7 +30,6 @@ pub struct ClientStatus {
     pub buried_l1_height: u64,
 }
 
-
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "alp"))]
 #[cfg_attr(feature = "client", rpc(server, client, namespace = "alp"))]
 pub trait AlpenApi {

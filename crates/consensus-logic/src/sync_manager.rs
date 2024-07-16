@@ -71,7 +71,7 @@ pub fn start_sync_tasks<
     engine: Arc<E>,
     pool: Arc<threadpool::ThreadPool>,
     params: Arc<Params>,
-    cl_state_tx: watch::Sender<Option<ClientState>>
+    cl_state_tx: watch::Sender<Option<ClientState>>,
 ) -> anyhow::Result<SyncManager> {
     // Create channels.
     let (ctm_tx, ctm_rx) = mpsc::channel::<ForkChoiceMessage>(64);
@@ -89,7 +89,7 @@ pub fn start_sync_tasks<
     }
 
     // Init the consensus worker state and get the current state from it.
-    let cw_state = worker::WorkerState::open(params.clone(), database.clone(), cupdate_tx, cl_state_tx)?;
+    let cw_state = worker::WorkerState::open(params.clone(), database.clone(), cupdate_tx)?;
     let cur_state = cw_state.cur_state().clone();
     let cur_tip_blkid = *cur_state.chain_tip_blkid();
     let fin_tip_blkid = *cur_state.finalized_blkid();
@@ -123,9 +123,10 @@ pub fn start_sync_tasks<
     let eng_ct = engine.clone();
     let eng_cw = engine.clone();
     let ctl_ct = csm_ctl.clone();
-    let ct_handle =
+    let _ct_handle =
         thread::spawn(|| fork_choice_manager::tracker_task(ct_state, eng_ct, ctm_rx, ctl_ct));
-    let cw_handle = thread::spawn(|| worker::consensus_worker_task(cw_state, eng_cw, csm_rx));
+    let _cw_handle =
+        thread::spawn(|| worker::consensus_worker_task(cw_state, eng_cw, csm_rx, cl_state_tx));
 
     // TODO do something with the handles
 
