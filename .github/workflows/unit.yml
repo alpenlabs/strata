@@ -82,7 +82,8 @@ jobs:
         if: always()
         with:
           name: mutants-incremental.out
-          path: mutants.out
+          path: mutants-shard${{ matrix.shard }}.out
+          overwrite: true
 
   doc:
     name: Run doc tests
