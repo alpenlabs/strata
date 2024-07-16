@@ -52,6 +52,10 @@ cov-report-html: cov-unit ## Generate a HTML coverage report and open it in the 
 mutants-test: ## Runs `nextest` under `cargo-mutants`. Caution: This can take *really* long to run.
 	cargo mutants --workspace -j2
 
+.PHONY: sec
+sec: ## Check for security advisories on any dependencies.
+	cargo audit -D warnings
+
 ##@ Code Quality
 
 .PHONY: fmt-ws
