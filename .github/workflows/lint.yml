@@ -96,6 +96,23 @@ jobs:
       - uses: actions/checkout@v4
       - uses: codespell-project/actions-codespell@v2
 
+  taplo:
+    name: Lint and check formatting of TOML files
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install taplo
+        run: |
+          curl -fsSL https://github.com/tamasfe/taplo/releases/latest/download/taplo-full-linux-x86_64.gz \
+            | gzip -d - | install -m 755 /dev/stdin /usr/local/bin/taplo
+      - name: Run taplo lint
+        run: |
+          taplo lint
+      - name: Run taplo format check
+        run: |
+          taplo fmt --check
+
   lint-success:
     name: Check that lints passed
     runs-on: ubuntu-latest
