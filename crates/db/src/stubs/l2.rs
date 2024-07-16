@@ -43,7 +43,7 @@ impl L2DataStore for StubL2Db {
 
         {
             let mut tbl = self.heights.lock();
-            tbl.entry(idx).or_insert_with(Vec::new).push(blkid);
+            tbl.entry(idx).or_default().push(blkid);
         }
 
         Ok(())

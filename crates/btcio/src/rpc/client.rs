@@ -36,8 +36,7 @@ pub fn to_val<T>(value: T) -> ClientResult<Value>
 where
     T: Serialize,
 {
-    to_value(value)
-        .map_err(|e| ClientError::ParamError(format!("Error creating value: {}", e.to_string())))
+    to_value(value).map_err(|e| ClientError::ParamError(format!("Error creating value: {}", e)))
 }
 
 // Represents a JSON-RPC error.
@@ -197,9 +196,9 @@ impl BitcoinClient {
                     if let Some(err) = data.error {
                         return Err(ClientError::RPCError(err.to_string()));
                     }
-                    return Ok(data
+                    return data
                         .result
-                        .ok_or(ClientError::Other("Empty data received".to_string()))?);
+                        .ok_or_else(|| ClientError::Other("Empty data received".to_string()));
                 }
                 Err(err) => {
                     warn!(err = %err, "Error calling bitcoin client");
