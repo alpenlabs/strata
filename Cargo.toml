@@ -13,6 +13,7 @@ members = [
 	"crates/util/mmr",
 	"crates/vtxjmt",
         "crates/prover/zkvm",
+        "crates/prover/guests",
         "crates/prover/adapters/risc0",
         "sequencer",
 ]
