@@ -6,6 +6,7 @@ use std::{thread, time};
 
 use alpen_vertex_state::exec_update::{ExecUpdate, UpdateInput, UpdateOutput};
 use borsh::{BorshDeserialize, BorshSerialize};
+use secp256k1::Message;
 use tokio::sync::broadcast;
 use tracing::*;
 
@@ -15,7 +16,7 @@ use alpen_vertex_evmctl::errors::EngineError;
 use alpen_vertex_evmctl::messages::{ExecPayloadData, PayloadEnv};
 use alpen_vertex_primitives::buf::{Buf32, Buf64};
 use alpen_vertex_state::block::{ExecSegment, L1Segment};
-use alpen_vertex_state::block_template;
+use alpen_vertex_state::block_template::{create_header_template, BlockHeaderTemplate};
 use alpen_vertex_state::client_state::ClientState;
 use alpen_vertex_state::prelude::*;
 
@@ -219,7 +220,7 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
 
 fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     slot: u64,
-    _ik: &IdentityKey,
+    ik: &IdentityKey,
     database: &D,
     engine: &E,
 ) -> Result<Option<(L2BlockId, L2Block)>, Error> {
@@ -278,8 +279,8 @@ fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     // Assemble the body and the header template.
     let body = L2BlockBody::new(l1_seg, exec_seg);
     let state_root = Buf32::zero(); // TODO compute this from the different parts
-    let tmplt = block_template::create_header_template(slot, ts, prev_block_id, &body, state_root);
-    let header_sig = Buf64::zero(); // TODO actually sign it
+    let tmplt = create_header_template(slot, ts, prev_block_id, &body, state_root);
+    let header_sig = sign_template_header(&tmplt, &ik);
     let final_header = tmplt.complete_with(header_sig);
     let blkid = final_header.get_blockid();
     let final_block = L2Block::new(final_header, body);
@@ -291,6 +292,24 @@ fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     debug!(?blkid, "wrote block to datastore");
 
     Ok(Some((blkid, final_block)))
+}
+
+/// Signs the L2BlockHeader and returns the signature
+// TODO: determine if we want to use [`Secp256k1::sign_ecdsa_recoverable`]
+// Ref: https://github.com/rust-bitcoin/rust-bitcoin/blob/master/bitcoin/src/sign_message.rs
+fn sign_template_header(header: &BlockHeaderTemplate, ik: &IdentityKey) -> Buf64 {
+    let msg_hash = header.get_sighash();
+    match ik {
+        IdentityKey::Sequencer(key) => {
+            let secp = secp256k1::Secp256k1::new();
+            let privkey =
+                secp256k1::SecretKey::from_slice(key.as_ref()).expect("Invalid private key");
+            let msg = Message::from_digest_slice(msg_hash.as_ref()).expect("Invalid message hash");
+            // let secp_sig_rec = secp.sign_ecdsa_recoverable(&msg, &privkey);
+            let secp_sig = secp.sign_ecdsa(&msg, &privkey);
+            Buf64::from(secp_sig.serialize_compact())
+        }
+    }
 }
 
 /// Returns the current unix time as milliseconds.

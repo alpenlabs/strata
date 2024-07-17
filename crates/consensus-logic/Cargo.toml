@@ -13,6 +13,7 @@ alpen-vertex-state = { workspace = true }
 anyhow = { workspace = true }
 bitcoin = { workspace = true }
 borsh = { workspace = true }
+secp256k1 = { workspace = true }
 thiserror = { workspace = true }
 threadpool = { workspace = true }
 tokio = { workspace = true }
