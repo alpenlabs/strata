@@ -14,24 +14,32 @@
     "todohighlight.isCaseSensitive": true,
     "todohighlight.keywords": [
         {
-            "text": "DEBUG:",
-            "backgroundColor": "#43454C"
+            "text": "OPTIMIZE:",
+            "backgroundColor": "#550055"
         },
         {
             "text": "REVIEW:",
-            "backgroundColor": "cyan"
+            "backgroundColor": "#24625A"
         },
         {
             "text": "NOTE:",
-            "backgroundColor": "yellow"
+            "backgroundColor": "#A4E871"
         },
         {
             "text": "HACK:",
-            "backgroundColor": "#880000"
+            "backgroundColor": "#FBBF24"
         },
         {
             "text": "TODO:",
-            "backgroundColor": "green"
+            "backgroundColor": "#2563EB"
+        },
+        {
+            "text": "FIXME:",
+            "backgroundColor": "#DC2626"
+        },
+        {
+            "text": "XXX:",
+            "backgroundColor": "#43464C"
         }
     ],
     "todohighlight.include": [
