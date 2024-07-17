@@ -25,6 +25,9 @@ pub struct Args {
     #[argh(option, description = "bitcoind RPC password")]
     pub bitcoind_password: String,
 
+    #[argh(option, short = 'c', description = "path to configuration")]
+    pub config: Option<PathBuf>,
+
     #[argh(
         option,
         short = 'n',

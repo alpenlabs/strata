@@ -6,7 +6,10 @@ use std::sync::Arc;
 use std::thread;
 use std::time;
 
+use anyhow::anyhow;
 use anyhow::Context;
+use bitcoin::Network;
+use config::FullConfig;
 use thiserror::Error;
 use tokio::sync::broadcast;
 use tokio::sync::{mpsc, oneshot, watch};
@@ -41,6 +44,18 @@ pub enum InitError {
     Other(String),
 }
 
+fn load_configuration(config: &Option<PathBuf>) ->  anyhow::Result<Option<FullConfig>>{
+    if let Some(conf) = config {
+         let config_str = fs::read_to_string(conf)?;
+         if let Ok(conf) = toml::from_str(&config_str) {
+             return Ok(Some(conf));
+         }
+    } else {
+            return Ok(None);
+    }
+    Err(anyhow!("couldn't load configuration"))
+}
+
 fn main() {
     let args: Args = argh::from_env();
     if let Err(e) = main_inner(args) {
@@ -51,21 +66,38 @@ fn main() {
 
 fn main_inner(args: Args) -> anyhow::Result<()> {
     logging::init();
+    
+    // initialize the full configuration
+    let full_config = 
+    {
+        let mut conf = FullConfig::new();
+        match load_configuration(&args.config)? {
+            Some(c) => { 
+                conf = c;
+                conf.update_from_args(&args);
+            },
+            None => {
+                conf.update_from_args(&args);
+            },
+        }
+        conf
+    };
 
     // Open the database.
-    let rbdb = open_rocksdb_database(&args)?;
+    let rbdb = open_rocksdb_database(&full_config)?;
 
     // Set up block params.
     let params = Params {
         rollup: RollupParams {
-            block_time: 1000,
+            block_time: full_config.rollup_config.block_time,
             cred_rule: block_credential::CredRule::Unchecked,
-            l1_start_block_height: 4,
+            l1_start_block_height: full_config.rollup_config.l1_start_block_height,
         },
         run: RunParams {
-            l1_follow_distance: 6,
+            l1_follow_distance: full_config.rollup_config.l1_follow_distance,
         },
     };
+
     let params = Arc::new(params);
 
     // Start runtime for async IO tasks.
@@ -93,17 +125,17 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     ));
 
     // Set up Bitcoin client RPC.
-    let bitcoind_url = format!("http://{}", args.bitcoind_host);
+    let bitcoind_url = format!("http://{}", full_config.l1_config.rpc_url);
     let btc_rpc = alpen_vertex_btcio::rpc::BitcoinClient::new(
         bitcoind_url,
-        args.bitcoind_user.clone(),
-        args.bitcoind_password.clone(),
+        full_config.l1_config.rpc_user.clone(),
+        full_config.l1_config.rpc_password.clone(),
         bitcoin::Network::Regtest,
     );
 
     // TODO remove this
-    if args.network != "regtest" {
-        warn!(network = %args.network, "network not set to regtest, ignoring");
+    if full_config.l1_config.network == Network::Regtest {
+        warn!("network not set to regtest, ignoring");
     }
 
     // Create dataflow channels.
@@ -153,7 +185,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         });
     }
 
-    let main_fut = main_task(args, sync_man, btc_rpc, database.clone());
+    let main_fut = main_task(&full_config, sync_man, btc_rpc, database.clone());
     if let Err(e) = rt.block_on(main_fut) {
         error!(err = %e, "main task exited");
         process::exit(0); // special case exit once we've gotten to this point
@@ -164,7 +196,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 }
 
 async fn main_task<D: Database>(
-    args: Args,
+    full_config: &FullConfig,
     sync_man: Arc<SyncManager>,
     l1_rpc_client: impl L1Client,
     database: Arc<D>,
@@ -185,7 +217,7 @@ where
     let alp_rpc = rpc_server::AlpenRpcImpl::new(stop_tx);
     let methods = alp_rpc.into_rpc();
 
-    let rpc_port = args.rpc_port; // TODO make configurable
+    let rpc_port = full_config.rollup_config.rpc_port; // TODO make configurable
     let rpc_server = jsonrpsee::server::ServerBuilder::new()
         .build(format!("127.0.0.1:{rpc_port}"))
         .await
@@ -205,8 +237,8 @@ where
     Ok(())
 }
 
-fn open_rocksdb_database(args: &Args) -> anyhow::Result<Arc<rockbound::DB>> {
-    let mut database_dir = args.datadir.clone();
+fn open_rocksdb_database(full_config: &FullConfig) -> anyhow::Result<Arc<rockbound::DB>> {
+    let mut database_dir = full_config.rollup_config.datadir.clone();
     database_dir.push("rocksdb");
 
     if !database_dir.exists() {

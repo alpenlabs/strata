@@ -1,0 +1,16 @@
+[l1_config]
+rpc_url = "http://localhost:8332"
+rpc_user = "alpen"
+rpc_password = "alpen"
+network = "regtest"  
+
+# RollupParams configuration
+[rollup_config]
+block_time = 250  # block time in milliseconds
+l1_start_block_height = 4  
+
+
+# reader configuration
+[reader_config]
+max_reorg_depth = 3  
+client_poll_dur_ms = 1000
