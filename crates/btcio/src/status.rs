@@ -17,7 +17,6 @@ pub async fn apply_status_updates(
     status_updates: &[StatusUpdate],
     l1_status: Arc<RwLock<L1Status>>,
 ) {
-    println!("event handling now");
     let mut l1_status_writer = l1_status.write().await;
     for event in status_updates {
         match event {

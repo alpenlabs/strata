@@ -181,9 +181,9 @@ async fn do_reader_task(
             .await
         {
                 warn!(%cur_height, err = %err, "failed to poll Bitcoin client");
+                status_updates.push(StatusUpdate::RpcError(err.to_string()));
 
                 if let Some(err) = err.downcast_ref::<reqwest::Error>() {
-                    status_updates.push(StatusUpdate::RpcError(err.to_string()));
                     // recoverable errors 
                     if err.is_connect() {
                         status_updates.push(StatusUpdate::RpcConnected(false));
