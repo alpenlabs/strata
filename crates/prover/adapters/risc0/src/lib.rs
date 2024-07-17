@@ -31,12 +31,10 @@ impl ZKVMHost for RiscZeroHost {
     }
 
     fn prove(&self) -> anyhow::Result<Proof> {
-        // Set DEV mode flag for the internal prover server
         if self.prover_options.use_mock_prover {
             std::env::set_var("RISC0_DEV_MODE", "true");
         }
 
-        // Initialize the prover
         let env = ExecutorEnv::builder().write(&self.inputs)?.build()?;
         let opts = self.determine_prover_options();
 
@@ -61,6 +59,11 @@ impl ZKVMVerifier for Risc0Verifier {
         receipt.verify(program_id)?;
         Ok(())
     }
+    
+    fn extract_public_output<T: serde::de::DeserializeOwned>(proof: &Proof) -> anyhow::Result<T> {
+        let receipt: Receipt = bincode::deserialize(&proof.0)?;
+        Ok(receipt.journal.decode()?)
+    }
 }
 
 #[cfg(test)]
@@ -77,12 +80,19 @@ mod tests {
 
     #[test]
     fn risc0_test_mock_prover() {
-        let input: u32 = 10;
-
+        let input: u32 = 1;
         let mut zkvm = RiscZeroHost::init(TEST_ELF.to_vec(), ProverOptions::default());
         zkvm.add_input(input);
 
+        // assert proof generation works
         let proof = zkvm.prove().expect("Failed to generate proof");
-        Risc0Verifier::verify(TEST_ELF_PROGRAM_ID, &proof).expect("Proof verification failed")
+        
+        // assert proof verification works
+        Risc0Verifier::verify(TEST_ELF_PROGRAM_ID, &proof).expect("Proof verification failed");
+
+        // assert public outputs extraction from proof  works
+        let out:u32 = Risc0Verifier::extract_public_output(&proof).expect("Failed to extract public outputs");
+        assert_eq!(input, out)
+
     }
 }
