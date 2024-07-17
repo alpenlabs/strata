@@ -14,6 +14,7 @@ pub trait ZKVMHost {
     fn init(guest_code: Vec<u8>, prover_options: ProverOptions) -> Self;
 
     /// Executes the guest code within the VM, generating and returning the validity proof.
+    // TODO: Consider using custom error types instead of a generic error to capture the different reasons proving can fail.
     fn prove(&self) -> anyhow::Result<Proof>;
 
     /// Adds up the input to be consumed by the guest program.

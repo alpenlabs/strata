@@ -72,6 +72,12 @@ mod tests {
 
     use super::*;
 
+    // Addding compiled guest code `TEST_ELF` to save the build time
+    // use risc0_zkvm::guest::env;
+    // fn main() {
+    //     let input: u32 = env::read();
+    //     env::commit(&input);
+    // }
     const TEST_ELF: &[u8] = include_bytes!("../elf/risc0-zkvm-elf");
     const TEST_ELF_PROGRAM_ID: [u32; 8] = [
         20204848, 2272092004, 2454927583, 1072502260, 1258449350, 2771660935, 3133675698,
@@ -93,6 +99,5 @@ mod tests {
         // assert public outputs extraction from proof  works
         let out:u32 = Risc0Verifier::extract_public_output(&proof).expect("Failed to extract public outputs");
         assert_eq!(input, out)
-
     }
 }
