@@ -71,7 +71,7 @@ mod tests {
 
     use super::*;
 
-    // Addding compiled guest code `TEST_ELF` to save the build time
+    // Adding compiled guest code `TEST_ELF` to save the build time
     // use risc0_zkvm::guest::env;
     // fn main() {
     //     let input: u32 = env::read();
