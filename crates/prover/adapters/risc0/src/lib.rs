@@ -1,16 +1,17 @@
+use anyhow::Ok;
 use bincode;
-use risc0_zkvm::{default_prover, ExecutorEnv};
-use zkvm::{Proof, ProverOptions, ZKVMHost};
+use risc0_zkvm::{default_prover, ExecutorEnv, Receipt};
+use zkvm::{Proof, ProverOptions, ZKVMHost, ZKVMVerifier};
 
-pub struct RiscZeroZKVM {
+pub struct RiscZeroHost {
     elf: Vec<u8>,
     inputs: Vec<u32>,
     prover_options: ProverOptions,
 }
 
-impl ZKVMHost for RiscZeroZKVM {
+impl ZKVMHost for RiscZeroHost {
     fn init(guest_code: Vec<u8>, prover_options: zkvm::ProverOptions) -> Self {
-        RiscZeroZKVM {
+        RiscZeroHost {
             elf: guest_code,
             inputs: Vec::new(),
             prover_options,
@@ -39,6 +40,16 @@ impl ZKVMHost for RiscZeroZKVM {
     }
 }
 
+pub struct Risc0Verifier;
+
+impl ZKVMVerifier for Risc0Verifier {
+    fn verify(program_id: [u32; 8], proof: &Proof) -> anyhow::Result<()> {
+        let receipt: Receipt = bincode::deserialize(&proof.0)?;
+        receipt.verify(program_id)?;
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use zkvm::ProverOptions;
@@ -46,15 +57,19 @@ mod tests {
     use super::*;
 
     const TEST_ELF: &[u8] = include_bytes!("../elf/risc0-zkvm-elf");
+    const TEST_ELF_PROGRAM_ID: [u32; 8] = [
+        20204848, 2272092004, 2454927583, 1072502260, 1258449350, 2771660935, 3133675698,
+        3100950446,
+    ];
 
     #[test]
     fn risc0_test_mock_prover() {
         let input: u32 = 10;
-        
-        let mut zkvm = RiscZeroZKVM::init(TEST_ELF.to_vec(), ProverOptions::default());
+
+        let mut zkvm = RiscZeroHost::init(TEST_ELF.to_vec(), ProverOptions::default());
         zkvm.add_input(input);
 
-        let proof = zkvm.prove();
-        assert!(proof.is_ok())
+        let proof = zkvm.prove().expect("Failed to generate proof");
+        Risc0Verifier::verify(TEST_ELF_PROGRAM_ID, &proof).expect("Proof verification failed")
     }
 }

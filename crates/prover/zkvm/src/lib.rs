@@ -29,5 +29,5 @@ pub trait ZKVMHost {
 }
 
 pub trait ZKVMVerifier {
-    fn verify(program_id:&[u32; 8], proof:&Proof) -> anyhow::Result<()>;
+    fn verify(program_id:[u32; 8], proof:&Proof) -> anyhow::Result<()>;
 }
