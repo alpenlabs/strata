@@ -17,7 +17,7 @@ use thiserror::Error;
 use tokio::sync::{oneshot, watch, Mutex};
 use tracing::*;
 
-use alpen_vertex_rpc_api::{AlpenApiServer, ClientStatus, L1Status};
+use alpen_vertex_rpc_api::{AlpenApiServer, ApiError, ClientStatus, L1Status};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -106,16 +106,17 @@ impl AlpenApiServer for AlpenRpcImpl {
     }
 
     async fn get_client_status(&self) -> RpcResult<ClientStatus> {
-        let mut client_status = ClientStatus::default();
         if let Some(status) = self.client_state_rx.borrow().clone() {
-            client_status.chain_tip = format!("{:?}", status.chain_tip_blkid());
-            client_status.finalized_blkid = format!("{:?}", status.finalized_blkid());
-            if let Some(l1_block) = status.recent_l1_block() {
-                client_status.last_l1_block = format!("{:?}", l1_block.to_string());
+            if let Some(last_l1_block) = status.recent_l1_block() {
+                return Ok(ClientStatus {
+                    chain_tip: *status.chain_tip_blkid().as_ref(),
+                    finalized_blkid: *status.finalized_blkid().as_ref(),
+                    last_l1_block: *last_l1_block.as_ref(),
+                    buried_l1_height: status.buried_l1_height(),
+                });
             }
-            client_status.buried_l1_height = status.buried_l1_height();
         }
 
-        Ok(client_status)
+        return Err(ApiError::ClientNotStarted.into());
     }
 }

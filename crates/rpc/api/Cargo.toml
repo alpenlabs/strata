@@ -4,5 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+alpen-vertex-state = { workspace = true }
+
 jsonrpsee = { workspace = true, features = ["server", "macros"] }
 serde = { workspace = true }
+serde-hex = { workspace = true }
+thiserror = { workspace = true }
