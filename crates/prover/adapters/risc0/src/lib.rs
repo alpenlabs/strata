@@ -1,5 +1,4 @@
 use anyhow::Ok;
-use bincode;
 use risc0_zkvm::{get_prover_server, ExecutorEnv, ProverOpts, Receipt};
 use zkvm::{Proof, ProverOptions, ZKVMHost, ZKVMVerifier};
 
