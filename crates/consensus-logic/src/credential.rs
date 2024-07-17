@@ -1,13 +1,14 @@
 //! Logic to check block credentials.
 
-use tracing::*;
+use bitcoin::XOnlyPublicKey;
+use secp256k1::{schnorr::Signature, Keypair, Message, Secp256k1, SecretKey};
 
 use alpen_vertex_primitives::{
     block_credential::CredRule,
     buf::{Buf32, Buf64},
     params::Params,
 };
-use alpen_vertex_state::block::L2BlockHeader;
+use alpen_vertex_state::{block::L2BlockHeader, block_template::BlockHeaderTemplate};
 
 pub fn check_block_credential(header: &L2BlockHeader, params: &Params) -> bool {
     let sigcom = compute_header_sig_commitment(header);
@@ -17,20 +18,64 @@ pub fn check_block_credential(header: &L2BlockHeader, params: &Params) -> bool {
     }
 }
 
-fn compute_header_sig_commitment(_header: &L2BlockHeader) -> Buf32 {
-    // TODO implement this, just concat all the components together aside from
-    // the sig, probably should be poseidon
-    warn!("header commitment generation still unimplemented");
-    Buf32::from([0; 32])
+fn compute_header_sig_commitment(header: &L2BlockHeader) -> Buf32 {
+    BlockHeaderTemplate::from_header(&header).get_sighash()
 }
 
-pub fn sign_schnorr_sig(_msg: &Buf32, _sk: &Buf32) -> Buf64 {
-    warn!("block signature signing still unimplemented");
-    Buf64::from([0; 64])
+pub fn sign_schnorr_sig(msg: &Buf32, sk: &Buf32) -> Buf64 {
+    let secp = Secp256k1::new();
+    let sk = SecretKey::from_slice(sk.as_ref()).expect("Invalid private key");
+    let kp = Keypair::from_secret_key(&secp, &sk);
+    let msg = Message::from_digest_slice(msg.as_ref()).expect("Invalid message hash");
+    let sig = secp.sign_schnorr(&msg, &kp);
+    Buf64::from(sig.serialize())
 }
 
-fn verify_schnorr_sig(_sig: &Buf64, _msg: &Buf32, _pk: &Buf32) -> bool {
-    // TODO implement signature verification
-    warn!("block signature verification still unimplemented");
-    true
+fn verify_schnorr_sig(sig: &Buf64, msg: &Buf32, pk: &Buf32) -> bool {
+    let msg = Message::from_digest_slice(msg.as_ref()).expect("Invalid message hash");
+    let pk = XOnlyPublicKey::from_slice(pk.as_ref()).expect("Invalid public key");
+    let sig = Signature::from_slice(&sig.0.as_ref());
+    match sig {
+        Ok(sig) => match sig.verify(&msg, &pk) {
+            Ok(_) => true,
+            Err(_) => false,
+        },
+        Err(_) => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use alpen_vertex_primitives::buf::Buf32;
+    use rand::Rng;
+    use secp256k1::{Secp256k1, SecretKey};
+
+    use super::{sign_schnorr_sig, verify_schnorr_sig};
+
+    #[test]
+    fn test_schnorr_signature_pass() {
+        let secp = Secp256k1::new();
+        let mut rng = rand::thread_rng();
+        let msg: [u8; 32] = [(); 32].map(|_| rng.gen());
+
+        let mut mod_msg = msg.clone();
+        mod_msg.swap(1, 2);
+
+        let sk = SecretKey::new(&mut rng);
+        let (pk, _) = sk.x_only_public_key(&secp);
+
+        let msg = Buf32::from(msg);
+        let sk = Buf32::from(*sk.as_ref());
+        let pk = Buf32::from(pk.serialize());
+
+        let sig = sign_schnorr_sig(&msg, &sk);
+        assert!(verify_schnorr_sig(&sig, &msg, &pk));
+
+        let mod_msg = Buf32::from(mod_msg);
+        assert!(!verify_schnorr_sig(&sig, &mod_msg, &pk));
+
+        let sig = sign_schnorr_sig(&mod_msg, &sk);
+        let res = verify_schnorr_sig(&sig, &mod_msg, &pk);
+        assert!(res);
+    }
 }
