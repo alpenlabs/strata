@@ -1,12 +1,8 @@
 //! Macro trait def for the `alp_` RPC namespace using jsonrpsee.
 
-use jsonrpsee::{
-    core::RpcResult,
-    proc_macros::rpc,
-};
+use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 
 use serde::{Deserialize, Serialize};
-use serde_hex::{SerHex, StrictPfx};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct L1Status {
@@ -23,15 +19,15 @@ pub struct L1Status {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ClientStatus {
     /// Blockchain tip.
-    #[serde(with = "SerHex::<StrictPfx>")]
+    #[serde(with = "hex::serde")]
     pub chain_tip: [u8; 32],
 
     /// L2 block that's been finalized and proven on L1.
-    #[serde(with = "SerHex::<StrictPfx>")]
+    #[serde(with = "hex::serde")]
     pub finalized_blkid: [u8; 32],
 
     /// Recent L1 block that we might still reorg.
-    #[serde(with = "SerHex::<StrictPfx>")]
+    #[serde(with = "hex::serde")]
     pub last_l1_block: [u8; 32],
 
     /// L1 block index we treat as being "buried" and won't reorg.

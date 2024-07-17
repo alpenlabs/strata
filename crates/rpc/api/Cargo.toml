@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 alpen-vertex-state = { workspace = true }
 
+hex = { workspace = true }
 jsonrpsee = { workspace = true, features = ["server", "macros"] }
 serde = { workspace = true }
-serde-hex = { workspace = true }
 thiserror = { workspace = true }

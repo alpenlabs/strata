@@ -28,7 +28,7 @@ pub enum Error {
 
     #[error("not yet implemented")]
     Unimplemented,
-   
+
     #[error("client not started")]
     ClientNotStarted,
 
@@ -49,7 +49,7 @@ impl Error {
             Self::Unsupported => -32600,
             Self::Unimplemented => -32601,
             Self::Other(_) => -32000,
-            Error::ClientNotStarted => -32001,
+            Self::ClientNotStarted => -32001,
             Self::OtherEx(_, _) => -32000,
         }
     }
@@ -66,7 +66,6 @@ impl Into<ErrorObjectOwned> for Error {
 }
 
 pub struct AlpenRpcImpl {
-    // TODO
     client_state_rx: watch::Receiver<Option<ClientState>>,
     stop_tx: Mutex<Option<oneshot::Sender<()>>>,
 }
@@ -110,17 +109,22 @@ impl AlpenApiServer for AlpenRpcImpl {
     }
 
     async fn get_client_status(&self) -> RpcResult<ClientStatus> {
-        if let Some(status) = self.client_state_rx.borrow().clone() {
-            if let Some(last_l1_block) = status.recent_l1_block() {
-                return Ok(ClientStatus {
-                    chain_tip: *status.chain_tip_blkid().as_ref(),
-                    finalized_blkid: *status.finalized_blkid().as_ref(),
-                    last_l1_block: *last_l1_block.as_ref(),
-                    buried_l1_height: status.buried_l1_height(),
-                });
-            }
-        }
+        // FIXME this is somewhat ugly but when we restructure the client state
+        // this will be a lot nicer
+        if let Some(status) = self.client_state_rx.borrow().as_ref() {
+            let Some(last_l1) = status.recent_l1_block() else {
+                warn!("last L1 block not set in client state, returning still not started");
+                return Err(Error::ClientNotStarted);
+            };
 
-        return Err(Error::ClientNotStarted.into());
+            Ok(ClientStatus {
+                chain_tip: *status.chain_tip_blkid(),
+                finalized_blkid: *status.finalized_blkid(),
+                last_l1_block: *last_l1,
+                buried_l1_height: status.buried_l1_height(),
+            })
+        } else {
+            Err(Error::ClientNotStarted.into())
+        }
     }
 }
