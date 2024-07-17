@@ -1,7 +1,7 @@
 [package]
+edition = "2021"
 name = "alpen-vertex-evmctl"
 version = "0.1.0"
-edition = "2021"
 
 [dependencies]
 alpen-vertex-primitives = { workspace = true }

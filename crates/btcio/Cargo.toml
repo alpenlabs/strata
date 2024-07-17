@@ -1,11 +1,11 @@
 [package]
+edition = "2021"
 name = "alpen-vertex-btcio"
 version = "0.1.0"
-edition = "2021"
 
 [dependencies]
-alpen-vertex-primitives = { workspace = true }
 alpen-vertex-db = { workspace = true }
+alpen-vertex-primitives = { workspace = true }
 alpen-vertex-state = { workspace = true }
 
 anyhow = { workspace = true }
@@ -14,11 +14,11 @@ base64 = { workspace = true }
 bitcoin = { workspace = true }
 bytes = { workspace = true }
 hex = { workspace = true }
-tokio = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
+tokio = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]

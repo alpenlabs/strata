@@ -1,7 +1,7 @@
 [package]
+edition = "2021"
 name = "alpen-vertex-evmexec"
 version = "0.1.0"
-edition = "2021"
 
 [dependencies]
 alpen-vertex-evmctl = { workspace = true }
@@ -10,11 +10,11 @@ alpen-vertex-state = { workspace = true }
 arbitrary = { workspace = true }
 borsh = { workspace = true }
 futures = { workspace = true }
-jsonrpsee = { workspace = true }
 http = { workspace = true }
 hyper = { workspace = true }
-reth-primitives = { workspace = true }
+jsonrpsee = { workspace = true }
 reth-node-ethereum = { workspace = true }
+reth-primitives = { workspace = true }
 reth-rpc = { workspace = true }
 reth-rpc-api = { workspace = true }
 reth-rpc-layer = { workspace = true }

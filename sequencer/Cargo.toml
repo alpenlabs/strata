@@ -1,21 +1,21 @@
 [package]
+edition = "2021"
 name = "alpen-vertex-sequencer"
 version = "0.1.0"
-edition = "2021"
 
 [[bin]]
 name = "alpen-vertex-sequencer"
 path = "src/main.rs"
 
 [dependencies]
+alpen-vertex-btcio = { workspace = true }
 alpen-vertex-common = { workspace = true }
 alpen-vertex-consensus-logic = { workspace = true }
-alpen-vertex-evmctl = { workspace = true }
 alpen-vertex-db = { workspace = true }
+alpen-vertex-evmctl = { workspace = true }
 alpen-vertex-primitives = { workspace = true }
 alpen-vertex-rpc-api = { workspace = true }
 alpen-vertex-state = { workspace = true }
-alpen-vertex-btcio = { workspace = true }
 
 anyhow = { workspace = true }
 argh = { workspace = true }
