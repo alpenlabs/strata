@@ -58,7 +58,7 @@ impl ZKVMVerifier for Risc0Verifier {
         receipt.verify(program_id)?;
         Ok(())
     }
-    
+
     fn extract_public_output<T: serde::de::DeserializeOwned>(proof: &Proof) -> anyhow::Result<T> {
         let receipt: Receipt = bincode::deserialize(&proof.0)?;
         Ok(receipt.journal.decode()?)
@@ -91,12 +91,13 @@ mod tests {
 
         // assert proof generation works
         let proof = zkvm.prove().expect("Failed to generate proof");
-        
+
         // assert proof verification works
         Risc0Verifier::verify(TEST_ELF_PROGRAM_ID, &proof).expect("Proof verification failed");
 
         // assert public outputs extraction from proof  works
-        let out:u32 = Risc0Verifier::extract_public_output(&proof).expect("Failed to extract public outputs");
+        let out: u32 =
+            Risc0Verifier::extract_public_output(&proof).expect("Failed to extract public outputs");
         assert_eq!(input, out)
     }
 }
