@@ -17,7 +17,7 @@ use thiserror::Error;
 use tokio::sync::{oneshot, watch, Mutex};
 use tracing::*;
 
-use alpen_vertex_rpc_api::{AlpenApiServer, ApiError, ClientStatus, L1Status};
+use alpen_vertex_rpc_api::{AlpenApiServer, ClientStatus, L1Status};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -28,6 +28,9 @@ pub enum Error {
 
     #[error("not yet implemented")]
     Unimplemented,
+   
+    #[error("client not started")]
+    ClientNotStarted,
 
     /// Generic internal error message.  If this is used often it should be made
     /// into its own error type.
@@ -43,10 +46,11 @@ pub enum Error {
 impl Error {
     pub fn code(&self) -> i32 {
         match self {
-            Self::Unsupported => 1001,
-            Self::Unimplemented => 1002,
-            Self::Other(_) => 1100,
-            Self::OtherEx(_, _) => 1101,
+            Self::Unsupported => -32600,
+            Self::Unimplemented => -32601,
+            Self::Other(_) => -32000,
+            Error::ClientNotStarted => -32001,
+            Self::OtherEx(_, _) => -32000,
         }
     }
 }
@@ -117,6 +121,6 @@ impl AlpenApiServer for AlpenRpcImpl {
             }
         }
 
-        return Err(ApiError::ClientNotStarted.into());
+        return Err(Error::ClientNotStarted.into());
     }
 }

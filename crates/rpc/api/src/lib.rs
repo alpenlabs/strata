@@ -3,11 +3,10 @@
 use jsonrpsee::{
     core::RpcResult,
     proc_macros::rpc,
-    types::{ErrorObject, ErrorObjectOwned},
 };
+
 use serde::{Deserialize, Serialize};
 use serde_hex::{SerHex, StrictPfx};
-use thiserror::Error;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct L1Status {
@@ -37,28 +36,6 @@ pub struct ClientStatus {
 
     /// L1 block index we treat as being "buried" and won't reorg.
     pub buried_l1_height: u64,
-}
-
-#[derive(Error, Debug)]
-pub enum ApiError {
-    #[error("Client Not Started Yet")]
-    ClientNotStarted,
-    #[error("Unknown Error")]
-    UnknownError,
-}
-
-impl From<ApiError> for ErrorObjectOwned {
-    fn from(err: ApiError) -> Self {
-        // JSON-RPC Server errors codes must be between -32099 to -32000
-        let code = match err {
-            // server error
-            ApiError::UnknownError => -32000,
-            // internal error
-            ApiError::ClientNotStarted => -32003,
-        };
-
-        ErrorObject::owned(code, err.to_string(), None::<()>)
-    }
 }
 
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "alp"))]
