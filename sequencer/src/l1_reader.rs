@@ -11,11 +11,11 @@ use alpen_vertex_db::traits::{Database, L1DataProvider};
 use alpen_vertex_primitives::params::Params;
 use tokio::sync::mpsc;
 
-use crate::config::FullConfig;
+use crate::config::Config;
 
 pub async fn start_reader_tasks<D: Database>(
     params: &Params,
-    config: &FullConfig,
+    config: &Config,
     rpc_client: impl L1Client,
     db: Arc<D>,
     csm_ctl: Arc<CsmController>,

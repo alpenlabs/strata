@@ -25,14 +25,14 @@ pub struct BitcoinConfig {
 }
 
 #[derive(Deserialize, Debug)]
-pub struct FullConfig {
+pub struct Config {
     pub l1_config: BitcoinConfig,
     pub rollup_config: RollupConfig,
     pub reader_config: ReaderConfig,
 }
 
-impl FullConfig {
-    pub fn new() -> FullConfig {
+impl Config {
+    pub fn new() -> Config {
         Self {
             l1_config: BitcoinConfig {
                 rpc_url: String::new(),
@@ -67,7 +67,7 @@ impl FullConfig {
 
 #[cfg(test)]
 mod test {
-    use crate::config::FullConfig;
+    use crate::config::Config;
 
     #[test]
     fn config_load_test() {
@@ -90,6 +90,6 @@ mod test {
             client_poll_dur_ms = 200
         "#;
 
-        assert!(toml::from_str::<FullConfig>(config_string).is_ok());
+        assert!(toml::from_str::<Config>(config_string).is_ok());
     }
 }
