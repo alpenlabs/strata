@@ -40,8 +40,8 @@ impl ZKVMHost for RiscZeroHost {
 
         let prover = get_prover_server(&opts)?;
         let proof = prover.prove(env, &self.elf)?.receipt;
-        let seralized_proof = bincode::serialize(&proof)?;
-        Ok(Proof(seralized_proof))
+        let serialized_proof = bincode::serialize(&proof)?;
+        Ok(Proof(serialized_proof))
     }
 
     fn add_input<T: serde::Serialize>(&mut self, item: T) {
