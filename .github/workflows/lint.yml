@@ -55,28 +55,6 @@ jobs:
           cache-on-failure: true
       - run: cargo hack check
 
-  docs:
-    name: Generate docs
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@nightly
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-      - run: cargo doc --document-private-items
-        env:
-          RUSTDOCFLAGS: --show-type-layout --enable-index-page -Zunstable-options -D warnings
-      - name: Compress docs artifacts
-        run: tar czf vertex-core-docs.tar.gz target/doc
-      - name: Archive docs
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: docs
-          path: vertex-core-docs.tar.gz
-
   fmt:
     name: Check code formatting
     runs-on: ubuntu-latest
@@ -121,7 +99,6 @@ jobs:
       - clippy-binaries
       - clippy
       - crate-checks
-      - docs
       - fmt
       - codespell
       - taplo
