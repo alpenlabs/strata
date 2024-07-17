@@ -65,3 +65,32 @@ impl FullConfig {
     }
 }
 
+#[cfg(test)]
+mod test {
+    use crate::config::FullConfig;
+
+    #[test]
+    fn config_load_test() {
+        let config_string = r#"
+            [l1_config]
+            rpc_url = "http://localhost:18332"
+            rpc_user = "alpen"
+            rpc_password = "alpen"
+            network = "regtest"
+
+            [rollup_config]
+            l1_start_block_height = 4
+            l1_follow_distance = 6
+            rpc_port = 8432
+            block_time = 250
+            datadir = "/path/to/data/directory"
+
+            [reader_config]
+            max_reorg_depth = 4
+            client_poll_dur_ms = 200
+        "#;
+
+        assert!(toml::from_str::<FullConfig>(config_string).is_ok());
+    }
+}
+
