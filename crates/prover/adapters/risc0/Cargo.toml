@@ -8,4 +8,4 @@ zkvm = { workspace = true }
 anyhow = { workspace = true }
 serde = { workspace = true }
 bincode = { workspace = true }
-risc0-zkvm = { version = "1.0.2" }
+risc0-zkvm = { version = "1.0.3", features = ["prove"] }

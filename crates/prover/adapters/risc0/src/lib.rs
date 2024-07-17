@@ -1,12 +1,24 @@
 use anyhow::Ok;
 use bincode;
-use risc0_zkvm::{default_prover, ExecutorEnv, Receipt};
+use risc0_zkvm::{get_prover_server, ExecutorEnv, ProverOpts, Receipt};
 use zkvm::{Proof, ProverOptions, ZKVMHost, ZKVMVerifier};
 
 pub struct RiscZeroHost {
     elf: Vec<u8>,
     inputs: Vec<u32>,
     prover_options: ProverOptions,
+}
+
+impl RiscZeroHost {
+    fn determine_prover_options(&self) -> ProverOpts {
+        if self.prover_options.stark_to_snark_conversion {
+            ProverOpts::groth16()
+        } else if self.prover_options.enable_compression {
+            ProverOpts::succinct()
+        } else {
+            ProverOpts::default()
+        }
+    }
 }
 
 impl ZKVMHost for RiscZeroHost {
@@ -26,9 +38,10 @@ impl ZKVMHost for RiscZeroHost {
 
         // Initialize the prover
         let env = ExecutorEnv::builder().write(&self.inputs)?.build()?;
-        let prover = default_prover();
-        let proof = prover.prove(env, &self.elf)?.receipt;
+        let opts = self.determine_prover_options();
 
+        let prover = get_prover_server(&opts)?;
+        let proof = prover.prove(env, &self.elf)?.receipt;
         let seralized_proof = bincode::serialize(&proof)?;
         Ok(Proof(seralized_proof))
     }

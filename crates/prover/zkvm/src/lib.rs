@@ -12,8 +12,8 @@ impl Default for ProverOptions {
     fn default() -> Self {
         Self {
             enable_compression: false,
-            use_mock_prover: true,
-            stark_to_snark_conversion: false,
+            use_mock_prover: false,
+            stark_to_snark_conversion: true,
         }
     }
 }
