@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use rockbound::{CommonDB, OptimisticTransactionDB as DB, SchemaBatch};
+use rockbound::{OptimisticTransactionDB as DB, SchemaBatch, SchemaDBOperationsExt};
 
 use alpen_vertex_state::sync_event::SyncEvent;
 

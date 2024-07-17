@@ -1,4 +1,4 @@
-use rockbound::{CodecError, rocksdb};
+use rockbound::{CodecError, rocksdb, TransactionError};
 use thiserror::Error;
 
 /// Simple result type used across database interface.
@@ -55,6 +55,13 @@ impl From<anyhow::Error> for DbError {
 
 impl From<CodecError> for DbError {
     fn from(value: CodecError) -> Self {
+        Self::Other(value.to_string())
+    }
+}
+
+impl<E: core::fmt::Display> From<TransactionError<E>> for DbError {
+    fn from(value: TransactionError<E>) -> Self {
+        // TODO: more specific error mapping
         Self::Other(value.to_string())
     }
 }
