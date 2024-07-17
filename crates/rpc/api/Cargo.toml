@@ -4,5 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+alpen-vertex-primitives = { workspace = true }
+
 jsonrpsee = { workspace = true, features = ["server", "macros"] }
 serde = { workspace = true }

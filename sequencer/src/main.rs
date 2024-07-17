@@ -6,10 +6,11 @@ use std::sync::Arc;
 use std::thread;
 use std::time;
 
+use alpen_vertex_primitives::l1::L1Status;
 use anyhow::Context;
 use thiserror::Error;
 use tokio::sync::broadcast;
-use tokio::sync::{mpsc, oneshot, watch};
+use tokio::sync::{mpsc, oneshot, watch, RwLock};
 use tracing::*;
 
 use alpen_vertex_btcio::rpc::traits::L1Client;
@@ -92,6 +93,8 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         l1_db, l2_db, sync_ev_db, cs_db, chst_db,
     ));
 
+    // Set up btcio status to pass around cheaply
+    let l1_status: Arc<RwLock<L1Status>> = Arc::new(RwLock::new(L1Status::default()));
     // Set up Bitcoin client RPC.
     let bitcoind_url = format!("http://{}", args.bitcoind_host);
     let btc_rpc = alpen_vertex_btcio::rpc::BitcoinClient::new(
@@ -153,7 +156,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         });
     }
 
-    let main_fut = main_task(args, sync_man, btc_rpc, database.clone());
+    let main_fut = main_task(args, sync_man, btc_rpc, database, l1_status);
     if let Err(e) = rt.block_on(main_fut) {
         error!(err = %e, "main task exited");
         process::exit(0); // special case exit once we've gotten to this point
@@ -163,26 +166,35 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn main_task<D: Database>(
+async fn main_task<D: Database + Send + Sync + 'static>(
     args: Args,
     sync_man: Arc<SyncManager>,
     l1_rpc_client: impl L1Client,
     database: Arc<D>,
+    l1_status: Arc<RwLock<L1Status>>,
 ) -> anyhow::Result<()>
 where
     // TODO how are these not redundant trait bounds???
     <D as alpen_vertex_db::traits::Database>::SeStore: Send + Sync + 'static,
     <D as alpen_vertex_db::traits::Database>::L1Store: Send + Sync + 'static,
+    <D as alpen_vertex_db::traits::Database>::L1Prov: Send + Sync + 'static,
 {
+
     // Start the L1 tasks to get that going.
     let csm_ctl = sync_man.get_csm_ctl();
-    l1_reader::start_reader_tasks(sync_man.params(), l1_rpc_client, database.clone(), csm_ctl)
-        .await?;
+    l1_reader::start_reader_tasks(
+        sync_man.params(),
+        l1_rpc_client,
+        database.clone(),
+        csm_ctl,
+        l1_status.clone(),
+    )
+    .await?;
 
     let (stop_tx, stop_rx) = oneshot::channel();
 
     // Init RPC methods.
-    let alp_rpc = rpc_server::AlpenRpcImpl::new(stop_tx);
+    let alp_rpc = rpc_server::AlpenRpcImpl::new(l1_status.clone(), database.clone(), stop_tx);
     let methods = alp_rpc.into_rpc();
 
     let rpc_port = args.rpc_port; // TODO make configurable
@@ -192,6 +204,8 @@ where
         .expect("init: build rpc server");
 
     let rpc_handle = rpc_server.start(methods);
+
+    // start a Btcio event handler
     info!("started RPC server");
 
     // Wait for a stop signal.

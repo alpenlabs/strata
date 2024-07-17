@@ -5,7 +5,7 @@ use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc};
 use tracing::*;
 
-use alpen_vertex_db::{database, traits::*};
+use alpen_vertex_db::traits::*;
 use alpen_vertex_evmctl::engine::ExecEngineCtl;
 use alpen_vertex_primitives::prelude::*;
 use alpen_vertex_state::{client_state::ClientState, operation::SyncAction};
@@ -20,6 +20,7 @@ use crate::{
 ///
 /// Unable to be shared across threads.  Any data we want to export we'll do
 /// through another handle.
+#[allow(unused)]
 pub struct WorkerState<D: Database> {
     /// Consensus parameters.
     params: Arc<Params>,

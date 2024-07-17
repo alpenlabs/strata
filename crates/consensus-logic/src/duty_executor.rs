@@ -219,7 +219,7 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
 
 fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     slot: u64,
-    ik: &IdentityKey,
+    _ik: &IdentityKey,
     database: &D,
     engine: &E,
 ) -> Result<Option<(L2BlockId, L2Block)>, Error> {

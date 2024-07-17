@@ -4,7 +4,7 @@ use tokio::sync::{mpsc, oneshot};
 use tracing::*;
 
 use alpen_vertex_db::{errors::DbError, traits::*};
-use alpen_vertex_state::{block::L2Block, sync_event::SyncEvent};
+use alpen_vertex_state::sync_event::SyncEvent;
 
 use crate::message::CsmMessage;
 

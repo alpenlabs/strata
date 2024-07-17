@@ -1,19 +1,6 @@
 //! Macro trait def for the `alp_` RPC namespace using jsonrpsee.
-
+use alpen_vertex_primitives::l1::L1Status;
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
-use serde::{Deserialize, Serialize};
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct L1Status {
-    /// Current block height.
-    pub cur_height: u64,
-
-    /// Current tip block ID as string.
-    pub cur_tip_blkid: String,
-
-    /// UNIX millis time of the last time we got a new update from the L1 connector.
-    pub last_update: u64,
-}
 
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "alp"))]
 #[cfg_attr(feature = "client", rpc(server, client, namespace = "alp"))]
@@ -26,6 +13,12 @@ pub trait AlpenApi {
     #[method(name = "stop")]
     async fn stop(&self) -> RpcResult<()>;
 
+    #[method(name = "l1connected")]
+    async fn get_l1_connection_status(&self) -> RpcResult<bool>;
+
     #[method(name = "l1status")]
     async fn get_l1_status(&self) -> RpcResult<L1Status>;
+
+    #[method(name = "l1blockHash")]
+    async fn get_l1_block_hash(&self, height: u64) -> RpcResult<String>;
 }

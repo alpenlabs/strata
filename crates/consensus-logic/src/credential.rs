@@ -17,19 +17,19 @@ pub fn check_block_credential(header: &L2BlockHeader, params: &Params) -> bool {
     }
 }
 
-fn compute_header_sig_commitment(header: &L2BlockHeader) -> Buf32 {
+fn compute_header_sig_commitment(_header: &L2BlockHeader) -> Buf32 {
     // TODO implement this, just concat all the components together aside from
     // the sig, probably should be poseidon
     warn!("header commitment generation still unimplemented");
     Buf32::from([0; 32])
 }
 
-pub fn sign_schnorr_sig(msg: &Buf32, sk: &Buf32) -> Buf64 {
+pub fn sign_schnorr_sig(_msg: &Buf32, _sk: &Buf32) -> Buf64 {
     warn!("block signature signing still unimplemented");
     Buf64::from([0; 64])
 }
 
-fn verify_schnorr_sig(sig: &Buf64, msg: &Buf32, pk: &Buf32) -> bool {
+fn verify_schnorr_sig(_sig: &Buf64, _msg: &Buf32, _pk: &Buf32) -> bool {
     // TODO implement signature verification
     warn!("block signature verification still unimplemented");
     true

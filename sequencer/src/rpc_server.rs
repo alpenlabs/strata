@@ -1,5 +1,10 @@
 #![allow(unused)]
 
+use std::sync::Arc;
+
+use alpen_vertex_db::traits::Database;
+use alpen_vertex_db::traits::L1DataProvider;
+use alpen_vertex_primitives::l1::L1Status;
 use async_trait::async_trait;
 use jsonrpsee::{
     core::RpcResult,
@@ -13,10 +18,11 @@ use reth_rpc_types::{
     StateContext, SyncInfo, SyncStatus, Transaction, TransactionRequest, Work,
 };
 use thiserror::Error;
-use tokio::sync::{oneshot, Mutex};
+use tokio::sync::{oneshot, Mutex, RwLock};
 use tracing::*;
 
-use alpen_vertex_rpc_api::{AlpenApiServer, L1Status};
+use alpen_vertex_rpc_api::AlpenApiServer;
+
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -60,21 +66,38 @@ impl Into<ErrorObjectOwned> for Error {
     }
 }
 
-pub struct AlpenRpcImpl {
+pub struct AlpenRpcImpl<D: Database + Send + Sync + 'static>
+where
+    <D as alpen_vertex_db::traits::Database>::L1Prov: Send + Sync + 'static,
+{
+    l1_status: Arc<RwLock<L1Status>>,
+    database: Arc<D>,
     // TODO
     stop_tx: Mutex<Option<oneshot::Sender<()>>>,
 }
 
-impl AlpenRpcImpl {
-    pub fn new(stop_tx: oneshot::Sender<()>) -> Self {
+impl<D: Database + Send + Sync + 'static> AlpenRpcImpl<D>
+where
+    <D as alpen_vertex_db::traits::Database>::L1Prov: Send + Sync + 'static,
+{
+    pub fn new(
+        l1_status: Arc<RwLock<L1Status>>,
+        database: Arc<D>,
+        stop_tx: oneshot::Sender<()>,
+    ) -> Self {
         Self {
+            l1_status,
+            database,
             stop_tx: Mutex::new(Some(stop_tx)),
         }
     }
 }
 
 #[async_trait]
-impl AlpenApiServer for AlpenRpcImpl {
+impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D>
+where
+    <D as alpen_vertex_db::traits::Database>::L1Prov: Send + Sync + 'static,
+{
     async fn protocol_version(&self) -> RpcResult<u64> {
         Ok(1)
     }
@@ -90,12 +113,29 @@ impl AlpenApiServer for AlpenRpcImpl {
     }
 
     async fn get_l1_status(&self) -> RpcResult<L1Status> {
-        // TODO implement this
-        warn!("alp_l1status not yet implemented");
+        let btcio_status = self.l1_status.read().await.clone();
+
         Ok(L1Status {
-            cur_height: 0,
-            cur_tip_blkid: String::new(),
-            last_update: 0,
+            bitcoin_rpc_connected: btcio_status.bitcoin_rpc_connected,
+            cur_height: btcio_status.cur_height,
+            cur_tip_blkid: btcio_status.cur_tip_blkid,
+            last_update: btcio_status.last_update,
+            last_rpc_error: btcio_status.last_rpc_error,
         })
+    }
+
+    async fn get_l1_connection_status(&self) -> RpcResult<bool> {
+        Ok(self.l1_status.read().await.bitcoin_rpc_connected)
+    }
+
+    async fn get_l1_block_hash(&self, height: u64) -> RpcResult<String> {
+        let block_manifest = self
+            .database
+            .l1_provider()
+            .get_block_manifest(height)
+            .unwrap()
+            .unwrap();
+
+        Ok(format!("{:?}", block_manifest.block_hash()))
     }
 }
