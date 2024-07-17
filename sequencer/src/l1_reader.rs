@@ -11,8 +11,11 @@ use alpen_vertex_db::traits::{Database, L1DataProvider};
 use alpen_vertex_primitives::params::Params;
 use tokio::sync::mpsc;
 
+use crate::config::FullConfig;
+
 pub async fn start_reader_tasks<D: Database>(
     params: &Params,
+    config: &FullConfig,
     rpc_client: impl L1Client,
     db: Arc<D>,
     csm_ctl: Arc<CsmController>,
@@ -30,7 +33,10 @@ where
         .get_chain_tip()?
         .unwrap_or(params.rollup().l1_start_block_height - 1);
 
-    let config = Arc::new(ReaderConfig::default());
+    let config = Arc::new(ReaderConfig {
+        max_reorg_depth: config.reader_config.max_reorg_depth,
+        client_poll_dur_ms: config.reader_config.client_poll_dur_ms,
+    });
 
     // TODO set up watchdog to handle when the spawned tasks fail gracefully
     let _reader_handle = tokio::spawn(bitcoin_data_reader_task(

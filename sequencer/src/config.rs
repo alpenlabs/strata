@@ -13,7 +13,7 @@ pub struct RollupConfig {
     pub block_time: u64,
     pub rpc_port: u16,
     pub sequencer_key: Option<PathBuf>,
-    pub datadir:  PathBuf
+    pub datadir: PathBuf,
 }
 
 #[derive(Deserialize, Debug)]
@@ -40,21 +40,21 @@ impl FullConfig {
                 rpc_password: String::new(),
                 network: Network::Regtest,
             },
-            rollup_config: RollupConfig { 
-                l1_start_block_height: 4, 
+            rollup_config: RollupConfig {
+                l1_start_block_height: 4,
                 l1_follow_distance: 6,
                 rpc_port: 8432,
-                block_time: 250, 
+                block_time: 250,
                 datadir: PathBuf::new(),
-                sequencer_key: None 
+                sequencer_key: None,
             },
             reader_config: ReaderConfig {
                 max_reorg_depth: 4,
                 client_poll_dur_ms: 200,
-            }
+            },
         }
     }
-    pub fn update_from_args(&mut self ,args: &Args) {
+    pub fn update_from_args(&mut self, args: &Args) {
         let args = args.clone();
         self.l1_config.rpc_user = args.bitcoind_user;
         self.l1_config.rpc_url = args.bitcoind_host;
@@ -93,4 +93,3 @@ mod test {
         assert!(toml::from_str::<FullConfig>(config_string).is_ok());
     }
 }
-

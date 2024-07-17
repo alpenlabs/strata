@@ -44,14 +44,14 @@ pub enum InitError {
     Other(String),
 }
 
-fn load_configuration(config: &Option<PathBuf>) ->  anyhow::Result<Option<FullConfig>>{
+fn load_configuration(config: &Option<PathBuf>) -> anyhow::Result<Option<FullConfig>> {
     if let Some(conf) = config {
-         let config_str = fs::read_to_string(conf)?;
-         if let Ok(conf) = toml::from_str(&config_str) {
-             return Ok(Some(conf));
-         }
+        let config_str = fs::read_to_string(conf)?;
+        if let Ok(conf) = toml::from_str(&config_str) {
+            return Ok(Some(conf));
+        }
     } else {
-            return Ok(None);
+        return Ok(None);
     }
     Err(anyhow!("couldn't load configuration"))
 }
@@ -66,19 +66,18 @@ fn main() {
 
 fn main_inner(args: Args) -> anyhow::Result<()> {
     logging::init();
-    
+
     // initialize the full configuration
-    let full_config = 
-    {
+    let full_config = {
         let mut conf = FullConfig::new();
         match load_configuration(&args.config)? {
-            Some(c) => { 
+            Some(c) => {
                 conf = c;
                 conf.update_from_args(&args);
-            },
+            }
             None => {
                 conf.update_from_args(&args);
-            },
+            }
         }
         conf
     };
@@ -208,8 +207,14 @@ where
 {
     // Start the L1 tasks to get that going.
     let csm_ctl = sync_man.get_csm_ctl();
-    l1_reader::start_reader_tasks(sync_man.params(), l1_rpc_client, database.clone(), csm_ctl)
-        .await?;
+    l1_reader::start_reader_tasks(
+        sync_man.params(),
+        full_config,
+        l1_rpc_client,
+        database.clone(),
+        csm_ctl,
+    )
+    .await?;
 
     let (stop_tx, stop_rx) = oneshot::channel();
 
