@@ -829,6 +829,7 @@ dependencies = [
 name = "alpen-vertex-state"
 version = "0.1.0"
 dependencies = [
+ "alpen-test-utils",
  "alpen-vertex-primitives",
  "arbitrary",
  "borsh",

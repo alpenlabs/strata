@@ -77,6 +77,37 @@ pub struct L2BlockHeader {
     pub(crate) signature: Buf64,
 }
 
+#[derive(BorshSerialize)]
+struct L2BlockHeaderWithoutSignature<'a> {
+    block_idx: &'a u64,
+    timestamp: &'a u64,
+    prev_block: &'a L2BlockId,
+    l1_segment_hash: &'a Buf32,
+    exec_segment_hash: &'a Buf32,
+    state_root: &'a Buf32,
+}
+
+impl<'a> L2BlockHeaderWithoutSignature<'a> {
+    fn from(header: &'a L2BlockHeader) -> Self {
+        Self {
+            block_idx: &header.block_idx,
+            timestamp: &header.timestamp,
+            prev_block: &header.prev_block,
+            l1_segment_hash: &header.l1_segment_hash,
+            exec_segment_hash: &header.exec_segment_hash,
+            state_root: &header.state_root,
+        }
+    }
+
+    /// Computes the L2BlockId of a Block with sha2
+    // TODO should this be poseidon?
+    fn hash(&self) -> L2BlockId {
+        let buf = borsh::to_vec(self).expect("msg");
+        let h = <sha2::Sha256 as digest::Digest>::digest(&buf);
+        L2BlockId::from(Buf32::from(<[u8; 32]>::from(h)))
+    }
+}
+
 impl L2BlockHeader {
     pub fn blockidx(&self) -> u64 {
         self.block_idx
@@ -106,12 +137,9 @@ impl L2BlockHeader {
         &self.signature
     }
 
-    /// Computes the blockid with SHA256.
-    // TODO should this be poseidon?
+    /// Computes the blockid.
     pub fn get_blockid(&self) -> L2BlockId {
-        let buf = borsh::to_vec(self).expect("block: compute blkid");
-        let h = <sha2::Sha256 as digest::Digest>::digest(&buf);
-        L2BlockId::from(Buf32::from(<[u8; 32]>::from(h)))
+        L2BlockHeaderWithoutSignature::from(&self).hash()
     }
 }
 
@@ -120,6 +148,10 @@ impl L2BlockHeader {
     pub fn set_parent_and_idx(&mut self, parent: L2BlockId, idx: u64) {
         self.prev_block = parent;
         self.block_idx = idx;
+    }
+
+    pub fn set_signature(&mut self, signature: Buf64) {
+        self.signature = signature;
     }
 }
 
@@ -187,5 +219,43 @@ impl ExecSegment {
     /// multiple EEs.
     pub fn update(&self) -> &exec_update::ExecUpdate {
         &self.update
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use alpen_test_utils::ArbitraryGenerator;
+    use alpen_vertex_primitives::buf::Buf64;
+
+    use crate::id::L2BlockId;
+
+    use super::L2BlockHeader;
+
+    #[test]
+    fn test_blockid() {
+        let mut block: L2BlockHeader = ArbitraryGenerator::new().generate();
+        let sig1 = block.sig().clone();
+        let id1 = block.get_blockid();
+
+        // Signature changes should not affect L2BlockId
+        let sig2: Buf64 = ArbitraryGenerator::new().generate();
+        block.set_signature(sig1);
+        let id2 = block.get_blockid();
+
+        let sig3: Buf64 = ArbitraryGenerator::new().generate();
+        block.set_signature(sig3);
+        let id3 = block.get_blockid();
+
+        assert_ne!(sig1, sig2);
+        assert_eq!(id1, id2);
+
+        assert_ne!(sig1, sig3);
+        assert_eq!(id1, id3);
+
+        // Changes to other fields should affect L2BlockId
+        let parent: L2BlockId = ArbitraryGenerator::new().generate();
+        block.set_parent_and_idx(parent, 1);
+        let id4 = block.get_blockid();
+        assert_ne!(id4, id1);
     }
 }
