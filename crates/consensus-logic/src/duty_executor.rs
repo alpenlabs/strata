@@ -6,7 +6,6 @@ use std::{thread, time};
 
 use alpen_vertex_state::exec_update::{ExecUpdate, UpdateInput, UpdateOutput};
 use borsh::{BorshDeserialize, BorshSerialize};
-use secp256k1::Message;
 use tokio::sync::broadcast;
 use tracing::*;
 
@@ -20,6 +19,7 @@ use alpen_vertex_state::block_template::{create_header_template, BlockHeaderTemp
 use alpen_vertex_state::client_state::ClientState;
 use alpen_vertex_state::prelude::*;
 
+use crate::credential::sign_schnorr_sig;
 use crate::duties::{self, Duty, DutyBatch, Identity};
 use crate::duty_extractor;
 use crate::errors::Error;
@@ -295,20 +295,10 @@ fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
 }
 
 /// Signs the L2BlockHeader and returns the signature
-// TODO: determine if we want to use [`Secp256k1::sign_ecdsa_recoverable`]
-// Ref: https://github.com/rust-bitcoin/rust-bitcoin/blob/master/bitcoin/src/sign_message.rs
 fn sign_template_header(header: &BlockHeaderTemplate, ik: &IdentityKey) -> Buf64 {
-    let msg_hash = header.get_sighash();
+    let msg = header.get_sighash();
     match ik {
-        IdentityKey::Sequencer(key) => {
-            let secp = secp256k1::Secp256k1::new();
-            let privkey =
-                secp256k1::SecretKey::from_slice(key.as_ref()).expect("Invalid private key");
-            let msg = Message::from_digest_slice(msg_hash.as_ref()).expect("Invalid message hash");
-            // let secp_sig_rec = secp.sign_ecdsa_recoverable(&msg, &privkey);
-            let secp_sig = secp.sign_ecdsa(&msg, &privkey);
-            Buf64::from(secp_sig.serialize_compact())
-        }
+        IdentityKey::Sequencer(sk) => sign_schnorr_sig(&msg, sk),
     }
 }
 
