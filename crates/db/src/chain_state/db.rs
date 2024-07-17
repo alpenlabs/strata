@@ -76,7 +76,7 @@ impl ChainstateStore for ChainStateDb {
         idx: u64,
         batch: &alpen_vertex_state::state_op::WriteBatch,
     ) -> DbResult<()> {
-        if (self.db.get::<WriteBatchSchema>(&idx)?).is_some() {
+        if self.db.get::<WriteBatchSchema>(&idx)?.is_some() {
             return Err(DbError::OverwriteStateUpdate(idx));
         }
 
