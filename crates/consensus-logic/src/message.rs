@@ -1,8 +1,6 @@
 use std::sync::Arc;
 
-use alpen_vertex_state::{
-    id::L2BlockId, client_state::ClientState, operation::ClientUpdateOutput,
-};
+use alpen_vertex_state::{client_state::ClientState, id::L2BlockId, operation::ClientUpdateOutput};
 
 /// Sync control message.
 #[derive(Copy, Clone, Debug)]

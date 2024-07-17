@@ -1,3 +1,5 @@
+use core::fmt;
+
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
@@ -7,23 +9,31 @@ use crate::state_queue::StateQueue;
 
 /// ID of an L1 block, usually the hash of its header.
 #[derive(
-    Copy,
-    Clone,
-    Debug,
-    Eq,
-    PartialEq,
-    Ord,
-    PartialOrd,
-    Hash,
-    BorshSerialize,
-    BorshDeserialize,
-    Arbitrary,
+    Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, BorshSerialize, BorshDeserialize, Arbitrary,
 )]
 pub struct L1BlockId(Buf32);
 
 impl From<Buf32> for L1BlockId {
     fn from(value: Buf32) -> Self {
         Self(value)
+    }
+}
+
+impl AsRef<[u8; 32]> for L1BlockId {
+    fn as_ref(&self) -> &[u8; 32] {
+        self.0.as_ref()
+    }
+}
+
+impl fmt::Debug for L1BlockId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(&self.0, f)
+    }
+}
+
+impl fmt::Display for L1BlockId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.0, f)
     }
 }
 

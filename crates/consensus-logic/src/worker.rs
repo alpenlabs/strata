@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::{broadcast, mpsc, watch};
 use tracing::*;
 
 use alpen_vertex_db::traits::*;
@@ -72,9 +72,10 @@ pub fn consensus_worker_task<D: Database, E: ExecEngineCtl>(
     mut state: WorkerState<D>,
     engine: Arc<E>,
     mut inp_msg_ch: mpsc::Receiver<CsmMessage>,
+    cl_state_tx: watch::Sender<Option<ClientState>>,
 ) -> Result<(), Error> {
     while let Some(msg) = inp_msg_ch.blocking_recv() {
-        if let Err(e) = process_msg(&mut state, engine.as_ref(), &msg) {
+        if let Err(e) = process_msg(&mut state, engine.as_ref(), &msg, cl_state_tx.clone()) {
             error!(err = %e, "failed to process sync message, skipping");
         }
     }
@@ -88,11 +89,12 @@ fn process_msg<D: Database, E: ExecEngineCtl>(
     state: &mut WorkerState<D>,
     engine: &E,
     msg: &CsmMessage,
+    cl_state_tx: watch::Sender<Option<ClientState>>,
 ) -> anyhow::Result<()> {
     match msg {
         CsmMessage::EventInput(idx) => {
             // TODO ensure correct event index ordering
-            handle_sync_event(state, engine, *idx)?;
+            handle_sync_event(state, engine, *idx, cl_state_tx)?;
             Ok(())
         }
     }
@@ -102,9 +104,13 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
     state: &mut WorkerState<D>,
     engine: &E,
     ev_idx: u64,
+    cl_state_tx: watch::Sender<Option<ClientState>>,
 ) -> anyhow::Result<()> {
     // Perform the main step of deciding what the output we're operating on.
     let (outp, new_state) = state.state_tracker.advance_consensus_state(ev_idx)?;
+
+    // publish the client status
+    cl_state_tx.send(Some((*new_state).clone()))?;
 
     for action in outp.actions() {
         match action {

@@ -22,7 +22,7 @@ use alpen_vertex_state::prelude::*;
 use crate::duties::{self, Duty, DutyBatch, Identity};
 use crate::duty_extractor;
 use crate::errors::Error;
-use crate::message::{ForkChoiceMessage, ClientUpdateNotif};
+use crate::message::{ClientUpdateNotif, ForkChoiceMessage};
 use crate::sync_manager::SyncManager;
 
 #[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]

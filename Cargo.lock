@@ -808,8 +808,11 @@ name = "alpen-vertex-rpc-api"
 version = "0.1.0"
 dependencies = [
  "alpen-vertex-primitives",
+ "alpen-vertex-state",
+ "hex",
  "jsonrpsee",
  "serde",
+ "thiserror",
 ]
 
 [[package]]
@@ -830,7 +833,7 @@ dependencies = [
  "bitcoin",
  "jsonrpsee",
  "parking_lot 0.12.3",
- "reqwest",
+ "reqwest 0.12.5",
  "reth-ipc",
  "reth-primitives",
  "reth-rpc-api",
