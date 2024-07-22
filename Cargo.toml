@@ -69,11 +69,11 @@ rockbound = { git = "https://github.com/sovereign-Labs/rockbound", tag = "v2.0.1
 rocksdb = "0.21"
 secp256k1 = "0.29.0"
 serde = "1.0"
+serde-hex = "0.1.0"
 serde_json = { version = "1.0", default-features = false, features = [
   "alloc",
   "raw_value",
 ] }
-serde-hex = "0.1.0"
 sha2 = "0.10"
 tempfile = "3.10.1"
 thiserror = "1.0"
