@@ -32,16 +32,22 @@ pub fn sign_schnorr_sig(msg: &Buf32, sk: &Buf32) -> Buf64 {
 }
 
 fn verify_schnorr_sig(sig: &Buf64, msg: &Buf32, pk: &Buf32) -> bool {
-    let msg = Message::from_digest_slice(msg.as_ref()).expect("Invalid message hash");
-    let pk = XOnlyPublicKey::from_slice(pk.as_ref()).expect("Invalid public key");
-    let sig = Signature::from_slice(&sig.0.as_ref());
-    match sig {
-        Ok(sig) => match sig.verify(&msg, &pk) {
-            Ok(_) => true,
-            Err(_) => false,
-        },
-        Err(_) => false,
-    }
+    let msg = match Message::from_digest_slice(msg.as_ref()) {
+        Ok(msg) => msg,
+        Err(_) => return false,
+    };
+
+    let pk = match XOnlyPublicKey::from_slice(pk.as_ref()) {
+        Ok(pk) => pk,
+        Err(_) => return false,
+    };
+
+    let sig = match Signature::from_slice(&sig.0.as_ref()) {
+        Ok(sig) => sig,
+        Err(_) => return false,
+    };
+
+    sig.verify(&msg, &pk).is_ok()
 }
 
 #[cfg(test)]
