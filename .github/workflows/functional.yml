@@ -1,0 +1,47 @@
+name: Run functional tests
+
+on:
+  pull_request:
+  merge_group:
+  push:
+    branches: [master]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  run-functional-tests:
+    name: Run functional tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "^3.10" # Keep in sync with `pyproject.toml`
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python -
+          echo "${HOME}/.local/bin" >> $GITHUB_PATH
+
+      - name: Configure Poetry to create the virtual environment inside the project
+        run: poetry config virtualenvs.in-project true
+
+      - name: Install dependencies
+        run: poetry install --no-root
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build Cargo project
+        run: cargo build --release
+
+      - name: Run functional tests
+        run: |
+          cd test && CARGO_RELEASE=1 poetry run python entry.py
