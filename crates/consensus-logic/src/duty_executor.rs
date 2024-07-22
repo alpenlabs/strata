@@ -54,8 +54,15 @@ pub fn duty_tracker_task<D: Database>(
     batch_queue: broadcast::Sender<DutyBatch>,
     ident: Identity,
     database: Arc<D>,
-) {
+) -> Result<(), Error> {
     let mut duties_tracker = duties::DutyTracker::new_empty();
+
+    let idx = database.client_state_provider().get_last_checkpoint_idx()?;
+    let last_checkpoint_state = database.client_state_provider().get_state_checkpoint(idx)?;
+    let mut last_finalized_blk = match last_checkpoint_state {
+        Some(state) => state.sync().map(|sync| *sync.finalized_blkid()),
+        None => None,
+    };
 
     loop {
         let update = match cupdate_rx.blocking_recv() {
@@ -75,7 +82,13 @@ pub fn duty_tracker_task<D: Database>(
         trace!(%ev_idx, "new consensus state, updating duties");
         trace!("STATE: {new_state:#?}");
 
-        if let Err(e) = update_tracker(&mut duties_tracker, new_state, &ident, database.as_ref()) {
+        if let Err(e) = update_tracker(
+            &mut duties_tracker,
+            new_state,
+            &ident,
+            database.as_ref(),
+            &mut last_finalized_blk,
+        ) {
             error!(err = %e, "failed to update duties tracker");
         }
 
@@ -87,6 +100,8 @@ pub fn duty_tracker_task<D: Database>(
     }
 
     info!("duty extractor task exiting");
+
+    Ok(())
 }
 
 fn update_tracker<D: Database>(
@@ -94,6 +109,7 @@ fn update_tracker<D: Database>(
     state: &ClientState,
     ident: &Identity,
     database: &D,
+    last_finalized_block: &mut Option<L2BlockId>,
 ) -> Result<(), Error> {
     let Some(ss) = state.sync() else {
         return Ok(());
@@ -111,9 +127,12 @@ fn update_tracker<D: Database>(
     let block_idx = block.header().blockidx();
     let ts = time::Instant::now(); // FIXME XXX use .timestamp()!!!
 
-    // TODO figure out which blocks were finalized
-    let newly_finalized = Vec::new();
-    let tracker_update = duties::StateUpdate::new(block_idx, ts, newly_finalized);
+    // Figure out which blocks were finalized
+    let new_finalized = state.sync().map(|sync| *sync.finalized_blkid());
+    let newly_finalized_blocks: Vec<L2BlockId> =
+        get_finalized_blocks(new_finalized, l2prov.as_ref(), last_finalized_block)?;
+
+    let tracker_update = duties::StateUpdate::new(block_idx, ts, newly_finalized_blocks);
     let n_evicted = tracker.update(&tracker_update);
     trace!(%n_evicted, "evicted old duties from new consensus state");
 
@@ -121,6 +140,41 @@ fn update_tracker<D: Database>(
     tracker.add_duties(tip_blkid, block_idx, new_duties.into_iter());
 
     Ok(())
+}
+
+fn get_finalized_blocks(
+    finalized: Option<L2BlockId>,
+    l2prov: &impl L2DataProvider,
+    last_finalized_block: &mut Option<L2BlockId>,
+) -> Result<Vec<L2BlockId>, Error> {
+    // Figure out which blocks were finalized
+    let mut newly_finalized_blocks: Vec<L2BlockId> = Vec::new();
+    let mut new_finalized = finalized;
+
+    loop {
+        if let Some(finalized) = new_finalized {
+            // If the last finalized block is equal to the new finalized block,
+            // it means that no new blocks are finalized
+            if *last_finalized_block == Some(finalized) {
+                break;
+            }
+
+            // else loop till we reach to the last finalized block or go all the way
+            // as long as we get some block data
+            // TODO: verify if this works as expected
+            newly_finalized_blocks.push(finalized);
+
+            match l2prov.get_block_data(finalized)? {
+                Some(block) => new_finalized = Some(*block.header().parent()),
+                None => break,
+            }
+        }
+    }
+
+    // Update the last_finalized_block with the new_finalized value
+    *last_finalized_block = finalized;
+
+    Ok(newly_finalized_blocks)
 }
 
 pub fn duty_dispatch_task<
