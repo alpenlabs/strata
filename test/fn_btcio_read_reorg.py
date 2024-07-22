@@ -15,7 +15,7 @@ class L1ReadReorgTest(flexitest.Test):
         btcrpc: BitcoindClient = btc.create_rpc()
         seqrpc = seq.create_rpc()
 
-        # Add two blocks since each block is generated every 0.5 seconds and we need atleast 4 or more blocks to invalidate 3 blocks at the end
+        # Add two blocks since each block is generated every 0.5 seconds and we need at least 4 or more blocks to invalidate 3 blocks at the end
         time.sleep(3)
         l1stat = seqrpc.alp_l1status()
         # relative height is chosen such that we can have arbitrary number of blocks which is affected by the time.sleep above

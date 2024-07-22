@@ -11,7 +11,6 @@ use tracing::*;
 use super::config::ReaderConfig;
 use super::messages::{BlockData, L1Event};
 use crate::rpc::traits::L1Client;
-use crate::rpc::types::RpcBlockchainInfo;
 use crate::status::{apply_status_updates, StatusUpdate};
 
 fn filter_interesting_txs(block: &Block) -> Vec<u32> {
@@ -173,10 +172,9 @@ async fn do_reader_task(
         let cur_height = state.cur_height;
         let poll_span = debug_span!("l1poll", %cur_height);
 
-        if let Err(err) =
-            poll_for_new_blocks(client, &event_tx, &config, &mut state, status_updates)
-                .instrument(poll_span)
-                .await
+        if let Err(err) = poll_for_new_blocks(client, event_tx, &config, &mut state, status_updates)
+            .instrument(poll_span)
+            .await
         {
             warn!(%cur_height, err = %err, "failed to poll Bitcoin client");
             status_updates.push(StatusUpdate::RpcError(err.to_string()));
@@ -199,7 +197,7 @@ async fn do_reader_task(
             current_time.elapsed().as_millis() as u64
         ));
 
-        apply_status_updates(&status_updates, l1_status.clone()).await;
+        apply_status_updates(status_updates, l1_status.clone()).await;
     }
 }
 

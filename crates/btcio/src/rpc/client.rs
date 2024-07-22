@@ -5,10 +5,8 @@ use std::{fmt::Display, str::FromStr};
 use async_trait::async_trait;
 use bitcoin::Txid;
 
-use anyhow::anyhow;
 use base64::engine::general_purpose;
 use base64::Engine;
-use bitcoin::hashes::sha256d::Hash;
 use bitcoin::hashes::Hash as _;
 // use async_recursion::async_recursion;
 use bitcoin::{

@@ -10,8 +10,8 @@ borsh = { workspace = true }
 digest = { workspace = true }
 hex = { workspace = true }
 reth-primitives = { workspace = true }
-sha2 = { workspace = true }
 serde = { workspace = true }
+sha2 = { workspace = true }
 
 [dev-dependencies]
 hex = { workspace = true }

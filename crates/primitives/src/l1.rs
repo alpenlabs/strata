@@ -1,5 +1,4 @@
 use std::fmt;
-use std::time::Duration;
 
 use arbitrary::Arbitrary;
 use bitcoin::hashes::Hash;
