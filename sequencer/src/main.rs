@@ -1,5 +1,6 @@
 use std::fs;
 use std::io;
+use std::path::Path;
 use std::path::PathBuf;
 use std::process;
 use std::sync::Arc;
@@ -44,7 +45,7 @@ pub enum InitError {
     Other(String),
 }
 
-fn load_configuration(config: &Option<PathBuf>) -> anyhow::Result<Option<Config>> {
+fn load_configuration(config: Option<&Path>) -> anyhow::Result<Option<Config>> {
     if let Some(conf) = config {
         let config_str = fs::read_to_string(conf)?;
         if let Ok(conf) = toml::from_str(&config_str) {
@@ -70,7 +71,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     // initialize the full configuration
     let config = {
         let mut conf = Config::new();
-        match load_configuration(&args.config)? {
+        match load_configuration(args.config.as_deref())? {
             Some(c) => {
                 conf = c;
                 conf.update_from_args(&args);
@@ -88,12 +89,12 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     // Set up block params.
     let params = Params {
         rollup: RollupParams {
-            block_time: config.rollup_config.block_time,
+            block_time: 1000,
             cred_rule: block_credential::CredRule::Unchecked,
-            l1_start_block_height: config.rollup_config.l1_start_block_height,
+            l1_start_block_height: 4,
         },
         run: RunParams {
-            l1_follow_distance: config.rollup_config.l1_follow_distance,
+            l1_follow_distance: config.sync.l1_follow_distance,
         },
     };
 
@@ -124,16 +125,16 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     ));
 
     // Set up Bitcoin client RPC.
-    let bitcoind_url = format!("http://{}", config.l1_config.rpc_url);
+    let bitcoind_url = format!("http://{}", config.bitcoind_rpc.rpc_url);
     let btc_rpc = alpen_vertex_btcio::rpc::BitcoinClient::new(
         bitcoind_url,
-        config.l1_config.rpc_user.clone(),
-        config.l1_config.rpc_password.clone(),
+        config.bitcoind_rpc.rpc_user.clone(),
+        config.bitcoind_rpc.rpc_password.clone(),
         bitcoin::Network::Regtest,
     );
 
     // TODO remove this
-    if config.l1_config.network == Network::Regtest {
+    if config.bitcoind_rpc.network == Network::Regtest {
         warn!("network not set to regtest, ignoring");
     }
 
@@ -222,7 +223,7 @@ where
     let alp_rpc = rpc_server::AlpenRpcImpl::new(stop_tx);
     let methods = alp_rpc.into_rpc();
 
-    let rpc_port = config.rollup_config.rpc_port; // TODO make configurable
+    let rpc_port = config.client.rpc_port; // TODO make configurable
     let rpc_server = jsonrpsee::server::ServerBuilder::new()
         .build(format!("127.0.0.1:{rpc_port}"))
         .await
@@ -243,7 +244,7 @@ where
 }
 
 fn open_rocksdb_database(config: &Config) -> anyhow::Result<Arc<rockbound::DB>> {
-    let mut database_dir = config.rollup_config.datadir.clone();
+    let mut database_dir = config.client.datadir.clone();
     database_dir.push("rocksdb");
 
     if !database_dir.exists() {

@@ -34,8 +34,8 @@ where
         .unwrap_or(params.rollup().l1_start_block_height - 1);
 
     let config = Arc::new(ReaderConfig {
-        max_reorg_depth: config.reader_config.max_reorg_depth,
-        client_poll_dur_ms: config.reader_config.client_poll_dur_ms,
+        max_reorg_depth: config.sync.max_reorg_depth,
+        client_poll_dur_ms: config.sync.client_poll_dur_ms,
     });
 
     // TODO set up watchdog to handle when the spawned tasks fail gracefully

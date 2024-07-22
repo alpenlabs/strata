@@ -1,23 +1,26 @@
 use std::path::PathBuf;
 
-use alpen_vertex_btcio::reader::config::ReaderConfig;
 use bitcoin::Network;
 use serde::Deserialize;
 
 use crate::args::Args;
 
 #[derive(Deserialize, Debug)]
-pub struct RollupConfig {
-    pub l1_start_block_height: u64,
-    pub l1_follow_distance: u64,
-    pub block_time: u64,
+pub struct ClientParams {
     pub rpc_port: u16,
     pub sequencer_key: Option<PathBuf>,
     pub datadir: PathBuf,
 }
 
 #[derive(Deserialize, Debug)]
-pub struct BitcoinConfig {
+pub struct SyncParams {
+    pub l1_follow_distance: u64,
+    pub max_reorg_depth: u32,
+    pub client_poll_dur_ms: u32
+} 
+
+#[derive(Deserialize, Debug)]
+pub struct BitcoindParams {
     pub rpc_url: String,
     pub rpc_user: String,
     pub rpc_password: String,
@@ -26,29 +29,27 @@ pub struct BitcoinConfig {
 
 #[derive(Deserialize, Debug)]
 pub struct Config {
-    pub l1_config: BitcoinConfig,
-    pub rollup_config: RollupConfig,
-    pub reader_config: ReaderConfig,
+    pub client: ClientParams,
+    pub bitcoind_rpc: BitcoindParams,
+    pub sync: SyncParams,
 }
 
 impl Config {
     pub fn new() -> Config {
         Self {
-            l1_config: BitcoinConfig {
+            bitcoind_rpc: BitcoindParams {
                 rpc_url: String::new(),
                 rpc_user: String::new(),
                 rpc_password: String::new(),
                 network: Network::Regtest,
             },
-            rollup_config: RollupConfig {
-                l1_start_block_height: 4,
-                l1_follow_distance: 6,
+            client : ClientParams {
                 rpc_port: 8432,
-                block_time: 250,
                 datadir: PathBuf::new(),
                 sequencer_key: None,
             },
-            reader_config: ReaderConfig {
+            sync: SyncParams {
+                l1_follow_distance: 6, 
                 max_reorg_depth: 4,
                 client_poll_dur_ms: 200,
             },
@@ -56,12 +57,12 @@ impl Config {
     }
     pub fn update_from_args(&mut self, args: &Args) {
         let args = args.clone();
-        self.l1_config.rpc_user = args.bitcoind_user;
-        self.l1_config.rpc_url = args.bitcoind_host;
-        self.rollup_config.rpc_port = args.rpc_port;
-        self.l1_config.rpc_password = args.bitcoind_password;
-        self.rollup_config.datadir = args.datadir;
-        self.rollup_config.sequencer_key = args.sequencer_key;
+        self.bitcoind_rpc.rpc_user = args.bitcoind_user;
+        self.bitcoind_rpc.rpc_url = args.bitcoind_host;
+        self.client.rpc_port = args.rpc_port;
+        self.bitcoind_rpc.rpc_password = args.bitcoind_password;
+        self.client.datadir = args.datadir;
+        self.client.sequencer_key = args.sequencer_key;
     }
 }
 
@@ -72,20 +73,18 @@ mod test {
     #[test]
     fn config_load_test() {
         let config_string = r#"
-            [l1_config]
+            [bitcoind_rpc]
             rpc_url = "http://localhost:18332"
             rpc_user = "alpen"
             rpc_password = "alpen"
             network = "regtest"
 
-            [rollup_config]
-            l1_start_block_height = 4
-            l1_follow_distance = 6
+            [client]
             rpc_port = 8432
-            block_time = 250
             datadir = "/path/to/data/directory"
 
-            [reader_config]
+            [sync]
+            l1_follow_distance = 6
             max_reorg_depth = 4
             client_poll_dur_ms = 200
         "#;
