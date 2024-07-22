@@ -5,7 +5,7 @@ name: Update Dependencies
 on:
   schedule:
     # Run at the first of every month
-    - cron: "0 0 1 * SUN"
+    - cron: "0 0 1 * *"
   workflow_dispatch:
     # Needed so we can run it manually
 
