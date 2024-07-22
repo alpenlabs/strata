@@ -38,15 +38,15 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@nightly
       - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
 
       - name: Build Cargo project
         run: cargo build
 
       - name: Install bitcoind
         run: |
-          sudo add-apt-repository ppa:bitcoin/bitcoin
-          sudo apt-get update
-          sudo apt-get install bitcoind
+          sudo snap install bitcoind
 
       - name: Run functional tests
         run: |
