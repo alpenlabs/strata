@@ -277,6 +277,7 @@ mod tests {
     use alpen_vertex_db::traits::{Database, L2DataStore};
     use alpen_vertex_state::{
         block::{L2Block, L2BlockBody, L2BlockHeader},
+        block_template::create_header_template,
         id::L2BlockId,
     };
 
@@ -284,18 +285,34 @@ mod tests {
 
     fn get_genesis_block() -> L2Block {
         let arb = ArbitraryGenerator::new();
-        let mut header: L2BlockHeader = arb.generate();
-        let empty_hash = L2BlockId::default();
+        let gen_header: L2BlockHeader = arb.generate();
         let body: L2BlockBody = arb.generate();
-        header.set_parent_and_idx(empty_hash, 0);
+
+        let empty_hash = L2BlockId::default();
+        let header = create_header_template(
+            0,
+            gen_header.timestamp(),
+            empty_hash,
+            &body,
+            *gen_header.state_root(),
+        )
+        .complete_with(*gen_header.sig());
         L2Block::new(header, body)
     }
 
     fn get_mock_block_with_parent(parent: &L2BlockHeader) -> L2Block {
         let arb = ArbitraryGenerator::new();
-        let mut header: L2BlockHeader = arb.generate();
+        let gen_header: L2BlockHeader = arb.generate();
         let body: L2BlockBody = arb.generate();
-        header.set_parent_and_idx(parent.get_blockid(), parent.blockidx() + 1);
+
+        let header = create_header_template(
+            parent.blockidx() + 1,
+            gen_header.timestamp(),
+            parent.get_blockid(),
+            &body,
+            *gen_header.state_root(),
+        )
+        .complete_with(*gen_header.sig());
         L2Block::new(header, body)
     }
 
