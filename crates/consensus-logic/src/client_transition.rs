@@ -1,5 +1,6 @@
 //! Core state transition function.
 
+use alpen_vertex_db::sync_event::schemas::SyncEventWithTimestamp;
 use alpen_vertex_db::traits::{Database, L1DataProvider, L2DataProvider};
 use alpen_vertex_primitives::prelude::*;
 use alpen_vertex_state::client_state::*;
@@ -50,6 +51,12 @@ pub fn process_event<D: Database>(
 
                 // TODO do whatever changes we have to to accept the new block
             }
+        }
+
+        SyncEvent::ComputedGenesis(gblkid) => {
+            // Just construct the sync state for the genesis.
+            let ss = SyncState::from_genesis_blkid(*gblkid);
+            writes.push(ClientStateWrite::ReplaceSync(Box::new(ss)));
         }
 
         SyncEvent::NewTipBlock(blkid) => {

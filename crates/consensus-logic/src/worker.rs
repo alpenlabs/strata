@@ -12,7 +12,8 @@ use alpen_vertex_state::{client_state::ClientState, operation::SyncAction};
 
 use crate::{
     errors::Error,
-    message::{ClientUpdateNotif, CsmMessage},
+    genesis,
+    message::{ClientUpdateNotif, CsmMessage, ForkChoiceMessage},
     state_tracker,
 };
 
@@ -68,13 +69,20 @@ impl<D: Database> WorkerState<D> {
 }
 
 /// Receives messages from channel to update consensus state with.
-pub fn consensus_worker_task<D: Database, E: ExecEngineCtl>(
+pub fn client_worker_task<D: Database, E: ExecEngineCtl>(
     mut state: WorkerState<D>,
     engine: Arc<E>,
-    mut inp_msg_ch: mpsc::Receiver<CsmMessage>,
+    mut msg_rx: mpsc::Receiver<CsmMessage>,
     cl_state_tx: watch::Sender<Option<ClientState>>,
+    fcm_tx: mpsc::Sender<ForkChoiceMessage>,
 ) -> Result<(), Error> {
-    while let Some(msg) = inp_msg_ch.blocking_recv() {
+    // Send a message off to the forkchoice manager that we're resuming.
+    let start_state = state.state_tracker.cur_state().clone();
+    assert!(fcm_tx
+        .blocking_send(ForkChoiceMessage::CsmResume(start_state))
+        .is_ok());
+
+    while let Some(msg) = msg_rx.blocking_recv() {
         if let Err(e) = process_msg(&mut state, engine.as_ref(), &msg, cl_state_tx.clone()) {
             error!(err = %e, "failed to process sync message, skipping");
         }
@@ -135,6 +143,22 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
                 // TODO we should probably emit a state checkpoint here if we
                 // aren't already
                 info!(?blkid, "finalizing block");
+            }
+
+            SyncAction::L2Genesis(l1blkid) => {
+                // First check if we actually need to do genesis or not.  If
+                // we've already done genesis then something is up that we don't
+                // understand.
+                if !genesis::check_needs_genesis(state.database.as_ref())? {
+                    error!(%ev_idx, "emitted L1Genesis action but we don't need to do genesis?");
+                }
+
+                // If we got to this point then everything we need to do genesis
+                // should already be in the database.
+                genesis::init_genesis_states(&state.params, state.database.as_ref())?;
+                info!(%l1blkid, "created L2 genesis block!");
+
+                // TODO We also have to unlock the FCM to start.
             }
         }
     }

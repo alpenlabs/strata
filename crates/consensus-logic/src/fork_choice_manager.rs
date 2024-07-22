@@ -2,8 +2,9 @@
 
 use std::sync::Arc;
 
+use alpen_vertex_primitives::buf::Buf32;
 use alpen_vertex_state::state_op;
-use tokio::sync::mpsc;
+use tokio::sync::{broadcast, mpsc, watch, Semaphore};
 use tracing::*;
 
 use alpen_vertex_db::errors::DbError;
@@ -20,6 +21,7 @@ use alpen_vertex_state::sync_event::SyncEvent;
 
 use crate::ctl::CsmController;
 use crate::message::ForkChoiceMessage;
+use crate::unfinalized_tracker::UnfinalizedBlockTracker;
 use crate::{chain_transition, credential, errors::*, reorg, unfinalized_tracker};
 
 /// Tracks the parts of the chain that haven't been finalized on-chain yet.
@@ -30,8 +32,8 @@ pub struct ForkChoiceManager<D: Database> {
     /// Underlying state database.
     database: Arc<D>,
 
-    /// Current consensus state we're considering blocks against.
-    cur_state: Arc<ClientState>,
+    /// Current CSM state, as of the last time we were updated about it.
+    cur_csm_state: Arc<ClientState>,
 
     /// Tracks unfinalized block tips.
     chain_tracker: unfinalized_tracker::UnfinalizedBlockTracker,
@@ -49,7 +51,7 @@ impl<D: Database> ForkChoiceManager<D> {
     pub fn new(
         params: Arc<Params>,
         database: Arc<D>,
-        cur_state: Arc<ClientState>,
+        cur_csm_state: Arc<ClientState>,
         chain_tracker: unfinalized_tracker::UnfinalizedBlockTracker,
         cur_best_block: L2BlockId,
         cur_index: u64,
@@ -57,7 +59,7 @@ impl<D: Database> ForkChoiceManager<D> {
         Self {
             params,
             database,
-            cur_state,
+            cur_csm_state,
             chain_tracker,
             cur_best_block,
             cur_index,
@@ -92,14 +94,111 @@ impl<D: Database> ForkChoiceManager<D> {
     }
 }
 
+/// Creates the forkchoice manager state from a database and rollup params.
+pub fn init_forkchoice_manager<D: Database>(
+    database: Arc<D>,
+    params: Arc<Params>,
+    init_csm_state: Arc<ClientState>,
+    fin_tip_blkid: L2BlockId,
+) -> anyhow::Result<ForkChoiceManager<D>> {
+    // Load data about the last finalized block so we can use that to initialize
+    // the finalized tracker.
+    let l2_prov = database.l2_provider();
+    let fin_block = l2_prov
+        .get_block_data(fin_tip_blkid)?
+        .ok_or(Error::MissingL2Block(fin_tip_blkid))?;
+    let fin_tip_index = fin_block.header().blockidx();
+
+    // Populate the unfinalized block tracker.
+    let mut chain_tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(fin_tip_blkid);
+    chain_tracker.load_unfinalized_blocks(fin_tip_index + 1, l2_prov.as_ref())?;
+
+    let (cur_tip_blkid, cur_tip_index) = determine_start_tip(&chain_tracker, database.as_ref())?;
+
+    // Actually assemble the forkchoice manager state.
+    let fcm = ForkChoiceManager::new(
+        params.clone(),
+        database.clone(),
+        init_csm_state,
+        chain_tracker,
+        cur_tip_blkid,
+        cur_tip_index,
+    );
+
+    Ok(fcm)
+}
+
+/// Recvs inputs from the FCM channel until we recieve a CSM state update that
+/// has a sync state set, indicating that we can start syncing the chain.
+fn wait_for_csm_sync_state(
+    fcm_rx: &mut mpsc::Receiver<ForkChoiceMessage>,
+) -> anyhow::Result<Arc<ClientState>> {
+    while let Some(msg) = fcm_rx.blocking_recv() {
+        if let Some(state) = process_early_fcm_msg(msg) {
+            return Ok(state);
+        }
+    }
+
+    warn!("CSM task exited without providing new state");
+    Err(Error::MissingClientSyncState.into())
+}
+
+/// Considers an FCM message and extracts the state from it if its sync state is
+/// set (ie. usable for doing forkchoice things with).
+fn process_early_fcm_msg(msg: ForkChoiceMessage) -> Option<Arc<ClientState>> {
+    match msg {
+        ForkChoiceMessage::CsmResume(state) => {
+            if state.sync().is_some() {
+                return Some(state);
+            }
+        }
+
+        ForkChoiceMessage::NewState(state, _) => {
+            if state.sync().is_some() {
+                return Some(state);
+            }
+        }
+
+        _ => {}
+    }
+
+    None
+}
+
+fn determine_start_tip(
+    unfin: &UnfinalizedBlockTracker,
+    database: &impl Database,
+) -> anyhow::Result<(L2BlockId, u64)> {
+    unimplemented!()
+}
+
 /// Main tracker task that takes a ready fork choice manager and some IO stuff.
 pub fn tracker_task<D: Database, E: ExecEngineCtl>(
-    state: ForkChoiceManager<D>,
+    database: Arc<D>,
     engine: Arc<E>,
-    ctm_rx: mpsc::Receiver<ForkChoiceMessage>,
+    mut fcm_rx: mpsc::Receiver<ForkChoiceMessage>,
     csm_ctl: Arc<CsmController>,
+    params: Arc<Params>,
 ) {
-    if let Err(e) = tracker_task_inner(state, engine.as_ref(), ctm_rx, &csm_ctl) {
+    let init_state = match wait_for_csm_sync_state(&mut fcm_rx) {
+        Ok(s) => s,
+        Err(e) => {
+            error!(err = %e, "failed to initialize forkchoice manager");
+            return;
+        }
+    };
+
+    // TODO make this initialize not to zero
+    let id = L2BlockId::from(Buf32::zero());
+    let fcm = match init_forkchoice_manager(database, params.clone(), init_state, id) {
+        Ok(fcm) => fcm,
+        Err(e) => {
+            error!(err = %e, "failed to init forkchoice manager!");
+            return;
+        }
+    };
+
+    if let Err(e) = tracker_task_inner(fcm, engine.as_ref(), fcm_rx, &csm_ctl) {
         error!(err = %e, "tracker aborted");
     }
 }
@@ -107,11 +206,11 @@ pub fn tracker_task<D: Database, E: ExecEngineCtl>(
 fn tracker_task_inner<D: Database, E: ExecEngineCtl>(
     mut state: ForkChoiceManager<D>,
     engine: &E,
-    mut ctm_rx: mpsc::Receiver<ForkChoiceMessage>,
+    mut fcm_rx: mpsc::Receiver<ForkChoiceMessage>,
     csm_ctl: &CsmController,
 ) -> anyhow::Result<()> {
     loop {
-        let Some(m) = ctm_rx.blocking_recv() else {
+        let Some(m) = fcm_rx.blocking_recv() else {
             break;
         };
 
@@ -123,18 +222,24 @@ fn tracker_task_inner<D: Database, E: ExecEngineCtl>(
 }
 
 fn process_ct_msg<D: Database, E: ExecEngineCtl>(
-    ctm: ForkChoiceMessage,
+    fcm: ForkChoiceMessage,
     state: &mut ForkChoiceManager<D>,
     engine: &E,
     csm_ctl: &CsmController,
 ) -> anyhow::Result<()> {
-    match ctm {
+    match fcm {
+        ForkChoiceMessage::CsmResume(_) => {
+            warn!("got unexpected late CSM resume message, ignoring");
+        }
+
         ForkChoiceMessage::NewState(cs, output) => {
-            let csm_tip = cs.chain_tip_blkid();
+            let sync = cs.sync().expect("fcm: client state missing sync data");
+
+            let csm_tip = sync.chain_tip_blkid();
             debug!(?csm_tip, "got new CSM state");
 
             // Update the new state.
-            state.cur_state = cs;
+            state.cur_csm_state = cs;
 
             // TODO use output actions to clear out dangling states now
             for act in output.actions() {
@@ -157,7 +262,7 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
 
             // First, decide if the block seems correctly signed and we haven't
             // already marked it as invalid.
-            let cstate = state.cur_state.clone();
+            let cstate = state.cur_csm_state.clone();
             let correctly_signed = check_new_block(&blkid, &block, &cstate, state)?;
             if !correctly_signed {
                 // It's invalid, write that and return.

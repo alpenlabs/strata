@@ -1,11 +1,28 @@
-//! Handle to inspect the current consensus state and wait for updates when there are any.
+//! Handle to inspect the current CSM state and wait for updates when there are
+//! any.
 
-use tokio::sync::watch;
+use std::sync::Arc;
+
+use tokio::sync::RwLock;
+
+use alpen_vertex_state::client_state::ClientState;
 
 pub struct StatusTracker {
-    _state_rx: watch::Receiver<()>,
+    cur_state: Arc<RwLock<Arc<ClientState>>>,
 }
 
 pub struct StatusUpdater {
-    _state_tx: watch::Sender<()>,
+    cur_state: Arc<RwLock<Arc<ClientState>>>,
+}
+
+pub fn make_csm_pair(cur_state: Arc<ClientState>) -> (StatusTracker, StatusUpdater) {
+    let cur_state = Arc::new(RwLock::new(cur_state));
+
+    let tracker = StatusTracker {
+        cur_state: cur_state.clone(),
+    };
+
+    let updater = StatusUpdater { cur_state };
+
+    (tracker, updater)
 }

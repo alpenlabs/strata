@@ -142,17 +142,23 @@ where
     async fn get_client_status(&self) -> RpcResult<ClientStatus> {
         // FIXME this is somewhat ugly but when we restructure the client state
         // this will be a lot nicer
-        if let Some(status) = self.client_state_rx.borrow().as_ref() {
-            let Some(last_l1) = status.recent_l1_block() else {
+        if let Some(state) = self.client_state_rx.borrow().as_ref() {
+            let Some(last_l1) = state.recent_l1_block() else {
                 warn!("last L1 block not set in client state, returning still not started");
                 return Err(Error::ClientNotStarted.into());
             };
 
+            // Copy these out of the sync state, if they're there.
+            let (chain_tip, finalized_blkid) = state
+                .sync()
+                .map(|ss| (*ss.chain_tip_blkid(), *ss.finalized_blkid()))
+                .unwrap_or_default();
+
             Ok(ClientStatus {
-                chain_tip: *status.chain_tip_blkid().as_ref(),
-                finalized_blkid: *status.finalized_blkid().as_ref(),
+                chain_tip: *chain_tip.as_ref(),
+                finalized_blkid: *finalized_blkid.as_ref(),
                 last_l1_block: *last_l1.as_ref(),
-                buried_l1_height: status.buried_l1_height(),
+                buried_l1_height: state.buried_l1_height(),
             })
         } else {
             Err(Error::ClientNotStarted.into())

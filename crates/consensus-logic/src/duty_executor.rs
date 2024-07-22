@@ -92,11 +92,15 @@ fn update_tracker<D: Database>(
     ident: &Identity,
     database: &D,
 ) -> Result<(), Error> {
-    let new_duties = duty_extractor::extract_duties(state, ident, database)?;
+    let Some(ss) = state.sync() else {
+        return Ok(());
+    };
+
+    let new_duties = duty_extractor::extract_duties(state, &ident, database)?;
 
     // Figure out the block slot from the tip blockid.
     // TODO include the block slot in the consensus state
-    let tip_blkid = *state.chain_tip_blkid();
+    let tip_blkid = *ss.chain_tip_blkid();
     let l2prov = database.l2_provider();
     let block = l2prov
         .get_block_data(tip_blkid)?
@@ -246,7 +250,12 @@ fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     let last_cstate = cs_prov
         .get_state_checkpoint(ckpt_idx)?
         .expect("dutyexec: get state checkpoint");
-    let prev_block_id = *last_cstate.chain_tip_blkid();
+
+    let Some(last_ss) = last_cstate.sync() else {
+        return Ok(None);
+    };
+
+    let prev_block_id = *last_ss.chain_tip_blkid();
 
     // Start preparing the EL payload.
     let ts = now_millis();

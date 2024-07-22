@@ -84,7 +84,8 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         rollup: RollupParams {
             block_time: 1000,
             cred_rule: block_credential::CredRule::Unchecked,
-            l1_start_block_height: 4,
+            horizon_l1_height: 3,
+            genesis_l1_height: 5,
         },
         run: RunParams {
             l1_follow_distance: config.sync.l1_follow_distance,

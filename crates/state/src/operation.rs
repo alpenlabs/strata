@@ -4,7 +4,7 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use crate::client_state::ClientState;
+use crate::client_state::{ClientState, SyncState};
 use crate::id::L2BlockId;
 use crate::l1::L1BlockId;
 
@@ -42,6 +42,9 @@ pub enum ClientStateWrite {
     /// Completely replace the full state with a new instance.
     Replace(Box<ClientState>),
 
+    /// Replace the sync state.
+    ReplaceSync(Box<SyncState>),
+
     /// Accept an L2 block and update tip state.
     AcceptL2Block(L2BlockId),
 
@@ -74,6 +77,11 @@ pub enum SyncAction {
 
     /// Finalizes a block, indicating that it won't be reverted.
     FinalizeBlock(L2BlockId),
+
+    /// Indicates to the worker that it's safe to perform the L2 genesis
+    /// operations and start the chain sync work, using a particular L1 block
+    /// as the genesis lockin block.
+    L2Genesis(L1BlockId),
 }
 
 /// Applies client state writes to a target state.
@@ -85,37 +93,60 @@ pub fn apply_writes_to_state(
         use ClientStateWrite::*;
         match w {
             Replace(cs) => *state = *cs,
+
+            ReplaceSync(nss) => {
+                let ss = state.expect_sync_mut();
+                *ss = *nss;
+            }
+
             RollbackL1BlocksTo(l1blkid) => {
-                let pos = state.recent_l1_blocks.iter().position(|b| *b == l1blkid);
+                let l1v = state.l1_view_mut();
+                let pos = l1v
+                    .local_unaccepted_blocks
+                    .iter()
+                    .position(|b| *b == l1blkid);
                 let Some(pos) = pos else {
                     // TODO better logging, maybe make this an actual error
                     panic!("operation: emitted invalid write");
                 };
-                state.recent_l1_blocks.truncate(pos);
+                l1v.local_unaccepted_blocks.truncate(pos);
             }
-            AcceptL1Block(l1blkid) => state.recent_l1_blocks.push(l1blkid),
+
+            AcceptL1Block(l1blkid) => {
+                // TODO make this also do shit
+                let l1v = state.l1_view_mut();
+                l1v.local_unaccepted_blocks.push(l1blkid);
+            }
+
             AcceptL2Block(blkid) => {
                 // TODO do any other bookkeeping
-                state.chain_tip = blkid;
+                let ss = state.expect_sync_mut();
+                ss.tip_blkid = blkid;
             }
+
             UpdateBuried(new_idx) => {
                 // Check that it's increasing.
-                let old_idx = state.buried_l1_height;
+                let old_idx = state.buried_l1_height();
                 if old_idx >= new_idx {
                     panic!("operation: emitted non-greater buried height");
                 }
 
+                let l1v = state.l1_view_mut();
+
                 // Check that it's not higher than what we know about.
                 let diff = (new_idx - old_idx) as usize;
-                if diff > state.recent_l1_blocks.len() {
+                if diff > l1v.local_unaccepted_blocks.len() {
                     panic!("operation: new buried height above known L1 tip");
                 }
 
                 // If everything checks out we can just remove them.
-                let _blocks = state.recent_l1_blocks.drain(..diff).collect::<Vec<_>>();
-                state.buried_l1_height = new_idx;
+                let blocks = l1v
+                    .local_unaccepted_blocks
+                    .drain(..diff)
+                    .collect::<Vec<_>>();
+                l1v.buried_l1_height = new_idx;
 
-                // TODO merge these blocks into the L1 MMR in the chain state if
+                // TODO merge these blocks into the L1 MMR in the client state if
                 // we haven't already
             }
         }

@@ -2,13 +2,7 @@ use std::{sync::Arc, thread, time::Duration};
 
 use tracing::*;
 
-use alpen_vertex_db::{
-    errors::DbError,
-    traits::{
-        ChainstateStore, ClientStateProvider, ClientStateStore, Database, L1DataProvider,
-        L2DataProvider, L2DataStore,
-    },
-};
+use alpen_vertex_db::{errors::DbError, traits::*};
 use alpen_vertex_primitives::{
     buf::{Buf32, Buf64},
     l1::L1BlockManifest,
@@ -17,7 +11,7 @@ use alpen_vertex_primitives::{
 use alpen_vertex_state::{
     block::{ExecSegment, L1Segment},
     chain_state::ChainState,
-    client_state::ClientState,
+    client_state::{ClientState, SyncState},
     exec_env::ExecEnvState,
     exec_update::{ExecUpdate, UpdateInput, UpdateOutput},
     header::L2BlockHeader,
@@ -25,37 +19,42 @@ use alpen_vertex_state::{
     prelude::*,
 };
 
-const MAX_HORIZON_POLL_RETRIES: u64 = 10;
-const MAX_HORIZON_POLL_INTERVAL: u64 = 1000;
+use crate::errors::Error;
 
-fn poll_horizon_l1_block<D: Database>(
-    l1_prov: Arc<D::L1Prov>,
-    horizon_blk_height: u64,
-) -> anyhow::Result<L1BlockManifest> {
-    // Fetch the horizon L1 block to construct the genesis L1 segment.
+/// Inserts into the database an initial basic client state that we can begin
+/// waiting for genesis with.
+pub fn init_client_state(params: &Params, database: &impl Database) -> anyhow::Result<()> {
+    debug!("initializing client state in database!");
 
-    let mut retries = 0;
-    loop {
-        if let Some(mf) = l1_prov.get_block_manifest(horizon_blk_height)? {
-            return Ok(mf);
-        }
-        thread::sleep(Duration::from_millis(MAX_HORIZON_POLL_INTERVAL));
-        if retries > MAX_HORIZON_POLL_RETRIES {
-            break;
-        }
-        retries += 1;
-    }
-    Err(anyhow::anyhow!(
-        "Max retries exceeded for polling horizon l1 block"
-    ))
+    let init_state = ClientState::from_genesis_params(
+        params.rollup().horizon_l1_height,
+        params.rollup().genesis_l1_height,
+    );
+
+    // Write the state into the database.
+    let cs_store = database.client_state_store();
+    cs_store.write_client_state_checkpoint(0, init_state)?;
+
+    Ok(())
 }
 
-/// Inserts appropriate records into the database to prepare it for syncing the
-/// rollup.  Requires that the horizon block header is present in the database.
-pub fn init_genesis_states<D: Database>(params: &Params, database: &D) -> anyhow::Result<()> {
+/// Inserts approprate chainstate into the database to start actively syncing
+/// the rollup chain.  Requires that the L1 blocks between the horizon and the
+/// L2 genesis are already in the datatabase.
+///
+/// This does not update the client state to include the new sync state data
+/// that it should have now.  That is introduced by writing a new sync event for
+/// that.
+pub fn init_genesis_states(params: &Params, database: &impl Database) -> anyhow::Result<()> {
     debug!("preparing database genesis state!");
 
-    let horizon_blk_height = params.rollup.l1_start_block_height;
+    let horizon_blk_height = params.rollup.horizon_l1_height;
+    let genesis_blk_height = params.rollup.genesis_l1_height;
+
+    // Query the pre-genesis blocks we need before we do anything else.
+    let l1_prov = database.l1_provider();
+    let pregenesis_mfs =
+        load_pre_genesis_l1_manifests(l1_prov.as_ref(), horizon_blk_height, genesis_blk_height)?;
 
     // Create a dummy exec state that we can build the rest of the genesis block
     // around and insert into the genesis state.
@@ -70,25 +69,36 @@ pub fn init_genesis_states<D: Database>(params: &Params, database: &D) -> anyhow
     let genesis_blkid = gblock.header().get_blockid();
     info!(?genesis_blkid, "created genesis block");
 
-    let l1_prov = database.l1_provider();
-    let horizon_blkmf = poll_horizon_l1_block::<D>(l1_prov.clone(), horizon_blk_height)?;
-
-    let horizon_blk_rec = L1HeaderRecord::from(&horizon_blkmf);
+    let horizon_blk_rec = L1HeaderRecord::from(pregenesis_mfs.last().unwrap());
     let l1vs = L1ViewState::new_at_horizon(horizon_blk_height, horizon_blk_rec);
 
     let gchstate = ChainState::from_genesis(genesis_blkid, l1vs, gees);
-    let gclstate = make_genesis_client_state(&gblock, &gchstate, params);
 
     // Now insert things into the database.
     let l2store = database.l2_store();
-    let cs_store = database.client_state_store();
     let chs_store = database.chainstate_store();
     l2store.put_block_data(gblock)?;
     chs_store.write_genesis_state(&gchstate)?;
-    cs_store.write_client_state_checkpoint(0, gclstate)?;
 
     info!("finished genesis insertions");
     Ok(())
+}
+
+fn load_pre_genesis_l1_manifests(
+    l1_prov: &impl L1DataProvider,
+    horizon_height: u64,
+    genesis_height: u64,
+) -> anyhow::Result<Vec<L1BlockManifest>> {
+    let mut manifests = Vec::new();
+    for height in horizon_height..=genesis_height {
+        let Some(mf) = l1_prov.get_block_manifest(height)? else {
+            return Err(Error::MissingL1BlockHeight(height).into());
+        };
+
+        manifests.push(mf);
+    }
+
+    Ok(manifests)
 }
 
 fn make_genesis_block(params: &Params, genesis_update: ExecUpdate) -> L2Block {
@@ -104,7 +114,7 @@ fn make_genesis_block(params: &Params, genesis_update: ExecUpdate) -> L2Block {
     // sources we need.
     // FIXME this isn't the right timestamp to start the blockchain, this should
     // definitely be pulled from the database or the rollup parameters maybe
-    let genesis_ts = params.rollup().l1_start_block_height;
+    let genesis_ts = params.rollup().horizon_l1_height;
     let zero_blkid = L2BlockId::from(Buf32::zero());
     let genesis_sr = Buf32::zero();
     let header = L2BlockHeader::new(0, genesis_ts, zero_blkid, &body, genesis_sr);
@@ -112,27 +122,11 @@ fn make_genesis_block(params: &Params, genesis_update: ExecUpdate) -> L2Block {
     L2Block::new(signed_genesis_header, body)
 }
 
-fn make_genesis_client_state(
-    _gblock: &L2Block,
-    gchstate: &ChainState,
-    params: &Params,
-) -> ClientState {
-    // TODO this might rework some more things as we include the genesis block
-    ClientState::from_genesis(gchstate, params.rollup().l1_start_block_height)
-}
-
-/// Check if the database needs to have genesis done to it.
-pub fn check_needs_genesis<D: Database>(database: &D) -> anyhow::Result<bool> {
+/// Check if the database needs to have client init done to it.
+pub fn check_needs_client_init(database: &impl Database) -> anyhow::Result<bool> {
     let cs_prov = database.client_state_provider();
 
-    // Check if we've written the genesis state checkpoint.  This should be the
-    // only check we have to do, but it's possible we're in an inconsistent
-    // state so we do perform others
-    if cs_prov.get_state_checkpoint(0)?.is_none() {
-        return Ok(true);
-    }
-
-    // Check if we've written the genesis state checkpoint.  These we perform a
+    // Check if we've written any genesis state checkpoint.  These we perform a
     // bit more carefully and check errors more granularly.
     match cs_prov.get_last_checkpoint_idx() {
         Ok(_) => {}
@@ -142,10 +136,10 @@ pub fn check_needs_genesis<D: Database>(database: &D) -> anyhow::Result<bool> {
         Err(e) => return Err(e.into()),
     }
 
-    let l2prov = database.l2_provider();
+    let l2_prov = database.l2_provider();
 
     // Check if there's any genesis block written.
-    match l2prov.get_blocks_at_height(0) {
+    match l2_prov.get_blocks_at_height(0) {
         Ok(blkids) => {
             if blkids.is_empty() {
                 return Ok(true);
@@ -159,4 +153,18 @@ pub fn check_needs_genesis<D: Database>(database: &D) -> anyhow::Result<bool> {
     }
 
     Ok(false)
+}
+
+pub fn check_needs_genesis(database: &impl Database) -> anyhow::Result<bool> {
+    let l2_prov = database.l2_provider();
+
+    // Check if there's any genesis block written.
+    match l2_prov.get_blocks_at_height(0) {
+        Ok(blkids) => Ok(blkids.is_empty()),
+
+        Err(DbError::NotBootstrapped) => Ok(true),
+
+        // Again, how should we handle this?
+        Err(e) => Err(e.into()),
+    }
 }

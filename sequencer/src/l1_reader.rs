@@ -34,7 +34,7 @@ where
     let l1prov = db.l1_provider().clone();
     let current_block_height = l1prov
         .get_chain_tip()?
-        .unwrap_or(params.rollup().l1_start_block_height - 1);
+        .unwrap_or(params.rollup().horizon_l1_height - 1);
 
     let config = Arc::new(ReaderConfig {
         max_reorg_depth: config.sync.max_reorg_depth,

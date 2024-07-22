@@ -13,7 +13,10 @@ pub struct RollupParams {
     pub cred_rule: CredRule,
 
     /// Block height from which to watch for L1 transactions
-    pub l1_start_block_height: u64,
+    pub horizon_l1_height: u64,
+
+    /// Block height we'll construct the L2 genesis block from.
+    pub genesis_l1_height: u64,
 }
 
 /// Client sync parameters that are used to make the network work but don't

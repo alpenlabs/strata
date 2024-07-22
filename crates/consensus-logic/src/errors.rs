@@ -15,6 +15,9 @@ pub enum Error {
     #[error("L1 blkid {0:?} missing from database")]
     MissingL1Block(L1BlockId),
 
+    #[error("L1 block {0} missing from database")]
+    MissingL1BlockHeight(u64),
+
     #[error("missing expected consensus writes at {0}")]
     MissingConsensusWrites(u64),
 
@@ -37,6 +40,9 @@ pub enum Error {
 
     #[error("invalid state transition on block {0:?}: {1}")]
     InvalidStateTsn(L2BlockId, TsnError),
+
+    #[error("client sync state unset")]
+    MissingClientSyncState,
 
     #[error("chaintip: {0}")]
     ChainTip(#[from] ChainTipError),
