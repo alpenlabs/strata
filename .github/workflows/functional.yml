@@ -46,7 +46,7 @@ jobs:
 
       - name: Install bitcoind
         run: |
-          sudo snap install bitcoind
+          sudo snap install bitcoin-core
 
       - name: Run functional tests
         run: |
