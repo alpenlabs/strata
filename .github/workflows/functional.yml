@@ -32,8 +32,8 @@ jobs:
       - name: Configure Poetry to create the virtual environment inside the project
         run: poetry config virtualenvs.in-project true
 
-      - name: Install dependencies
-        run: poetry install --no-root
+      - name: Install python dependencies
+        run: cd test && poetry install --no-root && cd -
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@nightly
