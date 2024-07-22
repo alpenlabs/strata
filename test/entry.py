@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import logging as log
 import os
 import sys
 import time
@@ -46,7 +47,7 @@ def generate_task(rpc: BitcoindClient, wait_dur, addr):
             blk = rpc.proxy.generatetoaddress(1, addr)
             print("made block", blk)
         except Exception as ex:
-            print(f"Encountered: {ex} while generating address")
+            log.warning(f"{ex} while generating address")
             return
 
 
