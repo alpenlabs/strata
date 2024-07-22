@@ -2,12 +2,11 @@
 
 import os
 import sys
-from threading import Thread
-import queue
 import time
+from threading import Thread
 
-from bitcoinlib.services.bitcoind import BitcoindClient
 import flexitest
+from bitcoinlib.services.bitcoind import BitcoindClient
 
 import seqrpc
 
@@ -46,7 +45,8 @@ def generate_task(rpc: BitcoindClient, wait_dur, addr):
         try:
             blk = rpc.proxy.generatetoaddress(1, addr)
             print("made block", blk)
-        except:
+        except Exception as ex:
+            print(f"Encountered: {ex} while generating address")
             return
 
 
@@ -64,11 +64,11 @@ class BitcoinFactory(flexitest.Factory):
             "bitcoind",
             "-regtest",
             "-printtoconsole",
-            "-datadir=%s" % datadir,
-            "-port=%s" % p2p_port,
-            "-rpcport=%s" % rpc_port,
-            "-rpcuser=%s" % BD_USERNAME,
-            "-rpcpassword=%s" % BD_PASSWORD,
+            f"-datadir={datadir}",
+            f"-port={p2p_port}",
+            f"-rpcport={rpc_port}",
+            f"-rpcuser={BD_USERNAME}",
+            f"-rpcpassword={BD_PASSWORD}",
         ]
 
         props = {
@@ -81,17 +81,16 @@ class BitcoinFactory(flexitest.Factory):
             svc = flexitest.service.ProcService(props, cmd, stdout=f)
 
             def _create_rpc():
-                url = "http://%s:%s@localhost:%s" % (BD_USERNAME, BD_PASSWORD, rpc_port)
+                url = f"http://{BD_USERNAME}:{BD_PASSWORD}@localhost:{rpc_port}"
                 return BitcoindClient(base_url=url)
 
-            setattr(svc, "create_rpc", _create_rpc)
+            svc.create_rpc = _create_rpc
 
             return svc
 
 
 class VertexFactory(flexitest.Factory):
     def __init__(self, datadir_pfx: str, port_range: list[int]):
-
         super().__init__(datadir_pfx, port_range)
 
     def create_sequencer(
@@ -123,7 +122,7 @@ class VertexFactory(flexitest.Factory):
         # fmt: on
         props = {"rpc_port": rpc_port, "seqkey": seqkey}
 
-        rpc_url = "ws://localhost:%s" % rpc_port
+        rpc_url = f"ws://localhost:{rpc_port}"
 
         with open(logfile, "w") as f:
             svc = flexitest.service.ProcService(props, cmd, stdout=f)
@@ -131,7 +130,7 @@ class VertexFactory(flexitest.Factory):
             def _create_rpc():
                 return seqrpc.JsonrpcClient(rpc_url)
 
-            setattr(svc, "create_rpc", _create_rpc)
+            svc.create_rpc = _create_rpc
 
             return svc
 
@@ -155,7 +154,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
         rpc_port = bitcoind.get_prop("rpc_port")
         rpc_user = bitcoind.get_prop("rpc_user")
         rpc_pass = bitcoind.get_prop("rpc_password")
-        rpc_sock = "localhost:%s" % rpc_port
+        rpc_sock = f"localhost:{rpc_port}"
         sequencer = seq_fac.create_sequencer(rpc_sock, rpc_user, rpc_pass)
         time.sleep(0.5)
 

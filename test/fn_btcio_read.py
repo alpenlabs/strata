@@ -1,6 +1,7 @@
 import time
-from bitcoinlib.services.bitcoind import BitcoindClient
+
 import flexitest
+from bitcoinlib.services.bitcoind import BitcoindClient
 
 
 @flexitest.register
