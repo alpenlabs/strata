@@ -1,6 +1,7 @@
 #! /bin/bash
+set -e
 
-source env.bash 
+source env.bash
 
 if [ "$CARGO_RELEASE" = 1 ]; then
 	export PATH=$(realpath ../target/release/):$PATH
