@@ -53,4 +53,6 @@ jobs:
 
       - name: Run functional tests
         run: |
-          cd test && poetry run python entry.py
+          export PATH=$(realpath target/debug/):$PATH && \
+          cd test && \
+          poetry run python entry.py
