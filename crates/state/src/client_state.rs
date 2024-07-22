@@ -19,7 +19,11 @@ use crate::{
 /// various other events.
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize)]
 pub struct ClientState {
-    /// State of the client tracking a genesised chain.
+    /// If we are after genesis.
+    pub(super) chain_active: bool,
+
+    /// State of the client tracking a genesised chain, after knowing about a
+    /// valid chain.
     pub(super) sync_state: Option<SyncState>,
 
     /// Local view of the L1 state that we compare against the chain's view of
@@ -39,11 +43,18 @@ impl ClientState {
     // TODO do we need this or should we load it at run time from the rollup params?
     pub fn from_genesis_params(horizon_l1_height: u64, genesis_l1_height: u64) -> Self {
         Self {
+            chain_active: false,
             sync_state: None,
             local_l1_view: LocalL1State::new(genesis_l1_height),
             horizon_l1_height,
             genesis_l1_height,
         }
+    }
+
+    /// If the chain is "active", meaning we are after genesis (although we
+    /// don't necessarily know what it is, that's dictated by the `SyncState`).
+    pub fn is_chain_active(&self) -> bool {
+        self.chain_active
     }
 
     /// Returns a ref to the inner sync state, if it exists.

@@ -163,7 +163,7 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
         }
     }
 
-    // Get the newly computed state.
+    // Make sure that the new state index is set as expected.
     assert_eq!(state.state_tracker.cur_state_idx(), ev_idx);
 
     // Write the state checkpoint.

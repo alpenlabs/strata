@@ -22,7 +22,7 @@ use alpen_vertex_state::sync_event::SyncEvent;
 use crate::ctl::CsmController;
 use crate::message::ForkChoiceMessage;
 use crate::unfinalized_tracker::UnfinalizedBlockTracker;
-use crate::{chain_transition, credential, errors::*, reorg, unfinalized_tracker};
+use crate::{chain_transition, credential, errors::*, genesis, reorg, unfinalized_tracker};
 
 /// Tracks the parts of the chain that haven't been finalized on-chain yet.
 pub struct ForkChoiceManager<D: Database> {
@@ -128,9 +128,9 @@ pub fn init_forkchoice_manager<D: Database>(
     Ok(fcm)
 }
 
-/// Recvs inputs from the FCM channel until we recieve a CSM state update that
-/// has a sync state set, indicating that we can start syncing the chain.
-fn wait_for_csm_sync_state(
+/// Recvs inputs from the FCM channel until we recieve a signal that we've
+/// reached a point where we've done genesis.
+fn wait_for_csm_ready(
     fcm_rx: &mut mpsc::Receiver<ForkChoiceMessage>,
 ) -> anyhow::Result<Arc<ClientState>> {
     while let Some(msg) = fcm_rx.blocking_recv() {
@@ -143,18 +143,18 @@ fn wait_for_csm_sync_state(
     Err(Error::MissingClientSyncState.into())
 }
 
-/// Considers an FCM message and extracts the state from it if its sync state is
-/// set (ie. usable for doing forkchoice things with).
+/// Considers an FCM message and extracts the CSM state from it if the chain
+/// seems active from its perspective.
 fn process_early_fcm_msg(msg: ForkChoiceMessage) -> Option<Arc<ClientState>> {
     match msg {
         ForkChoiceMessage::CsmResume(state) => {
-            if state.sync().is_some() {
+            if state.is_chain_active() {
                 return Some(state);
             }
         }
 
         ForkChoiceMessage::NewState(state, _) => {
-            if state.sync().is_some() {
+            if state.is_chain_active() {
                 return Some(state);
             }
         }
@@ -165,11 +165,39 @@ fn process_early_fcm_msg(msg: ForkChoiceMessage) -> Option<Arc<ClientState>> {
     None
 }
 
+/// Determines the starting chain tip.  For now, this is just the block with the
+/// highest index, choosing the lowest ordered blockid in the case of ties.
 fn determine_start_tip(
     unfin: &UnfinalizedBlockTracker,
     database: &impl Database,
 ) -> anyhow::Result<(L2BlockId, u64)> {
-    unimplemented!()
+    let mut iter = unfin.chain_tips_iter();
+    let l2_prov = database.l2_provider();
+
+    let mut best = iter.next().expect("fcm: no chain tips");
+    let mut best_height = l2_prov
+        .get_block_data(*best)?
+        .ok_or(Error::MissingL2Block(*best))?
+        .header()
+        .blockidx();
+
+    // Iterate through the remaining elements and choose.
+    for blkid in iter {
+        let blkid_height = l2_prov
+            .get_block_data(*blkid)?
+            .ok_or(Error::MissingL2Block(*best))?
+            .header()
+            .blockidx();
+
+        if blkid_height == best_height && blkid < best {
+            best = blkid;
+        } else if blkid_height > best_height {
+            best = blkid;
+            best_height = blkid_height;
+        }
+    }
+
+    Ok((*best, best_height))
 }
 
 /// Main tracker task that takes a ready fork choice manager and some IO stuff.
@@ -180,7 +208,8 @@ pub fn tracker_task<D: Database, E: ExecEngineCtl>(
     csm_ctl: Arc<CsmController>,
     params: Arc<Params>,
 ) {
-    let init_state = match wait_for_csm_sync_state(&mut fcm_rx) {
+    // Wait until the CSM gives us a state we can start from.
+    let init_state = match wait_for_csm_ready(&mut fcm_rx) {
         Ok(s) => s,
         Err(e) => {
             error!(err = %e, "failed to initialize forkchoice manager");
@@ -188,9 +217,46 @@ pub fn tracker_task<D: Database, E: ExecEngineCtl>(
         }
     };
 
-    // TODO make this initialize not to zero
-    let id = L2BlockId::from(Buf32::zero());
-    let fcm = match init_forkchoice_manager(database, params.clone(), init_state, id) {
+    // Depending on the chain init state we either pull the finalized tip out of
+    // that or we have to construct the genesis block and use that as the
+    // finalized tip.
+    //
+    // TODO fix this horribly pyramid
+    let cur_fin_tip = match init_state.sync() {
+        Some(ss) => *ss.finalized_blkid(),
+        None => {
+            // As a sanity check, we should still check that this flag is set
+            // since otherwise we may have incomplete data.
+            if init_state.is_chain_active() {
+                match genesis::init_genesis_chainstate(params.as_ref(), database.as_ref()) {
+                    Ok(gblkid) => {
+                        // If we did genesis we also want to tell the CSM about the new tip.
+                        let tip_event = SyncEvent::NewTipBlock(gblkid);
+                        if csm_ctl.submit_event(tip_event).is_err() {
+                            // I wonder what would break here if we wrote that
+                            // we got to genesis but then the CSM never got the
+                            // sync event.  Maybe we should fast-fail if it
+                            // seems we already got to genesis?
+                            error!("failed to submit genesis sync event");
+                        }
+
+                        // Then return it as the finalized tip.
+                        gblkid
+                    }
+                    Err(e) => {
+                        error!(err = %e, "failed to compute chain genesis");
+                        return;
+                    }
+                }
+            } else {
+                panic!("fcm: tried to resume with pregenesis client state");
+            }
+        }
+    };
+
+    // Now that we have the database state in order, we can actually init the
+    // FCM.
+    let fcm = match init_forkchoice_manager(database, params.clone(), init_state, cur_fin_tip) {
         Ok(fcm) => fcm,
         Err(e) => {
             error!(err = %e, "failed to init forkchoice manager!");

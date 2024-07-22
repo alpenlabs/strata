@@ -45,8 +45,11 @@ pub fn init_client_state(params: &Params, database: &impl Database) -> anyhow::R
 /// This does not update the client state to include the new sync state data
 /// that it should have now.  That is introduced by writing a new sync event for
 /// that.
-pub fn init_genesis_states(params: &Params, database: &impl Database) -> anyhow::Result<()> {
-    debug!("preparing database genesis state!");
+pub fn init_genesis_chainstate(
+    params: &Params,
+    database: &impl Database,
+) -> anyhow::Result<L2BlockId> {
+    debug!("preparing database genesis chainstate!");
 
     let horizon_blk_height = params.rollup.horizon_l1_height;
     let genesis_blk_height = params.rollup.genesis_l1_height;
@@ -81,7 +84,7 @@ pub fn init_genesis_states(params: &Params, database: &impl Database) -> anyhow:
     chs_store.write_genesis_state(&gchstate)?;
 
     info!("finished genesis insertions");
-    Ok(())
+    Ok(genesis_blkid)
 }
 
 fn load_pre_genesis_l1_manifests(
