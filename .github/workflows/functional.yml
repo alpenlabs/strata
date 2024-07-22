@@ -46,7 +46,10 @@ jobs:
 
       - name: Install bitcoind
         run: |
-          sudo snap install bitcoin-core
+          wget https://bitcoin.org/bin/bitcoin-core-27.0/bitcoin-27.0-x86_64-linux-gnu.tar.gz
+          tar xzf bitcoin-27.0-x86_64-linux-gnu.tar.gz
+          sudo install -m 0755 -t /usr/local/bin bitcoin-27.0/bin/*
+          bitcoind --version
 
       - name: Run functional tests
         run: |
