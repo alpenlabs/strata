@@ -6,7 +6,7 @@
 //! reusing any Reth types.
 
 pub mod block;
-pub mod block_template;
+pub mod header;
 pub mod bridge_ops;
 pub mod bridge_state;
 pub mod chain_state;

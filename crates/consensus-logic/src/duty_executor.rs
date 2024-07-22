@@ -15,8 +15,8 @@ use alpen_vertex_evmctl::errors::EngineError;
 use alpen_vertex_evmctl::messages::{ExecPayloadData, PayloadEnv};
 use alpen_vertex_primitives::buf::{Buf32, Buf64};
 use alpen_vertex_state::block::{ExecSegment, L1Segment};
-use alpen_vertex_state::block_template::{create_header_template, BlockHeaderTemplate};
 use alpen_vertex_state::client_state::ClientState;
+use alpen_vertex_state::header::L2BlockHeader;
 use alpen_vertex_state::prelude::*;
 
 use crate::credential::sign_schnorr_sig;
@@ -276,14 +276,14 @@ fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     let exec_update = ExecUpdate::new(eui, UpdateOutput::new_from_state(Buf32::zero()));
     let exec_seg = ExecSegment::new(exec_update);
 
-    // Assemble the body and the header template.
+    // Assemble the body and the header core.
     let body = L2BlockBody::new(l1_seg, exec_seg);
     let state_root = Buf32::zero(); // TODO compute this from the different parts
-    let tmplt = create_header_template(slot, ts, prev_block_id, &body, state_root);
-    let header_sig = sign_template_header(&tmplt, &ik);
-    let final_header = tmplt.complete_with(header_sig);
-    let blkid = final_header.get_blockid();
-    let final_block = L2Block::new(final_header, body);
+    let header = L2BlockHeader::new(slot, ts, prev_block_id, &body, state_root);
+    let header_sig = sign_header(&header, &ik);
+    let signed_header = SignedL2BlockHeader::new(header, header_sig);
+    let blkid = signed_header.get_blockid();
+    let final_block = L2Block::new(signed_header, body);
     info!(%slot, ?blkid, "finished building new block");
 
     // Store the block in the database.
@@ -295,7 +295,7 @@ fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
 }
 
 /// Signs the L2BlockHeader and returns the signature
-fn sign_template_header(header: &BlockHeaderTemplate, ik: &IdentityKey) -> Buf64 {
+fn sign_header(header: &L2BlockHeader, ik: &IdentityKey) -> Buf64 {
     let msg = header.get_sighash();
     match ik {
         IdentityKey::Sequencer(sk) => sign_schnorr_sig(&msg, sk),

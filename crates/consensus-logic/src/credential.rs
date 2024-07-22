@@ -8,9 +8,9 @@ use alpen_vertex_primitives::{
     buf::{Buf32, Buf64},
     params::Params,
 };
-use alpen_vertex_state::{block::L2BlockHeader, block_template::BlockHeaderTemplate};
+use alpen_vertex_state::header::{L2Header, SignedL2BlockHeader};
 
-pub fn check_block_credential(header: &L2BlockHeader, params: &Params) -> bool {
+pub fn check_block_credential(header: &SignedL2BlockHeader, params: &Params) -> bool {
     let sigcom = compute_header_sig_commitment(header);
     match &params.rollup().cred_rule {
         CredRule::Unchecked => true,
@@ -18,8 +18,8 @@ pub fn check_block_credential(header: &L2BlockHeader, params: &Params) -> bool {
     }
 }
 
-fn compute_header_sig_commitment(header: &L2BlockHeader) -> Buf32 {
-    BlockHeaderTemplate::from_header(&header).get_sighash()
+fn compute_header_sig_commitment(header: &SignedL2BlockHeader) -> Buf32 {
+    header.get_blockid().into()
 }
 
 pub fn sign_schnorr_sig(msg: &Buf32, sk: &Buf32) -> Buf64 {

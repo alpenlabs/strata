@@ -6,6 +6,7 @@ use std::sync::Arc;
 use std::thread;
 
 use alpen_vertex_state::client_state::ClientState;
+use alpen_vertex_state::header::L2Header;
 use tokio::sync::{broadcast, mpsc, watch};
 use tracing::*;
 

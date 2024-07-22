@@ -92,7 +92,7 @@ impl UnfinalizedBlockTracker {
     pub fn attach_block(
         &mut self,
         blkid: L2BlockId,
-        header: &L2BlockHeader,
+        header: &SignedL2BlockHeader,
     ) -> Result<bool, ChainTipError> {
         if self.pending_table.contains_key(&blkid) {
             return Err(ChainTipError::BlockAlreadyAttached(blkid));
@@ -276,8 +276,8 @@ mod tests {
     use alpen_test_utils::ArbitraryGenerator;
     use alpen_vertex_db::traits::{Database, L2DataStore};
     use alpen_vertex_state::{
-        block::{L2Block, L2BlockBody, L2BlockHeader},
-        block_template::create_header_template,
+        block::{L2Block, L2BlockBody},
+        header::{L2BlockHeader, L2Header, SignedL2BlockHeader},
         id::L2BlockId,
     };
 
@@ -285,40 +285,45 @@ mod tests {
 
     fn get_genesis_block() -> L2Block {
         let arb = ArbitraryGenerator::new();
-        let gen_header: L2BlockHeader = arb.generate();
+        let gen_header: SignedL2BlockHeader = arb.generate();
         let body: L2BlockBody = arb.generate();
 
         let empty_hash = L2BlockId::default();
-        let header = create_header_template(
+        let header = L2BlockHeader::new(
             0,
             gen_header.timestamp(),
             empty_hash,
             &body,
             *gen_header.state_root(),
-        )
-        .complete_with(*gen_header.sig());
-        L2Block::new(header, body)
+        );
+        let signed_header = SignedL2BlockHeader::new(header, *gen_header.sig());
+        L2Block::new(signed_header, body)
     }
 
-    fn get_mock_block_with_parent(parent: &L2BlockHeader) -> L2Block {
+    fn get_mock_block_with_parent(parent: &SignedL2BlockHeader) -> L2Block {
         let arb = ArbitraryGenerator::new();
-        let gen_header: L2BlockHeader = arb.generate();
+        let gen_header: SignedL2BlockHeader = arb.generate();
         let body: L2BlockBody = arb.generate();
 
-        let header = create_header_template(
+        let header = L2BlockHeader::new(
             parent.blockidx() + 1,
             gen_header.timestamp(),
             parent.get_blockid(),
             &body,
             *gen_header.state_root(),
-        )
-        .complete_with(*gen_header.sig());
-        L2Block::new(header, body)
+        );
+        let signed_header = SignedL2BlockHeader::new(header, *gen_header.sig());
+        L2Block::new(signed_header, body)
     }
 
     fn setup_test_chain(
         l2_prov: &impl L2DataStore,
-    ) -> (L2BlockHeader, L2BlockHeader, L2BlockHeader, L2BlockHeader) {
+    ) -> (
+        SignedL2BlockHeader,
+        SignedL2BlockHeader,
+        SignedL2BlockHeader,
+        SignedL2BlockHeader,
+    ) {
         // b2   b2a (side chain)
         // |   /
         // | /
