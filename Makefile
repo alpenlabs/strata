@@ -56,6 +56,23 @@ mutants-test: ## Runs `nextest` under `cargo-mutants`. Caution: This can take *r
 sec: ## Check for security advisories on any dependencies.
 	cargo audit -D warnings
 
+##@ Functional Tests
+.PHONY: ensure-poetry
+ensure-poetry:
+	@if ! command -v poetry &> /dev/null; then \
+		echo "poetry not found. Please install it by running the command `cargo install taplo-cli --locked` or refer to the following link for more information: https://taplo.tamasfe.dev/cli/installation/binary.html" \
+		exit 1; \
+    fi
+
+.PHONY: activate
+activate: ensure-poetry ## Activate poetry environment for integration tests.
+	cd test && poetry install --no-root
+
+
+.PHONY: test-functional
+test-functional: ensure-poetry ## Runs functional tests
+	cd test && ./run_test.sh
+
 ##@ Code Quality
 
 .PHONY: fmt-check-ws
@@ -68,7 +85,7 @@ fmt-ws: ## Format source code in the workspace.
 
 .PHONY: ensure-taplo
 ensure-taplo:
-	@if ! command -v ruff &> /dev/null; then \
+	@if ! command -v taplo &> /dev/null; then \
 		echo "taplo not found. Please install it by running the command `cargo install taplo-cli --locked` or refer to the following link for more information: https://taplo.tamasfe.dev/cli/installation/binary.html" \
 		exit 1; \
     fi
@@ -86,6 +103,14 @@ ensure-ruff:
 		echo "ruff not found. Please install it by running the command `pip install ruff` or refer to the following link for more information: https://docs.astral.sh/ruff/installation/" \
 		exit 1; \
     fi
+
+.PHONY: fmt-check-func-tests
+fmt-check-func-tests: ensure-ruff ## Check formatting of python files inside `test` directory.
+	cd test && ruff format --check
+
+.PHONY: fmt-func-tests
+fmt-func-tests: ensure-ruff ## Apply formatting of python files inside `test` directory.
+	cd test && ruff format
 
 .PHONY: lint-check-ws
 lint-check-ws: ## Checks for lint issues in the workspace.
@@ -117,16 +142,24 @@ ensure-codespell:
     fi
 
 .PHONY: lint-codepsell
-lint-check-codespell: ensure-codespell # Runs `codespell` to check for spelling errors.
+lint-check-codespell: ensure-codespell ## Runs `codespell` to check for spelling errors.
 	codespell
 
 .PHONY: lint-fix-codepsell
-lint-fix-codespell: ensure-codespell # Runs `codespell` to fix spelling errors if possible.
+lint-fix-codespell: ensure-codespell ## Runs `codespell` to fix spelling errors if possible.
 	codespell -w
 
 .PHONY: lint-toml
 lint-check-toml: ensure-taplo ## Lints TOML files
 	taplo lint
+
+.PHONY: lint-check-func-tests
+lint-check-func-tests: ensure-ruff ## Lints python files inside the `test` directory.
+	cd test && ruff check
+
+.PHONY: lint-fix-func-tests
+lint-fix-func-tests: ensure-ruff ## Runs lint fixes for python files inside `test` directory.
+	cd test && ruff check --fix
 
 .PHONY: lint
 lint: ## Runs all lints and checks for issues without trying to fix them.
