@@ -40,7 +40,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Build Cargo project
-        run: cargo build --release
+        run: cargo build
 
       - name: Install bitcoind
         run: |
@@ -50,4 +50,4 @@ jobs:
 
       - name: Run functional tests
         run: |
-          cd test && CARGO_RELEASE=1 poetry run python entry.py
+          cd test && poetry run python entry.py
