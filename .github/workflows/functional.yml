@@ -44,9 +44,9 @@ jobs:
 
       - name: Install bitcoind
         run: |
-          add-apt-repository ppa:bitcoin/bitcoin
-          apt-get update
-          apt-get install bitcoind
+          sudo add-apt-repository ppa:bitcoin/bitcoin
+          sudo apt-get update
+          sudo apt-get install bitcoind
 
       - name: Run functional tests
         run: |
