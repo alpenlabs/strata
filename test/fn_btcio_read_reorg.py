@@ -25,11 +25,11 @@ class L1ReadReorgTest(flexitest.Test):
         # blocks n-2 , n-1 , n are invalidated where n is the height of blockchain
         height_to_invalidate_from = int(l1stat["cur_height"]) - 3
         block_to_invalidate_from = btcrpc.proxy.getblockhash(height_to_invalidate_from)
-        to_be_invalid_block = seqrpc.alp_l1blockHash(height_to_invalidate_from + 1)
+        to_be_invalid_block = seqrpc.alp_getL1blockHash(height_to_invalidate_from + 1)
         btcrpc.proxy.invalidateblock(block_to_invalidate_from)
         # Wait for some blocks to be added after invalidating (n-3) blocks
         # because poll time for sequencer is supposed to be 500ms
         # and 2 seconds seems to be optimal for sequencer to catch changes
         time.sleep(2)
-        block_from_invalidated_height = seqrpc.alp_l1blockHash(height_to_invalidate_from + 1)
+        block_from_invalidated_height = seqrpc.alp_getL1blockHash(height_to_invalidate_from + 1)
         assert to_be_invalid_block != block_from_invalidated_height, "Expected reorg from 3rd Block"
