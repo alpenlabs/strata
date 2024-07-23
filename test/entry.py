@@ -177,20 +177,22 @@ def main(argv):
 
     tests = [argv[1]] if len(argv) > 1 else flexitest.runtime.load_candidate_modules(modules)
 
-    for test in tests:
-        datadir_root = flexitest.create_datadir_in_workspace(os.path.join(test_dir, "_dd"))
+    datadir_root = flexitest.create_datadir_in_workspace(os.path.join(test_dir, "_dd"))
 
-        btc_fac = BitcoinFactory(datadir_root, [12300 + i for i in range(20)])
-        seq_fac = VertexFactory(datadir_root, [12400 + i for i in range(20)])
+    btc_fac = BitcoinFactory(datadir_root, [12300 + i for i in range(20)])
+    seq_fac = VertexFactory(datadir_root, [12400 + i for i in range(20)])
 
-        factories = {"bitcoin": btc_fac, "sequencer": seq_fac}
-        envs = {"basic": BasicEnvConfig()}
+    factories = {"bitcoin": btc_fac, "sequencer": seq_fac}
+    envs = {
+        "basic": BasicEnvConfig(),
+        "l1_read_reorg_test": BasicEnvConfig(),
+    }
 
-        rt = flexitest.TestRuntime(envs, datadir_root, factories)
-        rt.prepare_registered_tests()
+    rt = flexitest.TestRuntime(envs, datadir_root, factories)
+    rt.prepare_registered_tests()
 
-        results = rt.run_tests([test])
-        flexitest.dump_results(results)
+    results = rt.run_tests(tests)
+    flexitest.dump_results(results)
 
     return 0
 

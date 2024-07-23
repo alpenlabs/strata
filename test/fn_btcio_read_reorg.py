@@ -7,7 +7,7 @@ from bitcoinlib.services.bitcoind import BitcoindClient
 @flexitest.register
 class L1ReadReorgTest(flexitest.Test):
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env("basic")
+        ctx.set_env("l1_read_reorg_test")
 
     def main(self, ctx: flexitest.RunContext):
         btc = ctx.get_service("bitcoin")
