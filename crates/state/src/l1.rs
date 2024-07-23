@@ -5,6 +5,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 
 use alpen_vertex_primitives::{l1, prelude::*};
 use ssz_derive::{Decode, Encode};
+use tree_hash_derive::TreeHash;
 
 use crate::state_queue::StateQueue;
 

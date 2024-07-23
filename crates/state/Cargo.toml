@@ -14,5 +14,8 @@ borsh = { workspace = true }
 digest = { workspace = true }
 num_enum = { workspace = true }
 sha2 = { workspace = true }
+
 ethereum_ssz = { workspace = true }
 ethereum_ssz_derive = { workspace = true }
+tree_hash = { workspace = true }
+tree_hash_derive = { workspace = true }

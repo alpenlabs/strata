@@ -803,6 +803,8 @@ dependencies = [
  "reth-primitives",
  "serde",
  "sha2 0.10.8",
+ "tree_hash",
+ "tree_hash_derive",
 ]
 
 [[package]]
@@ -862,6 +864,8 @@ dependencies = [
  "ethereum_ssz_derive",
  "num_enum",
  "sha2 0.10.8",
+ "tree_hash",
+ "tree_hash_derive",
 ]
 
 [[package]]
@@ -2949,6 +2953,18 @@ dependencies = [
  "impl-serde",
  "primitive-types",
  "uint",
+]
+
+[[package]]
+name = "ethereum_hashing"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6ea7b408432c13f71af01197b1d3d0069c48a27bfcfbe72a81fc346e47f6defb"
+dependencies = [
+ "cpufeatures",
+ "lazy_static",
+ "ring",
+ "sha2 0.10.8",
 ]
 
 [[package]]
@@ -9911,6 +9927,28 @@ dependencies = [
  "tracing-core",
  "tracing-log",
  "tracing-serde",
+]
+
+[[package]]
+name = "tree_hash"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "134d6b24a5b829f30b5ee7de05ba7384557f5f6b00e29409cdf2392f93201bfa"
+dependencies = [
+ "ethereum-types",
+ "ethereum_hashing",
+ "smallvec",
+]
+
+[[package]]
+name = "tree_hash_derive"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ce7bccc538359a213436af7bc95804bdbf1c2a21d80e22953cbe9e096837ff1"
+dependencies = [
+ "darling 0.13.4",
+ "quote",
+ "syn 1.0.109",
 ]
 
 [[package]]

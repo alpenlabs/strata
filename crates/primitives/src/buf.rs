@@ -8,6 +8,7 @@ use bitcoin::BlockHash;
 use borsh::{BorshDeserialize, BorshSerialize};
 use reth_primitives::alloy_primitives::FixedBytes;
 use ssz::{Decode, DecodeError, Encode};
+use tree_hash::{Hash256, PackedEncoding, TreeHash, TreeHashType, HASHSIZE};
 
 // 20-byte buf
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -272,6 +273,25 @@ impl Decode for Buf64 {
         let mut array = [0u8; 64];
         array.copy_from_slice(bytes);
         Ok(Buf64(FixedBytes(array)))
+    }
+}
+
+impl TreeHash for Buf32 {
+    fn tree_hash_type() -> TreeHashType {
+        TreeHashType::Vector
+    }
+
+    fn tree_hash_packed_encoding(&self) -> PackedEncoding {
+        PackedEncoding::from_slice(&self.0 .0)
+    }
+
+    fn tree_hash_packing_factor() -> usize {
+        HASHSIZE
+    }
+
+    #[allow(clippy::cast_lossless)] // Lint does not apply to all uses of this macro.
+    fn tree_hash_root(&self) -> Hash256 {
+        Hash256::from_slice(&self.0 .0)
     }
 }
 

@@ -84,3 +84,5 @@ tracing-subscriber = "0.3"
 
 ethereum_ssz = "0.5.4"
 ethereum_ssz_derive = "0.5.4"
+tree_hash = "0.6.0"
+tree_hash_derive = "0.6.0"

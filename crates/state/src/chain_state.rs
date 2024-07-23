@@ -1,6 +1,7 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use ssz_derive::Encode;
+use tree_hash_derive::TreeHash;
 
 use crate::{bridge_ops, bridge_state, exec_env, l1};
 use crate::{id::L2BlockId, state_queue::StateQueue};
