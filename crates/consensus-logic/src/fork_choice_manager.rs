@@ -291,6 +291,8 @@ pub fn tracker_task<D: Database, E: ExecEngineCtl>(
         }
     };
 
+    info!(%cur_fin_tip, "starting forkchoice manager");
+
     // Now that we have the database state in order, we can actually init the
     // FCM.
     let fcm = match init_forkchoice_manager(database, params.clone(), init_state, cur_fin_tip) {
@@ -301,12 +303,12 @@ pub fn tracker_task<D: Database, E: ExecEngineCtl>(
         }
     };
 
-    if let Err(e) = tracker_task_inner(fcm, engine.as_ref(), fcm_rx, &csm_ctl) {
+    if let Err(e) = forkchoice_manager_task_inner(fcm, engine.as_ref(), fcm_rx, &csm_ctl) {
         error!(err = %e, "tracker aborted");
     }
 }
 
-fn tracker_task_inner<D: Database, E: ExecEngineCtl>(
+fn forkchoice_manager_task_inner<D: Database, E: ExecEngineCtl>(
     mut state: ForkChoiceManager<D>,
     engine: &E,
     mut fcm_rx: mpsc::Receiver<ForkChoiceMessage>,

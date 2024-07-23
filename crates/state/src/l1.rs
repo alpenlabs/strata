@@ -172,6 +172,10 @@ impl L1ViewState {
     pub fn tip_height(&self) -> u64 {
         self.maturation_queue.next_idx()
     }
+
+    pub fn maturation_queue(&self) -> &StateQueue<L1MaturationEntry> {
+        &self.maturation_queue
+    }
 }
 
 impl<'a> Arbitrary<'a> for L1ViewState {

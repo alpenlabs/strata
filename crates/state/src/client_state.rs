@@ -74,7 +74,9 @@ impl ClientState {
     /// Returns a mut ref to the inner sync state.  Only valid if we've observed
     /// genesis.  Only meant to be called when applying sync writes.
     pub fn expect_sync_mut(&mut self) -> &mut SyncState {
-        self.sync_state.as_mut().expect("clientstate: sync state")
+        self.sync_state
+            .as_mut()
+            .expect("clientstate: missing sync state")
     }
 
     pub fn recent_l1_block(&self) -> Option<&L1BlockId> {
@@ -133,5 +135,13 @@ impl LocalL1State {
             local_unaccepted_blocks: Vec::new(),
             buried_l1_height: buried,
         }
+    }
+
+    pub fn local_unaccepted_blocks(&self) -> &[L1BlockId] {
+        &self.local_unaccepted_blocks
+    }
+
+    pub fn buried_l1_height(&self) -> u64 {
+        self.buried_l1_height
     }
 }

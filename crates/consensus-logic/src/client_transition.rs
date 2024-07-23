@@ -16,7 +16,7 @@ pub fn process_event<D: Database>(
     state: &ClientState,
     ev: &SyncEvent,
     database: &D,
-    _params: &Params,
+    params: &Params,
 ) -> Result<ClientUpdateOutput, Error> {
     let mut writes = Vec::new();
     let mut actions = Vec::new();
@@ -34,6 +34,24 @@ pub fn process_event<D: Database>(
 
             // TODO if we have some number of L1 blocks finalized, also emit an
             // `UpdateBuried` write
+
+            let l1v = state.l1_view();
+
+            if let Some(ss) = state.sync() {
+                // TODO figure out what to do here
+            } else {
+                let horizon_ht = params.rollup.horizon_l1_height;
+                let genesis_ht = params.rollup.genesis_l1_height;
+
+                // TODO make params configurable
+                let genesis_threshold = genesis_ht + 3;
+
+                // If necessary, activeate the chain!
+                if !state.is_chain_active() && *height >= genesis_threshold {
+                    debug!("emitting chain activation");
+                    writes.push(ClientStateWrite::ActivateChain);
+                }
+            }
         }
 
         SyncEvent::L1Revert(_to_height) => {

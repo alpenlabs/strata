@@ -12,6 +12,7 @@ use alpen_vertex_state::{client_state::ClientState, operation::SyncAction};
 
 use crate::{
     errors::Error,
+    fork_choice_manager::ForkChoiceManager,
     genesis,
     message::{ClientUpdateNotif, CsmMessage, ForkChoiceMessage},
     state_tracker,
@@ -74,16 +75,22 @@ pub fn client_worker_task<D: Database, E: ExecEngineCtl>(
     engine: Arc<E>,
     mut msg_rx: mpsc::Receiver<CsmMessage>,
     cl_state_tx: watch::Sender<Option<ClientState>>,
-    fcm_tx: mpsc::Sender<ForkChoiceMessage>,
+    fcm_msg_tx: mpsc::Sender<ForkChoiceMessage>,
 ) -> Result<(), Error> {
     // Send a message off to the forkchoice manager that we're resuming.
     let start_state = state.state_tracker.cur_state().clone();
-    assert!(fcm_tx
+    assert!(fcm_msg_tx
         .blocking_send(ForkChoiceMessage::CsmResume(start_state))
         .is_ok());
 
     while let Some(msg) = msg_rx.blocking_recv() {
-        if let Err(e) = process_msg(&mut state, engine.as_ref(), &msg, cl_state_tx.clone()) {
+        if let Err(e) = process_msg(
+            &mut state,
+            engine.as_ref(),
+            &msg,
+            cl_state_tx.clone(),
+            &fcm_msg_tx,
+        ) {
             error!(err = %e, "failed to process sync message, skipping");
         }
     }
@@ -98,11 +105,12 @@ fn process_msg<D: Database, E: ExecEngineCtl>(
     engine: &E,
     msg: &CsmMessage,
     cl_state_tx: watch::Sender<Option<ClientState>>,
+    fcm_msg_tx: &mpsc::Sender<ForkChoiceMessage>,
 ) -> anyhow::Result<()> {
     match msg {
         CsmMessage::EventInput(idx) => {
             // TODO ensure correct event index ordering
-            handle_sync_event(state, engine, *idx, cl_state_tx)?;
+            handle_sync_event(state, engine, *idx, cl_state_tx, fcm_msg_tx)?;
             Ok(())
         }
     }
@@ -113,9 +121,11 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
     engine: &E,
     ev_idx: u64,
     cl_state_tx: watch::Sender<Option<ClientState>>,
+    fcm_msg_tx: &mpsc::Sender<ForkChoiceMessage>,
 ) -> anyhow::Result<()> {
     // Perform the main step of deciding what the output we're operating on.
     let (outp, new_state) = state.state_tracker.advance_consensus_state(ev_idx)?;
+    let outp = Arc::new(outp);
 
     // publish the client status
     cl_state_tx.send(Some((*new_state).clone()))?;
@@ -162,7 +172,12 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
     css.write_client_state_checkpoint(ev_idx, new_state.as_ref().clone())?;
 
     // Broadcast the update.
-    let update = ClientUpdateNotif::new(ev_idx, Arc::new(outp), new_state);
+    let fcm_msg = ForkChoiceMessage::NewState(new_state.clone(), outp.clone());
+    if fcm_msg_tx.blocking_send(fcm_msg).is_err() {
+        error!(%ev_idx, "failed to submit new CSM state to FCM");
+    }
+
+    let update = ClientUpdateNotif::new(ev_idx, outp, new_state);
     if state.cupdate_tx.send(Arc::new(update)).is_err() {
         warn!(%ev_idx, "failed to send broadcast for new CSM update");
     }
