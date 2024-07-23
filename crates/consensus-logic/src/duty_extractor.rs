@@ -1,5 +1,5 @@
 use alpen_vertex_db::traits::{Database, L2DataProvider};
-use alpen_vertex_state::client_state::ClientState;
+use alpen_vertex_state::{client_state::ClientState, header::L2Header};
 
 use crate::{
     duties::{self, BlockSigningDuty},
