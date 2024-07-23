@@ -36,3 +36,4 @@ threadpool = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 toml = { workspace = true }
+format_serde_error = { workspace = true } 

@@ -16,8 +16,8 @@ pub struct ClientParams {
 pub struct SyncParams {
     pub l1_follow_distance: u64,
     pub max_reorg_depth: u32,
-    pub client_poll_dur_ms: u32
-} 
+    pub client_poll_dur_ms: u32,
+}
 
 #[derive(Deserialize, Debug)]
 pub struct BitcoindParams {
@@ -43,13 +43,13 @@ impl Config {
                 rpc_password: String::new(),
                 network: Network::Regtest,
             },
-            client : ClientParams {
+            client: ClientParams {
                 rpc_port: 8432,
                 datadir: PathBuf::new(),
                 sequencer_key: None,
             },
             sync: SyncParams {
-                l1_follow_distance: 6, 
+                l1_follow_distance: 6,
                 max_reorg_depth: 4,
                 client_poll_dur_ms: 200,
             },

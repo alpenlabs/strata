@@ -7,10 +7,10 @@ use std::sync::Arc;
 use std::thread;
 use std::time;
 
-use anyhow::anyhow;
 use anyhow::Context;
 use bitcoin::Network;
 use config::Config;
+use format_serde_error::SerdeError;
 use thiserror::Error;
 use tokio::sync::broadcast;
 use tokio::sync::{mpsc, oneshot, watch};
@@ -43,18 +43,21 @@ pub enum InitError {
 
     #[error("{0}")]
     Other(String),
+
+    #[error("config: {0}")]
+    MalformedConfig(#[from] SerdeError),
 }
 
-fn load_configuration(config: Option<&Path>) -> anyhow::Result<Option<Config>> {
+fn load_configuration(config: Option<&Path>) -> Result<Option<Config>, InitError> {
     if let Some(conf) = config {
-        let config_str = fs::read_to_string(conf)?;
-        if let Ok(conf) = toml::from_str(&config_str) {
-            return Ok(Some(conf));
-        }
-    } else {
-        return Ok(None);
+        let config_str = fs::read_to_string(conf).map_err(|err| InitError::Io(err))?;
+        let conf = toml::from_str::<Config>(&config_str)
+            .map_err(|err| SerdeError::new(config_str.to_string(), err))
+            .map_err(|err| InitError::MalformedConfig(err))?;
+        return Ok(Some(conf));
     }
-    Err(anyhow!("couldn't load configuration"))
+
+    return Ok(None);
 }
 
 fn main() {
@@ -70,17 +73,10 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     // initialize the full configuration
     let config = {
-        let mut conf = Config::new();
-        match load_configuration(args.config.as_deref())? {
-            Some(c) => {
-                conf = c;
-                conf.update_from_args(&args);
-            }
-            None => {
-                conf.update_from_args(&args);
-            }
-        }
-        conf
+        let mut conf = load_configuration(args.config.as_deref())?;
+        // Values passed over arguments get the precendence over the configuration files
+        conf.get_or_insert(Config::new()).update_from_args(&args);
+        conf.unwrap()
     };
 
     // Open the database.
@@ -223,7 +219,7 @@ where
     let alp_rpc = rpc_server::AlpenRpcImpl::new(stop_tx);
     let methods = alp_rpc.into_rpc();
 
-    let rpc_port = config.client.rpc_port; // TODO make configurable
+    let rpc_port = config.client.rpc_port;
     let rpc_server = jsonrpsee::server::ServerBuilder::new()
         .build(format!("127.0.0.1:{rpc_port}"))
         .await

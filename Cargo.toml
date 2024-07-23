@@ -79,4 +79,5 @@ tokio = { version = "1.37", features = ["full"] }
 tower = "0.4"
 tracing = "0.1"
 tracing-subscriber = "0.3"
-toml = "0.8.14"
+toml = "0.5"
+format_serde_error = { git = "https://github.com/AlexanderThaller/format_serde_error" }
