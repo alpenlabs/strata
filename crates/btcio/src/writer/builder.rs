@@ -37,9 +37,7 @@ const BITCOIN_DUST_LIMIT: u64 = 546;
 
 // TODO: these might need to be in rollup params
 const BATCH_DATA_TAG: &[u8] = &[1];
-const PUBLICKEY_TAG: &[u8] = &[2];
 const ROLLUP_NAME_TAG: &[u8] = &[3];
-const SIGNATURE_TAG: &[u8] = &[4];
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct UTXO {
@@ -97,8 +95,6 @@ pub enum InscriptionError {
 pub fn create_inscription_transactions(
     rollup_name: &str,
     write_intent: &[u8],
-    seq_signature: Vec<u8>,
-    seq_public_key: Vec<u8>,
     utxos: Vec<UTXO>,
     recipient: Address,
     reveal_value: u64,
@@ -111,13 +107,7 @@ pub fn create_inscription_transactions(
     let public_key = XOnlyPublicKey::from_keypair(&key_pair).0;
 
     // Start creating inscription content
-    let reveal_script = build_reveal_script(
-        &public_key,
-        rollup_name,
-        write_intent,
-        seq_signature,
-        seq_public_key,
-    )?;
+    let reveal_script = build_reveal_script(&public_key, rollup_name, write_intent)?;
 
     // Create spend info for tapscript
     let taproot_spend_info = TaprootBuilder::new()
@@ -431,8 +421,6 @@ fn build_reveal_script(
     taproot_public_key: &XOnlyPublicKey,
     rollup_name: &str,
     write_intent: &[u8],
-    seq_signature: Vec<u8>,
-    seq_public_key: Vec<u8>,
 ) -> Result<script::ScriptBuf, anyhow::Error> {
     let mut builder = script::Builder::new()
         .push_x_only_key(taproot_public_key)
@@ -441,11 +429,11 @@ fn build_reveal_script(
         .push_opcode(OP_IF)
         .push_slice(PushBytesBuf::try_from(ROLLUP_NAME_TAG.to_vec())?)
         .push_slice(PushBytesBuf::try_from(rollup_name.as_bytes().to_vec())?)
-        .push_slice(PushBytesBuf::try_from(SIGNATURE_TAG.to_vec())?)
-        .push_slice(PushBytesBuf::try_from(seq_signature)?)
-        .push_slice(PushBytesBuf::try_from(PUBLICKEY_TAG.to_vec())?)
-        // pubkey corresponding to the above signature
-        .push_slice(PushBytesBuf::try_from(seq_public_key)?)
+        // .push_slice(PushBytesBuf::try_from(SIGNATURE_TAG.to_vec())?)
+        // .push_slice(PushBytesBuf::try_from(seq_signature)?)
+        // .push_slice(PushBytesBuf::try_from(PUBLICKEY_TAG.to_vec())?)
+        // // Pubkey corresponding to the above signature
+        // .push_slice(PushBytesBuf::try_from(seq_public_key)?)
         .push_slice(PushBytesBuf::try_from(BATCH_DATA_TAG.to_vec())?)
         .push_int(write_intent.len() as i64);
 
@@ -735,15 +723,12 @@ mod tests {
 
     #[test]
     fn test_create_inscription_transactions() {
-        let (rollup_name, _, _, sequencer_public_key, address, utxos) = get_mock_data();
+        let (rollup_name, _, _, _, address, utxos) = get_mock_data();
 
         let write_intent = vec![0u8; 100];
-        let sig = vec![1; 32];
         let (commit, reveal) = super::create_inscription_transactions(
             rollup_name,
             &write_intent,
-            sequencer_public_key.clone(),
-            sig,
             utxos.to_vec(),
             address.clone(),
             REVEAL_OUTPUT_AMOUNT,

@@ -40,4 +40,7 @@ pub struct Args {
 
     #[argh(option, description = "path to reth authrpc jwtsecret")]
     pub reth_jwtsecret: Option<PathBuf>,
+
+    #[argh(option, short = 's', description = "sequencer bitcoin address")]
+    pub sequencer_bitcoin_address: Option<String>,
 }

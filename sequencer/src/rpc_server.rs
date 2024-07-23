@@ -2,8 +2,6 @@
 
 use std::{borrow::BorrowMut, sync::Arc};
 
-use alpen_express_consensus_logic::sync_manager::SyncManager;
-use alpen_express_primitives::buf::Buf32;
 use async_trait::async_trait;
 use jsonrpsee::{
     core::RpcResult,
@@ -17,10 +15,12 @@ use reth_rpc_types::{
     StateContext, SyncInfo, SyncStatus, Transaction, TransactionRequest, Work,
 };
 use thiserror::Error;
-use tokio::sync::{oneshot, watch, Mutex, RwLock};
+use tokio::sync::{mpsc, oneshot, watch, Mutex, RwLock};
 
+use alpen_express_consensus_logic::sync_manager::SyncManager;
 use alpen_express_db::traits::L1DataProvider;
 use alpen_express_db::traits::{ChainstateProvider, Database, L2DataProvider};
+use alpen_express_primitives::buf::Buf32;
 use alpen_express_rpc_api::{AlpenApiServer, ClientStatus, L1Status};
 use alpen_express_state::{
     chain_state::ChainState, client_state::ClientState, header::L2Header, id::L2BlockId,
@@ -251,5 +251,33 @@ where
             error!(%name, "background task aborted for unknown reason");
             Err(Error::BlockingAbort(name.to_owned()))
         }
+    }
+}
+
+pub struct FuncTestServerImpl {
+    pub intent_tx: Mutex<mpsc::Sender<BlobIntent>>,
+}
+
+impl FuncTestServerImpl {
+    pub fn new(intent_tx: Mutex<mpsc::Sender<BlobIntent>>) -> Self {
+        Self { intent_tx }
+    }
+}
+
+#[async_trait]
+impl AlpenFuncTestApiServer for FuncTestServerImpl {
+    async fn trigger_da_blob(&self, blobpayload: Vec<u8>) -> RpcResult<()> {
+        // Send this to intent receiver
+        // TODO: Get commitment from rpc as well
+        let commitment = Buf32::from([0u8; 32]);
+        let blobintent = BlobIntent::new(BlobDest::L1, commitment, blobpayload);
+        if let Err(_) = self.intent_tx.lock().await.send(blobintent).await {
+            return Err(Error::Other("Failed to send intent to receiver".to_string()).into());
+        }
+        Ok(())
+    }
+
+    async fn test_functional(&self) -> RpcResult<u32> {
+        Ok(1)
     }
 }

@@ -9,6 +9,9 @@ use crate::args::Args;
 pub struct ClientParams {
     pub rpc_port: u16,
     pub sequencer_key: Option<PathBuf>,
+
+    /// The address to which the inscriptions are spent
+    pub sequencer_bitcoin_address: String, // TODO: probably move this to another struct
     pub datadir: PathBuf,
 }
 
@@ -47,18 +50,21 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn new() -> Config {
+    pub fn from_args(args: &Args) -> Config {
+        // TODO: get everything from args or from toml
         Self {
             bitcoind_rpc: BitcoindParams {
-                rpc_url: String::new(),
-                rpc_user: String::new(),
-                rpc_password: String::new(),
-                network: Network::Regtest,
+                rpc_url: args.bitcoind_host.clone(),
+                rpc_user: args.bitcoind_host.clone(),
+                rpc_password: args.bitcoind_password.clone(),
+                network: Network::from_core_arg(&args.network)
+                    .expect("required valid bitcoin network"),
             },
             client: ClientParams {
                 rpc_port: 8432,
                 datadir: PathBuf::new(),
                 sequencer_key: None,
+                sequencer_bitcoin_address: args.sequencer_bitcoin_address.clone(),
             },
             sync: SyncParams {
                 l1_follow_distance: 6,
@@ -75,6 +81,7 @@ impl Config {
     }
     pub fn update_from_args(&mut self, args: &Args) {
         let args = args.clone();
+
         if let Some(rpc_user) = args.bitcoind_user {
             self.bitcoind_rpc.rpc_user = rpc_user;
         }
@@ -99,6 +106,9 @@ impl Config {
         if let Some(jwtsecret) = args.reth_jwtsecret {
             self.exec.reth.secret = jwtsecret;
         }
+        if let Some(seq_addr) = args.sequencer_bitcoin_address {
+            self.client.sequencer_bitcoin_address = seq_addr;
+        }
     }
 }
 
@@ -118,6 +128,7 @@ mod test {
             [client]
             rpc_port = 8432
             datadir = "/path/to/data/directory"
+            sequencer_bitcoin_address = "some_addr"
 
             [sync]
             l1_follow_distance = 6

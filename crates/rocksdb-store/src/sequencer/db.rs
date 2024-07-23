@@ -195,7 +195,7 @@ mod tests {
 
         assert!(result.is_ok());
         let idx = result.unwrap();
-        assert_eq!(idx, 1);
+        assert_eq!(idx, 0);
 
         //Also check appropriate mapping is created
         assert_eq!(
@@ -240,12 +240,12 @@ mod tests {
 
         assert!(result.is_ok());
         let reveal_idx = result.unwrap();
-        assert_eq!(reveal_idx, 2);
+        assert_eq!(reveal_idx, 1);
 
-        let stored_commit_txn = seq_db.get_l1_txn(1).unwrap();
+        let stored_commit_txn = seq_db.get_l1_txn(0).unwrap();
         assert_eq!(stored_commit_txn, Some(commit_txn));
 
-        let stored_reveal_txn = seq_db.get_l1_txn(2).unwrap();
+        let stored_reveal_txn = seq_db.get_l1_txn(1).unwrap();
         assert_eq!(stored_reveal_txn, Some(reveal_txn));
 
         // Check if blobid -> txidx mapping is created
@@ -375,7 +375,7 @@ mod tests {
 
         let result = seq_db.get_last_blob_idx();
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), Some(1));
+        assert_eq!(result.unwrap(), Some(0));
     }
 
     #[test]
@@ -394,7 +394,7 @@ mod tests {
 
         let result = seq_db.get_reveal_txidx_for_blob(blob_hash);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), Some(2));
+        assert_eq!(result.unwrap(), Some(1));
     }
 
     #[test]
@@ -415,9 +415,9 @@ mod tests {
 
         let blob_hash = Buf32::from([0u8; 32]);
         let blob = vec![1, 2, 3];
-        seq_db.put_blob(blob_hash, blob).unwrap();
+        let idx = seq_db.put_blob(blob_hash, blob).unwrap();
 
-        let result = seq_db.get_blobid_for_blob_idx(1);
+        let result = seq_db.get_blobid_for_blob_idx(idx);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), Some(blob_hash));
     }
@@ -454,6 +454,6 @@ mod tests {
         let _ = seq_db.put_commit_reveal_txns(blob_hash, ctxn, rtxn);
 
         let result = seq_db.get_last_txn_idx().unwrap();
-        assert_eq!(result, Some(2));
+        assert_eq!(result, Some(1));
     }
 }

@@ -22,6 +22,7 @@ class L1StatusTest(flexitest.Test):
         interval = MAX_HORIZON_POLL_INTERVAL_SECS + SEQ_SLACK_TIME_SECS
 
         time.sleep(interval)
+
         received_block = btcrpc.getblock(btcrpc.proxy.getbestblockhash())
         l1stat = seqrpc.alp_l1status()
 

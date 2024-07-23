@@ -15,7 +15,7 @@ use alpen_express_db::{
 };
 
 use super::{
-    builder::{create_inscription_transactions, sign_blob_with_private_key, UtxoParseError, UTXO},
+    builder::{create_inscription_transactions, UtxoParseError, UTXO},
     config::{InscriptionFeePolicy, WriterConfig},
     state::WriterState,
 };
@@ -145,7 +145,7 @@ async fn create_inscriptions_from_intent(
     config: &WriterConfig,
 ) -> anyhow::Result<(Transaction, Transaction)> {
     let payload = write_intent.payload();
-    let (signature, pub_key) = sign_blob_with_private_key(&payload, &config.private_key)?;
+    // let (signature, pub_key) = sign_blob_with_private_key(&payload, &config.private_key)?;
     let utxos = rpc_client.get_utxos().await?;
     let utxos = utxos
         .into_iter()
@@ -160,12 +160,9 @@ async fn create_inscriptions_from_intent(
     };
     create_inscription_transactions(
         &config.rollup_name,
-        // TODO: include commitment along with payload in inscription
         &payload,
-        signature,
-        pub_key,
         utxos,
-        config.change_address.clone(),
+        config.sequencer_address.clone(),
         config.amount_for_reveal_txn,
         fee_rate,
         rpc_client.network(),
@@ -344,10 +341,10 @@ async fn check_confirmations_and_resend_txn(
 
 #[cfg(test)]
 mod test {
-    use std::sync::Arc;
+    use std::{str::FromStr, sync::Arc};
 
     use async_trait::async_trait;
-    use bitcoin::{consensus::deserialize, hashes::Hash, Block, BlockHash, Network, Txid};
+    use bitcoin::{consensus::deserialize, hashes::Hash, Address, Block, BlockHash, Network, Txid};
     use tokio::sync::Mutex;
 
     use alpen_express_db::{sequencer::db::SequencerDB, traits::SequencerDatabase, SeqDb};
@@ -443,11 +440,25 @@ mod test {
         Arc::new(SequencerDB::new(seqdb))
     }
 
+    fn get_config() -> WriterConfig {
+        let addr = Address::from_str("bcrt1q6u6qyya3sryhh42lahtnz2m7zuufe7dlt8j0j5")
+            .unwrap()
+            .require_network(Network::Regtest)
+            .unwrap();
+        WriterConfig {
+            sequencer_address: addr,
+            rollup_name: "alpen".to_string(),
+            inscription_fee_policy: InscriptionFeePolicy::Fixed(100),
+            poll_duration_ms: 1000,
+            amount_for_reveal_txn: 1000,
+        }
+    }
+
     #[tokio::test]
     async fn test_handle_intent_new_intent() {
         let db = get_db();
         let client = Arc::new(TestBitcoinClient::new(1));
-        let config = WriterConfig::default();
+        let config = get_config();
         let state = Arc::new(Mutex::new(WriterState::new_empty(db.clone())));
 
         let intent: BlobIntent = ArbitraryGenerator::new().generate();
@@ -486,7 +497,7 @@ mod test {
     async fn test_handle_intent_existing_intent() {
         let db = get_db();
         let client = Arc::new(TestBitcoinClient::new(1));
-        let config = WriterConfig::default();
+        let config = get_config();
         let state = Arc::new(Mutex::new(WriterState::new_empty(db.clone())));
 
         let intent: BlobIntent = ArbitraryGenerator::new().generate();
@@ -534,7 +545,7 @@ mod test {
     async fn test_handle_intent_existing_commit_reveal() {
         let db = get_db();
         let client = Arc::new(TestBitcoinClient::new(1));
-        let config = WriterConfig::default();
+        let config = get_config();
         let state = Arc::new(Mutex::new(WriterState::new_empty(db.clone())));
 
         let intent: BlobIntent = ArbitraryGenerator::new().generate();
@@ -595,7 +606,7 @@ mod test {
     #[tokio::test]
     async fn test_process_queue_txn_unsent() {
         let client = Arc::new(TestBitcoinClient::new(0));
-        let config = WriterConfig::default();
+        let config = get_config();
         let db = get_db();
         let state = Arc::new(Mutex::new(WriterState::new_empty(db.clone())));
 
@@ -635,7 +646,7 @@ mod test {
     #[tokio::test]
     async fn test_process_queue_txn_inmempool_2_confirmations() {
         let client = Arc::new(TestBitcoinClient::new(2));
-        let config = WriterConfig::default();
+        let config = get_config();
         let db = get_db();
         let state = Arc::new(Mutex::new(WriterState::new_empty(db.clone())));
 
@@ -675,7 +686,7 @@ mod test {
     #[tokio::test]
     async fn test_process_queue_txn_inmempool_to_finalized() {
         let client = Arc::new(TestBitcoinClient::new(FINALITY_DEPTH + 1));
-        let config = WriterConfig::default();
+        let config = get_config();
         let db = get_db();
         let state = Arc::new(Mutex::new(WriterState::new_empty(db.clone())));
 
@@ -706,16 +717,16 @@ mod test {
 
         process_queue_txn(&ctxn, 0, &state, &client).await.unwrap();
 
-        // The txn should have status Finalized
+        // If finalized, should be removed from queue
         let st = state.lock().await;
-        let txn = st.txns_queue.get(0).unwrap();
-        assert_eq!(*txn.status(), L1TxnStatus::Finalized);
+        assert_eq!(st.txns_queue.len(), 0);
+        assert_eq!(st.start_txn_idx, 1);
     }
 
     #[tokio::test]
     async fn test_process_queue_txn_finalized() {
         let client = Arc::new(TestBitcoinClient::new(1));
-        let config = WriterConfig::default();
+        let config = get_config();
         let db = get_db();
         let state = Arc::new(Mutex::new(WriterState::new_empty(db.clone())));
 
