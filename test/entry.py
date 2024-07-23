@@ -2,6 +2,8 @@
 
 import logging as log
 import os
+import secrets
+import string
 import sys
 import time
 from threading import Thread
@@ -13,6 +15,8 @@ import seqrpc
 
 BD_USERNAME = "alpen"
 BD_PASSWORD = "alpen"
+LETTERS = string.ascii_lowercase
+DATADIR_NAME_LENGTH = 10
 
 
 def generate_seqkey() -> bytes:
@@ -56,7 +60,9 @@ class BitcoinFactory(flexitest.Factory):
         super().__init__(datadir_pfx, port_range)
 
     def create_regtest_bitcoin(self) -> flexitest.Service:
-        datadir = self.create_datadir("bitcoin")
+        datadir_name = "".join(secrets.choice(LETTERS) for i in range(DATADIR_NAME_LENGTH))
+        log.warning(f"Using {datadir_name} as the datadir for bitcoin regtest")
+        datadir = self.create_datadir(f"bitcoin_{datadir_name}")
         p2p_port = self.next_port()
         rpc_port = self.next_port()
         logfile = os.path.join(datadir, "service.log")
@@ -97,7 +103,9 @@ class VertexFactory(flexitest.Factory):
     def create_sequencer(
         self, bitcoind_sock: str, bitcoind_user: str, bitcoind_pass: str
     ) -> flexitest.Service:
-        datadir = self.create_datadir("seq")
+        datadir_name = "".join(secrets.choice(LETTERS) for i in range(DATADIR_NAME_LENGTH))
+        log.warning(f"Using {datadir_name} as the datadir for sequencer")
+        datadir = self.create_datadir(f"seq_{datadir_name}")
         rpc_port = self.next_port()
         logfile = os.path.join(datadir, "service.log")
 
