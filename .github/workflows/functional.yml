@@ -53,6 +53,7 @@ jobs:
 
       - name: Run functional tests
         run: |
-          export PATH=$(realpath target/debug/):$PATH && \
+          export PATH=$(realpath target/debug/):$PATH
+          which alpen-vertex-sequencer
           cd test && \
           poetry run python entry.py
