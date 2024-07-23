@@ -87,6 +87,7 @@ impl ClientState {
 }
 
 /// Relates to our view of the L2 chain, does not exist before genesis.
+// TODO maybe include tip height and finalized height?  or their headers?
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
 pub struct SyncState {
     /// Last L2 block we've chosen as the current tip.

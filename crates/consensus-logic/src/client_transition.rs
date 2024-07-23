@@ -1,6 +1,7 @@
 //! Core state transition function.
 
-use alpen_vertex_db::sync_event::schemas::SyncEventWithTimestamp;
+use tracing::*;
+
 use alpen_vertex_db::traits::{Database, L1DataProvider, L2DataProvider};
 use alpen_vertex_primitives::prelude::*;
 use alpen_vertex_state::client_state::*;
@@ -12,7 +13,7 @@ use crate::errors::*;
 /// Processes the event given the current consensus state, producing some
 /// output.  This can return database errors.
 pub fn process_event<D: Database>(
-    _state: &ClientState,
+    state: &ClientState,
     ev: &SyncEvent,
     database: &D,
     _params: &Params,
@@ -40,16 +41,28 @@ pub fn process_event<D: Database>(
         }
 
         SyncEvent::L1DABatch(blkids) => {
-            // TODO load it up and figure out what's there, see if we have to
-            // load the state updates from L1 or something
-            let l2prov = database.l2_provider();
+            if blkids.is_empty() {
+                warn!("empty L1DABatch");
+            }
 
-            for id in blkids {
-                let _block = l2prov
-                    .get_block_data(*id)?
-                    .ok_or(Error::MissingL2Block(*id))?;
+            if let Some(ss) = state.sync() {
+                // TODO load it up and figure out what's there, see if we have to
+                // load the state updates from L1 or something
+                let l2prov = database.l2_provider();
 
-                // TODO do whatever changes we have to to accept the new block
+                for id in blkids {
+                    let _block = l2prov
+                        .get_block_data(*id)?
+                        .ok_or(Error::MissingL2Block(*id))?;
+
+                    // TODO do whatever changes we have to to accept the new block
+                }
+
+                let last = blkids.last().unwrap();
+                writes.push(ClientStateWrite::UpdateFinalized(*last));
+            } else {
+                // TODO we can expand this later to make more sense
+                return Err(Error::MissingClientSyncState.into());
             }
         }
 

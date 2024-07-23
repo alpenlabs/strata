@@ -146,19 +146,9 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
             }
 
             SyncAction::L2Genesis(l1blkid) => {
-                // First check if we actually need to do genesis or not.  If
-                // we've already done genesis then something is up that we don't
-                // understand.
-                if !genesis::check_needs_genesis(state.database.as_ref())? {
-                    error!(%ev_idx, "emitted L1Genesis action but we don't need to do genesis?");
-                }
-
-                // If we got to this point then everything we need to do genesis
-                // should already be in the database.
-                genesis::init_genesis_states(&state.params, state.database.as_ref())?;
-                info!(%l1blkid, "created L2 genesis block!");
-
-                // TODO We also have to unlock the FCM to start.
+                // TODO make this SyncAction do something more significant or
+                // get rid of it
+                info!(%l1blkid, "sync action to do genesis");
             }
         }
     }

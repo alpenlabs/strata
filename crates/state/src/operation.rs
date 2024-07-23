@@ -45,6 +45,10 @@ pub enum ClientStateWrite {
     /// Replace the sync state.
     ReplaceSync(Box<SyncState>),
 
+    /// Sets the flag that the chain is now active, kicking off the FCM to
+    /// start.
+    ActivateChain,
+
     /// Accept an L2 block and update tip state.
     AcceptL2Block(L2BlockId),
 
@@ -56,6 +60,9 @@ pub enum ClientStateWrite {
 
     /// Updates the buried block index to a higher index.
     UpdateBuried(u64),
+
+    /// Update the finalized block.
+    UpdateFinalized(L2BlockId),
 }
 
 /// Actions the client state machine directs the node to take to update its own
@@ -97,6 +104,12 @@ pub fn apply_writes_to_state(
             ReplaceSync(nss) => {
                 let ss = state.expect_sync_mut();
                 *ss = *nss;
+            }
+
+            ActivateChain => {
+                // This is all this does.  Actually setting the finalized tip is
+                // done by some sync event emitted by the FCM.
+                state.chain_active = true;
             }
 
             RollbackL1BlocksTo(l1blkid) => {
@@ -148,6 +161,11 @@ pub fn apply_writes_to_state(
 
                 // TODO merge these blocks into the L1 MMR in the client state if
                 // we haven't already
+            }
+
+            UpdateFinalized(blkid) => {
+                let ss = state.expect_sync_mut();
+                ss.finalized_blkid = blkid;
             }
         }
     }

@@ -44,6 +44,9 @@ pub enum Error {
     #[error("client sync state unset")]
     MissingClientSyncState,
 
+    #[error("csm dropped")]
+    CsmDropped,
+
     #[error("chaintip: {0}")]
     ChainTip(#[from] ChainTipError),
 
