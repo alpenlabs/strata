@@ -12,5 +12,7 @@ alpen-vertex-primitives = { workspace = true }
 arbitrary = { workspace = true }
 borsh = { workspace = true }
 digest = { workspace = true }
-sha2 = { workspace = true }
 num_enum = { workspace = true }
+sha2 = { workspace = true }
+ethereum_ssz = { workspace = true }
+ethereum_ssz_derive = { workspace = true }

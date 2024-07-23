@@ -7,6 +7,7 @@ use bitcoin::hashes::Hash;
 use bitcoin::BlockHash;
 use borsh::{BorshDeserialize, BorshSerialize};
 use reth_primitives::alloy_primitives::FixedBytes;
+use ssz::{Decode, DecodeError, Encode};
 
 // 20-byte buf
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -99,7 +100,7 @@ impl fmt::Display for Buf32 {
 }
 
 // 64-byte buf, useful for schnorr signatures
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Copy, Clone, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct Buf64(pub FixedBytes<64>);
 
 impl Buf64 {
@@ -191,5 +192,116 @@ impl<'a> Arbitrary<'a> for Buf64 {
         let mut array = [0u8; 64];
         u.fill_buffer(&mut array)?;
         Ok(Buf64(array.into()))
+    }
+}
+
+impl Encode for Buf32 {
+    fn is_ssz_fixed_len() -> bool {
+        true
+    }
+
+    fn ssz_fixed_len() -> usize {
+        32
+    }
+
+    fn ssz_bytes_len(&self) -> usize {
+        32
+    }
+
+    fn ssz_append(&self, buf: &mut Vec<u8>) {
+        buf.extend_from_slice(&self.0 .0);
+    }
+}
+
+impl Decode for Buf32 {
+    fn is_ssz_fixed_len() -> bool {
+        true
+    }
+
+    fn ssz_fixed_len() -> usize {
+        32
+    }
+
+    fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, DecodeError> {
+        if bytes.len() != 32 {
+            return Err(DecodeError::InvalidByteLength {
+                expected: 32,
+                len: bytes.len(),
+            });
+        }
+        let mut array = [0u8; 32];
+        array.copy_from_slice(bytes);
+        Ok(Buf32(FixedBytes(array)))
+    }
+}
+
+impl Encode for Buf64 {
+    fn is_ssz_fixed_len() -> bool {
+        true
+    }
+
+    fn ssz_fixed_len() -> usize {
+        64
+    }
+
+    fn ssz_bytes_len(&self) -> usize {
+        64
+    }
+
+    fn ssz_append(&self, buf: &mut Vec<u8>) {
+        buf.extend_from_slice(&self.0 .0);
+    }
+}
+
+impl Decode for Buf64 {
+    fn is_ssz_fixed_len() -> bool {
+        true
+    }
+
+    fn ssz_fixed_len() -> usize {
+        64
+    }
+
+    fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, DecodeError> {
+        if bytes.len() != 64 {
+            return Err(DecodeError::InvalidByteLength {
+                expected: 64,
+                len: bytes.len(),
+            });
+        }
+        let mut array = [0u8; 64];
+        array.copy_from_slice(bytes);
+        Ok(Buf64(FixedBytes(array)))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ssz_buf32() {
+        let original = Buf32(FixedBytes([1u8; 32]));
+
+        // Encode
+        let encoded: Vec<u8> = original.as_ssz_bytes();
+        assert_eq!(encoded.len(), 32);
+
+        // Decode
+        let decoded = Buf32::from_ssz_bytes(&encoded).unwrap();
+        assert_eq!(original.0 .0, decoded.0 .0);
+    }
+
+    #[test]
+    fn test_ssz_buf64() {
+        let original = Buf64(FixedBytes([5u8; 64]));
+
+        // Encode
+        let encoded: Vec<u8> = original.as_ssz_bytes();
+        assert_eq!(encoded.len(), 64);
+
+        // Decode
+        let decoded = Buf64::from_ssz_bytes(&encoded).unwrap();
+        assert_eq!(original.0 .0, decoded.0 .0);
     }
 }

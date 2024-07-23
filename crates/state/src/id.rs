@@ -4,6 +4,7 @@ use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use alpen_vertex_primitives::buf::Buf32;
+use ssz_derive::{Decode, Encode};
 
 /// ID of an L2 block, usually the hash of its root header.
 #[derive(
@@ -18,7 +19,10 @@ use alpen_vertex_primitives::buf::Buf32;
     Arbitrary,
     BorshSerialize,
     BorshDeserialize,
+    Decode,
+    Encode,
 )]
+#[ssz(struct_behaviour = "transparent")]
 pub struct L2BlockId(Buf32);
 
 impl From<Buf32> for L2BlockId {
