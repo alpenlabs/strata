@@ -1,0 +1,12 @@
+[package]
+name = "sp1-adapter"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+zkvm = { workspace = true }
+anyhow = { workspace = true }
+serde = { workspace = true }
+bincode = { workspace = true }
+# revm = { git = "https://github.com/sp1-patches/revm", branch = "patch-v5.0.0", features = ["std"], default-features = false }
+zkvm-primitives = { git = "https://github.com/MdTeach/reth", branch = "feat/add-prover-primitives"}

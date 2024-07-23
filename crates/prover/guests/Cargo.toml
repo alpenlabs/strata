@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 
 [build-dependencies]
-risc0-build = { version = "1.0.2"}
+risc0-build = { version = "1.0.3"}
 
 [package.metadata.risc0]
 methods = ["guest-reth-stf"]

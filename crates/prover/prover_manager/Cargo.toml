@@ -1,0 +1,9 @@
+[package]
+name = "prover_manager"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+zkvm = { path = "../zkvm" }
+risc0-adapter = { path = "../adapters/risc0" }
+guest-builder = { path = "../guests" }
