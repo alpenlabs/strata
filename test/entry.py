@@ -165,22 +165,24 @@ class BasicEnvConfig(flexitest.EnvConfig):
 
 def main(argv):
     test_dir = os.path.dirname(os.path.abspath(__file__))
-
-    datadir_root = flexitest.create_datadir_in_workspace(os.path.join(test_dir, "_dd"))
-
     modules = flexitest.runtime.scan_dir_for_modules(test_dir)
-    tests = flexitest.runtime.load_candidate_modules(modules)
 
-    btc_fac = BitcoinFactory(datadir_root, [12300 + i for i in range(20)])
-    seq_fac = VertexFactory(datadir_root, [12400 + i for i in range(20)])
-    factories = {"bitcoin": btc_fac, "sequencer": seq_fac}
-    envs = {"basic": BasicEnvConfig()}
-    rt = flexitest.TestRuntime(envs, datadir_root, factories)
-    rt.prepare_registered_tests()
-    if len(argv) > 1:
-        tests = [argv[1]]
-    results = rt.run_tests(tests)
-    flexitest.dump_results(results)
+    tests = [argv[1]] if len(argv) > 1 else flexitest.runtime.load_candidate_modules(modules)
+
+    for test in tests:
+        datadir_root = flexitest.create_datadir_in_workspace(os.path.join(test_dir, "_dd"))
+
+        btc_fac = BitcoinFactory(datadir_root, [12300 + i for i in range(20)])
+        seq_fac = VertexFactory(datadir_root, [12400 + i for i in range(20)])
+
+        factories = {"bitcoin": btc_fac, "sequencer": seq_fac}
+        envs = {"basic": BasicEnvConfig()}
+
+        rt = flexitest.TestRuntime(envs, datadir_root, factories)
+        rt.prepare_registered_tests()
+
+        results = rt.run_tests([test])
+        flexitest.dump_results(results)
 
     return 0
 
