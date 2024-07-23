@@ -68,9 +68,12 @@ ensure-poetry:
 activate: ensure-poetry ## Activate poetry environment for integration tests.
 	cd test && poetry install --no-root
 
+.PHONY: clean-dd
+clean-dd:
+	rm -rf test/_dd 2>/dev/null
 
 .PHONY: test-functional
-test-functional: ensure-poetry ## Runs functional tests
+test-functional: ensure-poetry clean-dd ## Runs functional tests.
 	cd test && ./run_test.sh
 
 ##@ Code Quality
