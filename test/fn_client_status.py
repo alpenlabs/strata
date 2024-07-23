@@ -4,7 +4,7 @@ import flexitest
 
 
 @flexitest.register
-class HelloTest(flexitest.Test):
+class L1ClientStatusTest(flexitest.Test):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
 
