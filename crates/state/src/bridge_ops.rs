@@ -4,9 +4,12 @@ use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use alpen_vertex_primitives::buf::Buf64;
+use ssz_derive::{Decode, Encode};
 
 /// Describes an intent to withdraw that hasn't been dispatched yet.
-#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
+#[derive(
+    Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Encode, Decode,
+)]
 pub struct WithdrawalIntent {
     /// Quantity of L1 asset, for Bitcoin this is sats.
     amt: u64,
@@ -32,7 +35,9 @@ impl WithdrawalBatch {
 }
 
 /// Describes a deposit data to be processed by an EE.
-#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
+#[derive(
+    Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Encode, Decode,
+)]
 pub struct DepositIntent {
     /// Quantity in the L1 asset, for Bitcoin this is sats.
     amt: u64,

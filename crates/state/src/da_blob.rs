@@ -7,6 +7,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 use alpen_vertex_primitives::buf::Buf32;
+use ssz_derive::{Decode, Encode};
 
 /// DA destination identifier.   This will eventually be used to enable
 /// storing blobs on alternative availability schemes.
@@ -23,7 +24,10 @@ use alpen_vertex_primitives::buf::Buf32;
     BorshSerialize,
     IntoPrimitive,
     TryFromPrimitive,
+    Encode,
+    Decode,
 )]
+#[ssz(enum_behaviour = "tag")]
 #[borsh(use_discriminant = true)]
 #[repr(u8)]
 pub enum BlobDest {
@@ -42,7 +46,19 @@ impl<'a> Arbitrary<'a> for BlobDest {
 
 /// Summary of a DA blob to be included on a DA layer.  Specifies the target and
 /// a commitment to the blob.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Arbitrary, BorshDeserialize, BorshSerialize)]
+#[derive(
+    Copy,
+    Clone,
+    Debug,
+    Eq,
+    PartialEq,
+    Hash,
+    Arbitrary,
+    BorshDeserialize,
+    BorshSerialize,
+    Encode,
+    Decode,
+)]
 pub struct BlobSpec {
     /// Target settlement layer we're expecting the DA on.
     dest: BlobDest,

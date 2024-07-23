@@ -798,6 +798,7 @@ dependencies = [
  "borsh",
  "digest 0.10.7",
  "ethereum_ssz",
+ "ethereum_ssz_derive",
  "hex",
  "reth-primitives",
  "serde",

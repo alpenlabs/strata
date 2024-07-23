@@ -6,6 +6,7 @@ use bitcoin::hashes::Hash;
 use bitcoin::{consensus::serialize, Block};
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
+use ssz_derive::{Decode, Encode};
 
 use crate::buf::Buf32;
 
@@ -23,24 +24,37 @@ use crate::buf::Buf32;
     Arbitrary,
     BorshDeserialize,
     BorshSerialize,
+    Encode,
+    Decode,
 )]
-pub struct L1TxRef(u64, u32);
+// pub struct L1TxRef(u64, u32);
+pub struct L1TxRef {
+    /// Block where the transaction is included
+    block: u64,
+    /// Index in the block where the transaction is included
+    idx: u32,
+}
 
 impl Into<(u64, u32)> for L1TxRef {
     fn into(self) -> (u64, u32) {
-        (self.0, self.1)
+        (self.block, self.idx)
     }
 }
 
 impl From<(u64, u32)> for L1TxRef {
     fn from(value: (u64, u32)) -> Self {
-        Self(value.0, value.1)
+        Self {
+            block: value.0,
+            idx: value.1,
+        }
     }
 }
 
 /// Merkle proof for a TXID within a block.
 // TODO rework this, make it possible to generate proofs, etc.
-#[derive(Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize, Encode, Decode,
+)]
 pub struct L1TxProof {
     position: u32,
     cohashes: Vec<Buf32>,
@@ -61,7 +75,9 @@ impl L1TxProof {
 }
 
 /// Tx body with a proof.
-#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary, Encode, Decode,
+)]
 pub struct L1Tx {
     proof: L1TxProof,
     tx: Vec<u8>,

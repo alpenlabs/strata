@@ -6,8 +6,11 @@ use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use alpen_vertex_primitives::l1;
+use ssz_derive::{Decode, Encode};
 
-#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
+#[derive(
+    Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Encode, Decode,
+)]
 pub struct ForcedInclusion {
     payload: Vec<u8>,
 }
@@ -18,7 +21,9 @@ impl ForcedInclusion {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
+#[derive(
+    Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Encode, Decode,
+)]
 pub struct ForcedInclusionTx {
     tx: l1::L1Tx,
 }

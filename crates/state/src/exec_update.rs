@@ -5,6 +5,7 @@ use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use alpen_vertex_primitives::buf::Buf32;
+use ssz_derive::{Decode, Encode};
 
 use crate::{bridge_ops, da_blob};
 
@@ -36,7 +37,9 @@ impl ExecUpdate {
 
 /// Contains the explicit inputs to the STF.  Implicit inputs are determined
 /// from the CL's exec env state.
-#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
+#[derive(
+    Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Encode, Decode,
+)]
 pub struct UpdateInput {
     /// Update index.  This is incremented exactly 1.  This is to handle the
     /// future possible cases where we skip CL blocks and provide a monotonic

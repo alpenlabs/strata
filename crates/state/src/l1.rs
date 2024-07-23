@@ -4,6 +4,7 @@ use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use alpen_vertex_primitives::{l1, prelude::*};
+use ssz_derive::{Decode, Encode};
 
 use crate::state_queue::StateQueue;
 
@@ -43,7 +44,7 @@ impl fmt::Display for L1BlockId {
 /// omit the wtxs root, but we'd need to re-prove it every time, and that would
 /// waste space.  So we treat this like you would an "extended header" or
 /// something.
-#[derive(Clone, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize, Encode, Decode)]
 pub struct L1HeaderRecord {
     /// Serialized header.  For Bitcoin this is always 80 bytes.
     buf: Vec<u8>,
@@ -138,7 +139,7 @@ impl L1HeaderPayload {
 
 /// Describes state relating to the CL's view of L1.  Updated by entries in the
 /// L1 segment of CL blocks.
-#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
+#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize, Encode, Decode)]
 pub struct L1ViewState {
     /// The first block we decide we're able to look at.  This probably won't
     /// change unless we want to do Bitcoin history expiry or something.
@@ -186,7 +187,9 @@ impl<'a> Arbitrary<'a> for L1ViewState {
 /// enough before accepting the block and acting on the interesting txs in it.
 ///
 /// Height is implicit by its position in the maturation queue.
-#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
+#[derive(
+    Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Encode, Decode,
+)]
 pub struct L1MaturationEntry {
     /// Header record that contains the important proof information.
     record: L1HeaderRecord,
@@ -220,7 +223,9 @@ impl L1MaturationEntry {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
+#[derive(
+    Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Encode, Decode,
+)]
 pub struct DepositUpdateTx {
     /// The transaction in the block.
     tx: l1::L1Tx,
@@ -245,7 +250,9 @@ impl DepositUpdateTx {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
+#[derive(
+    Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Encode, Decode,
+)]
 pub struct DaTx {
     // TODO other fields that we need to be able to identify the DA
     /// The transaction in the block.

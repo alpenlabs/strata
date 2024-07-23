@@ -1,5 +1,6 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
+use ssz_derive::Encode;
 
 use crate::{bridge_ops, bridge_state, exec_env, l1};
 use crate::{id::L2BlockId, state_queue::StateQueue};
@@ -8,7 +9,7 @@ use crate::{id::L2BlockId, state_queue::StateQueue};
 /// pre-state and a block.
 ///
 /// This corresponds to the beacon chain state.
-#[derive(Clone, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize, Encode)]
 pub struct ChainState {
     // all these fields are kinda dummies at the moment
     /// Accepted and valid L2 blocks that we might still reorg.  The last of

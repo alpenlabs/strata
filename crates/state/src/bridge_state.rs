@@ -10,12 +10,13 @@ use alpen_vertex_primitives::{
     buf::Buf32,
     l1::{self, OutputRef},
 };
+use ssz_derive::{Decode, Encode};
 
 /// Global operator idx.
 pub type OperatorIdx = u32;
 
 /// Entry for an operator.  They have a
-#[derive(Clone, Debug, Eq, PartialEq, Hash, BorshDeserialize, BorshSerialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, BorshDeserialize, BorshSerialize, Encode, Decode)]
 pub struct OperatorEntry {
     /// Global operator index.
     idx: OperatorIdx,
@@ -27,7 +28,7 @@ pub struct OperatorEntry {
     wallet_pk: Buf32,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
+#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize, Encode, Decode)]
 pub struct OperatorTable {
     /// Next unassigned operator index.
     next_idx: u32,
@@ -70,7 +71,7 @@ impl OperatorTable {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
+#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize, Encode)]
 pub struct DepositsTable {
     /// Next unassigned deposit index.
     next_idx: u32,
@@ -124,7 +125,10 @@ impl DepositsTable {
 }
 
 /// Container for the state machine of a deposit factory.
-#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
+// FIXME: ssz::Decode is not implemented because:
+// a. couldn't find a way to encode/decode DepositState.
+// b. cound't skip both serializing and deserializing
+#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize, Encode)]
 pub struct DepositEntry {
     deposit_idx: u32,
 
@@ -143,6 +147,8 @@ pub struct DepositEntry {
     pending_update_txs: Vec<l1::L1TxRef>,
 
     /// Deposit state.
+    #[ssz(skip_serializing)]
+    // #[ssz(skip_deserializing)] FIXME NOTE: Default trait is needed in case we need to allow Decode in the struct
     state: DepositState,
 }
 
@@ -161,6 +167,8 @@ impl DepositEntry {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
+// TODO: figure out a way to [`ssz:Encode`] and [`ssz:Decode`]
+// #[ssz(enum_behaviour = "tag")]
 pub enum DepositState {
     /// Deposit utxo has been recognized.
     Created(CreatedState),
