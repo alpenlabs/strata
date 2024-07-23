@@ -8,9 +8,10 @@
 
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
+use ssz::{Decode, Encode};
 
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
-pub struct StateQueue<T> {
+pub struct StateQueue<T: Encode + Decode> {
     /// The front of the queue that we take entries out of.
     base_idx: u64,
 
@@ -18,7 +19,37 @@ pub struct StateQueue<T> {
     entries: Vec<T>,
 }
 
-impl<T> StateQueue<T> {
+impl<T: Encode + Decode> Encode for StateQueue<T> {
+    fn is_ssz_fixed_len() -> bool {
+        false
+    }
+
+    fn ssz_bytes_len(&self) -> usize {
+        self.base_idx.ssz_bytes_len() + self.entries.ssz_bytes_len()
+    }
+
+    fn ssz_append(&self, buf: &mut Vec<u8>) {
+        self.base_idx.ssz_append(buf);
+        self.entries.ssz_append(buf);
+    }
+}
+
+impl<T: Encode + Decode> Decode for StateQueue<T> {
+    fn is_ssz_fixed_len() -> bool {
+        false
+    }
+
+    fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
+        let mut offset = 0;
+        let base_idx = u64::from_ssz_bytes(&bytes[offset..])?;
+        offset += base_idx.ssz_bytes_len();
+        let entries = Vec::<T>::from_ssz_bytes(&bytes[offset..])?;
+
+        Ok(StateQueue { base_idx, entries })
+    }
+}
+
+impl<T: Encode + Decode> StateQueue<T> {
     /// Creates a new empty fresh queue.
     pub fn new_empty() -> Self {
         Self {
