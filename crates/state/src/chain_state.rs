@@ -2,7 +2,7 @@ use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use alpen_vertex_primitives::buf::Buf32;
-use alpen_vertex_primitives::hash;
+use alpen_vertex_primitives::hash::compute_borsh_hash;
 
 use crate::{bridge_ops, bridge_state, exec_env, l1};
 use crate::{id::L2BlockId, state_queue::StateQueue};
@@ -41,54 +41,13 @@ pub struct ChainState {
 // It should be replaced once we swap out ChainState's type definitions with SSZ type definitions
 // which defines all of this more rigorously
 #[derive(BorshSerialize)]
-pub struct HashedChainState {
+struct HashedChainState {
     accepted_l2_blocks_hash: Buf32,
     l1_state_hash: Buf32,
     pending_withdraws_hash: Buf32,
     exec_env_hash: Buf32,
     operators_hash: Buf32,
     deposits_hash: Buf32,
-}
-
-impl HashedChainState {
-    fn from(state: &ChainState) -> Self {
-        let accepted_l2_blocks_buf =
-            borsh::to_vec(&state.l1_state).expect("ChainState: serialize accepted_l2_blocks");
-        let accepted_l2_blocks_hash = hash::raw(&accepted_l2_blocks_buf);
-
-        let l1_state_buf = borsh::to_vec(&state.l1_state).expect("ChainState: serialize l1_state");
-        let l1_state_hash = hash::raw(&l1_state_buf);
-
-        let pending_withdrawals_buf = borsh::to_vec(&state.pending_withdraws)
-            .expect("ChainState: serialize pending_withdraws");
-        let pending_withdraws_hash = hash::raw(&pending_withdrawals_buf);
-
-        let exec_env_buf =
-            borsh::to_vec(&state.exec_env_state).expect("ChainState: serialize exec_env_state");
-        let exec_env_hash = hash::raw(&exec_env_buf);
-
-        let operators_buf =
-            borsh::to_vec(&state.operator_table).expect("ChainState: serialize operator_table");
-        let operators_hash = hash::raw(&operators_buf);
-
-        let deposits_buf =
-            borsh::to_vec(&state.deposits_table).expect("ChainState: serialize deposit_table");
-        let deposits_hash = hash::raw(&deposits_buf);
-
-        HashedChainState {
-            accepted_l2_blocks_hash,
-            l1_state_hash,
-            pending_withdraws_hash,
-            exec_env_hash,
-            operators_hash,
-            deposits_hash,
-        }
-    }
-
-    fn hash(&self) -> Buf32 {
-        let buf = borsh::to_vec(&self).expect("HashedChainState");
-        hash::raw(&buf)
-    }
 }
 
 impl ChainState {
@@ -115,7 +74,15 @@ impl ChainState {
     }
 
     pub fn state_root(&self) -> Buf32 {
-        HashedChainState::from(&self).hash()
+        let hashed_state = HashedChainState {
+            accepted_l2_blocks_hash: compute_borsh_hash(&self.accepted_l2_blocks),
+            l1_state_hash: compute_borsh_hash(&self.l1_state),
+            pending_withdraws_hash: compute_borsh_hash(&self.pending_withdraws),
+            exec_env_hash: compute_borsh_hash(&self.exec_env_state),
+            operators_hash: compute_borsh_hash(&self.operator_table),
+            deposits_hash: compute_borsh_hash(&self.deposits_table),
+        };
+        compute_borsh_hash(&hashed_state)
     }
 }
 
@@ -141,9 +108,10 @@ mod tests {
         let root = state.state_root();
 
         let expected = Buf32::from([
-            153, 10, 153, 6, 60, 63, 93, 172, 107, 96, 191, 234, 236, 220, 132, 129, 141, 255, 71,
-            58, 94, 244, 66, 69, 30, 42, 21, 26, 55, 50, 87, 72,
+            204, 67, 212, 125, 147, 105, 49, 245, 74, 231, 31, 227, 7, 182, 25, 145, 169, 240, 161,
+            198, 228, 211, 168, 197, 252, 140, 251, 190, 127, 139, 180, 201,
         ]);
+
         assert_eq!(root, expected);
     }
 }
