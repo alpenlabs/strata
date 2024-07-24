@@ -1,15 +1,17 @@
 use risc0_zkvm::guest::env;
 
-// use revm::InMemoryDB;
-// use zkvm_primitives::SP1RethInput;
+use revm::InMemoryDB;
+use zkvm_primitives::db::InMemoryDBHelper;
+use zkvm_primitives::{db, SP1RethInput};
 
 const ENCODED_IP: &[u8] = include_bytes!("../1.bin");
 
 fn main() {
     // TODO: Implement your guest code here
-    // let mut input: SP1RethInput = bincode::deserialize(ENCODED_IP).unwrap();
+    let mut input: SP1RethInput = bincode::deserialize(ENCODED_IP).unwrap();
 
-    // let db = InMemoryDB::
+    // Initialize the database.
+    let db = InMemoryDB::initialize(&mut input).unwrap();
 
     // read the input
     // let db = InMemoryDB::initialize(&mut input).unwrap();
