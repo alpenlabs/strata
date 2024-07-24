@@ -71,6 +71,11 @@ impl ClientState {
         &mut self.local_l1_view
     }
 
+    /// Overwrites the sync state.
+    pub fn set_sync_state(&mut self, ss: SyncState) {
+        self.sync_state = Some(ss);
+    }
+
     /// Returns a mut ref to the inner sync state.  Only valid if we've observed
     /// genesis.  Only meant to be called when applying sync writes.
     pub fn expect_sync_mut(&mut self) -> &mut SyncState {

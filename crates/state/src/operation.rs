@@ -102,8 +102,7 @@ pub fn apply_writes_to_state(
             Replace(cs) => *state = *cs,
 
             ReplaceSync(nss) => {
-                let ss = state.expect_sync_mut();
-                *ss = *nss;
+                state.set_sync_state(*nss);
             }
 
             ActivateChain => {
