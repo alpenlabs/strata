@@ -803,6 +803,7 @@ dependencies = [
  "reth-primitives",
  "serde",
  "sha2 0.10.8",
+ "ssz_rs",
  "tree_hash",
  "tree_hash_derive",
 ]
@@ -864,6 +865,7 @@ dependencies = [
  "ethereum_ssz_derive",
  "num_enum",
  "sha2 0.10.8",
+ "ssz_rs",
  "tree_hash",
  "tree_hash_derive",
 ]
@@ -9250,6 +9252,31 @@ name = "sptr"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3b9b39299b249ad65f3b7e96443bad61c02ca5cd3589f46cb6d610a0fd6c0d6a"
+
+[[package]]
+name = "ssz_rs"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "057291e5631f280978fa9c8009390663ca4613359fc1318e36a8c24c392f6d1f"
+dependencies = [
+ "bitvec",
+ "hex",
+ "num-bigint 0.4.6",
+ "serde",
+ "sha2 0.9.9",
+ "ssz_rs_derive",
+]
+
+[[package]]
+name = "ssz_rs_derive"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f07d54c4d01a1713eb363b55ba51595da15f6f1211435b71466460da022aa140"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+]
 
 [[package]]
 name = "stable_deref_trait"

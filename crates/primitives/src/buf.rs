@@ -10,6 +10,9 @@ use reth_primitives::alloy_primitives::FixedBytes;
 use ssz::{Decode, DecodeError, Encode};
 use tree_hash::{Hash256, PackedEncoding, TreeHash, TreeHashType, HASHSIZE};
 
+use ssz_rs::{Deserialize, Merkleized, Node, Serialize, SimpleSerialize, Sized as SSZSized};
+use ssz_rs::{DeserializeError, MerkleizationError, SerializeError};
+
 // 20-byte buf
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct Buf20(pub FixedBytes<20>);
@@ -292,6 +295,48 @@ impl TreeHash for Buf32 {
     #[allow(clippy::cast_lossless)] // Lint does not apply to all uses of this macro.
     fn tree_hash_root(&self) -> Hash256 {
         Hash256::from_slice(&self.0 .0)
+    }
+}
+
+impl Serialize for Buf32 {
+    fn serialize(&self, buffer: &mut Vec<u8>) -> Result<usize, SerializeError> {
+        buffer.extend_from_slice(&self.0 .0);
+        Ok(32)
+    }
+}
+
+impl Deserialize for Buf32 {
+    fn deserialize(encoding: &[u8]) -> Result<Self, DeserializeError> {
+        if encoding.len() != 32 {
+            return Err(DeserializeError::InvalidType(
+                ssz_rs::TypeError::InvalidBound(32),
+            ));
+        }
+        let mut inner = [0u8; 32];
+        inner.copy_from_slice(encoding);
+        Ok(Buf32(FixedBytes(inner)))
+    }
+}
+
+impl SSZSized for Buf32 {
+    fn is_variable_size() -> bool {
+        false
+    }
+
+    fn size_hint() -> usize {
+        32
+    }
+}
+
+impl Merkleized for Buf32 {
+    fn hash_tree_root(&mut self) -> Result<Node, MerkleizationError> {
+        Ok(Node::try_from(self.0.as_ref()).unwrap())
+    }
+}
+
+impl SimpleSerialize for Buf32 {
+    fn is_composite_type() -> bool {
+        false // Buf32 is a basic type, not a composite type
     }
 }
 
