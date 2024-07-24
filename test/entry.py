@@ -2,8 +2,6 @@
 
 import logging as log
 import os
-import secrets
-import string
 import sys
 import time
 from threading import Thread
@@ -15,8 +13,7 @@ import seqrpc
 
 BD_USERNAME = "alpen"
 BD_PASSWORD = "alpen"
-LETTERS = string.ascii_lowercase
-DATADIR_NAME_LENGTH = 10
+DD_ROOT = "_dd"
 
 
 def generate_seqkey() -> bytes:
@@ -56,13 +53,11 @@ def generate_task(rpc: BitcoindClient, wait_dur, addr):
 
 
 class BitcoinFactory(flexitest.Factory):
-    def __init__(self, datadir_pfx: str, port_range: list[int]):
-        super().__init__(datadir_pfx, port_range)
+    def __init__(self, port_range: list[int]):
+        super().__init__(port_range)
 
-    def create_regtest_bitcoin(self) -> flexitest.Service:
-        datadir_name = "".join(secrets.choice(LETTERS) for i in range(DATADIR_NAME_LENGTH))
-        log.warning(f"Using {datadir_name} as the datadir for bitcoin regtest")
-        datadir = self.create_datadir(f"bitcoin_{datadir_name}")
+    def create_regtest_bitcoin(self, ctx: flexitest.EnvContext) -> flexitest.Service:
+        datadir = ctx.make_service_dir("bitcoin")
         p2p_port = self.next_port()
         rpc_port = self.next_port()
         logfile = os.path.join(datadir, "service.log")
@@ -97,15 +92,13 @@ class BitcoinFactory(flexitest.Factory):
 
 
 class VertexFactory(flexitest.Factory):
-    def __init__(self, datadir_pfx: str, port_range: list[int]):
-        super().__init__(datadir_pfx, port_range)
+    def __init__(self, port_range: list[int]):
+        super().__init__(port_range)
 
     def create_sequencer(
-        self, bitcoind_sock: str, bitcoind_user: str, bitcoind_pass: str
+        self, bitcoind_sock: str, bitcoind_user: str, bitcoind_pass: str, ctx: flexitest.EnvContext
     ) -> flexitest.Service:
-        datadir_name = "".join(secrets.choice(LETTERS) for i in range(DATADIR_NAME_LENGTH))
-        log.warning(f"Using {datadir_name} as the datadir for sequencer")
-        datadir = self.create_datadir(f"seq_{datadir_name}")
+        datadir = ctx.make_service_dir("sequencer")
         rpc_port = self.next_port()
         logfile = os.path.join(datadir, "service.log")
 
@@ -146,11 +139,11 @@ class VertexFactory(flexitest.Factory):
 
 class BasicEnvConfig(flexitest.EnvConfig):
     def __init__(self):
-        pass
+        super().__init__()
 
-    def init(self, facs: dict) -> flexitest.LiveEnv:
-        btc_fac = facs["bitcoin"]
-        seq_fac = facs["sequencer"]
+    def init(self, ctx: flexitest.EnvContext) -> flexitest.LiveEnv:
+        btc_fac = ctx.get_factory("bitcoin")
+        seq_fac = ctx.get_factory("sequencer")
 
         bitcoind = btc_fac.create_regtest_bitcoin()
         time.sleep(0.5)
@@ -177,10 +170,10 @@ def main(argv):
 
     tests = [argv[1]] if len(argv) > 1 else flexitest.runtime.load_candidate_modules(modules)
 
-    datadir_root = flexitest.create_datadir_in_workspace(os.path.join(test_dir, "_dd"))
+    datadir_root = flexitest.create_datadir_in_workspace(os.path.join(test_dir, DD_ROOT))
 
-    btc_fac = BitcoinFactory(datadir_root, [12300 + i for i in range(20)])
-    seq_fac = VertexFactory(datadir_root, [12400 + i for i in range(20)])
+    btc_fac = BitcoinFactory([12300 + i for i in range(20)])
+    seq_fac = VertexFactory([12400 + i for i in range(20)])
 
     factories = {"bitcoin": btc_fac, "sequencer": seq_fac}
     envs = {
@@ -192,7 +185,10 @@ def main(argv):
     rt.prepare_registered_tests()
 
     results = rt.run_tests(tests)
+    rt.save_json_file("results.json", results)
     flexitest.dump_results(results)
+
+    flexitest.fail_on_error(results)
 
     return 0
 
