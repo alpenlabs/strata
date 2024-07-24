@@ -4,7 +4,7 @@ use zkvm::{ProverOptions, ZKVMHost};
 
 fn main() {
     let pops = ProverOptions {
-        use_mock_prover: false,
+        // use_mock_prover: false,
         ..Default::default()
     };
     let prover = RiscZeroHost::init(GUEST_RETH_STF_ELF.into(), pops);
