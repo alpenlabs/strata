@@ -5,7 +5,9 @@
 use std::sync::Arc;
 use std::thread;
 
-use tokio::sync::{broadcast, mpsc};
+use alpen_vertex_state::client_state::ClientState;
+use alpen_vertex_state::header::L2Header;
+use tokio::sync::{broadcast, mpsc, watch};
 use tracing::*;
 
 use alpen_vertex_db::traits::{Database, L2DataProvider};
@@ -70,6 +72,7 @@ pub fn start_sync_tasks<
     engine: Arc<E>,
     pool: Arc<threadpool::ThreadPool>,
     params: Arc<Params>,
+    cl_state_tx: watch::Sender<Option<ClientState>>,
 ) -> anyhow::Result<SyncManager> {
     // Create channels.
     let (ctm_tx, ctm_rx) = mpsc::channel::<ForkChoiceMessage>(64);
@@ -79,53 +82,65 @@ pub fn start_sync_tasks<
     // TODO should this be in an `Arc`?  it's already fairly compact so we might
     // not be benefitting from the reduced cloning
     let (cupdate_tx, cupdate_rx) = broadcast::channel::<Arc<ClientUpdateNotif>>(64);
+    let my_db = database.clone();
+    let my_params = params.clone();
+    let my_csm_ctl = csm_ctl.clone();
 
-    // Check if we have to do genesis.
-    if genesis::check_needs_genesis(database.as_ref())? {
-        info!("we need to do genesis!");
-        genesis::init_genesis_states(&params, database.as_ref())?;
-    }
+    // Check for genesis, init consensus worker and init the chain tracker
+    // XXX THIS SHOULD NOT BE RUNNING IN A SEPARATE THREAD.
+    // TODO make this not run in a separate thread
+    thread::spawn(move || -> anyhow::Result<()> {
+        // Check if we have to do genesis.
+        if genesis::check_needs_genesis(my_db.as_ref())? {
+            info!("we need to do genesis!");
+            genesis::init_genesis_states(&my_params, my_db.as_ref())?;
+        }
 
-    // Init the consensus worker state and get the current state from it.
-    let cw_state = worker::WorkerState::open(params.clone(), database.clone(), cupdate_tx)?;
-    let cur_state = cw_state.cur_state().clone();
-    let cur_tip_blkid = *cur_state.chain_tip_blkid();
-    let fin_tip_blkid = *cur_state.finalized_blkid();
+        // Init the consensus worker state and get the current state from it.
+        let cw_state = worker::WorkerState::open(my_params.clone(), database.clone(), cupdate_tx)?;
+        let cur_state = cw_state.cur_state().clone();
+        let cur_tip_blkid = *cur_state.chain_tip_blkid();
+        let fin_tip_blkid = *cur_state.finalized_blkid();
 
-    // Get the block's index.
-    let l2_prov = database.l2_provider();
-    let tip_block = l2_prov
-        .get_block_data(cur_tip_blkid)?
-        .ok_or(errors::Error::MissingL2Block(cur_tip_blkid))?;
-    let cur_tip_index = tip_block.header().blockidx();
+        // Get the block's index.
+        let l2_prov = my_db.l2_provider();
+        let tip_block = l2_prov
+            .get_block_data(cur_tip_blkid)?
+            .ok_or(errors::Error::MissingL2Block(cur_tip_blkid))?;
+        let cur_tip_index = tip_block.header().blockidx();
 
-    let fin_block = l2_prov
-        .get_block_data(fin_tip_blkid)?
-        .ok_or(errors::Error::MissingL2Block(fin_tip_blkid))?;
-    let fin_tip_index = fin_block.header().blockidx();
+        let fin_block = l2_prov
+            .get_block_data(fin_tip_blkid)?
+            .ok_or(errors::Error::MissingL2Block(fin_tip_blkid))?;
+        let fin_tip_index = fin_block.header().blockidx();
 
-    // Init the chain tracker from the state we figured out.
-    let mut chain_tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(fin_tip_blkid);
-    chain_tracker.load_unfinalized_blocks(fin_tip_index + 1, l2_prov.as_ref())?;
-    let ct_state = fork_choice_manager::ForkChoiceManager::new(
-        params.clone(),
-        database.clone(),
-        cur_state,
-        chain_tracker,
-        cur_tip_blkid,
-        cur_tip_index,
-    );
+        // Init the chain tracker from the state we figured out.
+        let mut chain_tracker =
+            unfinalized_tracker::UnfinalizedBlockTracker::new_empty(fin_tip_blkid);
+        chain_tracker.load_unfinalized_blocks(fin_tip_index + 1, l2_prov.as_ref())?;
+        let ct_state = fork_choice_manager::ForkChoiceManager::new(
+            my_params.clone(),
+            database.clone(),
+            cur_state,
+            chain_tracker,
+            cur_tip_blkid,
+            cur_tip_index,
+        );
 
-    // Start core threads.
-    // TODO set up watchdog for these things
-    let eng_ct = engine.clone();
-    let eng_cw = engine.clone();
-    let ctl_ct = csm_ctl.clone();
-    let ct_handle =
-        thread::spawn(|| fork_choice_manager::tracker_task(ct_state, eng_ct, ctm_rx, ctl_ct));
-    let cw_handle = thread::spawn(|| worker::consensus_worker_task(cw_state, eng_cw, csm_rx));
+        // Start core threads.
+        // TODO set up watchdog for these things
+        let eng_ct = engine.clone();
+        let ctl_ct = my_csm_ctl.clone();
+        let _ct_handle =
+            thread::spawn(|| fork_choice_manager::tracker_task(ct_state, eng_ct, ctm_rx, ctl_ct));
 
-    // TODO do something with the handles
+        let eng_cw = engine.clone();
+        let _cw_handle =
+            thread::spawn(|| worker::consensus_worker_task(cw_state, eng_cw, csm_rx, cl_state_tx));
+
+        // TODO do something with the handles
+        Ok(())
+    });
 
     Ok(SyncManager {
         params,

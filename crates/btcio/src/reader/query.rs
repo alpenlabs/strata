@@ -1,15 +1,17 @@
 use std::collections::VecDeque;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{self, Duration};
 
+use alpen_vertex_primitives::l1::L1Status;
 use anyhow::bail;
 use bitcoin::{Block, BlockHash};
-use tokio::sync::mpsc;
-use tracing::instrument::WithSubscriber;
+use tokio::sync::{mpsc, RwLock};
 use tracing::*;
 
 use super::config::ReaderConfig;
 use super::messages::{BlockData, L1Event};
+use crate::rpc::types::RpcBlockchainInfo;
+use crate::status::{apply_status_updates, StatusUpdate};
 use crate::rpc::traits::L1Client;
 
 fn filter_interesting_txs(block: &Block) -> Vec<u32> {
@@ -57,6 +59,7 @@ impl ReaderState {
         ret
     }
 
+    #[allow(unused)]
     /// Gets the blockhash of the given height, if we have it.
     pub fn get_height_blkid(&self, height: u64) -> Option<&BlockHash> {
         if height > self.cur_height {
@@ -71,7 +74,7 @@ impl ReaderState {
         let idx = self.recent_blocks.len() as u64 - back_off - 1;
         Some(&self.recent_blocks[idx as usize])
     }
-
+    #[allow(unused)]
     fn deepest_block(&self) -> u64 {
         self.cur_height - self.recent_blocks.len() as u64 - 1
     }
@@ -125,8 +128,20 @@ pub async fn bitcoin_data_reader_task(
     event_tx: mpsc::Sender<L1Event>,
     cur_block_height: u64,
     config: Arc<ReaderConfig>,
+    l1_status: Arc<RwLock<L1Status>>,
 ) {
-    if let Err(e) = do_reader_task(&client, &event_tx, cur_block_height, config).await {
+    let mut status_updates = Vec::new();
+    if let Err(e) = do_reader_task(
+        &client,
+        &event_tx,
+        cur_block_height,
+        config,
+        &mut status_updates,
+        l1_status.clone()
+
+    )
+    .await
+    {
         error!(err = %e, "reader task exited");
     }
 }
@@ -136,8 +151,11 @@ async fn do_reader_task(
     event_tx: &mpsc::Sender<L1Event>,
     cur_block_height: u64,
     config: Arc<ReaderConfig>,
+    status_updates: &mut Vec<StatusUpdate>,
+    l1_status: Arc<RwLock<L1Status>>
 ) -> anyhow::Result<()> {
     info!(%cur_block_height, "started L1 reader task!");
+    
 
     let poll_dur = Duration::from_millis(config.client_poll_dur_ms as u64);
 
@@ -150,23 +168,41 @@ async fn do_reader_task(
     let best_blkid = state.best_block();
     info!(%best_blkid, "initialized L1 reader state");
 
+    let current_time = time::Instant::now(); 
     // FIXME This function will return when reorg happens when there are not
     // enough elements in the vec deque, probably during startup.
     loop {
         let cur_height = state.cur_height;
         let poll_span = debug_span!("l1poll", %cur_height);
 
-        match poll_for_new_blocks(client, &event_tx, &config, &mut state)
+
+        if let Err(err) = poll_for_new_blocks(client, &event_tx, &config, &mut state, status_updates)
             .instrument(poll_span)
             .await
         {
-            Ok(_) => {}
-            Err(e) => {
-                warn!(%cur_height, err = %e, "failed to poll Bitcoin client");
-            }
+                warn!(%cur_height, err = %err, "failed to poll Bitcoin client");
+                status_updates.push(StatusUpdate::RpcError(err.to_string()));
+
+                if let Some(err) = err.downcast_ref::<reqwest::Error>() {
+                    // recoverable errors 
+                    if err.is_connect() {
+                        status_updates.push(StatusUpdate::RpcConnected(false));
+                    }
+                    // unrecoverable errors
+                    if err.is_builder() {
+                        panic!("btcio: couldn't build the L1 client");
+                    }
+                }
         }
 
         tokio::time::sleep(poll_dur).await;
+
+        status_updates.push(
+            StatusUpdate::LastUpdate(
+                current_time.elapsed().as_millis() as u64
+            ));
+
+        apply_status_updates(&status_updates, l1_status.clone()).await;
     }
 }
 
@@ -205,12 +241,19 @@ async fn init_reader_state(
 async fn poll_for_new_blocks(
     client: &impl L1Client,
     event_tx: &mpsc::Sender<L1Event>,
-    config: &ReaderConfig,
+    _config: &ReaderConfig,
     state: &mut ReaderState,
+    status_updates: &mut Vec<StatusUpdate>,
 ) -> anyhow::Result<()> {
+
     let chain_info = client.get_blockchain_info().await?;
+    status_updates.push(StatusUpdate::RpcConnected(true));
     let client_height = chain_info.blocks;
     let fresh_best_block = chain_info.bestblockhash();
+
+    status_updates.push(StatusUpdate::CurHeight(client_height));
+    status_updates.push(StatusUpdate::CurTip(fresh_best_block.to_string()));
+
     if fresh_best_block == *state.best_block() {
         trace!("polled client, nothing to do");
         return Ok(());
@@ -237,7 +280,7 @@ async fn poll_for_new_blocks(
     // Now process each block we missed.
     let scan_start_height = state.cur_height + 1;
     for fetch_height in scan_start_height..=client_height {
-        let blkid = match fetch_and_process_block(fetch_height, client, event_tx, state).await {
+        let blkid = match fetch_and_process_block(fetch_height, client, event_tx, state, status_updates).await {
             Ok(b) => b,
             Err(e) => {
                 warn!(%fetch_height, err = %e, "failed to fetch new block");
@@ -277,6 +320,7 @@ async fn fetch_and_process_block(
     client: &impl L1Client,
     event_tx: &mpsc::Sender<L1Event>,
     state: &mut ReaderState,
+    status_updates: &mut Vec<StatusUpdate>
 ) -> anyhow::Result<BlockHash> {
     let block = client.get_block_at(height).await?;
 
@@ -284,6 +328,8 @@ async fn fetch_and_process_block(
     let block_data = BlockData::new(height, block, filtered_txs);
     let blkid = block_data.block().block_hash();
 
+    status_updates.push(StatusUpdate::CurHeight(height));
+    status_updates.push(StatusUpdate::CurTip(blkid.to_string()));
     if let Err(e) = event_tx.send(L1Event::BlockData(block_data)).await {
         error!("failed to submit L1 block event, did the persistence task crash?");
         return Err(e.into());

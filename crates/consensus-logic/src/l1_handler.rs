@@ -9,7 +9,7 @@ use tracing::*;
 use alpen_vertex_btcio::reader::messages::L1Event;
 use alpen_vertex_db::traits::L1DataStore;
 use alpen_vertex_primitives::buf::Buf32;
-use alpen_vertex_primitives::{l1::L1BlockManifest, utils::generate_l1_tx};
+use alpen_vertex_primitives::l1::L1BlockManifest;
 use alpen_vertex_state::sync_event::SyncEvent;
 
 use crate::ctl::CsmController;
@@ -33,7 +33,11 @@ where
     Ok(())
 }
 
-fn handle_event<L1D>(event: L1Event, l1db: &L1D, csm_ctl: &CsmController) -> anyhow::Result<()>
+fn handle_event<L1D>(
+    event: L1Event,
+    l1db: &L1D,
+    csm_ctl: &CsmController,
+) -> anyhow::Result<()>
 where
     L1D: L1DataStore + Sync + Send + 'static,
 {
@@ -64,7 +68,6 @@ where
             .collect();*/
             let l1txs = Vec::new();
             let num_txs = l1txs.len();
-
             l1db.put_block_data(blockdata.block_num(), manifest, l1txs)?;
             info!(%l1blkid, txs = %num_txs, "wrote L1 block manifest");
 
@@ -72,6 +75,7 @@ where
             let blkid: Buf32 = blockdata.block().block_hash().into();
             let ev = SyncEvent::L1Block(blockdata.block_num(), blkid.into());
             csm_ctl.submit_event(ev)?;
+
 
             Ok(())
         }

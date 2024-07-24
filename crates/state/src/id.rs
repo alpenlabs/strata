@@ -33,6 +33,12 @@ impl From<L2BlockId> for Buf32 {
     }
 }
 
+impl AsRef<[u8; 32]> for L2BlockId {
+    fn as_ref(&self) -> &[u8; 32] {
+        self.0.as_ref()
+    }
+}
+
 impl fmt::Debug for L2BlockId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(&self.0, f)

@@ -1,3 +1,5 @@
+use std::{sync::Arc, thread, time::Duration};
+
 use tracing::*;
 
 use alpen_vertex_db::{
@@ -9,18 +11,44 @@ use alpen_vertex_db::{
 };
 use alpen_vertex_primitives::{
     buf::{Buf32, Buf64},
+    l1::L1BlockManifest,
     params::Params,
 };
 use alpen_vertex_state::{
     block::{ExecSegment, L1Segment},
-    block_template,
     chain_state::ChainState,
     client_state::ClientState,
     exec_env::ExecEnvState,
-    exec_update::{self, ExecUpdate, UpdateInput, UpdateOutput},
+    exec_update::{ExecUpdate, UpdateInput, UpdateOutput},
+    header::L2BlockHeader,
     l1::{L1HeaderRecord, L1ViewState},
     prelude::*,
 };
+
+const MAX_HORIZON_POLL_RETRIES: u64 = 10;
+const MAX_HORIZON_POLL_INTERVAL: u64 = 1000;
+
+fn poll_horizon_l1_block<D: Database>(
+    l1_prov: Arc<D::L1Prov>,
+    horizon_blk_height: u64,
+) -> anyhow::Result<L1BlockManifest> {
+    // Fetch the horizon L1 block to construct the genesis L1 segment.
+
+    let mut retries = 0;
+    loop {
+        if let Some(mf) = l1_prov.get_block_manifest(horizon_blk_height)? {
+            return Ok(mf);
+        }
+        thread::sleep(Duration::from_millis(MAX_HORIZON_POLL_INTERVAL));
+        if retries > MAX_HORIZON_POLL_RETRIES {
+            break;
+        }
+        retries += 1;
+    }
+    return Err(anyhow::anyhow!(
+        "Max retries exceeded for polling horizon l1 block"
+    ));
+}
 
 /// Inserts approprate records into the database to prepare it for syncing the
 /// rollup.  Requires that the horizon block header is present in the database.
@@ -40,13 +68,11 @@ pub fn init_genesis_states<D: Database>(params: &Params, database: &D) -> anyhow
     // Build the genesis block and genesis consensus states.
     let gblock = make_genesis_block(params, geu);
     let genesis_blkid = gblock.header().get_blockid();
-    trace!(?genesis_blkid, "created genesis block");
+    info!(?genesis_blkid, "created genesis block");
 
-    // Fetch the horizon L1 block to construct the genesis L1 segment.
     let l1_prov = database.l1_provider();
-    let horizon_blkmf = l1_prov
-        .get_block_manifest(horizon_blk_height)?
-        .ok_or(anyhow::anyhow!("missing L1 horizon block manifest"))?;
+    let horizon_blkmf = poll_horizon_l1_block::<D>(l1_prov.clone(), horizon_blk_height)?;
+
     let horizon_blk_rec = L1HeaderRecord::from(&horizon_blkmf);
     let l1vs = L1ViewState::new_at_horizon(horizon_blk_height, horizon_blk_rec);
 
@@ -74,23 +100,20 @@ fn make_genesis_block(params: &Params, genesis_update: ExecUpdate) -> L2Block {
 
     let body = L2BlockBody::new(l1_seg, exec_seg);
 
-    // Assemble the genesis header template, pulling in data from whatever
+    // Assemble the genesis header core, pulling in data from whatever
     // sources we need.
     // FIXME this isn't the right timestamp to start the blockchain, this should
     // definitely be pulled from the database or the rollup parameters maybe
     let genesis_ts = params.rollup().l1_start_block_height;
     let zero_blkid = L2BlockId::from(Buf32::zero());
     let genesis_sr = Buf32::zero();
-    let tmplt =
-        block_template::create_header_template(0, genesis_ts, zero_blkid, &body, genesis_sr);
-
-    let gheader = tmplt.complete_with(Buf64::zero());
-
-    L2Block::new(gheader, body)
+    let header = L2BlockHeader::new(0, genesis_ts, zero_blkid, &body, genesis_sr);
+    let signed_genesis_header = SignedL2BlockHeader::new(header, Buf64::zero());
+    L2Block::new(signed_genesis_header, body)
 }
 
 fn make_genesis_client_state(
-    gblock: &L2Block,
+    _gblock: &L2Block,
     gchstate: &ChainState,
     params: &Params,
 ) -> ClientState {

@@ -3,8 +3,14 @@ use std::time::Duration;
 use std::{fmt::Display, str::FromStr};
 
 use async_trait::async_trait;
-use bitcoin::hashes::Hash;
 use bitcoin::Txid;
+
+use anyhow::anyhow;
+use base64::engine::general_purpose;
+use base64::Engine;
+use bitcoin::hashes::sha256d::Hash;
+use bitcoin::hashes::Hash as _;
+// use async_recursion::async_recursion;
 use bitcoin::{
     block::{Header, Version},
     consensus::deserialize,
@@ -18,11 +24,14 @@ use serde_json::{json, to_value, value::RawValue, value::Value};
 use tracing::*;
 
 use super::{
-    traits::{L1Client, SeqL1Client},
-    types::{GetTransactionResponse, RawUTXO, RpcBlockchainInfo},
+    traits::SeqL1Client,
+    types::GetTransactionResponse,
 };
 
 use thiserror::Error;
+
+use super::traits::L1Client;
+use super::types::{RawUTXO, RpcBlockchainInfo};
 
 const MAX_RETRIES: u32 = 3;
 
@@ -127,11 +136,14 @@ type ClientResult<T> = Result<T, ClientError>;
 impl BitcoinClient {
     pub fn new(url: String, username: String, password: String, network: Network) -> Self {
         let mut headers = HeaderMap::new();
+        let mut user_pw = String::new();
+        general_purpose::STANDARD.encode_string(format!("{}:{}", username, password), &mut user_pw);
+            
         headers.insert(
             "Authorization",
             format!(
                 "Basic {}",
-                base64::encode(format!("{}:{}", username, password))
+                user_pw 
             )
             .parse()
             .expect("Failed to parse auth header!"),
@@ -187,6 +199,7 @@ impl BitcoinClient {
                         .json::<Response<T>>()
                         .await
                         .map_err(|e| ClientError::RPCError(e.to_string()))?;
+
                     if let Some(err) = data.error {
                         return Err(ClientError::RPCError(err.to_string()));
                     }

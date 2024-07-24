@@ -1,5 +1,7 @@
 #![allow(unused)]
 
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use jsonrpsee::{
     core::RpcResult,
@@ -13,10 +15,14 @@ use reth_rpc_types::{
     StateContext, SyncInfo, SyncStatus, Transaction, TransactionRequest, Work,
 };
 use thiserror::Error;
-use tokio::sync::{oneshot, Mutex};
-use tracing::*;
+use tokio::sync::{oneshot, watch, Mutex, RwLock};
 
-use alpen_vertex_rpc_api::{AlpenApiServer, L1Status};
+use alpen_vertex_db::traits::Database;
+use alpen_vertex_db::traits::L1DataProvider;
+use alpen_vertex_rpc_api::{AlpenApiServer, ClientStatus, L1Status};
+use alpen_vertex_state::client_state::ClientState;
+
+use tracing::*;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -27,6 +33,9 @@ pub enum Error {
 
     #[error("not yet implemented")]
     Unimplemented,
+
+    #[error("client not started")]
+    ClientNotStarted,
 
     /// Generic internal error message.  If this is used often it should be made
     /// into its own error type.
@@ -42,10 +51,11 @@ pub enum Error {
 impl Error {
     pub fn code(&self) -> i32 {
         match self {
-            Self::Unsupported => 1001,
-            Self::Unimplemented => 1002,
-            Self::Other(_) => 1100,
-            Self::OtherEx(_, _) => 1101,
+            Self::Unsupported => -32600,
+            Self::Unimplemented => -32601,
+            Self::Other(_) => -32000,
+            Self::ClientNotStarted => -32001,
+            Self::OtherEx(_, _) => -32000,
         }
     }
 }
@@ -60,21 +70,34 @@ impl Into<ErrorObjectOwned> for Error {
     }
 }
 
-pub struct AlpenRpcImpl {
-    // TODO
+pub struct AlpenRpcImpl<D> {
+    l1_status: Arc<RwLock<alpen_vertex_primitives::l1::L1Status>>,
+    database: Arc<D>,
+    client_state_rx: watch::Receiver<Option<ClientState>>,
     stop_tx: Mutex<Option<oneshot::Sender<()>>>,
 }
 
-impl AlpenRpcImpl {
-    pub fn new(stop_tx: oneshot::Sender<()>) -> Self {
+impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
+    pub fn new(
+        l1_status: Arc<RwLock<alpen_vertex_primitives::l1::L1Status>>,
+        database: Arc<D>,
+        client_state_rx: watch::Receiver<Option<ClientState>>,
+        stop_tx: oneshot::Sender<()>,
+    ) -> Self {
         Self {
+            l1_status,
+            database,
+            client_state_rx,
             stop_tx: Mutex::new(Some(stop_tx)),
         }
     }
 }
 
 #[async_trait]
-impl AlpenApiServer for AlpenRpcImpl {
+impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D>
+where
+    <D as alpen_vertex_db::traits::Database>::L1Prov: Send + Sync + 'static,
+{
     async fn protocol_version(&self) -> RpcResult<u64> {
         Ok(1)
     }
@@ -90,12 +113,49 @@ impl AlpenApiServer for AlpenRpcImpl {
     }
 
     async fn get_l1_status(&self) -> RpcResult<L1Status> {
-        // TODO implement this
-        warn!("alp_l1status not yet implemented");
+        let btcio_status = self.l1_status.read().await.clone();
+
         Ok(L1Status {
-            cur_height: 0,
-            cur_tip_blkid: String::new(),
-            last_update: 0,
+            bitcoin_rpc_connected: btcio_status.bitcoin_rpc_connected,
+            cur_height: btcio_status.cur_height,
+            cur_tip_blkid: btcio_status.cur_tip_blkid,
+            last_update: btcio_status.last_update,
+            last_rpc_error: btcio_status.last_rpc_error,
         })
+    }
+
+    async fn get_l1_connection_status(&self) -> RpcResult<bool> {
+        Ok(self.l1_status.read().await.bitcoin_rpc_connected)
+    }
+
+    async fn get_l1_block_hash(&self, height: u64) -> RpcResult<String> {
+        let block_manifest = self
+            .database
+            .l1_provider()
+            .get_block_manifest(height)
+            .unwrap()
+            .unwrap();
+
+        Ok(format!("{:?}", block_manifest.block_hash()))
+    }
+
+    async fn get_client_status(&self) -> RpcResult<ClientStatus> {
+        // FIXME this is somewhat ugly but when we restructure the client state
+        // this will be a lot nicer
+        if let Some(status) = self.client_state_rx.borrow().as_ref() {
+            let Some(last_l1) = status.recent_l1_block() else {
+                warn!("last L1 block not set in client state, returning still not started");
+                return Err(Error::ClientNotStarted.into());
+            };
+
+            Ok(ClientStatus {
+                chain_tip: *status.chain_tip_blkid().as_ref(),
+                finalized_blkid: *status.finalized_blkid().as_ref(),
+                last_l1_block: *last_l1.as_ref(),
+                buried_l1_height: status.buried_l1_height(),
+            })
+        } else {
+            Err(Error::ClientNotStarted.into())
+        }
     }
 }

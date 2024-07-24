@@ -7,7 +7,7 @@ use crate::errors::TsnError;
 
 /// Processes a block, producing a write batch for the block to produce a new
 /// chainstate.
-pub fn process_block(state: &ChainState, block: &L2Block) -> Result<WriteBatch, TsnError> {
+pub fn process_block(_state: &ChainState, _block: &L2Block) -> Result<WriteBatch, TsnError> {
     // TODO
     Ok(WriteBatch::new_empty())
 }

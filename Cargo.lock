@@ -709,6 +709,7 @@ dependencies = [
  "bitcoin",
  "borsh",
  "rand 0.8.5",
+ "secp256k1",
  "thiserror",
  "threadpool",
  "tokio",
@@ -799,6 +800,7 @@ dependencies = [
  "digest 0.10.7",
  "hex",
  "reth-primitives",
+ "serde",
  "sha2 0.10.8",
 ]
 
@@ -806,8 +808,12 @@ dependencies = [
 name = "alpen-vertex-rpc-api"
 version = "0.1.0"
 dependencies = [
+ "alpen-vertex-primitives",
+ "alpen-vertex-state",
+ "hex",
  "jsonrpsee",
  "serde",
+ "thiserror",
 ]
 
 [[package]]
@@ -829,6 +835,7 @@ dependencies = [
  "format_serde_error",
  "jsonrpsee",
  "parking_lot 0.12.3",
+ "reqwest 0.12.5",
  "reth-ipc",
  "reth-primitives",
  "reth-rpc-api",

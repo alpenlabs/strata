@@ -3,9 +3,9 @@
 use tokio::sync::watch;
 
 pub struct StatusTracker {
-    state_rx: watch::Receiver<()>,
+    _state_rx: watch::Receiver<()>,
 }
 
 pub struct StatusUpdater {
-    state_tx: watch::Sender<()>,
+    _state_tx: watch::Sender<()>,
 }
