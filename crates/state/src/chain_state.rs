@@ -1,6 +1,9 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
+use alpen_vertex_primitives::buf::Buf32;
+use alpen_vertex_primitives::hash::compute_borsh_hash;
+
 use crate::{bridge_ops, bridge_state, exec_env, l1};
 use crate::{id::L2BlockId, state_queue::StateQueue};
 
@@ -32,6 +35,21 @@ pub struct ChainState {
     pub(crate) deposits_table: bridge_state::DepositsTable,
 }
 
+/// Hashed Chain State. This is used to compute the state root of the [`ChainState`]
+///
+// TODO: FIXME: Note that this is used as a temporary solution for the state root calculation
+// It should be replaced once we swap out ChainState's type definitions with SSZ type definitions
+// which defines all of this more rigorously
+#[derive(BorshSerialize)]
+struct HashedChainState {
+    accepted_l2_blocks_hash: Buf32,
+    l1_state_hash: Buf32,
+    pending_withdraws_hash: Buf32,
+    exec_env_hash: Buf32,
+    operators_hash: Buf32,
+    deposits_hash: Buf32,
+}
+
 impl ChainState {
     pub fn from_genesis(
         genesis_blkid: L2BlockId,
@@ -54,6 +72,18 @@ impl ChainState {
             .copied()
             .expect("state: missing tip block")
     }
+
+    pub fn state_root(&self) -> Buf32 {
+        let hashed_state = HashedChainState {
+            accepted_l2_blocks_hash: compute_borsh_hash(&self.accepted_l2_blocks),
+            l1_state_hash: compute_borsh_hash(&self.l1_state),
+            pending_withdraws_hash: compute_borsh_hash(&self.pending_withdraws),
+            exec_env_hash: compute_borsh_hash(&self.exec_env_state),
+            operators_hash: compute_borsh_hash(&self.operator_table),
+            deposits_hash: compute_borsh_hash(&self.deposits_table),
+        };
+        compute_borsh_hash(&hashed_state)
+    }
 }
 
 impl<'a> Arbitrary<'a> for ChainState {
@@ -62,5 +92,26 @@ impl<'a> Arbitrary<'a> for ChainState {
         let l1_state = l1::L1ViewState::arbitrary(u)?;
         let exec_state = exec_env::ExecEnvState::arbitrary(u)?;
         Ok(Self::from_genesis(genesis_blkid, l1_state, exec_state))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use arbitrary::Unstructured;
+
+    use super::*;
+
+    #[test]
+    fn test_state_root_calc() {
+        let mut u = Unstructured::new(&[12u8; 50]);
+        let state = ChainState::arbitrary(&mut u).unwrap();
+        let root = state.state_root();
+
+        let expected = Buf32::from([
+            204, 67, 212, 125, 147, 105, 49, 245, 74, 231, 31, 227, 7, 182, 25, 145, 169, 240, 161,
+            198, 228, 211, 168, 197, 252, 140, 251, 190, 127, 139, 180, 201,
+        ]);
+
+        assert_eq!(root, expected);
     }
 }
