@@ -120,9 +120,9 @@ fn fill_sighash_buf(tmplt: &L2BlockHeader, buf: &mut [u8]) -> Result<(), io::Err
     cur.write_all(&tmplt.block_idx.to_be_bytes())?;
     cur.write_all(&tmplt.timestamp.to_be_bytes())?;
     cur.write_all(Buf32::from(tmplt.prev_block).as_ref())?;
-    cur.write_all(Buf32::from(tmplt.l1_segment_hash).as_ref())?;
-    cur.write_all(Buf32::from(tmplt.exec_segment_hash).as_ref())?;
-    cur.write_all(Buf32::from(tmplt.state_root).as_ref())?;
+    cur.write_all(tmplt.l1_segment_hash.as_ref())?;
+    cur.write_all(tmplt.exec_segment_hash.as_ref())?;
+    cur.write_all(tmplt.state_root.as_ref())?;
 
     #[cfg(test)]
     if cur.position() as usize != buf.len() {
@@ -164,15 +164,15 @@ impl L2Header for SignedL2BlockHeader {
     }
 
     fn parent(&self) -> &L2BlockId {
-        &self.header.parent()
+        self.header.parent()
     }
 
     fn l1_payload_hash(&self) -> &Buf32 {
-        &self.header.l1_payload_hash()
+        self.header.l1_payload_hash()
     }
 
     fn exec_payload_hash(&self) -> &Buf32 {
-        &self.header.exec_payload_hash()
+        self.header.exec_payload_hash()
     }
 
     fn state_root(&self) -> &Buf32 {

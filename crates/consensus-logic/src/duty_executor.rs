@@ -281,7 +281,7 @@ fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     let body = L2BlockBody::new(l1_seg, exec_seg);
     let state_root = Buf32::zero(); // TODO compute this from the different parts
     let header = L2BlockHeader::new(slot, ts, prev_block_id, &body, state_root);
-    let header_sig = sign_header(&header, &ik);
+    let header_sig = sign_header(&header, ik);
     let signed_header = SignedL2BlockHeader::new(header, header_sig);
     let blkid = signed_header.get_blockid();
     let final_block = L2Block::new(signed_header, body);

@@ -42,7 +42,7 @@ fn verify_schnorr_sig(sig: &Buf64, msg: &Buf32, pk: &Buf32) -> bool {
         Err(_) => return false,
     };
 
-    let sig = match Signature::from_slice(&sig.0.as_ref()) {
+    let sig = match Signature::from_slice(sig.0.as_ref()) {
         Ok(sig) => sig,
         Err(_) => return false,
     };
@@ -64,7 +64,7 @@ mod tests {
         let mut rng = rand::thread_rng();
         let msg: [u8; 32] = [(); 32].map(|_| rng.gen());
 
-        let mut mod_msg = msg.clone();
+        let mut mod_msg = msg;
         mod_msg.swap(1, 2);
 
         let sk = SecretKey::new(&mut rng);
