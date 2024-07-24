@@ -17,7 +17,7 @@ class L1ClientStatusTest(flexitest.Test):
         print("protocol version", proto_ver)
         assert proto_ver == 1, "query protocol version"
 
-        time.sleep(3)
+        time.sleep(2)
         client_status = seqrpc.alp_clientStatus()
         print("client status", client_status)
 
