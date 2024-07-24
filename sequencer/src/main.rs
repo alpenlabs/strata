@@ -41,23 +41,18 @@ pub enum InitError {
     #[error("io: {0}")]
     Io(#[from] io::Error),
 
-    #[error("{0}")]
-    Other(String),
-
     #[error("config: {0}")]
     MalformedConfig(#[from] SerdeError),
+
+    #[error("{0}")]
+    Other(String),
 }
 
-fn load_configuration(config: Option<&Path>) -> Result<Option<Config>, InitError> {
-    if let Some(conf) = config {
-        let config_str = fs::read_to_string(conf).map_err(|err| InitError::Io(err))?;
-        let conf = toml::from_str::<Config>(&config_str)
-            .map_err(|err| SerdeError::new(config_str.to_string(), err))
-            .map_err(|err| InitError::MalformedConfig(err))?;
-        return Ok(Some(conf));
-    }
-
-    return Ok(None);
+fn load_configuration(path: &Path) -> Result<Config, InitError> {
+    let config_str = fs::read_to_string(path)?;
+    let conf = toml::from_str::<Config>(&config_str)
+        .map_err(|err| SerdeError::new(config_str.to_string(), err))?;
+    Ok(conf)
 }
 
 fn main() {
@@ -72,12 +67,13 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     logging::init();
 
     // initialize the full configuration
-    let config = {
-        let mut conf = load_configuration(args.config.as_deref())?;
-        // Values passed over arguments get the precendence over the configuration files
-        conf.get_or_insert(Config::new()).update_from_args(&args);
-        conf.unwrap()
+    let mut config = match args.config.as_ref() {
+        Some(config_path) => load_configuration(config_path)?,
+        None => Config::new(),
     };
+
+    // Values passed over arguments get the precendence over the configuration files
+    config.update_from_args(&args);
 
     // Open the database.
     let rbdb = open_rocksdb_database(&config)?;
