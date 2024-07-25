@@ -31,6 +31,7 @@ alpen-express-evmctl = { path = "crates/evmctl" }
 alpen-express-evmexec = { path = "crates/evmexec" }
 alpen-express-mmr = { path = "crates/util/mmr" }
 alpen-express-primitives = { path = "crates/primitives" }
+alpen-express-rocksdb = { path = "crates/rocksdb-store" }
 alpen-express-rpc-api = { path = "crates/rpc/api" }
 alpen-express-state = { path = "crates/state" }
 alpen-test-utils = { path = "crates/test-utils" }

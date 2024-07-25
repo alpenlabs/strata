@@ -708,15 +708,10 @@ dependencies = [
  "alpen-express-mmr",
  "alpen-express-primitives",
  "alpen-express-state",
- "alpen-test-utils",
  "anyhow",
- "arbitrary",
- "bincode",
  "bitcoin",
  "borsh",
  "parking_lot 0.12.3",
- "reth-db",
- "rockbound",
  "thiserror",
  "tracing",
 ]
@@ -813,6 +808,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "alpen-express-rocksdb"
+version = "0.1.0"
+dependencies = [
+ "alpen-express-db",
+ "alpen-express-mmr",
+ "alpen-express-primitives",
+ "alpen-express-state",
+ "alpen-test-utils",
+ "anyhow",
+ "arbitrary",
+ "bincode",
+ "bitcoin",
+ "borsh",
+ "reth-db",
+ "rockbound",
+ "thiserror",
+ "tracing",
+]
+
+[[package]]
 name = "alpen-express-rpc-api"
 version = "0.1.0"
 dependencies = [
@@ -835,6 +850,7 @@ dependencies = [
  "alpen-express-evmctl",
  "alpen-express-evmexec",
  "alpen-express-primitives",
+ "alpen-express-rocksdb",
  "alpen-express-rpc-api",
  "alpen-express-state",
  "anyhow",
@@ -876,6 +892,7 @@ name = "alpen-test-utils"
 version = "0.1.0"
 dependencies = [
  "alpen-express-db",
+ "alpen-express-rocksdb",
  "anyhow",
  "arbitrary",
  "bitcoin",

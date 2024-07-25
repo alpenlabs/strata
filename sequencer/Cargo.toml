@@ -15,6 +15,7 @@ alpen-express-db = { workspace = true }
 alpen-express-evmctl = { workspace = true }
 alpen-express-evmexec = { workspace = true }
 alpen-express-primitives = { workspace = true }
+alpen-express-rocksdb = { workspace = true }
 alpen-express-rpc-api = { workspace = true }
 alpen-express-state = { workspace = true }
 

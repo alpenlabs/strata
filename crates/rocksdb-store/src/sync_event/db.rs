@@ -1,22 +1,22 @@
 use std::sync::Arc;
 
-use rockbound::{OptimisticTransactionDB as DB, SchemaBatch, SchemaDBOperationsExt};
+use rockbound::{OptimisticTransactionDB, SchemaBatch, SchemaDBOperationsExt};
 
+use alpen_express_db::errors::DbError;
+use alpen_express_db::traits::{SyncEventProvider, SyncEventStore};
+use alpen_express_db::DbResult;
 use alpen_express_state::sync_event::SyncEvent;
 
 use super::schemas::{SyncEventSchema, SyncEventWithTimestamp};
-use crate::errors::{DbError, DbResult};
-use crate::traits::SyncEventProvider;
-use crate::traits::SyncEventStore;
 
 pub struct SyncEventDb {
-    db: Arc<DB>,
+    db: Arc<OptimisticTransactionDB>,
 }
 
 impl SyncEventDb {
     // NOTE: db is expected to open all the column families defined in STORE_COLUMN_FAMILIES.
     // FIXME: Make it better/generic.
-    pub fn new(db: Arc<DB>) -> Self {
+    pub fn new(db: Arc<OptimisticTransactionDB>) -> Self {
         Self { db }
     }
 

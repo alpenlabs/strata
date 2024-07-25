@@ -3,7 +3,7 @@ use std::sync::Arc;
 use alpen_express_primitives::buf::Buf32;
 use rockbound::{OptimisticTransactionDB as DB, Schema, SchemaBatch, SchemaDBOperationsExt};
 
-use crate::{
+use alpen_express_db::{
     errors::DbError,
     traits::{SeqDataProvider, SeqDataStore},
     types::TxnStatusEntry,
@@ -131,9 +131,9 @@ impl SeqDataProvider for SeqDb {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::errors::DbError;
-    use crate::traits::{SeqDataProvider, SeqDataStore};
-    use crate::types::TxnStatusEntry;
+    use alpen_express_db::errors::DbError;
+    use alpen_express_db::traits::{SeqDataProvider, SeqDataStore};
+    use alpen_express_db::types::TxnStatusEntry;
     use alpen_express_primitives::buf::Buf32;
     use alpen_test_utils::bitcoin::get_test_bitcoin_txns;
     use alpen_test_utils::get_rocksdb_tmp_instance;

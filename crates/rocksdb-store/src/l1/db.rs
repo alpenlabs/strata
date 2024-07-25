@@ -12,8 +12,7 @@ use alpen_express_primitives::{
 };
 
 use super::schemas::{L1BlockSchema, MmrSchema, TxnSchema};
-use crate::errors::*;
-use crate::traits::{L1DataProvider, L1DataStore};
+use alpen_express_db::{errors::DbError, traits::*, DbResult};
 
 pub struct L1Db {
     db: Arc<DB>,
@@ -160,8 +159,14 @@ impl L1DataProvider for L1Db {
 
     fn get_blockid_range(&self, start_idx: u64, end_idx: u64) -> DbResult<Vec<Buf32>> {
         let mut options = ReadOptions::default();
-        options.set_iterate_lower_bound(KeyEncoder::<L1BlockSchema>::encode_key(&start_idx)?);
-        options.set_iterate_upper_bound(KeyEncoder::<L1BlockSchema>::encode_key(&end_idx)?);
+        options.set_iterate_lower_bound(
+            KeyEncoder::<L1BlockSchema>::encode_key(&start_idx)
+                .map_err(|err| DbError::Other(err.to_string()))?,
+        );
+        options.set_iterate_upper_bound(
+            KeyEncoder::<L1BlockSchema>::encode_key(&end_idx)
+                .map_err(|err| DbError::Other(err.to_string()))?,
+        );
 
         let res = self
             .db

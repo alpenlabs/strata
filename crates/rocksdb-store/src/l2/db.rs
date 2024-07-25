@@ -4,8 +4,9 @@ use rockbound::{OptimisticTransactionDB as DB, SchemaBatch, SchemaDBOperationsEx
 
 use alpen_express_state::{block::L2BlockBundle, prelude::*};
 
-use crate::{
-    l2::schemas::L2BlockHeightSchema,
+use crate::l2::schemas::L2BlockHeightSchema;
+use alpen_express_db::{
+    errors::DbError,
     traits::{BlockStatus, L2DataProvider, L2DataStore},
     DbResult,
 };
@@ -44,7 +45,7 @@ impl L2DataStore for L2Db {
 
                 Ok::<_, anyhow::Error>(())
             })
-            .map_err(Into::into)
+            .map_err(|_| DbError::Other("transaction error".to_string()))
     }
 
     fn del_block_data(&self, id: L2BlockId) -> DbResult<bool> {
@@ -71,7 +72,7 @@ impl L2DataStore for L2Db {
 
                 Ok::<_, anyhow::Error>(true)
             })
-            .map_err(Into::into)
+            .map_err(|_| DbError::Other("transaction error".to_string()))
     }
 
     fn set_block_status(&self, id: L2BlockId, status: BlockStatus) -> DbResult<()> {

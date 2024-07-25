@@ -5,8 +5,9 @@ use parking_lot::Mutex;
 
 use alpen_express_state::prelude::*;
 
-use crate::errors::*;
-use crate::traits::*;
+use crate::{traits::*, DbResult};
+
+use crate::traits::BlockStatus;
 
 /// Dummy implementation that isn't really compliant with the spec, but we don't
 /// care because we just want to get something running. :sunglasses:.
