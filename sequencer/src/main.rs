@@ -135,10 +135,6 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         warn!("network not set to regtest, ignoring");
     }
 
-    // Create dataflow channels.
-    let (_cout_tx, _cout_rx) = mpsc::channel::<operation::ClientUpdateOutput>(64);
-    // TODO connect up these other channels
-
     // Init engine controller.
     let eng_ctl = alpen_vertex_evmctl::stub::StubController::new(time::Duration::from_millis(100));
     let eng_ctl = Arc::new(eng_ctl);

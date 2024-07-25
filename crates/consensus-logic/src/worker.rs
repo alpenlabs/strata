@@ -186,11 +186,9 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
         error!(%ev_idx, "failed to submit new CSM state to FCM");
     }
 
-    let status = CsmStatus {
-        last_sync_ev_idx: ev_idx,
-        chain_tip_blkid: new_state.sync().map(|ss| *ss.chain_tip_blkid()),
-        finalized_blkid: new_state.sync().map(|ss| *ss.finalized_blkid()),
-    };
+    let mut status = CsmStatus::default();
+    status.set_last_sync_ev_idx(ev_idx);
+    status.update_from_client_state(new_state.as_ref());
     if csm_status_tx.send(status).is_err() {
         error!(%ev_idx, "failed to submit new CSM status update");
     }
