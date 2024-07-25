@@ -24,7 +24,7 @@ DOCKER_IMAGE_NAME ?=
 
 .PHONY: help
 help: ## Display this help.
-	@awk 'BEGIN {FS = ":.*##"; printf "Usage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*##"; printf "Usage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-25s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 ##@ Build
 
@@ -202,7 +202,8 @@ test: ## Runs all tests in the workspace including unit and docs tests.
 	make test-doc
 
 .PHONY: pr
-pr: ## Runs lints (without fixing) and unit tests (run this before creating a PR).
-	make lint && \
-	make sec && \
-	make test-unit
+pr: lint sec test-doc test-unit test-functional ## Runs lints (without fixing), audit and tests (run this before creating a PR).
+	@echo "\n\033[36m======== CHECKS_COMPLETE ========\033[0m\n"
+	@test -z "$$(git status --porcelain)" || echo "WARNNG: You have uncommitted changes"
+	@echo "All good to create a PR!"
+
