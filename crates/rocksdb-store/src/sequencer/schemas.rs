@@ -4,11 +4,11 @@ use crate::define_table_with_default_codec;
 use crate::define_table_with_seek_key_codec;
 use crate::define_table_without_codec;
 use crate::impl_borsh_value_codec;
-use alpen_express_db::types::TxnStatusEntry;
+use alpen_express_db::types::{BlobEntry, TxEntry};
 
 define_table_with_seek_key_codec!(
     /// A table to store L1 txns
-    (SeqL1TxnSchema) u64 => TxnStatusEntry
+    (SeqL1TxnSchema) u64 => TxEntry
 );
 
 define_table_with_seek_key_codec!(
@@ -23,7 +23,7 @@ define_table_with_seek_key_codec!(
 
 define_table_with_default_codec!(
     /// A table to store blobid -> blob mapping
-    (SeqBlobSchema) Buf32 => Vec<u8>
+    (SeqBlobSchema) Buf32 => BlobEntry
 );
 
 define_table_with_default_codec!(

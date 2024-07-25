@@ -1,17 +1,16 @@
-use std::{collections::VecDeque, sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use alpen_express_primitives::buf::Buf32;
 use alpen_express_state::da_blob::{BlobDest, BlobIntent};
+use anyhow::anyhow;
 use bitcoin::Transaction;
 use sha2::{Digest, Sha256};
 use tokio::sync::mpsc::Receiver;
-use tokio::sync::Mutex;
 use tracing::*;
 
 use alpen_express_db::{
     traits::{SeqDataProvider, SeqDataStore, SequencerDatabase},
-    types::{L1TxnStatus, TxnStatusEntry},
-    DbResult,
+    types::{BlobEntry, BlobL1Status},
 };
 
 use super::{
@@ -22,9 +21,11 @@ use super::{
 use crate::rpc::{
     traits::{L1Client, SeqL1Client},
     types::RawUTXO,
+    ClientError,
 };
 
 const FINALITY_DEPTH: u64 = 6;
+const BROADCAST_POLL_INTERVAL: u64 = 5000; // millis
 
 pub async fn writer_control_task<D: SequencerDatabase + Send + Sync + 'static>(
     intent_rx: Receiver<BlobIntent>,
@@ -35,25 +36,32 @@ pub async fn writer_control_task<D: SequencerDatabase + Send + Sync + 'static>(
     info!("Starting writer control task");
 
     let state = initialize_writer_state(db.clone())?;
-    let state = Arc::new(Mutex::new(state));
-    let st_clone = state.clone();
 
-    tokio::spawn(transactions_tracker_task(
-        st_clone,
+    // The watcher task watches L1 for txs confirmations and finalizations. Ideally this should be
+    // taken care of by the reader task. This can be done later.
+    tokio::spawn(watcher_task(
+        state.last_finalized_blob_idx,
         rpc_client.clone(),
         config.clone(),
+        db.clone(),
     ));
 
-    let _ = listen_for_write_intents(intent_rx, rpc_client, config, state, db).await;
+    tokio::spawn(broadcaster_task(
+        state,
+        rpc_client.clone(),
+        config.clone(),
+        db.clone(),
+    ));
+
+    let _ = listen_for_write_intents(intent_rx, rpc_client, config, db).await;
 
     Ok(())
 }
 
 async fn listen_for_write_intents<D>(
     mut intent_rx: Receiver<BlobIntent>,
-    rpc_client: Arc<impl SeqL1Client>,
+    rpc_client: Arc<impl SeqL1Client + L1Client>,
     config: WriterConfig,
-    state: Arc<Mutex<WriterState<D>>>,
     db: Arc<D>,
 ) -> anyhow::Result<()>
 where
@@ -70,15 +78,7 @@ where
             continue;
         }
 
-        if let Err(e) = handle_intent(
-            write_intent,
-            db.clone(),
-            &rpc_client,
-            &config,
-            state.clone(),
-        )
-        .await
-        {
+        if let Err(e) = handle_intent(write_intent, db.clone(), &rpc_client, &config).await {
             error!(%e, "Failed to handle intent");
         }
     }
@@ -87,46 +87,32 @@ where
 async fn handle_intent<D: SequencerDatabase>(
     intent: BlobIntent,
     db: Arc<D>,
-    rpc_client: &Arc<impl SeqL1Client>,
+    rpc_client: &Arc<impl SeqL1Client + L1Client>,
     config: &WriterConfig,
-    state: Arc<Mutex<WriterState<D>>>,
 ) -> anyhow::Result<()> {
     // If it is already present in the db and corresponding txns are created, return
 
     let blobid = calculate_intent_hash(&intent.payload()); // TODO: should we use the commitment
                                                            // here?
     let seqprov = db.sequencer_provider();
+    let seqstore = db.sequencer_store();
 
     match seqprov.get_blob_by_id(blobid.clone())? {
         Some(_) => {
-            warn!("duplicate write intent {blobid:?}. Checking if L1 transaction exists");
-            if seqprov.get_reveal_txidx_for_blob(blobid)?.is_some() {
-                warn!("L1 txn exists, ignoring the intent");
-                return Ok(());
-            }
+            warn!("duplicate write intent {blobid:?}. Ignoring");
+            return Ok(());
         }
         None => {
             // Store in db
-            let _ = db
-                .sequencer_store()
-                .put_blob(blobid, intent.payload().to_vec())?;
+            // TODO: handle insufficient utxos
+            let (commit, reveal) =
+                create_inscriptions_from_intent(&intent.payload(), &rpc_client, &config).await?;
+            let (commit_txid, reveal_txid) = seqstore.put_commit_reveal_txs(commit, reveal)?;
+            let blobentry =
+                BlobEntry::new_unsent(intent.payload().to_vec(), commit_txid, reveal_txid);
+            let _ = seqstore.put_blob(blobid, blobentry)?;
         }
     }
-
-    // Create commit reveal txns and atomically store in db as well
-    let (commit, reveal) = create_inscriptions_from_intent(&intent, &rpc_client, &config).await?;
-
-    let commit_tx = TxnStatusEntry::from_txn_unsent(&commit);
-    let reveal_tx = TxnStatusEntry::from_txn_unsent(&reveal);
-
-    let _reveal_txidx =
-        db.sequencer_store()
-            .put_commit_reveal_txns(blobid, commit_tx.clone(), reveal_tx.clone());
-
-    // Update the writer state by adding the txns which will be used by tracker
-    state.lock().await.add_new_txn(commit_tx);
-    state.lock().await.add_new_txn(reveal_tx);
-
     Ok(())
 }
 
@@ -140,11 +126,10 @@ fn calculate_intent_hash(intent: &[u8]) -> Buf32 {
 }
 
 async fn create_inscriptions_from_intent(
-    write_intent: &BlobIntent,
-    rpc_client: &Arc<impl SeqL1Client>,
+    payload: &[u8],
+    rpc_client: &Arc<impl SeqL1Client + L1Client>,
     config: &WriterConfig,
 ) -> anyhow::Result<(Transaction, Transaction)> {
-    let payload = write_intent.payload();
     // let (signature, pub_key) = sign_blob_with_private_key(&payload, &config.private_key)?;
     let utxos = rpc_client.get_utxos().await?;
     let utxos = utxos
@@ -170,171 +155,196 @@ async fn create_inscriptions_from_intent(
     .map_err(|e| anyhow::anyhow!(e.to_string()))
 }
 
-/// Initializes the writer state by creating a queue of transactions starting from the latest blob.
-///
-/// This function retrieves the latest blob and its corresponding transaction index, then creates a
-/// queue of transactions by looping backwards until finalized transactions are reached. The queue
-/// is then used to initialize the writer state.
-///
-/// # Returns
-/// * `anyhow::Result<WriterState<D>>`: The initialized writer state or an error.
-///
-/// # Errors
-/// Returns an error if fetching data from the database fails.
 fn initialize_writer_state<D: SequencerDatabase>(db: Arc<D>) -> anyhow::Result<WriterState<D>> {
-    if let Some(last_idx) = db.sequencer_provider().get_last_blob_idx()? {
-        let blobid = db.sequencer_provider().get_blobid_for_blob_idx(last_idx)?;
-        match blobid {
-            Some(blobid) => {
-                if let Some(txidx) = db.sequencer_provider().get_reveal_txidx_for_blob(blobid)? {
-                    let (queue, start_idx) = create_txn_queue(txidx, db.clone())?;
-                    return Ok(WriterState::new(db, queue, start_idx));
-                }
-            }
-            None => {
-                // TODO: what to do?
-            }
-        }
-    }
-    return Ok(WriterState::new_empty(db));
-}
+    let prov = db.sequencer_provider();
 
-/// Creates a queue of transactions starting from a given reveal transaction index.
-///
-/// This function builds a queue of transactions by fetching commit and reveal transactions in pairs
-/// starting from the specified index and working backwards until a transaction with the status
-/// `Finalized` is encountered or the beginning of the sequence is reached.
-///
-/// # Type Parameters
-/// * `D`: A type implementing the `SequencerDatabase` trait.
-///
-/// # Parameters
-/// * `txidx`: The starting transaction index. This should probably be the latest txn idx.
-/// * `db`: An `Arc` to a database implementing `SequencerDatabase`.
-///
-/// # Returns
-/// * `DbResult<(VecDeque<TxnStatusEntry>, u64)>`: A result containing the queue of transactions and
-///   the updated transaction index, or an error.
-///
-/// # Errors
-/// Returns an error if fetching transactions from the database fails.
-/// ```
-fn create_txn_queue<D: SequencerDatabase>(
-    txidx: u64,
-    db: Arc<D>,
-) -> DbResult<(VecDeque<TxnStatusEntry>, u64)> {
-    let seqprov = db.sequencer_provider();
-    let mut queue = VecDeque::default();
-    let mut txidx = txidx;
+    let last_idx = match prov.get_last_blob_idx()? {
+        Some(last_idx) => last_idx,
+        None => {
+            // Insert genesis blob to db and return.
+            // Genesis here is just empty. And the major purpose is to have something instead of
+            // dealing with Option<u64> in states.
+            let entry = BlobEntry::new(
+                Default::default(),
+                Buf32::zero(),
+                Buf32::zero(),
+                BlobL1Status::Finalized,
+            );
+            let idx = db.sequencer_store().put_blob(Buf32::zero(), entry)?;
+            assert_eq!(idx, 0, "Expect genesis blobid to be zero");
+            return Ok(WriterState::new(db, 0, 0));
+        }
+    };
+
+    let mut curr_idx = last_idx;
+
+    let mut last_sent_idx = 0;
+    let mut last_finalized_idx = 0;
+
     loop {
-        if txidx <= 0 {
+        let blob = if let Some(blob) = prov.get_blob_by_idx(curr_idx)? {
+            blob
+        } else {
+            break;
+        };
+        if curr_idx <= 0 {
             break;
         }
-        // fetch commit and reveal txns
-        let reveal_txn = seqprov
-            .get_l1_txn(txidx)?
-            .expect("Inconsistent existence of transactions");
-        let commit_txn = seqprov
-            .get_l1_txn(txidx - 1)?
-            .expect("Inconsistsent existence of transactions");
-
-        if *reveal_txn.status() == L1TxnStatus::Finalized {
-            return Ok((queue, txidx));
-        } else {
-            queue.push_front(reveal_txn);
-            queue.push_front(commit_txn);
-        }
-        txidx -= 2;
+        match blob.status {
+            BlobL1Status::InMempool => {
+                last_sent_idx = curr_idx;
+            }
+            BlobL1Status::Finalized => {
+                last_finalized_idx = curr_idx;
+                // We don't need to check beyond finalized blob
+                break;
+            }
+            _ => {}
+        };
+        curr_idx -= 1;
     }
-    return Ok((queue, 0));
+    return Ok(WriterState::new(db, last_finalized_idx, last_sent_idx));
 }
 
-/// Watches for inscription transactions status in bitcoin and resends if not in mempool, until they
-/// are confirmed
-async fn transactions_tracker_task<D: SequencerDatabase>(
-    state: Arc<Mutex<WriterState<D>>>,
-    rpc_client: Arc<impl L1Client>,
+/// Broadcasts the next blob to be sent
+async fn broadcaster_task<D: SequencerDatabase + Send + Sync + 'static>(
+    mut state: WriterState<D>,
+    rpc_client: Arc<impl SeqL1Client + L1Client>,
     config: WriterConfig,
+    db: Arc<D>,
 ) -> anyhow::Result<()> {
-    // TODO: better interval values and placement in the loop
-
-    let interval = tokio::time::interval(Duration::from_millis(config.poll_duration_ms));
+    let interval = tokio::time::interval(Duration::from_millis(BROADCAST_POLL_INTERVAL));
     tokio::pin!(interval);
 
     loop {
+        // SLEEP!
         interval.as_mut().tick().await;
 
-        let txns: VecDeque<_> = {
-            let st = state.lock().await;
-            st.txns_queue.iter().cloned().collect()
-        };
-
-        for (idx, txn) in txns.iter().enumerate() {
-            process_queue_txn(txn, idx, &state, &rpc_client).await?;
+        // Check from db if the last sent is confirmed because if we sent the new one before the
+        // previous is confirmed, they might end up in different order
+        if db
+            .sequencer_provider()
+            .get_blob_by_idx(state.last_sent_blob_idx)?
+            .map(|x| x.status == BlobL1Status::Confirmed)
+            .ok_or(anyhow!("Last sent blob not found in db"))?
+        {
+            continue;
         }
-    }
-}
 
-async fn process_queue_txn<D: SequencerDatabase>(
-    txn: &TxnStatusEntry,
-    idx: usize,
-    state: &Arc<Mutex<WriterState<D>>>,
-    rpc_client: &Arc<impl L1Client>,
-) -> anyhow::Result<()> {
-    let status = match txn.status {
-        L1TxnStatus::Unsent => {
-            // NOTE: when sending errors, set it's status to unsent so that it is tried
-            // again later
-            if let Ok(_) = rpc_client.send_raw_transaction(txn.txn_raw.clone()).await {
-                L1TxnStatus::InMempool
-            } else {
-                L1TxnStatus::Unsent
+        let next_idx = state.last_sent_blob_idx + 1;
+
+        if let Some(blobentry) = db
+            .sequencer_provider()
+            .get_blob_by_idx(state.last_sent_blob_idx)?
+        {
+            // Get commit reveal txns
+            let commit_tx = db
+                .sequencer_provider()
+                .get_l1_tx(blobentry.commit_txid)?
+                .ok_or(anyhow!("Expected to find commit tx in db"))?;
+            let reveal_tx = db
+                .sequencer_provider()
+                .get_l1_tx(blobentry.reveal_txid)?
+                .ok_or(anyhow!("Expected to find reveal tx in db"))?;
+            // Send
+            match send_commit_reveal_txs(commit_tx, reveal_tx, rpc_client.as_ref()).await {
+                Ok(_) => {
+                    state.last_sent_blob_idx = next_idx;
+                }
+                Err(SendError::MissingOrInvalidInput) => {
+                    // This is tricky, need to reconstruct commit-reveal txns. Might need to resend
+                    // previous ones as well.
+                    let (commit, reveal) =
+                        create_inscriptions_from_intent(&blobentry.blob, &rpc_client, &config)
+                            .await?;
+                    let (commit_txid, reveal_txid) =
+                        db.sequencer_store().put_commit_reveal_txs(commit, reveal)?;
+                    let new_blobentry =
+                        BlobEntry::new_unsent(blobentry.blob.clone(), commit_txid, reveal_txid);
+
+                    db.sequencer_store()
+                        .update_blob_by_idx(state.last_sent_blob_idx, new_blobentry)?;
+                    // Do nothing, this will be sent in the next step of the loop
+                }
+                Err(SendError::Other(errstr)) => {
+                    // TODO: Maybe retry?
+                }
             }
         }
-
-        L1TxnStatus::InMempool | L1TxnStatus::Confirmed => {
-            check_confirmations_and_resend_txn(&txn, &rpc_client).await
-        }
-
-        L1TxnStatus::Finalized => L1TxnStatus::Finalized,
-    };
-    // Update/finalize the txn
-    if status == L1TxnStatus::Finalized {
-        state.lock().await.finalize_txn(idx)?;
-    } else {
-        state.lock().await.update_txn(idx, status)?;
     }
-    Ok(())
 }
 
-async fn check_confirmations_and_resend_txn(
-    txn: &TxnStatusEntry,
-    rpc_client: &Arc<impl L1Client>,
-) -> L1TxnStatus {
-    let confs = rpc_client.get_transaction_confirmations(txn.txid().0).await;
+enum SendError {
+    MissingOrInvalidInput,
+    Other(String),
+}
 
-    match confs {
-        Ok(confs) if confs > FINALITY_DEPTH => {
-            info!(txn = %hex::encode(txn.txid().0), "Transaction finalized");
-            L1TxnStatus::Finalized
-        }
+async fn send_commit_reveal_txs(
+    commit_tx_raw: Vec<u8>,
+    reveal_tx_raw: Vec<u8>,
+    client: &(impl SeqL1Client + L1Client),
+) -> Result<(), SendError> {
+    match send_tx(commit_tx_raw, client).await {
+        Ok(_) => send_tx(reveal_tx_raw, client).await,
+        Err(e) => Err(e),
+    }
+}
 
-        Ok(confs) if confs > 0 => L1TxnStatus::Confirmed,
+async fn send_tx(tx_raw: Vec<u8>, client: &(impl SeqL1Client + L1Client)) -> Result<(), SendError> {
+    match client.send_raw_transaction(tx_raw).await {
+        Ok(_) => Ok(()),
+        Err(ClientError::Server(-27, _)) => Ok(()), // Tx already in chain
+        Err(ClientError::Server(-26, _)) => Err(SendError::MissingOrInvalidInput),
+        Err(e) => Err(SendError::Other(e.to_string())),
+    }
+}
 
-        Ok(_) => L1TxnStatus::InMempool,
+/// Watches for inscription transactions status in bitcoin
+async fn watcher_task<D: SequencerDatabase + Send + Sync + 'static>(
+    last_finalized_blob_idx: u64,
+    rpc_client: Arc<impl L1Client>,
+    config: WriterConfig,
+    db: Arc<D>,
+) -> anyhow::Result<()> {
+    // TODO: better interval values and placement in the loop
+    let interval = tokio::time::interval(Duration::from_millis(config.poll_duration_ms));
+    tokio::pin!(interval);
 
-        Err(e) => {
-            warn!(error = %e, "Error fetching txn confirmations");
+    let mut curr_blobidx = last_finalized_blob_idx + 1; // start with the next blob
+    let mut blobentries: HashMap<u64, BlobEntry> = HashMap::new();
+    loop {
+        interval.as_mut().tick().await;
 
-            // TODO: possibly resend with higher fees
-            let _res = rpc_client
-                .send_raw_transaction(hex::encode(txn.txn_raw()))
-                .await
-                .map_err(|e| {
-                    warn!(error = %e, "Couldn't resend transaction");
-                    e
-                });
-            L1TxnStatus::Unsent
+        if let Some(mut blobentry) = db.sequencer_provider().get_blob_by_idx(curr_blobidx)? {
+            let confs = rpc_client
+                .get_transaction_confirmations(blobentry.reveal_txid.0)
+                .await?;
+            // If confs is 0 then it is probably in mempool
+            // TODO: But if confs is error(saying txn not found, TODO: check this) then it could
+            // possibly have reorged
+
+            if confs >= 1 {
+                // blob is confirmed, mark it as confirmed
+                blobentry.status = BlobL1Status::Confirmed;
+                blobentries.insert(curr_blobidx, blobentry.clone());
+
+                // Update this in db
+                db.sequencer_store()
+                    .update_blob_by_idx(curr_blobidx, blobentry.clone())?;
+
+                // Also set the blob that is deep enough to be finalized
+                let finidx = curr_blobidx - FINALITY_DEPTH;
+                if let Some(blobentry) = blobentries.get(&finidx) {
+                    let mut blobentry = blobentry.clone();
+                    blobentry.status = BlobL1Status::Finalized;
+                    blobentries.insert(finidx, blobentry.clone());
+                    db.sequencer_store().update_blob_by_idx(finidx, blobentry)?;
+                }
+                curr_blobidx += 1;
+            }
+            blobentries.insert(curr_blobidx, blobentry.clone());
+        } else {
+            // No blob exists, just continue the loop and thus wait for blob to be present in db
         }
     }
 }
@@ -564,8 +574,8 @@ mod test {
             .await
             .unwrap();
 
-        let commit_tx = TxnStatusEntry::from_txn_unsent(&commit);
-        let reveal_tx = TxnStatusEntry::from_txn_unsent(&reveal);
+        let commit_tx = TxEntry::from_txn_unsent(&commit);
+        let reveal_tx = TxEntry::from_txn_unsent(&reveal);
 
         db.sequencer_store()
             .put_commit_reveal_txns(intent_hash, commit_tx, reveal_tx)
@@ -621,8 +631,8 @@ mod test {
             .await
             .unwrap();
 
-        let rtxn = TxnStatusEntry::from_txn_unsent(&r);
-        let ctxn = TxnStatusEntry::from_txn_unsent(&c);
+        let rtxn = TxEntry::from_txn_unsent(&r);
+        let ctxn = TxEntry::from_txn_unsent(&c);
 
         // insert to db
         db.sequencer_store()
@@ -661,8 +671,8 @@ mod test {
             .await
             .unwrap();
 
-        let rtxn = TxnStatusEntry::from_txn(&r, L1TxnStatus::InMempool);
-        let ctxn = TxnStatusEntry::from_txn(&c, L1TxnStatus::InMempool);
+        let rtxn = TxEntry::from_txn(&r, L1TxnStatus::InMempool);
+        let ctxn = TxEntry::from_txn(&c, L1TxnStatus::InMempool);
 
         // insert to db
         db.sequencer_store()
@@ -701,8 +711,8 @@ mod test {
             .await
             .unwrap();
 
-        let rtxn = TxnStatusEntry::from_txn(&r, L1TxnStatus::InMempool);
-        let ctxn = TxnStatusEntry::from_txn(&c, L1TxnStatus::InMempool);
+        let rtxn = TxEntry::from_txn(&r, L1TxnStatus::InMempool);
+        let ctxn = TxEntry::from_txn(&c, L1TxnStatus::InMempool);
 
         // insert to db
         db.sequencer_store()
@@ -741,8 +751,8 @@ mod test {
             .await
             .unwrap();
 
-        let rtxn = TxnStatusEntry::from_txn(&r, L1TxnStatus::Finalized);
-        let ctxn = TxnStatusEntry::from_txn(&c, L1TxnStatus::Finalized);
+        let rtxn = TxEntry::from_txn(&r, L1TxnStatus::Finalized);
+        let ctxn = TxEntry::from_txn(&c, L1TxnStatus::Finalized);
 
         // insert to db
         db.sequencer_store()

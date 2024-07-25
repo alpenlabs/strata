@@ -6,47 +6,62 @@ use borsh::{BorshDeserialize, BorshSerialize};
 
 use alpen_express_primitives::buf::Buf32;
 
-/// This keeps track of the transaction sent to L1 and has the raw txn so that if needed to resend
-/// it to L1, we need not serialize it again.
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize)]
-pub struct TxnStatusEntry {
-    pub txid: Buf32,
-    pub txn_raw: Vec<u8>,
-    pub status: L1TxnStatus,
+pub struct BlobEntry {
+    pub blob: Vec<u8>,
+    pub commit_txid: Buf32,
+    pub reveal_txid: Buf32,
+    pub status: BlobL1Status,
 }
 
-impl TxnStatusEntry {
-    pub fn from_txn(txn: &Transaction, status: L1TxnStatus) -> Self {
-        let txid = Buf32(txn.compute_txid().to_byte_array().into());
-        let txn_raw = serialize(txn);
+impl BlobEntry {
+    pub fn new(
+        blob: Vec<u8>,
+        commit_txid: Buf32,
+        reveal_txid: Buf32,
+        status: BlobL1Status,
+    ) -> Self {
         Self {
-            txid,
-            txn_raw,
+            blob,
+            commit_txid,
+            reveal_txid,
             status,
         }
     }
 
-    pub fn from_txn_unsent(txn: &Transaction) -> Self {
-        Self::from_txn(txn, L1TxnStatus::Unsent)
+    pub fn new_unsent(blob: Vec<u8>, commit_txid: Buf32, reveal_txid: Buf32) -> Self {
+        Self::new(blob, commit_txid, reveal_txid, BlobL1Status::Unsent)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize)]
+pub enum BlobL1Status {
+    Unsent,
+    InMempool,
+    Confirmed,
+    Finalized,
+}
+
+/// This keeps track of the transaction sent to L1 and has the raw txn so that if needed to resend
+/// it to L1, we need not serialize it again.
+#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize)]
+pub struct TxEntry {
+    pub txid: Buf32,
+    pub tx_raw: Vec<u8>,
+}
+
+impl TxEntry {
+    pub fn from_txn(txn: &Transaction) -> Self {
+        let txid = Buf32(txn.compute_txid().to_byte_array().into());
+        let tx_raw = serialize(txn);
+        Self { txid, tx_raw }
     }
 
     pub fn txid(&self) -> &Buf32 {
         &self.txid
     }
 
-    pub fn txn_raw(&self) -> &[u8] {
-        &self.txn_raw
+    pub fn tx_raw(&self) -> &[u8] {
+        &self.tx_raw
     }
-
-    pub fn status(&self) -> &L1TxnStatus {
-        &self.status
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize)]
-pub enum L1TxnStatus {
-    Unsent,
-    InMempool,
-    Confirmed,
-    Finalized,
 }

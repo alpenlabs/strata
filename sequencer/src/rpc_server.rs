@@ -271,8 +271,9 @@ impl AlpenFuncTestApiServer for FuncTestServerImpl {
         // TODO: Get commitment from rpc as well
         let commitment = Buf32::from([0u8; 32]);
         let blobintent = BlobIntent::new(BlobDest::L1, commitment, blobpayload);
-        if let Err(_) = self.intent_tx.lock().await.send(blobintent).await {
-            return Err(Error::Other("Failed to send intent to receiver".to_string()).into());
+        if let Err(e) = self.intent_tx.lock().await.send(blobintent).await {
+            debug!(%e, "error");
+            return Err(Error::Other("".to_string()).into());
         }
         Ok(())
     }

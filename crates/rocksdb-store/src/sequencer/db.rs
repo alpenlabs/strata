@@ -1,12 +1,13 @@
 use std::sync::Arc;
 
 use alpen_express_primitives::buf::Buf32;
+use bitcoin::{hashes::Hash, Transaction};
 use rockbound::{OptimisticTransactionDB as DB, Schema, SchemaBatch, SchemaDBOperationsExt};
 
 use alpen_express_db::{
     errors::DbError,
     traits::{SeqDataProvider, SeqDataStore, SequencerDatabase},
-    types::TxnStatusEntry,
+    types::{BlobEntry, TxEntry},
     DbResult,
 };
 
@@ -42,7 +43,7 @@ impl SeqDb {
 }
 
 impl SeqDataStore for SeqDb {
-    fn put_blob(&self, blob_hash: Buf32, blob: Vec<u8>) -> DbResult<u64> {
+    fn put_blob(&self, blob_hash: Buf32, blob: BlobEntry) -> DbResult<u64> {
         if self.db.get::<SeqBlobSchema>(&blob_hash)?.is_some() {
             return Err(DbError::Other(format!(
                 "Entry already exists for blobid {blob_hash:?}"
@@ -65,54 +66,24 @@ impl SeqDataStore for SeqDb {
         Ok(idx)
     }
 
-    /// Store commit reveal txns associated with the blobid.
-    fn put_commit_reveal_txns(
+    fn put_commit_reveal_txs(
         &self,
-        blobid: Buf32,
-        commit_txn: TxnStatusEntry,
-        reveal_txn: TxnStatusEntry,
-    ) -> DbResult<u64> {
-        if self.db.get::<SeqBlobSchema>(&blobid)?.is_none() {
-            return Err(DbError::Other(format!(
-                "Inexistent blobid {blobid:?} while storing commit reveal txn"
-            )));
-        }
-
-        let commit_idx = self
-            .get_last_idx::<SeqL1TxnSchema>()?
-            .map(|x| x + 1) // new idx is last reveal idx + 1
-            .unwrap_or(0);
-        let reveal_idx = commit_idx + 1;
-
-        let mut batch = SchemaBatch::new();
-
-        // Atomically add entries
-        batch.put::<SeqL1TxnSchema>(&commit_idx, &commit_txn)?;
-        batch.put::<SeqL1TxnSchema>(&reveal_idx, &reveal_txn)?;
-        batch.put::<SeqBIdRevTxnIdxSchema>(&blobid, &reveal_idx)?;
-
-        self.db.write_schemas(batch)?;
-
-        Ok(reveal_idx)
+        commit_tx: Transaction,
+        reveal_tx: Transaction,
+    ) -> DbResult<(Buf32, Buf32)> {
+        let commit_txid = Buf32::from(*commit_tx.compute_txid().as_raw_hash().as_byte_array());
+        let reveal_txid = Buf32::from(*reveal_tx.compute_txid().as_raw_hash().as_byte_array());
+        todo!();
+        Ok((commit_txid, reveal_txid))
     }
 
-    fn update_txn(&self, txidx: u64, txn: TxnStatusEntry) -> DbResult<()> {
-        if self.db.get::<SeqL1TxnSchema>(&txidx)?.is_none() {
-            return Err(DbError::Other(format!(
-                "Inexistent txn idx {txidx:?} while updating txn"
-            )));
-        }
-        self.db.put::<SeqL1TxnSchema>(&txidx, &txn)?;
-        Ok(())
+    fn update_blob_by_idx(&self, blobidx: u64, blobentry: BlobEntry) -> DbResult<()> {
+        todo!()
     }
 }
 
 impl SeqDataProvider for SeqDb {
-    fn get_l1_txn(&self, idx: u64) -> DbResult<Option<TxnStatusEntry>> {
-        Ok(self.db.get::<SeqL1TxnSchema>(&idx)?)
-    }
-
-    fn get_blob_by_id(&self, id: Buf32) -> DbResult<Option<Vec<u8>>> {
+    fn get_blob_by_id(&self, id: Buf32) -> DbResult<Option<BlobEntry>> {
         Ok(self.db.get::<SeqBlobSchema>(&id)?)
     }
 
@@ -120,16 +91,12 @@ impl SeqDataProvider for SeqDb {
         self.get_last_idx::<SeqBlobIdSchema>()
     }
 
-    fn get_last_txn_idx(&self) -> DbResult<Option<u64>> {
-        self.get_last_idx::<SeqL1TxnSchema>()
+    fn get_l1_tx(&self, txid: Buf32) -> DbResult<Option<Vec<u8>>> {
+        todo!()
     }
 
-    fn get_reveal_txidx_for_blob(&self, blobid: Buf32) -> DbResult<Option<u64>> {
-        Ok(self.db.get::<SeqBIdRevTxnIdxSchema>(&blobid)?)
-    }
-
-    fn get_blobid_for_blob_idx(&self, blobidx: u64) -> DbResult<Option<Buf32>> {
-        Ok(self.db.get::<SeqBlobIdSchema>(&blobidx)?)
+    fn get_blob_by_idx(&self, blobidx: u64) -> DbResult<Option<crate::types::BlobEntry>> {
+        todo!()
     }
 }
 
@@ -159,6 +126,10 @@ impl<D: SeqDataStore + SeqDataProvider> SequencerDatabase for SequencerDB<D> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::errors::DbError;
+    use crate::traits::{SeqDataProvider, SeqDataStore};
+    use crate::types::TxEntry;
+    use crate::types::TxnStatusEntry;
     use alpen_express_db::errors::DbError;
     use alpen_express_db::traits::{SeqDataProvider, SeqDataStore};
     use alpen_express_db::types::TxnStatusEntry;
@@ -173,13 +144,13 @@ mod tests {
         get_rocksdb_tmp_instance().unwrap()
     }
 
-    fn get_commit_reveal_txns() -> (TxnStatusEntry, TxnStatusEntry) {
+    fn get_commit_reveal_txns() -> (TxEntry, TxEntry) {
         let txns = get_test_bitcoin_txns();
 
         // NOTE that actually the commit reveal should be parent-child, but these are not.
         // This shouldn't matter here though.
-        let commit_txn = TxnStatusEntry::from_txn_unsent(&txns[0]);
-        let reveal_txn = TxnStatusEntry::from_txn_unsent(&txns[1]);
+        let commit_txn = TxEntry::from_txn(&txns[0]);
+        let reveal_txn = TxEntry::from_txn(&txns[1]);
         (commit_txn, reveal_txn)
     }
 

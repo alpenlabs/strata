@@ -55,14 +55,14 @@ impl Config {
         Self {
             bitcoind_rpc: BitcoindParams {
                 rpc_url: args.bitcoind_host.clone(),
-                rpc_user: args.bitcoind_host.clone(),
+                rpc_user: args.bitcoind_user.clone(),
                 rpc_password: args.bitcoind_password.clone(),
                 network: Network::from_core_arg(&args.network)
                     .expect("required valid bitcoin network"),
             },
             client: ClientParams {
-                rpc_port: 8432,
-                datadir: PathBuf::new(),
+                rpc_port: args.rpc_port,
+                datadir: args.datadir.clone(),
                 sequencer_key: None,
                 sequencer_bitcoin_address: args.sequencer_bitcoin_address.clone(),
             },
