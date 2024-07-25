@@ -49,6 +49,9 @@ pub enum Error {
     #[error("db: {0}")]
     Db(#[from] alpen_vertex_db::errors::DbError),
 
+    #[error("blocking task '{0}' failed for unknown reason")]
+    BlockingAbort(String),
+
     /// Generic internal error message.  If this is used often it should be made
     /// into its own error type.
     #[error("{0}")]
@@ -69,6 +72,7 @@ impl Error {
             Self::MissingL2Block(_) => -32603,
             Self::MissingChainstate(_) => -32604,
             Self::Db(_) => -32605,
+            Self::BlockingAbort(_) => -32001,
             Self::Other(_) => -32000,
             Self::OtherEx(_, _) => -32000,
         }
@@ -127,7 +131,7 @@ impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
         let tip_blkid = *ss.chain_tip_blkid();
 
         let db = self.database.clone();
-        let chs_fut = tokio::task::spawn_blocking::<_, Result<Arc<ChainState>, Error>>(move || {
+        let chs = wait_blocking("load_chainstate", move || {
             // FIXME this is horrible, the sync state should have the block
             // number in it somewhere
             let l2_prov = db.l2_provider();
@@ -142,16 +146,10 @@ impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
                 .ok_or(Error::MissingChainstate(idx))?;
 
             Ok(Arc::new(toplevel_st))
-        });
+        })
+        .await?;
 
-        match chs_fut.await {
-            Ok(res) => match res {
-                Ok(v) => Ok((cs, Some(v))),
-                Err(e) => Err(e.into()),
-            },
-            // This should only very rarely happen.
-            _ => Err(Error::Other("internal server error".to_owned())),
-        }
+        Ok((cs, Some(chs)))
     }
 }
 
@@ -221,5 +219,21 @@ where
             last_l1_block: *last_l1.as_ref(),
             buried_l1_height: state.buried_l1_height(),
         })
+    }
+}
+
+/// Wrapper around [``tokio::task::spawn_blocking``] that handles errors in the
+/// external task and merges the errors into the standard RPC error type.
+async fn wait_blocking<F, R>(name: &'static str, f: F) -> Result<R, Error>
+where
+    F: Fn() -> Result<R, Error> + Sync + Send + 'static,
+    R: Sync + Send + 'static,
+{
+    match tokio::task::spawn_blocking(f).await {
+        Ok(v) => v,
+        Err(_) => {
+            error!(%name, "background task aborted for unknown reason");
+            Err(Error::BlockingAbort(name.to_owned()))
+        }
     }
 }
