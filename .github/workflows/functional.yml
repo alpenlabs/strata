@@ -33,7 +33,7 @@ jobs:
         run: poetry config virtualenvs.in-project true
 
       - name: Install python dependencies
-        run: cd test && poetry install --no-root && cd -
+        run: cd functional-tests && poetry install --no-root && cd -
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@nightly
@@ -55,5 +55,5 @@ jobs:
         run: |
           export PATH=$(realpath target/debug/):$PATH
           which alpen-vertex-sequencer
-          cd test && \
+          cd functional-tests && \
           poetry run python entry.py

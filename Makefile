@@ -66,7 +66,7 @@ ensure-poetry:
 
 .PHONY: activate
 activate: ensure-poetry ## Activate poetry environment for integration tests.
-	cd test && poetry install --no-root
+	cd functional-tests && poetry install --no-root
 
 .PHONY: clean-dd
 clean-dd:
@@ -74,7 +74,7 @@ clean-dd:
 
 .PHONY: test-functional
 test-functional: ensure-poetry clean-dd ## Runs functional tests.
-	cd test && ./run_test.sh
+	cd functional-tests && ./run_test.sh
 
 ##@ Code Quality
 
@@ -109,11 +109,11 @@ ensure-ruff:
 
 .PHONY: fmt-check-func-tests
 fmt-check-func-tests: ensure-ruff ## Check formatting of python files inside `test` directory.
-	cd test && ruff format --check
+	cd functional-tests && ruff format --check
 
 .PHONY: fmt-func-tests
 fmt-func-tests: ensure-ruff ## Apply formatting of python files inside `test` directory.
-	cd test && ruff format
+	cd functional-tests && ruff format
 
 .PHONY: lint-check-ws
 lint-check-ws: ## Checks for lint issues in the workspace.
@@ -158,11 +158,11 @@ lint-check-toml: ensure-taplo ## Lints TOML files
 
 .PHONY: lint-check-func-tests
 lint-check-func-tests: ensure-ruff ## Lints python files inside the `test` directory.
-	cd test && ruff check
+	cd functional-tests && ruff check
 
 .PHONY: lint-fix-func-tests
 lint-fix-func-tests: ensure-ruff ## Runs lint fixes for python files inside `test` directory.
-	cd test && ruff check --fix
+	cd functional-tests && ruff check --fix
 
 .PHONY: lint
 lint: ## Runs all lints and checks for issues without trying to fix them.
