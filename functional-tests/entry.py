@@ -6,9 +6,9 @@ import sys
 import time
 from threading import Thread
 
+import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 
-import flexitest
 import seqrpc
 from constants import BD_PASSWORD, BD_USERNAME, BLOCK_GENERATION_INTERVAL_SECS, DD_ROOT
 

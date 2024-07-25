@@ -1,8 +1,8 @@
 import time
 
+import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 
-import flexitest
 from constants import MAX_HORIZON_POLL_INTERVAL_SECS, SEQ_SLACK_TIME_SECS
 
 
