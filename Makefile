@@ -5,6 +5,9 @@ GIT_TAG ?= $(shell git describe --tags --abbrev=0)
 
 BUILD_PATH = "target"
 
+FUNCTIONAL_TESTS_DIR  = functional-tests
+FUNCTIONAL_TESTS_DATADIR = _dd
+
 # Cargo profile for builds. Default is for local builds, CI uses an override.
 PROFILE ?= release
 
@@ -66,15 +69,15 @@ ensure-poetry:
 
 .PHONY: activate
 activate: ensure-poetry ## Activate poetry environment for integration tests.
-	cd functional-tests && poetry install --no-root
+	cd $(FUNCTIONAL_TESTS_DIR) && poetry install --no-root
 
 .PHONY: clean-dd
 clean-dd:
-	rm -rf test/_dd 2>/dev/null
+	rm -rf $(FUNCTIONAL_TESTS_DIR)/$(FUNCTIONAL_TESTS_DATADIR) 2>/dev/null
 
 .PHONY: test-functional
 test-functional: ensure-poetry clean-dd ## Runs functional tests.
-	cd functional-tests && ./run_test.sh
+	cd $(FUNCTIONAL_TESTS_DIR) && ./run_test.sh
 
 ##@ Code Quality
 
@@ -109,11 +112,11 @@ ensure-ruff:
 
 .PHONY: fmt-check-func-tests
 fmt-check-func-tests: ensure-ruff ## Check formatting of python files inside `test` directory.
-	cd functional-tests && ruff format --check
+	cd $(FUNCTIONAL_TESTS_DIR) && ruff format --check
 
 .PHONY: fmt-func-tests
 fmt-func-tests: ensure-ruff ## Apply formatting of python files inside `test` directory.
-	cd functional-tests && ruff format
+	cd $(FUNCTIONAL_TESTS_DIR) && ruff format
 
 .PHONY: lint-check-ws
 lint-check-ws: ## Checks for lint issues in the workspace.
@@ -158,11 +161,11 @@ lint-check-toml: ensure-taplo ## Lints TOML files
 
 .PHONY: lint-check-func-tests
 lint-check-func-tests: ensure-ruff ## Lints python files inside the `test` directory.
-	cd functional-tests && ruff check
+	cd $(FUNCTIONAL_TESTS_DIR) && ruff check
 
 .PHONY: lint-fix-func-tests
 lint-fix-func-tests: ensure-ruff ## Runs lint fixes for python files inside `test` directory.
-	cd functional-tests && ruff check --fix
+	cd $(FUNCTIONAL_TESTS_DIR) && ruff check --fix
 
 .PHONY: lint
 lint: ## Runs all lints and checks for issues without trying to fix them.
