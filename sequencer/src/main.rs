@@ -1,5 +1,6 @@
 use std::fs;
 use std::io;
+use std::path::Path;
 use std::path::PathBuf;
 use std::process;
 use std::sync::Arc;
@@ -8,6 +9,9 @@ use std::time;
 
 use alpen_vertex_primitives::l1::L1Status;
 use anyhow::Context;
+use bitcoin::Network;
+use config::Config;
+use format_serde_error::SerdeError;
 use thiserror::Error;
 use tokio::sync::{broadcast, mpsc, oneshot, watch, RwLock};
 use tracing::*;
@@ -37,8 +41,18 @@ pub enum InitError {
     #[error("io: {0}")]
     Io(#[from] io::Error),
 
+    #[error("config: {0}")]
+    MalformedConfig(#[from] SerdeError),
+
     #[error("{0}")]
     Other(String),
+}
+
+fn load_configuration(path: &Path) -> Result<Config, InitError> {
+    let config_str = fs::read_to_string(path)?;
+    let conf = toml::from_str::<Config>(&config_str)
+        .map_err(|err| SerdeError::new(config_str.to_string(), err))?;
+    Ok(conf)
 }
 
 fn main() {
@@ -52,8 +66,17 @@ fn main() {
 fn main_inner(args: Args) -> anyhow::Result<()> {
     logging::init();
 
+    // initialize the full configuration
+    let mut config = match args.config.as_ref() {
+        Some(config_path) => load_configuration(config_path)?,
+        None => Config::new(),
+    };
+
+    // Values passed over arguments get the precendence over the configuration files
+    config.update_from_args(&args);
+
     // Open the database.
-    let rbdb = open_rocksdb_database(&args)?;
+    let rbdb = open_rocksdb_database(&config)?;
 
     // Set up block params.
     let params = Params {
@@ -63,9 +86,10 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             l1_start_block_height: 4,
         },
         run: RunParams {
-            l1_follow_distance: 6,
+            l1_follow_distance: config.sync.l1_follow_distance,
         },
     };
+
     let params = Arc::new(params);
 
     // Start runtime for async IO tasks.
@@ -96,17 +120,17 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let l1_status = Arc::new(RwLock::new(L1Status::default()));
 
     // Set up Bitcoin client RPC.
-    let bitcoind_url = format!("http://{}", args.bitcoind_host);
+    let bitcoind_url = format!("http://{}", config.bitcoind_rpc.rpc_url);
     let btc_rpc = alpen_vertex_btcio::rpc::BitcoinClient::new(
         bitcoind_url,
-        args.bitcoind_user.clone(),
-        args.bitcoind_password.clone(),
+        config.bitcoind_rpc.rpc_user.clone(),
+        config.bitcoind_rpc.rpc_password.clone(),
         bitcoin::Network::Regtest,
     );
 
     // TODO remove this
-    if args.network != "regtest" {
-        warn!(network = %args.network, "network not set to regtest, ignoring");
+    if config.bitcoind_rpc.network == Network::Regtest {
+        warn!("network not set to regtest, ignoring");
     }
 
     // Create dataflow channels.
@@ -158,13 +182,14 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     }
 
     let main_fut = main_task(
-        args,
+        &config,
         sync_man,
         btc_rpc,
         database.clone(),
         l1_status,
         cur_state_rx,
     );
+
     if let Err(e) = rt.block_on(main_fut) {
         error!(err = %e, "main task exited");
         process::exit(0); // special case exit once we've gotten to this point
@@ -175,7 +200,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 }
 
 async fn main_task<D: Database + Send + Sync + 'static>(
-    args: Args,
+    config: &Config,
     sync_man: Arc<SyncManager>,
     l1_rpc_client: impl L1Client,
     database: Arc<D>,
@@ -192,6 +217,7 @@ where
     let csm_ctl = sync_man.get_csm_ctl();
     l1_reader::start_reader_tasks(
         sync_man.params(),
+        config,
         l1_rpc_client,
         database.clone(),
         csm_ctl,
@@ -206,7 +232,7 @@ where
         rpc_server::AlpenRpcImpl::new(l1_status.clone(), database.clone(), cur_state_rx, stop_tx);
     let methods = alp_rpc.into_rpc();
 
-    let rpc_port = args.rpc_port; // TODO make configurable
+    let rpc_port = config.client.rpc_port;
     let rpc_server = jsonrpsee::server::ServerBuilder::new()
         .build(format!("127.0.0.1:{rpc_port}"))
         .await
@@ -228,8 +254,8 @@ where
     Ok(())
 }
 
-fn open_rocksdb_database(args: &Args) -> anyhow::Result<Arc<rockbound::DB>> {
-    let mut database_dir = args.datadir.clone();
+fn open_rocksdb_database(config: &Config) -> anyhow::Result<Arc<rockbound::DB>> {
+    let mut database_dir = config.client.datadir.clone();
     database_dir.push("rocksdb");
 
     if !database_dir.exists() {

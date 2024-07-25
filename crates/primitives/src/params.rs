@@ -22,7 +22,7 @@ pub struct RollupParams {
 #[derive(Clone, Debug)]
 pub struct RunParams {
     /// Number of blocks that we follow the L1 from.
-    pub l1_follow_distance: usize,
+    pub l1_follow_distance: u64,
 }
 
 /// Combined set of parameters across all the consensus logic.
