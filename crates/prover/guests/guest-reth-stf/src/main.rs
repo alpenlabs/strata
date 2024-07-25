@@ -3,7 +3,7 @@ use risc0_zkvm::guest::env;
 use revm::InMemoryDB;
 use zkvm_primitives::db::InMemoryDBHelper;
 use zkvm_primitives::processor::EvmProcessor;
-use zkvm_primitives::{db, SP1RethInput};
+use zkvm_primitives::{SP1RethInput};
 
 const ENCODED_IP: &[u8] = include_bytes!("../1.bin");
 
@@ -20,6 +20,10 @@ fn main() {
         db: Some(db),
         header: None,
     };
+
+    executor.initialize();
+    executor.execute();
+    executor.finalize();
 
     // read the input
     // let db = InMemoryDB::initialize(&mut input).unwrap();
