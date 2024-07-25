@@ -6,9 +6,9 @@ import sys
 import time
 from threading import Thread
 
-import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 
+import flexitest
 import seqrpc
 
 BD_USERNAME = "alpen"
@@ -167,8 +167,9 @@ class BasicEnvConfig(flexitest.EnvConfig):
 def main(argv):
     test_dir = os.path.dirname(os.path.abspath(__file__))
     modules = flexitest.runtime.scan_dir_for_modules(test_dir)
+    all_tests = flexitest.runtime.load_candidate_modules(modules)
 
-    tests = [argv[1]] if len(argv) > 1 else flexitest.runtime.load_candidate_modules(modules)
+    tests = [argv[1]] if len(argv) > 1 else all_tests
 
     datadir_root = flexitest.create_datadir_in_workspace(os.path.join(test_dir, DD_ROOT))
 
