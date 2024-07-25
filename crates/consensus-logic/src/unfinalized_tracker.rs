@@ -132,47 +132,51 @@ impl UnfinalizedBlockTracker {
             return Err(ChainTipError::MissingBlock(*blkid));
         }
 
-        let mut path = vec![];
-        let mut to_evict = Vec::new();
+        let mut finalized = vec![];
         let mut at = *blkid;
 
-        // Walk down to the current finalized tip and put everything in the
-        // eviction table.
+        // Walk down to the current finalized tip and put everything as finalized.
         while at != self.finalized_tip {
-            path.push(at);
+            finalized.push(at);
 
-            // Get the parent of the block we're at, add all of the children
-            // other than the one we're at to the eviction table.
+            // Get the parent of the block we're at
             let ent = self.pending_table.get(&at).unwrap();
-            for ch in &ent.children {
-                if *ch != at {
-                    to_evict.push(*ch);
-                }
-            }
-
             at = ent.parent;
         }
 
-        // Now actually go through and evict all the blocks we said we were
-        // going to, adding more on as we add them.
-        let mut evicted = Vec::new();
-        while let Some(evicting) = to_evict.pop() {
-            let ent = self
-                .pending_table
-                .remove(&evicting)
-                .expect("chaintip: evicting dangling child ref");
-            self.unfinalized_tips.remove(&evicting);
+        let mut to_evict = vec![];
 
-            to_evict.extend(ent.children.into_iter());
-            evicted.push(evicting);
+        // Walk down from the parent of blkid and find the chains that needs to be evicted
+        let mut at = self.pending_table.get(blkid).unwrap().parent;
+        loop {
+            let ent = self.pending_table.get(&at).unwrap();
+            for child in &ent.children {
+                if !finalized.contains(child) {
+                    to_evict.push(*child);
+                }
+            }
+            if at == self.finalized_tip {
+                break;
+            }
+            at = ent.parent;
+        }
+
+        // Put all the blocks of the chains that needs to be evicted
+        let mut evicted = to_evict.clone();
+        for b in to_evict {
+            evicted.extend(self.get_all_descendants(&b))
+        }
+
+        // Remove the evicted blocks from the pending table
+        for b in &evicted {
+            self.remove(b);
         }
 
         // And also remove blocks that we're finalizing, *except* the new
         // finalized tip.
-        assert!(self.pending_table.remove(&self.finalized_tip).is_some());
-        for pblk in &path {
-            if pblk != blkid {
-                assert!(self.pending_table.remove(pblk).is_some());
+        for b in &finalized {
+            if b != blkid {
+                self.remove(b);
             }
         }
 
@@ -181,12 +185,48 @@ impl UnfinalizedBlockTracker {
         self.finalized_tip = *blkid;
 
         // Sanity check and construct the report.
-        assert!(!path.is_empty(), "chaintip: somehow finalized no blocks");
+        assert!(
+            !finalized.is_empty(),
+            "chaintip: somehow finalized no blocks"
+        );
         Ok(FinalizeReport {
             prev_tip: old_tip,
-            finalized: path,
+            finalized,
             rejected: evicted,
         })
+    }
+
+    pub fn get_all_descendants(&self, blkid: &L2BlockId) -> Vec<L2BlockId> {
+        let mut descendants = Vec::new();
+        let mut to_visit = vec![*blkid];
+
+        while let Some(curr_blk) = to_visit.pop() {
+            if let Some(entry) = self.pending_table.get(&curr_blk) {
+                for child in &entry.children {
+                    descendants.push(*child);
+                    to_visit.push(*child);
+                }
+            }
+        }
+        descendants
+    }
+
+    pub fn remove(&mut self, blkid: &L2BlockId) {
+        // First, find and store the parent
+        let parent = self.get_parent(blkid).cloned();
+
+        // Remove the block from the pending table
+        self.pending_table.remove(blkid);
+
+        // Remove the block from its parent's children list
+        if let Some(parent) = parent {
+            if let Some(parent_entry) = self.pending_table.get_mut(&parent) {
+                parent_entry.children.remove(blkid);
+            }
+        }
+
+        // Remove the block from unfinalized tips
+        self.unfinalized_tips.remove(blkid);
     }
 
     /// Loads the unfinalized blocks into the tracker which are already in the DB
@@ -272,6 +312,8 @@ impl FinalizeReport {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use alpen_test_utils::ArbitraryGenerator;
     use alpen_vertex_db::traits::{Database, L2DataStore};
     use alpen_vertex_state::{
@@ -315,40 +357,60 @@ mod tests {
         L2Block::new(signed_header, body)
     }
 
-    fn setup_test_chain(
-        l2_prov: &impl L2DataStore,
-    ) -> (
-        SignedL2BlockHeader,
-        SignedL2BlockHeader,
-        SignedL2BlockHeader,
-        SignedL2BlockHeader,
-    ) {
-        // b2   b2a (side chain)
+    fn setup_test_chain(l2_prov: &impl L2DataStore) -> [L2BlockId; 7] {
+        // Chain A: g -> a1 -> a2 -> a3
+        // Chain B: g -> a1 -> b2 -> b3
+        // Chain C: g -> c1
+
+        // a3   b3
+        // |     |
+        // |     |
+        // a2   b2
         // |   /
         // | /
-        // b1 (finalized)
-        // |
-        // g1 (10)
+        // a1  c1
+        // |  /
+        // g
         // |
 
         let genesis = get_genesis_block();
         let genesis_header = genesis.header().clone();
 
-        let block1 = get_mock_block_with_parent(genesis.header());
-        let block1_header = block1.header().clone();
+        let block_a1 = get_mock_block_with_parent(genesis.header());
+        let block_a1_header = block_a1.header().clone();
 
-        let block2 = get_mock_block_with_parent(block1.header());
-        let block2_header = block2.header().clone();
+        let block_c1 = get_mock_block_with_parent(genesis.header());
+        let block_c1_header = block_c1.header().clone();
 
-        let block2a = get_mock_block_with_parent(block1.header());
-        let block2a_header = block2a.header().clone();
+        let block_a2 = get_mock_block_with_parent(block_a1.header());
+        let block_a2_header = block_a2.header().clone();
+
+        let block_b2 = get_mock_block_with_parent(block_a1.header());
+        let block_b2_header = block_b2.header().clone();
+
+        let block_a3 = get_mock_block_with_parent(block_a2.header());
+        let block_a3_header = block_a3.header().clone();
+
+        let block_b3 = get_mock_block_with_parent(block_b2.header());
+        let block_b3_header = block_b3.header().clone();
 
         l2_prov.put_block_data(genesis.clone()).unwrap();
-        l2_prov.put_block_data(block1.clone()).unwrap();
-        l2_prov.put_block_data(block2.clone()).unwrap();
-        l2_prov.put_block_data(block2a.clone()).unwrap();
+        l2_prov.put_block_data(block_a1.clone()).unwrap();
+        l2_prov.put_block_data(block_c1.clone()).unwrap();
+        l2_prov.put_block_data(block_a2.clone()).unwrap();
+        l2_prov.put_block_data(block_b2.clone()).unwrap();
+        l2_prov.put_block_data(block_a3.clone()).unwrap();
+        l2_prov.put_block_data(block_b3.clone()).unwrap();
 
-        (genesis_header, block1_header, block2_header, block2a_header)
+        [
+            genesis_header.get_blockid(),
+            block_a1_header.get_blockid(),
+            block_c1_header.get_blockid(),
+            block_a2_header.get_blockid(),
+            block_b2_header.get_blockid(),
+            block_a3_header.get_blockid(),
+            block_b3_header.get_blockid(),
+        ]
     }
 
     #[test]
@@ -356,29 +418,123 @@ mod tests {
         let db = alpen_test_utils::get_common_db();
         let l2_prov = db.l2_provider();
 
-        let (genesis, block1, block2, block2a) = setup_test_chain(l2_prov.as_ref());
+        let [g, a1, c1, a2, b2, a3, b3] = setup_test_chain(l2_prov.as_ref());
 
         // Init the chain tracker from the state we figured out.
-        let mut chain_tracker =
-            unfinalized_tracker::UnfinalizedBlockTracker::new_empty(genesis.get_blockid());
+        let mut chain_tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(g);
 
         chain_tracker
             .load_unfinalized_blocks(1, l2_prov.as_ref())
             .unwrap();
 
-        assert_eq!(
-            chain_tracker.get_parent(&block1.get_blockid()),
-            Some(&genesis.get_blockid())
-        );
+        assert_eq!(chain_tracker.get_parent(&g), None);
+        assert_eq!(chain_tracker.get_parent(&a1), Some(&g));
+        assert_eq!(chain_tracker.get_parent(&c1), Some(&g));
+        assert_eq!(chain_tracker.get_parent(&a2), Some(&a1));
+        assert_eq!(chain_tracker.get_parent(&b2), Some(&a1));
+        assert_eq!(chain_tracker.get_parent(&a3), Some(&a2));
+        assert_eq!(chain_tracker.get_parent(&b3), Some(&b2));
 
         assert_eq!(
-            chain_tracker.get_parent(&block2.get_blockid()),
-            Some(&block1.get_blockid())
+            chain_tracker.pending_table.get(&g).unwrap().children,
+            HashSet::from_iter(vec![a1, c1])
         );
-
         assert_eq!(
-            chain_tracker.get_parent(&block2a.get_blockid()),
-            Some(&block1.get_blockid())
+            chain_tracker.pending_table.get(&a1).unwrap().children,
+            HashSet::from_iter(vec![a2, b2])
         );
+        assert_eq!(
+            chain_tracker.pending_table.get(&c1).unwrap().children,
+            HashSet::from_iter(vec![])
+        );
+        assert_eq!(
+            chain_tracker.pending_table.get(&a2).unwrap().children,
+            HashSet::from_iter(vec![a3])
+        );
+        assert_eq!(
+            chain_tracker.pending_table.get(&b2).unwrap().children,
+            HashSet::from_iter(vec![b3])
+        );
+    }
+
+    #[test]
+    fn test_get_descendants() {
+        let db = alpen_test_utils::get_common_db();
+        let l2_prov = db.l2_provider();
+
+        let [g, a1, c1, a2, b2, a3, b3] = setup_test_chain(l2_prov.as_ref());
+
+        // Init the chain tracker from the state we figured out.
+        let mut chain_tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(g);
+
+        chain_tracker
+            .load_unfinalized_blocks(1, l2_prov.as_ref())
+            .unwrap();
+
+        assert_eq!(chain_tracker.get_all_descendants(&g).len(), 6);
+        assert_eq!(chain_tracker.get_all_descendants(&a1).len(), 4);
+        assert_eq!(chain_tracker.get_all_descendants(&c1).len(), 0);
+        assert_eq!(chain_tracker.get_all_descendants(&a2).len(), 1);
+        assert_eq!(chain_tracker.get_all_descendants(&b2).len(), 1);
+        assert_eq!(chain_tracker.get_all_descendants(&a3).len(), 0);
+        assert_eq!(chain_tracker.get_all_descendants(&b3).len(), 0);
+    }
+
+    #[test]
+    fn test_update_finalized_tip() {
+        let db = alpen_test_utils::get_common_db();
+        let l2_prov = db.l2_provider();
+
+        let [g, a1, c1, a2, b2, a3, b3] = setup_test_chain(l2_prov.as_ref());
+
+        // Init the chain tracker from the state we figured out.
+        let mut chain_tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(g);
+
+        chain_tracker
+            .load_unfinalized_blocks(1, l2_prov.as_ref())
+            .unwrap();
+
+        let report = chain_tracker.update_finalized_tip(&b2).unwrap();
+        assert_eq!(report.prev_tip(), &g);
+        assert_eq!(report.finalized, &[b2, a1]);
+        assert_eq!(report.rejected(), &[a2, c1, a3]);
+        assert_eq!(chain_tracker.finalized_tip, b2);
+
+        assert_eq!(chain_tracker.get_all_descendants(&g), &[]);
+        assert_eq!(chain_tracker.get_all_descendants(&a1), &[]);
+        assert_eq!(chain_tracker.get_all_descendants(&c1), &[]);
+        assert_eq!(chain_tracker.get_all_descendants(&a2), &[]);
+        assert_eq!(chain_tracker.get_all_descendants(&b2), &[b3]);
+        assert_eq!(chain_tracker.get_all_descendants(&a3), &[]);
+        assert_eq!(chain_tracker.get_all_descendants(&b3), &[]);
+    }
+
+    #[test]
+    fn test_update_finalized_tip_2() {
+        let db = alpen_test_utils::get_common_db();
+        let l2_prov = db.l2_provider();
+
+        let [g, a1, c1, a2, b2, a3, b3] = setup_test_chain(l2_prov.as_ref());
+
+        // Init the chain tracker from the state we figured out.
+        let mut chain_tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(g);
+
+        chain_tracker
+            .load_unfinalized_blocks(1, l2_prov.as_ref())
+            .unwrap();
+
+        let report = chain_tracker.update_finalized_tip(&a2).unwrap();
+        assert_eq!(report.prev_tip(), &g);
+        assert_eq!(report.finalized, &[a2, a1]);
+        assert_eq!(report.rejected(), &[b2, c1, b3]);
+        assert_eq!(chain_tracker.finalized_tip, a2);
+
+        assert_eq!(chain_tracker.get_all_descendants(&g), &[]);
+        assert_eq!(chain_tracker.get_all_descendants(&a1), &[]);
+        assert_eq!(chain_tracker.get_all_descendants(&c1), &[]);
+        assert_eq!(chain_tracker.get_all_descendants(&a2), &[a3]);
+        assert_eq!(chain_tracker.get_all_descendants(&b2), &[]);
+        assert_eq!(chain_tracker.get_all_descendants(&a3), &[]);
+        assert_eq!(chain_tracker.get_all_descendants(&b3), &[]);
     }
 }
