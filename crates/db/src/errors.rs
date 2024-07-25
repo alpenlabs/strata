@@ -1,8 +1,4 @@
-use rockbound::{rocksdb, CodecError, TransactionError};
 use thiserror::Error;
-
-/// Simple result type used across database interface.
-pub type DbResult<T> = Result<T, DbError>;
 
 #[derive(Debug, Error)]
 pub enum DbError {
@@ -36,10 +32,6 @@ pub enum DbError {
 
     #[error("tried to revert to index {0} above current tip {1}")]
     RevertAboveCurrent(u64, u64),
-
-    #[error("rocksdb: {0}")]
-    Rocksdb(#[from] rocksdb::Error),
-
     #[error("not yet implemented")]
     Unimplemented,
 
@@ -49,19 +41,6 @@ pub enum DbError {
 
 impl From<anyhow::Error> for DbError {
     fn from(value: anyhow::Error) -> Self {
-        Self::Other(value.to_string())
-    }
-}
-
-impl From<CodecError> for DbError {
-    fn from(value: CodecError) -> Self {
-        Self::Other(value.to_string())
-    }
-}
-
-impl<E: core::fmt::Display> From<TransactionError<E>> for DbError {
-    fn from(value: TransactionError<E>) -> Self {
-        // TODO: more specific error mapping
         Self::Other(value.to_string())
     }
 }

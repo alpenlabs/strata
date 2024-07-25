@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use alpen_express_db::{
-    database::CommonDatabase,
-    stubs::{chain_state::StubChainstateDb, l2::StubL2Db},
-    ClientStateDb, L1Db, SyncEventDb,
-};
+use alpen_express_db::database::CommonDatabase;
+
+use alpen_express_db::stubs::{chain_state::StubChainstateDb, l2::StubL2Db};
+use alpen_express_rocksdb::{ClientStateDb, L1Db, SyncEventDb};
+
 use arbitrary::{Arbitrary, Unstructured};
 use rand::Rng;
 use rockbound::rocksdb;
@@ -37,8 +37,8 @@ impl ArbitraryGenerator {
 }
 
 pub fn get_rocksdb_tmp_instance() -> anyhow::Result<Arc<rockbound::OptimisticTransactionDB>> {
-    let dbname = alpen_express_db::ROCKSDB_NAME;
-    let cfs = alpen_express_db::STORE_COLUMN_FAMILIES;
+    let dbname = alpen_express_rocksdb::ROCKSDB_NAME;
+    let cfs = alpen_express_rocksdb::STORE_COLUMN_FAMILIES;
     let mut opts = rocksdb::Options::default();
     opts.create_missing_column_families(true);
     opts.create_if_missing(true);

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use rockbound::{OptimisticTransactionDB as DB, Schema, SchemaDBOperationsExt};
 
-use crate::DbResult;
+use alpen_express_db::DbResult;
 
 pub fn get_last_idx<T>(db: Arc<DB>) -> DbResult<Option<u64>>
 where

@@ -130,11 +130,11 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     ));
 
     // Initialize databases.
-    let l1_db = Arc::new(alpen_express_db::L1Db::new(rbdb.clone()));
-    let l2_db = Arc::new(alpen_express_db::l2::db::L2Db::new(rbdb.clone()));
-    let sync_ev_db = Arc::new(alpen_express_db::SyncEventDb::new(rbdb.clone()));
-    let cs_db = Arc::new(alpen_express_db::ClientStateDb::new(rbdb.clone()));
-    let chst_db = Arc::new(alpen_express_db::ChainStateDb::new(rbdb.clone()));
+    let l1_db = Arc::new(alpen_express_rocksdb::L1Db::new(rbdb.clone()));
+    let l2_db = Arc::new(alpen_express_rocksdb::l2::db::L2Db::new(rbdb.clone()));
+    let sync_ev_db = Arc::new(alpen_express_rocksdb::SyncEventDb::new(rbdb.clone()));
+    let cs_db = Arc::new(alpen_express_rocksdb::ClientStateDb::new(rbdb.clone()));
+    let chst_db = Arc::new(alpen_express_rocksdb::ChainStateDb::new(rbdb.clone()));
     let database = Arc::new(alpen_express_db::database::CommonDatabase::new(
         l1_db, l2_db, sync_ev_db, cs_db, chst_db,
     ));
@@ -291,8 +291,8 @@ fn open_rocksdb_database(
         fs::create_dir_all(&database_dir)?;
     }
 
-    let dbname = alpen_express_db::ROCKSDB_NAME;
-    let cfs = alpen_express_db::STORE_COLUMN_FAMILIES;
+    let dbname = alpen_express_rocksdb::ROCKSDB_NAME;
+    let cfs = alpen_express_rocksdb::STORE_COLUMN_FAMILIES;
     let mut opts = rocksdb::Options::default();
     opts.create_if_missing(true);
     opts.create_missing_column_families(true);

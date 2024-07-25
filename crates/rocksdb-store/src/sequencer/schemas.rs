@@ -4,7 +4,7 @@ use crate::define_table_with_default_codec;
 use crate::define_table_with_seek_key_codec;
 use crate::define_table_without_codec;
 use crate::impl_borsh_value_codec;
-use crate::types::TxnStatusEntry;
+use alpen_express_db::types::TxnStatusEntry;
 
 define_table_with_seek_key_codec!(
     /// A table to store L1 txns

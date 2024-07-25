@@ -7,8 +7,7 @@ use alpen_express_state::chain_state::ChainState;
 use alpen_express_state::state_op;
 use alpen_express_state::state_op::WriteBatch;
 
-use crate::errors::*;
-use crate::traits::*;
+use crate::{errors::DbError, traits::*, DbResult};
 
 struct InnerState {
     write_batches: BTreeMap<u64, WriteBatch>,

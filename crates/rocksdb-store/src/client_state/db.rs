@@ -1,15 +1,15 @@
 use std::sync::Arc;
 
-use rockbound::{OptimisticTransactionDB as DB, Schema, SchemaDBOperationsExt};
+use rockbound::Schema;
+use rockbound::{OptimisticTransactionDB, SchemaDBOperationsExt};
 
+use alpen_express_db::{errors::*, traits::*, DbResult};
 use alpen_express_state::operation::*;
 
 use super::schemas::{ClientStateSchema, ClientUpdateOutputSchema};
-use crate::errors::*;
-use crate::traits::*;
 
 pub struct ClientStateDb {
-    db: Arc<DB>,
+    db: Arc<OptimisticTransactionDB>,
 }
 
 impl ClientStateDb {
@@ -17,7 +17,7 @@ impl ClientStateDb {
     ///
     /// Assumes it was opened with column families as defined in `STORE_COLUMN_FAMILIES`.
     // FIXME Make it better/generic.
-    pub fn new(db: Arc<DB>) -> Self {
+    pub fn new(db: Arc<OptimisticTransactionDB>) -> Self {
         Self { db }
     }
 
