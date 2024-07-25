@@ -10,10 +10,7 @@ from bitcoinlib.services.bitcoind import BitcoindClient
 
 import flexitest
 import seqrpc
-
-BD_USERNAME = "alpen"
-BD_PASSWORD = "alpen"
-DD_ROOT = "_dd"
+from constants import BD_PASSWORD, BD_USERNAME, BLOCK_GENERATION_INTERVAL_SECS, DD_ROOT
 
 
 def generate_seqkey() -> bytes:
@@ -146,19 +143,19 @@ class BasicEnvConfig(flexitest.EnvConfig):
         seq_fac = ctx.get_factory("sequencer")
 
         bitcoind = btc_fac.create_regtest_bitcoin()
-        time.sleep(0.5)
+        time.sleep(BLOCK_GENERATION_INTERVAL_SECS)
 
         brpc = bitcoind.create_rpc()
         brpc.proxy.createwallet("dummy")
 
         # generate blocks every 500 millis
-        generate_blocks(brpc, 0.5)
+        generate_blocks(brpc, BLOCK_GENERATION_INTERVAL_SECS)
         rpc_port = bitcoind.get_prop("rpc_port")
         rpc_user = bitcoind.get_prop("rpc_user")
         rpc_pass = bitcoind.get_prop("rpc_password")
         rpc_sock = f"localhost:{rpc_port}"
         sequencer = seq_fac.create_sequencer(rpc_sock, rpc_user, rpc_pass)
-        time.sleep(0.5)
+        time.sleep(BLOCK_GENERATION_INTERVAL_SECS)
 
         svcs = {"bitcoin": bitcoind, "sequencer": sequencer}
         return flexitest.LiveEnv(svcs)

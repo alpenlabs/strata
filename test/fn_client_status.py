@@ -1,6 +1,7 @@
 import time
 
 import flexitest
+from constants import BLOCK_GENERATION_INTERVAL_SECS, SEQ_SLACK_TIME_SECS
 
 
 @flexitest.register
@@ -17,8 +18,6 @@ class L1ClientStatusTest(flexitest.Test):
         print("protocol version", proto_ver)
         assert proto_ver == 1, "query protocol version"
 
-        time.sleep(3)
+        time.sleep(BLOCK_GENERATION_INTERVAL_SECS + SEQ_SLACK_TIME_SECS)
         client_status = seqrpc.alp_clientStatus()
         print("client status", client_status)
-
-        time.sleep(2)
