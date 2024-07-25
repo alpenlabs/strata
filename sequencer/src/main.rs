@@ -1,3 +1,4 @@
+#![allow(dead_code)] // TODO: remove this once `Args.network` is used
 use std::fs;
 use std::io;
 use std::path::Path;
@@ -72,7 +73,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         None => Config::new(),
     };
 
-    // Values passed over arguments get the precendence over the configuration files
+    // Values passed over arguments get the precedence over the configuration files
     config.update_from_args(&args);
 
     // Open the database.
