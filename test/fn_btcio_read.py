@@ -1,7 +1,8 @@
 import time
 
-import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
+
+import flexitest
 
 
 @flexitest.register
@@ -17,7 +18,7 @@ class L1StatusTest(flexitest.Test):
         btcrpc: BitcoindClient = btc.create_rpc()
         seqrpc = seq.create_rpc()
 
-        time.sleep(1)
+        time.sleep(2)
         received_block = btcrpc.getblock(btcrpc.proxy.getbestblockhash())
         l1stat = seqrpc.alp_l1status()
 
