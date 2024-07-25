@@ -54,7 +54,7 @@ mutants-test: ## Runs `nextest` under `cargo-mutants`. Caution: This can take *r
 
 .PHONY: sec
 sec: ## Check for security advisories on any dependencies.
-	cargo audit -D warnings
+	cargo audit #  HACK: not denying warnings as we depend on `yaml-rust` via `format-serde-error` which is unmaintained
 
 ##@ Functional Tests
 .PHONY: ensure-poetry
