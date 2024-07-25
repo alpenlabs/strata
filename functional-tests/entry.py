@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 import logging as log
 import os
 import sys
@@ -53,6 +52,7 @@ class BitcoinFactory(flexitest.Factory):
     def __init__(self, port_range: list[int]):
         super().__init__(port_range)
 
+    @flexitest.with_ectx("ctx")
     def create_regtest_bitcoin(self, ctx: flexitest.EnvContext) -> flexitest.Service:
         datadir = ctx.make_service_dir("bitcoin")
         p2p_port = self.next_port()
@@ -92,6 +92,7 @@ class VertexFactory(flexitest.Factory):
     def __init__(self, port_range: list[int]):
         super().__init__(port_range)
 
+    @flexitest.with_ectx("ctx")
     def create_sequencer(
         self, bitcoind_sock: str, bitcoind_user: str, bitcoind_pass: str, ctx: flexitest.EnvContext
     ) -> flexitest.Service:
