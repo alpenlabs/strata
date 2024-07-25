@@ -10,20 +10,25 @@ use alpen_vertex_state::header::L2Header;
 use tokio::sync::{broadcast, mpsc, watch};
 use tracing::*;
 
-use alpen_vertex_db::traits::{Database, L2DataProvider};
+use alpen_vertex_db::traits::Database;
 use alpen_vertex_evmctl::engine::ExecEngineCtl;
 use alpen_vertex_primitives::params::Params;
 
 use crate::ctl::CsmController;
 use crate::message::{ClientUpdateNotif, CsmMessage, ForkChoiceMessage};
-use crate::{errors, fork_choice_manager, genesis, unfinalized_tracker, worker};
+use crate::status::CsmStatus;
+use crate::{fork_choice_manager, genesis, worker};
 
+/// Handle to the core pipeline tasks.
 pub struct SyncManager {
     params: Arc<Params>,
 
     fc_manager_tx: mpsc::Sender<ForkChoiceMessage>,
     csm_ctl: Arc<CsmController>,
+
     cupdate_rx: broadcast::Receiver<Arc<ClientUpdateNotif>>,
+    cl_state_rx: watch::Receiver<Arc<ClientState>>,
+    csm_status_rx: watch::Receiver<CsmStatus>,
 }
 
 impl SyncManager {
@@ -52,6 +57,16 @@ impl SyncManager {
         self.cupdate_rx.resubscribe()
     }
 
+    /// Returns a new watch `Receiver` handle to the CSM state watch.
+    pub fn create_state_watch_sub(&self) -> watch::Receiver<Arc<ClientState>> {
+        self.cl_state_rx.clone()
+    }
+
+    /// Gets a clone of the last sent CSM status.
+    pub fn get_csm_status(&self) -> CsmStatus {
+        self.csm_status_rx.borrow().clone()
+    }
+
     /// Submits a fork choice message if possible. (synchronously)
     pub fn submit_chain_tip_msg(&self, ctm: ForkChoiceMessage) -> bool {
         self.fc_manager_tx.blocking_send(ctm).is_ok()
@@ -72,7 +87,6 @@ pub fn start_sync_tasks<
     engine: Arc<E>,
     pool: Arc<threadpool::ThreadPool>,
     params: Arc<Params>,
-    cl_state_tx: watch::Sender<Option<ClientState>>,
 ) -> anyhow::Result<SyncManager> {
     // Create channels.
     let (fcm_tx, fcm_rx) = mpsc::channel::<ForkChoiceMessage>(64);
@@ -101,10 +115,25 @@ pub fn start_sync_tasks<
 
     // Prepare the client worker state and start the thread for that.
     let cw_state = worker::WorkerState::open(params.clone(), database.clone(), cupdate_tx)?;
+    let state = cw_state.cur_state().clone();
+
+    let mut status = CsmStatus::default();
+    status.set_last_sync_ev_idx(cw_state.cur_event_idx());
+    status.update_from_client_state(state.as_ref());
+    let (csm_status_tx, csm_status_rx) = watch::channel(status);
+    let (cl_state_tx, cl_state_rx) = watch::channel(state);
+
     let csm_eng = engine.clone();
     let csm_fcm_tx = fcm_tx.clone();
     let _cw_handle = thread::spawn(|| {
-        worker::client_worker_task(cw_state, csm_eng, csm_rx, cl_state_tx, csm_fcm_tx)
+        worker::client_worker_task(
+            cw_state,
+            csm_eng,
+            csm_rx,
+            cl_state_tx,
+            csm_status_tx,
+            csm_fcm_tx,
+        )
     });
 
     Ok(SyncManager {
@@ -112,5 +141,7 @@ pub fn start_sync_tasks<
         fc_manager_tx: fcm_tx,
         csm_ctl,
         cupdate_rx,
+        cl_state_rx,
+        csm_status_rx,
     })
 }

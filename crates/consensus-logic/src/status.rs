@@ -1,28 +1,32 @@
 //! Handle to inspect the current CSM state and wait for updates when there are
 //! any.
 
-use std::sync::Arc;
+use alpen_vertex_state::{client_state::ClientState, id::L2BlockId};
 
-use tokio::sync::RwLock;
+#[derive(Clone, Debug, Default)]
+pub struct CsmStatus {
+    /// Index of the last sync event.
+    pub last_sync_ev_idx: u64,
 
-use alpen_vertex_state::client_state::ClientState;
+    /// Chain tip's block ID.
+    pub chain_tip_blkid: Option<L2BlockId>,
 
-pub struct StatusTracker {
-    cur_state: Arc<RwLock<Arc<ClientState>>>,
+    /// Finalized block ID.
+    pub finalized_blkid: Option<L2BlockId>,
 }
 
-pub struct StatusUpdater {
-    cur_state: Arc<RwLock<Arc<ClientState>>>,
-}
+impl CsmStatus {
+    pub fn set_last_sync_ev_idx(&mut self, idx: u64) {
+        self.last_sync_ev_idx = idx;
+    }
 
-pub fn make_csm_pair(cur_state: Arc<ClientState>) -> (StatusTracker, StatusUpdater) {
-    let cur_state = Arc::new(RwLock::new(cur_state));
-
-    let tracker = StatusTracker {
-        cur_state: cur_state.clone(),
-    };
-
-    let updater = StatusUpdater { cur_state };
-
-    (tracker, updater)
+    pub fn update_from_client_state(&mut self, state: &ClientState) {
+        if let Some(ss) = state.sync() {
+            self.chain_tip_blkid = Some(*ss.chain_tip_blkid());
+            self.finalized_blkid = Some(*ss.finalized_blkid());
+        } else {
+            self.chain_tip_blkid = None;
+            self.finalized_blkid = None;
+        }
+    }
 }

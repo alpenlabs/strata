@@ -83,9 +83,9 @@ pub fn init_genesis_chainstate(
     chs_store.write_genesis_state(&gchstate)?;
     l2store.put_block_data(gblock)?;
 
-    // TODO make ^this be atomic so we can't accidentally write both, or make it
-    // so we can overwrite the genesis chainstate if there's no other states or
-    // something
+    // TODO make ^this be atomic so we can't accidentally not write both, or
+    // make it so we can overwrite the genesis chainstate if there's no other
+    // states or something
 
     info!("finished genesis insertions");
     Ok(genesis_blkid)
