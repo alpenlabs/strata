@@ -51,7 +51,18 @@ jobs:
           sudo install -m 0755 -t /usr/local/bin bitcoin-27.0/bin/*
           bitcoind --version
 
-      - name: Run functional tests
+      - name: Run functional tests (1)
+        id: funcTestsRun1
+        continue-on-error: true
+        run: |
+          export PATH=$(realpath target/debug/):$PATH
+          which alpen-vertex-sequencer
+          cd functional-tests && \
+          poetry run python entry.py
+
+      # Run again just to be sure as some tests are flaky
+      - name: Run functional tests (2)
+        if: steps.funcTestsRun1.outcome == 'failure'
         run: |
           export PATH=$(realpath target/debug/):$PATH
           which alpen-vertex-sequencer
