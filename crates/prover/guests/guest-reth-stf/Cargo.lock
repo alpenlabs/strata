@@ -633,9 +633,9 @@ dependencies = [
 
 [[package]]
 name = "blst"
-version = "0.3.12"
+version = "0.3.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62dc83a094a71d43eeadd254b1ec2d24cb6a0bb6cadce00df51f0db594711a32"
+checksum = "4378725facc195f1a538864863f6de233b500a8862747e7f165078a419d5e874"
 dependencies = [
  "cc",
  "glob",
@@ -1634,7 +1634,7 @@ checksum = "7a66a03ae7c801facd77a29370b4faec201768915ac14a721ba36f20bc9c209b"
 [[package]]
 name = "reth-codecs"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=feat/add-prover-primitives#e4b5eda4788bbf3a730305a46946f8adeb42d137"
+source = "git+https://github.com/MdTeach/reth?branch=zkvm#c906c23bc8aa3fc88b7180fde259233b0e787554"
 dependencies = [
  "alloy-consensus 0.2.0",
  "alloy-eips 0.2.0",
@@ -1650,7 +1650,7 @@ dependencies = [
 [[package]]
 name = "reth-codecs-derive"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=feat/add-prover-primitives#e4b5eda4788bbf3a730305a46946f8adeb42d137"
+source = "git+https://github.com/MdTeach/reth?branch=zkvm#c906c23bc8aa3fc88b7180fde259233b0e787554"
 dependencies = [
  "convert_case 0.6.0",
  "proc-macro2",
@@ -1661,7 +1661,7 @@ dependencies = [
 [[package]]
 name = "reth-ethereum-forks"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=feat/add-prover-primitives#e4b5eda4788bbf3a730305a46946f8adeb42d137"
+source = "git+https://github.com/MdTeach/reth?branch=zkvm#c906c23bc8aa3fc88b7180fde259233b0e787554"
 dependencies = [
  "alloy-chains",
  "alloy-primitives",
@@ -1678,7 +1678,7 @@ dependencies = [
 [[package]]
 name = "reth-primitives"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=feat/add-prover-primitives#e4b5eda4788bbf3a730305a46946f8adeb42d137"
+source = "git+https://github.com/MdTeach/reth?branch=zkvm#c906c23bc8aa3fc88b7180fde259233b0e787554"
 dependencies = [
  "alloy-eips 0.2.0",
  "alloy-genesis",
@@ -1701,7 +1701,7 @@ dependencies = [
 [[package]]
 name = "reth-primitives-traits"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=feat/add-prover-primitives#e4b5eda4788bbf3a730305a46946f8adeb42d137"
+source = "git+https://github.com/MdTeach/reth?branch=zkvm#c906c23bc8aa3fc88b7180fde259233b0e787554"
 dependencies = [
  "alloy-consensus 0.2.0",
  "alloy-eips 0.2.0",
@@ -1721,7 +1721,7 @@ dependencies = [
 [[package]]
 name = "reth-static-file-types"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=feat/add-prover-primitives#e4b5eda4788bbf3a730305a46946f8adeb42d137"
+source = "git+https://github.com/MdTeach/reth?branch=zkvm#c906c23bc8aa3fc88b7180fde259233b0e787554"
 dependencies = [
  "alloy-primitives",
  "derive_more",
@@ -1732,7 +1732,7 @@ dependencies = [
 [[package]]
 name = "reth-trie-common"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=feat/add-prover-primitives#e4b5eda4788bbf3a730305a46946f8adeb42d137"
+source = "git+https://github.com/MdTeach/reth?branch=zkvm#c906c23bc8aa3fc88b7180fde259233b0e787554"
 dependencies = [
  "alloy-consensus 0.2.0",
  "alloy-genesis",
@@ -2673,14 +2673,16 @@ dependencies = [
 [[package]]
 name = "zkvm-primitives"
 version = "0.1.0"
-source = "git+https://github.com/MdTeach/reth?branch=feat/add-prover-primitives#e4b5eda4788bbf3a730305a46946f8adeb42d137"
+source = "git+https://github.com/MdTeach/reth?branch=zkvm#c906c23bc8aa3fc88b7180fde259233b0e787554"
 dependencies = [
+ "alloy-eips 0.2.0",
  "alloy-primitives",
  "alloy-rlp",
  "alloy-rlp-derive",
  "alloy-rpc-types",
  "anyhow",
  "reth-primitives",
+ "reth-trie-common",
  "revm",
  "rlp",
  "serde",
