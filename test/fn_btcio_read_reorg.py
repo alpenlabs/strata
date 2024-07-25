@@ -29,8 +29,8 @@ class L1ReadReorgTest(flexitest.Test):
         to_be_invalid_block = seqrpc.alp_getL1blockHash(height_to_invalidate_from + 1)
         btcrpc.proxy.invalidateblock(block_to_invalidate_from)
         # Wait for some blocks to be added after invalidating (n-3) blocks
-        # because poll time for sequencer is supposed to be 500ms
-        # and 2 seconds seems to be optimal for sequencer to catch changes
-        time.sleep(2)
+        # because poll time for sequencer is supposed to be 1000ms
+        # and 3 seconds seems to be optimal for sequencer to catch changes
+        time.sleep(3)
         block_from_invalidated_height = seqrpc.alp_getL1blockHash(height_to_invalidate_from + 1)
         assert to_be_invalid_block != block_from_invalidated_height, "Expected reorg from 3rd Block"
