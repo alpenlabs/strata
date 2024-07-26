@@ -88,22 +88,22 @@ impl Default for ElPayload {
 }
 
 impl From<ExecutionPayloadV1> for ElPayload {
-    fn from(value: ExecutionPayloadV1) -> ElPayload {
+    fn from(val: ExecutionPayloadV1) -> Self {
         ElPayload {
-            parent_hash: value.parent_hash.0.into(),
-            fee_recipient: value.fee_recipient.0 .0.into(),
-            state_root: value.state_root.0.into(),
-            receipts_root: value.receipts_root.0.into(),
-            logs_bloom: value.logs_bloom.0.into(),
-            prev_randao: value.prev_randao.0.into(),
-            block_number: value.block_number,
-            gas_limit: value.gas_limit,
-            gas_used: value.gas_used,
-            timestamp: value.timestamp,
-            extra_data: value.extra_data.into(),
-            base_fee_per_gas: B256::from(value.base_fee_per_gas).0.into(),
-            block_hash: value.block_hash.0.into(),
-            transactions: value
+            parent_hash: val.parent_hash.0.into(),
+            fee_recipient: val.fee_recipient.0 .0.into(),
+            state_root: val.state_root.0.into(),
+            receipts_root: val.receipts_root.0.into(),
+            logs_bloom: val.logs_bloom.0.into(),
+            prev_randao: val.prev_randao.0.into(),
+            block_number: val.block_number,
+            gas_limit: val.gas_limit,
+            gas_used: val.gas_used,
+            timestamp: val.timestamp,
+            extra_data: val.extra_data.into(),
+            base_fee_per_gas: B256::from(val.base_fee_per_gas).0.into(),
+            block_hash: val.block_hash.0.into(),
+            transactions: val
                 .transactions
                 .into_iter()
                 .map(|bytes| bytes.0.into())
@@ -113,22 +113,22 @@ impl From<ExecutionPayloadV1> for ElPayload {
 }
 
 impl From<ElPayload> for ExecutionPayloadV1 {
-    fn from(value: ElPayload) -> ExecutionPayloadV1 {
+    fn from(val: ElPayload) -> Self {
         ExecutionPayloadV1 {
-            parent_hash: value.parent_hash.0,
-            fee_recipient: value.fee_recipient.0.into(),
-            state_root: value.state_root.0,
-            receipts_root: value.receipts_root.0,
-            logs_bloom: value.logs_bloom.into(),
-            prev_randao: value.prev_randao.0,
-            block_number: value.block_number,
-            gas_limit: value.gas_limit,
-            gas_used: value.gas_used,
-            timestamp: value.timestamp,
-            extra_data: value.extra_data.into(),
-            base_fee_per_gas: value.base_fee_per_gas.0.into(),
-            block_hash: value.block_hash.0,
-            transactions: value
+            parent_hash: val.parent_hash.0,
+            fee_recipient: val.fee_recipient.0.into(),
+            state_root: val.state_root.0,
+            receipts_root: val.receipts_root.0,
+            logs_bloom: val.logs_bloom.into(),
+            prev_randao: val.prev_randao.0,
+            block_number: val.block_number,
+            gas_limit: val.gas_limit,
+            gas_used: val.gas_used,
+            timestamp: val.timestamp,
+            extra_data: val.extra_data.into(),
+            base_fee_per_gas: val.base_fee_per_gas.0.into(),
+            block_hash: val.block_hash.0,
+            transactions: val
                 .transactions
                 .into_iter()
                 .map(|bytes| bytes.into())
