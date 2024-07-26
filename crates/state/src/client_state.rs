@@ -6,10 +6,7 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use crate::{
-    chain_state::ChainState, id::L2BlockId, l1::L1BlockId, prelude::L2Block,
-    state_queue::StateQueue,
-};
+use crate::{id::L2BlockId, l1::L1BlockId};
 
 /// High level client's state of the network.  This is local to the client, not
 /// coordinated as part of the L2 chain.

@@ -152,7 +152,7 @@ pub fn apply_writes_to_state(
                 }
 
                 // If everything checks out we can just remove them.
-                let blocks = l1v
+                let _blocks = l1v
                     .local_unaccepted_blocks
                     .drain(..diff)
                     .collect::<Vec<_>>();
