@@ -12,7 +12,13 @@ pub fn extract_duties<D: Database>(
     _ident: &duties::Identity,
     database: &D,
 ) -> Result<Vec<duties::Duty>, Error> {
-    let tip_blkid = *state.chain_tip_blkid();
+    // If a sync state isn't present then we probably don't have anything we
+    // want to do.  We might change this later.
+    let Some(ss) = state.sync() else {
+        return Ok(Vec::new());
+    };
+
+    let tip_blkid = *ss.chain_tip_blkid();
 
     // Figure out the block slot from the tip blockid.
     // TODO include the block slot in the consensus state

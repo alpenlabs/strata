@@ -14,7 +14,7 @@ use bitcoin::Network;
 use config::Config;
 use format_serde_error::SerdeError;
 use thiserror::Error;
-use tokio::sync::{broadcast, mpsc, oneshot, watch, RwLock};
+use tokio::sync::{broadcast, oneshot, RwLock};
 use tracing::*;
 
 use alpen_vertex_btcio::rpc::traits::L1Client;
@@ -27,8 +27,6 @@ use alpen_vertex_db::traits::Database;
 use alpen_vertex_primitives::buf::Buf32;
 use alpen_vertex_primitives::{block_credential, params::*};
 use alpen_vertex_rpc_api::AlpenApiServer;
-use alpen_vertex_state::client_state::ClientState;
-use alpen_vertex_state::operation;
 
 use crate::args::Args;
 
@@ -84,7 +82,8 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         rollup: RollupParams {
             block_time: 1000,
             cred_rule: block_credential::CredRule::Unchecked,
-            l1_start_block_height: 4,
+            horizon_l1_height: 3,
+            genesis_l1_height: 5,
         },
         run: RunParams {
             l1_follow_distance: config.sync.l1_follow_distance,
@@ -134,11 +133,6 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         warn!("network not set to regtest, ignoring");
     }
 
-    // Create dataflow channels.
-    let (_cout_tx, _cout_rx) = mpsc::channel::<operation::ClientUpdateOutput>(64);
-    let (cur_state_tx, cur_state_rx) = watch::channel::<Option<ClientState>>(None);
-    // TODO connect up these other channels
-
     // Init engine controller.
     let eng_ctl = alpen_vertex_evmctl::stub::StubController::new(time::Duration::from_millis(100));
     let eng_ctl = Arc::new(eng_ctl);
@@ -149,7 +143,6 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         eng_ctl.clone(),
         pool.clone(),
         params.clone(),
-        cur_state_tx.clone(),
     )?;
     let sync_man = Arc::new(sync_man);
 
@@ -182,15 +175,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         });
     }
 
-    let main_fut = main_task(
-        &config,
-        sync_man,
-        btc_rpc,
-        database.clone(),
-        l1_status,
-        cur_state_rx,
-    );
-
+    let main_fut = main_task(&config, sync_man, btc_rpc, database.clone(), l1_status);
     if let Err(e) = rt.block_on(main_fut) {
         error!(err = %e, "main task exited");
         process::exit(0); // special case exit once we've gotten to this point
@@ -206,7 +191,6 @@ async fn main_task<D: Database + Send + Sync + 'static>(
     l1_rpc_client: impl L1Client,
     database: Arc<D>,
     l1_status: Arc<RwLock<L1Status>>,
-    cur_state_rx: watch::Receiver<Option<ClientState>>,
 ) -> anyhow::Result<()>
 where
     // TODO how are these not redundant trait bounds???
@@ -229,8 +213,12 @@ where
     let (stop_tx, stop_rx) = oneshot::channel();
 
     // Init RPC methods.
-    let alp_rpc =
-        rpc_server::AlpenRpcImpl::new(l1_status.clone(), database.clone(), cur_state_rx, stop_tx);
+    let alp_rpc = rpc_server::AlpenRpcImpl::new(
+        l1_status.clone(),
+        database.clone(),
+        sync_man.clone(),
+        stop_tx,
+    );
     let methods = alp_rpc.into_rpc();
 
     let rpc_port = config.client.rpc_port;

@@ -105,9 +105,9 @@ pub fn reconstruct_cur_state(
         .get_state_checkpoint(last_ckpt_idx)?
         .ok_or(Error::MissingCheckpoint(last_ckpt_idx))?;
 
-    // Special case genesis since we don't have writes at that index.
+    // Special case init since we don't have writes at that index.
     if last_ckpt_idx == 0 {
-        debug!("starting from genesis");
+        debug!("starting from init state");
         return Ok((0, state));
     }
 
