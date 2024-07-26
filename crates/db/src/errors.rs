@@ -32,8 +32,30 @@ pub enum DbError {
 
     #[error("tried to revert to index {0} above current tip {1}")]
     RevertAboveCurrent(u64, u64),
+
     #[error("not yet implemented")]
     Unimplemented,
+
+    #[error("IO Error")]
+    IoError,
+
+    #[error("operation timed out")]
+    TimedOut,
+
+    #[error("operation aborted")]
+    Aborted,
+
+    #[error("invalid argument")]
+    InvalidArgument,
+
+    #[error("resource busy")]
+    Busy,
+
+    #[error("codec error {0}")]
+    CodecError(String),
+
+    #[error("transaction error {0}")]
+    TransactionError(String),
 
     #[error("{0}")]
     Other(String),

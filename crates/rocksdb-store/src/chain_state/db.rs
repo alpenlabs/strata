@@ -1,14 +1,15 @@
 use std::sync::Arc;
 
-use alpen_express_db::errors::DbError;
-use alpen_express_db::DbResult;
-use alpen_express_state::state_op;
 use rockbound::OptimisticTransactionDB as DB;
 use rockbound::{SchemaBatch, SchemaDBOperationsExt};
 
+use alpen_express_db::errors::DbError;
+use alpen_express_db::traits::*;
+use alpen_express_db::DbResult;
+use alpen_express_state::state_op;
+
 use super::schemas::{ChainStateSchema, WriteBatchSchema};
 use crate::utils::{get_first_idx, get_last_idx};
-use alpen_express_db::traits::*;
 
 pub struct ChainStateDb {
     db: Arc<DB>,
