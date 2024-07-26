@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::{thread, time};
 
-use alpen_vertex_state::exec_update::{ExecUpdate, UpdateInput, UpdateOutput};
+use alpen_vertex_state::exec_update::{ExecUpdate, UpdateOutput};
 use borsh::{BorshDeserialize, BorshSerialize};
 use tokio::sync::broadcast;
 use tracing::*;
@@ -14,7 +14,7 @@ use alpen_vertex_evmctl::engine::{ExecEngineCtl, PayloadStatus};
 use alpen_vertex_evmctl::errors::EngineError;
 use alpen_vertex_evmctl::messages::{ExecPayloadData, PayloadEnv};
 use alpen_vertex_primitives::buf::{Buf32, Buf64};
-use alpen_vertex_state::block::{ExecSegment, L1Segment};
+use alpen_vertex_state::block::{ExecSegment, L1Segment, L2BlockAccessory};
 use alpen_vertex_state::client_state::ClientState;
 use alpen_vertex_state::header::L2BlockHeader;
 use alpen_vertex_state::prelude::*;
@@ -46,7 +46,7 @@ impl IdentityData {
     }
 }
 
-pub fn duty_tracker_task<D: Database, E: ExecEngineCtl>(
+pub fn duty_tracker_task<D: Database>(
     mut cupdate_rx: broadcast::Receiver<Arc<ClientUpdateNotif>>,
     batch_queue: broadcast::Sender<DutyBatch>,
     ident: Identity,
@@ -259,9 +259,8 @@ fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
 
     // Start preparing the EL payload.
     let ts = now_millis();
-    let prev_global_sr = Buf32::zero(); // TODO
     let safe_l1_block = Buf32::zero(); // TODO
-    let payload_env = PayloadEnv::new(ts, prev_global_sr, safe_l1_block, Vec::new());
+    let payload_env = PayloadEnv::new(ts, prev_block_id.clone(), safe_l1_block, Vec::new());
     let key = engine.prepare_payload(payload_env)?;
     trace!(%slot, "submitted EL payload job, waiting for completion");
 
@@ -282,7 +281,7 @@ fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
 
     // TODO correctly assemble the exec segment, since this is bodging out how
     // the inputs/outputs should be structured
-    let eui = UpdateInput::new(slot, Buf32::zero(), payload_data.el_payload().to_vec());
+    let eui = payload_data.update_input().clone();
     let exec_update = ExecUpdate::new(eui, UpdateOutput::new_from_state(Buf32::zero()));
     let exec_seg = ExecSegment::new(exec_update);
 
@@ -293,7 +292,8 @@ fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     let header_sig = sign_header(&header, ik);
     let signed_header = SignedL2BlockHeader::new(header, header_sig);
     let blkid = signed_header.get_blockid();
-    let final_block = L2Block::new(signed_header, body);
+    let block_accessory = L2BlockAccessory::new(payload_data.accessory_data().to_vec());
+    let final_block = L2Block::new(signed_header, body, block_accessory);
     info!(%slot, ?blkid, "finished building new block");
 
     // Store the block in the database.

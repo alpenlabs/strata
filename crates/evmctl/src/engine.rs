@@ -61,6 +61,7 @@ pub enum BlockStatus {
     Syncing,
 }
 
+#[derive(Debug)]
 pub enum PayloadStatus {
     /// Still building the payload.
     Working,

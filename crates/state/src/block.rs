@@ -19,11 +19,15 @@ pub struct L2Block {
 
     /// Body that contains the bulk of the data.
     body: L2BlockBody,
+
+    /// auxiliary information, separated from proofs. 
+    /// May be moved so some optional sidecar structure downloadable separately from block.
+    accessory: L2BlockAccessory,
 }
 
 impl L2Block {
-    pub fn new(header: SignedL2BlockHeader, body: L2BlockBody) -> Self {
-        Self { header, body }
+    pub fn new(header: SignedL2BlockHeader, body: L2BlockBody, accessory: L2BlockAccessory) -> Self {
+        Self { header, body, accessory }
     }
 
     pub fn header(&self) -> &SignedL2BlockHeader {
@@ -36,6 +40,10 @@ impl L2Block {
 
     pub fn exec_segment(&self) -> &ExecSegment {
         &self.body.exec_segment
+    }
+
+    pub fn exec_accessory(&self) -> &[u8] {
+        &self.accessory.exec_accessory
     }
 }
 
@@ -50,7 +58,7 @@ impl<'a> Arbitrary<'a> for L2Block {
         let sr = Buf32::arbitrary(u)?;
         let header = L2BlockHeader::new(idx, ts, prev, &body, sr);
         let signed_header = SignedL2BlockHeader::new(header, Buf64::arbitrary(u)?);
-        Ok(Self::new(signed_header, body))
+        Ok(Self::new(signed_header, body, L2BlockAccessory::new(vec![])))
     }
 }
 
@@ -118,5 +126,20 @@ impl ExecSegment {
     /// multiple EEs.
     pub fn update(&self) -> &exec_update::ExecUpdate {
         &self.update
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize)]
+pub struct L2BlockAccessory {
+    exec_accessory: Vec<u8>
+}
+
+impl L2BlockAccessory {
+    pub fn new(exec_accessory: Vec<u8>) -> Self {
+        Self { exec_accessory }
+    }
+
+    pub fn exec_accessory(&self) -> &[u8] {
+        &self.exec_accessory
     }
 }

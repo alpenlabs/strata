@@ -317,7 +317,7 @@ mod tests {
     use alpen_test_utils::ArbitraryGenerator;
     use alpen_vertex_db::traits::{Database, L2DataProvider, L2DataStore};
     use alpen_vertex_state::{
-        block::{L2Block, L2BlockBody},
+        block::{L2Block, L2BlockAccessory, L2BlockBody},
         header::{L2BlockHeader, L2Header, SignedL2BlockHeader},
         id::L2BlockId,
     };
@@ -328,6 +328,7 @@ mod tests {
         let arb = ArbitraryGenerator::new();
         let gen_header: SignedL2BlockHeader = arb.generate();
         let body: L2BlockBody = arb.generate();
+        let accessory: L2BlockAccessory = arb.generate();
 
         let empty_hash = L2BlockId::default();
         let header = L2BlockHeader::new(
@@ -338,13 +339,14 @@ mod tests {
             *gen_header.state_root(),
         );
         let signed_header = SignedL2BlockHeader::new(header, *gen_header.sig());
-        L2Block::new(signed_header, body)
+        L2Block::new(signed_header, body, accessory)
     }
 
     fn get_mock_block_with_parent(parent: &SignedL2BlockHeader) -> L2Block {
         let arb = ArbitraryGenerator::new();
         let gen_header: SignedL2BlockHeader = arb.generate();
         let body: L2BlockBody = arb.generate();
+        let accessory: L2BlockAccessory = arb.generate();
 
         let header = L2BlockHeader::new(
             parent.blockidx() + 1,
@@ -354,7 +356,7 @@ mod tests {
             *gen_header.state_root(),
         );
         let signed_header = SignedL2BlockHeader::new(header, *gen_header.sig());
-        L2Block::new(signed_header, body)
+        L2Block::new(signed_header, body, accessory)
     }
 
     fn setup_test_chain(l2_prov: &impl L2DataStore) -> [L2BlockId; 7] {

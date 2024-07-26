@@ -9,6 +9,8 @@ use std::collections::*;
 use std::sync::Mutex;
 use std::time;
 
+use alpen_vertex_primitives::buf::Buf32;
+use alpen_vertex_state::exec_update::UpdateInput;
 use alpen_vertex_state::prelude::*;
 
 use crate::engine::*;
@@ -69,7 +71,11 @@ impl ExecEngineCtl for StubController {
             Ok(PayloadStatus::Working)
         } else {
             // TODO make up a more plausible payload
-            let exec = ExecPayloadData::new_simple(Vec::new());
+            let exec = ExecPayloadData::new(
+                UpdateInput::new(0, Buf32::zero(), Vec::new()),
+                Vec::new(),
+                Vec::new(),
+            );
             Ok(PayloadStatus::Ready(exec))
         }
     }
