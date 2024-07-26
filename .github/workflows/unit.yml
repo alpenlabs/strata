@@ -47,7 +47,7 @@ jobs:
         with:
           paths: "target/nextest/ci/junit.xml"
       - name: Publish Test Coverage
-        uses: codecov/codecov-action@v4.2.0
+        uses: codecov/codecov-action@v4.5.0
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
           files: lcov.info
