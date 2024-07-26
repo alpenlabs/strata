@@ -68,9 +68,7 @@ impl<T: ELHttpClient, D: L2DataProvider> RpcExecEngineCtl<T, D> {
     }
 
     fn get_block_info(&self, l2block: L2Block) -> anyhow::Result<EVML2Block> {
-        let evm_block_info = EVML2Block::try_from(l2block).map_err(|err| anyhow::Error::msg(err));
-
-        evm_block_info
+        EVML2Block::try_from(l2block).map_err(anyhow::Error::msg)
     }
 
     async fn update_block_state(
@@ -152,7 +150,7 @@ impl<T: ELHttpClient, D: L2DataProvider> RpcExecEngineCtl<T, D> {
             payload_attributes
         );
 
-        let mut fcs = self.fork_choice_state.lock().await.clone();
+        let mut fcs = *self.fork_choice_state.lock().await;
         fcs.head_block_hash = prev_block.block_hash();
 
         let forkchoice_result = self
@@ -497,8 +495,10 @@ mod tests {
         let mut mock_client = MockELHttpClient::new();
         let fcs = ForkchoiceState::default();
 
-        let mut el_payload = ElPayload::default();
-        el_payload.base_fee_per_gas = Buf32(U256::from(10).into());
+        let el_payload = ElPayload {
+            base_fee_per_gas: Buf32(U256::from(10).into()),
+            ..Default::default()
+        };
         let accessory_data = borsh::to_vec(&el_payload).unwrap();
         let update_input = UpdateInput::try_from(el_payload).unwrap();
 

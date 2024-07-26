@@ -6,6 +6,7 @@ use alpen_vertex_primitives::evm_exec::EVMExtraPayload;
 use alpen_vertex_state::block::L2Block;
 
 pub(crate) struct EVML2Block {
+    #[allow(dead_code)]
     l2_block: L2Block,
     extra_payload: EVMExtraPayload,
 }
