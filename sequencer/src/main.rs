@@ -14,7 +14,7 @@ use bitcoin::Network;
 use config::Config;
 use format_serde_error::SerdeError;
 use thiserror::Error;
-use tokio::sync::{broadcast, mpsc, oneshot, watch, RwLock};
+use tokio::sync::{broadcast, oneshot, RwLock};
 use tracing::*;
 
 use alpen_vertex_btcio::rpc::traits::L1Client;
@@ -27,8 +27,6 @@ use alpen_vertex_db::traits::Database;
 use alpen_vertex_primitives::buf::Buf32;
 use alpen_vertex_primitives::{block_credential, params::*};
 use alpen_vertex_rpc_api::AlpenApiServer;
-use alpen_vertex_state::client_state::ClientState;
-use alpen_vertex_state::operation;
 
 use crate::args::Args;
 
