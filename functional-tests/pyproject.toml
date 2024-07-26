@@ -11,7 +11,7 @@ bitcoinlib = "^0.6.15"
 websockets = "^12.0"
 
 [tool.poetry.dev-dependencies]
-ruff = "0.5.2"
+ruff = "0.5.5"
 
 [tool.ruff]
 line-length = 100
