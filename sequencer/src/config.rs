@@ -105,6 +105,10 @@ mod test {
             l1_follow_distance = 6
             max_reorg_depth = 4
             client_poll_dur_ms = 200
+
+            [exec.reth]
+            rpc_url = "http://localhost:8551"
+            secret = "1234567890abcdef"
         "#;
 
         assert!(toml::from_str::<Config>(config_string).is_ok());
