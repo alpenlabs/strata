@@ -179,7 +179,7 @@ develop = false
 type = "git"
 url = "https://codeberg.org/treyd/flexitest.git"
 reference = "HEAD"
-resolved_reference = "ba184d16f072285431f11070dc7b3e6606f1d4fa"
+resolved_reference = "6ac33a2371f34d16aea4e4d354c9e1b234dafda2"
 
 [[package]]
 name = "greenlet"
