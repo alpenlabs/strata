@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use rockbound::{OptimisticTransactionDB as DB, Schema, SchemaDBOperationsExt};
+use rockbound::{rocksdb, OptimisticTransactionDB as DB, Schema, SchemaDBOperationsExt};
 
-use alpen_express_db::DbResult;
+use alpen_express_db::{errors::DbError, DbResult};
 
 pub fn get_last_idx<T>(db: Arc<DB>) -> DbResult<Option<u64>>
 where
@@ -30,5 +30,17 @@ where
             Ok(Some(tip))
         }
         None => Ok(None),
+    }
+}
+
+// shim for translating rocksdb error to DbError
+pub fn translate_rocksdb_error(err: rocksdb::Error) -> DbError {
+    match err.kind() {
+        rocksdb::ErrorKind::InvalidArgument => DbError::InvalidArgument,
+        rocksdb::ErrorKind::IOError => DbError::IoError,
+        rocksdb::ErrorKind::TimedOut => DbError::TimedOut,
+        rocksdb::ErrorKind::Aborted => DbError::Aborted,
+        rocksdb::ErrorKind::Busy => DbError::Busy,
+        _ => DbError::Other(err.to_string()),
     }
 }

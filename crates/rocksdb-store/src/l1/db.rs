@@ -161,11 +161,11 @@ impl L1DataProvider for L1Db {
         let mut options = ReadOptions::default();
         options.set_iterate_lower_bound(
             KeyEncoder::<L1BlockSchema>::encode_key(&start_idx)
-                .map_err(|err| DbError::Other(err.to_string()))?,
+                .map_err(|err| DbError::CodecError(err.to_string()))?,
         );
         options.set_iterate_upper_bound(
             KeyEncoder::<L1BlockSchema>::encode_key(&end_idx)
-                .map_err(|err| DbError::Other(err.to_string()))?,
+                .map_err(|err| DbError::CodecError(err.to_string()))?,
         );
 
         let res = self
