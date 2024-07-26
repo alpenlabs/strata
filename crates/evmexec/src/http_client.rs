@@ -7,9 +7,8 @@ use reth_primitives::{Block, BlockHash};
 use reth_rpc_api::{EngineApiClient, EthApiClient};
 use reth_rpc_layer::{AuthClientLayer, AuthClientService};
 use reth_rpc_types::engine::{
-    ExecutionPayloadBodiesV1, ExecutionPayloadEnvelopeV2,
-    ExecutionPayloadInputV2, ForkchoiceState, ForkchoiceUpdated, JwtSecret, PayloadAttributes,
-    PayloadId,
+    ExecutionPayloadBodiesV1, ExecutionPayloadEnvelopeV2, ExecutionPayloadInputV2, ForkchoiceState,
+    ForkchoiceUpdated, JwtSecret, PayloadAttributes, PayloadId,
 };
 
 #[cfg(test)]

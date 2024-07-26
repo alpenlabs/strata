@@ -35,7 +35,7 @@ pub struct RethELParams {
 
 #[derive(Deserialize, Debug)]
 pub struct ExecParams {
-    pub reth: RethELParams
+    pub reth: RethELParams,
 }
 
 #[derive(Deserialize, Debug)]
@@ -69,8 +69,8 @@ impl Config {
                 reth: RethELParams {
                     rpc_url: "http://localhost:8551".to_string(),
                     secret: String::new(),
-                }
-            }
+                },
+            },
         }
     }
     pub fn update_from_args(&mut self, args: &Args) {

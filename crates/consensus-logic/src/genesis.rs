@@ -2,7 +2,10 @@ use tracing::*;
 
 use alpen_vertex_db::{errors::DbError, traits::*};
 use alpen_vertex_primitives::{
-    buf::{Buf32, Buf64}, evm_exec::create_evm_extra_payload, l1::L1BlockManifest, params::Params
+    buf::{Buf32, Buf64},
+    evm_exec::create_evm_extra_payload,
+    l1::L1BlockManifest,
+    params::Params,
 };
 use alpen_vertex_state::{
     block::{ExecSegment, L1Segment, L2BlockAccessory},
@@ -60,8 +63,12 @@ pub fn init_genesis_chainstate(
     // TODO this might need to talk to the EL to do the genesus setup *properly*
     let extra_payload = create_evm_extra_payload(params.rollup.evm_genesis_block_hash);
     let geui = UpdateInput::new(0, Buf32::zero(), extra_payload);
-    let gees = ExecEnvState::from_base_input(geui.clone(), params.rollup.evm_genesis_block_state_root);
-    let geu = ExecUpdate::new(geui.clone(), UpdateOutput::new_from_state(params.rollup.evm_genesis_block_state_root));
+    let gees =
+        ExecEnvState::from_base_input(geui.clone(), params.rollup.evm_genesis_block_state_root);
+    let geu = ExecUpdate::new(
+        geui.clone(),
+        UpdateOutput::new_from_state(params.rollup.evm_genesis_block_state_root),
+    );
 
     // Build the genesis block and genesis consensus states.
     let gblock = make_genesis_block(params, geu);

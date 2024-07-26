@@ -15,11 +15,13 @@ impl EVMExtraPayload {
 
     pub fn block_hash(&self) -> Buf32 {
         self.block_hash.into()
-    } 
+    }
 }
 
 /// Generate extra_payload for evm el
 pub fn create_evm_extra_payload(block_hash: Buf32) -> Vec<u8> {
-    let extra_payload = EVMExtraPayload { block_hash: *block_hash.as_ref() };
+    let extra_payload = EVMExtraPayload {
+        block_hash: *block_hash.as_ref(),
+    };
     borsh::to_vec(&extra_payload).expect("extra_payload vec")
 }

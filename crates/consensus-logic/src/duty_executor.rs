@@ -260,7 +260,7 @@ fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     // Start preparing the EL payload.
     let ts = now_millis();
     let safe_l1_block = Buf32::zero(); // TODO
-    let payload_env = PayloadEnv::new(ts, prev_block_id.clone(), safe_l1_block, Vec::new());
+    let payload_env = PayloadEnv::new(ts, prev_block_id, safe_l1_block, Vec::new());
     let key = engine.prepare_payload(payload_env)?;
     trace!(%slot, "submitted EL payload job, waiting for completion");
 
