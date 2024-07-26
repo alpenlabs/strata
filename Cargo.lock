@@ -749,9 +749,12 @@ dependencies = [
 name = "alpen-vertex-evmexec"
 version = "0.1.0"
 dependencies = [
+ "alpen-test-utils",
+ "alpen-vertex-db",
  "alpen-vertex-evmctl",
  "alpen-vertex-primitives",
  "alpen-vertex-state",
+ "anyhow",
  "arbitrary",
  "borsh",
  "futures",
@@ -766,9 +769,12 @@ dependencies = [
  "reth-rpc-api",
  "reth-rpc-layer",
  "reth-rpc-types",
+ "reth-rpc-types-compat",
  "serde",
+ "thiserror",
  "tokio",
  "tower",
+ "tracing",
 ]
 
 [[package]]
@@ -825,6 +831,7 @@ dependencies = [
  "alpen-vertex-consensus-logic",
  "alpen-vertex-db",
  "alpen-vertex-evmctl",
+ "alpen-vertex-evmexec",
  "alpen-vertex-primitives",
  "alpen-vertex-rpc-api",
  "alpen-vertex-state",

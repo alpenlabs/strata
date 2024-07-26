@@ -1,8 +1,15 @@
-use alpen_vertex_primitives::buf::{Buf20, Buf32};
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use reth_primitives::B256;
 use reth_rpc_types::ExecutionPayloadV1;
+use reth_rpc_types_compat::engine::try_payload_v1_to_block;
+use thiserror::Error;
+
+use alpen_vertex_primitives::{
+    buf::{Buf20, Buf32},
+    evm_exec::create_evm_extra_payload,
+};
+use alpen_vertex_state::exec_update::UpdateInput;
 
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub(crate) struct ElPayload {
@@ -36,23 +43,67 @@ pub(crate) struct ElPayload {
     pub transactions: Vec<Vec<u8>>,
 }
 
+#[derive(Debug, Error)]
+pub enum ElPayloadError {
+    #[error("Failed to extract evm block from payload: {0}")]
+    BlockConversionError(String),
+}
+
+impl TryFrom<ElPayload> for UpdateInput {
+    type Error = ElPayloadError;
+
+    fn try_from(el_payload: ElPayload) -> Result<Self, Self::Error> {
+        let extra_payload = create_evm_extra_payload(el_payload.block_hash);
+        let v1_payload = ExecutionPayloadV1::from(el_payload);
+        let evm_block = try_payload_v1_to_block(v1_payload)
+            .map_err(|err| ElPayloadError::BlockConversionError(err.to_string()))?;
+
+        Ok(Self::new(
+            evm_block.number,
+            Buf32(evm_block.transactions_root),
+            extra_payload,
+        ))
+    }
+}
+
+impl Default for ElPayload {
+    fn default() -> Self {
+        Self {
+            parent_hash: Default::default(),
+            fee_recipient: Default::default(),
+            state_root: Default::default(),
+            receipts_root: Default::default(),
+            logs_bloom: [0u8; 256],
+            prev_randao: Default::default(),
+            block_number: Default::default(),
+            gas_limit: Default::default(),
+            gas_used: Default::default(),
+            timestamp: Default::default(),
+            extra_data: Default::default(),
+            base_fee_per_gas: Default::default(),
+            block_hash: Default::default(),
+            transactions: Default::default(),
+        }
+    }
+}
+
 impl From<ExecutionPayloadV1> for ElPayload {
-    fn from(val: ExecutionPayloadV1) -> Self {
+    fn from(value: ExecutionPayloadV1) -> ElPayload {
         ElPayload {
-            parent_hash: val.parent_hash.0.into(),
-            fee_recipient: val.fee_recipient.0 .0.into(),
-            state_root: val.state_root.0.into(),
-            receipts_root: val.receipts_root.0.into(),
-            logs_bloom: val.logs_bloom.0.into(),
-            prev_randao: val.prev_randao.0.into(),
-            block_number: val.block_number,
-            gas_limit: val.gas_limit,
-            gas_used: val.gas_used,
-            timestamp: val.timestamp,
-            extra_data: val.extra_data.into(),
-            base_fee_per_gas: B256::from(val.base_fee_per_gas).0.into(),
-            block_hash: val.block_hash.0.into(),
-            transactions: val
+            parent_hash: value.parent_hash.0.into(),
+            fee_recipient: value.fee_recipient.0 .0.into(),
+            state_root: value.state_root.0.into(),
+            receipts_root: value.receipts_root.0.into(),
+            logs_bloom: value.logs_bloom.0.into(),
+            prev_randao: value.prev_randao.0.into(),
+            block_number: value.block_number,
+            gas_limit: value.gas_limit,
+            gas_used: value.gas_used,
+            timestamp: value.timestamp,
+            extra_data: value.extra_data.into(),
+            base_fee_per_gas: B256::from(value.base_fee_per_gas).0.into(),
+            block_hash: value.block_hash.0.into(),
+            transactions: value
                 .transactions
                 .into_iter()
                 .map(|bytes| bytes.0.into())
@@ -62,22 +113,22 @@ impl From<ExecutionPayloadV1> for ElPayload {
 }
 
 impl From<ElPayload> for ExecutionPayloadV1 {
-    fn from(val: ElPayload) -> Self {
+    fn from(value: ElPayload) -> ExecutionPayloadV1 {
         ExecutionPayloadV1 {
-            parent_hash: val.parent_hash.0,
-            fee_recipient: val.fee_recipient.0.into(),
-            state_root: val.state_root.0,
-            receipts_root: val.receipts_root.0,
-            logs_bloom: val.logs_bloom.into(),
-            prev_randao: val.prev_randao.0,
-            block_number: val.block_number,
-            gas_limit: val.gas_limit,
-            gas_used: val.gas_used,
-            timestamp: val.timestamp,
-            extra_data: val.extra_data.into(),
-            base_fee_per_gas: val.base_fee_per_gas.0.into(),
-            block_hash: val.block_hash.0,
-            transactions: val
+            parent_hash: value.parent_hash.0,
+            fee_recipient: value.fee_recipient.0.into(),
+            state_root: value.state_root.0,
+            receipts_root: value.receipts_root.0,
+            logs_bloom: value.logs_bloom.into(),
+            prev_randao: value.prev_randao.0,
+            block_number: value.block_number,
+            gas_limit: value.gas_limit,
+            gas_used: value.gas_used,
+            timestamp: value.timestamp,
+            extra_data: value.extra_data.into(),
+            base_fee_per_gas: value.base_fee_per_gas.0.into(),
+            block_hash: value.block_hash.0,
+            transactions: value
                 .transactions
                 .into_iter()
                 .map(|bytes| bytes.into())

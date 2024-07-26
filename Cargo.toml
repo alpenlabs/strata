@@ -28,6 +28,7 @@ alpen-vertex-common = { path = "crates/common" }
 alpen-vertex-consensus-logic = { path = "crates/consensus-logic" }
 alpen-vertex-db = { path = "crates/db" }
 alpen-vertex-evmctl = { path = "crates/evmctl" }
+alpen-vertex-evmexec = { path = "crates/evmexec" }
 alpen-vertex-mmr = { path = "crates/util/mmr" }
 alpen-vertex-primitives = { path = "crates/primitives" }
 alpen-vertex-rpc-api = { path = "crates/rpc/api" }
@@ -66,6 +67,7 @@ reth-rpc = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
 reth-rpc-api = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
 reth-rpc-layer = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
 reth-rpc-types = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
+reth-rpc-types-compat = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
 rockbound = { git = "https://github.com/sovereign-Labs/rockbound", tag = "v2.0.1" }
 rocksdb = "0.21"
 secp256k1 = "0.29.0"

@@ -6,7 +6,6 @@ use std::path::PathBuf;
 use std::process;
 use std::sync::Arc;
 use std::thread;
-use std::time;
 
 use alpen_vertex_primitives::l1::L1Status;
 use anyhow::Context;
@@ -24,6 +23,7 @@ use alpen_vertex_consensus_logic::duty_executor::{self, IdentityData, IdentityKe
 use alpen_vertex_consensus_logic::sync_manager;
 use alpen_vertex_consensus_logic::sync_manager::SyncManager;
 use alpen_vertex_db::traits::Database;
+use alpen_vertex_evmexec::{fork_choice_state_initial, ELHttpClient};
 use alpen_vertex_primitives::buf::Buf32;
 use alpen_vertex_primitives::{block_credential, params::*};
 use alpen_vertex_rpc_api::AlpenApiServer;
@@ -118,7 +118,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     // Initialize databases.
     let l1_db = Arc::new(alpen_vertex_db::L1Db::new(rbdb.clone()));
-    let l2_db = Arc::new(alpen_vertex_db::stubs::l2::StubL2Db::new()); // FIXME stub
+    let l2_db = Arc::new(alpen_vertex_db::l2::db::L2Db::new(rbdb.clone()));
     let sync_ev_db = Arc::new(alpen_vertex_db::SyncEventDb::new(rbdb.clone()));
     let cs_db = Arc::new(alpen_vertex_db::ClientStateDb::new(rbdb.clone()));
     let chst_db = Arc::new(alpen_vertex_db::stubs::chain_state::StubChainstateDb::new());
@@ -144,7 +144,15 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     }
 
     // Init engine controller.
-    let eng_ctl = alpen_vertex_evmctl::stub::StubController::new(time::Duration::from_millis(100));
+    let client = ELHttpClient::from_url_secret(&config.exec.reth.rpc_url, &config.exec.reth.secret);
+
+    let initial_fcs = fork_choice_state_initial(database.clone(), params.rollup())?;
+    let eng_ctl = alpen_vertex_evmexec::engine::RpcExecEngineCtl::new(
+        client,
+        initial_fcs,
+        rt.handle().clone(),
+        database.l2_provider().clone(),
+    );
     let eng_ctl = Arc::new(eng_ctl);
 
     // Start the sync manager.
@@ -173,12 +181,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         // Spawn the two tasks.
         thread::spawn(move || {
             // FIXME figure out why this can't infer the type, it's like *right there*
-            duty_executor::duty_tracker_task::<_, alpen_vertex_evmctl::stub::StubController>(
-                cu_rx,
-                duties_tx,
-                idata.ident,
-                db,
-            )
+            duty_executor::duty_tracker_task::<_>(cu_rx, duties_tx, idata.ident, db)
         });
         thread::spawn(move || {
             duty_executor::duty_dispatch_task(duties_rx, idata.key, sm, db2, eng_ctl_de, pool)

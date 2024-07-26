@@ -13,6 +13,7 @@ alpen-vertex-common = { workspace = true }
 alpen-vertex-consensus-logic = { workspace = true }
 alpen-vertex-db = { workspace = true }
 alpen-vertex-evmctl = { workspace = true }
+alpen-vertex-evmexec = { workspace = true }
 alpen-vertex-primitives = { workspace = true }
 alpen-vertex-rpc-api = { workspace = true }
 alpen-vertex-state = { workspace = true }
