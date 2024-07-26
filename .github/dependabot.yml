@@ -5,6 +5,6 @@ updates:
     schedule:
       interval: "monthly"
   - package-ecosystem: "pip"
-    directory: "functional_tests/"
+    directory: "functional-tests/"
     schedule:
       interval: "monthly"
