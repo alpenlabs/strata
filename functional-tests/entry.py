@@ -175,12 +175,9 @@ def main(argv):
     seq_fac = VertexFactory([12400 + i for i in range(20)])
 
     factories = {"bitcoin": btc_fac, "sequencer": seq_fac}
-    envs = {
-        "basic": BasicEnvConfig(),
-        "l1_read_reorg_test": BasicEnvConfig(),
-    }
+    global_envs = {"basic": BasicEnvConfig()}
 
-    rt = flexitest.TestRuntime(envs, datadir_root, factories)
+    rt = flexitest.TestRuntime(global_envs, datadir_root, factories)
     rt.prepare_registered_tests()
 
     results = rt.run_tests(tests)
