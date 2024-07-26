@@ -26,10 +26,8 @@ fn main() {
     executor.finalize();
 
     // read the input
-    // let db = InMemoryDB::initialize(&mut input).unwrap();
+    let res = executor.header.unwrap().state_root;
 
-    // TODO: do something with the input
-    // println!("got the winess {:?}", witness.gas_limit);
+    env::commit(&res);
 
-    // write public output to the journal
 }

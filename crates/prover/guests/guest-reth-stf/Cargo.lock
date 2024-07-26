@@ -1188,6 +1188,7 @@ dependencies = [
  "elliptic-curve",
  "once_cell",
  "sha2",
+ "signature",
 ]
 
 [[package]]
@@ -1634,7 +1635,7 @@ checksum = "7a66a03ae7c801facd77a29370b4faec201768915ac14a721ba36f20bc9c209b"
 [[package]]
 name = "reth-codecs"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=zkvm#c906c23bc8aa3fc88b7180fde259233b0e787554"
+source = "git+https://github.com/MdTeach/reth?branch=feat/add-prover-primitives#f80993cc61aad91338e432ebe69db69cf9117d63"
 dependencies = [
  "alloy-consensus 0.2.0",
  "alloy-eips 0.2.0",
@@ -1650,7 +1651,7 @@ dependencies = [
 [[package]]
 name = "reth-codecs-derive"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=zkvm#c906c23bc8aa3fc88b7180fde259233b0e787554"
+source = "git+https://github.com/MdTeach/reth?branch=feat/add-prover-primitives#f80993cc61aad91338e432ebe69db69cf9117d63"
 dependencies = [
  "convert_case 0.6.0",
  "proc-macro2",
@@ -1661,7 +1662,7 @@ dependencies = [
 [[package]]
 name = "reth-ethereum-forks"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=zkvm#c906c23bc8aa3fc88b7180fde259233b0e787554"
+source = "git+https://github.com/MdTeach/reth?branch=feat/add-prover-primitives#f80993cc61aad91338e432ebe69db69cf9117d63"
 dependencies = [
  "alloy-chains",
  "alloy-primitives",
@@ -1678,7 +1679,7 @@ dependencies = [
 [[package]]
 name = "reth-primitives"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=zkvm#c906c23bc8aa3fc88b7180fde259233b0e787554"
+source = "git+https://github.com/MdTeach/reth?branch=feat/add-prover-primitives#f80993cc61aad91338e432ebe69db69cf9117d63"
 dependencies = [
  "alloy-eips 0.2.0",
  "alloy-genesis",
@@ -1686,6 +1687,7 @@ dependencies = [
  "alloy-rlp",
  "bytes",
  "derive_more",
+ "k256",
  "once_cell",
  "rayon",
  "reth-ethereum-forks",
@@ -1701,7 +1703,7 @@ dependencies = [
 [[package]]
 name = "reth-primitives-traits"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=zkvm#c906c23bc8aa3fc88b7180fde259233b0e787554"
+source = "git+https://github.com/MdTeach/reth?branch=feat/add-prover-primitives#f80993cc61aad91338e432ebe69db69cf9117d63"
 dependencies = [
  "alloy-consensus 0.2.0",
  "alloy-eips 0.2.0",
@@ -1721,7 +1723,7 @@ dependencies = [
 [[package]]
 name = "reth-static-file-types"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=zkvm#c906c23bc8aa3fc88b7180fde259233b0e787554"
+source = "git+https://github.com/MdTeach/reth?branch=feat/add-prover-primitives#f80993cc61aad91338e432ebe69db69cf9117d63"
 dependencies = [
  "alloy-primitives",
  "derive_more",
@@ -1732,7 +1734,7 @@ dependencies = [
 [[package]]
 name = "reth-trie-common"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=zkvm#c906c23bc8aa3fc88b7180fde259233b0e787554"
+source = "git+https://github.com/MdTeach/reth?branch=feat/add-prover-primitives#f80993cc61aad91338e432ebe69db69cf9117d63"
 dependencies = [
  "alloy-consensus 0.2.0",
  "alloy-genesis",
@@ -1760,8 +1762,6 @@ dependencies = [
  "dyn-clone",
  "revm-interpreter",
  "revm-precompile",
- "serde",
- "serde_json",
 ]
 
 [[package]]
@@ -1771,7 +1771,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e6b0daddea06fc6da5346acc39b32a357bbe3579e9e3d94117d9ae125cd596fc"
 dependencies = [
  "revm-primitives",
- "serde",
 ]
 
 [[package]]
@@ -1781,13 +1780,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ef55228211251d7b6c7707c3ee13bb70dea4d2fd81ec4034521e4fe31010b2ea"
 dependencies = [
  "aurora-engine-modexp",
- "c-kzg",
  "cfg-if",
  "k256",
  "once_cell",
  "revm-primitives",
  "ripemd",
- "secp256k1",
  "sha2",
  "substrate-bn",
 ]
@@ -2173,7 +2170,6 @@ version = "1.0.120"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4e0d21c9a8cae1235ad58a00c11cb40d4b1e5c784f1ef2c537876ed6ffd8b7c5"
 dependencies = [
- "indexmap",
  "itoa",
  "ryu",
  "serde",
@@ -2407,9 +2403,9 @@ dependencies = [
 
 [[package]]
 name = "toml_datetime"
-version = "0.6.6"
+version = "0.6.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4badfd56924ae69bcc9039335b2e017639ce3f9b001c393c1b2d1ef846ce2cbf"
+checksum = "f8fb9f64314842840f1d940ac544da178732128f1c78c21772e876579e0da1db"
 
 [[package]]
 name = "toml_edit"
@@ -2520,9 +2516,9 @@ checksum = "830b7e5d4d90034032940e4ace0d9a9a057e7a45cd94e6c007832e39edb82f6d"
 
 [[package]]
 name = "version_check"
-version = "0.9.4"
+version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
+checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "wait-timeout"
@@ -2673,7 +2669,7 @@ dependencies = [
 [[package]]
 name = "zkvm-primitives"
 version = "0.1.0"
-source = "git+https://github.com/MdTeach/reth?branch=zkvm#c906c23bc8aa3fc88b7180fde259233b0e787554"
+source = "git+https://github.com/MdTeach/reth?branch=feat/add-prover-primitives#f80993cc61aad91338e432ebe69db69cf9117d63"
 dependencies = [
  "alloy-eips 0.2.0",
  "alloy-primitives",
@@ -2681,6 +2677,7 @@ dependencies = [
  "alloy-rlp-derive",
  "alloy-rpc-types",
  "anyhow",
+ "k256",
  "reth-primitives",
  "reth-trie-common",
  "revm",

@@ -1,6 +1,6 @@
 use anyhow::Ok;
 use bincode;
-use risc0_zkvm::{get_prover_server, ExecutorEnv, ProverOpts, Receipt};
+use risc0_zkvm::{default_prover, ExecutorEnv, ProverOpts, Receipt};
 use zkvm::{Proof, ProverOptions, ZKVMHost, ZKVMVerifier};
 
 pub struct RiscZeroHost {
@@ -38,7 +38,8 @@ impl ZKVMHost for RiscZeroHost {
         let env = ExecutorEnv::builder().write(&self.inputs)?.build()?;
         let opts = self.determine_prover_options();
 
-        let prover = get_prover_server(&opts)?;
+        // let prover = get_prover_server(&opts)?;
+        let prover = default_prover();
         let proof = prover.prove(env, &self.elf)?.receipt;
         let serialized_proof = bincode::serialize(&proof)?;
         Ok(Proof(serialized_proof))
