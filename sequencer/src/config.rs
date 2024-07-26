@@ -28,10 +28,22 @@ pub struct BitcoindParams {
 }
 
 #[derive(Deserialize, Debug)]
+pub struct RethELParams {
+    pub rpc_url: String,
+    pub secret: String,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct ExecParams {
+    pub reth: RethELParams
+}
+
+#[derive(Deserialize, Debug)]
 pub struct Config {
     pub client: ClientParams,
     pub bitcoind_rpc: BitcoindParams,
     pub sync: SyncParams,
+    pub exec: ExecParams,
 }
 
 impl Config {
@@ -53,6 +65,12 @@ impl Config {
                 max_reorg_depth: 4,
                 client_poll_dur_ms: 200,
             },
+            exec: ExecParams {
+                reth: RethELParams {
+                    rpc_url: "http://localhost:8551".to_string(),
+                    secret: String::new(),
+                }
+            }
         }
     }
     pub fn update_from_args(&mut self, args: &Args) {
