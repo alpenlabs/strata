@@ -38,7 +38,7 @@ pub fn init_client_state(params: &Params, database: &impl Database) -> anyhow::R
     Ok(())
 }
 
-/// Inserts approprate chainstate into the database to start actively syncing
+/// Inserts appropriate chainstate into the database to start actively syncing
 /// the rollup chain.  Requires that the L1 blocks between the horizon and the
 /// L2 genesis are already in the datatabase.
 ///

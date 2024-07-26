@@ -87,7 +87,7 @@ pub enum SyncAction {
 
     /// Indicates to the worker that it's safe to perform the L2 genesis
     /// operations and start the chain sync work, using a particular L1 block
-    /// as the genesis lockin block.
+    /// as the genesis lock-in block.
     L2Genesis(L1BlockId),
 }
 

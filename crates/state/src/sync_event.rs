@@ -18,9 +18,9 @@ pub enum SyncEvent {
     /// Special case sync event we send only at the instant we compute a fresh
     /// genesis block.
     ///
-    /// Maybe this should just be implict with the `NewTipBlock` that comes from
-    /// accepting the genesis block as a tip.  I'm not really sure, I'll figure
-    /// that out next week.
+    /// Maybe this should just be implicit with the `NewTipBlock` that comes
+    /// from accepting the genesis block as a tip.  I'm not really sure, I'll
+    /// figure that out next week.
     ComputedGenesis(L2BlockId),
 
     /// Fork choice manager found a new valid chain tip block.  At this point

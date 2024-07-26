@@ -128,7 +128,7 @@ pub fn init_forkchoice_manager<D: Database>(
     Ok(fcm)
 }
 
-/// Recvs inputs from the FCM channel until we recieve a signal that we've
+/// Recvs inputs from the FCM channel until we receive a signal that we've
 /// reached a point where we've done genesis.
 fn wait_for_csm_ready(
     fcm_rx: &mut mpsc::Receiver<ForkChoiceMessage>,
