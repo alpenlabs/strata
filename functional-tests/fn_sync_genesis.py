@@ -26,4 +26,4 @@ class SyncGenesisTest(flexitest.Test):
             print(stat)
             time.sleep(1)
 
-        assert stat["finalized_blkid"] != UNSET_SET, "did not notice genesis"
+        assert stat["finalized_blkid"] != UNSET_ID, "did not notice genesis"
