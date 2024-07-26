@@ -196,14 +196,14 @@ impl UnfinalizedBlockTracker {
         })
     }
 
-    pub fn get_all_descendants(&self, blkid: &L2BlockId) -> Vec<L2BlockId> {
-        let mut descendants = Vec::new();
+    pub fn get_all_descendants(&self, blkid: &L2BlockId) -> HashSet<L2BlockId> {
+        let mut descendants = HashSet::new();
         let mut to_visit = vec![*blkid];
 
         while let Some(curr_blk) = to_visit.pop() {
             if let Some(entry) = self.pending_table.get(&curr_blk) {
                 for child in &entry.children {
-                    descendants.push(*child);
+                    descendants.insert(*child);
                     to_visit.push(*child);
                 }
             }
@@ -315,7 +315,7 @@ mod tests {
     use std::collections::HashSet;
 
     use alpen_test_utils::ArbitraryGenerator;
-    use alpen_vertex_db::traits::{Database, L2DataStore};
+    use alpen_vertex_db::traits::{Database, L2DataProvider, L2DataStore};
     use alpen_vertex_state::{
         block::{L2Block, L2BlockBody},
         header::{L2BlockHeader, L2Header, SignedL2BlockHeader},
@@ -471,13 +471,50 @@ mod tests {
             .load_unfinalized_blocks(1, l2_prov.as_ref())
             .unwrap();
 
-        assert_eq!(chain_tracker.get_all_descendants(&g).len(), 6);
-        assert_eq!(chain_tracker.get_all_descendants(&a1).len(), 4);
+        assert_eq!(
+            chain_tracker.get_all_descendants(&g),
+            HashSet::from_iter([a1, c1, a2, b2, a3, b3])
+        );
+        assert_eq!(
+            chain_tracker.get_all_descendants(&a1),
+            HashSet::from_iter([a2, a3, b2, b3])
+        );
         assert_eq!(chain_tracker.get_all_descendants(&c1).len(), 0);
-        assert_eq!(chain_tracker.get_all_descendants(&a2).len(), 1);
-        assert_eq!(chain_tracker.get_all_descendants(&b2).len(), 1);
+        assert_eq!(
+            chain_tracker.get_all_descendants(&a2),
+            HashSet::from_iter([a3])
+        );
+        assert_eq!(
+            chain_tracker.get_all_descendants(&b2),
+            HashSet::from_iter([b3])
+        );
         assert_eq!(chain_tracker.get_all_descendants(&a3).len(), 0);
         assert_eq!(chain_tracker.get_all_descendants(&b3).len(), 0);
+    }
+
+    fn check_update_finalized(
+        prev_finalized_tip: L2BlockId,
+        new_finalized_tip: L2BlockId,
+        finalized_blocks: &[L2BlockId],
+        rejected_blocks: &[L2BlockId],
+        unfinalized_tips: HashSet<L2BlockId>,
+        l2_prov: &(impl L2DataStore + L2DataProvider),
+    ) {
+        // Init the chain tracker from the state we figured out.
+        let mut chain_tracker =
+            unfinalized_tracker::UnfinalizedBlockTracker::new_empty(prev_finalized_tip);
+
+        chain_tracker.load_unfinalized_blocks(1, l2_prov).unwrap();
+
+        let report = chain_tracker
+            .update_finalized_tip(&new_finalized_tip)
+            .unwrap();
+
+        assert_eq!(report.prev_tip(), &prev_finalized_tip);
+        assert_eq!(report.finalized, finalized_blocks);
+        assert_eq!(report.rejected(), rejected_blocks);
+        assert_eq!(chain_tracker.finalized_tip, new_finalized_tip);
+        assert_eq!(chain_tracker.unfinalized_tips, unfinalized_tips);
     }
 
     #[test]
@@ -487,54 +524,49 @@ mod tests {
 
         let [g, a1, c1, a2, b2, a3, b3] = setup_test_chain(l2_prov.as_ref());
 
-        // Init the chain tracker from the state we figured out.
-        let mut chain_tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(g);
+        check_update_finalized(
+            g,
+            b2,
+            &[b2, a1],
+            &[a2, c1, a3],
+            HashSet::from_iter([b3]),
+            l2_prov.as_ref(),
+        );
 
-        chain_tracker
-            .load_unfinalized_blocks(1, l2_prov.as_ref())
-            .unwrap();
+        check_update_finalized(
+            g,
+            a2,
+            &[a2, a1],
+            &[b2, c1, b3],
+            HashSet::from_iter([a3]),
+            l2_prov.as_ref(),
+        );
 
-        let report = chain_tracker.update_finalized_tip(&b2).unwrap();
-        assert_eq!(report.prev_tip(), &g);
-        assert_eq!(report.finalized, &[b2, a1]);
-        assert_eq!(report.rejected(), &[a2, c1, a3]);
-        assert_eq!(chain_tracker.finalized_tip, b2);
+        check_update_finalized(
+            g,
+            a1,
+            &[a1],
+            &[c1],
+            HashSet::from_iter([a3, b3]),
+            l2_prov.as_ref(),
+        );
 
-        assert_eq!(chain_tracker.get_all_descendants(&g), &[]);
-        assert_eq!(chain_tracker.get_all_descendants(&a1), &[]);
-        assert_eq!(chain_tracker.get_all_descendants(&c1), &[]);
-        assert_eq!(chain_tracker.get_all_descendants(&a2), &[]);
-        assert_eq!(chain_tracker.get_all_descendants(&b2), &[b3]);
-        assert_eq!(chain_tracker.get_all_descendants(&a3), &[]);
-        assert_eq!(chain_tracker.get_all_descendants(&b3), &[]);
-    }
+        check_update_finalized(
+            a1,
+            a2,
+            &[a2],
+            &[b2, b3],
+            HashSet::from_iter([a3]),
+            l2_prov.as_ref(),
+        );
 
-    #[test]
-    fn test_update_finalized_tip_2() {
-        let db = alpen_test_utils::get_common_db();
-        let l2_prov = db.l2_provider();
-
-        let [g, a1, c1, a2, b2, a3, b3] = setup_test_chain(l2_prov.as_ref());
-
-        // Init the chain tracker from the state we figured out.
-        let mut chain_tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(g);
-
-        chain_tracker
-            .load_unfinalized_blocks(1, l2_prov.as_ref())
-            .unwrap();
-
-        let report = chain_tracker.update_finalized_tip(&a2).unwrap();
-        assert_eq!(report.prev_tip(), &g);
-        assert_eq!(report.finalized, &[a2, a1]);
-        assert_eq!(report.rejected(), &[b2, c1, b3]);
-        assert_eq!(chain_tracker.finalized_tip, a2);
-
-        assert_eq!(chain_tracker.get_all_descendants(&g), &[]);
-        assert_eq!(chain_tracker.get_all_descendants(&a1), &[]);
-        assert_eq!(chain_tracker.get_all_descendants(&c1), &[]);
-        assert_eq!(chain_tracker.get_all_descendants(&a2), &[a3]);
-        assert_eq!(chain_tracker.get_all_descendants(&b2), &[]);
-        assert_eq!(chain_tracker.get_all_descendants(&a3), &[]);
-        assert_eq!(chain_tracker.get_all_descendants(&b3), &[]);
+        check_update_finalized(
+            a1,
+            a3,
+            &[a3, a2],
+            &[b2, b3],
+            HashSet::from_iter([a3]),
+            l2_prov.as_ref(),
+        );
     }
 }
