@@ -1,0 +1,31 @@
+name: Security
+
+on:
+  pull_request:
+  merge_group:
+  push:
+    branches: [master]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  supply-chain:
+    name: Run `cargo-audit`
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+        #  HACK: not denying warnings as we depend on `yaml-rust` via `format-serde-error` which is unmaintained
+      - name: Check for audit warnings
+        run: cargo audit -D warnings
+        continue-on-error: true
+
+        # HACK: re-run without denying warnings so that we don't miss any vulnerabilities
+      - name: Check for vulnerabilities
+        run: cargo audit

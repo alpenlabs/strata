@@ -3,7 +3,6 @@
 //! This just implements a very simple n-of-n multisig bridge.  It will be
 //! extended to a more sophisticated design when we have that specced out.
 
-use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use alpen_vertex_primitives::{
@@ -206,7 +205,7 @@ pub struct DispatchCommand {
     withdraw_outputs: Vec<WithdrawOutput>,
 }
 
-/// An output constructed from [``bridge_ops::WithdrawalIntent``].
+/// An output constructed from [`crate::bridge_ops::WithdrawalIntent`].
 #[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
 pub struct WithdrawOutput {
     /// Taproot pubkey.

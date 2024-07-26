@@ -78,7 +78,7 @@ pub fn duty_tracker_task<D: Database, E: ExecEngineCtl>(
 
         // Publish the new batch.
         let batch = DutyBatch::new(ev_idx, duties_tracker.duties().to_vec());
-        if !batch_queue.send(batch).is_ok() {
+        if batch_queue.send(batch).is_err() {
             warn!("failed to publish new duties batch");
         }
     }
@@ -92,7 +92,7 @@ fn update_tracker<D: Database>(
     ident: &Identity,
     database: &D,
 ) -> Result<(), Error> {
-    let new_duties = duty_extractor::extract_duties(state, &ident, database)?;
+    let new_duties = duty_extractor::extract_duties(state, ident, database)?;
 
     // Figure out the block slot from the tip blockid.
     // TODO include the block slot in the consensus state
@@ -162,7 +162,7 @@ pub fn duty_dispatch_task<
             let sm = sync_man.clone();
             let db = database.clone();
             let e = engine.clone();
-            let _join = pool.execute(move || duty_exec_task(d, ik, sm, db, e));
+            pool.execute(move || duty_exec_task(d, ik, sm, db, e));
             trace!(%id, "dispatched duty exec task");
             pending_duties.insert(id, ());
         }
@@ -241,7 +241,8 @@ fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     // pull out the current tip block from it
     // XXX this is really bad as-is
     let cs_prov = database.client_state_provider();
-    let ckpt_idx = cs_prov.get_last_checkpoint_idx()?; // FIXME this isn't what this is for, it only works because we're checkpointing on every state right now
+    let ckpt_idx = cs_prov.get_last_checkpoint_idx()?; // FIXME: this isn't what this is for, it only works because we're checkpointing on every state
+                                                       // right now
     let last_cstate = cs_prov
         .get_state_checkpoint(ckpt_idx)?
         .expect("dutyexec: get state checkpoint");
@@ -280,7 +281,7 @@ fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     let body = L2BlockBody::new(l1_seg, exec_seg);
     let state_root = Buf32::zero(); // TODO compute this from the different parts
     let header = L2BlockHeader::new(slot, ts, prev_block_id, &body, state_root);
-    let header_sig = sign_header(&header, &ik);
+    let header_sig = sign_header(&header, ik);
     let signed_header = SignedL2BlockHeader::new(header, header_sig);
     let blkid = signed_header.get_blockid();
     let final_block = L2Block::new(signed_header, body);

@@ -112,7 +112,7 @@ pub fn apply_writes_to_state(
                 }
 
                 // If everything checks out we can just remove them.
-                let blocks = state.recent_l1_blocks.drain(..diff).collect::<Vec<_>>();
+                let _blocks = state.recent_l1_blocks.drain(..diff).collect::<Vec<_>>();
                 state.buried_l1_height = new_idx;
 
                 // TODO merge these blocks into the L1 MMR in the chain state if

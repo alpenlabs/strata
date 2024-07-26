@@ -2,7 +2,7 @@
 
 use crate::prelude::*;
 
-/// Rule we use to decide how to identify if a L2 block is correcty signed.
+/// Rule we use to decide how to identify if an L2 block is correctly signed.
 #[derive(Clone, Debug)]
 pub enum CredRule {
     /// Any block gets accepted, unconditionally.

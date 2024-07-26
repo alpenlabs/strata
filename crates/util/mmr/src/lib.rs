@@ -155,7 +155,7 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
         self.peaks[current_height] = current_node;
         self.num += 1;
 
-        return updated_proof;
+        updated_proof
     }
 
     fn update_single_proof(
@@ -233,28 +233,28 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
         self.peaks[current_height] = current_node;
         self.num += 1;
 
-        return new_proof;
+        new_proof
     }
 
     pub fn verify(&self, proof: &MerkleProof<H>, leaf: &Hash) -> bool {
-        self.verify_raw(&proof.cohashes, proof.index, &leaf)
+        self.verify_raw(&proof.cohashes, proof.index, leaf)
     }
 
     fn verify_raw(&self, cohashes: &[Hash], leaf_index: u64, leaf_hash: &Hash) -> bool {
         let root = self.peaks[cohashes.len()];
 
-        if cohashes.len() == 0 {
+        if cohashes.is_empty() {
             return root == *leaf_hash;
         }
 
         let mut cur_hash = *leaf_hash;
         let mut side_flags = leaf_index;
 
-        for i in 0..cohashes.len() {
+        for cohash in cohashes.iter() {
             let node_hash = if side_flags & 1 == 1 {
-                H::hash_node(cohashes[i], cur_hash)
+                H::hash_node(*cohash, cur_hash)
             } else {
-                H::hash_node(cur_hash, cohashes[i])
+                H::hash_node(cur_hash, *cohash)
             };
 
             side_flags >>= 1;
@@ -273,8 +273,8 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
         }
 
         match proof_list.iter().find(|proof| proof.index == index) {
-            Some(proof) => return Ok(Some(proof.clone())),
-            None => return Ok(None),
+            Some(proof) => Ok(Some(proof.clone())),
+            None => Ok(None),
         }
     }
 }
@@ -303,7 +303,7 @@ impl<H: MerkleHasher + Clone> MerkleProof<H> {
 
     /// verifies the hash against the current proof for given mmr
     pub fn verify_against_mmr(&self, mmr: &MerkleMr<H>, leaf_hash: Hash) -> bool {
-        mmr.verify(&self, &leaf_hash)
+        mmr.verify(self, &leaf_hash)
     }
 }
 
@@ -332,7 +332,7 @@ mod test {
 
     fn generate_hashes_for_n_integers(n: usize) -> Vec<Hash> {
         (0..n)
-            .map(|i| Sha256::digest(&i.to_be_bytes()).into())
+            .map(|i| Sha256::digest(i.to_be_bytes()).into())
             .collect::<Vec<Hash>>()
     }
 
@@ -349,7 +349,7 @@ mod test {
 
         let hash: Vec<Hash> = specific_nodes
             .iter()
-            .map(|i| Sha256::digest(&i.to_be_bytes()).into())
+            .map(|i| Sha256::digest(i.to_be_bytes()).into())
             .collect();
 
         (0..specific_nodes.len()).for_each(|i| {
@@ -377,7 +377,7 @@ mod test {
             .unwrap()
             .expect("Didn't find proof for given index");
 
-        let hash = Sha256::digest(&0_usize.to_be_bytes()).into();
+        let hash = Sha256::digest(0_usize.to_be_bytes()).into();
         assert!(mmr.verify(&proof, &hash));
     }
 
@@ -396,7 +396,7 @@ mod test {
         let hashed1: Hash = Sha256::digest(b"first").into();
 
         let mut mmr: MerkleMr<Sha256> = MerkleMr::new(14);
-        mmr.add_leaf(hashed1.try_into().unwrap());
+        mmr.add_leaf(hashed1);
 
         assert_eq!(
             mmr.get_single_root(),
@@ -412,9 +412,9 @@ mod test {
         let hashed1: Hash = Sha256::digest(b"first").into();
 
         let mut mmr: MerkleMr<Sha256> = MerkleMr::new(14);
-        mmr.add_leaf(hashed1.try_into().unwrap());
-        mmr.add_leaf(hashed1.try_into().unwrap());
-        mmr.add_leaf(hashed1.try_into().unwrap());
+        mmr.add_leaf(hashed1);
+        mmr.add_leaf(hashed1);
+        mmr.add_leaf(hashed1);
 
         assert_eq!(mmr.get_single_root(), Err(MerkleError::NotPowerOfTwo));
     }
@@ -424,10 +424,10 @@ mod test {
         let hashed1: Hash = Sha256::digest(b"first").into();
 
         let mut mmr: MerkleMr<Sha256> = MerkleMr::new(14);
-        mmr.add_leaf(hashed1.try_into().unwrap());
-        mmr.add_leaf(hashed1.try_into().unwrap());
-        mmr.add_leaf(hashed1.try_into().unwrap());
-        mmr.add_leaf(hashed1.try_into().unwrap());
+        mmr.add_leaf(hashed1);
+        mmr.add_leaf(hashed1);
+        mmr.add_leaf(hashed1);
+        mmr.add_leaf(hashed1);
 
         assert_eq!(
             mmr.get_single_root(),
@@ -447,9 +447,9 @@ mod test {
             _pd: PhantomData,
         };
 
-        let hash = Sha256::digest(&6_usize.to_be_bytes()).into();
+        let hash = Sha256::digest(6_usize.to_be_bytes()).into();
 
-        assert!(matches!(mmr.verify(&invalid_proof, &hash), false));
+        assert!(!mmr.verify(&invalid_proof, &hash));
     }
 
     #[test]
@@ -507,15 +507,15 @@ mod test {
         };
 
         // add 4 elements into mmr  so 20 + 4 elements
-        let elem = 4;
-        let num_hash = generate_hashes_for_n_integers(elem);
+        let num_elems = 4;
+        let num_hash = generate_hashes_for_n_integers(num_elems);
 
-        for i in 0..elem {
-            let new_proof = mmr.add_leaf_updating_proof(num_hash[i], &proof);
+        for elem in num_hash.iter().take(num_elems) {
+            let new_proof = mmr.add_leaf_updating_proof(*elem, &proof);
             proof = new_proof;
         }
 
-        assert!(proof.verify_against_mmr(&mmr, num_hash[0].try_into().unwrap()));
+        assert!(proof.verify_against_mmr(&mmr, num_hash[0]));
     }
 
     #[test]
@@ -525,16 +525,16 @@ mod test {
         let mut proof_list = Vec::new();
 
         // add 4 elements into mmr  so 20 + 4 elements
-        let elem = 4;
-        let num_hash = generate_hashes_for_n_integers(elem);
+        let num_elems = 4;
+        let num_hash = generate_hashes_for_n_integers(num_elems);
 
-        for i in 0..elem {
-            let new_proof = mmr.add_leaf_updating_proof_list(num_hash[i], &mut proof_list);
+        for elem in num_hash.iter().take(num_elems) {
+            let new_proof = mmr.add_leaf_updating_proof_list(*elem, &mut proof_list);
             proof_list.push(new_proof);
         }
 
-        for i in 0..elem {
-            assert!(proof_list[i].verify_against_mmr(&mmr, num_hash[i].try_into().unwrap()));
+        for i in 0..num_elems {
+            assert!(proof_list[i].verify_against_mmr(&mmr, num_hash[i]));
         }
     }
 }

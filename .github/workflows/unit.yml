@@ -1,0 +1,114 @@
+# Runs unit tests.
+
+name: Unit Tests
+
+on:
+  pull_request:
+  merge_group:
+  push:
+    branches: [master]
+
+env:
+  CARGO_TERM_COLOR: always
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test and generate report
+    runs-on: ubuntu-latest
+    # nightly rust might break from time to time
+    continue-on-error: true
+    env:
+      RUSTFLAGS: -D warnings
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: llvm-tools-preview
+      - uses: Swatinem/rust-cache@v2
+      - name: Install latest nextest release
+        uses: taiki-e/install-action@v2
+        with:
+          tool: nextest
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
+      - name: Run tests with coverage
+        run: |
+          cargo llvm-cov --workspace nextest --profile ci --lcov --output-path lcov.info
+      - name: Test Summary
+        uses: test-summary/action@v2
+        if: always()
+        with:
+          paths: "target/nextest/ci/junit.xml"
+      - name: Publish Test Coverage
+        uses: codecov/codecov-action@v4.2.0
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+          files: lcov.info
+
+  mutants-test:
+    name: Generate mutants on diff and test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    continue-on-error: true # FIXME: remove this if all mutants are covered
+    needs: [test]
+    strategy:
+      fail-fast: false # Collect all mutants even if some are missed
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Relative diff
+        run: |
+          git branch -av
+          git diff origin/${{ github.base_ref }}.. | tee git.diff
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        name: Install `cargo-mutants`
+        with:
+          tool: cargo-mutants
+      - name: Run `cargo-mutants`
+        run: |
+          cargo mutants --no-shuffle -vV --in-diff git.diff --shard ${{ matrix.shard }}/8 --baseline=skip --timeout 300
+      - name: Archive mutants.out
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mutants-incremental.out
+          path: mutants-shard${{ matrix.shard }}.out
+          overwrite: true
+
+  doc:
+    name: Run doc tests
+    runs-on: ubuntu-latest
+    env:
+      RUST_BACKTRACE: 1
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - name: Run doctests
+        run: cargo test --doc --workspace
+
+  unit-success:
+    name: Check that unit tests pass
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [test, mutants-test, doc]
+    timeout-minutes: 60
+    steps:
+      - name: Decide whether the needed jobs succeeded or failed
+        uses: re-actors/alls-green@release/v1
+        with:
+          jobs: ${{ toJSON(needs) }}

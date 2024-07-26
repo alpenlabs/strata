@@ -1,3 +1,4 @@
+#![allow(unexpected_cfgs)] // TODO: remove this when we add the `client` feature flag.
 //! Macro trait def for the `alp_` RPC namespace using jsonrpsee.
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 

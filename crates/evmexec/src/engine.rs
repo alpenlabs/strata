@@ -159,7 +159,7 @@ impl<T: ELHttpClient> RpcExecEngineCtl<T> {
             }
             PayloadStatusEnum::Syncing => EngineResult::Ok(BlockStatus::Syncing),
             PayloadStatusEnum::Invalid { .. } => EngineResult::Ok(BlockStatus::Invalid),
-            PayloadStatusEnum::Accepted => EngineResult::Err(EngineError::Unimplemented), // should not be possible
+            PayloadStatusEnum::Accepted => EngineResult::Err(EngineError::Unimplemented), /* should not be possible */
         }
     }
 
@@ -192,7 +192,7 @@ impl<T: ELHttpClient> RpcExecEngineCtl<T> {
         let forkchoice_result = self
             .client
             .fork_choice_updated_v2(
-                self.fork_choice_state.lock().await.clone(),
+                *self.fork_choice_state.lock().await,
                 Some(payload_attributes),
             )
             .await;

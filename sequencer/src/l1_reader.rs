@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::thread;
 
 use alpen_vertex_primitives::l1::L1Status;
-use tokio::sync::{mpsc,RwLock};
+use tokio::sync::{mpsc, RwLock};
 
 use alpen_vertex_btcio::reader::{
     config::ReaderConfig, messages::L1Event, query::bitcoin_data_reader_task,
@@ -47,7 +47,7 @@ where
         ev_tx,
         current_block_height,
         config.clone(),
-        l1_status.clone()
+        l1_status.clone(),
     ));
 
     let l1db = db.l1_store().clone();

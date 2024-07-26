@@ -1,6 +1,4 @@
-from time import sleep
 import flexitest
-import time
 
 
 @flexitest.register
@@ -13,4 +11,4 @@ class L1ConnectTest(flexitest.Test):
 
         seqrpc = seq.create_rpc()
         l1stat = seqrpc.alp_l1connected()
-        assert l1stat == True, "Error connecting to Bitcoin Rpc client"
+        assert l1stat, "Error connecting to Bitcoin Rpc client"

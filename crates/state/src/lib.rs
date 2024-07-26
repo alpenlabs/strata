@@ -1,4 +1,5 @@
-#![feature(is_sorted)] // TODO switch to using crate
+#![allow(dead_code)] // TODO: remove once the bridge state `sanity_check` fn is used.
+#![feature(is_sorted)] // TODO: switch to using crate
 
 //! Rollup types relating to the consensus-layer state of the rollup.
 //!
@@ -6,7 +7,6 @@
 //! reusing any Reth types.
 
 pub mod block;
-pub mod header;
 pub mod bridge_ops;
 pub mod bridge_state;
 pub mod chain_state;
@@ -15,6 +15,7 @@ pub mod da_blob;
 pub mod exec_env;
 pub mod exec_update;
 pub mod forced_inclusion;
+pub mod header;
 pub mod id;
 pub mod l1;
 pub mod operation;

@@ -155,7 +155,7 @@ pub trait ClientStateProvider {
 /// L2 data store for CL blocks.  Does not store anything about what we think
 /// the L2 chain tip is, that's controlled by the consensus state.
 pub trait L2DataStore {
-    /// Stores an L2 bloc=k, does not care about the block height of the L2
+    /// Stores an L2 block, does not care about the block height of the L2
     /// block.  Also sets the block's status to "unchecked".
     fn put_block_data(&self, block: L2Block) -> DbResult<()>;
 

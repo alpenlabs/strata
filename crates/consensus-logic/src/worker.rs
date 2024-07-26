@@ -16,7 +16,7 @@ use crate::{
     state_tracker,
 };
 
-/// Mutatble worker state that we modify in the consensus worker task.
+/// Mutable worker state that we modify in the consensus worker task.
 ///
 /// Unable to be shared across threads.  Any data we want to export we'll do
 /// through another handle.

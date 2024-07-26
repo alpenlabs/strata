@@ -36,7 +36,6 @@ pub struct ChainState {
 }
 
 /// Hashed Chain State. This is used to compute the state root of the [`ChainState`]
-///
 // TODO: FIXME: Note that this is used as a temporary solution for the state root calculation
 // It should be replaced once we swap out ChainState's type definitions with SSZ type definitions
 // which defines all of this more rigorously

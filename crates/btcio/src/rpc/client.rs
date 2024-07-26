@@ -5,10 +5,8 @@ use std::{fmt::Display, str::FromStr};
 use async_trait::async_trait;
 use bitcoin::Txid;
 
-use anyhow::anyhow;
 use base64::engine::general_purpose;
 use base64::Engine;
-use bitcoin::hashes::sha256d::Hash;
 use bitcoin::hashes::Hash as _;
 // use async_recursion::async_recursion;
 use bitcoin::{
@@ -23,10 +21,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, to_value, value::RawValue, value::Value};
 use tracing::*;
 
-use super::{
-    traits::SeqL1Client,
-    types::GetTransactionResponse,
-};
+use super::{traits::SeqL1Client, types::GetTransactionResponse};
 
 use thiserror::Error;
 
@@ -39,8 +34,7 @@ pub fn to_val<T>(value: T) -> ClientResult<Value>
 where
     T: Serialize,
 {
-    to_value(value)
-        .map_err(|e| ClientError::ParamError(format!("Error creating value: {}", e.to_string())))
+    to_value(value).map_err(|e| ClientError::ParamError(format!("Error creating value: {}", e)))
 }
 
 // Represents a JSON-RPC error.
@@ -138,15 +132,12 @@ impl BitcoinClient {
         let mut headers = HeaderMap::new();
         let mut user_pw = String::new();
         general_purpose::STANDARD.encode_string(format!("{}:{}", username, password), &mut user_pw);
-            
+
         headers.insert(
             "Authorization",
-            format!(
-                "Basic {}",
-                user_pw 
-            )
-            .parse()
-            .expect("Failed to parse auth header!"),
+            format!("Basic {}", user_pw)
+                .parse()
+                .expect("Failed to parse auth header!"),
         );
         headers.insert(
             "Content-Type",
@@ -203,9 +194,9 @@ impl BitcoinClient {
                     if let Some(err) = data.error {
                         return Err(ClientError::RPCError(err.to_string()));
                     }
-                    return Ok(data
+                    return data
                         .result
-                        .ok_or(ClientError::Other("Empty data received".to_string()))?);
+                        .ok_or_else(|| ClientError::Other("Empty data received".to_string()));
                 }
                 Err(err) => {
                     warn!(err = %err, "Error calling bitcoin client");

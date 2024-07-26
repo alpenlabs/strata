@@ -1,7 +1,7 @@
 [package]
+edition = "2021"
 name = "alpen-vertex-primitives"
 version = "0.1.0"
-edition = "2021"
 
 [dependencies]
 arbitrary = { workspace = true }
@@ -10,8 +10,8 @@ borsh = { workspace = true }
 digest = { workspace = true }
 hex = { workspace = true }
 reth-primitives = { workspace = true }
-sha2 = { workspace = true }
 serde = { workspace = true }
+sha2 = { workspace = true }
 
 [dev-dependencies]
 hex = { workspace = true }

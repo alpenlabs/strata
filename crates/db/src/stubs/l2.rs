@@ -15,6 +15,12 @@ pub struct StubL2Db {
     heights: Mutex<HashMap<u64, Vec<L2BlockId>>>,
 }
 
+impl Default for StubL2Db {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl StubL2Db {
     pub fn new() -> Self {
         Self {
@@ -37,7 +43,7 @@ impl L2DataStore for StubL2Db {
 
         {
             let mut tbl = self.heights.lock();
-            tbl.entry(idx).or_insert_with(Vec::new).push(blkid);
+            tbl.entry(idx).or_default().push(blkid);
         }
 
         Ok(())

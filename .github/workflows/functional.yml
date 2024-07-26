@@ -1,0 +1,70 @@
+name: Run functional tests
+
+on:
+  pull_request:
+  merge_group:
+  push:
+    branches: [master]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  run-functional-tests:
+    name: Run functional tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "^3.10" # Keep in sync with `pyproject.toml`
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python -
+          echo "${HOME}/.local/bin" >> $GITHUB_PATH
+
+      - name: Configure Poetry to create the virtual environment inside the project
+        run: poetry config virtualenvs.in-project true
+
+      - name: Install python dependencies
+        run: cd functional-tests && poetry install --no-root && cd -
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Build Cargo project
+        run: cargo build
+
+      - name: Install bitcoind
+        run: |
+          wget https://bitcoin.org/bin/bitcoin-core-27.0/bitcoin-27.0-x86_64-linux-gnu.tar.gz
+          tar xzf bitcoin-27.0-x86_64-linux-gnu.tar.gz
+          sudo install -m 0755 -t /usr/local/bin bitcoin-27.0/bin/*
+          bitcoind --version
+
+      - name: Run functional tests (1)
+        id: funcTestsRun1
+        continue-on-error: true
+        run: |
+          export PATH=$(realpath target/debug/):$PATH
+          which alpen-vertex-sequencer
+          cd functional-tests && \
+          poetry run python entry.py
+
+      # Run again just to be sure as some tests are flaky
+      - name: Run functional tests (2)
+        if: steps.funcTestsRun1.outcome == 'failure'
+        run: |
+          export PATH=$(realpath target/debug/):$PATH
+          which alpen-vertex-sequencer
+          cd functional-tests && \
+          poetry run python entry.py

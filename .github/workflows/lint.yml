@@ -1,0 +1,110 @@
+name: Lint
+
+on:
+  pull_request:
+  merge_group:
+  push:
+    branches: [master]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  clippy-binaries:
+    name: Run clippy on binaries
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        include:
+          - binary: alpen-vertex-sequencer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - run: cargo clippy --bin "${{ matrix.binary }}" --workspace
+        env:
+          RUSTFLAGS: -D warnings
+
+  clippy:
+    name: Run clippy on library crates
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - run: cargo clippy --workspace --lib --examples --tests --benches --all-features --locked
+        env:
+          RUSTFLAGS: -D warnings
+
+  crate-checks:
+    name: Check that crates compile on their own
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: taiki-e/install-action@cargo-hack
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - run: cargo hack check
+
+  fmt:
+    name: Check code formatting
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
+      - run: cargo fmt --all --check
+
+  codespell:
+    name: Check code spellings
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: codespell-project/actions-codespell@v2
+
+  taplo:
+    name: Lint and check formatting of TOML files
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install taplo
+        run: |
+          curl -fsSL https://github.com/tamasfe/taplo/releases/latest/download/taplo-full-linux-x86_64.gz \
+            | gzip -d - | install -m 755 /dev/stdin /usr/local/bin/taplo
+      - name: Run taplo lint
+        run: |
+          taplo lint
+      - name: Run taplo format check
+        run: |
+          taplo fmt --check
+
+  lint-success:
+    name: Check that lints passed
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      - clippy-binaries
+      - clippy
+      - crate-checks
+      - fmt
+      - codespell
+      - taplo
+    timeout-minutes: 30
+    steps:
+      - name: Decide whether the needed jobs succeeded or failed
+        uses: re-actors/alls-green@release/v1
+        with:
+          jobs: ${{ toJSON(needs) }}

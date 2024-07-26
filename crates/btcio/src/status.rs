@@ -25,9 +25,10 @@ pub async fn apply_status_updates(
             StatusUpdate::RpcConnected(connected) => {
                 l1_status_writer.bitcoin_rpc_connected = *connected
             }
-            StatusUpdate::RpcError(err_string) => l1_status_writer.last_rpc_error = Some(err_string.clone()),
+            StatusUpdate::RpcError(err_string) => {
+                l1_status_writer.last_rpc_error = Some(err_string.clone())
+            }
             StatusUpdate::CurTip(tip) => l1_status_writer.cur_tip_blkid = tip.clone(),
         }
-
     }
 }

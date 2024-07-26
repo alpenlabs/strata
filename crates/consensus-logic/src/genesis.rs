@@ -45,12 +45,12 @@ fn poll_horizon_l1_block<D: Database>(
         }
         retries += 1;
     }
-    return Err(anyhow::anyhow!(
+    Err(anyhow::anyhow!(
         "Max retries exceeded for polling horizon l1 block"
-    ));
+    ))
 }
 
-/// Inserts approprate records into the database to prepare it for syncing the
+/// Inserts appropriate records into the database to prepare it for syncing the
 /// rollup.  Requires that the horizon block header is present in the database.
 pub fn init_genesis_states<D: Database>(params: &Params, database: &D) -> anyhow::Result<()> {
     debug!("preparing database genesis state!");

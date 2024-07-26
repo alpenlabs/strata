@@ -90,7 +90,7 @@ where
                 }
                 format!("{}{}", parts[0], padded)
             } else if parts.len() == 1 {
-                format!("{}{}", parts[0], "0".repeat(8 as usize))
+                format!("{}{}", parts[0], "0".repeat(8_usize))
             } else {
                 return Err(E::custom("Invalid amount representation"));
             };

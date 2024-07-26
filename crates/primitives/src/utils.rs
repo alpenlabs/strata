@@ -37,7 +37,7 @@ fn get_cohashes_from_wtxids(wtxids: &[Wtxid], index: u32) -> (Vec<Buf32>, Buf32)
     while curr_level.len() > 1 {
         let len = curr_level.len();
         if len % 2 != 0 {
-            curr_level.push(curr_level[len - 1].clone());
+            curr_level.push(curr_level[len - 1]);
         }
 
         let proof_item_index = if curr_index % 2 == 0 {
@@ -59,10 +59,10 @@ fn get_cohashes_from_wtxids(wtxids: &[Wtxid], index: u32) -> (Vec<Buf32>, Buf32)
                 let mut arr = [0u8; 64];
                 arr[..32].copy_from_slice(a);
                 arr[32..].copy_from_slice(b);
-                sha256d::Hash::hash(&arr).as_byte_array().clone()
+                *sha256d::Hash::hash(&arr).as_byte_array()
             })
             .collect::<Vec<_>>();
-        curr_index = curr_index >> 1;
+        curr_index >>= 1;
     }
     (proof, Buf32(curr_level[0].into()))
 }

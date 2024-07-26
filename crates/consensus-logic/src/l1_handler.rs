@@ -33,11 +33,7 @@ where
     Ok(())
 }
 
-fn handle_event<L1D>(
-    event: L1Event,
-    l1db: &L1D,
-    csm_ctl: &CsmController,
-) -> anyhow::Result<()>
+fn handle_event<L1D>(event: L1Event, l1db: &L1D, csm_ctl: &CsmController) -> anyhow::Result<()>
 where
     L1D: L1DataStore + Sync + Send + 'static,
 {
@@ -75,7 +71,6 @@ where
             let blkid: Buf32 = blockdata.block().block_hash().into();
             let ev = SyncEvent::L1Block(blockdata.block_num(), blkid.into());
             csm_ctl.submit_event(ev)?;
-
 
             Ok(())
         }

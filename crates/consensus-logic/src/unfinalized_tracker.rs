@@ -50,7 +50,7 @@ impl UnfinalizedBlockTracker {
         }
     }
 
-    /// Returns the "fianlized tip", which is the base of the unfinalized tree.
+    /// Returns the "finalized tip", which is the base of the unfinalized tree.
     pub fn finalized_tip(&self) -> &L2BlockId {
         &self.finalized_tip
     }
@@ -156,8 +156,7 @@ impl UnfinalizedBlockTracker {
         // Now actually go through and evict all the blocks we said we were
         // going to, adding more on as we add them.
         let mut evicted = Vec::new();
-        while !to_evict.is_empty() {
-            let evicting = to_evict.pop().unwrap();
+        while let Some(evicting) = to_evict.pop() {
             let ent = self
                 .pending_table
                 .remove(&evicting)

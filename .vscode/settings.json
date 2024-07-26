@@ -1,0 +1,53 @@
+{
+    "editor.formatOnSave": true,
+    "rust-analyzer.checkOnSave": true,
+    "rust-analyzer.check.overrideCommand": [
+        "clippy",
+        "--workspace",
+        "--all-features",
+        "--benches",
+        "--tests",
+        "--examples"
+    ],
+    "rust-analyzer.diagnostics.enable": true,
+    "todohighlight.isEnable": true,
+    "todohighlight.isCaseSensitive": true,
+    "todohighlight.keywords": [
+        {
+            "text": "OPTIMIZE:",
+            "backgroundColor": "#550055"
+        },
+        {
+            "text": "REVIEW:",
+            "backgroundColor": "#24625A"
+        },
+        {
+            "text": "NOTE:",
+            "backgroundColor": "#A4E871"
+        },
+        {
+            "text": "HACK:",
+            "backgroundColor": "#FBBF24"
+        },
+        {
+            "text": "TODO:",
+            "backgroundColor": "#2563EB"
+        },
+        {
+            "text": "FIXME:",
+            "backgroundColor": "#DC2626"
+        },
+        {
+            "text": "XXX:",
+            "backgroundColor": "#43464C"
+        }
+    ],
+    "todohighlight.include": [
+        "**/*.rs",
+        "**/*.python",
+        "**/*.yaml",
+        "**/*.toml"
+    ],
+    "todohighlight.exclude": ["**/target/**", "**/.vscode/**"],
+    "todohighlight.maxFilesForSearch": 5120
+}

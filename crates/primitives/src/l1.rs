@@ -1,5 +1,4 @@
 use std::fmt;
-use std::time::Duration;
 
 use arbitrary::Arbitrary;
 use bitcoin::hashes::Hash;
@@ -26,9 +25,9 @@ use crate::buf::Buf32;
 )]
 pub struct L1TxRef(u64, u32);
 
-impl Into<(u64, u32)> for L1TxRef {
-    fn into(self) -> (u64, u32) {
-        (self.0, self.1)
+impl From<L1TxRef> for (u64, u32) {
+    fn from(val: L1TxRef) -> Self {
+        (val.0, val.1)
     }
 }
 
@@ -160,9 +159,9 @@ impl OutputRef {
     }
 }
 
-impl Into<(Buf32, u16)> for OutputRef {
-    fn into(self) -> (Buf32, u16) {
-        (self.txid, self.outidx)
+impl From<OutputRef> for (Buf32, u16) {
+    fn from(val: OutputRef) -> Self {
+        (val.txid, val.outidx)
     }
 }
 

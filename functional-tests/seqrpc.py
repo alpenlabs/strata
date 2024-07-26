@@ -10,7 +10,7 @@ class RpcError(Exception):
         self.data = data
 
     def __str__(self) -> str:
-        return "RpcError: code %s (%s)" % (self.code, self.msg)
+        return f"RpcError: code {self.code} ({self.msg})"
 
 
 def _make_request(method: str, req_id: int, params) -> str:

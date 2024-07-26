@@ -43,7 +43,7 @@ impl SyncEventStore for SyncEventDb {
     }
 
     fn clear_sync_event(&self, start_idx: u64, end_idx: u64) -> DbResult<()> {
-        if !(start_idx < end_idx) {
+        if start_idx >= end_idx {
             return Err(DbError::Other(
                 "start_idx must be less than end_idx".to_string(),
             ));
@@ -51,7 +51,7 @@ impl SyncEventStore for SyncEventDb {
 
         match self.get_last_key()? {
             Some(last_key) => {
-                if !(end_idx <= last_key) {
+                if end_idx > last_key {
                     return Err(DbError::Other(
                         "end_idx must be less than or equal to last_key".to_string(),
                     ));
@@ -62,8 +62,8 @@ impl SyncEventStore for SyncEventDb {
 
         let iterator = self.db.iter::<SyncEventSchema>()?;
 
-        // TODO: determine if the expectation behaviour for this is to clear early events or clear late events
-        // The implementation is based for early events
+        // TODO: determine if the expectation behaviour for this is to clear early events or clear
+        // late events. The implementation is based for early events
         let mut batch = SchemaBatch::new();
 
         for res in iterator {

@@ -3,7 +3,7 @@ use bitcoin::Block;
 /// L1 events that we observe and want the persistence task to work on.
 #[derive(Clone, Debug)]
 pub enum L1Event {
-    /// Data that contains block number, block and relevent transactions
+    /// Data that contains block number, block and relevant transactions
     BlockData(BlockData),
 
     /// Revert to the provided block height

@@ -35,6 +35,12 @@ pub struct StubChainstateDb {
     state: Mutex<InnerState>,
 }
 
+impl Default for StubChainstateDb {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl StubChainstateDb {
     pub fn new() -> Self {
         Self {

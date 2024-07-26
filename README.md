@@ -24,7 +24,7 @@ These exist in `crates/`.
 * `evmexec` - utils relating to EVM execution via REVM
 * `primitives` - common types used throughout project, mostly re-exports
 * `rpc/api` - Alpen rollup RPC defs
-* `state` - type defs relating to rollup data strctures
+* `state` - type defs relating to rollup data structures
 * `util/` - independent utility libraries
   * `mmr` - "merkle mountain range" util
 * `vtxjmt` - extensions to JMT crate for our purposes

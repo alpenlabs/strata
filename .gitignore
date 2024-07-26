@@ -67,6 +67,10 @@ target/
 # MSVC Windows builds of rustc generate these, which store debugging information
 *.pdb
 
+# Tests artifacts
+mutants.out*
+lcov.info
+
 ########
 # Python
 ########

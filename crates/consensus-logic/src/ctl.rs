@@ -61,13 +61,13 @@ impl SubmitEventShim {
     /// Synchronously submits an event to the CSM database to be processed by
     /// the thing.
     fn submit_event_blocking(&self, ev: SyncEvent) -> anyhow::Result<u64, DbError> {
-        Ok((self.handle)(ev).wait_blocking()?)
+        (self.handle)(ev).wait_blocking()
     }
 
     /// Asynchronously submits an event to the CSM database to be processed by
     /// the thing.
     async fn submit_event(&self, ev: SyncEvent) -> anyhow::Result<u64, DbError> {
-        Ok((self.handle)(ev).wait().await?)
+        (self.handle)(ev).wait().await
     }
 }
 
