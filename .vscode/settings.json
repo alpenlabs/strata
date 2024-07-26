@@ -2,12 +2,14 @@
     "editor.formatOnSave": true,
     "rust-analyzer.checkOnSave": true,
     "rust-analyzer.check.overrideCommand": [
+        "cargo",
         "clippy",
         "--workspace",
         "--all-features",
         "--benches",
         "--tests",
-        "--examples"
+        "--examples",
+        "--message-format=json"
     ],
     "rust-analyzer.diagnostics.enable": true,
     "todohighlight.isEnable": true,
