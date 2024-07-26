@@ -4,9 +4,8 @@
 use alpen_express_state::{
     prelude::*,
     block::L1Segment,
-    chain_state::ChainState,
     exec_update,
-    state_op::{StateCache, WriteBatch},
+    state_op::StateCache,
 };
 
 use crate::errors::TsnError;

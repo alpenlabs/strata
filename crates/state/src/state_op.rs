@@ -7,8 +7,7 @@ use alpen_express_primitives::buf::Buf32;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::chain_state::ChainState;
-use crate::operation::apply_writes_to_state;
-use crate::{bridge_ops, bridge_state, l1};
+use crate::{bridge_ops, l1};
 
 #[derive(Clone, Debug, PartialEq, BorshDeserialize, BorshSerialize)]
 pub enum StateOp {
