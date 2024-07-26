@@ -84,6 +84,16 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             cred_rule: block_credential::CredRule::Unchecked,
             horizon_l1_height: 3,
             genesis_l1_height: 5,
+            evm_genesis_block_hash: Buf32(
+                "0x37ad61cff1367467a98cf7c54c4ac99e989f1fbb1bc1e646235e90c065c565ba"
+                    .parse()
+                    .unwrap(),
+            ),
+            evm_genesis_block_state_root: Buf32(
+                "0x351714af72d74259f45cd7eab0b04527cd40e74836a45abcae50f92d919d988f"
+                    .parse()
+                    .unwrap(),
+            ),
         },
         run: RunParams {
             l1_follow_distance: config.sync.l1_follow_distance,
