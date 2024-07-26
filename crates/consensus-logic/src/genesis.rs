@@ -1,5 +1,3 @@
-use std::{sync::Arc, thread, time::Duration};
-
 use tracing::*;
 
 use alpen_vertex_db::{errors::DbError, traits::*};
@@ -11,7 +9,7 @@ use alpen_vertex_primitives::{
 use alpen_vertex_state::{
     block::{ExecSegment, L1Segment},
     chain_state::ChainState,
-    client_state::{ClientState, SyncState},
+    client_state::ClientState,
     exec_env::ExecEnvState,
     exec_update::{ExecUpdate, UpdateInput, UpdateOutput},
     header::L2BlockHeader,

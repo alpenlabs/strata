@@ -2,9 +2,8 @@
 
 use std::sync::Arc;
 
-use alpen_vertex_primitives::buf::Buf32;
 use alpen_vertex_state::state_op;
-use tokio::sync::{broadcast, mpsc, watch, Semaphore};
+use tokio::sync::mpsc;
 use tracing::*;
 
 use alpen_vertex_db::errors::DbError;
@@ -228,7 +227,7 @@ fn determine_stored_finalized_tip(
     let l2_prov = database.l2_provider();
     let h0_blocks = l2_prov.get_blocks_at_height(0)?;
     assert!(h0_blocks.len() <= 1); // sanity check
-    if let Some(gblkid) = h0_blocks.get(0) {
+    if let Some(gblkid) = h0_blocks.first() {
         return Ok(*gblkid);
     }
 
@@ -253,7 +252,7 @@ fn determine_stored_finalized_tip(
 
         Err(e) => {
             error!(err = %e, "failed to compute chain genesis");
-            Err(e.into())
+            Err(e)
         }
     }
 }

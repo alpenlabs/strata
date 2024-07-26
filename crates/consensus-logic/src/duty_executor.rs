@@ -96,7 +96,7 @@ fn update_tracker<D: Database>(
         return Ok(());
     };
 
-    let new_duties = duty_extractor::extract_duties(state, &ident, database)?;
+    let new_duties = duty_extractor::extract_duties(state, ident, database)?;
 
     // Figure out the block slot from the tip blockid.
     // TODO include the block slot in the consensus state

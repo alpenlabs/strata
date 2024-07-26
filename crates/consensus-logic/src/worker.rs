@@ -12,8 +12,6 @@ use alpen_vertex_state::{client_state::ClientState, operation::SyncAction};
 
 use crate::{
     errors::Error,
-    fork_choice_manager::ForkChoiceManager,
-    genesis,
     message::{ClientUpdateNotif, CsmMessage, ForkChoiceMessage},
     state_tracker,
     status::CsmStatus,

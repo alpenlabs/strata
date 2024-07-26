@@ -1,4 +1,5 @@
 //! Core state transition function.
+#![allow(unused)] // still under development
 
 use tracing::*;
 
@@ -80,7 +81,7 @@ pub fn process_event<D: Database>(
                 writes.push(ClientStateWrite::UpdateFinalized(*last));
             } else {
                 // TODO we can expand this later to make more sense
-                return Err(Error::MissingClientSyncState.into());
+                return Err(Error::MissingClientSyncState);
             }
         }
 
