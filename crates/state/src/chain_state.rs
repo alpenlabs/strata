@@ -87,11 +87,12 @@ impl<'a> Arbitrary<'a> for ChainState {
     }
 }
 
+#[allow(unused)]
 #[cfg(test)]
 mod tests {
-    use arbitrary::Unstructured;
+    //use arbitrary::Unstructured;
 
-    use super::*;
+    //use super::*;
 
     // TODO re-enable this test, it's going to be changing a lot so these kinds
     // of test vectors aren't that useful right now
