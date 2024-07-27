@@ -3,6 +3,7 @@
 
 use std::sync::Arc;
 
+use alpen_vertex_state::block::L2BlockBundle;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use alpen_vertex_mmr::CompactMmr;
@@ -157,7 +158,7 @@ pub trait ClientStateProvider {
 pub trait L2DataStore {
     /// Stores an L2 block, does not care about the block height of the L2
     /// block.  Also sets the block's status to "unchecked".
-    fn put_block_data(&self, block: L2Block) -> DbResult<()>;
+    fn put_block_data(&self, block: L2BlockBundle) -> DbResult<()>;
 
     /// Tries to delete an L2 block from the store, returning if it really
     /// existed or not.  This should only be used for blocks well before some
@@ -171,7 +172,7 @@ pub trait L2DataStore {
 /// Data provider for L2 blocks.
 pub trait L2DataProvider {
     /// Gets the L2 block by its ID, if we have it.
-    fn get_block_data(&self, id: L2BlockId) -> DbResult<Option<L2Block>>;
+    fn get_block_data(&self, id: L2BlockId) -> DbResult<Option<L2BlockBundle>>;
 
     /// Gets the L2 block IDs that we have at some height, in case there's more
     /// than one on competing forks.

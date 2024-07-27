@@ -9,7 +9,7 @@ use alpen_vertex_db::{
     traits::{ClientStateProvider, Database, L2DataProvider},
 };
 use alpen_vertex_primitives::params::RollupParams;
-use alpen_vertex_state::{block::L2Block, client_state::ClientState, id::L2BlockId};
+use alpen_vertex_state::{block::L2BlockBundle, client_state::ClientState, id::L2BlockId};
 
 use crate::block::EVML2Block;
 
@@ -38,7 +38,7 @@ pub fn fork_choice_state_initial<D: Database>(
     })
 }
 
-fn get_block_hash(l2_block: L2Block) -> Result<B256> {
+fn get_block_hash(l2_block: L2BlockBundle) -> Result<B256> {
     EVML2Block::try_from(l2_block)
         .map(|block| block.block_hash())
         .context("Failed to convert L2Block to EVML2Block")

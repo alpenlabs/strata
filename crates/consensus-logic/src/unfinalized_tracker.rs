@@ -317,14 +317,14 @@ mod tests {
     use alpen_test_utils::ArbitraryGenerator;
     use alpen_vertex_db::traits::{Database, L2DataProvider, L2DataStore};
     use alpen_vertex_state::{
-        block::{L2Block, L2BlockAccessory, L2BlockBody},
+        block::{L2Block, L2BlockAccessory, L2BlockBody, L2BlockBundle},
         header::{L2BlockHeader, L2Header, SignedL2BlockHeader},
         id::L2BlockId,
     };
 
     use crate::unfinalized_tracker;
 
-    fn get_genesis_block() -> L2Block {
+    fn get_genesis_block() -> L2BlockBundle {
         let arb = ArbitraryGenerator::new();
         let gen_header: SignedL2BlockHeader = arb.generate();
         let body: L2BlockBody = arb.generate();
@@ -339,10 +339,10 @@ mod tests {
             *gen_header.state_root(),
         );
         let signed_header = SignedL2BlockHeader::new(header, *gen_header.sig());
-        L2Block::new(signed_header, body, accessory)
+        L2BlockBundle::new(L2Block::new(signed_header, body), accessory)
     }
 
-    fn get_mock_block_with_parent(parent: &SignedL2BlockHeader) -> L2Block {
+    fn get_mock_block_with_parent(parent: &SignedL2BlockHeader) -> L2BlockBundle {
         let arb = ArbitraryGenerator::new();
         let gen_header: SignedL2BlockHeader = arb.generate();
         let body: L2BlockBody = arb.generate();
@@ -356,7 +356,7 @@ mod tests {
             *gen_header.state_root(),
         );
         let signed_header = SignedL2BlockHeader::new(header, *gen_header.sig());
-        L2Block::new(signed_header, body, accessory)
+        L2BlockBundle::new(L2Block::new(signed_header, body), accessory)
     }
 
     fn setup_test_chain(l2_prov: &impl L2DataStore) -> [L2BlockId; 7] {

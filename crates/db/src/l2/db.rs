@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use rockbound::{SchemaBatch, DB};
 
-use alpen_vertex_state::prelude::*;
+use alpen_vertex_state::{block::L2BlockBundle, prelude::*};
 
 use crate::{
     l2::schemas::L2BlockHeightSchema,
@@ -23,18 +23,18 @@ impl L2Db {
 }
 
 impl L2DataStore for L2Db {
-    fn put_block_data(&self, block: L2Block) -> DbResult<()> {
-        let block_id = block.header().get_blockid();
+    fn put_block_data(&self, bundle: L2BlockBundle) -> DbResult<()> {
+        let block_id = bundle.block().header().get_blockid();
 
         // append to previous block height data
-        let block_height = block.header().blockidx();
+        let block_height = bundle.block().header().blockidx();
         let mut block_height_data = self.get_blocks_at_height(block_height)?;
         if !block_height_data.contains(&block_id) {
             block_height_data.push(block_id);
         }
 
         let mut batch = SchemaBatch::new();
-        batch.put::<L2BlockSchema>(&block_id, &block)?;
+        batch.put::<L2BlockSchema>(&block_id, &bundle)?;
         batch.put::<L2BlockStatusSchema>(&block_id, &BlockStatus::Unchecked)?;
         batch.put::<L2BlockHeightSchema>(&block_height, &block_height_data)?;
         self.db.write_schemas(batch)?;
@@ -43,13 +43,13 @@ impl L2DataStore for L2Db {
     }
 
     fn del_block_data(&self, id: L2BlockId) -> DbResult<bool> {
-        let block = match self.get_block_data(id)? {
+        let bundle = match self.get_block_data(id)? {
             Some(block) => block,
             None => return Ok(false),
         };
 
         // update to previous block height data
-        let block_height = block.header().blockidx();
+        let block_height = bundle.block().header().blockidx();
         let mut block_height_data = self.get_blocks_at_height(block_height)?;
         block_height_data.retain(|&block_id| block_id != id);
 
@@ -76,7 +76,7 @@ impl L2DataStore for L2Db {
 }
 
 impl L2DataProvider for L2Db {
-    fn get_block_data(&self, id: L2BlockId) -> DbResult<Option<L2Block>> {
+    fn get_block_data(&self, id: L2BlockId) -> DbResult<Option<L2BlockBundle>> {
         Ok(self.db.get::<L2BlockSchema>(&id)?)
     }
 
@@ -97,11 +97,11 @@ mod tests {
     use super::*;
     use alpen_test_utils::{get_rocksdb_tmp_instance, ArbitraryGenerator};
 
-    fn get_mock_data() -> L2Block {
+    fn get_mock_data() -> L2BlockBundle {
         let arb = ArbitraryGenerator::new();
-        let l2_lock: L2Block = arb.generate();
+        let l2_block: L2BlockBundle = arb.generate();
 
-        l2_lock
+        l2_block
     }
 
     fn setup_db() -> L2Db {
@@ -113,12 +113,12 @@ mod tests {
     fn set_and_get_block_data() {
         let l2_db = setup_db();
 
-        let block = get_mock_data();
-        let block_hash = block.header().get_blockid();
-        let block_height = block.header().blockidx();
+        let bundle = get_mock_data();
+        let block_hash = bundle.block().header().get_blockid();
+        let block_height = bundle.block().header().blockidx();
 
         l2_db
-            .put_block_data(block.clone())
+            .put_block_data(bundle.clone())
             .expect("failed to put block data");
 
         // assert block was stored
@@ -126,7 +126,7 @@ mod tests {
             .get_block_data(block_hash)
             .expect("failed to retrieve block data")
             .unwrap();
-        assert_eq!(received_block, block);
+        assert_eq!(received_block, bundle);
 
         // assert block status was set to `BlockStatus::Unchecked``
         let block_status = l2_db
@@ -145,9 +145,9 @@ mod tests {
     #[test]
     fn del_and_get_block_data() {
         let l2_db = setup_db();
-        let block = get_mock_data();
-        let block_hash = block.header().get_blockid();
-        let block_height = block.header().blockidx();
+        let bundle = get_mock_data();
+        let block_hash = bundle.block().header().get_blockid();
+        let block_height = bundle.block().header().blockidx();
 
         // deleting non existing block should return false
         let res = l2_db
@@ -157,7 +157,7 @@ mod tests {
 
         // deleting existing block should return true
         l2_db
-            .put_block_data(block.clone())
+            .put_block_data(bundle.clone())
             .expect("failed to put block data");
         let res = l2_db
             .del_block_data(block_hash)
@@ -186,11 +186,11 @@ mod tests {
     #[test]
     fn set_and_get_block_status() {
         let l2_db = setup_db();
-        let block = get_mock_data();
-        let block_hash = block.header().get_blockid();
+        let bundle = get_mock_data();
+        let block_hash = bundle.block().header().get_blockid();
 
         l2_db
-            .put_block_data(block.clone())
+            .put_block_data(bundle.clone())
             .expect("failed to put block data");
 
         // assert block status was set to `BlockStatus::Valid``

@@ -15,7 +15,7 @@ use alpen_vertex_db::traits::L2DataProvider;
 use alpen_vertex_evmctl::engine::{BlockStatus, ExecEngineCtl, PayloadStatus};
 use alpen_vertex_evmctl::errors::{EngineError, EngineResult};
 use alpen_vertex_evmctl::messages::{ELDepositData, ExecPayloadData, Op, PayloadEnv};
-use alpen_vertex_state::block::L2Block;
+use alpen_vertex_state::block::L2BlockBundle;
 use alpen_vertex_state::exec_update::UpdateInput;
 use alpen_vertex_state::id::L2BlockId;
 
@@ -55,7 +55,7 @@ impl<T: ELHttpClient, D: L2DataProvider> RpcExecEngineCtl<T, D> {
 }
 
 impl<T: ELHttpClient, D: L2DataProvider> RpcExecEngineCtl<T, D> {
-    fn get_l2block(&self, l2_block_id: &L2BlockId) -> anyhow::Result<L2Block> {
+    fn get_l2block(&self, l2_block_id: &L2BlockId) -> anyhow::Result<L2BlockBundle> {
         self.database
             .get_block_data(*l2_block_id)?
             .ok_or(anyhow::anyhow!("missing L2Block"))
@@ -67,7 +67,7 @@ impl<T: ELHttpClient, D: L2DataProvider> RpcExecEngineCtl<T, D> {
             .map(|evm_block| evm_block.block_hash())
     }
 
-    fn get_block_info(&self, l2block: L2Block) -> anyhow::Result<EVML2Block> {
+    fn get_block_info(&self, l2block: L2BlockBundle) -> anyhow::Result<EVML2Block> {
         EVML2Block::try_from(l2block).map_err(anyhow::Error::msg)
     }
 
@@ -439,15 +439,13 @@ mod tests {
         let el_payload = random_el_payload();
 
         let arb = alpen_test_utils::ArbitraryGenerator::new();
-        let l2block = L2Block::new(
-            arb.generate(),
-            arb.generate(),
-            L2BlockAccessory::new(borsh::to_vec(&el_payload).unwrap()),
-        );
+        let l2block: L2Block = arb.generate();
+        let accessory = L2BlockAccessory::new(borsh::to_vec(&el_payload).unwrap());
+        let l2block_bundle = L2BlockBundle::new(l2block, accessory);
 
-        let evm_l2_block = EVML2Block::try_from(l2block.clone()).unwrap();
+        let evm_l2_block = EVML2Block::try_from(l2block_bundle.clone()).unwrap();
 
-        l2db.put_block_data(l2block).unwrap();
+        l2db.put_block_data(l2block_bundle).unwrap();
 
         let rpc_exec_engine_ctl =
             RpcExecEngineCtl::new(mock_client, fcs, Handle::current(), Arc::new(l2db));

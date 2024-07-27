@@ -14,7 +14,7 @@ use alpen_vertex_evmctl::engine::{ExecEngineCtl, PayloadStatus};
 use alpen_vertex_evmctl::errors::EngineError;
 use alpen_vertex_evmctl::messages::{ExecPayloadData, PayloadEnv};
 use alpen_vertex_primitives::buf::{Buf32, Buf64};
-use alpen_vertex_state::block::{ExecSegment, L1Segment, L2BlockAccessory};
+use alpen_vertex_state::block::{ExecSegment, L1Segment, L2BlockAccessory, L2BlockBundle};
 use alpen_vertex_state::client_state::ClientState;
 use alpen_vertex_state::header::L2BlockHeader;
 use alpen_vertex_state::prelude::*;
@@ -293,12 +293,13 @@ fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     let signed_header = SignedL2BlockHeader::new(header, header_sig);
     let blkid = signed_header.get_blockid();
     let block_accessory = L2BlockAccessory::new(payload_data.accessory_data().to_vec());
-    let final_block = L2Block::new(signed_header, body, block_accessory);
+    let final_block = L2Block::new(signed_header, body);
+    let final_block_bundle = L2BlockBundle::new(final_block.clone(), block_accessory);
     info!(%slot, ?blkid, "finished building new block");
 
     // Store the block in the database.
     let l2store = database.l2_store();
-    l2store.put_block_data(final_block.clone())?;
+    l2store.put_block_data(final_block_bundle)?;
     debug!(?blkid, "wrote block to datastore");
 
     Ok(Some((blkid, final_block)))

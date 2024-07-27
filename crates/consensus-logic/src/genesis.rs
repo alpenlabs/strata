@@ -8,7 +8,7 @@ use alpen_vertex_primitives::{
     params::Params,
 };
 use alpen_vertex_state::{
-    block::{ExecSegment, L1Segment, L2BlockAccessory},
+    block::{ExecSegment, L1Segment, L2BlockAccessory, L2BlockBundle},
     chain_state::ChainState,
     client_state::ClientState,
     exec_env::ExecEnvState,
@@ -111,7 +111,7 @@ fn load_pre_genesis_l1_manifests(
     Ok(manifests)
 }
 
-fn make_genesis_block(params: &Params, genesis_update: ExecUpdate) -> L2Block {
+fn make_genesis_block(params: &Params, genesis_update: ExecUpdate) -> L2BlockBundle {
     // This has to be empty since everyone should have an unambiguous view of the genesis block.
     let l1_seg = L1Segment::new_empty();
 
@@ -121,8 +121,8 @@ fn make_genesis_block(params: &Params, genesis_update: ExecUpdate) -> L2Block {
     let body = L2BlockBody::new(l1_seg, exec_seg);
 
     // TODO stub
-    let exec_accessory = vec![];
-    let accessory = L2BlockAccessory::new(exec_accessory);
+    let exec_payload = vec![];
+    let accessory = L2BlockAccessory::new(exec_payload);
 
     // Assemble the genesis header template, pulling in data from whatever
     // sources we need.
@@ -133,7 +133,8 @@ fn make_genesis_block(params: &Params, genesis_update: ExecUpdate) -> L2Block {
     let genesis_sr = Buf32::zero();
     let header = L2BlockHeader::new(0, genesis_ts, zero_blkid, &body, genesis_sr);
     let signed_genesis_header = SignedL2BlockHeader::new(header, Buf64::zero());
-    L2Block::new(signed_genesis_header, body, accessory)
+    let block = L2Block::new(signed_genesis_header, body);
+    L2BlockBundle::new(block, accessory)
 }
 
 /// Check if the database needs to have client init done to it.

@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
@@ -19,23 +21,11 @@ pub struct L2Block {
 
     /// Body that contains the bulk of the data.
     body: L2BlockBody,
-
-    /// auxiliary information, separated from proofs.
-    /// May be moved so some optional sidecar structure downloadable separately from block.
-    accessory: L2BlockAccessory,
 }
 
 impl L2Block {
-    pub fn new(
-        header: SignedL2BlockHeader,
-        body: L2BlockBody,
-        accessory: L2BlockAccessory,
-    ) -> Self {
-        Self {
-            header,
-            body,
-            accessory,
-        }
+    pub fn new(header: SignedL2BlockHeader, body: L2BlockBody) -> Self {
+        Self { header, body }
     }
 
     pub fn header(&self) -> &SignedL2BlockHeader {
@@ -48,10 +38,6 @@ impl L2Block {
 
     pub fn exec_segment(&self) -> &ExecSegment {
         &self.body.exec_segment
-    }
-
-    pub fn exec_accessory(&self) -> &[u8] {
-        &self.accessory.exec_accessory
     }
 }
 
@@ -66,11 +52,7 @@ impl<'a> Arbitrary<'a> for L2Block {
         let sr = Buf32::arbitrary(u)?;
         let header = L2BlockHeader::new(idx, ts, prev, &body, sr);
         let signed_header = SignedL2BlockHeader::new(header, Buf64::arbitrary(u)?);
-        Ok(Self::new(
-            signed_header,
-            body,
-            L2BlockAccessory::new(vec![]),
-        ))
+        Ok(Self::new(signed_header, body))
     }
 }
 
@@ -143,15 +125,49 @@ impl ExecSegment {
 
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize)]
 pub struct L2BlockAccessory {
-    exec_accessory: Vec<u8>,
+    exec_payload: Vec<u8>,
 }
 
 impl L2BlockAccessory {
-    pub fn new(exec_accessory: Vec<u8>) -> Self {
-        Self { exec_accessory }
+    pub fn new(exec_payload: Vec<u8>) -> Self {
+        Self { exec_payload }
     }
 
-    pub fn exec_accessory(&self) -> &[u8] {
-        &self.exec_accessory
+    pub fn exec_payload(&self) -> &[u8] {
+        &self.exec_payload
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
+pub struct L2BlockBundle {
+    block: L2Block,
+    accessory: L2BlockAccessory,
+}
+
+impl L2BlockBundle {
+    pub fn new(block: L2Block, accessory: L2BlockAccessory) -> Self {
+        Self { block, accessory }
+    }
+
+    pub fn block(&self) -> &L2Block {
+        &self.block
+    }
+
+    pub fn accessory(&self) -> &L2BlockAccessory {
+        &self.accessory
+    }
+}
+
+impl From<L2BlockBundle> for L2Block {
+    fn from(value: L2BlockBundle) -> Self {
+        value.block
+    }
+}
+
+impl Deref for L2BlockBundle {
+    type Target = L2Block;
+
+    fn deref(&self) -> &Self::Target {
+        &self.block
     }
 }

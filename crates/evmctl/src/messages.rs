@@ -1,5 +1,5 @@
 use alpen_vertex_primitives::prelude::*;
-use alpen_vertex_state::{block::L2Block, exec_update::UpdateInput, id::L2BlockId};
+use alpen_vertex_state::{block::L2BlockBundle, exec_update::UpdateInput, id::L2BlockId};
 
 /// Succinct commitment to relevant EL block data.
 // This ended up being the same as the EL payload types in the state crate,
@@ -31,10 +31,10 @@ impl ExecPayloadData {
         }
     }
 
-    pub fn from_l2_block(l2block: &L2Block) -> Self {
+    pub fn from_l2_block_bundle(l2block: &L2BlockBundle) -> Self {
         Self {
-            update_input: l2block.exec_segment().update().input().clone(),
-            accessory_data: l2block.exec_accessory().to_vec(),
+            update_input: l2block.block().exec_segment().update().input().clone(),
+            accessory_data: l2block.accessory().exec_payload().to_vec(),
             // TODO: extract ops from block
             ops: vec![],
         }

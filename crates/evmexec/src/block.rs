@@ -3,7 +3,7 @@ use reth_primitives::B256;
 use thiserror::Error;
 
 use alpen_vertex_primitives::evm_exec::EVMExtraPayload;
-use alpen_vertex_state::block::L2Block;
+use alpen_vertex_state::block::{L2Block, L2BlockBundle};
 
 pub(crate) struct EVML2Block {
     #[allow(dead_code)]
@@ -17,16 +17,16 @@ impl EVML2Block {
     }
 }
 
-impl TryFrom<L2Block> for EVML2Block {
+impl TryFrom<L2BlockBundle> for EVML2Block {
     type Error = ConversionError;
 
-    fn try_from(value: L2Block) -> Result<Self, Self::Error> {
+    fn try_from(value: L2BlockBundle) -> Result<Self, Self::Error> {
         let extra_payload_slice = value.exec_segment().update().input().extra_payload();
         let extra_payload = EVMExtraPayload::try_from_slice(extra_payload_slice)
             .or(Err(ConversionError::Invalid))?;
 
         Ok(Self {
-            l2_block: value,
+            l2_block: value.block().to_owned(),
             extra_payload,
         })
     }
