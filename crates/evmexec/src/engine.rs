@@ -495,7 +495,19 @@ mod tests {
 
         let el_payload = ElPayload {
             base_fee_per_gas: Buf32(U256::from(10).into()),
-            ..Default::default()
+            parent_hash: Default::default(),
+            fee_recipient: Default::default(),
+            state_root: Default::default(),
+            receipts_root: Default::default(),
+            logs_bloom: [0u8; 256],
+            prev_randao: Default::default(),
+            block_number: Default::default(),
+            gas_limit: Default::default(),
+            gas_used: Default::default(),
+            timestamp: Default::default(),
+            extra_data: Default::default(),
+            block_hash: Default::default(),
+            transactions: Default::default(),
         };
         let accessory_data = borsh::to_vec(&el_payload).unwrap();
         let update_input = UpdateInput::try_from(el_payload).unwrap();

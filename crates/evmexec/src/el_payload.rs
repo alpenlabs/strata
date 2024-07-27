@@ -66,27 +66,6 @@ impl TryFrom<ElPayload> for UpdateInput {
     }
 }
 
-impl Default for ElPayload {
-    fn default() -> Self {
-        Self {
-            parent_hash: Default::default(),
-            fee_recipient: Default::default(),
-            state_root: Default::default(),
-            receipts_root: Default::default(),
-            logs_bloom: [0u8; 256],
-            prev_randao: Default::default(),
-            block_number: Default::default(),
-            gas_limit: Default::default(),
-            gas_used: Default::default(),
-            timestamp: Default::default(),
-            extra_data: Default::default(),
-            base_fee_per_gas: Default::default(),
-            block_hash: Default::default(),
-            transactions: Default::default(),
-        }
-    }
-}
-
 impl From<ExecutionPayloadV1> for ElPayload {
     fn from(val: ExecutionPayloadV1) -> Self {
         ElPayload {
