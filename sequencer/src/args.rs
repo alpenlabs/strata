@@ -38,4 +38,10 @@ pub struct Args {
 
     #[argh(option, short = 'k', description = "path to sequencer root key")]
     pub sequencer_key: Option<PathBuf>,
+
+    #[argh(option, description = "reth authrpc host:port")]
+    pub reth_authrpc: Option<String>,
+
+    #[argh(option, description = "path to reth authrpc jwtsecret")]
+    pub reth_jwtsecret: Option<PathBuf>,
 }

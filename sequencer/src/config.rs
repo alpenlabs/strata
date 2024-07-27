@@ -30,7 +30,7 @@ pub struct BitcoindParams {
 #[derive(Deserialize, Debug)]
 pub struct RethELParams {
     pub rpc_url: String,
-    pub secret: String,
+    pub secret: PathBuf,
 }
 
 #[derive(Deserialize, Debug)]
@@ -67,8 +67,8 @@ impl Config {
             },
             exec: ExecParams {
                 reth: RethELParams {
-                    rpc_url: "http://localhost:8551".to_string(),
-                    secret: String::new(),
+                    rpc_url: String::new(),
+                    secret: PathBuf::new(),
                 },
             },
         }
@@ -81,6 +81,12 @@ impl Config {
         self.bitcoind_rpc.rpc_password = args.bitcoind_password;
         self.client.datadir = args.datadir;
         self.client.sequencer_key = args.sequencer_key;
+        if let Some(rpc_url) = args.reth_authrpc {
+            self.exec.reth.rpc_url = rpc_url;
+        }
+        if let Some(jwtsecret) = args.reth_jwtsecret {
+            self.exec.reth.secret = jwtsecret;
+        }
     }
 }
 

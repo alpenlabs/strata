@@ -14,8 +14,7 @@ use reth_rpc_types::engine::{
 #[cfg(test)]
 use mockall::automock;
 
-fn http_client(http_url: &str, secret_hex: &str) -> HttpClient<AuthClientService<HttpBackend>> {
-    let secret = JwtSecret::from_hex(secret_hex).unwrap();
+fn http_client(http_url: &str, secret: JwtSecret) -> HttpClient<AuthClientService<HttpBackend>> {
     let middleware = tower::ServiceBuilder::new().layer(AuthClientLayer::new(secret));
 
     HttpClientBuilder::default()
@@ -56,9 +55,9 @@ pub struct ELHttpClientImpl {
 }
 
 impl ELHttpClientImpl {
-    pub fn from_url_secret(http_url: &str, secret_hex: &str) -> Self {
+    pub fn from_url_secret(http_url: &str, secret: JwtSecret) -> Self {
         ELHttpClientImpl {
-            client: Arc::new(http_client(http_url, secret_hex)),
+            client: Arc::new(http_client(http_url, secret)),
         }
     }
 

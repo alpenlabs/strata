@@ -12,6 +12,8 @@ use anyhow::Context;
 use bitcoin::Network;
 use config::Config;
 use format_serde_error::SerdeError;
+use reth_rpc_types::engine::JwtError;
+use reth_rpc_types::engine::JwtSecret;
 use thiserror::Error;
 use tokio::sync::{broadcast, oneshot, RwLock};
 use tracing::*;
@@ -43,6 +45,9 @@ pub enum InitError {
     #[error("config: {0}")]
     MalformedConfig(#[from] SerdeError),
 
+    #[error("jwt: {0}")]
+    MalformedSecret(#[from] JwtError),
+
     #[error("{0}")]
     Other(String),
 }
@@ -52,6 +57,13 @@ fn load_configuration(path: &Path) -> Result<Config, InitError> {
     let conf = toml::from_str::<Config>(&config_str)
         .map_err(|err| SerdeError::new(config_str.to_string(), err))?;
     Ok(conf)
+}
+
+fn load_jwtsecret(path: &Path) -> Result<JwtSecret, InitError> {
+    let secret = fs::read_to_string(path)?;
+    let jwt_secret = JwtSecret::from_hex(secret)?;
+
+    Ok(jwt_secret)
 }
 
 fn main() {
@@ -144,7 +156,8 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     }
 
     // Init engine controller.
-    let client = ELHttpClient::from_url_secret(&config.exec.reth.rpc_url, &config.exec.reth.secret);
+    let reth_jwtsecret = load_jwtsecret(&config.exec.reth.secret)?;
+    let client = ELHttpClient::from_url_secret(&config.exec.reth.rpc_url, reth_jwtsecret);
 
     let initial_fcs = fork_choice_state_initial(database.clone(), params.rollup())?;
     let eng_ctl = alpen_vertex_evmexec::engine::RpcExecEngineCtl::new(

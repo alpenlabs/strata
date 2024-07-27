@@ -17,5 +17,5 @@ client_poll_dur_ms = 200
 [exec.reth]
 # reth {authrpc.address}:{authrpc.port}
 rpc_url = "http://localhost:8551"
-# reth authrpc.jwtsecret content
-secret = "<jwt.hex>"
+# reth authrpc.jwtsecret path
+secret = "/path/to/jwt.hex"
