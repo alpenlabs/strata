@@ -27,7 +27,7 @@ type RpcResult<T> = Result<T, jsonrpsee::core::ClientError>;
 
 #[allow(async_fn_in_trait)]
 #[cfg_attr(test, automock)]
-pub trait ELHttpClient {
+pub trait EngineRpc {
     async fn fork_choice_updated_v2(
         &self,
         fork_choice_state: ForkchoiceState,
@@ -50,13 +50,13 @@ pub trait ELHttpClient {
 }
 
 #[derive(Debug, Clone)]
-pub struct ELHttpClientImpl {
+pub struct EngineRpcClient {
     client: Arc<HttpClient<AuthClientService<HttpBackend>>>,
 }
 
-impl ELHttpClientImpl {
+impl EngineRpcClient {
     pub fn from_url_secret(http_url: &str, secret: JwtSecret) -> Self {
-        ELHttpClientImpl {
+        EngineRpcClient {
             client: Arc::new(http_client(http_url, secret)),
         }
     }
@@ -66,7 +66,7 @@ impl ELHttpClientImpl {
     }
 }
 
-impl ELHttpClient for ELHttpClientImpl {
+impl EngineRpc for EngineRpcClient {
     async fn fork_choice_updated_v2(
         &self,
         fork_choice_state: ForkchoiceState,

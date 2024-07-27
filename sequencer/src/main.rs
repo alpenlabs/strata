@@ -25,7 +25,7 @@ use alpen_vertex_consensus_logic::duty_executor::{self, IdentityData, IdentityKe
 use alpen_vertex_consensus_logic::sync_manager;
 use alpen_vertex_consensus_logic::sync_manager::SyncManager;
 use alpen_vertex_db::traits::Database;
-use alpen_vertex_evmexec::{fork_choice_state_initial, ELHttpClient};
+use alpen_vertex_evmexec::{fork_choice_state_initial, EngineRpcClient};
 use alpen_vertex_primitives::buf::Buf32;
 use alpen_vertex_primitives::{block_credential, params::*};
 use alpen_vertex_rpc_api::AlpenApiServer;
@@ -157,7 +157,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     // Init engine controller.
     let reth_jwtsecret = load_jwtsecret(&config.exec.reth.secret)?;
-    let client = ELHttpClient::from_url_secret(&config.exec.reth.rpc_url, reth_jwtsecret);
+    let client = EngineRpcClient::from_url_secret(&config.exec.reth.rpc_url, reth_jwtsecret);
 
     let initial_fcs = fork_choice_state_initial(database.clone(), params.rollup())?;
     let eng_ctl = alpen_vertex_evmexec::engine::RpcExecEngineCtl::new(

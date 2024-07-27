@@ -7,4 +7,4 @@ pub mod engine;
 pub mod preloaded_storage;
 
 pub use fcs::fork_choice_state_initial;
-pub use http_client::ELHttpClientImpl as ELHttpClient;
+pub use http_client::EngineRpcClient;

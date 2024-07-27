@@ -21,7 +21,7 @@ use alpen_vertex_state::id::L2BlockId;
 
 use crate::block::EVML2Block;
 use crate::el_payload::ElPayload;
-use crate::http_client::ELHttpClient;
+use crate::http_client::EngineRpc;
 
 fn address_from_slice(slice: &[u8]) -> Option<Address> {
     let slice: Option<[u8; 20]> = slice.try_into().ok();
@@ -31,32 +31,32 @@ fn address_from_slice(slice: &[u8]) -> Option<Address> {
 /// (head, safe, finalized)
 pub type FCS = (L2BlockId, Option<L2BlockId>, Option<L2BlockId>);
 
-pub struct RpcExecEngineCtl<T: ELHttpClient, D: L2DataProvider> {
+pub struct RpcExecEngineCtl<T: EngineRpc, P: L2DataProvider> {
     client: T,
     fork_choice_state: Mutex<ForkchoiceState>,
     tokio_handle: Handle,
-    database: Arc<D>,
+    l2_provider: Arc<P>,
 }
 
-impl<T: ELHttpClient, D: L2DataProvider> RpcExecEngineCtl<T, D> {
+impl<T: EngineRpc, P: L2DataProvider> RpcExecEngineCtl<T, P> {
     pub fn new(
         client: T,
         fork_choice_state: ForkchoiceState,
         handle: Handle,
-        database: Arc<D>,
+        l2_provider: Arc<P>,
     ) -> Self {
         Self {
             client,
             fork_choice_state: Mutex::new(fork_choice_state),
             tokio_handle: handle,
-            database,
+            l2_provider,
         }
     }
 }
 
-impl<T: ELHttpClient, D: L2DataProvider> RpcExecEngineCtl<T, D> {
+impl<T: EngineRpc, P: L2DataProvider> RpcExecEngineCtl<T, P> {
     fn get_l2block(&self, l2_block_id: &L2BlockId) -> anyhow::Result<L2BlockBundle> {
-        self.database
+        self.l2_provider
             .get_block_data(*l2_block_id)?
             .ok_or(anyhow::anyhow!("missing L2Block"))
     }
@@ -274,7 +274,7 @@ impl<T: ELHttpClient, D: L2DataProvider> RpcExecEngineCtl<T, D> {
     }
 }
 
-impl<T: ELHttpClient, D: L2DataProvider> ExecEngineCtl for RpcExecEngineCtl<T, D> {
+impl<T: EngineRpc, P: L2DataProvider> ExecEngineCtl for RpcExecEngineCtl<T, P> {
     fn submit_payload(&self, payload: ExecPayloadData) -> EngineResult<BlockStatus> {
         self.tokio_handle.block_on(self.submit_new_payload(payload))
     }
@@ -361,7 +361,7 @@ mod tests {
     use alpen_vertex_evmctl::messages::PayloadEnv;
     use alpen_vertex_primitives::buf::Buf32;
 
-    use crate::http_client::MockELHttpClient;
+    use crate::http_client::MockEngineRpc;
 
     use super::*;
 
@@ -392,7 +392,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_update_block_state() {
-        let mut mock_client = MockELHttpClient::new();
+        let mut mock_client = MockEngineRpc::new();
 
         let fcs_partial = ForkchoiceStatePartial {
             head_block_hash: Some(B256::random()),
@@ -424,7 +424,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_build_block_from_mempool() {
-        let mut mock_client = MockELHttpClient::new();
+        let mut mock_client = MockEngineRpc::new();
         let fcs = ForkchoiceState::default();
 
         mock_client
@@ -466,7 +466,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_payload_status() {
-        let mut mock_client = MockELHttpClient::new();
+        let mut mock_client = MockEngineRpc::new();
         let fcs = ForkchoiceState::default();
 
         mock_client.expect_get_payload_v2().returning(move |_| {
@@ -490,7 +490,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_submit_new_payload() {
-        let mut mock_client = MockELHttpClient::new();
+        let mut mock_client = MockEngineRpc::new();
         let fcs = ForkchoiceState::default();
 
         let el_payload = ElPayload {
