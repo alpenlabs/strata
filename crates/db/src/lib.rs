@@ -56,6 +56,7 @@ pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
 ];
 
 // Re-exports
+pub use chain_state::db::ChainStateDb;
 pub use client_state::db::ClientStateDb;
 pub use l1::db::L1Db;
 pub use sequencer::db::SeqDb;
