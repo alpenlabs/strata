@@ -157,7 +157,10 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     // Init engine controller.
     let reth_jwtsecret = load_jwtsecret(&config.exec.reth.secret)?;
-    let client = EngineRpcClient::from_url_secret(&config.exec.reth.rpc_url, reth_jwtsecret);
+    let client = EngineRpcClient::from_url_secret(
+        &format!("http://{}", &config.exec.reth.rpc_url),
+        reth_jwtsecret,
+    );
 
     let initial_fcs = fork_choice_state_initial(database.clone(), params.rollup())?;
     let eng_ctl = alpen_vertex_evmexec::engine::RpcExecEngineCtl::new(
