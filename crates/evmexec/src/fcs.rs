@@ -21,13 +21,19 @@ pub fn fork_choice_state_initial<D: Database>(
 
     let latest_block_hash = get_block_hash_by_id(
         db.as_ref(),
-        last_cstate.as_ref().map(|state| state.chain_tip_blkid()),
+        last_cstate
+            .as_ref()
+            .and_then(|state| state.sync())
+            .map(|sync_state| sync_state.chain_tip_blkid()),
     )?
     .unwrap_or(config.evm_genesis_block_hash.into());
 
     let finalized_block_hash = get_block_hash_by_id(
         db.as_ref(),
-        last_cstate.as_ref().map(|state| state.finalized_blkid()),
+        last_cstate
+            .as_ref()
+            .and_then(|state| state.sync())
+            .map(|sync_state| sync_state.finalized_blkid()),
     )?
     .unwrap_or(B256::ZERO);
 
