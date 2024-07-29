@@ -1,10 +1,63 @@
 use alpen_express_primitives::{
     block_credential,
-    buf::Buf32,
+    buf::{Buf32, Buf64},
     params::{Params, RollupParams, RunParams},
 };
-use alpen_express_state::client_state::ClientState;
+use alpen_express_state::{
+    block::{L2Block, L2BlockBody},
+    client_state::ClientState,
+    header::{L2BlockHeader, L2Header, SignedL2BlockHeader},
+    id::L2BlockId,
+};
 
+use crate::ArbitraryGenerator;
+
+pub fn gen_block(parent: Option<&SignedL2BlockHeader>) -> L2Block {
+    let arb = ArbitraryGenerator::new();
+    let header: L2BlockHeader = arb.generate();
+    let body: L2BlockBody = arb.generate();
+
+    let block_idx = match parent {
+        Some(p) => p.blockidx() + 1,
+        None => 0,
+    };
+
+    let prev_block = match parent {
+        Some(p) => p.get_blockid(),
+        None => L2BlockId::default(),
+    };
+
+    let header = L2BlockHeader::new(
+        block_idx,
+        header.timestamp(),
+        prev_block,
+        &body,
+        *header.state_root(),
+    );
+    let empty_sig = Buf64::zero();
+    let signed_header = SignedL2BlockHeader::new(header, empty_sig);
+    L2Block::new(signed_header, body)
+}
+
+pub fn gen_l2_chain(parent: Option<SignedL2BlockHeader>, blocks_num: usize) -> Vec<L2Block> {
+    let mut blocks = Vec::new();
+    let mut parent = match parent {
+        Some(p) => p,
+        None => {
+            let p = gen_block(None);
+            blocks.push(p.clone());
+            p.header().clone()
+        }
+    };
+
+    for _ in 0..blocks_num {
+        let block = gen_block(Some(&parent));
+        blocks.push(block.clone());
+        parent = block.header().clone()
+    }
+
+    blocks
+}
 pub fn gen_params() -> Params {
     Params {
         rollup: RollupParams {
