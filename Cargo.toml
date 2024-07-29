@@ -14,6 +14,7 @@ members = [
   "crates/vtxjmt",
   "crates/prover/zkvm",
   "crates/prover/adapters/risc0",
+  "crates/prover/guests",
   "sequencer",
   "reth",
 ]
