@@ -21,8 +21,8 @@ use tracing::*;
 
 use alpen_express_btcio::rpc::traits::L1Client;
 use alpen_express_common::logging;
-use alpen_express_consensus_logic::duty::types::{DutyBatch, Identity};
-use alpen_express_consensus_logic::duty::worker::{self as duty_worker, IdentityData, IdentityKey};
+use alpen_express_consensus_logic::duty::types::{DutyBatch, Identity, IdentityData, IdentityKey};
+use alpen_express_consensus_logic::duty::worker::{self as duty_worker};
 use alpen_express_consensus_logic::sync_manager;
 use alpen_express_consensus_logic::sync_manager::SyncManager;
 use alpen_express_db::traits::Database;
@@ -202,15 +202,10 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             duty_worker::duty_tracker_task::<_>(cu_rx, duties_tx, idata.ident, db)
         });
 
+        let d_params = params.clone();
         thread::spawn(move || {
             duty_worker::duty_dispatch_task(
-                duties_rx,
-                idata.key,
-                sm,
-                db2,
-                eng_ctl_de,
-                pool,
-                params.rollup(),
+                duties_rx, idata.key, sm, db2, eng_ctl_de, pool, d_params,
             )
         });
     }
