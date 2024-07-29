@@ -4,7 +4,7 @@ use alpen_express_primitives::{
     params::{Params, RollupParams, RunParams},
 };
 use alpen_express_state::{
-    block::{L2Block, L2BlockBody},
+    block::{L2Block, L2BlockAccessory, L2BlockBody, L2BlockBundle},
     client_state::ClientState,
     header::{L2BlockHeader, L2Header, SignedL2BlockHeader},
     id::L2BlockId,
@@ -12,10 +12,11 @@ use alpen_express_state::{
 
 use crate::ArbitraryGenerator;
 
-pub fn gen_block(parent: Option<&SignedL2BlockHeader>) -> L2Block {
+pub fn gen_block(parent: Option<&SignedL2BlockHeader>) -> L2BlockBundle {
     let arb = ArbitraryGenerator::new();
     let header: L2BlockHeader = arb.generate();
     let body: L2BlockBody = arb.generate();
+    let accessory: L2BlockAccessory = arb.generate();
 
     let block_idx = match parent {
         Some(p) => p.blockidx() + 1,
@@ -36,10 +37,11 @@ pub fn gen_block(parent: Option<&SignedL2BlockHeader>) -> L2Block {
     );
     let empty_sig = Buf64::zero();
     let signed_header = SignedL2BlockHeader::new(header, empty_sig);
-    L2Block::new(signed_header, body)
+    let block = L2Block::new(signed_header, body);
+    L2BlockBundle::new(block, accessory)
 }
 
-pub fn gen_l2_chain(parent: Option<SignedL2BlockHeader>, blocks_num: usize) -> Vec<L2Block> {
+pub fn gen_l2_chain(parent: Option<SignedL2BlockHeader>, blocks_num: usize) -> Vec<L2BlockBundle> {
     let mut blocks = Vec::new();
     let mut parent = match parent {
         Some(p) => p,
