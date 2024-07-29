@@ -4,7 +4,7 @@ datadir = "/path/to/data/directory"
 # sequencer_key = "/path/to/data/directory/" 
 
 [bitcoind_rpc]
-rpc_url = "http://localhost:18332"
+rpc_url = "localhost:18332"
 rpc_user = "alpen"
 rpc_password = "alpen"
 network = "regtest"
@@ -16,6 +16,6 @@ client_poll_dur_ms = 200
 
 [exec.reth]
 # reth {authrpc.address}:{authrpc.port}
-rpc_url = "http://localhost:8551"
+rpc_url = "localhost:8551"
 # reth authrpc.jwtsecret path
 secret = "/path/to/jwt.hex"
