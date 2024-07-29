@@ -44,6 +44,10 @@ pub enum Error {
     #[error("client sync state unset")]
     MissingClientSyncState,
 
+    /// Used when assembling blocks and we don't have an actual block ID to use.
+    #[error("invalid state transition: {0}")]
+    InvalidStateTsnImm(#[from] TsnError),
+
     #[error("csm dropped")]
     CsmDropped,
 

@@ -563,10 +563,13 @@ fn apply_tip_update<D: Database>(
             .ok_or(Error::MissingL2Block(*blkid))?;
         let block_idx = block.header().blockidx();
 
+        let header = block.header();
+        let body = block.body();
+
         // Compute the transition write batch, then compute the new state
         // locally and update our going state.
         let mut prestate_cache = StateCache::new(pre_state);
-        chain_transition::process_block(&mut prestate_cache, &block)
+        chain_transition::process_block(&mut prestate_cache, header, body)
             .map_err(|e| Error::InvalidStateTsn(*blkid, e))?;
         let (post_state, wb) = prestate_cache.finalize();
         pre_state = post_state;

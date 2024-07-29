@@ -4,6 +4,7 @@ use std::sync::Arc;
 use std::thread;
 use std::time;
 
+use borsh::BorshSerialize;
 use tracing::*;
 
 use alpen_express_db::traits::{
@@ -24,6 +25,7 @@ use alpen_express_state::header::L2BlockHeader;
 use alpen_express_state::prelude::*;
 
 use super::types::IdentityKey;
+use crate::chain_transition;
 use crate::credential::sign_schnorr_sig;
 use crate::errors::Error;
 
@@ -103,12 +105,19 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     // but will be more advanced later.
     let exec_seg = prepare_exec_segment(slot, ts, prev_global_sr, safe_l1_block, engine)?;
 
-    // Assemble the body and the header core.
+    // Assemble the body and fake header.
     let body = L2BlockBody::new(l1_seg, exec_seg);
-    let state_root = Buf32::zero(); // TODO compute this from the different parts
-    let header = L2BlockHeader::new(slot, ts, prev_block_id, &body, state_root);
+    let fake_header = L2BlockHeader::new(slot, ts, prev_block_id, &body, Buf32::zero());
+
+    // Execute the block to compute the new state root, then assemble the real header.
+    // TODO do something with the write batch?  to prepare it in the database?
+    let (post_state, _wb) = compute_post_state(prev_chstate, &fake_header, &body)?;
+    let new_state_root = post_state.compute_state_root();
+
+    let header = L2BlockHeader::new(slot, ts, prev_block_id, &body, new_state_root);
     let header_sig = sign_header(&header, ik);
     let signed_header = SignedL2BlockHeader::new(header, header_sig);
+
     let blkid = signed_header.get_blockid();
     let final_block = L2Block::new(signed_header, body);
 
@@ -126,6 +135,7 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
 }
 
 fn prepare_l1_segment(cstate: &ClientState, prev_chstate: &ChainState) -> Result<L1Segment, Error> {
+    // TODO
     Ok(L1Segment::new_empty())
 }
 
@@ -190,6 +200,18 @@ fn poll_status_loop<E: ExecEngineCtl>(
     }
 
     Ok(None)
+}
+
+// TODO do we want to do this here?
+fn compute_post_state(
+    prev_chstate: ChainState,
+    header: &impl L2Header,
+    body: &L2BlockBody,
+) -> Result<(ChainState, WriteBatch), Error> {
+    let mut state_cache = StateCache::new(prev_chstate);
+    chain_transition::process_block(&mut state_cache, header, &body)?;
+    let (post_state, wb) = state_cache.finalize();
+    Ok((post_state, wb))
 }
 
 /// Signs the L2BlockHeader and returns the signature

@@ -32,6 +32,10 @@ impl L2Block {
         &self.header
     }
 
+    pub fn body(&self) -> &L2BlockBody {
+        &self.body
+    }
+
     pub fn l1_segment(&self) -> &L1Segment {
         &self.body.l1_segment
     }

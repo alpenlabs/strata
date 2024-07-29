@@ -1,12 +1,7 @@
 //! Top-level CL state transition logic.  This is largely stubbed off now, but
 //! we'll replace components with real implementations as we go along.
 
-use alpen_express_state::{
-    prelude::*,
-    block::L1Segment,
-    exec_update,
-    state_op::StateCache,
-};
+use alpen_express_state::{block::L1Segment, exec_update, prelude::*, state_op::StateCache};
 
 use crate::errors::TsnError;
 
@@ -16,8 +11,13 @@ use crate::errors::TsnError;
 /// there are any semantic issues that don't make sense.
 ///
 /// This operates on a state cache that's expected to be empty, panics
-/// otherwise.
-pub fn process_block(state: &mut StateCache, block: &L2Block) -> Result<(), TsnError> {
+/// otherwise.  Does not check the `state_root` in the header for correctness,
+/// so that can be unset so it can be use during block assembly.
+pub fn process_block(
+    state: &mut StateCache,
+    header: &impl L2Header,
+    body: &L2BlockBody,
+) -> Result<(), TsnError> {
     // We want to fail quickly here because otherwise we don't know what's
     // happening.
     if !state.is_empty() {
@@ -25,13 +25,12 @@ pub fn process_block(state: &mut StateCache, block: &L2Block) -> Result<(), TsnE
     }
 
     // Update basic bookkeeping.
-    let header = block.header();
     state.set_slot(header.blockidx());
 
     // Go through each stage and play out the operations it has.
-    process_l1_view_update(state, block.l1_segment())?;
+    process_l1_view_update(state, body.l1_segment())?;
     process_pending_withdrawals(state)?;
-    process_execution_update(state, block.exec_segment().update())?;
+    process_execution_update(state, body.exec_segment().update())?;
 
     Ok(())
 }
