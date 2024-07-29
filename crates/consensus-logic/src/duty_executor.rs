@@ -5,11 +5,14 @@ use std::sync::Arc;
 use std::{thread, time};
 
 use alpen_vertex_state::exec_update::{ExecUpdate, UpdateInput, UpdateOutput};
+use alpen_vertex_state::l1::L1HeaderPayload;
 use borsh::{BorshDeserialize, BorshSerialize};
 use tokio::sync::broadcast;
 use tracing::*;
 
-use alpen_vertex_db::traits::{ClientStateProvider, Database, L2DataProvider, L2DataStore};
+use alpen_vertex_db::traits::{
+    ChainstateProvider, ClientStateProvider, Database, L1DataProvider, L2DataProvider, L2DataStore,
+};
 use alpen_vertex_evmctl::engine::{ExecEngineCtl, PayloadStatus};
 use alpen_vertex_evmctl::errors::EngineError;
 use alpen_vertex_evmctl::messages::{ExecPayloadData, PayloadEnv};
@@ -244,30 +247,45 @@ fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     // TODO get the consensus state this duty was created in response to and
     // pull out the current tip block from it
     // XXX this is really bad as-is
-    let cs_prov = database.client_state_provider();
-    let ckpt_idx = cs_prov.get_last_checkpoint_idx()?; // FIXME: this isn't what this is for, it only works because we're checkpointing on every state
-                                                       // right now
-    let last_cstate = cs_prov
+    let client_state_provider = database.client_state_provider();
+    let ckpt_idx = client_state_provider.get_last_checkpoint_idx()?; // FIXME: this isn't what this is for, it only works because we're checkpointing on every state
+                                                                     // right now
+    let chain_state_provider = database.chainstate_provider();
+    let rollup_state = chain_state_provider
+        .get_toplevel_state(chain_state_provider.get_last_state_idx()?)?
+        .unwrap();
+
+    let last_cstate = client_state_provider
         .get_state_checkpoint(ckpt_idx)?
         .expect("dutyexec: get state checkpoint");
 
     let Some(last_ss) = last_cstate.sync() else {
         return Ok(None);
     };
-
     let prev_block_id = *last_ss.chain_tip_blkid();
+    let prev_block = l2prov.get_block_data(prev_block_id)?.unwrap();
 
+    let l1prov = database.l1_provider();
+    let buried_l1_block_height = last_cstate.l1_view().buried_l1_height();
     // Start preparing the EL payload.
     let ts = now_millis();
-    let prev_global_sr = Buf32::zero(); // TODO
-    let safe_l1_block = Buf32::zero(); // TODO
+    let prev_global_sr = *prev_block.header().state_root();
+    let safe_l1_block = l1prov
+        .get_block_manifest(buried_l1_block_height)?
+        .expect("no safe l1 block found")
+        .block_hash();
     let payload_env = PayloadEnv::new(ts, prev_global_sr, safe_l1_block, Vec::new());
     let key = engine.prepare_payload(payload_env)?;
     trace!(%slot, "submitted EL payload job, waiting for completion");
-
-    // TODO Pull data from CSM state that we've observed from L1, including new
-    // headers or any headers needed to perform a reorg if necessary.
-    let l1_seg = L1Segment::new(Vec::new());
+    let l1_maturation_queue = rollup_state.l1_state().maturation_queue();
+    let l1_payload = l1_maturation_queue
+        .iter_entries()
+        .map(|(idx, entry)| {
+            let (header_record, _deposit_update, _da_tx) = entry.clone().into_parts();
+            L1HeaderPayload::new_bare(idx, header_record)
+        })
+        .collect();
+    let l1_seg = L1Segment::new(l1_payload);
 
     // Wait 2 seconds for the block to be finished.
     // TODO Pull data from state about the new safe L1 hash, prev state roots,
@@ -288,7 +306,7 @@ fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
 
     // Assemble the body and the header core.
     let body = L2BlockBody::new(l1_seg, exec_seg);
-    let state_root = Buf32::zero(); // TODO compute this from the different parts
+    let state_root = rollup_state.state_root();
     let header = L2BlockHeader::new(slot, ts, prev_block_id, &body, state_root);
     let header_sig = sign_header(&header, ik);
     let signed_header = SignedL2BlockHeader::new(header, header_sig);

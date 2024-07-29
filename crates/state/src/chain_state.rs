@@ -4,6 +4,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use alpen_vertex_primitives::buf::Buf32;
 use alpen_vertex_primitives::hash::compute_borsh_hash;
 
+use crate::l1::L1ViewState;
 use crate::{bridge_ops, bridge_state, exec_env, l1};
 use crate::{id::L2BlockId, state_queue::StateQueue};
 
@@ -60,6 +61,10 @@ impl ChainState {
             operator_table: bridge_state::OperatorTable::new_empty(),
             deposits_table: bridge_state::DepositsTable::new_empty(),
         }
+    }
+
+    pub fn l1_state(&self) -> &L1ViewState {
+        &self.l1_state
     }
 
     pub fn chain_tip_blockid(&self) -> L2BlockId {
