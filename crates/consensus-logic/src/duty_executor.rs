@@ -6,7 +6,6 @@ use std::thread::sleep;
 use std::time::Duration;
 use std::{thread, time};
 
-use alpen_vertex_state::exec_update::{ExecUpdate, UpdateOutput};
 use borsh::{BorshDeserialize, BorshSerialize};
 use tokio::sync::broadcast;
 use tracing::*;
@@ -16,8 +15,10 @@ use alpen_vertex_evmctl::engine::{ExecEngineCtl, PayloadStatus};
 use alpen_vertex_evmctl::errors::EngineError;
 use alpen_vertex_evmctl::messages::{ExecPayloadData, PayloadEnv};
 use alpen_vertex_primitives::buf::{Buf32, Buf64};
+use alpen_vertex_primitives::params::RollupParams;
 use alpen_vertex_state::block::{ExecSegment, L1Segment, L2BlockAccessory, L2BlockBundle};
 use alpen_vertex_state::client_state::ClientState;
+use alpen_vertex_state::exec_update::{ExecUpdate, UpdateOutput};
 use alpen_vertex_state::header::L2BlockHeader;
 use alpen_vertex_state::prelude::*;
 
@@ -132,6 +133,7 @@ pub fn duty_dispatch_task<
     database: Arc<D>,
     engine: Arc<E>,
     pool: Arc<threadpool::ThreadPool>,
+    params: &RollupParams,
 ) {
     // TODO make this actually work
     let mut pending_duties: HashMap<u64, ()> = HashMap::new();
@@ -168,7 +170,8 @@ pub fn duty_dispatch_task<
             let sm = sync_man.clone();
             let db = database.clone();
             let e = engine.clone();
-            pool.execute(move || duty_exec_task(d, ik, sm, db, e));
+            let params = params.clone();
+            pool.execute(move || duty_exec_task(d, ik, sm, db, e, params));
             trace!(%id, "dispatched duty exec task");
             pending_duties.insert(id, ());
         }
@@ -186,8 +189,16 @@ fn duty_exec_task<D: Database, E: ExecEngineCtl>(
     sync_man: Arc<SyncManager>,
     database: Arc<D>,
     engine: Arc<E>,
+    params: RollupParams,
 ) {
-    if let Err(e) = perform_duty(&duty, &ik, &sync_man, database.as_ref(), engine.as_ref()) {
+    if let Err(e) = perform_duty(
+        &duty,
+        &ik,
+        &sync_man,
+        database.as_ref(),
+        engine.as_ref(),
+        params,
+    ) {
         error!(err = %e, "error performing duty");
     } else {
         debug!("completed duty successfully");
@@ -200,11 +211,13 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
     sync_man: &SyncManager,
     database: &D,
     engine: &E,
+    params: RollupParams,
 ) -> Result<(), Error> {
     match duty {
         Duty::SignBlock(data) => {
             let target = data.target_slot();
-            let Some((blkid, _block)) = sign_and_store_block(target, ik, database, engine)? else {
+            let Some((blkid, _block)) = sign_and_store_block(target, ik, database, engine, params)?
+            else {
                 return Ok(());
             };
 
@@ -229,6 +242,7 @@ fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     ik: &IdentityKey,
     database: &D,
     engine: &E,
+    params: RollupParams,
 ) -> Result<Option<(L2BlockId, L2Block)>, Error> {
     debug!(%slot, "prepating to publish block");
 
@@ -265,7 +279,7 @@ fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
         .expect("prev block must exist");
 
     // TODO: get from rollup config
-    let block_time = 5000;
+    let block_time = params.block_time;
     let target_ts = prev_block.block().header().timestamp() + block_time;
     let current_ts = now_millis();
 

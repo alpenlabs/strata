@@ -197,7 +197,15 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             duty_executor::duty_tracker_task::<_>(cu_rx, duties_tx, idata.ident, db)
         });
         thread::spawn(move || {
-            duty_executor::duty_dispatch_task(duties_rx, idata.key, sm, db2, eng_ctl_de, pool)
+            duty_executor::duty_dispatch_task(
+                duties_rx,
+                idata.key,
+                sm,
+                db2,
+                eng_ctl_de,
+                pool,
+                params.rollup(),
+            )
         });
     }
 
