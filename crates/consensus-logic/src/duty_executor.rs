@@ -2,6 +2,8 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::thread::sleep;
+use std::time::Duration;
 use std::{thread, time};
 
 use alpen_vertex_state::exec_update::{ExecUpdate, UpdateOutput};
@@ -256,6 +258,20 @@ fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     };
 
     let prev_block_id = *last_ss.chain_tip_blkid();
+
+    let prev_block = database
+        .l2_provider()
+        .get_block_data(prev_block_id)?
+        .expect("prev block must exist");
+
+    // TODO: get from rollup config
+    let block_time = 5000;
+    let target_ts = prev_block.block().header().timestamp() + block_time;
+    let current_ts = now_millis();
+
+    if current_ts < target_ts {
+        sleep(Duration::from_millis(target_ts - current_ts));
+    }
 
     // Start preparing the EL payload.
     let ts = now_millis();
