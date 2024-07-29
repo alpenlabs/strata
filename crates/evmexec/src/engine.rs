@@ -138,7 +138,8 @@ impl<T: EngineRpc, P: L2DataProvider> RpcExecEngineCtl<T, P> {
             .collect();
 
         let payload_attributes = PayloadAttributes {
-            timestamp: payload_env.timestamp(),
+            // evm expects timestamp in seconds
+            timestamp: payload_env.timestamp() / 1000,
             prev_randao: B256::ZERO,
             withdrawals: Some(withdrawals),
             parent_beacon_block_root: None,
@@ -246,11 +247,7 @@ impl<T: EngineRpc, P: L2DataProvider> RpcExecEngineCtl<T, P> {
 
         let v2_payload = ExecutionPayloadInputV2 {
             execution_payload: el_payload.into(),
-            withdrawals: if withdrawals.is_empty() {
-                None
-            } else {
-                Some(withdrawals)
-            },
+            withdrawals: Some(withdrawals),
         };
 
         info!("submit_new_payload; v2_payload: {:?}", v2_payload);
@@ -314,6 +311,9 @@ impl<T: EngineRpc, P: L2DataProvider> ExecEngineCtl for RpcExecEngineCtl<T, P> {
 
         self.tokio_handle.block_on(async {
             let fork_choice_state = ForkchoiceStatePartial {
+                // NOTE: update_head_block is not called currently; so update head and safe block
+                // together
+                head_block_hash: Some(block_hash),
                 safe_block_hash: Some(block_hash),
                 ..Default::default()
             };

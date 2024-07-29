@@ -80,7 +80,9 @@ impl Config {
         self.client.rpc_port = args.rpc_port;
         self.bitcoind_rpc.rpc_password = args.bitcoind_password;
         self.client.datadir = args.datadir;
-        self.client.sequencer_key = args.sequencer_key;
+        if args.sequencer_key.is_some() {
+            self.client.sequencer_key = args.sequencer_key;
+        }
         if let Some(rpc_url) = args.reth_authrpc {
             self.exec.reth.rpc_url = rpc_url;
         }

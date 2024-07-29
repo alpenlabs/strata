@@ -178,7 +178,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let sync_man = Arc::new(sync_man);
 
     // If the sequencer key is set, start the sequencer duties task.
-    if let Some(seqkey_path) = &args.sequencer_key {
+    if let Some(seqkey_path) = &config.client.sequencer_key {
         info!(?seqkey_path, "initing sequencer duties task");
         let idata = load_seqkey(seqkey_path)?;
 
