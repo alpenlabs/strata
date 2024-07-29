@@ -431,3 +431,42 @@ fn poll_status_loop<E: ExecEngineCtl>(
 
     Ok(None)
 }
+
+#[cfg(test)]
+mod tests {
+    use alpen_test_utils::l2::gen_l2_chain;
+    use alpen_vertex_db::traits::{Database, L2DataStore};
+    use alpen_vertex_state::header::L2Header;
+
+    use super::get_finalized_blocks;
+
+    #[test]
+    fn test_get_finalized_blocks() {
+        let db = alpen_test_utils::get_common_db();
+        let chain = gen_l2_chain(None, 5);
+
+        for block in chain.clone() {
+            db.as_ref()
+                .l2_store()
+                .as_ref()
+                .put_block_data(block)
+                .unwrap();
+        }
+
+        let block_ids: Vec<_> = chain.iter().map(|b| b.header().get_blockid()).collect();
+
+        let mut last_finalized_block = Some(block_ids[0]);
+        let new_finalized = Some(block_ids[4]);
+        let finalized_blocks = get_finalized_blocks(
+            new_finalized,
+            db.l2_provider().as_ref(),
+            &mut last_finalized_block,
+        )
+        .unwrap();
+
+        let expected_finalized_blocks: Vec<_> = block_ids[1..=4].iter().rev().cloned().collect();
+
+        assert_eq!(finalized_blocks, expected_finalized_blocks);
+        assert_eq!(last_finalized_block, new_finalized);
+    }
+}
