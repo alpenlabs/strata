@@ -22,9 +22,9 @@ use alpen_express_state::exec_update::{ExecUpdate, UpdateOutput};
 use alpen_express_state::header::L2BlockHeader;
 use alpen_express_state::prelude::*;
 
+use super::extractor;
+use super::types::{self, Duty, DutyBatch, Identity};
 use crate::credential::sign_schnorr_sig;
-use crate::duties::{self, Duty, DutyBatch, Identity};
-use crate::duty_extractor;
 use crate::errors::Error;
 use crate::message::{ClientUpdateNotif, ForkChoiceMessage};
 use crate::sync_manager::SyncManager;
@@ -50,12 +50,24 @@ impl IdentityData {
 }
 
 pub fn duty_tracker_task<D: Database>(
-    mut cupdate_rx: broadcast::Receiver<Arc<ClientUpdateNotif>>,
+    cupdate_rx: broadcast::Receiver<Arc<ClientUpdateNotif>>,
     batch_queue: broadcast::Sender<DutyBatch>,
     ident: Identity,
     database: Arc<D>,
+) {
+    let db = database.as_ref();
+    if let Err(e) = duty_tracker_task_inner(cupdate_rx, batch_queue, ident, db) {
+        error!(err = %e, "tracker task exited");
+    }
+}
+
+fn duty_tracker_task_inner(
+    mut cupdate_rx: broadcast::Receiver<Arc<ClientUpdateNotif>>,
+    batch_queue: broadcast::Sender<DutyBatch>,
+    ident: Identity,
+    database: &impl Database,
 ) -> Result<(), Error> {
-    let mut duties_tracker = duties::DutyTracker::new_empty();
+    let mut duties_tracker = types::DutyTracker::new_empty();
 
     let idx = database.client_state_provider().get_last_checkpoint_idx()?;
     let last_checkpoint_state = database.client_state_provider().get_state_checkpoint(idx)?;
@@ -83,7 +95,7 @@ pub fn duty_tracker_task<D: Database>(
         trace!(%ev_idx, "new consensus state, updating duties");
         trace!("STATE: {new_state:#?}");
 
-        if let Err(e) = update_tracker(&mut duties_tracker, new_state, &ident, database.as_ref()) {
+        if let Err(e) = update_tracker(&mut duties_tracker, new_state, &ident, database) {
             error!(err = %e, "failed to update duties tracker");
         }
 
@@ -100,7 +112,7 @@ pub fn duty_tracker_task<D: Database>(
 }
 
 fn update_tracker<D: Database>(
-    tracker: &mut duties::DutyTracker,
+    tracker: &mut types::DutyTracker,
     state: &ClientState,
     ident: &Identity,
     database: &D,
@@ -109,7 +121,7 @@ fn update_tracker<D: Database>(
         return Ok(());
     };
 
-    let new_duties = duty_extractor::extract_duties(state, ident, database)?;
+    let new_duties = extractor::extract_duties(state, ident, database)?;
 
     // Figure out the block slot from the tip blockid.
     // TODO include the block slot in the consensus state
@@ -129,7 +141,7 @@ fn update_tracker<D: Database>(
         new_finalized,
     )?;
 
-    let tracker_update = duties::StateUpdate::new(block_idx, ts, newly_finalized_blocks);
+    let tracker_update = types::StateUpdate::new(block_idx, ts, newly_finalized_blocks);
     let n_evicted = tracker.update(&tracker_update);
     trace!(%n_evicted, "evicted old duties from new consensus state");
 
