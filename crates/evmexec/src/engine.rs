@@ -9,7 +9,6 @@ use reth_rpc_types::engine::{
 use reth_rpc_types::Withdrawal;
 use tokio::runtime::Handle;
 use tokio::sync::Mutex;
-use tracing::info;
 
 use alpen_vertex_db::traits::L2DataProvider;
 use alpen_vertex_evmctl::engine::{BlockStatus, ExecEngineCtl, PayloadStatus};
@@ -75,7 +74,6 @@ impl<T: EngineRpc, P: L2DataProvider> RpcExecEngineCtl<T, P> {
         &self,
         fcs_partial: ForkchoiceStatePartial,
     ) -> EngineResult<BlockStatus> {
-        info!("update_block_state; fcs_partial: {:?}", fcs_partial);
         let fork_choice_state = {
             let existing = self.fork_choice_state.lock().await;
             ForkchoiceState {
@@ -91,17 +89,10 @@ impl<T: EngineRpc, P: L2DataProvider> RpcExecEngineCtl<T, P> {
             }
         };
 
-        info!("update_block_state; fcs_full: {:?}", fork_choice_state);
-
         let fork_choice_result = self
             .client
             .fork_choice_updated_v2(fork_choice_state, None)
             .await;
-
-        info!(
-            "update_block_state; fork_choice_result: {:?}",
-            fork_choice_result
-        );
 
         let update_status =
             fork_choice_result.map_err(|err| EngineError::Other(err.to_string()))?;
@@ -122,8 +113,6 @@ impl<T: EngineRpc, P: L2DataProvider> RpcExecEngineCtl<T, P> {
         payload_env: PayloadEnv,
         prev_block: EVML2Block,
     ) -> EngineResult<u64> {
-        info!("build_block_from_mempool; payload_env: {:?}", payload_env);
-
         // TODO: pass other fields from payload_env
         let withdrawals: Vec<Withdrawal> = payload_env
             .el_ops()
@@ -146,11 +135,6 @@ impl<T: EngineRpc, P: L2DataProvider> RpcExecEngineCtl<T, P> {
             suggested_fee_recipient: Address::ZERO,
         };
 
-        info!(
-            "build_block_from_mempool; payload_attributes: {:?}",
-            payload_attributes
-        );
-
         let mut fcs = *self.fork_choice_state.lock().await;
         fcs.head_block_hash = prev_block.block_hash();
 
@@ -158,11 +142,6 @@ impl<T: EngineRpc, P: L2DataProvider> RpcExecEngineCtl<T, P> {
             .client
             .fork_choice_updated_v2(fcs, Some(payload_attributes))
             .await;
-
-        info!(
-            "build_block_from_mempool; forkchoice_result: {:?}",
-            forkchoice_result
-        );
 
         // TODO: correct error type
         let update_status = forkchoice_result.map_err(|err| EngineError::Other(err.to_string()))?;
@@ -173,21 +152,16 @@ impl<T: EngineRpc, P: L2DataProvider> RpcExecEngineCtl<T, P> {
 
         let raw_id: [u8; 8] = payload_id.0.into();
 
-        info!("build_block_from_mempool; raw_id: {:?}", raw_id);
-
         Ok(u64::from_be_bytes(raw_id))
     }
 
     async fn get_payload_status(&self, payload_id: u64) -> EngineResult<PayloadStatus> {
-        info!("get_payload_status; payload_id: {:?}", payload_id);
         let pl_id = PayloadId::new(payload_id.to_be_bytes());
         let payload = self
             .client
             .get_payload_v2(pl_id)
             .map_err(|_| EngineError::UnknownPayloadId(payload_id))
             .await?;
-
-        info!("get_payload_status; payload: {:?}", payload);
 
         let execution_payload_data = match payload.execution_payload {
             ExecutionPayloadFieldV2::V1(payload) => {
@@ -219,17 +193,10 @@ impl<T: EngineRpc, P: L2DataProvider> RpcExecEngineCtl<T, P> {
             }
         };
 
-        info!(
-            "get_payload_status; execution_payload_data: {:?}",
-            execution_payload_data
-        );
-
         Ok(PayloadStatus::Ready(execution_payload_data))
     }
 
     async fn submit_new_payload(&self, payload: ExecPayloadData) -> EngineResult<BlockStatus> {
-        info!("submit_new_payload; payload: {:?}", payload);
-
         let el_payload = borsh::from_slice::<ElPayload>(payload.accessory_data())
             .map_err(|_| EngineError::Other("Invalid payload".to_string()))?;
 
@@ -250,14 +217,7 @@ impl<T: EngineRpc, P: L2DataProvider> RpcExecEngineCtl<T, P> {
             withdrawals: Some(withdrawals),
         };
 
-        info!("submit_new_payload; v2_payload: {:?}", v2_payload);
-
         let payload_status_result = self.client.new_payload_v2(v2_payload).await;
-
-        info!(
-            "submit_new_payload; payload_status_result: {:?}",
-            payload_status_result
-        );
 
         let payload_status =
             payload_status_result.map_err(|err| EngineError::Other(err.to_string()))?;
