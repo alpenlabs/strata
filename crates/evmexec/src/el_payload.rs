@@ -1,8 +1,15 @@
-use alpen_vertex_primitives::buf::{Buf20, Buf32};
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use reth_primitives::B256;
 use reth_rpc_types::ExecutionPayloadV1;
+use reth_rpc_types_compat::engine::try_payload_v1_to_block;
+use thiserror::Error;
+
+use alpen_vertex_primitives::{
+    buf::{Buf20, Buf32},
+    evm_exec::create_evm_extra_payload,
+};
+use alpen_vertex_state::exec_update::UpdateInput;
 
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub(crate) struct ElPayload {
@@ -34,6 +41,29 @@ pub(crate) struct ElPayload {
     pub block_hash: Buf32,
     /// The transactions of the block.
     pub transactions: Vec<Vec<u8>>,
+}
+
+#[derive(Debug, Error)]
+pub enum ElPayloadError {
+    #[error("Failed to extract evm block from payload: {0}")]
+    BlockConversionError(String),
+}
+
+impl TryFrom<ElPayload> for UpdateInput {
+    type Error = ElPayloadError;
+
+    fn try_from(el_payload: ElPayload) -> Result<Self, Self::Error> {
+        let extra_payload = create_evm_extra_payload(el_payload.block_hash);
+        let v1_payload = ExecutionPayloadV1::from(el_payload);
+        let evm_block = try_payload_v1_to_block(v1_payload)
+            .map_err(|err| ElPayloadError::BlockConversionError(err.to_string()))?;
+
+        Ok(Self::new(
+            evm_block.number,
+            Buf32(evm_block.transactions_root),
+            extra_payload,
+        ))
+    }
 }
 
 impl From<ExecutionPayloadV1> for ElPayload {

@@ -360,14 +360,14 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
 
         ForkChoiceMessage::NewBlock(blkid) => {
             let l2prov = state.database.l2_provider();
-            let block = l2prov
+            let block_bundle = l2prov
                 .get_block_data(blkid)?
                 .ok_or(Error::MissingL2Block(blkid))?;
 
             // First, decide if the block seems correctly signed and we haven't
             // already marked it as invalid.
             let cstate = state.cur_csm_state.clone();
-            let correctly_signed = check_new_block(&blkid, &block, &cstate, state)?;
+            let correctly_signed = check_new_block(&blkid, &block_bundle, &cstate, state)?;
             if !correctly_signed {
                 // It's invalid, write that and return.
                 state.set_block_status(&blkid, BlockStatus::Invalid)?;
@@ -376,11 +376,8 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
 
             // Try to execute the payload, seeing if *that's* valid.
             // TODO take implicit input produced by the CL STF and include that in the payload data
-            // TODO include the full exec update input from the CL block
-            let exec_hash = block.header().exec_payload_hash();
-            let exec_seg = block.exec_segment();
-            let dummy_payload = exec_seg.update().input().extra_payload();
-            let eng_payload = ExecPayloadData::new_simple(dummy_payload.to_vec());
+            let exec_hash = block_bundle.header().exec_payload_hash();
+            let eng_payload = ExecPayloadData::from_l2_block_bundle(&block_bundle);
             debug!(?blkid, ?exec_hash, "submitting execution payload");
             let res = engine.submit_payload(eng_payload)?;
 
@@ -398,7 +395,9 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
             // should switch to it as a potential head.  This returns if we
             // created a new tip instead of advancing an existing tip.
             let cur_tip = state.cur_best_block;
-            let new_tip = state.chain_tracker.attach_block(blkid, block.header())?;
+            let new_tip = state
+                .chain_tracker
+                .attach_block(blkid, block_bundle.header())?;
             if new_tip {
                 debug!(?blkid, "created new pending tip");
             }

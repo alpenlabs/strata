@@ -6,13 +6,14 @@ use std::path::PathBuf;
 use std::process;
 use std::sync::Arc;
 use std::thread;
-use std::time;
 
 use alpen_vertex_primitives::l1::L1Status;
 use anyhow::Context;
 use bitcoin::Network;
 use config::Config;
 use format_serde_error::SerdeError;
+use reth_rpc_types::engine::JwtError;
+use reth_rpc_types::engine::JwtSecret;
 use thiserror::Error;
 use tokio::sync::{broadcast, oneshot, RwLock};
 use tracing::*;
@@ -24,6 +25,7 @@ use alpen_vertex_consensus_logic::duty_executor::{self, IdentityData, IdentityKe
 use alpen_vertex_consensus_logic::sync_manager;
 use alpen_vertex_consensus_logic::sync_manager::SyncManager;
 use alpen_vertex_db::traits::Database;
+use alpen_vertex_evmexec::{fork_choice_state_initial, EngineRpcClient};
 use alpen_vertex_primitives::buf::Buf32;
 use alpen_vertex_primitives::{block_credential, params::*};
 use alpen_vertex_rpc_api::AlpenApiServer;
@@ -43,6 +45,9 @@ pub enum InitError {
     #[error("config: {0}")]
     MalformedConfig(#[from] SerdeError),
 
+    #[error("jwt: {0}")]
+    MalformedSecret(#[from] JwtError),
+
     #[error("{0}")]
     Other(String),
 }
@@ -52,6 +57,13 @@ fn load_configuration(path: &Path) -> Result<Config, InitError> {
     let conf = toml::from_str::<Config>(&config_str)
         .map_err(|err| SerdeError::new(config_str.to_string(), err))?;
     Ok(conf)
+}
+
+fn load_jwtsecret(path: &Path) -> Result<JwtSecret, InitError> {
+    let secret = fs::read_to_string(path)?;
+    let jwt_secret = JwtSecret::from_hex(secret)?;
+
+    Ok(jwt_secret)
 }
 
 fn main() {
@@ -84,6 +96,16 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             cred_rule: block_credential::CredRule::Unchecked,
             horizon_l1_height: 3,
             genesis_l1_height: 5,
+            evm_genesis_block_hash: Buf32(
+                "0x37ad61cff1367467a98cf7c54c4ac99e989f1fbb1bc1e646235e90c065c565ba"
+                    .parse()
+                    .unwrap(),
+            ),
+            evm_genesis_block_state_root: Buf32(
+                "0x351714af72d74259f45cd7eab0b04527cd40e74836a45abcae50f92d919d988f"
+                    .parse()
+                    .unwrap(),
+            ),
         },
         run: RunParams {
             l1_follow_distance: config.sync.l1_follow_distance,
@@ -108,10 +130,10 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     // Initialize databases.
     let l1_db = Arc::new(alpen_vertex_db::L1Db::new(rbdb.clone()));
-    let l2_db = Arc::new(alpen_vertex_db::stubs::l2::StubL2Db::new()); // FIXME stub
+    let l2_db = Arc::new(alpen_vertex_db::l2::db::L2Db::new(rbdb.clone()));
     let sync_ev_db = Arc::new(alpen_vertex_db::SyncEventDb::new(rbdb.clone()));
     let cs_db = Arc::new(alpen_vertex_db::ClientStateDb::new(rbdb.clone()));
-    let chst_db = Arc::new(alpen_vertex_db::stubs::chain_state::StubChainstateDb::new());
+    let chst_db = Arc::new(alpen_vertex_db::ChainStateDb::new(rbdb.clone()));
     let database = Arc::new(alpen_vertex_db::database::CommonDatabase::new(
         l1_db, l2_db, sync_ev_db, cs_db, chst_db,
     ));
@@ -134,7 +156,19 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     }
 
     // Init engine controller.
-    let eng_ctl = alpen_vertex_evmctl::stub::StubController::new(time::Duration::from_millis(100));
+    let reth_jwtsecret = load_jwtsecret(&config.exec.reth.secret)?;
+    let client = EngineRpcClient::from_url_secret(
+        &format!("http://{}", &config.exec.reth.rpc_url),
+        reth_jwtsecret,
+    );
+
+    let initial_fcs = fork_choice_state_initial(database.clone(), params.rollup())?;
+    let eng_ctl = alpen_vertex_evmexec::engine::RpcExecEngineCtl::new(
+        client,
+        initial_fcs,
+        rt.handle().clone(),
+        database.l2_provider().clone(),
+    );
     let eng_ctl = Arc::new(eng_ctl);
 
     // Start the sync manager.
@@ -147,7 +181,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let sync_man = Arc::new(sync_man);
 
     // If the sequencer key is set, start the sequencer duties task.
-    if let Some(seqkey_path) = &args.sequencer_key {
+    if let Some(seqkey_path) = &config.client.sequencer_key {
         info!(?seqkey_path, "initing sequencer duties task");
         let idata = load_seqkey(seqkey_path)?;
 
@@ -163,15 +197,18 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         // Spawn the two tasks.
         thread::spawn(move || {
             // FIXME figure out why this can't infer the type, it's like *right there*
-            duty_executor::duty_tracker_task::<_, alpen_vertex_evmctl::stub::StubController>(
-                cu_rx,
-                duties_tx,
-                idata.ident,
-                db,
-            )
+            duty_executor::duty_tracker_task::<_>(cu_rx, duties_tx, idata.ident, db)
         });
         thread::spawn(move || {
-            duty_executor::duty_dispatch_task(duties_rx, idata.key, sm, db2, eng_ctl_de, pool)
+            duty_executor::duty_dispatch_task(
+                duties_rx,
+                idata.key,
+                sm,
+                db2,
+                eng_ctl_de,
+                pool,
+                params.rollup(),
+            )
         });
     }
 

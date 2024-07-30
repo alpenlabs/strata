@@ -1,6 +1,6 @@
 //! Global consensus parameters for the rollup.
 
-use crate::block_credential::CredRule;
+use crate::{block_credential::CredRule, prelude::Buf32};
 
 /// Consensus parameters that don't change for the lifetime of the network
 /// (unless there's some weird hard fork).
@@ -17,6 +17,11 @@ pub struct RollupParams {
 
     /// Block height we'll construct the L2 genesis block from.
     pub genesis_l1_height: u64,
+
+    /// Hardcoded EL genesis info
+    /// TODO: move elsewhere
+    pub evm_genesis_block_hash: Buf32,
+    pub evm_genesis_block_state_root: Buf32,
 }
 
 /// Client sync parameters that are used to make the network work but don't

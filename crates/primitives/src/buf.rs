@@ -9,7 +9,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use reth_primitives::alloy_primitives::FixedBytes;
 
 // 20-byte buf
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default)]
 pub struct Buf20(pub FixedBytes<20>);
 
 impl Buf20 {

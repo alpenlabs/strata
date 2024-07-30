@@ -2,9 +2,10 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::thread::sleep;
+use std::time::Duration;
 use std::{thread, time};
 
-use alpen_vertex_state::exec_update::{ExecUpdate, UpdateInput, UpdateOutput};
 use borsh::{BorshDeserialize, BorshSerialize};
 use tokio::sync::broadcast;
 use tracing::*;
@@ -14,8 +15,10 @@ use alpen_vertex_evmctl::engine::{ExecEngineCtl, PayloadStatus};
 use alpen_vertex_evmctl::errors::EngineError;
 use alpen_vertex_evmctl::messages::{ExecPayloadData, PayloadEnv};
 use alpen_vertex_primitives::buf::{Buf32, Buf64};
-use alpen_vertex_state::block::{ExecSegment, L1Segment};
+use alpen_vertex_primitives::params::RollupParams;
+use alpen_vertex_state::block::{ExecSegment, L1Segment, L2BlockAccessory, L2BlockBundle};
 use alpen_vertex_state::client_state::ClientState;
+use alpen_vertex_state::exec_update::{ExecUpdate, UpdateOutput};
 use alpen_vertex_state::header::L2BlockHeader;
 use alpen_vertex_state::prelude::*;
 
@@ -46,7 +49,7 @@ impl IdentityData {
     }
 }
 
-pub fn duty_tracker_task<D: Database, E: ExecEngineCtl>(
+pub fn duty_tracker_task<D: Database>(
     mut cupdate_rx: broadcast::Receiver<Arc<ClientUpdateNotif>>,
     batch_queue: broadcast::Sender<DutyBatch>,
     ident: Identity,
@@ -130,6 +133,7 @@ pub fn duty_dispatch_task<
     database: Arc<D>,
     engine: Arc<E>,
     pool: Arc<threadpool::ThreadPool>,
+    params: &RollupParams,
 ) {
     // TODO make this actually work
     let mut pending_duties: HashMap<u64, ()> = HashMap::new();
@@ -166,7 +170,8 @@ pub fn duty_dispatch_task<
             let sm = sync_man.clone();
             let db = database.clone();
             let e = engine.clone();
-            pool.execute(move || duty_exec_task(d, ik, sm, db, e));
+            let params = params.clone();
+            pool.execute(move || duty_exec_task(d, ik, sm, db, e, params));
             trace!(%id, "dispatched duty exec task");
             pending_duties.insert(id, ());
         }
@@ -184,8 +189,16 @@ fn duty_exec_task<D: Database, E: ExecEngineCtl>(
     sync_man: Arc<SyncManager>,
     database: Arc<D>,
     engine: Arc<E>,
+    params: RollupParams,
 ) {
-    if let Err(e) = perform_duty(&duty, &ik, &sync_man, database.as_ref(), engine.as_ref()) {
+    if let Err(e) = perform_duty(
+        &duty,
+        &ik,
+        &sync_man,
+        database.as_ref(),
+        engine.as_ref(),
+        params,
+    ) {
         error!(err = %e, "error performing duty");
     } else {
         debug!("completed duty successfully");
@@ -198,11 +211,13 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
     sync_man: &SyncManager,
     database: &D,
     engine: &E,
+    params: RollupParams,
 ) -> Result<(), Error> {
     match duty {
         Duty::SignBlock(data) => {
             let target = data.target_slot();
-            let Some((blkid, _block)) = sign_and_store_block(target, ik, database, engine)? else {
+            let Some((blkid, _block)) = sign_and_store_block(target, ik, database, engine, params)?
+            else {
                 return Ok(());
             };
 
@@ -227,6 +242,7 @@ fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     ik: &IdentityKey,
     database: &D,
     engine: &E,
+    params: RollupParams,
 ) -> Result<Option<(L2BlockId, L2Block)>, Error> {
     debug!(%slot, "prepating to publish block");
 
@@ -257,11 +273,24 @@ fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
 
     let prev_block_id = *last_ss.chain_tip_blkid();
 
+    let prev_block = database
+        .l2_provider()
+        .get_block_data(prev_block_id)?
+        .expect("prev block must exist");
+
+    // TODO: get from rollup config
+    let block_time = params.block_time;
+    let target_ts = prev_block.block().header().timestamp() + block_time;
+    let current_ts = now_millis();
+
+    if current_ts < target_ts {
+        sleep(Duration::from_millis(target_ts - current_ts));
+    }
+
     // Start preparing the EL payload.
     let ts = now_millis();
-    let prev_global_sr = Buf32::zero(); // TODO
     let safe_l1_block = Buf32::zero(); // TODO
-    let payload_env = PayloadEnv::new(ts, prev_global_sr, safe_l1_block, Vec::new());
+    let payload_env = PayloadEnv::new(ts, prev_block_id, safe_l1_block, Vec::new());
     let key = engine.prepare_payload(payload_env)?;
     trace!(%slot, "submitted EL payload job, waiting for completion");
 
@@ -282,7 +311,7 @@ fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
 
     // TODO correctly assemble the exec segment, since this is bodging out how
     // the inputs/outputs should be structured
-    let eui = UpdateInput::new(slot, Buf32::zero(), payload_data.el_payload().to_vec());
+    let eui = payload_data.update_input().clone();
     let exec_update = ExecUpdate::new(eui, UpdateOutput::new_from_state(Buf32::zero()));
     let exec_seg = ExecSegment::new(exec_update);
 
@@ -293,12 +322,14 @@ fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     let header_sig = sign_header(&header, ik);
     let signed_header = SignedL2BlockHeader::new(header, header_sig);
     let blkid = signed_header.get_blockid();
+    let block_accessory = L2BlockAccessory::new(payload_data.accessory_data().to_vec());
     let final_block = L2Block::new(signed_header, body);
+    let final_block_bundle = L2BlockBundle::new(final_block.clone(), block_accessory);
     info!(%slot, ?blkid, "finished building new block");
 
     // Store the block in the database.
     let l2store = database.l2_store();
-    l2store.put_block_data(final_block.clone())?;
+    l2store.put_block_data(final_block_bundle)?;
     debug!(?blkid, "wrote block to datastore");
 
     Ok(Some((blkid, final_block)))

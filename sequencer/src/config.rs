@@ -28,10 +28,22 @@ pub struct BitcoindParams {
 }
 
 #[derive(Deserialize, Debug)]
+pub struct RethELParams {
+    pub rpc_url: String,
+    pub secret: PathBuf,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct ExecParams {
+    pub reth: RethELParams,
+}
+
+#[derive(Deserialize, Debug)]
 pub struct Config {
     pub client: ClientParams,
     pub bitcoind_rpc: BitcoindParams,
     pub sync: SyncParams,
+    pub exec: ExecParams,
 }
 
 impl Config {
@@ -53,16 +65,40 @@ impl Config {
                 max_reorg_depth: 4,
                 client_poll_dur_ms: 200,
             },
+            exec: ExecParams {
+                reth: RethELParams {
+                    rpc_url: String::new(),
+                    secret: PathBuf::new(),
+                },
+            },
         }
     }
     pub fn update_from_args(&mut self, args: &Args) {
         let args = args.clone();
-        self.bitcoind_rpc.rpc_user = args.bitcoind_user;
-        self.bitcoind_rpc.rpc_url = args.bitcoind_host;
-        self.client.rpc_port = args.rpc_port;
-        self.bitcoind_rpc.rpc_password = args.bitcoind_password;
-        self.client.datadir = args.datadir;
-        self.client.sequencer_key = args.sequencer_key;
+        if let Some(rpc_user) = args.bitcoind_user {
+            self.bitcoind_rpc.rpc_user = rpc_user;
+        }
+        if let Some(rpc_url) = args.bitcoind_host {
+            self.bitcoind_rpc.rpc_url = rpc_url;
+        }
+        if let Some(rpc_password) = args.bitcoind_password {
+            self.bitcoind_rpc.rpc_password = rpc_password;
+        }
+        if let Some(rpc_port) = args.rpc_port {
+            self.client.rpc_port = rpc_port;
+        }
+        if let Some(datadir) = args.datadir {
+            self.client.datadir = datadir;
+        }
+        if args.sequencer_key.is_some() {
+            self.client.sequencer_key = args.sequencer_key;
+        }
+        if let Some(rpc_url) = args.reth_authrpc {
+            self.exec.reth.rpc_url = rpc_url;
+        }
+        if let Some(jwtsecret) = args.reth_jwtsecret {
+            self.exec.reth.secret = jwtsecret;
+        }
     }
 }
 
@@ -87,6 +123,10 @@ mod test {
             l1_follow_distance = 6
             max_reorg_depth = 4
             client_poll_dur_ms = 200
+
+            [exec.reth]
+            rpc_url = "http://localhost:8551"
+            secret = "1234567890abcdef"
         "#;
 
         assert!(toml::from_str::<Config>(config_string).is_ok());

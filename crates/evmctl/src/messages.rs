@@ -1,4 +1,5 @@
 use alpen_vertex_primitives::prelude::*;
+use alpen_vertex_state::{block::L2BlockBundle, exec_update::UpdateInput, id::L2BlockId};
 
 /// Succinct commitment to relevant EL block data.
 // This ended up being the same as the EL payload types in the state crate,
@@ -9,7 +10,9 @@ pub struct ExecPayloadData {
     ///
     /// This is the "explicit" input from the CL block.
     // TODO replace this with the `UpdateInput` from the exec update, maybe some other stuff
-    el_payload: Vec<u8>,
+    update_input: UpdateInput,
+
+    accessory_data: Vec<u8>,
 
     /// CL operations pushed into the EL, such as deposits from L1.  This
     /// corresponds to the "withdrawals" field in the `ExecutionPayloadVX`
@@ -20,17 +23,29 @@ pub struct ExecPayloadData {
 }
 
 impl ExecPayloadData {
-    pub fn new(el_payload: Vec<u8>, ops: Vec<Op>) -> Self {
-        Self { el_payload, ops }
+    pub fn new(update_input: UpdateInput, accessory_data: Vec<u8>, ops: Vec<Op>) -> Self {
+        Self {
+            update_input,
+            accessory_data,
+            ops,
+        }
     }
 
-    /// Creates a new instance with some specific payload no ops.
-    pub fn new_simple(el_payload: Vec<u8>) -> Self {
-        Self::new(el_payload, Vec::new())
+    pub fn from_l2_block_bundle(l2block: &L2BlockBundle) -> Self {
+        Self {
+            update_input: l2block.block().exec_segment().update().input().clone(),
+            accessory_data: l2block.accessory().exec_payload().to_vec(),
+            // TODO: extract ops from block
+            ops: vec![],
+        }
     }
 
-    pub fn el_payload(&self) -> &[u8] {
-        &self.el_payload
+    pub fn update_input(&self) -> &UpdateInput {
+        &self.update_input
+    }
+
+    pub fn accessory_data(&self) -> &[u8] {
+        &self.accessory_data
     }
 
     pub fn ops(&self) -> &[Op] {
@@ -55,8 +70,8 @@ pub struct PayloadEnv {
     /// Timestamp we're attesting this block was created on.
     timestamp: u64,
 
-    /// State root of the previous CL block.
-    _prev_global_state_root: Buf32,
+    /// BlockId of previous CL block
+    prev_l2_block_id: L2BlockId,
 
     /// Safe L1 block we're exposing into the EL that's not likely to reorg.
     _safe_l1_block: Buf32,
@@ -68,13 +83,13 @@ pub struct PayloadEnv {
 impl PayloadEnv {
     pub fn new(
         timestamp: u64,
-        _prev_global_state_root: Buf32,
+        prev_l2_block_id: L2BlockId,
         _safe_l1_block: Buf32,
         el_ops: Vec<Op>,
     ) -> Self {
         Self {
             timestamp,
-            _prev_global_state_root,
+            prev_l2_block_id,
             _safe_l1_block,
             el_ops,
         }
@@ -86,6 +101,10 @@ impl PayloadEnv {
 
     pub fn el_ops(&self) -> &[Op] {
         &self.el_ops
+    }
+
+    pub fn prev_l2_block_id(&self) -> &L2BlockId {
+        &self.prev_l2_block_id
     }
 }
 

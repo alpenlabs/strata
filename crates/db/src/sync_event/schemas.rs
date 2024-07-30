@@ -2,7 +2,7 @@ use alpen_vertex_state::sync_event::SyncEvent;
 use borsh::{BorshDeserialize, BorshSerialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::define_table_with_default_codec;
+use crate::define_table_with_seek_key_codec;
 use crate::define_table_without_codec;
 use crate::impl_borsh_value_codec;
 
@@ -31,7 +31,7 @@ impl SyncEventWithTimestamp {
 }
 
 // Sync Event Schema and corresponding codecs implementation
-define_table_with_default_codec!(
+define_table_with_seek_key_codec!(
     /// A table to store Sync Events. Maps event index to event
     (SyncEventSchema) u64 => SyncEventWithTimestamp
 );

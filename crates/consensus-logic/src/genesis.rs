@@ -3,11 +3,12 @@ use tracing::*;
 use alpen_vertex_db::{errors::DbError, traits::*};
 use alpen_vertex_primitives::{
     buf::{Buf32, Buf64},
+    evm_exec::create_evm_extra_payload,
     l1::L1BlockManifest,
     params::Params,
 };
 use alpen_vertex_state::{
-    block::{ExecSegment, L1Segment},
+    block::{ExecSegment, L1Segment, L2BlockAccessory, L2BlockBundle},
     chain_state::ChainState,
     client_state::ClientState,
     exec_env::ExecEnvState,
@@ -60,10 +61,14 @@ pub fn init_genesis_chainstate(
     // Create a dummy exec state that we can build the rest of the genesis block
     // around and insert into the genesis state.
     // TODO this might need to talk to the EL to do the genesus setup *properly*
-    let geui = UpdateInput::new(0, Buf32::zero(), Vec::new());
-    let gees = ExecEnvState::from_base_input(geui.clone(), Buf32::zero());
-    let genesis_ee_state = Buf32::zero();
-    let geu = ExecUpdate::new(geui.clone(), UpdateOutput::new_from_state(genesis_ee_state));
+    let extra_payload = create_evm_extra_payload(params.rollup.evm_genesis_block_hash);
+    let geui = UpdateInput::new(0, Buf32::zero(), extra_payload);
+    let gees =
+        ExecEnvState::from_base_input(geui.clone(), params.rollup.evm_genesis_block_state_root);
+    let geu = ExecUpdate::new(
+        geui.clone(),
+        UpdateOutput::new_from_state(params.rollup.evm_genesis_block_state_root),
+    );
 
     // Build the genesis block and genesis consensus states.
     let gblock = make_genesis_block(params, geu);
@@ -106,7 +111,7 @@ fn load_pre_genesis_l1_manifests(
     Ok(manifests)
 }
 
-fn make_genesis_block(params: &Params, genesis_update: ExecUpdate) -> L2Block {
+fn make_genesis_block(params: &Params, genesis_update: ExecUpdate) -> L2BlockBundle {
     // This has to be empty since everyone should have an unambiguous view of the genesis block.
     let l1_seg = L1Segment::new_empty();
 
@@ -115,7 +120,11 @@ fn make_genesis_block(params: &Params, genesis_update: ExecUpdate) -> L2Block {
 
     let body = L2BlockBody::new(l1_seg, exec_seg);
 
-    // Assemble the genesis header core, pulling in data from whatever
+    // TODO stub
+    let exec_payload = vec![];
+    let accessory = L2BlockAccessory::new(exec_payload);
+
+    // Assemble the genesis header template, pulling in data from whatever
     // sources we need.
     // FIXME this isn't the right timestamp to start the blockchain, this should
     // definitely be pulled from the database or the rollup parameters maybe
@@ -124,7 +133,8 @@ fn make_genesis_block(params: &Params, genesis_update: ExecUpdate) -> L2Block {
     let genesis_sr = Buf32::zero();
     let header = L2BlockHeader::new(0, genesis_ts, zero_blkid, &body, genesis_sr);
     let signed_genesis_header = SignedL2BlockHeader::new(header, Buf64::zero());
-    L2Block::new(signed_genesis_header, body)
+    let block = L2Block::new(signed_genesis_header, body);
+    L2BlockBundle::new(block, accessory)
 }
 
 /// Check if the database needs to have client init done to it.

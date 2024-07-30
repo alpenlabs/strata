@@ -1,5 +1,6 @@
 use std::collections::*;
 
+use alpen_vertex_state::block::L2BlockBundle;
 use parking_lot::Mutex;
 
 use alpen_vertex_state::prelude::*;
@@ -10,7 +11,7 @@ use crate::traits::*;
 /// Dummy implementation that isn't really compliant with the spec, but we don't
 /// care because we just want to get something running. :sunglasses:.
 pub struct StubL2Db {
-    blocks: Mutex<HashMap<L2BlockId, L2Block>>,
+    blocks: Mutex<HashMap<L2BlockId, L2BlockBundle>>,
     statuses: Mutex<HashMap<L2BlockId, BlockStatus>>,
     heights: Mutex<HashMap<u64, Vec<L2BlockId>>>,
 }
@@ -32,13 +33,13 @@ impl StubL2Db {
 }
 
 impl L2DataStore for StubL2Db {
-    fn put_block_data(&self, block: L2Block) -> DbResult<()> {
-        let blkid = block.header().get_blockid();
-        let idx = block.header().blockidx();
+    fn put_block_data(&self, bundle: L2BlockBundle) -> DbResult<()> {
+        let blkid = bundle.block().header().get_blockid();
+        let idx = bundle.block().header().blockidx();
 
         {
             let mut tbl = self.blocks.lock();
-            tbl.insert(blkid, block);
+            tbl.insert(blkid, bundle);
         }
 
         {
@@ -62,7 +63,7 @@ impl L2DataStore for StubL2Db {
 }
 
 impl L2DataProvider for StubL2Db {
-    fn get_block_data(&self, id: L2BlockId) -> DbResult<Option<L2Block>> {
+    fn get_block_data(&self, id: L2BlockId) -> DbResult<Option<L2BlockBundle>> {
         let tbl = self.blocks.lock();
         Ok(tbl.get(&id).cloned())
     }

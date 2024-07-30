@@ -1,130 +1,75 @@
-use std::future::Future;
+use std::sync::Arc;
 
 use futures::future::TryFutureExt;
-use jsonrpsee::http_client::HttpClient;
-use jsonrpsee::http_client::{transport::HttpBackend, HttpClientBuilder};
-use reth_node_ethereum::EthEngineTypes;
 use reth_primitives::{Address, B256};
-use reth_rpc_api::EngineApiClient;
-use reth_rpc_layer::{AuthClientLayer, AuthClientService};
 use reth_rpc_types::engine::{
-    ExecutionPayloadEnvelopeV2, ExecutionPayloadFieldV2, ExecutionPayloadInputV2, ForkchoiceState,
-    ForkchoiceUpdated, JwtSecret, PayloadAttributes, PayloadId, PayloadStatusEnum,
+    ExecutionPayloadFieldV2, ExecutionPayloadInputV2, ForkchoiceState, PayloadAttributes,
+    PayloadId, PayloadStatusEnum,
 };
 use reth_rpc_types::Withdrawal;
 use tokio::runtime::Handle;
 use tokio::sync::Mutex;
 
+use alpen_vertex_db::traits::L2DataProvider;
 use alpen_vertex_evmctl::engine::{BlockStatus, ExecEngineCtl, PayloadStatus};
 use alpen_vertex_evmctl::errors::{EngineError, EngineResult};
 use alpen_vertex_evmctl::messages::{ELDepositData, ExecPayloadData, Op, PayloadEnv};
-use alpen_vertex_primitives::buf::Buf32;
+use alpen_vertex_state::block::L2BlockBundle;
+use alpen_vertex_state::exec_update::UpdateInput;
 use alpen_vertex_state::id::L2BlockId;
 
+use crate::block::EVML2Block;
 use crate::el_payload::ElPayload;
+use crate::http_client::EngineRpc;
 
 fn address_from_slice(slice: &[u8]) -> Option<Address> {
     let slice: Option<[u8; 20]> = slice.try_into().ok();
     slice.map(Address::from)
 }
 
-fn http_client(http_url: &str, secret_hex: &str) -> HttpClient<AuthClientService<HttpBackend>> {
-    let secret = JwtSecret::from_hex(secret_hex).unwrap();
-    let middleware = tower::ServiceBuilder::new().layer(AuthClientLayer::new(secret));
+/// (head, safe, finalized)
+pub type FCS = (L2BlockId, Option<L2BlockId>, Option<L2BlockId>);
 
-    HttpClientBuilder::default()
-        .set_http_middleware(middleware)
-        .build(http_url)
-        .expect("Failed to create http client")
-}
-
-pub trait ELHttpClient {
-    fn fork_choice_updated_v2(
-        &self,
-        fork_choice_state: ForkchoiceState,
-        payload_attributes: Option<PayloadAttributes>,
-    ) -> impl Future<Output = Result<ForkchoiceUpdated, jsonrpsee::core::ClientError>>;
-
-    fn get_payload_v2(
-        &self,
-        payload_id: PayloadId,
-    ) -> impl Future<Output = Result<ExecutionPayloadEnvelopeV2, jsonrpsee::core::ClientError>>;
-
-    fn new_payload_v2(
-        &self,
-        payload: ExecutionPayloadInputV2,
-    ) -> impl Future<Output = Result<reth_rpc_types::engine::PayloadStatus, jsonrpsee::core::ClientError>>;
-}
-
-pub struct ELHttpClientImpl {
-    client: HttpClient<AuthClientService<HttpBackend>>,
-}
-
-impl ELHttpClientImpl {
-    pub fn from_url_secret(http_url: &str, secret_hex: &str) -> Self {
-        ELHttpClientImpl {
-            client: http_client(http_url, secret_hex),
-        }
-    }
-
-    pub fn inner(&self) -> &HttpClient<AuthClientService<HttpBackend>> {
-        &self.client
-    }
-}
-
-impl ELHttpClient for ELHttpClientImpl {
-    fn fork_choice_updated_v2(
-        &self,
-        fork_choice_state: ForkchoiceState,
-        payload_attributes: Option<PayloadAttributes>,
-    ) -> impl Future<Output = Result<ForkchoiceUpdated, jsonrpsee::core::ClientError>> {
-        <HttpClient<AuthClientService<HttpBackend>> as EngineApiClient<EthEngineTypes>>::fork_choice_updated_v2::<'_, '_>(&self.client, fork_choice_state, payload_attributes)
-    }
-
-    fn get_payload_v2(
-        &self,
-        payload_id: PayloadId,
-    ) -> impl Future<Output = Result<ExecutionPayloadEnvelopeV2, jsonrpsee::core::ClientError>>
-    {
-        <HttpClient<AuthClientService<HttpBackend>> as EngineApiClient<EthEngineTypes>>::get_payload_v2::<'_, '_>(&self.client, payload_id)
-    }
-
-    fn new_payload_v2(
-        &self,
-        payload: ExecutionPayloadInputV2,
-    ) -> impl Future<Output = Result<reth_rpc_types::engine::PayloadStatus, jsonrpsee::core::ClientError>>
-    {
-        <HttpClient<AuthClientService<HttpBackend>> as EngineApiClient<EthEngineTypes>>::new_payload_v2::<'_, '_>(&self.client, payload)
-    }
-}
-
-#[derive(Debug, Default)]
-pub struct ForkchoiceStatePartial {
-    /// Hash of the head block.
-    pub head_block_hash: Option<B256>,
-    /// Hash of the safe block.
-    pub safe_block_hash: Option<B256>,
-    /// Hash of finalized block.
-    pub finalized_block_hash: Option<B256>,
-}
-
-pub struct RpcExecEngineCtl<T> {
+pub struct RpcExecEngineCtl<T: EngineRpc, P: L2DataProvider> {
     client: T,
     fork_choice_state: Mutex<ForkchoiceState>,
-    handle: Handle,
+    tokio_handle: Handle,
+    l2_provider: Arc<P>,
 }
 
-impl<T> RpcExecEngineCtl<T> {
-    pub fn new(client: T, fork_choice_state: ForkchoiceState, handle: Handle) -> Self {
+impl<T: EngineRpc, P: L2DataProvider> RpcExecEngineCtl<T, P> {
+    pub fn new(
+        client: T,
+        fork_choice_state: ForkchoiceState,
+        handle: Handle,
+        l2_provider: Arc<P>,
+    ) -> Self {
         Self {
             client,
             fork_choice_state: Mutex::new(fork_choice_state),
-            handle,
+            tokio_handle: handle,
+            l2_provider,
         }
     }
 }
 
-impl<T: ELHttpClient> RpcExecEngineCtl<T> {
+impl<T: EngineRpc, P: L2DataProvider> RpcExecEngineCtl<T, P> {
+    fn get_l2block(&self, l2_block_id: &L2BlockId) -> anyhow::Result<L2BlockBundle> {
+        self.l2_provider
+            .get_block_data(*l2_block_id)?
+            .ok_or(anyhow::anyhow!("missing L2Block"))
+    }
+
+    fn get_evm_block_hash(&self, l2_block_id: &L2BlockId) -> anyhow::Result<B256> {
+        self.get_l2block(l2_block_id)
+            .and_then(|l2block| self.get_block_info(l2block))
+            .map(|evm_block| evm_block.block_hash())
+    }
+
+    fn get_block_info(&self, l2block: L2BlockBundle) -> anyhow::Result<EVML2Block> {
+        EVML2Block::try_from(l2block).map_err(anyhow::Error::msg)
+    }
+
     async fn update_block_state(
         &self,
         fcs_partial: ForkchoiceStatePartial,
@@ -163,7 +108,11 @@ impl<T: ELHttpClient> RpcExecEngineCtl<T> {
         }
     }
 
-    async fn build_block_from_mempool(&self, payload_env: PayloadEnv) -> EngineResult<u64> {
+    async fn build_block_from_mempool(
+        &self,
+        payload_env: PayloadEnv,
+        prev_block: EVML2Block,
+    ) -> EngineResult<u64> {
         // TODO: pass other fields from payload_env
         let withdrawals: Vec<Withdrawal> = payload_env
             .el_ops()
@@ -178,23 +127,20 @@ impl<T: ELHttpClient> RpcExecEngineCtl<T> {
             .collect();
 
         let payload_attributes = PayloadAttributes {
-            timestamp: payload_env.timestamp(),
+            // evm expects timestamp in seconds
+            timestamp: payload_env.timestamp() / 1000,
             prev_randao: B256::ZERO,
-            withdrawals: if withdrawals.is_empty() {
-                None
-            } else {
-                Some(withdrawals)
-            },
+            withdrawals: Some(withdrawals),
             parent_beacon_block_root: None,
             suggested_fee_recipient: Address::ZERO,
         };
 
+        let mut fcs = *self.fork_choice_state.lock().await;
+        fcs.head_block_hash = prev_block.block_hash();
+
         let forkchoice_result = self
             .client
-            .fork_choice_updated_v2(
-                *self.fork_choice_state.lock().await,
-                Some(payload_attributes),
-            )
+            .fork_choice_updated_v2(fcs, Some(payload_attributes))
             .await;
 
         // TODO: correct error type
@@ -204,8 +150,8 @@ impl<T: ELHttpClient> RpcExecEngineCtl<T> {
             .payload_id
             .ok_or(EngineError::Other("payload_id missing".into()))?; // should never happen
 
-        // XXX fix this hack, it's pub now, this is just to make it compile
-        let raw_id: [u8; 8] = unsafe { std::mem::transmute(payload_id) };
+        let raw_id: [u8; 8] = payload_id.0.into();
+
         Ok(u64::from_be_bytes(raw_id))
     }
 
@@ -220,7 +166,11 @@ impl<T: ELHttpClient> RpcExecEngineCtl<T> {
         let execution_payload_data = match payload.execution_payload {
             ExecutionPayloadFieldV2::V1(payload) => {
                 let el_payload: ElPayload = payload.into();
-                ExecPayloadData::new_simple(borsh::to_vec(&el_payload).unwrap())
+                let accessory_data = borsh::to_vec(&el_payload).unwrap();
+                let update_input = UpdateInput::try_from(el_payload)
+                    .map_err(|err| EngineError::Other(err.to_string()))?;
+
+                ExecPayloadData::new(update_input, accessory_data, vec![])
             }
             ExecutionPayloadFieldV2::V2(payload) => {
                 let ops = payload
@@ -235,7 +185,11 @@ impl<T: ELHttpClient> RpcExecEngineCtl<T> {
                     .collect();
 
                 let el_payload: ElPayload = payload.payload_inner.into();
-                ExecPayloadData::new(borsh::to_vec(&el_payload).unwrap(), ops)
+                let accessory_data = borsh::to_vec(&el_payload).unwrap();
+                let update_input = UpdateInput::try_from(el_payload)
+                    .map_err(|err| EngineError::Other(err.to_string()))?;
+
+                ExecPayloadData::new(update_input, accessory_data, ops)
             }
         };
 
@@ -243,7 +197,7 @@ impl<T: ELHttpClient> RpcExecEngineCtl<T> {
     }
 
     async fn submit_new_payload(&self, payload: ExecPayloadData) -> EngineResult<BlockStatus> {
-        let el_payload = borsh::from_slice::<ElPayload>(payload.el_payload())
+        let el_payload = borsh::from_slice::<ElPayload>(payload.accessory_data())
             .map_err(|_| EngineError::Other("Invalid payload".to_string()))?;
 
         let withdrawals: Vec<Withdrawal> = payload
@@ -260,11 +214,7 @@ impl<T: ELHttpClient> RpcExecEngineCtl<T> {
 
         let v2_payload = ExecutionPayloadInputV2 {
             execution_payload: el_payload.into(),
-            withdrawals: if withdrawals.is_empty() {
-                None
-            } else {
-                Some(withdrawals)
-            },
+            withdrawals: Some(withdrawals),
         };
 
         let payload_status_result = self.client.new_payload_v2(v2_payload).await;
@@ -281,23 +231,33 @@ impl<T: ELHttpClient> RpcExecEngineCtl<T> {
     }
 }
 
-impl<T: ELHttpClient> ExecEngineCtl for RpcExecEngineCtl<T> {
+impl<T: EngineRpc, P: L2DataProvider> ExecEngineCtl for RpcExecEngineCtl<T, P> {
     fn submit_payload(&self, payload: ExecPayloadData) -> EngineResult<BlockStatus> {
-        self.handle.block_on(self.submit_new_payload(payload))
+        self.tokio_handle.block_on(self.submit_new_payload(payload))
     }
 
     fn prepare_payload(&self, env: PayloadEnv) -> EngineResult<u64> {
-        self.handle.block_on(self.build_block_from_mempool(env))
+        let prev_l2block = self
+            .get_l2block(env.prev_l2_block_id())
+            .map_err(|err| EngineError::Other(err.to_string()))?;
+        let prev_block = EVML2Block::try_from(prev_l2block)
+            .map_err(|err| EngineError::Other(err.to_string()))?;
+        self.tokio_handle
+            .block_on(self.build_block_from_mempool(env, prev_block))
     }
 
     fn get_payload_status(&self, id: u64) -> EngineResult<PayloadStatus> {
-        self.handle.block_on(self.get_payload_status(id))
+        self.tokio_handle.block_on(self.get_payload_status(id))
     }
 
     fn update_head_block(&self, id: L2BlockId) -> EngineResult<()> {
-        self.handle.block_on(async {
+        let block_hash = self
+            .get_evm_block_hash(&id)
+            .map_err(|err| EngineError::Other(err.to_string()))?;
+
+        self.tokio_handle.block_on(async {
             let fork_choice_state = ForkchoiceStatePartial {
-                head_block_hash: Some(Buf32::from(id).into()),
+                head_block_hash: Some(block_hash),
                 ..Default::default()
             };
             self.update_block_state(fork_choice_state).await.map(|_| ())
@@ -305,9 +265,16 @@ impl<T: ELHttpClient> ExecEngineCtl for RpcExecEngineCtl<T> {
     }
 
     fn update_safe_block(&self, id: L2BlockId) -> EngineResult<()> {
-        self.handle.block_on(async {
+        let block_hash = self
+            .get_evm_block_hash(&id)
+            .map_err(|err| EngineError::Other(err.to_string()))?;
+
+        self.tokio_handle.block_on(async {
             let fork_choice_state = ForkchoiceStatePartial {
-                safe_block_hash: Some(Buf32::from(id).into()),
+                // NOTE: update_head_block is not called currently; so update head and safe block
+                // together
+                head_block_hash: Some(block_hash),
+                safe_block_hash: Some(block_hash),
                 ..Default::default()
             };
             self.update_block_state(fork_choice_state).await.map(|_| ())
@@ -315,9 +282,13 @@ impl<T: ELHttpClient> ExecEngineCtl for RpcExecEngineCtl<T> {
     }
 
     fn update_finalized_block(&self, id: L2BlockId) -> EngineResult<()> {
-        self.handle.block_on(async {
+        let block_hash = self
+            .get_evm_block_hash(&id)
+            .map_err(|err| EngineError::Other(err.to_string()))?;
+
+        self.tokio_handle.block_on(async {
             let fork_choice_state = ForkchoiceStatePartial {
-                finalized_block_hash: Some(Buf32::from(id).into()),
+                finalized_block_hash: Some(block_hash),
                 ..Default::default()
             };
             self.update_block_state(fork_choice_state).await.map(|_| ())
@@ -325,47 +296,37 @@ impl<T: ELHttpClient> ExecEngineCtl for RpcExecEngineCtl<T> {
     }
 }
 
+#[derive(Debug, Default)]
+struct ForkchoiceStatePartial {
+    /// Hash of the head block.
+    pub head_block_hash: Option<B256>,
+    /// Hash of the safe block.
+    pub safe_block_hash: Option<B256>,
+    /// Hash of finalized block.
+    pub finalized_block_hash: Option<B256>,
+}
+
 #[cfg(test)]
 mod tests {
-    use arbitrary::{Arbitrary, Unstructured};
-    use mockall::{mock, predicate::*};
-    use rand::{Rng, RngCore};
+    use alpen_vertex_db::stubs::l2::StubL2Db;
+    use alpen_vertex_db::traits::L2DataStore;
+    use alpen_vertex_state::block::{L2Block, L2BlockAccessory};
+    use rand::Rng;
     use reth_primitives::revm_primitives::FixedBytes;
     use reth_primitives::{Bloom, Bytes, U256};
+    use reth_rpc_types::engine::{ExecutionPayloadEnvelopeV2, ForkchoiceUpdated};
     use reth_rpc_types::ExecutionPayloadV1;
 
     use alpen_vertex_evmctl::errors::EngineResult;
     use alpen_vertex_evmctl::messages::PayloadEnv;
     use alpen_vertex_primitives::buf::Buf32;
 
+    use crate::http_client::MockEngineRpc;
+
     use super::*;
 
-    mock! {
-        HttpClient {}
-        impl ELHttpClient for HttpClient {
-            fn fork_choice_updated_v2(
-                &self,
-                fork_choice_state: ForkchoiceState,
-                payload_attributes: Option<PayloadAttributes>,
-            ) -> impl Future<Output = Result<ForkchoiceUpdated, jsonrpsee::core::ClientError>>;
-
-            fn get_payload_v2(
-                &self,
-                payload_id: PayloadId,
-            ) -> impl Future<Output = Result<ExecutionPayloadEnvelopeV2, jsonrpsee::core::ClientError>>;
-
-            fn new_payload_v2(
-                &self,
-                payload: ExecutionPayloadInputV2,
-            ) -> impl Future<Output = Result<reth_rpc_types::engine::PayloadStatus, jsonrpsee::core::ClientError>>;
-        }
-    }
-
     fn random_el_payload() -> ElPayload {
-        let mut rand_data = vec![0u8; 1024];
-        rand::thread_rng().fill_bytes(&mut rand_data);
-        let mut unstructured = Unstructured::new(&rand_data);
-        ElPayload::arbitrary(&mut unstructured).unwrap()
+        random_execution_payload_v1().into()
     }
 
     fn random_execution_payload_v1() -> ExecutionPayloadV1 {
@@ -391,7 +352,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_update_block_state() {
-        let mut mock_client = MockHttpClient::new();
+        let mut mock_client = MockEngineRpc::new();
 
         let fcs_partial = ForkchoiceStatePartial {
             head_block_hash: Some(B256::random()),
@@ -407,11 +368,14 @@ mod tests {
 
         mock_client
             .expect_fork_choice_updated_v2()
-            .returning(move |_, _| {
-                Box::pin(async { Ok(ForkchoiceUpdated::from_status(PayloadStatusEnum::Valid)) })
-            });
+            .returning(move |_, _| Ok(ForkchoiceUpdated::from_status(PayloadStatusEnum::Valid)));
 
-        let rpc_exec_engine_ctl = RpcExecEngineCtl::new(mock_client, fcs, Handle::current());
+        let rpc_exec_engine_ctl = RpcExecEngineCtl::new(
+            mock_client,
+            fcs,
+            Handle::current(),
+            Arc::new(StubL2Db::new()),
+        );
 
         let result = rpc_exec_engine_ctl.update_block_state(fcs_partial).await;
 
@@ -420,29 +384,41 @@ mod tests {
 
     #[tokio::test]
     async fn test_build_block_from_mempool() {
-        let mut mock_client = MockHttpClient::new();
+        let mut mock_client = MockEngineRpc::new();
         let fcs = ForkchoiceState::default();
 
         mock_client
             .expect_fork_choice_updated_v2()
             .returning(move |_, _| {
-                Box::pin(async {
-                    Ok(ForkchoiceUpdated::from_status(PayloadStatusEnum::Valid)
-                        .with_payload_id(PayloadId::new([1u8; 8])))
-                })
+                Ok(ForkchoiceUpdated::from_status(PayloadStatusEnum::Valid)
+                    .with_payload_id(PayloadId::new([1u8; 8])))
             });
 
-        let rpc_exec_engine_ctl = RpcExecEngineCtl::new(mock_client, fcs, Handle::current());
+        let l2db = StubL2Db::new();
+
+        let el_payload = random_el_payload();
+
+        let arb = alpen_test_utils::ArbitraryGenerator::new();
+        let l2block: L2Block = arb.generate();
+        let accessory = L2BlockAccessory::new(borsh::to_vec(&el_payload).unwrap());
+        let l2block_bundle = L2BlockBundle::new(l2block, accessory);
+
+        let evm_l2_block = EVML2Block::try_from(l2block_bundle.clone()).unwrap();
+
+        l2db.put_block_data(l2block_bundle).unwrap();
+
+        let rpc_exec_engine_ctl =
+            RpcExecEngineCtl::new(mock_client, fcs, Handle::current(), Arc::new(l2db));
 
         let timestamp = 0;
         let el_ops = vec![];
         let safe_l1_block = Buf32(FixedBytes::<32>::random());
-        let prev_global_state_root = Buf32(FixedBytes::<32>::random());
+        let prev_l2_block = Buf32(FixedBytes::<32>::random()).into();
 
-        let payload_env = PayloadEnv::new(timestamp, prev_global_state_root, safe_l1_block, el_ops);
+        let payload_env = PayloadEnv::new(timestamp, prev_l2_block, safe_l1_block, el_ops);
 
         let result = rpc_exec_engine_ctl
-            .build_block_from_mempool(payload_env)
+            .build_block_from_mempool(payload_env, evm_l2_block)
             .await;
 
         assert!(result.is_ok());
@@ -450,19 +426,22 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_payload_status() {
-        let mut mock_client = MockHttpClient::new();
+        let mut mock_client = MockEngineRpc::new();
         let fcs = ForkchoiceState::default();
 
         mock_client.expect_get_payload_v2().returning(move |_| {
-            Box::pin(async {
-                Ok(ExecutionPayloadEnvelopeV2 {
-                    execution_payload: ExecutionPayloadFieldV2::V1(random_execution_payload_v1()),
-                    block_value: U256::from(100),
-                })
+            Ok(ExecutionPayloadEnvelopeV2 {
+                execution_payload: ExecutionPayloadFieldV2::V1(random_execution_payload_v1()),
+                block_value: U256::from(100),
             })
         });
 
-        let rpc_exec_engine_ctl = RpcExecEngineCtl::new(mock_client, fcs, Handle::current());
+        let rpc_exec_engine_ctl = RpcExecEngineCtl::new(
+            mock_client,
+            fcs,
+            Handle::current(),
+            Arc::new(StubL2Db::new()),
+        );
 
         let result = rpc_exec_engine_ctl.get_payload_status(0).await;
 
@@ -471,24 +450,43 @@ mod tests {
 
     #[tokio::test]
     async fn test_submit_new_payload() {
-        let mut mock_client = MockHttpClient::new();
+        let mut mock_client = MockEngineRpc::new();
         let fcs = ForkchoiceState::default();
 
-        let el_payload = random_el_payload();
-        let ops = vec![Op::Deposit(ELDepositData::new(10000, [1u8; 20].into()))];
+        let el_payload = ElPayload {
+            base_fee_per_gas: Buf32(U256::from(10).into()),
+            parent_hash: Default::default(),
+            fee_recipient: Default::default(),
+            state_root: Default::default(),
+            receipts_root: Default::default(),
+            logs_bloom: [0u8; 256],
+            prev_randao: Default::default(),
+            block_number: Default::default(),
+            gas_limit: Default::default(),
+            gas_used: Default::default(),
+            timestamp: Default::default(),
+            extra_data: Default::default(),
+            block_hash: Default::default(),
+            transactions: Default::default(),
+        };
+        let accessory_data = borsh::to_vec(&el_payload).unwrap();
+        let update_input = UpdateInput::try_from(el_payload).unwrap();
 
-        let payload_data = ExecPayloadData::new(borsh::to_vec(&el_payload).unwrap(), ops);
+        let payload_data = ExecPayloadData::new(update_input, accessory_data, vec![]);
 
         mock_client.expect_new_payload_v2().returning(move |_| {
-            Box::pin(async {
-                Ok(reth_rpc_types::engine::PayloadStatus {
-                    status: PayloadStatusEnum::Valid,
-                    latest_valid_hash: None,
-                })
+            Ok(reth_rpc_types::engine::PayloadStatus {
+                status: PayloadStatusEnum::Valid,
+                latest_valid_hash: None,
             })
         });
 
-        let rpc_exec_engine_ctl = RpcExecEngineCtl::new(mock_client, fcs, Handle::current());
+        let rpc_exec_engine_ctl = RpcExecEngineCtl::new(
+            mock_client,
+            fcs,
+            Handle::current(),
+            Arc::new(StubL2Db::new()),
+        );
 
         let result = rpc_exec_engine_ctl.submit_new_payload(payload_data).await;
 

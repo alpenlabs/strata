@@ -18,6 +18,8 @@ def generate_seqkey() -> bytes:
     assert len(buf) == 32, "bad seqkey len"
     return buf
 
+def generate_jwt_secret() -> str:
+    return os.urandom(32).hex()
 
 def generate_blocks(
     bitcoin_rpc: BitcoindClient,
@@ -94,7 +96,7 @@ class VertexFactory(flexitest.Factory):
 
     @flexitest.with_ectx("ctx")
     def create_sequencer(
-        self, bitcoind_sock: str, bitcoind_user: str, bitcoind_pass: str, ctx: flexitest.EnvContext
+        self, bitcoind_sock: str, bitcoind_user: str, bitcoind_pass: str, reth_socket: str, reth_secret_path: str, ctx: flexitest.EnvContext
     ) -> flexitest.Service:
         datadir = ctx.make_service_dir("sequencer")
         rpc_port = self.next_port()
@@ -115,8 +117,9 @@ class VertexFactory(flexitest.Factory):
             "--bitcoind-host", bitcoind_sock,
             "--bitcoind-user", bitcoind_user,
             "--bitcoind-password", bitcoind_pass,
-            "--network",
-            "regtest",
+            "--reth-authrpc", reth_socket,
+            "--reth-jwtsecret", reth_secret_path,
+            "--network", "regtest",
             "--sequencer-key", keyfile,
         ]
         # fmt: on
@@ -134,6 +137,34 @@ class VertexFactory(flexitest.Factory):
 
             return svc
 
+class RethFactory(flexitest.Factory):
+    def __init__(self, port_range: list[int]):
+        super().__init__(port_range)
+
+    @flexitest.with_ectx("ctx")
+    def create_exec_client(
+        self, reth_secret_path: str, ctx: flexitest.EnvContext
+    ) -> flexitest.Service:
+        datadir = ctx.make_service_dir("reth")
+        rpc_port = self.next_port()
+        logfile = os.path.join(datadir, "service.log")
+
+        # fmt: off
+        cmd = [
+            "alpen-vertex-reth",
+            "--datadir", datadir,
+            "--authrpc.port", str(rpc_port),
+            "--authrpc.jwtsecret", reth_secret_path,
+            "-vvvv"
+        ]
+        # fmt: on
+        props = {"rpc_port": rpc_port}
+
+        with open(logfile, "w") as f:
+            svc = flexitest.service.ProcService(props, cmd, stdout=f)
+
+            return svc
+
 
 class BasicEnvConfig(flexitest.EnvConfig):
     def __init__(self):
@@ -142,6 +173,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
     def init(self, ctx: flexitest.EnvContext) -> flexitest.LiveEnv:
         btc_fac = ctx.get_factory("bitcoin")
         seq_fac = ctx.get_factory("sequencer")
+        reth_fac = ctx.get_factory("reth")
 
         bitcoind = btc_fac.create_regtest_bitcoin()
         time.sleep(BLOCK_GENERATION_INTERVAL_SECS)
@@ -149,16 +181,28 @@ class BasicEnvConfig(flexitest.EnvConfig):
         brpc = bitcoind.create_rpc()
         brpc.proxy.createwallet("dummy")
 
+        secret_dir = ctx.make_service_dir("secret")
+        reth_secret_path = os.path.join(secret_dir, "jwt.hex")
+
+        with open(reth_secret_path, 'w') as file:
+            file.write(generate_jwt_secret())
+
+        reth = reth_fac.create_exec_client(reth_secret_path)
+
+        reth_port = reth.get_prop("rpc_port")
+        reth_socket = f"localhost:{reth_port}"
+
         # generate blocks every 500 millis
         generate_blocks(brpc, BLOCK_GENERATION_INTERVAL_SECS)
         rpc_port = bitcoind.get_prop("rpc_port")
         rpc_user = bitcoind.get_prop("rpc_user")
         rpc_pass = bitcoind.get_prop("rpc_password")
         rpc_sock = f"localhost:{rpc_port}"
-        sequencer = seq_fac.create_sequencer(rpc_sock, rpc_user, rpc_pass)
-        time.sleep(BLOCK_GENERATION_INTERVAL_SECS)
+        sequencer = seq_fac.create_sequencer(rpc_sock, rpc_user, rpc_pass, reth_socket, reth_secret_path)
+        # need to wait for at least `genesis_l1_height` blocks to be generated. sleeping some more for safety 
+        time.sleep(BLOCK_GENERATION_INTERVAL_SECS * 10)
 
-        svcs = {"bitcoin": bitcoind, "sequencer": sequencer}
+        svcs = {"bitcoin": bitcoind, "sequencer": sequencer, "reth": reth}
         return flexitest.LiveEnv(svcs)
 
 
@@ -173,8 +217,9 @@ def main(argv):
 
     btc_fac = BitcoinFactory([12300 + i for i in range(20)])
     seq_fac = VertexFactory([12400 + i for i in range(20)])
+    reth_fac = RethFactory([12500 + i for i in range(20)])
 
-    factories = {"bitcoin": btc_fac, "sequencer": seq_fac}
+    factories = {"bitcoin": btc_fac, "sequencer": seq_fac, "reth": reth_fac}
     global_envs = {"basic": BasicEnvConfig()}
 
     rt = flexitest.TestRuntime(global_envs, datadir_root, factories)

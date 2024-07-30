@@ -4,7 +4,7 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use alpen_vertex_primitives::buf::Buf32;
+use alpen_vertex_primitives::{buf::Buf32, evm_exec::create_evm_extra_payload};
 
 use crate::{bridge_ops, da_blob};
 
@@ -36,7 +36,7 @@ impl ExecUpdate {
 
 /// Contains the explicit inputs to the STF.  Implicit inputs are determined
 /// from the CL's exec env state.
-#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
+#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
 pub struct UpdateInput {
     /// Update index.  This is incremented exactly 1.  This is to handle the
     /// future possible cases where we skip CL blocks and provide a monotonic
@@ -50,6 +50,21 @@ pub struct UpdateInput {
     /// Buffer of any other payload data.  This is used with the other fields
     /// here to construct the full EVM header payload.
     extra_payload: Vec<u8>,
+}
+
+impl<'a> Arbitrary<'a> for UpdateInput {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let update_idx = u64::arbitrary(u)?;
+        let entries_root = Buf32::arbitrary(u)?;
+        let block_hash = Buf32::arbitrary(u)?;
+        let extra_payload = create_evm_extra_payload(block_hash);
+
+        Ok(Self {
+            update_idx,
+            entries_root,
+            extra_payload,
+        })
+    }
 }
 
 impl UpdateInput {
