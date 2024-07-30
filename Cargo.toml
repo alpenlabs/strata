@@ -14,6 +14,10 @@ members = [
   "crates/vtxjmt",
   "crates/prover/zkvm",
   "crates/prover/adapters/risc0",
+  "crates/bridge-db",
+  "crates/bridge-exec",
+  "crates/bridge-rpc-service",
+  "crates/bridge-tx-manager",
   "sequencer",
   "reth",
 ]
