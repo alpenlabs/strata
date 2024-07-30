@@ -3,37 +3,43 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 use alpen_express_primitives::buf::Buf32;
 use alpen_express_state::da_blob::{BlobDest, BlobIntent};
 use anyhow::anyhow;
-use bitcoin::Transaction;
+use bitcoin::{consensus::serialize, hashes::Hash, Transaction};
 use sha2::{Digest, Sha256};
-use tokio::sync::mpsc::Receiver;
+use tokio::sync::mpsc::{self, Receiver, Sender};
 use tracing::*;
 
 use alpen_express_db::{
     traits::{SeqDataProvider, SeqDataStore, SequencerDatabase},
     types::{BlobEntry, BlobL1Status},
 };
+use alpen_vertex_primitives::buf::Buf32;
+use alpen_vertex_state::da_blob::{BlobDest, BlobIntent};
 
-use super::{
-    builder::{create_inscription_transactions, UtxoParseError, UTXO},
-    config::{InscriptionFeePolicy, WriterConfig},
-    state::WriterState,
-};
-use crate::rpc::{
-    traits::{L1Client, SeqL1Client},
-    types::RawUTXO,
-    ClientError,
-};
+use super::utils::{get_blob_by_idx, update_blob_by_idx};
+use super::{broadcast::broadcaster_task, builder::build_inscription_txs};
+use super::{config::WriterConfig, state::WriterState};
+use crate::rpc::traits::{L1Client, SeqL1Client};
 
 const FINALITY_DEPTH: u64 = 6;
-const BROADCAST_POLL_INTERVAL: u64 = 5000; // millis
 
-pub async fn writer_control_task<D: SequencerDatabase + Send + Sync + 'static>(
-    intent_rx: Receiver<BlobIntent>,
+pub struct DaWriter {
+    intent_tx: Sender<BlobIntent>,
+}
+
+impl DaWriter {
+    pub fn submit_inent(&self, intent: BlobIntent) -> anyhow::Result<()> {
+        Ok(self.intent_tx.blocking_send(intent)?)
+    }
+}
+
+pub fn start_writer_task<D: SequencerDatabase + Send + Sync + 'static>(
     rpc_client: Arc<impl SeqL1Client + L1Client>,
     config: WriterConfig,
     db: Arc<D>,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<DaWriter> {
     info!("Starting writer control task");
+
+    let (intent_tx, intent_rx) = mpsc::channel::<BlobIntent>(10);
 
     let state = initialize_writer_state(db.clone())?;
 
@@ -53,9 +59,9 @@ pub async fn writer_control_task<D: SequencerDatabase + Send + Sync + 'static>(
         db.clone(),
     ));
 
-    let _ = listen_for_write_intents(intent_rx, rpc_client, config, db).await;
+    tokio::spawn(listen_for_write_intents(intent_rx, rpc_client, config, db));
 
-    Ok(())
+    Ok(DaWriter { intent_tx })
 }
 
 async fn listen_for_write_intents<D>(
@@ -78,42 +84,59 @@ where
             continue;
         }
 
-        if let Err(e) = handle_intent(write_intent, db.clone(), &rpc_client, &config).await {
+        if let Err(e) = handle_intent(write_intent, db.clone(), rpc_client.clone(), &config).await {
             error!(%e, "Failed to handle intent");
         }
     }
 }
 
-async fn handle_intent<D: SequencerDatabase>(
+/// This returns None if the intent already exists and returns Some(commit_txid, reveal_txid) for
+/// new intent
+async fn handle_intent<D: SequencerDatabase + Send + Sync + 'static>(
     intent: BlobIntent,
     db: Arc<D>,
-    rpc_client: &Arc<impl SeqL1Client + L1Client>,
+    client: Arc<impl L1Client + SeqL1Client>,
     config: &WriterConfig,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<Option<(Buf32, Buf32)>> {
     // If it is already present in the db and corresponding txns are created, return
 
-    let blobid = calculate_intent_hash(&intent.payload()); // TODO: should we use the commitment
-                                                           // here?
-    let seqprov = db.sequencer_provider();
-    let seqstore = db.sequencer_store();
+    // TODO: handle insufficient utxos
+    let (commit, reveal) = build_inscription_txs(&intent.payload(), &client, &config).await?;
 
-    match seqprov.get_blob_by_id(blobid.clone())? {
+    tokio::task::spawn_blocking(move || store_intent(intent, db, commit, reveal)).await?
+}
+
+fn store_intent<D: SequencerDatabase + Send + Sync + 'static>(
+    intent: BlobIntent,
+    db: Arc<D>,
+    commit: Transaction,
+    reveal: Transaction,
+) -> anyhow::Result<Option<(Buf32, Buf32)>> {
+    let blobid = calculate_intent_hash(&intent.payload()); // TODO: should we use the commitment in
+                                                           // the intent?
+    match db.sequencer_provider().get_blob_by_id(blobid.clone())? {
         Some(_) => {
             warn!("duplicate write intent {blobid:?}. Ignoring");
-            return Ok(());
+            return Ok(None);
         }
         None => {
             // Store in db
-            // TODO: handle insufficient utxos
-            let (commit, reveal) =
-                create_inscriptions_from_intent(&intent.payload(), &rpc_client, &config).await?;
-            let (commit_txid, reveal_txid) = seqstore.put_commit_reveal_txs(commit, reveal)?;
-            let blobentry =
-                BlobEntry::new_unsent(intent.payload().to_vec(), commit_txid, reveal_txid);
-            let _ = seqstore.put_blob(blobid, blobentry)?;
+            let cid: Buf32 = commit.compute_txid().as_raw_hash().to_byte_array().into();
+            let rid: Buf32 = reveal.compute_txid().as_raw_hash().to_byte_array().into();
+
+            db.sequencer_store().put_commit_reveal_txs(
+                cid,
+                serialize(&commit),
+                rid,
+                serialize(&reveal),
+            )?;
+
+            let blobentry = BlobEntry::new_unsent(intent.payload().to_vec(), cid, rid);
+            let _ = db.sequencer_store().put_blob(blobid, blobentry)?;
+
+            return Ok(Some((cid, rid)));
         }
     }
-    Ok(())
 }
 
 fn calculate_intent_hash(intent: &[u8]) -> Buf32 {
@@ -125,45 +148,15 @@ fn calculate_intent_hash(intent: &[u8]) -> Buf32 {
     Buf32(hash.into())
 }
 
-async fn create_inscriptions_from_intent(
-    payload: &[u8],
-    rpc_client: &Arc<impl SeqL1Client + L1Client>,
-    config: &WriterConfig,
-) -> anyhow::Result<(Transaction, Transaction)> {
-    // let (signature, pub_key) = sign_blob_with_private_key(&payload, &config.private_key)?;
-    let utxos = rpc_client.get_utxos().await?;
-    let utxos = utxos
-        .into_iter()
-        .map(|x| <RawUTXO as TryInto<UTXO>>::try_into(x))
-        .into_iter()
-        .collect::<Result<Vec<UTXO>, UtxoParseError>>()
-        .map_err(|e| anyhow::anyhow!("{:?}", e))?;
-
-    let fee_rate = match config.inscription_fee_policy {
-        InscriptionFeePolicy::Smart => rpc_client.estimate_smart_fee().await?,
-        InscriptionFeePolicy::Fixed(val) => val,
-    };
-    create_inscription_transactions(
-        &config.rollup_name,
-        &payload,
-        utxos,
-        config.sequencer_address.clone(),
-        config.amount_for_reveal_txn,
-        fee_rate,
-        rpc_client.network(),
-    )
-    .map_err(|e| anyhow::anyhow!(e.to_string()))
-}
-
 fn initialize_writer_state<D: SequencerDatabase>(db: Arc<D>) -> anyhow::Result<WriterState<D>> {
     let prov = db.sequencer_provider();
 
     let last_idx = match prov.get_last_blob_idx()? {
         Some(last_idx) => last_idx,
         None => {
-            // Insert genesis blob to db and return.
-            // Genesis here is just empty. And the major purpose is to have something instead of
-            // dealing with Option<u64> in states.
+            // Insert sentinel blob to db and return.
+            // Sentinel here is just empty. And the major purpose is to have cleaner data structures
+            // instead of dealing with Option<u64> in states.
             let entry = BlobEntry::new(
                 Default::default(),
                 Buf32::zero(),
@@ -171,7 +164,7 @@ fn initialize_writer_state<D: SequencerDatabase>(db: Arc<D>) -> anyhow::Result<W
                 BlobL1Status::Finalized,
             );
             let idx = db.sequencer_store().put_blob(Buf32::zero(), entry)?;
-            assert_eq!(idx, 0, "Expect genesis blobid to be zero");
+            assert_eq!(idx, 0, "Expect sentinel blobid to be zero");
             return Ok(WriterState::new(db, 0, 0));
         }
     };
@@ -181,15 +174,10 @@ fn initialize_writer_state<D: SequencerDatabase>(db: Arc<D>) -> anyhow::Result<W
     let mut last_sent_idx = 0;
     let mut last_finalized_idx = 0;
 
-    loop {
-        let blob = if let Some(blob) = prov.get_blob_by_idx(curr_idx)? {
-            blob
-        } else {
+    while curr_idx > 0 {
+        let Some(blob) = prov.get_blob_by_idx(curr_idx)? else {
             break;
         };
-        if curr_idx <= 0 {
-            break;
-        }
         match blob.status {
             BlobL1Status::InMempool => {
                 last_sent_idx = curr_idx;
@@ -204,99 +192,6 @@ fn initialize_writer_state<D: SequencerDatabase>(db: Arc<D>) -> anyhow::Result<W
         curr_idx -= 1;
     }
     return Ok(WriterState::new(db, last_finalized_idx, last_sent_idx));
-}
-
-/// Broadcasts the next blob to be sent
-async fn broadcaster_task<D: SequencerDatabase + Send + Sync + 'static>(
-    mut state: WriterState<D>,
-    rpc_client: Arc<impl SeqL1Client + L1Client>,
-    config: WriterConfig,
-    db: Arc<D>,
-) -> anyhow::Result<()> {
-    let interval = tokio::time::interval(Duration::from_millis(BROADCAST_POLL_INTERVAL));
-    tokio::pin!(interval);
-
-    loop {
-        // SLEEP!
-        interval.as_mut().tick().await;
-
-        // Check from db if the last sent is confirmed because if we sent the new one before the
-        // previous is confirmed, they might end up in different order
-        if db
-            .sequencer_provider()
-            .get_blob_by_idx(state.last_sent_blob_idx)?
-            .map(|x| x.status == BlobL1Status::Confirmed)
-            .ok_or(anyhow!("Last sent blob not found in db"))?
-        {
-            continue;
-        }
-
-        let next_idx = state.last_sent_blob_idx + 1;
-
-        if let Some(blobentry) = db
-            .sequencer_provider()
-            .get_blob_by_idx(state.last_sent_blob_idx)?
-        {
-            // Get commit reveal txns
-            let commit_tx = db
-                .sequencer_provider()
-                .get_l1_tx(blobentry.commit_txid)?
-                .ok_or(anyhow!("Expected to find commit tx in db"))?;
-            let reveal_tx = db
-                .sequencer_provider()
-                .get_l1_tx(blobentry.reveal_txid)?
-                .ok_or(anyhow!("Expected to find reveal tx in db"))?;
-            // Send
-            match send_commit_reveal_txs(commit_tx, reveal_tx, rpc_client.as_ref()).await {
-                Ok(_) => {
-                    state.last_sent_blob_idx = next_idx;
-                }
-                Err(SendError::MissingOrInvalidInput) => {
-                    // This is tricky, need to reconstruct commit-reveal txns. Might need to resend
-                    // previous ones as well.
-                    let (commit, reveal) =
-                        create_inscriptions_from_intent(&blobentry.blob, &rpc_client, &config)
-                            .await?;
-                    let (commit_txid, reveal_txid) =
-                        db.sequencer_store().put_commit_reveal_txs(commit, reveal)?;
-                    let new_blobentry =
-                        BlobEntry::new_unsent(blobentry.blob.clone(), commit_txid, reveal_txid);
-
-                    db.sequencer_store()
-                        .update_blob_by_idx(state.last_sent_blob_idx, new_blobentry)?;
-                    // Do nothing, this will be sent in the next step of the loop
-                }
-                Err(SendError::Other(errstr)) => {
-                    // TODO: Maybe retry?
-                }
-            }
-        }
-    }
-}
-
-enum SendError {
-    MissingOrInvalidInput,
-    Other(String),
-}
-
-async fn send_commit_reveal_txs(
-    commit_tx_raw: Vec<u8>,
-    reveal_tx_raw: Vec<u8>,
-    client: &(impl SeqL1Client + L1Client),
-) -> Result<(), SendError> {
-    match send_tx(commit_tx_raw, client).await {
-        Ok(_) => send_tx(reveal_tx_raw, client).await,
-        Err(e) => Err(e),
-    }
-}
-
-async fn send_tx(tx_raw: Vec<u8>, client: &(impl SeqL1Client + L1Client)) -> Result<(), SendError> {
-    match client.send_raw_transaction(tx_raw).await {
-        Ok(_) => Ok(()),
-        Err(ClientError::Server(-27, _)) => Ok(()), // Tx already in chain
-        Err(ClientError::Server(-26, _)) => Err(SendError::MissingOrInvalidInput),
-        Err(e) => Err(SendError::Other(e.to_string())),
-    }
 }
 
 /// Watches for inscription transactions status in bitcoin
@@ -315,7 +210,7 @@ async fn watcher_task<D: SequencerDatabase + Send + Sync + 'static>(
     loop {
         interval.as_mut().tick().await;
 
-        if let Some(mut blobentry) = db.sequencer_provider().get_blob_by_idx(curr_blobidx)? {
+        if let Some(mut blobentry) = get_blob_by_idx(db.clone(), curr_blobidx).await? {
             let confs = rpc_client
                 .get_transaction_confirmations(blobentry.reveal_txid.0)
                 .await?;
@@ -329,16 +224,15 @@ async fn watcher_task<D: SequencerDatabase + Send + Sync + 'static>(
                 blobentries.insert(curr_blobidx, blobentry.clone());
 
                 // Update this in db
-                db.sequencer_store()
-                    .update_blob_by_idx(curr_blobidx, blobentry.clone())?;
+                update_blob_by_idx(db.clone(), curr_blobidx, blobentry.clone()).await?;
 
-                // Also set the blob that is deep enough to be finalized
+                // Also set the blob that is deep enough as finalized
                 let finidx = curr_blobidx - FINALITY_DEPTH;
                 if let Some(blobentry) = blobentries.get(&finidx) {
                     let mut blobentry = blobentry.clone();
                     blobentry.status = BlobL1Status::Finalized;
                     blobentries.insert(finidx, blobentry.clone());
-                    db.sequencer_store().update_blob_by_idx(finidx, blobentry)?;
+                    update_blob_by_idx(db.clone(), finidx, blobentry.clone()).await?;
                 }
                 curr_blobidx += 1;
             }
@@ -355,7 +249,6 @@ mod test {
 
     use async_trait::async_trait;
     use bitcoin::{consensus::deserialize, hashes::Hash, Address, Block, BlockHash, Network, Txid};
-    use tokio::sync::Mutex;
 
     use alpen_express_db::{sequencer::db::SequencerDB, traits::SequencerDatabase, SeqDb};
     use alpen_test_utils::ArbitraryGenerator;
@@ -367,7 +260,7 @@ mod test {
             types::{RawUTXO, RpcBlockchainInfo},
             ClientError,
         },
-        writer::{config::WriterConfig, state::WriterState},
+        writer::config::{InscriptionFeePolicy, WriterConfig},
     };
 
     struct TestBitcoinClient {
@@ -465,21 +358,30 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_handle_intent_new_intent() {
+    async fn test_handle_intent() {
         let db = get_db();
         let client = Arc::new(TestBitcoinClient::new(1));
         let config = get_config();
-        let state = Arc::new(Mutex::new(WriterState::new_empty(db.clone())));
 
+        // TODO: Explicitly make sure the intent dest is L1
         let intent: BlobIntent = ArbitraryGenerator::new().generate();
         let intent_hash = calculate_intent_hash(&intent.payload());
 
         let last_idx = db.sequencer_provider().get_last_blob_idx().unwrap();
         assert_eq!(last_idx, None);
 
-        handle_intent(intent.clone(), db.clone(), &client, &config, state)
+        // Assert there's no blobentry in db
+        assert_eq!(
+            db.sequencer_provider().get_blob_by_id(intent_hash).unwrap(),
+            None
+        );
+
+        let res = handle_intent(intent.clone(), db.clone(), client.clone(), &config)
             .await
             .unwrap();
+        assert!(res.is_some());
+
+        let (cid, rid) = res.unwrap();
 
         // There should be new intent entry in db along with commit reveal txns
         assert!(db
@@ -488,289 +390,63 @@ mod test {
             .unwrap()
             .is_some());
 
-        let reveal_idx = 1;
-        assert_eq!(
-            db.sequencer_provider()
-                .get_reveal_txidx_for_blob(intent_hash)
-                .unwrap(),
-            Some(reveal_idx)
+        // There should be txns in db as well
+        assert!(db.sequencer_provider().get_l1_tx(cid).unwrap().is_some());
+        assert!(db.sequencer_provider().get_l1_tx(rid).unwrap().is_some());
+
+        // Now if the intent is handled again, it should return None
+        let res = handle_intent(intent.clone(), db.clone(), client, &config)
+            .await
+            .unwrap();
+        assert!(res.is_none());
+    }
+
+    #[test]
+    fn test_initialize_writer_state_no_last_blob_idx() {
+        let db = get_db();
+
+        let blb = db.sequencer_provider().get_blob_by_idx(0);
+        assert!(blb.is_err());
+
+        let st = initialize_writer_state(db.clone()).unwrap();
+
+        let blb = db.sequencer_provider().get_blob_by_idx(0).unwrap();
+        assert!(
+            blb.is_some(),
+            "There should be initial blob after initialization"
         );
 
-        let last_idx = db.sequencer_provider().get_last_blob_idx().unwrap();
-        assert_eq!(last_idx, Some(0));
-
-        let last_txn_idx = db.sequencer_provider().get_last_txn_idx().unwrap();
-        assert_eq!(last_txn_idx, Some(1));
+        assert_eq!(st.last_sent_blob_idx, 0);
+        assert_eq!(st.last_finalized_blob_idx, 0);
     }
 
-    #[tokio::test]
-    async fn test_handle_intent_existing_intent() {
+    #[test]
+    fn test_initialize_writer_state_with_existing_unsent_blobs() {
         let db = get_db();
-        let client = Arc::new(TestBitcoinClient::new(1));
-        let config = get_config();
-        let state = Arc::new(Mutex::new(WriterState::new_empty(db.clone())));
 
-        let intent: BlobIntent = ArbitraryGenerator::new().generate();
-        let intent_hash = calculate_intent_hash(&intent.payload());
+        let mut e1: BlobEntry = ArbitraryGenerator::new().generate();
+        e1.status = BlobL1Status::Finalized;
+        let blob_hash: Buf32 = [1; 32].into();
+        let idx1 = db.sequencer_store().put_blob(blob_hash, e1).unwrap();
 
-        // insert the intent
-        db.sequencer_store()
-            .put_blob(intent_hash, intent.payload().to_vec())
-            .unwrap();
+        let mut e2: BlobEntry = ArbitraryGenerator::new().generate();
+        e2.status = BlobL1Status::Confirmed;
+        let blob_hash: Buf32 = [2; 32].into();
+        let idx2 = db.sequencer_store().put_blob(blob_hash, e2).unwrap();
 
-        let last_idx = db.sequencer_provider().get_last_blob_idx().unwrap();
-        assert_eq!(last_idx, Some(0));
+        let mut e3: BlobEntry = ArbitraryGenerator::new().generate();
+        e3.status = BlobL1Status::InMempool;
+        let blob_hash: Buf32 = [3; 32].into();
+        let idx3 = db.sequencer_store().put_blob(blob_hash, e3).unwrap();
 
-        handle_intent(intent.clone(), db.clone(), &client, &config, state)
-            .await
-            .unwrap();
+        let mut e4: BlobEntry = ArbitraryGenerator::new().generate();
+        e4.status = BlobL1Status::Unsent;
+        let blob_hash: Buf32 = [4; 32].into();
+        let idx4 = db.sequencer_store().put_blob(blob_hash, e4).unwrap();
 
-        // There should be new intent entry in db along with commit reveal txns
+        let st = initialize_writer_state(db.clone()).unwrap();
 
-        assert!(db
-            .sequencer_provider()
-            .get_blob_by_id(intent_hash)
-            .unwrap()
-            .is_some());
-
-        let reveal_idx = 1;
-        assert_eq!(
-            db.sequencer_provider()
-                .get_reveal_txidx_for_blob(intent_hash)
-                .unwrap(),
-            Some(reveal_idx)
-        );
-
-        let last_idx_new = db.sequencer_provider().get_last_blob_idx().unwrap();
-        assert_eq!(
-            last_idx, last_idx_new,
-            "Idx should not change as no new blob is inserted"
-        );
-
-        let last_txn_idx = db.sequencer_provider().get_last_txn_idx().unwrap();
-        assert_eq!(last_txn_idx, Some(1));
-    }
-
-    #[tokio::test]
-    async fn test_handle_intent_existing_commit_reveal() {
-        let db = get_db();
-        let client = Arc::new(TestBitcoinClient::new(1));
-        let config = get_config();
-        let state = Arc::new(Mutex::new(WriterState::new_empty(db.clone())));
-
-        let intent: BlobIntent = ArbitraryGenerator::new().generate();
-        let intent_hash = calculate_intent_hash(&intent.payload());
-
-        // insert the intent
-        db.sequencer_store()
-            .put_blob(intent_hash, intent.payload().to_vec())
-            .unwrap();
-
-        let last_idx = db.sequencer_provider().get_last_blob_idx().unwrap();
-        assert_eq!(last_idx, Some(0));
-
-        // insert commit reveal for the intent
-        let (commit, reveal) = create_inscriptions_from_intent(&intent, &client, &config)
-            .await
-            .unwrap();
-
-        let commit_tx = TxEntry::from_txn_unsent(&commit);
-        let reveal_tx = TxEntry::from_txn_unsent(&reveal);
-
-        db.sequencer_store()
-            .put_commit_reveal_txns(intent_hash, commit_tx, reveal_tx)
-            .unwrap();
-
-        handle_intent(intent.clone(), db.clone(), &client, &config, state)
-            .await
-            .unwrap();
-
-        // There should be new intent entry in db along with commit reveal txns
-
-        assert!(db
-            .sequencer_provider()
-            .get_blob_by_id(intent_hash)
-            .unwrap()
-            .is_some());
-
-        let reveal_idx = 1;
-        assert_eq!(
-            db.sequencer_provider()
-                .get_reveal_txidx_for_blob(intent_hash)
-                .unwrap(),
-            Some(reveal_idx)
-        );
-
-        let last_idx_new = db.sequencer_provider().get_last_blob_idx().unwrap();
-        assert_eq!(
-            last_idx, last_idx_new,
-            "Idx should not change as no new blob is inserted"
-        );
-
-        let last_txn_idx = db.sequencer_provider().get_last_txn_idx().unwrap();
-        assert_eq!(last_txn_idx, Some(1));
-    }
-
-    // Tests for process_queue_txn
-
-    #[tokio::test]
-    async fn test_process_queue_txn_unsent() {
-        let client = Arc::new(TestBitcoinClient::new(0));
-        let config = get_config();
-        let db = get_db();
-        let state = Arc::new(Mutex::new(WriterState::new_empty(db.clone())));
-
-        let intent: BlobIntent = ArbitraryGenerator::new().generate();
-        let intent_hash = calculate_intent_hash(&intent.payload());
-
-        db.sequencer_store()
-            .put_blob(intent_hash, intent.payload().to_vec())
-            .unwrap();
-
-        let (c, r) = create_inscriptions_from_intent(&intent, &client, &config)
-            .await
-            .unwrap();
-
-        let rtxn = TxEntry::from_txn_unsent(&r);
-        let ctxn = TxEntry::from_txn_unsent(&c);
-
-        // insert to db
-        db.sequencer_store()
-            .put_commit_reveal_txns(intent_hash, ctxn.clone(), rtxn)
-            .unwrap();
-
-        // Now, the idx of ctxn in db is 0 and that of rtxn is 1. And the start_txn_idx in state is
-        // 0
-
-        // Add an new unsent txn to state
-        state.lock().await.add_new_txn(ctxn.clone());
-
-        process_queue_txn(&ctxn, 0, &state, &client).await.unwrap();
-
-        // The txn should be InMempool now
-        let st = state.lock().await;
-        let txn = st.txns_queue.get(0).unwrap();
-        assert_eq!(*txn.status(), L1TxnStatus::InMempool);
-    }
-
-    #[tokio::test]
-    async fn test_process_queue_txn_inmempool_2_confirmations() {
-        let client = Arc::new(TestBitcoinClient::new(2));
-        let config = get_config();
-        let db = get_db();
-        let state = Arc::new(Mutex::new(WriterState::new_empty(db.clone())));
-
-        let intent: BlobIntent = ArbitraryGenerator::new().generate();
-        let intent_hash = calculate_intent_hash(&intent.payload());
-
-        db.sequencer_store()
-            .put_blob(intent_hash, intent.payload().to_vec())
-            .unwrap();
-
-        let (c, r) = create_inscriptions_from_intent(&intent, &client, &config)
-            .await
-            .unwrap();
-
-        let rtxn = TxEntry::from_txn(&r, L1TxnStatus::InMempool);
-        let ctxn = TxEntry::from_txn(&c, L1TxnStatus::InMempool);
-
-        // insert to db
-        db.sequencer_store()
-            .put_commit_reveal_txns(intent_hash, ctxn.clone(), rtxn)
-            .unwrap();
-
-        // Now, the idx of ctxn in db is 0 and that of rtxn is 1. And the start_txn_idx in state is
-        // 0
-
-        // Add an new unsent txn to state
-        state.lock().await.add_new_txn(ctxn.clone());
-
-        process_queue_txn(&ctxn, 0, &state, &client).await.unwrap();
-
-        // The txn should be Confirmed now
-        let st = state.lock().await;
-        let txn = st.txns_queue.get(0).unwrap();
-        assert_eq!(*txn.status(), L1TxnStatus::Confirmed);
-    }
-
-    #[tokio::test]
-    async fn test_process_queue_txn_inmempool_to_finalized() {
-        let client = Arc::new(TestBitcoinClient::new(FINALITY_DEPTH + 1));
-        let config = get_config();
-        let db = get_db();
-        let state = Arc::new(Mutex::new(WriterState::new_empty(db.clone())));
-
-        let intent: BlobIntent = ArbitraryGenerator::new().generate();
-        let intent_hash = calculate_intent_hash(&intent.payload());
-
-        db.sequencer_store()
-            .put_blob(intent_hash, intent.payload().to_vec())
-            .unwrap();
-
-        let (c, r) = create_inscriptions_from_intent(&intent, &client, &config)
-            .await
-            .unwrap();
-
-        let rtxn = TxEntry::from_txn(&r, L1TxnStatus::InMempool);
-        let ctxn = TxEntry::from_txn(&c, L1TxnStatus::InMempool);
-
-        // insert to db
-        db.sequencer_store()
-            .put_commit_reveal_txns(intent_hash, ctxn.clone(), rtxn)
-            .unwrap();
-
-        // Now, the idx of ctxn in db is 0 and that of rtxn is 1. And the start_txn_idx in state is
-        // 0
-
-        // Add an new unsent txn to state
-        state.lock().await.add_new_txn(ctxn.clone());
-
-        process_queue_txn(&ctxn, 0, &state, &client).await.unwrap();
-
-        // If finalized, should be removed from queue
-        let st = state.lock().await;
-        assert_eq!(st.txns_queue.len(), 0);
-        assert_eq!(st.start_txn_idx, 1);
-    }
-
-    #[tokio::test]
-    async fn test_process_queue_txn_finalized() {
-        let client = Arc::new(TestBitcoinClient::new(1));
-        let config = get_config();
-        let db = get_db();
-        let state = Arc::new(Mutex::new(WriterState::new_empty(db.clone())));
-
-        let intent: BlobIntent = ArbitraryGenerator::new().generate();
-        let intent_hash = calculate_intent_hash(&intent.payload());
-
-        db.sequencer_store()
-            .put_blob(intent_hash, intent.payload().to_vec())
-            .unwrap();
-
-        let (c, r) = create_inscriptions_from_intent(&intent, &client, &config)
-            .await
-            .unwrap();
-
-        let rtxn = TxEntry::from_txn(&r, L1TxnStatus::Finalized);
-        let ctxn = TxEntry::from_txn(&c, L1TxnStatus::Finalized);
-
-        // insert to db
-        db.sequencer_store()
-            .put_commit_reveal_txns(intent_hash, ctxn.clone(), rtxn)
-            .unwrap();
-
-        // Now, the idx of ctxn in db is 0 and that of rtxn is 1. And the start_txn_idx in state is
-        // 0
-
-        // Add an new unsent txn to state
-        state.lock().await.add_new_txn(ctxn.clone());
-
-        process_queue_txn(&ctxn, 0, &state, &client).await.unwrap();
-
-        // The txn should be removed from the state and the start_txn_idx should have increased by
-        // 1
-        let st = state.lock().await;
-        assert_eq!(st.txns_queue.len(), 0);
-        assert_eq!(st.start_txn_idx, 1);
+        assert_eq!(st.last_sent_blob_idx, idx3);
+        assert_eq!(st.last_finalized_blob_idx, idx1);
     }
 }

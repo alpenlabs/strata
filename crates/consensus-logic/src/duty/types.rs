@@ -28,7 +28,7 @@ pub enum Duty {
     /// Goal to sign a block.
     SignBlock(BlockSigningDuty),
     /// Goal to write blobs to L1
-    WriteBlob(BlobIntent),
+    PublishBatchData(BlobIntent),
 }
 
 impl Duty {
@@ -36,7 +36,7 @@ impl Duty {
     pub fn expiry(&self) -> Expiry {
         match self {
             Self::SignBlock(_) => Expiry::NextBlock,
-            Self::WriteBlob(_) => Expiry::Timestamp(
+            Self::PublishBatchData(_) => Expiry::Timestamp(
                 time::Instant::now() + Duration::from_secs(L1_WRITE_INTERVAL_SECS),
             ),
         }

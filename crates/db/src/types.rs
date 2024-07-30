@@ -1,14 +1,11 @@
-// Module for database local types
+//! Module for database local types
 
 use arbitrary::Arbitrary;
-use bitcoin::hashes::Hash;
-use bitcoin::{consensus::serialize, Transaction};
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use alpen_express_primitives::buf::Buf32;
 
-#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize)]
-#[cfg_attr(test, derive(Arbitrary))]
+#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct BlobEntry {
     pub blob: Vec<u8>,
     pub commit_txid: Buf32,
@@ -36,35 +33,10 @@ impl BlobEntry {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize)]
-#[cfg_attr(test, derive(Arbitrary))]
+#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub enum BlobL1Status {
     Unsent,
     InMempool,
     Confirmed,
     Finalized,
-}
-
-/// This keeps track of the transaction sent to L1 and has the raw txn so that if needed to resend
-/// it to L1, we need not serialize it again.
-#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize)]
-pub struct TxEntry {
-    pub txid: Buf32,
-    pub tx_raw: Vec<u8>,
-}
-
-impl TxEntry {
-    pub fn from_txn(txn: &Transaction) -> Self {
-        let txid = Buf32(txn.compute_txid().to_byte_array().into());
-        let tx_raw = serialize(txn);
-        Self { txid, tx_raw }
-    }
-
-    pub fn txid(&self) -> &Buf32 {
-        &self.txid
-    }
-
-    pub fn tx_raw(&self) -> &[u8] {
-        &self.tx_raw
-    }
 }

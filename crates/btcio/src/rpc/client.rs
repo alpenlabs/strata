@@ -7,7 +7,6 @@ use bitcoin::Txid;
 
 use base64::engine::general_purpose;
 use base64::Engine;
-use bitcoin::hashes::Hash as _;
 use bitcoin::{
     block::{Header, Version},
     consensus::deserialize,
@@ -245,7 +244,7 @@ impl BitcoinClient {
                     if retries >= MAX_RETRIES {
                         return Err(ClientError::MaxRetriesExceeded(MAX_RETRIES));
                     }
-                    tokio::time::sleep(Duration::from_millis(2000)).await;
+                    tokio::time::sleep(Duration::from_millis(1000)).await;
                 }
             };
         }

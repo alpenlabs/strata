@@ -4,7 +4,6 @@
 use std::sync::Arc;
 
 use alpen_express_state::block::L2BlockBundle;
-use bitcoin::Transaction;
 use borsh::{BorshDeserialize, BorshSerialize};
 #[cfg(feature = "mocks")]
 use mockall::automock;
@@ -19,7 +18,6 @@ use alpen_express_state::state_op::WriteBatch;
 use alpen_express_state::sync_event::SyncEvent;
 
 use crate::types::BlobEntry;
-use crate::types::TxEntry;
 use crate::DbResult;
 
 /// Common database interface that we can parameterize worker tasks over if

@@ -126,7 +126,6 @@ impl<D: SeqDataStore + SeqDataProvider> SequencerDatabase for SequencerDB<D> {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
 
     use super::*;
     use crate::errors::DbError;

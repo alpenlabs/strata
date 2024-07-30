@@ -69,14 +69,10 @@ pub trait AlpenApi {
     async fn get_client_status(&self) -> RpcResult<ClientStatus>;
 }
 
-#[cfg_attr(not(feature = "client"), rpc(server, namespace = "test"))]
-#[cfg_attr(feature = "client", rpc(server, client, namespace = "test"))]
-pub trait AlpenFuncTestApi {
-    #[method(name = "postBlob")]
+#[cfg_attr(not(feature = "client"), rpc(server, namespace = "alpadmin"))]
+#[cfg_attr(feature = "client", rpc(server, client, namespace = "alpadmin"))]
+pub trait AlpenAdminApi {
+    #[method(name = "submitDABlob")]
     /// Basically adds L1Write sequencer duty which will be executed by sequencer
-    async fn trigger_da_blob(&self, blobdata: Vec<u8>) -> RpcResult<()>;
-
-    #[method(name = "testFunctional")]
-    /// Basically adds L1Write sequencer duty which will be executed by sequencer
-    async fn test_functional(&self) -> RpcResult<u32>;
+    async fn submit_da_blob(&self, blobdata: Vec<u8>) -> RpcResult<()>;
 }

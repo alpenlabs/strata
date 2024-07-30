@@ -1,5 +1,5 @@
 use core::{result::Result::Ok, str::FromStr};
-use std::cmp::Reverse;
+use std::{cmp::Reverse, sync::Arc};
 
 use anyhow::anyhow;
 use bitcoin::{
@@ -31,7 +31,12 @@ use bitcoin::{
 use rand::RngCore;
 use thiserror::Error;
 
-use crate::rpc::types::RawUTXO;
+use crate::rpc::{
+    traits::{L1Client, SeqL1Client},
+    types::RawUTXO,
+};
+
+use super::config::{InscriptionFeePolicy, WriterConfig};
 
 const BITCOIN_DUST_LIMIT: u64 = 546;
 
@@ -89,6 +94,36 @@ pub enum InscriptionError {
 
     #[error("{0}")]
     Other(#[from] anyhow::Error),
+}
+
+pub async fn build_inscription_txs(
+    payload: &[u8],
+    rpc_client: &Arc<impl SeqL1Client + L1Client>,
+    config: &WriterConfig,
+) -> anyhow::Result<(Transaction, Transaction)> {
+    // let (signature, pub_key) = sign_blob_with_private_key(&payload, &config.private_key)?;
+    let utxos = rpc_client.get_utxos().await?;
+    let utxos = utxos
+        .into_iter()
+        .map(|x| <RawUTXO as TryInto<UTXO>>::try_into(x))
+        .into_iter()
+        .collect::<Result<Vec<UTXO>, UtxoParseError>>()
+        .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+
+    let fee_rate = match config.inscription_fee_policy {
+        InscriptionFeePolicy::Smart => rpc_client.estimate_smart_fee().await?,
+        InscriptionFeePolicy::Fixed(val) => val,
+    };
+    create_inscription_transactions(
+        &config.rollup_name,
+        &payload,
+        utxos,
+        config.sequencer_address.clone(),
+        config.amount_for_reveal_txn,
+        fee_rate,
+        rpc_client.network(),
+    )
+    .map_err(|e| anyhow::anyhow!(e.to_string()))
 }
 
 #[allow(clippy::too_many_arguments)]

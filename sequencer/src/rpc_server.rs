@@ -1,5 +1,6 @@
 #![allow(unused)]
 
+use std::sync::Arc;
 use std::{borrow::BorrowMut, sync::Arc};
 
 use async_trait::async_trait;
@@ -17,14 +18,18 @@ use reth_rpc_types::{
 use thiserror::Error;
 use tokio::sync::{mpsc, oneshot, watch, Mutex, RwLock};
 
+use alpen_express_btcio::writer::DaWriter;
 use alpen_express_consensus_logic::sync_manager::SyncManager;
 use alpen_express_db::traits::L1DataProvider;
 use alpen_express_db::traits::{ChainstateProvider, Database, L2DataProvider};
 use alpen_express_primitives::buf::Buf32;
 use alpen_express_rpc_api::{AlpenApiServer, ClientStatus, L1Status};
 use alpen_express_state::{
-    chain_state::ChainState, client_state::ClientState, header::L2Header, id::L2BlockId,
-    l1::L1BlockId,
+    chain_state::ChainState,
+    client_state::ClientState,
+    da_blob::{BlobDest, BlobIntent},
+    header::L2Header,
+    id::L2BlockId,
 };
 
 use tracing::*;
@@ -254,31 +259,27 @@ where
     }
 }
 
-pub struct FuncTestServerImpl {
-    pub intent_tx: Mutex<mpsc::Sender<BlobIntent>>,
+pub struct AdminServerImpl {
+    pub writer: Arc<DaWriter>,
 }
 
-impl FuncTestServerImpl {
-    pub fn new(intent_tx: Mutex<mpsc::Sender<BlobIntent>>) -> Self {
-        Self { intent_tx }
+impl AdminServerImpl {
+    pub fn new(writer: Arc<DaWriter>) -> Self {
+        Self { writer }
     }
 }
 
 #[async_trait]
-impl AlpenFuncTestApiServer for FuncTestServerImpl {
-    async fn trigger_da_blob(&self, blobpayload: Vec<u8>) -> RpcResult<()> {
+impl AlpenAdminApiServer for AdminServerImpl {
+    async fn submit_da_blob(&self, blobpayload: Vec<u8>) -> RpcResult<()> {
         // Send this to intent receiver
         // TODO: Get commitment from rpc as well
         let commitment = Buf32::from([0u8; 32]);
         let blobintent = BlobIntent::new(BlobDest::L1, commitment, blobpayload);
-        if let Err(e) = self.intent_tx.lock().await.send(blobintent).await {
+        if let Err(e) = self.writer.submit_inent(blobintent) {
             debug!(%e, "error");
             return Err(Error::Other("".to_string()).into());
         }
         Ok(())
-    }
-
-    async fn test_functional(&self) -> RpcResult<u32> {
-        Ok(1)
     }
 }

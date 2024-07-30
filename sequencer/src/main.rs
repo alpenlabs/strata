@@ -8,11 +8,11 @@ use std::sync::Arc;
 use std::thread;
 
 use alpen_vertex_btcio::writer::config::WriterConfig;
-use alpen_vertex_btcio::writer::writer_control_task;
+use alpen_vertex_btcio::writer::start_writer_task;
+use alpen_vertex_btcio::writer::DaWriter;
 use alpen_vertex_db::sequencer::db::SequencerDB;
 use alpen_vertex_db::SeqDb;
 use alpen_vertex_primitives::l1::L1Status;
-use alpen_vertex_state::da_blob::BlobIntent;
 use anyhow::Context;
 use bitcoin::Network;
 use config::Config;
@@ -84,13 +84,21 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     logging::init();
 
     // initialize the full configuration
+<<<<<<< HEAD
     let mut config = match args.config.as_ref() {
         Some(config_path) => load_configuration(config_path)?,
         None => Config::new(),
+=======
+    let config = match args.config.as_ref() {
+        Some(config_path) => {
+            // Values passed over arguments get the precedence over the configuration files
+            let mut config = load_configuration(config_path)?;
+            config.update_from_args(&args);
+            config
+        }
+        None => Config::from_args(&args),
+>>>>>>> ec26c3d (l1_writer,l1_db: update unit testcases)
     };
-
-    // Values passed over arguments get the precedence over the configuration files
-    config.update_from_args(&args);
 
     // Open the database.
     let rbdb = open_rocksdb_database(&config)?;
@@ -98,6 +106,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     // Set up block params.
     let params = Params {
         rollup: RollupParams {
+            rollup_name: "express".to_string(),
             block_time: 1000,
             cred_rule: block_credential::CredRule::Unchecked,
             horizon_l1_height: 3,
@@ -187,6 +196,10 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         params.clone(),
     )?;
     let sync_man = Arc::new(sync_man);
+<<<<<<< HEAD
+=======
+    let mut writer_ctl: Option<Arc<DaWriter>> = None;
+>>>>>>> ec26c3d (l1_writer,l1_db: update unit testcases)
 
     // If the sequencer key is set, start the sequencer duties task.
     if let Some(seqkey_path) = &config.client.sequencer_key {
@@ -203,12 +216,27 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         let pool = pool.clone();
         let (l1wr_tx, l1wr_rx) = tokio::sync::mpsc::channel::<BlobIntent>(8);
 
-        // Spawn the two tasks.
+        // Spawn up writer
+        let writer_config = WriterConfig::new(
+            config.client.sequencer_bitcoin_address.clone(),
+            config.bitcoind_rpc.network,
+            params.rollup().rollup_name.clone(),
+        )?;
+        // Initialize SequencerDatabase
+        let seqdb = Arc::new(SeqDb::new(rbdb.clone()));
+        let dbseq = Arc::new(SequencerDB::new(seqdb));
+        let rpc = btc_rpc.clone();
+        let writer = Arc::new(start_writer_task(rpc, writer_config, dbseq)?);
+
+        writer_ctl = Some(writer.clone());
+
+        // Spawn duty tasks.
         thread::spawn(move || {
             // FIXME figure out why this can't infer the type, it's like *right there*
             duty_worker::duty_tracker_task::<_>(cu_rx, duties_tx, idata.ident, db)
         });
 
+<<<<<<< HEAD
         let d_params = params.clone();
         thread::spawn(move || {
             duty_worker::duty_dispatch_task(
@@ -227,6 +255,31 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     }
 
     let main_fut = main_task(&config, sync_man, btc_rpc, database.clone(), l1_status);
+=======
+        let params_clone = params.clone();
+        thread::spawn(move || {
+            duty_executor::duty_dispatch_task(
+                duties_rx,
+                idata.key,
+                sm,
+                db2,
+                eng_ctl_de,
+                writer,
+                pool,
+                params_clone.rollup(),
+            )
+        });
+    }
+
+    let main_fut = main_task(
+        &config,
+        sync_man,
+        btc_rpc,
+        database.clone(),
+        l1_status,
+        writer_ctl,
+    );
+>>>>>>> ec26c3d (l1_writer,l1_db: update unit testcases)
     if let Err(e) = rt.block_on(main_fut) {
         error!(err = %e, "main task exited");
         process::exit(0); // special case exit once we've gotten to this point
@@ -242,6 +295,10 @@ async fn main_task<D: Database + Send + Sync + 'static, L: L1Client>(
     l1_rpc_client: Arc<L>,
     database: Arc<D>,
     l1_status: Arc<RwLock<L1Status>>,
+<<<<<<< HEAD
+=======
+    writer: Option<Arc<DaWriter>>,
+>>>>>>> ec26c3d (l1_writer,l1_db: update unit testcases)
 ) -> anyhow::Result<()>
 where
     // TODO how are these not redundant trait bounds???
@@ -270,7 +327,16 @@ where
         sync_man.clone(),
         stop_tx,
     );
+<<<<<<< HEAD
     let methods = alp_rpc.into_rpc();
+=======
+    let mut methods = alp_rpc.into_rpc();
+
+    if writer.is_some() {
+        let admin_rpc = rpc_server::AdminServerImpl::new(writer.unwrap().clone());
+        methods.merge(admin_rpc.into_rpc())?;
+    }
+>>>>>>> ec26c3d (l1_writer,l1_db: update unit testcases)
 
     let rpc_port = config.client.rpc_port;
     let rpc_server = jsonrpsee::server::ServerBuilder::new()

@@ -51,20 +51,27 @@ pub struct Config {
 
 impl Config {
     pub fn from_args(args: &Args) -> Config {
-        // TODO: get everything from args or from toml
+        let args = args.clone();
         Self {
             bitcoind_rpc: BitcoindParams {
-                rpc_url: args.bitcoind_host.clone(),
-                rpc_user: args.bitcoind_user.clone(),
-                rpc_password: args.bitcoind_password.clone(),
-                network: Network::from_core_arg(&args.network)
-                    .expect("required valid bitcoin network"),
+                rpc_url: args
+                    .bitcoind_host
+                    .expect("args: no bitcoin rpc_url provided"),
+                rpc_user: args
+                    .bitcoind_user
+                    .expect("args: no bitcoin rpc_user provided"),
+                rpc_password: args
+                    .bitcoind_password
+                    .expect("args: no bitcoin rpc_password provided"),
+                network: args.network.expect("args: no bitcoin network provided"),
             },
             client: ClientParams {
-                rpc_port: args.rpc_port,
-                datadir: args.datadir.clone(),
+                rpc_port: args.rpc_port.expect("args: no client rpc_port provided"),
+                datadir: args.datadir.expect("args: no client datadir provided"),
                 sequencer_key: None,
-                sequencer_bitcoin_address: args.sequencer_bitcoin_address.clone(),
+                sequencer_bitcoin_address: args
+                    .sequencer_bitcoin_address
+                    .expect("args: no sequencer_bitcion_address provided"),
             },
             sync: SyncParams {
                 l1_follow_distance: 6,

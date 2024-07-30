@@ -20,15 +20,16 @@ pub struct WriterConfig {
 }
 
 impl WriterConfig {
-    pub fn from_sequencer_address(
+    pub fn new(
         address: String,
         network: bitcoin::Network,
+        rollup_name: String,
     ) -> anyhow::Result<Self> {
         let addr = Address::from_str(&address)?.require_network(network)?;
         Ok(Self {
             sequencer_address: addr,
+            rollup_name,
             // TODO: get these from config as well
-            rollup_name: "alpen".to_string(),
             inscription_fee_policy: InscriptionFeePolicy::Fixed(100),
             poll_duration_ms: 1000,
             amount_for_reveal_txn: 1000,

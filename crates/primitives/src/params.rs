@@ -6,6 +6,9 @@ use crate::{block_credential::CredRule, prelude::Buf32};
 /// (unless there's some weird hard fork).
 #[derive(Clone, Debug)]
 pub struct RollupParams {
+    /// Rollup name
+    pub rollup_name: String,
+
     /// Block time in milliseconds.
     pub block_time: u64,
 
