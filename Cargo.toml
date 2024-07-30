@@ -8,7 +8,6 @@ members = [
   "crates/eectl",
   "crates/evmexec",
   "crates/primitives",
-  "crates/prover/adapters/risc0",
   "crates/prover/adapters/sp1",
   "crates/prover/primitives",
   "crates/prover/zkvm",
@@ -24,8 +23,13 @@ members = [
   "crates/test-utils",
   "crates/util/mmr",
   "crates/vtxjmt",
-
+  "crates/bridge-exec",
+  "crates/bridge-rpc-service",
+  "crates/bridge-tx-manager",
+  "crates/prover/primitives",
   # binaries listed separately
+  "crates/prover/zkvm",
+  "crates/prover/adapters/risc0",
   "sequencer",
   "reth",
 ]

@@ -1,0 +1,10 @@
+[package]
+edition = "2021"
+name = "alpen-vertex-bridge-operator"
+version = "0.1.0"
+
+[[bin]]
+name = "alpen-vertex-bridge-operator"
+path = "src/main.rs"
+
+[dependencies]
