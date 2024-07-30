@@ -199,7 +199,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
         rpc_pass = bitcoind.get_prop("rpc_password")
         rpc_sock = f"localhost:{rpc_port}"
         sequencer = seq_fac.create_sequencer(rpc_sock, rpc_user, rpc_pass, reth_socket, reth_secret_path)
-        # need to wait for atleast `genesis_l1_height` blocks to be generated. sleeping some more for safety 
+        # need to wait for at least `genesis_l1_height` blocks to be generated. sleeping some more for safety 
         time.sleep(BLOCK_GENERATION_INTERVAL_SECS * 10)
 
         svcs = {"bitcoin": bitcoind, "sequencer": sequencer, "reth": reth}

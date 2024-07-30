@@ -4,11 +4,11 @@ name = "alpen-vertex-evmexec"
 version = "0.1.0"
 
 [dependencies]
-anyhow = { workspace = true }
 alpen-vertex-db = { workspace = true }
 alpen-vertex-evmctl = { workspace = true }
 alpen-vertex-primitives = { workspace = true }
 alpen-vertex-state = { workspace = true }
+anyhow = { workspace = true }
 arbitrary = { workspace = true }
 borsh = { workspace = true }
 futures = { workspace = true }
