@@ -434,9 +434,9 @@ fn poll_status_loop<E: ExecEngineCtl>(
 
 #[cfg(test)]
 mod tests {
+    use alpen_express_db::traits::{Database, L2DataStore};
+    use alpen_express_state::header::L2Header;
     use alpen_test_utils::l2::gen_l2_chain;
-    use alpen_vertex_db::traits::{Database, L2DataStore};
-    use alpen_vertex_state::header::L2Header;
 
     use super::get_finalized_blocks;
 

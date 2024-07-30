@@ -1,3 +1,5 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use alpen_express_primitives::{
     block_credential,
     buf::{Buf32, Buf64},
@@ -7,7 +9,6 @@ use alpen_express_state::{
     block::{L2Block, L2BlockAccessory, L2BlockBody, L2BlockBundle},
     client_state::ClientState,
     header::{L2BlockHeader, L2Header, SignedL2BlockHeader},
-    id::L2BlockId,
 };
 
 use crate::ArbitraryGenerator;
@@ -18,19 +19,21 @@ pub fn gen_block(parent: Option<&SignedL2BlockHeader>) -> L2BlockBundle {
     let body: L2BlockBody = arb.generate();
     let accessory: L2BlockAccessory = arb.generate();
 
-    let block_idx = match parent {
-        Some(p) => p.blockidx() + 1,
-        None => 0,
-    };
+    let start = SystemTime::now();
+    let since_the_epoch = start
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards");
+    let current_timestamp = since_the_epoch.as_millis() as u64;
 
-    let prev_block = match parent {
-        Some(p) => p.get_blockid(),
-        None => L2BlockId::default(),
-    };
+    let block_idx = parent.map(|h| h.blockidx() + 1).unwrap_or(0);
+    let prev_block = parent.map(|h| h.get_blockid()).unwrap_or_default();
+    let timestamp = parent
+        .map(|h| h.timestamp() + 100)
+        .unwrap_or(current_timestamp);
 
     let header = L2BlockHeader::new(
         block_idx,
-        header.timestamp(),
+        timestamp,
         prev_block,
         &body,
         *header.state_root(),
