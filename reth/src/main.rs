@@ -12,7 +12,7 @@ use reth_chainspec::ChainSpec;
 use reth_node_ethereum::EthereumNode;
 use tracing::info;
 
-const ALPEN_CHAIN_SPEC: &str = include_str!("../res/alpen-chain.json");
+const ALPEN_CHAIN_SPEC: &str = include_str!("../res/alpen-dev-chain.json");
 
 fn main() {
     reth::sigsegv_handler::install();
