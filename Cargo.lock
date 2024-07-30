@@ -726,6 +726,7 @@ dependencies = [
  "alpen-vertex-state",
  "anyhow",
  "arbitrary",
+ "bincode",
  "bitcoin",
  "borsh",
  "parking_lot 0.12.3",

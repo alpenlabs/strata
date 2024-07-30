@@ -66,3 +66,43 @@ macro_rules! define_table_with_default_codec {
         impl_borsh_value_codec!($table_name, $value);
     };
 }
+
+/// Macro similar to [`define_table_with_default_codec`], but to be used when
+/// your key type should be [`SeekKeyEncoder`]. Borsh serializes integers as
+/// little-endian, but RocksDB uses lexicographic ordering which is only
+/// compatible with big-endian, so we use [`bincode`] with the big-endian option
+/// here.
+#[macro_export]
+macro_rules! define_table_with_seek_key_codec {
+    ($(#[$docs:meta])+ ($table_name:ident) $key:ty => $value:ty) => {
+        define_table_without_codec!($(#[$docs])+ ( $table_name ) $key => $value);
+
+        impl ::rockbound::schema::KeyEncoder<$table_name> for $key {
+            fn encode_key(&self) -> ::std::result::Result<::std::vec::Vec<u8>, ::rockbound::CodecError> {
+                use ::anyhow::Context as _;
+                use ::bincode::Options as _;
+
+                let bincode_options = ::bincode::options()
+                    .with_fixint_encoding()
+                    .with_big_endian();
+
+                bincode_options.serialize(self).context("Failed to serialize key").map_err(Into::into)
+            }
+        }
+
+        impl ::rockbound::schema::KeyDecoder<$table_name> for $key {
+            fn decode_key(data: &[u8]) -> ::std::result::Result<Self, ::rockbound::CodecError> {
+                use ::anyhow::Context as _;
+                use ::bincode::Options as _;
+
+                let bincode_options = ::bincode::options()
+                    .with_fixint_encoding()
+                    .with_big_endian();
+
+                bincode_options.deserialize_from(&mut &data[..]).context("Failed to deserialize key").map_err(Into::into)
+            }
+        }
+
+        impl_borsh_value_codec!($table_name, $value);
+    };
+}
