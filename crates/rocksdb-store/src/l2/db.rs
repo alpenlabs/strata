@@ -2,16 +2,15 @@ use std::sync::Arc;
 
 use rockbound::{OptimisticTransactionDB as DB, SchemaBatch, SchemaDBOperationsExt};
 
-use alpen_express_state::{block::L2BlockBundle, prelude::*};
-
-use crate::l2::schemas::L2BlockHeightSchema;
 use alpen_express_db::{
     errors::DbError,
     traits::{BlockStatus, L2DataProvider, L2DataStore},
     DbResult,
 };
+use alpen_express_state::{block::L2BlockBundle, prelude::*};
 
 use super::schemas::{L2BlockSchema, L2BlockStatusSchema};
+use crate::l2::schemas::L2BlockHeightSchema;
 
 pub struct L2Db {
     db: Arc<DB>,
