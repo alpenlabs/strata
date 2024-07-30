@@ -275,12 +275,14 @@ pub trait SeqDataStore {
     /// Update an existing blob
     fn update_blob_by_idx(&self, blobidx: u64, blobentry: BlobEntry) -> DbResult<()>;
 
-    /// Store L1 commit-reveal txs
+    /// Store serialized L1 commit-reveal txs
     fn put_commit_reveal_txs(
         &self,
-        commit_tx: Transaction,
-        reveal_tx: Transaction,
-    ) -> DbResult<(Buf32, Buf32)>;
+        commit_tx_id: Buf32,
+        commit_tx: Vec<u8>,
+        reveal_tx_id: Buf32,
+        reveal_tx: Vec<u8>,
+    ) -> DbResult<()>;
 
     // TODO: might need method to remove tx as well because tx corresponding to blob might have to
     // be reconstructed if inputs change or reorg happen

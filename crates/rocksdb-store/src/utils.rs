@@ -4,7 +4,7 @@ use rockbound::{rocksdb, OptimisticTransactionDB as DB, Schema, SchemaDBOperatio
 
 use alpen_express_db::{errors::DbError, DbResult};
 
-pub fn get_last_idx<T>(db: Arc<DB>) -> DbResult<Option<u64>>
+pub fn get_last_idx<T>(db: &DB) -> DbResult<Option<u64>>
 where
     T: Schema<Key = u64>,
 {
@@ -19,7 +19,7 @@ where
     }
 }
 
-pub fn get_first_idx<T>(db: Arc<DB>) -> DbResult<Option<u64>>
+pub fn get_first_idx<T>(db: &DB) -> DbResult<Option<u64>>
 where
     T: Schema<Key = u64>,
 {

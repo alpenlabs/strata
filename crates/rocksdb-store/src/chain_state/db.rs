@@ -21,11 +21,11 @@ impl ChainStateDb {
     }
 
     fn get_first_idx(&self) -> DbResult<Option<u64>> {
-        get_first_idx::<ChainStateSchema>(self.db.clone())
+        get_first_idx::<ChainStateSchema>(&self.db)
     }
 
     fn get_last_idx(&self) -> DbResult<Option<u64>> {
-        get_last_idx::<ChainStateSchema>(self.db.clone())
+        get_last_idx::<ChainStateSchema>(&self.db)
     }
 }
 

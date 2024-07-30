@@ -1,5 +1,6 @@
 // Module for database local types
 
+use arbitrary::Arbitrary;
 use bitcoin::hashes::Hash;
 use bitcoin::{consensus::serialize, Transaction};
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -7,6 +8,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use alpen_express_primitives::buf::Buf32;
 
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize)]
+#[cfg_attr(test, derive(Arbitrary))]
 pub struct BlobEntry {
     pub blob: Vec<u8>,
     pub commit_txid: Buf32,
@@ -35,6 +37,7 @@ impl BlobEntry {
 }
 
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize)]
+#[cfg_attr(test, derive(Arbitrary))]
 pub enum BlobL1Status {
     Unsent,
     InMempool,
