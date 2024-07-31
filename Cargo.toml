@@ -11,6 +11,7 @@ members = [
   "crates/eectl",
   "crates/evmexec",
   "crates/primitives",
+  "crates/prover/adapters/risc0",
   "crates/prover/adapters/sp1",
   "crates/prover/bitcoin-blockspace",
   "crates/prover/btc-headerchain",
@@ -34,13 +35,13 @@ members = [
   "proofs/sp1",
 
   # binaries listed separately
-  "sequencer",
-  "reth",
+  "bin/sequencer",
+  "bin/reth",
   "bin/operator",
   "bin/challenger",
 ]
 
-default-members = ["sequencer", "reth"]
+default-members = ["bin/sequencer", "bin/reth"]
 
 resolver = "2"
 
