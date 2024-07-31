@@ -11,6 +11,9 @@
         "--examples",
         "--message-format=json"
     ],
+    "rust-analyzer.linkedProjects": [
+        "crates/prover/guests/guest-reth-stf/Cargo.toml"
+    ],
     "rust-analyzer.diagnostics.enable": true,
     "todohighlight.isEnable": true,
     "todohighlight.isCaseSensitive": true,
@@ -50,6 +53,9 @@
         "**/*.yaml",
         "**/*.toml"
     ],
-    "todohighlight.exclude": ["**/target/**", "**/.vscode/**"],
+    "todohighlight.exclude": [
+        "**/target/**",
+        "**/.vscode/**"
+    ],
     "todohighlight.maxFilesForSearch": 5120
 }

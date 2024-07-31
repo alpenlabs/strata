@@ -11,7 +11,7 @@ dependencies = [
  "cfg-if",
  "once_cell",
  "version_check",
- "zerocopy",
+ "zerocopy 0.7.35",
 ]
 
 [[package]]
@@ -22,9 +22,9 @@ checksum = "5c6cb57a04249c6480766f7f7cef5467412af1490f8d1e243141daddada3264f"
 
 [[package]]
 name = "alloy-chains"
-version = "0.1.23"
+version = "0.1.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1752d7d62e2665da650a36d84abbf239f812534475d51f072a49a533513b7cdd"
+checksum = "47ff94ce0f141c2671c23d02c7b88990dd432856639595c5d010663d017c2c58"
 dependencies = [
  "num_enum",
  "serde",
@@ -651,9 +651,9 @@ checksum = "c3ac9f8b63eca6fd385229b3675f6cc0dc5c8a5c8a54a59d4f52ffd670d87b0c"
 
 [[package]]
 name = "bytemuck"
-version = "1.16.1"
+version = "1.16.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b236fc92302c97ed75b38da1f4917b5cdda4984745740f153a5d3059e48d725e"
+checksum = "102087e286b4677862ea56cf8fc58bb2cdfa8725c40ffb80fe3a008eb7f2fc83"
 dependencies = [
  "bytemuck_derive",
 ]
@@ -677,9 +677,9 @@ checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 
 [[package]]
 name = "bytes"
-version = "1.6.1"
+version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a12916984aab3fa6e39d655a33e09c0071eb36d6ab3aea5c2d78551f1df6d952"
+checksum = "fca2be1d5c43812bae364ee3f30b3afcb7877cf59f4aeb94c66f313a41d2fac9"
 dependencies = [
  "serde",
 ]
@@ -700,9 +700,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.1.6"
+version = "1.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2aba8f4e9906c7ce3c73463f62a7f0c65183ada1a2d47e397cc8810827f9694f"
+checksum = "26a5c3fd7bfa1ce3897a3a3501d362b2d87b7f2583ebcb4a949ec25911025cbc"
 
 [[package]]
 name = "cfg-if"
@@ -941,9 +941,9 @@ dependencies = [
 
 [[package]]
 name = "enumn"
-version = "0.1.13"
+version = "0.1.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6fd000fd6988e73bbe993ea3db9b1aa64906ab88766d654973924340c8cddb42"
+checksum = "2f9ed6b3789237c8a0c1c505af1c7eb2c560df6186f01b098c3a1064ea532f38"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1362,18 +1362,18 @@ dependencies = [
 
 [[package]]
 name = "num_enum"
-version = "0.7.2"
+version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "02339744ee7253741199f897151b38e72257d13802d4ee837285cc2990a90845"
+checksum = "4e613fc340b2220f734a8595782c551f1250e969d87d3be1ae0579e8d4065179"
 dependencies = [
  "num_enum_derive",
 ]
 
 [[package]]
 name = "num_enum_derive"
-version = "0.7.2"
+version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "681030a937600a36906c185595136d26abfebb4aa9c65701cefcaf8578bb982b"
+checksum = "af1844ef2428cc3e1cb900be36181049ef3d3193c63e43026cfe202983b27a56"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1469,9 +1469,12 @@ dependencies = [
 
 [[package]]
 name = "ppv-lite86"
-version = "0.2.17"
+version = "0.2.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b40af805b3121feab8a3c29f04d8ad262fa8e0561883e7653e024ae4479e6de"
+checksum = "dee4364d9f3b902ef14fab8a1ddffb783a1cb6b4bba3bfc1fa3922732c7de97f"
+dependencies = [
+ "zerocopy 0.6.6",
+]
 
 [[package]]
 name = "primitive-types"
@@ -1635,7 +1638,7 @@ checksum = "7a66a03ae7c801facd77a29370b4faec201768915ac14a721ba36f20bc9c209b"
 [[package]]
 name = "reth-codecs"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-consensus 0.2.0",
  "alloy-eips 0.2.0",
@@ -1651,7 +1654,7 @@ dependencies = [
 [[package]]
 name = "reth-codecs-derive"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "convert_case 0.6.0",
  "proc-macro2",
@@ -1662,7 +1665,7 @@ dependencies = [
 [[package]]
 name = "reth-ethereum-forks"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-chains",
  "alloy-primitives",
@@ -1679,7 +1682,7 @@ dependencies = [
 [[package]]
 name = "reth-primitives"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-eips 0.2.0",
  "alloy-genesis",
@@ -1703,7 +1706,7 @@ dependencies = [
 [[package]]
 name = "reth-primitives-traits"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-consensus 0.2.0",
  "alloy-eips 0.2.0",
@@ -1723,7 +1726,7 @@ dependencies = [
 [[package]]
 name = "reth-static-file-types"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-primitives",
  "derive_more",
@@ -1734,7 +1737,7 @@ dependencies = [
 [[package]]
 name = "reth-trie-common"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-consensus 0.2.0",
  "alloy-genesis",
@@ -1831,9 +1834,9 @@ dependencies = [
 
 [[package]]
 name = "risc0-binfmt"
-version = "1.0.4"
+version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5dd4c241c8f5de7f91701f35d60b579b4ba5e46ddc1db2d38771d1dca5d37793"
+checksum = "4003dd96f2e323dfef431b21a2aaddee1c6791fc32dea8eb2bff1b438bf5caf6"
 dependencies = [
  "anyhow",
  "elf",
@@ -1845,9 +1848,9 @@ dependencies = [
 
 [[package]]
 name = "risc0-circuit-recursion"
-version = "1.0.4"
+version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "30369440306329e982a20fd0b8e2a62c3026e91989bf6d485b748fe510315b91"
+checksum = "e7c4154d2fbbde5af02a1c35c90340c2749044f5d5cd7834251b616ffa28d467"
 dependencies = [
  "anyhow",
  "bytemuck",
@@ -1859,9 +1862,9 @@ dependencies = [
 
 [[package]]
 name = "risc0-circuit-rv32im"
-version = "1.0.4"
+version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ef3b5644506d6eadb74cc74b6d3c657c2b1d800d4a14c7ebd2fa8a6308b603b"
+checksum = "ce836e7c553e63cbd807d15925ba5dd641a80cdee7d123619eaa60bb555ab014"
 dependencies = [
  "anyhow",
  "risc0-binfmt",
@@ -1874,9 +1877,9 @@ dependencies = [
 
 [[package]]
 name = "risc0-core"
-version = "1.0.4"
+version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e25282999cfee3974a5bc485f5094d4bc77b8dfa153d3762047345de3c55a25e"
+checksum = "047cc26c68c092d664ded7488dcac0462d9e31190e1598a7820fe4246d313583"
 dependencies = [
  "bytemuck",
  "rand_core",
@@ -1884,9 +1887,9 @@ dependencies = [
 
 [[package]]
 name = "risc0-groth16"
-version = "1.0.4"
+version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ac252f123c846d9eb324449d561fececf645c1171b75d6bcea29aed67ad19cf"
+checksum = "b3309c7acaf46ed3d21df3841185afd8ea4aab9fb63dbd1974694dfdae276970"
 dependencies = [
  "anyhow",
  "ark-bn254",
@@ -1904,9 +1907,9 @@ dependencies = [
 
 [[package]]
 name = "risc0-zkp"
-version = "1.0.4"
+version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37d6db46e9a23981d4ff26e95abd8a8fbd4ee7ac0c2b32e2bbb5aec61cb88110"
+checksum = "ae55272541351a2391e5051519b33bfdf41f5648216827cc2cb94a49b6937380"
 dependencies = [
  "anyhow",
  "blake2",
@@ -1926,9 +1929,9 @@ dependencies = [
 
 [[package]]
 name = "risc0-zkvm"
-version = "1.0.4"
+version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d808884adc43c71bd871d625e9cfb96ca747ee291d5c50566e17701059f45509"
+checksum = "f234694d9dabc1172cf418b7a3ba65447caad15b994f450e9941d2a7cc89e045"
 dependencies = [
  "anyhow",
  "bytemuck",
@@ -1951,9 +1954,9 @@ dependencies = [
 
 [[package]]
 name = "risc0-zkvm-platform"
-version = "1.0.4"
+version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97964f6b997a9ff14b17348bd1ab1966c767eba05c0d532ea975658975a7fffd"
+checksum = "16735dab52ae8bf0dc30df78fce901b674f469dfd7b5f5dfddd54caea22f14d5"
 dependencies = [
  "bytemuck",
  "getrandom",
@@ -2404,9 +2407,9 @@ dependencies = [
 
 [[package]]
 name = "toml_datetime"
-version = "0.6.7"
+version = "0.6.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8fb9f64314842840f1d940ac544da178732128f1c78c21772e876579e0da1db"
+checksum = "0dd7358ecb8fc2f8d014bf86f6f638ce72ba252a2c3a2572f2a795f1d23efb41"
 
 [[package]]
 name = "toml_edit"
@@ -2629,11 +2632,32 @@ dependencies = [
 
 [[package]]
 name = "zerocopy"
+version = "0.6.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "854e949ac82d619ee9a14c66a1b674ac730422372ccb759ce0c39cabcf2bf8e6"
+dependencies = [
+ "byteorder",
+ "zerocopy-derive 0.6.6",
+]
+
+[[package]]
+name = "zerocopy"
 version = "0.7.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b9b4fd18abc82b8136838da5d50bae7bdea537c574d8dc1a34ed098d6c166f0"
 dependencies = [
- "zerocopy-derive",
+ "zerocopy-derive 0.7.35",
+]
+
+[[package]]
+name = "zerocopy-derive"
+version = "0.6.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "125139de3f6b9d625c39e2efdd73d41bdac468ccd556556440e322be0e1bbd91"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.72",
 ]
 
 [[package]]
@@ -2670,7 +2694,7 @@ dependencies = [
 [[package]]
 name = "zkvm-primitives"
 version = "0.1.0"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-eips 0.2.0",
  "alloy-primitives",
