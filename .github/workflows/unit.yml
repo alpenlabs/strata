@@ -19,8 +19,6 @@ jobs:
   test:
     name: Test and generate report
     runs-on: ubuntu-latest
-    # nightly rust might break from time to time
-    continue-on-error: true
     env:
       RUSTFLAGS: -D warnings
       CARGO_TERM_COLOR: always
