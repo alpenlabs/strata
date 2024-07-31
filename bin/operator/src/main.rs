@@ -4,5 +4,5 @@
 //! publishing appropriate transactions. Can also perform challenger duties.
 
 fn main() {
-    todo!("I'm the oeprator. Implement me!");
+    todo!("I'm the operator. Implement me!");
 }
