@@ -137,12 +137,7 @@ mod tests {
     use alpen_express_primitives::buf::Buf32;
     use alpen_test_utils::bitcoin::get_test_bitcoin_txns;
     use alpen_test_utils::get_rocksdb_tmp_instance;
-<<<<<<< HEAD
-    use alpen_vertex_primitives::buf::Buf32;
     use rockbound::OptimisticTransactionDB as DB;
-=======
-    use rockbound::DB;
->>>>>>> 9701bdf (refactor: rename vertex to express)
     use std::sync::Arc;
     use test;
 
