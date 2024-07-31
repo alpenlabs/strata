@@ -35,6 +35,9 @@ pub fn process_event<D: Database>(
 
             // TODO if we have some number of L1 blocks finalized, also emit an
             // `UpdateBuried` write
+            if *height >= params.rollup().l1_reorg_safe_depth + state.buried_l1_height() {
+                writes.push(ClientStateWrite::UpdateBuried(state.buried_l1_height() + 1));
+            }
 
             let l1v = state.l1_view();
 
@@ -55,8 +58,12 @@ pub fn process_event<D: Database>(
             }
         }
 
-        SyncEvent::L1Revert(_to_height) => {
+        SyncEvent::L1Revert(to_height) => {
             // TODO
+            let l1prov = database.l1_provider();
+            let blkmf = l1prov.get_block_manifest(*to_height)?.unwrap();
+            let blkid = blkmf.block_hash().into();
+            writes.push(ClientStateWrite::RollbackL1BlocksTo(blkid));
         }
 
         SyncEvent::L1DABatch(blkids) => {
@@ -79,6 +86,7 @@ pub fn process_event<D: Database>(
 
                 let last = blkids.last().unwrap();
                 writes.push(ClientStateWrite::UpdateFinalized(*last));
+                actions.push(SyncAction::FinalizeBlock(*last))
             } else {
                 // TODO we can expand this later to make more sense
                 return Err(Error::MissingClientSyncState);
