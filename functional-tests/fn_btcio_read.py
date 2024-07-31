@@ -24,7 +24,8 @@ class L1StatusTest(flexitest.Test):
         time.sleep(interval)
         received_block = btcrpc.getblock(btcrpc.proxy.getbestblockhash())
         l1stat = seqrpc.alp_l1status()
-        curr_time = l1stat['last_update']
+        # Time is in millis
+        curr_time = l1stat['last_update'] // 1000
         # ensure that the l1reader task has started within few seconds of test being run
         assert((curr_time - start_time) <= interval)
         # check if height on bitcoin is same as, it is seen in sequencer
@@ -33,6 +34,6 @@ class L1StatusTest(flexitest.Test):
         ), "Height seen by Sequencer doesn't match the Height on the bitcoin node"
         time.sleep(MAX_HORIZON_POLL_INTERVAL_SECS * 2)
         l1stat = seqrpc.alp_l1status()
-        elapsed_time = l1stat['last_update']
+        elapsed_time = l1stat['last_update'] // 1000
         # check if L1 reader is seeing new L1 activity
         assert((elapsed_time - curr_time) >= MAX_HORIZON_POLL_INTERVAL_SECS * 2)

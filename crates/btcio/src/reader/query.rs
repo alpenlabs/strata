@@ -196,7 +196,7 @@ async fn do_reader_task(
             SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
-                .as_secs(),
+                .as_millis() as u64,
         ));
 
         apply_status_updates(status_updates, l1_status.clone()).await;
