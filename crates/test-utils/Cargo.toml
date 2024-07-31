@@ -12,5 +12,4 @@ bitcoin = { workspace = true }
 hex = { workspace = true }
 rand = { workspace = true }
 rockbound = { workspace = true }
-rocksdb = { workspace = true }
 tempfile = { workspace = true }

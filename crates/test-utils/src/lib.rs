@@ -7,6 +7,7 @@ use alpen_vertex_db::{
 };
 use arbitrary::{Arbitrary, Unstructured};
 use rand::Rng;
+use rockbound::rocksdb;
 use tempfile::TempDir;
 
 pub mod bitcoin;
@@ -35,7 +36,7 @@ impl ArbitraryGenerator {
     }
 }
 
-pub fn get_rocksdb_tmp_instance() -> anyhow::Result<Arc<rockbound::DB>> {
+pub fn get_rocksdb_tmp_instance() -> anyhow::Result<Arc<rockbound::OptimisticTransactionDB>> {
     let dbname = alpen_vertex_db::ROCKSDB_NAME;
     let cfs = alpen_vertex_db::STORE_COLUMN_FAMILIES;
     let mut opts = rocksdb::Options::default();
@@ -44,7 +45,7 @@ pub fn get_rocksdb_tmp_instance() -> anyhow::Result<Arc<rockbound::DB>> {
 
     let temp_dir = TempDir::new().expect("failed to create temp dir");
 
-    let rbdb = rockbound::DB::open(
+    let rbdb = rockbound::OptimisticTransactionDB::open(
         temp_dir.into_path(),
         dbname,
         cfs.iter().map(|s| s.to_string()),

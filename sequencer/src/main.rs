@@ -14,6 +14,7 @@ use config::Config;
 use format_serde_error::SerdeError;
 use reth_rpc_types::engine::JwtError;
 use reth_rpc_types::engine::JwtSecret;
+use rockbound::rocksdb;
 use thiserror::Error;
 use tokio::sync::{broadcast, oneshot, RwLock};
 use tracing::*;
@@ -280,7 +281,9 @@ where
     Ok(())
 }
 
-fn open_rocksdb_database(config: &Config) -> anyhow::Result<Arc<rockbound::DB>> {
+fn open_rocksdb_database(
+    config: &Config,
+) -> anyhow::Result<Arc<rockbound::OptimisticTransactionDB>> {
     let mut database_dir = config.client.datadir.clone();
     database_dir.push("rocksdb");
 
@@ -294,7 +297,7 @@ fn open_rocksdb_database(config: &Config) -> anyhow::Result<Arc<rockbound::DB>> 
     opts.create_if_missing(true);
     opts.create_missing_column_families(true);
 
-    let rbdb = rockbound::DB::open(
+    let rbdb = rockbound::OptimisticTransactionDB::open(
         &database_dir,
         dbname,
         cfs.iter().map(|s| s.to_string()),

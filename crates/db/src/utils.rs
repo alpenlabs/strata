@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use rockbound::{Schema, DB};
+use rockbound::{OptimisticTransactionDB as DB, Schema, SchemaDBOperationsExt};
 
 use crate::DbResult;
 
