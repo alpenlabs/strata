@@ -279,9 +279,10 @@ async fn main_task<
 ) -> anyhow::Result<()>
 where
     // TODO how are these not redundant trait bounds???
-    <D as alpen_express_db::traits::Database>::SeStore: Send + Sync + 'static,
-    <D as alpen_express_db::traits::Database>::L1Store: Send + Sync + 'static,
-    <D as alpen_express_db::traits::Database>::L1Prov: Send + Sync + 'static,
+    <D as Database>::SeStore: Send + Sync + 'static,
+    <D as Database>::L1Store: Send + Sync + 'static,
+    <D as Database>::L1Prov: Send + Sync + 'static,
+    <D as Database>::L2Prov: Send + Sync + 'static,
 {
     // Start the L1 tasks to get that going.
     let csm_ctl = sync_man.get_csm_ctl();
