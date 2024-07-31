@@ -14,3 +14,6 @@ borsh = { workspace = true }
 parking_lot = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+
+[features]
+stubs = []

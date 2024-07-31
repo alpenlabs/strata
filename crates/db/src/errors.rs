@@ -33,9 +33,6 @@ pub enum DbError {
     #[error("tried to revert to index {0} above current tip {1}")]
     RevertAboveCurrent(u64, u64),
 
-    #[error("not yet implemented")]
-    Unimplemented,
-
     #[error("IO Error")]
     IoError,
 
@@ -56,6 +53,12 @@ pub enum DbError {
 
     #[error("transaction error {0}")]
     TransactionError(String),
+
+    #[error(" rocksdb {0}")]
+    RocksDb(String),
+
+    #[error("not yet implemented")]
+    Unimplemented,
 
     #[error("{0}")]
     Other(String),

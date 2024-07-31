@@ -4,7 +4,7 @@ name = "alpen-test-utils"
 version = "0.1.0"
 
 [dependencies]
-alpen-express-db = { workspace = true }
+alpen-express-db = { workspace = true, features = ["stubs"] }
 alpen-express-rocksdb = { workspace = true }
 
 anyhow = { workspace = true }

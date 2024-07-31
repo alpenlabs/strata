@@ -41,6 +41,6 @@ pub fn translate_rocksdb_error(err: rocksdb::Error) -> DbError {
         rocksdb::ErrorKind::TimedOut => DbError::TimedOut,
         rocksdb::ErrorKind::Aborted => DbError::Aborted,
         rocksdb::ErrorKind::Busy => DbError::Busy,
-        _ => DbError::Other(err.to_string()),
+        _ => DbError::RocksDb(err.to_string()),
     }
 }
