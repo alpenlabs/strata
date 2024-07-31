@@ -27,7 +27,6 @@ class L1StatusTest(flexitest.Test):
 
         # Time is in millis
         cur_time = l1stat['last_update'] // 1000
-        print("cur time", cur_time)
 
         # ensure that the l1reader task has started within few seconds of test being run
         assert cur_time - start_time <= interval, "time not flowing properly"
@@ -39,7 +38,6 @@ class L1StatusTest(flexitest.Test):
         time.sleep(MAX_HORIZON_POLL_INTERVAL_SECS * 2)
         l1stat = seqrpc.alp_l1status()
         elapsed_time = l1stat['last_update'] // 1000
-        print("elapsed", elapsed_time)
 
         # check if L1 reader is seeing new L1 activity
         assert elapsed_time - cur_time >= MAX_HORIZON_POLL_INTERVAL_SECS * 2, "time not flowing properly"
