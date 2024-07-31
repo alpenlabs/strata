@@ -27,6 +27,33 @@ pub struct ClientStatus {
     pub buried_l1_height: u64,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct BlockHeader {
+     pub block_idx: u64,
+     pub timestamp: u64,
+     pub prev_block: [u8;32],
+     pub l1_segment_hash: [u8;32],
+     pub exec_segment_hash: [u8;32],
+     pub state_root: [u8;32],
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct DepositInfo {
+
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ExecUpdate {
+
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ExecState {
+
+}
+
+
+
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "alp"))]
 #[cfg_attr(feature = "client", rpc(server, client, namespace = "alp"))]
 pub trait AlpenApi {
@@ -49,6 +76,28 @@ pub trait AlpenApi {
 
     #[method(name = "clientStatus")]
     async fn get_client_status(&self) -> RpcResult<ClientStatus>;
+
+    #[method(name = "getRecentBlocks")]
+    async fn get_recent_blocks(&self, count: u64) -> RpcResult<Vec<BlockHeader>>;
+
+    #[method(name = "getBlocksAtIdx")]
+    async fn get_blocks_at_idx(&self, index: u64) -> RpcResult<Vec<BlockHeader>>;
+
+    #[method(name = "getBlockById")]
+    async fn get_block_by_id(&self, block_id: String) -> RpcResult<BlockHeader>;
+
+    #[method(name = "getExecUpdateById")]
+    async fn get_exec_update_by_id(&self, block_id: String) -> RpcResult<ExecUpdate>;
+
+    #[method(name = "getCurDeposits")]
+    async fn get_current_deposits(&self) -> RpcResult<Vec<u32>>;
+
+    #[method(name = "getCurDepositById")]
+    async fn get_current_deposit_by_id(&self, deposit_id: u32) -> RpcResult<DepositInfo>;
+
+    #[method(name = "getCurExecState")]
+    async fn get_current_exec_state(&self) -> RpcResult<ExecState>;
+
 }
 
 #[serde_as]

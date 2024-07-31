@@ -22,15 +22,11 @@ use alpen_express_consensus_logic::sync_manager::SyncManager;
 
 use alpen_express_db::traits::{ChainstateProvider, Database, L2DataProvider};
 use alpen_express_db::traits::{L1DataProvider, SequencerDatabase};
-use alpen_express_primitives::{buf::Buf32, l1::L1Status};
-use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer, ClientStatus, HexBytes};
+use alpen_express_primitives::buf::Buf32;
+use alpen_express_primitives::l1::L1Status;
+use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer, BlockHeader, ClientStatus, DepositInfo, ExecState, ExecUpdate, HexBytes};
 use alpen_express_state::{
-    chain_state::ChainState,
-    client_state::ClientState,
-    da_blob::{BlobDest, BlobIntent},
-    header::L2Header,
-    id::L2BlockId,
-    l1::L1BlockId,
+    block::L2BlockBundle, chain_state::ChainState, client_state::ClientState, da_blob::{BlobDest, BlobIntent}, header::{L2Header, SignedL2BlockHeader}, id::L2BlockId, l1::L1BlockId
 };
 
 use tracing::*;
@@ -60,6 +56,9 @@ pub enum Error {
     #[error("blocking task '{0}' failed for unknown reason")]
     BlockingAbort(String),
 
+    #[error("incorrect parameters: {0}")]
+    IncorrectParameters(String),
+
     /// Generic internal error message.  If this is used often it should be made
     /// into its own error type.
     #[error("{0}")]
@@ -76,10 +75,11 @@ impl Error {
         match self {
             Self::Unsupported => -32600,
             Self::Unimplemented => -32601,
-            Self::ClientNotStarted => -32602,
+            Self::IncorrectParameters(_) => -32602,
             Self::MissingL2Block(_) => -32603,
             Self::MissingChainstate(_) => -32604,
             Self::Db(_) => -32605,
+            Self::ClientNotStarted => -32606,
             Self::BlockingAbort(_) => -32001,
             Self::Other(_) => -32000,
             Self::OtherEx(_, _) => -32000,
@@ -159,12 +159,50 @@ impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
 
         Ok((cs, Some(chs)))
     }
+
+    fn construct_l2_block_headers(&self, block_header: &SignedL2BlockHeader) -> BlockHeader {
+        BlockHeader {
+            block_idx: block_header.blockidx(),
+            timestamp: block_header.timestamp(),
+            prev_block: *block_header.parent().as_ref(),
+            l1_segment_hash: *block_header.l1_payload_hash().as_ref(),
+            exec_segment_hash: *block_header.exec_payload_hash().as_ref(),
+            state_root: *block_header.state_root().as_ref()
+        }
+    }
+
+    fn parse_l2block_id(&self,block_id: &str) -> Result<L2BlockId,Error> {
+        if block_id.len() != 64 {
+            return Err(Error::IncorrectParameters("invalid BlockId".to_string()).into());
+        }
+
+        let mut bytes = [0u8; 32];
+        block_id.as_bytes()
+                 .chunks(2)
+                 .enumerate()
+                 .map(|(idx, chunk)| {
+                        let byte_str = std::str::from_utf8(chunk).map_err(|_| Error::IncorrectParameters("invalid BlockId".to_string()))?;
+                        bytes[idx] = u8::from_str_radix(byte_str, 16).map_err(|_| Error::IncorrectParameters("invalid BlockId".to_string()))?;
+                        Ok::<(), Error>(())
+                 });
+
+        Ok(L2BlockId::from(Buf32::from(bytes)))
+    }
+
+    fn fetch_l2block(&self, l2_prov: Arc<<D as Database>::L2Prov>, blkid: L2BlockId) -> Result<L2BlockBundle, Error>
+    {
+        Ok(l2_prov.get_block_data(blkid)
+            .map_err(Error::Db)?
+            .ok_or(Error::MissingL2Block(blkid))?)
+    }
+
 }
 
 #[async_trait]
 impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D>
 where
-    <D as alpen_express_db::traits::Database>::L1Prov: Send + Sync + 'static,
+    <D as Database>::L1Prov: Send + Sync + 'static,
+    <D as Database>::L2Prov: Send + Sync + 'static,
 {
     async fn protocol_version(&self) -> RpcResult<u64> {
         Ok(1)
@@ -236,9 +274,70 @@ where
             buried_l1_height: state.l1_view().buried_l1_height(),
         })
     }
-}
 
-/// Wrapper around [``tokio::task::spawn_blocking``] that handles errors in the
+    async fn get_recent_blocks(&self, count: u64) -> RpcResult<Vec<BlockHeader>> {
+        // FIXME: sync state should have a block number
+        let cl_state = self.get_client_state().await;
+        let tip_blkid = cl_state.sync().ok_or(Error::ClientNotStarted)?.chain_tip_blkid();
+
+        let l2_prov = self.database.l2_provider();
+        let tip_block_idx = self.fetch_l2block(l2_prov.clone(), *tip_blkid)?
+        .header()
+        .blockidx();
+
+        if count > tip_block_idx {
+            return Err(Error::IncorrectParameters("count too high".to_string()).into())
+        }
+
+        // TODO: paginate the count
+        let block_headers :Result<Vec<BlockHeader>, Error>= ((tip_block_idx-count)..tip_block_idx).map(|idx| {
+            let blkid = *l2_prov
+                            .get_blocks_at_height(idx)
+                            .map_err(Error::Db)?
+                            // figure out if we want a Vec or a hashmap
+                            .get(0)
+                            .unwrap();
+
+            let l2block = self.fetch_l2block(l2_prov.clone(), blkid)?;
+
+            Ok(self.construct_l2_block_headers(l2block.header()))
+        }).collect();
+
+        Ok(block_headers?)
+    }
+
+    async fn get_blocks_at_idx(&self, index: u64) -> RpcResult<Vec<BlockHeader>> {
+        let l2_prov = self.database.l2_provider();
+        let block_data: Result<Vec<BlockHeader>, Error> = l2_prov
+                            .get_blocks_at_height(index)
+                            .map_err(Error::Db)?
+                            .iter()
+                            .map(|blkid| {
+                                let l2block = self.fetch_l2block(l2_prov.clone(), *blkid)?;
+
+                                Ok(self.construct_l2_block_headers(l2block.block().header()))
+                            }).collect();
+
+        Ok(block_data?)
+    }
+
+    async fn get_block_by_id(&self, block_id: String) -> RpcResult<BlockHeader> {
+        let block_id = self.parse_l2block_id(&block_id)?;
+        let l2_prov = self.database.l2_provider();
+        let l2block = self.fetch_l2block(l2_prov.clone(), block_id)?;
+
+        Ok(self.construct_l2_block_headers(l2block.header()))
+    }
+
+    async fn get_exec_update_by_id(&self, block_id: String) -> RpcResult<ExecUpdate>{ unimplemented!() }
+
+    async fn get_current_deposits(&self) -> RpcResult<Vec<u32>>{ unimplemented!() }
+
+    async fn get_current_deposit_by_id(&self, deposit_id: u32) -> RpcResult<DepositInfo>{ unimplemented!() }
+
+    async fn get_current_exec_state(&self) -> RpcResult<ExecState>{ unimplemented!() }
+}
+/// Wrapper around [``tokio::task::spawn_blocking``] that handles errors in th{ unimplemented!() }
 /// external task and merges the errors into the standard RPC error type.
 async fn wait_blocking<F, R>(name: &'static str, f: F) -> Result<R, Error>
 where
