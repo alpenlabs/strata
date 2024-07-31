@@ -22,10 +22,10 @@ jobs:
         env:
           RUSTDOCFLAGS: --show-type-layout --enable-index-page -Zunstable-options -D warnings
       - name: Compress docs artifacts
-        run: tar czf vertex-core-docs.tar.gz target/doc
+        run: tar czf express-core-docs.tar.gz target/doc
       - name: Archive docs
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: docs
-          path: vertex-core-docs.tar.gz
+          path: express-core-docs.tar.gz

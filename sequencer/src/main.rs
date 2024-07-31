@@ -7,7 +7,7 @@ use std::process;
 use std::sync::Arc;
 use std::thread;
 
-use alpen_vertex_primitives::l1::L1Status;
+use alpen_express_primitives::l1::L1Status;
 use anyhow::Context;
 use bitcoin::Network;
 use config::Config;
@@ -19,17 +19,17 @@ use thiserror::Error;
 use tokio::sync::{broadcast, oneshot, RwLock};
 use tracing::*;
 
-use alpen_vertex_btcio::rpc::traits::L1Client;
-use alpen_vertex_common::logging;
-use alpen_vertex_consensus_logic::duties::{DutyBatch, Identity};
-use alpen_vertex_consensus_logic::duty_executor::{self, IdentityData, IdentityKey};
-use alpen_vertex_consensus_logic::sync_manager;
-use alpen_vertex_consensus_logic::sync_manager::SyncManager;
-use alpen_vertex_db::traits::Database;
-use alpen_vertex_evmexec::{fork_choice_state_initial, EngineRpcClient};
-use alpen_vertex_primitives::buf::Buf32;
-use alpen_vertex_primitives::{block_credential, params::*};
-use alpen_vertex_rpc_api::AlpenApiServer;
+use alpen_express_btcio::rpc::traits::L1Client;
+use alpen_express_common::logging;
+use alpen_express_consensus_logic::duties::{DutyBatch, Identity};
+use alpen_express_consensus_logic::duty_executor::{self, IdentityData, IdentityKey};
+use alpen_express_consensus_logic::sync_manager;
+use alpen_express_consensus_logic::sync_manager::SyncManager;
+use alpen_express_db::traits::Database;
+use alpen_express_evmexec::{fork_choice_state_initial, EngineRpcClient};
+use alpen_express_primitives::buf::Buf32;
+use alpen_express_primitives::{block_credential, params::*};
+use alpen_express_rpc_api::AlpenApiServer;
 
 use crate::args::Args;
 
@@ -118,24 +118,24 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     // Start runtime for async IO tasks.
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
-        .thread_name("vertex-rt")
+        .thread_name("express-rt")
         .build()
         .expect("init: build rt");
 
     // Init thread pool for batch jobs.
     // TODO switch to num_cpus maybe?  we don't want to compete with tokio though
     let pool = Arc::new(threadpool::ThreadPool::with_name(
-        "vertex-pool".to_owned(),
+        "express-pool".to_owned(),
         8,
     ));
 
     // Initialize databases.
-    let l1_db = Arc::new(alpen_vertex_db::L1Db::new(rbdb.clone()));
-    let l2_db = Arc::new(alpen_vertex_db::l2::db::L2Db::new(rbdb.clone()));
-    let sync_ev_db = Arc::new(alpen_vertex_db::SyncEventDb::new(rbdb.clone()));
-    let cs_db = Arc::new(alpen_vertex_db::ClientStateDb::new(rbdb.clone()));
-    let chst_db = Arc::new(alpen_vertex_db::ChainStateDb::new(rbdb.clone()));
-    let database = Arc::new(alpen_vertex_db::database::CommonDatabase::new(
+    let l1_db = Arc::new(alpen_express_db::L1Db::new(rbdb.clone()));
+    let l2_db = Arc::new(alpen_express_db::l2::db::L2Db::new(rbdb.clone()));
+    let sync_ev_db = Arc::new(alpen_express_db::SyncEventDb::new(rbdb.clone()));
+    let cs_db = Arc::new(alpen_express_db::ClientStateDb::new(rbdb.clone()));
+    let chst_db = Arc::new(alpen_express_db::ChainStateDb::new(rbdb.clone()));
+    let database = Arc::new(alpen_express_db::database::CommonDatabase::new(
         l1_db, l2_db, sync_ev_db, cs_db, chst_db,
     ));
 
@@ -144,7 +144,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     // Set up Bitcoin client RPC.
     let bitcoind_url = format!("http://{}", config.bitcoind_rpc.rpc_url);
-    let btc_rpc = alpen_vertex_btcio::rpc::BitcoinClient::new(
+    let btc_rpc = alpen_express_btcio::rpc::BitcoinClient::new(
         bitcoind_url,
         config.bitcoind_rpc.rpc_user.clone(),
         config.bitcoind_rpc.rpc_password.clone(),
@@ -164,7 +164,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     );
 
     let initial_fcs = fork_choice_state_initial(database.clone(), params.rollup())?;
-    let eng_ctl = alpen_vertex_evmexec::engine::RpcExecEngineCtl::new(
+    let eng_ctl = alpen_express_evmexec::engine::RpcExecEngineCtl::new(
         client,
         initial_fcs,
         rt.handle().clone(),
@@ -232,9 +232,9 @@ async fn main_task<D: Database + Send + Sync + 'static>(
 ) -> anyhow::Result<()>
 where
     // TODO how are these not redundant trait bounds???
-    <D as alpen_vertex_db::traits::Database>::SeStore: Send + Sync + 'static,
-    <D as alpen_vertex_db::traits::Database>::L1Store: Send + Sync + 'static,
-    <D as alpen_vertex_db::traits::Database>::L1Prov: Send + Sync + 'static,
+    <D as alpen_express_db::traits::Database>::SeStore: Send + Sync + 'static,
+    <D as alpen_express_db::traits::Database>::L1Store: Send + Sync + 'static,
+    <D as alpen_express_db::traits::Database>::L1Prov: Send + Sync + 'static,
 {
     // Start the L1 tasks to get that going.
     let csm_ctl = sync_man.get_csm_ctl();
@@ -291,8 +291,8 @@ fn open_rocksdb_database(
         fs::create_dir_all(&database_dir)?;
     }
 
-    let dbname = alpen_vertex_db::ROCKSDB_NAME;
-    let cfs = alpen_vertex_db::STORE_COLUMN_FAMILIES;
+    let dbname = alpen_express_db::ROCKSDB_NAME;
+    let cfs = alpen_express_db::STORE_COLUMN_FAMILIES;
     let mut opts = rocksdb::Options::default();
     opts.create_if_missing(true);
     opts.create_missing_column_families(true);

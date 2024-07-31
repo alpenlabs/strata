@@ -4,7 +4,7 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use alpen_vertex_primitives::{buf::Buf32, evm_exec::create_evm_extra_payload};
+use alpen_express_primitives::{buf::Buf32, evm_exec::create_evm_extra_payload};
 
 use crate::{bridge_ops, da_blob};
 

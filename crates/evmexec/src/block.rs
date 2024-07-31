@@ -2,8 +2,8 @@ use borsh::BorshDeserialize;
 use reth_primitives::B256;
 use thiserror::Error;
 
-use alpen_vertex_primitives::evm_exec::EVMExtraPayload;
-use alpen_vertex_state::block::{L2Block, L2BlockBundle};
+use alpen_express_primitives::evm_exec::EVMExtraPayload;
+use alpen_express_state::block::{L2Block, L2BlockBundle};
 
 pub(crate) struct EVML2Block {
     #[allow(dead_code)]

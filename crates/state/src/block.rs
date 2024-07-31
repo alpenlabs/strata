@@ -3,7 +3,7 @@ use std::ops::Deref;
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use alpen_vertex_primitives::prelude::*;
+use alpen_express_primitives::prelude::*;
 
 use crate::{
     exec_update,

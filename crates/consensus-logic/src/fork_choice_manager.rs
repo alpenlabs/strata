@@ -2,21 +2,21 @@
 
 use std::sync::Arc;
 
-use alpen_vertex_state::state_op;
+use alpen_express_state::state_op;
 use tokio::sync::mpsc;
 use tracing::*;
 
-use alpen_vertex_db::errors::DbError;
-use alpen_vertex_db::traits::{
+use alpen_express_db::errors::DbError;
+use alpen_express_db::traits::{
     BlockStatus, ChainstateProvider, ChainstateStore, Database, L2DataProvider, L2DataStore,
 };
-use alpen_vertex_evmctl::engine::ExecEngineCtl;
-use alpen_vertex_evmctl::messages::ExecPayloadData;
-use alpen_vertex_primitives::params::Params;
-use alpen_vertex_state::client_state::ClientState;
-use alpen_vertex_state::operation::SyncAction;
-use alpen_vertex_state::prelude::*;
-use alpen_vertex_state::sync_event::SyncEvent;
+use alpen_express_evmctl::engine::ExecEngineCtl;
+use alpen_express_evmctl::messages::ExecPayloadData;
+use alpen_express_primitives::params::Params;
+use alpen_express_state::client_state::ClientState;
+use alpen_express_state::operation::SyncAction;
+use alpen_express_state::prelude::*;
+use alpen_express_state::sync_event::SyncEvent;
 
 use crate::ctl::CsmController;
 use crate::message::ForkChoiceMessage;
@@ -385,7 +385,7 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
             // being invalid and return too.
             // TODO verify this is reasonable behavior, especially with regard
             // to pre-sync
-            if res == alpen_vertex_evmctl::engine::BlockStatus::Invalid {
+            if res == alpen_express_evmctl::engine::BlockStatus::Invalid {
                 // It's invalid, write that and return.
                 state.set_block_status(&blkid, BlockStatus::Invalid)?;
                 return Ok(());
@@ -479,7 +479,7 @@ fn check_new_block<D: Database>(
     // Check that we haven't already marked the block as invalid.
     let l2prov = state.database.l2_provider();
     if let Some(status) = l2prov.get_block_status(*blkid)? {
-        if status == alpen_vertex_db::traits::BlockStatus::Invalid {
+        if status == alpen_express_db::traits::BlockStatus::Invalid {
             warn!(?blkid, "rejecting block that fails EL validation");
             return Ok(false);
         }

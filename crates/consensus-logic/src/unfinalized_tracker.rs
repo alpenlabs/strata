@@ -2,9 +2,9 @@
 
 use std::collections::*;
 
-use alpen_vertex_db::traits::L2DataProvider;
-use alpen_vertex_primitives::buf::Buf32;
-use alpen_vertex_state::prelude::*;
+use alpen_express_db::traits::L2DataProvider;
+use alpen_express_primitives::buf::Buf32;
+use alpen_express_state::prelude::*;
 
 use crate::errors::ChainTipError;
 
@@ -314,13 +314,13 @@ impl FinalizeReport {
 mod tests {
     use std::collections::HashSet;
 
-    use alpen_test_utils::ArbitraryGenerator;
-    use alpen_vertex_db::traits::{Database, L2DataProvider, L2DataStore};
-    use alpen_vertex_state::{
+    use alpen_express_db::traits::{Database, L2DataProvider, L2DataStore};
+    use alpen_express_state::{
         block::{L2Block, L2BlockAccessory, L2BlockBody, L2BlockBundle},
         header::{L2BlockHeader, L2Header, SignedL2BlockHeader},
         id::L2BlockId,
     };
+    use alpen_test_utils::ArbitraryGenerator;
 
     use crate::unfinalized_tracker;
 

@@ -3,17 +3,17 @@
 
 use std::sync::Arc;
 
-use alpen_vertex_state::block::L2BlockBundle;
+use alpen_express_state::block::L2BlockBundle;
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use alpen_vertex_mmr::CompactMmr;
-use alpen_vertex_primitives::{l1::*, prelude::*};
-use alpen_vertex_state::chain_state::ChainState;
-use alpen_vertex_state::client_state::ClientState;
-use alpen_vertex_state::operation::*;
-use alpen_vertex_state::prelude::*;
-use alpen_vertex_state::state_op::WriteBatch;
-use alpen_vertex_state::sync_event::SyncEvent;
+use alpen_express_mmr::CompactMmr;
+use alpen_express_primitives::{l1::*, prelude::*};
+use alpen_express_state::chain_state::ChainState;
+use alpen_express_state::client_state::ClientState;
+use alpen_express_state::operation::*;
+use alpen_express_state::prelude::*;
+use alpen_express_state::state_op::WriteBatch;
+use alpen_express_state::sync_event::SyncEvent;
 
 use crate::types::TxnStatusEntry;
 use crate::DbResult;

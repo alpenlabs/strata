@@ -1,7 +1,7 @@
 //! Handle to inspect the current CSM state and wait for updates when there are
 //! any.
 
-use alpen_vertex_state::{client_state::ClientState, id::L2BlockId};
+use alpen_express_state::{client_state::ClientState, id::L2BlockId};
 
 #[derive(Clone, Debug, Default)]
 pub struct CsmStatus {

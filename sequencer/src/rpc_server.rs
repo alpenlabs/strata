@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use alpen_vertex_consensus_logic::sync_manager::SyncManager;
+use alpen_express_consensus_logic::sync_manager::SyncManager;
 use async_trait::async_trait;
 use jsonrpsee::{
     core::RpcResult,
@@ -18,10 +18,10 @@ use reth_rpc_types::{
 use thiserror::Error;
 use tokio::sync::{oneshot, watch, Mutex, RwLock};
 
-use alpen_vertex_db::traits::L1DataProvider;
-use alpen_vertex_db::traits::{ChainstateProvider, Database, L2DataProvider};
-use alpen_vertex_rpc_api::{AlpenApiServer, ClientStatus, L1Status};
-use alpen_vertex_state::{
+use alpen_express_db::traits::L1DataProvider;
+use alpen_express_db::traits::{ChainstateProvider, Database, L2DataProvider};
+use alpen_express_rpc_api::{AlpenApiServer, ClientStatus, L1Status};
+use alpen_express_state::{
     chain_state::ChainState, client_state::ClientState, header::L2Header, id::L2BlockId,
 };
 
@@ -29,7 +29,7 @@ use tracing::*;
 
 #[derive(Debug, Error)]
 pub enum Error {
-    /// Unsupported RPCs for Vertex.  Some of these might need to be replaced
+    /// Unsupported RPCs for express.  Some of these might need to be replaced
     /// with standard unsupported errors.
     #[error("unsupported RPC")]
     Unsupported,
@@ -47,7 +47,7 @@ pub enum Error {
     MissingChainstate(u64),
 
     #[error("db: {0}")]
-    Db(#[from] alpen_vertex_db::errors::DbError),
+    Db(#[from] alpen_express_db::errors::DbError),
 
     #[error("blocking task '{0}' failed for unknown reason")]
     BlockingAbort(String),
@@ -90,7 +90,7 @@ impl From<Error> for ErrorObjectOwned {
 }
 
 pub struct AlpenRpcImpl<D> {
-    l1_status: Arc<RwLock<alpen_vertex_primitives::l1::L1Status>>,
+    l1_status: Arc<RwLock<alpen_express_primitives::l1::L1Status>>,
     database: Arc<D>,
     sync_manager: Arc<SyncManager>,
     stop_tx: Mutex<Option<oneshot::Sender<()>>>,
@@ -98,7 +98,7 @@ pub struct AlpenRpcImpl<D> {
 
 impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
     pub fn new(
-        l1_status: Arc<RwLock<alpen_vertex_primitives::l1::L1Status>>,
+        l1_status: Arc<RwLock<alpen_express_primitives::l1::L1Status>>,
         database: Arc<D>,
         sync_manager: Arc<SyncManager>,
         stop_tx: oneshot::Sender<()>,
@@ -156,7 +156,7 @@ impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
 #[async_trait]
 impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D>
 where
-    <D as alpen_vertex_db::traits::Database>::L1Prov: Send + Sync + 'static,
+    <D as alpen_express_db::traits::Database>::L1Prov: Send + Sync + 'static,
 {
     async fn protocol_version(&self) -> RpcResult<u64> {
         Ok(1)

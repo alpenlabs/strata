@@ -1,8 +1,8 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use alpen_vertex_primitives::buf::Buf32;
-use alpen_vertex_primitives::hash::compute_borsh_hash;
+use alpen_express_primitives::buf::Buf32;
+use alpen_express_primitives::hash::compute_borsh_hash;
 
 use crate::{bridge_ops, bridge_state, exec_env, l1};
 use crate::{id::L2BlockId, state_queue::StateQueue};

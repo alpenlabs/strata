@@ -1,12 +1,12 @@
 [package]
 edition = "2021"
-name = "alpen-vertex-db"
+name = "alpen-express-db"
 version = "0.1.0"
 
 [dependencies]
-alpen-vertex-mmr = { workspace = true }
-alpen-vertex-primitives = { workspace = true }
-alpen-vertex-state = { workspace = true }
+alpen-express-mmr = { workspace = true }
+alpen-express-primitives = { workspace = true }
+alpen-express-state = { workspace = true }
 
 anyhow = { workspace = true }
 arbitrary = { workspace = true }

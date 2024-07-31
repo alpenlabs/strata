@@ -90,7 +90,7 @@ class BitcoinFactory(flexitest.Factory):
             return svc
 
 
-class VertexFactory(flexitest.Factory):
+class ExpressFactory(flexitest.Factory):
     def __init__(self, port_range: list[int]):
         super().__init__(port_range)
 
@@ -111,7 +111,7 @@ class VertexFactory(flexitest.Factory):
 
         # fmt: off
         cmd = [
-            "alpen-vertex-sequencer",
+            "alpen-express-sequencer",
             "--datadir", datadir,
             "--rpc-port", str(rpc_port),
             "--bitcoind-host", bitcoind_sock,
@@ -151,7 +151,7 @@ class RethFactory(flexitest.Factory):
 
         # fmt: off
         cmd = [
-            "alpen-vertex-reth",
+            "alpen-express-reth",
             "--datadir", datadir,
             "--authrpc.port", str(rpc_port),
             "--authrpc.jwtsecret", reth_secret_path,
@@ -199,7 +199,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
         rpc_pass = bitcoind.get_prop("rpc_password")
         rpc_sock = f"localhost:{rpc_port}"
         sequencer = seq_fac.create_sequencer(rpc_sock, rpc_user, rpc_pass, reth_socket, reth_secret_path)
-        # need to wait for at least `genesis_l1_height` blocks to be generated. sleeping some more for safety 
+        # need to wait for at least `genesis_l1_height` blocks to be generated. sleeping some more for safety
         time.sleep(BLOCK_GENERATION_INTERVAL_SECS * 10)
 
         svcs = {"bitcoin": bitcoind, "sequencer": sequencer, "reth": reth}
@@ -216,7 +216,7 @@ def main(argv):
     datadir_root = flexitest.create_datadir_in_workspace(os.path.join(test_dir, DD_ROOT))
 
     btc_fac = BitcoinFactory([12300 + i for i in range(20)])
-    seq_fac = VertexFactory([12400 + i for i in range(20)])
+    seq_fac = ExpressFactory([12400 + i for i in range(20)])
     reth_fac = RethFactory([12500 + i for i in range(20)])
 
     factories = {"bitcoin": btc_fac, "sequencer": seq_fac, "reth": reth_fac}

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use rockbound::{OptimisticTransactionDB as DB, SchemaBatch, SchemaDBOperationsExt};
 
-use alpen_vertex_state::{block::L2BlockBundle, prelude::*};
+use alpen_express_state::{block::L2BlockBundle, prelude::*};
 
 use crate::{
     l2::schemas::L2BlockHeightSchema,

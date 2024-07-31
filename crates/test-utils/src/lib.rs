@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use alpen_vertex_db::{
+use alpen_express_db::{
     database::CommonDatabase,
     stubs::{chain_state::StubChainstateDb, l2::StubL2Db},
     ClientStateDb, L1Db, SyncEventDb,
@@ -37,8 +37,8 @@ impl ArbitraryGenerator {
 }
 
 pub fn get_rocksdb_tmp_instance() -> anyhow::Result<Arc<rockbound::OptimisticTransactionDB>> {
-    let dbname = alpen_vertex_db::ROCKSDB_NAME;
-    let cfs = alpen_vertex_db::STORE_COLUMN_FAMILIES;
+    let dbname = alpen_express_db::ROCKSDB_NAME;
+    let cfs = alpen_express_db::STORE_COLUMN_FAMILIES;
     let mut opts = rocksdb::Options::default();
     opts.create_missing_column_families(true);
     opts.create_if_missing(true);

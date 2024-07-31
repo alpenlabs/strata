@@ -1,6 +1,6 @@
 [package]
 edition = "2021"
-name = "alpen-vertex-jmt"
+name = "alpen-express-jmt"
 version = "0.1.0"
 
 [dependencies]

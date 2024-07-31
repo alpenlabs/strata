@@ -1,6 +1,6 @@
 [package]
 edition = "2021"
-name = "alpen-vertex-mmr"
+name = "alpen-express-mmr"
 version = "0.1.0"
 
 [dependencies]

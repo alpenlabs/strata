@@ -3,7 +3,7 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use alpen_vertex_primitives::buf::Buf64;
+use alpen_express_primitives::buf::Buf64;
 
 /// Describes an intent to withdraw that hasn't been dispatched yet.
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]

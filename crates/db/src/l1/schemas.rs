@@ -1,5 +1,5 @@
-use alpen_vertex_mmr::CompactMmr;
-use alpen_vertex_primitives::{
+use alpen_express_mmr::CompactMmr;
+use alpen_express_primitives::{
     buf::Buf32,
     l1::{L1BlockManifest, L1Tx},
 };

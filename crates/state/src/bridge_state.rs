@@ -5,7 +5,7 @@
 
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use alpen_vertex_primitives::{
+use alpen_express_primitives::{
     buf::Buf32,
     l1::{self, OutputRef},
 };

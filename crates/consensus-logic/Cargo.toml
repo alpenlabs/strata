@@ -1,14 +1,14 @@
 [package]
 edition = "2021"
-name = "alpen-vertex-consensus-logic"
+name = "alpen-express-consensus-logic"
 version = "0.1.0"
 
 [dependencies]
-alpen-vertex-btcio = { workspace = true }
-alpen-vertex-db = { workspace = true }
-alpen-vertex-evmctl = { workspace = true }
-alpen-vertex-primitives = { workspace = true }
-alpen-vertex-state = { workspace = true }
+alpen-express-btcio = { workspace = true }
+alpen-express-db = { workspace = true }
+alpen-express-evmctl = { workspace = true }
+alpen-express-primitives = { workspace = true }
+alpen-express-state = { workspace = true }
 
 anyhow = { workspace = true }
 bitcoin = { workspace = true }
@@ -21,4 +21,3 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 alpen-test-utils = { workspace = true }
-rand = { version = "*", features = ["getrandom"] }

@@ -1,9 +1,9 @@
 use std::collections::*;
 
-use alpen_vertex_state::block::L2BlockBundle;
+use alpen_express_state::block::L2BlockBundle;
 use parking_lot::Mutex;
 
-use alpen_vertex_state::prelude::*;
+use alpen_express_state::prelude::*;
 
 use crate::errors::*;
 use crate::traits::*;
