@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use alpen_vertex_state::state_op;
-use rockbound::SchemaBatch;
-use rockbound::DB;
+use rockbound::OptimisticTransactionDB as DB;
+use rockbound::{SchemaBatch, SchemaDBOperationsExt};
 
 use super::schemas::{ChainStateSchema, WriteBatchSchema};
 use crate::errors::*;

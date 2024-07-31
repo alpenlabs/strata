@@ -1,4 +1,4 @@
-use rockbound::{CodecError, rocksdb, TransactionError};
+use rockbound::{rocksdb, CodecError, TransactionError};
 use thiserror::Error;
 
 /// Simple result type used across database interface.

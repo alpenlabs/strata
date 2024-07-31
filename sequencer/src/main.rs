@@ -14,10 +14,10 @@ use config::Config;
 use format_serde_error::SerdeError;
 use reth_rpc_types::engine::JwtError;
 use reth_rpc_types::engine::JwtSecret;
+use rockbound::rocksdb;
 use thiserror::Error;
 use tokio::sync::{broadcast, oneshot, RwLock};
 use tracing::*;
-use rockbound::rocksdb;
 
 use alpen_vertex_btcio::rpc::traits::L1Client;
 use alpen_vertex_common::logging;
@@ -281,7 +281,9 @@ where
     Ok(())
 }
 
-fn open_rocksdb_database(config: &Config) -> anyhow::Result<Arc<rockbound::DB>> {
+fn open_rocksdb_database(
+    config: &Config,
+) -> anyhow::Result<Arc<rockbound::OptimisticTransactionDB>> {
     let mut database_dir = config.client.datadir.clone();
     database_dir.push("rocksdb");
 

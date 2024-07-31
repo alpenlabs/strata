@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use alpen_vertex_primitives::buf::Buf32;
-use rockbound::{Schema, SchemaBatch, OptimisticTransactionDB as DB, SchemaDBOperationsExt};
+use rockbound::{OptimisticTransactionDB as DB, Schema, SchemaBatch, SchemaDBOperationsExt};
 
 use crate::{
     errors::DbError,

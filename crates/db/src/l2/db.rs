@@ -38,7 +38,7 @@ impl L2DataStore for L2Db {
                     block_height_data.push(block_id);
                 }
 
-                txn.put::<L2BlockSchema>(&block_id, &block)?;
+                txn.put::<L2BlockSchema>(&block_id, &bundle)?;
                 txn.put::<L2BlockStatusSchema>(&block_id, &BlockStatus::Unchecked)?;
                 txn.put::<L2BlockHeightSchema>(&block_height, &block_height_data)?;
 
