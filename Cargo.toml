@@ -14,7 +14,6 @@ members = [
   "crates/vtxjmt",
   "crates/prover/zkvm",
   "crates/prover/adapters/risc0",
-  "crates/bridge-db",
   "crates/bridge-exec",
   "crates/bridge-rpc-service",
   "crates/bridge-tx-manager",
@@ -39,6 +38,22 @@ alpen-express-rocksdb = { path = "crates/rocksdb-store" }
 alpen-express-rpc-api = { path = "crates/rpc/api" }
 alpen-express-state = { path = "crates/state" }
 alpen-test-utils = { path = "crates/test-utils" }
+<<<<<<< HEAD
+=======
+alpen-vertex-bridge-exec = { path = "crates/bridge-exec" }
+alpen-vertex-bridge-rpc = { path = "crates/bridge-rpc-service" }
+alpen-vertex-bridge-txm = { path = "crates/bridge-tx-manager" }
+alpen-vertex-btcio = { path = "crates/btcio" }
+alpen-vertex-common = { path = "crates/common" }
+alpen-vertex-consensus-logic = { path = "crates/consensus-logic" }
+alpen-vertex-db = { path = "crates/db" }
+alpen-vertex-evmctl = { path = "crates/evmctl" }
+alpen-vertex-evmexec = { path = "crates/evmexec" }
+alpen-vertex-mmr = { path = "crates/util/mmr" }
+alpen-vertex-primitives = { path = "crates/primitives" }
+alpen-vertex-rpc-api = { path = "crates/rpc/api" }
+alpen-vertex-state = { path = "crates/state" }
+>>>>>>> fcc9f6d (refactor: move bridge-db to db)
 zkvm = { path = "crates/prover/zkvm" }
 
 alloy-genesis = { version = "0.1", default-features = false }
