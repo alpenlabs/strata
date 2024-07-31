@@ -17,13 +17,13 @@ members = [
   "crates/bridge-exec",
   "crates/bridge-rpc-service",
   "crates/bridge-tx-manager",
-  "sequencer",
-  "reth",
+  "bin/sequencer",
+  "bin/reth",
   "bin/operator",
   "bin/challenger",
 ]
 
-default-members = ["sequencer", "reth"]
+default-members = ["bin/sequencer", "bin/reth"]
 
 resolver = "2"
 
