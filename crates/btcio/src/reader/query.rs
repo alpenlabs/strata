@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 use std::sync::Arc;
-use std::time::{self, Duration};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use alpen_vertex_primitives::l1::L1Status;
 use anyhow::bail;
@@ -165,7 +165,6 @@ async fn do_reader_task(
     let best_blkid = state.best_block();
     info!(%best_blkid, "initialized L1 reader state");
 
-    let current_time = time::Instant::now();
     // FIXME This function will return when reorg happens when there are not
     // enough elements in the vec deque, probably during startup.
     loop {
@@ -194,7 +193,10 @@ async fn do_reader_task(
         tokio::time::sleep(poll_dur).await;
 
         status_updates.push(StatusUpdate::LastUpdate(
-            current_time.elapsed().as_millis() as u64
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
         ));
 
         apply_status_updates(status_updates, l1_status.clone()).await;
