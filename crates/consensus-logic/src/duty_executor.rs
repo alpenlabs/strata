@@ -59,10 +59,11 @@ pub fn duty_tracker_task<D: Database>(
 
     let idx = database.client_state_provider().get_last_checkpoint_idx()?;
     let last_checkpoint_state = database.client_state_provider().get_state_checkpoint(idx)?;
-    let mut last_finalized_blk = match last_checkpoint_state {
+    let last_finalized_blk = match last_checkpoint_state {
         Some(state) => state.sync().map(|sync| *sync.finalized_blkid()),
         None => None,
     };
+    duties_tracker.set_finalized_block(last_finalized_blk);
 
     loop {
         let update = match cupdate_rx.blocking_recv() {
@@ -82,13 +83,7 @@ pub fn duty_tracker_task<D: Database>(
         trace!(%ev_idx, "new consensus state, updating duties");
         trace!("STATE: {new_state:#?}");
 
-        if let Err(e) = update_tracker(
-            &mut duties_tracker,
-            new_state,
-            &ident,
-            database.as_ref(),
-            &mut last_finalized_blk,
-        ) {
+        if let Err(e) = update_tracker(&mut duties_tracker, new_state, &ident, database.as_ref()) {
             error!(err = %e, "failed to update duties tracker");
         }
 
@@ -109,7 +104,6 @@ fn update_tracker<D: Database>(
     state: &ClientState,
     ident: &Identity,
     database: &D,
-    last_finalized_block: &mut Option<L2BlockId>,
 ) -> Result<(), Error> {
     let Some(ss) = state.sync() else {
         return Ok(());
@@ -129,8 +123,11 @@ fn update_tracker<D: Database>(
 
     // Figure out which blocks were finalized
     let new_finalized = state.sync().map(|sync| *sync.finalized_blkid());
-    let newly_finalized_blocks: Vec<L2BlockId> =
-        get_finalized_blocks(new_finalized, l2prov.as_ref(), last_finalized_block)?;
+    let newly_finalized_blocks: Vec<L2BlockId> = get_finalized_blocks(
+        tracker.get_finalized_block(),
+        l2prov.as_ref(),
+        new_finalized,
+    )?;
 
     let tracker_update = duties::StateUpdate::new(block_idx, ts, newly_finalized_blocks);
     let n_evicted = tracker.update(&tracker_update);
@@ -143,36 +140,30 @@ fn update_tracker<D: Database>(
 }
 
 fn get_finalized_blocks(
-    finalized: Option<L2BlockId>,
+    last_finalized_block: Option<L2BlockId>,
     l2prov: &impl L2DataProvider,
-    last_finalized_block: &mut Option<L2BlockId>,
+    finalized: Option<L2BlockId>,
 ) -> Result<Vec<L2BlockId>, Error> {
     // Figure out which blocks were finalized
     let mut newly_finalized_blocks: Vec<L2BlockId> = Vec::new();
     let mut new_finalized = finalized;
 
-    loop {
-        if let Some(finalized) = new_finalized {
-            // If the last finalized block is equal to the new finalized block,
-            // it means that no new blocks are finalized
-            if *last_finalized_block == Some(finalized) {
-                break;
-            }
-
-            // else loop till we reach to the last finalized block or go all the way
-            // as long as we get some block data
-            // TODO: verify if this works as expected
-            newly_finalized_blocks.push(finalized);
-
-            match l2prov.get_block_data(finalized)? {
-                Some(block) => new_finalized = Some(*block.header().parent()),
-                None => break,
-            }
+    while let Some(finalized) = new_finalized {
+        // If the last finalized block is equal to the new finalized block,
+        // it means that no new blocks are finalized
+        if last_finalized_block == Some(finalized) {
+            break;
         }
-    }
 
-    // Update the last_finalized_block with the new_finalized value
-    *last_finalized_block = finalized;
+        // else loop till we reach to the last finalized block or go all the way
+        // as long as we get some block data
+        match l2prov.get_block_data(finalized)? {
+            Some(block) => new_finalized = Some(*block.header().parent()),
+            None => break,
+        }
+
+        newly_finalized_blocks.push(finalized);
+    }
 
     Ok(newly_finalized_blocks)
 }
@@ -455,18 +446,50 @@ mod tests {
 
         let block_ids: Vec<_> = chain.iter().map(|b| b.header().get_blockid()).collect();
 
-        let mut last_finalized_block = Some(block_ids[0]);
-        let new_finalized = Some(block_ids[4]);
-        let finalized_blocks = get_finalized_blocks(
-            new_finalized,
-            db.l2_provider().as_ref(),
-            &mut last_finalized_block,
-        )
-        .unwrap();
+        {
+            let last_finalized_block = Some(block_ids[0]);
+            let new_finalized = Some(block_ids[4]);
+            let finalized_blocks = get_finalized_blocks(
+                last_finalized_block,
+                db.l2_provider().as_ref(),
+                new_finalized,
+            )
+            .unwrap();
 
-        let expected_finalized_blocks: Vec<_> = block_ids[1..=4].iter().rev().cloned().collect();
+            let expected_finalized_blocks: Vec<_> =
+                block_ids[1..=4].iter().rev().cloned().collect();
 
-        assert_eq!(finalized_blocks, expected_finalized_blocks);
-        assert_eq!(last_finalized_block, new_finalized);
+            assert_eq!(finalized_blocks, expected_finalized_blocks);
+        }
+
+        {
+            let last_finalized_block = None;
+            let new_finalized = Some(block_ids[4]);
+            let finalized_blocks = get_finalized_blocks(
+                last_finalized_block,
+                db.l2_provider().as_ref(),
+                new_finalized,
+            )
+            .unwrap();
+
+            let expected_finalized_blocks: Vec<_> =
+                block_ids[0..=4].iter().rev().cloned().collect();
+
+            assert_eq!(finalized_blocks, expected_finalized_blocks);
+        }
+
+        {
+            let last_finalized_block = None;
+            let new_finalized = None;
+            let finalized_blocks = get_finalized_blocks(
+                last_finalized_block,
+                db.l2_provider().as_ref(),
+                new_finalized,
+            )
+            .unwrap();
+
+            let expected_finalized_blocks: Vec<_> = vec![];
+            assert_eq!(finalized_blocks, expected_finalized_blocks);
+        }
     }
 }

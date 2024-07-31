@@ -19,11 +19,10 @@ pub fn gen_block(parent: Option<&SignedL2BlockHeader>) -> L2BlockBundle {
     let body: L2BlockBody = arb.generate();
     let accessory: L2BlockAccessory = arb.generate();
 
-    let start = SystemTime::now();
-    let since_the_epoch = start
+    let current_timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards");
-    let current_timestamp = since_the_epoch.as_millis() as u64;
+        .unwrap()
+        .as_millis() as u64;
 
     let block_idx = parent.map(|h| h.blockidx() + 1).unwrap_or(0);
     let prev_block = parent.map(|h| h.get_blockid()).unwrap_or_default();
