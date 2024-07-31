@@ -4,7 +4,7 @@ use zkvm::{Proof, ProverOptions, ZKVMHost, ZKVMVerifier};
 
 pub struct RiscZeroHost {
     elf: Vec<u8>,
-    inputs: Vec<u32>,
+    _inputs: Vec<u8>,
     prover_options: ProverOptions,
 }
 
@@ -24,29 +24,23 @@ impl ZKVMHost for RiscZeroHost {
     fn init(guest_code: Vec<u8>, prover_options: zkvm::ProverOptions) -> Self {
         RiscZeroHost {
             elf: guest_code,
-            inputs: Vec::new(),
+            _inputs: Vec::new(),
             prover_options,
         }
     }
 
-    fn prove(&self) -> anyhow::Result<Proof> {
+    fn prove<T: serde::Serialize>(&self, input: T) -> anyhow::Result<Proof> {
         if self.prover_options.use_mock_prover {
             std::env::set_var("RISC0_DEV_MODE", "true");
         }
 
-        let env = ExecutorEnv::builder().write(&self.inputs)?.build()?;
+        let env = ExecutorEnv::builder().write(&input)?.build()?;
         let opts = self.determine_prover_options();
 
         let prover = get_prover_server(&opts)?;
         let proof = prover.prove(env, &self.elf)?.receipt;
         let serialized_proof = bincode::serialize(&proof)?;
         Ok(Proof(serialized_proof))
-    }
-
-    fn add_input<T: serde::Serialize>(&mut self, item: T) {
-        let mut serializer = risc0_zkvm::serde::Serializer::new(&mut self.inputs);
-        item.serialize(&mut serializer)
-            .expect("Risc0 hint serialization is infallible");
     }
 }
 
@@ -86,11 +80,10 @@ mod tests {
     #[test]
     fn risc0_test_mock_prover() {
         let input: u32 = 1;
-        let mut zkvm = RiscZeroHost::init(TEST_ELF.to_vec(), ProverOptions::default());
-        zkvm.add_input(input);
+        let zkvm = RiscZeroHost::init(TEST_ELF.to_vec(), ProverOptions::default());
 
         // assert proof generation works
-        let proof = zkvm.prove().expect("Failed to generate proof");
+        let proof = zkvm.prove(input).expect("Failed to generate proof");
 
         // assert proof verification works
         Risc0Verifier::verify(TEST_ELF_PROGRAM_ID, &proof).expect("Proof verification failed");
