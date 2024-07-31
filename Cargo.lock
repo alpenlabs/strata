@@ -977,7 +977,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "alpen-vertex-bridge-challenger"
+version = "0.1.0"
+
+[[package]]
 name = "alpen-vertex-bridge-exec"
+version = "0.1.0"
+
+[[package]]
+name = "alpen-vertex-bridge-operator"
 version = "0.1.0"
 
 [[package]]

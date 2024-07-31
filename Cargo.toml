@@ -36,6 +36,8 @@ members = [
   # binaries listed separately
   "sequencer",
   "reth",
+  "bin/operator",
+  "bin/challenger",
 ]
 
 default-members = ["sequencer", "reth"]
