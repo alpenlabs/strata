@@ -1,6 +1,6 @@
-# Alpen Vertex Rollup
+# Alpen Express Rollup
 
-Alpen's prototype rollup, codenamed Vertex.  This is pre-alpha software and
+Alpen's prototype rollup, codenamed Express. This is pre-alpha software and
 nothing is even close to being usable yet.
 
 ## Repository structure
@@ -73,11 +73,11 @@ ensure `horizon_l1_height` <= `genesis_l1_height` < bitcoin_block_height
 Start EL Client:
 
 ```sh
-cargo run --bin alpen-vertex-reth  -- --datadir .data/reth --http -vvvv
+cargo run --bin alpen-express-reth  -- --datadir .data/reth --http -vvvv
 ```
 
 Start CL Client/Sequencer
 
 ```sh
-cargo run --bin alpen-vertex-sequencer -- --config config.toml
+cargo run --bin alpen-express-sequencer -- --config config.toml
 ```

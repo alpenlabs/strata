@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use rockbound::{OptimisticTransactionDB as DB, Schema, SchemaDBOperationsExt};
 
-use alpen_vertex_state::operation::*;
+use alpen_express_state::operation::*;
 
 use super::schemas::{ClientStateSchema, ClientUpdateOutputSchema};
 use crate::errors::*;
@@ -53,7 +53,7 @@ impl ClientStateStore for ClientStateDb {
     fn write_client_state_checkpoint(
         &self,
         idx: u64,
-        state: alpen_vertex_state::client_state::ClientState,
+        state: alpen_express_state::client_state::ClientState,
     ) -> DbResult<()> {
         // FIXME this should probably be a transaction
         if self.db.get::<ClientStateSchema>(&idx)?.is_some() {
@@ -118,15 +118,15 @@ impl ClientStateProvider for ClientStateDb {
     fn get_state_checkpoint(
         &self,
         idx: u64,
-    ) -> DbResult<Option<alpen_vertex_state::client_state::ClientState>> {
+    ) -> DbResult<Option<alpen_express_state::client_state::ClientState>> {
         Ok(self.db.get::<ClientStateSchema>(&idx)?)
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use alpen_express_state::client_state::ClientState;
     use alpen_test_utils::*;
-    use alpen_vertex_state::client_state::ClientState;
 
     use super::*;
 

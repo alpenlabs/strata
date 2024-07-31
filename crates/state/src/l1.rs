@@ -3,7 +3,7 @@ use core::fmt;
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use alpen_vertex_primitives::{l1, prelude::*};
+use alpen_express_primitives::{l1, prelude::*};
 
 use crate::state_queue::StateQueue;
 
@@ -69,8 +69,8 @@ impl L1HeaderRecord {
     }
 }
 
-impl From<&alpen_vertex_primitives::l1::L1BlockManifest> for L1HeaderRecord {
-    fn from(value: &alpen_vertex_primitives::l1::L1BlockManifest) -> Self {
+impl From<&alpen_express_primitives::l1::L1BlockManifest> for L1HeaderRecord {
+    fn from(value: &alpen_express_primitives::l1::L1BlockManifest) -> Self {
         Self {
             buf: value.header().to_vec(),
             wtxs_root: value.txs_root(),

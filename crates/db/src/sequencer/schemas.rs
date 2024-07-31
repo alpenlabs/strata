@@ -1,4 +1,4 @@
-use alpen_vertex_primitives::buf::Buf32;
+use alpen_express_primitives::buf::Buf32;
 
 use crate::define_table_with_default_codec;
 use crate::define_table_with_seek_key_codec;

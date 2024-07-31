@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use alpen_vertex_state::state_op;
+use alpen_express_state::state_op;
 use rockbound::OptimisticTransactionDB as DB;
 use rockbound::{SchemaBatch, SchemaDBOperationsExt};
 
@@ -45,7 +45,7 @@ impl ChainstateProvider for ChainStateDb {
     fn get_writes_at(
         &self,
         idx: u64,
-    ) -> DbResult<Option<alpen_vertex_state::state_op::WriteBatch>> {
+    ) -> DbResult<Option<alpen_express_state::state_op::WriteBatch>> {
         Ok(self.db.get::<WriteBatchSchema>(&idx)?)
     }
 
@@ -53,7 +53,7 @@ impl ChainstateProvider for ChainStateDb {
     fn get_toplevel_state(
         &self,
         idx: u64,
-    ) -> DbResult<Option<alpen_vertex_state::chain_state::ChainState>> {
+    ) -> DbResult<Option<alpen_express_state::chain_state::ChainState>> {
         Ok(self.db.get::<ChainStateSchema>(&idx)?)
     }
 }
@@ -61,7 +61,7 @@ impl ChainstateProvider for ChainStateDb {
 impl ChainstateStore for ChainStateDb {
     fn write_genesis_state(
         &self,
-        toplevel: &alpen_vertex_state::chain_state::ChainState,
+        toplevel: &alpen_express_state::chain_state::ChainState,
     ) -> DbResult<()> {
         let genesis_key = 0;
         if self.get_first_idx()?.is_some() || self.get_last_idx()?.is_some() {
@@ -74,7 +74,7 @@ impl ChainstateStore for ChainStateDb {
     fn write_state_update(
         &self,
         idx: u64,
-        batch: &alpen_vertex_state::state_op::WriteBatch,
+        batch: &alpen_express_state::state_op::WriteBatch,
     ) -> DbResult<()> {
         if self.db.get::<WriteBatchSchema>(&idx)?.is_some() {
             return Err(DbError::OverwriteStateUpdate(idx));
@@ -145,8 +145,8 @@ impl ChainstateStore for ChainStateDb {
 
 #[cfg(test)]
 mod tests {
+    use alpen_express_state::chain_state::ChainState;
     use alpen_test_utils::{get_rocksdb_tmp_instance, ArbitraryGenerator};
-    use alpen_vertex_state::chain_state::ChainState;
     use state_op::WriteBatch;
 
     use super::*;

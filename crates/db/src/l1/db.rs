@@ -5,8 +5,8 @@ use rockbound::schema::KeyEncoder;
 use rockbound::{OptimisticTransactionDB as DB, SchemaBatch, SchemaDBOperationsExt};
 use tracing::*;
 
-use alpen_vertex_mmr::CompactMmr;
-use alpen_vertex_primitives::{
+use alpen_express_mmr::CompactMmr;
+use alpen_express_primitives::{
     buf::Buf32,
     l1::{L1BlockManifest, L1Tx, L1TxRef},
 };
@@ -179,7 +179,7 @@ impl L1DataProvider for L1Db {
 
 #[cfg(test)]
 mod tests {
-    use alpen_vertex_primitives::l1::L1TxProof;
+    use alpen_express_primitives::l1::L1TxProof;
 
     use alpen_test_utils::{get_rocksdb_tmp_instance, ArbitraryGenerator};
 

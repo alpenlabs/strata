@@ -32,7 +32,7 @@ pub mod utils;
 
 pub type DbResult<T> = anyhow::Result<T, errors::DbError>;
 
-pub const ROCKSDB_NAME: &str = "vertex";
+pub const ROCKSDB_NAME: &str = "express";
 
 pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
     ChainStateSchema::COLUMN_FAMILY_NAME,

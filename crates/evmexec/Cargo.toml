@@ -1,13 +1,13 @@
 [package]
 edition = "2021"
-name = "alpen-vertex-evmexec"
+name = "alpen-express-evmexec"
 version = "0.1.0"
 
 [dependencies]
-alpen-vertex-db = { workspace = true }
-alpen-vertex-evmctl = { workspace = true }
-alpen-vertex-primitives = { workspace = true }
-alpen-vertex-state = { workspace = true }
+alpen-express-db = { workspace = true }
+alpen-express-evmctl = { workspace = true }
+alpen-express-primitives = { workspace = true }
+alpen-express-state = { workspace = true }
 anyhow = { workspace = true }
 arbitrary = { workspace = true }
 borsh = { workspace = true }
@@ -29,6 +29,6 @@ tower = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
+alpen-test-utils = { workspace = true }
 mockall = { workspace = true }
 rand = { workspace = true }
-alpen-test-utils = { workspace = true }

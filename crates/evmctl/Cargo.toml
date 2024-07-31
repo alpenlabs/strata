@@ -1,10 +1,10 @@
 [package]
 edition = "2021"
-name = "alpen-vertex-evmctl"
+name = "alpen-express-evmctl"
 version = "0.1.0"
 
 [dependencies]
-alpen-vertex-primitives = { workspace = true }
-alpen-vertex-state = { workspace = true }
+alpen-express-primitives = { workspace = true }
+alpen-express-state = { workspace = true }
 
 thiserror = { workspace = true }

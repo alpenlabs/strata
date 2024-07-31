@@ -3,7 +3,7 @@ use std::io::{self, Cursor, Write};
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use alpen_vertex_primitives::{
+use alpen_express_primitives::{
     buf::{Buf32, Buf64},
     hash,
 };
@@ -73,7 +73,7 @@ impl L2BlockHeader {
         // 8 + 8 + 32 + 32 + 32 + 32 = 144
         let mut buf = [0; 144];
         fill_sighash_buf(self, &mut buf).expect("blockasm: compute sighash");
-        alpen_vertex_primitives::hash::raw(&buf)
+        alpen_express_primitives::hash::raw(&buf)
     }
 }
 

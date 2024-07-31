@@ -23,17 +23,17 @@ default-members = ["sequencer", "reth"]
 resolver = "2"
 
 [workspace.dependencies]
+alpen-express-btcio = { path = "crates/btcio" }
+alpen-express-common = { path = "crates/common" }
+alpen-express-consensus-logic = { path = "crates/consensus-logic" }
+alpen-express-db = { path = "crates/db" }
+alpen-express-evmctl = { path = "crates/evmctl" }
+alpen-express-evmexec = { path = "crates/evmexec" }
+alpen-express-mmr = { path = "crates/util/mmr" }
+alpen-express-primitives = { path = "crates/primitives" }
+alpen-express-rpc-api = { path = "crates/rpc/api" }
+alpen-express-state = { path = "crates/state" }
 alpen-test-utils = { path = "crates/test-utils" }
-alpen-vertex-btcio = { path = "crates/btcio" }
-alpen-vertex-common = { path = "crates/common" }
-alpen-vertex-consensus-logic = { path = "crates/consensus-logic" }
-alpen-vertex-db = { path = "crates/db" }
-alpen-vertex-evmctl = { path = "crates/evmctl" }
-alpen-vertex-evmexec = { path = "crates/evmexec" }
-alpen-vertex-mmr = { path = "crates/util/mmr" }
-alpen-vertex-primitives = { path = "crates/primitives" }
-alpen-vertex-rpc-api = { path = "crates/rpc/api" }
-alpen-vertex-state = { path = "crates/state" }
 zkvm = { path = "crates/prover/zkvm" }
 
 alloy-genesis = { version = "0.1", default-features = false }

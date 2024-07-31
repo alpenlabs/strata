@@ -1,4 +1,4 @@
-# Vertex Functional Tests
+# Express Functional Tests
 
 Tests will be added here when we have more functionality to test.
 

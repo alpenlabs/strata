@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use alpen_vertex_primitives::buf::Buf32;
+use alpen_express_primitives::buf::Buf32;
 use rockbound::{OptimisticTransactionDB as DB, Schema, SchemaBatch, SchemaDBOperationsExt};
 
 use crate::{
@@ -134,9 +134,9 @@ mod tests {
     use crate::errors::DbError;
     use crate::traits::{SeqDataProvider, SeqDataStore};
     use crate::types::TxnStatusEntry;
+    use alpen_express_primitives::buf::Buf32;
     use alpen_test_utils::bitcoin::get_test_bitcoin_txns;
     use alpen_test_utils::get_rocksdb_tmp_instance;
-    use alpen_vertex_primitives::buf::Buf32;
     use rockbound::OptimisticTransactionDB as DB;
     use std::sync::Arc;
     use test;

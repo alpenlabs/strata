@@ -651,27 +651,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "alpen-test-utils"
+name = "alpen-express-btcio"
 version = "0.1.0"
 dependencies = [
- "alpen-vertex-db",
- "anyhow",
- "arbitrary",
- "bitcoin",
- "hex",
- "rand 0.8.5",
- "rockbound",
- "tempfile",
-]
-
-[[package]]
-name = "alpen-vertex-btcio"
-version = "0.1.0"
-dependencies = [
+ "alpen-express-db",
+ "alpen-express-primitives",
+ "alpen-express-state",
  "alpen-test-utils",
- "alpen-vertex-db",
- "alpen-vertex-primitives",
- "alpen-vertex-state",
  "anyhow",
  "async-trait",
  "base64 0.22.1",
@@ -687,7 +673,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "alpen-vertex-common"
+name = "alpen-express-common"
 version = "0.1.0"
 dependencies = [
  "tracing",
@@ -695,15 +681,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "alpen-vertex-consensus-logic"
+name = "alpen-express-consensus-logic"
 version = "0.1.0"
 dependencies = [
+ "alpen-express-btcio",
+ "alpen-express-db",
+ "alpen-express-evmctl",
+ "alpen-express-primitives",
+ "alpen-express-state",
  "alpen-test-utils",
- "alpen-vertex-btcio",
- "alpen-vertex-db",
- "alpen-vertex-evmctl",
- "alpen-vertex-primitives",
- "alpen-vertex-state",
  "anyhow",
  "bitcoin",
  "borsh",
@@ -716,13 +702,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "alpen-vertex-db"
+name = "alpen-express-db"
 version = "0.1.0"
 dependencies = [
+ "alpen-express-mmr",
+ "alpen-express-primitives",
+ "alpen-express-state",
  "alpen-test-utils",
- "alpen-vertex-mmr",
- "alpen-vertex-primitives",
- "alpen-vertex-state",
  "anyhow",
  "arbitrary",
  "bincode",
@@ -736,23 +722,23 @@ dependencies = [
 ]
 
 [[package]]
-name = "alpen-vertex-evmctl"
+name = "alpen-express-evmctl"
 version = "0.1.0"
 dependencies = [
- "alpen-vertex-primitives",
- "alpen-vertex-state",
+ "alpen-express-primitives",
+ "alpen-express-state",
  "thiserror",
 ]
 
 [[package]]
-name = "alpen-vertex-evmexec"
+name = "alpen-express-evmexec"
 version = "0.1.0"
 dependencies = [
+ "alpen-express-db",
+ "alpen-express-evmctl",
+ "alpen-express-primitives",
+ "alpen-express-state",
  "alpen-test-utils",
- "alpen-vertex-db",
- "alpen-vertex-evmctl",
- "alpen-vertex-primitives",
- "alpen-vertex-state",
  "anyhow",
  "arbitrary",
  "borsh",
@@ -777,14 +763,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "alpen-vertex-jmt"
+name = "alpen-express-jmt"
 version = "0.1.0"
 dependencies = [
  "jmt",
 ]
 
 [[package]]
-name = "alpen-vertex-mmr"
+name = "alpen-express-mmr"
 version = "0.1.0"
 dependencies = [
  "arbitrary",
@@ -796,7 +782,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "alpen-vertex-primitives"
+name = "alpen-express-primitives"
 version = "0.1.0"
 dependencies = [
  "arbitrary",
@@ -810,7 +796,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "alpen-vertex-reth"
+name = "alpen-express-reth"
 version = "0.1.0"
 dependencies = [
  "alloy-genesis",
@@ -827,11 +813,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "alpen-vertex-rpc-api"
+name = "alpen-express-rpc-api"
 version = "0.1.0"
 dependencies = [
- "alpen-vertex-primitives",
- "alpen-vertex-state",
+ "alpen-express-primitives",
+ "alpen-express-state",
  "hex",
  "jsonrpsee",
  "serde",
@@ -839,18 +825,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "alpen-vertex-sequencer"
+name = "alpen-express-sequencer"
 version = "0.1.0"
 dependencies = [
- "alpen-vertex-btcio",
- "alpen-vertex-common",
- "alpen-vertex-consensus-logic",
- "alpen-vertex-db",
- "alpen-vertex-evmctl",
- "alpen-vertex-evmexec",
- "alpen-vertex-primitives",
- "alpen-vertex-rpc-api",
- "alpen-vertex-state",
+ "alpen-express-btcio",
+ "alpen-express-common",
+ "alpen-express-consensus-logic",
+ "alpen-express-db",
+ "alpen-express-evmctl",
+ "alpen-express-evmexec",
+ "alpen-express-primitives",
+ "alpen-express-rpc-api",
+ "alpen-express-state",
  "anyhow",
  "argh",
  "async-trait",
@@ -874,15 +860,29 @@ dependencies = [
 ]
 
 [[package]]
-name = "alpen-vertex-state"
+name = "alpen-express-state"
 version = "0.1.0"
 dependencies = [
- "alpen-vertex-primitives",
+ "alpen-express-primitives",
  "arbitrary",
  "borsh",
  "digest 0.10.7",
  "num_enum",
  "sha2 0.10.8",
+]
+
+[[package]]
+name = "alpen-test-utils"
+version = "0.1.0"
+dependencies = [
+ "alpen-express-db",
+ "anyhow",
+ "arbitrary",
+ "bitcoin",
+ "hex",
+ "rand 0.8.5",
+ "rockbound",
+ "tempfile",
 ]
 
 [[package]]
@@ -1876,9 +1876,9 @@ checksum = "c3ac9f8b63eca6fd385229b3675f6cc0dc5c8a5c8a54a59d4f52ffd670d87b0c"
 
 [[package]]
 name = "bytemuck"
-version = "1.16.1"
+version = "1.16.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b236fc92302c97ed75b38da1f4917b5cdda4984745740f153a5d3059e48d725e"
+checksum = "102087e286b4677862ea56cf8fc58bb2cdfa8725c40ffb80fe3a008eb7f2fc83"
 dependencies = [
  "bytemuck_derive",
 ]

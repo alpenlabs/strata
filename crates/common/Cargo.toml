@@ -1,6 +1,6 @@
 [package]
 edition = "2021"
-name = "alpen-vertex-common"
+name = "alpen-express-common"
 version = "0.1.0"
 
 [dependencies]

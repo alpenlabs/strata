@@ -1,5 +1,5 @@
-use alpen_vertex_primitives::prelude::*;
-use alpen_vertex_state::{block::L2BlockBundle, exec_update::UpdateInput, id::L2BlockId};
+use alpen_express_primitives::prelude::*;
+use alpen_express_state::{block::L2BlockBundle, exec_update::UpdateInput, id::L2BlockId};
 
 /// Succinct commitment to relevant EL block data.
 // This ended up being the same as the EL payload types in the state crate,

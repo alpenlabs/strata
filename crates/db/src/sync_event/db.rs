@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use rockbound::{OptimisticTransactionDB as DB, SchemaBatch, SchemaDBOperationsExt};
 
-use alpen_vertex_state::sync_event::SyncEvent;
+use alpen_express_state::sync_event::SyncEvent;
 
 use super::schemas::{SyncEventSchema, SyncEventWithTimestamp};
 use crate::errors::{DbError, DbResult};

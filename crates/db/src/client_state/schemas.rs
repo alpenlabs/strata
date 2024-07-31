@@ -1,5 +1,5 @@
-use alpen_vertex_state::client_state::ClientState;
-use alpen_vertex_state::operation::ClientUpdateOutput;
+use alpen_express_state::client_state::ClientState;
+use alpen_express_state::operation::ClientUpdateOutput;
 
 use crate::define_table_with_seek_key_codec;
 use crate::define_table_without_codec;

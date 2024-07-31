@@ -8,13 +8,13 @@
 // errors as we'd be able to identify when our perspective on the state is
 // inconsistent with the remote state.
 
-use alpen_vertex_state::id::L2BlockId;
+use alpen_express_state::id::L2BlockId;
 
 use crate::errors::*;
 use crate::messages::*;
 
 /// Interface to control an execution engine.  This is defined in terms of
-/// Vertex semantics which will be produced inside the EL impl according to
+/// express semantics which will be produced inside the EL impl according to
 /// whatever semantics it has.
 pub trait ExecEngineCtl {
     /// Execute a block payload to determine its validity and if it extends the

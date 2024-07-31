@@ -6,7 +6,7 @@ use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
-use alpen_vertex_primitives::buf::Buf32;
+use alpen_express_primitives::buf::Buf32;
 
 /// DA destination identifier.   This will eventually be used to enable
 /// storing blobs on alternative availability schemes.

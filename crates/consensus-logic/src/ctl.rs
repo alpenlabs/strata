@@ -3,8 +3,8 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
 use tracing::*;
 
-use alpen_vertex_db::{errors::DbError, traits::*};
-use alpen_vertex_state::sync_event::SyncEvent;
+use alpen_express_db::{errors::DbError, traits::*};
+use alpen_express_state::sync_event::SyncEvent;
 
 use crate::message::CsmMessage;
 

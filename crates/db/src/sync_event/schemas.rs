@@ -1,4 +1,4 @@
-use alpen_vertex_state::sync_event::SyncEvent;
+use alpen_express_state::sync_event::SyncEvent;
 use borsh::{BorshDeserialize, BorshSerialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 

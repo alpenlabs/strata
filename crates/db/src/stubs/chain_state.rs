@@ -3,9 +3,9 @@ use std::collections::*;
 use parking_lot::Mutex;
 use tracing::*;
 
-use alpen_vertex_state::chain_state::ChainState;
-use alpen_vertex_state::state_op;
-use alpen_vertex_state::state_op::WriteBatch;
+use alpen_express_state::chain_state::ChainState;
+use alpen_express_state::state_op;
+use alpen_express_state::state_op::WriteBatch;
 
 use crate::errors::*;
 use crate::traits::*;
@@ -162,7 +162,7 @@ impl ChainstateProvider for StubChainstateDb {
     fn get_toplevel_state(
         &self,
         idx: u64,
-    ) -> DbResult<Option<alpen_vertex_state::chain_state::ChainState>> {
+    ) -> DbResult<Option<alpen_express_state::chain_state::ChainState>> {
         let st = self.state.lock();
         Ok(st.toplevels.get(&idx).cloned())
     }

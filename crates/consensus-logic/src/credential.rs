@@ -3,12 +3,12 @@
 use bitcoin::XOnlyPublicKey;
 use secp256k1::{schnorr::Signature, Keypair, Message, Secp256k1, SecretKey};
 
-use alpen_vertex_primitives::{
+use alpen_express_primitives::{
     block_credential::CredRule,
     buf::{Buf32, Buf64},
     params::Params,
 };
-use alpen_vertex_state::header::{L2Header, SignedL2BlockHeader};
+use alpen_express_state::header::{L2Header, SignedL2BlockHeader};
 
 pub fn check_block_credential(header: &SignedL2BlockHeader, params: &Params) -> bool {
     let sigcom = compute_header_sig_commitment(header);
@@ -52,7 +52,7 @@ fn verify_schnorr_sig(sig: &Buf64, msg: &Buf32, pk: &Buf32) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use alpen_vertex_primitives::buf::Buf32;
+    use alpen_express_primitives::buf::Buf32;
     use rand::Rng;
     use secp256k1::{Secp256k1, SecretKey};
 

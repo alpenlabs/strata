@@ -4,7 +4,7 @@ use bitcoin::hashes::Hash;
 use bitcoin::{consensus::serialize, Transaction};
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use alpen_vertex_primitives::buf::Buf32;
+use alpen_express_primitives::buf::Buf32;
 
 /// This keeps track of the transaction sent to L1 and has the raw txn so that if needed to resend
 /// it to L1, we need not serialize it again.
