@@ -14,15 +14,26 @@ class L1StatusTest(flexitest.Test):
     def main(self, ctx: flexitest.RunContext):
         btc = ctx.get_service("bitcoin")
         seq = ctx.get_service("sequencer")
+        start_time = int(time.time())
 
         # create both btc and sequencer RPC
         btcrpc: BitcoindClient = btc.create_rpc()
         seqrpc = seq.create_rpc()
+        interval = MAX_HORIZON_POLL_INTERVAL_SECS + SEQ_SLACK_TIME_SECS
 
-        time.sleep(MAX_HORIZON_POLL_INTERVAL_SECS + SEQ_SLACK_TIME_SECS)
+        time.sleep(interval)
         received_block = btcrpc.getblock(btcrpc.proxy.getbestblockhash())
         l1stat = seqrpc.alp_l1status()
-
+        # Time is in millis
+        curr_time = l1stat['last_update'] // 1000
+        # ensure that the l1reader task has started within few seconds of test being run
+        assert((curr_time - start_time) <= interval)
+        # check if height on bitcoin is same as, it is seen in sequencer
         assert (
             l1stat["cur_height"] == received_block["height"]
         ), "Height seen by Sequencer doesn't match the Height on the bitcoin node"
+        time.sleep(MAX_HORIZON_POLL_INTERVAL_SECS * 2)
+        l1stat = seqrpc.alp_l1status()
+        elapsed_time = l1stat['last_update'] // 1000
+        # check if L1 reader is seeing new L1 activity
+        assert((elapsed_time - curr_time) >= MAX_HORIZON_POLL_INTERVAL_SECS * 2)
