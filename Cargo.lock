@@ -138,14 +138,28 @@ dependencies = [
 
 [[package]]
 name = "alloy-consensus"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "da374e868f54c7f4ad2ad56829827badca388efd645f8cf5fccc61c2b5343504"
+dependencies = [
+ "alloy-eips 0.1.4",
+ "alloy-primitives",
+ "alloy-rlp",
+ "alloy-serde 0.1.4",
+ "c-kzg",
+ "serde",
+]
+
+[[package]]
+name = "alloy-consensus"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f58047cc851e58c26224521d1ecda466e3d746ebca0274cd5427aa660a88c353"
 dependencies = [
- "alloy-eips",
+ "alloy-eips 0.2.0",
  "alloy-primitives",
  "alloy-rlp",
- "alloy-serde",
+ "alloy-serde 0.2.0",
  "c-kzg",
  "serde",
 ]
@@ -170,13 +184,28 @@ dependencies = [
 
 [[package]]
 name = "alloy-eips"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f76ecab54890cdea1e4808fc0891c7e6cfcf71fe1a9fe26810c7280ef768f4ed"
+dependencies = [
+ "alloy-primitives",
+ "alloy-rlp",
+ "alloy-serde 0.1.4",
+ "c-kzg",
+ "once_cell",
+ "serde",
+ "sha2 0.10.8",
+]
+
+[[package]]
+name = "alloy-eips"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d32a3e14fa0d152d00bd8daf605eb74ad397efb0f54bd7155585823dddb4401e"
 dependencies = [
  "alloy-primitives",
  "alloy-rlp",
- "alloy-serde",
+ "alloy-serde 0.2.0",
  "c-kzg",
  "derive_more",
  "k256",
@@ -192,7 +221,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "20cb76c8a3913f2466c5488f3a915e3a15d15596bdc935558c1a9be75e9ec508"
 dependencies = [
  "alloy-primitives",
- "alloy-serde",
+ "alloy-serde 0.2.0",
  "serde",
 ]
 
@@ -227,12 +256,12 @@ version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3223d71dc78f464b2743418d0be8b5c894313e272105a6206ad5e867d67b3ce2"
 dependencies = [
- "alloy-consensus",
- "alloy-eips",
+ "alloy-consensus 0.2.0",
+ "alloy-eips 0.2.0",
  "alloy-json-rpc",
  "alloy-primitives",
- "alloy-rpc-types-eth",
- "alloy-serde",
+ "alloy-rpc-types-eth 0.2.0",
+ "alloy-serde 0.2.0",
  "alloy-signer",
  "alloy-sol-types",
  "async-trait",
@@ -271,14 +300,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f29da7457d853cb8199ec04b227d5d2ef598be3e59fc2bbad70c8be213292f32"
 dependencies = [
  "alloy-chains",
- "alloy-consensus",
- "alloy-eips",
+ "alloy-consensus 0.2.0",
+ "alloy-eips 0.2.0",
  "alloy-json-rpc",
  "alloy-network",
  "alloy-primitives",
  "alloy-pubsub",
  "alloy-rpc-client",
- "alloy-rpc-types-eth",
+ "alloy-rpc-types-eth 0.2.0",
  "alloy-transport",
  "alloy-transport-http",
  "alloy-transport-ws",
@@ -365,14 +394,24 @@ dependencies = [
 
 [[package]]
 name = "alloy-rpc-types"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "184a7a42c7ba9141cc9e76368356168c282c3bc3d9e5d78f3556bdfe39343447"
+dependencies = [
+ "alloy-rpc-types-eth 0.1.4",
+ "alloy-serde 0.1.4",
+]
+
+[[package]]
+name = "alloy-rpc-types"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7e5d76f1e8b22f48b7b8f985782b68e7eb3938780e50e8b646a53e41a598cdf5"
 dependencies = [
  "alloy-rpc-types-engine",
- "alloy-rpc-types-eth",
+ "alloy-rpc-types-eth 0.2.0",
  "alloy-rpc-types-trace",
- "alloy-serde",
+ "alloy-serde 0.2.0",
  "serde",
 ]
 
@@ -395,7 +434,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4282c002a4ae9f57887dae57083fcca6dca09cb6685bf98b8582ea93cb3df97d"
 dependencies = [
  "alloy-primitives",
- "alloy-serde",
+ "alloy-serde 0.2.0",
  "serde",
 ]
 
@@ -405,7 +444,7 @@ version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9b47dcc8e3bebea57b1c9495a7e6f3313e99d355c0f5b80473cfbdfcbdd6ebea"
 dependencies = [
- "alloy-eips",
+ "alloy-eips 0.2.0",
  "alloy-primitives",
  "alloy-rpc-types-engine",
  "serde",
@@ -419,12 +458,12 @@ version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "73445fbc5c02258e3d0d977835c92366a4d91545fd456c3fc8601c61810bc9f6"
 dependencies = [
- "alloy-consensus",
- "alloy-eips",
+ "alloy-consensus 0.2.0",
+ "alloy-eips 0.2.0",
  "alloy-primitives",
  "alloy-rlp",
- "alloy-rpc-types-eth",
- "alloy-serde",
+ "alloy-rpc-types-eth 0.2.0",
+ "alloy-serde 0.2.0",
  "jsonrpsee-types",
  "jsonwebtoken",
  "rand 0.8.5",
@@ -434,15 +473,33 @@ dependencies = [
 
 [[package]]
 name = "alloy-rpc-types-eth"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab4123ee21f99ba4bd31bfa36ba89112a18a500f8b452f02b35708b1b951e2b9"
+dependencies = [
+ "alloy-consensus 0.1.4",
+ "alloy-eips 0.1.4",
+ "alloy-primitives",
+ "alloy-rlp",
+ "alloy-serde 0.1.4",
+ "alloy-sol-types",
+ "itertools 0.13.0",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
+name = "alloy-rpc-types-eth"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "605fa8462732bb8fd0645a9941e12961e079d45ae6a44634c826f8229c187bdf"
 dependencies = [
- "alloy-consensus",
- "alloy-eips",
+ "alloy-consensus 0.2.0",
+ "alloy-eips 0.2.0",
  "alloy-primitives",
  "alloy-rlp",
- "alloy-serde",
+ "alloy-serde 0.2.0",
  "alloy-sol-types",
  "itertools 0.13.0",
  "jsonrpsee-types",
@@ -457,9 +514,9 @@ version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5ffcb83a5a91d327c40ba2157a19016bb883c1426f1708fea5f9e042032fd73e"
 dependencies = [
- "alloy-eips",
+ "alloy-eips 0.2.0",
  "alloy-primitives",
- "alloy-serde",
+ "alloy-serde 0.2.0",
  "serde",
  "serde_json",
 ]
@@ -471,8 +528,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5f561a8cdd377b6ac3beab805b9df5ec2c7d99bb6139aab23c317f26df6fb346"
 dependencies = [
  "alloy-primitives",
- "alloy-rpc-types-eth",
- "alloy-serde",
+ "alloy-rpc-types-eth 0.2.0",
+ "alloy-serde 0.2.0",
  "serde",
  "serde_json",
  "thiserror",
@@ -485,9 +542,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c06a4bd39910631c11148c5b2c55e2c61f8626affd2a612e382c668d5e5971ce"
 dependencies = [
  "alloy-primitives",
- "alloy-rpc-types-eth",
- "alloy-serde",
+ "alloy-rpc-types-eth 0.2.0",
+ "alloy-serde 0.2.0",
  "serde",
+]
+
+[[package]]
+name = "alloy-serde"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9416c52959e66ead795a11f4a86c248410e9e368a0765710e57055b8a1774dd6"
+dependencies = [
+ "alloy-primitives",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -5988,8 +6056,15 @@ checksum = "106dd99e98437432fed6519dedecfade6a06a73bb7b2a1e019fdd2bee5778d94"
 name = "prover_manager"
 version = "0.1.0"
 dependencies = [
+ "alpen-vertex-primitives",
+ "alpen-vertex-state",
  "anyhow",
+ "bincode",
+ "guest-builder",
+ "risc0-adapter",
  "serde",
+ "zkvm",
+ "zkvm-primitives",
 ]
 
 [[package]]
@@ -6503,7 +6578,7 @@ dependencies = [
 [[package]]
 name = "reth-auto-seal-consensus"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "futures-util",
  "reth-beacon-consensus",
@@ -6530,7 +6605,7 @@ dependencies = [
 [[package]]
 name = "reth-basic-payload-builder"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-rlp",
  "futures-core",
@@ -6553,7 +6628,7 @@ dependencies = [
 [[package]]
 name = "reth-beacon-consensus"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "futures",
  "itertools 0.13.0",
@@ -6587,7 +6662,7 @@ dependencies = [
 [[package]]
 name = "reth-blockchain-tree"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "aquamarine",
  "linked_hash_set",
@@ -6618,7 +6693,7 @@ dependencies = [
 [[package]]
 name = "reth-blockchain-tree-api"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "reth-consensus",
  "reth-execution-errors",
@@ -6630,7 +6705,7 @@ dependencies = [
 [[package]]
 name = "reth-chain-state"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "auto_impl",
  "derive_more",
@@ -6648,10 +6723,10 @@ dependencies = [
 [[package]]
 name = "reth-chainspec"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-chains",
- "alloy-eips",
+ "alloy-eips 0.2.0",
  "alloy-genesis",
  "alloy-primitives",
  "alloy-trie",
@@ -6724,9 +6799,9 @@ dependencies = [
 [[package]]
 name = "reth-cli-util"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
- "alloy-eips",
+ "alloy-eips 0.2.0",
  "alloy-primitives",
  "eyre",
  "libc",
@@ -6739,10 +6814,10 @@ dependencies = [
 [[package]]
 name = "reth-codecs"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
- "alloy-consensus",
- "alloy-eips",
+ "alloy-consensus 0.2.0",
+ "alloy-eips 0.2.0",
  "alloy-genesis",
  "alloy-primitives",
  "alloy-trie",
@@ -6755,7 +6830,7 @@ dependencies = [
 [[package]]
 name = "reth-codecs-derive"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "convert_case 0.6.0",
  "proc-macro2",
@@ -6766,7 +6841,7 @@ dependencies = [
 [[package]]
 name = "reth-config"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "confy",
  "humantime-serde",
@@ -6779,7 +6854,7 @@ dependencies = [
 [[package]]
 name = "reth-consensus"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "auto_impl",
  "reth-primitives",
@@ -6789,7 +6864,7 @@ dependencies = [
 [[package]]
 name = "reth-consensus-common"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "reth-chainspec",
  "reth-consensus",
@@ -6799,10 +6874,10 @@ dependencies = [
 [[package]]
 name = "reth-consensus-debug-client"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
- "alloy-consensus",
- "alloy-eips",
+ "alloy-consensus 0.2.0",
+ "alloy-eips 0.2.0",
  "alloy-provider",
  "auto_impl",
  "eyre",
@@ -6822,7 +6897,7 @@ dependencies = [
 [[package]]
 name = "reth-db"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "bytes",
  "derive_more",
@@ -6852,7 +6927,7 @@ dependencies = [
 [[package]]
 name = "reth-db-api"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "bytes",
  "derive_more",
@@ -6872,7 +6947,7 @@ dependencies = [
 [[package]]
 name = "reth-db-common"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-genesis",
  "boyer-moore-magiclen",
@@ -6898,7 +6973,7 @@ dependencies = [
 [[package]]
 name = "reth-discv4"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-primitives",
  "alloy-rlp",
@@ -6922,7 +6997,7 @@ dependencies = [
 [[package]]
 name = "reth-discv5"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-primitives",
  "alloy-rlp",
@@ -6948,7 +7023,7 @@ dependencies = [
 [[package]]
 name = "reth-dns-discovery"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-primitives",
  "data-encoding",
@@ -6970,7 +7045,7 @@ dependencies = [
 [[package]]
 name = "reth-downloaders"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-rlp",
  "futures",
@@ -6997,7 +7072,7 @@ dependencies = [
 [[package]]
 name = "reth-ecies"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "aes 0.8.4",
  "alloy-primitives",
@@ -7028,7 +7103,7 @@ dependencies = [
 [[package]]
 name = "reth-engine-primitives"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "reth-chainspec",
  "reth-payload-primitives",
@@ -7038,7 +7113,7 @@ dependencies = [
 [[package]]
 name = "reth-engine-tree"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "aquamarine",
  "futures",
@@ -7082,7 +7157,7 @@ dependencies = [
 [[package]]
 name = "reth-engine-util"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "eyre",
  "futures",
@@ -7101,7 +7176,7 @@ dependencies = [
 [[package]]
 name = "reth-errors"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "reth-blockchain-tree-api",
  "reth-consensus",
@@ -7114,7 +7189,7 @@ dependencies = [
 [[package]]
 name = "reth-eth-wire"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-rlp",
  "bytes",
@@ -7139,7 +7214,7 @@ dependencies = [
 [[package]]
 name = "reth-eth-wire-types"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-chains",
  "alloy-genesis",
@@ -7155,7 +7230,7 @@ dependencies = [
 [[package]]
 name = "reth-ethereum-consensus"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "reth-chainspec",
  "reth-consensus",
@@ -7167,7 +7242,7 @@ dependencies = [
 [[package]]
 name = "reth-ethereum-engine"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "futures",
  "pin-project",
@@ -7191,7 +7266,7 @@ dependencies = [
 [[package]]
 name = "reth-ethereum-engine-primitives"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-rlp",
  "reth-chainspec",
@@ -7209,7 +7284,7 @@ dependencies = [
 [[package]]
 name = "reth-ethereum-forks"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-chains",
  "alloy-primitives",
@@ -7226,7 +7301,7 @@ dependencies = [
 [[package]]
 name = "reth-ethereum-payload-builder"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "reth-basic-payload-builder",
  "reth-errors",
@@ -7245,7 +7320,7 @@ dependencies = [
 [[package]]
 name = "reth-etl"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "rayon",
  "reth-db-api",
@@ -7255,9 +7330,9 @@ dependencies = [
 [[package]]
 name = "reth-evm"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
- "alloy-eips",
+ "alloy-eips 0.2.0",
  "auto_impl",
  "futures-util",
  "reth-chainspec",
@@ -7273,9 +7348,9 @@ dependencies = [
 [[package]]
 name = "reth-evm-ethereum"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
- "alloy-eips",
+ "alloy-eips 0.2.0",
  "alloy-sol-types",
  "reth-chainspec",
  "reth-ethereum-consensus",
@@ -7291,9 +7366,9 @@ dependencies = [
 [[package]]
 name = "reth-execution-errors"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
- "alloy-eips",
+ "alloy-eips 0.2.0",
  "alloy-primitives",
  "reth-consensus",
  "reth-prune-types",
@@ -7305,7 +7380,7 @@ dependencies = [
 [[package]]
 name = "reth-execution-types"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "reth-execution-errors",
  "reth-primitives",
@@ -7316,7 +7391,7 @@ dependencies = [
 [[package]]
 name = "reth-exex"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "eyre",
  "futures",
@@ -7344,7 +7419,7 @@ dependencies = [
 [[package]]
 name = "reth-exex-types"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-primitives",
  "reth-provider",
@@ -7353,7 +7428,7 @@ dependencies = [
 [[package]]
 name = "reth-fs-util"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "serde",
  "serde_json",
@@ -7363,7 +7438,7 @@ dependencies = [
 [[package]]
 name = "reth-ipc"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "async-trait",
  "bytes",
@@ -7384,7 +7459,7 @@ dependencies = [
 [[package]]
 name = "reth-libmdbx"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "bitflags 2.6.0",
  "byteorder",
@@ -7400,7 +7475,7 @@ dependencies = [
 [[package]]
 name = "reth-mdbx-sys"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "bindgen",
  "cc",
@@ -7409,7 +7484,7 @@ dependencies = [
 [[package]]
 name = "reth-metrics"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "futures",
  "metrics",
@@ -7421,7 +7496,7 @@ dependencies = [
 [[package]]
 name = "reth-metrics-derive"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "once_cell",
  "proc-macro2",
@@ -7433,7 +7508,7 @@ dependencies = [
 [[package]]
 name = "reth-net-banlist"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-primitives",
 ]
@@ -7441,7 +7516,7 @@ dependencies = [
 [[package]]
 name = "reth-net-nat"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "futures-util",
  "reqwest 0.12.5",
@@ -7453,7 +7528,7 @@ dependencies = [
 [[package]]
 name = "reth-network"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-rlp",
  "aquamarine",
@@ -7503,7 +7578,7 @@ dependencies = [
 [[package]]
 name = "reth-network-api"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-primitives",
  "alloy-rpc-types-admin",
@@ -7518,7 +7593,7 @@ dependencies = [
 [[package]]
 name = "reth-network-p2p"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "auto_impl",
  "futures",
@@ -7536,7 +7611,7 @@ dependencies = [
 [[package]]
 name = "reth-network-peers"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-primitives",
  "alloy-rlp",
@@ -7551,7 +7626,7 @@ dependencies = [
 [[package]]
 name = "reth-network-types"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "humantime-serde",
  "reth-net-banlist",
@@ -7565,7 +7640,7 @@ dependencies = [
 [[package]]
 name = "reth-nippy-jar"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "anyhow",
  "bincode",
@@ -7585,7 +7660,7 @@ dependencies = [
 [[package]]
 name = "reth-node-api"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "reth-db-api",
  "reth-engine-primitives",
@@ -7601,7 +7676,7 @@ dependencies = [
 [[package]]
 name = "reth-node-builder"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "aquamarine",
  "backon",
@@ -7653,7 +7728,7 @@ dependencies = [
 [[package]]
 name = "reth-node-core"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-genesis",
  "alloy-rpc-types-engine",
@@ -7714,7 +7789,7 @@ dependencies = [
 [[package]]
 name = "reth-node-ethereum"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "eyre",
  "futures",
@@ -7748,7 +7823,7 @@ dependencies = [
 [[package]]
 name = "reth-node-events"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-rpc-types-engine",
  "futures",
@@ -7776,7 +7851,7 @@ source = "git+https://github.com/paradigmxyz/reth.git?tag=v1.0.1#d599393771f9d7d
 [[package]]
 name = "reth-payload-builder"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "futures-util",
  "metrics",
@@ -7797,7 +7872,7 @@ dependencies = [
 [[package]]
 name = "reth-payload-primitives"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "reth-chainspec",
  "reth-errors",
@@ -7812,7 +7887,7 @@ dependencies = [
 [[package]]
 name = "reth-payload-validator"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "reth-chainspec",
  "reth-primitives",
@@ -7823,13 +7898,13 @@ dependencies = [
 [[package]]
 name = "reth-primitives"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
- "alloy-eips",
+ "alloy-eips 0.2.0",
  "alloy-genesis",
  "alloy-primitives",
  "alloy-rlp",
- "alloy-rpc-types",
+ "alloy-rpc-types 0.2.0",
  "bytes",
  "c-kzg",
  "derive_more",
@@ -7853,14 +7928,14 @@ dependencies = [
 [[package]]
 name = "reth-primitives-traits"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
- "alloy-consensus",
- "alloy-eips",
+ "alloy-consensus 0.2.0",
+ "alloy-eips 0.2.0",
  "alloy-genesis",
  "alloy-primitives",
  "alloy-rlp",
- "alloy-rpc-types-eth",
+ "alloy-rpc-types-eth 0.2.0",
  "byteorder",
  "bytes",
  "derive_more",
@@ -7874,7 +7949,7 @@ dependencies = [
 [[package]]
 name = "reth-provider"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-rpc-types-engine",
  "auto_impl",
@@ -7912,7 +7987,7 @@ dependencies = [
 [[package]]
 name = "reth-prune"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-primitives",
  "itertools 0.13.0",
@@ -7938,7 +8013,7 @@ dependencies = [
 [[package]]
 name = "reth-prune-types"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-primitives",
  "bytes",
@@ -7952,9 +8027,9 @@ dependencies = [
 [[package]]
 name = "reth-revm"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
- "alloy-eips",
+ "alloy-eips 0.2.0",
  "reth-chainspec",
  "reth-consensus-common",
  "reth-execution-errors",
@@ -7969,7 +8044,7 @@ dependencies = [
 [[package]]
 name = "reth-rpc"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-dyn-abi",
  "alloy-genesis",
@@ -8022,7 +8097,7 @@ dependencies = [
 [[package]]
 name = "reth-rpc-api"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "jsonrpsee",
  "reth-engine-primitives",
@@ -8035,7 +8110,7 @@ dependencies = [
 [[package]]
 name = "reth-rpc-builder"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "http 1.1.0",
  "jsonrpsee",
@@ -8066,7 +8141,7 @@ dependencies = [
 [[package]]
 name = "reth-rpc-engine-api"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "async-trait",
  "jsonrpsee-core",
@@ -8094,7 +8169,7 @@ dependencies = [
 [[package]]
 name = "reth-rpc-eth-api"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-dyn-abi",
  "async-trait",
@@ -8126,7 +8201,7 @@ dependencies = [
 [[package]]
 name = "reth-rpc-eth-types"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-sol-types",
  "derive_more",
@@ -8163,7 +8238,7 @@ dependencies = [
 [[package]]
 name = "reth-rpc-layer"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-rpc-types-engine",
  "http 1.1.0",
@@ -8176,7 +8251,7 @@ dependencies = [
 [[package]]
 name = "reth-rpc-server-types"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-primitives",
  "jsonrpsee-core",
@@ -8192,10 +8267,10 @@ dependencies = [
 [[package]]
 name = "reth-rpc-types"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-primitives",
- "alloy-rpc-types",
+ "alloy-rpc-types 0.2.0",
  "alloy-rpc-types-admin",
  "alloy-rpc-types-anvil",
  "alloy-rpc-types-beacon",
@@ -8203,17 +8278,17 @@ dependencies = [
  "alloy-rpc-types-mev",
  "alloy-rpc-types-trace",
  "alloy-rpc-types-txpool",
- "alloy-serde",
+ "alloy-serde 0.2.0",
  "jsonrpsee-types",
 ]
 
 [[package]]
 name = "reth-rpc-types-compat"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-rlp",
- "alloy-rpc-types",
+ "alloy-rpc-types 0.2.0",
  "reth-primitives",
  "reth-rpc-types",
  "reth-trie-common",
@@ -8222,7 +8297,7 @@ dependencies = [
 [[package]]
 name = "reth-stages"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "futures-util",
  "itertools 0.13.0",
@@ -8256,7 +8331,7 @@ dependencies = [
 [[package]]
 name = "reth-stages-api"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-primitives",
  "aquamarine",
@@ -8283,7 +8358,7 @@ dependencies = [
 [[package]]
 name = "reth-stages-types"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-primitives",
  "bytes",
@@ -8296,7 +8371,7 @@ dependencies = [
 [[package]]
 name = "reth-static-file"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-primitives",
  "parking_lot 0.12.3",
@@ -8316,7 +8391,7 @@ dependencies = [
 [[package]]
 name = "reth-static-file-types"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-primitives",
  "clap",
@@ -8328,7 +8403,7 @@ dependencies = [
 [[package]]
 name = "reth-storage-api"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "auto_impl",
  "reth-chainspec",
@@ -8345,7 +8420,7 @@ dependencies = [
 [[package]]
 name = "reth-storage-errors"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "reth-fs-util",
  "reth-primitives",
@@ -8355,7 +8430,7 @@ dependencies = [
 [[package]]
 name = "reth-tasks"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "auto_impl",
  "dyn-clone",
@@ -8373,7 +8448,7 @@ dependencies = [
 [[package]]
 name = "reth-tokio-util"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "tokio",
  "tokio-stream",
@@ -8383,7 +8458,7 @@ dependencies = [
 [[package]]
 name = "reth-tracing"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "clap",
  "eyre",
@@ -8398,7 +8473,7 @@ dependencies = [
 [[package]]
 name = "reth-transaction-pool"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-rlp",
  "aquamarine",
@@ -8429,7 +8504,7 @@ dependencies = [
 [[package]]
 name = "reth-trie"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-rlp",
  "auto_impl",
@@ -8451,9 +8526,9 @@ dependencies = [
 [[package]]
 name = "reth-trie-common"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
- "alloy-consensus",
+ "alloy-consensus 0.2.0",
  "alloy-genesis",
  "alloy-primitives",
  "alloy-rlp",
@@ -8471,7 +8546,7 @@ dependencies = [
 [[package]]
 name = "reth-trie-db"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-rlp",
  "auto_impl",
@@ -8494,7 +8569,7 @@ dependencies = [
 [[package]]
 name = "reth-trie-parallel"
 version = "1.0.3"
-source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#1fe97682dafc40a8d24b05a12c4da668951723f3"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
 dependencies = [
  "alloy-rlp",
  "derive_more",
@@ -8537,7 +8612,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5296ccad8d7ccbeb6c5a037a57bfe1ff27e81d8c4efbd3ae7df0a554eb1a818a"
 dependencies = [
  "alloy-primitives",
- "alloy-rpc-types",
+ "alloy-rpc-types 0.2.0",
  "alloy-sol-types",
  "anstyle",
  "boa_engine",
@@ -8583,7 +8658,7 @@ version = "7.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2fc4311037ee093ec50ec734e1424fcb3e12d535c6cef683b75d1c064639630c"
 dependencies = [
- "alloy-eips",
+ "alloy-eips 0.2.0",
  "alloy-primitives",
  "auto_impl",
  "bitflags 2.6.0",
@@ -11416,6 +11491,25 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "serde",
+]
+
+[[package]]
+name = "zkvm-primitives"
+version = "0.1.0"
+source = "git+https://github.com/MdTeach/reth?branch=prover-primitives#938886b65bf4aed786ae11307048f3cb2acc0116"
+dependencies = [
+ "alloy-eips 0.2.0",
+ "alloy-primitives",
+ "alloy-rlp",
+ "alloy-rlp-derive",
+ "alloy-rpc-types 0.1.4",
+ "anyhow",
+ "reth-primitives",
+ "reth-trie-common",
+ "revm",
+ "rlp",
+ "serde",
+ "thiserror",
 ]
 
 [[package]]
