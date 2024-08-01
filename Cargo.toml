@@ -24,7 +24,7 @@ members = [
   "crates/util/mmr",
   "crates/vtxjmt",
   "crates/bridge-exec",
-  "crates/bridge-rpc-service",
+  "crates/bridge-rpc-api",
   "crates/bridge-tx-manager",
   "crates/prover/primitives",
   # binaries listed separately
