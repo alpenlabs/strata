@@ -216,12 +216,7 @@ where
                 tx_type: tx.transaction.tx_type(),
                 success: res.result.is_success(),
                 cumulative_gas_used: cumulative_gas_used.try_into().unwrap(),
-                logs: res
-                    .result
-                    .logs()
-                    .into_iter()
-                    .map(|log| log.clone().into())
-                    .collect(),
+                logs: res.result.logs().to_vec(),
             };
 
             // Update logs bloom.
@@ -340,7 +335,7 @@ fn fill_eth_tx_env(tx_env: &mut TxEnv, essence: &Transaction, caller: Address) {
             } else {
                 TransactTo::Create
             };
-            tx_env.value = tx.value.into();
+            tx_env.value = tx.value;
             tx_env.data = tx.input.clone();
             tx_env.chain_id = tx.chain_id;
             tx_env.nonce = Some(tx.nonce);
@@ -356,7 +351,7 @@ fn fill_eth_tx_env(tx_env: &mut TxEnv, essence: &Transaction, caller: Address) {
             } else {
                 TransactTo::Create
             };
-            tx_env.value = tx.value.into();
+            tx_env.value = tx.value;
             tx_env.data = tx.input.clone();
             tx_env.chain_id = Some(tx.chain_id);
             tx_env.nonce = Some(tx.nonce);
@@ -372,7 +367,7 @@ fn fill_eth_tx_env(tx_env: &mut TxEnv, essence: &Transaction, caller: Address) {
             } else {
                 TransactTo::Create
             };
-            tx_env.value = tx.value.into();
+            tx_env.value = tx.value;
             tx_env.data = tx.input.clone();
             tx_env.chain_id = Some(tx.chain_id);
             tx_env.nonce = Some(tx.nonce);
