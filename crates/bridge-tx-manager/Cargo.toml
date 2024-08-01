@@ -1,6 +1,6 @@
 [package]
 edition = "2021"
-name = "alpen-vertex-bridge-txm"
+name = "express-bridge-txm"
 version = "0.1.0"
 
 [lints]

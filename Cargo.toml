@@ -61,6 +61,9 @@ alpen-express-state = { path = "crates/state" }
 alpen-express-status = { path = "crates/status" }
 alpen-test-utils = { path = "crates/test-utils" }
 bitcoin-blockspace = { path = "crates/prover/bitcoin-blockspace" }
+express-bridge-exec = { path = "crates/bridge-exec" }
+express-bridge-rpc-api = { path = "crates/bridge-rpc-api" }
+express-bridge-txm = { path = "crates/bridge-tx-manager" }
 express-chaintsn = { path = "crates/chaintsn" }
 express-reth-db = { path = "crates/reth/db" }
 express-reth-exex = { path = "crates/reth/exex" }
