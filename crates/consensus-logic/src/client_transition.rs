@@ -59,7 +59,9 @@ pub fn process_event<D: Database>(
 
         SyncEvent::L1Revert(to_height) => {
             let l1prov = database.l1_provider();
-            let blkmf = l1prov.get_block_manifest(*to_height)?.unwrap();
+            let blkmf = l1prov
+                .get_block_manifest(*to_height)?
+                .ok_or(Error::MissingL1BlockHeight(*to_height))?;
             let blkid = blkmf.block_hash().into();
             writes.push(ClientStateWrite::RollbackL1BlocksTo(blkid));
         }
@@ -114,10 +116,10 @@ pub fn process_event<D: Database>(
 
 #[cfg(test)]
 mod tests {
-    use alpen_express_db::client_state;
-    use alpen_express_primitives::block_credential;
+    use alpen_express_db::{client_state, traits::L1DataStore};
+    use alpen_express_primitives::{block_credential, l1::L1BlockManifest};
     use alpen_express_state::{l1::L1BlockId, operation};
-    use alpen_test_utils::{get_common_db, get_rocksdb_tmp_instance};
+    use alpen_test_utils::{get_common_db, get_rocksdb_tmp_instance, ArbitraryGenerator};
 
     use crate::genesis;
 
@@ -156,7 +158,7 @@ mod tests {
     }
 
     #[test]
-    fn handle_l1_event() {
+    fn handle_l1_block() {
         let database = get_common_db();
         let params = get_params();
         let mut state = gen_client_state(&params);
@@ -209,19 +211,44 @@ mod tests {
 
             let output = process_event(&state, &event, database.as_ref(), &params).unwrap();
 
-            let writes = output.writes();
-            let actions = output.actions();
-
             let expection_writes = [
                 ClientStateWrite::AcceptL1Block(l1_block_id),
                 ClientStateWrite::UpdateBuried(params.rollup.genesis_l1_height + 1),
             ];
             let expected_actions = [];
 
-            assert_eq!(writes, expection_writes);
-            assert_eq!(actions, expected_actions);
+            assert_eq!(output.writes(), expection_writes);
+            assert_eq!(output.actions(), expected_actions);
 
-            operation::apply_writes_to_state(&mut state, writes.iter().cloned());
+            operation::apply_writes_to_state(&mut state, output.writes().iter().cloned());
         }
+    }
+
+    #[test]
+    fn handle_l1_revert() {
+        let database = get_common_db();
+        let params = get_params();
+        let mut state = gen_client_state(&params);
+
+        let height = 5;
+        let event = SyncEvent::L1Revert(height);
+
+        let output = process_event(&state, &event, database.as_ref(), &params);
+        assert!(output.is_err_and(|x| matches!(x, Error::MissingL1BlockHeight(height))));
+
+        let l1_block: L1BlockManifest = ArbitraryGenerator::new().generate();
+        database
+            .l1_store()
+            .put_block_data(height, l1_block.clone(), vec![])
+            .unwrap();
+
+        let output = process_event(&state, &event, database.as_ref(), &params).unwrap();
+        let expectation_writes = [ClientStateWrite::RollbackL1BlocksTo(
+            l1_block.block_hash().into(),
+        )];
+        let expected_actions = [];
+
+        assert_eq!(output.actions(), expected_actions);
+        assert_eq!(output.writes(), expectation_writes);
     }
 }
