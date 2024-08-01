@@ -361,49 +361,6 @@ impl BitcoinClient {
         Ok([change_address, change_address_2])
     }
 
-    // sign_raw_transaction_with_wallet signs a raw transaction with the wallet of bitcoind
-    pub async fn sign_raw_transaction_with_wallet(&self, tx: String) -> ClientResult<String> {
-        #[derive(Serialize, Deserialize, Debug)]
-        struct SignError {
-            txid: String,
-            vout: u32,
-            witness: Vec<String>,
-            #[serde(rename = "scriptSig")]
-            script_sig: String,
-            sequence: u32,
-            error: String,
-        }
-
-        #[derive(Serialize, Deserialize, Debug)]
-        struct SignRPCResponse {
-            hex: String,
-            complete: bool,
-            errors: Option<Vec<SignError>>,
-        }
-
-        let res = self
-            .call::<SignRPCResponse>("signrawtransactionwithwallet", &[to_value(tx)?])
-            .await?;
-
-        match res.errors {
-            None => Ok(res.hex),
-            Some(ref errors) => {
-                warn!("Error while signing with wallet: {:?}", res.errors);
-                let errs = errors
-                    .iter()
-                    .map(|x| x.error.clone())
-                    .collect::<Vec<String>>();
-
-                // TODO: This throws error even when a transaction is partially signed. There does
-                // not seem to be other way to distinguish partially signed error from other
-                // errors. So in future, we might need to handle that particular case where error
-                // message is "CHECK(MULTI)SIG failing with non-zero signature (possibly need more
-                // signatures)"
-                Err(ClientError::Signing(errs))
-            }
-        }
-    }
-
     #[cfg(test)]
     pub async fn send_to_address(&self, address: String, amt: u32) -> anyhow::Result<String> {
         if self.network == Network::Regtest {
@@ -533,6 +490,49 @@ impl SeqL1Client for BitcoinClient {
 
         // convert to sat/vB and round up
         Ok((btc_vkb * 100_000_000.0 / 1000.0).ceil() as u64)
+    }
+
+    // sign_raw_transaction_with_wallet signs a raw transaction with the wallet of bitcoind
+    async fn sign_raw_transaction_with_wallet(&self, tx: String) -> ClientResult<String> {
+        #[derive(Serialize, Deserialize, Debug)]
+        struct SignError {
+            txid: String,
+            vout: u32,
+            witness: Vec<String>,
+            #[serde(rename = "scriptSig")]
+            script_sig: String,
+            sequence: u32,
+            error: String,
+        }
+
+        #[derive(Serialize, Deserialize, Debug)]
+        struct SignRPCResponse {
+            hex: String,
+            complete: bool,
+            errors: Option<Vec<SignError>>,
+        }
+
+        let res = self
+            .call::<SignRPCResponse>("signrawtransactionwithwallet", &[to_value(tx)?])
+            .await?;
+
+        match res.errors {
+            None => Ok(res.hex),
+            Some(ref errors) => {
+                warn!("Error while signing with wallet: {:?}", res.errors);
+                let errs = errors
+                    .iter()
+                    .map(|x| x.error.clone())
+                    .collect::<Vec<String>>();
+
+                // TODO: This throws error even when a transaction is partially signed. There does
+                // not seem to be other way to distinguish partially signed error from other
+                // errors. So in future, we might need to handle that particular case where error
+                // message is "CHECK(MULTI)SIG failing with non-zero signature (possibly need more
+                // signatures)"
+                Err(ClientError::Signing(errs))
+            }
+        }
     }
 
     fn network(&self) -> Network {

@@ -39,6 +39,9 @@ pub trait SeqL1Client: Sync + Send + 'static {
     /// estimate_smart_fee estimates the fee to confirm a transaction in the next block
     async fn estimate_smart_fee(&self) -> Result<u64, ClientError>;
 
+    /// sign transaction with bitcoind wallet
+    async fn sign_raw_transaction_with_wallet(&self, tx: String) -> Result<String, ClientError>;
+
     /// Network of the rpc client
     fn network(&self) -> Network;
 }
