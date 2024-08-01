@@ -63,7 +63,7 @@ sec: ## Check for security advisories on any dependencies.
 .PHONY: ensure-poetry
 ensure-poetry:
 	@if ! command -v poetry &> /dev/null; then \
-		echo "poetry not found. Please install it by running the command `cargo install taplo-cli --locked` or refer to the following link for more information: https://taplo.tamasfe.dev/cli/installation/binary.html" \
+		echo "poetry not found. Please install it by the following the instructions from: https://python-poetry.org/docs/#installation" \
 		exit 1; \
     fi
 
@@ -92,7 +92,7 @@ fmt-ws: ## Format source code in the workspace.
 .PHONY: ensure-taplo
 ensure-taplo:
 	@if ! command -v taplo &> /dev/null; then \
-		echo "taplo not found. Please install it by running the command `cargo install taplo-cli --locked` or refer to the following link for more information: https://taplo.tamasfe.dev/cli/installation/binary.html" \
+		echo "taplo not found. Please install it by following the instructions from: https://taplo.tamasfe.dev/cli/installation/binary.html" \
 		exit 1; \
     fi
 
@@ -106,7 +106,7 @@ fmt-toml: ensure-taplo ## Runs `taplo` to format TOML files
 
 ensure-ruff:
 	@if ! command -v ruff &> /dev/null; then \
-		echo "ruff not found. Please install it by running the command `pip install ruff` or refer to the following link for more information: https://docs.astral.sh/ruff/installation/" \
+		echo "ruff not found. Please install it by running the command 'pip install ruff' or refer to the following link for more information: https://docs.astral.sh/ruff/installation/" \
 		exit 1; \
     fi
 
@@ -145,7 +145,7 @@ lint-fix-ws: ## Lints the workspace and applies fixes where possible.
 
 ensure-codespell:
 	@if ! command -v codespell &> /dev/null; then \
-		echo "codespell not found. Please install it by running the command `pip install codespell` or refer to the following link for more information: https://github.com/codespell-project/codespell" \
+		echo "codespell not found. Please install it by running the command 'pip install codespell' or refer to the following link for more information: https://github.com/codespell-project/codespell" \
 		exit 1; \
     fi
 
