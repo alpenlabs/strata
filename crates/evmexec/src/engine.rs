@@ -27,47 +27,17 @@ fn address_from_slice(slice: &[u8]) -> Option<Address> {
     slice.map(Address::from)
 }
 
-/// (head, safe, finalized)
-pub type FCS = (L2BlockId, Option<L2BlockId>, Option<L2BlockId>);
-
-pub struct RpcExecEngineCtl<T: EngineRpc, P: L2DataProvider> {
-    client: T,
-    fork_choice_state: Mutex<ForkchoiceState>,
-    tokio_handle: Handle,
-    l2_provider: Arc<P>,
+struct RpcExecEngineInner<T: EngineRpc> {
+    pub client: T,
+    pub fork_choice_state: Mutex<ForkchoiceState>,
 }
 
-impl<T: EngineRpc, P: L2DataProvider> RpcExecEngineCtl<T, P> {
-    pub fn new(
-        client: T,
-        fork_choice_state: ForkchoiceState,
-        handle: Handle,
-        l2_provider: Arc<P>,
-    ) -> Self {
+impl<T: EngineRpc> RpcExecEngineInner<T> {
+    fn new(client: T, fork_choice_state: ForkchoiceState) -> Self {
         Self {
             client,
             fork_choice_state: Mutex::new(fork_choice_state),
-            tokio_handle: handle,
-            l2_provider,
         }
-    }
-}
-
-impl<T: EngineRpc, P: L2DataProvider> RpcExecEngineCtl<T, P> {
-    fn get_l2block(&self, l2_block_id: &L2BlockId) -> anyhow::Result<L2BlockBundle> {
-        self.l2_provider
-            .get_block_data(*l2_block_id)?
-            .ok_or(anyhow::anyhow!("missing L2Block"))
-    }
-
-    fn get_evm_block_hash(&self, l2_block_id: &L2BlockId) -> anyhow::Result<B256> {
-        self.get_l2block(l2_block_id)
-            .and_then(|l2block| self.get_block_info(l2block))
-            .map(|evm_block| evm_block.block_hash())
-    }
-
-    fn get_block_info(&self, l2block: L2BlockBundle) -> anyhow::Result<EVML2Block> {
-        EVML2Block::try_from(l2block).map_err(anyhow::Error::msg)
     }
 
     async fn update_block_state(
@@ -231,9 +201,49 @@ impl<T: EngineRpc, P: L2DataProvider> RpcExecEngineCtl<T, P> {
     }
 }
 
+pub struct RpcExecEngineCtl<T: EngineRpc, P: L2DataProvider> {
+    inner: RpcExecEngineInner<T>,
+    tokio_handle: Handle,
+    l2_provider: Arc<P>,
+}
+
+impl<T: EngineRpc, P: L2DataProvider> RpcExecEngineCtl<T, P> {
+    pub fn new(
+        client: T,
+        fork_choice_state: ForkchoiceState,
+        handle: Handle,
+        l2_provider: Arc<P>,
+    ) -> Self {
+        Self {
+            inner: RpcExecEngineInner::new(client, fork_choice_state),
+            tokio_handle: handle,
+            l2_provider,
+        }
+    }
+}
+
+impl<T: EngineRpc, P: L2DataProvider> RpcExecEngineCtl<T, P> {
+    fn get_l2block(&self, l2_block_id: &L2BlockId) -> anyhow::Result<L2BlockBundle> {
+        self.l2_provider
+            .get_block_data(*l2_block_id)?
+            .ok_or(anyhow::anyhow!("missing L2Block"))
+    }
+
+    fn get_evm_block_hash(&self, l2_block_id: &L2BlockId) -> anyhow::Result<B256> {
+        self.get_l2block(l2_block_id)
+            .and_then(|l2block| self.get_block_info(l2block))
+            .map(|evm_block| evm_block.block_hash())
+    }
+
+    fn get_block_info(&self, l2block: L2BlockBundle) -> anyhow::Result<EVML2Block> {
+        EVML2Block::try_from(l2block).map_err(anyhow::Error::msg)
+    }
+}
+
 impl<T: EngineRpc, P: L2DataProvider> ExecEngineCtl for RpcExecEngineCtl<T, P> {
     fn submit_payload(&self, payload: ExecPayloadData) -> EngineResult<BlockStatus> {
-        self.tokio_handle.block_on(self.submit_new_payload(payload))
+        self.tokio_handle
+            .block_on(self.inner.submit_new_payload(payload))
     }
 
     fn prepare_payload(&self, env: PayloadEnv) -> EngineResult<u64> {
@@ -243,11 +253,12 @@ impl<T: EngineRpc, P: L2DataProvider> ExecEngineCtl for RpcExecEngineCtl<T, P> {
         let prev_block = EVML2Block::try_from(prev_l2block)
             .map_err(|err| EngineError::Other(err.to_string()))?;
         self.tokio_handle
-            .block_on(self.build_block_from_mempool(env, prev_block))
+            .block_on(self.inner.build_block_from_mempool(env, prev_block))
     }
 
     fn get_payload_status(&self, id: u64) -> EngineResult<PayloadStatus> {
-        self.tokio_handle.block_on(self.get_payload_status(id))
+        self.tokio_handle
+            .block_on(self.inner.get_payload_status(id))
     }
 
     fn update_head_block(&self, id: L2BlockId) -> EngineResult<()> {
@@ -260,7 +271,10 @@ impl<T: EngineRpc, P: L2DataProvider> ExecEngineCtl for RpcExecEngineCtl<T, P> {
                 head_block_hash: Some(block_hash),
                 ..Default::default()
             };
-            self.update_block_state(fork_choice_state).await.map(|_| ())
+            self.inner
+                .update_block_state(fork_choice_state)
+                .await
+                .map(|_| ())
         })
     }
 
@@ -277,7 +291,10 @@ impl<T: EngineRpc, P: L2DataProvider> ExecEngineCtl for RpcExecEngineCtl<T, P> {
                 safe_block_hash: Some(block_hash),
                 ..Default::default()
             };
-            self.update_block_state(fork_choice_state).await.map(|_| ())
+            self.inner
+                .update_block_state(fork_choice_state)
+                .await
+                .map(|_| ())
         })
     }
 
@@ -291,12 +308,15 @@ impl<T: EngineRpc, P: L2DataProvider> ExecEngineCtl for RpcExecEngineCtl<T, P> {
                 finalized_block_hash: Some(block_hash),
                 ..Default::default()
             };
-            self.update_block_state(fork_choice_state).await.map(|_| ())
+            self.inner
+                .update_block_state(fork_choice_state)
+                .await
+                .map(|_| ())
         })
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Copy)]
 struct ForkchoiceStatePartial {
     /// Hash of the head block.
     pub head_block_hash: Option<B256>,
@@ -308,9 +328,6 @@ struct ForkchoiceStatePartial {
 
 #[cfg(test)]
 mod tests {
-    use alpen_express_db::stubs::l2::StubL2Db;
-    use alpen_express_db::traits::L2DataStore;
-    use alpen_express_state::block::{L2Block, L2BlockAccessory};
     use rand::Rng;
     use reth_primitives::revm_primitives::FixedBytes;
     use reth_primitives::{Bloom, Bytes, U256};
@@ -320,6 +337,7 @@ mod tests {
     use alpen_express_evmctl::errors::EngineResult;
     use alpen_express_evmctl::messages::PayloadEnv;
     use alpen_express_primitives::buf::Buf32;
+    use alpen_express_state::block::{L2Block, L2BlockAccessory};
 
     use crate::http_client::MockEngineRpc;
 
@@ -351,35 +369,70 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_update_block_state() {
+    async fn test_update_block_state_success() {
         let mut mock_client = MockEngineRpc::new();
-
-        let fcs_partial = ForkchoiceStatePartial {
-            head_block_hash: Some(B256::random()),
-            safe_block_hash: None,
-            finalized_block_hash: None,
-        };
-
-        let fcs = ForkchoiceState {
-            head_block_hash: B256::random(),
-            safe_block_hash: B256::random(),
-            finalized_block_hash: B256::random(),
-        };
 
         mock_client
             .expect_fork_choice_updated_v2()
             .returning(move |_, _| Ok(ForkchoiceUpdated::from_status(PayloadStatusEnum::Valid)));
 
-        let rpc_exec_engine_ctl = RpcExecEngineCtl::new(
-            mock_client,
-            fcs,
-            Handle::current(),
-            Arc::new(StubL2Db::new()),
-        );
+        let initial_fcs = ForkchoiceState {
+            head_block_hash: B256::random(),
+            safe_block_hash: B256::random(),
+            finalized_block_hash: B256::random(),
+        };
 
-        let result = rpc_exec_engine_ctl.update_block_state(fcs_partial).await;
+        let rpc_exec_engine_inner = RpcExecEngineInner::new(mock_client, initial_fcs);
+
+        let fcs_update = ForkchoiceStatePartial {
+            head_block_hash: Some(B256::random()),
+            safe_block_hash: None,
+            finalized_block_hash: None,
+        };
+
+        let result = rpc_exec_engine_inner.update_block_state(fcs_update).await;
 
         assert!(matches!(result, EngineResult::Ok(BlockStatus::Valid)));
+        assert!(
+            *rpc_exec_engine_inner.fork_choice_state.lock().await
+                == ForkchoiceState {
+                    head_block_hash: fcs_update.head_block_hash.unwrap(),
+                    safe_block_hash: initial_fcs.safe_block_hash,
+                    finalized_block_hash: initial_fcs.finalized_block_hash,
+                }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_update_block_state_failed() {
+        let mut mock_client = MockEngineRpc::new();
+
+        mock_client
+            .expect_fork_choice_updated_v2()
+            .returning(move |_, _| {
+                Ok(ForkchoiceUpdated::from_status(PayloadStatusEnum::Invalid {
+                    validation_error: "foo".to_string(),
+                }))
+            });
+
+        let initial_fcs = ForkchoiceState {
+            head_block_hash: B256::random(),
+            safe_block_hash: B256::random(),
+            finalized_block_hash: B256::random(),
+        };
+
+        let rpc_exec_engine_inner = RpcExecEngineInner::new(mock_client, initial_fcs);
+
+        let fcs_update = ForkchoiceStatePartial {
+            head_block_hash: Some(B256::random()),
+            safe_block_hash: None,
+            finalized_block_hash: None,
+        };
+
+        let result = rpc_exec_engine_inner.update_block_state(fcs_update).await;
+
+        assert!(matches!(result, EngineResult::Ok(BlockStatus::Invalid)));
+        assert!(*rpc_exec_engine_inner.fork_choice_state.lock().await == initial_fcs)
     }
 
     #[tokio::test]
@@ -394,8 +447,6 @@ mod tests {
                     .with_payload_id(PayloadId::new([1u8; 8])))
             });
 
-        let l2db = StubL2Db::new();
-
         let el_payload = random_el_payload();
 
         let arb = alpen_test_utils::ArbitraryGenerator::new();
@@ -405,10 +456,7 @@ mod tests {
 
         let evm_l2_block = EVML2Block::try_from(l2block_bundle.clone()).unwrap();
 
-        l2db.put_block_data(l2block_bundle).unwrap();
-
-        let rpc_exec_engine_ctl =
-            RpcExecEngineCtl::new(mock_client, fcs, Handle::current(), Arc::new(l2db));
+        let rpc_exec_engine_inner = RpcExecEngineInner::new(mock_client, fcs);
 
         let timestamp = 0;
         let el_ops = vec![];
@@ -417,11 +465,15 @@ mod tests {
 
         let payload_env = PayloadEnv::new(timestamp, prev_l2_block, safe_l1_block, el_ops);
 
-        let result = rpc_exec_engine_ctl
+        let result = rpc_exec_engine_inner
             .build_block_from_mempool(payload_env, evm_l2_block)
             .await;
 
         assert!(result.is_ok());
+        // let exec_payload = ExecutionPayloadV1::from(el_payload);
+        assert!(
+            *rpc_exec_engine_inner.fork_choice_state.lock().await == ForkchoiceState::default()
+        );
     }
 
     #[tokio::test]
@@ -436,14 +488,9 @@ mod tests {
             })
         });
 
-        let rpc_exec_engine_ctl = RpcExecEngineCtl::new(
-            mock_client,
-            fcs,
-            Handle::current(),
-            Arc::new(StubL2Db::new()),
-        );
+        let rpc_exec_engine_inner = RpcExecEngineInner::new(mock_client, fcs);
 
-        let result = rpc_exec_engine_ctl.get_payload_status(0).await;
+        let result = rpc_exec_engine_inner.get_payload_status(0).await;
 
         assert!(result.is_ok());
     }
@@ -481,14 +528,9 @@ mod tests {
             })
         });
 
-        let rpc_exec_engine_ctl = RpcExecEngineCtl::new(
-            mock_client,
-            fcs,
-            Handle::current(),
-            Arc::new(StubL2Db::new()),
-        );
+        let rpc_exec_engine_inner = RpcExecEngineInner::new(mock_client, fcs);
 
-        let result = rpc_exec_engine_ctl.submit_new_payload(payload_data).await;
+        let result = rpc_exec_engine_inner.submit_new_payload(payload_data).await;
 
         assert!(matches!(result, EngineResult::Ok(BlockStatus::Valid)));
     }
