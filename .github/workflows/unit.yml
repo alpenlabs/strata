@@ -36,6 +36,9 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-llvm-cov
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
       - name: Run tests with coverage
         run: |
           cargo llvm-cov --workspace nextest --profile ci --lcov --output-path lcov.info
