@@ -8,6 +8,7 @@ members = [
   "crates/evmexec",
   "crates/primitives",
   "crates/rpc/api",
+  "crates/reth/db",
   "crates/state",
   "crates/test-utils",
   "crates/util/mmr",
@@ -36,6 +37,7 @@ alpen-express-rocksdb = { path = "crates/rocksdb-store" }
 alpen-express-rpc-api = { path = "crates/rpc/api" }
 alpen-express-state = { path = "crates/state" }
 alpen-test-utils = { path = "crates/test-utils" }
+express-reth-db = { path = "crates/reth/db" }
 zkvm = { path = "crates/prover/zkvm" }
 zkvm-primitives = { path = "crates/prover/primitives" }
 

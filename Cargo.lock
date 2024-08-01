@@ -3152,6 +3152,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "express-reth-db"
+version = "0.1.0"
+dependencies = [
+ "alpen-express-rocksdb",
+ "anyhow",
+ "bincode",
+ "reth-primitives",
+ "rockbound",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "tracing",
+ "zkvm-primitives",
+]
+
+[[package]]
 name = "eyre"
 version = "0.6.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
