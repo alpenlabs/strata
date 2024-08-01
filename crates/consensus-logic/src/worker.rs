@@ -159,6 +159,7 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
                 // TODO we should probably emit a state checkpoint here if we
                 // aren't already
                 info!(?blkid, "finalizing block");
+                engine.update_finalized_block(*blkid)?;
             }
 
             SyncAction::L2Genesis(l1blkid) => {
