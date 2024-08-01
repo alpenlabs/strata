@@ -711,6 +711,7 @@ dependencies = [
  "anyhow",
  "bitcoin",
  "borsh",
+ "mockall",
  "parking_lot 0.12.3",
  "thiserror",
  "tracing",
