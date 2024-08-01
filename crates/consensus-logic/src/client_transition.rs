@@ -116,12 +116,10 @@ pub fn process_event<D: Database>(
 
 #[cfg(test)]
 mod tests {
-    use alpen_express_db::{client_state, traits::L1DataStore};
+    use alpen_express_db::traits::L1DataStore;
     use alpen_express_primitives::{block_credential, l1::L1BlockManifest};
     use alpen_express_state::{l1::L1BlockId, operation};
-    use alpen_test_utils::{get_common_db, get_rocksdb_tmp_instance, ArbitraryGenerator};
-
-    use crate::genesis;
+    use alpen_test_utils::{get_common_db, ArbitraryGenerator};
 
     use super::*;
 
@@ -157,16 +155,29 @@ mod tests {
         )
     }
 
+    fn gen_l1_chain(len: usize) -> Vec<L1BlockManifest> {
+        let mut blocks = vec![];
+        for _ in 0..len {
+            let block: L1BlockManifest = ArbitraryGenerator::new().generate();
+            blocks.push(block);
+        }
+        blocks
+    }
+
     #[test]
     fn handle_l1_block() {
         let database = get_common_db();
         let params = get_params();
         let mut state = gen_client_state(&params);
-        let l1_block_id = L1BlockId::from(Buf32::default());
+
+        assert!(!state.is_chain_active());
+        let l1_chain = gen_l1_chain(15);
 
         // before the genesis of L2 is reached
         {
-            let event = SyncEvent::L1Block(1, l1_block_id);
+            let height = 1;
+            let l1_block_id = l1_chain[height as usize].block_hash().into();
+            let event = SyncEvent::L1Block(height, l1_block_id);
 
             let output = process_event(&state, &event, database.as_ref(), &params).unwrap();
 
@@ -180,17 +191,20 @@ mod tests {
             assert_eq!(actions, expected_actions);
 
             operation::apply_writes_to_state(&mut state, writes.iter().cloned());
+
+            assert!(!state.is_chain_active());
+            assert_eq!(state.recent_l1_block(), Some(&l1_block_id));
+            assert_eq!(state.buried_l1_height(), params.rollup.genesis_l1_height);
+            assert_eq!(state.l1_view().local_unaccepted_blocks(), [l1_block_id]);
         }
 
         // after the genesis of L2 is reached
         {
             let height = params.rollup.genesis_l1_height + 3;
+            let l1_block_id = l1_chain[height as usize].block_hash().into();
             let event = SyncEvent::L1Block(height, l1_block_id);
 
             let output = process_event(&state, &event, database.as_ref(), &params).unwrap();
-
-            let writes = output.writes();
-            let actions = output.actions();
 
             let expection_writes = [
                 ClientStateWrite::AcceptL1Block(l1_block_id),
@@ -198,15 +212,24 @@ mod tests {
             ];
             let expected_actions = [];
 
-            assert_eq!(writes, expection_writes);
-            assert_eq!(actions, expected_actions);
+            assert_eq!(output.writes(), expection_writes);
+            assert_eq!(output.actions(), expected_actions);
 
-            operation::apply_writes_to_state(&mut state, writes.iter().cloned());
+            operation::apply_writes_to_state(&mut state, output.writes().iter().cloned());
+
+            assert!(state.is_chain_active());
+            assert_eq!(state.recent_l1_block(), Some(&l1_block_id));
+            assert_eq!(state.buried_l1_height(), params.rollup.genesis_l1_height);
+            assert_eq!(
+                state.l1_view().local_unaccepted_blocks(),
+                [l1_chain[1].block_hash().into(), l1_block_id,]
+            );
         }
 
         // after l1_reorg_depth is reached
         {
             let height = params.rollup.genesis_l1_height + params.rollup.l1_reorg_safe_depth as u64;
+            let l1_block_id = l1_chain[height as usize].block_hash().into();
             let event = SyncEvent::L1Block(height, l1_block_id);
 
             let output = process_event(&state, &event, database.as_ref(), &params).unwrap();
@@ -221,6 +244,17 @@ mod tests {
             assert_eq!(output.actions(), expected_actions);
 
             operation::apply_writes_to_state(&mut state, output.writes().iter().cloned());
+
+            assert!(state.is_chain_active());
+            assert_eq!(state.recent_l1_block(), Some(&l1_block_id));
+            assert_eq!(
+                state.buried_l1_height(),
+                params.rollup.genesis_l1_height + 1
+            );
+            assert_eq!(
+                state.l1_view().local_unaccepted_blocks(),
+                [l1_chain[8].block_hash().into(), l1_block_id,]
+            );
         }
     }
 
