@@ -1,21 +1,21 @@
 use std::{future::Future, sync::Arc};
 
-use alloy_genesis::Genesis;
 use clap::Parser;
 use reth::{
     args::LogArgs,
     builder::{NodeBuilder, WithLaunchContext},
-    commands::node::NodeCommand,
     CliRunner,
 };
 use reth_chainspec::ChainSpec;
+use reth_cli_commands::node::NodeCommand;
 use reth_node_ethereum::EthereumNode;
+use reth_primitives::Genesis;
 use tracing::info;
 
 const ALPEN_CHAIN_SPEC: &str = include_str!("../res/alpen-dev-chain.json");
 
 fn main() {
-    reth::sigsegv_handler::install();
+    reth_cli_util::sigsegv_handler::install();
 
     // Enable backtraces unless a RUST_BACKTRACE value has already been explicitly provided.
     if std::env::var_os("RUST_BACKTRACE").is_none() {

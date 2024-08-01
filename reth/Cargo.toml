@@ -13,8 +13,11 @@ clap = "4"
 eyre = "0.6"
 reth = { workspace = true }
 reth-chainspec = { workspace = true }
+reth-cli-commands = { workspace = true }
+reth-cli-util = { workspace = true }
 reth-db = { workspace = true }
 reth-node-ethereum = { workspace = true }
+reth-primitives = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
 toml = { workspace = true }
