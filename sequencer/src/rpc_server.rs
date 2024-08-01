@@ -20,7 +20,7 @@ use tokio::sync::{oneshot, watch, Mutex, RwLock};
 
 use alpen_express_db::traits::L1DataProvider;
 use alpen_express_db::traits::{ChainstateProvider, Database, L2DataProvider};
-use alpen_express_rpc_api::{AlpenApiServer, ClientStatus, L1Status};
+use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer, ClientStatus, L1Status};
 use alpen_express_state::{
     chain_state::ChainState, client_state::ClientState, header::L2Header, id::L2BlockId,
 };
@@ -162,16 +162,6 @@ where
         Ok(1)
     }
 
-    async fn stop(&self) -> RpcResult<()> {
-        let mut opt = self.stop_tx.lock().await;
-        if let Some(stop_tx) = opt.take() {
-            if stop_tx.send(()).is_err() {
-                warn!("tried to send stop signal, channel closed");
-            }
-        }
-        Ok(())
-    }
-
     async fn get_l1_status(&self) -> RpcResult<L1Status> {
         let btcio_status = self.l1_status.read().await.clone();
 
@@ -219,6 +209,22 @@ where
             last_l1_block: *last_l1.as_ref(),
             buried_l1_height: state.buried_l1_height(),
         })
+    }
+}
+
+#[async_trait]
+impl<D: Database + Send + Sync + 'static> AlpenAdminApiServer for AlpenRpcImpl<D>
+where
+    <D as alpen_express_db::traits::Database>::L1Prov: Send + Sync + 'static,
+{
+    async fn stop(&self) -> RpcResult<()> {
+        let mut opt = self.stop_tx.lock().await;
+        if let Some(stop_tx) = opt.take() {
+            if stop_tx.send(()).is_err() {
+                warn!("tried to send stop signal, channel closed");
+            }
+        }
+        Ok(())
     }
 }
 

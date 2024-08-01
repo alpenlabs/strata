@@ -49,10 +49,6 @@ pub trait AlpenApi {
     #[method(name = "protocolVersion")]
     async fn protocol_version(&self) -> RpcResult<u64>;
 
-    // TODO make this under the admin RPC interface
-    #[method(name = "stop")]
-    async fn stop(&self) -> RpcResult<()>;
-
     #[method(name = "l1connected")]
     async fn get_l1_connection_status(&self) -> RpcResult<bool>;
 
@@ -64,4 +60,11 @@ pub trait AlpenApi {
 
     #[method(name = "clientStatus")]
     async fn get_client_status(&self) -> RpcResult<ClientStatus>;
+}
+
+#[cfg_attr(not(feature = "client"), rpc(server, namespace = "alpadmin"))]
+#[cfg_attr(feature = "client", rpc(server, client, namespace = "alpadmin"))]
+pub trait AlpenAdminApi {
+    #[method(name = "stop")]
+    async fn stop(&self) -> RpcResult<()>;
 }
