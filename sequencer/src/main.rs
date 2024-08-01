@@ -107,7 +107,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
                     .parse()
                     .unwrap(),
             ),
-            l1_reorg_safe_depth: 5,
+            l1_reorg_safe_depth: config.sync.max_reorg_depth,
         },
         run: RunParams {
             l1_follow_distance: config.sync.l1_follow_distance,

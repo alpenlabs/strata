@@ -24,7 +24,7 @@ pub struct RollupParams {
     pub evm_genesis_block_state_root: Buf32,
 
     /// Depth after which we consider the L1 block to not reorg
-    pub l1_reorg_safe_depth: u64,
+    pub l1_reorg_safe_depth: u32,
 }
 
 /// Client sync parameters that are used to make the network work but don't

@@ -35,7 +35,7 @@ pub fn process_event<D: Database>(
 
             // TODO if we have some number of L1 blocks finalized, also emit an
             // `UpdateBuried` write
-            if *height >= params.rollup().l1_reorg_safe_depth + state.buried_l1_height() {
+            if *height >= params.rollup().l1_reorg_safe_depth as u64 + state.buried_l1_height() {
                 writes.push(ClientStateWrite::UpdateBuried(state.buried_l1_height() + 1));
             }
 
