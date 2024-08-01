@@ -2,53 +2,60 @@ use std::{sync::Arc, time::Duration};
 
 use anyhow::anyhow;
 
-use alpen_vertex_db::{
+use alpen_express_db::{
     traits::{SeqDataProvider, SeqDataStore, SequencerDatabase},
-    types::{BlobEntry, BlobL1Status},
+    types::BlobL1Status,
 };
 
-use super::{config::WriterConfig, state::WriterState};
 use crate::{
     rpc::{
         traits::{L1Client, SeqL1Client},
         ClientError,
     },
-    writer::{
-        builder::build_inscription_txs,
-        utils::{get_blob_by_idx, get_l1_tx, put_commit_reveal_txs},
-    },
+    writer::utils::{get_blob_by_idx, get_l1_tx},
 };
 
 const BROADCAST_POLL_INTERVAL: u64 = 5000; // millis
 
 /// Broadcasts the next blob to be sent
 pub async fn broadcaster_task<D: SequencerDatabase + Send + Sync + 'static>(
-    mut state: WriterState<D>,
+    next_publish_blob_idx: u64,
     rpc_client: Arc<impl SeqL1Client + L1Client>,
-    config: WriterConfig,
     db: Arc<D>,
 ) -> anyhow::Result<()> {
     let interval = tokio::time::interval(Duration::from_millis(BROADCAST_POLL_INTERVAL));
     tokio::pin!(interval);
 
+    let mut curr_idx = next_publish_blob_idx;
+
     loop {
         // SLEEP!
         interval.as_mut().tick().await;
 
-        // Check from db if the last sent is confirmed because if we sent the new one before the
-        // previous is confirmed, they might end up in different order
-
-        if get_blob_by_idx(db.clone(), state.last_sent_blob_idx)
-            .await?
-            .map(|x| x.status == BlobL1Status::Confirmed)
-            .ok_or(anyhow!("Last sent blob not found in db"))?
+        // Check from db if the previous published blob is confirmed/finalized. Because if not, they
+        // might end up in different order
+        if curr_idx > 0
+            && !get_blob_by_idx(db.clone(), curr_idx - 1)
+                .await?
+                .map(|x| x.status == BlobL1Status::Confirmed || x.status == BlobL1Status::Finalized)
+                .ok_or(anyhow!("Last published blob not found in db"))?
         {
             continue;
         }
 
-        let next_idx = state.last_sent_blob_idx + 1;
-
-        if let Some(blobentry) = db.sequencer_provider().get_blob_by_idx(next_idx)? {
+        if let Some(mut blobentry) = db.sequencer_provider().get_blob_by_idx(curr_idx)? {
+            match blobentry.status {
+                BlobL1Status::Unsigned | BlobL1Status::NeedsResign => {
+                    continue;
+                }
+                BlobL1Status::Confirmed | BlobL1Status::Published | BlobL1Status::Finalized => {
+                    curr_idx += 1;
+                    continue;
+                }
+                BlobL1Status::Unpublished => {
+                    // do the publishing work below
+                }
+            }
             // Get commit reveal txns
             let commit_tx = get_l1_tx(db.clone(), blobentry.commit_txid)
                 .await?
@@ -60,22 +67,17 @@ pub async fn broadcaster_task<D: SequencerDatabase + Send + Sync + 'static>(
             // Send
             match send_commit_reveal_txs(commit_tx, reveal_tx, rpc_client.as_ref()).await {
                 Ok(_) => {
-                    state.last_sent_blob_idx = next_idx;
+                    curr_idx += 1;
                 }
                 Err(SendError::MissingOrInvalidInput) => {
-                    // This is tricky, need to reconstruct commit-reveal txns. Might need to resend
-                    // previous ones as well.
-                    let (commit, reveal) =
-                        build_inscription_txs(&blobentry.blob, &rpc_client, &config).await?;
-                    let (cid, rid) = put_commit_reveal_txs(db.clone(), commit, reveal).await?;
-                    let new_blobentry = BlobEntry::new_unsent(blobentry.blob.clone(), cid, rid);
+                    // Means need to Resign/Republish
+                    blobentry.status = BlobL1Status::NeedsResign;
 
                     db.sequencer_store()
-                        .update_blob_by_idx(state.last_sent_blob_idx, new_blobentry)?;
-                    // Do nothing, this will be sent in the next step of the loop
+                        .update_blob_by_idx(curr_idx, blobentry)?;
                 }
                 Err(SendError::Other(_)) => {
-                    // TODO: Maybe retry?
+                    // TODO: Maybe retry or return?
                 }
             }
         }

@@ -4,8 +4,8 @@ use std::time::{self, Duration};
 
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use alpen_vertex_primitives::buf::Buf32;
-use alpen_vertex_state::{da_blob::BlobIntent, id::L2BlockId};
+use alpen_express_primitives::buf::Buf32;
+use alpen_express_state::{da_blob::BlobIntent, id::L2BlockId};
 
 const L1_WRITE_INTERVAL_SECS: u64 = 10 * 60; // 10 mins
 

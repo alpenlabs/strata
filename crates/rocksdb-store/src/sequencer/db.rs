@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
 use alpen_express_primitives::buf::Buf32;
-use bitcoin::{hashes::Hash, Transaction};
-use rockbound::{OptimisticTransactionDB as DB, Schema, SchemaBatch, SchemaDBOperationsExt};
+use rockbound::{OptimisticTransactionDB as DB, SchemaBatch, SchemaDBOperationsExt};
 
 use alpen_express_db::{
     errors::DbError,
@@ -139,7 +138,6 @@ mod tests {
     use alpen_express_primitives::buf::Buf32;
     use alpen_test_utils::bitcoin::get_test_bitcoin_txns;
     use alpen_test_utils::{get_rocksdb_tmp_instance, ArbitraryGenerator};
-    use alpen_vertex_primitives::buf::Buf32;
 
     use bitcoin::consensus::serialize;
     use bitcoin::hashes::Hash;

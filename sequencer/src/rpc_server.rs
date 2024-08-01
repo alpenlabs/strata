@@ -20,10 +20,11 @@ use tokio::sync::{mpsc, oneshot, watch, Mutex, RwLock};
 
 use alpen_express_btcio::writer::DaWriter;
 use alpen_express_consensus_logic::sync_manager::SyncManager;
-use alpen_express_db::traits::L1DataProvider;
+
 use alpen_express_db::traits::{ChainstateProvider, Database, L2DataProvider};
+use alpen_express_db::traits::{L1DataProvider, SequencerDatabase};
 use alpen_express_primitives::buf::Buf32;
-use alpen_express_rpc_api::{AlpenApiServer, ClientStatus, L1Status};
+use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer, ClientStatus, L1Status};
 use alpen_express_state::{
     chain_state::ChainState,
     client_state::ClientState,
@@ -259,24 +260,24 @@ where
     }
 }
 
-pub struct AdminServerImpl {
-    pub writer: Arc<DaWriter>,
+pub struct AdminServerImpl<S> {
+    pub writer: Arc<DaWriter<S>>,
 }
 
-impl AdminServerImpl {
-    pub fn new(writer: Arc<DaWriter>) -> Self {
+impl<S: SequencerDatabase> AdminServerImpl<S> {
+    pub fn new(writer: Arc<DaWriter<S>>) -> Self {
         Self { writer }
     }
 }
 
 #[async_trait]
-impl AlpenAdminApiServer for AdminServerImpl {
+impl<S: SequencerDatabase + Send + Sync + 'static> AlpenAdminApiServer for AdminServerImpl<S> {
     async fn submit_da_blob(&self, blobpayload: Vec<u8>) -> RpcResult<()> {
         // Send this to intent receiver
         // TODO: Get commitment from rpc as well
         let commitment = Buf32::from([0u8; 32]);
         let blobintent = BlobIntent::new(BlobDest::L1, commitment, blobpayload);
-        if let Err(e) = self.writer.submit_inent(blobintent) {
+        if let Err(e) = self.writer.submit_intent(blobintent) {
             debug!(%e, "error");
             return Err(Error::Other("".to_string()).into());
         }
