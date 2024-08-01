@@ -40,6 +40,9 @@ alpen-express-rocksdb = { path = "crates/rocksdb-store" }
 alpen-express-rpc-api = { path = "crates/rpc/api" }
 alpen-express-state = { path = "crates/state" }
 alpen-test-utils = { path = "crates/test-utils" }
+express-bridge-exec = { path = "crates/bridge-exec" }
+express-bridge-rpc-api = { path = "crates/bridge-rpc-api" }
+express-bridge-txm = { path = "crates/bridge-tx-manager" }
 zkvm = { path = "crates/prover/zkvm" }
 
 alloy-genesis = { version = "0.1", default-features = false }

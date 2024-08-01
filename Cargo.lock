@@ -907,19 +907,7 @@ name = "alpen-vertex-bridge-challenger"
 version = "0.1.0"
 
 [[package]]
-name = "alpen-vertex-bridge-exec"
-version = "0.1.0"
-
-[[package]]
 name = "alpen-vertex-bridge-operator"
-version = "0.1.0"
-
-[[package]]
-name = "alpen-vertex-bridge-rpc"
-version = "0.1.0"
-
-[[package]]
-name = "alpen-vertex-bridge-txm"
 version = "0.1.0"
 
 [[package]]
@@ -3034,6 +3022,24 @@ dependencies = [
  "libc",
  "windows-sys 0.52.0",
 ]
+
+[[package]]
+name = "express-bridge-exec"
+version = "0.1.0"
+
+[[package]]
+name = "express-bridge-rpc-api"
+version = "0.1.0"
+dependencies = [
+ "bitcoin",
+ "jsonrpsee",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "express-bridge-txm"
+version = "0.1.0"
 
 [[package]]
 name = "eyre"
