@@ -14,6 +14,9 @@ borsh = { workspace = true }
 parking_lot = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+mockall = { workspace = true, optional = true }
 
 [features]
+default = []
 stubs = []
+mocks = ["mockall"]
