@@ -15,7 +15,7 @@ members = [
   "crates/prover/zkvm",
   "crates/prover/adapters/risc0",
   "crates/bridge-exec",
-  "crates/bridge-rpc-service",
+  "crates/bridge-rpc-api",
   "crates/bridge-tx-manager",
   "bin/sequencer",
   "bin/reth",
