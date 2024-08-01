@@ -29,7 +29,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-          shared-key: $CACHE_KEY
+          shared-key: ${{ env.CACHE_KEY }}
       - name: Build project
         run: |
           cargo build --workspace --locked
@@ -50,7 +50,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-          shared-key: $CACHE_KEY
+          shared-key: ${{ env.CACHE_KEY }}
       - run: cargo clippy --bin "${{ matrix.binary }}" --workspace --locked
         env:
           RUSTFLAGS: -D warnings
@@ -66,7 +66,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-          shared-key: $CACHE_KEY
+          shared-key: ${{ env.CACHE_KEY }}
       - run: cargo clippy --workspace --lib --examples --tests --benches --all-features --locked
         env:
           RUSTFLAGS: -D warnings
@@ -83,7 +83,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-          shared-key: $CACHE_KEY
+          shared-key: ${{ env.CACHE_KEY }}
       - run: cargo hack check --locked
 
   fmt:
