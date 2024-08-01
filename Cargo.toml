@@ -54,6 +54,9 @@ alpen-express-rpc-api = { path = "crates/rpc/api" }
 alpen-express-rpc-types = { path = "crates/rpc/types" }
 alpen-express-state = { path = "crates/state" }
 alpen-test-utils = { path = "crates/test-utils" }
+express-bridge-exec = { path = "crates/bridge-exec" }
+express-bridge-rpc-api = { path = "crates/bridge-rpc-api" }
+express-bridge-txm = { path = "crates/bridge-tx-manager" }
 express-chaintsn = { path = "crates/chaintsn" }
 express-reth-db = { path = "crates/reth/db" }
 express-reth-exex = { path = "crates/reth/exex" }

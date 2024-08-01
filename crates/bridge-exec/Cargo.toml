@@ -1,6 +1,6 @@
 [package]
 edition = "2021"
-name = "alpen-vertex-bridge-exec"
+name = "express-bridge-exec"
 version = "0.1.0"
 
 [lints]
