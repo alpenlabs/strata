@@ -119,56 +119,20 @@ mod tests {
     use alpen_express_db::traits::L1DataStore;
     use alpen_express_primitives::{block_credential, l1::L1BlockManifest};
     use alpen_express_state::{l1::L1BlockId, operation};
-    use alpen_test_utils::{get_common_db, ArbitraryGenerator};
+    use alpen_test_utils::{
+        bitcoin::gen_l1_chain,
+        get_common_db,
+        l2::{gen_client_state, gen_params},
+        ArbitraryGenerator,
+    };
 
     use super::*;
-
-    fn get_params() -> Params {
-        Params {
-            rollup: RollupParams {
-                block_time: 1000,
-                cred_rule: block_credential::CredRule::Unchecked,
-                horizon_l1_height: 3,
-                genesis_l1_height: 5,
-                evm_genesis_block_hash: Buf32(
-                    "0x37ad61cff1367467a98cf7c54c4ac99e989f1fbb1bc1e646235e90c065c565ba"
-                        .parse()
-                        .unwrap(),
-                ),
-                evm_genesis_block_state_root: Buf32(
-                    "0x351714af72d74259f45cd7eab0b04527cd40e74836a45abcae50f92d919d988f"
-                        .parse()
-                        .unwrap(),
-                ),
-                l1_reorg_safe_depth: 5,
-            },
-            run: RunParams {
-                l1_follow_distance: 3,
-            },
-        }
-    }
-
-    fn gen_client_state(params: &Params) -> ClientState {
-        ClientState::from_genesis_params(
-            params.rollup.genesis_l1_height,
-            params.rollup.genesis_l1_height,
-        )
-    }
-
-    fn gen_l1_chain(len: usize) -> Vec<L1BlockManifest> {
-        let mut blocks = vec![];
-        for _ in 0..len {
-            let block: L1BlockManifest = ArbitraryGenerator::new().generate();
-            blocks.push(block);
-        }
-        blocks
-    }
 
     #[test]
     fn handle_l1_block() {
         let database = get_common_db();
-        let params = get_params();
-        let mut state = gen_client_state(&params);
+        let params = gen_params();
+        let mut state = gen_client_state(Some(&params));
 
         assert!(!state.is_chain_active());
         let l1_chain = gen_l1_chain(15);
@@ -261,8 +225,8 @@ mod tests {
     #[test]
     fn handle_l1_revert() {
         let database = get_common_db();
-        let params = get_params();
-        let mut state = gen_client_state(&params);
+        let params = gen_params();
+        let mut state = gen_client_state(Some(&params));
 
         let height = 5;
         let event = SyncEvent::L1Revert(height);

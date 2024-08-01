@@ -88,6 +88,10 @@ impl ClientState {
     pub fn buried_l1_height(&self) -> u64 {
         self.local_l1_view.buried_l1_height
     }
+
+    pub fn genesis_l1_height(&self) -> u64 {
+        self.genesis_l1_height
+    }
 }
 
 /// Relates to our view of the L2 chain, does not exist before genesis.
