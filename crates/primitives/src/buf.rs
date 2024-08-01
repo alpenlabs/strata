@@ -4,6 +4,7 @@ use std::str;
 
 use arbitrary::Arbitrary;
 use bitcoin::hashes::Hash;
+use bitcoin::secp256k1::rand::rngs::ThreadRng;
 use bitcoin::BlockHash;
 use borsh::{BorshDeserialize, BorshSerialize};
 use reth_primitives::alloy_primitives::FixedBytes;

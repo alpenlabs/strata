@@ -4,6 +4,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use alpen_express_primitives::buf::Buf32;
 use alpen_express_primitives::hash::compute_borsh_hash;
 
+use crate::l1::L1ViewState;
 use crate::prelude::*;
 use crate::{bridge_ops, bridge_state, exec_env, l1};
 
@@ -80,6 +81,10 @@ impl ChainState {
 
     pub fn chain_tip_blockid(&self) -> L2BlockId {
         self.last_block
+    }
+
+    pub fn l1_view(&self) -> &L1ViewState {
+        &self.l1_state
     }
 
     /// Computes a commitment to a the chainstate.  This is super expensive

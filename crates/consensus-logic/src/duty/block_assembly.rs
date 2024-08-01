@@ -4,7 +4,9 @@ use std::sync::Arc;
 use std::thread;
 use std::time;
 
-use borsh::BorshSerialize;
+use alpen_express_db::traits::L1DataProvider;
+use alpen_express_state::l1::L1HeaderPayload;
+use alpen_express_state::l1::L1HeaderRecord;
 use tracing::*;
 
 use alpen_express_db::traits::{
@@ -23,6 +25,7 @@ use alpen_express_state::client_state::ClientState;
 use alpen_express_state::exec_update::{ExecUpdate, UpdateInput, UpdateOutput};
 use alpen_express_state::header::L2BlockHeader;
 use alpen_express_state::prelude::*;
+use alpen_express_state::state_op::*;
 
 use super::types::IdentityKey;
 use crate::chain_transition;
@@ -40,6 +43,7 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     params: &Arc<Params>,
 ) -> Result<Option<(L2BlockId, L2Block)>, Error> {
     debug!("preparing block");
+    let l1_prov = database.l1_provider();
     let l2_prov = database.l2_provider();
     let cs_prov = database.client_state_provider();
     let chs_prov = database.chainstate_provider();
@@ -99,7 +103,7 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
 
     // TODO Pull data from CSM state that we've observed from L1, including new
     // headers or any headers needed to perform a reorg if necessary.
-    let l1_seg = prepare_l1_segment(&last_cstate, &prev_chstate)?;
+    let l1_seg = prepare_l1_segment(&last_cstate, &prev_chstate, l1_prov.as_ref())?;
 
     // Prepare the execution segment, which right now is just talking to the EVM
     // but will be more advanced later.
@@ -134,9 +138,149 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     Ok(Some((blkid, final_block)))
 }
 
-fn prepare_l1_segment(cstate: &ClientState, prev_chstate: &ChainState) -> Result<L1Segment, Error> {
-    // TODO
-    Ok(L1Segment::new_empty())
+fn prepare_l1_segment(
+    cstate: &ClientState,
+    prev_chstate: &ChainState,
+    l1_prov: &impl L1DataProvider,
+) -> Result<L1Segment, Error> {
+    let l1v = cstate.l1_view();
+
+    let unacc_blocks = l1v
+        .local_unaccepted_blocks()
+        .iter()
+        .enumerate()
+        // TODO verify this offset computation is correct
+        .map(|(i, b)| (l1v.buried_l1_height() + i as u64 + 1, b))
+        .collect::<Vec<_>>();
+
+    // Check to see if there's actually no blocks in the queue.  In that case we can just give
+    // everything we know about.
+    if prev_chstate.l1_view().maturation_queue().is_empty() {
+        let mut payloads = Vec::new();
+        for (h, _b) in unacc_blocks {
+            let rec = load_header_record(h, l1_prov)?;
+            payloads.push(L1HeaderPayload::new_bare(h, rec));
+        }
+
+        debug!(n = %payloads.len(), "filling in empty queue with fresh L1 payloads");
+        return Ok(L1Segment::new(payloads));
+    }
+
+    let maturing_blocks = prev_chstate
+        .l1_view()
+        .maturation_queue()
+        .iter_entries()
+        .map(|(h, e)| (h, e.get_blkid()))
+        .collect::<Vec<_>>();
+
+    // Annoying copy we have to do to make the ref types work in `find_pivot_block_height`.
+    let maturing_blocks_refs = maturing_blocks
+        .iter()
+        .map(|(i, h)| (*i, h))
+        .collect::<Vec<_>>();
+
+    // FIXME this is not comparing the proof of work, it's just looking at the chain lengths, this
+    // is almost the same thing, but might break in the case of a difficulty adjustment taking place
+    // at a reorg exactly on the transition block
+    let Some((pivot_h, _pivot_id)) = find_pivot_block_height(&unacc_blocks, &maturing_blocks_refs)
+    else {
+        // Then we're really screwed.
+        warn!("can't determine shared block to insert new maturing blocks");
+        return Ok(L1Segment::new_empty());
+    };
+
+    // Compute the offset in the unaccepted list for the blocks we want to use.
+    let unacc_fresh_offset = (pivot_h - l1v.buried_l1_height() - 1) as usize;
+    let fresh_blocks = &unacc_blocks[unacc_fresh_offset..];
+
+    // Load the blocsks.
+    let mut payloads = Vec::new();
+    for (h, _b) in fresh_blocks {
+        let rec = load_header_record(*h, l1_prov)?;
+        payloads.push(L1HeaderPayload::new_bare(*h, rec));
+    }
+
+    if !payloads.is_empty() {
+        debug!(n = %payloads.len(), "have new L1 blocks to provide");
+    }
+
+    Ok(L1Segment::new(payloads))
+}
+
+fn load_header_record(h: u64, l1_prov: &impl L1DataProvider) -> Result<L1HeaderRecord, Error> {
+    let mf = l1_prov
+        .get_block_manifest(h)?
+        .ok_or(Error::MissingL1BlockHeight(h))?;
+    // TODO need to include tx root proof we can verify
+    Ok(L1HeaderRecord::new(mf.header().to_vec(), mf.txs_root()))
+}
+
+/// Takes two partially-overlapping lists of block indexes and IDs and returns a
+/// ref to the last index and ID they share, if any.
+fn find_pivot_block_height<'c>(
+    a: &'c [(u64, &'c L1BlockId)],
+    b: &'c [(u64, &'c L1BlockId)],
+) -> Option<(u64, &'c L1BlockId)> {
+    if a.is_empty() || b.is_empty() {
+        return None;
+    }
+
+    let a_start = a[0].0 as i64;
+    let b_start = b[0].0 as i64;
+    let a_end = a_start + (a.len() as i64);
+    let b_end = b_start + (b.len() as i64);
+
+    #[cfg(test)]
+    eprintln!("ranges {a_start}..{a_end}, {b_start}..{b_end}");
+
+    // Check if they're actually overlapping.
+    if !(a_start < b_end && b_start < a_end) {
+        return None;
+    }
+
+    // Depending on how the windows overlap at the start we figure out the offsets for how we're
+    // iterating here.
+    let (a_off, b_off) = match b_start - a_start {
+        0 => (0, 0),
+        n if n > 0 => (n, 0),
+        n if n < 0 => (0, -n),
+        _ => unreachable!(),
+    };
+
+    #[cfg(test)]
+    eprintln!("offsets {a_off} {b_off}");
+
+    // Sanity checks.
+    assert!(a_off >= 0);
+    assert!(b_off >= 0);
+
+    let overlap_len = i64::min(a_end, b_end) - i64::max(a_start, b_start);
+
+    #[cfg(test)]
+    eprintln!("overlap {overlap_len}");
+
+    // Now iterate over the overlap range and return if it makes sense.
+    let mut last = None;
+    for i in 0..overlap_len {
+        let (ai, aid) = a[(i as i64 + a_off) as usize];
+        let (bi, bid) = b[(i as i64 + b_off) as usize];
+
+        #[cfg(test)]
+        {
+            eprintln!("Ai {ai} {aid}");
+            eprintln!("Bi {bi} {bid}");
+        }
+
+        assert_eq!(ai, bi); // Sanity check.
+
+        if aid != bid {
+            break;
+        }
+
+        last = Some((ai, aid));
+    }
+
+    last
 }
 
 /// Prepares the execution segment for the block.
@@ -227,4 +371,200 @@ fn sign_header(header: &L2BlockHeader, ik: &IdentityKey) -> Buf64 {
 // the rest of the network for this?
 fn now_millis() -> u64 {
     time::UNIX_EPOCH.elapsed().unwrap().as_millis() as u64
+}
+
+#[cfg(test)]
+mod tests {
+    // TODO to improve these tests, they could use a bit more randomization of lengths and offsets
+
+    use alpen_express_state::l1::L1BlockId;
+    use alpen_test_utils::ArbitraryGenerator;
+
+    use super::find_pivot_block_height;
+
+    #[test]
+    fn test_find_pivot_noop() {
+        let ag = ArbitraryGenerator::new_with_size(1 << 12);
+
+        let blkids: [L1BlockId; 10] = ag.generate();
+        eprintln!("{blkids:#?}");
+
+        let blocks = blkids
+            .iter()
+            .enumerate()
+            .map(|(i, b)| (i as u64 + 8, b))
+            .collect::<Vec<_>>();
+
+        let max_height = blocks.last().unwrap().0;
+        let max_id = blocks.last().unwrap().1;
+
+        let (shared_h, shared_id) =
+            find_pivot_block_height(&blocks, &blocks).expect("test: find pivot");
+
+        assert_eq!(shared_h, max_height);
+        assert_eq!(shared_id, max_id);
+    }
+
+    #[test]
+    fn test_find_pivot_noop_offset() {
+        let ag = ArbitraryGenerator::new_with_size(1 << 12);
+
+        let blkids: [L1BlockId; 10] = ag.generate();
+        eprintln!("{blkids:#?}");
+
+        let blocks = blkids
+            .iter()
+            .enumerate()
+            .map(|(i, b)| (i as u64 + 8, b))
+            .collect::<Vec<_>>();
+
+        let max_height = blocks[7].0;
+        let max_id = blocks[7].1;
+
+        let (shared_h, shared_id) =
+            find_pivot_block_height(&blocks[..8], &blocks[2..]).expect("test: find pivot");
+
+        assert_eq!(shared_h, max_height);
+        assert_eq!(shared_id, max_id);
+    }
+
+    #[test]
+    fn test_find_pivot_simple_extend() {
+        let ag = ArbitraryGenerator::new_with_size(1 << 12);
+
+        let blkids1: [L1BlockId; 10] = ag.generate();
+        let mut blkids2 = Vec::from(blkids1);
+        blkids2.push(ag.generate());
+        blkids2.push(ag.generate());
+        eprintln!("{blkids1:#?}");
+
+        let blocks1 = blkids1
+            .iter()
+            .enumerate()
+            .map(|(i, b)| (i as u64 + 8, b))
+            .collect::<Vec<_>>();
+
+        let blocks2 = blkids2
+            .iter()
+            .enumerate()
+            .map(|(i, b)| (i as u64 + 8, b))
+            .collect::<Vec<_>>();
+
+        let max_height = blocks1.last().unwrap().0;
+        let max_id = blocks1.last().unwrap().1;
+
+        let (shared_h, shared_id) =
+            find_pivot_block_height(&blocks1, &blocks2).expect("test: find pivot");
+
+        assert_eq!(shared_h, max_height);
+        assert_eq!(shared_id, max_id);
+    }
+
+    #[test]
+    fn test_find_pivot_typical_reorg() {
+        let ag = ArbitraryGenerator::new_with_size(1 << 16);
+
+        let mut blkids1: Vec<L1BlockId> = Vec::new();
+        for _ in 0..10 {
+            blkids1.push(ag.generate());
+        }
+
+        let mut blkids2 = blkids1.clone();
+        blkids2.pop();
+        blkids2.push(ag.generate());
+        blkids2.push(ag.generate());
+
+        let blocks1 = blkids1
+            .iter()
+            .enumerate()
+            .map(|(i, b)| (i as u64 + 8, b))
+            .collect::<Vec<_>>();
+
+        let blocks2 = blkids2
+            .iter()
+            .enumerate()
+            .map(|(i, b)| (i as u64 + 8, b))
+            .collect::<Vec<_>>();
+
+        let max_height = blocks1[blocks1.len() - 2].0;
+        let max_id = blocks1[blocks1.len() - 2].1;
+
+        // Also using a pretty deep offset here.
+        let (shared_h, shared_id) =
+            find_pivot_block_height(&blocks1, &blocks2[5..]).expect("test: find pivot");
+
+        assert_eq!(shared_h, max_height);
+        assert_eq!(shared_id, max_id);
+    }
+
+    #[test]
+    fn test_find_pivot_cur_shorter_reorg() {
+        let ag = ArbitraryGenerator::new_with_size(1 << 16);
+
+        let mut blkids1: Vec<L1BlockId> = Vec::new();
+        for _ in 0..10 {
+            blkids1.push(ag.generate());
+        }
+
+        let mut blkids2 = blkids1.clone();
+        blkids2.pop();
+        blkids2.pop();
+        blkids2.pop();
+        blkids2.pop();
+        let len = blkids2.len();
+        blkids2.push(ag.generate());
+        blkids2.push(ag.generate());
+
+        let blocks1 = blkids1
+            .iter()
+            .enumerate()
+            .map(|(i, b)| (i as u64 + 8, b))
+            .collect::<Vec<_>>();
+
+        let blocks2 = blkids2
+            .iter()
+            .enumerate()
+            .map(|(i, b)| (i as u64 + 8, b))
+            .collect::<Vec<_>>();
+
+        let max_height = blocks2[len - 1].0;
+        let max_id = blocks2[len - 1].1;
+
+        // Also using a pretty deep offset here.
+        let (shared_h, shared_id) =
+            find_pivot_block_height(&blocks1, &blocks2[5..]).expect("test: find pivot");
+
+        assert_eq!(shared_h, max_height);
+        assert_eq!(shared_id, max_id);
+    }
+
+    #[test]
+    fn test_find_pivot_disjoint() {
+        let ag = ArbitraryGenerator::new_with_size(1 << 16);
+
+        let mut blkids1: Vec<L1BlockId> = Vec::new();
+        for _ in 0..10 {
+            blkids1.push(ag.generate());
+        }
+
+        let mut blkids2: Vec<L1BlockId> = Vec::new();
+        for _ in 0..10 {
+            blkids2.push(ag.generate());
+        }
+
+        let blocks1 = blkids1
+            .iter()
+            .enumerate()
+            .map(|(i, b)| (i as u64 + 8, b))
+            .collect::<Vec<_>>();
+
+        let blocks2 = blkids2
+            .iter()
+            .enumerate()
+            .map(|(i, b)| (i as u64 + 8, b))
+            .collect::<Vec<_>>();
+
+        let res = find_pivot_block_height(&blocks1[2..], &blocks2[..3]);
+        assert!(res.is_none());
+    }
 }

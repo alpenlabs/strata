@@ -219,6 +219,11 @@ impl L1MaturationEntry {
         }
     }
 
+    /// Computes the L1 blockid from the stored block.
+    pub fn get_blkid(&self) -> L1BlockId {
+        alpen_express_primitives::hash::sha256d(&self.record.buf).into()
+    }
+
     pub fn into_parts(self) -> (L1HeaderRecord, Vec<DepositUpdateTx>, Vec<DaTx>) {
         (self.record, self.deposit_update_txs, self.da_txs)
     }
