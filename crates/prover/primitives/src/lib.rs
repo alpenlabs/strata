@@ -33,7 +33,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// Public Parameters that proof asserts
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ELProofPublicParams {
     pub block_idx: u64,
     pub prev_blockhash: FixedBytes<32>,
@@ -130,7 +130,6 @@ pub fn process_block_transaction(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use reth_primitives::hex::FromHex;
     use revm::primitives::SpecId;
     use std::path::PathBuf;
     const EVM_CONFIG: EvmConfig = EvmConfig {
@@ -138,20 +137,23 @@ mod tests {
         spec_id: SpecId::SHANGHAI,
     };
 
+    #[derive(Serialize, Deserialize)]
+    struct TestData {
+        witness: ZKVMInput,
+        params: ELProofPublicParams,
+    }
+
     #[test]
     fn block_stf_test() {
         let json_content = std::fs::read_to_string(
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/test_data/witness/1.json"),
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test_data/witness_params.json"),
         )
         .expect("Failed to read the blob data file");
 
-        let input: ZKVMInput = serde_json::from_str(&json_content).expect("failed");
+        let test_data: TestData = serde_json::from_str(&json_content).expect("failed");
+        let input = test_data.witness;
         let op = process_block_transaction(input, EVM_CONFIG);
 
-        assert_eq!(
-            op.new_state_root,
-            B256::from_hex("0x509a2e64af6cce1cd1d39b6d910f2b08a7d6bb3d3b4cbbad74555392bac70661")
-                .unwrap()
-        );
+        assert_eq!(op, test_data.params);
     }
 }
