@@ -42,7 +42,7 @@ jobs:
           cache-on-failure: true
 
       - name: Build Cargo project
-        run: cargo build
+        run: cargo build --locked
 
       - name: Install bitcoind
         run: |
