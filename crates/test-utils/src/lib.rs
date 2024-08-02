@@ -11,6 +11,7 @@ use rockbound::rocksdb;
 use tempfile::TempDir;
 
 pub mod bitcoin;
+pub mod l2;
 
 pub struct ArbitraryGenerator {
     buffer: Vec<u8>,

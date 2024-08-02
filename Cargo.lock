@@ -892,7 +892,9 @@ name = "alpen-test-utils"
 version = "0.1.0"
 dependencies = [
  "alpen-express-db",
+ "alpen-express-primitives",
  "alpen-express-rocksdb",
+ "alpen-express-state",
  "anyhow",
  "arbitrary",
  "bitcoin",
