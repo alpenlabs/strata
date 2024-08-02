@@ -31,7 +31,10 @@ pub fn process_event<D: Database>(
 
             // TODO do the consensus checks
 
-            writes.push(ClientStateWrite::AcceptL1Block(*l1blkid));
+            // Only accept the block if it's greater than or equal to the buried height.
+            if *height >= state.buried_l1_height() {
+                writes.push(ClientStateWrite::AcceptL1Block(*l1blkid));
+            }
 
             // If we have some number of L1 blocks finalized, also emit an `UpdateBuried` write
             if *height >= params.rollup().l1_reorg_safe_depth as u64 + state.buried_l1_height() {

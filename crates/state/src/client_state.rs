@@ -150,4 +150,12 @@ impl LocalL1State {
     pub fn buried_l1_height(&self) -> u64 {
         self.buried_l1_height
     }
+
+    /// Returns an iterator over the unaccepted L2 blocks and their corresponding heights.
+    pub fn unacc_blocks_iter(&self) -> impl Iterator<Item = (u64, &L1BlockId)> {
+        self.local_unaccepted_blocks()
+            .iter()
+            .enumerate()
+            .map(|(i, b)| (self.buried_l1_height + i as u64 + 1, b))
+    }
 }

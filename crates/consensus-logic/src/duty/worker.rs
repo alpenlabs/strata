@@ -242,16 +242,16 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
 ) -> Result<(), Error> {
     match duty {
         Duty::SignBlock(data) => {
-            let target = data.target_slot();
+            let target_slot = data.target_slot();
 
             // TODO get the cur client state from the sync manager, the one used
             // to initiate this dutyn and pass it into `sign_and_store_block`
 
-            let asm_span = info_span!("blockasm", %target);
+            let asm_span = info_span!("blockasm", %target_slot);
             let _span = asm_span.enter();
 
             let Some((blkid, _block)) =
-                block_assembly::sign_and_store_block(target, ik, database, engine, params)?
+                block_assembly::sign_and_store_block(target_slot, ik, database, engine, params)?
             else {
                 return Ok(());
             };

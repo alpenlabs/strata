@@ -71,12 +71,12 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     // Figure out some general data about the slot and the previous state.
     let ts = now_millis();
 
-    let safe_l1_block = Buf32::zero(); // TODO
-
     let Some(last_ss) = last_cstate.sync() else {
+        warn!(%slot, %ckpt_idx, "tried to produce block but no sync state available");
         return Ok(None);
     };
 
+    // By "prev" here we mean the block we're building on top of.
     let prev_block_id = *last_ss.chain_tip_blkid();
     let prev_block = l2_prov
         .get_block_data(prev_block_id)?
@@ -87,8 +87,11 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     let target_ts = prev_block.block().header().timestamp() + block_time;
     let current_ts = now_millis();
 
+    // If it's too early to produce the block, wait a bit.
     if current_ts < target_ts {
-        thread::sleep(time::Duration::from_millis(target_ts - current_ts));
+        let sleep_dur = target_ts - current_ts;
+        trace!(%current_ts, %target_ts, sleep_dur, "too early, waiting to produce block");
+        thread::sleep(time::Duration::from_millis(sleep_dur));
     }
 
     let prev_global_sr = *prev_block.header().state_root();
@@ -101,13 +104,25 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
         .get_toplevel_state(prev_slot)?
         .ok_or(Error::MissingBlockChainstate(prev_block_id))?;
 
+    // Figure out the save L1 blkid.
+    // FIXME this is somewhat janky, should get it from the MMR
+    let safe_l1_block_rec = prev_chstate.l1_view().safe_block();
+    let safe_l1_blkid = alpen_express_primitives::hash::sha256d(safe_l1_block_rec.buf());
+
     // TODO Pull data from CSM state that we've observed from L1, including new
     // headers or any headers needed to perform a reorg if necessary.
     let l1_seg = prepare_l1_segment(&last_cstate, &prev_chstate, l1_prov.as_ref())?;
 
     // Prepare the execution segment, which right now is just talking to the EVM
     // but will be more advanced later.
-    let exec_seg = prepare_exec_segment(slot, ts, prev_global_sr, safe_l1_block, engine)?;
+    let exec_seg = prepare_exec_segment(
+        slot,
+        ts,
+        prev_block_id,
+        prev_global_sr,
+        safe_l1_blkid,
+        engine,
+    )?;
 
     // Assemble the body and fake header.
     let body = L2BlockBody::new(l1_seg, exec_seg);
@@ -145,17 +160,13 @@ fn prepare_l1_segment(
 ) -> Result<L1Segment, Error> {
     let l1v = cstate.l1_view();
 
-    let unacc_blocks = l1v
-        .local_unaccepted_blocks()
-        .iter()
-        .enumerate()
-        // TODO verify this offset computation is correct
-        .map(|(i, b)| (l1v.buried_l1_height() + i as u64 + 1, b))
-        .collect::<Vec<_>>();
+    let unacc_blocks = l1v.unacc_blocks_iter().collect::<Vec<_>>();
+    trace!(unacc_blocks = %unacc_blocks.len(), "figuring out which blocks to include in L1 segment");
 
     // Check to see if there's actually no blocks in the queue.  In that case we can just give
     // everything we know about.
-    if prev_chstate.l1_view().maturation_queue().is_empty() {
+    let maturation_queue_size = prev_chstate.l1_view().maturation_queue().len();
+    if maturation_queue_size == 0 {
         let mut payloads = Vec::new();
         for (h, _b) in unacc_blocks {
             let rec = load_header_record(h, l1_prov)?;
@@ -182,6 +193,7 @@ fn prepare_l1_segment(
     // FIXME this is not comparing the proof of work, it's just looking at the chain lengths, this
     // is almost the same thing, but might break in the case of a difficulty adjustment taking place
     // at a reorg exactly on the transition block
+    trace!("computing pivot");
     let Some((pivot_h, _pivot_id)) = find_pivot_block_height(&unacc_blocks, &maturing_blocks_refs)
     else {
         // Then we're really screwed.
@@ -287,14 +299,15 @@ fn find_pivot_block_height<'c>(
 fn prepare_exec_segment<E: ExecEngineCtl>(
     slot: u64,
     timestamp: u64,
+    prev_l2_blkid: L2BlockId,
     prev_global_sr: Buf32,
     safe_l1_block: Buf32,
     engine: &E,
 ) -> Result<ExecSegment, Error> {
+    trace!("preparing exec payload");
+
     // Start preparing the EL payload.
-    // FIXME this isn't right, we should be getting the state
-    let prev_l2_block_id = L2BlockId::from(Buf32::zero());
-    let payload_env = PayloadEnv::new(timestamp, prev_l2_block_id, safe_l1_block, Vec::new());
+    let payload_env = PayloadEnv::new(timestamp, prev_l2_blkid, safe_l1_block, Vec::new());
     let key = engine.prepare_payload(payload_env)?;
     trace!("submitted EL payload job, waiting for completion");
 
@@ -309,10 +322,8 @@ fn prepare_exec_segment<E: ExecEngineCtl>(
     };
     trace!("finished EL payload job");
 
-    // TODO correctly assemble the exec segment, since this is bodging out how
-    // the inputs/outputs should be structured
-    // FIXME this was broken in a rebase
-    let eui = UpdateInput::new(slot, Buf32::zero(), payload_data.accessory_data().to_vec());
+    // Reassemble it into an exec update.
+    let eui = payload_data.update_input().clone();
     let exec_update = ExecUpdate::new(eui, UpdateOutput::new_from_state(Buf32::zero()));
 
     Ok(ExecSegment::new(exec_update))
@@ -331,6 +342,7 @@ fn poll_status_loop<E: ExecEngineCtl>(
         thread::sleep(wait);
 
         // Check the payload for the result.
+        trace!(%job, "polling engine for completed payload");
         let payload = engine.get_payload_status(job)?;
         if let PayloadStatus::Ready(pl) = payload {
             return Ok(Some(pl));
