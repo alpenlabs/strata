@@ -7,3 +7,6 @@
 
 pub mod script_builder;
 pub mod signature_handler;
+
+// Re-exports
+pub use script_builder::deposit::*;
