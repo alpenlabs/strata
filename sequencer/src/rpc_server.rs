@@ -23,8 +23,8 @@ use alpen_express_consensus_logic::sync_manager::SyncManager;
 
 use alpen_express_db::traits::{ChainstateProvider, Database, L2DataProvider};
 use alpen_express_db::traits::{L1DataProvider, SequencerDatabase};
-use alpen_express_primitives::buf::Buf32;
-use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer, ClientStatus, L1Status};
+use alpen_express_primitives::{buf::Buf32, l1::L1Status};
+use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer, ClientStatus};
 use alpen_express_state::{
     chain_state::ChainState,
     client_state::ClientState,
@@ -181,15 +181,9 @@ where
     }
 
     async fn get_l1_status(&self) -> RpcResult<L1Status> {
-        let btcio_status = self.l1_status.read().await.clone();
+        let l1_status = self.l1_status.read().await.clone();
 
-        Ok(L1Status {
-            bitcoin_rpc_connected: btcio_status.bitcoin_rpc_connected,
-            cur_height: btcio_status.cur_height,
-            cur_tip_blkid: btcio_status.cur_tip_blkid,
-            last_update: btcio_status.last_update,
-            last_rpc_error: btcio_status.last_rpc_error,
-        })
+        Ok(l1_status)
     }
 
     async fn get_l1_connection_status(&self) -> RpcResult<bool> {

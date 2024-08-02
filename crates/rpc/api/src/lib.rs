@@ -1,28 +1,9 @@
 #![allow(unexpected_cfgs)] // TODO: remove this when we add the `client` feature flag.
 //! Macro trait def for the `alp_` RPC namespace using jsonrpsee.
+use alpen_express_primitives::l1::L1Status;
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 
 use serde::{Deserialize, Serialize};
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct L1Status {
-    /// If the last time we tried to poll the client (as of `last_update`)
-    /// we were successful.
-    pub bitcoin_rpc_connected: bool,
-
-    /// The last error message we received when trying to poll the client, if
-    /// there was one.
-    pub last_rpc_error: Option<String>,
-
-    /// Current block height.
-    pub cur_height: u64,
-
-    /// Current tip block ID as string.
-    pub cur_tip_blkid: String,
-
-    /// UNIX millis time of the last time we got a new update from the L1 connector.
-    pub last_update: u64,
-}
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ClientStatus {

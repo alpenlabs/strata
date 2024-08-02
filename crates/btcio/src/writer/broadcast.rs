@@ -1,6 +1,9 @@
 use std::{sync::Arc, time::Duration};
 
+use alpen_express_primitives::l1::L1Status;
 use anyhow::anyhow;
+use bitcoin::{consensus::deserialize, Txid};
+use tokio::sync::RwLock;
 use tracing::*;
 
 use alpen_express_db::{
@@ -23,6 +26,7 @@ pub async fn broadcaster_task<D: SequencerDatabase + Send + Sync + 'static>(
     next_publish_blob_idx: u64,
     rpc_client: Arc<impl SeqL1Client + L1Client>,
     db: Arc<D>,
+    l1_status: Arc<RwLock<L1Status>>,
 ) -> anyhow::Result<()> {
     info!("Starting L1 writer's broadcaster task");
     let interval = tokio::time::interval(Duration::from_millis(BROADCAST_POLL_INTERVAL));
@@ -43,13 +47,11 @@ pub async fn broadcaster_task<D: SequencerDatabase + Send + Sync + 'static>(
                 .map(|x| x.status == BlobL1Status::Confirmed || x.status == BlobL1Status::Finalized)
                 .ok_or(anyhow!("Last published blob not found in db"))?
         {
-            debug!("previous blob has not been confirmed");
             continue;
         }
 
         debug!(%curr_idx, "fetching from seq db");
         if let Some(mut blobentry) = db.sequencer_provider().get_blob_by_idx(curr_idx)? {
-            debug!("Found corresponding blob entry {:#?}", blobentry);
             match blobentry.status {
                 BlobL1Status::Unsigned | BlobL1Status::NeedsResign => {
                     continue;
@@ -62,7 +64,6 @@ pub async fn broadcaster_task<D: SequencerDatabase + Send + Sync + 'static>(
                     // do the publishing work below
                 }
             }
-            debug!("Getting l1 tx");
             // Get commit reveal txns
             let commit_tx = get_l1_tx(db.clone(), blobentry.commit_txid)
                 .await?
@@ -71,12 +72,18 @@ pub async fn broadcaster_task<D: SequencerDatabase + Send + Sync + 'static>(
                 .await?
                 .ok_or(anyhow!("Expected to find commit tx in db"))?;
 
-            debug!("obtained l1 txs, now sending");
-
             // Send
             match send_commit_reveal_txs(commit_tx, reveal_tx, rpc_client.as_ref()).await {
                 Ok(_) => {
                     debug!("Successfully sent: {}", blobentry.reveal_txid.to_string());
+                    // Update L1 status
+                    {
+                        let mut l1st = l1_status.write().await;
+                        let txid: Txid = deserialize(&blobentry.reveal_txid.0.as_slice())?;
+                        l1st.last_published_txid = Some(txid.to_string());
+                        // TODO: add last update
+                        debug!("Updated l1 status: {:?}", l1st);
+                    }
                     curr_idx += 1;
                 }
                 Err(SendError::MissingOrInvalidInput) => {
