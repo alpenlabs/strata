@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use rockbound::{rocksdb, OptimisticTransactionDB as DB, Schema, SchemaDBOperationsExt};
 
 use alpen_express_db::{errors::DbError, DbResult};

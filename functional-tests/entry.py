@@ -99,7 +99,7 @@ class BitcoinFactory(flexitest.Factory):
 
             def _create_rpc():
                 url = f"http://{BD_USERNAME}:{BD_PASSWORD}@localhost:{rpc_port}"
-                return BitcoindClient(base_url=url)
+                return BitcoindClient(base_url=url, network="regtest")
 
             svc.create_rpc = _create_rpc
 

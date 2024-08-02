@@ -1,7 +1,7 @@
 mod broadcast;
 mod builder;
 pub mod config;
-mod utils;
+pub mod utils;
 mod watcher;
 mod writer;
 

@@ -19,6 +19,7 @@ use crate::{
     writer::utils::{get_blob_by_idx, get_l1_tx},
 };
 
+// TODO: make this configurable, possibly get from Params
 const BROADCAST_POLL_INTERVAL: u64 = 1000; // millis
 
 /// Broadcasts the next blob to be sent
@@ -37,7 +38,6 @@ pub async fn broadcaster_task<D: SequencerDatabase + Send + Sync + 'static>(
     loop {
         // SLEEP!
         interval.as_mut().tick().await;
-        debug!(%curr_idx, "Trying to broadcast blob idx");
 
         // Check from db if the previous published blob is confirmed/finalized. Because if not, they
         // might end up in different order
@@ -50,7 +50,6 @@ pub async fn broadcaster_task<D: SequencerDatabase + Send + Sync + 'static>(
             continue;
         }
 
-        debug!(%curr_idx, "fetching from seq db");
         if let Some(mut blobentry) = db.sequencer_provider().get_blob_by_idx(curr_idx)? {
             match blobentry.status {
                 BlobL1Status::Unsigned | BlobL1Status::NeedsResign => {

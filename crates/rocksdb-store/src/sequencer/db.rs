@@ -1,17 +1,17 @@
 use std::sync::Arc;
 
-use alpen_express_primitives::buf::Buf32;
 use rockbound::{OptimisticTransactionDB as DB, SchemaBatch, SchemaDBOperationsExt};
 
 use alpen_express_db::{
     errors::DbError,
     traits::{SeqDataProvider, SeqDataStore, SequencerDatabase},
     types::BlobEntry,
-    utils::get_last_idx,
     DbResult,
 };
+use alpen_express_primitives::buf::Buf32;
 
 use super::schemas::{SeqBlobIdSchema, SeqBlobSchema, SeqL1TxnSchema};
+use crate::utils::get_last_idx;
 
 pub struct SeqDb {
     db: Arc<DB>,
@@ -69,7 +69,7 @@ impl SeqDataStore for SeqDb {
 
     fn update_blob_by_idx(&self, blobidx: u64, blobentry: BlobEntry) -> DbResult<()> {
         match self.db.get::<SeqBlobIdSchema>(&blobidx)? {
-            Some(id) => Ok(self.db.put(&id, &blobentry)?),
+            Some(id) => Ok(self.db.put::<SeqBlobSchema>(&id, &blobentry)?),
             None => Err(DbError::Other(format!(
                 "BlobEntry does not exist for idx {blobidx:?}"
             ))),
@@ -125,14 +125,8 @@ impl<D: SeqDataStore + SeqDataProvider> SequencerDatabase for SequencerDB<D> {
 mod tests {
 
     use super::*;
-    use crate::errors::DbError;
-    use crate::traits::{SeqDataProvider, SeqDataStore};
-    use crate::types::TxEntry;
-    use crate::types::TxnStatusEntry;
-    use crate::types::TxnStatusEntry;
     use alpen_express_db::errors::DbError;
     use alpen_express_db::traits::{SeqDataProvider, SeqDataStore};
-    use alpen_express_db::types::TxnStatusEntry;
     use alpen_express_primitives::buf::Buf32;
     use alpen_test_utils::bitcoin::get_test_bitcoin_txns;
     use alpen_test_utils::{get_rocksdb_tmp_instance, ArbitraryGenerator};

@@ -29,10 +29,8 @@ pub async fn watcher_task<D: SequencerDatabase + Send + Sync + 'static>(
     let mut curr_blobidx = next_to_watch;
     loop {
         interval.as_mut().tick().await;
-        debug!(%curr_blobidx, "Watching for blob");
 
         if let Some(blobentry) = get_blob_by_idx(db.clone(), curr_blobidx).await? {
-            debug!(%curr_blobidx, "blobentry found in db");
             match blobentry.status {
                 BlobL1Status::Published | BlobL1Status::Confirmed => {
                     debug!(%curr_blobidx, "blobentry is published or confirmed");

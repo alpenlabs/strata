@@ -28,9 +28,10 @@ impl BlobEntry {
         }
     }
 
-    /// Create new unsigned blobentry. This won't have commit - reveal pairs associated with it.
-    /// Because it is better to defer gathering utxos as late as possible to prevent being spent by
-    /// others. Those will be created and signed in a single step.
+    /// Create new unsigned blobentry.
+    /// NOTE: This won't have commit - reveal pairs associated with it.
+    ///   Because it is better to defer gathering utxos as late as possible to prevent being spent
+    ///   by others. Those will be created and signed in a single step.
     pub fn new_unsigned(blob: Vec<u8>) -> Self {
         let cid = Buf32::zero();
         let rid = Buf32::zero();

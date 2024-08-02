@@ -133,10 +133,10 @@ pub async fn create_and_sign_blob_inscriptions<D: SequencerDatabase + Send + Syn
     Ok(())
 }
 
-pub fn calculate_intent_hash(intent: &[u8]) -> Buf32 {
+pub fn calculate_blob_hash(blob: &[u8]) -> Buf32 {
     let hash: [u8; 32] = {
         let mut hasher = Sha256::new();
-        hasher.update(intent);
+        hasher.update(blob);
         hasher.finalize().into()
     };
     Buf32(hash.into())
@@ -148,7 +148,8 @@ mod test {
 
     use bitcoin::{Address, Network};
 
-    use alpen_express_db::{sequencer::db::SequencerDB, traits::SequencerDatabase, SeqDb};
+    use alpen_express_db::traits::SequencerDatabase;
+    use alpen_express_rocksdb::{sequencer::db::SequencerDB, SeqDb};
 
     use super::*;
     use crate::writer::{
@@ -189,7 +190,7 @@ mod test {
         assert_eq!(entry.commit_txid, Buf32::zero());
         assert_eq!(entry.reveal_txid, Buf32::zero());
 
-        let intent_hash = calculate_intent_hash(&entry.blob);
+        let intent_hash = calculate_blob_hash(&entry.blob);
         let idx = db.sequencer_store().put_blob(intent_hash, entry).unwrap();
 
         create_and_sign_blob_inscriptions(idx, db.clone(), client, &config)

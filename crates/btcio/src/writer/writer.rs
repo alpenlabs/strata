@@ -18,7 +18,7 @@ use alpen_express_state::da_blob::BlobIntent;
 
 use super::config::WriterConfig;
 use super::utils::{create_and_sign_blob_inscriptions, get_blob_by_id, put_blob, BlobIdx};
-use super::{broadcast::broadcaster_task, utils::calculate_intent_hash};
+use super::{broadcast::broadcaster_task, utils::calculate_blob_hash};
 use crate::{
     rpc::traits::{L1Client, SeqL1Client},
     writer::watcher::watcher_task,
@@ -128,7 +128,7 @@ where
 }
 
 fn store_entry<D: SequencerDatabase>(entry: BlobEntry, db: Arc<D>) -> anyhow::Result<Option<u64>> {
-    let blobid = calculate_intent_hash(&entry.blob); // TODO: maybe use blobintent's commitment
+    let blobid = calculate_blob_hash(&entry.blob); // TODO: maybe use blobintent's commitment
 
     match db.sequencer_provider().get_blob_by_id(blobid.clone())? {
         Some(_) => {
@@ -147,7 +147,7 @@ async fn store_entry_async<D: SequencerDatabase + Send + Sync + 'static>(
     entry: BlobEntry,
     db: Arc<D>,
 ) -> anyhow::Result<Option<u64>> {
-    let blobid = calculate_intent_hash(&entry.blob); // TODO: maybe use blobintent's commitment
+    let blobid = calculate_blob_hash(&entry.blob); // TODO: maybe use blobintent's commitment
 
     match get_blob_by_id(db.clone(), blobid.clone()).await? {
         Some(_) => {
@@ -220,7 +220,8 @@ mod test {
     use alpen_express_primitives::buf::Buf32;
     use bitcoin::{Address, Network};
 
-    use alpen_express_db::{sequencer::db::SequencerDB, traits::SequencerDatabase, SeqDb};
+    use alpen_express_db::traits::SequencerDatabase;
+    use alpen_express_rocksdb::{sequencer::db::SequencerDB, SeqDb};
     use alpen_test_utils::ArbitraryGenerator;
 
     use super::*;

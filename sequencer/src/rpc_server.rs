@@ -18,7 +18,7 @@ use reth_rpc_types::{
 use thiserror::Error;
 use tokio::sync::{mpsc, oneshot, watch, Mutex, RwLock};
 
-use alpen_express_btcio::writer::DaWriter;
+use alpen_express_btcio::writer::{utils::calculate_blob_hash, DaWriter};
 use alpen_express_consensus_logic::sync_manager::SyncManager;
 
 use alpen_express_db::traits::{ChainstateProvider, Database, L2DataProvider};
@@ -266,12 +266,12 @@ impl<S: SequencerDatabase> AdminServerImpl<S> {
 
 #[async_trait]
 impl<S: SequencerDatabase + Send + Sync + 'static> AlpenAdminApiServer for AdminServerImpl<S> {
-    async fn submit_da_blob(&self, blobpayload: Vec<u8>) -> RpcResult<()> {
-        // Send this to intent receiver
-        let commitment = Buf32::from([0u8; 32]); // TODO: calculate properly
-        let blobintent = BlobIntent::new(BlobDest::L1, commitment, blobpayload);
+    async fn submit_da_blob(&self, blob: Vec<u8>) -> RpcResult<()> {
+        let commitment = calculate_blob_hash(&blob);
+        let blobintent = BlobIntent::new(BlobDest::L1, commitment, blob);
+        // NOTE: It would be nice to return reveal txid from the submit method. But creation of txs
+        // is deferred to signer in the writer module
         if let Err(e) = self.writer.submit_intent_async(blobintent).await {
-            debug!(%e, "error");
             return Err(Error::Other("".to_string()).into());
         }
         Ok(())

@@ -25,5 +25,6 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 alpen-test-utils = { workspace = true }
+alpen-express-rocksdb = { workspace = true }
 arbitrary = { workspace = true }
 mockall = { workspace = true }

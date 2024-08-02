@@ -22,7 +22,6 @@ pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
     L2BlockHeightSchema::COLUMN_FAMILY_NAME,
     WriteBatchSchema::COLUMN_FAMILY_NAME,
     // Seqdb schemas
-    SeqBIdRevTxnIdxSchema::COLUMN_FAMILY_NAME,
     SeqBlobIdSchema::COLUMN_FAMILY_NAME,
     SeqBlobSchema::COLUMN_FAMILY_NAME,
     SeqL1TxIdSchema::COLUMN_FAMILY_NAME,
@@ -40,9 +39,7 @@ pub use sync_event::db::SyncEventDb;
 use l2::schemas::{L2BlockHeightSchema, L2BlockSchema, L2BlockStatusSchema};
 
 use rockbound::{schema::ColumnFamilyName, Schema};
-use sequencer::schemas::{
-    SeqBIdRevTxnIdxSchema, SeqBlobIdSchema, SeqBlobSchema, SeqL1TxIdSchema, SeqL1TxnSchema,
-};
+use sequencer::schemas::{SeqBlobIdSchema, SeqBlobSchema, SeqL1TxIdSchema, SeqL1TxnSchema};
 
 use crate::chain_state::schemas::{ChainStateSchema, WriteBatchSchema};
 use crate::client_state::schemas::{ClientStateSchema, ClientUpdateOutputSchema};
