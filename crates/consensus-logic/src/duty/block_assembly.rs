@@ -115,7 +115,7 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
 
     // Prepare the execution segment, which right now is just talking to the EVM
     // but will be more advanced later.
-    let exec_seg = prepare_exec_segment(
+    let (exec_seg, block_acc) = prepare_exec_data(
         slot,
         ts,
         prev_block_id,
@@ -139,9 +139,6 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
 
     let blkid = signed_header.get_blockid();
     let final_block = L2Block::new(signed_header, body);
-
-    // FIXME this is kind bodged together, it should be pulling more data in from the engine
-    let block_acc = L2BlockAccessory::new(Vec::new());
     let final_bundle = L2BlockBundle::new(final_block.clone(), block_acc);
     info!(?blkid, "finished building new block");
 
@@ -150,6 +147,7 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     l2store.put_block_data(final_bundle)?;
     debug!(?blkid, "wrote block to datastore");
 
+    // TODO should we actually return the bundle here?
     Ok(Some((blkid, final_block)))
 }
 
@@ -296,14 +294,14 @@ fn find_pivot_block_height<'c>(
 }
 
 /// Prepares the execution segment for the block.
-fn prepare_exec_segment<E: ExecEngineCtl>(
+fn prepare_exec_data<E: ExecEngineCtl>(
     slot: u64,
     timestamp: u64,
     prev_l2_blkid: L2BlockId,
     prev_global_sr: Buf32,
     safe_l1_block: Buf32,
     engine: &E,
-) -> Result<ExecSegment, Error> {
+) -> Result<(ExecSegment, L2BlockAccessory), Error> {
     trace!("preparing exec payload");
 
     // Start preparing the EL payload.
@@ -325,8 +323,12 @@ fn prepare_exec_segment<E: ExecEngineCtl>(
     // Reassemble it into an exec update.
     let eui = payload_data.update_input().clone();
     let exec_update = ExecUpdate::new(eui, UpdateOutput::new_from_state(Buf32::zero()));
+    let exec_seg = ExecSegment::new(exec_update);
 
-    Ok(ExecSegment::new(exec_update))
+    // And the accessory.
+    let acc = L2BlockAccessory::new(payload_data.accessory_data().to_vec());
+
+    Ok((exec_seg, acc))
 }
 
 fn poll_status_loop<E: ExecEngineCtl>(
