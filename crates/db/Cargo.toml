@@ -9,6 +9,7 @@ alpen-express-primitives = { workspace = true }
 alpen-express-state = { workspace = true }
 
 anyhow = { workspace = true }
+arbitrary = { workspace = true }
 bitcoin = { workspace = true }
 borsh = { workspace = true }
 parking_lot = { workspace = true }

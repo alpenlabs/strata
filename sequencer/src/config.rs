@@ -68,7 +68,7 @@ impl Config {
             client: ClientParams {
                 rpc_port: args.rpc_port.expect("args: no client rpc_port provided"),
                 datadir: args.datadir.expect("args: no client datadir provided"),
-                sequencer_key: None,
+                sequencer_key: args.sequencer_key,
                 sequencer_bitcoin_address: args
                     .sequencer_bitcoin_address
                     .expect("args: no sequencer_bitcion_address provided"),
@@ -80,8 +80,10 @@ impl Config {
             },
             exec: ExecParams {
                 reth: RethELParams {
-                    rpc_url: String::new(),
-                    secret: PathBuf::new(),
+                    rpc_url: args.reth_authrpc.unwrap_or("".to_string()), // TODO: sensible default
+                    secret: args.reth_jwtsecret.unwrap_or(PathBuf::new()), /* TODO: probably
+                                                                           * secret
+                                                                           * should be Option */
                 },
             },
         }

@@ -90,12 +90,10 @@ impl SeqDataProvider for SeqDb {
         Ok(self.db.get::<SeqL1TxnSchema>(&txid)?)
     }
 
-    fn get_blob_by_idx(&self, blobidx: u64) -> DbResult<Option<crate::types::BlobEntry>> {
+    fn get_blob_by_idx(&self, blobidx: u64) -> DbResult<Option<BlobEntry>> {
         match self.db.get::<SeqBlobIdSchema>(&blobidx)? {
             Some(id) => Ok(self.db.get::<SeqBlobSchema>(&id)?),
-            None => Err(DbError::Other(format!(
-                "BlobEntry does not exist for idx {blobidx:?}"
-            ))),
+            None => Ok(None),
         }
     }
 }

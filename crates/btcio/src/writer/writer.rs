@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use tokio::sync::mpsc::{self, Receiver, Sender};
+use tokio::{
+    runtime::Runtime,
+    sync::mpsc::{self, Receiver, Sender},
+};
 use tracing::*;
 
 use alpen_express_db::{
@@ -10,7 +13,7 @@ use alpen_express_db::{
 use alpen_express_state::da_blob::BlobIntent;
 
 use super::config::WriterConfig;
-use super::utils::{create_and_sign_blob_inscriptions, BlobIdx};
+use super::utils::{create_and_sign_blob_inscriptions, get_blob_by_id, put_blob, BlobIdx};
 use super::{broadcast::broadcaster_task, utils::calculate_intent_hash};
 use crate::{
     rpc::traits::{L1Client, SeqL1Client},
@@ -30,7 +33,7 @@ pub struct DaWriter<D> {
     signer_tx: Sender<BlobIdx>,
 }
 
-impl<D: SequencerDatabase> DaWriter<D> {
+impl<D: SequencerDatabase + Send + Sync + 'static> DaWriter<D> {
     pub fn submit_intent(&self, intent: BlobIntent) -> anyhow::Result<()> {
         // TODO: check for intent dest ??
         let entry = BlobEntry::new_unsigned(intent.payload().to_vec());
@@ -41,12 +44,24 @@ impl<D: SequencerDatabase> DaWriter<D> {
         } // None means duplicate intent
         Ok(())
     }
+
+    pub async fn submit_intent_async(&self, intent: BlobIntent) -> anyhow::Result<()> {
+        // TODO: check for intent dest ??
+        let entry = BlobEntry::new_unsigned(intent.payload().to_vec());
+
+        // Write to db and if not already exisging, notify signer about the new entry
+        if let Some(idx) = store_entry_async(entry, self.db.clone()).await? {
+            self.signer_tx.send(idx).await?;
+        } // None means duplicate intent
+        Ok(())
+    }
 }
 
 pub fn start_writer_task<D: SequencerDatabase + Send + Sync + 'static>(
     rpc_client: Arc<impl SeqL1Client + L1Client>,
     config: WriterConfig,
     db: Arc<D>,
+    rt: &Runtime,
 ) -> anyhow::Result<DaWriter<D>> {
     info!("Starting writer control task");
 
@@ -56,20 +71,20 @@ pub fn start_writer_task<D: SequencerDatabase + Send + Sync + 'static>(
 
     // The watcher task watches L1 for txs confirmations and finalizations. Ideally this should be
     // taken care of by the reader task. This can be done later.
-    tokio::spawn(watcher_task(
+    rt.spawn(watcher_task(
         init_state.next_watch_blob_idx,
         rpc_client.clone(),
         config.clone(),
         db.clone(),
     ));
 
-    tokio::spawn(broadcaster_task(
+    rt.spawn(broadcaster_task(
         init_state.next_publish_blob_idx,
         rpc_client.clone(),
         db.clone(),
     ));
 
-    tokio::spawn(listen_for_signing_intents(
+    rt.spawn(listen_for_signing_intents(
         signer_rx,
         rpc_client,
         config,
@@ -93,12 +108,15 @@ where
             .recv()
             .await
             .ok_or(anyhow::anyhow!("Signer channel closed"))?;
+        debug!(%blobidx, "Receicved blob for signing");
 
         if let Err(e) =
             create_and_sign_blob_inscriptions(blobidx, db.clone(), rpc_client.clone(), &config)
                 .await
         {
             error!(%e, "Failed to handle intent");
+        } else {
+            debug!("Successfully signed blob");
         }
     }
 }
@@ -114,6 +132,25 @@ fn store_entry<D: SequencerDatabase>(entry: BlobEntry, db: Arc<D>) -> anyhow::Re
         None => {
             // Store in db
             let idx = db.sequencer_store().put_blob(blobid, entry)?;
+            return Ok(Some(idx));
+        }
+    }
+}
+
+async fn store_entry_async<D: SequencerDatabase + Send + Sync + 'static>(
+    entry: BlobEntry,
+    db: Arc<D>,
+) -> anyhow::Result<Option<u64>> {
+    let blobid = calculate_intent_hash(&entry.blob); // TODO: maybe use blobintent's commitment
+
+    match get_blob_by_id(db.clone(), blobid.clone()).await? {
+        Some(_) => {
+            warn!("duplicate write intent {blobid:?}. Ignoring");
+            return Ok(None);
+        }
+        None => {
+            // Store in db
+            let idx = put_blob(db, blobid, entry).await?;
             return Ok(Some(idx));
         }
     }

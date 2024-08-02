@@ -274,10 +274,9 @@ impl<S: SequencerDatabase> AdminServerImpl<S> {
 impl<S: SequencerDatabase + Send + Sync + 'static> AlpenAdminApiServer for AdminServerImpl<S> {
     async fn submit_da_blob(&self, blobpayload: Vec<u8>) -> RpcResult<()> {
         // Send this to intent receiver
-        // TODO: Get commitment from rpc as well
-        let commitment = Buf32::from([0u8; 32]);
+        let commitment = Buf32::from([0u8; 32]); // TODO: calculate properly
         let blobintent = BlobIntent::new(BlobDest::L1, commitment, blobpayload);
-        if let Err(e) = self.writer.submit_intent(blobintent) {
+        if let Err(e) = self.writer.submit_intent_async(blobintent).await {
             debug!(%e, "error");
             return Err(Error::Other("".to_string()).into());
         }

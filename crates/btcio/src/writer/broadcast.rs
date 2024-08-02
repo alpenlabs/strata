@@ -1,6 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use anyhow::anyhow;
+use tracing::*;
 
 use alpen_express_db::{
     traits::{SeqDataProvider, SeqDataStore, SequencerDatabase},
@@ -15,7 +16,7 @@ use crate::{
     writer::utils::{get_blob_by_idx, get_l1_tx},
 };
 
-const BROADCAST_POLL_INTERVAL: u64 = 5000; // millis
+const BROADCAST_POLL_INTERVAL: u64 = 1000; // millis
 
 /// Broadcasts the next blob to be sent
 pub async fn broadcaster_task<D: SequencerDatabase + Send + Sync + 'static>(
@@ -23,6 +24,7 @@ pub async fn broadcaster_task<D: SequencerDatabase + Send + Sync + 'static>(
     rpc_client: Arc<impl SeqL1Client + L1Client>,
     db: Arc<D>,
 ) -> anyhow::Result<()> {
+    info!("Starting L1 writer's broadcaster task");
     let interval = tokio::time::interval(Duration::from_millis(BROADCAST_POLL_INTERVAL));
     tokio::pin!(interval);
 
@@ -31,6 +33,7 @@ pub async fn broadcaster_task<D: SequencerDatabase + Send + Sync + 'static>(
     loop {
         // SLEEP!
         interval.as_mut().tick().await;
+        debug!(%curr_idx, "Trying to broadcast blob idx");
 
         // Check from db if the previous published blob is confirmed/finalized. Because if not, they
         // might end up in different order
@@ -40,10 +43,13 @@ pub async fn broadcaster_task<D: SequencerDatabase + Send + Sync + 'static>(
                 .map(|x| x.status == BlobL1Status::Confirmed || x.status == BlobL1Status::Finalized)
                 .ok_or(anyhow!("Last published blob not found in db"))?
         {
+            debug!("previous blob has not been confirmed");
             continue;
         }
 
+        debug!(%curr_idx, "fetching from seq db");
         if let Some(mut blobentry) = db.sequencer_provider().get_blob_by_idx(curr_idx)? {
+            debug!("Found corresponding blob entry {:#?}", blobentry);
             match blobentry.status {
                 BlobL1Status::Unsigned | BlobL1Status::NeedsResign => {
                     continue;
@@ -56,6 +62,7 @@ pub async fn broadcaster_task<D: SequencerDatabase + Send + Sync + 'static>(
                     // do the publishing work below
                 }
             }
+            debug!("Getting l1 tx");
             // Get commit reveal txns
             let commit_tx = get_l1_tx(db.clone(), blobentry.commit_txid)
                 .await?
@@ -64,9 +71,12 @@ pub async fn broadcaster_task<D: SequencerDatabase + Send + Sync + 'static>(
                 .await?
                 .ok_or(anyhow!("Expected to find commit tx in db"))?;
 
+            debug!("obtained l1 txs, now sending");
+
             // Send
             match send_commit_reveal_txs(commit_tx, reveal_tx, rpc_client.as_ref()).await {
                 Ok(_) => {
+                    debug!("Successfully sent: {}", blobentry.reveal_txid.to_string());
                     curr_idx += 1;
                 }
                 Err(SendError::MissingOrInvalidInput) => {
@@ -76,10 +86,13 @@ pub async fn broadcaster_task<D: SequencerDatabase + Send + Sync + 'static>(
                     db.sequencer_store()
                         .update_blob_by_idx(curr_idx, blobentry)?;
                 }
-                Err(SendError::Other(_)) => {
+                Err(SendError::Other(e)) => {
+                    warn!(%e, "Error sending !");
                     // TODO: Maybe retry or return?
                 }
             }
+        } else {
+            debug!(%curr_idx, "No blob found");
         }
     }
 }

@@ -74,32 +74,15 @@ where
         type Value = u64;
 
         fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-            write!(
-                formatter,
-                "a string representation of btc values with 8 decimal places"
-            )
+            write!(formatter, "a float representation of btc values expected")
         }
 
-        fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+        fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E>
         where
             E: serde::de::Error,
         {
-            let parts: Vec<&str> = v.split('.').collect();
-            let combined = if parts.len() == 2 {
-                let padded = format!("{:0<8}", parts[1]);
-                if padded.len() != 8 {
-                    return Err(E::custom(
-                        "Invalid btc amount precision(more than 8 decimal places)",
-                    ));
-                }
-                format!("{}{}", parts[0], padded)
-            } else if parts.len() == 1 {
-                format!("{}{}", parts[0], "0".repeat(8_usize))
-            } else {
-                return Err(E::custom("Invalid amount representation"));
-            };
-
-            combined.parse().map_err(E::custom)
+            let sats = (v * 100_000_000.0).round() as u64;
+            Ok(sats)
         }
     }
     deserializer.deserialize_any(SatVisitor)
@@ -120,24 +103,24 @@ mod test {
     #[test]
     fn test_deserialize_satoshis() {
         // Valid cases
-        let json_data = r#"{"value": "0.000042"}"#;
+        let json_data = r#"{"value": 0.000042}"#;
         let result: TestStruct = serde_json::from_str(json_data).unwrap();
         assert_eq!(result.value, 4200);
 
-        let json_data = r#"{"value": "1.23456789"}"#;
+        let json_data = r#"{"value": 1.23456789}"#;
         let result: TestStruct = serde_json::from_str(json_data).unwrap();
         assert_eq!(result.value, 123456789);
 
-        let json_data = r#"{"value": "123"}"#;
+        let json_data = r#"{"value": 123.0}"#;
         let result: TestStruct = serde_json::from_str(json_data).unwrap();
         assert_eq!(result.value, 12300000000);
 
-        let json_data = r#"{"value": "123.45"}"#;
+        let json_data = r#"{"value": 123.45}"#;
         let result: TestStruct = serde_json::from_str(json_data).unwrap();
         assert_eq!(result.value, 12345000000);
 
         // Invalid cases
-        let json_data = r#"{"value": "123.456789012"}"#;
+        let json_data = r#"{"value": 123}"#;
         let result: Result<TestStruct, _> = serde_json::from_str(json_data);
         assert!(result.is_err());
 

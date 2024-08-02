@@ -70,7 +70,10 @@ impl TryFrom<RawUTXO> for UTXO {
 
     fn try_from(value: RawUTXO) -> Result<Self, Self::Error> {
         let rawtxid = value.txid;
-        let txid = deserialize(&hex::decode(rawtxid)?)?;
+        let mut decoded = hex::decode(rawtxid)?;
+        // Reverse because the display str has the reverse order of actual bytes
+        decoded.reverse();
+        let txid = deserialize(&decoded)?;
         Ok(UTXO {
             txid,
             vout: value.vout,

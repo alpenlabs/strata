@@ -26,6 +26,23 @@ pub async fn get_blob_by_idx<D: SequencerDatabase + Send + Sync + 'static>(
     tokio::task::spawn_blocking(move || Ok(db.sequencer_provider().get_blob_by_idx(idx)?)).await?
 }
 
+// Helper function to fetch a blob entry from withing tokio
+pub async fn get_blob_by_id<D: SequencerDatabase + Send + Sync + 'static>(
+    db: Arc<D>,
+    id: Buf32,
+) -> anyhow::Result<Option<BlobEntry>> {
+    tokio::task::spawn_blocking(move || Ok(db.sequencer_provider().get_blob_by_id(id)?)).await?
+}
+
+// Helper to put blob from within tokio's context
+pub async fn put_blob<D: SequencerDatabase + Send + Sync + 'static>(
+    db: Arc<D>,
+    id: Buf32,
+    entry: BlobEntry,
+) -> anyhow::Result<u64> {
+    tokio::task::spawn_blocking(move || Ok(db.sequencer_store().put_blob(id, entry)?)).await?
+}
+
 // Helper function to update a blob entry by index from withing tokio
 pub async fn update_blob_by_idx<D: SequencerDatabase + Send + Sync + 'static>(
     db: Arc<D>,

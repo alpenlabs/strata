@@ -4,6 +4,7 @@ use alpen_express_db::{
     traits::SequencerDatabase,
     types::{BlobEntry, BlobL1Status},
 };
+use tracing::*;
 
 use crate::{
     rpc::traits::{L1Client, SeqL1Client},
@@ -21,16 +22,20 @@ pub async fn watcher_task<D: SequencerDatabase + Send + Sync + 'static>(
     config: WriterConfig,
     db: Arc<D>,
 ) -> anyhow::Result<()> {
+    info!("Starting L1 writer's watcher task");
     let interval = tokio::time::interval(Duration::from_millis(config.poll_duration_ms));
     tokio::pin!(interval);
 
     let mut curr_blobidx = next_to_watch;
     loop {
         interval.as_mut().tick().await;
+        debug!(%curr_blobidx, "Watching for blob");
 
         if let Some(blobentry) = get_blob_by_idx(db.clone(), curr_blobidx).await? {
+            debug!(%curr_blobidx, "blobentry found in db");
             match blobentry.status {
                 BlobL1Status::Published | BlobL1Status::Confirmed => {
+                    debug!(%curr_blobidx, "blobentry is published or confirmed");
                     let confs = check_confirmations_and_update_entry(
                         rpc_client.clone(),
                         curr_blobidx,
@@ -43,6 +48,7 @@ pub async fn watcher_task<D: SequencerDatabase + Send + Sync + 'static>(
                     }
                 }
                 BlobL1Status::Unsigned | BlobL1Status::NeedsResign => {
+                    debug!(%curr_blobidx, "blobentry is unsigned or needs resign");
                     create_and_sign_blob_inscriptions(
                         curr_blobidx,
                         db.clone(),
@@ -52,9 +58,12 @@ pub async fn watcher_task<D: SequencerDatabase + Send + Sync + 'static>(
                     .await?;
                 }
                 BlobL1Status::Finalized => {
+                    debug!(%curr_blobidx, "blobentry is finalized");
                     curr_blobidx += 1;
                 }
-                BlobL1Status::Unpublished => {} // Do Nothing
+                BlobL1Status::Unpublished => {
+                    debug!(%curr_blobidx, "blobentry is unpublished;");
+                } // Do Nothing
             }
         } else {
             // No blob exists, just continue the loop and thus wait for blob to be present in db
