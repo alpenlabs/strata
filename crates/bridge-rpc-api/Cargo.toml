@@ -12,3 +12,12 @@ rust.unused_must_use = "deny"
 rustdoc.all = "warn"
 
 [dependencies]
+anyhow = { workspace = true }
+bitcoin = { workspace = true }
+jsonrpsee = { workspace = true, features = ["server", "macros"] }
+reth-primitives = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[features]
+client = ["jsonrpsee/client"]
