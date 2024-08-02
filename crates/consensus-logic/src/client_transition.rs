@@ -55,9 +55,12 @@ pub fn process_event<D: Database>(
             }
 
             // If we have some number of L1 blocks finalized, also emit an `UpdateBuried` write.
-            /*if state.buried_l1_height() < maturable_height {
+            // TODO clean up this bookkeeping slightly
+            let keep_window = params.rollup().l1_reorg_safe_depth as u64;
+            let maturable_height = next_exp_height - keep_window;
+            if maturable_height > state.buried_l1_height() {
                 writes.push(ClientStateWrite::UpdateBuried(maturable_height));
-            }*/
+            }
 
             if let Some(ss) = state.sync() {
                 // TODO figure out what to do here
