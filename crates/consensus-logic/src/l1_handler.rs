@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use alpen_express_primitives::params::Params;
 use bitcoin::consensus::serialize;
 use bitcoin::hashes::Hash;
 use bitcoin::Block;
@@ -19,12 +20,13 @@ pub fn bitcoin_data_handler_task<L1D>(
     l1db: Arc<L1D>,
     csm_ctl: Arc<CsmController>,
     mut event_rx: mpsc::Receiver<L1Event>,
+    params: Arc<Params>,
 ) -> anyhow::Result<()>
 where
     L1D: L1DataStore + Sync + Send + 'static,
 {
     while let Some(event) = event_rx.blocking_recv() {
-        if let Err(e) = handle_event(event, l1db.as_ref(), csm_ctl.as_ref()) {
+        if let Err(e) = handle_event(event, l1db.as_ref(), csm_ctl.as_ref(), &params) {
             error!(err = %e, "failed to handle L1 event");
         }
     }
@@ -33,7 +35,12 @@ where
     Ok(())
 }
 
-fn handle_event<L1D>(event: L1Event, l1db: &L1D, csm_ctl: &CsmController) -> anyhow::Result<()>
+fn handle_event<L1D>(
+    event: L1Event,
+    l1db: &L1D,
+    csm_ctl: &CsmController,
+    params: &Arc<Params>,
+) -> anyhow::Result<()>
 where
     L1D: L1DataStore + Sync + Send + 'static,
 {
@@ -52,6 +59,15 @@ where
         }
 
         L1Event::BlockData(blockdata) => {
+            let height = blockdata.block_num();
+
+            // Bail out fast if we don't have to care.
+            let horizon = params.rollup().horizon_l1_height;
+            if height < horizon {
+                warn!(%height, %horizon, "ignoring BlockData for block before horizon");
+                return Ok(());
+            }
+
             let l1blkid = blockdata.block().block_hash();
 
             let manifest = generate_block_manifest(blockdata.block());
@@ -65,9 +81,9 @@ where
             let l1txs = Vec::new();
             let num_txs = l1txs.len();
             l1db.put_block_data(blockdata.block_num(), manifest, l1txs)?;
-            info!(%l1blkid, txs = %num_txs, "wrote L1 block manifest");
+            info!(%height, %l1blkid, txs = %num_txs, "wrote L1 block manifest");
 
-            // Write to sync event db.
+            // Write to sync event db if it's something we care about.
             let blkid: Buf32 = blockdata.block().block_hash().into();
             let ev = SyncEvent::L1Block(blockdata.block_num(), blkid.into());
             csm_ctl.submit_event(ev)?;

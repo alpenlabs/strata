@@ -3,6 +3,7 @@
 
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
+use tracing::*;
 
 use crate::client_state::{ClientState, SyncState};
 use crate::id::L2BlockId;
@@ -52,8 +53,8 @@ pub enum ClientStateWrite {
     /// Accept an L2 block and update tip state.
     AcceptL2Block(L2BlockId),
 
-    /// Rolls back L1 blocks to this block ID.
-    RollbackL1BlocksTo(L1BlockId),
+    /// Rolls back L1 blocks to this block height.
+    RollbackL1BlocksTo(u64),
 
     /// Insert L1 blocks into the pending queue.
     AcceptL1Block(L1BlockId),
@@ -77,9 +78,6 @@ pub enum SyncAction {
 
     /// Marks an L2 blockid as invalid and we won't follow any chain that has
     /// it, and will reject it from our peers.
-    // TODO possibly we should have some way of marking a block invalid through
-    // preliminary checks before writing a sync event we then have to check,
-    // this should be investigated more
     MarkInvalid(L2BlockId),
 
     /// Finalizes a block, indicating that it won't be reverted.
@@ -111,17 +109,17 @@ pub fn apply_writes_to_state(
                 state.chain_active = true;
             }
 
-            RollbackL1BlocksTo(l1blkid) => {
+            RollbackL1BlocksTo(block_height) => {
                 let l1v = state.l1_view_mut();
-                let pos = l1v
-                    .local_unaccepted_blocks
-                    .iter()
-                    .position(|b| *b == l1blkid);
-                let Some(pos) = pos else {
-                    // TODO better logging, maybe make this an actual error
+                let buried_height = l1v.buried_l1_height;
+
+                if block_height < buried_height {
+                    error!(%block_height, %buried_height, "unable to roll back past buried height");
                     panic!("operation: emitted invalid write");
-                };
-                l1v.local_unaccepted_blocks.truncate(pos);
+                }
+
+                let new_unacc_len = block_height - buried_height;
+                l1v.local_unaccepted_blocks.truncate(new_unacc_len as usize);
             }
 
             AcceptL1Block(l1blkid) => {
@@ -139,7 +137,7 @@ pub fn apply_writes_to_state(
             UpdateBuried(new_idx) => {
                 // Check that it's increasing.
                 let old_idx = state.buried_l1_height();
-                if old_idx >= new_idx {
+                if new_idx < old_idx {
                     panic!("operation: emitted non-greater buried height");
                 }
 

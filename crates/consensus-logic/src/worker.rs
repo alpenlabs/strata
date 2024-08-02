@@ -98,7 +98,7 @@ pub fn client_worker_task<D: Database, E: ExecEngineCtl>(
             &csm_status_tx,
             &fcm_msg_tx,
         ) {
-            error!(err = %e, "failed to process sync message, skipping");
+            error!(err = %e, ?msg, "failed to process sync message, skipping");
         }
     }
 

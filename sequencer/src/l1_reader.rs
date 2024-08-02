@@ -16,7 +16,7 @@ use alpen_express_primitives::params::Params;
 use crate::config::Config;
 
 pub async fn start_reader_tasks<D: Database>(
-    params: &Params,
+    params: Arc<Params>,
     config: &Config,
     rpc_client: impl L1Client,
     db: Arc<D>,
@@ -32,9 +32,10 @@ where
 
     // TODO switch to checking the L1 tip in the consensus/client state
     let l1prov = db.l1_provider().clone();
-    let current_block_height = l1prov
+    let target_next_block = l1prov
         .get_chain_tip()?
-        .unwrap_or(params.rollup().horizon_l1_height - 1);
+        .map(|i| i + 1)
+        .unwrap_or(params.rollup().horizon_l1_height);
 
     let config = Arc::new(ReaderConfig {
         max_reorg_depth: config.sync.max_reorg_depth,
@@ -45,13 +46,14 @@ where
     let _reader_handle = tokio::spawn(bitcoin_data_reader_task(
         rpc_client,
         ev_tx,
-        current_block_height,
+        target_next_block,
         config.clone(),
         l1_status.clone(),
     ));
 
     let l1db = db.l1_store().clone();
     let _sedb = db.sync_event_store().clone();
-    let _handler_handle = thread::spawn(move || bitcoin_data_handler_task(l1db, csm_ctl, ev_rx));
+    let _handler_handle =
+        thread::spawn(move || bitcoin_data_handler_task(l1db, csm_ctl, ev_rx, params));
     Ok(())
 }

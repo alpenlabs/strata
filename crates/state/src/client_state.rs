@@ -42,7 +42,7 @@ impl ClientState {
         Self {
             chain_active: false,
             sync_state: None,
-            local_l1_view: LocalL1State::new(genesis_l1_height),
+            local_l1_view: LocalL1State::new(horizon_l1_height),
             horizon_l1_height,
             genesis_l1_height,
         }

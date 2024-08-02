@@ -51,6 +51,9 @@ pub enum Error {
     #[error("csm dropped")]
     CsmDropped,
 
+    #[error("tried to reorg too deep (target {0} vs buried {1})")]
+    ReorgTooDeep(u64, u64),
+
     #[error("chaintip: {0}")]
     ChainTip(#[from] ChainTipError),
 

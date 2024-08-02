@@ -236,7 +236,7 @@ where
     // Start the L1 tasks to get that going.
     let csm_ctl = sync_man.get_csm_ctl();
     l1_reader::start_reader_tasks(
-        sync_man.params(),
+        sync_man.get_params(),
         config,
         l1_rpc_client,
         database.clone(),

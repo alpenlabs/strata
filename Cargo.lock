@@ -886,6 +886,7 @@ dependencies = [
  "digest 0.10.7",
  "num_enum",
  "sha2 0.10.8",
+ "tracing",
 ]
 
 [[package]]

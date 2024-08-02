@@ -31,6 +31,7 @@ impl CsmController {
     /// Writes a sync event to the database and updates the watch channel to
     /// trigger the CSM executor to process the event.
     pub fn submit_event(&self, sync_event: SyncEvent) -> anyhow::Result<()> {
+        trace!(?sync_event, "submitting sync event");
         let ev_idx = self.submit_event_shim.submit_event_blocking(sync_event)?;
         let msg = CsmMessage::EventInput(ev_idx);
         if self.csm_tx.blocking_send(msg).is_err() {

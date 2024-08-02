@@ -14,3 +14,4 @@ borsh = { workspace = true }
 digest = { workspace = true }
 num_enum = { workspace = true }
 sha2 = { workspace = true }
+tracing = { workspace = true } # ideally this shouldn't be in this trait

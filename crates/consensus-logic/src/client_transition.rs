@@ -24,24 +24,40 @@ pub fn process_event<D: Database>(
 
     match ev {
         SyncEvent::L1Block(height, l1blkid) => {
+            // If the block is before the horizon we don't care about it.
+            if *height < params.rollup().horizon_l1_height {
+                warn!(%height, "ignoring unexpected L1Block event before horizon");
+                return Ok(ClientUpdateOutput::new(writes, actions));
+            }
+
             // FIXME this doesn't do any SPV checks to make sure we only go to
             // a longer chain, it just does it unconditionally
             let l1prov = database.l1_provider();
             let _blkmf = l1prov.get_block_manifest(*height)?;
 
+            let l1v = state.l1_view();
+
             // TODO do the consensus checks
 
-            // Only accept the block if it's greater than or equal to the buried height.
-            if *height >= state.buried_l1_height() {
+            // Only accept the block if it's the next block in the chain we expect to accept.
+            let cur_seen_tip_height =
+                state.buried_l1_height() + l1v.local_unaccepted_blocks().len() as u64;
+            let next_exp_height = cur_seen_tip_height + 1;
+
+            // TODO check that the new block we're trying to add has the same parent as the tip
+            // block
+            let cur_tip_block = l1prov
+                .get_block_manifest(cur_seen_tip_height)?
+                .ok_or(Error::MissingL1BlockHeight(cur_seen_tip_height))?;
+
+            if *height == next_exp_height {
                 writes.push(ClientStateWrite::AcceptL1Block(*l1blkid));
             }
 
-            // If we have some number of L1 blocks finalized, also emit an `UpdateBuried` write
-            if *height >= params.rollup().l1_reorg_safe_depth as u64 + state.buried_l1_height() {
-                writes.push(ClientStateWrite::UpdateBuried(state.buried_l1_height() + 1));
-            }
-
-            let l1v = state.l1_view();
+            // If we have some number of L1 blocks finalized, also emit an `UpdateBuried` write.
+            /*if state.buried_l1_height() < maturable_height {
+                writes.push(ClientStateWrite::UpdateBuried(maturable_height));
+            }*/
 
             if let Some(ss) = state.sync() {
                 // TODO figure out what to do here
@@ -62,11 +78,14 @@ pub fn process_event<D: Database>(
 
         SyncEvent::L1Revert(to_height) => {
             let l1prov = database.l1_provider();
-            let blkmf = l1prov
-                .get_block_manifest(*to_height)?
-                .ok_or(Error::MissingL1BlockHeight(*to_height))?;
-            let blkid = blkmf.block_hash().into();
-            writes.push(ClientStateWrite::RollbackL1BlocksTo(blkid));
+
+            let buried = state.l1_view().buried_l1_height();
+            if *to_height < buried {
+                error!(%to_height, %buried, "got L1 revert below buried height");
+                return Err(Error::ReorgTooDeep(*to_height, buried));
+            }
+
+            writes.push(ClientStateWrite::RollbackL1BlocksTo(*to_height));
         }
 
         SyncEvent::L1DABatch(blkids) => {
@@ -89,7 +108,7 @@ pub fn process_event<D: Database>(
 
                 let last = blkids.last().unwrap();
                 writes.push(ClientStateWrite::UpdateFinalized(*last));
-                actions.push(SyncAction::FinalizeBlock(*last))
+                actions.push(SyncAction::FinalizeBlock(*last));
             } else {
                 // TODO we can expand this later to make more sense
                 return Err(Error::MissingClientSyncState);
