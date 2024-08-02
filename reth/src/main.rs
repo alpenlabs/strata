@@ -1,6 +1,11 @@
+mod db;
+
 use std::{future::Future, sync::Arc};
 
 use clap::Parser;
+use express_reth_db::rocksdb::WitnessDB;
+use express_reth_exex::ProverWitnessGenerator;
+use express_reth_rpc::{AlpenRPC, AlpenRpcApiServer};
 use reth::{
     args::LogArgs,
     builder::{NodeBuilder, WithLaunchContext},
@@ -29,7 +34,25 @@ fn main() {
     command.network.discovery.disable_discovery = true;
 
     if let Err(err) = run(command, |builder, _| async {
-        let handle = builder.launch_node(EthereumNode::default()).await?;
+        let datadir = builder.config().datadir().data_dir().to_path_buf();
+        let rbdb = db::open_rocksdb_database(datadir.clone()).expect("open rocksdb");
+
+        let db = Arc::new(WitnessDB::new(rbdb));
+        let rpc_db = db.clone();
+
+        let handle = builder
+            .node(EthereumNode::default())
+            .extend_rpc_modules(|ctx| {
+                let alpen_rpc = AlpenRPC::new(rpc_db);
+                ctx.modules.merge_configured(alpen_rpc.into_rpc())?;
+
+                Ok(())
+            })
+            .install_exex("prover_input", |ctx| async {
+                Ok(ProverWitnessGenerator::new(ctx, db).start())
+            })
+            .launch()
+            .await?;
         handle.node_exit_future.await
     }) {
         eprintln!("Error: {err:?}");

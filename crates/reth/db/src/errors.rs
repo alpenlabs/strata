@@ -38,3 +38,9 @@ impl From<anyhow::Error> for DbError {
         Self::Other(value.to_string())
     }
 }
+
+impl From<rockbound::CodecError> for DbError {
+    fn from(value: rockbound::CodecError) -> Self {
+        DbError::CodecError(value.to_string())
+    }
+}

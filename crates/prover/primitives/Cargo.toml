@@ -7,9 +7,7 @@ edition = "2021"
 alloy-eips = { version = "0.2", default-features = false }
 alloy-rlp = { version = "0.3.4", default-features = false }
 alloy-rlp-derive = { version = "0.3", default-features = false }
-alloy-rpc-types = { version = "0.1", default-features = false, features = [
-    "eth",
-] }
+alloy-rpc-types = { workspace = true }
 anyhow = { workspace = true }
 k256 = { version = "=0.13.3", features = [
     "std",

@@ -44,7 +44,7 @@ pub struct ELProofPublicParams {
 }
 
 /// Necessary information to prove the execution of the RETH block.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ZKVMInput {
     /// The Keccak 256-bit hash of the parent block's header, in its entirety.
     pub parent_header: Header,

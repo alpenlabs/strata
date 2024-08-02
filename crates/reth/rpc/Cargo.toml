@@ -1,0 +1,14 @@
+[package]
+edition = "2021"
+name = "express-reth-rpc"
+version = "0.1.0"
+
+[dependencies]
+bincode = { workspace = true }
+express-reth-db = { workspace = true }
+eyre = { workspace = true }
+jsonrpsee = { workspace = true }
+reth-primitives = { workspace = true }
+serde = { workspace = true }
+tokio = { workspace = true, features = ["macros", "sync"] }
+zkvm-primitives = { workspace = true }

@@ -15,4 +15,5 @@ pub trait WitnessStore {
 
 pub trait WitnessProvider {
     fn get_block_witness(&self, block_hash: B256) -> DbResult<Option<ZKVMInput>>;
+    fn get_block_witness_raw(&self, block_hash: B256) -> DbResult<Option<Vec<u8>>>;
 }
