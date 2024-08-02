@@ -3714,6 +3714,14 @@ version = "0.1.0"
 [[package]]
 name = "express-bridge-rpc-api"
 version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bitcoin",
+ "jsonrpsee",
+ "reth-primitives",
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "express-bridge-txm"
