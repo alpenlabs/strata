@@ -28,6 +28,6 @@ pub fn extract_duties<D: Database>(
 
     // Since we're not rotating sequencers, for now we just *always* produce a
     // new block.
-    let duty_data = BlockSigningDuty::new_simple(block_idx + 1);
+    let duty_data = BlockSigningDuty::new_simple(block_idx + 1, tip_blkid, state.l1_view().clone());
     Ok(vec![types::Duty::SignBlock(duty_data)])
 }

@@ -19,5 +19,5 @@ tracing = { workspace = true }
 
 [features]
 default = []
-stubs = []
 mocks = ["mockall"]
+stubs = []
