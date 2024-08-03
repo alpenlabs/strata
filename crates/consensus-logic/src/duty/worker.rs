@@ -243,6 +243,8 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
     match duty {
         Duty::SignBlock(data) => {
             let target_slot = data.target_slot();
+            let parent = data.parent();
+            let l1_view = data.l1_view();
 
             // TODO get the cur client state from the sync manager, the one used
             // to initiate this dutyn and pass it into `sign_and_store_block`
@@ -250,8 +252,15 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
             let asm_span = info_span!("blockasm", %target_slot);
             let _span = asm_span.enter();
 
-            let Some((blkid, _block)) =
-                block_assembly::sign_and_store_block(target_slot, ik, database, engine, params)?
+            let Some((blkid, _block)) = block_assembly::sign_and_store_block(
+                target_slot,
+                parent,
+                l1_view,
+                ik,
+                database,
+                engine,
+                params,
+            )?
             else {
                 return Ok(());
             };
