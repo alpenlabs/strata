@@ -5,7 +5,7 @@ use std::time;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use alpen_express_primitives::buf::Buf32;
-use alpen_express_state::id::L2BlockId;
+use alpen_express_state::{client_state::LocalL1State, id::L2BlockId};
 
 /// Describes when we'll stop working to fulfill a duty.
 #[derive(Clone, Debug)]
@@ -41,15 +41,31 @@ impl Duty {
 pub struct BlockSigningDuty {
     /// Slot to sign for.
     slot: u64,
+    /// Parent to build on
+    parent: L2BlockId,
+    /// L1 Local State
+    l1_view: LocalL1State,
 }
 
 impl BlockSigningDuty {
-    pub fn new_simple(slot: u64) -> Self {
-        Self { slot }
+    pub fn new_simple(slot: u64, parent: L2BlockId, l1_view: LocalL1State) -> Self {
+        Self {
+            slot,
+            parent,
+            l1_view,
+        }
     }
 
     pub fn target_slot(&self) -> u64 {
         self.slot
+    }
+
+    pub fn parent(&self) -> L2BlockId {
+        self.parent
+    }
+
+    pub fn l1_view(&self) -> &LocalL1State {
+        &self.l1_view
     }
 }
 

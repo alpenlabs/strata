@@ -6,6 +6,7 @@ use std::thread;
 use std::time;
 
 use alpen_express_db::traits::L1DataProvider;
+use alpen_express_state::client_state::LocalL1State;
 use alpen_express_state::l1::L1HeaderPayload;
 use alpen_express_state::l1::L1HeaderRecord;
 use tracing::*;
@@ -38,6 +39,8 @@ use crate::errors::Error;
 // TODO pass in the CSM state we're using to assemble this
 pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     slot: u64,
+    prev_block_id: L2BlockId,
+    l1_state: &LocalL1State,
     ik: &IdentityKey,
     database: &D,
     engine: &E,
@@ -59,24 +62,9 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
         return Ok(None);
     }
 
-    // TODO get the consensus state this duty was created in response to and
-    // pull out the current tip block from it
-    // XXX this is really bad as-is, see comment in worker.rs in `perform_duty`
-    // FIXME this isn't what this is for, it only works because we're
-    // checkpointing on every state right now
-    let ckpt_idx = cs_prov.get_last_checkpoint_idx()?;
-    let last_cstate = cs_prov
-        .get_state_checkpoint(ckpt_idx)?
-        .expect("dutyexec: get state checkpoint");
-
     // Figure out some general data about the slot and the previous state.
-    let Some(last_ss) = last_cstate.sync() else {
-        warn!(%slot, %ckpt_idx, "tried to produce block but no sync state available");
-        return Ok(None);
-    };
+    let ts = now_millis();
 
-    // By "prev" here we mean the block we're building on top of.
-    let prev_block_id = *last_ss.chain_tip_blkid();
     let prev_block = l2_prov
         .get_block_data(prev_block_id)?
         .ok_or(Error::MissingL2Block(prev_block_id))?;
@@ -112,7 +100,7 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
 
     // TODO Pull data from CSM state that we've observed from L1, including new
     // headers or any headers needed to perform a reorg if necessary.
-    let l1_seg = prepare_l1_segment(&last_cstate, &prev_chstate, l1_prov.as_ref())?;
+    let l1_seg = prepare_l1_segment(l1_state, &prev_chstate, l1_prov.as_ref())?;
 
     // Prepare the execution segment, which right now is just talking to the EVM
     // but will be more advanced later.
@@ -153,12 +141,10 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
 }
 
 fn prepare_l1_segment(
-    cstate: &ClientState,
+    l1v: &LocalL1State,
     prev_chstate: &ChainState,
     l1_prov: &impl L1DataProvider,
 ) -> Result<L1Segment, Error> {
-    let l1v = cstate.l1_view();
-
     let unacc_blocks = l1v.unacc_blocks_iter().collect::<Vec<_>>();
     trace!(unacc_blocks = %unacc_blocks.len(), "figuring out which blocks to include in L1 segment");
 
