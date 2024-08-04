@@ -1,5 +1,6 @@
-use anyhow::Ok;
-use risc0_zkvm::{get_prover_server, ExecutorEnv, Journal, ProverOpts, Receipt};
+use anyhow::{anyhow, Ok};
+use risc0_zkvm::{get_prover_server, ExecutorEnv, ProverOpts, Receipt};
+use serde_json::to_vec;
 use zkvm::{Proof, ProverOptions, ZKVMHost, ZKVMVerifier};
 
 pub struct RiscZeroHost {
@@ -58,15 +59,20 @@ impl ZKVMVerifier for Risc0Verifier {
         Ok(receipt.journal.decode()?)
     }
 
-    fn verify_with_public_params<T: serde::Serialize>(
+    fn verify_with_public_params<T: serde::de::DeserializeOwned + serde::Serialize>(
         program_id: [u32; 8],
         public_params: T,
         proof: &Proof,
     ) -> anyhow::Result<()> {
-        let mut receipt: Receipt = bincode::deserialize(&proof.0)?;
-        receipt.journal = Journal::new(bincode::serialize(&public_params)?);
+        let receipt: Receipt = bincode::deserialize(&proof.0)?;
         receipt.verify(program_id)?;
-        Ok(())
+        let pp: T = receipt.journal.decode()?;
+
+        if to_vec(&pp)? == to_vec(&public_params)? {
+            Ok(())
+        } else {
+            Err(anyhow!("Failed to verify the proof"))
+        }
     }
 }
 

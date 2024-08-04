@@ -34,6 +34,7 @@ alpen-vertex-mmr = { path = "crates/util/mmr" }
 alpen-vertex-primitives = { path = "crates/primitives" }
 alpen-vertex-rpc-api = { path = "crates/rpc/api" }
 alpen-vertex-state = { path = "crates/state" }
+alpen-vertex-evmexec = { path = "crates/evmexec" }
 zkvm = { path = "crates/prover/zkvm" }
 
 anyhow = "1.0.86"

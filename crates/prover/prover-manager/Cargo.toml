@@ -6,6 +6,7 @@ version = "0.1.0"
 [dependencies]
 alpen-vertex-state = { workspace = true }
 alpen-vertex-primitives = { workspace = true }
+alpen-vertex-evmexec = { workspace = true }
 zkvm = { path = "../zkvm" }
 risc0-adapter = { path = "../adapters/risc0" }
 guest-builder = { path = "../../../proofs" }
@@ -13,3 +14,4 @@ zkvm-primitives = { git = "https://github.com/MdTeach/reth", branch = "prover-pr
 anyhow = { workspace = true }
 serde = { workspace = true }
 bincode = { workspace = true }
+borsh = { workspace = true }

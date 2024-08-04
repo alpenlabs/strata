@@ -5,7 +5,7 @@ use reth_primitives::B256;
 use reth_rpc_types::ExecutionPayloadV1;
 
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
-pub(crate) struct ElPayload {
+pub struct ElPayload {
     /// The parent hash of the block.
     pub parent_hash: Buf32,
     /// The fee recipient of the block.

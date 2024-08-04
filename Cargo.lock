@@ -5952,10 +5952,12 @@ checksum = "106dd99e98437432fed6519dedecfade6a06a73bb7b2a1e019fdd2bee5778d94"
 name = "prover-manager"
 version = "0.1.0"
 dependencies = [
+ "alpen-vertex-evmexec",
  "alpen-vertex-primitives",
  "alpen-vertex-state",
  "anyhow",
  "bincode",
+ "borsh",
  "guest-builder",
  "risc0-adapter",
  "serde",
@@ -8455,6 +8457,7 @@ dependencies = [
  "bincode",
  "risc0-zkvm",
  "serde",
+ "serde_json",
  "zkvm",
 ]
 
