@@ -1,9 +1,10 @@
-use anyhow::{anyhow, Ok};
 use risc0_zkvm::{
-    get_prover_server, ExecutorEnv, ExecutorImpl, ProverOpts, Receipt, VerifierContext,
+    compute_image_id, get_prover_server, sha::Digest, ExecutorEnv, ExecutorImpl, ProverOpts,
+    Receipt, VerifierContext,
 };
+use serde::{de::DeserializeOwned, Serialize};
 use serde_json::to_vec;
-use zkvm::{Proof, ProverOptions, ZKVMHost, ZKVMVerifier};
+use zkvm::{Proof, ProverOptions, VerifcationKey, ZKVMHost, ZKVMVerifier};
 
 pub struct RiscZeroHost {
     elf: Vec<u8>,
@@ -32,21 +33,23 @@ impl ZKVMHost for RiscZeroHost {
         }
     }
 
-    fn prove<T: serde::Serialize>(&self, input: T) -> anyhow::Result<Proof> {
+    fn prove<T: serde::Serialize>(&self, item: T) -> anyhow::Result<(Proof, VerifcationKey)> {
         if self.prover_options.use_mock_prover {
             std::env::set_var("RISC0_DEV_MODE", "true");
         }
 
         // Setup the prover
-        let env = ExecutorEnv::builder().write(&input)?.build()?;
+        let env = ExecutorEnv::builder().write(&item)?.build()?;
         let opts = self.determine_prover_options();
         let prover = get_prover_server(&opts)?;
+
+        // Setup verification key
+        let program_id = compute_image_id(&self.elf)?;
+        let verification_key = bincode::serialize(&program_id)?;
 
         // Generate the session
         let mut exec = ExecutorImpl::from_elf(env, &self.elf)?;
         let session = exec.run()?;
-
-        println!("**** Total cycles: {:?} ****", session.total_cycles);
 
         // Generate the proof
         let ctx = VerifierContext::default();
@@ -54,43 +57,43 @@ impl ZKVMHost for RiscZeroHost {
 
         // Proof seralization
         let serialized_proof = bincode::serialize(&proof_info.receipt)?;
-        Ok(Proof(serialized_proof))
+        Ok((Proof(serialized_proof), VerifcationKey(verification_key)))
     }
 }
 
 pub struct Risc0Verifier;
 
 impl ZKVMVerifier for Risc0Verifier {
-    fn verify(program_id: [u32; 8], proof: &Proof) -> anyhow::Result<()> {
+    fn verify(verification_key: &VerifcationKey, proof: &Proof) -> anyhow::Result<()> {
         let receipt: Receipt = bincode::deserialize(&proof.0)?;
-        receipt.verify(program_id)?;
+        let vk: Digest = bincode::deserialize(&verification_key.0)?;
+        receipt.verify(vk)?;
         Ok(())
     }
 
-    fn extract_public_output<T: serde::de::DeserializeOwned>(proof: &Proof) -> anyhow::Result<T> {
-        let receipt: Receipt = bincode::deserialize(&proof.0)?;
-        Ok(receipt.journal.decode()?)
-    }
-
-    fn verify_with_public_params<T: serde::de::DeserializeOwned + serde::Serialize>(
-        program_id: [u32; 8],
+    fn verify_with_public_params<T: serde::Serialize + serde::de::DeserializeOwned>(
+        verification_key: &VerifcationKey,
         public_params: T,
         proof: &Proof,
     ) -> anyhow::Result<()> {
-        // let mut receipt: Receipt = bincode::deserialize(&proof.0)?;
-        // receipt.journal = Journal::new(bincode::serialize(&public_params)?);
-        // receipt.verify(program_id)?;
-        // Ok(())
-
         let receipt: Receipt = bincode::deserialize(&proof.0)?;
-        receipt.verify(program_id)?;
-        let pp: T = receipt.journal.decode()?;
+        let vk: Digest = bincode::deserialize(&verification_key.0)?;
+        receipt.verify(vk)?;
 
-        if to_vec(&pp)? == to_vec(&public_params)? {
-            Ok(())
-        } else {
-            Err(anyhow!("Failed to verify the proof"))
-        }
+        let actual_public_parameter: T = receipt.journal.decode()?;
+
+        // TODO: use custom ZKVM error
+        anyhow::ensure!(
+            to_vec(&actual_public_parameter)? == to_vec(&public_params)?,
+            "Failed to verify proof given the public param"
+        );
+
+        Ok(())
+    }
+
+    fn extract_public_output<T: Serialize + DeserializeOwned>(proof: &Proof) -> anyhow::Result<T> {
+        let receipt: Receipt = bincode::deserialize(&proof.0)?;
+        Ok(receipt.journal.decode()?)
     }
 }
 
@@ -107,10 +110,6 @@ mod tests {
     //     env::commit(&input);
     // }
     const TEST_ELF: &[u8] = include_bytes!("../elf/risc0-zkvm-elf");
-    const TEST_ELF_PROGRAM_ID: [u32; 8] = [
-        20204848, 2272092004, 2454927583, 1072502260, 1258449350, 2771660935, 3133675698,
-        3100950446,
-    ];
 
     #[test]
     fn test_mock_prover() {
@@ -118,10 +117,10 @@ mod tests {
         let zkvm = RiscZeroHost::init(TEST_ELF.to_vec(), ProverOptions::default());
 
         // assert proof generation works
-        let proof = zkvm.prove(input).expect("Failed to generate proof");
+        let (proof, vk) = zkvm.prove(input).expect("Failed to generate proof");
 
         // assert proof verification works
-        Risc0Verifier::verify(TEST_ELF_PROGRAM_ID, &proof).expect("Proof verification failed");
+        Risc0Verifier::verify(&vk, &proof).expect("Proof verification failed");
 
         // assert public outputs extraction from proof  works
         let out: u32 =
@@ -135,10 +134,10 @@ mod tests {
         let zkvm = RiscZeroHost::init(TEST_ELF.to_vec(), ProverOptions::default());
 
         // assert proof generation works
-        let proof = zkvm.prove(input).expect("Failed to generate proof");
+        let (proof, vk) = zkvm.prove(input).expect("Failed to generate proof");
 
         // assert proof verification works
-        Risc0Verifier::verify_with_public_params(TEST_ELF_PROGRAM_ID, input, &proof)
+        Risc0Verifier::verify_with_public_params(&vk, input, &proof)
             .expect("Proof verification failed");
     }
 }
