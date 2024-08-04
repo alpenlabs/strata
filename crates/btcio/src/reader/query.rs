@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use alpen_express_primitives::l1::L1Status;
+use alpen_express_rpc_types::types::L1Status;
 use anyhow::bail;
 use bitcoin::{Block, BlockHash};
 use tokio::sync::{mpsc, RwLock};

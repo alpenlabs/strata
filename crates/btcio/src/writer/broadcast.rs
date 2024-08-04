@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
-use alpen_express_primitives::l1::L1Status;
+use alpen_express_rpc_types::L1Status;
 use anyhow::anyhow;
 use bitcoin::{consensus::deserialize, Txid};
 use tokio::sync::RwLock;

@@ -1,0 +1,8 @@
+[package]
+edition = "2021"
+name = "alpen-express-rpc-types"
+version = "0.1.0"
+
+[dependencies]
+hex = { workspace = true }
+serde = { workspace = true }

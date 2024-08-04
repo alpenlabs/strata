@@ -1,9 +1,9 @@
 use std::sync::Arc;
 use std::thread;
 
-use alpen_express_primitives::l1::L1Status;
 use tokio::sync::{mpsc, RwLock};
 
+use alpen_express_rpc_types::L1Status;
 use alpen_express_btcio::reader::{
     config::ReaderConfig, messages::L1Event, query::bitcoin_data_reader_task,
 };

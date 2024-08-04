@@ -8,6 +8,7 @@ use std::sync::Arc;
 use std::thread;
 
 use alpen_express_db::traits::SequencerDatabase;
+use alpen_express_rpc_types::L1Status;
 use anyhow::Context;
 use bitcoin::Network;
 use config::Config;
@@ -31,7 +32,6 @@ use alpen_express_consensus_logic::sync_manager::SyncManager;
 use alpen_express_db::traits::Database;
 use alpen_express_evmexec::{fork_choice_state_initial, EngineRpcClient};
 use alpen_express_primitives::buf::Buf32;
-use alpen_express_primitives::l1::L1Status;
 use alpen_express_primitives::{block_credential, params::*};
 use alpen_express_rocksdb::sequencer::db::SequencerDB;
 use alpen_express_rocksdb::SeqDb;
