@@ -1,5 +1,7 @@
 use anyhow::{anyhow, Ok};
-use risc0_zkvm::{get_prover_server, ExecutorEnv, ProverOpts, Receipt};
+use risc0_zkvm::{
+    get_prover_server, ExecutorEnv, ExecutorImpl, ProverOpts, Receipt, VerifierContext,
+};
 use serde_json::to_vec;
 use zkvm::{Proof, ProverOptions, ZKVMHost, ZKVMVerifier};
 
@@ -35,12 +37,23 @@ impl ZKVMHost for RiscZeroHost {
             std::env::set_var("RISC0_DEV_MODE", "true");
         }
 
+        // Setup the prover
         let env = ExecutorEnv::builder().write(&input)?.build()?;
         let opts = self.determine_prover_options();
-
         let prover = get_prover_server(&opts)?;
-        let proof = prover.prove(env, &self.elf)?.receipt;
-        let serialized_proof = bincode::serialize(&proof)?;
+
+        // Generate the session
+        let mut exec = ExecutorImpl::from_elf(env, &self.elf)?;
+        let session = exec.run()?;
+
+        println!("**** Total cycles: {:?} ****", session.total_cycles);
+
+        // Generate the proof
+        let ctx = VerifierContext::default();
+        let proof_info = prover.prove_session(&ctx, &session)?;
+
+        // Proof seralization
+        let serialized_proof = bincode::serialize(&proof_info.receipt)?;
         Ok(Proof(serialized_proof))
     }
 }
