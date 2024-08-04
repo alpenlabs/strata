@@ -63,18 +63,18 @@ num_enum = "0.7"
 parking_lot = "0.12.3"
 rand = "0.8.5"
 reqwest = { version = "0.12.4", features = ["json"] }
-reth = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
-reth-chainspec = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
-reth-db = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
-reth-ipc = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
-reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
-reth-primitives = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
-reth-revm = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
-reth-rpc = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
-reth-rpc-api = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
-reth-rpc-layer = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
-reth-rpc-types = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
-reth-rpc-types-compat = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
+reth = { git = "https://github.com/MdTeach/reth", branch = "prover-primitives" }
+reth-chainspec = { git = "https://github.com/MdTeach/reth", branch = "prover-primitives" }
+reth-db = { git = "https://github.com/MdTeach/reth", branch = "prover-primitives" }
+reth-ipc = { git = "https://github.com/MdTeach/reth", branch = "prover-primitives" }
+reth-node-ethereum = { git = "https://github.com/MdTeach/reth", branch = "prover-primitives" }
+reth-primitives = { git = "https://github.com/MdTeach/reth", branch = "prover-primitives" }
+reth-revm = { git = "https://github.com/MdTeach/reth", branch = "prover-primitives" }
+reth-rpc = { git = "https://github.com/MdTeach/reth", branch = "prover-primitives" }
+reth-rpc-api = { git = "https://github.com/MdTeach/reth", branch = "prover-primitives" }
+reth-rpc-layer = { git = "https://github.com/MdTeach/reth", branch = "prover-primitives" }
+reth-rpc-types = { git = "https://github.com/MdTeach/reth", branch = "prover-primitives" }
+reth-rpc-types-compat = { git = "https://github.com/MdTeach/reth", branch = "prover-primitives" }
 rockbound = { git = "https://github.com/alpenlabs/rockbound", rev = "d647fa31510dff0b" }
 secp256k1 = "0.29.0"
 serde = "1.0"

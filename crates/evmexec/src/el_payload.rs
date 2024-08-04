@@ -12,7 +12,7 @@ use alpen_express_primitives::{
 use alpen_express_state::exec_update::UpdateInput;
 
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
-pub(crate) struct ElPayload {
+pub struct ElPayload {
     /// The parent hash of the block.
     pub parent_hash: Buf32,
     /// The fee recipient of the block.

@@ -1,8 +1,8 @@
 mod block;
-mod el_payload;
 mod fork_choice_state;
 mod http_client;
 
+pub mod el_payload;
 pub mod engine;
 pub mod preloaded_storage;
 
