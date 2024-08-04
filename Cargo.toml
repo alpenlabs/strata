@@ -14,8 +14,8 @@ members = [
   "crates/vtxjmt",
   "crates/prover/zkvm",
   "crates/prover/adapters/risc0",
-  "crates/prover/guests",
-  "crates/prover/prover_manager",
+  "crates/prover/prover-manager",
+  "proofs",
   "sequencer",
   "reth",
 ]

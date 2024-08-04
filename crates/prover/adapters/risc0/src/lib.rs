@@ -1,5 +1,5 @@
 use anyhow::Ok;
-use risc0_zkvm::{get_prover_server, ExecutorEnv, ProverOpts, Receipt};
+use risc0_zkvm::{get_prover_server, ExecutorEnv, Journal, ProverOpts, Receipt};
 use zkvm::{Proof, ProverOptions, ZKVMHost, ZKVMVerifier};
 
 pub struct RiscZeroHost {
@@ -57,6 +57,17 @@ impl ZKVMVerifier for Risc0Verifier {
         let receipt: Receipt = bincode::deserialize(&proof.0)?;
         Ok(receipt.journal.decode()?)
     }
+
+    fn verify_with_public_params<T: serde::Serialize>(
+        program_id: [u32; 8],
+        public_params: T,
+        proof: &Proof,
+    ) -> anyhow::Result<()> {
+        let mut receipt: Receipt = bincode::deserialize(&proof.0)?;
+        receipt.journal = Journal::new(bincode::serialize(&public_params)?);
+        receipt.verify(program_id)?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -78,7 +89,7 @@ mod tests {
     ];
 
     #[test]
-    fn risc0_test_mock_prover() {
+    fn test_mock_prover() {
         let input: u32 = 1;
         let zkvm = RiscZeroHost::init(TEST_ELF.to_vec(), ProverOptions::default());
 
@@ -92,5 +103,18 @@ mod tests {
         let out: u32 =
             Risc0Verifier::extract_public_output(&proof).expect("Failed to extract public outputs");
         assert_eq!(input, out)
+    }
+
+    #[test]
+    fn test_mock_prover_with_public_param() {
+        let input: u32 = 1;
+        let zkvm = RiscZeroHost::init(TEST_ELF.to_vec(), ProverOptions::default());
+
+        // assert proof generation works
+        let proof = zkvm.prove(input).expect("Failed to generate proof");
+
+        // assert proof verification works
+        Risc0Verifier::verify_with_public_params(TEST_ELF_PROGRAM_ID, input, &proof)
+            .expect("Proof verification failed");
     }
 }
