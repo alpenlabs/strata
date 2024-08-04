@@ -1,6 +1,6 @@
 [package]
 edition = "2021"
-name = "prover_manager"
+name = "prover-manager"
 version = "0.1.0"
 
 [dependencies]
@@ -8,7 +8,7 @@ alpen-vertex-state = { workspace = true }
 alpen-vertex-primitives = { workspace = true }
 zkvm = { path = "../zkvm" }
 risc0-adapter = { path = "../adapters/risc0" }
-guest-builder = { path = "../guests" }
+guest-builder = { path = "../../../proofs" }
 zkvm-primitives = { git = "https://github.com/MdTeach/reth", branch = "prover-primitives" }
 anyhow = { workspace = true }
 serde = { workspace = true }
