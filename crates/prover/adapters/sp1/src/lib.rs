@@ -1,7 +1,10 @@
-use anyhow::{anyhow, Ok};
+use anyhow::Ok;
 
+use serde::{de::DeserializeOwned, Serialize};
 use serde_json::to_vec;
-use zkvm::{Proof, ProverOptions, ZKVMHost, ZKVMVerifier};
+
+use sp1_sdk::{ProverClient, SP1ProofWithPublicValues, SP1Stdin, SP1VerifyingKey};
+use zkvm::{Proof, ProverOptions, VerifcationKey, ZKVMHost, ZKVMVerifier};
 
 pub struct SP1Host {
     elf: Vec<u8>,
@@ -20,33 +23,72 @@ impl ZKVMHost for SP1Host {
         }
     }
 
-    fn prove<T: serde::Serialize>(&self, input: T) -> anyhow::Result<Proof> {
+    fn prove<T: serde::Serialize>(&self, input: T) -> anyhow::Result<(Proof, VerifcationKey)> {
+        // Init the prover
+        let client = ProverClient::new();
+        let (pk, vk) = client.setup(&self.elf);
+
+        // Setup the I/O
+        let mut stdin = SP1Stdin::new();
+        stdin.write(&input);
+
+        // Start proving
+        let mut prover = client.prove(&pk, stdin);
+        if self.prover_options.stark_to_snark_conversion {
+            prover = prover.plonk();
+        }
+        let proof = prover.run()?;
+
         // Proof seralization
-        let serialized_proof = todo!();
-        Ok(Proof(serialized_proof))
+        let serialized_proof = bincode::serialize(&proof)?;
+        let verification_key = bincode::serialize(&vk)?;
+        Ok((Proof(serialized_proof), VerifcationKey(verification_key)))
     }
 }
 
 pub struct SP1Verifier;
 
 impl ZKVMVerifier for SP1Verifier {
-    fn verify(program_id: [u32; 8], proof: &Proof) -> anyhow::Result<()> {
-        todo!()
+    fn verify(verification_key: &VerifcationKey, proof: &Proof) -> anyhow::Result<()> {
+        let proof: SP1ProofWithPublicValues = bincode::deserialize(&proof.0)?;
+        let vkey: SP1VerifyingKey = bincode::deserialize(&verification_key.0)?;
+
+        let client = ProverClient::new();
+        client.verify(&proof, &vkey)?;
+
+        Ok(())
     }
 
-    fn verify_with_public_params<T: serde::de::DeserializeOwned + serde::Serialize>(
-        program_id: [u32; 8],
+    fn verify_with_public_params<T: DeserializeOwned + serde::Serialize>(
+        verification_key: &VerifcationKey,
         public_params: T,
         proof: &Proof,
     ) -> anyhow::Result<()> {
-        todo!()
+        let mut proof: SP1ProofWithPublicValues = bincode::deserialize(&proof.0)?;
+        let vkey: SP1VerifyingKey = bincode::deserialize(&verification_key.0)?;
+
+        let client = ProverClient::new();
+        client.verify(&proof, &vkey)?;
+
+        let actual_public_parameter: T = proof.public_values.read();
+
+        // TODO: use custom ZKVM error
+        anyhow::ensure!(
+            to_vec(&actual_public_parameter)? == to_vec(&public_params)?,
+            "Failed to verify proof given the public param"
+        );
+
+        Ok(())
     }
 
-    fn extract_public_output<T: serde::de::DeserializeOwned>(proof: &Proof) -> anyhow::Result<T> {
-        todo!()
+    fn extract_public_output<T: Serialize + DeserializeOwned>(proof: &Proof) -> anyhow::Result<T> {
+        let mut proof: SP1ProofWithPublicValues = bincode::deserialize(&proof.0)?;
+        let public_params: T = proof.public_values.read();
+        Ok(public_params)
     }
 }
 
+// NOTE: SP1 prover runs in release mode only; therefore run the tests on release mode only
 #[cfg(test)]
 mod tests {
     use zkvm::ProverOptions;
@@ -54,16 +96,13 @@ mod tests {
     use super::*;
 
     // Adding compiled guest code `TEST_ELF` to save the build time
-    // use risc0_zkvm::guest::env;
+    // #![no_main]
+    // sp1_zkvm::entrypoint!(main);
     // fn main() {
-    //     let input: u32 = env::read();
-    //     env::commit(&input);
+    //     let n = sp1_zkvm::io::read::<u32>();
+    //     sp1_zkvm::io::commit(&n);
     // }
-    const TEST_ELF: &[u8] = include_bytes!("../elf/risc0-zkvm-elf");
-    const TEST_ELF_PROGRAM_ID: [u32; 8] = [
-        20204848, 2272092004, 2454927583, 1072502260, 1258449350, 2771660935, 3133675698,
-        3100950446,
-    ];
+    const TEST_ELF: &[u8] = include_bytes!("../elf/riscv32im-succinct-zkvm-elf");
 
     #[test]
     fn test_mock_prover() {
@@ -71,10 +110,10 @@ mod tests {
         let zkvm = SP1Host::init(TEST_ELF.to_vec(), ProverOptions::default());
 
         // assert proof generation works
-        let proof = zkvm.prove(input).expect("Failed to generate proof");
+        let (proof, vk) = zkvm.prove(input).expect("Failed to generate proof");
 
         // assert proof verification works
-        SP1Verifier::verify(TEST_ELF_PROGRAM_ID, &proof).expect("Proof verification failed");
+        SP1Verifier::verify(&vk, &proof).expect("Proof verification failed");
 
         // assert public outputs extraction from proof  works
         let out: u32 =
@@ -88,10 +127,10 @@ mod tests {
         let zkvm = SP1Host::init(TEST_ELF.to_vec(), ProverOptions::default());
 
         // assert proof generation works
-        let proof = zkvm.prove(input).expect("Failed to generate proof");
+        let (proof, vk) = zkvm.prove(input).expect("Failed to generate proof");
 
         // assert proof verification works
-        SP1Verifier::verify_with_public_params(TEST_ELF_PROGRAM_ID, input, &proof)
+        SP1Verifier::verify_with_public_params(&vk, input, &proof)
             .expect("Proof verification failed");
     }
 }

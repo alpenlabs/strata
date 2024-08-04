@@ -77,6 +77,11 @@ impl ZKVMVerifier for Risc0Verifier {
         public_params: T,
         proof: &Proof,
     ) -> anyhow::Result<()> {
+        // let mut receipt: Receipt = bincode::deserialize(&proof.0)?;
+        // receipt.journal = Journal::new(bincode::serialize(&public_params)?);
+        // receipt.verify(program_id)?;
+        // Ok(())
+
         let receipt: Receipt = bincode::deserialize(&proof.0)?;
         receipt.verify(program_id)?;
         let pp: T = receipt.journal.decode()?;
