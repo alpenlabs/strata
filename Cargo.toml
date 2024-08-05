@@ -1,7 +1,7 @@
 [workspace]
 members = [
   "crates/bridge-exec",
-  "crates/bridge-rpc-service",
+  "crates/bridge-rpc-api",
   "crates/bridge-tx-manager",
   "crates/btcio",
   "crates/chaintsn",
@@ -37,11 +37,10 @@ members = [
   # binaries listed separately
   "bin/sequencer",
   "bin/reth",
-  "bin/operator",
-  "bin/challenger",
+  "bin/bridge-client",
 ]
 
-default-members = ["bin/sequencer", "bin/reth"]
+default-members = ["bin/sequencer", "bin/reth", "bin/bridge-client"]
 
 resolver = "2"
 
@@ -91,6 +90,8 @@ bitcoind = { version = "0.36.0", features = ["26_0"] }
 bitcoind-json-rpc-types = "0.3.0"
 borsh = { version = "1.5.0", features = ["derive"] }
 bytes = { version = "1.6.0" }
+chrono = { version = "0.4.38" }
+clap = { version = "4.5.13", features = ["derive"] }
 digest = "0.10"
 eyre = "0.6"
 format_serde_error = { git = "https://github.com/AlexanderThaller/format_serde_error" }

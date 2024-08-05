@@ -1,0 +1,23 @@
+[package]
+edition = "2021"
+name = "express-bridge-client"
+version = "0.1.0"
+
+[[bin]]
+name = "express-bridge-client"
+path = "src/main.rs"
+
+[dependencies]
+alpen-express-common = { workspace = true }
+express-bridge-rpc-api = { workspace = true }
+express-bridge-txm = { workspace = true }
+
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+bitcoin = { workspace = true }
+chrono = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+jsonrpsee = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
