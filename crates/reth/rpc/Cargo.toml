@@ -7,7 +7,7 @@ version = "0.1.0"
 bincode = { workspace = true }
 express-reth-db = { workspace = true }
 eyre = { workspace = true }
-jsonrpsee = { workspace = true }
+jsonrpsee = { workspace = true, features = ["server", "macros"] }
 reth-primitives = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true, features = ["macros", "sync"] }
