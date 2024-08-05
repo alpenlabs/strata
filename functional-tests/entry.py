@@ -49,6 +49,16 @@ def generate_task(rpc: BitcoindClient, wait_dur, addr):
             log.warning(f"{ex} while generating address")
             return
 
+def generate_n_blocks(bitcoin_rpc: BitcoindClient, n: int):
+    addr = bitcoin_rpc.proxy.getnewaddress()
+    print("generating {n} blocks to address", addr)
+    try:
+        blk = bitcoin_rpc.proxy.generatetoaddress(n, addr)
+        print("made blocks", blk)
+    except Exception as ex:
+        log.warning(f"{ex} while generating address")
+        return
+
 
 class BitcoinFactory(flexitest.Factory):
     def __init__(self, port_range: list[int]):
@@ -167,7 +177,8 @@ class RethFactory(flexitest.Factory):
 
 
 class BasicEnvConfig(flexitest.EnvConfig):
-    def __init__(self):
+    def __init__(self, pre_generate_blocks: int = 0):
+        self.pre_generate_blocks = pre_generate_blocks
         super().__init__()
 
     def init(self, ctx: flexitest.EnvContext) -> flexitest.LiveEnv:
@@ -180,6 +191,9 @@ class BasicEnvConfig(flexitest.EnvConfig):
 
         brpc = bitcoind.create_rpc()
         brpc.proxy.createwallet("dummy")
+        
+        if self.pre_generate_blocks > 0:
+            generate_n_blocks(brpc, self.pre_generate_blocks)
 
         secret_dir = ctx.make_service_dir("secret")
         reth_secret_path = os.path.join(secret_dir, "jwt.hex")
@@ -192,13 +206,15 @@ class BasicEnvConfig(flexitest.EnvConfig):
         reth_port = reth.get_prop("rpc_port")
         reth_socket = f"localhost:{reth_port}"
 
-        # generate blocks every 500 millis
-        generate_blocks(brpc, BLOCK_GENERATION_INTERVAL_SECS)
         rpc_port = bitcoind.get_prop("rpc_port")
         rpc_user = bitcoind.get_prop("rpc_user")
         rpc_pass = bitcoind.get_prop("rpc_password")
         rpc_sock = f"localhost:{rpc_port}"
         sequencer = seq_fac.create_sequencer(rpc_sock, rpc_user, rpc_pass, reth_socket, reth_secret_path)
+        # maybe wait for sequencer to init ?
+
+        # generate blocks every 500 millis
+        generate_blocks(brpc, BLOCK_GENERATION_INTERVAL_SECS)
         # need to wait for at least `genesis_l1_height` blocks to be generated. sleeping some more for safety
         time.sleep(BLOCK_GENERATION_INTERVAL_SECS * 10)
 
