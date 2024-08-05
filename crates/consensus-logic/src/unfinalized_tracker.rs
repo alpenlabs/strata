@@ -315,49 +315,10 @@ mod tests {
     use std::collections::HashSet;
 
     use alpen_express_db::traits::{Database, L2DataProvider, L2DataStore};
-    use alpen_express_state::{
-        block::{L2Block, L2BlockAccessory, L2BlockBody, L2BlockBundle},
-        header::{L2BlockHeader, L2Header, SignedL2BlockHeader},
-        id::L2BlockId,
-    };
-    use alpen_test_utils::ArbitraryGenerator;
+    use alpen_express_state::{header::L2Header, id::L2BlockId};
+    use alpen_test_utils::l2::gen_l2_chain;
 
     use crate::unfinalized_tracker;
-
-    fn get_genesis_block() -> L2BlockBundle {
-        let arb = ArbitraryGenerator::new();
-        let gen_header: SignedL2BlockHeader = arb.generate();
-        let body: L2BlockBody = arb.generate();
-        let accessory: L2BlockAccessory = arb.generate();
-
-        let empty_hash = L2BlockId::default();
-        let header = L2BlockHeader::new(
-            0,
-            gen_header.timestamp(),
-            empty_hash,
-            &body,
-            *gen_header.state_root(),
-        );
-        let signed_header = SignedL2BlockHeader::new(header, *gen_header.sig());
-        L2BlockBundle::new(L2Block::new(signed_header, body), accessory)
-    }
-
-    fn get_mock_block_with_parent(parent: &SignedL2BlockHeader) -> L2BlockBundle {
-        let arb = ArbitraryGenerator::new();
-        let gen_header: SignedL2BlockHeader = arb.generate();
-        let body: L2BlockBody = arb.generate();
-        let accessory: L2BlockAccessory = arb.generate();
-
-        let header = L2BlockHeader::new(
-            parent.blockidx() + 1,
-            gen_header.timestamp(),
-            parent.get_blockid(),
-            &body,
-            *gen_header.state_root(),
-        );
-        let signed_header = SignedL2BlockHeader::new(header, *gen_header.sig());
-        L2BlockBundle::new(L2Block::new(signed_header, body), accessory)
-    }
 
     fn setup_test_chain(l2_prov: &impl L2DataStore) -> [L2BlockId; 7] {
         // Chain A: g -> a1 -> a2 -> a3
@@ -375,43 +336,27 @@ mod tests {
         // g
         // |
 
-        let genesis = get_genesis_block();
-        let genesis_header = genesis.header().clone();
+        let a_chain = gen_l2_chain(None, 3);
+        let b_chain = gen_l2_chain(Some(a_chain[1].header().clone()), 2);
+        let c_chain = gen_l2_chain(Some(a_chain[0].header().clone()), 1);
 
-        let block_a1 = get_mock_block_with_parent(genesis.header());
-        let block_a1_header = block_a1.header().clone();
-
-        let block_c1 = get_mock_block_with_parent(genesis.header());
-        let block_c1_header = block_c1.header().clone();
-
-        let block_a2 = get_mock_block_with_parent(block_a1.header());
-        let block_a2_header = block_a2.header().clone();
-
-        let block_b2 = get_mock_block_with_parent(block_a1.header());
-        let block_b2_header = block_b2.header().clone();
-
-        let block_a3 = get_mock_block_with_parent(block_a2.header());
-        let block_a3_header = block_a3.header().clone();
-
-        let block_b3 = get_mock_block_with_parent(block_b2.header());
-        let block_b3_header = block_b3.header().clone();
-
-        l2_prov.put_block_data(genesis.clone()).unwrap();
-        l2_prov.put_block_data(block_a1.clone()).unwrap();
-        l2_prov.put_block_data(block_c1.clone()).unwrap();
-        l2_prov.put_block_data(block_a2.clone()).unwrap();
-        l2_prov.put_block_data(block_b2.clone()).unwrap();
-        l2_prov.put_block_data(block_a3.clone()).unwrap();
-        l2_prov.put_block_data(block_b3.clone()).unwrap();
+        for b in a_chain
+            .clone()
+            .into_iter()
+            .chain(b_chain.clone())
+            .chain(c_chain.clone())
+        {
+            l2_prov.put_block_data(b).unwrap();
+        }
 
         [
-            genesis_header.get_blockid(),
-            block_a1_header.get_blockid(),
-            block_c1_header.get_blockid(),
-            block_a2_header.get_blockid(),
-            block_b2_header.get_blockid(),
-            block_a3_header.get_blockid(),
-            block_b3_header.get_blockid(),
+            a_chain[0].header().get_blockid(),
+            a_chain[1].header().get_blockid(),
+            c_chain[0].header().get_blockid(),
+            a_chain[2].header().get_blockid(),
+            b_chain[0].header().get_blockid(),
+            a_chain[3].header().get_blockid(),
+            b_chain[1].header().get_blockid(),
         ]
     }
 

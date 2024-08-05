@@ -1,10 +1,67 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use alpen_express_primitives::{
     block_credential,
-    buf::Buf32,
+    buf::{Buf32, Buf64},
     params::{Params, RollupParams, RunParams},
 };
-use alpen_express_state::client_state::ClientState;
+use alpen_express_state::{
+    block::{L2Block, L2BlockAccessory, L2BlockBody, L2BlockBundle},
+    client_state::ClientState,
+    header::{L2BlockHeader, L2Header, SignedL2BlockHeader},
+};
 
+use crate::ArbitraryGenerator;
+
+pub fn gen_block(parent: Option<&SignedL2BlockHeader>) -> L2BlockBundle {
+    let arb = ArbitraryGenerator::new();
+    let header: L2BlockHeader = arb.generate();
+    let body: L2BlockBody = arb.generate();
+    let accessory: L2BlockAccessory = arb.generate();
+
+    let current_timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64;
+
+    let block_idx = parent.map(|h| h.blockidx() + 1).unwrap_or(0);
+    let prev_block = parent.map(|h| h.get_blockid()).unwrap_or_default();
+    let timestamp = parent
+        .map(|h| h.timestamp() + 100)
+        .unwrap_or(current_timestamp);
+
+    let header = L2BlockHeader::new(
+        block_idx,
+        timestamp,
+        prev_block,
+        &body,
+        *header.state_root(),
+    );
+    let empty_sig = Buf64::zero();
+    let signed_header = SignedL2BlockHeader::new(header, empty_sig);
+    let block = L2Block::new(signed_header, body);
+    L2BlockBundle::new(block, accessory)
+}
+
+pub fn gen_l2_chain(parent: Option<SignedL2BlockHeader>, blocks_num: usize) -> Vec<L2BlockBundle> {
+    let mut blocks = Vec::new();
+    let mut parent = match parent {
+        Some(p) => p,
+        None => {
+            let p = gen_block(None);
+            blocks.push(p.clone());
+            p.header().clone()
+        }
+    };
+
+    for _ in 0..blocks_num {
+        let block = gen_block(Some(&parent));
+        blocks.push(block.clone());
+        parent = block.header().clone()
+    }
+
+    blocks
+}
 pub fn gen_params() -> Params {
     Params {
         rollup: RollupParams {

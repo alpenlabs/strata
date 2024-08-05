@@ -54,8 +54,16 @@ pub fn duty_tracker_task<D: Database>(
     batch_queue: broadcast::Sender<DutyBatch>,
     ident: Identity,
     database: Arc<D>,
-) {
+) -> Result<(), Error> {
     let mut duties_tracker = duties::DutyTracker::new_empty();
+
+    let idx = database.client_state_provider().get_last_checkpoint_idx()?;
+    let last_checkpoint_state = database.client_state_provider().get_state_checkpoint(idx)?;
+    let last_finalized_blk = match last_checkpoint_state {
+        Some(state) => state.sync().map(|sync| *sync.finalized_blkid()),
+        None => None,
+    };
+    duties_tracker.set_finalized_block(last_finalized_blk);
 
     loop {
         let update = match cupdate_rx.blocking_recv() {
@@ -87,6 +95,8 @@ pub fn duty_tracker_task<D: Database>(
     }
 
     info!("duty extractor task exiting");
+
+    Ok(())
 }
 
 fn update_tracker<D: Database>(
@@ -111,9 +121,15 @@ fn update_tracker<D: Database>(
     let block_idx = block.header().blockidx();
     let ts = time::Instant::now(); // FIXME XXX use .timestamp()!!!
 
-    // TODO figure out which blocks were finalized
-    let newly_finalized = Vec::new();
-    let tracker_update = duties::StateUpdate::new(block_idx, ts, newly_finalized);
+    // Figure out which blocks were finalized
+    let new_finalized = state.sync().map(|sync| *sync.finalized_blkid());
+    let newly_finalized_blocks: Vec<L2BlockId> = get_finalized_blocks(
+        tracker.get_finalized_block(),
+        l2prov.as_ref(),
+        new_finalized,
+    )?;
+
+    let tracker_update = duties::StateUpdate::new(block_idx, ts, newly_finalized_blocks);
     let n_evicted = tracker.update(&tracker_update);
     trace!(%n_evicted, "evicted old duties from new consensus state");
 
@@ -121,6 +137,35 @@ fn update_tracker<D: Database>(
     tracker.add_duties(tip_blkid, block_idx, new_duties.into_iter());
 
     Ok(())
+}
+
+fn get_finalized_blocks(
+    last_finalized_block: Option<L2BlockId>,
+    l2prov: &impl L2DataProvider,
+    finalized: Option<L2BlockId>,
+) -> Result<Vec<L2BlockId>, Error> {
+    // Figure out which blocks were finalized
+    let mut newly_finalized_blocks: Vec<L2BlockId> = Vec::new();
+    let mut new_finalized = finalized;
+
+    while let Some(finalized) = new_finalized {
+        // If the last finalized block is equal to the new finalized block,
+        // it means that no new blocks are finalized
+        if last_finalized_block == Some(finalized) {
+            break;
+        }
+
+        // else loop till we reach to the last finalized block or go all the way
+        // as long as we get some block data
+        match l2prov.get_block_data(finalized)? {
+            Some(block) => new_finalized = Some(*block.header().parent()),
+            None => break,
+        }
+
+        newly_finalized_blocks.push(finalized);
+    }
+
+    Ok(newly_finalized_blocks)
 }
 
 pub fn duty_dispatch_task<
@@ -376,4 +421,75 @@ fn poll_status_loop<E: ExecEngineCtl>(
     }
 
     Ok(None)
+}
+
+#[cfg(test)]
+mod tests {
+    use alpen_express_db::traits::{Database, L2DataStore};
+    use alpen_express_state::header::L2Header;
+    use alpen_test_utils::l2::gen_l2_chain;
+
+    use super::get_finalized_blocks;
+
+    #[test]
+    fn test_get_finalized_blocks() {
+        let db = alpen_test_utils::get_common_db();
+        let chain = gen_l2_chain(None, 5);
+
+        for block in chain.clone() {
+            db.as_ref()
+                .l2_store()
+                .as_ref()
+                .put_block_data(block)
+                .unwrap();
+        }
+
+        let block_ids: Vec<_> = chain.iter().map(|b| b.header().get_blockid()).collect();
+
+        {
+            let last_finalized_block = Some(block_ids[0]);
+            let new_finalized = Some(block_ids[4]);
+            let finalized_blocks = get_finalized_blocks(
+                last_finalized_block,
+                db.l2_provider().as_ref(),
+                new_finalized,
+            )
+            .unwrap();
+
+            let expected_finalized_blocks: Vec<_> =
+                block_ids[1..=4].iter().rev().cloned().collect();
+
+            assert_eq!(finalized_blocks, expected_finalized_blocks);
+        }
+
+        {
+            let last_finalized_block = None;
+            let new_finalized = Some(block_ids[4]);
+            let finalized_blocks = get_finalized_blocks(
+                last_finalized_block,
+                db.l2_provider().as_ref(),
+                new_finalized,
+            )
+            .unwrap();
+
+            let expected_finalized_blocks: Vec<_> =
+                block_ids[0..=4].iter().rev().cloned().collect();
+
+            assert_eq!(finalized_blocks, expected_finalized_blocks);
+        }
+
+        {
+            let last_finalized_block = None;
+            let new_finalized = None;
+            let finalized_blocks = get_finalized_blocks(
+                last_finalized_block,
+                db.l2_provider().as_ref(),
+                new_finalized,
+            )
+            .unwrap();
+
+            let expected_finalized_blocks: Vec<_> = vec![];
+            assert_eq!(finalized_blocks, expected_finalized_blocks);
+        }
+    }
 }

@@ -58,6 +58,7 @@ impl BlockSigningDuty {
 pub struct DutyTracker {
     next_id: u64,
     duties: Vec<DutyEntry>,
+    finalized_block: Option<L2BlockId>,
 }
 
 impl DutyTracker {
@@ -66,6 +67,7 @@ impl DutyTracker {
         Self {
             next_id: 1,
             duties: Vec::new(),
+            finalized_block: None,
         }
     }
 
@@ -77,6 +79,10 @@ impl DutyTracker {
     /// Updates the tracker with a new world state, purging relevant duties.
     pub fn update(&mut self, update: &StateUpdate) -> usize {
         let mut kept_duties = Vec::new();
+
+        if update.latest_finalized_block.is_some() {
+            self.set_finalized_block(update.latest_finalized_block);
+        }
 
         for d in self.duties.drain(..) {
             match d.duty.expiry() {
@@ -118,6 +124,14 @@ impl DutyTracker {
             created_blkid: blkid,
             created_slot: slot,
         }));
+    }
+
+    pub fn set_finalized_block(&mut self, blkid: Option<L2BlockId>) {
+        self.finalized_block = blkid;
+    }
+
+    pub fn get_finalized_block(&self) -> Option<L2BlockId> {
+        self.finalized_block
     }
 
     /// Returns the slice of duties we're keeping around.
@@ -162,6 +176,9 @@ pub struct StateUpdate {
 
     /// Newly finalized blocks, must be sorted.
     newly_finalized_blocks: Vec<L2BlockId>,
+
+    /// Latest finalized block.
+    latest_finalized_block: Option<L2BlockId>,
 }
 
 impl StateUpdate {
@@ -170,11 +187,16 @@ impl StateUpdate {
         cur_timestamp: time::Instant,
         mut newly_finalized_blocks: Vec<L2BlockId>,
     ) -> Self {
+        // Extract latest finalized block before sorting
+        let latest_finalized_block = newly_finalized_blocks.first().cloned();
+
         newly_finalized_blocks.sort();
+
         Self {
             last_block_slot,
             cur_timestamp,
             newly_finalized_blocks,
+            latest_finalized_block,
         }
     }
 
