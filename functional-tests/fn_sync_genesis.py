@@ -4,7 +4,7 @@ from bitcoinlib.services.bitcoind import BitcoindClient
 import flexitest
 
 UNSET_ID = "0000000000000000000000000000000000000000000000000000000000000000"
-
+MAX_GENESIS_TRIES = 10
 
 @flexitest.register
 class SyncGenesisTest(flexitest.Test):
@@ -20,10 +20,34 @@ class SyncGenesisTest(flexitest.Test):
 
         time.sleep(1)
 
-        stat = None
-        for _ in range(10):
+        # Wait until genesis.  This might need to be tweaked if we change how
+        # long we wait for genesis in tests.
+        tries = 0
+        last_slot = None
+        while True:
+            if tries > MAX_GENESIS_TRIES:
+                assert False, "did not observe genesis before timeout"
+
             stat = seqrpc.alp_clientStatus()
             print(stat)
-            time.sleep(1)
+            if stat["finalized_blkid"] != UNSET_ID:
+                last_slot = stat["chain_tip_slot"]
+                print("observed genesis, now at slot", last_slot)
+                break
 
-        assert stat["finalized_blkid"] != UNSET_ID, "did not notice genesis"
+            time.sleep(0.5)
+            print("waiting for genesis...")
+
+        assert last_slot
+
+        # Make sure we're making progress.
+        stat = None
+        for _ in range(5):
+            time.sleep(3)
+            stat = seqrpc.alp_clientStatus()
+            tip_slot = stat["chain_tip_slot"]
+            tip_blkid = stat["chain_tip"]
+            print("cur tip slot", tip_slot, "blkid", tip_blkid)
+            assert tip_slot >= last_slot, "cur slot went backwards"
+            assert tip_slot > last_slot, "seem to not be making progress"
+            last_slot = tip_slot

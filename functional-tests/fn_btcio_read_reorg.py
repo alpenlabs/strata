@@ -29,7 +29,7 @@ class L1ReadReorgTest(flexitest.Test):
         time.sleep(wait_time)
         l1stat = seqrpc.alp_l1status()
 
-        height_to_invalidate_from = int(l1stat["cur_height"]) - self.REORG_DEPTH
+        height_to_invalidate_from = int(l1stat["cur_height"]) - REORG_DEPTH
         print("height to invalidate from", height_to_invalidate_from)
         block_to_invalidate_from = btcrpc.proxy.getblockhash(height_to_invalidate_from)
         to_be_invalid_block = seqrpc.alp_getL1blockHash(height_to_invalidate_from + 1)

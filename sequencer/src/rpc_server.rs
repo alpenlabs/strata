@@ -212,8 +212,22 @@ where
             .map(|ss| (*ss.chain_tip_blkid(), *ss.finalized_blkid()))
             .unwrap_or_default();
 
+        // FIXME make this load from cache, and put the data we actually want
+        // here in the client state
+        // FIXME error handling
+        let db = self.database.clone();
+        let slot: u64 = wait_blocking("load_cur_block", move || {
+            let l2_prov = db.l2_provider();
+            l2_prov
+                .get_block_data(chain_tip)
+                .map(|b| b.map(|b| b.header().blockidx()).unwrap_or(u64::MAX))
+                .map_err(Error::from)
+        })
+        .await?;
+
         Ok(ClientStatus {
             chain_tip: *chain_tip.as_ref(),
+            chain_tip_slot: slot,
             finalized_blkid: *finalized_blkid.as_ref(),
             last_l1_block: *last_l1.as_ref(),
             buried_l1_height: state.buried_l1_height(),

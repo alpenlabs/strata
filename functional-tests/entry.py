@@ -44,7 +44,7 @@ def generate_task(rpc: BitcoindClient, wait_dur, addr):
         time.sleep(wait_dur)
         try:
             blk = rpc.proxy.generatetoaddress(1, addr)
-            print("made block", blk)
+            #print("made block", blk)
         except Exception as ex:
             log.warning(f"{ex} while generating address")
             return

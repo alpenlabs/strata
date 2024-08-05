@@ -26,9 +26,12 @@ pub struct L1Status {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ClientStatus {
-    /// Blockchain tip.
+    /// L1 blockchain tip.
     #[serde(with = "hex::serde")]
     pub chain_tip: [u8; 32],
+
+    /// L1 chain tip slot.
+    pub chain_tip_slot: u64,
 
     /// L2 block that's been finalized and proven on L1.
     #[serde(with = "hex::serde")]
