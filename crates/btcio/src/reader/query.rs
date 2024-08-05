@@ -223,13 +223,14 @@ async fn init_reader_state(
     let mut init_queue = VecDeque::new();
 
     // Do some math to figure out where our start and end are.
+    // TODO something screwed up with bookkeeping here
     let chain_info = client.get_blockchain_info().await?;
     let start_height = i64::max(target_next_block as i64 - lookback as i64, 0) as u64;
-    let end_height = u64::min(target_next_block, chain_info.blocks);
+    let end_height = u64::min(target_next_block - 1, chain_info.blocks);
     debug!(%start_height, %end_height, "queried L1 client, have init range");
 
-    // Loop through the range we've determined to be okay and pull the blocks
-    // in.
+    // Loop through the range we've determined to be okay and pull the blocks we want to look back
+    // through in.
     let mut real_cur_height = start_height;
     for height in start_height..=end_height {
         let blkid = client.get_block_hash(height).await?;
