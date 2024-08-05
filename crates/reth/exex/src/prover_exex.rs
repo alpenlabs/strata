@@ -32,8 +32,6 @@ impl<Node: FullNodeComponents, S: WitnessStore + Clone> ProverWitnessGenerator<N
                 .zip(chain.execution_outcome_at_block(block_number))
         });
 
-        println!("abishek this was called with bundles");
-
         for (block_hash, outcome) in bundles {
             #[cfg(debug_assertions)]
             assert!(outcome.len() == 1, "should only contain single block");
