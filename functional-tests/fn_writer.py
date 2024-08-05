@@ -26,8 +26,9 @@ class L1WriterTest(flexitest.Test):
 
         time.sleep(MAX_HORIZON_POLL_INTERVAL_SECS + SEQ_SLACK_TIME_SECS)
 
+        blobdata = "2c4253d512da5bb4223f10e8e6017ede69cc63d6e6126916f4b68a1830b7f805"
         # Submit blob
-        _ = seqrpc.alpadmin_submitDABlob([1,2,3])
+        _ = seqrpc.alpadmin_submitDABlob(blobdata)
 
         # Allow some time for sequencer to publish blob
         time.sleep(SEQ_PUBLISH_BATCH_INTERVAL_SECS)

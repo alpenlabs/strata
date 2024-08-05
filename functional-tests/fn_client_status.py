@@ -17,7 +17,7 @@ class L1ClientStatusTest(flexitest.Test):
         seqrpc = seq.create_rpc()
 
         # This sleep is needed to allow sequencer to boot up
-        time.sleep(1)
+        time.sleep(SEQ_SLACK_TIME_SECS)
 
         proto_ver = seqrpc.alp_protocolVersion()
         print("protocol version", proto_ver)

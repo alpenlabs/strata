@@ -65,6 +65,7 @@ pub fn gen_l2_chain(parent: Option<SignedL2BlockHeader>, blocks_num: usize) -> V
 pub fn gen_params() -> Params {
     Params {
         rollup: RollupParams {
+            rollup_name: "express".to_string(),
             block_time: 1000,
             cred_rule: block_credential::CredRule::Unchecked,
             horizon_l1_height: 3,

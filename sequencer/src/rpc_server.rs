@@ -24,7 +24,7 @@ use alpen_express_consensus_logic::sync_manager::SyncManager;
 use alpen_express_db::traits::{ChainstateProvider, Database, L2DataProvider};
 use alpen_express_db::traits::{L1DataProvider, SequencerDatabase};
 use alpen_express_primitives::{buf::Buf32, l1::L1Status};
-use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer, ClientStatus};
+use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer, ClientStatus, HexBytes};
 use alpen_express_state::{
     chain_state::ChainState,
     client_state::ClientState,
@@ -266,9 +266,9 @@ impl<S: SequencerDatabase> AdminServerImpl<S> {
 
 #[async_trait]
 impl<S: SequencerDatabase + Send + Sync + 'static> AlpenAdminApiServer for AdminServerImpl<S> {
-    async fn submit_da_blob(&self, blob: Vec<u8>) -> RpcResult<()> {
-        let commitment = calculate_blob_hash(&blob);
-        let blobintent = BlobIntent::new(BlobDest::L1, commitment, blob);
+    async fn submit_da_blob(&self, blob: HexBytes) -> RpcResult<()> {
+        let commitment = calculate_blob_hash(&blob.0);
+        let blobintent = BlobIntent::new(BlobDest::L1, commitment, blob.0);
         // NOTE: It would be nice to return reveal txid from the submit method. But creation of txs
         // is deferred to signer in the writer module
         if let Err(e) = self.writer.submit_intent_async(blobintent).await {

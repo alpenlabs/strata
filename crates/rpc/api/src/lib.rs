@@ -4,6 +4,7 @@ use alpen_express_primitives::l1::L1Status;
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 
 use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ClientStatus {
@@ -50,10 +51,14 @@ pub trait AlpenApi {
     async fn get_client_status(&self) -> RpcResult<ClientStatus>;
 }
 
+#[serde_as]
+#[derive(Serialize, Deserialize)]
+pub struct HexBytes(#[serde_as(as = "serde_with::hex::Hex")] pub Vec<u8>);
+
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "alpadmin"))]
 #[cfg_attr(feature = "client", rpc(server, client, namespace = "alpadmin"))]
 pub trait AlpenAdminApi {
     #[method(name = "submitDABlob")]
     /// Basically adds L1Write sequencer duty which will be executed by sequencer
-    async fn submit_da_blob(&self, blobdata: Vec<u8>) -> RpcResult<()>;
+    async fn submit_da_blob(&self, blobdata: HexBytes) -> RpcResult<()>;
 }
