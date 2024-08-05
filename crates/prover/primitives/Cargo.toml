@@ -10,8 +10,8 @@ alloy-rlp-derive = { version = "0.3", default-features = false }
 alloy-rpc-types = { workspace = true }
 anyhow = { workspace = true }
 k256 = { version = "=0.13.3", features = [
-    "std",
-    "ecdsa",
+  "std",
+  "ecdsa",
 ], default-features = false }
 reth-primitives = { workspace = true }
 reth-trie-common.workspace = true
