@@ -62,6 +62,29 @@ impl<D: Database> WorkerState<D> {
         })
     }
 
+    #[cfg(test)]
+    pub fn new_stub_worker(
+        params: Arc<Params>,
+        database: Arc<D>,
+        cur_state_idx: u64,
+        cur_state: ClientState,
+        cupdate_tx: broadcast::Sender<Arc<ClientUpdateNotif>>,
+    ) -> anyhow::Result<Self>  {
+        let state_tracker = state_tracker::StateTracker::new(
+            params.clone(),
+            database.clone(),
+            cur_state_idx,
+            Arc::new(cur_state),
+        );
+
+        Ok(Self {
+            params,
+            database,
+            state_tracker,
+            cupdate_tx,
+        })
+    }
+
     /// Gets the index of the current state.
     pub fn cur_event_idx(&self) -> u64 {
         self.state_tracker.cur_state_idx()
@@ -118,6 +141,16 @@ fn process_msg<D: Database, E: ExecEngineCtl>(
     match msg {
         CsmMessage::EventInput(idx) => {
             // TODO ensure correct event index ordering
+
+            if state.state_tracker.cur_state_idx() + 1 != *idx  {
+                let cur_state_idx = state.state_tracker.cur_state_idx();
+                let missed_events = *idx - (state.state_tracker.cur_state_idx() + 1);
+                warn!("Missed {} Sync Events", missed_events);
+                for i in 0..missed_events {
+                    handle_sync_event(state, engine, cur_state_idx + i + 1 , cl_state_tx, csm_status_tx, fcm_msg_tx)?;
+                }
+            }
+
             handle_sync_event(state, engine, *idx, cl_state_tx, csm_status_tx, fcm_msg_tx)?;
             Ok(())
         }
@@ -202,4 +235,60 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{sync::Arc, time::Duration};
+
+    use alpen_express_db::traits::{Database, SyncEventStore};
+    use alpen_express_state::{id::L2BlockId, sync_event::SyncEvent};
+    use alpen_test_utils::{get_common_db, l2::{gen_client_state, gen_params}};
+    use alpen_express_evmctl::stub::StubController;
+    use tokio::sync::{broadcast, mpsc, watch};
+
+    use crate::{message::{ClientUpdateNotif, CsmMessage, ForkChoiceMessage}, status::CsmStatus, worker::process_msg};
+
+    use super::WorkerState;
+
+    #[test]
+    fn something() {
+        let database = get_common_db();
+        let sync_store = database.sync_event_store().clone() as Arc<dyn SyncEventStore>;
+
+        let arb = alpen_test_utils::ArbitraryGenerator::new();
+        let l2block: L2BlockId = arb.generate();
+
+        for _ in 0..4 {
+            let _ = sync_store.write_sync_event(SyncEvent::NewTipBlock(l2block));
+        }
+
+        let params = Arc::new(gen_params());
+        let client_state = gen_client_state(Some(&params));
+        let engine = StubController::new(Duration::from_millis(100));
+
+        let (cupdate_tx, _cupdate_rx) = broadcast::channel::<Arc<ClientUpdateNotif>>(64);
+        // cur_state_idx set to 1 such that 2nd event hasn't been applied
+        let mut cw_state = WorkerState::new_stub_worker(params.clone(), database.clone(),1,client_state,cupdate_tx).unwrap();
+        // send the 3rd event input
+        let msg = CsmMessage::EventInput(3);
+
+        let state = cw_state.cur_state().clone();
+        let status = CsmStatus::default();
+
+        let (csm_status_tx, _csm_status_rx) = watch::channel(status);
+        let (cl_state_tx, _cl_state_rx) = watch::channel(state);
+        let (fcm_tx, _fcm_rx) = mpsc::channel::<ForkChoiceMessage>(64);
+
+        if let Err(_) = process_msg(
+            &mut cw_state,
+            &engine,
+            &msg,
+            &cl_state_tx,
+            &csm_status_tx,
+            &fcm_tx,
+        ) {
+        }
+
+    }
 }
