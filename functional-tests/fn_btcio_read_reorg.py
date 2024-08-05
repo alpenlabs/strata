@@ -14,7 +14,7 @@ class L1ReadReorgTest(flexitest.Test):
 
     def __init__(self, ctx: flexitest.InitContext):
         # standalone env for this test as it involves mutating the blockchain via invalidation
-        ctx.set_env(BasicEnvConfig())
+        ctx.set_env("basic")
 
     def main(self, ctx: flexitest.RunContext):
         btc = ctx.get_service("bitcoin")

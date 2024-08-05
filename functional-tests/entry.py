@@ -39,12 +39,6 @@ def generate_blocks(
 
 
 def generate_task(rpc: BitcoindClient, wait_dur, addr):
-    print("Generating to address", addr)
-    nblocks_init = 101
-
-    print(f"First generating {nblocks_init} blocks for initial usable fund")
-    rpc.proxy.generatetoaddress(nblocks_init, addr)
-
     while True:
         time.sleep(wait_dur)
         try:

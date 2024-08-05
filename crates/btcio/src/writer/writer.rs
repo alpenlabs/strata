@@ -187,7 +187,7 @@ fn initialize_writer_state<D: SequencerDatabase>(db: Arc<D>) -> anyhow::Result<W
         };
         println!("some blob {:?} for idx {}", blob.status, curr_idx);
         match blob.status {
-            // We are watching from the lastest so we don't need to update next_publish_idx if we
+            // We are watching from the latest so we don't need to update next_publish_idx if we
             // found one already
             BlobL1Status::Published if next_publish_idx.is_none() => {
                 next_publish_idx = Some(curr_idx + 1);

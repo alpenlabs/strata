@@ -18,7 +18,7 @@ use crate::rpc::traits::{L1Client, SeqL1Client};
 use super::builder::build_inscription_txs;
 use super::config::WriterConfig;
 
-// Helper function to fetch a blob entry from withing tokio
+// Helper function to fetch a blob entry from within tokio
 pub async fn get_blob_by_idx<D: SequencerDatabase + Send + Sync + 'static>(
     db: Arc<D>,
     idx: u64,
@@ -26,7 +26,7 @@ pub async fn get_blob_by_idx<D: SequencerDatabase + Send + Sync + 'static>(
     tokio::task::spawn_blocking(move || Ok(db.sequencer_provider().get_blob_by_idx(idx)?)).await?
 }
 
-// Helper function to fetch a blob entry from withing tokio
+// Helper function to fetch a blob entry from within tokio
 pub async fn get_blob_by_id<D: SequencerDatabase + Send + Sync + 'static>(
     db: Arc<D>,
     id: Buf32,
@@ -43,7 +43,7 @@ pub async fn put_blob<D: SequencerDatabase + Send + Sync + 'static>(
     tokio::task::spawn_blocking(move || Ok(db.sequencer_store().put_blob(id, entry)?)).await?
 }
 
-// Helper function to update a blob entry by index from withing tokio
+// Helper function to update a blob entry by index from within tokio
 pub async fn update_blob_by_idx<D: SequencerDatabase + Send + Sync + 'static>(
     db: Arc<D>,
     idx: u64,
@@ -55,7 +55,7 @@ pub async fn update_blob_by_idx<D: SequencerDatabase + Send + Sync + 'static>(
     .await?
 }
 
-// Helper function to fetch a l1tx from withing tokio
+// Helper function to fetch a l1tx from within tokio
 pub async fn get_l1_tx<D: SequencerDatabase + Send + Sync + 'static>(
     db: Arc<D>,
     txid: Buf32,

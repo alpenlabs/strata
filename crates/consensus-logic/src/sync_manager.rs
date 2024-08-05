@@ -88,8 +88,12 @@ pub fn start_sync_tasks<
     params: Arc<Params>,
 ) -> anyhow::Result<SyncManager> {
     // Create channels.
-    let (fcm_tx, fcm_rx) = mpsc::channel::<ForkChoiceMessage>(64);
-    let (csm_tx, csm_rx) = mpsc::channel::<CsmMessage>(64);
+    // the channel size has been increased because when we encounter ~=100 blocks at once, then fork
+    // choice manager thread panics.
+    // TODO: This is hacky fix and we need backpressure mechanism such that the channel is not
+    // overwhelmed
+    let (fcm_tx, fcm_rx) = mpsc::channel::<ForkChoiceMessage>(250);
+    let (csm_tx, csm_rx) = mpsc::channel::<CsmMessage>(250);
     let csm_ctl = Arc::new(CsmController::new(database.clone(), pool, csm_tx));
 
     // TODO should this be in an `Arc`?  it's already fairly compact so we might
