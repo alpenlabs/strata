@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use bitcoin::{Block, BlockHash, Network, Txid};
+use bitcoin::{Block, BlockHash, Network, Transaction, Txid};
 
 use super::{
     types::{RawUTXO, RpcBlockchainInfo},
@@ -36,11 +36,16 @@ pub trait SeqL1Client: Sync + Send + 'static {
     /// Get utxos
     async fn get_utxos(&self) -> Result<Vec<RawUTXO>, ClientError>;
 
-    /// estimate_smart_fee estimates the fee to confirm a transaction in the next block
+    /// Estimate_smart_fee estimates the fee to confirm a transaction in the next block
     async fn estimate_smart_fee(&self) -> Result<u64, ClientError>;
 
-    /// sign transaction with bitcoind wallet
-    async fn sign_raw_transaction_with_wallet(&self, tx: String) -> Result<String, ClientError>;
+    /// Sign transaction with bitcoind wallet, returns signed transaction which might not be
+    /// complete if it requires multi-signature. Since this is for sequencer, we shouldn't care
+    /// about multi-signature. Later we can have a generic signing method to suit multisig cases.
+    async fn sign_raw_transaction_with_wallet(
+        &self,
+        tx: Transaction,
+    ) -> Result<Transaction, ClientError>;
 
     /// Network of the rpc client
     fn network(&self) -> Network;

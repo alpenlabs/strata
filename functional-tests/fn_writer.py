@@ -11,7 +11,7 @@ from constants import MAX_HORIZON_POLL_INTERVAL_SECS, SEQ_SLACK_TIME_SECS, SEQ_P
 @flexitest.register
 class L1WriterTest(flexitest.Test):
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env("basic")
+        ctx.set_env("premined_blocks")
 
     def main(self, ctx: flexitest.RunContext):
         btc = ctx.get_service("bitcoin")
@@ -20,10 +20,7 @@ class L1WriterTest(flexitest.Test):
         seqrpc = seq.create_rpc()
 
         # Generate some funds to sequencer
-        seqaddr = seq.props["address"]
-        print("Generating to address", seqaddr);
-        print(f"First generating 101 blocks for initial usable fund")
-        btcrpc.proxy.generatetoaddress(101, seqaddr)
+        seqaddr = seq.get_prop("address")
 
         l1_status = seqrpc.alp_l1status()
         assert l1_status["last_published_txid"] is None, "Unexpected last_published_txid"

@@ -188,7 +188,7 @@ mod tests {
 
         let ((cid, craw), (rid, rraw)) = get_commit_reveal_txns();
 
-        let _ = seq_db
+        seq_db
             .put_commit_reveal_txs(cid, craw.clone(), rid, rraw.clone())
             .unwrap();
 
@@ -217,7 +217,7 @@ mod tests {
         let updated_blob: BlobEntry = ArbitraryGenerator::new().generate();
 
         // Update existing idx
-        let _ = seq_db
+        seq_db
             .update_blob_by_idx(idx, updated_blob.clone())
             .unwrap();
         let retrieved_blob = seq_db.get_blob_by_id(blob_hash).unwrap().unwrap();
@@ -289,7 +289,7 @@ mod tests {
 
         let ((cid, craw), (rid, rraw)) = get_commit_reveal_txns();
 
-        let _ = seq_db
+        seq_db
             .put_commit_reveal_txs(cid, craw.clone(), rid, rraw.clone())
             .unwrap();
 

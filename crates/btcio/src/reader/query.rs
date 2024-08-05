@@ -180,10 +180,9 @@ async fn do_reader_task(
         let cur_best_height = state.best_block_idx();
         let poll_span = debug_span!("l1poll", %cur_best_height);
 
-        if let Err(err) =
-            poll_for_new_blocks(client, &event_tx, &config, &mut state, status_updates)
-                .instrument(poll_span)
-                .await
+        if let Err(err) = poll_for_new_blocks(client, event_tx, &config, &mut state, status_updates)
+            .instrument(poll_span)
+            .await
         {
             warn!(%cur_best_height, err = %err, "failed to poll Bitcoin client");
             status_updates.push(StatusUpdate::RpcError(err.to_string()));

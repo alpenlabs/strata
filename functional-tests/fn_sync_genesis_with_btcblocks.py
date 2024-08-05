@@ -13,7 +13,7 @@ MAX_GENESIS_TRIES = 10
 class SyncGenesisTest(flexitest.Test):
     def __init__(self, ctx: flexitest.InitContext):
         # generate 100 bitcoin blocks before starting sequencer
-        ctx.set_env(BasicEnvConfig(pre_generate_blocks=100))
+        ctx.set_env("premined_blocks")
 
     def main(self, ctx: flexitest.RunContext):
         btc = ctx.get_service("bitcoin")

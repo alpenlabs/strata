@@ -1,6 +1,5 @@
 #![allow(unused)]
 
-use std::sync::Arc;
 use std::{borrow::BorrowMut, sync::Arc};
 
 use async_trait::async_trait;
@@ -31,6 +30,7 @@ use alpen_express_state::{
     da_blob::{BlobDest, BlobIntent},
     header::L2Header,
     id::L2BlockId,
+    l1::L1BlockId,
 };
 
 use tracing::*;

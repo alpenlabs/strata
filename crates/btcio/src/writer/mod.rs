@@ -3,9 +3,9 @@ mod builder;
 pub mod config;
 pub mod utils;
 mod watcher;
-mod writer;
+mod writer_handler;
 
 #[cfg(test)]
 mod test_utils;
 
-pub use writer::*;
+pub use writer_handler::*;

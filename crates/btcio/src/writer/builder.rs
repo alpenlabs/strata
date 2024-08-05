@@ -45,7 +45,7 @@ const BATCH_DATA_TAG: &[u8] = &[1];
 const ROLLUP_NAME_TAG: &[u8] = &[3];
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct UTXO {
+pub struct Utxo {
     pub txid: Txid,
     pub vout: u32,
     pub address: String,
@@ -65,7 +65,7 @@ pub enum UtxoParseError {
     TxDecode(#[from] bitcoin::consensus::encode::Error),
 }
 
-impl TryFrom<RawUTXO> for UTXO {
+impl TryFrom<RawUTXO> for Utxo {
     type Error = UtxoParseError;
 
     fn try_from(value: RawUTXO) -> Result<Self, Self::Error> {
@@ -74,7 +74,7 @@ impl TryFrom<RawUTXO> for UTXO {
         // Reverse because the display str has the reverse order of actual bytes
         decoded.reverse();
         let txid = deserialize(&decoded)?;
-        Ok(UTXO {
+        Ok(Utxo {
             txid,
             vout: value.vout,
             address: value.address,
@@ -108,9 +108,8 @@ pub async fn build_inscription_txs(
     let utxos = rpc_client.get_utxos().await?;
     let utxos = utxos
         .into_iter()
-        .map(|x| <RawUTXO as TryInto<UTXO>>::try_into(x))
-        .into_iter()
-        .collect::<Result<Vec<UTXO>, UtxoParseError>>()
+        .map(<RawUTXO as TryInto<Utxo>>::try_into)
+        .collect::<Result<Vec<Utxo>, UtxoParseError>>()
         .map_err(|e| anyhow::anyhow!("{:?}", e))?;
 
     let fee_rate = match config.inscription_fee_policy {
@@ -119,7 +118,7 @@ pub async fn build_inscription_txs(
     };
     create_inscription_transactions(
         &config.rollup_name,
-        &payload,
+        payload,
         utxos,
         config.sequencer_address.clone(),
         config.amount_for_reveal_txn,
@@ -133,7 +132,7 @@ pub async fn build_inscription_txs(
 pub fn create_inscription_transactions(
     rollup_name: &str,
     write_intent: &[u8],
-    utxos: Vec<UTXO>,
+    utxos: Vec<Utxo>,
     recipient: Address,
     reveal_value: u64,
     fee_rate: u64,
@@ -252,17 +251,20 @@ fn get_size(
         );
     }
 
-    if tx.input.len() == 1 && script.is_some() && control_block.is_some() {
-        tx.input[0].witness.push(script.unwrap());
-        tx.input[0].witness.push(control_block.unwrap().serialize());
+    match (script, control_block) {
+        (Some(sc), Some(cb)) if tx.input.len() == 1 => {
+            tx.input[0].witness.push(sc);
+            tx.input[0].witness.push(cb.serialize());
+        }
+        _ => {}
     }
 
     tx.vsize()
 }
 
 /// Choose utxos almost naively.
-fn choose_utxos(utxos: &[UTXO], amount: u64) -> Result<(Vec<UTXO>, u64), InscriptionError> {
-    let mut bigger_utxos: Vec<&UTXO> = utxos.iter().filter(|utxo| utxo.amount >= amount).collect();
+fn choose_utxos(utxos: &[Utxo], amount: u64) -> Result<(Vec<Utxo>, u64), InscriptionError> {
+    let mut bigger_utxos: Vec<&Utxo> = utxos.iter().filter(|utxo| utxo.amount >= amount).collect();
     let mut sum: u64 = 0;
 
     if !bigger_utxos.is_empty() {
@@ -276,13 +278,13 @@ fn choose_utxos(utxos: &[UTXO], amount: u64) -> Result<(Vec<UTXO>, u64), Inscrip
 
         Ok((vec![utxo.clone()], sum))
     } else {
-        let mut smaller_utxos: Vec<&UTXO> =
+        let mut smaller_utxos: Vec<&Utxo> =
             utxos.iter().filter(|utxo| utxo.amount < amount).collect();
 
         // sort vec by amount (large first)
         smaller_utxos.sort_by_key(|x| Reverse(&x.amount));
 
-        let mut chosen_utxos: Vec<UTXO> = vec![];
+        let mut chosen_utxos: Vec<Utxo> = vec![];
 
         for utxo in smaller_utxos {
             sum += utxo.amount;
@@ -302,12 +304,12 @@ fn choose_utxos(utxos: &[UTXO], amount: u64) -> Result<(Vec<UTXO>, u64), Inscrip
 }
 
 fn build_commit_transaction(
-    utxos: Vec<UTXO>,
+    utxos: Vec<Utxo>,
     recipient: Address,
     change_address: Address,
     output_value: u64,
     fee_rate: u64,
-) -> Result<(Transaction, Vec<UTXO>), InscriptionError> {
+) -> Result<(Transaction, Vec<Utxo>), InscriptionError> {
     // get single input single output transaction size
     let mut size = get_size(
         &default_txin(),
@@ -320,7 +322,7 @@ fn build_commit_transaction(
     );
     let mut last_size = size;
 
-    let utxos: Vec<UTXO> = utxos
+    let utxos: Vec<Utxo> = utxos
         .iter()
         .filter(|utxo| utxo.spendable && utxo.solvable && utxo.amount > BITCOIN_DUST_LIMIT)
         .cloned()
@@ -449,10 +451,7 @@ pub fn generate_key_pair(
 ) -> Result<UntweakedKeypair, anyhow::Error> {
     let mut rand_bytes = [0; 32];
     rand::thread_rng().fill_bytes(&mut rand_bytes);
-    Ok(UntweakedKeypair::from_seckey_slice(
-        secp256k1,
-        &mut rand_bytes,
-    )?)
+    Ok(UntweakedKeypair::from_seckey_slice(secp256k1, &rand_bytes)?)
 }
 
 fn build_reveal_script(
@@ -535,7 +534,7 @@ fn sign_reveal_transaction(
     witness.push(signature.as_ref());
     witness.push(reveal_script);
     witness.push(
-        &taproot_spend_info
+        taproot_spend_info
             .control_block(&(reveal_script.clone(), LeafVersion::TapScript))
             .ok_or(anyhow!("Could not create control block"))?
             .serialize(),
@@ -574,13 +573,13 @@ mod tests {
 
     const BTC_TO_SATS: u64 = 100_000_000;
 
-    use super::{BITCOIN_DUST_LIMIT, UTXO};
+    use super::{Utxo, BITCOIN_DUST_LIMIT};
     use crate::{rpc::types::RawUTXO, writer::builder::InscriptionError};
 
     const REVEAL_OUTPUT_AMOUNT: u64 = BITCOIN_DUST_LIMIT;
 
     #[allow(clippy::type_complexity)]
-    fn get_mock_data() -> (&'static str, Vec<u8>, Vec<u8>, Vec<u8>, Address, Vec<UTXO>) {
+    fn get_mock_data() -> (&'static str, Vec<u8>, Vec<u8>, Vec<u8>, Address, Vec<Utxo>) {
         let rollup_name = "test_rollup";
         let body = vec![100; 1000];
         let signature = vec![100; 64];
@@ -650,41 +649,41 @@ mod tests {
     fn choose_utxos() {
         let (_, _, _, _, _, utxos) = get_mock_data();
 
-        let (chosen_utxos, sum) = super::choose_utxos(&utxos, 5_00_000_000).unwrap();
+        let (chosen_utxos, sum) = super::choose_utxos(&utxos, 500_000_000).unwrap();
 
-        assert_eq!(sum, 10_00_000_000);
+        assert_eq!(sum, 1_000_000_000);
         assert_eq!(chosen_utxos.len(), 1);
         assert_eq!(chosen_utxos[0], utxos[2]);
 
-        let (chosen_utxos, sum) = super::choose_utxos(&utxos, 10_00_000_000).unwrap();
+        let (chosen_utxos, sum) = super::choose_utxos(&utxos, 1_000_000_000).unwrap();
 
-        assert_eq!(sum, 10_00_000_000);
+        assert_eq!(sum, 1_000_000_000);
         assert_eq!(chosen_utxos.len(), 1);
         assert_eq!(chosen_utxos[0], utxos[2]);
 
-        let (chosen_utxos, sum) = super::choose_utxos(&utxos, 20_00_000_000).unwrap();
+        let (chosen_utxos, sum) = super::choose_utxos(&utxos, 2_000_000_000).unwrap();
 
-        assert_eq!(sum, 50_00_000_000);
+        assert_eq!(sum, 5_000_000_000);
         assert_eq!(chosen_utxos.len(), 1);
         assert_eq!(chosen_utxos[0], utxos[1]);
 
-        let (chosen_utxos, sum) = super::choose_utxos(&utxos, 155_00_000_000).unwrap();
+        let (chosen_utxos, sum) = super::choose_utxos(&utxos, 15_500_000_000).unwrap();
 
-        assert_eq!(sum, 160_00_000_000);
+        assert_eq!(sum, 16_000_000_000);
         assert_eq!(chosen_utxos.len(), 3);
         assert_eq!(chosen_utxos[0], utxos[0]);
         assert_eq!(chosen_utxos[1], utxos[1]);
         assert_eq!(chosen_utxos[2], utxos[2]);
 
-        let res = super::choose_utxos(&utxos, 500_00_000_000);
+        let res = super::choose_utxos(&utxos, 50_000_000_000);
 
         assert!(matches!(
             res,
-            Err(InscriptionError::NotEnoughUtxos(500_00_000_000))
+            Err(InscriptionError::NotEnoughUtxos(50_000_000_000))
         ));
     }
 
-    fn get_txn_from_utxo(utxo: &UTXO, _address: &Address) -> Transaction {
+    fn get_txn_from_utxo(utxo: &Utxo, _address: &Address) -> Transaction {
         let inputs = vec![TxIn {
             previous_output: OutPoint {
                 txid: utxo.txid,

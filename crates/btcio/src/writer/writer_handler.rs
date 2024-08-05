@@ -110,35 +110,35 @@ where
     D: SequencerDatabase + Sync + Send + 'static,
 {
     loop {
-        let blobidx = sign_rx
-            .recv()
-            .await
-            .ok_or(anyhow::anyhow!("Signer channel closed"))?;
+        let Some(blobidx) = sign_rx.recv().await else {
+            break;
+        };
         debug!(%blobidx, "Receicved blob for signing");
 
         if let Err(e) =
             create_and_sign_blob_inscriptions(blobidx, db.clone(), rpc_client.clone(), &config)
                 .await
         {
-            error!(%e, "Failed to handle intent");
+            error!(%e, %blobidx, "Failed to handle blob intent");
         } else {
-            debug!("Successfully signed blob");
+            debug!(%blobidx, "Successfully signed blob");
         }
     }
+    Ok(())
 }
 
 fn store_entry<D: SequencerDatabase>(entry: BlobEntry, db: Arc<D>) -> anyhow::Result<Option<u64>> {
     let blobid = calculate_blob_hash(&entry.blob); // TODO: maybe use blobintent's commitment
 
-    match db.sequencer_provider().get_blob_by_id(blobid.clone())? {
+    match db.sequencer_provider().get_blob_by_id(blobid)? {
         Some(_) => {
             warn!("duplicate write intent {blobid:?}. Ignoring");
-            return Ok(None);
+            Ok(None)
         }
         None => {
             // Store in db
             let idx = db.sequencer_store().put_blob(blobid, entry)?;
-            return Ok(Some(idx));
+            Ok(Some(idx))
         }
     }
 }
@@ -149,15 +149,15 @@ async fn store_entry_async<D: SequencerDatabase + Send + Sync + 'static>(
 ) -> anyhow::Result<Option<u64>> {
     let blobid = calculate_blob_hash(&entry.blob); // TODO: maybe use blobintent's commitment
 
-    match get_blob_by_id(db.clone(), blobid.clone()).await? {
+    match get_blob_by_id(db.clone(), blobid).await? {
         Some(_) => {
             warn!("duplicate write intent {blobid:?}. Ignoring");
-            return Ok(None);
+            Ok(None)
         }
         None => {
             // Store in db
             let idx = put_blob(db, blobid, entry).await?;
-            return Ok(Some(idx));
+            Ok(Some(idx))
         }
     }
 }
@@ -174,18 +174,14 @@ fn initialize_writer_state<D: SequencerDatabase>(db: Arc<D>) -> anyhow::Result<W
             });
         }
     };
-    println!("LAST IDX {}", curr_idx);
 
     let mut next_publish_idx = None;
     let mut next_watch_idx = 0;
 
     loop {
-        println!("curridx {}", curr_idx);
         let Some(blob) = prov.get_blob_by_idx(curr_idx)? else {
-            println!("not found blob for idx {}", curr_idx);
             break;
         };
-        println!("some blob {:?} for idx {}", blob.status, curr_idx);
         match blob.status {
             // We are watching from the latest so we don't need to update next_publish_idx if we
             // found one already
@@ -193,24 +189,21 @@ fn initialize_writer_state<D: SequencerDatabase>(db: Arc<D>) -> anyhow::Result<W
                 next_publish_idx = Some(curr_idx + 1);
             }
             BlobL1Status::Finalized => {
-                println!("obtained finaliesd");
                 next_watch_idx = curr_idx + 1;
                 // We don't need to check beyond finalized blob
                 break;
             }
-            _ => {
-                println!("unvisited arm for {:?}", blob.status);
-            }
+            _ => {}
         };
         if curr_idx == 0 {
             break;
         }
         curr_idx -= 1;
     }
-    return Ok(WriterInitialState {
+    Ok(WriterInitialState {
         next_watch_blob_idx: next_watch_idx,
         next_publish_blob_idx: next_publish_idx.unwrap_or(0),
-    });
+    })
 }
 
 #[cfg(test)]

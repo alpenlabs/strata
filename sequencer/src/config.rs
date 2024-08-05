@@ -50,28 +50,34 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn from_args(args: &Args) -> Config {
+    pub fn from_args(args: &Args) -> Result<Config, String> {
         let args = args.clone();
-        Self {
+        Ok(Self {
             bitcoind_rpc: BitcoindParams {
                 rpc_url: args
                     .bitcoind_host
-                    .expect("args: no bitcoin rpc_url provided"),
+                    .ok_or_else(|| "args: no bitcoin --rpc-url provided".to_string())?,
                 rpc_user: args
                     .bitcoind_user
-                    .expect("args: no bitcoin rpc_user provided"),
+                    .ok_or_else(|| "args: no bitcoin --rpc-user provided".to_string())?,
                 rpc_password: args
                     .bitcoind_password
-                    .expect("args: no bitcoin rpc_password provided"),
-                network: args.network.expect("args: no bitcoin network provided"),
+                    .ok_or_else(|| "args: no bitcoin --rpc-password provided".to_string())?,
+                network: args
+                    .network
+                    .ok_or_else(|| "args: no bitcoin --network provided".to_string())?,
             },
             client: ClientParams {
-                rpc_port: args.rpc_port.expect("args: no client rpc_port provided"),
-                datadir: args.datadir.expect("args: no client datadir provided"),
+                rpc_port: args
+                    .rpc_port
+                    .ok_or_else(|| "args: no client --rpc-port provided".to_string())?,
+                datadir: args
+                    .datadir
+                    .ok_or_else(|| "args: no client --datadir provided".to_string())?,
                 sequencer_key: args.sequencer_key,
                 sequencer_bitcoin_address: args
                     .sequencer_bitcoin_address
-                    .expect("args: no sequencer_bitcion_address provided"),
+                    .ok_or_else(|| "args: no --sequencer-bitcion-address provided".to_string())?,
             },
             sync: SyncParams {
                 l1_follow_distance: 6,
@@ -81,12 +87,12 @@ impl Config {
             exec: ExecParams {
                 reth: RethELParams {
                     rpc_url: args.reth_authrpc.unwrap_or("".to_string()), // TODO: sensible default
-                    secret: args.reth_jwtsecret.unwrap_or(PathBuf::new()), /* TODO: probably
-                                                                           * secret
-                                                                           * should be Option */
+                    secret: args.reth_jwtsecret.unwrap_or_default(),      /* TODO: probably
+                                                                           * secret should be
+                                                                           * Option */
                 },
             },
-        }
+        })
     }
     pub fn update_from_args(&mut self, args: &Args) {
         let args = args.clone();

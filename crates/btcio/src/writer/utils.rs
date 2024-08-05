@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use anyhow::Context;
-use bitcoin::consensus::encode::{deserialize_hex, serialize_hex};
 use bitcoin::hashes::Hash;
 use bitcoin::{consensus::serialize, Transaction};
 use sha2::{Digest, Sha256};
@@ -95,9 +94,8 @@ pub async fn sign_transaction(
     client: &impl SeqL1Client,
     tx: Transaction,
 ) -> anyhow::Result<Transaction> {
-    let txraw = serialize_hex(&tx);
-    let result_tx = client.sign_raw_transaction_with_wallet(txraw).await?;
-    Ok(deserialize_hex(&result_tx)?)
+    let tx = client.sign_raw_transaction_with_wallet(tx).await?;
+    Ok(tx)
 }
 
 pub type BlobIdx = u64;
@@ -112,7 +110,7 @@ pub async fn create_and_sign_blob_inscriptions<D: SequencerDatabase + Send + Syn
 ) -> anyhow::Result<()> {
     if let Some(mut entry) = get_blob_by_idx(db.clone(), blobidx).await? {
         // TODO: handle insufficient utxos
-        let (commit, reveal) = build_inscription_txs(&entry.blob, &client, &config).await?;
+        let (commit, reveal) = build_inscription_txs(&entry.blob, &client, config).await?;
 
         let signed_commit: Transaction = sign_transaction(client.as_ref(), commit)
             .await

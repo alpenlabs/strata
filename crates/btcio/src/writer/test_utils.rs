@@ -1,6 +1,6 @@
 use alpen_test_utils::ArbitraryGenerator;
 use async_trait::async_trait;
-use bitcoin::{consensus::deserialize, hashes::Hash, Block, BlockHash, Network, Txid};
+use bitcoin::{consensus::deserialize, hashes::Hash, Block, BlockHash, Network, Transaction, Txid};
 
 use crate::rpc::{
     traits::{L1Client, SeqL1Client},
@@ -59,11 +59,10 @@ impl SeqL1Client for TestBitcoinClient {
     async fn get_utxos(&self) -> Result<Vec<RawUTXO>, ClientError> {
         // Generate enough utxos to cover for the costs later
         let utxos: Vec<_> = (1..10)
-            .into_iter()
             .map(|_| ArbitraryGenerator::new().generate())
             .enumerate()
             .map(|(i, x)| RawUTXO {
-                txid: hex::encode(&[i as u8; 32]), // need to do this otherwise random str is
+                txid: hex::encode([i as u8; 32]), // need to do this otherwise random str is
                 // generated
                 amount: 100 * 100_000_000,
                 spendable: true,
@@ -79,7 +78,10 @@ impl SeqL1Client for TestBitcoinClient {
     }
 
     /// sign transaction with bitcoind wallet
-    async fn sign_raw_transaction_with_wallet(&self, tx: String) -> Result<String, ClientError> {
+    async fn sign_raw_transaction_with_wallet(
+        &self,
+        tx: Transaction,
+    ) -> Result<Transaction, ClientError> {
         Ok(tx)
     }
 

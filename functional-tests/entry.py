@@ -42,10 +42,9 @@ def generate_task(rpc: BitcoindClient, wait_dur, addr):
     while True:
         time.sleep(wait_dur)
         try:
-            blk = rpc.proxy.generatetoaddress(1, addr)
-            #print("made block", blk)
+            rpc.proxy.generatetoaddress(1, addr)
         except Exception as ex:
-            log.warning(f"{ex} while generating address")
+            log.warning(f"{ex} while generating to address {addr}")
             return
 
 def generate_n_blocks(bitcoin_rpc: BitcoindClient, n: int):
@@ -197,6 +196,10 @@ class BasicEnvConfig(flexitest.EnvConfig):
 
         seqaddr = brpc.proxy.getnewaddress()
 
+        if self.pre_generate_blocks > 0:
+            print(f"Pre generating {self.pre_generate_blocks} blocks to addresss {seqaddr}")
+            brpc.proxy.generatetoaddress(self.pre_generate_blocks, seqaddr)
+
         secret_dir = ctx.make_service_dir("secret")
         reth_secret_path = os.path.join(secret_dir, "jwt.hex")
 
@@ -236,7 +239,7 @@ def main(argv):
     reth_fac = RethFactory([12500 + i for i in range(20)])
 
     factories = {"bitcoin": btc_fac, "sequencer": seq_fac, "reth": reth_fac}
-    global_envs = {"basic": BasicEnvConfig()}
+    global_envs = {"basic": BasicEnvConfig(), "premined_blocks": BasicEnvConfig(101)}
 
     rt = flexitest.TestRuntime(global_envs, datadir_root, factories)
     rt.prepare_registered_tests()

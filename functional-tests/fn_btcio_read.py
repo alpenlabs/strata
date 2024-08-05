@@ -32,6 +32,7 @@ class L1StatusTest(flexitest.Test):
         # ensure that the l1reader task has started within few seconds of test being run
         assert cur_time - start_time <= interval, "time not flowing properly"
         # check if height on bitcoin is same as, it is seen in sequencer
+        print("L1 stat curr height:", l1stat["cur_height"], "Received from bitcoin:", received_block["height"])
         assert (
             l1stat["cur_height"] == received_block["height"]
         ), "sequencer height doesn't match the bitcoin node height"

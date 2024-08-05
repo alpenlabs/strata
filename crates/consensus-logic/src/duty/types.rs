@@ -1,13 +1,11 @@
 //! Sequencer duties.
 
-use std::time::{self, Duration};
+use std::time::{self};
 
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use alpen_express_primitives::buf::Buf32;
-use alpen_express_state::{da_blob::BlobIntent, id::L2BlockId};
-
-const L1_WRITE_INTERVAL_SECS: u64 = 10 * 60; // 10 mins
+use alpen_express_state::id::L2BlockId;
 
 /// Describes when we'll stop working to fulfill a duty.
 #[derive(Clone, Debug)]
@@ -27,8 +25,7 @@ pub enum Expiry {
 pub enum Duty {
     /// Goal to sign a block.
     SignBlock(BlockSigningDuty),
-    /// Goal to write blobs to L1
-    PublishBatchData(BlobIntent),
+    // TODO: Add Goal to write batch data to L1
 }
 
 impl Duty {
@@ -36,9 +33,6 @@ impl Duty {
     pub fn expiry(&self) -> Expiry {
         match self {
             Self::SignBlock(_) => Expiry::NextBlock,
-            Self::PublishBatchData(_) => Expiry::Timestamp(
-                time::Instant::now() + Duration::from_secs(L1_WRITE_INTERVAL_SECS),
-            ),
         }
     }
 }

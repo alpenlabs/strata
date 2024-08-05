@@ -28,6 +28,4 @@ class L1ClientStatusTest(flexitest.Test):
         client_status = seqrpc.alp_clientStatus()
         print("client status", client_status)
 
-        time.sleep(2)
-
         return True

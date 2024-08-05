@@ -3,6 +3,7 @@ use std::time::Duration;
 use std::{fmt::Display, str::FromStr};
 
 use async_trait::async_trait;
+use bitcoin::consensus::encode::{deserialize_hex, serialize_hex};
 use bitcoin::Txid;
 
 use base64::engine::general_purpose;
@@ -33,8 +34,7 @@ pub fn to_val<T>(value: T) -> ClientResult<Value>
 where
     T: Serialize,
 {
-    to_value(value)
-        .map_err(|e| ClientError::Param(format!("Error creating value: {}", e.to_string())))
+    to_value(value).map_err(|e| ClientError::Param(format!("Error creating value: {}", e)))
 }
 
 // Represents a JSON-RPC error.
@@ -121,7 +121,7 @@ pub enum ClientError {
 
 impl From<serde_json::error::Error> for ClientError {
     fn from(value: serde_json::error::Error) -> Self {
-        Self::Parse(format!("Could not parse {}", value.to_string()))
+        Self::Parse(format!("Could not parse {}", value))
     }
 }
 
@@ -493,7 +493,7 @@ impl SeqL1Client for BitcoinClient {
     }
 
     // sign_raw_transaction_with_wallet signs a raw transaction with the wallet of bitcoind
-    async fn sign_raw_transaction_with_wallet(&self, tx: String) -> ClientResult<String> {
+    async fn sign_raw_transaction_with_wallet(&self, tx: Transaction) -> ClientResult<Transaction> {
         #[derive(Serialize, Deserialize, Debug)]
         struct SignError {
             txid: String,
@@ -512,12 +512,17 @@ impl SeqL1Client for BitcoinClient {
             errors: Option<Vec<SignError>>,
         }
 
+        let txraw = serialize_hex(&tx);
         let res = self
-            .call::<SignRPCResponse>("signrawtransactionwithwallet", &[to_value(tx)?])
+            .call::<SignRPCResponse>("signrawtransactionwithwallet", &[to_value(txraw)?])
             .await?;
 
         match res.errors {
-            None => Ok(res.hex),
+            None => {
+                let hex = res.hex;
+                let tx = deserialize_hex(&hex).map_err(|e| ClientError::Parse(e.to_string()))?;
+                Ok(tx)
+            }
             Some(ref errors) => {
                 warn!("Error while signing with wallet: {:?}", res.errors);
                 let errs = errors
