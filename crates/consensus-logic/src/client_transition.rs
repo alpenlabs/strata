@@ -266,12 +266,10 @@ mod tests {
             .unwrap();
 
         let output = process_event(&state, &event, database.as_ref(), &params).unwrap();
-        let expectation_writes = [ClientStateWrite::RollbackL1BlocksTo(
-            l1_block.block_hash().into(),
-        )];
+        let expected_writes = [ClientStateWrite::RollbackL1BlocksTo(5)];
         let expected_actions = [];
 
         assert_eq!(output.actions(), expected_actions);
-        assert_eq!(output.writes(), expectation_writes);
+        assert_eq!(output.writes(), expected_writes);
     }
 }

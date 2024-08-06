@@ -1,4 +1,5 @@
 //! Impl logic for the block assembly duties.
+#![allow(unused)]
 
 use std::sync::Arc;
 use std::thread;
@@ -22,7 +23,7 @@ use alpen_express_state::block::L2BlockBundle;
 use alpen_express_state::block::{ExecSegment, L1Segment};
 use alpen_express_state::chain_state::ChainState;
 use alpen_express_state::client_state::ClientState;
-use alpen_express_state::exec_update::{ExecUpdate, UpdateInput, UpdateOutput};
+use alpen_express_state::exec_update::{ExecUpdate, UpdateOutput};
 use alpen_express_state::header::L2BlockHeader;
 use alpen_express_state::prelude::*;
 use alpen_express_state::state_op::*;
@@ -272,8 +273,8 @@ fn find_pivot_block_height<'c>(
     // Now iterate over the overlap range and return if it makes sense.
     let mut last = None;
     for i in 0..overlap_len {
-        let (ai, aid) = a[(i as i64 + a_off) as usize];
-        let (bi, bid) = b[(i as i64 + b_off) as usize];
+        let (ai, aid) = a[(i + a_off) as usize];
+        let (bi, bid) = b[(i + b_off) as usize];
 
         #[cfg(test)]
         {
@@ -367,7 +368,7 @@ fn compute_post_state(
     body: &L2BlockBody,
 ) -> Result<(ChainState, WriteBatch), Error> {
     let mut state_cache = StateCache::new(prev_chstate);
-    chain_transition::process_block(&mut state_cache, header, &body)?;
+    chain_transition::process_block(&mut state_cache, header, body)?;
     let (post_state, wb) = state_cache.finalize();
     Ok((post_state, wb))
 }

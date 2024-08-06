@@ -102,7 +102,7 @@ fn apply_op_to_chainstate(op: &StateOp, state: &mut ChainState) {
             state.l1_state.maturation_queue.push_back(entry.clone());
         }
 
-        StateOp::MatureL1Block(maturing_idx) => {
+        StateOp::MatureL1Block(_maturing_idx) => {
             // TODO take it out of the queue and add it to the MMR
         }
 

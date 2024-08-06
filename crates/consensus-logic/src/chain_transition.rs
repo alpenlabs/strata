@@ -1,5 +1,6 @@
 //! Top-level CL state transition logic.  This is largely stubbed off now, but
 //! we'll replace components with real implementations as we go along.
+#![allow(unused)]
 
 use alpen_express_state::{block::L1Segment, exec_update, prelude::*, state_op::StateCache};
 
