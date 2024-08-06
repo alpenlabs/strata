@@ -144,13 +144,12 @@ fn process_msg<D: Database, E: ExecEngineCtl>(
 
             if state.state_tracker.cur_state_idx() + 1 != *idx {
                 let cur_state_idx = state.state_tracker.cur_state_idx();
-                let missed_events = *idx - (state.state_tracker.cur_state_idx() + 1);
-                warn!("Missed {} Sync Events", missed_events);
-                for i in 0..missed_events {
+                for missed_idx in (cur_state_idx + 1)..*idx {
+                    warn!(%missed_idx, "applying missed sync events");
                     handle_sync_event(
                         state,
                         engine,
-                        cur_state_idx + i + 1,
+                        missed_idx,
                         cl_state_tx,
                         csm_status_tx,
                         fcm_msg_tx,
