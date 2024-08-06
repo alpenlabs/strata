@@ -102,8 +102,19 @@ fn apply_op_to_chainstate(op: &StateOp, state: &mut ChainState) {
             state.l1_state.maturation_queue.push_back(entry.clone());
         }
 
-        StateOp::MatureL1Block(_maturing_idx) => {
-            // TODO take it out of the queue and add it to the MMR
+        StateOp::MatureL1Block(maturing_idx) => {
+            let mqueue = &mut state.l1_state.maturation_queue;
+
+            // Checks.
+            assert!(mqueue.len() > 1); // make sure we'll still have blocks in the queue
+            let front_idx = mqueue.front_idx().unwrap();
+            assert_eq!(front_idx, *maturing_idx);
+
+            // Actually take the block out so we can do something with it.
+            let _matured_block = mqueue.pop_front();
+
+            // TODO add it to the MMR so we can reference it in the future
+            // TODO handle the DA txs and the deposit update txs, maybe in other ops
         }
 
         StateOp::EnqueueDepositIntent(intent) => {

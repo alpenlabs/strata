@@ -45,6 +45,10 @@ impl fmt::Display for L1BlockId {
 /// something.
 #[derive(Clone, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
 pub struct L1HeaderRecord {
+    /// L1 block ID here so that we don't have to recompute it too much, which
+    /// is expensive in proofs.
+    blkid: L1BlockId,
+
     /// Serialized header.  For Bitcoin this is always 80 bytes.
     buf: Vec<u8>,
 
@@ -57,7 +61,17 @@ pub struct L1HeaderRecord {
 
 impl L1HeaderRecord {
     pub fn new(buf: Vec<u8>, wtxs_root: Buf32) -> Self {
-        Self { buf, wtxs_root }
+        // TODO move this hash outside
+        let blkid = alpen_express_primitives::hash::sha256d(&buf).into();
+        Self {
+            blkid,
+            buf,
+            wtxs_root,
+        }
+    }
+
+    pub fn blkid(&self) -> &L1BlockId {
+        &self.blkid
     }
 
     pub fn buf(&self) -> &[u8] {
@@ -72,6 +86,7 @@ impl L1HeaderRecord {
 impl From<&alpen_express_primitives::l1::L1BlockManifest> for L1HeaderRecord {
     fn from(value: &alpen_express_primitives::l1::L1BlockManifest) -> Self {
         Self {
+            blkid: value.block_hash().into(),
             buf: value.header().to_vec(),
             wtxs_root: value.txs_root(),
         }
@@ -220,8 +235,8 @@ impl L1MaturationEntry {
     }
 
     /// Computes the L1 blockid from the stored block.
-    pub fn get_blkid(&self) -> L1BlockId {
-        alpen_express_primitives::hash::sha256d(&self.record.buf).into()
+    pub fn blkid(&self) -> &L1BlockId {
+        self.record.blkid()
     }
 
     pub fn into_parts(self) -> (L1HeaderRecord, Vec<DepositUpdateTx>, Vec<DaTx>) {

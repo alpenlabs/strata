@@ -180,20 +180,14 @@ fn prepare_l1_segment(
         .l1_view()
         .maturation_queue()
         .iter_entries()
-        .map(|(h, e)| (h, e.get_blkid()))
-        .collect::<Vec<_>>();
-
-    // Annoying copy we have to do to make the ref types work in `find_pivot_block_height`.
-    let maturing_blocks_refs = maturing_blocks
-        .iter()
-        .map(|(i, h)| (*i, h))
+        .map(|(h, e)| (h, e.blkid()))
         .collect::<Vec<_>>();
 
     // FIXME this is not comparing the proof of work, it's just looking at the chain lengths, this
     // is almost the same thing, but might break in the case of a difficulty adjustment taking place
     // at a reorg exactly on the transition block
     trace!("computing pivot");
-    let Some((pivot_h, _pivot_id)) = find_pivot_block_height(&unacc_blocks, &maturing_blocks_refs)
+    let Some((pivot_h, _pivot_id)) = find_pivot_block_height(&unacc_blocks, &maturing_blocks)
     else {
         // Then we're really screwed.
         warn!("can't determine shared block to insert new maturing blocks");
