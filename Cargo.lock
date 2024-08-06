@@ -3080,6 +3080,7 @@ dependencies = [
 name = "express-reth-db"
 version = "0.1.0"
 dependencies = [
+ "alpen-express-db",
  "alpen-express-rocksdb",
  "anyhow",
  "bincode",
@@ -3088,7 +3089,6 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
- "thiserror",
  "tracing",
  "zkvm-primitives",
 ]
@@ -3124,12 +3124,21 @@ version = "0.1.0"
 dependencies = [
  "bincode",
  "express-reth-db",
+ "express-rpc-utils",
  "eyre",
+ "hex",
  "jsonrpsee",
  "reth-primitives",
  "serde",
  "tokio",
  "zkvm-primitives",
+]
+
+[[package]]
+name = "express-rpc-utils"
+version = "0.1.0"
+dependencies = [
+ "jsonrpsee",
 ]
 
 [[package]]

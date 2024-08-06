@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
 use express_reth_db::WitnessProvider;
+use express_rpc_utils::to_jsonrpsee_error;
 use jsonrpsee::core::RpcResult;
 use reth_primitives::B256;
 
-use crate::{utils::to_jsonrpsee_error, AlpenRpcApiServer, BlockWitness};
+use crate::{AlpenRpcApiServer, BlockWitness};
 
 /// rpc implementation
 #[derive(Debug, Clone)]

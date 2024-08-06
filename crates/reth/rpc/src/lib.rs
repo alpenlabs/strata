@@ -1,7 +1,6 @@
 //! alpen custom reth rpc
 
 mod rpc;
-mod utils;
 
 use reth_primitives::B256;
 pub use rpc::AlpenRPC;
@@ -23,8 +22,8 @@ pub trait AlpenRpcApi {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-// #[serde(untagged)]
+#[serde(untagged)]
 pub enum BlockWitness {
-    Raw(Vec<u8>),
+    Raw(#[serde(with = "hex::serde")] Vec<u8>),
     Json(ZKVMInput),
 }

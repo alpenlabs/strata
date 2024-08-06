@@ -8,6 +8,7 @@ members = [
   "crates/evmexec",
   "crates/primitives",
   "crates/rpc/api",
+  "crates/rpc/utils",
   "crates/reth/db",
   "crates/reth/exex",
   "crates/reth/rpc",
@@ -42,6 +43,7 @@ alpen-test-utils = { path = "crates/test-utils" }
 express-reth-db = { path = "crates/reth/db" }
 express-reth-exex = { path = "crates/reth/exex" }
 express-reth-rpc = { path = "crates/reth/rpc" }
+express-rpc-utils = { path = "crates/rpc/utils" }
 zkvm = { path = "crates/prover/zkvm" }
 zkvm-primitives = { path = "crates/prover/primitives" }
 
