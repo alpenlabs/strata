@@ -25,7 +25,8 @@ pub struct ExecEnvState {
     /// Deposits that have been queued by something but haven't been accepted in
     /// an update yet.  The sequencer should be processing these as soon as
     /// possible.
-    pending_deposits: StateQueue<bridge_ops::DepositIntent>,
+    // TODO make this not pub
+    pub pending_deposits: StateQueue<bridge_ops::DepositIntent>,
 
     /// Forced inclusions that have been accepted by the CL but not processed by
     /// a CL payload yet.
@@ -53,6 +54,14 @@ impl ExecEnvState {
 
     pub fn cur_state_root(&self) -> &Buf32 {
         &self.cur_state
+    }
+
+    pub fn pending_deposits(&self) -> &StateQueue<bridge_ops::DepositIntent> {
+        &self.pending_deposits
+    }
+
+    pub fn pending_deposits_mut(&mut self) -> &mut StateQueue<bridge_ops::DepositIntent> {
+        &mut self.pending_deposits
     }
 }
 

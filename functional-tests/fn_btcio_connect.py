@@ -10,5 +10,6 @@ class L1ConnectTest(flexitest.Test):
         seq = ctx.get_service("sequencer")
 
         seqrpc = seq.create_rpc()
+        print("checking connectivity")
         l1stat = seqrpc.alp_l1connected()
         assert l1stat, "Error connecting to Bitcoin Rpc client"

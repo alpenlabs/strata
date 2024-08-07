@@ -58,6 +58,20 @@ impl OperatorTable {
         }
     }
 
+    /// Inserts a new operator entry.
+    pub fn insert(&mut self, signing_pk: Buf32, wallet_pk: Buf32) {
+        let entry = OperatorEntry {
+            idx: {
+                let idx = self.next_idx;
+                self.next_idx += 1;
+                idx
+            },
+            signing_pk,
+            wallet_pk,
+        };
+        self.operators.push(entry);
+    }
+
     /// Gets an operator from the table by its idx.
     ///
     /// Does a binary search.

@@ -93,7 +93,7 @@ pub fn gen_client_state(params: Option<&Params>) -> ClientState {
         None => &gen_params(),
     };
     ClientState::from_genesis_params(
-        params.rollup.genesis_l1_height,
+        params.rollup.horizon_l1_height,
         params.rollup.genesis_l1_height,
     )
 }

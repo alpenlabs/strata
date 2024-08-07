@@ -53,8 +53,9 @@ impl<D: Database> StateTracker<D> {
         &mut self,
         ev_idx: u64,
     ) -> anyhow::Result<(ClientUpdateOutput, Arc<ClientState>)> {
-        if ev_idx != self.cur_state_idx + 1 {
-            return Err(Error::SkippedEventIdx(ev_idx, self.cur_state_idx).into());
+        let prev_ev_idx = ev_idx - 1;
+        if prev_ev_idx != self.cur_state_idx {
+            return Err(Error::SkippedEventIdx(prev_ev_idx, self.cur_state_idx).into());
         }
 
         // Load the event from the database.

@@ -238,3 +238,24 @@ impl DutyBatch {
         &self.duties
     }
 }
+
+/// Sequencer key used for signing-related duties.
+#[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
+pub enum IdentityKey {
+    Sequencer(Buf32),
+}
+
+/// Contains both the identity key used for signing and the identity used for
+/// verifying signatures.  This is really just a stub that we should replace
+/// with real cryptographic signatures and putting keys in the rollup params.
+#[derive(Clone, Debug)]
+pub struct IdentityData {
+    pub ident: Identity,
+    pub key: IdentityKey,
+}
+
+impl IdentityData {
+    pub fn new(ident: Identity, key: IdentityKey) -> Self {
+        Self { ident, key }
+    }
+}

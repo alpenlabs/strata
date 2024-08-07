@@ -1,8 +1,9 @@
 #![allow(unused)]
 
-use std::sync::Arc;
+use std::{borrow::BorrowMut, sync::Arc};
 
 use alpen_express_consensus_logic::sync_manager::SyncManager;
+use alpen_express_primitives::buf::Buf32;
 use async_trait::async_trait;
 use jsonrpsee::{
     core::RpcResult,
@@ -23,6 +24,7 @@ use alpen_express_db::traits::{ChainstateProvider, Database, L2DataProvider};
 use alpen_express_rpc_api::{AlpenApiServer, ClientStatus, L1Status};
 use alpen_express_state::{
     chain_state::ChainState, client_state::ClientState, header::L2Header, id::L2BlockId,
+    l1::L1BlockId,
 };
 
 use tracing::*;
@@ -189,23 +191,23 @@ where
     }
 
     async fn get_l1_block_hash(&self, height: u64) -> RpcResult<String> {
-        let block_manifest = self
-            .database
-            .l1_provider()
-            .get_block_manifest(height)
-            .unwrap()
-            .unwrap();
-
-        Ok(format!("{:?}", block_manifest.block_hash()))
+        // FIXME this used to panic and take down core services making the test
+        // hang, but it now it's just returns the wrong data without crashing
+        match self.database.l1_provider().get_block_manifest(height) {
+            Ok(Some(mf)) => Ok(mf.block_hash().to_string()),
+            Ok(None) => Ok("".to_string()),
+            Err(e) => Ok(e.to_string()),
+        }
     }
 
     async fn get_client_status(&self) -> RpcResult<ClientStatus> {
         let state = self.get_client_state().await;
 
-        let Some(last_l1) = state.recent_l1_block() else {
-            warn!("last L1 block not set in client state, returning still not started");
-            return Err(Error::ClientNotStarted.into());
-        };
+        let last_l1 = state.most_recent_l1_block().copied().unwrap_or_else(|| {
+            // TODO figure out a better way to do this
+            warn!("last L1 block not set in client state, returning zero");
+            L1BlockId::from(Buf32::zero())
+        });
 
         // Copy these out of the sync state, if they're there.
         let (chain_tip, finalized_blkid) = state
@@ -213,11 +215,25 @@ where
             .map(|ss| (*ss.chain_tip_blkid(), *ss.finalized_blkid()))
             .unwrap_or_default();
 
+        // FIXME make this load from cache, and put the data we actually want
+        // here in the client state
+        // FIXME error handling
+        let db = self.database.clone();
+        let slot: u64 = wait_blocking("load_cur_block", move || {
+            let l2_prov = db.l2_provider();
+            l2_prov
+                .get_block_data(chain_tip)
+                .map(|b| b.map(|b| b.header().blockidx()).unwrap_or(u64::MAX))
+                .map_err(Error::from)
+        })
+        .await?;
+
         Ok(ClientStatus {
             chain_tip: *chain_tip.as_ref(),
+            chain_tip_slot: slot,
             finalized_blkid: *finalized_blkid.as_ref(),
             last_l1_block: *last_l1.as_ref(),
-            buried_l1_height: state.buried_l1_height(),
+            buried_l1_height: state.l1_view().buried_l1_height(),
         })
     }
 }

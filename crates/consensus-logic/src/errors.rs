@@ -44,8 +44,18 @@ pub enum Error {
     #[error("client sync state unset")]
     MissingClientSyncState,
 
+    /// Used when assembling blocks and we don't have an actual block ID to use.
+    #[error("invalid state transition: {0}")]
+    InvalidStateTsnImm(#[from] TsnError),
+
     #[error("csm dropped")]
     CsmDropped,
+
+    #[error("tried to reorg too deep (target {0} vs buried {1})")]
+    ReorgTooDeep(u64, u64),
+
+    #[error("out of order L1 block {2} (exp next height {0}, block {1})")]
+    OutOfOrderL1Block(u64, u64, L1BlockId),
 
     #[error("chaintip: {0}")]
     ChainTip(#[from] ChainTipError),
@@ -83,4 +93,13 @@ pub enum TsnError {
 
     #[error("mismatch parent (head {0:?}, parent {1:?}")]
     MismatchParent(L2BlockId, L2BlockId),
+
+    #[error("attested mismatched ID for {0} (set {1}, computed {2})")]
+    L1BlockIdMismatch(u64, L1BlockId, L1BlockId),
+
+    #[error("parent link at L1 block {0} incorrect (set parent {1}, found block {2})")]
+    L1BlockParentMismatch(u64, L1BlockId, L1BlockId),
+
+    #[error("L1 segment block did not extend the chain tip")]
+    L1SegNotExtend,
 }

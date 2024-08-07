@@ -13,6 +13,14 @@ use crate::state_queue::StateQueue;
 )]
 pub struct L1BlockId(Buf32);
 
+impl L1BlockId {
+    /// Computes the blkid from the header buf.  This expensive in proofs and
+    /// should only be done when necessary.
+    pub fn compute_from_header_buf(buf: &[u8]) -> L1BlockId {
+        Self::from(alpen_express_primitives::hash::sha256d(buf))
+    }
+}
+
 impl From<Buf32> for L1BlockId {
     fn from(value: Buf32) -> Self {
         Self(value)
@@ -45,6 +53,10 @@ impl fmt::Display for L1BlockId {
 /// something.
 #[derive(Clone, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
 pub struct L1HeaderRecord {
+    /// L1 block ID here so that we don't have to recompute it too much, which
+    /// is expensive in proofs.
+    blkid: L1BlockId,
+
     /// Serialized header.  For Bitcoin this is always 80 bytes.
     buf: Vec<u8>,
 
@@ -57,7 +69,17 @@ pub struct L1HeaderRecord {
 
 impl L1HeaderRecord {
     pub fn new(buf: Vec<u8>, wtxs_root: Buf32) -> Self {
-        Self { buf, wtxs_root }
+        // TODO move this hash outside
+        let blkid = alpen_express_primitives::hash::sha256d(&buf).into();
+        Self {
+            blkid,
+            buf,
+            wtxs_root,
+        }
+    }
+
+    pub fn blkid(&self) -> &L1BlockId {
+        &self.blkid
     }
 
     pub fn buf(&self) -> &[u8] {
@@ -67,11 +89,20 @@ impl L1HeaderRecord {
     pub fn wtxs_root(&self) -> &Buf32 {
         &self.wtxs_root
     }
+
+    /// Extracts the parent block ID from the header record.
+    pub fn parent_blkid(&self) -> L1BlockId {
+        assert_eq!(self.buf.len(), 80, "l1: header record not 80 bytes");
+        let mut buf = [0; 32];
+        buf.copy_from_slice(&self.buf()[4..36]); // range of parent field bytes
+        L1BlockId::from(Buf32::from(buf))
+    }
 }
 
 impl From<&alpen_express_primitives::l1::L1BlockManifest> for L1HeaderRecord {
     fn from(value: &alpen_express_primitives::l1::L1BlockManifest) -> Self {
         Self {
+            blkid: value.block_hash().into(),
             buf: value.header().to_vec(),
             wtxs_root: value.txs_root(),
         }
@@ -136,6 +167,16 @@ impl L1HeaderPayload {
     }
 }
 
+impl From<L1HeaderPayload> for L1MaturationEntry {
+    fn from(value: L1HeaderPayload) -> Self {
+        Self {
+            record: value.record,
+            deposit_update_txs: value.deposit_update_txs,
+            da_txs: value.da_txs,
+        }
+    }
+}
+
 /// Describes state relating to the CL's view of L1.  Updated by entries in the
 /// L1 segment of CL blocks.
 #[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
@@ -158,6 +199,18 @@ impl L1ViewState {
             horizon_height,
             safe_block,
             maturation_queue: StateQueue::new_at_index(horizon_height),
+        }
+    }
+
+    pub fn new_at_genesis(
+        horizon_height: u64,
+        genesis_height: u64,
+        genesis_trigger_block: L1HeaderRecord,
+    ) -> Self {
+        Self {
+            horizon_height,
+            safe_block: genesis_trigger_block,
+            maturation_queue: StateQueue::new_at_index(genesis_height),
         }
     }
 
@@ -217,6 +270,11 @@ impl L1MaturationEntry {
             deposit_update_txs,
             da_txs,
         }
+    }
+
+    /// Computes the L1 blockid from the stored block.
+    pub fn blkid(&self) -> &L1BlockId {
+        self.record.blkid()
     }
 
     pub fn into_parts(self) -> (L1HeaderRecord, Vec<DepositUpdateTx>, Vec<DaTx>) {

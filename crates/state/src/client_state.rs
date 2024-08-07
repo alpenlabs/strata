@@ -42,7 +42,7 @@ impl ClientState {
         Self {
             chain_active: false,
             sync_state: None,
-            local_l1_view: LocalL1State::new(genesis_l1_height),
+            local_l1_view: LocalL1State::new(horizon_l1_height),
             horizon_l1_height,
             genesis_l1_height,
         }
@@ -81,12 +81,12 @@ impl ClientState {
             .expect("clientstate: missing sync state")
     }
 
-    pub fn recent_l1_block(&self) -> Option<&L1BlockId> {
+    pub fn most_recent_l1_block(&self) -> Option<&L1BlockId> {
         self.local_l1_view.local_unaccepted_blocks.last()
     }
 
-    pub fn buried_l1_height(&self) -> u64 {
-        self.local_l1_view.buried_l1_height
+    pub fn next_exp_l1_block(&self) -> u64 {
+        self.local_l1_view.next_expected_block
     }
 
     pub fn genesis_l1_height(&self) -> u64 {
@@ -132,22 +132,58 @@ pub struct LocalL1State {
     pub(super) local_unaccepted_blocks: Vec<L1BlockId>,
 
     /// L1 block index we treat as being "buried" and won't reorg.
-    pub(super) buried_l1_height: u64,
+    pub(super) next_expected_block: u64,
 }
 
 impl LocalL1State {
-    pub fn new(buried: u64) -> Self {
+    /// Constructs a new instance of the local L1 state bookkeeping.
+    ///
+    /// # Panics
+    ///
+    /// If we try to construct it in a way that implies we don't have the L1 genesis block.
+    pub fn new(next_expected_block: u64) -> Self {
+        if next_expected_block == 0 {
+            panic!("clientstate: tried to construct without known L1 genesis block");
+        }
+
         Self {
             local_unaccepted_blocks: Vec::new(),
-            buried_l1_height: buried,
+            next_expected_block,
         }
     }
 
+    /// Returns a slice of the unaccepted blocks.
     pub fn local_unaccepted_blocks(&self) -> &[L1BlockId] {
         &self.local_unaccepted_blocks
     }
 
+    /// Returns the height of the next block we expected to receive.
+    pub fn next_expected_block(&self) -> u64 {
+        self.next_expected_block
+    }
+
+    /// Returned the height of the buried L1 block, which we can't reorg to.
     pub fn buried_l1_height(&self) -> u64 {
-        self.buried_l1_height
+        self.next_expected_block - self.local_unaccepted_blocks.len() as u64
+    }
+
+    /// Returns an iterator over the unaccepted L2 blocks, from the lowest up.
+    pub fn unacc_blocks_iter(&self) -> impl Iterator<Item = (u64, &L1BlockId)> {
+        self.local_unaccepted_blocks()
+            .iter()
+            .enumerate()
+            .map(|(i, b)| (self.buried_l1_height() + i as u64, b))
+    }
+
+    pub fn tip_height(&self) -> u64 {
+        if self.next_expected_block == 0 {
+            panic!("clientstate: started without L1 genesis block somehow");
+        }
+
+        self.next_expected_block - 1
+    }
+
+    pub fn tip_blkid(&self) -> Option<&L1BlockId> {
+        self.local_unaccepted_blocks().last()
     }
 }

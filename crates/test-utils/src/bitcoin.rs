@@ -16,6 +16,7 @@ pub fn get_test_bitcoin_txns() -> Vec<Transaction> {
 }
 
 pub fn gen_l1_chain(len: usize) -> Vec<L1BlockManifest> {
+    // FIXME this is bad, the blocks generated are nonsensical
     let mut blocks = vec![];
     for _ in 0..len {
         let block: L1BlockManifest = ArbitraryGenerator::new().generate();

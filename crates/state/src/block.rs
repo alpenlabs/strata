@@ -32,6 +32,10 @@ impl L2Block {
         &self.header
     }
 
+    pub fn body(&self) -> &L2BlockBody {
+        &self.body
+    }
+
     pub fn l1_segment(&self) -> &L1Segment {
         &self.body.l1_segment
     }
@@ -96,6 +100,10 @@ impl L1Segment {
 
     pub fn new_empty() -> Self {
         Self::new(Vec::new())
+    }
+
+    pub fn new_payloads(&self) -> &[l1::L1HeaderPayload] {
+        &self.new_payloads
     }
 }
 

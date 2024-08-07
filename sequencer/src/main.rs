@@ -21,8 +21,8 @@ use tracing::*;
 
 use alpen_express_btcio::rpc::traits::L1Client;
 use alpen_express_common::logging;
-use alpen_express_consensus_logic::duties::{DutyBatch, Identity};
-use alpen_express_consensus_logic::duty_executor::{self, IdentityData, IdentityKey};
+use alpen_express_consensus_logic::duty::types::{DutyBatch, Identity, IdentityData, IdentityKey};
+use alpen_express_consensus_logic::duty::worker::{self as duty_worker};
 use alpen_express_consensus_logic::sync_manager;
 use alpen_express_consensus_logic::sync_manager::SyncManager;
 use alpen_express_db::traits::Database;
@@ -199,17 +199,13 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         // Spawn the two tasks.
         thread::spawn(move || {
             // FIXME figure out why this can't infer the type, it's like *right there*
-            duty_executor::duty_tracker_task::<_>(cu_rx, duties_tx, idata.ident, db)
+            duty_worker::duty_tracker_task::<_>(cu_rx, duties_tx, idata.ident, db)
         });
+
+        let d_params = params.clone();
         thread::spawn(move || {
-            duty_executor::duty_dispatch_task(
-                duties_rx,
-                idata.key,
-                sm,
-                db2,
-                eng_ctl_de,
-                pool,
-                params.rollup(),
+            duty_worker::duty_dispatch_task(
+                duties_rx, idata.key, sm, db2, eng_ctl_de, pool, d_params,
             )
         });
     }
@@ -240,7 +236,7 @@ where
     // Start the L1 tasks to get that going.
     let csm_ctl = sync_man.get_csm_ctl();
     l1_reader::start_reader_tasks(
-        sync_man.params(),
+        sync_man.get_params(),
         config,
         l1_rpc_client,
         database.clone(),

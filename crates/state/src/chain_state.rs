@@ -4,8 +4,9 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use alpen_express_primitives::buf::Buf32;
 use alpen_express_primitives::hash::compute_borsh_hash;
 
+use crate::l1::L1ViewState;
+use crate::prelude::*;
 use crate::{bridge_ops, bridge_state, exec_env, l1};
-use crate::{id::L2BlockId, state_queue::StateQueue};
 
 /// L2 blockchain state.  This is the state computed as a function of a
 /// pre-state and a block.
@@ -15,6 +16,16 @@ use crate::{id::L2BlockId, state_queue::StateQueue};
 pub struct ChainState {
     /// Most recent seen block.
     pub(crate) last_block: L2BlockId,
+
+    /// The slot of the last produced block.
+    pub(crate) slot: u64,
+
+    /// The index of the checkpoint period we're in, and so the index we expect
+    /// the next checkpoint to be.
+    ///
+    /// Immediately after genesis, this is 0, so the first checkpoint batch is
+    /// checkpoint 0, moving us into checkpoint period 1.
+    pub(crate) checkpoint_period: u64,
 
     /// Rollup's view of L1 state.
     pub(crate) l1_state: l1::L1ViewState,
@@ -39,6 +50,9 @@ pub struct ChainState {
 // which defines all of this more rigorously
 #[derive(BorshSerialize)]
 struct HashedChainState {
+    last_block: Buf32,
+    slot: u64,
+    checkpoint_period: u64,
     l1_state_hash: Buf32,
     pending_withdraws_hash: Buf32,
     exec_env_hash: Buf32,
@@ -47,6 +61,7 @@ struct HashedChainState {
 }
 
 impl ChainState {
+    // TODO remove genesis blkid since apparently we don't need it anymore
     pub fn from_genesis(
         genesis_blkid: L2BlockId,
         l1_state: l1::L1ViewState,
@@ -54,6 +69,8 @@ impl ChainState {
     ) -> Self {
         Self {
             last_block: genesis_blkid,
+            slot: 0,
+            checkpoint_period: 0,
             l1_state,
             pending_withdraws: StateQueue::new_empty(),
             exec_env_state: exec_state,
@@ -66,8 +83,17 @@ impl ChainState {
         self.last_block
     }
 
-    pub fn state_root(&self) -> Buf32 {
+    pub fn l1_view(&self) -> &L1ViewState {
+        &self.l1_state
+    }
+
+    /// Computes a commitment to a the chainstate.  This is super expensive
+    /// because it does a bunch of hashing.
+    pub fn compute_state_root(&self) -> Buf32 {
         let hashed_state = HashedChainState {
+            last_block: self.last_block.into(),
+            slot: self.slot,
+            checkpoint_period: self.checkpoint_period,
             l1_state_hash: compute_borsh_hash(&self.l1_state),
             pending_withdraws_hash: compute_borsh_hash(&self.pending_withdraws),
             exec_env_hash: compute_borsh_hash(&self.exec_env_state),

@@ -75,8 +75,8 @@ pub fn init_genesis_chainstate(
     let genesis_blkid = gblock.header().get_blockid();
     info!(?genesis_blkid, "created genesis block");
 
-    let horizon_blk_rec = L1HeaderRecord::from(pregenesis_mfs.last().unwrap());
-    let l1vs = L1ViewState::new_at_horizon(horizon_blk_height, horizon_blk_rec);
+    let genesis_blk_rec = L1HeaderRecord::from(pregenesis_mfs.last().unwrap());
+    let l1vs = L1ViewState::new_at_genesis(horizon_blk_height, genesis_blk_height, genesis_blk_rec);
 
     let gchstate = ChainState::from_genesis(genesis_blkid, l1vs, gees);
 
