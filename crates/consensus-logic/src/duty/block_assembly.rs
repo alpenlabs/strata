@@ -131,7 +131,7 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
 
     // Execute the block to compute the new state root, then assemble the real header.
     // TODO do something with the write batch?  to prepare it in the database?
-    let (post_state, _wb) = compute_post_state(prev_chstate, &fake_header, &body, &params)?;
+    let (post_state, _wb) = compute_post_state(prev_chstate, &fake_header, &body, params)?;
     let new_state_root = post_state.compute_state_root();
 
     let header = L2BlockHeader::new(slot, ts, prev_block_id, &body, new_state_root);
