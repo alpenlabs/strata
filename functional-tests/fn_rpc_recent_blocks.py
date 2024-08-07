@@ -19,24 +19,24 @@ class RecentBlocksTest(flexitest.Test):
         seqrpc = seq.create_rpc()
         counter = 0
         while True:
-            try:
-                _ = seqrpc.alp_getBlocksAtIdx(NUM_BLOCKS_TO_RECEIVE)
-            except:
-                # cancel retrying if we encounter this for more than 20 19:20s
+            blk = seqrpc.alp_getBlocksAtIdx(NUM_BLOCKS_TO_RECEIVE)
+            if blk is None:
+                counter += 1
+                time.sleep(1)
+                # stop retrying after 20 times
                 if counter == 20:
                     break
-                time.sleep(1)
-                counter += 1
                 continue
 
             break
+
 
         recent_blks = seqrpc.alp_getRecentBlocks(NUM_BLOCKS_TO_RECEIVE)
 
         assert len(recent_blks) == NUM_BLOCKS_TO_RECEIVE
 
         # check if they are in order by verifying if N-1 block is parent of N block
-        for idx in range(0, NUM_BLOCKS_TO_RECEIVE):
+        for idx in reversed(range(0, NUM_BLOCKS_TO_RECEIVE)):
             if idx != NUM_BLOCKS_TO_RECEIVE - 1:
                 assert recent_blks[idx]["prev_block"] == recent_blks[idx + 1]["block_id"]
 

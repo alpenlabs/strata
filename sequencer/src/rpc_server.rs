@@ -34,8 +34,6 @@ use alpen_express_state::{
 
 use tracing::*;
 
-use crate::rpc_server;
-
 #[derive(Debug, Error)]
 pub enum Error {
     /// Unsupported RPCs for express.  Some of these might need to be replaced
@@ -52,8 +50,14 @@ pub enum Error {
     #[error("missing L2 block {0:?}")]
     MissingL2Block(L2BlockId),
 
-    #[error("sync state missing because genesis hasn't happened yet")]
-    MissingSyncState,
+    #[error("missing L1 block manifest {0}")]
+    MissingL1BlockManifest(u64),
+
+    #[error("tried to call chain-related method before rollup genesis")]
+    BeforeGenesis,
+
+    #[error("unknown idx {0}")]
+    UnknownIdx(u32),
 
     #[error("missing chainstate for index {0}")]
     MissingChainstate(u64),
@@ -66,6 +70,9 @@ pub enum Error {
 
     #[error("incorrect parameters: {0}")]
     IncorrectParameters(String),
+
+    #[error("fetch limit reached. max {0}, provided {1}")]
+    FetchLimitReached(u64, u64),
 
     /// Generic internal error message.  If this is used often it should be made
     /// into its own error type.
@@ -88,7 +95,10 @@ impl Error {
             Self::MissingChainstate(_) => -32604,
             Self::Db(_) => -32605,
             Self::ClientNotStarted => -32606,
-            Self::MissingSyncState => -32607,
+            Self::BeforeGenesis => -32607,
+            Self::FetchLimitReached(_, _) => -32608,
+            Self::UnknownIdx(_) => -32608,
+            Self::MissingL1BlockManifest(_) => -32609,
             Self::BlockingAbort(_) => -32001,
             Self::Other(_) => -32000,
             Self::OtherEx(_, _) => -32000,
@@ -107,7 +117,7 @@ impl From<Error> for ErrorObjectOwned {
 }
 
 fn fetch_l2blk<D: Database + Sync + Send + 'static>(
-    l2_prov: Arc<<D as Database>::L2Prov>,
+    l2_prov: &Arc<<D as Database>::L2Prov>,
     blkid: L2BlockId,
 ) -> Result<L2BlockBundle, Error>
 where
@@ -225,17 +235,20 @@ where
         Ok(self.l1_status.read().await.bitcoin_rpc_connected)
     }
 
-    async fn get_l1_block_hash(&self, height: u64) -> RpcResult<String> {
+    async fn get_l1_block_hash(&self, height: u64) -> RpcResult<Option<String>> {
         let db = self.database.clone();
         let blk_manifest = wait_blocking("l1_block_manifest", move || {
-            Ok(db
+            db
                 .l1_provider()
                 .get_block_manifest(height)
-                .unwrap()
-                .unwrap())
+                .map_err(|_| Error::MissingL1BlockManifest(height))
         })
         .await?;
-        Ok(blk_manifest.block_hash().to_string())
+
+        match blk_manifest {
+            Some(blk) => Ok(Some(blk.block_hash().to_string())),
+            None => Ok(None)
+            }
     }
 
     async fn get_client_status(&self) -> RpcResult<ClientStatus> {
@@ -284,37 +297,34 @@ where
             .chain_tip_blkid();
         let db = self.database.clone();
 
-        if count > 1000 {
-            return Err(Error::IncorrectParameters(
-                "can't provide blocks for count greater than 1000".to_string(),
-            )
+        let fetch_limit = self.sync_manager.params().run().l2_blocks_fetch_limit;
+        if count > fetch_limit{
+            return Err(Error::FetchLimitReached(fetch_limit, count)
             .into());
         }
 
         let blk_headers = wait_blocking("block_headers", move || {
             let l2_prov = db.l2_provider();
-            let l2_blk = fetch_l2blk::<D>(l2_prov.clone(), tip_blkid)?;
+            let mut output = Vec::new();
+            let mut cur_blkid = tip_blkid;
 
-            let mut parent_blk = *l2_blk.header().parent();
+            while output.len() < count as usize  {
+                let l2_blk = fetch_l2blk::<D>(l2_prov, cur_blkid)?;
+                output.push(conv_blk_header_to_rpc(l2_blk.header()));
+                cur_blkid = *l2_blk.header().parent();
+                if l2_blk.header().blockidx() == 0 || Buf32::from(cur_blkid).is_zero() {
+                    break;
+                }
+            }
 
-            let blk_headers: Result<Vec<BlockHeader>, Error> = (0..count)
-                .rev()
-                .map(|_| {
-                    let l2_blk = fetch_l2blk::<D>(l2_prov.clone(), parent_blk)?;
-                    parent_blk = *l2_blk.header().parent();
-
-                    Ok(conv_blk_header_to_rpc(l2_blk.header()))
-                })
-                .collect();
-
-            blk_headers
+            Ok(output)
         })
         .await?;
 
         Ok(blk_headers)
     }
 
-    async fn get_blocks_at_idx(&self, idx: u64) -> RpcResult<Vec<BlockHeader>> {
+    async fn get_blocks_at_idx(&self, idx: u64) -> RpcResult<Option<Vec<BlockHeader>>> {
         let cl_state = self.get_client_state().await;
         let tip_blkid = *cl_state
             .sync()
@@ -325,15 +335,12 @@ where
         let blk_header = wait_blocking("block_at_idx", move || {
             let l2_prov = db.l2_provider();
             // check the tip idx
-            let tip_idx = fetch_l2blk::<D>(l2_prov.clone(), tip_blkid)?
+            let tip_idx = fetch_l2blk::<D>(l2_prov, tip_blkid)?
                 .header()
                 .blockidx();
 
             if idx > tip_idx {
-                return Err(Error::IncorrectParameters(format!(
-                    "index {} greater than the tip_index {}",
-                    idx, tip_idx
-                )));
+                return Ok(None);
             }
 
             Ok(l2_prov
@@ -341,84 +348,94 @@ where
                 .map_err(Error::Db)?
                 .iter()
                 .map(|blkid| {
-                    let l2_blk = fetch_l2blk::<D>(l2_prov.clone(), *blkid)?;
+                    let l2_blk = fetch_l2blk::<D>(l2_prov, *blkid)?;
 
-                    Ok(conv_blk_header_to_rpc(l2_blk.block().header()))
+                    Ok(Some(conv_blk_header_to_rpc(l2_blk.block().header())))
                 })
-                .collect::<Result<Vec<BlockHeader>, Error>>())
+                .collect::<Result<Option<Vec<BlockHeader>>, Error>>()?)
         })
         .await?;
 
-        Ok(blk_header?)
+        Ok(blk_header)
     }
 
     async fn get_block_by_id(
         &self,
         blkid: alpen_express_rpc_types::L2BlockId,
-    ) -> RpcResult<BlockHeader> {
+    ) -> RpcResult<Option<BlockHeader>> {
         let db = self.database.clone();
         let blkid = L2BlockId::from(Buf32::from(blkid.0));
 
         let l2_blk = wait_blocking("fetch_block", move || {
             let l2_prov = db.l2_provider();
 
-            fetch_l2blk::<D>(l2_prov.clone(), blkid)
+            fetch_l2blk::<D>(l2_prov, blkid)
         })
-        .await?;
+        .await.ok();
 
-        Ok(conv_blk_header_to_rpc(l2_blk.header()))
+        match l2_blk {
+            Some(l2_blk) => {
+                Ok(Some(conv_blk_header_to_rpc(l2_blk.header())))
+            },
+            None => Ok(None),
+        }
     }
 
     async fn get_exec_update_by_id(
         &self,
         blkid: alpen_express_rpc_types::L2BlockId,
-    ) -> RpcResult<ExecUpdate> {
+    ) -> RpcResult<Option<ExecUpdate>> {
         let db = self.database.clone();
         let blkid = L2BlockId::from(Buf32::from(blkid.0));
 
         let l2_blk = wait_blocking("fetch_block", move || {
             let l2_prov = db.l2_provider();
 
-            fetch_l2blk::<D>(l2_prov.clone(), blkid)
+            fetch_l2blk::<D>(&l2_prov, blkid)
         })
-        .await?;
+        .await.ok();
 
-        let exec_update = l2_blk.exec_segment().update();
+        match l2_blk {
+            Some(l2_blk) => {
+                    let exec_update = l2_blk.exec_segment().update();
 
-        let withdrawals = exec_update
-            .output()
-            .withdrawals()
-            .iter()
-            .map(|intent| {
-                let (amt, dest_pk) = intent.into_parts();
-                let dest_pk = *dest_pk.as_ref();
-                WithdrawalIntent { amt, dest_pk }
-            })
-            .collect();
+                    let withdrawals = exec_update
+                        .output()
+                        .withdrawals()
+                        .iter()
+                        .map(|intent| {
+                            let (amt, dest_pk) = intent.into_parts();
+                            let dest_pk = *dest_pk.as_ref();
+                            WithdrawalIntent { amt, dest_pk }
+                        })
+                        .collect();
 
-        let da_blobs = exec_update
-            .output()
-            .da_blobs()
-            .iter()
-            .map(|blob| DaBlob {
-                dest: blob.dest().into(),
-                blob_commitment: *blob.commitment().as_ref(),
-            })
-            .collect();
+                    let da_blobs = exec_update
+                        .output()
+                        .da_blobs()
+                        .iter()
+                        .map(|blob| DaBlob {
+                            dest: blob.dest().into(),
+                            blob_commitment: *blob.commitment().as_ref(),
+                        })
+                        .collect();
 
-        Ok(ExecUpdate {
-            update_idx: exec_update.input().update_idx(),
-            entries_root: *exec_update.input().entries_root().as_ref(),
-            extra_payload: exec_update.input().extra_payload().to_vec(),
-            new_state: *exec_update.output().new_state().as_ref(),
-            withdrawals,
-            da_blobs,
-        })
+                   Ok(Some(ExecUpdate {
+                        update_idx: exec_update.input().update_idx(),
+                        entries_root: *exec_update.input().entries_root().as_ref(),
+                        extra_payload: exec_update.input().extra_payload().to_vec(),
+                        new_state: *exec_update.output().new_state().as_ref(),
+                        withdrawals,
+                        da_blobs,
+                    }))
+            },
+            None => Ok(None),
+        }
     }
 
     async fn get_current_deposits(&self) -> RpcResult<Vec<u32>> {
         let (_, chain_state) = self.get_cur_states().await?;
-        let chain_state = chain_state.ok_or(Error::MissingSyncState)?;
+        let chain_state = chain_state.ok_or(Error::BeforeGenesis)?;
 
         Ok(chain_state
             .deposits_table()
@@ -428,12 +445,12 @@ where
 
     async fn get_current_deposit_by_id(&self, deposit_id: u32) -> RpcResult<DepositEntry> {
         let (_, chain_state) = self.get_cur_states().await?;
-        let chain_state = chain_state.ok_or(Error::MissingSyncState)?;
+        let chain_state = chain_state.ok_or(Error::BeforeGenesis)?;
 
         let deposit_entry = chain_state
             .deposits_table()
             .get_deposit(deposit_id)
-            .ok_or(Error::Other("unknown deposit idx".to_string()))?;
+            .ok_or(Error::UnknownIdx(deposit_id))?;
 
         let state = match deposit_entry.deposit_state() {
             alpen_express_state::bridge_state::DepositState::Created(_) => DepositState::Created,

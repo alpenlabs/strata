@@ -52,6 +52,10 @@ impl Buf32 {
     pub fn zero() -> Self {
         Self([0; 32].into())
     }
+
+    pub fn is_zero(&self) -> bool {
+        *self.as_ref() == [0;32]
+    }
 }
 
 impl From<[u8; 32]> for Buf32 {
