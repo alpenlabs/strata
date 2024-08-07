@@ -140,16 +140,19 @@ fn process_msg<D: Database, E: ExecEngineCtl>(
 ) -> anyhow::Result<()> {
     match msg {
         CsmMessage::EventInput(idx) => {
-            // TODO ensure correct event index ordering
-
-            if state.state_tracker.cur_state_idx() + 1 != *idx {
-                let cur_state_idx = state.state_tracker.cur_state_idx();
-                for missed_idx in (cur_state_idx + 1)..*idx {
-                    warn!(%missed_idx, "applying missed sync events");
+            // If we somehow missed a sync event we need to try to rerun those,
+            // just in case.
+            let cur_ev_idx = state.state_tracker.cur_state_idx();
+            let next_exp_idx = cur_ev_idx + 1;
+            let missed_ev_cnt = idx - next_exp_idx;
+            if missed_ev_cnt > 0 {
+                warn!(%missed_ev_cnt, "applying missed sync events");
+                for ev_idx in next_exp_idx..*idx {
+                    trace!(%ev_idx, "running missed sync event");
                     handle_sync_event(
                         state,
                         engine,
-                        missed_idx,
+                        ev_idx,
                         cl_state_tx,
                         csm_status_tx,
                         fcm_msg_tx,
@@ -157,6 +160,7 @@ fn process_msg<D: Database, E: ExecEngineCtl>(
                 }
             }
 
+            // This is actually running the targeted sync event.
             handle_sync_event(state, engine, *idx, cl_state_tx, csm_status_tx, fcm_msg_tx)?;
             Ok(())
         }
