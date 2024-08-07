@@ -62,6 +62,29 @@ impl<D: Database> WorkerState<D> {
         })
     }
 
+    #[cfg(test)]
+    pub fn new_stub_worker(
+        params: Arc<Params>,
+        database: Arc<D>,
+        cur_state_idx: u64,
+        cur_state: ClientState,
+        cupdate_tx: broadcast::Sender<Arc<ClientUpdateNotif>>,
+    ) -> anyhow::Result<Self> {
+        let state_tracker = state_tracker::StateTracker::new(
+            params.clone(),
+            database.clone(),
+            cur_state_idx,
+            Arc::new(cur_state),
+        );
+
+        Ok(Self {
+            params,
+            database,
+            state_tracker,
+            cupdate_tx,
+        })
+    }
+
     /// Gets the index of the current state.
     pub fn cur_event_idx(&self) -> u64 {
         self.state_tracker.cur_state_idx()
@@ -117,7 +140,27 @@ fn process_msg<D: Database, E: ExecEngineCtl>(
 ) -> anyhow::Result<()> {
     match msg {
         CsmMessage::EventInput(idx) => {
-            // TODO ensure correct event index ordering
+            // If we somehow missed a sync event we need to try to rerun those,
+            // just in case.
+            let cur_ev_idx = state.state_tracker.cur_state_idx();
+            let next_exp_idx = cur_ev_idx + 1;
+            let missed_ev_cnt = idx - next_exp_idx;
+            if missed_ev_cnt > 0 {
+                warn!(%missed_ev_cnt, "applying missed sync events");
+                for ev_idx in next_exp_idx..*idx {
+                    trace!(%ev_idx, "running missed sync event");
+                    handle_sync_event(
+                        state,
+                        engine,
+                        ev_idx,
+                        cl_state_tx,
+                        csm_status_tx,
+                        fcm_msg_tx,
+                    )?;
+                }
+            }
+
+            // This is actually running the targeted sync event.
             handle_sync_event(state, engine, *idx, cl_state_tx, csm_status_tx, fcm_msg_tx)?;
             Ok(())
         }
