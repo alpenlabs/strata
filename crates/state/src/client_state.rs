@@ -172,7 +172,7 @@ impl LocalL1State {
         self.local_unaccepted_blocks()
             .iter()
             .enumerate()
-            .map(|(i, b)| (self.buried_l1_height() + i as u64 + 1, b))
+            .map(|(i, b)| (self.buried_l1_height() + i as u64, b))
     }
 
     pub fn tip_height(&self) -> u64 {

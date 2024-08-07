@@ -3,6 +3,7 @@
 use std::{borrow::BorrowMut, sync::Arc};
 
 use alpen_express_consensus_logic::sync_manager::SyncManager;
+use alpen_express_primitives::buf::Buf32;
 use async_trait::async_trait;
 use jsonrpsee::{
     core::RpcResult,
@@ -23,6 +24,7 @@ use alpen_express_db::traits::{ChainstateProvider, Database, L2DataProvider};
 use alpen_express_rpc_api::{AlpenApiServer, ClientStatus, L1Status};
 use alpen_express_state::{
     chain_state::ChainState, client_state::ClientState, header::L2Header, id::L2BlockId,
+    l1::L1BlockId,
 };
 
 use tracing::*;
@@ -201,10 +203,11 @@ where
     async fn get_client_status(&self) -> RpcResult<ClientStatus> {
         let state = self.get_client_state().await;
 
-        let Some(last_l1) = state.most_recent_l1_block() else {
-            warn!("last L1 block not set in client state, returning still not started");
-            return Err(Error::ClientNotStarted.into());
-        };
+        let last_l1 = state.most_recent_l1_block().copied().unwrap_or_else(|| {
+            // TODO figure out a better way to do this
+            warn!("last L1 block not set in client state, returning zero");
+            L1BlockId::from(Buf32::zero())
+        });
 
         // Copy these out of the sync state, if they're there.
         let (chain_tip, finalized_blkid) = state

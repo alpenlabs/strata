@@ -36,7 +36,7 @@ pub fn process_event<D: Database>(
             // FIXME this doesn't do any SPV checks to make sure we only go to
             // a longer chain, it just does it unconditionally
             let l1prov = database.l1_provider();
-            let _blkmf = l1prov.get_block_manifest(*height)?;
+            let new_block_mf = l1prov.get_block_manifest(*height)?;
 
             let l1v = state.l1_view();
 
@@ -45,12 +45,13 @@ pub fn process_event<D: Database>(
             // Only accept the block if it's the next block in the chain we expect to accept.
             let cur_seen_tip_height = l1v.tip_height();
             let next_exp_height = l1v.next_expected_block();
-
-            // TODO check that the new block we're trying to add has the same parent as the tip
-            // block
-            let cur_tip_block = l1prov
-                .get_block_manifest(cur_seen_tip_height)?
-                .ok_or(Error::MissingL1BlockHeight(cur_seen_tip_height))?;
+            if next_exp_height > params.rollup().horizon_l1_height {
+                // TODO check that the new block we're trying to add has the same parent as the tip
+                // block
+                let cur_tip_block = l1prov
+                    .get_block_manifest(cur_seen_tip_height)?
+                    .ok_or(Error::MissingL1BlockHeight(cur_seen_tip_height))?;
+            }
 
             if *height == next_exp_height {
                 writes.push(ClientStateWrite::AcceptL1Block(*l1blkid));

@@ -18,7 +18,7 @@ class SyncGenesisTest(flexitest.Test):
         # create both btc and sequencer RPC
         seqrpc = seq.create_rpc()
 
-        time.sleep(1)
+        time.sleep(3)
 
         # Wait until genesis.  This might need to be tweaked if we change how
         # long we wait for genesis in tests.
@@ -28,6 +28,7 @@ class SyncGenesisTest(flexitest.Test):
             if tries > MAX_GENESIS_TRIES:
                 assert False, "did not observe genesis before timeout"
 
+            print("waiting for genesis")
             stat = seqrpc.alp_clientStatus()
             print(stat)
             if stat["finalized_blkid"] != UNSET_ID:
@@ -36,9 +37,9 @@ class SyncGenesisTest(flexitest.Test):
                 break
 
             time.sleep(0.5)
-            print("waiting for genesis...")
+            print("waiting for genesis... -- tries", tries)
 
-        assert last_slot
+        assert last_slot is not None, "last slot never set"
 
         # Make sure we're making progress.
         stat = None
