@@ -176,7 +176,7 @@ impl DepositEntry {
         }
     }
 
-    pub fn get_all_pending_update_tx(&self) -> &[l1::L1TxRef] {
+    pub fn pending_update_tx(&self) -> &[l1::L1TxRef] {
         &self.pending_update_txs
     }
 
