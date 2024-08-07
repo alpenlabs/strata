@@ -32,6 +32,10 @@ use alpen_express_rocksdb::{
 use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer};
 use alpen_express_rpc_types::L1Status;
 // use alpen_express_btcio::broadcaster::manager::BroadcastDbManager;
+use alpen_express_db::traits::SequencerDatabase;
+use alpen_express_rpc_types::L1Status;
+use alpen_express_status::NodeStatus;
+use alpen_express_status::Watch;
 use anyhow::Context;
 use bitcoin::Network;
 use config::Config;
@@ -210,6 +214,11 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     // Set up database managers.
     let l2_block_manager = Arc::new(L2BlockManager::new(pool.clone(), database.clone()));
+    let node_status = Arc::new(NodeStatus {
+        l1_status: Arc::new(RwLock::new(L1Status::default())),
+        csm_status: Watch::new(),
+        cl_state: Watch::new(),
+    });
 
     // Set up btcio status to pass around cheaply
     let l1_status = Arc::new(RwLock::new(L1Status::default()));
@@ -339,7 +348,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         btc_rpc.clone(),
         database.clone(),
         csm_ctl,
-        l1_status.clone(),
+        node_status.clone(),
     )?;
 
     let shutdown_signal = task_manager.shutdown_signal();

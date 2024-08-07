@@ -22,6 +22,7 @@ members = [
   "crates/state",
   "crates/storage",
   "crates/tasks",
+  "crates/status",
   "crates/test-utils",
   "crates/util/mmr",
   "crates/vtxjmt",
@@ -60,6 +61,8 @@ express-rpc-utils = { path = "crates/rpc/utils" }
 express-storage = { path = "crates/storage" }
 express-tasks = { path = "crates/tasks" }
 express-zkvm = { path = "crates/prover/zkvm" }                      # FIXME make these names more consistent?
+alpen-express-status = { path = "crates/status" }
+zkvm = { path = "crates/prover/zkvm" }
 zkvm-primitives = { path = "crates/prover/primitives" }
 
 # IMPORTANT: ensure alloy-* types are of the same version as inside reth dependency

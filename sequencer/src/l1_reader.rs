@@ -1,5 +1,9 @@
 use std::sync::Arc;
 
+use tokio::sync::{mpsc, RwLock};
+use alpen_express_common::status::NodeStatus;
+use alpen_express_primitives::l1::L1Status;
+use tokio::sync::mpsc;
 use alpen_express_btcio::{
     reader::{config::ReaderConfig, messages::L1Event, query::bitcoin_data_reader_task},
     rpc::traits::L1Client,
@@ -20,8 +24,13 @@ pub fn start_reader_tasks<D: Database + Send + Sync + 'static>(
     rpc_client: Arc<impl L1Client>,
     db: Arc<D>,
     csm_ctl: Arc<CsmController>,
-    l1_status: Arc<RwLock<L1Status>>,
-) -> anyhow::Result<()> {
+    node_status: Arc<NodeStatus>,
+) -> anyhow::Result<()>
+where
+    // TODO how are these not redundant trait bounds???
+    <D as alpen_express_db::traits::Database>::SeStore: Send + Sync + 'static,
+    <D as alpen_express_db::traits::Database>::L1Store: Send + Sync + 'static,
+{
     let (ev_tx, ev_rx) = mpsc::channel::<L1Event>(100); // TODO: think about the buffer size
 
     // TODO switch to checking the L1 tip in the consensus/client state

@@ -667,10 +667,9 @@ name = "alpen-express-btcio"
 version = "0.1.0"
 dependencies = [
  "alpen-express-db",
- "alpen-express-primitives",
  "alpen-express-rocksdb",
  "alpen-express-rpc-types",
- "alpen-express-state",
+ "alpen-express-status",
  "alpen-test-utils",
  "anyhow",
  "arbitrary",
@@ -943,6 +942,16 @@ dependencies = [
  "serde",
  "sha2 0.10.8",
  "tracing",
+]
+
+[[package]]
+name = "alpen-express-status"
+version = "0.1.0"
+dependencies = [
+ "alpen-express-primitives",
+ "alpen-express-state",
+ "thiserror",
+ "tokio",
 ]
 
 [[package]]
