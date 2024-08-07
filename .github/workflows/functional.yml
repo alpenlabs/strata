@@ -10,7 +10,38 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  run-functional-tests:
+  lint:
+    name: Lint test files
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "^3.10" # Keep in sync with `pyproject.toml`
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python -
+          echo "${HOME}/.local/bin" >> $GITHUB_PATH
+
+      - name: Configure Poetry to create the virtual environment inside the project
+        run: poetry config virtualenvs.in-project true
+
+      - name: Install python dependencies
+        run: cd functional-tests && poetry install --no-root && cd -
+
+      - name: Check formatting
+        run: cd functional-tests && poetry run ruff format --check && cd -
+
+      - name: Lint
+        run: cd functional-tests && poetry run ruff check && cd -
+
+  run:
     name: Run functional tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -68,3 +99,15 @@ jobs:
           which alpen-express-sequencer
           cd functional-tests && \
           poetry run python entry.py
+
+  functional-tests-success:
+    name: Check that all checks pass
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [lint, run]
+    timeout-minutes: 60
+    steps:
+      - name: Decide whether the needed jobs succeeded or failed
+        uses: re-actors/alls-green@release/v1
+        with:
+          jobs: ${{ toJSON(needs) }}

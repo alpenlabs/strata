@@ -1,10 +1,10 @@
 import time
 
-from bitcoinlib.services.bitcoind import BitcoindClient
 import flexitest
 
 UNSET_ID = "0000000000000000000000000000000000000000000000000000000000000000"
 MAX_GENESIS_TRIES = 10
+
 
 @flexitest.register
 class SyncGenesisTest(flexitest.Test):
@@ -12,7 +12,7 @@ class SyncGenesisTest(flexitest.Test):
         ctx.set_env("basic")
 
     def main(self, ctx: flexitest.RunContext):
-        btc = ctx.get_service("bitcoin")
+        ctx.get_service("bitcoin")
         seq = ctx.get_service("sequencer")
 
         # create both btc and sequencer RPC
@@ -25,8 +25,7 @@ class SyncGenesisTest(flexitest.Test):
         tries = 0
         last_slot = None
         while True:
-            if tries > MAX_GENESIS_TRIES:
-                assert False, "did not observe genesis before timeout"
+            assert tries <= MAX_GENESIS_TRIES, "did not observe genesis before timeout"
 
             print("waiting for genesis")
             stat = seqrpc.alp_clientStatus()

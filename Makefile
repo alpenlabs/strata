@@ -104,19 +104,13 @@ fmt-check-toml: ensure-taplo ## Runs `taplo` to check that TOML files are proper
 fmt-toml: ensure-taplo ## Runs `taplo` to format TOML files
 	taplo fmt
 
-ensure-ruff:
-	@if ! command -v ruff &> /dev/null; then \
-		echo "ruff not found. Please install it by running the command 'pip install ruff' or refer to the following link for more information: https://docs.astral.sh/ruff/installation/" \
-		exit 1; \
-    fi
-
 .PHONY: fmt-check-func-tests
-fmt-check-func-tests: ensure-ruff ## Check formatting of python files inside `test` directory.
-	cd $(FUNCTIONAL_TESTS_DIR) && ruff format --check
+fmt-check-func-tests: ensure-poetry ## Check formatting of python files inside `test` directory.
+	cd $(FUNCTIONAL_TESTS_DIR) && poetry run ruff format --check
 
 .PHONY: fmt-func-tests
-fmt-func-tests: ensure-ruff ## Apply formatting of python files inside `test` directory.
-	cd $(FUNCTIONAL_TESTS_DIR) && ruff format
+fmt-func-tests: ensure-poetry ## Apply formatting of python files inside `test` directory.
+	cd $(FUNCTIONAL_TESTS_DIR) && poetry run ruff format
 
 .PHONY: lint-check-ws
 lint-check-ws: ## Checks for lint issues in the workspace.
@@ -161,28 +155,21 @@ lint-fix-codespell: ensure-codespell ## Runs `codespell` to fix spelling errors 
 lint-check-toml: ensure-taplo ## Lints TOML files
 	taplo lint
 
-.PHONY: lint-check-func-tests
-lint-check-func-tests: ensure-ruff ## Lints python files inside the `test` directory.
-	cd $(FUNCTIONAL_TESTS_DIR) && ruff check
+.PHONY: lint-check-functional-tests
+lint-check-func-tests: ensure-poetry ## Lints the functional tests
+	cd $(FUNCTIONAL_TESTS_DIR) && poetry run ruff check
 
-.PHONY: lint-fix-func-tests
-lint-fix-func-tests: ensure-ruff ## Runs lint fixes for python files inside `test` directory.
-	cd $(FUNCTIONAL_TESTS_DIR) && ruff check --fix
+.PHONY: lint-fix-functional-tests
+lint-fix-func-tests: ensure-poetry ## Lints the functional tests and applies fixes where possible
+	cd $(FUNCTIONAL_TESTS_DIR) && poetry run ruff check --fix
 
 .PHONY: lint
-lint: ## Runs all lints and checks for issues without trying to fix them.
-	make lint-check-ws && \
-	make lint-check-codespell && \
-	make lint-check-toml && \
-	make fmt-check-toml && \
-	make fmt-check-ws
+lint: fmt-check-ws fmt-check-func-tests fmt-check-toml lint-check-ws lint-check-func-tests lint-check-codespell ## Runs all lints and checks for issues without trying to fix them.
+	@echo "\n\033[36m======== OK: Lints and Formatting ========\033[0m\n"
 
 .PHONY: lint-fix
-lint-fix: ## Runs all lints and applies fixes where possible.
-	make lint-fix-ws && \
-	make lint-fix-codespell && \
-	make fmt-toml && \
-	make fmt-ws
+lint-fix: fmt-toml fmt-ws lint-fix-ws lint-fix-codespell ## Runs all lints and applies fixes where possible.
+	@echo "\n\033[36m======== OK: Lints and Formatting Fixes ========\033[0m\n"
 
 .PHONY: rustdocs
 rustdocs: ## Runs `cargo docs` to generate the Rust documents in the `target/doc` directory.

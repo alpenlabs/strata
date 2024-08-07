@@ -1,6 +1,5 @@
 import time
 
-from bitcoinlib.services.bitcoind import BitcoindClient
 import flexitest
 
 from entry import BasicEnvConfig
@@ -16,7 +15,7 @@ class SyncGenesisTest(flexitest.Test):
         ctx.set_env("premined_blocks")
 
     def main(self, ctx: flexitest.RunContext):
-        btc = ctx.get_service("bitcoin")
+        ctx.get_service("bitcoin")
         seq = ctx.get_service("sequencer")
 
         # create both btc and sequencer RPC
