@@ -26,7 +26,7 @@ pub trait AlpenApi {
     async fn get_l1_status(&self) -> RpcResult<L1Status>;
 
     #[method(name = "getL1blockHash")]
-    async fn get_l1_block_hash(&self, height: u64) -> RpcResult<String>;
+    async fn get_l1_block_hash(&self, height: u64) -> RpcResult<Option<String>>;
 
     #[method(name = "clientStatus")]
     async fn get_client_status(&self) -> RpcResult<ClientStatus>;
@@ -35,13 +35,13 @@ pub trait AlpenApi {
     async fn get_recent_blocks(&self, count: u64) -> RpcResult<Vec<BlockHeader>>;
 
     #[method(name = "getBlocksAtIdx")]
-    async fn get_blocks_at_idx(&self, index: u64) -> RpcResult<Vec<BlockHeader>>;
+    async fn get_blocks_at_idx(&self, index: u64) -> RpcResult<Option<Vec<BlockHeader>>>;
 
     #[method(name = "getBlockById")]
-    async fn get_block_by_id(&self, block_id: L2BlockId) -> RpcResult<BlockHeader>;
+    async fn get_block_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<BlockHeader>>;
 
     #[method(name = "getExecUpdateById")]
-    async fn get_exec_update_by_id(&self, block_id: L2BlockId) -> RpcResult<ExecUpdate>;
+    async fn get_exec_update_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<ExecUpdate>>;
 
     #[method(name = "getCurrentDeposits")]
     async fn get_current_deposits(&self) -> RpcResult<Vec<u32>>;
