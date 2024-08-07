@@ -101,6 +101,10 @@ impl L1Segment {
     pub fn new_empty() -> Self {
         Self::new(Vec::new())
     }
+
+    pub fn new_payloads(&self) -> &[l1::L1HeaderPayload] {
+        &self.new_payloads
+    }
 }
 
 /// Information relating to how to update the execution layer.

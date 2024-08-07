@@ -568,8 +568,9 @@ fn apply_tip_update<D: Database>(
 
         // Compute the transition write batch, then compute the new state
         // locally and update our going state.
+        let rparams = state.params.rollup();
         let mut prestate_cache = StateCache::new(pre_state);
-        chain_transition::process_block(&mut prestate_cache, header, body)
+        chain_transition::process_block(&mut prestate_cache, header, body, rparams)
             .map_err(|e| Error::InvalidStateTsn(*blkid, e))?;
         let (post_state, wb) = prestate_cache.finalize();
         pre_state = post_state;

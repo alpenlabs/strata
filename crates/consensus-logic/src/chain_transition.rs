@@ -2,7 +2,17 @@
 //! we'll replace components with real implementations as we go along.
 #![allow(unused)]
 
-use alpen_express_state::{block::L1Segment, exec_update, prelude::*, state_op::StateCache};
+use tracing::*;
+
+use alpen_express_primitives::params::RollupParams;
+use alpen_express_state::{
+    block::L1Segment,
+    exec_update,
+    l1::{self, L1MaturationEntry},
+    prelude::*,
+    state_op::StateCache,
+    state_queue,
+};
 
 use crate::errors::TsnError;
 
@@ -18,6 +28,7 @@ pub fn process_block(
     state: &mut StateCache,
     header: &impl L2Header,
     body: &L2BlockBody,
+    params: &RollupParams,
 ) -> Result<(), TsnError> {
     // We want to fail quickly here because otherwise we don't know what's
     // happening.
@@ -29,7 +40,7 @@ pub fn process_block(
     state.set_slot(header.blockidx());
 
     // Go through each stage and play out the operations it has.
-    process_l1_view_update(state, body.l1_segment())?;
+    process_l1_view_update(state, body.l1_segment(), params)?;
     process_pending_withdrawals(state)?;
     process_execution_update(state, body.exec_segment().update())?;
 
@@ -55,8 +66,86 @@ fn process_execution_update(
 }
 
 /// Update our view of the L1 state, playing out downstream changes from that.
-fn process_l1_view_update(state: &mut StateCache, l1seg: &L1Segment) -> Result<(), TsnError> {
-    // TODO accept new blocks (comparing if they do a reorg)
+fn process_l1_view_update(
+    state: &mut StateCache,
+    l1seg: &L1Segment,
+    params: &RollupParams,
+) -> Result<(), TsnError> {
+    let l1v = state.state().l1_view();
+
+    // Accept new blocks, comparing the tip against the current to figure out if
+    // we need to do a reorg.
+    // FIXME this should actually check PoW, it just does it based on block heights
+    if !l1seg.new_payloads().is_empty() {
+        println!("new payloads {:?}", l1seg.new_payloads());
+
+        // Validate the new blocks actually extend the tip.  This is what we have to tweak to make
+        // more complicated to check the PoW.
+        let new_tip_block = l1seg.new_payloads().last().unwrap();
+        let new_tip_height = new_tip_block.idx();
+        let cur_tip_height = l1v.tip_height();
+        if new_tip_block.idx() <= cur_tip_height {
+            return Err(TsnError::L1SegNotExtend);
+        }
+
+        // Now make sure that the block hashes all connect up sensibly.
+        let height_inc = new_tip_height - cur_tip_height;
+        let possible_reorg_depth = l1seg.new_payloads().len() as u64 - height_inc;
+        let pivot_idx = cur_tip_height - possible_reorg_depth;
+        let pivot_blkid = l1v
+            .maturation_queue()
+            .get_absolute(pivot_idx)
+            .map(|b| b.blkid())
+            .unwrap_or_else(|| l1v.safe_block().blkid());
+        check_block_integrity(pivot_idx, pivot_blkid, l1seg.new_payloads())?;
+
+        // Okay now that we've figured that out, let's actually how to actually do the reorg.
+        if pivot_idx < cur_tip_height {
+            state.revert_l1_view_to(pivot_idx);
+        }
+
+        for e in l1seg.new_payloads() {
+            let ment = L1MaturationEntry::from(e.clone());
+            state.apply_l1_block_entry(ment);
+        }
+    }
+
     // TODO accept sufficiently buried blocks (triggering deposit creation or whatever), etc.
+
+    Ok(())
+}
+
+/// Checks the attested block IDs and parent blkid connections in new blocks.
+fn check_block_integrity(
+    pivot_idx: u64,
+    pivot_blkid: &L1BlockId,
+    new_blocks: &[l1::L1HeaderPayload],
+) -> Result<(), TsnError> {
+    // Iterate over all the blocks in the new list and make sure they match.
+    for (i, e) in new_blocks.iter().enumerate() {
+        let h = pivot_idx + i as u64 + 1;
+
+        // Make sure the hash matches.
+        let computed_id = L1BlockId::compute_from_header_buf(e.header_buf());
+        let attested_id = e.record().blkid();
+        if computed_id != *attested_id {
+            return Err(TsnError::L1BlockIdMismatch(h, *attested_id, computed_id));
+        }
+
+        // Make sure matches parent.
+        let blk_parent = e.record().parent_blkid();
+        if i == 0 {
+            if blk_parent != *pivot_blkid {
+                return Err(TsnError::L1BlockParentMismatch(h, blk_parent, *pivot_blkid));
+            }
+        } else {
+            let parent_payload = &new_blocks[i - 1];
+            let parent_id = parent_payload.record().blkid();
+            if blk_parent != *parent_id {
+                return Err(TsnError::L1BlockParentMismatch(h, blk_parent, *parent_id));
+            }
+        }
+    }
+
     Ok(())
 }

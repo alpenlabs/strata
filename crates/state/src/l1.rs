@@ -13,6 +13,14 @@ use crate::state_queue::StateQueue;
 )]
 pub struct L1BlockId(Buf32);
 
+impl L1BlockId {
+    /// Computes the blkid from the header buf.  This expensive in proofs and
+    /// should only be done when necessary.
+    pub fn compute_from_header_buf(buf: &[u8]) -> L1BlockId {
+        Self::from(alpen_express_primitives::hash::sha256d(buf))
+    }
+}
+
 impl From<Buf32> for L1BlockId {
     fn from(value: Buf32) -> Self {
         Self(value)
@@ -80,6 +88,14 @@ impl L1HeaderRecord {
 
     pub fn wtxs_root(&self) -> &Buf32 {
         &self.wtxs_root
+    }
+
+    /// Extracts the parent block ID from the header record.
+    pub fn parent_blkid(&self) -> L1BlockId {
+        assert_eq!(self.buf.len(), 80, "l1: header record not 80 bytes");
+        let mut buf = [0; 32];
+        buf.copy_from_slice(&self.buf()[4..36]); // range of parent field bytes
+        L1BlockId::from(Buf32::from(buf))
     }
 }
 
@@ -151,6 +167,16 @@ impl L1HeaderPayload {
     }
 }
 
+impl From<L1HeaderPayload> for L1MaturationEntry {
+    fn from(value: L1HeaderPayload) -> Self {
+        Self {
+            record: value.record,
+            deposit_update_txs: value.deposit_update_txs,
+            da_txs: value.da_txs,
+        }
+    }
+}
+
 /// Describes state relating to the CL's view of L1.  Updated by entries in the
 /// L1 segment of CL blocks.
 #[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
@@ -173,6 +199,18 @@ impl L1ViewState {
             horizon_height,
             safe_block,
             maturation_queue: StateQueue::new_at_index(horizon_height),
+        }
+    }
+
+    pub fn new_at_genesis(
+        horizon_height: u64,
+        genesis_height: u64,
+        genesis_trigger_block: L1HeaderRecord,
+    ) -> Self {
+        Self {
+            horizon_height,
+            safe_block: genesis_trigger_block,
+            maturation_queue: StateQueue::new_at_index(genesis_height),
         }
     }
 

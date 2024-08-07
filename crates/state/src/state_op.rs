@@ -7,6 +7,7 @@ use alpen_express_primitives::buf::Buf32;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::chain_state::ChainState;
+use crate::l1::L1MaturationEntry;
 use crate::{bridge_ops, l1};
 
 #[derive(Clone, Debug, PartialEq, BorshDeserialize, BorshSerialize)]
@@ -190,6 +191,14 @@ impl StateCache {
     /// Inserts a new operator with the specified pubkeys into the operator table.
     pub fn insert_operator(&mut self, signing_pk: Buf32, wallet_pk: Buf32) {
         self.merge_op(StateOp::CreateOperator(signing_pk, wallet_pk));
+    }
+
+    pub fn revert_l1_view_to(&mut self, height: u64) {
+        self.merge_op(StateOp::RevertL1Height(height));
+    }
+
+    pub fn apply_l1_block_entry(&mut self, ent: L1MaturationEntry) {
+        self.merge_op(StateOp::AcceptL1Block(ent));
     }
 
     // TODO add more manipulator functions
