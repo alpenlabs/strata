@@ -278,11 +278,10 @@ where
     async fn get_recent_blocks(&self, count: u64) -> RpcResult<Vec<BlockHeader>> {
         // FIXME: sync state should have a block number
         let cl_state = self.get_client_state().await;
-        let tip_blkid = cl_state
+        let tip_blkid = *cl_state
             .sync()
             .ok_or(Error::ClientNotStarted)?
-            .chain_tip_blkid()
-            .clone();
+            .chain_tip_blkid();
         let db = self.database.clone();
 
         if count > 1000 {
@@ -308,7 +307,7 @@ where
                 })
                 .collect();
 
-            Ok(blk_headers?)
+            blk_headers
         })
         .await?;
 
@@ -317,11 +316,10 @@ where
 
     async fn get_blocks_at_idx(&self, idx: u64) -> RpcResult<Vec<BlockHeader>> {
         let cl_state = self.get_client_state().await;
-        let tip_blkid = cl_state
+        let tip_blkid = *cl_state
             .sync()
             .ok_or(Error::ClientNotStarted)?
-            .chain_tip_blkid()
-            .clone();
+            .chain_tip_blkid();
         let db = self.database.clone();
 
         let blk_header = wait_blocking("block_at_idx", move || {
