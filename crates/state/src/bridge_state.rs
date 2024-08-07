@@ -135,8 +135,8 @@ impl DepositsTable {
             .map(|i| &mut self.deposits[i])
     }
 
-    pub fn get_all_deposits(&self) -> Vec<u32> {
-        self.deposits.iter().map(|e| e.deposit_idx).collect()
+    pub fn get_all_deposits_ids_iter(&self) -> impl Iterator<Item = u32> + '_ {
+        self.deposits.iter().map(|e| e.deposit_idx)
     }
 }
 

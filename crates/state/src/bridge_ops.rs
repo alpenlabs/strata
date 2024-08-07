@@ -18,7 +18,7 @@ pub struct WithdrawalIntent {
 }
 
 impl WithdrawalIntent {
-    pub fn get_intent(&self) -> (u64, Buf64) {
+    pub fn into_parts(&self) -> (u64, Buf64) {
         (self.amt, self.dest_pk)
     }
 }
