@@ -111,7 +111,7 @@ pub fn apply_writes_to_state(
 
             RollbackL1BlocksTo(block_height) => {
                 let l1v = state.l1_view_mut();
-                let buried_height = l1v.buried_l1_height;
+                let buried_height = l1v.buried_l1_height();
 
                 if block_height < buried_height {
                     error!(%block_height, %buried_height, "unable to roll back past buried height");
@@ -126,6 +126,7 @@ pub fn apply_writes_to_state(
                 // TODO make this also do shit
                 let l1v = state.l1_view_mut();
                 l1v.local_unaccepted_blocks.push(l1blkid);
+                l1v.next_expected_block += 1;
             }
 
             AcceptL2Block(blkid) => {
@@ -135,26 +136,27 @@ pub fn apply_writes_to_state(
             }
 
             UpdateBuried(new_idx) => {
+                let l1v = state.l1_view_mut();
+
                 // Check that it's increasing.
-                let old_idx = state.buried_l1_height();
+                let old_idx = l1v.buried_l1_height();
+
                 if new_idx < old_idx {
                     panic!("operation: emitted non-greater buried height");
                 }
 
-                let l1v = state.l1_view_mut();
-
                 // Check that it's not higher than what we know about.
-                let diff = (new_idx - old_idx) as usize;
-                if diff > l1v.local_unaccepted_blocks.len() {
+                if new_idx >= l1v.next_expected_block() {
                     panic!("operation: new buried height above known L1 tip");
                 }
 
                 // If everything checks out we can just remove them.
+                let diff = (new_idx - old_idx) as usize;
                 let _blocks = l1v
                     .local_unaccepted_blocks
                     .drain(..diff)
                     .collect::<Vec<_>>();
-                l1v.buried_l1_height = new_idx;
+                l1v.next_expected_block = new_idx;
 
                 // TODO merge these blocks into the L1 MMR in the client state if
                 // we haven't already

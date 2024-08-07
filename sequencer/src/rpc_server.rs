@@ -1,6 +1,6 @@
 #![allow(unused)]
 
-use std::sync::Arc;
+use std::{borrow::BorrowMut, sync::Arc};
 
 use alpen_express_consensus_logic::sync_manager::SyncManager;
 use async_trait::async_trait;
@@ -201,7 +201,7 @@ where
     async fn get_client_status(&self) -> RpcResult<ClientStatus> {
         let state = self.get_client_state().await;
 
-        let Some(last_l1) = state.recent_l1_block() else {
+        let Some(last_l1) = state.most_recent_l1_block() else {
             warn!("last L1 block not set in client state, returning still not started");
             return Err(Error::ClientNotStarted.into());
         };
@@ -230,7 +230,7 @@ where
             chain_tip_slot: slot,
             finalized_blkid: *finalized_blkid.as_ref(),
             last_l1_block: *last_l1.as_ref(),
-            buried_l1_height: state.buried_l1_height(),
+            buried_l1_height: state.l1_view().buried_l1_height(),
         })
     }
 }

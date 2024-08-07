@@ -26,6 +26,9 @@ pub fn process_event<D: Database>(
         SyncEvent::L1Block(height, l1blkid) => {
             // If the block is before the horizon we don't care about it.
             if *height < params.rollup().horizon_l1_height {
+                #[cfg(test)]
+                eprintln!("early L1 block at h={height}, you may have set up the test env wrong");
+
                 warn!(%height, "ignoring unexpected L1Block event before horizon");
                 return Ok(ClientUpdateOutput::new(writes, actions));
             }
@@ -40,9 +43,8 @@ pub fn process_event<D: Database>(
             // TODO do the consensus checks
 
             // Only accept the block if it's the next block in the chain we expect to accept.
-            let cur_seen_tip_height =
-                state.buried_l1_height() + l1v.local_unaccepted_blocks().len() as u64;
-            let next_exp_height = cur_seen_tip_height + 1;
+            let cur_seen_tip_height = l1v.tip_height();
+            let next_exp_height = l1v.next_expected_block();
 
             // TODO check that the new block we're trying to add has the same parent as the tip
             // block
@@ -52,13 +54,17 @@ pub fn process_event<D: Database>(
 
             if *height == next_exp_height {
                 writes.push(ClientStateWrite::AcceptL1Block(*l1blkid));
+            } else {
+                #[cfg(test)]
+                eprintln!("not sure what to do here h={height} exp={next_exp_height}");
+                return Err(Error::OutOfOrderL1Block(next_exp_height, *height, *l1blkid));
             }
 
             // If we have some number of L1 blocks finalized, also emit an `UpdateBuried` write.
             // TODO clean up this bookkeeping slightly
             let keep_window = params.rollup().l1_reorg_safe_depth as u64;
-            let maturable_height = next_exp_height - keep_window;
-            if maturable_height > state.buried_l1_height() {
+            let maturable_height = next_exp_height.saturating_sub(keep_window);
+            if maturable_height > state.next_exp_l1_block() {
                 writes.push(ClientStateWrite::UpdateBuried(maturable_height));
             }
 
@@ -154,7 +160,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn handle_l1_block() {
+    fn test_genesis() {
+        // TODO there's a ton of duplication in this test, we could wrap it up so we just run
+        // through a table and call a function with it
+
         let database = get_common_db();
         let params = gen_params();
         let mut state = gen_client_state(Some(&params));
@@ -162,9 +171,20 @@ mod tests {
         assert!(!state.is_chain_active());
         let l1_chain = gen_l1_chain(15);
 
-        // before the genesis of L2 is reached
+        for (i, b) in l1_chain.iter().enumerate() {
+            let l1_store = database.l1_store();
+            l1_store
+                .put_block_data(i as u64, b.clone(), Vec::new())
+                .expect("test: insert blocks");
+        }
+
+        let blkids: Vec<L1BlockId> = l1_chain.iter().map(|b| b.block_hash().into()).collect();
+        let horizon = params.rollup().horizon_l1_height;
+        let genesis = params.rollup().genesis_l1_height;
+
+        // at horizon block
         {
-            let height = 1;
+            let height = horizon;
             let l1_block_id = l1_chain[height as usize].block_hash().into();
             let event = SyncEvent::L1Block(height, l1_block_id);
 
@@ -173,82 +193,157 @@ mod tests {
             let writes = output.writes();
             let actions = output.actions();
 
-            let expection_writes = [ClientStateWrite::AcceptL1Block(l1_block_id)];
+            let expected_writes = [ClientStateWrite::AcceptL1Block(l1_block_id)];
             let expected_actions = [];
 
-            assert_eq!(writes, expection_writes);
+            assert_eq!(writes, expected_writes);
             assert_eq!(actions, expected_actions);
 
             operation::apply_writes_to_state(&mut state, writes.iter().cloned());
 
             assert!(!state.is_chain_active());
-            assert_eq!(state.recent_l1_block(), Some(&l1_block_id));
-            assert_eq!(state.buried_l1_height(), params.rollup.genesis_l1_height);
-            assert_eq!(state.l1_view().local_unaccepted_blocks(), [l1_block_id]);
+            assert_eq!(state.most_recent_l1_block(), Some(&l1_block_id));
+            assert_eq!(state.next_exp_l1_block(), horizon + 1);
+            assert_eq!(
+                state.l1_view().local_unaccepted_blocks(),
+                &blkids[height as usize..height as usize + 1]
+            );
         }
 
-        // after the genesis of L2 is reached
+        // at horizon block + 1
         {
-            let height = params.rollup.genesis_l1_height + 3;
+            let height = params.rollup().horizon_l1_height + 1;
             let l1_block_id = l1_chain[height as usize].block_hash().into();
             let event = SyncEvent::L1Block(height, l1_block_id);
 
             let output = process_event(&state, &event, database.as_ref(), &params).unwrap();
 
-            let expection_writes = [
+            let writes = output.writes();
+            let actions = output.actions();
+
+            let expected_writes = [ClientStateWrite::AcceptL1Block(l1_block_id)];
+            let expected_actions = [];
+
+            assert_eq!(writes, expected_writes);
+            assert_eq!(actions, expected_actions);
+
+            operation::apply_writes_to_state(&mut state, writes.iter().cloned());
+
+            assert!(!state.is_chain_active());
+            assert_eq!(state.most_recent_l1_block(), Some(&l1_block_id));
+            assert_eq!(state.next_exp_l1_block(), genesis);
+            assert_eq!(
+                state.l1_view().local_unaccepted_blocks(),
+                &blkids[horizon as usize..horizon as usize + 2]
+            );
+        }
+
+        // as the genesis of L2 is reached, but not locked in yet
+        {
+            let height = genesis;
+            let l1_block_id = l1_chain[height as usize].block_hash().into();
+            let event = SyncEvent::L1Block(height, l1_block_id);
+
+            let output = process_event(&state, &event, database.as_ref(), &params).unwrap();
+
+            let expected_writes = [ClientStateWrite::AcceptL1Block(l1_block_id)];
+            let expected_actions = [];
+
+            assert_eq!(output.writes(), expected_writes);
+            assert_eq!(output.actions(), expected_actions);
+
+            operation::apply_writes_to_state(&mut state, output.writes().iter().cloned());
+
+            assert!(!state.is_chain_active());
+            assert_eq!(state.most_recent_l1_block(), Some(&l1_block_id));
+            assert_eq!(state.next_exp_l1_block(), height + 1);
+            assert_eq!(
+                state.l1_view().local_unaccepted_blocks(),
+                &blkids[horizon as usize..height as usize + 1]
+            );
+        }
+
+        // genesis + 1
+        {
+            let height = genesis + 1;
+            let l1_block_id = l1_chain[height as usize].block_hash().into();
+            let event = SyncEvent::L1Block(height, l1_block_id);
+
+            let output = process_event(&state, &event, database.as_ref(), &params).unwrap();
+
+            let expected_writes = [ClientStateWrite::AcceptL1Block(l1_block_id)];
+            let expected_actions = [];
+
+            assert_eq!(output.writes(), expected_writes);
+            assert_eq!(output.actions(), expected_actions);
+
+            operation::apply_writes_to_state(&mut state, output.writes().iter().cloned());
+
+            assert!(!state.is_chain_active());
+            assert_eq!(state.most_recent_l1_block(), Some(&l1_block_id));
+            assert_eq!(state.next_exp_l1_block(), height + 1);
+            assert_eq!(
+                state.l1_view().local_unaccepted_blocks(),
+                &blkids[horizon as usize..height as usize + 1]
+            );
+        }
+
+        // genesis + 2
+        {
+            let height = genesis + 2;
+            let l1_block_id = l1_chain[height as usize].block_hash().into();
+            let event = SyncEvent::L1Block(height, l1_block_id);
+
+            let output = process_event(&state, &event, database.as_ref(), &params).unwrap();
+
+            let expected_writes = [ClientStateWrite::AcceptL1Block(l1_block_id)];
+            let expected_actions = [];
+
+            assert_eq!(output.writes(), expected_writes);
+            assert_eq!(output.actions(), expected_actions);
+
+            operation::apply_writes_to_state(&mut state, output.writes().iter().cloned());
+
+            assert!(!state.is_chain_active());
+            assert_eq!(state.most_recent_l1_block(), Some(&l1_block_id));
+            assert_eq!(state.next_exp_l1_block(), height + 1);
+            assert_eq!(
+                state.l1_view().local_unaccepted_blocks(),
+                &blkids[horizon as usize..height as usize + 1]
+            );
+        }
+
+        // genesis + 3, where we should lock in genesis
+        {
+            let height = genesis + 3;
+            let l1_block_id = l1_chain[height as usize].block_hash().into();
+            let event = SyncEvent::L1Block(height, l1_block_id);
+
+            let output = process_event(&state, &event, database.as_ref(), &params).unwrap();
+
+            let expected_writes = [
                 ClientStateWrite::AcceptL1Block(l1_block_id),
                 ClientStateWrite::ActivateChain,
             ];
             let expected_actions = [];
 
-            assert_eq!(output.writes(), expection_writes);
+            assert_eq!(output.writes(), expected_writes);
             assert_eq!(output.actions(), expected_actions);
 
             operation::apply_writes_to_state(&mut state, output.writes().iter().cloned());
 
             assert!(state.is_chain_active());
-            assert_eq!(state.recent_l1_block(), Some(&l1_block_id));
-            assert_eq!(state.buried_l1_height(), params.rollup.genesis_l1_height);
+            assert_eq!(state.most_recent_l1_block(), Some(&l1_block_id));
+            assert_eq!(state.next_exp_l1_block(), height + 1);
             assert_eq!(
                 state.l1_view().local_unaccepted_blocks(),
-                [l1_chain[1].block_hash().into(), l1_block_id,]
-            );
-        }
-
-        // after l1_reorg_depth is reached
-        {
-            let height = params.rollup.genesis_l1_height + params.rollup.l1_reorg_safe_depth as u64;
-            let l1_block_id = l1_chain[height as usize].block_hash().into();
-            let event = SyncEvent::L1Block(height, l1_block_id);
-
-            let output = process_event(&state, &event, database.as_ref(), &params).unwrap();
-
-            let expection_writes = [
-                ClientStateWrite::AcceptL1Block(l1_block_id),
-                ClientStateWrite::UpdateBuried(params.rollup.genesis_l1_height + 1),
-            ];
-            let expected_actions = [];
-
-            assert_eq!(output.writes(), expection_writes);
-            assert_eq!(output.actions(), expected_actions);
-
-            operation::apply_writes_to_state(&mut state, output.writes().iter().cloned());
-
-            assert!(state.is_chain_active());
-            assert_eq!(state.recent_l1_block(), Some(&l1_block_id));
-            assert_eq!(
-                state.buried_l1_height(),
-                params.rollup.genesis_l1_height + 1
-            );
-            assert_eq!(
-                state.l1_view().local_unaccepted_blocks(),
-                [l1_chain[8].block_hash().into(), l1_block_id,]
+                &blkids[horizon as usize..height as usize + 1]
             );
         }
     }
 
     #[test]
-    fn handle_l1_revert() {
+    fn test_l1_reorg() {
         let database = get_common_db();
         let params = gen_params();
         let mut state = gen_client_state(Some(&params));
@@ -256,20 +351,18 @@ mod tests {
         let height = 5;
         let event = SyncEvent::L1Revert(height);
 
-        let output = process_event(&state, &event, database.as_ref(), &params);
-        assert!(output.is_err_and(|x| matches!(x, Error::MissingL1BlockHeight(height))));
-
         let l1_block: L1BlockManifest = ArbitraryGenerator::new().generate();
         database
             .l1_store()
             .put_block_data(height, l1_block.clone(), vec![])
             .unwrap();
 
-        let output = process_event(&state, &event, database.as_ref(), &params).unwrap();
+        let res = process_event(&state, &event, database.as_ref(), &params).unwrap();
+        eprintln!("process_event on {event:?} -> {res:?}");
         let expected_writes = [ClientStateWrite::RollbackL1BlocksTo(5)];
         let expected_actions = [];
 
-        assert_eq!(output.actions(), expected_actions);
-        assert_eq!(output.writes(), expected_writes);
+        assert_eq!(res.actions(), expected_actions);
+        assert_eq!(res.writes(), expected_writes);
     }
 }

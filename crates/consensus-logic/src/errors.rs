@@ -54,6 +54,9 @@ pub enum Error {
     #[error("tried to reorg too deep (target {0} vs buried {1})")]
     ReorgTooDeep(u64, u64),
 
+    #[error("out of order L1 block {2} (exp next height {0}, block {1})")]
+    OutOfOrderL1Block(u64, u64, L1BlockId),
+
     #[error("chaintip: {0}")]
     ChainTip(#[from] ChainTipError),
 
