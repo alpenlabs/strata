@@ -155,7 +155,7 @@ lint-fix-codespell: ensure-codespell ## Runs `codespell` to fix spelling errors 
 lint-check-toml: ensure-taplo ## Lints TOML files
 	taplo lint
 
-.PHONY: lint-check-functional-tests
+.PHONY: lint-check-func-tests
 lint-check-func-tests: ensure-poetry ## Lints the functional tests
 	cd $(FUNCTIONAL_TESTS_DIR) && poetry run ruff check
 
