@@ -12,6 +12,7 @@ alpen-express-state = { workspace = true }
 express-chaintsn = { workspace = true }
 express-storage = { workspace = true }
 express-tasks = { workspace = true }
+alpen-express-status = { workspace = true }
 
 anyhow = { workspace = true }
 bitcoin = { workspace = true }

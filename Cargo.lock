@@ -667,8 +667,10 @@ name = "alpen-express-btcio"
 version = "0.1.0"
 dependencies = [
  "alpen-express-db",
+ "alpen-express-primitives",
  "alpen-express-rocksdb",
  "alpen-express-rpc-types",
+ "alpen-express-state",
  "alpen-express-status",
  "alpen-test-utils",
  "anyhow",
@@ -710,6 +712,7 @@ dependencies = [
  "alpen-express-primitives",
  "alpen-express-rocksdb",
  "alpen-express-state",
+ "alpen-express-status",
  "alpen-test-utils",
  "anyhow",
  "bitcoin",
@@ -905,6 +908,7 @@ dependencies = [
  "alpen-express-rpc-api",
  "alpen-express-rpc-types",
  "alpen-express-state",
+ "alpen-express-status",
  "anyhow",
  "argh",
  "async-trait",
@@ -952,6 +956,7 @@ dependencies = [
  "alpen-express-state",
  "thiserror",
  "tokio",
+ "tracing",
 ]
 
 [[package]]

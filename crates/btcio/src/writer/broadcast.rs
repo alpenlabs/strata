@@ -2,6 +2,11 @@
 
 use std::{sync::Arc, time::Duration};
 
+use alpen_express_status::NodeStatus;
+use anyhow::anyhow;
+use bitcoin::{consensus::deserialize, Txid};
+use tracing::*;
+
 use alpen_express_db::{
     traits::{SeqDataProvider, SeqDataStore, SequencerDatabase},
     types::BlobL1Status,
@@ -28,7 +33,7 @@ pub async fn broadcaster_task<D: SequencerDatabase + Send + Sync + 'static>(
     next_publish_blob_idx: u64,
     rpc_client: Arc<impl SeqL1Client + L1Client>,
     db: Arc<D>,
-    l1_status: Arc<RwLock<L1Status>>,
+    node_status: Arc<NodeStatus>,
 ) -> anyhow::Result<()> {
     info!("Starting L1 writer's broadcaster task");
     let interval = tokio::time::interval(Duration::from_millis(BROADCAST_POLL_INTERVAL));
@@ -81,7 +86,7 @@ pub async fn broadcaster_task<D: SequencerDatabase + Send + Sync + 'static>(
                         .update_blob_by_idx(curr_idx, blobentry.clone())?;
                     // Update L1 status
                     {
-                        let mut l1st = l1_status.write().await;
+                        let mut l1st = node_status.l1_status().await;
                         let txid: Txid = deserialize(blobentry.reveal_txid.0.as_slice())?;
                         l1st.last_published_txid = Some(txid.to_string());
                         l1st.published_inscription_count += 1;

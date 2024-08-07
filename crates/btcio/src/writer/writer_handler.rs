@@ -1,5 +1,14 @@
 use std::sync::Arc;
 
+use alpen_express_status::NodeStatus;
+use tokio::sync::{
+    mpsc::{self, Receiver, Sender},
+    RwLock,
+    runtime::Runtime,
+    sync::mpsc::{self, Receiver, Sender},
+};
+use tracing::*;
+
 use alpen_express_db::{
     traits::{SeqDataProvider, SeqDataStore, SequencerDatabase},
     types::{BlobEntry, BlobL1Status},
@@ -69,7 +78,7 @@ pub fn start_writer_task<D: SequencerDatabase + Send + Sync + 'static>(
     rpc_client: Arc<impl SeqL1Client + L1Client>,
     config: WriterConfig,
     db: Arc<D>,
-    l1_status: Arc<RwLock<L1Status>>,
+    node_status: Arc<NodeStatus>,
 ) -> anyhow::Result<DaWriter<D>> {
     info!("Starting writer control task");
 

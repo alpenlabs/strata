@@ -32,6 +32,7 @@ use alpen_express_rocksdb::{
 use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer};
 use alpen_express_rpc_types::L1Status;
 // use alpen_express_btcio::broadcaster::manager::BroadcastDbManager;
+use alpen_express_btcio::writer::DaWriter;
 use alpen_express_db::traits::SequencerDatabase;
 use alpen_express_rpc_types::L1Status;
 use alpen_express_status::NodeStatus;
@@ -45,7 +46,7 @@ use format_serde_error::SerdeError;
 use reth_rpc_types::engine::{JwtError, JwtSecret};
 use rockbound::rocksdb;
 use thiserror::Error;
-use tokio::sync::{broadcast, oneshot, RwLock};
+use tokio::sync::{broadcast, oneshot};
 use tracing::*;
 
 use crate::args::Args;
@@ -214,14 +215,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     // Set up database managers.
     let l2_block_manager = Arc::new(L2BlockManager::new(pool.clone(), database.clone()));
-    let node_status = Arc::new(NodeStatus {
-        l1_status: Arc::new(RwLock::new(L1Status::default())),
-        csm_status: Watch::new(),
-        cl_state: Watch::new(),
-    });
-
-    // Set up btcio status to pass around cheaply
-    let l1_status = Arc::new(RwLock::new(L1Status::default()));
+    let node_status = Arc::new(NodeStatus::default());
 
     // Set up Bitcoin client RPC.
     let bitcoind_url = format!("http://{}", config.bitcoind_rpc.rpc_url);
@@ -267,6 +261,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         eng_ctl.clone(),
         pool.clone(),
         params.clone(),
+        node_status.clone(),
     )?;
     let sync_man = Arc::new(sync_man);
     let mut inscription_handler = None;
@@ -393,7 +388,7 @@ async fn start_rpc<D: Database + Send + Sync + 'static>(
 
     // Init RPC methods.
     let alp_rpc = rpc_server::AlpenRpcImpl::new(
-        l1_status.clone(),
+        node_status.clone(),
         database.clone(),
         sync_man.clone(),
         bcast_handle.clone(),

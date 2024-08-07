@@ -5,9 +5,10 @@ use std::{
 };
 
 use alpen_express_rpc_types::types::L1Status;
+use alpen_express_status::NodeStatus;
 use anyhow::bail;
 use bitcoin::{Block, BlockHash};
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::mpsc;
 use tracing::*;
 
 use super::{
@@ -165,7 +166,7 @@ async fn do_reader_task(
     target_next_block: u64,
     config: Arc<ReaderConfig>,
     status_updates: &mut Vec<StatusUpdate>,
-    l1_status: Arc<RwLock<L1Status>>,
+    node_status: Arc<NodeStatus>,
 ) -> anyhow::Result<()> {
     info!(%target_next_block, "started L1 reader task!");
 
@@ -214,7 +215,7 @@ async fn do_reader_task(
                 .as_millis() as u64,
         ));
 
-        apply_status_updates(status_updates, l1_status.clone()).await;
+        apply_status_updates(status_updates, node_status.clone()).await;
     }
 }
 
