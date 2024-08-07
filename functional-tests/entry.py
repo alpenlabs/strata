@@ -51,7 +51,7 @@ def generate_task(rpc: BitcoindClient, wait_dur, addr):
 
 def generate_n_blocks(bitcoin_rpc: BitcoindClient, n: int):
     addr = bitcoin_rpc.proxy.getnewaddress()
-    print("generating {n} blocks to address", addr)
+    print(f"generating {n} blocks to address", addr)
     try:
         blk = bitcoin_rpc.proxy.generatetoaddress(n, addr)
         print("made blocks", blk)
@@ -227,7 +227,7 @@ def main(argv):
     modules = flexitest.runtime.scan_dir_for_modules(test_dir)
     all_tests = flexitest.runtime.load_candidate_modules(modules)
 
-    tests = [argv[1]] if len(argv) > 1 else all_tests
+    tests = [str(argv[1]).removesuffix('.py')] if len(argv) > 1 else all_tests
 
     datadir_root = flexitest.create_datadir_in_workspace(os.path.join(test_dir, DD_ROOT))
 
