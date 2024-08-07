@@ -1,7 +1,8 @@
 #![allow(unexpected_cfgs)] // TODO: remove this when we add the `client` feature flag.
 //! Macro trait def for the `alp_` RPC namespace using jsonrpsee.
-use alpen_express_rpc_types::types::{
-    BlockHeader, ClientStatus, DepositEntry, ExecUpdate, L1Status,
+use alpen_express_rpc_types::{
+    types::{BlockHeader, ClientStatus, DepositEntry, ExecUpdate, L1Status},
+    L2BlockId,
 };
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 use serde::{Deserialize, Serialize};
@@ -37,10 +38,10 @@ pub trait AlpenApi {
     async fn get_blocks_at_idx(&self, index: u64) -> RpcResult<Vec<BlockHeader>>;
 
     #[method(name = "getBlockById")]
-    async fn get_block_by_id(&self, block_id: String) -> RpcResult<BlockHeader>;
+    async fn get_block_by_id(&self, block_id: L2BlockId) -> RpcResult<BlockHeader>;
 
     #[method(name = "getExecUpdateById")]
-    async fn get_exec_update_by_id(&self, block_id: String) -> RpcResult<ExecUpdate>;
+    async fn get_exec_update_by_id(&self, block_id: L2BlockId) -> RpcResult<ExecUpdate>;
 
     #[method(name = "getCurrentDeposits")]
     async fn get_current_deposits(&self) -> RpcResult<Vec<u32>>;

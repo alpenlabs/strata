@@ -3,7 +3,6 @@ use std::thread;
 
 use tokio::sync::{mpsc, RwLock};
 
-use alpen_express_rpc_types::L1Status;
 use alpen_express_btcio::reader::{
     config::ReaderConfig, messages::L1Event, query::bitcoin_data_reader_task,
 };
@@ -12,6 +11,7 @@ use alpen_express_consensus_logic::ctl::CsmController;
 use alpen_express_consensus_logic::l1_handler::bitcoin_data_handler_task;
 use alpen_express_db::traits::{Database, L1DataProvider};
 use alpen_express_primitives::params::Params;
+use alpen_express_rpc_types::L1Status;
 
 use crate::config::Config;
 

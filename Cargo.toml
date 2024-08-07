@@ -96,7 +96,7 @@ reth-rpc-types-compat = { git = "https://github.com/alpenlabs/reth.git", rev = "
 reth-trie-common = { git = "https://github.com/alpenlabs/reth.git", rev = "a90fc90df8be5651" }
 rockbound = { git = "https://github.com/alpenlabs/rockbound", rev = "3b10aaabef6652f0" }
 secp256k1 = "0.29.0"
-serde = "1.0"
+serde = { version = "1.0", features = ["derive"] }
 serde-hex = "0.1.0"
 serde_json = { version = "1.0", default-features = false, features = [
   "alloc",

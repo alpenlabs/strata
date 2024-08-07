@@ -25,7 +25,8 @@ use alpen_express_db::traits::{L1DataProvider, SequencerDatabase};
 use alpen_express_primitives::buf::Buf32;
 use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer, HexBytes};
 use alpen_express_rpc_types::{
-    BlockHeader, ClientStatus, DaBlobs, DepositEntry, ExecUpdate, L1Status, WithdrawalIntent,
+    BlockHeader, ClientStatus, DaBlob, DepositEntry, DepositState, ExecUpdate, L1Status,
+    WithdrawalIntent,
 };
 use alpen_express_state::{
     block::{L2Block, L2BlockBundle}, chain_state::ChainState, client_state::ClientState, da_blob::{BlobDest, BlobIntent}, exec_update, header::{L2Header, SignedL2BlockHeader}, id::L2BlockId, l1::L1BlockId
@@ -51,7 +52,7 @@ pub enum Error {
     #[error("missing L2 block {0:?}")]
     MissingL2Block(L2BlockId),
 
-    #[error("sync State not initialized")]
+    #[error("sync state missing because genesis hasn't happened yet")]
     MissingSyncState,
 
     #[error("missing chainstate for index {0}")]
@@ -103,6 +104,19 @@ impl From<Error> for ErrorObjectOwned {
             _ => ErrorObjectOwned::owned::<serde_json::Value>(code, format!("{}", val), None),
         }
     }
+}
+
+fn fetch_l2blk<D: Database + Sync + Send + 'static>(
+    l2_prov: Arc<<D as Database>::L2Prov>,
+    blkid: L2BlockId,
+) -> Result<L2BlockBundle, Error>
+where
+    <D as Database>::L2Prov: Send + Sync + 'static,
+{
+    l2_prov
+        .get_block_data(blkid)
+        .map_err(Error::Db)?
+        .ok_or(Error::MissingL2Block(blkid))
 }
 
 pub struct AlpenRpcImpl<D> {
@@ -167,28 +181,17 @@ impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
 
         Ok((cs, Some(chs)))
     }
+}
 
-    fn construct_l2_block_headers(&self, block_header: &SignedL2BlockHeader) -> BlockHeader {
-        BlockHeader {
-            block_idx: block_header.blockidx(),
-            timestamp: block_header.timestamp(),
-            block_id: *block_header.get_blockid().as_ref(),
-            prev_block: *block_header.parent().as_ref(),
-            l1_segment_hash: *block_header.l1_payload_hash().as_ref(),
-            exec_segment_hash: *block_header.exec_payload_hash().as_ref(),
-            state_root: *block_header.state_root().as_ref(),
-        }
-    }
-
-    fn fetch_l2block(
-        &self,
-        l2_prov: Arc<<D as Database>::L2Prov>,
-        blkid: L2BlockId,
-    ) -> Result<L2BlockBundle, Error> {
-        l2_prov
-            .get_block_data(blkid)
-            .map_err(Error::Db)?
-            .ok_or(Error::MissingL2Block(blkid))
+fn conv_blk_header_to_rpc(blk_header: &impl L2Header) -> BlockHeader {
+    BlockHeader {
+        block_idx: blk_header.blockidx(),
+        timestamp: blk_header.timestamp(),
+        block_id: *blk_header.get_blockid().as_ref(),
+        prev_block: *blk_header.parent().as_ref(),
+        l1_segment_hash: *blk_header.l1_payload_hash().as_ref(),
+        exec_segment_hash: *blk_header.exec_payload_hash().as_ref(),
+        state_root: *blk_header.state_root().as_ref(),
     }
 }
 
@@ -223,13 +226,16 @@ where
     }
 
     async fn get_l1_block_hash(&self, height: u64) -> RpcResult<String> {
-        // FIXME this used to panic and take down core services making the test
-        // hang, but it now it's just returns the wrong data without crashing
-        match self.database.l1_provider().get_block_manifest(height) {
-            Ok(Some(mf)) => Ok(mf.block_hash().to_string()),
-            Ok(None) => Ok("".to_string()),
-            Err(e) => Ok(e.to_string()),
-        }
+        let db = self.database.clone();
+        let blk_manifest = wait_blocking("l1_block_manifest", move || {
+            Ok(db
+                .l1_provider()
+                .get_block_manifest(height)
+                .unwrap()
+                .unwrap())
+        })
+        .await?;
+        Ok(format!("{:?}", blk_manifest.block_hash()))
     }
 
     async fn get_client_status(&self) -> RpcResult<ClientStatus> {
@@ -275,73 +281,118 @@ where
         let tip_blkid = cl_state
             .sync()
             .ok_or(Error::ClientNotStarted)?
-            .chain_tip_blkid();
+            .chain_tip_blkid()
+            .clone();
+        let db = self.database.clone();
 
-        let l2_prov = self.database.l2_provider();
-        let tip_block_idx = self
-            .fetch_l2block(l2_prov.clone(), *tip_blkid)?
-            .header()
-            .blockidx();
-
-        if count > tip_block_idx {
-            return Err(Error::IncorrectParameters("count too high".to_string()).into());
+        if count > 1000 {
+            return Err(Error::IncorrectParameters(
+                "can't provide blocks for count greater than 1000".to_string(),
+            )
+            .into());
         }
 
-        // TODO: paginate the count
-        let block_headers: Result<Vec<BlockHeader>, Error> = ((tip_block_idx - count)
-            ..tip_block_idx)
-            .map(|idx| {
-                let blkid = *l2_prov
-                    .get_blocks_at_height(idx)
-                    .map_err(Error::Db)?
-                    .first()
-                    .unwrap();
+        let blk_headers = wait_blocking("block_headers", move || {
+            let l2_prov = db.l2_provider();
+            let l2_blk = fetch_l2blk::<D>(l2_prov.clone(), tip_blkid)?;
 
-                let l2block = self.fetch_l2block(l2_prov.clone(), blkid)?;
+            let mut parent_blk = *l2_blk.header().parent();
 
-                Ok(self.construct_l2_block_headers(l2block.header()))
-            })
-            .collect();
+            let blk_headers: Result<Vec<BlockHeader>, Error> = (0..count)
+                .rev()
+                .map(|_| {
+                    let l2_blk = fetch_l2blk::<D>(l2_prov.clone(), parent_blk)?;
+                    parent_blk = *l2_blk.header().parent();
 
-        Ok(block_headers?)
+                    Ok(conv_blk_header_to_rpc(l2_blk.header()))
+                })
+                .collect();
+
+            Ok(blk_headers?)
+        })
+        .await?;
+
+        Ok(blk_headers)
     }
 
-    async fn get_blocks_at_idx(&self, index: u64) -> RpcResult<Vec<BlockHeader>> {
-        let l2_prov = self.database.l2_provider();
-        let block_data: Result<Vec<BlockHeader>, Error> = l2_prov
-            .get_blocks_at_height(index)
-            .map_err(Error::Db)?
-            .iter()
-            .map(|blkid| {
-                let l2block = self.fetch_l2block(l2_prov.clone(), *blkid)?;
+    async fn get_blocks_at_idx(&self, idx: u64) -> RpcResult<Vec<BlockHeader>> {
+        let cl_state = self.get_client_state().await;
+        let tip_blkid = cl_state
+            .sync()
+            .ok_or(Error::ClientNotStarted)?
+            .chain_tip_blkid()
+            .clone();
+        let db = self.database.clone();
 
-                Ok(self.construct_l2_block_headers(l2block.block().header()))
-            })
-            .collect();
+        let blk_header = wait_blocking("block_at_idx", move || {
+            let l2_prov = db.l2_provider();
+            // check the tip idx
+            let tip_idx = fetch_l2blk::<D>(l2_prov.clone(), tip_blkid)?
+                .header()
+                .blockidx();
 
-        Ok(block_data?)
+            if idx > tip_idx {
+                return Err(Error::IncorrectParameters(format!(
+                    "index {} greater than the tip_index {}",
+                    idx, tip_idx
+                )));
+            }
+
+            Ok(l2_prov
+                .get_blocks_at_height(idx)
+                .map_err(Error::Db)?
+                .iter()
+                .map(|blkid| {
+                    let l2_blk = fetch_l2blk::<D>(l2_prov.clone(), *blkid)?;
+
+                    Ok(conv_blk_header_to_rpc(l2_blk.block().header()))
+                })
+                .collect::<Result<Vec<BlockHeader>, Error>>())
+        })
+        .await?;
+
+        Ok(blk_header?)
     }
 
-    async fn get_block_by_id(&self, block_id: String) -> RpcResult<BlockHeader> {
-        let block_id = parse_l2block_id(&block_id)?;
-        let l2_prov = self.database.l2_provider();
-        let l2block = self.fetch_l2block(l2_prov.clone(), block_id)?;
+    async fn get_block_by_id(
+        &self,
+        blkid: alpen_express_rpc_types::L2BlockId,
+    ) -> RpcResult<BlockHeader> {
+        let db = self.database.clone();
+        let blkid = L2BlockId::from(Buf32::from(blkid.0));
 
-        Ok(self.construct_l2_block_headers(l2block.header()))
+        let l2_blk = wait_blocking("fetch_block", move || {
+            let l2_prov = db.l2_provider();
+
+            fetch_l2blk::<D>(l2_prov.clone(), blkid)
+        })
+        .await?;
+
+        Ok(conv_blk_header_to_rpc(l2_blk.header()))
     }
 
-    async fn get_exec_update_by_id(&self, block_id: String) -> RpcResult<ExecUpdate> {
-        let block_id = parse_l2block_id(&block_id)?;
-        let l2_prov = self.database.l2_provider();
-        let fetch_l2block = self.fetch_l2block(l2_prov.clone(), block_id)?;
-        let exec_update = fetch_l2block.exec_segment().update();
+    async fn get_exec_update_by_id(
+        &self,
+        blkid: alpen_express_rpc_types::L2BlockId,
+    ) -> RpcResult<ExecUpdate> {
+        let db = self.database.clone();
+        let blkid = L2BlockId::from(Buf32::from(blkid.0));
+
+        let l2_blk = wait_blocking("fetch_block", move || {
+            let l2_prov = db.l2_provider();
+
+            fetch_l2blk::<D>(l2_prov.clone(), blkid)
+        })
+        .await?;
+
+        let exec_update = l2_blk.exec_segment().update();
 
         let withdrawals = exec_update
             .output()
             .withdrawals()
             .iter()
             .map(|intent| {
-                let (amt, dest_pk) = intent.get_intent();
+                let (amt, dest_pk) = intent.into_parts();
                 let dest_pk = *dest_pk.as_ref();
                 WithdrawalIntent { amt, dest_pk }
             })
@@ -351,9 +402,9 @@ where
             .output()
             .da_blobs()
             .iter()
-            .map(|blob| DaBlobs {
+            .map(|blob| DaBlob {
                 dest: blob.dest().into(),
-                block_commitment: *blob.commitment().as_ref(),
+                blob_commitment: *blob.commitment().as_ref(),
             })
             .collect();
 
@@ -371,7 +422,10 @@ where
         let (_, chain_state) = self.get_cur_states().await?;
         let chain_state = chain_state.ok_or(Error::MissingSyncState)?;
 
-        Ok(chain_state.deposit_table().get_all_deposits())
+        Ok(chain_state
+            .deposit_table()
+            .get_all_deposits_ids_iter()
+            .collect())
     }
 
     async fn get_current_deposit_by_id(&self, deposit_id: u32) -> RpcResult<DepositEntry> {
@@ -381,13 +435,15 @@ where
         let deposit_entry = chain_state
             .deposit_table()
             .get_deposit(deposit_id)
-            .ok_or(Error::Other("Deposit table not found".to_string()))?;
+            .ok_or(Error::Other("unknown deposit idx".to_string()))?;
 
         let state = match deposit_entry.deposit_state() {
-            alpen_express_state::bridge_state::DepositState::Created(_) => "Created".into(),
-            alpen_express_state::bridge_state::DepositState::Accepted(_) => "Accepted".into(),
-            alpen_express_state::bridge_state::DepositState::Dispatched(_) => "Dispatched".into(),
-            alpen_express_state::bridge_state::DepositState::Executed => "Executed".into(),
+            alpen_express_state::bridge_state::DepositState::Created(_) => DepositState::Created,
+            alpen_express_state::bridge_state::DepositState::Accepted(_) => DepositState::Accepted,
+            alpen_express_state::bridge_state::DepositState::Dispatched(_) => {
+                DepositState::Dispatched
+            }
+            alpen_express_state::bridge_state::DepositState::Executed => DepositState::Executed,
         };
 
         Ok(DepositEntry {
