@@ -12,7 +12,8 @@ use zkvm_primitives::ZKVMInput;
 #[cfg_attr(not(test), rpc(server, namespace = "alpen"))]
 #[cfg_attr(test, rpc(server, client, namespace = "alpen"))]
 pub trait AlpenRpcApi {
-    /// Returns the state changesets for requested blocks.
+    /// Returns the state changesets with storage proofs for requested blocks.
+    /// Used as part of input to riscvm during proof generation
     #[method(name = "blockWitness")]
     fn block_witness(
         &self,
