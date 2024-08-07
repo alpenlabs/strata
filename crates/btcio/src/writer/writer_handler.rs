@@ -1,12 +1,9 @@
 use std::sync::Arc;
 
-use alpen_express_primitives::l1::L1Status;
+use alpen_express_status::NodeStatus;
 use tokio::{
     runtime::Runtime,
-    sync::{
-        mpsc::{self, Receiver, Sender},
-        RwLock,
-    },
+    sync::mpsc::{self, Receiver, Sender},
 };
 use tracing::*;
 
@@ -66,7 +63,7 @@ pub fn start_writer_task<D: SequencerDatabase + Send + Sync + 'static>(
     config: WriterConfig,
     db: Arc<D>,
     rt: &Runtime,
-    l1_status: Arc<RwLock<L1Status>>,
+    node_status: Arc<NodeStatus>,
 ) -> anyhow::Result<DaWriter<D>> {
     info!("Starting writer control task");
 
@@ -87,7 +84,7 @@ pub fn start_writer_task<D: SequencerDatabase + Send + Sync + 'static>(
         init_state.next_publish_blob_idx,
         rpc_client.clone(),
         db.clone(),
-        l1_status.clone(),
+        node_status.clone(),
     ));
 
     rt.spawn(listen_for_signing_intents(

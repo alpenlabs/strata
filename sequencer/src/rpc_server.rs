@@ -2,6 +2,7 @@
 
 use std::{borrow::BorrowMut, sync::Arc};
 
+use alpen_express_status::{NodeStatus, StatusError};
 use async_trait::async_trait;
 use jsonrpsee::{
     core::RpcResult,
@@ -60,6 +61,9 @@ pub enum Error {
     #[error("blocking task '{0}' failed for unknown reason")]
     BlockingAbort(String),
 
+    #[error("status error for this enum")]
+    ImproperStatus,
+
     /// Generic internal error message.  If this is used often it should be made
     /// into its own error type.
     #[error("{0}")]
@@ -80,6 +84,7 @@ impl Error {
             Self::MissingL2Block(_) => -32603,
             Self::MissingChainstate(_) => -32604,
             Self::Db(_) => -32605,
+            Self::ImproperStatus => -32606,
             Self::BlockingAbort(_) => -32001,
             Self::Other(_) => -32000,
             Self::OtherEx(_, _) => -32000,
@@ -98,7 +103,7 @@ impl From<Error> for ErrorObjectOwned {
 }
 
 pub struct AlpenRpcImpl<D> {
-    l1_status: Arc<RwLock<alpen_express_primitives::l1::L1Status>>,
+    node_status: Arc<NodeStatus>,
     database: Arc<D>,
     sync_manager: Arc<SyncManager>,
     stop_tx: Mutex<Option<oneshot::Sender<()>>>,
@@ -106,13 +111,13 @@ pub struct AlpenRpcImpl<D> {
 
 impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
     pub fn new(
-        l1_status: Arc<RwLock<alpen_express_primitives::l1::L1Status>>,
+        node_status: Arc<NodeStatus>,
         database: Arc<D>,
         sync_manager: Arc<SyncManager>,
         stop_tx: oneshot::Sender<()>,
     ) -> Self {
         Self {
-            l1_status,
+            node_status,
             database,
             sync_manager,
             stop_tx: Mutex::new(Some(stop_tx)),
@@ -120,16 +125,21 @@ impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
     }
 
     /// Gets a ref to the current client state as of the last update.
-    async fn get_client_state(&self) -> Arc<ClientState> {
-        let cs_rx = self.sync_manager.create_state_watch_sub();
-        let cs = cs_rx.borrow();
-        cs.clone()
+    async fn get_client_state(&self) -> Result<Arc<ClientState>, StatusError> {
+        let cs_rx = self.sync_manager.create_state_watch_sub()?;
+        let cs = cs_rx.borrow().clone();
+
+        Ok(cs)
     }
 
     /// Gets a clone of the current client state and fetches the chainstate that
     /// of the L2 block that it considers the tip state.
     async fn get_cur_states(&self) -> Result<(Arc<ClientState>, Option<Arc<ChainState>>), Error> {
-        let cs = self.get_client_state().await;
+        // TODO : add string to error
+        let cs = self
+            .get_client_state()
+            .await
+            .map_err(|_| Error::ImproperStatus)?;
 
         if cs.sync().is_none() {
             return Ok((cs, None));
@@ -181,13 +191,13 @@ where
     }
 
     async fn get_l1_status(&self) -> RpcResult<L1Status> {
-        let l1_status = self.l1_status.read().await.clone();
+        let btcio_status = self.node_status.l1_status().await.clone();
 
-        Ok(l1_status)
+        Ok(btcio_status)
     }
 
     async fn get_l1_connection_status(&self) -> RpcResult<bool> {
-        Ok(self.l1_status.read().await.bitcoin_rpc_connected)
+        Ok(self.node_status.l1_status().await.bitcoin_rpc_connected)
     }
 
     async fn get_l1_block_hash(&self, height: u64) -> RpcResult<String> {
@@ -201,7 +211,10 @@ where
     }
 
     async fn get_client_status(&self) -> RpcResult<ClientStatus> {
-        let state = self.get_client_state().await;
+        let state = self
+            .get_client_state()
+            .await
+            .map_err(|_| Error::ImproperStatus)?;
 
         let last_l1 = state.most_recent_l1_block().copied().unwrap_or_else(|| {
             // TODO figure out a better way to do this

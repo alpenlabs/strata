@@ -656,11 +656,11 @@ dependencies = [
 name = "alpen-express-btcio"
 version = "0.1.0"
 dependencies = [
- "alpen-express-common",
  "alpen-express-db",
  "alpen-express-primitives",
  "alpen-express-rocksdb",
  "alpen-express-state",
+ "alpen-express-status",
  "alpen-test-utils",
  "anyhow",
  "arbitrary",
@@ -697,6 +697,7 @@ dependencies = [
  "alpen-express-evmctl",
  "alpen-express-primitives",
  "alpen-express-state",
+ "alpen-express-status",
  "alpen-test-utils",
  "anyhow",
  "bitcoin",
@@ -871,6 +872,7 @@ dependencies = [
  "alpen-express-rocksdb",
  "alpen-express-rpc-api",
  "alpen-express-state",
+ "alpen-express-status",
  "anyhow",
  "argh",
  "async-trait",
@@ -903,6 +905,17 @@ dependencies = [
  "digest 0.10.7",
  "num_enum",
  "sha2 0.10.8",
+ "tracing",
+]
+
+[[package]]
+name = "alpen-express-status"
+version = "0.1.0"
+dependencies = [
+ "alpen-express-primitives",
+ "alpen-express-state",
+ "thiserror",
+ "tokio",
  "tracing",
 ]
 
@@ -9802,17 +9815,6 @@ name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
-
-[[package]]
-name = "status"
-version = "0.1.0"
-dependencies = [
- "alpen-express-consensus-logic",
- "alpen-express-primitives",
- "alpen-express-state",
- "thiserror",
- "tokio",
-]
 
 [[package]]
 name = "strsim"

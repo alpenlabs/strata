@@ -18,6 +18,7 @@ alpen-express-primitives = { workspace = true }
 alpen-express-rocksdb = { workspace = true }
 alpen-express-rpc-api = { workspace = true }
 alpen-express-state = { workspace = true }
+alpen-express-status = { workspace = true }
 
 anyhow = { workspace = true }
 argh = { workspace = true }

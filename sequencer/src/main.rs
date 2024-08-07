@@ -7,10 +7,9 @@ use std::process;
 use std::sync::Arc;
 use std::thread;
 
+use alpen_express_btcio::writer::DaWriter;
 use alpen_express_db::traits::SequencerDatabase;
 use alpen_express_status::NodeStatus;
-use alpen_express_status::Watch;
-use alpen_express_primitives::l1::L1Status;
 use anyhow::Context;
 use bitcoin::Network;
 use config::Config;
@@ -19,13 +18,12 @@ use reth_rpc_types::engine::JwtError;
 use reth_rpc_types::engine::JwtSecret;
 use rockbound::rocksdb;
 use thiserror::Error;
-use tokio::sync::{broadcast, oneshot, RwLock};
+use tokio::sync::{broadcast, oneshot};
 use tracing::*;
 
 use alpen_express_btcio::rpc::traits::L1Client;
 use alpen_express_btcio::writer::config::WriterConfig;
 use alpen_express_btcio::writer::start_writer_task;
-use alpen_express_btcio::writer::DaWriter;
 use alpen_express_common::logging;
 use alpen_express_consensus_logic::duty::types::{DutyBatch, Identity, IdentityData, IdentityKey};
 use alpen_express_consensus_logic::duty::worker::{self as duty_worker};
@@ -34,7 +32,6 @@ use alpen_express_consensus_logic::sync_manager::SyncManager;
 use alpen_express_db::traits::Database;
 use alpen_express_evmexec::{fork_choice_state_initial, EngineRpcClient};
 use alpen_express_primitives::buf::Buf32;
-use alpen_express_primitives::l1::L1Status;
 use alpen_express_primitives::{block_credential, params::*};
 use alpen_express_rocksdb::sequencer::db::SequencerDB;
 use alpen_express_rocksdb::SeqDb;
@@ -159,14 +156,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         l1_db, l2_db, sync_ev_db, cs_db, chst_db,
     ));
 
-    let node_status = Arc::new(NodeStatus {
-        l1_status: Arc::new(RwLock::new(L1Status::default())),
-        csm_status: Watch::new(),
-        cl_state: Watch::new(),
-    });
-
-    // Set up btcio status to pass around cheaply
-    let l1_status = Arc::new(RwLock::new(L1Status::default()));
+    let node_status = Arc::new(NodeStatus::default());
 
     // Set up Bitcoin client RPC.
     let bitcoind_url = format!("http://{}", config.bitcoind_rpc.rpc_url);
@@ -205,6 +195,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         eng_ctl.clone(),
         pool.clone(),
         params.clone(),
+        node_status.clone(),
     )?;
     let sync_man = Arc::new(sync_man);
     let mut writer_ctl = None;
@@ -238,7 +229,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             writer_config,
             dbseq,
             &rt,
-            l1_status.clone(),
+            node_status.clone(),
         )?);
 
         writer_ctl = Some(writer.clone());
@@ -257,7 +248,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         });
     }
 
-    let main_fut = main_task(&config, sync_man, btc_rpc, database.clone(), node_status);
+    let main_fut = main_task(&config, sync_man, btc_rpc, database.clone(), node_status, writer_ctl);
     if let Err(e) = rt.block_on(main_fut) {
         error!(err = %e, "main task exited");
         process::exit(0); // special case exit once we've gotten to this point
@@ -277,6 +268,7 @@ async fn main_task<
     l1_rpc_client: Arc<L>,
     database: Arc<D>,
     node_status: Arc<NodeStatus>,
+    writer: Option<Arc<DaWriter<SD>>>,
 ) -> anyhow::Result<()>
 where
     // TODO how are these not redundant trait bounds???
@@ -300,7 +292,7 @@ where
 
     // Init RPC methods.
     let alp_rpc = rpc_server::AlpenRpcImpl::new(
-        l1_status.clone(),
+        node_status.clone(),
         database.clone(),
         sync_man.clone(),
         stop_tx,

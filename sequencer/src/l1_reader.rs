@@ -1,8 +1,7 @@
 use std::sync::Arc;
 use std::thread;
 
-use alpen_express_common::status::NodeStatus;
-use alpen_express_primitives::l1::L1Status;
+use alpen_express_status::status::NodeStatus;
 use tokio::sync::mpsc;
 
 use alpen_express_btcio::reader::{
@@ -49,7 +48,7 @@ where
         ev_tx,
         target_next_block,
         config.clone(),
-        l1_status.clone(),
+        node_status.clone(),
     ));
 
     let l1db = db.l1_store().clone();

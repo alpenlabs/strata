@@ -9,6 +9,7 @@ alpen-express-db = { workspace = true }
 alpen-express-evmctl = { workspace = true }
 alpen-express-primitives = { workspace = true }
 alpen-express-state = { workspace = true }
+alpen-express-status = { workspace = true }
 
 anyhow = { workspace = true }
 bitcoin = { workspace = true }
