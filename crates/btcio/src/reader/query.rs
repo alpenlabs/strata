@@ -2,7 +2,9 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+
 use alpen_express_primitives::l1::L1Status;
+
 use anyhow::bail;
 use bitcoin::{Block, BlockHash};
 use tokio::sync::{mpsc, RwLock};
@@ -136,7 +138,7 @@ pub async fn bitcoin_data_reader_task(
     event_tx: mpsc::Sender<L1Event>,
     target_next_block: u64,
     config: Arc<ReaderConfig>,
-    l1_status: Arc<RwLock<L1Status>>,
+    node_status: Arc<NodeStatus>,
 ) {
     let mut status_updates = Vec::new();
     if let Err(e) = do_reader_task(
@@ -145,7 +147,7 @@ pub async fn bitcoin_data_reader_task(
         target_next_block,
         config,
         &mut status_updates,
-        l1_status.clone(),
+        node_status.clone(),
     )
     .await
     {

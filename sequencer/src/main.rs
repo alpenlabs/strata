@@ -8,6 +8,9 @@ use std::sync::Arc;
 use std::thread;
 
 use alpen_express_db::traits::SequencerDatabase;
+use alpen_express_status::NodeStatus;
+use alpen_express_status::Watch;
+use alpen_express_primitives::l1::L1Status;
 use anyhow::Context;
 use bitcoin::Network;
 use config::Config;
@@ -156,6 +159,12 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         l1_db, l2_db, sync_ev_db, cs_db, chst_db,
     ));
 
+    let node_status = Arc::new(NodeStatus {
+        l1_status: Arc::new(RwLock::new(L1Status::default())),
+        csm_status: Watch::new(),
+        cl_state: Watch::new(),
+    });
+
     // Set up btcio status to pass around cheaply
     let l1_status = Arc::new(RwLock::new(L1Status::default()));
 
@@ -248,14 +257,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         });
     }
 
-    let main_fut = main_task(
-        &config,
-        sync_man,
-        btc_rpc,
-        database.clone(),
-        l1_status,
-        writer_ctl,
-    );
+    let main_fut = main_task(&config, sync_man, btc_rpc, database.clone(), node_status);
     if let Err(e) = rt.block_on(main_fut) {
         error!(err = %e, "main task exited");
         process::exit(0); // special case exit once we've gotten to this point
@@ -274,8 +276,7 @@ async fn main_task<
     sync_man: Arc<SyncManager>,
     l1_rpc_client: Arc<L>,
     database: Arc<D>,
-    l1_status: Arc<RwLock<L1Status>>,
-    writer: Option<Arc<DaWriter<SD>>>,
+    node_status: Arc<NodeStatus>,
 ) -> anyhow::Result<()>
 where
     // TODO how are these not redundant trait bounds???
@@ -291,7 +292,7 @@ where
         l1_rpc_client,
         database.clone(),
         csm_ctl,
-        l1_status.clone(),
+        node_status.clone(),
     )
     .await?;
 

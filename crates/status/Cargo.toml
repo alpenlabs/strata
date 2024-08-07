@@ -1,0 +1,12 @@
+[package]
+edition = "2021"
+name = "alpen-express-status"
+version = "0.1.0"
+
+[dependencies]
+alpen-express-consensus-logic = { workspace = true }
+alpen-express-primitives = { workspace = true }
+alpen-express-state = { workspace = true }
+
+thiserror = { workspace = true }
+tokio = { workspace = true }

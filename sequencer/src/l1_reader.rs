@@ -1,8 +1,9 @@
 use std::sync::Arc;
 use std::thread;
 
+use alpen_express_common::status::NodeStatus;
 use alpen_express_primitives::l1::L1Status;
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::mpsc;
 
 use alpen_express_btcio::reader::{
     config::ReaderConfig, messages::L1Event, query::bitcoin_data_reader_task,
@@ -21,7 +22,7 @@ pub async fn start_reader_tasks<D: Database>(
     rpc_client: Arc<impl L1Client>,
     db: Arc<D>,
     csm_ctl: Arc<CsmController>,
-    l1_status: Arc<RwLock<L1Status>>,
+    node_status: Arc<NodeStatus>,
 ) -> anyhow::Result<()>
 where
     // TODO how are these not redundant trait bounds???
