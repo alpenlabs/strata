@@ -4,7 +4,7 @@
 //!  - implementation of RPC client
 //!  - crate for just data structures that represents the JSON responses from Bitcoin core RPC
 
-use serde::{de::Visitor, Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct L1Status {
@@ -128,6 +128,7 @@ pub struct ExecUpdate {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum DepositState {
     Created,
     Accepted,
@@ -136,7 +137,6 @@ pub enum DepositState {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(rename_all = "lowercase")]
 pub struct DepositEntry {
     /// The index of the deposit, used to identify or track the deposit within the system.
     pub deposit_idx: u32,
@@ -149,72 +149,4 @@ pub struct DepositEntry {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct L2BlockId(#[serde(deserialize_with = "deserialize_blkid")] pub [u8; 32]);
-
-fn deserialize_blkid<'d, D>(deserializer: D) -> Result<[u8; 32], D::Error>
-where
-    D: Deserializer<'d>,
-{
-    struct BlkVisitor;
-
-    impl<'d> Visitor<'d> for BlkVisitor {
-        type Value = [u8; 32];
-
-        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-            write!(formatter, "a string representation of block id")
-        }
-
-        fn visit_str<E>(self, block_id: &str) -> Result<Self::Value, E>
-        where
-            E: serde::de::Error,
-        {
-            if block_id.len() != 64 {
-                return Err(E::custom(format!("invalid BlockId {}", block_id)));
-            }
-
-            let mut bytes = [0u8; 32];
-
-            for (idx, byte) in bytes.iter_mut().enumerate().take(32) {
-                let start = idx * 2;
-                let chunk = &block_id[start..start + 2];
-                let byte_str = std::str::from_utf8(chunk.as_bytes())
-                    .map_err(|e| E::custom(format!("invalid BlockId {}, {}", block_id, e)))?;
-                *byte = u8::from_str_radix(byte_str, 16)
-                    .map_err(|e| E::custom(format!("invalid BlockId {}, {}", block_id, e)))?;
-            }
-
-            Ok(bytes)
-        }
-    }
-    deserializer.deserialize_any(BlkVisitor)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[derive(Deserialize)]
-    struct TestStruct {
-        #[serde(deserialize_with = "deserialize_blkid")]
-        value: [u8; 32],
-    }
-
-    #[test]
-    fn test_deserialize_blkid() {
-        // Valid case
-        let json_data =
-            r#"{"value": "29e1ea0f41164d50259613c5eb2eb65e78279e49826be8149d4d56c6822eaccc"}"#;
-        let result: TestStruct = serde_json::from_str(json_data).unwrap();
-        assert_eq!(
-            result.value,
-            [
-                41, 225, 234, 15, 65, 22, 77, 80, 37, 150, 19, 197, 235, 46, 182, 94, 120, 39, 158,
-                73, 130, 107, 232, 20, 157, 77, 86, 198, 130, 46, 172, 204
-            ]
-        );
-
-        // invalid case
-        let json_data = r#"{"value": "29e1ea0f41164d50259613c5eb2eb65e78279e49826be8149d4d56"}"#;
-        assert!(serde_json::from_str::<TestStruct>(json_data).is_err());
-    }
-}
+pub struct L2BlockId(#[serde(with = "hex::serde")] pub [u8; 32]);

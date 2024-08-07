@@ -105,11 +105,11 @@ impl ChainState {
         compute_borsh_hash(&hashed_state)
     }
 
-    pub fn deposit_table(&self) -> &DepositsTable {
+    pub fn deposits_table(&self) -> &DepositsTable {
         &self.deposits_table
     }
 
-    pub fn exec_state(&self) -> &ExecEnvState {
+    pub fn exec_env_state(&self) -> &ExecEnvState {
         &self.exec_env_state
     }
 }

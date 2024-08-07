@@ -83,6 +83,7 @@ pub fn gen_params() -> Params {
             l1_reorg_safe_depth: 5,
         },
         run: RunParams {
+            l2_blocks_fetch_limit: 1000,
             l1_follow_distance: 3,
             client_checkpoint_interval: 10,
         },

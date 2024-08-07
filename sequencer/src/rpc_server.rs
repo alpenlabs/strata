@@ -235,7 +235,7 @@ where
                 .unwrap())
         })
         .await?;
-        Ok(format!("{:?}", blk_manifest.block_hash()))
+        Ok(blk_manifest.block_hash().to_string())
     }
 
     async fn get_client_status(&self) -> RpcResult<ClientStatus> {
@@ -421,7 +421,7 @@ where
         let chain_state = chain_state.ok_or(Error::MissingSyncState)?;
 
         Ok(chain_state
-            .deposit_table()
+            .deposits_table()
             .get_all_deposits_ids_iter()
             .collect())
     }
@@ -431,7 +431,7 @@ where
         let chain_state = chain_state.ok_or(Error::MissingSyncState)?;
 
         let deposit_entry = chain_state
-            .deposit_table()
+            .deposits_table()
             .get_deposit(deposit_id)
             .ok_or(Error::Other("unknown deposit idx".to_string()))?;
 
@@ -451,7 +451,8 @@ where
         })
     }
 }
-/// Wrapper around [``tokio::task::spawn_blocking``] that handles errors in th{ unimplemented!() }
+
+/// Wrapper around [``tokio::task::spawn_blocking``] that handles errors in
 /// external task and merges the errors into the standard RPC error type.
 async fn wait_blocking<F, R>(name: &'static str, f: F) -> Result<R, Error>
 where

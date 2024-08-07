@@ -39,6 +39,8 @@ pub struct RunParams {
     pub l1_follow_distance: u64,
     /// Number of events after which we checkpoint the client
     pub client_checkpoint_interval: u32,
+    /// Max number of recent l2 blocks that can be fetched from RPC
+    pub l2_blocks_fetch_limit: u64,
 }
 
 /// Combined set of parameters across all the consensus logic.
