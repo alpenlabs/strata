@@ -35,11 +35,17 @@ impl SyncEventDb {
 
 impl SyncEventStore for SyncEventDb {
     fn write_sync_event(&self, ev: SyncEvent) -> DbResult<u64> {
-        let last_id = self.get_last_key()?.unwrap_or(0);
-        let id = last_id + 1;
-        let event = SyncEventWithTimestamp::new(ev);
-        self.db.put::<SyncEventSchema>(&id, &event)?;
-        Ok(id)
+        self.db
+            .with_optimistic_txn(rockbound::TransactionRetry::Count(5), move |txn| {
+                let last_id = rockbound::utils::get_last::<SyncEventSchema>(txn)?
+                    .map(|(k, _)| k)
+                    .unwrap_or(0);
+                let id = last_id + 1;
+                let event = SyncEventWithTimestamp::new(ev.clone());
+                txn.put::<SyncEventSchema>(&id, &event)?;
+                Ok::<_, anyhow::Error>(id)
+            })
+            .map_err(|err| DbError::TransactionError(err.to_string()))
     }
 
     fn clear_sync_event(&self, start_idx: u64, end_idx: u64) -> DbResult<()> {
