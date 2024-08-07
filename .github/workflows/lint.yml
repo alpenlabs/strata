@@ -8,57 +8,11 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  CACHE_KEY: lint
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
-  cancel-in-progress: true
 
 jobs:
-  build:
-    name: Build workspace before tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: dtolnay/rust-toolchain@nightly
-        with:
-          components: llvm-tools-preview
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-          shared-key: ${{ env.CACHE_KEY }}
-      - name: Build project
-        run: |
-          cargo build --workspace --locked
-
-  clippy-binaries:
-    name: Run clippy on binaries
-    runs-on: ubuntu-latest
-    needs: build
-    timeout-minutes: 30
-    strategy:
-      matrix:
-        include:
-          - binary: alpen-express-sequencer
-          - binary: alpen-express-reth
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@clippy
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-          shared-key: ${{ env.CACHE_KEY }}
-      - run: cargo clippy --bin "${{ matrix.binary }}" --workspace --locked
-        env:
-          RUSTFLAGS: -D warnings
-
   clippy:
     name: Run clippy on library crates
     runs-on: ubuntu-latest
-    needs: build
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -66,8 +20,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-          shared-key: ${{ env.CACHE_KEY }}
-      - run: cargo clippy --workspace --lib --examples --tests --benches --all-features --locked
+      - run: cargo clippy --workspace --lib --examples --tests --benches --all-features --all-targets --locked
         env:
           RUSTFLAGS: -D warnings
 
@@ -75,7 +28,6 @@ jobs:
     name: Check that crates compile on their own
     runs-on: ubuntu-latest
     timeout-minutes: 40
-    needs: build
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
@@ -83,7 +35,14 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-          shared-key: ${{ env.CACHE_KEY }}
+      - name: Configure sccache
+        run: |
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+          echo  "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.2
+        with:
+          version: "v0.8.1" # sccache version
       - run: cargo hack check --locked
 
   fmt:
@@ -127,7 +86,6 @@ jobs:
     runs-on: ubuntu-latest
     if: always()
     needs:
-      - clippy-binaries
       - clippy
       - crate-checks
       - fmt
