@@ -81,7 +81,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     // initialize the full configuration
     let mut config = match args.config.as_ref() {
         Some(config_path) => load_configuration(config_path)?,
-        None => Config::new(),
+        None => Config::default(),
     };
 
     // Values passed over arguments get the precedence over the configuration files
@@ -111,6 +111,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         },
         run: RunParams {
             l1_follow_distance: config.sync.l1_follow_distance,
+            client_checkpoint_interval: config.sync.client_checkpoint_interval,
         },
     };
 

@@ -34,6 +34,8 @@ pub struct RollupParams {
 pub struct RunParams {
     /// Number of blocks that we follow the L1 from.
     pub l1_follow_distance: u64,
+    /// Number of events after which we checkpoint the client
+    pub client_checkpoint_interval: u32,
 }
 
 /// Combined set of parameters across all the consensus logic.

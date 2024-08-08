@@ -17,6 +17,7 @@ pub struct SyncParams {
     pub l1_follow_distance: u64,
     pub max_reorg_depth: u32,
     pub client_poll_dur_ms: u32,
+    pub client_checkpoint_interval: u32,
 }
 
 #[derive(Deserialize, Debug)]
@@ -47,7 +48,7 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn new() -> Config {
+    pub fn default() -> Config {
         Self {
             bitcoind_rpc: BitcoindParams {
                 rpc_url: String::new(),
@@ -64,6 +65,7 @@ impl Config {
                 l1_follow_distance: 6,
                 max_reorg_depth: 4,
                 client_poll_dur_ms: 200,
+                client_checkpoint_interval: 10,
             },
             exec: ExecParams {
                 reth: RethELParams {
@@ -123,6 +125,7 @@ mod test {
             l1_follow_distance = 6
             max_reorg_depth = 4
             client_poll_dur_ms = 200
+            client_checkpoint_interval = 10
 
             [exec.reth]
             rpc_url = "http://localhost:8551"
