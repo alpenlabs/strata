@@ -1,34 +1,25 @@
 //! Bootstraps an RPC server for the operator.
 use anyhow::Context;
 use async_trait::async_trait;
-use bitcoin::secp256k1::schnorr::Signature;
 use chrono::{DateTime, Utc};
 use jsonrpsee::{core::RpcResult, RpcModule};
 use tokio::sync::oneshot;
 use tracing::{info, warn};
 
 use super::constants::{RPC_PORT, RPC_SERVER};
-use express_bridge_rpc_api::{
-    ExpressBridgeControlApiServer, ExpressBridgeNetworkApiServer, ExpressBridgeWalletApiServer,
-};
-use express_bridge_txm::DepositInfo;
+use express_bridge_rpc_api::{ExpressBridgeControlApiServer, ExpressBridgeNetworkApiServer};
 
 pub(crate) async fn start<T>(rpc_impl: &T) -> anyhow::Result<()>
 where
-    T: ExpressBridgeControlApiServer
-        + ExpressBridgeNetworkApiServer
-        + ExpressBridgeWalletApiServer
-        + Clone,
+    T: ExpressBridgeControlApiServer + ExpressBridgeNetworkApiServer + Clone,
 {
     let mut rpc_module = RpcModule::new(rpc_impl.clone());
 
     let control_api = ExpressBridgeControlApiServer::into_rpc(rpc_impl.clone());
     let network_api = ExpressBridgeNetworkApiServer::into_rpc(rpc_impl.clone());
-    let wallet_api = ExpressBridgeWalletApiServer::into_rpc(rpc_impl.clone());
 
     rpc_module.merge(control_api).context("merge control api")?;
     rpc_module.merge(network_api).context("merge network api")?;
-    rpc_module.merge(wallet_api).context("merge wallet api")?;
 
     let addr = format!("{RPC_SERVER}:{RPC_PORT}");
     let rpc_server = jsonrpsee::server::ServerBuilder::new()
@@ -79,7 +70,14 @@ impl ExpressBridgeControlApiServer for BridgeRpcImpl {
         let current_time = Utc::now().timestamp();
         let start_time = self.start_time.timestamp();
 
-        assert!(current_time >= start_time, "clock cannot move backwards");
+        // The user might care about their system time being incorrect.
+        if current_time <= start_time {
+            return Err(jsonrpsee::types::ErrorObjectOwned::owned::<_>(
+                -32000,
+                "system time may be inaccurate", // `start_time` may have been incorrect too
+                Some(current_time.saturating_sub(start_time)),
+            ));
+        }
 
         Ok(current_time.abs_diff(start_time))
     }
@@ -89,29 +87,5 @@ impl ExpressBridgeControlApiServer for BridgeRpcImpl {
 impl ExpressBridgeNetworkApiServer for BridgeRpcImpl {
     async fn ping(&self) -> RpcResult<()> {
         unimplemented!("ping")
-    }
-}
-
-#[async_trait]
-impl ExpressBridgeWalletApiServer for BridgeRpcImpl {
-    async fn request_signature(&self, _deposit_info: DepositInfo) -> RpcResult<Signature> {
-        unimplemented!("request_signature");
-    }
-
-    async fn sign_deposit_transaction(
-        &self,
-        _address: String,
-        _deposit_info: DepositInfo,
-    ) -> RpcResult<Signature> {
-        unimplemented!("sign_deposit_transaction");
-    }
-
-    async fn verify_deposit_transaction(
-        &self,
-        _address: String,
-        _deposit_info: DepositInfo,
-        _signature: Signature,
-    ) -> RpcResult<()> {
-        unimplemented!("verify_deposit_transaction");
     }
 }
