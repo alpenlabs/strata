@@ -60,6 +60,9 @@ pub enum Error {
     #[error("chaintip: {0}")]
     ChainTip(#[from] ChainTipError),
 
+    #[error("failed creating genesis chain state: {0}")]
+    GenesisFailed(String),
+
     #[error("engine: {0}")]
     Engine(#[from] EngineError),
 

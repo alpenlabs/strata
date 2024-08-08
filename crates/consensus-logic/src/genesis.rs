@@ -151,22 +151,6 @@ pub fn check_needs_client_init(database: &impl Database) -> anyhow::Result<bool>
         Err(e) => return Err(e.into()),
     }
 
-    let l2_prov = database.l2_provider();
-
-    // Check if there's any genesis block written.
-    match l2_prov.get_blocks_at_height(0) {
-        Ok(blkids) => {
-            if blkids.is_empty() {
-                return Ok(true);
-            }
-        }
-
-        Err(DbError::NotBootstrapped) => return Ok(true),
-
-        // Again, how should we handle this?
-        Err(e) => return Err(e.into()),
-    }
-
     Ok(false)
 }
 

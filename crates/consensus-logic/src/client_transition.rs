@@ -3,13 +3,14 @@
 
 use tracing::*;
 
-use alpen_express_db::traits::{Database, L1DataProvider, L2DataProvider};
+use alpen_express_db::traits::{Database, L1DataProvider, L2DataProvider, L2DataStore};
 use alpen_express_primitives::prelude::*;
 use alpen_express_state::client_state::*;
 use alpen_express_state::operation::*;
 use alpen_express_state::sync_event::SyncEvent;
 
 use crate::errors::*;
+use crate::genesis;
 
 /// Processes the event given the current consensus state, producing some
 /// output.  This can return database errors.
@@ -36,7 +37,7 @@ pub fn process_event<D: Database>(
             // FIXME this doesn't do any SPV checks to make sure we only go to
             // a longer chain, it just does it unconditionally
             let l1prov = database.l1_provider();
-            let new_block_mf = l1prov.get_block_manifest(*height)?;
+            let _new_block_mf = l1prov.get_block_manifest(*height)?;
 
             let l1v = state.l1_view();
 
@@ -82,6 +83,20 @@ pub fn process_event<D: Database>(
                 if !state.is_chain_active() && *height >= genesis_threshold {
                     debug!("emitting chain activation");
                     writes.push(ClientStateWrite::ActivateChain);
+
+                    // when state_sync.is_none() and chain_active: false -> true transition, ensure
+                    // genesis block is created
+                    let genesis_blockid = genesis::init_genesis_chainstate(params, database)
+                        .map_err(|err| {
+                            error!(err = %err, "failed to compute chain genesis");
+                            Error::GenesisFailed(err.to_string())
+                        })?;
+
+                    writes.push(ClientStateWrite::ReplaceSync(Box::new(
+                        SyncState::from_genesis_blkid(genesis_blockid),
+                    )));
+
+                    // add L2Genesis action ?
                 }
             }
         }
@@ -123,12 +138,6 @@ pub fn process_event<D: Database>(
                 // TODO we can expand this later to make more sense
                 return Err(Error::MissingClientSyncState);
             }
-        }
-
-        SyncEvent::ComputedGenesis(gblkid) => {
-            // Just construct the sync state for the genesis.
-            let ss = SyncState::from_genesis_blkid(*gblkid);
-            writes.push(ClientStateWrite::ReplaceSync(Box::new(ss)));
         }
 
         SyncEvent::NewTipBlock(blkid) => {

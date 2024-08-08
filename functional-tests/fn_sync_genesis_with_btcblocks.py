@@ -46,6 +46,7 @@ class SyncGenesisTest(flexitest.Test):
         for _ in range(5):
             time.sleep(3)
             stat = seqrpc.alp_clientStatus()
+            print(stat)
             tip_slot = stat["chain_tip_slot"]
             tip_blkid = stat["chain_tip"]
             print("cur tip slot", tip_slot, "blkid", tip_blkid)
