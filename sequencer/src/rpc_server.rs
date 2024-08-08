@@ -238,8 +238,7 @@ where
     async fn get_l1_block_hash(&self, height: u64) -> RpcResult<Option<String>> {
         let db = self.database.clone();
         let blk_manifest = wait_blocking("l1_block_manifest", move || {
-            db
-                .l1_provider()
+            db.l1_provider()
                 .get_block_manifest(height)
                 .map_err(|_| Error::MissingL1BlockManifest(height))
         })
@@ -247,8 +246,8 @@ where
 
         match blk_manifest {
             Some(blk) => Ok(Some(blk.block_hash().to_string())),
-            None => Ok(None)
-            }
+            None => Ok(None),
+        }
     }
 
     async fn get_client_status(&self) -> RpcResult<ClientStatus> {
@@ -298,9 +297,8 @@ where
         let db = self.database.clone();
 
         let fetch_limit = self.sync_manager.params().run().l2_blocks_fetch_limit;
-        if count > fetch_limit{
-            return Err(Error::FetchLimitReached(fetch_limit, count)
-            .into());
+        if count > fetch_limit {
+            return Err(Error::FetchLimitReached(fetch_limit, count).into());
         }
 
         let blk_headers = wait_blocking("block_headers", move || {
@@ -308,7 +306,7 @@ where
             let mut output = Vec::new();
             let mut cur_blkid = tip_blkid;
 
-            while output.len() < count as usize  {
+            while output.len() < count as usize {
                 let l2_blk = fetch_l2blk::<D>(l2_prov, cur_blkid)?;
                 output.push(conv_blk_header_to_rpc(l2_blk.header()));
                 cur_blkid = *l2_blk.header().parent();
@@ -335,15 +333,13 @@ where
         let blk_header = wait_blocking("block_at_idx", move || {
             let l2_prov = db.l2_provider();
             // check the tip idx
-            let tip_idx = fetch_l2blk::<D>(l2_prov, tip_blkid)?
-                .header()
-                .blockidx();
+            let tip_idx = fetch_l2blk::<D>(l2_prov, tip_blkid)?.header().blockidx();
 
             if idx > tip_idx {
                 return Ok(None);
             }
 
-            Ok(l2_prov
+            l2_prov
                 .get_blocks_at_height(idx)
                 .map_err(Error::Db)?
                 .iter()
@@ -352,7 +348,7 @@ where
 
                     Ok(Some(conv_blk_header_to_rpc(l2_blk.block().header())))
                 })
-                .collect::<Result<Option<Vec<BlockHeader>>, Error>>()?)
+                .collect::<Result<Option<Vec<BlockHeader>>, Error>>()
         })
         .await?;
 
@@ -371,12 +367,11 @@ where
 
             fetch_l2blk::<D>(l2_prov, blkid)
         })
-        .await.ok();
+        .await
+        .ok();
 
         match l2_blk {
-            Some(l2_blk) => {
-                Ok(Some(conv_blk_header_to_rpc(l2_blk.header())))
-            },
+            Some(l2_blk) => Ok(Some(conv_blk_header_to_rpc(l2_blk.header()))),
             None => Ok(None),
         }
     }
@@ -391,44 +386,45 @@ where
         let l2_blk = wait_blocking("fetch_block", move || {
             let l2_prov = db.l2_provider();
 
-            fetch_l2blk::<D>(&l2_prov, blkid)
+            fetch_l2blk::<D>(l2_prov, blkid)
         })
-        .await.ok();
+        .await
+        .ok();
 
         match l2_blk {
             Some(l2_blk) => {
-                    let exec_update = l2_blk.exec_segment().update();
+                let exec_update = l2_blk.exec_segment().update();
 
-                    let withdrawals = exec_update
-                        .output()
-                        .withdrawals()
-                        .iter()
-                        .map(|intent| {
-                            let (amt, dest_pk) = intent.into_parts();
-                            let dest_pk = *dest_pk.as_ref();
-                            WithdrawalIntent { amt, dest_pk }
-                        })
-                        .collect();
+                let withdrawals = exec_update
+                    .output()
+                    .withdrawals()
+                    .iter()
+                    .map(|intent| {
+                        let (amt, dest_pk) = intent.into_parts();
+                        let dest_pk = *dest_pk.as_ref();
+                        WithdrawalIntent { amt, dest_pk }
+                    })
+                    .collect();
 
-                    let da_blobs = exec_update
-                        .output()
-                        .da_blobs()
-                        .iter()
-                        .map(|blob| DaBlob {
-                            dest: blob.dest().into(),
-                            blob_commitment: *blob.commitment().as_ref(),
-                        })
-                        .collect();
+                let da_blobs = exec_update
+                    .output()
+                    .da_blobs()
+                    .iter()
+                    .map(|blob| DaBlob {
+                        dest: blob.dest().into(),
+                        blob_commitment: *blob.commitment().as_ref(),
+                    })
+                    .collect();
 
-                   Ok(Some(ExecUpdate {
-                        update_idx: exec_update.input().update_idx(),
-                        entries_root: *exec_update.input().entries_root().as_ref(),
-                        extra_payload: exec_update.input().extra_payload().to_vec(),
-                        new_state: *exec_update.output().new_state().as_ref(),
-                        withdrawals,
-                        da_blobs,
-                    }))
-            },
+                Ok(Some(ExecUpdate {
+                    update_idx: exec_update.input().update_idx(),
+                    entries_root: *exec_update.input().entries_root().as_ref(),
+                    extra_payload: exec_update.input().extra_payload().to_vec(),
+                    new_state: *exec_update.output().new_state().as_ref(),
+                    withdrawals,
+                    da_blobs,
+                }))
+            }
             None => Ok(None),
         }
     }

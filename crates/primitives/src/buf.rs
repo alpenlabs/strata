@@ -54,7 +54,7 @@ impl Buf32 {
     }
 
     pub fn is_zero(&self) -> bool {
-        *self.as_ref() == [0;32]
+        *self.as_ref() == [0; 32]
     }
 }
 
