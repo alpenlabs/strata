@@ -4,7 +4,6 @@ import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 
 from constants import BLOCK_GENERATION_INTERVAL_SECS, SEQ_SLACK_TIME_SECS
-from entry import BasicEnvConfig
 
 REORG_DEPTH = 3
 

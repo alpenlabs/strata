@@ -208,7 +208,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
         seqaddr = brpc.proxy.getnewaddress()
 
         if self.pre_generate_blocks > 0:
-            print(f"Pre generating {self.pre_generate_blocks} blocks to addresss {seqaddr}")
+            print(f"Pre generating {self.pre_generate_blocks} blocks to address {seqaddr}")
             brpc.proxy.generatetoaddress(self.pre_generate_blocks, seqaddr)
 
         secret_dir = ctx.make_service_dir("secret")

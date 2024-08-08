@@ -2,10 +2,12 @@ import time
 
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
-from bitcoinlib.encoding import addr_bech32_to_pubkeyhash, addr_base58_to_pubkeyhash
-from bitcoinlib.transactions import Script
 
-from constants import MAX_HORIZON_POLL_INTERVAL_SECS, SEQ_SLACK_TIME_SECS, SEQ_PUBLISH_BATCH_INTERVAL_SECS
+from constants import (
+    MAX_HORIZON_POLL_INTERVAL_SECS,
+    SEQ_PUBLISH_BATCH_INTERVAL_SECS,
+    SEQ_SLACK_TIME_SECS,
+)
 
 
 @flexitest.register
@@ -44,7 +46,10 @@ class L1WriterTest(flexitest.Test):
         # Check if txn is present in mempool/blockchain and is spent to sequencer address
         tx = btcrpc.gettransaction(txid)
 
-        # NOTE: could have just compared address, but bitcoinlib is somehow giving bc1* addr even though network is regtest
-        assert tx.outputs[0].lock_script.hex() == scriptpubkey, "Output should be locked to sequencer's scriptpubkey"
+        # NOTE: could have just compared address
+        # but bitcoinlib is somehow giving bc1* addr even though network is regtest
+        assert (
+            tx.outputs[0].lock_script.hex() == scriptpubkey
+        ), "Output should be locked to sequencer's scriptpubkey"
 
         return True
