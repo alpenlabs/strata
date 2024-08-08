@@ -38,6 +38,7 @@ class SyncGenesisTest(flexitest.Test):
 
             time.sleep(0.5)
             print("waiting for genesis... -- tries", tries)
+            tries += 1
 
         assert last_slot is not None, "last slot never set"
 

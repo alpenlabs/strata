@@ -70,8 +70,6 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
         .expect("dutyexec: get state checkpoint");
 
     // Figure out some general data about the slot and the previous state.
-    let ts = now_millis();
-
     let Some(last_ss) = last_cstate.sync() else {
         warn!(%slot, %ckpt_idx, "tried to produce block but no sync state available");
         return Ok(None);
@@ -94,6 +92,8 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
         trace!(%current_ts, %target_ts, sleep_dur, "too early, waiting to produce block");
         thread::sleep(time::Duration::from_millis(sleep_dur));
     }
+
+    let ts = now_millis();
 
     let prev_global_sr = *prev_block.header().state_root();
 
