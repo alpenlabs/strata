@@ -126,6 +126,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         },
         run: RunParams {
             l1_follow_distance: config.sync.l1_follow_distance,
+            client_checkpoint_interval: config.sync.client_checkpoint_interval,
         },
     };
 

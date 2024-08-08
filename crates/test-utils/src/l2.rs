@@ -84,6 +84,7 @@ pub fn gen_params() -> Params {
         },
         run: RunParams {
             l1_follow_distance: 3,
+            client_checkpoint_interval: 10,
         },
     }
 }
