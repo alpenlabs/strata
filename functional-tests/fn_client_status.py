@@ -11,7 +11,6 @@ class L1ClientStatusTest(flexitest.Test):
         ctx.set_env("basic")
 
     def main(self, ctx: flexitest.RunContext):
-        ctx.get_service("bitcoin")
         seq = ctx.get_service("sequencer")
 
         seqrpc = seq.create_rpc()

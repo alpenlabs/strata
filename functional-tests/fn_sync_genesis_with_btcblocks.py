@@ -15,7 +15,6 @@ class SyncGenesisTest(flexitest.Test):
         ctx.set_env("premined_blocks")
 
     def main(self, ctx: flexitest.RunContext):
-        ctx.get_service("bitcoin")
         seq = ctx.get_service("sequencer")
 
         # create both btc and sequencer RPC
