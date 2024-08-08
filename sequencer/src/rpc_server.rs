@@ -2,8 +2,6 @@
 
 use std::{borrow::BorrowMut, sync::Arc};
 
-use alpen_express_consensus_logic::sync_manager::SyncManager;
-use alpen_express_primitives::buf::Buf32;
 use async_trait::async_trait;
 use jsonrpsee::{
     core::RpcResult,
@@ -17,13 +15,21 @@ use reth_rpc_types::{
     StateContext, SyncInfo, SyncStatus, Transaction, TransactionRequest, Work,
 };
 use thiserror::Error;
-use tokio::sync::{oneshot, watch, Mutex, RwLock};
+use tokio::sync::{mpsc, oneshot, watch, Mutex, RwLock};
 
-use alpen_express_db::traits::L1DataProvider;
+use alpen_express_btcio::writer::{utils::calculate_blob_hash, DaWriter};
+use alpen_express_consensus_logic::sync_manager::SyncManager;
+
 use alpen_express_db::traits::{ChainstateProvider, Database, L2DataProvider};
-use alpen_express_rpc_api::{AlpenApiServer, ClientStatus, L1Status};
+use alpen_express_db::traits::{L1DataProvider, SequencerDatabase};
+use alpen_express_primitives::{buf::Buf32, l1::L1Status};
+use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer, ClientStatus, HexBytes};
 use alpen_express_state::{
-    chain_state::ChainState, client_state::ClientState, header::L2Header, id::L2BlockId,
+    chain_state::ChainState,
+    client_state::ClientState,
+    da_blob::{BlobDest, BlobIntent},
+    header::L2Header,
+    id::L2BlockId,
     l1::L1BlockId,
 };
 
@@ -175,15 +181,9 @@ where
     }
 
     async fn get_l1_status(&self) -> RpcResult<L1Status> {
-        let btcio_status = self.l1_status.read().await.clone();
+        let l1_status = self.l1_status.read().await.clone();
 
-        Ok(L1Status {
-            bitcoin_rpc_connected: btcio_status.bitcoin_rpc_connected,
-            cur_height: btcio_status.cur_height,
-            cur_tip_blkid: btcio_status.cur_tip_blkid,
-            last_update: btcio_status.last_update,
-            last_rpc_error: btcio_status.last_rpc_error,
-        })
+        Ok(l1_status)
     }
 
     async fn get_l1_connection_status(&self) -> RpcResult<bool> {
@@ -251,5 +251,29 @@ where
             error!(%name, "background task aborted for unknown reason");
             Err(Error::BlockingAbort(name.to_owned()))
         }
+    }
+}
+
+pub struct AdminServerImpl<S> {
+    pub writer: Arc<DaWriter<S>>,
+}
+
+impl<S: SequencerDatabase> AdminServerImpl<S> {
+    pub fn new(writer: Arc<DaWriter<S>>) -> Self {
+        Self { writer }
+    }
+}
+
+#[async_trait]
+impl<S: SequencerDatabase + Send + Sync + 'static> AlpenAdminApiServer for AdminServerImpl<S> {
+    async fn submit_da_blob(&self, blob: HexBytes) -> RpcResult<()> {
+        let commitment = calculate_blob_hash(&blob.0);
+        let blobintent = BlobIntent::new(BlobDest::L1, commitment, blob.0);
+        // NOTE: It would be nice to return reveal txid from the submit method. But creation of txs
+        // is deferred to signer in the writer module
+        if let Err(e) = self.writer.submit_intent_async(blobintent).await {
+            return Err(Error::Other("".to_string()).into());
+        }
+        Ok(())
     }
 }

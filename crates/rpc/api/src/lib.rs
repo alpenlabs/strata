@@ -1,28 +1,10 @@
 #![allow(unexpected_cfgs)] // TODO: remove this when we add the `client` feature flag.
 //! Macro trait def for the `alp_` RPC namespace using jsonrpsee.
+use alpen_express_primitives::l1::L1Status;
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 
 use serde::{Deserialize, Serialize};
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct L1Status {
-    /// If the last time we tried to poll the client (as of `last_update`)
-    /// we were successful.
-    pub bitcoin_rpc_connected: bool,
-
-    /// The last error message we received when trying to poll the client, if
-    /// there was one.
-    pub last_rpc_error: Option<String>,
-
-    /// Current block height.
-    pub cur_height: u64,
-
-    /// Current tip block ID as string.
-    pub cur_tip_blkid: String,
-
-    /// UNIX millis time of the last time we got a new update from the L1 connector.
-    pub last_update: u64,
-}
+use serde_with::serde_as;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ClientStatus {
@@ -67,4 +49,16 @@ pub trait AlpenApi {
 
     #[method(name = "clientStatus")]
     async fn get_client_status(&self) -> RpcResult<ClientStatus>;
+}
+
+#[serde_as]
+#[derive(Serialize, Deserialize)]
+pub struct HexBytes(#[serde_as(as = "serde_with::hex::Hex")] pub Vec<u8>);
+
+#[cfg_attr(not(feature = "client"), rpc(server, namespace = "alpadmin"))]
+#[cfg_attr(feature = "client", rpc(server, client, namespace = "alpadmin"))]
+pub trait AlpenAdminApi {
+    #[method(name = "submitDABlob")]
+    /// Basically adds L1Write sequencer duty which will be executed by sequencer
+    async fn submit_da_blob(&self, blobdata: HexBytes) -> RpcResult<()>;
 }

@@ -9,6 +9,9 @@ use crate::args::Args;
 pub struct ClientParams {
     pub rpc_port: u16,
     pub sequencer_key: Option<PathBuf>,
+
+    /// The address to which the inscriptions are spent
+    pub sequencer_bitcoin_address: String, // TODO: probably move this to another struct
     pub datadir: PathBuf,
 }
 
@@ -47,18 +50,34 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn new() -> Config {
-        Self {
+    pub fn from_args(args: &Args) -> Result<Config, String> {
+        let args = args.clone();
+        Ok(Self {
             bitcoind_rpc: BitcoindParams {
-                rpc_url: String::new(),
-                rpc_user: String::new(),
-                rpc_password: String::new(),
-                network: Network::Regtest,
+                rpc_url: args
+                    .bitcoind_host
+                    .ok_or_else(|| "args: no bitcoin --rpc-url provided".to_string())?,
+                rpc_user: args
+                    .bitcoind_user
+                    .ok_or_else(|| "args: no bitcoin --rpc-user provided".to_string())?,
+                rpc_password: args
+                    .bitcoind_password
+                    .ok_or_else(|| "args: no bitcoin --rpc-password provided".to_string())?,
+                network: args
+                    .network
+                    .ok_or_else(|| "args: no bitcoin --network provided".to_string())?,
             },
             client: ClientParams {
-                rpc_port: 8432,
-                datadir: PathBuf::new(),
-                sequencer_key: None,
+                rpc_port: args
+                    .rpc_port
+                    .ok_or_else(|| "args: no client --rpc-port provided".to_string())?,
+                datadir: args
+                    .datadir
+                    .ok_or_else(|| "args: no client --datadir provided".to_string())?,
+                sequencer_key: args.sequencer_key,
+                sequencer_bitcoin_address: args
+                    .sequencer_bitcoin_address
+                    .ok_or_else(|| "args: no --sequencer-bitcion-address provided".to_string())?,
             },
             sync: SyncParams {
                 l1_follow_distance: 6,
@@ -67,14 +86,17 @@ impl Config {
             },
             exec: ExecParams {
                 reth: RethELParams {
-                    rpc_url: String::new(),
-                    secret: PathBuf::new(),
+                    rpc_url: args.reth_authrpc.unwrap_or("".to_string()), // TODO: sensible default
+                    secret: args.reth_jwtsecret.unwrap_or_default(),      /* TODO: probably
+                                                                           * secret should be
+                                                                           * Option */
                 },
             },
-        }
+        })
     }
     pub fn update_from_args(&mut self, args: &Args) {
         let args = args.clone();
+
         if let Some(rpc_user) = args.bitcoind_user {
             self.bitcoind_rpc.rpc_user = rpc_user;
         }
@@ -99,6 +121,9 @@ impl Config {
         if let Some(jwtsecret) = args.reth_jwtsecret {
             self.exec.reth.secret = jwtsecret;
         }
+        if let Some(seq_addr) = args.sequencer_bitcoin_address {
+            self.client.sequencer_bitcoin_address = seq_addr;
+        }
     }
 }
 
@@ -118,6 +143,7 @@ mod test {
             [client]
             rpc_port = 8432
             datadir = "/path/to/data/directory"
+            sequencer_bitcoin_address = "some_addr"
 
             [sync]
             l1_follow_distance = 6

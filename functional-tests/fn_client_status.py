@@ -15,10 +15,17 @@ class L1ClientStatusTest(flexitest.Test):
         seq = ctx.get_service("sequencer")
 
         seqrpc = seq.create_rpc()
+
+        # This sleep is needed to allow sequencer to boot up
+        time.sleep(SEQ_SLACK_TIME_SECS)
+
         proto_ver = seqrpc.alp_protocolVersion()
         print("protocol version", proto_ver)
         assert proto_ver == 1, "query protocol version"
 
         time.sleep(MAX_HORIZON_POLL_INTERVAL_SECS + SEQ_SLACK_TIME_SECS)
+
         client_status = seqrpc.alp_clientStatus()
         print("client status", client_status)
+
+        return True

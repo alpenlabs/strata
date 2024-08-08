@@ -1,6 +1,6 @@
 //! Sequencer duties.
 
-use std::time;
+use std::time::{self};
 
 use borsh::{BorshDeserialize, BorshSerialize};
 
@@ -25,6 +25,7 @@ pub enum Expiry {
 pub enum Duty {
     /// Goal to sign a block.
     SignBlock(BlockSigningDuty),
+    // TODO: Add Goal to write batch data to L1
 }
 
 impl Duty {

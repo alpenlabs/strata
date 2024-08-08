@@ -17,7 +17,7 @@ use alpen_express_state::prelude::*;
 use alpen_express_state::state_op::WriteBatch;
 use alpen_express_state::sync_event::SyncEvent;
 
-use crate::types::TxnStatusEntry;
+use crate::types::BlobEntry;
 use crate::DbResult;
 
 /// Common database interface that we can parameterize worker tasks over if
@@ -268,39 +268,35 @@ pub trait SequencerDatabase {
 pub trait SeqDataStore {
     /// Store the blob. Also create and store appropriate blob idx -> blobid mapping.
     /// Returns new blobidx, and returns error if entry already exists
-    fn put_blob(&self, blob_id: Buf32, blob: Vec<u8>) -> DbResult<u64>;
+    fn put_blob(&self, blob_id: Buf32, blobentry: BlobEntry) -> DbResult<u64>;
 
-    /// Store commit-reveal transactions, along with reveal txid -> blobid mapping, all of which
-    /// should happen atomically.
-    /// Returns the reveal txn idx
-    fn put_commit_reveal_txns(
+    /// Update an existing blob
+    fn update_blob_by_idx(&self, blobidx: u64, blobentry: BlobEntry) -> DbResult<()>;
+
+    /// Store serialized L1 commit-reveal txs
+    fn put_commit_reveal_txs(
         &self,
-        blobid: Buf32,
-        commit_txn: TxnStatusEntry,
-        reveal_txn: TxnStatusEntry,
-    ) -> DbResult<u64>;
+        commit_tx_id: Buf32,
+        commit_tx: Vec<u8>,
+        reveal_tx_id: Buf32,
+        reveal_tx: Vec<u8>,
+    ) -> DbResult<()>;
 
-    /// Update an existing transaction
-    fn update_txn(&self, txidx: u64, txn: TxnStatusEntry) -> DbResult<()>;
+    // TODO: might need method to remove tx as well because tx corresponding to blob might have to
+    // be reconstructed if inputs change or reorg happen
 }
 
 #[cfg_attr(feature = "mocks", automock)]
 pub trait SeqDataProvider {
-    /// Get the l1 inscription txn by idx
-    fn get_l1_txn(&self, idx: u64) -> DbResult<Option<TxnStatusEntry>>;
-
     /// Get blob by its hash
-    fn get_blob_by_id(&self, id: Buf32) -> DbResult<Option<Vec<u8>>>;
+    fn get_blob_by_id(&self, id: Buf32) -> DbResult<Option<BlobEntry>>;
+
+    /// Get blob by its idx
+    fn get_blob_by_idx(&self, blobidx: u64) -> DbResult<Option<BlobEntry>>;
 
     /// Get the last blob idx
     fn get_last_blob_idx(&self) -> DbResult<Option<u64>>;
 
-    /// Get the last txn idx
-    fn get_last_txn_idx(&self) -> DbResult<Option<u64>>;
-
-    ///Get the reveal tx idx associated with blob idx
-    fn get_reveal_txidx_for_blob(&self, blobid: Buf32) -> DbResult<Option<u64>>;
-
-    /// Get the blob id for blob idx
-    fn get_blobid_for_blob_idx(&self, blobidx: u64) -> DbResult<Option<Buf32>>;
+    /// Get l1 tx
+    fn get_l1_tx(&self, txid: Buf32) -> DbResult<Option<Vec<u8>>>;
 }

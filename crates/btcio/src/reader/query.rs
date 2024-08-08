@@ -132,7 +132,7 @@ impl ReaderState {
 }
 
 pub async fn bitcoin_data_reader_task(
-    client: impl L1Client,
+    client: Arc<impl L1Client>,
     event_tx: mpsc::Sender<L1Event>,
     target_next_block: u64,
     config: Arc<ReaderConfig>,
@@ -140,7 +140,7 @@ pub async fn bitcoin_data_reader_task(
 ) {
     let mut status_updates = Vec::new();
     if let Err(e) = do_reader_task(
-        &client,
+        client.as_ref(),
         &event_tx,
         target_next_block,
         config,

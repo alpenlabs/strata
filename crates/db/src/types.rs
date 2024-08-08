@@ -1,52 +1,61 @@
-// Module for database local types
+//! Module for database local types
 
-use bitcoin::hashes::Hash;
-use bitcoin::{consensus::serialize, Transaction};
+use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use alpen_express_primitives::buf::Buf32;
 
-/// This keeps track of the transaction sent to L1 and has the raw txn so that if needed to resend
-/// it to L1, we need not serialize it again.
-#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize)]
-pub struct TxnStatusEntry {
-    pub txid: Buf32,
-    pub txn_raw: Vec<u8>,
-    pub status: L1TxnStatus,
+#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
+pub struct BlobEntry {
+    pub blob: Vec<u8>,
+    pub commit_txid: Buf32,
+    pub reveal_txid: Buf32,
+    pub status: BlobL1Status,
 }
 
-impl TxnStatusEntry {
-    pub fn from_txn(txn: &Transaction, status: L1TxnStatus) -> Self {
-        let txid = Buf32(txn.compute_txid().to_byte_array().into());
-        let txn_raw = serialize(txn);
+impl BlobEntry {
+    pub fn new(
+        blob: Vec<u8>,
+        commit_txid: Buf32,
+        reveal_txid: Buf32,
+        status: BlobL1Status,
+    ) -> Self {
         Self {
-            txid,
-            txn_raw,
+            blob,
+            commit_txid,
+            reveal_txid,
             status,
         }
     }
 
-    pub fn from_txn_unsent(txn: &Transaction) -> Self {
-        Self::from_txn(txn, L1TxnStatus::Unsent)
-    }
-
-    pub fn txid(&self) -> &Buf32 {
-        &self.txid
-    }
-
-    pub fn txn_raw(&self) -> &[u8] {
-        &self.txn_raw
-    }
-
-    pub fn status(&self) -> &L1TxnStatus {
-        &self.status
+    /// Create new unsigned blobentry.
+    /// NOTE: This won't have commit - reveal pairs associated with it.
+    ///   Because it is better to defer gathering utxos as late as possible to prevent being spent
+    ///   by others. Those will be created and signed in a single step.
+    pub fn new_unsigned(blob: Vec<u8>) -> Self {
+        let cid = Buf32::zero();
+        let rid = Buf32::zero();
+        Self::new(blob, cid, rid, BlobL1Status::Unsigned)
     }
 }
 
-#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize)]
-pub enum L1TxnStatus {
-    Unsent,
-    InMempool,
+#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
+pub enum BlobL1Status {
+    /// The blob has not been signed yet
+    Unsigned,
+
+    /// The commit reveal txs for blob are signed and waiting to be published
+    Unpublished,
+
+    /// The the txs are published
+    Published,
+
+    /// The the txs are confirmed in L1
     Confirmed,
+
+    /// The the txs are finalized in L1
     Finalized,
+
+    /// The txs need to be resigned because possibly the utxos were already spent
+    NeedsResign,
 }
