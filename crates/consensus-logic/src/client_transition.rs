@@ -331,9 +331,19 @@ mod tests {
 
             let output = process_event(&state, &event, database.as_ref(), &params).unwrap();
 
+            let genesis_blockids = database
+                .l2_provider()
+                .get_blocks_at_height(0)
+                .expect("genesis block should be created");
+            assert_eq!(genesis_blockids.len(), 1);
+            let genesis_blockid = genesis_blockids.first().unwrap();
+
             let expected_writes = [
                 ClientStateWrite::AcceptL1Block(l1_block_id),
                 ClientStateWrite::ActivateChain,
+                ClientStateWrite::ReplaceSync(Box::new(SyncState::from_genesis_blkid(
+                    *genesis_blockid,
+                ))),
             ];
             let expected_actions = [];
 
