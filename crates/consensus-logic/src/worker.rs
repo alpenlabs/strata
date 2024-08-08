@@ -144,8 +144,8 @@ fn process_msg<D: Database, E: ExecEngineCtl>(
             // just in case.
             let cur_ev_idx = state.state_tracker.cur_state_idx();
             let next_exp_idx = cur_ev_idx + 1;
-            let missed_ev_cnt = idx - next_exp_idx;
-            if missed_ev_cnt > 0 {
+            if *idx > next_exp_idx {
+                let missed_ev_cnt = idx - next_exp_idx;
                 warn!(%missed_ev_cnt, "applying missed sync events");
                 for ev_idx in next_exp_idx..*idx {
                     trace!(%ev_idx, "running missed sync event");
