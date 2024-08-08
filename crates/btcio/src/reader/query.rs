@@ -6,24 +6,19 @@ use std::{
 
 use alpen_express_status::StatusTx;
 use anyhow::bail;
-use bitcoin::{Block, BlockHash};
+use bitcoin::BlockHash;
 use tokio::sync::mpsc;
 use tracing::*;
 
 use crate::{
     reader::{
         config::ReaderConfig,
+        filter::{filter_interesting_txs, TxInterest},
         messages::{BlockData, L1Event},
     },
     rpc::traits::BitcoinReader,
     status::{apply_status_updates, L1StatusUpdate},
 };
-
-fn filter_interesting_txs(block: &Block) -> Vec<u32> {
-    // TODO actually implement the filter logic. Now it returns everything
-    // TODO maybe this should be on the persistence side?
-    (0..=block.txdata.len()).map(|i| i as u32).collect()
-}
 
 /// State we use in various parts of the reader.
 #[derive(Debug)]
@@ -144,13 +139,11 @@ pub async fn bitcoin_data_reader_task(
     config: Arc<ReaderConfig>,
     status_rx: Arc<StatusTx>,
 ) {
-    let mut status_updates = Vec::new();
     if let Err(e) = do_reader_task(
         client.as_ref(),
         &event_tx,
         target_next_block,
         config,
-        &mut status_updates,
         status_rx.clone(),
     )
     .await
@@ -164,7 +157,6 @@ async fn do_reader_task(
     event_tx: &mpsc::Sender<L1Event>,
     target_next_block: u64,
     config: Arc<ReaderConfig>,
-    status_updates: &mut Vec<L1StatusUpdate>,
     status_rx: Arc<StatusTx>,
 ) -> anyhow::Result<()> {
     info!(%target_next_block, "started L1 reader task!");
@@ -180,15 +172,15 @@ async fn do_reader_task(
     let best_blkid = state.best_block();
     info!(%best_blkid, "initialized L1 reader state");
 
-    // FIXME This function will return when reorg happens when there are not
-    // enough elements in the vec deque, probably during startup.
     loop {
+        let mut status_updates: Vec<L1StatusUpdate> = Vec::new();
         let cur_best_height = state.best_block_idx();
         let poll_span = debug_span!("l1poll", %cur_best_height);
 
-        if let Err(err) = poll_for_new_blocks(client, event_tx, &config, &mut state, status_updates)
-            .instrument(poll_span)
-            .await
+        if let Err(err) =
+            poll_for_new_blocks(client, event_tx, &config, &mut state, &mut status_updates)
+                .instrument(poll_span)
+                .await
         {
             warn!(%cur_best_height, err = %err, "failed to poll Bitcoin client");
             status_updates.push(L1StatusUpdate::RpcError(err.to_string()));
@@ -214,7 +206,7 @@ async fn do_reader_task(
                 .as_millis() as u64,
         ));
 
-        apply_status_updates(status_updates, status_rx.clone()).await;
+        apply_status_updates(&status_updates, status_rx.clone()).await;
     }
 }
 
@@ -254,7 +246,7 @@ async fn init_reader_state(
 async fn poll_for_new_blocks(
     client: &impl BitcoinReader,
     event_tx: &mpsc::Sender<L1Event>,
-    _config: &ReaderConfig,
+    config: &ReaderConfig,
     state: &mut ReaderState,
     status_updates: &mut Vec<L1StatusUpdate>,
 ) -> anyhow::Result<()> {
@@ -292,16 +284,22 @@ async fn poll_for_new_blocks(
     // Now process each block we missed.
     let scan_start_height = state.next_height;
     for fetch_height in scan_start_height..=client_height {
-        let l1blkid =
-            match fetch_and_process_block(fetch_height, client, event_tx, state, status_updates)
-                .await
-            {
-                Ok(b) => b,
-                Err(e) => {
-                    warn!(%fetch_height, err = %e, "failed to fetch new block");
-                    break;
-                }
-            };
+        let l1blkid = match fetch_and_process_block(
+            fetch_height,
+            client,
+            event_tx,
+            state,
+            status_updates,
+            config.tx_interest.clone(),
+        )
+        .await
+        {
+            Ok(b) => b,
+            Err(e) => {
+                warn!(%fetch_height, err = %e, "failed to fetch new block");
+                break;
+            }
+        };
         info!(%fetch_height, %l1blkid, "accepted new block");
     }
 
@@ -336,11 +334,12 @@ async fn fetch_and_process_block(
     event_tx: &mpsc::Sender<L1Event>,
     state: &mut ReaderState,
     status_updates: &mut Vec<L1StatusUpdate>,
+    tx_interest: TxInterest,
 ) -> anyhow::Result<BlockHash> {
     let block = client.get_block_at(height).await?;
     let txs = block.txdata.len();
 
-    let filtered_txs = filter_interesting_txs(&block);
+    let filtered_txs = filter_interesting_txs(&block, tx_interest);
     let block_data = BlockData::new(height, block, filtered_txs);
     let l1blkid = block_data.block().block_hash();
     trace!(%l1blkid, %height, %txs, "fetched block from client");

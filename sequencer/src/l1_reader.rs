@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{str::FromStr, sync::Arc};
 
 use alpen_express_btcio::{
     reader::{config::ReaderConfig, messages::L1Event, query::bitcoin_data_reader_task},
@@ -8,6 +8,7 @@ use alpen_express_consensus_logic::{ctl::CsmController, l1_handler::bitcoin_data
 use alpen_express_db::traits::{Database, L1DataProvider};
 use alpen_express_primitives::params::Params;
 use alpen_express_status::StatusTx;
+use bitcoin::Address;
 use express_tasks::TaskExecutor;
 use tokio::sync::mpsc;
 
@@ -36,10 +37,12 @@ where
         .map(|i| i + 1)
         .unwrap_or(params.rollup().horizon_l1_height);
 
-    let config = Arc::new(ReaderConfig {
-        max_reorg_depth: config.sync.max_reorg_depth,
-        client_poll_dur_ms: config.sync.client_poll_dur_ms,
-    });
+    let config = Arc::new(ReaderConfig::new(
+        config.sync.max_reorg_depth,
+        config.sync.client_poll_dur_ms,
+        Address::from_str(&config.client.sequencer_bitcoin_address)?
+            .require_network(config.bitcoind_rpc.network)?,
+    ));
 
     // TODO set up watchdog to handle when the spawned tasks fail gracefully
     executor.spawn_critical_async(
