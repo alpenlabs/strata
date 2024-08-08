@@ -8,5 +8,9 @@ anyhow = { workspace = true }
 bincode = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-sp1-sdk = "1.0.1"
+sp1-sdk = { version = "1.0.1", optional = true }
 zkvm = { workspace = true }
+
+[features]
+default = []
+prover = ["dep:sp1-sdk"]

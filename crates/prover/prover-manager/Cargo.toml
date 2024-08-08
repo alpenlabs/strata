@@ -8,10 +8,16 @@ alpen-vertex-state = { workspace = true }
 alpen-vertex-primitives = { workspace = true }
 alpen-vertex-evmexec = { workspace = true }
 zkvm = { path = "../zkvm" }
-risc0-adapter = { path = "../adapters/risc0" }
-guest-builder = { path = "../../../proofs" }
-zkvm-primitives = { git = "https://github.com/MdTeach/reth", branch = "prover-primitives" }
+risc0-adapter = { path = "../adapters/risc0", optional = true, features = [
+  "prover",
+] }
+guest-builder = { path = "../../../proofs", optional = true }
+zkvm-primitives = { git = "https://github.com/MdTeach/reth", branch = "prover-primitives", optional = true }
 anyhow = { workspace = true }
 serde = { workspace = true }
 bincode = { workspace = true }
 borsh = { workspace = true }
+
+[features]
+default = []
+prover = ["dep:risc0-adapter", "guest-builder", "zkvm-primitives"]
