@@ -18,8 +18,10 @@ def generate_seqkey() -> bytes:
     assert len(buf) == 32, "bad seqkey len"
     return buf
 
+
 def generate_jwt_secret() -> str:
     return os.urandom(32).hex()
+
 
 def generate_blocks(
     bitcoin_rpc: BitcoindClient,
@@ -46,6 +48,7 @@ def generate_task(rpc: BitcoindClient, wait_dur, addr):
         except Exception as ex:
             log.warning(f"{ex} while generating to address {addr}")
             return
+
 
 def generate_n_blocks(bitcoin_rpc: BitcoindClient, n: int):
     addr = bitcoin_rpc.proxy.getnewaddress()
@@ -105,7 +108,14 @@ class ExpressFactory(flexitest.Factory):
 
     @flexitest.with_ectx("ctx")
     def create_sequencer(
-        self, bitcoind_sock: str, bitcoind_user: str, bitcoind_pass: str, reth_socket: str, reth_secret_path: str, sequencer_address: str, ctx: flexitest.EnvContext
+        self,
+        bitcoind_sock: str,
+        bitcoind_user: str,
+        bitcoind_pass: str,
+        reth_socket: str,
+        reth_secret_path: str,
+        sequencer_address: str,
+        ctx: flexitest.EnvContext,
     ) -> flexitest.Service:
         datadir = ctx.make_service_dir("sequencer")
         rpc_port = self.next_port()
@@ -146,6 +156,7 @@ class ExpressFactory(flexitest.Factory):
             svc.create_rpc = _create_rpc
 
             return svc
+
 
 class RethFactory(flexitest.Factory):
     def __init__(self, port_range: list[int]):
@@ -197,13 +208,13 @@ class BasicEnvConfig(flexitest.EnvConfig):
         seqaddr = brpc.proxy.getnewaddress()
 
         if self.pre_generate_blocks > 0:
-            print(f"Pre generating {self.pre_generate_blocks} blocks to addresss {seqaddr}")
+            print(f"Pre generating {self.pre_generate_blocks} blocks to address {seqaddr}")
             brpc.proxy.generatetoaddress(self.pre_generate_blocks, seqaddr)
 
         secret_dir = ctx.make_service_dir("secret")
         reth_secret_path = os.path.join(secret_dir, "jwt.hex")
 
-        with open(reth_secret_path, 'w') as file:
+        with open(reth_secret_path, "w") as file:
             file.write(generate_jwt_secret())
 
         reth = reth_fac.create_exec_client(reth_secret_path)
@@ -217,8 +228,11 @@ class BasicEnvConfig(flexitest.EnvConfig):
         rpc_user = bitcoind.get_prop("rpc_user")
         rpc_pass = bitcoind.get_prop("rpc_password")
         rpc_sock = f"localhost:{rpc_port}/wallet/{walletname}"
-        sequencer = seq_fac.create_sequencer(rpc_sock, rpc_user, rpc_pass, reth_socket, reth_secret_path, seqaddr)
-        # need to wait for at least `genesis_l1_height` blocks to be generated. sleeping some more for safety
+        sequencer = seq_fac.create_sequencer(
+            rpc_sock, rpc_user, rpc_pass, reth_socket, reth_secret_path, seqaddr
+        )
+        # Need to wait for at least `genesis_l1_height` blocks to be generated.
+        # Sleeping some more for safety
         time.sleep(BLOCK_GENERATION_INTERVAL_SECS * 10)
 
         svcs = {"bitcoin": bitcoind, "sequencer": sequencer, "reth": reth}
@@ -230,7 +244,7 @@ def main(argv):
     modules = flexitest.runtime.scan_dir_for_modules(test_dir)
     all_tests = flexitest.runtime.load_candidate_modules(modules)
 
-    tests = [str(argv[1]).removesuffix('.py')] if len(argv) > 1 else all_tests
+    tests = [str(argv[1]).removesuffix(".py")] if len(argv) > 1 else all_tests
 
     datadir_root = flexitest.create_datadir_in_workspace(os.path.join(test_dir, DD_ROOT))
 

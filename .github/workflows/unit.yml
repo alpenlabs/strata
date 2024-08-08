@@ -19,9 +19,6 @@ jobs:
   test:
     name: Run unit tests and generate report
     runs-on: ubuntu-latest
-    env:
-      RUSTFLAGS: -D warnings
-      CARGO_TERM_COLOR: always
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly

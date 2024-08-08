@@ -4,14 +4,12 @@ import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 
 from constants import BLOCK_GENERATION_INTERVAL_SECS, SEQ_SLACK_TIME_SECS
-from entry import BasicEnvConfig
 
 REORG_DEPTH = 3
 
 
 @flexitest.register
 class L1ReadReorgTest(flexitest.Test):
-
     def __init__(self, ctx: flexitest.InitContext):
         # standalone env for this test as it involves mutating the blockchain via invalidation
         ctx.set_env("basic")
