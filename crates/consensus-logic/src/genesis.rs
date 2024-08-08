@@ -58,22 +58,13 @@ pub fn init_genesis_chainstate(
     let pregenesis_mfs =
         load_pre_genesis_l1_manifests(l1_prov.as_ref(), horizon_blk_height, genesis_blk_height)?;
 
-    // Create a dummy exec state that we can build the rest of the genesis block
-    // around and insert into the genesis state.
-    // TODO this might need to talk to the EL to do the genesus setup *properly*
-    let extra_payload = create_evm_extra_payload(params.rollup.evm_genesis_block_hash);
-    let geui = UpdateInput::new(0, Buf32::zero(), extra_payload);
+    // Build the genesis block and genesis consensus states.
+    let gblock = make_genesis_block(params);
+    let genesis_blkid = gblock.header().get_blockid();
+
+    let geui = gblock.exec_segment().update().input();
     let gees =
         ExecEnvState::from_base_input(geui.clone(), params.rollup.evm_genesis_block_state_root);
-    let geu = ExecUpdate::new(
-        geui.clone(),
-        UpdateOutput::new_from_state(params.rollup.evm_genesis_block_state_root),
-    );
-
-    // Build the genesis block and genesis consensus states.
-    let gblock = make_genesis_block(params, geu);
-    let genesis_blkid = gblock.header().get_blockid();
-    info!(?genesis_blkid, "created genesis block");
 
     let genesis_blk_rec = L1HeaderRecord::from(pregenesis_mfs.last().unwrap());
     let l1vs = L1ViewState::new_at_genesis(horizon_blk_height, genesis_blk_height, genesis_blk_rec);
@@ -111,7 +102,19 @@ fn load_pre_genesis_l1_manifests(
     Ok(manifests)
 }
 
-fn make_genesis_block(params: &Params, genesis_update: ExecUpdate) -> L2BlockBundle {
+// NOTE: generate block MUST be deterministic
+// repeated calls with same params MUST return identical blocks
+pub fn make_genesis_block(params: &Params) -> L2BlockBundle {
+    // Create a dummy exec state that we can build the rest of the genesis block
+    // around and insert into the genesis state.
+    // TODO this might need to talk to the EL to do the genesus setup *properly*
+    let extra_payload = create_evm_extra_payload(params.rollup.evm_genesis_block_hash);
+    let geui = UpdateInput::new(0, Buf32::zero(), extra_payload);
+    let genesis_update = ExecUpdate::new(
+        geui.clone(),
+        UpdateOutput::new_from_state(params.rollup.evm_genesis_block_state_root),
+    );
+
     // This has to be empty since everyone should have an unambiguous view of the genesis block.
     let l1_seg = L1Segment::new_empty();
 

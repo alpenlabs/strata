@@ -6,11 +6,12 @@ use tracing::*;
 use alpen_express_db::traits::{Database, L1DataProvider, L2DataProvider, L2DataStore};
 use alpen_express_primitives::prelude::*;
 use alpen_express_state::client_state::*;
+use alpen_express_state::header::L2Header;
 use alpen_express_state::operation::*;
 use alpen_express_state::sync_event::SyncEvent;
 
 use crate::errors::*;
-use crate::genesis;
+use crate::genesis::make_genesis_block;
 
 /// Processes the event given the current consensus state, producing some
 /// output.  This can return database errors.
@@ -82,21 +83,13 @@ pub fn process_event<D: Database>(
                 // If necessary, activeate the chain!
                 if !state.is_chain_active() && *height >= genesis_threshold {
                     debug!("emitting chain activation");
+                    let genesis_block = make_genesis_block(params);
+
                     writes.push(ClientStateWrite::ActivateChain);
-
-                    // when state_sync.is_none() and chain_active: false -> true transition, ensure
-                    // genesis block is created
-                    let genesis_blockid = genesis::init_genesis_chainstate(params, database)
-                        .map_err(|err| {
-                            error!(err = %err, "failed to compute chain genesis");
-                            Error::GenesisFailed(err.to_string())
-                        })?;
-
                     writes.push(ClientStateWrite::ReplaceSync(Box::new(
-                        SyncState::from_genesis_blkid(genesis_blockid),
+                        SyncState::from_genesis_blkid(genesis_block.header().get_blockid()),
                     )));
-
-                    // add L2Genesis action ?
+                    actions.push(SyncAction::L2Genesis(*l1blkid));
                 }
             }
         }
@@ -166,6 +159,8 @@ mod tests {
         l2::{gen_client_state, gen_params},
         ArbitraryGenerator,
     };
+
+    use crate::genesis;
 
     use super::*;
 
@@ -331,21 +326,17 @@ mod tests {
 
             let output = process_event(&state, &event, database.as_ref(), &params).unwrap();
 
-            let genesis_blockids = database
-                .l2_provider()
-                .get_blocks_at_height(0)
-                .expect("genesis block should be created");
-            assert_eq!(genesis_blockids.len(), 1);
-            let genesis_blockid = genesis_blockids.first().unwrap();
+            let genesis_block = genesis::make_genesis_block(&params);
+            let genesis_blockid = genesis_block.header().get_blockid();
 
             let expected_writes = [
                 ClientStateWrite::AcceptL1Block(l1_block_id),
                 ClientStateWrite::ActivateChain,
                 ClientStateWrite::ReplaceSync(Box::new(SyncState::from_genesis_blkid(
-                    *genesis_blockid,
+                    genesis_blockid,
                 ))),
             ];
-            let expected_actions = [];
+            let expected_actions = [SyncAction::L2Genesis(l1_block_id)];
 
             assert_eq!(output.writes(), expected_writes);
             assert_eq!(output.actions(), expected_actions);
