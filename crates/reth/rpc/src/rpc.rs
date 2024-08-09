@@ -25,7 +25,7 @@ where
     DB: WitnessProvider + Send + Sync + Clone + 'static,
 {
     #[doc = "fetch block execution witness data for proving in zkvm"]
-    fn block_witness(
+    fn get_block_witness(
         &self,
         block_hash: B256,
         json: Option<bool>,

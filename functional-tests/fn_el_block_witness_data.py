@@ -28,7 +28,7 @@ class ElBlockWitnessDataGenerationTest(flexitest.Test):
 
         for blocknum in blocknums:
             blockhash = rethrpc.eth_getBlockByNumber(hex(blocknum), False)["hash"]
-            witness_data = rethrpc.alpen_blockWitness(blockhash, False)
+            witness_data = rethrpc.alpee_getBlockWitness(blockhash, False)
 
             assert witness_data != None, "non empty witness"
 
