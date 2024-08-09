@@ -7,19 +7,22 @@ members = [
   "crates/eectl",
   "crates/evmexec",
   "crates/primitives",
-  "crates/rpc/api",
-  "crates/rpc/utils",
+  "crates/prover/adapters/risc0",
+  "crates/prover/primitives",
+  "crates/prover/zkvm",
   "crates/reth/db",
   "crates/reth/exex",
   "crates/reth/rpc",
+  "crates/rpc/api",
   "crates/rpc/types",
+  "crates/rpc/utils",
   "crates/state",
+  "crates/storage",
   "crates/test-utils",
   "crates/util/mmr",
   "crates/vtxjmt",
-  "crates/prover/zkvm",
-  "crates/prover/adapters/risc0",
-  "crates/prover/primitives",
+
+  # binaries listed separately
   "sequencer",
   "reth",
 ]
@@ -46,7 +49,8 @@ express-reth-db = { path = "crates/reth/db" }
 express-reth-exex = { path = "crates/reth/exex" }
 express-reth-rpc = { path = "crates/reth/rpc" }
 express-rpc-utils = { path = "crates/rpc/utils" }
-zkvm = { path = "crates/prover/zkvm" }
+express-storage = { path = "crates/storage" }
+zkvm = { path = "crates/prover/zkvm" } # FIXME make these names more consistent?
 zkvm-primitives = { path = "crates/prover/primitives" }
 
 # IMPORTANT: ensure alloy-* types are of the same version as inside reth dependency

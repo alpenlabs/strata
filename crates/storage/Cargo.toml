@@ -1,0 +1,7 @@
+[package]
+name = "express-storage"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+alpen-express-db = { workspace = true }

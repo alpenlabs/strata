@@ -25,6 +25,7 @@ These exist in `crates/`.
 * `primitives` - common types used throughout project, mostly re-exports
 * `rpc/api` - Alpen rollup RPC defs
 * `state` - type defs relating to rollup data structures
+* `storage` - intermediate storage IO abstraction layer
 * `util/` - independent utility libraries
   * `mmr` - "merkle mountain range" util
 * `vtxjmt` - extensions to JMT crate for our purposes

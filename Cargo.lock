@@ -3156,6 +3156,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "express-storage"
+version = "0.1.0"
+dependencies = [
+ "alpen-express-db",
+]
+
+[[package]]
 name = "eyre"
 version = "0.6.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
