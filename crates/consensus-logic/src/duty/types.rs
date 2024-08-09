@@ -1,9 +1,6 @@
 //! Sequencer duties.
 
-use std::{
-    hash::{DefaultHasher, Hash, Hasher},
-    time,
-};
+use std::time::{self};
 
 use borsh::{BorshDeserialize, BorshSerialize};
 
@@ -24,7 +21,7 @@ pub enum Expiry {
 }
 
 /// Duties the sequencer might carry out.
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Debug)]
 pub enum Duty {
     /// Goal to sign a block.
     SignBlock(BlockSigningDuty),
@@ -38,16 +35,10 @@ impl Duty {
             Self::SignBlock(_) => Expiry::NextBlock,
         }
     }
-
-    pub fn id(&self) -> u64 {
-        let mut hasher = DefaultHasher::new();
-        self.hash(&mut hasher);
-        hasher.finish()
-    }
 }
 
 /// Describes information associated with signing a block.
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Debug)]
 pub struct BlockSigningDuty {
     /// Slot to sign for.
     slot: u64,
@@ -82,6 +73,7 @@ impl BlockSigningDuty {
 /// Manages a set of duties we need to carry out.
 #[derive(Clone, Debug)]
 pub struct DutyTracker {
+    next_id: u64,
     duties: Vec<DutyEntry>,
     finalized_block: Option<L2BlockId>,
 }
@@ -90,6 +82,7 @@ impl DutyTracker {
     /// Creates a new instance that has nothing in it.
     pub fn new_empty() -> Self {
         Self {
+            next_id: 1,
             duties: Vec::new(),
             finalized_block: None,
         }
@@ -138,8 +131,13 @@ impl DutyTracker {
     /// Adds some more duties.
     pub fn add_duties(&mut self, blkid: L2BlockId, slot: u64, duties: impl Iterator<Item = Duty>) {
         self.duties.extend(duties.map(|d| DutyEntry {
-            id: d.id(),
             duty: d,
+            id: {
+                // This is horrible but it works. :)
+                let id = self.next_id;
+                self.next_id += 1;
+                id
+            },
             created_blkid: blkid,
             created_slot: slot,
         }));
