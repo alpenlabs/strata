@@ -10,8 +10,8 @@ pub struct ReaderConfig {
     /// Time between polls to the L1 client, in millis.
     pub client_poll_dur_ms: u32,
 
-    /// TxInterest
-    pub tx_interest: TxInterest,
+    /// The kind of transactions that we are interested in
+    pub tx_interests: Vec<TxInterest>,
 }
 
 impl ReaderConfig {
@@ -19,7 +19,7 @@ impl ReaderConfig {
         Self {
             max_reorg_depth,
             client_poll_dur_ms,
-            tx_interest: TxInterest::SpentToAddress(seq_addr),
+            tx_interests: vec![TxInterest::SpentToAddress(seq_addr)],
         }
     }
 }

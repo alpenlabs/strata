@@ -290,7 +290,7 @@ async fn poll_for_new_blocks(
             event_tx,
             state,
             status_updates,
-            config.tx_interest.clone(),
+            &config.tx_interests,
         )
         .await
         {
@@ -334,12 +334,12 @@ async fn fetch_and_process_block(
     event_tx: &mpsc::Sender<L1Event>,
     state: &mut ReaderState,
     status_updates: &mut Vec<L1StatusUpdate>,
-    tx_interest: TxInterest,
+    tx_interests: &[TxInterest],
 ) -> anyhow::Result<BlockHash> {
     let block = client.get_block_at(height).await?;
     let txs = block.txdata.len();
 
-    let filtered_txs = filter_interesting_txs(&block, tx_interest);
+    let filtered_txs = filter_interesting_txs(&block, tx_interests);
     let block_data = BlockData::new(height, block, filtered_txs);
     let l1blkid = block_data.block().block_hash();
     trace!(%l1blkid, %height, %txs, "fetched block from client");

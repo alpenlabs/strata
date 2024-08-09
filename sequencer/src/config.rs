@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use alpen_express_btcio::reader::{config::ReaderConfig, filter::TxInterest};
 use bitcoin::Network;
 use serde::Deserialize;
 
@@ -99,6 +100,7 @@ impl Config {
             },
         })
     }
+
     pub fn update_from_args(&mut self, args: &Args) {
         let args = args.clone();
 
@@ -131,6 +133,15 @@ impl Config {
         }
         if let Some(db_retry_count) = args.db_retry_count {
             self.client.db_retry_count = db_retry_count;
+        }
+    }
+
+    pub fn get_reader_config(&self) -> ReaderConfig {
+        ReaderConfig {
+            max_reorg_depth: self.sync.max_reorg_depth,
+            client_poll_dur_ms: self.sync.client_poll_dur_ms,
+            tx_interests: vec![TxInterest::TxIdWithPrefix(Vec::new())], /* basically filter all
+                                                                         * the txs */
         }
     }
 }

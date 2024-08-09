@@ -54,7 +54,7 @@ fn get_cohashes_from_wtxids(wtxids: &[Wtxid], index: u32) -> (Vec<Buf32>, Buf32)
             .chunks(2)
             .map(|pair| {
                 let [a, b] = pair else {
-                    panic!("should be a pair");
+                    panic!("utils: cohash chunk should be a pair");
                 };
                 let mut arr = [0u8; 64];
                 arr[..32].copy_from_slice(a);
@@ -85,21 +85,20 @@ pub fn generate_l1_tx(idx: u32, block: &Block) -> L1Tx {
     );
     let tx = &block.txdata[idx as usize];
 
-    let (cohashes, _wtxroot) = get_cohashes_from_wtxids(
-        &block
-            .txdata
-            .iter()
-            .enumerate()
-            .map(|(i, x)| {
-                if i == 0 {
-                    Wtxid::all_zeros() // Coinbase's wtxid is all zeros
-                } else {
-                    x.compute_wtxid()
-                }
-            })
-            .collect::<Vec<_>>(),
-        idx,
-    );
+    // Get all witness ids for txs
+    let wtxids = &block
+        .txdata
+        .iter()
+        .enumerate()
+        .map(|(i, x)| {
+            if i == 0 {
+                Wtxid::all_zeros() // Coinbase's wtxid is all zeros
+            } else {
+                x.compute_wtxid()
+            }
+        })
+        .collect::<Vec<_>>();
+    let (cohashes, _wtxroot) = get_cohashes_from_wtxids(wtxids, idx);
 
     let proof = L1TxProof::new(idx, cohashes);
     let tx = serialize(tx);
