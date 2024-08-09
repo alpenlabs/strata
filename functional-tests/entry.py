@@ -167,22 +167,35 @@ class RethFactory(flexitest.Factory):
         self, reth_secret_path: str, ctx: flexitest.EnvContext
     ) -> flexitest.Service:
         datadir = ctx.make_service_dir("reth")
-        rpc_port = self.next_port()
+        authrpc_port = self.next_port()
+        listener_port = self.next_port()
+        ethrpc_port = self.next_port()
         logfile = os.path.join(datadir, "service.log")
 
         # fmt: off
         cmd = [
             "alpen-express-reth",
+            "--disable-discovery",
             "--datadir", datadir,
-            "--authrpc.port", str(rpc_port),
+            "--authrpc.port", str(authrpc_port),
             "--authrpc.jwtsecret", reth_secret_path,
+            "--port", str(listener_port),
+            "--ws",
+            "--ws.port", str(ethrpc_port),
             "-vvvv"
         ]
         # fmt: on
-        props = {"rpc_port": rpc_port}
+        props = {"rpc_port": authrpc_port}
+
+        ethrpc_url = f"ws://localhost:{ethrpc_port}"
 
         with open(logfile, "w") as f:
             svc = flexitest.service.ProcService(props, cmd, stdout=f)
+
+            def _create_rpc():
+                return seqrpc.JsonrpcClient(ethrpc_url)
+
+            svc.create_rpc = _create_rpc
 
             return svc
 
@@ -250,7 +263,7 @@ def main(argv):
 
     btc_fac = BitcoinFactory([12300 + i for i in range(20)])
     seq_fac = ExpressFactory([12400 + i for i in range(20)])
-    reth_fac = RethFactory([12500 + i for i in range(20)])
+    reth_fac = RethFactory([12500 + i for i in range(20 * 3)])
 
     factories = {"bitcoin": btc_fac, "sequencer": seq_fac, "reth": reth_fac}
     global_envs = {"basic": BasicEnvConfig(), "premined_blocks": BasicEnvConfig(101)}

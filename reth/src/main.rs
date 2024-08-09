@@ -1,21 +1,26 @@
+mod db;
+
 use std::{future::Future, sync::Arc};
 
-use alloy_genesis::Genesis;
 use clap::Parser;
+use express_reth_db::rocksdb::WitnessDB;
+use express_reth_exex::ProverWitnessGenerator;
+use express_reth_rpc::{AlpenRPC, AlpenRpcApiServer};
 use reth::{
     args::LogArgs,
     builder::{NodeBuilder, WithLaunchContext},
-    commands::node::NodeCommand,
     CliRunner,
 };
 use reth_chainspec::ChainSpec;
+use reth_cli_commands::node::NodeCommand;
 use reth_node_ethereum::EthereumNode;
+use reth_primitives::Genesis;
 use tracing::info;
 
 const ALPEN_CHAIN_SPEC: &str = include_str!("../res/alpen-dev-chain.json");
 
 fn main() {
-    reth::sigsegv_handler::install();
+    reth_cli_util::sigsegv_handler::install();
 
     // Enable backtraces unless a RUST_BACKTRACE value has already been explicitly provided.
     if std::env::var_os("RUST_BACKTRACE").is_none() {
@@ -29,7 +34,25 @@ fn main() {
     command.network.discovery.disable_discovery = true;
 
     if let Err(err) = run(command, |builder, _| async {
-        let handle = builder.launch_node(EthereumNode::default()).await?;
+        let datadir = builder.config().datadir().data_dir().to_path_buf();
+        let rbdb = db::open_rocksdb_database(datadir.clone()).expect("open rocksdb");
+
+        let db = Arc::new(WitnessDB::new(rbdb));
+        let rpc_db = db.clone();
+
+        let handle = builder
+            .node(EthereumNode::default())
+            .extend_rpc_modules(|ctx| {
+                let alpen_rpc = AlpenRPC::new(rpc_db);
+                ctx.modules.merge_configured(alpen_rpc.into_rpc())?;
+
+                Ok(())
+            })
+            .install_exex("prover_input", |ctx| async {
+                Ok(ProverWitnessGenerator::new(ctx, db).start())
+            })
+            .launch()
+            .await?;
         handle.node_exit_future.await
     }) {
         eprintln!("Error: {err:?}");

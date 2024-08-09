@@ -1,0 +1,21 @@
+[package]
+edition = "2021"
+name = "express-reth-db"
+version = "0.1.0"
+
+[dependencies]
+alpen-express-db = { workspace = true }
+alpen-express-rocksdb = { workspace = true }
+zkvm-primitives = { workspace = true }
+
+anyhow = { workspace = true }
+bincode = { workspace = true }
+borsh = { workspace = true }
+reth-primitives = { workspace = true }
+rockbound = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+tempfile = { workspace = true }

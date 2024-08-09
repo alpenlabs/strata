@@ -1,0 +1,28 @@
+[package]
+edition = "2021"
+name = "express-reth-exex"
+version = "0.1.0"
+
+[dependencies]
+express-reth-db = { workspace = true }
+zkvm-primitives = { workspace = true }
+
+alloy-rpc-types = { workspace = true }
+anyhow = { workspace = true }
+bincode = { workspace = true }
+eyre = { workspace = true }
+reth-exex = { workspace = true }
+reth-node-api = { workspace = true }
+reth-primitives = { workspace = true }
+reth-provider = { workspace = true }
+reth-revm = { workspace = true }
+reth-rpc-types-compat = { workspace = true }
+rockbound = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+serde = { workspace = true }
+tempfile = { workspace = true }

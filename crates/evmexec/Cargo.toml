@@ -14,7 +14,7 @@ borsh = { workspace = true }
 futures = { workspace = true }
 http = { workspace = true }
 hyper = { workspace = true }
-jsonrpsee = { workspace = true }
+jsonrpsee = { workspace = true, features = ["jsonrpsee-http-client"] }
 reth-node-ethereum = { workspace = true }
 reth-primitives = { workspace = true }
 reth-rpc = { workspace = true }

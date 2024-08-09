@@ -8,12 +8,17 @@ members = [
   "crates/evmexec",
   "crates/primitives",
   "crates/rpc/api",
+  "crates/rpc/utils",
+  "crates/reth/db",
+  "crates/reth/exex",
+  "crates/reth/rpc",
   "crates/state",
   "crates/test-utils",
   "crates/util/mmr",
   "crates/vtxjmt",
   "crates/prover/zkvm",
   "crates/prover/adapters/risc0",
+  "crates/prover/primitives",
   "sequencer",
   "reth",
 ]
@@ -35,9 +40,16 @@ alpen-express-rocksdb = { path = "crates/rocksdb-store" }
 alpen-express-rpc-api = { path = "crates/rpc/api" }
 alpen-express-state = { path = "crates/state" }
 alpen-test-utils = { path = "crates/test-utils" }
+express-reth-db = { path = "crates/reth/db" }
+express-reth-exex = { path = "crates/reth/exex" }
+express-reth-rpc = { path = "crates/reth/rpc" }
+express-rpc-utils = { path = "crates/rpc/utils" }
 zkvm = { path = "crates/prover/zkvm" }
+zkvm-primitives = { path = "crates/prover/primitives" }
 
-alloy-genesis = { version = "0.1", default-features = false }
+# IMPORTANT: ensure alloy-* types are of the same version as inside reth dependency 
+alloy-genesis = { version = "0.2", default-features = false }
+alloy-rpc-types = { version = "0.2", default-features = false }
 anyhow = "1.0.86"
 arbitrary = { version = "1.3.2", features = ["derive"] }
 argh = "0.1"
@@ -48,31 +60,38 @@ bitcoin = { version = "0.32.1", features = ["serde"] }
 borsh = { version = "1.5.0", features = ["derive"] }
 bytes = { version = "1.6.0" }
 digest = "0.10"
+eyre = "0.6"
 format_serde_error = { git = "https://github.com/AlexanderThaller/format_serde_error" }
 futures = "0.3"
 hex = { version = "0.4", features = ["serde"] }
 http = "1.0.0"
 hyper = "0.14.25"
 jmt = "0.10.0"
-jsonrpsee = { version = "0.23", features = ["jsonrpsee-http-client"] }
+jsonrpsee = { version = "0.23" }
 jsonrpsee-types = "0.23"
 mockall = "0.11"
 num_enum = "0.7"
 parking_lot = "0.12.3"
 rand = "0.8.5"
 reqwest = { version = "0.12.4", features = ["json"] }
-reth = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
-reth-chainspec = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
-reth-db = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
-reth-ipc = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
-reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
-reth-primitives = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
-reth-revm = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
-reth-rpc = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
-reth-rpc-api = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
-reth-rpc-layer = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
-reth-rpc-types = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
-reth-rpc-types-compat = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.0.1" }
+reth = { git = "https://github.com/alpenlabs/reth.git", rev = "a90fc90df8be5651" }
+reth-chainspec = { git = "https://github.com/alpenlabs/reth.git", rev = "a90fc90df8be5651" }
+reth-cli-commands = { git = "https://github.com/alpenlabs/reth.git", rev = "a90fc90df8be5651" }
+reth-cli-util = { git = "https://github.com/alpenlabs/reth.git", rev = "a90fc90df8be5651" }
+reth-db = { git = "https://github.com/alpenlabs/reth.git", rev = "a90fc90df8be5651" }
+reth-exex = { git = "https://github.com/alpenlabs/reth.git", rev = "a90fc90df8be5651" }
+reth-ipc = { git = "https://github.com/alpenlabs/reth.git", rev = "a90fc90df8be5651" }
+reth-node-api = { git = "https://github.com/alpenlabs/reth.git", rev = "a90fc90df8be5651" }
+reth-node-ethereum = { git = "https://github.com/alpenlabs/reth.git", rev = "a90fc90df8be5651" }
+reth-primitives = { git = "https://github.com/alpenlabs/reth.git", rev = "a90fc90df8be5651" }
+reth-provider = { git = "https://github.com/alpenlabs/reth.git", rev = "a90fc90df8be5651" }
+reth-revm = { git = "https://github.com/alpenlabs/reth.git", rev = "a90fc90df8be5651" }
+reth-rpc = { git = "https://github.com/alpenlabs/reth.git", rev = "a90fc90df8be5651" }
+reth-rpc-api = { git = "https://github.com/alpenlabs/reth.git", rev = "a90fc90df8be5651" }
+reth-rpc-layer = { git = "https://github.com/alpenlabs/reth.git", rev = "a90fc90df8be5651" }
+reth-rpc-types = { git = "https://github.com/alpenlabs/reth.git", rev = "a90fc90df8be5651" }
+reth-rpc-types-compat = { git = "https://github.com/alpenlabs/reth.git", rev = "a90fc90df8be5651" }
+reth-trie-common = { git = "https://github.com/alpenlabs/reth.git", rev = "a90fc90df8be5651" }
 rockbound = { git = "https://github.com/alpenlabs/rockbound", rev = "3b10aaabef6652f0" }
 secp256k1 = "0.29.0"
 serde = "1.0"
