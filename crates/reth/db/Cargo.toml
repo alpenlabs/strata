@@ -9,8 +9,8 @@ alpen-express-rocksdb = { workspace = true }
 zkvm-primitives = { workspace = true }
 
 anyhow = { workspace = true }
-borsh = { workspace = true }
 bincode = { workspace = true }
+borsh = { workspace = true }
 reth-primitives = { workspace = true }
 rockbound = { workspace = true }
 tracing = { workspace = true }
