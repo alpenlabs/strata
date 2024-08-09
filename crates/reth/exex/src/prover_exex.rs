@@ -137,6 +137,8 @@ fn extract_zkvm_input<Node: FullNodeComponents>(
         // TODO: handle the contract input
         contracts: Default::default(),
         parent_header: prev_block.header,
+        // NOTE: using default to save prover cost.
+        // Will need to revisit if BLOCKHASH opcode operation is a blocker
         ancestor_headers: Default::default(),
     };
 
