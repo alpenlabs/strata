@@ -28,6 +28,9 @@ pub struct WithdrawalInfo<State = Requested> {
     state: std::marker::PhantomData<State>,
     // Rollup data required to verify withdrawal assignment.
     // TODO: This possibly requires SSZ impl for efficient verification
+    // An alternative is to have an RPC on the full node that allows querying the assignee
+    // information from the chainstate via the `deposit_utxo` (as each such utxo is mapped to at
+    // most one unique assignee at any given time).
     // rollup_block_info: ??
 }
 

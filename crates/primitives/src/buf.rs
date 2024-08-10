@@ -7,7 +7,7 @@ use bitcoin::hashes::Hash;
 use bitcoin::BlockHash;
 use borsh::{BorshDeserialize, BorshSerialize};
 use reth_primitives::alloy_primitives::FixedBytes;
-use serde::{Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 // 20-byte buf
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default)]
@@ -46,7 +46,7 @@ impl fmt::Display for Buf20 {
 }
 
 // 32-byte buf, useful for hashes and schnorr pubkeys
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Serialize, Deserialize)]
 pub struct Buf32(pub FixedBytes<32>);
 
 impl Buf32 {

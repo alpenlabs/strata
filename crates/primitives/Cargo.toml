@@ -11,6 +11,7 @@ digest = { workspace = true }
 hex = { workspace = true }
 reth-primitives = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
 sha2 = { workspace = true }
 
 [dev-dependencies]

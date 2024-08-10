@@ -4,6 +4,7 @@
 //! extended to a more sophisticated design when we have that specced out.
 
 use borsh::{BorshDeserialize, BorshSerialize};
+use serde::{Deserialize, Serialize};
 
 use alpen_express_primitives::{
     buf::Buf32,
@@ -14,7 +15,9 @@ use alpen_express_primitives::{
 pub type OperatorIdx = u32;
 
 /// Entry for an operator.  They have a
-#[derive(Clone, Debug, Eq, PartialEq, Hash, BorshDeserialize, BorshSerialize)]
+#[derive(
+    Clone, Debug, Eq, PartialEq, Hash, BorshDeserialize, BorshSerialize, Serialize, Deserialize,
+)]
 pub struct OperatorEntry {
     /// Global operator index.
     idx: OperatorIdx,

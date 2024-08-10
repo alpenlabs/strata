@@ -21,7 +21,9 @@ async fn main() {
     info!("running bridge client in {} mode", cli_args.mode);
 
     if let ModeOfOperation::Operator = cli_args.mode {
-        operator::bootstrap().await.expect("bootstrap operator node");
+        operator::bootstrap()
+            .await
+            .expect("bootstrap operator node");
     } else {
         challenger::bootstrap().await;
     }
