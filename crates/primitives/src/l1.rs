@@ -1,8 +1,14 @@
-use std::fmt;
+use std::{
+    fmt, io,
+    io::{Read, Write},
+    str::FromStr,
+};
 
 use arbitrary::Arbitrary;
-use bitcoin::{consensus::serialize, hashes::Hash, Block};
+use bitcoin::{address::NetworkUnchecked, consensus::serialize, hashes::Hash, Address, Block};
 use borsh::{BorshDeserialize, BorshSerialize};
+use serde::{Deserialize, Serialize};
+use serde_json;
 
 use crate::buf::Buf32;
 
@@ -167,5 +173,130 @@ impl From<OutputRef> for (Buf32, u16) {
 impl fmt::Debug for OutputRef {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_fmt(format_args!("{:?}:{}", self.txid, self.outidx))
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct L1Status {
+    /// If the last time we tried to poll the client (as of `last_update`)
+    /// we were successful.
+    pub bitcoin_rpc_connected: bool,
+
+    /// The last error message we received when trying to poll the client, if
+    /// there was one.
+    pub last_rpc_error: Option<String>,
+
+    /// Current block height.
+    pub cur_height: u64,
+
+    /// Current tip block ID as string.
+    pub cur_tip_blkid: String,
+
+    /// Last published txid where L2 blob was present
+    pub last_published_txid: Option<String>,
+
+    /// UNIX millis time of the last time we got a new update from the L1 connector.
+    pub last_update: u64,
+}
+
+/// A wrapper around the [`bitcoin::Address<NetworkUnchecked>`] type created in order to implement
+/// some useful traits on it such as [`serde::Deserialize`], [`borsh::BorshSerialize`] and
+/// [`borsh::BorshDeserialize`].
+// TODO: implement [`arbitrary::Arbitrary`]?
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct BitcoinAddress(Address<NetworkUnchecked>);
+
+impl FromStr for BitcoinAddress {
+    type Err = <Address<NetworkUnchecked> as FromStr>::Err;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let address = Address::from_str(s)?;
+
+        Ok(Self(address))
+    }
+}
+
+impl BitcoinAddress {
+    pub fn address(&self) -> &Address<NetworkUnchecked> {
+        &self.0
+    }
+}
+
+impl<'de> Deserialize<'de> for BitcoinAddress {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s: &str = Deserialize::deserialize(deserializer)?;
+        Address::from_str(s)
+            .map(BitcoinAddress)
+            .map_err(serde::de::Error::custom)
+    }
+}
+
+impl BorshSerialize for BitcoinAddress {
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), io::Error> {
+        let addr_str = serde_json::to_string(&self)?;
+        writer.write_all(addr_str.as_bytes())?;
+        Ok(())
+    }
+}
+
+impl BorshDeserialize for BitcoinAddress {
+    fn deserialize_reader<R: Read>(reader: &mut R) -> Result<Self, io::Error> {
+        let mut addr_bytes = Vec::new();
+        reader.read_to_end(&mut addr_bytes)?;
+        let addr_str = String::from_utf8(addr_bytes)
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid UTF-8"))?;
+        let address = Address::from_str(&addr_str)
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid Bitcoin address"))?;
+        Ok(BitcoinAddress(address))
+    }
+}
+
+/// A wrapper for bitcoin amount in sats similar to the implementation in [`bitcoin::Amount`].
+///
+/// **NOTE**: This wrapper has been created so that we can implement `Borsh*` traits on it.
+#[derive(
+    Debug, Clone, Serialize, Deserialize, Eq, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary,
+)]
+pub struct BitcoinAmount(u64);
+
+impl BitcoinAmount {
+    // The zero amount.
+    pub const ZERO: BitcoinAmount = Self(0);
+    /// The maximum value allowed as an amount. Useful for sanity checking.
+    pub const MAX_MONEY: BitcoinAmount = Self::from_int_btc(21_000_000);
+    /// The minimum value of an amount.
+    pub const MIN: BitcoinAmount = Self::ZERO;
+    /// The maximum value of an amount.
+    pub const MAX: BitcoinAmount = Self(u64::MAX);
+    /// The number of bytes that an amount contributes to the size of a transaction.
+    pub const SIZE: usize = 8; // Serialized length of a u64.
+
+    /// Get the number of sats in this [`BitcoinAmount`].
+    pub fn to_sat(&self) -> u64 {
+        self.0
+    }
+
+    /// Create a [`BitcoinAmount`] with sats precision and the given number of sats.
+    pub const fn from_sat(value: u64) -> Self {
+        Self(value)
+    }
+
+    /// Convert from a value expressing integer values of bitcoins to an [`BitcoinAmount`]
+    /// in const context.
+    ///
+    /// ## Panics
+    ///
+    /// The function panics if the argument multiplied by the number of sats
+    /// per bitcoin overflows a u64 type.
+    pub const fn from_int_btc(btc: u64) -> Self {
+        match btc.checked_mul(100_000_000) {
+            Some(amount) => Self::from_sat(amount),
+            None => {
+                panic!("number of sats greater than u64::MAX");
+            }
+        }
     }
 }

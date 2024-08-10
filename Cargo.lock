@@ -878,6 +878,11 @@ dependencies = [
  "alpen-express-db",
  "alpen-express-rpc-types",
  "bitcoin",
+ "alpen-express-primitives",
+ "alpen-express-rpc-types",
+ "alpen-express-state",
+ "express-bridge-exec",
+ "express-bridge-txm",
  "hex",
  "jsonrpsee",
  "serde",
@@ -3713,6 +3718,12 @@ dependencies = [
 [[package]]
 name = "express-bridge-exec"
 version = "0.1.0"
+dependencies = [
+ "alpen-express-state",
+ "bitcoin",
+ "express-bridge-txm",
+ "serde",
+]
 
 [[package]]
 name = "express-bridge-rpc-api"
@@ -3727,6 +3738,7 @@ dependencies = [
 name = "express-bridge-txm"
 version = "0.1.0"
 dependencies = [
+ "alpen-express-state",
  "bitcoin",
  "reth-primitives",
  "serde",

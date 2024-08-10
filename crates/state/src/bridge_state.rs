@@ -8,12 +8,15 @@ use alpen_express_primitives::{
     l1::{self, OutputRef},
 };
 use borsh::{BorshDeserialize, BorshSerialize};
+use serde::{Deserialize, Serialize};
 
 /// Global operator idx.
 pub type OperatorIdx = u32;
 
 /// Entry for an operator.  They have a
-#[derive(Clone, Debug, Eq, PartialEq, Hash, BorshDeserialize, BorshSerialize)]
+#[derive(
+    Clone, Debug, Eq, PartialEq, Hash, BorshDeserialize, BorshSerialize, Serialize, Deserialize,
+)]
 pub struct OperatorEntry {
     /// Global operator index.
     idx: OperatorIdx,

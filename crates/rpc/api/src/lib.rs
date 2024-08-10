@@ -1,11 +1,18 @@
 #![allow(unexpected_cfgs)] // TODO: remove this when we add the `client` feature flag.
 //! Macro trait def for the `alp_` RPC namespace using jsonrpsee.
 use alpen_express_db::types::L1TxStatus;
+use alpen_express_primitives::l1::L1Status;
 use alpen_express_rpc_types::{
     types::{BlockHeader, ClientStatus, DepositEntry, ExecUpdate, L1Status},
     L2BlockId,
 };
 use bitcoin::Txid;
+use bitcoin::secp256k1::schnorr::Signature;
+use express_bridge_exec::Duty as BridgeDuty;
+use express_bridge_txm::{
+    script_builder::withdrawal::{Requested, WithdrawalInfo},
+    DepositInfo,
+};
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
@@ -73,4 +80,27 @@ pub trait AlpenAdminApi {
     #[method(name = "broadcastRawTx")]
     /// Adds an equivalent entry to broadcaster database, which will eventually be broadcasted
     async fn broadcast_raw_tx(&self, rawtx: HexBytes) -> RpcResult<Txid>;
+}
+
+/// APIs that are invoked by the bridge client to query and execute its duties.
+#[cfg_attr(not(feature = "client"), rpc(server, namespace = "alpbridge"))]
+#[cfg_attr(feature = "client", rpc(server, client, namespace = "alpbridge"))]
+pub trait AlpenBridgeApi {
+    #[method(name = "getDuties")]
+    async fn get_duties(&self) -> RpcResult<Vec<BridgeDuty>>;
+
+    /// Broadcast the signature for a deposit request to other bridge clients.
+    #[method(name = "broadcastDepositSignature")]
+    async fn broadcast_deposit_signature(
+        &self,
+        deposit_info: DepositInfo,
+        signature: Signature,
+    ) -> RpcResult<()>;
+
+    /// Broadcast request for signatures on withdrawal reimbursement from other bridge clients.
+    #[method(name = "broadcastReimbursementRequest")]
+    async fn broadcast_reimbursement_request(
+        &self,
+        withdrawal_info: WithdrawalInfo<Requested>,
+    ) -> RpcResult<()>;
 }

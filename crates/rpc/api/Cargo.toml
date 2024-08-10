@@ -5,7 +5,11 @@ version = "0.1.0"
 
 [dependencies]
 alpen-express-db = { workspace = true }
+alpen-express-primitives = { workspace = true }
 alpen-express-rpc-types = { workspace = true }
+alpen-express-state = { workspace = true }
+express-bridge-exec = { workspace = true }
+express-bridge-txm = { workspace = true }
 
 bitcoin = { workspace = true }
 hex = { workspace = true }

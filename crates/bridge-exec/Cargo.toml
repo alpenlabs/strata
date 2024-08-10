@@ -12,3 +12,8 @@ rust.unused_must_use = "deny"
 rustdoc.all = "warn"
 
 [dependencies]
+alpen-express-state = { workspace = true }
+express-bridge-txm = { workspace = true }
+
+bitcoin = { workspace = true }
+serde = { workspace = true }
