@@ -3593,10 +3593,42 @@ dependencies = [
 ]
 
 [[package]]
+name = "express-risc0-adapter"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "express-zkvm",
+ "risc0-zkvm",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "express-rpc-utils"
 version = "0.1.0"
 dependencies = [
  "jsonrpsee",
+]
+
+[[package]]
+name = "express-sp1-adapter"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "express-zkvm",
+ "serde",
+ "serde_json",
+ "sp1-sdk",
+]
+
+[[package]]
+name = "express-zkvm"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
 ]
 
 [[package]]
@@ -9860,17 +9892,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "risc0-adapter"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bincode",
- "risc0-zkvm",
- "serde",
- "zkvm",
-]
-
-[[package]]
 name = "risc0-binfmt"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11043,18 +11064,6 @@ dependencies = [
  "log",
  "rand 0.8.5",
  "sha1",
-]
-
-[[package]]
-name = "sp1-adapter"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bincode",
- "serde",
- "serde_json",
- "sp1-sdk",
- "zkvm",
 ]
 
 [[package]]
@@ -13210,14 +13219,6 @@ dependencies = [
  "sha2 0.10.8",
  "sha3",
  "subtle",
-]
-
-[[package]]
-name = "zkvm"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "serde",
 ]
 
 [[package]]

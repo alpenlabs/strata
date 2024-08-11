@@ -45,7 +45,7 @@ express-reth-db = { path = "crates/reth/db" }
 express-reth-exex = { path = "crates/reth/exex" }
 express-reth-rpc = { path = "crates/reth/rpc" }
 express-rpc-utils = { path = "crates/rpc/utils" }
-zkvm = { path = "crates/prover/zkvm" }
+express-zkvm = { path = "crates/prover/zkvm" }
 zkvm-primitives = { path = "crates/prover/primitives" }
 
 # IMPORTANT: ensure alloy-* types are of the same version as inside reth dependency
