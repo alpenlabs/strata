@@ -7,6 +7,15 @@ use bitcoin::{Amount, OutPoint};
 use reth_primitives::Address as RollupAddress;
 use serde::{Deserialize, Serialize};
 
+/// A trait to define the ability to construct a deposit transaction.
+pub trait ConstructDepositTx: Clone + Sized {
+    /// Construct the deposit transaction based on some information that depends on the bridge
+    /// implementation, the deposit request transaction created by the user and some metadata
+    /// related to the rollup.
+    fn construct_deposit_tx(&self) -> Vec<u8>;
+    // TODO: add more methods required to construct the Deposit Transaction.
+}
+
 /// The metadata associated with a deposit. This will be used to communicated additional
 /// information to the rollup. For now, this only carries limited information but we may extend
 /// it later.
@@ -36,4 +45,10 @@ pub struct DepositInfo {
 
     /// The metadata associated with the deposit request.
     metadata: DepositMetadata,
+}
+
+impl ConstructDepositTx for DepositInfo {
+    fn construct_deposit_tx(&self) -> Vec<u8> {
+        unimplemented!();
+    }
 }
