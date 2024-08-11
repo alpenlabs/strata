@@ -1,8 +1,15 @@
 //! Provides types/traits associated with the withdrawal process.
 
-use alpen_express_state::bridge_state::OperatorIdx;
 use bitcoin::{secp256k1::schnorr::Signature, OutPoint};
 use serde::{Deserialize, Serialize};
+
+/// A trait to define the ability to construct a Withdrawal Reimbursement Transaction.
+pub trait ConstructReimbursementTx: Clone + Sized {
+    /// Construct the Withdrawal Reimbursement Transaction based on the withdrawal information
+    /// gathered from the rollup, and the specific reserved UTXO provided by an operator.
+    fn construct_reimbursement_tx(&self) -> Vec<u8>;
+    // TODO: add more methods required to construct the final reimbursement transaction.
+}
 
 /// A marker type indicating that a withdrawal request has come in and needs to be validated.
 #[derive(Debug, Clone)]
@@ -22,9 +29,6 @@ pub struct WithdrawalInfo<State = Requested> {
     /// The Deposit UTXO in the Bridge Address that is to be used to reimburse the operator.
     deposit_utxo: OutPoint,
 
-    /// The ID of the operator requesting the signature.
-    operator_id: OperatorIdx,
-
     state: std::marker::PhantomData<State>,
     // Rollup data required to verify withdrawal assignment.
     // TODO: This possibly requires SSZ impl for efficient verification
@@ -37,6 +41,12 @@ pub struct WithdrawalInfo<State = Requested> {
 impl WithdrawalInfo<Requested> {
     /// Validate that the operator requesting
     pub fn validate(&self) -> WithdrawalInfo<Validated> {
+        unimplemented!();
+    }
+}
+
+impl ConstructReimbursementTx for WithdrawalInfo<Validated> {
+    fn construct_reimbursement_tx(&self) -> Vec<u8> {
         unimplemented!();
     }
 }
