@@ -18,6 +18,7 @@ members = [
   "crates/vtxjmt",
   "crates/prover/zkvm",
   "crates/prover/adapters/risc0",
+  "crates/prover/adapters/sp1",
   "crates/prover/primitives",
   "sequencer",
   "reth",
@@ -47,7 +48,7 @@ express-rpc-utils = { path = "crates/rpc/utils" }
 zkvm = { path = "crates/prover/zkvm" }
 zkvm-primitives = { path = "crates/prover/primitives" }
 
-# IMPORTANT: ensure alloy-* types are of the same version as inside reth dependency 
+# IMPORTANT: ensure alloy-* types are of the same version as inside reth dependency
 alloy-genesis = { version = "0.2", default-features = false }
 alloy-rpc-types = { version = "0.2", default-features = false }
 anyhow = "1.0.86"
