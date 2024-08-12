@@ -14,7 +14,6 @@ class ElBlockGenerationTest(flexitest.Test):
         rethrpc = reth.create_rpc()
 
         last_blocknum = int(rethrpc.eth_blockNumber(), 16)
-
         for _ in range(5):
             time.sleep(3)
             blocknum = int(rethrpc.eth_blockNumber(), 16)
