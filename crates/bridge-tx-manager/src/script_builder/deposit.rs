@@ -4,7 +4,6 @@
 //! bridge-in dataflow.
 
 use bitcoin::{Amount, OutPoint};
-use reth_primitives::Address as RollupAddress;
 use serde::{Deserialize, Serialize};
 
 /// A trait to define the ability to construct a deposit transaction.
@@ -37,8 +36,9 @@ pub struct DepositInfo {
     /// The deposit request transaction UTXO from the user.
     deposit_request_utxo: OutPoint,
 
-    /// The rollup address to mint the equivalent tokens to.
-    rollup_address: RollupAddress,
+    /// The execution layer address to mint the equivalent tokens to.
+    /// As of now, this is just the 20-byte EVM address.
+    el_address: Vec<u8>,
 
     /// The amount in bitcoins that the user wishes to deposit.
     amount: Amount,
