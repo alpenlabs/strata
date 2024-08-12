@@ -144,8 +144,8 @@ fn process_msg<D: Database, E: ExecEngineCtl>(
             // just in case.
             let cur_ev_idx = state.state_tracker.cur_state_idx();
             let next_exp_idx = cur_ev_idx + 1;
-            let missed_ev_cnt = idx - next_exp_idx;
-            if missed_ev_cnt > 0 {
+            if *idx > next_exp_idx {
+                let missed_ev_cnt = idx - next_exp_idx;
                 warn!(%missed_ev_cnt, "applying missed sync events");
                 for ev_idx in next_exp_idx..*idx {
                     trace!(%ev_idx, "running missed sync event");
@@ -216,10 +216,11 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
     // Make sure that the new state index is set as expected.
     assert_eq!(state.state_tracker.cur_state_idx(), ev_idx);
 
-    // Write the state checkpoint.
-    // TODO Don't do this on every update.
-    let css = state.database.client_state_store();
-    css.write_client_state_checkpoint(ev_idx, new_state.as_ref().clone())?;
+    // Write the state checkpoint on interval.
+    if ev_idx % state.params.run.client_checkpoint_interval as u64 == 0 {
+        let css = state.database.client_state_store();
+        css.write_client_state_checkpoint(ev_idx, new_state.as_ref().clone())?;
+    }
 
     // Broadcast the update to all the different things listening (which should
     // be consolidated).

@@ -2,8 +2,6 @@ import time
 
 import flexitest
 
-from constants import MAX_HORIZON_POLL_INTERVAL_SECS, SEQ_SLACK_TIME_SECS
-
 
 @flexitest.register
 class ElBlockGenerationTest(flexitest.Test):
@@ -15,7 +13,7 @@ class ElBlockGenerationTest(flexitest.Test):
 
         rethrpc = reth.create_rpc()
 
-        last_blocknum = int(rethrpc.eth_blockNumber(), 16);
+        last_blocknum = int(rethrpc.eth_blockNumber(), 16)
 
         for _ in range(5):
             time.sleep(3)
