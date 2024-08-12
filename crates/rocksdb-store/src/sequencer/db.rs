@@ -29,25 +29,24 @@ impl SeqDb {
 
 impl SeqDataStore for SeqDb {
     fn put_blob(&self, blob_hash: Buf32, blob: BlobEntry) -> DbResult<u64> {
-        if self.db.get::<SeqBlobSchema>(&blob_hash)?.is_some() {
-            return Err(DbError::Other(format!(
-                "Entry already exists for blobid {blob_hash:?}"
-            )));
-        }
-        // TODO: wrap these in a db transaction
-        let idx = get_last_idx::<SeqBlobIdSchema>(&self.db)?
-            .map(|x| x + 1)
-            .unwrap_or(0);
+        self.db
+            .with_optimistic_txn(rockbound::TransactionRetry::Count(5), |txn| {
+                if txn.get::<SeqBlobSchema>(&blob_hash)?.is_some() {
+                    return Err(DbError::Other(format!(
+                        "Entry already exists for blobid {blob_hash:?}"
+                    )));
+                }
 
-        let mut batch = SchemaBatch::new();
+                let idx = rockbound::utils::get_last::<SeqBlobIdSchema>(txn)?
+                    .map(|(x, _)| x + 1)
+                    .unwrap_or(0);
 
-        // Atomically add the entries
-        batch.put::<SeqBlobIdSchema>(&idx, &blob_hash)?;
-        batch.put::<SeqBlobSchema>(&blob_hash, &blob)?;
+                txn.put::<SeqBlobIdSchema>(&idx, &blob_hash)?;
+                txn.put::<SeqBlobSchema>(&blob_hash, &blob)?;
 
-        self.db.write_schemas(batch)?;
-
-        Ok(idx)
+                Ok(idx)
+            })
+            .map_err(|e| DbError::TransactionError(e.to_string()))
     }
 
     fn put_commit_reveal_txs(
