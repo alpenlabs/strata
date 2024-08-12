@@ -4,6 +4,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+use alpen_express_db::traits::Database;
 use alpen_express_status::StatusTx;
 use anyhow::bail;
 use bitcoin::BlockHash;
@@ -132,19 +133,21 @@ impl ReaderState {
     }
 }
 
-pub async fn bitcoin_data_reader_task(
+pub async fn bitcoin_data_reader_task<D: Database + 'static>(
     client: Arc<impl BitcoinReader>,
     event_tx: mpsc::Sender<L1Event>,
     target_next_block: u64,
     config: Arc<ReaderConfig>,
     status_rx: Arc<StatusTx>,
+    chstate_prov: Arc<D::ChsProv>,
 ) {
-    if let Err(e) = do_reader_task(
+    if let Err(e) = do_reader_task::<D>(
         client.as_ref(),
         &event_tx,
         target_next_block,
         config,
         status_rx.clone(),
+        chstate_prov,
     )
     .await
     {
@@ -152,12 +155,13 @@ pub async fn bitcoin_data_reader_task(
     }
 }
 
-async fn do_reader_task(
+async fn do_reader_task<D: Database + 'static>(
     client: &impl BitcoinReader,
     event_tx: &mpsc::Sender<L1Event>,
     target_next_block: u64,
     config: Arc<ReaderConfig>,
     status_rx: Arc<StatusTx>,
+    chstate_prov: Arc<D::ChsProv>,
 ) -> anyhow::Result<()> {
     info!(%target_next_block, "started L1 reader task!");
 
@@ -177,10 +181,17 @@ async fn do_reader_task(
         let cur_best_height = state.best_block_idx();
         let poll_span = debug_span!("l1poll", %cur_best_height);
 
-        if let Err(err) =
-            poll_for_new_blocks(client, event_tx, &config, &mut state, &mut status_updates)
-                .instrument(poll_span)
-                .await
+        let tx_interests = derive_tx_interests::<D>(chstate_prov.clone(), &config)?;
+
+        if let Err(err) = poll_for_new_blocks(
+            client,
+            event_tx,
+            &tx_interests,
+            &mut state,
+            &mut status_updates,
+        )
+        .instrument(poll_span)
+        .await
         {
             warn!(%cur_best_height, err = %err, "failed to poll Bitcoin client");
             status_updates.push(L1StatusUpdate::RpcError(err.to_string()));
@@ -208,6 +219,15 @@ async fn do_reader_task(
 
         apply_status_updates(&status_updates, status_rx.clone()).await;
     }
+}
+
+fn derive_tx_interests<D: Database + 'static>(
+    _chstate_prov: Arc<D::ChsProv>,
+    _config: &Arc<ReaderConfig>, // NOTE: we might not need the config, but just in case
+) -> anyhow::Result<Vec<TxInterest>> {
+    // TODO: Figure out how to do it from chainstate provider
+    // For now we'll just go with filtering all txs
+    Ok(vec![TxInterest::TxIdWithPrefix(vec![])])
 }
 
 /// Inits the reader state by trying to backfill blocks up to a target height.
@@ -246,7 +266,7 @@ async fn init_reader_state(
 async fn poll_for_new_blocks(
     client: &impl BitcoinReader,
     event_tx: &mpsc::Sender<L1Event>,
-    config: &ReaderConfig,
+    tx_interests: &[TxInterest],
     state: &mut ReaderState,
     status_updates: &mut Vec<L1StatusUpdate>,
 ) -> anyhow::Result<()> {
@@ -290,7 +310,7 @@ async fn poll_for_new_blocks(
             event_tx,
             state,
             status_updates,
-            &config.tx_interests,
+            tx_interests,
         )
         .await
         {

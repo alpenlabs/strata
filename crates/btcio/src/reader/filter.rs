@@ -16,20 +16,17 @@ pub fn filter_interesting_txs(block: &Block, interests: &[TxInterest]) -> Vec<u3
         .txdata
         .iter()
         .enumerate()
-        .filter_map(|(i, tx)| {
-            if is_interesting(tx, interests) {
-                Some(i as u32)
-            } else {
-                None
-            }
-        })
+        .filter(|(_, tx)| is_interesting(tx, interests))
+        .map(|(i, _)| i as u32)
         .collect()
 }
 
 /// Determines if a [`Transaction`] is interesting based on given interests
 fn is_interesting(tx: &Transaction, interests: &[TxInterest]) -> bool {
+    let txid = tx.compute_txid();
+
     interests.iter().any(|interest| match interest {
-        TxInterest::TxIdWithPrefix(pf) => tx.compute_txid()[0..pf.len()] == *pf,
+        TxInterest::TxIdWithPrefix(pf) => txid[0..pf.len()] == *pf,
         TxInterest::SpentToAddress(address) => tx
             .output
             .iter()
@@ -89,7 +86,7 @@ mod test {
         }
     }
 
-    fn get_addr(addr: &str) -> Address {
+    fn parse_addr(addr: &str) -> Address {
         Address::from_str(addr)
             .unwrap()
             .require_network(Network::Regtest)
@@ -98,9 +95,9 @@ mod test {
 
     #[test]
     fn test_filter_interesting_txs_spent_to_address() {
-        let address = get_addr(INTERESTING_ADDR);
+        let address = parse_addr(INTERESTING_ADDR);
         let tx1 = create_test_tx(vec![create_test_txout(100, &address)]);
-        let tx2 = create_test_tx(vec![create_test_txout(100, &get_addr(OTHER_ADDR))]);
+        let tx2 = create_test_tx(vec![create_test_txout(100, &parse_addr(OTHER_ADDR))]);
         let block = create_test_block(vec![tx1, tx2]);
 
         let result = filter_interesting_txs(&block, &[TxInterest::SpentToAddress(address)]);
@@ -109,8 +106,8 @@ mod test {
 
     #[test]
     fn test_filter_interesting_txs_txid_with_prefix() {
-        let address = get_addr(INTERESTING_ADDR);
-        let address1 = get_addr(OTHER_ADDR);
+        let address = parse_addr(INTERESTING_ADDR);
+        let address1 = parse_addr(OTHER_ADDR);
         let tx1 = create_test_tx(vec![create_test_txout(100, &address)]);
         let tx2 = create_test_tx(vec![create_test_txout(100, &address1)]);
         let block = create_test_block(vec![tx1, tx2.clone()]);
@@ -126,9 +123,9 @@ mod test {
 
     #[test]
     fn test_filter_interesting_txs_no_match() {
-        let address = get_addr(INTERESTING_ADDR);
-        let tx1 = create_test_tx(vec![create_test_txout(1000, &get_addr(OTHER_ADDR))]);
-        let tx2 = create_test_tx(vec![create_test_txout(10000, &get_addr(OTHER_ADDR))]);
+        let address = parse_addr(INTERESTING_ADDR);
+        let tx1 = create_test_tx(vec![create_test_txout(1000, &parse_addr(OTHER_ADDR))]);
+        let tx2 = create_test_tx(vec![create_test_txout(10000, &parse_addr(OTHER_ADDR))]);
         let block = create_test_block(vec![tx1, tx2]);
 
         let result = filter_interesting_txs(&block, &[TxInterest::SpentToAddress(address)]);
@@ -141,16 +138,16 @@ mod test {
 
         let result = filter_interesting_txs(
             &block,
-            &[TxInterest::SpentToAddress(get_addr(INTERESTING_ADDR))],
+            &[TxInterest::SpentToAddress(parse_addr(INTERESTING_ADDR))],
         );
         assert!(result.is_empty()); // No transactions match
     }
 
     #[test]
     fn test_filter_interesting_txs_multiple_matches() {
-        let address = get_addr(INTERESTING_ADDR);
+        let address = parse_addr(INTERESTING_ADDR);
         let tx1 = create_test_tx(vec![create_test_txout(100, &address)]);
-        let tx2 = create_test_tx(vec![create_test_txout(100, &get_addr(OTHER_ADDR))]);
+        let tx2 = create_test_tx(vec![create_test_txout(100, &parse_addr(OTHER_ADDR))]);
         let tx3 = create_test_tx(vec![create_test_txout(1000, &address)]);
         let block = create_test_block(vec![tx1, tx2, tx3]);
 
@@ -160,9 +157,9 @@ mod test {
 
     #[test]
     fn test_filter_all_txs() {
-        let address = get_addr(INTERESTING_ADDR);
+        let address = parse_addr(INTERESTING_ADDR);
         let tx1 = create_test_tx(vec![create_test_txout(100, &address)]);
-        let tx2 = create_test_tx(vec![create_test_txout(100, &get_addr(OTHER_ADDR))]);
+        let tx2 = create_test_tx(vec![create_test_txout(100, &parse_addr(OTHER_ADDR))]);
         let tx3 = create_test_tx(vec![create_test_txout(1000, &address)]);
         let block = create_test_block(vec![tx1, tx2, tx3]);
 

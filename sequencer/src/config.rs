@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use alpen_express_btcio::reader::{config::ReaderConfig, filter::TxInterest};
+use alpen_express_btcio::reader::config::ReaderConfig;
 use bitcoin::Network;
 use serde::Deserialize;
 
@@ -140,8 +140,6 @@ impl Config {
         ReaderConfig {
             max_reorg_depth: self.sync.max_reorg_depth,
             client_poll_dur_ms: self.sync.client_poll_dur_ms,
-            tx_interests: vec![TxInterest::TxIdWithPrefix(Vec::new())], /* basically filter all
-                                                                         * the txs */
         }
     }
 }

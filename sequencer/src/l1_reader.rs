@@ -37,16 +37,18 @@ where
         .unwrap_or(params.rollup().horizon_l1_height);
 
     let reader_config = Arc::new(config.get_reader_config());
+    let chprov = db.chainstate_provider().clone();
 
     // TODO set up watchdog to handle when the spawned tasks fail gracefully
     executor.spawn_critical_async(
         "bitcoin_data_reader_task",
-        bitcoin_data_reader_task(
+        bitcoin_data_reader_task::<D>(
             rpc_client,
             ev_tx,
             target_next_block,
             reader_config,
             status_rx.clone(),
+            chprov,
         ),
     );
 

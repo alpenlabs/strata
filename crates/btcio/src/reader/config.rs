@@ -1,7 +1,3 @@
-use bitcoin::Address;
-
-use super::filter::TxInterest;
-
 #[derive(Clone, Debug)]
 pub struct ReaderConfig {
     /// This is the maximum depth we ever expect to reorg.
@@ -9,17 +5,15 @@ pub struct ReaderConfig {
 
     /// Time between polls to the L1 client, in millis.
     pub client_poll_dur_ms: u32,
-
-    /// The kind of transactions that we are interested in
-    pub tx_interests: Vec<TxInterest>,
+    // NOTE:
+    // I still think we might need some kind of address to watch over here
 }
 
 impl ReaderConfig {
-    pub fn new(max_reorg_depth: u32, client_poll_dur_ms: u32, seq_addr: Address) -> Self {
+    pub fn new(max_reorg_depth: u32, client_poll_dur_ms: u32) -> Self {
         Self {
             max_reorg_depth,
             client_poll_dur_ms,
-            tx_interests: vec![TxInterest::SpentToAddress(seq_addr)],
         }
     }
 }
