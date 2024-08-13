@@ -1,6 +1,6 @@
 //! Sequencer duties.
 
-use std::time::{self};
+use std::time;
 
 use borsh::{BorshDeserialize, BorshSerialize};
 
@@ -18,14 +18,18 @@ pub enum Expiry {
 
     /// Duty expires after a certain timestamp.
     Timestamp(time::Instant),
+
+    /// Duty expires after a specific L2 block is finalized
+    BlockIdFinalized(L2BlockId),
 }
 
 /// Duties the sequencer might carry out.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, BorshSerialize)]
 pub enum Duty {
     /// Goal to sign a block.
     SignBlock(BlockSigningDuty),
     // TODO: Add Goal to write batch data to L1
+    CommitBatch(BatchCommitmentDuty),
 }
 
 impl Duty {
@@ -33,12 +37,15 @@ impl Duty {
     pub fn expiry(&self) -> Expiry {
         match self {
             Self::SignBlock(_) => Expiry::NextBlock,
+            Self::CommitBatch(BatchCommitmentDuty { blockid, .. }) => {
+                Expiry::BlockIdFinalized(*blockid)
+            }
         }
     }
 }
 
 /// Describes information associated with signing a block.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, BorshSerialize)]
 pub struct BlockSigningDuty {
     /// Slot to sign for.
     slot: u64,
@@ -67,6 +74,24 @@ impl BlockSigningDuty {
 
     pub fn l1_view(&self) -> &LocalL1State {
         &self.l1_view
+    }
+}
+
+#[derive(Debug, Clone, BorshSerialize)]
+pub struct BatchCommitmentDuty {
+    // last slot of batch
+    slot: u64,
+    // id of block in last slot
+    blockid: L2BlockId,
+}
+
+impl BatchCommitmentDuty {
+    pub fn new(slot: u64, blockid: L2BlockId) -> Self {
+        Self { slot, blockid }
+    }
+
+    pub fn end_slot(&self) -> u64 {
+        self.slot
     }
 }
 
@@ -115,6 +140,11 @@ impl DutyTracker {
                 }
                 Expiry::Timestamp(ts) => {
                     if update.cur_timestamp > ts {
+                        continue;
+                    }
+                }
+                Expiry::BlockIdFinalized(l2blockid) => {
+                    if update.is_finalized(&l2blockid) {
                         continue;
                     }
                 }

@@ -4,6 +4,10 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time;
 
+use alpen_express_btcio::writer::DaWriter;
+use alpen_express_primitives::buf::{Buf32, Buf64};
+use alpen_express_state::batch::{BatchCommitment, SignedBatchCommitment};
+use alpen_express_state::da_blob::{BlobDest, BlobIntent};
 use tokio::sync::broadcast;
 use tracing::*;
 
@@ -15,6 +19,7 @@ use alpen_express_state::prelude::*;
 
 use super::types::{self, Duty, DutyBatch, Identity, IdentityKey};
 use super::{block_assembly, extractor};
+use crate::credential::sign_schnorr_sig;
 use crate::errors::Error;
 use crate::message::{ClientUpdateNotif, ForkChoiceMessage};
 use crate::sync_manager::SyncManager;
@@ -24,9 +29,10 @@ pub fn duty_tracker_task<D: Database>(
     batch_queue: broadcast::Sender<DutyBatch>,
     ident: Identity,
     database: Arc<D>,
+    params: Arc<Params>,
 ) {
     let db = database.as_ref();
-    if let Err(e) = duty_tracker_task_inner(cupdate_rx, batch_queue, ident, db) {
+    if let Err(e) = duty_tracker_task_inner(cupdate_rx, batch_queue, ident, db, params.as_ref()) {
         error!(err = %e, "tracker task exited");
     }
 }
@@ -36,6 +42,7 @@ fn duty_tracker_task_inner(
     batch_queue: broadcast::Sender<DutyBatch>,
     ident: Identity,
     database: &impl Database,
+    params: &Params,
 ) -> Result<(), Error> {
     let mut duties_tracker = types::DutyTracker::new_empty();
 
@@ -65,7 +72,7 @@ fn duty_tracker_task_inner(
         trace!(%ev_idx, "new consensus state, updating duties");
         trace!("STATE: {new_state:#?}");
 
-        if let Err(e) = update_tracker(&mut duties_tracker, new_state, &ident, database) {
+        if let Err(e) = update_tracker(&mut duties_tracker, new_state, &ident, database, params) {
             error!(err = %e, "failed to update duties tracker");
         }
 
@@ -86,12 +93,15 @@ fn update_tracker<D: Database>(
     state: &ClientState,
     ident: &Identity,
     database: &D,
+    params: &Params,
 ) -> Result<(), Error> {
     let Some(ss) = state.sync() else {
         return Ok(());
     };
 
-    let new_duties = extractor::extract_duties(state, ident, database)?;
+    let new_duties = extractor::extract_duties(state, ident, database, params)?;
+
+    info!(new_duties = ?new_duties, "new duties");
 
     // Figure out the block slot from the tip blockid.
     // TODO include the block slot in the consensus state
@@ -150,15 +160,18 @@ fn get_finalized_blocks(
     Ok(newly_finalized_blocks)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn duty_dispatch_task<
     D: Database + Sync + Send + 'static,
     E: ExecEngineCtl + Sync + Send + 'static,
+    S: SequencerDatabase + Sync + Send + 'static,
 >(
     mut updates: broadcast::Receiver<DutyBatch>,
     ident_key: IdentityKey,
     sync_man: Arc<SyncManager>,
     database: Arc<D>,
     engine: Arc<E>,
+    da_writer: Arc<DaWriter<S>>,
     pool: Arc<threadpool::ThreadPool>,
     params: Arc<Params>,
 ) {
@@ -197,8 +210,9 @@ pub fn duty_dispatch_task<
             let sm = sync_man.clone();
             let db = database.clone();
             let e = engine.clone();
+            let da_writer = da_writer.clone();
             let params = params.clone();
-            pool.execute(move || duty_exec_task(d, ik, sm, db, e, params));
+            pool.execute(move || duty_exec_task(d, ik, sm, db, e, da_writer, params));
             trace!(%id, "dispatched duty exec task");
             pending_duties.insert(id, ());
         }
@@ -210,12 +224,13 @@ pub fn duty_dispatch_task<
 /// Toplevel function that's actually performs a job.  This is spawned on a/
 /// thread pool so we don't have to worry about it blocking *too* much other
 /// work.
-fn duty_exec_task<D: Database, E: ExecEngineCtl>(
+fn duty_exec_task<D: Database, E: ExecEngineCtl, S: SequencerDatabase + Send + Sync + 'static>(
     duty: Duty,
     ik: IdentityKey,
     sync_man: Arc<SyncManager>,
     database: Arc<D>,
     engine: Arc<E>,
+    da_writer: Arc<DaWriter<S>>,
     params: Arc<Params>,
 ) {
     if let Err(e) = perform_duty(
@@ -224,6 +239,7 @@ fn duty_exec_task<D: Database, E: ExecEngineCtl>(
         &sync_man,
         database.as_ref(),
         engine.as_ref(),
+        da_writer.as_ref(),
         &params,
     ) {
         error!(err = %e, "error performing duty");
@@ -232,12 +248,13 @@ fn duty_exec_task<D: Database, E: ExecEngineCtl>(
     }
 }
 
-fn perform_duty<D: Database, E: ExecEngineCtl>(
+fn perform_duty<D: Database, E: ExecEngineCtl, S: SequencerDatabase + Send + Sync + 'static>(
     duty: &Duty,
     ik: &IdentityKey,
     sync_man: &SyncManager,
     database: &D,
     engine: &E,
+    da_writer: &DaWriter<S>,
     params: &Arc<Params>,
 ) -> Result<(), Error> {
     match duty {
@@ -278,5 +295,43 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
 
             Ok(())
         }
+        Duty::CommitBatch(data) => {
+            info!(data = ?data, "commit batch");
+            let end_slot = data.end_slot();
+
+            let end_chain_state = database
+                .chainstate_provider()
+                .get_toplevel_state(end_slot)?
+                .ok_or(Error::MissingIdxChainstate(end_slot))?;
+
+            let l2blockid = end_chain_state.chain_tip_blockid();
+            let l1blockid = end_chain_state.l1_view().safe_block().blkid();
+
+            let commitment = BatchCommitment::new(*l1blockid, l2blockid);
+            let commitment_sighash = commitment.get_sighash().expect("compute sighash");
+            let signature = sign_with_identity_key(&commitment_sighash, ik);
+            let signed_commitment = SignedBatchCommitment::new(commitment, signature);
+
+            // serialize and send to l1 writer
+
+            let payload = borsh::to_vec(&signed_commitment).expect("batch serialization");
+            let blob_intent = BlobIntent::new(BlobDest::L1, commitment_sighash, payload);
+
+            info!(signed_commitment = ?signed_commitment, "signed commitment");
+            info!(blob_intent = ?blob_intent, "blob intent");
+
+            da_writer
+                .submit_intent(blob_intent)
+                // add type for DA related errors ?
+                .map_err(|err| Error::Other(err.to_string()))?;
+
+            Ok(())
+        }
+    }
+}
+
+fn sign_with_identity_key(msg: &Buf32, ik: &IdentityKey) -> Buf64 {
+    match ik {
+        IdentityKey::Sequencer(sk) => sign_schnorr_sig(msg, sk),
     }
 }

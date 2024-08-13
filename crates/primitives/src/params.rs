@@ -28,6 +28,9 @@ pub struct RollupParams {
 
     /// Depth after which we consider the L1 block to not reorg
     pub l1_reorg_safe_depth: u32,
+
+    /// target batch size in number of l2 blocks
+    pub batch_l2_blocks_target: u64,
 }
 
 /// Client sync parameters that are used to make the network work but don't

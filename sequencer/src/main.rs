@@ -123,6 +123,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
                     .unwrap(),
             ),
             l1_reorg_safe_depth: config.sync.max_reorg_depth,
+            batch_l2_blocks_target: 64,
         },
         run: RunParams {
             l1_follow_distance: config.sync.l1_follow_distance,
@@ -236,15 +237,16 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         writer_ctl = Some(writer.clone());
 
         // Spawn duty tasks.
+        let t_params = params.clone();
         thread::spawn(move || {
             // FIXME figure out why this can't infer the type, it's like *right there*
-            duty_worker::duty_tracker_task::<_>(cu_rx, duties_tx, idata.ident, db)
+            duty_worker::duty_tracker_task::<_>(cu_rx, duties_tx, idata.ident, db, t_params)
         });
 
         let d_params = params.clone();
         thread::spawn(move || {
             duty_worker::duty_dispatch_task(
-                duties_rx, idata.key, sm, db2, eng_ctl_de, pool, d_params,
+                duties_rx, idata.key, sm, db2, eng_ctl_de, writer, pool, d_params,
             )
         });
     }

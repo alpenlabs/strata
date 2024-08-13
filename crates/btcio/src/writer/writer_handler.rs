@@ -32,6 +32,7 @@ pub struct WriterInitialState {
     pub next_publish_blob_idx: u64,
 }
 
+#[derive(Debug, Clone)]
 pub struct DaWriter<D> {
     db: Arc<D>,
     signer_tx: Sender<BlobIdx>,
