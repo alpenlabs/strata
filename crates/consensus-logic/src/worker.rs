@@ -12,6 +12,7 @@ use alpen_express_state::{client_state::ClientState, operation::SyncAction};
 
 use crate::{
     errors::Error,
+    genesis,
     message::{ClientUpdateNotif, CsmMessage, ForkChoiceMessage},
     state_tracker,
     status::CsmStatus,
@@ -206,9 +207,16 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
             }
 
             SyncAction::L2Genesis(l1blkid) => {
-                // TODO make this SyncAction do something more significant or
-                // get rid of it
                 info!(%l1blkid, "sync action to do genesis");
+
+                // TODO: use l1blkid during chain state genesis ?
+
+                genesis::init_genesis_chainstate(&state.params, state.database.as_ref()).map_err(
+                    |err| {
+                        error!(err = %err, "failed to compute chain genesis");
+                        Error::GenesisFailed(err.to_string())
+                    },
+                )?;
             }
         }
     }

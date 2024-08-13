@@ -3,13 +3,15 @@
 
 use tracing::*;
 
-use alpen_express_db::traits::{Database, L1DataProvider, L2DataProvider};
+use alpen_express_db::traits::{Database, L1DataProvider, L2DataProvider, L2DataStore};
 use alpen_express_primitives::prelude::*;
 use alpen_express_state::client_state::*;
+use alpen_express_state::header::L2Header;
 use alpen_express_state::operation::*;
 use alpen_express_state::sync_event::SyncEvent;
 
 use crate::errors::*;
+use crate::genesis::make_genesis_block;
 
 /// Processes the event given the current consensus state, producing some
 /// output.  This can return database errors.
@@ -36,7 +38,7 @@ pub fn process_event<D: Database>(
             // FIXME this doesn't do any SPV checks to make sure we only go to
             // a longer chain, it just does it unconditionally
             let l1prov = database.l1_provider();
-            let new_block_mf = l1prov.get_block_manifest(*height)?;
+            let _new_block_mf = l1prov.get_block_manifest(*height)?;
 
             let l1v = state.l1_view();
 
@@ -81,7 +83,13 @@ pub fn process_event<D: Database>(
                 // If necessary, activeate the chain!
                 if !state.is_chain_active() && *height >= genesis_threshold {
                     debug!("emitting chain activation");
+                    let genesis_block = make_genesis_block(params);
+
                     writes.push(ClientStateWrite::ActivateChain);
+                    writes.push(ClientStateWrite::ReplaceSync(Box::new(
+                        SyncState::from_genesis_blkid(genesis_block.header().get_blockid()),
+                    )));
+                    actions.push(SyncAction::L2Genesis(*l1blkid));
                 }
             }
         }
@@ -125,12 +133,6 @@ pub fn process_event<D: Database>(
             }
         }
 
-        SyncEvent::ComputedGenesis(gblkid) => {
-            // Just construct the sync state for the genesis.
-            let ss = SyncState::from_genesis_blkid(*gblkid);
-            writes.push(ClientStateWrite::ReplaceSync(Box::new(ss)));
-        }
-
         SyncEvent::NewTipBlock(blkid) => {
             let l2prov = database.l2_provider();
             let _block = l2prov
@@ -157,6 +159,8 @@ mod tests {
         l2::{gen_client_state, gen_params},
         ArbitraryGenerator,
     };
+
+    use crate::genesis;
 
     use super::*;
 
@@ -322,11 +326,17 @@ mod tests {
 
             let output = process_event(&state, &event, database.as_ref(), &params).unwrap();
 
+            let genesis_block = genesis::make_genesis_block(&params);
+            let genesis_blockid = genesis_block.header().get_blockid();
+
             let expected_writes = [
                 ClientStateWrite::AcceptL1Block(l1_block_id),
                 ClientStateWrite::ActivateChain,
+                ClientStateWrite::ReplaceSync(Box::new(SyncState::from_genesis_blkid(
+                    genesis_blockid,
+                ))),
             ];
-            let expected_actions = [];
+            let expected_actions = [SyncAction::L2Genesis(l1_block_id)];
 
             assert_eq!(output.writes(), expected_writes);
             assert_eq!(output.actions(), expected_actions);

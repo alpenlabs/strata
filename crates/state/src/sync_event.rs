@@ -15,14 +15,6 @@ pub enum SyncEvent {
     /// New L2 blocks were posted to L1 in a DA batch.
     L1DABatch(Vec<L2BlockId>),
 
-    /// Special case sync event we send only at the instant we compute a fresh
-    /// genesis block.
-    ///
-    /// Maybe this should just be implicit with the `NewTipBlock` that comes
-    /// from accepting the genesis block as a tip.  I'm not really sure, I'll
-    /// figure that out next week.
-    ComputedGenesis(L2BlockId),
-
     /// Fork choice manager found a new valid chain tip block.  At this point
     /// we've already asked the EL to check if it's valid and know we *could*
     /// accept it.  This is also how we indicate the genesis block.
