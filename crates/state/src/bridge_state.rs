@@ -135,7 +135,7 @@ impl DepositsTable {
             .map(|i| &mut self.deposits[i])
     }
 
-    pub fn get_all_deposits_ids_iter(&self) -> impl Iterator<Item = u32> + '_ {
+    pub fn get_all_deposits_idxs_iters_iter(&self) -> impl Iterator<Item = u32> + '_ {
         self.deposits.iter().map(|e| e.deposit_idx)
     }
 }
@@ -176,7 +176,7 @@ impl DepositEntry {
         }
     }
 
-    pub fn pending_update_tx(&self) -> &[l1::L1TxRef] {
+    pub fn pending_update_txs(&self) -> &[l1::L1TxRef] {
         &self.pending_update_txs
     }
 
