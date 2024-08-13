@@ -51,6 +51,7 @@ alpen-express-rocksdb = { path = "crates/rocksdb-store" }
 alpen-express-rpc-api = { path = "crates/rpc/api" }
 alpen-express-rpc-types = { path = "crates/rpc/types" }
 alpen-express-state = { path = "crates/state" }
+alpen-express-status = { path = "crates/status" }
 alpen-test-utils = { path = "crates/test-utils" }
 bitcoin-blockspace = { path = "crates/prover/bitcoin-blockspace" }
 express-chaintsn = { path = "crates/chaintsn" }
@@ -61,7 +62,6 @@ express-rpc-utils = { path = "crates/rpc/utils" }
 express-storage = { path = "crates/storage" }
 express-tasks = { path = "crates/tasks" }
 express-zkvm = { path = "crates/prover/zkvm" }                      # FIXME make these names more consistent?
-alpen-express-status = { path = "crates/status" }
 zkvm = { path = "crates/prover/zkvm" }
 zkvm-primitives = { path = "crates/prover/primitives" }
 

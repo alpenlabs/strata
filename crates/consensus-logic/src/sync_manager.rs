@@ -5,6 +5,8 @@
 use std::sync::Arc;
 
 use alpen_express_status::{NodeStatus, StatusError};
+use alpen_express_state::client_state::ClientState;
+use alpen_express_status::{NodeStatus, NodeStatus2, Status, StatusError};
 use tokio::sync::{broadcast, mpsc, watch};
 use tracing::*;
 
@@ -94,6 +96,7 @@ pub fn start_sync_tasks<
     pool: threadpool::ThreadPool,
     params: Arc<Params>,
     node_status: Arc<NodeStatus>,
+    node_status2: Arc<NodeStatus2>,
 ) -> anyhow::Result<SyncManager> {
     // Create channels.
     let (fcm_tx, fcm_rx) = mpsc::channel::<ForkChoiceMessage>(64);
