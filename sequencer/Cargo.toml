@@ -25,6 +25,7 @@ argh = { workspace = true }
 async-trait = { workspace = true }
 bitcoin = { workspace = true }
 format_serde_error = { workspace = true }
+hex = { workspace = true }
 jsonrpsee = { workspace = true, features = ["server", "macros"] }
 parking_lot = { workspace = true }
 reqwest = { workspace = true }

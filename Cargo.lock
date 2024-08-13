@@ -885,6 +885,7 @@ dependencies = [
  "async-trait",
  "bitcoin",
  "format_serde_error",
+ "hex",
  "jsonrpsee",
  "parking_lot 0.12.3",
  "reqwest 0.12.5",
