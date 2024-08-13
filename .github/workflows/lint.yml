@@ -43,6 +43,13 @@ jobs:
         uses: mozilla-actions/sccache-action@v0.0.2
         with:
           version: "v0.8.1" # sccache version
+      - name: Cleanup space
+        # https://github.com/actions/runner-images/issues/2840#issuecomment-790492173
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
       - run: cargo hack check --locked
 
   fmt:
