@@ -10,6 +10,7 @@ use std::thread;
 use alpen_express_btcio::writer::DaWriter;
 use alpen_express_db::traits::SequencerDatabase;
 use alpen_express_status::NodeStatus;
+use alpen_express_status::NodeStatus2;
 use anyhow::Context;
 use bitcoin::Network;
 use config::Config;
@@ -158,6 +159,8 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     let node_status = Arc::new(NodeStatus::default());
 
+    let node_status2 = Arc::new(NodeStatus2::new());
+
     // Set up Bitcoin client RPC.
     let bitcoind_url = format!("http://{}", config.bitcoind_rpc.rpc_url);
     let btc_rpc = alpen_express_btcio::rpc::BitcoinClient::new(
@@ -196,6 +199,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         pool.clone(),
         params.clone(),
         node_status.clone(),
+        node_status2.clone(),
     )?;
     let sync_man = Arc::new(sync_man);
     let mut writer_ctl = None;
@@ -248,7 +252,14 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         });
     }
 
-    let main_fut = main_task(&config, sync_man, btc_rpc, database.clone(), node_status, writer_ctl);
+    let main_fut = main_task(
+        &config,
+        sync_man,
+        btc_rpc,
+        database.clone(),
+        node_status,
+        writer_ctl,
+    );
     if let Err(e) = rt.block_on(main_fut) {
         error!(err = %e, "main task exited");
         process::exit(0); // special case exit once we've gotten to this point

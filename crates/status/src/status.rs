@@ -110,3 +110,102 @@ impl Default for NodeStatus {
         }
     }
 }
+
+#[derive(Clone, PartialEq, Eq)]
+pub enum Status {
+    L1Status,
+    CSMStatus,
+    ClientState,
+}
+
+pub struct NodeStatus2 {
+    readers: Vec<Arc<dyn StatusReader>>,
+    writers: Vec<Arc<dyn StatusWriter>>,
+}
+
+impl NodeStatus2 {
+    pub fn new() -> Self {
+        Self {
+            readers: Vec::new(),
+            writers: Vec::new(),
+        }
+    }
+
+    pub fn add_reader(&mut self, reader: Arc<dyn StatusReader>) {
+        self.readers.push(reader);
+    }
+
+    pub fn add_writer(&mut self, writer: Arc<dyn StatusWriter>) {
+        self.writers.push(writer);
+    }
+
+    pub fn get_reader(&self, status: Status) -> Option<Arc<dyn StatusReader>> {
+        for reader in self.readers.clone() {
+            if reader.name() == status {
+                return Some(reader.clone());
+            }
+        }
+        None
+    }
+
+    pub fn get_writer(&mut self, status: Status) -> Option<Arc<dyn StatusWriter>> {
+        for writer in self.writers.clone() {
+            if writer.name() == status {
+                return Some(writer.clone());
+            }
+        }
+        None
+    }
+}
+
+pub trait StatusStruct {
+    fn name(&self) -> Status;
+}
+
+pub trait StatusReader {
+    fn read(&self) -> Arc<dyn StatusStruct>;
+    fn name(&self) -> Status;
+}
+
+pub trait StatusWriter {
+    fn write(&self, new_val: Arc<dyn StatusStruct>);
+    fn name(&self) -> Status;
+}
+
+impl StatusReader for watch::Receiver<Arc<dyn StatusStruct>> {
+    fn read(&self) -> Arc<dyn StatusStruct> {
+        self.borrow().clone()
+    }
+
+    fn name(&self) -> Status {
+        self.borrow().name()
+    }
+}
+
+impl StatusWriter for watch::Sender<Arc<dyn StatusStruct>> {
+    fn write(&self, new_value: Arc<dyn StatusStruct>) {
+        if self.send(new_value).is_err() {
+            error!("failed to submit new status update for");
+        }
+    }
+
+    fn name(&self) -> Status {
+        self.borrow().name()
+    }
+}
+
+impl StatusStruct for L1Status {
+    fn name(&self) -> Status {
+        Status::L1Status
+    }
+}
+impl StatusStruct for CsmStatus {
+    fn name(&self) -> Status {
+        Status::CSMStatus
+    }
+}
+impl StatusStruct for ClientState {
+    fn name(&self) -> Status {
+        Status::ClientState
+    }
+}

@@ -148,13 +148,7 @@ fn process_msg<D: Database, E: ExecEngineCtl>(
                 warn!(%missed_ev_cnt, "applying missed sync events");
                 for ev_idx in next_exp_idx..*idx {
                     trace!(%ev_idx, "running missed sync event");
-                    handle_sync_event(
-                        state,
-                        engine,
-                        ev_idx,
-                        node_status.clone(),
-                        fcm_msg_tx,
-                    )?;
+                    handle_sync_event(state, engine, ev_idx, node_status.clone(), fcm_msg_tx)?;
                 }
             }
 
