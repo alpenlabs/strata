@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
+import json
 import logging as log
 import os
 import sys
 import time
 from threading import Thread
+from typing import Optional
 
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
@@ -115,6 +117,7 @@ class ExpressFactory(flexitest.Factory):
         reth_socket: str,
         reth_secret_path: str,
         sequencer_address: str,
+        rollup_params: Optional[dict],
         ctx: flexitest.EnvContext,
     ) -> flexitest.Service:
         datadir = ctx.make_service_dir("sequencer")
@@ -125,8 +128,6 @@ class ExpressFactory(flexitest.Factory):
         seqkey = generate_seqkey()
         with open(keyfile, "wb") as f:
             f.write(seqkey)
-
-        # TODO EL setup, this is actually two services running coupled
 
         # fmt: off
         cmd = [
@@ -143,6 +144,14 @@ class ExpressFactory(flexitest.Factory):
             "--sequencer-bitcoin-address", sequencer_address,
         ]
         # fmt: on
+
+        if rollup_params:
+            rollup_params_file = os.path.join(datadir, "rollup_params.json")
+            with open(rollup_params_file, "w") as f:
+                json.dump(rollup_params, f)
+
+            cmd.extend(["--rollup-params", rollup_params_file])
+
         props = {"rpc_port": rpc_port, "seqkey": seqkey, "address": sequencer_address}
 
         rpc_url = f"ws://localhost:{rpc_port}"
@@ -201,8 +210,9 @@ class RethFactory(flexitest.Factory):
 
 
 class BasicEnvConfig(flexitest.EnvConfig):
-    def __init__(self, pre_generate_blocks: int = 0):
+    def __init__(self, pre_generate_blocks: int = 0, rollup_params: Optional[dict] = None):
         self.pre_generate_blocks = pre_generate_blocks
+        self.rollup_params = rollup_params
         super().__init__()
 
     def init(self, ctx: flexitest.EnvContext) -> flexitest.LiveEnv:
@@ -242,7 +252,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
         rpc_pass = bitcoind.get_prop("rpc_password")
         rpc_sock = f"localhost:{rpc_port}/wallet/{walletname}"
         sequencer = seq_fac.create_sequencer(
-            rpc_sock, rpc_user, rpc_pass, reth_socket, reth_secret_path, seqaddr
+            rpc_sock, rpc_user, rpc_pass, reth_socket, reth_secret_path, seqaddr, self.rollup_params
         )
         # Need to wait for at least `genesis_l1_height` blocks to be generated.
         # Sleeping some more for safety
@@ -250,6 +260,20 @@ class BasicEnvConfig(flexitest.EnvConfig):
 
         svcs = {"bitcoin": bitcoind, "sequencer": sequencer, "reth": reth}
         return flexitest.LiveEnv(svcs)
+
+
+# post batch every 5 l2 blocks
+fast_batch_rollup_params = {
+    "rollup_name": "expresssss",
+    "block_time": 1000,
+    "cred_rule": "Unchecked",
+    "horizon_l1_height": 3,
+    "genesis_l1_height": 5,
+    "evm_genesis_block_hash": "37ad61cff1367467a98cf7c54c4ac99e989f1fbb1bc1e646235e90c065c565ba",
+    "evm_genesis_block_state_root": "351714af72d74259f45cd7eab0b04527cd40e74836a45abcae50f92d919d988f",  # noqa: E501
+    "l1_reorg_safe_depth": 4,
+    "batch_l2_blocks_target": 5,
+}
 
 
 def main(argv):
@@ -266,7 +290,11 @@ def main(argv):
     reth_fac = RethFactory([12500 + i for i in range(20 * 3)])
 
     factories = {"bitcoin": btc_fac, "sequencer": seq_fac, "reth": reth_fac}
-    global_envs = {"basic": BasicEnvConfig(), "premined_blocks": BasicEnvConfig(101)}
+    global_envs = {
+        "basic": BasicEnvConfig(),
+        "premined_blocks": BasicEnvConfig(101),
+        "fast_batches": BasicEnvConfig(101, rollup_params=fast_batch_rollup_params),
+    }
 
     rt = flexitest.TestRuntime(global_envs, datadir_root, factories)
     rt.prepare_registered_tests()
