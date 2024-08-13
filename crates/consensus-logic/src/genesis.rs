@@ -102,8 +102,9 @@ fn load_pre_genesis_l1_manifests(
     Ok(manifests)
 }
 
-// NOTE: generate block MUST be deterministic
-// repeated calls with same params MUST return identical blocks
+/// Create genesis L2 block based on rollup params
+/// NOTE: generate block MUST be deterministic
+/// repeated calls with same params MUST return identical blocks
 pub fn make_genesis_block(params: &Params) -> L2BlockBundle {
     // Create a dummy exec state that we can build the rest of the genesis block
     // around and insert into the genesis state.
