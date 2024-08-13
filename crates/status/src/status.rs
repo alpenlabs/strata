@@ -1,12 +1,15 @@
 #![allow(dead_code)]
 
+use std::borrow::Borrow;
 use std::sync::Arc;
 
+use alpen_express_state::{client_state, csm_status};
 use thiserror::Error;
 use tokio::sync::watch::{Receiver, Sender};
 use tokio::sync::{watch, RwLock};
 use tracing::error;
 
+use crate::status::L1Status;
 use alpen_express_state::{client_state::ClientState, csm_status::CsmStatus};
 
 #[derive(Debug, Error)]
@@ -131,6 +134,7 @@ impl NodeStatus2 {
     }
 
     pub fn add_reader(&mut self, reader: Arc<dyn StatusReader>) {
+        // self.readers.push(reader);
         self.readers.push(reader);
     }
 
@@ -140,8 +144,13 @@ impl NodeStatus2 {
 
     pub fn get_reader(&self, status: Status) -> Option<Arc<dyn StatusReader>> {
         for reader in self.readers.clone() {
-            if reader.name() == status {
-                return Some(reader.clone());
+            match reader.name() {
+                Some(name) => {
+                    if name == status {
+                        return Some(reader.clone())
+                    }
+                },
+                None => continue,
             }
         }
         None
@@ -149,8 +158,13 @@ impl NodeStatus2 {
 
     pub fn get_writer(&mut self, status: Status) -> Option<Arc<dyn StatusWriter>> {
         for writer in self.writers.clone() {
-            if writer.name() == status {
-                return Some(writer.clone());
+            match writer.name() {
+                Some(name) => {
+                    if name == status {
+                        return Some(writer.clone())
+                    }
+                },
+                None => continue,
             }
         }
         None
@@ -161,35 +175,41 @@ pub trait StatusStruct {
     fn name(&self) -> Status;
 }
 
-pub trait StatusReader {
-    fn read(&self) -> Arc<dyn StatusStruct>;
-    fn name(&self) -> Status;
+pub trait StatusReader{
+    fn read(&self) -> Option<Arc<dyn StatusStruct>>;
+    fn name(&self) -> Option<Status>;
 }
 
 pub trait StatusWriter {
-    fn write(&self, new_val: Arc<dyn StatusStruct>);
-    fn name(&self) -> Status;
+    fn write(&self, new_val: Option<Arc<dyn StatusStruct>>);
+    fn name(&self) -> Option<Status>;
 }
 
-impl StatusReader for watch::Receiver<Arc<dyn StatusStruct>> {
-    fn read(&self) -> Arc<dyn StatusStruct> {
+impl StatusReader for watch::Receiver<Option<Arc<dyn StatusStruct>>> {
+    fn read(&self) -> Option<Arc<dyn StatusStruct>> {
         self.borrow().clone()
     }
 
-    fn name(&self) -> Status {
-        self.borrow().name()
+    fn name(&self) -> Option<Status> {
+        if self.borrow().is_some() {
+            return Some(self.borrow().clone().unwrap().name())
+        }
+        None
     }
 }
 
-impl StatusWriter for watch::Sender<Arc<dyn StatusStruct>> {
-    fn write(&self, new_value: Arc<dyn StatusStruct>) {
+impl StatusWriter for watch::Sender<Option<Arc<dyn StatusStruct>>> {
+    fn write(&self, new_value: Option<Arc<dyn StatusStruct>>) {
         if self.send(new_value).is_err() {
             error!("failed to submit new status update for");
         }
     }
 
-    fn name(&self) -> Status {
-        self.borrow().name()
+    fn name(&self) -> Option<Status> {
+        if self.borrow().is_some() {
+            return Some(self.borrow().clone().unwrap().name())
+        }
+        None
     }
 }
 
@@ -208,3 +228,67 @@ impl StatusStruct for ClientState {
         Status::ClientState
     }
 }
+
+#[derive(Debug,Clone, Default)]
+pub struct StatusBundle{
+    pub csm: Option<CsmStatus>,
+    pub cl: Option<ClientState>,
+    pub l1: Option<L1Status>
+}
+
+
+pub struct NodeStatus3 {
+    tx: watch::Sender<StatusBundle>,
+    rx: watch::Receiver<StatusBundle>
+}
+
+pub enum UpdateStatus {
+    UpdateL1(L1Status),
+    UpdateCl(ClientState),
+    UpdateCsm(CsmStatus)
+}
+
+impl NodeStatus3 {
+    pub fn new() -> NodeStatus3 {
+        let (st_tx, st_rx) = watch::channel(StatusBundle::default());
+        NodeStatus3 {
+            tx: st_tx,
+            rx: st_rx,
+        }
+    }
+
+    pub fn update_status(&self,update_status: &[UpdateStatus]) -> Result<(),StatusError> {
+            let bundle = self.rx.borrow();
+            let mut bundle = StatusBundle {
+                csm: bundle.csm.clone(),
+                cl: bundle.cl.clone(),
+                l1: bundle.l1.clone()
+            };
+
+            for update in update_status {
+                match update {
+                    UpdateStatus::UpdateL1(l1_status) => {
+                        bundle.l1 = Some(l1_status.clone());
+                    },
+                    UpdateStatus::UpdateCl(client_state) => {
+                        bundle.cl = Some(client_state.clone());
+                    },
+                    UpdateStatus::UpdateCsm(csm_status) => {
+                        bundle.csm = Some(csm_status.clone());
+                    },
+                };
+            }
+
+            //TODO: custom error type for this
+            if self.tx.send(bundle).is_err() {
+                return Err(StatusError::Other("Couldn't send".to_string()));
+            }
+
+            return Ok(())
+        }
+
+    pub fn get(&self) -> StatusBundle {
+        self.rx.borrow().clone()
+    }
+}
+

@@ -11,6 +11,9 @@ use express_tasks::ShutdownGuard;
 use tokio::sync::{broadcast, mpsc, watch};
 use tracing::*;
 use alpen_express_status::NodeStatus;
+use alpen_express_state::{
+    client_state::ClientState, csm_status::CsmStatus, operation::SyncAction,
+};
 
 use crate::{
     errors::Error,
@@ -87,7 +90,7 @@ pub fn client_worker_task<D: Database, E: ExecEngineCtl>(
     mut state: WorkerState<D>,
     engine: Arc<E>,
     mut msg_rx: mpsc::Receiver<CsmMessage>,
-    node_status: Arc<NodeStatus>,
+    node_status: Arc<NodeStatus3>,
     fcm_msg_tx: mpsc::Sender<ForkChoiceMessage>,
 ) -> Result<(), Error> {
     // Send a message off to the forkchoice manager that we're resuming.
@@ -122,7 +125,7 @@ fn process_msg<D: Database, E: ExecEngineCtl>(
     state: &mut WorkerState<D>,
     engine: &E,
     msg: &CsmMessage,
-    node_status: Arc<NodeStatus>,
+    node_status: Arc<NodeStatus3>,
     fcm_msg_tx: &mpsc::Sender<ForkChoiceMessage>,
 ) -> anyhow::Result<()> {
     match msg {
@@ -151,7 +154,7 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
     state: &mut WorkerState<D>,
     engine: &E,
     ev_idx: u64,
-    node_status: Arc<NodeStatus>,
+    node_status: Arc<NodeStatus3>,
     fcm_msg_tx: &mpsc::Sender<ForkChoiceMessage>,
 ) -> anyhow::Result<()> {
     // Perform the main step of deciding what the output we're operating on.
@@ -219,9 +222,11 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
     let mut status = CsmStatus::default();
     status.set_last_sync_ev_idx(ev_idx);
     status.update_from_client_state(new_state.as_ref());
+    let client_state = new_state.as_ref().clone();
 
-    node_status.csm_status_watch().send(status)?;
-    node_status.cl_state_watch().send(new_state.clone())?;
+    // add lifetimes
+    let update_status = vec![UpdateStatus::UpdateCsm(status), UpdateStatus::UpdateCl(client_state)];
+    node_status.update_status(&update_status);
 
     let update = ClientUpdateNotif::new(ev_idx, outp, new_state);
     if state.cupdate_tx.send(Arc::new(update)).is_err() {

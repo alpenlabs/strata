@@ -143,7 +143,7 @@ pub async fn bitcoin_data_reader_task(
     event_tx: mpsc::Sender<L1Event>,
     target_next_block: u64,
     config: Arc<ReaderConfig>,
-    node_status: Arc<NodeStatus>,
+    node_status: Arc<NodeStatus3>,
 ) {
     let mut status_updates = Vec::new();
     if let Err(e) = do_reader_task(
@@ -166,7 +166,7 @@ async fn do_reader_task(
     target_next_block: u64,
     config: Arc<ReaderConfig>,
     status_updates: &mut Vec<StatusUpdate>,
-    node_status: Arc<NodeStatus>,
+    node_status: Arc<NodeStatus3>,
 ) -> anyhow::Result<()> {
     info!(%target_next_block, "started L1 reader task!");
 

@@ -86,7 +86,7 @@ pub enum Error {
     #[error("fetch limit reached. max {0}, provided {1}")]
     FetchLimitReached(u64, u64),
 
-    #[error("status error for this enum")]
+    #[error("status error")]
     ImproperStatus,
 
     /// Generic internal error message.  If this is used often it should be made
@@ -143,7 +143,7 @@ fn fetch_l2blk<D: Database + Sync + Send + 'static>(
 }
 
 pub struct AlpenRpcImpl<D> {
-    node_status: Arc<NodeStatus>,
+    node_status: Arc<NodeStatus3>,
     database: Arc<D>,
     sync_manager: Arc<SyncManager>,
     bcast_handle: Arc<L1BroadcastHandle>,
@@ -152,7 +152,7 @@ pub struct AlpenRpcImpl<D> {
 
 impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
     pub fn new(
-        node_status: Arc<NodeStatus>,
+        node_status: Arc<NodeStatus3>,
         database: Arc<D>,
         sync_manager: Arc<SyncManager>,
         bcast_handle: Arc<L1BroadcastHandle>,
@@ -168,16 +168,18 @@ impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
     }
 
     /// Gets a ref to the current client state as of the last update.
-    async fn get_client_state(&self) -> Result<Arc<ClientState>, StatusError> {
-        let cs_rx = self.sync_manager.create_state_watch_sub()?;
-        let cs = cs_rx.borrow().clone();
+    async fn get_client_state(&self) -> Result<ClientState, StatusError> {
+        let node_status = self.sync_manager.node_status();
 
-        Ok(cs)
+        match node_status.get().cl {
+            Some(cl) => Ok(cl),
+            None => Err(StatusError::NotInitializedError),
+        }
     }
 
     /// Gets a clone of the current client state and fetches the chainstate that
     /// of the L2 block that it considers the tip state.
-    async fn get_cur_states(&self) -> Result<(Arc<ClientState>, Option<Arc<ChainState>>), Error> {
+    async fn get_cur_states(&self) -> Result<(ClientState, Option<Arc<ChainState>>), Error> {
         // TODO : add string to error
         let cs = self
             .get_client_state()
@@ -243,13 +245,14 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
     }
 
     async fn get_l1_status(&self) -> RpcResult<L1Status> {
-        let btcio_status = self.node_status.l1_status().await.clone();
-
-        Ok(btcio_status)
+        match self.node_status.get().l1 {
+            Some(l1) => Ok(l1),
+            None => Err(Error::ImproperStatus.into()),
+        }
     }
 
     async fn get_l1_connection_status(&self) -> RpcResult<bool> {
-        Ok(self.node_status.l1_status().await.bitcoin_rpc_connected)
+         Ok(self.get_l1_status().await?.bitcoin_rpc_connected)
     }
 
     async fn get_l1_block_hash(&self, height: u64) -> RpcResult<Option<String>> {

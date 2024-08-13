@@ -34,7 +34,7 @@ pub struct SyncManager {
     fc_manager_tx: mpsc::Sender<ForkChoiceMessage>,
     csm_ctl: Arc<CsmController>,
     cupdate_rx: broadcast::Receiver<Arc<ClientUpdateNotif>>,
-    node_status: Arc<NodeStatus>,
+    node_status: Arc<NodeStatus3>,
 }
 
 impl SyncManager {
@@ -63,14 +63,8 @@ impl SyncManager {
         self.cupdate_rx.resubscribe()
     }
 
-    /// Returns a new watch `Receiver` handle to the CSM state watch.
-    pub fn create_state_watch_sub(&self) -> Result<watch::Receiver<Arc<ClientState>>, StatusError> {
-        self.node_status.cl_state_watch().borrow_rx()
-    }
-
-    /// Gets a clone of the last sent CSM status.
-    pub fn get_csm_status(&self) -> Result<watch::Receiver<CsmStatus>, StatusError> {
-        self.node_status.csm_status_watch().borrow_rx()
+    pub fn node_status(&self) -> Arc<NodeStatus3> {
+        self.node_status.clone()
     }
 
     /// Submits a fork choice message if possible. (synchronously)
@@ -95,8 +89,7 @@ pub fn start_sync_tasks<
     engine: Arc<E>,
     pool: threadpool::ThreadPool,
     params: Arc<Params>,
-    node_status: Arc<NodeStatus>,
-    node_status2: Arc<NodeStatus2>,
+    node_status: Arc<NodeStatus3>,
 ) -> anyhow::Result<SyncManager> {
     // Create channels.
     let (fcm_tx, fcm_rx) = mpsc::channel::<ForkChoiceMessage>(64);
@@ -146,13 +139,16 @@ pub fn start_sync_tasks<
     status.set_last_sync_ev_idx(cw_state.cur_event_idx());
     status.update_from_client_state(state.as_ref());
 
-    node_status.update_csm_status(&status);
-    node_status.update_cl_state(state.clone());
-    // let (csm_status_tx, csm_status_rx) = watch::channel(status);
+    let update_status = vec![UpdateStatus::UpdateCsm(status), UpdateStatus::UpdateCl(state.as_ref().clone())];
+    let _ = node_status.update_status(&update_status);
+    // node_status.update_csm_status(&status);
+    // node_status.update_cl_state(state.clone());
+
     // let (cl_state_tx, cl_state_rx) = watch::channel(state);
 
     let csm_eng = engine.clone();
     let csm_fcm_tx = fcm_tx.clone();
+
     let ns = node_status.clone();
     executor.spawn_critical("client_worker_task", |shutdown| {
         worker::client_worker_task(
@@ -172,6 +168,6 @@ pub fn start_sync_tasks<
         fc_manager_tx: fcm_tx,
         csm_ctl,
         cupdate_rx,
-        node_status: node_status.clone(),
+        node_status,
     })
 }

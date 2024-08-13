@@ -37,7 +37,6 @@ use alpen_express_db::traits::SequencerDatabase;
 use alpen_express_rpc_types::L1Status;
 use alpen_express_status::NodeStatus;
 use alpen_express_status::Watch;
-use alpen_express_status::NodeStatus2;
 use anyhow::Context;
 use bitcoin::Network;
 use config::Config;
@@ -218,7 +217,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let l2_block_manager = Arc::new(L2BlockManager::new(pool.clone(), database.clone()));
     let node_status = Arc::new(NodeStatus::default());
 
-    let node_status2 = Arc::new(NodeStatus2::new());
+    let node_status = Arc::new(NodeStatus3::new());
 
     // Set up Bitcoin client RPC.
     let bitcoind_url = format!("http://{}", config.bitcoind_rpc.rpc_url);
@@ -265,7 +264,6 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         pool.clone(),
         params.clone(),
         node_status.clone(),
-        node_status2.clone(),
     )?;
     let sync_man = Arc::new(sync_man);
     let mut inscription_handler = None;

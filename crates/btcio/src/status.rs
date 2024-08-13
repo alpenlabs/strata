@@ -13,8 +13,9 @@ pub enum StatusUpdate {
     CurTip(String),
 }
 
-pub async fn apply_status_updates(status_updates: &[StatusUpdate], node_status: Arc<NodeStatus>) {
-    let mut l1_status = node_status.l1_status().await;
+pub async fn apply_status_updates(status_updates: &[StatusUpdate], node_status: Arc<NodeStatus3>) {
+    //TODO: handle if no l1
+    let mut l1_status = node_status.get().l1.unwrap();
     for event in status_updates {
         match event {
             StatusUpdate::CurHeight(height) => l1_status.cur_height = *height,
@@ -27,5 +28,5 @@ pub async fn apply_status_updates(status_updates: &[StatusUpdate], node_status: 
         }
     }
 
-    node_status.update_l1_status(&l1_status).await;
+    let _ = node_status.update_status(&vec![UpdateStatus::UpdateL1(l1_status)]);
 }
