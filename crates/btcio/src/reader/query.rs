@@ -4,7 +4,6 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use alpen_express_rpc_types::types::L1Status;
 use alpen_express_status::NodeStatus;
 use anyhow::bail;
 use bitcoin::{Block, BlockHash};
@@ -143,7 +142,7 @@ pub async fn bitcoin_data_reader_task(
     event_tx: mpsc::Sender<L1Event>,
     target_next_block: u64,
     config: Arc<ReaderConfig>,
-    node_status: Arc<NodeStatus3>,
+    node_status: Arc<NodeStatus>,
 ) {
     let mut status_updates = Vec::new();
     if let Err(e) = do_reader_task(
@@ -166,7 +165,7 @@ async fn do_reader_task(
     target_next_block: u64,
     config: Arc<ReaderConfig>,
     status_updates: &mut Vec<StatusUpdate>,
-    node_status: Arc<NodeStatus3>,
+    node_status: Arc<NodeStatus>,
 ) -> anyhow::Result<()> {
     info!(%target_next_block, "started L1 reader task!");
 

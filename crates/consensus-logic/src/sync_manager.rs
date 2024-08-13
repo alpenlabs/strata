@@ -4,10 +4,10 @@
 
 use std::sync::Arc;
 
-use alpen_express_status::{NodeStatus, StatusError};
 use alpen_express_state::client_state::ClientState;
-use alpen_express_status::{NodeStatus, NodeStatus2, Status, StatusError};
 use tokio::sync::{broadcast, mpsc, watch};
+use alpen_express_status::{NodeStatus, UpdateStatus};
+use tokio::sync::{broadcast, mpsc};
 use tracing::*;
 
 use alpen_express_db::traits::Database;
@@ -34,7 +34,7 @@ pub struct SyncManager {
     fc_manager_tx: mpsc::Sender<ForkChoiceMessage>,
     csm_ctl: Arc<CsmController>,
     cupdate_rx: broadcast::Receiver<Arc<ClientUpdateNotif>>,
-    node_status: Arc<NodeStatus3>,
+    node_status: Arc<NodeStatus>,
 }
 
 impl SyncManager {
@@ -63,7 +63,7 @@ impl SyncManager {
         self.cupdate_rx.resubscribe()
     }
 
-    pub fn node_status(&self) -> Arc<NodeStatus3> {
+    pub fn node_status(&self) -> Arc<NodeStatus> {
         self.node_status.clone()
     }
 
@@ -89,7 +89,7 @@ pub fn start_sync_tasks<
     engine: Arc<E>,
     pool: threadpool::ThreadPool,
     params: Arc<Params>,
-    node_status: Arc<NodeStatus3>,
+    node_status: Arc<NodeStatus>,
 ) -> anyhow::Result<SyncManager> {
     // Create channels.
     let (fcm_tx, fcm_rx) = mpsc::channel::<ForkChoiceMessage>(64);
@@ -139,10 +139,7 @@ pub fn start_sync_tasks<
     status.set_last_sync_ev_idx(cw_state.cur_event_idx());
     status.update_from_client_state(state.as_ref());
 
-    let update_status = vec![
-        UpdateStatus::UpdateCsm(status),
-        UpdateStatus::UpdateCl(state.as_ref().clone()),
-    ];
+    let update_status = vec![UpdateStatus::UpdateCsm(status), UpdateStatus::UpdateCl(state.as_ref().clone())];
     if node_status.update_status(&update_status).is_err() {
         error!("Error while updating status");
     }

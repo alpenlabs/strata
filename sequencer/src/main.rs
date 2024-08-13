@@ -215,9 +215,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     // Set up database managers.
     let l2_block_manager = Arc::new(L2BlockManager::new(pool.clone(), database.clone()));
-    let node_status = Arc::new(NodeStatus::default());
-
-    let node_status = Arc::new(NodeStatus3::new());
+    let node_status = Arc::new(NodeStatus::new());
 
     // Set up Bitcoin client RPC.
     let bitcoind_url = format!("http://{}", config.bitcoind_rpc.rpc_url);

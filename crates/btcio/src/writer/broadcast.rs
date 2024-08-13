@@ -2,7 +2,7 @@
 
 use std::{sync::Arc, time::Duration};
 
-use alpen_express_status::NodeStatus3;
+use alpen_express_status::NodeStatus;
 use anyhow::anyhow;
 use bitcoin::{consensus::deserialize, Txid};
 use tracing::*;
@@ -33,7 +33,7 @@ pub async fn broadcaster_task<D: SequencerDatabase + Send + Sync + 'static>(
     next_publish_blob_idx: u64,
     rpc_client: Arc<impl SeqL1Client + L1Client>,
     db: Arc<D>,
-    node_status: Arc<NodeStatus3>,
+    node_status: Arc<NodeStatus>,
 ) -> anyhow::Result<()> {
     info!("Starting L1 writer's broadcaster task");
     let interval = tokio::time::interval(Duration::from_millis(BROADCAST_POLL_INTERVAL));

@@ -143,7 +143,7 @@ fn fetch_l2blk<D: Database + Sync + Send + 'static>(
 }
 
 pub struct AlpenRpcImpl<D> {
-    node_status: Arc<NodeStatus3>,
+    node_status: Arc<NodeStatus>,
     database: Arc<D>,
     sync_manager: Arc<SyncManager>,
     bcast_handle: Arc<L1BroadcastHandle>,
@@ -152,7 +152,7 @@ pub struct AlpenRpcImpl<D> {
 
 impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
     pub fn new(
-        node_status: Arc<NodeStatus3>,
+        node_status: Arc<NodeStatus>,
         database: Arc<D>,
         sync_manager: Arc<SyncManager>,
         bcast_handle: Arc<L1BroadcastHandle>,

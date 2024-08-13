@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
-use alpen_express_rpc_types::types::L1Status;
 use tokio::sync::RwLock;
-use alpen_express_status::NodeStatus;
+
+use alpen_express_primitives::l1::L1Status;
+use alpen_express_status::{NodeStatus, UpdateStatus};
 
 #[derive(Debug, Clone)]
 pub enum StatusUpdate {
@@ -13,9 +14,9 @@ pub enum StatusUpdate {
     CurTip(String),
 }
 
-pub async fn apply_status_updates(status_updates: &[StatusUpdate], node_status: Arc<NodeStatus3>) {
+pub async fn apply_status_updates(status_updates: &[StatusUpdate], node_status: Arc<NodeStatus>) {
     //TODO: handle if no l1
-    let mut l1_status = node_status.get().l1;
+    let l1_status = node_status.get().l1;
     let mut l1_status = match l1_status {
         Some(l1) => l1,
         None => L1Status::default(),

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use alpen_express_status::NodeStatus3;
+use alpen_express_status::NodeStatus;
 use tokio::{
     mpsc::{self, Receiver, Sender},
     RwLock,

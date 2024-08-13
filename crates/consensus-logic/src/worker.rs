@@ -14,6 +14,7 @@ use alpen_express_status::NodeStatus;
 use alpen_express_state::{
     client_state::ClientState, csm_status::CsmStatus, operation::SyncAction,
 };
+use alpen_express_status::{NodeStatus, UpdateStatus};
 
 use crate::{
     errors::Error,
@@ -90,7 +91,7 @@ pub fn client_worker_task<D: Database, E: ExecEngineCtl>(
     mut state: WorkerState<D>,
     engine: Arc<E>,
     mut msg_rx: mpsc::Receiver<CsmMessage>,
-    node_status: Arc<NodeStatus3>,
+    node_status: Arc<NodeStatus>,
     fcm_msg_tx: mpsc::Sender<ForkChoiceMessage>,
 ) -> Result<(), Error> {
     // Send a message off to the forkchoice manager that we're resuming.
@@ -125,7 +126,7 @@ fn process_msg<D: Database, E: ExecEngineCtl>(
     state: &mut WorkerState<D>,
     engine: &E,
     msg: &CsmMessage,
-    node_status: Arc<NodeStatus3>,
+    node_status: Arc<NodeStatus>,
     fcm_msg_tx: &mpsc::Sender<ForkChoiceMessage>,
 ) -> anyhow::Result<()> {
     match msg {
@@ -154,7 +155,7 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
     state: &mut WorkerState<D>,
     engine: &E,
     ev_idx: u64,
-    node_status: Arc<NodeStatus3>,
+    node_status: Arc<NodeStatus>,
     fcm_msg_tx: &mpsc::Sender<ForkChoiceMessage>,
 ) -> anyhow::Result<()> {
     // Perform the main step of deciding what the output we're operating on.
@@ -229,7 +230,9 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
         UpdateStatus::UpdateCsm(status),
         UpdateStatus::UpdateCl(client_state),
     ];
-    node_status.update_status(&update_status);
+    if node_status.update_status(&update_status).is_err() {
+        error!(%ev_idx, "cannot update status");
+    }
 
     let update = ClientUpdateNotif::new(ev_idx, outp, new_state);
     if state.cupdate_tx.send(Arc::new(update)).is_err() {
