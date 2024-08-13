@@ -24,7 +24,6 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: llvm-tools-preview
-      - uses: Swatinem/rust-cache@v2
       - name: Install latest nextest release
         uses: taiki-e/install-action@v2
         with:
@@ -36,6 +35,13 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
+      - name: Cleanup space
+        # https://github.com/actions/runner-images/issues/2840#issuecomment-790492173
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
       - name: Run tests with coverage
         run: |
           cargo llvm-cov --workspace --locked nextest --profile ci --lcov --output-path lcov.info
