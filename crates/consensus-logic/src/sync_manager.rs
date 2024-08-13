@@ -139,12 +139,13 @@ pub fn start_sync_tasks<
     status.set_last_sync_ev_idx(cw_state.cur_event_idx());
     status.update_from_client_state(state.as_ref());
 
-    let update_status = vec![UpdateStatus::UpdateCsm(status), UpdateStatus::UpdateCl(state.as_ref().clone())];
-    let _ = node_status.update_status(&update_status);
-    // node_status.update_csm_status(&status);
-    // node_status.update_cl_state(state.clone());
-
-    // let (cl_state_tx, cl_state_rx) = watch::channel(state);
+    let update_status = vec![
+        UpdateStatus::UpdateCsm(status),
+        UpdateStatus::UpdateCl(state.as_ref().clone()),
+    ];
+    if node_status.update_status(&update_status).is_err() {
+        error!("Error while updating status");
+    }
 
     let csm_eng = engine.clone();
     let csm_fcm_tx = fcm_tx.clone();

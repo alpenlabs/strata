@@ -15,7 +15,11 @@ pub enum StatusUpdate {
 
 pub async fn apply_status_updates(status_updates: &[StatusUpdate], node_status: Arc<NodeStatus3>) {
     //TODO: handle if no l1
-    let mut l1_status = node_status.get().l1.unwrap();
+    let mut l1_status = node_status.get().l1;
+    let mut l1_status = match l1_status {
+        Some(l1) => l1,
+        None => L1Status::default(),
+    };
     for event in status_updates {
         match event {
             StatusUpdate::CurHeight(height) => l1_status.cur_height = *height,

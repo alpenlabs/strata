@@ -252,7 +252,7 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
     }
 
     async fn get_l1_connection_status(&self) -> RpcResult<bool> {
-         Ok(self.get_l1_status().await?.bitcoin_rpc_connected)
+        Ok(self.get_l1_status().await?.bitcoin_rpc_connected)
     }
 
     async fn get_l1_block_hash(&self, height: u64) -> RpcResult<Option<String>> {
