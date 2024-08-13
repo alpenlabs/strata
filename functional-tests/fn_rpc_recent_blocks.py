@@ -22,9 +22,10 @@ class RecentBlocksTest(flexitest.Test):
             if blk is None:
                 counter += 1
                 time.sleep(1)
+            else:
+                break
 
         recent_blks = seqrpc.alp_getRecentBlocks(NUM_BLOCKS_TO_RECEIVE)
-
         assert len(recent_blks) == NUM_BLOCKS_TO_RECEIVE
 
         # check if they are in order by verifying if N-1 block is parent of N block

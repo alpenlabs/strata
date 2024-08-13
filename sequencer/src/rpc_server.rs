@@ -369,18 +369,14 @@ where
         let db = self.database.clone();
         let blkid = L2BlockId::from(Buf32::from(blkid.0));
 
-        let l2_blk = wait_blocking("fetch_block", move || {
+        Ok(wait_blocking("fetch_block", move || {
             let l2_prov = db.l2_provider();
 
             fetch_l2blk::<D>(l2_prov, blkid)
         })
         .await
-        .ok();
-
-        match l2_blk {
-            Some(l2_blk) => Ok(Some(conv_blk_header_to_rpc(l2_blk.header()))),
-            None => Ok(None),
-        }
+        .map(|blk| conv_blk_header_to_rpc(blk.header()))
+        .ok())
     }
 
     async fn get_exec_update_by_id(
@@ -442,7 +438,7 @@ where
 
         Ok(chain_state
             .deposits_table()
-            .get_all_deposits_ids_iter()
+            .get_all_deposits_idxs_iters_iter()
             .collect())
     }
 
@@ -509,46 +505,5 @@ impl<S: SequencerDatabase + Send + Sync + 'static> AlpenAdminApiServer for Admin
             return Err(Error::Other("".to_string()).into());
         }
         Ok(())
-    }
-}
-
-fn parse_l2block_id(block_id: &str) -> Result<L2BlockId, Error> {
-    if block_id.len() != 64 {
-        return Err(Error::IncorrectParameters("invalid BlockId".into()));
-    }
-
-    let mut bytes = [0u8; 32];
-
-    for (idx, byte) in bytes.iter_mut().enumerate().take(32) {
-        let start = idx * 2;
-        let chunk = &block_id[start..start + 2];
-        let byte_str = std::str::from_utf8(chunk.as_bytes())
-            .map_err(|_| Error::IncorrectParameters("invalid BlockId".to_string()))?;
-        *byte = u8::from_str_radix(byte_str, 16)
-            .map_err(|_| Error::IncorrectParameters("invalid BlockId".to_string()))?;
-    }
-
-    Ok(L2BlockId::from(Buf32::from(bytes)))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_parse_l2_blockid() {
-        let block_id =
-            parse_l2block_id("698567f5fc38ab42831e0455dc097094a7899b9480411ed73fbca99244b743c6");
-        assert!(block_id.is_ok());
-
-        // incomplete block id
-        let block_id =
-            parse_l2block_id("698567f5fc38ab42831e0455dc097094a7899b9480411ed73fbca99244b743");
-        assert!(block_id.is_err());
-
-        // overflowing block id
-        let block_id =
-            parse_l2block_id("698567f5fc38ab42831e0455dc097094a7899b9480411ed73fbca99244b74323423");
-        assert!(block_id.is_err());
     }
 }
