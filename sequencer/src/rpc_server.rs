@@ -22,13 +22,19 @@ use alpen_express_consensus_logic::sync_manager::SyncManager;
 
 use alpen_express_db::traits::{ChainstateProvider, Database, L2DataProvider};
 use alpen_express_db::traits::{L1DataProvider, SequencerDatabase};
-use alpen_express_primitives::{buf::Buf32, l1::L1Status};
-use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer, ClientStatus, HexBytes};
+use alpen_express_primitives::buf::Buf32;
+use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer, HexBytes};
+use alpen_express_rpc_types::{
+    BlockHeader, ClientStatus, DaBlob, DepositEntry, DepositState, ExecUpdate, L1Status,
+    WithdrawalIntent,
+};
 use alpen_express_state::{
+    block::{L2Block, L2BlockBundle},
     chain_state::ChainState,
     client_state::ClientState,
     da_blob::{BlobDest, BlobIntent},
-    header::L2Header,
+    exec_update,
+    header::{L2Header, SignedL2BlockHeader},
     id::L2BlockId,
     l1::L1BlockId,
 };
@@ -51,6 +57,15 @@ pub enum Error {
     #[error("missing L2 block {0:?}")]
     MissingL2Block(L2BlockId),
 
+    #[error("missing L1 block manifest {0}")]
+    MissingL1BlockManifest(u64),
+
+    #[error("tried to call chain-related method before rollup genesis")]
+    BeforeGenesis,
+
+    #[error("unknown idx {0}")]
+    UnknownIdx(u32),
+
     #[error("missing chainstate for index {0}")]
     MissingChainstate(u64),
 
@@ -59,6 +74,12 @@ pub enum Error {
 
     #[error("blocking task '{0}' failed for unknown reason")]
     BlockingAbort(String),
+
+    #[error("incorrect parameters: {0}")]
+    IncorrectParameters(String),
+
+    #[error("fetch limit reached. max {0}, provided {1}")]
+    FetchLimitReached(u64, u64),
 
     /// Generic internal error message.  If this is used often it should be made
     /// into its own error type.
@@ -76,10 +97,15 @@ impl Error {
         match self {
             Self::Unsupported => -32600,
             Self::Unimplemented => -32601,
-            Self::ClientNotStarted => -32602,
+            Self::IncorrectParameters(_) => -32602,
             Self::MissingL2Block(_) => -32603,
             Self::MissingChainstate(_) => -32604,
             Self::Db(_) => -32605,
+            Self::ClientNotStarted => -32606,
+            Self::BeforeGenesis => -32607,
+            Self::FetchLimitReached(_, _) => -32608,
+            Self::UnknownIdx(_) => -32608,
+            Self::MissingL1BlockManifest(_) => -32609,
             Self::BlockingAbort(_) => -32001,
             Self::Other(_) => -32000,
             Self::OtherEx(_, _) => -32000,
@@ -97,8 +123,21 @@ impl From<Error> for ErrorObjectOwned {
     }
 }
 
+fn fetch_l2blk<D: Database + Sync + Send + 'static>(
+    l2_prov: &Arc<<D as Database>::L2Prov>,
+    blkid: L2BlockId,
+) -> Result<L2BlockBundle, Error>
+where
+    <D as Database>::L2Prov: Send + Sync + 'static,
+{
+    l2_prov
+        .get_block_data(blkid)
+        .map_err(Error::Db)?
+        .ok_or(Error::MissingL2Block(blkid))
+}
+
 pub struct AlpenRpcImpl<D> {
-    l1_status: Arc<RwLock<alpen_express_primitives::l1::L1Status>>,
+    l1_status: Arc<RwLock<L1Status>>,
     database: Arc<D>,
     sync_manager: Arc<SyncManager>,
     stop_tx: Mutex<Option<oneshot::Sender<()>>>,
@@ -106,7 +145,7 @@ pub struct AlpenRpcImpl<D> {
 
 impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
     pub fn new(
-        l1_status: Arc<RwLock<alpen_express_primitives::l1::L1Status>>,
+        l1_status: Arc<RwLock<L1Status>>,
         database: Arc<D>,
         sync_manager: Arc<SyncManager>,
         stop_tx: oneshot::Sender<()>,
@@ -161,10 +200,23 @@ impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
     }
 }
 
+fn conv_blk_header_to_rpc(blk_header: &impl L2Header) -> BlockHeader {
+    BlockHeader {
+        block_idx: blk_header.blockidx(),
+        timestamp: blk_header.timestamp(),
+        block_id: *blk_header.get_blockid().as_ref(),
+        prev_block: *blk_header.parent().as_ref(),
+        l1_segment_hash: *blk_header.l1_payload_hash().as_ref(),
+        exec_segment_hash: *blk_header.exec_payload_hash().as_ref(),
+        state_root: *blk_header.state_root().as_ref(),
+    }
+}
+
 #[async_trait]
 impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D>
 where
-    <D as alpen_express_db::traits::Database>::L1Prov: Send + Sync + 'static,
+    <D as Database>::L1Prov: Send + Sync + 'static,
+    <D as Database>::L2Prov: Send + Sync + 'static,
 {
     async fn protocol_version(&self) -> RpcResult<u64> {
         Ok(1)
@@ -190,13 +242,18 @@ where
         Ok(self.l1_status.read().await.bitcoin_rpc_connected)
     }
 
-    async fn get_l1_block_hash(&self, height: u64) -> RpcResult<String> {
-        // FIXME this used to panic and take down core services making the test
-        // hang, but it now it's just returns the wrong data without crashing
-        match self.database.l1_provider().get_block_manifest(height) {
-            Ok(Some(mf)) => Ok(mf.block_hash().to_string()),
-            Ok(None) => Ok("".to_string()),
-            Err(e) => Ok(e.to_string()),
+    async fn get_l1_block_hash(&self, height: u64) -> RpcResult<Option<String>> {
+        let db = self.database.clone();
+        let blk_manifest = wait_blocking("l1_block_manifest", move || {
+            db.l1_provider()
+                .get_block_manifest(height)
+                .map_err(|_| Error::MissingL1BlockManifest(height))
+        })
+        .await?;
+
+        match blk_manifest {
+            Some(blk) => Ok(Some(blk.block_hash().to_string())),
+            None => Ok(None),
         }
     }
 
@@ -236,9 +293,182 @@ where
             buried_l1_height: state.l1_view().buried_l1_height(),
         })
     }
+
+    async fn get_recent_blocks(&self, count: u64) -> RpcResult<Vec<BlockHeader>> {
+        // FIXME: sync state should have a block number
+        let cl_state = self.get_client_state().await;
+        let tip_blkid = *cl_state
+            .sync()
+            .ok_or(Error::ClientNotStarted)?
+            .chain_tip_blkid();
+        let db = self.database.clone();
+
+        let fetch_limit = self.sync_manager.params().run().l2_blocks_fetch_limit;
+        if count > fetch_limit {
+            return Err(Error::FetchLimitReached(fetch_limit, count).into());
+        }
+
+        let blk_headers = wait_blocking("block_headers", move || {
+            let l2_prov = db.l2_provider();
+            let mut output = Vec::new();
+            let mut cur_blkid = tip_blkid;
+
+            while output.len() < count as usize {
+                let l2_blk = fetch_l2blk::<D>(l2_prov, cur_blkid)?;
+                output.push(conv_blk_header_to_rpc(l2_blk.header()));
+                cur_blkid = *l2_blk.header().parent();
+                if l2_blk.header().blockidx() == 0 || Buf32::from(cur_blkid).is_zero() {
+                    break;
+                }
+            }
+
+            Ok(output)
+        })
+        .await?;
+
+        Ok(blk_headers)
+    }
+
+    async fn get_blocks_at_idx(&self, idx: u64) -> RpcResult<Option<Vec<BlockHeader>>> {
+        let cl_state = self.get_client_state().await;
+        let tip_blkid = *cl_state
+            .sync()
+            .ok_or(Error::ClientNotStarted)?
+            .chain_tip_blkid();
+        let db = self.database.clone();
+
+        let blk_header = wait_blocking("block_at_idx", move || {
+            let l2_prov = db.l2_provider();
+            // check the tip idx
+            let tip_idx = fetch_l2blk::<D>(l2_prov, tip_blkid)?.header().blockidx();
+
+            if idx > tip_idx {
+                return Ok(None);
+            }
+
+            l2_prov
+                .get_blocks_at_height(idx)
+                .map_err(Error::Db)?
+                .iter()
+                .map(|blkid| {
+                    let l2_blk = fetch_l2blk::<D>(l2_prov, *blkid)?;
+
+                    Ok(Some(conv_blk_header_to_rpc(l2_blk.block().header())))
+                })
+                .collect::<Result<Option<Vec<BlockHeader>>, Error>>()
+        })
+        .await?;
+
+        Ok(blk_header)
+    }
+
+    async fn get_block_by_id(
+        &self,
+        blkid: alpen_express_rpc_types::L2BlockId,
+    ) -> RpcResult<Option<BlockHeader>> {
+        let db = self.database.clone();
+        let blkid = L2BlockId::from(Buf32::from(blkid.0));
+
+        Ok(wait_blocking("fetch_block", move || {
+            let l2_prov = db.l2_provider();
+
+            fetch_l2blk::<D>(l2_prov, blkid)
+        })
+        .await
+        .map(|blk| conv_blk_header_to_rpc(blk.header()))
+        .ok())
+    }
+
+    async fn get_exec_update_by_id(
+        &self,
+        blkid: alpen_express_rpc_types::L2BlockId,
+    ) -> RpcResult<Option<ExecUpdate>> {
+        let db = self.database.clone();
+        let blkid = L2BlockId::from(Buf32::from(blkid.0));
+
+        let l2_blk = wait_blocking("fetch_block", move || {
+            let l2_prov = db.l2_provider();
+
+            fetch_l2blk::<D>(l2_prov, blkid)
+        })
+        .await
+        .ok();
+
+        match l2_blk {
+            Some(l2_blk) => {
+                let exec_update = l2_blk.exec_segment().update();
+
+                let withdrawals = exec_update
+                    .output()
+                    .withdrawals()
+                    .iter()
+                    .map(|intent| {
+                        let (amt, dest_pk) = intent.into_parts();
+                        let dest_pk = *dest_pk.as_ref();
+                        WithdrawalIntent { amt, dest_pk }
+                    })
+                    .collect();
+
+                let da_blobs = exec_update
+                    .output()
+                    .da_blobs()
+                    .iter()
+                    .map(|blob| DaBlob {
+                        dest: blob.dest().into(),
+                        blob_commitment: *blob.commitment().as_ref(),
+                    })
+                    .collect();
+
+                Ok(Some(ExecUpdate {
+                    update_idx: exec_update.input().update_idx(),
+                    entries_root: *exec_update.input().entries_root().as_ref(),
+                    extra_payload: exec_update.input().extra_payload().to_vec(),
+                    new_state: *exec_update.output().new_state().as_ref(),
+                    withdrawals,
+                    da_blobs,
+                }))
+            }
+            None => Ok(None),
+        }
+    }
+
+    async fn get_current_deposits(&self) -> RpcResult<Vec<u32>> {
+        let (_, chain_state) = self.get_cur_states().await?;
+        let chain_state = chain_state.ok_or(Error::BeforeGenesis)?;
+
+        Ok(chain_state
+            .deposits_table()
+            .get_all_deposits_idxs_iters_iter()
+            .collect())
+    }
+
+    async fn get_current_deposit_by_id(&self, deposit_id: u32) -> RpcResult<DepositEntry> {
+        let (_, chain_state) = self.get_cur_states().await?;
+        let chain_state = chain_state.ok_or(Error::BeforeGenesis)?;
+
+        let deposit_entry = chain_state
+            .deposits_table()
+            .get_deposit(deposit_id)
+            .ok_or(Error::UnknownIdx(deposit_id))?;
+
+        let state = match deposit_entry.deposit_state() {
+            alpen_express_state::bridge_state::DepositState::Created(_) => DepositState::Created,
+            alpen_express_state::bridge_state::DepositState::Accepted(_) => DepositState::Accepted,
+            alpen_express_state::bridge_state::DepositState::Dispatched(_) => {
+                DepositState::Dispatched
+            }
+            alpen_express_state::bridge_state::DepositState::Executed => DepositState::Executed,
+        };
+
+        Ok(DepositEntry {
+            deposit_idx: deposit_id,
+            amt: deposit_entry.amt(),
+            state,
+        })
+    }
 }
 
-/// Wrapper around [``tokio::task::spawn_blocking``] that handles errors in the
+/// Wrapper around [``tokio::task::spawn_blocking``] that handles errors in
 /// external task and merges the errors into the standard RPC error type.
 async fn wait_blocking<F, R>(name: &'static str, f: F) -> Result<R, Error>
 where

@@ -134,6 +134,10 @@ impl DepositsTable {
             .ok()
             .map(|i| &mut self.deposits[i])
     }
+
+    pub fn get_all_deposits_idxs_iters_iter(&self) -> impl Iterator<Item = u32> + '_ {
+        self.deposits.iter().map(|e| e.deposit_idx)
+    }
 }
 
 /// Container for the state machine of a deposit factory.
@@ -170,6 +174,18 @@ impl DepositEntry {
         } else {
             None
         }
+    }
+
+    pub fn pending_update_txs(&self) -> &[l1::L1TxRef] {
+        &self.pending_update_txs
+    }
+
+    pub fn deposit_state(&self) -> &DepositState {
+        &self.state
+    }
+
+    pub fn amt(&self) -> u64 {
+        self.amt
     }
 }
 

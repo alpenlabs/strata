@@ -17,6 +17,12 @@ pub struct WithdrawalIntent {
     dest_pk: Buf64,
 }
 
+impl WithdrawalIntent {
+    pub fn into_parts(&self) -> (u64, Buf64) {
+        (self.amt, self.dest_pk)
+    }
+}
+
 /// Set of withdrawals that are assigned to a deposit bridge utxo.
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
 pub struct WithdrawalBatch {

@@ -4,6 +4,8 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use alpen_express_primitives::buf::Buf32;
 use alpen_express_primitives::hash::compute_borsh_hash;
 
+use crate::bridge_state::DepositsTable;
+use crate::exec_env::ExecEnvState;
 use crate::l1::L1ViewState;
 use crate::prelude::*;
 use crate::{bridge_ops, bridge_state, exec_env, l1};
@@ -101,6 +103,14 @@ impl ChainState {
             deposits_hash: compute_borsh_hash(&self.deposits_table),
         };
         compute_borsh_hash(&hashed_state)
+    }
+
+    pub fn deposits_table(&self) -> &DepositsTable {
+        &self.deposits_table
+    }
+
+    pub fn exec_env_state(&self) -> &ExecEnvState {
+        &self.exec_env_state
     }
 }
 

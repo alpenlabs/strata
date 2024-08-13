@@ -1,18 +1,17 @@
 use std::sync::Arc;
 
+use alpen_express_primitives::buf::Buf32;
 use anyhow::Context;
 use bitcoin::hashes::Hash;
 use bitcoin::{consensus::serialize, Transaction};
 use sha2::{Digest, Sha256};
 
+use crate::rpc::traits::{L1Client, SeqL1Client};
 use alpen_express_db::types::BlobL1Status;
 use alpen_express_db::{
     traits::{SeqDataProvider, SeqDataStore, SequencerDatabase},
     types::BlobEntry,
 };
-use alpen_express_primitives::buf::Buf32;
-
-use crate::rpc::traits::{L1Client, SeqL1Client};
 
 use super::builder::build_inscription_txs;
 use super::config::WriterConfig;

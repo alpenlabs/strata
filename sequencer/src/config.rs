@@ -9,9 +9,9 @@ use crate::args::Args;
 pub struct ClientParams {
     pub rpc_port: u16,
     pub sequencer_key: Option<PathBuf>,
-
     /// The address to which the inscriptions are spent
     pub sequencer_bitcoin_address: String, // TODO: probably move this to another struct
+    pub l2_blocks_fetch_limit: u64,
     pub datadir: PathBuf,
 }
 
@@ -76,6 +76,7 @@ impl Config {
                     .datadir
                     .ok_or_else(|| "args: no client --datadir provided".to_string())?,
                 sequencer_key: args.sequencer_key,
+                l2_blocks_fetch_limit: 1_000,
                 sequencer_bitcoin_address: args
                     .sequencer_bitcoin_address
                     .ok_or_else(|| "args: no --sequencer-bitcion-address provided".to_string())?,
@@ -144,6 +145,7 @@ mod test {
 
             [client]
             rpc_port = 8432
+            l2_blocks_fetch_limit = 1000
             datadir = "/path/to/data/directory"
             sequencer_bitcoin_address = "some_addr"
 

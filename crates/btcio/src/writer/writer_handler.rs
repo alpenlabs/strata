@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use alpen_express_primitives::l1::L1Status;
+use alpen_express_rpc_types::L1Status;
 use tokio::{
     runtime::Runtime,
     sync::{

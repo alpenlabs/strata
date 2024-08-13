@@ -228,14 +228,14 @@ mod tests {
 
         // insert another block with arbitrary id
         let db = setup_db();
-        let idx = 200011;
+        let idx = 200_011;
         insert_block_data(idx, &db);
     }
 
     #[test]
     fn test_insert_into_non_empty_db() {
         let db = setup_db();
-        let idx = 1000;
+        let idx = 1_000;
         insert_block_data(idx, &db); // first insertion
 
         let invalid_idxs = vec![1, 2, 5000, 1000, 1002, 999]; // basically any id beside idx + 1

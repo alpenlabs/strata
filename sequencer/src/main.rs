@@ -8,6 +8,7 @@ use std::sync::Arc;
 use std::thread;
 
 use alpen_express_db::traits::SequencerDatabase;
+use alpen_express_rpc_types::L1Status;
 use anyhow::Context;
 use bitcoin::Network;
 use config::Config;
@@ -31,7 +32,6 @@ use alpen_express_consensus_logic::sync_manager::SyncManager;
 use alpen_express_db::traits::Database;
 use alpen_express_evmexec::{fork_choice_state_initial, EngineRpcClient};
 use alpen_express_primitives::buf::Buf32;
-use alpen_express_primitives::l1::L1Status;
 use alpen_express_primitives::{block_credential, params::*};
 use alpen_express_rocksdb::sequencer::db::SequencerDB;
 use alpen_express_rocksdb::SeqDb;
@@ -108,7 +108,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let params = Params {
         rollup: RollupParams {
             rollup_name: "express".to_string(),
-            block_time: 1000,
+            block_time: 1_000,
             cred_rule: block_credential::CredRule::Unchecked,
             horizon_l1_height: 3,
             genesis_l1_height: 5,
@@ -127,6 +127,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         run: RunParams {
             l1_follow_distance: config.sync.l1_follow_distance,
             client_checkpoint_interval: config.sync.client_checkpoint_interval,
+            l2_blocks_fetch_limit: config.client.l2_blocks_fetch_limit,
         },
     };
 
@@ -279,9 +280,10 @@ async fn main_task<
 ) -> anyhow::Result<()>
 where
     // TODO how are these not redundant trait bounds???
-    <D as alpen_express_db::traits::Database>::SeStore: Send + Sync + 'static,
-    <D as alpen_express_db::traits::Database>::L1Store: Send + Sync + 'static,
-    <D as alpen_express_db::traits::Database>::L1Prov: Send + Sync + 'static,
+    <D as Database>::SeStore: Send + Sync + 'static,
+    <D as Database>::L1Store: Send + Sync + 'static,
+    <D as Database>::L1Prov: Send + Sync + 'static,
+    <D as Database>::L2Prov: Send + Sync + 'static,
 {
     // Start the L1 tasks to get that going.
     let csm_ctl = sync_man.get_csm_ctl();

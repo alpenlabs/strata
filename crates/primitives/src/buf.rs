@@ -52,6 +52,10 @@ impl Buf32 {
     pub fn zero() -> Self {
         Self([0; 32].into())
     }
+
+    pub fn is_zero(&self) -> bool {
+        *self.as_ref() == [0; 32]
+    }
 }
 
 impl From<[u8; 32]> for Buf32 {
@@ -119,6 +123,12 @@ impl fmt::Debug for Buf64 {
 impl From<[u8; 64]> for Buf64 {
     fn from(value: [u8; 64]) -> Self {
         Self(FixedBytes::from(value))
+    }
+}
+
+impl AsRef<[u8; 64]> for Buf64 {
+    fn as_ref(&self) -> &[u8; 64] {
+        &self.0
     }
 }
 

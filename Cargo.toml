@@ -12,6 +12,7 @@ members = [
   "crates/reth/db",
   "crates/reth/exex",
   "crates/reth/rpc",
+  "crates/rpc/types",
   "crates/state",
   "crates/test-utils",
   "crates/util/mmr",
@@ -38,6 +39,7 @@ alpen-express-mmr = { path = "crates/util/mmr" }
 alpen-express-primitives = { path = "crates/primitives" }
 alpen-express-rocksdb = { path = "crates/rocksdb-store" }
 alpen-express-rpc-api = { path = "crates/rpc/api" }
+alpen-express-rpc-types = { path = "crates/rpc/types" }
 alpen-express-state = { path = "crates/state" }
 alpen-test-utils = { path = "crates/test-utils" }
 express-reth-db = { path = "crates/reth/db" }
@@ -47,7 +49,7 @@ express-rpc-utils = { path = "crates/rpc/utils" }
 zkvm = { path = "crates/prover/zkvm" }
 zkvm-primitives = { path = "crates/prover/primitives" }
 
-# IMPORTANT: ensure alloy-* types are of the same version as inside reth dependency 
+# IMPORTANT: ensure alloy-* types are of the same version as inside reth dependency
 alloy-genesis = { version = "0.2", default-features = false }
 alloy-rpc-types = { version = "0.2", default-features = false }
 anyhow = "1.0.86"
@@ -94,7 +96,7 @@ reth-rpc-types-compat = { git = "https://github.com/alpenlabs/reth.git", rev = "
 reth-trie-common = { git = "https://github.com/alpenlabs/reth.git", rev = "a90fc90df8be5651" }
 rockbound = { git = "https://github.com/alpenlabs/rockbound", rev = "3b10aaabef6652f0" }
 secp256k1 = "0.29.0"
-serde = "1.0"
+serde = { version = "1.0", features = ["derive"] }
 serde-hex = "0.1.0"
 serde_json = { version = "1.0", default-features = false, features = [
   "alloc",
