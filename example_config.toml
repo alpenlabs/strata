@@ -1,6 +1,6 @@
 [client]
 rpc_port = 8432
-l2_blocks_fetch_limit = 1000
+l2_blocks_fetch_limit = 1_000
 datadir = "/path/to/data/directory"
 # sequencer_key = "/path/to/data/directory/"
 

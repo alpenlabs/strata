@@ -1,6 +1,5 @@
 import time
 
-from bitcoinlib.services.bitcoind import BitcoindClient
 import flexitest
 
 NUM_BLOCKS_TO_RECEIVE = 10
@@ -18,18 +17,11 @@ class RecentBlocksTest(flexitest.Test):
         # create both btc and sequencer RPC
         seqrpc = seq.create_rpc()
         counter = 0
-        while True:
+        while counter <= 20:
             blk = seqrpc.alp_getBlocksAtIdx(NUM_BLOCKS_TO_RECEIVE)
             if blk is None:
                 counter += 1
                 time.sleep(1)
-                # stop retrying after 20 times
-                if counter == 20:
-                    break
-                continue
-
-            break
-
 
         recent_blks = seqrpc.alp_getRecentBlocks(NUM_BLOCKS_TO_RECEIVE)
 

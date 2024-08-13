@@ -76,7 +76,7 @@ impl Config {
                     .datadir
                     .ok_or_else(|| "args: no client --datadir provided".to_string())?,
                 sequencer_key: args.sequencer_key,
-                l2_blocks_fetch_limit: 1000,
+                l2_blocks_fetch_limit: 1_000,
                 sequencer_bitcoin_address: args
                     .sequencer_bitcoin_address
                     .ok_or_else(|| "args: no --sequencer-bitcion-address provided".to_string())?,
