@@ -20,6 +20,15 @@ jobs:
     name: Run unit tests and generate report
     runs-on: ubuntu-latest
     steps:
+      - name: Cleanup space
+        # https://github.com/actions/runner-images/issues/2840#issuecomment-790492173
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /usr/local/.ghcup
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
         with:
@@ -35,13 +44,6 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-      - name: Cleanup space
-        # https://github.com/actions/runner-images/issues/2840#issuecomment-790492173
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
       - name: Run tests with coverage
         run: |
           cargo llvm-cov --workspace --locked nextest --profile ci --lcov --output-path lcov.info
