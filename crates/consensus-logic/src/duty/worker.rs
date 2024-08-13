@@ -176,7 +176,7 @@ pub fn duty_dispatch_task<
     params: Arc<Params>,
 ) {
     // TODO make this actually work
-    let mut pending_duties: HashMap<u64, ()> = HashMap::new();
+    let mut pending_duties: HashMap<Buf32, ()> = HashMap::new();
 
     // TODO still need some stuff here to decide if we're fully synced and
     // *should* dispatch duties

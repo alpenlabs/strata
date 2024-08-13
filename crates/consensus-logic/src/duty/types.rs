@@ -4,7 +4,7 @@ use std::time;
 
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use alpen_express_primitives::buf::Buf32;
+use alpen_express_primitives::{buf::Buf32, hash::compute_borsh_hash};
 use alpen_express_state::{client_state::LocalL1State, id::L2BlockId};
 
 /// Describes when we'll stop working to fulfill a duty.
@@ -41,6 +41,10 @@ impl Duty {
                 Expiry::BlockIdFinalized(*blockid)
             }
         }
+    }
+
+    pub fn id(&self) -> Buf32 {
+        compute_borsh_hash(self)
     }
 }
 
@@ -98,7 +102,6 @@ impl BatchCommitmentDuty {
 /// Manages a set of duties we need to carry out.
 #[derive(Clone, Debug)]
 pub struct DutyTracker {
-    next_id: u64,
     duties: Vec<DutyEntry>,
     finalized_block: Option<L2BlockId>,
 }
@@ -107,7 +110,6 @@ impl DutyTracker {
     /// Creates a new instance that has nothing in it.
     pub fn new_empty() -> Self {
         Self {
-            next_id: 1,
             duties: Vec::new(),
             finalized_block: None,
         }
@@ -161,13 +163,8 @@ impl DutyTracker {
     /// Adds some more duties.
     pub fn add_duties(&mut self, blkid: L2BlockId, slot: u64, duties: impl Iterator<Item = Duty>) {
         self.duties.extend(duties.map(|d| DutyEntry {
+            id: d.id(),
             duty: d,
-            id: {
-                // This is horrible but it works. :)
-                let id = self.next_id;
-                self.next_id += 1;
-                id
-            },
             created_blkid: blkid,
             created_slot: slot,
         }));
@@ -193,7 +190,7 @@ pub struct DutyEntry {
     duty: Duty,
 
     /// ID used to help avoid re-performing a duty.
-    id: u64,
+    id: Buf32,
 
     /// Block ID it was created for.
     created_blkid: L2BlockId,
@@ -207,7 +204,7 @@ impl DutyEntry {
         &self.duty
     }
 
-    pub fn id(&self) -> u64 {
+    pub fn id(&self) -> Buf32 {
         self.id
     }
 }
