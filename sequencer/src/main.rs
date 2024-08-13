@@ -108,7 +108,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let params = Params {
         rollup: RollupParams {
             rollup_name: "express".to_string(),
-            block_time: 1000,
+            block_time: 1_000,
             cred_rule: block_credential::CredRule::Unchecked,
             horizon_l1_height: 3,
             genesis_l1_height: 5,

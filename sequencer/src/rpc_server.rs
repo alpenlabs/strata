@@ -29,7 +29,14 @@ use alpen_express_rpc_types::{
     WithdrawalIntent,
 };
 use alpen_express_state::{
-    block::{L2Block, L2BlockBundle}, chain_state::ChainState, client_state::ClientState, da_blob::{BlobDest, BlobIntent}, exec_update, header::{L2Header, SignedL2BlockHeader}, id::L2BlockId, l1::L1BlockId
+    block::{L2Block, L2BlockBundle},
+    chain_state::ChainState,
+    client_state::ClientState,
+    da_blob::{BlobDest, BlobIntent},
+    exec_update,
+    header::{L2Header, SignedL2BlockHeader},
+    id::L2BlockId,
+    l1::L1BlockId,
 };
 
 use tracing::*;
@@ -505,7 +512,6 @@ impl<S: SequencerDatabase + Send + Sync + 'static> AlpenAdminApiServer for Admin
     }
 }
 
-
 fn parse_l2block_id(block_id: &str) -> Result<L2BlockId, Error> {
     if block_id.len() != 64 {
         return Err(Error::IncorrectParameters("invalid BlockId".into()));
@@ -538,6 +544,11 @@ mod tests {
         // incomplete block id
         let block_id =
             parse_l2block_id("698567f5fc38ab42831e0455dc097094a7899b9480411ed73fbca99244b743");
+        assert!(block_id.is_err());
+
+        // overflowing block id
+        let block_id =
+            parse_l2block_id("698567f5fc38ab42831e0455dc097094a7899b9480411ed73fbca99244b74323423");
         assert!(block_id.is_err());
     }
 }
