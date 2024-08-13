@@ -1,8 +1,6 @@
 use std::sync::Arc;
+use tracing::error;
 
-use tokio::sync::RwLock;
-
-use alpen_express_primitives::l1::L1Status;
 use alpen_express_status::{NodeStatus, UpdateStatus};
 
 #[derive(Debug, Clone)]
@@ -17,10 +15,7 @@ pub enum StatusUpdate {
 pub async fn apply_status_updates(status_updates: &[StatusUpdate], node_status: Arc<NodeStatus>) {
     //TODO: handle if no l1
     let l1_status = node_status.get().l1;
-    let mut l1_status = match l1_status {
-        Some(l1) => l1,
-        None => L1Status::default(),
-    };
+    let mut l1_status = l1_status.unwrap_or_default();
     for event in status_updates {
         match event {
             StatusUpdate::CurHeight(height) => l1_status.cur_height = *height,
@@ -33,5 +28,10 @@ pub async fn apply_status_updates(status_updates: &[StatusUpdate], node_status: 
         }
     }
 
-    let _ = node_status.update_status(&vec![UpdateStatus::UpdateL1(l1_status)]);
+    if node_status
+        .update_status(&[UpdateStatus::UpdateL1(l1_status)])
+        .is_err()
+    {
+        error!("error updating l1status");
+    }
 }

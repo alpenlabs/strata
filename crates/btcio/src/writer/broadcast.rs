@@ -2,8 +2,7 @@
 
 use std::{sync::Arc, time::Duration};
 
-use alpen_express_status::NodeStatus;
-use anyhow::anyhow;
+use alpen_express_status::{NodeStatus, UpdateStatus};
 use bitcoin::{consensus::deserialize, Txid};
 use tracing::*;
 
@@ -13,7 +12,6 @@ use alpen_express_db::{
 };
 use alpen_express_rpc_types::L1Status;
 use anyhow::anyhow;
-use bitcoin::{consensus::deserialize, Txid};
 use tokio::sync::RwLock;
 use tracing::*;
 
@@ -91,6 +89,12 @@ pub async fn broadcaster_task<D: SequencerDatabase + Send + Sync + 'static>(
                         l1st.last_published_txid = Some(txid.to_string());
                         l1st.published_inscription_count += 1;
                         // TODO: add last update
+                        if node_status
+                            .update_status(&[UpdateStatus::UpdateL1(l1st.clone())])
+                            .is_err()
+                        {
+                            error!("error updating l1status");
+                        }
                         #[cfg(debug_assertions)]
                         debug!("Updated l1 status: {:?}", l1st);
                     }

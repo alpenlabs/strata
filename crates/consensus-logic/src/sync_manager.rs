@@ -139,7 +139,10 @@ pub fn start_sync_tasks<
     status.set_last_sync_ev_idx(cw_state.cur_event_idx());
     status.update_from_client_state(state.as_ref());
 
-    let update_status = vec![UpdateStatus::UpdateCsm(status), UpdateStatus::UpdateCl(state.as_ref().clone())];
+    let update_status = [
+        UpdateStatus::UpdateCsm(status),
+        UpdateStatus::UpdateCl(state.as_ref().clone()),
+    ];
     if node_status.update_status(&update_status).is_err() {
         error!("Error while updating status");
     }

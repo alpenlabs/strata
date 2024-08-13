@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+use alpen_express_rpc_types::L1Status;
 use thiserror::Error;
 use tokio::sync::watch;
 use tracing::error;
@@ -21,26 +22,28 @@ pub struct StatusBundle {
     pub l1: Option<L1Status>,
 }
 
-pub struct NodeStatus {
-    tx: watch::Sender<StatusBundle>,
-    rx: watch::Receiver<StatusBundle>,
-}
-
 pub enum UpdateStatus {
     UpdateL1(L1Status),
     UpdateCl(ClientState),
     UpdateCsm(CsmStatus),
 }
 
-impl NodeStatus {
-    pub fn new() -> NodeStatus {
+pub struct NodeStatus {
+    tx: watch::Sender<StatusBundle>,
+    rx: watch::Receiver<StatusBundle>,
+}
+
+impl Default for NodeStatus {
+    fn default() -> Self {
         let (st_tx, st_rx) = watch::channel(StatusBundle::default());
-        NodeStatus {
+        Self {
             tx: st_tx,
             rx: st_rx,
         }
     }
+}
 
+impl NodeStatus {
     pub fn update_status(&self, update_status: &[UpdateStatus]) -> Result<(), StatusError> {
         let bundle = self.rx.borrow();
         let mut new_bundle = StatusBundle {
@@ -68,11 +71,8 @@ impl NodeStatus {
         let x = self.tx.send(new_bundle);
         println!("{:?}", x);
         println!("was sent successfully");
-        //     println!("why is this not being sent");
-        //     return Err(StatusError::Other("Couldn't send".to_string()));
-        // }
 
-        return Ok(());
+        Ok(())
     }
 
     pub fn get(&self) -> StatusBundle {

@@ -312,7 +312,7 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
 
     async fn get_recent_blocks(&self, count: u64) -> RpcResult<Vec<BlockHeader>> {
         // FIXME: sync state should have a block number
-        let cl_state = self.get_client_state().await;
+        let cl_state = self.get_client_state().await.map_err(|_| Error::ClientNotStarted)?;
         let tip_blkid = *cl_state
             .sync()
             .ok_or(Error::ClientNotStarted)?
@@ -346,7 +346,7 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
     }
 
     async fn get_blocks_at_idx(&self, idx: u64) -> RpcResult<Option<Vec<BlockHeader>>> {
-        let cl_state = self.get_client_state().await;
+        let cl_state = self.get_client_state().await.map_err(|err| Error::ClientNotStarted)?;
         let tip_blkid = *cl_state
             .sync()
             .ok_or(Error::ClientNotStarted)?

@@ -225,13 +225,13 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
     status.update_from_client_state(new_state.as_ref());
     let client_state = new_state.as_ref().clone();
 
-    // add lifetimes
     let update_status = vec![
         UpdateStatus::UpdateCsm(status),
         UpdateStatus::UpdateCl(client_state),
     ];
+
     if node_status.update_status(&update_status).is_err() {
-        error!(%ev_idx, "cannot update status");
+        error!(%ev_idx, "cannot update csm and cl status");
     }
 
     let update = ClientUpdateNotif::new(ev_idx, outp, new_state);

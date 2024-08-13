@@ -953,6 +953,7 @@ name = "alpen-express-status"
 version = "0.1.0"
 dependencies = [
  "alpen-express-primitives",
+ "alpen-express-rpc-types",
  "alpen-express-state",
  "thiserror",
  "tokio",

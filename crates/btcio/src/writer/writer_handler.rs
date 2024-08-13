@@ -2,8 +2,7 @@ use std::sync::Arc;
 
 use alpen_express_status::NodeStatus;
 use tokio::{
-    mpsc::{self, Receiver, Sender},
-    RwLock,
+    sync::RwLock,
     runtime::Runtime,
     sync::mpsc::{self, Receiver, Sender},
 };
@@ -14,13 +13,8 @@ use alpen_express_db::{
     types::{BlobEntry, BlobL1Status},
 };
 use alpen_express_primitives::buf::Buf32;
-use alpen_express_rpc_types::L1Status;
 use alpen_express_state::da_blob::BlobIntent;
 use express_tasks::TaskExecutor;
-use tokio::sync::{
-    mpsc::{self, Receiver, Sender},
-    RwLock,
-};
 use tracing::*;
 
 use super::{
