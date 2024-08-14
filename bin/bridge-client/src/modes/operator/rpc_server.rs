@@ -58,8 +58,6 @@ impl Default for BridgeRpcImpl {
     }
 }
 
-// NOTE: These methods require context regarding the client itself so these have been implemented
-// here directly. For all other traits, the impls should go into `express-bridge-rpc-api::services`.
 #[async_trait]
 impl ExpressBridgeControlApiServer for BridgeRpcImpl {
     async fn get_protocol_version(&self) -> RpcResult<String> {

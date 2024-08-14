@@ -12,6 +12,10 @@ rust.unused_must_use = "deny"
 rustdoc.all = "warn"
 
 [dependencies]
+alpen-express-primitives = { workspace = true }
+
+async-trait = { workspace = true }
 bitcoin = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+thiserror = { workspace = true }

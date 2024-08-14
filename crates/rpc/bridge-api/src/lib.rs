@@ -6,8 +6,6 @@
 
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 
-pub mod services;
-
 /// RPCs related to information about the client itself.
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "alpbridge"))]
 #[cfg_attr(feature = "client", rpc(server, client, namespace = "alpbridge"))]
