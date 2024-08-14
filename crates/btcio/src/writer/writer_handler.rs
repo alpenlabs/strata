@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use alpen_express_primitives::buf::Buf32;
 use alpen_express_rpc_types::L1Status;
 use tokio::{
     runtime::Runtime,
@@ -16,9 +17,9 @@ use alpen_express_db::{
 };
 use alpen_express_state::da_blob::BlobIntent;
 
+use super::broadcast::broadcaster_task;
 use super::config::WriterConfig;
 use super::utils::{create_and_sign_blob_inscriptions, get_blob_by_id, put_blob, BlobIdx};
-use super::{broadcast::broadcaster_task, utils::calculate_blob_hash};
 use crate::{
     rpc::traits::{L1Client, SeqL1Client},
     writer::watcher::watcher_task,
@@ -44,7 +45,8 @@ impl<D: SequencerDatabase + Send + Sync + 'static> DaWriter<D> {
         let entry = BlobEntry::new_unsigned(intent.payload().to_vec());
 
         // Write to db and if not already exisging, notify signer about the new entry
-        if let Some(idx) = store_entry(entry, self.db.clone())? {
+        // if let Some(idx) = store_entry(*intent.commitment(), entry, self.db.clone())? {
+        if let Some(idx) = store_entry(*intent.commitment(), entry, self.db.clone())? {
             self.signer_tx.blocking_send(idx)?;
         } // None means duplicate intent
         Ok(())
@@ -55,7 +57,7 @@ impl<D: SequencerDatabase + Send + Sync + 'static> DaWriter<D> {
         let entry = BlobEntry::new_unsigned(intent.payload().to_vec());
 
         // Write to db and if not already exisging, notify signer about the new entry
-        if let Some(idx) = store_entry_async(entry, self.db.clone()).await? {
+        if let Some(idx) = store_entry_async(*intent.commitment(), entry, self.db.clone()).await? {
             self.signer_tx.send(idx).await?;
         } // None means duplicate intent
         Ok(())
@@ -128,36 +130,37 @@ where
     Ok(())
 }
 
-fn store_entry<D: SequencerDatabase>(entry: BlobEntry, db: Arc<D>) -> anyhow::Result<Option<u64>> {
-    let blobid = calculate_blob_hash(&entry.blob); // TODO: maybe use blobintent's commitment
-
-    match db.sequencer_provider().get_blob_by_id(blobid)? {
+fn store_entry<D: SequencerDatabase>(
+    commitment: Buf32,
+    entry: BlobEntry,
+    db: Arc<D>,
+) -> anyhow::Result<Option<u64>> {
+    match db.sequencer_provider().get_blob_by_id(commitment)? {
         Some(_) => {
-            warn!("duplicate write intent {blobid:?}. Ignoring");
+            warn!("duplicate write intent {commitment:?}. Ignoring");
             Ok(None)
         }
         None => {
             // Store in db
-            let idx = db.sequencer_store().put_blob(blobid, entry)?;
+            let idx = db.sequencer_store().put_blob(commitment, entry)?;
             Ok(Some(idx))
         }
     }
 }
 
 async fn store_entry_async<D: SequencerDatabase + Send + Sync + 'static>(
+    commitment: Buf32,
     entry: BlobEntry,
     db: Arc<D>,
 ) -> anyhow::Result<Option<u64>> {
-    let blobid = calculate_blob_hash(&entry.blob); // TODO: maybe use blobintent's commitment
-
-    match get_blob_by_id(db.clone(), blobid).await? {
+    match get_blob_by_id(db.clone(), commitment).await? {
         Some(_) => {
-            warn!("duplicate write intent {blobid:?}. Ignoring");
+            warn!("duplicate write intent {commitment:?}. Ignoring");
             Ok(None)
         }
         None => {
             // Store in db
-            let idx = put_blob(db, blobid, entry).await?;
+            let idx = put_blob(db, commitment, entry).await?;
             Ok(Some(idx))
         }
     }
