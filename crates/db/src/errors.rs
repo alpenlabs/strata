@@ -33,20 +33,30 @@ pub enum DbError {
     #[error("tried to revert to index {0} above current tip {1}")]
     RevertAboveCurrent(u64, u64),
 
-    #[error("IO Error")]
+    #[error("IO Error (rocksdb)")]
     IoError,
 
-    #[error("operation timed out")]
+    #[error("operation timed out (rocksdb)")]
     TimedOut,
 
-    #[error("operation aborted")]
+    #[error("operation aborted (rocksdb)")]
     Aborted,
 
-    #[error("invalid argument")]
+    #[error("invalid argument (rocksdb)")]
     InvalidArgument,
 
-    #[error("resource busy")]
+    #[error("resource busy (rocksdb)")]
     Busy,
+
+    /// A database worker task failed in an way that could not be determined.
+    #[error("worked task exited strangely")]
+    WorkerFailedStrangely,
+
+    /// This happens in a cache when we were a second call to a database entry after a primary one
+    /// was startedd whose result we would use failed.  This is meant to be a transient error that
+    /// typically could be retried, but the specifics depend on the underlying database semantics.
+    #[error("failed to load a cache entry")]
+    CacheLoadFail,
 
     #[error("codec error {0}")]
     CodecError(String),

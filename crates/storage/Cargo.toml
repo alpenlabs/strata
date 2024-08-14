@@ -8,6 +8,7 @@ alpen-express-db = { workspace = true }
 alpen-express-state = { workspace = true }
 
 async-trait = { workspace = true }
+lru = { workspace = true }
 paste = { workspace = true }
 threadpool = { workspace = true }
 tokio = { workspace = true }

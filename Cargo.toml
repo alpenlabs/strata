@@ -75,6 +75,7 @@ hyper = "0.14.25"
 jmt = "0.10.0"
 jsonrpsee = { version = "0.23" }
 jsonrpsee-types = "0.23"
+lru = "0.12"
 mockall = "0.11"
 num_enum = "0.7"
 parking_lot = "0.12.3"

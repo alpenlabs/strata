@@ -74,11 +74,19 @@ macro_rules! inst_ops {
 
                 $(
                     pub async fn [<$iname _async>] (&self, $($aname: $aty),*) -> DbResult<$ret> {
-                        self.inner. [<$iname _async>] (&self.pool, $($aname),*).await
+                        let resp_rx = self.inner. [<$iname _chan>] (&self.pool, $($aname),*);
+                        match resp_rx.await {
+                            Ok(v) => v,
+                            Err(_e) => Err(DbError::WorkerFailedStrangely),
+                        }
                     }
 
                     pub fn [<$iname _blocking>] (&self, $($aname: $aty),*) -> DbResult<$ret> {
                         self.inner. [<$iname _blocking>] ($($aname),*)
+                    }
+
+                    pub fn [<$iname _chan>] (&self, $($aname: $aty),*) -> tokio::sync::oneshot::Receiver<DbResult<$ret>> {
+                        self.inner. [<$iname _chan>] (&self.pool, $($aname),*)
                     }
                 )*
             }
@@ -86,8 +94,8 @@ macro_rules! inst_ops {
             #[async_trait::async_trait]
             trait ShimTrait {
                 $(
-                    async fn [<$iname _async>] (&self, pool: &threadpool::ThreadPool, $($aname: $aty),*) -> DbResult<$ret>;
                     fn [<$iname _blocking>] (&self, $($aname: $aty),*) -> DbResult<$ret>;
+                    fn [<$iname _chan>] (&self, pool: &threadpool::ThreadPool, $($aname: $aty),*) -> tokio::sync::oneshot::Receiver<DbResult<$ret>>;
                 )*
             }
 
@@ -98,7 +106,11 @@ macro_rules! inst_ops {
             #[async_trait::async_trait]
             impl $(<$($tparam: $tpconstr + Sync + Send + 'static),+>)? ShimTrait for Inner $(<$($tparam),+>)? {
                 $(
-                    async fn [<$iname _async>] (&self, pool: &threadpool::ThreadPool, $($aname: $aty),*) -> DbResult<$ret> {
+                    fn [<$iname _blocking>] (&self, $($aname: $aty),*) -> DbResult<$ret> {
+                        $iname(&self.ctx, $($aname),*)
+                    }
+
+                    fn [<$iname _chan>] (&self, pool: &threadpool::ThreadPool, $($aname: $aty),*) -> tokio::sync::oneshot::Receiver<DbResult<$ret>> {
                         let (resp_tx, resp_rx) = tokio::sync::oneshot::channel();
                         let ctx = self.ctx.clone();
 
@@ -109,14 +121,7 @@ macro_rules! inst_ops {
                             }
                         });
 
-                        match resp_rx.await {
-                            Ok(v) => v,
-                            Err(e) => Err(DbError::Other(format!("{e}"))),
-                        }
-                    }
-
-                    fn [<$iname _blocking>] (&self, $($aname: $aty),*) -> DbResult<$ret> {
-                        $iname(&self.ctx, $($aname),*)
+                        resp_rx
                     }
                 )*
             }
