@@ -1,6 +1,7 @@
 //! Module for database local types
 
 use arbitrary::Arbitrary;
+use bitcoin::{consensus::serialize, hashes::Hash, Transaction};
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use alpen_express_primitives::buf::Buf32;
@@ -47,15 +48,68 @@ pub enum BlobL1Status {
     /// The commit reveal txs for blob are signed and waiting to be published
     Unpublished,
 
-    /// The the txs are published
+    /// The txs are published
     Published,
 
-    /// The the txs are confirmed in L1
+    /// The txs are confirmed in L1
     Confirmed,
 
-    /// The the txs are finalized in L1
+    /// The txs are finalized in L1
     Finalized,
 
     /// The txs need to be resigned because possibly the utxos were already spent
     NeedsResign,
+}
+
+#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize)]
+pub struct L1TxEntry {
+    tx_raw: Vec<u8>,
+    txid: [u8; 32],
+    pub status: L1TxStatus,
+}
+
+impl L1TxEntry {
+    pub fn from_tx(tx: Transaction) -> Self {
+        Self {
+            tx_raw: serialize(&tx),
+            txid: *tx.compute_txid().as_raw_hash().as_byte_array(),
+            status: L1TxStatus::Unpublished,
+        }
+    }
+
+    pub fn tx_raw(&self) -> &[u8] {
+        &self.tx_raw
+    }
+
+    pub fn txid(&self) -> &[u8] {
+        &self.txid
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize)]
+pub enum L1TxStatus {
+    /// The tx is waiting to be published
+    Unpublished,
+
+    /// The tx is published
+    Published,
+
+    /// The tx is included in L1
+    Confirmed,
+
+    /// The tx is finalized in L1
+    Finalized,
+
+    /// The tx is not included in L1 and has errored with some error code
+    Excluded(ExcludeReason),
+}
+
+#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
+pub enum ExcludeReason {
+    /// Excluded because inputs were spent or not present in the chain/mempool
+    MissingInputsOrSpent,
+
+    /// Excluded for other reasons.
+    // TODO: add other cases
+    Other(String),
 }

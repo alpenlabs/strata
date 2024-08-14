@@ -18,6 +18,7 @@ use alpen_express_state::state_op::WriteBatch;
 use alpen_express_state::sync_event::SyncEvent;
 
 use crate::types::BlobEntry;
+use crate::types::L1TxEntry;
 use crate::DbResult;
 
 /// Common database interface that we can parameterize worker tasks over if
@@ -299,4 +300,36 @@ pub trait SeqDataProvider {
 
     /// Get l1 tx
     fn get_l1_tx(&self, txid: Buf32) -> DbResult<Option<Vec<u8>>>;
+}
+
+pub trait TxBroadcastDatabase {
+    type BcastStore: BcastStore;
+    type BcastProv: BcastProvider;
+
+    fn broadcast_store(&self) -> &Arc<Self::BcastStore>;
+    fn broadcast_provider(&self) -> &Arc<Self::BcastProv>;
+}
+
+pub trait BcastStore {
+    /// Adds a new txentry to database
+    fn add_tx(&self, txid: Buf32, txentry: L1TxEntry) -> DbResult<u64>;
+
+    /// Updates an existing txentry
+    fn update_tx(&self, txid: Buf32, txentry: L1TxEntry) -> DbResult<()>;
+
+    /// Updates an existing txentry
+    fn update_tx_by_idx(&self, idx: u64, txentry: L1TxEntry) -> DbResult<()>;
+
+    // TODO: possibly add delete as well
+}
+
+pub trait BcastProvider {
+    /// Fetch txentry from db
+    fn get_txentry(&self, txid: Buf32) -> DbResult<Option<L1TxEntry>>;
+
+    /// Get last txidx
+    fn get_last_txidx(&self) -> DbResult<Option<u64>>;
+
+    /// get txentry by idx
+    fn get_txentry_by_idx(&self) -> DbResult<Option<L1TxEntry>>;
 }
