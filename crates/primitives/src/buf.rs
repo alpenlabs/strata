@@ -7,6 +7,7 @@ use bitcoin::hashes::Hash;
 use bitcoin::BlockHash;
 use borsh::{BorshDeserialize, BorshSerialize};
 use reth_primitives::alloy_primitives::FixedBytes;
+use serde::{Deserialize, Deserializer};
 
 // 20-byte buf
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default)]
@@ -99,6 +100,34 @@ impl fmt::Display for Buf32 {
         hex::encode_to_slice(&self.0[29..], &mut buf).expect("buf: enc hex");
         f.write_str(unsafe { str::from_utf8_unchecked(&buf) })?;
         Ok(())
+    }
+}
+
+impl<'de> Deserialize<'de> for Buf32 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        // Deserialize the input as a string
+        let s = <String as Deserialize>::deserialize(deserializer)?;
+
+        // Convert the hexadecimal string to bytes
+        let bytes =
+            hex::decode(s.strip_prefix("0x").unwrap_or(&s)).map_err(serde::de::Error::custom)?;
+
+        // Ensure the byte array is exactly 32 bytes long
+        if bytes.len() != 32 {
+            return Err(serde::de::Error::invalid_length(
+                bytes.len(),
+                &"expected 32 bytes",
+            ));
+        }
+
+        // Convert the byte vector into a fixed-size array
+        let mut buf32 = [0u8; 32];
+        buf32.copy_from_slice(&bytes);
+
+        Ok(Buf32::from(buf32))
     }
 }
 
@@ -201,5 +230,43 @@ impl<'a> Arbitrary<'a> for Buf64 {
         let mut array = [0u8; 64];
         u.fill_buffer(&mut array)?;
         Ok(Buf64(array.into()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Buf32;
+
+    #[test]
+    fn test_buf32_deserialization() {
+        // without 0x
+        assert_eq!(
+            Buf32::from([0; 32]),
+            serde_json::from_str(
+                "\"0000000000000000000000000000000000000000000000000000000000000000\"",
+            )
+            .unwrap()
+        );
+
+        // with 0x
+        assert_eq!(
+            Buf32::from([1; 32]),
+            serde_json::from_str(
+                "\"0x0101010101010101010101010101010101010101010101010101010101010101\"",
+            )
+            .unwrap()
+        );
+
+        // correct byte order
+        assert_eq!(
+            Buf32::from([
+                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                1, 1, 1, 170u8
+            ]),
+            serde_json::from_str(
+                "\"0x01010101010101010101010101010101010101010101010101010101010101aa\"",
+            )
+            .unwrap()
+        );
     }
 }

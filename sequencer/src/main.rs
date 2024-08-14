@@ -14,7 +14,6 @@ use format_serde_error::SerdeError;
 use reth_rpc_types::engine::JwtError;
 use reth_rpc_types::engine::JwtSecret;
 use rockbound::rocksdb;
-use rollup_params::parse_rollup_params_json;
 use thiserror::Error;
 use tokio::sync::{broadcast, oneshot, RwLock};
 use tracing::*;
@@ -44,7 +43,6 @@ use crate::args::Args;
 mod args;
 mod config;
 mod l1_reader;
-mod rollup_params;
 mod rpc_server;
 
 #[derive(Debug, Error)]
@@ -80,8 +78,10 @@ fn load_rollup_params_or_default(path: &Option<PathBuf>) -> Result<RollupParams,
     match path {
         Some(path) => {
             let json = fs::read_to_string(path)?;
+            let rollup_params = serde_json::from_str::<RollupParams>(&json)
+                .map_err(|err| SerdeError::new(json.to_string(), err))?;
 
-            parse_rollup_params_json(json)
+            Ok(rollup_params)
         }
         None => Ok(default_rollup_params()),
     }

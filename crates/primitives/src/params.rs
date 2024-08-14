@@ -1,10 +1,12 @@
 //! Global consensus parameters for the rollup.
 
+use serde::Deserialize;
+
 use crate::{block_credential::CredRule, prelude::Buf32};
 
 /// Consensus parameters that don't change for the lifetime of the network
 /// (unless there's some weird hard fork).
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Deserialize)]
 pub struct RollupParams {
     /// Rollup name
     pub rollup_name: String,
