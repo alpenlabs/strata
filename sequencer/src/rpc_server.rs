@@ -26,6 +26,7 @@ use alpen_express_state::{
     l1::L1BlockId,
 };
 use alpen_express_status::{NodeStatus, StatusError};
+use alpen_express_status::{StatusError, StatusRx};
 use async_trait::async_trait;
 use bitcoin::{consensus::deserialize, hashes::Hash, Transaction as BTransaction, Txid};
 use jsonrpsee::{
@@ -143,7 +144,7 @@ fn fetch_l2blk<D: Database + Sync + Send + 'static>(
 }
 
 pub struct AlpenRpcImpl<D> {
-    node_status: Arc<NodeStatus>,
+    status_rx: Arc<StatusRx>,
     database: Arc<D>,
     sync_manager: Arc<SyncManager>,
     bcast_handle: Arc<L1BroadcastHandle>,
@@ -152,14 +153,14 @@ pub struct AlpenRpcImpl<D> {
 
 impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
     pub fn new(
-        node_status: Arc<NodeStatus>,
+        status_rx: Arc<StatusRx>,
         database: Arc<D>,
         sync_manager: Arc<SyncManager>,
         bcast_handle: Arc<L1BroadcastHandle>,
         stop_tx: oneshot::Sender<()>,
     ) -> Self {
         Self {
-            node_status,
+            status_rx,
             database,
             sync_manager,
             bcast_handle,
@@ -169,9 +170,9 @@ impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
 
     /// Gets a ref to the current client state as of the last update.
     async fn get_client_state(&self) -> Result<ClientState, StatusError> {
-        let node_status = self.sync_manager.node_status();
+        let status_rx = self.sync_manager.status_rx();
 
-        match node_status.get().cl {
+        match status_rx.get().cl {
             Some(cl) => Ok(cl),
             None => Err(StatusError::NotInitializedError),
         }
@@ -245,7 +246,7 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
     }
 
     async fn get_l1_status(&self) -> RpcResult<L1Status> {
-        match self.node_status.get().l1 {
+        match self.status_rx.get().l1 {
             Some(l1) => Ok(l1),
             None => Err(Error::ImproperStatus.into()),
         }
@@ -312,7 +313,10 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
 
     async fn get_recent_blocks(&self, count: u64) -> RpcResult<Vec<BlockHeader>> {
         // FIXME: sync state should have a block number
-        let cl_state = self.get_client_state().await.map_err(|_| Error::ClientNotStarted)?;
+        let cl_state = self
+            .get_client_state()
+            .await
+            .map_err(|_| Error::ClientNotStarted)?;
         let tip_blkid = *cl_state
             .sync()
             .ok_or(Error::ClientNotStarted)?
@@ -346,7 +350,10 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
     }
 
     async fn get_blocks_at_idx(&self, idx: u64) -> RpcResult<Option<Vec<BlockHeader>>> {
-        let cl_state = self.get_client_state().await.map_err(|err| Error::ClientNotStarted)?;
+        let cl_state = self
+            .get_client_state()
+            .await
+            .map_err(|err| Error::ClientNotStarted)?;
         let tip_blkid = *cl_state
             .sync()
             .ok_or(Error::ClientNotStarted)?

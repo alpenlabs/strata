@@ -14,7 +14,7 @@ use alpen_express_status::NodeStatus;
 use alpen_express_state::{
     client_state::ClientState, csm_status::CsmStatus, operation::SyncAction,
 };
-use alpen_express_status::{NodeStatus, UpdateStatus};
+use alpen_express_status::{StatusTx, UpdateStatus};
 
 use crate::{
     errors::Error,
@@ -91,7 +91,7 @@ pub fn client_worker_task<D: Database, E: ExecEngineCtl>(
     mut state: WorkerState<D>,
     engine: Arc<E>,
     mut msg_rx: mpsc::Receiver<CsmMessage>,
-    node_status: Arc<NodeStatus>,
+    status_rx: Arc<StatusTx>,
     fcm_msg_tx: mpsc::Sender<ForkChoiceMessage>,
 ) -> Result<(), Error> {
     // Send a message off to the forkchoice manager that we're resuming.
@@ -105,7 +105,7 @@ pub fn client_worker_task<D: Database, E: ExecEngineCtl>(
             &mut state,
             engine.as_ref(),
             &msg,
-            node_status.clone(),
+            status_rx.clone(),
             &fcm_msg_tx,
         ) {
             error!(err = %e, ?msg, "failed to process sync message, skipping");
@@ -126,7 +126,7 @@ fn process_msg<D: Database, E: ExecEngineCtl>(
     state: &mut WorkerState<D>,
     engine: &E,
     msg: &CsmMessage,
-    node_status: Arc<NodeStatus>,
+    status_rx: Arc<StatusTx>,
     fcm_msg_tx: &mpsc::Sender<ForkChoiceMessage>,
 ) -> anyhow::Result<()> {
     match msg {
@@ -140,12 +140,12 @@ fn process_msg<D: Database, E: ExecEngineCtl>(
                 warn!(%missed_ev_cnt, "applying missed sync events");
                 for ev_idx in next_exp_idx..*idx {
                     trace!(%ev_idx, "running missed sync event");
-                    handle_sync_event(state, engine, ev_idx, node_status.clone(), fcm_msg_tx)?;
+                    handle_sync_event(state, engine, ev_idx, status_rx.clone(), fcm_msg_tx)?;
                 }
             }
 
             // TODO ensure correct event index ordering
-            handle_sync_event(state, engine, *idx, node_status.clone(), fcm_msg_tx)?;
+            handle_sync_event(state, engine, *idx, status_rx.clone(), fcm_msg_tx)?;
             Ok(())
         }
     }
@@ -155,7 +155,7 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
     state: &mut WorkerState<D>,
     engine: &E,
     ev_idx: u64,
-    node_status: Arc<NodeStatus>,
+    status_rx: Arc<StatusTx>,
     fcm_msg_tx: &mpsc::Sender<ForkChoiceMessage>,
 ) -> anyhow::Result<()> {
     // Perform the main step of deciding what the output we're operating on.
@@ -230,7 +230,7 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
         UpdateStatus::UpdateCl(client_state),
     ];
 
-    if node_status.update_status(&update_status).is_err() {
+    if status_rx.update_status(&update_status).is_err() {
         error!(%ev_idx, "cannot update csm and cl status");
     }
 

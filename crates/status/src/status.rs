@@ -1,4 +1,6 @@
 #![allow(dead_code)]
+use std::sync::Arc;
+
 use alpen_express_rpc_types::L1Status;
 use thiserror::Error;
 use tokio::sync::watch;
@@ -28,24 +30,27 @@ pub enum UpdateStatus {
     UpdateCsm(CsmStatus),
 }
 
-pub struct NodeStatus {
-    tx: watch::Sender<StatusBundle>,
+pub struct StatusRx {
     rx: watch::Receiver<StatusBundle>,
 }
 
-impl Default for NodeStatus {
-    fn default() -> Self {
-        let (st_tx, st_rx) = watch::channel(StatusBundle::default());
-        Self {
-            tx: st_tx,
-            rx: st_rx,
-        }
+impl StatusRx {
+    pub fn get(&self) -> StatusBundle {
+        self.rx.borrow().clone()
     }
 }
 
-impl NodeStatus {
+pub struct StatusTx {
+    tx: watch::Sender<StatusBundle>,
+}
+
+impl StatusTx {
+    pub fn get_recent(&self) -> StatusBundle {
+        self.tx.borrow().clone()
+    }
+
     pub fn update_status(&self, update_status: &[UpdateStatus]) -> Result<(), StatusError> {
-        let bundle = self.rx.borrow();
+        let bundle = self.get_recent();
         let mut new_bundle = StatusBundle {
             csm: bundle.csm.clone(),
             cl: bundle.cl.clone(),
@@ -67,15 +72,18 @@ impl NodeStatus {
             };
         }
 
-        //TODO: custom error type for this
-        let x = self.tx.send(new_bundle);
-        println!("{:?}", x);
-        println!("was sent successfully");
+        if self.tx.send(new_bundle).is_err() {
+            return Err(StatusError::NotInitializedError);
+        }
 
         Ok(())
     }
+}
 
-    pub fn get(&self) -> StatusBundle {
-        self.rx.borrow().clone()
-    }
+pub fn create_status_rx() -> (Arc<StatusRx>, Arc<StatusTx>) {
+    let (st_tx, st_rx) = watch::channel(StatusBundle::default());
+    (
+        Arc::new(StatusRx { rx: st_rx }),
+        Arc::new(StatusTx { tx: st_tx }),
+    )
 }

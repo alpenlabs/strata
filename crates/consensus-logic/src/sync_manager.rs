@@ -6,14 +6,13 @@ use std::sync::Arc;
 
 use alpen_express_state::client_state::ClientState;
 use tokio::sync::{broadcast, mpsc, watch};
-use alpen_express_status::{NodeStatus, UpdateStatus};
+use alpen_express_status::{StatusRx, StatusTx, UpdateStatus};
 use tokio::sync::{broadcast, mpsc};
 use tracing::*;
 
 use alpen_express_db::traits::Database;
 use alpen_express_eectl::engine::ExecEngineCtl;
 use alpen_express_primitives::params::Params;
-use alpen_express_state::client_state::ClientState;
 use express_storage::L2BlockManager;
 use express_tasks::TaskExecutor;
 use tokio::sync::{broadcast, mpsc, watch};
@@ -34,7 +33,8 @@ pub struct SyncManager {
     fc_manager_tx: mpsc::Sender<ForkChoiceMessage>,
     csm_ctl: Arc<CsmController>,
     cupdate_rx: broadcast::Receiver<Arc<ClientUpdateNotif>>,
-    node_status: Arc<NodeStatus>,
+    status_rx_writer: Arc<StatusTx>,
+    status_rx: Arc<StatusRx>,
 }
 
 impl SyncManager {
@@ -63,8 +63,12 @@ impl SyncManager {
         self.cupdate_rx.resubscribe()
     }
 
-    pub fn node_status(&self) -> Arc<NodeStatus> {
-        self.node_status.clone()
+    pub fn status_rx(&self) -> Arc<StatusRx> {
+        self.status_rx.clone()
+    }
+
+    pub fn status_rx_writer(&self) -> Arc<StatusTx> {
+        self.status_rx_writer.clone()
     }
 
     /// Submits a fork choice message if possible. (synchronously)
@@ -89,7 +93,8 @@ pub fn start_sync_tasks<
     engine: Arc<E>,
     pool: threadpool::ThreadPool,
     params: Arc<Params>,
-    node_status: Arc<NodeStatus>,
+    status_rx_writer: Arc<StatusTx>,
+    status_rx: Arc<StatusRx>,
 ) -> anyhow::Result<SyncManager> {
     // Create channels.
     let (fcm_tx, fcm_rx) = mpsc::channel::<ForkChoiceMessage>(64);
@@ -143,14 +148,14 @@ pub fn start_sync_tasks<
         UpdateStatus::UpdateCsm(status),
         UpdateStatus::UpdateCl(state.as_ref().clone()),
     ];
-    if node_status.update_status(&update_status).is_err() {
+    if status_rx_writer.update_status(&update_status).is_err() {
         error!("Error while updating status");
     }
 
     let csm_eng = engine.clone();
     let csm_fcm_tx = fcm_tx.clone();
 
-    let ns = node_status.clone();
+    let ns = status_rx_writer.clone();
     executor.spawn_critical("client_worker_task", |shutdown| {
         worker::client_worker_task(
             shutdown,
@@ -169,6 +174,7 @@ pub fn start_sync_tasks<
         fc_manager_tx: fcm_tx,
         csm_ctl,
         cupdate_rx,
-        node_status,
+        status_rx_writer,
+        status_rx,
     })
 }

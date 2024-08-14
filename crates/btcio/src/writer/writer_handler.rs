@@ -6,6 +6,7 @@ use tokio::{
     runtime::Runtime,
     sync::mpsc::{self, Receiver, Sender},
 };
+use tokio::sync::mpsc::{self, Receiver, Sender} ;
 use tracing::*;
 
 use alpen_express_db::{
@@ -16,6 +17,7 @@ use alpen_express_primitives::buf::Buf32;
 use alpen_express_state::da_blob::BlobIntent;
 use express_tasks::TaskExecutor;
 use tracing::*;
+use alpen_express_status::StatusTx;
 
 use super::{
     broadcast::broadcaster_task,
@@ -72,7 +74,7 @@ pub fn start_writer_task<D: SequencerDatabase + Send + Sync + 'static>(
     rpc_client: Arc<impl SeqL1Client + L1Client>,
     config: WriterConfig,
     db: Arc<D>,
-    node_status: Arc<NodeStatus>,
+    status_tx: Arc<StatusTx>,
 ) -> anyhow::Result<DaWriter<D>> {
     info!("Starting writer control task");
 
@@ -97,7 +99,7 @@ pub fn start_writer_task<D: SequencerDatabase + Send + Sync + 'static>(
     let rpc_client_b = rpc_client.clone();
     let db_b = db.clone();
     executor.spawn_critical_async("btcio::broadcaster_task", async move {
-        broadcaster_task(next_publish_blob_idx, rpc_client_b, db_b, l1_status.clone())
+        broadcaster_task(next_publish_blob_idx, rpc_client_b, db_b, status_tx.clone())
             .await
             .unwrap()
     });

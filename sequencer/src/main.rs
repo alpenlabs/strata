@@ -37,6 +37,7 @@ use alpen_express_db::traits::SequencerDatabase;
 use alpen_express_rpc_types::L1Status;
 use alpen_express_status::NodeStatus;
 use alpen_express_status::Watch;
+use alpen_express_status::StatusTx;
 use anyhow::Context;
 use bitcoin::Network;
 use config::Config;
@@ -215,6 +216,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     // Set up database managers.
     let l2_block_manager = Arc::new(L2BlockManager::new(pool.clone(), database.clone()));
+    let (status_rx, status_rx_writer) = alpen_express_status::create_status_rx();
 
     // Set up Bitcoin client RPC.
     let bitcoind_url = format!("http://{}", config.bitcoind_rpc.rpc_url);
@@ -260,7 +262,8 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         eng_ctl.clone(),
         pool.clone(),
         params.clone(),
-        node_status.clone(),
+        status_rx_writer.clone(),
+        status_rx.clone(),
     )?;
     let sync_man = Arc::new(sync_man);
     let mut inscription_handler = None;
@@ -301,7 +304,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             rpc,
             writer_config,
             dbseq,
-            l1_status.clone(),
+            status_rx_writer.clone(),
             pool.clone(),
             bcast_handle.clone(),
         )?);
@@ -342,7 +345,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         btc_rpc.clone(),
         database.clone(),
         csm_ctl,
-        node_status.clone(),
+        status_rx_writer.clone()
     )?;
 
     let shutdown_signal = task_manager.shutdown_signal();
@@ -355,8 +358,10 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             config,
             sync_man,
             db_cloned,
-            l1_status,
+            status_rx,
+            status_rx_writer,
             inscription_handler,
+            writer_ctl,
             bcast_handle,
         )
         .await
@@ -379,7 +384,8 @@ async fn start_rpc<D: Database + Send + Sync + 'static>(
     config: Config,
     sync_man: Arc<SyncManager>,
     database: Arc<D>,
-    l1_status: Arc<RwLock<L1Status>>,
+    status_rx: Arc<StatusRx>,
+    status_rx_writer: Arc<StatusTx>,
     inscription_handler: Option<Arc<InscriptionHandle>>,
     bcast_handle: Arc<L1BroadcastHandle>,
 ) -> anyhow::Result<()> {
@@ -387,7 +393,7 @@ async fn start_rpc<D: Database + Send + Sync + 'static>(
 
     // Init RPC methods.
     let alp_rpc = rpc_server::AlpenRpcImpl::new(
-        node_status.clone(),
+        status_rx.clone(),
         database.clone(),
         sync_man.clone(),
         bcast_handle.clone(),
