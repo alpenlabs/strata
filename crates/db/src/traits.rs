@@ -331,5 +331,5 @@ pub trait BcastProvider {
     fn get_last_txidx(&self) -> DbResult<Option<u64>>;
 
     /// get txentry by idx
-    fn get_txentry_by_idx(&self) -> DbResult<Option<L1TxEntry>>;
+    fn get_txentry_by_idx(&self, idx: u64) -> DbResult<Option<L1TxEntry>>;
 }
