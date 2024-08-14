@@ -15,7 +15,7 @@ use super::{
 };
 use crate::{
     rpc::traits::L1Client,
-    status::{apply_status_updates, StatusUpdate},
+    status::apply_status_updates,
 };
 use alpen_express_status::StatusTx;
 

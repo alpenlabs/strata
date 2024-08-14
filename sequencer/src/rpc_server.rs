@@ -25,6 +25,7 @@ use alpen_express_state::{
     id::L2BlockId,
     l1::L1BlockId,
 };
+
 use alpen_express_status::{NodeStatus, StatusError};
 use alpen_express_status::{StatusError, StatusRx};
 use async_trait::async_trait;
@@ -45,6 +46,8 @@ use tokio::sync::{
     mpsc::{self, Sender},
     oneshot, watch, Mutex, RwLock,
 };
+use alpen_express_status::{StatusError, StatusRx};
+
 use tracing::*;
 
 #[derive(Debug, Error)]
@@ -87,8 +90,8 @@ pub enum Error {
     #[error("fetch limit reached. max {0}, provided {1}")]
     FetchLimitReached(u64, u64),
 
-    #[error("status error")]
-    ImproperStatus,
+    #[error("status error: {0}")]
+    ImproperStatus(String),
 
     /// Generic internal error message.  If this is used often it should be made
     /// into its own error type.
@@ -115,7 +118,7 @@ impl Error {
             Self::FetchLimitReached(_, _) => -32608,
             Self::UnknownIdx(_) => -32608,
             Self::MissingL1BlockManifest(_) => -32609,
-            Self::ImproperStatus => -32606,
+            Self::ImproperStatus(_) => -32606,
             Self::BlockingAbort(_) => -32001,
             Self::Other(_) => -32000,
             Self::OtherEx(_, _) => -32000,
@@ -174,18 +177,17 @@ impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
 
         match status_rx.get().cl {
             Some(cl) => Ok(cl),
-            None => Err(StatusError::NotInitializedError),
+            None => Err(StatusError::NotInitialized),
         }
     }
 
     /// Gets a clone of the current client state and fetches the chainstate that
     /// of the L2 block that it considers the tip state.
     async fn get_cur_states(&self) -> Result<(ClientState, Option<Arc<ChainState>>), Error> {
-        // TODO : add string to error
         let cs = self
             .get_client_state()
             .await
-            .map_err(|_| Error::ImproperStatus)?;
+            .map_err(|err| Error::ImproperStatus(err.to_string()))?;
 
         if cs.sync().is_none() {
             return Ok((cs, None));
@@ -248,7 +250,7 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
     async fn get_l1_status(&self) -> RpcResult<L1Status> {
         match self.status_rx.get().l1 {
             Some(l1) => Ok(l1),
-            None => Err(Error::ImproperStatus.into()),
+            None => Err(Error::ImproperStatus("L1 Status not initialized".into()).into()),
         }
     }
 
@@ -275,7 +277,7 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         let state = self
             .get_client_state()
             .await
-            .map_err(|_| Error::ImproperStatus)?;
+            .map_err(|err| Error::ImproperStatus(err.to_string()))?;
 
         let last_l1 = state.most_recent_l1_block().copied().unwrap_or_else(|| {
             // TODO figure out a better way to do this

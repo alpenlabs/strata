@@ -1,3 +1,4 @@
-pub mod status;
+//! contains utilities for handling node status
+pub mod status_manager;
 
-pub use status::*;
+pub use status_manager::*;

@@ -2,7 +2,7 @@
 
 use std::{sync::Arc, time::Duration};
 
-use alpen_express_status::{NodeStatus, UpdateStatus};
+use alpen_express_status::UpdateStatus;
 use anyhow::anyhow;
 use bitcoin::{consensus::deserialize, Txid};
 use tracing::*;
@@ -12,8 +12,6 @@ use alpen_express_db::{
     types::BlobL1Status,
 };
 use alpen_express_rpc_types::L1Status;
-use anyhow::anyhow;
-use tokio::sync::RwLock;
 use tracing::*;
 use alpen_express_status::StatusTx;
 
