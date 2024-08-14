@@ -35,12 +35,12 @@ members = [
   "proofs/sp1",
 
   # binaries listed separately
-  "bin/sequencer",
-  "bin/reth",
+  "sequencer",
+  "reth",
   "bin/bridge-client",
 ]
 
-default-members = ["bin/sequencer", "bin/reth", "bin/bridge-client"]
+default-members = ["sequencer", "reth", "bin/bridge-client"]
 
 resolver = "2"
 
