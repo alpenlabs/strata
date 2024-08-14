@@ -81,6 +81,7 @@ pub fn gen_params() -> Params {
                     .unwrap(),
             ),
             l1_reorg_safe_depth: 5,
+            batch_l2_blocks_target: 64,
         },
         run: RunParams {
             l2_blocks_fetch_limit: 1000,

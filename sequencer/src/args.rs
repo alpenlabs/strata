@@ -43,4 +43,8 @@ pub struct Args {
 
     #[argh(option, short = 's', description = "sequencer bitcoin address")]
     pub sequencer_bitcoin_address: Option<String>,
+
+    // TODO: allow only for dev/test mode ?
+    #[argh(option, short = 'p', description = "custom rollup config path")]
+    pub rollup_params: Option<PathBuf>,
 }

@@ -25,6 +25,9 @@ pub struct L1Status {
     /// Last published txid where L2 blob was present
     pub last_published_txid: Option<String>,
 
+    /// number of published transactions in current run (commit + reveal pair count as 1)
+    pub published_inscription_count: u64,
+
     /// UNIX millis time of the last time we got a new update from the L1 connector.
     pub last_update: u64,
 }

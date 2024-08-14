@@ -23,7 +23,7 @@ pub trait L1Client: Sync + Send + 'static {
 
     /// get number of confirmations for txid
     /// 0 confirmations means tx is still in mempool
-    async fn get_transaction_confirmations<T: AsRef<[u8]> + Send>(
+    async fn get_transaction_confirmations<T: AsRef<[u8; 32]> + Send>(
         &self,
         txid: T,
     ) -> Result<u64, ClientError>;

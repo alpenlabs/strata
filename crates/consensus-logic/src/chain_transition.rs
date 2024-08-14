@@ -37,7 +37,7 @@ pub fn process_block(
     }
 
     // Update basic bookkeeping.
-    state.set_slot(header.blockidx());
+    state.set_cur_header(header);
 
     // Go through each stage and play out the operations it has.
     process_l1_view_update(state, body.l1_segment(), params)?;

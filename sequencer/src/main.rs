@@ -7,8 +7,6 @@ use std::process;
 use std::sync::Arc;
 use std::thread;
 
-use alpen_express_db::traits::SequencerDatabase;
-use alpen_express_rpc_types::L1Status;
 use anyhow::Context;
 use bitcoin::Network;
 use config::Config;
@@ -30,12 +28,15 @@ use alpen_express_consensus_logic::duty::worker::{self as duty_worker};
 use alpen_express_consensus_logic::sync_manager;
 use alpen_express_consensus_logic::sync_manager::SyncManager;
 use alpen_express_db::traits::Database;
+use alpen_express_db::traits::SequencerDatabase;
 use alpen_express_evmexec::{fork_choice_state_initial, EngineRpcClient};
+use alpen_express_primitives::block_credential;
 use alpen_express_primitives::buf::Buf32;
-use alpen_express_primitives::{block_credential, params::*};
+use alpen_express_primitives::params::{Params, RollupParams, RunParams};
 use alpen_express_rocksdb::sequencer::db::SequencerDB;
 use alpen_express_rocksdb::SeqDb;
 use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer};
+use alpen_express_rpc_types::L1Status;
 
 use crate::args::Args;
 
@@ -73,6 +74,42 @@ fn load_jwtsecret(path: &Path) -> Result<JwtSecret, InitError> {
     Ok(jwt_secret)
 }
 
+fn load_rollup_params_or_default(path: &Option<PathBuf>) -> Result<RollupParams, InitError> {
+    match path {
+        Some(path) => {
+            let json = fs::read_to_string(path)?;
+            let rollup_params = serde_json::from_str::<RollupParams>(&json)
+                .map_err(|err| SerdeError::new(json.to_string(), err))?;
+
+            Ok(rollup_params)
+        }
+        None => Ok(default_rollup_params()),
+    }
+}
+
+fn default_rollup_params() -> RollupParams {
+    // TODO: load default params from a json during compile time
+    RollupParams {
+        rollup_name: "express".to_string(),
+        block_time: 1000,
+        cred_rule: block_credential::CredRule::Unchecked,
+        horizon_l1_height: 3,
+        genesis_l1_height: 5,
+        evm_genesis_block_hash: Buf32(
+            "0x37ad61cff1367467a98cf7c54c4ac99e989f1fbb1bc1e646235e90c065c565ba"
+                .parse()
+                .unwrap(),
+        ),
+        evm_genesis_block_state_root: Buf32(
+            "0x351714af72d74259f45cd7eab0b04527cd40e74836a45abcae50f92d919d988f"
+                .parse()
+                .unwrap(),
+        ),
+        l1_reorg_safe_depth: 4,
+        batch_l2_blocks_target: 64,
+    }
+}
+
 fn main() {
     let args: Args = argh::from_env();
     if let Err(e) = main_inner(args) {
@@ -106,24 +143,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     // Set up block params.
     let params = Params {
-        rollup: RollupParams {
-            rollup_name: "express".to_string(),
-            block_time: 1_000,
-            cred_rule: block_credential::CredRule::Unchecked,
-            horizon_l1_height: 3,
-            genesis_l1_height: 5,
-            evm_genesis_block_hash: Buf32(
-                "0x37ad61cff1367467a98cf7c54c4ac99e989f1fbb1bc1e646235e90c065c565ba"
-                    .parse()
-                    .unwrap(),
-            ),
-            evm_genesis_block_state_root: Buf32(
-                "0x351714af72d74259f45cd7eab0b04527cd40e74836a45abcae50f92d919d988f"
-                    .parse()
-                    .unwrap(),
-            ),
-            l1_reorg_safe_depth: config.sync.max_reorg_depth,
-        },
+        rollup: load_rollup_params_or_default(&args.rollup_params).expect("rollup params"),
         run: RunParams {
             l1_follow_distance: config.sync.l1_follow_distance,
             client_checkpoint_interval: config.sync.client_checkpoint_interval,
@@ -236,15 +256,16 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         writer_ctl = Some(writer.clone());
 
         // Spawn duty tasks.
+        let t_params = params.clone();
         thread::spawn(move || {
             // FIXME figure out why this can't infer the type, it's like *right there*
-            duty_worker::duty_tracker_task::<_>(cu_rx, duties_tx, idata.ident, db)
+            duty_worker::duty_tracker_task::<_>(cu_rx, duties_tx, idata.ident, db, t_params)
         });
 
         let d_params = params.clone();
         thread::spawn(move || {
             duty_worker::duty_dispatch_task(
-                duties_rx, idata.key, sm, db2, eng_ctl_de, pool, d_params,
+                duties_rx, idata.key, sm, db2, eng_ctl_de, writer, pool, d_params,
             )
         });
     }

@@ -75,12 +75,17 @@ pub async fn broadcaster_task<D: SequencerDatabase + Send + Sync + 'static>(
             match send_commit_reveal_txs(commit_tx, reveal_tx, rpc_client.as_ref()).await {
                 Ok(_) => {
                     debug!("Successfully sent: {}", blobentry.reveal_txid.to_string());
+                    blobentry.status = BlobL1Status::Published;
+                    db.sequencer_store()
+                        .update_blob_by_idx(curr_idx, blobentry.clone())?;
                     // Update L1 status
                     {
                         let mut l1st = l1_status.write().await;
                         let txid: Txid = deserialize(blobentry.reveal_txid.0.as_slice())?;
                         l1st.last_published_txid = Some(txid.to_string());
+                        l1st.published_inscription_count += 1;
                         // TODO: add last update
+                        #[cfg(debug_assertions)]
                         debug!("Updated l1 status: {:?}", l1st);
                     }
                     curr_idx += 1;
@@ -122,7 +127,7 @@ async fn send_tx(tx_raw: Vec<u8>, client: &(impl SeqL1Client + L1Client)) -> Res
     match client.send_raw_transaction(tx_raw).await {
         Ok(_) => Ok(()),
         Err(ClientError::Server(-27, _)) => Ok(()), // Tx already in chain
-        Err(ClientError::Server(-26, _)) => Err(SendError::MissingOrInvalidInput),
+        Err(ClientError::Server(-25, _)) => Err(SendError::MissingOrInvalidInput),
         Err(e) => Err(SendError::Other(e.to_string())),
     }
 }

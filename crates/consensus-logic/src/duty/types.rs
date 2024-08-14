@@ -1,11 +1,11 @@
 //! Sequencer duties.
 
-use std::time::{self};
+use std::time;
 
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use alpen_express_primitives::buf::Buf32;
-use alpen_express_state::{client_state::LocalL1State, id::L2BlockId};
+use alpen_express_primitives::{buf::Buf32, hash::compute_borsh_hash};
+use alpen_express_state::id::L2BlockId;
 
 /// Describes when we'll stop working to fulfill a duty.
 #[derive(Clone, Debug)]
@@ -18,14 +18,18 @@ pub enum Expiry {
 
     /// Duty expires after a certain timestamp.
     Timestamp(time::Instant),
+
+    /// Duty expires after a specific L2 block is finalized
+    BlockIdFinalized(L2BlockId),
 }
 
 /// Duties the sequencer might carry out.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, BorshSerialize)]
 pub enum Duty {
     /// Goal to sign a block.
     SignBlock(BlockSigningDuty),
-    // TODO: Add Goal to write batch data to L1
+    /// Goal to write batch data to L1
+    CommitBatch(BatchCommitmentDuty),
 }
 
 impl Duty {
@@ -33,28 +37,29 @@ impl Duty {
     pub fn expiry(&self) -> Expiry {
         match self {
             Self::SignBlock(_) => Expiry::NextBlock,
+            Self::CommitBatch(BatchCommitmentDuty { blockid, .. }) => {
+                Expiry::BlockIdFinalized(*blockid)
+            }
         }
+    }
+
+    pub fn id(&self) -> Buf32 {
+        compute_borsh_hash(self)
     }
 }
 
 /// Describes information associated with signing a block.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, BorshSerialize)]
 pub struct BlockSigningDuty {
     /// Slot to sign for.
     slot: u64,
     /// Parent to build on
     parent: L2BlockId,
-    /// L1 Local State
-    l1_view: LocalL1State,
 }
 
 impl BlockSigningDuty {
-    pub fn new_simple(slot: u64, parent: L2BlockId, l1_view: LocalL1State) -> Self {
-        Self {
-            slot,
-            parent,
-            l1_view,
-        }
+    pub fn new_simple(slot: u64, parent: L2BlockId) -> Self {
+        Self { slot, parent }
     }
 
     pub fn target_slot(&self) -> u64 {
@@ -64,16 +69,29 @@ impl BlockSigningDuty {
     pub fn parent(&self) -> L2BlockId {
         self.parent
     }
+}
 
-    pub fn l1_view(&self) -> &LocalL1State {
-        &self.l1_view
+#[derive(Clone, Debug, BorshSerialize)]
+pub struct BatchCommitmentDuty {
+    /// Last slot of batch
+    slot: u64,
+    /// Id of block in last slot
+    blockid: L2BlockId,
+}
+
+impl BatchCommitmentDuty {
+    pub fn new(slot: u64, blockid: L2BlockId) -> Self {
+        Self { slot, blockid }
+    }
+
+    pub fn end_slot(&self) -> u64 {
+        self.slot
     }
 }
 
 /// Manages a set of duties we need to carry out.
 #[derive(Clone, Debug)]
 pub struct DutyTracker {
-    next_id: u64,
     duties: Vec<DutyEntry>,
     finalized_block: Option<L2BlockId>,
 }
@@ -82,7 +100,6 @@ impl DutyTracker {
     /// Creates a new instance that has nothing in it.
     pub fn new_empty() -> Self {
         Self {
-            next_id: 1,
             duties: Vec::new(),
             finalized_block: None,
         }
@@ -101,6 +118,7 @@ impl DutyTracker {
             self.set_finalized_block(update.latest_finalized_block);
         }
 
+        let old_cnt = self.duties.len();
         for d in self.duties.drain(..) {
             match d.duty.expiry() {
                 Expiry::NextBlock => {
@@ -118,26 +136,25 @@ impl DutyTracker {
                         continue;
                     }
                 }
+                Expiry::BlockIdFinalized(l2blockid) => {
+                    if update.is_finalized(&l2blockid) {
+                        continue;
+                    }
+                }
             }
 
             kept_duties.push(d);
         }
 
-        let old_cnt = self.duties.len();
         self.duties = kept_duties;
-        self.duties.len() - old_cnt
+        old_cnt - self.duties.len()
     }
 
     /// Adds some more duties.
     pub fn add_duties(&mut self, blkid: L2BlockId, slot: u64, duties: impl Iterator<Item = Duty>) {
         self.duties.extend(duties.map(|d| DutyEntry {
+            id: d.id(),
             duty: d,
-            id: {
-                // This is horrible but it works. :)
-                let id = self.next_id;
-                self.next_id += 1;
-                id
-            },
             created_blkid: blkid,
             created_slot: slot,
         }));
@@ -163,7 +180,7 @@ pub struct DutyEntry {
     duty: Duty,
 
     /// ID used to help avoid re-performing a duty.
-    id: u64,
+    id: Buf32,
 
     /// Block ID it was created for.
     created_blkid: L2BlockId,
@@ -177,7 +194,7 @@ impl DutyEntry {
         &self.duty
     }
 
-    pub fn id(&self) -> u64 {
+    pub fn id(&self) -> Buf32 {
         self.id
     }
 }
