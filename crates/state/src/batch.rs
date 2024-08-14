@@ -6,12 +6,12 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use crate::{id::L2BlockId, l1::L1BlockId};
 
 /// Public parameters for batch proof to be posted to DA.
-/// Will be updated as prover specs evolve
+/// Will be updated as prover specs evolve.
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
 pub struct BatchCommitment {
-    // last safe L1 block for the batch
+    /// Last safe L1 block for the batch
     l1blockid: L1BlockId,
-    // last L2 block covered by the batch
+    /// Last L2 block covered by the batch
     l2blockid: L2BlockId,
 }
 

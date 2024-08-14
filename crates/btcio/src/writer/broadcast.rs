@@ -85,6 +85,7 @@ pub async fn broadcaster_task<D: SequencerDatabase + Send + Sync + 'static>(
                         l1st.last_published_txid = Some(txid.to_string());
                         l1st.published_inscription_count += 1;
                         // TODO: add last update
+                        #[cfg(debug_assertions)]
                         debug!("Updated l1 status: {:?}", l1st);
                     }
                     curr_idx += 1;

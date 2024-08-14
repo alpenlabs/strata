@@ -1,7 +1,5 @@
 use std::sync::Arc;
 
-use alpen_express_primitives::buf::Buf32;
-use alpen_express_rpc_types::L1Status;
 use tokio::{
     runtime::Runtime,
     sync::{
@@ -15,6 +13,8 @@ use alpen_express_db::{
     traits::{SeqDataProvider, SeqDataStore, SequencerDatabase},
     types::{BlobEntry, BlobL1Status},
 };
+use alpen_express_primitives::buf::Buf32;
+use alpen_express_rpc_types::L1Status;
 use alpen_express_state::da_blob::BlobIntent;
 
 use super::broadcast::broadcaster_task;
@@ -24,6 +24,7 @@ use crate::{
     rpc::traits::{L1Client, SeqL1Client},
     writer::watcher::watcher_task,
 };
+
 #[derive(Debug)]
 pub struct WriterInitialState {
     /// Next unfinalized block to watch for

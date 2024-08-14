@@ -445,7 +445,7 @@ impl L1Client for BitcoinClient {
         }
     }
 
-    async fn get_transaction_confirmations<T: AsRef<[u8]> + Send>(
+    async fn get_transaction_confirmations<T: AsRef<[u8; 32]> + Send>(
         &self,
         txid: T,
     ) -> ClientResult<u64> {

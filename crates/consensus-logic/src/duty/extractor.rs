@@ -52,8 +52,8 @@ fn extract_batch_duties<D: Database>(
 
     let finalized_blkid = *ss.finalized_blkid();
 
-    // generate all valid batches from last finalized block to latest
-    // deduplication is managed by duty executor and l1 writer
+    // Generate all valid batches from last finalized block till latest.
+    // Deduplication is managed by duty executor and l1 writer
     let duties = generate_batches(finalized_blkid, database, params)?
         .into_iter()
         .map(|(slot, blockid)| Duty::CommitBatch(BatchCommitmentDuty::new(slot, blockid)))
@@ -71,31 +71,29 @@ fn generate_batches<D: Database>(
     let chainstate_provider = database.chainstate_provider();
     let l2prov = database.l2_provider();
 
-    // should a safety factor be subtracted from this ?
+    // should a safety factor be subtracted from this?
     let tip_blockidx = chainstate_provider.get_last_state_idx()?;
 
-    let last_batch_block = l2prov
+    let finalized_block = l2prov
         .get_block_data(finalized_blkid)?
         .ok_or(Error::MissingL2Block(finalized_blkid))?;
 
-    let mut last_idx = last_batch_block.header().blockidx();
+    // L2 Block finalization happens at batch level.
+    // So finalized block idx is idx of last block of latest finalized batch.
+    let last_idx = finalized_block.header().blockidx();
 
     let mut batches = Vec::new();
 
-    loop {
-        // probably more sophisticated way to delimit batches here
-        let next_idx = last_idx + params.rollup.batch_l2_blocks_target;
-        if next_idx > tip_blockidx {
-            break;
-        }
-
+    let mut next_idx = last_idx + params.rollup.batch_l2_blocks_target;
+    while next_idx <= tip_blockidx {
         let chain_state = chainstate_provider
             .get_toplevel_state(next_idx)?
             .ok_or(Error::MissingCheckpoint(next_idx))?;
 
         batches.push((next_idx, chain_state.chain_tip_blockid()));
 
-        last_idx = next_idx;
+        // probably more sophisticated way to delimit batches here
+        next_idx += params.rollup.batch_l2_blocks_target;
     }
 
     Ok(batches)

@@ -28,7 +28,7 @@ pub enum Expiry {
 pub enum Duty {
     /// Goal to sign a block.
     SignBlock(BlockSigningDuty),
-    // TODO: Add Goal to write batch data to L1
+    /// Goal to write batch data to L1
     CommitBatch(BatchCommitmentDuty),
 }
 
@@ -73,9 +73,9 @@ impl BlockSigningDuty {
 
 #[derive(Debug, Clone, BorshSerialize)]
 pub struct BatchCommitmentDuty {
-    // last slot of batch
+    /// Last slot of batch
     slot: u64,
-    // id of block in last slot
+    /// Id of block in last slot
     blockid: L2BlockId,
 }
 
