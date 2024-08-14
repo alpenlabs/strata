@@ -261,7 +261,9 @@ fn perform_duty<D: Database, E: ExecEngineCtl, S: SequencerDatabase + Send + Syn
         Duty::SignBlock(data) => {
             let target_slot = data.target_slot();
             let parent = data.parent();
-            let l1_view = data.l1_view();
+
+            let client_state = sync_man.create_state_watch_sub().borrow().clone();
+            let l1_view = client_state.l1_view();
 
             // TODO get the cur client state from the sync manager, the one used
             // to initiate this dutyn and pass it into `sign_and_store_block`
