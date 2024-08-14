@@ -5,42 +5,18 @@ use alpen_express_rpc_types::{
     types::{BlockHeader, ClientStatus, DepositEntry, ExecUpdate, L1Status},
     L2BlockId,
 };
-use bitcoin::Txid;
-use bitcoin::secp256k1::schnorr::Signature;
-use bitcoin::{secp256k1::schnorr::Signature, OutPoint, Transaction};
-use express_bridge_exec::Duty as BridgeDuty;
-use express_bridge_txm::{
-    script_builder::withdrawal::{Requested, WithdrawalInfo},
-    DepositInfo,
+use alpen_express_rpc_types::{
+    types::{BlockHeader, ClientStatus, DepositEntry, ExecUpdate, L1Status},
+    L2BlockId,
 };
-use jsonrpsee::{core::RpcResult, proc_macros::rpc};
-use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
-
-use alpen_express_primitives::l1::L1Status;
 use alpen_express_state::{bridge_duties::BridgeDuties, bridge_ops::WithdrawalBatch};
 use express_bridge_txm::{DepositInfo, ReimbursementRequest, Requested};
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct ClientStatus {
-    /// L1 blockchain tip.
-    #[serde(with = "hex::serde")]
-    pub chain_tip: [u8; 32],
-
-    /// L1 chain tip slot.
-    pub chain_tip_slot: u64,
-
-    /// L2 block that's been finalized and proven on L1.
-    #[serde(with = "hex::serde")]
-    pub finalized_blkid: [u8; 32],
-
-    /// Recent L1 block that we might still reorg.
-    #[serde(with = "hex::serde")]
-    pub last_l1_block: [u8; 32],
-
-    /// L1 block index we treat as being "buried" and won't reorg.
-    pub buried_l1_height: u64,
-}
+use bitcoin::secp256k1::schnorr::Signature;
+use bitcoin::{OutPoint, Transaction, Txid};
+use jsonrpsee::{core::RpcResult, proc_macros::rpc};
+use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "alp"))]
 #[cfg_attr(feature = "client", rpc(server, client, namespace = "alp"))]

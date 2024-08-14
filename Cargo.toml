@@ -1,7 +1,6 @@
 [workspace]
 members = [
   "crates/bridge-exec",
-  "crates/bridge-rpc-api",
   "crates/bridge-tx-manager",
   "crates/btcio",
   "crates/chaintsn",

@@ -44,6 +44,7 @@ use tokio::sync::{
     mpsc::{self, Sender},
     oneshot, watch, Mutex, RwLock,
 };
+
 use tracing::*;
 
 #[derive(Debug, Error)]
@@ -402,8 +403,7 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
                     .iter()
                     .map(|intent| {
                         let (amt, dest_pk) = intent.into_parts();
-                        let dest_pk = *dest_pk.as_ref();
-                        WithdrawalIntent { amt, dest_pk }
+                        WithdrawalIntent::new(amt, dest_pk)
                     })
                     .collect();
 

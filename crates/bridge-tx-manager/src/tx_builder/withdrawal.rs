@@ -1,9 +1,10 @@
 //! Provides types/traits associated with the withdrawal process.
 
-use alpen_express_primitives::l1::BitcoinAddress;
 use async_trait::async_trait;
 use bitcoin::{secp256k1::schnorr::Signature, Amount, OutPoint};
 use serde::{Deserialize, Serialize};
+
+use alpen_express_primitives::l1::BitcoinAddress;
 
 use crate::SignatureInfo;
 
@@ -86,10 +87,10 @@ impl ReimbursementRequest<Validated> {
     /// Construct and sign off on the validated withdrawal reimbursement transaction based on
     /// information available in the rollup chainstate and the utxo information from the
     /// operator. The requests_table needs to be supplied externally.
-    // NOTE: `requests_table` is equivalent to `Vec<WithdrawalBatch>` (without the block window
-    // information) but having that adds a dependency on `alpen-express-state` for this crate which
-    // results in a cyclic dependency. It is best to keep this crate which is responsible for
-    // creating transactions and signing them as independent of other `express` crates as possible.
+    // NOTE: `requests_table` is equivalent to `Vec<WithdrawalIntent>` but having that adds a
+    // dependency on `alpen-express-state` for this crate which results in a cyclic dependency.
+    // It is best to keep this crate which is responsible for creating transactions and signing
+    // them as independent of other `express` crates as possible.
     pub fn construct_and_sign(&self, _requests_table: Vec<(BitcoinAddress, Amount)>) -> Signature {
         unimplemented!();
     }
