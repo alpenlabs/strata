@@ -122,6 +122,12 @@ impl From<[u8; 64]> for Buf64 {
     }
 }
 
+impl AsRef<[u8; 64]> for Buf64 {
+    fn as_ref(&self) -> &[u8; 64] {
+        &self.0
+    }
+}
+
 impl BorshSerialize for Buf20 {
     fn serialize<W: Write>(&self, writer: &mut W) -> io::Result<()> {
         let bytes = self.0.as_ref();

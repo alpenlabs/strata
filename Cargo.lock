@@ -669,6 +669,7 @@ dependencies = [
  "alpen-express-db",
  "alpen-express-primitives",
  "alpen-express-rocksdb",
+ "alpen-express-rpc-types",
  "alpen-express-state",
  "alpen-test-utils",
  "anyhow",
@@ -857,13 +858,20 @@ dependencies = [
 name = "alpen-express-rpc-api"
 version = "0.1.0"
 dependencies = [
- "alpen-express-primitives",
- "alpen-express-state",
+ "alpen-express-rpc-types",
  "hex",
  "jsonrpsee",
  "serde",
  "serde_with",
  "thiserror",
+]
+
+[[package]]
+name = "alpen-express-rpc-types"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "serde",
 ]
 
 [[package]]
@@ -879,6 +887,7 @@ dependencies = [
  "alpen-express-primitives",
  "alpen-express-rocksdb",
  "alpen-express-rpc-api",
+ "alpen-express-rpc-types",
  "alpen-express-state",
  "anyhow",
  "argh",
@@ -911,6 +920,7 @@ dependencies = [
  "borsh",
  "digest 0.10.7",
  "num_enum 0.7.2",
+ "serde",
  "sha2 0.10.8",
  "tracing",
 ]
@@ -5633,9 +5643,9 @@ dependencies = [
 
 [[package]]
 name = "lz4-sys"
-version = "1.9.5"
+version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e9764018d143cc854c9f17f0b907de70f14393b1f502da6375dce70f00514eb3"
+checksum = "109de74d5d2353660401699a4174a4ff23fcc649caf553df71933c7fb45ad868"
 dependencies = [
  "cc",
  "libc",

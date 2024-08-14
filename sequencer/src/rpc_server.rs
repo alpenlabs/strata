@@ -23,13 +23,17 @@ use alpen_express_consensus_logic::sync_manager::SyncManager;
 use alpen_express_db::traits::{ChainstateProvider, Database, L2DataProvider};
 use alpen_express_db::traits::{L1DataProvider, SequencerDatabase};
 use alpen_express_primitives::buf::Buf32;
-use alpen_express_primitives::l1::L1Status;
-use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer, BlockHeader, ClientStatus, DepositInfo, ExecState, ExecUpdate, HexBytes};
+use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer, HexBytes};
+use alpen_express_rpc_types::{
+    BlockHeader, ClientStatus, DaBlobs, DepositEntry, ExecUpdate, L1Status, WithdrawalIntent,
+};
 use alpen_express_state::{
-    block::L2BlockBundle, chain_state::ChainState, client_state::ClientState, da_blob::{BlobDest, BlobIntent}, header::{L2Header, SignedL2BlockHeader}, id::L2BlockId, l1::L1BlockId
+    block::{L2Block, L2BlockBundle}, chain_state::ChainState, client_state::ClientState, da_blob::{BlobDest, BlobIntent}, exec_update, header::{L2Header, SignedL2BlockHeader}, id::L2BlockId, l1::L1BlockId
 };
 
 use tracing::*;
+
+use crate::rpc_server;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -46,6 +50,9 @@ pub enum Error {
 
     #[error("missing L2 block {0:?}")]
     MissingL2Block(L2BlockId),
+
+    #[error("sync State not initialized")]
+    MissingSyncState,
 
     #[error("missing chainstate for index {0}")]
     MissingChainstate(u64),
@@ -80,6 +87,7 @@ impl Error {
             Self::MissingChainstate(_) => -32604,
             Self::Db(_) => -32605,
             Self::ClientNotStarted => -32606,
+            Self::MissingSyncState => -32607,
             Self::BlockingAbort(_) => -32001,
             Self::Other(_) => -32000,
             Self::OtherEx(_, _) => -32000,
@@ -98,7 +106,7 @@ impl From<Error> for ErrorObjectOwned {
 }
 
 pub struct AlpenRpcImpl<D> {
-    l1_status: Arc<RwLock<alpen_express_primitives::l1::L1Status>>,
+    l1_status: Arc<RwLock<L1Status>>,
     database: Arc<D>,
     sync_manager: Arc<SyncManager>,
     stop_tx: Mutex<Option<oneshot::Sender<()>>>,
@@ -106,7 +114,7 @@ pub struct AlpenRpcImpl<D> {
 
 impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
     pub fn new(
-        l1_status: Arc<RwLock<alpen_express_primitives::l1::L1Status>>,
+        l1_status: Arc<RwLock<L1Status>>,
         database: Arc<D>,
         sync_manager: Arc<SyncManager>,
         stop_tx: oneshot::Sender<()>,
@@ -164,38 +172,24 @@ impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
         BlockHeader {
             block_idx: block_header.blockidx(),
             timestamp: block_header.timestamp(),
+            block_id: *block_header.get_blockid().as_ref(),
             prev_block: *block_header.parent().as_ref(),
             l1_segment_hash: *block_header.l1_payload_hash().as_ref(),
             exec_segment_hash: *block_header.exec_payload_hash().as_ref(),
-            state_root: *block_header.state_root().as_ref()
+            state_root: *block_header.state_root().as_ref(),
         }
     }
 
-    fn parse_l2block_id(&self,block_id: &str) -> Result<L2BlockId,Error> {
-        if block_id.len() != 64 {
-            return Err(Error::IncorrectParameters("invalid BlockId".to_string()).into());
-        }
-
-        let mut bytes = [0u8; 32];
-        block_id.as_bytes()
-                 .chunks(2)
-                 .enumerate()
-                 .map(|(idx, chunk)| {
-                        let byte_str = std::str::from_utf8(chunk).map_err(|_| Error::IncorrectParameters("invalid BlockId".to_string()))?;
-                        bytes[idx] = u8::from_str_radix(byte_str, 16).map_err(|_| Error::IncorrectParameters("invalid BlockId".to_string()))?;
-                        Ok::<(), Error>(())
-                 });
-
-        Ok(L2BlockId::from(Buf32::from(bytes)))
-    }
-
-    fn fetch_l2block(&self, l2_prov: Arc<<D as Database>::L2Prov>, blkid: L2BlockId) -> Result<L2BlockBundle, Error>
-    {
-        Ok(l2_prov.get_block_data(blkid)
+    fn fetch_l2block(
+        &self,
+        l2_prov: Arc<<D as Database>::L2Prov>,
+        blkid: L2BlockId,
+    ) -> Result<L2BlockBundle, Error> {
+        l2_prov
+            .get_block_data(blkid)
             .map_err(Error::Db)?
-            .ok_or(Error::MissingL2Block(blkid))?)
+            .ok_or(Error::MissingL2Block(blkid))
     }
-
 }
 
 #[async_trait]
@@ -278,30 +272,36 @@ where
     async fn get_recent_blocks(&self, count: u64) -> RpcResult<Vec<BlockHeader>> {
         // FIXME: sync state should have a block number
         let cl_state = self.get_client_state().await;
-        let tip_blkid = cl_state.sync().ok_or(Error::ClientNotStarted)?.chain_tip_blkid();
+        let tip_blkid = cl_state
+            .sync()
+            .ok_or(Error::ClientNotStarted)?
+            .chain_tip_blkid();
 
         let l2_prov = self.database.l2_provider();
-        let tip_block_idx = self.fetch_l2block(l2_prov.clone(), *tip_blkid)?
-        .header()
-        .blockidx();
+        let tip_block_idx = self
+            .fetch_l2block(l2_prov.clone(), *tip_blkid)?
+            .header()
+            .blockidx();
 
         if count > tip_block_idx {
-            return Err(Error::IncorrectParameters("count too high".to_string()).into())
+            return Err(Error::IncorrectParameters("count too high".to_string()).into());
         }
 
         // TODO: paginate the count
-        let block_headers :Result<Vec<BlockHeader>, Error>= ((tip_block_idx-count)..tip_block_idx).map(|idx| {
-            let blkid = *l2_prov
-                            .get_blocks_at_height(idx)
-                            .map_err(Error::Db)?
-                            // figure out if we want a Vec or a hashmap
-                            .get(0)
-                            .unwrap();
+        let block_headers: Result<Vec<BlockHeader>, Error> = ((tip_block_idx - count)
+            ..tip_block_idx)
+            .map(|idx| {
+                let blkid = *l2_prov
+                    .get_blocks_at_height(idx)
+                    .map_err(Error::Db)?
+                    .first()
+                    .unwrap();
 
-            let l2block = self.fetch_l2block(l2_prov.clone(), blkid)?;
+                let l2block = self.fetch_l2block(l2_prov.clone(), blkid)?;
 
-            Ok(self.construct_l2_block_headers(l2block.header()))
-        }).collect();
+                Ok(self.construct_l2_block_headers(l2block.header()))
+            })
+            .collect();
 
         Ok(block_headers?)
     }
@@ -309,33 +309,93 @@ where
     async fn get_blocks_at_idx(&self, index: u64) -> RpcResult<Vec<BlockHeader>> {
         let l2_prov = self.database.l2_provider();
         let block_data: Result<Vec<BlockHeader>, Error> = l2_prov
-                            .get_blocks_at_height(index)
-                            .map_err(Error::Db)?
-                            .iter()
-                            .map(|blkid| {
-                                let l2block = self.fetch_l2block(l2_prov.clone(), *blkid)?;
+            .get_blocks_at_height(index)
+            .map_err(Error::Db)?
+            .iter()
+            .map(|blkid| {
+                let l2block = self.fetch_l2block(l2_prov.clone(), *blkid)?;
 
-                                Ok(self.construct_l2_block_headers(l2block.block().header()))
-                            }).collect();
+                Ok(self.construct_l2_block_headers(l2block.block().header()))
+            })
+            .collect();
 
         Ok(block_data?)
     }
 
     async fn get_block_by_id(&self, block_id: String) -> RpcResult<BlockHeader> {
-        let block_id = self.parse_l2block_id(&block_id)?;
+        let block_id = parse_l2block_id(&block_id)?;
         let l2_prov = self.database.l2_provider();
         let l2block = self.fetch_l2block(l2_prov.clone(), block_id)?;
 
         Ok(self.construct_l2_block_headers(l2block.header()))
     }
 
-    async fn get_exec_update_by_id(&self, block_id: String) -> RpcResult<ExecUpdate>{ unimplemented!() }
+    async fn get_exec_update_by_id(&self, block_id: String) -> RpcResult<ExecUpdate> {
+        let block_id = parse_l2block_id(&block_id)?;
+        let l2_prov = self.database.l2_provider();
+        let fetch_l2block = self.fetch_l2block(l2_prov.clone(), block_id)?;
+        let exec_update = fetch_l2block.exec_segment().update();
 
-    async fn get_current_deposits(&self) -> RpcResult<Vec<u32>>{ unimplemented!() }
+        let withdrawals = exec_update
+            .output()
+            .withdrawals()
+            .iter()
+            .map(|intent| {
+                let (amt, dest_pk) = intent.get_intent();
+                let dest_pk = *dest_pk.as_ref();
+                WithdrawalIntent { amt, dest_pk }
+            })
+            .collect();
 
-    async fn get_current_deposit_by_id(&self, deposit_id: u32) -> RpcResult<DepositInfo>{ unimplemented!() }
+        let da_blobs = exec_update
+            .output()
+            .da_blobs()
+            .iter()
+            .map(|blob| DaBlobs {
+                dest: blob.dest().into(),
+                block_commitment: *blob.commitment().as_ref(),
+            })
+            .collect();
 
-    async fn get_current_exec_state(&self) -> RpcResult<ExecState>{ unimplemented!() }
+        Ok(ExecUpdate {
+            update_idx: exec_update.input().update_idx(),
+            entries_root: *exec_update.input().entries_root().as_ref(),
+            extra_payload: exec_update.input().extra_payload().to_vec(),
+            new_state: *exec_update.output().new_state().as_ref(),
+            withdrawals,
+            da_blobs,
+        })
+    }
+
+    async fn get_current_deposits(&self) -> RpcResult<Vec<u32>> {
+        let (_, chain_state) = self.get_cur_states().await?;
+        let chain_state = chain_state.ok_or(Error::MissingSyncState)?;
+
+        Ok(chain_state.deposit_table().get_all_deposits())
+    }
+
+    async fn get_current_deposit_by_id(&self, deposit_id: u32) -> RpcResult<DepositEntry> {
+        let (_, chain_state) = self.get_cur_states().await?;
+        let chain_state = chain_state.ok_or(Error::MissingSyncState)?;
+
+        let deposit_entry = chain_state
+            .deposit_table()
+            .get_deposit(deposit_id)
+            .ok_or(Error::Other("Deposit table not found".to_string()))?;
+
+        let state = match deposit_entry.deposit_state() {
+            alpen_express_state::bridge_state::DepositState::Created(_) => "Created".into(),
+            alpen_express_state::bridge_state::DepositState::Accepted(_) => "Accepted".into(),
+            alpen_express_state::bridge_state::DepositState::Dispatched(_) => "Dispatched".into(),
+            alpen_express_state::bridge_state::DepositState::Executed => "Executed".into(),
+        };
+
+        Ok(DepositEntry {
+            deposit_idx: deposit_id,
+            amt: deposit_entry.amt(),
+            state,
+        })
+    }
 }
 /// Wrapper around [``tokio::task::spawn_blocking``] that handles errors in th{ unimplemented!() }
 /// external task and merges the errors into the standard RPC error type.
@@ -374,5 +434,42 @@ impl<S: SequencerDatabase + Send + Sync + 'static> AlpenAdminApiServer for Admin
             return Err(Error::Other("".to_string()).into());
         }
         Ok(())
+    }
+}
+
+
+fn parse_l2block_id(block_id: &str) -> Result<L2BlockId, Error> {
+    if block_id.len() != 64 {
+        return Err(Error::IncorrectParameters("invalid BlockId".into()));
+    }
+
+    let mut bytes = [0u8; 32];
+
+    for (idx, byte) in bytes.iter_mut().enumerate().take(32) {
+        let start = idx * 2;
+        let chunk = &block_id[start..start + 2];
+        let byte_str = std::str::from_utf8(chunk.as_bytes())
+            .map_err(|_| Error::IncorrectParameters("invalid BlockId".to_string()))?;
+        *byte = u8::from_str_radix(byte_str, 16)
+            .map_err(|_| Error::IncorrectParameters("invalid BlockId".to_string()))?;
+    }
+
+    Ok(L2BlockId::from(Buf32::from(bytes)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_l2_blockid() {
+        let block_id =
+            parse_l2block_id("698567f5fc38ab42831e0455dc097094a7899b9480411ed73fbca99244b743c6");
+        assert!(block_id.is_ok());
+
+        // incomplete block id
+        let block_id =
+            parse_l2block_id("698567f5fc38ab42831e0455dc097094a7899b9480411ed73fbca99244b743");
+        assert!(block_id.is_err());
     }
 }

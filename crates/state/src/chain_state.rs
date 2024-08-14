@@ -6,6 +6,8 @@ use alpen_express_primitives::hash::compute_borsh_hash;
 
 use crate::l1::L1ViewState;
 use crate::prelude::*;
+use crate::bridge_state::DepositsTable;
+use crate::exec_env::ExecEnvState;
 use crate::{bridge_ops, bridge_state, exec_env, l1};
 
 /// L2 blockchain state.  This is the state computed as a function of a
@@ -101,6 +103,14 @@ impl ChainState {
             deposits_hash: compute_borsh_hash(&self.deposits_table),
         };
         compute_borsh_hash(&hashed_state)
+    }
+
+    pub fn deposit_table(&self) -> &DepositsTable {
+        &self.deposits_table
+    }
+
+    pub fn exec_state(&self) -> &ExecEnvState {
+        &self.exec_env_state
     }
 }
 
