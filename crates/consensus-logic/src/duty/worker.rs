@@ -1,7 +1,7 @@
 //! Executes duties.
 
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use std::time;
 
 use alpen_express_btcio::writer::DaWriter;
@@ -160,6 +160,11 @@ fn get_finalized_blocks(
     Ok(newly_finalized_blocks)
 }
 
+struct DutyExecStatus {
+    id: Buf32,
+    result: Result<(), Error>,
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn duty_dispatch_task<
     D: Database + Sync + Send + 'static,
@@ -176,10 +181,26 @@ pub fn duty_dispatch_task<
     params: Arc<Params>,
 ) {
     // TODO make this actually work
-    let mut pending_duties: HashMap<Buf32, ()> = HashMap::new();
+    let pending_duties = Arc::new(RwLock::new(HashMap::<Buf32, ()>::new()));
 
     // TODO still need some stuff here to decide if we're fully synced and
     // *should* dispatch duties
+
+    let (duty_status_tx, duty_status_rx) = std::sync::mpsc::channel::<DutyExecStatus>();
+
+    let pending_duties_t = pending_duties.clone();
+    std::thread::spawn(move || loop {
+        if let Ok(DutyExecStatus { id, result }) = duty_status_rx.recv() {
+            if let Err(e) = result {
+                error!(err = %e, "error performing duty");
+            } else {
+                debug!("completed duty successfully");
+            }
+            if pending_duties_t.write().unwrap().remove(&id).is_none() {
+                warn!(%id, "tried to remove non-existent duty");
+            }
+        }
+    });
 
     loop {
         let update = match updates.blocking_recv() {
@@ -195,11 +216,13 @@ pub fn duty_dispatch_task<
 
         // TODO check pending_duties to remove any completed duties
 
+        let mut pending_duties_local = pending_duties.read().unwrap().clone();
+
         for duty in update.duties() {
             let id = duty.id();
 
             // Skip any duties we've already dispatched.
-            if pending_duties.contains_key(&id) {
+            if pending_duties_local.contains_key(&id) {
                 continue;
             }
 
@@ -211,11 +234,16 @@ pub fn duty_dispatch_task<
             let db = database.clone();
             let e = engine.clone();
             let da_writer = da_writer.clone();
-            let params = params.clone();
-            pool.execute(move || duty_exec_task(d, ik, sm, db, e, da_writer, params));
+            let params: Arc<Params> = params.clone();
+            let duty_status_tx_l = duty_status_tx.clone();
+            pool.execute(move || {
+                duty_exec_task(d, ik, sm, db, e, da_writer, params, duty_status_tx_l)
+            });
             trace!(%id, "dispatched duty exec task");
-            pending_duties.insert(id, ());
+            pending_duties_local.insert(id, ());
         }
+
+        *pending_duties.write().unwrap() = pending_duties_local;
     }
 
     info!("duty dispatcher task exiting");
@@ -224,6 +252,7 @@ pub fn duty_dispatch_task<
 /// Toplevel function that's actually performs a job.  This is spawned on a/
 /// thread pool so we don't have to worry about it blocking *too* much other
 /// work.
+#[allow(clippy::too_many_arguments)] // TODO: fix this
 fn duty_exec_task<D: Database, E: ExecEngineCtl, S: SequencerDatabase + Send + Sync + 'static>(
     duty: Duty,
     ik: IdentityKey,
@@ -232,8 +261,9 @@ fn duty_exec_task<D: Database, E: ExecEngineCtl, S: SequencerDatabase + Send + S
     engine: Arc<E>,
     da_writer: Arc<DaWriter<S>>,
     params: Arc<Params>,
+    duty_status_tx: std::sync::mpsc::Sender<DutyExecStatus>,
 ) {
-    if let Err(e) = perform_duty(
+    let result = perform_duty(
         &duty,
         &ik,
         &sync_man,
@@ -241,10 +271,15 @@ fn duty_exec_task<D: Database, E: ExecEngineCtl, S: SequencerDatabase + Send + S
         engine.as_ref(),
         da_writer.as_ref(),
         &params,
-    ) {
-        error!(err = %e, "error performing duty");
-    } else {
-        debug!("completed duty successfully");
+    );
+
+    let status = DutyExecStatus {
+        id: duty.id(),
+        result,
+    };
+
+    if let Err(e) = duty_status_tx.send(status) {
+        error!(err = %e, "failed to send duty status");
     }
 }
 
