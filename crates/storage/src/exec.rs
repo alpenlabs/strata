@@ -55,7 +55,7 @@ where
 macro_rules! inst_ops {
     {
         ($base:ident, $ctx:ident $(<$($tparam:ident: $tpconstr:tt),+>)?) {
-            $($iname:ident($arg:ty) => $ret:ty [$aname:ident, $bname:ident];)*
+            $($iname:ident($arg:ty) => $ret:ty;)*
         }
     } => {
         pub struct $base {
@@ -63,61 +63,63 @@ macro_rules! inst_ops {
             inner: Arc<dyn ShimTrait>,
         }
 
-        impl $base {
-            pub fn new $(<$($tparam: $tpconstr + Sync + Send + 'static),+>)? (pool: threadpool::ThreadPool, ctx: Arc<$ctx $(<$($tparam),+>)?>) -> Self {
-                Self {
-                    pool,
-                    inner: Arc::new(Inner { ctx }),
-                }
-            }
-
-            $(
-                pub async fn $aname(&self, arg: $arg) -> DbResult<$ret> {
-                    self.inner.$aname(&self.pool, arg).await
-                }
-
-                pub fn $bname(&self, arg: $arg) -> DbResult<$ret> {
-                    self.inner.$bname(arg)
-                }
-            )*
-        }
-
-        #[async_trait::async_trait]
-        trait ShimTrait {
-            $(
-                async fn $aname(&self, pool: &threadpool::ThreadPool, arg: $arg) -> DbResult<$ret>;
-                fn $bname(&self, arg: $arg) -> DbResult<$ret>;
-            )*
-        }
-
-        pub struct Inner $(<$($tparam: $tpconstr + Sync + Send + 'static),+>)? {
-            ctx: Arc<$ctx $(<$($tparam),+>)?>,
-        }
-
-        #[async_trait::async_trait]
-        impl $(<$($tparam: $tpconstr + Sync + Send + 'static),+>)? ShimTrait for Inner $(<$($tparam),+>)? {
-            $(
-                async fn $aname(&self, pool: &threadpool::ThreadPool, arg: $arg) -> DbResult<$ret> {
-                    let (resp_tx, resp_rx) = tokio::sync::oneshot::channel();
-                    let ctx = self.ctx.clone();
-
-                    pool.execute(move || {
-                        let res = $iname(&ctx, arg);
-                        if resp_tx.send(res).is_err() {
-                            warn!("failed to send response");
-                        }
-                    });
-
-                    match resp_rx.await {
-                        Ok(v) => v,
-                        Err(e) => Err(DbError::Other(format!("{e}"))),
+        paste::paste! {
+            impl $base {
+                pub fn new $(<$($tparam: $tpconstr + Sync + Send + 'static),+>)? (pool: threadpool::ThreadPool, ctx: Arc<$ctx $(<$($tparam),+>)?>) -> Self {
+                    Self {
+                        pool,
+                        inner: Arc::new(Inner { ctx }),
                     }
                 }
 
-                fn $bname(&self, arg: $arg) -> DbResult<$ret> {
-                    $iname(&self.ctx, arg)
-                }
-            )*
+                $(
+                    pub async fn [<$iname _async>] (&self, arg: $arg) -> DbResult<$ret> {
+                        self.inner. [<$iname _async>] (&self.pool, arg).await
+                    }
+
+                    pub fn [<$iname _blocking>] (&self, arg: $arg) -> DbResult<$ret> {
+                        self.inner. [<$iname _blocking>] (arg)
+                    }
+                )*
+            }
+
+            #[async_trait::async_trait]
+            trait ShimTrait {
+                $(
+                    async fn [<$iname _async>] (&self, pool: &threadpool::ThreadPool, arg: $arg) -> DbResult<$ret>;
+                    fn [<$iname _blocking>] (&self, arg: $arg) -> DbResult<$ret>;
+                )*
+            }
+
+            pub struct Inner $(<$($tparam: $tpconstr + Sync + Send + 'static),+>)? {
+                ctx: Arc<$ctx $(<$($tparam),+>)?>,
+            }
+
+            #[async_trait::async_trait]
+            impl $(<$($tparam: $tpconstr + Sync + Send + 'static),+>)? ShimTrait for Inner $(<$($tparam),+>)? {
+                $(
+                    async fn [<$iname _async>] (&self, pool: &threadpool::ThreadPool, arg: $arg) -> DbResult<$ret> {
+                        let (resp_tx, resp_rx) = tokio::sync::oneshot::channel();
+                        let ctx = self.ctx.clone();
+
+                        pool.execute(move || {
+                            let res = $iname(&ctx, arg);
+                            if resp_tx.send(res).is_err() {
+                                warn!("failed to send response");
+                            }
+                        });
+
+                        match resp_rx.await {
+                            Ok(v) => v,
+                            Err(e) => Err(DbError::Other(format!("{e}"))),
+                        }
+                    }
+
+                    fn [<$iname _blocking>] (&self, arg: $arg) -> DbResult<$ret> {
+                        $iname(&self.ctx, arg)
+                    }
+                )*
+            }
         }
     }
 }
