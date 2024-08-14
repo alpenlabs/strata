@@ -15,6 +15,7 @@ use crate::utils::get_last_idx;
 
 pub struct SeqDb {
     db: Arc<DB>,
+    retry_count: u16,
 }
 
 impl SeqDb {
@@ -22,30 +23,33 @@ impl SeqDb {
     ///
     /// Assumes it was opened with column families as defined in `STORE_COLUMN_FAMILIES`.
     // FIXME Make it better/generic.
-    pub fn new(db: Arc<DB>) -> Self {
-        Self { db }
+    pub fn new(db: Arc<DB>, retry_count: u16) -> Self {
+        Self { db, retry_count }
     }
 }
 
 impl SeqDataStore for SeqDb {
     fn put_blob(&self, blob_hash: Buf32, blob: BlobEntry) -> DbResult<u64> {
         self.db
-            .with_optimistic_txn(rockbound::TransactionRetry::Count(5), |txn| {
-                if txn.get::<SeqBlobSchema>(&blob_hash)?.is_some() {
-                    return Err(DbError::Other(format!(
-                        "Entry already exists for blobid {blob_hash:?}"
-                    )));
-                }
+            .with_optimistic_txn(
+                rockbound::TransactionRetry::Count(self.retry_count),
+                |txn| {
+                    if txn.get::<SeqBlobSchema>(&blob_hash)?.is_some() {
+                        return Err(DbError::Other(format!(
+                            "Entry already exists for blobid {blob_hash:?}"
+                        )));
+                    }
 
-                let idx = rockbound::utils::get_last::<SeqBlobIdSchema>(txn)?
-                    .map(|(x, _)| x + 1)
-                    .unwrap_or(0);
+                    let idx = rockbound::utils::get_last::<SeqBlobIdSchema>(txn)?
+                        .map(|(x, _)| x + 1)
+                        .unwrap_or(0);
 
-                txn.put::<SeqBlobIdSchema>(&idx, &blob_hash)?;
-                txn.put::<SeqBlobSchema>(&blob_hash, &blob)?;
+                    txn.put::<SeqBlobIdSchema>(&idx, &blob_hash)?;
+                    txn.put::<SeqBlobSchema>(&blob_hash, &blob)?;
 
-                Ok(idx)
-            })
+                    Ok(idx)
+                },
+            )
             .map_err(|e| DbError::TransactionError(e.to_string()))
     }
 
@@ -150,7 +154,7 @@ mod tests {
     #[test]
     fn test_put_blob_new_entry() {
         let db = setup_db();
-        let seq_db = SeqDb::new(db.clone());
+        let seq_db = SeqDb::new(db.clone(), 5);
 
         let blob: BlobEntry = ArbitraryGenerator::new().generate();
         let blob_hash: Buf32 = [0; 32].into();
@@ -166,7 +170,7 @@ mod tests {
     #[test]
     fn test_put_blob_existing_entry() {
         let db = setup_db();
-        let seq_db = SeqDb::new(db.clone());
+        let seq_db = SeqDb::new(db.clone(), 5);
         let blob: BlobEntry = ArbitraryGenerator::new().generate();
         let blob_hash: Buf32 = [0; 32].into();
 
@@ -183,7 +187,7 @@ mod tests {
     #[test]
     fn test_put_commit_reveal_txns() {
         let db = setup_db();
-        let seq_db = SeqDb::new(db.clone());
+        let seq_db = SeqDb::new(db.clone(), 5);
 
         let ((cid, craw), (rid, rraw)) = get_commit_reveal_txns();
 
@@ -201,7 +205,7 @@ mod tests {
     #[test]
     fn test_update_blob_by_idx() {
         let db = setup_db();
-        let seq_db = SeqDb::new(db.clone());
+        let seq_db = SeqDb::new(db.clone(), 5);
 
         let blob: BlobEntry = ArbitraryGenerator::new().generate();
         let blob_hash: Buf32 = [0; 32].into();
@@ -226,7 +230,7 @@ mod tests {
     #[test]
     fn test_get_blob_by_id() {
         let db = setup_db();
-        let seq_db = SeqDb::new(db.clone());
+        let seq_db = SeqDb::new(db.clone(), 5);
 
         let blob: BlobEntry = ArbitraryGenerator::new().generate();
         let blob_hash: Buf32 = [0; 32].into();
@@ -240,7 +244,7 @@ mod tests {
     #[test]
     fn test_get_blob_by_idx() {
         let db = setup_db();
-        let seq_db = SeqDb::new(db.clone());
+        let seq_db = SeqDb::new(db.clone(), 5);
 
         let blob: BlobEntry = ArbitraryGenerator::new().generate();
         let blob_hash: Buf32 = [0; 32].into();
@@ -254,7 +258,7 @@ mod tests {
     #[test]
     fn test_get_last_blob_idx() {
         let db = setup_db();
-        let seq_db = SeqDb::new(db.clone());
+        let seq_db = SeqDb::new(db.clone(), 5);
 
         let blob: BlobEntry = ArbitraryGenerator::new().generate();
         let blob_hash: Buf32 = [0; 32].into();
@@ -280,7 +284,7 @@ mod tests {
     #[test]
     fn test_get_l1_tx() {
         let db = setup_db();
-        let seq_db = SeqDb::new(db.clone());
+        let seq_db = SeqDb::new(db.clone(), 5);
 
         // Test non existing l1 tx
         let res = seq_db.get_l1_tx(Buf32::zero()).unwrap();

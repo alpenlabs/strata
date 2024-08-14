@@ -169,8 +169,14 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     // Initialize databases.
     let l1_db = Arc::new(alpen_express_rocksdb::L1Db::new(rbdb.clone()));
-    let l2_db = Arc::new(alpen_express_rocksdb::l2::db::L2Db::new(rbdb.clone()));
-    let sync_ev_db = Arc::new(alpen_express_rocksdb::SyncEventDb::new(rbdb.clone()));
+    let l2_db = Arc::new(alpen_express_rocksdb::l2::db::L2Db::new(
+        rbdb.clone(),
+        config.client.db_retry_count,
+    ));
+    let sync_ev_db = Arc::new(alpen_express_rocksdb::SyncEventDb::new(
+        rbdb.clone(),
+        config.client.db_retry_count,
+    ));
     let cs_db = Arc::new(alpen_express_rocksdb::ClientStateDb::new(rbdb.clone()));
     let chst_db = Arc::new(alpen_express_rocksdb::ChainStateDb::new(rbdb.clone()));
     let database = Arc::new(alpen_express_db::database::CommonDatabase::new(
@@ -242,7 +248,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             params.rollup().rollup_name.clone(),
         )?;
         // Initialize SequencerDatabase
-        let seqdb = Arc::new(SeqDb::new(rbdb.clone()));
+        let seqdb = Arc::new(SeqDb::new(rbdb.clone(), 5));
         let dbseq = Arc::new(SequencerDB::new(seqdb));
         let rpc = btc_rpc.clone();
         let writer = Arc::new(start_writer_task(

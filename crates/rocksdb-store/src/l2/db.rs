@@ -14,11 +14,12 @@ use crate::l2::schemas::L2BlockHeightSchema;
 
 pub struct L2Db {
     db: Arc<DB>,
+    retry_count: u16,
 }
 
 impl L2Db {
-    pub fn new(db: Arc<DB>) -> Self {
-        Self { db }
+    pub fn new(db: Arc<DB>, retry_count: u16) -> Self {
+        Self { db, retry_count }
     }
 }
 
@@ -30,20 +31,23 @@ impl L2DataStore for L2Db {
         let block_height = bundle.block().header().blockidx();
 
         self.db
-            .with_optimistic_txn(rockbound::TransactionRetry::Count(5), |txn| {
-                let mut block_height_data = txn
-                    .get::<L2BlockHeightSchema>(&block_height)?
-                    .unwrap_or(Vec::new());
-                if !block_height_data.contains(&block_id) {
-                    block_height_data.push(block_id);
-                }
+            .with_optimistic_txn(
+                rockbound::TransactionRetry::Count(self.retry_count),
+                |txn| {
+                    let mut block_height_data = txn
+                        .get::<L2BlockHeightSchema>(&block_height)?
+                        .unwrap_or(Vec::new());
+                    if !block_height_data.contains(&block_id) {
+                        block_height_data.push(block_id);
+                    }
 
-                txn.put::<L2BlockSchema>(&block_id, &bundle)?;
-                txn.put::<L2BlockStatusSchema>(&block_id, &BlockStatus::Unchecked)?;
-                txn.put::<L2BlockHeightSchema>(&block_height, &block_height_data)?;
+                    txn.put::<L2BlockSchema>(&block_id, &bundle)?;
+                    txn.put::<L2BlockStatusSchema>(&block_id, &BlockStatus::Unchecked)?;
+                    txn.put::<L2BlockHeightSchema>(&block_height, &block_height_data)?;
 
-                Ok::<_, anyhow::Error>(())
-            })
+                    Ok::<_, anyhow::Error>(())
+                },
+            )
             .map_err(|e| DbError::TransactionError(e.to_string()))
     }
 
@@ -59,18 +63,21 @@ impl L2DataStore for L2Db {
         block_height_data.retain(|&block_id| block_id != id);
 
         self.db
-            .with_optimistic_txn(rockbound::TransactionRetry::Count(5), |txn| {
-                let mut block_height_data = txn
-                    .get::<L2BlockHeightSchema>(&block_height)?
-                    .unwrap_or(Vec::new());
-                block_height_data.retain(|&block_id| block_id != id);
+            .with_optimistic_txn(
+                rockbound::TransactionRetry::Count(self.retry_count),
+                |txn| {
+                    let mut block_height_data = txn
+                        .get::<L2BlockHeightSchema>(&block_height)?
+                        .unwrap_or(Vec::new());
+                    block_height_data.retain(|&block_id| block_id != id);
 
-                txn.delete::<L2BlockSchema>(&id)?;
-                txn.delete::<L2BlockStatusSchema>(&id)?;
-                txn.put::<L2BlockHeightSchema>(&block_height, &block_height_data)?;
+                    txn.delete::<L2BlockSchema>(&id)?;
+                    txn.delete::<L2BlockStatusSchema>(&id)?;
+                    txn.put::<L2BlockHeightSchema>(&block_height, &block_height_data)?;
 
-                Ok::<_, anyhow::Error>(true)
-            })
+                    Ok::<_, anyhow::Error>(true)
+                },
+            )
             .map_err(|e| DbError::TransactionError(e.to_string()))
     }
 
@@ -118,7 +125,7 @@ mod tests {
 
     fn setup_db() -> L2Db {
         let db = get_rocksdb_tmp_instance().unwrap();
-        L2Db::new(db)
+        L2Db::new(db, 5)
     }
 
     #[test]

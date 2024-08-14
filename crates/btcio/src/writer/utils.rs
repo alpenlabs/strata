@@ -156,7 +156,7 @@ mod test {
 
     fn get_db() -> Arc<SequencerDB<SeqDb>> {
         let db = alpen_test_utils::get_rocksdb_tmp_instance().unwrap();
-        let seqdb = Arc::new(SeqDb::new(db));
+        let seqdb = Arc::new(SeqDb::new(db, 5));
         Arc::new(SequencerDB::new(seqdb))
     }
 

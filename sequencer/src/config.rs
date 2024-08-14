@@ -13,6 +13,7 @@ pub struct ClientParams {
     pub sequencer_bitcoin_address: String, // TODO: probably move this to another struct
     pub l2_blocks_fetch_limit: u64,
     pub datadir: PathBuf,
+    pub db_retry_count: u16,
 }
 
 #[derive(Deserialize, Debug)]
@@ -80,6 +81,7 @@ impl Config {
                 sequencer_bitcoin_address: args
                     .sequencer_bitcoin_address
                     .ok_or_else(|| "args: no --sequencer-bitcion-address provided".to_string())?,
+                db_retry_count: 5,
             },
             sync: SyncParams {
                 l1_follow_distance: 6,
@@ -127,6 +129,9 @@ impl Config {
         if let Some(seq_addr) = args.sequencer_bitcoin_address {
             self.client.sequencer_bitcoin_address = seq_addr;
         }
+        if let Some(db_retry_count) = args.db_retry_count {
+            self.client.db_retry_count = db_retry_count;
+        }
     }
 }
 
@@ -148,6 +153,7 @@ mod test {
             l2_blocks_fetch_limit = 1000
             datadir = "/path/to/data/directory"
             sequencer_bitcoin_address = "some_addr"
+            db_retry_count = 5
 
             [sync]
             l1_follow_distance = 6

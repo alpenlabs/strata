@@ -76,7 +76,7 @@ pub fn get_common_db(
     let rbdb = get_rocksdb_tmp_instance().unwrap();
     let l1_db = Arc::new(L1Db::new(rbdb.clone()));
     let l2_db = Arc::new(StubL2Db::new());
-    let sync_ev_db = Arc::new(SyncEventDb::new(rbdb.clone()));
+    let sync_ev_db = Arc::new(SyncEventDb::new(rbdb.clone(), 5));
     let cs_db = Arc::new(ClientStateDb::new(rbdb.clone()));
     let chst_db = Arc::new(StubChainstateDb::new());
 

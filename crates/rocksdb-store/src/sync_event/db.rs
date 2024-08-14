@@ -11,13 +11,14 @@ use super::schemas::{SyncEventSchema, SyncEventWithTimestamp};
 
 pub struct SyncEventDb {
     db: Arc<OptimisticTransactionDB>,
+    retry_count: u16,
 }
 
 impl SyncEventDb {
     // NOTE: db is expected to open all the column families defined in STORE_COLUMN_FAMILIES.
     // FIXME: Make it better/generic.
-    pub fn new(db: Arc<OptimisticTransactionDB>) -> Self {
-        Self { db }
+    pub fn new(db: Arc<OptimisticTransactionDB>, retry_count: u16) -> Self {
+        Self { db, retry_count }
     }
 
     fn get_last_key(&self) -> DbResult<Option<u64>> {
@@ -36,15 +37,18 @@ impl SyncEventDb {
 impl SyncEventStore for SyncEventDb {
     fn write_sync_event(&self, ev: SyncEvent) -> DbResult<u64> {
         self.db
-            .with_optimistic_txn(rockbound::TransactionRetry::Count(5), move |txn| {
-                let last_id = rockbound::utils::get_last::<SyncEventSchema>(txn)?
-                    .map(|(k, _)| k)
-                    .unwrap_or(0);
-                let id = last_id + 1;
-                let event = SyncEventWithTimestamp::new(ev.clone());
-                txn.put::<SyncEventSchema>(&id, &event)?;
-                Ok::<_, anyhow::Error>(id)
-            })
+            .with_optimistic_txn(
+                rockbound::TransactionRetry::Count(self.retry_count),
+                move |txn| {
+                    let last_id = rockbound::utils::get_last::<SyncEventSchema>(txn)?
+                        .map(|(k, _)| k)
+                        .unwrap_or(0);
+                    let id = last_id + 1;
+                    let event = SyncEventWithTimestamp::new(ev.clone());
+                    txn.put::<SyncEventSchema>(&id, &event)?;
+                    Ok::<_, anyhow::Error>(id)
+                },
+            )
             .map_err(|err| DbError::TransactionError(err.to_string()))
     }
 
@@ -119,7 +123,7 @@ mod tests {
 
     fn setup_db() -> SyncEventDb {
         let db = get_rocksdb_tmp_instance().unwrap();
-        SyncEventDb::new(db)
+        SyncEventDb::new(db, 5)
     }
 
     fn insert_event(db: &SyncEventDb) -> SyncEvent {
