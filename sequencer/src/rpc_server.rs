@@ -25,22 +25,18 @@ use alpen_express_btcio::broadcaster::L1BroadcastHandle;
 use alpen_express_btcio::writer::{utils::calculate_blob_hash, DaWriter};
 use alpen_express_consensus_logic::sync_manager::SyncManager;
 use alpen_express_db::{
-    traits::{ChainstateProvider, Database, L2DataProvider},
-    types::L1TxEntry,
+    traits::{ChainstateProvider, Database, L1DataProvider, L2DataProvider, SequencerDatabase},
+    types::{L1TxEntry, L1TxStatus},
     DbResult,
-};
-use alpen_express_db::{
-    traits::{L1DataProvider, SequencerDatabase},
-    types::L1TxStatus,
 };
 use alpen_express_primitives::buf::Buf32;
 use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer, HexBytes, HexBytes32};
 use alpen_express_rpc_types::{
     BlockHeader, ClientStatus, DaBlob, DepositEntry, DepositState, ExecUpdate, L1Status,
-    WithdrawalIntent,
 };
 use alpen_express_state::{
     block::{L2Block, L2BlockBundle},
+    bridge_ops::WithdrawalIntent,
     chain_state::ChainState,
     client_state::ClientState,
     da_blob::{BlobDest, BlobIntent},
@@ -411,8 +407,7 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
                     .iter()
                     .map(|intent| {
                         let (amt, dest_pk) = intent.into_parts();
-                        let dest_pk = *dest_pk.as_ref();
-                        WithdrawalIntent { amt, dest_pk }
+                        WithdrawalIntent::new(amt, dest_pk)
                     })
                     .collect();
 

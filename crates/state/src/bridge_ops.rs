@@ -26,8 +26,12 @@ pub struct WithdrawalIntent {
 }
 
 impl WithdrawalIntent {
-    pub fn into_parts(&self) -> (u64, Buf64) {
-        (self.amt, self.dest_pk)
+    pub fn new(amt: BitcoinAmount, dest_pk: BitcoinAddress) -> Self {
+        Self { amt, dest_pk }
+    }
+
+    pub fn into_parts(&self) -> (BitcoinAmount, BitcoinAddress) {
+        (self.amt, self.dest_pk.clone())
     }
 }
 

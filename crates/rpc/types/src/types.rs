@@ -6,6 +6,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use alpen_express_state::bridge_ops::WithdrawalIntent;
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct L1Status {
     /// If the last time we tried to poll the client (as of `last_update`)
@@ -80,16 +82,6 @@ pub struct BlockHeader {
     /// The root hash of the state tree
     #[serde(with = "hex::serde")]
     pub state_root: [u8; 32],
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct WithdrawalIntent {
-    /// Amount of currency to be withdrawn.
-    pub amt: u64,
-
-    /// Destination public key for the withdrawal
-    #[serde(with = "hex::serde")]
-    pub dest_pk: [u8; 64],
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

@@ -872,12 +872,9 @@ name = "alpen-express-rpc-api"
 version = "0.1.0"
 dependencies = [
  "alpen-express-db",
- "alpen-express-rpc-types",
- "bitcoin",
  "alpen-express-primitives",
  "alpen-express-rpc-types",
  "alpen-express-state",
- "express-bridge-exec",
  "bitcoin",
  "express-bridge-txm",
  "hex",
@@ -891,6 +888,7 @@ dependencies = [
 name = "alpen-express-rpc-types"
 version = "0.1.0"
 dependencies = [
+ "alpen-express-state",
  "hex",
  "serde",
  "serde_json",
