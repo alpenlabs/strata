@@ -209,7 +209,10 @@ mod tests {
             .unwrap();
 
         for idx in 1..block_count {
-            let batch = WriteBatch::new(vec![StateOp::SetSlot(idx, blockids[idx as usize])]);
+            let batch = WriteBatch::new(vec![StateOp::SetSlotAndTipBlock(
+                idx,
+                blockids[idx as usize],
+            )]);
             database
                 .chainstate_store()
                 .write_state_update(idx, &batch)

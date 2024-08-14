@@ -7,6 +7,7 @@ use alpen_express_primitives::buf::Buf32;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::chain_state::ChainState;
+use crate::header::L2Header;
 use crate::id::L2BlockId;
 use crate::l1::L1MaturationEntry;
 use crate::{bridge_ops, l1};
@@ -17,7 +18,7 @@ pub enum StateOp {
     Replace(Box<ChainState>),
 
     /// Sets the current slot.
-    SetSlot(u64, L2BlockId),
+    SetSlotAndTipBlock(u64, L2BlockId),
 
     /// Reverts L1 accepted height back to a previous height, rolling back any
     /// blocks that were there.
@@ -77,7 +78,7 @@ fn apply_op_to_chainstate(op: &StateOp, state: &mut ChainState) {
     match op {
         StateOp::Replace(new_state) => *state = new_state.as_ref().clone(),
 
-        StateOp::SetSlot(slot, last_block) => {
+        StateOp::SetSlotAndTipBlock(slot, last_block) => {
             state.slot = *slot;
             state.last_block = *last_block;
         }
@@ -183,8 +184,11 @@ impl StateCache {
     }
 
     /// Sets the current slot in the state.
-    pub fn set_slot(&mut self, slot: u64, blockid: L2BlockId) {
-        self.merge_op(StateOp::SetSlot(slot, blockid));
+    pub fn set_cur_header(&mut self, header: &impl L2Header) {
+        self.merge_op(StateOp::SetSlotAndTipBlock(
+            header.blockidx(),
+            header.get_blockid(),
+        ));
     }
 
     /// Enqueues a deposit intent into the pending deposits queue.
