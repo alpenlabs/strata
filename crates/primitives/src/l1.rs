@@ -263,7 +263,8 @@ impl<'de> Deserialize<'de> for BitcoinAddress {
 
 impl BorshSerialize for BitcoinAddress {
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), io::Error> {
-        let addr_str = serde_json::to_string(&self)?;
+        let addr_str =
+            serde_json::to_string(&self).map_err(|e| io::Error::new(ErrorKind::Other, e))?;
 
         // address serialization adds `"` to both ends of the string (for JSON compatibility)
         let addr_str = addr_str.trim_matches('"');
