@@ -118,6 +118,7 @@ impl DutyTracker {
             self.set_finalized_block(update.latest_finalized_block);
         }
 
+        let old_cnt = self.duties.len();
         for d in self.duties.drain(..) {
             match d.duty.expiry() {
                 Expiry::NextBlock => {
@@ -145,9 +146,8 @@ impl DutyTracker {
             kept_duties.push(d);
         }
 
-        let old_cnt = self.duties.len();
         self.duties = kept_duties;
-        self.duties.len() - old_cnt
+        old_cnt - self.duties.len()
     }
 
     /// Adds some more duties.
