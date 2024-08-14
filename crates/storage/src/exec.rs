@@ -1,4 +1,4 @@
-//! DB operation executor logic.
+//! DB operation executor logic, mainly the macro that generates the IO stuff.
 //!
 //! This manages the indirection to spawn async requests onto a threadpool and execute blocking
 //! calls locally.
@@ -55,7 +55,7 @@ where
 macro_rules! inst_ops {
     {
         ($base:ident, $ctx:ident $(<$($tparam:ident: $tpconstr:tt),+>)?) {
-            $($iname:ident($arg:ty) => $ret:ty;)*
+            $($iname:ident($($aname:ident: $aty:ty),*) => $ret:ty;)*
         }
     } => {
         pub struct $base {
@@ -73,12 +73,12 @@ macro_rules! inst_ops {
                 }
 
                 $(
-                    pub async fn [<$iname _async>] (&self, arg: $arg) -> DbResult<$ret> {
-                        self.inner. [<$iname _async>] (&self.pool, arg).await
+                    pub async fn [<$iname _async>] (&self, $($aname: $aty),*) -> DbResult<$ret> {
+                        self.inner. [<$iname _async>] (&self.pool, $($aname),*).await
                     }
 
-                    pub fn [<$iname _blocking>] (&self, arg: $arg) -> DbResult<$ret> {
-                        self.inner. [<$iname _blocking>] (arg)
+                    pub fn [<$iname _blocking>] (&self, $($aname: $aty),*) -> DbResult<$ret> {
+                        self.inner. [<$iname _blocking>] ($($aname),*)
                     }
                 )*
             }
@@ -86,8 +86,8 @@ macro_rules! inst_ops {
             #[async_trait::async_trait]
             trait ShimTrait {
                 $(
-                    async fn [<$iname _async>] (&self, pool: &threadpool::ThreadPool, arg: $arg) -> DbResult<$ret>;
-                    fn [<$iname _blocking>] (&self, arg: $arg) -> DbResult<$ret>;
+                    async fn [<$iname _async>] (&self, pool: &threadpool::ThreadPool, $($aname: $aty),*) -> DbResult<$ret>;
+                    fn [<$iname _blocking>] (&self, $($aname: $aty),*) -> DbResult<$ret>;
                 )*
             }
 
@@ -98,12 +98,12 @@ macro_rules! inst_ops {
             #[async_trait::async_trait]
             impl $(<$($tparam: $tpconstr + Sync + Send + 'static),+>)? ShimTrait for Inner $(<$($tparam),+>)? {
                 $(
-                    async fn [<$iname _async>] (&self, pool: &threadpool::ThreadPool, arg: $arg) -> DbResult<$ret> {
+                    async fn [<$iname _async>] (&self, pool: &threadpool::ThreadPool, $($aname: $aty),*) -> DbResult<$ret> {
                         let (resp_tx, resp_rx) = tokio::sync::oneshot::channel();
                         let ctx = self.ctx.clone();
 
                         pool.execute(move || {
-                            let res = $iname(&ctx, arg);
+                            let res = $iname(&ctx, $($aname),*);
                             if resp_tx.send(res).is_err() {
                                 warn!("failed to send response");
                             }
@@ -115,8 +115,8 @@ macro_rules! inst_ops {
                         }
                     }
 
-                    fn [<$iname _blocking>] (&self, arg: $arg) -> DbResult<$ret> {
-                        $iname(&self.ctx, arg)
+                    fn [<$iname _blocking>] (&self, $($aname: $aty),*) -> DbResult<$ret> {
+                        $iname(&self.ctx, $($aname),*)
                     }
                 )*
             }

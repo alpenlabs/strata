@@ -22,10 +22,10 @@ impl<D: Database> Context<D> {
 
 inst_ops! {
     (L2DataOps, Context<D: Database>) {
-        get_block(L2BlockId) => Option<L2BlockBundle>;
-        get_blocks_at_height(u64) => Vec<L2BlockId>;
-        get_block_status(L2BlockId) => Option<BlockStatus>;
-        put_block(L2BlockBundle) => ();
+        get_block(id: L2BlockId) => Option<L2BlockBundle>;
+        get_blocks_at_height(h: u64) => Vec<L2BlockId>;
+        get_block_status(id: L2BlockId) => Option<BlockStatus>;
+        put_block(block: L2BlockBundle) => ();
     }
 }
 
