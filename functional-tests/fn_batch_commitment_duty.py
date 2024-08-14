@@ -23,14 +23,14 @@ class L1StatusTest(flexitest.Test):
             time.sleep(1)
             l1stat = seqrpc.alp_l1status()
             # print(l1stat)
-            if l1stat["published_txn_count"] > 0:
+            if l1stat["published_inscription_count"] > 0:
                 print("saw published txn", l1stat["last_published_txid"])
                 break
         else:
             raise AssertionError("did not see batches being published")
 
         last_l1stat = l1stat
-        initial_txn_count = last_l1stat["published_txn_count"]
+        initial_txn_count = last_l1stat["published_inscription_count"]
         final_txn_count = initial_txn_count
 
         for _ in range(5):
@@ -38,10 +38,10 @@ class L1StatusTest(flexitest.Test):
 
             l1stat = seqrpc.alp_l1status()
             print(l1stat)
-            if l1stat["published_txn_count"] <= last_l1stat["published_txn_count"]:
+            if l1stat["published_inscription_count"] <= last_l1stat["published_inscription_count"]:
                 print("no published transactions")
 
-            final_txn_count = l1stat["published_txn_count"]
+            final_txn_count = l1stat["published_inscription_count"]
 
         # batches should be produced ~ every 5s
         assert final_txn_count - initial_txn_count > 5, "not enough batches produced"

@@ -345,7 +345,7 @@ fn perform_duty<D: Database, E: ExecEngineCtl, S: SequencerDatabase + Send + Syn
             let l1blockid = end_chain_state.l1_view().safe_block().blkid();
 
             let commitment = BatchCommitment::new(*l1blockid, l2blockid);
-            let commitment_sighash = commitment.get_sighash().expect("compute sighash");
+            let commitment_sighash = commitment.get_sighash();
             let signature = sign_with_identity_key(&commitment_sighash, ik);
             let signed_commitment = SignedBatchCommitment::new(commitment, signature);
 

@@ -83,7 +83,7 @@ pub async fn broadcaster_task<D: SequencerDatabase + Send + Sync + 'static>(
                         let mut l1st = l1_status.write().await;
                         let txid: Txid = deserialize(blobentry.reveal_txid.0.as_slice())?;
                         l1st.last_published_txid = Some(txid.to_string());
-                        l1st.published_txn_count += 1;
+                        l1st.published_inscription_count += 1;
                         // TODO: add last update
                         debug!("Updated l1 status: {:?}", l1st);
                     }

@@ -1,15 +1,12 @@
-use std::{
-    io::{self, Cursor, Write},
-    ops::Deref,
-};
+use std::io::{Cursor, Write};
 
 use alpen_express_primitives::buf::{Buf32, Buf64};
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::{id::L2BlockId, l1::L1BlockId};
 
-/// Public parameters for batch proof to be posted to DA
-/// will be updated as prover specs evolve
+/// Public parameters for batch proof to be posted to DA.
+/// Will be updated as prover specs evolve
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
 pub struct BatchCommitment {
     // last safe L1 block for the batch
@@ -26,14 +23,16 @@ impl BatchCommitment {
         }
     }
 
-    pub fn get_sighash(&self) -> Result<Buf32, io::Error> {
+    pub fn get_sighash(&self) -> Buf32 {
         let mut buf = [0; 32 + 32];
 
         let mut cur = Cursor::new(&mut buf[..]);
-        cur.write_all(self.l1blockid.as_ref())?;
-        cur.write_all(self.l2blockid.as_ref())?;
+        cur.write_all(self.l1blockid.as_ref())
+            .expect("write to buf");
+        cur.write_all(self.l2blockid.as_ref())
+            .expect("write to buf");
 
-        Ok(alpen_express_primitives::hash::raw(&buf))
+        alpen_express_primitives::hash::raw(&buf)
     }
 }
 
@@ -49,10 +48,8 @@ impl SignedBatchCommitment {
     }
 }
 
-impl Deref for SignedBatchCommitment {
-    type Target = BatchCommitment;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
+impl From<SignedBatchCommitment> for BatchCommitment {
+    fn from(value: SignedBatchCommitment) -> Self {
+        value.inner
     }
 }
