@@ -12,8 +12,17 @@ rust.unused_must_use = "deny"
 rustdoc.all = "warn"
 
 [dependencies]
+alpen-express-primitives = { workspace = true }
+alpen-express-rpc-api = { workspace = true, features = ["client"] }
 alpen-express-state = { workspace = true }
 express-bridge-txm = { workspace = true }
 
+async-trait = { workspace = true }
 bitcoin = { workspace = true }
+format_serde_error = { workspace = true }
+jsonrpsee = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread"] }
+toml = { workspace = true }

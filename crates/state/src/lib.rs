@@ -8,6 +8,7 @@
 
 pub mod batch;
 pub mod block;
+pub mod bridge_duties;
 pub mod bridge_ops;
 pub mod bridge_state;
 pub mod chain_state;

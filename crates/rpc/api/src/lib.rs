@@ -1,4 +1,3 @@
-#![allow(unexpected_cfgs)] // TODO: remove this when we add the `client` feature flag.
 //! Macro trait def for the `alp_` RPC namespace using jsonrpsee.
 use alpen_express_db::types::L1TxStatus;
 use alpen_express_primitives::l1::L1Status;
@@ -8,6 +7,7 @@ use alpen_express_rpc_types::{
 };
 use bitcoin::Txid;
 use bitcoin::secp256k1::schnorr::Signature;
+use bitcoin::{secp256k1::schnorr::Signature, OutPoint, Transaction};
 use express_bridge_exec::Duty as BridgeDuty;
 use express_bridge_txm::{
     script_builder::withdrawal::{Requested, WithdrawalInfo},
@@ -16,6 +16,31 @@ use express_bridge_txm::{
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
+
+use alpen_express_primitives::l1::L1Status;
+use alpen_express_state::{bridge_duties::BridgeDuties, bridge_ops::WithdrawalBatch};
+use express_bridge_txm::{DepositInfo, ReimbursementRequest, Requested};
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ClientStatus {
+    /// L1 blockchain tip.
+    #[serde(with = "hex::serde")]
+    pub chain_tip: [u8; 32],
+
+    /// L1 chain tip slot.
+    pub chain_tip_slot: u64,
+
+    /// L2 block that's been finalized and proven on L1.
+    #[serde(with = "hex::serde")]
+    pub finalized_blkid: [u8; 32],
+
+    /// Recent L1 block that we might still reorg.
+    #[serde(with = "hex::serde")]
+    pub last_l1_block: [u8; 32],
+
+    /// L1 block index we treat as being "buried" and won't reorg.
+    pub buried_l1_height: u64,
+}
 
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "alp"))]
 #[cfg_attr(feature = "client", rpc(server, client, namespace = "alp"))]
@@ -86,8 +111,12 @@ pub trait AlpenAdminApi {
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "alpbridge"))]
 #[cfg_attr(feature = "client", rpc(server, client, namespace = "alpbridge"))]
 pub trait AlpenBridgeApi {
+    /// Get relevant duties after a given block height in the rollup till the current block height.
+    ///
+    /// These duties could be extracted from the chainstate in the rollup or through the bridge p2p
+    /// messaging queue.
     #[method(name = "getDuties")]
-    async fn get_duties(&self) -> RpcResult<Vec<BridgeDuty>>;
+    async fn get_duties(&self, from_height: u64) -> RpcResult<BridgeDuties>;
 
     /// Broadcast the signature for a deposit request to other bridge clients.
     #[method(name = "broadcastDepositSignature")]
@@ -101,6 +130,20 @@ pub trait AlpenBridgeApi {
     #[method(name = "broadcastReimbursementRequest")]
     async fn broadcast_reimbursement_request(
         &self,
-        withdrawal_info: WithdrawalInfo<Requested>,
+        request: ReimbursementRequest<Requested>,
     ) -> RpcResult<()>;
+
+    /// Get the details of the withdrawal assignee based on the UTXO.
+    ///
+    /// This is useful for validating whether a given withdrawal request was assigned to a given
+    /// operator as a UTXO is guaranteed to be unique.
+    #[method(name = "getAssigneeDetails")]
+    async fn get_assignee_details(
+        &self,
+        deposit_utxo: OutPoint,
+    ) -> RpcResult<Option<WithdrawalBatch>>;
+
+    /// Broadcast fully signed transactions.
+    #[method(name = "broadcastTx")]
+    async fn broadcast_transactions(&self, txs: Vec<Transaction>) -> RpcResult<()>;
 }

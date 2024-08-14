@@ -17,3 +17,6 @@ jsonrpsee = { workspace = true, features = ["server", "macros"] }
 serde = { workspace = true }
 serde_with = { workspace = true, features = ["hex"] }
 thiserror = { workspace = true }
+
+[features]
+client = ["jsonrpsee/client"]
