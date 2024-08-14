@@ -7,7 +7,7 @@ use crate::{id::L2BlockId, l1::L1BlockId};
 
 /// Public parameters for batch proof to be posted to DA.
 /// Will be updated as prover specs evolve.
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+#[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
 pub struct BatchCommitment {
     /// Last safe L1 block for the batch
     l1blockid: L1BlockId,
@@ -36,7 +36,7 @@ impl BatchCommitment {
     }
 }
 
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+#[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
 pub struct SignedBatchCommitment {
     inner: BatchCommitment,
     signature: Buf64,

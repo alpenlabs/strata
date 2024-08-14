@@ -71,7 +71,7 @@ impl BlockSigningDuty {
     }
 }
 
-#[derive(Debug, Clone, BorshSerialize)]
+#[derive(Clone, Debug, BorshSerialize)]
 pub struct BatchCommitmentDuty {
     /// Last slot of batch
     slot: u64,
