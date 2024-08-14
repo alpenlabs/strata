@@ -126,7 +126,7 @@ async fn send_tx(tx_raw: Vec<u8>, client: &(impl SeqL1Client + L1Client)) -> Res
     match client.send_raw_transaction(tx_raw).await {
         Ok(_) => Ok(()),
         Err(ClientError::Server(-27, _)) => Ok(()), // Tx already in chain
-        Err(ClientError::Server(-26, _)) => Err(SendError::MissingOrInvalidInput),
+        Err(ClientError::Server(-25, _)) => Err(SendError::MissingOrInvalidInput),
         Err(e) => Err(SendError::Other(e.to_string())),
     }
 }
