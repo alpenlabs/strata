@@ -449,7 +449,9 @@ impl L1Client for BitcoinClient {
         &self,
         txid: T,
     ) -> ClientResult<u64> {
-        let txid = hex::encode(txid);
+        let mut txid = txid.as_ref().to_vec();
+        txid.reverse();
+        let txid = hex::encode(&txid);
         let result = self
             .call::<GetTransactionResponse>("gettransaction", &[to_val(txid)?])
             .await?;

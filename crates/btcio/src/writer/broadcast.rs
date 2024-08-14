@@ -75,6 +75,9 @@ pub async fn broadcaster_task<D: SequencerDatabase + Send + Sync + 'static>(
             match send_commit_reveal_txs(commit_tx, reveal_tx, rpc_client.as_ref()).await {
                 Ok(_) => {
                     debug!("Successfully sent: {}", blobentry.reveal_txid.to_string());
+                    blobentry.status = BlobL1Status::Published;
+                    db.sequencer_store()
+                        .update_blob_by_idx(curr_idx, blobentry.clone())?;
                     // Update L1 status
                     {
                         let mut l1st = l1_status.write().await;
