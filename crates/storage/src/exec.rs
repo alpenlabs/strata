@@ -55,7 +55,7 @@ where
 macro_rules! inst_ops {
     {
         ($base:ident, $ctx:ident $(<$($tparam:ident: $tpconstr:tt),+>)?) {
-            $($iname:ident => $aname:ident, $bname:ident; $arg:ty => $ret:ty),*
+            $($iname:ident($arg:ty) => $ret:ty [$aname:ident, $bname:ident];)*
         }
     } => {
         pub struct $base {
@@ -79,7 +79,7 @@ macro_rules! inst_ops {
                 pub fn $bname(&self, arg: $arg) -> DbResult<$ret> {
                     self.inner.$bname(arg)
                 }
-            ),*
+            )*
         }
 
         #[async_trait::async_trait]
@@ -87,7 +87,7 @@ macro_rules! inst_ops {
             $(
                 async fn $aname(&self, pool: &threadpool::ThreadPool, arg: $arg) -> DbResult<$ret>;
                 fn $bname(&self, arg: $arg) -> DbResult<$ret>;
-            ),*
+            )*
         }
 
         pub struct Inner $(<$($tparam: $tpconstr + Sync + Send + 'static),+>)? {
@@ -117,7 +117,7 @@ macro_rules! inst_ops {
                 fn $bname(&self, arg: $arg) -> DbResult<$ret> {
                     $iname(&self.ctx, arg)
                 }
-            ),*
+            )*
         }
     }
 }
