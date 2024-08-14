@@ -5,11 +5,8 @@
 
 use std::sync::Arc;
 
-use threadpool::ThreadPool;
-use tokio::sync::oneshot;
-use tracing::*;
-
-use alpen_express_db::{errors::DbError, DbResult};
+pub use alpen_express_db::{errors::DbError, DbResult};
+pub use tracing::*;
 
 /// Shim to opaquely execute the operation without being aware of the underlying impl.
 pub struct OpShim<T, R> {
@@ -31,15 +28,15 @@ where
     }
 
     /// Executes the operation on the provided thread pool and returns the result over.
-    pub async fn exec_async(&self, pool: &ThreadPool, arg: T) -> DbResult<R> {
-        let (resp_tx, resp_rx) = oneshot::channel();
+    pub async fn exec_async(&self, pool: &threadpool::ThreadPool, arg: T) -> DbResult<R> {
+        let (resp_tx, resp_rx) = tokio::sync::oneshot::channel();
 
         let exec_fn = self.executor_fn.clone();
 
         pool.execute(move || {
             let res = exec_fn(arg);
             if resp_tx.send(res).is_err() {
-                warn!("failed to send response");
+                tracing::warn!("failed to send response");
             }
         });
 
@@ -57,32 +54,68 @@ where
 
 macro_rules! inst_ops {
     {
-        ($base:ty => $tp:ident, $ctx:ident $(<$($tparam:ident: $tpconstr:tt),+>)?) {
+        ($base:ident, $ctx:ident $(<$($tparam:ident: $tpconstr:tt),+>)?) {
             $($iname:ident => $aname:ident, $bname:ident; $arg:ty => $ret:ty),*
         }
     } => {
+        pub struct $base {
+            pool: threadpool::ThreadPool,
+            inner: Arc<dyn ShimTrait>,
+        }
+
         impl $base {
-            pub fn new $(<$($tparam: $tpconstr + Sync + Send + 'static),+>)? (pool: ThreadPool, ctx: Arc<$ctx $(<$($tparam),+>)?>) -> Self {
+            pub fn new $(<$($tparam: $tpconstr + Sync + Send + 'static),+>)? (pool: threadpool::ThreadPool, ctx: Arc<$ctx $(<$($tparam),+>)?>) -> Self {
                 Self {
-                    $tp: pool,
-                    $(
-                        $iname: {
-                            let ctx = ctx.clone();
-                            OpShim::wrap(move |arg| {
-                                $iname(ctx.as_ref(), arg)
-                            })
-                        }
-                    ),*
+                    pool,
+                    inner: Arc::new(Inner { ctx }),
                 }
             }
 
             $(
                 pub async fn $aname(&self, arg: $arg) -> DbResult<$ret> {
-                    self.$iname.exec_async(&self.$tp, arg).await
+                    self.inner.$aname(&self.pool, arg).await
                 }
 
                 pub fn $bname(&self, arg: $arg) -> DbResult<$ret> {
-                    self.$iname.exec_blocking(arg)
+                    self.inner.$bname(arg)
+                }
+            ),*
+        }
+
+        #[async_trait::async_trait]
+        trait ShimTrait {
+            $(
+                async fn $aname(&self, pool: &threadpool::ThreadPool, arg: $arg) -> DbResult<$ret>;
+                fn $bname(&self, arg: $arg) -> DbResult<$ret>;
+            ),*
+        }
+
+        pub struct Inner $(<$($tparam: $tpconstr + Sync + Send + 'static),+>)? {
+            ctx: Arc<$ctx $(<$($tparam),+>)?>,
+        }
+
+        #[async_trait::async_trait]
+        impl $(<$($tparam: $tpconstr + Sync + Send + 'static),+>)? ShimTrait for Inner $(<$($tparam),+>)? {
+            $(
+                async fn $aname(&self, pool: &threadpool::ThreadPool, arg: $arg) -> DbResult<$ret> {
+                    let (resp_tx, resp_rx) = tokio::sync::oneshot::channel();
+                    let ctx = self.ctx.clone();
+
+                    pool.execute(move || {
+                        let res = $iname(&ctx, arg);
+                        if resp_tx.send(res).is_err() {
+                            warn!("failed to send response");
+                        }
+                    });
+
+                    match resp_rx.await {
+                        Ok(v) => v,
+                        Err(e) => Err(DbError::Other(format!("{e}"))),
+                    }
+                }
+
+                fn $bname(&self, arg: $arg) -> DbResult<$ret> {
+                    $iname(&self.ctx, arg)
                 }
             ),*
         }

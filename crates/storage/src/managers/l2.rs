@@ -2,34 +2,16 @@
 
 use std::sync::Arc;
 
-use alpen_express_db::{traits::*, DbResult};
+//use tokio::sync::oneshot;
+//use tracing::*;
+
+use alpen_express_db::traits::*;
 use alpen_express_state::{block::L2BlockBundle, id::L2BlockId};
-use threadpool::ThreadPool;
 
-use crate::exec::{inst_ops, OpShim};
-
-pub struct L2DataManager {
-    pool: ThreadPool,
-    imp_get_block: OpShim<L2BlockId, Option<L2BlockBundle>>,
-}
-
-impl L2DataManager {
-    pub fn _new_manual<D: Database + Sync + Send + 'static>(
-        pool: ThreadPool,
-        ctx: Arc<Context<D>>,
-    ) -> Self {
-        Self {
-            pool,
-            imp_get_block: {
-                let ctx = ctx.clone();
-                OpShim::wrap(move |arg| imp_get_block(ctx.as_ref(), arg))
-            },
-        }
-    }
-}
+use crate::exec::*;
 
 inst_ops! {
-    (L2DataManager => pool, Context<D: Database>) {
+    (L2DataOps, Context<D: Database>) {
         imp_get_block => get_block_blocking, get_block_async; L2BlockId => Option<L2BlockBundle>
     }
 }
