@@ -61,7 +61,7 @@ pub enum BlobL1Status {
     NeedsResign,
 }
 
-#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct L1TxEntry {
     tx_raw: Vec<u8>,
     txid: [u8; 32],
@@ -86,7 +86,7 @@ impl L1TxEntry {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub enum L1TxStatus {
     /// The tx is waiting to be published
     Unpublished,
