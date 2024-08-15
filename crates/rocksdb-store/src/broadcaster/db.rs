@@ -6,7 +6,7 @@ use rockbound::{
 
 use alpen_express_db::{
     errors::DbError,
-    traits::{BcastProvider, BcastStore},
+    traits::{BcastProvider, BcastStore, TxBroadcastDatabase},
     types::L1TxEntry,
     DbResult,
 };
@@ -97,6 +97,29 @@ impl BcastProvider for BroadcastDb {
                 "Entry does not exist for idx {idx:?}"
             )))
         }
+    }
+}
+
+pub struct BroadcastDatabase {
+    db: Arc<BroadcastDb>,
+}
+
+impl BroadcastDatabase {
+    pub fn new(db: Arc<BroadcastDb>) -> Self {
+        Self { db }
+    }
+}
+
+impl TxBroadcastDatabase for BroadcastDatabase {
+    type BcastStore = BroadcastDb;
+    type BcastProv = BroadcastDb;
+
+    fn broadcast_store(&self) -> &Arc<Self::BcastStore> {
+        &self.db
+    }
+
+    fn broadcast_provider(&self) -> &Arc<Self::BcastProv> {
+        &self.db
     }
 }
 
