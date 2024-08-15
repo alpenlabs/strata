@@ -20,7 +20,7 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
+alpen-express-db = { workspace = true, features = ["stubs"] }
 alpen-express-rocksdb = { workspace = true, features = ["test_utils"] }
 alpen-test-utils = { workspace = true }
 rand = { version = "0.8.5", features = ["getrandom", "std_rng"] }
-alpen-express-db = { workspace = true, features = ["stubs"] }

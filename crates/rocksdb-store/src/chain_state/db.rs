@@ -69,9 +69,7 @@ impl ChainstateStore for ChainStateDb {
         if self.get_first_idx()?.is_some() || self.get_last_idx()?.is_some() {
             return Err(DbError::OverwriteStateUpdate(genesis_key));
         }
-        self.db
-            .db
-            .put::<ChainStateSchema>(&genesis_key, toplevel)?;
+        self.db.db.put::<ChainStateSchema>(&genesis_key, toplevel)?;
         Ok(())
     }
 

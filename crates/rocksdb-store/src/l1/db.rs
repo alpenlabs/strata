@@ -116,18 +116,18 @@ impl L1DataStore for L1Db {
 impl L1DataProvider for L1Db {
     fn get_tx(&self, tx_ref: L1TxRef) -> DbResult<Option<L1Tx>> {
         let (block_height, txindex) = tx_ref.into();
-        let tx = self
-            .db
-            .db
-            .get::<L1BlockSchema>(&{ block_height })
-            .and_then(|mf_opt| match mf_opt {
-                Some(mf) => {
-                    let txs_opt = self.db.db.get::<TxnSchema>(&mf.block_hash())?;
-                    let tx = txs_opt.and_then(|txs| txs.get(txindex as usize).cloned());
-                    Ok(tx)
-                }
-                None => Ok(None),
-            });
+        let tx =
+            self.db
+                .db
+                .get::<L1BlockSchema>(&{ block_height })
+                .and_then(|mf_opt| match mf_opt {
+                    Some(mf) => {
+                        let txs_opt = self.db.db.get::<TxnSchema>(&mf.block_hash())?;
+                        let tx = txs_opt.and_then(|txs| txs.get(txindex as usize).cloned());
+                        Ok(tx)
+                    }
+                    None => Ok(None),
+                });
         Ok(tx?)
     }
 
