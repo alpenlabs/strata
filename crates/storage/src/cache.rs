@@ -78,7 +78,7 @@ pub struct CacheTable<K, V> {
 impl<K: Clone + Eq + Hash, V: Clone> CacheTable<K, V> {
     /// Creates a new cache with some maximum capacity.
     ///
-    /// This measues entries by *count* not their (serialized?) size, so ideally entries should
+    /// This measures entries by *count* not their (serialized?) size, so ideally entries should
     /// consume similar amounts of memory to helps us best reason about real cache capacity.
     pub fn new(size: NonZeroUsize) -> Self {
         Self {
