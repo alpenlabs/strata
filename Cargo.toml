@@ -4,7 +4,7 @@ members = [
   "crates/common",
   "crates/consensus-logic",
   "crates/db",
-  "crates/evmctl",
+  "crates/eectl",
   "crates/evmexec",
   "crates/primitives",
   "crates/rpc/api",
@@ -33,7 +33,7 @@ alpen-express-btcio = { path = "crates/btcio" }
 alpen-express-common = { path = "crates/common" }
 alpen-express-consensus-logic = { path = "crates/consensus-logic" }
 alpen-express-db = { path = "crates/db" }
-alpen-express-evmctl = { path = "crates/evmctl" }
+alpen-express-eectl = { path = "crates/eectl" }
 alpen-express-evmexec = { path = "crates/evmexec" }
 alpen-express-mmr = { path = "crates/util/mmr" }
 alpen-express-primitives = { path = "crates/primitives" }

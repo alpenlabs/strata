@@ -9,8 +9,8 @@ use alpen_express_db::errors::DbError;
 use alpen_express_db::traits::{
     BlockStatus, ChainstateProvider, ChainstateStore, Database, L2DataProvider, L2DataStore,
 };
-use alpen_express_evmctl::engine::ExecEngineCtl;
-use alpen_express_evmctl::messages::ExecPayloadData;
+use alpen_express_eectl::engine::ExecEngineCtl;
+use alpen_express_eectl::messages::ExecPayloadData;
 use alpen_express_primitives::params::Params;
 use alpen_express_state::client_state::ClientState;
 use alpen_express_state::operation::SyncAction;
@@ -325,7 +325,7 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
             // being invalid and return too.
             // TODO verify this is reasonable behavior, especially with regard
             // to pre-sync
-            if res == alpen_express_evmctl::engine::BlockStatus::Invalid {
+            if res == alpen_express_eectl::engine::BlockStatus::Invalid {
                 // It's invalid, write that and return.
                 state.set_block_status(&blkid, BlockStatus::Invalid)?;
                 return Ok(());

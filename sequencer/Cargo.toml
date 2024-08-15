@@ -12,7 +12,7 @@ alpen-express-btcio = { workspace = true }
 alpen-express-common = { workspace = true }
 alpen-express-consensus-logic = { workspace = true }
 alpen-express-db = { workspace = true }
-alpen-express-evmctl = { workspace = true }
+alpen-express-eectl = { workspace = true }
 alpen-express-evmexec = { workspace = true }
 alpen-express-primitives = { workspace = true }
 alpen-express-rocksdb = { workspace = true }

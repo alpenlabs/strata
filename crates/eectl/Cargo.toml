@@ -1,6 +1,6 @@
 [package]
 edition = "2021"
-name = "alpen-express-evmctl"
+name = "alpen-express-eectl"
 version = "0.1.0"
 
 [dependencies]

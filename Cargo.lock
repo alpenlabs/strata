@@ -694,7 +694,7 @@ version = "0.1.0"
 dependencies = [
  "alpen-express-btcio",
  "alpen-express-db",
- "alpen-express-evmctl",
+ "alpen-express-eectl",
  "alpen-express-primitives",
  "alpen-express-state",
  "alpen-test-utils",
@@ -727,7 +727,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "alpen-express-evmctl"
+name = "alpen-express-eectl"
 version = "0.1.0"
 dependencies = [
  "alpen-express-primitives",
@@ -740,7 +740,7 @@ name = "alpen-express-evmexec"
 version = "0.1.0"
 dependencies = [
  "alpen-express-db",
- "alpen-express-evmctl",
+ "alpen-express-eectl",
  "alpen-express-primitives",
  "alpen-express-state",
  "alpen-test-utils",
@@ -874,7 +874,7 @@ dependencies = [
  "alpen-express-common",
  "alpen-express-consensus-logic",
  "alpen-express-db",
- "alpen-express-evmctl",
+ "alpen-express-eectl",
  "alpen-express-evmexec",
  "alpen-express-primitives",
  "alpen-express-rocksdb",
