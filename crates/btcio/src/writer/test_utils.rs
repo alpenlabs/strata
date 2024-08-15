@@ -45,10 +45,7 @@ impl L1Client for TestBitcoinClient {
         Ok(Txid::from_slice(&[1u8; 32]).unwrap())
     }
 
-    async fn get_transaction_confirmations<T: AsRef<[u8; 32]> + Send>(
-        &self,
-        _txid: T,
-    ) -> Result<u64, ClientError> {
+    async fn get_transaction_confirmations(&self, _txid: Txid) -> Result<u64, ClientError> {
         Ok(self.confs)
     }
 }

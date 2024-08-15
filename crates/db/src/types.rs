@@ -81,7 +81,7 @@ impl L1TxEntry {
         &self.tx_raw
     }
 
-    pub fn txid(&self) -> &[u8] {
+    pub fn txid(&self) -> &[u8; 32] {
         &self.txid
     }
 }

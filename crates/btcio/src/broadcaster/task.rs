@@ -1,5 +1,6 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
+use bitcoin::{hashes::Hash, Txid};
 use tracing::*;
 
 use alpen_express_db::{
@@ -122,8 +123,9 @@ async fn handle_entry(
         }
         L1TxStatus::Published | L1TxStatus::Confirmed => {
             // check for confirmations
+            let txid = Txid::from_slice(txentry.txid()).map_err(|e| BroadcasterError::Other(e.to_string()))?;
             match rpc_client
-                .get_transaction_confirmations(txentry.txid())
+                .get_transaction_confirmations(txid)
                 .await
                 .map_err(|e| BroadcasterError::Other(e.to_string()))?
             {

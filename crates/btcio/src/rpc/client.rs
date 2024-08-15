@@ -445,15 +445,9 @@ impl L1Client for BitcoinClient {
         }
     }
 
-    async fn get_transaction_confirmations<T: AsRef<[u8; 32]> + Send>(
-        &self,
-        txid: T,
-    ) -> ClientResult<u64> {
-        let mut txid = txid.as_ref().to_vec();
-        txid.reverse();
-        let txid = hex::encode(&txid);
+    async fn get_transaction_confirmations(&self, txid: Txid) -> ClientResult<u64> {
         let result = self
-            .call::<GetTransactionResponse>("gettransaction", &[to_val(txid)?])
+            .call::<GetTransactionResponse>("gettransaction", &[to_val(txid.to_string())?])
             .await?;
 
         Ok(result.confirmations)
