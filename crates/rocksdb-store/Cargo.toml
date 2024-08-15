@@ -16,8 +16,13 @@ bitcoin = { workspace = true }
 borsh = { workspace = true }
 reth-db = { workspace = true }
 rockbound = { workspace = true }
+tempfile = { workspace = true, optional = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
 alpen-test-utils = { workspace = true }
+
+[features]
+default = ["test_utils"]
+test_utils = ["tempfile"]

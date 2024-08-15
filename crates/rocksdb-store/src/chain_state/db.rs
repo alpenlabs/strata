@@ -9,23 +9,23 @@ use alpen_express_state::state_op;
 
 use super::schemas::{ChainStateSchema, WriteBatchSchema};
 use crate::utils::{get_first_idx, get_last_idx};
-use crate::DbOpsConfig;
+use crate::OptimisticDb;
 
 pub struct ChainStateDb {
-    ops: Arc<DbOpsConfig>,
+    db: Arc<OptimisticDb>,
 }
 
 impl ChainStateDb {
-    pub fn new(db: Arc<DbOpsConfig>) -> Self {
-        Self { ops: db }
+    pub fn new(db: Arc<OptimisticDb>) -> Self {
+        Self { db }
     }
 
     fn get_first_idx(&self) -> DbResult<Option<u64>> {
-        get_first_idx::<ChainStateSchema>(&self.ops.db)
+        get_first_idx::<ChainStateSchema>(&self.db.db)
     }
 
     fn get_last_idx(&self) -> DbResult<Option<u64>> {
-        get_last_idx::<ChainStateSchema>(&self.ops.db)
+        get_last_idx::<ChainStateSchema>(&self.db.db)
     }
 }
 
@@ -48,7 +48,7 @@ impl ChainstateProvider for ChainStateDb {
         &self,
         idx: u64,
     ) -> DbResult<Option<alpen_express_state::state_op::WriteBatch>> {
-        Ok(self.ops.db.get::<WriteBatchSchema>(&idx)?)
+        Ok(self.db.db.get::<WriteBatchSchema>(&idx)?)
     }
 
     // TODO: define what toplevel means more clearly
@@ -56,7 +56,7 @@ impl ChainstateProvider for ChainStateDb {
         &self,
         idx: u64,
     ) -> DbResult<Option<alpen_express_state::chain_state::ChainState>> {
-        Ok(self.ops.db.get::<ChainStateSchema>(&idx)?)
+        Ok(self.db.db.get::<ChainStateSchema>(&idx)?)
     }
 }
 
@@ -69,7 +69,7 @@ impl ChainstateStore for ChainStateDb {
         if self.get_first_idx()?.is_some() || self.get_last_idx()?.is_some() {
             return Err(DbError::OverwriteStateUpdate(genesis_key));
         }
-        self.ops
+        self.db
             .db
             .put::<ChainStateSchema>(&genesis_key, toplevel)?;
         Ok(())
@@ -80,12 +80,12 @@ impl ChainstateStore for ChainStateDb {
         idx: u64,
         batch: &alpen_express_state::state_op::WriteBatch,
     ) -> DbResult<()> {
-        if self.ops.db.get::<WriteBatchSchema>(&idx)?.is_some() {
+        if self.db.db.get::<WriteBatchSchema>(&idx)?.is_some() {
             return Err(DbError::OverwriteStateUpdate(idx));
         }
 
         let pre_state_idx = idx - 1;
-        let pre_state = match self.ops.db.get::<ChainStateSchema>(&pre_state_idx)? {
+        let pre_state = match self.db.db.get::<ChainStateSchema>(&pre_state_idx)? {
             Some(state) => state,
             None => return Err(DbError::OooInsert("ChainState", idx)),
         };
@@ -94,7 +94,7 @@ impl ChainstateStore for ChainStateDb {
         let mut write_batch = SchemaBatch::new();
         write_batch.put::<WriteBatchSchema>(&idx, batch)?;
         write_batch.put::<ChainStateSchema>(&idx, &post_state)?;
-        self.ops.db.write_schemas(write_batch)?;
+        self.db.db.write_schemas(write_batch)?;
 
         Ok(())
     }
@@ -114,7 +114,7 @@ impl ChainstateStore for ChainStateDb {
             del_batch.delete::<ChainStateSchema>(&idx)?;
             del_batch.delete::<WriteBatchSchema>(&idx)?;
         }
-        self.ops.db.write_schemas(del_batch)?;
+        self.db.db.write_schemas(del_batch)?;
         Ok(())
     }
 
@@ -142,15 +142,17 @@ impl ChainstateStore for ChainStateDb {
             del_batch.delete::<ChainStateSchema>(&idx)?;
             del_batch.delete::<WriteBatchSchema>(&idx)?;
         }
-        self.ops.db.write_schemas(del_batch)?;
+        self.db.db.write_schemas(del_batch)?;
         Ok(())
     }
 }
 
+#[cfg(feature = "test_utils")]
 #[cfg(test)]
 mod tests {
+    use crate::test_utils::get_rocksdb_tmp_instance;
     use alpen_express_state::chain_state::ChainState;
-    use alpen_test_utils::{get_rocksdb_tmp_instance, ArbitraryGenerator};
+    use alpen_test_utils::ArbitraryGenerator;
     use state_op::WriteBatch;
 
     use super::*;

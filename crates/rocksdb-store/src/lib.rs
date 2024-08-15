@@ -5,6 +5,8 @@ pub mod l2;
 pub mod macros;
 pub mod sequencer;
 pub mod sync_event;
+#[cfg(feature = "test_utils")]
+pub mod test_utils;
 pub mod utils;
 
 pub const ROCKSDB_NAME: &str = "express";
@@ -38,8 +40,8 @@ pub use sync_event::db::SyncEventDb;
 
 use l2::schemas::{L2BlockHeightSchema, L2BlockSchema, L2BlockStatusSchema};
 
-use rockbound::{schema::ColumnFamilyName, Schema};
 use rockbound::OptimisticTransactionDB;
+use rockbound::{schema::ColumnFamilyName, Schema};
 use sequencer::schemas::{SeqBlobIdSchema, SeqBlobSchema, SeqL1TxIdSchema, SeqL1TxnSchema};
 
 use crate::chain_state::schemas::{ChainStateSchema, WriteBatchSchema};
@@ -48,7 +50,7 @@ use crate::l1::schemas::{L1BlockSchema, MmrSchema, TxnSchema};
 use crate::sync_event::schemas::SyncEventSchema;
 
 /// database operations configuration
-pub struct DbOpsConfig {
+pub struct OptimisticDb {
     pub db: OptimisticTransactionDB,
-    pub retry_count: u16
+    pub retry_count: u16,
 }

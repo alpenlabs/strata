@@ -11,24 +11,24 @@ use alpen_express_primitives::{
     l1::{L1BlockManifest, L1Tx, L1TxRef},
 };
 
-use crate::DbOpsConfig;
+use crate::OptimisticDb;
 
 use super::schemas::{L1BlockSchema, MmrSchema, TxnSchema};
 use alpen_express_db::{errors::DbError, traits::*, DbResult};
 
 pub struct L1Db {
-    ops: Arc<DbOpsConfig>,
+    db: Arc<OptimisticDb>,
 }
 
 impl L1Db {
     // NOTE: db is expected to open all the column families defined in STORE_COLUMN_FAMILIES.
     // FIXME: Make it better/generic.
-    pub fn new(db: Arc<DbOpsConfig>) -> Self {
-        Self { ops: db }
+    pub fn new(db: Arc<OptimisticDb>) -> Self {
+        Self { db }
     }
 
     pub fn get_latest_block_number(&self) -> DbResult<Option<u64>> {
-        let mut iterator = self.ops.db.iter::<L1BlockSchema>()?;
+        let mut iterator = self.db.db.iter::<L1BlockSchema>()?;
         iterator.seek_to_last();
         let mut rev_iterator = iterator.rev();
         if let Some(res) = rev_iterator.next() {
@@ -53,7 +53,7 @@ impl L1DataStore for L1Db {
         let mut batch = SchemaBatch::new();
         batch.put::<L1BlockSchema>(&idx, &mf)?;
         batch.put::<TxnSchema>(&mf.block_hash(), &txs)?;
-        self.ops.db.write_schemas(batch)?;
+        self.db.db.write_schemas(batch)?;
         Ok(())
     }
 
@@ -66,7 +66,7 @@ impl L1DataStore for L1Db {
             }
             _ => {}
         }
-        self.ops.db.put::<MmrSchema>(&idx, &mmr)?;
+        self.db.db.put::<MmrSchema>(&idx, &mmr)?;
         Ok(())
     }
 
@@ -83,7 +83,7 @@ impl L1DataStore for L1Db {
         let mut batch = SchemaBatch::new();
         for height in ((idx + 1)..=last_block_num).rev() {
             let blk_manifest = self
-                .ops
+                .db
                 .db
                 .get::<L1BlockSchema>(&height)?
                 .expect("Expected block not found");
@@ -102,7 +102,7 @@ impl L1DataStore for L1Db {
         }
 
         // Execute the batch
-        self.ops.db.write_schemas(batch)?;
+        self.db.db.write_schemas(batch)?;
         Ok(())
     }
 }
@@ -117,12 +117,12 @@ impl L1DataProvider for L1Db {
     fn get_tx(&self, tx_ref: L1TxRef) -> DbResult<Option<L1Tx>> {
         let (block_height, txindex) = tx_ref.into();
         let tx = self
-            .ops
+            .db
             .db
             .get::<L1BlockSchema>(&{ block_height })
             .and_then(|mf_opt| match mf_opt {
                 Some(mf) => {
-                    let txs_opt = self.ops.db.get::<TxnSchema>(&mf.block_hash())?;
+                    let txs_opt = self.db.db.get::<TxnSchema>(&mf.block_hash())?;
                     let tx = txs_opt.and_then(|txs| txs.get(txindex as usize).cloned());
                     Ok(tx)
                 }
@@ -140,11 +140,11 @@ impl L1DataProvider for L1Db {
         // indexes with the smaller manifest so we don't have to load all the
         // interesting transactions twice if we want to look at all of them
 
-        let Some(mf) = self.ops.db.get::<L1BlockSchema>(&idx)? else {
+        let Some(mf) = self.db.db.get::<L1BlockSchema>(&idx)? else {
             return Ok(None);
         };
 
-        let Some(txs) = self.ops.db.get::<TxnSchema>(&mf.block_hash())? else {
+        let Some(txs) = self.db.db.get::<TxnSchema>(&mf.block_hash())? else {
             warn!(%idx, "missing L1 block body");
             return Err(DbError::MissingL1BlockBody(idx));
         };
@@ -158,7 +158,7 @@ impl L1DataProvider for L1Db {
     }
 
     fn get_last_mmr_to(&self, idx: u64) -> DbResult<Option<CompactMmr>> {
-        Ok(self.ops.db.get::<MmrSchema>(&idx)?)
+        Ok(self.db.db.get::<MmrSchema>(&idx)?)
     }
 
     fn get_blockid_range(&self, start_idx: u64, end_idx: u64) -> DbResult<Vec<Buf32>> {
@@ -173,7 +173,7 @@ impl L1DataProvider for L1Db {
         );
 
         let res = self
-            .ops
+            .db
             .db
             .iter_with_opts::<L1BlockSchema>(options)?
             .map(|item_result| item_result.map(|item| item.into_tuple().1.block_hash()))
@@ -183,15 +183,17 @@ impl L1DataProvider for L1Db {
     }
 
     fn get_block_manifest(&self, idx: u64) -> DbResult<Option<L1BlockManifest>> {
-        Ok(self.ops.db.get::<L1BlockSchema>(&idx)?)
+        Ok(self.db.db.get::<L1BlockSchema>(&idx)?)
     }
 }
 
+#[cfg(feature = "test_utils")]
 #[cfg(test)]
 mod tests {
     use alpen_express_primitives::l1::L1TxProof;
+    use alpen_test_utils::ArbitraryGenerator;
 
-    use alpen_test_utils::{get_rocksdb_tmp_instance, ArbitraryGenerator};
+    use crate::test_utils::get_rocksdb_tmp_instance;
 
     use super::*;
 

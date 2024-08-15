@@ -25,7 +25,7 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
-alpen-express-rocksdb = { workspace = true }
+alpen-express-rocksdb = { workspace = true, features = ["test_utils"] }
 alpen-test-utils = { workspace = true }
 arbitrary = { workspace = true }
 mockall = { workspace = true }

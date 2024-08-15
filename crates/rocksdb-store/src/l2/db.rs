@@ -10,15 +10,15 @@ use alpen_express_db::{
 use alpen_express_state::{block::L2BlockBundle, prelude::*};
 
 use super::schemas::{L2BlockSchema, L2BlockStatusSchema};
-use crate::{l2::schemas::L2BlockHeightSchema, DbOpsConfig};
+use crate::{l2::schemas::L2BlockHeightSchema, OptimisticDb};
 
 pub struct L2Db {
-    ops: Arc<DbOpsConfig>,
+    db: Arc<OptimisticDb>,
 }
 
 impl L2Db {
-    pub fn new(db: Arc<DbOpsConfig>) -> Self {
-        Self { ops: db }
+    pub fn new(db: Arc<OptimisticDb>) -> Self {
+        Self { db }
     }
 }
 
@@ -29,10 +29,10 @@ impl L2DataStore for L2Db {
         // append to previous block height data
         let block_height = bundle.block().header().blockidx();
 
-        self.ops
+        self.db
             .db
             .with_optimistic_txn(
-                rockbound::TransactionRetry::Count(self.ops.retry_count),
+                rockbound::TransactionRetry::Count(self.db.retry_count),
                 |txn| {
                     let mut block_height_data = txn
                         .get::<L2BlockHeightSchema>(&block_height)?
@@ -62,10 +62,10 @@ impl L2DataStore for L2Db {
         let mut block_height_data = self.get_blocks_at_height(block_height)?;
         block_height_data.retain(|&block_id| block_id != id);
 
-        self.ops
+        self.db
             .db
             .with_optimistic_txn(
-                rockbound::TransactionRetry::Count(self.ops.retry_count),
+                rockbound::TransactionRetry::Count(self.db.retry_count),
                 |txn| {
                     let mut block_height_data = txn
                         .get::<L2BlockHeightSchema>(&block_height)?
@@ -89,7 +89,7 @@ impl L2DataStore for L2Db {
 
         let mut batch = SchemaBatch::new();
         batch.put::<L2BlockStatusSchema>(&id, &status)?;
-        self.ops.db.write_schemas(batch)?;
+        self.db.db.write_schemas(batch)?;
 
         Ok(())
     }
@@ -97,26 +97,30 @@ impl L2DataStore for L2Db {
 
 impl L2DataProvider for L2Db {
     fn get_block_data(&self, id: L2BlockId) -> DbResult<Option<L2BlockBundle>> {
-        Ok(self.ops.db.get::<L2BlockSchema>(&id)?)
+        Ok(self.db.db.get::<L2BlockSchema>(&id)?)
     }
 
     fn get_blocks_at_height(&self, idx: u64) -> DbResult<Vec<L2BlockId>> {
         Ok(self
-            .ops
+            .db
             .db
             .get::<L2BlockHeightSchema>(&idx)?
             .unwrap_or(Vec::new()))
     }
 
     fn get_block_status(&self, id: L2BlockId) -> DbResult<Option<BlockStatus>> {
-        Ok(self.ops.db.get::<L2BlockStatusSchema>(&id)?)
+        Ok(self.db.db.get::<L2BlockStatusSchema>(&id)?)
     }
 }
 
+#[cfg(feature = "test_utils")]
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alpen_test_utils::{get_rocksdb_tmp_instance, ArbitraryGenerator};
+
+    use alpen_test_utils::ArbitraryGenerator;
+
+    use crate::test_utils::get_rocksdb_tmp_instance;
 
     fn get_mock_data() -> L2BlockBundle {
         let arb = ArbitraryGenerator::new();

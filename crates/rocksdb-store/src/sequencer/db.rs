@@ -11,10 +11,10 @@ use alpen_express_db::{
 use alpen_express_primitives::buf::Buf32;
 
 use super::schemas::{SeqBlobIdSchema, SeqBlobSchema, SeqL1TxnSchema};
-use crate::{utils::get_last_idx, DbOpsConfig};
+use crate::OptimisticDb;
 
 pub struct SeqDb {
-    ops: Arc<DbOpsConfig>,
+    db: Arc<OptimisticDb>,
 }
 
 impl SeqDb {
@@ -22,17 +22,17 @@ impl SeqDb {
     ///
     /// Assumes it was opened with column families as defined in `STORE_COLUMN_FAMILIES`.
     // FIXME Make it better/generic.
-    pub fn new(ops: Arc<DbOpsConfig>) -> Self {
-        Self { ops }
+    pub fn new(db: Arc<OptimisticDb>) -> Self {
+        Self { db }
     }
 }
 
 impl SeqDataStore for SeqDb {
     fn put_blob(&self, blob_hash: Buf32, blob: BlobEntry) -> DbResult<u64> {
-        self.ops
+        self.db
             .db
             .with_optimistic_txn(
-                rockbound::TransactionRetry::Count(self.ops.retry_count),
+                rockbound::TransactionRetry::Count(self.db.retry_count),
                 |txn| {
                     if txn.get::<SeqBlobSchema>(&blob_hash)?.is_some() {
                         return Err(DbError::Other(format!(
@@ -66,13 +66,13 @@ impl SeqDataStore for SeqDb {
         batch.put::<SeqL1TxnSchema>(&commit_txid, &commit_tx)?;
         batch.put::<SeqL1TxnSchema>(&reveal_txid, &reveal_tx)?;
 
-        self.ops.db.write_schemas(batch)?;
+        self.db.db.write_schemas(batch)?;
         Ok(())
     }
 
     fn update_blob_by_idx(&self, blobidx: u64, blobentry: BlobEntry) -> DbResult<()> {
-        match self.ops.db.get::<SeqBlobIdSchema>(&blobidx)? {
-            Some(id) => Ok(self.ops.db.put::<SeqBlobSchema>(&id, &blobentry)?),
+        match self.db.db.get::<SeqBlobIdSchema>(&blobidx)? {
+            Some(id) => Ok(self.db.db.put::<SeqBlobSchema>(&id, &blobentry)?),
             None => Err(DbError::Other(format!(
                 "BlobEntry does not exist for idx {blobidx:?}"
             ))),
@@ -82,20 +82,20 @@ impl SeqDataStore for SeqDb {
 
 impl SeqDataProvider for SeqDb {
     fn get_blob_by_id(&self, id: Buf32) -> DbResult<Option<BlobEntry>> {
-        Ok(self.ops.db.get::<SeqBlobSchema>(&id)?)
+        Ok(self.db.db.get::<SeqBlobSchema>(&id)?)
     }
 
     fn get_last_blob_idx(&self) -> DbResult<Option<u64>> {
-        get_last_idx::<SeqBlobIdSchema>(&self.ops.db)
+        Ok(rockbound::utils::get_last::<SeqBlobIdSchema>(&self.db.db)?.map(|(x, _)| x))
     }
 
     fn get_l1_tx(&self, txid: Buf32) -> DbResult<Option<Vec<u8>>> {
-        Ok(self.ops.db.get::<SeqL1TxnSchema>(&txid)?)
+        Ok(self.db.db.get::<SeqL1TxnSchema>(&txid)?)
     }
 
     fn get_blob_by_idx(&self, blobidx: u64) -> DbResult<Option<BlobEntry>> {
-        match self.ops.db.get::<SeqBlobIdSchema>(&blobidx)? {
-            Some(id) => Ok(self.ops.db.get::<SeqBlobSchema>(&id)?),
+        match self.db.db.get::<SeqBlobIdSchema>(&blobidx)? {
+            Some(id) => Ok(self.db.db.get::<SeqBlobSchema>(&id)?),
             None => Ok(None),
         }
     }
@@ -124,22 +124,27 @@ impl<D: SeqDataStore + SeqDataProvider> SequencerDatabase for SequencerDB<D> {
     }
 }
 
+#[cfg(feature = "test_utils")]
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
 
-    use super::*;
+    use bitcoin::consensus::serialize;
+    use bitcoin::hashes::Hash;
+
     use alpen_express_db::errors::DbError;
     use alpen_express_db::traits::{SeqDataProvider, SeqDataStore};
     use alpen_express_primitives::buf::Buf32;
     use alpen_test_utils::bitcoin::get_test_bitcoin_txns;
-    use alpen_test_utils::{get_rocksdb_tmp_instance, ArbitraryGenerator};
+    use alpen_test_utils::ArbitraryGenerator;
 
-    use bitcoin::consensus::serialize;
-    use bitcoin::hashes::Hash;
-    use std::sync::Arc;
+    use crate::test_utils::get_rocksdb_tmp_instance;
+
+    use super::*;
+
     use test;
 
-    fn setup_db() -> Arc<DbOpsConfig> {
+    fn setup_db() -> Arc<OptimisticDb> {
         get_rocksdb_tmp_instance().unwrap()
     }
 

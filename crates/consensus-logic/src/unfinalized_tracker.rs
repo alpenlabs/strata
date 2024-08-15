@@ -315,6 +315,7 @@ mod tests {
     use std::collections::HashSet;
 
     use alpen_express_db::traits::{Database, L2DataProvider, L2DataStore};
+    use alpen_express_rocksdb::test_utils::get_common_db;
     use alpen_express_state::{header::L2Header, id::L2BlockId};
     use alpen_test_utils::l2::gen_l2_chain;
 
@@ -362,7 +363,7 @@ mod tests {
 
     #[test]
     fn test_load_unfinalized_blocks() {
-        let db = alpen_test_utils::get_common_db();
+        let db = get_common_db();
         let l2_prov = db.l2_provider();
 
         let [g, a1, c1, a2, b2, a3, b3] = setup_test_chain(l2_prov.as_ref());
@@ -406,7 +407,7 @@ mod tests {
 
     #[test]
     fn test_get_descendants() {
-        let db = alpen_test_utils::get_common_db();
+        let db = get_common_db();
         let l2_prov = db.l2_provider();
 
         let [g, a1, c1, a2, b2, a3, b3] = setup_test_chain(l2_prov.as_ref());
@@ -466,7 +467,7 @@ mod tests {
 
     #[test]
     fn test_update_finalized_tip() {
-        let db = alpen_test_utils::get_common_db();
+        let db = get_common_db();
         let l2_prov = db.l2_provider();
 
         let [g, a1, c1, a2, b2, a3, b3] = setup_test_chain(l2_prov.as_ref());

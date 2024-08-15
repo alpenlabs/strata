@@ -34,7 +34,7 @@ use alpen_express_primitives::block_credential;
 use alpen_express_primitives::buf::Buf32;
 use alpen_express_primitives::params::{Params, RollupParams, RunParams};
 use alpen_express_rocksdb::sequencer::db::SequencerDB;
-use alpen_express_rocksdb::DbOpsConfig;
+use alpen_express_rocksdb::OptimisticDb;
 use alpen_express_rocksdb::SeqDb;
 use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer};
 use alpen_express_rpc_types::L1Status;
@@ -142,7 +142,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     // Open the database.
     let rbdb = open_rocksdb_database(&config)?;
     // init a database configuration
-    let db_ops = Arc::new(DbOpsConfig {
+    let db_ops = Arc::new(OptimisticDb {
         db: rbdb,
         retry_count: config.client.db_retry_count,
     });
