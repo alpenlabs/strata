@@ -5,4 +5,6 @@ pub mod broadcaster;
 pub mod reader;
 pub mod rpc;
 pub mod status;
+#[cfg(test)]
+pub(crate) mod test_utils;
 pub mod writer;

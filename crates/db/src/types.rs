@@ -90,16 +90,12 @@ impl L1TxEntry {
 pub enum L1TxStatus {
     /// The tx is waiting to be published
     Unpublished,
-
     /// The tx is published
     Published,
-
     /// The tx is included in L1
     Confirmed,
-
     /// The tx is finalized in L1
     Finalized,
-
     /// The tx is not included in L1 and has errored with some error code
     Excluded(ExcludeReason),
 }
@@ -108,7 +104,6 @@ pub enum L1TxStatus {
 pub enum ExcludeReason {
     /// Excluded because inputs were spent or not present in the chain/mempool
     MissingInputsOrSpent,
-
     /// Excluded for other reasons.
     // TODO: add other cases
     Other(String),
