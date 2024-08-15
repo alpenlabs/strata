@@ -40,7 +40,6 @@ pub use sync_event::db::SyncEventDb;
 
 use l2::schemas::{L2BlockHeightSchema, L2BlockSchema, L2BlockStatusSchema};
 
-use rockbound::OptimisticTransactionDB;
 use rockbound::{schema::ColumnFamilyName, Schema};
 use sequencer::schemas::{SeqBlobIdSchema, SeqBlobSchema, SeqL1TxIdSchema, SeqL1TxnSchema};
 
@@ -50,7 +49,7 @@ use crate::l1::schemas::{L1BlockSchema, MmrSchema, TxnSchema};
 use crate::sync_event::schemas::SyncEventSchema;
 
 /// database operations configuration
-pub struct OptimisticDb {
-    pub db: OptimisticTransactionDB,
+#[derive(Clone, Copy, Debug)]
+pub struct DbOpsConfig {
     pub retry_count: u16,
 }

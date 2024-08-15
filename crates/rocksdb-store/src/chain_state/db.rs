@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use rockbound::OptimisticTransactionDB;
 use rockbound::{SchemaBatch, SchemaDBOperationsExt};
 
 use alpen_express_db::errors::DbError;
@@ -9,23 +10,24 @@ use alpen_express_state::state_op;
 
 use super::schemas::{ChainStateSchema, WriteBatchSchema};
 use crate::utils::{get_first_idx, get_last_idx};
-use crate::OptimisticDb;
+use crate::DbOpsConfig;
 
 pub struct ChainStateDb {
-    db: Arc<OptimisticDb>,
+    db: Arc<OptimisticTransactionDB>,
+    _ops: DbOpsConfig,
 }
 
 impl ChainStateDb {
-    pub fn new(db: Arc<OptimisticDb>) -> Self {
-        Self { db }
+    pub fn new(db: Arc<OptimisticTransactionDB>, ops: DbOpsConfig) -> Self {
+        Self { db, _ops: ops }
     }
 
     fn get_first_idx(&self) -> DbResult<Option<u64>> {
-        get_first_idx::<ChainStateSchema>(&self.db.db)
+        get_first_idx::<ChainStateSchema>(&self.db)
     }
 
     fn get_last_idx(&self) -> DbResult<Option<u64>> {
-        get_last_idx::<ChainStateSchema>(&self.db.db)
+        get_last_idx::<ChainStateSchema>(&self.db)
     }
 }
 
@@ -48,7 +50,7 @@ impl ChainstateProvider for ChainStateDb {
         &self,
         idx: u64,
     ) -> DbResult<Option<alpen_express_state::state_op::WriteBatch>> {
-        Ok(self.db.db.get::<WriteBatchSchema>(&idx)?)
+        Ok(self.db.get::<WriteBatchSchema>(&idx)?)
     }
 
     // TODO: define what toplevel means more clearly
@@ -56,7 +58,7 @@ impl ChainstateProvider for ChainStateDb {
         &self,
         idx: u64,
     ) -> DbResult<Option<alpen_express_state::chain_state::ChainState>> {
-        Ok(self.db.db.get::<ChainStateSchema>(&idx)?)
+        Ok(self.db.get::<ChainStateSchema>(&idx)?)
     }
 }
 
@@ -69,7 +71,7 @@ impl ChainstateStore for ChainStateDb {
         if self.get_first_idx()?.is_some() || self.get_last_idx()?.is_some() {
             return Err(DbError::OverwriteStateUpdate(genesis_key));
         }
-        self.db.db.put::<ChainStateSchema>(&genesis_key, toplevel)?;
+        self.db.put::<ChainStateSchema>(&genesis_key, toplevel)?;
         Ok(())
     }
 
@@ -78,12 +80,12 @@ impl ChainstateStore for ChainStateDb {
         idx: u64,
         batch: &alpen_express_state::state_op::WriteBatch,
     ) -> DbResult<()> {
-        if self.db.db.get::<WriteBatchSchema>(&idx)?.is_some() {
+        if self.db.get::<WriteBatchSchema>(&idx)?.is_some() {
             return Err(DbError::OverwriteStateUpdate(idx));
         }
 
         let pre_state_idx = idx - 1;
-        let pre_state = match self.db.db.get::<ChainStateSchema>(&pre_state_idx)? {
+        let pre_state = match self.db.get::<ChainStateSchema>(&pre_state_idx)? {
             Some(state) => state,
             None => return Err(DbError::OooInsert("ChainState", idx)),
         };
@@ -92,7 +94,7 @@ impl ChainstateStore for ChainStateDb {
         let mut write_batch = SchemaBatch::new();
         write_batch.put::<WriteBatchSchema>(&idx, batch)?;
         write_batch.put::<ChainStateSchema>(&idx, &post_state)?;
-        self.db.db.write_schemas(write_batch)?;
+        self.db.write_schemas(write_batch)?;
 
         Ok(())
     }
@@ -112,7 +114,7 @@ impl ChainstateStore for ChainStateDb {
             del_batch.delete::<ChainStateSchema>(&idx)?;
             del_batch.delete::<WriteBatchSchema>(&idx)?;
         }
-        self.db.db.write_schemas(del_batch)?;
+        self.db.write_schemas(del_batch)?;
         Ok(())
     }
 
@@ -140,7 +142,7 @@ impl ChainstateStore for ChainStateDb {
             del_batch.delete::<ChainStateSchema>(&idx)?;
             del_batch.delete::<WriteBatchSchema>(&idx)?;
         }
-        self.db.db.write_schemas(del_batch)?;
+        self.db.write_schemas(del_batch)?;
         Ok(())
     }
 }
@@ -156,8 +158,8 @@ mod tests {
     use super::*;
 
     fn setup_db() -> ChainStateDb {
-        let db = get_rocksdb_tmp_instance().unwrap();
-        ChainStateDb::new(db)
+        let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
+        ChainStateDb::new(db, db_ops)
     }
 
     #[test]

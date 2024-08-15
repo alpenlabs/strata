@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use rockbound::{SchemaBatch, SchemaDBOperationsExt};
+use rockbound::{OptimisticTransactionDB, SchemaBatch, SchemaDBOperationsExt};
 
 use alpen_express_db::{
     errors::DbError,
@@ -10,15 +10,16 @@ use alpen_express_db::{
 use alpen_express_state::{block::L2BlockBundle, prelude::*};
 
 use super::schemas::{L2BlockSchema, L2BlockStatusSchema};
-use crate::{l2::schemas::L2BlockHeightSchema, OptimisticDb};
+use crate::{l2::schemas::L2BlockHeightSchema, DbOpsConfig};
 
 pub struct L2Db {
-    db: Arc<OptimisticDb>,
+    db: Arc<OptimisticTransactionDB>,
+    ops: DbOpsConfig,
 }
 
 impl L2Db {
-    pub fn new(db: Arc<OptimisticDb>) -> Self {
-        Self { db }
+    pub fn new(db: Arc<OptimisticTransactionDB>, ops: DbOpsConfig) -> Self {
+        Self { db, ops }
     }
 }
 
@@ -30,9 +31,8 @@ impl L2DataStore for L2Db {
         let block_height = bundle.block().header().blockidx();
 
         self.db
-            .db
             .with_optimistic_txn(
-                rockbound::TransactionRetry::Count(self.db.retry_count),
+                rockbound::TransactionRetry::Count(self.ops.retry_count),
                 |txn| {
                     let mut block_height_data = txn
                         .get::<L2BlockHeightSchema>(&block_height)?
@@ -63,9 +63,8 @@ impl L2DataStore for L2Db {
         block_height_data.retain(|&block_id| block_id != id);
 
         self.db
-            .db
             .with_optimistic_txn(
-                rockbound::TransactionRetry::Count(self.db.retry_count),
+                rockbound::TransactionRetry::Count(self.ops.retry_count),
                 |txn| {
                     let mut block_height_data = txn
                         .get::<L2BlockHeightSchema>(&block_height)?
@@ -89,7 +88,7 @@ impl L2DataStore for L2Db {
 
         let mut batch = SchemaBatch::new();
         batch.put::<L2BlockStatusSchema>(&id, &status)?;
-        self.db.db.write_schemas(batch)?;
+        self.db.write_schemas(batch)?;
 
         Ok(())
     }
@@ -97,19 +96,18 @@ impl L2DataStore for L2Db {
 
 impl L2DataProvider for L2Db {
     fn get_block_data(&self, id: L2BlockId) -> DbResult<Option<L2BlockBundle>> {
-        Ok(self.db.db.get::<L2BlockSchema>(&id)?)
+        Ok(self.db.get::<L2BlockSchema>(&id)?)
     }
 
     fn get_blocks_at_height(&self, idx: u64) -> DbResult<Vec<L2BlockId>> {
         Ok(self
-            .db
             .db
             .get::<L2BlockHeightSchema>(&idx)?
             .unwrap_or(Vec::new()))
     }
 
     fn get_block_status(&self, id: L2BlockId) -> DbResult<Option<BlockStatus>> {
-        Ok(self.db.db.get::<L2BlockStatusSchema>(&id)?)
+        Ok(self.db.get::<L2BlockStatusSchema>(&id)?)
     }
 }
 
@@ -130,8 +128,8 @@ mod tests {
     }
 
     fn setup_db() -> L2Db {
-        let db = get_rocksdb_tmp_instance().unwrap();
-        L2Db::new(db)
+        let (db, ops) = get_rocksdb_tmp_instance().unwrap();
+        L2Db::new(db, ops)
     }
 
     #[test]

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use rockbound::{SchemaBatch, SchemaDBOperationsExt};
+use rockbound::{OptimisticTransactionDB, SchemaBatch, SchemaDBOperationsExt};
 
 use alpen_express_db::{
     errors::DbError,
@@ -11,10 +11,11 @@ use alpen_express_db::{
 use alpen_express_primitives::buf::Buf32;
 
 use super::schemas::{SeqBlobIdSchema, SeqBlobSchema, SeqL1TxnSchema};
-use crate::OptimisticDb;
+use crate::DbOpsConfig;
 
 pub struct SeqDb {
-    db: Arc<OptimisticDb>,
+    db: Arc<OptimisticTransactionDB>,
+    ops: DbOpsConfig,
 }
 
 impl SeqDb {
@@ -22,17 +23,16 @@ impl SeqDb {
     ///
     /// Assumes it was opened with column families as defined in `STORE_COLUMN_FAMILIES`.
     // FIXME Make it better/generic.
-    pub fn new(db: Arc<OptimisticDb>) -> Self {
-        Self { db }
+    pub fn new(db: Arc<OptimisticTransactionDB>, ops: DbOpsConfig) -> Self {
+        Self { db, ops }
     }
 }
 
 impl SeqDataStore for SeqDb {
     fn put_blob(&self, blob_hash: Buf32, blob: BlobEntry) -> DbResult<u64> {
         self.db
-            .db
             .with_optimistic_txn(
-                rockbound::TransactionRetry::Count(self.db.retry_count),
+                rockbound::TransactionRetry::Count(self.ops.retry_count),
                 |txn| {
                     if txn.get::<SeqBlobSchema>(&blob_hash)?.is_some() {
                         return Err(DbError::Other(format!(
@@ -66,13 +66,13 @@ impl SeqDataStore for SeqDb {
         batch.put::<SeqL1TxnSchema>(&commit_txid, &commit_tx)?;
         batch.put::<SeqL1TxnSchema>(&reveal_txid, &reveal_tx)?;
 
-        self.db.db.write_schemas(batch)?;
+        self.db.write_schemas(batch)?;
         Ok(())
     }
 
     fn update_blob_by_idx(&self, blobidx: u64, blobentry: BlobEntry) -> DbResult<()> {
-        match self.db.db.get::<SeqBlobIdSchema>(&blobidx)? {
-            Some(id) => Ok(self.db.db.put::<SeqBlobSchema>(&id, &blobentry)?),
+        match self.db.get::<SeqBlobIdSchema>(&blobidx)? {
+            Some(id) => Ok(self.db.put::<SeqBlobSchema>(&id, &blobentry)?),
             None => Err(DbError::Other(format!(
                 "BlobEntry does not exist for idx {blobidx:?}"
             ))),
@@ -82,20 +82,20 @@ impl SeqDataStore for SeqDb {
 
 impl SeqDataProvider for SeqDb {
     fn get_blob_by_id(&self, id: Buf32) -> DbResult<Option<BlobEntry>> {
-        Ok(self.db.db.get::<SeqBlobSchema>(&id)?)
+        Ok(self.db.get::<SeqBlobSchema>(&id)?)
     }
 
     fn get_last_blob_idx(&self) -> DbResult<Option<u64>> {
-        Ok(rockbound::utils::get_last::<SeqBlobIdSchema>(&self.db.db)?.map(|(x, _)| x))
+        Ok(rockbound::utils::get_last::<SeqBlobIdSchema>(&*self.db)?.map(|(x, _)| x))
     }
 
     fn get_l1_tx(&self, txid: Buf32) -> DbResult<Option<Vec<u8>>> {
-        Ok(self.db.db.get::<SeqL1TxnSchema>(&txid)?)
+        Ok(self.db.get::<SeqL1TxnSchema>(&txid)?)
     }
 
     fn get_blob_by_idx(&self, blobidx: u64) -> DbResult<Option<BlobEntry>> {
-        match self.db.db.get::<SeqBlobIdSchema>(&blobidx)? {
-            Some(id) => Ok(self.db.db.get::<SeqBlobSchema>(&id)?),
+        match self.db.get::<SeqBlobIdSchema>(&blobidx)? {
+            Some(id) => Ok(self.db.get::<SeqBlobSchema>(&id)?),
             None => Ok(None),
         }
     }
@@ -127,8 +127,6 @@ impl<D: SeqDataStore + SeqDataProvider> SequencerDatabase for SequencerDB<D> {
 #[cfg(feature = "test_utils")]
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
     use bitcoin::consensus::serialize;
     use bitcoin::hashes::Hash;
 
@@ -144,10 +142,6 @@ mod tests {
 
     use test;
 
-    fn setup_db() -> Arc<OptimisticDb> {
-        get_rocksdb_tmp_instance().unwrap()
-    }
-
     fn get_commit_reveal_txns() -> ((Buf32, Vec<u8>), (Buf32, Vec<u8>)) {
         let txns = get_test_bitcoin_txns();
         let ctxid = txns[0].compute_txid().as_raw_hash().to_byte_array().into();
@@ -157,8 +151,8 @@ mod tests {
 
     #[test]
     fn test_put_blob_new_entry() {
-        let db = setup_db();
-        let seq_db = SeqDb::new(db);
+        let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
+        let seq_db = SeqDb::new(db, db_ops);
 
         let blob: BlobEntry = ArbitraryGenerator::new().generate();
         let blob_hash: Buf32 = [0; 32].into();
@@ -173,8 +167,8 @@ mod tests {
 
     #[test]
     fn test_put_blob_existing_entry() {
-        let db = setup_db();
-        let seq_db = SeqDb::new(db);
+        let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
+        let seq_db = SeqDb::new(db, db_ops);
         let blob: BlobEntry = ArbitraryGenerator::new().generate();
         let blob_hash: Buf32 = [0; 32].into();
 
@@ -190,8 +184,8 @@ mod tests {
 
     #[test]
     fn test_put_commit_reveal_txns() {
-        let db = setup_db();
-        let seq_db = SeqDb::new(db);
+        let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
+        let seq_db = SeqDb::new(db, db_ops);
 
         let ((cid, craw), (rid, rraw)) = get_commit_reveal_txns();
 
@@ -208,8 +202,8 @@ mod tests {
 
     #[test]
     fn test_update_blob_by_idx() {
-        let db = setup_db();
-        let seq_db = SeqDb::new(db);
+        let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
+        let seq_db = SeqDb::new(db, db_ops);
 
         let blob: BlobEntry = ArbitraryGenerator::new().generate();
         let blob_hash: Buf32 = [0; 32].into();
@@ -233,8 +227,8 @@ mod tests {
 
     #[test]
     fn test_get_blob_by_id() {
-        let db = setup_db();
-        let seq_db = SeqDb::new(db);
+        let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
+        let seq_db = SeqDb::new(db, db_ops);
 
         let blob: BlobEntry = ArbitraryGenerator::new().generate();
         let blob_hash: Buf32 = [0; 32].into();
@@ -247,8 +241,8 @@ mod tests {
 
     #[test]
     fn test_get_blob_by_idx() {
-        let db = setup_db();
-        let seq_db = SeqDb::new(db);
+        let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
+        let seq_db = SeqDb::new(db, db_ops);
 
         let blob: BlobEntry = ArbitraryGenerator::new().generate();
         let blob_hash: Buf32 = [0; 32].into();
@@ -261,8 +255,8 @@ mod tests {
 
     #[test]
     fn test_get_last_blob_idx() {
-        let db = setup_db();
-        let seq_db = SeqDb::new(db);
+        let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
+        let seq_db = SeqDb::new(db, db_ops);
 
         let blob: BlobEntry = ArbitraryGenerator::new().generate();
         let blob_hash: Buf32 = [0; 32].into();
@@ -287,8 +281,8 @@ mod tests {
 
     #[test]
     fn test_get_l1_tx() {
-        let db = setup_db();
-        let seq_db = SeqDb::new(db);
+        let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
+        let seq_db = SeqDb::new(db, db_ops);
 
         // Test non existing l1 tx
         let res = seq_db.get_l1_tx(Buf32::zero()).unwrap();

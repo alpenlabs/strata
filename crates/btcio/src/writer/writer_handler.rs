@@ -229,8 +229,8 @@ mod test {
     use crate::writer::config::{InscriptionFeePolicy, WriterConfig};
 
     fn get_db() -> Arc<SequencerDB<SeqDb>> {
-        let db = get_rocksdb_tmp_instance().unwrap();
-        let seqdb = Arc::new(SeqDb::new(db));
+        let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
+        let seqdb = Arc::new(SeqDb::new(db, db_ops));
         Arc::new(SequencerDB::new(seqdb))
     }
 

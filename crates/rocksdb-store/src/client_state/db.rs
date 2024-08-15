@@ -1,17 +1,19 @@
 use std::sync::Arc;
 
+use rockbound::OptimisticTransactionDB;
 use rockbound::Schema;
 use rockbound::SchemaDBOperationsExt;
 
 use alpen_express_db::{errors::*, traits::*, DbResult};
 use alpen_express_state::operation::*;
 
-use crate::OptimisticDb;
+use crate::DbOpsConfig;
 
 use super::schemas::{ClientStateSchema, ClientUpdateOutputSchema};
 
 pub struct ClientStateDb {
-    db: Arc<OptimisticDb>,
+    db: Arc<OptimisticTransactionDB>,
+    _ops: DbOpsConfig,
 }
 
 impl ClientStateDb {
@@ -19,15 +21,15 @@ impl ClientStateDb {
     ///
     /// Assumes it was opened with column families as defined in `STORE_COLUMN_FAMILIES`.
     // FIXME Make it better/generic.
-    pub fn new(db: Arc<OptimisticDb>) -> Self {
-        Self { db }
+    pub fn new(db: Arc<OptimisticTransactionDB>, ops: DbOpsConfig) -> Self {
+        Self { db, _ops: ops }
     }
 
     fn get_last_idx<T>(&self) -> DbResult<Option<u64>>
     where
         T: Schema<Key = u64>,
     {
-        let mut iterator = self.db.db.iter::<T>()?;
+        let mut iterator = self.db.iter::<T>()?;
         iterator.seek_to_last();
         match iterator.rev().next() {
             Some(res) => {
@@ -48,7 +50,7 @@ impl ClientStateStore for ClientStateDb {
         if idx != expected_idx {
             return Err(DbError::OooInsert("consensus_store", idx));
         }
-        self.db.db.put::<ClientUpdateOutputSchema>(&idx, &output)?;
+        self.db.put::<ClientUpdateOutputSchema>(&idx, &output)?;
         Ok(())
     }
 
@@ -58,10 +60,10 @@ impl ClientStateStore for ClientStateDb {
         state: alpen_express_state::client_state::ClientState,
     ) -> DbResult<()> {
         // FIXME this should probably be a transaction
-        if self.db.db.get::<ClientStateSchema>(&idx)?.is_some() {
+        if self.db.get::<ClientStateSchema>(&idx)?.is_some() {
             return Err(DbError::OverwriteConsensusCheckpoint(idx));
         }
-        self.db.db.put::<ClientStateSchema>(&idx, &state)?;
+        self.db.put::<ClientStateSchema>(&idx, &state)?;
         Ok(())
     }
 }
@@ -75,7 +77,7 @@ impl ClientStateProvider for ClientStateDb {
     }
 
     fn get_client_state_writes(&self, idx: u64) -> DbResult<Option<Vec<ClientStateWrite>>> {
-        let output = self.db.db.get::<ClientUpdateOutputSchema>(&idx)?;
+        let output = self.db.get::<ClientUpdateOutputSchema>(&idx)?;
         match output {
             Some(out) => Ok(Some(out.writes().to_owned())),
             None => Ok(None),
@@ -83,7 +85,7 @@ impl ClientStateProvider for ClientStateDb {
     }
 
     fn get_client_update_actions(&self, idx: u64) -> DbResult<Option<Vec<SyncAction>>> {
-        let output = self.db.db.get::<ClientUpdateOutputSchema>(&idx)?;
+        let output = self.db.get::<ClientUpdateOutputSchema>(&idx)?;
         match output {
             Some(out) => Ok(Some(out.actions().to_owned())),
             None => Ok(None),
@@ -98,7 +100,7 @@ impl ClientStateProvider for ClientStateDb {
     }
 
     fn get_prev_checkpoint_at(&self, idx: u64) -> DbResult<u64> {
-        let mut iterator = self.db.db.iter::<ClientStateSchema>()?;
+        let mut iterator = self.db.iter::<ClientStateSchema>()?;
         iterator.seek_to_last();
         let rev_iterator = iterator.rev();
 
@@ -121,7 +123,7 @@ impl ClientStateProvider for ClientStateDb {
         &self,
         idx: u64,
     ) -> DbResult<Option<alpen_express_state::client_state::ClientState>> {
-        Ok(self.db.db.get::<ClientStateSchema>(&idx)?)
+        Ok(self.db.get::<ClientStateSchema>(&idx)?)
     }
 }
 
@@ -135,8 +137,8 @@ mod tests {
     use super::*;
 
     fn setup_db() -> ClientStateDb {
-        let db = get_rocksdb_tmp_instance().unwrap();
-        ClientStateDb::new(db)
+        let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
+        ClientStateDb::new(db, db_ops)
     }
 
     #[test]
