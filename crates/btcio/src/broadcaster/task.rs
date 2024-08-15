@@ -3,10 +3,7 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 use bitcoin::{hashes::Hash, Txid};
 use tracing::*;
 
-use alpen_express_db::{
-    traits::{BcastStore, TxBroadcastDatabase},
-    types::{ExcludeReason, L1TxEntry, L1TxStatus},
-};
+use alpen_express_db::types::{ExcludeReason, L1TxEntry, L1TxStatus};
 
 use crate::{
     broadcaster::{error::BroadcasterError, state::BroadcasterState},
@@ -16,29 +13,28 @@ use crate::{
     },
 };
 
-use super::error::BroadcasterResult;
+use super::{error::BroadcasterResult, manager::BroadcastManager};
 
 // TODO: make these configurable, possibly get from Params
 const BROADCAST_POLL_INTERVAL: u64 = 1000; // millis
 const FINALITY_DEPTH: u64 = 6;
 
 /// Broadcasts the next blob to be sent
-// TODO: make use of broadcast manager instead of db
-pub async fn broadcaster_task<D: TxBroadcastDatabase + Send + Sync + 'static>(
+pub async fn broadcaster_task(
     rpc_client: Arc<impl SeqL1Client + L1Client>,
-    db: Arc<D>,
+    manager: Arc<BroadcastManager>,
 ) -> BroadcasterResult<()> {
     info!("Starting Broadcaster task");
     let interval = tokio::time::interval(Duration::from_millis(BROADCAST_POLL_INTERVAL));
     tokio::pin!(interval);
 
-    let mut state = BroadcasterState::from_db(db.clone())?;
+    let mut state = BroadcasterState::initialize(manager.clone()).await?;
     // Run indefinitely to watch/publish txs
     loop {
         interval.as_mut().tick().await;
 
         let (updated_entries, to_remove) =
-            process_unfinalized_entries(&state.unfinalized_entries, db.clone(), &rpc_client)
+            process_unfinalized_entries(&state.unfinalized_entries, manager.clone(), &rpc_client)
                 .await
                 .map_err(|e| {
                     error!(%e, "broadcaster exiting");
@@ -49,25 +45,14 @@ pub async fn broadcaster_task<D: TxBroadcastDatabase + Send + Sync + 'static>(
             _ = state.unfinalized_entries.remove(&idx);
         }
 
-        let temp_state = BroadcasterState::from_db_start_idx(db.clone(), state.next_idx)?;
-        if temp_state.next_idx < state.next_idx {
-            return Err(BroadcasterError::Other(
-                "Inconsistent db idx and state idx".to_string(),
-            ));
-        }
-        // Update state
-        state.unfinalized_entries = updated_entries;
-        state
-            .unfinalized_entries
-            .extend(temp_state.unfinalized_entries);
-        state.next_idx = temp_state.next_idx;
+        state = state.next_state(updated_entries, manager.clone()).await?;
     }
 }
 
 /// Processes unfinalized entries and returns entries idxs that are finalized
-async fn process_unfinalized_entries<D: TxBroadcastDatabase + Send + Sync + 'static>(
+async fn process_unfinalized_entries(
     unfinalized_entries: &HashMap<u64, L1TxEntry>,
-    db: Arc<D>,
+    manager: Arc<BroadcastManager>,
     rpc_client: &Arc<impl SeqL1Client + L1Client>,
 ) -> BroadcasterResult<(HashMap<u64, L1TxEntry>, Vec<u64>)> {
     let mut to_remove = Vec::new();
@@ -79,8 +64,7 @@ async fn process_unfinalized_entries<D: TxBroadcastDatabase + Send + Sync + 'sta
             let mut new_txentry = txentry.clone();
             new_txentry.status = status.clone();
             // update in db
-            db.broadcast_store()
-                .update_tx_by_idx(*idx, new_txentry.clone())?;
+            manager.put_txentry_async(*idx, new_txentry.clone()).await?;
 
             // Remove if finalized
             if status == L1TxStatus::Finalized {
@@ -123,7 +107,8 @@ async fn handle_entry(
         }
         L1TxStatus::Published | L1TxStatus::Confirmed => {
             // check for confirmations
-            let txid = Txid::from_slice(txentry.txid()).map_err(|e| BroadcasterError::Other(e.to_string()))?;
+            let txid = Txid::from_slice(txentry.txid())
+                .map_err(|e| BroadcasterError::Other(e.to_string()))?;
             match rpc_client
                 .get_transaction_confirmations(txid)
                 .await
