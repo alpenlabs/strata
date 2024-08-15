@@ -3,6 +3,7 @@
 use std::{borrow::BorrowMut, sync::Arc};
 
 use async_trait::async_trait;
+use bitcoin::{consensus::deserialize, Transaction as BTransaction, Txid};
 use jsonrpsee::{
     core::RpcResult,
     types::{ErrorObject, ErrorObjectOwned},
@@ -17,11 +18,17 @@ use reth_rpc_types::{
 use thiserror::Error;
 use tokio::sync::{mpsc, oneshot, watch, Mutex, RwLock};
 
-use alpen_express_btcio::writer::{utils::calculate_blob_hash, DaWriter};
+use alpen_express_btcio::{
+    broadcaster::manager::BroadcastManager,
+    writer::{utils::calculate_blob_hash, DaWriter},
+};
 use alpen_express_consensus_logic::sync_manager::SyncManager;
 
-use alpen_express_db::traits::{ChainstateProvider, Database, L2DataProvider};
 use alpen_express_db::traits::{L1DataProvider, SequencerDatabase};
+use alpen_express_db::{
+    traits::{ChainstateProvider, Database, L2DataProvider},
+    types::L1TxEntry,
+};
 use alpen_express_primitives::buf::Buf32;
 use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer, HexBytes};
 use alpen_express_rpc_types::{
@@ -478,12 +485,19 @@ where
 }
 
 pub struct AdminServerImpl<S> {
-    pub writer: Arc<DaWriter<S>>,
+    // TODO: Clean up writer's signature, possibly use some kind of manager
+    // Currently writer is Some() for sequencer only, but we need bcast_manager for both fullnode
+    // and seq
+    pub writer: Option<Arc<DaWriter<S>>>,
+    pub bcast_manager: Arc<BroadcastManager>,
 }
 
 impl<S: SequencerDatabase> AdminServerImpl<S> {
-    pub fn new(writer: Arc<DaWriter<S>>) -> Self {
-        Self { writer }
+    pub fn new(writer: Option<Arc<DaWriter<S>>>, bcast_manager: Arc<BroadcastManager>) -> Self {
+        Self {
+            writer,
+            bcast_manager,
+        }
     }
 }
 
@@ -494,9 +508,25 @@ impl<S: SequencerDatabase + Send + Sync + 'static> AlpenAdminApiServer for Admin
         let blobintent = BlobIntent::new(BlobDest::L1, commitment, blob.0);
         // NOTE: It would be nice to return reveal txid from the submit method. But creation of txs
         // is deferred to signer in the writer module
-        if let Err(e) = self.writer.submit_intent_async(blobintent).await {
-            return Err(Error::Other("".to_string()).into());
+        if let Some(writer) = &self.writer {
+            if let Err(e) = writer.submit_intent_async(blobintent).await {
+                return Err(Error::Other("".to_string()).into());
+            }
         }
         Ok(())
+    }
+
+    async fn broadcast_raw_tx(&self, rawtx: HexBytes) -> RpcResult<Txid> {
+        let tx: BTransaction = deserialize(&rawtx.0).map_err(|e| Error::Other(e.to_string()))?;
+        let txid = tx.compute_txid();
+
+        let entry = L1TxEntry::from_tx(tx);
+
+        self.bcast_manager
+            .add_txentry_async((*entry.txid()).into(), entry)
+            .await
+            .map_err(|e| Error::Other(e.to_string()))?;
+
+        Ok(txid)
     }
 }

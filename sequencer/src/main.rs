@@ -6,6 +6,11 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
+use alpen_express_btcio::broadcaster::manager::BroadcastManager;
+use alpen_express_btcio::broadcaster::task::broadcaster_task;
+use alpen_express_btcio::rpc::traits::L1Client;
+use alpen_express_btcio::rpc::traits::SeqL1Client;
+use alpen_express_rocksdb::broadcaster::db::BroadcastDatabase;
 use anyhow::Context;
 use bitcoin::Network;
 use config::Config;
@@ -195,6 +200,10 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         rbdb.clone(),
         db_ops,
     ));
+    let bcast_db = Arc::new(alpen_express_rocksdb::BroadcastDb::new(
+        rbdb.clone(),
+        db_ops,
+    ));
     let database = Arc::new(alpen_express_db::database::CommonDatabase::new(
         l1_db, l2_db, sync_ev_db, cs_db, chst_db,
     ));
@@ -235,6 +244,9 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         l2_block_manager.clone(),
     );
     let eng_ctl = Arc::new(eng_ctl);
+
+    let bcastdb = Arc::new(BroadcastDatabase::new(bcast_db));
+    let bcast_man = Arc::new(BroadcastManager::new(bcastdb, Arc::new(pool.clone())));
 
     // Start the sync manager.
     let sync_man = sync_manager::start_sync_tasks(
@@ -314,7 +326,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         &task_executor,
         sync_man.get_params(),
         &config,
-        btc_rpc,
+        btc_rpc.clone(),
         database.clone(),
         csm_ctl,
         l1_status.clone(),
@@ -329,6 +341,8 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             shutdown_signal,
             config,
             sync_man,
+            bcast_man,
+            btc_rpc,
             database_r,
             l1_status,
             writer_ctl,
@@ -347,17 +361,24 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn start_rpc<
     D: Database + Send + Sync + 'static,
+    L: L1Client + SeqL1Client,
     SD: SequencerDatabase + Send + Sync + 'static,
 >(
     shutdown_signal: ShutdownSignal,
     config: Config,
     sync_man: Arc<SyncManager>,
+    bcast_man: Arc<BroadcastManager>,
+    l1_rpc_client: Arc<L>,
     database: Arc<D>,
     l1_status: Arc<RwLock<L1Status>>,
     writer: Option<Arc<DaWriter<SD>>>,
 ) -> anyhow::Result<()> {
+    // start broadcast task
+    tokio::spawn(broadcaster_task(l1_rpc_client, bcast_man.clone()));
+
     let (stop_tx, stop_rx) = oneshot::channel();
 
     // Init RPC methods.
@@ -367,12 +388,10 @@ async fn start_rpc<
         sync_man.clone(),
         stop_tx,
     );
-    let mut methods = alp_rpc.into_rpc();
 
-    if let Some(writer) = writer {
-        let admin_rpc = rpc_server::AdminServerImpl::new(writer.clone());
-        methods.merge(admin_rpc.into_rpc())?;
-    }
+    let mut methods = alp_rpc.into_rpc();
+    let admin_rpc = rpc_server::AdminServerImpl::new(writer, bcast_man);
+    methods.merge(admin_rpc.into_rpc())?;
 
     let rpc_port = config.client.rpc_port;
 

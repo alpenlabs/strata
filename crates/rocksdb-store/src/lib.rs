@@ -37,6 +37,7 @@ pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
 
 use broadcaster::schemas::{BcastL1TxIdSchema, BcastL1TxSchema};
 // Re-exports
+pub use broadcaster::db::BroadcastDb;
 pub use chain_state::db::ChainStateDb;
 pub use client_state::db::ClientStateDb;
 pub use l1::db::L1Db;

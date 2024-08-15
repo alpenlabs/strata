@@ -7,7 +7,6 @@ use alpen_express_db::{
     types::{BlobEntry, BlobL1Status},
 };
 use bitcoin::{hashes::Hash, Txid};
-use tracing::*;
 
 use crate::{
     rpc::traits::{L1Client, SeqL1Client},

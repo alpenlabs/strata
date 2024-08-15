@@ -868,6 +868,7 @@ name = "alpen-express-rpc-api"
 version = "0.1.0"
 dependencies = [
  "alpen-express-rpc-types",
+ "bitcoin",
  "hex",
  "jsonrpsee",
  "serde",

@@ -82,7 +82,10 @@ async fn filter_unfinalized_from_db(
 #[cfg(test)]
 mod test {
     use alpen_express_db::{traits::TxBroadcastDatabase, types::ExcludeReason};
-    use alpen_express_rocksdb::broadcaster::db::{BroadcastDatabase, BroadcastDb};
+    use alpen_express_rocksdb::{
+        broadcaster::db::{BroadcastDatabase, BroadcastDb},
+        test_utils::get_rocksdb_tmp_instance,
+    };
     use alpen_test_utils::ArbitraryGenerator;
 
     use crate::broadcaster::manager::BroadcastManager;
@@ -90,8 +93,8 @@ mod test {
     use super::*;
 
     fn get_db() -> Arc<impl TxBroadcastDatabase> {
-        let db = alpen_test_utils::get_rocksdb_tmp_instance().unwrap();
-        let bcastdb = Arc::new(BroadcastDb::new(db));
+        let (db, dbops) = get_rocksdb_tmp_instance().unwrap();
+        let bcastdb = Arc::new(BroadcastDb::new(db, dbops));
         Arc::new(BroadcastDatabase::new(bcastdb))
     }
 

@@ -59,7 +59,8 @@ async fn process_unfinalized_entries(
     let mut updated_entries = HashMap::new();
 
     for (idx, txentry) in unfinalized_entries.iter() {
-        let updated_status = handle_entry(rpc_client, txentry).await?;
+        info!(%idx, "processing txentry");
+        let updated_status = handle_entry(rpc_client, txentry, *idx).await?;
 
         if let Some(status) = updated_status {
             let mut new_txentry = txentry.clone();
@@ -69,7 +70,7 @@ async fn process_unfinalized_entries(
             manager.put_txentry_async(*idx, new_txentry.clone()).await?;
 
             // Remove if finalized
-            if status == L1TxStatus::Finalized {
+            if status == L1TxStatus::Finalized || matches!(status, L1TxStatus::Excluded(_)) {
                 to_remove.push(*idx);
             }
 
@@ -86,23 +87,28 @@ async fn process_unfinalized_entries(
 async fn handle_entry(
     rpc_client: &Arc<impl SeqL1Client + L1Client>,
     txentry: &L1TxEntry,
+    idx: u64,
 ) -> BroadcasterResult<Option<L1TxStatus>> {
     match txentry.status {
         L1TxStatus::Unpublished => {
             // Try to publish
             match send_tx(txentry.tx_raw(), rpc_client).await {
-                Ok(_) => Ok(Some(L1TxStatus::Published)),
+                Ok(_) => {
+                    info!(%idx, "Successfully published tx");
+                    Ok(Some(L1TxStatus::Published))
+                }
                 Err(PublishError::MissingInputsOrSpent) => {
                     warn!(
+                        %idx,
                         ?txentry,
-                        "tx exculded while broadcasting due to missing or spent inputs"
+                        "tx excluded while broadcasting due to missing or spent inputs"
                     );
                     Ok(Some(L1TxStatus::Excluded(
                         ExcludeReason::MissingInputsOrSpent,
                     )))
                 }
                 Err(PublishError::Other(str)) => {
-                    warn!(?txentry, %str, "tx excluded while broadcasting");
+                    warn!(%idx, %str, ?txentry, "tx excluded while broadcasting");
                     Err(BroadcasterError::Other(str))
                 }
             }
@@ -158,6 +164,7 @@ async fn send_tx(
 mod test {
     use alpen_express_db::{traits::TxBroadcastDatabase, types::ExcludeReason};
     use alpen_express_rocksdb::broadcaster::db::{BroadcastDatabase, BroadcastDb};
+    use alpen_express_rocksdb::test_utils::get_rocksdb_tmp_instance;
     use alpen_test_utils::ArbitraryGenerator;
 
     use crate::broadcaster::manager::BroadcastManager;
@@ -166,8 +173,8 @@ mod test {
     use super::*;
 
     fn get_db() -> Arc<impl TxBroadcastDatabase> {
-        let db = alpen_test_utils::get_rocksdb_tmp_instance().unwrap();
-        let bcastdb = Arc::new(BroadcastDb::new(db));
+        let (db, dbops) = get_rocksdb_tmp_instance().unwrap();
+        let bcastdb = Arc::new(BroadcastDb::new(db, dbops));
         Arc::new(BroadcastDatabase::new(bcastdb))
     }
 
@@ -199,7 +206,7 @@ mod test {
         let client = TestBitcoinClient::new(0);
         let cl = Arc::new(client);
 
-        let res = handle_entry(&cl, &e).await.unwrap();
+        let res = handle_entry(&cl, &e, 0).await.unwrap();
         assert_eq!(
             res,
             Some(L1TxStatus::Published),
@@ -221,7 +228,7 @@ mod test {
         let client = TestBitcoinClient::new(0);
         let cl = Arc::new(client);
 
-        let res = handle_entry(&cl, &e).await.unwrap();
+        let res = handle_entry(&cl, &e, 0).await.unwrap();
         assert_eq!(
             res, None,
             "Status should not change if no confirmations for a published tx"
@@ -231,7 +238,7 @@ mod test {
         let client = TestBitcoinClient::new(FINALITY_DEPTH - 1);
         let cl = Arc::new(client);
 
-        let res = handle_entry(&cl, &e).await.unwrap();
+        let res = handle_entry(&cl, &e, 0).await.unwrap();
         assert_eq!(
             res,
             Some(L1TxStatus::Confirmed),
@@ -242,7 +249,7 @@ mod test {
         let client = TestBitcoinClient::new(FINALITY_DEPTH);
         let cl = Arc::new(client);
 
-        let res = handle_entry(&cl, &e).await.unwrap();
+        let res = handle_entry(&cl, &e, 0).await.unwrap();
         assert_eq!(
             res,
             Some(L1TxStatus::Finalized),
@@ -264,7 +271,7 @@ mod test {
         let client = TestBitcoinClient::new(0);
         let cl = Arc::new(client);
 
-        let res = handle_entry(&cl, &e).await.unwrap();
+        let res = handle_entry(&cl, &e, 0).await.unwrap();
         assert_eq!(
             res,
             Some(L1TxStatus::Unpublished),
@@ -275,7 +282,7 @@ mod test {
         let client = TestBitcoinClient::new(FINALITY_DEPTH - 1);
         let cl = Arc::new(client);
 
-        let res = handle_entry(&cl, &e).await.unwrap();
+        let res = handle_entry(&cl, &e, 0).await.unwrap();
         assert_eq!(
             res,
             Some(L1TxStatus::Confirmed),
@@ -286,7 +293,7 @@ mod test {
         let client = TestBitcoinClient::new(FINALITY_DEPTH);
         let cl = Arc::new(client);
 
-        let res = handle_entry(&cl, &e).await.unwrap();
+        let res = handle_entry(&cl, &e, 0).await.unwrap();
         assert_eq!(
             res,
             Some(L1TxStatus::Finalized),
@@ -308,7 +315,7 @@ mod test {
         let client = TestBitcoinClient::new(FINALITY_DEPTH);
         let cl = Arc::new(client);
 
-        let res = handle_entry(&cl, &e).await.unwrap();
+        let res = handle_entry(&cl, &e, 0).await.unwrap();
         assert_eq!(
             res, None,
             "Status should not change for finalized tx. Should remain the same."
@@ -319,7 +326,7 @@ mod test {
         let client = TestBitcoinClient::new(0);
         let cl = Arc::new(client);
 
-        let res = handle_entry(&cl, &e).await.unwrap();
+        let res = handle_entry(&cl, &e, 0).await.unwrap();
         assert_eq!(
             res, None,
             "Status should not change for finalized tx. Should remain the same."
@@ -342,7 +349,7 @@ mod test {
         let client = TestBitcoinClient::new(FINALITY_DEPTH);
         let cl = Arc::new(client);
 
-        let res = handle_entry(&cl, &e).await.unwrap();
+        let res = handle_entry(&cl, &e, 0).await.unwrap();
         assert_eq!(
             res, None,
             "Status should not change for excluded tx. Should remain the same."
@@ -353,7 +360,7 @@ mod test {
         let client = TestBitcoinClient::new(0);
         let cl = Arc::new(client);
 
-        let res = handle_entry(&cl, &e).await.unwrap();
+        let res = handle_entry(&cl, &e, 0).await.unwrap();
         assert_eq!(
             res, None,
             "Status should not change for excluded tx. Should remain the same."

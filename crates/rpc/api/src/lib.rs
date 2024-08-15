@@ -4,6 +4,7 @@ use alpen_express_rpc_types::{
     types::{BlockHeader, ClientStatus, DepositEntry, ExecUpdate, L1Status},
     L2BlockId,
 };
+use bitcoin::Txid;
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
@@ -58,6 +59,10 @@ pub struct HexBytes(#[serde_as(as = "serde_with::hex::Hex")] pub Vec<u8>);
 #[cfg_attr(feature = "client", rpc(server, client, namespace = "alpadmin"))]
 pub trait AlpenAdminApi {
     #[method(name = "submitDABlob")]
-    /// Basically adds L1Write sequencer duty which will be executed by sequencer
+    /// Adds L1Write sequencer duty which will be executed by sequencer
     async fn submit_da_blob(&self, blobdata: HexBytes) -> RpcResult<()>;
+
+    #[method(name = "broadcastRawTx")]
+    /// Adds an equivalent entry to broadcaster database, which will eventually be broadcasted
+    async fn broadcast_raw_tx(&self, rawtx: HexBytes) -> RpcResult<Txid>;
 }

@@ -6,6 +6,7 @@ version = "0.1.0"
 [dependencies]
 alpen-express-rpc-types = { workspace = true }
 
+bitcoin = { workspace = true }
 hex = { workspace = true }
 jsonrpsee = { workspace = true, features = ["server", "macros"] }
 serde = { workspace = true }

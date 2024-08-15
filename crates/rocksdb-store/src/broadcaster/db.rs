@@ -12,15 +12,18 @@ use alpen_express_db::{
 };
 use alpen_express_primitives::buf::Buf32;
 
+use crate::DbOpsConfig;
+
 use super::schemas::{BcastL1TxIdSchema, BcastL1TxSchema};
 
 pub struct BroadcastDb {
     db: Arc<DB>,
+    _ops: DbOpsConfig,
 }
 
 impl BroadcastDb {
-    pub fn new(db: Arc<DB>) -> Self {
-        Self { db }
+    pub fn new(db: Arc<DB>, ops: DbOpsConfig) -> Self {
+        Self { db, _ops: ops }
     }
 }
 
@@ -125,19 +128,19 @@ impl TxBroadcastDatabase for BroadcastDatabase {
 
 #[cfg(test)]
 mod tests {
+    use crate::test_utils::get_rocksdb_tmp_instance;
+
     use super::*;
     use alpen_express_db::errors::DbError;
     use alpen_express_db::traits::{BcastProvider, BcastStore};
     use alpen_express_db::types::L1TxStatus;
     use alpen_express_primitives::buf::Buf32;
     use alpen_test_utils::bitcoin::get_test_bitcoin_txns;
-    use alpen_test_utils::get_rocksdb_tmp_instance;
     use bitcoin::hashes::Hash;
-    use rockbound::OptimisticTransactionDB as DB;
-    use std::sync::Arc;
 
-    fn setup_db() -> Arc<DB> {
-        get_rocksdb_tmp_instance().unwrap()
+    fn setup_db() -> BroadcastDb {
+        let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
+        BroadcastDb::new(db, db_ops)
     }
 
     fn generate_l1_tx_entry() -> (Buf32, L1TxEntry) {
@@ -150,22 +153,20 @@ mod tests {
     #[test]
     fn test_add_tx_new_entry() {
         let db = setup_db();
-        let broadcast_db = BroadcastDb::new(db.clone());
 
         let (txid, txentry) = generate_l1_tx_entry();
 
-        let idx = broadcast_db.add_tx(txid, txentry.clone()).unwrap();
+        let idx = db.add_tx(txid, txentry.clone()).unwrap();
 
         assert_eq!(idx, 0);
 
-        let stored_entry = broadcast_db.get_txentry_by_idx(idx).unwrap();
+        let stored_entry = db.get_txentry_by_idx(idx).unwrap();
         assert_eq!(stored_entry, Some(txentry));
     }
 
     #[test]
     fn test_add_tx_existing_entry() {
-        let db = setup_db();
-        let broadcast_db = BroadcastDb::new(db.clone());
+        let broadcast_db = setup_db();
 
         let (txid, txentry) = generate_l1_tx_entry();
 
@@ -181,8 +182,7 @@ mod tests {
 
     #[test]
     fn test_update_tx() {
-        let db = setup_db();
-        let broadcast_db = BroadcastDb::new(db.clone());
+        let broadcast_db = setup_db();
 
         let (txid, txentry) = generate_l1_tx_entry();
 
@@ -206,8 +206,7 @@ mod tests {
 
     #[test]
     fn test_update_tx_by_idx() {
-        let db = setup_db();
-        let broadcast_db = BroadcastDb::new(db.clone());
+        let broadcast_db = setup_db();
 
         let (txid, txentry) = generate_l1_tx_entry();
 
@@ -231,8 +230,7 @@ mod tests {
 
     #[test]
     fn test_get_txentry_by_idx() {
-        let db = setup_db();
-        let broadcast_db = BroadcastDb::new(db.clone());
+        let broadcast_db = setup_db();
 
         // Test non-existing entry
         let result = broadcast_db.get_txentry_by_idx(0);
@@ -248,8 +246,7 @@ mod tests {
 
     #[test]
     fn test_get_last_txidx() {
-        let db = setup_db();
-        let broadcast_db = BroadcastDb::new(db.clone());
+        let broadcast_db = setup_db();
 
         let last_txidx = broadcast_db.get_last_txidx().unwrap();
         assert_eq!(last_txidx, None, "There is no last txidx in the beginning");
