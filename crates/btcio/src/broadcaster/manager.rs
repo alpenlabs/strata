@@ -5,6 +5,7 @@ use tokio::sync::oneshot;
 use tracing::*;
 
 use alpen_express_db::{
+    errors::DbError,
     traits::{BcastProvider, BcastStore, TxBroadcastDatabase},
     types::L1TxEntry,
     DbResult,
@@ -28,12 +29,28 @@ impl BroadcastManager {
         }
     }
 
-    pub fn get_tx_by_idx(&self, idx: u32) -> DbResult<Option<L1TxEntry>> {
-        Ok(None)
+    pub fn get_tx_by_idx(&self, idx: u64) -> DbResult<Option<L1TxEntry>> {
+        (self.get_tx_shim.handle)(idx).wait_blocking()
     }
 
-    pub async fn get_tx_by_idx_async(&self, idx: u32) -> DbResult<Option<L1TxEntry>> {
-        Ok(None)
+    pub async fn get_tx_by_idx_async(&self, idx: u64) -> DbResult<Option<L1TxEntry>> {
+        (self.get_tx_shim.handle)(idx).wait().await
+    }
+
+    pub fn put_tx(&self, idx: u64, entry: L1TxEntry) -> DbResult<()> {
+        (self.put_tx_shim.handle)((idx, entry)).wait_blocking()
+    }
+
+    pub async fn put_tx_async(&self, idx: u64, entry: L1TxEntry) -> DbResult<()> {
+        (self.put_tx_shim.handle)((idx, entry)).wait().await
+    }
+
+    pub fn add_tx(&self, id: Buf32, entry: L1TxEntry) -> DbResult<u64> {
+        (self.add_tx_shim.handle)((id, entry)).wait_blocking()
+    }
+
+    pub async fn add_tx_async(&self, id: Buf32, entry: L1TxEntry) -> DbResult<u64> {
+        (self.add_tx_shim.handle)((id, entry)).wait().await
     }
 }
 
@@ -43,6 +60,22 @@ struct Shim<T, R> {
 
 struct BroadcastHandle<R> {
     resp_rx: oneshot::Receiver<DbResult<R>>,
+}
+
+impl<R> BroadcastHandle<R> {
+    pub fn wait_blocking(self) -> DbResult<R> {
+        match self.resp_rx.blocking_recv() {
+            Ok(v) => v,
+            Err(e) => Err(DbError::Other(format!("{e}"))),
+        }
+    }
+
+    pub async fn wait(self) -> DbResult<R> {
+        match self.resp_rx.await {
+            Ok(v) => v,
+            Err(e) => Err(DbError::Other(format!("{e}"))),
+        }
+    }
 }
 
 fn make_get_tx_shim<D: TxBroadcastDatabase + Sync + Send + 'static>(

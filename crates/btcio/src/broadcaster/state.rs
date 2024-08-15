@@ -51,7 +51,7 @@ fn filter_unfinalized_from_db<D: TxBroadcastDatabase + Send + Sync + 'static>(
 ) -> BroadcasterResult<HashMap<u64, L1TxEntry>> {
     let mut unfinalized_entries = HashMap::new();
     for idx in from..to {
-        let Some(txentry) = db.broadcast_provider().get_txentry_by_idx()? else {
+        let Some(txentry) = db.broadcast_provider().get_txentry_by_idx(idx)? else {
             break;
         };
 
