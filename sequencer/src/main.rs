@@ -34,6 +34,7 @@ use alpen_express_primitives::block_credential;
 use alpen_express_primitives::buf::Buf32;
 use alpen_express_primitives::params::{Params, RollupParams, RunParams};
 use alpen_express_rocksdb::sequencer::db::SequencerDB;
+use alpen_express_rocksdb::DbOpsConfig;
 use alpen_express_rocksdb::SeqDb;
 use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer};
 use alpen_express_rpc_types::L1Status;
@@ -140,6 +141,11 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     // Open the database.
     let rbdb = open_rocksdb_database(&config)?;
+    // init a database configuration
+    let db_ops = Arc::new(DbOpsConfig {
+        db: rbdb,
+        retry_count: config.client.db_retry_count,
+    });
 
     // Set up block params.
     let params = Params {
@@ -168,17 +174,11 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     ));
 
     // Initialize databases.
-    let l1_db = Arc::new(alpen_express_rocksdb::L1Db::new(rbdb.clone()));
-    let l2_db = Arc::new(alpen_express_rocksdb::l2::db::L2Db::new(
-        rbdb.clone(),
-        config.client.db_retry_count,
-    ));
-    let sync_ev_db = Arc::new(alpen_express_rocksdb::SyncEventDb::new(
-        rbdb.clone(),
-        config.client.db_retry_count,
-    ));
-    let cs_db = Arc::new(alpen_express_rocksdb::ClientStateDb::new(rbdb.clone()));
-    let chst_db = Arc::new(alpen_express_rocksdb::ChainStateDb::new(rbdb.clone()));
+    let l1_db = Arc::new(alpen_express_rocksdb::L1Db::new(db_ops.clone()));
+    let l2_db = Arc::new(alpen_express_rocksdb::l2::db::L2Db::new(db_ops.clone()));
+    let sync_ev_db = Arc::new(alpen_express_rocksdb::SyncEventDb::new(db_ops.clone()));
+    let cs_db = Arc::new(alpen_express_rocksdb::ClientStateDb::new(db_ops.clone()));
+    let chst_db = Arc::new(alpen_express_rocksdb::ChainStateDb::new(db_ops.clone()));
     let database = Arc::new(alpen_express_db::database::CommonDatabase::new(
         l1_db, l2_db, sync_ev_db, cs_db, chst_db,
     ));
@@ -248,7 +248,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             params.rollup().rollup_name.clone(),
         )?;
         // Initialize SequencerDatabase
-        let seqdb = Arc::new(SeqDb::new(rbdb.clone(), 5));
+        let seqdb = Arc::new(SeqDb::new(db_ops));
         let dbseq = Arc::new(SequencerDB::new(seqdb));
         let rpc = btc_rpc.clone();
         let writer = Arc::new(start_writer_task(
@@ -362,9 +362,7 @@ where
     Ok(())
 }
 
-fn open_rocksdb_database(
-    config: &Config,
-) -> anyhow::Result<Arc<rockbound::OptimisticTransactionDB>> {
+fn open_rocksdb_database(config: &Config) -> anyhow::Result<rockbound::OptimisticTransactionDB> {
     let mut database_dir = config.client.datadir.clone();
     database_dir.push("rocksdb");
 
@@ -386,7 +384,7 @@ fn open_rocksdb_database(
     )
     .context("opening database")?;
 
-    Ok(Arc::new(rbdb))
+    Ok(rbdb)
 }
 
 fn load_seqkey(path: &PathBuf) -> anyhow::Result<IdentityData> {

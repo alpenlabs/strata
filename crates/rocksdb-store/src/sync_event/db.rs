@@ -1,28 +1,29 @@
 use std::sync::Arc;
 
-use rockbound::{OptimisticTransactionDB, SchemaBatch, SchemaDBOperationsExt};
+use rockbound::{SchemaBatch, SchemaDBOperationsExt};
 
 use alpen_express_db::errors::DbError;
 use alpen_express_db::traits::{SyncEventProvider, SyncEventStore};
 use alpen_express_db::DbResult;
 use alpen_express_state::sync_event::SyncEvent;
 
+use crate::DbOpsConfig;
+
 use super::schemas::{SyncEventSchema, SyncEventWithTimestamp};
 
 pub struct SyncEventDb {
-    db: Arc<OptimisticTransactionDB>,
-    retry_count: u16,
+    ops: Arc<DbOpsConfig>,
 }
 
 impl SyncEventDb {
     // NOTE: db is expected to open all the column families defined in STORE_COLUMN_FAMILIES.
     // FIXME: Make it better/generic.
-    pub fn new(db: Arc<OptimisticTransactionDB>, retry_count: u16) -> Self {
-        Self { db, retry_count }
+    pub fn new(ops: Arc<DbOpsConfig>) -> Self {
+        Self { ops }
     }
 
     fn get_last_key(&self) -> DbResult<Option<u64>> {
-        let mut iterator = self.db.iter::<SyncEventSchema>()?;
+        let mut iterator = self.ops.db.iter::<SyncEventSchema>()?;
         iterator.seek_to_last();
         match iterator.rev().next() {
             Some(res) => {
@@ -36,9 +37,10 @@ impl SyncEventDb {
 
 impl SyncEventStore for SyncEventDb {
     fn write_sync_event(&self, ev: SyncEvent) -> DbResult<u64> {
-        self.db
+        self.ops
+            .db
             .with_optimistic_txn(
-                rockbound::TransactionRetry::Count(self.retry_count),
+                rockbound::TransactionRetry::Count(self.ops.retry_count),
                 move |txn| {
                     let last_id = rockbound::utils::get_last::<SyncEventSchema>(txn)?
                         .map(|(k, _)| k)
@@ -70,7 +72,7 @@ impl SyncEventStore for SyncEventDb {
             None => return Err(DbError::Other("cannot clear empty db".to_string())),
         }
 
-        let iterator = self.db.iter::<SyncEventSchema>()?;
+        let iterator = self.ops.db.iter::<SyncEventSchema>()?;
 
         // TODO: determine if the expectation behaviour for this is to clear early events or clear
         // late events. The implementation is based for early events
@@ -86,7 +88,7 @@ impl SyncEventStore for SyncEventDb {
                 batch.delete::<SyncEventSchema>(&id)?;
             }
         }
-        self.db.write_schemas(batch)?;
+        self.ops.db.write_schemas(batch)?;
         Ok(())
     }
 }
@@ -97,7 +99,7 @@ impl SyncEventProvider for SyncEventDb {
     }
 
     fn get_sync_event(&self, idx: u64) -> DbResult<Option<SyncEvent>> {
-        let event = self.db.get::<SyncEventSchema>(&idx)?;
+        let event = self.ops.db.get::<SyncEventSchema>(&idx)?;
         match event {
             Some(ev) => Ok(Some(ev.event())),
             None => Ok(None),
@@ -105,7 +107,7 @@ impl SyncEventProvider for SyncEventDb {
     }
 
     fn get_event_timestamp(&self, idx: u64) -> DbResult<Option<u64>> {
-        let event = self.db.get::<SyncEventSchema>(&idx)?;
+        let event = self.ops.db.get::<SyncEventSchema>(&idx)?;
         match event {
             Some(ev) => Ok(Some(ev.timestamp())),
             None => Ok(None),
@@ -123,7 +125,7 @@ mod tests {
 
     fn setup_db() -> SyncEventDb {
         let db = get_rocksdb_tmp_instance().unwrap();
-        SyncEventDb::new(db, 5)
+        SyncEventDb::new(db)
     }
 
     fn insert_event(db: &SyncEventDb) -> SyncEvent {

@@ -4,7 +4,7 @@ use std::sync::Arc;
 use alpen_express_db::database::CommonDatabase;
 
 use alpen_express_db::stubs::{chain_state::StubChainstateDb, l2::StubL2Db};
-use alpen_express_rocksdb::{ClientStateDb, L1Db, SyncEventDb};
+use alpen_express_rocksdb::{ClientStateDb, DbOpsConfig, L1Db, SyncEventDb};
 
 use arbitrary::{Arbitrary, Unstructured};
 use rand::RngCore;
@@ -52,7 +52,7 @@ impl ArbitraryGenerator {
     }
 }
 
-pub fn get_rocksdb_tmp_instance() -> anyhow::Result<Arc<rockbound::OptimisticTransactionDB>> {
+pub fn get_rocksdb_tmp_instance() -> anyhow::Result<Arc<DbOpsConfig>> {
     let dbname = alpen_express_rocksdb::ROCKSDB_NAME;
     let cfs = alpen_express_rocksdb::STORE_COLUMN_FAMILIES;
     let mut opts = rocksdb::Options::default();
@@ -68,7 +68,12 @@ pub fn get_rocksdb_tmp_instance() -> anyhow::Result<Arc<rockbound::OptimisticTra
         &opts,
     )?;
 
-    Ok(Arc::new(rbdb))
+    let db_ops = Arc::new(DbOpsConfig {
+        db: rbdb,
+        retry_count: 5,
+    });
+
+    Ok(db_ops)
 }
 
 pub fn get_common_db(
@@ -76,8 +81,8 @@ pub fn get_common_db(
     let rbdb = get_rocksdb_tmp_instance().unwrap();
     let l1_db = Arc::new(L1Db::new(rbdb.clone()));
     let l2_db = Arc::new(StubL2Db::new());
-    let sync_ev_db = Arc::new(SyncEventDb::new(rbdb.clone(), 5));
-    let cs_db = Arc::new(ClientStateDb::new(rbdb.clone()));
+    let sync_ev_db = Arc::new(SyncEventDb::new(rbdb.clone()));
+    let cs_db = Arc::new(ClientStateDb::new(rbdb));
     let chst_db = Arc::new(StubChainstateDb::new());
 
     Arc::new(CommonDatabase::new(
