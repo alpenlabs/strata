@@ -20,7 +20,7 @@ These exist in `crates/`.
 * `common` - utils for services
 * `consensus-logic` - consensus state machine impl
 * `db` - Database abstractions
-* `evmctl` - EL exec control infra
+* `eectl` - EL exec control infra
 * `evmexec` - utils relating to EVM execution via REVM
 * `primitives` - common types used throughout project, mostly re-exports
 * `rpc/api` - Alpen rollup RPC defs

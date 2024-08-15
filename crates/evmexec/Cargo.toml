@@ -5,7 +5,7 @@ version = "0.1.0"
 
 [dependencies]
 alpen-express-db = { workspace = true }
-alpen-express-evmctl = { workspace = true }
+alpen-express-eectl = { workspace = true }
 alpen-express-primitives = { workspace = true }
 alpen-express-state = { workspace = true }
 anyhow = { workspace = true }

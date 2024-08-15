@@ -11,9 +11,9 @@ use tokio::runtime::Handle;
 use tokio::sync::Mutex;
 
 use alpen_express_db::traits::L2DataProvider;
-use alpen_express_evmctl::engine::{BlockStatus, ExecEngineCtl, PayloadStatus};
-use alpen_express_evmctl::errors::{EngineError, EngineResult};
-use alpen_express_evmctl::messages::{ELDepositData, ExecPayloadData, Op, PayloadEnv};
+use alpen_express_eectl::engine::{BlockStatus, ExecEngineCtl, PayloadStatus};
+use alpen_express_eectl::errors::{EngineError, EngineResult};
+use alpen_express_eectl::messages::{ELDepositData, ExecPayloadData, Op, PayloadEnv};
 use alpen_express_state::block::L2BlockBundle;
 use alpen_express_state::exec_update::UpdateInput;
 use alpen_express_state::id::L2BlockId;
@@ -334,8 +334,8 @@ mod tests {
     use reth_rpc_types::engine::{ExecutionPayloadEnvelopeV2, ForkchoiceUpdated};
     use reth_rpc_types::ExecutionPayloadV1;
 
-    use alpen_express_evmctl::errors::EngineResult;
-    use alpen_express_evmctl::messages::PayloadEnv;
+    use alpen_express_eectl::errors::EngineResult;
+    use alpen_express_eectl::messages::PayloadEnv;
     use alpen_express_primitives::buf::Buf32;
     use alpen_express_state::block::{L2Block, L2BlockAccessory};
 

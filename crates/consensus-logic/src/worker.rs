@@ -6,7 +6,7 @@ use tokio::sync::{broadcast, mpsc, watch};
 use tracing::*;
 
 use alpen_express_db::traits::*;
-use alpen_express_evmctl::engine::ExecEngineCtl;
+use alpen_express_eectl::engine::ExecEngineCtl;
 use alpen_express_primitives::prelude::*;
 use alpen_express_state::{client_state::ClientState, operation::SyncAction};
 
