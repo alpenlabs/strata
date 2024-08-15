@@ -1,4 +1,4 @@
-//! DB operation executor logic, mainly the macro that generates the IO stuff.
+//! DB operation interface logic, primarily the macro defined to
 //!
 //! This manages the indirection to spawn async requests onto a threadpool and execute blocking
 //! calls locally.
@@ -7,6 +7,9 @@ use std::sync::Arc;
 
 pub use alpen_express_db::{errors::DbError, DbResult};
 pub use tracing::*;
+
+/// Handle for receiving a result from a database operation on another thread.
+pub type DbRecv<T> = tokio::sync::oneshot::Receiver<DbResult<T>>;
 
 /// Shim to opaquely execute the operation without being aware of the underlying impl.
 pub struct OpShim<T, R> {
@@ -85,7 +88,7 @@ macro_rules! inst_ops {
                         self.inner. [<$iname _blocking>] ($($aname),*)
                     }
 
-                    pub fn [<$iname _chan>] (&self, $($aname: $aty),*) -> tokio::sync::oneshot::Receiver<DbResult<$ret>> {
+                    pub fn [<$iname _chan>] (&self, $($aname: $aty),*) -> DbRecv<$ret> {
                         self.inner. [<$iname _chan>] (&self.pool, $($aname),*)
                     }
                 )*
@@ -95,7 +98,7 @@ macro_rules! inst_ops {
             trait ShimTrait {
                 $(
                     fn [<$iname _blocking>] (&self, $($aname: $aty),*) -> DbResult<$ret>;
-                    fn [<$iname _chan>] (&self, pool: &threadpool::ThreadPool, $($aname: $aty),*) -> tokio::sync::oneshot::Receiver<DbResult<$ret>>;
+                    fn [<$iname _chan>] (&self, pool: &threadpool::ThreadPool, $($aname: $aty),*) -> DbRecv<$ret>;
                 )*
             }
 
@@ -110,7 +113,7 @@ macro_rules! inst_ops {
                         $iname(&self.ctx, $($aname),*)
                     }
 
-                    fn [<$iname _chan>] (&self, pool: &threadpool::ThreadPool, $($aname: $aty),*) -> tokio::sync::oneshot::Receiver<DbResult<$ret>> {
+                    fn [<$iname _chan>] (&self, pool: &threadpool::ThreadPool, $($aname: $aty),*) -> DbRecv<$ret> {
                         let (resp_tx, resp_rx) = tokio::sync::oneshot::channel();
                         let ctx = self.ctx.clone();
 

@@ -1,22 +1,24 @@
-//! L2 block data manager.  Maintains references to the handles and stuff.
+//! L2 block data operation interface.
 
 use std::sync::Arc;
-
-//use tokio::sync::oneshot;
-//use tracing::*;
 
 use alpen_express_db::traits::*;
 use alpen_express_state::{block::L2BlockBundle, id::L2BlockId};
 
 use crate::exec::*;
 
+/// Database context for an database operation interface.
 pub struct Context<D: Database> {
     db: Arc<D>,
 }
 
-impl<D: Database> Context<D> {
+impl<D: Database + Sync + Send + 'static> Context<D> {
     pub fn new(db: Arc<D>) -> Self {
         Self { db }
+    }
+
+    pub fn into_ops(self, pool: threadpool::ThreadPool) -> L2DataOps {
+        L2DataOps::new(pool, Arc::new(self))
     }
 }
 

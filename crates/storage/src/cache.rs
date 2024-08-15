@@ -4,17 +4,16 @@ use std::hash::Hash;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
 
-use tokio::sync::{broadcast, oneshot, Mutex, RwLock};
+use tokio::sync::{broadcast, Mutex, RwLock};
 use tracing::*;
 
-use alpen_express_db::{errors::DbError, DbResult};
+use alpen_express_db::{DbError, DbResult};
+
+use crate::exec::DbRecv;
 
 /// Entry for something we can put into the cache without actually knowing what it is, and so we can
 /// keep the reservation to it.
 type CacheSlot<T> = Arc<RwLock<SlotState<T>>>;
-
-/// Handle representing the result of off-thread database fetch we can wait on.
-type DbRecv<T> = oneshot::Receiver<DbResult<T>>;
 
 /// Describes a cache entry that may be occupied, reserved for pending database read, or returned an
 /// error from a database read.
@@ -56,15 +55,35 @@ impl<T: Clone> SlotState<T> {
     }
 }
 
+/// Wrapper around a LRU cache that handles cache reservations and asynchronously waiting for
+/// database operations in the background without keeping a global lock on the cache.
 pub struct CacheTable<K, V> {
     cache: Mutex<lru::LruCache<K, CacheSlot<V>>>,
 }
 
 impl<K: Clone + Eq + Hash, V: Clone> CacheTable<K, V> {
+    /// Creates a new cache with some maximum capacity.
+    ///
+    /// This measues entries by *count* not their (serialized?) size, so ideally entries should
+    /// consume similar amounts of memory to helps us best reason about real cache capacity.
     pub fn new(size: NonZeroUsize) -> Self {
         Self {
             cache: Mutex::new(lru::LruCache::new(size)),
         }
+    }
+
+    /// Gets the number of elements in the cache.
+    // TODO replace this with an atomic we update after every op
+    pub async fn get_len_async(&self) -> usize {
+        let cache = self.cache.lock().await;
+        cache.len()
+    }
+
+    /// Gets the number of elements in the cache.
+    // TODO replace this with an atomic we update after every op
+    pub async fn get_len_blocking(&self) -> usize {
+        let cache = self.cache.blocking_lock();
+        cache.len()
     }
 
     /// Removes the entry for a particular cache entry.
@@ -77,6 +96,20 @@ impl<K: Clone + Eq + Hash, V: Clone> CacheTable<K, V> {
     pub fn purge_blocking(&self, k: &K) {
         let mut cache = self.cache.blocking_lock();
         cache.pop(k);
+    }
+
+    /// Inserts an entry into the table, dropping the previous value.
+    pub async fn insert_async(&self, k: K, v: V) {
+        let slot = Arc::new(RwLock::new(SlotState::Ready(v)));
+        let mut cache = self.cache.lock().await;
+        cache.put(k, slot);
+    }
+
+    /// Inserts an entry into the table, dropping the previous value.
+    pub async fn insert_blocking(&self, k: K, v: V) {
+        let slot = Arc::new(RwLock::new(SlotState::Ready(v)));
+        let mut cache = self.cache.blocking_lock();
+        cache.put(k, slot);
     }
 
     /// Returns a clone of an entry from the cache or possibly invoking some function returning a
