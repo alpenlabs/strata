@@ -11,7 +11,7 @@ pub enum L1StatusUpdate {
     RpcError(String),
     CurTip(String),
     LastPublishedTxid(String),
-    IncrementInscriptionCount
+    IncrementInscriptionCount,
 }
 
 pub async fn apply_status_updates(status_updates: &[L1StatusUpdate], status_rx: Arc<StatusTx>) {
@@ -29,7 +29,7 @@ pub async fn apply_status_updates(status_updates: &[L1StatusUpdate], status_rx: 
             L1StatusUpdate::LastPublishedTxid(txid) => {
                 l1_status.last_published_txid = Some(txid.clone())
             }
-            L1StatusUpdate::IncrementInscriptionCount => l1_status.published_inscription_count += 1
+            L1StatusUpdate::IncrementInscriptionCount => l1_status.published_inscription_count += 1,
         }
     }
 
