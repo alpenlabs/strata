@@ -34,10 +34,17 @@ impl<T: Clone> SlotState<T> {
     pub async fn get_async(&self) -> DbResult<T> {
         match self {
             Self::Ready(v) => Ok(v.clone()),
-            Self::Pending(ch) => match ch.resubscribe().recv().await {
-                Ok(v) => Ok(v),
-                Err(_e) => Err(DbError::WorkerFailedStrangely),
-            },
+            Self::Pending(ch) => {
+                // When we see this log get triggered and but feels like the corresponding fetch is
+                // hanging for this read then it means that this code wasn't implemented
+                // correctly.
+                // TODO figure out how to test this
+                trace!("waiting for database fetch to complete");
+                match ch.resubscribe().recv().await {
+                    Ok(v) => Ok(v),
+                    Err(_e) => Err(DbError::WorkerFailedStrangely),
+                }
+            }
             Self::Error => Err(DbError::CacheLoadFail),
         }
     }
@@ -46,10 +53,17 @@ impl<T: Clone> SlotState<T> {
     pub fn get_blocking(&self) -> DbResult<T> {
         match self {
             Self::Ready(v) => Ok(v.clone()),
-            Self::Pending(ch) => match ch.resubscribe().blocking_recv() {
-                Ok(v) => Ok(v),
-                Err(_e) => Err(DbError::WorkerFailedStrangely),
-            },
+            Self::Pending(ch) => {
+                // When we see this log get triggered and but feels like the corresponding fetch is
+                // hanging for this read then it means that this code wasn't implemented
+                // correctly.
+                // TODO figure out how to test this
+                trace!("waiting for database fetch to complete");
+                match ch.resubscribe().blocking_recv() {
+                    Ok(v) => Ok(v),
+                    Err(_e) => Err(DbError::WorkerFailedStrangely),
+                }
+            }
             Self::Error => Err(DbError::CacheLoadFail),
         }
     }
