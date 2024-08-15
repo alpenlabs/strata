@@ -81,7 +81,7 @@ impl<K: Clone + Eq + Hash, V: Clone> CacheTable<K, V> {
 
     /// Gets the number of elements in the cache.
     // TODO replace this with an atomic we update after every op
-    pub async fn get_len_blocking(&self) -> usize {
+    pub fn get_len_blocking(&self) -> usize {
         let cache = self.cache.blocking_lock();
         cache.len()
     }
@@ -106,7 +106,7 @@ impl<K: Clone + Eq + Hash, V: Clone> CacheTable<K, V> {
     }
 
     /// Inserts an entry into the table, dropping the previous value.
-    pub async fn insert_blocking(&self, k: K, v: V) {
+    pub fn insert_blocking(&self, k: K, v: V) {
         let slot = Arc::new(RwLock::new(SlotState::Ready(v)));
         let mut cache = self.cache.blocking_lock();
         cache.put(k, slot);
@@ -122,7 +122,7 @@ impl<K: Clone + Eq + Hash, V: Clone> CacheTable<K, V> {
         let (mut slot_lock, complete_tx) = {
             let mut cache = self.cache.lock().await;
             if let Some(entry_lock) = cache.get(k) {
-                let entry = entry_lock.blocking_read();
+                let entry = entry_lock.read().await;
                 return Ok(entry.get_async().await?);
             }
 
@@ -207,5 +207,81 @@ impl<K: Clone + Eq + Hash, V: Clone> CacheTable<K, V> {
         }
 
         Ok(res)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use alpen_express_db::DbError;
+
+    use super::CacheTable;
+
+    #[tokio::test]
+    async fn test_basic_async() {
+        let cache = CacheTable::<u64, u64>::new(3.try_into().unwrap());
+
+        let res = cache
+            .get_or_fetch_async(&42, || {
+                let (tx, rx) = tokio::sync::oneshot::channel();
+                tx.send(Ok(10)).expect("test: send init value");
+                rx
+            })
+            .await
+            .expect("test: cache gof");
+        assert_eq!(res, 10);
+
+        let res = cache
+            .get_or_fetch_async(&42, || {
+                let (tx, rx) = tokio::sync::oneshot::channel();
+                tx.send(Err(DbError::Busy)).expect("test: send init value");
+                rx
+            })
+            .await
+            .expect("test: load gof");
+        assert_eq!(res, 10);
+
+        cache.insert_async(42, 12).await;
+        let res = cache
+            .get_or_fetch_async(&42, || {
+                let (tx, rx) = tokio::sync::oneshot::channel();
+                tx.send(Err(DbError::Busy)).expect("test: send init value");
+                rx
+            })
+            .await
+            .expect("test: load gof");
+        assert_eq!(res, 12);
+
+        let len = cache.get_len_async().await;
+        assert_eq!(len, 1);
+        cache.purge_async(&42).await;
+        let len = cache.get_len_async().await;
+        assert_eq!(len, 0);
+    }
+
+    #[test]
+    fn test_basic_blocking() {
+        let cache = CacheTable::<u64, u64>::new(3.try_into().unwrap());
+
+        let res = cache
+            .get_or_fetch_blocking(&42, || Ok(10))
+            .expect("test: cache gof");
+        assert_eq!(res, 10);
+
+        let res = cache
+            .get_or_fetch_blocking(&42, || Err(DbError::Busy))
+            .expect("test: load gof");
+        assert_eq!(res, 10);
+
+        cache.insert_blocking(42, 12);
+        let res = cache
+            .get_or_fetch_blocking(&42, || Err(DbError::Busy))
+            .expect("test: load gof");
+        assert_eq!(res, 12);
+
+        let len = cache.get_len_blocking();
+        assert_eq!(len, 1);
+        cache.purge_blocking(&42);
+        let len = cache.get_len_blocking();
+        assert_eq!(len, 0);
     }
 }
