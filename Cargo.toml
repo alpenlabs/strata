@@ -25,7 +25,7 @@ members = [
 
   # binaries listed separately
   "sequencer",
-  "reth",,
+  "reth",
 ]
 
 default-members = ["sequencer", "reth"]

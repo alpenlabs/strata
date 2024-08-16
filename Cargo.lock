@@ -3092,6 +3092,12 @@ dependencies = [
 [[package]]
 name = "express-chaintsn"
 version = "0.1.0"
+dependencies = [
+ "alpen-express-primitives",
+ "alpen-express-state",
+ "thiserror",
+ "tracing",
+]
 
 [[package]]
 name = "express-reth-db"

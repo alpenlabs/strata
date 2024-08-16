@@ -1,3 +1,4 @@
 //! Rollup chain state transition.
 
-// TODO
+pub mod errors;
+pub mod transition;
