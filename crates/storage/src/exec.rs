@@ -94,8 +94,7 @@ macro_rules! inst_ops {
                 )*
             }
 
-            #[async_trait::async_trait]
-            trait ShimTrait {
+            trait ShimTrait: Sync + Send + 'static {
                 $(
                     fn [<$iname _blocking>] (&self, $($aname: $aty),*) -> DbResult<$ret>;
                     fn [<$iname _chan>] (&self, pool: &threadpool::ThreadPool, $($aname: $aty),*) -> DbRecv<$ret>;
@@ -106,7 +105,6 @@ macro_rules! inst_ops {
                 ctx: Arc<$ctx $(<$($tparam),+>)?>,
             }
 
-            #[async_trait::async_trait]
             impl $(<$($tparam: $tpconstr + Sync + Send + 'static),+>)? ShimTrait for Inner $(<$($tparam),+>)? {
                 $(
                     fn [<$iname _blocking>] (&self, $($aname: $aty),*) -> DbResult<$ret> {
