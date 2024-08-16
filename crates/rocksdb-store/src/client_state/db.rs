@@ -1,15 +1,19 @@
 use std::sync::Arc;
 
+use rockbound::OptimisticTransactionDB;
 use rockbound::Schema;
-use rockbound::{OptimisticTransactionDB, SchemaDBOperationsExt};
+use rockbound::SchemaDBOperationsExt;
 
 use alpen_express_db::{errors::*, traits::*, DbResult};
 use alpen_express_state::operation::*;
+
+use crate::DbOpsConfig;
 
 use super::schemas::{ClientStateSchema, ClientUpdateOutputSchema};
 
 pub struct ClientStateDb {
     db: Arc<OptimisticTransactionDB>,
+    _ops: DbOpsConfig,
 }
 
 impl ClientStateDb {
@@ -17,8 +21,8 @@ impl ClientStateDb {
     ///
     /// Assumes it was opened with column families as defined in `STORE_COLUMN_FAMILIES`.
     // FIXME Make it better/generic.
-    pub fn new(db: Arc<OptimisticTransactionDB>) -> Self {
-        Self { db }
+    pub fn new(db: Arc<OptimisticTransactionDB>, ops: DbOpsConfig) -> Self {
+        Self { db, _ops: ops }
     }
 
     fn get_last_idx<T>(&self) -> DbResult<Option<u64>>
@@ -128,11 +132,13 @@ mod tests {
     use alpen_express_state::client_state::ClientState;
     use alpen_test_utils::*;
 
+    use crate::test_utils::get_rocksdb_tmp_instance;
+
     use super::*;
 
     fn setup_db() -> ClientStateDb {
-        let db = get_rocksdb_tmp_instance().unwrap();
-        ClientStateDb::new(db)
+        let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
+        ClientStateDb::new(db, db_ops)
     }
 
     #[test]

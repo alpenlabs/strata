@@ -696,6 +696,7 @@ dependencies = [
  "alpen-express-db",
  "alpen-express-eectl",
  "alpen-express-primitives",
+ "alpen-express-rocksdb",
  "alpen-express-state",
  "alpen-test-utils",
  "anyhow",
@@ -841,6 +842,7 @@ dependencies = [
  "borsh",
  "reth-db",
  "rockbound",
+ "tempfile",
  "thiserror",
  "tracing",
 ]
@@ -924,7 +926,6 @@ version = "0.1.0"
 dependencies = [
  "alpen-express-db",
  "alpen-express-primitives",
- "alpen-express-rocksdb",
  "alpen-express-state",
  "anyhow",
  "arbitrary",
@@ -932,7 +933,6 @@ dependencies = [
  "hex",
  "rand 0.8.5",
  "rockbound",
- "tempfile",
 ]
 
 [[package]]

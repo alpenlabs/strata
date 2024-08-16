@@ -5,6 +5,8 @@ pub mod l2;
 pub mod macros;
 pub mod sequencer;
 pub mod sync_event;
+#[cfg(feature = "test_utils")]
+pub mod test_utils;
 pub mod utils;
 
 pub const ROCKSDB_NAME: &str = "express";
@@ -45,3 +47,9 @@ use crate::chain_state::schemas::{ChainStateSchema, WriteBatchSchema};
 use crate::client_state::schemas::{ClientStateSchema, ClientUpdateOutputSchema};
 use crate::l1::schemas::{L1BlockSchema, MmrSchema, TxnSchema};
 use crate::sync_event::schemas::SyncEventSchema;
+
+/// database operations configuration
+#[derive(Clone, Copy, Debug)]
+pub struct DbOpsConfig {
+    pub retry_count: u16,
+}

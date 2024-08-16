@@ -47,4 +47,7 @@ pub struct Args {
     // TODO: allow only for dev/test mode ?
     #[argh(option, short = 'p', description = "custom rollup config path")]
     pub rollup_params: Option<PathBuf>,
+
+    #[argh(option, description = "database retry count")]
+    pub db_retry_count: Option<u16>,
 }

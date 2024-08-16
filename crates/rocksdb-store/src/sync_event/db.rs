@@ -7,17 +7,20 @@ use alpen_express_db::traits::{SyncEventProvider, SyncEventStore};
 use alpen_express_db::DbResult;
 use alpen_express_state::sync_event::SyncEvent;
 
+use crate::DbOpsConfig;
+
 use super::schemas::{SyncEventSchema, SyncEventWithTimestamp};
 
 pub struct SyncEventDb {
     db: Arc<OptimisticTransactionDB>,
+    ops: DbOpsConfig,
 }
 
 impl SyncEventDb {
     // NOTE: db is expected to open all the column families defined in STORE_COLUMN_FAMILIES.
     // FIXME: Make it better/generic.
-    pub fn new(db: Arc<OptimisticTransactionDB>) -> Self {
-        Self { db }
+    pub fn new(db: Arc<OptimisticTransactionDB>, ops: DbOpsConfig) -> Self {
+        Self { db, ops }
     }
 
     fn get_last_key(&self) -> DbResult<Option<u64>> {
@@ -36,15 +39,18 @@ impl SyncEventDb {
 impl SyncEventStore for SyncEventDb {
     fn write_sync_event(&self, ev: SyncEvent) -> DbResult<u64> {
         self.db
-            .with_optimistic_txn(rockbound::TransactionRetry::Count(5), move |txn| {
-                let last_id = rockbound::utils::get_last::<SyncEventSchema>(txn)?
-                    .map(|(k, _)| k)
-                    .unwrap_or(0);
-                let id = last_id + 1;
-                let event = SyncEventWithTimestamp::new(ev.clone());
-                txn.put::<SyncEventSchema>(&id, &event)?;
-                Ok::<_, anyhow::Error>(id)
-            })
+            .with_optimistic_txn(
+                rockbound::TransactionRetry::Count(self.ops.retry_count),
+                move |txn| {
+                    let last_id = rockbound::utils::get_last::<SyncEventSchema>(txn)?
+                        .map(|(k, _)| k)
+                        .unwrap_or(0);
+                    let id = last_id + 1;
+                    let event = SyncEventWithTimestamp::new(ev.clone());
+                    txn.put::<SyncEventSchema>(&id, &event)?;
+                    Ok::<_, anyhow::Error>(id)
+                },
+            )
             .map_err(|err| DbError::TransactionError(err.to_string()))
     }
 
@@ -109,17 +115,20 @@ impl SyncEventProvider for SyncEventDb {
     }
 }
 
+#[cfg(feature = "test_utils")]
 #[cfg(test)]
 mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use alpen_test_utils::*;
 
+    use crate::test_utils::get_rocksdb_tmp_instance;
+
     use super::*;
 
     fn setup_db() -> SyncEventDb {
-        let db = get_rocksdb_tmp_instance().unwrap();
-        SyncEventDb::new(db)
+        let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
+        SyncEventDb::new(db, db_ops)
     }
 
     fn insert_event(db: &SyncEventDb) -> SyncEvent {

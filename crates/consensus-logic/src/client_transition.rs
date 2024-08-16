@@ -152,10 +152,10 @@ pub fn process_event<D: Database>(
 mod tests {
     use alpen_express_db::traits::L1DataStore;
     use alpen_express_primitives::{block_credential, l1::L1BlockManifest};
+    use alpen_express_rocksdb::test_utils::get_common_db;
     use alpen_express_state::{l1::L1BlockId, operation};
     use alpen_test_utils::{
         bitcoin::gen_l1_chain,
-        get_common_db,
         l2::{gen_client_state, gen_params},
         ArbitraryGenerator,
     };

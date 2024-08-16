@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use rockbound::rocksdb::ReadOptions;
 use rockbound::schema::KeyEncoder;
-use rockbound::{OptimisticTransactionDB as DB, SchemaBatch, SchemaDBOperationsExt};
+use rockbound::{OptimisticTransactionDB, SchemaBatch, SchemaDBOperationsExt};
 use tracing::*;
 
 use alpen_express_mmr::CompactMmr;
@@ -11,18 +11,21 @@ use alpen_express_primitives::{
     l1::{L1BlockManifest, L1Tx, L1TxRef},
 };
 
+use crate::DbOpsConfig;
+
 use super::schemas::{L1BlockSchema, MmrSchema, TxnSchema};
 use alpen_express_db::{errors::DbError, traits::*, DbResult};
 
 pub struct L1Db {
-    db: Arc<DB>,
+    db: Arc<OptimisticTransactionDB>,
+    _ops: DbOpsConfig,
 }
 
 impl L1Db {
     // NOTE: db is expected to open all the column families defined in STORE_COLUMN_FAMILIES.
     // FIXME: Make it better/generic.
-    pub fn new(db: Arc<DB>) -> Self {
-        Self { db }
+    pub fn new(db: Arc<OptimisticTransactionDB>, ops: DbOpsConfig) -> Self {
+        Self { db, _ops: ops }
     }
 
     pub fn get_latest_block_number(&self) -> DbResult<Option<u64>> {
@@ -182,17 +185,19 @@ impl L1DataProvider for L1Db {
     }
 }
 
+#[cfg(feature = "test_utils")]
 #[cfg(test)]
 mod tests {
     use alpen_express_primitives::l1::L1TxProof;
+    use alpen_test_utils::ArbitraryGenerator;
 
-    use alpen_test_utils::{get_rocksdb_tmp_instance, ArbitraryGenerator};
+    use crate::test_utils::get_rocksdb_tmp_instance;
 
     use super::*;
 
     fn setup_db() -> L1Db {
-        let db = get_rocksdb_tmp_instance().unwrap();
-        L1Db::new(db)
+        let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
+        L1Db::new(db, db_ops)
     }
 
     fn insert_block_data(idx: u64, db: &L1Db) -> (L1BlockManifest, Vec<L1Tx>, CompactMmr) {

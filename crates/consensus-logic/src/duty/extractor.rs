@@ -108,6 +108,7 @@ mod tests {
         buf::Buf32,
         params::{RollupParams, RunParams},
     };
+    use alpen_express_rocksdb::test_utils::get_common_db;
     use alpen_express_state::{
         block::{L2Block, L2BlockBody, L2BlockBundle},
         chain_state::ChainState,
@@ -117,7 +118,6 @@ mod tests {
         l1::{L1HeaderRecord, L1ViewState},
         state_op::{StateOp, WriteBatch},
     };
-    use alpen_test_utils::get_common_db;
 
     use super::*;
 

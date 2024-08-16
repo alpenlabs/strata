@@ -219,15 +219,18 @@ mod test {
     use bitcoin::{Address, Network};
 
     use alpen_express_db::traits::SequencerDatabase;
-    use alpen_express_rocksdb::{sequencer::db::SequencerDB, SeqDb};
+    use alpen_express_rocksdb::{
+        sequencer::db::SequencerDB, test_utils::get_rocksdb_tmp_instance, SeqDb,
+    };
+
     use alpen_test_utils::ArbitraryGenerator;
 
     use super::*;
     use crate::writer::config::{InscriptionFeePolicy, WriterConfig};
 
     fn get_db() -> Arc<SequencerDB<SeqDb>> {
-        let db = alpen_test_utils::get_rocksdb_tmp_instance().unwrap();
-        let seqdb = Arc::new(SeqDb::new(db));
+        let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
+        let seqdb = Arc::new(SeqDb::new(db, db_ops));
         Arc::new(SequencerDB::new(seqdb))
     }
 
