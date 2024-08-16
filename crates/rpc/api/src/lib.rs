@@ -1,5 +1,6 @@
 #![allow(unexpected_cfgs)] // TODO: remove this when we add the `client` feature flag.
 //! Macro trait def for the `alp_` RPC namespace using jsonrpsee.
+use alpen_express_db::types::L1TxStatus;
 use alpen_express_rpc_types::{
     types::{BlockHeader, ClientStatus, DepositEntry, ExecUpdate, L1Status},
     L2BlockId,
@@ -49,11 +50,18 @@ pub trait AlpenApi {
 
     #[method(name = "getCurrentDepositById")]
     async fn get_current_deposit_by_id(&self, deposit_id: u32) -> RpcResult<DepositEntry>;
+
+    #[method(name = "getTxStatus")]
+    async fn get_tx_status(&self, txid: HexBytes32) -> RpcResult<Option<L1TxStatus>>;
 }
 
 #[serde_as]
 #[derive(Serialize, Deserialize)]
 pub struct HexBytes(#[serde_as(as = "serde_with::hex::Hex")] pub Vec<u8>);
+
+#[serde_as]
+#[derive(Serialize, Deserialize)]
+pub struct HexBytes32(#[serde_as(as = "serde_with::hex::Hex")] pub [u8; 32]);
 
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "alpadmin"))]
 #[cfg_attr(feature = "client", rpc(server, client, namespace = "alpadmin"))]

@@ -739,6 +739,8 @@ dependencies = [
  "borsh",
  "mockall",
  "parking_lot 0.12.3",
+ "serde",
+ "serde_json",
  "thiserror",
  "tracing",
 ]
@@ -868,6 +870,7 @@ dependencies = [
 name = "alpen-express-rpc-api"
 version = "0.1.0"
 dependencies = [
+ "alpen-express-db",
  "alpen-express-rpc-types",
  "bitcoin",
  "hex",

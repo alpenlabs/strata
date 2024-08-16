@@ -389,6 +389,7 @@ async fn start_rpc<
         l1_status.clone(),
         database.clone(),
         sync_man.clone(),
+        bcast_man.clone(),
         stop_tx,
     );
 

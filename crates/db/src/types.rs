@@ -5,6 +5,7 @@ use bitcoin::{consensus::serialize, hashes::Hash, Transaction};
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use alpen_express_primitives::buf::Buf32;
+use serde::{ser::SerializeStruct, Serialize, Serializer};
 
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct BlobEntry {
@@ -100,11 +101,41 @@ pub enum L1TxStatus {
     Excluded(ExcludeReason),
 }
 
-#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
+#[derive(Debug, Clone, PartialEq, Serialize, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub enum ExcludeReason {
     /// Excluded because inputs were spent or not present in the chain/mempool
     MissingInputsOrSpent,
     /// Excluded for other reasons.
     // TODO: add other cases
     Other(String),
+}
+
+impl Serialize for L1TxStatus {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut state = serializer.serialize_struct("L1TxStatus", 2)?;
+        match *self {
+            L1TxStatus::Unpublished => {
+                state.serialize_field("status", "Unpublished")?;
+            }
+            L1TxStatus::Published => {
+                state.serialize_field("status", "Published")?;
+            }
+            L1TxStatus::Confirmed(height) => {
+                state.serialize_field("status", "Confirmed")?;
+                state.serialize_field("height", &height)?;
+            }
+            L1TxStatus::Finalized(height) => {
+                state.serialize_field("status", "Finalized")?;
+                state.serialize_field("height", &height)?;
+            }
+            L1TxStatus::Excluded(ref reason) => {
+                state.serialize_field("status", "Excluded")?;
+                state.serialize_field("reason", reason)?;
+            }
+        }
+        state.end()
+    }
 }

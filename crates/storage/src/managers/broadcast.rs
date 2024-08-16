@@ -5,7 +5,10 @@
 
 use std::sync::Arc;
 
-use alpen_express_db::{traits::*, types::L1TxEntry};
+use alpen_express_db::{
+    traits::*,
+    types::{L1TxEntry, L1TxStatus},
+};
 use alpen_express_primitives::buf::Buf32;
 
 use crate::exec::*;
@@ -28,6 +31,7 @@ impl<D: TxBroadcastDatabase + Sync + Send + 'static> BroadcastContext<D> {
 inst_ops! {
     (BroadcastDbManager, BroadcastContext<D: TxBroadcastDatabase>) {
         get_txentry(idx: u64) => Option<L1TxEntry>;
+        get_txstatus(id: Buf32) => Option<L1TxStatus>;
         get_last_txidx() => Option<u64>;
         add_txentry(id: Buf32, entry: L1TxEntry) => u64;
         put_txentry(idx: u64, entry: L1TxEntry) => ();
@@ -40,6 +44,14 @@ fn get_txentry<D: TxBroadcastDatabase + Sync + Send + 'static>(
 ) -> DbResult<Option<L1TxEntry>> {
     let bcast_prov = context.db.broadcast_provider();
     bcast_prov.get_txentry_by_idx(idx)
+}
+
+fn get_txstatus<D: TxBroadcastDatabase + Sync + Send + 'static>(
+    context: &BroadcastContext<D>,
+    id: Buf32,
+) -> DbResult<Option<L1TxStatus>> {
+    let bcast_prov = context.db.broadcast_provider();
+    Ok(bcast_prov.get_txentry(id)?.map(|entry| entry.status))
 }
 
 fn get_last_txidx<D: TxBroadcastDatabase + Sync + Send + 'static>(

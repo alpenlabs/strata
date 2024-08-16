@@ -22,13 +22,16 @@ use tokio::sync::{mpsc, oneshot, watch, Mutex, RwLock};
 use alpen_express_btcio::writer::{utils::calculate_blob_hash, DaWriter};
 use alpen_express_consensus_logic::sync_manager::SyncManager;
 
-use alpen_express_db::traits::{L1DataProvider, SequencerDatabase};
 use alpen_express_db::{
     traits::{ChainstateProvider, Database, L2DataProvider},
     types::L1TxEntry,
 };
+use alpen_express_db::{
+    traits::{L1DataProvider, SequencerDatabase},
+    types::L1TxStatus,
+};
 use alpen_express_primitives::buf::Buf32;
-use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer, HexBytes};
+use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer, HexBytes, HexBytes32};
 use alpen_express_rpc_types::{
     BlockHeader, ClientStatus, DaBlob, DepositEntry, DepositState, ExecUpdate, L1Status,
     WithdrawalIntent,
@@ -142,6 +145,7 @@ pub struct AlpenRpcImpl<D> {
     l1_status: Arc<RwLock<L1Status>>,
     database: Arc<D>,
     sync_manager: Arc<SyncManager>,
+    bcast_manager: Arc<BroadcastDbManager>,
     stop_tx: Mutex<Option<oneshot::Sender<()>>>,
 }
 
@@ -150,12 +154,14 @@ impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
         l1_status: Arc<RwLock<L1Status>>,
         database: Arc<D>,
         sync_manager: Arc<SyncManager>,
+        bcast_manager: Arc<BroadcastDbManager>,
         stop_tx: oneshot::Sender<()>,
     ) -> Self {
         Self {
             l1_status,
             database,
             sync_manager,
+            bcast_manager,
             stop_tx: Mutex::new(Some(stop_tx)),
         }
     }
@@ -463,6 +469,17 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
             amt: deposit_entry.amt(),
             state,
         })
+    }
+
+    async fn get_tx_status(&self, txid: HexBytes32) -> RpcResult<Option<L1TxStatus>> {
+        let mut txid = txid.0;
+        txid.reverse();
+        let id = Buf32::from(txid);
+        Ok(self
+            .bcast_manager
+            .get_txstatus_async(id)
+            .await
+            .map_err(|e| Error::Other(e.to_string()))?)
     }
 }
 
