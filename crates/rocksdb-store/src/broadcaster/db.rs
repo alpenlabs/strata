@@ -146,7 +146,7 @@ mod tests {
     fn generate_l1_tx_entry() -> (Buf32, L1TxEntry) {
         let txns = get_test_bitcoin_txns();
         let txid = txns[0].compute_txid().as_raw_hash().to_byte_array().into();
-        let txentry = L1TxEntry::from_tx(txns[0].clone());
+        let txentry = L1TxEntry::from_tx(&txns[0]);
         (txid, txentry)
     }
 

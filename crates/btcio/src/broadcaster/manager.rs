@@ -11,14 +11,14 @@ use alpen_express_db::{
     DbResult,
 };
 
-pub struct BroadcastManager {
+pub struct BroadcastDbManager {
     get_txentry_shim: Shim<u64, Option<L1TxEntry>>,
     get_last_idx_shim: Shim<(), Option<u64>>,
     add_txentry_shim: Shim<(Buf32, L1TxEntry), u64>,
     put_txentry_shim: Shim<(u64, L1TxEntry), ()>,
 }
 
-impl BroadcastManager {
+impl BroadcastDbManager {
     pub fn new<D: TxBroadcastDatabase + Send + Sync + 'static>(
         db: Arc<D>,
         pool: Arc<threadpool::ThreadPool>,

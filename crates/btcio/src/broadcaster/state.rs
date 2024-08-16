@@ -4,7 +4,7 @@ use alpen_express_db::types::{L1TxEntry, L1TxStatus};
 
 use super::{
     error::{BroadcasterError, BroadcasterResult},
-    manager::BroadcastManager,
+    manager::BroadcastDbManager,
 };
 
 pub(crate) struct BroadcasterState {
@@ -16,12 +16,12 @@ pub(crate) struct BroadcasterState {
 }
 
 impl BroadcasterState {
-    pub async fn initialize(manager: Arc<BroadcastManager>) -> BroadcasterResult<Self> {
+    pub async fn initialize(manager: &Arc<BroadcastDbManager>) -> BroadcasterResult<Self> {
         Self::initialize_from_idx(manager, 0).await
     }
 
     pub async fn initialize_from_idx(
-        manager: Arc<BroadcastManager>,
+        manager: &Arc<BroadcastDbManager>,
         start_idx: u64,
     ) -> BroadcasterResult<Self> {
         let next_idx = manager
@@ -39,27 +39,36 @@ impl BroadcasterState {
     }
 
     /// Fetches entries from database based on the `next_idx` and returns a new state
-    pub async fn next_state(
-        &self,
+    pub async fn next(
+        &mut self,
         updated_entries: HashMap<u64, L1TxEntry>,
-        manager: Arc<BroadcastManager>,
-    ) -> BroadcasterResult<Self> {
-        let mut new_state = Self::initialize_from_idx(manager, self.next_idx).await?;
-        if new_state.next_idx < self.next_idx {
+        manager: &Arc<BroadcastDbManager>,
+    ) -> BroadcasterResult<()> {
+        let next_idx = manager
+            .get_last_txidx_async()
+            .await?
+            .map(|x| x + 1)
+            .unwrap_or(0);
+
+        if next_idx < self.next_idx {
             return Err(BroadcasterError::Other(
                 "Inconsistent db idx and state idx".to_string(),
             ));
         }
+        let new_unfinalized_entries =
+            filter_unfinalized_from_db(manager, self.next_idx, next_idx).await?;
+
         // Update state
-        new_state.unfinalized_entries.extend(updated_entries);
-        Ok(new_state)
+        self.unfinalized_entries.extend(updated_entries);
+        self.unfinalized_entries.extend(new_unfinalized_entries);
+        Ok(())
     }
 }
 
 /// Returns unfinalized and unexcluded `[L1TxEntry]`s from db starting from index `from` upto `to`
 /// non-inclusive.
 async fn filter_unfinalized_from_db(
-    manager: Arc<BroadcastManager>,
+    manager: &Arc<BroadcastDbManager>,
     from: u64,
     to: u64,
 ) -> BroadcasterResult<HashMap<u64, L1TxEntry>> {
@@ -88,7 +97,7 @@ mod test {
     };
     use alpen_test_utils::ArbitraryGenerator;
 
-    use crate::broadcaster::manager::BroadcastManager;
+    use crate::broadcaster::manager::BroadcastDbManager;
 
     use super::*;
 
@@ -98,10 +107,10 @@ mod test {
         Arc::new(BroadcastDatabase::new(bcastdb))
     }
 
-    fn get_manager() -> Arc<BroadcastManager> {
+    fn get_manager() -> Arc<BroadcastDbManager> {
         let pool = threadpool::Builder::new().num_threads(2).build();
         let db = get_db();
-        let mgr = BroadcastManager::new(db, Arc::new(pool));
+        let mgr = BroadcastDbManager::new(db, Arc::new(pool));
         Arc::new(mgr)
     }
 
@@ -132,7 +141,7 @@ mod test {
         gen_entry_with_status(L1TxStatus::Excluded(ExcludeReason::MissingInputsOrSpent))
     }
 
-    async fn populate_broadcast_db(mgr: Arc<BroadcastManager>) -> Vec<(u64, L1TxEntry)> {
+    async fn populate_broadcast_db(mgr: Arc<BroadcastDbManager>) -> Vec<(u64, L1TxEntry)> {
         // Make some insertions
         let e1 = gen_unpublished_entry();
         let i1 = mgr
@@ -176,7 +185,7 @@ mod test {
             panic!("Invalid initialization");
         };
         // Now initialize state
-        let state = BroadcasterState::initialize(mgr).await.unwrap();
+        let state = BroadcasterState::initialize(&mgr).await.unwrap();
 
         assert_eq!(state.next_idx, i5 + 1);
 
@@ -199,7 +208,7 @@ mod test {
             panic!("Invalid initialization");
         };
         // Now initialize state
-        let state = BroadcasterState::initialize(mgr.clone()).await.unwrap();
+        let mut state = BroadcasterState::initialize(&mgr).await.unwrap();
 
         // Get updated entries where one entry is modified, another is removed
         let mut updated_entries = state.unfinalized_entries.clone();
@@ -220,16 +229,16 @@ mod test {
             .unwrap();
         // Compute next state
         //
-        let newstate = state.next_state(updated_entries, mgr).await.unwrap();
+        state.next(updated_entries, &mgr).await.unwrap();
 
-        assert_eq!(newstate.next_idx, idx1 + 1);
+        assert_eq!(state.next_idx, idx1 + 1);
         assert_eq!(
-            newstate.unfinalized_entries.get(&0).unwrap().status,
+            state.unfinalized_entries.get(&0).unwrap().status,
             L1TxStatus::Excluded(ExcludeReason::MissingInputsOrSpent)
         );
 
         // check it does not contain idx of excluded but contains that of published tx
-        assert!(!newstate.unfinalized_entries.contains_key(&idx));
-        assert!(newstate.unfinalized_entries.contains_key(&idx1));
+        assert!(!state.unfinalized_entries.contains_key(&idx));
+        assert!(state.unfinalized_entries.contains_key(&idx1));
     }
 }

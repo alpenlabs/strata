@@ -69,9 +69,9 @@ pub struct L1TxEntry {
 }
 
 impl L1TxEntry {
-    pub fn from_tx(tx: Transaction) -> Self {
+    pub fn from_tx(tx: &Transaction) -> Self {
         Self {
-            tx_raw: serialize(&tx),
+            tx_raw: serialize(tx),
             txid: *tx.compute_txid().as_raw_hash().as_byte_array(),
             status: L1TxStatus::Unpublished,
         }

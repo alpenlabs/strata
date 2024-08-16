@@ -13,7 +13,7 @@ use crate::{
     },
 };
 
-use super::{error::BroadcasterResult, manager::BroadcastManager};
+use super::{error::BroadcasterResult, manager::BroadcastDbManager};
 
 // TODO: make these configurable, possibly get from Params
 const BROADCAST_POLL_INTERVAL: u64 = 1000; // millis
@@ -22,13 +22,13 @@ const FINALITY_DEPTH: u64 = 6;
 /// Broadcasts the next blob to be sent
 pub async fn broadcaster_task(
     rpc_client: Arc<impl SeqL1Client + L1Client>,
-    manager: Arc<BroadcastManager>,
+    manager: Arc<BroadcastDbManager>,
 ) -> BroadcasterResult<()> {
     info!("Starting Broadcaster task");
     let interval = tokio::time::interval(Duration::from_millis(BROADCAST_POLL_INTERVAL));
     tokio::pin!(interval);
 
-    let mut state = BroadcasterState::initialize(manager.clone()).await?;
+    let mut state = BroadcasterState::initialize(&manager).await?;
     // Run indefinitely to watch/publish txs
     loop {
         interval.as_mut().tick().await;
@@ -45,14 +45,14 @@ pub async fn broadcaster_task(
             _ = state.unfinalized_entries.remove(&idx);
         }
 
-        state = state.next_state(updated_entries, manager.clone()).await?;
+        state.next(updated_entries, &manager).await?;
     }
 }
 
 /// Processes unfinalized entries and returns entries idxs that are finalized
 async fn process_unfinalized_entries(
     unfinalized_entries: &HashMap<u64, L1TxEntry>,
-    manager: Arc<BroadcastManager>,
+    manager: Arc<BroadcastDbManager>,
     rpc_client: &Arc<impl SeqL1Client + L1Client>,
 ) -> BroadcasterResult<(HashMap<u64, L1TxEntry>, Vec<u64>)> {
     let mut to_remove = Vec::new();
@@ -167,7 +167,7 @@ mod test {
     use alpen_express_rocksdb::test_utils::get_rocksdb_tmp_instance;
     use alpen_test_utils::ArbitraryGenerator;
 
-    use crate::broadcaster::manager::BroadcastManager;
+    use crate::broadcaster::manager::BroadcastDbManager;
     use crate::test_utils::TestBitcoinClient;
 
     use super::*;
@@ -178,10 +178,10 @@ mod test {
         Arc::new(BroadcastDatabase::new(bcastdb))
     }
 
-    fn get_manager() -> Arc<BroadcastManager> {
+    fn get_manager() -> Arc<BroadcastDbManager> {
         let pool = threadpool::Builder::new().num_threads(2).build();
         let db = get_db();
-        let mgr = BroadcastManager::new(db, Arc::new(pool));
+        let mgr = BroadcastDbManager::new(db, Arc::new(pool));
         Arc::new(mgr)
     }
 
@@ -388,7 +388,7 @@ mod test {
             .await
             .unwrap();
 
-        let state = BroadcasterState::initialize(mgr.clone()).await.unwrap();
+        let state = BroadcasterState::initialize(&mgr).await.unwrap();
 
         // This client will make the published tx finalized
         let client = TestBitcoinClient::new(FINALITY_DEPTH);

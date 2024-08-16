@@ -19,7 +19,7 @@ use thiserror::Error;
 use tokio::sync::{mpsc, oneshot, watch, Mutex, RwLock};
 
 use alpen_express_btcio::{
-    broadcaster::manager::BroadcastManager,
+    broadcaster::manager::BroadcastDbManager,
     writer::{utils::calculate_blob_hash, DaWriter},
 };
 use alpen_express_consensus_logic::sync_manager::SyncManager;
@@ -489,11 +489,11 @@ pub struct AdminServerImpl<S> {
     // Currently writer is Some() for sequencer only, but we need bcast_manager for both fullnode
     // and seq
     pub writer: Option<Arc<DaWriter<S>>>,
-    pub bcast_manager: Arc<BroadcastManager>,
+    pub bcast_manager: Arc<BroadcastDbManager>,
 }
 
 impl<S: SequencerDatabase> AdminServerImpl<S> {
-    pub fn new(writer: Option<Arc<DaWriter<S>>>, bcast_manager: Arc<BroadcastManager>) -> Self {
+    pub fn new(writer: Option<Arc<DaWriter<S>>>, bcast_manager: Arc<BroadcastDbManager>) -> Self {
         Self {
             writer,
             bcast_manager,
@@ -520,7 +520,7 @@ impl<S: SequencerDatabase + Send + Sync + 'static> AlpenAdminApiServer for Admin
         let tx: BTransaction = deserialize(&rawtx.0).map_err(|e| Error::Other(e.to_string()))?;
         let txid = tx.compute_txid();
 
-        let entry = L1TxEntry::from_tx(tx);
+        let entry = L1TxEntry::from_tx(&tx);
 
         self.bcast_manager
             .add_txentry_async((*entry.txid()).into(), entry)
