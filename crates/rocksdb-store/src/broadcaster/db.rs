@@ -194,7 +194,7 @@ mod tests {
         let _ = broadcast_db.add_tx(txid, txentry.clone()).unwrap();
 
         let mut updated_txentry = txentry;
-        updated_txentry.status = L1TxStatus::Finalized;
+        updated_txentry.status = L1TxStatus::Finalized(1);
 
         broadcast_db
             .update_tx(txid, updated_txentry.clone())
@@ -218,7 +218,7 @@ mod tests {
         let idx = broadcast_db.add_tx(txid, txentry.clone()).unwrap();
 
         let mut updated_txentry = txentry;
-        updated_txentry.status = L1TxStatus::Finalized;
+        updated_txentry.status = L1TxStatus::Finalized(1);
 
         broadcast_db
             .update_tx_by_idx(idx, updated_txentry.clone())

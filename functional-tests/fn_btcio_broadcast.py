@@ -46,4 +46,9 @@ class BroadcastTest(flexitest.Test):
                 print(e)
         assert tx_published, "Tx was not published"
 
+        # Also check from rpc, wait for a while
+        time.sleep(1)
+        st = seqrpc.alp_getTxStatus(txid)
+        assert st["status"] == "Confirmed"
+
         return True
