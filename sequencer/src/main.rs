@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use alpen_express_btcio::broadcaster::manager::BroadcastDbManager;
+// use alpen_express_btcio::broadcaster::manager::BroadcastDbManager;
 use alpen_express_btcio::broadcaster::task::broadcaster_task;
 use alpen_express_btcio::rpc::traits::L1Client;
 use alpen_express_btcio::rpc::traits::SeqL1Client;
@@ -14,6 +14,8 @@ use alpen_express_rocksdb::broadcaster::db::BroadcastDatabase;
 use anyhow::Context;
 use bitcoin::Network;
 use config::Config;
+use express_storage::managers::broadcast::BroadcastContext;
+use express_storage::managers::broadcast::BroadcastDbManager;
 use express_storage::L2BlockManager;
 use format_serde_error::SerdeError;
 use reth_rpc_types::engine::JwtError;
@@ -246,7 +248,8 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let eng_ctl = Arc::new(eng_ctl);
 
     let bcastdb = Arc::new(BroadcastDatabase::new(bcast_db));
-    let bcast_man = Arc::new(BroadcastDbManager::new(bcastdb, Arc::new(pool.clone())));
+    let bcastctx = BroadcastContext::new(bcastdb);
+    let bcast_man = Arc::new(bcastctx.into_ops(pool.clone()));
 
     // Start the sync manager.
     let sync_man = sync_manager::start_sync_tasks(

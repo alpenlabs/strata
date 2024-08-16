@@ -1,6 +1,7 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use bitcoin::{hashes::Hash, Txid};
+use express_storage::managers::broadcast::BroadcastDbManager;
 use tracing::*;
 
 use alpen_express_db::types::{ExcludeReason, L1TxEntry, L1TxStatus};
@@ -13,7 +14,7 @@ use crate::{
     },
 };
 
-use super::{error::BroadcasterResult, manager::BroadcastDbManager};
+use super::error::BroadcasterResult;
 
 // TODO: make these configurable, possibly get from Params
 const BROADCAST_POLL_INTERVAL: u64 = 1000; // millis
@@ -166,8 +167,8 @@ mod test {
     use alpen_express_rocksdb::broadcaster::db::{BroadcastDatabase, BroadcastDb};
     use alpen_express_rocksdb::test_utils::get_rocksdb_tmp_instance;
     use alpen_test_utils::ArbitraryGenerator;
+    use express_storage::managers::broadcast::BroadcastContext;
 
-    use crate::broadcaster::manager::BroadcastDbManager;
     use crate::test_utils::TestBitcoinClient;
 
     use super::*;
@@ -181,7 +182,7 @@ mod test {
     fn get_manager() -> Arc<BroadcastDbManager> {
         let pool = threadpool::Builder::new().num_threads(2).build();
         let db = get_db();
-        let mgr = BroadcastDbManager::new(db, Arc::new(pool));
+        let mgr = BroadcastContext::new(db).into_ops(pool);
         Arc::new(mgr)
     }
 

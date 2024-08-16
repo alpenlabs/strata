@@ -678,6 +678,7 @@ dependencies = [
  "base64 0.22.1",
  "bitcoin",
  "bytes",
+ "express-storage",
  "express-tasks",
  "hex",
  "mockall",
@@ -3666,6 +3667,7 @@ name = "express-storage"
 version = "0.1.0"
 dependencies = [
  "alpen-express-db",
+ "alpen-express-primitives",
  "alpen-express-state",
  "async-trait",
  "lru",

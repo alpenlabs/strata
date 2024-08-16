@@ -1,11 +1,9 @@
 use std::{collections::HashMap, sync::Arc};
 
 use alpen_express_db::types::{L1TxEntry, L1TxStatus};
+use express_storage::managers::broadcast::BroadcastDbManager;
 
-use super::{
-    error::{BroadcasterError, BroadcasterResult},
-    manager::BroadcastDbManager,
-};
+use super::error::{BroadcasterError, BroadcasterResult};
 
 pub(crate) struct BroadcasterState {
     /// Next tx idx from which we should next read the tx entries to check and process
@@ -58,9 +56,10 @@ impl BroadcasterState {
         let new_unfinalized_entries =
             filter_unfinalized_from_db(manager, self.next_idx, next_idx).await?;
 
-        // Update state
+        // Update state: include updated entries and new unfinalized entries
         self.unfinalized_entries.extend(updated_entries);
         self.unfinalized_entries.extend(new_unfinalized_entries);
+        self.next_idx = next_idx;
         Ok(())
     }
 }
@@ -74,7 +73,7 @@ async fn filter_unfinalized_from_db(
 ) -> BroadcasterResult<HashMap<u64, L1TxEntry>> {
     let mut unfinalized_entries = HashMap::new();
     for idx in from..to {
-        let Some(txentry) = manager.get_txentry_by_idx_async(idx).await? else {
+        let Some(txentry) = manager.get_txentry_async(idx).await? else {
             break;
         };
 
@@ -96,8 +95,7 @@ mod test {
         test_utils::get_rocksdb_tmp_instance,
     };
     use alpen_test_utils::ArbitraryGenerator;
-
-    use crate::broadcaster::manager::BroadcastDbManager;
+    use express_storage::managers::broadcast::BroadcastContext;
 
     use super::*;
 
@@ -110,7 +108,7 @@ mod test {
     fn get_manager() -> Arc<BroadcastDbManager> {
         let pool = threadpool::Builder::new().num_threads(2).build();
         let db = get_db();
-        let mgr = BroadcastDbManager::new(db, Arc::new(pool));
+        let mgr = BroadcastContext::new(db).into_ops(pool);
         Arc::new(mgr)
     }
 
