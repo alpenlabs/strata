@@ -137,7 +137,7 @@ impl<K: Clone + Eq + Hash, V: Clone> CacheTable<K, V> {
             let mut cache = self.cache.lock().await;
             if let Some(entry_lock) = cache.get(k) {
                 let entry = entry_lock.read().await;
-                return Ok(entry.get_async().await?);
+                return entry.get_async().await;
             }
 
             // Create a new cache slot and insert and lock it.
@@ -189,7 +189,7 @@ impl<K: Clone + Eq + Hash, V: Clone> CacheTable<K, V> {
             let mut cache = self.cache.blocking_lock();
             if let Some(entry_lock) = cache.get(k) {
                 let entry = entry_lock.blocking_read();
-                return Ok(entry.get_blocking()?);
+                return entry.get_blocking();
             }
 
             // Create a new cache slot and insert and lock it.
