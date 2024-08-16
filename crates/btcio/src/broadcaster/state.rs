@@ -78,7 +78,7 @@ async fn filter_unfinalized_from_db(
         };
 
         match txentry.status {
-            L1TxStatus::Finalized | L1TxStatus::Excluded(_) => {}
+            L1TxStatus::Finalized(_) | L1TxStatus::Excluded(_) => {}
             _ => {
                 unfinalized_entries.insert(idx, txentry);
             }
@@ -120,11 +120,11 @@ mod test {
     }
 
     fn gen_confirmed_entry() -> L1TxEntry {
-        gen_entry_with_status(L1TxStatus::Confirmed)
+        gen_entry_with_status(L1TxStatus::Confirmed(1))
     }
 
     fn gen_finalized_entry() -> L1TxEntry {
-        gen_entry_with_status(L1TxStatus::Finalized)
+        gen_entry_with_status(L1TxStatus::Finalized(1))
     }
 
     fn gen_unpublished_entry() -> L1TxEntry {

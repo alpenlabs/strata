@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use bitcoin::{Block, BlockHash, Network, Transaction, Txid};
 
 use super::{
-    types::{RawUTXO, RpcBlockchainInfo},
+    types::{RPCTransactionInfo, RawUTXO, RpcBlockchainInfo},
     ClientError,
 };
 
@@ -23,8 +23,8 @@ pub trait L1Client: Sync + Send + 'static {
 
     /// get number of confirmations for txid
     /// 0 confirmations means tx is still in mempool
-    async fn get_transaction_confirmations(&self, txid: Txid) -> Result<u64, ClientError>;
-    //
+    async fn get_transaction_info(&self, txid: Txid) -> Result<RPCTransactionInfo, ClientError>;
+
     // TODO: add others as necessary
 }
 

@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, to_value, value::RawValue, value::Value};
 use tracing::*;
 
-use super::{traits::SeqL1Client, types::GetTransactionResponse};
+use super::{traits::SeqL1Client, types::RPCTransactionInfo};
 
 use thiserror::Error;
 
@@ -445,12 +445,10 @@ impl L1Client for BitcoinClient {
         }
     }
 
-    async fn get_transaction_confirmations(&self, txid: Txid) -> ClientResult<u64> {
-        let result = self
-            .call::<GetTransactionResponse>("gettransaction", &[to_val(txid.to_string())?])
-            .await?;
-
-        Ok(result.confirmations)
+    async fn get_transaction_info(&self, txid: Txid) -> ClientResult<RPCTransactionInfo> {
+        Ok(self
+            .call::<RPCTransactionInfo>("gettransaction", &[to_val(txid.to_string())?])
+            .await?)
     }
 }
 

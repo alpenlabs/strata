@@ -1,6 +1,6 @@
 //! L1 tx Broadcast data manager.
 
-// NOTE: As an existing convention, this should actuall be in ops, but we don't need caching layer
+// NOTE: As an existing convention, this should actually be in ops, but we don't need caching layer
 // sofar thus this should be fine.
 
 use std::sync::Arc;

@@ -78,7 +78,7 @@ async fn check_confirmations_and_update_entry<D: SequencerDatabase + Send + Sync
     db: Arc<D>,
 ) -> anyhow::Result<u64> {
     let txid = Txid::from_slice(blobentry.reveal_txid.0.as_slice())?;
-    let confs = rpc_client.get_transaction_confirmations(txid).await?;
+    let confs = rpc_client.get_transaction_info(txid).await?.confirmations;
     // If confs is 0 then it is yet in mempool
     // TODO: But if confs is error(saying txn not found, TODO: check this) then it
     // could possibly have reorged and we might need to

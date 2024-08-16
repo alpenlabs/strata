@@ -92,10 +92,10 @@ pub enum L1TxStatus {
     Unpublished,
     /// The tx is published
     Published,
-    /// The tx is included in L1
-    Confirmed,
-    /// The tx is finalized in L1
-    Finalized,
+    /// The tx is included in L1 at given height
+    Confirmed(u64),
+    /// The tx is finalized in L1 at given height
+    Finalized(u64),
     /// The tx is not included in L1 and has errored with some error code
     Excluded(ExcludeReason),
 }

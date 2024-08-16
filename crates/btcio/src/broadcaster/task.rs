@@ -71,7 +71,9 @@ async fn process_unfinalized_entries(
             manager.put_txentry_async(*idx, new_txentry.clone()).await?;
 
             // Remove if finalized
-            if status == L1TxStatus::Finalized || matches!(status, L1TxStatus::Excluded(_)) {
+            if matches!(status, L1TxStatus::Finalized(_))
+                || matches!(status, L1TxStatus::Excluded(_))
+            {
                 to_remove.push(*idx);
             }
 
@@ -114,26 +116,26 @@ async fn handle_entry(
                 }
             }
         }
-        L1TxStatus::Published | L1TxStatus::Confirmed => {
+        L1TxStatus::Published | L1TxStatus::Confirmed(_) => {
             // check for confirmations
             let txid = Txid::from_slice(txentry.txid())
                 .map_err(|e| BroadcasterError::Other(e.to_string()))?;
-            match rpc_client
-                .get_transaction_confirmations(txid)
+            let txinfo = rpc_client
+                .get_transaction_info(txid)
                 .await
-                .map_err(|e| BroadcasterError::Other(e.to_string()))?
-            {
-                0 if txentry.status == L1TxStatus::Confirmed => {
+                .map_err(|e| BroadcasterError::Other(e.to_string()))?;
+            match txinfo.confirmations {
+                0 if matches!(txentry.status, L1TxStatus::Confirmed(_h)) => {
                     // if the confirmations of a txn that is already confirmed is 0 then there is
                     // something wrong, possibly a reorg, so just set it to unpublished
                     Ok(Some(L1TxStatus::Unpublished))
                 }
                 0 => Ok(None),
-                c if c >= FINALITY_DEPTH => Ok(Some(L1TxStatus::Finalized)),
-                _ => Ok(Some(L1TxStatus::Confirmed)),
+                c if c >= FINALITY_DEPTH => Ok(Some(L1TxStatus::Finalized(txinfo.block_height()))),
+                _ => Ok(Some(L1TxStatus::Confirmed(txinfo.block_height()))),
             }
         }
-        L1TxStatus::Finalized => Ok(None), // Nothing to do for finalized tx
+        L1TxStatus::Finalized(_) => Ok(None), // Nothing to do for finalized tx
         L1TxStatus::Excluded(_) => {
             // If a tx is excluded due to MissingInputsOrSpent then the downstream task like
             // writer/signer will be accountable for recreating the tx and asking to broadcast.
@@ -242,7 +244,7 @@ mod test {
         let res = handle_entry(&cl, &e, 0).await.unwrap();
         assert_eq!(
             res,
-            Some(L1TxStatus::Confirmed),
+            Some(L1TxStatus::Confirmed(cl.included_height)),
             "Status should be confirmed if 0 < confirmations < finality_depth"
         );
 
@@ -253,7 +255,7 @@ mod test {
         let res = handle_entry(&cl, &e, 0).await.unwrap();
         assert_eq!(
             res,
-            Some(L1TxStatus::Finalized),
+            Some(L1TxStatus::Finalized(cl.included_height)),
             "Status should be confirmed if confirmations >= finality_depth"
         );
     }
@@ -261,7 +263,7 @@ mod test {
     #[tokio::test]
     async fn test_handle_confirmed_entry() {
         let mgr = get_manager();
-        let e = gen_entry_with_status(L1TxStatus::Confirmed);
+        let e = gen_entry_with_status(L1TxStatus::Confirmed(1));
 
         // Add tx to db
         mgr.add_txentry_async((*e.txid()).into(), e.clone())
@@ -286,7 +288,7 @@ mod test {
         let res = handle_entry(&cl, &e, 0).await.unwrap();
         assert_eq!(
             res,
-            Some(L1TxStatus::Confirmed),
+            Some(L1TxStatus::Confirmed(cl.included_height)),
             "Status should be confirmed if 0 < confirmations < finality_depth"
         );
 
@@ -297,7 +299,7 @@ mod test {
         let res = handle_entry(&cl, &e, 0).await.unwrap();
         assert_eq!(
             res,
-            Some(L1TxStatus::Finalized),
+            Some(L1TxStatus::Finalized(cl.included_height)),
             "Status should be confirmed if confirmations >= finality_depth"
         );
     }
@@ -305,7 +307,7 @@ mod test {
     #[tokio::test]
     async fn test_handle_finalized_entry() {
         let mgr = get_manager();
-        let e = gen_entry_with_status(L1TxStatus::Finalized);
+        let e = gen_entry_with_status(L1TxStatus::Finalized(1));
 
         // Add tx to db
         mgr.add_txentry_async((*e.txid()).into(), e.clone())
@@ -414,7 +416,7 @@ mod test {
         );
         assert_eq!(
             new_entries.get(&i3).unwrap().status,
-            L1TxStatus::Finalized,
+            L1TxStatus::Finalized(cl.included_height),
             "published tx should be finalized"
         );
     }
