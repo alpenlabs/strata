@@ -8,6 +8,7 @@ use alpen_express_btcio::writer::DaWriter;
 use alpen_express_primitives::buf::{Buf32, Buf64};
 use alpen_express_state::batch::{BatchCommitment, SignedBatchCommitment};
 use alpen_express_state::da_blob::{BlobDest, BlobIntent};
+use express_storage::L2BlockManager;
 use tokio::sync::broadcast;
 use tracing::*;
 
@@ -29,10 +30,18 @@ pub fn duty_tracker_task<D: Database>(
     batch_queue: broadcast::Sender<DutyBatch>,
     ident: Identity,
     database: Arc<D>,
+    l2_block_manager: Arc<L2BlockManager>,
     params: Arc<Params>,
 ) {
     let db = database.as_ref();
-    if let Err(e) = duty_tracker_task_inner(cupdate_rx, batch_queue, ident, db, params.as_ref()) {
+    if let Err(e) = duty_tracker_task_inner(
+        cupdate_rx,
+        batch_queue,
+        ident,
+        db,
+        &l2_block_manager,
+        params.as_ref(),
+    ) {
         error!(err = %e, "tracker task exited");
     }
 }
@@ -42,6 +51,7 @@ fn duty_tracker_task_inner(
     batch_queue: broadcast::Sender<DutyBatch>,
     ident: Identity,
     database: &impl Database,
+    l2_block_manager: &L2BlockManager,
     params: &Params,
 ) -> Result<(), Error> {
     let mut duties_tracker = types::DutyTracker::new_empty();
@@ -72,7 +82,14 @@ fn duty_tracker_task_inner(
         trace!(%ev_idx, "new consensus state, updating duties");
         trace!("STATE: {new_state:#?}");
 
-        if let Err(e) = update_tracker(&mut duties_tracker, new_state, &ident, database, params) {
+        if let Err(e) = update_tracker(
+            &mut duties_tracker,
+            new_state,
+            &ident,
+            database,
+            &l2_block_manager,
+            params,
+        ) {
             error!(err = %e, "failed to update duties tracker");
         }
 
@@ -88,11 +105,12 @@ fn duty_tracker_task_inner(
     Ok(())
 }
 
-fn update_tracker<D: Database>(
+fn update_tracker(
     tracker: &mut types::DutyTracker,
     state: &ClientState,
     ident: &Identity,
-    database: &D,
+    database: &impl Database,
+    l2_block_manager: &L2BlockManager,
     params: &Params,
 ) -> Result<(), Error> {
     let Some(ss) = state.sync() else {
@@ -106,9 +124,8 @@ fn update_tracker<D: Database>(
     // Figure out the block slot from the tip blockid.
     // TODO include the block slot in the consensus state
     let tip_blkid = *ss.chain_tip_blkid();
-    let l2prov = database.l2_provider();
-    let block = l2prov
-        .get_block_data(tip_blkid)?
+    let block = l2_block_manager
+        .get_block_blocking(&tip_blkid)?
         .ok_or(Error::MissingL2Block(tip_blkid))?;
     let block_idx = block.header().blockidx();
     let ts = time::Instant::now(); // FIXME XXX use .timestamp()!!!
@@ -117,7 +134,7 @@ fn update_tracker<D: Database>(
     let new_finalized = state.sync().map(|sync| *sync.finalized_blkid());
     let newly_finalized_blocks: Vec<L2BlockId> = get_finalized_blocks(
         tracker.get_finalized_block(),
-        l2prov.as_ref(),
+        l2_block_manager,
         new_finalized,
     )?;
 
@@ -133,7 +150,7 @@ fn update_tracker<D: Database>(
 
 fn get_finalized_blocks(
     last_finalized_block: Option<L2BlockId>,
-    l2prov: &impl L2DataProvider,
+    l2_blkman: &L2BlockManager,
     finalized: Option<L2BlockId>,
 ) -> Result<Vec<L2BlockId>, Error> {
     // Figure out which blocks were finalized
@@ -149,7 +166,7 @@ fn get_finalized_blocks(
 
         // else loop till we reach to the last finalized block or go all the way
         // as long as we get some block data
-        match l2prov.get_block_data(finalized)? {
+        match l2_blkman.get_block_blocking(&finalized)? {
             Some(block) => new_finalized = Some(*block.header().parent()),
             None => break,
         }

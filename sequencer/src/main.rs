@@ -275,10 +275,18 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         writer_ctl = Some(writer.clone());
 
         // Spawn duty tasks.
+        let t_l2blkman = l2_block_manager.clone();
         let t_params = params.clone();
         thread::spawn(move || {
             // FIXME figure out why this can't infer the type, it's like *right there*
-            duty_worker::duty_tracker_task::<_>(cu_rx, duties_tx, idata.ident, db, t_params)
+            duty_worker::duty_tracker_task::<_>(
+                cu_rx,
+                duties_tx,
+                idata.ident,
+                db,
+                t_l2blkman,
+                t_params,
+            )
         });
 
         let d_params = params.clone();
