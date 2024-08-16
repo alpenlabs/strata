@@ -177,7 +177,7 @@ pub fn duty_dispatch_task<
     database: Arc<D>,
     engine: Arc<E>,
     da_writer: Arc<DaWriter<S>>,
-    pool: Arc<threadpool::ThreadPool>,
+    pool: threadpool::ThreadPool,
     params: Arc<Params>,
 ) {
     // TODO make this actually work

@@ -361,7 +361,7 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
             let best_block = pick_best_block(
                 &cur_tip,
                 state.chain_tracker.chain_tips_iter(),
-                state.database.as_ref(),
+                &state.l2_block_manager,
             )?;
 
             // Figure out what our job is now.
@@ -448,7 +448,7 @@ fn check_new_block<D: Database>(
 /// Returns if we should switch to the new fork.  This is dependent on our
 /// current tip and any of the competing forks.  It's "sticky" in that it'll try
 /// to stay where we currently are unless there's a definitely-better fork.
-fn pick_best_block<'t, D: Database>(
+fn pick_best_block<'t>(
     cur_tip: &'t L2BlockId,
     tips_iter: impl Iterator<Item = &'t L2BlockId>,
     l2_block_manager: &L2BlockManager,

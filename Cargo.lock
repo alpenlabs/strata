@@ -899,6 +899,7 @@ dependencies = [
  "argh",
  "async-trait",
  "bitcoin",
+ "express-storage",
  "format_serde_error",
  "hex",
  "jsonrpsee",
