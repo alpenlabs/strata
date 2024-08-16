@@ -20,6 +20,7 @@ members = [
   "crates/rpc/utils",
   "crates/state",
   "crates/storage",
+  "crates/tasks",
   "crates/test-utils",
   "crates/util/mmr",
   "crates/vtxjmt",
@@ -54,6 +55,7 @@ express-reth-rpc = { path = "crates/reth/rpc" }
 express-rpc-utils = { path = "crates/rpc/utils" }
 express-storage = { path = "crates/storage" }
 express-zkvm = { path = "crates/prover/zkvm" }                      # FIXME make these names more consistent?
+express-tasks = { path = "crates/tasks" }
 zkvm-primitives = { path = "crates/prover/primitives" }
 
 # IMPORTANT: ensure alloy-* types are of the same version as inside reth dependency
@@ -72,6 +74,7 @@ digest = "0.10"
 eyre = "0.6"
 format_serde_error = { git = "https://github.com/AlexanderThaller/format_serde_error" }
 futures = "0.3"
+futures-util = "0.3"
 hex = { version = "0.4", features = ["serde"] }
 http = "1.0.0"
 hyper = "0.14.25"
