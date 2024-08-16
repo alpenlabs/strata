@@ -2,9 +2,9 @@
 
 use std::collections::*;
 
-use alpen_express_db::traits::L2DataProvider;
 use alpen_express_primitives::buf::Buf32;
 use alpen_express_state::prelude::*;
+use express_storage::L2BlockManager;
 
 use crate::errors::ChainTipError;
 
@@ -233,17 +233,17 @@ impl UnfinalizedBlockTracker {
     pub fn load_unfinalized_blocks(
         &mut self,
         finalized_height: u64,
-        database: &impl L2DataProvider,
+        l2_block_manager: &L2BlockManager,
     ) -> anyhow::Result<()> {
         let mut height = finalized_height;
-        while let Ok(block_ids) = database.get_blocks_at_height(height) {
+        while let Ok(block_ids) = l2_block_manager.get_blocks_at_height_blocking(height) {
             if block_ids.is_empty() {
                 break;
             }
             for block_id in block_ids {
-                if let Some(block) = database.get_block_data(block_id)? {
+                if let Some(block) = l2_block_manager.get_block_blocking(&block_id)? {
                     let header = block.header();
-                    let _ = self.attach_block(block_id, header);
+                    let _ = self.attach_block(*block_id, header);
                 }
             }
             height += 1;

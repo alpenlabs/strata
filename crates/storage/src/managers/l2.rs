@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use alpen_express_db::errors::DbError;
+use alpen_express_db::traits::BlockStatus;
 use alpen_express_db::DbResult;
 use threadpool::ThreadPool;
 
@@ -40,15 +41,45 @@ impl L2BlockManager {
     }
 
     /// Gets a block either in the cache or from the underlying database.
-    pub async fn get_block_async(&self, k: &L2BlockId) -> Result<Option<L2BlockBundle>, DbError> {
+    pub async fn get_block_async(&self, id: &L2BlockId) -> DbResult<Option<L2BlockBundle>> {
         self.block_cache
-            .get_or_fetch_async(k, || self.ops.get_block_chan(*k))
+            .get_or_fetch_async(id, || self.ops.get_block_chan(*id))
             .await
     }
 
     /// Gets a block either in the cache or from the underlying database.
-    pub fn get_block_blocking(&self, k: &L2BlockId) -> Result<Option<L2BlockBundle>, DbError> {
+    pub fn get_block_blocking(&self, id: &L2BlockId) -> DbResult<Option<L2BlockBundle>> {
         self.block_cache
-            .get_or_fetch_blocking(k, || self.ops.get_block_blocking(*k))
+            .get_or_fetch_blocking(id, || self.ops.get_block_blocking(*id))
+    }
+
+    pub async fn get_blocks_at_height_async(&self, h: u64) -> DbResult<Vec<L2BlockId>> {
+        self.ops.get_blocks_at_height_async(h).await
+    }
+
+    pub fn get_blocks_at_height_blocking(&self, h: u64) -> DbResult<Vec<L2BlockId>> {
+        self.ops.get_blocks_at_height_blocking(h)
+    }
+
+    pub async fn get_block_status_async(&self, id: &L2BlockId) -> DbResult<Option<BlockStatus>> {
+        self.ops.get_block_status_async(*id).await
+    }
+
+    pub fn get_block_status_blocking(&self, id: &L2BlockId) -> DbResult<Option<BlockStatus>> {
+        self.ops.get_block_status_blocking(*id)
+    }
+
+    pub async fn put_block_status_async(
+        &self,
+        id: &L2BlockId,
+        status: BlockStatus,
+    ) -> DbResult<()> {
+        // TODO
+        unimplemented!()
+    }
+
+    pub fn put_block_status_blocking(&self, id: &L2BlockId, status: BlockStatus) -> DbResult<()> {
+        // TODO
+        unimplemented!()
     }
 }

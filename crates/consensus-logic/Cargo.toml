@@ -10,6 +10,7 @@ alpen-express-eectl = { workspace = true }
 alpen-express-primitives = { workspace = true }
 alpen-express-state = { workspace = true }
 express-chaintsn = { workspace = true }
+express-storage = { workspace = true }
 
 anyhow = { workspace = true }
 bitcoin = { workspace = true }
