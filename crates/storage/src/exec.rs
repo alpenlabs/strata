@@ -26,7 +26,7 @@ where
         F: Fn(T) -> DbResult<R> + Sync + Send + 'static,
     {
         Self {
-            executor_fn: Arc::new(move |t| op(t)),
+            executor_fn: Arc::new(op),
         }
     }
 
