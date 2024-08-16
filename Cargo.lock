@@ -3090,6 +3090,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "express-chaintsn"
+version = "0.1.0"
+
+[[package]]
 name = "express-reth-db"
 version = "0.1.0"
 dependencies = [
