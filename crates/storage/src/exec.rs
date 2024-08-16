@@ -94,6 +94,7 @@ macro_rules! inst_ops {
                 )*
             }
 
+            #[async_trait::async_trait]
             trait ShimTrait: Sync + Send + 'static {
                 $(
                     fn [<$iname _blocking>] (&self, $($aname: $aty),*) -> DbResult<$ret>;
