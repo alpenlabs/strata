@@ -8,6 +8,7 @@ members = [
   "crates/evmexec",
   "crates/primitives",
   "crates/prover/adapters/risc0",
+  "crates/prover/adapters/sp1",
   "crates/prover/primitives",
   "crates/prover/zkvm",
   "crates/reth/db",
@@ -50,7 +51,7 @@ express-reth-exex = { path = "crates/reth/exex" }
 express-reth-rpc = { path = "crates/reth/rpc" }
 express-rpc-utils = { path = "crates/rpc/utils" }
 express-storage = { path = "crates/storage" }
-zkvm = { path = "crates/prover/zkvm" }                              # FIXME make these names more consistent?
+express-zkvm = { path = "crates/prover/zkvm" }                      # FIXME make these names more consistent?
 zkvm-primitives = { path = "crates/prover/primitives" }
 
 # IMPORTANT: ensure alloy-* types are of the same version as inside reth dependency
