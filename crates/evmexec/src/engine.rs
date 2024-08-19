@@ -10,13 +10,13 @@ use reth_rpc_types::Withdrawal;
 use tokio::runtime::Handle;
 use tokio::sync::Mutex;
 
-use alpen_express_db::traits::L2DataProvider;
 use alpen_express_eectl::engine::{BlockStatus, ExecEngineCtl, PayloadStatus};
 use alpen_express_eectl::errors::{EngineError, EngineResult};
 use alpen_express_eectl::messages::{ELDepositData, ExecPayloadData, Op, PayloadEnv};
 use alpen_express_state::block::L2BlockBundle;
 use alpen_express_state::exec_update::UpdateInput;
 use alpen_express_state::id::L2BlockId;
+use express_storage::L2BlockManager;
 
 use crate::block::EVML2Block;
 use crate::el_payload::ElPayload;
@@ -201,31 +201,31 @@ impl<T: EngineRpc> RpcExecEngineInner<T> {
     }
 }
 
-pub struct RpcExecEngineCtl<T: EngineRpc, P: L2DataProvider> {
+pub struct RpcExecEngineCtl<T: EngineRpc> {
     inner: RpcExecEngineInner<T>,
     tokio_handle: Handle,
-    l2_provider: Arc<P>,
+    l2_block_manager: Arc<L2BlockManager>,
 }
 
-impl<T: EngineRpc, P: L2DataProvider> RpcExecEngineCtl<T, P> {
+impl<T: EngineRpc> RpcExecEngineCtl<T> {
     pub fn new(
         client: T,
         fork_choice_state: ForkchoiceState,
         handle: Handle,
-        l2_provider: Arc<P>,
+        l2_block_manager: Arc<L2BlockManager>,
     ) -> Self {
         Self {
             inner: RpcExecEngineInner::new(client, fork_choice_state),
             tokio_handle: handle,
-            l2_provider,
+            l2_block_manager,
         }
     }
 }
 
-impl<T: EngineRpc, P: L2DataProvider> RpcExecEngineCtl<T, P> {
+impl<T: EngineRpc> RpcExecEngineCtl<T> {
     fn get_l2block(&self, l2_block_id: &L2BlockId) -> anyhow::Result<L2BlockBundle> {
-        self.l2_provider
-            .get_block_data(*l2_block_id)?
+        self.l2_block_manager
+            .get_block_blocking(l2_block_id)?
             .ok_or(anyhow::anyhow!("missing L2Block"))
     }
 
@@ -240,7 +240,7 @@ impl<T: EngineRpc, P: L2DataProvider> RpcExecEngineCtl<T, P> {
     }
 }
 
-impl<T: EngineRpc, P: L2DataProvider> ExecEngineCtl for RpcExecEngineCtl<T, P> {
+impl<T: EngineRpc> ExecEngineCtl for RpcExecEngineCtl<T> {
     fn submit_payload(&self, payload: ExecPayloadData) -> EngineResult<BlockStatus> {
         self.tokio_handle
             .block_on(self.inner.submit_new_payload(payload))

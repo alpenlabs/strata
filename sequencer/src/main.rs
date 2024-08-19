@@ -225,7 +225,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         client,
         initial_fcs,
         rt.handle().clone(),
-        database.l2_provider().clone(),
+        l2_block_manager.clone(),
     );
     let eng_ctl = Arc::new(eng_ctl);
 
