@@ -6,8 +6,9 @@ use jsonrpsee::{core::RpcResult, RpcModule};
 use tokio::sync::oneshot;
 use tracing::{info, warn};
 
-use super::constants::{RPC_PORT, RPC_SERVER};
 use express_bridge_rpc_api::{ExpressBridgeControlApiServer, ExpressBridgeNetworkApiServer};
+
+use crate::constants::{RPC_PORT, RPC_SERVER};
 
 pub(crate) async fn start<T>(rpc_impl: &T) -> anyhow::Result<()>
 where

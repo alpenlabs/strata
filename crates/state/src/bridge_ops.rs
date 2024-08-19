@@ -33,6 +33,14 @@ impl WithdrawalIntent {
     pub fn into_parts(&self) -> (BitcoinAmount, BitcoinAddress) {
         (self.amt, self.dest_pk.clone())
     }
+
+    pub fn amt(&self) -> &BitcoinAmount {
+        &self.amt
+    }
+
+    pub fn dest_pk(&self) -> &BitcoinAddress {
+        &self.dest_pk
+    }
 }
 
 /// Set of withdrawals that are assigned to a deposit bridge utxo.
@@ -45,11 +53,11 @@ pub struct WithdrawalBatch {
     /// This happens when the sum of the intents equals [`WITHDRAWAL_DENOMINATION`]
     assignee: Option<OperatorEntry>,
 
-    /// The particular deposit UTXO that is to be used to service the current batch.
+    /// The particular deposit outpoint that is to be used to service the current batch.
     ///
-    /// The deposit UTXO is predetermined when the withdrawal batch is first created as all
+    /// The deposit outpoint is predetermined when the withdrawal batch is first created as all
     /// such UTXOs are functionally indistinguishable.
-    deposit_utxo: OutputRef,
+    deposit_outpoint: OutputRef,
 
     /// The bitcoin block height before which the withdrawal must be completed.
     /// When set to 0, it means that the withdrawal cannot be processed yet.
@@ -81,8 +89,8 @@ impl WithdrawalBatch {
         &self.valid_till_blockheight
     }
 
-    pub fn deposit_utxo(&self) -> &OutPoint {
-        self.deposit_utxo.outpoint()
+    pub fn deposit_outpoint(&self) -> &OutPoint {
+        self.deposit_outpoint.outpoint()
     }
 }
 

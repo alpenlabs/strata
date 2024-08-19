@@ -1,6 +1,6 @@
 //! Type/traits related to the bridge-related duties.
 
-use express_bridge_txm::{DepositRequest, ReimbursementRequest};
+use express_bridge_txm::{DepositRequest, ReimbursementRequest, Unsigned};
 use serde::{Deserialize, Serialize};
 
 use crate::bridge_ops::WithdrawalBatch;
@@ -13,7 +13,7 @@ pub enum Duty {
     /// Bridge Address.
     ///
     /// This duty is created when a user deposit request comes in, and applies to all operators.
-    SignDeposit(DepositRequest),
+    SignDeposit(DepositRequest<Unsigned>),
 
     /// The duty to fulfill a withdrawal request that is assigned to a particular operator.
     ///
@@ -38,9 +38,9 @@ pub struct BridgeDuties {
     /// The bridge duties computed from the chainstate and the bridge p2p message queue.
     duties: Vec<Duty>,
 
-    /// The rollup block height after which the duties are computed.
-    from_height: u64,
+    /// The checkpoint in the CL after which the duties are computed.
+    checkpoint_start: u64,
 
-    /// The rollup block height till which the duties are computed.
-    to_height: u64,
+    /// The checkpoint in the CL till which the duties are computed (inclusive).
+    checkpoint_end: u64,
 }

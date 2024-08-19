@@ -7,5 +7,4 @@ pub mod book_keeping;
 pub mod challenger;
 pub mod config;
 pub mod deposit_handler;
-pub mod operator;
 pub mod withdrawal_handler;
