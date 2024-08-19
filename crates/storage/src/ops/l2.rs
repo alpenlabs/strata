@@ -7,7 +7,7 @@ use alpen_express_state::{block::L2BlockBundle, id::L2BlockId};
 
 use crate::exec::*;
 
-/// Database context for an database operation interface.
+/// Database context for the operation interface.
 pub struct Context<D: Database> {
     db: Arc<D>,
 }

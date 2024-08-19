@@ -85,6 +85,7 @@ pub trait L1DataProvider {
 
     /// Returns a half-open interval of block hashes, if we have all of them
     /// present.  Otherwise, returns error.
+    // TODO convert to L1BlockId
     fn get_blockid_range(&self, start_idx: u64, end_idx: u64) -> DbResult<Vec<Buf32>>;
 
     /// Gets the relevant txs we stored in a block.
