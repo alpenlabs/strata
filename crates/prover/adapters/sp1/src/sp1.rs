@@ -102,10 +102,14 @@ mod tests {
     //     let n = sp1_zkvm::io::read::<u32>();
     //     sp1_zkvm::io::commit(&n);
     // }
-    const TEST_ELF: &[u8] = include_bytes!("../elf/riscv32im-succinct-zkvm-elf");
+    const TEST_ELF: &[u8] = include_bytes!("../tests/elf/riscv32im-succinct-zkvm-elf");
 
     #[test]
     fn test_mock_prover() {
+        if cfg!(debug_assertions) {
+            panic!("SP1 prover runs in release mode only");
+        }
+
         let input: u32 = 1;
         let zkvm = SP1Host::init(TEST_ELF.to_vec(), ProverOptions::default());
 
@@ -123,6 +127,10 @@ mod tests {
 
     #[test]
     fn test_mock_prover_with_public_param() {
+        if cfg!(debug_assertions) {
+            panic!("SP1 prover runs in release mode only");
+        }
+
         let input: u32 = 1;
         let zkvm = SP1Host::init(TEST_ELF.to_vec(), ProverOptions::default());
 

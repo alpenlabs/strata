@@ -111,7 +111,7 @@ mod tests {
     //     let input: u32 = env::read();
     //     env::commit(&input);
     // }
-    const TEST_ELF: &[u8] = include_bytes!("../elf/risc0-zkvm-elf");
+    const TEST_ELF: &[u8] = include_bytes!("../tests/elf/risc0-zkvm-elf");
 
     #[test]
     fn test_mock_prover() {
