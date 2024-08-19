@@ -32,3 +32,26 @@ impl SignatureInfo {
         &self.signer_pubkey
     }
 }
+
+/// Marker representing that a Deposit Request is unsigned.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Unsigned;
+
+/// The signature details of a signed deposit request.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Signed(SignatureInfo);
+
+impl Signed {
+    /// Create a new signature info.
+    pub fn new(signature: Signature, signer_pubkey: XOnlyPublicKey) -> Self {
+        Self(SignatureInfo {
+            signature,
+            signer_pubkey,
+        })
+    }
+
+    /// Get the [`SignatureInfo`] from the `Signed` data.
+    pub fn inner(&self) -> &SignatureInfo {
+        &self.0
+    }
+}

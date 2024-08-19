@@ -39,7 +39,7 @@ pub struct AddressConfig {
 
 impl Config {
     /// Parse the config at the given path and produce the [`Config`].
-    pub fn from_path(path: &PathBuf) -> ParseConfigResult<Self> {
+    pub fn load_from_path(path: &PathBuf) -> InitResult<Self> {
         let contents = fs::read_to_string(path)?;
         let config = toml::from_str::<Config>(contents.as_str())
             .map_err(|e| SerdeError::new(contents, e))?;
@@ -59,9 +59,10 @@ pub struct SecretsConfig {
     pub_key: PathBuf,
 }
 
-/// Error with the configuration.
+/// Error during initialization.
+// TODO: move this out to a dedicated module or `bin`.
 #[derive(Debug, Error)]
-pub enum ConfigError {
+pub enum InitError {
     /// I/O related error while reading config.
     #[error("error loading config file: {0}")]
     Io(#[from] io::Error),
@@ -72,4 +73,4 @@ pub enum ConfigError {
 }
 
 /// Result of parsing the config file which may produce a [`ConfigError`].
-pub type ParseConfigResult<T> = Result<T, ConfigError>;
+pub type InitResult<T> = Result<T, InitError>;

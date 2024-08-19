@@ -3,16 +3,16 @@
 //! Contains types, traits and implementations related to creating various transactions used in the
 //! bridge-in dataflow.
 
-use bitcoin::{Amount, OutPoint};
+use bitcoin::{secp256k1::schnorr::Signature, Amount, OutPoint, XOnlyPublicKey};
 use serde::{Deserialize, Serialize};
 
-use crate::SignatureInfo;
+use crate::{Signed, Unsigned};
 
 /// The deposit information  required to create the Deposit Transaction.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DepositInfo {
-    /// The deposit request transaction UTXO from the user.
-    deposit_request_utxo: OutPoint,
+    /// The deposit request transaction outpoint from the user.
+    deposit_request_outpoint: OutPoint,
 
     /// The execution layer address to mint the equivalent tokens to.
     /// As of now, this is just the 20-byte EVM address.
@@ -57,12 +57,12 @@ pub struct DepositMetadata {
 /// as the subsequent signing duty originating from an operator who attaches their signature. Each
 /// operator that receives a signature validates, aggregates and stores it.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DepositRequest {
+pub struct DepositRequest<SigStatus = Unsigned> {
     /// The details required to create the Deposit Transaction deterministically.
     deposit_info: DepositInfo,
 
-    /// The signature details if the transaction has already been signed by an operator.
-    signature_info: Option<SignatureInfo>,
+    /// The signature details.
+    signature_info: SigStatus,
 }
 
 impl DepositRequest {
@@ -71,8 +71,20 @@ impl DepositRequest {
         &self.deposit_info
     }
 
-    /// Get the signature information associated with this request.
-    pub fn signature_info(&self) -> &Option<SignatureInfo> {
-        &self.signature_info
+    /// Sign the transaction.
+    pub fn add_signature(&self) -> DepositRequest<Signed> {
+        unimplemented!()
+    }
+}
+
+impl DepositRequest<Signed> {
+    /// Get the signature in the signed deposit request.
+    pub fn signature(&self) -> &Signature {
+        self.signature_info.inner().signature()
+    }
+
+    /// Get the signer pubkey in the signed deposit request.
+    pub fn signer_pubkey(&self) -> &XOnlyPublicKey {
+        self.signature_info.inner().signer_pubkey()
     }
 }

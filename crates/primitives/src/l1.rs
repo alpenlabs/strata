@@ -245,6 +245,16 @@ impl FromStr for BitcoinAddress {
     }
 }
 
+impl TryFrom<Buf32> for BitcoinAddress {
+    type Error = <Address<NetworkUnchecked> as FromStr>::Err;
+
+    fn try_from(value: Buf32) -> Result<Self, Self::Error> {
+        let address_str = format!("{:x}", value.0);
+
+        BitcoinAddress::from_str(&address_str)
+    }
+}
+
 impl BitcoinAddress {
     pub fn address(&self) -> &Address<NetworkUnchecked> {
         &self.0

@@ -4,7 +4,9 @@
 //! publishing appropriate transactions. Can also perform challenger duties.
 
 mod args;
+pub(crate) mod constants;
 mod modes;
+pub(crate) mod rpc_server;
 
 use alpen_express_common::logging;
 use args::{Args, ModeOfOperation};
@@ -20,11 +22,14 @@ async fn main() {
 
     info!("running bridge client in {} mode", cli_args.mode);
 
-    if let ModeOfOperation::Operator = cli_args.mode {
-        operator::bootstrap()
-            .await
-            .expect("bootstrap operator node");
-    } else {
-        challenger::bootstrap().await;
+    match cli_args.mode {
+        ModeOfOperation::Operator => {
+            operator::bootstrap()
+                .await
+                .expect("bootstrap operator node");
+        }
+        ModeOfOperation::Challenger => {
+            challenger::bootstrap().await;
+        }
     }
 }
