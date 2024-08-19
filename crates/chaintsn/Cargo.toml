@@ -11,5 +11,5 @@ thiserror = { workspace = true }
 tracing = { workspace = true, optional = true }
 
 [features]
-default = ["std"]
-std = ["dep:tracing"]
+default = ["fullstd"]
+fullstd = ["dep:tracing"]
