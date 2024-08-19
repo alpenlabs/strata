@@ -21,7 +21,7 @@ use alpen_express_state::sync_event::SyncEvent;
 use crate::ctl::CsmController;
 use crate::message::ForkChoiceMessage;
 use crate::unfinalized_tracker::UnfinalizedBlockTracker;
-use crate::{chain_transition, credential, errors::*, reorg, unfinalized_tracker};
+use crate::{credential, errors::*, reorg, unfinalized_tracker};
 
 /// Tracks the parts of the chain that haven't been finalized on-chain yet.
 pub struct ForkChoiceManager<D: Database> {
@@ -510,7 +510,7 @@ fn apply_tip_update<D: Database>(
         // locally and update our going state.
         let rparams = state.params.rollup();
         let mut prestate_cache = StateCache::new(pre_state);
-        chain_transition::process_block(&mut prestate_cache, header, body, rparams)
+        express_chaintsn::transition::process_block(&mut prestate_cache, header, body, rparams)
             .map_err(|e| Error::InvalidStateTsn(*blkid, e))?;
         let (post_state, wb) = prestate_cache.finalize();
         pre_state = post_state;

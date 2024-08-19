@@ -702,6 +702,7 @@ dependencies = [
  "anyhow",
  "bitcoin",
  "borsh",
+ "express-chaintsn",
  "rand 0.8.5",
  "secp256k1",
  "thiserror",
@@ -3087,6 +3088,16 @@ checksum = "534c5cf6194dfab3db3242765c03bbe257cf92f22b38f6bc0c58d59108a820ba"
 dependencies = [
  "libc",
  "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "express-chaintsn"
+version = "0.1.0"
+dependencies = [
+ "alpen-express-primitives",
+ "alpen-express-state",
+ "thiserror",
+ "tracing",
 ]
 
 [[package]]

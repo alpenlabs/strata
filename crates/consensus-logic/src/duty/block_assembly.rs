@@ -29,8 +29,7 @@ use alpen_express_state::header::L2BlockHeader;
 use alpen_express_state::prelude::*;
 use alpen_express_state::state_op::*;
 
-use super::types::IdentityKey;
-use crate::chain_transition;
+use super::types::*;
 use crate::credential::sign_schnorr_sig;
 use crate::errors::Error;
 
@@ -349,7 +348,7 @@ fn compute_post_state(
     params: &Arc<Params>,
 ) -> Result<(ChainState, WriteBatch), Error> {
     let mut state_cache = StateCache::new(prev_chstate);
-    chain_transition::process_block(&mut state_cache, header, body, params.rollup())?;
+    express_chaintsn::transition::process_block(&mut state_cache, header, body, params.rollup())?;
     let (post_state, wb) = state_cache.finalize();
     Ok((post_state, wb))
 }

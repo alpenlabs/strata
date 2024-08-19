@@ -2,8 +2,6 @@
 //! we'll replace components with real implementations as we go along.
 #![allow(unused)]
 
-use tracing::*;
-
 use alpen_express_primitives::params::RollupParams;
 use alpen_express_state::{
     block::L1Segment,
@@ -15,6 +13,7 @@ use alpen_express_state::{
 };
 
 use crate::errors::TsnError;
+use crate::macros::*;
 
 /// Processes a block, making writes into the provided state cache that will
 /// then be written to disk.  This does not check the block's credentials, it
@@ -77,7 +76,7 @@ fn process_l1_view_update(
     // we need to do a reorg.
     // FIXME this should actually check PoW, it just does it based on block heights
     if !l1seg.new_payloads().is_empty() {
-        println!("new payloads {:?}", l1seg.new_payloads());
+        trace!("new payloads {:?}", l1seg.new_payloads());
 
         // Validate the new blocks actually extend the tip.  This is what we have to tweak to make
         // more complicated to check the PoW.
