@@ -1,11 +1,11 @@
-#[cfg(feature = "std")]
-mod macros_std;
+#[cfg(feature = "fullstd")]
+mod macros_fullstd;
 
-#[cfg(feature = "std")]
-pub use macros_std::*;
+#[cfg(feature = "fullstd")]
+pub use macros_fullstd::*;
 
-#[cfg(not(feature = "std"))]
+#[cfg(not(feature = "fullstd"))]
 mod macros_nostd;
 
-#[cfg(not(feature = "std"))]
+#[cfg(not(feature = "fullstd"))]
 pub use macros_nostd::*;
