@@ -1,0 +1,15 @@
+[package]
+name = "express-chaintsn"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+alpen-express-primitives = { workspace = true }
+alpen-express-state = { workspace = true }
+
+thiserror = { workspace = true }
+tracing = { workspace = true, optional = true }
+
+[features]
+default = ["fullstd"]
+fullstd = ["dep:tracing"]
