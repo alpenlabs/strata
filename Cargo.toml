@@ -16,7 +16,6 @@ members = [
   "crates/prover/bitcoin-blockspace",
   "crates/prover/btc-headerchain",
   "crates/prover/primitives",
-  "crates/prover/zkvm",
   "crates/reth/db",
   "crates/reth/exex",
   "crates/reth/node",
