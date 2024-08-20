@@ -737,6 +737,7 @@ dependencies = [
  "arbitrary",
  "bitcoin",
  "borsh",
+ "hex",
  "mockall",
  "parking_lot 0.12.3",
  "serde",

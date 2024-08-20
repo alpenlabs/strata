@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use bitcoin::{hashes::Hash, Txid};
-use express_storage::managers::broadcast::BroadcastDbManager;
+use express_storage::managers::l1tx_broadcast::BroadcastDbManager;
 use tracing::*;
 
 use alpen_express_db::types::{ExcludeReason, L1TxEntry, L1TxStatus};
@@ -34,13 +34,16 @@ pub async fn broadcaster_task(
     loop {
         interval.as_mut().tick().await;
 
-        let (updated_entries, to_remove) =
-            process_unfinalized_entries(&state.unfinalized_entries, manager.clone(), &rpc_client)
-                .await
-                .map_err(|e| {
-                    error!(%e, "broadcaster exiting");
-                    e
-                })?;
+        let (updated_entries, to_remove) = process_unfinalized_entries(
+            &state.unfinalized_entries,
+            manager.clone(),
+            rpc_client.as_ref(),
+        )
+        .await
+        .map_err(|e| {
+            error!(%e, "broadcaster exiting");
+            e
+        })?;
 
         for idx in to_remove {
             _ = state.unfinalized_entries.remove(&idx);
@@ -54,7 +57,7 @@ pub async fn broadcaster_task(
 async fn process_unfinalized_entries(
     unfinalized_entries: &HashMap<u64, L1TxEntry>,
     manager: Arc<BroadcastDbManager>,
-    rpc_client: &Arc<impl SeqL1Client + L1Client>,
+    rpc_client: &(impl SeqL1Client + L1Client),
 ) -> BroadcasterResult<(HashMap<u64, L1TxEntry>, Vec<u64>)> {
     let mut to_remove = Vec::new();
     let mut updated_entries = HashMap::new();
@@ -68,7 +71,9 @@ async fn process_unfinalized_entries(
             new_txentry.status = status.clone();
 
             // update in db, maybe this should be moved out of this fn to separate concerns??
-            manager.put_txentry_async(*idx, new_txentry.clone()).await?;
+            manager
+                .update_tx_entry_async(*idx, new_txentry.clone())
+                .await?;
 
             // Remove if finalized
             if matches!(status, L1TxStatus::Finalized(_))
@@ -88,31 +93,32 @@ async fn process_unfinalized_entries(
 /// Takes in `[L1TxEntry]`, checks status and then either publishes or checks for confirmations and
 /// returns its updated status. Returns None if status is not changed
 async fn handle_entry(
-    rpc_client: &Arc<impl SeqL1Client + L1Client>,
+    rpc_client: &(impl SeqL1Client + L1Client),
     txentry: &L1TxEntry,
     idx: u64,
 ) -> BroadcasterResult<Option<L1TxStatus>> {
+    let txid = txentry.txid_str();
     match txentry.status {
         L1TxStatus::Unpublished => {
             // Try to publish
             match send_tx(txentry.tx_raw(), rpc_client).await {
                 Ok(_) => {
-                    info!(%idx, "Successfully published tx");
+                    info!(%idx, %txid, "Successfully published tx");
                     Ok(Some(L1TxStatus::Published))
                 }
                 Err(PublishError::MissingInputsOrSpent) => {
                     warn!(
                         %idx,
-                        ?txentry,
+                        %txid,
                         "tx excluded while broadcasting due to missing or spent inputs"
                     );
                     Ok(Some(L1TxStatus::Excluded(
                         ExcludeReason::MissingInputsOrSpent,
                     )))
                 }
-                Err(PublishError::Other(str)) => {
-                    warn!(%idx, %str, ?txentry, "tx excluded while broadcasting");
-                    Err(BroadcasterError::Other(str))
+                Err(PublishError::Other(msg)) => {
+                    warn!(%idx, %msg, %txid, "tx excluded while broadcasting");
+                    Err(BroadcasterError::Other(msg))
                 }
             }
         }
@@ -126,7 +132,7 @@ async fn handle_entry(
                 .map_err(|e| BroadcasterError::Other(e.to_string()))?;
             match txinfo.confirmations {
                 0 if matches!(txentry.status, L1TxStatus::Confirmed(_h)) => {
-                    // if the confirmations of a txn that is already confirmed is 0 then there is
+                    // If the confirmations of a txn that is already confirmed is 0 then there is
                     // something wrong, possibly a reorg, so just set it to unpublished
                     Ok(Some(L1TxStatus::Unpublished))
                 }
@@ -153,7 +159,7 @@ enum PublishError {
 
 async fn send_tx(
     tx_raw: &[u8],
-    client: &Arc<impl SeqL1Client + L1Client>,
+    client: &(impl SeqL1Client + L1Client),
 ) -> Result<(), PublishError> {
     match client.send_raw_transaction(tx_raw).await {
         Ok(_) => Ok(()),
@@ -169,7 +175,7 @@ mod test {
     use alpen_express_rocksdb::broadcaster::db::{BroadcastDatabase, BroadcastDb};
     use alpen_express_rocksdb::test_utils::get_rocksdb_tmp_instance;
     use alpen_test_utils::ArbitraryGenerator;
-    use express_storage::managers::broadcast::BroadcastContext;
+    use express_storage::managers::l1tx_broadcast::L1BroadcastContext;
 
     use crate::test_utils::TestBitcoinClient;
 
@@ -184,7 +190,7 @@ mod test {
     fn get_manager() -> Arc<BroadcastDbManager> {
         let pool = threadpool::Builder::new().num_threads(2).build();
         let db = get_db();
-        let mgr = BroadcastContext::new(db).into_ops(pool);
+        let mgr = L1BroadcastContext::new(db).into_ops(pool);
         Arc::new(mgr)
     }
 
@@ -201,7 +207,7 @@ mod test {
         let e = gen_entry_with_status(L1TxStatus::Unpublished);
 
         // Add tx to db
-        mgr.add_txentry_async((*e.txid()).into(), e.clone())
+        mgr.insert_new_tx_entry_async((*e.txid()).into(), e.clone())
             .await
             .unwrap();
 
@@ -209,7 +215,7 @@ mod test {
         let client = TestBitcoinClient::new(0);
         let cl = Arc::new(client);
 
-        let res = handle_entry(&cl, &e, 0).await.unwrap();
+        let res = handle_entry(cl.as_ref(), &e, 0).await.unwrap();
         assert_eq!(
             res,
             Some(L1TxStatus::Published),
@@ -223,7 +229,7 @@ mod test {
         let e = gen_entry_with_status(L1TxStatus::Published);
 
         // Add tx to db
-        mgr.add_txentry_async((*e.txid()).into(), e.clone())
+        mgr.insert_new_tx_entry_async((*e.txid()).into(), e.clone())
             .await
             .unwrap();
 
@@ -231,7 +237,7 @@ mod test {
         let client = TestBitcoinClient::new(0);
         let cl = Arc::new(client);
 
-        let res = handle_entry(&cl, &e, 0).await.unwrap();
+        let res = handle_entry(cl.as_ref(), &e, 0).await.unwrap();
         assert_eq!(
             res, None,
             "Status should not change if no confirmations for a published tx"
@@ -241,7 +247,7 @@ mod test {
         let client = TestBitcoinClient::new(FINALITY_DEPTH - 1);
         let cl = Arc::new(client);
 
-        let res = handle_entry(&cl, &e, 0).await.unwrap();
+        let res = handle_entry(cl.as_ref(), &e, 0).await.unwrap();
         assert_eq!(
             res,
             Some(L1TxStatus::Confirmed(cl.included_height)),
@@ -252,7 +258,7 @@ mod test {
         let client = TestBitcoinClient::new(FINALITY_DEPTH);
         let cl = Arc::new(client);
 
-        let res = handle_entry(&cl, &e, 0).await.unwrap();
+        let res = handle_entry(cl.as_ref(), &e, 0).await.unwrap();
         assert_eq!(
             res,
             Some(L1TxStatus::Finalized(cl.included_height)),
@@ -266,7 +272,7 @@ mod test {
         let e = gen_entry_with_status(L1TxStatus::Confirmed(1));
 
         // Add tx to db
-        mgr.add_txentry_async((*e.txid()).into(), e.clone())
+        mgr.insert_new_tx_entry_async((*e.txid()).into(), e.clone())
             .await
             .unwrap();
 
@@ -274,7 +280,7 @@ mod test {
         let client = TestBitcoinClient::new(0);
         let cl = Arc::new(client);
 
-        let res = handle_entry(&cl, &e, 0).await.unwrap();
+        let res = handle_entry(cl.as_ref(), &e, 0).await.unwrap();
         assert_eq!(
             res,
             Some(L1TxStatus::Unpublished),
@@ -285,7 +291,7 @@ mod test {
         let client = TestBitcoinClient::new(FINALITY_DEPTH - 1);
         let cl = Arc::new(client);
 
-        let res = handle_entry(&cl, &e, 0).await.unwrap();
+        let res = handle_entry(cl.as_ref(), &e, 0).await.unwrap();
         assert_eq!(
             res,
             Some(L1TxStatus::Confirmed(cl.included_height)),
@@ -296,7 +302,7 @@ mod test {
         let client = TestBitcoinClient::new(FINALITY_DEPTH);
         let cl = Arc::new(client);
 
-        let res = handle_entry(&cl, &e, 0).await.unwrap();
+        let res = handle_entry(cl.as_ref(), &e, 0).await.unwrap();
         assert_eq!(
             res,
             Some(L1TxStatus::Finalized(cl.included_height)),
@@ -310,7 +316,7 @@ mod test {
         let e = gen_entry_with_status(L1TxStatus::Finalized(1));
 
         // Add tx to db
-        mgr.add_txentry_async((*e.txid()).into(), e.clone())
+        mgr.insert_new_tx_entry_async((*e.txid()).into(), e.clone())
             .await
             .unwrap();
 
@@ -318,7 +324,7 @@ mod test {
         let client = TestBitcoinClient::new(FINALITY_DEPTH);
         let cl = Arc::new(client);
 
-        let res = handle_entry(&cl, &e, 0).await.unwrap();
+        let res = handle_entry(cl.as_ref(), &e, 0).await.unwrap();
         assert_eq!(
             res, None,
             "Status should not change for finalized tx. Should remain the same."
@@ -329,7 +335,7 @@ mod test {
         let client = TestBitcoinClient::new(0);
         let cl = Arc::new(client);
 
-        let res = handle_entry(&cl, &e, 0).await.unwrap();
+        let res = handle_entry(cl.as_ref(), &e, 0).await.unwrap();
         assert_eq!(
             res, None,
             "Status should not change for finalized tx. Should remain the same."
@@ -344,7 +350,7 @@ mod test {
         )));
 
         // Add tx to db
-        mgr.add_txentry_async((*e.txid()).into(), e.clone())
+        mgr.insert_new_tx_entry_async((*e.txid()).into(), e.clone())
             .await
             .unwrap();
 
@@ -352,7 +358,7 @@ mod test {
         let client = TestBitcoinClient::new(FINALITY_DEPTH);
         let cl = Arc::new(client);
 
-        let res = handle_entry(&cl, &e, 0).await.unwrap();
+        let res = handle_entry(cl.as_ref(), &e, 0).await.unwrap();
         assert_eq!(
             res, None,
             "Status should not change for excluded tx. Should remain the same."
@@ -363,7 +369,7 @@ mod test {
         let client = TestBitcoinClient::new(0);
         let cl = Arc::new(client);
 
-        let res = handle_entry(&cl, &e, 0).await.unwrap();
+        let res = handle_entry(cl.as_ref(), &e, 0).await.unwrap();
         assert_eq!(
             res, None,
             "Status should not change for excluded tx. Should remain the same."
@@ -376,18 +382,18 @@ mod test {
         // Add a couple of txs
         let e1 = gen_entry_with_status(L1TxStatus::Unpublished);
         let i1 = mgr
-            .add_txentry_async((*e1.txid()).into(), e1)
+            .insert_new_tx_entry_async((*e1.txid()).into(), e1)
             .await
             .unwrap();
         let e2 = gen_entry_with_status(L1TxStatus::Excluded(ExcludeReason::MissingInputsOrSpent));
         let _i2 = mgr
-            .add_txentry_async((*e2.txid()).into(), e2)
+            .insert_new_tx_entry_async((*e2.txid()).into(), e2)
             .await
             .unwrap();
 
         let e3 = gen_entry_with_status(L1TxStatus::Published);
         let i3 = mgr
-            .add_txentry_async((*e3.txid()).into(), e3)
+            .insert_new_tx_entry_async((*e3.txid()).into(), e3)
             .await
             .unwrap();
 
@@ -398,7 +404,7 @@ mod test {
         let cl = Arc::new(client);
 
         let (new_entries, to_remove) =
-            process_unfinalized_entries(&state.unfinalized_entries, mgr, &cl)
+            process_unfinalized_entries(&state.unfinalized_entries, mgr, cl.as_ref())
                 .await
                 .unwrap();
 

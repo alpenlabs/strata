@@ -4,7 +4,7 @@ use std::{borrow::BorrowMut, sync::Arc};
 
 use async_trait::async_trait;
 use bitcoin::{consensus::deserialize, Transaction as BTransaction, Txid};
-use express_storage::managers::broadcast::BroadcastDbManager;
+use express_storage::managers::l1tx_broadcast::BroadcastDbManager;
 use jsonrpsee::{
     core::RpcResult,
     types::{ErrorObject, ErrorObjectOwned},
@@ -477,7 +477,7 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         let id = Buf32::from(txid);
         Ok(self
             .bcast_manager
-            .get_txstatus_async(id)
+            .get_tx_status_async(id)
             .await
             .map_err(|e| Error::Other(e.to_string()))?)
     }
@@ -538,7 +538,7 @@ impl<S: SequencerDatabase + Send + Sync + 'static> AlpenAdminApiServer for Admin
         let entry = L1TxEntry::from_tx(&tx);
 
         self.bcast_manager
-            .add_txentry_async((*entry.txid()).into(), entry)
+            .insert_new_tx_entry_async((*entry.txid()).into(), entry)
             .await
             .map_err(|e| Error::Other(e.to_string()))?;
 

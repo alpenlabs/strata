@@ -1,32 +1,31 @@
 use std::{collections::HashMap, sync::Arc};
 
 use alpen_express_db::types::{L1TxEntry, L1TxStatus};
-use express_storage::managers::broadcast::BroadcastDbManager;
+use express_storage::managers::l1tx_broadcast::BroadcastDbManager;
 
 use super::error::{BroadcasterError, BroadcasterResult};
 
 pub(crate) struct BroadcasterState {
-    /// Next tx idx from which we should next read the tx entries to check and process
+    /// Next index from which we should next read the [`L1TxEntry`] to check and process
     pub(crate) next_idx: u64,
 
-    /// Unfinalized tx entries which the broadcaster will check for
+    /// Unfinalized [`L1TxEntry`]s which the broadcaster will check for
     pub(crate) unfinalized_entries: HashMap<u64, L1TxEntry>,
 }
 
 impl BroadcasterState {
+    /// Initialize the `[BroadcasterState]` by looking at all [`L1TxEntry`]s in database
     pub async fn initialize(manager: &Arc<BroadcastDbManager>) -> BroadcasterResult<Self> {
         Self::initialize_from_idx(manager, 0).await
     }
 
+    /// Initialize the [`BroadcasterState`] by looking at [`L1TxEntry`]s in database starting from
+    /// given `start_idx`
     pub async fn initialize_from_idx(
         manager: &Arc<BroadcastDbManager>,
         start_idx: u64,
     ) -> BroadcasterResult<Self> {
-        let next_idx = manager
-            .get_last_txidx_async()
-            .await?
-            .map(|x| x + 1)
-            .unwrap_or(0);
+        let next_idx = manager.get_next_tx_idx_async().await?;
 
         let unfinalized_entries = filter_unfinalized_from_db(manager, start_idx, next_idx).await?;
 
@@ -36,17 +35,13 @@ impl BroadcasterState {
         })
     }
 
-    /// Fetches entries from database based on the `next_idx` and returns a new state
+    /// Fetches entries from database based on the `next_idx` and updates the broadcaster state
     pub async fn next(
         &mut self,
         updated_entries: HashMap<u64, L1TxEntry>,
         manager: &Arc<BroadcastDbManager>,
     ) -> BroadcasterResult<()> {
-        let next_idx = manager
-            .get_last_txidx_async()
-            .await?
-            .map(|x| x + 1)
-            .unwrap_or(0);
+        let next_idx = manager.get_next_tx_idx_async().await?;
 
         if next_idx < self.next_idx {
             return Err(BroadcasterError::Other(
@@ -64,7 +59,7 @@ impl BroadcasterState {
     }
 }
 
-/// Returns unfinalized and unexcluded `[L1TxEntry]`s from db starting from index `from` upto `to`
+/// Returns unfinalized and unexcluded [`L1TxEntry`]s from db starting from index `from` until `to`
 /// non-inclusive.
 async fn filter_unfinalized_from_db(
     manager: &Arc<BroadcastDbManager>,
@@ -73,7 +68,7 @@ async fn filter_unfinalized_from_db(
 ) -> BroadcasterResult<HashMap<u64, L1TxEntry>> {
     let mut unfinalized_entries = HashMap::new();
     for idx in from..to {
-        let Some(txentry) = manager.get_txentry_async(idx).await? else {
+        let Some(txentry) = manager.get_tx_entry_async(idx).await? else {
             break;
         };
 
@@ -95,7 +90,7 @@ mod test {
         test_utils::get_rocksdb_tmp_instance,
     };
     use alpen_test_utils::ArbitraryGenerator;
-    use express_storage::managers::broadcast::BroadcastContext;
+    use express_storage::managers::l1tx_broadcast::L1BroadcastContext;
 
     use super::*;
 
@@ -108,7 +103,7 @@ mod test {
     fn get_manager() -> Arc<BroadcastDbManager> {
         let pool = threadpool::Builder::new().num_threads(2).build();
         let db = get_db();
-        let mgr = BroadcastContext::new(db).into_ops(pool);
+        let mgr = L1BroadcastContext::new(db).into_ops(pool);
         Arc::new(mgr)
     }
 
@@ -143,31 +138,31 @@ mod test {
         // Make some insertions
         let e1 = gen_unpublished_entry();
         let i1 = mgr
-            .add_txentry_async((*e1.txid()).into(), e1.clone())
+            .insert_new_tx_entry_async((*e1.txid()).into(), e1.clone())
             .await
             .unwrap();
 
         let e2 = gen_confirmed_entry();
         let i2 = mgr
-            .add_txentry_async((*e2.txid()).into(), e2.clone())
+            .insert_new_tx_entry_async((*e2.txid()).into(), e2.clone())
             .await
             .unwrap();
 
         let e3 = gen_finalized_entry();
         let i3 = mgr
-            .add_txentry_async((*e3.txid()).into(), e3.clone())
+            .insert_new_tx_entry_async((*e3.txid()).into(), e3.clone())
             .await
             .unwrap();
 
         let e4 = gen_published_entry();
         let i4 = mgr
-            .add_txentry_async((*e4.txid()).into(), e4.clone())
+            .insert_new_tx_entry_async((*e4.txid()).into(), e4.clone())
             .await
             .unwrap();
 
         let e5 = gen_excluded_entry();
         let i5 = mgr
-            .add_txentry_async((*e5.txid()).into(), e5.clone())
+            .insert_new_tx_entry_async((*e5.txid()).into(), e5.clone())
             .await
             .unwrap();
         vec![(i1, e1), (i2, e2), (i3, e3), (i4, e4), (i5, e5)]
@@ -217,12 +212,12 @@ mod test {
         // Insert two more items to db, one excluded and one published.
         let e = gen_excluded_entry(); // this should not be in new state
         let idx = mgr
-            .add_txentry_async((*e.txid()).into(), e.clone())
+            .insert_new_tx_entry_async((*e.txid()).into(), e.clone())
             .await
             .unwrap();
         let e1 = gen_published_entry(); // this should be in new state
         let idx1 = mgr
-            .add_txentry_async((*e1.txid()).into(), e1.clone())
+            .insert_new_tx_entry_async((*e1.txid()).into(), e1.clone())
             .await
             .unwrap();
         // Compute next state

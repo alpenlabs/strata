@@ -18,21 +18,19 @@ use super::schemas::{BcastL1TxIdSchema, BcastL1TxSchema};
 
 pub struct BroadcastDb {
     db: Arc<DB>,
-    _ops: DbOpsConfig,
+    ops: DbOpsConfig,
 }
 
 impl BroadcastDb {
     pub fn new(db: Arc<DB>, ops: DbOpsConfig) -> Self {
-        Self { db, _ops: ops }
+        Self { db, ops }
     }
 }
 
-const RETRY: TransactionRetry = TransactionRetry::Count(5);
-
 impl BcastStore for BroadcastDb {
-    fn add_tx(&self, txid: Buf32, txentry: L1TxEntry) -> DbResult<u64> {
+    fn insert_new_tx_entry(&self, txid: Buf32, txentry: L1TxEntry) -> DbResult<u64> {
         self.db
-            .with_optimistic_txn(RETRY, |txn| {
+            .with_optimistic_txn(TransactionRetry::Count(self.ops.retry_count), |txn| {
                 if txn.get::<BcastL1TxSchema>(&txid)?.is_some() {
                     return Err(DbError::Other(format!(
                         "Entry already exists for id {txid:?}"
@@ -51,9 +49,9 @@ impl BcastStore for BroadcastDb {
             .map_err(|e| DbError::TransactionError(e.to_string()))
     }
 
-    fn update_tx(&self, txid: Buf32, txentry: L1TxEntry) -> DbResult<()> {
+    fn update_tx_entry_by_id(&self, txid: Buf32, txentry: L1TxEntry) -> DbResult<()> {
         self.db
-            .with_optimistic_txn(RETRY, |tx| {
+            .with_optimistic_txn(TransactionRetry::Count(self.ops.retry_count), |tx| {
                 if tx.get::<BcastL1TxSchema>(&txid)?.is_none() {
                     return Err(DbError::Other(format!(
                         "Entry does not exist for id {txid:?}"
@@ -64,13 +62,13 @@ impl BcastStore for BroadcastDb {
             .map_err(|e| DbError::TransactionError(e.to_string()))
     }
 
-    fn update_tx_by_idx(
+    fn update_tx_entry(
         &self,
         idx: u64,
         txentry: alpen_express_db::types::L1TxEntry,
     ) -> DbResult<()> {
         self.db
-            .with_optimistic_txn(RETRY, |tx| {
+            .with_optimistic_txn(TransactionRetry::Count(self.ops.retry_count), |tx| {
                 if let Some(id) = tx.get::<BcastL1TxIdSchema>(&idx)? {
                     Ok(tx.put::<BcastL1TxSchema>(&id, &txentry)?)
                 } else {
@@ -84,15 +82,17 @@ impl BcastStore for BroadcastDb {
 }
 
 impl BcastProvider for BroadcastDb {
-    fn get_txentry(&self, txid: Buf32) -> DbResult<Option<L1TxEntry>> {
+    fn get_tx_entry_by_id(&self, txid: Buf32) -> DbResult<Option<L1TxEntry>> {
         Ok(self.db.get::<BcastL1TxSchema>(&txid)?)
     }
 
-    fn get_last_txidx(&self) -> DbResult<Option<u64>> {
-        Ok(get_last::<BcastL1TxIdSchema>(self.db.as_ref())?.map(|(k, _)| k))
+    fn get_next_tx_idx(&self) -> DbResult<u64> {
+        Ok(get_last::<BcastL1TxIdSchema>(self.db.as_ref())?
+            .map(|(k, _)| k + 1)
+            .unwrap_or_default())
     }
 
-    fn get_txentry_by_idx(&self, idx: u64) -> DbResult<Option<L1TxEntry>> {
+    fn get_tx_entry(&self, idx: u64) -> DbResult<Option<L1TxEntry>> {
         if let Some(id) = self.db.get::<BcastL1TxIdSchema>(&idx)? {
             Ok(self.db.get::<BcastL1TxSchema>(&id)?)
         } else {
@@ -156,11 +156,11 @@ mod tests {
 
         let (txid, txentry) = generate_l1_tx_entry();
 
-        let idx = db.add_tx(txid, txentry.clone()).unwrap();
+        let idx = db.insert_new_tx_entry(txid, txentry.clone()).unwrap();
 
         assert_eq!(idx, 0);
 
-        let stored_entry = db.get_txentry_by_idx(idx).unwrap();
+        let stored_entry = db.get_tx_entry(idx).unwrap();
         assert_eq!(stored_entry, Some(txentry));
     }
 
@@ -170,9 +170,11 @@ mod tests {
 
         let (txid, txentry) = generate_l1_tx_entry();
 
-        let _ = broadcast_db.add_tx(txid, txentry.clone()).unwrap();
+        let _ = broadcast_db
+            .insert_new_tx_entry(txid, txentry.clone())
+            .unwrap();
 
-        let result = broadcast_db.add_tx(txid, txentry);
+        let result = broadcast_db.insert_new_tx_entry(txid, txentry);
 
         assert!(result.is_err());
         if let Err(DbError::Other(err)) = result {
@@ -187,44 +189,48 @@ mod tests {
         let (txid, txentry) = generate_l1_tx_entry();
 
         // Attempt to update non-existing entry
-        let result = broadcast_db.update_tx(txid, txentry.clone());
+        let result = broadcast_db.update_tx_entry_by_id(txid, txentry.clone());
         assert!(result.is_err());
 
         // Add and then update the entry
-        let _ = broadcast_db.add_tx(txid, txentry.clone()).unwrap();
+        let _ = broadcast_db
+            .insert_new_tx_entry(txid, txentry.clone())
+            .unwrap();
 
         let mut updated_txentry = txentry;
         updated_txentry.status = L1TxStatus::Finalized(1);
 
         broadcast_db
-            .update_tx(txid, updated_txentry.clone())
+            .update_tx_entry_by_id(txid, updated_txentry.clone())
             .unwrap();
 
-        let stored_entry = broadcast_db.get_txentry(txid).unwrap();
+        let stored_entry = broadcast_db.get_tx_entry_by_id(txid).unwrap();
         assert_eq!(stored_entry, Some(updated_txentry));
     }
 
     #[test]
-    fn test_update_tx_by_idx() {
+    fn test_update_tx_entry() {
         let broadcast_db = setup_db();
 
         let (txid, txentry) = generate_l1_tx_entry();
 
         // Attempt to update non-existing index
-        let result = broadcast_db.update_tx_by_idx(0, txentry.clone());
+        let result = broadcast_db.update_tx_entry(0, txentry.clone());
         assert!(result.is_err());
 
         // Add and then update the entry by index
-        let idx = broadcast_db.add_tx(txid, txentry.clone()).unwrap();
+        let idx = broadcast_db
+            .insert_new_tx_entry(txid, txentry.clone())
+            .unwrap();
 
         let mut updated_txentry = txentry;
         updated_txentry.status = L1TxStatus::Finalized(1);
 
         broadcast_db
-            .update_tx_by_idx(idx, updated_txentry.clone())
+            .update_tx_entry(idx, updated_txentry.clone())
             .unwrap();
 
-        let stored_entry = broadcast_db.get_txentry_by_idx(idx).unwrap();
+        let stored_entry = broadcast_db.get_tx_entry(idx).unwrap();
         assert_eq!(stored_entry, Some(updated_txentry));
     }
 
@@ -233,30 +239,34 @@ mod tests {
         let broadcast_db = setup_db();
 
         // Test non-existing entry
-        let result = broadcast_db.get_txentry_by_idx(0);
+        let result = broadcast_db.get_tx_entry(0);
         assert!(result.is_err());
 
         let (txid, txentry) = generate_l1_tx_entry();
 
-        let idx = broadcast_db.add_tx(txid, txentry.clone()).unwrap();
+        let idx = broadcast_db
+            .insert_new_tx_entry(txid, txentry.clone())
+            .unwrap();
 
-        let stored_entry = broadcast_db.get_txentry_by_idx(idx).unwrap();
+        let stored_entry = broadcast_db.get_tx_entry(idx).unwrap();
         assert_eq!(stored_entry, Some(txentry));
     }
 
     #[test]
-    fn test_get_last_txidx() {
+    fn test_get_next_txidx() {
         let broadcast_db = setup_db();
 
-        let last_txidx = broadcast_db.get_last_txidx().unwrap();
-        assert_eq!(last_txidx, None, "There is no last txidx in the beginning");
+        let next_txidx = broadcast_db.get_next_tx_idx().unwrap();
+        assert_eq!(next_txidx, 0, "The next txidx is 0 in the beginning");
 
         let (txid, txentry) = generate_l1_tx_entry();
 
-        let idx = broadcast_db.add_tx(txid, txentry.clone()).unwrap();
+        let idx = broadcast_db
+            .insert_new_tx_entry(txid, txentry.clone())
+            .unwrap();
 
-        let last_txidx = broadcast_db.get_last_txidx().unwrap();
+        let next_txidx = broadcast_db.get_next_tx_idx().unwrap();
 
-        assert_eq!(last_txidx, Some(idx));
+        assert_eq!(next_txidx, idx + 1);
     }
 }

@@ -14,8 +14,7 @@ use alpen_express_rocksdb::broadcaster::db::BroadcastDatabase;
 use anyhow::Context;
 use bitcoin::Network;
 use config::Config;
-use express_storage::managers::broadcast::BroadcastContext;
-use express_storage::managers::broadcast::BroadcastDbManager;
+use express_storage::managers::l1tx_broadcast::{BroadcastDbManager, L1BroadcastContext};
 use express_storage::L2BlockManager;
 use format_serde_error::SerdeError;
 use reth_rpc_types::engine::JwtError;
@@ -248,7 +247,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let eng_ctl = Arc::new(eng_ctl);
 
     let bcastdb = Arc::new(BroadcastDatabase::new(bcast_db));
-    let bcastctx = BroadcastContext::new(bcastdb);
+    let bcastctx = L1BroadcastContext::new(bcastdb);
     let bcast_man = Arc::new(bcastctx.into_ops(pool.clone()));
 
     // Start the sync manager.

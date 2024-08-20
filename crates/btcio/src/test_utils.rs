@@ -9,9 +9,9 @@ use crate::rpc::{
 };
 
 pub struct TestBitcoinClient {
-    /// Parameter that returns confirmed height for a given tx
+    /// Parameter that returns confirmed height for a given transaction
     pub confs: u64,
-    /// Parameter that indicates which height a tx is included in
+    /// Parameter that indicates which height a transaction is included in
     pub included_height: u64,
 }
 

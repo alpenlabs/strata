@@ -46,26 +46,31 @@ pub enum BlobL1Status {
     /// The blob has not been signed yet
     Unsigned,
 
-    /// The commit reveal txs for blob are signed and waiting to be published
+    /// The commit reveal transactions for blob are signed and waiting to be published
     Unpublished,
 
-    /// The txs are published
+    /// The transactions are published
     Published,
 
-    /// The txs are confirmed in L1
+    /// The transactions are confirmed in L1
     Confirmed,
 
-    /// The txs are finalized in L1
+    /// The transactions are finalized in L1
     Finalized,
 
-    /// The txs need to be resigned because possibly the utxos were already spent
+    /// The transactions need to be resigned because possibly the utxos were already spent
     NeedsResign,
 }
 
+/// This is the entry that gets saved to the database corresponding to a bitcoin transaction that
+/// the broadcaster will publish and watches for until finalization
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct L1TxEntry {
+    /// Raw serialized transaction. This is basically `consensus::serialize()` of [`Transaction`]
     tx_raw: Vec<u8>,
+    /// Transaction id. This is to prevent computing after deserializing `tx_raw`.
     txid: [u8; 32],
+    /// The status of the transaction in bitcoin
     pub status: L1TxStatus,
 }
 
@@ -85,22 +90,30 @@ impl L1TxEntry {
     pub fn txid(&self) -> &[u8; 32] {
         &self.txid
     }
+
+    pub fn txid_str(&self) -> String {
+        let mut txid = self.txid;
+        txid.reverse();
+        hex::encode(txid)
+    }
 }
 
+/// The possible statuses of a publishable transaction
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub enum L1TxStatus {
-    /// The tx is waiting to be published
+    /// The transaction is waiting to be published
     Unpublished,
-    /// The tx is published
+    /// The transaction is published
     Published,
-    /// The tx is included in L1 at given height
+    /// The transaction  is included in L1 at given height
     Confirmed(u64),
-    /// The tx is finalized in L1 at given height
+    /// The transaction is finalized in L1 at given height
     Finalized(u64),
-    /// The tx is not included in L1 and has errored with some error code
+    /// The transaction is not included in L1 and has errored with some error code
     Excluded(ExcludeReason),
 }
 
+/// Reason why the transaction was not included in the bitcoin chain
 #[derive(Debug, Clone, PartialEq, Serialize, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub enum ExcludeReason {
     /// Excluded because inputs were spent or not present in the chain/mempool

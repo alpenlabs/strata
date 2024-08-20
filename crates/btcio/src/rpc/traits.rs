@@ -21,8 +21,7 @@ pub trait L1Client: Sync + Send + 'static {
     async fn send_raw_transaction<T: AsRef<[u8]> + Send>(&self, tx: T)
         -> Result<Txid, ClientError>;
 
-    /// get number of confirmations for txid
-    /// 0 confirmations means tx is still in mempool
+    /// get number of confirmations for [`Txid`]. 0 confirmations means the tx is still in mempool
     async fn get_transaction_info(&self, txid: Txid) -> Result<RPCTransactionInfo, ClientError>;
 
     // TODO: add others as necessary

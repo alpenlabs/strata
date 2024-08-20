@@ -131,12 +131,12 @@ pub struct L1HeaderPayload {
 
     /// Txs related to deposits.
     ///
-    /// MUST be sorted by tx index within block.
+    /// MUST be sorted by [`DepositUpdateTx`] index within block.
     deposit_update_txs: Vec<DepositUpdateTx>,
 
     /// Txs representing L1 DA.
     ///
-    /// MUST be sorted by tx index within block.
+    /// MUST be sorted by [`DaTx`] index within block.
     da_txs: Vec<DaTx>,
 }
 
@@ -250,12 +250,12 @@ pub struct L1MaturationEntry {
 
     /// Txs related to deposits.
     ///
-    /// MUST be sorted by tx index within block.
+    /// MUST be sorted by [`DepositUpdateTx`] index within block.
     deposit_update_txs: Vec<DepositUpdateTx>,
 
     /// Txs representing L1 DA.
     ///
-    /// MUST be sorted by tx index within block.
+    /// MUST be sorted by [`DaTx`] index within block.
     da_txs: Vec<DaTx>,
 }
 
@@ -288,7 +288,7 @@ pub struct DepositUpdateTx {
     tx: l1::L1Tx,
 
     /// The deposit ID that this corresponds to, so that we can update it when
-    /// we mature the L1 block.  A ref to this tx exists in `pending_update_txs`
+    /// we mature the L1 block.  A ref to this [`L1Tx`] exists in `pending_update_txs`
     /// in the `DepositEntry` structure in state.
     deposit_idx: u32,
 }
