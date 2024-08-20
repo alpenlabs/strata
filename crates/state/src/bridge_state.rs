@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use alpen_express_primitives::{
     buf::Buf32,
-    l1::{self, BitcoinAmount, OutputRef},
+    l1::{self, BitcoinAmount, OutputRef, TweakedTrPubkey},
 };
 
 /// The bitcoin block height that a withdrawal command references.
@@ -243,8 +243,8 @@ pub struct DispatchCommand {
 /// An output constructed from [`crate::bridge_ops::WithdrawalIntent`].
 #[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
 pub struct WithdrawOutput {
-    /// Taproot pubkey.
-    dest_addr: Buf32,
+    /// Taproot pubkey with the merkle root information.
+    dest_addr: TweakedTrPubkey,
 
     /// Amount in sats.
     amt: BitcoinAmount,
