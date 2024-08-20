@@ -83,7 +83,7 @@ pub fn start_sync_tasks<
     D: Database + Sync + Send + 'static,
     E: ExecEngineCtl + Sync + Send + 'static,
 >(
-    executor: TaskExecutor,
+    executor: &TaskExecutor,
     database: Arc<D>,
     l2_block_manager: Arc<L2BlockManager>,
     engine: Arc<E>,

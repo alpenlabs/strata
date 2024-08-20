@@ -8,7 +8,6 @@ use tokio::sync::{mpsc, RwLock};
 use tracing::*;
 
 use alpen_express_rpc_types::types::L1Status;
-use express_tasks::ShutdownGuard;
 
 use super::config::ReaderConfig;
 use super::messages::{BlockData, L1Event};
@@ -134,7 +133,6 @@ impl ReaderState {
 }
 
 pub async fn bitcoin_data_reader_task(
-    shutdown: ShutdownGuard,
     client: Arc<impl L1Client>,
     event_tx: mpsc::Sender<L1Event>,
     target_next_block: u64,
@@ -143,7 +141,6 @@ pub async fn bitcoin_data_reader_task(
 ) {
     let mut status_updates = Vec::new();
     if let Err(e) = do_reader_task(
-        shutdown,
         client.as_ref(),
         &event_tx,
         target_next_block,
@@ -158,7 +155,6 @@ pub async fn bitcoin_data_reader_task(
 }
 
 async fn do_reader_task(
-    shutdown: ShutdownGuard,
     client: &impl L1Client,
     event_tx: &mpsc::Sender<L1Event>,
     target_next_block: u64,
@@ -182,9 +178,6 @@ async fn do_reader_task(
     // FIXME This function will return when reorg happens when there are not
     // enough elements in the vec deque, probably during startup.
     loop {
-        if shutdown.should_shutdown() {
-            break;
-        }
         let cur_best_height = state.best_block_idx();
         let poll_span = debug_span!("l1poll", %cur_best_height);
 
@@ -218,8 +211,6 @@ async fn do_reader_task(
 
         apply_status_updates(status_updates, l1_status.clone()).await;
     }
-
-    Ok(())
 }
 
 /// Inits the reader state by trying to backfill blocks up to a target height.

@@ -3,7 +3,6 @@ use std::{sync::Arc, time::Duration};
 use alpen_express_rpc_types::L1Status;
 use anyhow::anyhow;
 use bitcoin::{consensus::deserialize, Txid};
-use express_tasks::ShutdownGuard;
 use tokio::sync::RwLock;
 use tracing::*;
 
@@ -25,7 +24,6 @@ const BROADCAST_POLL_INTERVAL: u64 = 1000; // millis
 
 /// Broadcasts the next blob to be sent
 pub async fn broadcaster_task<D: SequencerDatabase + Send + Sync + 'static>(
-    shutdown: ShutdownGuard,
     next_publish_blob_idx: u64,
     rpc_client: Arc<impl SeqL1Client + L1Client>,
     db: Arc<D>,
@@ -38,9 +36,6 @@ pub async fn broadcaster_task<D: SequencerDatabase + Send + Sync + 'static>(
     let mut curr_idx = next_publish_blob_idx;
 
     loop {
-        if shutdown.should_shutdown() {
-            break;
-        }
         // SLEEP!
         interval.as_mut().tick().await;
 
@@ -111,8 +106,6 @@ pub async fn broadcaster_task<D: SequencerDatabase + Send + Sync + 'static>(
             debug!(%curr_idx, "No blob found");
         }
     }
-
-    Ok(())
 }
 
 enum SendError {

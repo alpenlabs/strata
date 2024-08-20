@@ -1,15 +1,17 @@
 use std::any::Any;
 use std::fmt::{Display, Formatter};
 use std::future::Future;
-use std::panic;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::time::Duration;
+use std::{panic, pin::pin};
 
+use futures_util::future::select;
 use futures_util::{FutureExt, TryFutureExt};
 use tokio::runtime::Handle;
-use tokio::sync::mpsc;
+use tokio::sync::futures::Notified;
+use tokio::sync::{mpsc, Notify};
 use tracing::{debug, error, info, warn};
 
 /// Error with the name of the task that panicked and an error downcasted to string, if possible.
@@ -48,38 +50,43 @@ impl PanickedTaskError {
 }
 
 #[derive(Debug, Clone)]
-pub struct ShutdownSignal(Arc<AtomicBool>);
+pub struct ShutdownSignal(Arc<AtomicBool>, Arc<Notify>);
 
 impl ShutdownSignal {
     fn new() -> Self {
-        Self(Arc::new(AtomicBool::new(false)))
+        Self(Arc::new(AtomicBool::new(false)), Arc::new(Notify::new()))
     }
 
     /// Send shutdown signal
     pub fn send(&self) {
         self.0.fetch_or(true, Ordering::Relaxed);
+        self.1.notify_waiters();
     }
 
     fn subscribe(&self) -> Shutdown {
-        Shutdown(self.0.clone())
+        Shutdown(self.clone())
     }
-}
 
-struct Shutdown(Arc<AtomicBool>);
-
-impl Shutdown {
     fn should_shutdown(&self) -> bool {
         self.0.load(Ordering::Relaxed)
     }
 
-    async fn wait_for_shutdown(&self) {
-        while !self.should_shutdown() {
-            tokio::time::sleep(Duration::from_millis(1)).await;
-        }
+    fn notified(&self) -> Notified {
+        self.1.notified()
+    }
+}
+
+struct Shutdown(ShutdownSignal);
+
+impl Shutdown {
+    fn should_shutdown(&self) -> bool {
+        self.0.should_shutdown()
     }
 
-    async fn into_future(self) {
-        self.wait_for_shutdown().await
+    async fn wait_for_shutdown(&self) {
+        while !self.should_shutdown() {
+            self.0.notified().await
+        }
     }
 }
 
@@ -154,7 +161,7 @@ impl TaskManager {
                         None => Ok(())
                     }
                 }
-                _ = shutdown.into_future() => {
+                _ = shutdown.wait_for_shutdown() => {
                     Ok(())
                 }
             }
@@ -271,7 +278,34 @@ impl TaskExecutor {
         })
     }
 
-    pub fn spawn_critical_async<F>(
+    pub fn spawn_critical_async(
+        &self,
+        name: &'static str,
+        fut: impl Future<Output = ()> + Send + 'static,
+    ) -> tokio::task::JoinHandle<()> {
+        let panicked_tasks_tx = self.panicked_tasks_tx.clone();
+        let shutdown = self.shutdown_signal.subscribe();
+
+        // wrap the task in catch unwind
+        let task = panic::AssertUnwindSafe(fut)
+            .catch_unwind()
+            .map_err(move |error| {
+                let task_error = PanickedTaskError::new(name, error);
+                error!("{task_error}");
+                let _ = panicked_tasks_tx.send(task_error);
+            })
+            .map(drop);
+
+        let task = async move {
+            // Create an instance of IncCounterOnDrop with the counter to increment
+            let task = pin!(task);
+            let shutdown = pin!(shutdown.wait_for_shutdown());
+            let _ = select(shutdown, task).await;
+        };
+        self.tokio_handle.spawn(task)
+    }
+
+    pub fn spawn_critical_async_with_shutdown<F>(
         &self,
         name: &'static str,
         async_func: impl FnOnce(ShutdownGuard) -> F,
@@ -352,7 +386,7 @@ mod tests {
             }
         });
 
-        executor.spawn_critical_async("panictask", |_| async {
+        executor.spawn_critical_async("panictask", async {
             panic!("intentional panic");
         });
 
@@ -383,7 +417,12 @@ mod tests {
             std::thread::sleep(Duration::from_millis(100));
         });
 
-        executor.spawn_critical_async("async-task", |shutdown| async move {
+        executor.spawn_critical_async("async-task", async {
+            // doing something useful
+            std::thread::sleep(Duration::from_millis(100));
+        });
+
+        executor.spawn_critical_async_with_shutdown("async-task-2", |shutdown| async move {
             loop {
                 if shutdown.should_shutdown() {
                     println!("got shutdown signal");

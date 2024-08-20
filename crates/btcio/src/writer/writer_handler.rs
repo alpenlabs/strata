@@ -64,7 +64,7 @@ impl<D: SequencerDatabase + Send + Sync + 'static> DaWriter<D> {
 }
 
 pub fn start_writer_task<D: SequencerDatabase + Send + Sync + 'static>(
-    executor: TaskExecutor,
+    executor: &TaskExecutor,
     rpc_client: Arc<impl SeqL1Client + L1Client>,
     config: WriterConfig,
     db: Arc<D>,
@@ -84,28 +84,22 @@ pub fn start_writer_task<D: SequencerDatabase + Send + Sync + 'static>(
     let rpc_client_w = rpc_client.clone();
     let config_w = config.clone();
     let db_w = db.clone();
-    executor.spawn_critical_async("btcio::watcher_task", |shutdown| async move {
-        watcher_task(shutdown, next_watch_blob_idx, rpc_client_w, config_w, db_w)
+    executor.spawn_critical_async("btcio::watcher_task", async move {
+        watcher_task(next_watch_blob_idx, rpc_client_w, config_w, db_w)
             .await
             .unwrap()
     });
 
     let rpc_client_b = rpc_client.clone();
     let db_b = db.clone();
-    executor.spawn_critical_async("btcio::broadcaster_task", |shutdown| async move {
-        broadcaster_task(
-            shutdown,
-            next_publish_blob_idx,
-            rpc_client_b,
-            db_b,
-            l1_status.clone(),
-        )
-        .await
-        .unwrap()
+    executor.spawn_critical_async("btcio::broadcaster_task", async move {
+        broadcaster_task(next_publish_blob_idx, rpc_client_b, db_b, l1_status.clone())
+            .await
+            .unwrap()
     });
 
     let db_s = db.clone();
-    executor.spawn_critical_async("btcio::listen_for_signing_intents", |_| async {
+    executor.spawn_critical_async("btcio::listen_for_signing_intents", async {
         listen_for_signing_intents(signer_rx, rpc_client, config, db_s)
             .await
             .unwrap()

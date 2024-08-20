@@ -16,7 +16,7 @@ use express_tasks::TaskExecutor;
 use crate::config::Config;
 
 pub fn start_reader_tasks<D: Database + Send + Sync + 'static>(
-    executor: TaskExecutor,
+    executor: &TaskExecutor,
     params: Arc<Params>,
     config: &Config,
     rpc_client: Arc<impl L1Client>,
@@ -39,16 +39,16 @@ pub fn start_reader_tasks<D: Database + Send + Sync + 'static>(
     });
 
     // TODO set up watchdog to handle when the spawned tasks fail gracefully
-    executor.spawn_critical_async("bitcoin_data_reader_task", |shutdown| {
+    executor.spawn_critical_async(
+        "bitcoin_data_reader_task",
         bitcoin_data_reader_task(
-            shutdown,
             rpc_client,
             ev_tx,
             target_next_block,
             config.clone(),
             l1_status.clone(),
-        )
-    });
+        ),
+    );
 
     let l1db = db.l1_store().clone();
     let _sedb = db.sync_event_store().clone();

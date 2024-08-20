@@ -6,7 +6,6 @@ use alpen_express_db::{
     traits::SequencerDatabase,
     types::{BlobEntry, BlobL1Status},
 };
-use express_tasks::ShutdownGuard;
 
 use crate::{
     rpc::traits::{L1Client, SeqL1Client},
@@ -19,7 +18,6 @@ const FINALITY_DEPTH: u64 = 6;
 
 /// Watches for inscription transactions status in bitcoin
 pub async fn watcher_task<D: SequencerDatabase + Send + Sync + 'static>(
-    shutdown: ShutdownGuard,
     next_to_watch: u64,
     rpc_client: Arc<impl L1Client + SeqL1Client>,
     config: WriterConfig,
@@ -31,9 +29,6 @@ pub async fn watcher_task<D: SequencerDatabase + Send + Sync + 'static>(
 
     let mut curr_blobidx = next_to_watch;
     loop {
-        if shutdown.should_shutdown() {
-            break;
-        }
         interval.as_mut().tick().await;
 
         if let Some(blobentry) = get_blob_by_idx(db.clone(), curr_blobidx).await? {
@@ -73,8 +68,6 @@ pub async fn watcher_task<D: SequencerDatabase + Send + Sync + 'static>(
             // No blob exists, just continue the loop and thus wait for blob to be present in db
         }
     }
-
-    Ok(())
 }
 
 async fn check_confirmations_and_update_entry<D: SequencerDatabase + Send + Sync + 'static>(

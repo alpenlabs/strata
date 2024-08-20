@@ -37,9 +37,7 @@ use alpen_express_rocksdb::DbOpsConfig;
 use alpen_express_rocksdb::SeqDb;
 use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer};
 use alpen_express_rpc_types::L1Status;
-use express_tasks::ShutdownGuard;
-use express_tasks::ShutdownSignal;
-use express_tasks::TaskManager;
+use express_tasks::{ShutdownSignal, TaskManager};
 
 use crate::args::Args;
 
@@ -177,6 +175,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let pool = threadpool::ThreadPool::with_name("express-pool".to_owned(), 8);
 
     let task_manager = TaskManager::new(rt.handle().clone());
+    let task_executor = task_manager.executor();
 
     // Initialize databases.
     let l1_db = Arc::new(alpen_express_rocksdb::L1Db::new(rbdb.clone(), db_ops));
@@ -239,7 +238,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     // Start the sync manager.
     let sync_man = sync_manager::start_sync_tasks(
-        task_manager.executor(),
+        &task_executor,
         database.clone(),
         l2_block_manager.clone(),
         eng_ctl.clone(),
@@ -275,7 +274,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         let dbseq = Arc::new(SequencerDB::new(seqdb));
         let rpc = btc_rpc.clone();
         let writer = Arc::new(start_writer_task(
-            task_manager.executor(),
+            &task_executor,
             rpc,
             writer_config,
             dbseq,
@@ -312,7 +311,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     // Start the L1 tasks to get that going.
     let csm_ctl = sync_man.get_csm_ctl();
     l1_reader::start_reader_tasks(
-        task_manager.executor(),
+        &task_executor,
         sync_man.get_params(),
         &config,
         btc_rpc,
@@ -325,9 +324,8 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let executor = task_manager.executor();
     let database_r = database.clone();
 
-    executor.spawn_critical_async("main-rpc", |shutdown| async {
+    executor.spawn_critical_async("main-rpc", async {
         start_rpc(
-            shutdown,
             shutdown_signal,
             config,
             sync_man,
@@ -353,7 +351,6 @@ async fn start_rpc<
     D: Database + Send + Sync + 'static,
     SD: SequencerDatabase + Send + Sync + 'static,
 >(
-    shutdown: ShutdownGuard,
     shutdown_signal: ShutdownSignal,
     config: Config,
     sync_man: Arc<SyncManager>,
@@ -390,14 +387,10 @@ async fn start_rpc<
     info!("started RPC server");
 
     // Wait for a stop signal.
-    tokio::select! {
-        _ = stop_rx => {
-            // Send shutdown to all tasks
-            shutdown_signal.send();
+    let _ = stop_rx.await;
 
-        },
-        _ = shutdown.wait_for_shutdown() => {}
-    };
+    // Send shutdown to all tasks
+    shutdown_signal.send();
 
     // Now start shutdown tasks.
     if rpc_handle.stop().is_err() {
