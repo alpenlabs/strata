@@ -1,7 +1,8 @@
 [workspace]
 members = [
   "crates/bridge-exec",
-  "crates/bridge-tx-manager",
+  "crates/bridge-txm",
+  "crates/prover/primitives",
   "crates/btcio",
   "crates/chaintsn",
   "crates/common",
@@ -21,6 +22,7 @@ members = [
   "crates/reth/node",
   "crates/reth/rpc",
   "crates/rpc/api",
+  "crates/rpc/bridge-api",
   "crates/rpc/types",
   "crates/rpc/utils",
   "crates/state",
@@ -61,7 +63,7 @@ alpen-test-utils = { path = "crates/test-utils" }
 bitcoin-blockspace = { path = "crates/prover/bitcoin-blockspace" }
 express-bridge-exec = { path = "crates/bridge-exec" }
 express-bridge-rpc-api = { path = "crates/rpc/bridge-api" }
-express-bridge-txm = { path = "crates/bridge-tx-manager" }
+express-bridge-txm = { path = "crates/bridge-txm" }
 express-chaintsn = { path = "crates/chaintsn" }
 express-reth-db = { path = "crates/reth/db" }
 express-reth-exex = { path = "crates/reth/exex" }
