@@ -220,6 +220,18 @@ class BasicEnvConfig(flexitest.EnvConfig):
         seq_fac = ctx.get_factory("sequencer")
         reth_fac = ctx.get_factory("reth")
 
+        # reth needs some time to startup, start it first
+        secret_dir = ctx.make_service_dir("secret")
+        reth_secret_path = os.path.join(secret_dir, "jwt.hex")
+
+        with open(reth_secret_path, "w") as file:
+            file.write(generate_jwt_secret())
+
+        reth = reth_fac.create_exec_client(reth_secret_path)
+
+        reth_port = reth.get_prop("rpc_port")
+        reth_socket = f"localhost:{reth_port}"
+
         bitcoind = btc_fac.create_regtest_bitcoin()
         time.sleep(BLOCK_GENERATION_INTERVAL_SECS)
 
@@ -233,17 +245,6 @@ class BasicEnvConfig(flexitest.EnvConfig):
         if self.pre_generate_blocks > 0:
             print(f"Pre generating {self.pre_generate_blocks} blocks to address {seqaddr}")
             brpc.proxy.generatetoaddress(self.pre_generate_blocks, seqaddr)
-
-        secret_dir = ctx.make_service_dir("secret")
-        reth_secret_path = os.path.join(secret_dir, "jwt.hex")
-
-        with open(reth_secret_path, "w") as file:
-            file.write(generate_jwt_secret())
-
-        reth = reth_fac.create_exec_client(reth_secret_path)
-
-        reth_port = reth.get_prop("rpc_port")
-        reth_socket = f"localhost:{reth_port}"
 
         # generate blocks every 500 millis
         generate_blocks(brpc, BLOCK_GENERATION_INTERVAL_SECS, seqaddr)
