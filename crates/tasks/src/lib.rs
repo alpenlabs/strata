@@ -1,6 +1,7 @@
 use std::any::Any;
 use std::fmt::{Display, Formatter};
 use std::future::Future;
+use std::panic;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::thread::JoinHandle;
@@ -259,7 +260,7 @@ impl TaskExecutor {
             self.pending_tasks_counter.clone(),
         );
         std::thread::spawn(move || {
-            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| func(shutdown)));
+            let result = panic::catch_unwind(panic::AssertUnwindSafe(|| func(shutdown)));
 
             if let Err(error) = result {
                 // TODO: transfer stacktrace?
@@ -286,7 +287,7 @@ impl TaskExecutor {
         let fut = async_func(shutdown);
 
         // wrap the task in catch unwind
-        let task = std::panic::AssertUnwindSafe(fut)
+        let task = panic::AssertUnwindSafe(fut)
             .catch_unwind()
             .map_err(move |error| {
                 let task_error = PanickedTaskError::new(name, error);
@@ -311,8 +312,8 @@ mod tests {
         let executor = manager.executor();
 
         // dont want to print stack trace for expected error while running test
-        let original_hook = std::panic::take_hook();
-        std::panic::set_hook(Box::new(|_| {}));
+        let original_hook = panic::take_hook();
+        panic::set_hook(Box::new(|_| {}));
 
         executor.spawn_critical("panictask", |_| {
             panic!("intentional panic");
@@ -322,7 +323,7 @@ mod tests {
 
         let err = manager.monitor(None).expect_err("should give error");
 
-        std::panic::set_hook(original_hook);
+        panic::set_hook(original_hook);
 
         assert_eq!(err.task_name, "panictask");
         assert_eq!(err.error, Some("intentional panic".to_string()));
@@ -336,8 +337,8 @@ mod tests {
         let executor = manager.executor();
 
         // dont want to print stack trace for expected error while running test
-        let original_hook = std::panic::take_hook();
-        std::panic::set_hook(Box::new(|_| {}));
+        let original_hook = panic::take_hook();
+        panic::set_hook(Box::new(|_| {}));
 
         executor.spawn_critical("ok-task", |shutdown| {
             loop {
@@ -359,7 +360,7 @@ mod tests {
 
         let err = manager.monitor(None).expect_err("should give error");
 
-        std::panic::set_hook(original_hook);
+        panic::set_hook(original_hook);
 
         assert_eq!(err.task_name, "panictask");
         assert_eq!(err.error, Some("intentional panic".to_string()));
