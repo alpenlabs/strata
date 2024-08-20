@@ -19,7 +19,7 @@ use thiserror::Error;
 use tokio::sync::{broadcast, oneshot, RwLock};
 use tracing::*;
 
-use alpen_express_btcio::rpc::traits::L1Client;
+use alpen_express_btcio::rpc::traits::BitcoinClient;
 use alpen_express_btcio::writer::config::WriterConfig;
 use alpen_express_btcio::writer::start_writer_task;
 use alpen_express_btcio::writer::DaWriter;
@@ -200,7 +200,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     // Set up Bitcoin client RPC.
     let bitcoind_url = format!("http://{}", config.bitcoind_rpc.rpc_url);
-    let btc_rpc = alpen_express_btcio::rpc::BitcoinClient::new(
+    let btc_rpc = alpen_express_btcio::rpc::BitcoinDClient::new(
         bitcoind_url,
         config.bitcoind_rpc.rpc_user.clone(),
         config.bitcoind_rpc.rpc_password.clone(),
@@ -316,7 +316,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
 async fn main_task<
     D: Database + Send + Sync + 'static,
-    L: L1Client,
+    L: BitcoinClient,
     SD: SequencerDatabase + Send + Sync + 'static,
 >(
     config: &Config,

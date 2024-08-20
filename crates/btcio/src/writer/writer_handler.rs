@@ -20,10 +20,7 @@ use alpen_express_state::da_blob::BlobIntent;
 use super::broadcast::broadcaster_task;
 use super::config::WriterConfig;
 use super::utils::{create_and_sign_blob_inscriptions, get_blob_by_id, put_blob, BlobIdx};
-use crate::{
-    rpc::traits::{L1Client, SeqL1Client},
-    writer::watcher::watcher_task,
-};
+use crate::{rpc::traits::BitcoinClient, writer::watcher::watcher_task};
 
 #[derive(Debug)]
 pub struct WriterInitialState {
@@ -66,7 +63,7 @@ impl<D: SequencerDatabase + Send + Sync + 'static> DaWriter<D> {
 }
 
 pub fn start_writer_task<D: SequencerDatabase + Send + Sync + 'static>(
-    rpc_client: Arc<impl SeqL1Client + L1Client>,
+    rpc_client: Arc<impl BitcoinClient>,
     config: WriterConfig,
     db: Arc<D>,
     rt: &Runtime,
@@ -106,7 +103,7 @@ pub fn start_writer_task<D: SequencerDatabase + Send + Sync + 'static>(
 
 async fn listen_for_signing_intents<D>(
     mut sign_rx: Receiver<BlobIdx>,
-    rpc_client: Arc<impl SeqL1Client + L1Client>,
+    rpc_client: Arc<impl BitcoinClient>,
     config: WriterConfig,
     db: Arc<D>,
 ) -> anyhow::Result<()>

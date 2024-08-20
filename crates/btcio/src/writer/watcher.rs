@@ -7,7 +7,7 @@ use alpen_express_db::{
 use tracing::*;
 
 use crate::{
-    rpc::traits::{L1Client, SeqL1Client},
+    rpc::traits::BitcoinClient,
     writer::utils::{create_and_sign_blob_inscriptions, get_blob_by_idx},
 };
 
@@ -18,7 +18,7 @@ const FINALITY_DEPTH: u64 = 6;
 /// Watches for inscription transactions status in bitcoin
 pub async fn watcher_task<D: SequencerDatabase + Send + Sync + 'static>(
     next_to_watch: u64,
-    rpc_client: Arc<impl L1Client + SeqL1Client>,
+    rpc_client: Arc<impl BitcoinClient>,
     config: WriterConfig,
     db: Arc<D>,
 ) -> anyhow::Result<()> {
@@ -70,7 +70,7 @@ pub async fn watcher_task<D: SequencerDatabase + Send + Sync + 'static>(
 }
 
 async fn check_confirmations_and_update_entry<D: SequencerDatabase + Send + Sync + 'static>(
-    rpc_client: Arc<impl L1Client>,
+    rpc_client: Arc<impl BitcoinClient>,
     curr_blobidx: u64,
     mut blobentry: BlobEntry,
     db: Arc<D>,

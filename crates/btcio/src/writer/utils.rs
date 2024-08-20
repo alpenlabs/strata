@@ -6,12 +6,13 @@ use bitcoin::hashes::Hash;
 use bitcoin::{consensus::serialize, Transaction};
 use sha2::{Digest, Sha256};
 
-use crate::rpc::traits::{L1Client, SeqL1Client};
 use alpen_express_db::types::BlobL1Status;
 use alpen_express_db::{
     traits::{SeqDataProvider, SeqDataStore, SequencerDatabase},
     types::BlobEntry,
 };
+
+use crate::rpc::traits::BitcoinClient;
 
 use super::builder::build_inscription_txs;
 use super::config::WriterConfig;
@@ -90,21 +91,23 @@ pub async fn put_commit_reveal_txs<D: SequencerDatabase + Send + Sync + 'static>
 }
 
 pub async fn sign_transaction(
-    client: &impl SeqL1Client,
+    client: &impl BitcoinClient,
     tx: Transaction,
 ) -> anyhow::Result<Transaction> {
     let tx = client.sign_raw_transaction_with_wallet(tx).await?;
     Ok(tx)
 }
 
+/// Type alias for blob index.
 pub type BlobIdx = u64;
+
 /// This will create inscription transactions corresponding to a blobidx and appropriately update
 /// the blob. This is called when we receive a new intent as well as when broadcasting fails because
 /// the input utxos have been spent by something else already
 pub async fn create_and_sign_blob_inscriptions<D: SequencerDatabase + Send + Sync + 'static>(
     blobidx: BlobIdx,
     db: Arc<D>,
-    client: Arc<impl L1Client + SeqL1Client>,
+    client: Arc<impl BitcoinClient>,
     config: &WriterConfig,
 ) -> anyhow::Result<()> {
     if let Some(mut entry) = get_blob_by_idx(db.clone(), blobidx).await? {
@@ -153,7 +156,7 @@ mod test {
     use super::*;
     use crate::writer::{
         config::{InscriptionFeePolicy, WriterConfig},
-        test_utils::TestBitcoinClient,
+        test_utils::BitcoinDTestClient,
     };
 
     fn get_db() -> Arc<SequencerDB<SeqDb>> {
@@ -179,7 +182,7 @@ mod test {
     #[tokio::test]
     async fn test_create_and_sign_blob_inscriptions() {
         let db = get_db();
-        let client = Arc::new(TestBitcoinClient::new(1));
+        let client = Arc::new(BitcoinDTestClient::new(1));
         let config = get_config();
 
         // First insert an unsigned blob

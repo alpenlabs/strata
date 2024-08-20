@@ -10,7 +10,7 @@ use tracing::*;
 
 use super::config::ReaderConfig;
 use super::messages::{BlockData, L1Event};
-use crate::rpc::traits::L1Client;
+use crate::rpc::traits::BitcoinClient;
 use crate::status::{apply_status_updates, StatusUpdate};
 
 fn filter_interesting_txs(block: &Block) -> Vec<u32> {
@@ -131,8 +131,9 @@ impl ReaderState {
     }
 }
 
+/// Main entry point for the Bitcoin data reader task.
 pub async fn bitcoin_data_reader_task(
-    client: Arc<impl L1Client>,
+    client: Arc<impl BitcoinClient>,
     event_tx: mpsc::Sender<L1Event>,
     target_next_block: u64,
     config: Arc<ReaderConfig>,
@@ -153,8 +154,9 @@ pub async fn bitcoin_data_reader_task(
     }
 }
 
+/// Main reader task that polls the Bitcoin client for new blocks.
 async fn do_reader_task(
-    client: &impl L1Client,
+    client: &impl BitcoinClient,
     event_tx: &mpsc::Sender<L1Event>,
     target_next_block: u64,
     config: Arc<ReaderConfig>,
@@ -212,11 +214,17 @@ async fn do_reader_task(
     }
 }
 
-/// Inits the reader state by trying to backfill blocks up to a target height.
+/// Initializes the [`ReaderState`].
+///
+/// # Note
+///
+/// Under the hood, this function will query the Bitcoin client for the
+/// blockchain info and initialize the reader state
+/// by trying to backfill blocks up to a target height.
 async fn init_reader_state(
     target_next_block: u64,
     lookback: usize,
-    client: &impl L1Client,
+    client: &impl BitcoinClient,
 ) -> anyhow::Result<ReaderState> {
     // Init the reader state using the blockid we were given, fill in a few blocks back.
     debug!(%target_next_block, "initializing reader state");
@@ -243,10 +251,9 @@ async fn init_reader_state(
     Ok(state)
 }
 
-/// Polls the chain to see if there's new blocks to look at, possibly reorging
-/// if there's a mixup and we have to go back.
+/// Polls the Bitcoin chain to check for new blocks and reorging if necessary.
 async fn poll_for_new_blocks(
-    client: &impl L1Client,
+    client: &impl BitcoinClient,
     event_tx: &mpsc::Sender<L1Event>,
     _config: &ReaderConfig,
     state: &mut ReaderState,
@@ -286,7 +293,7 @@ async fn poll_for_new_blocks(
     // Now process each block we missed.
     let scan_start_height = state.next_height;
     for fetch_height in scan_start_height..=client_height {
-        let l1blkid =
+        let blkid =
             match fetch_and_process_block(fetch_height, client, event_tx, state, status_updates)
                 .await
             {
@@ -296,37 +303,43 @@ async fn poll_for_new_blocks(
                     break;
                 }
             };
-        info!(%fetch_height, %l1blkid, "accepted new block");
+        info!(%fetch_height, %blkid, "accepted new block");
     }
 
     Ok(())
 }
 
-/// Finds the highest block index where we do agree with the node.  If we never
-/// find one then we're really screwed.
+/// Finds the highest block index where we do agree with the node.
+///
+/// # Note
+///
+/// The reader might be in deep trouble if we can't find a common block. It
+/// should always have a common block with the node, even if we're behind.
 async fn find_pivot_block(
-    client: &impl L1Client,
+    client: &impl BitcoinClient,
     state: &ReaderState,
 ) -> anyhow::Result<Option<(u64, BlockHash)>> {
-    for (height, l1blkid) in state.iter_blocks_back() {
+    for (height, blkid) in state.iter_blocks_back() {
         // If at genesis, we can't reorg any farther.
         if height == 0 {
-            return Ok(Some((height, *l1blkid)));
+            return Ok(Some((height, *blkid)));
         }
 
-        let queried_l1blkid = client.get_block_hash(height).await?;
-        trace!(%height, %l1blkid, %queried_l1blkid, "comparing blocks to find pivot");
-        if queried_l1blkid == *l1blkid {
-            return Ok(Some((height, *l1blkid)));
+        let queried_blkid = client.get_block_hash(height).await?;
+        trace!(%height, %blkid, %queried_blkid, "comparing blocks to find pivot");
+        if queried_blkid == *blkid {
+            return Ok(Some((height, *blkid)));
         }
     }
 
     Ok(None)
 }
 
+/// Fetches a block from the client and processes it, sending the block data
+/// to the persistence task.
 async fn fetch_and_process_block(
     height: u64,
-    client: &impl L1Client,
+    client: &impl BitcoinClient,
     event_tx: &mpsc::Sender<L1Event>,
     state: &mut ReaderState,
     status_updates: &mut Vec<StatusUpdate>,
@@ -336,18 +349,18 @@ async fn fetch_and_process_block(
 
     let filtered_txs = filter_interesting_txs(&block);
     let block_data = BlockData::new(height, block, filtered_txs);
-    let l1blkid = block_data.block().block_hash();
-    trace!(%l1blkid, %height, %txs, "fetched block from client");
+    let blkid = block_data.block().block_hash();
+    trace!(%blkid, %height, %txs, "fetched block from client");
 
     status_updates.push(StatusUpdate::CurHeight(height));
-    status_updates.push(StatusUpdate::CurTip(l1blkid.to_string()));
+    status_updates.push(StatusUpdate::CurTip(blkid.to_string()));
     if let Err(e) = event_tx.send(L1Event::BlockData(block_data)).await {
         error!("failed to submit L1 block event, did the persistence task crash?");
         return Err(e.into());
     }
 
     // Insert to new block, incrementing cur_height.
-    let _deep = state.accept_new_block(l1blkid);
+    let _deep = state.accept_new_block(blkid);
 
-    Ok(l1blkid)
+    Ok(blkid)
 }

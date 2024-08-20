@@ -19,14 +19,11 @@ use reqwest::header::HeaderMap;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, to_value, value::RawValue, value::Value};
+use thiserror::Error;
 use tracing::*;
 
-use super::{traits::SeqL1Client, types::GetTransactionResponse};
-
-use thiserror::Error;
-
-use super::traits::L1Client;
 use super::types::{RawUTXO, RpcBlockchainInfo};
+use super::{traits::BitcoinClient, types::GetTransactionResponse};
 
 const MAX_RETRIES: u32 = 3;
 
@@ -61,7 +58,7 @@ struct Response<R> {
 
 // BitcoinClient is a struct that represents a connection to a Bitcoin RPC node
 #[derive(Debug)]
-pub struct BitcoinClient {
+pub struct BitcoinDClient {
     url: String,
     client: reqwest::Client,
     network: Network,
@@ -127,7 +124,7 @@ impl From<serde_json::error::Error> for ClientError {
 
 type ClientResult<T> = Result<T, ClientError>;
 
-impl BitcoinClient {
+impl BitcoinDClient {
     pub fn new(url: String, username: String, password: String, network: Network) -> Self {
         let mut headers = HeaderMap::new();
         let mut user_pw = String::new();
@@ -398,7 +395,7 @@ impl BitcoinClient {
 }
 
 #[async_trait]
-impl L1Client for BitcoinClient {
+impl BitcoinClient for BitcoinDClient {
     async fn get_blockchain_info(&self) -> ClientResult<RpcBlockchainInfo> {
         let res = self
             .call::<RpcBlockchainInfo>("getblockchaininfo", &[])
@@ -458,10 +455,7 @@ impl L1Client for BitcoinClient {
 
         Ok(result.confirmations)
     }
-}
 
-#[async_trait]
-impl SeqL1Client for BitcoinClient {
     // get_utxos returns all unspent transaction outputs for the wallets of bitcoind
     async fn get_utxos(&self) -> ClientResult<Vec<RawUTXO>> {
         let utxos = self
@@ -542,7 +536,7 @@ impl SeqL1Client for BitcoinClient {
         }
     }
 
-    fn network(&self) -> Network {
+    fn get_network(&self) -> Network {
         self.network
     }
 }

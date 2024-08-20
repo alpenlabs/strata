@@ -12,10 +12,7 @@ use alpen_express_db::{
 };
 
 use crate::{
-    rpc::{
-        traits::{L1Client, SeqL1Client},
-        ClientError,
-    },
+    rpc::{traits::BitcoinClient, ClientError},
     writer::utils::{get_blob_by_idx, get_l1_tx},
 };
 
@@ -25,7 +22,7 @@ const BROADCAST_POLL_INTERVAL: u64 = 1000; // millis
 /// Broadcasts the next blob to be sent
 pub async fn broadcaster_task<D: SequencerDatabase + Send + Sync + 'static>(
     next_publish_blob_idx: u64,
-    rpc_client: Arc<impl SeqL1Client + L1Client>,
+    rpc_client: Arc<impl BitcoinClient>,
     db: Arc<D>,
     l1_status: Arc<RwLock<L1Status>>,
 ) -> anyhow::Result<()> {
@@ -116,14 +113,14 @@ enum SendError {
 async fn send_commit_reveal_txs(
     commit_tx_raw: Vec<u8>,
     reveal_tx_raw: Vec<u8>,
-    client: &(impl SeqL1Client + L1Client),
+    client: &impl BitcoinClient,
 ) -> Result<(), SendError> {
     send_tx(commit_tx_raw, client).await?;
     send_tx(reveal_tx_raw, client).await?;
     Ok(())
 }
 
-async fn send_tx(tx_raw: Vec<u8>, client: &(impl SeqL1Client + L1Client)) -> Result<(), SendError> {
+async fn send_tx(tx_raw: Vec<u8>, client: &impl BitcoinClient) -> Result<(), SendError> {
     match client.send_raw_transaction(tx_raw).await {
         Ok(_) => Ok(()),
         Err(ClientError::Server(-27, _)) => Ok(()), // Tx already in chain

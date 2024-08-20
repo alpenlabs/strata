@@ -31,10 +31,7 @@ use bitcoin::{
 use rand::RngCore;
 use thiserror::Error;
 
-use crate::rpc::{
-    traits::{L1Client, SeqL1Client},
-    types::RawUTXO,
-};
+use crate::rpc::{traits::BitcoinClient, types::RawUTXO};
 
 use super::config::{InscriptionFeePolicy, WriterConfig};
 
@@ -101,7 +98,7 @@ pub enum InscriptionError {
 
 pub async fn build_inscription_txs(
     payload: &[u8],
-    rpc_client: &Arc<impl SeqL1Client + L1Client>,
+    rpc_client: &Arc<impl BitcoinClient>,
     config: &WriterConfig,
 ) -> anyhow::Result<(Transaction, Transaction)> {
     // let (signature, pub_key) = sign_blob_with_private_key(&payload, &config.private_key)?;
@@ -123,7 +120,7 @@ pub async fn build_inscription_txs(
         config.sequencer_address.clone(),
         config.amount_for_reveal_txn,
         fee_rate,
-        rpc_client.network(),
+        rpc_client.get_network(),
     )
     .map_err(|e| anyhow::anyhow!(e.to_string()))
 }
