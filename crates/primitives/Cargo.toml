@@ -4,6 +4,7 @@ name = "alpen-express-primitives"
 version = "0.1.0"
 
 [dependencies]
+anyhow = { workspace = true }
 arbitrary = { workspace = true }
 bitcoin = { workspace = true }
 borsh = { workspace = true }
@@ -13,7 +14,3 @@ reth-primitives = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
-
-[dev-dependencies]
-hex = { workspace = true }
-serde_json = { workspace = true }

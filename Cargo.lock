@@ -818,6 +818,7 @@ dependencies = [
 name = "alpen-express-primitives"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "arbitrary",
  "bitcoin",
  "borsh",
