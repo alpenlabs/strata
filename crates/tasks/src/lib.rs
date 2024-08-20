@@ -3,15 +3,13 @@ use std::fmt::{Display, Formatter};
 use std::future::Future;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
-use std::task::Poll;
 use std::thread::JoinHandle;
 use std::time::Duration;
 
-use futures_util::future::poll_fn;
 use futures_util::{FutureExt, TryFutureExt};
 use tokio::runtime::Handle;
 use tokio::sync::mpsc;
-use tracing::{debug, error};
+use tracing::{debug, error, warn};
 
 /// Error with the name of the task that panicked and an error downcasted to string, if possible.
 #[derive(Debug, thiserror::Error)]
@@ -33,14 +31,11 @@ impl Display for PanickedTaskError {
 
 impl PanickedTaskError {
     fn new(task_name: &str, error: Box<dyn Any>) -> Self {
-        let error = match error.downcast::<PanickedTaskError>() {
-            Ok(value) => return *value,
-            Err(error) => match error.downcast::<String>() {
-                Ok(value) => Some(*value),
-                Err(error) => match error.downcast::<&str>() {
-                    Ok(value) => Some(value.to_string()),
-                    Err(_) => None,
-                },
+        let error = match error.downcast::<String>() {
+            Ok(value) => Some(*value),
+            Err(error) => match error.downcast::<&str>() {
+                Ok(value) => Some(value.to_string()),
+                Err(_) => None,
             },
         };
 
@@ -71,19 +66,14 @@ impl ShutdownSignal {
 struct Shutdown(Arc<AtomicBool>);
 
 impl Shutdown {
-    fn should_shutdown(&mut self) -> bool {
+    fn should_shutdown(&self) -> bool {
         self.0.load(Ordering::Relaxed)
     }
 
     async fn into_future(self) {
-        poll_fn(|_| {
-            if self.0.load(Ordering::Relaxed) {
-                Poll::Ready(())
-            } else {
-                Poll::Pending
-            }
-        })
-        .await
+        while !self.should_shutdown() {
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
     }
 }
 
@@ -94,7 +84,7 @@ impl ShutdownGuard {
         counter.fetch_add(1, Ordering::SeqCst);
         Self(shutdown, counter)
     }
-    pub fn should_shutdown(&mut self) -> bool {
+    pub fn should_shutdown(&self) -> bool {
         self.0.should_shutdown()
     }
 }
@@ -105,12 +95,6 @@ impl Drop for ShutdownGuard {
     }
 }
 
-// #[derive(Debug)]
-// struct NamedJoinHandle<T> {
-//     name: &'static str,
-//     inner: JoinHandle<T>,
-// }
-
 pub struct TaskManager {
     /// Handle to the tokio runtime.
     tokio_handle: Handle,
@@ -120,8 +104,6 @@ pub struct TaskManager {
     panicked_tasks_rx: mpsc::UnboundedReceiver<PanickedTaskError>,
     /// send shutdown signals to tasks
     shutdown_signal: ShutdownSignal,
-    /// join handles to active threads
-    // join_handles: Arc<Mutex<VecDeque<NamedJoinHandle<()>>>>,
     /// pending tasks count
     pending_tasks_counter: Arc<AtomicUsize>,
 }
@@ -135,7 +117,6 @@ impl TaskManager {
             panicked_tasks_tx,
             panicked_tasks_rx,
             shutdown_signal: ShutdownSignal::new(),
-            // join_handles: Arc::new(Mutex::new(VecDeque::new())),
             pending_tasks_counter: Arc::new(AtomicUsize::new(0)),
         }
     }
@@ -145,11 +126,12 @@ impl TaskManager {
             self.tokio_handle.clone(),
             self.panicked_tasks_tx.clone(),
             self.shutdown_signal.clone(),
-            // self.join_handles.clone(),
             self.pending_tasks_counter.clone(),
         )
     }
 
+    /// waits until any tasks panic, returns `Err(first_panic_error)`
+    /// returns `Ok(())` if shutdown message is recieved instead
     fn wait_for_task_panic(&mut self, shutdown: Shutdown) -> Result<(), PanickedTaskError> {
         self.tokio_handle.block_on(async {
             tokio::select! {
@@ -166,8 +148,15 @@ impl TaskManager {
         })
     }
 
-    pub fn graceful_shutdown(self, timeout: Option<Duration>) -> bool {
+    pub fn do_graceful_shutdown(self, timeout: Option<Duration>) -> bool {
         self.shutdown_signal.send();
+        self.wait_for_graceful_shutdown(timeout)
+    }
+
+    /// Wait for all tasks to complete, returning true.
+    /// If timeout is provided, wait until timeout;
+    /// return false if tasks have not completed by this time.
+    fn wait_for_graceful_shutdown(self, timeout: Option<Duration>) -> bool {
         let when = timeout.map(|t| std::time::Instant::now() + t);
         while self.pending_tasks_counter.load(Ordering::Relaxed) > 0 {
             if when
@@ -184,13 +173,27 @@ impl TaskManager {
         true
     }
 
+    pub fn start_signal_listeners(&self) {
+        let shutdown_signal_c = self.shutdown_signal.clone();
+
+        self.tokio_handle.spawn(async move {
+            // TODO: add more relevant signals
+            // TODO: double ctrl+c for force quit
+            let _ = tokio::signal::ctrl_c().into_future().await;
+
+            // got a ctrl+c. send a shutdown
+            warn!("Got INT. Start cleanup");
+            shutdown_signal_c.send()
+        });
+    }
+
     pub fn monitor(mut self) -> Result<(), PanickedTaskError> {
-        println!("monitor");
         let res = self.wait_for_task_panic(self.shutdown_signal.subscribe());
 
         println!("start shutdown");
 
-        self.graceful_shutdown(None);
+        self.shutdown_signal.send();
+        self.wait_for_graceful_shutdown(None);
 
         // join all pending threads ?
 
@@ -207,8 +210,6 @@ pub struct TaskExecutor {
     panicked_tasks_tx: mpsc::UnboundedSender<PanickedTaskError>,
     /// send shutdown signals to tasks
     shutdown_signal: ShutdownSignal,
-    /// join handles to active threads
-    // join_handles: Arc<Mutex<VecDeque<NamedJoinHandle<()>>>>,
     /// number of pending tasks
     pending_tasks_counter: Arc<AtomicUsize>,
 }
@@ -218,21 +219,19 @@ impl TaskExecutor {
         tokio_handle: Handle,
         panicked_tasks_tx: mpsc::UnboundedSender<PanickedTaskError>,
         shutdown_signal: ShutdownSignal,
-        // join_handles: Arc<Mutex<VecDeque<NamedJoinHandle<()>>>>,
         pending_tasks_counter: Arc<AtomicUsize>,
     ) -> Self {
         Self {
             tokio_handle,
             panicked_tasks_tx,
             shutdown_signal,
-            // join_handles,
             pending_tasks_counter,
         }
     }
 
     pub fn spawn_critical<F>(&self, name: &'static str, func: F) -> JoinHandle<()>
     where
-        F: FnOnce(ShutdownGuard) + Send + Sync + 'static,
+        F: FnOnce(ShutdownGuard) + Send + 'static,
     {
         let panicked_tasks_tx = self.panicked_tasks_tx.clone();
         let shutdown = ShutdownGuard::new(
@@ -248,14 +247,6 @@ impl TaskExecutor {
                 let _ = panicked_tasks_tx.send(task_error);
             };
         })
-
-        // self.join_handles
-        //     .lock()
-        //     .unwrap()
-        //     .push_back(NamedJoinHandle {
-        //         name,
-        //         inner: handle,
-        //     });
     }
 
     pub fn spawn_critical_async<F>(
@@ -327,7 +318,7 @@ mod tests {
         let original_hook = std::panic::take_hook();
         std::panic::set_hook(Box::new(|_| {}));
 
-        executor.spawn_critical("ok-task", |mut shutdown| {
+        executor.spawn_critical("ok-task", |shutdown| {
             loop {
                 if shutdown.should_shutdown() {
                     println!("got shutdown signal");
@@ -360,7 +351,7 @@ mod tests {
         let manager = TaskManager::new(handle);
         let executor = manager.executor();
 
-        executor.spawn_critical("task", |mut shutdown| loop {
+        executor.spawn_critical("task", |shutdown| loop {
             if shutdown.should_shutdown() {
                 println!("got shutdown signal");
                 break;
@@ -370,7 +361,7 @@ mod tests {
             std::thread::sleep(Duration::from_millis(100));
         });
 
-        executor.spawn_critical_async("async-task", |mut shutdown| async move {
+        executor.spawn_critical_async("async-task", |shutdown| async move {
             loop {
                 if shutdown.should_shutdown() {
                     println!("got shutdown signal");
@@ -382,7 +373,12 @@ mod tests {
             }
         });
 
-        manager.shutdown_signal.send();
+        let shutdown_sig = manager.shutdown_signal.clone();
+
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(100));
+            shutdown_sig.send();
+        });
 
         let res = manager.monitor();
 
