@@ -3,6 +3,7 @@ use std::{sync::Arc, time::Duration};
 use alpen_express_rpc_types::L1Status;
 use anyhow::anyhow;
 use bitcoin::{consensus::deserialize, Txid};
+use bitcoincore_rpc_async::Error as RpcError;
 use tokio::sync::RwLock;
 use tracing::*;
 
@@ -12,7 +13,7 @@ use alpen_express_db::{
 };
 
 use crate::{
-    rpc::{traits::BitcoinClient, ClientError},
+    rpc::traits::BitcoinClient,
     writer::utils::{get_blob_by_idx, get_l1_tx},
 };
 
@@ -87,16 +88,16 @@ pub async fn broadcaster_task<D: SequencerDatabase + Send + Sync + 'static>(
                     }
                     curr_idx += 1;
                 }
-                Err(SendError::MissingOrInvalidInput) => {
+                Err(e) => {
+                    // DEBUG: What the hell is this?
+                    // FIXME: remove me
+                    #[cfg(debug_assertions)]
+                    dbg!(&e);
                     // Means need to Resign/Republish
                     blobentry.status = BlobL1Status::NeedsResign;
 
                     db.sequencer_store()
                         .update_blob_by_idx(curr_idx, blobentry)?;
-                }
-                Err(SendError::Other(e)) => {
-                    warn!(%e, "Error sending !");
-                    // TODO: Maybe retry or return?
                 }
             }
         } else {
@@ -105,26 +106,16 @@ pub async fn broadcaster_task<D: SequencerDatabase + Send + Sync + 'static>(
     }
 }
 
-enum SendError {
-    MissingOrInvalidInput,
-    Other(String),
-}
-
 async fn send_commit_reveal_txs(
     commit_tx_raw: Vec<u8>,
     reveal_tx_raw: Vec<u8>,
     client: &impl BitcoinClient,
-) -> Result<(), SendError> {
+) -> Result<(), RpcError> {
     send_tx(commit_tx_raw, client).await?;
     send_tx(reveal_tx_raw, client).await?;
     Ok(())
 }
 
-async fn send_tx(tx_raw: Vec<u8>, client: &impl BitcoinClient) -> Result<(), SendError> {
-    match client.send_raw_transaction(tx_raw).await {
-        Ok(_) => Ok(()),
-        Err(ClientError::Server(-27, _)) => Ok(()), // Tx already in chain
-        Err(ClientError::Server(-25, _)) => Err(SendError::MissingOrInvalidInput),
-        Err(e) => Err(SendError::Other(e.to_string())),
-    }
+async fn send_tx(tx_raw: Vec<u8>, client: &impl BitcoinClient) -> Result<Txid, RpcError> {
+    client.send_raw_transaction(tx_raw).await
 }

@@ -1,4 +1,4 @@
-use bitcoin::Address;
+use bitcoin::{Address, Network};
 use std::str::FromStr;
 
 #[derive(Debug, Clone)]
@@ -17,14 +17,13 @@ pub struct WriterConfig {
 
     /// How much amount(in sats) to send to reveal address
     pub(super) amount_for_reveal_txn: u64,
+
+    /// The Bitcoin [`Network`] to use
+    pub(super) network: Network,
 }
 
 impl WriterConfig {
-    pub fn new(
-        address: String,
-        network: bitcoin::Network,
-        rollup_name: String,
-    ) -> anyhow::Result<Self> {
+    pub fn new(address: String, network: Network, rollup_name: String) -> anyhow::Result<Self> {
         let addr = Address::from_str(&address)?.require_network(network)?;
         Ok(Self {
             sequencer_address: addr,
@@ -33,6 +32,7 @@ impl WriterConfig {
             inscription_fee_policy: InscriptionFeePolicy::Fixed(100),
             poll_duration_ms: 1000,
             amount_for_reveal_txn: 1000,
+            network,
         })
     }
 }

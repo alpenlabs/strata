@@ -101,6 +101,7 @@ pub async fn build_inscription_txs(
     rpc_client: &Arc<impl BitcoinClient>,
     config: &WriterConfig,
 ) -> anyhow::Result<(Transaction, Transaction)> {
+    let network = config.network;
     // let (signature, pub_key) = sign_blob_with_private_key(&payload, &config.private_key)?;
     let utxos = rpc_client.get_utxos().await?;
     let utxos = utxos
@@ -110,7 +111,7 @@ pub async fn build_inscription_txs(
         .map_err(|e| anyhow::anyhow!("{:?}", e))?;
 
     let fee_rate = match config.inscription_fee_policy {
-        InscriptionFeePolicy::Smart => rpc_client.estimate_smart_fee().await?,
+        InscriptionFeePolicy::Smart => rpc_client.estimate_smart_fee(1).await?,
         InscriptionFeePolicy::Fixed(val) => val,
     };
     create_inscription_transactions(
@@ -120,7 +121,7 @@ pub async fn build_inscription_txs(
         config.sequencer_address.clone(),
         config.amount_for_reveal_txn,
         fee_rate,
-        rpc_client.get_network(),
+        network,
     )
     .map_err(|e| anyhow::anyhow!(e.to_string()))
 }

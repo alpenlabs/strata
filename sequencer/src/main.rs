@@ -7,6 +7,7 @@ use std::process;
 use std::sync::Arc;
 use std::thread;
 
+use alpen_express_btcio::rpc::BitcoinDClient;
 use anyhow::Context;
 use bitcoin::Network;
 use config::Config;
@@ -112,15 +113,16 @@ fn default_rollup_params() -> RollupParams {
     }
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let args: Args = argh::from_env();
-    if let Err(e) = main_inner(args) {
+    if let Err(e) = main_inner(args).await {
         eprintln!("FATAL ERROR: {e}");
         eprintln!("trace:\n{e:?}");
     }
 }
 
-fn main_inner(args: Args) -> anyhow::Result<()> {
+async fn main_inner(args: Args) -> anyhow::Result<()> {
     logging::init();
 
     // initialize the full configuration
@@ -200,12 +202,12 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     // Set up Bitcoin client RPC.
     let bitcoind_url = format!("http://{}", config.bitcoind_rpc.rpc_url);
-    let btc_rpc = alpen_express_btcio::rpc::BitcoinDClient::new(
+    let btc_rpc = BitcoinDClient::new(
         bitcoind_url,
         config.bitcoind_rpc.rpc_user.clone(),
         config.bitcoind_rpc.rpc_password.clone(),
-        bitcoin::Network::Regtest,
-    );
+    )
+    .await?;
     let btc_rpc = Arc::new(btc_rpc);
 
     // TODO remove this

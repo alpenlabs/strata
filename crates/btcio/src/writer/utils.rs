@@ -166,9 +166,10 @@ mod test {
     }
 
     fn get_config() -> WriterConfig {
+        let network = Network::Regtest;
         let addr = Address::from_str("bcrt1q6u6qyya3sryhh42lahtnz2m7zuufe7dlt8j0j5")
             .unwrap()
-            .require_network(Network::Regtest)
+            .require_network(network)
             .unwrap();
         WriterConfig {
             sequencer_address: addr,
@@ -176,6 +177,7 @@ mod test {
             inscription_fee_policy: InscriptionFeePolicy::Fixed(100),
             poll_duration_ms: 1000,
             amount_for_reveal_txn: 1000,
+            network,
         }
     }
 
