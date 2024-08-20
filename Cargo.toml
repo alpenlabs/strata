@@ -54,8 +54,8 @@ express-reth-exex = { path = "crates/reth/exex" }
 express-reth-rpc = { path = "crates/reth/rpc" }
 express-rpc-utils = { path = "crates/rpc/utils" }
 express-storage = { path = "crates/storage" }
-express-zkvm = { path = "crates/prover/zkvm" }                      # FIXME make these names more consistent?
 express-tasks = { path = "crates/tasks" }
+express-zkvm = { path = "crates/prover/zkvm" }                      # FIXME make these names more consistent?
 zkvm-primitives = { path = "crates/prover/primitives" }
 
 # IMPORTANT: ensure alloy-* types are of the same version as inside reth dependency

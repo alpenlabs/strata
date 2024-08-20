@@ -144,7 +144,7 @@ impl TaskManager {
     }
 
     /// waits until any tasks panic, returns `Err(first_panic_error)`
-    /// returns `Ok(())` if shutdown message is recieved instead
+    /// returns `Ok(())` if shutdown message is received instead
     fn wait_for_task_panic(&mut self, shutdown: Shutdown) -> Result<(), PanickedTaskError> {
         self.tokio_handle.block_on(async {
             tokio::select! {
