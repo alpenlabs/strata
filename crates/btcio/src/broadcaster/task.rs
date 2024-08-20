@@ -2,6 +2,7 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use bitcoin::{hashes::Hash, Txid};
 use express_storage::managers::l1tx_broadcast::BroadcastDbManager;
+use tokio::sync::mpsc::Receiver;
 use tracing::*;
 
 use alpen_express_db::types::{ExcludeReason, L1TxEntry, L1TxStatus};
@@ -24,6 +25,7 @@ const FINALITY_DEPTH: u64 = 6;
 pub async fn broadcaster_task(
     rpc_client: Arc<impl SeqL1Client + L1Client>,
     manager: Arc<BroadcastDbManager>,
+    mut entry_receiver: Receiver<(u64, L1TxEntry)>,
 ) -> BroadcasterResult<()> {
     info!("Starting Broadcaster task");
     let interval = tokio::time::interval(Duration::from_millis(BROADCAST_POLL_INTERVAL));
@@ -32,7 +34,18 @@ pub async fn broadcaster_task(
     let mut state = BroadcasterState::initialize(&manager).await?;
     // Run indefinitely to watch/publish txs
     loop {
-        interval.as_mut().tick().await;
+        tokio::select! {
+            _ = interval.tick() => {}
+
+            Some((idx, txentry)) = entry_receiver.recv() => {
+                let txid = txentry.txid_str();
+                info!(%idx, %txid, "Received txentry");
+
+                // Insert into state's unfinalized entries. Need not update next_idx because that
+                // will be handled in state.next() call
+                state.unfinalized_entries.insert(idx, txentry);
+            }
+        }
 
         let (updated_entries, to_remove) = process_unfinalized_entries(
             &state.unfinalized_entries,

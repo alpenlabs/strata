@@ -4,7 +4,7 @@ use std::{borrow::BorrowMut, sync::Arc};
 
 use async_trait::async_trait;
 use bitcoin::{consensus::deserialize, Transaction as BTransaction, Txid};
-use express_storage::managers::l1tx_broadcast::BroadcastDbManager;
+use express_storage::managers::l1tx_broadcast::{BroadcastDbManager, L1BroadcastHandle};
 use jsonrpsee::{
     core::RpcResult,
     types::{ErrorObject, ErrorObjectOwned},
@@ -17,7 +17,10 @@ use reth_rpc_types::{
     StateContext, SyncInfo, SyncStatus, Transaction, TransactionRequest, Work,
 };
 use thiserror::Error;
-use tokio::sync::{mpsc, oneshot, watch, Mutex, RwLock};
+use tokio::sync::{
+    mpsc::{self, Sender},
+    oneshot, watch, Mutex, RwLock,
+};
 
 use alpen_express_btcio::writer::{utils::calculate_blob_hash, DaWriter};
 use alpen_express_consensus_logic::sync_manager::SyncManager;
@@ -25,6 +28,7 @@ use alpen_express_consensus_logic::sync_manager::SyncManager;
 use alpen_express_db::{
     traits::{ChainstateProvider, Database, L2DataProvider},
     types::L1TxEntry,
+    DbResult,
 };
 use alpen_express_db::{
     traits::{L1DataProvider, SequencerDatabase},
@@ -145,7 +149,7 @@ pub struct AlpenRpcImpl<D> {
     l1_status: Arc<RwLock<L1Status>>,
     database: Arc<D>,
     sync_manager: Arc<SyncManager>,
-    bcast_manager: Arc<BroadcastDbManager>,
+    bcast_handle: Arc<L1BroadcastHandle>,
     stop_tx: Mutex<Option<oneshot::Sender<()>>>,
 }
 
@@ -154,14 +158,14 @@ impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
         l1_status: Arc<RwLock<L1Status>>,
         database: Arc<D>,
         sync_manager: Arc<SyncManager>,
-        bcast_manager: Arc<BroadcastDbManager>,
+        bcast_handle: Arc<L1BroadcastHandle>,
         stop_tx: oneshot::Sender<()>,
     ) -> Self {
         Self {
             l1_status,
             database,
             sync_manager,
-            bcast_manager,
+            bcast_handle,
             stop_tx: Mutex::new(Some(stop_tx)),
         }
     }
@@ -476,8 +480,8 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         txid.reverse();
         let id = Buf32::from(txid);
         Ok(self
-            .bcast_manager
-            .get_tx_status_async(id)
+            .bcast_handle
+            .get_tx_status(id)
             .await
             .map_err(|e| Error::Other(e.to_string()))?)
     }
@@ -504,14 +508,14 @@ pub struct AdminServerImpl<S> {
     // Currently writer is Some() for sequencer only, but we need bcast_manager for both fullnode
     // and seq
     pub writer: Option<Arc<DaWriter<S>>>,
-    pub bcast_manager: Arc<BroadcastDbManager>,
+    pub bcast_handle: Arc<L1BroadcastHandle>,
 }
 
 impl<S: SequencerDatabase> AdminServerImpl<S> {
-    pub fn new(writer: Option<Arc<DaWriter<S>>>, bcast_manager: Arc<BroadcastDbManager>) -> Self {
+    pub fn new(writer: Option<Arc<DaWriter<S>>>, bcast_handle: Arc<L1BroadcastHandle>) -> Self {
         Self {
             writer,
-            bcast_manager,
+            bcast_handle,
         }
     }
 }
@@ -537,8 +541,8 @@ impl<S: SequencerDatabase + Send + Sync + 'static> AlpenAdminApiServer for Admin
 
         let entry = L1TxEntry::from_tx(&tx);
 
-        self.bcast_manager
-            .insert_new_tx_entry_async((*entry.txid()).into(), entry)
+        self.bcast_handle
+            .insert_new_tx_entry((*entry.txid()).into(), entry)
             .await
             .map_err(|e| Error::Other(e.to_string()))?;
 

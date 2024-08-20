@@ -10,6 +10,7 @@ use alpen_express_db::{
     types::{L1TxEntry, L1TxStatus},
 };
 use alpen_express_primitives::buf::Buf32;
+use tokio::sync::mpsc::Sender;
 
 use crate::exec::*;
 
@@ -77,4 +78,36 @@ fn update_tx_entry<D: TxBroadcastDatabase + Sync + Send + 'static>(
 ) -> DbResult<()> {
     let bcast_store = context.db.broadcast_store();
     bcast_store.update_tx_entry(idx, entry)
+}
+
+pub struct L1BroadcastHandle {
+    manager: Arc<BroadcastDbManager>,
+    sender: Sender<(u64, L1TxEntry)>,
+}
+
+impl L1BroadcastHandle {
+    pub fn new(sender: Sender<(u64, L1TxEntry)>, manager: Arc<BroadcastDbManager>) -> Self {
+        Self { manager, sender }
+    }
+
+    pub async fn get_tx_status(&self, txid: Buf32) -> DbResult<Option<L1TxStatus>> {
+        self.manager.get_tx_status_async(txid).await
+    }
+
+    pub async fn insert_new_tx_entry(&self, txid: Buf32, txentry: L1TxEntry) -> DbResult<u64> {
+        match self
+            .manager
+            .insert_new_tx_entry_async(txid, txentry.clone())
+            .await
+        {
+            Ok(idx) => {
+                // abc
+                if let Err(e) = self.sender.send((idx, txentry)).await {
+                    warn!(%e, "Error sending txentry from Broadcast handle");
+                }
+                Ok(idx)
+            }
+            Err(e) => Err(e),
+        }
+    }
 }

@@ -10,10 +10,12 @@ use std::time::Duration;
 use alpen_express_btcio::broadcaster::task::broadcaster_task;
 use alpen_express_btcio::rpc::traits::L1Client;
 use alpen_express_btcio::rpc::traits::SeqL1Client;
+use alpen_express_db::types::L1TxEntry;
 use alpen_express_rocksdb::broadcaster::db::BroadcastDatabase;
 use anyhow::Context;
 use bitcoin::Network;
 use config::Config;
+use express_storage::managers::l1tx_broadcast::L1BroadcastHandle;
 use express_storage::managers::l1tx_broadcast::{BroadcastDbManager, L1BroadcastContext};
 use express_storage::L2BlockManager;
 use format_serde_error::SerdeError;
@@ -21,6 +23,7 @@ use reth_rpc_types::engine::JwtError;
 use reth_rpc_types::engine::JwtSecret;
 use rockbound::rocksdb;
 use thiserror::Error;
+use tokio::sync::mpsc;
 use tokio::sync::{broadcast, oneshot, RwLock};
 use tracing::*;
 
@@ -379,7 +382,10 @@ async fn start_rpc<
     writer: Option<Arc<DaWriter<SD>>>,
 ) -> anyhow::Result<()> {
     // start broadcast task
-    tokio::spawn(broadcaster_task(l1_rpc_client, bcast_man.clone()));
+    let (tx, rx) = mpsc::channel::<(u64, L1TxEntry)>(64);
+    tokio::spawn(broadcaster_task(l1_rpc_client, bcast_man.clone(), rx));
+
+    let bcast_handle = Arc::new(L1BroadcastHandle::new(tx, bcast_man));
 
     let (stop_tx, stop_rx) = oneshot::channel();
 
@@ -388,12 +394,12 @@ async fn start_rpc<
         l1_status.clone(),
         database.clone(),
         sync_man.clone(),
-        bcast_man.clone(),
+        bcast_handle.clone(),
         stop_tx,
     );
 
     let mut methods = alp_rpc.into_rpc();
-    let admin_rpc = rpc_server::AdminServerImpl::new(writer, bcast_man);
+    let admin_rpc = rpc_server::AdminServerImpl::new(writer, bcast_handle);
     methods.merge(admin_rpc.into_rpc())?;
 
     let rpc_port = config.client.rpc_port;
