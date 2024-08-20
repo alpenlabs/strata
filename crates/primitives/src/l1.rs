@@ -1,19 +1,22 @@
 use std::{
-    fmt, io,
-    io::{Read, Write},
+    io,
+    io::{ErrorKind, Read, Write},
     iter::Sum,
     ops::Add,
     str::FromStr,
 };
 
+use anyhow::{anyhow, Context};
 use arbitrary::{Arbitrary, Unstructured};
 use bitcoin::{
     address::NetworkUnchecked,
     consensus::serialize,
     hashes::{sha256d, Hash},
-    Address, Block, OutPoint,
+    key::TapTweak,
+    Address, AddressType, Block, Network, OutPoint, XOnlyPublicKey,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
+use reth_primitives::revm_primitives::FixedBytes;
 use serde::{Deserialize, Serialize};
 use serde_json;
 
@@ -245,17 +248,11 @@ impl FromStr for BitcoinAddress {
     }
 }
 
-impl TryFrom<Buf32> for BitcoinAddress {
-    type Error = <Address<NetworkUnchecked> as FromStr>::Err;
-
-    fn try_from(value: Buf32) -> Result<Self, Self::Error> {
-        let address_str = format!("{:x}", value.0);
-
-        BitcoinAddress::from_str(&address_str)
-    }
-}
-
 impl BitcoinAddress {
+    pub fn new(address: Address<NetworkUnchecked>) -> Self {
+        Self(address)
+    }
+
     pub fn address(&self) -> &Address<NetworkUnchecked> {
         &self.0
     }
@@ -327,6 +324,8 @@ impl BitcoinAmount {
     pub const MAX: BitcoinAmount = Self(u64::MAX);
     /// The number of bytes that an amount contributes to the size of a transaction.
     pub const SIZE: usize = 8; // Serialized length of a u64.
+                               // The number of sats in 1 bitcoin.
+    pub const SATS_FACTOR: u64 = 100_000_000;
 
     /// Get the number of sats in this [`BitcoinAmount`].
     pub fn to_sat(&self) -> u64 {
@@ -338,7 +337,7 @@ impl BitcoinAmount {
         Self(value)
     }
 
-    /// Convert from a value expressing integer values of bitcoins to an [`BitcoinAmount`]
+    /// Convert from a value expressing integer values of bitcoins to a [`BitcoinAmount`]
     /// in const context.
     ///
     /// ## Panics
@@ -346,7 +345,7 @@ impl BitcoinAmount {
     /// The function panics if the argument multiplied by the number of sats
     /// per bitcoin overflows a u64 type.
     pub const fn from_int_btc(btc: u64) -> Self {
-        match btc.checked_mul(100_000_000) {
+        match btc.checked_mul(Self::SATS_FACTOR) {
             Some(amount) => Self::from_sat(amount),
             None => {
                 panic!("number of sats greater than u64::MAX");
@@ -369,11 +368,71 @@ impl Sum for BitcoinAmount {
     }
 }
 
+/// A wrapper around [`Buf32`] to store the tweaked taproot pubkeys (containing the merkle root
+/// information).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+pub struct TweakedTrPubkey(Buf32);
+
+impl TweakedTrPubkey {
+    /// Construct a new `TaprootPubkey` directly from a `Buf32`.
+    pub fn new(val: Buf32) -> Self {
+        Self(val)
+    }
+
+    /// Get the underlying [`Buf32`].
+    pub fn buf32(&self) -> &Buf32 {
+        &self.0
+    }
+
+    /// Convert a [`BitcoinAddress`] into a [`TweakedTrPubkey`].
+    pub fn from_address(address: &BitcoinAddress, network: Network) -> anyhow::Result<Self> {
+        let unchecked_addr = address.address().clone();
+        let checked_addr = unchecked_addr.require_network(network)?;
+
+        if let Some(AddressType::P2tr) = checked_addr.address_type() {
+            let script_pubkey = checked_addr.script_pubkey();
+
+            // skip the version and length bytes
+            let pubkey_bytes = &script_pubkey.as_bytes()[2..34];
+            let output_key: XOnlyPublicKey = XOnlyPublicKey::from_slice(pubkey_bytes)
+                .context("invalid key format for taproot address")?;
+
+            let serialized_key: FixedBytes<32> = output_key.serialize().into();
+
+            Ok(Self(Buf32(serialized_key)))
+        } else {
+            Err(anyhow!("Address is not a P2TR (Taproot) address"))
+        }
+    }
+
+    /// Convert the [`TweakedTrPubkey`] to an [`Address`].
+    pub fn to_address(&self, network: Network) -> anyhow::Result<Address> {
+        let buf: [u8; 32] = self.0 .0 .0;
+        let tweaked_pubkey = XOnlyPublicKey::from_slice(&buf)?;
+
+        Ok(Address::p2tr_tweaked(
+            tweaked_pubkey.dangerous_assume_tweaked(),
+            network,
+        ))
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use bitcoin::{hashes::Hash, Txid};
+    use arbitrary::{Arbitrary, Unstructured};
+    use bitcoin::{
+        hashes::Hash,
+        key::{Keypair, Secp256k1},
+        opcodes::all::OP_CHECKSIG,
+        secp256k1::{All, SecretKey},
+        taproot::TaprootBuilder,
+        Address, Network, ScriptBuf, TapNodeHash, Txid, XOnlyPublicKey,
+    };
 
-    use super::{BitcoinAddress, BorshDeserialize, BorshSerialize, OutPoint, OutputRef};
+    use super::{
+        BitcoinAddress, BitcoinAmount, BorshDeserialize, BorshSerialize, OutPoint, OutputRef,
+        TweakedTrPubkey,
+    };
 
     #[test]
     fn borsh_serialization_of_outputref_works() {
@@ -399,6 +458,18 @@ mod tests {
         assert_eq!(
             output_ref, de_output_ref,
             "original and deserialized OutputRefs must be the same"
+        );
+    }
+
+    #[test]
+    fn arbitrary_impl_for_outputref_works() {
+        let data = vec![1u8; 100];
+        let mut unstructured = Unstructured::new(&data);
+        let random_outputref = OutputRef::arbitrary(&mut unstructured);
+
+        assert!(
+            random_outputref.is_ok(),
+            "could not generate arbitrary outputref"
         );
     }
 
@@ -449,5 +520,96 @@ mod tests {
             &serialized_addr[..],
             "original address bytes and serialized address bytes must be the same",
         );
+    }
+
+    #[test]
+    fn bitcoin_addr_to_taproot_pubkey_conversion_works() {
+        let secp = Secp256k1::new();
+        let network = Network::Bitcoin;
+        let (address, _) = get_taproot_address(&secp, network);
+
+        let taproot_pubkey = TweakedTrPubkey::from_address(&address, network);
+
+        assert!(
+            taproot_pubkey.is_ok(),
+            "conversion from address to taproot pubkey failed"
+        );
+
+        let taproot_pubkey = taproot_pubkey.unwrap();
+        let bitcoin_address = taproot_pubkey.to_address(network);
+
+        assert!(
+            bitcoin_address.is_ok(),
+            "conversion from taproot pubkey to address failed"
+        );
+
+        let bitcoin_address = bitcoin_address.unwrap();
+        let unchecked_addr = bitcoin_address.as_unchecked();
+
+        let new_taproot_pubkey =
+            TweakedTrPubkey::from_address(&BitcoinAddress::new(unchecked_addr.clone()), network);
+
+        assert_eq!(
+            unchecked_addr,
+            address.address(),
+            "converted and original addresses must be the same"
+        );
+
+        assert_eq!(
+            taproot_pubkey,
+            new_taproot_pubkey.unwrap(),
+            "converted and original taproot pubkeys must be the same"
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "number of sats greater than u64::MAX")]
+    fn bitcoinamount_should_handle_sats_exceeding_u64_max() {
+        let bitcoins: u64 = u64::MAX / BitcoinAmount::SATS_FACTOR + 1;
+
+        BitcoinAmount::from_int_btc(bitcoins);
+    }
+
+    fn get_taproot_address(
+        secp: &Secp256k1<All>,
+        network: Network,
+    ) -> (BitcoinAddress, Option<TapNodeHash>) {
+        let internal_pubkey = get_random_pubkey_from_slice(secp, &[0x12; 32]);
+
+        let pk1 = get_random_pubkey_from_slice(secp, &[0x02; 32]);
+
+        let mut script1 = ScriptBuf::new();
+        script1.push_slice(pk1.serialize());
+        script1.push_opcode(OP_CHECKSIG);
+
+        let pk2 = get_random_pubkey_from_slice(secp, &[0x05; 32]);
+
+        let mut script2 = ScriptBuf::new();
+        script2.push_slice(pk2.serialize());
+        script2.push_opcode(OP_CHECKSIG);
+
+        let taproot_builder = TaprootBuilder::new()
+            .add_leaf(1, script1)
+            .unwrap()
+            .add_leaf(1, script2)
+            .unwrap();
+
+        let tree_info = taproot_builder.finalize(secp, internal_pubkey).unwrap();
+        let merkle_root = tree_info.merkle_root();
+
+        let taproot_address = Address::p2tr(secp, internal_pubkey, merkle_root, network);
+
+        (
+            BitcoinAddress::new(taproot_address.as_unchecked().clone()),
+            merkle_root,
+        )
+    }
+
+    fn get_random_pubkey_from_slice(secp: &Secp256k1<All>, buf: &[u8]) -> XOnlyPublicKey {
+        let sk = SecretKey::from_slice(buf).unwrap();
+        let keypair = Keypair::from_secret_key(secp, &sk);
+        let (pk, _) = XOnlyPublicKey::from_keypair(&keypair);
+
+        pk
     }
 }
