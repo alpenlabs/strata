@@ -47,11 +47,11 @@ where
 /// Struct to implement the `express_bridge_rpc_api::ExpressBridgeNetworkApiServer` on. Contains
 /// fields corresponding the global context for the RPC.
 #[derive(Debug, Clone)]
-pub(crate) struct BridgeRpcImpl {
+pub(crate) struct BridgeRpc {
     start_time: DateTime<Utc>,
 }
 
-impl Default for BridgeRpcImpl {
+impl Default for BridgeRpc {
     fn default() -> Self {
         Self {
             start_time: Utc::now(),
@@ -60,7 +60,7 @@ impl Default for BridgeRpcImpl {
 }
 
 #[async_trait]
-impl ExpressBridgeControlApiServer for BridgeRpcImpl {
+impl ExpressBridgeControlApiServer for BridgeRpc {
     async fn get_protocol_version(&self) -> RpcResult<String> {
         Ok(env!("CARGO_PKG_VERSION").to_string())
     }
@@ -83,7 +83,7 @@ impl ExpressBridgeControlApiServer for BridgeRpcImpl {
 }
 
 #[async_trait]
-impl ExpressBridgeNetworkApiServer for BridgeRpcImpl {
+impl ExpressBridgeNetworkApiServer for BridgeRpc {
     async fn ping(&self) -> RpcResult<()> {
         unimplemented!("ping")
     }
