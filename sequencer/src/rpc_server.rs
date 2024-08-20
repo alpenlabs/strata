@@ -126,10 +126,7 @@ impl From<Error> for ErrorObjectOwned {
 fn fetch_l2blk<D: Database + Sync + Send + 'static>(
     l2_prov: &Arc<<D as Database>::L2Prov>,
     blkid: L2BlockId,
-) -> Result<L2BlockBundle, Error>
-where
-    <D as Database>::L2Prov: Send + Sync + 'static,
-{
+) -> Result<L2BlockBundle, Error> {
     l2_prov
         .get_block_data(blkid)
         .map_err(Error::Db)?
@@ -213,11 +210,7 @@ fn conv_blk_header_to_rpc(blk_header: &impl L2Header) -> BlockHeader {
 }
 
 #[async_trait]
-impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D>
-where
-    <D as Database>::L1Prov: Send + Sync + 'static,
-    <D as Database>::L2Prov: Send + Sync + 'static,
-{
+impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
     async fn protocol_version(&self) -> RpcResult<u64> {
         Ok(1)
     }

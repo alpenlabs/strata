@@ -17,6 +17,7 @@ use alpen_express_state::prelude::*;
 use alpen_express_state::state_op::StateCache;
 use alpen_express_state::sync_event::SyncEvent;
 use express_storage::L2BlockManager;
+use express_tasks::ShutdownGuard;
 
 use crate::ctl::CsmController;
 use crate::message::ForkChoiceMessage;
@@ -142,11 +143,16 @@ pub fn init_forkchoice_manager<D: Database>(
 /// Recvs inputs from the FCM channel until we receive a signal that we've
 /// reached a point where we've done genesis.
 fn wait_for_csm_ready(
+    shutdown: &ShutdownGuard,
     fcm_rx: &mut mpsc::Receiver<ForkChoiceMessage>,
 ) -> anyhow::Result<Arc<ClientState>> {
     while let Some(msg) = fcm_rx.blocking_recv() {
         if let Some(state) = process_early_fcm_msg(msg) {
             return Ok(state);
+        }
+
+        if shutdown.should_shutdown() {
+            break;
         }
     }
 
@@ -214,6 +220,7 @@ fn determine_start_tip(
 
 /// Main tracker task that takes a ready fork choice manager and some IO stuff.
 pub fn tracker_task<D: Database, E: ExecEngineCtl>(
+    shutdown: ShutdownGuard,
     database: Arc<D>,
     l2_block_manager: Arc<L2BlockManager>,
     engine: Arc<E>,
@@ -223,7 +230,7 @@ pub fn tracker_task<D: Database, E: ExecEngineCtl>(
 ) {
     // Wait until the CSM gives us a state we can start from.
     info!("waiting for CSM ready");
-    let init_state = match wait_for_csm_ready(&mut fcm_rx) {
+    let init_state = match wait_for_csm_ready(&shutdown, &mut fcm_rx) {
         Ok(s) => s,
         Err(e) => {
             error!(err = %e, "failed to initialize forkchoice manager");
@@ -260,18 +267,24 @@ pub fn tracker_task<D: Database, E: ExecEngineCtl>(
         }
     };
 
-    if let Err(e) = forkchoice_manager_task_inner(fcm, engine.as_ref(), fcm_rx, &csm_ctl) {
+    if let Err(e) = forkchoice_manager_task_inner(&shutdown, fcm, engine.as_ref(), fcm_rx, &csm_ctl)
+    {
         error!(err = %e, "tracker aborted");
     }
 }
 
 fn forkchoice_manager_task_inner<D: Database, E: ExecEngineCtl>(
+    shutdown: &ShutdownGuard,
     mut state: ForkChoiceManager<D>,
     engine: &E,
     mut fcm_rx: mpsc::Receiver<ForkChoiceMessage>,
     csm_ctl: &CsmController,
 ) -> anyhow::Result<()> {
     loop {
+        if shutdown.should_shutdown() {
+            break;
+        }
+
         let Some(m) = fcm_rx.blocking_recv() else {
             break;
         };

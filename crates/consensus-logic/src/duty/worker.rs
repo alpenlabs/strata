@@ -4,19 +4,20 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time;
 
-use alpen_express_btcio::writer::DaWriter;
-use alpen_express_primitives::buf::{Buf32, Buf64};
-use alpen_express_state::batch::{BatchCommitment, SignedBatchCommitment};
-use alpen_express_state::da_blob::{BlobDest, BlobIntent};
-use express_storage::L2BlockManager;
 use tokio::sync::broadcast;
 use tracing::*;
 
+use alpen_express_btcio::writer::DaWriter;
 use alpen_express_db::traits::*;
 use alpen_express_eectl::engine::ExecEngineCtl;
+use alpen_express_primitives::buf::{Buf32, Buf64};
 use alpen_express_primitives::params::Params;
+use alpen_express_state::batch::{BatchCommitment, SignedBatchCommitment};
 use alpen_express_state::client_state::ClientState;
+use alpen_express_state::da_blob::{BlobDest, BlobIntent};
 use alpen_express_state::prelude::*;
+use express_storage::L2BlockManager;
+use express_tasks::{ShutdownGuard, TaskExecutor};
 
 use super::types::{self, Duty, DutyBatch, Identity, IdentityKey};
 use super::{block_assembly, extractor};
@@ -26,6 +27,7 @@ use crate::message::{ClientUpdateNotif, ForkChoiceMessage};
 use crate::sync_manager::SyncManager;
 
 pub fn duty_tracker_task<D: Database>(
+    shutdown: ShutdownGuard,
     cupdate_rx: broadcast::Receiver<Arc<ClientUpdateNotif>>,
     batch_queue: broadcast::Sender<DutyBatch>,
     ident: Identity,
@@ -35,6 +37,7 @@ pub fn duty_tracker_task<D: Database>(
 ) {
     let db = database.as_ref();
     if let Err(e) = duty_tracker_task_inner(
+        shutdown,
         cupdate_rx,
         batch_queue,
         ident,
@@ -47,6 +50,7 @@ pub fn duty_tracker_task<D: Database>(
 }
 
 fn duty_tracker_task_inner(
+    shutdown: ShutdownGuard,
     mut cupdate_rx: broadcast::Receiver<Arc<ClientUpdateNotif>>,
     batch_queue: broadcast::Sender<DutyBatch>,
     ident: Identity,
@@ -65,6 +69,9 @@ fn duty_tracker_task_inner(
     duties_tracker.set_finalized_block(last_finalized_blk);
 
     loop {
+        if shutdown.should_shutdown() {
+            break;
+        }
         let update = match cupdate_rx.blocking_recv() {
             Ok(u) => u,
             Err(broadcast::error::RecvError::Closed) => {
@@ -182,12 +189,14 @@ struct DutyExecStatus {
     result: Result<(), Error>,
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)] // FIXME
 pub fn duty_dispatch_task<
     D: Database + Sync + Send + 'static,
     E: ExecEngineCtl + Sync + Send + 'static,
     S: SequencerDatabase + Sync + Send + 'static,
 >(
+    shutdown: ShutdownGuard,
+    executor: TaskExecutor,
     mut updates: broadcast::Receiver<DutyBatch>,
     ident_key: IdentityKey,
     sync_man: Arc<SyncManager>,
@@ -206,7 +215,7 @@ pub fn duty_dispatch_task<
     let (duty_status_tx, duty_status_rx) = std::sync::mpsc::channel::<DutyExecStatus>();
 
     let pending_duties_t = pending_duties.clone();
-    std::thread::spawn(move || loop {
+    executor.spawn_critical("pending duty tracker", move |shutdown| loop {
         if let Ok(DutyExecStatus { id, result }) = duty_status_rx.recv() {
             if let Err(e) = result {
                 error!(err = %e, "error performing duty");
@@ -216,10 +225,16 @@ pub fn duty_dispatch_task<
             if pending_duties_t.write().unwrap().remove(&id).is_none() {
                 warn!(%id, "tried to remove non-existent duty");
             }
+            if shutdown.should_shutdown() {
+                break;
+            }
         }
     });
 
     loop {
+        if shutdown.should_shutdown() {
+            break;
+        }
         let update = match updates.blocking_recv() {
             Ok(u) => u,
             Err(broadcast::error::RecvError::Closed) => {

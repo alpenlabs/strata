@@ -3,9 +3,8 @@ use std::fs;
 use std::io;
 use std::path::Path;
 use std::path::PathBuf;
-use std::process;
 use std::sync::Arc;
-use std::thread;
+use std::time::Duration;
 
 use anyhow::Context;
 use bitcoin::Network;
@@ -19,7 +18,6 @@ use thiserror::Error;
 use tokio::sync::{broadcast, oneshot, RwLock};
 use tracing::*;
 
-use alpen_express_btcio::rpc::traits::L1Client;
 use alpen_express_btcio::writer::config::WriterConfig;
 use alpen_express_btcio::writer::start_writer_task;
 use alpen_express_btcio::writer::DaWriter;
@@ -39,6 +37,9 @@ use alpen_express_rocksdb::DbOpsConfig;
 use alpen_express_rocksdb::SeqDb;
 use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer};
 use alpen_express_rpc_types::L1Status;
+use express_tasks::ShutdownGuard;
+use express_tasks::ShutdownSignal;
+use express_tasks::TaskManager;
 
 use crate::args::Args;
 
@@ -112,12 +113,17 @@ fn default_rollup_params() -> RollupParams {
     }
 }
 
-fn main() {
+fn main() -> anyhow::Result<()> {
     let args: Args = argh::from_env();
     if let Err(e) = main_inner(args) {
         eprintln!("FATAL ERROR: {e}");
         eprintln!("trace:\n{e:?}");
+        // TODO: error code ?
+
+        return Err(e);
     }
+
+    Ok(())
 }
 
 fn main_inner(args: Args) -> anyhow::Result<()> {
@@ -169,6 +175,8 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     // Init thread pool for batch jobs.
     // TODO switch to num_cpus maybe?  we don't want to compete with tokio though
     let pool = threadpool::ThreadPool::with_name("express-pool".to_owned(), 8);
+
+    let task_manager = TaskManager::new(rt.handle().clone());
 
     // Initialize databases.
     let l1_db = Arc::new(alpen_express_rocksdb::L1Db::new(rbdb.clone(), db_ops));
@@ -231,6 +239,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     // Start the sync manager.
     let sync_man = sync_manager::start_sync_tasks(
+        task_manager.executor(),
         database.clone(),
         l2_block_manager.clone(),
         eng_ctl.clone(),
@@ -244,6 +253,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     if let Some(seqkey_path) = &config.client.sequencer_key {
         info!(?seqkey_path, "initing sequencer duties task");
         let idata = load_seqkey(seqkey_path)?;
+        let executor = task_manager.executor();
 
         // Set up channel and clone some things.
         let sm = sync_man.clone();
@@ -265,10 +275,10 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         let dbseq = Arc::new(SequencerDB::new(seqdb));
         let rpc = btc_rpc.clone();
         let writer = Arc::new(start_writer_task(
+            task_manager.executor(),
             rpc,
             writer_config,
             dbseq,
-            &rt,
             l1_status.clone(),
         )?);
 
@@ -277,9 +287,9 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         // Spawn duty tasks.
         let t_l2blkman = l2_block_manager.clone();
         let t_params = params.clone();
-        thread::spawn(move || {
-            // FIXME figure out why this can't infer the type, it's like *right there*
-            duty_worker::duty_tracker_task::<_>(
+        executor.spawn_critical("duty_worker::duty_tracker_task", move |shutdown| {
+            duty_worker::duty_tracker_task(
+                shutdown,
                 cu_rx,
                 duties_tx,
                 idata.ident,
@@ -290,61 +300,67 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         });
 
         let d_params = params.clone();
-        thread::spawn(move || {
+        let d_executor = task_manager.executor();
+        executor.spawn_critical("duty_worker::duty_dispatch_task", move |shutdown| {
             duty_worker::duty_dispatch_task(
-                duties_rx, idata.key, sm, db2, eng_ctl_de, writer, pool, d_params,
+                shutdown, d_executor, duties_rx, idata.key, sm, db2, eng_ctl_de, writer, pool,
+                d_params,
             )
         });
     }
 
-    let main_fut = main_task(
+    // Start the L1 tasks to get that going.
+    let csm_ctl = sync_man.get_csm_ctl();
+    l1_reader::start_reader_tasks(
+        task_manager.executor(),
+        sync_man.get_params(),
         &config,
-        sync_man,
         btc_rpc,
         database.clone(),
-        l1_status,
-        writer_ctl,
-    );
-    if let Err(e) = rt.block_on(main_fut) {
-        error!(err = %e, "main task exited");
-        process::exit(0); // special case exit once we've gotten to this point
+        csm_ctl,
+        l1_status.clone(),
+    )?;
+
+    let shutdown_signal = task_manager.shutdown_signal();
+    let executor = task_manager.executor();
+    let database_r = database.clone();
+
+    executor.spawn_critical_async("main-rpc", |shutdown| async {
+        start_rpc(
+            shutdown,
+            shutdown_signal,
+            config,
+            sync_man,
+            database_r,
+            l1_status,
+            writer_ctl,
+        )
+        .await
+        .unwrap()
+    });
+
+    task_manager.start_signal_listeners();
+    if let Err(err) = task_manager.monitor(Some(Duration::from_secs(5))) {
+        // we exited because of a panic
+        return Err(anyhow::Error::from(err));
     }
 
     info!("exiting");
     Ok(())
 }
 
-async fn main_task<
+async fn start_rpc<
     D: Database + Send + Sync + 'static,
-    L: L1Client,
     SD: SequencerDatabase + Send + Sync + 'static,
 >(
-    config: &Config,
+    shutdown: ShutdownGuard,
+    shutdown_signal: ShutdownSignal,
+    config: Config,
     sync_man: Arc<SyncManager>,
-    l1_rpc_client: Arc<L>,
     database: Arc<D>,
     l1_status: Arc<RwLock<L1Status>>,
     writer: Option<Arc<DaWriter<SD>>>,
-) -> anyhow::Result<()>
-where
-    // TODO how are these not redundant trait bounds???
-    <D as Database>::SeStore: Send + Sync + 'static,
-    <D as Database>::L1Store: Send + Sync + 'static,
-    <D as Database>::L1Prov: Send + Sync + 'static,
-    <D as Database>::L2Prov: Send + Sync + 'static,
-{
-    // Start the L1 tasks to get that going.
-    let csm_ctl = sync_man.get_csm_ctl();
-    l1_reader::start_reader_tasks(
-        sync_man.get_params(),
-        config,
-        l1_rpc_client,
-        database.clone(),
-        csm_ctl,
-        l1_status.clone(),
-    )
-    .await?;
-
+) -> anyhow::Result<()> {
     let (stop_tx, stop_rx) = oneshot::channel();
 
     // Init RPC methods.
@@ -356,12 +372,13 @@ where
     );
     let mut methods = alp_rpc.into_rpc();
 
-    if writer.is_some() {
-        let admin_rpc = rpc_server::AdminServerImpl::new(writer.unwrap().clone());
+    if let Some(writer) = writer {
+        let admin_rpc = rpc_server::AdminServerImpl::new(writer.clone());
         methods.merge(admin_rpc.into_rpc())?;
     }
 
     let rpc_port = config.client.rpc_port;
+
     let rpc_server = jsonrpsee::server::ServerBuilder::new()
         .build(format!("127.0.0.1:{rpc_port}"))
         .await
@@ -373,12 +390,22 @@ where
     info!("started RPC server");
 
     // Wait for a stop signal.
-    let _ = stop_rx.await;
+    tokio::select! {
+        _ = stop_rx => {
+            // Send shutdown to all tasks
+            shutdown_signal.send();
+
+        },
+        _ = shutdown.wait_for_shutdown() => {}
+    };
 
     // Now start shutdown tasks.
     if rpc_handle.stop().is_err() {
         warn!("RPC server already stopped");
     }
+
+    // wait for rpc to stop
+    rpc_handle.stopped().await;
 
     Ok(())
 }

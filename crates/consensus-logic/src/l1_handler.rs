@@ -8,7 +8,7 @@ use tokio::sync::mpsc;
 use tracing::*;
 
 use alpen_express_btcio::reader::messages::L1Event;
-use alpen_express_db::traits::L1DataStore;
+use alpen_express_db::traits::{Database, L1DataStore};
 use alpen_express_primitives::buf::Buf32;
 use alpen_express_primitives::l1::L1BlockManifest;
 use alpen_express_state::sync_event::SyncEvent;
@@ -16,15 +16,12 @@ use alpen_express_state::sync_event::SyncEvent;
 use crate::ctl::CsmController;
 
 /// Consumes L1 events and reflects them in the database.
-pub fn bitcoin_data_handler_task<L1D>(
-    l1db: Arc<L1D>,
+pub fn bitcoin_data_handler_task<D: Database + Send + Sync + 'static>(
+    l1db: Arc<D::L1Store>,
     csm_ctl: Arc<CsmController>,
     mut event_rx: mpsc::Receiver<L1Event>,
     params: Arc<Params>,
-) -> anyhow::Result<()>
-where
-    L1D: L1DataStore + Sync + Send + 'static,
-{
+) -> anyhow::Result<()> {
     while let Some(event) = event_rx.blocking_recv() {
         if let Err(e) = handle_event(event, l1db.as_ref(), csm_ctl.as_ref(), &params) {
             error!(err = %e, "failed to handle L1 event");

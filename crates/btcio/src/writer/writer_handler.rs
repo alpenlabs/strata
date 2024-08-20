@@ -1,11 +1,8 @@
 use std::sync::Arc;
 
-use tokio::{
-    runtime::Runtime,
-    sync::{
-        mpsc::{self, Receiver, Sender},
-        RwLock,
-    },
+use tokio::sync::{
+    mpsc::{self, Receiver, Sender},
+    RwLock,
 };
 use tracing::*;
 
@@ -16,6 +13,7 @@ use alpen_express_db::{
 use alpen_express_primitives::buf::Buf32;
 use alpen_express_rpc_types::L1Status;
 use alpen_express_state::da_blob::BlobIntent;
+use express_tasks::TaskExecutor;
 
 use super::broadcast::broadcaster_task;
 use super::config::WriterConfig;
@@ -66,40 +64,52 @@ impl<D: SequencerDatabase + Send + Sync + 'static> DaWriter<D> {
 }
 
 pub fn start_writer_task<D: SequencerDatabase + Send + Sync + 'static>(
+    executor: TaskExecutor,
     rpc_client: Arc<impl SeqL1Client + L1Client>,
     config: WriterConfig,
     db: Arc<D>,
-    rt: &Runtime,
     l1_status: Arc<RwLock<L1Status>>,
 ) -> anyhow::Result<DaWriter<D>> {
     info!("Starting writer control task");
 
     let (signer_tx, signer_rx) = mpsc::channel::<BlobIdx>(10);
 
-    let init_state = initialize_writer_state(db.clone())?;
+    let WriterInitialState {
+        next_watch_blob_idx,
+        next_publish_blob_idx,
+    } = initialize_writer_state(db.clone())?;
 
     // The watcher task watches L1 for txs confirmations and finalizations. Ideally this should be
     // taken care of by the reader task. This can be done later.
-    rt.spawn(watcher_task(
-        init_state.next_watch_blob_idx,
-        rpc_client.clone(),
-        config.clone(),
-        db.clone(),
-    ));
+    let rpc_client_w = rpc_client.clone();
+    let config_w = config.clone();
+    let db_w = db.clone();
+    executor.spawn_critical_async("btcio::watcher_task", |shutdown| async move {
+        watcher_task(shutdown, next_watch_blob_idx, rpc_client_w, config_w, db_w)
+            .await
+            .unwrap()
+    });
 
-    rt.spawn(broadcaster_task(
-        init_state.next_publish_blob_idx,
-        rpc_client.clone(),
-        db.clone(),
-        l1_status.clone(),
-    ));
+    let rpc_client_b = rpc_client.clone();
+    let db_b = db.clone();
+    executor.spawn_critical_async("btcio::broadcaster_task", |shutdown| async move {
+        broadcaster_task(
+            shutdown,
+            next_publish_blob_idx,
+            rpc_client_b,
+            db_b,
+            l1_status.clone(),
+        )
+        .await
+        .unwrap()
+    });
 
-    rt.spawn(listen_for_signing_intents(
-        signer_rx,
-        rpc_client,
-        config,
-        db.clone(),
-    ));
+    let db_s = db.clone();
+    executor.spawn_critical_async("btcio::listen_for_signing_intents", |_| async {
+        listen_for_signing_intents(signer_rx, rpc_client, config, db_s)
+            .await
+            .unwrap()
+    });
 
     Ok(DaWriter { signer_tx, db })
 }
