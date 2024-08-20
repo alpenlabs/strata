@@ -5,13 +5,16 @@
 
 use alpen_express_primitives::{
     buf::Buf32,
-    l1::{self, OutputRef},
+    l1::{self, BitcoinAmount, OutputRef},
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 use express_bridge_txm::{DepositInfo, SignatureInfo, WithdrawalInfo};
 use serde::{Deserialize, Serialize};
 
 use crate::bridge_ops::WithdrawalBatch;
+
+/// The bitcoin block height that a withdrawal command references.
+pub type BitcoinBlockHeight = u64;
 
 /// Global operator idx.
 pub type OperatorIdx = u32;
@@ -150,9 +153,12 @@ impl DepositsTable {
 pub struct DepositEntry {
     deposit_idx: u32,
 
+    /// The outpoint that this deposit entry references.
+    output: OutputRef,
+
     /// List of notary operators, by their indexes.
     // TODO convert this to a windowed bitmap or something
-    notary_operators: Vec<u32>,
+    notary_operators: Vec<OperatorIdx>,
 
     /// Deposit amount, in the native asset.  For Bitcoin this is sats.
     amt: u64,
@@ -200,7 +206,7 @@ pub enum DepositState {
     Created(CreatedState),
 
     /// Deposit utxo has been accepted.
-    Accepted(AcceptedState),
+    Accepted,
 
     /// Order to send out withdrawal dispatched.
     Dispatched(DispatchedState),
@@ -211,24 +217,12 @@ pub enum DepositState {
 
 #[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
 pub struct CreatedState {
-    /// Output for the proposed thing.
-    request_output: OutputRef,
-
     /// Destination identifier in EL, probably an encoded address.
     dest_ident: Vec<u8>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
-pub struct AcceptedState {
-    /// Output the funds are being stored in at rest.
-    output: OutputRef,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
 pub struct DispatchedState {
-    /// Output the funds are still being stored in at rest.
-    output: OutputRef,
-
     /// Configuration for outputs to be written to.
     cmd: DispatchCommand,
 }
@@ -237,7 +231,15 @@ pub struct DispatchedState {
 /// outputs we're trying to withdraw to.
 #[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
 pub struct DispatchCommand {
+    /// The table of withdrawal ouptuts.
     withdraw_outputs: Vec<WithdrawOutput>,
+
+    /// The index of the operator that the deposit is assigned to for withdrawal reimbursement.
+    assignee: OperatorIdx,
+
+    /// The bitcoin block height before which the withdrawal must be completed.
+    /// When set to 0, it means that the withdrawal cannot be processed yet.
+    valid_till_blockheight: BitcoinBlockHeight,
 }
 
 /// An output constructed from [`crate::bridge_ops::WithdrawalIntent`].
@@ -247,5 +249,5 @@ pub struct WithdrawOutput {
     dest_addr: Buf32,
 
     /// Amount in sats.
-    amt: u64,
+    amt: BitcoinAmount,
 }

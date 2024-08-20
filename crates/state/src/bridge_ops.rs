@@ -14,8 +14,6 @@ use crate::bridge_state::OperatorEntry;
 
 pub const WITHDRAWAL_DENOMINATION: BitcoinAmount = BitcoinAmount::from_int_btc(10);
 
-pub type BitcoinBlockHeight = u64;
-
 /// Describes an intent to withdraw that hasn't been dispatched yet.
 #[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
 pub struct WithdrawalIntent {
@@ -49,20 +47,6 @@ impl WithdrawalIntent {
 pub struct WithdrawalBatch {
     /// A series of [WithdrawalIntent]'s who sum does not exceed [`WITHDRAWAL_DENOMINATION`].
     intents: Vec<WithdrawalIntent>,
-
-    /// The operator that is assigned the withdrawal.
-    /// This happens when the sum of the intents equals [`WITHDRAWAL_DENOMINATION`]
-    assignee: Option<OperatorEntry>,
-
-    /// The particular deposit outpoint that is to be used to service the current batch.
-    ///
-    /// The deposit outpoint is predetermined when the withdrawal batch is first created as all
-    /// such UTXOs are functionally indistinguishable.
-    deposit_outpoint: OutputRef,
-
-    /// The bitcoin block height before which the withdrawal must be completed.
-    /// When set to 0, it means that the withdrawal cannot be processed yet.
-    valid_till_blockheight: BitcoinBlockHeight,
 }
 
 impl WithdrawalBatch {
@@ -72,26 +56,8 @@ impl WithdrawalBatch {
         self.intents.iter().map(|wi| wi.amt).sum()
     }
 
-    /// Adds an intent to the batch and returns the assigned operator if the total withdrawal amount
-    /// equals [`WITHDRAWAL_DENOMINATION`].
-    fn add_and_assign(&self, _withdrawal_intent: &WithdrawalIntent) -> Option<OperatorEntry> {
-        unimplemented!();
-    }
-
     pub fn intents(&self) -> &[WithdrawalIntent] {
         &self.intents[..]
-    }
-
-    pub fn assignee(&self) -> &Option<OperatorEntry> {
-        &self.assignee
-    }
-
-    pub fn valid_till_blockheight(&self) -> &BitcoinBlockHeight {
-        &self.valid_till_blockheight
-    }
-
-    pub fn deposit_outpoint(&self) -> &OutPoint {
-        self.deposit_outpoint.outpoint()
     }
 }
 

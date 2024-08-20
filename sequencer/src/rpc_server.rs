@@ -448,7 +448,7 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
 
         let state = match deposit_entry.deposit_state() {
             alpen_express_state::bridge_state::DepositState::Created(_) => DepositState::Created,
-            alpen_express_state::bridge_state::DepositState::Accepted(_) => DepositState::Accepted,
+            alpen_express_state::bridge_state::DepositState::Accepted => DepositState::Accepted,
             alpen_express_state::bridge_state::DepositState::Dispatched(_) => {
                 DepositState::Dispatched
             }
