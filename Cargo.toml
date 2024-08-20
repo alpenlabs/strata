@@ -25,11 +25,11 @@ members = [
   "crates/vtxjmt",
   "crates/bridge-exec",
   "crates/rpc/bridge-api",
-  "crates/bridge-tx-manager",
   "crates/prover/primitives",
   # binaries listed separately
   "crates/prover/zkvm",
   "crates/prover/adapters/risc0",
+  "crates/bridge-txm",
   "sequencer",
   "reth",
   "bin/bridge-client",
@@ -55,7 +55,7 @@ alpen-express-state = { path = "crates/state" }
 alpen-test-utils = { path = "crates/test-utils" }
 express-bridge-exec = { path = "crates/bridge-exec" }
 express-bridge-rpc-api = { path = "crates/rpc/bridge-api" }
-express-bridge-txm = { path = "crates/bridge-tx-manager" }
+express-bridge-txm = { path = "crates/bridge-txm" }
 express-chaintsn = { path = "crates/chaintsn" }
 express-reth-db = { path = "crates/reth/db" }
 express-reth-exex = { path = "crates/reth/exex" }
