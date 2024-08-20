@@ -368,13 +368,12 @@ impl Sum for BitcoinAmount {
     }
 }
 
-/// A wrapper around [`Buf32`] to store the tweaked taproot pubkeys (containing the merkle root
-/// information).
+/// A wrapper around [`Buf32`] for XOnly Schnorr taproot pubkeys.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
-pub struct TweakedTrPubkey(Buf32);
+pub struct XOnlyPk(Buf32);
 
-impl TweakedTrPubkey {
-    /// Construct a new `TaprootPubkey` directly from a `Buf32`.
+impl XOnlyPk {
+    /// Construct a new [`XOnlyPk`] directly from a [`Buf32`].
     pub fn new(val: Buf32) -> Self {
         Self(val)
     }
@@ -384,7 +383,7 @@ impl TweakedTrPubkey {
         &self.0
     }
 
-    /// Convert a [`BitcoinAddress`] into a [`TweakedTrPubkey`].
+    /// Convert a [`BitcoinAddress`] into a [`XOnlyPk`].
     pub fn from_address(address: &BitcoinAddress, network: Network) -> anyhow::Result<Self> {
         let unchecked_addr = address.address().clone();
         let checked_addr = unchecked_addr.require_network(network)?;
@@ -405,13 +404,13 @@ impl TweakedTrPubkey {
         }
     }
 
-    /// Convert the [`TweakedTrPubkey`] to an [`Address`].
+    /// Convert the [`XOnlyPk`] to an [`Address`].
     pub fn to_address(&self, network: Network) -> anyhow::Result<Address> {
         let buf: [u8; 32] = self.0 .0 .0;
-        let tweaked_pubkey = XOnlyPublicKey::from_slice(&buf)?;
+        let pubkey = XOnlyPublicKey::from_slice(&buf)?;
 
         Ok(Address::p2tr_tweaked(
-            tweaked_pubkey.dangerous_assume_tweaked(),
+            pubkey.dangerous_assume_tweaked(),
             network,
         ))
     }
@@ -431,7 +430,7 @@ mod tests {
 
     use super::{
         BitcoinAddress, BitcoinAmount, BorshDeserialize, BorshSerialize, OutPoint, OutputRef,
-        TweakedTrPubkey,
+        XOnlyPk,
     };
 
     #[test]
@@ -528,7 +527,7 @@ mod tests {
         let network = Network::Bitcoin;
         let (address, _) = get_taproot_address(&secp, network);
 
-        let taproot_pubkey = TweakedTrPubkey::from_address(&address, network);
+        let taproot_pubkey = XOnlyPk::from_address(&address, network);
 
         assert!(
             taproot_pubkey.is_ok(),
@@ -547,7 +546,7 @@ mod tests {
         let unchecked_addr = bitcoin_address.as_unchecked();
 
         let new_taproot_pubkey =
-            TweakedTrPubkey::from_address(&BitcoinAddress::new(unchecked_addr.clone()), network);
+            XOnlyPk::from_address(&BitcoinAddress::new(unchecked_addr.clone()), network);
 
         assert_eq!(
             unchecked_addr,
