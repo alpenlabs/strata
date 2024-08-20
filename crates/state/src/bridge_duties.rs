@@ -1,6 +1,6 @@
 //! Type/traits related to the bridge-related duties.
 
-use express_bridge_txm::{DepositRequest, ReimbursementRequest, Unsigned};
+use express_bridge_txm::{DepositInfo, ReimbursementRequest};
 use serde::{Deserialize, Serialize};
 
 use crate::bridge_ops::WithdrawalBatch;
@@ -13,7 +13,7 @@ pub enum Duty {
     /// Bridge Address.
     ///
     /// This duty is created when a user deposit request comes in, and applies to all operators.
-    SignDeposit(DepositRequest<Unsigned>),
+    SignDeposit(DepositInfo),
 
     /// The duty to fulfill a withdrawal request that is assigned to a particular operator.
     ///
@@ -29,7 +29,12 @@ pub enum Duty {
     ///
     /// This duty is created by the operator that is assigned the [`WithdrawalBatch`], and applies
     /// to the rest of the operators.
+    // TODO: move this to a `BridgeMessage` scope after <https://alpenlabs.atlassian.net/browse/EXP-108>.
     SignWithdrawal(ReimbursementRequest),
+
+    /// Other messages originating from the bridge clients. This encapsulates the `BridgeMessage`
+    /// as will be defined in <https://alpenlabs.atlassian.net/browse/EXP-108>.
+    P2PMessage,
 }
 
 /// A container for bridge duties after `from_height` till `to_height` blocks in the rollup.
