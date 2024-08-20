@@ -62,12 +62,12 @@ impl L2BlockManager {
         self.ops.get_blocks_at_height_blocking(h)
     }
 
-    /// Gets the block's verificaiton status.  Async.
+    /// Gets the block's verification status.  Async.
     pub async fn get_block_status_async(&self, id: &L2BlockId) -> DbResult<Option<BlockStatus>> {
         self.ops.get_block_status_async(*id).await
     }
 
-    /// Gets the block's verificaiton status.  Blocking.
+    /// Gets the block's verification status.  Blocking.
     pub fn get_block_status_blocking(&self, id: &L2BlockId) -> DbResult<Option<BlockStatus>> {
         self.ops.get_block_status_blocking(*id)
     }
@@ -81,7 +81,7 @@ impl L2BlockManager {
         self.ops.put_block_status_async(*id, status).await
     }
 
-    /// Sets the block's verificaiton status.  Blocking.
+    /// Sets the block's verification status.  Blocking.
     pub fn put_block_status_blocking(&self, id: &L2BlockId, status: BlockStatus) -> DbResult<()> {
         self.ops.put_block_status_blocking(*id, status)
     }
