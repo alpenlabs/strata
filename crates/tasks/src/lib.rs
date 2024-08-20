@@ -9,7 +9,7 @@ use std::time::Duration;
 use futures_util::{FutureExt, TryFutureExt};
 use tokio::runtime::Handle;
 use tokio::sync::mpsc;
-use tracing::{debug, error, warn};
+use tracing::{debug, error, info, warn};
 
 /// Error with the name of the task that panicked and an error downcasted to string, if possible.
 #[derive(Debug, thiserror::Error)]
@@ -47,14 +47,15 @@ impl PanickedTaskError {
 }
 
 #[derive(Debug, Clone)]
-struct ShutdownSignal(Arc<AtomicBool>);
+pub struct ShutdownSignal(Arc<AtomicBool>);
 
 impl ShutdownSignal {
     fn new() -> Self {
         Self(Arc::new(AtomicBool::new(false)))
     }
 
-    fn send(&self) {
+    /// Send shutdown signal
+    pub fn send(&self) {
         self.0.fetch_or(true, Ordering::Relaxed);
     }
 
@@ -70,10 +71,14 @@ impl Shutdown {
         self.0.load(Ordering::Relaxed)
     }
 
-    async fn into_future(self) {
+    async fn wait_for_shutdown(&self) {
         while !self.should_shutdown() {
             tokio::time::sleep(Duration::from_millis(1)).await;
         }
+    }
+
+    async fn into_future(self) {
+        self.wait_for_shutdown().await
     }
 }
 
@@ -84,8 +89,15 @@ impl ShutdownGuard {
         counter.fetch_add(1, Ordering::SeqCst);
         Self(shutdown, counter)
     }
+
+    /// Check if shutdown signal has been sent
     pub fn should_shutdown(&self) -> bool {
         self.0.should_shutdown()
+    }
+
+    /// Waits until shutdown signal is sent
+    pub async fn wait_for_shutdown(&self) {
+        self.0.wait_for_shutdown().await
     }
 }
 
@@ -148,10 +160,15 @@ impl TaskManager {
         })
     }
 
-    pub fn do_graceful_shutdown(self, timeout: Option<Duration>) -> bool {
-        self.shutdown_signal.send();
-        self.wait_for_graceful_shutdown(timeout)
+    /// Get shutdown signal trigger
+    pub fn shutdown_signal(&self) -> ShutdownSignal {
+        self.shutdown_signal.clone()
     }
+
+    // pub fn do_graceful_shutdown(self, timeout: Option<Duration>) -> bool {
+    //     self.shutdown_signal.send();
+    //     self.wait_for_graceful_shutdown(timeout)
+    // }
 
     /// Wait for all tasks to complete, returning true.
     /// If timeout is provided, wait until timeout;
@@ -173,8 +190,9 @@ impl TaskManager {
         true
     }
 
+    /// Add signal listeners and send shutdown
     pub fn start_signal_listeners(&self) {
-        let shutdown_signal_c = self.shutdown_signal.clone();
+        let shutdown_signal = self.shutdown_signal();
 
         self.tokio_handle.spawn(async move {
             // TODO: add more relevant signals
@@ -182,18 +200,20 @@ impl TaskManager {
             let _ = tokio::signal::ctrl_c().into_future().await;
 
             // got a ctrl+c. send a shutdown
-            warn!("Got INT. Start cleanup");
-            shutdown_signal_c.send()
+            warn!("Got INT. Initiating shutdown");
+            shutdown_signal.send()
         });
     }
 
-    pub fn monitor(mut self) -> Result<(), PanickedTaskError> {
+    pub fn monitor(mut self, shutdown_timeout: Option<Duration>) -> Result<(), PanickedTaskError> {
         let res = self.wait_for_task_panic(self.shutdown_signal.subscribe());
 
-        println!("start shutdown");
-
         self.shutdown_signal.send();
-        self.wait_for_graceful_shutdown(None);
+        let shutdown_in_time = self.wait_for_graceful_shutdown(shutdown_timeout);
+
+        if !shutdown_in_time {
+            info!("Shutdown timeout expired; Forced shutdown");
+        }
 
         // join all pending threads ?
 
@@ -242,6 +262,7 @@ impl TaskExecutor {
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| func(shutdown)));
 
             if let Err(error) = result {
+                // TODO: transfer stacktrace?
                 let task_error = PanickedTaskError::new(name, error);
                 error!("{task_error}");
                 let _ = panicked_tasks_tx.send(task_error);
@@ -299,7 +320,7 @@ mod tests {
 
         println!("{:#?}", manager.pending_tasks_counter);
 
-        let err = manager.monitor().expect_err("should give error");
+        let err = manager.monitor(None).expect_err("should give error");
 
         std::panic::set_hook(original_hook);
 
@@ -336,7 +357,7 @@ mod tests {
 
         println!("{:#?}", manager.pending_tasks_counter);
 
-        let err = manager.monitor().expect_err("should give error");
+        let err = manager.monitor(None).expect_err("should give error");
 
         std::panic::set_hook(original_hook);
 
@@ -380,7 +401,7 @@ mod tests {
             shutdown_sig.send();
         });
 
-        let res = manager.monitor();
+        let res = manager.monitor(None);
 
         assert!(matches!(res, Ok(())), "should exit successfully");
     }
