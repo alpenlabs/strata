@@ -39,7 +39,7 @@ pub fn duty_tracker_task<D: Database>(
         batch_queue,
         ident,
         db,
-        &l2_block_manager,
+        l2_block_manager,
         params.as_ref(),
     ) {
         error!(err = %e, "tracker task exited");

@@ -120,9 +120,9 @@ pub fn init_forkchoice_manager<D: Database>(
 
     // Populate the unfinalized block tracker.
     let mut chain_tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(fin_tip_blkid);
-    chain_tracker.load_unfinalized_blocks(fin_tip_index + 1, &l2_block_manager)?;
+    chain_tracker.load_unfinalized_blocks(fin_tip_index + 1, l2_block_manager)?;
 
-    let (cur_tip_blkid, cur_tip_index) = determine_start_tip(&chain_tracker, &l2_block_manager)?;
+    let (cur_tip_blkid, cur_tip_index) = determine_start_tip(&chain_tracker, l2_block_manager)?;
 
     // Actually assemble the forkchoice manager state.
     let fcm = ForkChoiceManager::new(
