@@ -231,7 +231,7 @@ pub struct DispatchedState {
 /// outputs we're trying to withdraw to.
 #[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
 pub struct DispatchCommand {
-    /// The table of withdrawal ouptuts.
+    /// The table of withdrawal outputs.
     withdraw_outputs: Vec<WithdrawOutput>,
 
     /// The index of the operator that the deposit is assigned to for withdrawal reimbursement.

@@ -3,10 +3,8 @@
 //! Contains types, traits and implementations related to creating various transactions used in the
 //! bridge-in dataflow.
 
-use bitcoin::{secp256k1::schnorr::Signature, Amount, OutPoint, XOnlyPublicKey};
+use bitcoin::{Amount, OutPoint};
 use serde::{Deserialize, Serialize};
-
-use crate::{Signed, Unsigned};
 
 /// The deposit information  required to create the Deposit Transaction.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -47,44 +45,4 @@ pub struct DepositMetadata {
     // TODO: Convert this to an enum that handles various identifiers if necessary in the future.
     // For now, this identifier will be a constant.
     identifier: String,
-}
-
-/// The details regarding the deposit transaction signing which includes all the information
-/// required to create the Deposit Transaction deterministically, as well as the signature if one
-/// has already been attached.
-///
-/// This container encapsulates both the initial duty originating in bitcoin from the user as well
-/// as the subsequent signing duty originating from an operator who attaches their signature. Each
-/// operator that receives a signature validates, aggregates and stores it.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DepositRequest<SigStatus = Unsigned> {
-    /// The details required to create the Deposit Transaction deterministically.
-    deposit_info: DepositInfo,
-
-    /// The signature details.
-    signature_info: SigStatus,
-}
-
-impl DepositRequest {
-    /// Get the deposit info associated with this request.
-    pub fn deposit_info(&self) -> &DepositInfo {
-        &self.deposit_info
-    }
-
-    /// Sign the transaction.
-    pub fn add_signature(&self) -> DepositRequest<Signed> {
-        unimplemented!()
-    }
-}
-
-impl DepositRequest<Signed> {
-    /// Get the signature in the signed deposit request.
-    pub fn signature(&self) -> &Signature {
-        self.signature_info.inner().signature()
-    }
-
-    /// Get the signer pubkey in the signed deposit request.
-    pub fn signer_pubkey(&self) -> &XOnlyPublicKey {
-        self.signature_info.inner().signer_pubkey()
-    }
 }
