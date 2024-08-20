@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use alpen_express_db::errors::DbError;
 use alpen_express_db::traits::BlockStatus;
 use alpen_express_db::DbResult;
 use threadpool::ThreadPool;
@@ -53,33 +52,37 @@ impl L2BlockManager {
             .get_or_fetch_blocking(id, || self.ops.get_block_blocking(*id))
     }
 
+    /// Gets the block at a height.  Async.
     pub async fn get_blocks_at_height_async(&self, h: u64) -> DbResult<Vec<L2BlockId>> {
         self.ops.get_blocks_at_height_async(h).await
     }
 
+    /// Gets the block at a height.  Blocking.
     pub fn get_blocks_at_height_blocking(&self, h: u64) -> DbResult<Vec<L2BlockId>> {
         self.ops.get_blocks_at_height_blocking(h)
     }
 
+    /// Gets the block's verificaiton status.  Async.
     pub async fn get_block_status_async(&self, id: &L2BlockId) -> DbResult<Option<BlockStatus>> {
         self.ops.get_block_status_async(*id).await
     }
 
+    /// Gets the block's verificaiton status.  Blocking.
     pub fn get_block_status_blocking(&self, id: &L2BlockId) -> DbResult<Option<BlockStatus>> {
         self.ops.get_block_status_blocking(*id)
     }
 
+    /// Sets the block's verification status.  Async.
     pub async fn put_block_status_async(
         &self,
         id: &L2BlockId,
         status: BlockStatus,
     ) -> DbResult<()> {
-        // TODO
-        unimplemented!()
+        self.ops.put_block_status_async(*id, status).await
     }
 
+    /// Sets the block's verificaiton status.  Blocking.
     pub fn put_block_status_blocking(&self, id: &L2BlockId, status: BlockStatus) -> DbResult<()> {
-        // TODO
-        unimplemented!()
+        self.ops.put_block_status_blocking(*id, status)
     }
 }
