@@ -5,7 +5,7 @@ use tokio::sync::{mpsc, RwLock};
 use alpen_express_btcio::reader::{
     config::ReaderConfig, messages::L1Event, query::bitcoin_data_reader_task,
 };
-use alpen_express_btcio::rpc::traits::L1Client;
+use alpen_express_btcio::rpc::traits::BitcoinClient;
 use alpen_express_consensus_logic::ctl::CsmController;
 use alpen_express_consensus_logic::l1_handler::bitcoin_data_handler_task;
 use alpen_express_db::traits::{Database, L1DataProvider};
@@ -19,7 +19,7 @@ pub fn start_reader_tasks<D: Database + Send + Sync + 'static>(
     executor: &TaskExecutor,
     params: Arc<Params>,
     config: &Config,
-    rpc_client: Arc<impl L1Client>,
+    rpc_client: Arc<impl BitcoinClient>,
     db: Arc<D>,
     csm_ctl: Arc<CsmController>,
     l1_status: Arc<RwLock<L1Status>>,

@@ -20,7 +20,7 @@ use thiserror::Error;
 use tokio::sync::{broadcast, oneshot, RwLock};
 use tracing::*;
 
-use alpen_express_btcio::broadcaster::spawn_broadcaster_task;
+use alpen_express_btcio::rpc::traits::BitcoinClient;
 use alpen_express_btcio::writer::config::WriterConfig;
 use alpen_express_btcio::writer::start_writer_task;
 use alpen_express_btcio::writer::DaWriter;
@@ -215,7 +215,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     // Set up Bitcoin client RPC.
     let bitcoind_url = format!("http://{}", config.bitcoind_rpc.rpc_url);
-    let btc_rpc = alpen_express_btcio::rpc::BitcoinClient::new(
+    let btc_rpc = alpen_express_btcio::rpc::BitcoinDClient::new(
         bitcoind_url,
         config.bitcoind_rpc.rpc_user.clone(),
         config.bitcoind_rpc.rpc_password.clone(),
@@ -368,6 +368,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 #[allow(clippy::too_many_arguments)]
 async fn start_rpc<
     D: Database + Send + Sync + 'static,
+    L: BitcoinClient,
     SD: SequencerDatabase + Send + Sync + 'static,
 >(
     shutdown_signal: ShutdownSignal,
