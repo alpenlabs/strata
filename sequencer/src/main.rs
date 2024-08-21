@@ -10,6 +10,7 @@ use std::thread;
 use anyhow::Context;
 use bitcoin::Network;
 use config::Config;
+use express_storage::L2BlockManager;
 use format_serde_error::SerdeError;
 use reth_rpc_types::engine::JwtError;
 use reth_rpc_types::engine::JwtSecret;
@@ -167,10 +168,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     // Init thread pool for batch jobs.
     // TODO switch to num_cpus maybe?  we don't want to compete with tokio though
-    let pool = Arc::new(threadpool::ThreadPool::with_name(
-        "express-pool".to_owned(),
-        8,
-    ));
+    let pool = threadpool::ThreadPool::with_name("express-pool".to_owned(), 8);
 
     // Initialize databases.
     let l1_db = Arc::new(alpen_express_rocksdb::L1Db::new(rbdb.clone(), db_ops));
@@ -193,6 +191,9 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let database = Arc::new(alpen_express_db::database::CommonDatabase::new(
         l1_db, l2_db, sync_ev_db, cs_db, chst_db,
     ));
+
+    // Set up database managers.
+    let l2_block_manager = Arc::new(L2BlockManager::new(pool.clone(), database.clone()));
 
     // Set up btcio status to pass around cheaply
     let l1_status = Arc::new(RwLock::new(L1Status::default()));
@@ -224,13 +225,14 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         client,
         initial_fcs,
         rt.handle().clone(),
-        database.l2_provider().clone(),
+        l2_block_manager.clone(),
     );
     let eng_ctl = Arc::new(eng_ctl);
 
     // Start the sync manager.
     let sync_man = sync_manager::start_sync_tasks(
         database.clone(),
+        l2_block_manager.clone(),
         eng_ctl.clone(),
         pool.clone(),
         params.clone(),
@@ -273,10 +275,18 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         writer_ctl = Some(writer.clone());
 
         // Spawn duty tasks.
+        let t_l2blkman = l2_block_manager.clone();
         let t_params = params.clone();
         thread::spawn(move || {
             // FIXME figure out why this can't infer the type, it's like *right there*
-            duty_worker::duty_tracker_task::<_>(cu_rx, duties_tx, idata.ident, db, t_params)
+            duty_worker::duty_tracker_task::<_>(
+                cu_rx,
+                duties_tx,
+                idata.ident,
+                db,
+                t_l2blkman,
+                t_params,
+            )
         });
 
         let d_params = params.clone();

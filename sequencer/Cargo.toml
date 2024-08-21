@@ -19,6 +19,7 @@ alpen-express-rocksdb = { workspace = true }
 alpen-express-rpc-api = { workspace = true }
 alpen-express-rpc-types = { workspace = true }
 alpen-express-state = { workspace = true }
+express-storage = { workspace = true }
 
 anyhow = { workspace = true }
 argh = { workspace = true }

@@ -28,6 +28,7 @@ inst_ops! {
         get_blocks_at_height(h: u64) => Vec<L2BlockId>;
         get_block_status(id: L2BlockId) => Option<BlockStatus>;
         put_block(block: L2BlockBundle) => ();
+        put_block_status(id: L2BlockId, status: BlockStatus) => ();
     }
 }
 
@@ -52,4 +53,13 @@ fn get_block_status<D: Database>(
 fn put_block<D: Database>(context: &Context<D>, block: L2BlockBundle) -> DbResult<()> {
     let l2_store = context.db.l2_store();
     l2_store.put_block_data(block)
+}
+
+fn put_block_status<D: Database>(
+    context: &Context<D>,
+    id: L2BlockId,
+    status: BlockStatus,
+) -> DbResult<()> {
+    let l2_store = context.db.l2_store();
+    l2_store.set_block_status(id, status)
 }

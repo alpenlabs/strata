@@ -12,6 +12,7 @@ use tracing::*;
 use alpen_express_db::traits::Database;
 use alpen_express_eectl::engine::ExecEngineCtl;
 use alpen_express_primitives::params::Params;
+use express_storage::L2BlockManager;
 
 use crate::ctl::CsmController;
 use crate::message::{ClientUpdateNotif, CsmMessage, ForkChoiceMessage};
@@ -83,8 +84,9 @@ pub fn start_sync_tasks<
     E: ExecEngineCtl + Sync + Send + 'static,
 >(
     database: Arc<D>,
+    l2_block_manager: Arc<L2BlockManager>,
     engine: Arc<E>,
-    pool: Arc<threadpool::ThreadPool>,
+    pool: threadpool::ThreadPool,
     params: Arc<Params>,
 ) -> anyhow::Result<SyncManager> {
     // Create channels.
@@ -105,15 +107,29 @@ pub fn start_sync_tasks<
     // Start the fork choice manager thread.  If we haven't done genesis yet
     // this will just wait until the CSM says we have.
     let fcm_db = database.clone();
+    let fcm_l2blkman = l2_block_manager.clone();
     let fcm_eng = engine.clone();
     let fcm_csm_ctl = csm_ctl.clone();
     let fcm_params = params.clone();
     let _ct_handle = thread::spawn(|| {
-        fork_choice_manager::tracker_task(fcm_db, fcm_eng, fcm_rx, fcm_csm_ctl, fcm_params)
+        // TODO this should be simplified into a builder or something
+        fork_choice_manager::tracker_task(
+            fcm_db,
+            fcm_l2blkman,
+            fcm_eng,
+            fcm_rx,
+            fcm_csm_ctl,
+            fcm_params,
+        )
     });
 
     // Prepare the client worker state and start the thread for that.
-    let cw_state = worker::WorkerState::open(params.clone(), database.clone(), cupdate_tx)?;
+    let cw_state = worker::WorkerState::open(
+        params.clone(),
+        database.clone(),
+        l2_block_manager,
+        cupdate_tx,
+    )?;
     let state = cw_state.cur_state().clone();
 
     let mut status = CsmStatus::default();

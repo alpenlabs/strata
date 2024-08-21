@@ -18,7 +18,7 @@ pub struct CsmController {
 impl CsmController {
     pub fn new<D: Database + Sync + Send + 'static>(
         database: Arc<D>,
-        pool: Arc<threadpool::ThreadPool>,
+        pool: threadpool::ThreadPool,
         csm_tx: mpsc::Sender<CsmMessage>,
     ) -> Self {
         let submit_event_shim = make_write_event_shim(database, pool);
@@ -94,7 +94,7 @@ impl EventSubmitHandle {
 
 fn make_write_event_shim<D: Database + Sync + Send + 'static>(
     database: Arc<D>,
-    pool: Arc<threadpool::ThreadPool>,
+    pool: threadpool::ThreadPool,
 ) -> SubmitEventShim {
     let fun = move |ev| {
         let db = database.clone();

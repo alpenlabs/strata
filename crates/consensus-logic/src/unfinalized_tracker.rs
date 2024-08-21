@@ -2,9 +2,9 @@
 
 use std::collections::*;
 
-use alpen_express_db::traits::L2DataProvider;
 use alpen_express_primitives::buf::Buf32;
 use alpen_express_state::prelude::*;
+use express_storage::L2BlockManager;
 
 use crate::errors::ChainTipError;
 
@@ -233,15 +233,15 @@ impl UnfinalizedBlockTracker {
     pub fn load_unfinalized_blocks(
         &mut self,
         finalized_height: u64,
-        database: &impl L2DataProvider,
+        l2_block_manager: &L2BlockManager,
     ) -> anyhow::Result<()> {
         let mut height = finalized_height;
-        while let Ok(block_ids) = database.get_blocks_at_height(height) {
+        while let Ok(block_ids) = l2_block_manager.get_blocks_at_height_blocking(height) {
             if block_ids.is_empty() {
                 break;
             }
             for block_id in block_ids {
-                if let Some(block) = database.get_block_data(block_id)? {
+                if let Some(block) = l2_block_manager.get_block_blocking(&block_id)? {
                     let header = block.header();
                     let _ = self.attach_block(block_id, header);
                 }
@@ -314,10 +314,11 @@ impl FinalizeReport {
 mod tests {
     use std::collections::HashSet;
 
-    use alpen_express_db::traits::{Database, L2DataProvider, L2DataStore};
+    use alpen_express_db::traits::{Database, L2DataStore};
     use alpen_express_rocksdb::test_utils::get_common_db;
     use alpen_express_state::{header::L2Header, id::L2BlockId};
     use alpen_test_utils::l2::gen_l2_chain;
+    use express_storage::L2BlockManager;
 
     use crate::unfinalized_tracker;
 
@@ -361,6 +362,31 @@ mod tests {
         ]
     }
 
+    fn check_update_finalized(
+        prev_finalized_tip: L2BlockId,
+        new_finalized_tip: L2BlockId,
+        finalized_blocks: &[L2BlockId],
+        rejected_blocks: &[L2BlockId],
+        unfinalized_tips: HashSet<L2BlockId>,
+        l2_blkman: &L2BlockManager,
+    ) {
+        // Init the chain tracker from the state we figured out.
+        let mut chain_tracker =
+            unfinalized_tracker::UnfinalizedBlockTracker::new_empty(prev_finalized_tip);
+
+        chain_tracker.load_unfinalized_blocks(1, l2_blkman).unwrap();
+
+        let report = chain_tracker
+            .update_finalized_tip(&new_finalized_tip)
+            .unwrap();
+
+        assert_eq!(report.prev_tip(), &prev_finalized_tip);
+        assert_eq!(report.finalized, finalized_blocks);
+        assert_eq!(report.rejected(), rejected_blocks);
+        assert_eq!(chain_tracker.finalized_tip, new_finalized_tip);
+        assert_eq!(chain_tracker.unfinalized_tips, unfinalized_tips);
+    }
+
     #[test]
     fn test_load_unfinalized_blocks() {
         let db = get_common_db();
@@ -371,9 +397,10 @@ mod tests {
         // Init the chain tracker from the state we figured out.
         let mut chain_tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(g);
 
-        chain_tracker
-            .load_unfinalized_blocks(1, l2_prov.as_ref())
-            .unwrap();
+        let pool = threadpool::ThreadPool::new(1);
+        let blkman = L2BlockManager::new(pool, db);
+
+        chain_tracker.load_unfinalized_blocks(1, &blkman).unwrap();
 
         assert_eq!(chain_tracker.get_parent(&g), None);
         assert_eq!(chain_tracker.get_parent(&a1), Some(&g));
@@ -415,9 +442,10 @@ mod tests {
         // Init the chain tracker from the state we figured out.
         let mut chain_tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(g);
 
-        chain_tracker
-            .load_unfinalized_blocks(1, l2_prov.as_ref())
-            .unwrap();
+        let pool = threadpool::ThreadPool::new(1);
+        let blkman = L2BlockManager::new(pool, db);
+
+        chain_tracker.load_unfinalized_blocks(1, &blkman).unwrap();
 
         assert_eq!(
             chain_tracker.get_all_descendants(&g),
@@ -440,31 +468,6 @@ mod tests {
         assert_eq!(chain_tracker.get_all_descendants(&b3).len(), 0);
     }
 
-    fn check_update_finalized(
-        prev_finalized_tip: L2BlockId,
-        new_finalized_tip: L2BlockId,
-        finalized_blocks: &[L2BlockId],
-        rejected_blocks: &[L2BlockId],
-        unfinalized_tips: HashSet<L2BlockId>,
-        l2_prov: &(impl L2DataStore + L2DataProvider),
-    ) {
-        // Init the chain tracker from the state we figured out.
-        let mut chain_tracker =
-            unfinalized_tracker::UnfinalizedBlockTracker::new_empty(prev_finalized_tip);
-
-        chain_tracker.load_unfinalized_blocks(1, l2_prov).unwrap();
-
-        let report = chain_tracker
-            .update_finalized_tip(&new_finalized_tip)
-            .unwrap();
-
-        assert_eq!(report.prev_tip(), &prev_finalized_tip);
-        assert_eq!(report.finalized, finalized_blocks);
-        assert_eq!(report.rejected(), rejected_blocks);
-        assert_eq!(chain_tracker.finalized_tip, new_finalized_tip);
-        assert_eq!(chain_tracker.unfinalized_tips, unfinalized_tips);
-    }
-
     #[test]
     fn test_update_finalized_tip() {
         let db = get_common_db();
@@ -472,13 +475,16 @@ mod tests {
 
         let [g, a1, c1, a2, b2, a3, b3] = setup_test_chain(l2_prov.as_ref());
 
+        let pool = threadpool::ThreadPool::new(1);
+        let blk_manager = L2BlockManager::new(pool, db);
+
         check_update_finalized(
             g,
             b2,
             &[b2, a1],
             &[a2, c1, a3],
             HashSet::from_iter([b3]),
-            l2_prov.as_ref(),
+            &blk_manager,
         );
 
         check_update_finalized(
@@ -487,7 +493,7 @@ mod tests {
             &[a2, a1],
             &[b2, c1, b3],
             HashSet::from_iter([a3]),
-            l2_prov.as_ref(),
+            &blk_manager,
         );
 
         check_update_finalized(
@@ -496,7 +502,7 @@ mod tests {
             &[a1],
             &[c1],
             HashSet::from_iter([a3, b3]),
-            l2_prov.as_ref(),
+            &blk_manager,
         );
 
         check_update_finalized(
@@ -505,7 +511,7 @@ mod tests {
             &[a2],
             &[b2, b3],
             HashSet::from_iter([a3]),
-            l2_prov.as_ref(),
+            &blk_manager,
         );
 
         check_update_finalized(
@@ -514,7 +520,7 @@ mod tests {
             &[a3, a2],
             &[b2, b3],
             HashSet::from_iter([a3]),
-            l2_prov.as_ref(),
+            &blk_manager,
         );
     }
 }

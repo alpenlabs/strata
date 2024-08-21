@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use express_storage::L2BlockManager;
 use tokio::sync::{broadcast, mpsc, watch};
 use tracing::*;
 
@@ -31,6 +32,9 @@ pub struct WorkerState<D: Database> {
     // TODO should we move this out?
     database: Arc<D>,
 
+    /// L2 block manager.
+    l2_block_manager: Arc<L2BlockManager>,
+
     /// Tracker used to remember the current consensus state.
     state_tracker: state_tracker::StateTracker<D>,
 
@@ -44,6 +48,7 @@ impl<D: Database> WorkerState<D> {
     pub fn open(
         params: Arc<Params>,
         database: Arc<D>,
+        l2_block_manager: Arc<L2BlockManager>,
         cupdate_tx: broadcast::Sender<Arc<ClientUpdateNotif>>,
     ) -> anyhow::Result<Self> {
         let cs_prov = database.client_state_provider().as_ref();
@@ -58,29 +63,7 @@ impl<D: Database> WorkerState<D> {
         Ok(Self {
             params,
             database,
-            state_tracker,
-            cupdate_tx,
-        })
-    }
-
-    #[cfg(test)]
-    pub fn new_stub_worker(
-        params: Arc<Params>,
-        database: Arc<D>,
-        cur_state_idx: u64,
-        cur_state: ClientState,
-        cupdate_tx: broadcast::Sender<Arc<ClientUpdateNotif>>,
-    ) -> anyhow::Result<Self> {
-        let state_tracker = state_tracker::StateTracker::new(
-            params.clone(),
-            database.clone(),
-            cur_state_idx,
-            Arc::new(cur_state),
-        );
-
-        Ok(Self {
-            params,
-            database,
+            l2_block_manager,
             state_tracker,
             cupdate_tx,
         })
@@ -193,8 +176,9 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
             SyncAction::MarkInvalid(blkid) => {
                 // TODO not sure what this should entail yet
                 warn!(?blkid, "marking block invalid!");
-                let store = state.database.l2_store();
-                store.set_block_status(*blkid, BlockStatus::Invalid)?;
+                state
+                    .l2_block_manager
+                    .put_block_status_blocking(blkid, BlockStatus::Invalid)?;
             }
 
             SyncAction::FinalizeBlock(blkid) => {
