@@ -4,6 +4,7 @@ use alpen_express_rpc_types::{
     types::{BlockHeader, ClientStatus, DepositEntry, ExecUpdate, L1Status},
     L2BlockId,
 };
+use alpen_express_state::bridge_state::OperatorIdx;
 use alpen_express_state::{bridge_duties::BridgeDuties, bridge_ops::WithdrawalBatch};
 use express_bridge_txm::{DepositInfo, ReimbursementRequest};
 
@@ -83,14 +84,20 @@ pub trait AlpenAdminApi {
 #[cfg_attr(feature = "client", rpc(server, client, namespace = "alpbridge"))]
 // TODO: Add RPCs to handle the `BridgeMessage` as per [EXP-107](https://alpenlabs.atlassian.net/browse/EXP-107).
 pub trait AlpenBridgeApi {
-    /// Get relevant duties after a given block height in the rollup till the current block height.
+    /// Get relevant duties after a certain checkpoint in the rollup till the latest checkpoint for
+    /// the given operator.
     ///
     /// These duties could be extracted from the chainstate in the rollup or through the bridge p2p
     /// messaging queue.
     #[method(name = "getDuties")]
-    async fn get_duties(&self, from_height: u64) -> RpcResult<BridgeDuties>;
+    async fn get_duties(
+        &self,
+        from_checkpoint: u64,
+        operator_idx: OperatorIdx,
+    ) -> RpcResult<BridgeDuties>;
 
     /// Broadcast the signature for a deposit request to other bridge clients.
+    //  FIXME: this should actually send out a BridgeMessage after it has been implemented via [EXP-107](https://alpenlabs.atlassian.net/browse/EXP-107).
     #[method(name = "broadcastDepositSignature")]
     async fn broadcast_deposit_signature(
         &self,
@@ -99,21 +106,12 @@ pub trait AlpenBridgeApi {
     ) -> RpcResult<()>;
 
     /// Broadcast request for signatures on withdrawal reimbursement from other bridge clients.
+    //  FIXME: this should actually send out a BridgeMessage after it has been implemented via [EXP-107](https://alpenlabs.atlassian.net/browse/EXP-107).
     #[method(name = "broadcastReimbursementRequest")]
     async fn broadcast_reimbursement_request(&self, request: ReimbursementRequest)
         -> RpcResult<()>;
 
-    /// Get the details of the withdrawal assignee based on the UTXO.
-    ///
-    /// This is useful for validating whether a given withdrawal request was assigned to a given
-    /// operator as an OutPoint is guaranteed to be unique.
-    #[method(name = "getAssigneeDetails")]
-    async fn get_assignee_details(
-        &self,
-        deposit_outpoint: OutPoint,
-    ) -> RpcResult<Option<WithdrawalBatch>>;
-
     /// Broadcast fully signed transactions.
-    #[method(name = "broadcastTx")]
+    #[method(name = "broadcastTxs")]
     async fn broadcast_transactions(&self, txs: Vec<Transaction>) -> RpcResult<()>;
 }
