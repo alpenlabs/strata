@@ -4,7 +4,6 @@ use std::{borrow::BorrowMut, sync::Arc};
 
 use async_trait::async_trait;
 use bitcoin::{consensus::deserialize, Transaction as BTransaction, Txid};
-use express_storage::managers::l1tx_broadcast::{BroadcastDbManager, L1BroadcastHandle};
 use jsonrpsee::{
     core::RpcResult,
     types::{ErrorObject, ErrorObjectOwned},
@@ -22,9 +21,9 @@ use tokio::sync::{
     oneshot, watch, Mutex, RwLock,
 };
 
+use alpen_express_btcio::broadcaster::L1BroadcastHandle;
 use alpen_express_btcio::writer::{utils::calculate_blob_hash, DaWriter};
 use alpen_express_consensus_logic::sync_manager::SyncManager;
-
 use alpen_express_db::{
     traits::{ChainstateProvider, Database, L2DataProvider},
     types::L1TxEntry,

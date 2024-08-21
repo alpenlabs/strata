@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use bitcoin::{hashes::Hash, Txid};
-use express_storage::managers::l1tx_broadcast::BroadcastDbManager;
+use express_storage::{ops::l1tx_broadcast, BroadcastDbOps};
 use tokio::sync::mpsc::Receiver;
 use tracing::*;
 
@@ -17,21 +17,22 @@ use crate::{
 
 use super::error::BroadcasterResult;
 
-// TODO: make these configurable, possibly get from Params
+// TODO: make these configurable, get from config
 const BROADCAST_POLL_INTERVAL: u64 = 1000; // millis
 const FINALITY_DEPTH: u64 = 6;
 
 /// Broadcasts the next blob to be sent
 pub async fn broadcaster_task(
     rpc_client: Arc<impl SeqL1Client + L1Client>,
-    manager: Arc<BroadcastDbManager>,
+    ops: Arc<l1tx_broadcast::BroadcastDbOps>,
     mut entry_receiver: Receiver<(u64, L1TxEntry)>,
 ) -> BroadcasterResult<()> {
     info!("Starting Broadcaster task");
     let interval = tokio::time::interval(Duration::from_millis(BROADCAST_POLL_INTERVAL));
     tokio::pin!(interval);
 
-    let mut state = BroadcasterState::initialize(&manager).await?;
+    let mut state = BroadcasterState::initialize(&ops).await?;
+
     // Run indefinitely to watch/publish txs
     loop {
         tokio::select! {
@@ -49,7 +50,7 @@ pub async fn broadcaster_task(
 
         let (updated_entries, to_remove) = process_unfinalized_entries(
             &state.unfinalized_entries,
-            manager.clone(),
+            ops.clone(),
             rpc_client.as_ref(),
         )
         .await
@@ -62,14 +63,14 @@ pub async fn broadcaster_task(
             _ = state.unfinalized_entries.remove(&idx);
         }
 
-        state.next(updated_entries, &manager).await?;
+        state.next(updated_entries, &ops).await?;
     }
 }
 
 /// Processes unfinalized entries and returns entries idxs that are finalized
 async fn process_unfinalized_entries(
     unfinalized_entries: &HashMap<u64, L1TxEntry>,
-    manager: Arc<BroadcastDbManager>,
+    ops: Arc<BroadcastDbOps>,
     rpc_client: &(impl SeqL1Client + L1Client),
 ) -> BroadcasterResult<(HashMap<u64, L1TxEntry>, Vec<u64>)> {
     let mut to_remove = Vec::new();
@@ -84,9 +85,7 @@ async fn process_unfinalized_entries(
             new_txentry.status = status.clone();
 
             // update in db, maybe this should be moved out of this fn to separate concerns??
-            manager
-                .update_tx_entry_async(*idx, new_txentry.clone())
-                .await?;
+            ops.update_tx_entry_async(*idx, new_txentry.clone()).await?;
 
             // Remove if finalized
             if matches!(status, L1TxStatus::Finalized(_))
@@ -188,7 +187,7 @@ mod test {
     use alpen_express_rocksdb::broadcaster::db::{BroadcastDatabase, BroadcastDb};
     use alpen_express_rocksdb::test_utils::get_rocksdb_tmp_instance;
     use alpen_test_utils::ArbitraryGenerator;
-    use express_storage::managers::l1tx_broadcast::L1BroadcastContext;
+    use express_storage::ops::l1tx_broadcast::Context;
 
     use crate::test_utils::TestBitcoinClient;
 
@@ -200,11 +199,11 @@ mod test {
         Arc::new(BroadcastDatabase::new(bcastdb))
     }
 
-    fn get_manager() -> Arc<BroadcastDbManager> {
+    fn get_ops() -> Arc<BroadcastDbOps> {
         let pool = threadpool::Builder::new().num_threads(2).build();
         let db = get_db();
-        let mgr = L1BroadcastContext::new(db).into_ops(pool);
-        Arc::new(mgr)
+        let ops = Context::new(db).into_ops(pool);
+        Arc::new(ops)
     }
 
     fn gen_entry_with_status(st: L1TxStatus) -> L1TxEntry {
@@ -216,11 +215,11 @@ mod test {
 
     #[tokio::test]
     async fn test_handle_unpublished_entry() {
-        let mgr = get_manager();
+        let ops = get_ops();
         let e = gen_entry_with_status(L1TxStatus::Unpublished);
 
         // Add tx to db
-        mgr.insert_new_tx_entry_async((*e.txid()).into(), e.clone())
+        ops.insert_new_tx_entry_async((*e.txid()).into(), e.clone())
             .await
             .unwrap();
 
@@ -238,11 +237,11 @@ mod test {
 
     #[tokio::test]
     async fn test_handle_published_entry() {
-        let mgr = get_manager();
+        let ops = get_ops();
         let e = gen_entry_with_status(L1TxStatus::Published);
 
         // Add tx to db
-        mgr.insert_new_tx_entry_async((*e.txid()).into(), e.clone())
+        ops.insert_new_tx_entry_async((*e.txid()).into(), e.clone())
             .await
             .unwrap();
 
@@ -281,11 +280,11 @@ mod test {
 
     #[tokio::test]
     async fn test_handle_confirmed_entry() {
-        let mgr = get_manager();
+        let ops = get_ops();
         let e = gen_entry_with_status(L1TxStatus::Confirmed(1));
 
         // Add tx to db
-        mgr.insert_new_tx_entry_async((*e.txid()).into(), e.clone())
+        ops.insert_new_tx_entry_async((*e.txid()).into(), e.clone())
             .await
             .unwrap();
 
@@ -325,11 +324,11 @@ mod test {
 
     #[tokio::test]
     async fn test_handle_finalized_entry() {
-        let mgr = get_manager();
+        let ops = get_ops();
         let e = gen_entry_with_status(L1TxStatus::Finalized(1));
 
         // Add tx to db
-        mgr.insert_new_tx_entry_async((*e.txid()).into(), e.clone())
+        ops.insert_new_tx_entry_async((*e.txid()).into(), e.clone())
             .await
             .unwrap();
 
@@ -357,13 +356,13 @@ mod test {
 
     #[tokio::test]
     async fn test_handle_excluded_entry() {
-        let mgr = get_manager();
+        let ops = get_ops();
         let e = gen_entry_with_status(L1TxStatus::Excluded(ExcludeReason::Other(
             "some reason".to_string(),
         )));
 
         // Add tx to db
-        mgr.insert_new_tx_entry_async((*e.txid()).into(), e.clone())
+        ops.insert_new_tx_entry_async((*e.txid()).into(), e.clone())
             .await
             .unwrap();
 
@@ -391,33 +390,33 @@ mod test {
 
     #[tokio::test]
     async fn test_process_unfinalized_entries() {
-        let mgr = get_manager();
+        let ops = get_ops();
         // Add a couple of txs
         let e1 = gen_entry_with_status(L1TxStatus::Unpublished);
-        let i1 = mgr
+        let i1 = ops
             .insert_new_tx_entry_async((*e1.txid()).into(), e1)
             .await
             .unwrap();
         let e2 = gen_entry_with_status(L1TxStatus::Excluded(ExcludeReason::MissingInputsOrSpent));
-        let _i2 = mgr
+        let _i2 = ops
             .insert_new_tx_entry_async((*e2.txid()).into(), e2)
             .await
             .unwrap();
 
         let e3 = gen_entry_with_status(L1TxStatus::Published);
-        let i3 = mgr
+        let i3 = ops
             .insert_new_tx_entry_async((*e3.txid()).into(), e3)
             .await
             .unwrap();
 
-        let state = BroadcasterState::initialize(&mgr).await.unwrap();
+        let state = BroadcasterState::initialize(&ops).await.unwrap();
 
         // This client will make the published tx finalized
         let client = TestBitcoinClient::new(FINALITY_DEPTH);
         let cl = Arc::new(client);
 
         let (new_entries, to_remove) =
-            process_unfinalized_entries(&state.unfinalized_entries, mgr, cl.as_ref())
+            process_unfinalized_entries(&state.unfinalized_entries, ops, cl.as_ref())
                 .await
                 .unwrap();
 

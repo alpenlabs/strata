@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use alpen_express_db::types::{L1TxEntry, L1TxStatus};
-use express_storage::managers::l1tx_broadcast::BroadcastDbManager;
+use express_storage::BroadcastDbOps;
 
 use super::error::{BroadcasterError, BroadcasterResult};
 
@@ -15,19 +15,19 @@ pub(crate) struct BroadcasterState {
 
 impl BroadcasterState {
     /// Initialize the `[BroadcasterState]` by looking at all [`L1TxEntry`]s in database
-    pub async fn initialize(manager: &Arc<BroadcastDbManager>) -> BroadcasterResult<Self> {
-        Self::initialize_from_idx(manager, 0).await
+    pub async fn initialize(ops: &Arc<BroadcastDbOps>) -> BroadcasterResult<Self> {
+        Self::initialize_from_idx(ops, 0).await
     }
 
     /// Initialize the [`BroadcasterState`] by looking at [`L1TxEntry`]s in database starting from
     /// given `start_idx`
     pub async fn initialize_from_idx(
-        manager: &Arc<BroadcastDbManager>,
+        ops: &Arc<BroadcastDbOps>,
         start_idx: u64,
     ) -> BroadcasterResult<Self> {
-        let next_idx = manager.get_next_tx_idx_async().await?;
+        let next_idx = ops.get_next_tx_idx_async().await?;
 
-        let unfinalized_entries = filter_unfinalized_from_db(manager, start_idx, next_idx).await?;
+        let unfinalized_entries = filter_unfinalized_from_db(ops, start_idx, next_idx).await?;
 
         Ok(Self {
             next_idx,
@@ -39,9 +39,9 @@ impl BroadcasterState {
     pub async fn next(
         &mut self,
         updated_entries: HashMap<u64, L1TxEntry>,
-        manager: &Arc<BroadcastDbManager>,
+        ops: &Arc<BroadcastDbOps>,
     ) -> BroadcasterResult<()> {
-        let next_idx = manager.get_next_tx_idx_async().await?;
+        let next_idx = ops.get_next_tx_idx_async().await?;
 
         if next_idx < self.next_idx {
             return Err(BroadcasterError::Other(
@@ -49,7 +49,7 @@ impl BroadcasterState {
             ));
         }
         let new_unfinalized_entries =
-            filter_unfinalized_from_db(manager, self.next_idx, next_idx).await?;
+            filter_unfinalized_from_db(ops, self.next_idx, next_idx).await?;
 
         // Update state: include updated entries and new unfinalized entries
         self.unfinalized_entries.extend(updated_entries);
@@ -62,13 +62,13 @@ impl BroadcasterState {
 /// Returns unfinalized and unexcluded [`L1TxEntry`]s from db starting from index `from` until `to`
 /// non-inclusive.
 async fn filter_unfinalized_from_db(
-    manager: &Arc<BroadcastDbManager>,
+    ops: &Arc<BroadcastDbOps>,
     from: u64,
     to: u64,
 ) -> BroadcasterResult<HashMap<u64, L1TxEntry>> {
     let mut unfinalized_entries = HashMap::new();
     for idx in from..to {
-        let Some(txentry) = manager.get_tx_entry_async(idx).await? else {
+        let Some(txentry) = ops.get_tx_entry_async(idx).await? else {
             break;
         };
 
@@ -90,7 +90,7 @@ mod test {
         test_utils::get_rocksdb_tmp_instance,
     };
     use alpen_test_utils::ArbitraryGenerator;
-    use express_storage::managers::l1tx_broadcast::L1BroadcastContext;
+    use express_storage::ops::l1tx_broadcast::Context;
 
     use super::*;
 
@@ -100,11 +100,11 @@ mod test {
         Arc::new(BroadcastDatabase::new(bcastdb))
     }
 
-    fn get_manager() -> Arc<BroadcastDbManager> {
+    fn get_ops() -> Arc<BroadcastDbOps> {
         let pool = threadpool::Builder::new().num_threads(2).build();
         let db = get_db();
-        let mgr = L1BroadcastContext::new(db).into_ops(pool);
-        Arc::new(mgr)
+        let ops = Context::new(db).into_ops(pool);
+        Arc::new(ops)
     }
 
     fn gen_entry_with_status(st: L1TxStatus) -> L1TxEntry {
@@ -134,34 +134,34 @@ mod test {
         gen_entry_with_status(L1TxStatus::Excluded(ExcludeReason::MissingInputsOrSpent))
     }
 
-    async fn populate_broadcast_db(mgr: Arc<BroadcastDbManager>) -> Vec<(u64, L1TxEntry)> {
+    async fn populate_broadcast_db(ops: Arc<BroadcastDbOps>) -> Vec<(u64, L1TxEntry)> {
         // Make some insertions
         let e1 = gen_unpublished_entry();
-        let i1 = mgr
+        let i1 = ops
             .insert_new_tx_entry_async((*e1.txid()).into(), e1.clone())
             .await
             .unwrap();
 
         let e2 = gen_confirmed_entry();
-        let i2 = mgr
+        let i2 = ops
             .insert_new_tx_entry_async((*e2.txid()).into(), e2.clone())
             .await
             .unwrap();
 
         let e3 = gen_finalized_entry();
-        let i3 = mgr
+        let i3 = ops
             .insert_new_tx_entry_async((*e3.txid()).into(), e3.clone())
             .await
             .unwrap();
 
         let e4 = gen_published_entry();
-        let i4 = mgr
+        let i4 = ops
             .insert_new_tx_entry_async((*e4.txid()).into(), e4.clone())
             .await
             .unwrap();
 
         let e5 = gen_excluded_entry();
-        let i5 = mgr
+        let i5 = ops
             .insert_new_tx_entry_async((*e5.txid()).into(), e5.clone())
             .await
             .unwrap();
@@ -171,14 +171,14 @@ mod test {
     #[tokio::test]
     async fn test_initialize() {
         // Insert entries to db
-        let mgr = get_manager();
+        let ops = get_ops();
 
-        let pop = populate_broadcast_db(mgr.clone()).await;
+        let pop = populate_broadcast_db(ops.clone()).await;
         let [(i1, _e1), (i2, _e2), (i3, _e3), (i4, _e4), (i5, _e5)] = pop.as_slice() else {
             panic!("Invalid initialization");
         };
         // Now initialize state
-        let state = BroadcasterState::initialize(&mgr).await.unwrap();
+        let state = BroadcasterState::initialize(&ops).await.unwrap();
 
         assert_eq!(state.next_idx, i5 + 1);
 
@@ -194,14 +194,14 @@ mod test {
     #[tokio::test]
     async fn test_next_state() {
         // Insert entries to db
-        let mgr = get_manager();
+        let ops = get_ops();
 
-        let pop = populate_broadcast_db(mgr.clone()).await;
+        let pop = populate_broadcast_db(ops.clone()).await;
         let [(_i1, _e1), (_i2, _e2), (_i3, _e3), (_i4, _e4), (_i5, _e5)] = pop.as_slice() else {
             panic!("Invalid initialization");
         };
         // Now initialize state
-        let mut state = BroadcasterState::initialize(&mgr).await.unwrap();
+        let mut state = BroadcasterState::initialize(&ops).await.unwrap();
 
         // Get updated entries where one entry is modified, another is removed
         let mut updated_entries = state.unfinalized_entries.clone();
@@ -211,18 +211,18 @@ mod test {
 
         // Insert two more items to db, one excluded and one published.
         let e = gen_excluded_entry(); // this should not be in new state
-        let idx = mgr
+        let idx = ops
             .insert_new_tx_entry_async((*e.txid()).into(), e.clone())
             .await
             .unwrap();
         let e1 = gen_published_entry(); // this should be in new state
-        let idx1 = mgr
+        let idx1 = ops
             .insert_new_tx_entry_async((*e1.txid()).into(), e1.clone())
             .await
             .unwrap();
         // Compute next state
         //
-        state.next(updated_entries, &mgr).await.unwrap();
+        state.next(updated_entries, &ops).await.unwrap();
 
         assert_eq!(state.next_idx, idx1 + 1);
         assert_eq!(

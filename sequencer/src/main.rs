@@ -7,26 +7,20 @@ use std::sync::Arc;
 use std::time::Duration;
 
 // use alpen_express_btcio::broadcaster::manager::BroadcastDbManager;
-use alpen_express_btcio::broadcaster::task::broadcaster_task;
-use alpen_express_btcio::rpc::traits::L1Client;
-use alpen_express_btcio::rpc::traits::SeqL1Client;
-use alpen_express_db::types::L1TxEntry;
-use alpen_express_rocksdb::broadcaster::db::BroadcastDatabase;
 use anyhow::Context;
 use bitcoin::Network;
 use config::Config;
-use express_storage::managers::l1tx_broadcast::L1BroadcastHandle;
-use express_storage::managers::l1tx_broadcast::{BroadcastDbManager, L1BroadcastContext};
-use express_storage::L2BlockManager;
+
 use format_serde_error::SerdeError;
 use reth_rpc_types::engine::JwtError;
 use reth_rpc_types::engine::JwtSecret;
 use rockbound::rocksdb;
 use thiserror::Error;
-use tokio::sync::mpsc;
 use tokio::sync::{broadcast, oneshot, RwLock};
 use tracing::*;
 
+use alpen_express_btcio::broadcaster::spawn_broadcaster_task;
+use alpen_express_btcio::rpc::traits::{L1Client, SeqL1Client};
 use alpen_express_btcio::writer::config::WriterConfig;
 use alpen_express_btcio::writer::start_writer_task;
 use alpen_express_btcio::writer::DaWriter;
@@ -35,17 +29,19 @@ use alpen_express_consensus_logic::duty::types::{DutyBatch, Identity, IdentityDa
 use alpen_express_consensus_logic::duty::worker::{self as duty_worker};
 use alpen_express_consensus_logic::sync_manager;
 use alpen_express_consensus_logic::sync_manager::SyncManager;
-use alpen_express_db::traits::Database;
-use alpen_express_db::traits::SequencerDatabase;
+use alpen_express_db::traits::{Database, SequencerDatabase};
 use alpen_express_evmexec::{fork_choice_state_initial, EngineRpcClient};
 use alpen_express_primitives::block_credential;
 use alpen_express_primitives::buf::Buf32;
 use alpen_express_primitives::params::{Params, RollupParams, RunParams};
+use alpen_express_rocksdb::broadcaster::db::BroadcastDatabase;
 use alpen_express_rocksdb::sequencer::db::SequencerDB;
 use alpen_express_rocksdb::DbOpsConfig;
 use alpen_express_rocksdb::SeqDb;
 use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer};
 use alpen_express_rpc_types::L1Status;
+use express_storage::BroadcastDbOps;
+use express_storage::L2BlockManager;
 use express_tasks::{ShutdownSignal, TaskManager};
 
 use crate::args::Args;
@@ -249,9 +245,10 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     );
     let eng_ctl = Arc::new(eng_ctl);
 
+    // Set up L1 broadcaster.
     let bcastdb = Arc::new(BroadcastDatabase::new(bcast_db));
-    let bcastctx = L1BroadcastContext::new(bcastdb);
-    let bcast_man = Arc::new(bcastctx.into_ops(pool.clone()));
+    let bcast_ctx = express_storage::ops::l1tx_broadcast::Context::new(bcastdb.clone());
+    let bcast_ops = Arc::new(bcast_ctx.into_ops(pool.clone()));
 
     // Start the sync manager.
     let sync_man = sync_manager::start_sync_tasks(
@@ -346,7 +343,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             shutdown_signal,
             config,
             sync_man,
-            bcast_man,
+            bcast_ops,
             btc_rpc,
             database_r,
             l1_status,
@@ -375,17 +372,15 @@ async fn start_rpc<
     shutdown_signal: ShutdownSignal,
     config: Config,
     sync_man: Arc<SyncManager>,
-    bcast_man: Arc<BroadcastDbManager>,
+    bcast_ops: Arc<BroadcastDbOps>,
     l1_rpc_client: Arc<L>,
     database: Arc<D>,
     l1_status: Arc<RwLock<L1Status>>,
     writer: Option<Arc<DaWriter<SD>>>,
 ) -> anyhow::Result<()> {
     // start broadcast task
-    let (tx, rx) = mpsc::channel::<(u64, L1TxEntry)>(64);
-    tokio::spawn(broadcaster_task(l1_rpc_client, bcast_man.clone(), rx));
-
-    let bcast_handle = Arc::new(L1BroadcastHandle::new(tx, bcast_man));
+    let bcast_handle = spawn_broadcaster_task(l1_rpc_client, bcast_ops);
+    let bcast_handle = Arc::new(bcast_handle);
 
     let (stop_tx, stop_rx) = oneshot::channel();
 
