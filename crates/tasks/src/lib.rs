@@ -355,7 +355,9 @@ mod tests {
 
         println!("{:#?}", manager.pending_tasks_counter);
 
-        let err = manager.monitor(None).expect_err("should give error");
+        let err = manager
+            .monitor(Some(Duration::from_secs(5)))
+            .expect_err("should give error");
 
         panic::set_hook(original_hook);
 
@@ -392,7 +394,9 @@ mod tests {
 
         println!("{:#?}", manager.pending_tasks_counter);
 
-        let err = manager.monitor(None).expect_err("should give error");
+        let err = manager
+            .monitor(Some(Duration::from_secs(5)))
+            .expect_err("should give error");
 
         panic::set_hook(original_hook);
 
@@ -441,7 +445,7 @@ mod tests {
             shutdown_sig.send();
         });
 
-        let res = manager.monitor(None);
+        let res = manager.monitor(Some(Duration::from_secs(5)));
 
         assert!(matches!(res, Ok(())), "should exit successfully");
     }
