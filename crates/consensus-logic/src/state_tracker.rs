@@ -101,35 +101,20 @@ pub fn reconstruct_cur_state(
     cs_prov: &impl ClientStateProvider,
 ) -> anyhow::Result<(u64, ClientState)> {
     let last_ckpt_idx = cs_prov.get_last_checkpoint_idx()?;
-    let mut state = cs_prov
-        .get_state_checkpoint(last_ckpt_idx)?
-        .ok_or(Error::MissingCheckpoint(last_ckpt_idx))?;
 
-    // Special case init since we don't have writes at that index.
+    // genesis state.
     if last_ckpt_idx == 0 {
         debug!("starting from init state");
+        let state = cs_prov
+            .get_state_checkpoint(0)?
+            .ok_or(Error::MissingCheckpoint(0))?;
         return Ok((0, state));
     }
 
     // If we're not in genesis, then we probably have to replay some writes.
     let last_write_idx = cs_prov.get_last_write_idx()?;
 
-    // But if the last written writes were for the last checkpoint, we can just
-    // return that directly.
-    if last_write_idx == last_ckpt_idx {
-        debug!(%last_ckpt_idx, "no writes to replay");
-        return Ok((last_ckpt_idx, state));
-    }
-
-    let write_replay_start = last_ckpt_idx + 1;
-    debug!(%last_write_idx, %last_ckpt_idx, "reconstructing state from checkpoint");
-
-    for i in write_replay_start..=last_write_idx {
-        let writes = cs_prov
-            .get_client_state_writes(i)?
-            .ok_or(Error::MissingConsensusWrites(i))?;
-        operation::apply_writes_to_state(&mut state, writes.into_iter());
-    }
+    let state = reconstruct_state(cs_prov, last_write_idx)?;
 
     Ok((last_write_idx, state))
 }
@@ -145,7 +130,7 @@ pub fn reconstruct_state(
         Some(cl) => {
             // if the checkpoint was created at the idx itself, return the checkpoint
             debug!(%idx, "no writes to replay");
-            return Ok(cl);
+            Ok(cl)
         }
         None => {
             // get the previously written checkpoint
@@ -167,7 +152,7 @@ pub fn reconstruct_state(
                 operation::apply_writes_to_state(&mut state, writes.into_iter());
             }
 
-            return Ok(state);
+            Ok(state)
         }
     }
 }
