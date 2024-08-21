@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use alpen_express_primitives::hash;
 use tokio::sync::mpsc;
 use tracing::*;
 
@@ -441,7 +442,23 @@ fn check_new_block<D: Database>(
         }
     }
 
-    // TODO more stuff
+    // check if the l1_segment_hash matches between L2Block and L2BlockHeader
+    let l1seg_buf = borsh::to_vec(block.l1_segment()).expect("blockasm: enc l1 segment");
+    let l1_segment_hash = hash::raw(&l1seg_buf);
+
+    if l1_segment_hash != *block.header().l1_payload_hash() {
+        warn!(?blkid, "computed l1_segment_hash doesn't match between L2Block and L2BlockHeader");
+        return Ok(false);
+    }
+
+    // check if the exec_segment_hash matches between L2Block and L2BlockHeader
+    let eseg_buf = borsh::to_vec(block.exec_segment()).expect("blockasm: enc exec segment");
+    let exec_segment_hash = hash::raw(&eseg_buf);
+
+    if exec_segment_hash != *block.header().exec_payload_hash() {
+        warn!(?blkid, "computed exec_segment_hash doesn't match between L2Block and L2BlockHeader");
+        return Ok(false);
+    }
 
     Ok(true)
 }
