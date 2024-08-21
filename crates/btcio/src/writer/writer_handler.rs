@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use tokio::{
-    runtime::Runtime,
+    runtime::Handle,
     sync::{
         mpsc::{self, Receiver, Sender},
         RwLock,
@@ -66,7 +66,7 @@ pub fn start_writer_task<D: SequencerDatabase + Send + Sync + 'static>(
     rpc_client: Arc<impl BitcoinClient>,
     config: WriterConfig,
     db: Arc<D>,
-    rt: &Runtime,
+    handle: &Handle,
     l1_status: Arc<RwLock<L1Status>>,
 ) -> anyhow::Result<DaWriter<D>> {
     info!("Starting writer control task");
@@ -77,21 +77,21 @@ pub fn start_writer_task<D: SequencerDatabase + Send + Sync + 'static>(
 
     // The watcher task watches L1 for txs confirmations and finalizations. Ideally this should be
     // taken care of by the reader task. This can be done later.
-    rt.spawn(watcher_task(
+    handle.spawn(watcher_task(
         init_state.next_watch_blob_idx,
         rpc_client.clone(),
         config.clone(),
         db.clone(),
     ));
 
-    rt.spawn(broadcaster_task(
+    handle.spawn(broadcaster_task(
         init_state.next_publish_blob_idx,
         rpc_client.clone(),
         db.clone(),
         l1_status.clone(),
     ));
 
-    rt.spawn(listen_for_signing_intents(
+    handle.spawn(listen_for_signing_intents(
         signer_rx,
         rpc_client,
         config,

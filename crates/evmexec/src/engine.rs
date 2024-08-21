@@ -211,12 +211,12 @@ impl<T: EngineRpc> RpcExecEngineCtl<T> {
     pub fn new(
         client: T,
         fork_choice_state: ForkchoiceState,
-        handle: Handle,
+        handle: &Handle,
         l2_block_manager: Arc<L2BlockManager>,
     ) -> Self {
         Self {
             inner: RpcExecEngineInner::new(client, fork_choice_state),
-            tokio_handle: handle,
+            tokio_handle: handle.clone(),
             l2_block_manager,
         }
     }

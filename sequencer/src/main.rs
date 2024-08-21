@@ -7,7 +7,6 @@ use std::process;
 use std::sync::Arc;
 use std::thread;
 
-use alpen_express_btcio::rpc::BitcoinDClient;
 use anyhow::Context;
 use bitcoin::Network;
 use config::Config;
@@ -16,28 +15,37 @@ use format_serde_error::SerdeError;
 use reth_rpc_types::engine::JwtError;
 use reth_rpc_types::engine::JwtSecret;
 use rockbound::rocksdb;
+use rpc_server::AlpenRpcImpl;
 use thiserror::Error;
+use threadpool::ThreadPool;
+use tokio::runtime::Builder;
+use tokio::runtime::Handle;
 use tokio::sync::{broadcast, oneshot, RwLock};
 use tracing::*;
 
-use alpen_express_btcio::rpc::traits::BitcoinClient;
+use alpen_express_btcio::rpc::BitcoinDClient;
 use alpen_express_btcio::writer::config::WriterConfig;
 use alpen_express_btcio::writer::start_writer_task;
-use alpen_express_btcio::writer::DaWriter;
 use alpen_express_common::logging;
 use alpen_express_consensus_logic::duty::types::{DutyBatch, Identity, IdentityData, IdentityKey};
 use alpen_express_consensus_logic::duty::worker::{self as duty_worker};
-use alpen_express_consensus_logic::sync_manager;
+use alpen_express_consensus_logic::sync_manager::start_sync_tasks;
 use alpen_express_consensus_logic::sync_manager::SyncManager;
+use alpen_express_db::database::CommonDatabase;
 use alpen_express_db::traits::Database;
-use alpen_express_db::traits::SequencerDatabase;
+use alpen_express_evmexec::engine::RpcExecEngineCtl;
 use alpen_express_evmexec::{fork_choice_state_initial, EngineRpcClient};
 use alpen_express_primitives::block_credential;
 use alpen_express_primitives::buf::Buf32;
 use alpen_express_primitives::params::{Params, RollupParams, RunParams};
+use alpen_express_rocksdb::l2::db::L2Db;
 use alpen_express_rocksdb::sequencer::db::SequencerDB;
+use alpen_express_rocksdb::ChainStateDb;
+use alpen_express_rocksdb::ClientStateDb;
 use alpen_express_rocksdb::DbOpsConfig;
+use alpen_express_rocksdb::L1Db;
 use alpen_express_rocksdb::SeqDb;
+use alpen_express_rocksdb::SyncEventDb;
 use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer};
 use alpen_express_rpc_types::L1Status;
 
@@ -113,16 +121,15 @@ fn default_rollup_params() -> RollupParams {
     }
 }
 
-#[tokio::main]
-async fn main() {
+fn main() {
     let args: Args = argh::from_env();
-    if let Err(e) = main_inner(args).await {
+    if let Err(e) = main_inner(args) {
         eprintln!("FATAL ERROR: {e}");
         eprintln!("trace:\n{e:?}");
     }
 }
 
-async fn main_inner(args: Args) -> anyhow::Result<()> {
+fn main_inner(args: Args) -> anyhow::Result<()> {
     logging::init();
 
     // initialize the full configuration
@@ -162,35 +169,25 @@ async fn main_inner(args: Args) -> anyhow::Result<()> {
     let params = Arc::new(params);
 
     // Start runtime for async IO tasks.
-    let rt = tokio::runtime::Builder::new_multi_thread()
+    let rt = Builder::new_multi_thread()
         .enable_all()
         .thread_name("express-rt")
         .build()
         .expect("init: build rt");
+    let handle = rt.handle();
 
     // Init thread pool for batch jobs.
     // TODO switch to num_cpus maybe?  we don't want to compete with tokio though
-    let pool = threadpool::ThreadPool::with_name("express-pool".to_owned(), 8);
+    let pool = ThreadPool::with_name("express-pool".to_owned(), 8);
 
     // Initialize databases.
-    let l1_db = Arc::new(alpen_express_rocksdb::L1Db::new(rbdb.clone(), db_ops));
-    let l2_db = Arc::new(alpen_express_rocksdb::l2::db::L2Db::new(
-        rbdb.clone(),
-        db_ops,
-    ));
-    let sync_ev_db = Arc::new(alpen_express_rocksdb::SyncEventDb::new(
-        rbdb.clone(),
-        db_ops,
-    ));
-    let cs_db = Arc::new(alpen_express_rocksdb::ClientStateDb::new(
-        rbdb.clone(),
-        db_ops,
-    ));
-    let chst_db = Arc::new(alpen_express_rocksdb::ChainStateDb::new(
-        rbdb.clone(),
-        db_ops,
-    ));
-    let database = Arc::new(alpen_express_db::database::CommonDatabase::new(
+    let l1_db = Arc::new(L1Db::new(rbdb.clone(), db_ops));
+    let l2_db = Arc::new(L2Db::new(rbdb.clone(), db_ops));
+    let sync_ev_db = Arc::new(SyncEventDb::new(rbdb.clone(), db_ops));
+    let cs_db = Arc::new(ClientStateDb::new(rbdb.clone(), db_ops));
+    let chst_db = Arc::new(ChainStateDb::new(rbdb.clone(), db_ops));
+    let seqdb = Arc::new(SeqDb::new(rbdb, db_ops));
+    let database = Arc::new(CommonDatabase::new(
         l1_db, l2_db, sync_ev_db, cs_db, chst_db,
     ));
 
@@ -200,6 +197,70 @@ async fn main_inner(args: Args) -> anyhow::Result<()> {
     // Set up btcio status to pass around cheaply
     let l1_status = Arc::new(RwLock::new(L1Status::default()));
 
+    // Init engine controller.
+    let reth_jwtsecret = load_jwtsecret(&config.exec.reth.secret)?;
+    let client = EngineRpcClient::from_url_secret(
+        &format!("http://{}", &config.exec.reth.rpc_url),
+        reth_jwtsecret,
+    );
+
+    let initial_fcs = fork_choice_state_initial(database.clone(), params.rollup())?;
+    let eng_ctl = RpcExecEngineCtl::new(
+        client,
+        initial_fcs,
+        handle,
+        l2_block_manager.clone(),
+    );
+    let eng_ctl = Arc::new(eng_ctl);
+
+    // Start the sync manager.
+    let sync_man = start_sync_tasks(
+        database.clone(),
+        l2_block_manager.clone(),
+        eng_ctl.clone(),
+        pool.clone(),
+        params.clone(),
+    )?;
+    let sync_man = Arc::new(sync_man);
+    let main_fut = main_task(
+        &config,
+        sync_man,
+        database.clone(),
+        l1_status,
+        eng_ctl,
+        pool.clone(),
+        params.clone(),
+        seqdb.clone(),
+        l2_block_manager.clone(),
+    );
+    if let Err(e) = rt.block_on(main_fut) {
+        error!(err = %e, "main task exited");
+        process::exit(0); // special case exit once we've gotten to this point
+    }
+
+    info!("exiting");
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn main_task<D: Database + Send + Sync + 'static>(
+    config: &Config,
+    sync_man: Arc<SyncManager>,
+    database: Arc<D>,
+    l1_status: Arc<RwLock<L1Status>>,
+    eng_ctl: Arc<RpcExecEngineCtl<EngineRpcClient>>,
+    pool: ThreadPool,
+    params: Arc<Params>,
+    seqdb: Arc<SeqDb>,
+    l2_block_manager: Arc<L2BlockManager>,
+) -> anyhow::Result<()>
+where
+    // TODO how are these not redundant trait bounds???
+    <D as Database>::SeStore: Send + Sync + 'static,
+    <D as Database>::L1Store: Send + Sync + 'static,
+    <D as Database>::L1Prov: Send + Sync + 'static,
+    <D as Database>::L2Prov: Send + Sync + 'static,
+{
     // Set up Bitcoin client RPC.
     let bitcoind_url = format!("http://{}", config.bitcoind_rpc.rpc_url);
     let btc_rpc = BitcoinDClient::new(
@@ -215,31 +276,29 @@ async fn main_inner(args: Args) -> anyhow::Result<()> {
         warn!("network not set to regtest, ignoring");
     }
 
-    // Init engine controller.
-    let reth_jwtsecret = load_jwtsecret(&config.exec.reth.secret)?;
-    let client = EngineRpcClient::from_url_secret(
-        &format!("http://{}", &config.exec.reth.rpc_url),
-        reth_jwtsecret,
-    );
-
-    let initial_fcs = fork_choice_state_initial(database.clone(), params.rollup())?;
-    let eng_ctl = alpen_express_evmexec::engine::RpcExecEngineCtl::new(
-        client,
-        initial_fcs,
-        rt.handle().clone(),
-        l2_block_manager.clone(),
-    );
-    let eng_ctl = Arc::new(eng_ctl);
-
-    // Start the sync manager.
-    let sync_man = sync_manager::start_sync_tasks(
+    // Start the L1 tasks to get that going.
+    let csm_ctl = sync_man.get_csm_ctl();
+    l1_reader::start_reader_tasks(
+        sync_man.get_params(),
+        config,
+        btc_rpc.clone(),
         database.clone(),
-        l2_block_manager.clone(),
-        eng_ctl.clone(),
-        pool.clone(),
-        params.clone(),
-    )?;
-    let sync_man = Arc::new(sync_man);
+        csm_ctl.clone(),
+        l1_status.clone(),
+    )
+    .await?;
+
+    let (stop_tx, stop_rx) = oneshot::channel();
+
+    // Init RPC methods.
+    let alp_rpc = AlpenRpcImpl::new(
+        l1_status.clone(),
+        database.clone(),
+        sync_man.clone(),
+        stop_tx,
+    );
+    let mut methods = alp_rpc.into_rpc();
+
     let mut writer_ctl = None;
 
     // If the sequencer key is set, start the sequencer duties task.
@@ -263,14 +322,13 @@ async fn main_inner(args: Args) -> anyhow::Result<()> {
             params.rollup().rollup_name.clone(),
         )?;
         // Initialize SequencerDatabase
-        let seqdb = Arc::new(SeqDb::new(rbdb, db_ops));
+        let handle = Handle::current();
         let dbseq = Arc::new(SequencerDB::new(seqdb));
-        let rpc = btc_rpc.clone();
         let writer = Arc::new(start_writer_task(
-            rpc,
+            btc_rpc.clone(),
             writer_config,
             dbseq,
-            &rt,
+            &handle,
             l1_status.clone(),
         )?);
 
@@ -299,67 +357,8 @@ async fn main_inner(args: Args) -> anyhow::Result<()> {
         });
     }
 
-    let main_fut = main_task(
-        &config,
-        sync_man,
-        btc_rpc,
-        database.clone(),
-        l1_status,
-        writer_ctl,
-    );
-    if let Err(e) = rt.block_on(main_fut) {
-        error!(err = %e, "main task exited");
-        process::exit(0); // special case exit once we've gotten to this point
-    }
-
-    info!("exiting");
-    Ok(())
-}
-
-async fn main_task<
-    D: Database + Send + Sync + 'static,
-    L: BitcoinClient,
-    SD: SequencerDatabase + Send + Sync + 'static,
->(
-    config: &Config,
-    sync_man: Arc<SyncManager>,
-    l1_rpc_client: Arc<L>,
-    database: Arc<D>,
-    l1_status: Arc<RwLock<L1Status>>,
-    writer: Option<Arc<DaWriter<SD>>>,
-) -> anyhow::Result<()>
-where
-    // TODO how are these not redundant trait bounds???
-    <D as Database>::SeStore: Send + Sync + 'static,
-    <D as Database>::L1Store: Send + Sync + 'static,
-    <D as Database>::L1Prov: Send + Sync + 'static,
-    <D as Database>::L2Prov: Send + Sync + 'static,
-{
-    // Start the L1 tasks to get that going.
-    let csm_ctl = sync_man.get_csm_ctl();
-    l1_reader::start_reader_tasks(
-        sync_man.get_params(),
-        config,
-        l1_rpc_client,
-        database.clone(),
-        csm_ctl,
-        l1_status.clone(),
-    )
-    .await?;
-
-    let (stop_tx, stop_rx) = oneshot::channel();
-
-    // Init RPC methods.
-    let alp_rpc = rpc_server::AlpenRpcImpl::new(
-        l1_status.clone(),
-        database.clone(),
-        sync_man.clone(),
-        stop_tx,
-    );
-    let mut methods = alp_rpc.into_rpc();
-
-    if writer.is_some() {
-        let admin_rpc = rpc_server::AdminServerImpl::new(writer.unwrap().clone());
+    if writer_ctl.is_some() {
+        let admin_rpc = rpc_server::AdminServerImpl::new(writer_ctl.unwrap().clone());
         methods.merge(admin_rpc.into_rpc())?;
     }
 
