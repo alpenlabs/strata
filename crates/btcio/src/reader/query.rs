@@ -4,6 +4,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+use alpen_express_status::StatusTx;
 use anyhow::bail;
 use bitcoin::{Block, BlockHash};
 use tokio::sync::mpsc;
@@ -15,9 +16,8 @@ use super::{
 };
 use crate::{
     rpc::traits::L1Client,
-    status::apply_status_updates,
+    status::{apply_status_updates, L1StatusUpdate},
 };
-use alpen_express_status::StatusTx;
 
 fn filter_interesting_txs(block: &Block) -> Vec<u32> {
     // TODO actually implement the filter logic. Now it returns everything

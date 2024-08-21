@@ -1,22 +1,21 @@
 use std::sync::Arc;
 
-use alpen_express_status::NodeStatus;
-use tokio::{
-    sync::RwLock,
-    runtime::Runtime,
-    sync::mpsc::{self, Receiver, Sender},
-};
-use tracing::*;
-
 use alpen_express_db::{
     traits::{SeqDataProvider, SeqDataStore, SequencerDatabase},
     types::{BlobEntry, BlobL1Status},
 };
 use alpen_express_primitives::buf::Buf32;
 use alpen_express_state::da_blob::BlobIntent;
-use express_tasks::TaskExecutor;
-use tracing::*;
 use alpen_express_status::StatusTx;
+use express_tasks::TaskExecutor;
+use tokio::{
+    runtime::Runtime,
+    sync::{
+        mpsc::{self, Receiver, Sender},
+        RwLock,
+    },
+};
+use tracing::*;
 
 use super::{
     broadcast::broadcaster_task,

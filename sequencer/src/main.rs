@@ -30,13 +30,8 @@ use alpen_express_rocksdb::{
     broadcaster::db::BroadcastDatabase, sequencer::db::SequencerDB, DbOpsConfig, SeqDb,
 };
 use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer};
-use alpen_express_rpc_types::L1Status;
 // use alpen_express_btcio::broadcaster::manager::BroadcastDbManager;
-use alpen_express_db::traits::SequencerDatabase;
-use alpen_express_rpc_types::L1Status;
-use alpen_express_status::NodeStatus;
-use alpen_express_status::Watch;
-use alpen_express_status::StatusTx;
+use alpen_express_status::{StatusRx, StatusTx};
 use anyhow::Context;
 use bitcoin::Network;
 use config::Config;
@@ -48,30 +43,6 @@ use rockbound::rocksdb;
 use thiserror::Error;
 use tokio::sync::{broadcast, oneshot};
 use tracing::*;
-use alpen_express_status::StatusRx;
-
-use alpen_express_btcio::broadcaster::spawn_broadcaster_task;
-use alpen_express_btcio::writer::config::WriterConfig;
-use alpen_express_btcio::writer::start_writer_task;
-use alpen_express_common::logging;
-use alpen_express_consensus_logic::duty::types::{DutyBatch, Identity, IdentityData, IdentityKey};
-use alpen_express_consensus_logic::duty::worker::{self as duty_worker};
-use alpen_express_consensus_logic::sync_manager;
-use alpen_express_consensus_logic::sync_manager::SyncManager;
-use alpen_express_db::traits::Database;
-use alpen_express_evmexec::{fork_choice_state_initial, EngineRpcClient};
-use alpen_express_primitives::block_credential;
-use alpen_express_primitives::buf::Buf32;
-use alpen_express_primitives::params::{Params, RollupParams, RunParams};
-use alpen_express_rocksdb::broadcaster::db::BroadcastDatabase;
-use alpen_express_rocksdb::sequencer::db::SequencerDB;
-use alpen_express_rocksdb::DbOpsConfig;
-use alpen_express_rocksdb::SeqDb;
-use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer};
-use express_storage::L2BlockManager;
-use express_tasks::{ShutdownSignal, TaskManager};
-use alpen_express_btcio::writer::DaWriter;
-use alpen_express_db::traits::SequencerDatabase;
 
 use crate::args::Args;
 
@@ -239,7 +210,6 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     // Set up database managers.
     let l2_block_manager = Arc::new(L2BlockManager::new(pool.clone(), database.clone()));
-    let (status_rx, status_tx) = alpen_express_status::create_status_channel();
 
     // Set up Bitcoin client RPC.
     let bitcoind_url = format!("http://{}", config.bitcoind_rpc.rpc_url);
@@ -285,8 +255,6 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         eng_ctl.clone(),
         pool.clone(),
         params.clone(),
-        status_tx.clone(),
-        status_rx.clone(),
     )?;
     let sync_man = Arc::new(sync_man);
     let mut inscription_handler = None;
@@ -294,6 +262,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     // start broadcast task
     let bcast_handle = spawn_broadcaster_task(&task_executor, btc_rpc.clone(), bcast_ops);
     let bcast_handle = Arc::new(bcast_handle);
+    let (status_tx, status_rx) = (sync_man.status_tx(), sync_man.status_rx());
 
     // If the sequencer key is set, start the sequencer duties task.
     if let Some(seqkey_path) = &config.client.sequencer_key {
@@ -368,7 +337,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         btc_rpc.clone(),
         database.clone(),
         csm_ctl,
-        status_tx.clone()
+        status_tx.clone(),
     )?;
 
     let shutdown_signal = task_manager.shutdown_signal();

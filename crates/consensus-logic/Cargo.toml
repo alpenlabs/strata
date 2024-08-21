@@ -8,11 +8,12 @@ alpen-express-btcio = { workspace = true }
 alpen-express-db = { workspace = true }
 alpen-express-eectl = { workspace = true }
 alpen-express-primitives = { workspace = true }
+alpen-express-rpc-types = { workspace = true }
 alpen-express-state = { workspace = true }
+alpen-express-status = { workspace = true }
 express-chaintsn = { workspace = true }
 express-storage = { workspace = true }
 express-tasks = { workspace = true }
-alpen-express-status = { workspace = true }
 
 anyhow = { workspace = true }
 bitcoin = { workspace = true }

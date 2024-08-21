@@ -1,7 +1,7 @@
 use std::sync::Arc;
-use tracing::{debug, error};
 
-use alpen_express_status::{StatusTx, UpdateStatus};
+use alpen_express_status::StatusTx;
+use tracing::{debug, error};
 
 #[derive(Debug, Clone)]
 pub enum L1StatusUpdate {
@@ -14,9 +14,8 @@ pub enum L1StatusUpdate {
     IncrementInscriptionCount,
 }
 
-pub async fn apply_status_updates(status_updates: &[L1StatusUpdate], status_rx: Arc<StatusTx>) {
-    let l1_status = status_rx.get_recent().l1;
-    let mut l1_status = l1_status.unwrap_or_default();
+pub async fn apply_status_updates(status_updates: &[L1StatusUpdate], status_tx: Arc<StatusTx>) {
+    let mut l1_status = status_tx.l1.borrow().clone();
     for event in status_updates {
         match event {
             L1StatusUpdate::CurHeight(height) => l1_status.cur_height = *height,
@@ -33,11 +32,8 @@ pub async fn apply_status_updates(status_updates: &[L1StatusUpdate], status_rx: 
         }
     }
 
-    if status_rx
-        .update_status(&[UpdateStatus::UpdateL1(l1_status.clone())])
-        .is_err()
-    {
-        error!("error updating l1status");
+    if let Err(err) = status_tx.l1.send(l1_status.clone()) {
+        error!("error updating l1status {}", err);
     } else {
         debug!("Updated l1 status: {:?}", l1_status);
     }

@@ -711,6 +711,7 @@ dependencies = [
  "alpen-express-eectl",
  "alpen-express-primitives",
  "alpen-express-rocksdb",
+ "alpen-express-rpc-types",
  "alpen-express-state",
  "alpen-express-status",
  "alpen-test-utils",

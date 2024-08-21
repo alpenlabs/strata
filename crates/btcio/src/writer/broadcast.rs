@@ -2,18 +2,15 @@
 
 use std::{sync::Arc, time::Duration};
 
-use alpen_express_status::UpdateStatus;
-use anyhow::anyhow;
-use bitcoin::{consensus::deserialize, Txid};
-use tracing::*;
-
 use alpen_express_db::{
     traits::{SeqDataProvider, SeqDataStore, SequencerDatabase},
     types::BlobL1Status,
 };
 use alpen_express_rpc_types::L1Status;
-use tracing::*;
 use alpen_express_status::StatusTx;
+use anyhow::anyhow;
+use bitcoin::{consensus::deserialize, Txid};
+use tracing::*;
 
 use crate::{
     rpc::{
@@ -86,7 +83,10 @@ pub async fn broadcaster_task<D: SequencerDatabase + Send + Sync + 'static>(
                     // Update L1 status
                     {
                         let txid: Txid = deserialize(blobentry.reveal_txid.0.as_slice())?;
-                        let status_updates = [L1StatusUpdate::LastPublishedTxid(txid.to_string()), L1StatusUpdate::IncrementInscriptionCount];
+                        let status_updates = [
+                            L1StatusUpdate::LastPublishedTxid(txid.to_string()),
+                            L1StatusUpdate::IncrementInscriptionCount,
+                        ];
                         apply_status_updates(&status_updates, status_rx.clone()).await;
                     }
                     curr_idx += 1;

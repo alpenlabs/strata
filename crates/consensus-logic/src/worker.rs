@@ -5,16 +5,14 @@ use std::sync::Arc;
 use alpen_express_db::traits::*;
 use alpen_express_eectl::engine::ExecEngineCtl;
 use alpen_express_primitives::prelude::*;
-use alpen_express_state::{client_state::ClientState, operation::SyncAction};
-use express_storage::L2BlockManager;
-use express_tasks::ShutdownGuard;
-use tokio::sync::{broadcast, mpsc, watch};
-use tracing::*;
-use alpen_express_status::NodeStatus;
 use alpen_express_state::{
     client_state::ClientState, csm_status::CsmStatus, operation::SyncAction,
 };
-use alpen_express_status::{StatusTx, UpdateStatus};
+use alpen_express_status::StatusTx;
+use express_storage::L2BlockManager;
+use express_tasks::ShutdownGuard;
+use tokio::sync::{broadcast, mpsc};
+use tracing::*;
 
 use crate::{
     errors::Error,
@@ -155,7 +153,7 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
     state: &mut WorkerState<D>,
     engine: &E,
     ev_idx: u64,
-    status_rx: Arc<StatusTx>,
+    status_tx: Arc<StatusTx>,
     fcm_msg_tx: &mpsc::Sender<ForkChoiceMessage>,
 ) -> anyhow::Result<()> {
     // Perform the main step of deciding what the output we're operating on.
@@ -225,14 +223,8 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
     status.update_from_client_state(new_state.as_ref());
     let client_state = new_state.as_ref().clone();
 
-    let update_status = vec![
-        UpdateStatus::UpdateCsm(status),
-        UpdateStatus::UpdateCl(client_state),
-    ];
-
-    if status_rx.update_status(&update_status).is_err() {
-        error!(%ev_idx, "cannot update csm and cl status");
-    }
+    let _ = status_tx.csm.send(status);
+    let _ = status_tx.cl.send(client_state);
 
     let update = ClientUpdateNotif::new(ev_idx, outp, new_state);
     if state.cupdate_tx.send(Arc::new(update)).is_err() {

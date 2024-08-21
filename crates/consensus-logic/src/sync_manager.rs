@@ -4,28 +4,23 @@
 
 use std::sync::Arc;
 
-use alpen_express_state::client_state::ClientState;
-use tokio::sync::{broadcast, mpsc, watch};
-use alpen_express_status::{StatusRx, StatusTx, UpdateStatus};
-use tokio::sync::{broadcast, mpsc};
-use tracing::*;
-
 use alpen_express_db::traits::Database;
 use alpen_express_eectl::engine::ExecEngineCtl;
 use alpen_express_primitives::params::Params;
+use alpen_express_rpc_types::L1Status;
+use alpen_express_state::csm_status::CsmStatus;
+use alpen_express_status::{create_status_channel, StatusRx, StatusTx};
 use express_storage::L2BlockManager;
 use express_tasks::TaskExecutor;
-use tokio::sync::{broadcast, mpsc, watch};
+use tokio::sync::{broadcast, mpsc};
 use tracing::*;
 
 use crate::{
     ctl::CsmController,
     fork_choice_manager, genesis,
     message::{ClientUpdateNotif, CsmMessage, ForkChoiceMessage},
-    status::CsmStatus,
     worker,
 };
-use alpen_express_state::csm_status::CsmStatus;
 
 /// Handle to the core pipeline tasks.
 pub struct SyncManager {
@@ -33,7 +28,7 @@ pub struct SyncManager {
     fc_manager_tx: mpsc::Sender<ForkChoiceMessage>,
     csm_ctl: Arc<CsmController>,
     cupdate_rx: broadcast::Receiver<Arc<ClientUpdateNotif>>,
-    status_rx_writer: Arc<StatusTx>,
+    status_tx: Arc<StatusTx>,
     status_rx: Arc<StatusRx>,
 }
 
@@ -67,8 +62,8 @@ impl SyncManager {
         self.status_rx.clone()
     }
 
-    pub fn status_rx_writer(&self) -> Arc<StatusTx> {
-        self.status_rx_writer.clone()
+    pub fn status_tx(&self) -> Arc<StatusTx> {
+        self.status_tx.clone()
     }
 
     /// Submits a fork choice message if possible. (synchronously)
@@ -93,8 +88,6 @@ pub fn start_sync_tasks<
     engine: Arc<E>,
     pool: threadpool::ThreadPool,
     params: Arc<Params>,
-    status_rx_writer: Arc<StatusTx>,
-    status_rx: Arc<StatusRx>,
 ) -> anyhow::Result<SyncManager> {
     // Create channels.
     let (fcm_tx, fcm_rx) = mpsc::channel::<ForkChoiceMessage>(64);
@@ -138,43 +131,28 @@ pub fn start_sync_tasks<
         l2_block_manager,
         cupdate_tx,
     )?;
-    let state = cw_state.cur_state().clone();
+    let state = cw_state.cur_state().as_ref().clone();
 
     let mut status = CsmStatus::default();
     status.set_last_sync_ev_idx(cw_state.cur_event_idx());
-    status.update_from_client_state(state.as_ref());
+    status.update_from_client_state(&state);
 
-    let update_status = [
-        UpdateStatus::UpdateCsm(status),
-        UpdateStatus::UpdateCl(state.as_ref().clone()),
-    ];
-    if status_rx_writer.update_status(&update_status).is_err() {
-        error!("Error while updating status");
-    }
+    let (status_tx, status_rx) = create_status_channel(status, state, L1Status::default());
 
     let csm_eng = engine.clone();
     let csm_fcm_tx = fcm_tx.clone();
 
-    let ns = status_rx_writer.clone();
+    let ns = status_tx.clone();
     executor.spawn_critical("client_worker_task", |shutdown| {
-        worker::client_worker_task(
-            shutdown,
-            cw_state,
-            csm_eng,
-            csm_rx,
-            ns,
-            csm_fcm_tx,
-        )
-        .unwrap();
+        worker::client_worker_task(shutdown, cw_state, csm_eng, csm_rx, ns, csm_fcm_tx).unwrap();
     });
-
 
     Ok(SyncManager {
         params,
         fc_manager_tx: fcm_tx,
         csm_ctl,
         cupdate_rx,
-        status_rx_writer,
+        status_tx,
         status_rx,
     })
 }
