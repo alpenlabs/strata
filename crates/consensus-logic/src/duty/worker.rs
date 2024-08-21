@@ -39,7 +39,7 @@ pub fn duty_tracker_task<D: Database>(
         batch_queue,
         ident,
         db,
-        l2_block_manager,
+        l2_block_manager.as_ref(),
         params.as_ref(),
     ) {
         error!(err = %e, "tracker task exited");
@@ -87,7 +87,7 @@ fn duty_tracker_task_inner(
             new_state,
             &ident,
             database,
-            &l2_block_manager,
+            l2_block_manager,
             params,
         ) {
             error!(err = %e, "failed to update duties tracker");
