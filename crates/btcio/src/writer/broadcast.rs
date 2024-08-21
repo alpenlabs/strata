@@ -6,7 +6,6 @@ use alpen_express_db::{
     traits::{SeqDataProvider, SeqDataStore, SequencerDatabase},
     types::BlobL1Status,
 };
-use alpen_express_rpc_types::L1Status;
 use alpen_express_status::StatusTx;
 use anyhow::anyhow;
 use bitcoin::{consensus::deserialize, Txid};

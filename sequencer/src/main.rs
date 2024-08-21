@@ -15,9 +15,7 @@ use alpen_express_consensus_logic::{
     duty::{
         types::{DutyBatch, Identity, IdentityData, IdentityKey},
         worker::{self as duty_worker},
-    },
-    sync_manager,
-    sync_manager::SyncManager,
+    }, genesis, state_tracker, sync_manager::{self, SyncManager}
 };
 use alpen_express_db::traits::Database;
 use alpen_express_evmexec::{fork_choice_state_initial, EngineRpcClient};
@@ -30,8 +28,10 @@ use alpen_express_rocksdb::{
     broadcaster::db::BroadcastDatabase, sequencer::db::SequencerDB, DbOpsConfig, SeqDb,
 };
 use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer};
+use alpen_express_rpc_types::L1Status;
+use alpen_express_state::csm_status::CsmStatus;
 // use alpen_express_btcio::broadcaster::manager::BroadcastDbManager;
-use alpen_express_status::{StatusRx, StatusTx};
+use alpen_express_status::{create_status_channel, StatusRx, StatusTx};
 use anyhow::Context;
 use bitcoin::Network;
 use config::Config;
@@ -246,6 +246,8 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let bcastdb = Arc::new(BroadcastDatabase::new(bcast_db));
     let bcast_ctx = express_storage::ops::l1tx_broadcast::Context::new(bcastdb.clone());
     let bcast_ops = Arc::new(bcast_ctx.into_ops(pool.clone()));
+    //status bundles
+    let (status_tx, status_rx) = start_status(database.clone(), params.clone())?;
 
     // Start the sync manager.
     let sync_man = sync_manager::start_sync_tasks(
@@ -255,6 +257,8 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         eng_ctl.clone(),
         pool.clone(),
         params.clone(),
+        status_tx.clone(),
+        status_rx.clone(),
     )?;
     let sync_man = Arc::new(sync_man);
     let mut inscription_handler = None;
@@ -466,4 +470,33 @@ fn load_seqkey(path: &PathBuf) -> anyhow::Result<IdentityData> {
     let idata = IdentityData::new(ident, ik);
 
     Ok(idata)
+}
+
+// initializes the status bundle that we can pass around cheaply for as name suggests status/metrics
+fn start_status<D: Database + Send + Sync + 'static>(
+    database: Arc<D>,
+    params: Arc<Params>,
+) -> anyhow::Result<(Arc<StatusTx>, Arc<StatusRx>)>
+where
+    <D as Database>::CsProv: Send + Sync + 'static,
+{
+    // Check if we have to do genesis.
+    if genesis::check_needs_client_init(database.as_ref())? {
+        info!("need to init client state!");
+        genesis::init_client_state(&params, database.as_ref())?;
+    }
+    // init client state
+    let cs_prov = database.client_state_provider().as_ref();
+    let (cur_state_idx, cur_state) = state_tracker::reconstruct_cur_state(cs_prov)?;
+
+    // init the CsmStatus
+    let mut status = CsmStatus::default();
+    status.set_last_sync_ev_idx(cur_state_idx);
+    status.update_from_client_state(&cur_state);
+
+    Ok(create_status_channel(
+        status,
+        cur_state,
+        L1Status::default(),
+    ))
 }

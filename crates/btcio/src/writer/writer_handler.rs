@@ -8,13 +8,7 @@ use alpen_express_primitives::buf::Buf32;
 use alpen_express_state::da_blob::BlobIntent;
 use alpen_express_status::StatusTx;
 use express_tasks::TaskExecutor;
-use tokio::{
-    runtime::Runtime,
-    sync::{
-        mpsc::{self, Receiver, Sender},
-        RwLock,
-    },
-};
+use tokio::sync::mpsc::{self, Receiver, Sender};
 use tracing::*;
 
 use super::{

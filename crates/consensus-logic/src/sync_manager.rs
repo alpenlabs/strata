@@ -88,6 +88,8 @@ pub fn start_sync_tasks<
     engine: Arc<E>,
     pool: threadpool::ThreadPool,
     params: Arc<Params>,
+    status_tx: Arc<StatusTx>,
+    status_rx: Arc<StatusRx>,
 ) -> anyhow::Result<SyncManager> {
     // Create channels.
     let (fcm_tx, fcm_rx) = mpsc::channel::<ForkChoiceMessage>(64);
@@ -97,12 +99,6 @@ pub fn start_sync_tasks<
     // TODO should this be in an `Arc`?  it's already fairly compact so we might
     // not be benefitting from the reduced cloning
     let (cupdate_tx, cupdate_rx) = broadcast::channel::<Arc<ClientUpdateNotif>>(64);
-
-    // Check if we have to do genesis.
-    if genesis::check_needs_client_init(database.as_ref())? {
-        info!("need to init client state!");
-        genesis::init_client_state(&params, database.as_ref())?;
-    }
 
     // Start the fork choice manager thread.  If we haven't done genesis yet
     // this will just wait until the CSM says we have.
@@ -131,13 +127,6 @@ pub fn start_sync_tasks<
         l2_block_manager,
         cupdate_tx,
     )?;
-    let state = cw_state.cur_state().as_ref().clone();
-
-    let mut status = CsmStatus::default();
-    status.set_last_sync_ev_idx(cw_state.cur_event_idx());
-    status.update_from_client_state(&state);
-
-    let (status_tx, status_rx) = create_status_channel(status, state, L1Status::default());
 
     let csm_eng = engine.clone();
     let csm_fcm_tx = fcm_tx.clone();
