@@ -314,7 +314,7 @@ impl TaskExecutor {
         F: Future<Output = ()> + Send + 'static,
     {
         let panicked_tasks_tx = self.panicked_tasks_tx.clone();
-        let shutdown = ShutdownGuard(
+        let shutdown = ShutdownGuard::new(
             self.shutdown_signal.subscribe(),
             self.pending_tasks_counter.clone(),
         );
