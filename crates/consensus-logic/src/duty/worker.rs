@@ -70,6 +70,7 @@ fn duty_tracker_task_inner(
 
     loop {
         if shutdown.should_shutdown() {
+            warn!("received shutdown signal");
             break;
         }
         let update = match cupdate_rx.blocking_recv() {
@@ -226,6 +227,7 @@ pub fn duty_dispatch_task<
                 warn!(%id, "tried to remove non-existent duty");
             }
             if shutdown.should_shutdown() {
+                warn!("received shutdown signal");
                 break;
             }
         }
@@ -233,6 +235,7 @@ pub fn duty_dispatch_task<
 
     loop {
         if shutdown.should_shutdown() {
+            warn!("received shutdown signal");
             break;
         }
         let update = match updates.blocking_recv() {

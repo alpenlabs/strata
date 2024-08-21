@@ -152,6 +152,7 @@ fn wait_for_csm_ready(
         }
 
         if shutdown.should_shutdown() {
+            warn!("received shutdown signal");
             break;
         }
     }
@@ -282,6 +283,7 @@ fn forkchoice_manager_task_inner<D: Database, E: ExecEngineCtl>(
 ) -> anyhow::Result<()> {
     loop {
         if shutdown.should_shutdown() {
+            warn!("received shutdown signal");
             break;
         }
 

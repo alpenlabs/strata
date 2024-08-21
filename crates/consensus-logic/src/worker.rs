@@ -111,6 +111,7 @@ pub fn client_worker_task<D: Database, E: ExecEngineCtl>(
         }
 
         if shutdown.should_shutdown() {
+            warn!("received shutdown signal");
             break;
         }
     }
