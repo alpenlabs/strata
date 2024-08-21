@@ -86,9 +86,6 @@ pub enum Error {
     #[error("fetch limit reached. max {0}, provided {1}")]
     FetchLimitReached(u64, u64),
 
-    #[error("status error: {0}")]
-    ImproperStatus(String),
-
     /// Generic internal error message.  If this is used often it should be made
     /// into its own error type.
     #[error("{0}")]
@@ -114,7 +111,6 @@ impl Error {
             Self::FetchLimitReached(_, _) => -32608,
             Self::UnknownIdx(_) => -32608,
             Self::MissingL1BlockManifest(_) => -32609,
-            Self::ImproperStatus(_) => -32606,
             Self::BlockingAbort(_) => -32001,
             Self::Other(_) => -32000,
             Self::OtherEx(_, _) => -32000,

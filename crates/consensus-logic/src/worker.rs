@@ -143,7 +143,7 @@ fn process_msg<D: Database, E: ExecEngineCtl>(
             }
 
             // TODO ensure correct event index ordering
-            handle_sync_event(state, engine, *idx, status_rx.clone(), fcm_msg_tx)?;
+            handle_sync_event(state, engine, *idx, status_rx, fcm_msg_tx)?;
             Ok(())
         }
     }
