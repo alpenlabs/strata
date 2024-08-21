@@ -313,9 +313,8 @@ impl FinalizeReport {
 #[cfg(test)]
 mod tests {
     use std::collections::HashSet;
-    use std::sync::Arc;
 
-    use alpen_express_db::traits::{Database, L2DataProvider, L2DataStore};
+    use alpen_express_db::traits::{Database, L2DataStore};
     use alpen_express_rocksdb::test_utils::get_common_db;
     use alpen_express_state::{header::L2Header, id::L2BlockId};
     use alpen_test_utils::l2::gen_l2_chain;
