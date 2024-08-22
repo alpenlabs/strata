@@ -1,3 +1,4 @@
+pub mod broadcaster;
 pub mod chain_state;
 pub mod client_state;
 pub mod l1;
@@ -28,10 +29,15 @@ pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
     SeqBlobSchema::COLUMN_FAMILY_NAME,
     SeqL1TxIdSchema::COLUMN_FAMILY_NAME,
     SeqL1TxnSchema::COLUMN_FAMILY_NAME,
+    // Bcast schemas
+    BcastL1TxIdSchema::COLUMN_FAMILY_NAME,
+    BcastL1TxSchema::COLUMN_FAMILY_NAME,
     // TODO add col families for other store types
 ];
 
+use broadcaster::schemas::{BcastL1TxIdSchema, BcastL1TxSchema};
 // Re-exports
+pub use broadcaster::db::BroadcastDb;
 pub use chain_state::db::ChainStateDb;
 pub use client_state::db::ClientStateDb;
 pub use l1::db::L1Db;

@@ -4,17 +4,23 @@ use bitcoin::{consensus::deserialize, hashes::Hash, Block, BlockHash, Network, T
 
 use crate::rpc::{
     traits::{L1Client, SeqL1Client},
-    types::{RawUTXO, RpcBlockchainInfo},
+    types::{RPCTransactionInfo, RawUTXO, RpcBlockchainInfo},
     ClientError,
 };
 
 pub struct TestBitcoinClient {
+    /// Parameter that returns confirmed height for a given transaction
     pub confs: u64,
+    /// Parameter that indicates which height a transaction is included in
+    pub included_height: u64,
 }
 
 impl TestBitcoinClient {
     pub fn new(confs: u64) -> Self {
-        Self { confs }
+        Self {
+            confs,
+            included_height: 100, // Use arbitrary value, make configurable as necessary
+        }
     }
 }
 
@@ -45,11 +51,11 @@ impl L1Client for TestBitcoinClient {
         Ok(Txid::from_slice(&[1u8; 32]).unwrap())
     }
 
-    async fn get_transaction_confirmations<T: AsRef<[u8; 32]> + Send>(
-        &self,
-        _txid: T,
-    ) -> Result<u64, ClientError> {
-        Ok(self.confs)
+    async fn get_transaction_info(&self, _txid: Txid) -> Result<RPCTransactionInfo, ClientError> {
+        let mut txinfo: RPCTransactionInfo = ArbitraryGenerator::new().generate();
+        txinfo.confirmations = self.confs;
+        txinfo.blockheight = Some(self.included_height);
+        Ok(txinfo)
     }
 }
 

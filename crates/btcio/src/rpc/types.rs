@@ -2,16 +2,18 @@
 use arbitrary::Arbitrary;
 use bitcoin::BlockHash;
 use serde::{de::Visitor, Deserialize, Deserializer, Serialize};
+use tracing::*;
 
-#[derive(Debug, Deserialize)]
-pub struct GetTransactionResponse {
+#[derive(Clone, Debug, Deserialize)]
+#[cfg_attr(test, derive(Arbitrary))]
+pub struct RPCTransactionInfo {
     pub amount: f64,
     pub fee: Option<f64>,
     pub confirmations: u64,
     pub generated: Option<bool>,
     pub trusted: Option<bool>,
     pub blockhash: Option<String>,
-    pub blockheight: Option<u32>,
+    pub blockheight: Option<u64>,
     pub blockindex: Option<u32>,
     pub blocktime: Option<u64>,
     pub txid: String,
@@ -27,8 +29,19 @@ pub struct GetTransactionResponse {
     pub bip125_replaceable: String,
     pub parent_descs: Option<Vec<String>>,
     pub hex: String,
-    pub decoded: Option<serde_json::Value>,
-    // NOTE: "details" field omitted as not used, add it when used
+    // NOTE: "details", and "decoded" fields omitted as not used, add them when used
+}
+
+impl RPCTransactionInfo {
+    pub fn block_height(&self) -> u64 {
+        if self.confirmations == 0 {
+            return 0;
+        }
+        self.blockheight.unwrap_or_else(|| {
+            warn!("Txn confirmed but did not obtain blockheight. Setting height to zero");
+            0
+        })
+    }
 }
 
 #[derive(Clone, Deserialize)]

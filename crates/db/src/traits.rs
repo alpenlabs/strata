@@ -18,6 +18,7 @@ use alpen_express_state::state_op::WriteBatch;
 use alpen_express_state::sync_event::SyncEvent;
 
 use crate::types::BlobEntry;
+use crate::types::L1TxEntry;
 use crate::DbResult;
 
 /// Common database interface that we can parameterize worker tasks over if
@@ -299,4 +300,45 @@ pub trait SeqDataProvider {
 
     /// Get l1 tx
     fn get_l1_tx(&self, txid: Buf32) -> DbResult<Option<Vec<u8>>>;
+}
+
+/// A trait encapsulating the provider and store traits for interacting with the broadcast
+/// transactions([`L1TxEntry`]), their indices and ids
+pub trait TxBroadcastDatabase {
+    type BcastStore: BcastStore;
+    type BcastProv: BcastProvider;
+
+    /// Return a reference to the store implementation
+    fn broadcast_store(&self) -> &Arc<Self::BcastStore>;
+    /// Return a reference to the provider implementation
+    fn broadcast_provider(&self) -> &Arc<Self::BcastProv>;
+}
+
+/// All methods related to storing/updating [`L1TxEntry`]s in the database
+pub trait BcastStore {
+    /// Adds a new txentry to database
+    fn insert_new_tx_entry(&self, txid: Buf32, txentry: L1TxEntry) -> DbResult<u64>;
+
+    /// Updates an existing txentry
+    fn update_tx_entry_by_id(&self, txid: Buf32, txentry: L1TxEntry) -> DbResult<()>;
+
+    /// Updates an existing txentry
+    fn update_tx_entry(&self, idx: u64, txentry: L1TxEntry) -> DbResult<()>;
+
+    // TODO: possibly add delete as well
+}
+
+/// All methods related to fetching [`L1TxEntry`]s and indices in the database
+pub trait BcastProvider {
+    /// Fetch [`L1TxEntry`] from db
+    fn get_tx_entry_by_id(&self, txid: Buf32) -> DbResult<Option<L1TxEntry>>;
+
+    /// Get next index to be inserted to
+    fn get_next_tx_idx(&self) -> DbResult<u64>;
+
+    /// Get transaction id for index
+    fn get_txid(&self, idx: u64) -> DbResult<Option<Buf32>>;
+
+    /// get txentry by idx
+    fn get_tx_entry(&self, idx: u64) -> DbResult<Option<L1TxEntry>>;
 }

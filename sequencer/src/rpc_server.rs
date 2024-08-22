@@ -3,6 +3,7 @@
 use std::{borrow::BorrowMut, sync::Arc};
 
 use async_trait::async_trait;
+use bitcoin::{consensus::deserialize, hashes::Hash, Transaction as BTransaction, Txid};
 use jsonrpsee::{
     core::RpcResult,
     types::{ErrorObject, ErrorObjectOwned},
@@ -15,15 +16,25 @@ use reth_rpc_types::{
     StateContext, SyncInfo, SyncStatus, Transaction, TransactionRequest, Work,
 };
 use thiserror::Error;
-use tokio::sync::{mpsc, oneshot, watch, Mutex, RwLock};
+use tokio::sync::{
+    mpsc::{self, Sender},
+    oneshot, watch, Mutex, RwLock,
+};
 
+use alpen_express_btcio::broadcaster::L1BroadcastHandle;
 use alpen_express_btcio::writer::{utils::calculate_blob_hash, DaWriter};
 use alpen_express_consensus_logic::sync_manager::SyncManager;
-
-use alpen_express_db::traits::{ChainstateProvider, Database, L2DataProvider};
-use alpen_express_db::traits::{L1DataProvider, SequencerDatabase};
+use alpen_express_db::{
+    traits::{ChainstateProvider, Database, L2DataProvider},
+    types::L1TxEntry,
+    DbResult,
+};
+use alpen_express_db::{
+    traits::{L1DataProvider, SequencerDatabase},
+    types::L1TxStatus,
+};
 use alpen_express_primitives::buf::Buf32;
-use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer, HexBytes};
+use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer, HexBytes, HexBytes32};
 use alpen_express_rpc_types::{
     BlockHeader, ClientStatus, DaBlob, DepositEntry, DepositState, ExecUpdate, L1Status,
     WithdrawalIntent,
@@ -137,6 +148,7 @@ pub struct AlpenRpcImpl<D> {
     l1_status: Arc<RwLock<L1Status>>,
     database: Arc<D>,
     sync_manager: Arc<SyncManager>,
+    bcast_handle: Arc<L1BroadcastHandle>,
     stop_tx: Mutex<Option<oneshot::Sender<()>>>,
 }
 
@@ -145,12 +157,14 @@ impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
         l1_status: Arc<RwLock<L1Status>>,
         database: Arc<D>,
         sync_manager: Arc<SyncManager>,
+        bcast_handle: Arc<L1BroadcastHandle>,
         stop_tx: oneshot::Sender<()>,
     ) -> Self {
         Self {
             l1_status,
             database,
             sync_manager,
+            bcast_handle,
             stop_tx: Mutex::new(Some(stop_tx)),
         }
     }
@@ -459,6 +473,17 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
             state,
         })
     }
+
+    async fn get_tx_status(&self, txid: HexBytes32) -> RpcResult<Option<L1TxStatus>> {
+        let mut txid = txid.0;
+        txid.reverse();
+        let id = Buf32::from(txid);
+        Ok(self
+            .bcast_handle
+            .get_tx_status(id)
+            .await
+            .map_err(|e| Error::Other(e.to_string()))?)
+    }
 }
 
 /// Wrapper around [``tokio::task::spawn_blocking``] that handles errors in
@@ -478,12 +503,19 @@ where
 }
 
 pub struct AdminServerImpl<S> {
-    pub writer: Arc<DaWriter<S>>,
+    // TODO: Clean up writer's signature, possibly use some kind of manager
+    // Currently writer is Some() for sequencer only, but we need bcast_manager for both fullnode
+    // and seq
+    pub writer: Option<Arc<DaWriter<S>>>,
+    pub bcast_handle: Arc<L1BroadcastHandle>,
 }
 
 impl<S: SequencerDatabase> AdminServerImpl<S> {
-    pub fn new(writer: Arc<DaWriter<S>>) -> Self {
-        Self { writer }
+    pub fn new(writer: Option<Arc<DaWriter<S>>>, bcast_handle: Arc<L1BroadcastHandle>) -> Self {
+        Self {
+            writer,
+            bcast_handle,
+        }
     }
 }
 
@@ -494,9 +526,26 @@ impl<S: SequencerDatabase + Send + Sync + 'static> AlpenAdminApiServer for Admin
         let blobintent = BlobIntent::new(BlobDest::L1, commitment, blob.0);
         // NOTE: It would be nice to return reveal txid from the submit method. But creation of txs
         // is deferred to signer in the writer module
-        if let Err(e) = self.writer.submit_intent_async(blobintent).await {
-            return Err(Error::Other("".to_string()).into());
+        if let Some(writer) = &self.writer {
+            if let Err(e) = writer.submit_intent_async(blobintent).await {
+                return Err(Error::Other("".to_string()).into());
+            }
         }
         Ok(())
+    }
+
+    async fn broadcast_raw_tx(&self, rawtx: HexBytes) -> RpcResult<Txid> {
+        let tx: BTransaction = deserialize(&rawtx.0).map_err(|e| Error::Other(e.to_string()))?;
+        let txid = tx.compute_txid();
+        let dbid = *txid.as_raw_hash().as_byte_array();
+
+        let entry = L1TxEntry::from_tx(&tx);
+
+        self.bcast_handle
+            .insert_new_tx_entry(dbid.into(), entry)
+            .await
+            .map_err(|e| Error::Other(e.to_string()))?;
+
+        Ok(txid)
     }
 }

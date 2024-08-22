@@ -264,7 +264,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
 
 
 # post batch every 5 l2 blocks
-fast_batch_rollup_params = {
+FAST_BATCH_ROLLUP_PARAMS = {
     "rollup_name": "expresssss",
     "block_time": 1000,
     "cred_rule": "Unchecked",
@@ -294,7 +294,7 @@ def main(argv):
     global_envs = {
         "basic": BasicEnvConfig(),
         "premined_blocks": BasicEnvConfig(101),
-        "fast_batches": BasicEnvConfig(101, rollup_params=fast_batch_rollup_params),
+        "fast_batches": BasicEnvConfig(101, rollup_params=FAST_BATCH_ROLLUP_PARAMS),
     }
 
     rt = flexitest.TestRuntime(global_envs, datadir_root, factories)

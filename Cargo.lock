@@ -678,6 +678,7 @@ dependencies = [
  "base64 0.22.1",
  "bitcoin",
  "bytes",
+ "express-storage",
  "express-tasks",
  "hex",
  "mockall",
@@ -687,6 +688,7 @@ dependencies = [
  "serde_json",
  "sha2 0.10.8",
  "thiserror",
+ "threadpool",
  "tokio",
  "tracing",
 ]
@@ -735,8 +737,10 @@ dependencies = [
  "arbitrary",
  "bitcoin",
  "borsh",
+ "hex",
  "mockall",
  "parking_lot 0.12.3",
+ "serde",
  "thiserror",
  "tracing",
 ]
@@ -866,7 +870,9 @@ dependencies = [
 name = "alpen-express-rpc-api"
 version = "0.1.0"
 dependencies = [
+ "alpen-express-db",
  "alpen-express-rpc-types",
+ "bitcoin",
  "hex",
  "jsonrpsee",
  "serde",
@@ -3664,6 +3670,7 @@ name = "express-storage"
 version = "0.1.0"
 dependencies = [
  "alpen-express-db",
+ "alpen-express-primitives",
  "alpen-express-state",
  "async-trait",
  "lru",

@@ -1,3 +1,5 @@
+// TODO rename/remove this module to avoid confusion with new tx broadcaster module
+
 use std::{sync::Arc, time::Duration};
 
 use alpen_express_rpc_types::L1Status;

@@ -6,10 +6,12 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
+use alpen_express_btcio::broadcaster::L1BroadcastHandle;
+// use alpen_express_btcio::broadcaster::manager::BroadcastDbManager;
 use anyhow::Context;
 use bitcoin::Network;
 use config::Config;
-use express_storage::L2BlockManager;
+
 use format_serde_error::SerdeError;
 use reth_rpc_types::engine::JwtError;
 use reth_rpc_types::engine::JwtSecret;
@@ -18,6 +20,7 @@ use thiserror::Error;
 use tokio::sync::{broadcast, oneshot, RwLock};
 use tracing::*;
 
+use alpen_express_btcio::broadcaster::spawn_broadcaster_task;
 use alpen_express_btcio::writer::config::WriterConfig;
 use alpen_express_btcio::writer::start_writer_task;
 use alpen_express_btcio::writer::DaWriter;
@@ -26,17 +29,18 @@ use alpen_express_consensus_logic::duty::types::{DutyBatch, Identity, IdentityDa
 use alpen_express_consensus_logic::duty::worker::{self as duty_worker};
 use alpen_express_consensus_logic::sync_manager;
 use alpen_express_consensus_logic::sync_manager::SyncManager;
-use alpen_express_db::traits::Database;
-use alpen_express_db::traits::SequencerDatabase;
+use alpen_express_db::traits::{Database, SequencerDatabase};
 use alpen_express_evmexec::{fork_choice_state_initial, EngineRpcClient};
 use alpen_express_primitives::block_credential;
 use alpen_express_primitives::buf::Buf32;
 use alpen_express_primitives::params::{Params, RollupParams, RunParams};
+use alpen_express_rocksdb::broadcaster::db::BroadcastDatabase;
 use alpen_express_rocksdb::sequencer::db::SequencerDB;
 use alpen_express_rocksdb::DbOpsConfig;
 use alpen_express_rocksdb::SeqDb;
 use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer};
 use alpen_express_rpc_types::L1Status;
+use express_storage::L2BlockManager;
 use express_tasks::{ShutdownSignal, TaskManager};
 
 use crate::args::Args;
@@ -195,6 +199,10 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         rbdb.clone(),
         db_ops,
     ));
+    let bcast_db = Arc::new(alpen_express_rocksdb::BroadcastDb::new(
+        rbdb.clone(),
+        db_ops,
+    ));
     let database = Arc::new(alpen_express_db::database::CommonDatabase::new(
         l1_db, l2_db, sync_ev_db, cs_db, chst_db,
     ));
@@ -235,6 +243,11 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         l2_block_manager.clone(),
     );
     let eng_ctl = Arc::new(eng_ctl);
+
+    // Set up L1 broadcaster.
+    let bcastdb = Arc::new(BroadcastDatabase::new(bcast_db));
+    let bcast_ctx = express_storage::ops::l1tx_broadcast::Context::new(bcastdb.clone());
+    let bcast_ops = Arc::new(bcast_ctx.into_ops(pool.clone()));
 
     // Start the sync manager.
     let sync_man = sync_manager::start_sync_tasks(
@@ -314,11 +327,15 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         &task_executor,
         sync_man.get_params(),
         &config,
-        btc_rpc,
+        btc_rpc.clone(),
         database.clone(),
         csm_ctl,
         l1_status.clone(),
     )?;
+
+    // start broadcast task
+    let bcast_handle = spawn_broadcaster_task(&task_executor, btc_rpc, bcast_ops);
+    let bcast_handle = Arc::new(bcast_handle);
 
     let shutdown_signal = task_manager.shutdown_signal();
     let executor = task_manager.executor();
@@ -332,6 +349,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             database_r,
             l1_status,
             writer_ctl,
+            bcast_handle,
         )
         .await
         .unwrap()
@@ -347,6 +365,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn start_rpc<
     D: Database + Send + Sync + 'static,
     SD: SequencerDatabase + Send + Sync + 'static,
@@ -357,6 +376,7 @@ async fn start_rpc<
     database: Arc<D>,
     l1_status: Arc<RwLock<L1Status>>,
     writer: Option<Arc<DaWriter<SD>>>,
+    bcast_handle: Arc<L1BroadcastHandle>,
 ) -> anyhow::Result<()> {
     let (stop_tx, stop_rx) = oneshot::channel();
 
@@ -365,14 +385,13 @@ async fn start_rpc<
         l1_status.clone(),
         database.clone(),
         sync_man.clone(),
+        bcast_handle.clone(),
         stop_tx,
     );
-    let mut methods = alp_rpc.into_rpc();
 
-    if let Some(writer) = writer {
-        let admin_rpc = rpc_server::AdminServerImpl::new(writer.clone());
-        methods.merge(admin_rpc.into_rpc())?;
-    }
+    let mut methods = alp_rpc.into_rpc();
+    let admin_rpc = rpc_server::AdminServerImpl::new(writer, bcast_handle);
+    methods.merge(admin_rpc.into_rpc())?;
 
     let rpc_port = config.client.rpc_port;
 
