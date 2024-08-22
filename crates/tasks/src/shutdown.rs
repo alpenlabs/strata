@@ -3,6 +3,7 @@ use std::sync::Arc;
 use tokio::sync::futures::Notified;
 use tokio::sync::Notify;
 
+/// Allows to send a signal to trigger shutdown
 #[derive(Debug, Clone)]
 pub struct ShutdownSignal(Arc<AtomicBool>, Arc<Notify>);
 
@@ -30,6 +31,7 @@ impl ShutdownSignal {
     }
 }
 
+/// Receiver for shutdown signal
 pub(crate) struct Shutdown(ShutdownSignal);
 
 impl Shutdown {
@@ -44,6 +46,8 @@ impl Shutdown {
     }
 }
 
+/// Receiver for shutdown signal.
+/// Also manages an atomic counter to keep track of live tasks.
 pub struct ShutdownGuard(Shutdown, Arc<AtomicUsize>);
 
 impl ShutdownGuard {

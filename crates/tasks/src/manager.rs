@@ -50,16 +50,43 @@ impl PanickedTaskError {
     }
 }
 
+/// TaskManager spawns and tracks long running tasks,
+/// watches for task panics and manages graceful shutdown
+/// on critical task panics and external signals.
+///
+/// Example:
+///
+/// ```
+/// let task_manager = TaskManager::new(tokio_handle);
+/// let executor = task_manager.executor();
+/// executor.spawn_critical("task name", |shutdown| {
+///     loop {
+///         if shutdown.should_shutdown() {
+///             break;
+///         }
+///
+///         // do task
+///     }
+/// });
+///
+/// // spawn more tasks...
+///
+/// // start listening to signals
+/// executor.start_signal_listeners();
+///
+/// // wait until shutdown
+/// let result = executor.monitor(Some(Duration::from_secs(5)));
+/// ```
 pub struct TaskManager {
-    /// Handle to the tokio runtime.
+    /// Tokio's runtime [`Handle`].
     tokio_handle: Handle,
-    /// Sender half for sending panic signals from tasks
+    /// Channel's sender tasked with sending `panic` signals from tasks.
     panicked_tasks_tx: mpsc::UnboundedSender<PanickedTaskError>,
-    /// Receiver half for sending panic signals to tasks
+    /// Channel's receiver tasked with receiving `panic` signals from tasks.
     panicked_tasks_rx: mpsc::UnboundedReceiver<PanickedTaskError>,
-    /// send shutdown signals to tasks
+    /// Async-capable shutdown signal that can be sent to tasks.
     shutdown_signal: ShutdownSignal,
-    /// pending tasks count
+    /// Pending tasks atomic counter for graceful shutdown.
     pending_tasks_counter: Arc<AtomicUsize>,
 }
 
@@ -192,6 +219,9 @@ impl TaskExecutor {
         }
     }
 
+    /// Spawn task in new thread.
+    /// Should check `ShutdownGuard` passed to closure to trigger own shutdown.
+    /// Panic will trigger shutdown.
     pub fn spawn_critical<F>(&self, name: &'static str, func: F) -> JoinHandle<()>
     where
         F: FnOnce(ShutdownGuard) + Send + 'static,
@@ -213,6 +243,8 @@ impl TaskExecutor {
         })
     }
 
+    /// Spawn future as task inside tokio runtime.
+    /// Panic will trigger shutdown.
     pub fn spawn_critical_async(
         &self,
         name: &'static str,
@@ -240,6 +272,9 @@ impl TaskExecutor {
         self.tokio_handle.spawn(task)
     }
 
+    /// Spawn future in tokio runtime.
+    /// Should check `ShutdownGuard` passed to closure to trigger own shutdown manually.
+    /// Panic will trigger shutdown.
     pub fn spawn_critical_async_with_shutdown<F>(
         &self,
         name: &'static str,
