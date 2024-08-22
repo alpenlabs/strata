@@ -9,7 +9,7 @@ mod modes;
 pub(crate) mod rpc_server;
 
 use alpen_express_common::logging;
-use args::{Args, ModeOfOperation};
+use args::{Cli, OperationMode};
 use clap::Parser;
 use modes::{challenger, operator};
 use tracing::info;
@@ -18,17 +18,17 @@ use tracing::info;
 async fn main() {
     logging::init();
 
-    let cli_args = Args::parse();
+    let cli_args = Cli::parse();
 
     info!("running bridge client in {} mode", cli_args.mode);
 
     match cli_args.mode {
-        ModeOfOperation::Operator => {
+        OperationMode::Operator => {
             operator::bootstrap()
                 .await
                 .expect("bootstrap operator node");
         }
-        ModeOfOperation::Challenger => {
+        OperationMode::Challenger => {
             challenger::bootstrap().await;
         }
     }
