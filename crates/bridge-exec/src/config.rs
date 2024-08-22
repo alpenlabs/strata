@@ -2,7 +2,10 @@
 //! the user running it.
 
 use core::time;
-use std::{fs, io, path::PathBuf};
+use std::{
+    fs, io,
+    path::{Path, PathBuf},
+};
 
 use alpen_express_primitives::l1::BitcoinAddress;
 use bitcoin::Network;
@@ -39,7 +42,7 @@ pub struct AddressConfig {
 
 impl Config {
     /// Parse the config at the given path and produce the [`Config`].
-    pub fn load_from_path(path: &PathBuf) -> InitResult<Self> {
+    pub fn load_from_path(path: impl AsRef<Path>) -> InitResult<Self> {
         let contents = fs::read_to_string(path)?;
         let config = toml::from_str::<Config>(contents.as_str())
             .map_err(|e| SerdeError::new(contents, e))?;
