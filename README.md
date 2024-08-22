@@ -74,7 +74,11 @@ ensure `horizon_l1_height` <= `genesis_l1_height` < bitcoin_block_height
 Start EL Client:
 
 ```sh
+# Normal mode
 cargo run --bin alpen-express-reth  -- --datadir .data/reth --http -vvvv
+
+# Block witness generation mode
+cargo run --bin alpen-express-reth  -- --datadir .data/reth --http --enable-witness-gen -vvvv
 ```
 
 Start CL Client/Sequencer
