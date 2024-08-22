@@ -61,7 +61,7 @@ impl Default for BridgeRpc {
 
 #[async_trait]
 impl ExpressBridgeControlApiServer for BridgeRpc {
-    async fn get_protocol_version(&self) -> RpcResult<String> {
+    async fn get_client_version(&self) -> RpcResult<String> {
         Ok(env!("CARGO_PKG_VERSION").to_string())
     }
 
