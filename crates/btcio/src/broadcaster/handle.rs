@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use express_tasks::TaskExecutor;
 use tokio::sync::mpsc;
 use tracing::*;
 
@@ -45,10 +46,16 @@ impl L1BroadcastHandle {
 }
 
 pub fn spawn_broadcaster_task(
+    executor: &TaskExecutor,
     l1_rpc_client: Arc<impl SeqL1Client + L1Client>,
     bcast_ops: Arc<BroadcastDbOps>,
 ) -> L1BroadcastHandle {
     let (bcast_tx, bcast_rx) = mpsc::channel::<(u64, L1TxEntry)>(64);
-    tokio::spawn(broadcaster_task(l1_rpc_client, bcast_ops.clone(), bcast_rx));
+    let ops = bcast_ops.clone();
+    executor.spawn_critical_async("l1_broadcaster_task", async move {
+        broadcaster_task(l1_rpc_client, ops, bcast_rx)
+            .await
+            .unwrap()
+    });
     L1BroadcastHandle::new(bcast_tx, bcast_ops)
 }

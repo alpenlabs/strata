@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
+use alpen_express_btcio::broadcaster::L1BroadcastHandle;
 // use alpen_express_btcio::broadcaster::manager::BroadcastDbManager;
 use anyhow::Context;
 use bitcoin::Network;
@@ -20,7 +21,6 @@ use tokio::sync::{broadcast, oneshot, RwLock};
 use tracing::*;
 
 use alpen_express_btcio::broadcaster::spawn_broadcaster_task;
-use alpen_express_btcio::rpc::traits::{L1Client, SeqL1Client};
 use alpen_express_btcio::writer::config::WriterConfig;
 use alpen_express_btcio::writer::start_writer_task;
 use alpen_express_btcio::writer::DaWriter;
@@ -40,7 +40,6 @@ use alpen_express_rocksdb::DbOpsConfig;
 use alpen_express_rocksdb::SeqDb;
 use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer};
 use alpen_express_rpc_types::L1Status;
-use express_storage::BroadcastDbOps;
 use express_storage::L2BlockManager;
 use express_tasks::{ShutdownSignal, TaskManager};
 
@@ -334,6 +333,10 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         l1_status.clone(),
     )?;
 
+    // start broadcast task
+    let bcast_handle = spawn_broadcaster_task(&task_executor, btc_rpc, bcast_ops);
+    let bcast_handle = Arc::new(bcast_handle);
+
     let shutdown_signal = task_manager.shutdown_signal();
     let executor = task_manager.executor();
     let database_r = database.clone();
@@ -343,11 +346,10 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             shutdown_signal,
             config,
             sync_man,
-            bcast_ops,
-            btc_rpc,
             database_r,
             l1_status,
             writer_ctl,
+            bcast_handle,
         )
         .await
         .unwrap()
@@ -366,22 +368,16 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 #[allow(clippy::too_many_arguments)]
 async fn start_rpc<
     D: Database + Send + Sync + 'static,
-    L: L1Client + SeqL1Client,
     SD: SequencerDatabase + Send + Sync + 'static,
 >(
     shutdown_signal: ShutdownSignal,
     config: Config,
     sync_man: Arc<SyncManager>,
-    bcast_ops: Arc<BroadcastDbOps>,
-    l1_rpc_client: Arc<L>,
     database: Arc<D>,
     l1_status: Arc<RwLock<L1Status>>,
     writer: Option<Arc<DaWriter<SD>>>,
+    bcast_handle: Arc<L1BroadcastHandle>,
 ) -> anyhow::Result<()> {
-    // start broadcast task
-    let bcast_handle = spawn_broadcaster_task(l1_rpc_client, bcast_ops);
-    let bcast_handle = Arc::new(bcast_handle);
-
     let (stop_tx, stop_rx) = oneshot::channel();
 
     // Init RPC methods.
