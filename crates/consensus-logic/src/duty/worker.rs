@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
-use std::time;
+use std::{thread, time};
 
 use alpen_express_btcio::writer::DaWriter;
 use alpen_express_primitives::buf::{Buf32, Buf64};
@@ -206,7 +206,7 @@ pub fn duty_dispatch_task<
     let (duty_status_tx, duty_status_rx) = std::sync::mpsc::channel::<DutyExecStatus>();
 
     let pending_duties_t = pending_duties.clone();
-    std::thread::spawn(move || loop {
+    thread::spawn(move || loop {
         if let Ok(DutyExecStatus { id, result }) = duty_status_rx.recv() {
             if let Err(e) = result {
                 error!(err = %e, "error performing duty");

@@ -114,7 +114,7 @@ where
         let Some(blobidx) = sign_rx.recv().await else {
             break;
         };
-        debug!(%blobidx, "Receicved blob for signing");
+        debug!(%blobidx, "Received blob for signing");
 
         if let Err(e) =
             create_and_sign_blob_inscriptions(blobidx, db.clone(), rpc_client.clone(), &config)
