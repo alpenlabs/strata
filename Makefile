@@ -76,7 +76,7 @@ clean-dd: ## Remove the data directory used by functional tests.
 	rm -rf $(FUNCTIONAL_TESTS_DIR)/$(FUNCTIONAL_TESTS_DATADIR) 2>/dev/null
 
 .PHONY: test-functional
-test-functional: ensure-poetry clean-dd ## Runs functional tests.
+test-functional: ensure-poetry activate clean-dd ## Runs functional tests.
 	cd $(FUNCTIONAL_TESTS_DIR) && ./run_test.sh
 
 ##@ Code Quality
@@ -105,11 +105,11 @@ fmt-toml: ensure-taplo ## Runs `taplo` to format TOML files
 	taplo fmt
 
 .PHONY: fmt-check-func-tests
-fmt-check-func-tests: ensure-poetry ## Check formatting of python files inside `test` directory.
+fmt-check-func-tests: ensure-poetry activate ## Check formatting of python files inside `test` directory.
 	cd $(FUNCTIONAL_TESTS_DIR) && poetry run ruff format --check
 
 .PHONY: fmt-func-tests
-fmt-func-tests: ensure-poetry ## Apply formatting of python files inside `test` directory.
+fmt-func-tests: ensure-poetry activate ## Apply formatting of python files inside `test` directory.
 	cd $(FUNCTIONAL_TESTS_DIR) && poetry run ruff format
 
 .PHONY: lint-check-ws
@@ -156,11 +156,11 @@ lint-check-toml: ensure-taplo ## Lints TOML files
 	taplo lint
 
 .PHONY: lint-check-func-tests
-lint-check-func-tests: ensure-poetry ## Lints the functional tests
+lint-check-func-tests: ensure-poetry activate ## Lints the functional tests
 	cd $(FUNCTIONAL_TESTS_DIR) && poetry run ruff check
 
 .PHONY: lint-fix-functional-tests
-lint-fix-func-tests: ensure-poetry ## Lints the functional tests and applies fixes where possible
+lint-fix-func-tests: ensure-poetry activate ## Lints the functional tests and applies fixes where possible
 	cd $(FUNCTIONAL_TESTS_DIR) && poetry run ruff check --fix
 
 .PHONY: lint
