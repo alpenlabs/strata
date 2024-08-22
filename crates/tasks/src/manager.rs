@@ -53,30 +53,6 @@ impl PanickedTaskError {
 /// TaskManager spawns and tracks long running tasks,
 /// watches for task panics and manages graceful shutdown
 /// on critical task panics and external signals.
-///
-/// Example:
-///
-/// ```
-/// let task_manager = TaskManager::new(tokio_handle);
-/// let executor = task_manager.executor();
-/// executor.spawn_critical("task name", |shutdown| {
-///     loop {
-///         if shutdown.should_shutdown() {
-///             break;
-///         }
-///
-///         // do task
-///     }
-/// });
-///
-/// // spawn more tasks...
-///
-/// // start listening to signals
-/// executor.start_signal_listeners();
-///
-/// // wait until shutdown
-/// let result = executor.monitor(Some(Duration::from_secs(5)));
-/// ```
 pub struct TaskManager {
     /// Tokio's runtime [`Handle`].
     tokio_handle: Handle,
