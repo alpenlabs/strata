@@ -1,5 +1,6 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
+use alpen_express_primitives::buf::Buf32;
 use bitcoin::{hashes::Hash, Txid};
 use express_storage::{ops::l1tx_broadcast, BroadcastDbOps};
 use tokio::sync::mpsc::Receiver;
@@ -39,7 +40,7 @@ pub async fn broadcaster_task(
             _ = interval.tick() => {}
 
             Some((idx, txentry)) = entry_receiver.recv() => {
-                let txid = txentry.txid_str();
+                let txid = get_txid_str(idx, ops.as_ref()).await?;
                 info!(%idx, %txid, "Received txentry");
 
                 // Insert into state's unfinalized entries. Need not update next_idx because that
@@ -67,6 +68,22 @@ pub async fn broadcaster_task(
     }
 }
 
+async fn get_txid(idx: u64, ops: &BroadcastDbOps) -> BroadcasterResult<Buf32> {
+    ops.get_txid_async(idx)
+        .await?
+        .ok_or(BroadcasterError::Other(format!(
+            "No txid entry found for idx {}",
+            idx
+        )))
+}
+
+async fn get_txid_str(idx: u64, ops: &BroadcastDbOps) -> BroadcasterResult<String> {
+    let txid: Buf32 = get_txid(idx, ops).await?;
+    let mut id = txid.0;
+    id.reverse();
+    Ok(hex::encode(id))
+}
+
 /// Processes unfinalized entries and returns entries idxs that are finalized
 async fn process_unfinalized_entries(
     unfinalized_entries: &HashMap<u64, L1TxEntry>,
@@ -78,7 +95,7 @@ async fn process_unfinalized_entries(
 
     for (idx, txentry) in unfinalized_entries.iter() {
         info!(%idx, "processing txentry");
-        let updated_status = handle_entry(rpc_client, txentry, *idx).await?;
+        let updated_status = handle_entry(rpc_client, txentry, *idx, ops.as_ref()).await?;
 
         if let Some(status) = updated_status {
             let mut new_txentry = txentry.clone();
@@ -108,8 +125,9 @@ async fn handle_entry(
     rpc_client: &(impl SeqL1Client + L1Client),
     txentry: &L1TxEntry,
     idx: u64,
+    ops: &BroadcastDbOps,
 ) -> BroadcasterResult<Option<L1TxStatus>> {
-    let txid = txentry.txid_str();
+    let txid = get_txid(idx, ops).await?;
     match txentry.status {
         L1TxStatus::Unpublished => {
             // Try to publish
@@ -136,7 +154,7 @@ async fn handle_entry(
         }
         L1TxStatus::Published | L1TxStatus::Confirmed(_) => {
             // check for confirmations
-            let txid = Txid::from_slice(txentry.txid())
+            let txid = Txid::from_slice(txid.0.as_slice())
                 .map_err(|e| BroadcasterError::Other(e.to_string()))?;
             let txinfo = rpc_client
                 .get_transaction_info(txid)
@@ -219,7 +237,7 @@ mod test {
         let e = gen_entry_with_status(L1TxStatus::Unpublished);
 
         // Add tx to db
-        ops.insert_new_tx_entry_async((*e.txid()).into(), e.clone())
+        ops.insert_new_tx_entry_async([1; 32].into(), e.clone())
             .await
             .unwrap();
 
@@ -227,7 +245,9 @@ mod test {
         let client = TestBitcoinClient::new(0);
         let cl = Arc::new(client);
 
-        let res = handle_entry(cl.as_ref(), &e, 0).await.unwrap();
+        let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref())
+            .await
+            .unwrap();
         assert_eq!(
             res,
             Some(L1TxStatus::Published),
@@ -241,7 +261,7 @@ mod test {
         let e = gen_entry_with_status(L1TxStatus::Published);
 
         // Add tx to db
-        ops.insert_new_tx_entry_async((*e.txid()).into(), e.clone())
+        ops.insert_new_tx_entry_async([1; 32].into(), e.clone())
             .await
             .unwrap();
 
@@ -249,7 +269,9 @@ mod test {
         let client = TestBitcoinClient::new(0);
         let cl = Arc::new(client);
 
-        let res = handle_entry(cl.as_ref(), &e, 0).await.unwrap();
+        let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref())
+            .await
+            .unwrap();
         assert_eq!(
             res, None,
             "Status should not change if no confirmations for a published tx"
@@ -259,7 +281,9 @@ mod test {
         let client = TestBitcoinClient::new(FINALITY_DEPTH - 1);
         let cl = Arc::new(client);
 
-        let res = handle_entry(cl.as_ref(), &e, 0).await.unwrap();
+        let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref())
+            .await
+            .unwrap();
         assert_eq!(
             res,
             Some(L1TxStatus::Confirmed(cl.included_height)),
@@ -270,7 +294,9 @@ mod test {
         let client = TestBitcoinClient::new(FINALITY_DEPTH);
         let cl = Arc::new(client);
 
-        let res = handle_entry(cl.as_ref(), &e, 0).await.unwrap();
+        let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref())
+            .await
+            .unwrap();
         assert_eq!(
             res,
             Some(L1TxStatus::Finalized(cl.included_height)),
@@ -284,7 +310,7 @@ mod test {
         let e = gen_entry_with_status(L1TxStatus::Confirmed(1));
 
         // Add tx to db
-        ops.insert_new_tx_entry_async((*e.txid()).into(), e.clone())
+        ops.insert_new_tx_entry_async([1; 32].into(), e.clone())
             .await
             .unwrap();
 
@@ -292,7 +318,9 @@ mod test {
         let client = TestBitcoinClient::new(0);
         let cl = Arc::new(client);
 
-        let res = handle_entry(cl.as_ref(), &e, 0).await.unwrap();
+        let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref())
+            .await
+            .unwrap();
         assert_eq!(
             res,
             Some(L1TxStatus::Unpublished),
@@ -303,7 +331,9 @@ mod test {
         let client = TestBitcoinClient::new(FINALITY_DEPTH - 1);
         let cl = Arc::new(client);
 
-        let res = handle_entry(cl.as_ref(), &e, 0).await.unwrap();
+        let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref())
+            .await
+            .unwrap();
         assert_eq!(
             res,
             Some(L1TxStatus::Confirmed(cl.included_height)),
@@ -314,7 +344,9 @@ mod test {
         let client = TestBitcoinClient::new(FINALITY_DEPTH);
         let cl = Arc::new(client);
 
-        let res = handle_entry(cl.as_ref(), &e, 0).await.unwrap();
+        let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref())
+            .await
+            .unwrap();
         assert_eq!(
             res,
             Some(L1TxStatus::Finalized(cl.included_height)),
@@ -328,7 +360,7 @@ mod test {
         let e = gen_entry_with_status(L1TxStatus::Finalized(1));
 
         // Add tx to db
-        ops.insert_new_tx_entry_async((*e.txid()).into(), e.clone())
+        ops.insert_new_tx_entry_async([1; 32].into(), e.clone())
             .await
             .unwrap();
 
@@ -336,7 +368,9 @@ mod test {
         let client = TestBitcoinClient::new(FINALITY_DEPTH);
         let cl = Arc::new(client);
 
-        let res = handle_entry(cl.as_ref(), &e, 0).await.unwrap();
+        let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref())
+            .await
+            .unwrap();
         assert_eq!(
             res, None,
             "Status should not change for finalized tx. Should remain the same."
@@ -347,7 +381,9 @@ mod test {
         let client = TestBitcoinClient::new(0);
         let cl = Arc::new(client);
 
-        let res = handle_entry(cl.as_ref(), &e, 0).await.unwrap();
+        let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref())
+            .await
+            .unwrap();
         assert_eq!(
             res, None,
             "Status should not change for finalized tx. Should remain the same."
@@ -362,7 +398,7 @@ mod test {
         )));
 
         // Add tx to db
-        ops.insert_new_tx_entry_async((*e.txid()).into(), e.clone())
+        ops.insert_new_tx_entry_async([1; 32].into(), e.clone())
             .await
             .unwrap();
 
@@ -370,7 +406,9 @@ mod test {
         let client = TestBitcoinClient::new(FINALITY_DEPTH);
         let cl = Arc::new(client);
 
-        let res = handle_entry(cl.as_ref(), &e, 0).await.unwrap();
+        let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref())
+            .await
+            .unwrap();
         assert_eq!(
             res, None,
             "Status should not change for excluded tx. Should remain the same."
@@ -381,7 +419,9 @@ mod test {
         let client = TestBitcoinClient::new(0);
         let cl = Arc::new(client);
 
-        let res = handle_entry(cl.as_ref(), &e, 0).await.unwrap();
+        let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref())
+            .await
+            .unwrap();
         assert_eq!(
             res, None,
             "Status should not change for excluded tx. Should remain the same."
@@ -394,18 +434,18 @@ mod test {
         // Add a couple of txs
         let e1 = gen_entry_with_status(L1TxStatus::Unpublished);
         let i1 = ops
-            .insert_new_tx_entry_async((*e1.txid()).into(), e1)
+            .insert_new_tx_entry_async([1; 32].into(), e1)
             .await
             .unwrap();
         let e2 = gen_entry_with_status(L1TxStatus::Excluded(ExcludeReason::MissingInputsOrSpent));
         let _i2 = ops
-            .insert_new_tx_entry_async((*e2.txid()).into(), e2)
+            .insert_new_tx_entry_async([2; 32].into(), e2)
             .await
             .unwrap();
 
         let e3 = gen_entry_with_status(L1TxStatus::Published);
         let i3 = ops
-            .insert_new_tx_entry_async((*e3.txid()).into(), e3)
+            .insert_new_tx_entry_async([3; 32].into(), e3)
             .await
             .unwrap();
 

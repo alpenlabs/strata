@@ -1,7 +1,7 @@
 //! Module for database local types
 
 use arbitrary::Arbitrary;
-use bitcoin::{consensus::serialize, hashes::Hash, Transaction};
+use bitcoin::{consensus::serialize, Transaction};
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use alpen_express_primitives::buf::Buf32;
@@ -68,8 +68,6 @@ pub enum BlobL1Status {
 pub struct L1TxEntry {
     /// Raw serialized transaction. This is basically `consensus::serialize()` of [`Transaction`]
     tx_raw: Vec<u8>,
-    /// Transaction id. This is to prevent computing after deserializing `tx_raw`.
-    txid: [u8; 32],
     /// The status of the transaction in bitcoin
     pub status: L1TxStatus,
 }
@@ -78,23 +76,12 @@ impl L1TxEntry {
     pub fn from_tx(tx: &Transaction) -> Self {
         Self {
             tx_raw: serialize(tx),
-            txid: *tx.compute_txid().as_raw_hash().as_byte_array(),
             status: L1TxStatus::Unpublished,
         }
     }
 
     pub fn tx_raw(&self) -> &[u8] {
         &self.tx_raw
-    }
-
-    pub fn txid(&self) -> &[u8; 32] {
-        &self.txid
-    }
-
-    pub fn txid_str(&self) -> String {
-        let mut txid = self.txid;
-        txid.reverse();
-        hex::encode(txid)
     }
 }
 

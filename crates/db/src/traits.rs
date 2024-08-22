@@ -330,11 +330,14 @@ pub trait BcastStore {
 
 /// All methods related to fetching [`L1TxEntry`]s and indices in the database
 pub trait BcastProvider {
-    /// Fetch txentry from db
+    /// Fetch [`L1TxEntry`] from db
     fn get_tx_entry_by_id(&self, txid: Buf32) -> DbResult<Option<L1TxEntry>>;
 
-    /// Get last txidx
+    /// Get next index to be inserted to
     fn get_next_tx_idx(&self) -> DbResult<u64>;
+
+    /// Get transaction id for index
+    fn get_txid(&self, idx: u64) -> DbResult<Option<Buf32>>;
 
     /// get txentry by idx
     fn get_tx_entry(&self, idx: u64) -> DbResult<Option<L1TxEntry>>;

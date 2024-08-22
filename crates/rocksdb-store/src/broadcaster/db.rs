@@ -92,8 +92,12 @@ impl BcastProvider for BroadcastDb {
             .unwrap_or_default())
     }
 
+    fn get_txid(&self, idx: u64) -> DbResult<Option<Buf32>> {
+        Ok(self.db.get::<BcastL1TxIdSchema>(&idx)?)
+    }
+
     fn get_tx_entry(&self, idx: u64) -> DbResult<Option<L1TxEntry>> {
-        if let Some(id) = self.db.get::<BcastL1TxIdSchema>(&idx)? {
+        if let Some(id) = self.get_txid(idx)? {
             Ok(self.db.get::<BcastL1TxSchema>(&id)?)
         } else {
             Err(DbError::Other(format!(

@@ -138,31 +138,31 @@ mod test {
         // Make some insertions
         let e1 = gen_unpublished_entry();
         let i1 = ops
-            .insert_new_tx_entry_async((*e1.txid()).into(), e1.clone())
+            .insert_new_tx_entry_async([1; 32].into(), e1.clone())
             .await
             .unwrap();
 
         let e2 = gen_confirmed_entry();
         let i2 = ops
-            .insert_new_tx_entry_async((*e2.txid()).into(), e2.clone())
+            .insert_new_tx_entry_async([2; 32].into(), e2.clone())
             .await
             .unwrap();
 
         let e3 = gen_finalized_entry();
         let i3 = ops
-            .insert_new_tx_entry_async((*e3.txid()).into(), e3.clone())
+            .insert_new_tx_entry_async([3; 32].into(), e3.clone())
             .await
             .unwrap();
 
         let e4 = gen_published_entry();
         let i4 = ops
-            .insert_new_tx_entry_async((*e4.txid()).into(), e4.clone())
+            .insert_new_tx_entry_async([4; 32].into(), e4.clone())
             .await
             .unwrap();
 
         let e5 = gen_excluded_entry();
         let i5 = ops
-            .insert_new_tx_entry_async((*e5.txid()).into(), e5.clone())
+            .insert_new_tx_entry_async([5; 32].into(), e5.clone())
             .await
             .unwrap();
         vec![(i1, e1), (i2, e2), (i3, e3), (i4, e4), (i5, e5)]
@@ -212,12 +212,12 @@ mod test {
         // Insert two more items to db, one excluded and one published.
         let e = gen_excluded_entry(); // this should not be in new state
         let idx = ops
-            .insert_new_tx_entry_async((*e.txid()).into(), e.clone())
+            .insert_new_tx_entry_async([6; 32].into(), e.clone())
             .await
             .unwrap();
         let e1 = gen_published_entry(); // this should be in new state
         let idx1 = ops
-            .insert_new_tx_entry_async((*e1.txid()).into(), e1.clone())
+            .insert_new_tx_entry_async([7; 32].into(), e1.clone())
             .await
             .unwrap();
         // Compute next state

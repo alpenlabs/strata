@@ -3,7 +3,7 @@
 use std::{borrow::BorrowMut, sync::Arc};
 
 use async_trait::async_trait;
-use bitcoin::{consensus::deserialize, Transaction as BTransaction, Txid};
+use bitcoin::{consensus::deserialize, hashes::Hash, Transaction as BTransaction, Txid};
 use jsonrpsee::{
     core::RpcResult,
     types::{ErrorObject, ErrorObjectOwned},
@@ -537,11 +537,12 @@ impl<S: SequencerDatabase + Send + Sync + 'static> AlpenAdminApiServer for Admin
     async fn broadcast_raw_tx(&self, rawtx: HexBytes) -> RpcResult<Txid> {
         let tx: BTransaction = deserialize(&rawtx.0).map_err(|e| Error::Other(e.to_string()))?;
         let txid = tx.compute_txid();
+        let dbid = *txid.as_raw_hash().as_byte_array();
 
         let entry = L1TxEntry::from_tx(&tx);
 
         self.bcast_handle
-            .insert_new_tx_entry((*entry.txid()).into(), entry)
+            .insert_new_tx_entry(dbid.into(), entry)
             .await
             .map_err(|e| Error::Other(e.to_string()))?;
 
