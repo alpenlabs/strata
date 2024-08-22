@@ -56,10 +56,8 @@ impl Config {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SecretsConfig {
     /// The path to the file that contains the operator private key.
+    /// This will be used to compute the public key.
     private_key: PathBuf,
-
-    /// The path to the file that contains the operator public key.
-    pub_key: PathBuf,
 }
 
 /// Error during initialization.
