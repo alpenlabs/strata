@@ -2,7 +2,6 @@
 members = [
   "crates/bridge-exec",
   "crates/bridge-txm",
-  "crates/prover/primitives",
   "crates/btcio",
   "crates/chaintsn",
   "crates/common",
@@ -16,6 +15,7 @@ members = [
   "crates/prover/bitcoin-blockspace",
   "crates/prover/btc-headerchain",
   "crates/prover/primitives",
+  "crates/prover/zkvm",
   "crates/reth/db",
   "crates/reth/exex",
   "crates/reth/node",
@@ -35,12 +35,12 @@ members = [
   "proofs/sp1",
 
   # binaries listed separately
-  "sequencer",
-  "reth",
   "bin/bridge-client",
+  "reth",
+  "sequencer",
 ]
 
-default-members = ["sequencer", "reth", "bin/bridge-client"]
+default-members = ["bin/bridge-client", "reth", "sequencer"]
 
 resolver = "2"
 
