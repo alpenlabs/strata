@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 use alpen_express_primitives::buf::Buf32;
 use bitcoin::{hashes::Hash, Txid};
@@ -86,12 +86,12 @@ async fn get_txid_str(idx: u64, ops: &BroadcastDbOps) -> BroadcasterResult<Strin
 
 /// Processes unfinalized entries and returns entries idxs that are finalized
 async fn process_unfinalized_entries(
-    unfinalized_entries: &HashMap<u64, L1TxEntry>,
+    unfinalized_entries: &BTreeMap<u64, L1TxEntry>,
     ops: Arc<BroadcastDbOps>,
     rpc_client: &(impl SeqL1Client + L1Client),
-) -> BroadcasterResult<(HashMap<u64, L1TxEntry>, Vec<u64>)> {
+) -> BroadcasterResult<(BTreeMap<u64, L1TxEntry>, Vec<u64>)> {
     let mut to_remove = Vec::new();
-    let mut updated_entries = HashMap::new();
+    let mut updated_entries = BTreeMap::new();
 
     for (idx, txentry) in unfinalized_entries.iter() {
         info!(%idx, "processing txentry");

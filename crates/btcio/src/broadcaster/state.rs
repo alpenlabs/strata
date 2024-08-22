@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::BTreeMap, sync::Arc};
 
 use alpen_express_db::types::{L1TxEntry, L1TxStatus};
 use express_storage::BroadcastDbOps;
@@ -10,7 +10,7 @@ pub(crate) struct BroadcasterState {
     pub(crate) next_idx: u64,
 
     /// Unfinalized [`L1TxEntry`]s which the broadcaster will check for
-    pub(crate) unfinalized_entries: HashMap<u64, L1TxEntry>,
+    pub(crate) unfinalized_entries: BTreeMap<u64, L1TxEntry>,
 }
 
 impl BroadcasterState {
@@ -38,7 +38,7 @@ impl BroadcasterState {
     /// Fetches entries from database based on the `next_idx` and updates the broadcaster state
     pub async fn next(
         &mut self,
-        updated_entries: HashMap<u64, L1TxEntry>,
+        updated_entries: BTreeMap<u64, L1TxEntry>,
         ops: &Arc<BroadcastDbOps>,
     ) -> BroadcasterResult<()> {
         let next_idx = ops.get_next_tx_idx_async().await?;
@@ -65,8 +65,8 @@ async fn filter_unfinalized_from_db(
     ops: &Arc<BroadcastDbOps>,
     from: u64,
     to: u64,
-) -> BroadcasterResult<HashMap<u64, L1TxEntry>> {
-    let mut unfinalized_entries = HashMap::new();
+) -> BroadcasterResult<BTreeMap<u64, L1TxEntry>> {
+    let mut unfinalized_entries = BTreeMap::new();
     for idx in from..to {
         let Some(txentry) = ops.get_tx_entry_async(idx).await? else {
             break;

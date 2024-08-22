@@ -16,7 +16,6 @@ hex = { workspace = true }
 mockall = { workspace = true, optional = true }
 parking_lot = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
