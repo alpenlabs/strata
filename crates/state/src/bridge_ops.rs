@@ -3,7 +3,7 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
-use alpen_express_primitives::{l1::BitcoinAmount, prelude::BitcoinAddress};
+use alpen_express_primitives::l1::{BitcoinAmount, XOnlyPk};
 
 pub const WITHDRAWAL_DENOMINATION: BitcoinAmount = BitcoinAmount::from_int_btc(10);
 
@@ -14,23 +14,23 @@ pub struct WithdrawalIntent {
     amt: BitcoinAmount,
 
     /// Destination address.
-    dest_pk: BitcoinAddress,
+    dest_pk: XOnlyPk,
 }
 
 impl WithdrawalIntent {
-    pub fn new(amt: BitcoinAmount, dest_pk: BitcoinAddress) -> Self {
+    pub fn new(amt: BitcoinAmount, dest_pk: XOnlyPk) -> Self {
         Self { amt, dest_pk }
     }
 
-    pub fn into_parts(&self) -> (BitcoinAmount, BitcoinAddress) {
-        (self.amt, self.dest_pk.clone())
+    pub fn into_parts(&self) -> (BitcoinAmount, XOnlyPk) {
+        (self.amt, self.dest_pk)
     }
 
     pub fn amt(&self) -> &BitcoinAmount {
         &self.amt
     }
 
-    pub fn dest_pk(&self) -> &BitcoinAddress {
+    pub fn dest_pk(&self) -> &XOnlyPk {
         &self.dest_pk
     }
 }
