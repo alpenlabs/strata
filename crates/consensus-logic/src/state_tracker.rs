@@ -94,9 +94,15 @@ impl<D: Database> StateTracker<D> {
     }
 }
 
-/// Reconstructs the last written consensus state from the last checkpoint and
-/// any outputs, returning the state index and the consensus state.  Used to
-/// prepare the state for the state tracker.
+/// Reconstructs the [`ClientState`] by fetching the last available checkpoint
+/// and replaying all relevant [`ClientStateWrite`]s from that checkpoint
+/// up to the specified index `idx`, ensuring an accurate and up-to-date state.
+///
+/// # Parameters
+///
+/// - `cs_prov`: An implementation of the [`ClientStateProvider`] trait, used for retrieving
+///   checkpoint and state data.
+/// - `idx`: The index from which to replay state writes, starting from the last checkpoint.
 pub fn reconstruct_cur_state(
     cs_prov: &impl ClientStateProvider,
 ) -> anyhow::Result<(u64, ClientState)> {
@@ -119,9 +125,17 @@ pub fn reconstruct_cur_state(
     Ok((last_write_idx, state))
 }
 
-/// Reconstructs the client state. Takes index as input.
-/// It Fetches the last available checkpoint and then replays all the ClientStateWrites
-/// from that checkpoint up to the requested index such that we have accurate clientState
+/// Reconstructs the `[ClientState`].
+///
+/// Under the hood fetches the last available checkpoint
+/// and then replays all the [`ClientStateWrite`]s
+/// from that checkpoint up to the requested index `idx`
+/// such that we have accurate [`ClientState`].
+///
+/// # Parameters
+///
+/// - `cs_prov`: anything that implements the [`ClientStateProvider`] trait.
+/// - `idx`: index to look ahead from.
 pub fn reconstruct_state(
     cs_prov: &impl ClientStateProvider,
     idx: u64,
@@ -174,7 +188,6 @@ mod tests {
 
     #[test]
     fn test_reconstruct_state() {
-        // prepare the clientState and ClientUpdateOutput for upto 20th index
         let database = get_common_db();
         let cl_store_db = database.client_state_store();
         let cl_provider_db = database.client_state_provider();
@@ -182,6 +195,7 @@ mod tests {
 
         let mut client_state_list = vec![state.clone()];
 
+        // prepare the clientState and ClientUpdateOutput for up to 20th index
         for idx in 0..20 {
             let mut state = state.clone();
             let l2block: L2Block = ArbitraryGenerator::new().generate();
@@ -200,7 +214,7 @@ mod tests {
             client_state_list.push(state.clone());
 
             let _ = cl_store_db.write_client_update_output(idx, output);
-            // write clientState checkpoint for multiple of 4
+            // write clientState checkpoint for indices that are multiples of 4
             if idx % 4 == 0 {
                 let _ = cl_store_db.write_client_state_checkpoint(idx, state);
             }
