@@ -447,7 +447,10 @@ fn check_new_block<D: Database>(
     let l1_segment_hash = hash::raw(&l1seg_buf);
 
     if l1_segment_hash != *block.header().l1_payload_hash() {
-        warn!(?blkid, "computed l1_segment_hash doesn't match between L2Block and L2BlockHeader");
+        warn!(
+            ?blkid,
+            "computed l1_segment_hash doesn't match between L2Block and L2BlockHeader"
+        );
         return Ok(false);
     }
 
@@ -456,7 +459,10 @@ fn check_new_block<D: Database>(
     let exec_segment_hash = hash::raw(&eseg_buf);
 
     if exec_segment_hash != *block.header().exec_payload_hash() {
-        warn!(?blkid, "computed exec_segment_hash doesn't match between L2Block and L2BlockHeader");
+        warn!(
+            ?blkid,
+            "computed exec_segment_hash doesn't match between L2Block and L2BlockHeader"
+        );
         return Ok(false);
     }
 
