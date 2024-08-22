@@ -50,7 +50,7 @@ impl PanickedTaskError {
     }
 }
 
-/// TaskManager spawns and tracks long running tasks,
+/// [`TaskManager`] spawns and tracks long running tasks,
 /// watches for task panics and manages graceful shutdown
 /// on critical task panics and external signals.
 pub struct TaskManager {
@@ -110,11 +110,6 @@ impl TaskManager {
     pub fn shutdown_signal(&self) -> ShutdownSignal {
         self.shutdown_signal.clone()
     }
-
-    // pub fn do_graceful_shutdown(self, timeout: Option<Duration>) -> bool {
-    //     self.shutdown_signal.send();
-    //     self.wait_for_graceful_shutdown(timeout)
-    // }
 
     /// Wait for all tasks to complete, returning true.
     /// If timeout is provided, wait until timeout;
