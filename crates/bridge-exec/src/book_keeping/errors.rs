@@ -8,7 +8,7 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum CheckpointError {
     /// IO error when interfacing with the underlying persistence layer for the checkpoint.
-    #[error("io error: {0}")]
+    #[error("storage error")]
     Io(#[from] io::Error),
 
     /// The data is incorrect or nor correctly formatted.
