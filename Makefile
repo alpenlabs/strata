@@ -72,7 +72,7 @@ activate: ensure-poetry ## Activate poetry environment for integration tests.
 	cd $(FUNCTIONAL_TESTS_DIR) && poetry install --no-root
 
 .PHONY: clean-dd
-clean-dd:
+clean-dd: ## Remove the data directory used by functional tests.
 	rm -rf $(FUNCTIONAL_TESTS_DIR)/$(FUNCTIONAL_TESTS_DATADIR) 2>/dev/null
 
 .PHONY: test-functional
