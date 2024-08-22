@@ -12,7 +12,7 @@ use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 pub trait ExpressBridgeControlApi {
     /// Get the bridge protocol version.
     #[method(name = "getProtocolVersion")]
-    async fn get_protocol_version(&self) -> RpcResult<String>;
+    async fn get_client_version(&self) -> RpcResult<String>;
 
     /// Get the uptime for the client in seconds assuming the clock is strictly monotonically
     /// increasing.
