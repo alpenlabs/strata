@@ -2,6 +2,7 @@ use std::sync::Arc;
 use std::thread;
 
 use tokio::sync::{mpsc, RwLock};
+use tracing::*;
 
 use alpen_express_btcio::reader::{
     config::ReaderConfig, messages::L1Event, query::bitcoin_data_reader_task,
@@ -43,6 +44,7 @@ where
     });
 
     // TODO set up watchdog to handle when the spawned tasks fail gracefully
+    debug!("spawning tokio task for bitcoin_data_reader_task");
     let _reader_handle = tokio::spawn(bitcoin_data_reader_task(
         rpc_client,
         ev_tx,
@@ -53,6 +55,7 @@ where
 
     let l1db = db.l1_store().clone();
     let _sedb = db.sync_event_store().clone();
+    debug!("spawning tokio task for bitcoin_data_handler_task");
     let _handler_handle =
         thread::spawn(move || bitcoin_data_handler_task(l1db, csm_ctl, ev_rx, params));
     Ok(())

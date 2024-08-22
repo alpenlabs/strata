@@ -169,6 +169,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let params = Arc::new(params);
 
     // Start runtime for async IO tasks.
+    debug!("starting runtime");
     let rt = Builder::new_multi_thread()
         .enable_all()
         .thread_name("express-rt")
@@ -233,6 +234,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         seqdb.clone(),
         l2_block_manager.clone(),
     );
+    debug!("starting main task");
     if let Err(e) = rt.block_on(main_fut) {
         error!(err = %e, "main task exited");
         process::exit(0); // special case exit once we've gotten to this point
@@ -278,6 +280,8 @@ where
 
     // Start the L1 tasks to get that going.
     let csm_ctl = sync_man.get_csm_ctl();
+
+    debug!("starting reader tasks");
     l1_reader::start_reader_tasks(
         sync_man.get_params(),
         config,
@@ -288,6 +292,7 @@ where
     )
     .await?;
 
+    debug!("Creating Channels for the RPC");
     let (stop_tx, stop_rx) = oneshot::channel();
 
     // Init RPC methods.
@@ -322,6 +327,7 @@ where
             params.rollup().rollup_name.clone(),
         )?;
         // Initialize SequencerDatabase
+        debug!("Getting a handle for the start_writer_task");
         let handle = Handle::current();
         let dbseq = Arc::new(SequencerDB::new(seqdb));
         let writer = Arc::new(start_writer_task(
@@ -375,6 +381,7 @@ where
 
     // Wait for a stop signal.
     let _ = stop_rx.await;
+    debug!("stop signal received");
 
     // Now start shutdown tasks.
     if rpc_handle.stop().is_err() {

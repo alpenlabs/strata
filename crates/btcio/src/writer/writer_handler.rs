@@ -77,6 +77,7 @@ pub fn start_writer_task<D: SequencerDatabase + Send + Sync + 'static>(
 
     // The watcher task watches L1 for txs confirmations and finalizations. Ideally this should be
     // taken care of by the reader task. This can be done later.
+    debug!("Spawning watcher_task");
     handle.spawn(watcher_task(
         init_state.next_watch_blob_idx,
         rpc_client.clone(),
@@ -84,6 +85,7 @@ pub fn start_writer_task<D: SequencerDatabase + Send + Sync + 'static>(
         db.clone(),
     ));
 
+    debug!("Spawning broadcaster_task");
     handle.spawn(broadcaster_task(
         init_state.next_publish_blob_idx,
         rpc_client.clone(),
@@ -91,6 +93,7 @@ pub fn start_writer_task<D: SequencerDatabase + Send + Sync + 'static>(
         l1_status.clone(),
     ));
 
+    debug!("Spawning listen_for_signing_intents");
     handle.spawn(listen_for_signing_intents(
         signer_rx,
         rpc_client,
@@ -110,6 +113,7 @@ async fn listen_for_signing_intents<D>(
 where
     D: SequencerDatabase + Sync + Send + 'static,
 {
+    debug!("listen_for_signing_intents started in a loop");
     loop {
         let Some(blobidx) = sign_rx.recv().await else {
             break;

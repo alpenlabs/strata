@@ -33,6 +33,7 @@ pub fn duty_tracker_task<D: Database>(
     l2_block_manager: Arc<L2BlockManager>,
     params: Arc<Params>,
 ) {
+    debug!("starting duty tracker task");
     let db = database.as_ref();
     if let Err(e) = duty_tracker_task_inner(
         cupdate_rx,
@@ -197,6 +198,7 @@ pub fn duty_dispatch_task<
     pool: threadpool::ThreadPool,
     params: Arc<Params>,
 ) {
+    debug!("starting duty dispatcher task");
     // TODO make this actually work
     let pending_duties = Arc::new(RwLock::new(HashMap::<Buf32, ()>::new()));
 
@@ -206,6 +208,7 @@ pub fn duty_dispatch_task<
     let (duty_status_tx, duty_status_rx) = std::sync::mpsc::channel::<DutyExecStatus>();
 
     let pending_duties_t = pending_duties.clone();
+    debug!("starting duty dispatcher task loop in a specific thread");
     thread::spawn(move || loop {
         if let Ok(DutyExecStatus { id, result }) = duty_status_rx.recv() {
             if let Err(e) = result {
@@ -219,6 +222,7 @@ pub fn duty_dispatch_task<
         }
     });
 
+    debug!("starting duty dispatcher task loop");
     loop {
         let update = match updates.blocking_recv() {
             Ok(u) => u,
@@ -253,6 +257,7 @@ pub fn duty_dispatch_task<
             let da_writer = da_writer.clone();
             let params: Arc<Params> = params.clone();
             let duty_status_tx_l = duty_status_tx.clone();
+            debug!("starting duty exec task");
             pool.execute(move || {
                 duty_exec_task(d, ik, sm, db, e, da_writer, params, duty_status_tx_l)
             });

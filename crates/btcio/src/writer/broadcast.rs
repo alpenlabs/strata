@@ -33,6 +33,7 @@ pub async fn broadcaster_task<D: SequencerDatabase + Send + Sync + 'static>(
 
     let mut curr_idx = next_publish_blob_idx;
 
+    debug!("broadcaster_task started in a loop");
     loop {
         // SLEEP!
         interval.as_mut().tick().await;

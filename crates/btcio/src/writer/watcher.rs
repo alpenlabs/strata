@@ -27,6 +27,7 @@ pub async fn watcher_task<D: SequencerDatabase + Send + Sync + 'static>(
     tokio::pin!(interval);
 
     let mut curr_blobidx = next_to_watch;
+    debug!("watcher_task started in a loop");
     loop {
         interval.as_mut().tick().await;
 
