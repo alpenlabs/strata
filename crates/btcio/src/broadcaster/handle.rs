@@ -11,7 +11,7 @@ use alpen_express_db::{
 use alpen_express_primitives::buf::Buf32;
 use express_storage::BroadcastDbOps;
 
-use crate::rpc::traits::{L1Client, SeqL1Client};
+use crate::rpc::traits::BitcoinClient;
 
 use super::task::broadcaster_task;
 
@@ -47,7 +47,7 @@ impl L1BroadcastHandle {
 
 pub fn spawn_broadcaster_task(
     executor: &TaskExecutor,
-    l1_rpc_client: Arc<impl SeqL1Client + L1Client>,
+    l1_rpc_client: Arc<impl BitcoinClient>,
     bcast_ops: Arc<BroadcastDbOps>,
 ) -> L1BroadcastHandle {
     let (bcast_tx, bcast_rx) = mpsc::channel::<(u64, L1TxEntry)>(64);

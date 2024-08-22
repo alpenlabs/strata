@@ -6,8 +6,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use alpen_express_btcio::broadcaster::L1BroadcastHandle;
-// use alpen_express_btcio::broadcaster::manager::BroadcastDbManager;
+use alpen_express_btcio::rpc::BitcoinDClient;
 use anyhow::Context;
 use bitcoin::Network;
 use config::Config;
@@ -215,12 +214,11 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     // Set up Bitcoin client RPC.
     let bitcoind_url = format!("http://{}", config.bitcoind_rpc.rpc_url);
-    let btc_rpc = alpen_express_btcio::rpc::BitcoinDClient::new(
+    let btc_rpc = BitcoinDClient::new(
         bitcoind_url,
         config.bitcoind_rpc.rpc_user.clone(),
         config.bitcoind_rpc.rpc_password.clone(),
-        bitcoin::Network::Regtest,
-    );
+    )
     let btc_rpc = Arc::new(btc_rpc);
 
     // TODO remove this

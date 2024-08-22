@@ -2,6 +2,7 @@ use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 use alpen_express_primitives::buf::Buf32;
 use bitcoin::{hashes::Hash, Txid};
+use bitcoincore_rpc_async::Error as RpcError;
 use express_storage::{ops::l1tx_broadcast, BroadcastDbOps};
 use tokio::sync::mpsc::Receiver;
 use tracing::*;
@@ -10,10 +11,7 @@ use alpen_express_db::types::{ExcludeReason, L1TxEntry, L1TxStatus};
 
 use crate::{
     broadcaster::{error::BroadcasterError, state::BroadcasterState},
-    rpc::{
-        traits::{L1Client, SeqL1Client},
-        ClientError,
-    },
+    rpc::traits::BitcoinClient,
 };
 
 use super::error::BroadcasterResult;
@@ -24,7 +22,7 @@ const FINALITY_DEPTH: u64 = 6;
 
 /// Broadcasts the next blob to be sent
 pub async fn broadcaster_task(
-    rpc_client: Arc<impl SeqL1Client + L1Client>,
+    rpc_client: Arc<impl BitcoinClient>,
     ops: Arc<l1tx_broadcast::BroadcastDbOps>,
     mut entry_receiver: Receiver<(u64, L1TxEntry)>,
 ) -> BroadcasterResult<()> {
@@ -88,7 +86,7 @@ async fn get_txid_str(idx: u64, ops: &BroadcastDbOps) -> BroadcasterResult<Strin
 async fn process_unfinalized_entries(
     unfinalized_entries: &BTreeMap<u64, L1TxEntry>,
     ops: Arc<BroadcastDbOps>,
-    rpc_client: &(impl SeqL1Client + L1Client),
+    rpc_client: &impl BitcoinClient,
 ) -> BroadcasterResult<(BTreeMap<u64, L1TxEntry>, Vec<u64>)> {
     let mut to_remove = Vec::new();
     let mut updated_entries = BTreeMap::new();
@@ -122,7 +120,7 @@ async fn process_unfinalized_entries(
 /// Takes in `[L1TxEntry]`, checks status and then either publishes or checks for confirmations and
 /// returns its updated status. Returns None if status is not changed
 async fn handle_entry(
-    rpc_client: &(impl SeqL1Client + L1Client),
+    rpc_client: &impl BitcoinClient,
     txentry: &L1TxEntry,
     idx: u64,
     ops: &BroadcastDbOps,
@@ -157,8 +155,8 @@ async fn handle_entry(
             let txid = Txid::from_slice(txid.0.as_slice())
                 .map_err(|e| BroadcasterError::Other(e.to_string()))?;
             let txinfo = rpc_client
-                .get_transaction_info(txid)
-                .await
+                .get_transaction(txid)
+                .wait
                 .map_err(|e| BroadcasterError::Other(e.to_string()))?;
             match txinfo.confirmations {
                 0 if matches!(txentry.status, L1TxStatus::Confirmed(_h)) => {
@@ -187,14 +185,14 @@ enum PublishError {
     Other(String),
 }
 
-async fn send_tx(
-    tx_raw: &[u8],
-    client: &(impl SeqL1Client + L1Client),
-) -> Result<(), PublishError> {
+async fn send_tx(tx_raw: &[u8], client: &impl BitcoinClient) -> Result<(), PublishError> {
     match client.send_raw_transaction(tx_raw).await {
         Ok(_) => Ok(()),
+        // FIXME: Handle this error in the bitcoincore_rpc_async crate Error type
+        /*
         Err(ClientError::Server(-27, _)) => Ok(()), // Tx already included
         Err(ClientError::Server(-25, _)) => Err(PublishError::MissingInputsOrSpent),
+        */
         Err(e) => Err(PublishError::Other(e.to_string())),
     }
 }
@@ -207,7 +205,7 @@ mod test {
     use alpen_test_utils::ArbitraryGenerator;
     use express_storage::ops::l1tx_broadcast::Context;
 
-    use crate::test_utils::TestBitcoinClient;
+    use crate::test_utils::BitcoinDTestClient;
 
     use super::*;
 
@@ -242,7 +240,7 @@ mod test {
             .unwrap();
 
         // This client will return confirmations to be 0
-        let client = TestBitcoinClient::new(0);
+        let client = BitcoinDTestClient::new(0);
         let cl = Arc::new(client);
 
         let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref())
@@ -266,7 +264,7 @@ mod test {
             .unwrap();
 
         // This client will return confirmations to be 0
-        let client = TestBitcoinClient::new(0);
+        let client = BitcoinDTestClient::new(0);
         let cl = Arc::new(client);
 
         let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref())
@@ -278,7 +276,7 @@ mod test {
         );
 
         // This client will return confirmations to be finality_depth - 1
-        let client = TestBitcoinClient::new(FINALITY_DEPTH - 1);
+        let client = BitcoinDTestClient::new(FINALITY_DEPTH - 1);
         let cl = Arc::new(client);
 
         let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref())
@@ -291,7 +289,7 @@ mod test {
         );
 
         // This client will return confirmations to be finality_depth
-        let client = TestBitcoinClient::new(FINALITY_DEPTH);
+        let client = BitcoinDTestClient::new(FINALITY_DEPTH);
         let cl = Arc::new(client);
 
         let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref())
@@ -315,7 +313,7 @@ mod test {
             .unwrap();
 
         // This client will return confirmations to be 0
-        let client = TestBitcoinClient::new(0);
+        let client = BitcoinDTestClient::new(0);
         let cl = Arc::new(client);
 
         let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref())
@@ -328,7 +326,7 @@ mod test {
         );
 
         // This client will return confirmations to be finality_depth - 1
-        let client = TestBitcoinClient::new(FINALITY_DEPTH - 1);
+        let client = BitcoinDTestClient::new(FINALITY_DEPTH - 1);
         let cl = Arc::new(client);
 
         let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref())
@@ -341,7 +339,7 @@ mod test {
         );
 
         // This client will return confirmations to be finality_depth
-        let client = TestBitcoinClient::new(FINALITY_DEPTH);
+        let client = BitcoinDTestClient::new(FINALITY_DEPTH);
         let cl = Arc::new(client);
 
         let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref())
@@ -365,7 +363,7 @@ mod test {
             .unwrap();
 
         // This client will return confirmations to be Finality depth
-        let client = TestBitcoinClient::new(FINALITY_DEPTH);
+        let client = BitcoinDTestClient::new(FINALITY_DEPTH);
         let cl = Arc::new(client);
 
         let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref())
@@ -378,7 +376,7 @@ mod test {
 
         // This client will return confirmations to be 0
         // NOTE: this should not occur in practice though
-        let client = TestBitcoinClient::new(0);
+        let client = BitcoinDTestClient::new(0);
         let cl = Arc::new(client);
 
         let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref())
@@ -403,7 +401,7 @@ mod test {
             .unwrap();
 
         // This client will return confirmations to be Finality depth
-        let client = TestBitcoinClient::new(FINALITY_DEPTH);
+        let client = BitcoinDTestClient::new(FINALITY_DEPTH);
         let cl = Arc::new(client);
 
         let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref())
@@ -416,7 +414,7 @@ mod test {
 
         // This client will return confirmations to be 0
         // NOTE: this should not occur in practice for a finalized tx though
-        let client = TestBitcoinClient::new(0);
+        let client = BitcoinDTestClient::new(0);
         let cl = Arc::new(client);
 
         let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref())
@@ -452,7 +450,7 @@ mod test {
         let state = BroadcasterState::initialize(&ops).await.unwrap();
 
         // This client will make the published tx finalized
-        let client = TestBitcoinClient::new(FINALITY_DEPTH);
+        let client = BitcoinDTestClient::new(FINALITY_DEPTH);
         let cl = Arc::new(client);
 
         let (new_entries, to_remove) =
