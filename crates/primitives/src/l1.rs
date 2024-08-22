@@ -369,7 +369,9 @@ impl Sum for BitcoinAmount {
 }
 
 /// A wrapper around [`Buf32`] for XOnly Schnorr taproot pubkeys.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
+)]
 pub struct XOnlyPk(Buf32);
 
 impl XOnlyPk {

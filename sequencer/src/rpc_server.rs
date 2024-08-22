@@ -401,7 +401,7 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
                     .output()
                     .withdrawals()
                     .iter()
-                    .map(|intent| WithdrawalIntent::new(*intent.amt(), intent.dest_pk().clone()))
+                    .map(|intent| WithdrawalIntent::new(*intent.amt(), *intent.dest_pk()))
                     .collect();
 
                 let da_blobs = exec_update
