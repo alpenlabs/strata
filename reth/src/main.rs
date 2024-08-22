@@ -6,6 +6,7 @@ use clap::Parser;
 use express_reth_db::rocksdb::WitnessDB;
 use express_reth_exex::ProverWitnessGenerator;
 use express_reth_rpc::{AlpenRPC, AlpenRpcApiServer};
+use eyre::Ok;
 use reth::{
     args::LogArgs,
     builder::{NodeBuilder, WithLaunchContext},
@@ -33,26 +34,29 @@ fn main() {
     // disable peer discovery
     command.network.discovery.disable_discovery = true;
 
-    if let Err(err) = run(command, |builder, _| async {
+    if let Err(err) = run(command, |builder, ext| async move {
         let datadir = builder.config().datadir().data_dir().to_path_buf();
-        let rbdb = db::open_rocksdb_database(datadir.clone()).expect("open rocksdb");
+        let mut node_builder = builder.node(EthereumNode::default());
 
-        let db = Arc::new(WitnessDB::new(rbdb));
-        let rpc_db = db.clone();
+        // Install Prover Input ExEx, persist to DB, and add RPC for querying block witness.
+        if ext.enable_witness_gen {
+            let rbdb = db::open_rocksdb_database(datadir.clone()).expect("open rocksdb");
+            let db = Arc::new(WitnessDB::new(rbdb));
+            let rpc_db = db.clone();
 
-        let handle = builder
-            .node(EthereumNode::default())
-            .extend_rpc_modules(|ctx| {
-                let alpen_rpc = AlpenRPC::new(rpc_db);
-                ctx.modules.merge_configured(alpen_rpc.into_rpc())?;
+            node_builder = node_builder
+                .extend_rpc_modules(|ctx| {
+                    let alpen_rpc = AlpenRPC::new(rpc_db);
+                    ctx.modules.merge_configured(alpen_rpc.into_rpc())?;
 
-                Ok(())
-            })
-            .install_exex("prover_input", |ctx| async {
-                Ok(ProverWitnessGenerator::new(ctx, db).start())
-            })
-            .launch()
-            .await?;
+                    Ok(())
+                })
+                .install_exex("prover_input", |ctx| async {
+                    Ok(ProverWitnessGenerator::new(ctx, db).start())
+                });
+        }
+
+        let handle = node_builder.launch().await?;
         handle.node_exit_future.await
     }) {
         eprintln!("Error: {err:?}");
@@ -65,6 +69,9 @@ fn main() {
 pub struct AdditionalConfig {
     #[command(flatten)]
     pub logs: LogArgs,
+
+    #[arg(long, default_value_t = false)]
+    pub enable_witness_gen: bool,
 }
 
 fn parse_chain_spec(chain_json: &str) -> eyre::Result<Arc<ChainSpec>> {

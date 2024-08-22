@@ -191,6 +191,7 @@ class RethFactory(flexitest.Factory):
             "--port", str(listener_port),
             "--ws",
             "--ws.port", str(ethrpc_port),
+            "--enable-witness-gen",
             "-vvvv"
         ]
         # fmt: on
