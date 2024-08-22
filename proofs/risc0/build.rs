@@ -1,8 +1,6 @@
 fn main() {
-    if cfg!(feature = "risc_zero") {
+    if cfg!(feature = "prover") {
         risc0_build::embed_methods();
-    } else if cfg!(feature = "sp1") {
-        todo!()
     } else {
         // Return mock ELF
         let out_dir = std::env::var_os("OUT_DIR").unwrap();

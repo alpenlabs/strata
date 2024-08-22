@@ -1,5 +1,5 @@
 [package]
-name = "guest-builder"
+name = "risc0-guest-builder"
 version = "0.1.0"
 edition = "2021"
 
@@ -13,5 +13,4 @@ methods = ["guest-reth-stf"]
 
 [features]
 default = []
-risc_zero = []
-sp1 = []
+prover = []

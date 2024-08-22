@@ -1035,16 +1035,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "guest-reth-stf"
-version = "0.1.0"
-dependencies = [
- "bincode",
- "revm",
- "risc0-zkvm",
- "zkvm-primitives",
-]
-
-[[package]]
 name = "hashbrown"
 version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1698,6 +1688,16 @@ dependencies = [
  "revm-primitives",
  "roaring",
  "serde",
+]
+
+[[package]]
+name = "reth-risc0"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "revm",
+ "risc0-zkvm",
+ "zkvm-primitives",
 ]
 
 [[package]]

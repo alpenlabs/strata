@@ -4147,13 +4147,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "guest-builder"
-version = "0.1.0"
-dependencies = [
- "risc0-build",
-]
-
-[[package]]
 name = "h2"
 version = "0.3.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10106,6 +10099,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "risc0-guest-builder"
+version = "0.1.0"
+dependencies = [
+ "risc0-build",
+]
+
+[[package]]
 name = "risc0-sys"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11144,6 +11144,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "sp1-build"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "65c9c5c2628b485693b6c2e5ba89f1af7ce5cfede39a6a4b041afd2e5b838480"
+dependencies = [
+ "anyhow",
+ "cargo_metadata",
+ "clap",
+ "dirs",
+]
+
+[[package]]
 name = "sp1-core"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11215,6 +11227,24 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "sp1-guest-builder"
+version = "0.1.0"
+dependencies = [
+ "sp1-helper",
+]
+
+[[package]]
+name = "sp1-helper"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ec6177089127a447ea26b258f722050c0c4f874eba5df7934b246b59088c8f72"
+dependencies = [
+ "cargo_metadata",
+ "chrono",
+ "sp1-build",
 ]
 
 [[package]]

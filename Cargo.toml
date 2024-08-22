@@ -23,7 +23,8 @@ members = [
   "crates/test-utils",
   "crates/util/mmr",
   "crates/vtxjmt",
-  "proofs",
+  "proofs/risc0",
+  "proofs/sp1",
 
   # binaries listed separately
   "sequencer",
