@@ -94,43 +94,136 @@ impl<D: Database> StateTracker<D> {
     }
 }
 
-/// Reconstructs the last written consensus state from the last checkpoint and
-/// any outputs, returning the state index and the consensus state.  Used to
-/// prepare the state for the state tracker.
-// TODO tweak this to be able to reconstruct any state?
+/// Reconstructs the [`ClientState`] by fetching the last available checkpoint
+/// and replaying all relevant [`ClientStateWrite`]s from that checkpoint
+/// up to the specified index `idx`, ensuring an accurate and up-to-date state.
+///
+/// # Parameters
+///
+/// - `cs_prov`: An implementation of the [`ClientStateProvider`] trait, used for retrieving
+///   checkpoint and state data.
+/// - `idx`: The index from which to replay state writes, starting from the last checkpoint.
 pub fn reconstruct_cur_state(
     cs_prov: &impl ClientStateProvider,
 ) -> anyhow::Result<(u64, ClientState)> {
     let last_ckpt_idx = cs_prov.get_last_checkpoint_idx()?;
-    let mut state = cs_prov
-        .get_state_checkpoint(last_ckpt_idx)?
-        .ok_or(Error::MissingCheckpoint(last_ckpt_idx))?;
 
-    // Special case init since we don't have writes at that index.
+    // genesis state.
     if last_ckpt_idx == 0 {
         debug!("starting from init state");
+        let state = cs_prov
+            .get_state_checkpoint(0)?
+            .ok_or(Error::MissingCheckpoint(0))?;
         return Ok((0, state));
     }
 
     // If we're not in genesis, then we probably have to replay some writes.
     let last_write_idx = cs_prov.get_last_write_idx()?;
 
-    // But if the last written writes were for the last checkpoint, we can just
-    // return that directly.
-    if last_write_idx == last_ckpt_idx {
-        debug!(%last_ckpt_idx, "no writes to replay");
-        return Ok((last_ckpt_idx, state));
-    }
-
-    let write_replay_start = last_ckpt_idx + 1;
-    debug!(%last_write_idx, %last_ckpt_idx, "reconstructing state from checkpoint");
-
-    for i in write_replay_start..=last_write_idx {
-        let writes = cs_prov
-            .get_client_state_writes(i)?
-            .ok_or(Error::MissingConsensusWrites(i))?;
-        operation::apply_writes_to_state(&mut state, writes.into_iter());
-    }
+    let state = reconstruct_state(cs_prov, last_write_idx)?;
 
     Ok((last_write_idx, state))
+}
+
+/// Reconstructs the `[ClientState`].
+///
+/// Under the hood fetches the last available checkpoint
+/// and then replays all the [`ClientStateWrite`]s
+/// from that checkpoint up to the requested index `idx`
+/// such that we have accurate [`ClientState`].
+///
+/// # Parameters
+///
+/// - `cs_prov`: anything that implements the [`ClientStateProvider`] trait.
+/// - `idx`: index to look ahead from.
+pub fn reconstruct_state(
+    cs_prov: &impl ClientStateProvider,
+    idx: u64,
+) -> anyhow::Result<ClientState> {
+    match cs_prov.get_state_checkpoint(idx)? {
+        Some(cl) => {
+            // if the checkpoint was created at the idx itself, return the checkpoint
+            debug!(%idx, "no writes to replay");
+            Ok(cl)
+        }
+        None => {
+            // get the previously written checkpoint
+            let prev_ckpt_idx = cs_prov.get_prev_checkpoint_at(idx)?;
+
+            // get the previous checkpoint Client State
+            let mut state = cs_prov
+                .get_state_checkpoint(prev_ckpt_idx)?
+                .ok_or(Error::MissingCheckpoint(idx))?;
+
+            // write the client state
+            let write_replay_start = prev_ckpt_idx + 1;
+            debug!(%prev_ckpt_idx, %idx, "reconstructing state from checkpoint");
+
+            for i in write_replay_start..=idx {
+                let writes = cs_prov
+                    .get_client_state_writes(i)?
+                    .ok_or(Error::MissingConsensusWrites(i))?;
+                operation::apply_writes_to_state(&mut state, writes.into_iter());
+            }
+
+            Ok(state)
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use alpen_express_db::traits::ClientStateStore;
+    use alpen_express_db::traits::Database;
+    use alpen_express_rocksdb::test_utils::get_common_db;
+    use alpen_express_state::{
+        block::L2Block,
+        client_state::{ClientState, SyncState},
+        header::L2Header,
+        operation::{apply_writes_to_state, ClientStateWrite, ClientUpdateOutput, SyncAction},
+    };
+    use alpen_test_utils::ArbitraryGenerator;
+
+    use super::reconstruct_state;
+
+    #[test]
+    fn test_reconstruct_state() {
+        let database = get_common_db();
+        let cl_store_db = database.client_state_store();
+        let cl_provider_db = database.client_state_provider();
+        let state: ClientState = ArbitraryGenerator::new().generate();
+
+        let mut client_state_list = vec![state.clone()];
+
+        // prepare the clientState and ClientUpdateOutput for up to 20th index
+        for idx in 0..20 {
+            let mut state = state.clone();
+            let l2block: L2Block = ArbitraryGenerator::new().generate();
+            let ss: SyncState = ArbitraryGenerator::new().generate();
+
+            let output = ClientUpdateOutput::new(
+                vec![
+                    ClientStateWrite::ReplaceSync(Box::new(ss)),
+                    ClientStateWrite::AcceptL2Block(l2block.header().get_blockid()),
+                ],
+                vec![SyncAction::UpdateTip(l2block.header().get_blockid())],
+            );
+
+            let client_writes = Vec::from(output.writes()).into_iter();
+            apply_writes_to_state(&mut state, client_writes);
+            client_state_list.push(state.clone());
+
+            let _ = cl_store_db.write_client_update_output(idx, output);
+            // write clientState checkpoint for indices that are multiples of 4
+            if idx % 4 == 0 {
+                let _ = cl_store_db.write_client_state_checkpoint(idx, state);
+            }
+        }
+        // for the 13th, 14th, 15th state, we require fetching the 12th index ClientState and
+        // applying the writes.
+        for i in 13..17 {
+            let client_state = reconstruct_state(cl_provider_db.as_ref(), i).unwrap();
+            assert_eq!(client_state_list[(i + 1) as usize], client_state);
+        }
+    }
 }
