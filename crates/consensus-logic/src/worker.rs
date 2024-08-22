@@ -10,6 +10,7 @@ use alpen_express_db::traits::*;
 use alpen_express_eectl::engine::ExecEngineCtl;
 use alpen_express_primitives::prelude::*;
 use alpen_express_state::{client_state::ClientState, operation::SyncAction};
+use express_tasks::ShutdownGuard;
 
 use crate::{
     errors::Error,
@@ -83,6 +84,7 @@ impl<D: Database> WorkerState<D> {
 /// Receives messages from channel to update consensus state with.
 // TODO consolidate all these channels into container/"io" types
 pub fn client_worker_task<D: Database, E: ExecEngineCtl>(
+    shutdown: ShutdownGuard,
     mut state: WorkerState<D>,
     engine: Arc<E>,
     mut msg_rx: mpsc::Receiver<CsmMessage>,
@@ -106,6 +108,11 @@ pub fn client_worker_task<D: Database, E: ExecEngineCtl>(
             &fcm_msg_tx,
         ) {
             error!(err = %e, ?msg, "failed to process sync message, skipping");
+        }
+
+        if shutdown.should_shutdown() {
+            warn!("received shutdown signal");
+            break;
         }
     }
 

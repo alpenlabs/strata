@@ -3,16 +3,16 @@
 //! executor and other core sync pipeline tasks.
 
 use std::sync::Arc;
-use std::thread;
 
-use alpen_express_state::client_state::ClientState;
 use tokio::sync::{broadcast, mpsc, watch};
 use tracing::*;
 
 use alpen_express_db::traits::Database;
 use alpen_express_eectl::engine::ExecEngineCtl;
 use alpen_express_primitives::params::Params;
+use alpen_express_state::client_state::ClientState;
 use express_storage::L2BlockManager;
+use express_tasks::TaskExecutor;
 
 use crate::ctl::CsmController;
 use crate::message::{ClientUpdateNotif, CsmMessage, ForkChoiceMessage};
@@ -83,6 +83,7 @@ pub fn start_sync_tasks<
     D: Database + Sync + Send + 'static,
     E: ExecEngineCtl + Sync + Send + 'static,
 >(
+    executor: &TaskExecutor,
     database: Arc<D>,
     l2_block_manager: Arc<L2BlockManager>,
     engine: Arc<E>,
@@ -111,9 +112,10 @@ pub fn start_sync_tasks<
     let fcm_eng = engine.clone();
     let fcm_csm_ctl = csm_ctl.clone();
     let fcm_params = params.clone();
-    let _ct_handle = thread::spawn(|| {
+    executor.spawn_critical("fork_choice_manager::tracker_task", |shutdown| {
         // TODO this should be simplified into a builder or something
         fork_choice_manager::tracker_task(
+            shutdown,
             fcm_db,
             fcm_l2blkman,
             fcm_eng,
@@ -140,8 +142,9 @@ pub fn start_sync_tasks<
 
     let csm_eng = engine.clone();
     let csm_fcm_tx = fcm_tx.clone();
-    let _cw_handle = thread::spawn(|| {
+    executor.spawn_critical("client_worker_task", |shutdown| {
         worker::client_worker_task(
+            shutdown,
             cw_state,
             csm_eng,
             csm_rx,
@@ -149,6 +152,7 @@ pub fn start_sync_tasks<
             csm_status_tx,
             csm_fcm_tx,
         )
+        .unwrap();
     });
 
     Ok(SyncManager {

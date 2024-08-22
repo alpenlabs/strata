@@ -19,6 +19,7 @@ jobs:
   test:
     name: Run unit tests and generate report
     runs-on: ubuntu-latest
+    timeout-minutes: 40 # better fail-safe than the default 360 in github actions
     steps:
       - name: Cleanup space
         # https://github.com/actions/runner-images/issues/2840#issuecomment-790492173

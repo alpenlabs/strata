@@ -2,11 +2,12 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use alpen_express_rpc_types::types::L1Status;
 use anyhow::bail;
 use bitcoin::{Block, BlockHash};
 use tokio::sync::{mpsc, RwLock};
 use tracing::*;
+
+use alpen_express_rpc_types::types::L1Status;
 
 use super::config::ReaderConfig;
 use super::messages::{BlockData, L1Event};

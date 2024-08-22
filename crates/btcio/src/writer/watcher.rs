@@ -1,10 +1,11 @@
 use std::{sync::Arc, time::Duration};
 
+use tracing::*;
+
 use alpen_express_db::{
     traits::SequencerDatabase,
     types::{BlobEntry, BlobL1Status},
 };
-use tracing::*;
 
 use crate::{
     rpc::traits::{L1Client, SeqL1Client},

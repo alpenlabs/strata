@@ -3,6 +3,7 @@ rpc_port = 8432
 l2_blocks_fetch_limit = 1_000
 datadir = "/path/to/data/directory"
 # sequencer_key = "/path/to/data/directory/"
+# sequencer_bitcoin_address = ""
 db_retry_count = 5
 
 [bitcoind_rpc]
@@ -15,6 +16,7 @@ network = "regtest"
 l1_follow_distance = 6
 max_reorg_depth = 4
 client_poll_dur_ms = 200
+client_checkpoint_interval = 10
 
 [exec.reth]
 # reth {authrpc.address}:{authrpc.port}

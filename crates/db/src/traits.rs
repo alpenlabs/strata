@@ -31,16 +31,16 @@ use crate::DbResult;
     type ChsStore=MockChainstateStore; type ChsProv=MockChainstateProvider;
 ))]
 pub trait Database {
-    type L1Store: L1DataStore;
-    type L1Prov: L1DataProvider;
-    type L2Store: L2DataStore;
-    type L2Prov: L2DataProvider;
-    type SeStore: SyncEventStore;
-    type SeProv: SyncEventProvider;
-    type CsStore: ClientStateStore;
-    type CsProv: ClientStateProvider;
-    type ChsStore: ChainstateStore;
-    type ChsProv: ChainstateProvider;
+    type L1Store: L1DataStore + Send + Sync;
+    type L1Prov: L1DataProvider + Send + Sync;
+    type L2Store: L2DataStore + Send + Sync;
+    type L2Prov: L2DataProvider + Send + Sync;
+    type SeStore: SyncEventStore + Send + Sync;
+    type SeProv: SyncEventProvider + Send + Sync;
+    type CsStore: ClientStateStore + Send + Sync;
+    type CsProv: ClientStateProvider + Send + Sync;
+    type ChsStore: ChainstateStore + Send + Sync;
+    type ChsProv: ChainstateProvider + Send + Sync;
 
     fn l1_store(&self) -> &Arc<Self::L1Store>;
     fn l1_provider(&self) -> &Arc<Self::L1Prov>;

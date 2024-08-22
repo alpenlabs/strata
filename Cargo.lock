@@ -678,6 +678,7 @@ dependencies = [
  "base64 0.22.1",
  "bitcoin",
  "bytes",
+ "express-tasks",
  "hex",
  "mockall",
  "rand 0.8.5",
@@ -714,6 +715,7 @@ dependencies = [
  "borsh",
  "express-chaintsn",
  "express-storage",
+ "express-tasks",
  "rand 0.8.5",
  "secp256k1",
  "thiserror",
@@ -901,6 +903,7 @@ dependencies = [
  "async-trait",
  "bitcoin",
  "express-storage",
+ "express-tasks",
  "format_serde_error",
  "hex",
  "jsonrpsee",
@@ -3666,6 +3669,18 @@ dependencies = [
  "lru",
  "paste",
  "threadpool",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "express-tasks"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arbitrary",
+ "futures-util",
+ "thiserror",
  "tokio",
  "tracing",
 ]
