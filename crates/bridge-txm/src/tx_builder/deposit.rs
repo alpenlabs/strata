@@ -3,7 +3,7 @@
 //! Contains types, traits and implementations related to creating various transactions used in the
 //! bridge-in dataflow.
 
-use bitcoin::{Amount, OutPoint};
+use bitcoin::{Amount, OutPoint, XOnlyPublicKey};
 use serde::{Deserialize, Serialize};
 
 /// The deposit information  required to create the Deposit Transaction.
@@ -25,9 +25,9 @@ pub struct DepositInfo {
 
 impl DepositInfo {
     /// Construct the deposit transaction based on some information that depends on the bridge
-    /// implementation, the deposit request transaction created by the user and some metadata
-    /// related to the rollup.
-    pub fn construct_deposit_tx(&self) -> Vec<u8> {
+    /// implementation, the deposit request transaction created by the user, some metadata
+    /// related to the rollup and the actual pubkeys of the operators in the federation.
+    pub fn construct_deposit_tx(&self, _pubkeys: Vec<XOnlyPublicKey>) -> Vec<u8> {
         unimplemented!();
     }
 }
