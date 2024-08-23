@@ -13,8 +13,8 @@ use tracing::*;
 
 use crate::{
     rpc::{
-        traits::{L1Client, SeqL1Client},
-        ClientError,
+        traits::{BitcoinBroadcaster, BitcoinReader},
+        ClientResult,
     },
     status::{apply_status_updates, L1StatusUpdate},
     writer::utils::{get_blob_by_idx, get_l1_tx},
@@ -26,7 +26,7 @@ const BROADCAST_POLL_INTERVAL: u64 = 1000; // millis
 /// Broadcasts the next blob to be sent
 pub async fn broadcaster_task<D: SequencerDatabase + Send + Sync + 'static>(
     next_publish_blob_idx: u64,
-    rpc_client: Arc<impl SeqL1Client + L1Client>,
+    rpc_client: Arc<impl BitcoinBroadcaster + BitcoinReader>,
     db: Arc<D>,
     status_rx: Arc<StatusTx>,
 ) -> anyhow::Result<()> {
@@ -73,7 +73,13 @@ pub async fn broadcaster_task<D: SequencerDatabase + Send + Sync + 'static>(
                 .ok_or(anyhow!("Expected to find commit tx in db"))?;
 
             // Send
-            match send_commit_reveal_txs(commit_tx, reveal_tx, rpc_client.as_ref()).await {
+            match send_commit_reveal_txs(
+                commit_tx.to_vec(),
+                reveal_tx.to_vec(),
+                rpc_client.as_ref(),
+            )
+            .await
+            {
                 Ok(_) => {
                     debug!("Successfully sent: {}", blobentry.reveal_txid.to_string());
                     blobentry.status = BlobL1Status::Published;
@@ -90,16 +96,8 @@ pub async fn broadcaster_task<D: SequencerDatabase + Send + Sync + 'static>(
                     }
                     curr_idx += 1;
                 }
-                Err(SendError::MissingOrInvalidInput) => {
-                    // Means need to Resign/Republish
-                    blobentry.status = BlobL1Status::NeedsResign;
-
-                    db.sequencer_store()
-                        .update_blob_by_idx(curr_idx, blobentry)?;
-                }
-                Err(SendError::Other(e)) => {
+                Err(e) => {
                     warn!(%e, "Error sending !");
-                    // TODO: Maybe retry or return?
                 }
             }
         } else {
@@ -108,26 +106,14 @@ pub async fn broadcaster_task<D: SequencerDatabase + Send + Sync + 'static>(
     }
 }
 
-enum SendError {
-    MissingOrInvalidInput,
-    Other(String),
-}
-
 async fn send_commit_reveal_txs(
-    commit_tx_raw: Vec<u8>,
-    reveal_tx_raw: Vec<u8>,
-    client: &(impl SeqL1Client + L1Client),
-) -> Result<(), SendError> {
-    send_tx(commit_tx_raw, client).await?;
-    send_tx(reveal_tx_raw, client).await?;
+    commit_tx: Vec<u8>,
+    reveal_tx: Vec<u8>,
+    client: &(impl BitcoinBroadcaster + BitcoinReader),
+) -> ClientResult<()> {
+    let commit_tx = deserialize(&commit_tx).expect("Failed to deserialize commit tx");
+    let reveal_tx = deserialize(&reveal_tx).expect("Failed to deserialize reveal tx");
+    client.send_raw_transaction(&commit_tx).await?;
+    client.send_raw_transaction(&reveal_tx).await?;
     Ok(())
-}
-
-async fn send_tx(tx_raw: Vec<u8>, client: &(impl SeqL1Client + L1Client)) -> Result<(), SendError> {
-    match client.send_raw_transaction(tx_raw).await {
-        Ok(_) => Ok(()),
-        Err(ClientError::Server(-27, _)) => Ok(()), // Tx already in chain
-        Err(ClientError::Server(-25, _)) => Err(SendError::MissingOrInvalidInput),
-        Err(e) => Err(SendError::Other(e.to_string())),
-    }
 }

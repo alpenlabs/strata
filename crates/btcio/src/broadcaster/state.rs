@@ -78,7 +78,7 @@ async fn filter_unfinalized_from_db(
         let txid = ops.get_txid_async(idx).await?.map(Txid::from);
         debug!(?idx, ?txid, ?status, "TxEntry");
         match txentry.status {
-            L1TxStatus::Finalized { height: _ } | L1TxStatus::Excluded { reason: _ } => {}
+            L1TxStatus::Finalized { confirmations: _ } | L1TxStatus::Excluded { reason: _ } => {}
             _ => {
                 unfinalized_entries.insert(idx, txentry);
             }
@@ -94,10 +94,11 @@ mod test {
         broadcaster::db::{BroadcastDatabase, BroadcastDb},
         test_utils::get_rocksdb_tmp_instance,
     };
-    use alpen_test_utils::ArbitraryGenerator;
+    use bitcoin::{consensus, Transaction};
     use express_storage::ops::l1tx_broadcast::Context;
 
     use super::*;
+    use crate::test_utils::SOME_TX;
 
     fn get_db() -> Arc<impl TxBroadcastDatabase> {
         let (db, dbops) = get_rocksdb_tmp_instance().unwrap();
@@ -113,18 +114,18 @@ mod test {
     }
 
     fn gen_entry_with_status(st: L1TxStatus) -> L1TxEntry {
-        let arb = ArbitraryGenerator::new();
-        let mut entry: L1TxEntry = arb.generate();
+        let tx: Transaction = consensus::encode::deserialize_hex(SOME_TX).unwrap();
+        let mut entry = L1TxEntry::from_tx(&tx);
         entry.status = st;
         entry
     }
 
     fn gen_confirmed_entry() -> L1TxEntry {
-        gen_entry_with_status(L1TxStatus::Confirmed { height: 1 })
+        gen_entry_with_status(L1TxStatus::Confirmed { confirmations: 1 })
     }
 
     fn gen_finalized_entry() -> L1TxEntry {
-        gen_entry_with_status(L1TxStatus::Finalized { height: 1 })
+        gen_entry_with_status(L1TxStatus::Finalized { confirmations: 1 })
     }
 
     fn gen_unpublished_entry() -> L1TxEntry {

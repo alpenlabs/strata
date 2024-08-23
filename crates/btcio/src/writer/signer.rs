@@ -2,13 +2,13 @@ use std::sync::Arc;
 
 use alpen_express_db::types::{BlobEntry, L1TxEntry};
 use alpen_express_primitives::buf::Buf32;
-use bitcoin::Transaction;
-use tracing::debug;
+use bitcoin::{consensus, Transaction};
+use tracing::*;
 
 use super::{builder::build_inscription_txs, config::WriterConfig};
 use crate::{
     broadcaster::L1BroadcastHandle,
-    rpc::traits::{L1Client, SeqL1Client},
+    rpc::traits::{BitcoinReader, BitcoinSigner, BitcoinWallet},
 };
 
 type BlobIdx = u64;
@@ -21,14 +21,21 @@ type BlobIdx = u64;
 pub async fn create_and_sign_blob_inscriptions(
     blobentry: &BlobEntry,
     bhandle: &L1BroadcastHandle,
-    client: Arc<impl L1Client + SeqL1Client>,
+    client: Arc<impl BitcoinReader + BitcoinWallet + BitcoinSigner>,
     config: &WriterConfig,
 ) -> anyhow::Result<(Buf32, Buf32)> {
+    trace!("Creating and signing blob inscriptions");
     let (commit, reveal) = build_inscription_txs(&blobentry.blob, &client, config).await?;
 
     debug!("Signing commit transaction {}", commit.compute_txid());
-    let signed_commit: Transaction = client.sign_raw_transaction_with_wallet(commit).await?;
+    let signed_commit = client
+        .sign_raw_transaction_with_wallet(&commit)
+        .await
+        .expect("could not sign commit tx")
+        .hex;
 
+    let signed_commit: Transaction = consensus::encode::deserialize_hex(&signed_commit)
+        .expect("could not deserialize transaction");
     let cid: Buf32 = signed_commit.compute_txid().into();
     let rid: Buf32 = reveal.compute_txid().into();
 

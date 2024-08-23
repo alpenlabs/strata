@@ -13,7 +13,7 @@ use tracing::*;
 use super::config::WriterConfig;
 use crate::{
     broadcaster::L1BroadcastHandle,
-    rpc::traits::{L1Client, SeqL1Client},
+    rpc::traits::{BitcoinReader, BitcoinSigner, BitcoinWallet},
     status::{apply_status_updates, L1StatusUpdate},
     writer::signer::create_and_sign_blob_inscriptions,
 };
@@ -88,7 +88,7 @@ impl InscriptionHandle {
 /// [`Result<InscriptionHandle>`](anyhow::Result)
 pub fn start_inscription_task<D: SequencerDatabase + Send + Sync + 'static>(
     executor: &TaskExecutor,
-    rpc_client: Arc<impl SeqL1Client + L1Client>,
+    rpc_client: Arc<impl BitcoinReader + BitcoinWallet + BitcoinSigner>,
     config: WriterConfig,
     db: Arc<D>,
     status_tx: Arc<StatusTx>,
@@ -143,7 +143,7 @@ fn get_next_blobidx_to_watch(insc_ops: &InscriptionDataOps) -> anyhow::Result<u6
 /// [`BlobL1Status::Confirmed`], or [`BlobL1Status::Finalized`]
 pub async fn watcher_task(
     next_blbidx_to_watch: u64,
-    rpc_client: Arc<impl L1Client + SeqL1Client>,
+    rpc_client: Arc<impl BitcoinReader + BitcoinWallet + BitcoinSigner>,
     config: WriterConfig,
     insc_ops: Arc<InscriptionDataOps>,
     bcast_handle: Arc<L1BroadcastHandle>,

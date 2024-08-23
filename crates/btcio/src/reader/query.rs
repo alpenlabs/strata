@@ -10,12 +10,12 @@ use bitcoin::{Block, BlockHash};
 use tokio::sync::mpsc;
 use tracing::*;
 
-use super::{
-    config::ReaderConfig,
-    messages::{BlockData, L1Event},
-};
 use crate::{
-    rpc::traits::L1Client,
+    reader::{
+        config::ReaderConfig,
+        messages::{BlockData, L1Event},
+    },
+    rpc::traits::BitcoinReader,
     status::{apply_status_updates, L1StatusUpdate},
 };
 
@@ -138,7 +138,7 @@ impl ReaderState {
 }
 
 pub async fn bitcoin_data_reader_task(
-    client: Arc<impl L1Client>,
+    client: Arc<impl BitcoinReader>,
     event_tx: mpsc::Sender<L1Event>,
     target_next_block: u64,
     config: Arc<ReaderConfig>,
@@ -160,7 +160,7 @@ pub async fn bitcoin_data_reader_task(
 }
 
 async fn do_reader_task(
-    client: &impl L1Client,
+    client: &impl BitcoinReader,
     event_tx: &mpsc::Sender<L1Event>,
     target_next_block: u64,
     config: Arc<ReaderConfig>,
@@ -222,7 +222,7 @@ async fn do_reader_task(
 async fn init_reader_state(
     target_next_block: u64,
     lookback: usize,
-    client: &impl L1Client,
+    client: &impl BitcoinReader,
 ) -> anyhow::Result<ReaderState> {
     // Init the reader state using the blockid we were given, fill in a few blocks back.
     debug!(%target_next_block, "initializing reader state");
@@ -252,7 +252,7 @@ async fn init_reader_state(
 /// Polls the chain to see if there's new blocks to look at, possibly reorging
 /// if there's a mixup and we have to go back.
 async fn poll_for_new_blocks(
-    client: &impl L1Client,
+    client: &impl BitcoinReader,
     event_tx: &mpsc::Sender<L1Event>,
     _config: &ReaderConfig,
     state: &mut ReaderState,
@@ -261,7 +261,7 @@ async fn poll_for_new_blocks(
     let chain_info = client.get_blockchain_info().await?;
     status_updates.push(L1StatusUpdate::RpcConnected(true));
     let client_height = chain_info.blocks;
-    let fresh_best_block = chain_info.bestblockhash();
+    let fresh_best_block = chain_info.best_block_hash.parse::<BlockHash>()?;
 
     status_updates.push(L1StatusUpdate::CurHeight(client_height));
     status_updates.push(L1StatusUpdate::CurTip(fresh_best_block.to_string()));
@@ -311,7 +311,7 @@ async fn poll_for_new_blocks(
 /// Finds the highest block index where we do agree with the node.  If we never
 /// find one then we're really screwed.
 async fn find_pivot_block(
-    client: &impl L1Client,
+    client: &impl BitcoinReader,
     state: &ReaderState,
 ) -> anyhow::Result<Option<(u64, BlockHash)>> {
     for (height, l1blkid) in state.iter_blocks_back() {
@@ -332,7 +332,7 @@ async fn find_pivot_block(
 
 async fn fetch_and_process_block(
     height: u64,
-    client: &impl L1Client,
+    client: &impl BitcoinReader,
     event_tx: &mpsc::Sender<L1Event>,
     state: &mut ReaderState,
     status_updates: &mut Vec<L1StatusUpdate>,

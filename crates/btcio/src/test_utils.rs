@@ -1,17 +1,25 @@
-use alpen_test_utils::ArbitraryGenerator;
+use std::collections::BTreeMap;
+
 use async_trait::async_trait;
-use bitcoin::{consensus::deserialize, hashes::Hash, Block, BlockHash, Network, Transaction, Txid};
+use bitcoin::{
+    consensus::{self, deserialize},
+    hashes::Hash,
+    Address, Amount, Block, BlockHash, Network, SignedAmount, Transaction, Txid, Work,
+};
+use bitcoind_json_rpc_types::v26::GetBlockchainInfo;
 
 use crate::rpc::{
-    traits::{L1Client, SeqL1Client},
-    types::{RPCTransactionInfo, RawUTXO, RpcBlockchainInfo},
-    ClientError,
+    traits::{BitcoinBroadcaster, BitcoinReader, BitcoinSigner, BitcoinWallet},
+    types::{GetTransaction, ListTransactions, ListUnspent, SignRawTransactionWithWallet},
+    ClientResult,
 };
 
+/// A test implementation of a Bitcoin client.
+#[derive(Debug, Clone)]
 pub struct TestBitcoinClient {
-    /// Parameter that returns confirmed height for a given transaction
+    /// Confirmations of a given transaction.
     pub confs: u64,
-    /// Parameter that indicates which height a transaction is included in
+    /// Which height a transaction was included in.
     pub included_height: u64,
 }
 
@@ -19,79 +27,172 @@ impl TestBitcoinClient {
     pub fn new(confs: u64) -> Self {
         Self {
             confs,
-            included_height: 100, // Use arbitrary value, make configurable as necessary
+            // Use arbitrary value, make configurable as necessary
+            included_height: 100,
         }
     }
 }
 
 const TEST_BLOCKSTR: &str = "000000207d862a78fcb02ab24ebd154a20b9992af6d2f0c94d3a67b94ad5a0009d577e70769f3ff7452ea5dd469d7d99f200d083d020f1585e4bd9f52e9d66b23891a9c6c4ea5e66ffff7f200000000001020000000001010000000000000000000000000000000000000000000000000000000000000000ffffffff04025f0200ffffffff02205fa01200000000160014d7340213b180c97bd55fedd7312b7e17389cf9bf0000000000000000266a24aa21a9ede2f61c3f71d1defd3fa999dfa36953755c690689799962b48bebd836974e8cf90120000000000000000000000000000000000000000000000000000000000000000000000000";
 
+/// A test transaction.
+///
+/// # Note
+///
+/// Taken from
+/// [`rust-bitcoin` test](https://docs.rs/bitcoin/0.32.1/src/bitcoin/blockdata/transaction.rs.html#1638).
+pub const SOME_TX: &str = "0100000001a15d57094aa7a21a28cb20b59aab8fc7d1149a3bdbcddba9c622e4f5f6a99ece010000006c493046022100f93bb0e7d8db7bd46e40132d1f8242026e045f03a0efe71bbb8e3f475e970d790221009337cd7f1f929f00cc6ff01f03729b069a7c21b59b1736ddfee5db5946c5da8c0121033b9b137ee87d5a812d6f506efdd37f0affa7ffc310711c06c7f3e097c9447c52ffffffff0100e1f505000000001976a9140389035a9225b3839e2bbf32d826a1e222031fd888ac00000000";
+
 #[async_trait]
-impl L1Client for TestBitcoinClient {
-    async fn get_blockchain_info(&self) -> Result<RpcBlockchainInfo, ClientError> {
-        Ok(ArbitraryGenerator::new().generate())
+impl BitcoinReader for TestBitcoinClient {
+    async fn estimate_smart_fee(&self, _conf_target: u16) -> ClientResult<u64> {
+        Ok(3)
     }
 
-    async fn get_block_at(&self, _height: u64) -> Result<Block, ClientError> {
+    async fn get_block(&self, _hash: &BlockHash) -> ClientResult<Block> {
         let block: Block = deserialize(&hex::decode(TEST_BLOCKSTR).unwrap()).unwrap();
         Ok(block)
     }
 
+    async fn get_block_at(&self, _height: u64) -> ClientResult<Block> {
+        let block: Block = deserialize(&hex::decode(TEST_BLOCKSTR).unwrap()).unwrap();
+        Ok(block)
+    }
+
+    async fn get_block_count(&self) -> ClientResult<u64> {
+        Ok(100)
+    }
+
     // get_block_hash returns the block hash of the block at the given height
-    async fn get_block_hash(&self, _h: u64) -> Result<BlockHash, ClientError> {
+    async fn get_block_hash(&self, _h: u64) -> ClientResult<BlockHash> {
         let block: Block = deserialize(&hex::decode(TEST_BLOCKSTR).unwrap()).unwrap();
         Ok(block.block_hash())
     }
 
-    // send_raw_transaction sends a raw transaction to the network
-    async fn send_raw_transaction<T: AsRef<[u8]> + Send>(
-        &self,
-        _tx: T,
-    ) -> Result<Txid, ClientError> {
-        Ok(Txid::from_slice(&[1u8; 32]).unwrap())
+    async fn get_blockchain_info(&self) -> ClientResult<GetBlockchainInfo> {
+        Ok(GetBlockchainInfo {
+            chain: "regtest".to_string(),
+            blocks: 100,
+            headers: 100,
+            best_block_hash: BlockHash::all_zeros().to_string(),
+            difficulty: 1.0,
+            median_time: 10 * 60,
+            verification_progress: 1.0,
+            initial_block_download: false,
+            chain_work: Work::from_be_bytes([0; 32]).to_string(),
+            size_on_disk: 1_000_000,
+            pruned: false,
+            prune_height: None,
+            automatic_pruning: None,
+            prune_target_size: None,
+            softforks: BTreeMap::new(),
+            warnings: "".to_string(),
+        })
     }
 
-    async fn get_transaction_info(&self, _txid: Txid) -> Result<RPCTransactionInfo, ClientError> {
-        let mut txinfo: RPCTransactionInfo = ArbitraryGenerator::new().generate();
-        txinfo.confirmations = self.confs;
-        txinfo.blockheight = Some(self.included_height);
-        Ok(txinfo)
+    async fn get_raw_mempool(&self) -> ClientResult<Vec<Txid>> {
+        Ok(vec![])
+    }
+
+    async fn network(&self) -> ClientResult<Network> {
+        Ok(Network::Regtest)
     }
 }
 
 #[async_trait]
-impl SeqL1Client for TestBitcoinClient {
-    // get_utxos returns all unspent transaction outputs for the wallets of bitcoind
-    async fn get_utxos(&self) -> Result<Vec<RawUTXO>, ClientError> {
-        // Generate enough utxos to cover for the costs later
-        let utxos: Vec<_> = (1..10)
-            .map(|_| ArbitraryGenerator::new().generate())
-            .enumerate()
-            .map(|(i, x)| RawUTXO {
-                txid: hex::encode([i as u8; 32]), // need to do this otherwise random str is
-                // generated
-                amount: 100 * 100_000_000,
-                spendable: true,
-                solvable: true,
-                ..x
+impl BitcoinBroadcaster for TestBitcoinClient {
+    // send_raw_transaction sends a raw transaction to the network
+    async fn send_raw_transaction(&self, _tx: &Transaction) -> ClientResult<Txid> {
+        Ok(Txid::from_slice(&[1u8; 32]).unwrap())
+    }
+}
+
+#[async_trait]
+impl BitcoinWallet for TestBitcoinClient {
+    async fn get_new_address(&self) -> ClientResult<Address> {
+        // taken from https://bitcoin.stackexchange.com/q/91222
+        let addr = "bcrt1qs758ursh4q9z627kt3pp5yysm78ddny6txaqgw"
+            .parse::<Address<_>>()
+            .unwrap()
+            .assume_checked();
+        Ok(addr)
+    }
+
+    async fn get_transaction(&self, txid: &Txid) -> ClientResult<GetTransaction> {
+        let some_tx = consensus::encode::deserialize_hex(SOME_TX).unwrap();
+        Ok(GetTransaction {
+            amount: SignedAmount::from_btc(100.0).unwrap(),
+            confirmations: self.confs,
+            generated: None,
+            trusted: None,
+            blockhash: None,
+            blockheight: Some(self.included_height),
+            blockindex: None,
+            blocktime: None,
+            txid: *txid,
+            wtxid: txid.to_string(),
+            walletconflicts: vec![],
+            replaced_by_txid: None,
+            replaces_txid: None,
+            comment: None,
+            to: None,
+            time: 0,
+            timereceived: 0,
+            bip125_replaceable: "false".to_string(),
+            details: vec![],
+            hex: some_tx,
+        })
+    }
+
+    async fn get_utxos(&self) -> ClientResult<Vec<ListUnspent>> {
+        // plenty of sats
+        (1..10)
+            .map(|i| {
+                Ok(ListUnspent {
+                    txid: Txid::from_slice(&[i; 32]).unwrap(),
+                    vout: 0,
+                    address: "bcrt1qs758ursh4q9z627kt3pp5yysm78ddny6txaqgw"
+                        .parse::<Address<_>>()
+                        .unwrap(),
+                    label: None,
+                    script_pubkey: "foo".to_string(),
+                    amount: Amount::from_btc(100.0).unwrap(),
+                    confirmations: self.confs as u32,
+                    spendable: true,
+                    solvable: true,
+                    safe: true,
+                })
             })
-            .collect();
-        Ok(utxos)
+            .collect()
     }
 
-    async fn estimate_smart_fee(&self) -> Result<u64, ClientError> {
-        Ok(3)
+    async fn list_transactions(
+        &self,
+        _count: Option<usize>,
+    ) -> ClientResult<Vec<ListTransactions>> {
+        Ok(vec![])
     }
 
-    /// sign transaction with bitcoind wallet
+    async fn list_wallets(&self) -> ClientResult<Vec<String>> {
+        Ok(vec![])
+    }
+}
+
+#[async_trait]
+impl BitcoinSigner for TestBitcoinClient {
+    async fn send_to_address(&self, _address: &Address, _amount: u64) -> ClientResult<Txid> {
+        Ok(Txid::from_slice(&[1u8; 32]).unwrap())
+    }
+
     async fn sign_raw_transaction_with_wallet(
         &self,
-        tx: Transaction,
-    ) -> Result<Transaction, ClientError> {
-        Ok(tx)
-    }
-
-    fn network(&self) -> Network {
-        Network::Regtest
+        tx: &Transaction,
+    ) -> ClientResult<SignRawTransactionWithWallet> {
+        let tx_hex = consensus::encode::serialize_hex(tx);
+        Ok(SignRawTransactionWithWallet {
+            hex: tx_hex,
+            complete: true,
+            errors: None,
+        })
     }
 }

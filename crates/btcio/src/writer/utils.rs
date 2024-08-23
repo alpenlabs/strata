@@ -8,16 +8,20 @@ use alpen_express_primitives::buf::Buf32;
 use anyhow::Context;
 use bitcoin::{consensus::serialize, hashes::Hash, Transaction};
 use sha2::{Digest, Sha256};
+use tokio::task::spawn_blocking;
 
 use super::{builder::build_inscription_txs, config::WriterConfig};
-use crate::rpc::traits::{L1Client, SeqL1Client};
+use crate::rpc::{
+    traits::{BitcoinReader, BitcoinSigner, BitcoinWallet},
+    types::SignRawTransactionWithWallet,
+};
 
 // Helper function to fetch a blob entry from within tokio
 pub async fn get_blob_by_idx<D: SequencerDatabase + Send + Sync + 'static>(
     db: Arc<D>,
     idx: u64,
 ) -> anyhow::Result<Option<BlobEntry>> {
-    tokio::task::spawn_blocking(move || Ok(db.sequencer_provider().get_blob_by_idx(idx)?)).await?
+    spawn_blocking(move || Ok(db.sequencer_provider().get_blob_by_idx(idx)?)).await?
 }
 
 // Helper function to fetch a blob entry from within tokio
@@ -25,7 +29,7 @@ pub async fn get_blob_by_id<D: SequencerDatabase + Send + Sync + 'static>(
     db: Arc<D>,
     id: Buf32,
 ) -> anyhow::Result<Option<BlobEntry>> {
-    tokio::task::spawn_blocking(move || Ok(db.sequencer_provider().get_blob_by_id(id)?)).await?
+    spawn_blocking(move || Ok(db.sequencer_provider().get_blob_by_id(id)?)).await?
 }
 
 // Helper to put blob from within tokio's context
@@ -34,7 +38,7 @@ pub async fn put_blob<D: SequencerDatabase + Send + Sync + 'static>(
     id: Buf32,
     entry: BlobEntry,
 ) -> anyhow::Result<u64> {
-    tokio::task::spawn_blocking(move || Ok(db.sequencer_store().put_blob(id, entry)?)).await?
+    spawn_blocking(move || Ok(db.sequencer_store().put_blob(id, entry)?)).await?
 }
 
 // Helper function to update a blob entry by index from within tokio
@@ -43,10 +47,7 @@ pub async fn update_blob_by_idx<D: SequencerDatabase + Send + Sync + 'static>(
     idx: u64,
     blob_entry: BlobEntry,
 ) -> anyhow::Result<()> {
-    tokio::task::spawn_blocking(move || {
-        Ok(db.sequencer_store().update_blob_by_idx(idx, blob_entry)?)
-    })
-    .await?
+    spawn_blocking(move || Ok(db.sequencer_store().update_blob_by_idx(idx, blob_entry)?)).await?
 }
 
 // Helper function to fetch a l1tx from within tokio
@@ -54,7 +55,7 @@ pub async fn get_l1_tx<D: SequencerDatabase + Send + Sync + 'static>(
     db: Arc<D>,
     txid: Buf32,
 ) -> anyhow::Result<Option<Vec<u8>>> {
-    tokio::task::spawn_blocking(move || Ok(db.sequencer_provider().get_l1_tx(txid)?)).await?
+    spawn_blocking(move || Ok(db.sequencer_provider().get_l1_tx(txid)?)).await?
 }
 
 // Helper function to store commit reveal txs
@@ -73,7 +74,7 @@ pub async fn put_commit_reveal_txs<D: SequencerDatabase + Send + Sync + 'static>
         .as_raw_hash()
         .to_byte_array()
         .into();
-    tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
+    spawn_blocking(move || -> anyhow::Result<()> {
         Ok(db.sequencer_store().put_commit_reveal_txs(
             cid,
             serialize(&commit_tx),
@@ -86,9 +87,9 @@ pub async fn put_commit_reveal_txs<D: SequencerDatabase + Send + Sync + 'static>
 }
 
 pub async fn sign_transaction(
-    client: &impl SeqL1Client,
-    tx: Transaction,
-) -> anyhow::Result<Transaction> {
+    client: &impl BitcoinSigner,
+    tx: &Transaction,
+) -> anyhow::Result<SignRawTransactionWithWallet> {
     let tx = client.sign_raw_transaction_with_wallet(tx).await?;
     Ok(tx)
 }
@@ -100,16 +101,17 @@ pub type BlobIdx = u64;
 pub async fn create_and_sign_blob_inscriptions<D: SequencerDatabase + Send + Sync + 'static>(
     blobidx: BlobIdx,
     db: Arc<D>,
-    client: Arc<impl L1Client + SeqL1Client>,
+    client: Arc<impl BitcoinReader + BitcoinWallet + BitcoinSigner>,
     config: &WriterConfig,
 ) -> anyhow::Result<()> {
     if let Some(mut entry) = get_blob_by_idx(db.clone(), blobidx).await? {
         // TODO: handle insufficient utxos
         let (commit, reveal) = build_inscription_txs(&entry.blob, &client, config).await?;
 
-        let signed_commit: Transaction = sign_transaction(client.as_ref(), commit)
+        let signed_commit: Transaction = sign_transaction(client.as_ref(), &commit)
             .await
-            .context(format!("Signing commit tx failed for blob {}", blobidx))?;
+            .context(format!("Signing commit tx failed for blob {}", blobidx))?
+            .hex;
 
         // We don't need to explicitly sign the reveal txn because we'll be doing key path spending
         // using the ephemeral key generated while building the inscriptions

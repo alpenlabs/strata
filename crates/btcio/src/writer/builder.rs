@@ -11,7 +11,6 @@ use bitcoin::{
         },
         script,
     },
-    consensus::deserialize,
     hashes::Hash,
     key::{TapTweak, TweakedPublicKey, UntweakedKeypair},
     script::PushBytesBuf,
@@ -30,10 +29,12 @@ use bitcoin::{
 use rand::RngCore;
 use thiserror::Error;
 
-use super::config::{InscriptionFeePolicy, WriterConfig};
-use crate::rpc::{
-    traits::{L1Client, SeqL1Client},
-    types::RawUTXO,
+use crate::{
+    rpc::{
+        traits::{BitcoinReader, BitcoinSigner, BitcoinWallet},
+        types::ListUnspent,
+    },
+    writer::config::{InscriptionFeePolicy, WriterConfig},
 };
 
 const BITCOIN_DUST_LIMIT: u64 = 546;
@@ -41,49 +42,6 @@ const BITCOIN_DUST_LIMIT: u64 = 546;
 // TODO: these might need to be in rollup params
 const BATCH_DATA_TAG: &[u8] = &[1];
 const ROLLUP_NAME_TAG: &[u8] = &[3];
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct Utxo {
-    pub txid: Txid,
-    pub vout: u32,
-    pub address: String,
-    pub script_pubkey: String,
-    pub amount: u64,
-    pub confirmations: u64,
-    pub spendable: bool,
-    pub solvable: bool,
-}
-
-#[derive(Debug, Error)]
-pub enum UtxoParseError {
-    #[error("Hex decode error")]
-    InvalidTxHex(#[from] hex::FromHexError),
-
-    #[error("Tx decode error")]
-    TxDecode(#[from] bitcoin::consensus::encode::Error),
-}
-
-impl TryFrom<RawUTXO> for Utxo {
-    type Error = UtxoParseError;
-
-    fn try_from(value: RawUTXO) -> Result<Self, Self::Error> {
-        let rawtxid = value.txid;
-        let mut decoded = hex::decode(rawtxid)?;
-        // Reverse because the display str has the reverse order of actual bytes
-        decoded.reverse();
-        let txid = deserialize(&decoded)?;
-        Ok(Utxo {
-            txid,
-            vout: value.vout,
-            address: value.address,
-            script_pubkey: value.script_pub_key,
-            amount: value.amount,
-            confirmations: value.confirmations,
-            spendable: value.spendable,
-            solvable: value.solvable,
-        })
-    }
-}
 
 #[derive(Debug, Error)]
 pub enum InscriptionError {
@@ -99,18 +57,15 @@ pub enum InscriptionError {
 
 pub async fn build_inscription_txs(
     payload: &[u8],
-    rpc_client: &Arc<impl SeqL1Client + L1Client>,
+    rpc_client: &Arc<impl BitcoinReader + BitcoinWallet + BitcoinSigner>,
     config: &WriterConfig,
 ) -> anyhow::Result<(Transaction, Transaction)> {
+    // let (signature, pub_key) = sign_blob_with_private_key(&payload, &config.private_key)?;
+    let network = rpc_client.network().await?;
     let utxos = rpc_client.get_utxos().await?;
-    let utxos = utxos
-        .into_iter()
-        .map(<RawUTXO as TryInto<Utxo>>::try_into)
-        .collect::<Result<Vec<Utxo>, UtxoParseError>>()
-        .map_err(|e| anyhow::anyhow!("{:?}", e))?;
 
     let fee_rate = match config.inscription_fee_policy {
-        InscriptionFeePolicy::Smart => rpc_client.estimate_smart_fee().await?,
+        InscriptionFeePolicy::Smart => rpc_client.estimate_smart_fee(1).await? * 2,
         InscriptionFeePolicy::Fixed(val) => val,
     };
     create_inscription_transactions(
@@ -120,7 +75,7 @@ pub async fn build_inscription_txs(
         config.sequencer_address.clone(),
         config.amount_for_reveal_txn,
         fee_rate,
-        rpc_client.network(),
+        network,
     )
     .map_err(|e| anyhow::anyhow!(e.to_string()))
 }
@@ -129,7 +84,7 @@ pub async fn build_inscription_txs(
 pub fn create_inscription_transactions(
     rollup_name: &str,
     write_intent: &[u8],
-    utxos: Vec<Utxo>,
+    utxos: Vec<ListUnspent>,
     recipient: Address,
     reveal_value: u64,
     fee_rate: u64,
@@ -244,9 +199,15 @@ fn get_size(
 }
 
 /// Choose utxos almost naively.
-fn choose_utxos(utxos: &[Utxo], amount: u64) -> Result<(Vec<Utxo>, u64), InscriptionError> {
-    let mut bigger_utxos: Vec<&Utxo> = utxos.iter().filter(|utxo| utxo.amount >= amount).collect();
-    let mut sum: u64 = 0;
+fn choose_utxos(
+    utxos: &[ListUnspent],
+    amount: u64,
+) -> Result<(Vec<ListUnspent>, u64), InscriptionError> {
+    let mut bigger_utxos: Vec<&ListUnspent> = utxos
+        .iter()
+        .filter(|utxo| utxo.amount.to_sat() >= amount)
+        .collect();
+    let mut sum = 0;
 
     if !bigger_utxos.is_empty() {
         // sort vec by amount (small first)
@@ -255,20 +216,22 @@ fn choose_utxos(utxos: &[Utxo], amount: u64) -> Result<(Vec<Utxo>, u64), Inscrip
         // single utxo will be enough
         // so return the transaction
         let utxo = bigger_utxos[0];
-        sum += utxo.amount;
+        sum += utxo.amount.to_sat();
 
         Ok((vec![utxo.clone()], sum))
     } else {
-        let mut smaller_utxos: Vec<&Utxo> =
-            utxos.iter().filter(|utxo| utxo.amount < amount).collect();
+        let mut smaller_utxos: Vec<&ListUnspent> = utxos
+            .iter()
+            .filter(|utxo| utxo.amount.to_sat() < amount)
+            .collect();
 
         // sort vec by amount (large first)
         smaller_utxos.sort_by_key(|x| Reverse(&x.amount));
 
-        let mut chosen_utxos: Vec<Utxo> = vec![];
+        let mut chosen_utxos: Vec<ListUnspent> = vec![];
 
         for utxo in smaller_utxos {
-            sum += utxo.amount;
+            sum += utxo.amount.to_sat();
             chosen_utxos.push(utxo.clone());
 
             if sum >= amount {
@@ -285,12 +248,12 @@ fn choose_utxos(utxos: &[Utxo], amount: u64) -> Result<(Vec<Utxo>, u64), Inscrip
 }
 
 fn build_commit_transaction(
-    utxos: Vec<Utxo>,
+    utxos: Vec<ListUnspent>,
     recipient: Address,
     change_address: Address,
     output_value: u64,
     fee_rate: u64,
-) -> Result<(Transaction, Vec<Utxo>), InscriptionError> {
+) -> Result<(Transaction, Vec<ListUnspent>), InscriptionError> {
     // get single input single output transaction size
     let mut size = get_size(
         &default_txin(),
@@ -303,9 +266,9 @@ fn build_commit_transaction(
     );
     let mut last_size = size;
 
-    let utxos: Vec<Utxo> = utxos
+    let utxos: Vec<ListUnspent> = utxos
         .iter()
-        .filter(|utxo| utxo.spendable && utxo.solvable && utxo.amount > BITCOIN_DUST_LIMIT)
+        .filter(|utxo| utxo.spendable && utxo.solvable && utxo.amount.to_sat() > BITCOIN_DUST_LIMIT)
         .cloned()
         .collect();
 
@@ -552,68 +515,72 @@ mod tests {
         TxOut, Witness,
     };
 
+    use super::*;
+    use crate::{rpc::types::ListUnspent, writer::builder::InscriptionError};
+
     const BTC_TO_SATS: u64 = 100_000_000;
-
-    use super::{Utxo, BITCOIN_DUST_LIMIT};
-    use crate::{rpc::types::RawUTXO, writer::builder::InscriptionError};
-
     const REVEAL_OUTPUT_AMOUNT: u64 = BITCOIN_DUST_LIMIT;
 
     #[allow(clippy::type_complexity)]
-    fn get_mock_data() -> (&'static str, Vec<u8>, Vec<u8>, Vec<u8>, Address, Vec<Utxo>) {
+    fn get_mock_data() -> (
+        &'static str,
+        Vec<u8>,
+        Vec<u8>,
+        Vec<u8>,
+        Address,
+        Vec<ListUnspent>,
+    ) {
         let rollup_name = "test_rollup";
         let body = vec![100; 1000];
         let signature = vec![100; 64];
         let sequencer_public_key = vec![100; 33];
         let address =
             Address::from_str("bc1pp8qru0ve43rw9xffmdd8pvveths3cx6a5t6mcr0xfn9cpxx2k24qf70xq9")
-                .unwrap()
-                .require_network(bitcoin::Network::Bitcoin)
                 .unwrap();
 
         let utxos = vec![
-            RawUTXO {
+            ListUnspent {
                 txid: "4cfbec13cf1510545f285cceceb6229bd7b6a918a8f6eba1dbee64d26226a3b7"
-                    .to_string(),
+                    .parse::<Txid>()
+                    .unwrap(),
                 vout: 0,
-                address: "bc1pp8qru0ve43rw9xffmdd8pvveths3cx6a5t6mcr0xfn9cpxx2k24qf70xq9"
-                    .to_string(),
-                script_pub_key: address.script_pubkey().to_hex_string(),
-                amount: 100 * BTC_TO_SATS,
+                address: address.clone(),
+                script_pubkey: "foo".to_string(),
+                amount: Amount::from_btc(100.0).unwrap(),
                 confirmations: 100,
                 spendable: true,
                 solvable: true,
-            }
-            .try_into()
-            .unwrap(),
-            RawUTXO {
+                label: None,
+                safe: true,
+            },
+            ListUnspent {
                 txid: "44990141674ff56ed6fee38879e497b2a726cddefd5e4d9b7bf1c4e561de4347"
-                    .to_string(),
+                    .parse::<Txid>()
+                    .unwrap(),
                 vout: 0,
-                address: "bc1pp8qru0ve43rw9xffmdd8pvveths3cx6a5t6mcr0xfn9cpxx2k24qf70xq9"
-                    .to_string(),
-                script_pub_key: address.script_pubkey().to_hex_string(),
-                amount: 50 * BTC_TO_SATS,
+                address: address.clone(),
+                script_pubkey: "foo".to_string(),
+                amount: Amount::from_btc(50.0).unwrap(),
                 confirmations: 100,
                 spendable: true,
                 solvable: true,
-            }
-            .try_into()
-            .unwrap(),
-            RawUTXO {
+                label: None,
+                safe: true,
+            },
+            ListUnspent {
                 txid: "4dbe3c10ee0d6bf16f9417c68b81e963b5bccef3924bbcb0885c9ea841912325"
-                    .to_string(),
+                    .parse::<Txid>()
+                    .unwrap(),
                 vout: 0,
-                address: "bc1pp8qru0ve43rw9xffmdd8pvveths3cx6a5t6mcr0xfn9cpxx2k24qf70xq9"
-                    .to_string(),
-                script_pub_key: address.script_pubkey().to_hex_string(),
-                amount: 10 * BTC_TO_SATS,
+                address: address.clone(),
+                script_pubkey: "foo".to_string(),
+                amount: Amount::from_btc(10.0).unwrap(),
                 confirmations: 100,
                 spendable: true,
                 solvable: true,
-            }
-            .try_into()
-            .unwrap(),
+                label: None,
+                safe: true,
+            },
         ];
 
         (
@@ -621,7 +588,7 @@ mod tests {
             body,
             signature,
             sequencer_public_key,
-            address,
+            address.assume_checked(),
             utxos,
         )
     }
@@ -664,7 +631,7 @@ mod tests {
         ));
     }
 
-    fn get_txn_from_utxo(utxo: &Utxo, _address: &Address) -> Transaction {
+    fn get_txn_from_utxo(utxo: &ListUnspent, _address: &Address) -> Transaction {
         let inputs = vec![TxIn {
             previous_output: OutPoint {
                 txid: utxo.txid,
@@ -676,8 +643,8 @@ mod tests {
         }];
 
         let outputs = vec![TxOut {
-            value: Amount::from_sat(utxo.amount),
-            script_pubkey: ScriptBuf::from_hex(utxo.script_pubkey.as_str()).unwrap(),
+            value: utxo.amount,
+            script_pubkey: utxo.address.clone().assume_checked().script_pubkey(),
         }];
 
         Transaction {

@@ -32,8 +32,8 @@ impl WriterConfig {
             rollup_name,
             // TODO: get these from config as well
             inscription_fee_policy: InscriptionFeePolicy::Smart,
-            poll_duration_ms: 1000,
-            amount_for_reveal_txn: 1000,
+            poll_duration_ms: 1_000,
+            amount_for_reveal_txn: 1_000,
         })
     }
 }

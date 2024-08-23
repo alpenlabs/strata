@@ -77,11 +77,13 @@ fn get_next_tx_idx<D: TxBroadcastDatabase + Sync + Send + 'static>(
 
 fn insert_new_tx_entry<D: TxBroadcastDatabase + Sync + Send + 'static>(
     context: &Context<D>,
-    id: Buf32,
+    txid: Buf32,
     entry: L1TxEntry,
 ) -> DbResult<u64> {
+    trace!(%txid, "insert_new_tx_entry");
+    assert!(entry.try_to_tx().is_ok(), "invalid tx entry {entry:?}");
     let bcast_store = context.db.broadcast_store();
-    bcast_store.insert_new_tx_entry(id, entry)
+    bcast_store.insert_new_tx_entry(txid, entry)
 }
 
 fn update_tx_entry<D: TxBroadcastDatabase + Sync + Send + 'static>(
