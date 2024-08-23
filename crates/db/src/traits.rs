@@ -266,22 +266,10 @@ pub trait SequencerDatabase {
 pub trait SeqDataStore {
     /// Store the blob. Also create and store appropriate blob idx -> blobid mapping.
     /// Returns new blobidx, and returns error if entry already exists
-    fn put_blob(&self, blob_id: Buf32, blobentry: BlobEntry) -> DbResult<u64>;
+    fn add_new_blob_entry(&self, blobid: Buf32, blobentry: BlobEntry) -> DbResult<u64>;
 
-    /// Update an existing blob
-    fn update_blob_by_idx(&self, blobidx: u64, blobentry: BlobEntry) -> DbResult<()>;
-
-    /// Store serialized L1 commit-reveal txs
-    fn put_commit_reveal_txs(
-        &self,
-        commit_tx_id: Buf32,
-        commit_tx: Vec<u8>,
-        reveal_tx_id: Buf32,
-        reveal_tx: Vec<u8>,
-    ) -> DbResult<()>;
-
-    // TODO: might need method to remove tx as well because tx corresponding to blob might have to
-    // be reconstructed if inputs change or reorg happen
+    /// Update an existing blob entry
+    fn update_blob_entry(&self, blobid: Buf32, blobentry: BlobEntry) -> DbResult<()>;
 }
 
 #[cfg_attr(feature = "mocks", automock)]
@@ -290,13 +278,10 @@ pub trait SeqDataProvider {
     fn get_blob_by_id(&self, id: Buf32) -> DbResult<Option<BlobEntry>>;
 
     /// Get blob by its idx
-    fn get_blob_by_idx(&self, blobidx: u64) -> DbResult<Option<BlobEntry>>;
+    fn get_blob_id(&self, blobidx: u64) -> DbResult<Option<Buf32>>;
 
     /// Get the last blob idx
     fn get_last_blob_idx(&self) -> DbResult<Option<u64>>;
-
-    /// Get l1 tx
-    fn get_l1_tx(&self, txid: Buf32) -> DbResult<Option<Vec<u8>>>;
 }
 
 /// A trait encapsulating the provider and store traits for interacting with the broadcast

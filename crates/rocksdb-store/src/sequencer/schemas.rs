@@ -6,16 +6,6 @@ use crate::{
     impl_borsh_value_codec,
 };
 
-define_table_with_default_codec!(
-    /// A table to store L1 txns
-    (SeqL1TxnSchema) Buf32 => Vec<u8>
-);
-
-define_table_with_seek_key_codec!(
-    /// A table to store mapping of idx to L1 tx
-    (SeqL1TxIdSchema) u64 => Buf32
-);
-
 define_table_with_seek_key_codec!(
     /// A table to store idx-> blobid mapping
     (SeqBlobIdSchema) u64 => Buf32

@@ -9,7 +9,7 @@ use alpen_express_db::{
 use alpen_express_primitives::buf::Buf32;
 use rockbound::{OptimisticTransactionDB, SchemaBatch, SchemaDBOperationsExt};
 
-use super::schemas::{SeqBlobIdSchema, SeqBlobSchema, SeqL1TxnSchema};
+use super::schemas::{SeqBlobIdSchema, SeqBlobSchema};
 use crate::DbOpsConfig;
 
 pub struct SeqDb {
@@ -28,7 +28,7 @@ impl SeqDb {
 }
 
 impl SeqDataStore for SeqDb {
-    fn put_blob(&self, blob_hash: Buf32, blob: BlobEntry) -> DbResult<u64> {
+    fn add_new_blob_entry(&self, blob_hash: Buf32, blob: BlobEntry) -> DbResult<u64> {
         self.db
             .with_optimistic_txn(
                 rockbound::TransactionRetry::Count(self.ops.retry_count),
@@ -52,30 +52,8 @@ impl SeqDataStore for SeqDb {
             .map_err(|e| DbError::TransactionError(e.to_string()))
     }
 
-    fn put_commit_reveal_txs(
-        &self,
-        commit_txid: Buf32,
-        commit_tx: Vec<u8>,
-        reveal_txid: Buf32,
-        reveal_tx: Vec<u8>,
-    ) -> DbResult<()> {
-        let mut batch = SchemaBatch::new();
-
-        // Atomically add the entries
-        batch.put::<SeqL1TxnSchema>(&commit_txid, &commit_tx)?;
-        batch.put::<SeqL1TxnSchema>(&reveal_txid, &reveal_tx)?;
-
-        self.db.write_schemas(batch)?;
-        Ok(())
-    }
-
-    fn update_blob_by_idx(&self, blobidx: u64, blobentry: BlobEntry) -> DbResult<()> {
-        match self.db.get::<SeqBlobIdSchema>(&blobidx)? {
-            Some(id) => Ok(self.db.put::<SeqBlobSchema>(&id, &blobentry)?),
-            None => Err(DbError::Other(format!(
-                "BlobEntry does not exist for idx {blobidx:?}"
-            ))),
-        }
+    fn update_blob_entry(&self, blobid: Buf32, blobentry: BlobEntry) -> DbResult<()> {
+        Ok(self.db.put::<SeqBlobSchema>(&blobid, &blobentry)?)
     }
 }
 
@@ -88,15 +66,8 @@ impl SeqDataProvider for SeqDb {
         Ok(rockbound::utils::get_last::<SeqBlobIdSchema>(&*self.db)?.map(|(x, _)| x))
     }
 
-    fn get_l1_tx(&self, txid: Buf32) -> DbResult<Option<Vec<u8>>> {
-        Ok(self.db.get::<SeqL1TxnSchema>(&txid)?)
-    }
-
-    fn get_blob_by_idx(&self, blobidx: u64) -> DbResult<Option<BlobEntry>> {
-        match self.db.get::<SeqBlobIdSchema>(&blobidx)? {
-            Some(id) => Ok(self.db.get::<SeqBlobSchema>(&id)?),
-            None => Ok(None),
-        }
+    fn get_blob_id(&self, blobidx: u64) -> DbResult<Option<Buf32>> {
+        Ok(self.db.get::<SeqBlobIdSchema>(&blobidx)?)
     }
 }
 
@@ -131,19 +102,11 @@ mod tests {
         traits::{SeqDataProvider, SeqDataStore},
     };
     use alpen_express_primitives::buf::Buf32;
-    use alpen_test_utils::{bitcoin::get_test_bitcoin_txns, ArbitraryGenerator};
-    use bitcoin::{consensus::serialize, hashes::Hash};
+    use alpen_test_utils::ArbitraryGenerator;
     use test;
 
     use super::*;
     use crate::test_utils::get_rocksdb_tmp_instance;
-
-    fn get_commit_reveal_txns() -> ((Buf32, Vec<u8>), (Buf32, Vec<u8>)) {
-        let txns = get_test_bitcoin_txns();
-        let ctxid = txns[0].compute_txid().as_raw_hash().to_byte_array().into();
-        let rtxid = txns[1].compute_txid().as_raw_hash().to_byte_array().into();
-        ((ctxid, serialize(&txns[0])), (rtxid, serialize(&txns[1])))
-    }
 
     #[test]
     fn test_put_blob_new_entry() {
@@ -153,11 +116,12 @@ mod tests {
         let blob: BlobEntry = ArbitraryGenerator::new().generate();
         let blob_hash: Buf32 = [0; 32].into();
 
-        let idx = seq_db.put_blob(blob_hash, blob.clone()).unwrap();
+        let idx = seq_db.add_new_blob_entry(blob_hash, blob.clone()).unwrap();
 
         assert_eq!(idx, 0);
+        assert_eq!(seq_db.get_blob_id(idx).unwrap(), Some(blob_hash));
 
-        let stored_blob = seq_db.get_blob_by_idx(idx).unwrap();
+        let stored_blob = seq_db.get_blob_by_id(blob_hash).unwrap();
         assert_eq!(stored_blob, Some(blob));
     }
 
@@ -168,9 +132,9 @@ mod tests {
         let blob: BlobEntry = ArbitraryGenerator::new().generate();
         let blob_hash: Buf32 = [0; 32].into();
 
-        let _ = seq_db.put_blob(blob_hash, blob.clone()).unwrap();
+        let _ = seq_db.add_new_blob_entry(blob_hash, blob.clone()).unwrap();
 
-        let result = seq_db.put_blob(blob_hash, blob);
+        let result = seq_db.add_new_blob_entry(blob_hash, blob);
 
         assert!(result.is_err());
         if let Err(DbError::Other(err)) = result {
@@ -179,25 +143,7 @@ mod tests {
     }
 
     #[test]
-    fn test_put_commit_reveal_txns() {
-        let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-        let seq_db = SeqDb::new(db, db_ops);
-
-        let ((cid, craw), (rid, rraw)) = get_commit_reveal_txns();
-
-        seq_db
-            .put_commit_reveal_txs(cid, craw.clone(), rid, rraw.clone())
-            .unwrap();
-
-        let stored_commit_txn = seq_db.get_l1_tx(cid).unwrap();
-        assert_eq!(stored_commit_txn, Some(craw));
-
-        let stored_reveal_txn = seq_db.get_l1_tx(rid).unwrap();
-        assert_eq!(stored_reveal_txn, Some(rraw));
-    }
-
-    #[test]
-    fn test_update_blob_by_idx() {
+    fn test_update_blob_() {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
         let seq_db = SeqDb::new(db, db_ops);
 
@@ -205,17 +151,13 @@ mod tests {
         let blob_hash: Buf32 = [0; 32].into();
 
         // Insert
-        let idx = seq_db.put_blob(blob_hash, blob.clone()).unwrap();
-
-        // Try update inexistent idx
-        let res = seq_db.update_blob_by_idx(idx + 1, blob);
-        assert!(res.is_err());
+        let _idx = seq_db.add_new_blob_entry(blob_hash, blob.clone()).unwrap();
 
         let updated_blob: BlobEntry = ArbitraryGenerator::new().generate();
 
         // Update existing idx
         seq_db
-            .update_blob_by_idx(idx, updated_blob.clone())
+            .update_blob_entry(blob_hash, updated_blob.clone())
             .unwrap();
         let retrieved_blob = seq_db.get_blob_by_id(blob_hash).unwrap().unwrap();
         assert_eq!(updated_blob, retrieved_blob);
@@ -229,23 +171,9 @@ mod tests {
         let blob: BlobEntry = ArbitraryGenerator::new().generate();
         let blob_hash: Buf32 = [0; 32].into();
 
-        let _ = seq_db.put_blob(blob_hash, blob.clone()).unwrap();
+        let _ = seq_db.add_new_blob_entry(blob_hash, blob.clone()).unwrap();
 
         let retrieved = seq_db.get_blob_by_id(blob_hash).unwrap().unwrap();
-        assert_eq!(retrieved, blob);
-    }
-
-    #[test]
-    fn test_get_blob_by_idx() {
-        let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-        let seq_db = SeqDb::new(db, db_ops);
-
-        let blob: BlobEntry = ArbitraryGenerator::new().generate();
-        let blob_hash: Buf32 = [0; 32].into();
-
-        let idx = seq_db.put_blob(blob_hash, blob.clone()).unwrap();
-
-        let retrieved = seq_db.get_blob_by_idx(idx).unwrap().unwrap();
         assert_eq!(retrieved, blob);
     }
 
@@ -263,37 +191,15 @@ mod tests {
             "There is no last blobidx in the beginning"
         );
 
-        let _ = seq_db.put_blob(blob_hash, blob.clone()).unwrap();
+        let _ = seq_db.add_new_blob_entry(blob_hash, blob.clone()).unwrap();
 
         let blob: BlobEntry = ArbitraryGenerator::new().generate();
         let blob_hash: Buf32 = [1; 32].into();
 
-        let idx = seq_db.put_blob(blob_hash, blob.clone()).unwrap();
+        let idx = seq_db.add_new_blob_entry(blob_hash, blob.clone()).unwrap();
 
         let last_blob_idx = seq_db.get_last_blob_idx().unwrap();
 
         assert_eq!(last_blob_idx, Some(idx));
-    }
-
-    #[test]
-    fn test_get_l1_tx() {
-        let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-        let seq_db = SeqDb::new(db, db_ops);
-
-        // Test non existing l1 tx
-        let res = seq_db.get_l1_tx(Buf32::zero()).unwrap();
-        assert_eq!(res, None);
-
-        let ((cid, craw), (rid, rraw)) = get_commit_reveal_txns();
-
-        seq_db
-            .put_commit_reveal_txs(cid, craw.clone(), rid, rraw.clone())
-            .unwrap();
-
-        let stored_commit_txn = seq_db.get_l1_tx(cid).unwrap();
-        assert_eq!(stored_commit_txn, Some(craw));
-
-        let stored_reveal_txn = seq_db.get_l1_tx(rid).unwrap();
-        assert_eq!(stored_reveal_txn, Some(rraw));
     }
 }
