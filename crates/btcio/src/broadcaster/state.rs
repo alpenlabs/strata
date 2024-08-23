@@ -73,7 +73,7 @@ async fn filter_unfinalized_from_db(
         };
 
         match txentry.status {
-            L1TxStatus::Finalized(_) | L1TxStatus::Excluded(_) => {}
+            L1TxStatus::Finalized { height: _ } | L1TxStatus::Excluded { reason: _ } => {}
             _ => {
                 unfinalized_entries.insert(idx, txentry);
             }
@@ -115,11 +115,11 @@ mod test {
     }
 
     fn gen_confirmed_entry() -> L1TxEntry {
-        gen_entry_with_status(L1TxStatus::Confirmed(1))
+        gen_entry_with_status(L1TxStatus::Confirmed { height: 1 })
     }
 
     fn gen_finalized_entry() -> L1TxEntry {
-        gen_entry_with_status(L1TxStatus::Finalized(1))
+        gen_entry_with_status(L1TxStatus::Finalized { height: 1 })
     }
 
     fn gen_unpublished_entry() -> L1TxEntry {
@@ -131,7 +131,9 @@ mod test {
     }
 
     fn gen_excluded_entry() -> L1TxEntry {
-        gen_entry_with_status(L1TxStatus::Excluded(ExcludeReason::MissingInputsOrSpent))
+        gen_entry_with_status(L1TxStatus::Excluded {
+            reason: ExcludeReason::MissingInputsOrSpent,
+        })
     }
 
     async fn populate_broadcast_db(ops: Arc<BroadcastDbOps>) -> Vec<(u64, L1TxEntry)> {
@@ -227,7 +229,9 @@ mod test {
         assert_eq!(state.next_idx, idx1 + 1);
         assert_eq!(
             state.unfinalized_entries.get(&0).unwrap().status,
-            L1TxStatus::Excluded(ExcludeReason::MissingInputsOrSpent)
+            L1TxStatus::Excluded {
+                reason: ExcludeReason::MissingInputsOrSpent
+            }
         );
 
         // check it does not contain idx of excluded but contains that of published tx

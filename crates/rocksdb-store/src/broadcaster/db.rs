@@ -202,7 +202,7 @@ mod tests {
             .unwrap();
 
         let mut updated_txentry = txentry;
-        updated_txentry.status = L1TxStatus::Finalized(1);
+        updated_txentry.status = L1TxStatus::Finalized { height: 1 };
 
         broadcast_db
             .update_tx_entry_by_id(txid, updated_txentry.clone())
@@ -228,7 +228,7 @@ mod tests {
             .unwrap();
 
         let mut updated_txentry = txentry;
-        updated_txentry.status = L1TxStatus::Finalized(1);
+        updated_txentry.status = L1TxStatus::Finalized { height: 1 };
 
         broadcast_db
             .update_tx_entry(idx, updated_txentry.clone())
