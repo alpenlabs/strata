@@ -4,12 +4,12 @@ use alpen_express_rpc_types::{
     types::{BlockHeader, ClientStatus, DepositEntry, ExecUpdate, L1Status},
     L2BlockId,
 };
+use alpen_express_state::bridge_duties::BridgeDuties;
 use alpen_express_state::bridge_state::OperatorIdx;
-use alpen_express_state::{bridge_duties::BridgeDuties, bridge_ops::WithdrawalBatch};
 use express_bridge_txm::{DepositInfo, ReimbursementRequest};
 
 use bitcoin::secp256k1::schnorr::Signature;
-use bitcoin::{OutPoint, Transaction, Txid};
+use bitcoin::{Transaction, Txid};
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;

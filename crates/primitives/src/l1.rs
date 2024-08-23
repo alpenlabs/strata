@@ -1,8 +1,7 @@
 use std::{
-    io,
-    io::{ErrorKind, Read, Write},
+    io::{self, ErrorKind, Read, Write},
     iter::Sum,
-    ops::Add,
+    ops::{Add, Deref, DerefMut},
     str::FromStr,
 };
 
@@ -13,7 +12,7 @@ use bitcoin::{
     consensus::serialize,
     hashes::{sha256d, Hash},
     key::TapTweak,
-    Address, AddressType, Block, Network, OutPoint, XOnlyPublicKey,
+    Address, AddressType, Amount, Block, Network, OutPoint, XOnlyPublicKey,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 use reth_primitives::revm_primitives::FixedBytes;
@@ -296,61 +295,59 @@ impl BorshDeserialize for BitcoinAddress {
     }
 }
 
-/// A wrapper for bitcoin amount in sats similar to the implementation in [`bitcoin::Amount`].
+/// A wrapper for [`bitcoin::Amount`].
 ///
 /// NOTE: This wrapper has been created so that we can implement `Borsh*` traits on it.
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    Serialize,
-    Deserialize,
-    Eq,
-    PartialEq,
-    BorshSerialize,
-    BorshDeserialize,
-    Arbitrary,
-)]
-pub struct BitcoinAmount(u64);
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Eq, PartialEq)]
+pub struct BitcoinAmount(Amount);
 
-impl BitcoinAmount {
-    // The zero amount.
-    pub const ZERO: BitcoinAmount = Self(0);
-    /// The maximum value allowed as an amount. Useful for sanity checking.
-    pub const MAX_MONEY: BitcoinAmount = Self::from_int_btc(21_000_000);
-    /// The minimum value of an amount.
-    pub const MIN: BitcoinAmount = Self::ZERO;
-    /// The maximum value of an amount.
-    pub const MAX: BitcoinAmount = Self(u64::MAX);
-    /// The number of bytes that an amount contributes to the size of a transaction.
-    pub const SIZE: usize = 8; // Serialized length of a u64.
-                               // The number of sats in 1 bitcoin.
-    pub const SATS_FACTOR: u64 = 100_000_000;
+impl From<Amount> for BitcoinAmount {
+    fn from(value: Amount) -> Self {
+        BitcoinAmount(value)
+    }
+}
 
-    /// Get the number of sats in this [`BitcoinAmount`].
-    pub fn to_sat(&self) -> u64 {
-        self.0
+impl Deref for BitcoinAmount {
+    type Target = Amount;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for BitcoinAmount {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl BorshSerialize for BitcoinAmount {
+    fn serialize<W: Write>(&self, writer: &mut W) -> io::Result<()> {
+        let sats = self.0.to_sat();
+
+        borsh::BorshSerialize::serialize(&sats, writer)
+    }
+}
+
+impl BorshDeserialize for BitcoinAmount {
+    fn deserialize(buf: &mut &[u8]) -> io::Result<Self> {
+        let sats = borsh::BorshDeserialize::deserialize(buf)?;
+
+        Ok(BitcoinAmount(Amount::from_sat(sats)))
     }
 
-    /// Create a [`BitcoinAmount`] with sats precision and the given number of sats.
-    pub const fn from_sat(value: u64) -> Self {
-        Self(value)
-    }
+    fn deserialize_reader<R: Read>(reader: &mut R) -> io::Result<Self> {
+        let sats = borsh::BorshDeserialize::deserialize_reader(reader)?;
 
-    /// Convert from a value expressing integer values of bitcoins to a [`BitcoinAmount`]
-    /// in const context.
-    ///
-    /// ## Panics
-    ///
-    /// The function panics if the argument multiplied by the number of sats
-    /// per bitcoin overflows a u64 type.
-    pub const fn from_int_btc(btc: u64) -> Self {
-        match btc.checked_mul(Self::SATS_FACTOR) {
-            Some(amount) => Self::from_sat(amount),
-            None => {
-                panic!("number of sats greater than u64::MAX");
-            }
-        }
+        Ok(BitcoinAmount(Amount::from_sat(sats)))
+    }
+}
+
+impl<'a> Arbitrary<'a> for BitcoinAmount {
+    fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
+        // Generate a random u64 value and convert it to Amount
+        let sats: u64 = u.arbitrary()?;
+        Ok(BitcoinAmount(Amount::from_sat(sats)))
     }
 }
 
@@ -358,13 +355,15 @@ impl Add for BitcoinAmount {
     type Output = BitcoinAmount;
 
     fn add(self, rhs: Self) -> Self::Output {
-        Self::from_sat(self.to_sat() + rhs.to_sat())
+        BitcoinAmount(self.0 + rhs.0)
     }
 }
 
 impl Sum for BitcoinAmount {
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
-        Self::from_sat(iter.map(|amt| amt.to_sat()).sum())
+        let total_amt = iter.fold(Amount::ZERO, |acc, amt| acc + amt.0);
+
+        BitcoinAmount(total_amt)
     }
 }
 
@@ -430,10 +429,7 @@ mod tests {
         Address, Network, ScriptBuf, TapNodeHash, Txid, XOnlyPublicKey,
     };
 
-    use super::{
-        BitcoinAddress, BitcoinAmount, BorshDeserialize, BorshSerialize, OutPoint, OutputRef,
-        XOnlyPk,
-    };
+    use super::{BitcoinAddress, BorshDeserialize, BorshSerialize, OutPoint, OutputRef, XOnlyPk};
 
     #[test]
     fn borsh_serialization_of_outputref_works() {
@@ -561,14 +557,6 @@ mod tests {
             new_taproot_pubkey.unwrap(),
             "converted and original taproot pubkeys must be the same"
         );
-    }
-
-    #[test]
-    #[should_panic(expected = "number of sats greater than u64::MAX")]
-    fn bitcoinamount_should_handle_sats_exceeding_u64_max() {
-        let bitcoins: u64 = u64::MAX / BitcoinAmount::SATS_FACTOR + 1;
-
-        BitcoinAmount::from_int_btc(bitcoins);
     }
 
     fn get_taproot_address(
