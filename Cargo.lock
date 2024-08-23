@@ -830,6 +830,7 @@ dependencies = [
  "clap",
  "express-reth-db",
  "express-reth-exex",
+ "express-reth-node",
  "express-reth-rpc",
  "eyre",
  "reth",
@@ -3623,6 +3624,28 @@ dependencies = [
  "tokio",
  "tracing",
  "zkvm-primitives",
+]
+
+[[package]]
+name = "express-reth-node"
+version = "0.1.0"
+dependencies = [
+ "alpen-express-rpc-types",
+ "eyre",
+ "reth",
+ "reth-basic-payload-builder",
+ "reth-chainspec",
+ "reth-ethereum-payload-builder",
+ "reth-evm",
+ "reth-node-api",
+ "reth-node-ethereum",
+ "reth-payload-builder",
+ "reth-primitives",
+ "reth-rpc-types",
+ "revm",
+ "revm-primitives",
+ "serde",
+ "tracing",
 ]
 
 [[package]]

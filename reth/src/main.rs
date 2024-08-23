@@ -5,6 +5,7 @@ use std::{future::Future, sync::Arc};
 use clap::Parser;
 use express_reth_db::rocksdb::WitnessDB;
 use express_reth_exex::ProverWitnessGenerator;
+use express_reth_node::ExpressEthereumNode;
 use express_reth_rpc::{AlpenRPC, AlpenRpcApiServer};
 use eyre::Ok;
 use reth::{
@@ -14,7 +15,6 @@ use reth::{
 };
 use reth_chainspec::ChainSpec;
 use reth_cli_commands::node::NodeCommand;
-use reth_node_ethereum::EthereumNode;
 use reth_primitives::Genesis;
 use tracing::info;
 
@@ -36,7 +36,7 @@ fn main() {
 
     if let Err(err) = run(command, |builder, ext| async move {
         let datadir = builder.config().datadir().data_dir().to_path_buf();
-        let mut node_builder = builder.node(EthereumNode::default());
+        let mut node_builder = builder.node(ExpressEthereumNode::default());
 
         // Install Prover Input ExEx, persist to DB, and add RPC for querying block witness.
         if ext.enable_witness_gen {

@@ -82,7 +82,7 @@ pub struct BlockHeader {
     pub state_root: [u8; 32],
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct WithdrawalIntent {
     /// Amount of currency to be withdrawn.
     pub amt: u64,
