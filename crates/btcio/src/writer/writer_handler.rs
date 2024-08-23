@@ -61,6 +61,7 @@ impl<D: SequencerDatabase + Send + Sync + 'static> DaWriter<D> {
 }
 
 pub fn start_writer_task<D: SequencerDatabase + Send + Sync + 'static>(
+    executor: &TaskExecutor,
     rpc_client: Arc<impl BitcoinClient>,
     config: WriterConfig,
     db: Arc<D>,

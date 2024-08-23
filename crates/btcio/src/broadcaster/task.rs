@@ -155,8 +155,8 @@ async fn handle_entry(
             let txid = Txid::from_slice(txid.0.as_slice())
                 .map_err(|e| BroadcasterError::Other(e.to_string()))?;
             let txinfo = rpc_client
-                .get_transaction(txid)
-                .wait
+                .get_transaction_info(txid)
+                .await
                 .map_err(|e| BroadcasterError::Other(e.to_string()))?;
             match txinfo.confirmations {
                 0 if matches!(txentry.status, L1TxStatus::Confirmed(_h)) => {

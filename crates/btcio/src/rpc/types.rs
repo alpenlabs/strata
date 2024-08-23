@@ -4,9 +4,17 @@ use bitcoin::BlockHash;
 use serde::{de::Visitor, Deserialize, Deserializer, Serialize};
 use tracing::*;
 
+/// Information about a Bitcoin transaction.
+///
+/// # Note
+///
+/// This type contains more information than the
+/// [`Transaction`](bitcoin::Transaction) type from the [`bitcoin`](bitcoin)
+/// crate. This is due to the fact that the Bitcoin Core RPC interface provides
+/// more information than what is available in the Bitcoin transaction format.
 #[derive(Clone, Debug, Deserialize)]
 #[cfg_attr(test, derive(Arbitrary))]
-pub struct RPCTransactionInfo {
+pub struct RpcTransactionInfo {
     pub amount: f64,
     pub fee: Option<f64>,
     pub confirmations: u64,
@@ -29,16 +37,15 @@ pub struct RPCTransactionInfo {
     pub bip125_replaceable: String,
     pub parent_descs: Option<Vec<String>>,
     pub hex: String,
-    // NOTE: "details", and "decoded" fields omitted as not used, add them when used
 }
 
-impl RPCTransactionInfo {
+impl RpcTransactionInfo {
     pub fn block_height(&self) -> u64 {
         if self.confirmations == 0 {
             return 0;
         }
         self.blockheight.unwrap_or_else(|| {
-            warn!("Txn confirmed but did not obtain blockheight. Setting height to zero");
+            warn!("Transaction confirmed but did not obtain blockheight. Setting height to zero");
             0
         })
     }

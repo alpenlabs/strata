@@ -218,7 +218,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         bitcoind_url,
         config.bitcoind_rpc.rpc_user.clone(),
         config.bitcoind_rpc.rpc_password.clone(),
-    )
+    );
     let btc_rpc = Arc::new(btc_rpc);
 
     // TODO remove this

@@ -5,7 +5,7 @@ use bitcoincore_rpc_async::Error as RpcError;
 
 use crate::rpc::{
     traits::BitcoinClient,
-    types::{RawUTXO, RpcBlockchainInfo},
+    types::{RawUTXO, RpcBlockchainInfo, RpcTransactionInfo},
 };
 
 pub struct BitcoinDTestClient {
@@ -63,11 +63,9 @@ impl BitcoinClient for BitcoinDTestClient {
         Ok(vec![])
     }
 
-    async fn get_transaction(&self, txid: Txid) -> Result<Transaction, RpcError> {
-        let mut txinfo: Transaction = ArbitraryGenerator::new().generate();
-        txinfo.confirmations = self.confs;
-        txinfo.blockheight = Some(self.included_height);
-        Ok(txinfo)
+    async fn get_transaction(&self, _txid: Txid) -> Result<Transaction, RpcError> {
+        let tx: Transaction = deserialize(&hex::decode(TEST_BLOCKSTR).unwrap()).unwrap();
+        Ok(tx)
     }
 
     async fn get_transaction_confirmations<T: AsRef<[u8; 32]> + Send>(
@@ -75,6 +73,13 @@ impl BitcoinClient for BitcoinDTestClient {
         _txid: T,
     ) -> Result<u64, RpcError> {
         Ok(self.confs)
+    }
+
+    async fn get_transaction_info(&self, _txid: Txid) -> Result<RpcTransactionInfo, RpcError> {
+        let mut txinfo: RpcTransactionInfo = ArbitraryGenerator::new().generate();
+        txinfo.confirmations = self.confs;
+        txinfo.blockheight = Some(self.included_height);
+        Ok(txinfo)
     }
 
     async fn get_utxos(&self) -> Result<Vec<RawUTXO>, RpcError> {

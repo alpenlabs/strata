@@ -5,7 +5,7 @@ use bitcoincore_rpc_async::Error as RpcError;
 use bitcoincore_rpc_async::{Auth, Client};
 
 use super::traits::BitcoinClient;
-use super::types::{RawUTXO, RpcBlockchainInfo};
+use super::types::{RawUTXO, RpcBlockchainInfo, RpcTransactionInfo};
 
 /// Thin wrapper around the [`bitcoincore_rpc_async`]'s [`Client`].
 ///
@@ -70,6 +70,10 @@ impl BitcoinClient for BitcoinDClient {
         txid: T,
     ) -> Result<u64, RpcError> {
         self.get_transaction_confirmations(txid).await
+    }
+
+    async fn get_transaction_info(&self, txid: Txid) -> Result<RpcTransactionInfo, RpcError> {
+        self.get_transaction_info(txid).await
     }
 
     async fn get_utxos(&self) -> Result<Vec<RawUTXO>, RpcError> {

@@ -154,10 +154,7 @@ mod test {
     };
 
     use super::*;
-    use crate::writer::{
-        config::{InscriptionFeePolicy, WriterConfig},
-        test_utils::BitcoinDTestClient,
-    };
+    use crate::{test_utils::BitcoinDTestClient, writer::config::{InscriptionFeePolicy, WriterConfig}};
 
     fn get_db() -> Arc<SequencerDB<SeqDb>> {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();

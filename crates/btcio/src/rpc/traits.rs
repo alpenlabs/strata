@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use bitcoin::{Amount, Block, BlockHash, Transaction, Txid};
 use bitcoincore_rpc_async::Error as RpcError;
 
-use super::types::{RawUTXO, RpcBlockchainInfo};
+use super::types::{RawUTXO, RpcBlockchainInfo, RpcTransactionInfo};
 
 /// Basic functionality that any Bitcoin client that interacts with the
 /// Bitcoin network should provide.
@@ -71,6 +71,16 @@ pub trait BitcoinClient: Sync + Send + 'static {
         &self,
         txid: T,
     ) -> Result<u64, RpcError>;
+
+    /// Gets information related to a transaction.
+    ///
+    /// This is equivalent to the `gettransaction` RPC call in Bitcoin Core.
+    ///
+    /// # Note
+    ///
+    /// This assumes that the transaction is present in the underlying Bitcoin
+    /// client's wallet.
+    async fn get_transaction_info(&self, txid: Txid) -> Result<RpcTransactionInfo, RpcError>;
 
     /// Gets all Unspent Transaction Outputs (UTXOs) for the underlying Bitcoin
     /// client's wallet.
