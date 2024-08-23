@@ -4,17 +4,17 @@ use alpen_express_db::{
     traits::SequencerDatabase,
     types::{BlobEntry, BlobL1Status, ExcludeReason, L1TxEntry, L1TxStatus},
 };
-use alpen_express_rpc_types::L1Status;
 use alpen_express_state::da_blob::{BlobDest, BlobIntent};
+use alpen_express_status::StatusTx;
 use express_storage::ops::inscription::{Context, InscriptionDataOps};
 use express_tasks::TaskExecutor;
-use tokio::sync::RwLock;
 use tracing::*;
 
 use super::config::WriterConfig;
 use crate::{
     broadcaster::L1BroadcastHandle,
     rpc::traits::{L1Client, SeqL1Client},
+    status::{apply_status_updates, L1StatusUpdate},
     writer::signer::create_and_sign_blob_inscriptions,
 };
 
@@ -91,7 +91,7 @@ pub fn start_inscription_task<D: SequencerDatabase + Send + Sync + 'static>(
     rpc_client: Arc<impl SeqL1Client + L1Client>,
     config: WriterConfig,
     db: Arc<D>,
-    l1_status: Arc<RwLock<L1Status>>,
+    status_tx: Arc<StatusTx>,
     pool: threadpool::ThreadPool,
     bcast_handle: Arc<L1BroadcastHandle>,
 ) -> anyhow::Result<InscriptionHandle> {
@@ -107,7 +107,7 @@ pub fn start_inscription_task<D: SequencerDatabase + Send + Sync + 'static>(
             config,
             ops,
             bcast_handle,
-            l1_status,
+            status_tx,
         )
         .await
         .unwrap()
@@ -147,7 +147,7 @@ pub async fn watcher_task(
     config: WriterConfig,
     insc_ops: Arc<InscriptionDataOps>,
     bcast_handle: Arc<L1BroadcastHandle>,
-    l1_status: Arc<RwLock<L1Status>>,
+    status_tx: Arc<StatusTx>,
 ) -> anyhow::Result<()> {
     info!("Starting L1 writer's watcher task");
     let interval = tokio::time::interval(Duration::from_millis(config.poll_duration_ms));
@@ -202,7 +202,7 @@ pub async fn watcher_task(
                             let new_status =
                                 determine_blob_next_status(&ctx, &rtx, &blobentry.status)?;
 
-                            update_l1_status(&blobentry, &new_status, l1_status.as_ref()).await;
+                            update_l1_status(&blobentry, &new_status, status_tx.clone()).await;
 
                             // Update blobentry with new status
                             let mut updated_entry = blobentry.clone();
@@ -234,7 +234,7 @@ pub async fn watcher_task(
 async fn update_l1_status(
     blobentry: &BlobEntry,
     new_status: &BlobL1Status,
-    l1_status: &RwLock<L1Status>,
+    status_tx: Arc<StatusTx>,
 ) {
     // Update L1 status. Since we are processing one blobentry at a time, if the entry is
     // finalized/confirmed, then it means it is published as well
@@ -242,9 +242,11 @@ async fn update_l1_status(
         || *new_status == BlobL1Status::Confirmed
         || *new_status == BlobL1Status::Finalized
     {
-        let mut status = l1_status.write().await;
-        status.last_published_txid = Some(blobentry.reveal_txid.into());
-        status.published_inscription_count += 1;
+        let status_updates = [
+            L1StatusUpdate::LastPublishedTxid(blobentry.reveal_txid.into()),
+            L1StatusUpdate::IncrementInscriptionCount,
+        ];
+        apply_status_updates(&status_updates, status_tx).await;
     }
 }
 

@@ -7,7 +7,7 @@ use alpen_express_btcio::{
 use alpen_express_consensus_logic::{ctl::CsmController, l1_handler::bitcoin_data_handler_task};
 use alpen_express_db::traits::{Database, L1DataProvider};
 use alpen_express_primitives::params::Params;
-use alpen_express_status:: StatusTx;
+use alpen_express_status::StatusTx;
 use express_tasks::TaskExecutor;
 use tokio::sync::mpsc;
 

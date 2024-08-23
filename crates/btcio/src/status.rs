@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use alpen_express_status::StatusTx;
+use bitcoin::Txid;
 use tracing::{debug, error};
 
 #[derive(Debug, Clone)]
@@ -10,7 +11,7 @@ pub enum L1StatusUpdate {
     RpcConnected(bool),
     RpcError(String),
     CurTip(String),
-    LastPublishedTxid(String),
+    LastPublishedTxid(Txid),
     IncrementInscriptionCount,
 }
 

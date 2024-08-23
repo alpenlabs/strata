@@ -7,17 +7,14 @@ use std::sync::Arc;
 use alpen_express_db::traits::Database;
 use alpen_express_eectl::engine::ExecEngineCtl;
 use alpen_express_primitives::params::Params;
-use alpen_express_rpc_types::L1Status;
-use alpen_express_state::csm_status::CsmStatus;
-use alpen_express_status::{create_status_channel, StatusRx, StatusTx};
+use alpen_express_status::{StatusRx, StatusTx};
 use express_storage::L2BlockManager;
 use express_tasks::TaskExecutor;
 use tokio::sync::{broadcast, mpsc};
-use tracing::*;
 
 use crate::{
     ctl::CsmController,
-    fork_choice_manager, genesis,
+    fork_choice_manager,
     message::{ClientUpdateNotif, CsmMessage, ForkChoiceMessage},
     worker,
 };
@@ -88,8 +85,7 @@ pub fn start_sync_tasks<
     engine: Arc<E>,
     pool: threadpool::ThreadPool,
     params: Arc<Params>,
-    status_tx: Arc<StatusTx>,
-    status_rx: Arc<StatusRx>,
+    status_bundle: (Arc<StatusTx>, Arc<StatusRx>),
 ) -> anyhow::Result<SyncManager> {
     // Create channels.
     let (fcm_tx, fcm_rx) = mpsc::channel::<ForkChoiceMessage>(64);
@@ -131,9 +127,10 @@ pub fn start_sync_tasks<
     let csm_eng = engine.clone();
     let csm_fcm_tx = fcm_tx.clone();
 
-    let ns = status_tx.clone();
+    let status_tx = status_bundle.0.clone();
     executor.spawn_critical("client_worker_task", |shutdown| {
-        worker::client_worker_task(shutdown, cw_state, csm_eng, csm_rx, ns, csm_fcm_tx).unwrap();
+        worker::client_worker_task(shutdown, cw_state, csm_eng, csm_rx, status_tx, csm_fcm_tx)
+            .unwrap();
     });
 
     Ok(SyncManager {
@@ -141,7 +138,7 @@ pub fn start_sync_tasks<
         fc_manager_tx: fcm_tx,
         csm_ctl,
         cupdate_rx,
-        status_tx,
-        status_rx,
+        status_tx: status_bundle.0,
+        status_rx: status_bundle.1,
     })
 }

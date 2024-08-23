@@ -15,7 +15,9 @@ use alpen_express_consensus_logic::{
     duty::{
         types::{DutyBatch, Identity, IdentityData, IdentityKey},
         worker::{self as duty_worker},
-    }, genesis, state_tracker, sync_manager::{self, SyncManager}
+    },
+    genesis, state_tracker,
+    sync_manager::{self, SyncManager},
 };
 use alpen_express_db::traits::Database;
 use alpen_express_evmexec::{fork_choice_state_initial, EngineRpcClient};
@@ -257,8 +259,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         eng_ctl.clone(),
         pool.clone(),
         params.clone(),
-        status_tx.clone(),
-        status_rx.clone(),
+        (status_tx.clone(), status_rx.clone()),
     )?;
     let sync_man = Arc::new(sync_man);
     let mut inscription_handler = None;
@@ -355,9 +356,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             sync_man,
             db_cloned,
             status_rx,
-            status_tx,
             inscription_handler,
-            writer_ctl,
             bcast_handle,
         )
         .await
@@ -381,7 +380,6 @@ async fn start_rpc<D: Database + Send + Sync + 'static>(
     sync_man: Arc<SyncManager>,
     database: Arc<D>,
     status_rx: Arc<StatusRx>,
-    status_rx_writer: Arc<StatusTx>,
     inscription_handler: Option<Arc<InscriptionHandle>>,
     bcast_handle: Arc<L1BroadcastHandle>,
 ) -> anyhow::Result<()> {
