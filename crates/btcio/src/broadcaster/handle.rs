@@ -23,6 +23,10 @@ impl L1BroadcastHandle {
         Self { ops, sender }
     }
 
+    pub fn ops(&self) -> &BroadcastDbOps {
+        self.ops.as_ref()
+    }
+
     pub async fn get_tx_status(&self, txid: Buf32) -> DbResult<Option<L1TxStatus>> {
         self.ops.get_tx_status_async(txid).await
     }
