@@ -23,8 +23,8 @@ impl L1BroadcastHandle {
         Self { ops, sender }
     }
 
-    pub fn ops(&self) -> &BroadcastDbOps {
-        self.ops.as_ref()
+    pub fn ops(&self) -> Arc<BroadcastDbOps> {
+        self.ops.clone()
     }
 
     pub async fn get_tx_status(&self, txid: Buf32) -> DbResult<Option<L1TxStatus>> {

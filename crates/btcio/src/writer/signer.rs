@@ -9,7 +9,10 @@ use tracing::*;
 
 use express_storage::{ops::inscription::InscriptionDataOps, BroadcastDbOps};
 
-use crate::rpc::traits::{L1Client, SeqL1Client};
+use crate::{
+    broadcaster::L1BroadcastHandle,
+    rpc::traits::{L1Client, SeqL1Client},
+};
 
 use super::{builder::build_inscription_txs, config::WriterConfig};
 
