@@ -105,8 +105,8 @@ async fn process_unfinalized_entries(
             ops.update_tx_entry_async(*idx, new_txentry.clone()).await?;
 
             // Remove if finalized
-            if matches!(status, L1TxStatus::Finalized(_))
-                || matches!(status, L1TxStatus::Excluded(_))
+            if matches!(status, L1TxStatus::Finalized { height: _ })
+                || matches!(status, L1TxStatus::Excluded { reason: _ })
             {
                 to_remove.push(*idx);
             }
@@ -142,9 +142,9 @@ async fn handle_entry(
                         %txid,
                         "tx excluded while broadcasting due to missing or spent inputs"
                     );
-                    Ok(Some(L1TxStatus::Excluded(
-                        ExcludeReason::MissingInputsOrSpent,
-                    )))
+                    Ok(Some(L1TxStatus::Excluded {
+                        reason: ExcludeReason::MissingInputsOrSpent,
+                    }))
                 }
                 Err(PublishError::Other(msg)) => {
                     warn!(%idx, %msg, %txid, "tx excluded while broadcasting");
@@ -152,7 +152,7 @@ async fn handle_entry(
                 }
             }
         }
-        L1TxStatus::Published | L1TxStatus::Confirmed(_) => {
+        L1TxStatus::Published | L1TxStatus::Confirmed { height: _ } => {
             // check for confirmations
             let txid = Txid::from_slice(txid.0.as_slice())
                 .map_err(|e| BroadcasterError::Other(e.to_string()))?;
@@ -161,18 +161,22 @@ async fn handle_entry(
                 .await
                 .map_err(|e| BroadcasterError::Other(e.to_string()))?;
             match txinfo.confirmations {
-                0 if matches!(txentry.status, L1TxStatus::Confirmed(_h)) => {
+                0 if matches!(txentry.status, L1TxStatus::Confirmed { height: _ }) => {
                     // If the confirmations of a txn that is already confirmed is 0 then there is
                     // something wrong, possibly a reorg, so just set it to unpublished
                     Ok(Some(L1TxStatus::Unpublished))
                 }
                 0 => Ok(None),
-                c if c >= FINALITY_DEPTH => Ok(Some(L1TxStatus::Finalized(txinfo.block_height()))),
-                _ => Ok(Some(L1TxStatus::Confirmed(txinfo.block_height()))),
+                c if c >= FINALITY_DEPTH => Ok(Some(L1TxStatus::Finalized {
+                    height: txinfo.block_height(),
+                })),
+                _ => Ok(Some(L1TxStatus::Confirmed {
+                    height: txinfo.block_height(),
+                })),
             }
         }
-        L1TxStatus::Finalized(_) => Ok(None), // Nothing to do for finalized tx
-        L1TxStatus::Excluded(_) => {
+        L1TxStatus::Finalized { height: _ } => Ok(None), // Nothing to do for finalized tx
+        L1TxStatus::Excluded { reason: _ } => {
             // If a tx is excluded due to MissingInputsOrSpent then the downstream task like
             // writer/signer will be accountable for recreating the tx and asking to broadcast.
             // If excluded due to Other reason, there's nothing much we can do.
@@ -286,7 +290,9 @@ mod test {
             .unwrap();
         assert_eq!(
             res,
-            Some(L1TxStatus::Confirmed(cl.included_height)),
+            Some(L1TxStatus::Confirmed {
+                height: cl.included_height
+            }),
             "Status should be confirmed if 0 < confirmations < finality_depth"
         );
 
@@ -299,7 +305,9 @@ mod test {
             .unwrap();
         assert_eq!(
             res,
-            Some(L1TxStatus::Finalized(cl.included_height)),
+            Some(L1TxStatus::Finalized {
+                height: cl.included_height
+            }),
             "Status should be confirmed if confirmations >= finality_depth"
         );
     }
@@ -307,7 +315,7 @@ mod test {
     #[tokio::test]
     async fn test_handle_confirmed_entry() {
         let ops = get_ops();
-        let e = gen_entry_with_status(L1TxStatus::Confirmed(1));
+        let e = gen_entry_with_status(L1TxStatus::Confirmed { height: 1 });
 
         // Add tx to db
         ops.insert_new_tx_entry_async([1; 32].into(), e.clone())
@@ -336,7 +344,9 @@ mod test {
             .unwrap();
         assert_eq!(
             res,
-            Some(L1TxStatus::Confirmed(cl.included_height)),
+            Some(L1TxStatus::Confirmed {
+                height: cl.included_height
+            }),
             "Status should be confirmed if 0 < confirmations < finality_depth"
         );
 
@@ -349,7 +359,9 @@ mod test {
             .unwrap();
         assert_eq!(
             res,
-            Some(L1TxStatus::Finalized(cl.included_height)),
+            Some(L1TxStatus::Finalized {
+                height: cl.included_height
+            }),
             "Status should be confirmed if confirmations >= finality_depth"
         );
     }
@@ -357,7 +369,7 @@ mod test {
     #[tokio::test]
     async fn test_handle_finalized_entry() {
         let ops = get_ops();
-        let e = gen_entry_with_status(L1TxStatus::Finalized(1));
+        let e = gen_entry_with_status(L1TxStatus::Finalized { height: 1 });
 
         // Add tx to db
         ops.insert_new_tx_entry_async([1; 32].into(), e.clone())
@@ -393,9 +405,9 @@ mod test {
     #[tokio::test]
     async fn test_handle_excluded_entry() {
         let ops = get_ops();
-        let e = gen_entry_with_status(L1TxStatus::Excluded(ExcludeReason::Other(
-            "some reason".to_string(),
-        )));
+        let e = gen_entry_with_status(L1TxStatus::Excluded {
+            reason: ExcludeReason::Other("some reason".to_string()),
+        });
 
         // Add tx to db
         ops.insert_new_tx_entry_async([1; 32].into(), e.clone())
@@ -437,7 +449,9 @@ mod test {
             .insert_new_tx_entry_async([1; 32].into(), e1)
             .await
             .unwrap();
-        let e2 = gen_entry_with_status(L1TxStatus::Excluded(ExcludeReason::MissingInputsOrSpent));
+        let e2 = gen_entry_with_status(L1TxStatus::Excluded {
+            reason: ExcludeReason::MissingInputsOrSpent,
+        });
         let _i2 = ops
             .insert_new_tx_entry_async([2; 32].into(), e2)
             .await
@@ -474,7 +488,9 @@ mod test {
         );
         assert_eq!(
             new_entries.get(&i3).unwrap().status,
-            L1TxStatus::Finalized(cl.included_height),
+            L1TxStatus::Finalized {
+                height: cl.included_height
+            },
             "published tx should be finalized"
         );
     }

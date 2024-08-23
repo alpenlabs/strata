@@ -5,7 +5,7 @@ use bitcoin::{consensus::serialize, Transaction};
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use alpen_express_primitives::buf::Buf32;
-use serde::{ser::SerializeStruct, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct BlobEntry {
@@ -86,22 +86,28 @@ impl L1TxEntry {
 }
 
 /// The possible statuses of a publishable transaction
-#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
+#[derive(
+    Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary, Serialize, Deserialize,
+)]
+#[serde(tag = "status")]
 pub enum L1TxStatus {
     /// The transaction is waiting to be published
     Unpublished,
     /// The transaction is published
     Published,
     /// The transaction  is included in L1 at given height
-    Confirmed(u64),
+    Confirmed { height: u64 },
     /// The transaction is finalized in L1 at given height
-    Finalized(u64),
+    Finalized { height: u64 },
     /// The transaction is not included in L1 and has errored with some error code
-    Excluded(ExcludeReason),
+    Excluded { reason: ExcludeReason },
 }
 
 /// Reason why the transaction was not included in the bitcoin chain
-#[derive(Debug, Clone, PartialEq, Serialize, BorshSerialize, BorshDeserialize, Arbitrary)]
+#[derive(
+    Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary, Serialize, Deserialize,
+)]
+#[serde(tag = "kind", content = "message")]
 pub enum ExcludeReason {
     /// Excluded because inputs were spent or not present in the chain/mempool
     MissingInputsOrSpent,
@@ -110,32 +116,45 @@ pub enum ExcludeReason {
     Other(String),
 }
 
-impl Serialize for L1TxStatus {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut state = serializer.serialize_struct("L1TxStatus", 2)?;
-        match *self {
-            L1TxStatus::Unpublished => {
-                state.serialize_field("status", "Unpublished")?;
-            }
-            L1TxStatus::Published => {
-                state.serialize_field("status", "Published")?;
-            }
-            L1TxStatus::Confirmed(height) => {
-                state.serialize_field("status", "Confirmed")?;
-                state.serialize_field("height", &height)?;
-            }
-            L1TxStatus::Finalized(height) => {
-                state.serialize_field("status", "Finalized")?;
-                state.serialize_field("height", &height)?;
-            }
-            L1TxStatus::Excluded(ref reason) => {
-                state.serialize_field("status", "Excluded")?;
-                state.serialize_field("reason", reason)?;
-            }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json;
+
+    #[test]
+    fn check_serde_of_l1txstatus() {
+        let test_cases: Vec<(L1TxStatus, &str)> = vec![
+            (L1TxStatus::Unpublished, r#"{"status":"Unpublished"}"#),
+            (L1TxStatus::Published, r#"{"status":"Published"}"#),
+            (
+                L1TxStatus::Confirmed { height: 10 },
+                r#"{"status":"Confirmed","height":10}"#,
+            ),
+            (
+                L1TxStatus::Finalized { height: 100 },
+                r#"{"status":"Finalized","height":100}"#,
+            ),
+            (
+                L1TxStatus::Excluded {
+                    reason: ExcludeReason::MissingInputsOrSpent,
+                },
+                r#"{"status":"Excluded","reason":{"kind":"MissingInputsOrSpent"}}"#,
+            ),
+            (
+                L1TxStatus::Excluded {
+                    reason: ExcludeReason::Other("Something went wrong".to_string()),
+                },
+                r#"{"status":"Excluded","reason":{"kind":"Other","message":"Something went wrong"}}"#,
+            ),
+        ];
+
+        // check serialization and deserialization
+        for (l1_tx_status, serialized) in test_cases {
+            let actual = serde_json::to_string(&l1_tx_status).unwrap();
+            assert_eq!(actual, serialized);
+
+            let actual: L1TxStatus = serde_json::from_str(serialized).unwrap();
+            assert_eq!(actual, l1_tx_status);
         }
-        state.end()
     }
 }
