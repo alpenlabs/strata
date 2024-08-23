@@ -38,11 +38,20 @@ impl DepositInfo {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DepositMetadata {
     /// The protocol version that the deposit is associated with.
-    version: String,
+    version: Version,
 
     /// Special identifier that helps the `alpen-exrpress-btcio::reader` worker identify relevant
     /// deposits.
     // TODO: Convert this to an enum that handles various identifiers if necessary in the future.
     // For now, this identifier will be a constant.
     identifier: String,
+}
+
+/// The version of the bridge protocol.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Version {
+    /// Devnet bridge with cooperative withdrawal path only (N:N trust assumption).
+    V0,
+    /// Full trust-minimized bridge with both cooperative and uncooperatie withdrawals paths.
+    V1,
 }
