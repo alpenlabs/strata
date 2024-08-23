@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use anyhow::bail;
-use bitcoin::{Block, BlockHash};
+use bitcoincore_rpc_async::bitcoin::{Block, BlockHash};
 use tokio::sync::{mpsc, RwLock};
 use tracing::*;
 

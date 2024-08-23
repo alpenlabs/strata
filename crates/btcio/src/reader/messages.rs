@@ -1,4 +1,4 @@
-use bitcoin::Block;
+use bitcoincore_rpc_async::bitcoin::Block;
 
 /// L1 events that we observe and want the persistence task to work on.
 #[derive(Clone, Debug)]

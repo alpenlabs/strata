@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 use alpen_express_primitives::buf::Buf32;
-use bitcoin::{hashes::Hash, Txid};
+use bitcoincore_rpc_async::bitcoin::{hashes::Hash, Txid};
 use bitcoincore_rpc_async::Error as RpcError;
 use express_storage::{ops::l1tx_broadcast, BroadcastDbOps};
 use tokio::sync::mpsc::Receiver;
@@ -155,7 +155,7 @@ async fn handle_entry(
             let txid = Txid::from_slice(txid.0.as_slice())
                 .map_err(|e| BroadcasterError::Other(e.to_string()))?;
             let txinfo = rpc_client
-                .get_transaction_info(txid)
+                .get_transaction_info(&txid)
                 .await
                 .map_err(|e| BroadcasterError::Other(e.to_string()))?;
             match txinfo.confirmations {

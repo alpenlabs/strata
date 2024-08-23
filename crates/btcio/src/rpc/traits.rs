@@ -1,6 +1,5 @@
 use async_trait::async_trait;
-use bitcoin::{Amount, Block, BlockHash, Transaction, Txid};
-use bitcoincore_rpc_async::Error as RpcError;
+use bitcoincore_rpc_async::{bitcoin::{Address, Amount, Block, BlockHash, Transaction, Txid}, json::AddressType, Error as RpcError, RawTx};
 
 use super::types::{RawUTXO, RpcBlockchainInfo, RpcTransactionInfo};
 
@@ -24,10 +23,10 @@ pub trait BitcoinClient: Sync + Send + 'static {
     ///
     /// By default uses the estimate mode of `CONSERVATIVE` which is the
     /// default in Bitcoin Core v27.
-    async fn estimate_smart_fee(&self, conf_target: u16) -> Result<u64, RpcError>;
+    async fn estimate_smart_fee(&self, conf_target: u16) -> Result<Option<Amount>, RpcError>;
 
     /// Gets a [`Block`] with the given hash.
-    async fn get_block(&self, hash: BlockHash) -> Result<Block, RpcError>;
+    async fn get_block(&self, hash: &BlockHash) -> Result<Block, RpcError>;
 
     /// Gets a [`Block`] at given height.
     async fn get_block_at(&self, height: u64) -> Result<Block, RpcError>;
@@ -47,30 +46,13 @@ pub trait BitcoinClient: Sync + Send + 'static {
 
     /// Generates new address under own control for the underlying Bitcoin
     /// client's wallet.
-    async fn get_new_address(&self) -> Result<String, RpcError>;
+    async fn get_new_address(&self, address_type: Option<AddressType>) -> Result<Address, RpcError>;
 
     /// Gets all transaction ids in mempool.
     async fn get_raw_mempool(&self) -> Result<Vec<Txid>, RpcError>;
 
     /// Gets a transaction with a given transaction id (txid).
-    async fn get_transaction(&self, txid: Txid) -> Result<Transaction, RpcError>;
-
-    /// Gets the number of confirmations for a given transaction id
-    /// (txid).
-    ///
-    /// # Parameters
-    ///
-    /// - `txid`: The transaction id to fetch confirmations for. This should be a 32-byte array
-    ///   containing the transaction id.
-    ///
-    /// # Note
-    ///
-    /// If a transaction has 0 confirmations, it means that the transaction
-    /// is still in the mempool, i. e. it has not been included in a block yet.
-    async fn get_transaction_confirmations<T: AsRef<[u8; 32]> + Send>(
-        &self,
-        txid: T,
-    ) -> Result<u64, RpcError>;
+    async fn get_transaction(&self, txid: &Txid) -> Result<Transaction, RpcError>;
 
     /// Gets information related to a transaction.
     ///
@@ -80,15 +62,15 @@ pub trait BitcoinClient: Sync + Send + 'static {
     ///
     /// This assumes that the transaction is present in the underlying Bitcoin
     /// client's wallet.
-    async fn get_transaction_info(&self, txid: Txid) -> Result<RpcTransactionInfo, RpcError>;
+    async fn get_transaction_info(&self, txid: &Txid) -> Result<RpcTransactionInfo, RpcError>;
 
     /// Gets all Unspent Transaction Outputs (UTXOs) for the underlying Bitcoin
     /// client's wallet.
     async fn get_utxos(&self) -> Result<Vec<RawUTXO>, RpcError>;
 
     /// Gets all transactions in blocks since block [`Blockhash`].
-    async fn list_since_block(&self, block_hash: BlockHash)
-        -> Result<Vec<(String, u64)>, RpcError>;
+    async fn list_since_block(&self, block_hash: &BlockHash)
+        -> Result<Vec<Txid>, RpcError>;
 
     /// Lists transactions in the underlying Bitcoin client's wallet.
     ///
@@ -96,7 +78,7 @@ pub trait BitcoinClient: Sync + Send + 'static {
     ///
     /// - `count`: The number of transactions to list. If `None`, assumes a maximum of 10
     ///   transactions.
-    async fn list_transactions(&self, count: Option<u32>) -> Result<Vec<(String, u64)>, RpcError>;
+    async fn list_transactions(&self, count: Option<usize>) -> Result<Vec<(Txid, u64)>, RpcError>;
 
     /// Lists all wallets in the underlying Bitcoin client.
     async fn list_wallets(&self) -> Result<Vec<String>, RpcError>;
@@ -107,10 +89,10 @@ pub trait BitcoinClient: Sync + Send + 'static {
     ///
     /// - `tx`: The raw transaction to send. This should be a byte array containing the serialized
     ///   raw transaction data.
-    async fn send_raw_transaction<T: AsRef<[u8]> + Send>(&self, tx: T) -> Result<Txid, RpcError>;
+    async fn send_raw_transaction<T: Sync + Send + RawTx>(&self, tx: T) -> Result<Txid, RpcError>;
 
     /// Sends an amount to a given address.
-    async fn send_to_address(&self, address: &str, amount: Amount) -> Result<Txid, RpcError>;
+    async fn send_to_address(&self, address: &Address, amount: Amount) -> Result<Txid, RpcError>;
 
     /// Signs a transaction using the keys available in the underlying Bitcoin
     /// client's wallet and returns a signed transaction.
@@ -121,6 +103,6 @@ pub trait BitcoinClient: Sync + Send + 'static {
     /// requires additional signatures, such as in a multisignature context.
     async fn sign_raw_transaction_with_wallet(
         &self,
-        tx: Transaction,
+        tx: &Transaction,
     ) -> Result<Transaction, RpcError>;
 }

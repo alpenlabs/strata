@@ -1,7 +1,13 @@
+use std::str::FromStr;
+
 use alpen_test_utils::ArbitraryGenerator;
 use async_trait::async_trait;
-use bitcoin::{consensus::deserialize, hashes::Hash, Amount, Block, BlockHash, Transaction, Txid};
-use bitcoincore_rpc_async::Error as RpcError;
+use bitcoincore_rpc_async::bitcoin::Address;
+use bitcoincore_rpc_async::bitcoin::{
+    consensus::deserialize, hashes::Hash, Amount, Block, BlockHash, Transaction, Txid,
+};
+use bitcoincore_rpc_async::json::AddressType;
+use bitcoincore_rpc_async::{Error as RpcError, RawTx};
 
 use crate::rpc::{
     traits::BitcoinClient,
@@ -27,11 +33,11 @@ const TEST_BLOCKSTR: &str = "000000207d862a78fcb02ab24ebd154a20b9992af6d2f0c94d3
 
 #[async_trait]
 impl BitcoinClient for BitcoinDTestClient {
-    async fn estimate_smart_fee(&self, _conf_target: u16) -> Result<u64, RpcError> {
-        Ok(3) // hardcoded to 3 sats/vByte
+    async fn estimate_smart_fee(&self, _conf_target: u16) -> Result<Option<Amount>, RpcError> {
+        Ok(Some(Amount::from_sat(3))) // hardcoded to 3 sats/vByte
     }
 
-    async fn get_block(&self, _hash: BlockHash) -> Result<Block, RpcError> {
+    async fn get_block(&self, _hash: &BlockHash) -> Result<Block, RpcError> {
         let block: Block = deserialize(&hex::decode(TEST_BLOCKSTR).unwrap()).unwrap();
         Ok(block)
     }
@@ -54,28 +60,24 @@ impl BitcoinClient for BitcoinDTestClient {
         Ok(ArbitraryGenerator::new().generate())
     }
 
-    async fn get_new_address(&self) -> Result<String, RpcError> {
+    async fn get_new_address(
+        &self,
+        _address_type: Option<AddressType>,
+    ) -> Result<Address, RpcError> {
         // random regtest address from https://bitcoin.stackexchange.com/q/91222
-        Ok("bcrt1qs758ursh4q9z627kt3pp5yysm78ddny6txaqgw".to_string())
+        Ok(Address::from_str("bcrt1qs758ursh4q9z627kt3pp5yysm78ddny6txaqgw").unwrap())
     }
 
     async fn get_raw_mempool(&self) -> Result<Vec<Txid>, RpcError> {
         Ok(vec![])
     }
 
-    async fn get_transaction(&self, _txid: Txid) -> Result<Transaction, RpcError> {
+    async fn get_transaction(&self, _txid: &Txid) -> Result<Transaction, RpcError> {
         let tx: Transaction = deserialize(&hex::decode(TEST_BLOCKSTR).unwrap()).unwrap();
         Ok(tx)
     }
 
-    async fn get_transaction_confirmations<T: AsRef<[u8; 32]> + Send>(
-        &self,
-        _txid: T,
-    ) -> Result<u64, RpcError> {
-        Ok(self.confs)
-    }
-
-    async fn get_transaction_info(&self, _txid: Txid) -> Result<RpcTransactionInfo, RpcError> {
+    async fn get_transaction_info(&self, _txid: &Txid) -> Result<RpcTransactionInfo, RpcError> {
         let mut txinfo: RpcTransactionInfo = ArbitraryGenerator::new().generate();
         txinfo.confirmations = self.confs;
         txinfo.blockheight = Some(self.included_height);
@@ -101,12 +103,15 @@ impl BitcoinClient for BitcoinDTestClient {
 
     async fn list_since_block(
         &self,
-        _blockhash: BlockHash,
-    ) -> Result<Vec<(String, u64)>, RpcError> {
+        _blockhash: &BlockHash,
+    ) -> Result<Vec<Txid>, RpcError> {
         Ok(vec![])
     }
 
-    async fn list_transactions(&self, _count: Option<u32>) -> Result<Vec<(String, u64)>, RpcError> {
+    async fn list_transactions(
+        &self,
+        _count: Option<usize>,
+    ) -> Result<Vec<(Txid, u64)>, RpcError> {
         Ok(vec![])
     }
 
@@ -114,18 +119,18 @@ impl BitcoinClient for BitcoinDTestClient {
         Ok(vec![])
     }
 
-    async fn send_raw_transaction<T: AsRef<[u8]> + Send>(&self, _tx: T) -> Result<Txid, RpcError> {
+    async fn send_raw_transaction<T: Sync + Send + RawTx>(&self, _tx: T) -> Result<Txid, RpcError> {
         Ok(Txid::from_slice(&[1u8; 32]).unwrap())
     }
 
-    async fn send_to_address(&self, _address: &str, _amount: Amount) -> Result<Txid, RpcError> {
+    async fn send_to_address(&self, _address: &Address, _amount: Amount) -> Result<Txid, RpcError> {
         Ok(Txid::from_slice(&[0u8; 32]).unwrap())
     }
 
     async fn sign_raw_transaction_with_wallet(
         &self,
-        tx: Transaction,
-    ) -> Result<Transaction, RpcError> {
-        Ok(tx)
+        tx: &Transaction,
+    ) -> Result<Transaction, RpcError>{
+        Ok(tx.clone())
     }
 }

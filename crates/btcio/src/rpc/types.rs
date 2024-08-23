@@ -1,6 +1,6 @@
 #[cfg(test)]
 use arbitrary::Arbitrary;
-use bitcoin::BlockHash;
+use bitcoincore_rpc_async::bitcoin::BlockHash;
 use serde::{de::Visitor, Deserialize, Deserializer, Serialize};
 use tracing::*;
 
@@ -18,24 +18,16 @@ pub struct RpcTransactionInfo {
     pub amount: f64,
     pub fee: Option<f64>,
     pub confirmations: u64,
-    pub generated: Option<bool>,
-    pub trusted: Option<bool>,
     pub blockhash: Option<String>,
     pub blockheight: Option<u64>,
     pub blockindex: Option<u32>,
     pub blocktime: Option<u64>,
     pub txid: String,
-    pub wtxid: String,
-    pub walletconflicts: Vec<String>,
-    pub replaced_by_txid: Option<String>,
-    pub replaces_txid: Option<String>,
-    pub comment: Option<String>,
-    pub to: Option<String>,
+    pub from: Option<Vec<String>>,
     pub time: u64,
     pub timereceived: u64,
     #[serde(rename = "bip125-replaceable")]
     pub bip125_replaceable: String,
-    pub parent_descs: Option<Vec<String>>,
     pub hex: String,
 }
 
@@ -71,7 +63,7 @@ pub struct RawUTXO {
 pub struct RpcBlockchainInfo {
     pub blocks: u64,
     pub headers: u64,
-    bestblockhash: String,
+    pub bestblockhash: String,
     pub initialblockdownload: bool,
     pub warnings: String,
 }

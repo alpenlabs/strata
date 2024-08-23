@@ -224,8 +224,9 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     })?;
     let btc_rpc = Arc::new(btc_rpc);
 
-    // TODO remove this
-    if config.bitcoind_rpc.network == Network::Regtest {
+    // TODO: remove this
+    dbg!(&config);
+    if config.bitcoind_rpc.network != Network::Regtest {
         warn!("network not set to regtest, ignoring");
     }
 
