@@ -3,10 +3,7 @@ use std::{sync::Arc, time::Duration};
 use tokio::sync::{mpsc, RwLock};
 use tracing::*;
 
-use alpen_express_db::{
-    traits::SequencerDatabase,
-    types::{BlobEntry, BlobL1Status},
-};
+use alpen_express_db::{traits::SequencerDatabase, types::BlobL1Status};
 use alpen_express_rpc_types::L1Status;
 use express_storage::{
     managers::inscription::InscriptionManager,
@@ -37,7 +34,7 @@ pub fn start_inscription_tasks<D: SequencerDatabase + Send + Sync + 'static>(
     rpc_client: Arc<impl SeqL1Client + L1Client>,
     config: WriterConfig,
     db: Arc<D>,
-    l1_status: Arc<RwLock<L1Status>>,
+    _l1_status: Arc<RwLock<L1Status>>,
     pool: threadpool::ThreadPool,
     bcast_handle: Arc<L1BroadcastHandle>,
 ) -> anyhow::Result<InscriptionManager> {

@@ -59,6 +59,7 @@ pub enum BlobL1Status {
 
     /// The transactions need to be resigned because possibly the utxos were already spent
     NeedsResign,
+    // TODO: Add other partial status like CommitPublished, CommitConfirmed, etc..
 }
 
 /// This is the entry that gets saved to the database corresponding to a bitcoin transaction that

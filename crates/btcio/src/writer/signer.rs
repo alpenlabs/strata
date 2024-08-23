@@ -9,10 +9,7 @@ use tracing::*;
 
 use express_storage::{ops::inscription::InscriptionDataOps, BroadcastDbOps};
 
-use crate::{
-    broadcaster::L1BroadcastHandle,
-    rpc::traits::{L1Client, SeqL1Client},
-};
+use crate::rpc::traits::{L1Client, SeqL1Client};
 
 use super::{builder::build_inscription_txs, config::WriterConfig};
 
@@ -88,7 +85,7 @@ pub async fn create_and_sign_blob_inscriptions(
             ops.put_blob_entry_async(id, entry).await?;
         } else {
             warn!(%blobidx, "Corresponding blob id not found for blobidx");
-            Err::<(), anyhow::Error>(anyhow::anyhow!(format!(
+            return Err::<(), anyhow::Error>(anyhow::anyhow!(format!(
                 "Corresponding blob id not found for blobidx {}",
                 blobidx
             )));
