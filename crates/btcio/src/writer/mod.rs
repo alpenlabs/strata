@@ -1,6 +1,6 @@
 mod builder;
 pub mod config;
-mod manager;
 mod signer;
+mod task;
 
-pub use manager::start_inscription_tasks;
+pub use task::start_inscription_tasks;
