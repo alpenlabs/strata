@@ -29,6 +29,8 @@ impl<D: SequencerDatabase + Sync + Send + 'static> Context<D> {
 inst_ops! {
     (InscriptionDataOps, Context<D: SequencerDatabase>) {
         get_blob_entry(id: Buf32) => Option<BlobEntry>;
+        get_blob_entry_by_idx(idx: u64) => Option<BlobEntry>;
+        get_blob_id(idx: u64) => Option<Buf32>;
         get_next_blob_idx() => u64;
         put_blob_entry(id: Buf32, entry: BlobEntry) => Option<u64>;
     }
@@ -40,6 +42,22 @@ fn get_blob_entry<D: SequencerDatabase>(
 ) -> DbResult<Option<BlobEntry>> {
     let provider = ctx.db.sequencer_provider();
     provider.get_blob_by_id(id)
+}
+
+fn get_blob_id<D: SequencerDatabase>(ctx: &Context<D>, idx: u64) -> DbResult<Option<Buf32>> {
+    let provider = ctx.db.sequencer_provider();
+    provider.get_blob_id(idx)
+}
+
+fn get_blob_entry_by_idx<D: SequencerDatabase>(
+    ctx: &Context<D>,
+    idx: u64,
+) -> DbResult<Option<BlobEntry>> {
+    let provider = ctx.db.sequencer_provider();
+    match provider.get_blob_id(idx)? {
+        Some(id) => provider.get_blob_by_id(id),
+        None => Ok(None),
+    }
 }
 
 fn get_next_blob_idx<D: SequencerDatabase>(ctx: &Context<D>) -> DbResult<u64> {
@@ -60,5 +78,5 @@ fn put_blob_entry<D: SequencerDatabase>(
         return Ok(None);
     }
     let store = ctx.db.sequencer_store();
-    Ok(Some(store.put_blob(id, entry)?))
+    Ok(Some(store.add_new_blob_entry(id, entry)?))
 }

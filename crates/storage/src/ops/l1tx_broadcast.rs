@@ -27,6 +27,7 @@ impl<D: TxBroadcastDatabase + Sync + Send + 'static> Context<D> {
 inst_ops! {
     (BroadcastDbOps, Context<D: TxBroadcastDatabase>) {
         get_tx_entry(idx: u64) => Option<L1TxEntry>;
+        get_tx_entry_by_id(id: Buf32) => Option<L1TxEntry>;
         get_tx_status(id: Buf32) => Option<L1TxStatus>;
         get_txid(idx: u64) => Option<Buf32>;
         get_next_tx_idx() => u64;
@@ -41,6 +42,14 @@ fn get_tx_entry<D: TxBroadcastDatabase + Sync + Send + 'static>(
 ) -> DbResult<Option<L1TxEntry>> {
     let bcast_prov = context.db.broadcast_provider();
     bcast_prov.get_tx_entry(idx)
+}
+
+fn get_tx_entry_by_id<D: TxBroadcastDatabase + Sync + Send + 'static>(
+    context: &Context<D>,
+    id: Buf32,
+) -> DbResult<Option<L1TxEntry>> {
+    let bcast_prov = context.db.broadcast_provider();
+    bcast_prov.get_tx_entry_by_id(id)
 }
 
 fn get_txid<D: TxBroadcastDatabase + Sync + Send + 'static>(
