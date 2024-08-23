@@ -51,5 +51,6 @@
         "**/*.toml"
     ],
     "todohighlight.exclude": ["**/target/**", "**/.vscode/**"],
-    "todohighlight.maxFilesForSearch": 5120
+    "todohighlight.maxFilesForSearch": 5120,
+    "makefile.configureOnOpen": false
 }

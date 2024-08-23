@@ -1,0 +1,52 @@
+{
+    "name": "Alpen Labs Express",
+	"image": "mcr.microsoft.com/devcontainers/rust:1",
+
+	"features": {
+		"ghcr.io/devcontainers/features/python:1": {}
+	},
+
+    "mounts": [
+        {
+            "source": "${localEnv:HOME}${localEnv:USERPROFILE}/.config/gh",
+            "target": "/home/vscode/.config/gh",
+            "type": "bind"
+        }
+    ],
+
+    "remoteUser": "vscode",
+
+    "onCreateCommand": "sudo apt update",
+
+    "postCreateCommand": {
+        "libclang-dev": "sudo apt install libclang-dev -y",
+        "codespell": "sudo apt install codespell -y",
+        "taplo": "curl -fsSLO https://github.com/tamasfe/taplo/releases/latest/download/taplo-linux-x86_64.gz && gzip -cd taplo-linux-x86_64.gz > taplo && sudo install -m 0755 -t /usr/local/bin taplo && rm taplo*",
+        "poetry": "curl -sSL https://install.python-poetry.org | python3 -",
+        "bitcoin": "curl -fsSLO https://bitcoincore.org/bin/bitcoin-core-27.1/bitcoin-27.1-x86_64-linux-gnu.tar.gz && tar xzf bitcoin-27.1-x86_64-linux-gnu.tar.gz && echo 'c9840607d230d65f6938b81deaec0b98fe9cb14c3a41a5b13b2c05d044a48422  bitcoin-27.1-x86_64-linux-gnu.tar.gz' | sha256sum -c && sudo install -m 0755 -t /usr/local/bin bitcoin-27.1/bin/* && rm -rf bitcoin-27.1*",
+        "cargo-nextest": "curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin"
+    },
+
+    "postStartCommand": "rustup show",
+
+	"customizations": {
+        "vscode": {
+            "extensions": [
+                "rust-lang.rust-analyzer",
+                "tamasfe.even-better-toml",
+                "fill-labs.dependi",
+                "vadimcn.vscode-lldb",
+                "editorconfig.editorconfig",
+                "ryanluker.vscode-coverage-gutters",
+                "wayou.vscode-todo-highlight",
+                "github.vscode-github-actions",
+                "github.vscode-pull-request-github",
+                "charliermarsh.ruff",
+                "redhat.vscode-yaml",
+                "ms-python.python",
+                "ms-python.vscode-pylance",
+                "ms-vscode.makefile-tools"
+            ]
+        }
+    }
+}
