@@ -1,9 +1,6 @@
-use std::{
-    sync::{Arc, RwLock},
-    time::Duration,
-};
+use std::{sync::Arc, time::Duration};
 
-use tokio::sync::mpsc::{self, Sender};
+use tokio::sync::{mpsc, RwLock};
 use tracing::*;
 
 use alpen_express_db::{
@@ -11,8 +8,8 @@ use alpen_express_db::{
     types::{BlobEntry, BlobL1Status},
 };
 use alpen_express_rpc_types::L1Status;
-use alpen_express_state::da_blob::BlobIntent;
 use express_storage::{
+    managers::inscription::InscriptionManager,
     ops::inscription::{Context, InscriptionDataOps},
     BroadcastDbOps,
 };
@@ -25,53 +22,6 @@ use crate::{
 };
 
 use super::{config::WriterConfig, signer::start_signer_task};
-
-pub struct InscriptionManager {
-    ops: Arc<InscriptionDataOps>,
-    signer_tx: Sender<BlobIdx>,
-}
-
-pub type BlobIdx = u64;
-
-impl InscriptionManager {
-    pub fn new(ops: Arc<InscriptionDataOps>, signer_tx: Sender<BlobIdx>) -> Self {
-        Self { ops, signer_tx }
-    }
-
-    pub fn ops(&self) -> &InscriptionDataOps {
-        &self.ops
-    }
-
-    pub fn submit_intent(&self, intent: BlobIntent) -> anyhow::Result<()> {
-        // TODO: check for intent dest ??
-        let entry = BlobEntry::new_unsigned(intent.payload().to_vec());
-
-        // Write to db and if not already exisging, notify signer about the new entry
-        // if let Some(idx) = store_entry(*intent.commitment(), entry, self.db.clone())? {
-        if let Some(idx) = self
-            .ops
-            .put_blob_entry_blocking(*intent.commitment(), entry)?
-        {
-            self.signer_tx.blocking_send(idx)?;
-        } // None means duplicate intent
-        Ok(())
-    }
-
-    pub async fn submit_intent_async(&self, intent: BlobIntent) -> anyhow::Result<()> {
-        // TODO: check for intent dest ??
-        let entry = BlobEntry::new_unsigned(intent.payload().to_vec());
-
-        // Write to db and if not already exisging, notify signer about the new entry
-        if let Some(idx) = self
-            .ops
-            .put_blob_entry_async(*intent.commitment(), entry)
-            .await?
-        {
-            self.signer_tx.send(idx).await?;
-        } // None means duplicate intent
-        Ok(())
-    }
-}
 
 #[derive(Debug)]
 pub struct WriterInitialState {
@@ -91,7 +41,7 @@ pub fn start_inscription_tasks<D: SequencerDatabase + Send + Sync + 'static>(
     pool: threadpool::ThreadPool,
     bcast_handle: Arc<L1BroadcastHandle>,
 ) -> anyhow::Result<InscriptionManager> {
-    let (signer_tx, signer_rx) = mpsc::channel::<BlobIdx>(10);
+    let (signer_tx, signer_rx) = mpsc::channel::<u64>(10);
 
     let ops = Arc::new(Context::new(db).into_ops(pool));
     let ops_s = ops.clone();

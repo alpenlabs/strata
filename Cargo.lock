@@ -3679,6 +3679,7 @@ dependencies = [
  "alpen-express-db",
  "alpen-express-primitives",
  "alpen-express-state",
+ "anyhow",
  "async-trait",
  "lru",
  "paste",
