@@ -4,6 +4,8 @@ use alpen_express_primitives::l1::{BitcoinAmount, XOnlyPk};
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
+pub const WITHDRAWAL_DENOMINATION: BitcoinAmount = BitcoinAmount::from_int_btc(10);
+
 /// Describes an intent to withdraw that hasn't been dispatched yet.
 #[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
 pub struct WithdrawalIntent {
