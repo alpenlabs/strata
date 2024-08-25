@@ -1534,7 +1534,6 @@ dependencies = [
 name = "reth-sp1"
 version = "0.1.0"
 dependencies = [
- "bincode",
  "revm",
  "sp1-zkvm",
  "zkvm-primitives",

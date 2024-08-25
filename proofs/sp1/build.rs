@@ -7,7 +7,7 @@ use std::{
 const RISC_V_COMPILER: &str = "/opt/riscv/bin/riscv-none-elf-gcc";
 const ELF_FILE_PATH: &str = "guest-reth-stf/elf/riscv32im-succinct-zkvm-elf";
 const MOCK_ELF_CONTENT: &str = r#"
-    pub const GUEST_RETH_STF_ELF: &[u8] = &[];
+    pub const RETH_SP1_ELF: &[u8] = &[];
 "#;
 
 fn main() {
@@ -43,7 +43,7 @@ fn generate_elf_content(elf_path: &str) -> String {
 
     format!(
         r#"
-        pub const GUEST_RETH_STF_ELF: &[u8] = &[{}];
+        pub const RETH_SP1_ELF: &[u8] = &[{}];
     "#,
         contents_str
     )

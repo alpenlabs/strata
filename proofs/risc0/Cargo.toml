@@ -4,6 +4,15 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+express-risc0-adapter = { path = "../../crates/prover/adapters/risc0", features = [
+  "prover",
+], optional = true }
+
+
+[dev-dependencies]
+bincode = { workspace = true }
+express-zkvm = { workspace = true }
+zkvm-primitives = { workspace = true }
 
 [build-dependencies]
 risc0-build = { version = "1.0.5" }
@@ -13,4 +22,4 @@ methods = ["guest-reth-stf"]
 
 [features]
 default = []
-prover = []
+prover = ["dep:express-risc0-adapter"]

@@ -188,7 +188,6 @@ where
         for (tx_no, tx) in self.input.transactions.iter().enumerate() {
             // Recover the sender from the transaction signature.
             let tx_from = tx.recover_signer().unwrap();
-            // let tx_from = Address::ZERO;
 
             // Validate tx gas.
             let block_available_gas = U256::from(self.input.gas_limit) - cumulative_gas_used;
