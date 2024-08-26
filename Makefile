@@ -20,6 +20,9 @@ FEATURES ?=
 # The docker image name
 DOCKER_IMAGE_NAME ?=
 
+# Skip building guest programs inside the proofs directory during CI checks
+export SKIP_GUEST_BUILD=1
+
 ##@ Help
 
 .PHONY: help
