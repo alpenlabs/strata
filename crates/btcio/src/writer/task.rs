@@ -3,7 +3,10 @@ use std::{sync::Arc, time::Duration};
 use tokio::sync::{mpsc, RwLock};
 use tracing::*;
 
-use alpen_express_db::{traits::SequencerDatabase, types::BlobL1Status};
+use alpen_express_db::{
+    traits::SequencerDatabase,
+    types::{BlobL1Status, ExcludeReason, L1TxEntry, L1TxStatus},
+};
 use alpen_express_rpc_types::L1Status;
 use express_storage::{
     managers::inscription::InscriptionManager,
@@ -118,7 +121,7 @@ const FINALITY_DEPTH: u64 = 6;
 
 /// Watches for inscription transactions status in bitcoin
 pub async fn watcher_task(
-    next_to_watch: u64,
+    next_blbidx_to_watch: u64,
     rpc_client: Arc<impl L1Client + SeqL1Client>,
     config: WriterConfig,
     insc_ops: Arc<InscriptionDataOps>,
@@ -128,17 +131,23 @@ pub async fn watcher_task(
     let interval = tokio::time::interval(Duration::from_millis(config.poll_duration_ms));
     tokio::pin!(interval);
 
-    let mut curr_blobidx = next_to_watch;
+    let mut curr_blobidx = next_blbidx_to_watch;
     loop {
         interval.as_mut().tick().await;
 
         if let Some(blobentry) = insc_ops.get_blob_entry_by_idx_async(curr_blobidx).await? {
-            match blobentry.status {
-                BlobL1Status::Published | BlobL1Status::Confirmed => {
-                    debug!(%curr_blobidx, "blobentry is published or confirmed");
-                }
+            let commit_tx = bcast_ops
+                .get_tx_entry_by_id_async(blobentry.commit_txid)
+                .await?;
+            let reveal_tx = bcast_ops
+                .get_tx_entry_by_id_async(blobentry.reveal_txid)
+                .await?;
+
+            let curr_status = blobentry.status.clone();
+            debug!(?curr_status, %curr_blobidx, "Blob entry");
+
+            match &curr_status {
                 BlobL1Status::Unsigned | BlobL1Status::NeedsResign => {
-                    debug!(%curr_blobidx, "blobentry is unsigned or needs resign");
                     create_and_sign_blob_inscriptions(
                         curr_blobidx,
                         insc_ops.as_ref(),
@@ -149,17 +158,53 @@ pub async fn watcher_task(
                     .await?;
                 }
                 BlobL1Status::Finalized => {
-                    debug!(%curr_blobidx, "blobentry is finalized");
                     curr_blobidx += 1;
                 }
-                BlobL1Status::Unpublished => {
-                    debug!(%curr_blobidx, "blobentry is unpublished;");
-                } // Do Nothing
+                BlobL1Status::Excluded => {
+                    warn!(%curr_blobidx, "blobentry is excluded, might need to recreate duty");
+                    curr_blobidx += 1;
+                }
+                BlobL1Status::Published | BlobL1Status::Confirmed | BlobL1Status::Unpublished => {
+                    debug!(%curr_blobidx, ?curr_status, "blobentry is published or confirmed, checking if finalized");
+                    match (commit_tx, reveal_tx) {
+                        (Some(ctx), Some(rtx)) => {
+                            let status = determine_blob_next_status(&ctx, &rtx, curr_status)?;
+                            // Update blobentry with new status
+                            insc_ops
+                                .update_blob_entry_status_async(curr_blobidx, blobentry, status)
+                                .await?;
+                        }
+                        _ => {
+                            error!(%curr_blobidx, "Commit/reveal txid associated with blobentry not found in broadcast database")
+                        }
+                    }
+                }
             }
         } else {
             // No blob exists, just continue the loop and thus wait for blob to be present in db
+            info!(%curr_blobidx, "Waiting for blobentry to be present in db");
         }
     }
+}
+
+fn determine_blob_next_status(
+    ctx: &L1TxEntry,
+    rtx: &L1TxEntry,
+    curr_status: BlobL1Status,
+) -> anyhow::Result<BlobL1Status> {
+    let status = match (&ctx.status, &rtx.status) {
+        (_, L1TxStatus::Finalized(_)) => BlobL1Status::Finalized,
+        (_, L1TxStatus::Confirmed(_)) => BlobL1Status::Confirmed,
+        (_, L1TxStatus::Published) => BlobL1Status::Published,
+        (L1TxStatus::Excluded(ExcludeReason::MissingInputsOrSpent), _) => BlobL1Status::NeedsResign,
+        (L1TxStatus::Excluded(reason), _) => {
+            // TODO: error or have a separate status?
+            warn!(?reason, "Inscriptions could not be included in the chain");
+            curr_status
+        }
+        (_, _) => curr_status,
+    };
+    Ok(status)
 }
 
 #[cfg(test)]

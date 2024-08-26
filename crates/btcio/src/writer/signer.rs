@@ -73,7 +73,7 @@ pub async fn create_and_sign_blob_inscriptions(
         let rentry = L1TxEntry::from_tx(&reveal);
 
         let _cidx = bops.insert_new_tx_entry_async(cid, centry).await?;
-        let _ridx = bops.insert_new_tx_entry_async(cid, rentry).await?;
+        let _ridx = bops.insert_new_tx_entry_async(rid, rentry).await?;
 
         // Update the corresponding commit/reveal txids in entry along with the status from
         // `Unsigned`/`NeedResign` to `Unpublished`

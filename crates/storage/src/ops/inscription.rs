@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use alpen_express_db::{
     traits::{SeqDataProvider, SeqDataStore, SequencerDatabase},
-    types::BlobEntry,
+    types::{BlobEntry, BlobL1Status},
     DbResult,
 };
 use alpen_express_primitives::buf::Buf32;
@@ -33,6 +33,7 @@ inst_ops! {
         get_blob_id(idx: u64) => Option<Buf32>;
         get_next_blob_idx() => u64;
         put_blob_entry(id: Buf32, entry: BlobEntry) => Option<u64>;
+        update_blob_entry_status(idx: u64, entry: BlobEntry, status: BlobL1Status) => ();
     }
 }
 
@@ -79,4 +80,21 @@ fn put_blob_entry<D: SequencerDatabase>(
     }
     let store = ctx.db.sequencer_store();
     Ok(Some(store.add_new_blob_entry(id, entry)?))
+}
+
+fn update_blob_entry_status<D: SequencerDatabase>(
+    ctx: &Context<D>,
+    idx: u64,
+    entry: BlobEntry,
+    status: BlobL1Status,
+) -> DbResult<()> {
+    let provider = ctx.db.sequencer_provider();
+    let id = provider.get_blob_id(idx)?;
+    if let Some(id) = id {
+        let store = ctx.db.sequencer_store();
+        let mut entry_new = entry.clone();
+        entry_new.status = status;
+        return store.update_blob_entry(id, entry_new);
+    }
+    Ok(())
 }
