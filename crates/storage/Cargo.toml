@@ -10,6 +10,7 @@ alpen-express-state = { workspace = true }
 
 anyhow = { workspace = true }
 async-trait = { workspace = true }
+bitcoin = { workspace = true }
 lru = { workspace = true }
 paste = { workspace = true }
 threadpool = { workspace = true }

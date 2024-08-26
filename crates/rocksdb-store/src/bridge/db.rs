@@ -1,0 +1,122 @@
+use std::sync::Arc;
+
+use alpen_express_db::{
+    entities::bridge_tx_state::BridgeTxState,
+    errors::DbError,
+    traits::{BridgeTxProvider, BridgeTxStore},
+    DbResult,
+};
+use alpen_express_primitives::buf::Buf32;
+use rockbound::{OptimisticTransactionDB as DB, SchemaDBOperationsExt, TransactionRetry};
+
+use super::schemas::{BridgeSigSchema, BridgeSigTxidSchema};
+use crate::DbOpsConfig;
+
+pub struct BridgeTxRocksDb {
+    db: Arc<DB>,
+    ops: DbOpsConfig,
+}
+
+impl BridgeTxRocksDb {
+    pub fn new(db: Arc<DB>, ops: DbOpsConfig) -> Self {
+        Self { db, ops }
+    }
+}
+
+impl BridgeTxStore for BridgeTxRocksDb {
+    fn upsert_tx_state(&self, txid: Buf32, tx_state: BridgeTxState) -> DbResult<()> {
+        self.db
+            .with_optimistic_txn(TransactionRetry::Count(self.ops.retry_count), |txn| {
+                // insert new id if the txid is new
+                if txn.get::<BridgeSigSchema>(&txid)?.is_none() {
+                    let idx = rockbound::utils::get_last::<BridgeSigTxidSchema>(txn)?
+                        .map(|(x, _)| x + 1)
+                        .unwrap_or(0);
+
+                    txn.put::<BridgeSigTxidSchema>(&idx, &txid)?;
+                }
+
+                txn.put::<BridgeSigSchema>(&txid, &tx_state)?;
+
+                Ok::<(), DbError>(())
+            })
+            .map_err(|e: rockbound::TransactionError<_>| DbError::TransactionError(e.to_string()))
+    }
+}
+
+impl BridgeTxProvider for BridgeTxRocksDb {
+    fn get_tx_state(&self, txid: Buf32) -> DbResult<Option<BridgeTxState>> {
+        Ok(self.db.get::<BridgeSigSchema>(&txid)?)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use arbitrary::{Arbitrary, Unstructured};
+
+    use super::*;
+    use crate::test_utils::get_rocksdb_tmp_instance;
+
+    #[test]
+    fn test_bridge_tx_state_store() {
+        let db = setup_db();
+
+        let raw_bytes = vec![0u8; 1024];
+        let mut u = Unstructured::new(&raw_bytes);
+
+        let bridge_tx_state = BridgeTxState::arbitrary(&mut u).unwrap();
+
+        let txid = bridge_tx_state.compute_txid().into();
+
+        // Test insert
+        let result = db.upsert_tx_state(txid, bridge_tx_state.clone());
+        assert!(
+            result.is_ok(),
+            "should be able to add collected sigs but got: {}",
+            result.err().unwrap()
+        );
+
+        // Test read
+        let stored_entry = db.get_tx_state(txid);
+        assert!(
+            stored_entry.is_ok(),
+            "should be able to access stored entry but got: {}",
+            stored_entry.err().unwrap()
+        );
+
+        let stored_entry = stored_entry.unwrap();
+        assert_eq!(
+            stored_entry,
+            Some(bridge_tx_state),
+            "stored entity should match the entity being stored"
+        );
+
+        // Test update
+        let new_state = BridgeTxState::arbitrary(&mut u).unwrap();
+        let result = db.upsert_tx_state(txid, new_state.clone());
+        assert!(
+            result.is_ok(),
+            "should be able to update existing data at a given Txid but got: {}",
+            result.err().unwrap()
+        );
+
+        let stored_entry = db.get_tx_state(txid);
+        assert!(
+            stored_entry.is_ok(),
+            "should be able to access updated stored entry but got: {}",
+            stored_entry.err().unwrap()
+        );
+
+        let stored_entry = stored_entry.unwrap();
+        assert_eq!(
+            stored_entry,
+            Some(new_state),
+            "stored entity should match the updated entity being stored"
+        );
+    }
+
+    fn setup_db() -> BridgeTxRocksDb {
+        let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
+        BridgeTxRocksDb::new(db, db_ops)
+    }
+}

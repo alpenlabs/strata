@@ -1,16 +1,14 @@
 //! Defines errors associated with the signature manager.
 
-use bitcoin::{
-    psbt::{self, ExtractTxError},
-    sighash::TaprootError,
-};
+use alpen_express_db::{entities::errors::EntityError, DbError};
+use bitcoin::{psbt::ExtractTxError, sighash::TaprootError};
 use thiserror::Error;
 
 /// Errors that may occur during the signing and aggregation of signatures for a particular
 /// [`Psbt`](bitcoin::Psbt).
 #[derive(Debug, Clone, Error)]
 pub enum BridgeSigError {
-    /// Failed to build a [`Pbst`] from the unsigned transaction. This can happen if the
+    /// Failed to build a [`Psbt`] from the unsigned transaction. This can happen if the
     /// transaction that is being converted to a psbt contains a non-empty script sig or
     /// witness fields.
     #[error("failed to build psbt: {0}")]
@@ -29,8 +27,12 @@ pub enum BridgeSigError {
     UnauthorizedPubkey,
 
     /// Error occurred while persisting/accessing signatures.
-    #[error("error persisting/accessing signatures")]
-    StorageError,
+    #[error("could not persist/access entity due to: {0}")]
+    StorageError(#[from] DbError),
+
+    /// Error occurred while persisting/accessing signatures.
+    #[error("invalid operation on entity: {0}")]
+    EntityError(#[from] EntityError),
 
     /// Transaction for the provided signature does not exist in state/storage.
     #[error("transaction does not exist")]
@@ -51,14 +53,6 @@ pub enum BridgeSigError {
     /// Failed to produce taproot sig hash
     #[error("failed to create taproot sig hash due to {0}")]
     SighashError(#[from] TaprootError),
-}
-
-/// Manual implementation of conversion for [`psbt::Error`] <-> [`BridgeSigError`] as the former
-/// does not implement [`Clone`] ¯\_(ツ)_/¯.
-impl From<psbt::Error> for BridgeSigError {
-    fn from(value: psbt::Error) -> Self {
-        Self::BuildPsbtFailed(value.to_string())
-    }
 }
 
 /// Result type alias for the signature manager with [`BridgeSigError`] as the Error variant.

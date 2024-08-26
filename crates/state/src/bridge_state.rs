@@ -32,7 +32,7 @@ pub struct OperatorEntry {
 #[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
 pub struct OperatorTable {
     /// Next unassigned operator index.
-    next_idx: u32,
+    next_idx: OperatorIdx,
 
     /// Operator table.
     ///

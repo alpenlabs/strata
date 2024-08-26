@@ -5,7 +5,7 @@ use std::{
 };
 
 use arbitrary::Arbitrary;
-use bitcoin::{hashes::Hash, BlockHash, Txid};
+use bitcoin::{hashes::Hash, secp256k1::schnorr, BlockHash, Txid};
 use borsh::{BorshDeserialize, BorshSerialize};
 use reth_primitives::alloy_primitives::FixedBytes;
 use serde::{Deserialize, Serialize};
@@ -146,6 +146,12 @@ impl From<[u8; 64]> for Buf64 {
 impl AsRef<[u8; 64]> for Buf64 {
     fn as_ref(&self) -> &[u8; 64] {
         &self.0
+    }
+}
+
+impl From<schnorr::Signature> for Buf64 {
+    fn from(value: schnorr::Signature) -> Self {
+        value.serialize().into()
     }
 }
 

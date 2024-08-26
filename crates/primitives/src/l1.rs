@@ -1,4 +1,5 @@
 use std::{
+    fmt::Display,
     io::{self, ErrorKind, Read, Write},
     iter::Sum,
     ops::Add,
@@ -7,18 +8,23 @@ use std::{
 
 use arbitrary::{Arbitrary, Unstructured};
 use bitcoin::{
+    absolute::LockTime,
     address::NetworkUnchecked,
     consensus::serialize,
     hashes::{sha256d, Hash},
-    key::TapTweak,
-    Address, AddressType, Block, Network, OutPoint, XOnlyPublicKey,
+    key::{rand, Keypair, Parity, Secp256k1, TapTweak},
+    secp256k1::{SecretKey, XOnlyPublicKey},
+    taproot::{ControlBlock, TaprootMerkleBranch},
+    transaction::Version,
+    Address, AddressType, Amount, Block, Network, OutPoint, Psbt, ScriptBuf, Sequence, TapNodeHash,
+    Transaction, TxIn, TxOut, Witness,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 use reth_primitives::revm_primitives::FixedBytes;
 use serde::{Deserialize, Serialize};
 use serde_json;
 
-use crate::{buf::Buf32, errors::AddressParseError};
+use crate::{buf::Buf32, errors::BridgeParseError};
 
 /// Reference to a transaction in a block.  This is the block index and the
 /// position of the transaction in the block.
@@ -153,6 +159,12 @@ impl From<Block> for L1BlockManifest {
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct OutputRef(OutPoint);
 
+impl From<OutPoint> for OutputRef {
+    fn from(value: OutPoint) -> Self {
+        Self(value)
+    }
+}
+
 impl OutputRef {
     pub fn outpoint(&self) -> &OutPoint {
         &self.0
@@ -246,6 +258,18 @@ impl FromStr for BitcoinAddress {
     }
 }
 
+impl From<Address<NetworkUnchecked>> for BitcoinAddress {
+    fn from(value: Address<NetworkUnchecked>) -> Self {
+        Self(value)
+    }
+}
+
+impl From<Address> for BitcoinAddress {
+    fn from(value: Address) -> Self {
+        Self(value.as_unchecked().clone())
+    }
+}
+
 impl BitcoinAddress {
     pub fn new(address: Address<NetworkUnchecked>) -> Self {
         Self(address)
@@ -311,6 +335,24 @@ impl BorshDeserialize for BitcoinAddress {
 )]
 pub struct BitcoinAmount(u64);
 
+impl Display for BitcoinAmount {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl From<Amount> for BitcoinAmount {
+    fn from(value: Amount) -> Self {
+        Self::from_sat(value.to_sat())
+    }
+}
+
+impl From<BitcoinAmount> for Amount {
+    fn from(value: BitcoinAmount) -> Self {
+        Self::from_sat(value.to_sat())
+    }
+}
+
 impl BitcoinAmount {
     // The zero amount.
     pub const ZERO: BitcoinAmount = Self(0);
@@ -321,12 +363,14 @@ impl BitcoinAmount {
     /// The maximum value of an amount.
     pub const MAX: BitcoinAmount = Self(u64::MAX);
     /// The number of bytes that an amount contributes to the size of a transaction.
-    pub const SIZE: usize = 8; // Serialized length of a u64.
-                               // The number of sats in 1 bitcoin.
-    pub const SATS_FACTOR: u64 = 100_000_000;
+    /// Serialized length of a u64.
+    pub const SIZE: usize = 8;
+
+    /// The number of sats in 1 bitcoin.
+    const SATS_FACTOR: u64 = 100_000_000;
 
     /// Get the number of sats in this [`BitcoinAmount`].
-    pub fn to_sat(&self) -> u64 {
+    pub const fn to_sat(&self) -> u64 {
         self.0
     }
 
@@ -341,7 +385,7 @@ impl BitcoinAmount {
     /// ## Panics
     ///
     /// The function panics if the argument multiplied by the number of sats
-    /// per bitcoin overflows a u64 type.
+    /// per bitcoin overflows a u64 type, or is greater than [`BitcoinAmount::MAX_MONEY`].
     pub const fn from_int_btc(btc: u64) -> Self {
         match btc.checked_mul(Self::SATS_FACTOR) {
             Some(amount) => Self::from_sat(amount),
@@ -387,7 +431,7 @@ impl XOnlyPk {
     pub fn from_address(
         address: &BitcoinAddress,
         network: Network,
-    ) -> Result<Self, AddressParseError> {
+    ) -> Result<Self, BridgeParseError> {
         let unchecked_addr = address.address().clone();
         let checked_addr = unchecked_addr.require_network(network)?;
 
@@ -402,12 +446,12 @@ impl XOnlyPk {
 
             Ok(Self(Buf32(serialized_key)))
         } else {
-            Err(AddressParseError::UnsupportedAddress)
+            Err(BridgeParseError::UnsupportedAddress)
         }
     }
 
     /// Convert the [`XOnlyPk`] to an [`Address`].
-    pub fn to_p2tr_address(&self, network: Network) -> Result<Address, AddressParseError> {
+    pub fn to_address(&self, network: Network) -> Result<Address, BridgeParseError> {
         let buf: [u8; 32] = self.0 .0 .0;
         let pubkey = XOnlyPublicKey::from_slice(&buf)?;
 
@@ -418,61 +462,274 @@ impl XOnlyPk {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BitcoinPsbt(bitcoin::Psbt);
+
+impl BitcoinPsbt {
+    pub fn inner(&self) -> &bitcoin::Psbt {
+        &self.0
+    }
+}
+
+impl From<bitcoin::Psbt> for BitcoinPsbt {
+    fn from(value: bitcoin::Psbt) -> Self {
+        Self(value)
+    }
+}
+
+impl From<BitcoinPsbt> for bitcoin::Psbt {
+    fn from(value: BitcoinPsbt) -> Self {
+        value.0
+    }
+}
+
+impl BorshSerialize for BitcoinPsbt {
+    fn serialize<W: Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        // Serialize the PSBT using bitcoin's built-in serialization
+        let psbt_bytes = self.0.serialize();
+        // First, write the length of the serialized PSBT (as u64)
+        BorshSerialize::serialize(&(psbt_bytes.len() as u64), writer)?;
+        // Then, write the actual serialized PSBT bytes
+        writer.write_all(&psbt_bytes)?;
+        Ok(())
+    }
+}
+
+impl BorshDeserialize for BitcoinPsbt {
+    fn deserialize_reader<R: Read>(reader: &mut R) -> std::io::Result<Self> {
+        // First, read the length of the PSBT (as u64)
+        let len = u64::deserialize_reader(reader)? as usize;
+        // Then, create a buffer to hold the PSBT bytes and read them
+        let mut psbt_bytes = vec![0u8; len];
+        reader.read_exact(&mut psbt_bytes)?;
+        // Use the bitcoin crate's deserialize method to create a Psbt from the bytes
+        let psbt = bitcoin::Psbt::deserialize(&psbt_bytes).map_err(|_| {
+            std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid PSBT data")
+        })?;
+        Ok(BitcoinPsbt(psbt))
+    }
+}
+
+impl<'a> Arbitrary<'a> for BitcoinPsbt {
+    fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
+        let num_outputs = u.arbitrary_len::<[u8; 32]>()? % 5;
+        let mut output: Vec<TxOut> = vec![];
+
+        for _ in 0..num_outputs {
+            let txout = BitcoinTxOut::arbitrary(u)?;
+            let txout = TxOut::from(txout);
+
+            output.push(txout);
+        }
+
+        let tx = Transaction {
+            version: Version(1),
+            lock_time: LockTime::from_consensus(0),
+            input: vec![TxIn {
+                previous_output: OutPoint::null(),
+                witness: Witness::new(),
+                sequence: Sequence(0),
+                script_sig: ScriptBuf::new(),
+            }],
+            output,
+        };
+
+        let psbt = Psbt::from_unsigned_tx(tx).map_err(|_e| arbitrary::Error::IncorrectFormat)?;
+        let psbt = BitcoinPsbt::from(psbt);
+
+        Ok(psbt)
+    }
+}
+
+/// A wrapper around [`bitcoin::TxOut`] that implements some additional traits.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BitcoinTxOut(bitcoin::TxOut);
+
+impl BitcoinTxOut {
+    pub fn inner(&self) -> &bitcoin::TxOut {
+        &self.0
+    }
+}
+
+impl From<bitcoin::TxOut> for BitcoinTxOut {
+    fn from(value: bitcoin::TxOut) -> Self {
+        Self(value)
+    }
+}
+
+impl From<BitcoinTxOut> for bitcoin::TxOut {
+    fn from(value: BitcoinTxOut) -> Self {
+        value.0
+    }
+}
+
+// Implement BorshSerialize for BitcoinTxOut
+impl BorshSerialize for BitcoinTxOut {
+    fn serialize<W: Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        // Serialize the value (u64)
+        BorshSerialize::serialize(&self.0.value.to_sat(), writer)?;
+
+        // Serialize the script_pubkey (ScriptBuf)
+        let script_bytes = self.0.script_pubkey.to_bytes();
+        BorshSerialize::serialize(&(script_bytes.len() as u64), writer)?;
+        writer.write_all(&script_bytes)?;
+
+        Ok(())
+    }
+}
+
+// Implement BorshDeserialize for BitcoinTxOut
+impl BorshDeserialize for BitcoinTxOut {
+    fn deserialize_reader<R: Read>(reader: &mut R) -> std::io::Result<Self> {
+        // Deserialize the value (u64)
+        let value = u64::deserialize_reader(reader)?;
+
+        // Deserialize the script_pubkey (ScriptBuf)
+        let script_len = u64::deserialize_reader(reader)? as usize;
+        let mut script_bytes = vec![0u8; script_len];
+        reader.read_exact(&mut script_bytes)?;
+        let script_pubkey = ScriptBuf::from(script_bytes);
+
+        Ok(BitcoinTxOut(bitcoin::TxOut {
+            value: Amount::from_sat(value),
+            script_pubkey,
+        }))
+    }
+}
+
+/// Implement Arbitrary for ArbitraryTxOut
+impl<'a> Arbitrary<'a> for BitcoinTxOut {
+    fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
+        // Generate arbitrary value and script for the TxOut
+        let value = u64::arbitrary(u)?;
+        let script_len = usize::arbitrary(u)? % 100; // Limit script length
+        let script_bytes = u.bytes(script_len)?;
+        let script_pubkey = bitcoin::ScriptBuf::from(script_bytes.to_vec());
+
+        Ok(Self(TxOut {
+            value: Amount::from_sat(value),
+            script_pubkey,
+        }))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SpendInfo {
+    pub script_buf: ScriptBuf,
+    pub control_block: ControlBlock,
+}
+
+// Implement BorshSerialize for SpendInfo
+impl BorshSerialize for SpendInfo {
+    fn serialize<W: Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        // Serialize the ScriptBuf
+        let script_bytes = self.script_buf.to_bytes();
+        BorshSerialize::serialize(&(script_bytes.len() as u64), writer)?;
+        writer.write_all(&script_bytes)?;
+
+        // Serialize the ControlBlock using bitcoin's serialize method
+        let control_block_bytes = self.control_block.serialize();
+        BorshSerialize::serialize(&(control_block_bytes.len() as u64), writer)?;
+        writer.write_all(&control_block_bytes)?;
+
+        Ok(())
+    }
+}
+
+// Implement BorshDeserialize for SpendInfo
+impl BorshDeserialize for SpendInfo {
+    fn deserialize_reader<R: Read>(reader: &mut R) -> std::io::Result<Self> {
+        // Deserialize the ScriptBuf
+        let script_len = u64::deserialize_reader(reader)? as usize;
+        let mut script_bytes = vec![0u8; script_len];
+        reader.read_exact(&mut script_bytes)?;
+        let script_buf = ScriptBuf::from(script_bytes);
+
+        // Deserialize the ControlBlock
+        let control_block_len = u64::deserialize_reader(reader)? as usize;
+        let mut control_block_bytes = vec![0u8; control_block_len];
+        reader.read_exact(&mut control_block_bytes)?;
+        let control_block: ControlBlock =
+            ControlBlock::decode(&control_block_bytes[..]).map_err(|_| {
+                std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid ControlBlock")
+            })?;
+
+        Ok(SpendInfo {
+            script_buf,
+            control_block,
+        })
+    }
+}
+
+impl<'a> Arbitrary<'a> for SpendInfo {
+    fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
+        // Arbitrary ScriptBuf (the script part of SpendInfo)
+        let script_len = usize::arbitrary(u)? % 100; // Limit the length of the script for practicality
+        let script_bytes = u.bytes(script_len)?; // Generate random bytes for the script
+        let script_buf = ScriptBuf::from(script_bytes.to_vec());
+
+        // Now we will manually generate the fields of the ControlBlock struct
+
+        // Arbitrary leaf version
+        let leaf_version = bitcoin::taproot::LeafVersion::TapScript;
+
+        // Arbitrary output key parity (Even or Odd)
+        let output_key_parity = if bool::arbitrary(u)? {
+            Parity::Even
+        } else {
+            Parity::Odd
+        };
+
+        // FIXME: this is an expensive call
+        let secp = Secp256k1::new();
+        let secret_key = SecretKey::new(&mut rand::thread_rng());
+        let keypair = Keypair::from_secret_key(&secp, &secret_key);
+        let (internal_key, _) = XOnlyPublicKey::from_keypair(&keypair);
+
+        // Arbitrary Taproot merkle branch (vector of 32-byte hashes)
+        const BRANCH_LENGTH: usize = 10;
+        let mut tapnode_hashes: Vec<TapNodeHash> = Vec::with_capacity(BRANCH_LENGTH);
+        for _ in 0..BRANCH_LENGTH {
+            let hash = TapNodeHash::from_slice(&<[u8; 32]>::arbitrary(u)?)
+                .map_err(|_e| arbitrary::Error::IncorrectFormat)?;
+            tapnode_hashes.push(hash);
+        }
+
+        let tapnode_hashes: &[TapNodeHash; BRANCH_LENGTH] =
+            &tapnode_hashes[..BRANCH_LENGTH].try_into().unwrap();
+
+        let merkle_branch = TaprootMerkleBranch::from(*tapnode_hashes);
+
+        // Construct the ControlBlock manually
+        let control_block = ControlBlock {
+            leaf_version,
+            output_key_parity,
+            internal_key,
+            merkle_branch,
+        };
+
+        // Construct the SpendInfo
+        Ok(SpendInfo {
+            script_buf,
+            control_block,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use arbitrary::{Arbitrary, Unstructured};
     use bitcoin::{
-        hashes::Hash,
         key::{Keypair, Secp256k1},
         opcodes::all::OP_CHECKSIG,
+        script::Builder,
         secp256k1::{All, SecretKey},
-        taproot::TaprootBuilder,
-        Address, Network, ScriptBuf, TapNodeHash, Txid, XOnlyPublicKey,
+        taproot::{ControlBlock, TaprootBuilder, TaprootMerkleBranch},
+        Address, Amount, Network, ScriptBuf, TapNodeHash, TxOut, XOnlyPublicKey,
     };
 
-    use super::{
-        BitcoinAddress, BitcoinAmount, BorshDeserialize, BorshSerialize, OutPoint, OutputRef,
-        XOnlyPk,
-    };
-
-    #[test]
-    fn borsh_serialization_of_outputref_works() {
-        let txid = Txid::from_slice(&[1u8; 32]).unwrap();
-        let outpoint = OutPoint { txid, vout: 42 };
-
-        let output_ref = OutputRef(outpoint);
-
-        let mut buffer: Vec<u8> = vec![];
-        assert!(
-            output_ref.serialize(&mut buffer).is_ok(),
-            "borsh serialization of OutputRef failed"
-        );
-
-        let de_output_ref = OutputRef::try_from_slice(&buffer[..]);
-        assert!(
-            de_output_ref.is_ok(),
-            "borsh deserialization of OutputRef failed"
-        );
-
-        let de_output_ref = de_output_ref.unwrap();
-
-        assert_eq!(
-            output_ref, de_output_ref,
-            "original and deserialized OutputRefs must be the same"
-        );
-    }
-
-    #[test]
-    fn arbitrary_impl_for_outputref_works() {
-        let data = vec![1u8; 100];
-        let mut unstructured = Unstructured::new(&data);
-        let random_outputref = OutputRef::arbitrary(&mut unstructured);
-
-        assert!(
-            random_outputref.is_ok(),
-            "could not generate arbitrary outputref"
-        );
-    }
+    use super::{BitcoinAddress, BitcoinAmount, BorshDeserialize, BorshSerialize, XOnlyPk};
+    use crate::l1::{BitcoinPsbt, BitcoinTxOut, SpendInfo};
 
     #[test]
     fn json_serialization_of_bitcoin_address_works() {
@@ -537,7 +794,7 @@ mod tests {
         );
 
         let taproot_pubkey = taproot_pubkey.unwrap();
-        let bitcoin_address = taproot_pubkey.to_p2tr_address(network);
+        let bitcoin_address = taproot_pubkey.to_address(network);
 
         assert!(
             bitcoin_address.is_ok(),
@@ -604,6 +861,91 @@ mod tests {
             BitcoinAddress::new(taproot_address.as_unchecked().clone()),
             merkle_root,
         )
+    }
+
+    #[test]
+    fn test_bitcoinpsbt_serialize_deserialize() {
+        // Create an arbitrary PSBT
+        let random_data = &[0u8; 1024];
+        let mut unstructured = Unstructured::new(&random_data[..]);
+        let bitcoin_psbt: BitcoinPsbt = BitcoinPsbt::arbitrary(&mut unstructured).unwrap();
+
+        // Serialize the struct
+        let mut serialized = vec![];
+        bitcoin_psbt
+            .serialize(&mut serialized)
+            .expect("Serialization failed");
+
+        // Deserialize the struct
+        let deserialized: BitcoinPsbt =
+            BitcoinPsbt::deserialize(&mut &serialized[..]).expect("Deserialization failed");
+
+        // Ensure the deserialized PSBT matches the original
+        assert_eq!(bitcoin_psbt.0, deserialized.0);
+    }
+
+    #[test]
+    fn test_spendinfo_serialize_deserialize() {
+        // Create a dummy ScriptBuf
+        let script_buf = Builder::new()
+            .push_opcode(bitcoin::blockdata::opcodes::all::OP_CHECKSIG)
+            .into_script();
+
+        // Create a dummy ControlBlock
+        let tapnode_hash: [TapNodeHash; 0] = [];
+        let control_block = ControlBlock {
+            leaf_version: bitcoin::taproot::LeafVersion::TapScript,
+            internal_key: get_random_pubkey_from_slice(&Secp256k1::new(), &[0x12; 32]),
+            merkle_branch: TaprootMerkleBranch::from(tapnode_hash),
+            output_key_parity: bitcoin::key::Parity::Odd,
+        };
+
+        let spend_info = SpendInfo {
+            script_buf,
+            control_block,
+        };
+
+        // Serialize the struct
+        let mut serialized = vec![];
+        spend_info
+            .serialize(&mut serialized)
+            .expect("Serialization failed");
+
+        // Deserialize the struct
+        let deserialized: SpendInfo =
+            SpendInfo::deserialize(&mut &serialized[..]).expect("Deserialization failed");
+
+        // Ensure the deserialized SpendInfo matches the original
+        assert_eq!(spend_info.script_buf, deserialized.script_buf);
+        assert_eq!(spend_info.control_block, deserialized.control_block);
+    }
+
+    #[test]
+    fn test_bitcointxout_serialize_deserialize() {
+        // Create a dummy TxOut with a simple script
+        let script = Builder::new()
+            .push_opcode(bitcoin::blockdata::opcodes::all::OP_CHECKSIG)
+            .into_script();
+        let tx_out = TxOut {
+            value: Amount::from_sat(1000),
+            script_pubkey: script,
+        };
+
+        let bitcoin_tx_out = BitcoinTxOut(tx_out);
+
+        // Serialize the BitcoinTxOut struct
+        let mut serialized = vec![];
+        bitcoin_tx_out
+            .serialize(&mut serialized)
+            .expect("Serialization failed");
+
+        // Deserialize the BitcoinTxOut struct
+        let deserialized: BitcoinTxOut =
+            BitcoinTxOut::deserialize(&mut &serialized[..]).expect("Deserialization failed");
+
+        // Ensure the deserialized BitcoinTxOut matches the original
+        assert_eq!(bitcoin_tx_out.0.value, deserialized.0.value);
+        assert_eq!(bitcoin_tx_out.0.script_pubkey, deserialized.0.script_pubkey);
     }
 
     fn get_random_pubkey_from_slice(secp: &Secp256k1<All>, buf: &[u8]) -> XOnlyPublicKey {

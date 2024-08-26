@@ -752,6 +752,7 @@ dependencies = [
  "alpen-express-mmr",
  "alpen-express-primitives",
  "alpen-express-state",
+ "alpen-test-utils",
  "anyhow",
  "arbitrary",
  "bitcoin",
@@ -837,6 +838,7 @@ dependencies = [
  "digest 0.10.7",
  "hex",
  "rand 0.8.5",
+ "musig2",
  "reth-primitives",
  "serde",
  "serde_json",
@@ -970,7 +972,6 @@ dependencies = [
  "bitcoin",
  "borsh",
  "digest 0.10.7",
- "express-bridge-sig-manager",
  "express-bridge-tx-builder",
  "hex",
  "num_enum 0.7.2",
@@ -1001,9 +1002,11 @@ dependencies = [
  "anyhow",
  "arbitrary",
  "bitcoin",
+ "express-storage",
  "hex",
  "rand 0.8.5",
  "rockbound",
+ "threadpool",
 ]
 
 [[package]]
@@ -3749,7 +3752,6 @@ dependencies = [
  "alpen-express-primitives",
  "async-trait",
  "bitcoin",
- "express-bridge-sig-manager",
  "express-bridge-tx-builder",
  "format_serde_error",
  "serde",
@@ -3768,11 +3770,13 @@ dependencies = [
 name = "express-bridge-sig-manager"
 version = "0.1.0"
 dependencies = [
+ "alpen-express-db",
  "alpen-express-primitives",
+ "alpen-test-utils",
  "bitcoin",
- "express-bridge-tx-builder",
- "serde",
+ "express-storage",
  "thiserror",
+ "tokio",
 ]
 
 [[package]]
@@ -3780,7 +3784,10 @@ name = "express-bridge-tx-builder"
 version = "0.1.0"
 dependencies = [
  "alpen-express-primitives",
+ "alpen-test-utils",
  "bitcoin",
+ "lazy_static",
+ "musig2",
  "serde",
  "thiserror",
 ]
@@ -3931,6 +3938,7 @@ dependencies = [
  "alpen-express-state",
  "anyhow",
  "async-trait",
+ "bitcoin",
  "lru",
  "paste",
  "threadpool",
@@ -6342,6 +6350,22 @@ dependencies = [
  "pin-project",
  "smallvec",
  "unsigned-varint 0.7.2",
+]
+
+[[package]]
+name = "musig2"
+version = "0.0.12"
+source = "git+https://github.com/alpenlabs/musig2.git?rev=v0.0.12#3a9aa8ee3b0428ca3c1676383c5b032d8a5cd162"
+dependencies = [
+ "base16ct",
+ "hmac 0.12.1",
+ "once_cell",
+ "secp",
+ "secp256k1",
+ "serde",
+ "serdect",
+ "sha2 0.10.8",
+ "subtle",
 ]
 
 [[package]]
@@ -11026,6 +11050,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "secp"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd426921f62c7e334ca27173743cd90a7263566a3be76ef0b47773d631633cf9"
+dependencies = [
+ "base16ct",
+ "once_cell",
+ "secp256k1",
+ "serde",
+ "serdect",
+ "subtle",
+]
+
+[[package]]
 name = "secp256k1"
 version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11235,6 +11273,16 @@ dependencies = [
  "ryu",
  "serde",
  "unsafe-libyaml",
+]
+
+[[package]]
+name = "serdect"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a84f14a19e9a014bb9f4512488d9829a68e04ecabffb0f9904cd1ace94598177"
+dependencies = [
+ "base16ct",
+ "serde",
 ]
 
 [[package]]
