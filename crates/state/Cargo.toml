@@ -9,7 +9,6 @@ version = "0.1.0"
 [dependencies]
 alpen-express-crypto = { workspace = true }
 alpen-express-primitives = { workspace = true }
-express-bridge-sig-manager = { workspace = true }
 express-bridge-tx-builder = { workspace = true }
 
 arbitrary = { workspace = true }

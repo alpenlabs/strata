@@ -7,10 +7,12 @@ version = "0.1.0"
 alpen-express-db = { workspace = true, features = ["stubs"] }
 alpen-express-primitives = { workspace = true }
 alpen-express-state = { workspace = true }
+express-storage = { workspace = true }
 
 anyhow = { workspace = true }
 arbitrary = { workspace = true }
-bitcoin = { workspace = true }
+bitcoin = { workspace = true, features = ["rand-std"] }
 hex = { workspace = true }
 rand = { workspace = true }
 rockbound = { workspace = true }
+threadpool = { workspace = true }

@@ -3,30 +3,30 @@
 //! Handles creation of bitcoin scripts via `bitcoin-rs`. Provides high-level APIs to get
 //! fully-formed bridge-related scripts.
 
-use bitcoin::{taproot::ControlBlock, ScriptBuf, Transaction, TxOut};
-use builder::TxBuilder;
-use errors::BridgeTxBuilderResult;
-
-pub mod builder;
+pub mod constants;
+pub mod context;
 pub mod deposit;
 pub mod errors;
+pub mod operations;
 pub mod prelude;
 pub mod withdrawal;
 
-/// Trait for any (bridge) transaction.
+use alpen_express_primitives::bridge::TxSigningData;
+use context::BuilderContext;
+use errors::BridgeTxBuilderResult;
+
+/// Trait that defines a method that any bridge transaction must implement in order to create a
+/// structure that can be signed.
 ///
 /// This is implemented by any struct that contains bridge-specific information to create
 /// transactions.
 pub trait TxKind {
-    /// Computes the witness elements required to spend the inputs in order (except the signatures).
-    fn compute_spend_infos(
+    /// The cryptographic context required to build the transaction.
+    type Context: BuilderContext;
+
+    /// Create the [`TxSigningData`] required to create the final signed transaction.
+    fn construct_signing_data(
         &self,
-        builder: &TxBuilder,
-    ) -> BridgeTxBuilderResult<Vec<(ScriptBuf, ControlBlock)>>;
-
-    /// Computes the prevouts required to sign a taproot transaction.
-    fn compute_prevouts(&self, builder: &TxBuilder) -> BridgeTxBuilderResult<Vec<TxOut>>;
-
-    /// Create the transaction with the help of a [`TxBuilder`].
-    fn create_unsigned_tx(&self, builder: &TxBuilder) -> BridgeTxBuilderResult<Transaction>;
+        builder: &Self::Context,
+    ) -> BridgeTxBuilderResult<TxSigningData>;
 }

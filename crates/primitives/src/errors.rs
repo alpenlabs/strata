@@ -4,7 +4,10 @@ use bitcoin::{address, secp256k1};
 use thiserror::Error;
 
 #[derive(Debug, Clone, Error)]
-pub enum AddressParseError {
+pub enum BridgeParseError {
+    #[error("public key table should be sorted by the `OperatorIdx`")]
+    MalformedPublicKeyTable,
+
     #[error("supplied pubkey is invalid")]
     InvalidPubkey(#[from] secp256k1::Error),
 

@@ -15,6 +15,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use mockall::automock;
 
 use crate::{
+    entities::bridge_tx_state::BridgeTxState,
     types::{BlobEntry, L1TxEntry},
     DbResult,
 };
@@ -340,4 +341,32 @@ pub trait BcastProvider {
 
     /// get txentry by idx
     fn get_tx_entry(&self, idx: u64) -> DbResult<Option<L1TxEntry>>;
+}
+
+/// A trait encapsulating the provider and store traits for interacting with the signature
+/// database of the bridge client.
+///
+/// This trait assumes that the [`Txid`] is always unique.
+pub trait BridgeTxDatabase {
+    type Store: BridgeTxStore;
+    type Provider: BridgeTxProvider;
+
+    /// Return a reference to the store implementation
+    fn bridge_tx_store(&self) -> &Arc<Self::Store>;
+    /// Return a reference to the provider implementation
+    fn bridge_tx_provider(&self) -> &Arc<Self::Provider>;
+}
+
+/// All methods related to storing/mutating [`CollectedSigs`] in the database.
+pub trait BridgeTxStore {
+    /// Add [`CollectedSigs`] to the database replacing the existing one if present.
+    fn upsert_tx_state(&self, txid: Buf32, tx_state: BridgeTxState) -> DbResult<()>;
+
+    // TODO: possibly add delete as well
+}
+
+/// All methods related to fetching [`CollectedSigs`]s in the database
+pub trait BridgeTxProvider {
+    /// Fetch [`L1TxEntry`] from db
+    fn get_tx_state(&self, txid: Buf32) -> DbResult<Option<BridgeTxState>>;
 }

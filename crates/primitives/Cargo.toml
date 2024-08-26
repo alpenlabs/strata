@@ -5,10 +5,11 @@ version = "0.1.0"
 
 [dependencies]
 arbitrary = { workspace = true }
-bitcoin = { workspace = true }
+bitcoin = { workspace = true, features = ["serde", "rand-std"] }
 borsh = { workspace = true }
 digest = { workspace = true }
 hex = { workspace = true }
+musig2 = { workspace = true }
 rand = { workspace = true, optional = true }
 reth-primitives = { workspace = true }
 secp256k1 = { workspace = true, optional = true }

@@ -2,9 +2,8 @@
 
 // TODO: there should be a database that tracks the status of tasks.
 
-use alpen_express_primitives::l1::BitcoinAmount;
+use alpen_express_primitives::{bridge::SignatureInfo, l1::BitcoinAmount};
 use bitcoin::{address::NetworkChecked, secp256k1::schnorr::Signature, Address, Network, OutPoint};
-use express_bridge_sig_manager::signature::SignatureInfo;
 use express_bridge_tx_builder::withdrawal::CooperativeWithdrawalInfo;
 
 use super::errors::WithdrawalExecResult;

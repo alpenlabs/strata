@@ -48,8 +48,8 @@ cov-unit: ## Run unit tests with coverage.
 	cargo llvm-cov nextest --lcov --output-path $(COV_FILE) $(UNIT_TEST_ARGS)
 
 .PHONY: cov-report-html
-cov-report-html: cov-unit ## Generate a HTML coverage report and open it in the browser.
-	cargo llvm-cov --open
+cov-report-html: ## Generate an HTML coverage report and open it in the browser.
+	cargo llvm-cov --open --workspace --locked nextest
 
 .PHONY: mutants-test
 mutants-test: ## Runs `nextest` under `cargo-mutants`. Caution: This can take *really* long to run.
@@ -143,11 +143,11 @@ ensure-codespell:
 		exit 1; \
     fi
 
-.PHONY: lint-codepsell
+.PHONY: lint-codespell
 lint-check-codespell: ensure-codespell ## Runs `codespell` to check for spelling errors.
 	codespell
 
-.PHONY: lint-fix-codepsell
+.PHONY: lint-fix-codespell
 lint-fix-codespell: ensure-codespell ## Runs `codespell` to fix spelling errors if possible.
 	codespell -w
 

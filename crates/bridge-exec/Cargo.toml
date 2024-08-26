@@ -14,7 +14,6 @@ rustdoc.all = "warn"
 
 [dependencies]
 alpen-express-primitives = { workspace = true }
-express-bridge-sig-manager = { workspace = true }
 express-bridge-tx-builder = { workspace = true }
 
 async-trait = { workspace = true }
