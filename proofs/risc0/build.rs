@@ -1,5 +1,5 @@
 fn main() {
-    if cfg!(feature = "prover") {
+    if cfg!(feature = "prover") && std::env::var("SKIP_GUEST_BUILD").is_err() {
         risc0_build::embed_methods();
     } else {
         // Return mock ELF
@@ -8,7 +8,7 @@ fn main() {
         let methods_path = out_dir.join("methods.rs");
 
         let elf = r#"
-            pub const RETH_SP1_ELF: &[u8] = &[];
+            pub const RETH_RISC0_ELF: &[u8] = &[];
         "#;
 
         std::fs::write(methods_path, elf).expect("Failed to write mock rollup elf");
