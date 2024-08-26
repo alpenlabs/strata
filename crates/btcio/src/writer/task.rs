@@ -1,11 +1,11 @@
 use std::{sync::Arc, time::Duration};
 
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::RwLock;
 use tracing::*;
 
 use alpen_express_db::{
     traits::SequencerDatabase,
-    types::{BlobL1Status, ExcludeReason, L1TxEntry, L1TxStatus},
+    types::{BlobEntry, BlobL1Status, ExcludeReason, L1TxEntry, L1TxStatus},
 };
 use alpen_express_rpc_types::L1Status;
 use express_storage::{
@@ -21,37 +21,23 @@ use crate::{
     writer::signer::create_and_sign_blob_inscriptions,
 };
 
-use super::{config::WriterConfig, signer::start_signer_task};
-
-#[derive(Debug)]
-pub struct WriterInitialState {
-    /// Next unfinalized block to watch for
-    pub next_watch_blob_idx: u64,
-
-    // Next blob idx to publish
-    pub next_publish_blob_idx: u64,
-}
+use super::config::WriterConfig;
 
 pub fn start_inscription_tasks<D: SequencerDatabase + Send + Sync + 'static>(
     executor: &TaskExecutor,
     rpc_client: Arc<impl SeqL1Client + L1Client>,
     config: WriterConfig,
     db: Arc<D>,
-    _l1_status: Arc<RwLock<L1Status>>,
+    l1_status: Arc<RwLock<L1Status>>,
     pool: threadpool::ThreadPool,
     bcast_handle: Arc<L1BroadcastHandle>,
 ) -> anyhow::Result<InscriptionManager> {
-    let (signer_tx, signer_rx) = mpsc::channel::<u64>(10);
-
     let ops = Arc::new(Context::new(db).into_ops(pool));
     let ops_s = ops.clone();
     let ops_w = ops.clone();
-    let insc_mgr = InscriptionManager::new(ops, signer_tx);
+    let insc_mgr = InscriptionManager::new(ops);
 
-    let WriterInitialState {
-        next_watch_blob_idx,
-        ..
-    } = initialize_writer_state(ops_s.as_ref())?;
+    let next_watch_blob_idx = get_next_blobidx_to_watch(ops_s.as_ref())?;
 
     // The watcher task watches L1 for txs confirmations and finalizations. Ideally this should be
     // taken care of by the reader task. This can be done later.
@@ -59,7 +45,6 @@ pub fn start_inscription_tasks<D: SequencerDatabase + Send + Sync + 'static>(
     let config_w = config.clone();
     let bcast_ops = bcast_handle.ops();
     let bcast_ops_w = bcast_ops.clone();
-    let bcast_ops_s = bcast_ops.clone();
     executor.spawn_critical_async("btcio::watcher_task", async move {
         watcher_task(
             next_watch_blob_idx,
@@ -67,65 +52,43 @@ pub fn start_inscription_tasks<D: SequencerDatabase + Send + Sync + 'static>(
             config_w,
             ops_w,
             bcast_ops_w,
+            l1_status,
         )
         .await
         .unwrap()
     });
 
-    executor.spawn_critical_async("btcio::listen_for_signing_intents", async {
-        start_signer_task(signer_rx, rpc_client, config, ops_s, bcast_ops_s)
-            .await
-            .unwrap()
-    });
     Ok(insc_mgr)
 }
 
-fn initialize_writer_state(insc_ops: &InscriptionDataOps) -> anyhow::Result<WriterInitialState> {
+/// Looks into the database from descending index order till it reaches 0 or Finalized blobentry
+/// from which the rest of the entries should be watched
+fn get_next_blobidx_to_watch(insc_ops: &InscriptionDataOps) -> anyhow::Result<u64> {
     let mut next_idx = insc_ops.get_next_blob_idx_blocking()?;
-    if next_idx == 0 {
-        return Ok(WriterInitialState {
-            next_watch_blob_idx: 0,
-            next_publish_blob_idx: 0,
-        });
-    }
-
-    let mut next_publish_idx = None;
-    let mut next_watch_idx = 0;
 
     while next_idx > 0 {
         let Some(blob) = insc_ops.get_blob_entry_by_idx_blocking(next_idx - 1)? else {
             break;
         };
-        match blob.status {
-            // We are watching from the latest so we don't need to update next_publish_idx if we
-            // found one already
-            BlobL1Status::Published if next_publish_idx.is_none() => {
-                next_publish_idx = Some(next_idx);
-            }
-            BlobL1Status::Finalized => {
-                next_watch_idx = next_idx;
-                // We don't need to check beyond finalized blob
-                break;
-            }
-            _ => {}
+        if blob.status == BlobL1Status::Finalized {
+            break;
         };
         next_idx -= 1;
     }
-    Ok(WriterInitialState {
-        next_watch_blob_idx: next_watch_idx,
-        next_publish_blob_idx: next_publish_idx.unwrap_or(0),
-    })
+    Ok(next_idx)
 }
 
 const FINALITY_DEPTH: u64 = 6;
 
-/// Watches for inscription transactions status in bitcoin
+/// Watches for inscription transactions status in bitcoin. Note that this watches for each
+/// inscription until it is confirmed
 pub async fn watcher_task(
     next_blbidx_to_watch: u64,
     rpc_client: Arc<impl L1Client + SeqL1Client>,
     config: WriterConfig,
     insc_ops: Arc<InscriptionDataOps>,
     bcast_ops: Arc<BroadcastDbOps>,
+    l1_status: Arc<RwLock<L1Status>>,
 ) -> anyhow::Result<()> {
     info!("Starting L1 writer's watcher task");
     let interval = tokio::time::interval(Duration::from_millis(config.poll_duration_ms));
@@ -143,19 +106,21 @@ pub async fn watcher_task(
                 .get_tx_entry_by_id_async(blobentry.reveal_txid)
                 .await?;
 
-            let curr_status = blobentry.status.clone();
-            debug!(?curr_status, %curr_blobidx, "Blob entry");
+            debug!(%curr_blobidx, "Blob status: {:?}, Commit txid: {}, Reveal tdxid: {}", blobentry.status, blobentry.commit_txid, blobentry.reveal_txid);
 
-            match &curr_status {
+            match blobentry.status {
                 BlobL1Status::Unsigned | BlobL1Status::NeedsResign => {
-                    create_and_sign_blob_inscriptions(
+                    handle_signing(
                         curr_blobidx,
-                        insc_ops.as_ref(),
+                        &blobentry,
+                        &insc_ops,
                         bcast_ops.as_ref(),
                         rpc_client.clone(),
                         &config,
                     )
                     .await?;
+
+                    debug!(%curr_blobidx, "Signed blob");
                 }
                 BlobL1Status::Finalized => {
                     curr_blobidx += 1;
@@ -165,19 +130,18 @@ pub async fn watcher_task(
                     curr_blobidx += 1;
                 }
                 BlobL1Status::Published | BlobL1Status::Confirmed | BlobL1Status::Unpublished => {
-                    debug!(%curr_blobidx, ?curr_status, "blobentry is published or confirmed, checking if finalized");
-                    match (commit_tx, reveal_tx) {
-                        (Some(ctx), Some(rtx)) => {
-                            let status = determine_blob_next_status(&ctx, &rtx, curr_status)?;
-                            // Update blobentry with new status
-                            insc_ops
-                                .update_blob_entry_status_async(curr_blobidx, blobentry, status)
-                                .await?;
-                        }
-                        _ => {
-                            error!(%curr_blobidx, "Commit/reveal txid associated with blobentry not found in broadcast database")
-                        }
-                    }
+                    debug!(%curr_blobidx, "Checking blobentry's broadcast status");
+
+                    check_and_update_blobentry_status(
+                        &mut curr_blobidx,
+                        &blobentry.status,
+                        &blobentry,
+                        commit_tx,
+                        reveal_tx,
+                        &l1_status,
+                        &insc_ops,
+                    )
+                    .await?;
                 }
             }
         } else {
@@ -187,15 +151,86 @@ pub async fn watcher_task(
     }
 }
 
+async fn check_and_update_blobentry_status(
+    curr_blobidx: &mut u64,
+    curr_status: &BlobL1Status,
+    blobentry: &BlobEntry,
+    commit_tx: Option<L1TxEntry>,
+    reveal_tx: Option<L1TxEntry>,
+    l1_status: &RwLock<L1Status>,
+    insc_ops: &InscriptionDataOps,
+) -> anyhow::Result<()> {
+    match (commit_tx, reveal_tx) {
+        (Some(ctx), Some(rtx)) => {
+            let status = determine_blob_next_status(&ctx, &rtx, curr_status.clone())?;
+            debug!(%curr_blobidx, ?status, "New status");
+
+            if status == BlobL1Status::Published
+                || status == BlobL1Status::Confirmed
+                || status == BlobL1Status::Finalized
+            {
+                let mut status = l1_status.write().await;
+                status.last_published_txid = Some(blobentry.reveal_txid.into());
+            } else if status == BlobL1Status::Finalized || status == BlobL1Status::Confirmed {
+                *curr_blobidx += 1;
+            }
+
+            // Update blobentry with new status
+            let mut updated_entry = blobentry.clone();
+            updated_entry.status = status.clone();
+            update_entry(*curr_blobidx, updated_entry, insc_ops).await?;
+        }
+        _ => {
+            error!(%curr_blobidx, "Commit/reveal txid associated with blobentry not found in broadcast database")
+        }
+    }
+    Ok(())
+}
+
+async fn handle_signing(
+    idx: u64,
+    blobentry: &BlobEntry,
+    insc_ops: &InscriptionDataOps,
+    bcast_ops: &BroadcastDbOps,
+    rpc_client: Arc<impl L1Client + SeqL1Client>,
+    config: &WriterConfig,
+) -> anyhow::Result<()> {
+    let (cid, rid) =
+        create_and_sign_blob_inscriptions(blobentry, bcast_ops, rpc_client.clone(), config).await?;
+    let mut updated_entry = blobentry.clone();
+    updated_entry.status = BlobL1Status::Unpublished;
+    updated_entry.commit_txid = cid;
+    updated_entry.reveal_txid = rid;
+    update_entry(idx, updated_entry, insc_ops).await?;
+    Ok(())
+}
+
+async fn update_entry(
+    curr_blobidx: u64,
+    updated_entry: BlobEntry,
+    insc_ops: &InscriptionDataOps,
+) -> anyhow::Result<()> {
+    let id = insc_ops
+        .get_blob_id_async(curr_blobidx)
+        .await?
+        .expect("Expect to find blobentry in db");
+    insc_ops.put_blob_entry_async(id, updated_entry).await?;
+    Ok(())
+}
+
 fn determine_blob_next_status(
     ctx: &L1TxEntry,
     rtx: &L1TxEntry,
     curr_status: BlobL1Status,
 ) -> anyhow::Result<BlobL1Status> {
     let status = match (&ctx.status, &rtx.status) {
+        // If reveal is finalized, both are finalized
         (_, L1TxStatus::Finalized(_)) => BlobL1Status::Finalized,
+        // If reveal is confirmed, both are confirmed
         (_, L1TxStatus::Confirmed(_)) => BlobL1Status::Confirmed,
+        // If reveal is published, both are published
         (_, L1TxStatus::Published) => BlobL1Status::Published,
+        // If commit is excluded, both are excluded
         (L1TxStatus::Excluded(ExcludeReason::MissingInputsOrSpent), _) => BlobL1Status::NeedsResign,
         (L1TxStatus::Excluded(reason), _) => {
             // TODO: error or have a separate status?
@@ -251,7 +286,7 @@ mod test {
         let lastidx = db.sequencer_provider().get_last_blob_idx().unwrap();
         assert_eq!(lastidx, None);
 
-        let st = initialize_writer_state(db.clone()).unwrap();
+        let st = get_next_blobidx_to_watch(db.clone()).unwrap();
 
         assert_eq!(st.next_publish_blob_idx, 0);
         assert_eq!(st.next_watch_blob_idx, 0);
@@ -281,7 +316,7 @@ mod test {
         let blob_hash: Buf32 = [4; 32].into();
         let _idx4 = db.sequencer_store().put_blob(blob_hash, e4).unwrap();
 
-        let st = initialize_writer_state(db.clone()).unwrap();
+        let st = get_next_blobidx_to_watch(db.clone()).unwrap();
 
         assert_eq!(st.next_watch_blob_idx, idx2);
         assert_eq!(st.next_publish_blob_idx, idx3);

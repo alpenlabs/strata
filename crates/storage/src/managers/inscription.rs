@@ -23,8 +23,6 @@ impl InscriptionManager {
         tracing::debug!(?intent, "SUBMIT INTENT");
         let entry = BlobEntry::new_unsigned(intent.payload().to_vec());
 
-        // Write to db and if not already exisging, notify signer about the new entry
-        // if let Some(idx) = store_entry(*intent.commitment(), entry, self.db.clone())? {
         Ok(self
             .ops
             .put_blob_entry_blocking(*intent.commitment(), entry)?)
@@ -34,7 +32,6 @@ impl InscriptionManager {
         // TODO: check for intent dest ??
         let entry = BlobEntry::new_unsigned(intent.payload().to_vec());
 
-        // Write to db and if not already exisging, notify signer about the new entry
         Ok(self
             .ops
             .put_blob_entry_async(*intent.commitment(), entry)
