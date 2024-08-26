@@ -28,32 +28,26 @@ impl SeqDb {
 }
 
 impl SeqDataStore for SeqDb {
-    fn add_new_blob_entry(&self, blob_hash: Buf32, blob: BlobEntry) -> DbResult<u64> {
+    fn put_blob_entry(&self, blob_hash: Buf32, blob: BlobEntry) -> DbResult<()> {
         self.db
             .with_optimistic_txn(
                 rockbound::TransactionRetry::Count(self.ops.retry_count),
-                |txn| {
-                    if txn.get::<SeqBlobSchema>(&blob_hash)?.is_some() {
-                        return Err(DbError::Other(format!(
-                            "Entry already exists for blobid {blob_hash:?}"
-                        )));
+                |txn| -> Result<(), DbError> {
+                    // If new, increment idx
+                    if txn.get::<SeqBlobSchema>(&blob_hash)?.is_none() {
+                        let idx = rockbound::utils::get_last::<SeqBlobIdSchema>(txn)?
+                            .map(|(x, _)| x + 1)
+                            .unwrap_or(0);
+
+                        txn.put::<SeqBlobIdSchema>(&idx, &blob_hash)?;
                     }
 
-                    let idx = rockbound::utils::get_last::<SeqBlobIdSchema>(txn)?
-                        .map(|(x, _)| x + 1)
-                        .unwrap_or(0);
-
-                    txn.put::<SeqBlobIdSchema>(&idx, &blob_hash)?;
                     txn.put::<SeqBlobSchema>(&blob_hash, &blob)?;
 
-                    Ok(idx)
+                    Ok(())
                 },
             )
             .map_err(|e| DbError::TransactionError(e.to_string()))
-    }
-
-    fn update_blob_entry(&self, blobid: Buf32, blobentry: BlobEntry) -> DbResult<()> {
-        Ok(self.db.put::<SeqBlobSchema>(&blobid, &blobentry)?)
     }
 }
 
@@ -116,9 +110,9 @@ mod tests {
         let blob: BlobEntry = ArbitraryGenerator::new().generate();
         let blob_hash: Buf32 = [0; 32].into();
 
-        let idx = seq_db.add_new_blob_entry(blob_hash, blob.clone()).unwrap();
+        seq_db.put_blob_entry(blob_hash, blob.clone()).unwrap();
+        let idx = seq_db.get_last_blob_idx().unwrap().unwrap();
 
-        assert_eq!(idx, 0);
         assert_eq!(seq_db.get_blob_id(idx).unwrap(), Some(blob_hash));
 
         let stored_blob = seq_db.get_blob_by_id(blob_hash).unwrap();
@@ -132,9 +126,9 @@ mod tests {
         let blob: BlobEntry = ArbitraryGenerator::new().generate();
         let blob_hash: Buf32 = [0; 32].into();
 
-        let _ = seq_db.add_new_blob_entry(blob_hash, blob.clone()).unwrap();
+        seq_db.put_blob_entry(blob_hash, blob.clone()).unwrap();
 
-        let result = seq_db.add_new_blob_entry(blob_hash, blob);
+        let result = seq_db.put_blob_entry(blob_hash, blob);
 
         assert!(result.is_err());
         if let Err(DbError::Other(err)) = result {
@@ -151,13 +145,13 @@ mod tests {
         let blob_hash: Buf32 = [0; 32].into();
 
         // Insert
-        let _idx = seq_db.add_new_blob_entry(blob_hash, blob.clone()).unwrap();
+        seq_db.put_blob_entry(blob_hash, blob.clone()).unwrap();
 
         let updated_blob: BlobEntry = ArbitraryGenerator::new().generate();
 
         // Update existing idx
         seq_db
-            .update_blob_entry(blob_hash, updated_blob.clone())
+            .put_blob_entry(blob_hash, updated_blob.clone())
             .unwrap();
         let retrieved_blob = seq_db.get_blob_by_id(blob_hash).unwrap().unwrap();
         assert_eq!(updated_blob, retrieved_blob);
@@ -171,7 +165,7 @@ mod tests {
         let blob: BlobEntry = ArbitraryGenerator::new().generate();
         let blob_hash: Buf32 = [0; 32].into();
 
-        let _ = seq_db.add_new_blob_entry(blob_hash, blob.clone()).unwrap();
+        seq_db.put_blob_entry(blob_hash, blob.clone()).unwrap();
 
         let retrieved = seq_db.get_blob_by_id(blob_hash).unwrap().unwrap();
         assert_eq!(retrieved, blob);
@@ -191,15 +185,14 @@ mod tests {
             "There is no last blobidx in the beginning"
         );
 
-        let _ = seq_db.add_new_blob_entry(blob_hash, blob.clone()).unwrap();
+        seq_db.put_blob_entry(blob_hash, blob.clone()).unwrap();
 
         let blob: BlobEntry = ArbitraryGenerator::new().generate();
         let blob_hash: Buf32 = [1; 32].into();
 
-        let idx = seq_db.add_new_blob_entry(blob_hash, blob.clone()).unwrap();
+        seq_db.put_blob_entry(blob_hash, blob.clone()).unwrap();
 
         let last_blob_idx = seq_db.get_last_blob_idx().unwrap();
-
-        assert_eq!(last_blob_idx, Some(idx));
+        assert_eq!(last_blob_idx, Some(0));
     }
 }

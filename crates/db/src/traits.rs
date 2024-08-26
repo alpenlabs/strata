@@ -264,12 +264,8 @@ pub trait SequencerDatabase {
 
 #[cfg_attr(feature = "mocks", automock)]
 pub trait SeqDataStore {
-    /// Store the blob. Also create and store appropriate blob idx -> blobid mapping.
-    /// Returns new blobidx, and returns error if entry already exists
-    fn add_new_blob_entry(&self, blobid: Buf32, blobentry: BlobEntry) -> DbResult<u64>;
-
-    /// Update an existing blob entry
-    fn update_blob_entry(&self, blobid: Buf32, blobentry: BlobEntry) -> DbResult<()>;
+    /// Store the blob.
+    fn put_blob_entry(&self, blobid: Buf32, blobentry: BlobEntry) -> DbResult<()>;
 }
 
 #[cfg_attr(feature = "mocks", automock)]
