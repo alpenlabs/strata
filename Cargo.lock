@@ -885,6 +885,7 @@ dependencies = [
 name = "alpen-express-rpc-types"
 version = "0.1.0"
 dependencies = [
+ "bitcoin",
  "hex",
  "serde",
  "serde_json",

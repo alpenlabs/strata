@@ -4,6 +4,7 @@
 //!  - implementation of RPC client
 //!  - crate for just data structures that represents the JSON responses from Bitcoin core RPC
 
+use bitcoin::Txid;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -23,7 +24,7 @@ pub struct L1Status {
     pub cur_tip_blkid: String,
 
     /// Last published txid where L2 blob was present
-    pub last_published_txid: Option<String>,
+    pub last_published_txid: Option<Txid>,
 
     /// number of published transactions in current run (commit + reveal pair count as 1)
     pub published_inscription_count: u64,
