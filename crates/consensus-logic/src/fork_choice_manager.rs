@@ -442,14 +442,14 @@ fn check_new_block<D: Database>(
         }
     }
 
-    if !verify_block_hashes(block, blkid) {
+    if !check_block_segments(block, blkid) {
         return Ok(false);
     }
 
     Ok(true)
 }
 
-fn verify_block_hashes(block: &L2Block, blkid: &L2BlockId) -> bool {
+fn check_block_segments(block: &L2Block, blkid: &L2BlockId) -> bool {
     // check if the l1_segment_hash matches between L2Block and L2BlockHeader
     let l1seg_buf = borsh::to_vec(block.l1_segment()).expect("blockasm: enc l1 segment");
     let l1_segment_hash = hash::raw(&l1seg_buf);
@@ -586,12 +586,12 @@ fn apply_tip_update<D: Database>(
 #[cfg(test)]
 mod tests {
     use alpen_express_state::{
-        block::{ExecSegment, L2Block, L2BlockBody},
+        block::{ExecSegment, L1Segment, L2Block, L2BlockBody},
         header::L2Header,
     };
     use alpen_test_utils::ArbitraryGenerator;
 
-    use super::verify_block_hashes;
+    use super::check_block_segments;
 
     #[test]
     fn test_verify_block_hashes() {
@@ -599,13 +599,19 @@ mod tests {
         let block: L2Block = ArbitraryGenerator::new().generate();
         let blk_id = block.header().get_blockid();
 
-        assert!(verify_block_hashes(&block, &blk_id));
+        assert!(check_block_segments(&block, &blk_id));
 
-        // mutate the l2Block's body to create a new block with arbitrary exec segment
         let arb_exec_segment: ExecSegment = ArbitraryGenerator::new().generate();
+        let arb_l1_segment: L1Segment = ArbitraryGenerator::new().generate();
+        // mutate the l2Block's body to create a new block with arbitrary exec segment
         let blk_body = L2BlockBody::new(block.body().l1_segment().clone(), arb_exec_segment);
-        let new_blk = L2Block::new(block.header().clone(), blk_body);
+        let arb_exec_block = L2Block::new(block.header().clone(), blk_body);
+        assert!(!check_block_segments(&arb_exec_block, &blk_id));
 
-        assert!(!verify_block_hashes(&new_blk, &blk_id));
+        // mutate the l2Block's body to create a new block with arbitrary l1 segment
+        let blk_body = L2BlockBody::new(arb_l1_segment, block.body().exec_segment().clone());
+        let arb_l1_block = L2Block::new(block.header().clone(), blk_body);
+
+        assert!(!check_block_segments(&arb_l1_block, &blk_id));
     }
 }
