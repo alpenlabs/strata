@@ -3,4 +3,7 @@ pub mod config;
 mod signer;
 mod task;
 
-pub use task::start_inscription_tasks;
+#[cfg(test)]
+mod test_utils;
+
+pub use task::{start_inscription_tasks, InscriptionHandle};

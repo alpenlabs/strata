@@ -210,7 +210,7 @@ pub fn duty_dispatch_task<
     sync_man: Arc<SyncManager>,
     database: Arc<D>,
     engine: Arc<E>,
-    insc_mgr: Arc<InscriptionManager>,
+    insc_mgr: Arc<InscriptionHandle>,
     pool: threadpool::ThreadPool,
     params: Arc<Params>,
 ) {
@@ -301,7 +301,7 @@ fn duty_exec_task<D: Database, E: ExecEngineCtl>(
     sync_man: Arc<SyncManager>,
     database: Arc<D>,
     engine: Arc<E>,
-    insc_mgr: Arc<InscriptionManager>,
+    insc_mgr: Arc<InscriptionHandle>,
     params: Arc<Params>,
     duty_status_tx: std::sync::mpsc::Sender<DutyExecStatus>,
 ) {
@@ -331,7 +331,7 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
     sync_man: &SyncManager,
     database: &D,
     engine: &E,
-    insc_mgr: &InscriptionManager,
+    insc_mgr: &InscriptionHandle,
     params: &Arc<Params>,
 ) -> Result<(), Error> {
     match duty {

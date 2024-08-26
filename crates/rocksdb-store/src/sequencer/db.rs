@@ -7,7 +7,7 @@ use alpen_express_db::{
     DbResult,
 };
 use alpen_express_primitives::buf::Buf32;
-use rockbound::{OptimisticTransactionDB, SchemaBatch, SchemaDBOperationsExt};
+use rockbound::{OptimisticTransactionDB, SchemaDBOperationsExt};
 
 use super::schemas::{SeqBlobIdSchema, SeqBlobSchema};
 use crate::DbOpsConfig;
@@ -91,10 +91,7 @@ impl<D: SeqDataStore + SeqDataProvider> SequencerDatabase for SequencerDB<D> {
 #[cfg(feature = "test_utils")]
 #[cfg(test)]
 mod tests {
-    use alpen_express_db::{
-        errors::DbError,
-        traits::{SeqDataProvider, SeqDataStore},
-    };
+    use alpen_express_db::traits::{SeqDataProvider, SeqDataStore};
     use alpen_express_primitives::buf::Buf32;
     use alpen_test_utils::ArbitraryGenerator;
     use test;
@@ -130,10 +127,8 @@ mod tests {
 
         let result = seq_db.put_blob_entry(blob_hash, blob);
 
-        assert!(result.is_err());
-        if let Err(DbError::Other(err)) = result {
-            assert!(err.contains("Entry already exists for blobid"));
-        }
+        // Should be ok to put to existing key
+        assert!(result.is_ok());
     }
 
     #[test]
@@ -186,13 +181,15 @@ mod tests {
         );
 
         seq_db.put_blob_entry(blob_hash, blob.clone()).unwrap();
+        // Now the last idx is 0
 
         let blob: BlobEntry = ArbitraryGenerator::new().generate();
         let blob_hash: Buf32 = [1; 32].into();
 
         seq_db.put_blob_entry(blob_hash, blob.clone()).unwrap();
+        // Now the last idx is 1
 
         let last_blob_idx = seq_db.get_last_blob_idx().unwrap();
-        assert_eq!(last_blob_idx, Some(0));
+        assert_eq!(last_blob_idx, Some(1));
     }
 }

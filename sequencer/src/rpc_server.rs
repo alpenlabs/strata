@@ -27,7 +27,6 @@ use alpen_express_state::{
 };
 use async_trait::async_trait;
 use bitcoin::{consensus::deserialize, hashes::Hash, Transaction as BTransaction, Txid};
-use express_storage::managers::inscription::InscriptionManager;
 use jsonrpsee::{
     core::RpcResult,
     types::{ErrorObject, ErrorObjectOwned},
@@ -500,13 +499,13 @@ pub struct AdminServerImpl {
     // TODO: Clean up writer's signature, possibly use some kind of manager
     // Currently writer is Some() for sequencer only, but we need bcast_manager for both fullnode
     // and seq
-    pub writer: Option<Arc<InscriptionManager>>,
+    pub writer: Option<Arc<InscriptionHandle>>,
     pub bcast_handle: Arc<L1BroadcastHandle>,
 }
 
 impl AdminServerImpl {
     pub fn new(
-        writer: Option<Arc<InscriptionManager>>,
+        writer: Option<Arc<InscriptionHandle>>,
         bcast_handle: Arc<L1BroadcastHandle>,
     ) -> Self {
         Self {

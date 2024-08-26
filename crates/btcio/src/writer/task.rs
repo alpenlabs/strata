@@ -1,5 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
+use alpen_express_state::da_blob::BlobIntent;
 use tokio::sync::RwLock;
 use tracing::*;
 
@@ -8,11 +9,7 @@ use alpen_express_db::{
     types::{BlobEntry, BlobL1Status, ExcludeReason, L1TxEntry, L1TxStatus},
 };
 use alpen_express_rpc_types::L1Status;
-use express_storage::{
-    managers::inscription::InscriptionManager,
-    ops::inscription::{Context, InscriptionDataOps},
-    BroadcastDbOps,
-};
+use express_storage::ops::inscription::{Context, InscriptionDataOps};
 use express_tasks::TaskExecutor;
 
 use crate::{
@@ -23,6 +20,36 @@ use crate::{
 
 use super::config::WriterConfig;
 
+/// A handle to the Inscription task. This is basically just a db wrapper for now
+pub struct InscriptionHandle {
+    ops: Arc<InscriptionDataOps>,
+}
+
+impl InscriptionHandle {
+    pub fn new(ops: Arc<InscriptionDataOps>) -> Self {
+        Self { ops }
+    }
+
+    pub fn submit_intent(&self, intent: BlobIntent) -> anyhow::Result<()> {
+        // TODO: check for intent dest ??
+        let entry = BlobEntry::new_unsigned(intent.payload().to_vec());
+
+        Ok(self
+            .ops
+            .put_blob_entry_blocking(*intent.commitment(), entry)?)
+    }
+
+    pub async fn submit_intent_async(&self, intent: BlobIntent) -> anyhow::Result<()> {
+        // TODO: check for intent dest ??
+        let entry = BlobEntry::new_unsigned(intent.payload().to_vec());
+
+        Ok(self
+            .ops
+            .put_blob_entry_async(*intent.commitment(), entry)
+            .await?)
+    }
+}
+
 pub fn start_inscription_tasks<D: SequencerDatabase + Send + Sync + 'static>(
     executor: &TaskExecutor,
     rpc_client: Arc<impl SeqL1Client + L1Client>,
@@ -31,27 +58,19 @@ pub fn start_inscription_tasks<D: SequencerDatabase + Send + Sync + 'static>(
     l1_status: Arc<RwLock<L1Status>>,
     pool: threadpool::ThreadPool,
     bcast_handle: Arc<L1BroadcastHandle>,
-) -> anyhow::Result<InscriptionManager> {
+) -> anyhow::Result<InscriptionHandle> {
     let ops = Arc::new(Context::new(db).into_ops(pool));
-    let ops_s = ops.clone();
-    let ops_w = ops.clone();
-    let insc_mgr = InscriptionManager::new(ops);
+    let insc_mgr = InscriptionHandle::new(ops.clone());
 
-    let next_watch_blob_idx = get_next_blobidx_to_watch(ops_s.as_ref())?;
+    let next_watch_blob_idx = get_next_blobidx_to_watch(ops.as_ref())?;
 
-    // The watcher task watches L1 for txs confirmations and finalizations. Ideally this should be
-    // taken care of by the reader task. This can be done later.
-    let rpc_client_w = rpc_client.clone();
-    let config_w = config.clone();
-    let bcast_ops = bcast_handle.ops();
-    let bcast_ops_w = bcast_ops.clone();
     executor.spawn_critical_async("btcio::watcher_task", async move {
         watcher_task(
             next_watch_blob_idx,
-            rpc_client_w,
-            config_w,
-            ops_w,
-            bcast_ops_w,
+            rpc_client,
+            config,
+            ops,
+            bcast_handle,
             l1_status,
         )
         .await
@@ -78,6 +97,7 @@ fn get_next_blobidx_to_watch(insc_ops: &InscriptionDataOps) -> anyhow::Result<u6
     Ok(next_idx)
 }
 
+// TODO: from config
 const FINALITY_DEPTH: u64 = 6;
 
 /// Watches for inscription transactions status in bitcoin. Note that this watches for each
@@ -87,7 +107,7 @@ pub async fn watcher_task(
     rpc_client: Arc<impl L1Client + SeqL1Client>,
     config: WriterConfig,
     insc_ops: Arc<InscriptionDataOps>,
-    bcast_ops: Arc<BroadcastDbOps>,
+    bcast_handle: Arc<L1BroadcastHandle>,
     l1_status: Arc<RwLock<L1Status>>,
 ) -> anyhow::Result<()> {
     info!("Starting L1 writer's watcher task");
@@ -99,10 +119,10 @@ pub async fn watcher_task(
         interval.as_mut().tick().await;
 
         if let Some(blobentry) = insc_ops.get_blob_entry_by_idx_async(curr_blobidx).await? {
-            let commit_tx = bcast_ops
+            let commit_tx = bcast_handle
                 .get_tx_entry_by_id_async(blobentry.commit_txid)
                 .await?;
-            let reveal_tx = bcast_ops
+            let reveal_tx = bcast_handle
                 .get_tx_entry_by_id_async(blobentry.reveal_txid)
                 .await?;
 
@@ -114,7 +134,7 @@ pub async fn watcher_task(
                         curr_blobidx,
                         &blobentry,
                         &insc_ops,
-                        bcast_ops.as_ref(),
+                        bcast_handle.as_ref(),
                         rpc_client.clone(),
                         &config,
                     )
@@ -191,12 +211,13 @@ async fn handle_signing(
     idx: u64,
     blobentry: &BlobEntry,
     insc_ops: &InscriptionDataOps,
-    bcast_ops: &BroadcastDbOps,
+    bcast_handle: &L1BroadcastHandle,
     rpc_client: Arc<impl L1Client + SeqL1Client>,
     config: &WriterConfig,
 ) -> anyhow::Result<()> {
     let (cid, rid) =
-        create_and_sign_blob_inscriptions(blobentry, bcast_ops, rpc_client.clone(), config).await?;
+        create_and_sign_blob_inscriptions(blobentry, bcast_handle, rpc_client.clone(), config)
+            .await?;
     let mut updated_entry = blobentry.clone();
     updated_entry.status = BlobL1Status::Unpublished;
     updated_entry.commit_txid = cid;
@@ -244,81 +265,53 @@ fn determine_blob_next_status(
 
 #[cfg(test)]
 mod test {
-    use std::{str::FromStr, sync::Arc};
 
     use alpen_express_primitives::buf::Buf32;
-    use bitcoin::{Address, Network};
-
-    use alpen_express_db::traits::SequencerDatabase;
-    use alpen_express_rocksdb::{
-        sequencer::db::SequencerDB, test_utils::get_rocksdb_tmp_instance, SeqDb,
-    };
 
     use alpen_test_utils::ArbitraryGenerator;
 
     use super::*;
-    use crate::writer::config::{InscriptionFeePolicy, WriterConfig};
-
-    fn get_db() -> Arc<SequencerDB<SeqDb>> {
-        let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-        let seqdb = Arc::new(SeqDb::new(db, db_ops));
-        Arc::new(SequencerDB::new(seqdb))
-    }
-
-    fn get_config() -> WriterConfig {
-        let addr = Address::from_str("bcrt1q6u6qyya3sryhh42lahtnz2m7zuufe7dlt8j0j5")
-            .unwrap()
-            .require_network(Network::Regtest)
-            .unwrap();
-        WriterConfig {
-            sequencer_address: addr,
-            rollup_name: "alpen".to_string(),
-            inscription_fee_policy: InscriptionFeePolicy::Fixed(100),
-            poll_duration_ms: 1000,
-            amount_for_reveal_txn: 1000,
-        }
-    }
+    use crate::writer::test_utils::get_insc_ops;
 
     #[test]
     fn test_initialize_writer_state_no_last_blob_idx() {
-        let db = get_db();
+        let iops = get_insc_ops();
 
-        let lastidx = db.sequencer_provider().get_last_blob_idx().unwrap();
-        assert_eq!(lastidx, None);
+        let nextidx = iops.get_next_blob_idx_blocking().unwrap();
+        assert_eq!(nextidx, 0);
 
-        let st = get_next_blobidx_to_watch(db.clone()).unwrap();
+        let idx = get_next_blobidx_to_watch(&iops).unwrap();
 
-        assert_eq!(st.next_publish_blob_idx, 0);
-        assert_eq!(st.next_watch_blob_idx, 0);
+        assert_eq!(idx, 0);
     }
 
     #[test]
     fn test_initialize_writer_state_with_existing_blobs() {
-        let db = get_db();
+        let iops = get_insc_ops();
 
         let mut e1: BlobEntry = ArbitraryGenerator::new().generate();
         e1.status = BlobL1Status::Finalized;
         let blob_hash: Buf32 = [1; 32].into();
-        let _idx1 = db.sequencer_store().put_blob(blob_hash, e1).unwrap();
+        iops.put_blob_entry_blocking(blob_hash, e1).unwrap();
+        let expected_idx = iops.get_next_blob_idx_blocking().unwrap();
 
         let mut e2: BlobEntry = ArbitraryGenerator::new().generate();
         e2.status = BlobL1Status::Published;
         let blob_hash: Buf32 = [2; 32].into();
-        let idx2 = db.sequencer_store().put_blob(blob_hash, e2).unwrap();
+        iops.put_blob_entry_blocking(blob_hash, e2).unwrap();
 
         let mut e3: BlobEntry = ArbitraryGenerator::new().generate();
         e3.status = BlobL1Status::Unsigned;
         let blob_hash: Buf32 = [3; 32].into();
-        let idx3 = db.sequencer_store().put_blob(blob_hash, e3).unwrap();
+        iops.put_blob_entry_blocking(blob_hash, e3).unwrap();
 
         let mut e4: BlobEntry = ArbitraryGenerator::new().generate();
         e4.status = BlobL1Status::Unsigned;
         let blob_hash: Buf32 = [4; 32].into();
-        let _idx4 = db.sequencer_store().put_blob(blob_hash, e4).unwrap();
+        iops.put_blob_entry_blocking(blob_hash, e4).unwrap();
 
-        let st = get_next_blobidx_to_watch(db.clone()).unwrap();
+        let idx = get_next_blobidx_to_watch(&iops).unwrap();
 
-        assert_eq!(st.next_watch_blob_idx, idx2);
-        assert_eq!(st.next_publish_blob_idx, idx3);
+        assert_eq!(idx, expected_idx);
     }
 }

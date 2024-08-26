@@ -377,7 +377,7 @@ async fn start_rpc<D: Database + Send + Sync + 'static>(
     sync_man: Arc<SyncManager>,
     database: Arc<D>,
     l1_status: Arc<RwLock<L1Status>>,
-    insc_mgr: Option<Arc<InscriptionManager>>,
+    insc_mgr: Option<Arc<InscriptionHandle>>,
     bcast_handle: Arc<L1BroadcastHandle>,
 ) -> anyhow::Result<()> {
     let (stop_tx, stop_rx) = oneshot::channel();
