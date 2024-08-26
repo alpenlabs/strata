@@ -10,6 +10,7 @@ reth-basic-payload-builder = { workspace = true }
 reth-chainspec = { workspace = true }
 reth-ethereum-payload-builder = { workspace = true }
 reth-evm = { workspace = true }
+reth-evm-ethereum = { workspace = true }
 reth-node-api = { workspace = true }
 reth-node-ethereum = { workspace = true }
 reth-payload-builder = { workspace = true }

@@ -100,6 +100,7 @@ reth-cli-util = { git = "https://github.com/alpenlabs/reth.git", rev = "dde184f5
 reth-db = { git = "https://github.com/alpenlabs/reth.git", rev = "dde184f56591d0af" }
 reth-ethereum-payload-builder = { git = "https://github.com/alpenlabs/reth.git", rev = "dde184f56591d0af" }
 reth-evm = { git = "https://github.com/alpenlabs/reth.git", rev = "dde184f56591d0af" }
+reth-evm-ethereum = { git = "https://github.com/alpenlabs/reth.git", rev = "dde184f56591d0af" }
 reth-exex = { git = "https://github.com/alpenlabs/reth.git", rev = "dde184f56591d0af" }
 reth-ipc = { git = "https://github.com/alpenlabs/reth.git", rev = "dde184f56591d0af" }
 reth-node-api = { git = "https://github.com/alpenlabs/reth.git", rev = "dde184f56591d0af" }

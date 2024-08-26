@@ -3637,6 +3637,7 @@ dependencies = [
  "reth-chainspec",
  "reth-ethereum-payload-builder",
  "reth-evm",
+ "reth-evm-ethereum",
  "reth-node-api",
  "reth-node-ethereum",
  "reth-payload-builder",
