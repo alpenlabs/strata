@@ -4,11 +4,12 @@ name = "express-reth-node"
 version = "0.1.0"
 
 [dependencies]
-alpen-express-rpc-types = { workspace = true }
+alloy-sol-types = { workspace = true }
 reth = { workspace = true }
 reth-basic-payload-builder = { workspace = true }
 reth-chainspec = { workspace = true }
 reth-ethereum-payload-builder = { workspace = true }
+reth-errors = { workspace = true }
 reth-evm = { workspace = true }
 reth-evm-ethereum = { workspace = true }
 reth-node-api = { workspace = true }

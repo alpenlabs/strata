@@ -6,7 +6,7 @@ use reth_node_ethereum::EthEvmConfig;
 use reth_primitives::{Header, TransactionSigned};
 use revm::{
     handler::register::EvmHandler, inspector_handle_register, precompile::PrecompileSpecId,
-    ContextPrecompiles, Database, Evm, EvmBuilder, GetInspector,
+    ContextPrecompile, ContextPrecompiles, Database, Evm, EvmBuilder, GetInspector,
 };
 use revm_primitives::{Address, AnalysisKind, Bytes, CfgEnvWithHandlerCfg, Env, TxEnv, U256};
 
@@ -34,7 +34,9 @@ impl ExpressEvmConfig {
             let mut precompiles = ContextPrecompiles::new(PrecompileSpecId::from_spec_id(spec_id));
             precompiles.extend([(
                 crate::precompiles::bridge::BRIDGEOUT_ADDRESS,
-                crate::precompiles::bridge::BRIDGEOUT.into(),
+                ContextPrecompile::ContextStateful(Arc::new(
+                    crate::precompiles::bridge::BridgeoutPrecompile::default(),
+                )),
             )]);
             precompiles
         });
@@ -88,7 +90,7 @@ impl ConfigureEvm for ExpressEvmConfig {
         EvmBuilder::default()
             .with_db(db)
             // add additional precompiles
-            .append_handler_register(ExpressEvmConfig::set_precompiles)
+            .append_handler_register(Self::set_precompiles)
             .build()
     }
 
@@ -101,7 +103,7 @@ impl ConfigureEvm for ExpressEvmConfig {
             .with_db(db)
             .with_external_context(inspector)
             // add additional precompiles
-            .append_handler_register(ExpressEvmConfig::set_precompiles)
+            .append_handler_register(Self::set_precompiles)
             .append_handler_register(inspector_handle_register)
             .build()
     }

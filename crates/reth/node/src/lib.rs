@@ -1,4 +1,5 @@
 mod constants;
+mod primitives;
 mod engine;
 mod evm;
 mod node;

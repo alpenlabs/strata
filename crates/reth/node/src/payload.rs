@@ -1,6 +1,5 @@
 use std::convert::Infallible;
 
-use alpen_express_rpc_types::WithdrawalIntent;
 use reth_chainspec::ChainSpec;
 use reth_node_api::{
     payload::{EngineApiMessageVersion, EngineObjectValidationError},
@@ -19,6 +18,8 @@ use reth_rpc_types::{
     ExecutionPayloadV1, Withdrawal,
 };
 use serde::{Deserialize, Serialize};
+
+use crate::primitives::WithdrawalIntent;
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ExpressPayloadAttributes {

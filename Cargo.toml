@@ -65,6 +65,7 @@ zkvm-primitives = { path = "crates/prover/primitives" }
 # IMPORTANT: ensure alloy-* and revm packages are of the same version as inside reth dependency
 alloy-genesis = { version = "0.2", default-features = false }
 alloy-rpc-types = { version = "0.2", default-features = false }
+alloy-sol-types = "0.7.2"
 anyhow = "1.0.86"
 arbitrary = { version = "1.3.2", features = ["derive"] }
 argh = "0.1"
@@ -98,6 +99,7 @@ reth-chainspec = { git = "https://github.com/alpenlabs/reth.git", rev = "dde184f
 reth-cli-commands = { git = "https://github.com/alpenlabs/reth.git", rev = "dde184f56591d0af" }
 reth-cli-util = { git = "https://github.com/alpenlabs/reth.git", rev = "dde184f56591d0af" }
 reth-db = { git = "https://github.com/alpenlabs/reth.git", rev = "dde184f56591d0af" }
+reth-errors = { git = "https://github.com/alpenlabs/reth.git", rev = "dde184f56591d0af" }
 reth-ethereum-payload-builder = { git = "https://github.com/alpenlabs/reth.git", rev = "dde184f56591d0af" }
 reth-evm = { git = "https://github.com/alpenlabs/reth.git", rev = "dde184f56591d0af" }
 reth-evm-ethereum = { git = "https://github.com/alpenlabs/reth.git", rev = "dde184f56591d0af" }
