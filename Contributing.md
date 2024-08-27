@@ -35,6 +35,16 @@ you can run the basic CI checks in your local environment:
   
   Learn more [here](https://nexte.st).
 
+
+- `cargo audit`
+
+  This is a tool to check Cargo.lock files for crates containing security vulnerabilities.
+
+  ```bash
+  cargo install --locked cargo-audit
+  ```
+  Learn more [here](https://docs.rs/cargo-audit/latest/cargo_audit/).
+
 - Functional test runner
 
   For dependencies required to run functional tests, see instructions in its [`README.md`](./functional-tests/README.md).
