@@ -180,9 +180,9 @@ class RethFactory(flexitest.Factory):
         datadir = ctx.make_service_dir("reth")
         authrpc_port = self.next_port()
         listener_port = self.next_port()
-        ethrpc_port = self.next_port()
+        ethrpc_ws_port = self.next_port()
+        ethrpc_http_port = self.next_port()
         logfile = os.path.join(datadir, "service.log")
-        ipc_path = os.path.join(datadir, "reth.ipc")
 
         # fmt: off
         cmd = [
@@ -193,8 +193,9 @@ class RethFactory(flexitest.Factory):
             "--authrpc.jwtsecret", reth_secret_path,
             "--port", str(listener_port),
             "--ws",
-            "--ws.port", str(ethrpc_port),
-            "--ipcpath", ipc_path,
+            "--ws.port", str(ethrpc_ws_port),
+            "--http",
+            "--http.port", str(ethrpc_http_port),
             "--color", "never",
             "--enable-witness-gen",
             "-vvvv"
@@ -202,7 +203,7 @@ class RethFactory(flexitest.Factory):
         # fmt: on
         props = {"rpc_port": authrpc_port}
 
-        ethrpc_url = f"ws://localhost:{ethrpc_port}"
+        ethrpc_url = f"ws://localhost:{ethrpc_ws_port}"
 
         with open(logfile, "w") as f:
             svc = flexitest.service.ProcService(props, cmd, stdout=f)
@@ -211,7 +212,8 @@ class RethFactory(flexitest.Factory):
                 return seqrpc.JsonrpcClient(ethrpc_url)
             
             def _create_web3():
-                w3 = web3.Web3(web3.Web3.IPCProvider(ipc_path))
+                http_ethrpc_url = f"http://localhost:{ethrpc_http_port}"
+                w3 = web3.Web3(web3.Web3.HTTPProvider(http_ethrpc_url))
                 # address, pk hardcoded in test genesis config
                 w3.address = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
                 account = w3.eth.account.from_key("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
