@@ -5,7 +5,7 @@ use crate::sha256d::sha256d;
 /// Computes the [`Txid`] using [RustCrypto SHA-2 crate](https://github.com/RustCrypto/hashes/tree/master/sha2)
 /// for the underlying `sha256d` hash function.
 ///
-/// Equivalent to [bitcoin::Transaction::compute_txid](https://github.com/rust-bitcoin/rust-bitcoin/blob/master/bitcoin/src/blockdata/transaction.rs)
+/// Equivalent to [compute_txid](bitcoin::Transaction::compute_txid)
 ///
 /// This function hashes the transaction **excluding** the segwit data (i.e., the marker, flag
 /// bytes, and the witness fields themselves). For non-segwit transactions, which do not have any
@@ -23,7 +23,7 @@ pub fn compute_txid(tx: &Transaction) -> [u8; 32] {
 
 /// Computes the segwit version of the transaction id using [RustCrypto SHA-2 crate](https://github.com/RustCrypto/hashes/tree/master/sha2)
 ///
-/// Equivalent to [bitcoin::Transaction::compute_txid](https://github.com/rust-bitcoin/rust-bitcoin/blob/master/bitcoin/src/blockdata/transaction.rs)
+/// Equivalent to [compute_wtxid](bitcoin::Transaction::compute_wtxid)
 ///
 /// Hashes the transaction **including** all segwit data (i.e. the marker, flag bytes, and the
 /// witness fields themselves). For non-segwit transactions which do not have any segwit data,

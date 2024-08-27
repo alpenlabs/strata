@@ -11,7 +11,7 @@ use crate::{
 
 /// Computes the transaction merkle root.
 ///
-/// Equivalent to [bitcoin::Block::compute_merkle_root](https://github.com/rust-bitcoin/rust-bitcoin/blob/master/bitcoin/src/blockdata/block.rs)
+/// Equivalent to [compute_merkle_root](Block::compute_merkle_root)
 pub fn compute_merkle_root(block: &Block) -> Option<[u8; 32]> {
     let hashes = block.txdata.iter().map(compute_txid);
     calculate_root(hashes)
@@ -19,7 +19,7 @@ pub fn compute_merkle_root(block: &Block) -> Option<[u8; 32]> {
 
 /// Computes the transaction witness root.
 ///
-/// Equivalent to [bitcoin::Block::compute_witness_root](https://github.com/rust-bitcoin/rust-bitcoin/blob/master/bitcoin/src/blockdata/block.rs)
+/// Equivalent to [witness_root](Block::witness_root)
 pub fn compute_witness_root(block: &Block) -> Option<[u8; 32]> {
     let hashes = block.txdata.iter().enumerate().map(|(i, t)| {
         if i == 0 {
@@ -34,7 +34,7 @@ pub fn compute_witness_root(block: &Block) -> Option<[u8; 32]> {
 
 /// Checks if Merkle root of header matches Merkle root of the transaction list.
 ///
-/// Equivalent to [bitcoin::Block::check_merkle_root](https://github.com/rust-bitcoin/rust-bitcoin/blob/master/bitcoin/src/blockdata/block.rs)
+/// Equivalent to [check_merkle_root](Block::check_merkle_root)
 pub fn check_merkle_root(block: &Block) -> bool {
     match compute_merkle_root(block) {
         Some(merkle_root) => block.header.merkle_root == TxMerkleNode::from_byte_array(merkle_root),
@@ -44,7 +44,7 @@ pub fn check_merkle_root(block: &Block) -> bool {
 
 /// Computes the witness commitment for the block's transaction list.
 ///
-/// Equivalent to [bitcoin::Block::cimpute_witness_commitment](https://github.com/rust-bitcoin/rust-bitcoin/blob/master/bitcoin/src/blockdata/block.rs)
+/// Equivalent to [compute_witness_commitment](Block::compute_witness_commitment)
 pub fn compute_witness_commitment(
     witness_root: &WitnessMerkleNode,
     witness_reserved_value: &[u8],
@@ -59,7 +59,7 @@ pub fn compute_witness_commitment(
 
 /// Returns the block hash.
 ///
-/// Equivalent to [bitcoin::Header::block_hash](https://github.com/rust-bitcoin/rust-bitcoin/blob/master/bitcoin/src/blockdata/block.rs)
+/// Equivalent to [compute_block_hash](Header::block_hash)
 fn compute_block_hash(header: &Header) -> [u8; 32] {
     let mut vec = Vec::with_capacity(80);
     header
@@ -70,7 +70,7 @@ fn compute_block_hash(header: &Header) -> [u8; 32] {
 
 /// Checks if witness commitment in coinbase matches the transaction list.
 ///
-/// Equivalent to [bitcoin::Block::check_witness_commitment](https://github.com/rust-bitcoin/rust-bitcoin/blob/master/bitcoin/src/blockdata/block.rs)
+/// Equivalent to [check_witness_commitment](Block::check_witness_commitment)
 pub fn check_witness_commitment(block: &Block) -> bool {
     const MAGIC: [u8; 6] = [0x6a, 0x24, 0xaa, 0x21, 0xa9, 0xed];
     // Witness commitment is optional if there are no transactions using SegWit in the block.

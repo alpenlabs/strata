@@ -5,7 +5,7 @@ use bitcoin::consensus::Encodable;
 use crate::sha256d::sha256d;
 
 /// Calculates the merkle root of an iterator of *hashes* using [RustCrypto SHA-2 crate](https://github.com/RustCrypto/hashes/tree/master/sha2).
-/// Equivalent to [bitcoin::TxMerkleNode::calculate_root](https://github.com/rust-bitcoin/rust-bitcoin/blob/master/bitcoin/src/merkle_tree/mod.rs)
+/// Equivalent to [calculate_root](bitcoin::merkle_tree::calculate_root)
 ///
 /// # Returns
 /// - `None` if `hashes` is empty. The merkle root of an empty tree of hashes is undefined.
