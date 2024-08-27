@@ -3,12 +3,18 @@ use bitcoin::{Address, Block, Transaction};
 /// What kind of transactions can be interesting for us to filter
 #[derive(Clone, Debug)]
 pub enum TxInterest {
-    /// Txs that are spent to an address
+    /// Transactions that are spent to an address
     SpentToAddress(Address),
-    /// Txs with certain prefix. This can also be used to support matching whole txids
+    /// Transactions with certain prefix. This can also be used to support matching whole txids
     TxIdWithPrefix(Vec<u8>),
+    /// Inscription transactions with given Rollup name. NameTag is an identifier that says next
+    /// element in the stack will be the rollup name
+    InscriptionWithRollupName(NameTag, RollupName),
     // Add other interesting conditions as needed
 }
+
+type NameTag = Vec<u8>;
+type RollupName = String;
 
 /// Filter all the interesting [`Transaction`]s in a block based on given interests
 pub fn filter_interesting_txs(block: &Block, interests: &[TxInterest]) -> Vec<u32> {
@@ -31,6 +37,7 @@ fn is_interesting(tx: &Transaction, interests: &[TxInterest]) -> bool {
             .output
             .iter()
             .any(|op| address.matches_script_pubkey(&op.script_pubkey)),
+        TxInterest::InscriptionWithRollupName(_, _) => false,
     })
 }
 
