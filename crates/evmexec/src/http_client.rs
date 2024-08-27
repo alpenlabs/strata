@@ -6,7 +6,6 @@ use express_reth_node::{
 use jsonrpsee::http_client::{transport::HttpBackend, HttpClient, HttpClientBuilder};
 #[cfg(test)]
 use mockall::automock;
-use reth_node_ethereum::EthEngineTypes;
 use reth_primitives::{Block, BlockHash};
 use reth_rpc_api::{EngineApiClient, EthApiClient};
 use reth_rpc_layer::{AuthClientLayer, AuthClientService};
