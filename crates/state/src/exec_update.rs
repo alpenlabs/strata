@@ -114,6 +114,11 @@ impl UpdateOutput {
         }
     }
 
+    pub fn with_withdrawals(mut self, withdrawals: Vec<bridge_ops::WithdrawalIntent>) -> Self {
+        self.withdrawals = withdrawals;
+        self
+    }
+
     pub fn new_state(&self) -> &Buf32 {
         &self.new_state
     }

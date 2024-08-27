@@ -26,8 +26,16 @@ pub struct ExpressPayloadAttributes {
     /// An inner payload type
     #[serde(flatten)]
     pub inner: EthPayloadAttributes,
-    // /// A custom field
-    // pub custom: u64,
+    // additional custom fields to be added
+}
+
+impl ExpressPayloadAttributes {
+    pub fn new_from_eth(payload_attributes: EthPayloadAttributes) -> Self {
+        Self {
+            inner: payload_attributes,
+            // more fields here
+        }
+    }
 }
 
 impl PayloadAttributes for ExpressPayloadAttributes {
@@ -143,6 +151,12 @@ pub struct ExpressExecutionPayloadEnvelopeV2 {
     #[serde(flatten)]
     pub inner: ExecutionPayloadEnvelopeV2,
     pub withdrawal_intents: Vec<WithdrawalIntent>,
+}
+
+impl ExpressExecutionPayloadEnvelopeV2 {
+    pub fn inner(&self) -> &ExecutionPayloadEnvelopeV2 {
+        &self.inner
+    }
 }
 
 impl From<ExpressBuiltPayload> for ExpressExecutionPayloadEnvelopeV2 {

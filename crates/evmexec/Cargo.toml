@@ -9,6 +9,7 @@ alpen-express-eectl = { workspace = true }
 alpen-express-primitives = { workspace = true }
 alpen-express-state = { workspace = true }
 express-storage = { workspace = true }
+express-reth-node = { workspace = true }
 
 anyhow = { workspace = true }
 arbitrary = { workspace = true }

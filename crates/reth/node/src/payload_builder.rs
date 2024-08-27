@@ -37,7 +37,7 @@ use tracing::{debug, trace, warn};
 
 use crate::{
     constants::BRIDGEOUT_ADDRESS,
-    engine::CustomEngineTypes,
+    engine::ExpressEngineTypes,
     evm::ExpressEvmConfig,
     payload::{ExpressBuiltPayload, ExpressPayloadBuilderAttributes},
     primitives::{WithdrawalIntent, WithdrawalIntentEvent},
@@ -81,7 +81,7 @@ pub struct ExpressPayloadServiceBuilder;
 
 impl<Node, Pool> PayloadServiceBuilder<Node, Pool> for ExpressPayloadServiceBuilder
 where
-    Node: FullNodeTypes<Engine = CustomEngineTypes>,
+    Node: FullNodeTypes<Engine = ExpressEngineTypes>,
     Pool: TransactionPool + Unpin + 'static,
 {
     async fn spawn_payload_service(

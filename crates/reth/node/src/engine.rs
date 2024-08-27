@@ -16,19 +16,18 @@ use super::payload::{
     ExpressPayloadBuilderAttributes,
 };
 
-/// Custom engine types - uses a custom payload attributes RPC type, but uses the default
-/// payload builder attributes type.
+/// Custom engine types for express to use custom payload attributes and payload
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[non_exhaustive]
-pub struct CustomEngineTypes;
+pub struct ExpressEngineTypes;
 
-impl PayloadTypes for CustomEngineTypes {
+impl PayloadTypes for ExpressEngineTypes {
     type BuiltPayload = ExpressBuiltPayload;
     type PayloadAttributes = ExpressPayloadAttributes;
     type PayloadBuilderAttributes = ExpressPayloadBuilderAttributes;
 }
 
-impl EngineTypes for CustomEngineTypes {
+impl EngineTypes for ExpressEngineTypes {
     type ExecutionPayloadV1 = ExecutionPayloadV1;
     type ExecutionPayloadV2 = ExpressExecutionPayloadEnvelopeV2;
     type ExecutionPayloadV3 = ExecutionPayloadEnvelopeV3;

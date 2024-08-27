@@ -10,7 +10,7 @@ use reth_node_ethereum::{
 
 use crate::evm::ExpressEvmConfig;
 
-use super::{engine::CustomEngineTypes, payload_builder::ExpressPayloadServiceBuilder};
+use super::{engine::ExpressEngineTypes, payload_builder::ExpressPayloadServiceBuilder};
 
 #[derive(Debug, Clone, Default)]
 #[non_exhaustive]
@@ -20,7 +20,7 @@ pub struct ExpressEthereumNode;
 impl NodeTypes for ExpressEthereumNode {
     type Primitives = ();
     // use the custom engine types
-    type Engine = CustomEngineTypes;
+    type Engine = ExpressEngineTypes;
 }
 
 /// Implement the Node trait for the custom node
@@ -28,7 +28,7 @@ impl NodeTypes for ExpressEthereumNode {
 /// This provides a preset configuration for the node
 impl<N> Node<N> for ExpressEthereumNode
 where
-    N: FullNodeTypes<Engine = CustomEngineTypes>,
+    N: FullNodeTypes<Engine = ExpressEngineTypes>,
 {
     type ComponentsBuilder = ComponentsBuilder<
         N,

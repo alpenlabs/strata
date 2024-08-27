@@ -47,7 +47,18 @@ impl<DB: Database> ContextStatefulPrecompile<DB> for BridgeoutPrecompile {
             )));
         }
 
-        let Ok(amount) = value.try_into() else {
+        let (sats, rem) = value.div_rem(U256::from(10_000_000_000u128));
+
+        if !rem.is_zero() {
+            // ensure there are no leftovers that get lost.
+            // is this important?
+            return Err(PrecompileErrors::Error(PrecompileError::other(
+                "value must be exact sats",
+            )));
+        }
+
+        let Ok(amount) = sats.try_into() else {
+            // should never happen. 2^64 ~ 8700 x total_btc_stats
             return Err(PrecompileErrors::Error(PrecompileError::other(
                 "above max withdrawal amt",
             )));
