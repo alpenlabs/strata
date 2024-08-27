@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
-use crate::traits::SequencerDatabase;
-
 use super::traits::*;
+use crate::traits::SequencerDatabase;
 
 /// Shim database type that assumes that all the database impls are wrapped in
 /// `Arc`s and that the provider and stores are actually the same types.  We

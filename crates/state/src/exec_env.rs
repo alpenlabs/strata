@@ -1,9 +1,8 @@
 //! Types relating to the state of an execution environment in the CL state.
 
+use alpen_express_primitives::buf::Buf32;
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
-
-use alpen_express_primitives::buf::Buf32;
 
 use crate::{bridge_ops, da_blob, exec_update, forced_inclusion, state_queue::StateQueue};
 

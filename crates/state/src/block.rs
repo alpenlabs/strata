@@ -1,9 +1,8 @@
 use std::ops::Deref;
 
+use alpen_express_primitives::prelude::*;
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
-
-use alpen_express_primitives::prelude::*;
 
 use crate::{
     exec_update,

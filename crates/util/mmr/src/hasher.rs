@@ -1,5 +1,4 @@
-use digest::generic_array::GenericArray;
-use digest::Digest;
+use digest::{generic_array::GenericArray, Digest};
 
 pub type Hash = [u8; 32];
 

@@ -1,8 +1,9 @@
-use sp1_helper::build_program;
 use std::{
     env, fs,
     path::{Path, PathBuf},
 };
+
+use sp1_helper::build_program;
 
 const RISC_V_COMPILER: &str = "/opt/riscv/bin/riscv-none-elf-gcc";
 const ELF_FILE_PATH: &str = "guest-reth-stf/elf/riscv32im-succinct-zkvm-elf";

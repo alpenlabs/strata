@@ -6,7 +6,6 @@ use std::marker::PhantomData;
 
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
-
 use error::MerkleError;
 use hasher::{Hash, MerkleHasher};
 
@@ -313,9 +312,8 @@ mod test {
 
     use sha2::{Digest, Sha256};
 
-    use crate::error::MerkleError;
-
     use super::{hasher::Hash, MerkleMr, MerkleProof};
+    use crate::error::MerkleError;
 
     fn generate_for_n_integers(n: usize) -> (MerkleMr<Sha256>, Vec<MerkleProof<Sha256>>) {
         let mut mmr: MerkleMr<Sha256> = MerkleMr::new(14);

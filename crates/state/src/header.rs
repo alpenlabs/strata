@@ -1,15 +1,13 @@
 use std::io::{self, Cursor, Write};
 
-use arbitrary::Arbitrary;
-use borsh::{BorshDeserialize, BorshSerialize};
-
 use alpen_express_primitives::{
     buf::{Buf32, Buf64},
     hash,
 };
+use arbitrary::Arbitrary;
+use borsh::{BorshDeserialize, BorshSerialize};
 
-use crate::block::L2BlockBody;
-use crate::id::L2BlockId;
+use crate::{block::L2BlockBody, id::L2BlockId};
 
 pub trait L2Header {
     fn blockidx(&self) -> u64;

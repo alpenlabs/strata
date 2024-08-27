@@ -104,8 +104,9 @@ where
 #[cfg(test)]
 mod test {
 
-    use super::*;
     use serde::Deserialize;
+
+    use super::*;
 
     #[derive(Deserialize)]
     struct TestStruct {

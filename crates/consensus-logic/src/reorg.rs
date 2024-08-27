@@ -133,9 +133,8 @@ mod tests {
     use alpen_express_state::id::L2BlockId;
     use rand::RngCore;
 
-    use crate::unfinalized_tracker;
-
     use super::{compute_reorg, Reorg};
+    use crate::unfinalized_tracker;
 
     fn rand_blkid() -> L2BlockId {
         use rand::rngs::OsRng;

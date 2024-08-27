@@ -1,8 +1,7 @@
 use std::fmt;
 
 use arbitrary::Arbitrary;
-use bitcoin::hashes::Hash;
-use bitcoin::{consensus::serialize, Block};
+use bitcoin::{consensus::serialize, hashes::Hash, Block};
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::buf::Buf32;

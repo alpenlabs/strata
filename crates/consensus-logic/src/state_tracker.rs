@@ -3,17 +3,15 @@
 
 use std::sync::Arc;
 
-use tracing::*;
-
 use alpen_express_db::traits::*;
 use alpen_express_primitives::params::Params;
 use alpen_express_state::{
     client_state::ClientState,
     operation::{self, ClientUpdateOutput},
 };
+use tracing::*;
 
-use crate::client_transition;
-use crate::errors::Error;
+use crate::{client_transition, errors::Error};
 
 pub struct StateTracker<D: Database> {
     params: Arc<Params>,
@@ -173,8 +171,7 @@ pub fn reconstruct_state(
 
 #[cfg(test)]
 mod tests {
-    use alpen_express_db::traits::ClientStateStore;
-    use alpen_express_db::traits::Database;
+    use alpen_express_db::traits::{ClientStateStore, Database};
     use alpen_express_rocksdb::test_utils::get_common_db;
     use alpen_express_state::{
         block::L2Block,

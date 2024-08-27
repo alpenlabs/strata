@@ -5,17 +5,12 @@
 //! returning `Ready` with dummy state.  We might extend this slightly to make
 //! it more believable.
 
-use std::collections::*;
-use std::sync::Mutex;
-use std::time;
+use std::{collections::*, sync::Mutex, time};
 
 use alpen_express_primitives::buf::Buf32;
-use alpen_express_state::exec_update::UpdateInput;
-use alpen_express_state::prelude::*;
+use alpen_express_state::{exec_update::UpdateInput, prelude::*};
 
-use crate::engine::*;
-use crate::errors::*;
-use crate::messages::*;
+use crate::{engine::*, errors::*, messages::*};
 
 struct State {
     next_idx: u64,

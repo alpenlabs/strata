@@ -1,10 +1,9 @@
 //! Module for database local types
 
+use alpen_express_primitives::buf::Buf32;
 use arbitrary::Arbitrary;
 use bitcoin::{consensus::serialize, Transaction};
 use borsh::{BorshDeserialize, BorshSerialize};
-
-use alpen_express_primitives::buf::Buf32;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
@@ -118,8 +117,9 @@ pub enum ExcludeReason {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use serde_json;
+
+    use super::*;
 
     #[test]
     fn check_serde_of_l1txstatus() {

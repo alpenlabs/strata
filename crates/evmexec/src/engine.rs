@@ -1,26 +1,24 @@
 use std::sync::Arc;
 
+use alpen_express_eectl::{
+    engine::{BlockStatus, ExecEngineCtl, PayloadStatus},
+    errors::{EngineError, EngineResult},
+    messages::{ELDepositData, ExecPayloadData, Op, PayloadEnv},
+};
+use alpen_express_state::{block::L2BlockBundle, exec_update::UpdateInput, id::L2BlockId};
+use express_storage::L2BlockManager;
 use futures::future::TryFutureExt;
 use reth_primitives::{Address, B256};
-use reth_rpc_types::engine::{
-    ExecutionPayloadFieldV2, ExecutionPayloadInputV2, ForkchoiceState, PayloadAttributes,
-    PayloadId, PayloadStatusEnum,
+use reth_rpc_types::{
+    engine::{
+        ExecutionPayloadFieldV2, ExecutionPayloadInputV2, ForkchoiceState, PayloadAttributes,
+        PayloadId, PayloadStatusEnum,
+    },
+    Withdrawal,
 };
-use reth_rpc_types::Withdrawal;
-use tokio::runtime::Handle;
-use tokio::sync::Mutex;
+use tokio::{runtime::Handle, sync::Mutex};
 
-use alpen_express_eectl::engine::{BlockStatus, ExecEngineCtl, PayloadStatus};
-use alpen_express_eectl::errors::{EngineError, EngineResult};
-use alpen_express_eectl::messages::{ELDepositData, ExecPayloadData, Op, PayloadEnv};
-use alpen_express_state::block::L2BlockBundle;
-use alpen_express_state::exec_update::UpdateInput;
-use alpen_express_state::id::L2BlockId;
-use express_storage::L2BlockManager;
-
-use crate::block::EVML2Block;
-use crate::el_payload::ElPayload;
-use crate::http_client::EngineRpc;
+use crate::{block::EVML2Block, el_payload::ElPayload, http_client::EngineRpc};
 
 fn address_from_slice(slice: &[u8]) -> Option<Address> {
     let slice: Option<[u8; 20]> = slice.try_into().ok();
@@ -328,20 +326,18 @@ struct ForkchoiceStatePartial {
 
 #[cfg(test)]
 mod tests {
-    use rand::Rng;
-    use reth_primitives::revm_primitives::FixedBytes;
-    use reth_primitives::{Bloom, Bytes, U256};
-    use reth_rpc_types::engine::{ExecutionPayloadEnvelopeV2, ForkchoiceUpdated};
-    use reth_rpc_types::ExecutionPayloadV1;
-
-    use alpen_express_eectl::errors::EngineResult;
-    use alpen_express_eectl::messages::PayloadEnv;
+    use alpen_express_eectl::{errors::EngineResult, messages::PayloadEnv};
     use alpen_express_primitives::buf::Buf32;
     use alpen_express_state::block::{L2Block, L2BlockAccessory};
-
-    use crate::http_client::MockEngineRpc;
+    use rand::Rng;
+    use reth_primitives::{revm_primitives::FixedBytes, Bloom, Bytes, U256};
+    use reth_rpc_types::{
+        engine::{ExecutionPayloadEnvelopeV2, ForkchoiceUpdated},
+        ExecutionPayloadV1,
+    };
 
     use super::*;
+    use crate::http_client::MockEngineRpc;
 
     fn random_el_payload() -> ElPayload {
         random_execution_payload_v1().into()

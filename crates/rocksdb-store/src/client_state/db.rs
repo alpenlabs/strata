@@ -1,15 +1,11 @@
 use std::sync::Arc;
 
-use rockbound::OptimisticTransactionDB;
-use rockbound::Schema;
-use rockbound::SchemaDBOperationsExt;
-
 use alpen_express_db::{errors::*, traits::*, DbResult};
 use alpen_express_state::operation::*;
-
-use crate::DbOpsConfig;
+use rockbound::{OptimisticTransactionDB, Schema, SchemaDBOperationsExt};
 
 use super::schemas::{ClientStateSchema, ClientUpdateOutputSchema};
+use crate::DbOpsConfig;
 
 pub struct ClientStateDb {
     db: Arc<OptimisticTransactionDB>,
@@ -132,9 +128,8 @@ mod tests {
     use alpen_express_state::client_state::ClientState;
     use alpen_test_utils::*;
 
-    use crate::test_utils::get_rocksdb_tmp_instance;
-
     use super::*;
+    use crate::test_utils::get_rocksdb_tmp_instance;
 
     fn setup_db() -> ClientStateDb {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();

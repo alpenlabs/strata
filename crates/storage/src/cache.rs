@@ -1,13 +1,10 @@
 //! Generic cache utility for what we're inserting into the database.
 
-use std::hash::Hash;
-use std::num::NonZeroUsize;
-use std::sync::Arc;
-
-use tokio::sync::{broadcast, Mutex, RwLock};
-use tracing::*;
+use std::{hash::Hash, num::NonZeroUsize, sync::Arc};
 
 use alpen_express_db::{DbError, DbResult};
+use tokio::sync::{broadcast, Mutex, RwLock};
+use tracing::*;
 
 use crate::exec::DbRecv;
 

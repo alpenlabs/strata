@@ -1,10 +1,9 @@
 use std::sync::Arc;
 
-use tokio::sync::{mpsc, oneshot};
-use tracing::*;
-
 use alpen_express_db::{errors::DbError, traits::*};
 use alpen_express_state::sync_event::SyncEvent;
+use tokio::sync::{mpsc, oneshot};
+use tracing::*;
 
 use crate::message::CsmMessage;
 

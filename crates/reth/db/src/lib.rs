@@ -1,7 +1,5 @@
 pub mod rocksdb;
-pub use alpen_express_db::errors;
-pub use alpen_express_db::DbResult;
-
+pub use alpen_express_db::{errors, DbResult};
 use reth_primitives::B256;
 use zkvm_primitives::ZKVMInput;
 

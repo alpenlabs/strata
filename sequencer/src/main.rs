@@ -1,47 +1,48 @@
 #![allow(dead_code)] // TODO: remove this once `Args.network` is used
-use std::fs;
-use std::io;
-use std::path::Path;
-use std::path::PathBuf;
-use std::sync::Arc;
-use std::time::Duration;
+use std::{
+    fs, io,
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::Duration,
+};
 
-use alpen_express_btcio::broadcaster::L1BroadcastHandle;
+use alpen_express_btcio::{
+    broadcaster::{spawn_broadcaster_task, L1BroadcastHandle},
+    writer::{config::WriterConfig, start_writer_task, DaWriter},
+};
+use alpen_express_common::logging;
+use alpen_express_consensus_logic::{
+    duty::{
+        types::{DutyBatch, Identity, IdentityData, IdentityKey},
+        worker::{self as duty_worker},
+    },
+    sync_manager,
+    sync_manager::SyncManager,
+};
+use alpen_express_db::traits::{Database, SequencerDatabase};
+use alpen_express_evmexec::{fork_choice_state_initial, EngineRpcClient};
+use alpen_express_primitives::{
+    block_credential,
+    buf::Buf32,
+    params::{Params, RollupParams, RunParams},
+};
+use alpen_express_rocksdb::{
+    broadcaster::db::BroadcastDatabase, sequencer::db::SequencerDB, DbOpsConfig, SeqDb,
+};
+use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer};
+use alpen_express_rpc_types::L1Status;
 // use alpen_express_btcio::broadcaster::manager::BroadcastDbManager;
 use anyhow::Context;
 use bitcoin::Network;
 use config::Config;
-
+use express_storage::L2BlockManager;
+use express_tasks::{ShutdownSignal, TaskManager};
 use format_serde_error::SerdeError;
-use reth_rpc_types::engine::JwtError;
-use reth_rpc_types::engine::JwtSecret;
+use reth_rpc_types::engine::{JwtError, JwtSecret};
 use rockbound::rocksdb;
 use thiserror::Error;
 use tokio::sync::{broadcast, oneshot, RwLock};
 use tracing::*;
-
-use alpen_express_btcio::broadcaster::spawn_broadcaster_task;
-use alpen_express_btcio::writer::config::WriterConfig;
-use alpen_express_btcio::writer::start_writer_task;
-use alpen_express_btcio::writer::DaWriter;
-use alpen_express_common::logging;
-use alpen_express_consensus_logic::duty::types::{DutyBatch, Identity, IdentityData, IdentityKey};
-use alpen_express_consensus_logic::duty::worker::{self as duty_worker};
-use alpen_express_consensus_logic::sync_manager;
-use alpen_express_consensus_logic::sync_manager::SyncManager;
-use alpen_express_db::traits::{Database, SequencerDatabase};
-use alpen_express_evmexec::{fork_choice_state_initial, EngineRpcClient};
-use alpen_express_primitives::block_credential;
-use alpen_express_primitives::buf::Buf32;
-use alpen_express_primitives::params::{Params, RollupParams, RunParams};
-use alpen_express_rocksdb::broadcaster::db::BroadcastDatabase;
-use alpen_express_rocksdb::sequencer::db::SequencerDB;
-use alpen_express_rocksdb::DbOpsConfig;
-use alpen_express_rocksdb::SeqDb;
-use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer};
-use alpen_express_rpc_types::L1Status;
-use express_storage::L2BlockManager;
-use express_tasks::{ShutdownSignal, TaskManager};
 
 use crate::args::Args;
 

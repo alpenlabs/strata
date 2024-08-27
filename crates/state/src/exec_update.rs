@@ -1,10 +1,9 @@
 //! Chain data types relating to the CL's updating view of an execution
 //! environment's state.  For now the EVM EL is the only execution environment.
 
+use alpen_express_primitives::{buf::Buf32, evm_exec::create_evm_extra_payload};
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
-
-use alpen_express_primitives::{buf::Buf32, evm_exec::create_evm_extra_payload};
 
 use crate::{bridge_ops, da_blob};
 

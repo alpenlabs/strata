@@ -1,15 +1,15 @@
 use std::sync::Arc;
 
+use alpen_express_db::{
+    errors::DbError,
+    traits::{SyncEventProvider, SyncEventStore},
+    DbResult,
+};
+use alpen_express_state::sync_event::SyncEvent;
 use rockbound::{OptimisticTransactionDB, SchemaBatch, SchemaDBOperationsExt};
 
-use alpen_express_db::errors::DbError;
-use alpen_express_db::traits::{SyncEventProvider, SyncEventStore};
-use alpen_express_db::DbResult;
-use alpen_express_state::sync_event::SyncEvent;
-
-use crate::DbOpsConfig;
-
 use super::schemas::{SyncEventSchema, SyncEventWithTimestamp};
+use crate::DbOpsConfig;
 
 pub struct SyncEventDb {
     db: Arc<OptimisticTransactionDB>,
@@ -122,9 +122,8 @@ mod tests {
 
     use alpen_test_utils::*;
 
-    use crate::test_utils::get_rocksdb_tmp_instance;
-
     use super::*;
+    use crate::test_utils::get_rocksdb_tmp_instance;
 
     fn setup_db() -> SyncEventDb {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();

@@ -4,9 +4,8 @@ use reth_primitives::B256;
 use rockbound::{SchemaDBOperations, SchemaDBOperationsExt};
 use zkvm_primitives::ZKVMInput;
 
-use crate::{errors::DbError, DbResult, WitnessProvider, WitnessStore};
-
 use super::schema::BlockWitnessSchema;
+use crate::{errors::DbError, DbResult, WitnessProvider, WitnessStore};
 
 #[derive(Debug)]
 pub struct WitnessDB<DB> {

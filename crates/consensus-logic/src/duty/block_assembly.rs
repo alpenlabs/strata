@@ -1,37 +1,34 @@
 //! Impl logic for the block assembly duties.
 #![allow(unused)]
 
-use std::sync::Arc;
-use std::thread;
-use std::time;
-
-use alpen_express_db::traits::L1DataProvider;
-use alpen_express_state::client_state::LocalL1State;
-use alpen_express_state::l1::L1HeaderPayload;
-use alpen_express_state::l1::L1HeaderRecord;
-use tracing::*;
+use std::{sync::Arc, thread, time};
 
 use alpen_express_db::traits::{
-    ChainstateProvider, ClientStateProvider, Database, L2DataProvider, L2DataStore,
+    ChainstateProvider, ClientStateProvider, Database, L1DataProvider, L2DataProvider, L2DataStore,
 };
-use alpen_express_eectl::engine::{ExecEngineCtl, PayloadStatus};
-use alpen_express_eectl::errors::EngineError;
-use alpen_express_eectl::messages::{ExecPayloadData, PayloadEnv};
-use alpen_express_primitives::buf::{Buf32, Buf64};
-use alpen_express_primitives::params::Params;
-use alpen_express_state::block::L2BlockAccessory;
-use alpen_express_state::block::L2BlockBundle;
-use alpen_express_state::block::{ExecSegment, L1Segment};
-use alpen_express_state::chain_state::ChainState;
-use alpen_express_state::client_state::ClientState;
-use alpen_express_state::exec_update::{ExecUpdate, UpdateOutput};
-use alpen_express_state::header::L2BlockHeader;
-use alpen_express_state::prelude::*;
-use alpen_express_state::state_op::*;
+use alpen_express_eectl::{
+    engine::{ExecEngineCtl, PayloadStatus},
+    errors::EngineError,
+    messages::{ExecPayloadData, PayloadEnv},
+};
+use alpen_express_primitives::{
+    buf::{Buf32, Buf64},
+    params::Params,
+};
+use alpen_express_state::{
+    block::{ExecSegment, L1Segment, L2BlockAccessory, L2BlockBundle},
+    chain_state::ChainState,
+    client_state::{ClientState, LocalL1State},
+    exec_update::{ExecUpdate, UpdateOutput},
+    header::L2BlockHeader,
+    l1::{L1HeaderPayload, L1HeaderRecord},
+    prelude::*,
+    state_op::*,
+};
+use tracing::*;
 
 use super::types::*;
-use crate::credential::sign_schnorr_sig;
-use crate::errors::Error;
+use crate::{credential::sign_schnorr_sig, errors::Error};
 
 /// Signs and stores a block in the database.  Does not submit it to the
 /// forkchoice manager.

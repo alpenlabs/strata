@@ -1,20 +1,19 @@
 use std::sync::Arc;
 
-use rockbound::rocksdb::ReadOptions;
-use rockbound::schema::KeyEncoder;
-use rockbound::{OptimisticTransactionDB, SchemaBatch, SchemaDBOperationsExt};
-use tracing::*;
-
+use alpen_express_db::{errors::DbError, traits::*, DbResult};
 use alpen_express_mmr::CompactMmr;
 use alpen_express_primitives::{
     buf::Buf32,
     l1::{L1BlockManifest, L1Tx, L1TxRef},
 };
-
-use crate::DbOpsConfig;
+use rockbound::{
+    rocksdb::ReadOptions, schema::KeyEncoder, OptimisticTransactionDB, SchemaBatch,
+    SchemaDBOperationsExt,
+};
+use tracing::*;
 
 use super::schemas::{L1BlockSchema, MmrSchema, TxnSchema};
-use alpen_express_db::{errors::DbError, traits::*, DbResult};
+use crate::DbOpsConfig;
 
 pub struct L1Db {
     db: Arc<OptimisticTransactionDB>,
@@ -191,9 +190,8 @@ mod tests {
     use alpen_express_primitives::l1::L1TxProof;
     use alpen_test_utils::ArbitraryGenerator;
 
-    use crate::test_utils::get_rocksdb_tmp_instance;
-
     use super::*;
+    use crate::test_utils::get_rocksdb_tmp_instance;
 
     fn setup_db() -> L1Db {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();

@@ -17,26 +17,26 @@
 // limitations under the License.
 
 use alloc::boxed::Box;
-use alloy_rlp::Encodable;
-use alloy_rpc_types::EIP1186AccountProofResponse;
 use core::{
     cell::RefCell,
     cmp,
     fmt::{Debug, Write},
     iter, mem,
 };
-use reth_primitives::alloy_primitives::{b256, B256};
 // use hashbrown::HashMap;
 use std::collections::HashMap;
 
+use alloy_rlp::Encodable;
+use alloy_rlp_derive::{RlpDecodable, RlpEncodable, RlpMaxEncodedLen};
+use alloy_rpc_types::EIP1186AccountProofResponse;
+use anyhow::{Context, Result};
+use reth_primitives::{
+    alloy_primitives::{b256, TxNumber, B256, U256},
+    Address,
+};
 use rlp::{Decodable, DecoderError, Prototype, Rlp};
 use serde::{Deserialize, Serialize};
 use thiserror::Error as ThisError;
-
-use alloy_rlp_derive::{RlpDecodable, RlpEncodable, RlpMaxEncodedLen};
-use anyhow::{Context, Result};
-use reth_primitives::alloy_primitives::{TxNumber, U256};
-use reth_primitives::Address;
 
 pub type StorageEntry = (MptNode, Vec<U256>);
 

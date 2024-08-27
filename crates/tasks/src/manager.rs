@@ -1,16 +1,19 @@
-use std::any::Any;
-use std::fmt::{Display, Formatter};
-use std::future::Future;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
-use std::thread::JoinHandle;
-use std::time::Duration;
-use std::{panic, pin::pin};
+use std::{
+    any::Any,
+    fmt::{Display, Formatter},
+    future::Future,
+    panic,
+    pin::pin,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+    thread::JoinHandle,
+    time::Duration,
+};
 
-use futures_util::future::select;
-use futures_util::{FutureExt, TryFutureExt};
-use tokio::runtime::Handle;
-use tokio::sync::mpsc;
+use futures_util::{future::select, FutureExt, TryFutureExt};
+use tokio::{runtime::Handle, sync::mpsc};
 use tracing::{debug, error, info, warn};
 
 use crate::shutdown::{Shutdown, ShutdownGuard, ShutdownSignal};

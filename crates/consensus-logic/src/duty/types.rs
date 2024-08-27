@@ -2,10 +2,9 @@
 
 use std::time;
 
-use borsh::{BorshDeserialize, BorshSerialize};
-
 use alpen_express_primitives::{buf::Buf32, hash::compute_borsh_hash};
 use alpen_express_state::id::L2BlockId;
+use borsh::{BorshDeserialize, BorshSerialize};
 
 /// Describes when we'll stop working to fulfill a duty.
 #[derive(Clone, Debug)]

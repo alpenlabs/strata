@@ -1,32 +1,30 @@
-use std::sync::atomic::AtomicU64;
-use std::time::Duration;
-use std::{fmt::Display, str::FromStr};
+use std::{fmt::Display, str::FromStr, sync::atomic::AtomicU64, time::Duration};
 
 use async_trait::async_trait;
-use bitcoin::consensus::encode::{deserialize_hex, serialize_hex};
-use bitcoin::Txid;
-
-use base64::engine::general_purpose;
-use base64::Engine;
+use base64::{engine::general_purpose, Engine};
 use bitcoin::{
     block::{Header, Version},
-    consensus::deserialize,
+    consensus::{
+        deserialize,
+        encode::{deserialize_hex, serialize_hex},
+    },
     hash_types::TxMerkleNode,
     hashes::Hash as _,
-    Address, Block, BlockHash, CompactTarget, Network, Transaction,
+    Address, Block, BlockHash, CompactTarget, Network, Transaction, Txid,
 };
-use reqwest::header::HeaderMap;
-use reqwest::StatusCode;
+use reqwest::{header::HeaderMap, StatusCode};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, to_value, value::RawValue, value::Value};
+use serde_json::{
+    json, to_value,
+    value::{RawValue, Value},
+};
+use thiserror::Error;
 use tracing::*;
 
-use super::{traits::SeqL1Client, types::RPCTransactionInfo};
-
-use thiserror::Error;
-
-use super::traits::L1Client;
-use super::types::{RawUTXO, RpcBlockchainInfo};
+use super::{
+    traits::{L1Client, SeqL1Client},
+    types::{RPCTransactionInfo, RawUTXO, RpcBlockchainInfo},
+};
 
 const MAX_RETRIES: u32 = 3;
 

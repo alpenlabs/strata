@@ -18,17 +18,17 @@
 
 use std::collections::hash_map::Entry;
 
-use crate::{
-    mpt::{keccak, StateAccount, KECCAK_EMPTY},
-    ZKVMInput,
-};
-
 use anyhow::{anyhow, Result};
 // use hashbrown::hash_map::Entry;
 use reth_primitives::{Address, Bytes, B256, U256};
 use revm::{
     db::{AccountState, DbAccount, InMemoryDB},
     primitives::{AccountInfo, Bytecode, HashMap},
+};
+
+use crate::{
+    mpt::{keccak, StateAccount, KECCAK_EMPTY},
+    ZKVMInput,
 };
 
 /// A helper trait to extend [InMemoryDB] with additional functionality.

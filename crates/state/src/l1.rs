@@ -1,9 +1,8 @@
 use core::fmt;
 
+use alpen_express_primitives::{l1, prelude::*};
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
-
-use alpen_express_primitives::{l1, prelude::*};
 
 use crate::state_queue::StateQueue;
 

@@ -1,12 +1,12 @@
 use std::collections::*;
 
-use alpen_express_state::block::L2BlockBundle;
+use alpen_express_state::{block::L2BlockBundle, prelude::*};
 use parking_lot::Mutex;
 
-use alpen_express_state::prelude::*;
-
-use crate::traits::BlockStatus;
-use crate::{traits::*, DbResult};
+use crate::{
+    traits::{BlockStatus, *},
+    DbResult,
+};
 
 /// Dummy implementation that isn't really compliant with the spec, but we don't
 /// care because we just want to get something running. :sunglasses:.

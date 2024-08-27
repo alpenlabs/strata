@@ -1,5 +1,3 @@
-use tracing::*;
-
 use alpen_express_db::{errors::DbError, traits::*};
 use alpen_express_primitives::{
     buf::{Buf32, Buf64},
@@ -17,6 +15,7 @@ use alpen_express_state::{
     l1::{L1HeaderRecord, L1ViewState},
     prelude::*,
 };
+use tracing::*;
 
 use crate::errors::Error;
 

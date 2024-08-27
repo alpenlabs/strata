@@ -31,12 +31,11 @@ use bitcoin::{
 use rand::RngCore;
 use thiserror::Error;
 
+use super::config::{InscriptionFeePolicy, WriterConfig};
 use crate::rpc::{
     traits::{L1Client, SeqL1Client},
     types::RawUTXO,
 };
-
-use super::config::{InscriptionFeePolicy, WriterConfig};
 
 const BITCOIN_DUST_LIMIT: u64 = 546;
 

@@ -12,8 +12,7 @@ use alpen_express_state::{
     state_queue,
 };
 
-use crate::errors::TsnError;
-use crate::macros::*;
+use crate::{errors::TsnError, macros::*};
 
 /// Processes a block, making writes into the provided state cache that will
 /// then be written to disk.  This does not check the block's credentials, it

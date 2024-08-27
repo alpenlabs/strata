@@ -2,16 +2,15 @@
 
 use std::{sync::Arc, time::Duration};
 
+use alpen_express_db::{
+    traits::{SeqDataProvider, SeqDataStore, SequencerDatabase},
+    types::BlobL1Status,
+};
 use alpen_express_rpc_types::L1Status;
 use anyhow::anyhow;
 use bitcoin::{consensus::deserialize, Txid};
 use tokio::sync::RwLock;
 use tracing::*;
-
-use alpen_express_db::{
-    traits::{SeqDataProvider, SeqDataStore, SequencerDatabase},
-    types::BlobL1Status,
-};
 
 use crate::{
     rpc::{

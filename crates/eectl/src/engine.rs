@@ -10,8 +10,7 @@
 
 use alpen_express_state::id::L2BlockId;
 
-use crate::errors::*;
-use crate::messages::*;
+use crate::{errors::*, messages::*};
 
 /// Interface to control an execution engine.  This is defined in terms of
 /// express semantics which will be produced inside the EL impl according to

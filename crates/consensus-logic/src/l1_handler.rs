@@ -1,17 +1,12 @@
 use std::sync::Arc;
 
-use alpen_express_primitives::params::Params;
-use bitcoin::consensus::serialize;
-use bitcoin::hashes::Hash;
-use bitcoin::Block;
-use tokio::sync::mpsc;
-use tracing::*;
-
 use alpen_express_btcio::reader::messages::L1Event;
 use alpen_express_db::traits::{Database, L1DataStore};
-use alpen_express_primitives::buf::Buf32;
-use alpen_express_primitives::l1::L1BlockManifest;
+use alpen_express_primitives::{buf::Buf32, l1::L1BlockManifest, params::Params};
 use alpen_express_state::sync_event::SyncEvent;
+use bitcoin::{consensus::serialize, hashes::Hash, Block};
+use tokio::sync::mpsc;
+use tracing::*;
 
 use crate::ctl::CsmController;
 

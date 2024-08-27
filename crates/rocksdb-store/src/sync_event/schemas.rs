@@ -1,10 +1,9 @@
-use alpen_express_state::sync_event::SyncEvent;
-use borsh::{BorshDeserialize, BorshSerialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::define_table_with_seek_key_codec;
-use crate::define_table_without_codec;
-use crate::impl_borsh_value_codec;
+use alpen_express_state::sync_event::SyncEvent;
+use borsh::{BorshDeserialize, BorshSerialize};
+
+use crate::{define_table_with_seek_key_codec, define_table_without_codec, impl_borsh_value_codec};
 
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct SyncEventWithTimestamp {
