@@ -1,6 +1,6 @@
-## Contribution Guidelines
+# Contribution Guidelines
 
-### Development Tools
+## Development Tools
 
 Please install the following tools in your development environment to make sure that
 you can run the basic CI checks in your local environment:
@@ -49,7 +49,7 @@ you can run the basic CI checks in your local environment:
 
   For dependencies required to run functional tests, see instructions in its [`README.md`](./functional-tests/README.md).
 
-### Before Creating a PR
+## Before Creating a PR
 
 Before you create a PR, make sure that all the required CI checks pass locally.
 For your convenience, a `Makefile` recipe has been created which you can run via:
