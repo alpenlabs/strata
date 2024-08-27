@@ -35,7 +35,6 @@ you can run the basic CI checks in your local environment:
   
   Learn more [here](https://nexte.st).
 
-
 - `cargo audit`
 
   This is a tool to check Cargo.lock files for crates containing security vulnerabilities.
