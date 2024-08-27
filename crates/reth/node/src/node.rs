@@ -8,9 +8,8 @@ use reth_node_ethereum::{
     EthExecutorProvider,
 };
 
-use crate::evm::ExpressEvmConfig;
-
 use super::{engine::ExpressEngineTypes, payload_builder::ExpressPayloadServiceBuilder};
+use crate::evm::ExpressEvmConfig;
 
 #[derive(Debug, Clone, Default)]
 #[non_exhaustive]

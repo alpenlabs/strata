@@ -9,8 +9,8 @@ from typing import Optional
 
 import flexitest
 import web3
-from bitcoinlib.services.bitcoind import BitcoindClient
 import web3.middleware
+from bitcoinlib.services.bitcoind import BitcoindClient
 
 import seqrpc
 from constants import BD_PASSWORD, BD_USERNAME, BLOCK_GENERATION_INTERVAL_SECS, DD_ROOT
@@ -210,14 +210,18 @@ class RethFactory(flexitest.Factory):
 
             def _create_rpc():
                 return seqrpc.JsonrpcClient(ethrpc_url)
-            
+
             def _create_web3():
                 http_ethrpc_url = f"http://localhost:{ethrpc_http_port}"
                 w3 = web3.Web3(web3.Web3.HTTPProvider(http_ethrpc_url))
                 # address, pk hardcoded in test genesis config
                 w3.address = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
-                account = w3.eth.account.from_key("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
-                w3.middleware_onion.add(web3.middleware.SignAndSendRawMiddlewareBuilder.build(account))
+                account = w3.eth.account.from_key(
+                    "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+                )
+                w3.middleware_onion.add(
+                    web3.middleware.SignAndSendRawMiddlewareBuilder.build(account)
+                )
                 return w3
 
             svc.create_rpc = _create_rpc

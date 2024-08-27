@@ -5,11 +5,12 @@ version = "0.1.0"
 
 [dependencies]
 alloy-sol-types = { workspace = true }
+eyre = { workspace = true }
 reth = { workspace = true }
 reth-basic-payload-builder = { workspace = true }
 reth-chainspec = { workspace = true }
-reth-ethereum-payload-builder = { workspace = true }
 reth-errors = { workspace = true }
+reth-ethereum-payload-builder = { workspace = true }
 reth-evm = { workspace = true }
 reth-evm-ethereum = { workspace = true }
 reth-node-api = { workspace = true }
@@ -21,4 +22,3 @@ revm = { workspace = true }
 revm-primitives = { workspace = true }
 serde = { workspace = true }
 tracing = { workspace = true }
-eyre = { workspace = true }

@@ -1,7 +1,7 @@
 import time
-from web3 import Web3
 
 import flexitest
+from web3 import Web3
 
 
 @flexitest.register
@@ -15,7 +15,8 @@ class ElBridgePrecompileTest(flexitest.Test):
 
         source = web3.address
         dest = web3.to_checksum_address("0x000000000000000000000000000000000b121d9e")
-        data = "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+        # 64 bytes
+        data = "0x" + "00" * 64
 
         assert web3.is_connected(), "cannot connect to reth"
 
@@ -27,7 +28,15 @@ class ElBridgePrecompileTest(flexitest.Test):
         # 1 eth
         to_transfer = 1_000_000_000_000_000_000
 
-        txid = web3.eth.send_transaction({ "to": dest, "value": hex(to_transfer), "gas": hex(100000), "from": source, "data": data })
+        txid = web3.eth.send_transaction(
+            {
+                "to": dest,
+                "value": hex(to_transfer),
+                "gas": hex(100000),
+                "from": source,
+                "data": data,
+            }
+        )
         print(txid.to_0x_hex())
 
         # build block

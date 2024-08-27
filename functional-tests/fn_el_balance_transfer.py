@@ -1,7 +1,7 @@
 import time
-from web3 import Web3
 
 import flexitest
+from web3 import Web3
 
 
 @flexitest.register
@@ -26,7 +26,11 @@ class ElBalanceTransferTest(flexitest.Test):
 
         to_transfer = 1_000_000_000_000_000_000
 
-        print(web3.eth.send_transaction({ "to": dest, "value": hex(to_transfer), "gas": hex(100000), "from": source }))
+        print(
+            web3.eth.send_transaction(
+                {"to": dest, "value": hex(to_transfer), "gas": hex(100000), "from": source}
+            )
+        )
 
         time.sleep(2)
 
