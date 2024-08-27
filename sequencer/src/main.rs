@@ -8,7 +8,7 @@ use std::{
 
 use alpen_express_btcio::{
     broadcaster::{spawn_broadcaster_task, L1BroadcastHandle},
-    writer::{config::WriterConfig, start_inscription_tasks, start_writer_task, DaWriter},
+    writer::{config::WriterConfig, start_inscription_tasks, InscriptionHandle},
 };
 use alpen_express_common::logging;
 use alpen_express_consensus_logic::{
@@ -19,7 +19,7 @@ use alpen_express_consensus_logic::{
     sync_manager,
     sync_manager::SyncManager,
 };
-use alpen_express_db::traits::{Database, SequencerDatabase};
+use alpen_express_db::traits::Database;
 use alpen_express_evmexec::{fork_choice_state_initial, EngineRpcClient};
 use alpen_express_primitives::{
     block_credential,
@@ -35,7 +35,7 @@ use alpen_express_rpc_types::L1Status;
 use anyhow::Context;
 use bitcoin::Network;
 use config::Config;
-use express_storage::{managers::inscription::InscriptionManager, L2BlockManager};
+use express_storage::L2BlockManager;
 use express_tasks::{ShutdownSignal, TaskManager};
 use format_serde_error::SerdeError;
 use reth_rpc_types::engine::{JwtError, JwtSecret};

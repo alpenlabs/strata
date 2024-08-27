@@ -30,7 +30,7 @@ inst_ops! {
     (InscriptionDataOps, Context<D: SequencerDatabase>) {
         get_blob_entry(id: Buf32) => Option<BlobEntry>;
         get_blob_entry_by_idx(idx: u64) => Option<BlobEntry>;
-        get_blob_id(idx: u64) => Option<Buf32>;
+        get_blob_entry_id(idx: u64) => Option<Buf32>;
         get_next_blob_idx() => u64;
         put_blob_entry(id: Buf32, entry: BlobEntry) => ();
     }
@@ -44,7 +44,7 @@ fn get_blob_entry<D: SequencerDatabase>(
     provider.get_blob_by_id(id)
 }
 
-fn get_blob_id<D: SequencerDatabase>(ctx: &Context<D>, idx: u64) -> DbResult<Option<Buf32>> {
+fn get_blob_entry_id<D: SequencerDatabase>(ctx: &Context<D>, idx: u64) -> DbResult<Option<Buf32>> {
     let provider = ctx.db.sequencer_provider();
     provider.get_blob_id(idx)
 }
@@ -54,7 +54,8 @@ fn get_blob_entry_by_idx<D: SequencerDatabase>(
     idx: u64,
 ) -> DbResult<Option<BlobEntry>> {
     let provider = ctx.db.sequencer_provider();
-    match provider.get_blob_id(idx)? {
+    let id_res = provider.get_blob_id(idx)?;
+    match id_res {
         Some(id) => provider.get_blob_by_id(id),
         None => Ok(None),
     }

@@ -273,7 +273,7 @@ pub trait SeqDataProvider {
     /// Get blob by its hash
     fn get_blob_by_id(&self, id: Buf32) -> DbResult<Option<BlobEntry>>;
 
-    /// Get blob by its idx
+    /// Get blob id corresponding to the index
     fn get_blob_id(&self, blobidx: u64) -> DbResult<Option<Buf32>>;
 
     /// Get the last blob idx

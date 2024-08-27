@@ -22,7 +22,6 @@ class L1StatusTest(flexitest.Test):
         for _ in range(10):
             time.sleep(1)
             l1stat = seqrpc.alp_l1status()
-            # print(l1stat)
             if l1stat["published_inscription_count"] > 0:
                 print("saw published txn", l1stat["last_published_txid"])
                 break

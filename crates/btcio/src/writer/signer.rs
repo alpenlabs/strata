@@ -3,13 +3,13 @@ use std::sync::Arc;
 use alpen_express_db::types::{BlobEntry, L1TxEntry};
 use alpen_express_primitives::buf::Buf32;
 use bitcoin::Transaction;
+use tracing::debug;
 
+use super::{builder::build_inscription_txs, config::WriterConfig};
 use crate::{
     broadcaster::L1BroadcastHandle,
     rpc::traits::{L1Client, SeqL1Client},
 };
-
-use super::{builder::build_inscription_txs, config::WriterConfig};
 
 type BlobIdx = u64;
 
@@ -25,6 +25,7 @@ pub async fn create_and_sign_blob_inscriptions(
     // TODO: handle insufficient utxos
     let (commit, reveal) = build_inscription_txs(&blobentry.blob, &client, config).await?;
 
+    debug!("Signing commit transaction {}", commit.compute_txid());
     let signed_commit: Transaction = client.sign_raw_transaction_with_wallet(commit).await?;
 
     let cid: Buf32 = signed_commit.compute_txid().into();
@@ -47,8 +48,10 @@ mod test {
     use alpen_express_primitives::hash;
 
     use super::*;
-    use crate::test_utils::TestBitcoinClient;
-    use crate::writer::test_utils::{get_bcast_handle, get_config, get_insc_ops};
+    use crate::{
+        test_utils::TestBitcoinClient,
+        writer::test_utils::{get_bcast_handle, get_config, get_insc_ops},
+    };
 
     #[tokio::test]
     async fn test_create_and_sign_blob_inscriptions() {

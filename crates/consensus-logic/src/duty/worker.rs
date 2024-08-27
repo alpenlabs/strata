@@ -6,6 +6,7 @@ use std::{
     time,
 };
 
+use alpen_express_btcio::writer::InscriptionHandle;
 use alpen_express_db::traits::*;
 use alpen_express_eectl::engine::ExecEngineCtl;
 use alpen_express_primitives::{
@@ -18,7 +19,7 @@ use alpen_express_state::{
     da_blob::{BlobDest, BlobIntent},
     prelude::*,
 };
-use express_storage::{managers::inscription::InscriptionManager, L2BlockManager};
+use express_storage::L2BlockManager;
 use express_tasks::{ShutdownGuard, TaskExecutor};
 use tokio::sync::broadcast;
 use tracing::*;
