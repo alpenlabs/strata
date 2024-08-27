@@ -2,6 +2,7 @@
 //! Input-output with Bitcoin, implementing L1 chain trait.
 
 pub mod broadcaster;
+pub(crate) mod inscription;
 pub mod reader;
 pub mod rpc;
 pub mod status;

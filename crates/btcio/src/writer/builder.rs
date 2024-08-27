@@ -4,16 +4,9 @@ use std::{cmp::Reverse, sync::Arc};
 use anyhow::anyhow;
 use bitcoin::{
     absolute::LockTime,
-    blockdata::{
-        opcodes::{
-            all::{OP_CHECKSIG, OP_ENDIF, OP_IF},
-            OP_FALSE,
-        },
-        script,
-    },
+    blockdata::{opcodes::all::OP_CHECKSIG, script},
     hashes::Hash,
     key::{TapTweak, TweakedPublicKey, UntweakedKeypair},
-    script::PushBytesBuf,
     secp256k1::{
         self, constants::SCHNORR_SIGNATURE_SIZE, schnorr::Signature, Secp256k1, XOnlyPublicKey,
     },
@@ -30,6 +23,7 @@ use rand::RngCore;
 use thiserror::Error;
 
 use crate::{
+    inscription::InscriptionData,
     rpc::{
         traits::{BitcoinReader, BitcoinSigner, BitcoinWallet},
         types::ListUnspent,
@@ -95,8 +89,10 @@ pub fn create_inscription_transactions(
     let key_pair = generate_key_pair(&secp256k1)?;
     let public_key = XOnlyPublicKey::from_keypair(&key_pair).0;
 
+    let insc_data = InscriptionData::new(rollup_name.to_string(), write_intent.to_vec());
+
     // Start creating inscription content
-    let reveal_script = build_reveal_script(&public_key, rollup_name, write_intent)?;
+    let reveal_script = build_reveal_script(&public_key, insc_data)?;
 
     // Create spend info for tapscript
     let taproot_spend_info = TaprootBuilder::new()
@@ -398,31 +394,19 @@ pub fn generate_key_pair(
     Ok(UntweakedKeypair::from_seckey_slice(secp256k1, &rand_bytes)?)
 }
 
+/// Builds reveal script such that it contains opcodes for verifying the internal key as well as the
+/// inscription block
 fn build_reveal_script(
     taproot_public_key: &XOnlyPublicKey,
-    rollup_name: &str,
-    write_intent: &[u8],
-) -> Result<script::ScriptBuf, anyhow::Error> {
-    let mut builder = script::Builder::new()
+    insc_data: InscriptionData,
+) -> Result<ScriptBuf, anyhow::Error> {
+    let mut script_bytes = script::Builder::new()
         .push_x_only_key(taproot_public_key)
         .push_opcode(OP_CHECKSIG)
-        .push_opcode(OP_FALSE)
-        .push_opcode(OP_IF)
-        .push_slice(PushBytesBuf::try_from(ROLLUP_NAME_TAG.to_vec())?)
-        .push_slice(PushBytesBuf::try_from(rollup_name.as_bytes().to_vec())?)
-        // .push_slice(PushBytesBuf::try_from(SIGNATURE_TAG.to_vec())?)
-        // .push_slice(PushBytesBuf::try_from(seq_signature)?)
-        // .push_slice(PushBytesBuf::try_from(PUBLICKEY_TAG.to_vec())?)
-        // // Pubkey corresponding to the above signature
-        // .push_slice(PushBytesBuf::try_from(seq_public_key)?)
-        .push_slice(PushBytesBuf::try_from(BATCH_DATA_TAG.to_vec())?)
-        .push_int(write_intent.len() as i64);
-
-    for chunk in write_intent.chunks(520) {
-        builder = builder.push_slice(PushBytesBuf::try_from(chunk.to_vec())?);
-    }
-
-    Ok(builder.push_opcode(OP_ENDIF).into_script())
+        .into_script()
+        .into_bytes();
+    script_bytes.extend(insc_data.to_script()?.into_bytes());
+    Ok(ScriptBuf::from(script_bytes))
 }
 
 fn calculate_commit_output_value(
