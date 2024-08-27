@@ -1,19 +1,17 @@
 use std::{sync::Arc, time::Duration};
 
-use tracing::*;
-
 use alpen_express_db::{
     traits::SequencerDatabase,
     types::{BlobEntry, BlobL1Status},
 };
 use bitcoin::{hashes::Hash, Txid};
+use tracing::*;
 
+use super::{config::WriterConfig, utils::update_blob_by_idx};
 use crate::{
     rpc::traits::{L1Client, SeqL1Client},
     writer::utils::{create_and_sign_blob_inscriptions, get_blob_by_idx},
 };
-
-use super::{config::WriterConfig, utils::update_blob_by_idx};
 
 const FINALITY_DEPTH: u64 = 6;
 

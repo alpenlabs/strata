@@ -1,9 +1,7 @@
 use alpen_express_eectl::errors::EngineError;
-use thiserror::Error;
-
-use alpen_express_state::id::L2BlockId;
-use alpen_express_state::l1::L1BlockId;
+use alpen_express_state::{id::L2BlockId, l1::L1BlockId};
 use express_chaintsn::errors::TsnError;
+use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum Error {

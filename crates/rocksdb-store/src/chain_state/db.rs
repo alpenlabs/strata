@@ -1,16 +1,14 @@
 use std::sync::Arc;
 
-use rockbound::OptimisticTransactionDB;
-use rockbound::{SchemaBatch, SchemaDBOperationsExt};
-
-use alpen_express_db::errors::DbError;
-use alpen_express_db::traits::*;
-use alpen_express_db::DbResult;
+use alpen_express_db::{errors::DbError, traits::*, DbResult};
 use alpen_express_state::state_op;
+use rockbound::{OptimisticTransactionDB, SchemaBatch, SchemaDBOperationsExt};
 
 use super::schemas::{ChainStateSchema, WriteBatchSchema};
-use crate::utils::{get_first_idx, get_last_idx};
-use crate::DbOpsConfig;
+use crate::{
+    utils::{get_first_idx, get_last_idx},
+    DbOpsConfig,
+};
 
 pub struct ChainStateDb {
     db: Arc<OptimisticTransactionDB>,
@@ -150,12 +148,12 @@ impl ChainstateStore for ChainStateDb {
 #[cfg(feature = "test_utils")]
 #[cfg(test)]
 mod tests {
-    use crate::test_utils::get_rocksdb_tmp_instance;
     use alpen_express_state::chain_state::ChainState;
     use alpen_test_utils::ArbitraryGenerator;
     use state_op::WriteBatch;
 
     use super::*;
+    use crate::test_utils::get_rocksdb_tmp_instance;
 
     fn setup_db() -> ChainStateDb {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();

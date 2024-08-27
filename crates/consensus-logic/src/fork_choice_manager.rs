@@ -2,28 +2,25 @@
 
 use std::sync::Arc;
 
-use alpen_express_primitives::hash;
+use alpen_express_db::{
+    errors::DbError,
+    traits::{BlockStatus, ChainstateProvider, ChainstateStore, Database},
+};
+use alpen_express_eectl::{engine::ExecEngineCtl, messages::ExecPayloadData};
+use alpen_express_primitives::{hash, params::Params};
+use alpen_express_state::{
+    block::L2BlockBundle, client_state::ClientState, operation::SyncAction, prelude::*,
+    state_op::StateCache, sync_event::SyncEvent,
+};
+use express_storage::L2BlockManager;
+use express_tasks::ShutdownGuard;
 use tokio::sync::mpsc;
 use tracing::*;
 
-use alpen_express_db::errors::DbError;
-use alpen_express_db::traits::{BlockStatus, ChainstateProvider, ChainstateStore, Database};
-use alpen_express_eectl::engine::ExecEngineCtl;
-use alpen_express_eectl::messages::ExecPayloadData;
-use alpen_express_primitives::params::Params;
-use alpen_express_state::block::L2BlockBundle;
-use alpen_express_state::client_state::ClientState;
-use alpen_express_state::operation::SyncAction;
-use alpen_express_state::prelude::*;
-use alpen_express_state::state_op::StateCache;
-use alpen_express_state::sync_event::SyncEvent;
-use express_storage::L2BlockManager;
-use express_tasks::ShutdownGuard;
-
-use crate::ctl::CsmController;
-use crate::message::ForkChoiceMessage;
-use crate::unfinalized_tracker::UnfinalizedBlockTracker;
-use crate::{credential, errors::*, reorg, unfinalized_tracker};
+use crate::{
+    credential, ctl::CsmController, errors::*, message::ForkChoiceMessage, reorg,
+    unfinalized_tracker, unfinalized_tracker::UnfinalizedBlockTracker,
+};
 
 /// Tracks the parts of the chain that haven't been finalized on-chain yet.
 pub struct ForkChoiceManager<D: Database> {

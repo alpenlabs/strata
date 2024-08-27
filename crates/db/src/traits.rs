@@ -3,23 +3,20 @@
 
 use std::sync::Arc;
 
-use alpen_express_state::block::L2BlockBundle;
+use alpen_express_mmr::CompactMmr;
+use alpen_express_primitives::{l1::*, prelude::*};
+use alpen_express_state::{
+    block::L2BlockBundle, chain_state::ChainState, client_state::ClientState, operation::*,
+    prelude::*, state_op::WriteBatch, sync_event::SyncEvent,
+};
 use borsh::{BorshDeserialize, BorshSerialize};
 #[cfg(feature = "mocks")]
 use mockall::automock;
 
-use alpen_express_mmr::CompactMmr;
-use alpen_express_primitives::{l1::*, prelude::*};
-use alpen_express_state::chain_state::ChainState;
-use alpen_express_state::client_state::ClientState;
-use alpen_express_state::operation::*;
-use alpen_express_state::prelude::*;
-use alpen_express_state::state_op::WriteBatch;
-use alpen_express_state::sync_event::SyncEvent;
-
-use crate::types::BlobEntry;
-use crate::types::L1TxEntry;
-use crate::DbResult;
+use crate::{
+    types::{BlobEntry, L1TxEntry},
+    DbResult,
+};
 
 /// Common database interface that we can parameterize worker tasks over if
 /// parameterizing them over each individual trait gets cumbersome or if we need

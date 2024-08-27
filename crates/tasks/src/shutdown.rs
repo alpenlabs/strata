@@ -1,7 +1,9 @@
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::Arc;
-use tokio::sync::futures::Notified;
-use tokio::sync::Notify;
+use std::sync::{
+    atomic::{AtomicBool, AtomicUsize, Ordering},
+    Arc,
+};
+
+use tokio::sync::{futures::Notified, Notify};
 
 /// Allows to send a signal to trigger shutdown
 #[derive(Debug, Clone)]

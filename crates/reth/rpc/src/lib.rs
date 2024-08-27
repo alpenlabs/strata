@@ -2,10 +2,9 @@
 
 mod rpc;
 
+use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 use reth_primitives::B256;
 pub use rpc::AlpenRPC;
-
-use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 use serde::{Deserialize, Serialize};
 use zkvm_primitives::ZKVMInput;
 

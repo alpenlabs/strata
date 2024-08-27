@@ -1,9 +1,5 @@
 use std::sync::Arc;
 
-use rockbound::{
-    utils::get_last, OptimisticTransactionDB as DB, SchemaDBOperationsExt, TransactionRetry,
-};
-
 use alpen_express_db::{
     errors::DbError,
     traits::{BcastProvider, BcastStore, TxBroadcastDatabase},
@@ -11,10 +7,12 @@ use alpen_express_db::{
     DbResult,
 };
 use alpen_express_primitives::buf::Buf32;
-
-use crate::DbOpsConfig;
+use rockbound::{
+    utils::get_last, OptimisticTransactionDB as DB, SchemaDBOperationsExt, TransactionRetry,
+};
 
 use super::schemas::{BcastL1TxIdSchema, BcastL1TxSchema};
+use crate::DbOpsConfig;
 
 pub struct BroadcastDb {
     db: Arc<DB>,
@@ -132,15 +130,17 @@ impl TxBroadcastDatabase for BroadcastDatabase {
 
 #[cfg(test)]
 mod tests {
-    use crate::test_utils::get_rocksdb_tmp_instance;
-
-    use super::*;
-    use alpen_express_db::errors::DbError;
-    use alpen_express_db::traits::{BcastProvider, BcastStore};
-    use alpen_express_db::types::L1TxStatus;
+    use alpen_express_db::{
+        errors::DbError,
+        traits::{BcastProvider, BcastStore},
+        types::L1TxStatus,
+    };
     use alpen_express_primitives::buf::Buf32;
     use alpen_test_utils::bitcoin::get_test_bitcoin_txns;
     use bitcoin::hashes::Hash;
+
+    use super::*;
+    use crate::test_utils::get_rocksdb_tmp_instance;
 
     fn setup_db() -> BroadcastDb {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();

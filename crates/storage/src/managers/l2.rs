@@ -1,14 +1,13 @@
 use std::sync::Arc;
 
-use alpen_express_db::traits::BlockStatus;
-use alpen_express_db::DbResult;
+use alpen_express_db::{
+    traits::{BlockStatus, Database},
+    DbResult,
+};
+use alpen_express_state::{block::L2BlockBundle, header::L2Header, id::L2BlockId};
 use threadpool::ThreadPool;
 
-use alpen_express_db::traits::Database;
-use alpen_express_state::{block::L2BlockBundle, header::L2Header, id::L2BlockId};
-
-use crate::cache;
-use crate::ops;
+use crate::{cache, ops};
 
 /// Caching manager of L2 blocks in the block database.
 pub struct L2BlockManager {

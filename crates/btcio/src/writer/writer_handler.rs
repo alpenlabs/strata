@@ -1,11 +1,5 @@
 use std::sync::Arc;
 
-use tokio::sync::{
-    mpsc::{self, Receiver, Sender},
-    RwLock,
-};
-use tracing::*;
-
 use alpen_express_db::{
     traits::{SeqDataProvider, SeqDataStore, SequencerDatabase},
     types::{BlobEntry, BlobL1Status},
@@ -14,10 +8,17 @@ use alpen_express_primitives::buf::Buf32;
 use alpen_express_rpc_types::L1Status;
 use alpen_express_state::da_blob::BlobIntent;
 use express_tasks::TaskExecutor;
+use tokio::sync::{
+    mpsc::{self, Receiver, Sender},
+    RwLock,
+};
+use tracing::*;
 
-use super::broadcast::broadcaster_task;
-use super::config::WriterConfig;
-use super::utils::{create_and_sign_blob_inscriptions, get_blob_by_id, put_blob, BlobIdx};
+use super::{
+    broadcast::broadcaster_task,
+    config::WriterConfig,
+    utils::{create_and_sign_blob_inscriptions, get_blob_by_id, put_blob, BlobIdx},
+};
 use crate::{
     rpc::traits::{L1Client, SeqL1Client},
     writer::watcher::watcher_task,
@@ -219,15 +220,13 @@ fn initialize_writer_state<D: SequencerDatabase>(db: Arc<D>) -> anyhow::Result<W
 mod test {
     use std::{str::FromStr, sync::Arc};
 
-    use alpen_express_primitives::buf::Buf32;
-    use bitcoin::{Address, Network};
-
     use alpen_express_db::traits::SequencerDatabase;
+    use alpen_express_primitives::buf::Buf32;
     use alpen_express_rocksdb::{
         sequencer::db::SequencerDB, test_utils::get_rocksdb_tmp_instance, SeqDb,
     };
-
     use alpen_test_utils::ArbitraryGenerator;
+    use bitcoin::{Address, Network};
 
     use super::*;
     use crate::writer::config::{InscriptionFeePolicy, WriterConfig};

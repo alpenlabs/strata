@@ -1,13 +1,12 @@
 use std::sync::Arc;
 
-use rockbound::{OptimisticTransactionDB, SchemaBatch, SchemaDBOperationsExt};
-
 use alpen_express_db::{
     errors::DbError,
     traits::{BlockStatus, L2DataProvider, L2DataStore},
     DbResult,
 };
 use alpen_express_state::{block::L2BlockBundle, prelude::*};
+use rockbound::{OptimisticTransactionDB, SchemaBatch, SchemaDBOperationsExt};
 
 use super::schemas::{L2BlockSchema, L2BlockStatusSchema};
 use crate::{l2::schemas::L2BlockHeightSchema, DbOpsConfig};
@@ -114,10 +113,9 @@ impl L2DataProvider for L2Db {
 #[cfg(feature = "test_utils")]
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     use alpen_test_utils::ArbitraryGenerator;
 
+    use super::*;
     use crate::test_utils::get_rocksdb_tmp_instance;
 
     fn get_mock_data() -> L2BlockBundle {

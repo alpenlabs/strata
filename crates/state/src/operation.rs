@@ -5,9 +5,11 @@ use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use tracing::*;
 
-use crate::client_state::{ClientState, SyncState};
-use crate::id::L2BlockId;
-use crate::l1::L1BlockId;
+use crate::{
+    client_state::{ClientState, SyncState},
+    id::L2BlockId,
+    l1::L1BlockId,
+};
 
 /// Output of a consensus state transition.  Both the consensus state writes and
 /// sync actions.

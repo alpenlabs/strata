@@ -1,17 +1,12 @@
 //! Core state transition function.
 #![allow(unused)] // still under development
 
-use tracing::*;
-
 use alpen_express_db::traits::{Database, L1DataProvider, L2DataProvider, L2DataStore};
 use alpen_express_primitives::prelude::*;
-use alpen_express_state::client_state::*;
-use alpen_express_state::header::L2Header;
-use alpen_express_state::operation::*;
-use alpen_express_state::sync_event::SyncEvent;
+use alpen_express_state::{client_state::*, header::L2Header, operation::*, sync_event::SyncEvent};
+use tracing::*;
 
-use crate::errors::*;
-use crate::genesis::make_genesis_block;
+use crate::{errors::*, genesis::make_genesis_block};
 
 /// Processes the event given the current consensus state, producing some
 /// output.  This can return database errors.
@@ -160,9 +155,8 @@ mod tests {
         ArbitraryGenerator,
     };
 
-    use crate::genesis;
-
     use super::*;
+    use crate::genesis;
 
     #[test]
     fn test_genesis() {

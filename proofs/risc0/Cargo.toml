@@ -1,7 +1,7 @@
 [package]
+edition = "2021"
 name = "risc0-guest-builder"
 version = "0.1.0"
-edition = "2021"
 
 [dependencies]
 express-risc0-adapter = { path = "../../crates/prover/adapters/risc0", features = [

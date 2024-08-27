@@ -1,8 +1,10 @@
 use std::sync::Arc;
 
-use alpen_express_db::traits::*;
-use alpen_express_db::types::{L1TxEntry, L1TxStatus};
-use alpen_express_db::DbResult;
+use alpen_express_db::{
+    traits::*,
+    types::{L1TxEntry, L1TxStatus},
+    DbResult,
+};
 use alpen_express_primitives::buf::Buf32;
 
 use crate::exec::*;

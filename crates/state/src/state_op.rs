@@ -6,11 +6,9 @@
 use alpen_express_primitives::buf::Buf32;
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use crate::chain_state::ChainState;
-use crate::header::L2Header;
-use crate::id::L2BlockId;
-use crate::l1::L1MaturationEntry;
-use crate::{bridge_ops, l1};
+use crate::{
+    bridge_ops, chain_state::ChainState, header::L2Header, id::L2BlockId, l1, l1::L1MaturationEntry,
+};
 
 #[derive(Clone, Debug, PartialEq, BorshDeserialize, BorshSerialize)]
 pub enum StateOp {

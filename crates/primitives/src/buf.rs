@@ -1,10 +1,11 @@
-use std::fmt;
-use std::io::{self, Read, Write};
-use std::str;
+use std::{
+    fmt,
+    io::{self, Read, Write},
+    str,
+};
 
 use arbitrary::Arbitrary;
-use bitcoin::hashes::Hash;
-use bitcoin::BlockHash;
+use bitcoin::{hashes::Hash, BlockHash};
 use borsh::{BorshDeserialize, BorshSerialize};
 use reth_primitives::alloy_primitives::FixedBytes;
 use serde::{Deserialize, Deserializer};

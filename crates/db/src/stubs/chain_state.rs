@@ -1,11 +1,8 @@
 use std::collections::*;
 
+use alpen_express_state::{chain_state::ChainState, state_op, state_op::WriteBatch};
 use parking_lot::Mutex;
 use tracing::*;
-
-use alpen_express_state::chain_state::ChainState;
-use alpen_express_state::state_op;
-use alpen_express_state::state_op::WriteBatch;
 
 use crate::{errors::DbError, traits::*, DbResult};
 

@@ -1,20 +1,16 @@
 use std::sync::Arc;
 
-use alpen_express_primitives::buf::Buf32;
-use anyhow::Context;
-use bitcoin::hashes::Hash;
-use bitcoin::{consensus::serialize, Transaction};
-use sha2::{Digest, Sha256};
-
-use crate::rpc::traits::{L1Client, SeqL1Client};
-use alpen_express_db::types::BlobL1Status;
 use alpen_express_db::{
     traits::{SeqDataProvider, SeqDataStore, SequencerDatabase},
-    types::BlobEntry,
+    types::{BlobEntry, BlobL1Status},
 };
+use alpen_express_primitives::buf::Buf32;
+use anyhow::Context;
+use bitcoin::{consensus::serialize, hashes::Hash, Transaction};
+use sha2::{Digest, Sha256};
 
-use super::builder::build_inscription_txs;
-use super::config::WriterConfig;
+use super::{builder::build_inscription_txs, config::WriterConfig};
+use crate::rpc::traits::{L1Client, SeqL1Client};
 
 // Helper function to fetch a blob entry from within tokio
 pub async fn get_blob_by_idx<D: SequencerDatabase + Send + Sync + 'static>(
@@ -143,16 +139,17 @@ pub fn calculate_blob_hash(blob: &[u8]) -> Buf32 {
 mod test {
     use std::{str::FromStr, sync::Arc};
 
-    use bitcoin::{Address, Network};
-
     use alpen_express_db::traits::SequencerDatabase;
     use alpen_express_rocksdb::{
         sequencer::db::SequencerDB, test_utils::get_rocksdb_tmp_instance, SeqDb,
     };
+    use bitcoin::{Address, Network};
 
     use super::*;
-    use crate::test_utils::TestBitcoinClient;
-    use crate::writer::config::{InscriptionFeePolicy, WriterConfig};
+    use crate::{
+        test_utils::TestBitcoinClient,
+        writer::config::{InscriptionFeePolicy, WriterConfig},
+    };
 
     fn get_db() -> Arc<SequencerDB<SeqDb>> {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();

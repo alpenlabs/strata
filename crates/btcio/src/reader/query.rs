@@ -1,18 +1,23 @@
-use std::collections::VecDeque;
-use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::{
+    collections::VecDeque,
+    sync::Arc,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 
+use alpen_express_rpc_types::types::L1Status;
 use anyhow::bail;
 use bitcoin::{Block, BlockHash};
 use tokio::sync::{mpsc, RwLock};
 use tracing::*;
 
-use alpen_express_rpc_types::types::L1Status;
-
-use super::config::ReaderConfig;
-use super::messages::{BlockData, L1Event};
-use crate::rpc::traits::L1Client;
-use crate::status::{apply_status_updates, StatusUpdate};
+use super::{
+    config::ReaderConfig,
+    messages::{BlockData, L1Event},
+};
+use crate::{
+    rpc::traits::L1Client,
+    status::{apply_status_updates, StatusUpdate},
+};
 
 fn filter_interesting_txs(block: &Block) -> Vec<u32> {
     // TODO actually implement the filter logic. Now it returns everything

@@ -16,10 +16,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    mpt::{keccak, RlpBytes, StateAccount},
-    ZKVMInput,
-};
+use std::{mem, mem::take};
 
 use alloy_eips::eip1559::BaseFeeParams;
 use alloy_rlp::BufMut;
@@ -37,7 +34,11 @@ use revm::{
     primitives::{SpecId, TransactTo, TxEnv},
     Database, DatabaseCommit, Evm,
 };
-use std::{mem, mem::take};
+
+use crate::{
+    mpt::{keccak, RlpBytes, StateAccount},
+    ZKVMInput,
+};
 
 /// The divisor for the gas limit bound.
 pub const GAS_LIMIT_DIVISOR: u64 = 1024;

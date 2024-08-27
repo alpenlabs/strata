@@ -1,13 +1,13 @@
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
+use alpen_express_db::types::{ExcludeReason, L1TxEntry, L1TxStatus};
 use alpen_express_primitives::buf::Buf32;
 use bitcoin::{hashes::Hash, Txid};
 use express_storage::{ops::l1tx_broadcast, BroadcastDbOps};
 use tokio::sync::mpsc::Receiver;
 use tracing::*;
 
-use alpen_express_db::types::{ExcludeReason, L1TxEntry, L1TxStatus};
-
+use super::error::BroadcasterResult;
 use crate::{
     broadcaster::{error::BroadcasterError, state::BroadcasterState},
     rpc::{
@@ -15,8 +15,6 @@ use crate::{
         ClientError,
     },
 };
-
-use super::error::BroadcasterResult;
 
 // TODO: make these configurable, get from config
 const BROADCAST_POLL_INTERVAL: u64 = 1000; // millis
@@ -206,14 +204,15 @@ async fn send_tx(
 #[cfg(test)]
 mod test {
     use alpen_express_db::{traits::TxBroadcastDatabase, types::ExcludeReason};
-    use alpen_express_rocksdb::broadcaster::db::{BroadcastDatabase, BroadcastDb};
-    use alpen_express_rocksdb::test_utils::get_rocksdb_tmp_instance;
+    use alpen_express_rocksdb::{
+        broadcaster::db::{BroadcastDatabase, BroadcastDb},
+        test_utils::get_rocksdb_tmp_instance,
+    };
     use alpen_test_utils::ArbitraryGenerator;
     use express_storage::ops::l1tx_broadcast::Context;
 
-    use crate::test_utils::TestBitcoinClient;
-
     use super::*;
+    use crate::test_utils::TestBitcoinClient;
 
     fn get_db() -> Arc<impl TxBroadcastDatabase> {
         let (db, dbops) = get_rocksdb_tmp_instance().unwrap();

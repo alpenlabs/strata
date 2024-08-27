@@ -1,5 +1,6 @@
-use bitcoin::Address;
 use std::str::FromStr;
+
+use bitcoin::Address;
 
 #[derive(Debug, Clone)]
 pub struct WriterConfig {

@@ -1,9 +1,8 @@
 use std::sync::Arc;
 
+use alpen_express_db::database::CommonDatabase;
 use rockbound::{rocksdb, OptimisticTransactionDB};
 use tempfile::TempDir;
-
-use alpen_express_db::database::CommonDatabase;
 
 use crate::{l2::db::L2Db, ChainStateDb, ClientStateDb, DbOpsConfig, L1Db, SyncEventDb};
 

@@ -1,14 +1,13 @@
 //! Logic to check block credentials.
 
-use bitcoin::XOnlyPublicKey;
-use secp256k1::{schnorr::Signature, Keypair, Message, Secp256k1, SecretKey};
-
 use alpen_express_primitives::{
     block_credential::CredRule,
     buf::{Buf32, Buf64},
     params::Params,
 };
 use alpen_express_state::header::{L2Header, SignedL2BlockHeader};
+use bitcoin::XOnlyPublicKey;
+use secp256k1::{schnorr::Signature, Keypair, Message, Secp256k1, SecretKey};
 
 pub fn check_block_credential(header: &SignedL2BlockHeader, params: &Params) -> bool {
     let sigcom = compute_header_sig_commitment(header);

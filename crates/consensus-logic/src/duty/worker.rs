@@ -1,30 +1,39 @@
 //! Executes duties.
 
-use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
-use std::time;
-
-use tokio::sync::broadcast;
-use tracing::*;
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock},
+    time,
+};
 
 use alpen_express_btcio::writer::DaWriter;
 use alpen_express_db::traits::*;
 use alpen_express_eectl::engine::ExecEngineCtl;
-use alpen_express_primitives::buf::{Buf32, Buf64};
-use alpen_express_primitives::params::Params;
-use alpen_express_state::batch::{BatchCommitment, SignedBatchCommitment};
-use alpen_express_state::client_state::ClientState;
-use alpen_express_state::da_blob::{BlobDest, BlobIntent};
-use alpen_express_state::prelude::*;
+use alpen_express_primitives::{
+    buf::{Buf32, Buf64},
+    params::Params,
+};
+use alpen_express_state::{
+    batch::{BatchCommitment, SignedBatchCommitment},
+    client_state::ClientState,
+    da_blob::{BlobDest, BlobIntent},
+    prelude::*,
+};
 use express_storage::L2BlockManager;
 use express_tasks::{ShutdownGuard, TaskExecutor};
+use tokio::sync::broadcast;
+use tracing::*;
 
-use super::types::{self, Duty, DutyBatch, Identity, IdentityKey};
-use super::{block_assembly, extractor};
-use crate::credential::sign_schnorr_sig;
-use crate::errors::Error;
-use crate::message::{ClientUpdateNotif, ForkChoiceMessage};
-use crate::sync_manager::SyncManager;
+use super::{
+    block_assembly, extractor,
+    types::{self, Duty, DutyBatch, Identity, IdentityKey},
+};
+use crate::{
+    credential::sign_schnorr_sig,
+    errors::Error,
+    message::{ClientUpdateNotif, ForkChoiceMessage},
+    sync_manager::SyncManager,
+};
 
 pub fn duty_tracker_task<D: Database>(
     shutdown: ShutdownGuard,

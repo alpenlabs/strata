@@ -1,14 +1,11 @@
+use alpen_express_primitives::{buf::Buf32, hash::compute_borsh_hash};
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use alpen_express_primitives::buf::Buf32;
-use alpen_express_primitives::hash::compute_borsh_hash;
-
-use crate::bridge_state::DepositsTable;
-use crate::exec_env::ExecEnvState;
-use crate::l1::L1ViewState;
-use crate::prelude::*;
-use crate::{bridge_ops, bridge_state, exec_env, l1};
+use crate::{
+    bridge_ops, bridge_state, bridge_state::DepositsTable, exec_env, exec_env::ExecEnvState, l1,
+    l1::L1ViewState, prelude::*,
+};
 
 /// L2 blockchain state.  This is the state computed as a function of a
 /// pre-state and a block.

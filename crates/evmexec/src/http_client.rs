@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
-use jsonrpsee::http_client::HttpClient;
-use jsonrpsee::http_client::{transport::HttpBackend, HttpClientBuilder};
+use jsonrpsee::http_client::{transport::HttpBackend, HttpClient, HttpClientBuilder};
+#[cfg(test)]
+use mockall::automock;
 use reth_node_ethereum::EthEngineTypes;
 use reth_primitives::{Block, BlockHash};
 use reth_rpc_api::{EngineApiClient, EthApiClient};
@@ -10,9 +11,6 @@ use reth_rpc_types::engine::{
     ExecutionPayloadBodiesV1, ExecutionPayloadEnvelopeV2, ExecutionPayloadInputV2, ForkchoiceState,
     ForkchoiceUpdated, JwtSecret, PayloadAttributes, PayloadId,
 };
-
-#[cfg(test)]
-use mockall::automock;
 
 fn http_client(http_url: &str, secret: JwtSecret) -> HttpClient<AuthClientService<HttpBackend>> {
     let middleware = tower::ServiceBuilder::new().layer(AuthClientLayer::new(secret));

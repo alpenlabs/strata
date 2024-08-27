@@ -2,6 +2,32 @@
 
 use std::{borrow::BorrowMut, sync::Arc};
 
+use alpen_express_btcio::{
+    broadcaster::L1BroadcastHandle,
+    writer::{utils::calculate_blob_hash, DaWriter},
+};
+use alpen_express_consensus_logic::sync_manager::SyncManager;
+use alpen_express_db::{
+    traits::{ChainstateProvider, Database, L1DataProvider, L2DataProvider, SequencerDatabase},
+    types::{L1TxEntry, L1TxStatus},
+    DbResult,
+};
+use alpen_express_primitives::buf::Buf32;
+use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer, HexBytes, HexBytes32};
+use alpen_express_rpc_types::{
+    BlockHeader, ClientStatus, DaBlob, DepositEntry, DepositState, ExecUpdate, L1Status,
+    WithdrawalIntent,
+};
+use alpen_express_state::{
+    block::{L2Block, L2BlockBundle},
+    chain_state::ChainState,
+    client_state::ClientState,
+    da_blob::{BlobDest, BlobIntent},
+    exec_update,
+    header::{L2Header, SignedL2BlockHeader},
+    id::L2BlockId,
+    l1::L1BlockId,
+};
 use async_trait::async_trait;
 use bitcoin::{consensus::deserialize, hashes::Hash, Transaction as BTransaction, Txid};
 use jsonrpsee::{
@@ -20,36 +46,6 @@ use tokio::sync::{
     mpsc::{self, Sender},
     oneshot, watch, Mutex, RwLock,
 };
-
-use alpen_express_btcio::broadcaster::L1BroadcastHandle;
-use alpen_express_btcio::writer::{utils::calculate_blob_hash, DaWriter};
-use alpen_express_consensus_logic::sync_manager::SyncManager;
-use alpen_express_db::{
-    traits::{ChainstateProvider, Database, L2DataProvider},
-    types::L1TxEntry,
-    DbResult,
-};
-use alpen_express_db::{
-    traits::{L1DataProvider, SequencerDatabase},
-    types::L1TxStatus,
-};
-use alpen_express_primitives::buf::Buf32;
-use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer, HexBytes, HexBytes32};
-use alpen_express_rpc_types::{
-    BlockHeader, ClientStatus, DaBlob, DepositEntry, DepositState, ExecUpdate, L1Status,
-    WithdrawalIntent,
-};
-use alpen_express_state::{
-    block::{L2Block, L2BlockBundle},
-    chain_state::ChainState,
-    client_state::ClientState,
-    da_blob::{BlobDest, BlobIntent},
-    exec_update,
-    header::{L2Header, SignedL2BlockHeader},
-    id::L2BlockId,
-    l1::L1BlockId,
-};
-
 use tracing::*;
 
 #[derive(Debug, Error)]

@@ -4,20 +4,22 @@
 
 use std::sync::Arc;
 
-use tokio::sync::{broadcast, mpsc, watch};
-use tracing::*;
-
 use alpen_express_db::traits::Database;
 use alpen_express_eectl::engine::ExecEngineCtl;
 use alpen_express_primitives::params::Params;
 use alpen_express_state::client_state::ClientState;
 use express_storage::L2BlockManager;
 use express_tasks::TaskExecutor;
+use tokio::sync::{broadcast, mpsc, watch};
+use tracing::*;
 
-use crate::ctl::CsmController;
-use crate::message::{ClientUpdateNotif, CsmMessage, ForkChoiceMessage};
-use crate::status::CsmStatus;
-use crate::{fork_choice_manager, genesis, worker};
+use crate::{
+    ctl::CsmController,
+    fork_choice_manager, genesis,
+    message::{ClientUpdateNotif, CsmMessage, ForkChoiceMessage},
+    status::CsmStatus,
+    worker,
+};
 
 /// Handle to the core pipeline tasks.
 pub struct SyncManager {

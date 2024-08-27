@@ -3,12 +3,11 @@
 //! This just implements a very simple n-of-n multisig bridge.  It will be
 //! extended to a more sophisticated design when we have that specced out.
 
-use borsh::{BorshDeserialize, BorshSerialize};
-
 use alpen_express_primitives::{
     buf::Buf32,
     l1::{self, OutputRef},
 };
+use borsh::{BorshDeserialize, BorshSerialize};
 
 /// Global operator idx.
 pub type OperatorIdx = u32;

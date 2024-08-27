@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
-use tokio::sync::RwLock;
-
 use alpen_express_rpc_types::types::L1Status;
+use tokio::sync::RwLock;
 
 #[derive(Debug, Clone)]
 pub enum StatusUpdate {

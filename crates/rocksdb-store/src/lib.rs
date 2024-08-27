@@ -35,24 +35,24 @@ pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
     // TODO add col families for other store types
 ];
 
-use broadcaster::schemas::{BcastL1TxIdSchema, BcastL1TxSchema};
 // Re-exports
 pub use broadcaster::db::BroadcastDb;
+use broadcaster::schemas::{BcastL1TxIdSchema, BcastL1TxSchema};
 pub use chain_state::db::ChainStateDb;
 pub use client_state::db::ClientStateDb;
 pub use l1::db::L1Db;
+use l2::schemas::{L2BlockHeightSchema, L2BlockSchema, L2BlockStatusSchema};
+use rockbound::{schema::ColumnFamilyName, Schema};
 pub use sequencer::db::SeqDb;
+use sequencer::schemas::{SeqBlobIdSchema, SeqBlobSchema, SeqL1TxIdSchema, SeqL1TxnSchema};
 pub use sync_event::db::SyncEventDb;
 
-use l2::schemas::{L2BlockHeightSchema, L2BlockSchema, L2BlockStatusSchema};
-
-use rockbound::{schema::ColumnFamilyName, Schema};
-use sequencer::schemas::{SeqBlobIdSchema, SeqBlobSchema, SeqL1TxIdSchema, SeqL1TxnSchema};
-
-use crate::chain_state::schemas::{ChainStateSchema, WriteBatchSchema};
-use crate::client_state::schemas::{ClientStateSchema, ClientUpdateOutputSchema};
-use crate::l1::schemas::{L1BlockSchema, MmrSchema, TxnSchema};
-use crate::sync_event::schemas::SyncEventSchema;
+use crate::{
+    chain_state::schemas::{ChainStateSchema, WriteBatchSchema},
+    client_state::schemas::{ClientStateSchema, ClientUpdateOutputSchema},
+    l1::schemas::{L1BlockSchema, MmrSchema, TxnSchema},
+    sync_event::schemas::SyncEventSchema,
+};
 
 /// database operations configuration
 #[derive(Clone, Copy, Debug)]

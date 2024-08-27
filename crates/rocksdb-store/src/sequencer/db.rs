@@ -1,7 +1,5 @@
 use std::sync::Arc;
 
-use rockbound::{OptimisticTransactionDB, SchemaBatch, SchemaDBOperationsExt};
-
 use alpen_express_db::{
     errors::DbError,
     traits::{SeqDataProvider, SeqDataStore, SequencerDatabase},
@@ -9,6 +7,7 @@ use alpen_express_db::{
     DbResult,
 };
 use alpen_express_primitives::buf::Buf32;
+use rockbound::{OptimisticTransactionDB, SchemaBatch, SchemaDBOperationsExt};
 
 use super::schemas::{SeqBlobIdSchema, SeqBlobSchema, SeqL1TxnSchema};
 use crate::DbOpsConfig;
@@ -127,20 +126,17 @@ impl<D: SeqDataStore + SeqDataProvider> SequencerDatabase for SequencerDB<D> {
 #[cfg(feature = "test_utils")]
 #[cfg(test)]
 mod tests {
-    use bitcoin::consensus::serialize;
-    use bitcoin::hashes::Hash;
-
-    use alpen_express_db::errors::DbError;
-    use alpen_express_db::traits::{SeqDataProvider, SeqDataStore};
+    use alpen_express_db::{
+        errors::DbError,
+        traits::{SeqDataProvider, SeqDataStore},
+    };
     use alpen_express_primitives::buf::Buf32;
-    use alpen_test_utils::bitcoin::get_test_bitcoin_txns;
-    use alpen_test_utils::ArbitraryGenerator;
-
-    use crate::test_utils::get_rocksdb_tmp_instance;
+    use alpen_test_utils::{bitcoin::get_test_bitcoin_txns, ArbitraryGenerator};
+    use bitcoin::{consensus::serialize, hashes::Hash};
+    use test;
 
     use super::*;
-
-    use test;
+    use crate::test_utils::get_rocksdb_tmp_instance;
 
     fn get_commit_reveal_txns() -> ((Buf32, Vec<u8>), (Buf32, Vec<u8>)) {
         let txns = get_test_bitcoin_txns();

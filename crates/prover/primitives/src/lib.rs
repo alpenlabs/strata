@@ -20,17 +20,18 @@ pub mod db;
 pub mod mpt;
 pub mod processor;
 
-use crate::mpt::{MptNode, StorageEntry};
+use std::collections::HashMap;
 
 use db::InMemoryDBHelper;
 use mpt::keccak;
 use processor::{EvmConfig, EvmProcessor};
-use reth_primitives::alloy_primitives::FixedBytes;
-use reth_primitives::{Address, Bytes, Header, TransactionSignedNoHash, Withdrawal, B256};
+use reth_primitives::{
+    alloy_primitives::FixedBytes, Address, Bytes, Header, TransactionSignedNoHash, Withdrawal, B256,
+};
 use revm::InMemoryDB;
-use std::collections::HashMap;
-
 use serde::{Deserialize, Serialize};
+
+use crate::mpt::{MptNode, StorageEntry};
 
 /// Public Parameters that proof asserts
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -129,9 +130,11 @@ pub fn process_block_transaction(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use revm::primitives::SpecId;
     use std::path::PathBuf;
+
+    use revm::primitives::SpecId;
+
+    use super::*;
     const EVM_CONFIG: EvmConfig = EvmConfig {
         chain_id: 12345,
         spec_id: SpecId::SHANGHAI,
