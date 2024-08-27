@@ -33,3 +33,30 @@ pub fn compute_wtxid(tx: &Transaction) -> [u8; 32] {
     tx.consensus_encode(&mut vec).expect("engines don't error");
     sha256d(&vec)
 }
+
+#[cfg(test)]
+mod tests {
+    use alpen_test_utils::bitcoin::get_btc_mainnet_block;
+    use bitcoin::{hashes::Hash, Txid, Wtxid};
+
+    use super::*;
+
+    #[test]
+    fn test_txid() {
+        let block = get_btc_mainnet_block();
+        for tx in &block.txdata {
+            assert_eq!(tx.compute_txid(), Txid::from_byte_array(compute_txid(tx)))
+        }
+    }
+
+    #[test]
+    fn test_wtxid() {
+        let block = get_btc_mainnet_block();
+        for tx in &block.txdata {
+            assert_eq!(
+                tx.compute_wtxid(),
+                Wtxid::from_byte_array(compute_wtxid(tx))
+            )
+        }
+    }
+}

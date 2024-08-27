@@ -121,3 +121,47 @@ pub fn check_pow(block: &Block) -> bool {
     let block_hash = BlockHash::from_byte_array(compute_block_hash(&block.header));
     target.is_met_by(block_hash)
 }
+
+#[cfg(test)]
+mod tests {
+    use alpen_test_utils::bitcoin::get_btc_mainnet_block;
+    use bitcoin::{hashes::Hash, TxMerkleNode, WitnessMerkleNode};
+
+    use crate::block::{
+        check_merkle_root, check_pow, check_witness_commitment, compute_witness_root,
+    };
+
+    use super::compute_merkle_root;
+
+    #[test]
+    fn test_tx_root() {
+        let block = get_btc_mainnet_block();
+        assert_eq!(
+            block.compute_merkle_root().unwrap(),
+            TxMerkleNode::from_byte_array(compute_merkle_root(&block).unwrap())
+        );
+    }
+
+    #[test]
+    fn test_wtx_root() {
+        let block = get_btc_mainnet_block();
+        assert_eq!(
+            block.witness_root().unwrap(),
+            WitnessMerkleNode::from_byte_array(compute_witness_root(&block).unwrap())
+        )
+    }
+
+    #[test]
+    fn test_block() {
+        let block = get_btc_mainnet_block();
+
+        assert!(block.check_merkle_root());
+        assert!(check_merkle_root(&block));
+
+        assert!(block.check_witness_commitment());
+        assert!(check_witness_commitment(&block));
+
+        assert!(block.header.validate_pow(block.header.target()).is_ok());
+        assert!(check_pow(&block));
+    }
+}

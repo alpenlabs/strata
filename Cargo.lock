@@ -1668,6 +1668,7 @@ dependencies = [
 name = "bitcoin-blockspace"
 version = "0.1.0"
 dependencies = [
+ "alpen-test-utils",
  "bitcoin",
  "sha2 0.10.8",
 ]
