@@ -15,7 +15,10 @@ fn main() {
     let out_dir = get_output_dir();
     let methods_path = out_dir.join("methods.rs");
 
-    if cfg!(feature = "prover") && std::env::var("SKIP_GUEST_BUILD").is_err() {
+    if cfg!(feature = "prover")
+        && std::env::var("SKIP_GUEST_BUILD").is_err()
+        && std::env::var("CARGO_CFG_CLIPPY").is_err()
+    {
         setup_compiler();
         build_program("guest-reth-stf");
         let elf_content = generate_elf_content(ELF_FILE_PATH);
