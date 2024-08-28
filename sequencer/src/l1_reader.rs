@@ -37,6 +37,7 @@ where
         .unwrap_or(params.rollup().horizon_l1_height);
 
     let reader_config = Arc::new(config.get_reader_config());
+    let params_r = params.clone();
     let chprov = db.chainstate_provider().clone();
 
     // TODO set up watchdog to handle when the spawned tasks fail gracefully
@@ -49,6 +50,7 @@ where
             reader_config,
             status_rx.clone(),
             chprov,
+            params_r,
         ),
     );
 

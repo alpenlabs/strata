@@ -15,7 +15,6 @@ pub enum TxInterest {
     // Add other interesting conditions as needed
 }
 
-type NameTag = Vec<u8>;
 type RollupName = String;
 
 /// Filter all the interesting [`Transaction`]s in a block based on given interests

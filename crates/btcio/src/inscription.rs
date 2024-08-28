@@ -65,6 +65,7 @@ pub enum InscriptionParseError {
 
 /// Parser for parsing relevant inscription data from a script. This expects a specific structure of
 /// inscription data.
+// TODO: make this keep track of the script iterator
 pub struct InscriptionParser {
     script: ScriptBuf,
 }
@@ -73,6 +74,9 @@ impl InscriptionParser {
     pub fn new(script: ScriptBuf) -> Self {
         Self { script }
     }
+
+    // TODO: Add parsing of inscription. This can be done while working for l1 precedence task
+    // https://github.com/alpenlabs/express/issues/38
 
     /// Parse the rollup name if present
     pub fn parse_rollup_name(&self) -> Result<String, InscriptionParseError> {
@@ -91,7 +95,7 @@ impl InscriptionParser {
         }
     }
 
-    /// Check for consecutive OP_FALSE and OP_IF
+    /// Check for consecutive OP_FALSE and OP_IF which marks the beginning of inscription
     fn enter_envelope(instructions: &mut Instructions) -> Result<(), InscriptionParseError> {
         // loop until op_false is found
         loop {
@@ -118,6 +122,7 @@ impl InscriptionParser {
         Ok(())
     }
 
+    /// Extract next instruction and try to parse it as an opcode
     fn next_op(instructions: &mut Instructions) -> Option<Opcode> {
         let nxt = instructions.next();
         match nxt {
@@ -126,6 +131,7 @@ impl InscriptionParser {
         }
     }
 
+    /// Extract next instruction and try to parse it as bytes
     fn next_bytes(instructions: &mut Instructions) -> Option<Vec<u8>> {
         match instructions.next() {
             Some(Ok(Instruction::PushBytes(bytes))) => Some(bytes.as_bytes().to_vec()),

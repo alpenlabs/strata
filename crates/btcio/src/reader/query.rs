@@ -5,6 +5,7 @@ use std::{
 };
 
 use alpen_express_db::traits::Database;
+use alpen_express_primitives::params::Params;
 use alpen_express_status::StatusTx;
 use anyhow::bail;
 use bitcoin::BlockHash;
@@ -29,6 +30,7 @@ pub async fn bitcoin_data_reader_task<D: Database + 'static>(
     config: Arc<ReaderConfig>,
     status_rx: Arc<StatusTx>,
     chstate_prov: Arc<D::ChsProv>,
+    params: Arc<Params>,
 ) {
     if let Err(e) = do_reader_task::<D>(
         client.as_ref(),
@@ -37,6 +39,7 @@ pub async fn bitcoin_data_reader_task<D: Database + 'static>(
         config,
         status_rx.clone(),
         chstate_prov,
+        params,
     )
     .await
     {
@@ -51,6 +54,7 @@ async fn do_reader_task<D: Database + 'static>(
     config: Arc<ReaderConfig>,
     status_rx: Arc<StatusTx>,
     chstate_prov: Arc<D::ChsProv>,
+    params: Arc<Params>,
 ) -> anyhow::Result<()> {
     info!(%target_next_block, "started L1 reader task!");
 
@@ -70,7 +74,8 @@ async fn do_reader_task<D: Database + 'static>(
         let cur_best_height = state.best_block_idx();
         let poll_span = debug_span!("l1poll", %cur_best_height);
 
-        let tx_interests = derive_tx_interests::<D>(chstate_prov.clone(), &config)?;
+        // Maybe this should be called outside loop?
+        let tx_interests = derive_tx_interests::<D>(chstate_prov.clone(), params.as_ref())?;
 
         if let Err(err) = poll_for_new_blocks(
             client,
@@ -112,11 +117,13 @@ async fn do_reader_task<D: Database + 'static>(
 
 fn derive_tx_interests<D: Database + 'static>(
     _chstate_prov: Arc<D::ChsProv>,
-    _config: &Arc<ReaderConfig>, // NOTE: we might not need the config, but just in case
+    params: &Params,
 ) -> anyhow::Result<Vec<TxInterest>> {
     // TODO: Figure out how to do it from chainstate provider
-    // For now we'll just go with filtering all txs
-    Ok(vec![TxInterest::TxIdWithPrefix(vec![])])
+    // For now we'll just go with filtering Inscription transactions
+    Ok(vec![TxInterest::RollupInscription(
+        params.rollup().rollup_name.clone(),
+    )])
 }
 
 /// Inits the reader state by trying to backfill blocks up to a target height.
