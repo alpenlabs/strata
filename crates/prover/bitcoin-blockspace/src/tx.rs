@@ -2,14 +2,14 @@ use bitcoin::{consensus::Encodable, Transaction};
 
 use crate::sha256d::sha256d;
 
-/// Computes the [`Txid`] using [RustCrypto SHA-2 crate](https://github.com/RustCrypto/hashes/tree/master/sha2)
+/// Computes the [`Txid`](bitcoin::Txid) using [RustCrypto's SHA-2 crate](https://github.com/RustCrypto/hashes/tree/master/sha2)
 /// for the underlying `sha256d` hash function.
 ///
-/// Equivalent to [compute_txid](bitcoin::Transaction::compute_txid)
+/// Equivalent to [`compute_txid`](bitcoin::Transaction::compute_txid)
 ///
 /// This function hashes the transaction **excluding** the segwit data (i.e., the marker, flag
 /// bytes, and the witness fields themselves). For non-segwit transactions, which do not have any
-/// segwit data, this will be equal to [`compute_wtxid()`].
+/// segwit data, this will be equal to [`compute_wtxid`].
 pub fn compute_txid(tx: &Transaction) -> [u8; 32] {
     let mut vec = Vec::new();
 
@@ -21,13 +21,13 @@ pub fn compute_txid(tx: &Transaction) -> [u8; 32] {
     sha256d(&vec)
 }
 
-/// Computes the segwit version of the transaction id using [RustCrypto SHA-2 crate](https://github.com/RustCrypto/hashes/tree/master/sha2)
+/// Computes the segwit version of the transaction id using [RustCrypto's SHA-2 crate](https://github.com/RustCrypto/hashes/tree/master/sha2)
 ///
-/// Equivalent to [compute_wtxid](bitcoin::Transaction::compute_wtxid)
+/// Equivalent to [`compute_wtxid`](bitcoin::Transaction::compute_wtxid)
 ///
 /// Hashes the transaction **including** all segwit data (i.e. the marker, flag bytes, and the
 /// witness fields themselves). For non-segwit transactions which do not have any segwit data,
-/// this will be equal to [`compute_txid()`].
+/// this will be equal to [`compute_txid`].
 pub fn compute_wtxid(tx: &Transaction) -> [u8; 32] {
     let mut vec = Vec::new();
     tx.consensus_encode(&mut vec).expect("engines don't error");

@@ -1,3 +1,8 @@
+//! Utility functions for computing and verifying various cryptographic properties of Bitcoin
+//! blocks, including Merkle roots, witness commitments, and proof-of-work validation. These
+//! functions are designed to be equivalent to the corresponding methods found in the
+//! [`bitcoin`](bitcoin::Block), providing custom implementations where necessary.
+
 use bitcoin::{
     block::Header, consensus::Encodable, hashes::Hash, Block, BlockHash, TxMerkleNode,
     WitnessCommitment, WitnessMerkleNode,
@@ -11,7 +16,7 @@ use crate::{
 
 /// Computes the transaction merkle root.
 ///
-/// Equivalent to [compute_merkle_root](Block::compute_merkle_root)
+/// Equivalent to [`compute_merkle_root`](Block::compute_merkle_root)
 pub fn compute_merkle_root(block: &Block) -> Option<[u8; 32]> {
     let hashes = block.txdata.iter().map(compute_txid);
     calculate_root(hashes)
@@ -19,7 +24,7 @@ pub fn compute_merkle_root(block: &Block) -> Option<[u8; 32]> {
 
 /// Computes the transaction witness root.
 ///
-/// Equivalent to [witness_root](Block::witness_root)
+/// Equivalent to [`witness_root`](Block::witness_root)
 pub fn compute_witness_root(block: &Block) -> Option<[u8; 32]> {
     let hashes = block.txdata.iter().enumerate().map(|(i, t)| {
         if i == 0 {
@@ -34,7 +39,7 @@ pub fn compute_witness_root(block: &Block) -> Option<[u8; 32]> {
 
 /// Checks if Merkle root of header matches Merkle root of the transaction list.
 ///
-/// Equivalent to [check_merkle_root](Block::check_merkle_root)
+/// Equivalent to [`check_merkle_root`](Block::check_merkle_root)
 pub fn check_merkle_root(block: &Block) -> bool {
     match compute_merkle_root(block) {
         Some(merkle_root) => block.header.merkle_root == TxMerkleNode::from_byte_array(merkle_root),
@@ -44,7 +49,7 @@ pub fn check_merkle_root(block: &Block) -> bool {
 
 /// Computes the witness commitment for the block's transaction list.
 ///
-/// Equivalent to [compute_witness_commitment](Block::compute_witness_commitment)
+/// Equivalent to [`compute_witness_commitment`](Block::compute_witness_commitment)
 pub fn compute_witness_commitment(
     witness_root: &WitnessMerkleNode,
     witness_reserved_value: &[u8],
@@ -59,7 +64,7 @@ pub fn compute_witness_commitment(
 
 /// Returns the block hash.
 ///
-/// Equivalent to [compute_block_hash](Header::block_hash)
+/// Equivalent to [`compute_block_hash`](Header::block_hash)
 fn compute_block_hash(header: &Header) -> [u8; 32] {
     let mut vec = Vec::with_capacity(80);
     header
@@ -70,9 +75,8 @@ fn compute_block_hash(header: &Header) -> [u8; 32] {
 
 /// Checks if witness commitment in coinbase matches the transaction list.
 ///
-/// Equivalent to [check_witness_commitment](Block::check_witness_commitment)
+/// Equivalent to [`check_witness_commitment`](Block::check_witness_commitment)
 pub fn check_witness_commitment(block: &Block) -> bool {
-    const MAGIC: [u8; 6] = [0x6a, 0x24, 0xaa, 0x21, 0xa9, 0xed];
     // Witness commitment is optional if there are no transactions using SegWit in the block.
     if block
         .txdata
@@ -90,6 +94,15 @@ pub fn check_witness_commitment(block: &Block) -> bool {
     if !coinbase.is_coinbase() {
         return false;
     }
+
+    // The commitment is recorded in a scriptPubKey of the coinbase transaction. It must be at least
+    // 38 bytes, with the first 6-byte of 0x6a24aa21a9ed, that is:
+    //
+    // 1-byte - OP_RETURN (0x6a)
+    // 1-byte - Push the following 36 bytes (0x24)
+    // 4-byte - Commitment header (0xaa21a9ed)
+    // 32-byte - Commitment hash: Double-SHA256(witness root hash|witness reserved value)
+    const MAGIC: [u8; 6] = [0x6a, 0x24, 0xaa, 0x21, 0xa9, 0xed];
 
     // Commitment is in the last output that starts with magic bytes.
     if let Some(pos) = coinbase
@@ -115,7 +128,7 @@ pub fn check_witness_commitment(block: &Block) -> bool {
     false
 }
 
-/// Checks that the proof-of-work for the block is valid, returning a bool
+/// Checks that the proof-of-work for the block is valid.
 pub fn check_pow(block: &Block) -> bool {
     let target = block.header.target();
     let block_hash = BlockHash::from_byte_array(compute_block_hash(&block.header));
@@ -127,11 +140,10 @@ mod tests {
     use alpen_test_utils::bitcoin::get_btc_mainnet_block;
     use bitcoin::{hashes::Hash, TxMerkleNode, WitnessMerkleNode};
 
+    use super::compute_merkle_root;
     use crate::block::{
         check_merkle_root, check_pow, check_witness_commitment, compute_witness_root,
     };
-
-    use super::compute_merkle_root;
 
     #[test]
     fn test_tx_root() {

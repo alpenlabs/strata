@@ -4,10 +4,12 @@ use bitcoin::consensus::Encodable;
 
 use crate::sha256d::sha256d;
 
-/// Calculates the merkle root of an iterator of *hashes* using [RustCrypto SHA-2 crate](https://github.com/RustCrypto/hashes/tree/master/sha2).
-/// Equivalent to [calculate_root](bitcoin::merkle_tree::calculate_root)
+/// Calculates the merkle root of an iterator of *hashes* using [RustCrypto's SHA-2 crate](https://github.com/RustCrypto/hashes/tree/master/sha2).
+///
+/// Equivalent to [`calculate_root`](bitcoin::merkle_tree::calculate_root)
 ///
 /// # Returns
+///
 /// - `None` if `hashes` is empty. The merkle root of an empty tree of hashes is undefined.
 /// - `Some(hash)` if `hashes` contains one element. A single hash is by definition the merkle root.
 /// - `Some(merkle_root)` if length of `hashes` is greater than one.
@@ -45,7 +47,9 @@ where
     Some(merkle_root_r(&mut alloc))
 }
 
-// `hashes` must contain at least one hash.
+/// Recursively computes the Merkle root from a list of hashes.
+///
+/// `hashes` must contain at least one hash.
 fn merkle_root_r(hashes: &mut [[u8; 32]]) -> [u8; 32] {
     if hashes.len() == 1 {
         return hashes[0];
