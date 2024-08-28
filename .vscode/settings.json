@@ -2,6 +2,7 @@
     "editor.formatOnSave": true,
     "rust-analyzer.checkOnSave": true,
     "rust-analyzer.check.overrideCommand": [
+        "SKIP_GUEST_BUILD=1",
         "cargo",
         "clippy",
         "--workspace",
@@ -10,6 +11,11 @@
         "--tests",
         "--examples",
         "--message-format=json"
+    ],
+    "rust-analyzer.linkedProjects": [
+        "Cargo.toml",
+        "proofs/risc0/guest-reth-stf/Cargo.toml",
+        "proofs/sp1/guest-reth-stf/Cargo.toml",
     ],
     "rust-analyzer.diagnostics.enable": true,
     "todohighlight.isEnable": true,
@@ -50,6 +56,9 @@
         "**/*.yaml",
         "**/*.toml"
     ],
-    "todohighlight.exclude": ["**/target/**", "**/.vscode/**"],
+    "todohighlight.exclude": [
+        "**/target/**",
+        "**/.vscode/**"
+    ],
     "todohighlight.maxFilesForSearch": 5120
 }

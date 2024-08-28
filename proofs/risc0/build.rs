@@ -1,5 +1,8 @@
 fn main() {
-    if cfg!(feature = "prover") && std::env::var("SKIP_GUEST_BUILD").is_err() {
+    if cfg!(feature = "prover")
+        && std::env::var("SKIP_GUEST_BUILD").is_err()
+        && std::env::var("CARGO_CFG_CLIPPY").is_err()
+    {
         risc0_build::embed_methods();
     } else {
         // Return mock ELF
