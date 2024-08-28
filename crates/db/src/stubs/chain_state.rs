@@ -52,7 +52,7 @@ impl ChainstateStore for StubChainstateDb {
         Ok(())
     }
 
-    fn write_state_update(&self, idx: u64, batch: &WriteBatch) -> DbResult<()> {
+    fn write_state_update(&self, idx: u64, batch: &WriteBatch) -> DbResult<ChainState> {
         let mut st = self.state.lock();
 
         let last_idx = st.find_last_write_batch();
@@ -68,10 +68,10 @@ impl ChainstateStore for StubChainstateDb {
 
         // Compute new state and insert things.
         let new_state = state_op::apply_write_batch_to_chainstate(toplevel, batch);
-        st.toplevels.insert(idx, new_state);
+        st.toplevels.insert(idx, new_state.clone());
         st.write_batches.insert(idx, batch.clone());
 
-        Ok(())
+        Ok(new_state)
     }
 
     fn purge_historical_state_before(&self, before_idx: u64) -> DbResult<()> {
@@ -100,7 +100,7 @@ impl ChainstateStore for StubChainstateDb {
         Ok(())
     }
 
-    fn rollback_writes_to(&self, new_tip_idx: u64) -> DbResult<()> {
+    fn rollback_writes_to(&self, new_tip_idx: u64) -> DbResult<Option<ChainState>> {
         let mut st = self.state.lock();
 
         if !st.toplevels.contains_key(&new_tip_idx) {
@@ -130,7 +130,9 @@ impl ChainstateStore for StubChainstateDb {
         let (k, _) = st.toplevels.last_key_value().unwrap();
         assert_eq!(*k, new_tip_idx);
 
-        Ok(())
+        let chs = st.toplevels.get(&new_tip_idx).cloned();
+
+        Ok(chs)
     }
 }
 

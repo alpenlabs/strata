@@ -29,6 +29,12 @@ pub struct OperatorEntry {
     wallet_pk: Buf32,
 }
 
+impl OperatorEntry {
+    pub fn signing_pk(&self) -> &Buf32 {
+        &self.signing_pk
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
 pub struct OperatorTable {
     /// Next unassigned operator index.

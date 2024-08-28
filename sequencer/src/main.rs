@@ -6,6 +6,8 @@ use std::{
     time::Duration,
 };
 
+use alpen_express_bridge_msg::types::BridgeMessage;
+use alpen_express_bridge_msg_manager::handler::{bridge_msg_worker_task, MsgState};
 use alpen_express_btcio::{
     broadcaster::{spawn_broadcaster_task, L1BroadcastHandle},
     rpc::BitcoinClient,
@@ -17,8 +19,8 @@ use alpen_express_consensus_logic::{
         types::{DutyBatch, Identity, IdentityData, IdentityKey},
         worker::{self as duty_worker},
     },
-    genesis, state_tracker, sync_manager,
-    sync_manager::SyncManager,
+    genesis, state_tracker,
+    sync_manager::{self, SyncManager},
 };
 use alpen_express_db::traits::Database;
 use alpen_express_evmexec::{fork_choice_state_initial, EngineRpcClient};
@@ -30,21 +32,20 @@ use alpen_express_primitives::{
 use alpen_express_rocksdb::{
     broadcaster::db::BroadcastDatabase, sequencer::db::SequencerDB, DbOpsConfig, SeqDb,
 };
-use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer};
+use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer, AlpenBridgeMsgApiServer};
 use alpen_express_rpc_types::L1Status;
 use alpen_express_state::csm_status::CsmStatus;
-// use alpen_express_btcio::broadcaster::manager::BroadcastDbManager;
 use alpen_express_status::{create_status_channel, StatusRx, StatusTx};
 use anyhow::Context;
 use bitcoin::Network;
 use config::Config;
-use express_storage::L2BlockManager;
+use express_storage::{ops::bridgemsg::BridgeMsgOps, L2BlockManager};
 use express_tasks::{ShutdownSignal, TaskManager};
 use format_serde_error::SerdeError;
 use reth_rpc_types::engine::{JwtError, JwtSecret};
 use rockbound::rocksdb;
 use thiserror::Error;
-use tokio::sync::{broadcast, oneshot};
+use tokio::sync::{broadcast, mpsc, oneshot};
 use tracing::*;
 
 use crate::args::Args;
@@ -207,8 +208,13 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         rbdb.clone(),
         db_ops,
     ));
+
+    let br_db = Arc::new(alpen_express_rocksdb::BridgeMsgDb::new(
+        rbdb.clone(),
+        db_ops,
+    ));
     let database = Arc::new(alpen_express_db::database::CommonDatabase::new(
-        l1_db, l2_db, sync_ev_db, cs_db, chst_db,
+        l1_db, l2_db, sync_ev_db, cs_db, chst_db, br_db,
     ));
 
     // Set up database managers.
@@ -251,6 +257,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let bcast_ops = Arc::new(bcast_ctx.into_ops(pool.clone()));
     //status bundles
     let (status_tx, status_rx) = start_status(database.clone(), params.clone())?;
+    // let (chs_tx, chs_rx) = mpsc::channel::<ChainState>(100);
 
     // Start the sync manager.
     let sync_man = sync_manager::start_sync_tasks(
@@ -260,7 +267,8 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         eng_ctl.clone(),
         pool.clone(),
         params.clone(),
-        (status_tx.clone(), status_rx.clone()),
+        status_tx.clone(),
+        status_rx.clone(),
     )?;
     let sync_man = Arc::new(sync_man);
     let mut inscription_handler = None;
@@ -346,22 +354,39 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         status_tx.clone(),
     )?;
 
+    let bridge_msg_ctx = express_storage::ops::bridgemsg::Context::new(database.clone());
+    let bridge_msg_ops = Arc::new(bridge_msg_ctx.into_ops(pool.clone()));
+
     let shutdown_signal = task_manager.shutdown_signal();
     let executor = task_manager.executor();
-    let db_cloned = database.clone();
+    let cloned_db = database.clone();
+    let cloned_bridge_msg_ops = bridge_msg_ops.clone();
+
+    let (message_tx, message_rx) = tokio::sync::mpsc::channel::<BridgeMessage>(100);
+    let cloned_status_rx = status_rx.clone();
 
     executor.spawn_critical_async("main-rpc", async {
         start_rpc(
             shutdown_signal,
             config,
             sync_man,
-            db_cloned,
-            status_rx,
+            cloned_db,
+            cloned_bridge_msg_ops,
+            cloned_status_rx,
             inscription_handler,
             bcast_handle,
+            message_tx,
         )
         .await
         .unwrap()
+    });
+
+    let cloned_bridge_msg_ops = bridge_msg_ops.clone();
+    let cloned_status_rx = status_rx.clone();
+
+    executor.spawn_critical_async("bridge-msg", async {
+        let msg_mgr = MsgState::new();
+        bridge_msg_worker_task(cloned_bridge_msg_ops, cloned_status_rx, msg_mgr, message_rx).await;
     });
 
     task_manager.start_signal_listeners();
@@ -380,9 +405,11 @@ async fn start_rpc<D: Database + Send + Sync + 'static>(
     config: Config,
     sync_man: Arc<SyncManager>,
     database: Arc<D>,
+    bridge_ops: Arc<BridgeMsgOps>,
     status_rx: Arc<StatusRx>,
     inscription_handler: Option<Arc<InscriptionHandle>>,
     bcast_handle: Arc<L1BroadcastHandle>,
+    message_tx: mpsc::Sender<BridgeMessage>,
 ) -> anyhow::Result<()> {
     let (stop_tx, stop_rx) = oneshot::channel();
 
@@ -397,7 +424,11 @@ async fn start_rpc<D: Database + Send + Sync + 'static>(
 
     let mut methods = alp_rpc.into_rpc();
     let admin_rpc = rpc_server::AdminServerImpl::new(inscription_handler, bcast_handle);
+
+    let bridge_rpc = rpc_server::AdminBridgeMsgImpl::new(message_tx, bridge_ops);
+
     methods.merge(admin_rpc.into_rpc())?;
+    methods.merge(bridge_rpc.into_rpc())?;
 
     let rpc_port = config.client.rpc_port;
 
@@ -479,7 +510,7 @@ fn start_status<D: Database + Send + Sync + 'static>(
 where
     <D as Database>::CsProv: Send + Sync + 'static,
 {
-    // Check if we have to do genesis.
+    // Check if we have to initialize client
     if genesis::check_needs_client_init(database.as_ref())? {
         info!("need to init client state!");
         genesis::init_client_state(&params, database.as_ref())?;
@@ -488,7 +519,6 @@ where
     let cs_prov = database.client_state_provider().as_ref();
     let (cur_state_idx, cur_state) = state_tracker::reconstruct_cur_state(cs_prov)?;
 
-    // init the CsmStatus
     let mut status = CsmStatus::default();
     status.set_last_sync_ev_idx(cur_state_idx);
     status.update_from_client_state(&cur_state);

@@ -4,6 +4,7 @@ name = "express-storage"
 version = "0.1.0"
 
 [dependencies]
+alpen-express-bridge-msg = { workspace = true }
 alpen-express-db = { workspace = true }
 alpen-express-primitives = { workspace = true }
 alpen-express-state = { workspace = true }

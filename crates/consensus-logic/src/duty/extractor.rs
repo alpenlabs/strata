@@ -111,7 +111,8 @@ mod tests {
     use alpen_express_rocksdb::test_utils::get_common_db;
     use alpen_express_state::{
         block::{L2Block, L2BlockBody, L2BlockBundle},
-        chain_state::ChainState,
+        bridge_state::OperatorTable,
+        chain_state::{ChainState, GenesisStateConfig},
         exec_env::ExecEnvState,
         exec_update::UpdateInput,
         header::{L2BlockHeader, SignedL2BlockHeader},
@@ -192,6 +193,7 @@ mod tests {
 
         let arb_header: [u8; 80] = arb.generate();
         let genesis_chain_state = ChainState::from_genesis(
+            GenesisStateConfig::new(OperatorTable::new_empty()),
             blockids[0],
             L1ViewState::new_at_genesis(
                 3,

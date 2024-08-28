@@ -1,3 +1,4 @@
+pub mod bridge_msg;
 pub mod broadcaster;
 pub mod chain_state;
 pub mod client_state;
@@ -30,10 +31,14 @@ pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
     // Bcast schemas
     BcastL1TxIdSchema::COLUMN_FAMILY_NAME,
     BcastL1TxSchema::COLUMN_FAMILY_NAME,
-    // TODO add col families for other store types
+    // Bridge schemas
+    BridgeMsgIdSchema::COLUMN_FAMILY_NAME, // TODO add col families for other store types
+    ScopeMsgIdSchema::COLUMN_FAMILY_NAME,
 ];
 
 // Re-exports
+pub use bridge_msg::db::BridgeMsgDb;
+use bridge_msg::schemas::{BridgeMsgIdSchema, ScopeMsgIdSchema};
 pub use broadcaster::db::BroadcastDb;
 use broadcaster::schemas::{BcastL1TxIdSchema, BcastL1TxSchema};
 pub use chain_state::db::ChainStateDb;

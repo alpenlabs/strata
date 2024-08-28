@@ -74,6 +74,7 @@ impl SyncManager {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 /// Starts the sync tasks using provided settings.
 pub fn start_sync_tasks<
     D: Database + Sync + Send + 'static,
@@ -85,7 +86,8 @@ pub fn start_sync_tasks<
     engine: Arc<E>,
     pool: threadpool::ThreadPool,
     params: Arc<Params>,
-    status_bundle: (Arc<StatusTx>, Arc<StatusRx>),
+    status_tx: Arc<StatusTx>,
+    status_rx: Arc<StatusRx>,
 ) -> anyhow::Result<SyncManager> {
     // Create channels.
     let (fcm_tx, fcm_rx) = mpsc::channel::<ForkChoiceMessage>(64);
@@ -103,7 +105,9 @@ pub fn start_sync_tasks<
     let fcm_eng = engine.clone();
     let fcm_csm_ctl = csm_ctl.clone();
     let fcm_params = params.clone();
-    executor.spawn_critical("fork_choice_manager::tracker_task", |shutdown| {
+    let fcm_status_tx = status_tx.clone();
+
+    executor.spawn_critical("fork_choice_manager::tracker_task", move |shutdown| {
         // TODO this should be simplified into a builder or something
         fork_choice_manager::tracker_task(
             shutdown,
@@ -113,6 +117,7 @@ pub fn start_sync_tasks<
             fcm_rx,
             fcm_csm_ctl,
             fcm_params,
+            fcm_status_tx,
         )
     });
 
@@ -127,10 +132,17 @@ pub fn start_sync_tasks<
     let csm_eng = engine.clone();
     let csm_fcm_tx = fcm_tx.clone();
 
-    let status_tx = status_bundle.0.clone();
-    executor.spawn_critical("client_worker_task", |shutdown| {
-        worker::client_worker_task(shutdown, cw_state, csm_eng, csm_rx, status_tx, csm_fcm_tx)
-            .unwrap();
+    let cr_status_tx = status_tx.clone();
+    executor.spawn_critical("client_worker_task", move |shutdown| {
+        worker::client_worker_task(
+            shutdown,
+            cw_state,
+            csm_eng,
+            csm_rx,
+            cr_status_tx,
+            csm_fcm_tx,
+        )
+        .unwrap();
     });
 
     Ok(SyncManager {
@@ -138,7 +150,7 @@ pub fn start_sync_tasks<
         fc_manager_tx: fcm_tx,
         csm_ctl,
         cupdate_rx,
-        status_tx: status_bundle.0,
-        status_rx: status_bundle.1,
+        status_tx,
+        status_rx,
     })
 }

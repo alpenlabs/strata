@@ -10,6 +10,8 @@ members = [
   "crates/db",
   "crates/eectl",
   "crates/evmexec",
+  "crates/bridge-msg/core",
+  "crates/bridge-msg/manager",
   "crates/primitives",
   "crates/prover/adapters/risc0",
   "crates/prover/adapters/sp1",
@@ -46,6 +48,8 @@ default-members = ["bin/bridge-client", "reth", "sequencer"]
 resolver = "2"
 
 [workspace.dependencies]
+alpen-express-bridge-msg = { path = "crates/bridge-msg/core" }
+alpen-express-bridge-msg-manager = { path = "crates/bridge-msg/manager" }
 alpen-express-btcio = { path = "crates/btcio" }
 alpen-express-common = { path = "crates/common" }
 alpen-express-consensus-logic = { path = "crates/consensus-logic" }
@@ -73,7 +77,7 @@ express-reth-rpc = { path = "crates/reth/rpc" }
 express-rpc-utils = { path = "crates/rpc/utils" }
 express-storage = { path = "crates/storage" }
 express-tasks = { path = "crates/tasks" }
-express-zkvm = { path = "crates/prover/zkvm" }                      # FIXME make these names more consistent?
+express-zkvm = { path = "crates/prover/zkvm" }                            # FIXME make these names more consistent?
 zkvm = { path = "crates/prover/zkvm" }
 zkvm-primitives = { path = "crates/prover/primitives" }
 
@@ -106,6 +110,7 @@ jsonrpsee = "0.23"
 jsonrpsee-types = "0.23"
 lru = "0.12"
 mockall = "0.11"
+musig2 = "0.0.11"
 num_enum = "0.7"
 parking_lot = "0.12.3"
 paste = "1.0"

@@ -4,7 +4,10 @@ use alpen_express_db::database::CommonDatabase;
 use rockbound::{rocksdb, OptimisticTransactionDB};
 use tempfile::TempDir;
 
-use crate::{l2::db::L2Db, ChainStateDb, ClientStateDb, DbOpsConfig, L1Db, SyncEventDb};
+use crate::{
+    bridge_msg::db::BridgeMsgDb, l2::db::L2Db, ChainStateDb, ClientStateDb, DbOpsConfig, L1Db,
+    SyncEventDb,
+};
 
 pub fn get_rocksdb_tmp_instance() -> anyhow::Result<(Arc<OptimisticTransactionDB>, DbOpsConfig)> {
     let dbname = crate::ROCKSDB_NAME;
@@ -27,15 +30,16 @@ pub fn get_rocksdb_tmp_instance() -> anyhow::Result<(Arc<OptimisticTransactionDB
     Ok((Arc::new(rbdb), db_ops))
 }
 
-pub fn get_common_db() -> Arc<CommonDatabase<L1Db, L2Db, SyncEventDb, ClientStateDb, ChainStateDb>>
-{
+pub fn get_common_db(
+) -> Arc<CommonDatabase<L1Db, L2Db, SyncEventDb, ClientStateDb, ChainStateDb, BridgeMsgDb>> {
     let (rbdb, db_ops) = get_rocksdb_tmp_instance().unwrap();
     let l1_db = Arc::new(L1Db::new(rbdb.clone(), db_ops));
     let l2_db = Arc::new(L2Db::new(rbdb.clone(), db_ops));
     let sync_ev_db = Arc::new(SyncEventDb::new(rbdb.clone(), db_ops));
     let cs_db = Arc::new(ClientStateDb::new(rbdb.clone(), db_ops));
     let chst_db = Arc::new(ChainStateDb::new(rbdb.clone(), db_ops));
+    let br_db = Arc::new(BridgeMsgDb::new(rbdb.clone(), db_ops));
     Arc::new(CommonDatabase::new(
-        l1_db, l2_db, sync_ev_db, cs_db, chst_db,
+        l1_db, l2_db, sync_ev_db, cs_db, chst_db, br_db,
     ))
 }

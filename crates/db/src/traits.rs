@@ -3,6 +3,7 @@
 
 use std::sync::Arc;
 
+use alpen_express_bridge_msg::types::BridgeMessage;
 use alpen_express_mmr::CompactMmr;
 use alpen_express_primitives::{l1::*, prelude::*};
 use alpen_express_state::{
@@ -27,6 +28,7 @@ use crate::{
     type SeStore=MockSyncEventStore; type SeProv=MockSyncEventProvider;
     type CsStore=MockClientStateStore; type CsProv=MockClientStateProvider;
     type ChsStore=MockChainstateStore; type ChsProv=MockChainstateProvider;
+    type BrMsgStore=MockBridgeMessageStore;
 ))]
 pub trait Database {
     type L1Store: L1DataStore + Send + Sync;
@@ -39,6 +41,7 @@ pub trait Database {
     type CsProv: ClientStateProvider + Send + Sync;
     type ChsStore: ChainstateStore + Send + Sync;
     type ChsProv: ChainstateProvider + Send + Sync;
+    type BrMsgStore: BridgeMessageStore + Send + Sync;
 
     fn l1_store(&self) -> &Arc<Self::L1Store>;
     fn l1_provider(&self) -> &Arc<Self::L1Prov>;
@@ -50,6 +53,7 @@ pub trait Database {
     fn client_state_provider(&self) -> &Arc<Self::CsProv>;
     fn chainstate_store(&self) -> &Arc<Self::ChsStore>;
     fn chainstate_provider(&self) -> &Arc<Self::ChsProv>;
+    fn bridge_msg_store(&self) -> &Arc<Self::BrMsgStore>;
 }
 
 /// Storage interface to control our view of L1 data.
@@ -226,13 +230,13 @@ pub trait ChainstateStore {
     /// Stores a write batch in the database, possibly computing that state
     /// under the hood from the writes.  Will not overwrite existing data,
     /// previous writes must be purged first in order to be replaced.
-    fn write_state_update(&self, idx: u64, batch: &WriteBatch) -> DbResult<()>;
+    fn write_state_update(&self, idx: u64, batch: &WriteBatch) -> DbResult<ChainState>;
 
     /// Tells the database to purge state before a certain block index (height).
     fn purge_historical_state_before(&self, before_idx: u64) -> DbResult<()>;
 
     /// Rolls back any writes and state checkpoints after a specified block.
-    fn rollback_writes_to(&self, new_tip_idx: u64) -> DbResult<()>;
+    fn rollback_writes_to(&self, new_tip_idx: u64) -> DbResult<Option<ChainState>>;
 }
 
 /// Read trait corresponding to [``ChainstateStore``].  See that trait's doc for
@@ -323,4 +327,17 @@ pub trait BcastProvider {
 
     /// get txentry by idx
     fn get_tx_entry(&self, idx: u64) -> DbResult<Option<L1TxEntry>>;
+}
+
+/// Interface for storing and retrieving bridge messages.
+#[cfg_attr(feature = "mocks", automock)]
+pub trait BridgeMessageStore {
+    /// Stores a bridge message
+    fn write_msg(&self, id: u64, msg: BridgeMessage) -> DbResult<()>;
+
+    /// Deletes messages by their UNIX epoch.
+    fn delete_msgs_before_timestamp(&self, msg_ids: u64) -> DbResult<()>;
+
+    /// Retrieves messages by their scope.
+    fn get_msgs_by_scope(&self, scope: &[u8]) -> DbResult<Option<BridgeMessage>>;
 }

@@ -47,7 +47,7 @@ impl fmt::Display for Buf20 {
 }
 
 // 32-byte buf, useful for hashes and schnorr pubkeys
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Serialize)]
+#[derive(Clone, Copy, Default, Eq, Hash, PartialEq, PartialOrd, Serialize, Ord)]
 pub struct Buf32(pub FixedBytes<32>);
 
 impl Buf32 {

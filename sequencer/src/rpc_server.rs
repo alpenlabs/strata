@@ -2,15 +2,22 @@
 
 use std::{borrow::BorrowMut, sync::Arc};
 
+use alpen_express_bridge_msg::types::BridgeMessage;
 use alpen_express_btcio::{broadcaster::L1BroadcastHandle, writer::InscriptionHandle};
 use alpen_express_consensus_logic::sync_manager::SyncManager;
 use alpen_express_db::{
-    traits::{ChainstateProvider, Database, L1DataProvider, L2DataProvider, SequencerDatabase},
+    traits::{
+        BridgeMessageStore, ChainstateProvider, Database, L1DataProvider, L2DataProvider,
+        SequencerDatabase,
+    },
     types::{L1TxEntry, L1TxStatus},
     DbResult,
 };
 use alpen_express_primitives::{buf::Buf32, hash};
-use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer, HexBytes, HexBytes32};
+use alpen_express_rpc_api::{
+    AlpenAdminApiServer, AlpenApiServer, AlpenBridgeApiServer, AlpenBridgeMsgApiServer, HexBytes,
+    HexBytes32,
+};
 use alpen_express_rpc_types::{
     BlockHeader, ClientStatus, DaBlob, DepositEntry, DepositState, ExecUpdate, L1Status,
 };
@@ -27,7 +34,12 @@ use alpen_express_state::{
 };
 use alpen_express_status::{StatusError, StatusRx};
 use async_trait::async_trait;
-use bitcoin::{consensus::deserialize, hashes::Hash, Transaction as BTransaction, Txid};
+use bitcoin::{
+    consensus::{deserialize, serde::Hex},
+    hashes::Hash,
+    Transaction as BTransaction, Txid,
+};
+use express_storage::ops::bridgemsg::BridgeMsgOps;
 use jsonrpsee::{
     core::RpcResult,
     types::{ErrorObject, ErrorObjectOwned},
@@ -86,6 +98,12 @@ pub enum Error {
     #[error("fetch limit reached. max {0}, provided {1}")]
     FetchLimitReached(u64, u64),
 
+    #[error("failed to deserialize")]
+    Deserialization,
+
+    #[error("failed to serialize")]
+    Serialization,
+
     /// Generic internal error message.  If this is used often it should be made
     /// into its own error type.
     #[error("{0}")]
@@ -111,6 +129,8 @@ impl Error {
             Self::FetchLimitReached(_, _) => -32608,
             Self::UnknownIdx(_) => -32608,
             Self::MissingL1BlockManifest(_) => -32609,
+            Self::Deserialization => -32610,
+            Self::Serialization => -32611,
             Self::BlockingAbort(_) => -32001,
             Self::Other(_) => -32000,
             Self::OtherEx(_, _) => -32000,
@@ -536,5 +556,56 @@ impl AlpenAdminApiServer for AdminServerImpl {
             .map_err(|e| Error::Other(e.to_string()))?;
 
         Ok(txid)
+    }
+}
+
+pub struct AdminBridgeMsgImpl {
+    message_tx: mpsc::Sender<BridgeMessage>,
+    bridge_msg_ops: Arc<BridgeMsgOps>,
+}
+
+impl AdminBridgeMsgImpl {
+    pub fn new(message_tx: mpsc::Sender<BridgeMessage>, database: Arc<BridgeMsgOps>) -> Self {
+        Self {
+            message_tx,
+            bridge_msg_ops: database,
+        }
+    }
+}
+
+#[async_trait]
+impl AlpenBridgeMsgApiServer for AdminBridgeMsgImpl {
+    async fn get_msgs_by_scope(&self, scope: HexBytes) -> RpcResult<Vec<HexBytes>> {
+        // get the database
+        let message = self
+            .bridge_msg_ops
+            .get_msgs_by_scope_async(Vec::from(scope.as_ref()))
+            .await
+            .map_err(Error::Db)?;
+
+        let serialized_messages = message
+            .iter()
+            .map(|msg| {
+                let msg = alpen_express_bridge_msg::utils::serialize_bridge_message(msg)
+                    .map_err(|_| Error::Serialization)?;
+
+                Ok::<HexBytes, Error>(HexBytes(msg))
+            })
+            .map(|m| m.unwrap())
+            .collect::<Vec<HexBytes>>();
+
+        Ok(serialized_messages)
+    }
+
+    async fn submit_raw_msg(&self, raw_msg: HexBytes) -> RpcResult<()> {
+        let deserialized_msg =
+            alpen_express_bridge_msg::utils::deserialize_bridge_message(raw_msg.as_ref())
+                .map_err(|_| Error::Deserialization)?;
+
+        if let Err(e) = self.message_tx.send(deserialized_msg).await {
+            return Err(Error::Other("failed to send bridge message".to_string()).into());
+        }
+
+        Ok(())
     }
 }

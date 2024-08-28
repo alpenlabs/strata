@@ -12,6 +12,7 @@ use alpen_express_state::{
     block::L2BlockBundle, client_state::ClientState, operation::SyncAction, prelude::*,
     state_op::StateCache, sync_event::SyncEvent,
 };
+use alpen_express_status::StatusTx;
 use express_storage::L2BlockManager;
 use express_tasks::ShutdownGuard;
 use tokio::sync::mpsc;
@@ -36,6 +37,9 @@ pub struct ForkChoiceManager<D: Database> {
     /// Current CSM state, as of the last time we were updated about it.
     cur_csm_state: Arc<ClientState>,
 
+    /// Chain State watch
+    status_tx: Arc<StatusTx>,
+
     /// Tracks unfinalized block tips.
     chain_tracker: unfinalized_tracker::UnfinalizedBlockTracker,
 
@@ -49,11 +53,13 @@ pub struct ForkChoiceManager<D: Database> {
 
 impl<D: Database> ForkChoiceManager<D> {
     /// Constructs a new instance we can run the tracker with.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         params: Arc<Params>,
         database: Arc<D>,
         l2_block_manager: Arc<L2BlockManager>,
         cur_csm_state: Arc<ClientState>,
+        status_tx: Arc<StatusTx>,
         chain_tracker: unfinalized_tracker::UnfinalizedBlockTracker,
         cur_best_block: L2BlockId,
         cur_index: u64,
@@ -63,6 +69,7 @@ impl<D: Database> ForkChoiceManager<D> {
             database,
             l2_block_manager,
             cur_csm_state,
+            status_tx,
             chain_tracker,
             cur_best_block,
             cur_index,
@@ -109,6 +116,7 @@ pub fn init_forkchoice_manager<D: Database>(
     params: &Arc<Params>,
     init_csm_state: Arc<ClientState>,
     fin_tip_blkid: L2BlockId,
+    status_tx: Arc<StatusTx>,
 ) -> anyhow::Result<ForkChoiceManager<D>> {
     // Load data about the last finalized block so we can use that to initialize
     // the finalized tracker.
@@ -130,6 +138,7 @@ pub fn init_forkchoice_manager<D: Database>(
         database.clone(),
         l2_block_manager.clone(),
         init_csm_state,
+        status_tx,
         chain_tracker,
         cur_tip_blkid,
         cur_tip_index,
@@ -218,6 +227,7 @@ fn determine_start_tip(
 }
 
 /// Main tracker task that takes a ready fork choice manager and some IO stuff.
+#[allow(clippy::too_many_arguments)]
 pub fn tracker_task<D: Database, E: ExecEngineCtl>(
     shutdown: ShutdownGuard,
     database: Arc<D>,
@@ -226,6 +236,7 @@ pub fn tracker_task<D: Database, E: ExecEngineCtl>(
     mut fcm_rx: mpsc::Receiver<ForkChoiceMessage>,
     csm_ctl: Arc<CsmController>,
     params: Arc<Params>,
+    status_tx: Arc<StatusTx>,
 ) {
     // Wait until the CSM gives us a state we can start from.
     info!("waiting for CSM ready");
@@ -258,6 +269,7 @@ pub fn tracker_task<D: Database, E: ExecEngineCtl>(
         &params,
         init_state,
         cur_fin_tip,
+        status_tx,
     ) {
         Ok(fcm) => fcm,
         Err(e) => {
@@ -580,16 +592,23 @@ fn apply_tip_update<D: Database>(
     // compute new states.
     if pivot_idx < state.cur_index {
         debug!(?pivot_blkid, %pivot_idx, "rolling back chainstate");
-        chs_store.rollback_writes_to(pivot_idx)?;
+        let chs = chs_store.rollback_writes_to(pivot_idx)?;
+        if state.status_tx.chs.send(chs).is_err() {
+            warn!("Receiver side dropped");
+        }
     }
 
     // Now that we've verified the new chain is really valid, we can go and
     // apply the changes to commit to the new chain.
     for (idx, blkid, writes) in updates {
         debug!(?blkid, "applying CL state update");
-        chs_store.write_state_update(idx, &writes)?;
+        let chs = chs_store.write_state_update(idx, &writes)?;
         state.cur_best_block = *blkid;
         state.cur_index = idx;
+
+        if state.status_tx.chs.send(Some(chs)).is_err() {
+            warn!("Receiver side dropped");
+        }
     }
 
     Ok(())

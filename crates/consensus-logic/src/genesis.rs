@@ -7,7 +7,8 @@ use alpen_express_primitives::{
 };
 use alpen_express_state::{
     block::{ExecSegment, L1Segment, L2BlockAccessory, L2BlockBundle},
-    chain_state::ChainState,
+    bridge_state::OperatorTable,
+    chain_state::{get_schnorr_keys, ChainState, GenesisStateConfig},
     client_state::ClientState,
     exec_env::ExecEnvState,
     exec_update::{ExecUpdate, UpdateInput, UpdateOutput},
@@ -68,7 +69,15 @@ pub fn init_genesis_chainstate(
     let genesis_blk_rec = L1HeaderRecord::from(pregenesis_mfs.last().unwrap());
     let l1vs = L1ViewState::new_at_genesis(horizon_blk_height, genesis_blk_height, genesis_blk_rec);
 
-    let gchstate = ChainState::from_genesis(genesis_blkid, l1vs, gees);
+    let mut operator_table = OperatorTable::new_empty();
+    let keys = get_schnorr_keys();
+
+    for key in keys {
+        operator_table.insert(key[1], Buf32::zero());
+    }
+
+    let genesis_config = GenesisStateConfig::new(operator_table);
+    let gchstate = ChainState::from_genesis(genesis_config, genesis_blkid, l1vs, gees);
 
     // Now insert things into the database.
     let chs_store = database.chainstate_store();

@@ -58,12 +58,24 @@ pub trait AlpenApi {
 }
 
 #[serde_as]
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct HexBytes(#[serde_as(as = "serde_with::hex::Hex")] pub Vec<u8>);
+
+impl AsRef<[u8]> for HexBytes {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
 
 #[serde_as]
 #[derive(Serialize, Deserialize)]
 pub struct HexBytes32(#[serde_as(as = "serde_with::hex::Hex")] pub [u8; 32]);
+
+impl AsRef<[u8]> for HexBytes32 {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
 
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "alpadmin"))]
 #[cfg_attr(feature = "client", rpc(server, client, namespace = "alpadmin"))]
@@ -113,4 +125,16 @@ pub trait AlpenBridgeApi {
     // methods may move to another trait later.
     #[method(name = "broadcastTxs")]
     async fn broadcast_transactions(&self, txs: Vec<Transaction>) -> RpcResult<()>;
+}
+
+#[cfg_attr(not(feature = "client"), rpc(server, namespace = "alpbridgemsg"))]
+#[cfg_attr(feature = "client", rpc(server, client, namespace = "alpbridgemsg"))]
+pub trait AlpenBridgeMsgApi {
+    /// Get message by scope, Currently either Deposit or Withdrawal
+    #[method(name = "getMsgsByScope")]
+    async fn get_msgs_by_scope(&self, scope: HexBytes) -> RpcResult<Vec<HexBytes>>;
+
+    /// Submit raw messages
+    #[method(name = "submitRawMsg")]
+    async fn submit_raw_msg(&self, raw_msg: HexBytes) -> RpcResult<()>;
 }
