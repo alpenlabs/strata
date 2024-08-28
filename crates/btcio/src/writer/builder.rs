@@ -343,7 +343,7 @@ fn default_txin() -> Vec<TxIn> {
     }]
 }
 
-fn build_reveal_transaction(
+pub fn build_reveal_transaction(
     input_transaction: Transaction,
     recipient: Address,
     output_value: u64,

@@ -1,5 +1,7 @@
 use bitcoin::{Address, Block, Transaction};
 
+use crate::inscription::InscriptionParser;
+
 /// What kind of transactions can be interesting for us to filter
 #[derive(Clone, Debug)]
 pub enum TxInterest {
@@ -7,9 +9,9 @@ pub enum TxInterest {
     SpentToAddress(Address),
     /// Transactions with certain prefix. This can also be used to support matching whole txids
     TxIdWithPrefix(Vec<u8>),
-    /// Inscription transactions with given Rollup name. NameTag is an identifier that says next
-    /// element in the stack will be the rollup name
-    InscriptionWithRollupName(NameTag, RollupName),
+    /// Inscription transactions with given Rollup name. This will be parsed by
+    /// [`InscriptionParser`] which dictates the structure of inscription.
+    RollupInscription(RollupName),
     // Add other interesting conditions as needed
 }
 
@@ -37,7 +39,19 @@ fn is_interesting(tx: &Transaction, interests: &[TxInterest]) -> bool {
             .output
             .iter()
             .any(|op| address.matches_script_pubkey(&op.script_pubkey)),
-        TxInterest::InscriptionWithRollupName(_, _) => false,
+        TxInterest::RollupInscription(name) => match tx.input[0].witness.tapscript() {
+            // Definitely not interesting if it is not a tapscript
+            None => false,
+            // If it is a tapscript, check rollup name
+            Some(scr) => {
+                let parser = InscriptionParser::new(scr.into());
+                parser
+                    .parse_rollup_name()
+                    .ok()
+                    .filter(|n| n == name)
+                    .is_some()
+            }
+        },
     })
 }
 
@@ -49,12 +63,17 @@ mod test {
         absolute::{Height, LockTime},
         block::{Header, Version as BVersion},
         hashes::Hash,
+        key::{Parity, Secp256k1, UntweakedKeypair},
+        secp256k1::XOnlyPublicKey,
+        taproot::{ControlBlock, LeafVersion, TaprootMerkleBranch},
         transaction::Version,
-        Address, Amount, Block, BlockHash, CompactTarget, Network, Transaction, TxMerkleNode,
-        TxOut,
+        Address, Amount, Block, BlockHash, CompactTarget, Network, TapNodeHash, Transaction,
+        TxMerkleNode, TxOut,
     };
+    use rand::RngCore;
 
     use super::*;
+    use crate::{inscription::InscriptionData, writer::builder::build_reveal_transaction};
 
     const OTHER_ADDR: &str = "bcrt1q6u6qyya3sryhh42lahtnz2m7zuufe7dlt8j0j5";
     const INTERESTING_ADDR: &str = "bcrt1qwqas84jmu20w6r7x3tqetezg8wx7uc3l57vue6";
@@ -126,6 +145,56 @@ mod test {
         let result =
             filter_interesting_txs(&block, &[TxInterest::TxIdWithPrefix(txid[0..5].to_vec())]);
         assert_eq!(result, vec![1]); // Only tx2 matches
+    }
+
+    // Create an inscription transaction. The focus here is to create a tapscript, rather than a
+    // completely valid control block
+    fn create_inscription_tx(rollup_name: String) -> Transaction {
+        let address = parse_addr(OTHER_ADDR);
+        let inp_tx = create_test_tx(vec![create_test_txout(100000000, &address)]);
+        let inscription_data = InscriptionData::new(rollup_name.clone(), vec![0, 1, 2, 3]);
+        let script = inscription_data.to_script().unwrap();
+
+        // Create controlblock
+        let secp256k1 = Secp256k1::new();
+        let mut rand_bytes = [0; 32];
+        rand::thread_rng().fill_bytes(&mut rand_bytes);
+        let key_pair = UntweakedKeypair::from_seckey_slice(&secp256k1, &rand_bytes).unwrap();
+        let public_key = XOnlyPublicKey::from_keypair(&key_pair).0;
+        let nodehash: [TapNodeHash; 0] = [];
+        let cb = ControlBlock {
+            leaf_version: LeafVersion::TapScript,
+            output_key_parity: Parity::Even,
+            internal_key: public_key,
+            merkle_branch: TaprootMerkleBranch::from(nodehash),
+        };
+
+        // Create transaction using control block
+        let mut tx = build_reveal_transaction(inp_tx, address, 100, 10, &script, &cb).unwrap();
+        tx.input[0].witness.push([1; 3]);
+        tx.input[0].witness.push(script);
+        tx.input[0].witness.push(cb.serialize());
+        tx
+    }
+
+    #[test]
+    fn test_filter_interesting_txs_with_rollup_inscription() {
+        // Test with valid name
+        let rollup_name = "TestRollup".to_string();
+        let tx = create_inscription_tx(rollup_name.clone());
+        let block = create_test_block(vec![tx]);
+        let result = filter_interesting_txs(&block, &[TxInterest::RollupInscription(rollup_name)]);
+        assert_eq!(result, vec![0], "Should filter valid rollup name");
+
+        // Test with invalid name
+        let rollup_name = "TestRollup".to_string();
+        let tx = create_inscription_tx(rollup_name.clone());
+        let block = create_test_block(vec![tx]);
+        let result = filter_interesting_txs(
+            &block,
+            &[TxInterest::RollupInscription("invalid_name".to_string())],
+        );
+        assert!(result.is_empty(), "Should filter out invalid name");
     }
 
     #[test]
