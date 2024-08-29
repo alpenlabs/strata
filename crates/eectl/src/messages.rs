@@ -9,7 +9,6 @@ pub struct ExecPayloadData {
     /// Encoded EL payload, minus any operations we push to it.
     ///
     /// This is the "explicit" input from the CL block.
-    // TODO replace this with the `UpdateInput` from the exec update, maybe some other stuff
     exec_update: ExecUpdate,
 
     accessory_data: Vec<u8>,
