@@ -2079,8 +2079,10 @@ dependencies = [
  "alpen-test-utils",
  "anyhow",
  "bitcoin",
+ "bitcoin-blockspace",
  "borsh",
  "ethnum",
+ "rand 0.8.5",
  "serde",
  "serde_json",
 ]

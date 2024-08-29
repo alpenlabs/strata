@@ -40,6 +40,7 @@ pub struct BtcChain {
 }
 
 impl BtcChain {
+    /// Retrieves the block header at the specified height.
     pub fn get_block(&self, height: u32) -> Header {
         if height < self.start {
             panic!("height must be greater than that");
@@ -51,10 +52,12 @@ impl BtcChain {
         self.headers[idx as usize]
     }
 
-    pub fn get_last_timestamps(&self, before: u32, count: u32) -> Vec<u32> {
+    /// Retrieves the timestamps of a specified number of blocks from a given height in a
+    /// descending order.
+    pub fn get_last_timestamps(&self, from: u32, count: u32) -> Vec<u32> {
         let mut timestamps = Vec::with_capacity(count as usize);
-        for i in (1..count + 1).rev() {
-            let h = self.get_block(before - i);
+        for i in (0..count).rev() {
+            let h = self.get_block(from - i);
             timestamps.push(h.time)
         }
         timestamps
