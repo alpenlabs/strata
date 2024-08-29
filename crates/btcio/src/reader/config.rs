@@ -5,8 +5,6 @@ pub struct ReaderConfig {
 
     /// Time between polls to the L1 client, in millis.
     pub client_poll_dur_ms: u32,
-    // NOTE:
-    // I still think we might need some kind of address to watch over here
 }
 
 impl ReaderConfig {

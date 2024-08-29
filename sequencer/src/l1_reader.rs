@@ -40,7 +40,6 @@ where
     let params_r = params.clone();
     let chprov = db.chainstate_provider().clone();
 
-    // TODO set up watchdog to handle when the spawned tasks fail gracefully
     executor.spawn_critical_async(
         "bitcoin_data_reader_task",
         bitcoin_data_reader_task::<D>(

@@ -18,20 +18,25 @@ pub(crate) struct InscriptionData {
 
 impl InscriptionData {
     const ROLLUP_NAME_TAG: &[u8] = &[1];
-    const BATCH_DATA_TAG: &[u8] = &[2];
-    // TODO: add other field, maybe a version
+    const VERSION_TAG: &[u8] = &[2];
+    const BATCH_DATA_TAG: &[u8] = &[3];
+
+    // NOTE: this may need to come from somewhere else rather than being hardcoded here
+    const VERSION: u8 = 1;
 
     pub fn new(name: String, batchdata: Vec<u8>) -> Self {
         Self { name, batchdata }
     }
 
-    // Generates a [`ScriptBuf`] that consists of OP_IF .. OP_ENDIF block
+    // Generates a [`ScriptBuf`] that consists of `OP_IF .. OP_ENDIF` block
     pub fn to_script(&self) -> anyhow::Result<ScriptBuf> {
         let mut builder = script::Builder::new()
             .push_opcode(OP_FALSE)
             .push_opcode(OP_IF)
             .push_slice(PushBytesBuf::try_from(Self::ROLLUP_NAME_TAG.to_vec())?)
             .push_slice(PushBytesBuf::try_from(self.name.as_bytes().to_vec())?)
+            .push_slice(PushBytesBuf::try_from(Self::VERSION_TAG.to_vec())?)
+            .push_slice(PushBytesBuf::from([Self::VERSION]))
             .push_slice(PushBytesBuf::try_from(Self::BATCH_DATA_TAG.to_vec())?)
             .push_int(self.batchdata.len() as i64);
 
@@ -46,7 +51,7 @@ impl InscriptionData {
 
 #[derive(Debug, Error)]
 pub enum InscriptionParseError {
-    /// Does not have an OP_IF..OP_ENDIF block
+    /// Does not have an `OP_IF..OP_ENDIF` block
     #[error("Invalid/Missing envelope")]
     InvalidEnvelope,
     /// Does not have a valid name tag
@@ -63,11 +68,11 @@ pub enum InscriptionParseError {
     Other(String),
 }
 
-/// Parser for parsing relevant inscription data from a script. This expects a specific structure of
-/// inscription data.
-// TODO: make this keep track of the script iterator
+/// Parser for relevant inscription data from a script.
+/// This expects a specific structure of inscription data.
 pub struct InscriptionParser {
     script: ScriptBuf,
+    // NOTE: might need to keep track of the script iterator
 }
 
 impl InscriptionParser {
@@ -75,10 +80,11 @@ impl InscriptionParser {
         Self { script }
     }
 
-    // TODO: Add parsing of inscription. This can be done while working for l1 precedence task
-    // https://github.com/alpenlabs/express/issues/38
-
-    /// Parse the rollup name if present
+    /// Parse the rollup name
+    ///
+    /// # Errors
+    ///
+    /// This function errors if no rollup name is found in the [`InscriptionData`]
     pub fn parse_rollup_name(&self) -> Result<String, InscriptionParseError> {
         let mut instructions = self.script.instructions();
 
@@ -95,16 +101,16 @@ impl InscriptionParser {
         }
     }
 
-    /// Check for consecutive OP_FALSE and OP_IF which marks the beginning of inscription
+    /// Check for consecutive `OP_FALSE` and `OP_IF` that marks the beginning of an inscription
     fn enter_envelope(instructions: &mut Instructions) -> Result<(), InscriptionParseError> {
-        // loop until op_false is found
+        // loop until OP_FALSE is found
         loop {
-            let nxt = instructions.next();
-            match nxt {
+            let next = instructions.next();
+            match next {
                 None => {
                     return Err(InscriptionParseError::InvalidEnvelope);
                 }
-                // OP_FALSE is basically empty push bytes
+                // OP_FALSE is basically empty PushBytes
                 Some(Ok(Instruction::PushBytes(bytes))) => {
                     if bytes.as_bytes().is_empty() {
                         break;
@@ -114,7 +120,7 @@ impl InscriptionParser {
             }
         }
 
-        // Now check next it is OP_IF
+        // Check if next opcode is OP_IF
         let op_if = Self::next_op(instructions);
         if op_if != Some(OP_IF) {
             return Err(InscriptionParseError::InvalidEnvelope);
