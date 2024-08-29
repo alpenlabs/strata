@@ -1,0 +1,15 @@
+[package]
+name = "btc-headerchain"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow.workspace = true
+bitcoin.workspace = true
+borsh.workspace = true
+ethnum = "1.5.0"
+serde.workspace = true
+serde_json = "1.0.127"
+
+[dev-dependencies]
+alpen-test-utils.workspace = true
