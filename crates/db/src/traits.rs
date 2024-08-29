@@ -253,6 +253,8 @@ pub trait ChainstateProvider {
     fn get_toplevel_state(&self, idx: u64) -> DbResult<Option<ChainState>>;
 }
 
+/// A trait encapsulating provider and store traits to interact with the underlying database for
+/// [`BlobEntry`]
 #[cfg_attr(feature = "mocks", automock(type SeqStore=MockSeqDataStore; type SeqProv=MockSeqDataProvider;))]
 pub trait SequencerDatabase {
     type SeqStore: SeqDataStore;
@@ -263,20 +265,22 @@ pub trait SequencerDatabase {
 }
 
 #[cfg_attr(feature = "mocks", automock)]
+/// A trait encapsulating  store traits to create/update [`BlobEntry`] in the database
 pub trait SeqDataStore {
-    /// Store the blob.
+    /// Store the [`BlobEntry`].
     fn put_blob_entry(&self, blobid: Buf32, blobentry: BlobEntry) -> DbResult<()>;
 }
 
 #[cfg_attr(feature = "mocks", automock)]
+/// A trait encapsulating  provider traits to fetch [`BlobEntry`] and indices from the database
 pub trait SeqDataProvider {
-    /// Get blob by its hash
+    /// Get a [`BlobEntry`] by its hash
     fn get_blob_by_id(&self, id: Buf32) -> DbResult<Option<BlobEntry>>;
 
-    /// Get blob id corresponding to the index
+    /// Get the blob ID corresponding to the index
     fn get_blob_id(&self, blobidx: u64) -> DbResult<Option<Buf32>>;
 
-    /// Get the last blob idx
+    /// Get the last blob index
     fn get_last_blob_idx(&self) -> DbResult<Option<u64>>;
 }
 

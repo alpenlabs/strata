@@ -5,7 +5,7 @@ use alpen_express_db::{
     types::{BlobEntry, BlobL1Status, ExcludeReason, L1TxEntry, L1TxStatus},
 };
 use alpen_express_rpc_types::L1Status;
-use alpen_express_state::da_blob::BlobIntent;
+use alpen_express_state::da_blob::{BlobDest, BlobIntent};
 use express_storage::ops::inscription::{Context, InscriptionDataOps};
 use express_tasks::TaskExecutor;
 use tokio::sync::RwLock;
@@ -21,7 +21,7 @@ use crate::{
 // TODO: from config
 const FINALITY_DEPTH: u64 = 6;
 
-/// A handle to the Inscription task. This is basically just a db wrapper for now
+/// A handle to the Inscription task.
 pub struct InscriptionHandle {
     ops: Arc<InscriptionDataOps>,
 }
@@ -32,7 +32,11 @@ impl InscriptionHandle {
     }
 
     pub fn submit_intent(&self, intent: BlobIntent) -> anyhow::Result<()> {
-        // TODO: check for intent dest ??
+        if intent.dest() != BlobDest::L1 {
+            warn!("Received intent not meant for L1: {}", intent.commitment());
+            return Ok(());
+        }
+
         let entry = BlobEntry::new_unsigned(intent.payload().to_vec());
         debug!("Received intent: {}", intent.commitment());
         if self
@@ -50,7 +54,11 @@ impl InscriptionHandle {
     }
 
     pub async fn submit_intent_async(&self, intent: BlobIntent) -> anyhow::Result<()> {
-        // TODO: check for intent dest ??
+        if intent.dest() != BlobDest::L1 {
+            warn!("Received intent not meant for L1: {}", intent.commitment());
+            return Ok(());
+        }
+
         let entry = BlobEntry::new_unsigned(intent.payload().to_vec());
         debug!("Received intent: {}", intent.commitment());
 
@@ -70,7 +78,15 @@ impl InscriptionHandle {
     }
 }
 
-pub fn start_inscription_tasks<D: SequencerDatabase + Send + Sync + 'static>(
+/// Starts the inscription task.
+///
+/// This creates an [`InscriptionHandle`] and spawns a watcher task that watches the status of
+/// incriptions in bitcoin.
+///
+/// # Returns
+///
+/// [`Result<InscriptionHandle>`](anyhow::Result)
+pub fn start_inscription_task<D: SequencerDatabase + Send + Sync + 'static>(
     executor: &TaskExecutor,
     rpc_client: Arc<impl SeqL1Client + L1Client>,
     config: WriterConfig,
@@ -100,8 +116,8 @@ pub fn start_inscription_tasks<D: SequencerDatabase + Send + Sync + 'static>(
     Ok(insc_mgr)
 }
 
-/// Looks into the database from descending index order till it reaches 0 or Finalized blobentry
-/// from which the rest of the entries should be watched
+/// Looks into the database from descending index order till it reaches 0 or `Finalized`
+/// [`BlobEntry`] from which the rest of the [`BlobEntry`]s should be watched.
 fn get_next_blobidx_to_watch(insc_ops: &InscriptionDataOps) -> anyhow::Result<u64> {
     let mut next_idx = insc_ops.get_next_blob_idx_blocking()?;
 
@@ -119,6 +135,12 @@ fn get_next_blobidx_to_watch(insc_ops: &InscriptionDataOps) -> anyhow::Result<u6
 
 /// Watches for inscription transactions status in bitcoin. Note that this watches for each
 /// inscription until it is confirmed
+/// Watches for inscription transactions status in the Bitcoin blockchain.
+///
+/// # Note
+///
+/// The inscription will be monitored until it acquires the status of
+/// [`BlobL1Status::Confirmed`], or [`BlobL1Status::Finalized`]
 pub async fn watcher_task(
     next_blbidx_to_watch: u64,
     rpc_client: Arc<impl L1Client + SeqL1Client>,
@@ -161,7 +183,6 @@ pub async fn watcher_task(
                     curr_blobidx += 1;
                 }
                 // If excluded, nothing to do, move on to process next entry
-                // TODO: create new batch and send?
                 BlobL1Status::Excluded => {
                     warn!(%curr_blobidx, "blobentry is excluded, might need to recreate duty");
                     curr_blobidx += 1;
@@ -171,36 +192,35 @@ pub async fn watcher_task(
                     debug!(%curr_blobidx, "Checking blobentry's broadcast status");
                     let commit_tx = bcast_handle
                         .get_tx_entry_by_id_async(blobentry.commit_txid)
-                        .await?
-                        .expect("Commit tx associated with blobentry not found in broadcast db");
+                        .await?;
                     let reveal_tx = bcast_handle
                         .get_tx_entry_by_id_async(blobentry.reveal_txid)
-                        .await?
-                        .expect("Reveal tx associated with blobentry not found in broadcast db");
+                        .await?;
 
-                    let new_status =
-                        determine_blob_next_status(&commit_tx, &reveal_tx, &blobentry.status)?;
+                    match (commit_tx, reveal_tx) {
+                        (Some(ctx), Some(rtx)) => {
+                            let new_status =
+                                determine_blob_next_status(&ctx, &rtx, &blobentry.status)?;
 
-                    // Update L1 status. Since we are processing one blobentry at a time, if the
-                    // entry is finalized/confirmed, then it means it is published as well
-                    if new_status == BlobL1Status::Published
-                        || new_status == BlobL1Status::Confirmed
-                        || new_status == BlobL1Status::Finalized
-                    {
-                        let mut status = l1_status.write().await;
-                        status.last_published_txid = Some(blobentry.reveal_txid.into());
-                        status.published_inscription_count += 1;
-                    }
+                            update_l1_status(&blobentry, &new_status, l1_status.as_ref()).await;
 
-                    // Update blobentry with new status
-                    let mut updated_entry = blobentry.clone();
-                    updated_entry.status = new_status.clone();
-                    update_existing_entry(curr_blobidx, updated_entry, &insc_ops).await?;
+                            // Update blobentry with new status
+                            let mut updated_entry = blobentry.clone();
+                            updated_entry.status = new_status.clone();
+                            update_existing_entry(curr_blobidx, updated_entry, &insc_ops).await?;
 
-                    if new_status == BlobL1Status::Finalized
-                        || new_status == BlobL1Status::Confirmed
-                    {
-                        curr_blobidx += 1;
+                            if new_status == BlobL1Status::Finalized
+                                || new_status == BlobL1Status::Confirmed
+                            {
+                                curr_blobidx += 1;
+                            }
+                        }
+                        _ => {
+                            warn!(%curr_blobidx, "Corresponding commit/reveal entry for blobentry not found in broadcast db. Sign and create transactions again.");
+                            let mut updated_entry = blobentry.clone();
+                            updated_entry.status = BlobL1Status::Unsigned;
+                            update_existing_entry(curr_blobidx, updated_entry, &insc_ops).await?;
+                        }
                     }
                 }
             }
@@ -208,6 +228,23 @@ pub async fn watcher_task(
             // No blob exists, just continue the loop to wait for blob's presence in db
             info!(%curr_blobidx, "Waiting for blobentry to be present in db");
         }
+    }
+}
+
+async fn update_l1_status(
+    blobentry: &BlobEntry,
+    new_status: &BlobL1Status,
+    l1_status: &RwLock<L1Status>,
+) {
+    // Update L1 status. Since we are processing one blobentry at a time, if the entry is
+    // finalized/confirmed, then it means it is published as well
+    if *new_status == BlobL1Status::Published
+        || *new_status == BlobL1Status::Confirmed
+        || *new_status == BlobL1Status::Finalized
+    {
+        let mut status = l1_status.write().await;
+        status.last_published_txid = Some(blobentry.reveal_txid.into());
+        status.published_inscription_count += 1;
     }
 }
 
@@ -221,14 +258,14 @@ async fn update_existing_entry(
     Ok(insc_ops.put_blob_entry_async(id, updated_entry).await?)
 }
 
-/// Based on the corresponding broadcast commit and reveal transactions' status, determine the
-/// status of the blob entry
+/// Determine the status of the `BlobEntry` based on the status of its commit and reveal
+/// transactions in bitcoin.
 fn determine_blob_next_status(
-    ctx: &L1TxEntry,
-    rtx: &L1TxEntry,
+    commit_tx: &L1TxEntry,
+    reveal_tx: &L1TxEntry,
     curr_status: &BlobL1Status,
 ) -> anyhow::Result<BlobL1Status> {
-    let status = match (&ctx.status, &rtx.status) {
+    let status = match (&commit_tx.status, &reveal_tx.status) {
         // If reveal is finalized, both are finalized
         (_, L1TxStatus::Finalized { .. }) => BlobL1Status::Finalized,
         // If reveal is confirmed, both are confirmed
@@ -258,11 +295,11 @@ mod test {
     use alpen_test_utils::ArbitraryGenerator;
 
     use super::*;
-    use crate::writer::test_utils::get_insc_ops;
+    use crate::writer::test_utils::get_inscription_ops;
 
     #[test]
     fn test_initialize_writer_state_no_last_blob_idx() {
-        let iops = get_insc_ops();
+        let iops = get_inscription_ops();
 
         let nextidx = iops.get_next_blob_idx_blocking().unwrap();
         assert_eq!(nextidx, 0);
@@ -274,7 +311,7 @@ mod test {
 
     #[test]
     fn test_initialize_writer_state_with_existing_blobs() {
-        let iops = get_insc_ops();
+        let iops = get_inscription_ops();
 
         let mut e1: BlobEntry = ArbitraryGenerator::new().generate();
         e1.status = BlobL1Status::Finalized;

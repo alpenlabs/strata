@@ -211,7 +211,7 @@ pub fn duty_dispatch_task<
     sync_man: Arc<SyncManager>,
     database: Arc<D>,
     engine: Arc<E>,
-    insc_mgr: Arc<InscriptionHandle>,
+    inscription_handle: Arc<InscriptionHandle>,
     pool: threadpool::ThreadPool,
     params: Arc<Params>,
 ) {
@@ -276,7 +276,7 @@ pub fn duty_dispatch_task<
             let sm = sync_man.clone();
             let db = database.clone();
             let e = engine.clone();
-            let da_writer = insc_mgr.clone();
+            let da_writer = inscription_handle.clone();
             let params: Arc<Params> = params.clone();
             let duty_status_tx_l = duty_status_tx.clone();
             pool.execute(move || {
@@ -302,7 +302,7 @@ fn duty_exec_task<D: Database, E: ExecEngineCtl>(
     sync_man: Arc<SyncManager>,
     database: Arc<D>,
     engine: Arc<E>,
-    insc_mgr: Arc<InscriptionHandle>,
+    inscription_handle: Arc<InscriptionHandle>,
     params: Arc<Params>,
     duty_status_tx: std::sync::mpsc::Sender<DutyExecStatus>,
 ) {
@@ -312,7 +312,7 @@ fn duty_exec_task<D: Database, E: ExecEngineCtl>(
         &sync_man,
         database.as_ref(),
         engine.as_ref(),
-        insc_mgr.as_ref(),
+        inscription_handle.as_ref(),
         &params,
     );
 
@@ -332,7 +332,7 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
     sync_man: &SyncManager,
     database: &D,
     engine: &E,
-    insc_mgr: &InscriptionHandle,
+    inscription_handle: &InscriptionHandle,
     params: &Arc<Params>,
 ) -> Result<(), Error> {
     match duty {
@@ -400,7 +400,7 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
             info!(signed_commitment = ?signed_commitment, "signed commitment");
             info!(blob_intent = ?blob_intent, "blob intent");
 
-            insc_mgr
+            inscription_handle
                 .submit_intent(blob_intent)
                 // add type for DA related errors ?
                 .map_err(|err| Error::Other(err.to_string()))?;

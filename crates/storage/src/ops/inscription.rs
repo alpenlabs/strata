@@ -1,4 +1,4 @@
-//! Operations for reading/writing inscription related data to db
+//! Operations for reading/writing inscription related data from/to Database
 
 use std::sync::Arc;
 
@@ -8,6 +8,7 @@ use alpen_express_db::{
     DbResult,
 };
 use alpen_express_primitives::buf::Buf32;
+use threadpool::ThreadPool;
 
 use crate::exec::*;
 
@@ -17,11 +18,13 @@ pub struct Context<D: SequencerDatabase> {
 }
 
 impl<D: SequencerDatabase + Sync + Send + 'static> Context<D> {
+    /// Create a `Context` for [`InscriptionDataOps`]
     pub fn new(db: Arc<D>) -> Self {
         Self { db }
     }
 
-    pub fn into_ops(self, pool: threadpool::ThreadPool) -> InscriptionDataOps {
+    /// Convert to [`InscriptionDataOps`] using a [`Threadpool`]
+    pub fn into_ops(self, pool: ThreadPool) -> InscriptionDataOps {
         InscriptionDataOps::new(pool, Arc::new(self))
     }
 }
@@ -68,7 +71,6 @@ fn get_next_blob_idx<D: SequencerDatabase>(ctx: &Context<D>) -> DbResult<u64> {
         .map(|x| x.map(|i| i + 1).unwrap_or_default())
 }
 
-/// Inserts blob entry to database, returns None if already exists, else returns Some(u64)
 fn put_blob_entry<D: SequencerDatabase>(
     ctx: &Context<D>,
     id: Buf32,

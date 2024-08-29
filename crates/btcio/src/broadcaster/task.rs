@@ -75,6 +75,7 @@ async fn process_unfinalized_entries(
     let mut updated_entries = BTreeMap::new();
 
     for (idx, txentry) in unfinalized_entries.iter() {
+        debug!(%idx, "processing txentry");
         let updated_status = handle_entry(rpc_client, txentry, *idx, ops.as_ref()).await?;
 
         if let Some(status) = updated_status {
@@ -110,10 +111,7 @@ async fn handle_entry(
     let txid = ops
         .get_txid_async(idx)
         .await?
-        .ok_or(BroadcasterError::Other(format!(
-            "Could not find txid for idx {}",
-            idx
-        )))?;
+        .ok_or(BroadcasterError::TxNotFound(idx))?;
     match txentry.status {
         L1TxStatus::Unpublished => {
             // Try to publish

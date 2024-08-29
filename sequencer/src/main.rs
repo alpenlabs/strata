@@ -8,7 +8,7 @@ use std::{
 
 use alpen_express_btcio::{
     broadcaster::{spawn_broadcaster_task, L1BroadcastHandle},
-    writer::{config::WriterConfig, start_inscription_tasks, InscriptionHandle},
+    writer::{config::WriterConfig, start_inscription_task, InscriptionHandle},
 };
 use alpen_express_common::logging;
 use alpen_express_consensus_logic::{
@@ -260,7 +260,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         params.clone(),
     )?;
     let sync_man = Arc::new(sync_man);
-    let mut insc_manager = None;
+    let mut inscription_handler = None;
 
     // start broadcast task
     let bcast_handle = spawn_broadcaster_task(&task_executor, btc_rpc.clone(), bcast_ops);
@@ -293,7 +293,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         let rpc = btc_rpc.clone();
 
         // Start inscription tasks
-        let insc_mgr = Arc::new(start_inscription_tasks(
+        let insc_hndlr = Arc::new(start_inscription_task(
             &task_executor,
             rpc,
             writer_config,
@@ -303,7 +303,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             bcast_handle.clone(),
         )?);
 
-        insc_manager = Some(insc_mgr.clone());
+        inscription_handler = Some(insc_hndlr.clone());
 
         // Spawn duty tasks.
         let t_l2blkman = l2_block_manager.clone();
@@ -324,7 +324,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         let d_executor = task_manager.executor();
         executor.spawn_critical("duty_worker::duty_dispatch_task", move |shutdown| {
             duty_worker::duty_dispatch_task(
-                shutdown, d_executor, duties_rx, idata.key, sm, db2, eng_ctl_de, insc_mgr, pool,
+                shutdown, d_executor, duties_rx, idata.key, sm, db2, eng_ctl_de, insc_hndlr, pool,
                 d_params,
             )
         });
@@ -344,16 +344,16 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     let shutdown_signal = task_manager.shutdown_signal();
     let executor = task_manager.executor();
-    let database_r = database.clone();
+    let db_cloned = database.clone();
 
     executor.spawn_critical_async("main-rpc", async {
         start_rpc(
             shutdown_signal,
             config,
             sync_man,
-            database_r,
+            db_cloned,
             l1_status,
-            insc_manager,
+            inscription_handler,
             bcast_handle,
         )
         .await
@@ -377,7 +377,7 @@ async fn start_rpc<D: Database + Send + Sync + 'static>(
     sync_man: Arc<SyncManager>,
     database: Arc<D>,
     l1_status: Arc<RwLock<L1Status>>,
-    insc_mgr: Option<Arc<InscriptionHandle>>,
+    inscription_handler: Option<Arc<InscriptionHandle>>,
     bcast_handle: Arc<L1BroadcastHandle>,
 ) -> anyhow::Result<()> {
     let (stop_tx, stop_rx) = oneshot::channel();
@@ -392,7 +392,7 @@ async fn start_rpc<D: Database + Send + Sync + 'static>(
     );
 
     let mut methods = alp_rpc.into_rpc();
-    let admin_rpc = rpc_server::AdminServerImpl::new(insc_mgr, bcast_handle);
+    let admin_rpc = rpc_server::AdminServerImpl::new(inscription_handler, bcast_handle);
     methods.merge(admin_rpc.into_rpc())?;
 
     let rpc_port = config.client.rpc_port;

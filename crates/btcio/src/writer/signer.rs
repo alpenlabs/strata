@@ -13,16 +13,17 @@ use crate::{
 
 type BlobIdx = u64;
 
-/// This will create inscription transactions corresponding to a blobidx. This is called when we
-/// receive a new intent as well as when broadcasting fails because the input utxos have been spent
-/// by something else already
+/// Create inscription transactions corresponding to a [`BlobEntry`].
+///
+/// This is useful when receiving a new intent as well as when
+/// broadcasting fails because the input UTXOs have been spent
+/// by something else already.
 pub async fn create_and_sign_blob_inscriptions(
     blobentry: &BlobEntry,
     bhandle: &L1BroadcastHandle,
     client: Arc<impl L1Client + SeqL1Client>,
     config: &WriterConfig,
 ) -> anyhow::Result<(Buf32, Buf32)> {
-    // TODO: handle insufficient utxos
     let (commit, reveal) = build_inscription_txs(&blobentry.blob, &client, config).await?;
 
     debug!("Signing commit transaction {}", commit.compute_txid());
@@ -34,9 +35,10 @@ pub async fn create_and_sign_blob_inscriptions(
     let centry = L1TxEntry::from_tx(&signed_commit);
     let rentry = L1TxEntry::from_tx(&reveal);
 
-    // TODO: put the commit-reveal pair atomically in db
-    let _cidx = bhandle.insert_new_tx_entry(cid, centry).await?;
-    let _ridx = bhandle.insert_new_tx_entry(rid, rentry).await?;
+    // These don't need to be atomic. It will be handled by writer task if it does not find both
+    // commit-reveal txs in db by triggering re-signing.
+    let _ = bhandle.insert_new_tx_entry(cid, centry).await?;
+    let _ = bhandle.insert_new_tx_entry(rid, rentry).await?;
     Ok((cid, rid))
 }
 
@@ -50,13 +52,13 @@ mod test {
     use super::*;
     use crate::{
         test_utils::TestBitcoinClient,
-        writer::test_utils::{get_bcast_handle, get_config, get_insc_ops},
+        writer::test_utils::{get_broadcast_handle, get_config, get_inscription_ops},
     };
 
     #[tokio::test]
     async fn test_create_and_sign_blob_inscriptions() {
-        let iops = get_insc_ops();
-        let bcast_handle = get_bcast_handle();
+        let iops = get_inscription_ops();
+        let bcast_handle = get_broadcast_handle();
         let client = Arc::new(TestBitcoinClient::new(1));
         let config = get_config();
 

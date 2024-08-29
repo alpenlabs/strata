@@ -32,17 +32,17 @@ impl SeqDataStore for SeqDb {
         self.db
             .with_optimistic_txn(
                 rockbound::TransactionRetry::Count(self.ops.retry_count),
-                |txn| -> Result<(), DbError> {
+                |tx| -> Result<(), DbError> {
                     // If new, increment idx
-                    if txn.get::<SeqBlobSchema>(&blob_hash)?.is_none() {
-                        let idx = rockbound::utils::get_last::<SeqBlobIdSchema>(txn)?
+                    if tx.get::<SeqBlobSchema>(&blob_hash)?.is_none() {
+                        let idx = rockbound::utils::get_last::<SeqBlobIdSchema>(tx)?
                             .map(|(x, _)| x + 1)
                             .unwrap_or(0);
 
-                        txn.put::<SeqBlobIdSchema>(&idx, &blob_hash)?;
+                        tx.put::<SeqBlobIdSchema>(&idx, &blob_hash)?;
                     }
 
-                    txn.put::<SeqBlobSchema>(&blob_hash, &blob)?;
+                    tx.put::<SeqBlobSchema>(&blob_hash, &blob)?;
 
                     Ok(())
                 },

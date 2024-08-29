@@ -496,7 +496,6 @@ where
 }
 
 pub struct AdminServerImpl {
-    // TODO: Clean up writer's signature, possibly use some kind of manager
     // Currently writer is Some() for sequencer only, but we need bcast_manager for both fullnode
     // and seq
     pub writer: Option<Arc<InscriptionHandle>>,

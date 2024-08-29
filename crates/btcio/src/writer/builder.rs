@@ -12,12 +12,11 @@ use bitcoin::{
         script,
     },
     consensus::deserialize,
-    hashes::{sha256d, Hash},
+    hashes::Hash,
     key::{TapTweak, TweakedPublicKey, UntweakedKeypair},
     script::PushBytesBuf,
     secp256k1::{
-        self, constants::SCHNORR_SIGNATURE_SIZE, schnorr::Signature, Secp256k1, SecretKey,
-        XOnlyPublicKey,
+        self, constants::SCHNORR_SIGNATURE_SIZE, schnorr::Signature, Secp256k1, XOnlyPublicKey,
     },
     sighash::{Prevouts, SighashCache},
     taproot::{
@@ -103,7 +102,6 @@ pub async fn build_inscription_txs(
     rpc_client: &Arc<impl SeqL1Client + L1Client>,
     config: &WriterConfig,
 ) -> anyhow::Result<(Transaction, Transaction)> {
-    // let (signature, pub_key) = sign_blob_with_private_key(&payload, &config.private_key)?;
     let utxos = rpc_client.get_utxos().await?;
     let utxos = utxos
         .into_iter()
@@ -211,22 +209,6 @@ pub fn create_inscription_transactions(
     );
 
     Ok((unsigned_commit_tx, reveal_tx))
-}
-
-// Signs a message with a private key
-pub fn sign_blob_with_private_key(
-    blob: &[u8],
-    private_key: &SecretKey,
-) -> anyhow::Result<(Vec<u8>, Vec<u8>)> {
-    let message = sha256d::Hash::hash(blob).to_byte_array();
-    let secp = Secp256k1::new();
-    let public_key = secp256k1::PublicKey::from_secret_key(&secp, private_key);
-    let msg = secp256k1::Message::from_digest_slice(&message).unwrap();
-    let sig = secp.sign_ecdsa(&msg, private_key);
-    Ok((
-        sig.serialize_compact().to_vec(),
-        public_key.serialize().to_vec(),
-    ))
 }
 
 fn get_size(
