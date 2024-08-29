@@ -10,6 +10,7 @@ members = [
   "crates/primitives",
   "crates/prover/adapters/risc0",
   "crates/prover/adapters/sp1",
+  "crates/prover/bitcoin-blockspace",
   "crates/prover/primitives",
   "crates/prover/zkvm",
   "crates/reth/db",
@@ -50,6 +51,7 @@ alpen-express-rpc-api = { path = "crates/rpc/api" }
 alpen-express-rpc-types = { path = "crates/rpc/types" }
 alpen-express-state = { path = "crates/state" }
 alpen-test-utils = { path = "crates/test-utils" }
+bitcoin-blockspace = { path = "crates/prover/bitcoin-blockspace" }
 express-chaintsn = { path = "crates/chaintsn" }
 express-reth-db = { path = "crates/reth/db" }
 express-reth-exex = { path = "crates/reth/exex" }

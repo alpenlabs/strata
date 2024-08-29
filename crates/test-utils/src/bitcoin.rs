@@ -1,5 +1,5 @@
 use alpen_express_primitives::l1::L1BlockManifest;
-use bitcoin::{consensus::deserialize, Transaction};
+use bitcoin::{consensus::deserialize, Block, Transaction};
 
 use crate::ArbitraryGenerator;
 
@@ -23,4 +23,12 @@ pub fn gen_l1_chain(len: usize) -> Vec<L1BlockManifest> {
         blocks.push(block);
     }
     blocks
+}
+
+pub fn get_btc_mainnet_block() -> Block {
+    let raw_block = include_bytes!(
+        "../data/mainnet_block_000000000000000000000c835b2adcaedc20fdf6ee440009c249452c726dafae.raw"
+    );
+    let block: Block = deserialize(&raw_block[..]).unwrap();
+    block
 }
