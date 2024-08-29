@@ -2,7 +2,6 @@
     "editor.formatOnSave": true,
     "rust-analyzer.checkOnSave": true,
     "rust-analyzer.check.overrideCommand": [
-        "SKIP_GUEST_BUILD=1",
         "cargo",
         "clippy",
         "--workspace",
