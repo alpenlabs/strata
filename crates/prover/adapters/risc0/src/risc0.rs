@@ -50,6 +50,7 @@ impl ZKVMHost for RiscZeroHost {
         // Generate the session
         let mut exec = ExecutorImpl::from_elf(env, &self.elf)?;
         let session = exec.run()?;
+        println!("User cycles: {:?}", session.user_cycles);
 
         // Generate the proof
         let ctx = VerifierContext::default();

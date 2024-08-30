@@ -17,6 +17,9 @@
         "proofs/sp1/guest-reth-stf/Cargo.toml",
     ],
     "rust-analyzer.diagnostics.enable": true,
+    // "rust-analyzer.cargo.features": [
+    //     "prover"
+    // ],
     "todohighlight.isEnable": true,
     "todohighlight.isCaseSensitive": true,
     "todohighlight.keywords": [
