@@ -1,0 +1,24 @@
+[package]
+edition = "2021"
+name = "express-reth-node"
+version = "0.1.0"
+
+[dependencies]
+alloy-sol-types = { workspace = true }
+eyre = { workspace = true }
+reth = { workspace = true }
+reth-basic-payload-builder = { workspace = true }
+reth-chainspec = { workspace = true }
+reth-errors = { workspace = true }
+reth-ethereum-payload-builder = { workspace = true }
+reth-evm = { workspace = true }
+reth-evm-ethereum = { workspace = true }
+reth-node-api = { workspace = true }
+reth-node-ethereum = { workspace = true }
+reth-payload-builder = { workspace = true }
+reth-primitives = { workspace = true }
+reth-rpc-types = { workspace = true }
+revm = { workspace = true }
+revm-primitives = { workspace = true }
+serde = { workspace = true }
+tracing = { workspace = true }

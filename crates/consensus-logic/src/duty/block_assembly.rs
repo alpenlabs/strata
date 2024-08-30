@@ -298,8 +298,7 @@ fn prepare_exec_data<E: ExecEngineCtl>(
     trace!("finished EL payload job");
 
     // Reassemble it into an exec update.
-    let eui = payload_data.update_input().clone();
-    let exec_update = ExecUpdate::new(eui, UpdateOutput::new_from_state(Buf32::zero()));
+    let exec_update = payload_data.exec_update().clone();
     let exec_seg = ExecSegment::new(exec_update);
 
     // And the accessory.

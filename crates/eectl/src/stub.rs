@@ -8,7 +8,10 @@
 use std::{collections::*, sync::Mutex, time};
 
 use alpen_express_primitives::buf::Buf32;
-use alpen_express_state::{exec_update::UpdateInput, prelude::*};
+use alpen_express_state::{
+    exec_update::{ExecUpdate, UpdateInput, UpdateOutput},
+    prelude::*,
+};
 
 use crate::{engine::*, errors::*, messages::*};
 
@@ -67,7 +70,10 @@ impl ExecEngineCtl for StubController {
         } else {
             // TODO make up a more plausible payload
             let exec = ExecPayloadData::new(
-                UpdateInput::new(0, Buf32::zero(), Vec::new()),
+                ExecUpdate::new(
+                    UpdateInput::new(0, Buf32::zero(), Vec::new()),
+                    UpdateOutput::new_from_state(Buf32::zero()),
+                ),
                 Vec::new(),
                 Vec::new(),
             );

@@ -5,7 +5,14 @@ use alpen_express_eectl::{
     errors::{EngineError, EngineResult},
     messages::{ELDepositData, ExecPayloadData, Op, PayloadEnv},
 };
-use alpen_express_state::{block::L2BlockBundle, exec_update::UpdateInput, id::L2BlockId};
+use alpen_express_primitives::buf::Buf64;
+use alpen_express_state::{
+    block::L2BlockBundle,
+    bridge_ops,
+    exec_update::{ExecUpdate, UpdateInput, UpdateOutput},
+    id::L2BlockId,
+};
+use express_reth_node::{ExpressExecutionPayloadEnvelopeV2, ExpressPayloadAttributes};
 use express_storage::L2BlockManager;
 use futures::future::TryFutureExt;
 use reth_primitives::{Address, B256};
@@ -94,14 +101,14 @@ impl<T: EngineRpc> RpcExecEngineInner<T> {
             })
             .collect();
 
-        let payload_attributes = PayloadAttributes {
+        let payload_attributes = ExpressPayloadAttributes::new_from_eth(PayloadAttributes {
             // evm expects timestamp in seconds
             timestamp: payload_env.timestamp() / 1000,
             prev_randao: B256::ZERO,
             withdrawals: Some(withdrawals),
             parent_beacon_block_root: None,
             suggested_fee_recipient: Address::ZERO,
-        };
+        });
 
         let mut fcs = *self.fork_choice_state.lock().await;
         fcs.head_block_hash = prev_block.block_hash();
@@ -131,14 +138,16 @@ impl<T: EngineRpc> RpcExecEngineInner<T> {
             .map_err(|_| EngineError::UnknownPayloadId(payload_id))
             .await?;
 
-        let execution_payload_data = match payload.execution_payload {
+        let ExpressExecutionPayloadEnvelopeV2 {
+            inner: execution_payload_v2,
+            withdrawal_intents: rpc_withdrawal_intents,
+        } = payload;
+
+        let (el_payload, ops) = match execution_payload_v2.execution_payload {
             ExecutionPayloadFieldV2::V1(payload) => {
                 let el_payload: ElPayload = payload.into();
-                let accessory_data = borsh::to_vec(&el_payload).unwrap();
-                let update_input = UpdateInput::try_from(el_payload)
-                    .map_err(|err| EngineError::Other(err.to_string()))?;
 
-                ExecPayloadData::new(update_input, accessory_data, vec![])
+                (el_payload, vec![])
             }
             ExecutionPayloadFieldV2::V2(payload) => {
                 let ops = payload
@@ -153,13 +162,29 @@ impl<T: EngineRpc> RpcExecEngineInner<T> {
                     .collect();
 
                 let el_payload: ElPayload = payload.payload_inner.into();
-                let accessory_data = borsh::to_vec(&el_payload).unwrap();
-                let update_input = UpdateInput::try_from(el_payload)
-                    .map_err(|err| EngineError::Other(err.to_string()))?;
 
-                ExecPayloadData::new(update_input, accessory_data, ops)
+                (el_payload, ops)
             }
         };
+
+        let el_state_root = el_payload.state_root;
+        let accessory_data = borsh::to_vec(&el_payload).unwrap();
+        let update_input =
+            UpdateInput::try_from(el_payload).map_err(|err| EngineError::Other(err.to_string()))?;
+
+        let withdrawal_intents = rpc_withdrawal_intents
+            .into_iter()
+            .map(to_bridge_withdrawal_intents)
+            .collect();
+
+        let update_output =
+            UpdateOutput::new_from_state(el_state_root).with_withdrawals(withdrawal_intents);
+
+        let execution_payload_data = ExecPayloadData::new(
+            ExecUpdate::new(update_input, update_output),
+            accessory_data,
+            ops,
+        );
 
         Ok(PayloadStatus::Ready(execution_payload_data))
     }
@@ -168,6 +193,7 @@ impl<T: EngineRpc> RpcExecEngineInner<T> {
         let el_payload = borsh::from_slice::<ElPayload>(payload.accessory_data())
             .map_err(|_| EngineError::Other("Invalid payload".to_string()))?;
 
+        // actually bridge-in deposits
         let withdrawals: Vec<Withdrawal> = payload
             .ops()
             .iter()
@@ -324,6 +350,13 @@ struct ForkchoiceStatePartial {
     pub finalized_block_hash: Option<B256>,
 }
 
+fn to_bridge_withdrawal_intents(
+    rpc_withdrawal_intent: express_reth_node::WithdrawalIntent,
+) -> bridge_ops::WithdrawalIntent {
+    let express_reth_node::WithdrawalIntent { amt, dest_pk } = rpc_withdrawal_intent;
+    bridge_ops::WithdrawalIntent::new(amt, Buf64(dest_pk))
+}
+
 #[cfg(test)]
 mod tests {
     use alpen_express_eectl::{errors::EngineResult, messages::PayloadEnv};
@@ -478,9 +511,12 @@ mod tests {
         let fcs = ForkchoiceState::default();
 
         mock_client.expect_get_payload_v2().returning(move |_| {
-            Ok(ExecutionPayloadEnvelopeV2 {
-                execution_payload: ExecutionPayloadFieldV2::V1(random_execution_payload_v1()),
-                block_value: U256::from(100),
+            Ok(ExpressExecutionPayloadEnvelopeV2 {
+                inner: ExecutionPayloadEnvelopeV2 {
+                    execution_payload: ExecutionPayloadFieldV2::V1(random_execution_payload_v1()),
+                    block_value: U256::from(100),
+                },
+                withdrawal_intents: vec![],
             })
         });
 
@@ -514,8 +550,13 @@ mod tests {
         };
         let accessory_data = borsh::to_vec(&el_payload).unwrap();
         let update_input = UpdateInput::try_from(el_payload).unwrap();
+        let update_output = UpdateOutput::new_from_state(Buf32::zero());
 
-        let payload_data = ExecPayloadData::new(update_input, accessory_data, vec![]);
+        let payload_data = ExecPayloadData::new(
+            ExecUpdate::new(update_input, update_output),
+            accessory_data,
+            vec![],
+        );
 
         mock_client.expect_new_payload_v2().returning(move |_| {
             Ok(reth_rpc_types::engine::PayloadStatus {

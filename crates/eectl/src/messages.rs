@@ -1,5 +1,5 @@
 use alpen_express_primitives::prelude::*;
-use alpen_express_state::{block::L2BlockBundle, exec_update::UpdateInput, id::L2BlockId};
+use alpen_express_state::{block::L2BlockBundle, exec_update::ExecUpdate, id::L2BlockId};
 
 /// Succinct commitment to relevant EL block data.
 // This ended up being the same as the EL payload types in the state crate,
@@ -9,8 +9,7 @@ pub struct ExecPayloadData {
     /// Encoded EL payload, minus any operations we push to it.
     ///
     /// This is the "explicit" input from the CL block.
-    // TODO replace this with the `UpdateInput` from the exec update, maybe some other stuff
-    update_input: UpdateInput,
+    exec_update: ExecUpdate,
 
     accessory_data: Vec<u8>,
 
@@ -23,9 +22,9 @@ pub struct ExecPayloadData {
 }
 
 impl ExecPayloadData {
-    pub fn new(update_input: UpdateInput, accessory_data: Vec<u8>, ops: Vec<Op>) -> Self {
+    pub fn new(exec_update: ExecUpdate, accessory_data: Vec<u8>, ops: Vec<Op>) -> Self {
         Self {
-            update_input,
+            exec_update,
             accessory_data,
             ops,
         }
@@ -33,15 +32,15 @@ impl ExecPayloadData {
 
     pub fn from_l2_block_bundle(l2block: &L2BlockBundle) -> Self {
         Self {
-            update_input: l2block.block().exec_segment().update().input().clone(),
+            exec_update: l2block.block().exec_segment().update().clone(),
             accessory_data: l2block.accessory().exec_payload().to_vec(),
             // TODO: extract ops from block
             ops: vec![],
         }
     }
 
-    pub fn update_input(&self) -> &UpdateInput {
-        &self.update_input
+    pub fn exec_update(&self) -> &ExecUpdate {
+        &self.exec_update
     }
 
     pub fn accessory_data(&self) -> &[u8] {

@@ -1732,6 +1732,8 @@ dependencies = [
  "dyn-clone",
  "revm-interpreter",
  "revm-precompile",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -1741,6 +1743,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e6b0daddea06fc6da5346acc39b32a357bbe3579e9e3d94117d9ae125cd596fc"
 dependencies = [
  "revm-primitives",
+ "serde",
 ]
 
 [[package]]
@@ -1750,11 +1753,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ef55228211251d7b6c7707c3ee13bb70dea4d2fd81ec4034521e4fe31010b2ea"
 dependencies = [
  "aurora-engine-modexp",
+ "blst",
+ "c-kzg",
  "cfg-if",
  "k256",
  "once_cell",
  "revm-primitives",
  "ripemd",
+ "secp256k1",
  "sha2",
  "substrate-bn",
 ]
@@ -2140,6 +2146,7 @@ version = "1.0.125"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "83c8e735a073ccf5be70aa8066aa984eaf2fa000db6c8d0100ae605b366d31ed"
 dependencies = [
+ "indexmap",
  "itoa",
  "memchr",
  "ryu",

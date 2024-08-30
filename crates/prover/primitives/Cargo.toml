@@ -17,7 +17,7 @@ k256 = { version = "=0.13.3", features = [
 ], default-features = false }
 reth-primitives = { workspace = true, default-features = false }
 reth-trie-common.workspace = true
-revm = { version = "12.1.0", default-features = false }
+revm = { workspace = true }
 rlp = "0.5.2"
 serde = { workspace = true }
 thiserror = "1.0"

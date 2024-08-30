@@ -1,15 +1,17 @@
 use std::sync::Arc;
 
+use express_reth_node::{
+    ExpressEngineTypes, ExpressExecutionPayloadEnvelopeV2, ExpressPayloadAttributes,
+};
 use jsonrpsee::http_client::{transport::HttpBackend, HttpClient, HttpClientBuilder};
 #[cfg(test)]
 use mockall::automock;
-use reth_node_ethereum::EthEngineTypes;
 use reth_primitives::{Block, BlockHash};
 use reth_rpc_api::{EngineApiClient, EthApiClient};
 use reth_rpc_layer::{AuthClientLayer, AuthClientService};
 use reth_rpc_types::engine::{
-    ExecutionPayloadBodiesV1, ExecutionPayloadEnvelopeV2, ExecutionPayloadInputV2, ForkchoiceState,
-    ForkchoiceUpdated, JwtSecret, PayloadAttributes, PayloadId,
+    ExecutionPayloadBodiesV1, ExecutionPayloadInputV2, ForkchoiceState, ForkchoiceUpdated,
+    JwtSecret, PayloadId,
 };
 
 fn http_client(http_url: &str, secret: JwtSecret) -> HttpClient<AuthClientService<HttpBackend>> {
@@ -29,10 +31,13 @@ pub trait EngineRpc {
     async fn fork_choice_updated_v2(
         &self,
         fork_choice_state: ForkchoiceState,
-        payload_attributes: Option<PayloadAttributes>,
+        payload_attributes: Option<ExpressPayloadAttributes>,
     ) -> RpcResult<ForkchoiceUpdated>;
 
-    async fn get_payload_v2(&self, payload_id: PayloadId) -> RpcResult<ExecutionPayloadEnvelopeV2>;
+    async fn get_payload_v2(
+        &self,
+        payload_id: PayloadId,
+    ) -> RpcResult<ExpressExecutionPayloadEnvelopeV2>;
 
     async fn new_payload_v2(
         &self,
@@ -68,27 +73,30 @@ impl EngineRpc for EngineRpcClient {
     async fn fork_choice_updated_v2(
         &self,
         fork_choice_state: ForkchoiceState,
-        payload_attributes: Option<PayloadAttributes>,
+        payload_attributes: Option<ExpressPayloadAttributes>,
     ) -> RpcResult<ForkchoiceUpdated> {
-        <HttpClient<AuthClientService<HttpBackend>> as EngineApiClient<EthEngineTypes>>::fork_choice_updated_v2(&self.client, fork_choice_state, payload_attributes).await
+        <HttpClient<AuthClientService<HttpBackend>> as EngineApiClient<ExpressEngineTypes>>::fork_choice_updated_v2(&self.client, fork_choice_state, payload_attributes).await
     }
 
-    async fn get_payload_v2(&self, payload_id: PayloadId) -> RpcResult<ExecutionPayloadEnvelopeV2> {
-        <HttpClient<AuthClientService<HttpBackend>> as EngineApiClient<EthEngineTypes>>::get_payload_v2(&self.client, payload_id).await
+    async fn get_payload_v2(
+        &self,
+        payload_id: PayloadId,
+    ) -> RpcResult<ExpressExecutionPayloadEnvelopeV2> {
+        <HttpClient<AuthClientService<HttpBackend>> as EngineApiClient<ExpressEngineTypes>>::get_payload_v2(&self.client, payload_id).await
     }
 
     async fn new_payload_v2(
         &self,
         payload: ExecutionPayloadInputV2,
     ) -> RpcResult<reth_rpc_types::engine::PayloadStatus> {
-        <HttpClient<AuthClientService<HttpBackend>> as EngineApiClient<EthEngineTypes>>::new_payload_v2(&self.client, payload).await
+        <HttpClient<AuthClientService<HttpBackend>> as EngineApiClient<ExpressEngineTypes>>::new_payload_v2(&self.client, payload).await
     }
 
     async fn get_payload_bodies_by_hash_v1(
         &self,
         block_hashes: Vec<BlockHash>,
     ) -> RpcResult<ExecutionPayloadBodiesV1> {
-        <HttpClient<AuthClientService<HttpBackend>> as EngineApiClient<EthEngineTypes>>::get_payload_bodies_by_hash_v1(&self.client, block_hashes).await
+        <HttpClient<AuthClientService<HttpBackend>> as EngineApiClient<ExpressEngineTypes>>::get_payload_bodies_by_hash_v1(&self.client, block_hashes).await
     }
 
     async fn block_by_hash(&self, block_hash: BlockHash) -> RpcResult<Option<Block>> {

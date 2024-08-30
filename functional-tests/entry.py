@@ -8,6 +8,8 @@ from threading import Thread
 from typing import Optional
 
 import flexitest
+import web3
+import web3.middleware
 from bitcoinlib.services.bitcoind import BitcoindClient
 
 import seqrpc
@@ -178,7 +180,8 @@ class RethFactory(flexitest.Factory):
         datadir = ctx.make_service_dir("reth")
         authrpc_port = self.next_port()
         listener_port = self.next_port()
-        ethrpc_port = self.next_port()
+        ethrpc_ws_port = self.next_port()
+        ethrpc_http_port = self.next_port()
         logfile = os.path.join(datadir, "service.log")
 
         # fmt: off
@@ -190,14 +193,17 @@ class RethFactory(flexitest.Factory):
             "--authrpc.jwtsecret", reth_secret_path,
             "--port", str(listener_port),
             "--ws",
-            "--ws.port", str(ethrpc_port),
+            "--ws.port", str(ethrpc_ws_port),
+            "--http",
+            "--http.port", str(ethrpc_http_port),
+            "--color", "never",
             "--enable-witness-gen",
             "-vvvv"
         ]
         # fmt: on
         props = {"rpc_port": authrpc_port}
 
-        ethrpc_url = f"ws://localhost:{ethrpc_port}"
+        ethrpc_url = f"ws://localhost:{ethrpc_ws_port}"
 
         with open(logfile, "w") as f:
             svc = flexitest.service.ProcService(props, cmd, stdout=f)
@@ -205,15 +211,35 @@ class RethFactory(flexitest.Factory):
             def _create_rpc():
                 return seqrpc.JsonrpcClient(ethrpc_url)
 
+            def _create_web3():
+                http_ethrpc_url = f"http://localhost:{ethrpc_http_port}"
+                w3 = web3.Web3(web3.Web3.HTTPProvider(http_ethrpc_url))
+                # address, pk hardcoded in test genesis config
+                w3.address = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+                account = w3.eth.account.from_key(
+                    "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+                )
+                w3.middleware_onion.add(
+                    web3.middleware.SignAndSendRawMiddlewareBuilder.build(account)
+                )
+                return w3
+
             svc.create_rpc = _create_rpc
+            svc.create_web3 = _create_web3
 
             return svc
 
 
 class BasicEnvConfig(flexitest.EnvConfig):
-    def __init__(self, pre_generate_blocks: int = 0, rollup_params: Optional[dict] = None):
+    def __init__(
+        self,
+        pre_generate_blocks: int = 0,
+        rollup_params: Optional[dict] = None,
+        auto_generate_blocks=True,
+    ):
         self.pre_generate_blocks = pre_generate_blocks
         self.rollup_params = rollup_params
+        self.auto_generate_blocks = auto_generate_blocks
         super().__init__()
 
     def init(self, ctx: flexitest.EnvContext) -> flexitest.LiveEnv:
@@ -234,6 +260,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
         reth_socket = f"localhost:{reth_port}"
 
         bitcoind = btc_fac.create_regtest_bitcoin()
+        # wait for services to to startup
         time.sleep(BLOCK_GENERATION_INTERVAL_SECS)
 
         brpc = bitcoind.create_rpc()
@@ -248,7 +275,8 @@ class BasicEnvConfig(flexitest.EnvConfig):
             brpc.proxy.generatetoaddress(self.pre_generate_blocks, seqaddr)
 
         # generate blocks every 500 millis
-        generate_blocks(brpc, BLOCK_GENERATION_INTERVAL_SECS, seqaddr)
+        if self.auto_generate_blocks:
+            generate_blocks(brpc, BLOCK_GENERATION_INTERVAL_SECS, seqaddr)
         rpc_port = bitcoind.get_prop("rpc_port")
         rpc_user = bitcoind.get_prop("rpc_user")
         rpc_pass = bitcoind.get_prop("rpc_password")
@@ -258,7 +286,8 @@ class BasicEnvConfig(flexitest.EnvConfig):
         )
         # Need to wait for at least `genesis_l1_height` blocks to be generated.
         # Sleeping some more for safety
-        time.sleep(BLOCK_GENERATION_INTERVAL_SECS * 10)
+        if self.auto_generate_blocks:
+            time.sleep(BLOCK_GENERATION_INTERVAL_SECS * 10)
 
         svcs = {"bitcoin": bitcoind, "sequencer": sequencer, "reth": reth}
         return flexitest.LiveEnv(svcs)
