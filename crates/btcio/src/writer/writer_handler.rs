@@ -5,13 +5,10 @@ use alpen_express_db::{
     types::{BlobEntry, BlobL1Status},
 };
 use alpen_express_primitives::buf::Buf32;
-use alpen_express_rpc_types::L1Status;
 use alpen_express_state::da_blob::BlobIntent;
+use alpen_express_status::StatusTx;
 use express_tasks::TaskExecutor;
-use tokio::sync::{
-    mpsc::{self, Receiver, Sender},
-    RwLock,
-};
+use tokio::sync::mpsc::{self, Receiver, Sender};
 use tracing::*;
 
 use super::{
@@ -69,7 +66,7 @@ pub fn start_writer_task<D: SequencerDatabase + Send + Sync + 'static>(
     rpc_client: Arc<impl SeqL1Client + L1Client>,
     config: WriterConfig,
     db: Arc<D>,
-    l1_status: Arc<RwLock<L1Status>>,
+    status_tx: Arc<StatusTx>,
 ) -> anyhow::Result<DaWriter<D>> {
     info!("Starting writer control task");
 
@@ -94,7 +91,7 @@ pub fn start_writer_task<D: SequencerDatabase + Send + Sync + 'static>(
     let rpc_client_b = rpc_client.clone();
     let db_b = db.clone();
     executor.spawn_critical_async("btcio::broadcaster_task", async move {
-        broadcaster_task(next_publish_blob_idx, rpc_client_b, db_b, l1_status.clone())
+        broadcaster_task(next_publish_blob_idx, rpc_client_b, db_b, status_tx.clone())
             .await
             .unwrap()
     });

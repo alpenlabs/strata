@@ -5,10 +5,13 @@ use std::sync::Arc;
 use alpen_express_db::traits::*;
 use alpen_express_eectl::engine::ExecEngineCtl;
 use alpen_express_primitives::prelude::*;
-use alpen_express_state::{client_state::ClientState, operation::SyncAction};
+use alpen_express_state::{
+    client_state::ClientState, csm_status::CsmStatus, operation::SyncAction,
+};
+use alpen_express_status::StatusTx;
 use express_storage::L2BlockManager;
 use express_tasks::ShutdownGuard;
-use tokio::sync::{broadcast, mpsc, watch};
+use tokio::sync::{broadcast, mpsc};
 use tracing::*;
 
 use crate::{
@@ -16,7 +19,6 @@ use crate::{
     genesis,
     message::{ClientUpdateNotif, CsmMessage, ForkChoiceMessage},
     state_tracker,
-    status::CsmStatus,
 };
 
 /// Mutable worker state that we modify in the consensus worker task.
@@ -87,8 +89,7 @@ pub fn client_worker_task<D: Database, E: ExecEngineCtl>(
     mut state: WorkerState<D>,
     engine: Arc<E>,
     mut msg_rx: mpsc::Receiver<CsmMessage>,
-    cl_state_tx: watch::Sender<Arc<ClientState>>,
-    csm_status_tx: watch::Sender<CsmStatus>,
+    status_rx: Arc<StatusTx>,
     fcm_msg_tx: mpsc::Sender<ForkChoiceMessage>,
 ) -> Result<(), Error> {
     // Send a message off to the forkchoice manager that we're resuming.
@@ -102,8 +103,7 @@ pub fn client_worker_task<D: Database, E: ExecEngineCtl>(
             &mut state,
             engine.as_ref(),
             &msg,
-            &cl_state_tx,
-            &csm_status_tx,
+            status_rx.clone(),
             &fcm_msg_tx,
         ) {
             error!(err = %e, ?msg, "failed to process sync message, skipping");
@@ -124,8 +124,7 @@ fn process_msg<D: Database, E: ExecEngineCtl>(
     state: &mut WorkerState<D>,
     engine: &E,
     msg: &CsmMessage,
-    cl_state_tx: &watch::Sender<Arc<ClientState>>,
-    csm_status_tx: &watch::Sender<CsmStatus>,
+    status_rx: Arc<StatusTx>,
     fcm_msg_tx: &mpsc::Sender<ForkChoiceMessage>,
 ) -> anyhow::Result<()> {
     match msg {
@@ -139,19 +138,12 @@ fn process_msg<D: Database, E: ExecEngineCtl>(
                 warn!(%missed_ev_cnt, "applying missed sync events");
                 for ev_idx in next_exp_idx..*idx {
                     trace!(%ev_idx, "running missed sync event");
-                    handle_sync_event(
-                        state,
-                        engine,
-                        ev_idx,
-                        cl_state_tx,
-                        csm_status_tx,
-                        fcm_msg_tx,
-                    )?;
+                    handle_sync_event(state, engine, ev_idx, status_rx.clone(), fcm_msg_tx)?;
                 }
             }
 
-            // This is actually running the targeted sync event.
-            handle_sync_event(state, engine, *idx, cl_state_tx, csm_status_tx, fcm_msg_tx)?;
+            // TODO ensure correct event index ordering
+            handle_sync_event(state, engine, *idx, status_rx, fcm_msg_tx)?;
             Ok(())
         }
     }
@@ -161,8 +153,7 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
     state: &mut WorkerState<D>,
     engine: &E,
     ev_idx: u64,
-    cl_state_tx: &watch::Sender<Arc<ClientState>>,
-    csm_status_tx: &watch::Sender<CsmStatus>,
+    status_tx: Arc<StatusTx>,
     fcm_msg_tx: &mpsc::Sender<ForkChoiceMessage>,
 ) -> anyhow::Result<()> {
     // Perform the main step of deciding what the output we're operating on.
@@ -230,13 +221,10 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
     let mut status = CsmStatus::default();
     status.set_last_sync_ev_idx(ev_idx);
     status.update_from_client_state(new_state.as_ref());
-    if csm_status_tx.send(status).is_err() {
-        error!(%ev_idx, "failed to submit new CSM status update");
-    }
+    let client_state = new_state.as_ref().clone();
 
-    if cl_state_tx.send(new_state.clone()).is_err() {
-        warn!(%ev_idx, "failed to send cl_state_tx update");
-    }
+    let _ = status_tx.csm.send(status);
+    let _ = status_tx.cl.send(client_state);
 
     let update = ClientUpdateNotif::new(ev_idx, outp, new_state);
     if state.cupdate_tx.send(Arc::new(update)).is_err() {

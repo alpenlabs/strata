@@ -7,30 +7,26 @@ use std::sync::Arc;
 use alpen_express_db::traits::Database;
 use alpen_express_eectl::engine::ExecEngineCtl;
 use alpen_express_primitives::params::Params;
-use alpen_express_state::client_state::ClientState;
+use alpen_express_status::{StatusRx, StatusTx};
 use express_storage::L2BlockManager;
 use express_tasks::TaskExecutor;
-use tokio::sync::{broadcast, mpsc, watch};
-use tracing::*;
+use tokio::sync::{broadcast, mpsc};
 
 use crate::{
     ctl::CsmController,
-    fork_choice_manager, genesis,
+    fork_choice_manager,
     message::{ClientUpdateNotif, CsmMessage, ForkChoiceMessage},
-    status::CsmStatus,
     worker,
 };
 
 /// Handle to the core pipeline tasks.
 pub struct SyncManager {
     params: Arc<Params>,
-
     fc_manager_tx: mpsc::Sender<ForkChoiceMessage>,
     csm_ctl: Arc<CsmController>,
-
     cupdate_rx: broadcast::Receiver<Arc<ClientUpdateNotif>>,
-    cl_state_rx: watch::Receiver<Arc<ClientState>>,
-    csm_status_rx: watch::Receiver<CsmStatus>,
+    status_tx: Arc<StatusTx>,
+    status_rx: Arc<StatusRx>,
 }
 
 impl SyncManager {
@@ -59,14 +55,12 @@ impl SyncManager {
         self.cupdate_rx.resubscribe()
     }
 
-    /// Returns a new watch `Receiver` handle to the CSM state watch.
-    pub fn create_state_watch_sub(&self) -> watch::Receiver<Arc<ClientState>> {
-        self.cl_state_rx.clone()
+    pub fn status_rx(&self) -> Arc<StatusRx> {
+        self.status_rx.clone()
     }
 
-    /// Gets a clone of the last sent CSM status.
-    pub fn get_csm_status(&self) -> CsmStatus {
-        self.csm_status_rx.borrow().clone()
+    pub fn status_tx(&self) -> Arc<StatusTx> {
+        self.status_tx.clone()
     }
 
     /// Submits a fork choice message if possible. (synchronously)
@@ -91,6 +85,7 @@ pub fn start_sync_tasks<
     engine: Arc<E>,
     pool: threadpool::ThreadPool,
     params: Arc<Params>,
+    status_bundle: (Arc<StatusTx>, Arc<StatusRx>),
 ) -> anyhow::Result<SyncManager> {
     // Create channels.
     let (fcm_tx, fcm_rx) = mpsc::channel::<ForkChoiceMessage>(64);
@@ -100,12 +95,6 @@ pub fn start_sync_tasks<
     // TODO should this be in an `Arc`?  it's already fairly compact so we might
     // not be benefitting from the reduced cloning
     let (cupdate_tx, cupdate_rx) = broadcast::channel::<Arc<ClientUpdateNotif>>(64);
-
-    // Check if we have to do genesis.
-    if genesis::check_needs_client_init(database.as_ref())? {
-        info!("need to init client state!");
-        genesis::init_client_state(&params, database.as_ref())?;
-    }
 
     // Start the fork choice manager thread.  If we haven't done genesis yet
     // this will just wait until the CSM says we have.
@@ -134,27 +123,14 @@ pub fn start_sync_tasks<
         l2_block_manager,
         cupdate_tx,
     )?;
-    let state = cw_state.cur_state().clone();
-
-    let mut status = CsmStatus::default();
-    status.set_last_sync_ev_idx(cw_state.cur_event_idx());
-    status.update_from_client_state(state.as_ref());
-    let (csm_status_tx, csm_status_rx) = watch::channel(status);
-    let (cl_state_tx, cl_state_rx) = watch::channel(state);
 
     let csm_eng = engine.clone();
     let csm_fcm_tx = fcm_tx.clone();
+
+    let status_tx = status_bundle.0.clone();
     executor.spawn_critical("client_worker_task", |shutdown| {
-        worker::client_worker_task(
-            shutdown,
-            cw_state,
-            csm_eng,
-            csm_rx,
-            cl_state_tx,
-            csm_status_tx,
-            csm_fcm_tx,
-        )
-        .unwrap();
+        worker::client_worker_task(shutdown, cw_state, csm_eng, csm_rx, status_tx, csm_fcm_tx)
+            .unwrap();
     });
 
     Ok(SyncManager {
@@ -162,7 +138,7 @@ pub fn start_sync_tasks<
         fc_manager_tx: fcm_tx,
         csm_ctl,
         cupdate_rx,
-        cl_state_rx,
-        csm_status_rx,
+        status_tx: status_bundle.0,
+        status_rx: status_bundle.1,
     })
 }

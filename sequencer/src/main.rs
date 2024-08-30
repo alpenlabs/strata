@@ -16,7 +16,7 @@ use alpen_express_consensus_logic::{
         types::{DutyBatch, Identity, IdentityData, IdentityKey},
         worker::{self as duty_worker},
     },
-    sync_manager,
+    genesis, state_tracker, sync_manager,
     sync_manager::SyncManager,
 };
 use alpen_express_db::traits::Database;
@@ -31,7 +31,9 @@ use alpen_express_rocksdb::{
 };
 use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer};
 use alpen_express_rpc_types::L1Status;
+use alpen_express_state::csm_status::CsmStatus;
 // use alpen_express_btcio::broadcaster::manager::BroadcastDbManager;
+use alpen_express_status::{create_status_channel, StatusRx, StatusTx};
 use anyhow::Context;
 use bitcoin::Network;
 use config::Config;
@@ -41,7 +43,7 @@ use format_serde_error::SerdeError;
 use reth_rpc_types::engine::{JwtError, JwtSecret};
 use rockbound::rocksdb;
 use thiserror::Error;
-use tokio::sync::{broadcast, oneshot, RwLock};
+use tokio::sync::{broadcast, oneshot};
 use tracing::*;
 
 use crate::args::Args;
@@ -211,9 +213,6 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     // Set up database managers.
     let l2_block_manager = Arc::new(L2BlockManager::new(pool.clone(), database.clone()));
 
-    // Set up btcio status to pass around cheaply
-    let l1_status = Arc::new(RwLock::new(L1Status::default()));
-
     // Set up Bitcoin client RPC.
     let bitcoind_url = format!("http://{}", config.bitcoind_rpc.rpc_url);
     let btc_rpc = alpen_express_btcio::rpc::BitcoinClient::new(
@@ -249,6 +248,8 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let bcastdb = Arc::new(BroadcastDatabase::new(bcast_db));
     let bcast_ctx = express_storage::ops::l1tx_broadcast::Context::new(bcastdb.clone());
     let bcast_ops = Arc::new(bcast_ctx.into_ops(pool.clone()));
+    //status bundles
+    let (status_tx, status_rx) = start_status(database.clone(), params.clone())?;
 
     // Start the sync manager.
     let sync_man = sync_manager::start_sync_tasks(
@@ -258,6 +259,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         eng_ctl.clone(),
         pool.clone(),
         params.clone(),
+        (status_tx.clone(), status_rx.clone()),
     )?;
     let sync_man = Arc::new(sync_man);
     let mut inscription_handler = None;
@@ -265,6 +267,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     // start broadcast task
     let bcast_handle = spawn_broadcaster_task(&task_executor, btc_rpc.clone(), bcast_ops);
     let bcast_handle = Arc::new(bcast_handle);
+    let (status_tx, status_rx) = (sync_man.status_tx(), sync_man.status_rx());
 
     // If the sequencer key is set, start the sequencer duties task.
     if let Some(seqkey_path) = &config.client.sequencer_key {
@@ -298,7 +301,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             rpc,
             writer_config,
             dbseq,
-            l1_status.clone(),
+            status_tx.clone(),
             pool.clone(),
             bcast_handle.clone(),
         )?);
@@ -339,7 +342,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         btc_rpc.clone(),
         database.clone(),
         csm_ctl,
-        l1_status.clone(),
+        status_tx.clone(),
     )?;
 
     let shutdown_signal = task_manager.shutdown_signal();
@@ -352,7 +355,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             config,
             sync_man,
             db_cloned,
-            l1_status,
+            status_rx,
             inscription_handler,
             bcast_handle,
         )
@@ -376,7 +379,7 @@ async fn start_rpc<D: Database + Send + Sync + 'static>(
     config: Config,
     sync_man: Arc<SyncManager>,
     database: Arc<D>,
-    l1_status: Arc<RwLock<L1Status>>,
+    status_rx: Arc<StatusRx>,
     inscription_handler: Option<Arc<InscriptionHandle>>,
     bcast_handle: Arc<L1BroadcastHandle>,
 ) -> anyhow::Result<()> {
@@ -384,7 +387,7 @@ async fn start_rpc<D: Database + Send + Sync + 'static>(
 
     // Init RPC methods.
     let alp_rpc = rpc_server::AlpenRpcImpl::new(
-        l1_status.clone(),
+        status_rx.clone(),
         database.clone(),
         sync_man.clone(),
         bcast_handle.clone(),
@@ -465,4 +468,33 @@ fn load_seqkey(path: &PathBuf) -> anyhow::Result<IdentityData> {
     let idata = IdentityData::new(ident, ik);
 
     Ok(idata)
+}
+
+// initializes the status bundle that we can pass around cheaply for as name suggests status/metrics
+fn start_status<D: Database + Send + Sync + 'static>(
+    database: Arc<D>,
+    params: Arc<Params>,
+) -> anyhow::Result<(Arc<StatusTx>, Arc<StatusRx>)>
+where
+    <D as Database>::CsProv: Send + Sync + 'static,
+{
+    // Check if we have to do genesis.
+    if genesis::check_needs_client_init(database.as_ref())? {
+        info!("need to init client state!");
+        genesis::init_client_state(&params, database.as_ref())?;
+    }
+    // init client state
+    let cs_prov = database.client_state_provider().as_ref();
+    let (cur_state_idx, cur_state) = state_tracker::reconstruct_cur_state(cs_prov)?;
+
+    // init the CsmStatus
+    let mut status = CsmStatus::default();
+    status.set_last_sync_ev_idx(cur_state_idx);
+    status.update_from_client_state(&cur_state);
+
+    Ok(create_status_channel(
+        status,
+        cur_state,
+        L1Status::default(),
+    ))
 }

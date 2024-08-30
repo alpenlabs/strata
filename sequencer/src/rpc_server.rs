@@ -25,6 +25,7 @@ use alpen_express_state::{
     id::L2BlockId,
     l1::L1BlockId,
 };
+use alpen_express_status::{StatusError, StatusRx};
 use async_trait::async_trait;
 use bitcoin::{consensus::deserialize, hashes::Hash, Transaction as BTransaction, Txid};
 use jsonrpsee::{
@@ -138,7 +139,7 @@ fn fetch_l2blk<D: Database + Sync + Send + 'static>(
 }
 
 pub struct AlpenRpcImpl<D> {
-    l1_status: Arc<RwLock<L1Status>>,
+    status_rx: Arc<StatusRx>,
     database: Arc<D>,
     sync_manager: Arc<SyncManager>,
     bcast_handle: Arc<L1BroadcastHandle>,
@@ -147,14 +148,14 @@ pub struct AlpenRpcImpl<D> {
 
 impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
     pub fn new(
-        l1_status: Arc<RwLock<L1Status>>,
+        status_rx: Arc<StatusRx>,
         database: Arc<D>,
         sync_manager: Arc<SyncManager>,
         bcast_handle: Arc<L1BroadcastHandle>,
         stop_tx: oneshot::Sender<()>,
     ) -> Self {
         Self {
-            l1_status,
+            status_rx,
             database,
             sync_manager,
             bcast_handle,
@@ -163,15 +164,13 @@ impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
     }
 
     /// Gets a ref to the current client state as of the last update.
-    async fn get_client_state(&self) -> Arc<ClientState> {
-        let cs_rx = self.sync_manager.create_state_watch_sub();
-        let cs = cs_rx.borrow();
-        cs.clone()
+    async fn get_client_state(&self) -> ClientState {
+        self.sync_manager.status_rx().cl.borrow().clone()
     }
 
     /// Gets a clone of the current client state and fetches the chainstate that
     /// of the L2 block that it considers the tip state.
-    async fn get_cur_states(&self) -> Result<(Arc<ClientState>, Option<Arc<ChainState>>), Error> {
+    async fn get_cur_states(&self) -> Result<(ClientState, Option<Arc<ChainState>>), Error> {
         let cs = self.get_client_state().await;
 
         if cs.sync().is_none() {
@@ -233,13 +232,11 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
     }
 
     async fn get_l1_status(&self) -> RpcResult<L1Status> {
-        let l1_status = self.l1_status.read().await.clone();
-
-        Ok(l1_status)
+        Ok(self.status_rx.l1.borrow().clone())
     }
 
     async fn get_l1_connection_status(&self) -> RpcResult<bool> {
-        Ok(self.l1_status.read().await.bitcoin_rpc_connected)
+        Ok(self.get_l1_status().await?.bitcoin_rpc_connected)
     }
 
     async fn get_l1_block_hash(&self, height: u64) -> RpcResult<Option<String>> {
@@ -297,6 +294,7 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
     async fn get_recent_blocks(&self, count: u64) -> RpcResult<Vec<BlockHeader>> {
         // FIXME: sync state should have a block number
         let cl_state = self.get_client_state().await;
+
         let tip_blkid = *cl_state
             .sync()
             .ok_or(Error::ClientNotStarted)?

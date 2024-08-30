@@ -23,6 +23,7 @@ members = [
   "crates/state",
   "crates/storage",
   "crates/tasks",
+  "crates/status",
   "crates/test-utils",
   "crates/util/mmr",
   "crates/vtxjmt",
@@ -51,6 +52,7 @@ alpen-express-rocksdb = { path = "crates/rocksdb-store" }
 alpen-express-rpc-api = { path = "crates/rpc/api" }
 alpen-express-rpc-types = { path = "crates/rpc/types" }
 alpen-express-state = { path = "crates/state" }
+alpen-express-status = { path = "crates/status" }
 alpen-test-utils = { path = "crates/test-utils" }
 bitcoin-blockspace = { path = "crates/prover/bitcoin-blockspace" }
 express-chaintsn = { path = "crates/chaintsn" }
@@ -61,6 +63,7 @@ express-rpc-utils = { path = "crates/rpc/utils" }
 express-storage = { path = "crates/storage" }
 express-tasks = { path = "crates/tasks" }
 express-zkvm = { path = "crates/prover/zkvm" }                      # FIXME make these names more consistent?
+zkvm = { path = "crates/prover/zkvm" }
 zkvm-primitives = { path = "crates/prover/primitives" }
 
 # IMPORTANT: ensure alloy-* types are of the same version as inside reth dependency

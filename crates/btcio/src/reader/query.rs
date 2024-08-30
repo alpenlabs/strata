@@ -4,10 +4,10 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use alpen_express_rpc_types::types::L1Status;
+use alpen_express_status::StatusTx;
 use anyhow::bail;
 use bitcoin::{Block, BlockHash};
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::mpsc;
 use tracing::*;
 
 use super::{
@@ -16,7 +16,7 @@ use super::{
 };
 use crate::{
     rpc::traits::L1Client,
-    status::{apply_status_updates, StatusUpdate},
+    status::{apply_status_updates, L1StatusUpdate},
 };
 
 fn filter_interesting_txs(block: &Block) -> Vec<u32> {
@@ -142,7 +142,7 @@ pub async fn bitcoin_data_reader_task(
     event_tx: mpsc::Sender<L1Event>,
     target_next_block: u64,
     config: Arc<ReaderConfig>,
-    l1_status: Arc<RwLock<L1Status>>,
+    status_rx: Arc<StatusTx>,
 ) {
     let mut status_updates = Vec::new();
     if let Err(e) = do_reader_task(
@@ -151,7 +151,7 @@ pub async fn bitcoin_data_reader_task(
         target_next_block,
         config,
         &mut status_updates,
-        l1_status.clone(),
+        status_rx.clone(),
     )
     .await
     {
@@ -164,8 +164,8 @@ async fn do_reader_task(
     event_tx: &mpsc::Sender<L1Event>,
     target_next_block: u64,
     config: Arc<ReaderConfig>,
-    status_updates: &mut Vec<StatusUpdate>,
-    l1_status: Arc<RwLock<L1Status>>,
+    status_updates: &mut Vec<L1StatusUpdate>,
+    status_rx: Arc<StatusTx>,
 ) -> anyhow::Result<()> {
     info!(%target_next_block, "started L1 reader task!");
 
@@ -191,12 +191,12 @@ async fn do_reader_task(
             .await
         {
             warn!(%cur_best_height, err = %err, "failed to poll Bitcoin client");
-            status_updates.push(StatusUpdate::RpcError(err.to_string()));
+            status_updates.push(L1StatusUpdate::RpcError(err.to_string()));
 
             if let Some(err) = err.downcast_ref::<reqwest::Error>() {
                 // recoverable errors
                 if err.is_connect() {
-                    status_updates.push(StatusUpdate::RpcConnected(false));
+                    status_updates.push(L1StatusUpdate::RpcConnected(false));
                 }
                 // unrecoverable errors
                 if err.is_builder() {
@@ -207,14 +207,14 @@ async fn do_reader_task(
 
         tokio::time::sleep(poll_dur).await;
 
-        status_updates.push(StatusUpdate::LastUpdate(
+        status_updates.push(L1StatusUpdate::LastUpdate(
             SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
                 .as_millis() as u64,
         ));
 
-        apply_status_updates(status_updates, l1_status.clone()).await;
+        apply_status_updates(status_updates, status_rx.clone()).await;
     }
 }
 
@@ -256,15 +256,15 @@ async fn poll_for_new_blocks(
     event_tx: &mpsc::Sender<L1Event>,
     _config: &ReaderConfig,
     state: &mut ReaderState,
-    status_updates: &mut Vec<StatusUpdate>,
+    status_updates: &mut Vec<L1StatusUpdate>,
 ) -> anyhow::Result<()> {
     let chain_info = client.get_blockchain_info().await?;
-    status_updates.push(StatusUpdate::RpcConnected(true));
+    status_updates.push(L1StatusUpdate::RpcConnected(true));
     let client_height = chain_info.blocks;
     let fresh_best_block = chain_info.bestblockhash();
 
-    status_updates.push(StatusUpdate::CurHeight(client_height));
-    status_updates.push(StatusUpdate::CurTip(fresh_best_block.to_string()));
+    status_updates.push(L1StatusUpdate::CurHeight(client_height));
+    status_updates.push(L1StatusUpdate::CurTip(fresh_best_block.to_string()));
 
     if fresh_best_block == *state.best_block() {
         trace!("polled client, nothing to do");
@@ -335,7 +335,7 @@ async fn fetch_and_process_block(
     client: &impl L1Client,
     event_tx: &mpsc::Sender<L1Event>,
     state: &mut ReaderState,
-    status_updates: &mut Vec<StatusUpdate>,
+    status_updates: &mut Vec<L1StatusUpdate>,
 ) -> anyhow::Result<BlockHash> {
     let block = client.get_block_at(height).await?;
     let txs = block.txdata.len();
@@ -345,8 +345,8 @@ async fn fetch_and_process_block(
     let l1blkid = block_data.block().block_hash();
     trace!(%l1blkid, %height, %txs, "fetched block from client");
 
-    status_updates.push(StatusUpdate::CurHeight(height));
-    status_updates.push(StatusUpdate::CurTip(l1blkid.to_string()));
+    status_updates.push(L1StatusUpdate::CurHeight(height));
+    status_updates.push(L1StatusUpdate::CurTip(l1blkid.to_string()));
     if let Err(e) = event_tx.send(L1Event::BlockData(block_data)).await {
         error!("failed to submit L1 block event, did the persistence task crash?");
         return Err(e.into());

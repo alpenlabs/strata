@@ -671,6 +671,7 @@ dependencies = [
  "alpen-express-rocksdb",
  "alpen-express-rpc-types",
  "alpen-express-state",
+ "alpen-express-status",
  "alpen-test-utils",
  "anyhow",
  "arbitrary",
@@ -710,7 +711,9 @@ dependencies = [
  "alpen-express-eectl",
  "alpen-express-primitives",
  "alpen-express-rocksdb",
+ "alpen-express-rpc-types",
  "alpen-express-state",
+ "alpen-express-status",
  "alpen-test-utils",
  "anyhow",
  "bitcoin",
@@ -906,6 +909,7 @@ dependencies = [
  "alpen-express-rpc-api",
  "alpen-express-rpc-types",
  "alpen-express-state",
+ "alpen-express-status",
  "anyhow",
  "argh",
  "async-trait",
@@ -942,6 +946,18 @@ dependencies = [
  "num_enum 0.7.2",
  "serde",
  "sha2 0.10.8",
+ "tracing",
+]
+
+[[package]]
+name = "alpen-express-status"
+version = "0.1.0"
+dependencies = [
+ "alpen-express-primitives",
+ "alpen-express-rpc-types",
+ "alpen-express-state",
+ "thiserror",
+ "tokio",
  "tracing",
 ]
 

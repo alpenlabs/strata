@@ -6,10 +6,9 @@ use alpen_express_db::{
     traits::{SeqDataProvider, SeqDataStore, SequencerDatabase},
     types::BlobL1Status,
 };
-use alpen_express_rpc_types::L1Status;
+use alpen_express_status::StatusTx;
 use anyhow::anyhow;
 use bitcoin::{consensus::deserialize, Txid};
-use tokio::sync::RwLock;
 use tracing::*;
 
 use crate::{
@@ -17,6 +16,7 @@ use crate::{
         traits::{L1Client, SeqL1Client},
         ClientError,
     },
+    status::{apply_status_updates, L1StatusUpdate},
     writer::utils::{get_blob_by_idx, get_l1_tx},
 };
 
@@ -28,7 +28,7 @@ pub async fn broadcaster_task<D: SequencerDatabase + Send + Sync + 'static>(
     next_publish_blob_idx: u64,
     rpc_client: Arc<impl SeqL1Client + L1Client>,
     db: Arc<D>,
-    l1_status: Arc<RwLock<L1Status>>,
+    status_rx: Arc<StatusTx>,
 ) -> anyhow::Result<()> {
     info!("Starting L1 writer's broadcaster task");
     let interval = tokio::time::interval(Duration::from_millis(BROADCAST_POLL_INTERVAL));
@@ -81,13 +81,12 @@ pub async fn broadcaster_task<D: SequencerDatabase + Send + Sync + 'static>(
                         .update_blob_by_idx(curr_idx, blobentry.clone())?;
                     // Update L1 status
                     {
-                        let mut l1st = l1_status.write().await;
                         let txid: Txid = deserialize(blobentry.reveal_txid.0.as_slice())?;
-                        l1st.last_published_txid = Some(txid.to_string());
-                        l1st.published_inscription_count += 1;
-                        // TODO: add last update
-                        #[cfg(debug_assertions)]
-                        debug!("Updated l1 status: {:?}", l1st);
+                        let status_updates = [
+                            L1StatusUpdate::LastPublishedTxid(txid.to_string()),
+                            L1StatusUpdate::IncrementInscriptionCount,
+                        ];
+                        apply_status_updates(&status_updates, status_rx.clone()).await;
                     }
                     curr_idx += 1;
                 }

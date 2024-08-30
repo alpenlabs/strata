@@ -340,7 +340,8 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
             let target_slot = data.target_slot();
             let parent = data.parent();
 
-            let client_state = sync_man.create_state_watch_sub().borrow().clone();
+            let client_state = sync_man.status_rx().cl.borrow().clone();
+
             let l1_view = client_state.l1_view();
 
             // TODO get the cur client state from the sync manager, the one used
