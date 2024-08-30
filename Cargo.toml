@@ -11,6 +11,7 @@ members = [
   "crates/prover/adapters/risc0",
   "crates/prover/adapters/sp1",
   "crates/prover/bitcoin-blockspace",
+  "crates/prover/btc-headerchain",
   "crates/prover/primitives",
   "crates/prover/zkvm",
   "crates/reth/db",

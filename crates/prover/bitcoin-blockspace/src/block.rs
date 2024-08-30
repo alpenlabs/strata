@@ -65,7 +65,7 @@ pub fn compute_witness_commitment(
 /// Returns the block hash.
 ///
 /// Equivalent to [`compute_block_hash`](Header::block_hash)
-fn compute_block_hash(header: &Header) -> [u8; 32] {
+pub fn compute_block_hash(header: &Header) -> [u8; 32] {
     let mut vec = Vec::with_capacity(80);
     header
         .consensus_encode(&mut vec)
@@ -129,9 +129,9 @@ pub fn check_witness_commitment(block: &Block) -> bool {
 }
 
 /// Checks that the proof-of-work for the block is valid.
-pub fn check_pow(block: &Block) -> bool {
-    let target = block.header.target();
-    let block_hash = BlockHash::from_byte_array(compute_block_hash(&block.header));
+pub fn check_pow(block: &Header) -> bool {
+    let target = block.target();
+    let block_hash = BlockHash::from_byte_array(compute_block_hash(block));
     target.is_met_by(block_hash)
 }
 
@@ -174,6 +174,6 @@ mod tests {
         assert!(check_witness_commitment(&block));
 
         assert!(block.header.validate_pow(block.header.target()).is_ok());
-        assert!(check_pow(&block));
+        assert!(check_pow(&block.header));
     }
 }

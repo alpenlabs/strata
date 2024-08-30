@@ -1,5 +1,5 @@
 use alpen_express_primitives::l1::L1BlockManifest;
-use bitcoin::{consensus::deserialize, Block, Transaction};
+use bitcoin::{block::Header, consensus::deserialize, Block, Transaction};
 
 use crate::ArbitraryGenerator;
 
@@ -31,4 +31,55 @@ pub fn get_btc_mainnet_block() -> Block {
     );
     let block: Block = deserialize(&raw_block[..]).unwrap();
     block
+}
+
+pub struct BtcChain {
+    pub headers: Vec<Header>,
+    pub start: u32,
+    pub end: u32,
+}
+
+impl BtcChain {
+    /// Retrieves the block header at the specified height.
+    pub fn get_block(&self, height: u32) -> Header {
+        if height < self.start {
+            panic!("height must be greater than that");
+        }
+        if height >= self.end {
+            panic!("height must be less than that");
+        }
+        let idx = height - self.start;
+        self.headers[idx as usize]
+    }
+
+    /// Retrieves the timestamps of a specified number of blocks from a given height in a
+    /// descending order.
+    pub fn get_last_timestamps(&self, from: u32, count: u32) -> Vec<u32> {
+        let mut timestamps = Vec::with_capacity(count as usize);
+        for i in (0..count).rev() {
+            let h = self.get_block(from - i);
+            timestamps.push(h.time)
+        }
+        timestamps
+    }
+}
+
+pub fn get_btc_chain() -> BtcChain {
+    let buffer = include_bytes!("../data/40000-50000.raw");
+
+    let chunk_size = Header::SIZE;
+    let capacity = buffer.len() / chunk_size;
+    let mut headers = Vec::with_capacity(capacity);
+
+    for chunk in buffer.chunks(chunk_size) {
+        let raw_header = chunk.to_vec();
+        let header: Header = deserialize(&raw_header).unwrap();
+        headers.push(header);
+    }
+
+    BtcChain {
+        headers,
+        start: 40_000,
+        end: 50_000,
+    }
 }
