@@ -66,7 +66,7 @@ where
 
             let manifest = generate_block_manifest(blockdata.block());
             let l1txs: Vec<_> = blockdata
-                .interesting_tx_idxs()
+                .relevant_tx_idxs()
                 .iter()
                 .map(|idx| generate_l1_tx(*idx, blockdata.block()))
                 .collect();

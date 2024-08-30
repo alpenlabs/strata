@@ -2,9 +2,9 @@ use bitcoin::{Address, Block, Transaction};
 
 use crate::inscription::InscriptionParser;
 
-/// What kind of transactions can be interesting for us to filter
+/// What kind of transactions can be relevant for us to filter
 #[derive(Clone, Debug)]
-pub enum TxInterest {
+pub enum RelevantTxType {
     /// Transactions that are spent to an address
     SpentToAddress(Address),
     /// Transactions with certain prefix. This can also be used to support matching whole txids
@@ -12,34 +12,34 @@ pub enum TxInterest {
     /// Inscription transactions with given Rollup name. This will be parsed by
     /// [`InscriptionParser`] which dictates the structure of inscription.
     RollupInscription(RollupName),
-    // Add other interesting conditions as needed
+    // Add other relevant conditions as needed
 }
 
 type RollupName = String;
 
-/// Filter all the interesting [`Transaction`]s in a block based on given interests
-pub fn filter_interesting_txs(block: &Block, interests: &[TxInterest]) -> Vec<u32> {
+/// Filter all the relevant [`Transaction`]s in a block based on given [`RelevantTxType`]s
+pub fn filter_relevant_txs(block: &Block, relevent_types: &[RelevantTxType]) -> Vec<u32> {
     block
         .txdata
         .iter()
         .enumerate()
-        .filter(|(_, tx)| is_interesting(tx, interests))
+        .filter(|(_, tx)| is_relevant(tx, relevent_types))
         .map(|(i, _)| i as u32)
         .collect()
 }
 
-/// Determines if a [`Transaction`] is interesting based on given interests
-fn is_interesting(tx: &Transaction, interests: &[TxInterest]) -> bool {
+/// Determines if a [`Transaction`] is relevant based on given [`RelevantTxType`]s
+fn is_relevant(tx: &Transaction, relevant_types: &[RelevantTxType]) -> bool {
     let txid = tx.compute_txid();
 
-    interests.iter().any(|interest| match interest {
-        TxInterest::TxIdWithPrefix(pf) => txid[0..pf.len()] == *pf,
-        TxInterest::SpentToAddress(address) => tx
+    relevant_types.iter().any(|rel_type| match rel_type {
+        RelevantTxType::TxIdWithPrefix(pf) => txid[0..pf.len()] == *pf,
+        RelevantTxType::SpentToAddress(address) => tx
             .output
             .iter()
             .any(|op| address.matches_script_pubkey(&op.script_pubkey)),
-        TxInterest::RollupInscription(name) => match tx.input[0].witness.tapscript() {
-            // Definitely not interesting if it is not a tapscript
+        RelevantTxType::RollupInscription(name) => match tx.input[0].witness.tapscript() {
+            // Definitely not relevant if it is not a tapscript
             None => false,
             // If it is a tapscript, check rollup name
             Some(scr) => {
@@ -75,7 +75,7 @@ mod test {
     use crate::{inscription::InscriptionData, writer::builder::build_reveal_transaction};
 
     const OTHER_ADDR: &str = "bcrt1q6u6qyya3sryhh42lahtnz2m7zuufe7dlt8j0j5";
-    const INTERESTING_ADDR: &str = "bcrt1qwqas84jmu20w6r7x3tqetezg8wx7uc3l57vue6";
+    const RELEVANT_ADDR: &str = "bcrt1qwqas84jmu20w6r7x3tqetezg8wx7uc3l57vue6";
 
     /// Helper function to create a test transaction with given txid and outputs
     fn create_test_tx(outputs: Vec<TxOut>) -> Transaction {
@@ -119,19 +119,19 @@ mod test {
     }
 
     #[test]
-    fn test_filter_interesting_txs_spent_to_address() {
-        let address = parse_addr(INTERESTING_ADDR);
+    fn test_filter_relevant_txs_spent_to_address() {
+        let address = parse_addr(RELEVANT_ADDR);
         let tx1 = create_test_tx(vec![create_test_txout(100, &address)]);
         let tx2 = create_test_tx(vec![create_test_txout(100, &parse_addr(OTHER_ADDR))]);
         let block = create_test_block(vec![tx1, tx2]);
 
-        let result = filter_interesting_txs(&block, &[TxInterest::SpentToAddress(address)]);
+        let result = filter_relevant_txs(&block, &[RelevantTxType::SpentToAddress(address)]);
         assert_eq!(result, vec![0]); // Only tx1 matches
     }
 
     #[test]
-    fn test_filter_interesting_txs_txid_with_prefix() {
-        let address = parse_addr(INTERESTING_ADDR);
+    fn test_filter_relevant_txs_txid_with_prefix() {
+        let address = parse_addr(RELEVANT_ADDR);
         let address1 = parse_addr(OTHER_ADDR);
         let tx1 = create_test_tx(vec![create_test_txout(100, &address)]);
         let tx2 = create_test_tx(vec![create_test_txout(100, &address1)]);
@@ -141,8 +141,10 @@ mod test {
             *a.as_byte_array()
         };
 
-        let result =
-            filter_interesting_txs(&block, &[TxInterest::TxIdWithPrefix(txid[0..5].to_vec())]);
+        let result = filter_relevant_txs(
+            &block,
+            &[RelevantTxType::TxIdWithPrefix(txid[0..5].to_vec())],
+        );
         assert_eq!(result, vec![1]); // Only tx2 matches
     }
 
@@ -177,68 +179,70 @@ mod test {
     }
 
     #[test]
-    fn test_filter_interesting_txs_with_rollup_inscription() {
+    fn test_filter_relevant_txs_with_rollup_inscription() {
         // Test with valid name
         let rollup_name = "TestRollup".to_string();
         let tx = create_inscription_tx(rollup_name.clone());
         let block = create_test_block(vec![tx]);
-        let result = filter_interesting_txs(&block, &[TxInterest::RollupInscription(rollup_name)]);
+        let result = filter_relevant_txs(&block, &[RelevantTxType::RollupInscription(rollup_name)]);
         assert_eq!(result, vec![0], "Should filter valid rollup name");
 
         // Test with invalid name
         let rollup_name = "TestRollup".to_string();
         let tx = create_inscription_tx(rollup_name.clone());
         let block = create_test_block(vec![tx]);
-        let result = filter_interesting_txs(
+        let result = filter_relevant_txs(
             &block,
-            &[TxInterest::RollupInscription("invalid_name".to_string())],
+            &[RelevantTxType::RollupInscription(
+                "invalid_name".to_string(),
+            )],
         );
         assert!(result.is_empty(), "Should filter out invalid name");
     }
 
     #[test]
-    fn test_filter_interesting_txs_no_match() {
-        let address = parse_addr(INTERESTING_ADDR);
+    fn test_filter_relevant_txs_no_match() {
+        let address = parse_addr(RELEVANT_ADDR);
         let tx1 = create_test_tx(vec![create_test_txout(1000, &parse_addr(OTHER_ADDR))]);
         let tx2 = create_test_tx(vec![create_test_txout(10000, &parse_addr(OTHER_ADDR))]);
         let block = create_test_block(vec![tx1, tx2]);
 
-        let result = filter_interesting_txs(&block, &[TxInterest::SpentToAddress(address)]);
+        let result = filter_relevant_txs(&block, &[RelevantTxType::SpentToAddress(address)]);
         assert!(result.is_empty()); // No transactions match
     }
 
     #[test]
-    fn test_filter_interesting_txs_empty_block() {
+    fn test_filter_relevant_txs_empty_block() {
         let block = create_test_block(vec![]);
 
-        let result = filter_interesting_txs(
+        let result = filter_relevant_txs(
             &block,
-            &[TxInterest::SpentToAddress(parse_addr(INTERESTING_ADDR))],
+            &[RelevantTxType::SpentToAddress(parse_addr(RELEVANT_ADDR))],
         );
         assert!(result.is_empty()); // No transactions match
     }
 
     #[test]
-    fn test_filter_interesting_txs_multiple_matches() {
-        let address = parse_addr(INTERESTING_ADDR);
+    fn test_filter_relevant_txs_multiple_matches() {
+        let address = parse_addr(RELEVANT_ADDR);
         let tx1 = create_test_tx(vec![create_test_txout(100, &address)]);
         let tx2 = create_test_tx(vec![create_test_txout(100, &parse_addr(OTHER_ADDR))]);
         let tx3 = create_test_tx(vec![create_test_txout(1000, &address)]);
         let block = create_test_block(vec![tx1, tx2, tx3]);
 
-        let result = filter_interesting_txs(&block, &[TxInterest::SpentToAddress(address)]);
+        let result = filter_relevant_txs(&block, &[RelevantTxType::SpentToAddress(address)]);
         assert_eq!(result, vec![0, 2]); // First and third txs match
     }
 
     #[test]
     fn test_filter_all_txs() {
-        let address = parse_addr(INTERESTING_ADDR);
+        let address = parse_addr(RELEVANT_ADDR);
         let tx1 = create_test_tx(vec![create_test_txout(100, &address)]);
         let tx2 = create_test_tx(vec![create_test_txout(100, &parse_addr(OTHER_ADDR))]);
         let tx3 = create_test_tx(vec![create_test_txout(1000, &address)]);
         let block = create_test_block(vec![tx1, tx2, tx3]);
 
-        let result = filter_interesting_txs(&block, &[TxInterest::TxIdWithPrefix(Vec::new())]);
+        let result = filter_relevant_txs(&block, &[RelevantTxType::TxIdWithPrefix(Vec::new())]);
         assert_eq!(result, vec![0, 1, 2]); // All txs match
     }
 }

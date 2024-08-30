@@ -15,15 +15,16 @@ pub enum L1Event {
 pub struct BlockData {
     block_num: u64,
     block: Block,
-    interesting_tx_idxs: Vec<u32>,
+    /// Indices of transactions in the block that are relevant to rollup
+    relevant_tx_idxs: Vec<u32>,
 }
 
 impl BlockData {
-    pub fn new(block_num: u64, block: Block, interesting_tx_idxs: Vec<u32>) -> Self {
+    pub fn new(block_num: u64, block: Block, relevant_tx_idxs: Vec<u32>) -> Self {
         Self {
             block_num,
             block,
-            interesting_tx_idxs,
+            relevant_tx_idxs,
         }
     }
 
@@ -31,8 +32,8 @@ impl BlockData {
         &self.block
     }
 
-    pub fn interesting_tx_idxs(&self) -> &[u32] {
-        &self.interesting_tx_idxs
+    pub fn relevant_tx_idxs(&self) -> &[u32] {
+        &self.relevant_tx_idxs
     }
 
     pub fn block_num(&self) -> u64 {

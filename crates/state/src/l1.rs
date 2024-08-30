@@ -239,7 +239,7 @@ impl<'a> Arbitrary<'a> for L1ViewState {
 
 /// Entry representing an L1 block that we've acknowledged seems to be on the
 /// longest chain but might still reorg.  We wait until the block is buried
-/// enough before accepting the block and acting on the interesting txs in it.
+/// enough before accepting the block and acting on the relevant txs in it.
 ///
 /// Height is implicit by its position in the maturation queue.
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
