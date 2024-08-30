@@ -76,16 +76,20 @@ impl HeaderVerificationState {
     /// # Returns
     ///
     /// The expected [`CompactTarget`] recalculation.
+    ///
+    /// # Note
+    /// The comments above and the implementation is based on [rust-bitcoin](https://github.com/rust-bitcoin/rust-bitcoin/blob/0d9e8f8c992223869a57162c4afe5a6112d08049/bitcoin/src/pow.rs#L352-L398).
+    /// This has not been directly used since it is not available on the current release
     fn next_target(&mut self, timestamp: u32) -> u32 {
         if (self.last_verified_block_num + 1) % DIFFICULTY_ADJUSTMENT_INTERVAL != 0 {
             return self.next_block_target;
         }
 
-        let min_timespan = POW_TARGET_TIMESPAN >> 2;
-        let max_timespan = POW_TARGET_TIMESPAN << 2;
+        const MIN_TIMESPAN: u32 = POW_TARGET_TIMESPAN >> 2;
+        const MAX_TIMESPAN: u32 = POW_TARGET_TIMESPAN << 2;
 
         let timespan = timestamp - self.interval_start_timestamp;
-        let actual_timespan = timespan.clamp(min_timespan, max_timespan);
+        let actual_timespan = timespan.clamp(MIN_TIMESPAN, MAX_TIMESPAN);
 
         let prev_target: Target = CompactTarget::from_consensus(self.next_block_target).into();
 
@@ -105,11 +109,8 @@ impl HeaderVerificationState {
     }
 
     fn update_timestamps(&mut self, timestamp: u32) {
-        // Shift existing timestamps to right
-        for i in (1..11).rev() {
-            self.last_11_blocks_timestamps[i] = self.last_11_blocks_timestamps[i - 1];
-        }
-        // Insert latest timestamp at index 0
+        // Shift existing timestamps to right and insert latest timestamp
+        self.last_11_blocks_timestamps.rotate_right(1);
         self.last_11_blocks_timestamps[0] = timestamp;
 
         let new_block_num = self.last_verified_block_num;
