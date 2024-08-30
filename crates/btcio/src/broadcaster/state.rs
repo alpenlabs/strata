@@ -1,7 +1,9 @@
 use std::{collections::BTreeMap, sync::Arc};
 
 use alpen_express_db::types::{L1TxEntry, L1TxStatus};
+use bitcoin::Txid;
 use express_storage::BroadcastDbOps;
+use tracing::*;
 
 use super::error::{BroadcasterError, BroadcasterResult};
 
@@ -72,6 +74,9 @@ async fn filter_unfinalized_from_db(
             break;
         };
 
+        let status = &txentry.status;
+        let txid = ops.get_txid_async(idx).await?.map(Txid::from);
+        debug!(?idx, ?txid, ?status, "TxEntry");
         match txentry.status {
             L1TxStatus::Finalized { height: _ } | L1TxStatus::Excluded { reason: _ } => {}
             _ => {

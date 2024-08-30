@@ -6,7 +6,7 @@ use std::{
     time,
 };
 
-use alpen_express_btcio::writer::DaWriter;
+use alpen_express_btcio::writer::InscriptionHandle;
 use alpen_express_db::traits::*;
 use alpen_express_eectl::engine::ExecEngineCtl;
 use alpen_express_primitives::{
@@ -203,7 +203,6 @@ struct DutyExecStatus {
 pub fn duty_dispatch_task<
     D: Database + Sync + Send + 'static,
     E: ExecEngineCtl + Sync + Send + 'static,
-    S: SequencerDatabase + Sync + Send + 'static,
 >(
     shutdown: ShutdownGuard,
     executor: TaskExecutor,
@@ -212,7 +211,7 @@ pub fn duty_dispatch_task<
     sync_man: Arc<SyncManager>,
     database: Arc<D>,
     engine: Arc<E>,
-    da_writer: Arc<DaWriter<S>>,
+    inscription_handle: Arc<InscriptionHandle>,
     pool: threadpool::ThreadPool,
     params: Arc<Params>,
 ) {
@@ -277,7 +276,7 @@ pub fn duty_dispatch_task<
             let sm = sync_man.clone();
             let db = database.clone();
             let e = engine.clone();
-            let da_writer = da_writer.clone();
+            let da_writer = inscription_handle.clone();
             let params: Arc<Params> = params.clone();
             let duty_status_tx_l = duty_status_tx.clone();
             pool.execute(move || {
@@ -297,13 +296,13 @@ pub fn duty_dispatch_task<
 /// thread pool so we don't have to worry about it blocking *too* much other
 /// work.
 #[allow(clippy::too_many_arguments)] // TODO: fix this
-fn duty_exec_task<D: Database, E: ExecEngineCtl, S: SequencerDatabase + Send + Sync + 'static>(
+fn duty_exec_task<D: Database, E: ExecEngineCtl>(
     duty: Duty,
     ik: IdentityKey,
     sync_man: Arc<SyncManager>,
     database: Arc<D>,
     engine: Arc<E>,
-    da_writer: Arc<DaWriter<S>>,
+    inscription_handle: Arc<InscriptionHandle>,
     params: Arc<Params>,
     duty_status_tx: std::sync::mpsc::Sender<DutyExecStatus>,
 ) {
@@ -313,7 +312,7 @@ fn duty_exec_task<D: Database, E: ExecEngineCtl, S: SequencerDatabase + Send + S
         &sync_man,
         database.as_ref(),
         engine.as_ref(),
-        da_writer.as_ref(),
+        inscription_handle.as_ref(),
         &params,
     );
 
@@ -327,13 +326,13 @@ fn duty_exec_task<D: Database, E: ExecEngineCtl, S: SequencerDatabase + Send + S
     }
 }
 
-fn perform_duty<D: Database, E: ExecEngineCtl, S: SequencerDatabase + Send + Sync + 'static>(
+fn perform_duty<D: Database, E: ExecEngineCtl>(
     duty: &Duty,
     ik: &IdentityKey,
     sync_man: &SyncManager,
     database: &D,
     engine: &E,
-    da_writer: &DaWriter<S>,
+    inscription_handle: &InscriptionHandle,
     params: &Arc<Params>,
 ) -> Result<(), Error> {
     match duty {
@@ -401,7 +400,7 @@ fn perform_duty<D: Database, E: ExecEngineCtl, S: SequencerDatabase + Send + Syn
             info!(signed_commitment = ?signed_commitment, "signed commitment");
             info!(blob_intent = ?blob_intent, "blob intent");
 
-            da_writer
+            inscription_handle
                 .submit_intent(blob_intent)
                 // add type for DA related errors ?
                 .map_err(|err| Error::Other(err.to_string()))?;

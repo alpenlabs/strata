@@ -205,6 +205,8 @@ impl TaskExecutor {
             self.shutdown_signal.subscribe(),
             self.pending_tasks_counter.clone(),
         );
+
+        info!(%name, "Starting critical task");
         std::thread::spawn(move || {
             let result = panic::catch_unwind(panic::AssertUnwindSafe(|| func(shutdown)));
 
@@ -243,6 +245,7 @@ impl TaskExecutor {
             let shutdown = pin!(shutdown.wait_for_shutdown());
             let _ = select(shutdown, task).await;
         };
+        info!(%name, "Starting critical async task");
         self.tokio_handle.spawn(task)
     }
 

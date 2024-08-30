@@ -8,7 +8,7 @@ use std::{
 
 use alpen_express_btcio::{
     broadcaster::{spawn_broadcaster_task, L1BroadcastHandle},
-    writer::{config::WriterConfig, start_writer_task, DaWriter},
+    writer::{config::WriterConfig, start_inscription_task, InscriptionHandle},
 };
 use alpen_express_common::logging;
 use alpen_express_consensus_logic::{
@@ -19,7 +19,7 @@ use alpen_express_consensus_logic::{
     sync_manager,
     sync_manager::SyncManager,
 };
-use alpen_express_db::traits::{Database, SequencerDatabase};
+use alpen_express_db::traits::Database;
 use alpen_express_evmexec::{fork_choice_state_initial, EngineRpcClient};
 use alpen_express_primitives::{
     block_credential,
@@ -260,7 +260,11 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         params.clone(),
     )?;
     let sync_man = Arc::new(sync_man);
-    let mut writer_ctl = None;
+    let mut inscription_handler = None;
+
+    // start broadcast task
+    let bcast_handle = spawn_broadcaster_task(&task_executor, btc_rpc.clone(), bcast_ops);
+    let bcast_handle = Arc::new(bcast_handle);
 
     // If the sequencer key is set, start the sequencer duties task.
     if let Some(seqkey_path) = &config.client.sequencer_key {
@@ -287,15 +291,19 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         let seqdb = Arc::new(SeqDb::new(rbdb, db_ops));
         let dbseq = Arc::new(SequencerDB::new(seqdb));
         let rpc = btc_rpc.clone();
-        let writer = Arc::new(start_writer_task(
+
+        // Start inscription tasks
+        let insc_hndlr = Arc::new(start_inscription_task(
             &task_executor,
             rpc,
             writer_config,
             dbseq,
             l1_status.clone(),
+            pool.clone(),
+            bcast_handle.clone(),
         )?);
 
-        writer_ctl = Some(writer.clone());
+        inscription_handler = Some(insc_hndlr.clone());
 
         // Spawn duty tasks.
         let t_l2blkman = l2_block_manager.clone();
@@ -316,7 +324,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         let d_executor = task_manager.executor();
         executor.spawn_critical("duty_worker::duty_dispatch_task", move |shutdown| {
             duty_worker::duty_dispatch_task(
-                shutdown, d_executor, duties_rx, idata.key, sm, db2, eng_ctl_de, writer, pool,
+                shutdown, d_executor, duties_rx, idata.key, sm, db2, eng_ctl_de, insc_hndlr, pool,
                 d_params,
             )
         });
@@ -334,22 +342,18 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         l1_status.clone(),
     )?;
 
-    // start broadcast task
-    let bcast_handle = spawn_broadcaster_task(&task_executor, btc_rpc, bcast_ops);
-    let bcast_handle = Arc::new(bcast_handle);
-
     let shutdown_signal = task_manager.shutdown_signal();
     let executor = task_manager.executor();
-    let database_r = database.clone();
+    let db_cloned = database.clone();
 
     executor.spawn_critical_async("main-rpc", async {
         start_rpc(
             shutdown_signal,
             config,
             sync_man,
-            database_r,
+            db_cloned,
             l1_status,
-            writer_ctl,
+            inscription_handler,
             bcast_handle,
         )
         .await
@@ -367,16 +371,13 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn start_rpc<
-    D: Database + Send + Sync + 'static,
-    SD: SequencerDatabase + Send + Sync + 'static,
->(
+async fn start_rpc<D: Database + Send + Sync + 'static>(
     shutdown_signal: ShutdownSignal,
     config: Config,
     sync_man: Arc<SyncManager>,
     database: Arc<D>,
     l1_status: Arc<RwLock<L1Status>>,
-    writer: Option<Arc<DaWriter<SD>>>,
+    inscription_handler: Option<Arc<InscriptionHandle>>,
     bcast_handle: Arc<L1BroadcastHandle>,
 ) -> anyhow::Result<()> {
     let (stop_tx, stop_rx) = oneshot::channel();
@@ -391,7 +392,7 @@ async fn start_rpc<
     );
 
     let mut methods = alp_rpc.into_rpc();
-    let admin_rpc = rpc_server::AdminServerImpl::new(writer, bcast_handle);
+    let admin_rpc = rpc_server::AdminServerImpl::new(inscription_handler, bcast_handle);
     methods.merge(admin_rpc.into_rpc())?;
 
     let rpc_port = config.client.rpc_port;

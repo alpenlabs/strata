@@ -41,6 +41,10 @@ impl L1BroadcastHandle {
 
         Ok(idx)
     }
+
+    pub async fn get_tx_entry_by_id_async(&self, txid: Buf32) -> DbResult<Option<L1TxEntry>> {
+        self.ops.get_tx_entry_by_id_async(txid).await
+    }
 }
 
 pub fn spawn_broadcaster_task(

@@ -2,17 +2,14 @@
 
 use std::{borrow::BorrowMut, sync::Arc};
 
-use alpen_express_btcio::{
-    broadcaster::L1BroadcastHandle,
-    writer::{utils::calculate_blob_hash, DaWriter},
-};
+use alpen_express_btcio::{broadcaster::L1BroadcastHandle, writer::InscriptionHandle};
 use alpen_express_consensus_logic::sync_manager::SyncManager;
 use alpen_express_db::{
     traits::{ChainstateProvider, Database, L1DataProvider, L2DataProvider, SequencerDatabase},
     types::{L1TxEntry, L1TxStatus},
     DbResult,
 };
-use alpen_express_primitives::buf::Buf32;
+use alpen_express_primitives::{buf::Buf32, hash};
 use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer, HexBytes, HexBytes32};
 use alpen_express_rpc_types::{
     BlockHeader, ClientStatus, DaBlob, DepositEntry, DepositState, ExecUpdate, L1Status,
@@ -498,16 +495,18 @@ where
     }
 }
 
-pub struct AdminServerImpl<S> {
-    // TODO: Clean up writer's signature, possibly use some kind of manager
+pub struct AdminServerImpl {
     // Currently writer is Some() for sequencer only, but we need bcast_manager for both fullnode
     // and seq
-    pub writer: Option<Arc<DaWriter<S>>>,
+    pub writer: Option<Arc<InscriptionHandle>>,
     pub bcast_handle: Arc<L1BroadcastHandle>,
 }
 
-impl<S: SequencerDatabase> AdminServerImpl<S> {
-    pub fn new(writer: Option<Arc<DaWriter<S>>>, bcast_handle: Arc<L1BroadcastHandle>) -> Self {
+impl AdminServerImpl {
+    pub fn new(
+        writer: Option<Arc<InscriptionHandle>>,
+        bcast_handle: Arc<L1BroadcastHandle>,
+    ) -> Self {
         Self {
             writer,
             bcast_handle,
@@ -516,9 +515,9 @@ impl<S: SequencerDatabase> AdminServerImpl<S> {
 }
 
 #[async_trait]
-impl<S: SequencerDatabase + Send + Sync + 'static> AlpenAdminApiServer for AdminServerImpl<S> {
+impl AlpenAdminApiServer for AdminServerImpl {
     async fn submit_da_blob(&self, blob: HexBytes) -> RpcResult<()> {
-        let commitment = calculate_blob_hash(&blob.0);
+        let commitment = hash::raw(&blob.0);
         let blobintent = BlobIntent::new(BlobDest::L1, commitment, blob.0);
         // NOTE: It would be nice to return reveal txid from the submit method. But creation of txs
         // is deferred to signer in the writer module

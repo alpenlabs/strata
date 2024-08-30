@@ -1,7 +1,6 @@
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 use alpen_express_db::types::{ExcludeReason, L1TxEntry, L1TxStatus};
-use alpen_express_primitives::buf::Buf32;
 use bitcoin::{hashes::Hash, Txid};
 use express_storage::{ops::l1tx_broadcast, BroadcastDbOps};
 use tokio::sync::mpsc::Receiver;
@@ -38,8 +37,8 @@ pub async fn broadcaster_task(
             _ = interval.tick() => {}
 
             Some((idx, txentry)) = entry_receiver.recv() => {
-                let txid = get_txid_str(idx, ops.as_ref()).await?;
-                info!(%idx, %txid, "Received txentry");
+                let txid: Option<Txid> = ops.get_txid_async(idx).await?.map(Into::into);
+                info!(%idx, ?txid, "Received txentry");
 
                 // Insert into state's unfinalized entries. Need not update next_idx because that
                 // will be handled in state.next() call
@@ -66,22 +65,6 @@ pub async fn broadcaster_task(
     }
 }
 
-async fn get_txid(idx: u64, ops: &BroadcastDbOps) -> BroadcasterResult<Buf32> {
-    ops.get_txid_async(idx)
-        .await?
-        .ok_or(BroadcasterError::Other(format!(
-            "No txid entry found for idx {}",
-            idx
-        )))
-}
-
-async fn get_txid_str(idx: u64, ops: &BroadcastDbOps) -> BroadcasterResult<String> {
-    let txid: Buf32 = get_txid(idx, ops).await?;
-    let mut id = txid.0;
-    id.reverse();
-    Ok(hex::encode(id))
-}
-
 /// Processes unfinalized entries and returns entries idxs that are finalized
 async fn process_unfinalized_entries(
     unfinalized_entries: &BTreeMap<u64, L1TxEntry>,
@@ -92,7 +75,7 @@ async fn process_unfinalized_entries(
     let mut updated_entries = BTreeMap::new();
 
     for (idx, txentry) in unfinalized_entries.iter() {
-        info!(%idx, "processing txentry");
+        debug!(%idx, "processing txentry");
         let updated_status = handle_entry(rpc_client, txentry, *idx, ops.as_ref()).await?;
 
         if let Some(status) = updated_status {
@@ -125,7 +108,10 @@ async fn handle_entry(
     idx: u64,
     ops: &BroadcastDbOps,
 ) -> BroadcasterResult<Option<L1TxStatus>> {
-    let txid = get_txid(idx, ops).await?;
+    let txid = ops
+        .get_txid_async(idx)
+        .await?
+        .ok_or(BroadcasterError::TxNotFound(idx))?;
     match txentry.status {
         L1TxStatus::Unpublished => {
             // Try to publish

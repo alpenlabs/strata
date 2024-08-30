@@ -9,6 +9,9 @@ pub enum BroadcasterError {
     #[error("client: {0}")]
     Client(#[from] anyhow::Error),
 
+    #[error("expected tx not found in db. Idx {0}")]
+    TxNotFound(u64),
+
     #[error("{0}")]
     Other(String),
 }

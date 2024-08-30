@@ -40,25 +40,24 @@ impl BlobEntry {
     }
 }
 
+/// Various status that transactions corresponding to a blob can be in L1
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub enum BlobL1Status {
-    /// The blob has not been signed yet
+    /// The blob has not been signed yet, i.e commit-reveal transactions have not been created yet.
     Unsigned,
-
-    /// The commit reveal transactions for blob are signed and waiting to be published
+    /// The commit-reveal transactions for blob are signed and waiting to be published
     Unpublished,
-
     /// The transactions are published
     Published,
-
-    /// The transactions are confirmed in L1
+    /// The transactions are confirmed
     Confirmed,
-
-    /// The transactions are finalized in L1
+    /// The transactions are finalized
     Finalized,
-
-    /// The transactions need to be resigned because possibly the utxos were already spent
+    /// The transactions need to be resigned.
+    /// This could be due to transactions input UTXOs already being spent.
     NeedsResign,
+    /// The transactions were not included for some reason
+    Excluded,
 }
 
 /// This is the entry that gets saved to the database corresponding to a bitcoin transaction that

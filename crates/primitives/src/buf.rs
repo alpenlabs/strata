@@ -5,7 +5,7 @@ use std::{
 };
 
 use arbitrary::Arbitrary;
-use bitcoin::{hashes::Hash, BlockHash};
+use bitcoin::{hashes::Hash, BlockHash, Txid};
 use borsh::{BorshDeserialize, BorshSerialize};
 use reth_primitives::alloy_primitives::FixedBytes;
 use serde::{Deserialize, Deserializer};
@@ -75,6 +75,21 @@ impl From<Buf32> for FixedBytes<32> {
 impl From<BlockHash> for Buf32 {
     fn from(value: BlockHash) -> Self {
         (*value.as_raw_hash().as_byte_array()).into()
+    }
+}
+
+impl From<Txid> for Buf32 {
+    fn from(value: Txid) -> Self {
+        let bytes: [u8; 32] = *value.as_raw_hash().as_byte_array();
+        bytes.into()
+    }
+}
+
+impl From<Buf32> for Txid {
+    fn from(value: Buf32) -> Self {
+        let mut bytes: [u8; 32] = [0; 32];
+        bytes.copy_from_slice(value.0.as_slice());
+        Txid::from_byte_array(bytes)
     }
 }
 
