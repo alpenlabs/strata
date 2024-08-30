@@ -2,7 +2,7 @@ use bitcoin::{Address, Block, Transaction};
 
 use crate::inscription::InscriptionParser;
 
-/// What kind of transactions can be relevant for us to filter
+/// What kind of transactions can be relevant for rollup node to filter
 #[derive(Clone, Debug)]
 pub enum RelevantTxType {
     /// Transactions that are spent to an address
