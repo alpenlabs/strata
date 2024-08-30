@@ -231,9 +231,15 @@ class RethFactory(flexitest.Factory):
 
 
 class BasicEnvConfig(flexitest.EnvConfig):
-    def __init__(self, pre_generate_blocks: int = 0, rollup_params: Optional[dict] = None):
+    def __init__(
+        self,
+        pre_generate_blocks: int = 0,
+        rollup_params: Optional[dict] = None,
+        auto_generate_blocks=True,
+    ):
         self.pre_generate_blocks = pre_generate_blocks
         self.rollup_params = rollup_params
+        self.auto_generate_blocks = auto_generate_blocks
         super().__init__()
 
     def init(self, ctx: flexitest.EnvContext) -> flexitest.LiveEnv:
@@ -254,6 +260,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
         reth_socket = f"localhost:{reth_port}"
 
         bitcoind = btc_fac.create_regtest_bitcoin()
+        # wait for services to to startup
         time.sleep(BLOCK_GENERATION_INTERVAL_SECS)
 
         brpc = bitcoind.create_rpc()
@@ -268,7 +275,8 @@ class BasicEnvConfig(flexitest.EnvConfig):
             brpc.proxy.generatetoaddress(self.pre_generate_blocks, seqaddr)
 
         # generate blocks every 500 millis
-        generate_blocks(brpc, BLOCK_GENERATION_INTERVAL_SECS, seqaddr)
+        if self.auto_generate_blocks:
+            generate_blocks(brpc, BLOCK_GENERATION_INTERVAL_SECS, seqaddr)
         rpc_port = bitcoind.get_prop("rpc_port")
         rpc_user = bitcoind.get_prop("rpc_user")
         rpc_pass = bitcoind.get_prop("rpc_password")
@@ -278,7 +286,8 @@ class BasicEnvConfig(flexitest.EnvConfig):
         )
         # Need to wait for at least `genesis_l1_height` blocks to be generated.
         # Sleeping some more for safety
-        time.sleep(BLOCK_GENERATION_INTERVAL_SECS * 10)
+        if self.auto_generate_blocks:
+            time.sleep(BLOCK_GENERATION_INTERVAL_SECS * 10)
 
         svcs = {"bitcoin": bitcoind, "sequencer": sequencer, "reth": reth}
         return flexitest.LiveEnv(svcs)
