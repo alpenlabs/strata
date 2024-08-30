@@ -26,6 +26,7 @@ These exist in `crates/`.
 * `rpc/api` - Alpen rollup RPC defs
 * `state` - type defs relating to rollup data structures
 * `storage` - intermediate storage IO abstraction layer
+* `status` - contains utilities for handling node status 
 * `util/` - independent utility libraries
   * `mmr` - "merkle mountain range" util
 * `vtxjmt` - extensions to JMT crate for our purposes

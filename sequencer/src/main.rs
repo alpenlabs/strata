@@ -16,8 +16,8 @@ use alpen_express_consensus_logic::{
         types::{DutyBatch, Identity, IdentityData, IdentityKey},
         worker::{self as duty_worker},
     },
-    genesis, state_tracker,
-    sync_manager::{self, SyncManager},
+    genesis, state_tracker, sync_manager,
+    sync_manager::SyncManager,
 };
 use alpen_express_db::traits::Database;
 use alpen_express_evmexec::{fork_choice_state_initial, EngineRpcClient};
