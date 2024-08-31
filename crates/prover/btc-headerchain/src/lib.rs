@@ -2,6 +2,7 @@ use alpen_express_primitives::buf::Buf32;
 use bitcoin::{block::Header, hashes::Hash, BlockHash, CompactTarget, Target};
 use btc_blockspace::block::compute_block_hash;
 use ethnum::U256;
+use serde::{Deserialize, Serialize};
 
 /// Difficulty recalculation interval.
 /// On [MAINNET](bitcoin::consensus::params::MAINNET), it is around 2 weeks
@@ -15,7 +16,7 @@ const POW_TARGET_SPACING: u32 = 10 * 60;
 /// [bitcoin::consensus::params::Params::difficulty_adjustment_interval].
 const DIFFICULTY_ADJUSTMENT_INTERVAL: u32 = POW_TARGET_TIMESPAN / POW_TARGET_SPACING;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HeaderVerificationState {
     /// [Block number](bitcoin::Block::bip34_block_height) of the last verified block
     pub last_verified_block_num: u32,
@@ -120,14 +121,14 @@ impl HeaderVerificationState {
         }
     }
 
-    pub fn check_and_update(&mut self, header: Header) {
+    pub fn check_and_update(&mut self, header: &Header) {
         // Check continuity
         assert_eq!(
             header.prev_blockhash.as_raw_hash().to_byte_array(),
             *self.last_verified_block_hash.as_ref(),
         );
 
-        let block_hash_raw = compute_block_hash(&header);
+        let block_hash_raw = compute_block_hash(header);
         let block_hash = BlockHash::from_byte_array(*block_hash_raw.as_ref());
 
         // Check PoW
@@ -154,68 +155,73 @@ impl HeaderVerificationState {
     }
 }
 
+/// Calculates the height at which a specific difficulty adjustment occurs relative to a
+/// starting height.
+///
+/// # Arguments
+///
+/// * `idx` - The index of the difficulty adjustment (1-based). 1 for the first adjustment, 2 for
+///   the second, and so on.
+/// * `start` - The starting height from which to calculate.
+pub fn get_difficulty_adjustment_height(idx: u32, start: u32) -> u32 {
+    ((start / DIFFICULTY_ADJUSTMENT_INTERVAL) + idx) * DIFFICULTY_ADJUSTMENT_INTERVAL
+}
+
 #[cfg(test)]
 mod tests {
-    use alpen_express_primitives::buf::Buf32;
-    use alpen_test_utils::bitcoin::get_btc_chain;
-    use bitcoin::hashes::Hash;
+    use alpen_test_utils::bitcoin::{get_btc_chain, BtcChain};
     use rand::Rng;
 
-    use super::HeaderVerificationState;
-    use crate::DIFFICULTY_ADJUSTMENT_INTERVAL;
+    use super::*;
 
-    /// Calculates the height at which a specific difficulty adjustment occurs relative to a
-    /// starting height.
-    ///
-    /// # Arguments
-    ///
-    /// * `idx` - The index of the difficulty adjustment (1-based). 1 for the first adjustment, 2
-    ///   for the second, and so on.
-    /// * `start` - The starting height from which to calculate.
-    fn get_difficulty_adjustment_height(idx: u32, start: u32) -> u32 {
-        ((start / DIFFICULTY_ADJUSTMENT_INTERVAL) + idx) * DIFFICULTY_ADJUSTMENT_INTERVAL
-    }
-
-    #[test]
-    fn test_blocks() {
-        let chain = get_btc_chain();
-
-        // Start from the first difficulty adjustment block after `chain.start`
-        // This ensures we have a known difficulty adjustment point and a set
-        // `interval_start_timestamp`
+    fn for_block(block_height: u32, chain: &BtcChain) -> HeaderVerificationState {
+        // Get the first difficulty adjustment block after `chain.start`
         let h1 = get_difficulty_adjustment_height(1, chain.start);
+        assert!(
+            block_height > h1 && block_height < chain.end,
+            "not enough info in the chain"
+        );
 
-        // Get the second difficulty adjustment block after `chain.start`
-        let h2 = get_difficulty_adjustment_height(2, chain.start);
+        // Get the difficulty adjustment block just before `block_height`
+        let h1 = get_difficulty_adjustment_height(0, block_height);
 
-        // Set the random block between h1 and h2 as the last verified block
-        let r1 = rand::thread_rng().gen_range(h1..h2 - 1);
-        let last_verified_block = chain.get_block(r1);
+        // Consider the block before `block_height` to be the last verified block
+        let vh = block_height - 1; // verified_height
 
-        // Fetch the previous timestamps of block from `r1`
-        // This fetches timestamps of `r1`, `r1-1`, `r1-2`, ...
-        let recent_block_timestamp: [u32; 11] =
-            chain.get_last_timestamps(r1, 11).try_into().unwrap();
+        // Fetch the previous timestamps of block from `vh`
+        // This fetches timestamps of `vh`, `vh-1`, `vh-2`, ...
+        let recent_block_timestamps: [u32; 11] =
+            chain.get_last_timestamps(vh, 11).try_into().unwrap();
 
-        let mut verification_state = HeaderVerificationState {
-            last_verified_block_num: r1,
+        HeaderVerificationState {
+            last_verified_block_num: vh,
             last_verified_block_hash: Buf32::from(
-                last_verified_block
+                chain
+                    .get_block(vh)
                     .block_hash()
                     .as_raw_hash()
                     .to_byte_array(),
             ),
-            next_block_target: last_verified_block
+            next_block_target: chain
+                .get_block(vh)
                 .target()
                 .to_compact_lossy()
                 .to_consensus(),
             interval_start_timestamp: chain.get_block(h1).time,
             total_accumulated_pow: 0f64,
-            last_11_blocks_timestamps: recent_block_timestamp,
-        };
+            last_11_blocks_timestamps: recent_block_timestamps,
+        }
+    }
 
-        for header_idx in (r1 + 1)..chain.end {
-            verification_state.check_and_update(chain.get_block(header_idx))
+    #[test]
+    fn test_blocks() {
+        let chain: BtcChain = get_btc_chain();
+        let h1 = get_difficulty_adjustment_height(1, chain.start);
+        let r1 = rand::thread_rng().gen_range(h1..chain.end);
+        let mut verification_state = for_block(r1, &chain);
+
+        for header_idx in r1..chain.end {
+            verification_state.check_and_update(&chain.get_block(header_idx))
         }
     }
 }
