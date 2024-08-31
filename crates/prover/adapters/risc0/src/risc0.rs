@@ -1,7 +1,7 @@
 use express_zkvm::{Proof, ProverOptions, VerifcationKey, ZKVMHost, ZKVMVerifier};
 use risc0_zkvm::{
-    compute_image_id, get_prover_server, sha::Digest, ExecutorEnv, ExecutorImpl, ProverOpts,
-    Receipt, VerifierContext,
+    compute_image_id, get_prover_server, sha::Digest, AssumptionReceipt, ExecutorEnv, ExecutorImpl,
+    ProverOpts, Receipt, VerifierContext,
 };
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::to_vec;
@@ -65,6 +65,50 @@ impl ZKVMHost for RiscZeroHost {
         // Generate the session
         let mut exec = ExecutorImpl::from_elf(env, &self.elf)?;
         let session = exec.run()?;
+
+        // Generate the proof
+        let ctx = VerifierContext::default();
+        let proof_info = prover.prove_session(&ctx, &session)?;
+
+        // Proof serialization
+        let serialized_proof = bincode::serialize(&proof_info.receipt)?;
+        Ok((
+            Proof::new(serialized_proof),
+            VerifcationKey(verification_key),
+        ))
+    }
+}
+
+impl RiscZeroHost {
+    pub fn prove_with_assumptions<T: serde::Serialize, U: Into<AssumptionReceipt> + Clone>(
+        &self,
+        item: T,
+        assumptions: Vec<U>,
+    ) -> anyhow::Result<(Proof, VerifcationKey)> {
+        if self.prover_options.use_mock_prover {
+            std::env::set_var("RISC0_DEV_MODE", "true");
+        }
+
+        // Setup the environment
+        let mut env_builder = ExecutorEnv::builder();
+        env_builder.write(&item)?;
+        for assumption in assumptions {
+            env_builder.add_assumption(assumption);
+        }
+        let env = env_builder.build()?;
+
+        // Setup the prover
+        let opts = self.determine_prover_options();
+        let prover = get_prover_server(&opts)?;
+
+        // Setup verification key
+        let program_id = compute_image_id(&self.elf)?;
+        let verification_key = bincode::serialize(&program_id)?;
+
+        // Generate the session
+        let mut exec = ExecutorImpl::from_elf(env, &self.elf)?;
+        let session = exec.run()?;
+        println!("User cycles: {:?}", session.user_cycles);
 
         // Generate the proof
         let ctx = VerifierContext::default();
