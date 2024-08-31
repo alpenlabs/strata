@@ -10405,8 +10405,10 @@ dependencies = [
  "bincode",
  "bitcoin",
  "btc-blockspace",
+ "btc-headerchain",
  "express-risc0-adapter",
  "express-zkvm",
+ "rand 0.8.5",
  "risc0-build",
  "zkvm-primitives",
 ]

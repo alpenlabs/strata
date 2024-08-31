@@ -19,6 +19,7 @@ fn main() {
         let elf = r#"
             pub const RETH_RISC0_ELF: &[u8] = &[];
             pub const ALPEN_BTC_BLOCKSPACE_RISC0_PROOF_ELF: &[u8] = &[];
+            pub const L1_BATCH_RISC0_ELF: &[u8] = &[];
         "#;
 
         std::fs::write(methods_path, elf).expect("Failed to write mock rollup elf");

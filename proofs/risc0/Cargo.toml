@@ -14,14 +14,16 @@ bincode = { workspace = true }
 express-zkvm = { workspace = true }
 zkvm-primitives = { workspace = true }
 btc-blockspace = { workspace = true }
+btc-headerchain = { workspace = true }
 alpen-test-utils = { workspace = true }
 bitcoin = { workspace = true }
+rand = { workspace = true }
 
 [build-dependencies]
 risc0-build = { version = "1.0.5" }
 
 [package.metadata.risc0]
-methods = ["guest-reth-stf", "btc-blockspace"]
+methods = ["guest-reth-stf", "btc-blockspace", "l1-batch"]
 
 [features]
 default = []
