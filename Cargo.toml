@@ -14,7 +14,7 @@ members = [
   "crates/prover/adapters/risc0",
   "crates/prover/adapters/sp1",
   "crates/prover/btc-blockspace",
-  "crates/prover/btc-headerchain",
+  "crates/prover/l1-batch",
   "crates/prover/primitives",
   "crates/prover/zkvm",
   "crates/prover/cl-stf",
@@ -65,7 +65,6 @@ alpen-express-state = { path = "crates/state" }
 alpen-express-status = { path = "crates/status" }
 alpen-test-utils = { path = "crates/test-utils" }
 btc-blockspace = { path = "crates/prover/btc-blockspace" }
-btc-headerchain = { path = "crates/prover/btc-headerchain" }
 express-bridge-exec = { path = "crates/bridge-exec" }
 express-bridge-rpc-api = { path = "crates/rpc/bridge-api" }
 express-bridge-sig-manager = { path = "crates/bridge-sig-manager" }
@@ -79,7 +78,8 @@ express-rpc-utils = { path = "crates/rpc/utils" }
 express-storage = { path = "crates/storage" }
 express-sync = { path = "crates/sync" }
 express-tasks = { path = "crates/tasks" }
-express-zkvm = { path = "crates/prover/zkvm" }                              # FIXME make these names more consistent?
+express-zkvm = { path = "crates/prover/zkvm" }                      # FIXME make these names more consistent?
+l1-batch = { path = "crates/prover/l1-batch" }
 zkvm = { path = "crates/prover/zkvm" }
 zkvm-primitives = { path = "crates/prover/primitives" }
 

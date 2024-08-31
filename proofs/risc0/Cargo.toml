@@ -14,7 +14,7 @@ btc-blockspace = { workspace = true }
 bincode = { workspace = true }
 express-zkvm = { workspace = true }
 zkvm-primitives = { workspace = true }
-btc-headerchain = { workspace = true }
+l1-batch = { workspace = true }
 alpen-test-utils = { workspace = true }
 bitcoin = { workspace = true }
 rand = { workspace = true }

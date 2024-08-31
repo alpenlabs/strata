@@ -2178,22 +2178,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "btc-headerchain"
-version = "0.1.0"
-dependencies = [
- "alpen-express-primitives",
- "alpen-test-utils",
- "anyhow",
- "bitcoin",
- "borsh",
- "btc-blockspace",
- "ethnum",
- "rand 0.8.5",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "bumpalo"
 version = "3.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5650,6 +5634,22 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_yaml 0.9.34+deprecated",
+]
+
+[[package]]
+name = "l1-batch"
+version = "0.1.0"
+dependencies = [
+ "alpen-express-primitives",
+ "alpen-test-utils",
+ "anyhow",
+ "bitcoin",
+ "borsh",
+ "btc-blockspace",
+ "ethnum",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -10466,6 +10466,7 @@ dependencies = [
  "express-chaintsn",
  "express-risc0-adapter",
  "express-zkvm",
+ "l1-batch",
  "rand 0.8.5",
  "risc0-build",
  "zkvm-primitives",
