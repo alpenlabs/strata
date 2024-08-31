@@ -1,4 +1,4 @@
-use btc_headerchain::logic::{process_batch_proof, L1BatchProofInput};
+use l1_batch::logic::{process_batch_proof, L1BatchProofInput};
 use risc0_zkvm::guest::env;
 
 fn main() {

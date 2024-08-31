@@ -628,20 +628,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "btc-headerchain"
-version = "0.1.0"
-dependencies = [
- "alpen-express-primitives",
- "anyhow",
- "bitcoin",
- "borsh",
- "btc-blockspace",
- "ethnum",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "byte-slice-cast"
 version = "1.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1241,11 +1227,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "l1-batch"
+version = "0.1.0"
+dependencies = [
+ "alpen-express-primitives",
+ "anyhow",
+ "bitcoin",
+ "borsh",
+ "btc-blockspace",
+ "ethnum",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "l1-batch-risc0"
 version = "0.1.0"
 dependencies = [
  "btc-blockspace",
- "btc-headerchain",
+ "l1-batch",
  "risc0-zkvm",
 ]
 

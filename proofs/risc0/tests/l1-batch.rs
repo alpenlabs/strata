@@ -3,12 +3,12 @@ mod test {
     use alpen_test_utils::bitcoin::{get_btc_chain, BtcChain};
     use bitcoin::hashes::Hash;
     use btc_blockspace::logic::BlockspaceProofOutput;
-    use btc_headerchain::{
+    use express_risc0_adapter::{Risc0Verifier, RiscZeroHost};
+    use express_zkvm::{ZKVMHost, ZKVMVerifier};
+    use l1_batch::{
         header_verification::{get_difficulty_adjustment_height, HeaderVerificationState},
         logic::{L1BatchProofInput, L1BatchProofOutput},
     };
-    use express_risc0_adapter::{Risc0Verifier, RiscZeroHost};
-    use express_zkvm::{ZKVMHost, ZKVMVerifier};
     use rand::Rng;
     use risc0_guest_builder::L1_BATCH_RISC0_ELF;
 
