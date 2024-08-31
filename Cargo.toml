@@ -80,7 +80,6 @@ express-sync = { path = "crates/sync" }
 express-tasks = { path = "crates/tasks" }
 express-zkvm = { path = "crates/prover/zkvm" }                      # FIXME make these names more consistent?
 l1-batch = { path = "crates/prover/l1-batch" }
-zkvm = { path = "crates/prover/zkvm" }
 zkvm-primitives = { path = "crates/prover/primitives" }
 
 # IMPORTANT: ensure alloy-* and revm packages are of the same version as inside reth dependency
