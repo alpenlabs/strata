@@ -144,7 +144,6 @@ class ExpressFactory(flexitest.Factory):
             "--sequencer-bitcoin-address", sequencer_address,
         ]
         # fmt: on
-
         if rollup_params:
             rollup_params_file = os.path.join(datadir, "rollup_params.json")
             with open(rollup_params_file, "w") as f:

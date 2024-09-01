@@ -217,6 +217,7 @@ pub fn duty_dispatch_task<
     params: Arc<Params>,
 ) {
     // TODO make this actually work
+
     let pending_duties = Arc::new(RwLock::new(HashMap::<Buf32, ()>::new()));
 
     // TODO still need some stuff here to decide if we're fully synced and
@@ -307,6 +308,7 @@ fn duty_exec_task<D: Database, E: ExecEngineCtl, S: SequencerDatabase + Send + S
     params: Arc<Params>,
     duty_status_tx: std::sync::mpsc::Sender<DutyExecStatus>,
 ) {
+    println!("i was called :D");
     let result = perform_duty(
         &duty,
         &ik,

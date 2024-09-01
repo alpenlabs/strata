@@ -74,7 +74,8 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
         .ok_or(Error::MissingL2Block(prev_block_id))?;
 
     // TODO: get from rollup config
-    let block_time = params.rollup().block_time;
+    let block_time = 10_000; //params.rollup().block_time;
+    println!("block time was {:?}", block_time);
     let target_ts = prev_block.block().header().timestamp() + block_time;
     let current_ts = now_millis();
 
@@ -105,6 +106,15 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     // TODO Pull data from CSM state that we've observed from L1, including new
     // headers or any headers needed to perform a reorg if necessary.
     let l1_seg = prepare_l1_segment(l1_state, &prev_chstate, l1_prov.as_ref())?;
+    println!("**** got the l1_seg {:?}", l1_seg.new_payloads().len());
+    let file_path = format!("temp-log-{:?}", slot);
+    let mut file = File::create(file_path).unwrap();
+    writeln!(
+        file,
+        "**** got the l1_seg {:?}",
+        l1_seg.new_payloads().len()
+    )
+    .unwrap();
 
     // Prepare the execution segment, which right now is just talking to the EVM
     // but will be more advanced later.

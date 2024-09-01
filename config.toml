@@ -1,15 +1,17 @@
 [client]
 rpc_port = 8432
 l2_blocks_fetch_limit = 1_000
-datadir = "./data/reth"
-# sequencer_key = "/path/to/data/directory/"
+datadir = "./.data"
+sequencer_key = "./test_seqkey.bin"
 # sequencer_bitcoin_address = ""
+sequencer_bitcoin_address = "bcrt1qyk7jrmlehs6dt2xfmkxp9a0rxe7xn4fqxxc29e"
 db_retry_count = 5
 
 [bitcoind_rpc]
-rpc_url = "localhost:18445"
+# rpc_url = "localhost:18445"
+rpc_url = "localhost:8333"
 rpc_user = "rpcuser"
-rpc_password = "rpcuser"
+rpc_password = "rpcpassword"
 network = "regtest"
 
 [sync]
@@ -22,4 +24,4 @@ client_checkpoint_interval = 10
 # reth {authrpc.address}:{authrpc.port}
 rpc_url = "localhost:8551"
 # reth authrpc.jwtsecret path
-secret = "/path/to/jwt.hex"
+secret = "./.data/reth/jwt.hex"
