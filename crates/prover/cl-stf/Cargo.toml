@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+alpen-express-block-credential = { workspace = true }
 express-chaintsn.workspace = true
 alpen-express-state.workspace = true
 alpen-express-primitives.workspace = true
