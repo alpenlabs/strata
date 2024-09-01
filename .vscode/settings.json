@@ -14,6 +14,7 @@
     "rust-analyzer.linkedProjects": [
         "Cargo.toml",
         "proofs/risc0/guest-reth-stf/Cargo.toml",
+        "proofs/risc0/guest-cl-stf/Cargo.toml",
         "proofs/sp1/guest-reth-stf/Cargo.toml",
     ],
     "rust-analyzer.diagnostics.enable": true,
