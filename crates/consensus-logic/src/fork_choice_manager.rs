@@ -2,12 +2,13 @@
 
 use std::sync::Arc;
 
+use alpen_express_block_credential;
 use alpen_express_db::{
     errors::DbError,
     traits::{BlockStatus, ChainstateProvider, ChainstateStore, Database},
 };
 use alpen_express_eectl::{engine::ExecEngineCtl, messages::ExecPayloadData};
-use alpen_express_primitives::{hash, params::Params};
+use alpen_express_primitives::params::Params;
 use alpen_express_state::{
     block::L2BlockBundle, client_state::ClientState, operation::SyncAction, prelude::*,
     state_op::StateCache, sync_event::SyncEvent,
@@ -18,8 +19,8 @@ use tokio::sync::mpsc;
 use tracing::*;
 
 use crate::{
-    credential, ctl::CsmController, errors::*, message::ForkChoiceMessage, reorg,
-    unfinalized_tracker, unfinalized_tracker::UnfinalizedBlockTracker,
+    ctl::CsmController, errors::*, message::ForkChoiceMessage, reorg, unfinalized_tracker,
+    unfinalized_tracker::UnfinalizedBlockTracker,
 };
 
 /// Tracks the parts of the chain that haven't been finalized on-chain yet.
@@ -440,7 +441,7 @@ fn check_new_block<D: Database>(
     let params = state.params.as_ref();
 
     // Check that the block is correctly signed.
-    let cred_ok = credential::check_block_credential(block.header(), params);
+    let cred_ok = alpen_express_block_credential::check_block_credential(block.header(), params);
     if !cred_ok {
         warn!(?blkid, "block has invalid credential");
         return Ok(false);

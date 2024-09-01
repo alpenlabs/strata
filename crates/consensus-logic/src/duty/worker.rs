@@ -6,6 +6,7 @@ use std::{
     time,
 };
 
+use alpen_express_block_credential::sign_schnorr_sig;
 use alpen_express_btcio::writer::InscriptionHandle;
 use alpen_express_db::traits::*;
 use alpen_express_eectl::engine::ExecEngineCtl;
@@ -29,7 +30,6 @@ use super::{
     types::{self, Duty, DutyBatch, Identity, IdentityKey},
 };
 use crate::{
-    credential::sign_schnorr_sig,
     errors::Error,
     message::{ClientUpdateNotif, ForkChoiceMessage},
     sync_manager::SyncManager,
