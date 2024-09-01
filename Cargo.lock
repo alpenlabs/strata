@@ -947,6 +947,7 @@ name = "alpen-express-state"
 version = "0.1.0"
 dependencies = [
  "alpen-express-primitives",
+ "alpen-test-utils",
  "arbitrary",
  "bitcoin",
  "borsh",
@@ -2375,18 +2376,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cl-stf"
-version = "0.1.0"
-dependencies = [
- "alpen-express-consensus-logic",
- "alpen-express-primitives",
- "alpen-express-state",
- "alpen-test-utils",
- "borsh",
- "express-chaintsn",
-]
-
-[[package]]
 name = "clang-sys"
 version = "1.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3786,6 +3775,17 @@ dependencies = [
  "alpen-express-state",
  "thiserror",
  "tracing",
+]
+
+[[package]]
+name = "express-cl-stf"
+version = "0.1.0"
+dependencies = [
+ "alpen-express-primitives",
+ "alpen-express-state",
+ "alpen-test-utils",
+ "borsh",
+ "express-chaintsn",
 ]
 
 [[package]]
@@ -10413,10 +10413,14 @@ dependencies = [
 name = "risc0-guest-builder"
 version = "0.1.0"
 dependencies = [
+ "alpen-express-primitives",
+ "alpen-express-state",
  "alpen-test-utils",
  "bincode",
  "bitcoin",
+ "borsh",
  "btc-blockspace",
+ "express-chaintsn",
  "express-risc0-adapter",
  "express-zkvm",
  "risc0-build",

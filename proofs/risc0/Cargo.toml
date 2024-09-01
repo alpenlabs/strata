@@ -10,18 +10,23 @@ express-risc0-adapter = { path = "../../crates/prover/adapters/risc0", features 
 
 
 [dev-dependencies]
+
+btc-blockspace = { workspace = true }
 bincode = { workspace = true }
 express-zkvm = { workspace = true }
 zkvm-primitives = { workspace = true }
-btc-blockspace = { workspace = true }
 alpen-test-utils = { workspace = true }
 bitcoin = { workspace = true }
+express-chaintsn.workspace = true
+alpen-express-state.workspace = true
+alpen-express-primitives.workspace = true
+borsh = { workspace = true }
 
 [build-dependencies]
 risc0-build = { version = "1.0.5" }
 
 [package.metadata.risc0]
-methods = ["guest-reth-stf", "btc-blockspace"]
+methods = ["guest-reth-stf", "guest-cl-stf", "btc-blockspace"]
 
 [features]
 default = []

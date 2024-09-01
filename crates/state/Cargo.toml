@@ -19,4 +19,8 @@ hex = { workspace = true }
 num_enum = { workspace = true }
 serde = { workspace = true }
 sha2 = { workspace = true }
-tracing = { workspace = true }
+tracing = { workspace = true }   # ideally this shouldn't be in this trait
+
+
+[dev-dependencies]
+alpen-test-utils = { workspace = true }

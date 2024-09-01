@@ -1,12 +1,13 @@
 use std::ops::Deref;
 
-use alpen_express_primitives::prelude::*;
+use alpen_express_primitives::{hash, prelude::*};
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
+use tracing::warn;
 
 use crate::{
     exec_update,
-    header::{L2BlockHeader, SignedL2BlockHeader},
+    header::{L2BlockHeader, L2Header, SignedL2BlockHeader},
     id::L2BlockId,
     l1,
 };
@@ -41,6 +42,26 @@ impl L2Block {
 
     pub fn exec_segment(&self) -> &ExecSegment {
         &self.body.exec_segment
+    }
+
+    pub fn check_block_segments(&self) -> bool {
+        // check if the l1_segment_hash matches between L2Block and L2BlockHeader
+        let l1seg_buf = borsh::to_vec(self.l1_segment()).expect("blockasm: enc l1 segment");
+        let l1_segment_hash = hash::raw(&l1seg_buf);
+        if l1_segment_hash != *self.header().l1_payload_hash() {
+            warn!("computed l1_segment_hash doesn't match between L2Block and L2BlockHeader");
+            return false;
+        }
+
+        // check if the exec_segment_hash matches between L2Block and L2BlockHeader
+        let eseg_buf = borsh::to_vec(self.exec_segment()).expect("blockasm: enc exec segment");
+        let exec_segment_hash = hash::raw(&eseg_buf);
+        if exec_segment_hash != *self.header().exec_payload_hash() {
+            warn!("computed exec_segment_hash doesn't match between L2Block and L2BlockHeader");
+            return false;
+        }
+
+        true
     }
 }
 
@@ -176,5 +197,30 @@ impl Deref for L2BlockBundle {
 
     fn deref(&self) -> &Self::Target {
         &self.block
+    }
+}
+#[cfg(test)]
+mod tests {
+    use alpen_test_utils::ArbitraryGenerator;
+
+    use super::*;
+
+    #[test]
+    fn test_verify_block_hashes() {
+        // use arbitrary generator to get the new block
+        let block: L2Block = ArbitraryGenerator::new().generate();
+        assert!(block.check_block_segments());
+
+        let arb_exec_segment: ExecSegment = ArbitraryGenerator::new().generate();
+        let arb_l1_segment: L1Segment = ArbitraryGenerator::new().generate();
+        // mutate the l2Block's body to create a new block with arbitrary exec segment
+        let blk_body = L2BlockBody::new(block.body().l1_segment().clone(), arb_exec_segment);
+        let arb_exec_block = L2Block::new(block.header().clone(), blk_body);
+        assert!(!arb_exec_block.check_block_segments());
+
+        // mutate the l2Block's body to create a new block with arbitrary l1 segment
+        let blk_body = L2BlockBody::new(arb_l1_segment, block.body().exec_segment().clone());
+        let arb_l1_block = L2Block::new(block.header().clone(), blk_body);
+        assert!(!arb_l1_block.check_block_segments());
     }
 }
