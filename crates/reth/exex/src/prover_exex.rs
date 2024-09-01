@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, fs::File, io::Write, sync::Arc};
 
 use alloy_rpc_types::EIP1186AccountProofResponse;
 use express_reth_db::WitnessStore;
@@ -141,6 +141,13 @@ fn extract_zkvm_input<Node: FullNodeComponents>(
         // Will need to revisit if BLOCKHASH opcode operation is a blocker
         ancestor_headers: Default::default(),
     };
+
+    // save the block number
+    let inp_serialized = serde_json::to_string_pretty(&input).unwrap();
+    let file_path = format!("zk-input-{:?}", current_block_idx);
+    let mut file = File::create(file_path).expect("Could not create file");
+    file.write_all(inp_serialized.as_bytes())
+        .expect("Could not write to file");
 
     Ok(input)
 }

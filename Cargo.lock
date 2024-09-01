@@ -720,6 +720,7 @@ dependencies = [
  "express-tasks",
  "rand 0.8.5",
  "secp256k1",
+ "serde_json",
  "thiserror",
  "threadpool",
  "tokio",
@@ -2251,6 +2252,16 @@ checksum = "773f3b9af64447d2ce9850330c473515014aa235e6a783b02db81ff39e4a3dad"
 dependencies = [
  "crypto-common",
  "inout",
+]
+
+[[package]]
+name = "cl-block-proof"
+version = "0.1.0"
+dependencies = [
+ "alpen-express-primitives",
+ "alpen-express-state",
+ "alpen-test-utils",
+ "express-chaintsn",
 ]
 
 [[package]]

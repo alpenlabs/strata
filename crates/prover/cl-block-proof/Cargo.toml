@@ -1,0 +1,12 @@
+[package]
+name = "cl-block-proof"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+express-chaintsn.workspace = true
+alpen-express-state.workspace = true
+alpen-express-primitives.workspace = true
+
+[dev-dependencies]
+alpen-test-utils.workspace = true

@@ -11,6 +11,7 @@ members = [
   "crates/prover/adapters/risc0",
   "crates/prover/adapters/sp1",
   "crates/prover/primitives",
+  "crates/prover/cl-block-proof",
   "crates/prover/zkvm",
   "crates/reth/db",
   "crates/reth/exex",

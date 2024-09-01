@@ -1,7 +1,13 @@
 //! Impl logic for the block assembly duties.
 #![allow(unused)]
 
-use std::{sync::Arc, thread, time};
+use std::{
+    fs::File,
+    io::{Cursor, Read, Write},
+    path::Path,
+    sync::Arc,
+    thread, time,
+};
 
 use alpen_express_db::traits::{
     ChainstateProvider, ClientStateProvider, Database, L1DataProvider, L2DataProvider, L2DataStore,
@@ -25,6 +31,8 @@ use alpen_express_state::{
     prelude::*,
     state_op::*,
 };
+use borsh::{from_slice, to_vec, BorshDeserialize, BorshSerialize};
+use serde_json::{json, to_string_pretty};
 use tracing::*;
 
 use super::types::*;
@@ -115,7 +123,7 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
 
     // Execute the block to compute the new state root, then assemble the real header.
     // TODO do something with the write batch?  to prepare it in the database?
-    let (post_state, _wb) = compute_post_state(prev_chstate, &fake_header, &body, params)?;
+    let (post_state, _wb) = compute_post_state(prev_chstate.clone(), &fake_header, &body, params)?;
     let new_state_root = post_state.compute_state_root();
 
     let header = L2BlockHeader::new(slot, ts, prev_block_id, &body, new_state_root);
@@ -132,8 +140,84 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     l2store.put_block_data(final_bundle)?;
     debug!(?blkid, "wrote block to datastore");
 
+    let dir_name = format!("cstf-slot-{:?}.borsh", slot);
+    write_chain_state(&dir_name, &prev_chstate, &post_state, &final_block, &blkid).unwrap();
+
+    let _ = read_chain_state(&dir_name).unwrap();
+
     // TODO should we actually return the bundle here?
     Ok(Some((blkid, final_block)))
+}
+
+fn write_chain_state(
+    dir_name: &str,
+    prev_chstate: &ChainState,
+    post_state: &ChainState,
+    final_block: &L2Block,
+    blkid: &L2BlockId,
+) -> std::io::Result<()> {
+    // Ensure the directory exists
+    std::fs::create_dir_all(dir_name)?;
+
+    // Construct the file paths based on the directory name
+    let prev_file_path = Path::new(dir_name).join("prev_chstate.borsh");
+    let post_file_path = Path::new(dir_name).join("post_state.borsh");
+    let block_file_path = Path::new(dir_name).join("final_block.borsh");
+    let blkid_file_path = Path::new(dir_name).join("blkid.borsh");
+
+    // Write prev_chstate to a separate file
+    let mut prev_file = File::create(prev_file_path)?;
+    prev_file.write_all(&to_vec(prev_chstate).unwrap())?;
+
+    // Write post_state to a separate file
+    let mut post_file = File::create(post_file_path)?;
+    post_file.write_all(&to_vec(post_state).unwrap())?;
+
+    // Write final_block to a separate file
+    let mut block_file = File::create(block_file_path)?;
+    block_file.write_all(&to_vec(final_block).unwrap())?;
+
+    // Write blkid to a separate file
+    let mut blkid_file = File::create(blkid_file_path)?;
+    blkid_file.write_all(&to_vec(blkid).unwrap())?;
+
+    Ok(())
+}
+
+fn read_chain_state(
+    dir_name: &str,
+) -> std::io::Result<(ChainState, ChainState, L2Block, L2BlockId)> {
+    // Construct the file paths based on the directory name
+    let prev_file_path = Path::new(dir_name).join("prev_chstate.borsh");
+    let post_file_path = Path::new(dir_name).join("post_state.borsh");
+    let block_file_path = Path::new(dir_name).join("final_block.borsh");
+    let blkid_file_path = Path::new(dir_name).join("blkid.borsh");
+
+    // Read prev_chstate from the file
+    let mut prev_file = File::open(prev_file_path)?;
+    let mut prev_data = Vec::new();
+    prev_file.read_to_end(&mut prev_data)?;
+    let prev_chstate: ChainState = from_slice(&prev_data).unwrap();
+
+    // Read post_state from the file
+    let mut post_file = File::open(post_file_path)?;
+    let mut post_data = Vec::new();
+    post_file.read_to_end(&mut post_data)?;
+    let post_state: ChainState = from_slice(&post_data).unwrap();
+
+    // Read final_block from the file
+    let mut block_file = File::open(block_file_path)?;
+    let mut block_data = Vec::new();
+    block_file.read_to_end(&mut block_data)?;
+    let final_block: L2Block = from_slice(&block_data).unwrap();
+
+    // Read blkid from the file
+    let mut blkid_file = File::open(blkid_file_path)?;
+    let mut blkid_data = Vec::new();
+    blkid_file.read_to_end(&mut blkid_data)?;
+    let blkid: L2BlockId = from_slice(&blkid_data).unwrap();
+
+    Ok((prev_chstate, post_state, final_block, blkid))
 }
 
 fn prepare_l1_segment(

@@ -125,7 +125,8 @@ mod tests {
         Params {
             rollup: RollupParams {
                 rollup_name: "express".to_string(),
-                block_time: 1000,
+                block_time: 10000,
+                // block_time: 1000,
                 cred_rule: block_credential::CredRule::Unchecked,
                 horizon_l1_height: 3,
                 genesis_l1_height: 5,
