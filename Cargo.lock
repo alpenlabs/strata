@@ -2293,6 +2293,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "cl-stf"
+version = "0.1.0"
+dependencies = [
+ "alpen-express-consensus-logic",
+ "alpen-express-primitives",
+ "alpen-express-state",
+ "alpen-test-utils",
+ "borsh",
+ "express-chaintsn",
+]
+
+[[package]]
 name = "clang-sys"
 version = "1.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

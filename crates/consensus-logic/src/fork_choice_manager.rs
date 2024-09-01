@@ -461,7 +461,8 @@ fn check_new_block<D: Database>(
     Ok(true)
 }
 
-fn check_block_segments(block: &L2Block, blkid: &L2BlockId) -> bool {
+// TODO: Add comments and why it was made public
+pub fn check_block_segments(block: &L2Block, blkid: &L2BlockId) -> bool {
     // check if the l1_segment_hash matches between L2Block and L2BlockHeader
     let l1seg_buf = borsh::to_vec(block.l1_segment()).expect("blockasm: enc l1 segment");
     let l1_segment_hash = hash::raw(&l1seg_buf);
