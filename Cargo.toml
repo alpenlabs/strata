@@ -48,6 +48,7 @@ default-members = ["bin/bridge-client", "reth", "sequencer"]
 resolver = "2"
 
 [workspace.dependencies]
+alpen-express-block-credential = { path = "crates/util/credential", default-features = false }
 alpen-express-btcio = { path = "crates/btcio" }
 alpen-express-common = { path = "crates/common" }
 alpen-express-consensus-logic = { path = "crates/consensus-logic" }
@@ -61,7 +62,6 @@ alpen-express-rpc-api = { path = "crates/rpc/api" }
 alpen-express-rpc-types = { path = "crates/rpc/types" }
 alpen-express-state = { path = "crates/state" }
 alpen-express-status = { path = "crates/status" }
-alpen-express-block-credential = { path = "crates/util/credential", default-features = false }
 alpen-test-utils = { path = "crates/test-utils" }
 btc-blockspace = { path = "crates/prover/btc-blockspace" }
 express-bridge-exec = { path = "crates/bridge-exec" }
