@@ -1,13 +1,10 @@
-#![allow(unused)]
-
-use std::{borrow::BorrowMut, sync::Arc};
+use std::sync::Arc;
 
 use alpen_express_btcio::{broadcaster::L1BroadcastHandle, writer::InscriptionHandle};
 use alpen_express_consensus_logic::sync_manager::SyncManager;
 use alpen_express_db::{
-    traits::{ChainstateProvider, Database, L1DataProvider, L2DataProvider, SequencerDatabase},
+    traits::{ChainstateProvider, Database, L1DataProvider, L2DataProvider},
     types::{L1TxEntry, L1TxStatus},
-    DbResult,
 };
 use alpen_express_primitives::{buf::Buf32, hash};
 use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer, HexBytes, HexBytes32};
@@ -15,35 +12,21 @@ use alpen_express_rpc_types::{
     BlockHeader, ClientStatus, DaBlob, DepositEntry, DepositState, ExecUpdate, L1Status,
 };
 use alpen_express_state::{
-    block::{L2Block, L2BlockBundle},
+    block::L2BlockBundle,
     bridge_ops::WithdrawalIntent,
     chain_state::ChainState,
     client_state::ClientState,
     da_blob::{BlobDest, BlobIntent},
-    exec_update,
-    header::{L2Header, SignedL2BlockHeader},
+    header::L2Header,
     id::L2BlockId,
     l1::L1BlockId,
 };
-use alpen_express_status::{StatusError, StatusRx};
+use alpen_express_status::StatusRx;
 use async_trait::async_trait;
 use bitcoin::{consensus::deserialize, hashes::Hash, Transaction as BTransaction, Txid};
-use jsonrpsee::{
-    core::RpcResult,
-    types::{ErrorObject, ErrorObjectOwned},
-};
-use reth_primitives::{Address, BlockId, BlockNumberOrTag, Bytes, B256, B64, U256, U64};
-use reth_rpc_api::EthApiServer;
-use reth_rpc_types::{
-    state::StateOverride, AccessListWithGasUsed, AnyTransactionReceipt, BlockOverrides, Bundle,
-    EIP1186AccountProofResponse, EthCallResponse, FeeHistory, Header, Index, RichBlock,
-    StateContext, SyncInfo, SyncStatus, Transaction, TransactionRequest, Work,
-};
+use jsonrpsee::{core::RpcResult, types::ErrorObjectOwned};
 use thiserror::Error;
-use tokio::sync::{
-    mpsc::{self, Sender},
-    oneshot, watch, Mutex, RwLock,
-};
+use tokio::sync::{oneshot, Mutex};
 use tracing::*;
 
 #[derive(Debug, Error)]
@@ -517,7 +500,7 @@ impl AlpenAdminApiServer for AdminServerImpl {
         // is deferred to signer in the writer module
         if let Some(writer) = &self.writer {
             if let Err(e) = writer.submit_intent_async(blobintent).await {
-                return Err(Error::Other("".to_string()).into());
+                return Err(Error::Other(e.to_string()).into());
             }
         }
         Ok(())
