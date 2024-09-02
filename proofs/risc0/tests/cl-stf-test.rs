@@ -1,4 +1,4 @@
-// #[cfg(feature = "prover")]
+#[cfg(feature = "prover")]
 
 mod test {
     use alpen_express_state::{block::L2Block, chain_state::ChainState};
