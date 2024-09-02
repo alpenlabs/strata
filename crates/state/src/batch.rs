@@ -7,7 +7,7 @@ use crate::{id::L2BlockId, l1::L1BlockId};
 /// Will be updated as prover specs evolve.
 #[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
 pub struct BatchCommitment {
-    /// Last safe L1 block for the batch
+    /// Safe L1 block for the batch
     l1blockid: L1BlockId,
     /// Last L2 block covered by the batch
     l2blockid: L2BlockId,
