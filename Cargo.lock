@@ -11365,7 +11365,11 @@ dependencies = [
 name = "sp1-guest-builder"
 version = "0.1.0"
 dependencies = [
+ "alpen-express-primitives",
+ "alpen-express-state",
+ "alpen-test-utils",
  "bincode",
+ "borsh",
  "express-sp1-adapter",
  "express-zkvm",
  "sp1-helper",

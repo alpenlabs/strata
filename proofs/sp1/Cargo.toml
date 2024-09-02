@@ -15,6 +15,10 @@ sp1-helper = "1.0.1"
 bincode = { workspace = true }
 express-zkvm = { workspace = true }
 zkvm-primitives = { workspace = true }
+alpen-express-state.workspace = true
+alpen-express-primitives.workspace = true
+borsh = { workspace = true }
+alpen-test-utils.workspace = true
 
 
 [package.metadata.risc0]
