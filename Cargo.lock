@@ -11371,6 +11371,8 @@ dependencies = [
  "borsh",
  "express-sp1-adapter",
  "express-zkvm",
+ "serde",
+ "serde_json",
  "sp1-helper",
  "zkvm-primitives",
 ]

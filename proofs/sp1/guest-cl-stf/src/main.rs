@@ -3,13 +3,25 @@ use alpen_express_primitives::{
     buf::Buf32,
     params::{Params, RollupParams, RunParams},
 };
+use bincode;
 use express_cl_stf::{verify_and_transition, ChainState, L2Block};
+use sha2::{Digest, Sha256};
+use zkvm_primitives::ELProofPublicParams;
 
 fn main() {
     let params = get_rollup_param();
-    let input: Vec<u8> = sp1_zkvm::io::read();
-    let (prev_state, block): (ChainState, L2Block) = borsh::from_slice(&input).unwrap();
 
+    // Read the input from the host
+    let el_vkey = sp1_zkvm::io::read::<[u32; 8]>();
+    let el_pp = sp1_zkvm::io::read::<ELProofPublicParams>();
+    let cl_input: Vec<u8> = sp1_zkvm::io::read();
+    let (prev_state, block): (ChainState, L2Block) = borsh::from_slice(&cl_input).unwrap();
+
+    // Verify the EL proof
+    let public_values_digest = Sha256::digest(bincode::serialize(&el_pp).unwrap());
+    sp1_zkvm::lib::verify::verify_sp1_proof(&el_vkey, &public_values_digest.into());
+
+    // Verify the CL block proof
     let new_state = verify_and_transition(prev_state, block, params).unwrap();
     sp1_zkvm::io::commit(&borsh::to_vec(&new_state).unwrap());
 }
