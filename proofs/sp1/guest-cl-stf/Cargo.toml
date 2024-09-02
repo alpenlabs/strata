@@ -1,0 +1,17 @@
+[package]
+edition = "2021"
+name = "cl-block-stf"
+version = "0.1.0"
+
+[workspace]
+
+[dependencies]
+sp1-zkvm = "1.2.0-rc2"
+express-cl-stf = { path = "../../../crates/prover/cl-stf" }
+alpen-express-primitives = { path = "../../../crates/primitives" }
+bitcoin = { version = "0.32.1", features = ["serde"] }
+borsh = { version = "1.5.0", features = ["derive"] }
+
+
+[patch.crates-io]
+# secp256k1 = { git = "https://github.com/sp1-patches/rust-secp256k1", branch = "patch-secp256k1-v0.29.0" }

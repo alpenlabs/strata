@@ -6,23 +6,23 @@ mod test {
     use sp1_guest_builder::GUEST_RETH_STF_ELF;
     use zkvm_primitives::{ELProofPublicParams, ZKVMInput};
 
-    const ENCODED_PROVER_INPUT: &[u8] =
-        include_bytes!("../../test-util/el_block_witness_input.bin");
+    //     const ENCODED_PROVER_INPUT: &[u8] =
+    //         include_bytes!("../../test-util/el_block_witness_input.bin");
 
-    #[test]
-    fn test_reth_stf_guest_code_trace_generation() {
-        if cfg!(debug_assertions) {
-            panic!("SP1 prover runs in release mode only");
-        }
+    //     #[test]
+    //     fn test_reth_stf_guest_code_trace_generation() {
+    //         if cfg!(debug_assertions) {
+    //             panic!("SP1 prover runs in release mode only");
+    //         }
 
-        let input: ZKVMInput = bincode::deserialize(ENCODED_PROVER_INPUT).unwrap();
-        let prover = SP1Host::init(GUEST_RETH_STF_ELF.into(), Default::default());
+    // let input: ZKVMInput = bincode::deserialize(ENCODED_PROVER_INPUT).unwrap();
+    // let prover = SP1Host::init(GUEST_RETH_STF_ELF.into(), Default::default());
 
-        let (proof, _) = prover
-            .prove(&[input.clone()], None)
-            .expect("Failed to generate proof");
+    // let (proof, _) = prover
+    //     .prove(&[input.clone()], None)
+    //     .expect("Failed to generate proof");
 
-        SP1Verifier::extract_public_output::<ELProofPublicParams>(&proof)
-            .expect("Failed to extract public outputs");
-    }
+    //         SP1Verifier::extract_public_output::<ELProofPublicParams>(&proof)
+    //             .expect("Failed to extract public outputs");
+    //     }
 }

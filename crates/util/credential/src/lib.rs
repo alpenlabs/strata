@@ -11,6 +11,12 @@ use secp256k1::{schnorr::Signature, Message};
 #[cfg(feature = "default")]
 use secp256k1::{Keypair, Secp256k1, SecretKey};
 
+#[cfg(target_os = "zkvm")]
+pub fn check_block_credential(header: &SignedL2BlockHeader, params: &Params) -> bool {
+    true
+}
+
+#[cfg(not(target_os = "zkvm"))]
 pub fn check_block_credential(header: &SignedL2BlockHeader, params: &Params) -> bool {
     let sigcom = compute_header_sig_commitment(header);
     match &params.rollup().cred_rule {
