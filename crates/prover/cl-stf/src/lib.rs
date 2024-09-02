@@ -43,8 +43,7 @@ fn apply_state_transition(
     )
     .map_err(|err| format!("State transition failed: {:?}", err))?;
 
-    let (post_state, _) = state_cache.finalize();
-    Ok(post_state)
+    Ok(state_cache.state().to_owned())
 }
 
 #[cfg(test)]

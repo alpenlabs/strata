@@ -20,7 +20,6 @@ mod test {
 
     #[test]
     fn test_reth_stf_guest_code_trace_generation() {
-        // let input: ZKVMInput = bincode::deserialize(ENCODED_PROVER_INPUT).unwrap();
         let input = get_prover_input();
         let input_ser = borsh::to_vec(&input).unwrap();
 

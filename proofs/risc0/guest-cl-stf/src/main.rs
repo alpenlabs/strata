@@ -7,7 +7,7 @@ use express_cl_stf::{verify_and_transition, ChainState, L2Block};
 use risc0_zkvm::guest::env;
 
 fn main() {
-    let params = get_rollup_param();
+    let params = get_rollup_params();
     let input: Vec<u8> = env::read();
     let (prev_state, block): (ChainState, L2Block) = borsh::from_slice(&input).unwrap();
 
@@ -16,7 +16,7 @@ fn main() {
 }
 
 // TODO: Should be read from config file and evaluated on compile time
-fn get_rollup_param() -> Params {
+fn get_rollup_params() -> Params {
     Params {
         rollup: RollupParams {
             rollup_name: "express".to_string(),
