@@ -6,17 +6,10 @@ use alpen_express_primitives::{
     params::Params,
 };
 use alpen_express_state::header::{L2Header, SignedL2BlockHeader};
-use bitcoin::XOnlyPublicKey;
-use secp256k1::{schnorr::Signature, Message};
+use secp256k1::{schnorr::Signature, Message, XOnlyPublicKey};
 #[cfg(feature = "default")]
 use secp256k1::{Keypair, Secp256k1, SecretKey};
 
-#[cfg(target_os = "zkvm")]
-pub fn check_block_credential(header: &SignedL2BlockHeader, params: &Params) -> bool {
-    true
-}
-
-#[cfg(not(target_os = "zkvm"))]
 pub fn check_block_credential(header: &SignedL2BlockHeader, params: &Params) -> bool {
     let sigcom = compute_header_sig_commitment(header);
     match &params.rollup().cred_rule {

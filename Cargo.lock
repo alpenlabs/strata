@@ -668,7 +668,6 @@ version = "0.1.0"
 dependencies = [
  "alpen-express-primitives",
  "alpen-express-state",
- "bitcoin",
  "borsh",
  "rand 0.8.5",
  "secp256k1",
@@ -1691,9 +1690,9 @@ checksum = "349f9b6a179ed607305526ca489b34ad0a41aed5f7980fa90eb03160b69598fb"
 
 [[package]]
 name = "bitcoin"
-version = "0.32.2"
+version = "0.32.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea507acc1cd80fc084ace38544bbcf7ced7c2aa65b653b102de0ce718df668f6"
+checksum = "4bf33434c870e98ecc8608588ccc990c5daba9ba9ad39733dc85fba22c211504"
 dependencies = [
  "base58ck",
  "bech32 0.11.0",

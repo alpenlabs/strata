@@ -144,12 +144,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "alpen-express-block-credential"
+name = "alpen-express-crypto"
 version = "0.1.0"
 dependencies = [
  "alpen-express-primitives",
- "alpen-express-state",
- "bitcoin",
  "borsh",
  "secp256k1",
  "sha2",
@@ -166,23 +164,18 @@ dependencies = [
  "hex",
  "reth-primitives",
  "serde",
- "serde_json",
  "sha2",
- "thiserror",
 ]
 
 [[package]]
 name = "alpen-express-state"
 version = "0.1.0"
 dependencies = [
+ "alpen-express-crypto",
  "alpen-express-primitives",
  "arbitrary",
- "bitcoin",
  "borsh",
  "digest 0.10.7",
- "express-bridge-sig-manager",
- "express-bridge-tx-builder",
- "hex",
  "num_enum",
  "serde",
  "sha2",
@@ -506,9 +499,9 @@ checksum = "349f9b6a179ed607305526ca489b34ad0a41aed5f7980fa90eb03160b69598fb"
 
 [[package]]
 name = "bitcoin"
-version = "0.32.2"
+version = "0.32.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea507acc1cd80fc084ace38544bbcf7ced7c2aa65b653b102de0ce718df668f6"
+checksum = "4bf33434c870e98ecc8608588ccc990c5daba9ba9ad39733dc85fba22c211504"
 dependencies = [
  "base58ck",
  "bech32",
@@ -996,27 +989,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "express-bridge-sig-manager"
-version = "0.1.0"
-dependencies = [
- "alpen-express-primitives",
- "bitcoin",
- "express-bridge-tx-builder",
- "serde",
- "thiserror",
-]
-
-[[package]]
-name = "express-bridge-tx-builder"
-version = "0.1.0"
-dependencies = [
- "alpen-express-primitives",
- "bitcoin",
- "serde",
- "thiserror",
-]
-
-[[package]]
 name = "express-chaintsn"
 version = "0.1.0"
 dependencies = [
@@ -1030,11 +1002,12 @@ dependencies = [
 name = "express-cl-stf"
 version = "0.1.0"
 dependencies = [
- "alpen-express-block-credential",
+ "alpen-express-crypto",
  "alpen-express-primitives",
  "alpen-express-state",
  "borsh",
  "express-chaintsn",
+ "thiserror",
 ]
 
 [[package]]
