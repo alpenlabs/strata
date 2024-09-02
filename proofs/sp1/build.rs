@@ -6,29 +6,36 @@ use std::{
 use sp1_helper::build_program;
 
 const RISC_V_COMPILER: &str = "/opt/riscv/bin/riscv-none-elf-gcc";
-// const ELF_FILE_PATH: &str = "guest-reth-stf/elf/riscv32im-succinct-zkvm-elf";
-const ELF_FILE_PATH: &str = "guest-cl-stf/elf/riscv32im-succinct-zkvm-elf";
-const MOCK_ELF_CONTENT: &str = r#"
-    pub const RETH_SP1_ELF: &[u8] = &[];
-    pub const CL_BLOCK_STF_ELF: &[u8] = &[];
-"#;
+const PROGRAMS_TO_BUILD: [&str; 1] = ["guest-cl-stf"];
 
 fn main() {
+    let guest_programs = get_guest_programs();
+    let mut methods_file_content = String::new();
+
+    for program in guest_programs {
+        let elf_name = format!("{}-ELF", program.to_uppercase()).replace("-", "_");
+        let mut elf_content = generate_mock_elf_content(&elf_name);
+
+        if is_build_enabled() && PROGRAMS_TO_BUILD.contains(&program.as_str()) {
+            setup_compiler();
+            build_program(&program);
+
+            let elf_path = format!("{}/elf/riscv32im-succinct-zkvm-elf", program);
+            elf_content = generate_elf_content(&elf_name, &elf_path);
+        }
+
+        methods_file_content += &elf_content;
+    }
+
     let out_dir = get_output_dir();
     let methods_path = out_dir.join("methods.rs");
+    fs::write(&methods_path, methods_file_content).expect("failed writing to methods path");
+}
 
-    if cfg!(feature = "prover")
+fn is_build_enabled() -> bool {
+    cfg!(feature = "prover")
         && std::env::var("SKIP_GUEST_BUILD").is_err()
         && std::env::var("CARGO_CFG_CLIPPY").is_err()
-    {
-        setup_compiler();
-        build_program("guest-cl-stf");
-        let elf_content = generate_elf_content(ELF_FILE_PATH);
-        fs::write(&methods_path, elf_content).expect("failed writing to methods path");
-        // fs::write(methods_path, MOCK_ELF_CONTENT).expect("failed writing to methods path");
-    } else {
-        fs::write(methods_path, MOCK_ELF_CONTENT).expect("failed writing to methods path");
-    }
 }
 
 fn get_output_dir() -> PathBuf {
@@ -40,7 +47,7 @@ fn setup_compiler() {
     env::set_var("CC_riscv32im_succinct_zkvm_elf", RISC_V_COMPILER);
 }
 
-fn generate_elf_content(elf_path: &str) -> String {
+fn generate_elf_content(elf_name: &str, elf_path: &str) -> String {
     let contents = fs::read(elf_path).expect("failed to find sp1 elf");
     let contents_str = contents
         .iter()
@@ -50,8 +57,35 @@ fn generate_elf_content(elf_path: &str) -> String {
 
     format!(
         r#"
-        pub const CL_BLOCK_STF_ELF: &[u8] = &[{}];
+        pub const {}: &[u8] = &[{}];
     "#,
-        contents_str
+        elf_name, contents_str
     )
+}
+
+fn generate_mock_elf_content(elf_name: &str) -> String {
+    format!(
+        r#"
+            pub const {}:&[u8] = &[];
+        "#,
+        elf_name
+    )
+}
+
+fn get_guest_programs() -> Vec<String> {
+    let path = Path::new(".");
+    let prefix = "guest-";
+
+    fs::read_dir(path)
+        .expect("Unable to read directory")
+        .filter_map(|entry| entry.ok())
+        .filter(|entry| entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false))
+        .filter_map(|entry| {
+            entry
+                .file_name()
+                .into_string()
+                .ok()
+                .filter(|name| name.starts_with(prefix))
+        })
+        .collect::<Vec<String>>()
 }

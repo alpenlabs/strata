@@ -2,7 +2,6 @@
 //! Consensus validation logic and core state machine
 
 pub mod client_transition;
-pub mod credential;
 pub mod ctl;
 pub mod duty;
 pub mod fork_choice_manager;

@@ -1,5 +1,4 @@
 #[cfg(feature = "prover")]
-#[ignore]
 mod test {
     // use express_risc0_adapter::{Risc0Verifier, RiscZeroHost};
     // use express_zkvm::{ZKVMHost, ZKVMVerifier};

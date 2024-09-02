@@ -595,17 +595,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
-name = "cl-block-stf"
-version = "0.1.0"
-dependencies = [
- "alpen-express-primitives",
- "bitcoin",
- "borsh",
- "express-cl-stf",
- "sp1-zkvm",
-]
-
-[[package]]
 name = "const-hex"
 version = "1.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -964,6 +953,17 @@ dependencies = [
  "ff",
  "rand_core",
  "subtle",
+]
+
+[[package]]
+name = "guest-cl-stf"
+version = "0.1.0"
+dependencies = [
+ "alpen-express-primitives",
+ "bitcoin",
+ "borsh",
+ "express-cl-stf",
+ "sp1-zkvm",
 ]
 
 [[package]]
