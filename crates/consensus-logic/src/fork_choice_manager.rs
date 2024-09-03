@@ -12,6 +12,7 @@ use alpen_express_state::{
     block::L2BlockBundle, client_state::ClientState, operation::SyncAction, prelude::*,
     state_op::StateCache, sync_event::SyncEvent,
 };
+use express_chaintsn::transition::process_block;
 use express_storage::L2BlockManager;
 use express_tasks::ShutdownGuard;
 use tokio::sync::mpsc;
@@ -297,12 +298,12 @@ fn forkchoice_manager_task_inner<D: Database, E: ExecEngineCtl>(
 }
 
 fn process_ct_msg<D: Database, E: ExecEngineCtl>(
-    fcm: ForkChoiceMessage,
-    state: &mut ForkChoiceManager<D>,
+    fc_message: ForkChoiceMessage,
+    fc_manager: &mut ForkChoiceManager<D>,
     engine: &E,
     csm_ctl: &CsmController,
 ) -> anyhow::Result<()> {
-    match fcm {
+    match fc_message {
         ForkChoiceMessage::CsmResume(_) => {
             warn!("got unexpected late CSM resume message, ignoring");
         }
@@ -314,12 +315,12 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
             debug!(?csm_tip, "got new CSM state");
 
             // Update the new state.
-            state.cur_csm_state = cs;
+            fc_manager.cur_csm_state = cs;
 
             // TODO use output actions to clear out dangling states now
             for act in output.actions() {
                 if let SyncAction::FinalizeBlock(blkid) = act {
-                    let fin_report = state.chain_tracker.update_finalized_tip(blkid)?;
+                    let fin_report = fc_manager.chain_tracker.update_finalized_tip(blkid)?;
                     info!(?blkid, ?fin_report, "finalized block")
                     // TODO do something with the finalization report
                 }
@@ -330,17 +331,17 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
         }
 
         ForkChoiceMessage::NewBlock(blkid) => {
-            let block_bundle = state
+            let block_bundle = fc_manager
                 .get_block_data(&blkid)?
                 .ok_or(Error::MissingL2Block(blkid))?;
 
             // First, decide if the block seems correctly signed and we haven't
             // already marked it as invalid.
-            let cstate = state.cur_csm_state.clone();
-            let correctly_signed = check_new_block(&blkid, &block_bundle, &cstate, state)?;
+            let cstate = fc_manager.cur_csm_state.clone();
+            let correctly_signed = check_new_block(&blkid, &block_bundle, &cstate, fc_manager)?;
             if !correctly_signed {
                 // It's invalid, write that and return.
-                state.set_block_status(&blkid, BlockStatus::Invalid)?;
+                fc_manager.set_block_status(&blkid, BlockStatus::Invalid)?;
                 return Ok(());
             }
 
@@ -357,15 +358,15 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
             // to pre-sync
             if res == alpen_express_eectl::engine::BlockStatus::Invalid {
                 // It's invalid, write that and return.
-                state.set_block_status(&blkid, BlockStatus::Invalid)?;
+                fc_manager.set_block_status(&blkid, BlockStatus::Invalid)?;
                 return Ok(());
             }
 
             // Insert block into pending block tracker and figure out if we
             // should switch to it as a potential head.  This returns if we
             // created a new tip instead of advancing an existing tip.
-            let cur_tip = state.cur_best_block;
-            let new_tip = state
+            let cur_tip = fc_manager.cur_best_block;
+            let new_tip = fc_manager
                 .chain_tracker
                 .attach_block(blkid, block_bundle.header())?;
             if new_tip {
@@ -374,8 +375,8 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
 
             let best_block = pick_best_block(
                 &cur_tip,
-                state.chain_tracker.chain_tips_iter(),
-                &state.l2_block_manager,
+                fc_manager.chain_tracker.chain_tips_iter(),
+                &fc_manager.l2_block_manager,
             )?;
 
             // Figure out what our job is now.
@@ -383,8 +384,9 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
             // context aware so that we know we're not doing anything abnormal
             // in the normal case
             let depth = 100; // TODO change this
-            let reorg = reorg::compute_reorg(&cur_tip, best_block, depth, &state.chain_tracker)
-                .ok_or(Error::UnableToFindReorg(cur_tip, *best_block))?;
+            let reorg =
+                reorg::compute_reorg(&cur_tip, best_block, depth, &fc_manager.chain_tracker)
+                    .ok_or(Error::UnableToFindReorg(cur_tip, *best_block))?;
 
             debug!("REORG {reorg:#?}");
 
@@ -392,7 +394,7 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
             // change the fork choice tip.
             if !reorg.is_identity() {
                 // Apply the reorg.
-                if let Err(e) = apply_tip_update(&reorg, state) {
+                if let Err(e) = apply_tip_update(&reorg, fc_manager) {
                     warn!("failed to compute CL STF");
 
                     // Specifically state transition errors we want to handle
@@ -404,7 +406,7 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
                             "invalid block on seemingly good fork, rejecting block"
                         );
 
-                        state.set_block_status(inv_blkid, BlockStatus::Invalid)?;
+                        fc_manager.set_block_status(inv_blkid, BlockStatus::Invalid)?;
                         return Ok(());
                     }
 
@@ -528,14 +530,14 @@ fn pick_best_block<'t>(
 
 fn apply_tip_update<D: Database>(
     reorg: &reorg::Reorg,
-    state: &mut ForkChoiceManager<D>,
+    fc_manager: &mut ForkChoiceManager<D>,
 ) -> anyhow::Result<()> {
-    let chs_store = state.database.chainstate_store();
-    let chs_prov = state.database.chainstate_provider();
+    let chs_store = fc_manager.database.chainstate_store();
+    let chs_prov = fc_manager.database.chainstate_provider();
 
     // See if we need to roll back recent changes.
     let pivot_blkid = reorg.pivot();
-    let pivot_idx = state.get_block_index(pivot_blkid)?;
+    let pivot_idx = fc_manager.get_block_index(pivot_blkid)?;
 
     // Load the post-state of the pivot block as the block to start computing
     // blocks going forwards with.
@@ -554,7 +556,7 @@ fn apply_tip_update<D: Database>(
         // Load the previous block and its post-state.
         // TODO make this not load both of the full blocks, we might have them
         // in memory anyways
-        let block = state
+        let block = fc_manager
             .get_block_data(blkid)?
             .ok_or(Error::MissingL2Block(*blkid))?;
         let block_idx = block.header().blockidx();
@@ -564,9 +566,9 @@ fn apply_tip_update<D: Database>(
 
         // Compute the transition write batch, then compute the new state
         // locally and update our going state.
-        let rparams = state.params.rollup();
+        let rparams = fc_manager.params.rollup();
         let mut prestate_cache = StateCache::new(pre_state);
-        express_chaintsn::transition::process_block(&mut prestate_cache, header, body, rparams)
+        process_block(&mut prestate_cache, header, body, rparams)
             .map_err(|e| Error::InvalidStateTsn(*blkid, e))?;
         let (post_state, wb) = prestate_cache.finalize();
         pre_state = post_state;
@@ -578,7 +580,7 @@ fn apply_tip_update<D: Database>(
 
     // Check to see if we need to roll back to a previous state in order to
     // compute new states.
-    if pivot_idx < state.cur_index {
+    if pivot_idx < fc_manager.cur_index {
         debug!(?pivot_blkid, %pivot_idx, "rolling back chainstate");
         chs_store.rollback_writes_to(pivot_idx)?;
     }
@@ -588,8 +590,8 @@ fn apply_tip_update<D: Database>(
     for (idx, blkid, writes) in updates {
         debug!(?blkid, "applying CL state update");
         chs_store.write_state_update(idx, &writes)?;
-        state.cur_best_block = *blkid;
-        state.cur_index = idx;
+        fc_manager.cur_best_block = *blkid;
+        fc_manager.cur_index = idx;
     }
 
     Ok(())

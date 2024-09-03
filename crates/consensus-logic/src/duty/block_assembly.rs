@@ -137,11 +137,11 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
 }
 
 fn prepare_l1_segment(
-    l1v: &LocalL1State,
+    local_l1_state: &LocalL1State,
     prev_chstate: &ChainState,
     l1_prov: &impl L1DataProvider,
 ) -> Result<L1Segment, Error> {
-    let unacc_blocks = l1v.unacc_blocks_iter().collect::<Vec<_>>();
+    let unacc_blocks = local_l1_state.unacc_blocks_iter().collect::<Vec<_>>();
     trace!(unacc_blocks = %unacc_blocks.len(), "figuring out which blocks to include in L1 segment");
 
     // Check to see if there's actually no blocks in the queue.  In that case we can just give
@@ -178,9 +178,10 @@ fn prepare_l1_segment(
 
     // Compute the offset in the unaccepted list for the blocks we want to use.
     let unacc_fresh_offset = (pivot_h - l1v.buried_l1_height()) as usize + 1;
+
     let fresh_blocks = &unacc_blocks[unacc_fresh_offset..];
 
-    // Load the blocsks.
+    // Load the blocks.
     let mut payloads = Vec::new();
     for (h, _b) in fresh_blocks {
         let rec = load_header_record(*h, l1_prov)?;
@@ -292,8 +293,7 @@ fn prepare_exec_data<E: ExecEngineCtl>(
     let wait = time::Duration::from_millis(100);
     let timeout = time::Duration::from_millis(3000);
     let Some(payload_data) = poll_status_loop(key, engine, wait, timeout)? else {
-        // TODO better error message
-        return Err(Error::Other("EL block assembly timed out".to_owned()));
+        return Err(Error::BlockAssemblyTimedOut);
     };
     trace!("finished EL payload job");
 

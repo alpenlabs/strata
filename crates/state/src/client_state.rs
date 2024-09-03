@@ -131,7 +131,7 @@ pub struct LocalL1State {
     // TODO this needs more tracking to make it remember where we are properly
     pub(super) local_unaccepted_blocks: Vec<L1BlockId>,
 
-    /// L1 block index we treat as being "buried" and won't reorg.
+    /// Next L1 block height we expect to receive
     pub(super) next_expected_block: u64,
 }
 

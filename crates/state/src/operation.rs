@@ -148,7 +148,7 @@ pub fn apply_writes_to_state(
                 }
 
                 // Check that it's not higher than what we know about.
-                if new_idx >= l1v.next_expected_block() {
+                if new_idx > l1v.tip_height() {
                     panic!("operation: new buried height above known L1 tip");
                 }
 

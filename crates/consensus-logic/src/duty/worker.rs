@@ -345,7 +345,7 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
             let l1_view = client_state.l1_view();
 
             // TODO get the cur client state from the sync manager, the one used
-            // to initiate this dutyn and pass it into `sign_and_store_block`
+            // to initiate this duty and pass it into `sign_and_store_block`
 
             let asm_span = info_span!("blockasm", %target_slot);
             let _span = asm_span.enter();

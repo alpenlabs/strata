@@ -82,7 +82,7 @@ fn process_l1_view_update(
         let new_tip_block = l1seg.new_payloads().last().unwrap();
         let new_tip_height = new_tip_block.idx();
         let first_new_block_height = new_tip_height - l1seg.new_payloads().len() as u64 + 1;
-        let implied_pivot_height = new_tip_height - l1seg.new_payloads().len() as u64;
+        let implied_pivot_height = first_new_block_height - 1;
         let cur_tip_height = l1v.tip_height();
 
         // Check that the new chain is actually longer, if it's shorter then we didn't do anything.
