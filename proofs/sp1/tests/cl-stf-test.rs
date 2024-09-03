@@ -1,9 +1,8 @@
 #[cfg(feature = "prover")]
-
 mod test {
     use alpen_express_state::{block::L2Block, chain_state::ChainState};
     use express_sp1_adapter::{SP1Host, SP1Verifier};
-    use express_zkvm::{Proof, VerifcationKey, ZKVMHost, ZKVMVerifier};
+    use express_zkvm::{AggregationInput, Proof, VerifcationKey, ZKVMHost, ZKVMVerifier};
     use sp1_guest_builder::GUEST_CL_STF_ELF;
 
     fn get_prover_input() -> (ChainState, L2Block, Proof, VerifcationKey) {
@@ -32,9 +31,10 @@ mod test {
         let input_ser = borsh::to_vec(&(prev_state, block)).unwrap();
 
         let prover = SP1Host::init(GUEST_CL_STF_ELF.into(), Default::default());
+        let proof_agg_input = AggregationInput::new(prev_el_proof, el_proof_vk);
 
         let (proof, _) = prover
-            .prove_v2((el_proof_vk, prev_el_proof, input_ser))
+            .prove_with_aggregation(input_ser, vec![proof_agg_input])
             .expect("Failed to generate proof");
 
         // let new_state_ser = SP1Verifier::extract_public_output::<Vec<u8>>(&proof)

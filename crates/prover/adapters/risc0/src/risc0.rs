@@ -1,4 +1,6 @@
-use express_zkvm::{Proof, ProverOptions, VerifcationKey, ZKVMHost, ZKVMVerifier};
+use express_zkvm::{
+    AggregationInput, Proof, ProverOptions, VerifcationKey, ZKVMHost, ZKVMVerifier,
+};
 use risc0_zkvm::{
     compute_image_id, get_prover_server, sha::Digest, ExecutorEnv, ExecutorImpl, ProverOpts,
     Receipt, VerifierContext,
@@ -61,6 +63,14 @@ impl ZKVMHost for RiscZeroHost {
             Proof::new(serialized_proof),
             VerifcationKey(verification_key),
         ))
+    }
+
+    fn prove_with_aggregation<T: serde::Serialize>(
+        &self,
+        item: T,
+        agg_inputs: Vec<AggregationInput>,
+    ) -> anyhow::Result<(Proof, VerifcationKey)> {
+        todo!()
     }
 }
 
