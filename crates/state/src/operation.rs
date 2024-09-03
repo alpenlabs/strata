@@ -158,7 +158,6 @@ pub fn apply_writes_to_state(
                     .local_unaccepted_blocks
                     .drain(..diff)
                     .collect::<Vec<_>>();
-                l1v.next_expected_block = new_idx;
 
                 // TODO merge these blocks into the L1 MMR in the client state if
                 // we haven't already

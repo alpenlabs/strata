@@ -291,13 +291,13 @@ fn forkchoice_manager_task_inner<D: Database, E: ExecEngineCtl>(
         };
 
         // TODO decide when errors are actually failures vs when they're okay
-        process_ct_msg(m, &mut state, engine, csm_ctl)?;
+        process_fc_message(m, &mut state, engine, csm_ctl)?;
     }
 
     Ok(())
 }
 
-fn process_ct_msg<D: Database, E: ExecEngineCtl>(
+fn process_fc_message<D: Database, E: ExecEngineCtl>(
     fc_message: ForkChoiceMessage,
     fc_manager: &mut ForkChoiceManager<D>,
     engine: &E,

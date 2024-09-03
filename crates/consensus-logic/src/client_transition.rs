@@ -64,6 +64,7 @@ pub fn process_event<D: Database>(
             let safe_depth = params.rollup().l1_reorg_safe_depth as u64;
             let maturable_height = next_exp_height.saturating_sub(safe_depth);
             if maturable_height > params.rollup().horizon_l1_height {
+                debug!("Emitting update_buried {}", maturable_height);
                 writes.push(ClientStateWrite::UpdateBuried(maturable_height));
             }
 

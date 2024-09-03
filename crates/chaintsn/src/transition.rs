@@ -87,7 +87,7 @@ fn process_l1_view_update(
 
         // Check that the new chain is actually longer, if it's shorter then we didn't do anything.
         // TODO This probably needs to be adjusted for PoW.
-        if new_tip_block.idx() <= cur_tip_height {
+        if new_tip_height <= cur_tip_height {
             return Err(TsnError::L1SegNotExtend);
         }
 
