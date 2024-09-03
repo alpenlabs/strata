@@ -10234,6 +10234,8 @@ dependencies = [
  "express-risc0-adapter",
  "express-zkvm",
  "risc0-build",
+ "serde",
+ "serde_json",
  "zkvm-primitives",
 ]
 

@@ -4,14 +4,21 @@ use alpen_express_primitives::{
     params::{Params, RollupParams, RunParams},
 };
 use express_cl_stf::{verify_and_transition, ChainState, L2Block};
-use risc0_zkvm::guest::env;
+use risc0_zkvm::{guest::env, serde, sha::Digest};
+use zkvm_primitives::ELProofPublicParams;
 
 fn main() {
     let params = get_rollup_param();
+    let vk: Digest = env::read();
+    let journal: Vec<u8> = env::read();
+    env::verify(vk, &journal).unwrap();
+
+    let el_proof_pp: ELProofPublicParams = serde::from_slice(&journal).unwrap();
+
     let input: Vec<u8> = env::read();
     let (prev_state, block): (ChainState, L2Block) = borsh::from_slice(&input).unwrap();
 
-    let new_state = verify_and_transition(prev_state, block, params).unwrap();
+    let new_state = verify_and_transition(prev_state, block, el_proof_pp, params).unwrap();
     env::commit(&borsh::to_vec(&new_state).unwrap());
 }
 

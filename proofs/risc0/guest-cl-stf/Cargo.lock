@@ -835,6 +835,7 @@ dependencies = [
  "borsh",
  "express-cl-stf",
  "risc0-zkvm",
+ "zkvm-primitives",
 ]
 
 [[package]]

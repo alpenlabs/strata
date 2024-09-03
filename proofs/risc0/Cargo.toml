@@ -18,7 +18,8 @@ alpen-express-state.workspace = true
 alpen-express-primitives.workspace = true
 borsh = { workspace = true }
 alpen-test-utils.workspace = true
-
+serde = { workspace = true }
+serde_json = { workspace = true }
 
 [build-dependencies]
 risc0-build = { version = "1.0.5" }

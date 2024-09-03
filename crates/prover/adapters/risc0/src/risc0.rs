@@ -69,8 +69,9 @@ impl RiscZeroHost {
                 let receipt: Receipt = bincode::deserialize(agg_input.proof().as_bytes())?;
                 let vk: Digest = bincode::deserialize(agg_input.vk().as_bytes())?;
 
-                env_builder.add_assumption(receipt);
                 env_builder.write(&vk)?;
+                env_builder.write(&receipt.journal.bytes.clone())?;
+                env_builder.add_assumption(receipt);
             }
         }
         env_builder.write(&input)?;
@@ -81,6 +82,7 @@ impl RiscZeroHost {
         let program_id = compute_image_id(&self.elf)?;
         let verification_key = bincode::serialize(&program_id)?;
 
+        println!("now prover started...");
         // Generate the session
         let mut exec = ExecutorImpl::from_elf(env, &self.elf)?;
         let session = exec.run()?;

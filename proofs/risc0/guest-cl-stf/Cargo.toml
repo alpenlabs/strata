@@ -9,5 +9,6 @@ version = "0.1.0"
 alpen-express-primitives = { path = "../../../crates/primitives" }
 express-cl-stf = { path = "../../../crates/prover/cl-stf" }
 risc0-zkvm = { version = "1.0.5", default-features = false, features = ['std'] }
+zkvm-primitives = { path = "../../../crates/prover/primitives" }
 
 borsh = { version = "1.5.0", features = ["derive"] }

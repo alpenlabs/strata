@@ -81,30 +81,3 @@ fn apply_state_transition(
     let (post_state, _) = state_cache.finalize();
     Ok(post_state)
 }
-
-#[cfg(test)]
-mod tests {
-    // use alpen_test_utils::l2::gen_params;
-    // use super::*;
-
-    // #[test]
-    // fn test_verify_and_transition() {
-    //     let prev_state_data: &[u8] = include_bytes!("../test-datas/prev_chstate.borsh");
-    //     let new_state_data: &[u8] = include_bytes!("../test-datas/post_state.borsh");
-    //     let new_block_data: &[u8] = include_bytes!("../test-datas/final_block.borsh");
-
-    //     let prev_state: ChainState = borsh::from_slice(prev_state_data).unwrap();
-    //     let expected_new_state: ChainState = borsh::from_slice(new_state_data).unwrap();
-    //     let block: L2Block = borsh::from_slice(new_block_data).unwrap();
-
-    //     let el_proof_pp: ELProofPublicParams = todo!();
-
-    //     let new_state = verify_and_transition(prev_state, block, el_proof_pp, gen_params())
-    //         .expect("Verification and transition failed");
-
-    //     assert_eq!(
-    //         expected_new_state.compute_state_root(),
-    //         new_state.compute_state_root()
-    //     );
-    // }
-}
