@@ -9,6 +9,8 @@ alpen-express-primitives.workspace = true
 alpen-express-state.workspace = true
 borsh = { workspace = true }
 express-chaintsn.workspace = true
+zkvm-primitives.workspace = true
+
 
 [dev-dependencies]
 alpen-test-utils.workspace = true

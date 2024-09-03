@@ -23,7 +23,7 @@ fn main() {
     let el_pp_deserialized: ELProofPublicParams = bincode::deserialize(&el_pp).unwrap();
 
     // Verify the CL block proof
-    let new_state = verify_and_transition(prev_state, block, params).unwrap();
+    let new_state = verify_and_transition(prev_state, block, el_pp_deserialized, params).unwrap();
     sp1_zkvm::io::commit(&borsh::to_vec(&new_state).unwrap());
 }
 
