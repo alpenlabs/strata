@@ -55,6 +55,15 @@ impl ZKVMHost for RiscZeroHost {
                 env_builder.write_slice(serialized_item);
             }
         }
+        if let Some(agg_inputs) = agg_inputs {
+            for agg_input in agg_inputs {
+                let receipt: Receipt = bincode::deserialize(agg_input.proof().as_bytes())?;
+                let vk: Digest = bincode::deserialize(agg_input.vk().as_bytes())?;
+
+                env_builder.add_assumption(receipt);
+                env_builder.write(&vk)?;
+            }
+        }
         let env = env_builder.build()?;
 
         // Setup the prover
