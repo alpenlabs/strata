@@ -13,13 +13,14 @@ fn main() {
 
     // Read the input from the host
     let el_vkey = sp1_zkvm::io::read::<[u32; 8]>();
-    let el_pp = sp1_zkvm::io::read::<ELProofPublicParams>();
+    let el_pp = sp1_zkvm::io::read::<Vec<u8>>();
     let cl_input: Vec<u8> = sp1_zkvm::io::read();
     let (prev_state, block): (ChainState, L2Block) = borsh::from_slice(&cl_input).unwrap();
 
     // Verify the EL proof
-    let public_values_digest = Sha256::digest(bincode::serialize(&el_pp).unwrap());
+    let public_values_digest = Sha256::digest(&el_pp);
     sp1_zkvm::lib::verify::verify_sp1_proof(&el_vkey, &public_values_digest.into());
+    let el_pp_deserialized: ELProofPublicParams = bincode::deserialize(&el_pp).unwrap();
 
     // Verify the CL block proof
     let new_state = verify_and_transition(prev_state, block, params).unwrap();
