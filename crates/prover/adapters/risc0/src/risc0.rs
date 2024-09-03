@@ -1,4 +1,6 @@
-use express_zkvm::{Proof, ProverOptions, VerifcationKey, ZKVMHost, ZKVMVerifier};
+use express_zkvm::{
+    AggregationInput, Proof, ProverOptions, VerifcationKey, ZKVMHost, ZKVMVerifier,
+};
 use risc0_zkvm::{
     compute_image_id, get_prover_server, sha::Digest, AssumptionReceipt, ExecutorEnv, ExecutorImpl,
     ProverOpts, Receipt, VerifierContext,
@@ -37,6 +39,7 @@ impl ZKVMHost for RiscZeroHost {
         &self,
         items: &[T],
         serialized_items: Option<&[Vec<u8>]>,
+        agg_inputs: Option<&[AggregationInput]>,
     ) -> anyhow::Result<(Proof, VerifcationKey)> {
         if self.prover_options.use_mock_prover {
             std::env::set_var("RISC0_DEV_MODE", "true");
@@ -179,7 +182,7 @@ mod tests {
 
         // assert proof generation works
         let (proof, vk) = zkvm
-            .prove(&[input], None)
+            .prove(&[input], None, None)
             .expect("Failed to generate proof");
 
         // assert proof verification works
@@ -198,7 +201,7 @@ mod tests {
 
         // assert proof generation works
         let (proof, vk) = zkvm
-            .prove(&[input], None)
+            .prove(&[input], None, None)
             .expect("Failed to generate proof");
 
         // assert proof verification works

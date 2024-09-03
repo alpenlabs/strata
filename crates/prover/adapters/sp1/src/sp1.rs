@@ -1,8 +1,12 @@
 use anyhow::Ok;
-use express_zkvm::{Proof, ProverOptions, VerifcationKey, ZKVMHost, ZKVMVerifier};
+use express_zkvm::{
+    AggregationInput, Proof, ProverOptions, VerifcationKey, ZKVMHost, ZKVMVerifier,
+};
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::to_vec;
-use sp1_sdk::{ProverClient, SP1ProofWithPublicValues, SP1Stdin, SP1VerifyingKey};
+use sp1_sdk::{
+    HashableKey, ProverClient, SP1Proof, SP1ProofWithPublicValues, SP1Stdin, SP1VerifyingKey,
+};
 
 /// A host for the `SP1` zkVM that stores the guest program in ELF format.
 /// The `SP1Host` is responsible for program execution and proving
@@ -23,6 +27,7 @@ impl ZKVMHost for SP1Host {
         &self,
         inputs: &[T],
         serialized_inputs: Option<&[Vec<u8>]>,
+        agg_inputs: Option<&[AggregationInput]>,
     ) -> anyhow::Result<(Proof, VerifcationKey)> {
         // Init the prover
         if self.prover_options.use_mock_prover {
@@ -34,12 +39,32 @@ impl ZKVMHost for SP1Host {
         // Setup the I/O
         let mut stdin = SP1Stdin::new();
 
+        // Write user input
         for input in inputs {
             stdin.write(&input);
         }
+
         if let Some(serialized_inputs) = serialized_inputs {
             for serialized_input in serialized_inputs {
                 stdin.write_slice(serialized_input);
+            }
+        }
+
+        if let Some(agg_inputs) = agg_inputs {
+            for agg_input in agg_inputs {
+                let proof: SP1ProofWithPublicValues =
+                    bincode::deserialize(agg_input.proof().as_bytes())?;
+                let vkey: SP1VerifyingKey = bincode::deserialize(agg_input.vk().as_bytes())?;
+
+                stdin.write(&vkey.hash_u32());
+                stdin.write(&proof.public_values);
+
+                match proof.proof {
+                    SP1Proof::Compressed(compressed_proof) => {
+                        stdin.write_proof(compressed_proof, vkey.vk);
+                    }
+                    _ => return Err(anyhow::anyhow!("can only handle compressed proofs")),
+                }
             }
         }
 
@@ -48,11 +73,13 @@ impl ZKVMHost for SP1Host {
         if self.prover_options.stark_to_snark_conversion {
             prover = prover.plonk();
         }
+
         let proof = prover.run()?;
 
         // Proof serialization
         let serialized_proof = bincode::serialize(&proof)?;
         let verification_key = bincode::serialize(&vk)?;
+
         Ok((
             Proof::new(serialized_proof),
             VerifcationKey(verification_key),
@@ -128,7 +155,7 @@ mod tests {
 
         // assert proof generation works
         let (proof, vk) = zkvm
-            .prove(&[input], None)
+            .prove(&[input], None, None)
             .expect("Failed to generate proof");
 
         // assert proof verification works
@@ -151,7 +178,7 @@ mod tests {
 
         // assert proof generation works
         let (proof, vk) = zkvm
-            .prove(&[input], None)
+            .prove(&[input], None, None)
             .expect("Failed to generate proof");
 
         // assert proof verification works

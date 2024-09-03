@@ -16,6 +16,16 @@ impl Proof {
 /// Verification Key required to verify proof generated from `ZKVMHost`
 pub struct VerifcationKey(pub Vec<u8>);
 
+impl VerifcationKey {
+    pub fn new(data: Vec<u8>) -> Self {
+        Self(data)
+    }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
+}
+
 /// Prover config of the ZKVM Host
 #[derive(Debug)]
 pub struct ProverOptions {
@@ -36,6 +46,7 @@ pub trait ZKVMHost {
         &self,
         items: &[T],
         serialized_items: Option<&[Vec<u8>]>,
+        agg_inputs: Option<&[AggregationInput]>,
     ) -> anyhow::Result<(Proof, VerifcationKey)>;
 }
 
@@ -64,5 +75,27 @@ impl Default for ProverOptions {
             use_mock_prover: true,
             stark_to_snark_conversion: false,
         }
+    }
+}
+
+/// An input to the aggregation program.
+///
+/// Consists of a proof and a verification key.
+pub struct AggregationInput {
+    proof: Proof,
+    vk: VerifcationKey,
+}
+
+impl AggregationInput {
+    pub fn new(proof: Proof, vk: VerifcationKey) -> Self {
+        Self { proof, vk }
+    }
+
+    pub fn proof(&self) -> &Proof {
+        &self.proof
+    }
+
+    pub fn vk(&self) -> &VerifcationKey {
+        &self.vk
     }
 }

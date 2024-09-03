@@ -29,7 +29,7 @@ mod test {
         let prover = SP1Host::init(GUEST_BTC_BLOCKSPACE_ELF.into(), Default::default());
 
         let (proof, _) = prover
-            .prove(&[scan_config], Some(&[serialized_block]))
+            .prove(&[scan_config], Some(&[serialized_block]), None)
             .expect("Failed to generate proof");
 
         SP1Verifier::extract_public_output::<BlockspaceProofOutput>(&proof)
