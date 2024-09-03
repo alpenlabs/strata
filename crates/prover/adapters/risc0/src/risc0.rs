@@ -36,14 +36,46 @@ impl ZKVMHost for RiscZeroHost {
     }
 
     fn prove<T: serde::Serialize>(&self, item: T) -> anyhow::Result<(Proof, VerifcationKey)> {
+        self.prove_internal(item, None)
+    }
+
+    fn prove_with_aggregation<T: serde::Serialize>(
+        &self,
+        item: T,
+        agg_inputs: Vec<AggregationInput>,
+    ) -> anyhow::Result<(Proof, VerifcationKey)> {
+        self.prove_internal(item, Some(agg_inputs))
+    }
+}
+
+impl RiscZeroHost {
+    fn prove_internal<T: serde::Serialize>(
+        &self,
+        input: T,
+        agg_inputs: Option<Vec<AggregationInput>>,
+    ) -> anyhow::Result<(Proof, VerifcationKey)> {
         if self.prover_options.use_mock_prover {
             std::env::set_var("RISC0_DEV_MODE", "true");
         }
 
         // Setup the prover
-        let env = ExecutorEnv::builder().write(&item)?.build()?;
         let opts = self.determine_prover_options();
         let prover = get_prover_server(&opts)?;
+
+        // Setup the I/O
+        let mut env_builder = ExecutorEnv::builder();
+        if let Some(agg_inputs) = agg_inputs {
+            for agg_input in agg_inputs {
+                let receipt: Receipt = bincode::deserialize(agg_input.proof().as_bytes())?;
+                let vk: Digest = bincode::deserialize(agg_input.vk().as_bytes())?;
+
+                env_builder.add_assumption(receipt);
+                env_builder.write(&vk)?;
+            }
+        }
+        env_builder.write(&input)?;
+
+        let env = env_builder.build()?;
 
         // Setup verification key
         let program_id = compute_image_id(&self.elf)?;
@@ -63,14 +95,6 @@ impl ZKVMHost for RiscZeroHost {
             Proof::new(serialized_proof),
             VerifcationKey(verification_key),
         ))
-    }
-
-    fn prove_with_aggregation<T: serde::Serialize>(
-        &self,
-        item: T,
-        agg_inputs: Vec<AggregationInput>,
-    ) -> anyhow::Result<(Proof, VerifcationKey)> {
-        todo!()
     }
 }
 
