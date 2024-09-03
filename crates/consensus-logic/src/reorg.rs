@@ -75,56 +75,33 @@ pub fn compute_reorg(
         });
     }
 
-    let mut down_blocks: Vec<&L2BlockId> = vec![start];
-    let mut up_blocks: Vec<&L2BlockId> = vec![dest];
+    // Create a vec of parents from tip to the beginning(before limit depth) and then move forwards
+    // until the blockids don't match
+    let mut down_blocks: Vec<_> = std::iter::successors(Some(start), |n| tracker.get_parent(n))
+        .take(limit_depth)
+        .collect();
+    let mut up_blocks: Vec<_> = std::iter::successors(Some(dest), |n| tracker.get_parent(n))
+        .take(limit_depth)
+        .collect();
 
-    loop {
-        // Check to see if we should abort.
-        if down_blocks.len() > limit_depth || up_blocks.len() > limit_depth {
-            return None;
+    down_blocks.reverse();
+    up_blocks.reverse();
+
+    // Now move forwards, until the blocks do not match
+    let mut pivot_idx = None;
+    for (i, (&d, &u)) in down_blocks.iter().zip(&up_blocks).enumerate() {
+        if *d != *u {
+            break;
         }
-
-        // Extend the "down" side down, see if it matches.
-        let down_at = &down_blocks[down_blocks.len() - 1];
-        if *down_at != tracker.finalized_tip() {
-            let down_parent = tracker.get_parent(down_at).expect("reorg: get parent");
-
-            // This looks crazy but it's actually correct, and the clearest way
-            // to do it.
-            if let Some((idx, pivot)) = up_blocks
-                .iter()
-                .enumerate()
-                .find(|(_, id)| **id == down_parent)
-            {
-                // Cool, now we have our pivot.
-                let pivot = **pivot;
-                let down = down_blocks.into_iter().copied().collect();
-                let up = up_blocks.into_iter().take(idx).rev().copied().collect();
-                return Some(Reorg { down, pivot, up });
-            }
-
-            down_blocks.push(down_parent);
-        }
-
-        // Extend the "up" side down, see if it matches.
-        let up_at = &up_blocks[up_blocks.len() - 1];
-        if *up_at != tracker.finalized_tip() {
-            let up_parent = tracker.get_parent(up_at).expect("reorg: get parent");
-
-            // Do this crazy thing again but in the other direction.
-            if let Some((idx, pivot)) = down_blocks
-                .iter()
-                .enumerate()
-                .find(|(_, id)| **id == up_parent)
-            {
-                let pivot = **pivot;
-                let down = down_blocks.into_iter().take(idx).copied().collect();
-                let up = up_blocks.into_iter().rev().copied().collect();
-                return Some(Reorg { down, pivot, up });
-            }
-
-            up_blocks.push(up_parent);
-        }
+        pivot_idx = Some(i);
+    }
+    if let Some(idx) = pivot_idx {
+        let pivot = *up_blocks[idx];
+        let down = down_blocks.drain(idx + 1..).copied().rev().collect();
+        let up = up_blocks.drain(idx + 1..).copied().collect();
+        Some(Reorg { pivot, down, up })
+    } else {
+        None
     }
 }
 
