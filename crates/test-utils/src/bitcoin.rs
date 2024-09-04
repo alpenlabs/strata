@@ -65,7 +65,7 @@ impl BtcChain {
 }
 
 pub fn get_btc_chain() -> BtcChain {
-    let buffer = include_bytes!("../data/40000-50000.raw");
+    let buffer = include_bytes!("../data/mainnet_blocks_40000-50000.raw");
 
     let chunk_size = Header::SIZE;
     let capacity = buffer.len() / chunk_size;
