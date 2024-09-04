@@ -388,7 +388,7 @@ fn process_fc_message<D: Database, E: ExecEngineCtl>(
                 reorg::compute_reorg(&cur_tip, best_block, depth, &fc_manager.chain_tracker)
                     .ok_or(Error::UnableToFindReorg(cur_tip, *best_block))?;
 
-            debug!("REORG {reorg:#?}");
+            debug!(reorg = ?reorg, "REORG");
 
             // Only if the update actually does something should we try to
             // change the fork choice tip.

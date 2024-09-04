@@ -95,8 +95,7 @@ where
         .join(command.chain.chain.to_string());
 
     let _guard = command.ext.logs.init_tracing()?;
-    info!(target: "reth::cli", "Initialized tracing, debug log directory: {}",
-    command.ext.logs.log_file_directory);
+    info!(target: "reth::cli", cmd = %command.ext.logs.log_file_directory, "Initialized tracing, debug log directory");
 
     let runner = CliRunner::default();
     runner.run_command_until_exit(|ctx| command.execute(ctx, launcher))?;

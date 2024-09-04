@@ -213,7 +213,7 @@ impl TaskExecutor {
             if let Err(error) = result {
                 // TODO: transfer stacktrace?
                 let task_error = PanickedTaskError::new(name, error);
-                error!("{task_error}");
+                error!(%task_error, "Task Error");
                 let _ = panicked_tasks_tx.send(task_error);
             };
         })
@@ -234,7 +234,7 @@ impl TaskExecutor {
             .catch_unwind()
             .map_err(move |error| {
                 let task_error = PanickedTaskError::new(name, error);
-                error!("{task_error}");
+                error!(%task_error, "Task Error");
                 let _ = panicked_tasks_tx.send(task_error);
             })
             .map(drop);
@@ -272,7 +272,7 @@ impl TaskExecutor {
             .catch_unwind()
             .map_err(move |error| {
                 let task_error = PanickedTaskError::new(name, error);
-                error!("{task_error}");
+                error!(%task_error, "Task Error");
                 let _ = panicked_tasks_tx.send(task_error);
             })
             .map(drop);

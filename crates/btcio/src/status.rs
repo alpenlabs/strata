@@ -32,8 +32,8 @@ pub async fn apply_status_updates(status_updates: &[L1StatusUpdate], status_tx: 
     }
 
     if let Err(err) = status_tx.l1.send(l1_status.clone()) {
-        error!("error updating l1status {}", err);
+        error!(%err, "error updating l1status");
     } else {
-        debug!("Updated l1 status: {:?}", l1_status);
+        debug!(?l1_status, "Updated l1 status");
     }
 }
