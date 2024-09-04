@@ -1,6 +1,5 @@
 //! Parses command-line arguments for the bridge-client CLI.
-use std::fmt::Display;
-use std::str::FromStr;
+use std::{fmt::Display, str::FromStr};
 
 use clap::{Parser, ValueEnum};
 

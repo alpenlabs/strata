@@ -12,7 +12,7 @@ use bitcoin::{
     consensus::serialize,
     hashes::{sha256d, Hash},
     key::TapTweak,
-    Address, AddressType, Amount, Block, Network, OutPoint, XOnlyPublicKey,
+    Address, AddressType, Block, Network, OutPoint, XOnlyPublicKey,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 use reth_primitives::revm_primitives::FixedBytes;

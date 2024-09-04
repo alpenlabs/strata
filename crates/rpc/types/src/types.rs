@@ -4,10 +4,9 @@
 //!  - implementation of RPC client
 //!  - crate for just data structures that represents the JSON responses from Bitcoin core RPC
 
+use alpen_express_state::bridge_ops::WithdrawalIntent;
 use bitcoin::Txid;
 use serde::{Deserialize, Serialize};
-
-use alpen_express_state::bridge_ops::WithdrawalIntent;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct L1Status {
@@ -85,19 +84,6 @@ pub struct BlockHeader {
     pub state_root: [u8; 32],
 }
 
-<<<<<<< HEAD
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
-pub struct WithdrawalIntent {
-    /// Amount of currency to be withdrawn.
-    pub amt: u64,
-
-    /// Destination public key for the withdrawal
-    #[serde(with = "hex::serde")]
-    pub dest_pk: [u8; 64],
-}
-
-=======
->>>>>>> ba81d33e (fix: udpate struct locations after rebase)
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct DaBlob {
     /// The destination or identifier for the blob.

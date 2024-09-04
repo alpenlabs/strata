@@ -8,10 +8,7 @@ use alpen_express_primitives::{
     l1::{self, BitcoinAmount, OutputRef, XOnlyPk},
 };
 use borsh::{BorshDeserialize, BorshSerialize};
-use express_bridge_txm::{DepositInfo, SignatureInfo, WithdrawalInfo};
 use serde::{Deserialize, Serialize};
-
-use crate::bridge_ops::WithdrawalBatch;
 
 /// The bitcoin block height that a withdrawal command references.
 pub type BitcoinBlockHeight = u64;

@@ -1,8 +1,7 @@
 //! Defines the functions that pertain to handling a withdrawal request.
 
-use bitcoin::{address::NetworkChecked, secp256k1::schnorr::Signature, Address, Network, OutPoint};
-
 use alpen_express_primitives::l1::BitcoinAmount;
+use bitcoin::{address::NetworkChecked, secp256k1::schnorr::Signature, Address, Network, OutPoint};
 use express_bridge_txm::{ReimbursementRequest, SignatureInfo};
 
 use super::errors::WithdrawalExecResult;

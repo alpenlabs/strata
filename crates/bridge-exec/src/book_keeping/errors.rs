@@ -2,6 +2,7 @@
 //! duties.
 
 use std::io;
+
 use thiserror::Error;
 
 /// Error encountered while reading/updating the checkpoint value.

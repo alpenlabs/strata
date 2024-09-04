@@ -13,10 +13,10 @@ use alpen_express_primitives::{buf::Buf32, hash};
 use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer, HexBytes, HexBytes32};
 use alpen_express_rpc_types::{
     BlockHeader, ClientStatus, DaBlob, DepositEntry, DepositState, ExecUpdate, L1Status,
-    WithdrawalIntent,
 };
 use alpen_express_state::{
     block::{L2Block, L2BlockBundle},
+    bridge_ops::WithdrawalIntent,
     chain_state::ChainState,
     client_state::ClientState,
     da_blob::{BlobDest, BlobIntent},
@@ -44,7 +44,6 @@ use tokio::sync::{
     mpsc::{self, Sender},
     oneshot, watch, Mutex, RwLock,
 };
-
 use tracing::*;
 
 #[derive(Debug, Error)]

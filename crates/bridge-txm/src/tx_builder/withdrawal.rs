@@ -1,9 +1,8 @@
 //! Provides types/traits associated with the withdrawal process.
 
+use alpen_express_primitives::l1::BitcoinAddress;
 use bitcoin::{secp256k1::schnorr::Signature, Amount, OutPoint};
 use serde::{Deserialize, Serialize};
-
-use alpen_express_primitives::l1::BitcoinAddress;
 
 use crate::SignatureInfo;
 

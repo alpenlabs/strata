@@ -2,11 +2,10 @@
 use anyhow::Context;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use express_bridge_rpc_api::{ExpressBridgeControlApiServer, ExpressBridgeNetworkApiServer};
 use jsonrpsee::{core::RpcResult, RpcModule};
 use tokio::sync::oneshot;
 use tracing::{info, warn};
-
-use express_bridge_rpc_api::{ExpressBridgeControlApiServer, ExpressBridgeNetworkApiServer};
 
 use crate::constants::{RPC_PORT, RPC_SERVER};
 

@@ -148,7 +148,7 @@ impl<'de> Deserialize<'de> for Buf32 {
 }
 
 // 64-byte buf, useful for schnorr signatures
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub struct Buf64(pub FixedBytes<64>);
 
 impl Buf64 {
