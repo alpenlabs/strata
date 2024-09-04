@@ -1,6 +1,7 @@
 use std::{
     fmt,
     sync::atomic::{AtomicUsize, Ordering},
+    time::Duration,
 };
 
 use async_trait::async_trait;
@@ -20,6 +21,7 @@ use serde_json::{
     json,
     value::{RawValue, Value},
 };
+use tokio::time::sleep;
 use tracing::*;
 
 use super::traits::BitcoinWallet;
@@ -31,6 +33,9 @@ use crate::rpc::{
 
 /// This is an alias for the result type returned by the [`BitcoinClient`].
 pub type ClientResult<T> = Result<T, ClientError>;
+
+/// The maximum number of retries for a request.
+const MAX_RETRIES: u8 = 3;
 
 /// Custom implementation to convert a value to a `Value` type.
 pub fn to_value<T>(value: T) -> ClientResult<Value>
@@ -101,68 +106,83 @@ impl BitcoinClient {
         method: &str,
         params: &[Value],
     ) -> ClientResult<T> {
-        trace!(method = %method, params = ?params, "Calling bitcoin client");
+        let mut retries = 0;
+        loop {
+            trace!(%method, ?params, %retries, "Calling bitcoin client");
 
-        let id = self.next_id();
+            let id = self.next_id();
 
-        let response = self
-            .client
-            .post(&self.url)
-            .json(&json!({
-                "jsonrpc": "1.0",
-                "id": id,
-                "method": method,
-                "params": params
-            }))
-            .send()
-            .await;
+            let response = self
+                .client
+                .post(&self.url)
+                .json(&json!({
+                    "jsonrpc": "1.0",
+                    "id": id,
+                    "method": method,
+                    "params": params
+                }))
+                .send()
+                .await;
 
-        match response {
-            Ok(resp) => {
-                let result = resp.json::<Response<T>>().await;
-                trace!(result = ?result, "Received response");
-                let data = result.map_err(|e| ClientError::Parse(e.to_string()))?;
-                trace!(data = ?data);
-                if let Some(err) = data.error {
-                    return Err(ClientError::Server(err.code, err.message));
+            match response {
+                Ok(resp) => {
+                    let data = resp
+                        .json::<Response<T>>()
+                        .await
+                        .map_err(|e| ClientError::Parse(e.to_string()))?;
+                    if let Some(err) = data.error {
+                        return Err(ClientError::Server(err.code, err.message));
+                    }
+                    return data
+                        .result
+                        .ok_or_else(|| ClientError::Other("Empty data received".to_string()));
                 }
-                data.result
-                    .ok_or_else(|| ClientError::Other("Empty data received".to_string()))
-            }
-            Err(err) => {
-                warn!(err = %err, "Error calling bitcoin client");
+                Err(err) => {
+                    warn!(err = %err, "Error calling bitcoin client");
 
-                if err.is_body() {
-                    Err(ClientError::Body(err.to_string()))
-                } else if err.is_status() {
-                    let e = match err.status() {
-                        Some(code) => ClientError::Status(code.to_string(), err.to_string()),
-                        _ => ClientError::Other(err.to_string()),
-                    };
-                    return Err(e);
-                } else if err.is_decode() {
-                    warn!(%err, "decoding error");
-                    return Err(ClientError::MalformedResponse(err.to_string()));
-                } else if err.is_connect() {
-                    let e = ClientError::Connection(err.to_string());
-                    warn!(%e, "connection error, retrying...");
-                    Err(e)
-                } else if err.is_timeout() {
-                    let e = ClientError::Timeout;
-                    warn!(%e, "timeout error, retrying...");
-                    Err(e)
-                } else if err.is_request() {
-                    let e = ClientError::Request(err.to_string());
-                    warn!(%e, "request error, retrying...");
-                    Err(e)
-                } else if err.is_builder() {
-                    Err(ClientError::ReqBuilder(err.to_string()))
-                } else if err.is_redirect() {
-                    Err(ClientError::HttpRedirect(err.to_string()))
-                } else {
-                    Err(ClientError::Other("Unknown error".to_string()))
+                    if err.is_body() {
+                        // Body error is unrecoverable
+                        return Err(ClientError::Body(err.to_string()));
+                    } else if err.is_status() {
+                        // Status error is unrecoverable
+                        let e = match err.status() {
+                            Some(code) => ClientError::Status(code.to_string(), err.to_string()),
+                            _ => ClientError::Other(err.to_string()),
+                        };
+                        return Err(e);
+                    } else if err.is_decode() {
+                        // Error decoding response, might be recoverable
+                        let e = ClientError::MalformedResponse(err.to_string());
+                        warn!(%e, "decoding error, retrying...");
+                    } else if err.is_connect() {
+                        // Connection error, might be recoverable
+                        let e = ClientError::Connection(err.to_string());
+                        warn!(%e, "connection error, retrying...");
+                    } else if err.is_timeout() {
+                        // Timeout error, might be recoverable
+                        let e = ClientError::Timeout;
+                        warn!(%e, "timeout error, retrying...");
+                    } else if err.is_request() {
+                        // General request error, might be recoverable
+                        let e = ClientError::Request(err.to_string());
+                        warn!(%e, "request error, retrying...");
+                    } else if err.is_builder() {
+                        // Request builder error is unrecoverable
+                        return Err(ClientError::ReqBuilder(err.to_string()));
+                    } else if err.is_redirect() {
+                        // Redirect error is unrecoverable
+                        return Err(ClientError::HttpRedirect(err.to_string()));
+                    } else {
+                        // Unknown error is unrecoverable
+                        return Err(ClientError::Other("Unknown error".to_string()));
+                    }
                 }
             }
+            retries += 1;
+            if retries >= MAX_RETRIES {
+                return Err(ClientError::MaxRetriesExceeded(MAX_RETRIES));
+            }
+            sleep(Duration::from_millis(1_000)).await;
         }
     }
 }
@@ -241,7 +261,7 @@ impl BitcoinBroadcaster for BitcoinClient {
             Ok(txid) => {
                 trace!(?txid, "Transaction sent");
                 Ok(txid)
-            },
+            }
             Err(ClientError::Server(i, s)) => match i {
                 // Dealing with known and common errors
                 -27 => Ok(tx.compute_txid()), // Tx already in chain
