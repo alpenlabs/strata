@@ -4,7 +4,8 @@
 use alpen_express_db::traits::{Database, L1DataProvider, L2DataProvider, L2DataStore};
 use alpen_express_primitives::prelude::*;
 use alpen_express_state::{
-    client_state::*, header::L2Header, l1::L1BlockId, operation::*, sync_event::SyncEvent,
+    client_state::*, header::L2Header, id::L2BlockId, l1::L1BlockId, operation::*,
+    sync_event::SyncEvent,
 };
 use tracing::*;
 
@@ -89,7 +90,7 @@ pub fn process_event<D: Database>(
             writes.push(ClientStateWrite::RollbackL1BlocksTo(*to_height));
         }
 
-        SyncEvent::L1DABatch(blkids) => {
+        SyncEvent::L1DABatch((height, blkids)) => {
             if blkids.is_empty() {
                 warn!("empty L1DABatch");
             }
@@ -108,8 +109,12 @@ pub fn process_event<D: Database>(
                 }
 
                 let last = blkids.last().unwrap();
-                writes.push(ClientStateWrite::UpdateFinalized(*last));
-                actions.push(SyncAction::FinalizeBlock(*last));
+                // When DABatch appears, it is only confirmed at the moment. These will be finalized
+                // only when the corresponding L1 block is buried enough
+                writes.push(ClientStateWrite::UpdateConfirmed((*height, *last)));
+
+                // writes.push(ClientStateWrite::UpdateFinalized(*last));
+                // actions.push(SyncAction::FinalizeBlock(*last));
             } else {
                 // TODO we can expand this later to make more sense
                 return Err(Error::MissingClientSyncState);

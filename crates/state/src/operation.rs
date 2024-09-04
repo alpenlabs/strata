@@ -64,8 +64,11 @@ pub enum ClientStateWrite {
     /// Updates the buried block index to a higher index.
     UpdateBuried(u64),
 
-    /// Update the finalized block.
-    UpdateFinalized(L2BlockId),
+    /// Update the l2 block whose batch proof has been confirmed in L1 at a height.
+    UpdateConfirmed((u64, L2BlockId)),
+
+    /// Update the l2 block whose batch proof has been finalized in L1 at a height.
+    UpdateFinalized((u64, L2BlockId)),
 }
 
 /// Actions the client state machine directs the node to take to update its own
@@ -161,12 +164,31 @@ pub fn apply_writes_to_state(
 
                 // TODO merge these blocks into the L1 MMR in the client state if
                 // we haven't already
+
+                // Now update confirmed blocks to finalized if any
+                update_finalized(state, new_idx);
             }
 
-            UpdateFinalized(blkid) => {
-                let ss = state.expect_sync_mut();
-                ss.finalized_blkid = blkid;
+            UpdateFinalized((height, _blkid)) => {
+                // THIS BLOCK IS REDUNDANT RIGHT NOW
+                update_finalized(state, height);
             }
+
+            UpdateConfirmed((l1height, blkid)) => {
+                let ss = state.expect_sync_mut();
+                ss.confirmed_blocks.push((l1height, blkid));
+            }
+        }
+    }
+}
+
+fn update_finalized(state: &mut ClientState, height: u64) {
+    let ss = state.expect_sync_mut();
+    if let Some(finalized_pos) = ss.confirmed_blocks.iter().position(|(h, _)| *h == height) {
+        let finalized_blocks = ss.confirmed_blocks.drain(..finalized_pos + 1);
+
+        if let Some((_, fin_blkid)) = finalized_blocks.last() {
+            ss.finalized_blkid = fin_blkid;
         }
     }
 }
