@@ -1,8 +1,9 @@
 use l1_batch::logic::{process_batch_proof, L1BatchProofInput};
 use risc0_zkvm::{guest::env, serde};
 
+// TODO: read from
 pub const BTC_BLOCKSPACE_RISC0_ID: [u32; 8] = [
-    2306016456, 3255285113, 4013425807, 3434287776, 4100354067, 1869760094, 1016980814, 1706045821,
+    3924733487, 4261975711, 2287119136, 3197699074, 1661616050, 1659118978, 3476255655, 873162380,
 ];
 
 fn main() {

@@ -2,53 +2,36 @@
 mod test {
     use std::str::FromStr;
 
-    use alpen_test_utils::bitcoin::{get_btc_chain, BtcChain};
-    use bitcoin::{consensus::deserialize, hashes::Hash, Address, Block};
+    use alpen_test_utils::bitcoin::get_btc_chain;
+    use bitcoin::{consensus::deserialize, params::MAINNET, Address, Block};
     use btc_blockspace::logic::{BlockspaceProofInput, BlockspaceProofOutput, ScanRuleConfig};
     use express_risc0_adapter::{Risc0Verifier, RiscZeroHost};
     use express_zkvm::{ProverOptions, ZKVMHost, ZKVMVerifier};
     use l1_batch::{
-        header_verification::{get_difficulty_adjustment_height, HeaderVerificationState},
+        header_verification::HeaderVerificationState,
         logic::{L1BatchProofInput, L1BatchProofOutput},
+        pow_params::PowParams,
     };
     use risc0_guest_builder::{ALPEN_BTC_BLOCKSPACE_RISC0_PROOF_ELF, L1_BATCH_RISC0_ELF};
     use risc0_zkvm::Receipt;
 
-    fn for_block(block_height: u32, chain: &BtcChain) -> HeaderVerificationState {
-        // Get the first difficulty adjustment block after `chain.start`
-        let h1 = get_difficulty_adjustment_height(1, chain.start);
-        assert!(
-            block_height > h1 && block_height < chain.end,
-            "not enough info in the chain"
-        );
-
-        // Get the difficulty adjustment block just before `block_height`
-        let h1 = get_difficulty_adjustment_height(0, block_height);
-
-        // Consider the block before `block_height` to be the last verified block
-        let vh = block_height - 1; // verified_height
-
-        // Fetch the previous timestamps of block from `vh`
-        // This fetches timestamps of `vh`, `vh-1`, `vh-2`, ...
-        let recent_block_timestamps: [u32; 11] =
-            chain.get_last_timestamps(vh, 11).try_into().unwrap();
+    fn get_header_verification_state(height: u32) -> HeaderVerificationState {
+        let chain = get_btc_chain(MAINNET.clone());
+        let (
+            last_verified_block_hash,
+            next_block_target,
+            last_11_blocks_timestamps,
+            interval_start_timestamp,
+        ) = chain.get_header_verification_info(height);
 
         HeaderVerificationState {
-            last_verified_block_num: vh,
-            last_verified_block_hash: chain
-                .get_header(vh)
-                .block_hash()
-                .as_raw_hash()
-                .to_byte_array()
-                .into(),
-            next_block_target: chain
-                .get_header(vh)
-                .target()
-                .to_compact_lossy()
-                .to_consensus(),
-            interval_start_timestamp: chain.get_header(h1).time,
+            params: PowParams::from(chain.params),
+            last_verified_block_num: height - 1,
+            last_verified_block_hash,
+            next_block_target,
+            interval_start_timestamp,
             total_accumulated_pow: 0f64,
-            last_11_blocks_timestamps: recent_block_timestamps,
+            last_11_blocks_timestamps,
         }
     }
 
@@ -61,15 +44,7 @@ mod test {
             (40324, "010000001f35c6ea4a54eb0ea718a9e2e9badc3383d6598ff9b6f8acfd80e52500000000a7a6fbce300cbb5c0920164d34c36d2a8bb94586e9889749962b1be9a02bbf3b9194784b5746651c0558e1140101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff08045746651c029001ffffffff0100f2052a01000000434104e5d390c21b7d221e6ba15c518444c1aae43d6fb6f721c4a5f71e590288637ca2961be07ee845a795da3fd1204f52d4faa819c167062782590f08cf717475e488ac00000000".to_owned()),
         ];
 
-        let prover_options = ProverOptions {
-            enable_compression: false,
-            use_mock_prover: false,
-            stark_to_snark_conversion: false,
-        };
-        // let prover = RiscZeroHost::init(ALPEN_BTC_BLOCKSPACE_RISC0_PROOF_ELF.into(),
-        // Default::default());
-        let prover =
-            RiscZeroHost::init(ALPEN_BTC_BLOCKSPACE_RISC0_PROOF_ELF.into(), prover_options);
+        let prover = RiscZeroHost::init(BTC_BLOCKSPACE_RISC0_ELF.into(), Default::default());
 
         let mut blockspace_proofs = Vec::new();
         let mut blockspace_outputs = Vec::new();
@@ -100,17 +75,10 @@ mod test {
             blockspace_outputs.push(output);
         }
 
-        let prover_options = ProverOptions {
-            enable_compression: true,
-            use_mock_prover: false,
-            stark_to_snark_conversion: false,
-        };
-        // let prover = RiscZeroHost::init(L1_BATCH_RISC0_ELF.into(), Default::default());
-        let prover = RiscZeroHost::init(L1_BATCH_RISC0_ELF.into(), prover_options);
-        let chain = get_btc_chain();
+        let prover = RiscZeroHost::init(L1_BATCH_RISC0_ELF.into(), Default::default());
         let input = L1BatchProofInput {
             batch: blockspace_outputs,
-            state: for_block(40321, &chain),
+            state: get_header_verification_state(40321),
         };
 
         let (proof, _) = prover

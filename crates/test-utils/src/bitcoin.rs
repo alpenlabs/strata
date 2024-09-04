@@ -1,5 +1,7 @@
 use alpen_express_primitives::l1::L1BlockManifest;
-use bitcoin::{block::Header, consensus::deserialize, Block, Transaction};
+use bitcoin::{
+    block::Header, consensus::deserialize, hashes::Hash, params::Params, Block, Transaction,
+};
 
 use crate::ArbitraryGenerator;
 
@@ -33,7 +35,25 @@ pub fn get_btc_mainnet_block() -> Block {
     block
 }
 
+/// Calculates the height at which a specific difficulty adjustment occurs relative to a
+/// starting height.
+///
+/// # Arguments
+///
+/// * `idx` - The index of the difficulty adjustment (1-based). 1 for the first adjustment, 2 for
+///   the second, and so on.
+/// * `start` - The starting height from which to calculate.
+/// * `params` - [PowParams](PowParams) of the network
+pub fn get_difficulty_adjustment_height(
+    idx: u32,
+    start: u32,
+    difficulty_adjustment_interval: u32,
+) -> u32 {
+    ((start / difficulty_adjustment_interval) + idx) * difficulty_adjustment_interval
+}
+
 pub struct BtcChain {
+    pub params: Params,
     pub headers: Vec<Header>,
     pub start: u32,
     pub end: u32,
@@ -42,12 +62,12 @@ pub struct BtcChain {
 impl BtcChain {
     /// Retrieves the block header at the specified height.
     pub fn get_header(&self, height: u32) -> Header {
-        if height < self.start {
-            panic!("height must be greater than that");
-        }
-        if height >= self.end {
-            panic!("height must be less than that");
-        }
+        assert!(
+            (self.start..self.end).contains(&height),
+            "height must be in the range [{}..{})",
+            self.start,
+            self.end
+        );
         let idx = height - self.start;
         self.headers[idx as usize]
     }
@@ -62,9 +82,41 @@ impl BtcChain {
         }
         timestamps
     }
+
+    pub fn get_first_difficulty_adjustment_height(&self) -> u32 {
+        get_difficulty_adjustment_height(
+            1,
+            self.start,
+            self.params.difficulty_adjustment_interval() as u32,
+        )
+    }
+
+    pub fn get_header_verification_info(&self, height: u32) -> ([u8; 32], u32, [u32; 11], u32) {
+        let difficulty_adjustment_interval = self.params.difficulty_adjustment_interval() as u32;
+
+        // Consider the block before `height` to be the last verified block
+        let vh = height - 1; // verified_height
+
+        let vb = self.get_header(vh); // verified block
+
+        // Fetch the previous timestamps of block from `vh`
+        // This fetches timestamps of `vh`, `vh-1`, `vh-2`, ...
+        let recent_block_timestamps: [u32; 11] =
+            self.get_last_timestamps(vh, 11).try_into().unwrap();
+
+        // Get the difficulty adjustment height just before the block
+        let h1 = get_difficulty_adjustment_height(0, height, difficulty_adjustment_interval);
+
+        (
+            vb.block_hash().as_raw_hash().to_byte_array(),
+            vb.target().to_compact_lossy().to_consensus(),
+            recent_block_timestamps,
+            self.get_header(h1).time,
+        )
+    }
 }
 
-pub fn get_btc_chain() -> BtcChain {
+pub fn get_btc_chain(params: Params) -> BtcChain {
     let buffer = include_bytes!("../data/mainnet_blocks_40000-50000.raw");
 
     let chunk_size = Header::SIZE;
@@ -78,6 +130,7 @@ pub fn get_btc_chain() -> BtcChain {
     }
 
     BtcChain {
+        params,
         headers,
         start: 40_000,
         end: 50_000,
