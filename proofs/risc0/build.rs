@@ -4,7 +4,6 @@ fn main() {
         "CFLAGS_riscv32im_risc0_zkvm_elf",
         "-target riscv32-unknown-elf",
     );
-
     if cfg!(feature = "prover")
         && std::env::var("SKIP_GUEST_BUILD").is_err()
         && std::env::var("CARGO_CFG_CLIPPY").is_err()
