@@ -8,7 +8,8 @@ version = "0.1.0"
 
 [dependencies]
 alpen-express-primitives = { workspace = true }
-express-bridge-txm = { workspace = true }
+express-bridge-sig-manager = { workspace = true }
+express-bridge-tx-builder = { workspace = true }
 
 arbitrary = { workspace = true }
 bitcoin = { workspace = true }

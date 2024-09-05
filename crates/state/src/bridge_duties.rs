@@ -1,6 +1,6 @@
 //! Type/traits related to the bridge-related duties.
 
-use express_bridge_txm::{DepositInfo, ReimbursementRequest};
+use express_bridge_tx_builder::prelude::DepositInfo;
 use serde::{Deserialize, Serialize};
 
 use crate::bridge_ops::WithdrawalBatch;
@@ -24,28 +24,8 @@ pub enum Duty {
     /// be used to query for the complete [`WithdrawalBatch`] information. We are not sending the
     /// [`WithdrawalBatch`] out directly as
     FulfillWithdrawal(WithdrawalBatch),
-
-    /// The duty to sign the Withdrawal Reimbursement Transaction.
-    ///
-    /// This duty is created by the operator that is assigned the [`WithdrawalBatch`], and applies
-    /// to the rest of the operators.
-    // TODO: move this to a `BridgeMessage` scope after <https://alpenlabs.atlassian.net/browse/EXP-108>.
-    SignWithdrawal(ReimbursementRequest),
-
-    /// Other messages originating from the bridge clients. This encapsulates the `BridgeMessage`
-    /// as will be defined in <https://alpenlabs.atlassian.net/browse/EXP-108>.
-    P2PMessage,
 }
 
-/// A container for bridge duties after `from_height` till `to_height` blocks in the rollup.
+/// A container for bridge duties based on the state in rollup.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BridgeDuties {
-    /// The bridge duties computed from the chainstate and the bridge p2p message queue.
-    duties: Vec<Duty>,
-
-    /// The checkpoint in the CL after which the duties are computed.
-    checkpoint_start: u64,
-
-    /// The checkpoint in the CL till which the duties are computed (inclusive).
-    checkpoint_end: u64,
-}
+pub struct BridgeDuties(Vec<Duty>);

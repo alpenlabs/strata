@@ -222,6 +222,13 @@ pub struct CreatedState {
 pub struct DispatchedState {
     /// Configuration for outputs to be written to.
     cmd: DispatchCommand,
+
+    /// The index of the operator that the deposit is assigned to for withdrawal reimbursement.
+    assignee: OperatorIdx,
+
+    /// The bitcoin block height before which the withdrawal must be completed.
+    /// When set to 0, it means that the withdrawal cannot be processed yet.
+    valid_till_blockheight: BitcoinBlockHeight,
 }
 
 /// Command to operator(s) to initiate the withdrawal.  Describes the set of
@@ -230,13 +237,6 @@ pub struct DispatchedState {
 pub struct DispatchCommand {
     /// The table of withdrawal outputs.
     withdraw_outputs: Vec<WithdrawOutput>,
-
-    /// The index of the operator that the deposit is assigned to for withdrawal reimbursement.
-    assignee: OperatorIdx,
-
-    /// The bitcoin block height before which the withdrawal must be completed.
-    /// When set to 0, it means that the withdrawal cannot be processed yet.
-    valid_till_blockheight: BitcoinBlockHeight,
 }
 
 /// An output constructed from [`crate::bridge_ops::WithdrawalIntent`].
