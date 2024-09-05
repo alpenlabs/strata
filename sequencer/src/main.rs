@@ -8,6 +8,7 @@ use std::{
 
 use alpen_express_btcio::{
     broadcaster::{spawn_broadcaster_task, L1BroadcastHandle},
+    rpc::BitcoinClient,
     writer::{config::WriterConfig, start_inscription_task, InscriptionHandle},
 };
 use alpen_express_common::logging;
@@ -215,16 +216,16 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     // Set up Bitcoin client RPC.
     let bitcoind_url = format!("http://{}", config.bitcoind_rpc.rpc_url);
-    let btc_rpc = alpen_express_btcio::rpc::BitcoinClient::new(
+    let btc_rpc = BitcoinClient::new(
         bitcoind_url,
         config.bitcoind_rpc.rpc_user.clone(),
         config.bitcoind_rpc.rpc_password.clone(),
-        bitcoin::Network::Regtest,
-    );
+    )
+    .map_err(anyhow::Error::from)?;
     let btc_rpc = Arc::new(btc_rpc);
 
     // TODO remove this
-    if config.bitcoind_rpc.network == Network::Regtest {
+    if config.bitcoind_rpc.network != Network::Regtest {
         warn!("network not set to regtest, ignoring");
     }
 

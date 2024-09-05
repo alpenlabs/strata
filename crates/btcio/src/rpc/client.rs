@@ -1,179 +1,117 @@
-use std::{fmt::Display, str::FromStr, sync::atomic::AtomicU64, time::Duration};
+use std::{
+    fmt,
+    sync::atomic::{AtomicUsize, Ordering},
+    time::Duration,
+};
 
 use async_trait::async_trait;
 use base64::{engine::general_purpose, Engine};
 use bitcoin::{
-    block::{Header, Version},
-    consensus::{
-        deserialize,
-        encode::{deserialize_hex, serialize_hex},
-    },
-    hash_types::TxMerkleNode,
-    hashes::Hash as _,
-    Address, Block, BlockHash, CompactTarget, Network, Transaction, Txid,
+    consensus::encode::serialize_hex, Address, Block, BlockHash, Network, Transaction, Txid,
 };
-use reqwest::{header::HeaderMap, StatusCode};
-use serde::{Deserialize, Serialize};
+use bitcoind_json_rpc_types::v26::{
+    GetBlockVerbosityZero, GetBlockchainInfo, GetNewAddress, SendToAddress,
+};
+use reqwest::{
+    header::{HeaderMap, AUTHORIZATION, CONTENT_TYPE},
+    Client,
+};
+use serde::{de, Deserialize, Serialize};
 use serde_json::{
-    json, to_value,
+    json,
     value::{RawValue, Value},
 };
-use thiserror::Error;
+use tokio::time::sleep;
 use tracing::*;
 
-use super::{
-    traits::{L1Client, SeqL1Client},
-    types::{RPCTransactionInfo, RawUTXO, RpcBlockchainInfo},
+use super::traits::BitcoinWallet;
+use crate::rpc::{
+    error::{BitcoinRpcError, ClientError},
+    traits::{BitcoinBroadcaster, BitcoinReader, BitcoinSigner},
+    types::{GetTransaction, ListTransactions, ListUnspent, SignRawTransactionWithWallet},
 };
 
-const MAX_RETRIES: u32 = 3;
+/// This is an alias for the result type returned by the [`BitcoinClient`].
+pub type ClientResult<T> = Result<T, ClientError>;
 
-pub fn to_val<T>(value: T) -> ClientResult<Value>
+/// The maximum number of retries for a request.
+const MAX_RETRIES: u8 = 3;
+
+/// Custom implementation to convert a value to a `Value` type.
+pub fn to_value<T>(value: T) -> ClientResult<Value>
 where
     T: Serialize,
 {
-    to_value(value).map_err(|e| ClientError::Param(format!("Error creating value: {}", e)))
+    serde_json::to_value(value)
+        .map_err(|e| ClientError::Param(format!("Error creating value: {}", e)))
 }
 
-// Represents a JSON-RPC error.
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
-pub struct RpcError {
-    pub code: i32,
-    pub message: String,
+/// An `async` client for interacting with a `bitcoind` instance.
+#[derive(Debug)]
+pub struct BitcoinClient {
+    /// The URL of the `bitcoind` instance.
+    url: String,
+    /// The underlying `async` HTTP client.
+    client: Client,
+    /// The ID of the current request.
+    id: AtomicUsize,
 }
 
-impl Display for RpcError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "RPCError code {}: {}", self.code, self.message)
-    }
-}
-
-// Response is a struct that represents a response returned by the Bitcoin RPC
-// It is generic over the type of the result field, which is usually a String in Bitcoin Core
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+/// Response returned by the `bitcoind` RPC server.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct Response<R> {
     pub result: Option<R>,
-    pub error: Option<RpcError>,
+    pub error: Option<BitcoinRpcError>,
     pub id: u64,
 }
 
-// BitcoinClient is a struct that represents a connection to a Bitcoin RPC node
-#[derive(Debug)]
-pub struct BitcoinClient {
-    url: String,
-    client: reqwest::Client,
-    network: Network,
-    next_id: AtomicU64,
-}
-
-#[derive(Debug, Error)]
-pub enum ClientError {
-    #[error("Network: {0}")]
-    Network(String),
-
-    #[error("RPC server returned error '{1}' (code {0})")]
-    Server(i32, String),
-
-    #[error("Error parsing rpc response: {0}")]
-    Parse(String),
-
-    #[error("Could not create RPC Param")]
-    Param(String),
-
-    #[error("{0}")]
-    Body(String),
-
-    #[error("Obtained failure status({0}): {1}")]
-    Status(StatusCode, String),
-
-    #[error("Malformed Response: {0}")]
-    MalformedResponse(String),
-
-    #[error("Could not connect: {0}")]
-    Connection(String),
-
-    #[error("Timeout")]
-    Timeout,
-
-    #[error("HttpRedirect: {0}")]
-    HttpRedirect(String),
-
-    #[error("Could not build request: {0}")]
-    ReqBuilder(String),
-
-    #[error("Max retries {0} exceeded")]
-    MaxRetriesExceeded(u32),
-
-    #[error("Could not create request: {0}")]
-    Request(String),
-
-    #[error("Network address: {0}")]
-    WrongNetworkAddress(Network),
-
-    #[error("Could not sign")]
-    Signing(Vec<String>),
-
-    #[error("{0}")]
-    Other(String),
-}
-
-impl From<serde_json::error::Error> for ClientError {
-    fn from(value: serde_json::error::Error) -> Self {
-        Self::Parse(format!("Could not parse {}", value))
-    }
-}
-
-type ClientResult<T> = Result<T, ClientError>;
-
 impl BitcoinClient {
-    pub fn new(url: String, username: String, password: String, network: Network) -> Self {
-        let mut headers = HeaderMap::new();
-        let mut user_pw = String::new();
-        general_purpose::STANDARD.encode_string(format!("{}:{}", username, password), &mut user_pw);
+    /// Creates a new [`BitcoinClient`] with the given URL, username, and password.
+    pub fn new(url: String, username: String, password: String) -> ClientResult<Self> {
+        if username.is_empty() || password.is_empty() {
+            return Err(ClientError::MissingUserPassword);
+        }
 
-        headers.insert(
-            "Authorization",
-            format!("Basic {}", user_pw)
-                .parse()
-                .expect("Failed to parse auth header!"),
-        );
-        headers.insert(
-            "Content-Type",
-            "application/json"
-                .parse()
-                .expect("Failed to parse content type header!"),
-        );
+        let user_pw = general_purpose::STANDARD.encode(format!("{username}:{password}"));
+        let authorization = format!("Basic {user_pw}")
+            .parse()
+            .map_err(|_| ClientError::Other("Error parsing header".to_string()))?;
 
-        let client = reqwest::Client::builder()
+        let content_type = "application/json"
+            .parse()
+            .map_err(|_| ClientError::Other("Error parsing header".to_string()))?;
+        let headers =
+            HeaderMap::from_iter([(AUTHORIZATION, authorization), (CONTENT_TYPE, content_type)]);
+
+        trace!(headers = ?headers);
+
+        let client = Client::builder()
             .default_headers(headers)
             .build()
-            .expect("Failed to build client!");
+            .map_err(|e| ClientError::Other(format!("Could not create client: {e}")))?;
 
-        Self {
-            url,
-            client,
-            network,
-            next_id: AtomicU64::new(0),
-        }
+        let id = AtomicUsize::new(0);
+
+        trace!(url = %url, "Created bitcoin client");
+
+        Ok(Self { url, client, id })
     }
 
-    pub fn network(&self) -> Network {
-        self.network
+    fn next_id(&self) -> usize {
+        self.id.fetch_add(1, Ordering::AcqRel)
     }
 
-    fn next_id(&self) -> u64 {
-        self.next_id
-            .fetch_add(1, std::sync::atomic::Ordering::AcqRel)
-    }
-
-    async fn call<T: serde::de::DeserializeOwned>(
+    async fn call<T: de::DeserializeOwned + fmt::Debug>(
         &self,
         method: &str,
-        params: &[serde_json::Value],
+        params: &[Value],
     ) -> ClientResult<T> {
         let mut retries = 0;
         loop {
+            trace!(%method, ?params, %retries, "Calling bitcoin client");
+
             let id = self.next_id();
+
             let response = self
                 .client
                 .post(&self.url)
@@ -203,338 +141,314 @@ impl BitcoinClient {
                     warn!(err = %err, "Error calling bitcoin client");
 
                     if err.is_body() {
-                        // Body error, unlikely to be recoverable by retrying
+                        // Body error is unrecoverable
                         return Err(ClientError::Body(err.to_string()));
                     } else if err.is_status() {
-                        // HTTP status error, not retryable
+                        // Status error is unrecoverable
                         let e = match err.status() {
-                            Some(code) => ClientError::Status(code, err.to_string()),
+                            Some(code) => ClientError::Status(code.to_string(), err.to_string()),
                             _ => ClientError::Other(err.to_string()),
                         };
                         return Err(e);
                     } else if err.is_decode() {
-                        // Error decoding the response, retry might not help
-                        return Err(ClientError::MalformedResponse(err.to_string()));
+                        // Error decoding response, might be recoverable
+                        let e = ClientError::MalformedResponse(err.to_string());
+                        warn!(%e, "decoding error, retrying...");
                     } else if err.is_connect() {
-                        // Connection error, retry might help
+                        // Connection error, might be recoverable
                         let e = ClientError::Connection(err.to_string());
                         warn!(%e, "connection error, retrying...");
                     } else if err.is_timeout() {
+                        // Timeout error, might be recoverable
                         let e = ClientError::Timeout;
-                        // Timeout error, retry might help
                         warn!(%e, "timeout error, retrying...");
                     } else if err.is_request() {
-                        // General request error, retry might help
+                        // General request error, might be recoverable
                         let e = ClientError::Request(err.to_string());
                         warn!(%e, "request error, retrying...");
                     } else if err.is_builder() {
-                        // Error building the request, unlikely to be recoverable
+                        // Request builder error is unrecoverable
                         return Err(ClientError::ReqBuilder(err.to_string()));
                     } else if err.is_redirect() {
-                        // Redirect error, not retryable
+                        // Redirect error is unrecoverable
                         return Err(ClientError::HttpRedirect(err.to_string()));
                     } else {
-                        // Unknown error, unlikely to be recoverable
+                        // Unknown error is unrecoverable
                         return Err(ClientError::Other("Unknown error".to_string()));
                     }
-
-                    retries += 1;
-                    if retries >= MAX_RETRIES {
-                        return Err(ClientError::MaxRetriesExceeded(MAX_RETRIES));
-                    }
-                    tokio::time::sleep(Duration::from_millis(1000)).await;
                 }
-            };
+            }
+            retries += 1;
+            if retries >= MAX_RETRIES {
+                return Err(ClientError::MaxRetriesExceeded(MAX_RETRIES));
+            }
+            sleep(Duration::from_millis(1_000)).await;
         }
     }
+}
 
-    // get_block_count returns the current block height
-    pub async fn get_block_count(&self) -> ClientResult<u64> {
+#[async_trait]
+impl BitcoinReader for BitcoinClient {
+    async fn estimate_smart_fee(&self, conf_target: u16) -> ClientResult<u64> {
+        let result = self
+            .call::<Box<RawValue>>("estimatesmartfee", &[to_value(conf_target)?])
+            .await?
+            .to_string();
+
+        let result_map: Value = result.parse::<Value>()?;
+
+        let btc_vkb = result_map
+            .get("feerate")
+            .unwrap_or(&"0.00001".parse::<Value>().unwrap())
+            .as_f64()
+            .unwrap();
+
+        // convert to sat/vB and round up
+        Ok((btc_vkb * 100_000_000.0 / 1000.0) as u64)
+    }
+
+    async fn get_block(&self, hash: &BlockHash) -> ClientResult<Block> {
+        let get_block = self
+            .call::<GetBlockVerbosityZero>("getblock", &[to_value(hash.to_string())?, to_value(0)?])
+            .await
+            .expect("get_block failed");
+        let block = get_block.block().expect("block failed");
+        Ok(block)
+    }
+
+    async fn get_block_at(&self, height: u64) -> ClientResult<Block> {
+        let hash = self.get_block_hash(height).await?;
+        self.get_block(&hash).await
+    }
+
+    async fn get_block_count(&self) -> ClientResult<u64> {
         self.call::<u64>("getblockcount", &[]).await
     }
 
-    // This returns [(txid, timestamp)]
-    pub async fn list_transactions(&self, confirmations: u32) -> ClientResult<Vec<(String, u64)>> {
-        let res = self
-            .call::<serde_json::Value>("listtransactions", &[to_value(confirmations)?])
-            .await?;
-        if let serde_json::Value::Array(array) = res {
-            Ok(array
-                .iter()
-                .map(|el| {
-                    (
-                        serde_json::from_value::<String>(el.get("txid").unwrap().clone())
-                            .unwrap()
-                            .clone(),
-                        serde_json::from_value::<u64>(el.get("time").unwrap().clone()).unwrap(),
-                    )
-                })
-                .collect())
-        } else {
-            Err(ClientError::MalformedResponse(res.to_string()))
+    async fn get_block_hash(&self, height: u64) -> ClientResult<BlockHash> {
+        self.call::<BlockHash>("getblockhash", &[to_value(height)?])
+            .await
+    }
+
+    async fn get_blockchain_info(&self) -> ClientResult<GetBlockchainInfo> {
+        self.call::<GetBlockchainInfo>("getblockchaininfo", &[])
+            .await
+    }
+
+    async fn get_raw_mempool(&self) -> ClientResult<Vec<Txid>> {
+        self.call::<Vec<Txid>>("getrawmempool", &[]).await
+    }
+
+    async fn network(&self) -> ClientResult<Network> {
+        Ok(self
+            .call::<GetBlockchainInfo>("getblockchaininfo", &[])
+            .await?
+            .chain
+            .parse::<Network>()
+            .map_err(|e| ClientError::Parse(e.to_string()))?)
+    }
+}
+
+#[async_trait]
+impl BitcoinBroadcaster for BitcoinClient {
+    async fn send_raw_transaction(&self, tx: &Transaction) -> ClientResult<Txid> {
+        let txstr = serialize_hex(tx);
+        trace!(txstr = %txstr, "Sending raw transaction");
+        match self
+            .call::<Txid>("sendrawtransaction", &[to_value(txstr)?])
+            .await
+        {
+            Ok(txid) => {
+                trace!(?txid, "Transaction sent");
+                Ok(txid)
+            }
+            Err(ClientError::Server(i, s)) => match i {
+                // Dealing with known and common errors
+                -27 => Ok(tx.compute_txid()), // Tx already in chain
+                -25 => Err(ClientError::MalformedResponse(s)), // unrecoverable
+                _ => Err(ClientError::Server(i, s)),
+            },
+            Err(e) => Err(ClientError::Other(e.to_string())),
         }
     }
+}
 
-    // get_mempool_txids returns a list of txids in the current mempool
-    pub async fn get_mempool_txids(&self) -> ClientResult<Vec<String>> {
-        let result = self
-            .call::<Box<RawValue>>("getrawmempool", &[])
+#[async_trait]
+impl BitcoinWallet for BitcoinClient {
+    async fn get_new_address(&self) -> ClientResult<Address> {
+        let address_unchecked = self
+            .call::<GetNewAddress>("getnewaddress", &[])
             .await?
-            .to_string();
-
-        serde_json::from_str::<Vec<String>>(&result)
-            .map_err(|e| ClientError::MalformedResponse(e.to_string()))
+            .0
+            .parse::<Address<_>>()
+            .map_err(|e| ClientError::Parse(e.to_string()))?
+            .assume_checked();
+        Ok(address_unchecked)
+    }
+    async fn get_transaction(&self, txid: &Txid) -> ClientResult<GetTransaction> {
+        Ok(self
+            .call::<GetTransaction>("gettransaction", &[to_value(txid.to_string())?])
+            .await?)
     }
 
-    // get_block returns the block at the given hash
-    pub async fn get_block(&self, hash: BlockHash) -> ClientResult<Block> {
-        let result = self
-            .call::<Box<RawValue>>("getblock", &[to_value(hash.to_string())?, to_value(3)?])
-            .await?
-            .to_string();
-
-        let full_block: serde_json::Value = serde_json::from_str(&result)?;
-
-        let header: anyhow::Result<Header> = (|| {
-            Ok(Header {
-                bits: CompactTarget::from_consensus(u32::from_str_radix(
-                    full_block["bits"].as_str().unwrap(),
-                    16,
-                )?),
-                merkle_root: TxMerkleNode::from_str(full_block["merkleroot"].as_str().unwrap())?,
-                nonce: full_block["nonce"].as_u64().unwrap() as u32,
-                prev_blockhash: BlockHash::from_str(
-                    full_block["previousblockhash"].as_str().unwrap(),
-                )?,
-                time: full_block["time"].as_u64().unwrap() as u32,
-                version: Version::from_consensus(full_block["version"].as_u64().unwrap() as i32),
-            })
-        })();
-        let header = header.map_err(|e| ClientError::Other(e.to_string()))?;
-
-        let txdata = full_block["tx"].as_array().unwrap();
-
-        let txs: Vec<Transaction> = txdata
-            .iter()
-            .map(|tx| {
-                let tx_hex = tx["hex"].as_str().unwrap();
-                deserialize(&hex::decode(tx_hex).unwrap()).unwrap()
-                // parse_hex_transaction(tx_hex).unwrap() // hex from rpc cannot be invalid
-            })
-            .collect();
-
-        Ok(Block {
-            header,
-            txdata: txs,
-        })
+    async fn get_utxos(&self) -> ClientResult<Vec<ListUnspent>> {
+        let resp = self.call::<Vec<ListUnspent>>("listunspent", &[]).await?;
+        trace!(?resp, "Got UTXOs");
+        Ok(resp)
     }
 
-    pub async fn list_since_block(&self, blockhash: String) -> ClientResult<Vec<String>> {
-        let result = self
-            .call::<Box<RawValue>>("listsinceblock", &[to_value(blockhash)?])
-            .await?
-            .to_string();
-
-        let rawdata: serde_json::Value = serde_json::from_str(&result)?;
-        let rawdata = rawdata.get("transactions").unwrap();
-        let rawtxns = rawdata.as_array().unwrap();
-        let txids = rawtxns
-            .iter()
-            .map(|x| x.get("txid").unwrap().as_str().unwrap().to_string())
-            .collect();
-        Ok(txids)
+    async fn list_transactions(&self, count: Option<usize>) -> ClientResult<Vec<ListTransactions>> {
+        self.call::<Vec<ListTransactions>>("listtransactions", &[to_value(count)?])
+            .await
     }
 
-    // get_change_address returns a change address for the wallet of bitcoind
-    async fn get_change_address(&self) -> ClientResult<Address> {
-        let address_string = self.call::<String>("getrawchangeaddress", &[]).await?;
-        let addr = Address::from_str(&address_string).and_then(|x| x.require_network(self.network));
-        addr.map_err(|_| ClientError::WrongNetworkAddress(self.network))
-    }
-
-    pub async fn get_change_addresses(&self) -> ClientResult<[Address; 2]> {
-        let change_address = self.get_change_address().await?;
-        let change_address_2 = self.get_change_address().await?;
-
-        Ok([change_address, change_address_2])
-    }
-
-    #[cfg(test)]
-    pub async fn send_to_address(&self, address: String, amt: u32) -> anyhow::Result<String> {
-        if self.network == Network::Regtest {
-            let result = self
-                .call::<Box<RawValue>>(
-                    "sendtoaddress",
-                    &[
-                        to_value(address)?,
-                        to_value(amt)?,
-                        // All the following items are needed to pass the fee-rate and fee-rate
-                        // needs to be passed just in case the regtest
-                        // chain cannot estimate fee rate due to
-                        // insufficient blocks
-                        to_value("")?,
-                        to_value("")?,
-                        to_value(true)?,
-                        to_value(true)?,
-                        to_value(<Option<String>>::None)?,
-                        to_value("unset")?,
-                        to_value(<Option<String>>::None)?,
-                        to_value(1.1)?, // fee rate
-                    ],
-                )
-                .await;
-            Ok(result.unwrap().to_string())
-        } else {
-            Err(anyhow::anyhow!(
-                "Cannot send_to_address on non-regtest network"
-            ))
-        }
-    }
-    pub async fn list_wallets(&self) -> ClientResult<Vec<String>> {
+    async fn list_wallets(&self) -> ClientResult<Vec<String>> {
         self.call::<Vec<String>>("listwallets", &[]).await
     }
 }
 
 #[async_trait]
-impl L1Client for BitcoinClient {
-    async fn get_blockchain_info(&self) -> ClientResult<RpcBlockchainInfo> {
-        let res = self
-            .call::<RpcBlockchainInfo>("getblockchaininfo", &[])
-            .await?;
-        Ok(res)
-    }
-
-    // get_block_hash returns the block hash of the block at the given height
-    async fn get_block_hash(&self, height: u64) -> ClientResult<BlockHash> {
-        let hash = self
-            .call::<String>("getblockhash", &[to_value(height)?])
-            .await?;
-        Ok(
-            BlockHash::from_str(&hash)
-                .map_err(|e| ClientError::MalformedResponse(e.to_string()))?,
-        )
-    }
-
-    async fn get_block_at(&self, height: u64) -> ClientResult<Block> {
-        let hash = self.get_block_hash(height).await?;
-        let block = self.get_block(hash).await?;
-        Ok(block)
-    }
-
-    // send_raw_transaction sends a raw transaction to the network
-    async fn send_raw_transaction<T: AsRef<[u8]> + Send>(&self, tx: T) -> ClientResult<Txid> {
-        let txstr = hex::encode(tx);
-        let resp = self
-            .call::<String>("sendrawtransaction", &[to_value(txstr)?])
-            .await?;
-
-        let hex = hex::decode(resp.clone());
-        match hex {
-            Ok(hx) => {
-                if hx.len() != 32 {
-                    return Err(ClientError::MalformedResponse(resp));
-                }
-                let mut arr: [u8; 32] = [0; 32];
-                arr.copy_from_slice(&hx);
-                Ok(Txid::from_slice(&arr)
-                    .map_err(|e| ClientError::MalformedResponse(e.to_string()))?)
-            }
-            Err(e) => Err(ClientError::MalformedResponse(e.to_string())),
-        }
-    }
-
-    async fn get_transaction_info(&self, txid: Txid) -> ClientResult<RPCTransactionInfo> {
-        Ok(self
-            .call::<RPCTransactionInfo>("gettransaction", &[to_val(txid.to_string())?])
-            .await?)
-    }
-}
-
-#[async_trait]
-impl SeqL1Client for BitcoinClient {
-    // get_utxos returns all unspent transaction outputs for the wallets of bitcoind
-    async fn get_utxos(&self) -> ClientResult<Vec<RawUTXO>> {
-        let utxos = self
-            .call::<Vec<RawUTXO>>("listunspent", &[to_value(0)?, to_value(9999999)?])
-            .await?;
-
-        if utxos.is_empty() {
-            return Err(ClientError::Other("No UTXOs found".to_string()));
-        }
-
-        Ok(utxos)
-    }
-
-    // estimate_smart_fee estimates the fee to confirm a transaction in the next block
-    async fn estimate_smart_fee(&self) -> ClientResult<u64> {
-        let result = self
-            .call::<Box<RawValue>>("estimatesmartfee", &[to_value(1)?])
+impl BitcoinSigner for BitcoinClient {
+    async fn send_to_address(&self, address: &Address, amount: u64) -> ClientResult<Txid> {
+        self.call::<SendToAddress>("sendtoaddress", &[to_value(address)?, to_value(amount)?])
             .await?
-            .to_string();
-
-        let result_map: serde_json::Value = serde_json::from_str(&result)?;
-
-        let btc_vkb = result_map
-            .get("feerate")
-            .unwrap_or(&serde_json::Value::from_str("0.00001").unwrap())
-            .as_f64()
-            .unwrap();
-
-        // convert to sat/vB and round up
-        Ok((btc_vkb * 100_000_000.0 / 1000.0).ceil() as u64)
+            .txid()
+            .map_err(|e| ClientError::Parse(e.to_string()))
     }
 
-    // sign_raw_transaction_with_wallet signs a raw transaction with the wallet of bitcoind
-    async fn sign_raw_transaction_with_wallet(&self, tx: Transaction) -> ClientResult<Transaction> {
-        #[derive(Serialize, Deserialize, Debug)]
-        struct SignError {
-            txid: String,
-            vout: u32,
-            witness: Vec<String>,
-            #[serde(rename = "scriptSig")]
-            script_sig: String,
-            sequence: u32,
-            error: String,
-        }
-
-        #[derive(Serialize, Deserialize, Debug)]
-        struct SignRPCResponse {
-            hex: String,
-            complete: bool,
-            errors: Option<Vec<SignError>>,
-        }
-
-        let txraw = serialize_hex(&tx);
-        let res = self
-            .call::<SignRPCResponse>("signrawtransactionwithwallet", &[to_value(txraw)?])
-            .await?;
-
-        match res.errors {
-            None => {
-                let hex = res.hex;
-                let tx = deserialize_hex(&hex).map_err(|e| ClientError::Parse(e.to_string()))?;
-                Ok(tx)
-            }
-            Some(ref errors) => {
-                warn!("Error while signing with wallet: {:?}", res.errors);
-                let errs = errors
-                    .iter()
-                    .map(|x| x.error.clone())
-                    .collect::<Vec<String>>();
-
-                // TODO: This throws error even when a transaction is partially signed. There does
-                // not seem to be other way to distinguish partially signed error from other
-                // errors. So in future, we might need to handle that particular case where error
-                // message is "CHECK(MULTI)SIG failing with non-zero signature (possibly need more
-                // signatures)"
-                Err(ClientError::Signing(errs))
-            }
-        }
-    }
-
-    fn network(&self) -> Network {
-        self.network
+    async fn sign_raw_transaction_with_wallet(
+        &self,
+        tx: &Transaction,
+    ) -> ClientResult<SignRawTransactionWithWallet> {
+        let tx_hex = serialize_hex(tx);
+        trace!(tx_hex = %tx_hex, "Signing transaction");
+        self.call::<SignRawTransactionWithWallet>(
+            "signrawtransactionwithwallet",
+            &[to_value(tx_hex)?],
+        )
+        .await
     }
 }
 
-// TODO: Add functional tests
+#[cfg(test)]
+mod test {
+    use alpen_express_common::logging;
+    use bitcoin::{consensus, hashes::Hash};
+    use bitcoind::{bitcoincore_rpc::RpcApi, BitcoinD};
+
+    use super::*;
+
+    /// Get the authentication credentials for a given `bitcoind` instance.
+    fn get_auth(bitcoind: &BitcoinD) -> (String, String) {
+        let params = &bitcoind.params;
+        let cookie_values = params.get_cookie_values().unwrap().unwrap();
+        (cookie_values.user, cookie_values.password)
+    }
+
+    /// Mine a number of blocks of a given size `count`, which may be specified to a given coinbase
+    /// `address`.
+    pub fn mine_blocks(
+        bitcoind: &BitcoinD,
+        count: usize,
+        address: Option<Address>,
+    ) -> anyhow::Result<Vec<BlockHash>> {
+        let coinbase_address = match address {
+            Some(address) => address,
+            None => bitcoind
+                .client
+                .get_new_address(None, None)?
+                .assume_checked(),
+        };
+        let block_hashes = bitcoind
+            .client
+            .generate_to_address(count as _, &coinbase_address)?;
+        Ok(block_hashes)
+    }
+
+    #[tokio::test()]
+    async fn client_works() {
+        logging::init();
+        let bitcoind = BitcoinD::from_downloaded().unwrap();
+        let url = bitcoind.rpc_url();
+        let (user, password) = get_auth(&bitcoind);
+        let client = BitcoinClient::new(url, user, password).unwrap();
+
+        // network
+        let got = client.network().await.unwrap();
+        let expected = Network::Regtest;
+
+        assert_eq!(expected, got);
+        // get_blockchain_info
+        let get_blockchain_info = client.get_blockchain_info().await.unwrap();
+        assert_eq!(get_blockchain_info.blocks, 0);
+
+        let blocks = mine_blocks(&bitcoind, 101, None).unwrap();
+
+        // get_block
+        let expected = blocks.last().unwrap();
+        let got = client.get_block(expected).await.unwrap().block_hash();
+        assert_eq!(*expected, got);
+
+        // get_block_at
+        let target_height = blocks.len() as u64;
+        let expected = blocks.last().unwrap();
+        let got = client
+            .get_block_at(target_height)
+            .await
+            .unwrap()
+            .block_hash();
+        assert_eq!(*expected, got);
+
+        // get_block_count
+        let expected = blocks.len() as u64;
+        let got = client.get_block_count().await.unwrap();
+        assert_eq!(expected, got);
+
+        // get_block_hash
+        let target_height = blocks.len() as u64;
+        let expected = blocks.last().unwrap();
+        let got = client.get_block_hash(target_height).await.unwrap();
+        assert_eq!(*expected, got);
+
+        // get_new_address and send_to_address
+        let address = client.get_new_address().await.unwrap();
+        let got = client.send_to_address(&address, 1).await.unwrap();
+        assert_eq!(got.as_byte_array().len(), 32); // 32 bytes is a Txid
+
+        // get_transaction
+        let txid = got;
+        let tx = client.get_transaction(&txid).await.unwrap().hex;
+        let got = client.send_raw_transaction(&tx).await.unwrap();
+        let expected = txid;
+        assert_eq!(expected, got);
+
+        // get_raw_mempool
+        let got = client.get_raw_mempool().await.unwrap();
+        let expected = vec![txid];
+        assert_eq!(expected, got);
+
+        // estimate_smart_fee
+        let got = client.estimate_smart_fee(1).await.unwrap();
+        let expected = 1; // 1 sat/vB
+        assert_eq!(expected, got);
+
+        // sign_raw_transaction_with_wallet
+        let got = client.sign_raw_transaction_with_wallet(&tx).await.unwrap();
+        assert!(got.complete);
+        assert!(consensus::encode::deserialize_hex::<Transaction>(&got.hex).is_ok());
+
+        // send_raw_transaction
+        let got = client.send_raw_transaction(&tx).await.unwrap();
+        assert!(got.as_byte_array().len() == 32);
+
+        // list_transactions
+        let got = client.list_transactions(None).await.unwrap();
+        assert_eq!(got.len(), 10);
+
+        // get_utxos
+        // let's mine one more block
+        mine_blocks(&bitcoind, 1, None).unwrap();
+        let got = client.get_utxos().await.unwrap();
+        assert_eq!(got.len(), 3);
+    }
+}

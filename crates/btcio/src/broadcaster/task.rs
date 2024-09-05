@@ -1,27 +1,25 @@
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 use alpen_express_db::types::{ExcludeReason, L1TxEntry, L1TxStatus};
-use bitcoin::{hashes::Hash, Txid};
+use bitcoin::{hashes::Hash, Transaction, Txid};
 use express_storage::{ops::l1tx_broadcast, BroadcastDbOps};
 use tokio::sync::mpsc::Receiver;
 use tracing::*;
 
-use super::error::BroadcasterResult;
 use crate::{
-    broadcaster::{error::BroadcasterError, state::BroadcasterState},
-    rpc::{
-        traits::{L1Client, SeqL1Client},
-        ClientError,
+    broadcaster::{
+        error::{BroadcasterError, BroadcasterResult},
+        state::BroadcasterState,
     },
+    rpc::traits::{BitcoinBroadcaster, BitcoinWallet},
 };
 
-// TODO: make these configurable, get from config
-const BROADCAST_POLL_INTERVAL: u64 = 1000; // millis
 const FINALITY_DEPTH: u64 = 6;
+const BROADCAST_POLL_INTERVAL: u64 = 1_000; // millis
 
 /// Broadcasts the next blob to be sent
 pub async fn broadcaster_task(
-    rpc_client: Arc<impl SeqL1Client + L1Client>,
+    rpc_client: Arc<impl BitcoinBroadcaster + BitcoinWallet>,
     ops: Arc<l1tx_broadcast::BroadcastDbOps>,
     mut entry_receiver: Receiver<(u64, L1TxEntry)>,
 ) -> BroadcasterResult<()> {
@@ -69,7 +67,7 @@ pub async fn broadcaster_task(
 async fn process_unfinalized_entries(
     unfinalized_entries: &BTreeMap<u64, L1TxEntry>,
     ops: Arc<BroadcastDbOps>,
-    rpc_client: &(impl SeqL1Client + L1Client),
+    rpc_client: &(impl BitcoinBroadcaster + BitcoinWallet),
 ) -> BroadcasterResult<(BTreeMap<u64, L1TxEntry>, Vec<u64>)> {
     let mut to_remove = Vec::new();
     let mut updated_entries = BTreeMap::new();
@@ -86,7 +84,7 @@ async fn process_unfinalized_entries(
             ops.update_tx_entry_async(*idx, new_txentry.clone()).await?;
 
             // Remove if finalized
-            if matches!(status, L1TxStatus::Finalized { height: _ })
+            if matches!(status, L1TxStatus::Finalized { confirmations: _ })
                 || matches!(status, L1TxStatus::Excluded { reason: _ })
             {
                 to_remove.push(*idx);
@@ -103,7 +101,7 @@ async fn process_unfinalized_entries(
 /// Takes in `[L1TxEntry]`, checks status and then either publishes or checks for confirmations and
 /// returns its updated status. Returns None if status is not changed
 async fn handle_entry(
-    rpc_client: &(impl SeqL1Client + L1Client),
+    rpc_client: &(impl BitcoinBroadcaster + BitcoinWallet),
     txentry: &L1TxEntry,
     idx: u64,
     ops: &BroadcastDbOps,
@@ -115,7 +113,9 @@ async fn handle_entry(
     match txentry.status {
         L1TxStatus::Unpublished => {
             // Try to publish
-            match send_tx(txentry.tx_raw(), rpc_client).await {
+            let tx = txentry.try_to_tx().expect("could not deserialize tx");
+            trace!(%idx, ?tx, "Publishing tx");
+            match send_tx(&tx, rpc_client).await {
                 Ok(_) => {
                     info!(%idx, %txid, "Successfully published tx");
                     Ok(Some(L1TxStatus::Published))
@@ -136,30 +136,30 @@ async fn handle_entry(
                 }
             }
         }
-        L1TxStatus::Published | L1TxStatus::Confirmed { height: _ } => {
+        L1TxStatus::Published | L1TxStatus::Confirmed { confirmations: _ } => {
             // check for confirmations
             let txid = Txid::from_slice(txid.0.as_slice())
                 .map_err(|e| BroadcasterError::Other(e.to_string()))?;
             let txinfo = rpc_client
-                .get_transaction_info(txid)
+                .get_transaction(&txid)
                 .await
                 .map_err(|e| BroadcasterError::Other(e.to_string()))?;
             match txinfo.confirmations {
-                0 if matches!(txentry.status, L1TxStatus::Confirmed { height: _ }) => {
-                    // If the confirmations of a txn that is already confirmed is 0 then there is
+                0 if matches!(txentry.status, L1TxStatus::Confirmed { confirmations: _ }) => {
+                    // If the confirmations of a tx that is already confirmed is 0 then there is
                     // something wrong, possibly a reorg, so just set it to unpublished
                     Ok(Some(L1TxStatus::Unpublished))
                 }
                 0 => Ok(None),
-                c if c >= FINALITY_DEPTH => Ok(Some(L1TxStatus::Finalized {
-                    height: txinfo.block_height(),
+                c if c >= (FINALITY_DEPTH) => Ok(Some(L1TxStatus::Finalized {
+                    confirmations: txinfo.block_height(),
                 })),
                 _ => Ok(Some(L1TxStatus::Confirmed {
-                    height: txinfo.block_height(),
+                    confirmations: txinfo.block_height(),
                 })),
             }
         }
-        L1TxStatus::Finalized { height: _ } => Ok(None), // Nothing to do for finalized tx
+        L1TxStatus::Finalized { confirmations: _ } => Ok(None),
         L1TxStatus::Excluded { reason: _ } => {
             // If a tx is excluded due to MissingInputsOrSpent then the downstream task like
             // writer/signer will be accountable for recreating the tx and asking to broadcast.
@@ -175,16 +175,12 @@ enum PublishError {
     Other(String),
 }
 
-async fn send_tx(
-    tx_raw: &[u8],
-    client: &(impl SeqL1Client + L1Client),
-) -> Result<(), PublishError> {
-    match client.send_raw_transaction(tx_raw).await {
-        Ok(_) => Ok(()),
-        Err(ClientError::Server(-27, _)) => Ok(()), // Tx already included
-        Err(ClientError::Server(-25, _)) => Err(PublishError::MissingInputsOrSpent),
-        Err(e) => Err(PublishError::Other(e.to_string())),
-    }
+async fn send_tx(tx: &Transaction, client: &impl BitcoinBroadcaster) -> Result<(), PublishError> {
+    let _ = client
+        .send_raw_transaction(tx)
+        .await
+        .map_err(|e| PublishError::Other(e.to_string()));
+    Ok(())
 }
 
 #[cfg(test)]
@@ -194,11 +190,11 @@ mod test {
         broadcaster::db::{BroadcastDatabase, BroadcastDb},
         test_utils::get_rocksdb_tmp_instance,
     };
-    use alpen_test_utils::ArbitraryGenerator;
+    use bitcoin::consensus;
     use express_storage::ops::l1tx_broadcast::Context;
 
     use super::*;
-    use crate::test_utils::TestBitcoinClient;
+    use crate::test_utils::{TestBitcoinClient, SOME_TX};
 
     fn get_db() -> Arc<impl TxBroadcastDatabase> {
         let (db, dbops) = get_rocksdb_tmp_instance().unwrap();
@@ -214,8 +210,8 @@ mod test {
     }
 
     fn gen_entry_with_status(st: L1TxStatus) -> L1TxEntry {
-        let arb = ArbitraryGenerator::new();
-        let mut entry: L1TxEntry = arb.generate();
+        let tx: Transaction = consensus::encode::deserialize_hex(SOME_TX).unwrap();
+        let mut entry = L1TxEntry::from_tx(&tx);
         entry.status = st;
         entry
     }
@@ -276,7 +272,7 @@ mod test {
         assert_eq!(
             res,
             Some(L1TxStatus::Confirmed {
-                height: cl.included_height
+                confirmations: cl.included_height
             }),
             "Status should be confirmed if 0 < confirmations < finality_depth"
         );
@@ -291,7 +287,7 @@ mod test {
         assert_eq!(
             res,
             Some(L1TxStatus::Finalized {
-                height: cl.included_height
+                confirmations: cl.included_height
             }),
             "Status should be confirmed if confirmations >= finality_depth"
         );
@@ -300,7 +296,7 @@ mod test {
     #[tokio::test]
     async fn test_handle_confirmed_entry() {
         let ops = get_ops();
-        let e = gen_entry_with_status(L1TxStatus::Confirmed { height: 1 });
+        let e = gen_entry_with_status(L1TxStatus::Confirmed { confirmations: 1 });
 
         // Add tx to db
         ops.insert_new_tx_entry_async([1; 32].into(), e.clone())
@@ -330,7 +326,7 @@ mod test {
         assert_eq!(
             res,
             Some(L1TxStatus::Confirmed {
-                height: cl.included_height
+                confirmations: cl.included_height
             }),
             "Status should be confirmed if 0 < confirmations < finality_depth"
         );
@@ -345,7 +341,7 @@ mod test {
         assert_eq!(
             res,
             Some(L1TxStatus::Finalized {
-                height: cl.included_height
+                confirmations: cl.included_height
             }),
             "Status should be confirmed if confirmations >= finality_depth"
         );
@@ -354,7 +350,7 @@ mod test {
     #[tokio::test]
     async fn test_handle_finalized_entry() {
         let ops = get_ops();
-        let e = gen_entry_with_status(L1TxStatus::Finalized { height: 1 });
+        let e = gen_entry_with_status(L1TxStatus::Finalized { confirmations: 1 });
 
         // Add tx to db
         ops.insert_new_tx_entry_async([1; 32].into(), e.clone())
@@ -474,7 +470,7 @@ mod test {
         assert_eq!(
             new_entries.get(&i3).unwrap().status,
             L1TxStatus::Finalized {
-                height: cl.included_height
+                confirmations: cl.included_height
             },
             "published tx should be finalized"
         );

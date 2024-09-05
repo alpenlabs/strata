@@ -2,7 +2,10 @@
 
 use alpen_express_primitives::buf::Buf32;
 use arbitrary::Arbitrary;
-use bitcoin::{consensus::serialize, Transaction};
+use bitcoin::{
+    consensus::{self, deserialize, serialize},
+    Transaction,
+};
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
@@ -71,6 +74,7 @@ pub struct L1TxEntry {
 }
 
 impl L1TxEntry {
+    /// Create a new [`L1TxEntry`] from a [`Transaction`].
     pub fn from_tx(tx: &Transaction) -> Self {
         Self {
             tx_raw: serialize(tx),
@@ -78,8 +82,19 @@ impl L1TxEntry {
         }
     }
 
+    /// Returns the raw serialized transaction.
+    ///
+    /// # Note
+    ///
+    /// Whenever possible use [`to_tx()`] to deserialize the transaction.
+    /// This imposes more strict type checks.
     pub fn tx_raw(&self) -> &[u8] {
         &self.tx_raw
+    }
+
+    /// Deserializes the raw transaction into a [`Transaction`].
+    pub fn try_to_tx(&self) -> Result<Transaction, consensus::encode::Error> {
+        deserialize(&self.tx_raw)
     }
 }
 
@@ -93,10 +108,10 @@ pub enum L1TxStatus {
     Unpublished,
     /// The transaction is published
     Published,
-    /// The transaction  is included in L1 at given height
-    Confirmed { height: u64 },
-    /// The transaction is finalized in L1 at given height
-    Finalized { height: u64 },
+    /// The transaction is included in L1 and has `u64` confirmations
+    Confirmed { confirmations: u64 },
+    /// The transaction is finalized in L1 and has `u64` confirmations
+    Finalized { confirmations: u64 },
     /// The transaction is not included in L1 and has errored with some error code
     Excluded { reason: ExcludeReason },
 }
@@ -126,12 +141,12 @@ mod tests {
             (L1TxStatus::Unpublished, r#"{"status":"Unpublished"}"#),
             (L1TxStatus::Published, r#"{"status":"Published"}"#),
             (
-                L1TxStatus::Confirmed { height: 10 },
-                r#"{"status":"Confirmed","height":10}"#,
+                L1TxStatus::Confirmed { confirmations: 10 },
+                r#"{"status":"Confirmed","confirmations":10}"#,
             ),
             (
-                L1TxStatus::Finalized { height: 100 },
-                r#"{"status":"Finalized","height":100}"#,
+                L1TxStatus::Finalized { confirmations: 100 },
+                r#"{"status":"Finalized","confirmations":100}"#,
             ),
             (
                 L1TxStatus::Excluded {

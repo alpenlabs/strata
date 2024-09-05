@@ -9,7 +9,7 @@ use tracing::*;
 
 use super::{config::WriterConfig, utils::update_blob_by_idx};
 use crate::{
-    rpc::traits::{L1Client, SeqL1Client},
+    rpc::traits::{BitcoinReader, BitcoinSigner, BitcoinWallet},
     writer::utils::{create_and_sign_blob_inscriptions, get_blob_by_idx},
 };
 
@@ -18,7 +18,7 @@ const FINALITY_DEPTH: u64 = 6;
 /// Watches for inscription transactions status in bitcoin
 pub async fn watcher_task<D: SequencerDatabase + Send + Sync + 'static>(
     next_to_watch: u64,
-    rpc_client: Arc<impl L1Client + SeqL1Client>,
+    rpc_client: Arc<impl BitcoinReader + BitcoinWallet + BitcoinSigner>,
     config: WriterConfig,
     db: Arc<D>,
 ) -> anyhow::Result<()> {
@@ -35,8 +35,8 @@ pub async fn watcher_task<D: SequencerDatabase + Send + Sync + 'static>(
                 BlobL1Status::Published | BlobL1Status::Confirmed => {
                     debug!(%curr_blobidx, "blobentry is published or confirmed");
                     let confs = check_confirmations_and_update_entry(
-                        rpc_client.clone(),
                         curr_blobidx,
+                        rpc_client.clone(),
                         blobentry,
                         db.clone(),
                     )
@@ -70,13 +70,13 @@ pub async fn watcher_task<D: SequencerDatabase + Send + Sync + 'static>(
 }
 
 async fn check_confirmations_and_update_entry<D: SequencerDatabase + Send + Sync + 'static>(
-    rpc_client: Arc<impl L1Client>,
     curr_blobidx: u64,
+    rpc_client: Arc<impl BitcoinReader + BitcoinWallet + BitcoinSigner>,
     mut blobentry: BlobEntry,
     db: Arc<D>,
 ) -> anyhow::Result<u64> {
     let txid = Txid::from_slice(blobentry.reveal_txid.0.as_slice())?;
-    let confs = rpc_client.get_transaction_info(txid).await?.confirmations;
+    let confs = rpc_client.get_transaction(&txid).await?.confirmations as u64;
     // If confs is 0 then it is yet in mempool
     // TODO: But if confs is error(saying txn not found, TODO: check this) then it
     // could possibly have reorged and we might need to

@@ -17,7 +17,7 @@ use super::{
     utils::{create_and_sign_blob_inscriptions, get_blob_by_id, put_blob, BlobIdx},
 };
 use crate::{
-    rpc::traits::{L1Client, SeqL1Client},
+    rpc::traits::{BitcoinBroadcaster, BitcoinReader, BitcoinSigner, BitcoinWallet},
     writer::watcher::watcher_task,
 };
 
@@ -63,7 +63,7 @@ impl<D: SequencerDatabase + Send + Sync + 'static> DaWriter<D> {
 
 pub fn start_writer_task<D: SequencerDatabase + Send + Sync + 'static>(
     executor: &TaskExecutor,
-    rpc_client: Arc<impl SeqL1Client + L1Client>,
+    rpc_client: Arc<impl BitcoinReader + BitcoinBroadcaster + BitcoinWallet + BitcoinSigner>,
     config: WriterConfig,
     db: Arc<D>,
     status_tx: Arc<StatusTx>,
@@ -108,7 +108,7 @@ pub fn start_writer_task<D: SequencerDatabase + Send + Sync + 'static>(
 
 async fn listen_for_signing_intents<D>(
     mut sign_rx: Receiver<BlobIdx>,
-    rpc_client: Arc<impl SeqL1Client + L1Client>,
+    rpc_client: Arc<impl BitcoinReader + BitcoinWallet + BitcoinSigner>,
     config: WriterConfig,
     db: Arc<D>,
 ) -> anyhow::Result<()>

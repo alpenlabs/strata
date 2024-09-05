@@ -1,48 +1,158 @@
 use async_trait::async_trait;
-use bitcoin::{Block, BlockHash, Network, Transaction, Txid};
+use bitcoin::{Address, Block, BlockHash, Network, Transaction, Txid};
+use bitcoind_json_rpc_types::v26::GetBlockchainInfo;
 
-use super::{
-    types::{RPCTransactionInfo, RawUTXO, RpcBlockchainInfo},
-    ClientError,
+use crate::rpc::{
+    client::ClientResult,
+    types::{GetTransaction, ListTransactions, ListUnspent, SignRawTransactionWithWallet},
 };
 
+/// Basic functionality that any Bitcoin client that interacts with the
+/// Bitcoin network should provide.
+///
+/// # Note
+///
+/// This is a fully `async` trait. The user should be responsible for
+/// handling the `async` nature of the trait methods. And if implementing
+/// this trait for a specific type that is not `async`, the user should
+/// consider wrapping with [`tokio`](tokio)'s
+/// [`spawn_blocking`](tokio::task::spawn_blocking) or any other method.
 #[async_trait]
-pub trait L1Client: Sync + Send + 'static {
-    /// Corresponds to `getblockchaininfo`.
-    async fn get_blockchain_info(&self) -> Result<RpcBlockchainInfo, ClientError>;
+pub trait BitcoinReader: Sync + Send + 'static {
+    /// Estimates the approximate fee per kilobyte needed for a transaction
+    /// to begin confirmation within conf_target blocks if possible and return
+    /// the number of blocks for which the estimate is valid.
+    ///
+    /// # Parameters
+    ///
+    /// - `conf_target`: Confirmation target in blocks.
+    ///
+    /// # Note
+    ///
+    /// Uses virtual transaction size as defined in
+    /// [BIP 141](https://github.com/bitcoin/bips/blob/master/bip-0141.mediawiki)
+    /// (witness data is discounted).
+    ///
+    /// By default uses the estimate mode of `CONSERVATIVE` which is the
+    /// default in Bitcoin Core v27.
+    async fn estimate_smart_fee(&self, conf_target: u16) -> ClientResult<u64>;
 
-    /// Fetches the block at given height
-    async fn get_block_at(&self, height: u64) -> Result<Block, ClientError>;
+    /// Gets a [`Block`] with the given hash.
+    async fn get_block(&self, hash: &BlockHash) -> ClientResult<Block>;
 
-    /// Fetches the block hash at given height
-    async fn get_block_hash(&self, height: u64) -> Result<BlockHash, ClientError>;
+    /// Gets a [`Block`] at given height.
+    async fn get_block_at(&self, height: u64) -> ClientResult<Block>;
 
-    /// Sends a raw transaction to the network
-    async fn send_raw_transaction<T: AsRef<[u8]> + Send>(&self, tx: T)
-        -> Result<Txid, ClientError>;
+    /// Gets the height of the most-work fully-validated chain.
+    ///
+    /// # Note
+    ///
+    /// The genesis block has a height of 0.
+    async fn get_block_count(&self) -> ClientResult<u64>;
 
-    /// get number of confirmations for [`Txid`]. 0 confirmations means the tx is still in mempool
-    async fn get_transaction_info(&self, txid: Txid) -> Result<RPCTransactionInfo, ClientError>;
+    /// Gets the [`BlockHash`] at given height.
+    async fn get_block_hash(&self, height: u64) -> ClientResult<BlockHash>;
 
-    // TODO: add others as necessary
+    /// Gets various state info regarding blockchain processing.
+    async fn get_blockchain_info(&self) -> ClientResult<GetBlockchainInfo>;
+
+    /// Gets all transaction ids in mempool.
+    async fn get_raw_mempool(&self) -> ClientResult<Vec<Txid>>;
+
+    /// Gets the underlying [`Network`] information.
+    async fn network(&self) -> ClientResult<Network>;
 }
 
+/// Broadcasting functionality that any Bitcoin client that interacts with the
+/// Bitcoin network should provide.
+///
+/// # Note
+///
+/// This is a fully `async` trait. The user should be responsible for
+/// handling the `async` nature of the trait methods. And if implementing
+/// this trait for a specific type that is not `async`, the user should
+/// consider wrapping with [`tokio`](https://tokio.rs)'s
+/// [`spawn_blocking`](https://docs.rs/tokio/latest/tokio/task/fn.spawn_blocking.html)
+/// or any other method.
 #[async_trait]
-pub trait SeqL1Client: Sync + Send + 'static {
-    /// Get utxos
-    async fn get_utxos(&self) -> Result<Vec<RawUTXO>, ClientError>;
+pub trait BitcoinBroadcaster: Sync + Send + 'static {
+    /// Sends a raw transaction to the network.
+    ///
+    /// # Parameters
+    ///
+    /// - `tx`: The raw transaction to send. This should be a byte array containing the serialized
+    ///   raw transaction data.
+    async fn send_raw_transaction(&self, tx: &Transaction) -> ClientResult<Txid>;
+}
 
-    /// Estimate_smart_fee estimates the fee to confirm a transaction in the next block
-    async fn estimate_smart_fee(&self) -> Result<u64, ClientError>;
+/// Wallet functionality that any Bitcoin client **without private keys** that
+/// interacts with the Bitcoin network should provide.
+///
+/// For signing transactions, see [`BitcoinSigner`].
+///
+/// # Note
+///
+/// This is a fully `async` trait. The user should be responsible for
+/// handling the `async` nature of the trait methods. And if implementing
+/// this trait for a specific type that is not `async`, the user should
+/// consider wrapping with [`tokio`](https://tokio.rs)'s
+/// [`spawn_blocking`](https://docs.rs/tokio/latest/tokio/task/fn.spawn_blocking.html)
+/// or any other method.
+#[async_trait]
+pub trait BitcoinWallet: Sync + Send + 'static {
+    /// Generates new address under own control for the underlying Bitcoin
+    /// client's wallet.
+    async fn get_new_address(&self) -> ClientResult<Address>;
 
-    /// Sign transaction with bitcoind wallet, returns signed transaction which might not be
-    /// complete if it requires multi-signature. Since this is for sequencer, we shouldn't care
-    /// about multi-signature. Later we can have a generic signing method to suit multisig cases.
+    /// Gets information related to a transaction.
+    ///
+    /// # Note
+    ///
+    /// This assumes that the transaction is present in the underlying Bitcoin
+    /// client's wallet.
+    async fn get_transaction(&self, txid: &Txid) -> ClientResult<GetTransaction>;
+
+    /// Gets all Unspent Transaction Outputs (UTXOs) for the underlying Bitcoin
+    /// client's wallet.
+    async fn get_utxos(&self) -> ClientResult<Vec<ListUnspent>>;
+
+    /// Lists transactions in the underlying Bitcoin client's wallet.
+    ///
+    /// # Parameters
+    ///
+    /// - `count`: The number of transactions to list. If `None`, assumes a maximum of 10
+    ///   transactions.
+    async fn list_transactions(&self, count: Option<usize>) -> ClientResult<Vec<ListTransactions>>;
+
+    /// Lists all wallets in the underlying Bitcoin client.
+    async fn list_wallets(&self) -> ClientResult<Vec<String>>;
+}
+
+/// Signing functionality that any Bitcoin client **with private keys** that
+/// interacts with the Bitcoin network should provide.
+///
+/// # Note
+///
+/// This is a fully `async` trait. The user should be responsible for
+/// handling the `async` nature of the trait methods. And if implementing
+/// this trait for a specific type that is not `async`, the user should
+/// consider wrapping with [`tokio`](https://tokio.rs)'s
+/// [`spawn_blocking`](https://docs.rs/tokio/latest/tokio/task/fn.spawn_blocking.html)
+/// or any other method.
+#[async_trait]
+pub trait BitcoinSigner: Sync + Send + 'static {
+    /// Sends an amount to a given address.
+    async fn send_to_address(&self, address: &Address, amount: u64) -> ClientResult<Txid>;
+
+    /// Signs a transaction using the keys available in the underlying Bitcoin
+    /// client's wallet and returns a signed transaction.
+    ///
+    /// # Note
+    ///
+    /// The returned signed transaction might not be consensus-valid if it
+    /// requires additional signatures, such as in a multisignature context.
     async fn sign_raw_transaction_with_wallet(
         &self,
-        tx: Transaction,
-    ) -> Result<Transaction, ClientError>;
-
-    /// Network of the rpc client
-    fn network(&self) -> Network;
+        tx: &Transaction,
+    ) -> ClientResult<SignRawTransactionWithWallet>;
 }

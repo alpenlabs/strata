@@ -11,7 +11,7 @@ use tokio::sync::mpsc;
 use tracing::*;
 
 use super::task::broadcaster_task;
-use crate::rpc::traits::{L1Client, SeqL1Client};
+use crate::rpc::traits::{BitcoinBroadcaster, BitcoinReader, BitcoinSigner, BitcoinWallet};
 
 pub struct L1BroadcastHandle {
     ops: Arc<BroadcastDbOps>,
@@ -49,7 +49,7 @@ impl L1BroadcastHandle {
 
 pub fn spawn_broadcaster_task(
     executor: &TaskExecutor,
-    l1_rpc_client: Arc<impl SeqL1Client + L1Client>,
+    l1_rpc_client: Arc<impl BitcoinReader + BitcoinBroadcaster + BitcoinWallet + BitcoinSigner>,
     bcast_ops: Arc<BroadcastDbOps>,
 ) -> L1BroadcastHandle {
     let (bcast_tx, bcast_rx) = mpsc::channel::<(u64, L1TxEntry)>(64);

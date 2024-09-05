@@ -1,14 +1,58 @@
-#[cfg(test)]
-use arbitrary::Arbitrary;
-use bitcoin::BlockHash;
-use serde::{de::Visitor, Deserialize, Deserializer, Serialize};
+use bitcoin::{
+    absolute::Height, address::NetworkUnchecked, consensus, Address, Amount, BlockHash,
+    SignedAmount, Transaction, Txid,
+};
+use bitcoind_json_rpc_types::v26::GetTransactionDetail;
+use serde::{
+    de::{self, IntoDeserializer, Visitor},
+    Deserialize, Deserializer, Serialize,
+};
 use tracing::*;
 
-#[derive(Clone, Debug, Deserialize)]
-#[cfg_attr(test, derive(Arbitrary))]
-pub struct RPCTransactionInfo {
-    pub amount: f64,
-    pub fee: Option<f64>,
+use crate::rpc::error::SignRawTransactionWithWalletError;
+
+/// The category of a transaction.
+///
+/// This is one of the results of `listtransactions` RPC method.
+///
+/// # Note
+///
+/// This is a subset of the categories available in Bitcoin Core.
+/// It also assumes that the transactions are present in the underlying Bitcoin
+/// client's wallet.
+#[derive(Clone, Copy, Debug, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum TransactionCategory {
+    /// Transactions sent.
+    Send,
+    /// Non-coinbase transactions received.
+    Receive,
+    /// Coinbase transactions received with more than 100 confirmations.
+    Generate,
+    /// Coinbase transactions received with 100 or less confirmations.
+    Immature,
+    /// Orphaned coinbase transactions received.
+    Orphan,
+}
+
+/// Models the result of JSON-RPC method `listunspent`.
+///
+/// # Note
+///
+/// This assumes that the UTXOs are present in the underlying Bitcoin
+/// client's wallet.
+///
+/// Careful with the amount field. It is a [`SignedAmount`], hence can be negative.
+/// Negative amounts for the [`TransactionCategory::Send`], and is positive
+/// for all other categories.
+///
+/// We can upstream this to [`bitcoind_json_rpc_types`].
+#[derive(Clone, Debug, PartialEq, Deserialize)]
+pub struct GetTransaction {
+    /// The signed amount in BTC.
+    #[serde(deserialize_with = "deserialize_signed_bitcoin")]
+    pub amount: SignedAmount,
+    /// The signed fee in BTC.
     pub confirmations: u64,
     pub generated: Option<bool>,
     pub trusted: Option<bool>,
@@ -16,7 +60,9 @@ pub struct RPCTransactionInfo {
     pub blockheight: Option<u64>,
     pub blockindex: Option<u32>,
     pub blocktime: Option<u64>,
-    pub txid: String,
+    /// The transaction id.
+    #[serde(deserialize_with = "deserialize_txid")]
+    pub txid: Txid,
     pub wtxid: String,
     pub walletconflicts: Vec<String>,
     pub replaced_by_txid: Option<String>,
@@ -27,12 +73,13 @@ pub struct RPCTransactionInfo {
     pub timereceived: u64,
     #[serde(rename = "bip125-replaceable")]
     pub bip125_replaceable: String,
-    pub parent_descs: Option<Vec<String>>,
-    pub hex: String,
-    // NOTE: "details", and "decoded" fields omitted as not used, add them when used
+    pub details: Vec<GetTransactionDetail>,
+    /// The transaction itself.
+    #[serde(deserialize_with = "deserialize_tx")]
+    pub hex: Transaction,
 }
 
-impl RPCTransactionInfo {
+impl GetTransaction {
     pub fn block_height(&self) -> u64 {
         if self.confirmations == 0 {
             return 0;
@@ -44,47 +91,109 @@ impl RPCTransactionInfo {
     }
 }
 
-#[derive(Clone, Deserialize)]
-#[cfg_attr(test, derive(Arbitrary))]
-pub struct RawUTXO {
-    pub txid: String,
+/// Models the result of JSON-RPC method `listunspent`.
+///
+/// # Note
+///
+/// This assumes that the UTXOs are present in the underlying Bitcoin
+/// client's wallet.
+///
+/// We can upstream this to [`bitcoind_json_rpc_types`].
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+pub struct ListUnspent {
+    /// The transaction id.
+    #[serde(deserialize_with = "deserialize_txid")]
+    pub txid: Txid,
+    /// The vout value.
     pub vout: u32,
-    pub address: String,
+    /// The Bitcoin address.
+    #[serde(deserialize_with = "deserialize_address")]
+    pub address: Address<NetworkUnchecked>,
+    // The associated label, if any.
+    pub label: Option<String>,
+    /// The script pubkey.
     #[serde(rename = "scriptPubKey")]
-    pub script_pub_key: String,
-    #[serde(deserialize_with = "deserialize_satoshis")]
-    pub amount: u64, // satoshis
-    pub confirmations: u64,
+    pub script_pubkey: String,
+    /// The transaction output amount in BTC.
+    #[serde(deserialize_with = "deserialize_bitcoin")]
+    pub amount: Amount,
+    /// The number of confirmations.
+    pub confirmations: u32,
+    /// Whether we have the private keys to spend this output.
     pub spendable: bool,
+    /// Whether we know how to spend this output, ignoring the lack of keys.
     pub solvable: bool,
+    /// Whether this output is considered safe to spend.
+    /// Unconfirmed transactions from outside keys and unconfirmed replacement
+    /// transactions are considered unsafe and are not eligible for spending by
+    /// `fundrawtransaction` and `sendtoaddress`.
+    pub safe: bool,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[cfg_attr(test, derive(Arbitrary))]
-pub struct RpcBlockchainInfo {
-    pub blocks: u64,
-    pub headers: u64,
-    bestblockhash: String,
-    pub initialblockdownload: bool,
-    pub warnings: String,
+/// Models the result of JSON-RPC method `listtransactions`.
+///
+/// # Note
+///
+/// This assumes that the transactions are present in the underlying Bitcoin
+/// client's wallet.
+///
+/// Careful with the amount field. It is a [`SignedAmount`], hence can be negative.
+/// Negative amounts for the [`TransactionCategory::Send`], and is positive
+/// for all other categories.
+///
+/// We can upstream this to [`bitcoind_json_rpc_types`].
+#[derive(Clone, Debug, PartialEq, Deserialize)]
+pub struct ListTransactions {
+    /// The Bitcoin address.
+    #[serde(deserialize_with = "deserialize_address")]
+    pub address: Address<NetworkUnchecked>,
+    /// Category of the transaction.
+    category: TransactionCategory,
+    /// The signed amount in BTC.
+    #[serde(deserialize_with = "deserialize_signed_bitcoin")]
+    pub amount: SignedAmount,
+    /// The label associated with the address, if any.
+    pub label: Option<String>,
+    /// The number of confirmations.
+    pub confirmations: u32,
+    pub trusted: Option<bool>,
+    pub generated: Option<bool>,
+    pub blockhash: Option<String>,
+    pub blockheight: Option<u64>,
+    pub blockindex: Option<u32>,
+    pub blocktime: Option<u64>,
+    /// The transaction id.
+    #[serde(deserialize_with = "deserialize_txid")]
+    pub txid: Txid,
 }
 
-impl RpcBlockchainInfo {
-    pub fn bestblockhash(&self) -> BlockHash {
-        self.bestblockhash
-            .parse::<BlockHash>()
-            .expect("rpc: bad blockhash")
-    }
+/// Models the result of JSON-RPC method `signrawtransactionwithwallet`.
+///
+/// # Note
+///
+/// This assumes that the transactions are present in the underlying Bitcoin
+/// client's wallet.
+///
+/// We can upstream this to [`bitcoind_json_rpc_types`].
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+pub struct SignRawTransactionWithWallet {
+    /// The Transaction ID.
+    pub hex: String,
+    /// If the transaction has a complete set of signatures.
+    pub complete: bool,
+    /// Errors, if any.
+    pub errors: Option<Vec<SignRawTransactionWithWalletError>>,
 }
 
-fn deserialize_satoshis<'d, D>(deserializer: D) -> Result<u64, D::Error>
+/// Deserializes the amount in BTC into proper [`Amount`]s.
+fn deserialize_bitcoin<'d, D>(deserializer: D) -> Result<Amount, D::Error>
 where
     D: Deserializer<'d>,
 {
     struct SatVisitor;
 
     impl<'d> Visitor<'d> for SatVisitor {
-        type Value = u64;
+        type Value = Amount;
 
         fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
             write!(formatter, "a float representation of btc values expected")
@@ -92,58 +201,190 @@ where
 
         fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E>
         where
-            E: serde::de::Error,
+            E: de::Error,
         {
-            let sats = (v * 100_000_000.0).round() as u64;
-            Ok(sats)
+            trace!("Deserializing BTCs: {}", v);
+            let amount = Amount::from_btc(v).expect("Amount deserialization failed");
+            Ok(amount)
         }
     }
     deserializer.deserialize_any(SatVisitor)
 }
 
-#[cfg(test)]
-mod test {
+/// Deserializes the *signed* amount in BTC into proper [`SignedAmount`]s.
+fn deserialize_signed_bitcoin<'d, D>(deserializer: D) -> Result<SignedAmount, D::Error>
+where
+    D: Deserializer<'d>,
+{
+    struct SatVisitor;
 
-    use serde::Deserialize;
+    impl<'d> Visitor<'d> for SatVisitor {
+        type Value = SignedAmount;
 
-    use super::*;
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            write!(formatter, "a float representation of btc values expected")
+        }
 
-    #[derive(Deserialize)]
-    struct TestStruct {
-        #[serde(deserialize_with = "deserialize_satoshis")]
-        value: u64,
+        fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            trace!("Deserializing signed BTCs: {}", v);
+            let signed_amount = SignedAmount::from_btc(v).expect("Amount deserialization failed");
+            Ok(signed_amount)
+        }
     }
+    deserializer.deserialize_any(SatVisitor)
+}
 
-    #[test]
-    fn test_deserialize_satoshis() {
-        // Valid cases
-        let json_data = r#"{"value": 0.000042}"#;
-        let result: TestStruct = serde_json::from_str(json_data).unwrap();
-        assert_eq!(result.value, 4200);
-
-        let json_data = r#"{"value": 1.23456789}"#;
-        let result: TestStruct = serde_json::from_str(json_data).unwrap();
-        assert_eq!(result.value, 123456789);
-
-        let json_data = r#"{"value": 123.0}"#;
-        let result: TestStruct = serde_json::from_str(json_data).unwrap();
-        assert_eq!(result.value, 12300000000);
-
-        let json_data = r#"{"value": 123.45}"#;
-        let result: TestStruct = serde_json::from_str(json_data).unwrap();
-        assert_eq!(result.value, 12345000000);
-
-        // Invalid cases
-        let json_data = r#"{"value": 123}"#;
-        let result: Result<TestStruct, _> = serde_json::from_str(json_data);
-        assert!(result.is_err());
-
-        let json_data = r#"{"value": "abc"}"#;
-        let result: Result<TestStruct, _> = serde_json::from_str(json_data);
-        assert!(result.is_err());
-
-        let json_data = r#"{"value": "123.456.78"}"#;
-        let result: Result<TestStruct, _> = serde_json::from_str(json_data);
-        assert!(result.is_err());
+fn deserialize_signed_bitcoin_option<'d, D>(
+    deserializer: D,
+) -> Result<Option<SignedAmount>, D::Error>
+where
+    D: Deserializer<'d>,
+{
+    let f: Option<f64> = Option::deserialize(deserializer)?;
+    match f {
+        Some(v) => deserialize_signed_bitcoin(v.into_deserializer()).map(Some),
+        None => Ok(None),
     }
+}
+
+/// Deserializes the transaction id string into proper [`Txid`]s.
+fn deserialize_txid<'d, D>(deserializer: D) -> Result<Txid, D::Error>
+where
+    D: Deserializer<'d>,
+{
+    struct TxidVisitor;
+
+    impl<'d> Visitor<'d> for TxidVisitor {
+        type Value = Txid;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            write!(formatter, "a transaction id string expected")
+        }
+
+        fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            trace!("Deserializing txid: {}", v);
+            let txid = v.parse::<Txid>().expect("invalid txid");
+
+            Ok(txid)
+        }
+    }
+    deserializer.deserialize_any(TxidVisitor)
+}
+
+/// Deserializes the transaction hex string into proper [`Transaction`]s.
+fn deserialize_tx<'d, D>(deserializer: D) -> Result<Transaction, D::Error>
+where
+    D: Deserializer<'d>,
+{
+    struct TxVisitor;
+
+    impl<'d> Visitor<'d> for TxVisitor {
+        type Value = Transaction;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            write!(formatter, "a transaction hex string expected")
+        }
+
+        fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            trace!("Deserializing tx: .{}.", v);
+            let tx = consensus::encode::deserialize_hex::<Transaction>(v)
+                .expect("failed to deserialize tx hex");
+            Ok(tx)
+        }
+    }
+    deserializer.deserialize_any(TxVisitor)
+}
+
+/// Deserializes the address string into proper [`Address`]s.
+///
+/// # Note
+///
+/// The user is responsible for ensuring that the address is valid,
+/// since this functions returns an [`Address<NetworkUnchecked>`].
+fn deserialize_address<'d, D>(deserializer: D) -> Result<Address<NetworkUnchecked>, D::Error>
+where
+    D: Deserializer<'d>,
+{
+    struct AddressVisitor;
+    impl<'d> Visitor<'d> for AddressVisitor {
+        type Value = Address<NetworkUnchecked>;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            write!(formatter, "a Bitcoin address string expected")
+        }
+
+        fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            trace!("Deserializing address: {}", v);
+            let address = v
+                .parse::<Address<_>>()
+                .expect("Address deserialization failed");
+            Ok(address)
+        }
+    }
+    deserializer.deserialize_any(AddressVisitor)
+}
+
+/// Deserializes the blockhash string into proper [`BlockHash`]s.
+fn deserialize_blockhash<'d, D>(deserializer: D) -> Result<BlockHash, D::Error>
+where
+    D: Deserializer<'d>,
+{
+    struct BlockHashVisitor;
+
+    impl<'d> Visitor<'d> for BlockHashVisitor {
+        type Value = BlockHash;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            write!(formatter, "a blockhash string expected")
+        }
+
+        fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            trace!("Deserializing blockhash: {}", v);
+            let blockhash = consensus::encode::deserialize_hex::<BlockHash>(v)
+                .expect("BlockHash deserialization failed");
+            Ok(blockhash)
+        }
+    }
+    deserializer.deserialize_any(BlockHashVisitor)
+}
+
+/// Deserializes the height string into proper [`Height`]s.
+fn deserialize_height<'d, D>(deserializer: D) -> Result<Height, D::Error>
+where
+    D: Deserializer<'d>,
+{
+    struct HeightVisitor;
+
+    impl<'d> Visitor<'d> for HeightVisitor {
+        type Value = Height;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            write!(formatter, "a height u32 string expected")
+        }
+
+        fn visit_u32<E>(self, v: u32) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            trace!("Deserializing height: {}", v);
+            let height = Height::from_consensus(v).expect("Height deserialization failed");
+            Ok(height)
+        }
+    }
+    deserializer.deserialize_any(HeightVisitor)
 }
