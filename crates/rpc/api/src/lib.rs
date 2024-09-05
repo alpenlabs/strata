@@ -109,6 +109,9 @@ pub trait AlpenBridgeApi {
         -> RpcResult<()>;
 
     /// Broadcast fully signed transactions.
+    // TODO: this is a duplicate of an RPC in the `AlpenAdminApi`. Keeping it here so that the
+    // bridge client only has to care about one RPC namespace i.e., `alpbridge`. But all of these
+    // methods may move to another trait later.
     #[method(name = "broadcastTxs")]
     async fn broadcast_transactions(&self, txs: Vec<Transaction>) -> RpcResult<()>;
 }
