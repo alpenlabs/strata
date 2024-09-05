@@ -7,8 +7,6 @@ use crate::inscription::InscriptionParser;
 pub enum RelevantTxType {
     /// Transactions that are spent to an address
     SpentToAddress(Address),
-    /// Transactions with certain prefix. This can also be used to support matching whole txids
-    TxIdWithPrefix(Vec<u8>),
     /// Inscription transactions with given Rollup name. This will be parsed by
     /// [`InscriptionParser`] which dictates the structure of inscription.
     RollupInscription(RollupName),
@@ -30,10 +28,7 @@ pub fn filter_relevant_txs(block: &Block, relevent_types: &[RelevantTxType]) -> 
 
 /// Determines if a [`Transaction`] is relevant based on given [`RelevantTxType`]s
 fn is_relevant(tx: &Transaction, relevant_types: &[RelevantTxType]) -> bool {
-    let txid = tx.compute_txid();
-
     relevant_types.iter().any(|rel_type| match rel_type {
-        RelevantTxType::TxIdWithPrefix(pf) => txid[0..pf.len()] == *pf,
         RelevantTxType::SpentToAddress(address) => tx
             .output
             .iter()
@@ -129,31 +124,12 @@ mod test {
         assert_eq!(result, vec![0]); // Only tx1 matches
     }
 
-    #[test]
-    fn test_filter_relevant_txs_txid_with_prefix() {
-        let address = parse_addr(RELEVANT_ADDR);
-        let address1 = parse_addr(OTHER_ADDR);
-        let tx1 = create_test_tx(vec![create_test_txout(100, &address)]);
-        let tx2 = create_test_tx(vec![create_test_txout(100, &address1)]);
-        let block = create_test_block(vec![tx1, tx2.clone()]);
-        let txid = {
-            let a = tx2.compute_txid();
-            *a.as_byte_array()
-        };
-
-        let result = filter_relevant_txs(
-            &block,
-            &[RelevantTxType::TxIdWithPrefix(txid[0..5].to_vec())],
-        );
-        assert_eq!(result, vec![1]); // Only tx2 matches
-    }
-
     // Create an inscription transaction. The focus here is to create a tapscript, rather than a
     // completely valid control block
     fn create_inscription_tx(rollup_name: String) -> Transaction {
         let address = parse_addr(OTHER_ADDR);
         let inp_tx = create_test_tx(vec![create_test_txout(100000000, &address)]);
-        let inscription_data = InscriptionData::new(rollup_name.clone(), vec![0, 1, 2, 3]);
+        let inscription_data = InscriptionData::new(rollup_name, vec![0, 1, 2, 3]);
         let script = inscription_data.to_script().unwrap();
 
         // Create controlblock
@@ -232,17 +208,5 @@ mod test {
 
         let result = filter_relevant_txs(&block, &[RelevantTxType::SpentToAddress(address)]);
         assert_eq!(result, vec![0, 2]); // First and third txs match
-    }
-
-    #[test]
-    fn test_filter_all_txs() {
-        let address = parse_addr(RELEVANT_ADDR);
-        let tx1 = create_test_tx(vec![create_test_txout(100, &address)]);
-        let tx2 = create_test_tx(vec![create_test_txout(100, &parse_addr(OTHER_ADDR))]);
-        let tx3 = create_test_tx(vec![create_test_txout(1000, &address)]);
-        let block = create_test_block(vec![tx1, tx2, tx3]);
-
-        let result = filter_relevant_txs(&block, &[RelevantTxType::TxIdWithPrefix(Vec::new())]);
-        assert_eq!(result, vec![0, 1, 2]); // All txs match
     }
 }
