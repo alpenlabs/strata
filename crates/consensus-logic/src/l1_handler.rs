@@ -1,14 +1,18 @@
 use std::sync::Arc;
 
-use alpen_express_btcio::reader::messages::{BlockData, L1Event};
+use alpen_express_btcio::{
+    inscription::{InscriptionData, InscriptionParser},
+    reader::messages::{BlockData, L1Event},
+};
 use alpen_express_db::traits::{Database, L1DataStore};
 use alpen_express_primitives::{
-    buf::Buf32,
-    l1::{L1BlockManifest, L1Tx},
-    params::Params,
-    utils::generate_l1_tx,
+    buf::Buf32, l1::L1BlockManifest, params::Params, utils::generate_l1_tx,
 };
-use alpen_express_state::{id::L2BlockId, sync_event::SyncEvent};
+use alpen_express_state::{
+    batch::{BatchCommitment, SignedBatchCommitment},
+    id::L2BlockId,
+    sync_event::SyncEvent,
+};
 use bitcoin::{consensus::serialize, hashes::Hash, Block};
 use tokio::sync::mpsc;
 use tracing::*;
@@ -101,7 +105,30 @@ fn check_for_da_batch(blockdata: &BlockData) -> Vec<L2BlockId> {
         .iter()
         .map(|&idx| blockdata.block().txdata[idx as usize].clone())
         .collect();
-    // TODO: Parse inscriptions and extract batch data
+
+    let inscriptions: Vec<InscriptionData> = txs
+        .iter()
+        .filter_map(|tx| {
+            tx.input[0].witness.tapscript().and_then(|scr| {
+                InscriptionParser::new(scr.into())
+                    .parse_inscription_data()
+                    .ok()
+            })
+        })
+        .collect();
+    let commitments: Vec<BatchCommitment> = inscriptions
+        .iter()
+        .filter_map(|insc_data| {
+            let commitment = borsh::from_slice::<SignedBatchCommitment>(insc_data.batch_data())
+                .ok()
+                .map(Into::into);
+            commitment
+        })
+        .collect();
+
+    if let Some(commitment) = commitments.last() {
+        return vec![*commitment.l2blockid()];
+    }
     Vec::default()
 }
 

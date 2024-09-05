@@ -21,6 +21,14 @@ impl BatchCommitment {
         }
     }
 
+    pub fn l1blockid(&self) -> &L1BlockId {
+        &self.l1blockid
+    }
+
+    pub fn l2blockid(&self) -> &L2BlockId {
+        &self.l2blockid
+    }
+
     pub fn get_sighash(&self) -> Buf32 {
         let mut buf = [0; 32 + 32];
 

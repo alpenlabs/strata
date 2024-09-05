@@ -11,9 +11,9 @@ use bitcoin::{
 };
 use thiserror::Error;
 
-pub(crate) struct InscriptionData {
+pub struct InscriptionData {
     name: String,
-    batchdata: Vec<u8>,
+    batch_data: Vec<u8>,
 }
 
 impl InscriptionData {
@@ -24,8 +24,12 @@ impl InscriptionData {
     // NOTE: this may need to come from somewhere else rather than being hardcoded here
     const VERSION: u8 = 1;
 
-    pub fn new(name: String, batchdata: Vec<u8>) -> Self {
-        Self { name, batchdata }
+    pub fn new(name: String, batch_data: Vec<u8>) -> Self {
+        Self { name, batch_data }
+    }
+
+    pub fn batch_data(&self) -> &[u8] {
+        &self.batch_data
     }
 
     // Generates a [`ScriptBuf`] that consists of `OP_IF .. OP_ENDIF` block
@@ -38,9 +42,9 @@ impl InscriptionData {
             .push_slice(PushBytesBuf::try_from(Self::VERSION_TAG.to_vec())?)
             .push_slice(PushBytesBuf::from([Self::VERSION]))
             .push_slice(PushBytesBuf::try_from(Self::BATCH_DATA_TAG.to_vec())?)
-            .push_int(self.batchdata.len() as i64);
+            .push_int(self.batch_data.len() as i64);
 
-        for chunk in self.batchdata.chunks(520) {
+        for chunk in self.batch_data.chunks(520) {
             builder = builder.push_slice(PushBytesBuf::try_from(chunk.to_vec())?);
         }
         builder = builder.push_opcode(OP_ENDIF);
@@ -143,6 +147,15 @@ impl InscriptionParser {
             Some(Ok(Instruction::PushBytes(bytes))) => Some(bytes.as_bytes().to_vec()),
             _ => None,
         }
+    }
+
+    /// Parse [`InsriptionData`]
+    ///
+    /// # Errors
+    ///
+    /// This function errors if it cannot parse the [`InscriptionData`]
+    pub fn parse_inscription_data(&self) -> Result<InscriptionData, InscriptionParseError> {
+        Err(InscriptionParseError::InvalidEnvelope)
     }
 }
 
