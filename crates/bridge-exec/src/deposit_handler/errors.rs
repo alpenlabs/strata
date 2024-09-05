@@ -2,11 +2,13 @@
 
 use thiserror::Error;
 
+// TODO: use concrete types instead of passing around `String`
+
 /// Error encountered during the deposit duty execution.
 #[derive(Error, Debug)]
 pub enum DepositExecError {
     /// Error occurred while signing a transaction.
-    #[error("signing error: {0}")]
+    #[error("signing failed due to: {0}")]
     Signing(String),
 
     /// The request for signature is invalid.
@@ -14,7 +16,7 @@ pub enum DepositExecError {
     InvalidRequest(String),
 
     /// Error occurred while broadcasting a message to the p2p network.
-    #[error("transaction broadcast error: {0}")]
+    #[error("transaction broadcast failed due to: {0}")]
     Broadcast(String),
 
     /// An unexpected error occurred during execution.
