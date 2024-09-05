@@ -7,7 +7,7 @@ use thiserror::Error;
 
 /// Error encountered while reading/updating the checkpoint value.
 #[derive(Error, Debug)]
-pub enum CheckpointError {
+pub enum TrackerError {
     /// IO error when interfacing with the underlying persistence layer for the checkpoint.
     #[error("storage error")]
     Io(#[from] io::Error),

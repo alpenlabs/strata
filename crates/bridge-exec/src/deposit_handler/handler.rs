@@ -1,7 +1,8 @@
 //! Defines the functions that pertain to handling a deposit.
 
 use bitcoin::secp256k1::schnorr::Signature;
-use express_bridge_txm::{DepositInfo, SignatureInfo};
+use express_bridge_sig_manager::signature::SignatureInfo;
+use express_bridge_tx_builder::deposit::DepositInfo;
 
 use super::errors::DepositExecResult;
 

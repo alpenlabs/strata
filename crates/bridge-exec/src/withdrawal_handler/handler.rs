@@ -4,7 +4,8 @@
 
 use alpen_express_primitives::l1::BitcoinAmount;
 use bitcoin::{address::NetworkChecked, secp256k1::schnorr::Signature, Address, Network, OutPoint};
-use express_bridge_txm::{ReimbursementRequest, SignatureInfo};
+use express_bridge_sig_manager::signature::SignatureInfo;
+use express_bridge_tx_builder::withdrawal::CooperativeWithdrawalInfo;
 
 use super::errors::WithdrawalExecResult;
 
@@ -24,7 +25,7 @@ pub fn get_operator_outpoint(
 
 /// Sign the reimbursement transaction.
 pub async fn sign_reimbursement_tx(
-    _withdrawal_info: &ReimbursementRequest,
+    _withdrawal_info: &CooperativeWithdrawalInfo,
 ) -> WithdrawalExecResult<SignatureInfo> {
     unimplemented!()
 }
@@ -34,7 +35,7 @@ pub async fn sign_reimbursement_tx(
 /// This is executed by the bridge operator that is assigned the given withdrawal.
 // TODO: pass in a database client once the database traits have been implemented.
 pub async fn aggregate_withdrawal_sig(
-    _withdrawal_info: &ReimbursementRequest,
+    _withdrawal_info: &CooperativeWithdrawalInfo,
     _sig: &SignatureInfo,
 ) -> WithdrawalExecResult<Option<Signature>> {
     unimplemented!()
