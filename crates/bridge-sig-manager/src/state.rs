@@ -3,8 +3,8 @@
 
 use std::collections::HashMap;
 
-use alpen_express_primitives::bridge::{OperatorIdx, PublickeyTable};
-use bitcoin::{secp256k1::schnorr::Signature, taproot::ControlBlock, Psbt, ScriptBuf, TxOut};
+use alpen_express_primitives::bridge::{OperatorIdx, PublickeyTable, SchnorrSignature};
+use bitcoin::{taproot::ControlBlock, Psbt, ScriptBuf, TxOut};
 use express_bridge_tx_builder::prelude::TxSigningData;
 
 use super::{errors::BridgeSigResult, signature::SignatureInfo};
@@ -30,7 +30,7 @@ pub struct TxState {
     required_signatures: usize,
 
     /// The table of signatures collected so far per input and per operator.
-    collected_sigs: Vec<HashMap<OperatorIdx, Signature>>,
+    collected_sigs: Vec<HashMap<OperatorIdx, SchnorrSignature>>,
 }
 
 impl TxState {
@@ -89,7 +89,7 @@ impl TxState {
 
     /// Get table of signatures collected so far where the first index is the index of the
     /// transaction input and the second index is the index of the signer.
-    pub fn collected_sigs(&self) -> &[HashMap<OperatorIdx, Signature>] {
+    pub fn collected_sigs(&self) -> &[HashMap<OperatorIdx, SchnorrSignature>] {
         &self.collected_sigs[..]
     }
 

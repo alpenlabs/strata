@@ -5,6 +5,7 @@
 // TODO import generic account types
 
 pub mod block_credential;
+pub mod bridge;
 pub mod buf;
 pub mod evm_exec;
 pub mod hash;

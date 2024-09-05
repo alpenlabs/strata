@@ -4,6 +4,7 @@
 //! extended to a more sophisticated design when we have that specced out.
 
 use alpen_express_primitives::{
+    bridge::OperatorIdx,
     buf::Buf32,
     l1::{self, BitcoinAmount, OutputRef, XOnlyPk},
 };
@@ -12,9 +13,6 @@ use serde::{Deserialize, Serialize};
 
 /// The bitcoin block height that a withdrawal command references.
 pub type BitcoinBlockHeight = u64;
-
-/// Global operator idx.
-pub type OperatorIdx = u32;
 
 /// Entry for an operator.  They have a
 #[derive(

@@ -1,10 +1,11 @@
 //! Macro trait def for the `alp_` RPC namespace using jsonrpsee.
 use alpen_express_db::types::L1TxStatus;
+use alpen_express_primitives::bridge::OperatorIdx;
 use alpen_express_rpc_types::{
     types::{BlockHeader, ClientStatus, DepositEntry, ExecUpdate, L1Status},
     L2BlockId,
 };
-use alpen_express_state::{bridge_duties::BridgeDuties, bridge_state::OperatorIdx};
+use alpen_express_state::bridge_duties::BridgeDuties;
 use bitcoin::{secp256k1::schnorr::Signature, Transaction, Txid};
 use express_bridge_tx_builder::prelude::{CooperativeWithdrawalInfo, DepositInfo};
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
@@ -81,17 +82,13 @@ pub trait AlpenAdminApi {
 #[cfg_attr(feature = "client", rpc(server, client, namespace = "alpbridge"))]
 // TODO: Add RPCs to handle the `BridgeMessage` as per [EXP-107](https://alpenlabs.atlassian.net/browse/EXP-107).
 pub trait AlpenBridgeApi {
-    /// Get relevant duties after a certain checkpoint in the rollup till the latest checkpoint for
-    /// the given operator.
+    /// Get relevant duties after a certain checkpoint in the rollup in the current state for the
+    /// operator with id `operator_idx`.
     ///
     /// These duties could be extracted from the chainstate in the rollup or through the bridge p2p
     /// messaging queue.
     #[method(name = "getDuties")]
-    async fn get_duties(
-        &self,
-        from_checkpoint: u64,
-        operator_idx: OperatorIdx,
-    ) -> RpcResult<BridgeDuties>;
+    async fn get_duties(&self, operator_idx: OperatorIdx) -> RpcResult<BridgeDuties>;
 
     /// Broadcast the signature for a deposit request to other bridge clients.
     //  FIXME: this should actually send out a BridgeMessage after it has been implemented via [EXP-107](https://alpenlabs.atlassian.net/browse/EXP-107).

@@ -3722,18 +3722,13 @@ name = "express-bridge-exec"
 version = "0.1.0"
 dependencies = [
  "alpen-express-primitives",
- "alpen-express-rpc-api",
- "alpen-express-state",
  "async-trait",
  "bitcoin",
  "express-bridge-sig-manager",
  "express-bridge-tx-builder",
  "format_serde_error",
- "jsonrpsee",
  "serde",
- "serde_json",
  "thiserror",
- "tokio",
  "toml 0.5.11",
 ]
 
@@ -3741,7 +3736,6 @@ dependencies = [
 name = "express-bridge-rpc-api"
 version = "0.1.0"
 dependencies = [
- "bitcoin",
  "jsonrpsee",
 ]
 
