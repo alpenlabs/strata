@@ -4,9 +4,9 @@ name = "bitcoin-blockspace"
 version = "0.1.0"
 
 [dependencies]
+alpen-express-primitives = { workspace = true }
 bitcoin = { workspace = true, features = ["serde"] }
 serde = { workspace = true, features = ["derive"] }
-alpen-express-primitives = { workspace = true }
 sha2.workspace = true
 
 [dev-dependencies]
