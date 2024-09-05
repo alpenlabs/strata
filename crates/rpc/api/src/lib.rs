@@ -6,7 +6,7 @@ use alpen_express_rpc_types::{
 };
 use alpen_express_state::{bridge_duties::BridgeDuties, bridge_state::OperatorIdx};
 use bitcoin::{secp256k1::schnorr::Signature, Transaction, Txid};
-use express_bridge_txm::{DepositInfo, ReimbursementRequest};
+use express_bridge_tx_builder::prelude::{CooperativeWithdrawalInfo, DepositInfo};
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
@@ -105,8 +105,10 @@ pub trait AlpenBridgeApi {
     /// Broadcast request for signatures on withdrawal reimbursement from other bridge clients.
     //  FIXME: this should actually send out a BridgeMessage after it has been implemented via [EXP-107](https://alpenlabs.atlassian.net/browse/EXP-107).
     #[method(name = "broadcastReimbursementRequest")]
-    async fn broadcast_reimbursement_request(&self, request: ReimbursementRequest)
-        -> RpcResult<()>;
+    async fn broadcast_reimbursement_request(
+        &self,
+        request: CooperativeWithdrawalInfo,
+    ) -> RpcResult<()>;
 
     /// Broadcast fully signed transactions.
     // TODO: this is a duplicate of an RPC in the `AlpenAdminApi`. Keeping it here so that the
