@@ -5,7 +5,6 @@ use std::{
     str::FromStr,
 };
 
-use anyhow::{anyhow, Context};
 use arbitrary::{Arbitrary, Unstructured};
 use bitcoin::{
     address::NetworkUnchecked,
@@ -19,7 +18,7 @@ use reth_primitives::revm_primitives::FixedBytes;
 use serde::{Deserialize, Serialize};
 use serde_json;
 
-use crate::buf::Buf32;
+use crate::{buf::Buf32, errors::AddressParseError};
 
 /// Reference to a transaction in a block.  This is the block index and the
 /// position of the transaction in the block.
@@ -385,7 +384,10 @@ impl XOnlyPk {
     }
 
     /// Convert a [`BitcoinAddress`] into a [`XOnlyPk`].
-    pub fn from_address(address: &BitcoinAddress, network: Network) -> anyhow::Result<Self> {
+    pub fn from_address(
+        address: &BitcoinAddress,
+        network: Network,
+    ) -> Result<Self, AddressParseError> {
         let unchecked_addr = address.address().clone();
         let checked_addr = unchecked_addr.require_network(network)?;
 
@@ -394,19 +396,18 @@ impl XOnlyPk {
 
             // skip the version and length bytes
             let pubkey_bytes = &script_pubkey.as_bytes()[2..34];
-            let output_key: XOnlyPublicKey = XOnlyPublicKey::from_slice(pubkey_bytes)
-                .context("invalid key format for taproot address")?;
+            let output_key: XOnlyPublicKey = XOnlyPublicKey::from_slice(pubkey_bytes)?;
 
             let serialized_key: FixedBytes<32> = output_key.serialize().into();
 
             Ok(Self(Buf32(serialized_key)))
         } else {
-            Err(anyhow!("Address is not a P2TR (Taproot) address"))
+            Err(AddressParseError::UnsupportedAddress)
         }
     }
 
     /// Convert the [`XOnlyPk`] to an [`Address`].
-    pub fn to_address(&self, network: Network) -> anyhow::Result<Address> {
+    pub fn to_p2tr_address(&self, network: Network) -> Result<Address, AddressParseError> {
         let buf: [u8; 32] = self.0 .0 .0;
         let pubkey = XOnlyPublicKey::from_slice(&buf)?;
 
@@ -536,7 +537,7 @@ mod tests {
         );
 
         let taproot_pubkey = taproot_pubkey.unwrap();
-        let bitcoin_address = taproot_pubkey.to_address(network);
+        let bitcoin_address = taproot_pubkey.to_p2tr_address(network);
 
         assert!(
             bitcoin_address.is_ok(),
