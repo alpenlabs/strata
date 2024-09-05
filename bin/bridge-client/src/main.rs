@@ -5,12 +5,12 @@
 
 mod args;
 pub(crate) mod constants;
+mod errors;
 mod modes;
 pub(crate) mod rpc_server;
 
 use alpen_express_common::logging;
 use args::{Cli, OperationMode};
-use clap::Parser;
 use modes::{challenger, operator};
 use tracing::info;
 
@@ -18,11 +18,18 @@ use tracing::info;
 async fn main() {
     logging::init();
 
-    let cli_args = Cli::parse();
+    let cli_args: Cli = argh::from_env();
 
-    info!("running bridge client in {} mode", cli_args.mode);
+    let mode: OperationMode = match cli_args.mode.try_into() {
+        Ok(mode) => mode,
+        Err(err) => {
+            panic!("{}", err);
+        }
+    };
 
-    match cli_args.mode {
+    info!("running bridge client in {} mode", mode);
+
+    match mode {
         OperationMode::Operator => {
             operator::bootstrap()
                 .await

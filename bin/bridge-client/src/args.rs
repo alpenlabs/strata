@@ -1,27 +1,27 @@
 //! Parses command-line arguments for the bridge-client CLI.
-use std::{fmt::Display, str::FromStr};
+use std::fmt::Display;
 
-use clap::{Parser, ValueEnum};
+use argh::FromArgs;
 
-#[derive(Debug, Parser)]
-#[command(name = "express-bridge-client")]
-#[command(about = "The bridge client for Express")]
+use crate::errors::InitError;
+
+#[derive(Debug, FromArgs)]
+#[argh(name = "express-bridge-client")]
+#[argh(description = "The bridge client for Express")]
 pub(crate) struct Cli {
-    #[arg(
-        value_enum,
-        help = "What mode to run the client in `Operator` (alias: op) or `Challenger` (alias: ch)"
+    #[argh(
+        positional,
+        description = "what mode to run the client in, either Operator (alias: op) or Challenger (alias: ch)"
     )]
-    pub mode: OperationMode,
+    pub mode: String,
 }
 
-#[derive(Debug, Clone, ValueEnum, Parser)]
+#[derive(Debug, Clone)]
 pub(super) enum OperationMode {
     /// Run client in Operator mode to handle deposits, withdrawals and challenging.
-    #[clap(alias = "op")]
     Operator,
 
     /// Run client in Challenger mode to verify/challenge Operator claims.
-    #[clap(alias = "ch")]
     Challenger,
 }
 
@@ -34,13 +34,14 @@ impl Display for OperationMode {
     }
 }
 
-impl FromStr for OperationMode {
-    type Err = String;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "operator" => Ok(Self::Operator),
-            "challenger" => Ok(Self::Challenger),
-            _ => Err("Invalid mode".to_string()),
+impl TryInto<OperationMode> for String {
+    type Error = InitError;
+
+    fn try_into(self) -> Result<OperationMode, Self::Error> {
+        match self.as_ref() {
+            "operator" | "op" => Ok(OperationMode::Operator),
+            "challenger" | "ch" => Ok(OperationMode::Challenger),
+            other => Err(InitError::InvalidMode(other.to_string())),
         }
     }
 }

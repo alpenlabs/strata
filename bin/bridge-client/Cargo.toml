@@ -13,11 +13,12 @@ express-bridge-rpc-api = { workspace = true }
 express-bridge-txm = { workspace = true }
 
 anyhow = { workspace = true }
+argh = { workspace = true }
 async-trait = { workspace = true }
 bitcoin = { workspace = true }
 chrono = { workspace = true }
-clap = { workspace = true, features = ["derive"] }
 jsonrpsee = { workspace = true }
+thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
