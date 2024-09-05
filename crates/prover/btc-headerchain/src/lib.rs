@@ -1,3 +1,4 @@
+use alpen_express_primitives::buf::Buf32;
 use bitcoin::{block::Header, hashes::Hash, BlockHash, CompactTarget, Target};
 use bitcoin_blockspace::block::compute_block_hash;
 use ethnum::U256;
@@ -20,7 +21,7 @@ pub struct HeaderVerificationState {
     pub last_verified_block_num: u32,
 
     /// [Hash](bitcoin::block::Header::block_hash) of the last verified block
-    pub last_verified_block_hash: [u8; 32],
+    pub last_verified_block_hash: Buf32,
 
     /// [Target](bitcoin::pow::CompactTarget) for the next block to verify
     pub next_block_target: u32,
@@ -123,11 +124,11 @@ impl HeaderVerificationState {
         // Check continuity
         assert_eq!(
             header.prev_blockhash.as_raw_hash().to_byte_array(),
-            self.last_verified_block_hash,
+            *self.last_verified_block_hash.as_ref(),
         );
 
         let block_hash_raw = compute_block_hash(&header);
-        let block_hash = BlockHash::from_byte_array(block_hash_raw);
+        let block_hash = BlockHash::from_byte_array(*block_hash_raw.as_ref());
 
         // Check PoW
         assert_eq!(header.bits.to_consensus(), self.next_block_target);
@@ -155,6 +156,7 @@ impl HeaderVerificationState {
 
 #[cfg(test)]
 mod tests {
+    use alpen_express_primitives::buf::Buf32;
     use alpen_test_utils::bitcoin::get_btc_chain;
     use bitcoin::hashes::Hash;
     use rand::Rng;
@@ -197,10 +199,12 @@ mod tests {
 
         let mut verification_state = HeaderVerificationState {
             last_verified_block_num: r1,
-            last_verified_block_hash: last_verified_block
-                .block_hash()
-                .as_raw_hash()
-                .to_byte_array(),
+            last_verified_block_hash: Buf32::from(
+                last_verified_block
+                    .block_hash()
+                    .as_raw_hash()
+                    .to_byte_array(),
+            ),
             next_block_target: last_verified_block
                 .target()
                 .to_compact_lossy()

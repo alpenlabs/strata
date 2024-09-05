@@ -3,6 +3,7 @@
 //! functions are designed to be equivalent to the corresponding methods found in the
 //! [`bitcoin`](bitcoin::Block), providing custom implementations where necessary.
 
+use alpen_express_primitives::{buf::Buf32, hash::sha256d};
 use bitcoin::{
     block::Header, consensus::Encodable, hashes::Hash, Block, BlockHash, TxMerkleNode,
     WitnessCommitment, WitnessMerkleNode,
@@ -10,14 +11,13 @@ use bitcoin::{
 
 use crate::{
     merkle::calculate_root,
-    sha256d::sha256d,
     tx::{compute_txid, compute_wtxid},
 };
 
 /// Computes the transaction merkle root.
 ///
 /// Equivalent to [`compute_merkle_root`](Block::compute_merkle_root)
-pub fn compute_merkle_root(block: &Block) -> Option<[u8; 32]> {
+pub fn compute_merkle_root(block: &Block) -> Option<Buf32> {
     let hashes = block.txdata.iter().map(compute_txid);
     calculate_root(hashes)
 }
@@ -25,11 +25,11 @@ pub fn compute_merkle_root(block: &Block) -> Option<[u8; 32]> {
 /// Computes the transaction witness root.
 ///
 /// Equivalent to [`witness_root`](Block::witness_root)
-pub fn compute_witness_root(block: &Block) -> Option<[u8; 32]> {
+pub fn compute_witness_root(block: &Block) -> Option<Buf32> {
     let hashes = block.txdata.iter().enumerate().map(|(i, t)| {
         if i == 0 {
             // Replace the first hash with zeroes.
-            [0u8; 32]
+            Buf32::zero()
         } else {
             compute_wtxid(t)
         }
@@ -42,7 +42,9 @@ pub fn compute_witness_root(block: &Block) -> Option<[u8; 32]> {
 /// Equivalent to [`check_merkle_root`](Block::check_merkle_root)
 pub fn check_merkle_root(block: &Block) -> bool {
     match compute_merkle_root(block) {
-        Some(merkle_root) => block.header.merkle_root == TxMerkleNode::from_byte_array(merkle_root),
+        Some(merkle_root) => {
+            block.header.merkle_root == TxMerkleNode::from_byte_array(*merkle_root.as_ref())
+        }
         None => false,
     }
 }
@@ -59,13 +61,13 @@ pub fn compute_witness_commitment(
         .consensus_encode(&mut vec)
         .expect("engines don't error");
     vec.extend(witness_reserved_value);
-    WitnessCommitment::from_byte_array(sha256d(&vec))
+    WitnessCommitment::from_byte_array(*sha256d(&vec).as_ref())
 }
 
 /// Returns the block hash.
 ///
 /// Equivalent to [`compute_block_hash`](Header::block_hash)
-pub fn compute_block_hash(header: &Header) -> [u8; 32] {
+pub fn compute_block_hash(header: &Header) -> Buf32 {
     let mut vec = Vec::with_capacity(80);
     header
         .consensus_encode(&mut vec)
@@ -119,7 +121,7 @@ pub fn check_witness_commitment(block: &Block) -> bool {
             if let Some(witness_root) = compute_witness_root(block) {
                 return commitment
                     == compute_witness_commitment(
-                        &WitnessMerkleNode::from_byte_array(witness_root),
+                        &WitnessMerkleNode::from_byte_array(*witness_root.as_ref()),
                         witness_vec[0],
                     );
             }
@@ -131,7 +133,7 @@ pub fn check_witness_commitment(block: &Block) -> bool {
 /// Checks that the proof-of-work for the block is valid.
 pub fn check_pow(block: &Header) -> bool {
     let target = block.target();
-    let block_hash = BlockHash::from_byte_array(compute_block_hash(block));
+    let block_hash = BlockHash::from_byte_array(*compute_block_hash(block).as_ref());
     target.is_met_by(block_hash)
 }
 
@@ -150,7 +152,7 @@ mod tests {
         let block = get_btc_mainnet_block();
         assert_eq!(
             block.compute_merkle_root().unwrap(),
-            TxMerkleNode::from_byte_array(compute_merkle_root(&block).unwrap())
+            TxMerkleNode::from_byte_array(*compute_merkle_root(&block).unwrap().as_ref())
         );
     }
 
@@ -159,7 +161,7 @@ mod tests {
         let block = get_btc_mainnet_block();
         assert_eq!(
             block.witness_root().unwrap(),
-            WitnessMerkleNode::from_byte_array(compute_witness_root(&block).unwrap())
+            WitnessMerkleNode::from_byte_array(*compute_witness_root(&block).unwrap().as_ref())
         )
     }
 

@@ -1,8 +1,7 @@
 use std::iter;
 
+use alpen_express_primitives::{buf::Buf32, hash::sha256d};
 use bitcoin::consensus::Encodable;
-
-use crate::sha256d::sha256d;
 
 /// Calculates the merkle root of an iterator of *hashes* using [RustCrypto's SHA-2 crate](https://github.com/RustCrypto/hashes/tree/master/sha2).
 ///
@@ -13,9 +12,9 @@ use crate::sha256d::sha256d;
 /// - `None` if `hashes` is empty. The merkle root of an empty tree of hashes is undefined.
 /// - `Some(hash)` if `hashes` contains one element. A single hash is by definition the merkle root.
 /// - `Some(merkle_root)` if length of `hashes` is greater than one.
-pub fn calculate_root<I>(mut hashes: I) -> Option<[u8; 32]>
+pub fn calculate_root<I>(mut hashes: I) -> Option<Buf32>
 where
-    I: Iterator<Item = [u8; 32]>,
+    I: Iterator<Item = Buf32>,
 {
     let first = hashes.next()?;
     let second = match hashes.next() {
@@ -35,9 +34,11 @@ where
         let hash2 = hashes.next().unwrap_or(hash1);
         let mut vec = Vec::with_capacity(64);
         hash1
+            .as_ref()
             .consensus_encode(&mut vec)
             .expect("in-memory writers don't error");
         hash2
+            .as_ref()
             .consensus_encode(&mut vec)
             .expect("in-memory writers don't error");
 
@@ -50,7 +51,7 @@ where
 /// Recursively computes the Merkle root from a list of hashes.
 ///
 /// `hashes` must contain at least one hash.
-fn merkle_root_r(hashes: &mut [[u8; 32]]) -> [u8; 32] {
+fn merkle_root_r(hashes: &mut [Buf32]) -> Buf32 {
     if hashes.len() == 1 {
         return hashes[0];
     }
@@ -60,9 +61,11 @@ fn merkle_root_r(hashes: &mut [[u8; 32]]) -> [u8; 32] {
         let idx2 = std::cmp::min(idx1 + 1, hashes.len() - 1);
         let mut vec = Vec::with_capacity(64);
         hashes[idx1]
+            .as_ref()
             .consensus_encode(&mut vec)
             .expect("in-memory writers don't error");
         hashes[idx2]
+            .as_ref()
             .consensus_encode(&mut vec)
             .expect("in-memory writers don't error");
         hashes[idx] = sha256d(&vec);

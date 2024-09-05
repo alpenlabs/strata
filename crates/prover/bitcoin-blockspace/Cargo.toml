@@ -6,8 +6,10 @@ version = "0.1.0"
 [dependencies]
 bitcoin = { workspace = true, features = ["serde"] }
 serde = { workspace = true, features = ["derive"] }
+alpen-express-primitives = { workspace = true }
 sha2.workspace = true
 
 [dev-dependencies]
 alpen-test-utils.workspace = true
 hex.workspace = true
+rand.workspace = true
