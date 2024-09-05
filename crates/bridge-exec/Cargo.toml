@@ -15,7 +15,8 @@ rustdoc.all = "warn"
 alpen-express-primitives = { workspace = true }
 alpen-express-rpc-api = { workspace = true, features = ["client"] }
 alpen-express-state = { workspace = true }
-express-bridge-txm = { workspace = true }
+express-bridge-sig-manager = { workspace = true }
+express-bridge-tx-builder = { workspace = true }
 
 async-trait = { workspace = true }
 bitcoin = { workspace = true }

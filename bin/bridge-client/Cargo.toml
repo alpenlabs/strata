@@ -10,7 +10,6 @@ path = "src/main.rs"
 [dependencies]
 alpen-express-common = { workspace = true }
 express-bridge-rpc-api = { workspace = true }
-express-bridge-txm = { workspace = true }
 
 anyhow = { workspace = true }
 argh = { workspace = true }

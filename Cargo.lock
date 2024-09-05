@@ -881,7 +881,8 @@ dependencies = [
  "alpen-express-rpc-types",
  "alpen-express-state",
  "bitcoin",
- "express-bridge-txm",
+ "express-bridge-sig-manager",
+ "express-bridge-tx-builder",
  "hex",
  "jsonrpsee",
  "serde",
@@ -949,7 +950,8 @@ dependencies = [
  "bitcoin",
  "borsh",
  "digest 0.10.7",
- "express-bridge-txm",
+ "express-bridge-sig-manager",
+ "express-bridge-tx-builder",
  "hex",
  "num_enum 0.7.2",
  "serde",
@@ -3708,7 +3710,6 @@ dependencies = [
  "bitcoin",
  "chrono",
  "express-bridge-rpc-api",
- "express-bridge-txm",
  "jsonrpsee",
  "thiserror",
  "tokio",
@@ -3725,7 +3726,8 @@ dependencies = [
  "alpen-express-state",
  "async-trait",
  "bitcoin",
- "express-bridge-txm",
+ "express-bridge-sig-manager",
+ "express-bridge-tx-builder",
  "format_serde_error",
  "jsonrpsee",
  "serde",
@@ -3740,19 +3742,27 @@ name = "express-bridge-rpc-api"
 version = "0.1.0"
 dependencies = [
  "bitcoin",
- "express-bridge-txm",
  "jsonrpsee",
 ]
 
 [[package]]
-name = "express-bridge-txm"
+name = "express-bridge-sig-manager"
 version = "0.1.0"
 dependencies = [
  "alpen-express-primitives",
- "async-trait",
+ "bitcoin",
+ "express-bridge-tx-builder",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
+name = "express-bridge-tx-builder"
+version = "0.1.0"
+dependencies = [
+ "alpen-express-primitives",
  "bitcoin",
  "serde",
- "serde_json",
  "thiserror",
 ]
 
