@@ -13,10 +13,10 @@ use alpen_express_primitives::{buf::Buf32, hash};
 use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer, HexBytes, HexBytes32};
 use alpen_express_rpc_types::{
     BlockHeader, ClientStatus, DaBlob, DepositEntry, DepositState, ExecUpdate, L1Status,
-    WithdrawalIntent,
 };
 use alpen_express_state::{
     block::{L2Block, L2BlockBundle},
+    bridge_ops::WithdrawalIntent,
     chain_state::ChainState,
     client_state::ClientState,
     da_blob::{BlobDest, BlobIntent},
@@ -400,11 +400,7 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
                     .output()
                     .withdrawals()
                     .iter()
-                    .map(|intent| {
-                        let (amt, dest_pk) = intent.into_parts();
-                        let dest_pk = *dest_pk.as_ref();
-                        WithdrawalIntent { amt, dest_pk }
-                    })
+                    .map(|intent| WithdrawalIntent::new(*intent.amt(), *intent.dest_pk()))
                     .collect();
 
                 let da_blobs = exec_update
@@ -451,7 +447,7 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
 
         let state = match deposit_entry.deposit_state() {
             alpen_express_state::bridge_state::DepositState::Created(_) => DepositState::Created,
-            alpen_express_state::bridge_state::DepositState::Accepted(_) => DepositState::Accepted,
+            alpen_express_state::bridge_state::DepositState::Accepted => DepositState::Accepted,
             alpen_express_state::bridge_state::DepositState::Dispatched(_) => {
                 DepositState::Dispatched
             }

@@ -8,11 +8,15 @@ version = "0.1.0"
 
 [dependencies]
 alpen-express-primitives = { workspace = true }
+express-bridge-sig-manager = { workspace = true }
+express-bridge-tx-builder = { workspace = true }
 
 arbitrary = { workspace = true }
+bitcoin = { workspace = true }
 borsh = { workspace = true }
 digest = { workspace = true }
+hex = { workspace = true }
 num_enum = { workspace = true }
 serde = { workspace = true }
 sha2 = { workspace = true }
-tracing = { workspace = true }   # ideally this shouldn't be in this trait
+tracing = { workspace = true }

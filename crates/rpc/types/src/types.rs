@@ -4,6 +4,7 @@
 //!  - implementation of RPC client
 //!  - crate for just data structures that represents the JSON responses from Bitcoin core RPC
 
+use alpen_express_state::bridge_ops::WithdrawalIntent;
 use bitcoin::Txid;
 use serde::{Deserialize, Serialize};
 
@@ -81,16 +82,6 @@ pub struct BlockHeader {
     /// The root hash of the state tree
     #[serde(with = "hex::serde")]
     pub state_root: [u8; 32],
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
-pub struct WithdrawalIntent {
-    /// Amount of currency to be withdrawn.
-    pub amt: u64,
-
-    /// Destination public key for the withdrawal
-    #[serde(with = "hex::serde")]
-    pub dest_pk: [u8; 64],
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

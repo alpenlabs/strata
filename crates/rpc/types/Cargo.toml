@@ -4,6 +4,7 @@ name = "alpen-express-rpc-types"
 version = "0.1.0"
 
 [dependencies]
+alpen-express-state = { workspace = true }
 bitcoin = { workspace = true }
 hex = { workspace = true }
 serde = { workspace = true }
