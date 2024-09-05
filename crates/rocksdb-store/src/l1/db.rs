@@ -136,7 +136,7 @@ impl L1DataProvider for L1Db {
     fn get_block_txs(&self, idx: u64) -> DbResult<Option<Vec<L1TxRef>>> {
         // TODO eventually change how this is stored so we keep a list of the tx
         // indexes with the smaller manifest so we don't have to load all the
-        // interesting transactions twice if we want to look at all of them
+        // relevant transactions twice if we want to look at all of them
 
         let Some(mf) = self.db.get::<L1BlockSchema>(&idx)? else {
             return Ok(None);

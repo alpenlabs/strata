@@ -4,154 +4,42 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+use alpen_express_db::traits::Database;
+use alpen_express_primitives::params::Params;
 use alpen_express_status::StatusTx;
 use anyhow::bail;
-use bitcoin::{Block, BlockHash};
+use bitcoin::BlockHash;
 use tokio::sync::mpsc;
 use tracing::*;
 
 use crate::{
     reader::{
         config::ReaderConfig,
+        filter::{filter_relevant_txs, RelevantTxType},
         messages::{BlockData, L1Event},
+        state::ReaderState,
     },
     rpc::traits::BitcoinReader,
     status::{apply_status_updates, L1StatusUpdate},
 };
 
-fn filter_interesting_txs(block: &Block) -> Vec<u32> {
-    // TODO actually implement the filter logic. Now it returns everything
-    // TODO maybe this should be on the persistence side?
-    (0..=block.txdata.len()).map(|i| i as u32).collect()
-}
-
-/// State we use in various parts of the reader.
-#[derive(Debug)]
-struct ReaderState {
-    /// The highest block in the chain, at `.back()` of queue + 1.
-    next_height: u64,
-
-    /// The `.back()` of this should have the same height as cur_height.
-    recent_blocks: VecDeque<BlockHash>,
-
-    /// Depth at which we start pulling recent blocks out of the front of the queue.
-    max_depth: usize,
-}
-
-impl ReaderState {
-    /// Constructs a new reader state instance using some context about how we
-    /// want to manage it.
-    fn new(next_height: u64, max_depth: usize, recent_blocks: VecDeque<BlockHash>) -> Self {
-        assert!(!recent_blocks.is_empty());
-        Self {
-            next_height,
-            max_depth,
-            recent_blocks,
-        }
-    }
-
-    fn best_block(&self) -> &BlockHash {
-        self.recent_blocks.back().unwrap()
-    }
-
-    fn best_block_idx(&self) -> u64 {
-        self.next_height - 1
-    }
-
-    /// Returns the idx of the deepest block in the reader state.
-    #[allow(unused)]
-    fn deepest_block(&self) -> u64 {
-        self.best_block_idx() - self.recent_blocks.len() as u64 + 1
-    }
-
-    /// Accepts a new block and possibly purges a buried one.
-    fn accept_new_block(&mut self, blkhash: BlockHash) -> Option<BlockHash> {
-        let ret = if self.recent_blocks.len() > self.max_depth {
-            Some(self.recent_blocks.pop_front().unwrap())
-        } else {
-            None
-        };
-
-        self.recent_blocks.push_back(blkhash);
-        self.next_height += 1;
-        ret
-    }
-
-    /// Gets the blockhash of the given height, if we have it.
-    #[allow(unused)]
-    pub fn get_height_blkid(&self, height: u64) -> Option<&BlockHash> {
-        if height >= self.next_height {
-            return None;
-        }
-
-        if height < self.deepest_block() {
-            return None;
-        }
-
-        let off = height - self.deepest_block();
-        Some(&self.recent_blocks[off as usize])
-    }
-
-    fn revert_tip(&mut self) -> Option<BlockHash> {
-        if !self.recent_blocks.is_empty() {
-            let back = self.recent_blocks.pop_back().unwrap();
-            self.next_height -= 1;
-            Some(back)
-        } else {
-            None
-        }
-    }
-
-    fn rollback_to_height(&mut self, new_height: u64) -> Vec<BlockHash> {
-        if new_height > self.next_height {
-            panic!("reader: new height greater than cur height");
-        }
-
-        let rollback_cnt = self.best_block_idx() - new_height;
-        if rollback_cnt >= self.recent_blocks.len() as u64 {
-            panic!("reader: tried to rollback past deepest block");
-        }
-
-        let mut buf = Vec::new();
-        for _ in 0..rollback_cnt {
-            let blkhash = self.revert_tip().expect("reader: rollback tip");
-            buf.push(blkhash);
-        }
-
-        // More sanity checks.
-        assert!(!self.recent_blocks.is_empty());
-        assert_eq!(self.best_block_idx(), new_height);
-
-        buf
-    }
-
-    /// Iterates over the blocks back from the tip, giving both the height and
-    /// the blockhash to compare against the chain.
-    fn iter_blocks_back(&self) -> impl Iterator<Item = (u64, &BlockHash)> {
-        let best_blk_idx = self.best_block_idx();
-        self.recent_blocks
-            .iter()
-            .rev()
-            .enumerate()
-            .map(move |(i, b)| (best_blk_idx - i as u64, b))
-    }
-}
-
-pub async fn bitcoin_data_reader_task(
+pub async fn bitcoin_data_reader_task<D: Database + 'static>(
     client: Arc<impl BitcoinReader>,
     event_tx: mpsc::Sender<L1Event>,
     target_next_block: u64,
     config: Arc<ReaderConfig>,
     status_rx: Arc<StatusTx>,
+    chstate_prov: Arc<D::ChsProv>,
+    params: Arc<Params>,
 ) {
-    let mut status_updates = Vec::new();
-    if let Err(e) = do_reader_task(
+    if let Err(e) = do_reader_task::<D>(
         client.as_ref(),
         &event_tx,
         target_next_block,
         config,
-        &mut status_updates,
         status_rx.clone(),
+        chstate_prov,
+        params,
     )
     .await
     {
@@ -159,13 +47,14 @@ pub async fn bitcoin_data_reader_task(
     }
 }
 
-async fn do_reader_task(
+async fn do_reader_task<D: Database + 'static>(
     client: &impl BitcoinReader,
     event_tx: &mpsc::Sender<L1Event>,
     target_next_block: u64,
     config: Arc<ReaderConfig>,
-    status_updates: &mut Vec<L1StatusUpdate>,
     status_rx: Arc<StatusTx>,
+    chstate_prov: Arc<D::ChsProv>,
+    params: Arc<Params>,
 ) -> anyhow::Result<()> {
     info!(%target_next_block, "started L1 reader task!");
 
@@ -180,15 +69,24 @@ async fn do_reader_task(
     let best_blkid = state.best_block();
     info!(%best_blkid, "initialized L1 reader state");
 
-    // FIXME This function will return when reorg happens when there are not
-    // enough elements in the vec deque, probably during startup.
     loop {
+        let mut status_updates: Vec<L1StatusUpdate> = Vec::new();
         let cur_best_height = state.best_block_idx();
         let poll_span = debug_span!("l1poll", %cur_best_height);
 
-        if let Err(err) = poll_for_new_blocks(client, event_tx, &config, &mut state, status_updates)
-            .instrument(poll_span)
-            .await
+        // Maybe this should be called outside loop?
+        let relevant_tx_types =
+            derive_relevant_tx_types::<D>(chstate_prov.clone(), params.as_ref())?;
+
+        if let Err(err) = poll_for_new_blocks(
+            client,
+            event_tx,
+            &relevant_tx_types,
+            &mut state,
+            &mut status_updates,
+        )
+        .instrument(poll_span)
+        .await
         {
             warn!(%cur_best_height, err = %err, "failed to poll Bitcoin client");
             status_updates.push(L1StatusUpdate::RpcError(err.to_string()));
@@ -214,8 +112,19 @@ async fn do_reader_task(
                 .as_millis() as u64,
         ));
 
-        apply_status_updates(status_updates, status_rx.clone()).await;
+        apply_status_updates(&status_updates, status_rx.clone()).await;
     }
+}
+
+fn derive_relevant_tx_types<D: Database + 'static>(
+    _chstate_prov: Arc<D::ChsProv>,
+    params: &Params,
+) -> anyhow::Result<Vec<RelevantTxType>> {
+    // TODO: Figure out how to do it from chainstate provider
+    // For now we'll just go with filtering Inscription transactions
+    Ok(vec![RelevantTxType::RollupInscription(
+        params.rollup().rollup_name.clone(),
+    )])
 }
 
 /// Inits the reader state by trying to backfill blocks up to a target height.
@@ -254,7 +163,7 @@ async fn init_reader_state(
 async fn poll_for_new_blocks(
     client: &impl BitcoinReader,
     event_tx: &mpsc::Sender<L1Event>,
-    _config: &ReaderConfig,
+    relevant_tx_types: &[RelevantTxType],
     state: &mut ReaderState,
     status_updates: &mut Vec<L1StatusUpdate>,
 ) -> anyhow::Result<()> {
@@ -290,18 +199,24 @@ async fn poll_for_new_blocks(
     debug!(%client_height, "have new blocks");
 
     // Now process each block we missed.
-    let scan_start_height = state.next_height;
+    let scan_start_height = state.next_height();
     for fetch_height in scan_start_height..=client_height {
-        let l1blkid =
-            match fetch_and_process_block(fetch_height, client, event_tx, state, status_updates)
-                .await
-            {
-                Ok(b) => b,
-                Err(e) => {
-                    warn!(%fetch_height, err = %e, "failed to fetch new block");
-                    break;
-                }
-            };
+        let l1blkid = match fetch_and_process_block(
+            fetch_height,
+            client,
+            event_tx,
+            state,
+            status_updates,
+            relevant_tx_types,
+        )
+        .await
+        {
+            Ok(b) => b,
+            Err(e) => {
+                warn!(%fetch_height, err = %e, "failed to fetch new block");
+                break;
+            }
+        };
         info!(%fetch_height, %l1blkid, "accepted new block");
     }
 
@@ -336,11 +251,12 @@ async fn fetch_and_process_block(
     event_tx: &mpsc::Sender<L1Event>,
     state: &mut ReaderState,
     status_updates: &mut Vec<L1StatusUpdate>,
+    relevant_tx_types: &[RelevantTxType],
 ) -> anyhow::Result<BlockHash> {
     let block = client.get_block_at(height).await?;
     let txs = block.txdata.len();
 
-    let filtered_txs = filter_interesting_txs(&block);
+    let filtered_txs = filter_relevant_txs(&block, relevant_tx_types);
     let block_data = BlockData::new(height, block, filtered_txs);
     let l1blkid = block_data.block().block_hash();
     trace!(%l1blkid, %height, %txs, "fetched block from client");

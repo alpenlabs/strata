@@ -2,7 +2,9 @@ use std::sync::Arc;
 
 use alpen_express_btcio::reader::messages::L1Event;
 use alpen_express_db::traits::{Database, L1DataStore};
-use alpen_express_primitives::{buf::Buf32, l1::L1BlockManifest, params::Params};
+use alpen_express_primitives::{
+    buf::Buf32, l1::L1BlockManifest, params::Params, utils::generate_l1_tx,
+};
 use alpen_express_state::sync_event::SyncEvent;
 use bitcoin::{consensus::serialize, hashes::Hash, Block};
 use tokio::sync::mpsc;
@@ -63,14 +65,11 @@ where
             let l1blkid = blockdata.block().block_hash();
 
             let manifest = generate_block_manifest(blockdata.block());
-            // TODO fix broken code, wasn't tested
-            /*let l1txs: Vec<_> = blockdata
-            .interesting_tx_idxs()
-            .iter()
-            .enumerate()
-            .map(|(i, _)| generate_l1_tx(i as u32, blockdata.block()))
-            .collect();*/
-            let l1txs = Vec::new();
+            let l1txs: Vec<_> = blockdata
+                .relevant_tx_idxs()
+                .iter()
+                .map(|idx| generate_l1_tx(*idx, blockdata.block()))
+                .collect();
             let num_txs = l1txs.len();
             l1db.put_block_data(blockdata.block_num(), manifest, l1txs)?;
             info!(%height, %l1blkid, txs = %num_txs, "wrote L1 block manifest");

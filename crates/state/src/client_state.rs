@@ -12,7 +12,7 @@ use crate::{id::L2BlockId, l1::L1BlockId};
 /// coordinated as part of the L2 chain.
 ///
 /// This is updated when we see a consensus-relevant message.  This is L2 blocks
-/// but also L1 blocks being published with interesting things in them, and
+/// but also L1 blocks being published with relevant things in them, and
 /// various other events.
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize)]
 pub struct ClientState {

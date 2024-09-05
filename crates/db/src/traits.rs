@@ -56,7 +56,7 @@ pub trait Database {
 #[cfg_attr(feature = "mocks", automock)]
 pub trait L1DataStore {
     /// Atomically extends the chain with a new block, providing the manifest
-    /// and a list of transactions we find interesting.  Returns error if
+    /// and a list of transactions we find relevant.  Returns error if
     /// provided out-of-order.
     fn put_block_data(&self, idx: u64, mf: L1BlockManifest, txs: Vec<L1Tx>) -> DbResult<()>;
 
@@ -85,7 +85,7 @@ pub trait L1DataProvider {
     /// present.  Otherwise, returns error.
     fn get_blockid_range(&self, start_idx: u64, end_idx: u64) -> DbResult<Vec<Buf32>>;
 
-    /// Gets the interesting txs we stored in a block.
+    /// Gets the relevant txs we stored in a block.
     fn get_block_txs(&self, idx: u64) -> DbResult<Option<Vec<L1TxRef>>>;
 
     /// Gets the tx with proof given a tx ref, if present.

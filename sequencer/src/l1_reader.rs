@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use alpen_express_btcio::{
-    reader::{config::ReaderConfig, messages::L1Event, query::bitcoin_data_reader_task},
+    reader::{messages::L1Event, query::bitcoin_data_reader_task},
     rpc::traits::BitcoinReader,
 };
 use alpen_express_consensus_logic::{ctl::CsmController, l1_handler::bitcoin_data_handler_task};
@@ -36,20 +36,20 @@ where
         .map(|i| i + 1)
         .unwrap_or(params.rollup().horizon_l1_height);
 
-    let config = Arc::new(ReaderConfig {
-        max_reorg_depth: config.sync.max_reorg_depth,
-        client_poll_dur_ms: config.sync.client_poll_dur_ms,
-    });
+    let reader_config = Arc::new(config.get_reader_config());
+    let params_r = params.clone();
+    let chprov = db.chainstate_provider().clone();
 
-    // TODO set up watchdog to handle when the spawned tasks fail gracefully
     executor.spawn_critical_async(
         "bitcoin_data_reader_task",
-        bitcoin_data_reader_task(
+        bitcoin_data_reader_task::<D>(
             rpc_client,
             ev_tx,
             target_next_block,
-            config.clone(),
+            reader_config,
             status_rx.clone(),
+            chprov,
+            params_r,
         ),
     );
 

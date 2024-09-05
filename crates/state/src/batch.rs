@@ -1,5 +1,3 @@
-use std::io::{Cursor, Write};
-
 use alpen_express_primitives::buf::{Buf32, Buf64};
 use borsh::{BorshDeserialize, BorshSerialize};
 
@@ -26,11 +24,8 @@ impl BatchCommitment {
     pub fn get_sighash(&self) -> Buf32 {
         let mut buf = [0; 32 + 32];
 
-        let mut cur = Cursor::new(&mut buf[..]);
-        cur.write_all(self.l1blockid.as_ref())
-            .expect("write to buf");
-        cur.write_all(self.l2blockid.as_ref())
-            .expect("write to buf");
+        buf[0..32].copy_from_slice(self.l1blockid.as_ref());
+        buf[32..].copy_from_slice(self.l2blockid.as_ref());
 
         alpen_express_primitives::hash::raw(&buf)
     }

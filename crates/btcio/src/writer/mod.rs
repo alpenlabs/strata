@@ -1,4 +1,4 @@
-mod builder;
+pub mod builder;
 pub mod config;
 mod signer;
 mod task;
