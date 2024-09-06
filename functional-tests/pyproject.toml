@@ -8,7 +8,7 @@ authors = []
 python = "^3.10"
 flexitest = { git = "https://codeberg.org/treyd/flexitest.git" }
 bitcoinlib = "^0.6.15"
-websockets = "^12.0"
+websockets = "^13.0"
 web3 = "^7.0.0"
 
 [tool.poetry.dev-dependencies]
