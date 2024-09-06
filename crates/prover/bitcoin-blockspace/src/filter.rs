@@ -1,8 +1,12 @@
 //! This includes all the filtering logic to filter out and extract
 //! deposits, forced inclusion transactions as well as state updates
 
+use std::str::FromStr;
+
 use bitcoin::{opcodes::all::OP_RETURN, Address, Block, Transaction};
 use serde::{Deserialize, Serialize};
+
+use crate::logic::ScanParams;
 
 const SOME_ALP_MAGIC: [u8; 32] = [1; 32];
 
@@ -74,14 +78,18 @@ fn extract_state_update(_tx: &Transaction) -> Option<ForcedInclusion> {
 
 pub fn extract_relevant_transactions(
     block: &Block,
-    bridge_address: &Address,
+    scan_params: &ScanParams,
 ) -> (Vec<Deposit>, Vec<ForcedInclusion>, Vec<StateUpdate>) {
     let mut deposits = Vec::new();
     let mut forced_inclusions = Vec::new();
     let mut state_updates = Vec::new();
 
+    let bridge_address = Address::from_str(&scan_params.bridge_address)
+        .unwrap()
+        .assume_checked();
+
     for tx in &block.txdata {
-        if let Some(deposit) = extract_deposit(tx, bridge_address) {
+        if let Some(deposit) = extract_deposit(tx, &bridge_address) {
             deposits.push(deposit)
         }
 

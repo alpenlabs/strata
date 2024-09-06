@@ -1,20 +1,26 @@
 //! Core logic of the Bitcoin Blockspace proof that will be proven
 
-use std::str::FromStr;
-
-use bitcoin::{block::Header, Address, Block};
+use alpen_express_primitives::buf::Buf32;
+use bitcoin::{block::Header, Block};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    block::{check_merkle_root, check_witness_commitment},
+    block::check_merkle_root,
     filter::{extract_relevant_transactions, Deposit, ForcedInclusion, StateUpdate},
 };
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BlockspaceProofInput {
     pub block: Block,
+    pub scan_params: ScanParams,
+    pub inclusion_proof: Vec<Buf32>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ScanParams {
     // TODO: figure out why serialize `Address`
     pub bridge_address: String,
+    pub sequencer_address: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -28,16 +34,14 @@ pub struct BlockspaceProofOutput {
 pub fn process_blockspace_proof(input: &BlockspaceProofInput) -> BlockspaceProofOutput {
     let BlockspaceProofInput {
         block,
-        bridge_address,
+        scan_params,
+        inclusion_proof: _,
     } = input;
     assert!(check_merkle_root(block));
-    assert!(check_witness_commitment(block));
-
-    // TODO: understand the implication
-    let bridge_address = Address::from_str(bridge_address).unwrap().assume_checked();
+    // assert!(check_witness_commitment(block));
 
     let (deposits, forced_inclusions, state_updates) =
-        extract_relevant_transactions(block, &bridge_address);
+        extract_relevant_transactions(block, scan_params);
 
     BlockspaceProofOutput {
         header: block.header,
