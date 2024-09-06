@@ -13,6 +13,7 @@ sp1-helper = "1.0.1"
 
 [dev-dependencies]
 alpen-test-utils = { workspace = true }
+bitcoin = { workspace = true }
 bitcoin-blockspace = { workspace = true }
 bincode = { workspace = true }
 express-zkvm = { workspace = true }

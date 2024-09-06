@@ -11540,6 +11540,7 @@ version = "0.1.0"
 dependencies = [
  "alpen-test-utils",
  "bincode",
+ "bitcoin",
  "bitcoin-blockspace",
  "express-sp1-adapter",
  "express-zkvm",

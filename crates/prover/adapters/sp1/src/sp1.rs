@@ -25,6 +25,9 @@ impl ZKVMHost for SP1Host {
         serialized_inputs: Option<&[Vec<u8>]>,
     ) -> anyhow::Result<(Proof, VerifcationKey)> {
         // Init the prover
+        if self.prover_options.use_mock_prover {
+            std::env::set_var("SP1_PROVER", "mock");
+        }
         let client = ProverClient::new();
         let (pk, vk) = client.setup(&self.elf);
 

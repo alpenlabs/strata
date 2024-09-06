@@ -1,7 +1,7 @@
 // NOTE: SP1 prover runs in release mode only; therefore run the tests on release mode only
 #[cfg(feature = "prover")]
 mod test {
-    use bitcoin_blockspace::logic::{BlockspaceProofInput, BlockspaceProofOutput, ScanParams};
+    use bitcoin_blockspace::logic::{BlockspaceProofOutput, ScanParams};
     use express_sp1_adapter::{SP1Host, SP1Verifier};
     use express_zkvm::{ZKVMHost, ZKVMVerifier};
     use sp1_guest_builder::GUEST_BTC_BLOCKSPACE_ELF;
@@ -19,13 +19,12 @@ mod test {
             sequencer_address: "bcrt1pf73jc96ujch43wp3k294003xx4llukyzvp0revwwnww62esvk7hqvarg98"
                 .to_owned(),
         };
-        // let serialized_block = serialize(&block);
-        let input = BlockspaceProofInput { block, scan_params };
+        let serialized_block = bitcoin::consensus::serialize(&block);
 
         let prover = SP1Host::init(GUEST_BTC_BLOCKSPACE_ELF.into(), Default::default());
 
         let (proof, _) = prover
-            .prove(&[input], None)
+            .prove(&[scan_params], Some(&[serialized_block]))
             .expect("Failed to generate proof");
 
         SP1Verifier::extract_public_output::<BlockspaceProofOutput>(&proof)
