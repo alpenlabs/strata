@@ -590,6 +590,8 @@ fn apply_tip_update<D: Database>(
     for (idx, blkid, writes) in updates {
         debug!(?blkid, "applying CL state update");
         chs_store.write_state_update(idx, &writes)?;
+        state.cur_best_block = *blkid;
+        state.cur_index = idx;
     }
 
     Ok(())
