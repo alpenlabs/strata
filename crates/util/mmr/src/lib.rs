@@ -54,6 +54,9 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
             None => vec![ZERO],
             Some(required) => {
                 let mut peaks = compact.peaks;
+                // this shouldn't ever need to run with the below Self::to_compact
+                // as that will truncate it automatically to the correct length
+                // this is mostly for safety.
                 if peaks.len() < required {
                     let num_to_add = required - peaks.len();
                     peaks.reserve_exact(num_to_add);
@@ -74,9 +77,13 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
 
     /// Exports a "compact" version of the MMR that can be easily serialized
     pub fn to_compact(&self) -> CompactMmr {
+        let min_peaks = Self::min_peaks(self.element_count);
+        // replace with assert_matches! when stabilised (https://github.com/rust-lang/rust/issues/82775)
+        // self.peaks should always have enough peaks to hold its elements
+        assert!(matches!(min_peaks, Some(mp) if self.peaks.len() >= mp));
         CompactMmr {
             element_count: self.element_count,
-            peaks: match Self::min_peaks(self.element_count) {
+            peaks: match min_peaks {
                 Some(required) => self.peaks.iter().take(required).copied().collect(),
                 None => vec![ZERO],
             },
