@@ -9,26 +9,19 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use error::MerkleError;
 use hasher::{Hash, MerkleHasher};
 
-fn zero() -> Hash {
-    [0; 32]
-}
-
-fn is_zero(h: Hash) -> bool {
-    h.iter().all(|b| *b == 0)
-}
-
 /// Compact representation of the MMR that should be borsh serializable easily.
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct CompactMmr {
-    entries: u64,
-    cap_log2: u8,
-    roots: Vec<Hash>,
+    element_count: u64,
+    peaks: Vec<Hash>,
 }
+
+const ZERO: [u8; 32] = [0; 32];
 
 #[derive(Clone)]
 pub struct MerkleMr<H: MerkleHasher + Clone> {
-    // number of elements inserted into mmr
-    pub num: u64,
+    /// number of elements inserted into mmr
+    pub element_count: u64,
     // Buffer of all possible peaks in mmr. only some of them will be valid at a time
     pub peaks: Box<[Hash]>,
     // phantom data for hasher
@@ -36,55 +29,69 @@ pub struct MerkleMr<H: MerkleHasher + Clone> {
 }
 
 impl<H: MerkleHasher + Clone> MerkleMr<H> {
-    pub fn new(cap_log2: usize) -> Self {
+    pub fn new(peak_count: usize) -> Self {
         Self {
-            num: 0,
-            peaks: vec![[0; 32]; cap_log2].into_boxed_slice(),
+            element_count: 0,
+            peaks: vec![ZERO; peak_count].into_boxed_slice(),
             hasher: PhantomData,
         }
     }
 
-    pub fn from_compact(compact: &CompactMmr) -> Self {
-        // FIXME this is somewhat inefficient, we could consume the vec and just
-        // slice out its elements, but this is fine for now
-        let mut roots = vec![zero(); compact.cap_log2 as usize];
-        let mut at = 0;
-        for i in 0..compact.cap_log2 {
-            if compact.entries >> i & 1 != 0 {
-                roots[i as usize] = compact.roots[at as usize];
-                at += 1;
+    /// returns the minimum peaks needed to store an mmr of `element_count` elements
+    #[inline]
+    fn min_peaks(element_count: u64) -> Option<usize> {
+        match element_count {
+            0 => None,
+            c => Some(c.ilog2() as usize + 1),
+        }
+    }
+
+    /// restores from a compacted mmr
+    pub fn from_compact(compact: CompactMmr) -> Self {
+        let required_peaks = Self::min_peaks(compact.element_count);
+        let peaks = match required_peaks {
+            None => vec![ZERO],
+            Some(required) => {
+                let mut peaks = compact.peaks;
+                if peaks.len() < required {
+                    let num_to_add = required - peaks.len();
+                    peaks.reserve_exact(num_to_add);
+                    // note we add in a loop so we don't need to make 2 allocs
+                    // (the ZEROs will be stack allocated... i think)
+                    (0..num_to_add).for_each(|_| peaks.push(ZERO))
+                }
+                peaks
             }
-        }
+        };
 
         Self {
-            num: compact.entries,
-            peaks: roots.into(),
+            element_count: compact.element_count,
+            peaks: peaks.into(),
             hasher: PhantomData,
         }
     }
 
+    /// exports a "compact" version of the mmr that can be easily serialized
     pub fn to_compact(&self) -> CompactMmr {
         CompactMmr {
-            entries: self.num,
-            cap_log2: self.peaks.len() as u8,
-            roots: self
-                .peaks
-                .iter()
-                .filter(|h| !is_zero(**h))
-                .copied()
-                .collect(),
+            element_count: self.element_count,
+            peaks: match Self::min_peaks(self.element_count) {
+                Some(required) => self.peaks.iter().take(required).copied().collect(),
+                None => vec![ZERO],
+            },
         }
     }
 
+    /// Adds a leaf's hash to the MMR
     pub fn add_leaf(&mut self, hash_arr: Hash) {
-        if self.num == 0 {
+        if self.element_count == 0 {
             self.peaks[0] = hash_arr;
-            self.num += 1;
+            self.element_count += 1;
             return;
         }
 
         // the number of elements in MMR is also the mask of peaks
-        let peak_mask = self.num;
+        let peak_mask = self.element_count;
 
         let mut current_node = hash_arr;
         // we iterate through the height
@@ -101,18 +108,18 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
         }
 
         self.peaks[current_height] = current_node;
-        self.num += 1;
+        self.element_count += 1;
     }
 
     pub fn get_single_root(&self) -> Result<Hash, MerkleError> {
-        if self.num == 0 {
+        if self.element_count == 0 {
             return Err(MerkleError::NoElements);
         }
-        if !self.num.is_power_of_two() && self.num != 1 {
+        if !self.element_count.is_power_of_two() && self.element_count != 1 {
             return Err(MerkleError::NotPowerOfTwo);
         }
 
-        Ok(self.peaks[(self.num.ilog2()) as usize])
+        Ok(self.peaks[(self.element_count.ilog2()) as usize])
     }
 
     pub fn add_leaf_updating_proof(
@@ -120,7 +127,7 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
         next: Hash,
         proof: &MerkleProof<H>,
     ) -> MerkleProof<H> {
-        if self.num == 0 {
+        if self.element_count == 0 {
             self.add_leaf(next);
             return MerkleProof {
                 cohashes: vec![],
@@ -130,8 +137,8 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
         }
         let mut updated_proof = proof.clone();
 
-        let new_leaf_index = self.num;
-        let peak_mask = self.num;
+        let new_leaf_index = self.element_count;
+        let peak_mask = self.element_count;
         let mut current_node = next;
         let mut current_height = 0;
         while (peak_mask >> current_height) & 1 == 1 {
@@ -152,7 +159,7 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
         }
 
         self.peaks[current_height] = current_node;
-        self.num += 1;
+        self.element_count += 1;
 
         updated_proof
     }
@@ -184,7 +191,7 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
         next: Hash,
         proof_list: &mut [MerkleProof<H>],
     ) -> MerkleProof<H> {
-        if self.num == 0 {
+        if self.element_count == 0 {
             self.add_leaf(next);
             return MerkleProof {
                 cohashes: vec![],
@@ -194,12 +201,12 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
         }
         let mut new_proof = MerkleProof {
             cohashes: vec![],
-            index: self.num,
+            index: self.element_count,
             _pd: PhantomData,
         };
 
-        let new_leaf_index = self.num;
-        let peak_mask = self.num;
+        let new_leaf_index = self.element_count;
+        let peak_mask = self.element_count;
         let mut current_node = next;
         let mut current_height = 0;
         while (peak_mask >> current_height) & 1 == 1 {
@@ -230,7 +237,7 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
         }
 
         self.peaks[current_height] = current_node;
-        self.num += 1;
+        self.element_count += 1;
 
         new_proof
     }
@@ -267,7 +274,7 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
         proof_list: &[MerkleProof<H>],
         index: u64,
     ) -> Result<Option<MerkleProof<H>>, MerkleError> {
-        if index > self.num {
+        if index > self.element_count {
             return Err(MerkleError::IndexOutOfBounds);
         }
 
@@ -315,7 +322,9 @@ mod test {
     use super::{hasher::Hash, MerkleMr, MerkleProof};
     use crate::error::MerkleError;
 
-    fn generate_for_n_integers(n: usize) -> (MerkleMr<Sha256>, Vec<MerkleProof<Sha256>>) {
+    fn generate_for_n_integers(
+        n: usize,
+    ) -> (MerkleMr<Sha256>, Vec<MerkleProof<Sha256>>, Vec<[u8; 32]>) {
         let mut mmr: MerkleMr<Sha256> = MerkleMr::new(14);
 
         let mut proof = Vec::new();
@@ -325,7 +334,7 @@ mod test {
             let new_proof = mmr.add_leaf_updating_proof_list(list_of_hashes[i], &mut proof);
             proof.push(new_proof);
         });
-        (mmr, proof)
+        (mmr, proof, list_of_hashes)
     }
 
     fn generate_hashes_for_n_integers(n: usize) -> Vec<Hash> {
@@ -335,7 +344,7 @@ mod test {
     }
 
     fn mmr_proof_for_specific_nodes(n: usize, specific_nodes: Vec<u64>) {
-        let (mmr, proof_list) = generate_for_n_integers(n);
+        let (mmr, proof_list, _) = generate_for_n_integers(n);
         let proof: Vec<MerkleProof<Sha256>> = specific_nodes
             .iter()
             .map(|i| {
@@ -368,7 +377,7 @@ mod test {
 
     #[test]
     fn check_single_element() {
-        let (mmr, proof_list) = generate_for_n_integers(1);
+        let (mmr, proof_list, _) = generate_for_n_integers(1);
 
         let proof = mmr
             .gen_proof(&proof_list, 0)
@@ -438,7 +447,7 @@ mod test {
 
     #[test]
     fn check_invalid_proof() {
-        let (mmr, _) = generate_for_n_integers(5);
+        let (mmr, ..) = generate_for_n_integers(5);
         let invalid_proof = MerkleProof::<Sha256> {
             cohashes: vec![],
             index: 6,
@@ -485,18 +494,20 @@ mod test {
 
     #[test]
     fn check_compact_and_non_compact() {
-        let (mmr, _) = generate_for_n_integers(5);
+        let (mmr, proofs, hashes) = generate_for_n_integers(5);
 
         let compact_mmr = mmr.to_compact();
-        let deserialized_mmr = MerkleMr::<Sha256>::from_compact(&compact_mmr);
+        let deserialized_mmr = MerkleMr::<Sha256>::from_compact(compact_mmr);
 
-        assert_eq!(mmr.num, deserialized_mmr.num);
-        assert_eq!(mmr.peaks, deserialized_mmr.peaks);
+        assert_eq!(mmr.element_count, deserialized_mmr.element_count);
+        for (i, proof) in proofs.into_iter().enumerate() {
+            assert!(deserialized_mmr.verify(&proof, &hashes[i]))
+        }
     }
 
     #[test]
     fn arbitrary_index_proof() {
-        let (mut mmr, _) = generate_for_n_integers(20);
+        let (mut mmr, ..) = generate_for_n_integers(20);
         // update proof for 21st element
         let mut proof: MerkleProof<Sha256> = MerkleProof {
             cohashes: vec![],
@@ -518,7 +529,7 @@ mod test {
 
     #[test]
     fn update_proof_list_from_arbitrary_index() {
-        let (mut mmr, _) = generate_for_n_integers(20);
+        let (mut mmr, ..) = generate_for_n_integers(20);
         // update proof for 21st element
         let mut proof_list = Vec::new();
 
