@@ -40,10 +40,10 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
 
     /// Returns the minimum peaks needed to store an MMR of `element_count` elements
     #[inline]
-    fn min_peaks(element_count: u64) -> Option<usize> {
+    fn min_peaks(element_count: u64) -> usize {
         match element_count {
-            0 => None,
-            c => Some(c.ilog2() as usize + 1),
+            0 => 0,
+            c => c.ilog2() as usize + 1,
         }
     }
 
@@ -51,17 +51,16 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
     pub fn from_compact(compact: CompactMmr) -> Self {
         let required_peaks = Self::min_peaks(compact.element_count);
         let peaks = match required_peaks {
-            None => vec![ZERO],
-            Some(required) => {
+            0 => vec![ZERO],
+            required => {
                 let mut peaks = compact.peaks;
                 // this shouldn't ever need to run with the below Self::to_compact
-                // as that will truncate it automatically to the correct length
+                // as that will truncate it automatically to the correct length.
                 // this is mostly for safety.
                 if peaks.len() < required {
                     let num_to_add = required - peaks.len();
                     peaks.reserve_exact(num_to_add);
                     // NOTE: we add in a loop so we don't need to make 2 allocs
-                    // (the ZEROs will be stack allocated... i think)
                     (0..num_to_add).for_each(|_| peaks.push(ZERO))
                 }
                 peaks
@@ -78,14 +77,13 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
     /// Exports a "compact" version of the MMR that can be easily serialized
     pub fn to_compact(&self) -> CompactMmr {
         let min_peaks = Self::min_peaks(self.element_count);
-        // replace with assert_matches! when stabilised (https://github.com/rust-lang/rust/issues/82775)
         // self.peaks should always have enough peaks to hold its elements
-        assert!(matches!(min_peaks, Some(mp) if self.peaks.len() >= mp));
+        assert!(self.peaks.len() >= min_peaks);
         CompactMmr {
             element_count: self.element_count,
             peaks: match min_peaks {
-                Some(required) => self.peaks.iter().take(required).copied().collect(),
-                None => vec![ZERO],
+                0 => vec![ZERO],
+                required => self.peaks.iter().take(required).copied().collect(),
             },
         }
     }
