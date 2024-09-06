@@ -25,6 +25,8 @@ use alpen_express_state::{
     prelude::*,
     state_op::*,
 };
+use alpen_express_status::StatusTx;
+use tokio::sync::watch;
 use tracing::*;
 
 use super::types::*;
@@ -33,6 +35,7 @@ use crate::{credential::sign_schnorr_sig, errors::Error};
 /// Signs and stores a block in the database.  Does not submit it to the
 /// forkchoice manager.
 // TODO pass in the CSM state we're using to assemble this
+#[allow(clippy::too_many_arguments)]
 pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     slot: u64,
     prev_block_id: L2BlockId,
@@ -41,6 +44,7 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     database: &D,
     engine: &E,
     params: &Arc<Params>,
+    chs_tx: watch::Sender<Option<ChainState>>,
 ) -> Result<Option<(L2BlockId, L2Block)>, Error> {
     debug!("preparing block");
     let l1_prov = database.l1_provider();
@@ -117,6 +121,9 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     // TODO do something with the write batch?  to prepare it in the database?
     let (post_state, _wb) = compute_post_state(prev_chstate, &fake_header, &body, params)?;
     let new_state_root = post_state.compute_state_root();
+    if chs_tx.send(Some(post_state)).is_err() {
+        warn!("chain state receiver dropped");
+    }
 
     let header = L2BlockHeader::new(slot, ts, prev_block_id, &body, new_state_root);
     let header_sig = sign_header(&header, ik);

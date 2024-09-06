@@ -105,7 +105,6 @@ pub fn start_sync_tasks<
     let fcm_eng = engine.clone();
     let fcm_csm_ctl = csm_ctl.clone();
     let fcm_params = params.clone();
-    let fcm_status_tx = status_tx.clone();
 
     executor.spawn_critical("fork_choice_manager::tracker_task", move |shutdown| {
         // TODO this should be simplified into a builder or something
@@ -117,7 +116,6 @@ pub fn start_sync_tasks<
             fcm_rx,
             fcm_csm_ctl,
             fcm_params,
-            fcm_status_tx,
         )
     });
 

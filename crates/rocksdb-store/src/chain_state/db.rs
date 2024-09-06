@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use alpen_express_db::{errors::DbError, traits::*, DbResult};
-use alpen_express_state::{chain_state::ChainState, state_op};
+use alpen_express_state::state_op;
 use rockbound::{OptimisticTransactionDB, SchemaBatch, SchemaDBOperationsExt};
 
 use super::schemas::{ChainStateSchema, WriteBatchSchema};
@@ -77,7 +77,7 @@ impl ChainstateStore for ChainStateDb {
         &self,
         idx: u64,
         batch: &alpen_express_state::state_op::WriteBatch,
-    ) -> DbResult<ChainState> {
+    ) -> DbResult<()> {
         if self.db.get::<WriteBatchSchema>(&idx)?.is_some() {
             return Err(DbError::OverwriteStateUpdate(idx));
         }
@@ -94,7 +94,7 @@ impl ChainstateStore for ChainStateDb {
         write_batch.put::<ChainStateSchema>(&idx, &post_state)?;
         self.db.write_schemas(write_batch)?;
 
-        Ok(post_state)
+        Ok(())
     }
 
     fn purge_historical_state_before(&self, before_idx: u64) -> DbResult<()> {
@@ -116,7 +116,7 @@ impl ChainstateStore for ChainStateDb {
         Ok(())
     }
 
-    fn rollback_writes_to(&self, new_tip_idx: u64) -> DbResult<Option<ChainState>> {
+    fn rollback_writes_to(&self, new_tip_idx: u64) -> DbResult<()> {
         let last_idx = match self.get_last_idx()? {
             Some(idx) => idx,
             None => return Err(DbError::NotBootstrapped),
@@ -135,16 +135,13 @@ impl ChainstateStore for ChainStateDb {
             return Err(DbError::MissingL2State(new_tip_idx));
         }
 
-        let chs_state = self.get_toplevel_state(new_tip_idx)?;
-
         let mut del_batch = SchemaBatch::new();
         for idx in new_tip_idx + 1..=last_idx {
             del_batch.delete::<ChainStateSchema>(&idx)?;
             del_batch.delete::<WriteBatchSchema>(&idx)?;
         }
         self.db.write_schemas(del_batch)?;
-
-        Ok(chs_state)
+        Ok(())
     }
 }
 

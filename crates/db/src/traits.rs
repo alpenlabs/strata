@@ -230,13 +230,13 @@ pub trait ChainstateStore {
     /// Stores a write batch in the database, possibly computing that state
     /// under the hood from the writes.  Will not overwrite existing data,
     /// previous writes must be purged first in order to be replaced.
-    fn write_state_update(&self, idx: u64, batch: &WriteBatch) -> DbResult<ChainState>;
+    fn write_state_update(&self, idx: u64, batch: &WriteBatch) -> DbResult<()>;
 
     /// Tells the database to purge state before a certain block index (height).
     fn purge_historical_state_before(&self, before_idx: u64) -> DbResult<()>;
 
     /// Rolls back any writes and state checkpoints after a specified block.
-    fn rollback_writes_to(&self, new_tip_idx: u64) -> DbResult<Option<ChainState>>;
+    fn rollback_writes_to(&self, new_tip_idx: u64) -> DbResult<()>;
 }
 
 /// Read trait corresponding to [``ChainstateStore``].  See that trait's doc for
