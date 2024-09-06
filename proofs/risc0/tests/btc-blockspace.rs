@@ -1,6 +1,7 @@
 #[cfg(feature = "prover")]
 mod test {
-    use bitcoin_blockspace::logic::{BlockspaceProofInput, BlockspaceProofOutput, ScanParams};
+    use bitcoin::consensus::serialize;
+    use bitcoin_blockspace::logic::{BlockspaceProofOutput, ScanParams};
     use express_risc0_adapter::{Risc0Verifier, RiscZeroHost};
     use express_zkvm::{ZKVMHost, ZKVMVerifier};
     use risc0_guest_builder::BTC_BLOCKSPACE_RISC0_ELF;
@@ -16,14 +17,11 @@ mod test {
             sequencer_address: "bcrt1pf73jc96ujch43wp3k294003xx4llukyzvp0revwwnww62esvk7hqvarg98"
                 .to_owned(),
         };
+        let serialized_block = serialize(&block);
 
-        let input = BlockspaceProofInput {
-            block,
-            scan_params,
-            inclusion_proof: vec![],
-        };
-
-        let (proof, _) = prover.prove(input).expect("Failed to generate proof");
+        let (proof, _) = prover
+            .prove(&[scan_params.clone()], Some(&[serialized_block]))
+            .expect("Failed to generate proof");
 
         let _output = Risc0Verifier::extract_public_output::<BlockspaceProofOutput>(&proof)
             .expect("Failed to extract public outputs");

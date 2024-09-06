@@ -154,7 +154,9 @@ dependencies = [
  "hex",
  "reth-primitives",
  "serde",
+ "serde_json",
  "sha2",
+ "thiserror",
 ]
 
 [[package]]
@@ -629,6 +631,7 @@ dependencies = [
 name = "btc-blockspace-risc0"
 version = "0.1.0"
 dependencies = [
+ "bitcoin",
  "bitcoin-blockspace",
  "risc0-zkvm",
 ]

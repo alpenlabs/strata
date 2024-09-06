@@ -1,6 +1,5 @@
 //! Core logic of the Bitcoin Blockspace proof that will be proven
 
-use alpen_express_primitives::buf::Buf32;
 use bitcoin::{block::Header, Block};
 use serde::{Deserialize, Serialize};
 
@@ -13,10 +12,10 @@ use crate::{
 pub struct BlockspaceProofInput {
     pub block: Block,
     pub scan_params: ScanParams,
-    pub inclusion_proof: Vec<Buf32>,
+    // TODO: add hintings and other necessary params
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScanParams {
     // TODO: figure out why serialize `Address`
     pub bridge_address: String,
@@ -32,11 +31,7 @@ pub struct BlockspaceProofOutput {
 }
 
 pub fn process_blockspace_proof(input: &BlockspaceProofInput) -> BlockspaceProofOutput {
-    let BlockspaceProofInput {
-        block,
-        scan_params,
-        inclusion_proof: _,
-    } = input;
+    let BlockspaceProofInput { block, scan_params } = input;
     assert!(check_merkle_root(block));
     // assert!(check_witness_commitment(block));
 
