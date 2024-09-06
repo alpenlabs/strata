@@ -36,3 +36,24 @@ pub fn sha256d(buf: &[u8]) -> Buf32 {
     let arr: [u8; 32] = hasher.finalize().into();
     Buf32::from(arr)
 }
+
+#[cfg(test)]
+mod tests {
+    use bitcoin::hashes::{sha256d, Hash};
+    use rand::Rng;
+
+    use super::sha256d;
+    use crate::buf::Buf32;
+
+    #[test]
+    fn test_sha256d_equivalene() {
+        let mut rng = rand::thread_rng();
+        let mut array = [0u8; 32];
+        rng.fill(&mut array);
+
+        let expected = Buf32::from(sha256d::Hash::hash(&array).to_byte_array());
+        let output = sha256d(&array);
+
+        assert_eq!(expected, output);
+    }
+}
