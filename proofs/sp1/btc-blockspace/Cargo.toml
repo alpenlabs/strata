@@ -1,0 +1,11 @@
+[package]
+edition = "2021"
+name = "btc-blockspace-sp1"
+version = "0.1.0"
+
+[workspace]
+
+[dependencies]
+bitcoin = { version = "0.32.1" }
+bitcoin-blockspace = { path = "../../../crates/prover/bitcoin-blockspace" }
+sp1-zkvm = "1.0.1"
