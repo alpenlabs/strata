@@ -22,9 +22,10 @@ const ZERO: [u8; 32] = [0; 32];
 pub struct MerkleMr<H: MerkleHasher + Clone> {
     /// number of elements inserted into mmr
     pub element_count: u64,
-    // Buffer of all possible peaks in mmr. only some of them will be valid at a time
+    /// Buffer of all possible peaks in a MMR.
+    /// Only some of them will be valid at a time.
     pub peaks: Box<[Hash]>,
-    // phantom data for hasher
+    /// [`PhantomData`] for the hasher.
     pub hasher: PhantomData<H>,
 }
 
@@ -37,7 +38,7 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
         }
     }
 
-    /// returns the minimum peaks needed to store an mmr of `element_count` elements
+    /// Returns the minimum peaks needed to store an MMR of `element_count` elements
     #[inline]
     fn min_peaks(element_count: u64) -> Option<usize> {
         match element_count {
@@ -46,7 +47,7 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
         }
     }
 
-    /// restores from a compacted mmr
+    /// Restores from a [`CompactMmr`]
     pub fn from_compact(compact: CompactMmr) -> Self {
         let required_peaks = Self::min_peaks(compact.element_count);
         let peaks = match required_peaks {
@@ -56,7 +57,7 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
                 if peaks.len() < required {
                     let num_to_add = required - peaks.len();
                     peaks.reserve_exact(num_to_add);
-                    // note we add in a loop so we don't need to make 2 allocs
+                    // NOTE: we add in a loop so we don't need to make 2 allocs
                     // (the ZEROs will be stack allocated... i think)
                     (0..num_to_add).for_each(|_| peaks.push(ZERO))
                 }
@@ -71,7 +72,7 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
         }
     }
 
-    /// exports a "compact" version of the mmr that can be easily serialized
+    /// Exports a "compact" version of the MMR that can be easily serialized
     pub fn to_compact(&self) -> CompactMmr {
         CompactMmr {
             element_count: self.element_count,
