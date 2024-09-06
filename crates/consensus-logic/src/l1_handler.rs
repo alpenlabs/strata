@@ -126,6 +126,8 @@ fn check_for_da_batch(blockdata: &BlockData) -> Vec<L2BlockId> {
         })
         .collect();
 
+    // NOTE/TODO: this is where we would verify the commitment, i.e, verify block ranges, verify
+    // proof, and whatever else that's necessary
     if let Some(commitment) = commitments.last() {
         return vec![*commitment.l2blockid()];
     }

@@ -95,14 +95,12 @@ pub fn compute_reorg(
         }
         pivot_idx = Some(i);
     }
-    if let Some(idx) = pivot_idx {
+    pivot_idx.map(|idx| {
         let pivot = *up_blocks[idx];
         let down = down_blocks.drain(idx + 1..).copied().rev().collect();
         let up = up_blocks.drain(idx + 1..).copied().collect();
-        Some(Reorg { pivot, down, up })
-    } else {
-        None
-    }
+        Reorg { pivot, down, up }
+    })
 }
 
 #[cfg(test)]
