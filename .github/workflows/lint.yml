@@ -27,7 +27,7 @@ jobs:
   crate-checks:
     name: Check that crates compile on their own
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 60 # cold run takes a lot of time as each crate is compiled separately
     steps:
       - name: Cleanup space
         # https://github.com/actions/runner-images/issues/2840#issuecomment-790492173
