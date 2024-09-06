@@ -18,10 +18,6 @@ bincode = { workspace = true }
 express-zkvm = { workspace = true }
 zkvm-primitives = { workspace = true }
 
-
-[package.metadata.risc0]
-methods = ["guest-reth-stf"]
-
 [features]
 default = []
 prover = ["dep:express-sp1-adapter"]

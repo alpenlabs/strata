@@ -3,7 +3,7 @@
 mod test {
     use express_sp1_adapter::{SP1Host, SP1Verifier};
     use express_zkvm::{ZKVMHost, ZKVMVerifier};
-    use sp1_guest_builder::RETH_SP1_ELF;
+    use sp1_guest_builder::GUEST_RETH_STF_ELF;
     use zkvm_primitives::{ELProofPublicParams, ZKVMInput};
 
     const ENCODED_PROVER_INPUT: &[u8] =
@@ -16,7 +16,7 @@ mod test {
         }
 
         let input: ZKVMInput = bincode::deserialize(ENCODED_PROVER_INPUT).unwrap();
-        let prover = SP1Host::init(RETH_SP1_ELF.into(), Default::default());
+        let prover = SP1Host::init(GUEST_RETH_STF_ELF.into(), Default::default());
 
         let (proof, _) = prover
             .prove(&[input.clone()], None)

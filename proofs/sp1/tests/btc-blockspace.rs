@@ -4,7 +4,7 @@ mod test {
     use bitcoin_blockspace::logic::{BlockspaceProofInput, BlockspaceProofOutput, ScanParams};
     use express_sp1_adapter::{SP1Host, SP1Verifier};
     use express_zkvm::{ZKVMHost, ZKVMVerifier};
-    use sp1_guest_builder::BTC_BLOCKSPACE_SP1_ELF;
+    use sp1_guest_builder::GUEST_BTC_BLOCKSPACE_ELF;
 
     #[test]
     fn test_btc_blockspace_code_trace_generation() {
@@ -22,7 +22,7 @@ mod test {
         // let serialized_block = serialize(&block);
         let input = BlockspaceProofInput { block, scan_params };
 
-        let prover = SP1Host::init(BTC_BLOCKSPACE_SP1_ELF.into(), Default::default());
+        let prover = SP1Host::init(GUEST_BTC_BLOCKSPACE_ELF.into(), Default::default());
 
         let (proof, _) = prover
             .prove(&[input], None)
