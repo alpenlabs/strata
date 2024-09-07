@@ -70,7 +70,6 @@ fn process_l1_view_update(
     params: &RollupParams,
 ) -> Result<(), TsnError> {
     let l1v = state.state().l1_view();
-
     // Accept new blocks, comparing the tip against the current to figure out if
     // we need to do a reorg.
     // FIXME this should actually check PoW, it just does it based on block heights

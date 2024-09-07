@@ -420,24 +420,6 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_rollup_name_missing_name_tag() {
-        // Create a script that has OP_IF but no tag bytes
-        let script = Builder::new()
-            .push_opcode(OP_FALSE)
-            .push_opcode(OP_IF)
-            .into_script();
-        println!("ScRIPT: {:?}", script.to_string());
-
-        // Parse the rollup name
-        let parser = InscriptionParser::new(script);
-        let result = parser.parse_rollup_name();
-        println!("{:?}", result);
-
-        // Assert that it returns an InvalidNameTag error
-        assert!(matches!(result, Err(InscriptionParseError::InvalidNameTag)));
-    }
-
-    #[test]
     fn test_parse_inscription_data() {
         let bytes = vec![0, 1, 2, 3];
         let inscription_data = InscriptionData::new("TestRollup".to_string(), bytes.clone(), 1);

@@ -303,7 +303,7 @@ FAST_BATCH_ROLLUP_PARAMS = {
     "evm_genesis_block_hash": "37ad61cff1367467a98cf7c54c4ac99e989f1fbb1bc1e646235e90c065c565ba",
     "evm_genesis_block_state_root": "351714af72d74259f45cd7eab0b04527cd40e74836a45abcae50f92d919d988f",  # noqa: E501
     "l1_reorg_safe_depth": 4,
-    "batch_l2_blocks_target": 5,
+    "target_l2_batch_size": 5,
 }
 
 

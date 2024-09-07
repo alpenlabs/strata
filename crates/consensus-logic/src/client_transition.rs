@@ -64,13 +64,14 @@ pub fn process_event<D: Database>(
             // If we have some number of L1 blocks finalized, also emit an `UpdateBuried` write.
             let safe_depth = params.rollup().l1_reorg_safe_depth as u64;
             let maturable_height = next_exp_height.saturating_sub(safe_depth);
-            if maturable_height > params.rollup().horizon_l1_height {
+            if maturable_height > params.rollup().horizon_l1_height && state.is_chain_active() {
                 debug!(%maturable_height, "Emitting UpdateBuried for maturable height");
                 writes.push(ClientStateWrite::UpdateBuried(maturable_height));
             }
 
             // Activate chain if not already
             if state.sync().is_none() {
+                debug!(%height, "Chain not active, activating chain. Received block");
                 let (wrs, acts) = activate_chain(params, state, *height, l1blkid);
                 writes.extend(wrs);
                 actions.extend(acts);
@@ -149,6 +150,7 @@ fn activate_chain(
 
     // TODO make params configurable
     let genesis_threshold = genesis_ht + 3;
+    debug!(%genesis_threshold, %genesis_ht, active=%state.is_chain_active(), "Inside activate chain");
 
     // If necessary, activate the chain!
     if !state.is_chain_active() && height >= genesis_threshold {

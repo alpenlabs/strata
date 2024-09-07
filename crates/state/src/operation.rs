@@ -128,6 +128,7 @@ pub fn apply_writes_to_state(
             }
 
             AcceptL1Block(l1blkid) => {
+                debug!(?l1blkid, "Received AcceptL1Block");
                 // TODO make this also do shit
                 let l1v = state.l1_view_mut();
                 l1v.local_unaccepted_blocks.push(l1blkid);
@@ -136,11 +137,13 @@ pub fn apply_writes_to_state(
 
             AcceptL2Block(blkid) => {
                 // TODO do any other bookkeeping
+                debug!("Accepting L2 block");
                 let ss = state.expect_sync_mut();
                 ss.tip_blkid = blkid;
             }
 
             UpdateBuried(new_idx) => {
+                debug!("UPDATING BURIED");
                 let l1v = state.l1_view_mut();
 
                 // Check that it's increasing.
@@ -175,6 +178,7 @@ pub fn apply_writes_to_state(
             }
 
             UpdateConfirmed((l1height, blkid)) => {
+                debug!("UPDATING CONFIRMED");
                 let ss = state.expect_sync_mut();
                 ss.confirmed_blocks.push((l1height, blkid));
             }
@@ -183,6 +187,7 @@ pub fn apply_writes_to_state(
 }
 
 fn update_finalized(state: &mut ClientState, height: u64) {
+    debug!("UPDATING BURIED/FINALIZED");
     let ss = state.expect_sync_mut();
     if let Some(finalized_pos) = ss.confirmed_blocks.iter().position(|(h, _)| *h == height) {
         let finalized_blocks = ss.confirmed_blocks.drain(..finalized_pos + 1);
