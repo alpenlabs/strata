@@ -143,7 +143,6 @@ pub fn apply_writes_to_state(
             }
 
             UpdateBuried(new_idx) => {
-                debug!("UPDATING BURIED");
                 let l1v = state.l1_view_mut();
 
                 // Check that it's increasing.
@@ -173,12 +172,12 @@ pub fn apply_writes_to_state(
             }
 
             UpdateFinalized((height, _blkid)) => {
-                // THIS BLOCK IS REDUNDANT RIGHT NOW
+                // NOTE: This block is redundant right now because blocks are finalized only when
+                // there's an UpdateBuried event
                 update_finalized(state, height);
             }
 
             UpdateConfirmed((l1height, blkid)) => {
-                debug!("UPDATING CONFIRMED");
                 let ss = state.expect_sync_mut();
                 ss.confirmed_blocks.push((l1height, blkid));
             }
@@ -187,7 +186,6 @@ pub fn apply_writes_to_state(
 }
 
 fn update_finalized(state: &mut ClientState, height: u64) {
-    debug!("UPDATING BURIED/FINALIZED");
     let ss = state.expect_sync_mut();
     if let Some(finalized_pos) = ss.confirmed_blocks.iter().position(|(h, _)| *h == height) {
         let finalized_blocks = ss.confirmed_blocks.drain(..finalized_pos + 1);

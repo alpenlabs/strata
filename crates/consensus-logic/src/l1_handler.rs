@@ -93,6 +93,8 @@ where
                 csm_ctl.submit_event(ev)?;
             }
 
+            // TODO: Check for deposits and forced inclusions and emit appropriate events
+
             Ok(())
         }
     }
@@ -118,16 +120,18 @@ fn check_for_da_batch(blockdata: &BlockData) -> Vec<L2BlockId> {
         .collect();
     let commitments: Vec<BatchCommitment> = inscriptions
         .iter()
-        .filter_map(|insc_data| {
-            let commitment = borsh::from_slice::<SignedBatchCommitment>(insc_data.batch_data())
+        .filter_map(|insc| {
+            borsh::from_slice::<SignedBatchCommitment>(insc.batch_data())
                 .ok()
-                .map(Into::into);
-            commitment
+                .map(Into::into)
         })
         .collect();
 
     // NOTE/TODO: this is where we would verify the commitment, i.e, verify block ranges, verify
     // proof, and whatever else that's necessary
+
+    // We only care about the last found commitment in a block. We'll most likely have only one
+    // commmitment in a block, but still
     if let Some(commitment) = commitments.last() {
         return vec![*commitment.l2blockid()];
     }

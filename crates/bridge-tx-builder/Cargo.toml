@@ -1,15 +1,15 @@
 [package]
+edition = "2021"
 name = "express-bridge-tx-builder"
 version = "0.1.0"
-edition = "2021"
 
 [lints]
 rust.missing_debug_implementations = "warn"
 rust.missing_docs = "warn"
 rust.rust_2018_idioms = { level = "deny", priority = -1 }
 rust.unreachable_pub = "warn"
-rust.unused_must_use = "deny"
 rust.unused_crate_dependencies = "deny"
+rust.unused_must_use = "deny"
 rustdoc.all = "warn"
 
 [dependencies]

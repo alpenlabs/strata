@@ -113,9 +113,6 @@ pub fn process_event<D: Database>(
                 // When DABatch appears, it is only confirmed at the moment. These will be finalized
                 // only when the corresponding L1 block is buried enough
                 writes.push(ClientStateWrite::UpdateConfirmed((*height, *last)));
-
-                // writes.push(ClientStateWrite::UpdateFinalized(*last));
-                // actions.push(SyncAction::FinalizeBlock(*last));
             } else {
                 // TODO we can expand this later to make more sense
                 return Err(Error::MissingClientSyncState);

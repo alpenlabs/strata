@@ -51,12 +51,9 @@ impl InscriptionData {
             .push_slice(PushBytesBuf::try_from(Self::BATCH_DATA_TAG.to_vec())?)
             .push_int(self.batch_data.len() as i64);
 
+        debug!(batchdata_size = %self.batch_data.len(), "Inserting batch data");
         for chunk in self.batch_data.chunks(520) {
-            println!(
-                "inserting chunk of size {:?} {:?}",
-                self.batch_data.len(),
-                chunk
-            );
+            debug!(size=%chunk.len(), "inserting chunk");
             builder = builder.push_slice(PushBytesBuf::try_from(chunk.to_vec())?);
         }
         builder = builder.push_opcode(OP_ENDIF);
@@ -115,7 +112,7 @@ impl InscriptionParser {
 
         Self::enter_envelope(&mut instructions)?;
 
-        let (tag, name) = Self::parse_tag_value(&mut instructions)?;
+        let (tag, name) = Self::parse_bytes_pair(&mut instructions)?;
 
         match (tag.as_slice(), name) {
             (InscriptionData::ROLLUP_NAME_TAG, namebytes) => {
@@ -177,7 +174,8 @@ impl InscriptionParser {
         }
     }
 
-    fn next_size(instructions: &mut Instructions) -> Option<u32> {
+    /// Extract next integer value(unsigned)
+    fn next_int(instructions: &mut Instructions) -> Option<u32> {
         let n = instructions.next();
         match n {
             Some(Ok(Instruction::PushBytes(bytes))) => {
@@ -191,38 +189,10 @@ impl InscriptionParser {
             }
             Some(Ok(Instruction::Op(op))) => {
                 // Handle small integers pushed by OP_1 to OP_16
-                if op == OP_PUSHNUM_1 {
-                    Some(1)
-                } else if op == OP_PUSHNUM_2 {
-                    Some(2)
-                } else if op == OP_PUSHNUM_3 {
-                    Some(3)
-                } else if op == OP_PUSHNUM_4 {
-                    Some(4)
-                } else if op == OP_PUSHNUM_5 {
-                    Some(5)
-                } else if op == OP_PUSHNUM_6 {
-                    Some(6)
-                } else if op == OP_PUSHNUM_7 {
-                    Some(7)
-                } else if op == OP_PUSHNUM_8 {
-                    Some(8)
-                } else if op == OP_PUSHNUM_9 {
-                    Some(9)
-                } else if op == OP_PUSHNUM_10 {
-                    Some(10)
-                } else if op == OP_PUSHNUM_11 {
-                    Some(11)
-                } else if op == OP_PUSHNUM_12 {
-                    Some(12)
-                } else if op == OP_PUSHNUM_13 {
-                    Some(13)
-                } else if op == OP_PUSHNUM_14 {
-                    Some(14)
-                } else if op == OP_PUSHNUM_15 {
-                    Some(15)
-                } else if op == OP_PUSHNUM_16 {
-                    Some(16)
+                let opval = op.to_u8();
+                let diff = opval - OP_PUSHNUM_1.to_u8();
+                if (0..16).contains(&diff) {
+                    Some(diff as u32 + 1)
                 } else {
                     None
                 }
@@ -231,7 +201,7 @@ impl InscriptionParser {
         }
     }
 
-    fn parse_tag_value(
+    fn parse_bytes_pair(
         instructions: &mut Instructions,
     ) -> Result<(Vec<u8>, Vec<u8>), InscriptionParseError> {
         let tag = Self::next_bytes(instructions).ok_or(InscriptionParseError::InvalidFormat)?;
@@ -249,8 +219,8 @@ impl InscriptionParser {
 
         Self::enter_envelope(&mut instructions)?;
 
-        // parse name
-        let (tag, name) = Self::parse_tag_value(&mut instructions)?;
+        // Parse name
+        let (tag, name) = Self::parse_bytes_pair(&mut instructions)?;
 
         let rollup_name = match (tag.as_slice(), name) {
             (InscriptionData::ROLLUP_NAME_TAG, namebytes) => {
@@ -259,18 +229,18 @@ impl InscriptionParser {
             _ => Err(InscriptionParseError::InvalidNameTag),
         }?;
 
-        // parse version
-        let (tag, ver) = Self::parse_tag_value(&mut instructions)?;
+        // Parse version
+        let (tag, ver) = Self::parse_bytes_pair(&mut instructions)?;
         let version = match (tag.as_slice(), ver.as_slice()) {
             (InscriptionData::VERSION_TAG, [v]) => Ok(v),
             (InscriptionData::VERSION_TAG, _) => Err(InscriptionParseError::InvalidVersion),
             _ => Err(InscriptionParseError::InvalidVersionTag),
         }?;
 
-        // parse bytes
+        // Parse bytes
         let tag =
             Self::next_bytes(&mut instructions).ok_or(InscriptionParseError::InvalidBlobTag)?;
-        let size = Self::next_size(&mut instructions);
+        let size = Self::next_int(&mut instructions);
         match (tag.as_slice(), size) {
             (InscriptionData::BATCH_DATA_TAG, Some(size)) => {
                 let batch_data = Self::extract_n_bytes(size, &mut instructions)?;
@@ -281,6 +251,7 @@ impl InscriptionParser {
         }
     }
 
+    /// Extract bytes of `size` from the remaining instructions
     fn extract_n_bytes(
         size: u32,
         instructions: &mut Instructions,

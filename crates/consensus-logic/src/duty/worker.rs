@@ -395,7 +395,6 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
 
             // serialize and send to l1 writer
 
-            debug!(?signed_commitment, "Serializing the signed_commmitment");
             let payload =
                 borsh::to_vec(&signed_commitment).map_err(|e| Error::Other(e.to_string()))?;
             let blob_intent = BlobIntent::new(BlobDest::L1, commitment_sighash, payload);
