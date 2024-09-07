@@ -19,5 +19,3 @@ FAST_BATCH_ROLLUP_PARAMS = {
     "l1_reorg_safe_depth": 4,
     "target_l2_batch_size": 5,
 }
-
-

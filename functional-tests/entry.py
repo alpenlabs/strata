@@ -13,7 +13,13 @@ import web3.middleware
 from bitcoinlib.services.bitcoind import BitcoindClient
 
 import seqrpc
-from constants import BD_PASSWORD, BD_USERNAME, BLOCK_GENERATION_INTERVAL_SECS, DD_ROOT, FAST_BATCH_ROLLUP_PARAMS
+from constants import (
+    BD_PASSWORD,
+    BD_USERNAME,
+    BLOCK_GENERATION_INTERVAL_SECS,
+    DD_ROOT,
+    FAST_BATCH_ROLLUP_PARAMS,
+)
 
 
 def generate_seqkey() -> bytes:
@@ -291,6 +297,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
 
         svcs = {"bitcoin": bitcoind, "sequencer": sequencer, "reth": reth}
         return flexitest.LiveEnv(svcs)
+
 
 def main(argv):
     test_dir = os.path.dirname(os.path.abspath(__file__))

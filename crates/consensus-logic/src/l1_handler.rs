@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use alpen_express_btcio::{
-    inscription::{InscriptionData, InscriptionParser},
+    inscription::InscriptionParser,
     reader::messages::{BlockData, L1Event},
 };
 use alpen_express_db::traits::{Database, L1DataStore};
@@ -102,24 +102,19 @@ where
 
 /// Parses inscriptions and checks for batch data in the transactions
 fn check_for_da_batch(blockdata: &BlockData) -> Vec<L2BlockId> {
-    let txs: Vec<_> = blockdata
+    let txs = blockdata
         .relevant_tx_idxs()
         .iter()
-        .map(|&idx| blockdata.block().txdata[idx as usize].clone())
-        .collect();
+        .map(|&idx| blockdata.block().txdata[idx as usize].clone());
 
-    let inscriptions: Vec<InscriptionData> = txs
-        .iter()
-        .filter_map(|tx| {
-            tx.input[0].witness.tapscript().and_then(|scr| {
-                InscriptionParser::new(scr.into())
-                    .parse_inscription_data()
-                    .ok()
-            })
+    let inscriptions = txs.filter_map(|tx| {
+        tx.input[0].witness.tapscript().and_then(|scr| {
+            InscriptionParser::new(scr.into())
+                .parse_inscription_data()
+                .ok()
         })
-        .collect();
+    });
     let commitments: Vec<BatchCommitment> = inscriptions
-        .iter()
         .filter_map(|insc| {
             borsh::from_slice::<SignedBatchCommitment>(insc.batch_data())
                 .ok()
