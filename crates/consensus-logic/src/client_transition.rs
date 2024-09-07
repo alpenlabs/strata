@@ -96,6 +96,8 @@ pub fn process_event<D: Database>(
                 warn!("empty L1DABatch");
             }
 
+            debug!(%height, ?blkids, "Received L1DABatch");
+
             if let Some(ss) = state.sync() {
                 // TODO load it up and figure out what's there, see if we have to
                 // load the state updates from L1 or something

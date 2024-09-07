@@ -108,6 +108,7 @@ impl InscriptionParser {
     ///
     /// This function errors if no rollup name is found in the [`InscriptionData`]
     pub fn parse_rollup_name(&self) -> Result<String, InscriptionParseError> {
+        debug!(?self.script, "Parsing name for script");
         let mut instructions = self.script.instructions();
 
         Self::enter_envelope(&mut instructions)?;
@@ -140,9 +141,7 @@ impl InscriptionParser {
                     }
                 }
                 _ => {
-                    return Err(InscriptionParseError::InvalidEnvelope(
-                        "No OP_FALSE found".to_string(),
-                    ))
+                    // Just carry on until OP_FALSE is found
                 }
             }
         }
