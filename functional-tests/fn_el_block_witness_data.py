@@ -16,7 +16,7 @@ class ElBlockWitnessDataGenerationTest(flexitest.Test):
 
         # TODO: do some transactions
 
-        time.sleep(5)
+        time.sleep(6)
 
         last_blocknum = int(rethrpc.eth_blockNumber(), 16)
 

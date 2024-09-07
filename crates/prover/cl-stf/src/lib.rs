@@ -7,6 +7,8 @@ use alpen_express_state::{
 pub use alpen_express_state::{block::L2Block, chain_state::ChainState, state_op::StateCache};
 use zkvm_primitives::ELProofPublicParams;
 
+pub type CLProofPublicParams = ([u8; 32], [u8; 32]);
+
 /// Verifies an L2 block and applies the chains state transition if the block is valid.
 pub fn verify_and_transition(
     prev_chstate: ChainState,
@@ -54,9 +56,8 @@ fn create_exec_segment(el_proof_pp: &ELProofPublicParams) -> ExecSegment {
         Buf32(el_proof_pp.txn_root),
         create_evm_extra_payload(Buf32(el_proof_pp.new_blockhash)),
     );
-    let update_output = UpdateOutput::new_from_state(Buf32::zero());
-    // TODO: fix this
-    // let update_output = UpdateOutput::new_from_state(Buf32(el_proof_pp.new_state_root));
+
+    let update_output = UpdateOutput::new_from_state(Buf32(el_proof_pp.new_state_root));
     let exec_update = ExecUpdate::new(update_input, update_output);
 
     ExecSegment::new(exec_update)

@@ -3,7 +3,7 @@ use alpen_express_primitives::{
     buf::Buf32,
     params::{Params, RollupParams, RunParams},
 };
-use express_cl_stf::{verify_and_transition, ChainState, L2Block};
+use express_cl_stf::{verify_and_transition, CLProofPublicParams, ChainState, L2Block};
 use risc0_zkvm::{guest::env, serde, sha::Digest};
 use zkvm_primitives::ELProofPublicParams;
 
@@ -18,8 +18,13 @@ fn main() {
     let input: Vec<u8> = env::read();
     let (prev_state, block): (ChainState, L2Block) = borsh::from_slice(&input).unwrap();
 
+    let prev_state_root = prev_state.compute_state_root();
+
     let new_state = verify_and_transition(prev_state, block, el_proof_pp, params).unwrap();
-    env::commit(&borsh::to_vec(&new_state).unwrap());
+    let new_state_root = new_state.compute_state_root();
+
+    let public_params: CLProofPublicParams = (*prev_state_root.as_ref(), *new_state_root.as_ref());
+    env::commit(&public_params);
 }
 
 // TODO: Should be read from config file and evaluated on compile time

@@ -25,7 +25,7 @@ serde_json = { workspace = true }
 risc0-build = { version = "1.0.5" }
 
 [package.metadata.risc0]
-methods = ["guest-reth-stf", "guest-cl-stf"]
+methods = ["guest-reth-stf", "guest-cl-stf", "guest-cl-agg"]
 
 [features]
 default = []

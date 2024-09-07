@@ -1,6 +1,8 @@
 #[cfg(feature = "prover")]
 
 mod test {
+    use std::{fs::File, io::Write};
+
     use alpen_express_state::{block::L2Block, chain_state::ChainState};
     use express_risc0_adapter::RiscZeroHost;
     use express_zkvm::{AggregationInput, Proof, VerifcationKey, ZKVMHost};
@@ -13,8 +15,9 @@ mod test {
             include_bytes!("../../test-util/cl_stfs/slot-1/final_block.borsh");
 
         let prev_el_proof_ser: &[u8] =
-            include_bytes!("../../test-util/el_stfs/slot-1-risc0/proof.bin");
-        let el_proof_vk_ser: &[u8] = include_bytes!("../../test-util/el_stfs/slot-1-risc0/vk.bin");
+            include_bytes!("../../test-util/el_stfs/slot-1/el_proof_slot1_r0.bin");
+        let el_proof_vk_ser: &[u8] =
+            include_bytes!("../../test-util/el_stfs/slot-1/el_vkey_slot1_r0.bin");
 
         let prev_state: ChainState = borsh::from_slice(prev_state_data).unwrap();
         let block: L2Block = borsh::from_slice(new_block_data).unwrap();
@@ -34,8 +37,17 @@ mod test {
         let prover = RiscZeroHost::init(CL_BLOCK_STF_ELF.into(), Default::default());
         let proof_agg_input = AggregationInput::new(prev_el_proof, el_proof_vk);
 
-        let _ = prover
+        let (proof, vk) = prover
             .prove_with_aggregation(input_ser, vec![proof_agg_input])
             .expect("Failed to generate proof");
+
+        let proof_ser = bincode::serialize(&proof).unwrap();
+        let vkey_ser = bincode::serialize(&vk).unwrap();
+
+        let mut proof_file = File::create("cl_proof_slot1.bin").unwrap();
+        proof_file.write_all(&proof_ser).unwrap();
+
+        let mut vk_file = File::create("cl_vkey_slot1.bin").unwrap();
+        vk_file.write_all(&vkey_ser).unwrap();
     }
 }

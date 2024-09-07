@@ -49,6 +49,11 @@ impl SP1Host {
         // Setup the I/O
         let mut stdin = SP1Stdin::new();
         if let Some(agg_inputs) = agg_inputs {
+            let num_agg_inputs = agg_inputs.len() as u32;
+            if num_agg_inputs > 1 {
+                stdin.write(&num_agg_inputs);
+            }
+
             for agg_input in agg_inputs {
                 let proof: SP1ProofWithPublicValues =
                     bincode::deserialize(agg_input.proof().as_bytes())?;
@@ -70,7 +75,7 @@ impl SP1Host {
         stdin.write(&input);
 
         // Start proving
-        let mut prover = client.prove(&pk, stdin);
+        let mut prover = client.prove(&pk, stdin).compressed();
         if self.prover_options.stark_to_snark_conversion {
             prover = prover.plonk();
         }

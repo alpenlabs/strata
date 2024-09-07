@@ -65,6 +65,11 @@ impl RiscZeroHost {
         // Setup the I/O
         let mut env_builder = ExecutorEnv::builder();
         if let Some(agg_inputs) = agg_inputs {
+            let num_agg_inputs = agg_inputs.len() as u32;
+            if num_agg_inputs > 1 {
+                env_builder.write(&num_agg_inputs)?;
+            }
+
             for agg_input in agg_inputs {
                 let receipt: Receipt = bincode::deserialize(agg_input.proof().as_bytes())?;
                 let vk: Digest = bincode::deserialize(agg_input.vk().as_bytes())?;
