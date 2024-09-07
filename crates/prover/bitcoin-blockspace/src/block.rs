@@ -24,21 +24,6 @@ pub fn compute_merkle_root(block: &Block) -> Option<Buf32> {
     calculate_root(hashes)
 }
 
-/// Computes the transaction witness root.
-///
-/// Equivalent to [`witness_root`](Block::witness_root)
-pub fn compute_witness_root(block: &Block) -> Option<Buf32> {
-    let hashes = block.txdata.iter().enumerate().map(|(i, t)| {
-        if i == 0 {
-            // Replace the first hash with zeroes.
-            Buf32::zero()
-        } else {
-            compute_wtxid(t)
-        }
-    });
-    calculate_root(hashes)
-}
-
 /// Checks if Merkle root of header matches Merkle root of the transaction list.
 ///
 /// Equivalent to [`check_merkle_root`](Block::check_merkle_root)
@@ -77,19 +62,30 @@ pub fn compute_block_hash(header: &Header) -> Buf32 {
     sha256d(&vec)
 }
 
-/// Checks if witness commitment in coinbase matches the transaction list.
-///
-/// Equivalent to [`check_witness_commitment`](Block::check_witness_commitment)
-pub fn check_witness_commitment(block: &Block) -> bool {
-    // Witness commitment is optional if there are no transactions using SegWit in the block.
-    if block
-        .txdata
-        .iter()
-        .all(|t| t.input.iter().all(|i| i.witness.is_empty()))
-    {
-        return true;
-    }
+/// Computes the block witness root from corresponding proof in [`L1Tx`]
+pub fn compute_witness_root(l1_tx: &L1Tx) -> Buf32 {
+    let tx: Transaction = consensus::deserialize(l1_tx.tx_data()).unwrap();
 
+    let mut root_hash = *compute_wtxid(&tx).as_ref();
+
+    let mut pos = l1_tx.proof().position();
+    for cohash in l1_tx.proof().cohashes() {
+        let mut buf = [0u8; 64];
+        if pos % 2 == 0 {
+            buf[0..32].copy_from_slice(&root_hash);
+            buf[32..64].copy_from_slice(cohash.as_ref());
+        } else {
+            buf[0..32].copy_from_slice(cohash.as_ref());
+            buf[32..64].copy_from_slice(&root_hash);
+        }
+        root_hash = *sha256d(&buf).as_ref();
+        pos /= 2;
+    }
+    Buf32::from(root_hash)
+}
+
+/// Checks if witness commitment in coinbase matches the corresponding [`L1Tx`](L1Tx).
+pub fn check_witness_commitment(block: &Block, l1_tx: &L1Tx) -> bool {
     if block.txdata.is_empty() {
         return false;
     }
@@ -119,14 +115,13 @@ pub fn check_witness_commitment(block: &Block) -> bool {
                 .unwrap();
         // Witness reserved value is in coinbase input witness.
         let witness_vec: Vec<_> = coinbase.input[0].witness.iter().collect();
+        let witness_root = compute_witness_root(l1_tx);
         if witness_vec.len() == 1 && witness_vec[0].len() == 32 {
-            if let Some(witness_root) = compute_witness_root(block) {
-                return commitment
-                    == compute_witness_commitment(
-                        &WitnessMerkleNode::from_byte_array(*witness_root.as_ref()),
-                        witness_vec[0],
-                    );
-            }
+            return commitment
+                == compute_witness_commitment(
+                    &WitnessMerkleNode::from_byte_array(*witness_root.as_ref()),
+                    witness_vec[0],
+                );
         }
     }
     false
@@ -139,31 +134,6 @@ pub fn check_pow(block: &Header) -> bool {
     target.is_met_by(block_hash)
 }
 
-pub fn calculate_inclusion_proof_root(l1_tx: L1Tx) -> Buf32 {
-    let tx: Transaction = consensus::deserialize(l1_tx.tx_data()).unwrap();
-
-    let mut root_hash = tx.compute_wtxid().to_byte_array();
-
-    let mut pos = l1_tx.proof().position();
-    for cohash in l1_tx.proof().cohashes() {
-        let mut buf = [0u8; 64];
-        if pos % 2 == 0 {
-            buf[0..32].copy_from_slice(&root_hash);
-            buf[32..64].copy_from_slice(cohash.as_ref());
-        } else {
-            buf[0..32].copy_from_slice(cohash.as_ref());
-            buf[32..64].copy_from_slice(&root_hash);
-        }
-        root_hash = *sha256d(&buf).as_ref();
-        pos /= 2;
-    }
-    Buf32::from(root_hash)
-}
-
-pub fn check_inclusion_proof() -> bool {
-    true
-}
-
 #[cfg(test)]
 mod tests {
     use alpen_express_primitives::utils::generate_l1_tx;
@@ -171,10 +141,8 @@ mod tests {
     use bitcoin::{hashes::Hash, TxMerkleNode, WitnessMerkleNode};
     use rand::Rng;
 
-    use super::{calculate_inclusion_proof_root, compute_merkle_root};
-    use crate::block::{
-        check_merkle_root, check_pow, check_witness_commitment, compute_witness_root,
-    };
+    use super::compute_merkle_root;
+    use crate::block::{check_pow, check_witness_commitment, compute_witness_root};
 
     #[test]
     fn test_tx_root() {
@@ -188,9 +156,25 @@ mod tests {
     #[test]
     fn test_wtx_root() {
         let block = get_btc_mainnet_block();
+
+        // Note: This takes longer than 60s
+        // for i in 1..block.txdata.len() {
+        //     let l1_tx = generate_l1_tx(i as u32, &block);
+        //     assert!(check_witness_commitment(&block, &l1_tx));
+
+        //     assert_eq!(
+        //         block.witness_root().unwrap(),
+        //         WitnessMerkleNode::from_byte_array(*compute_witness_root(&l1_tx).as_ref())
+        //     )
+        // }
+
+        let r = rand::thread_rng().gen_range(1..block.txdata.len()) as u32;
+        let l1_tx = generate_l1_tx(r, &block);
+        assert!(check_witness_commitment(&block, &l1_tx));
+
         assert_eq!(
             block.witness_root().unwrap(),
-            WitnessMerkleNode::from_byte_array(*compute_witness_root(&block).unwrap().as_ref())
+            WitnessMerkleNode::from_byte_array(*compute_witness_root(&l1_tx).as_ref())
         )
     }
 
@@ -198,33 +182,7 @@ mod tests {
     fn test_block() {
         let block = get_btc_mainnet_block();
 
-        assert!(block.check_merkle_root());
-        assert!(check_merkle_root(&block));
-
-        assert!(block.check_witness_commitment());
-        assert!(check_witness_commitment(&block));
-
         assert!(block.header.validate_pow(block.header.target()).is_ok());
         assert!(check_pow(&block.header));
-    }
-
-    #[test]
-    fn test_inclusion_proof() {
-        let block = get_btc_mainnet_block();
-
-        let expected_root = compute_witness_root(&block).unwrap();
-
-        // Note: This takes longer than 60s
-        // for i in 1..block.txdata.len() {
-        //     println!("{}", i);
-        //     let tx = generate_l1_tx(i as u32, &block);
-        //     let root = calculate_inclusion_proof_root(tx);
-        //     assert_eq!(root, expected_root);
-        // }
-
-        let r = rand::thread_rng().gen_range(1..block.txdata.len()) as u32;
-        let tx = generate_l1_tx(r, &block);
-        let root = calculate_inclusion_proof_root(tx);
-        assert_eq!(root, expected_root);
     }
 }

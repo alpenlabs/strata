@@ -46,7 +46,7 @@ mod tests {
     use crate::buf::Buf32;
 
     #[test]
-    fn test_sha256d_equivalene() {
+    fn test_sha256d_equivalence() {
         let mut rng = rand::thread_rng();
         let mut array = [0u8; 32];
         rng.fill(&mut array);
