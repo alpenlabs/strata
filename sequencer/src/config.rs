@@ -7,9 +7,29 @@ use serde::Deserialize;
 use crate::args::Args;
 
 #[derive(Deserialize, Debug)]
+pub struct SequencerConfig {
+    /// path to sequencer root key
+    pub sequencer_key: PathBuf,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct FullNodeConfig {
+    /// host:port of sequencer rpc
+    pub sequencer_rpc: String,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(untagged)]
+pub enum ClientMode {
+    Sequencer(SequencerConfig),
+    FullNode(FullNodeConfig),
+}
+
+#[derive(Deserialize, Debug)]
 pub struct ClientParams {
     pub rpc_port: u16,
-    pub sequencer_key: Option<PathBuf>,
+    #[serde(flatten)]
+    pub client_mode: ClientMode,
     /// The address to which the inscriptions are spent
     pub sequencer_bitcoin_address: String, // TODO: probably move this to another struct
     pub l2_blocks_fetch_limit: u64,
@@ -77,7 +97,18 @@ impl Config {
                 datadir: args
                     .datadir
                     .ok_or_else(|| "args: no client --datadir provided".to_string())?,
-                sequencer_key: args.sequencer_key,
+                client_mode: {
+                    if let Some(sequencer_key) = args.sequencer_key {
+                        ClientMode::Sequencer(SequencerConfig { sequencer_key })
+                    } else if let Some(sequencer_rpc) = args.sequencer_rpc {
+                        ClientMode::FullNode(FullNodeConfig { sequencer_rpc })
+                    } else {
+                        return Err(
+                            "args: no client --sequencer-key or --sequencer-rpc provided"
+                                .to_string(),
+                        );
+                    }
+                },
                 l2_blocks_fetch_limit: 1_000,
                 sequencer_bitcoin_address: args
                     .sequencer_bitcoin_address
@@ -119,8 +150,11 @@ impl Config {
         if let Some(datadir) = args.datadir {
             self.client.datadir = datadir;
         }
-        if args.sequencer_key.is_some() {
-            self.client.sequencer_key = args.sequencer_key;
+        // sequencer_key has priority over sequencer_rpc if both are provided
+        if let Some(sequencer_key) = args.sequencer_key {
+            self.client.client_mode = ClientMode::Sequencer(SequencerConfig { sequencer_key });
+        } else if let Some(sequencer_rpc) = args.sequencer_rpc {
+            self.client.client_mode = ClientMode::FullNode(FullNodeConfig { sequencer_rpc });
         }
         if let Some(rpc_url) = args.reth_authrpc {
             self.exec.reth.rpc_url = rpc_url;
@@ -150,7 +184,7 @@ mod test {
 
     #[test]
     fn config_load_test() {
-        let config_string = r#"
+        let config_string_sequencer = r#"
             [bitcoind_rpc]
             rpc_url = "http://localhost:18332"
             rpc_user = "alpen"
@@ -162,6 +196,7 @@ mod test {
             l2_blocks_fetch_limit = 1000
             datadir = "/path/to/data/directory"
             sequencer_bitcoin_address = "some_addr"
+            sequencer_key = "/path/to/sequencer_key"
             db_retry_count = 5
 
             [sync]
@@ -175,6 +210,34 @@ mod test {
             secret = "1234567890abcdef"
         "#;
 
-        assert!(toml::from_str::<Config>(config_string).is_ok());
+        assert!(toml::from_str::<Config>(config_string_sequencer).is_ok());
+
+        let config_string_fullnode = r#"
+            [bitcoind_rpc]
+            rpc_url = "http://localhost:18332"
+            rpc_user = "alpen"
+            rpc_password = "alpen"
+            network = "regtest"
+
+            [client]
+            rpc_port = 8432
+            l2_blocks_fetch_limit = 1000
+            datadir = "/path/to/data/directory"
+            sequencer_bitcoin_address = "some_addr"
+            sequencer_rpc = "9.9.9.9:8432"
+            db_retry_count = 5
+
+            [sync]
+            l1_follow_distance = 6
+            max_reorg_depth = 4
+            client_poll_dur_ms = 200
+            client_checkpoint_interval = 10
+
+            [exec.reth]
+            rpc_url = "http://localhost:8551"
+            secret = "1234567890abcdef"
+        "#;
+
+        assert!(toml::from_str::<Config>(config_string_fullnode).is_ok());
     }
 }

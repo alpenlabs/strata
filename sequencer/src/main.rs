@@ -37,12 +37,14 @@ use alpen_express_state::csm_status::CsmStatus;
 use alpen_express_status::{create_status_channel, StatusRx, StatusTx};
 use anyhow::Context;
 use bitcoin::Network;
-use config::Config;
+use config::{ClientMode, Config};
 use express_storage::L2BlockManager;
+use express_sync::{L2SyncManager, RpcSyncPeer};
 use express_tasks::{ShutdownSignal, TaskManager};
 use format_serde_error::SerdeError;
 use reth_rpc_types::engine::{JwtError, JwtSecret};
 use rockbound::rocksdb;
+use rpc_client::sync_client;
 use thiserror::Error;
 use tokio::sync::{broadcast, oneshot};
 use tracing::*;
@@ -52,6 +54,7 @@ use crate::args::Args;
 mod args;
 mod config;
 mod l1_reader;
+mod rpc_client;
 mod rpc_server;
 
 #[derive(Debug, Error)]
@@ -271,7 +274,8 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let (status_tx, status_rx) = (sync_man.status_tx(), sync_man.status_rx());
 
     // If the sequencer key is set, start the sequencer duties task.
-    if let Some(seqkey_path) = &config.client.sequencer_key {
+    if let ClientMode::Sequencer(sequencer_config) = &config.client.client_mode {
+        let seqkey_path = &sequencer_config.sequencer_key;
         info!(?seqkey_path, "initing sequencer duties task");
         let idata = load_seqkey(seqkey_path)?;
         let executor = task_manager.executor();
@@ -334,6 +338,23 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         });
     }
 
+    if let ClientMode::FullNode(fullnode_config) = &config.client.client_mode {
+        let sequencer_rpc = &fullnode_config.sequencer_rpc;
+        info!(?sequencer_rpc, "initing fullnode task");
+
+        let rpc_client = rt.block_on(sync_client(sequencer_rpc));
+        let sync_peer = RpcSyncPeer::new(rpc_client);
+        let mut l2_sync_manager = L2SyncManager::new(
+            sync_peer,
+            l2_block_manager.clone(),
+            sync_man.clone(),
+            database.clone(),
+        );
+        task_executor.spawn_critical_async("l2-sync-manager", async move {
+            l2_sync_manager.run().await.unwrap()
+        });
+    }
+
     // Start the L1 tasks to get that going.
     let csm_ctl = sync_man.get_csm_ctl();
     l1_reader::start_reader_tasks(
@@ -347,10 +368,9 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     )?;
 
     let shutdown_signal = task_manager.shutdown_signal();
-    let executor = task_manager.executor();
     let db_cloned = database.clone();
 
-    executor.spawn_critical_async("main-rpc", async {
+    task_executor.spawn_critical_async("main-rpc", async {
         start_rpc(
             shutdown_signal,
             config,
@@ -395,7 +415,7 @@ async fn start_rpc<D: Database + Send + Sync + 'static>(
         sync_man.clone(),
         bcast_handle.clone(),
         stop_tx,
-        l2_block_manager.clone(),
+        l2_block_manager,
     );
 
     let mut methods = alp_rpc.into_rpc();
