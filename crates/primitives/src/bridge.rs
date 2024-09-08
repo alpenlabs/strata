@@ -7,10 +7,12 @@ use std::{
 
 use arbitrary::{Arbitrary, Unstructured};
 use bitcoin::{
-    secp256k1::{schnorr, PublicKey},
+    key::rand,
+    secp256k1::{schnorr, PublicKey, SecretKey},
     Transaction, TxOut,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
+use musig2::{BinaryEncoding, NonceSeed, PartialSignature, PubNonce, SecNonce};
 use serde::{Deserialize, Serialize};
 
 use crate::{errors::BridgeParseError, l1::SpendInfo};
@@ -124,6 +126,8 @@ impl<'a> Arbitrary<'a> for PublickeyTable {
 }
 
 /// Wrapper type to implement traits on.
+//
+// NOTE: this type is no longer used in the codebase but keeping it around just in case.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SchnorrSignature(schnorr::Signature);
 
@@ -167,9 +171,55 @@ impl BorshDeserialize for SchnorrSignature {
     }
 }
 
-/// The table of signatures collected so far for each input in a bridge transaction from each
-/// required operator.
-pub type CollectedSigs = Vec<BTreeMap<OperatorIdx, SchnorrSignature>>;
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Musig2PartialSig(PartialSignature);
+
+impl From<PartialSignature> for Musig2PartialSig {
+    fn from(value: PartialSignature) -> Self {
+        Self(value)
+    }
+}
+
+impl Musig2PartialSig {
+    pub fn inner(&self) -> &PartialSignature {
+        &self.0
+    }
+}
+
+impl BorshSerialize for Musig2PartialSig {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        let serialized = self.0.serialize();
+
+        writer.write_all(&serialized)
+    }
+}
+
+impl BorshDeserialize for Musig2PartialSig {
+    fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        // Buffer size for 32-byte PartialSignature
+        let mut partial_sig_bytes = [0u8; 32];
+        reader.read_exact(&mut partial_sig_bytes)?; // Read exactly 32 bytes
+
+        // Create PartialSignature from bytes
+        let partial_sig = PartialSignature::from_slice(&partial_sig_bytes[..]).map_err(|_| {
+            std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid PartialSignature")
+        })?;
+
+        Ok(Self(partial_sig))
+    }
+}
+
+impl<'a> Arbitrary<'a> for Musig2PartialSig {
+    fn arbitrary(_u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
+        let secret_key = SecretKey::new(&mut rand::thread_rng());
+
+        // Create a PartialSignature from the secret key bytes
+        let partial_sig = PartialSignature::from_slice(secret_key.as_ref())
+            .map_err(|_| arbitrary::Error::IncorrectFormat)?;
+
+        Ok(Self(partial_sig))
+    }
+}
 
 /// A container that encapsulates all the information necessary to produce a
 /// valid signature for a transaction in the bridge.
@@ -189,10 +239,10 @@ pub struct TxSigningData {
 /// Information regarding the signature which includes the schnorr signature itself as well as the
 /// pubkey of the signer so that the signature can be verified at the callsite (given a particular
 /// message that was signed).
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Arbitrary, Serialize, Deserialize)]
 pub struct SignatureInfo {
     /// The schnorr signature for a given message.
-    signature: SchnorrSignature,
+    partial_sig: Musig2PartialSig,
 
     /// The index of the operator that can be used to query the corresponding pubkey.
     signer_index: OperatorIdx,
@@ -200,16 +250,16 @@ pub struct SignatureInfo {
 
 impl SignatureInfo {
     /// Create a new [`SignatureInfo`].
-    pub fn new(signature: SchnorrSignature, signer_index: OperatorIdx) -> Self {
+    pub fn new(partial_sig: Musig2PartialSig, signer_index: OperatorIdx) -> Self {
         Self {
-            signature,
+            partial_sig,
             signer_index,
         }
     }
 
     /// Get the schnorr signature.
-    pub fn signature(&self) -> &SchnorrSignature {
-        &self.signature
+    pub fn signature(&self) -> &Musig2PartialSig {
+        &self.partial_sig
     }
 
     /// Get the index of the signer (operator).
@@ -218,14 +268,113 @@ impl SignatureInfo {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Musig2PubNonce(PubNonce);
+
+impl Musig2PubNonce {
+    pub fn inner(&self) -> &PubNonce {
+        &self.0
+    }
+}
+
+impl From<PubNonce> for Musig2PubNonce {
+    fn from(value: PubNonce) -> Self {
+        Self(value)
+    }
+}
+
+impl BorshSerialize for Musig2PubNonce {
+    fn serialize<W: Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        writer.write_all(&self.0.serialize())?;
+
+        Ok(())
+    }
+}
+
+impl BorshDeserialize for Musig2PubNonce {
+    fn deserialize_reader<R: Read>(reader: &mut R) -> std::io::Result<Self> {
+        // Manually deserialize PubNonce (assume PubNonce has a `from_bytes` method)
+        let mut nonce_bytes = [0u8; 66]; // same as uncompressed `secp256k1::PublicKey`
+        reader.read_exact(&mut nonce_bytes)?;
+        let nonce = PubNonce::from_bytes(&nonce_bytes).map_err(|_e| {
+            std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid pubnonce")
+        })?;
+
+        Ok(Self(nonce))
+    }
+}
+
+impl<'a> Arbitrary<'a> for Musig2PubNonce {
+    fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
+        let mut nonce_seed_bytes = [0u8; 32];
+        u.fill_buffer(&mut nonce_seed_bytes)?;
+        let nonce_seed = NonceSeed::from(nonce_seed_bytes);
+
+        let sec_nonce = SecNonce::build(nonce_seed).build();
+        let pub_nonce = sec_nonce.public_nonce();
+
+        Ok(Self(pub_nonce))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Musig2SecNonce(SecNonce);
+
+impl Musig2SecNonce {
+    pub fn inner(&self) -> &SecNonce {
+        &self.0
+    }
+}
+
+impl From<SecNonce> for Musig2SecNonce {
+    fn from(value: SecNonce) -> Self {
+        Self(value)
+    }
+}
+
+impl BorshSerialize for Musig2SecNonce {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        writer.write_all(&self.0.to_bytes())
+    }
+}
+
+impl BorshDeserialize for Musig2SecNonce {
+    fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let mut sec_nonce_bytes = [0u8; 64];
+        reader.read_exact(&mut sec_nonce_bytes)?;
+
+        // Create SecNonce from bytes
+        let sec_nonce = SecNonce::from_bytes(&sec_nonce_bytes).map_err(|_| {
+            std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid SecNonce")
+        })?;
+
+        Ok(Musig2SecNonce(sec_nonce))
+    }
+}
+
+impl<'a> Arbitrary<'a> for Musig2SecNonce {
+    fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
+        // Generate a random nonce seed (32 bytes)
+        let mut nonce_seed_bytes = [0u8; 32];
+        u.fill_buffer(&mut nonce_seed_bytes)?;
+        let nonce_seed = NonceSeed::from(nonce_seed_bytes);
+
+        let sec_nonce = SecNonce::build(nonce_seed).build();
+
+        Ok(Musig2SecNonce(sec_nonce))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
 
+    use arbitrary::{Arbitrary, Unstructured};
     use bitcoin::secp256k1::{PublicKey, Secp256k1, SecretKey};
     use borsh::{BorshDeserialize, BorshSerialize};
 
-    use super::PublickeyTable;
+    use super::{Musig2PubNonce, PublickeyTable};
+    use crate::bridge::{Musig2PartialSig, Musig2SecNonce};
 
     #[test]
     fn test_publickeytable_serialize_deserialize() {
@@ -284,6 +433,126 @@ mod tests {
 
         // Ensure deserialization fails
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_borsh_serialization_musig2_partial_sig() {
+        let raw_bytes = vec![0u8; 1024];
+        let mut u = Unstructured::new(&raw_bytes);
+
+        // Generate a random Musig2PartialSig using Arbitrary
+        let musig2_partial_sig = Musig2PartialSig::arbitrary(&mut u);
+        assert!(
+            musig2_partial_sig.is_ok(),
+            "should be able to generate musig2 partial sig but got: {}",
+            musig2_partial_sig.err().unwrap()
+        );
+
+        let musig2_partial_sig = musig2_partial_sig.unwrap();
+
+        // Serialize Musig2PartialSig using Borsh
+        let mut serialized_sig = vec![];
+        let result = musig2_partial_sig.serialize(&mut serialized_sig);
+
+        assert!(
+            result.is_ok(),
+            "serialization of partial sig should work but got error: {}",
+            result.err().unwrap()
+        );
+
+        // Ensure we wrote exactly 32 bytes
+        assert_eq!(
+            serialized_sig.len(),
+            32,
+            "serialized PartialSignature should be 32 bytes but got {} bytes",
+            serialized_sig.len()
+        );
+
+        // Deserialize Musig2PartialSig using Borsh
+        let deserialized_sig: Musig2PartialSig =
+            Musig2PartialSig::deserialize(&mut &serialized_sig[..])
+                .expect("deserialization should work");
+
+        // Ensure the original and deserialized signatures are the same
+        assert_eq!(
+            deserialized_sig.0, musig2_partial_sig.0,
+            "deserialized and original MuSig2 partial sigs should be the same"
+        );
+    }
+
+    #[test]
+    fn test_borsh_serialization_of_pub_nonce() {
+        // Create a buffer of random bytes for generating a random NonceTable
+        let raw_bytes = vec![0u8; 1024];
+        let mut u = Unstructured::new(&raw_bytes);
+
+        // Generate a random NonceTable using the Arbitrary implementation
+        let orig_nonce =
+            Musig2PubNonce::arbitrary(&mut u).expect("Failed to generate arbitrary NonceTable");
+
+        // Serialize the PubNonce
+        let mut serialized_nonce = vec![];
+        let result = orig_nonce.serialize(&mut serialized_nonce);
+
+        assert!(
+            result.is_ok(),
+            "serialization should work but got: {}",
+            result.err().unwrap()
+        );
+
+        // Deserialize the PubNonce
+        let deserialized_nonce: Musig2PubNonce =
+            Musig2PubNonce::deserialize(&mut &serialized_nonce[..])
+                .expect("deserialization of PubNonce should work");
+
+        // Assert that the serialized and deserialized PubNonce values match
+        assert_eq!(
+            deserialized_nonce, orig_nonce,
+            "Deserialized PubNonce does not match the original",
+        );
+    }
+
+    #[test]
+    fn test_borsh_serialization_sec_nonce() {
+        // Create a buffer of random bytes for generating a random Musig2SecNonce
+        let raw_bytes = vec![0u8; 1024];
+        let mut u = Unstructured::new(&raw_bytes);
+
+        // Generate a random Musig2SecNonce using Arbitrary
+        let musig2_sec_nonce = Musig2SecNonce::arbitrary(&mut u);
+        assert!(
+            musig2_sec_nonce.is_ok(),
+            "should be able to generate musig2 sec nonce but got: {}",
+            musig2_sec_nonce.err().unwrap()
+        );
+
+        let musig2_sec_nonce = musig2_sec_nonce.unwrap();
+
+        // Serialize Musig2SecNonce using Borsh
+        let mut serialized_secnonce = vec![];
+        let result = musig2_sec_nonce.serialize(&mut serialized_secnonce);
+
+        assert!(
+            result.is_ok(),
+            "serialization of secnonce should work but got error: {}",
+            result.err().unwrap()
+        );
+
+        assert_eq!(
+            serialized_secnonce.len(),
+            64,
+            "secnonce should have a length of 66"
+        );
+        // Deserialize Musig2SecNonce using Borsh
+        let deserialized_secnonce: Musig2SecNonce =
+            Musig2SecNonce::deserialize(&mut &serialized_secnonce[..])
+                .expect("deserialization should work");
+
+        // Assert that the serialized and deserialized SecNonce values match
+        assert_eq!(
+            deserialized_secnonce, musig2_sec_nonce,
+            "Deserialized SecNonce does not match the original"
+        );
     }
 
     // Helper function to create a random secp256k1 PublicKey

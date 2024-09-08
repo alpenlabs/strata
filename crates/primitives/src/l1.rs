@@ -12,8 +12,8 @@ use bitcoin::{
     address::NetworkUnchecked,
     consensus::serialize,
     hashes::{sha256d, Hash},
-    key::{rand, Keypair, Parity, Secp256k1, TapTweak},
-    secp256k1::{SecretKey, XOnlyPublicKey},
+    key::{rand, Keypair, Parity, TapTweak},
+    secp256k1::{SecretKey, XOnlyPublicKey, SECP256K1},
     taproot::{ControlBlock, TaprootMerkleBranch},
     transaction::Version,
     Address, AddressType, Amount, Block, Network, OutPoint, Psbt, ScriptBuf, Sequence, TapNodeHash,
@@ -503,7 +503,7 @@ impl BorshDeserialize for BitcoinPsbt {
         let mut psbt_bytes = vec![0u8; len];
         reader.read_exact(&mut psbt_bytes)?;
         // Use the bitcoin crate's deserialize method to create a Psbt from the bytes
-        let psbt = bitcoin::Psbt::deserialize(&psbt_bytes).map_err(|_| {
+        let psbt = Psbt::deserialize(&psbt_bytes).map_err(|_| {
             std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid PSBT data")
         })?;
         Ok(BitcoinPsbt(psbt))
@@ -680,10 +680,8 @@ impl<'a> Arbitrary<'a> for SpendInfo {
             Parity::Odd
         };
 
-        // FIXME: this is an expensive call
-        let secp = Secp256k1::new();
         let secret_key = SecretKey::new(&mut rand::thread_rng());
-        let keypair = Keypair::from_secret_key(&secp, &secret_key);
+        let keypair = Keypair::from_secret_key(SECP256K1, &secret_key);
         let (internal_key, _) = XOnlyPublicKey::from_keypair(&keypair);
 
         // Arbitrary Taproot merkle branch (vector of 32-byte hashes)

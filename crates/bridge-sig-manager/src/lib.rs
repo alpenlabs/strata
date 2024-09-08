@@ -5,4 +5,5 @@
 
 pub mod errors;
 pub mod manager;
+pub mod operations;
 pub mod prelude;

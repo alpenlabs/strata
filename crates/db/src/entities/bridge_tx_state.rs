@@ -1,17 +1,21 @@
 //! Defines the [`TxState`] type that tracks the state of signature collection for a particular
 //! [`Psbt`].
 
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Not};
 
 use alpen_express_primitives::{
-    bridge::{OperatorIdx, PublickeyTable, SchnorrSignature, SignatureInfo, TxSigningData},
+    bridge::{
+        Musig2PartialSig, Musig2PubNonce, Musig2SecNonce, OperatorIdx, PublickeyTable,
+        SignatureInfo, TxSigningData,
+    },
     l1::{BitcoinPsbt, BitcoinTxOut, SpendInfo},
 };
 use arbitrary::Arbitrary;
 use bitcoin::{Psbt, Transaction, TxOut, Txid};
 use borsh::{BorshDeserialize, BorshSerialize};
+use musig2::{PartialSignature, PubNonce};
 
-use super::errors::{BridgeTxStateError, EntityResult};
+use super::errors::{BridgeTxStateError, EntityError, EntityResult};
 
 /// The state a transaction is in with respect to the number of signatures that have been collected
 /// from the bridge federation signatories.
@@ -33,13 +37,30 @@ pub struct BridgeTxState {
     /// The number of required signatures (same as the length of [`Self::pubkeys`])
     required_signatures: usize,
 
-    /// The table of signatures collected so far per input and per operator.
-    collected_sigs: Vec<HashMap<OperatorIdx, SchnorrSignature>>,
+    /// The private nonce unique to the transaction being tracked by this state.
+    // FIXME: storing the secret nonce in the db is not a good practice but since it needs to be
+    // generated uniquely per transaction that is to be signed, we store it here.
+    // For more on nonce security, see [this](https://docs.rs/musig2/latest/musig2/#security).
+    secnonce: Musig2SecNonce,
+
+    /// The (public) nonces shared for the particular [`Psbt`] that this state tracks under MuSig2.
+    /// **NOTE**: The keys are not sorted. To get the ordered nonces, use the corresponding
+    /// `ordered_*` getter.
+    collected_nonces: HashMap<OperatorIdx, Musig2PubNonce>,
+
+    /// The table of signatures collected so far per operator and per input in the [`Self::psbt`].
+    /// **NOTE**: The keys are not sorted. To get the ordered nonces, use the corresponding
+    /// `ordered_*` getter.
+    collected_sigs: Vec<HashMap<OperatorIdx, Musig2PartialSig>>,
 }
 
 impl BridgeTxState {
     /// Create a new [`TxState`] for the given [`Psbt`] and list of [`PublicKey`].
-    pub fn new(tx_signing_data: TxSigningData, pubkey_table: PublickeyTable) -> EntityResult<Self> {
+    pub fn new(
+        tx_signing_data: TxSigningData,
+        pubkey_table: PublickeyTable,
+        sec_nonce: Musig2SecNonce,
+    ) -> EntityResult<Self> {
         let num_keys = pubkey_table.0.len();
         let mut psbt = Psbt::from_unsigned_tx(tx_signing_data.unsigned_tx)
             .map_err(BridgeTxStateError::from)?;
@@ -57,12 +78,16 @@ impl BridgeTxState {
             .map(BitcoinTxOut::from)
             .collect::<Vec<BitcoinTxOut>>();
 
+        let collected_nonces: HashMap<OperatorIdx, Musig2PubNonce> = HashMap::new();
+
         Ok(Self {
             psbt: psbt.into(),
             prevouts,
             spend_infos: tx_signing_data.spend_infos,
             required_signatures: num_keys,
             pubkey_table,
+            secnonce: sec_nonce,
+            collected_nonces,
             collected_sigs,
         })
     }
@@ -87,8 +112,13 @@ impl BridgeTxState {
         &self.required_signatures
     }
 
-    /// Get the list of [`PublicKey`]'s in the locking script of the UTXO that the [`Psbt`]
-    /// spends.
+    /// Get the private nonce for the transaction being tracked in this state.
+    pub fn secnonce(&self) -> &Musig2SecNonce {
+        &self.secnonce
+    }
+
+    /// Get the [`PublickeyTable`] that maps [`OperatorIdx`] to the corresponding `PublicKey`
+    /// correspondng to the multisig.
     pub fn pubkeys(&self) -> &PublickeyTable {
         &self.pubkey_table
     }
@@ -103,10 +133,61 @@ impl BridgeTxState {
         self.psbt.inner().unsigned_tx.compute_txid()
     }
 
-    /// Get table of signatures collected so far where the first index is the index of the
-    /// transaction input and the second index is the index of the signer.
-    pub fn collected_sigs(&self) -> &[HashMap<OperatorIdx, SchnorrSignature>] {
-        &self.collected_sigs[..]
+    /// Get the map of collected nonces.
+    pub fn collected_nonces(&self) -> &HashMap<OperatorIdx, Musig2PubNonce> {
+        &self.collected_nonces
+    }
+
+    /// Get table of signatures collected so far per input in the transaction.
+    pub fn collected_sigs(&self) -> &[HashMap<OperatorIdx, Musig2PartialSig>] {
+        &self.collected_sigs
+    }
+
+    /// Get the ordered list of nonces collected so far.
+    // NOTE: As accessing the list of nonces is usually done to `sum` them up, it's convenient to
+    // return an iterator over the inner `PubNonce` type.
+    pub fn ordered_nonces(&self) -> impl IntoIterator<Item = PubNonce> {
+        let mut ordered_nonces: Vec<PubNonce> =
+            Vec::with_capacity(self.collected_nonces.keys().len());
+
+        for operator_idx in self.collected_nonces.keys() {
+            if let Some(nonce) = self.collected_nonces.get(operator_idx) {
+                ordered_nonces.push(nonce.inner().clone());
+            }
+        }
+
+        // TODO: replace with yield when we get generators
+        ordered_nonces.into_iter()
+    }
+
+    /// Check if all the nonces have been received.
+    ///
+    /// # Returns
+    ///
+    /// The aggregated nonce if all the required nonces have been collected, otherwise `None`.
+    pub fn has_all_nonces(&self) -> bool {
+        // Since we only add valid nonces (by checking the pubkey table), just checking the length
+        // should be sufficient.
+        self.collected_nonces.keys().len() == self.required_signatures
+    }
+
+    /// Add a nonce to the collected nonces.
+    ///
+    /// # Returns
+    ///
+    /// A flag indicating whether adding this nonce completes the collection.
+    pub fn add_nonce(
+        &mut self,
+        operator_index: &OperatorIdx,
+        nonce: Musig2PubNonce,
+    ) -> EntityResult<bool> {
+        if self.pubkey_table.0.contains_key(operator_index).not() {
+            return Err(EntityError::BridgeOpUnauthorized);
+        }
+
+        self.collected_nonces.insert(*operator_index, nonce);
+
+        Ok(self.has_all_nonces())
     }
 
     /// Check if all the required signatures have been collected for the [`Psbt`].
@@ -121,6 +202,12 @@ impl BridgeTxState {
 
     /// Add a signature to the collection. If the signature corresponding to a particular pubkey has
     /// already been added, it is updated.
+    ///
+    /// **Note**: This being a database-related operation, no validation is performed on the
+    /// provided signature as that requires access to a signing module. The only validation that
+    /// this method performs is that the signature comes from an [`OperatorIdx`] that is part of
+    /// the [`Self::pubkey_table`]. It is assumed that all necessary validation has already been
+    /// performed at the callsite.
     ///
     /// # Returns
     ///
@@ -144,75 +231,135 @@ impl BridgeTxState {
         // Some extra validation (should also be done by the rollup node)
         // Check if the signer is authorized i.e., they are part of the federation.
         let signer_index = signature_info.signer_index();
-        self.pubkey_table
-            .0
-            .get(signer_index)
-            .ok_or(BridgeTxStateError::Unauthorized)?;
+
+        if self.pubkey_table.0.contains_key(signer_index).not() {
+            return Err(BridgeTxStateError::Unauthorized)?;
+        }
 
         self.collected_sigs[input_index].insert(*signer_index, *signature_info.signature());
 
         Ok(self.is_fully_signed())
+    }
+
+    /// Get the ordered signatures per input collected so far.
+    pub fn ordered_sigs(&self) -> Vec<Vec<PartialSignature>> {
+        let num_inputs = self.collected_sigs.len();
+        let mut ordered_sigs = vec![Vec::with_capacity(self.required_signatures); num_inputs];
+
+        for (input_index, sigs) in self.collected_sigs.iter().enumerate() {
+            for operator_idx in self.pubkey_table.0.keys() {
+                if let Some(sig) = sigs.get(operator_idx) {
+                    ordered_sigs[input_index].push(*sig.inner());
+                }
+            }
+        }
+
+        ordered_sigs
     }
 }
 
 #[cfg(test)]
 mod tests {
     use alpen_test_utils::bridge::{
-        generate_keypairs, generate_mock_prevouts, generate_pubkey_table,
+        generate_keypairs, generate_mock_tx_signing_data, generate_pubkey_table, generate_sec_nonce,
     };
-    use bitcoin::{
-        absolute::{self},
-        key::{Keypair, Secp256k1},
-        secp256k1::Message,
-        transaction::Version,
-        Transaction,
-    };
+    use arbitrary::Unstructured;
+    use bitcoin::{key::Secp256k1, secp256k1::All};
 
     use super::*;
     use crate::entities::errors::EntityError;
 
-    fn create_test_tx_output(inputs: usize) -> TxSigningData {
-        let tx = Transaction {
-            version: Version(1),
-            lock_time: absolute::LockTime::ZERO,
-            input: vec![Default::default(); inputs],
-            output: vec![],
-        };
+    #[test]
+    fn test_has_all_nonces() {
+        let secp = Secp256k1::new();
+        let own_index = 0;
+        let num_operators = 2;
+        let num_inputs = 1;
+        let mut tx_state = create_mock_tx_state(&secp, own_index, num_inputs, num_operators);
 
-        let prevouts = generate_mock_prevouts(inputs);
+        assert!(
+            !tx_state.has_all_nonces(),
+            "expected: false since no nonces have been collected but got: true"
+        );
 
-        TxSigningData {
-            unsigned_tx: tx,
-            prevouts,
-            spend_infos: vec![],
+        let data = vec![0u8; 1024];
+        let mut unstructured = Unstructured::new(&data[..]);
+
+        for i in 0..num_operators {
+            let random_nonce = Musig2PubNonce::arbitrary(&mut unstructured)
+                .expect("should produce random pubnonce");
+
+            tx_state
+                .add_nonce(&(i as u32), random_nonce)
+                .expect("should be able to add nonce");
         }
+
+        assert!(
+            tx_state.has_all_nonces(),
+            "expected: true but got: false for the collected nonces: {:?}",
+            tx_state.collected_nonces()
+        );
+    }
+
+    #[test]
+    fn test_add_nonce() {
+        let secp = Secp256k1::new();
+        let own_index = 0;
+        let num_operators = 2;
+        let num_inputs = 1;
+        let mut tx_state = create_mock_tx_state(&secp, own_index, num_inputs, num_operators);
+
+        let data = vec![0u8; 1024];
+        let mut unstructured = Unstructured::new(&data[..]);
+
+        for i in 0..num_operators {
+            let random_nonce = Musig2PubNonce::arbitrary(&mut unstructured)
+                .expect("should produce random pubnonce");
+
+            let result = tx_state.add_nonce(&(i as u32), random_nonce);
+
+            assert!(result.is_ok(), "Expected Ok since operator {} exists", i);
+
+            if (i + 1) < num_operators {
+                assert!(
+                    !result.unwrap(),
+                    "Expected false since not all nonces have been collected"
+                );
+            } else {
+                assert!(
+                    result.unwrap(),
+                    "Expected true since all nonces have been collected"
+                );
+            }
+        }
+
+        let random_nonce =
+            Musig2PubNonce::arbitrary(&mut unstructured).expect("should produce random pubnonce");
+        let result = tx_state.add_nonce(&(num_operators as u32), random_nonce);
+
+        assert!(
+            result.is_err_and(|e| matches!(e, EntityError::BridgeOpUnauthorized)),
+            "should result in `BridgeOpUnauthorized` error when adding nonce from an operator that is not part of the federation");
     }
 
     #[test]
     fn test_is_fully_signed_all_signatures_present() {
         let secp = Secp256k1::new();
-        let (pks, sks) = generate_keypairs(&secp, 2);
+        let own_index = 0;
+        let num_operators = 2;
+        let num_inputs = 1;
+        let mut tx_state = create_mock_tx_state(&secp, own_index, num_inputs, num_operators);
 
-        let tx_output = create_test_tx_output(1); // Single input
-        let pubkey_table = generate_pubkey_table(&pks);
-        let mut tx_state =
-            BridgeTxState::new(tx_output, pubkey_table).expect("Failed to create TxState");
+        for i in 0..num_operators {
+            let data = vec![0u8; 32];
+            let mut unstructured = Unstructured::new(&data);
+            let sig = Musig2PartialSig::arbitrary(&mut unstructured)
+                .expect("should generate arbitrary signature");
 
-        let sig1 = secp.sign_schnorr(
-            &Message::from_digest_slice(&[0xab; 32]).unwrap(),
-            &Keypair::from_secret_key(&secp, &sks[0]),
-        );
-        let sig2 = secp.sign_schnorr(
-            &Message::from_digest_slice(&[0xab; 32]).unwrap(),
-            &Keypair::from_secret_key(&secp, &sks[1]),
-        );
-
-        tx_state
-            .add_signature(SignatureInfo::new(sig1.into(), 0), 0)
-            .unwrap();
-        tx_state
-            .add_signature(SignatureInfo::new(sig2.into(), 1), 0)
-            .unwrap();
+            tx_state
+                .add_signature(SignatureInfo::new(sig, i as u32), 0)
+                .unwrap();
+        }
 
         assert!(
             tx_state.is_fully_signed(),
@@ -223,21 +370,18 @@ mod tests {
     #[test]
     fn test_is_fully_signed_missing_signature() {
         let secp = Secp256k1::new();
-        let (pks, sks) = generate_keypairs(&secp, 1);
+        let own_index = 0;
+        let num_operators = 1;
+        let num_inputs = 1;
+        let mut tx_state = create_mock_tx_state(&secp, own_index, num_inputs, num_operators);
 
-        let tx_output = create_test_tx_output(1); // Single input
-
-        let pubkey_table = generate_pubkey_table(&pks);
-        let mut tx_state =
-            BridgeTxState::new(tx_output, pubkey_table).expect("Failed to create TxState");
-
-        let sig1 = secp.sign_schnorr(
-            &Message::from_digest_slice(&[0xab; 32]).unwrap(),
-            &Keypair::from_secret_key(&secp, &sks[0]),
-        );
+        let data = vec![0u8; 32];
+        let mut unstructured = Unstructured::new(&data);
+        let sig = Musig2PartialSig::arbitrary(&mut unstructured)
+            .expect("should generate arbitrary signature");
 
         tx_state
-            .add_signature(SignatureInfo::new(sig1.into(), 0), 0)
+            .add_signature(SignatureInfo::new(sig, 0), 0)
             .unwrap();
 
         assert!(
@@ -246,7 +390,7 @@ mod tests {
         );
 
         // Remove the signature and test again
-        tx_state.collected_sigs[0].remove(&0);
+        tx_state.collected_sigs[0].remove(&(own_index as u32));
         assert!(
             !tx_state.is_fully_signed(),
             "Expected transaction to not be fully signed"
@@ -256,48 +400,47 @@ mod tests {
     #[test]
     fn test_add_signature_success() {
         let secp = Secp256k1::new();
-        let (pks, sks) = generate_keypairs(&secp, 1);
+        let own_index = 0;
+        let num_operators = 1;
+        let num_inputs = 3;
+        let mut tx_state = create_mock_tx_state(&secp, own_index, num_inputs, num_operators);
 
-        let tx_output = create_test_tx_output(1); // Single input
-        let pubkey_table = generate_pubkey_table(&pks);
-        let mut tx_state =
-            BridgeTxState::new(tx_output, pubkey_table).expect("Failed to create TxState");
+        let data = vec![0u8; 32];
+        let mut unstructured = Unstructured::new(&data);
+        let sig = Musig2PartialSig::arbitrary(&mut unstructured)
+            .expect("should generate arbitrary signature");
 
-        let sig1 = secp.sign_schnorr(
-            &Message::from_digest_slice(&[0xab; 32]).unwrap(),
-            &Keypair::from_secret_key(&secp, &sks[0]),
-        );
+        for input_index in 0..num_inputs {
+            assert!(tx_state
+                .add_signature(
+                    SignatureInfo::new(sig, own_index as OperatorIdx),
+                    input_index
+                )
+                .is_ok());
 
-        assert!(tx_state
-            .add_signature(SignatureInfo::new(sig1.into(), 0), 0)
-            .is_ok());
-
-        assert_eq!(
-            tx_state.collected_sigs[0].get(&0),
-            Some(sig1.into()).as_ref()
-        );
+            assert_eq!(
+                tx_state.collected_sigs[input_index].get(&(own_index as u32)),
+                Some(sig).as_ref()
+            );
+        }
     }
 
     #[test]
     fn test_add_signature_invalid_pubkey() {
         let secp = Secp256k1::new();
-        let (pks, sks) = generate_keypairs(&secp, 1);
+        let own_index = 0;
+        let num_operators = 1;
+        let num_inputs = 1;
+        let mut tx_state = create_mock_tx_state(&secp, own_index, num_inputs, num_operators);
 
-        let tx_output = create_test_tx_output(1); // Single input
-        let pubkey_table = generate_pubkey_table(&pks);
-        let mut tx_state =
-            BridgeTxState::new(tx_output, pubkey_table).expect("Failed to create TxState");
+        let data = vec![0u8; 32];
+        let mut unstructured = Unstructured::new(&data);
+        let sig = Musig2PartialSig::arbitrary(&mut unstructured)
+            .expect("should generate arbitrary signature");
 
-        let sig1 = secp.sign_schnorr(
-            &Message::from_digest_slice(&[0xab; 32]).unwrap(),
-            &Keypair::from_secret_key(&secp, &sks[0]),
-        );
-
-        let unauthorized_signer_index = (pks.len() + 1) as u32;
-        let result = tx_state.add_signature(
-            SignatureInfo::new(sig1.into(), unauthorized_signer_index),
-            0,
-        );
+        let unauthorized_signer_index = num_operators + 1;
+        let result =
+            tx_state.add_signature(SignatureInfo::new(sig, unauthorized_signer_index as u32), 0);
         assert!(result.is_err());
 
         assert!(matches!(
@@ -309,21 +452,21 @@ mod tests {
     #[test]
     fn test_add_signature_input_index_out_of_bounds() {
         let secp = Secp256k1::new();
-        let (pks, sks) = generate_keypairs(&secp, 1);
+        let own_index = 0;
+        let num_operators = 1;
+        let num_inputs = 1;
+        let mut tx_state = create_mock_tx_state(&secp, own_index, num_inputs, num_operators);
 
-        let tx_output = create_test_tx_output(1); // Single input
-        let pubkey_table = generate_pubkey_table(&pks);
-        let mut tx_state =
-            BridgeTxState::new(tx_output, pubkey_table).expect("Failed to create TxState");
-
-        let sig1 = secp.sign_schnorr(
-            &Message::from_digest_slice(&[0xab; 32]).unwrap(),
-            &Keypair::from_secret_key(&secp, &sks[0]),
-        );
+        let data = vec![0u8; 32];
+        let mut unstructured = Unstructured::new(&data);
+        let sig = Musig2PartialSig::arbitrary(&mut unstructured)
+            .expect("should generate arbitrary signature");
 
         let invalid_input_index = 1;
-        let result =
-            tx_state.add_signature(SignatureInfo::new(sig1.into(), 0), invalid_input_index);
+        let result = tx_state.add_signature(
+            SignatureInfo::new(sig, own_index as u32),
+            invalid_input_index,
+        );
         assert!(result.is_err());
 
         let expected_txid = tx_state.unsigned_tx().compute_txid();
@@ -344,5 +487,27 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// Creates a mock [`BridgeTxState`] for the given params. We do this manually here instead of
+    /// leveraging [`arbitrary::Arbitrary`] since we want more fine-grained control over the created
+    /// structure.
+    fn create_mock_tx_state(
+        secp: &Secp256k1<All>,
+        own_index: usize,
+        num_inputs: usize,
+        num_operators: usize,
+    ) -> BridgeTxState {
+        let (pks, sks) = generate_keypairs(secp, num_operators);
+
+        let tx_output = generate_mock_tx_signing_data(num_inputs);
+
+        let pubkey_table = generate_pubkey_table(&pks);
+
+        let sec_nonce =
+            generate_sec_nonce(&tx_output.unsigned_tx.compute_txid(), pks, sks[own_index]);
+
+        BridgeTxState::new(tx_output, pubkey_table, sec_nonce.into())
+            .expect("Failed to create TxState")
     }
 }

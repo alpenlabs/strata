@@ -759,6 +759,7 @@ dependencies = [
  "borsh",
  "hex",
  "mockall",
+ "musig2",
  "parking_lot 0.12.3",
  "serde",
  "serde_json",
@@ -837,8 +838,8 @@ dependencies = [
  "borsh",
  "digest 0.10.7",
  "hex",
- "rand 0.8.5",
  "musig2",
+ "rand 0.8.5",
  "reth-primitives",
  "serde",
  "serde_json",
@@ -1004,6 +1005,7 @@ dependencies = [
  "bitcoin",
  "express-storage",
  "hex",
+ "musig2",
  "rand 0.8.5",
  "rockbound",
  "threadpool",
@@ -3773,8 +3775,10 @@ dependencies = [
  "alpen-express-db",
  "alpen-express-primitives",
  "alpen-test-utils",
+ "arbitrary",
  "bitcoin",
  "express-storage",
+ "musig2",
  "thiserror",
  "tokio",
 ]
@@ -5723,7 +5727,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e310b3a6b5907f99202fcdb4960ff45b93735d7c7d96b760fcff8db2dc0e103d"
 dependencies = [
  "cfg-if",
- "windows-targets 0.48.5",
+ "windows-targets 0.52.6",
 ]
 
 [[package]]
@@ -6354,8 +6358,9 @@ dependencies = [
 
 [[package]]
 name = "musig2"
-version = "0.0.12"
-source = "git+https://github.com/alpenlabs/musig2.git?rev=v0.0.12#3a9aa8ee3b0428ca3c1676383c5b032d8a5cd162"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c89bee285da6010ad76c3467c4de8265bb4fa46fba0017df95ae55cad4436528"
 dependencies = [
  "base16ct",
  "hmac 0.12.1",
