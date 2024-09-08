@@ -38,13 +38,13 @@ pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
     // Bridge relay schemas
     BridgeMsgIdSchema::COLUMN_FAMILY_NAME,
     ScopeMsgIdSchema::COLUMN_FAMILY_NAME,
-    // Bridge transaction schemas
-    BridgeSigTxidSchema::COLUMN_FAMILY_NAME,
-    BridgeSigSchema::COLUMN_FAMILY_NAME,
+    // Bridge signature schemas
+    BridgeTxStateTxidSchema::COLUMN_FAMILY_NAME,
+    BridgeTxStateSchema::COLUMN_FAMILY_NAME,
     // TODO add col families for other store types
 ];
 
-use bridge::schemas::{BridgeSigSchema, BridgeSigTxidSchema};
+use bridge::schemas::{BridgeTxStateSchema, BridgeTxStateTxidSchema};
 // Re-exports
 pub use bridge_relay::db::BridgeMsgDb;
 use bridge_relay::schemas::*;

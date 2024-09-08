@@ -5,7 +5,10 @@ use thiserror::Error;
 
 #[derive(Debug, Clone, Error)]
 pub enum BridgeParseError {
-    #[error("public key table should be sorted by the `OperatorIdx`")]
+    #[error("nonce table should be sorted by `OperatorIdx`")]
+    MalformedNonceTable,
+
+    #[error("public key table should be sorted by `OperatorIdx`")]
     MalformedPublicKeyTable,
 
     #[error("supplied pubkey is invalid")]

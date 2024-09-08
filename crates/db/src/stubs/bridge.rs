@@ -26,6 +26,12 @@ impl BridgeTxStore for StubTxStateDb {
 
         Ok(())
     }
+
+    fn evict_tx_state(&self, txid: Buf32) -> DbResult<Option<BridgeTxState>> {
+        let mut db = self.0.write().unwrap();
+
+        Ok(db.remove(&txid))
+    }
 }
 
 impl BridgeTxProvider for StubTxStateDb {

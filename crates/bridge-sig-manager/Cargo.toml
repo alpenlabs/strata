@@ -18,8 +18,10 @@ alpen-express-primitives = { workspace = true }
 express-storage = { workspace = true }
 
 bitcoin = { workspace = true, features = ["rand-std"] }
+musig2 = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
 alpen-test-utils = { workspace = true }
+arbitrary = { workspace = true }
 tokio = { workspace = true }

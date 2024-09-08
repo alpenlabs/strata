@@ -359,14 +359,19 @@ pub trait BridgeTxDatabase {
 
 /// All methods related to storing/mutating [`CollectedSigs`] in the database.
 pub trait BridgeTxStore {
-    /// Add [`CollectedSigs`] to the database replacing the existing one if present.
+    /// Add [`BridgeTxState`] to the database replacing the existing one if present.
     fn upsert_tx_state(&self, txid: Buf32, tx_state: BridgeTxState) -> DbResult<()>;
 
-    // TODO: possibly add delete as well
+    /// Evict the stored [`BridgeTxState`] from the database and return it. This can be invoked, for
+    /// example, when a fully signed Deposit Transaction has been broadcasted. If the `txid` did
+    /// not exist, `None` is returned.
+    ///
+    /// *WARNING*: This can have detrimental effects if used at the wrong time.
+    fn evict_tx_state(&self, txid: Buf32) -> DbResult<Option<BridgeTxState>>;
 }
 
-/// All methods related to fetching [`CollectedSigs`]s in the database
+/// All methods related to fetching [`BridgeTxState`]s in the database
 pub trait BridgeTxProvider {
-    /// Fetch [`L1TxEntry`] from db
+    /// Fetch [`BridgeTxState`] from db.
     fn get_tx_state(&self, txid: Buf32) -> DbResult<Option<BridgeTxState>>;
 }

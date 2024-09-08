@@ -9,7 +9,7 @@ use alpen_express_db::{
 use alpen_express_primitives::buf::Buf32;
 use rockbound::{OptimisticTransactionDB as DB, SchemaDBOperationsExt, TransactionRetry};
 
-use super::schemas::{BridgeSigSchema, BridgeSigTxidSchema};
+use super::schemas::{BridgeTxStateSchema, BridgeTxStateTxidSchema};
 use crate::DbOpsConfig;
 
 pub struct BridgeTxRocksDb {
@@ -28,17 +28,30 @@ impl BridgeTxStore for BridgeTxRocksDb {
         self.db
             .with_optimistic_txn(TransactionRetry::Count(self.ops.retry_count), |txn| {
                 // insert new id if the txid is new
-                if txn.get::<BridgeSigSchema>(&txid)?.is_none() {
-                    let idx = rockbound::utils::get_last::<BridgeSigTxidSchema>(txn)?
+                if txn.get::<BridgeTxStateSchema>(&txid)?.is_none() {
+                    let idx = rockbound::utils::get_last::<BridgeTxStateTxidSchema>(txn)?
                         .map(|(x, _)| x + 1)
                         .unwrap_or(0);
 
-                    txn.put::<BridgeSigTxidSchema>(&idx, &txid)?;
+                    txn.put::<BridgeTxStateTxidSchema>(&idx, &txid)?;
                 }
 
-                txn.put::<BridgeSigSchema>(&txid, &tx_state)?;
+                txn.put::<BridgeTxStateSchema>(&txid, &tx_state)?;
 
                 Ok::<(), DbError>(())
+            })
+            .map_err(|e: rockbound::TransactionError<_>| DbError::TransactionError(e.to_string()))
+    }
+
+    fn evict_tx_state(&self, txid: Buf32) -> DbResult<Option<BridgeTxState>> {
+        self.db
+            .with_optimistic_txn(TransactionRetry::Count(self.ops.retry_count), |txn| {
+                if let Some(state) = txn.get::<BridgeTxStateSchema>(&txid)? {
+                    txn.delete::<BridgeTxStateSchema>(&txid)?;
+                    return Ok::<Option<BridgeTxState>, DbError>(Some(state));
+                }
+
+                Ok(None)
             })
             .map_err(|e: rockbound::TransactionError<_>| DbError::TransactionError(e.to_string()))
     }
@@ -46,7 +59,7 @@ impl BridgeTxStore for BridgeTxRocksDb {
 
 impl BridgeTxProvider for BridgeTxRocksDb {
     fn get_tx_state(&self, txid: Buf32) -> DbResult<Option<BridgeTxState>> {
-        Ok(self.db.get::<BridgeSigSchema>(&txid)?)
+        Ok(self.db.get::<BridgeTxStateSchema>(&txid)?)
     }
 }
 
@@ -112,6 +125,25 @@ mod tests {
             stored_entry,
             Some(new_state),
             "stored entity should match the updated entity being stored"
+        );
+
+        // Test evict
+        let evicted_entry = db.evict_tx_state(txid).unwrap();
+        assert!(
+            evicted_entry.is_some_and(|entry| entry == stored_entry.unwrap()),
+            "stored entry should be returned after being evicted"
+        );
+
+        let re_evicted_entry = db.evict_tx_state(txid).unwrap();
+        assert!(
+            re_evicted_entry.is_none(),
+            "evicting an already evicted entry should return None"
+        );
+
+        let stored_entry = db.get_tx_state(txid).unwrap();
+        assert!(
+            stored_entry.is_none(),
+            "stored entry should not be present after eviction"
         );
     }
 

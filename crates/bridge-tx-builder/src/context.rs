@@ -3,7 +3,11 @@
 //! processes.
 
 use alpen_express_primitives::bridge::PublickeyTable;
-use bitcoin::{key::Secp256k1, secp256k1::All, Network};
+use bitcoin::{
+    key::Secp256k1,
+    secp256k1::{All, SECP256K1},
+    Network,
+};
 use musig2::secp256k1::XOnlyPublicKey;
 
 use crate::prelude::get_aggregated_pubkey;
@@ -31,19 +35,19 @@ pub struct TxBuilder {
     network: Network,
 
     /// The network to build the transactions for.
-    secp: Secp256k1<All>,
+    secp: &'static Secp256k1<All>,
 }
 
 impl TxBuilder {
     /// Create a new [`TxBuilder`] with the context required to build transactions of various
     /// [`TxKind`].
-    pub fn new(operator_pubkeys: PublickeyTable, network: Network, secp: Secp256k1<All>) -> Self {
+    pub fn new(operator_pubkeys: PublickeyTable, network: Network) -> Self {
         let aggregated_pubkey = get_aggregated_pubkey(&operator_pubkeys.into());
 
         Self {
             aggregated_pubkey,
             network,
-            secp,
+            secp: SECP256K1,
         }
     }
 }
@@ -61,6 +65,6 @@ impl BuilderContext for TxBuilder {
 
     /// Get the secp engine used by the builder.
     fn secp(&self) -> &Secp256k1<All> {
-        &self.secp
+        self.secp
     }
 }

@@ -275,7 +275,7 @@ mod tests {
         let (drt_output_address, take_back_leaf_hash) =
             create_drt_taproot_output(&operator_pubkeys.clone().into());
 
-        let tx_builder = TxBuilder::new(operator_pubkeys, Network::Regtest, Secp256k1::new());
+        let tx_builder = TxBuilder::new(operator_pubkeys, Network::Regtest);
 
         // Correct merkle proof
         let deposit_info = DepositInfo::new(
