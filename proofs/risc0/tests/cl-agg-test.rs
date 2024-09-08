@@ -37,7 +37,7 @@ mod test {
         let prover = RiscZeroHost::init(GUEST_CL_AGG_ELF.into(), Default::default());
 
         prover
-            .prove_with_aggregation(0, agg_inputs)
+            .prove_with_aggregation("cl_agg", agg_inputs)
             .expect("Failed to generate proof");
     }
 }

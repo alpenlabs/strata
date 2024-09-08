@@ -79,6 +79,7 @@ impl SP1Host {
         if self.prover_options.stark_to_snark_conversion {
             prover = prover.plonk();
         }
+
         let proof = prover.run()?;
 
         // Proof serialization

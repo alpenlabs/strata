@@ -1,8 +1,6 @@
 #[cfg(feature = "prover")]
 
 mod test {
-    use std::{fs::File, io::Write};
-
     use alpen_express_state::{block::L2Block, chain_state::ChainState};
     use express_risc0_adapter::RiscZeroHost;
     use express_zkvm::{AggregationInput, Proof, VerifcationKey, ZKVMHost};
@@ -37,17 +35,8 @@ mod test {
         let prover = RiscZeroHost::init(CL_BLOCK_STF_ELF.into(), Default::default());
         let proof_agg_input = AggregationInput::new(prev_el_proof, el_proof_vk);
 
-        let (proof, vk) = prover
+        prover
             .prove_with_aggregation(input_ser, vec![proof_agg_input])
             .expect("Failed to generate proof");
-
-        let proof_ser = bincode::serialize(&proof).unwrap();
-        let vkey_ser = bincode::serialize(&vk).unwrap();
-
-        let mut proof_file = File::create("cl_proof_slot1.bin").unwrap();
-        proof_file.write_all(&proof_ser).unwrap();
-
-        let mut vk_file = File::create("cl_vkey_slot1.bin").unwrap();
-        vk_file.write_all(&vkey_ser).unwrap();
     }
 }

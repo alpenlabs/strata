@@ -87,7 +87,6 @@ impl RiscZeroHost {
         let program_id = compute_image_id(&self.elf)?;
         let verification_key = bincode::serialize(&program_id)?;
 
-        println!("now prover started...");
         // Generate the session
         let mut exec = ExecutorImpl::from_elf(env, &self.elf)?;
         let session = exec.run()?;

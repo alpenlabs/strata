@@ -4,7 +4,7 @@ use alpen_express_primitives::{
     params::{Params, RollupParams, RunParams},
 };
 use bincode;
-use express_cl_stf::{verify_and_transition, ChainState, L2Block};
+use express_cl_stf::{verify_and_transition, CLProofPublicParams, ChainState, L2Block};
 use sha2::{Digest, Sha256};
 use zkvm_primitives::ELProofPublicParams;
 
@@ -22,9 +22,14 @@ fn main() {
     sp1_zkvm::lib::verify::verify_sp1_proof(&el_vkey, &public_values_digest.into());
     let el_pp_deserialized: ELProofPublicParams = bincode::deserialize(&el_pp).unwrap();
 
+    let prev_state_root = prev_state.compute_state_root();
+
     // Verify the CL block proof
     let new_state = verify_and_transition(prev_state, block, el_pp_deserialized, params).unwrap();
-    sp1_zkvm::io::commit(&borsh::to_vec(&new_state).unwrap());
+    let new_state_root = new_state.compute_state_root();
+
+    let public_params: CLProofPublicParams = (*prev_state_root.as_ref(), *new_state_root.as_ref());
+    sp1_zkvm::io::commit(&public_params);
 }
 
 // TODO: Should be read from config file and evaluated on compile time

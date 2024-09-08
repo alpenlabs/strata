@@ -20,9 +20,9 @@
         "proofs/sp1/guest-cl-stf/Cargo.toml",
         "proofs/sp1/guest-cl-agg/Cargo.toml",
     ],
-    "rust-analyzer.cargo.features": [
-        "prover"
-    ],
+    // "rust-analyzer.cargo.features": [
+    //     "prover"
+    // ],
     "rust-analyzer.diagnostics.enable": true,
     "todohighlight.isEnable": true,
     "todohighlight.isCaseSensitive": true,

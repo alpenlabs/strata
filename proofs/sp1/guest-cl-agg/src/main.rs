@@ -25,21 +25,20 @@ fn main() {
 
 fn read_and_validate_next_proof() -> CLProofPublicParams {
     let cl_block_vkey = sp1_zkvm::io::read::<[u32; 8]>();
-    let cl_proof_pp: CLProofPublicParams = sp1_zkvm::io::read();
+    let cl_proof_pp: Vec<u8> = sp1_zkvm::io::read();
 
     // Verify the CL block proof
-    // let public_values_digest = Sha256::digest(&cl_proof_pp);
-    // sp1_zkvm::lib::verify::verify_sp1_proof(&cl_block_vkey, &public_values_digest.into());
+    let public_values_digest = Sha256::digest(&cl_proof_pp);
+    sp1_zkvm::lib::verify::verify_sp1_proof(&cl_block_vkey, &public_values_digest.into());
 
-    cl_proof_pp
+    let cl_proof_pp_deserialized: CLProofPublicParams = bincode::deserialize(&cl_proof_pp).unwrap();
+    cl_proof_pp_deserialized
 }
 
 fn validate_proof_consistency(
     current_proof_pp: CLProofPublicParams,
     next_proof_pp: CLProofPublicParams,
 ) {
-    // Compare the post-state root of the current proof with the initial state root of the next
-    // proof
     assert_eq!(
         current_proof_pp.1, // post-state root of the current proof
         next_proof_pp.0,    // initial state root of the next proof

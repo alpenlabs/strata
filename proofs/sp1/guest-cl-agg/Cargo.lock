@@ -1083,7 +1083,6 @@ version = "0.1.0"
 dependencies = [
  "alpen-express-primitives",
  "bincode",
- "borsh",
  "express-cl-stf",
  "sha2",
  "sp1-zkvm",
