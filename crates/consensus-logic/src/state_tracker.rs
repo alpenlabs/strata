@@ -201,7 +201,10 @@ mod tests {
             let output = ClientUpdateOutput::new(
                 vec![
                     ClientStateWrite::ReplaceSync(Box::new(ss)),
-                    ClientStateWrite::AcceptL2Block(l2block.header().get_blockid()),
+                    ClientStateWrite::AcceptL2Block(
+                        l2block.header().get_blockid(),
+                        l2block.header().blockidx(),
+                    ),
                 ],
                 vec![SyncAction::UpdateTip(l2block.header().get_blockid())],
             );

@@ -52,8 +52,8 @@ pub enum ClientStateWrite {
     /// start.
     ActivateChain,
 
-    /// Accept an L2 block and update tip state.
-    AcceptL2Block(L2BlockId),
+    /// Accept an L2 block and its height and update tip state.
+    AcceptL2Block(L2BlockId, u64),
 
     /// Rolls back L1 blocks to this block height.
     RollbackL1BlocksTo(u64),
@@ -145,11 +145,12 @@ pub fn apply_writes_to_state(
                 l1v.next_expected_block += 1;
             }
 
-            AcceptL2Block(blkid) => {
+            AcceptL2Block(blkid, height) => {
                 // TODO do any other bookkeeping
                 debug!(%blkid, "received AcceptL2Block");
                 let ss = state.expect_sync_mut();
                 ss.tip_blkid = blkid;
+                ss.tip_height = height;
             }
 
             UpdateBuried(new_idx) => {
