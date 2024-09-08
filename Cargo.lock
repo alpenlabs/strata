@@ -922,6 +922,7 @@ dependencies = [
  "argh",
  "async-trait",
  "bitcoin",
+ "borsh",
  "express-storage",
  "express-tasks",
  "format_serde_error",

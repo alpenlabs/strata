@@ -7,9 +7,12 @@ use alpen_express_db::{
     types::{L1TxEntry, L1TxStatus},
 };
 use alpen_express_primitives::{buf::Buf32, hash};
-use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer, HexBytes, HexBytes32};
+use alpen_express_rpc_api::{
+    AlpenAdminApiServer, AlpenApiServer, AlpenSyncApiServer, HexBytes, HexBytes32,
+};
 use alpen_express_rpc_types::{
     BlockHeader, ClientStatus, DaBlob, DepositEntry, DepositState, ExecUpdate, L1Status,
+    NodeSyncStatus,
 };
 use alpen_express_state::{
     block::L2BlockBundle,
@@ -24,6 +27,7 @@ use alpen_express_state::{
 use alpen_express_status::StatusRx;
 use async_trait::async_trait;
 use bitcoin::{consensus::deserialize, hashes::Hash, Transaction as BTransaction, Txid};
+use express_storage::L2BlockManager;
 use jsonrpsee::{core::RpcResult, types::ErrorObjectOwned};
 use thiserror::Error;
 use tokio::sync::{oneshot, Mutex};
@@ -127,6 +131,7 @@ pub struct AlpenRpcImpl<D> {
     sync_manager: Arc<SyncManager>,
     bcast_handle: Arc<L1BroadcastHandle>,
     stop_tx: Mutex<Option<oneshot::Sender<()>>>,
+    l2_block_manager: Arc<L2BlockManager>,
 }
 
 impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
@@ -136,6 +141,7 @@ impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
         sync_manager: Arc<SyncManager>,
         bcast_handle: Arc<L1BroadcastHandle>,
         stop_tx: oneshot::Sender<()>,
+        l2_block_manager: Arc<L2BlockManager>,
     ) -> Self {
         Self {
             status_rx,
@@ -143,6 +149,7 @@ impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
             sync_manager,
             bcast_handle,
             stop_tx: Mutex::new(Some(stop_tx)),
+            l2_block_manager,
         }
     }
 
@@ -274,7 +281,7 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         })
     }
 
-    async fn get_recent_blocks(&self, count: u64) -> RpcResult<Vec<BlockHeader>> {
+    async fn get_recent_block_headers(&self, count: u64) -> RpcResult<Vec<BlockHeader>> {
         // FIXME: sync state should have a block number
         let cl_state = self.get_client_state().await;
 
@@ -310,7 +317,7 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         Ok(blk_headers)
     }
 
-    async fn get_blocks_at_idx(&self, idx: u64) -> RpcResult<Option<Vec<BlockHeader>>> {
+    async fn get_block_headers_at_idx(&self, idx: u64) -> RpcResult<Option<Vec<BlockHeader>>> {
         let cl_state = self.get_client_state().await;
         let tip_blkid = *cl_state
             .sync()
@@ -343,12 +350,9 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         Ok(blk_header)
     }
 
-    async fn get_block_by_id(
-        &self,
-        blkid: alpen_express_rpc_types::L2BlockId,
-    ) -> RpcResult<Option<BlockHeader>> {
+    async fn get_block_header_by_id(&self, blkid: L2BlockId) -> RpcResult<Option<BlockHeader>> {
         let db = self.database.clone();
-        let blkid = L2BlockId::from(Buf32::from(blkid.0));
+        // let blkid = L2BlockId::from(Buf32::from(blkid.0));
 
         Ok(wait_blocking("fetch_block", move || {
             let l2_prov = db.l2_provider();
@@ -360,12 +364,9 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         .ok())
     }
 
-    async fn get_exec_update_by_id(
-        &self,
-        blkid: alpen_express_rpc_types::L2BlockId,
-    ) -> RpcResult<Option<ExecUpdate>> {
+    async fn get_exec_update_by_id(&self, blkid: L2BlockId) -> RpcResult<Option<ExecUpdate>> {
         let db = self.database.clone();
-        let blkid = L2BlockId::from(Buf32::from(blkid.0));
+        // let blkid = L2BlockId::from(Buf32::from(blkid.0));
 
         let l2_blk = wait_blocking("fetch_block", move || {
             let l2_prov = db.l2_provider();
@@ -519,5 +520,34 @@ impl AlpenAdminApiServer for AdminServerImpl {
             .map_err(|e| Error::Other(e.to_string()))?;
 
         Ok(txid)
+    }
+}
+
+#[async_trait]
+impl<D: Database + Send + Sync + 'static> AlpenSyncApiServer for AlpenRpcImpl<D> {
+    async fn get_sync_status(&self) -> RpcResult<NodeSyncStatus> {
+        let sync = {
+            let cl = self.status_rx.cl.borrow();
+            cl.sync().unwrap().clone()
+        };
+        Ok(NodeSyncStatus {
+            tip_height: sync.chain_tip_height(),
+            tip_block_id: *sync.chain_tip_blkid(),
+            finalized_block_id: *sync.finalized_blkid(),
+        })
+    }
+
+    async fn sync_blocks_by_height(&self, _height: u64) -> RpcResult<Option<Vec<Vec<u8>>>> {
+        todo!()
+    }
+
+    async fn sync_block_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<Vec<u8>>> {
+        let block = self
+            .l2_block_manager
+            .get_block_async(&block_id)
+            .await
+            .map(|res| res.map(|blk| borsh::to_vec(&blk).unwrap())) // maybe send the raw bytes from db directly?
+            .map_err(|e| Error::Other(e.to_string()))?;
+        Ok(block)
     }
 }

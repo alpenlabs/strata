@@ -359,6 +359,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             status_rx,
             inscription_handler,
             bcast_handle,
+            l2_block_manager,
         )
         .await
         .unwrap()
@@ -383,6 +384,7 @@ async fn start_rpc<D: Database + Send + Sync + 'static>(
     status_rx: Arc<StatusRx>,
     inscription_handler: Option<Arc<InscriptionHandle>>,
     bcast_handle: Arc<L1BroadcastHandle>,
+    l2_block_manager: Arc<L2BlockManager>,
 ) -> anyhow::Result<()> {
     let (stop_tx, stop_rx) = oneshot::channel();
 
@@ -393,6 +395,7 @@ async fn start_rpc<D: Database + Send + Sync + 'static>(
         sync_man.clone(),
         bcast_handle.clone(),
         stop_tx,
+        l2_block_manager.clone(),
     );
 
     let mut methods = alp_rpc.into_rpc();

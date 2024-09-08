@@ -3,9 +3,9 @@ use alpen_express_db::types::L1TxStatus;
 use alpen_express_primitives::bridge::OperatorIdx;
 use alpen_express_rpc_types::{
     types::{BlockHeader, ClientStatus, DepositEntry, ExecUpdate, L1Status},
-    L2BlockId,
+    NodeSyncStatus,
 };
-use alpen_express_state::bridge_duties::BridgeDuties;
+use alpen_express_state::{bridge_duties::BridgeDuties, id::L2BlockId};
 use bitcoin::{secp256k1::schnorr::Signature, Transaction, Txid};
 use express_bridge_tx_builder::prelude::{CooperativeWithdrawalInfo, DepositInfo};
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
@@ -35,14 +35,14 @@ pub trait AlpenApi {
     #[method(name = "clientStatus")]
     async fn get_client_status(&self) -> RpcResult<ClientStatus>;
 
-    #[method(name = "getRecentBlocks")]
-    async fn get_recent_blocks(&self, count: u64) -> RpcResult<Vec<BlockHeader>>;
+    #[method(name = "getRecentBlockHeaders")]
+    async fn get_recent_block_headers(&self, count: u64) -> RpcResult<Vec<BlockHeader>>;
 
-    #[method(name = "getBlocksAtIdx")]
-    async fn get_blocks_at_idx(&self, index: u64) -> RpcResult<Option<Vec<BlockHeader>>>;
+    #[method(name = "getBlockHeadersAtIdx")]
+    async fn get_block_headers_at_idx(&self, index: u64) -> RpcResult<Option<Vec<BlockHeader>>>;
 
-    #[method(name = "getBlockById")]
-    async fn get_block_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<BlockHeader>>;
+    #[method(name = "getBlockHeaderById")]
+    async fn get_block_header_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<BlockHeader>>;
 
     #[method(name = "getExecUpdateById")]
     async fn get_exec_update_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<ExecUpdate>>;
@@ -113,4 +113,17 @@ pub trait AlpenBridgeApi {
     // methods may move to another trait later.
     #[method(name = "broadcastTxs")]
     async fn broadcast_transactions(&self, txs: Vec<Transaction>) -> RpcResult<()>;
+}
+
+#[cfg_attr(not(feature = "client"), rpc(server, namespace = "alp"))]
+#[cfg_attr(feature = "client", rpc(server, client, namespace = "alp"))]
+pub trait AlpenSyncApi {
+    #[method(name = "syncStatus")]
+    async fn get_sync_status(&self) -> RpcResult<NodeSyncStatus>;
+
+    #[method(name = "syncBlocksByHeight")]
+    async fn sync_blocks_by_height(&self, height: u64) -> RpcResult<Option<Vec<Vec<u8>>>>;
+
+    #[method(name = "syncBlockById")]
+    async fn sync_block_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<Vec<u8>>>;
 }
