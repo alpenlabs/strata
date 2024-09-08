@@ -27,6 +27,7 @@ members = [
   "crates/rpc/utils",
   "crates/state",
   "crates/storage",
+  "crates/sync",
   "crates/tasks",
   "crates/status",
   "crates/test-utils",
@@ -72,6 +73,7 @@ express-reth-node = { path = "crates/reth/node" }
 express-reth-rpc = { path = "crates/reth/rpc" }
 express-rpc-utils = { path = "crates/rpc/utils" }
 express-storage = { path = "crates/storage" }
+express-sync = { path = "crates/sync" }
 express-tasks = { path = "crates/tasks" }
 express-zkvm = { path = "crates/prover/zkvm" }                      # FIXME make these names more consistent?
 zkvm = { path = "crates/prover/zkvm" }
@@ -101,6 +103,7 @@ futures-util = "0.3"
 hex = { version = "0.4", features = ["serde"] }
 http = "1.0.0"
 hyper = "0.14.25"
+indexmap = "2.5.0"
 jmt = "0.10.0"
 jsonrpsee = "0.23"
 jsonrpsee-types = "0.23"
