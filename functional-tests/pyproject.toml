@@ -10,6 +10,7 @@ flexitest = { git = "https://codeberg.org/treyd/flexitest.git" }
 bitcoinlib = "^0.6.15"
 websockets = "^13.0"
 web3 = "^7.2.0"
+py-solc-x = "^2.0.3"
 
 [tool.poetry.dev-dependencies]
 ruff = "0.6.4"

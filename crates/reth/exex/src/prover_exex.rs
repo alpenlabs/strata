@@ -1,11 +1,14 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 use alloy_rpc_types::EIP1186AccountProofResponse;
 use express_reth_db::WitnessStore;
 use eyre::eyre;
 use reth_exex::{ExExContext, ExExEvent};
 use reth_node_api::FullNodeComponents;
-use reth_primitives::{Address, TransactionSignedNoHash};
+use reth_primitives::{Address, TransactionSignedNoHash, B256};
 use reth_provider::{BlockReader, Chain, ExecutionOutcome, StateProviderFactory};
 use reth_revm::{db::BundleState, primitives::FixedBytes};
 use reth_rpc_types_compat::proof::from_primitive_account_proof;
@@ -41,7 +44,6 @@ impl<Node: FullNodeComponents, S: WitnessStore + Clone> ProverWitnessGenerator<N
             // TODO: maybe put db writes in another thread
             if let Err(err) = self.db.put_block_witness(block_hash, &prover_input) {
                 error!(?err, ?block_hash);
-
                 break;
             }
 
@@ -101,18 +103,36 @@ fn extract_zkvm_input<Node: FullNodeComponents>(
 
     let mut parent_proofs: HashMap<Address, EIP1186AccountProofResponse> = HashMap::new();
     let mut current_proofs: HashMap<Address, EIP1186AccountProofResponse> = HashMap::new();
+    let mut contracts = HashSet::new();
 
     // Accumulate account proof of account in previous block
-    for address in current_bundle_state.state().keys() {
-        let proof = previous_provider.proof(&previous_bundle_state, *address, &[])?;
+    for (address, account) in current_bundle_state.state() {
+        let slots: Vec<B256> = account
+            .storage
+            .keys()
+            .map(|v| B256::from_slice(v.as_le_slice()))
+            .collect();
 
+        if let Some(account_info) = &account.info {
+            if let Some(code) = &account_info.code {
+                contracts.insert(code.bytecode().clone());
+            }
+        }
+
+        let proof = previous_provider.proof(&previous_bundle_state, *address, &slots)?;
         let proof = from_primitive_account_proof(proof);
         parent_proofs.insert(*address, proof);
     }
 
     // Accumulate account proof of account in current block
-    for address in current_bundle_state.state().keys() {
-        let proof = previous_provider.proof(&exec_outcome.bundle, *address, &[])?;
+    for (address, account) in current_bundle_state.state() {
+        let slots: Vec<B256> = account
+            .storage
+            .keys()
+            .map(|v| B256::from_slice(v.as_le_slice()))
+            .collect();
+
+        let proof = previous_provider.proof(&exec_outcome.bundle, *address, &slots)?;
         let proof = from_primitive_account_proof(proof);
         current_proofs.insert(*address, proof);
     }
@@ -134,8 +154,7 @@ fn extract_zkvm_input<Node: FullNodeComponents>(
         withdrawals: Vec::new(),
         parent_state_trie: state_trie,
         parent_storage: storage,
-        // TODO: handle the contract input
-        contracts: Default::default(),
+        contracts: contracts.iter().cloned().collect(),
         parent_header: prev_block.header,
         // NOTE: using default to save prover cost.
         // Will need to revisit if BLOCKHASH opcode operation is a blocker
