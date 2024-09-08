@@ -1,12 +1,13 @@
 import flexitest
+from solcx import compile_source, install_solc, set_solc_version
 from web3 import Web3
-from solcx import compile_source, install_solc,set_solc_version
+
 
 @flexitest.register
 class ElBlockWitnessDataGenerationTest(flexitest.Test):
     def __init__(self, ctx: flexitest.InitContext):
-        install_solc(version='0.8.16')
-        set_solc_version('0.8.16')
+        install_solc(version="0.8.16")
+        set_solc_version("0.8.16")
         ctx.set_env("basic")
 
     def main(self, ctx: flexitest.RunContext):
@@ -23,7 +24,7 @@ class ElBlockWitnessDataGenerationTest(flexitest.Test):
         tx_receipt = web3.eth.wait_for_transaction_receipt(tx_hash)
 
         # Get the block hash where contract was deployed
-        assert(tx_receipt['status'] == 1)
+        assert tx_receipt["status"] == 1
         blocknum = tx_receipt.blockNumber
         blockhash = rethrpc.eth_getBlockByNumber(hex(blocknum), False)["hash"]
 
@@ -31,10 +32,12 @@ class ElBlockWitnessDataGenerationTest(flexitest.Test):
         witness_data = rethrpc.alpee_getBlockWitness(blockhash, True)
         assert witness_data is not None, "non empty witness"
 
+        print(witness_data)
+
 
 def get_contract():
     compiled_sol = compile_source(
-        '''
+        """
         pragma solidity ^0.8.0;
 
         contract Greeter {
@@ -44,12 +47,11 @@ def get_contract():
                 greeting = 'Hello';
             }
         }
-        ''',
-        output_values=['abi', 'bin']
+        """,
+        output_values=["abi", "bin"],
     )
 
     _, contract_interface = compiled_sol.popitem()
-    bytecode = contract_interface['bin']
-    abi = contract_interface['abi']
+    bytecode = contract_interface["bin"]
+    abi = contract_interface["abi"]
     return abi, bytecode
-

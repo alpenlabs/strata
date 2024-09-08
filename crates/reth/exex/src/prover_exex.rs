@@ -13,7 +13,10 @@ use reth_provider::{BlockReader, Chain, ExecutionOutcome, StateProviderFactory};
 use reth_revm::{db::BundleState, primitives::FixedBytes};
 use reth_rpc_types_compat::proof::from_primitive_account_proof;
 use tracing::{debug, error};
-use zkvm_primitives::{mpt::proofs_to_tries, ZKVMInput};
+use zkvm_primitives::{
+    mpt::{self, proofs_to_tries},
+    ZKVMInput,
+};
 
 pub struct ProverWitnessGenerator<Node: FullNodeComponents, S: WitnessStore + Clone> {
     ctx: ExExContext<Node>,
@@ -113,9 +116,12 @@ fn extract_zkvm_input<Node: FullNodeComponents>(
             .map(|v| B256::from_slice(v.as_le_slice()))
             .collect();
 
+        // Accumulate contract bytecode
         if let Some(account_info) = &account.info {
             if let Some(code) = &account_info.code {
-                contracts.insert(code.bytecode().clone());
+                if account_info.code_hash() != mpt::KECCAK_EMPTY {
+                    contracts.insert(code.bytecode().clone());
+                }
             }
         }
 
