@@ -1,0 +1,39 @@
+version: '3.8'
+
+x-common:
+  environment: &environment
+    BITCOIND_RPC_PORT: "9823"
+    BITCOIND_HOST: "localhost"
+    BITCOIND_RPC_USER: "alpen"
+    BITCOIND_RPC_PASSWORD: "alpen"
+
+services:
+  builder:
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.base
+    image: "express_builder:builder"
+    container_name: express_builder
+
+  reth:
+    build:
+      dockerfile: ./docker/reth/Dockerfile
+    environment:
+      RETH_PORT: "12002"
+      LISTENER_PORT: "12008"
+      WEBSOCKET_PORT: "12009"
+      HTTP_PORT: "12010"
+    image: "express_reth:reth"
+    container_name: express_reth
+    depends_on:
+      - builder
+
+  sequencer:
+    build:
+      dockerfile: ./docker/sequencer/Dockerfile
+    environment:
+      <<: *environment
+    image: "express_sequencer:sequencer"
+    container_name: express_sequencer
+    depends_on:
+      - builder

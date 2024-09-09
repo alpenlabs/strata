@@ -1,0 +1,15 @@
+.config/*
+.vscode/*
+.ruff_cache/*
+.venv/*
+__pycache__/*
+.git/*
+.github/*
+target/*
+functional-tests/.ruff_cache/*
+functional-tests/.venv/*
+functional-tests/__pycache__/*
+functional-tests/_dd/*
+test/__pycache__/*
+test/_dd/*
+proofs/*
