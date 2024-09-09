@@ -17,7 +17,7 @@ impl Proof {
 pub struct VerifcationKey(pub Vec<u8>);
 
 /// Prover config of the ZKVM Host
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ProverOptions {
     pub enable_compression: bool,
     pub use_mock_prover: bool,
@@ -25,7 +25,7 @@ pub struct ProverOptions {
 }
 
 /// A trait implemented by the prover ("host") of a zkVM program.
-pub trait ZKVMHost: Send + Sync {
+pub trait ZKVMHost: Send + Sync + Clone {
     /// Initializes the ZKVM with the provided ELF program and prover configuration.
     fn init(guest_code: Vec<u8>, prover_options: ProverOptions) -> Self;
 
