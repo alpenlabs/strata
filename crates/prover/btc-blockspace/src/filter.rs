@@ -1,9 +1,7 @@
 //! This includes all the filtering logic to filter out and extract
 //! deposits, forced inclusion transactions as well as state updates
 
-use std::str::FromStr;
-
-use bitcoin::{opcodes::all::OP_RETURN, Address, Block, Transaction};
+use bitcoin::{opcodes::all::OP_RETURN, Block, ScriptBuf, Transaction};
 use serde::{Deserialize, Serialize};
 
 use crate::logic::ScanRuleConfig;
@@ -22,7 +20,10 @@ pub type StateUpdate = Vec<u8>;
 /// Note: This needs to be consistent with the logic in other places
 /// This is used as the placeholder logic for now
 /// TODO: Use the same logic
-fn extract_deposit(tx: &Transaction, bridge_address: &Address) -> Option<DepositRequestData> {
+fn extract_deposit(
+    tx: &Transaction,
+    bridge_scriptbufs: &[ScriptBuf],
+) -> Option<DepositRequestData> {
     // DepositRequestData Tx
     // ________________________________________
     //            | n-of-n
@@ -36,7 +37,8 @@ fn extract_deposit(tx: &Transaction, bridge_address: &Address) -> Option<Deposit
         return None;
     }
 
-    if !bridge_address.matches_script_pubkey(&tx.output[0].script_pubkey) {
+    // TODO: this will take some hints to do this more efficiently
+    if !bridge_scriptbufs.contains(&tx.output[0].script_pubkey) {
         return None;
     }
 
@@ -88,12 +90,8 @@ pub fn extract_relevant_transactions(
     let mut forced_inclusions = Vec::new();
     let mut state_updates = Vec::new();
 
-    let bridge_address = Address::from_str(&scan_rule.bridge_address)
-        .unwrap()
-        .assume_checked();
-
     for tx in &block.txdata {
-        if let Some(deposit) = extract_deposit(tx, &bridge_address) {
+        if let Some(deposit) = extract_deposit(tx, &scan_rule.bridge_scriptbufs) {
             deposits.push(deposit)
         }
 
@@ -128,7 +126,7 @@ mod tests {
         let tx: Transaction = Decodable::consensus_decode(&mut raw_tx.as_slice()).unwrap();
 
         let bridge_address = Address::from_str(BRIDGE_ADDR).unwrap().assume_checked();
-        let deposit = extract_deposit(&tx, &bridge_address);
+        let deposit = extract_deposit(&tx, &[bridge_address.script_pubkey()]);
 
         assert!(deposit.is_some_and(
             |deposit| deposit.amount == 50_000_000 && hex::encode(deposit.to) == ETH_USER

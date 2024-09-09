@@ -392,16 +392,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bitcoin-blockspace"
-version = "0.1.0"
-dependencies = [
- "alpen-express-primitives",
- "bitcoin",
- "serde",
- "sha2",
-]
-
-[[package]]
 name = "bitcoin-internals"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -515,6 +505,17 @@ dependencies = [
  "quote",
  "syn 2.0.75",
  "syn_derive",
+]
+
+[[package]]
+name = "btc-blockspace"
+version = "0.1.0"
+dependencies = [
+ "alpen-express-primitives",
+ "bitcoin",
+ "borsh",
+ "serde",
+ "sha2",
 ]
 
 [[package]]
@@ -925,7 +926,7 @@ name = "guest-btc-blockspace-sp1"
 version = "0.1.0"
 dependencies = [
  "bitcoin",
- "bitcoin-blockspace",
+ "btc-blockspace",
  "sp1-zkvm",
 ]
 

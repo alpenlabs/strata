@@ -1,6 +1,6 @@
 //! Core logic of the Bitcoin Blockspace proof that will be proven
 
-use bitcoin::{block::Header, Block};
+use bitcoin::{block::Header, Block, ScriptBuf};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -18,7 +18,7 @@ pub struct BlockspaceProofInput {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScanRuleConfig {
     // TODO: figure out why serialize `Address`
-    pub bridge_address: String,
+    pub bridge_scriptbufs: Vec<ScriptBuf>,
     pub sequencer_address: String,
 }
 

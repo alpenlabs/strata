@@ -1,6 +1,8 @@
 #[cfg(feature = "prover")]
 mod test {
-    use bitcoin::consensus::serialize;
+    use std::str::FromStr;
+
+    use bitcoin::{consensus::serialize, Address};
     use btc_blockspace::logic::{BlockspaceProofOutput, ScanRuleConfig};
     use express_risc0_adapter::{Risc0Verifier, RiscZeroHost};
     use express_zkvm::{ZKVMHost, ZKVMVerifier};
@@ -12,8 +14,12 @@ mod test {
         let prover = RiscZeroHost::init(BTC_BLOCKSPACE_RISC0_ELF.into(), Default::default());
 
         let scan_config = ScanRuleConfig {
-            bridge_address: "bcrt1pf73jc96ujch43wp3k294003xx4llukyzvp0revwwnww62esvk7hqvarg98"
-                .to_owned(),
+            bridge_scriptbufs: vec![Address::from_str(
+                "bcrt1pf73jc96ujch43wp3k294003xx4llukyzvp0revwwnww62esvk7hqvarg98",
+            )
+            .unwrap()
+            .assume_checked()
+            .script_pubkey()],
             sequencer_address: "bcrt1pf73jc96ujch43wp3k294003xx4llukyzvp0revwwnww62esvk7hqvarg98"
                 .to_owned(),
         };

@@ -1,6 +1,9 @@
 // NOTE: SP1 prover runs in release mode only; therefore run the tests on release mode only
 #[cfg(feature = "prover")]
 mod test {
+    use std::str::FromStr;
+
+    use bitcoin::Address;
     use btc_blockspace::logic::{BlockspaceProofOutput, ScanRuleConfig};
     use express_sp1_adapter::{SP1Host, SP1Verifier};
     use express_zkvm::{ZKVMHost, ZKVMVerifier};
@@ -14,8 +17,12 @@ mod test {
 
         let block = alpen_test_utils::bitcoin::get_btc_mainnet_block();
         let scan_config = ScanRuleConfig {
-            bridge_address: "bcrt1pf73jc96ujch43wp3k294003xx4llukyzvp0revwwnww62esvk7hqvarg98"
-                .to_owned(),
+            bridge_scriptbufs: vec![Address::from_str(
+                "bcrt1pf73jc96ujch43wp3k294003xx4llukyzvp0revwwnww62esvk7hqvarg98",
+            )
+            .unwrap()
+            .assume_checked()
+            .script_pubkey()],
             sequencer_address: "bcrt1pf73jc96ujch43wp3k294003xx4llukyzvp0revwwnww62esvk7hqvarg98"
                 .to_owned(),
         };
