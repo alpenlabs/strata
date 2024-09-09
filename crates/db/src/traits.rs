@@ -302,6 +302,36 @@ pub trait SeqDataProvider {
     fn get_last_batch_idx(&self) -> DbResult<Option<u64>>;
 }
 
+/// A trait encapsulating provider and store traits to interact with the underlying database for
+/// [`BlobEntry`]
+/// #[cfg_attr(feature = "mocks", automock(type SeqStore=MockSeqDataStore; type SeqProv=MockSeqDataProvider;))]
+pub trait ProverDatabase {
+    type ProverStore: ProverDataStore;
+    type ProverProv: ProverDataProvider;
+
+    fn prover_store(&self) -> &Arc<Self::ProverStore>;
+    fn prover_provider(&self) -> &Arc<Self::ProverProv>;
+}
+
+/// A trait encapsulating  store traits to create/update [`BlobEntry`] in the database
+pub trait ProverDataStore {
+    /// Store the [`BlobEntry`].
+    fn put_blob_entry(&self, blobid: u64, blobentry: Vec<u8>) -> DbResult<()>;
+}
+
+#[cfg_attr(feature = "mocks", automock)]
+/// A trait encapsulating  provider traits to fetch [`BlobEntry`] and indices from the database
+pub trait ProverDataProvider {
+    /// Get a [`BlobEntry`] by its hash
+    fn get_blob_by_id(&self, id: u64) -> DbResult<Option<Vec<u8>>>;
+
+    /// Get the blob ID corresponding to the index
+    fn get_blob_id(&self, blobidx: u64) -> DbResult<Option<Vec<u8>>>;
+
+    /// Get the last blob index
+    fn get_last_blob_idx(&self) -> DbResult<Option<u64>>;
+}
+
 /// A trait encapsulating the provider and store traits for interacting with the broadcast
 /// transactions([`L1TxEntry`]), their indices and ids
 pub trait TxBroadcastDatabase {
