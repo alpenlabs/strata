@@ -17,8 +17,6 @@ borsh = { workspace = true }
 digest = { workspace = true }
 hex = { workspace = true }
 num_enum = { workspace = true }
-rand = "0.8"                                                            # For generating random numbers (keys)
-secp256k1 = { version = "0.27", features = ["rand", "global-context"] }
 serde = { workspace = true }
 sha2 = { workspace = true }
 tracing = { workspace = true }

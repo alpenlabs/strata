@@ -68,7 +68,7 @@ impl ChainstateStore for StubChainstateDb {
 
         // Compute new state and insert things.
         let new_state = state_op::apply_write_batch_to_chainstate(toplevel, batch);
-        st.toplevels.insert(idx, new_state.clone());
+        st.toplevels.insert(idx, new_state);
         st.write_batches.insert(idx, batch.clone());
 
         Ok(())

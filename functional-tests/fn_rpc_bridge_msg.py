@@ -29,7 +29,7 @@ class BridgeMsgTest(flexitest.Test):
 
         seqrpc.alpbridgemsg_submitRawMsg(blobdata)
 
-        time.sleep(WAIT_TIME)
+        time.sleep(WAIT_TIME * 4)
 
         # VODepositSig(10)
         scope = "000a000000"

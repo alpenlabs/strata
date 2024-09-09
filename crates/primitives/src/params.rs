@@ -2,7 +2,7 @@
 
 use serde::Deserialize;
 
-use crate::{block_credential::CredRule, prelude::Buf32};
+use crate::{block_credential::CredRule, prelude::Buf32, utils::SchnorrKeypair};
 
 /// Consensus parameters that don't change for the lifetime of the network
 /// (unless there's some weird hard fork).
@@ -33,6 +33,9 @@ pub struct RollupParams {
 
     /// target batch size in number of l2 blocks
     pub batch_l2_blocks_target: u64,
+
+    /// schnorr keys for operator
+    pub operator_signing_keys: Vec<SchnorrKeypair>,
 }
 
 /// Client sync parameters that are used to make the network work but don't

@@ -333,11 +333,11 @@ pub trait BcastProvider {
 #[cfg_attr(feature = "mocks", automock)]
 pub trait BridgeMessageStore {
     /// Stores a bridge message
-    fn write_msg(&self, id: u64, msg: BridgeMessage) -> DbResult<()>;
+    fn write_msg(&self, id: u128, msg: BridgeMessage) -> DbResult<()>;
 
     /// Deletes messages by their UNIX epoch.
-    fn delete_msgs_before_timestamp(&self, msg_ids: u64) -> DbResult<()>;
+    fn delete_msgs_before_timestamp(&self, msg_ids: u128) -> DbResult<()>;
 
     /// Retrieves messages by their scope.
-    fn get_msgs_by_scope(&self, scope: &[u8]) -> DbResult<Option<BridgeMessage>>;
+    fn get_msgs_by_scope(&self, scope: &[u8]) -> DbResult<Vec<BridgeMessage>>;
 }

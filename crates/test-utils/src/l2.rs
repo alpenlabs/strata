@@ -4,6 +4,7 @@ use alpen_express_primitives::{
     block_credential,
     buf::{Buf32, Buf64},
     params::{Params, RollupParams, RunParams},
+    utils::get_test_schnorr_keys,
 };
 use alpen_express_state::{
     block::{L2Block, L2BlockAccessory, L2BlockBody, L2BlockBundle},
@@ -82,6 +83,7 @@ pub fn gen_params() -> Params {
             ),
             l1_reorg_safe_depth: 5,
             batch_l2_blocks_target: 64,
+            operator_signing_keys: get_test_schnorr_keys().to_vec(),
         },
         run: RunParams {
             l2_blocks_fetch_limit: 1000,

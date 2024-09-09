@@ -133,6 +133,14 @@ impl fmt::Display for BridgeMsgId {
     }
 }
 
+#[derive(Copy, Clone, Deserialize, Debug)]
+pub struct BridgeParams {
+    // Time for which message is stored and bandwidth is reset
+    pub refresh_interval: u64,
+    // max no. of messages corresponding to single operator.
+    pub bandwidth: u32,
+}
+
 #[cfg(test)]
 mod tests {
     use alpen_express_primitives::buf::{Buf32, Buf64};

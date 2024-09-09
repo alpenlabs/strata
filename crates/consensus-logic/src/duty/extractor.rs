@@ -107,6 +107,7 @@ mod tests {
         block_credential,
         buf::Buf32,
         params::{RollupParams, RunParams},
+        utils::get_test_schnorr_keys,
     };
     use alpen_express_rocksdb::test_utils::get_common_db;
     use alpen_express_state::{
@@ -142,6 +143,7 @@ mod tests {
                 ),
                 l1_reorg_safe_depth: 5,
                 batch_l2_blocks_target: 64,
+                operator_signing_keys: Vec::from(get_test_schnorr_keys()),
             },
             run: RunParams {
                 l2_blocks_fetch_limit: 1000,

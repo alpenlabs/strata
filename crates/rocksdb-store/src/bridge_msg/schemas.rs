@@ -7,10 +7,10 @@ use crate::{
 
 define_table_with_seek_key_codec!(
     /// A table to store mapping of Unix epoch to Bridge Message
-    (BridgeMsgIdSchema) u64 => BridgeMessage
+    (BridgeMsgIdSchema) u128 => BridgeMessage
 );
 
 define_table_with_default_codec!(
     /// A table to store mapping of scope to Bridge Message Ids
-    (ScopeMsgIdSchema) Scope => u64
+    (ScopeMsgIdSchema) Scope => Vec<u128>
 );

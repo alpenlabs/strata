@@ -22,7 +22,7 @@ impl BridgeMsgDb {
         Self { db, ops }
     }
 
-    fn get_msg_ids_before_timestamp(&self, msg_id: u64) -> DbResult<Vec<u64>> {
+    fn get_msg_ids_before_timestamp(&self, msg_id: u128) -> DbResult<Vec<u128>> {
         // reverse and then place a iterator here
         let mut iterator = self.db.iter::<BridgeMsgIdSchema>()?;
         iterator.seek_to_first();
@@ -40,13 +40,28 @@ impl BridgeMsgDb {
 }
 
 impl BridgeMessageStore for BridgeMsgDb {
-    fn write_msg(&self, id: u64, msg: BridgeMessage) -> alpen_express_db::DbResult<()> {
+    fn write_msg(&self, id: u128, msg: BridgeMessage) -> alpen_express_db::DbResult<()> {
+        let mut id = id;
+        while self.db.get::<BridgeMsgIdSchema>(&id)?.is_some() {
+            id += 1;
+        }
+
         self.db.put::<BridgeMsgIdSchema>(&id, &msg);
-        self.db.put::<ScopeMsgIdSchema>(msg.get_scope(), &id);
+
+        if let Some(scopes) = self.db.get::<ScopeMsgIdSchema>(msg.get_scope())? {
+            let mut new_scopes = Vec::new();
+            new_scopes.extend(&scopes);
+            new_scopes.push(id);
+            self.db
+                .put::<ScopeMsgIdSchema>(msg.get_scope(), &new_scopes);
+            return Ok(());
+        }
+
+        self.db.put::<ScopeMsgIdSchema>(msg.get_scope(), &vec![id]);
         Ok(())
     }
 
-    fn delete_msgs_before_timestamp(&self, msg_id: u64) -> DbResult<()> {
+    fn delete_msgs_before_timestamp(&self, msg_id: u128) -> DbResult<()> {
         let ids = self.get_msg_ids_before_timestamp(msg_id)?;
 
         let mut batch = SchemaBatch::new();
@@ -58,19 +73,34 @@ impl BridgeMessageStore for BridgeMsgDb {
         Ok(())
     }
 
-    fn get_msgs_by_scope(&self, scope: &[u8]) -> DbResult<Option<BridgeMessage>> {
-        println!("{:?}", scope);
+    fn get_msgs_by_scope(&self, scope: &[u8]) -> DbResult<Vec<BridgeMessage>> {
         let mut msg_scope = Scope::from_raw(scope).ok();
-        println!("SCOPE {:?}", msg_scope);
 
         if let Some(scope) = msg_scope {
-            let mut msg_id = self.db.get::<ScopeMsgIdSchema>(&scope)?;
-            if let Some(id) = msg_id {
-                let msg = self.db.get::<BridgeMsgIdSchema>(&id)?;
-                return Ok(msg);
+            let mut msg_ids = Vec::new();
+
+            // Regular loop for filtering and mapping
+            for msg in (self.db.iter::<ScopeMsgIdSchema>()?).flatten() {
+                let (m_scope, id) = msg.into_tuple();
+                if scope == m_scope {
+                    msg_ids.push(id);
+                }
             }
+
+            let mut msgs = Vec::new();
+
+            // Iterating over filtered message IDs to fetch messages
+            for message_id_group in msg_ids {
+                for message_id in message_id_group {
+                    if let Ok(Some(message)) = self.db.get::<BridgeMsgIdSchema>(&message_id) {
+                        msgs.push(message);
+                    }
+                }
+            }
+            return Ok(msgs);
         }
-        Ok(None)
+
+        Err(DbError::InvalidArgument)
     }
 }
 
@@ -91,7 +121,7 @@ mod tests {
         BridgeMsgDb::new(db, db_ops)
     }
 
-    fn new_bridge_msg() -> (u64, BridgeMessage) {
+    fn new_bridge_msg() -> (u128, BridgeMessage) {
         let arb = ArbitraryGenerator::new();
 
         let msg: BridgeMessage = arb.generate();
@@ -99,7 +129,7 @@ mod tests {
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
-            .as_millis() as u64;
+            .as_micros();
 
         (timestamp, msg)
     }
@@ -145,7 +175,7 @@ mod tests {
         assert!(result.is_ok());
 
         // Check if only the second message remains
-        let ids = br_db.get_msg_ids_before_timestamp(u64::MAX).unwrap();
+        let ids = br_db.get_msg_ids_before_timestamp(u128::MAX).unwrap();
         assert!(!ids.contains(&timestamp1));
     }
 
@@ -165,7 +195,7 @@ mod tests {
         let result = br_db.get_msgs_by_scope(&scope);
         assert!(result.is_ok());
 
-        assert!(result.unwrap().is_some());
+        assert!(!result.unwrap().is_empty());
     }
 
     #[test]
@@ -178,10 +208,14 @@ mod tests {
 
         // Try to retrieve messages with a different scope
         let result = br_db.get_msgs_by_scope(&[1, 1, 1]);
+        assert!(result.is_err());
+
+        // Try to retrieve messages with a different scope
+        let result = br_db.get_msgs_by_scope(&[0, 10, 0, 0, 0]);
         assert!(result.is_ok());
 
         // Should be empty since no message has the scope [1, 1, 1]
         let msgs = result.unwrap();
-        assert!(msgs.is_none());
+        assert!(msgs.is_empty());
     }
 }

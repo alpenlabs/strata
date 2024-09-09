@@ -28,6 +28,7 @@ use alpen_express_primitives::{
     block_credential,
     buf::Buf32,
     params::{Params, RollupParams, RunParams},
+    utils::get_test_schnorr_keys,
 };
 use alpen_express_rocksdb::{
     broadcaster::db::BroadcastDatabase, sequencer::db::SequencerDB, DbOpsConfig, SeqDb,
@@ -117,6 +118,7 @@ fn default_rollup_params() -> RollupParams {
         ),
         l1_reorg_safe_depth: 4,
         batch_l2_blocks_target: 64,
+        operator_signing_keys: Vec::from(get_test_schnorr_keys()),
     }
 }
 
@@ -364,6 +366,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     let (message_tx, message_rx) = tokio::sync::mpsc::channel::<BridgeMessage>(100);
     let cloned_status_rx = status_rx.clone();
+    let bridge_config = config.bridge;
 
     executor.spawn_critical_async("main-rpc", async {
         start_rpc(
@@ -383,10 +386,18 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     let cloned_bridge_msg_ops = bridge_msg_ops.clone();
     let cloned_status_rx = status_rx.clone();
+    let bridge_config = Arc::new(bridge_config);
 
     executor.spawn_critical_async("bridge-msg", async {
-        let msg_mgr = MsgState::new();
-        bridge_msg_worker_task(cloned_bridge_msg_ops, cloned_status_rx, msg_mgr, message_rx).await;
+        let msg_mgr = MsgState::new(bridge_config.clone());
+        bridge_msg_worker_task(
+            cloned_bridge_msg_ops,
+            cloned_status_rx,
+            msg_mgr,
+            message_rx,
+            bridge_config,
+        )
+        .await;
     });
 
     task_manager.start_signal_listeners();

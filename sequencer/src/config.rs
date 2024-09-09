@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use alpen_express_bridge_msg::types::BridgeParams;
 use alpen_express_btcio::reader::config::ReaderConfig;
 use bitcoin::Network;
 use serde::Deserialize;
@@ -50,6 +51,7 @@ pub struct Config {
     pub bitcoind_rpc: BitcoindParams,
     pub sync: SyncParams,
     pub exec: ExecParams,
+    pub bridge: BridgeParams,
 }
 
 impl Config {
@@ -97,6 +99,10 @@ impl Config {
                                                                            * secret should be
                                                                            * Option */
                 },
+            },
+            bridge: BridgeParams {
+                refresh_interval: 100,
+                bandwidth: 500,
             },
         })
     }
@@ -173,6 +179,10 @@ mod test {
             [exec.reth]
             rpc_url = "http://localhost:8551"
             secret = "1234567890abcdef"
+
+            [bridge]
+            refresh_interval = 100
+            bandwidth = 500
         "#;
 
         assert!(toml::from_str::<Config>(config_string).is_ok());

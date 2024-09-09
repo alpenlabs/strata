@@ -1,14 +1,13 @@
-use borsh::{BorshDeserialize, BorshSerialize};
+use borsh::BorshSerialize;
+use rand::rngs::OsRng;
+use secp256k1::{
+    schnorr::{self, Signature},
+    Keypair, Message, Secp256k1, SecretKey, XOnlyPublicKey,
+};
 use sha2::{Digest, Sha256};
+use tracing::info;
 
 use crate::types::BridgeMessage;
-
-/// Deserializes a [`BridgeMessage`] from a hexadecimal string representation of binary data.
-pub fn deserialize_bridge_message(binary_data: &[u8]) -> anyhow::Result<BridgeMessage> {
-    // deserialize message
-    let msg: BridgeMessage = BorshDeserialize::try_from_slice(binary_data)?;
-    Ok(msg)
-}
 
 /// Serializes a [`BridgeMessage`] into a hexadecimal string with an appended CRC32 checksum.
 pub fn serialize_bridge_message(msg: &BridgeMessage) -> anyhow::Result<Vec<u8>> {
@@ -23,47 +22,52 @@ pub fn compute_sha256(payload: &[u8]) -> [u8; 32] {
     Sha256::digest(payload).into()
 }
 
-/// Validates the SHA-256 hash of a given payload against the provided hash bytes.
-pub fn check_sha256(payload: &[u8], hash_bytes: &[u8]) -> bool {
-    let computed_hash = compute_sha256(payload);
-    *hash_bytes == computed_hash[0..4]
+pub fn check_signature_validity(
+    signing_pk: [u8; 32],
+    payload: &[u8],
+    signature: [u8; 64],
+) -> anyhow::Result<bool> {
+    let signing_pk = XOnlyPublicKey::from_slice(&signing_pk)?;
+
+    let msg = Message::from_digest(compute_sha256(payload));
+
+    let sig = schnorr::Signature::from_slice(&signature)?;
+
+    if sig.verify(&msg, &signing_pk).is_err() {
+        info!("message signature validation failed");
+        return Ok(false);
+    }
+
+    Ok(true)
+}
+
+pub fn sign_message(payload: &[u8], sk: [u8; 32]) -> Signature {
+    let secp = Secp256k1::new();
+    let mut rng = OsRng;
+
+    let keypair = Keypair::from_secret_key(&secp, &SecretKey::from_slice(&sk).unwrap());
+
+    let msg = Message::from_digest(compute_sha256(payload));
+
+    secp.sign_schnorr_with_rng(&msg, &keypair, &mut rng)
 }
 
 #[cfg(test)]
 mod tests {
-    use alpen_express_primitives::buf::Buf64;
-    use alpen_express_state::chain_state::get_schnorr_keys;
-    use rand::rngs::OsRng;
-    use secp256k1::{Keypair, Message, Secp256k1, SecretKey};
+    use alpen_express_primitives::{buf::Buf64, utils::get_test_schnorr_keys};
+    use borsh::from_slice;
 
     use super::*;
     use crate::{types::Scope, utils::BridgeMessage};
 
     #[test]
-    fn test_serialize_deserialize_bridge_message() {
+    fn test_signing_veryfying_message() {
         // payload
         let dummy_payload = vec![1, 2, 3, 4, 5, 6, 7];
-        // signing the keys
-        let secp = Secp256k1::new();
-        let mut rng = OsRng;
+        let signature = get_test_schnorr_keys();
 
-        // Create a message from the payload
-        let msg = Message::from_digest(compute_sha256(&dummy_payload));
-        println!("{:?}", msg);
+        let sig = sign_message(&dummy_payload, *signature[0].sk.as_ref());
 
-        // Sign the message with Schnorr signature
-
-        let signature = get_schnorr_keys();
-        let keypair = Keypair::from_secret_key(
-            &secp,
-            &SecretKey::from_slice(signature[0][0].as_ref()).unwrap(),
-        );
-        println!("{:?}", keypair);
-
-        let sig = secp.sign_schnorr_with_rng(&msg, &keypair, &mut rng);
-
-        println!("{:?}", keypair.x_only_public_key().0.serialize());
-        println!("{:?}", keypair.secret_key());
         // Create a sample BridgeMessage
         let scope = Scope::V0DepositSig(10);
         let original_message = BridgeMessage {
@@ -72,17 +76,23 @@ mod tests {
             scope,
             payload: dummy_payload,
         };
-        println!("{:?}", original_message);
 
         // Serialize the message
         let serialized_msg =
             serialize_bridge_message(&original_message).expect("Serialization failed");
 
-        println!("{:?}", hex::encode(serialized_msg.clone()));
+        // check if the signed message is valid
+        assert!(check_signature_validity(
+            *signature[0].pk.as_ref(),
+            original_message.payload(),
+            *original_message.signature().as_ref()
+        )
+        .unwrap());
+        // assert!(check_signature_validity(*signature[0].pk.as_ref(), original_message.payload(),
+        // *original_message.signature().as_ref()).unwrap());
 
         // Deserialize the message
-        let deserialized_msg =
-            deserialize_bridge_message(&serialized_msg).expect("Deserialization failed");
+        let deserialized_msg: BridgeMessage = from_slice::<BridgeMessage>(&serialized_msg).unwrap();
 
         // Assert that the original and deserialized messages are the same
         assert_eq!(original_message, deserialized_msg);

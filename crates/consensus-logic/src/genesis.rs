@@ -8,7 +8,7 @@ use alpen_express_primitives::{
 use alpen_express_state::{
     block::{ExecSegment, L1Segment, L2BlockAccessory, L2BlockBundle},
     bridge_state::OperatorTable,
-    chain_state::{get_schnorr_keys, ChainState, GenesisStateConfig},
+    chain_state::{ChainState, GenesisStateConfig},
     client_state::ClientState,
     exec_env::ExecEnvState,
     exec_update::{ExecUpdate, UpdateInput, UpdateOutput},
@@ -70,10 +70,9 @@ pub fn init_genesis_chainstate(
     let l1vs = L1ViewState::new_at_genesis(horizon_blk_height, genesis_blk_height, genesis_blk_rec);
 
     let mut operator_table = OperatorTable::new_empty();
-    let keys = get_schnorr_keys();
 
-    for key in keys {
-        operator_table.insert(key[1], Buf32::zero());
+    for key in params.rollup().operator_signing_keys.clone() {
+        operator_table.insert(key.pk, Buf32::zero());
     }
 
     let genesis_config = GenesisStateConfig::new(operator_table);

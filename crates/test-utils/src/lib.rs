@@ -4,7 +4,6 @@ use arbitrary::{Arbitrary, Unstructured};
 use rand::RngCore;
 
 pub mod bitcoin;
-pub mod keys;
 pub mod l2;
 
 const ARB_GEN_LEN: usize = 1 << 24; // 16 MiB

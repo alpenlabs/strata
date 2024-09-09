@@ -39,6 +39,7 @@ use bitcoin::{
     hashes::Hash,
     Transaction as BTransaction, Txid,
 };
+use borsh::{from_slice, BorshDeserialize};
 use express_storage::ops::bridgemsg::BridgeMsgOps;
 use jsonrpsee::{
     core::RpcResult,
@@ -587,20 +588,19 @@ impl AlpenBridgeMsgApiServer for AdminBridgeMsgImpl {
             .iter()
             .map(|msg| {
                 let msg = alpen_express_bridge_msg::utils::serialize_bridge_message(msg)
-                    .map_err(|_| Error::Serialization)?;
+                    .map_err(|_| Error::Serialization)
+                    .unwrap();
 
-                Ok::<HexBytes, Error>(HexBytes(msg))
+                HexBytes(msg)
             })
-            .map(|m| m.unwrap())
             .collect::<Vec<HexBytes>>();
 
         Ok(serialized_messages)
     }
 
     async fn submit_raw_msg(&self, raw_msg: HexBytes) -> RpcResult<()> {
-        let deserialized_msg =
-            alpen_express_bridge_msg::utils::deserialize_bridge_message(raw_msg.as_ref())
-                .map_err(|_| Error::Deserialization)?;
+        let deserialized_msg: BridgeMessage =
+            from_slice::<BridgeMessage>(raw_msg.as_ref()).map_err(|_| Error::Deserialization)?;
 
         if let Err(e) = self.message_tx.send(deserialized_msg).await {
             return Err(Error::Other("failed to send bridge message".to_string()).into());
