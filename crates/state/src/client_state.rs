@@ -249,4 +249,8 @@ impl CheckPointInfo {
             l2_range,
         }
     }
+
+    pub fn checkpoint_idx(&self) -> u64 {
+        self.checkpoint_idx
+    }
 }

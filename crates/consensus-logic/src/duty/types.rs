@@ -1,9 +1,9 @@
 //! Sequencer duties.
 
-use std::time;
+use std::{ops::Deref, time};
 
 use alpen_express_primitives::{buf::Buf32, hash::compute_borsh_hash};
-use alpen_express_state::id::L2BlockId;
+use alpen_express_state::{client_state::CheckPointInfo, id::L2BlockId};
 use borsh::{BorshDeserialize, BorshSerialize};
 
 /// Describes when we'll stop working to fulfill a duty.
@@ -20,6 +20,9 @@ pub enum Expiry {
 
     /// Duty expires after a specific L2 block is finalized
     BlockIdFinalized(L2BlockId),
+
+    /// Duty expires after a specific checkpoint is confirmed on bitcoin
+    CheckpointIdxConfirmed(u64),
 }
 
 /// Duties the sequencer might carry out.
@@ -27,6 +30,8 @@ pub enum Expiry {
 pub enum Duty {
     /// Goal to sign a block.
     SignBlock(BlockSigningDuty),
+    /// Goal to build a batch.
+    BuildBatch(BatchBuildDuty),
     /// Goal to write batch data to L1
     CommitBatch(BatchCommitmentDuty),
 }
@@ -39,6 +44,7 @@ impl Duty {
             Self::CommitBatch(BatchCommitmentDuty { blockid, .. }) => {
                 Expiry::BlockIdFinalized(*blockid)
             }
+            Self::BuildBatch(duty) => Expiry::CheckpointIdxConfirmed(duty.checkpoint_idx()),
         }
     }
 
@@ -67,6 +73,24 @@ impl BlockSigningDuty {
 
     pub fn parent(&self) -> L2BlockId {
         self.parent
+    }
+}
+
+/// This duty is created whenever a previous batch is found on L1 and verified.
+/// When this duty is created, in order to execute the duty, the sequencer looks for corresponding
+/// batch proof in the proof db. After the proof is found, this duty is considered done and another
+/// duty [`BatchCommitmentDuty`] is created.
+#[derive(Clone, Debug, BorshSerialize)]
+pub struct BatchBuildDuty {
+    /// Checkpoint/batch info
+    inner: CheckPointInfo,
+}
+
+impl Deref for BatchBuildDuty {
+    type Target = CheckPointInfo;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
     }
 }
 
@@ -139,6 +163,11 @@ impl DutyTracker {
                     if update.is_finalized(&l2blockid) {
                         continue;
                     }
+                }
+                Expiry::CheckpointIdxConfirmed(idx) => {
+                    // TODO, how do we get checkpoint idx from state here? It would be nice to have
+                    // a reference to current client state in the function argument rather than
+                    // StateUpdate
                 }
             }
 
