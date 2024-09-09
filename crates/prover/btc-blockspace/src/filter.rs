@@ -6,12 +6,12 @@ use std::str::FromStr;
 use bitcoin::{opcodes::all::OP_RETURN, Address, Block, Transaction};
 use serde::{Deserialize, Serialize};
 
-use crate::logic::ScanParams;
+use crate::logic::ScanRuleConfig;
 
 const SOME_ALP_MAGIC: [u8; 32] = [1; 32];
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Deposit {
+pub struct DepositRequestData {
     pub to: [u8; 20],
     pub amount: u64,
 }
@@ -22,8 +22,8 @@ pub type StateUpdate = Vec<u8>;
 /// Note: This needs to be consistent with the logic in other places
 /// This is used as the placeholder logic for now
 /// TODO: Use the same logic
-fn extract_deposit(tx: &Transaction, bridge_address: &Address) -> Option<Deposit> {
-    // Deposit Tx
+fn extract_deposit(tx: &Transaction, bridge_address: &Address) -> Option<DepositRequestData> {
+    // DepositRequestData Tx
     // ________________________________________
     //            | n-of-n
     // txin       | 0.5 BTC
@@ -56,7 +56,7 @@ fn extract_deposit(tx: &Transaction, bridge_address: &Address) -> Option<Deposit
         return None;
     }
 
-    Some(Deposit {
+    Some(DepositRequestData {
         to: bytes[35..55].try_into().unwrap(),
         amount: tx.output[0].value.to_sat(),
     })
@@ -78,13 +78,17 @@ fn extract_state_update(_tx: &Transaction) -> Option<ForcedInclusion> {
 
 pub fn extract_relevant_transactions(
     block: &Block,
-    scan_params: &ScanParams,
-) -> (Vec<Deposit>, Vec<ForcedInclusion>, Vec<StateUpdate>) {
+    scan_rule: &ScanRuleConfig,
+) -> (
+    Vec<DepositRequestData>,
+    Vec<ForcedInclusion>,
+    Vec<StateUpdate>,
+) {
     let mut deposits = Vec::new();
     let mut forced_inclusions = Vec::new();
     let mut state_updates = Vec::new();
 
-    let bridge_address = Address::from_str(&scan_params.bridge_address)
+    let bridge_address = Address::from_str(&scan_rule.bridge_address)
         .unwrap()
         .assume_checked();
 
