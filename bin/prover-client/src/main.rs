@@ -11,6 +11,7 @@ use worker::consumer_worker;
 
 pub(crate) mod constants;
 pub(crate) mod models;
+pub(crate) mod proving;
 pub(crate) mod rpc_server;
 pub(crate) mod task_tracker;
 pub(crate) mod worker;

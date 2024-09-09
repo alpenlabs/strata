@@ -4,6 +4,7 @@ pub mod client_state;
 pub mod l1;
 pub mod l2;
 pub mod macros;
+pub mod prover;
 pub mod sequencer;
 pub mod sync_event;
 #[cfg(feature = "test_utils")]
