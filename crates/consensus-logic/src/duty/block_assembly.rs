@@ -44,7 +44,6 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     database: &D,
     engine: &E,
     params: &Arc<Params>,
-    chs_tx: watch::Sender<Option<ChainState>>,
 ) -> Result<Option<(L2BlockId, L2Block)>, Error> {
     debug!("preparing block");
     let l1_prov = database.l1_provider();
@@ -121,9 +120,6 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     // TODO do something with the write batch?  to prepare it in the database?
     let (post_state, _wb) = compute_post_state(prev_chstate, &fake_header, &body, params)?;
     let new_state_root = post_state.compute_state_root();
-    if chs_tx.send(Some(post_state)).is_err() {
-        warn!("chain state receiver dropped");
-    }
 
     let header = L2BlockHeader::new(slot, ts, prev_block_id, &body, new_state_root);
     let header_sig = sign_header(&header, ik);

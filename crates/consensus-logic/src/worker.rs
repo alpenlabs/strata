@@ -223,8 +223,8 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
     status.update_from_client_state(new_state.as_ref());
     let client_state = new_state.as_ref().clone();
 
-    let _ = status_tx.csm.send(status);
-    let _ = status_tx.cl.send(client_state);
+    status_tx.update_csm_status(&status);
+    status_tx.update_client_state(&client_state);
 
     let update = ClientUpdateNotif::new(ev_idx, outp, new_state);
     if state.cupdate_tx.send(Arc::new(update)).is_err() {

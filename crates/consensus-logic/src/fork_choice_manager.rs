@@ -12,6 +12,7 @@ use alpen_express_state::{
     block::L2BlockBundle, client_state::ClientState, operation::SyncAction, prelude::*,
     state_op::StateCache, sync_event::SyncEvent,
 };
+use alpen_express_status::StatusTx;
 use express_storage::L2BlockManager;
 use express_tasks::ShutdownGuard;
 use tokio::sync::mpsc;
@@ -39,6 +40,9 @@ pub struct ForkChoiceManager<D: Database> {
     /// Tracks unfinalized block tips.
     chain_tracker: unfinalized_tracker::UnfinalizedBlockTracker,
 
+    /// general status wrapper.
+    status_tx: Arc<StatusTx>,
+
     /// Current best block.
     // TODO make sure we actually want to have this
     cur_best_block: L2BlockId,
@@ -56,6 +60,7 @@ impl<D: Database> ForkChoiceManager<D> {
         l2_block_manager: Arc<L2BlockManager>,
         cur_csm_state: Arc<ClientState>,
         chain_tracker: unfinalized_tracker::UnfinalizedBlockTracker,
+        status_tx: Arc<StatusTx>,
         cur_best_block: L2BlockId,
         cur_index: u64,
     ) -> Self {
@@ -65,6 +70,7 @@ impl<D: Database> ForkChoiceManager<D> {
             l2_block_manager,
             cur_csm_state,
             chain_tracker,
+            status_tx,
             cur_best_block,
             cur_index,
         }
@@ -110,6 +116,7 @@ pub fn init_forkchoice_manager<D: Database>(
     params: &Arc<Params>,
     init_csm_state: Arc<ClientState>,
     fin_tip_blkid: L2BlockId,
+    status_tx: Arc<StatusTx>,
 ) -> anyhow::Result<ForkChoiceManager<D>> {
     // Load data about the last finalized block so we can use that to initialize
     // the finalized tracker.
@@ -132,6 +139,7 @@ pub fn init_forkchoice_manager<D: Database>(
         l2_block_manager.clone(),
         init_csm_state,
         chain_tracker,
+        status_tx,
         cur_tip_blkid,
         cur_tip_index,
     );
@@ -228,6 +236,7 @@ pub fn tracker_task<D: Database, E: ExecEngineCtl>(
     mut fcm_rx: mpsc::Receiver<ForkChoiceMessage>,
     csm_ctl: Arc<CsmController>,
     params: Arc<Params>,
+    status_tx: Arc<StatusTx>,
 ) {
     // Wait until the CSM gives us a state we can start from.
     info!("waiting for CSM ready");
@@ -260,6 +269,7 @@ pub fn tracker_task<D: Database, E: ExecEngineCtl>(
         &params,
         init_state,
         cur_fin_tip,
+        status_tx,
     ) {
         Ok(fcm) => fcm,
         Err(e) => {
@@ -577,6 +587,8 @@ fn apply_tip_update<D: Database>(
         // to apply an update.
         updates.push((block_idx, blkid, wb));
     }
+
+    state.status_tx.update_chain_state(&pre_state);
 
     // Check to see if we need to roll back to a previous state in order to
     // compute new states.

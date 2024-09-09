@@ -21,9 +21,9 @@ class BridgeMsgTest(flexitest.Test):
         #                 scope: [197], payload: [] }
         blobdata = "".join(
             [
-                "00000000d2cff500e063f9f4b4d8bd842eae6f9b17833e997779bab28397ab72",
-                "2f1fdead39e8a378f8c15328076ae1cb45ce26aeb07bf6864d52f924658b141a",
-                "a72425d4000a0000000700000001020304050607aa44af3c",
+                "0000000069b125a60f343e833805e9c55bdd42953b6803ac0e262145",
+                "005dd038e69c91a73d7773ecf4f236fa94b9356c41ab4993e5cd51d1",
+                "ab744f3b4258d47f26e03f01000a0000000700000001020304050607",
             ]
         )
 

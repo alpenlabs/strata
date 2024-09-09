@@ -349,7 +349,6 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
 
             let asm_span = info_span!("blockasm", %target_slot);
             let _span = asm_span.enter();
-            let chs_tx = sync_man.status_tx().chs.clone();
 
             let Some((blkid, _block)) = block_assembly::sign_and_store_block(
                 target_slot,
@@ -359,7 +358,6 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
                 database,
                 engine,
                 params,
-                chs_tx,
             )?
             else {
                 return Ok(());

@@ -7,6 +7,7 @@ use alpen_express_state::{
 };
 use thiserror::Error;
 use tokio::sync::watch;
+use tracing::warn;
 
 #[derive(Debug, Error)]
 pub enum StatusError {
@@ -23,6 +24,32 @@ pub struct StatusRx {
     pub cl: watch::Receiver<ClientState>,
     pub l1: watch::Receiver<L1Status>,
     pub chs: watch::Receiver<Option<ChainState>>,
+}
+
+impl StatusTx {
+    pub fn update_chain_state(&self, post_state: &ChainState) {
+        if self.chs.send(Some(post_state.clone())).is_err() {
+            warn!("chain state receiver dropped");
+        }
+    }
+
+    pub fn update_client_state(&self, post_state: &ClientState) {
+        if self.cl.send(post_state.clone()).is_err() {
+            warn!("client state receiver dropped");
+        }
+    }
+
+    pub fn update_l1_status(&self, post_state: &L1Status) {
+        if self.l1.send(post_state.clone()).is_err() {
+            warn!("l1 status receiver dropped");
+        }
+    }
+
+    pub fn update_csm_status(&self, post_state: &CsmStatus) {
+        if self.csm.send(post_state.clone()).is_err() {
+            warn!("csm status receiver dropped");
+        }
+    }
 }
 
 /// Bundle wrapper for Status sender
