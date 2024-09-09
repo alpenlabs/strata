@@ -144,6 +144,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "alpen-btc-blockspace-risc0-proof"
+version = "0.1.0"
+dependencies = [
+ "bitcoin",
+ "btc-blockspace",
+ "risc0-zkvm",
+]
+
+[[package]]
 name = "alpen-express-primitives"
 version = "0.1.0"
 dependencies = [
@@ -623,18 +632,8 @@ version = "0.1.0"
 dependencies = [
  "alpen-express-primitives",
  "bitcoin",
- "borsh",
  "serde",
  "sha2",
-]
-
-[[package]]
-name = "btc-blockspace-risc0"
-version = "0.1.0"
-dependencies = [
- "bitcoin",
- "btc-blockspace",
- "risc0-zkvm",
 ]
 
 [[package]]

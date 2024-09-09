@@ -1,6 +1,6 @@
 [package]
 edition = "2021"
-name = "btc-blockspace-risc0"
+name = "alpen-btc-blockspace-risc0-proof"
 version = "0.1.0"
 
 [workspace]

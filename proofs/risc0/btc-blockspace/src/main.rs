@@ -1,9 +1,9 @@
 use bitcoin::{consensus::deserialize, Block};
-use btc_blockspace::logic::{process_blockspace_proof, BlockspaceProofInput, ScanParams};
+use btc_blockspace::logic::{process_blockspace_proof, BlockspaceProofInput, ScanRuleConfig};
 use risc0_zkvm::guest::env;
 
 fn main() {
-    let scan_config: ScanParams = env::read();
+    let scan_config: ScanRuleConfig = env::read();
 
     let len: u32 = env::read();
     let mut slice = vec![0u8; len as usize];
