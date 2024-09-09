@@ -120,6 +120,15 @@ pub fn process_event<D: Database>(
                 // load the state updates from L1 or something
                 let l2prov = database.l2_provider();
 
+                // Get l1,l2 tip idx
+                let tip_blkid = *ss.chain_tip_blkid();
+                let block = l2prov
+                    .get_block_data(tip_blkid)?
+                    .ok_or(Error::MissingL2Block(tip_blkid))?;
+
+                let l2_tip_idx = block.header().blockidx();
+                let l1_tip_idx = state.l1_view().tip_height();
+
                 for id in blkids {
                     let _block = l2prov
                         .get_block_data(*id)?
@@ -132,6 +141,9 @@ pub fn process_event<D: Database>(
                 // When DABatch appears, it is only confirmed at the moment. These will be finalized
                 // only when the corresponding L1 block is buried enough
                 writes.push(ClientStateWrite::UpdateConfirmed(*height, *last));
+                writes.push(ClientStateWrite::UpdateNextCheckpointInfo(
+                    l1_tip_idx, l2_tip_idx,
+                ));
             } else {
                 // TODO we can expand this later to make more sense
                 return Err(Error::MissingClientSyncState);
