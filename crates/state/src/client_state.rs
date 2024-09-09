@@ -3,6 +3,8 @@
 //! implement the consensus logic.
 // TODO move this to another crate that contains our sync logic
 
+use std::ops::RangeInclusive;
+
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
@@ -42,7 +44,7 @@ impl ClientState {
         Self {
             chain_active: false,
             sync_state: None,
-            local_l1_view: LocalL1State::new(horizon_l1_height),
+            local_l1_view: LocalL1State::new(horizon_l1_height, 0),
             horizon_l1_height,
             genesis_l1_height,
         }
@@ -151,6 +153,9 @@ pub struct LocalL1State {
 
     /// Next L1 block height we expect to receive
     pub(super) next_expected_block: u64,
+
+    /// Next checkpoint that we expect to see. This is None for full nodes and Some for sequencer.
+    pub(super) next_checkpoint_info: Option<CheckPointInfo>,
 }
 
 impl LocalL1State {
@@ -159,14 +164,21 @@ impl LocalL1State {
     /// # Panics
     ///
     /// If we try to construct it in a way that implies we don't have the L1 genesis block.
-    pub fn new(next_expected_block: u64) -> Self {
+    pub fn new(next_expected_block: u64, next_checkpoint_idx: u64) -> Self {
         if next_expected_block == 0 {
             panic!("clientstate: tried to construct without known L1 genesis block");
         }
 
+        let next_checkpoint_info = Some(CheckPointInfo::new(
+            next_checkpoint_idx,
+            next_expected_block..=next_expected_block,
+            0..=0, // Maybe this should also come from arguments
+        ));
+
         Self {
             local_unaccepted_blocks: Vec::new(),
             next_expected_block,
+            next_checkpoint_info,
         }
     }
 
@@ -203,5 +215,29 @@ impl LocalL1State {
 
     pub fn tip_blkid(&self) -> Option<&L1BlockId> {
         self.local_unaccepted_blocks().last()
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
+pub struct CheckPointInfo {
+    /// The index of the checkpoint
+    checkpoint_idx: u64,
+    /// L1 height range the checkpoint covers
+    l1_range: RangeInclusive<u64>,
+    /// L2 height range the checkpoint covers
+    l2_range: RangeInclusive<u64>,
+}
+
+impl CheckPointInfo {
+    pub fn new(
+        checkpoint_idx: u64,
+        l1_range: RangeInclusive<u64>,
+        l2_range: RangeInclusive<u64>,
+    ) -> Self {
+        Self {
+            checkpoint_idx,
+            l1_range,
+            l2_range,
+        }
     }
 }
