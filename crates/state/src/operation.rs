@@ -69,6 +69,10 @@ pub enum ClientStateWrite {
 
     /// Update the l2 block whose batch proof has been finalized.
     UpdateFinalized(L2BlockId),
+
+    /// Update the next checkpoint info for which a batch proof needs to be created and posted to
+    /// L1. This has l1_tip_height and l2_tip_height
+    UpdateNextCheckpointInfo(u64, u64),
 }
 
 /// Actions the client state machine directs the node to take to update its own
@@ -186,6 +190,18 @@ pub fn apply_writes_to_state(
             UpdateConfirmed(l1height, blkid) => {
                 let ss = state.expect_sync_mut();
                 ss.confirmed_checkpoint_blocks.push((l1height, blkid));
+            }
+
+            UpdateNextCheckpointInfo(l1_tip, l2_tip) => {
+                // Update next_checkpoint state.
+                // We might need to do this when the block is buried
+                let checkpoint_info =
+                    state.l1_view_mut().next_checkpoint_info.as_mut().expect(
+                        "missing next_checkpoint_info while executing UpdateConfirmed write",
+                    );
+                checkpoint_info.checkpoint_idx += 1;
+                checkpoint_info.l1_range = checkpoint_info.l1_range.start() + 1..=l1_tip;
+                checkpoint_info.l2_range = checkpoint_info.l2_range.start() + 1..=l2_tip;
             }
         }
     }

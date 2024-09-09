@@ -230,11 +230,11 @@ impl LocalL1State {
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
 pub struct CheckPointInfo {
     /// The index of the checkpoint
-    checkpoint_idx: u64,
+    pub(super) checkpoint_idx: u64,
     /// L1 height range the checkpoint covers
-    l1_range: RangeInclusive<u64>,
+    pub(super) l1_range: RangeInclusive<u64>,
     /// L2 height range the checkpoint covers
-    l2_range: RangeInclusive<u64>,
+    pub(super) l2_range: RangeInclusive<u64>,
 }
 
 impl CheckPointInfo {
