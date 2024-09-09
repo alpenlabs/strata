@@ -22,3 +22,6 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 uuid = { version = "1.0", features = ["v4", "serde"] }
+alpen-express-rocksdb = { workspace = true }
+express-zkvm = { workspace = true }
+rayon = "1.8.0"

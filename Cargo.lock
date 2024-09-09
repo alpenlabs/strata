@@ -3845,11 +3845,14 @@ name = "express-prover-client"
 version = "0.1.0"
 dependencies = [
  "alpen-express-common",
+ "alpen-express-rocksdb",
  "anyhow",
  "argh",
  "async-trait",
  "express-prover-client-rpc-api",
+ "express-zkvm",
  "jsonrpsee",
+ "rayon",
  "serde",
  "thiserror",
  "tokio",
