@@ -84,6 +84,26 @@ pub fn compute_reorg(
         .take(limit_depth)
         .collect();
 
+    if down_blocks.is_empty() || up_blocks.is_empty() {
+        return None;
+    }
+
+    // Now trim the vectors such that they start from the same ancestor
+    if let Some(pos) = up_blocks
+        .iter()
+        .position(|&x| x == *down_blocks.last().unwrap())
+    {
+        up_blocks.drain(pos + 1..);
+    } else if let Some(pos) = down_blocks
+        .iter()
+        .position(|&x| x == *up_blocks.last().unwrap())
+    {
+        down_blocks.drain(pos + 1..);
+    } else {
+        return None;
+    }
+
+    // Now reverse so that common ancestor is at the beginning
     down_blocks.reverse();
     up_blocks.reverse();
 
@@ -373,5 +393,85 @@ mod tests {
         eprintln!("expected {exp_reorg:#?}\nfound {reorg:#?}");
         assert_eq!(reorg, exp_reorg);
         assert!(reorg.is_identity());
+    }
+
+    #[test]
+    fn test_longer_down_depth_less_than_chain_length() {
+        let base = rand_blkid();
+        let mut tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(base);
+
+        // Set up the two branches.
+        let side_1 = [base, rand_blkid(), rand_blkid(), rand_blkid(), rand_blkid()];
+        let side_2 = [side_1[1], rand_blkid(), rand_blkid()];
+        let limit_depth = 4; // This is not larger than the longest chain length
+        eprintln!("base {base:?}\nside1 {side_1:#?}\nside2 {side_2:#?}");
+
+        let exp_reorg = Reorg {
+            down: vec![side_1[4], side_1[3], side_1[2]],
+            pivot: side_1[1],
+            up: vec![side_2[1], side_2[2]],
+        };
+
+        // Insert them.
+        side_1
+            .windows(2)
+            .for_each(|pair| tracker.insert_fake_block(pair[1], pair[0]));
+        side_2
+            .windows(2)
+            .for_each(|pair| tracker.insert_fake_block(pair[1], pair[0]));
+
+        let reorg = compute_reorg(
+            side_1.last().unwrap(),
+            side_2.last().unwrap(),
+            limit_depth,
+            &tracker,
+        );
+
+        let reorg = reorg.expect("test: reorg not found");
+        eprintln!("expected {exp_reorg:#?}\nfound {reorg:#?}");
+        assert_eq!(reorg, exp_reorg);
+    }
+
+    #[test]
+    fn test_longer_up_depth_less_than_chain_length() {
+        let base = rand_blkid();
+        let mut tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(base);
+
+        // Set up the two branches.
+        let side_1 = [base, rand_blkid(), rand_blkid(), rand_blkid()];
+        let side_2 = [
+            side_1[1],
+            rand_blkid(),
+            rand_blkid(),
+            rand_blkid(),
+            rand_blkid(),
+        ];
+        let limit_depth = 5; // This is not larger than the longest chain length
+        eprintln!("base {base:?}\nside1 {side_1:#?}\nside2 {side_2:#?}");
+
+        let exp_reorg = Reorg {
+            down: vec![side_1[3], side_1[2]],
+            pivot: side_1[1],
+            up: vec![side_2[1], side_2[2], side_2[3], side_2[4]],
+        };
+
+        // Insert them.
+        side_1
+            .windows(2)
+            .for_each(|pair| tracker.insert_fake_block(pair[1], pair[0]));
+        side_2
+            .windows(2)
+            .for_each(|pair| tracker.insert_fake_block(pair[1], pair[0]));
+
+        let reorg = compute_reorg(
+            side_1.last().unwrap(),
+            side_2.last().unwrap(),
+            limit_depth,
+            &tracker,
+        );
+
+        let reorg = reorg.expect("test: reorg not found");
+        eprintln!("expected {exp_reorg:#?}\nfound {reorg:#?}");
+        assert_eq!(reorg, exp_reorg);
     }
 }
