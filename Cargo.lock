@@ -3841,6 +3841,26 @@ dependencies = [
  "rand 0.8.5",
  "serde",
  "serde_json",
+name = "express-prover-client"
+version = "0.1.0"
+dependencies = [
+ "alpen-express-common",
+ "anyhow",
+ "argh",
+ "async-trait",
+ "express-prover-client-rpc-api",
+ "jsonrpsee",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-subscriber 0.3.18",
+]
+
+[[package]]
+name = "express-prover-client-rpc-api"
+version = "0.1.0"
+dependencies = [
+ "jsonrpsee",
 ]
 
 [[package]]
