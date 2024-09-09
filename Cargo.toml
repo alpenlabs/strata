@@ -25,6 +25,7 @@ members = [
   "crates/reth/rpc",
   "crates/rpc/api",
   "crates/rpc/bridge-api",
+  "crates/rpc/prover-client-api",
   "crates/rpc/types",
   "crates/rpc/utils",
   "crates/state",
@@ -40,6 +41,7 @@ members = [
 
   # binaries listed separately
   "bin/bridge-client",
+  "bin/prover-client",
   "reth",
   "sequencer",
 
@@ -83,7 +85,9 @@ express-rpc-utils = { path = "crates/rpc/utils" }
 express-storage = { path = "crates/storage" }
 express-sync = { path = "crates/sync" }
 express-tasks = { path = "crates/tasks" }
-express-zkvm = { path = "crates/zkvm/zkvm" }                                     # FIXME make these names more consistent?
+express-zkvm = { path = "crates/prover/zkvm" }                                   # FIXME make these names more consistent?
+zkvm = { path = "crates/prover/zkvm" }
+zkvm-primitives = { path = "crates/prover/primitives" }
 
 # IMPORTANT: ensure alloy-* and revm packages are of the same version as inside reth dependency
 alloy-genesis = { version = "0.2", default-features = false }
