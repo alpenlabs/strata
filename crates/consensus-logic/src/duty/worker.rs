@@ -409,6 +409,10 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
 
             Ok(())
         }
+        Duty::BuildBatch(data) => {
+            // TODO: check in database if proof corresponding to this is present
+            Ok(())
+        }
     }
 }
 
