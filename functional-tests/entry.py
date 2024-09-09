@@ -306,6 +306,16 @@ class RethFactory(flexitest.Factory):
             return svc
 
 
+class ProverClientFactory(flexitest.Factory):
+    def __init__(self, port_range: list[int]):
+        super().__init__(port_range)
+
+    @flexitest.with_ectx("ctx")
+    def create_prover_client(self, ctx: flexitest.EnvContext,):
+        datadir = ctx.make_service_dir("prover_client")
+        rpc_port = self.next_port()
+        logfile = os.path.join(datadir, "service.log")
+
 class BasicEnvConfig(flexitest.EnvConfig):
     def __init__(
         self,
