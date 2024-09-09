@@ -1,9 +1,11 @@
 //! Prover client.
 
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use alpen_express_common::logging;
-use models::RpcContext;
+use express_risc0_adapter::RiscZeroHost;
+use express_zkvm::{ProverOptions, ZKVMHost};
+use models::{ProofGenConfig, RpcContext};
 use rpc_server::ProverClientRpc;
 use task_tracker::TaskTracker;
 use tracing::info;
@@ -24,8 +26,15 @@ async fn main() {
     let task_tracker = Arc::new(TaskTracker::new());
     let rpc_context = RpcContext::new(Arc::clone(&task_tracker));
 
+    let mut vm_map: HashMap<u8, RiscZeroHost> = HashMap::new();
+    vm_map.insert(0, RiscZeroHost::init(vec![], ProverOptions::default()));
+    vm_map.insert(1, RiscZeroHost::init(vec![], ProverOptions::default()));
+    vm_map.insert(2, RiscZeroHost::init(vec![], ProverOptions::default()));
+
+    let prover: proving::Prover<RiscZeroHost> =
+        proving::Prover::new(3, vm_map, Arc::new(ProofGenConfig::Skip));
     // Spawn consumer worker
-    tokio::spawn(consumer_worker(Arc::clone(&task_tracker)));
+    tokio::spawn(consumer_worker(Arc::clone(&task_tracker), prover));
 
     run_rpc_server(rpc_context)
         .await

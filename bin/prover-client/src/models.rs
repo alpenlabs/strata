@@ -98,7 +98,7 @@ pub enum TaskStatus {
 pub struct Task {
     pub id: Uuid,
     pub el_block_num: u64,
-    pub witness: ELBlockWitness,
+    pub witness: Witness,
     pub status: TaskStatus,
 }
 

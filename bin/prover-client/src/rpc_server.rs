@@ -67,7 +67,9 @@ impl ExpressProverClientApiServerServer for ProverClientRpc {
         // Create a new proving task
         {
             let task_tracker = Arc::clone(&self.context.task_tracker);
-            let task_id = task_tracker.create_task(el_block_num, witness).await;
+            let task_id = task_tracker
+                .create_task(el_block_num, crate::models::Witness::ElBlock(witness))
+                .await;
             tokio::time::sleep(Duration::from_secs(1)).await;
             println!("Created task: {}", task_id);
         }

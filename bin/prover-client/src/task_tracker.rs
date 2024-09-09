@@ -1,7 +1,7 @@
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
-use crate::models::{ELBlockWitness, Task, TaskStatus};
+use crate::models::{ELBlockWitness, Task, TaskStatus, Witness};
 
 pub struct TaskTracker {
     tasks: Mutex<Vec<Task>>,
@@ -14,7 +14,7 @@ impl TaskTracker {
         }
     }
 
-    pub async fn create_task(&self, el_block_num: u64, witness: ELBlockWitness) -> Uuid {
+    pub async fn create_task(&self, el_block_num: u64, witness: Witness) -> Uuid {
         let task_id = Uuid::new_v4();
         let task = Task {
             id: task_id,
