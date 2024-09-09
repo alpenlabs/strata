@@ -1,11 +1,14 @@
 use std::{
     collections::{hash_map::Entry, HashMap},
+    fs,
     ops::Deref,
+    path::{Path, PathBuf},
     sync::{Arc, RwLock},
 };
 
-use alpen_express_rocksdb::prover::db::ProofDb;
-use express_zkvm::{Proof, ZKVMHost};
+use alpen_express_rocksdb::{prover::db::ProofDb, DbOpsConfig};
+use express_zkvm::{Proof, ProverOptions, ZKVMHost};
+use rockbound::rocksdb;
 use uuid::Uuid;
 
 use crate::models::{
@@ -67,18 +70,22 @@ impl ProverState {
 
 // A prover that generates proofs in parallel using a thread pool. If the pool is saturated,
 // the prover will reject new jobs.
-pub(crate) struct Prover {
+pub(crate) struct Prover<Vm>
+where
+    Vm: ZKVMHost + 'static,
+{
     prover_state: Arc<RwLock<ProverState>>,
+    config: Arc<ProofGenConfig>,
     proof_db: Arc<ProofDb>,
     num_threads: usize,
     pool: rayon::ThreadPool,
-    _aggregated_proof_block_jump: u64,
+    vm: HashMap<u8, Vm>,
 }
 
 fn make_proof<Vm>(
-    mut vm: Vm,
     config: Arc<ProofGenConfig>,
     state_transition_data: Witness,
+    vm: Vm,
 ) -> Result<Proof, anyhow::Error>
 where
     Vm: ZKVMHost + 'static,
@@ -90,12 +97,42 @@ where
     }
 }
 
-impl Prover {
+impl<Vm: ZKVMHost> Prover<Vm> {
     pub(crate) fn new(
         num_threads: usize,
-        _aggregated_proof_block_jump: u64,
-        proof_db: Arc<ProofDb>,
+        vm_map: HashMap<u8, Vm>,
+        config: Arc<ProofGenConfig>,
     ) -> Self {
+        fn open_rocksdb_database() -> anyhow::Result<Arc<rockbound::OptimisticTransactionDB>> {
+            let mut database_dir = PathBuf::default();
+            database_dir.push("rocksdb_prover");
+
+            if !database_dir.exists() {
+                fs::create_dir_all(&database_dir)?;
+            }
+
+            let dbname = alpen_express_rocksdb::ROCKSDB_NAME;
+            let cfs = alpen_express_rocksdb::STORE_COLUMN_FAMILIES;
+            let mut opts = rocksdb::Options::default();
+            opts.create_if_missing(true);
+            opts.create_missing_column_families(true);
+
+            let rbdb = rockbound::OptimisticTransactionDB::open(
+                &database_dir,
+                dbname,
+                cfs.iter().map(|s| s.to_string()),
+                &opts,
+            )?;
+
+            Ok(Arc::new(rbdb))
+        }
+
+        //let vm_map = HashMap::new();
+
+        let rbdb = open_rocksdb_database().unwrap();
+        let db_ops = DbOpsConfig { retry_count: 3 };
+
+        let db = ProofDb::new(rbdb, db_ops);
         Self {
             num_threads,
             pool: rayon::ThreadPoolBuilder::new()
@@ -107,16 +144,13 @@ impl Prover {
                 prover_status: Default::default(),
                 pending_tasks_count: Default::default(),
             })),
-            proof_db,
-            _aggregated_proof_block_jump,
+            proof_db: Arc::new(db),
+            vm: vm_map,
+            config,
         }
     }
 
-    pub(crate) fn submit_witness(
-        &self,
-        state_transition_data: Witness,
-        state_diffs: Vec<u8>,
-    ) -> WitnessSubmissionStatus {
+    pub(crate) fn submit_witness(&self, state_transition_data: Witness) -> WitnessSubmissionStatus {
         let header_hash = Uuid::new_v4(); //state_transition_data.da_block_header.hash();
         let data = ProverStatus::WitnessSubmitted(state_transition_data);
 
@@ -136,11 +170,9 @@ impl Prover {
         }
     }
 
-    pub(crate) fn start_proving<Vm>(
+    pub(crate) fn start_proving(
         &self,
         block_header_hash: Uuid,
-        config: Arc<ProofGenConfig>,
-        mut vm: Vm,
     ) -> Result<ProofProcessingStatus, ProverServiceError>
     where
         Vm: ZKVMHost + 'static,
@@ -160,10 +192,12 @@ impl Prover {
                 if start_prover {
                     prover_state.set_to_proving(block_header_hash.clone());
                     //vm.add_hint(state_transition_data);
+                    let config = self.config.clone();
+                    let mut vm = self.vm.get(&0).unwrap().clone();
 
                     self.pool.spawn(move || {
                         tracing::info_span!("guest_execution").in_scope(|| {
-                            let proof = make_proof(vm, config, state_transition_data);
+                            let proof = make_proof(config, state_transition_data, vm.clone());
 
                             let mut prover_state =
                                 prover_state_clone.write().expect("Lock was poisoned");
