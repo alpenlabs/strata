@@ -177,11 +177,7 @@ fn prepare_l1_segment(
     };
 
     // Compute the offset in the unaccepted list for the blocks we want to use.
-    let unacc_fresh_offset = unacc_blocks
-        .iter()
-        .position(|(h, _)| *h == pivot_h)
-        .unwrap()
-        + 1;
+    let unacc_fresh_offset = (pivot_h - l1v.buried_l1_height()) as usize + 1;
     let fresh_blocks = &unacc_blocks[unacc_fresh_offset..];
 
     // Load the blocsks.
