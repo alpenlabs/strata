@@ -24,6 +24,7 @@ members = [
   "crates/reth/rpc",
   "crates/rpc/api",
   "crates/rpc/bridge-api",
+  "crates/rpc/prover-client-api",
   "crates/rpc/types",
   "crates/rpc/utils",
   "crates/state",
@@ -40,6 +41,7 @@ members = [
 
   # binaries listed separately
   "bin/bridge-client",
+  "bin/prover-client",
   "reth",
   "sequencer",
 ]
@@ -70,6 +72,7 @@ express-bridge-rpc-api = { path = "crates/rpc/bridge-api" }
 express-bridge-sig-manager = { path = "crates/bridge-sig-manager" }
 express-bridge-tx-builder = { path = "crates/bridge-tx-builder" }
 express-chaintsn = { path = "crates/chaintsn" }
+express-prover-client-rpc-api = { path = "crates/rpc/prover-client-api" }
 express-reth-db = { path = "crates/reth/db" }
 express-reth-exex = { path = "crates/reth/exex" }
 express-reth-node = { path = "crates/reth/node" }
@@ -78,6 +81,7 @@ express-rpc-utils = { path = "crates/rpc/utils" }
 express-storage = { path = "crates/storage" }
 express-sync = { path = "crates/sync" }
 express-tasks = { path = "crates/tasks" }
+express-zkvm = { path = "crates/prover/zkvm" }                              # FIXME make these names more consistent?
 express-zkvm = { path = "crates/prover/zkvm" }                              # FIXME make these names more consistent?
 zkvm = { path = "crates/prover/zkvm" }
 zkvm-primitives = { path = "crates/prover/primitives" }

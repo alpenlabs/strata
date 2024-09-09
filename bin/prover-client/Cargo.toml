@@ -1,0 +1,22 @@
+[package]
+edition = "2021"
+name = "express-prover-client"
+version = "0.1.0"
+
+[[bin]]
+name = "express-prover-client"
+path = "src/main.rs"
+
+[dependencies]
+alpen-express-common = { workspace = true }
+express-prover-client-rpc-api = { workspace = true }
+
+
+anyhow = { workspace = true }
+argh = { workspace = true }
+async-trait = { workspace = true }
+jsonrpsee = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
