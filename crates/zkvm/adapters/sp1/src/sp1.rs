@@ -8,6 +8,7 @@ use sp1_sdk::{
 
 /// A host for the `SP1` zkVM that stores the guest program in ELF format.
 /// The `SP1Host` is responsible for program execution and proving
+#[derive(Clone)]
 pub struct SP1Host {
     elf: Vec<u8>,
     prover_options: ProverOptions,

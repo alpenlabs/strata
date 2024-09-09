@@ -8,6 +8,8 @@ use serde_json::to_vec;
 
 /// A host for the `RiscZero` zkVM that stores the guest program in ELF format
 /// The `RiscZeroHost` is responsible for program execution and proving
+
+#[derive(Clone)]
 pub struct RiscZeroHost {
     elf: Vec<u8>,
     prover_options: ProverOptions,
