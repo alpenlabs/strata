@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 
 use async_trait::async_trait;
 use bitcoin::{
+    bip32::Xpriv,
     consensus::{self, deserialize},
     hashes::Hash,
     Address, Amount, Block, BlockHash, Network, SignedAmount, Transaction, Txid, Work,
@@ -190,5 +191,11 @@ impl Signer for TestBitcoinClient {
             complete: true,
             errors: None,
         })
+    }
+    async fn get_xpriv(&self) -> ClientResult<Option<Xpriv>> {
+        // taken from https://docs.rs/bitcoin/0.32.2/src/bitcoin/bip32.rs.html#1090
+        // DO NOT USE THIS BY ANY MEANS IN PRODUCTION WITH REAL FUNDS
+        let xpriv = "xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi".parse::<Xpriv>().unwrap();
+        Ok(Some(xpriv))
     }
 }

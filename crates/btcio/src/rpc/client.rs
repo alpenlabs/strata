@@ -1,4 +1,5 @@
 use std::{
+    env::var,
     fmt,
     sync::atomic::{AtomicUsize, Ordering},
     time::Duration,
@@ -7,7 +8,8 @@ use std::{
 use async_trait::async_trait;
 use base64::{engine::general_purpose, Engine};
 use bitcoin::{
-    consensus::encode::serialize_hex, Address, Block, BlockHash, Network, Transaction, Txid,
+    bip32::Xpriv, consensus::encode::serialize_hex, Address, Block, BlockHash, Network,
+    Transaction, Txid,
 };
 use bitcoind_json_rpc_types::v26::{GetBlockVerbosityZero, GetBlockchainInfo, GetNewAddress};
 use reqwest::{
@@ -22,6 +24,7 @@ use serde_json::{
 use tokio::time::sleep;
 use tracing::*;
 
+use super::types::ListDescriptors;
 use crate::rpc::{
     error::{BitcoinRpcError, ClientError},
     traits::{Broadcaster, Reader, Signer, Wallet},
@@ -318,6 +321,40 @@ impl Signer for BitcoinClient {
         )
         .await
     }
+
+    async fn get_xpriv(&self) -> ClientResult<Option<Xpriv>> {
+        // If the ENV variable `BITCOIN_XPRIV_RETRIEVABLE` is not set, we return `None`
+        if var("BITCOIN_XPRIV_RETRIEVABLE").is_err() {
+            return Ok(None);
+        }
+
+        let descriptors = self
+            .call::<ListDescriptors>("listdescriptors", &[to_value(true)?]) // true is the xpriv, false is the xpub
+            .await?
+            .descriptors;
+        if descriptors.is_empty() {
+            return Err(ClientError::Other("No descriptors found".to_string()));
+        }
+
+        // We are only interested in the one that contains `tr(` and `86h`
+        let descriptor = descriptors
+            .iter()
+            .find(|d| d.desc.contains("tr(") && d.desc.contains("86h"))
+            .map(|d| d.desc.clone())
+            .ok_or(ClientError::Xpriv)?;
+
+        // Now we extract the xpriv from the `tr()` up to the first `/`
+        let xpriv_str = descriptor
+            .split("tr(")
+            .nth(1)
+            .ok_or(ClientError::Xpriv)?
+            .split("/")
+            .next()
+            .ok_or(ClientError::Xpriv)?;
+
+        let xpriv = xpriv_str.parse::<Xpriv>().map_err(|_| ClientError::Xpriv)?;
+        Ok(Some(xpriv))
+    }
 }
 
 #[cfg(test)]
@@ -325,7 +362,7 @@ mod test {
     use std::env::set_var;
 
     use alpen_express_common::logging;
-    use bitcoin::{consensus, hashes::Hash};
+    use bitcoin::{consensus, hashes::Hash, NetworkKind};
     use bitcoind::{bitcoincore_rpc::RpcApi, BitcoinD};
 
     use super::*;
@@ -450,5 +487,10 @@ mod test {
         mine_blocks(&bitcoind, 1, None).unwrap();
         let got = client.get_utxos().await.unwrap();
         assert_eq!(got.len(), 3);
+
+        // listdescriptors
+        let got = client.get_xpriv().await.unwrap().unwrap().network;
+        let expected = NetworkKind::Test;
+        assert_eq!(expected, got);
     }
 }

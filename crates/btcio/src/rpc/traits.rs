@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use bitcoin::{Address, Block, BlockHash, Network, Transaction, Txid};
+use bitcoin::{bip32::Xpriv, Address, Block, BlockHash, Network, Transaction, Txid};
 use bitcoind_json_rpc_types::v26::GetBlockchainInfo;
 
 use crate::rpc::{
@@ -152,4 +152,7 @@ pub trait Signer {
         &self,
         tx: &Transaction,
     ) -> ClientResult<SignRawTransactionWithWallet>;
+
+    /// Gets the underlying [`Xpriv`] from the wallet.
+    async fn get_xpriv(&self) -> ClientResult<Option<Xpriv>>;
 }
