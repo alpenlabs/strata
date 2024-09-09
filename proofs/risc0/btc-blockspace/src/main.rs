@@ -1,5 +1,5 @@
 use bitcoin::{consensus::deserialize, Block};
-use bitcoin_blockspace::logic::{process_blockspace_proof, BlockspaceProofInput, ScanParams};
+use btc_blockspace::logic::{process_blockspace_proof, BlockspaceProofInput, ScanParams};
 use risc0_zkvm::guest::env;
 
 fn main() {

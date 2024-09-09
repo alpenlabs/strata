@@ -13,7 +13,7 @@ members = [
   "crates/primitives",
   "crates/prover/adapters/risc0",
   "crates/prover/adapters/sp1",
-  "crates/prover/bitcoin-blockspace",
+  "crates/prover/btc-blockspace",
   "crates/prover/btc-headerchain",
   "crates/prover/primitives",
   "crates/prover/zkvm",
@@ -60,7 +60,7 @@ alpen-express-rpc-types = { path = "crates/rpc/types" }
 alpen-express-state = { path = "crates/state" }
 alpen-express-status = { path = "crates/status" }
 alpen-test-utils = { path = "crates/test-utils" }
-bitcoin-blockspace = { path = "crates/prover/bitcoin-blockspace" }
+btc-blockspace = { path = "crates/prover/btc-blockspace" }
 express-bridge-exec = { path = "crates/bridge-exec" }
 express-bridge-rpc-api = { path = "crates/rpc/bridge-api" }
 express-bridge-sig-manager = { path = "crates/bridge-sig-manager" }

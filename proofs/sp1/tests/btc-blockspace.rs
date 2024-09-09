@@ -1,7 +1,7 @@
 // NOTE: SP1 prover runs in release mode only; therefore run the tests on release mode only
 #[cfg(feature = "prover")]
 mod test {
-    use bitcoin_blockspace::logic::{BlockspaceProofOutput, ScanParams};
+    use btc_blockspace::logic::{BlockspaceProofOutput, ScanParams};
     use express_sp1_adapter::{SP1Host, SP1Verifier};
     use express_zkvm::{ZKVMHost, ZKVMVerifier};
     use sp1_guest_builder::GUEST_BTC_BLOCKSPACE_ELF;

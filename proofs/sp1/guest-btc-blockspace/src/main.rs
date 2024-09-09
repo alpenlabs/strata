@@ -1,5 +1,5 @@
 use bitcoin::Block;
-use bitcoin_blockspace::logic::{process_blockspace_proof, BlockspaceProofInput, ScanParams};
+use btc_blockspace::logic::{process_blockspace_proof, BlockspaceProofInput, ScanParams};
 
 fn main() {
     let scan_params = sp1_zkvm::io::read::<ScanParams>();

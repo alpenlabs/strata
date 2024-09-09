@@ -1,6 +1,6 @@
 use alpen_express_primitives::buf::Buf32;
 use bitcoin::{block::Header, hashes::Hash, BlockHash, CompactTarget, Target};
-use bitcoin_blockspace::block::compute_block_hash;
+use btc_blockspace::block::compute_block_hash;
 use ethnum::U256;
 
 /// Difficulty recalculation interval.

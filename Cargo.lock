@@ -1693,19 +1693,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bitcoin-blockspace"
-version = "0.1.0"
-dependencies = [
- "alpen-express-primitives",
- "alpen-test-utils",
- "bitcoin",
- "hex",
- "rand 0.8.5",
- "serde",
- "sha2 0.10.8",
-]
-
-[[package]]
 name = "bitcoin-internals"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2159,6 +2146,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "btc-blockspace"
+version = "0.1.0"
+dependencies = [
+ "alpen-express-primitives",
+ "alpen-test-utils",
+ "bitcoin",
+ "hex",
+ "rand 0.8.5",
+ "serde",
+ "sha2 0.10.8",
+]
+
+[[package]]
 name = "btc-headerchain"
 version = "0.1.0"
 dependencies = [
@@ -2166,8 +2166,8 @@ dependencies = [
  "alpen-test-utils",
  "anyhow",
  "bitcoin",
- "bitcoin-blockspace",
  "borsh",
+ "btc-blockspace",
  "ethnum",
  "rand 0.8.5",
  "serde",
@@ -10404,7 +10404,7 @@ dependencies = [
  "alpen-test-utils",
  "bincode",
  "bitcoin",
- "bitcoin-blockspace",
+ "btc-blockspace",
  "express-risc0-adapter",
  "express-zkvm",
  "risc0-build",
@@ -11542,7 +11542,7 @@ dependencies = [
  "alpen-test-utils",
  "bincode",
  "bitcoin",
- "bitcoin-blockspace",
+ "btc-blockspace",
  "express-sp1-adapter",
  "express-zkvm",
  "sp1-helper",

@@ -7,7 +7,7 @@ version = "0.1.0"
 
 [dependencies]
 bitcoin = { version = "0.32.1" }
-bitcoin-blockspace = { path = "../../../crates/prover/bitcoin-blockspace" }
+btc-blockspace = { path = "../../../crates/prover/btc-blockspace" }
 sp1-zkvm = "1.0.1"
 
 [patch.crates-io]

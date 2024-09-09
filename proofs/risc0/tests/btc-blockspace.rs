@@ -1,7 +1,7 @@
 #[cfg(feature = "prover")]
 mod test {
     use bitcoin::consensus::serialize;
-    use bitcoin_blockspace::logic::{BlockspaceProofOutput, ScanParams};
+    use btc_blockspace::logic::{BlockspaceProofOutput, ScanParams};
     use express_risc0_adapter::{Risc0Verifier, RiscZeroHost};
     use express_zkvm::{ZKVMHost, ZKVMVerifier};
     use risc0_guest_builder::BTC_BLOCKSPACE_RISC0_ELF;
