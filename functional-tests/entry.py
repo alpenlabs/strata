@@ -201,7 +201,7 @@ class RethFactory(flexitest.Factory):
             "-vvvv"
         ]
         # fmt: on
-        props = {"rpc_port": authrpc_port}
+        props = {"rpc_port": authrpc_port, "eth_rpc_http_port": ethrpc_http_port}
 
         ethrpc_url = f"ws://localhost:{ethrpc_ws_port}"
 
@@ -248,6 +248,8 @@ class ProverClientFactory(flexitest.Factory):
         cmd = [
             "express-prover-client",
             "--rpc-port", str(rpc_port),
+            "--sequencer-rpc", sequencer_url,
+            "--reth-rpc", reth_url
         ]
         # fmt: on
 
@@ -332,11 +334,12 @@ class BasicEnvConfig(flexitest.EnvConfig):
 
         if self.enable_prover_client:
             seq_port = sequencer.get_prop("rpc_port")
+            reth_rpc_http_port = reth.get_prop("eth_rpc_http_port")
 
             prover_client_fac = ctx.get_factory("prover_client")
             prover_client = prover_client_fac.create_prover_client(
-                f"http://localhost:{reth_port}",
-                f"http://localhost:{seq_port}"
+                f"http://localhost:{seq_port}",
+                f"http://localhost:{reth_rpc_http_port}",
             )
             svcs["prover_client"] = prover_client
 
