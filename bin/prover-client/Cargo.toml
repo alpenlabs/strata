@@ -10,12 +10,14 @@ path = "src/main.rs"
 [dependencies]
 alpen-express-common = { workspace = true }
 express-prover-client-rpc-api = { workspace = true }
+zkvm-primitives = { workspace = true }
 
 
 anyhow = { workspace = true }
 argh = { workspace = true }
 async-trait = { workspace = true }
 jsonrpsee = { workspace = true }
+reth-rpc-types = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }

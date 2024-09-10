@@ -3855,6 +3855,7 @@ dependencies = [
  "express-zkvm",
  "jsonrpsee",
  "rayon",
+ "reth-rpc-types",
  "rockbound",
  "serde",
  "thiserror",
@@ -3862,6 +3863,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber 0.3.18",
  "uuid 1.10.0",
+ "zkvm-primitives",
 ]
 
 [[package]]
