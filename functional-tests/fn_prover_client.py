@@ -12,7 +12,9 @@ class ProverClientTest(flexitest.Test):
         prover_client = ctx.get_service("prover_client")
         prover_client_rpc = prover_client.create_rpc()
 
-        time.sleep(1)
-        rpc_res = prover_client_rpc.dev_alp_prove_el_block(10)
+        # Wait for the some block building
+        time.sleep(2)
+
+        rpc_res = prover_client_rpc.dev_alp_prove_el_block(1)
         print("got the rpc res: {}",rpc_res)
 
