@@ -10,8 +10,8 @@ use alpen_express_db::{
 use alpen_express_eectl::{engine::ExecEngineCtl, messages::ExecPayloadData};
 use alpen_express_primitives::params::Params;
 use alpen_express_state::{
-    block::L2BlockBundle, client_state::ClientState, operation::SyncAction, prelude::*,
-    state_op::StateCache, sync_event::SyncEvent,
+    block::L2BlockBundle, block_validation::validate_block_segments, client_state::ClientState,
+    operation::SyncAction, prelude::*, state_op::StateCache, sync_event::SyncEvent,
 };
 use express_chaintsn::transition::process_block;
 use express_storage::L2BlockManager;
@@ -456,7 +456,7 @@ fn check_new_block<D: Database>(
         }
     }
 
-    if !block.check_block_segments() {
+    if !validate_block_segments(block) {
         return Ok(false);
     }
 

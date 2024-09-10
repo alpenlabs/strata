@@ -11,7 +11,7 @@ fn main() {
     let input: Vec<u8> = env::read();
     let (prev_state, block): (ChainState, L2Block) = borsh::from_slice(&input).unwrap();
 
-    let new_state = verify_and_transition(prev_state, block, params).unwrap();
+    let new_state = verify_and_transition(prev_state, block, params);
     env::commit(&borsh::to_vec(&new_state).unwrap());
 }
 

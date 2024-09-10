@@ -10,7 +10,7 @@ fn main() {
     let input: Vec<u8> = sp1_zkvm::io::read();
     let (prev_state, block): (ChainState, L2Block) = borsh::from_slice(&input).unwrap();
 
-    let new_state = verify_and_transition(prev_state, block, params).unwrap();
+    let new_state = verify_and_transition(prev_state, block, params);
     sp1_zkvm::io::commit(&borsh::to_vec(&new_state).unwrap());
 }
 

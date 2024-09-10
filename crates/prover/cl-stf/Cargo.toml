@@ -7,8 +7,10 @@ edition = "2021"
 alpen-express-block-credential = { workspace = true }
 alpen-express-primitives.workspace = true
 alpen-express-state.workspace = true
-borsh = { workspace = true }
 express-chaintsn.workspace = true
+
+borsh = { workspace = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]
 alpen-test-utils.workspace = true
