@@ -21,7 +21,7 @@ pub enum Expiry {
     /// Duty expires after a specific L2 block is finalized
     BlockIdFinalized(L2BlockId),
 
-    /// Duty expires after a specific checkpoint is confirmed on bitcoin
+    /// Duty expires after a specific checkpoint is confirmed(or finalized, TBD) on bitcoin
     CheckpointIdxConfirmed(u64),
 }
 
@@ -91,6 +91,12 @@ impl Deref for BatchBuildDuty {
 
     fn deref(&self) -> &Self::Target {
         &self.inner
+    }
+}
+
+impl From<CheckPointInfo> for BatchBuildDuty {
+    fn from(value: CheckPointInfo) -> Self {
+        Self { inner: value }
     }
 }
 
@@ -164,7 +170,7 @@ impl DutyTracker {
                         continue;
                     }
                 }
-                Expiry::CheckpointIdxConfirmed(idx) => {
+                Expiry::CheckpointIdxConfirmed(_idx) => {
                     // TODO, how do we get checkpoint idx from state here? It would be nice to have
                     // a reference to current client state in the function argument rather than
                     // StateUpdate

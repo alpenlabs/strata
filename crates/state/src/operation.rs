@@ -190,10 +190,9 @@ pub fn apply_writes_to_state(
             UpdateNextCheckpointInfo(l1_tip, l2_tip) => {
                 // Update next_checkpoint state.
                 // We might need to do this when the block is buried
-                let checkpoint_info =
-                    state.l1_view_mut().next_checkpoint_info.as_mut().expect(
-                        "missing next_checkpoint_info while executing UpdateConfirmed write",
-                    );
+                let checkpoint_info = state.l1_view_mut().next_checkpoint_info.as_mut().expect(
+                    "missing next_checkpoint_info while executing UpdateNextBatchInfo write",
+                );
                 checkpoint_info.checkpoint_idx += 1;
                 checkpoint_info.l1_range = checkpoint_info.l1_range.start() + 1..=l1_tip;
                 checkpoint_info.l2_range = checkpoint_info.l2_range.start() + 1..=l2_tip;
