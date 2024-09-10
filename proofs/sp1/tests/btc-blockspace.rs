@@ -23,8 +23,6 @@ mod test {
             .unwrap()
             .assume_checked()
             .script_pubkey()],
-            sequencer_address: "bcrt1pf73jc96ujch43wp3k294003xx4llukyzvp0revwwnww62esvk7hqvarg98"
-                .to_owned(),
         };
         let serialized_block = bitcoin::consensus::serialize(&block);
 

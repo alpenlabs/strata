@@ -10,7 +10,8 @@ const SOME_ALP_MAGIC: [u8; 32] = [1; 32];
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DepositRequestData {
-    pub to: [u8; 20],
+    /// Address of the rollup where the `amount` is deposited
+    pub dest_addr: Vec<u8>,
     pub amount: u64,
 }
 
@@ -38,7 +39,10 @@ fn extract_deposit(
     }
 
     // TODO: this will take some hints to do this more efficiently
-    if !bridge_scriptbufs.contains(&tx.output[0].script_pubkey) {
+    if bridge_scriptbufs
+        .binary_search(&tx.output[0].script_pubkey)
+        .is_err()
+    {
         return None;
     }
 
@@ -59,7 +63,7 @@ fn extract_deposit(
     }
 
     Some(DepositRequestData {
-        to: bytes[35..55].try_into().unwrap(),
+        dest_addr: bytes[35..55].to_vec(),
         amount: tx.output[0].value.to_sat(),
     })
 }
@@ -74,7 +78,7 @@ fn extract_forced_inclusion(_tx: &Transaction) -> Option<ForcedInclusion> {
 /// Note: This needs to be consistent with the logic in other places
 /// This is used as the placeholder logic for now
 /// TODO: Use the same logic
-fn extract_state_update(_tx: &Transaction) -> Option<ForcedInclusion> {
+fn extract_state_update(_tx: &Transaction) -> Option<StateUpdate> {
     None
 }
 
@@ -128,8 +132,8 @@ mod tests {
         let bridge_address = Address::from_str(BRIDGE_ADDR).unwrap().assume_checked();
         let deposit = extract_deposit(&tx, &[bridge_address.script_pubkey()]);
 
-        assert!(deposit.is_some_and(
-            |deposit| deposit.amount == 50_000_000 && hex::encode(deposit.to) == ETH_USER
-        ));
+        assert!(deposit
+            .is_some_and(|deposit| deposit.amount == 50_000_000
+                && hex::encode(deposit.dest_addr) == ETH_USER));
     }
 }

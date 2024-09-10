@@ -66,22 +66,24 @@ pub fn compute_block_hash(header: &Header) -> Buf32 {
 pub fn compute_witness_root(l1_tx: &L1Tx) -> Buf32 {
     let tx: Transaction = consensus::deserialize(l1_tx.tx_data()).unwrap();
 
-    let mut root_hash = *compute_wtxid(&tx).as_ref();
+    // `cur_hash` represents the intermediate hash at each step. After all cohashes are processed
+    // `cur_hash` becomes the root hash
+    let mut cur_hash = *compute_wtxid(&tx).as_ref();
 
     let mut pos = l1_tx.proof().position();
     for cohash in l1_tx.proof().cohashes() {
         let mut buf = [0u8; 64];
-        if pos % 2 == 0 {
-            buf[0..32].copy_from_slice(&root_hash);
+        if pos & 1 == 0 {
+            buf[0..32].copy_from_slice(&cur_hash);
             buf[32..64].copy_from_slice(cohash.as_ref());
         } else {
             buf[0..32].copy_from_slice(cohash.as_ref());
-            buf[32..64].copy_from_slice(&root_hash);
+            buf[32..64].copy_from_slice(&cur_hash);
         }
-        root_hash = *sha256d(&buf).as_ref();
-        pos /= 2;
+        cur_hash = *sha256d(&buf).as_ref();
+        pos >>= 1;
     }
-    Buf32::from(root_hash)
+    Buf32::from(cur_hash)
 }
 
 /// Checks if witness commitment in coinbase matches the corresponding [`L1Tx`](L1Tx).

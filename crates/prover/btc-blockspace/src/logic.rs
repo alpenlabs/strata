@@ -17,9 +17,7 @@ pub struct BlockspaceProofInput {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScanRuleConfig {
-    // TODO: figure out why serialize `Address`
     pub bridge_scriptbufs: Vec<ScriptBuf>,
-    pub sequencer_address: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
