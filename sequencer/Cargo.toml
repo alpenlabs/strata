@@ -20,6 +20,7 @@ alpen-express-rpc-api = { workspace = true }
 alpen-express-rpc-types = { workspace = true }
 alpen-express-state = { workspace = true }
 alpen-express-status = { workspace = true }
+express-rpc-utils = { workspace = true }
 express-storage = { workspace = true }
 express-sync = { workspace = true }
 express-tasks = { workspace = true }
@@ -30,6 +31,7 @@ async-trait = { workspace = true }
 bitcoin = { workspace = true }
 borsh = { workspace = true }
 format_serde_error = { workspace = true }
+futures = { workspace = true }
 hex = { workspace = true }
 jsonrpsee = { workspace = true, features = ["server", "macros"] }
 parking_lot = { workspace = true }

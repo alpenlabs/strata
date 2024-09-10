@@ -122,7 +122,10 @@ pub trait AlpenSyncApi {
     async fn get_sync_status(&self) -> RpcResult<NodeSyncStatus>;
 
     #[method(name = "syncBlocksByHeight")]
-    async fn sync_blocks_by_height(&self, height: u64) -> RpcResult<Option<Vec<Vec<u8>>>>;
+    async fn sync_blocks_by_height(&self, height: u64) -> RpcResult<Vec<u8>>;
+
+    #[method(name = "syncBlocksByRange")]
+    async fn sync_blocks_by_range(&self, start_height: u64, end_height: u64) -> RpcResult<Vec<u8>>;
 
     #[method(name = "syncBlockById")]
     async fn sync_block_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<Vec<u8>>>;
