@@ -67,8 +67,8 @@ pub enum ClientStateWrite {
     /// Update the l2 block whose batch proof has been confirmed in L1 at a height.
     UpdateConfirmed(u64, L2BlockId),
 
-    /// Update the l2 block whose batch proof has been finalized in L1 at a height.
-    UpdateFinalized(u64, L2BlockId),
+    /// Update the l2 block whose batch proof has been finalized.
+    UpdateFinalized(L2BlockId),
 }
 
 /// Actions the client state machine directs the node to take to update its own
@@ -166,15 +166,10 @@ pub fn apply_writes_to_state(
 
                 // TODO merge these blocks into the L1 MMR in the client state if
                 // we haven't already
-
-                // Now update confirmed blocks to finalized if any
-                update_finalized(state, new_idx);
             }
 
-            UpdateFinalized(height, _blkid) => {
-                // NOTE: This block is redundant right now because blocks are finalized only when
-                // there's an UpdateBuried event
-                update_finalized(state, height);
+            UpdateFinalized(blkid) => {
+                update_finalized(state, blkid);
             }
 
             UpdateConfirmed(l1height, blkid) => {
@@ -185,13 +180,20 @@ pub fn apply_writes_to_state(
     }
 }
 
-fn update_finalized(state: &mut ClientState, height: u64) {
+fn update_finalized(state: &mut ClientState, blkid: L2BlockId) {
     let ss = state.expect_sync_mut();
-    if let Some(finalized_pos) = ss.confirmed_blocks.iter().position(|(h, _)| *h == height) {
-        let finalized_blocks = ss.confirmed_blocks.drain(..finalized_pos + 1);
+    let fin_pos = ss
+        .confirmed_blocks
+        .iter()
+        .position(|(_, bid)| *bid == blkid)
+        .unwrap_or_else(|| {
+            panic!(
+                "expected to find blockid {} to be finalized in SyncState.confirmed_blocks",
+                blkid
+            )
+        });
+    ss.finalized_blkid = ss.confirmed_blocks[fin_pos].1;
 
-        if let Some((_, fin_blkid)) = finalized_blocks.last() {
-            ss.finalized_blkid = fin_blkid;
-        }
-    }
+    // Remove all the blocks before the blkid since they are finalized
+    ss.confirmed_blocks.drain(..fin_pos + 1);
 }

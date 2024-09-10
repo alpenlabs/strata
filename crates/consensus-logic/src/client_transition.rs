@@ -64,9 +64,26 @@ pub fn process_event<D: Database>(
             // If we have some number of L1 blocks finalized, also emit an `UpdateBuried` write.
             let safe_depth = params.rollup().l1_reorg_safe_depth as u64;
             let maturable_height = next_exp_height.saturating_sub(safe_depth);
+
             if maturable_height > params.rollup().horizon_l1_height && state.is_chain_active() {
                 debug!(%maturable_height, "Emitting UpdateBuried for maturable height");
                 writes.push(ClientStateWrite::UpdateBuried(maturable_height));
+
+                // Add SyncAction for Finalization
+                let to_finalize_blkid = state
+                    .sync()
+                    .expect("sync state should be set")
+                    .get_confirmed_block_at(maturable_height);
+
+                if let Some(blkid) = to_finalize_blkid {
+                    writes.push(ClientStateWrite::UpdateFinalized(blkid));
+                    actions.push(SyncAction::FinalizeBlock(blkid));
+                } else {
+                    warn!(
+                    %maturable_height,
+                    "expected to find blockid corresponding to buried l1 height in confirmed_blocks but could not find"
+                    );
+                }
             }
 
             // Activate chain if not already
