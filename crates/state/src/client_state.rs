@@ -152,8 +152,8 @@ pub struct LocalL1State {
     /// Next L1 block height we expect to receive
     pub(super) next_expected_block: u64,
 
-    /// Next checkpoint that we expect to see. This should ideall be None for full nodes and Some
-    /// for sequencer.
+    /// Next checkpoint that we expect to see. This should ideally be None for full nodes and Some
+    /// for sequencer, because full nodes don't need to create checkpoints
     pub(super) next_checkpoint_info: Option<CheckPointInfo>,
 }
 

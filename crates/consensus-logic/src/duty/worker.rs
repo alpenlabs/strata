@@ -155,7 +155,18 @@ fn update_tracker(
         new_finalized,
     )?;
 
-    let tracker_update = types::StateUpdate::new(block_idx, ts, newly_finalized_blocks);
+    let latest_finalized_batch = state
+        .l1_view()
+        .next_checkpoint_info()
+        .map(|x| x.checkpoint_idx())
+        .and_then(|x| if x > 0 { Some(x - 1) } else { None });
+
+    let tracker_update = types::StateUpdate::new(
+        block_idx,
+        ts,
+        newly_finalized_blocks,
+        latest_finalized_batch,
+    );
     let n_evicted = tracker.update(&tracker_update);
     trace!(%n_evicted, "evicted old duties from new consensus state");
 
@@ -376,7 +387,7 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
 
             Ok(())
         }
-        Duty::BuildBatch(data) => {
+        Duty::CommitBatch(data) => {
             info!(data = ?data, "commit batch");
 
             let commitment = poll_for_batch_commitment(database)?;
