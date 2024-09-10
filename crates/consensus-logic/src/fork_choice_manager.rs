@@ -237,20 +237,20 @@ pub fn tracker_task<D: Database, E: ExecEngineCtl>(
     mut fcm_rx: mpsc::Receiver<ForkChoiceMessage>,
     csm_ctl: Arc<CsmController>,
     params: Arc<Params>,
-) {
+) -> anyhow::Result<()> {
     // Wait until the CSM gives us a state we can start from.
     info!("waiting for CSM ready");
     let init_state = match wait_for_csm_ready(&shutdown, &mut fcm_rx) {
         Ok(s) => s,
         Err(e) => {
             error!(err = %e, "failed to initialize forkchoice manager");
-            return;
+            return Err(e);
         }
     };
 
     // we should have the finalized tips in state at this point
     let Some(ss) = init_state.sync() else {
-        panic!("fcm: tried to resume without sync state");
+        return Err(anyhow::anyhow!("fcm: tried to resume without sync state"));
     };
 
     // If we have an active sync state we just have the finalized tip there already.
@@ -267,14 +267,17 @@ pub fn tracker_task<D: Database, E: ExecEngineCtl>(
         Ok(fcm) => fcm,
         Err(e) => {
             error!(err = %e, "failed to init forkchoice manager!");
-            return;
+            return Err(e);
         }
     };
 
     if let Err(e) = forkchoice_manager_task_inner(&shutdown, fcm, engine.as_ref(), fcm_rx, &csm_ctl)
     {
-        error!(err = %e, "tracker aborted");
+        error!(err = ?e, "tracker aborted");
+        return Err(e);
     }
+
+    Ok(())
 }
 
 fn forkchoice_manager_task_inner<D: Database, E: ExecEngineCtl>(

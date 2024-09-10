@@ -114,6 +114,7 @@ pub fn start_sync_tasks<
             fcm_csm_ctl,
             fcm_params,
         )
+        .unwrap();
     });
 
     // Prepare the client worker state and start the thread for that.

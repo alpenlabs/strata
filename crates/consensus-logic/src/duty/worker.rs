@@ -43,9 +43,9 @@ pub fn duty_tracker_task<D: Database>(
     database: Arc<D>,
     l2_block_manager: Arc<L2BlockManager>,
     params: Arc<Params>,
-) {
+) -> Result<(), Error> {
     let db = database.as_ref();
-    if let Err(e) = duty_tracker_task_inner(
+    duty_tracker_task_inner(
         shutdown,
         cupdate_rx,
         batch_queue,
@@ -53,9 +53,7 @@ pub fn duty_tracker_task<D: Database>(
         db,
         l2_block_manager.as_ref(),
         params.as_ref(),
-    ) {
-        error!(err = %e, "tracker task exited");
-    }
+    )
 }
 
 fn duty_tracker_task_inner(

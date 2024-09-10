@@ -326,6 +326,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
                 t_l2blkman,
                 t_params,
             )
+            .unwrap();
         });
 
         let d_params = params.clone();
