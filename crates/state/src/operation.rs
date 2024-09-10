@@ -125,6 +125,12 @@ pub fn apply_writes_to_state(
 
                 let new_unacc_len = block_height - buried_height;
                 l1v.local_unaccepted_blocks.truncate(new_unacc_len as usize);
+
+                // Remove confirmed blocks that are above the block_height
+                let ss = state.expect_sync_mut();
+                if let Some(pos) = ss.confirmed_blocks.iter().position(|e| e.0 > block_height) {
+                    ss.confirmed_blocks.drain(pos..);
+                }
             }
 
             AcceptL1Block(l1blkid) => {
