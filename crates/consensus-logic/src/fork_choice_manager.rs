@@ -298,12 +298,12 @@ fn forkchoice_manager_task_inner<D: Database, E: ExecEngineCtl>(
 }
 
 fn process_fc_message<D: Database, E: ExecEngineCtl>(
-    fc_message: ForkChoiceMessage,
-    fc_manager: &mut ForkChoiceManager<D>,
+    msg: ForkChoiceMessage,
+    fcm_state: &mut ForkChoiceManager<D>,
     engine: &E,
     csm_ctl: &CsmController,
 ) -> anyhow::Result<()> {
-    match fc_message {
+    match msg {
         ForkChoiceMessage::CsmResume(_) => {
             warn!("got unexpected late CSM resume message, ignoring");
         }
@@ -315,12 +315,12 @@ fn process_fc_message<D: Database, E: ExecEngineCtl>(
             debug!(?csm_tip, "got new CSM state");
 
             // Update the new state.
-            fc_manager.cur_csm_state = cs;
+            fcm_state.cur_csm_state = cs;
 
             // TODO use output actions to clear out dangling states now
             for act in output.actions() {
                 if let SyncAction::FinalizeBlock(blkid) = act {
-                    let fin_report = fc_manager.chain_tracker.update_finalized_tip(blkid)?;
+                    let fin_report = fcm_state.chain_tracker.update_finalized_tip(blkid)?;
                     info!(?blkid, ?fin_report, "finalized block")
                     // TODO do something with the finalization report
                 }
@@ -331,17 +331,17 @@ fn process_fc_message<D: Database, E: ExecEngineCtl>(
         }
 
         ForkChoiceMessage::NewBlock(blkid) => {
-            let block_bundle = fc_manager
+            let block_bundle = fcm_state
                 .get_block_data(&blkid)?
                 .ok_or(Error::MissingL2Block(blkid))?;
 
             // First, decide if the block seems correctly signed and we haven't
             // already marked it as invalid.
-            let cstate = fc_manager.cur_csm_state.clone();
-            let correctly_signed = check_new_block(&blkid, &block_bundle, &cstate, fc_manager)?;
+            let cstate = fcm_state.cur_csm_state.clone();
+            let correctly_signed = check_new_block(&blkid, &block_bundle, &cstate, fcm_state)?;
             if !correctly_signed {
                 // It's invalid, write that and return.
-                fc_manager.set_block_status(&blkid, BlockStatus::Invalid)?;
+                fcm_state.set_block_status(&blkid, BlockStatus::Invalid)?;
                 return Ok(());
             }
 
@@ -358,15 +358,15 @@ fn process_fc_message<D: Database, E: ExecEngineCtl>(
             // to pre-sync
             if res == alpen_express_eectl::engine::BlockStatus::Invalid {
                 // It's invalid, write that and return.
-                fc_manager.set_block_status(&blkid, BlockStatus::Invalid)?;
+                fcm_state.set_block_status(&blkid, BlockStatus::Invalid)?;
                 return Ok(());
             }
 
             // Insert block into pending block tracker and figure out if we
             // should switch to it as a potential head.  This returns if we
             // created a new tip instead of advancing an existing tip.
-            let cur_tip = fc_manager.cur_best_block;
-            let new_tip = fc_manager
+            let cur_tip = fcm_state.cur_best_block;
+            let new_tip = fcm_state
                 .chain_tracker
                 .attach_block(blkid, block_bundle.header())?;
             if new_tip {
@@ -375,8 +375,8 @@ fn process_fc_message<D: Database, E: ExecEngineCtl>(
 
             let best_block = pick_best_block(
                 &cur_tip,
-                fc_manager.chain_tracker.chain_tips_iter(),
-                &fc_manager.l2_block_manager,
+                fcm_state.chain_tracker.chain_tips_iter(),
+                &fcm_state.l2_block_manager,
             )?;
 
             // Figure out what our job is now.
@@ -384,9 +384,8 @@ fn process_fc_message<D: Database, E: ExecEngineCtl>(
             // context aware so that we know we're not doing anything abnormal
             // in the normal case
             let depth = 100; // TODO change this
-            let reorg =
-                reorg::compute_reorg(&cur_tip, best_block, depth, &fc_manager.chain_tracker)
-                    .ok_or(Error::UnableToFindReorg(cur_tip, *best_block))?;
+            let reorg = reorg::compute_reorg(&cur_tip, best_block, depth, &fcm_state.chain_tracker)
+                .ok_or(Error::UnableToFindReorg(cur_tip, *best_block))?;
 
             debug!(reorg = ?reorg, "REORG");
 
@@ -394,7 +393,7 @@ fn process_fc_message<D: Database, E: ExecEngineCtl>(
             // change the fork choice tip.
             if !reorg.is_identity() {
                 // Apply the reorg.
-                if let Err(e) = apply_tip_update(&reorg, fc_manager) {
+                if let Err(e) = apply_tip_update(&reorg, fcm_state) {
                     warn!("failed to compute CL STF");
 
                     // Specifically state transition errors we want to handle
@@ -406,7 +405,7 @@ fn process_fc_message<D: Database, E: ExecEngineCtl>(
                             "invalid block on seemingly good fork, rejecting block"
                         );
 
-                        fc_manager.set_block_status(inv_blkid, BlockStatus::Invalid)?;
+                        fcm_state.set_block_status(inv_blkid, BlockStatus::Invalid)?;
                         return Ok(());
                     }
 

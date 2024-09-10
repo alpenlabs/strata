@@ -65,10 +65,10 @@ pub enum ClientStateWrite {
     UpdateBuried(u64),
 
     /// Update the l2 block whose batch proof has been confirmed in L1 at a height.
-    UpdateConfirmed((u64, L2BlockId)),
+    UpdateConfirmed(u64, L2BlockId),
 
     /// Update the l2 block whose batch proof has been finalized in L1 at a height.
-    UpdateFinalized((u64, L2BlockId)),
+    UpdateFinalized(u64, L2BlockId),
 }
 
 /// Actions the client state machine directs the node to take to update its own
@@ -128,7 +128,7 @@ pub fn apply_writes_to_state(
             }
 
             AcceptL1Block(l1blkid) => {
-                debug!(?l1blkid, "Received AcceptL1Block");
+                debug!(?l1blkid, "received AcceptL1Block");
                 // TODO make this also do shit
                 let l1v = state.l1_view_mut();
                 l1v.local_unaccepted_blocks.push(l1blkid);
@@ -137,7 +137,7 @@ pub fn apply_writes_to_state(
 
             AcceptL2Block(blkid) => {
                 // TODO do any other bookkeeping
-                debug!("Accepting L2 block");
+                debug!(%blkid, "received AcceptL2Block");
                 let ss = state.expect_sync_mut();
                 ss.tip_blkid = blkid;
             }
@@ -171,13 +171,13 @@ pub fn apply_writes_to_state(
                 update_finalized(state, new_idx);
             }
 
-            UpdateFinalized((height, _blkid)) => {
+            UpdateFinalized(height, _blkid) => {
                 // NOTE: This block is redundant right now because blocks are finalized only when
                 // there's an UpdateBuried event
                 update_finalized(state, height);
             }
 
-            UpdateConfirmed((l1height, blkid)) => {
+            UpdateConfirmed(l1height, blkid) => {
                 let ss = state.expect_sync_mut();
                 ss.confirmed_blocks.push((l1height, blkid));
             }

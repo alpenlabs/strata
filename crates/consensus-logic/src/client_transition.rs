@@ -91,12 +91,12 @@ pub fn process_event<D: Database>(
             writes.push(ClientStateWrite::RollbackL1BlocksTo(*to_height));
         }
 
-        SyncEvent::L1DABatch((height, blkids)) => {
+        SyncEvent::L1DABatch(height, blkids) => {
             if blkids.is_empty() {
                 warn!("empty L1DABatch");
             }
 
-            debug!(%height, ?blkids, "Received L1DABatch");
+            debug!(%height, ?blkids, "received L1DABatch");
 
             if let Some(ss) = state.sync() {
                 // TODO load it up and figure out what's there, see if we have to
@@ -114,7 +114,7 @@ pub fn process_event<D: Database>(
                 let last = blkids.last().unwrap();
                 // When DABatch appears, it is only confirmed at the moment. These will be finalized
                 // only when the corresponding L1 block is buried enough
-                writes.push(ClientStateWrite::UpdateConfirmed((*height, *last)));
+                writes.push(ClientStateWrite::UpdateConfirmed(*height, *last));
             } else {
                 // TODO we can expand this later to make more sense
                 return Err(Error::MissingClientSyncState);

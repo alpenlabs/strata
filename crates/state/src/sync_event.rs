@@ -13,7 +13,7 @@ pub enum SyncEvent {
     L1Revert(u64),
 
     /// New L2 blocks were posted to L1 in a DA batch at given height.
-    L1DABatch((u64, Vec<L2BlockId>)),
+    L1DABatch(u64, Vec<L2BlockId>),
 
     /// Fork choice manager found a new valid chain tip block.  At this point
     /// we've already asked the EL to check if it's valid and know we *could*

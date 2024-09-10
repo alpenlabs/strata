@@ -89,7 +89,7 @@ where
             // Check for da batch and send event accordingly
             let batch = check_for_da_batch(&blockdata);
             if !batch.is_empty() {
-                let ev = SyncEvent::L1DABatch((height, batch));
+                let ev = SyncEvent::L1DABatch(height, batch);
                 csm_ctl.submit_event(ev)?;
             }
 
@@ -105,18 +105,29 @@ fn check_for_da_batch(blockdata: &BlockData) -> Vec<L2BlockId> {
     let txs = blockdata
         .relevant_tx_idxs()
         .iter()
-        .map(|&idx| blockdata.block().txdata[idx as usize].clone());
+        .map(|&idx| &blockdata.block().txdata[idx as usize]);
 
     let inscriptions = txs.filter_map(|tx| {
         tx.input[0].witness.tapscript().and_then(|scr| {
             InscriptionParser::new(scr.into())
                 .parse_inscription_data()
+                .map_err(|e| {
+                    let txid = tx.compute_txid();
+                    warn!(%txid, err = %e, "invalid inscription inside transaction which is marked as relevant");
+                    e
+                })
                 .ok()
+                .map(|x| (x, tx))
         })
     });
     let commitments: Vec<BatchCommitment> = inscriptions
-        .filter_map(|insc| {
+        .filter_map(|(insc, tx)| {
             borsh::from_slice::<SignedBatchCommitment>(insc.batch_data())
+                .map_err(|e| {
+                    let txid = tx.compute_txid();
+                    warn!(%txid, err = %e, "could not deserialize blob inside inscription");
+                    e
+                })
                 .ok()
                 .map(Into::into)
         })
