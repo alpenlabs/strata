@@ -6,8 +6,9 @@ use std::sync::Arc;
 use alpen_express_mmr::CompactMmr;
 use alpen_express_primitives::{l1::*, prelude::*};
 use alpen_express_state::{
-    block::L2BlockBundle, chain_state::ChainState, client_state::ClientState, operation::*,
-    prelude::*, state_op::WriteBatch, sync_event::SyncEvent,
+    batch::BatchCommitment, block::L2BlockBundle, chain_state::ChainState,
+    client_state::ClientState, operation::*, prelude::*, state_op::WriteBatch,
+    sync_event::SyncEvent,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 #[cfg(feature = "mocks")]
@@ -269,6 +270,16 @@ pub trait SequencerDatabase {
 pub trait SeqDataStore {
     /// Store the [`BlobEntry`].
     fn put_blob_entry(&self, blobid: Buf32, blobentry: BlobEntry) -> DbResult<()>;
+
+    /// Store the [`BatchCommitment`]
+    ///
+    /// `batchidx` for the BatchCommitment is expected to increase monotonically and
+    /// be equal to the [`alpen_express_state::chain_state::ChainState::checkpoint_period`]
+    fn put_batch_commitment(
+        &self,
+        batchidx: u64,
+        batch_commitment: BatchCommitment,
+    ) -> DbResult<()>;
 }
 
 #[cfg_attr(feature = "mocks", automock)]
@@ -282,6 +293,12 @@ pub trait SeqDataProvider {
 
     /// Get the last blob index
     fn get_last_blob_idx(&self) -> DbResult<Option<u64>>;
+
+    /// Get a [`BatchCommitment`] by it's index
+    fn get_batch_commitment(&self, batchidx: u64) -> DbResult<Option<BatchCommitment>>;
+
+    /// Get last batch index
+    fn get_last_batch_idx(&self) -> DbResult<Option<u64>>;
 }
 
 /// A trait encapsulating the provider and store traits for interacting with the broadcast
