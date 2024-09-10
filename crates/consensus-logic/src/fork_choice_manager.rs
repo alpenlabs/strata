@@ -109,18 +109,28 @@ pub fn init_forkchoice_manager<D: Database>(
     l2_block_manager: &Arc<L2BlockManager>,
     params: &Arc<Params>,
     init_csm_state: Arc<ClientState>,
-    fin_tip_blkid: L2BlockId,
 ) -> anyhow::Result<ForkChoiceManager<D>> {
     // Load data about the last finalized block so we can use that to initialize
     // the finalized tracker.
-    let fin_block = l2_block_manager
-        .get_block_blocking(&fin_tip_blkid)?
-        .ok_or(Error::MissingL2Block(fin_tip_blkid))?;
-    let fin_tip_index = fin_block.header().blockidx();
+    let sync_state = init_csm_state.sync().expect("csm state should be init");
+    let chain_tip_height = sync_state.chain_tip_height();
+
+    let finalized_blockid = *sync_state.finalized_blkid();
+    let finalized_block = l2_block_manager
+        .get_block_blocking(&finalized_blockid)?
+        .ok_or(Error::MissingL2Block(finalized_blockid))?;
+    let finalized_height = finalized_block.header().blockidx();
+
+    debug!(%finalized_height, %chain_tip_height, "finalized and chain tip height");
 
     // Populate the unfinalized block tracker.
-    let mut chain_tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(fin_tip_blkid);
-    chain_tracker.load_unfinalized_blocks(fin_tip_index + 1, l2_block_manager.as_ref())?;
+    let mut chain_tracker =
+        unfinalized_tracker::UnfinalizedBlockTracker::new_empty(finalized_blockid);
+    chain_tracker.load_unfinalized_blocks(
+        finalized_height,
+        chain_tip_height,
+        l2_block_manager.as_ref(),
+    )?;
 
     let (cur_tip_blkid, cur_tip_index) =
         determine_start_tip(&chain_tracker, l2_block_manager.as_ref())?;
@@ -245,21 +255,15 @@ pub fn tracker_task<D: Database, E: ExecEngineCtl>(
 
     // If we have an active sync state we just have the finalized tip there already.
 
-    let cur_fin_tip = *ss.finalized_blkid();
+    let finalized_blockid = *ss.finalized_blkid();
 
     // wait for sync is done
 
-    info!(%cur_fin_tip, "starting forkchoice manager");
+    info!(%finalized_blockid, "starting forkchoice manager");
 
     // Now that we have the database state in order, we can actually init the
     // FCM.
-    let fcm = match init_forkchoice_manager(
-        &database,
-        &l2_block_manager,
-        &params,
-        init_state,
-        cur_fin_tip,
-    ) {
+    let fcm = match init_forkchoice_manager(&database, &l2_block_manager, &params, init_state) {
         Ok(fcm) => fcm,
         Err(e) => {
             error!(err = %e, "failed to init forkchoice manager!");
