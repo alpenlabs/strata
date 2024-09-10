@@ -84,6 +84,17 @@ pub fn process_event<D: Database>(
                     "expected to find blockid corresponding to buried l1 height in confirmed_blocks but could not find"
                     );
                 }
+
+                // If we have a confirmed checkpoint that is finalized with this block, set it as
+                // finalized
+                if state
+                    .l1_view()
+                    .next_checkpoint_info()
+                    .filter(|x| x.prev_checkpoint_l1_height == maturable_height)
+                    .is_some()
+                {
+                    writes.push(ClientStateWrite::CheckpointFinalized(maturable_height))
+                }
             }
 
             // Activate chain if not already
@@ -141,8 +152,8 @@ pub fn process_event<D: Database>(
                 // When DABatch appears, it is only confirmed at the moment. These will be finalized
                 // only when the corresponding L1 block is buried enough
                 writes.push(ClientStateWrite::UpdateConfirmed(*height, *last));
-                writes.push(ClientStateWrite::UpdateNextCheckpointInfo(
-                    l1_tip_idx, l2_tip_idx,
+                writes.push(ClientStateWrite::NewCheckpointReceived(
+                    l1_tip_idx, l2_tip_idx, *height,
                 ));
             } else {
                 // TODO we can expand this later to make more sense
