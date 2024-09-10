@@ -10,6 +10,7 @@ version = "0.1.0"
 alpen-express-primitives = { workspace = true }
 express-bridge-sig-manager = { workspace = true }
 express-bridge-tx-builder = { workspace = true }
+express-zkvm = { workspace = true }
 
 arbitrary = { workspace = true }
 bitcoin = { workspace = true }
