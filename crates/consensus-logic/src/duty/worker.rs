@@ -374,19 +374,11 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
 
             Ok(())
         }
-        Duty::CommitBatch(data) => {
+        Duty::BuildBatch(data) => {
             info!(data = ?data, "commit batch");
-            let end_slot = data.end_slot();
 
-            let end_chain_state = database
-                .chainstate_provider()
-                .get_toplevel_state(end_slot)?
-                .ok_or(Error::MissingIdxChainstate(end_slot))?;
+            let commitment = poll_for_batch_commitment(database)?;
 
-            let l2blockid = end_chain_state.chain_tip_blockid();
-            let l1blockid = end_chain_state.l1_view().safe_block().blkid();
-
-            let commitment = BatchCommitment::new(*l1blockid, l2blockid);
             let commitment_sighash = commitment.get_sighash();
             let signature = sign_with_identity_key(&commitment_sighash, ik);
             let signed_commitment = SignedBatchCommitment::new(commitment, signature);
@@ -407,11 +399,12 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
 
             Ok(())
         }
-        Duty::BuildBatch(data) => {
-            // TODO: check in database if proof corresponding to this is present
-            Ok(())
-        }
     }
+}
+
+fn poll_for_batch_commitment<D: Database>(_database: &D) -> Result<BatchCommitment, Error> {
+    // TODO: wait until batch proof is found in db
+    todo!()
 }
 
 fn sign_with_identity_key(msg: &Buf32, ik: &IdentityKey) -> Buf64 {

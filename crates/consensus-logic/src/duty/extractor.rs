@@ -1,6 +1,6 @@
-use alpen_express_db::traits::{ChainstateProvider, Database, L2DataProvider};
+use alpen_express_db::traits::{Database, L2DataProvider};
 use alpen_express_primitives::params::Params;
-use alpen_express_state::{client_state::ClientState, header::L2Header, id::L2BlockId};
+use alpen_express_state::{client_state::ClientState, header::L2Header};
 
 use super::types::{BatchBuildDuty, BlockSigningDuty, Duty, Identity};
 use crate::errors::Error;
