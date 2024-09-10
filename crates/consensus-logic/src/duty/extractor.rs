@@ -33,16 +33,14 @@ pub fn extract_duties<D: Database>(
     let duty_data = BlockSigningDuty::new_simple(block_idx + 1, tip_blkid);
     let mut duties = vec![Duty::SignBlock(duty_data)];
 
-    duties.append(&mut extract_batch_duties(state)?);
+    duties.push(extract_batch_duty(state)?);
 
     Ok(duties)
 }
 
-fn extract_batch_duties(state: &ClientState) -> Result<Vec<Duty>, Error> {
-    // If a sync state isn't present then we probably don't have anything we
-    // want to do.  We might change this later.
+fn extract_batch_duty(state: &ClientState) -> Result<Duty, Error> {
     if state.sync().is_none() {
-        return Ok(Vec::new());
+        return Err(Error::MissingClientSyncState);
     };
 
     let checkpoint_info = state
@@ -50,5 +48,5 @@ fn extract_batch_duties(state: &ClientState) -> Result<Vec<Duty>, Error> {
         .next_checkpoint_info()
         .expect("expect checkpoint info to be present");
     let duty: BatchCommitmentDuty = checkpoint_info.clone().into();
-    Ok(vec![Duty::CommitBatch(duty)])
+    Ok(Duty::CommitBatch(duty))
 }
