@@ -18,7 +18,7 @@ use crate::rpc::{
 /// consider wrapping with [`tokio`](tokio)'s
 /// [`spawn_blocking`](tokio::task::spawn_blocking) or any other method.
 #[async_trait]
-pub trait BitcoinReader: Sync + Send + 'static {
+pub trait Reader {
     /// Estimates the approximate fee per kilobyte needed for a transaction
     /// to begin confirmation within conf_target blocks if possible and return
     /// the number of blocks for which the estimate is valid.
@@ -75,7 +75,7 @@ pub trait BitcoinReader: Sync + Send + 'static {
 /// [`spawn_blocking`](https://docs.rs/tokio/latest/tokio/task/fn.spawn_blocking.html)
 /// or any other method.
 #[async_trait]
-pub trait BitcoinBroadcaster: Sync + Send + 'static {
+pub trait Broadcaster {
     /// Sends a raw transaction to the network.
     ///
     /// # Parameters
@@ -99,7 +99,7 @@ pub trait BitcoinBroadcaster: Sync + Send + 'static {
 /// [`spawn_blocking`](https://docs.rs/tokio/latest/tokio/task/fn.spawn_blocking.html)
 /// or any other method.
 #[async_trait]
-pub trait BitcoinWallet: Sync + Send + 'static {
+pub trait Wallet {
     /// Generates new address under own control for the underlying Bitcoin
     /// client's wallet.
     async fn get_new_address(&self) -> ClientResult<Address>;
@@ -140,10 +140,7 @@ pub trait BitcoinWallet: Sync + Send + 'static {
 /// [`spawn_blocking`](https://docs.rs/tokio/latest/tokio/task/fn.spawn_blocking.html)
 /// or any other method.
 #[async_trait]
-pub trait BitcoinSigner: Sync + Send + 'static {
-    /// Sends an amount to a given address.
-    async fn send_to_address(&self, address: &Address, amount: u64) -> ClientResult<Txid>;
-
+pub trait Signer {
     /// Signs a transaction using the keys available in the underlying Bitcoin
     /// client's wallet and returns a signed transaction.
     ///

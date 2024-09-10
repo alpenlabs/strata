@@ -8,7 +8,7 @@ use tracing::*;
 use super::{builder::build_inscription_txs, config::WriterConfig};
 use crate::{
     broadcaster::L1BroadcastHandle,
-    rpc::traits::{BitcoinReader, BitcoinSigner, BitcoinWallet},
+    rpc::traits::{Reader, Signer, Wallet},
 };
 
 type BlobIdx = u64;
@@ -21,7 +21,7 @@ type BlobIdx = u64;
 pub async fn create_and_sign_blob_inscriptions(
     blobentry: &BlobEntry,
     bhandle: &L1BroadcastHandle,
-    client: Arc<impl BitcoinReader + BitcoinWallet + BitcoinSigner>,
+    client: Arc<impl Reader + Wallet + Signer>,
     config: &WriterConfig,
 ) -> anyhow::Result<(Buf32, Buf32)> {
     trace!("Creating and signing blob inscriptions");

@@ -25,7 +25,7 @@ use thiserror::Error;
 use crate::{
     inscription::InscriptionData,
     rpc::{
-        traits::{BitcoinReader, BitcoinSigner, BitcoinWallet},
+        traits::{Reader, Signer, Wallet},
         types::ListUnspent,
     },
     writer::config::{InscriptionFeePolicy, WriterConfig},
@@ -51,7 +51,7 @@ pub enum InscriptionError {
 
 pub async fn build_inscription_txs(
     payload: &[u8],
-    rpc_client: &Arc<impl BitcoinReader + BitcoinWallet + BitcoinSigner>,
+    rpc_client: &Arc<impl Reader + Wallet + Signer>,
     config: &WriterConfig,
 ) -> anyhow::Result<(Transaction, Transaction)> {
     // let (signature, pub_key) = sign_blob_with_private_key(&payload, &config.private_key)?;

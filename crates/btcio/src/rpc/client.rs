@@ -9,9 +9,7 @@ use base64::{engine::general_purpose, Engine};
 use bitcoin::{
     consensus::encode::serialize_hex, Address, Block, BlockHash, Network, Transaction, Txid,
 };
-use bitcoind_json_rpc_types::v26::{
-    GetBlockVerbosityZero, GetBlockchainInfo, GetNewAddress, SendToAddress,
-};
+use bitcoind_json_rpc_types::v26::{GetBlockVerbosityZero, GetBlockchainInfo, GetNewAddress};
 use reqwest::{
     header::{HeaderMap, AUTHORIZATION, CONTENT_TYPE},
     Client,
@@ -24,10 +22,9 @@ use serde_json::{
 use tokio::time::sleep;
 use tracing::*;
 
-use super::traits::BitcoinWallet;
 use crate::rpc::{
     error::{BitcoinRpcError, ClientError},
-    traits::{BitcoinBroadcaster, BitcoinReader, BitcoinSigner},
+    traits::{Broadcaster, Reader, Signer, Wallet},
     types::{GetTransaction, ListTransactions, ListUnspent, SignRawTransactionWithWallet},
 };
 
@@ -123,7 +120,7 @@ impl BitcoinClient {
                 }))
                 .send()
                 .await;
-
+            trace!(?response, "Response received");
             match response {
                 Ok(resp) => {
                     let data = resp
@@ -188,7 +185,7 @@ impl BitcoinClient {
 }
 
 #[async_trait]
-impl BitcoinReader for BitcoinClient {
+impl Reader for BitcoinClient {
     async fn estimate_smart_fee(&self, conf_target: u16) -> ClientResult<u64> {
         let result = self
             .call::<Box<RawValue>>("estimatesmartfee", &[to_value(conf_target)?])
@@ -250,7 +247,7 @@ impl BitcoinReader for BitcoinClient {
 }
 
 #[async_trait]
-impl BitcoinBroadcaster for BitcoinClient {
+impl Broadcaster for BitcoinClient {
     async fn send_raw_transaction(&self, tx: &Transaction) -> ClientResult<Txid> {
         let txstr = serialize_hex(tx);
         trace!(txstr = %txstr, "Sending raw transaction");
@@ -274,7 +271,7 @@ impl BitcoinBroadcaster for BitcoinClient {
 }
 
 #[async_trait]
-impl BitcoinWallet for BitcoinClient {
+impl Wallet for BitcoinClient {
     async fn get_new_address(&self) -> ClientResult<Address> {
         let address_unchecked = self
             .call::<GetNewAddress>("getnewaddress", &[])
@@ -308,14 +305,7 @@ impl BitcoinWallet for BitcoinClient {
 }
 
 #[async_trait]
-impl BitcoinSigner for BitcoinClient {
-    async fn send_to_address(&self, address: &Address, amount: u64) -> ClientResult<Txid> {
-        self.call::<SendToAddress>("sendtoaddress", &[to_value(address)?, to_value(amount)?])
-            .await?
-            .txid()
-            .map_err(|e| ClientError::Parse(e.to_string()))
-    }
-
+impl Signer for BitcoinClient {
     async fn sign_raw_transaction_with_wallet(
         &self,
         tx: &Transaction,
@@ -332,6 +322,8 @@ impl BitcoinSigner for BitcoinClient {
 
 #[cfg(test)]
 mod test {
+    use std::env::set_var;
+
     use alpen_express_common::logging;
     use bitcoin::{consensus, hashes::Hash};
     use bitcoind::{bitcoincore_rpc::RpcApi, BitcoinD};
@@ -368,6 +360,8 @@ mod test {
     #[tokio::test()]
     async fn client_works() {
         logging::init();
+        // setting the ENV variable `BITCOIN_XPRIV_RETRIEVABLE` to retrieve the xpriv
+        set_var("BITCOIN_XPRIV_RETRIEVABLE", "true");
         let bitcoind = BitcoinD::from_downloaded().unwrap();
         let url = bitcoind.rpc_url();
         let (user, password) = get_auth(&bitcoind);
@@ -410,13 +404,19 @@ mod test {
         let got = client.get_block_hash(target_height).await.unwrap();
         assert_eq!(*expected, got);
 
-        // get_new_address and send_to_address
+        // get_new_address
         let address = client.get_new_address().await.unwrap();
-        let got = client.send_to_address(&address, 1).await.unwrap();
-        assert_eq!(got.as_byte_array().len(), 32); // 32 bytes is a Txid
+        let txid = client
+            .call::<String>(
+                "sendtoaddress",
+                &[to_value(address.to_string()).unwrap(), to_value(1).unwrap()],
+            )
+            .await
+            .unwrap()
+            .parse::<Txid>()
+            .unwrap();
 
         // get_transaction
-        let txid = got;
         let tx = client.get_transaction(&txid).await.unwrap().hex;
         let got = client.send_raw_transaction(&tx).await.unwrap();
         let expected = txid;
