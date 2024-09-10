@@ -138,6 +138,7 @@ mod tests {
         let pk = compute_pubkey_for_privkey(&sk, &secp);
 
         let sig = sign_msg_hash(&sk, &msg_hash, &secp);
+        assert!(verify_sig(&pk, &msg_hash, &sig));
     }
 
     #[test]
