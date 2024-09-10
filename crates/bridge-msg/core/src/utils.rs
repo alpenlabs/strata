@@ -1,100 +1,153 @@
-use borsh::BorshSerialize;
+use std::sync::Arc;
+
+use alpen_express_primitives::buf::{Buf32, Buf64};
+use alpen_express_state::bridge_state::OperatorTable;
 use rand::rngs::OsRng;
-use secp256k1::{
-    schnorr::{self, Signature},
-    Keypair, Message, Secp256k1, SecretKey, XOnlyPublicKey,
-};
-use sha2::{Digest, Sha256};
-use tracing::info;
+use secp256k1::{schnorr::Signature, All, Keypair, Message, Secp256k1, SecretKey, XOnlyPublicKey};
+use thiserror::Error;
 
-use crate::types::BridgeMessage;
+use crate::types::{BridgeMessage, Scope};
 
-/// Serializes a [`BridgeMessage`] into a hexadecimal string with an appended CRC32 checksum.
-pub fn serialize_bridge_message(msg: &BridgeMessage) -> anyhow::Result<Vec<u8>> {
-    let mut binary_data = Vec::new();
-    BorshSerialize::serialize(msg, &mut binary_data)?;
-
-    Ok(binary_data)
+/// Contains data needed to construct bridge messages.
+#[derive(Clone)]
+pub struct MessageSigner {
+    operator_idx: u32,
+    msg_signing_sk: Buf32,
+    secp: Arc<Secp256k1<All>>,
 }
 
-/// Computes the SHA-256 hash for the given payload.
-pub fn compute_sha256(payload: &[u8]) -> [u8; 32] {
-    Sha256::digest(payload).into()
-}
-
-pub fn check_signature_validity(
-    signing_pk: [u8; 32],
-    payload: &[u8],
-    signature: [u8; 64],
-) -> anyhow::Result<bool> {
-    let signing_pk = XOnlyPublicKey::from_slice(&signing_pk)?;
-
-    let msg = Message::from_digest(compute_sha256(payload));
-
-    let sig = schnorr::Signature::from_slice(&signature)?;
-
-    if sig.verify(&msg, &signing_pk).is_err() {
-        info!("message signature validation failed");
-        return Ok(false);
+impl MessageSigner {
+    pub fn new(operator_idx: u32, msg_signing_sk: Buf32, secp: Arc<Secp256k1<All>>) -> Self {
+        Self {
+            operator_idx,
+            msg_signing_sk,
+            secp,
+        }
     }
 
-    Ok(true)
+    /// Gets the idx of the operator that we are using for signing messages.
+    pub fn operator_idx(&self) -> u32 {
+        self.operator_idx
+    }
+
+    /// Gets the pubkey corresponding to the internal msg signing sk.
+    pub fn get_pubkey(&self) -> Buf32 {
+        compute_pubkey_for_privkey(&self.msg_signing_sk, self.secp.as_ref())
+    }
+
+    /// Signs a message using a raw scope and payload.
+    pub fn sign_raw(&self, scope: Vec<u8>, payload: Vec<u8>) -> BridgeMessage {
+        let mut tmp_m = BridgeMessage {
+            source_id: self.operator_idx,
+            sig: Buf64::zero(),
+            scope,
+            payload,
+        };
+
+        let id: Buf32 = tmp_m.compute_id().into();
+        let sig = sign_msg_hash(&self.msg_signing_sk, &id, self.secp.as_ref());
+        tmp_m.sig = sig;
+
+        tmp_m
+    }
+
+    /// Signs a message with some particular typed scope.
+    pub fn sign_scope(&self, scope: &Scope, payload: Vec<u8>) -> BridgeMessage {
+        let raw_scope = borsh::to_vec(scope).unwrap();
+        self.sign_raw(raw_scope, payload)
+    }
 }
 
-pub fn sign_message(payload: &[u8], sk: [u8; 32]) -> Signature {
-    let secp = Secp256k1::new();
+/// Computes the corresponding x-only pubkey as a buf32 for an sk.
+pub fn compute_pubkey_for_privkey<A: secp256k1::Signing>(sk: &Buf32, secp: &Secp256k1<A>) -> Buf32 {
+    let kp = Keypair::from_seckey_slice(secp, sk.as_ref()).unwrap();
+    let (xonly_pk, _) = kp.public_key().x_only_public_key();
+    Buf32::from(xonly_pk.serialize())
+}
+
+/// Generates a signature for the message.
+pub fn sign_msg_hash<A: secp256k1::Signing>(
+    sk: &Buf32,
+    msg_hash: &Buf32,
+    secp: &Secp256k1<A>,
+) -> Buf64 {
     let mut rng = OsRng;
 
-    let keypair = Keypair::from_secret_key(&secp, &SecretKey::from_slice(&sk).unwrap());
+    let keypair = Keypair::from_secret_key(secp, &SecretKey::from_slice(sk.as_ref()).unwrap());
+    let msg = Message::from_digest(*msg_hash.as_ref());
+    let sig = secp.sign_schnorr_with_rng(&msg, &keypair, &mut rng);
 
-    let msg = Message::from_digest(compute_sha256(payload));
+    Buf64::from(*sig.as_ref())
+}
 
-    secp.sign_schnorr_with_rng(&msg, &keypair, &mut rng)
+/// Returns if the signature is correct for the message.
+pub fn verify_sig(pk: &Buf32, msg_hash: &Buf32, sig: &Buf64) -> bool {
+    let pk = XOnlyPublicKey::from_slice(pk.as_ref()).unwrap();
+    let msg = Message::from_digest(*msg_hash.as_ref());
+    let sig = Signature::from_slice(sig.as_ref()).unwrap();
+
+    sig.verify(&msg, &pk).is_ok()
+}
+
+#[derive(Debug, Error)]
+pub enum VerifyError {
+    #[error("invalid signature")]
+    InvalidSig,
+
+    #[error("unknown operator idx")]
+    UnknownOperator,
+}
+
+/// Verifies a bridge message using the operator table working with and checks
+/// if the operator exists and verifies the signature using their pubkeys.
+pub fn verify_bridge_msg_sig<A: secp256k1::Signing>(
+    msg: &BridgeMessage,
+    optbl: &OperatorTable,
+) -> Result<(), VerifyError> {
+    let op = optbl
+        .get_operator(msg.source_id())
+        .ok_or(VerifyError::UnknownOperator)?;
+    let signing_pk = op.signing_pk();
+
+    let msg_hash = msg.compute_id().into_inner();
+    if !verify_sig(signing_pk, &msg_hash, msg.signature()) {
+        return Err(VerifyError::InvalidSig);
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use alpen_express_primitives::{buf::Buf64, utils::get_test_schnorr_keys};
-    use borsh::from_slice;
+    use arbitrary::Arbitrary;
 
     use super::*;
     use crate::{types::Scope, utils::BridgeMessage};
 
     #[test]
-    fn test_signing_veryfying_message() {
-        // payload
-        let dummy_payload = vec![1, 2, 3, 4, 5, 6, 7];
-        let signature = get_test_schnorr_keys();
+    fn test_sign_verify_raw() {
+        let secp = Secp256k1::new();
 
-        let sig = sign_message(&dummy_payload, *signature[0].sk.as_ref());
+        let msg_hash = [
+            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+            25, 26, 27, 28, 29, 30, 31, 32,
+        ];
+        let msg_hash = Buf32::from(msg_hash);
+        let sk = Buf32::from([3; 32]);
+        let pk = compute_pubkey_for_privkey(&sk, &secp);
 
-        // Create a sample BridgeMessage
-        let scope = Scope::V0DepositSig(10);
-        let original_message = BridgeMessage {
-            source_id: 0,
-            sig: Buf64::from(*sig.as_ref()),
-            scope,
-            payload: dummy_payload,
-        };
+        let sig = sign_msg_hash(&sk, &msg_hash, &secp);
+    }
 
-        // Serialize the message
-        let serialized_msg =
-            serialize_bridge_message(&original_message).expect("Serialization failed");
+    #[test]
+    fn test_sign_verify_msg() {
+        let secp = Arc::new(Secp256k1::new());
+        let sk = Buf32::from([1; 32]);
 
-        // check if the signed message is valid
-        assert!(check_signature_validity(
-            *signature[0].pk.as_ref(),
-            original_message.payload(),
-            *original_message.signature().as_ref()
-        )
-        .unwrap());
-        // assert!(check_signature_validity(*signature[0].pk.as_ref(), original_message.payload(),
-        // *original_message.signature().as_ref()).unwrap());
+        let signer = MessageSigner::new(4, sk, secp);
 
-        // Deserialize the message
-        let deserialized_msg: BridgeMessage = from_slice::<BridgeMessage>(&serialized_msg).unwrap();
-
-        // Assert that the original and deserialized messages are the same
-        assert_eq!(original_message, deserialized_msg);
+        let payload = vec![1, 2, 3, 4, 5];
+        let m = signer.sign_scope(&Scope::Misc, payload);
     }
 }

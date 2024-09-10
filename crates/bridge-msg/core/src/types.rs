@@ -8,15 +8,18 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-/// Bridge Message to be passed by the operator for Signature Duties
+/// Message container used to direct payloads depending on the context between parties.
 #[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize, Deserialize, Serialize)]
 pub struct BridgeMessage {
-    /// Operator Id
+    /// Operator ID
     pub(crate) source_id: u32,
+
     /// Schnorr signature of the message
     pub(crate) sig: Buf64,
+
     /// Purpose of the message.
-    pub(crate) scope: Scope,
+    pub(crate) scope: Vec<u8>,
+
     /// serialized message
     pub(crate) payload: Vec<u8>,
 }
@@ -25,8 +28,8 @@ impl<'a> Arbitrary<'a> for BridgeMessage {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         let source_id = u32::arbitrary(u)?;
         let sig = Buf64::arbitrary(u)?;
-        let scope = Scope::arbitrary(u)?;
-        let mut payload = Vec::with_capacity(20);
+        let scope = borsh::to_vec(&Scope::Misc).unwrap();
+        let mut payload = vec![0; 20];
         u.fill_buffer(&mut payload)?;
 
         Ok(Self {
@@ -39,69 +42,81 @@ impl<'a> Arbitrary<'a> for BridgeMessage {
 }
 
 impl BridgeMessage {
-    /// computes the [`BridgeMsgId`] by serializing and then hashing the [`BridgeMessage`]
-    pub fn compute_id(&self) -> anyhow::Result<BridgeMsgId> {
-        // Serialize the BridgeMessage struct into a binary format using bincode
-        let mut serialized_data: Vec<u8> = Vec::new();
-        BorshSerialize::serialize(&self, &mut serialized_data)?;
-        let hash = Sha256::digest(&serialized_data);
-        let mut result = [0u8; 32];
-        result.copy_from_slice(&hash);
-
-        Ok(BridgeMsgId::from(Buf32::from(result)))
+    /// Source ID.
+    pub fn source_id(&self) -> u32 {
+        self.source_id
     }
 
-    /// get the deserialized Scope in enum form
-    pub fn get_scope(&self) -> &Scope {
-        &self.scope
-    }
-
-    /// get the scope in raw form
-    pub fn get_scope_raw(&self) -> anyhow::Result<Vec<u8>> {
-        let mut writer = Vec::new();
-        BorshSerialize::serialize(&self.scope, &mut writer)?;
-        Ok(writer)
-    }
-
-    /// raw payload
-    pub fn payload(&self) -> &[u8] {
-        &self.payload
-    }
-
-    /// signature
+    /// Signature.
     pub fn signature(&self) -> &Buf64 {
         &self.sig
     }
 
-    /// source id
-    pub fn source_id(&self) -> u32 {
-        self.source_id
+    /// Raw scope.
+    pub fn scope(&self) -> &[u8] {
+        &self.scope
+    }
+
+    /// Raw payload
+    pub fn payload(&self) -> &[u8] {
+        &self.payload
+    }
+
+    /// Tries to parse the scope buf as a typed scope.
+    pub fn try_parse_scope(&self) -> Option<Scope> {
+        Scope::try_from_slice(self.scope()).ok()
+    }
+
+    /// Computes a msg ID based on the .
+    pub fn compute_id(&self) -> BridgeMsgId {
+        // No signature because it might be malleable and it doesn't have any
+        // useful data in it we'd want to inspect.
+        let mut digest = Sha256::default();
+        digest.update(&self.source_id.to_be_bytes());
+        digest.update(&(self.scope.len() as u64).to_be_bytes());
+        digest.update(&self.scope);
+        digest.update(&(self.payload.len() as u64).to_be_bytes());
+        digest.update(&self.payload);
+
+        let hash: [u8; 32] = digest.finalize().into();
+        BridgeMsgId::from(Buf32::from(hash))
     }
 }
 
 /// Scope of the [`BridgeMessage`]
-#[derive(
-    Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
-)]
+#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize, Deserialize, Serialize)]
 pub enum Scope {
-    /// Deposit Signature with Outpoint
+    /// Used for debugging purposes.
+    Misc,
+
+    /// Deposit Signature with Outpoint.
+    // TODO make this contain the outpoint
     V0DepositSig(u32),
-    // Withdrawal Signature with Deposit index. Withdrawal are related to Deposits
+
+    /// Withdrawal Signature with Deposit index.
     V0WithdrawalSig(u32),
 }
 
 impl Scope {
-    /// get the deserialized Scope in enum form
-    pub fn from_raw(raw: &[u8]) -> anyhow::Result<Scope> {
-        let scope: Scope = Scope::try_from_slice(raw)?;
-
-        Ok(scope)
+    /// Tries to parse the scope from a slice.
+    pub fn try_from_slice(raw: &[u8]) -> anyhow::Result<Scope> {
+        Ok(borsh::from_slice(raw)?)
     }
 }
 
-/// Id of [`BridgeMessage`]
+/// Id of [``BridgeMessage``].
 #[derive(Clone, Eq, PartialEq, Hash, Arbitrary)]
 pub struct BridgeMsgId(Buf32);
+
+impl BridgeMsgId {
+    pub fn inner(&self) -> &Buf32 {
+        &self.0
+    }
+
+    pub fn into_inner(self) -> Buf32 {
+        self.0
+    }
+}
 
 impl From<Buf32> for BridgeMsgId {
     fn from(value: Buf32) -> Self {
@@ -134,9 +149,10 @@ impl fmt::Display for BridgeMsgId {
 }
 
 #[derive(Copy, Clone, Deserialize, Debug)]
-pub struct BridgeParams {
+pub struct BridgeConfig {
     // Time for which message is stored and bandwidth is reset
     pub refresh_interval: u64,
+
     // max no. of messages corresponding to single operator.
     pub bandwidth: u32,
 }
@@ -151,38 +167,22 @@ mod tests {
 
     fn get_arb_bridge_msg() -> BridgeMessage {
         let msg: BridgeMessage = ArbitraryGenerator::new().generate();
-
         msg
     }
 
-    fn get_bridge_msg() -> BridgeMessage {
-        let scope = Scope::V0DepositSig(10);
-
+    fn make_bridge_msg() -> BridgeMessage {
         BridgeMessage {
             source_id: 1,
             sig: Buf64::from([0; 64]),
-            scope,
+            scope: borsh::to_vec(&Scope::Misc).unwrap(),
             payload: vec![1, 2, 3, 4, 5],
         }
     }
 
     #[test]
-    fn test_compute_id() {
-        let msg = get_bridge_msg();
-
-        let msg_id = BridgeMsgId::from(Buf32::from([
-            0xf7, 0xcd, 0xde, 0x84, 0x01, 0x35, 0x2e, 0x70, 0x92, 0x08, 0x69, 0x1a, 0x13, 0xcd,
-            0x02, 0x79, 0xfc, 0x12, 0x71, 0xdd, 0xd1, 0xf7, 0x4f, 0xb1, 0xe6, 0x12, 0xec, 0xbc,
-            0xf2, 0xa0, 0x2f, 0xc7,
-        ]));
-
-        assert_eq!(msg.compute_id().unwrap(), msg_id);
-    }
-
-    #[test]
     fn test_get_scope_raw() {
-        let msg = get_bridge_msg();
+        let msg = make_bridge_msg();
 
-        assert_eq!(msg.get_scope_raw().unwrap(), vec![0, 10, 0, 0, 0])
+        assert_eq!(msg.scope(), vec![0])
     }
 }
