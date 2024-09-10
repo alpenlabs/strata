@@ -46,7 +46,12 @@ members = [
   "sequencer",
 ]
 
-default-members = ["bin/bridge-client", "reth", "sequencer"]
+default-members = [
+  "bin/bridge-client",
+  "bin/prover-client",
+  "reth",
+  "sequencer",
+]
 
 resolver = "2"
 

@@ -105,10 +105,14 @@ pub struct Task {
 #[derive(Clone)]
 pub struct RpcContext {
     pub task_tracker: Arc<TaskTracker>,
+    pub rpc_url: String,
 }
 
 impl RpcContext {
-    pub fn new(task_tracker: Arc<TaskTracker>) -> Self {
-        RpcContext { task_tracker }
+    pub fn new(task_tracker: Arc<TaskTracker>, rpc_url: String) -> Self {
+        RpcContext {
+            task_tracker,
+            rpc_url,
+        }
     }
 }
