@@ -3,12 +3,10 @@
 //! implement the consensus logic.
 // TODO move this to another crate that contains our sync logic
 
-use std::ops::RangeInclusive;
-
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use crate::{id::L2BlockId, l1::L1BlockId};
+use crate::{batch::CheckPointInfo, id::L2BlockId, l1::L1BlockId};
 
 /// High level client's state of the network.  This is local to the client, not
 /// coordinated as part of the L2 chain.
@@ -220,33 +218,5 @@ impl LocalL1State {
 
     pub fn next_checkpoint_info(&self) -> Option<&CheckPointInfo> {
         self.next_checkpoint_info.as_ref()
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
-pub struct CheckPointInfo {
-    /// The index of the checkpoint
-    pub(super) checkpoint_idx: u64,
-    /// L1 height range the checkpoint covers
-    pub(super) l1_range: RangeInclusive<u64>,
-    /// L2 height range the checkpoint covers
-    pub(super) l2_range: RangeInclusive<u64>,
-}
-
-impl CheckPointInfo {
-    pub fn new(
-        checkpoint_idx: u64,
-        l1_range: RangeInclusive<u64>,
-        l2_range: RangeInclusive<u64>,
-    ) -> Self {
-        Self {
-            checkpoint_idx,
-            l1_range,
-            l2_range,
-        }
-    }
-
-    pub fn checkpoint_idx(&self) -> u64 {
-        self.checkpoint_idx
     }
 }
