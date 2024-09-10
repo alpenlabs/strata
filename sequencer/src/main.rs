@@ -30,7 +30,7 @@ use alpen_express_primitives::{
 use alpen_express_rocksdb::{
     broadcaster::db::BroadcastDatabase, sequencer::db::SequencerDB, DbOpsConfig, SeqDb,
 };
-use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer};
+use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer, AlpenSyncApiServer};
 use alpen_express_rpc_types::L1Status;
 use alpen_express_state::csm_status::CsmStatus;
 // use alpen_express_btcio::broadcaster::manager::BroadcastDbManager;
@@ -291,7 +291,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
         // Spawn up writer
         let writer_config = WriterConfig::new(
-            config.client.sequencer_bitcoin_address.clone(),
+            sequencer_config.sequencer_bitcoin_address.clone(),
             config.bitcoind_rpc.network,
             params.rollup().rollup_name.clone(),
         )?;
@@ -344,14 +344,11 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
         let rpc_client = rt.block_on(sync_client(sequencer_rpc));
         let sync_peer = RpcSyncPeer::new(rpc_client);
-        let mut l2_sync_manager = L2SyncManager::new(
-            sync_peer,
-            l2_block_manager.clone(),
-            sync_man.clone(),
-            database.clone(),
-        );
+        let l2_sync_manager =
+            L2SyncManager::new(sync_peer, l2_block_manager.clone(), sync_man.clone());
+
         task_executor.spawn_critical_async("l2-sync-manager", async move {
-            l2_sync_manager.run().await.unwrap()
+            l2_sync_manager.run().await.unwrap();
         });
     }
 
@@ -415,12 +412,14 @@ async fn start_rpc<D: Database + Send + Sync + 'static>(
         sync_man.clone(),
         bcast_handle.clone(),
         stop_tx,
-        l2_block_manager,
+        l2_block_manager.clone(),
     );
 
     let mut methods = alp_rpc.into_rpc();
     let admin_rpc = rpc_server::AdminServerImpl::new(inscription_handler, bcast_handle);
     methods.merge(admin_rpc.into_rpc())?;
+    let sync_rpc = rpc_server::AlpenSyncRpcImpl::new(status_rx.clone(), l2_block_manager.clone());
+    methods.merge(sync_rpc.into_rpc())?;
 
     let rpc_port = config.client.rpc_port;
 

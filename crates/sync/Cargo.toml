@@ -15,7 +15,6 @@ async-trait = { workspace = true }
 borsh = { workspace = true }
 express-storage = { workspace = true }
 futures-util = { workspace = true }
-indexmap = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }

@@ -10,6 +10,8 @@ use crate::args::Args;
 pub struct SequencerConfig {
     /// path to sequencer root key
     pub sequencer_key: PathBuf,
+    /// address with funds for sequencer transactions
+    pub sequencer_bitcoin_address: String,
 }
 
 #[derive(Deserialize, Debug)]
@@ -31,7 +33,6 @@ pub struct ClientParams {
     #[serde(flatten)]
     pub client_mode: ClientMode,
     /// The address to which the inscriptions are spent
-    pub sequencer_bitcoin_address: String, // TODO: probably move this to another struct
     pub l2_blocks_fetch_limit: u64,
     pub datadir: PathBuf,
     pub db_retry_count: u16,
@@ -98,21 +99,23 @@ impl Config {
                     .datadir
                     .ok_or_else(|| "args: no client --datadir provided".to_string())?,
                 client_mode: {
-                    if let Some(sequencer_key) = args.sequencer_key {
-                        ClientMode::Sequencer(SequencerConfig { sequencer_key })
+                    if let (Some(sequencer_key), Some(sequencer_bitcoin_address)) =
+                        (args.sequencer_key, args.sequencer_bitcoin_address)
+                    {
+                        ClientMode::Sequencer(SequencerConfig {
+                            sequencer_key,
+                            sequencer_bitcoin_address,
+                        })
                     } else if let Some(sequencer_rpc) = args.sequencer_rpc {
                         ClientMode::FullNode(FullNodeConfig { sequencer_rpc })
                     } else {
                         return Err(
-                            "args: no client --sequencer-key or --sequencer-rpc provided"
+                            "args: no client --sequencer-key or --sequencer-bitcion-address provided or --sequencer-rpc provided"
                                 .to_string(),
                         );
                     }
                 },
                 l2_blocks_fetch_limit: 1_000,
-                sequencer_bitcoin_address: args
-                    .sequencer_bitcoin_address
-                    .ok_or_else(|| "args: no --sequencer-bitcion-address provided".to_string())?,
                 db_retry_count: 5,
             },
             sync: SyncParams {
@@ -151,8 +154,14 @@ impl Config {
             self.client.datadir = datadir;
         }
         // sequencer_key has priority over sequencer_rpc if both are provided
-        if let Some(sequencer_key) = args.sequencer_key {
-            self.client.client_mode = ClientMode::Sequencer(SequencerConfig { sequencer_key });
+
+        if let (Some(sequencer_key), Some(sequencer_bitcoin_address)) =
+            (args.sequencer_key, args.sequencer_bitcoin_address)
+        {
+            self.client.client_mode = ClientMode::Sequencer(SequencerConfig {
+                sequencer_key,
+                sequencer_bitcoin_address,
+            });
         } else if let Some(sequencer_rpc) = args.sequencer_rpc {
             self.client.client_mode = ClientMode::FullNode(FullNodeConfig { sequencer_rpc });
         }
@@ -161,9 +170,6 @@ impl Config {
         }
         if let Some(jwtsecret) = args.reth_jwtsecret {
             self.exec.reth.secret = jwtsecret;
-        }
-        if let Some(seq_addr) = args.sequencer_bitcoin_address {
-            self.client.sequencer_bitcoin_address = seq_addr;
         }
         if let Some(db_retry_count) = args.db_retry_count {
             self.client.db_retry_count = db_retry_count;
