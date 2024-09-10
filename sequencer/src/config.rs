@@ -30,10 +30,10 @@ pub enum ClientMode {
 
 #[derive(Debug, Deserialize)]
 pub struct ClientConfig {
+    pub rpc_host: String,
     pub rpc_port: u16,
     #[serde(flatten)]
     pub client_mode: ClientMode,
-    /// The address to which the inscriptions are spent
     pub l2_blocks_fetch_limit: u64,
     pub datadir: PathBuf,
     pub db_retry_count: u16,
@@ -94,6 +94,9 @@ impl Config {
                     .ok_or_else(|| "args: no bitcoin --network provided".to_string())?,
             },
             client: ClientConfig {
+                rpc_host: args
+                    .rpc_host
+                    .ok_or_else(|| "args: no client --rpc-host provided".to_string())?,
                 rpc_port: args
                     .rpc_port
                     .ok_or_else(|| "args: no client --rpc-port provided".to_string())?,
@@ -154,6 +157,9 @@ impl Config {
         if let Some(rpc_password) = args.bitcoind_password {
             self.bitcoind_rpc.rpc_password = rpc_password;
         }
+        if let Some(rpc_host) = args.rpc_host {
+            self.client.rpc_host = rpc_host;
+        }
         if let Some(rpc_port) = args.rpc_port {
             self.client.rpc_port = rpc_port;
         }
@@ -196,7 +202,7 @@ mod test {
     use crate::config::Config;
 
     #[test]
-    fn config_load_test() {
+    fn test_config_load() {
         let config_string_sequencer = r#"
             [bitcoind_rpc]
             rpc_url = "http://localhost:18332"
@@ -205,6 +211,7 @@ mod test {
             network = "regtest"
 
             [client]
+            rpc_host = "0.0.0.0"
             rpc_port = 8432
             l2_blocks_fetch_limit = 1000
             datadir = "/path/to/data/directory"
@@ -238,6 +245,7 @@ mod test {
             network = "regtest"
 
             [client]
+            rpc_host = "0.0.0.0"
             rpc_port = 8432
             l2_blocks_fetch_limit = 1000
             datadir = "/path/to/data/directory"

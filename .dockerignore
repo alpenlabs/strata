@@ -4,11 +4,7 @@
 .github/
 .ruff_cache/
 .vscode/
-.functional-tests/.ruff_cache/
-.functional-tests/.venv/
-.functional-tests/__pycache__/
-.test/__pycache__/
-.test/_dd/
+functional-tests/
 
 # Ignore build artifacts and cache
 target/
@@ -16,8 +12,6 @@ target/*
 
 # Ignore test-related files and directories
 test/
-test/__pycache__/
-test/_dd/
 
 # Ignore cache, temporary, and virtual environment files
 *.log

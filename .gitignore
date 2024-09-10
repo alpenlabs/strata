@@ -246,3 +246,8 @@ elf
 
 # macOS specific files
 .DS_Store
+
+# Build specific files
+data/
+jwt.hex
+seq_key.bin

@@ -5,21 +5,30 @@
 # fail if env is missing
 set -eu
 
-mkdir /app/reth
+mkdir -p /app/reth
 
-# For now create a sample jwtsecret
-echo "7df2f4bc998cbf0631d0c871bf06b5caa3f2ab48afa1856b81b814afa898bf71" > jwt.hex
+# save the JWTSECRET to file
+echo "$JWTSECRET" > jwt.hex
 
-alpen-express-reth
---disable-discovery \
---datadir /app/reth \
---authrpc.port $RETH_PORT \
---authrpc.jwtsecret jwt.hex \
---port $LISTENER_PORT \
---ws
---ws.port $WEBSOCKET_PORT \
---http
---http.port $HTTP_PORT \
---color never \
---enable-witness-gen
--vvvv
+cat <<EOF > p2p.pem
+-----BEGIN PRIVATE KEY-----
+$P2P_SECRET_KEY
+-----END PRIVATE KEY-----
+" > p2p.bin
+EOF
+
+echo "starting Reth"
+
+strata-reth \
+    --disable-discovery \
+    --datadir /app/reth \
+    --authrpc.addr 0.0.0.0 \
+    --authrpc.port $RETH_AUTH_RPC_PORT \
+    --http \
+    --http.addr 0.0.0.0 \
+    --http.port $RETH_PORT \
+    --authrpc.jwtsecret jwt.hex \
+    --color never \
+    --enable-witness-gen \
+    --p2p-secret-key p2p.bin \
+    -vvvv $@

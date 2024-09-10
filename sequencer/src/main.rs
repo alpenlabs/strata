@@ -465,10 +465,11 @@ async fn start_rpc<D: Database + Send + Sync + 'static>(
     let mut methods = alp_rpc.into_rpc();
     methods.merge(admin_rpc.into_rpc())?;
 
+    let rpc_host = config.client.rpc_host;
     let rpc_port = config.client.rpc_port;
 
     let rpc_server = jsonrpsee::server::ServerBuilder::new()
-        .build(format!("127.0.0.1:{rpc_port}"))
+        .build(format!("{rpc_host}:{rpc_port}"))
         .await
         .expect("init: build rpc server");
 
