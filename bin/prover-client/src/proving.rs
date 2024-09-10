@@ -92,8 +92,8 @@ where
 {
     match config.deref() {
         ProofGenConfig::Skip => Ok(Proof::new(Vec::default())),
-        ProofGenConfig::Execute => Ok(vm.prove(state_transition_data).unwrap().0),
-        ProofGenConfig::Prover => Ok(vm.prove(state_transition_data).unwrap().0),
+        ProofGenConfig::Execute => Ok(vm.prove(&[state_transition_data], None).unwrap().0),
+        ProofGenConfig::Prover => Ok(vm.prove(&[state_transition_data], None).unwrap().0),
     }
 }
 
