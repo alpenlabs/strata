@@ -100,7 +100,7 @@ pub enum VerifyError {
 
 /// Verifies a bridge message using the operator table working with and checks
 /// if the operator exists and verifies the signature using their pubkeys.
-pub fn verify_bridge_msg_sig<A: secp256k1::Signing>(
+pub fn verify_bridge_msg_sig(
     msg: &BridgeMessage,
     optbl: &OperatorTable,
 ) -> Result<(), VerifyError> {

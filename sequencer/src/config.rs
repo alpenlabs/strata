@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use alpen_express_bridge_msg::types::BridgeParams;
+use alpen_express_bridge_msg::types::BridgeConfig;
 use alpen_express_btcio::reader::config::ReaderConfig;
 use bitcoin::Network;
 use serde::Deserialize;
@@ -51,7 +51,7 @@ pub struct Config {
     pub bitcoind_rpc: BitcoindParams,
     pub sync: SyncParams,
     pub exec: ExecParams,
-    pub bridge: BridgeParams,
+    pub bridge: BridgeConfig,
 }
 
 impl Config {
@@ -100,7 +100,7 @@ impl Config {
                                                                            * Option */
                 },
             },
-            bridge: BridgeParams {
+            bridge: BridgeConfig {
                 refresh_interval: 100,
                 bandwidth: 500,
             },

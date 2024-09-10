@@ -5,41 +5,41 @@ use std::{
 };
 
 use alpen_express_bridge_msg::types::BridgeMsgId;
-use tokio::sync::RwLock;
+use tokio::sync::Mutex;
 
-#[derive(Default)]
-pub(crate) struct RecentMessageTracker {
-    messages: Arc<RwLock<HashMap<BridgeMsgId, u128>>>,
-    refresh_interval: u64,
+pub struct RecentMessageTracker {
+    messages: Arc<Mutex<HashMap<BridgeMsgId, u128>>>,
+    forget_duration: u64,
 }
 
 impl RecentMessageTracker {
-    pub(crate) fn new(refresh_interval: u64) -> Self {
+    pub fn new(forget_duration: u64) -> Self {
         Self {
-            messages: Arc::new(RwLock::new(HashMap::new())),
-            refresh_interval,
+            messages: Arc::new(Mutex::new(HashMap::new())),
+            forget_duration,
         }
     }
 
-    pub(crate) async fn add_message(&self, timestamp: u128, message_id: BridgeMsgId) {
-        self.messages.write().await.insert(message_id, timestamp);
+    /// Checks if we should relay the message.
+    pub async fn check_should_relay(&self, timestamp: u128, message_id: BridgeMsgId) -> bool {
+        let mut msgs = self.messages.lock().await;
+        if msgs.contains_key(&message_id) {
+            false
+        } else {
+            msgs.insert(message_id, timestamp);
+            true
+        }
     }
 
-    pub(crate) async fn is_duplicate(&self, message_id: &BridgeMsgId) -> bool {
-        let messages = self.messages.read().await;
-        messages.contains_key(message_id)
-    }
-
-    pub(crate) async fn clear_old_messages(&self) {
+    /// Clears messages that should be forgotten by now.
+    pub async fn clear_stale_messages(&self) {
         let expiration_time = (std::time::SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")
-            - Duration::from_secs(self.refresh_interval))
+            - Duration::from_secs(self.forget_duration))
         .as_micros();
 
-        self.messages
-            .write()
-            .await
-            .retain(|_, &mut timestamp| timestamp > expiration_time);
+        let mut msgs = self.messages.lock().await;
+        msgs.retain(|_, &mut timestamp| timestamp > expiration_time);
     }
 }

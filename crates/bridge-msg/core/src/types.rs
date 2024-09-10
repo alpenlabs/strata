@@ -104,8 +104,10 @@ impl Scope {
     }
 }
 
-/// Id of [``BridgeMessage``].
-#[derive(Clone, Eq, PartialEq, Hash, Arbitrary)]
+/// ID of a [``BridgeMessage``] computed from the sender ID, scope, and payload.
+#[derive(
+    Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, Arbitrary, BorshDeserialize, BorshSerialize,
+)]
 pub struct BridgeMsgId(Buf32);
 
 impl BridgeMsgId {

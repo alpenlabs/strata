@@ -4,11 +4,12 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use alpen_express_bridge_msg::types::{BridgeMessage, BridgeParams};
+use alpen_express_bridge_msg::types::{BridgeConfig, BridgeMessage};
 use alpen_express_status::StatusRx;
 use express_storage::ops::bridgemsg::BridgeMsgOps;
+use secp256k1::{All, Secp256k1};
 use tokio::{select, sync::mpsc, time::interval};
-use tracing::{info, warn};
+use tracing::*;
 
 use crate::{operator_bandwidth::OperatorBandwidth, recent_msg_tracker::RecentMessageTracker};
 
@@ -17,36 +18,21 @@ use crate::{operator_bandwidth::OperatorBandwidth, recent_msg_tracker::RecentMes
 /// The [`MsgManager`] struct is responsible for handling incoming messages, validating them
 /// against the current chain state, enforcing operator bandwidth limits to prevent spamming,
 /// and maintaining a record of processed messages to avoid duplication.
-pub struct MsgState {
-    /// leaky bucket style request handling method
-    operator_bandwidth: OperatorBandwidth,
-    /// processed message to avoid duplicate message,
+pub struct RelayerState {
+    /// Tracker to avoid duplicating messages.
     processed_msgs: RecentMessageTracker,
+
+    /// libsecp handle.
+    secp: Arc<Secp256k1<All>>,
 }
 
-impl MsgState {
+impl RelayerState {
     /// creates new message state
-    pub fn new(params: Arc<BridgeParams>) -> Self {
-        MsgState {
-            operator_bandwidth: OperatorBandwidth::new(),
-            processed_msgs: RecentMessageTracker::new(params.refresh_interval),
+    pub fn new(config: &BridgeConfig) -> Self {
+        RelayerState {
+            processed_msgs: RecentMessageTracker::new(config.refresh_interval),
+            secp: Arc::new(Secp256k1::new()),
         }
-    }
-
-    /// Returns the current Unix timestamp in milliseconds, optionally subtracting a given duration.
-    ///
-    /// # Arguments
-    ///
-    /// * `sub_duration` - An optional `Duration` to subtract from the current time.
-    ///
-    /// # Returns
-    ///
-    /// * `u64` - The Unix timestamp in milliseconds
-    fn get_unix_time(&self, sub_duration: Option<Duration>) -> u128 {
-        let duration = SystemTime::now().duration_since(UNIX_EPOCH).unwrap()
-            - sub_duration.unwrap_or(Duration::ZERO);
-
-        duration.as_micros()
     }
 
     /// Handles new incoming messages by validating, enforcing bandwidth limits, checking
@@ -60,56 +46,33 @@ impl MsgState {
         message: BridgeMessage,
         bridge_ops: Arc<BridgeMsgOps>,
         status_rx: Arc<StatusRx>,
-        params: Arc<BridgeParams>,
     ) -> anyhow::Result<()> {
-        let message_id = message.compute_id()?;
+        let message_id = message.compute_id();
 
         // Check for duplicates
-        if self.processed_msgs.is_duplicate(&message_id).await {
-            info!(%message_id, "Message already processed");
+        let timestamp = get_now_micros();
+        if !self
+            .processed_msgs
+            .check_should_relay(timestamp, message_id)
+            .await
+        {
+            trace!(%message_id, "dropping message we've already seen");
             return Ok(());
         }
 
-        // Bandwidth enforcement logic
-        let source_id = message.source_id();
-        if self
-            .update_bandwidth_counter(source_id, params.bandwidth)
-            .await
-        {
-            warn!(%source_id, "Bandwidth limit crossed (possible spamming)");
-            return Ok(());
-        }
         let chs_state = status_rx.chs.borrow().clone();
         if let Some(chs_state) = chs_state {
-            match chs_state.operator_table().get_operator(source_id) {
-                Some(operator) => {
-                    if !alpen_express_bridge_msg::utils::check_signature_validity(
-                        *operator.signing_pk().as_ref(),
-                        message.payload(),
-                        *message.signature().as_ref(),
-                    )? {
-                        println!("Signature is invalid");
-                        return Ok(());
-                    }
-                }
-                None => {
+            match alpen_express_bridge_msg::utils::verify_bridge_msg_sig(
+                &message,
+                chs_state.operator_table(),
+            ) {
+                Ok(()) => {}
+                Err(e) => {
+                    trace!(err = %e, "dropping invalid message");
                     return Ok(());
                 }
             }
 
-            // insert it into processed_message
-            //
-            let timestamp = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_micros();
-
-            self.processed_msgs
-                .add_message(timestamp, message_id.clone())
-                .await;
-
-            // update the operator table, to enforce the bandwidth
-            self.operator_bandwidth.increment(source_id).await;
             //  store them in database
             bridge_ops.write_msg_blocking(timestamp, message)?;
         }
@@ -132,53 +95,56 @@ impl MsgState {
         bridge_ops.delete_msgs_before_timestamp_blocking(time_before)?;
 
         // remove from the processed message here
-        self.processed_msgs.clear_old_messages().await;
+        self.processed_msgs.clear_stale_messages().await;
         Ok(())
-    }
-
-    /// Enforces operator bandwidth limits by checking if the source ID has exceeded the allowed
-    /// threshold.
-    ///
-    /// # Arguments
-    ///
-    /// * `source_id` - The identifier of the operator to check.
-    async fn update_bandwidth_counter(&self, source_id: u32, bandwidth: u32) -> bool {
-        // Check if the source_id is greater than BANDWIDTH
-        if self.operator_bandwidth.get(source_id).await > bandwidth {
-            return true;
-        }
-        false
     }
 }
 
 pub async fn bridge_msg_worker_task(
     bridge_ops: Arc<BridgeMsgOps>,
     status_rx: Arc<StatusRx>,
-    mut msg_state: MsgState,
+    mut msg_state: RelayerState,
     mut message_rx: mpsc::Receiver<BridgeMessage>,
-    params: Arc<BridgeParams>,
+    params: Arc<BridgeConfig>,
 ) {
     // arbitrary refresh interval to refresh the number of message particular operator can send
     let mut refresh_interval = interval(Duration::from_secs(params.refresh_interval));
     loop {
         select! {
             Some(new_message) = message_rx.recv() => {
-                if let Err(e) = msg_state.handle_new_message(new_message, bridge_ops.clone(), status_rx.clone(), params.clone()).await {
-                    warn!(err = %e, "Failed to handle new message");
+                if let Err(e) = msg_state.handle_new_message(new_message, bridge_ops.clone(), status_rx.clone()).await {
+                    warn!(err = %e, "failed to handle new message");
                 }
             }
             _ = refresh_interval.tick() => {
-                // clear the operator bandwidth
-                msg_state.operator_bandwidth.clear().await;
-
                 // prune old messages that cross the threshold duration
-                let duration = msg_state.get_unix_time(Some(Duration::from_secs(params.refresh_interval)));
+                let duration = get_now_micros_maybe_sub(Some(Duration::from_secs(params.refresh_interval)));
                 if let Err(e) = msg_state.prune_old_msg_before(duration, bridge_ops.clone()).await {
                     warn!(err = %e, "Failed to prune old messages");
                 }
             }
         }
     }
+}
+
+fn get_now_micros() -> u128 {
+    let duration = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+    duration.as_micros()
+}
+
+/// Returns the current Unix timestamp in milliseconds, optionally subtracting a given duration.
+///
+/// # Arguments
+///
+/// * `sub_duration` - An optional `Duration` to subtract from the current time.
+///
+/// # Returns
+///
+/// * `u64` - The Unix timestamp in milliseconds
+fn get_now_micros_maybe_sub(sub_duration: Option<Duration>) -> u128 {
+    let duration = SystemTime::now().duration_since(UNIX_EPOCH).unwrap()
+        - sub_duration.unwrap_or(Duration::ZERO);
+    duration.as_micros()
 }
 
 #[cfg(test)]
@@ -197,7 +163,7 @@ mod tests {
         let message_id: BridgeMsgId = ArbitraryGenerator::new().generate();
 
         // Initially, the message should not be marked as duplicate
-        assert!(!processed_msgs.is_duplicate(&message_id).await);
+        assert!(!processed_msgs.check_duplicate(&message_id).await);
 
         // Add the message
         let timestamp = SystemTime::now()
@@ -206,11 +172,11 @@ mod tests {
             .as_micros();
 
         processed_msgs
-            .add_message(timestamp, message_id.clone())
+            .check_should_relay(timestamp, message_id.clone())
             .await;
 
         // Now it should be marked as duplicate
-        assert!(processed_msgs.is_duplicate(&message_id).await);
+        assert!(processed_msgs.check_duplicate(&message_id).await);
     }
 
     #[tokio::test]
@@ -227,23 +193,23 @@ mod tests {
         let old_timestamp = current_timestamp - Duration::from_secs(200);
 
         processed_msgs
-            .add_message(current_timestamp.as_micros(), message_id.clone())
+            .check_should_relay(current_timestamp.as_micros(), message_id.clone())
             .await;
         processed_msgs
-            .add_message(old_timestamp.as_micros(), old_message_id.clone())
+            .check_should_relay(old_timestamp.as_micros(), old_message_id.clone())
             .await;
 
         // Both messages should be considered processed initially
-        assert!(processed_msgs.is_duplicate(&message_id).await);
-        assert!(processed_msgs.is_duplicate(&old_message_id).await);
+        assert!(processed_msgs.check_duplicate(&message_id).await);
+        assert!(processed_msgs.check_duplicate(&old_message_id).await);
 
         // Clear old messages
-        processed_msgs.clear_old_messages().await;
+        processed_msgs.clear_stale_messages().await;
 
         // The old message should no longer be considered processed
-        assert!(!processed_msgs.is_duplicate(&old_message_id).await);
+        assert!(!processed_msgs.check_duplicate(&old_message_id).await);
         // The current message should still be considered processed
-        assert!(processed_msgs.is_duplicate(&message_id).await);
+        assert!(processed_msgs.check_duplicate(&message_id).await);
     }
 
     #[tokio::test]
