@@ -2,12 +2,12 @@ use std::{
     collections::{hash_map::Entry, HashMap},
     fs,
     ops::Deref,
-    path::{Path, PathBuf},
+    path::PathBuf,
     sync::{Arc, RwLock},
 };
 
 use alpen_express_rocksdb::{prover::db::ProofDb, DbOpsConfig};
-use express_zkvm::{Proof, ProverOptions, ZKVMHost};
+use express_zkvm::{Proof, ZKVMHost};
 use rockbound::rocksdb;
 use uuid::Uuid;
 
@@ -103,30 +103,6 @@ impl<Vm: ZKVMHost> Prover<Vm> {
         vm_map: HashMap<u8, Vm>,
         config: Arc<ProofGenConfig>,
     ) -> Self {
-        fn open_rocksdb_database() -> anyhow::Result<Arc<rockbound::OptimisticTransactionDB>> {
-            let mut database_dir = PathBuf::default();
-            database_dir.push("rocksdb_prover");
-
-            if !database_dir.exists() {
-                fs::create_dir_all(&database_dir)?;
-            }
-
-            let dbname = alpen_express_rocksdb::ROCKSDB_NAME;
-            let cfs = alpen_express_rocksdb::STORE_COLUMN_FAMILIES;
-            let mut opts = rocksdb::Options::default();
-            opts.create_if_missing(true);
-            opts.create_missing_column_families(true);
-
-            let rbdb = rockbound::OptimisticTransactionDB::open(
-                &database_dir,
-                dbname,
-                cfs.iter().map(|s| s.to_string()),
-                &opts,
-            )?;
-
-            Ok(Arc::new(rbdb))
-        }
-
         //let vm_map = HashMap::new();
 
         let rbdb = open_rocksdb_database().unwrap();
@@ -190,10 +166,10 @@ impl<Vm: ZKVMHost> Prover<Vm> {
 
                 // Initiate a new proving job only if the prover is not busy.
                 if start_prover {
-                    prover_state.set_to_proving(block_header_hash.clone());
+                    prover_state.set_to_proving(block_header_hash);
                     //vm.add_hint(state_transition_data);
                     let config = self.config.clone();
-                    let mut vm = self.vm.get(&0).unwrap().clone();
+                    let vm = self.vm.get(&0).unwrap().clone();
 
                     self.pool.spawn(move || {
                         tracing::info_span!("guest_execution").in_scope(|| {
@@ -231,14 +207,14 @@ impl<Vm: ZKVMHost> Prover<Vm> {
         block_header_hash: Uuid,
     ) -> Result<ProofSubmissionStatus, anyhow::Error> {
         let mut prover_state = self.prover_state.write().unwrap();
-        let status = prover_state.get_prover_status(block_header_hash.clone());
+        let status = prover_state.get_prover_status(block_header_hash);
 
         match status {
             Some(ProverStatus::ProvingInProgress) => {
                 Ok(ProofSubmissionStatus::ProofGenerationInProgress)
             }
             Some(ProverStatus::Proved(proof)) => {
-                self.save_proof_to_db(block_header_hash.clone().into(), proof)?;
+                self.save_proof_to_db(block_header_hash, proof)?;
 
                 prover_state.remove(&block_header_hash);
                 Ok(ProofSubmissionStatus::Success)
@@ -255,8 +231,32 @@ impl<Vm: ZKVMHost> Prover<Vm> {
         }
     }
 
-    fn save_proof_to_db(&self, da_hash: Uuid, proof: &Proof) -> Result<(), anyhow::Error> {
+    fn save_proof_to_db(&self, _da_hash: Uuid, _proof: &Proof) -> Result<(), anyhow::Error> {
         //self.proof_db.insert_proof(da_hash, proof)?;
         Ok(())
     }
+}
+
+fn open_rocksdb_database() -> anyhow::Result<Arc<rockbound::OptimisticTransactionDB>> {
+    let mut database_dir = PathBuf::default();
+    database_dir.push("rocksdb_prover");
+
+    if !database_dir.exists() {
+        fs::create_dir_all(&database_dir)?;
+    }
+
+    let dbname = alpen_express_rocksdb::ROCKSDB_NAME;
+    let cfs = alpen_express_rocksdb::STORE_COLUMN_FAMILIES;
+    let mut opts = rocksdb::Options::default();
+    opts.create_if_missing(true);
+    opts.create_missing_column_families(true);
+
+    let rbdb = rockbound::OptimisticTransactionDB::open(
+        &database_dir,
+        dbname,
+        cfs.iter().map(|s| s.to_string()),
+        &opts,
+    )?;
+
+    Ok(Arc::new(rbdb))
 }

@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
@@ -105,10 +106,30 @@ pub struct Task {
 #[derive(Clone)]
 pub struct RpcContext {
     pub task_tracker: Arc<TaskTracker>,
+    sequencer_rpc_url: String,
+    reth_rpc_url: String,
+    el_rpc_client: HttpClient,
 }
 
 impl RpcContext {
-    pub fn new(task_tracker: Arc<TaskTracker>) -> Self {
-        RpcContext { task_tracker }
+    pub fn new(
+        task_tracker: Arc<TaskTracker>,
+        sequencer_rpc_url: String,
+        reth_rpc_url: String,
+    ) -> Self {
+        let el_rpc_client = HttpClientBuilder::default()
+            .build(&reth_rpc_url)
+            .expect("failed to connect to the el client");
+
+        RpcContext {
+            task_tracker,
+            sequencer_rpc_url,
+            reth_rpc_url,
+            el_rpc_client,
+        }
+    }
+
+    pub fn el_client(&self) -> &HttpClient {
+        &self.el_rpc_client
     }
 }
