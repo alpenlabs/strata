@@ -163,7 +163,8 @@ pub struct LocalL1State {
     /// Next L1 block height we expect to receive
     pub(super) next_expected_block: u64,
 
-    /// Next checkpoint that we expect to see. This is None for full nodes and Some for sequencer.
+    /// Next checkpoint that we expect to see. This should ideall be None for full nodes and Some
+    /// for sequencer.
     pub(super) next_checkpoint_info: Option<CheckPointInfo>,
 }
 
@@ -224,6 +225,10 @@ impl LocalL1State {
 
     pub fn tip_blkid(&self) -> Option<&L1BlockId> {
         self.local_unaccepted_blocks().last()
+    }
+
+    pub fn next_checkpoint_info(&self) -> Option<&CheckPointInfo> {
+        self.next_checkpoint_info.as_ref()
     }
 }
 
