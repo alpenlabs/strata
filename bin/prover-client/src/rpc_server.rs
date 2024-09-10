@@ -8,12 +8,9 @@ use jsonrpsee::{core::RpcResult, RpcModule};
 use tokio::sync::oneshot;
 use tracing::{info, warn};
 
-use crate::{
-    constants::{RPC_PORT, RPC_SERVER},
-    models::{ELBlockWitness, RpcContext},
-};
+use crate::models::{ELBlockWitness, RpcContext};
 
-pub(crate) async fn start<T>(rpc_impl: &T) -> anyhow::Result<()>
+pub(crate) async fn start<T>(rpc_impl: &T, rpc_url: String) -> anyhow::Result<()>
 where
     T: ExpressProverClientApiServerServer + Clone,
 {
@@ -23,15 +20,15 @@ where
         .merge(prover_client_api)
         .context("merge prover client api")?;
 
-    let addr = format!("{RPC_SERVER}:{RPC_PORT}");
+    info!("conneting to the server {:?}", rpc_url);
     let rpc_server = jsonrpsee::server::ServerBuilder::new()
-        .build(&addr)
+        .build(&rpc_url)
         .await
-        .expect("build bridge rpc server");
+        .expect("build prover rpc server");
 
     let rpc_handle = rpc_server.start(rpc_module);
     let (_stop_tx, stop_rx): (oneshot::Sender<bool>, oneshot::Receiver<bool>) = oneshot::channel();
-    info!("prover client  RPC server started at: {addr}");
+    info!("prover client  RPC server started at: {}", rpc_url);
 
     let _ = stop_rx.await;
     info!("stopping RPC server");
