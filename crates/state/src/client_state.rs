@@ -154,7 +154,7 @@ pub struct LocalL1State {
 
     /// Next checkpoint that we expect to see. This should ideally be None for full nodes and Some
     /// for sequencer, because full nodes don't need to create checkpoints
-    pub(super) next_checkpoint_info: Option<CheckPointInfo>,
+    pub(super) next_checkpoint_info: Option<CheckPointInfoWithStatus>,
 }
 
 impl LocalL1State {
@@ -168,10 +168,14 @@ impl LocalL1State {
             panic!("clientstate: tried to construct without known L1 genesis block");
         }
 
-        let next_checkpoint_info = Some(CheckPointInfo::new(
+        let checkpt_info = CheckPointInfo::new(
             next_checkpoint_idx,
             next_expected_block..=next_expected_block,
             0..=0, // Maybe this should also come from arguments
+        );
+        let next_checkpoint_info = Some(CheckPointInfoWithStatus::new_finalized(
+            checkpt_info,
+            next_expected_block - 1,
         ));
 
         Self {
@@ -216,7 +220,44 @@ impl LocalL1State {
         self.local_unaccepted_blocks().last()
     }
 
-    pub fn next_checkpoint_info(&self) -> Option<&CheckPointInfo> {
+    pub fn next_checkpoint_info(&self) -> Option<&CheckPointInfoWithStatus> {
         self.next_checkpoint_info.as_ref()
     }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
+pub struct CheckPointInfoWithStatus {
+    pub info: CheckPointInfo,
+    pub prev_checkpoint_l1_height: u64,
+    pub prev_checkpoint_status: CheckpointStatus,
+}
+
+impl CheckPointInfoWithStatus {
+    pub fn new_confirmed(info: CheckPointInfo, prev_checkpoint_l1_height: u64) -> Self {
+        Self {
+            info,
+            prev_checkpoint_l1_height,
+            prev_checkpoint_status: CheckpointStatus::Confirmed,
+        }
+    }
+
+    pub fn new_finalized(info: CheckPointInfo, prev_checkpoint_l1_height: u64) -> Self {
+        Self {
+            info,
+            prev_checkpoint_l1_height,
+            prev_checkpoint_status: CheckpointStatus::Finalized,
+        }
+    }
+
+    pub fn set_finalized(&mut self) {
+        self.prev_checkpoint_status = CheckpointStatus::Finalized;
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
+pub enum CheckpointStatus {
+    /// Confirmed on bitcoin
+    Confirmed,
+    /// Finalized on bitcoin
+    Finalized,
 }

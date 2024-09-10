@@ -1,6 +1,9 @@
 use alpen_express_db::traits::{Database, L2DataProvider};
 use alpen_express_primitives::params::Params;
-use alpen_express_state::{client_state::ClientState, header::L2Header};
+use alpen_express_state::{
+    client_state::{CheckpointStatus, ClientState},
+    header::L2Header,
+};
 
 use super::types::{BatchCommitmentDuty, BlockSigningDuty, Duty, Identity};
 use crate::errors::Error;
@@ -33,12 +36,12 @@ pub fn extract_duties<D: Database>(
     let duty_data = BlockSigningDuty::new_simple(block_idx + 1, tip_blkid);
     let mut duties = vec![Duty::SignBlock(duty_data)];
 
-    duties.push(extract_batch_duty(state)?);
+    duties.extend(extract_batch_duties(state)?);
 
     Ok(duties)
 }
 
-fn extract_batch_duty(state: &ClientState) -> Result<Duty, Error> {
+fn extract_batch_duties(state: &ClientState) -> Result<Vec<Duty>, Error> {
     if state.sync().is_none() {
         return Err(Error::MissingClientSyncState);
     };
@@ -47,6 +50,12 @@ fn extract_batch_duty(state: &ClientState) -> Result<Duty, Error> {
         .l1_view()
         .next_checkpoint_info()
         .expect("expect checkpoint info to be present");
-    let duty: BatchCommitmentDuty = checkpoint_info.clone().into();
-    Ok(Duty::CommitBatch(duty))
+
+    // We only create a new batch duty if the prev batch checkpoint is finalized
+    if checkpoint_info.prev_checkpoint_status == CheckpointStatus::Finalized {
+        let duty: BatchCommitmentDuty = checkpoint_info.info.clone().into();
+        Ok(vec![Duty::CommitBatch(duty)])
+    } else {
+        Ok(vec![])
+    }
 }

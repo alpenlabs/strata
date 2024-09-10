@@ -97,4 +97,10 @@ impl CheckPointInfo {
     pub fn checkpoint_idx(&self) -> u64 {
         self.checkpoint_idx
     }
+
+    pub fn update_next(&mut self, l1_tip: u64, l2_tip: u64) {
+        self.l1_range = self.l1_range.end() + 1..=l1_tip;
+        self.l2_range = self.l2_range.end() + 1..=l2_tip;
+        self.checkpoint_idx += 1;
+    }
 }
