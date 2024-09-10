@@ -3,7 +3,7 @@
 use std::{ops::Deref, time};
 
 use alpen_express_primitives::{buf::Buf32, hash::compute_borsh_hash};
-use alpen_express_state::{client_state::CheckPointInfo, id::L2BlockId};
+use alpen_express_state::{batch::CheckPointInfo, id::L2BlockId};
 use borsh::{BorshDeserialize, BorshSerialize};
 
 /// Describes when we'll stop working to fulfill a duty.
@@ -32,8 +32,6 @@ pub enum Duty {
     SignBlock(BlockSigningDuty),
     /// Goal to build a batch.
     BuildBatch(BatchBuildDuty),
-    /// Goal to write batch data to L1
-    CommitBatch(BatchCommitmentDuty),
 }
 
 impl Duty {
@@ -41,9 +39,6 @@ impl Duty {
     pub fn expiry(&self) -> Expiry {
         match self {
             Self::SignBlock(_) => Expiry::NextBlock,
-            Self::CommitBatch(BatchCommitmentDuty { blockid, .. }) => {
-                Expiry::BlockIdFinalized(*blockid)
-            }
             Self::BuildBatch(duty) => Expiry::CheckpointIdxConfirmed(duty.checkpoint_idx()),
         }
     }
@@ -78,8 +73,7 @@ impl BlockSigningDuty {
 
 /// This duty is created whenever a previous batch is found on L1 and verified.
 /// When this duty is created, in order to execute the duty, the sequencer looks for corresponding
-/// batch proof in the proof db. After the proof is found, this duty is considered done and another
-/// duty [`BatchCommitmentDuty`] is created.
+/// batch proof in the proof db.
 #[derive(Clone, Debug, BorshSerialize)]
 pub struct BatchBuildDuty {
     /// Checkpoint/batch info

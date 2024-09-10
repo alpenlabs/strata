@@ -139,7 +139,7 @@ fn check_for_da_batch(blockdata: &BlockData) -> Vec<L2BlockId> {
     // We only care about the last found commitment in a block. We'll most likely have only one
     // commmitment in a block, but still
     if let Some(commitment) = commitments.last() {
-        return vec![*commitment.l2blockid()];
+        return vec![*commitment.l2_blockid()];
     }
     Vec::default()
 }
