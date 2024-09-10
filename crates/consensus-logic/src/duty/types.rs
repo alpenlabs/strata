@@ -1,6 +1,6 @@
 //! Sequencer duties.
 
-use std::{ops::Deref, time};
+use std::time;
 
 use alpen_express_primitives::{buf::Buf32, hash::compute_borsh_hash};
 use alpen_express_state::{batch::CheckPointInfo, id::L2BlockId};
@@ -21,8 +21,8 @@ pub enum Expiry {
     /// Duty expires after a specific L2 block is finalized
     BlockIdFinalized(L2BlockId),
 
-    /// Duty expires after a specific checkpoint is confirmed(or finalized, TBD) on bitcoin
-    CheckpointIdxConfirmed(u64),
+    /// Duty expires after a specific checkpoint is finalized on bitcoin
+    CheckpointIdxFinalized(u64),
 }
 
 /// Duties the sequencer might carry out.
@@ -31,7 +31,7 @@ pub enum Duty {
     /// Goal to sign a block.
     SignBlock(BlockSigningDuty),
     /// Goal to build a batch.
-    BuildBatch(BatchBuildDuty),
+    CommitBatch(BatchCommitmentDuty),
 }
 
 impl Duty {
@@ -39,7 +39,7 @@ impl Duty {
     pub fn expiry(&self) -> Expiry {
         match self {
             Self::SignBlock(_) => Expiry::NextBlock,
-            Self::BuildBatch(duty) => Expiry::CheckpointIdxConfirmed(duty.checkpoint_idx()),
+            Self::CommitBatch(duty) => Expiry::CheckpointIdxFinalized(duty.inner.checkpoint_idx()),
         }
     }
 
@@ -75,40 +75,14 @@ impl BlockSigningDuty {
 /// When this duty is created, in order to execute the duty, the sequencer looks for corresponding
 /// batch proof in the proof db.
 #[derive(Clone, Debug, BorshSerialize)]
-pub struct BatchBuildDuty {
+pub struct BatchCommitmentDuty {
     /// Checkpoint/batch info
     inner: CheckPointInfo,
 }
 
-impl Deref for BatchBuildDuty {
-    type Target = CheckPointInfo;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-
-impl From<CheckPointInfo> for BatchBuildDuty {
+impl From<CheckPointInfo> for BatchCommitmentDuty {
     fn from(value: CheckPointInfo) -> Self {
         Self { inner: value }
-    }
-}
-
-#[derive(Clone, Debug, BorshSerialize)]
-pub struct BatchCommitmentDuty {
-    /// Last slot of batch
-    slot: u64,
-    /// Id of block in last slot
-    blockid: L2BlockId,
-}
-
-impl BatchCommitmentDuty {
-    pub fn new(slot: u64, blockid: L2BlockId) -> Self {
-        Self { slot, blockid }
-    }
-
-    pub fn end_slot(&self) -> u64 {
-        self.slot
     }
 }
 
@@ -164,10 +138,14 @@ impl DutyTracker {
                         continue;
                     }
                 }
-                Expiry::CheckpointIdxConfirmed(_idx) => {
-                    // TODO, how do we get checkpoint idx from state here? It would be nice to have
-                    // a reference to current client state in the function argument rather than
-                    // StateUpdate
+                Expiry::CheckpointIdxFinalized(idx) => {
+                    if update
+                        .latest_finalized_batch
+                        .filter(|&x| x >= idx)
+                        .is_some()
+                    {
+                        continue;
+                    }
                 }
             }
 
@@ -241,6 +219,9 @@ pub struct StateUpdate {
 
     /// Latest finalized block.
     latest_finalized_block: Option<L2BlockId>,
+
+    /// Latest finalized batch.
+    latest_finalized_batch: Option<u64>,
 }
 
 impl StateUpdate {
@@ -248,6 +229,7 @@ impl StateUpdate {
         last_block_slot: u64,
         cur_timestamp: time::Instant,
         mut newly_finalized_blocks: Vec<L2BlockId>,
+        latest_finalized_batch: Option<u64>,
     ) -> Self {
         // Extract latest finalized block before sorting
         let latest_finalized_block = newly_finalized_blocks.first().cloned();
@@ -259,11 +241,12 @@ impl StateUpdate {
             cur_timestamp,
             newly_finalized_blocks,
             latest_finalized_block,
+            latest_finalized_batch,
         }
     }
 
     pub fn new_simple(last_block_slot: u64, cur_timestamp: time::Instant) -> Self {
-        Self::new(last_block_slot, cur_timestamp, Vec::new())
+        Self::new(last_block_slot, cur_timestamp, Vec::new(), None)
     }
 
     pub fn is_finalized(&self, id: &L2BlockId) -> bool {

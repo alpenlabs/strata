@@ -2,7 +2,7 @@ use alpen_express_db::traits::{Database, L2DataProvider};
 use alpen_express_primitives::params::Params;
 use alpen_express_state::{client_state::ClientState, header::L2Header};
 
-use super::types::{BatchBuildDuty, BlockSigningDuty, Duty, Identity};
+use super::types::{BatchCommitmentDuty, BlockSigningDuty, Duty, Identity};
 use crate::errors::Error;
 
 /// Extracts new duties given a consensus state and a identity.
@@ -45,10 +45,10 @@ fn extract_batch_duties(state: &ClientState) -> Result<Vec<Duty>, Error> {
         return Ok(Vec::new());
     };
 
-    if let Some(checkpoint_info) = state.l1_view().next_checkpoint_info() {
-        let duty: BatchBuildDuty = checkpoint_info.clone().into();
-        Ok(vec![Duty::BuildBatch(duty)])
-    } else {
-        Ok(vec![])
-    }
+    let checkpoint_info = state
+        .l1_view()
+        .next_checkpoint_info()
+        .expect("expect checkpoint info to be present");
+    let duty: BatchCommitmentDuty = checkpoint_info.clone().into();
+    Ok(vec![Duty::CommitBatch(duty)])
 }
