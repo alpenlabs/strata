@@ -18,6 +18,9 @@ pub enum DbError {
     #[error("not yet bootstrapped")]
     NotBootstrapped,
 
+    #[error("tried to overwrite batch commitment at idx {0}")]
+    OverwriteBatchCommitment(u64),
+
     #[error("tried to overwrite consensus checkpoint at idx {0}")]
     OverwriteConsensusCheckpoint(u64),
 
