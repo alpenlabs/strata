@@ -129,7 +129,7 @@ mod test {
     fn create_inscription_tx(rollup_name: String) -> Transaction {
         let address = parse_addr(OTHER_ADDR);
         let inp_tx = create_test_tx(vec![create_test_txout(100000000, &address)]);
-        let inscription_data = InscriptionData::new(rollup_name, vec![0, 1, 2, 3]);
+        let inscription_data = InscriptionData::new(rollup_name, vec![0, 1, 2, 3], 1);
         let script = inscription_data.to_script().unwrap();
 
         // Create controlblock

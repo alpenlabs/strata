@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use alpen_express_status::StatusTx;
 use bitcoin::Txid;
-use tracing::{debug, error};
+use tracing::error;
 
 #[derive(Debug, Clone)]
 pub enum L1StatusUpdate {
@@ -32,8 +32,6 @@ pub async fn apply_status_updates(status_updates: &[L1StatusUpdate], status_tx: 
     }
 
     if let Err(err) = status_tx.l1.send(l1_status.clone()) {
-        error!("error updating l1status {}", err);
-    } else {
-        debug!("Updated l1 status: {:?}", l1_status);
+        error!(%err, "error updating l1status");
     }
 }

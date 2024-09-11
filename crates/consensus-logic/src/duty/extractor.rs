@@ -84,7 +84,7 @@ fn generate_batches<D: Database>(
 
     let mut batches = Vec::new();
 
-    let mut next_idx = last_idx + params.rollup.batch_l2_blocks_target;
+    let mut next_idx = last_idx + params.rollup.target_l2_batch_size;
     while next_idx <= tip_blockidx {
         let chain_state = chainstate_provider
             .get_toplevel_state(next_idx)?
@@ -93,7 +93,7 @@ fn generate_batches<D: Database>(
         batches.push((next_idx, chain_state.chain_tip_blockid()));
 
         // probably more sophisticated way to delimit batches here
-        next_idx += params.rollup.batch_l2_blocks_target;
+        next_idx += params.rollup.target_l2_batch_size;
     }
 
     Ok(batches)
@@ -140,7 +140,7 @@ mod tests {
                         .unwrap(),
                 ),
                 l1_reorg_safe_depth: 5,
-                batch_l2_blocks_target: 64,
+                target_l2_batch_size: 64,
             },
             run: RunParams {
                 l2_blocks_fetch_limit: 1000,
@@ -223,7 +223,7 @@ mod tests {
     #[test]
     fn test_batch_generation() {
         let mut params = gen_params();
-        params.rollup.batch_l2_blocks_target = 10;
+        params.rollup.target_l2_batch_size = 10;
 
         let database = get_common_db();
 

@@ -115,7 +115,7 @@ fn default_rollup_params() -> RollupParams {
                 .unwrap(),
         ),
         l1_reorg_safe_depth: 4,
-        batch_l2_blocks_target: 64,
+        target_l2_batch_size: 64,
     }
 }
 

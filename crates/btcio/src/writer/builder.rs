@@ -32,6 +32,7 @@ use crate::{
 };
 
 const BITCOIN_DUST_LIMIT: u64 = 546;
+const INSCRIPTION_VERSION: u8 = 1;
 
 // TODO: these might need to be in rollup params
 const BATCH_DATA_TAG: &[u8] = &[1];
@@ -89,7 +90,11 @@ pub fn create_inscription_transactions(
     let key_pair = generate_key_pair(&secp256k1)?;
     let public_key = XOnlyPublicKey::from_keypair(&key_pair).0;
 
-    let insc_data = InscriptionData::new(rollup_name.to_string(), write_intent.to_vec());
+    let insc_data = InscriptionData::new(
+        rollup_name.to_string(),
+        write_intent.to_vec(),
+        INSCRIPTION_VERSION,
+    );
 
     // Start creating inscription content
     let reveal_script = build_reveal_script(&public_key, insc_data)?;

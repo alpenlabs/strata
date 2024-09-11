@@ -75,57 +75,52 @@ pub fn compute_reorg(
         });
     }
 
-    let mut down_blocks: Vec<&L2BlockId> = vec![start];
-    let mut up_blocks: Vec<&L2BlockId> = vec![dest];
+    // Create a vec of parents from tip to the beginning(before limit depth) and then move forwards
+    // until the blockids don't match
+    let mut down_blocks: Vec<_> = std::iter::successors(Some(start), |n| tracker.get_parent(n))
+        .take(limit_depth)
+        .collect();
+    let mut up_blocks: Vec<_> = std::iter::successors(Some(dest), |n| tracker.get_parent(n))
+        .take(limit_depth)
+        .collect();
 
-    loop {
-        // Check to see if we should abort.
-        if down_blocks.len() > limit_depth || up_blocks.len() > limit_depth {
-            return None;
-        }
-
-        // Extend the "down" side down, see if it matches.
-        let down_at = &down_blocks[down_blocks.len() - 1];
-        if *down_at != tracker.finalized_tip() {
-            let down_parent = tracker.get_parent(down_at).expect("reorg: get parent");
-
-            // This looks crazy but it's actually correct, and the clearest way
-            // to do it.
-            if let Some((idx, pivot)) = up_blocks
-                .iter()
-                .enumerate()
-                .find(|(_, id)| **id == down_parent)
-            {
-                // Cool, now we have our pivot.
-                let pivot = **pivot;
-                let down = down_blocks.into_iter().copied().collect();
-                let up = up_blocks.into_iter().take(idx).rev().copied().collect();
-                return Some(Reorg { down, pivot, up });
-            }
-
-            down_blocks.push(down_parent);
-        }
-
-        // Extend the "up" side down, see if it matches.
-        let up_at = &up_blocks[up_blocks.len() - 1];
-        if *up_at != tracker.finalized_tip() {
-            let up_parent = tracker.get_parent(up_at).expect("reorg: get parent");
-
-            // Do this crazy thing again but in the other direction.
-            if let Some((idx, pivot)) = down_blocks
-                .iter()
-                .enumerate()
-                .find(|(_, id)| **id == up_parent)
-            {
-                let pivot = **pivot;
-                let down = down_blocks.into_iter().take(idx).copied().collect();
-                let up = up_blocks.into_iter().rev().copied().collect();
-                return Some(Reorg { down, pivot, up });
-            }
-
-            up_blocks.push(up_parent);
-        }
+    if down_blocks.is_empty() || up_blocks.is_empty() {
+        return None;
     }
+
+    // Now trim the vectors such that they start from the same ancestor
+    if let Some(pos) = up_blocks
+        .iter()
+        .position(|&x| x == *down_blocks.last().unwrap())
+    {
+        up_blocks.drain(pos + 1..);
+    } else if let Some(pos) = down_blocks
+        .iter()
+        .position(|&x| x == *up_blocks.last().unwrap())
+    {
+        down_blocks.drain(pos + 1..);
+    } else {
+        return None;
+    }
+
+    // Now reverse so that common ancestor is at the beginning
+    down_blocks.reverse();
+    up_blocks.reverse();
+
+    // Now move forwards, until the blocks do not match
+    let mut pivot_idx = None;
+    for (i, (&d, &u)) in down_blocks.iter().zip(&up_blocks).enumerate() {
+        if *d != *u {
+            break;
+        }
+        pivot_idx = Some(i);
+    }
+    pivot_idx.map(|idx| {
+        let pivot = *up_blocks[idx];
+        let down = down_blocks.drain(idx + 1..).copied().rev().collect();
+        let up = up_blocks.drain(idx + 1..).copied().collect();
+        Reorg { pivot, down, up }
+    })
 }
 
 #[cfg(test)]
@@ -398,5 +393,85 @@ mod tests {
         eprintln!("expected {exp_reorg:#?}\nfound {reorg:#?}");
         assert_eq!(reorg, exp_reorg);
         assert!(reorg.is_identity());
+    }
+
+    #[test]
+    fn test_longer_down_depth_less_than_chain_length() {
+        let base = rand_blkid();
+        let mut tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(base);
+
+        // Set up the two branches.
+        let side_1 = [base, rand_blkid(), rand_blkid(), rand_blkid(), rand_blkid()];
+        let side_2 = [side_1[1], rand_blkid(), rand_blkid()];
+        let limit_depth = 4; // This is not larger than the longest chain length
+        eprintln!("base {base:?}\nside1 {side_1:#?}\nside2 {side_2:#?}");
+
+        let exp_reorg = Reorg {
+            down: vec![side_1[4], side_1[3], side_1[2]],
+            pivot: side_1[1],
+            up: vec![side_2[1], side_2[2]],
+        };
+
+        // Insert them.
+        side_1
+            .windows(2)
+            .for_each(|pair| tracker.insert_fake_block(pair[1], pair[0]));
+        side_2
+            .windows(2)
+            .for_each(|pair| tracker.insert_fake_block(pair[1], pair[0]));
+
+        let reorg = compute_reorg(
+            side_1.last().unwrap(),
+            side_2.last().unwrap(),
+            limit_depth,
+            &tracker,
+        );
+
+        let reorg = reorg.expect("test: reorg not found");
+        eprintln!("expected {exp_reorg:#?}\nfound {reorg:#?}");
+        assert_eq!(reorg, exp_reorg);
+    }
+
+    #[test]
+    fn test_longer_up_depth_less_than_chain_length() {
+        let base = rand_blkid();
+        let mut tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(base);
+
+        // Set up the two branches.
+        let side_1 = [base, rand_blkid(), rand_blkid(), rand_blkid()];
+        let side_2 = [
+            side_1[1],
+            rand_blkid(),
+            rand_blkid(),
+            rand_blkid(),
+            rand_blkid(),
+        ];
+        let limit_depth = 5; // This is not larger than the longest chain length
+        eprintln!("base {base:?}\nside1 {side_1:#?}\nside2 {side_2:#?}");
+
+        let exp_reorg = Reorg {
+            down: vec![side_1[3], side_1[2]],
+            pivot: side_1[1],
+            up: vec![side_2[1], side_2[2], side_2[3], side_2[4]],
+        };
+
+        // Insert them.
+        side_1
+            .windows(2)
+            .for_each(|pair| tracker.insert_fake_block(pair[1], pair[0]));
+        side_2
+            .windows(2)
+            .for_each(|pair| tracker.insert_fake_block(pair[1], pair[0]));
+
+        let reorg = compute_reorg(
+            side_1.last().unwrap(),
+            side_2.last().unwrap(),
+            limit_depth,
+            &tracker,
+        );
+
+        let reorg = reorg.expect("test: reorg not found");
+        eprintln!("expected {exp_reorg:#?}\nfound {reorg:#?}");
+        assert_eq!(reorg, exp_reorg);
     }
 }

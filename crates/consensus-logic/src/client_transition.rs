@@ -3,7 +3,10 @@
 
 use alpen_express_db::traits::{Database, L1DataProvider, L2DataProvider, L2DataStore};
 use alpen_express_primitives::prelude::*;
-use alpen_express_state::{client_state::*, header::L2Header, operation::*, sync_event::SyncEvent};
+use alpen_express_state::{
+    client_state::*, header::L2Header, id::L2BlockId, l1::L1BlockId, operation::*,
+    sync_event::SyncEvent,
+};
 use tracing::*;
 
 use crate::{errors::*, genesis::make_genesis_block};
@@ -59,34 +62,38 @@ pub fn process_event<D: Database>(
             }
 
             // If we have some number of L1 blocks finalized, also emit an `UpdateBuried` write.
-            // TODO clean up this bookkeeping slightly
-            let keep_window = params.rollup().l1_reorg_safe_depth as u64;
-            let maturable_height = next_exp_height.saturating_sub(keep_window);
-            if maturable_height > state.next_exp_l1_block() {
+            let safe_depth = params.rollup().l1_reorg_safe_depth as u64;
+            let maturable_height = next_exp_height.saturating_sub(safe_depth);
+
+            if maturable_height > params.rollup().horizon_l1_height && state.is_chain_active() {
+                debug!(%maturable_height, "Emitting UpdateBuried for maturable height");
                 writes.push(ClientStateWrite::UpdateBuried(maturable_height));
-            }
 
-            if let Some(ss) = state.sync() {
-                // TODO figure out what to do here
-            } else {
-                let horizon_ht = params.rollup.horizon_l1_height;
-                let genesis_ht = params.rollup.genesis_l1_height;
+                // Add SyncAction for Finalization
+                let to_finalize_blkid = state
+                    .sync()
+                    .expect("sync state should be set")
+                    .get_confirmed_checkpt_block_at(maturable_height);
 
-                // TODO make params configurable
-                let genesis_threshold = genesis_ht + 3;
-
-                // If necessary, activeate the chain!
-                if !state.is_chain_active() && *height >= genesis_threshold {
-                    debug!("emitting chain activation");
-                    let genesis_block = make_genesis_block(params);
-
-                    writes.push(ClientStateWrite::ActivateChain);
-                    writes.push(ClientStateWrite::ReplaceSync(Box::new(
-                        SyncState::from_genesis_blkid(genesis_block.header().get_blockid()),
-                    )));
-                    actions.push(SyncAction::L2Genesis(*l1blkid));
+                if let Some(blkid) = to_finalize_blkid {
+                    writes.push(ClientStateWrite::UpdateFinalized(blkid));
+                    actions.push(SyncAction::FinalizeBlock(blkid));
+                } else {
+                    warn!(
+                    %maturable_height,
+                    "expected to find blockid corresponding to buried l1 height in confirmed_blocks but could not find"
+                    );
                 }
             }
+
+            // Activate chain if not already
+            if state.sync().is_none() {
+                debug!(%height, "Chain not active, activating chain. Received block");
+                let (wrs, acts) = activate_chain(params, state, *height, l1blkid);
+                writes.extend(wrs);
+                actions.extend(acts);
+            }
+            // NOTE: might need to do something if chain is activated
         }
 
         SyncEvent::L1Revert(to_height) => {
@@ -101,10 +108,12 @@ pub fn process_event<D: Database>(
             writes.push(ClientStateWrite::RollbackL1BlocksTo(*to_height));
         }
 
-        SyncEvent::L1DABatch(blkids) => {
+        SyncEvent::L1DABatch(height, blkids) => {
             if blkids.is_empty() {
                 warn!("empty L1DABatch");
             }
+
+            debug!(%height, ?blkids, "received L1DABatch");
 
             if let Some(ss) = state.sync() {
                 // TODO load it up and figure out what's there, see if we have to
@@ -120,8 +129,9 @@ pub fn process_event<D: Database>(
                 }
 
                 let last = blkids.last().unwrap();
-                writes.push(ClientStateWrite::UpdateFinalized(*last));
-                actions.push(SyncAction::FinalizeBlock(*last));
+                // When DABatch appears, it is only confirmed at the moment. These will be finalized
+                // only when the corresponding L1 block is buried enough
+                writes.push(ClientStateWrite::UpdateConfirmed(*height, *last));
             } else {
                 // TODO we can expand this later to make more sense
                 return Err(Error::MissingClientSyncState);
@@ -141,6 +151,35 @@ pub fn process_event<D: Database>(
     }
 
     Ok(ClientUpdateOutput::new(writes, actions))
+}
+
+fn activate_chain(
+    params: &Params,
+    state: &ClientState,
+    height: u64,
+    l1blkid: &L1BlockId,
+) -> (Vec<ClientStateWrite>, Vec<SyncAction>) {
+    let mut writes = Vec::new();
+    let mut actions = Vec::new();
+    let horizon_ht = params.rollup.horizon_l1_height;
+    let genesis_ht = params.rollup.genesis_l1_height;
+
+    // TODO make params configurable
+    let genesis_threshold = genesis_ht + 3;
+    debug!(%genesis_threshold, %genesis_ht, active=%state.is_chain_active(), "Inside activate chain");
+
+    // If necessary, activate the chain!
+    if !state.is_chain_active() && height >= genesis_threshold {
+        debug!("emitting chain activation");
+        let genesis_block = make_genesis_block(params);
+
+        writes.push(ClientStateWrite::ActivateChain);
+        writes.push(ClientStateWrite::ReplaceSync(Box::new(
+            SyncState::from_genesis_blkid(genesis_block.header().get_blockid()),
+        )));
+        actions.push(SyncAction::L2Genesis(*l1blkid));
+    }
+    (writes, actions)
 }
 
 #[cfg(test)]

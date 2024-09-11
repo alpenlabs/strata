@@ -13,7 +13,13 @@ import web3.middleware
 from bitcoinlib.services.bitcoind import BitcoindClient
 
 import seqrpc
-from constants import BD_PASSWORD, BD_USERNAME, BLOCK_GENERATION_INTERVAL_SECS, DD_ROOT
+from constants import (
+    BD_PASSWORD,
+    BD_USERNAME,
+    BLOCK_GENERATION_INTERVAL_SECS,
+    DD_ROOT,
+    FAST_BATCH_ROLLUP_PARAMS,
+)
 
 
 def generate_seqkey() -> bytes:
@@ -291,20 +297,6 @@ class BasicEnvConfig(flexitest.EnvConfig):
 
         svcs = {"bitcoin": bitcoind, "sequencer": sequencer, "reth": reth}
         return flexitest.LiveEnv(svcs)
-
-
-# post batch every 5 l2 blocks
-FAST_BATCH_ROLLUP_PARAMS = {
-    "rollup_name": "expresssss",
-    "block_time": 1000,
-    "cred_rule": "Unchecked",
-    "horizon_l1_height": 3,
-    "genesis_l1_height": 5,
-    "evm_genesis_block_hash": "37ad61cff1367467a98cf7c54c4ac99e989f1fbb1bc1e646235e90c065c565ba",
-    "evm_genesis_block_state_root": "351714af72d74259f45cd7eab0b04527cd40e74836a45abcae50f92d919d988f",  # noqa: E501
-    "l1_reorg_safe_depth": 4,
-    "batch_l2_blocks_target": 5,
-}
 
 
 def main(argv):

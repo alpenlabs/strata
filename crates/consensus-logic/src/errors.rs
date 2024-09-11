@@ -71,6 +71,9 @@ pub enum Error {
     #[error("not yet implemented")]
     Unimplemented,
 
+    #[error("block assembly timed out")]
+    BlockAssemblyTimedOut,
+
     #[error("{0}")]
     Other(String),
 }
