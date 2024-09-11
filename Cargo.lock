@@ -3837,8 +3837,13 @@ dependencies = [
 name = "express-chaintsn"
 version = "0.1.0"
 dependencies = [
+ "alpen-express-btcio",
+ "alpen-express-eectl",
  "alpen-express-primitives",
  "alpen-express-state",
+ "anyhow",
+ "bitcoin",
+ "borsh",
  "rand_chacha 0.3.1",
  "rand_core 0.6.4",
  "thiserror",
@@ -12146,6 +12151,7 @@ dependencies = [
  "alpen-express-state",
  "alpen-test-utils",
  "anyhow",
+ "arbitrary",
  "bitcoin",
  "borsh",
  "hex",

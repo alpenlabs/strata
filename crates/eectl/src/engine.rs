@@ -60,6 +60,7 @@ pub enum BlockStatus {
     Syncing,
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum PayloadStatus {
     /// Still building the payload.

@@ -1,5 +1,9 @@
 use alpen_express_primitives::prelude::*;
-use alpen_express_state::{block::L2BlockBundle, exec_update::ExecUpdate, id::L2BlockId};
+use alpen_express_state::{
+    block::L2BlockBundle,
+    exec_update::{ExecUpdate, Op},
+    id::L2BlockId,
+};
 
 /// Succinct commitment to relevant EL block data.
 // This ended up being the same as the EL payload types in the state crate,
@@ -34,8 +38,13 @@ impl ExecPayloadData {
         Self {
             exec_update: l2block.block().exec_segment().update().clone(),
             accessory_data: l2block.accessory().exec_payload().to_vec(),
-            // TODO: extract ops from block
-            ops: vec![],
+            ops: l2block
+                .block()
+                .exec_segment()
+                .update()
+                .input()
+                .applied_ops()
+                .to_vec(),
         }
     }
 
@@ -104,37 +113,5 @@ impl PayloadEnv {
 
     pub fn prev_l2_block_id(&self) -> &L2BlockId {
         &self.prev_l2_block_id
-    }
-}
-
-/// Operation the CL pushes into the EL to perform as part of the block it's
-/// producing.
-#[derive(Clone, Debug)]
-pub enum Op {
-    /// Deposit some amount.
-    Deposit(ELDepositData),
-}
-
-#[derive(Clone, Debug)]
-pub struct ELDepositData {
-    /// Amount in L1 native asset.  For Bitcoin this is sats.
-    amt: u64,
-
-    /// Dest addr encoded in a portable format, assumed to be valid but must be
-    /// checked by EL before committing to building block.
-    dest_addr: Vec<u8>,
-}
-
-impl ELDepositData {
-    pub fn new(amt: u64, dest_addr: Vec<u8>) -> Self {
-        Self { amt, dest_addr }
-    }
-
-    pub fn amt(&self) -> u64 {
-        self.amt
-    }
-
-    pub fn dest_addr(&self) -> &[u8] {
-        &self.dest_addr
     }
 }

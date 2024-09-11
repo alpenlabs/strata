@@ -2,7 +2,7 @@
 
 use std::convert::TryInto;
 
-use alpen_express_state::tx::DepositReqeustInfo;
+use alpen_express_state::tx::DepositRequestInfo;
 use bitcoin::{opcodes::all::OP_RETURN, ScriptBuf, Transaction};
 
 use super::{
@@ -16,7 +16,7 @@ use crate::utils::{next_bytes, next_op};
 pub fn extract_deposit_request_info(
     tx: &Transaction,
     config: &DepositTxConfig,
-) -> Option<DepositReqeustInfo> {
+) -> Option<DepositRequestInfo> {
     // tapscript output and OP_RETURN must be present
     if tx.output.len() >= 2 {
         if let Ok(DepositRequestScriptInfo {
@@ -26,10 +26,10 @@ pub fn extract_deposit_request_info(
         {
             // find the outpoint with taproot address, so that we can extract sent amount from that
             if check_bridge_offer_output(tx, config).is_ok() {
-                return Some(DepositReqeustInfo {
+                return Some(DepositRequestInfo {
                     amt: tx.output[0].value.to_sat(),
                     address: ee_bytes,
-                    tap_ctrl_blk_hash,
+                    take_back_leaf_hash: tap_ctrl_blk_hash,
                 });
             }
         }
@@ -127,7 +127,7 @@ mod tests {
 
         assert_eq!(out.amt, amt.to_sat());
         assert_eq!(out.address, evm_addr);
-        assert_eq!(out.tap_ctrl_blk_hash, dummy_control_block);
+        assert_eq!(out.take_back_leaf_hash, dummy_control_block);
     }
 
     #[test]

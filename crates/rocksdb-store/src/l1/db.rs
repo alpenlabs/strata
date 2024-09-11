@@ -122,7 +122,11 @@ impl L1DataProvider for L1Db {
             .and_then(|mf_opt| match mf_opt {
                 Some(mf) => {
                     let txs_opt = self.db.get::<TxnSchema>(&mf.block_hash())?;
-                    let tx = txs_opt.and_then(|txs| txs.get(txindex as usize).cloned());
+                    let tx = txs_opt.and_then(|txs| {
+                        txs.iter()
+                            .find(|tx| tx.proof().position() == txindex)
+                            .cloned()
+                    });
                     Ok(tx)
                 }
                 None => Ok(None),
@@ -189,7 +193,6 @@ impl L1DataProvider for L1Db {
 #[cfg(test)]
 mod tests {
     use alpen_express_primitives::l1::L1TxProof;
-    use alpen_express_state::tx::ProtocolOperation;
     use alpen_test_utils::ArbitraryGenerator;
 
     use super::*;
@@ -208,8 +211,7 @@ mod tests {
         let txs: Vec<L1Tx> = (0..10)
             .map(|i| {
                 let proof = L1TxProof::new(i, arb.generate());
-                let parsed_tx: ProtocolOperation = arb.generate();
-                L1Tx::new(proof, arb.generate(), parsed_tx)
+                L1Tx::new(proof, arb.generate(), arb.generate())
             })
             .collect();
         let mmr: CompactMmr = arb.generate();

@@ -127,6 +127,11 @@ impl OperatorTable {
     pub fn get_entry_at_pos(&self, pos: u32) -> Option<&OperatorEntry> {
         self.operators.get(pos as usize)
     }
+
+    /// Get all the operator's index
+    pub fn operator_indices(&self) -> Vec<OperatorIdx> {
+        self.operators.iter().map(|operator| operator.idx).collect()
+    }
 }
 
 impl OperatorKeyProvider for OperatorTable {
@@ -227,6 +232,24 @@ impl DepositsTable {
     pub fn get_entry_at_pos(&self, pos: u32) -> Option<&DepositEntry> {
         self.deposits.get(pos as usize)
     }
+
+    pub fn add_deposits(&mut self, tx_ref: &OutputRef, operators: &[u32], amt: u64) {
+        // TODO: work out what we want to do with pending update transaction
+        let deposit_entry = DepositEntry::new(
+            self.next_idx(),
+            tx_ref.clone(),
+            operators.to_vec(),
+            amt,
+            Vec::new(),
+        );
+
+        self.deposits.push(deposit_entry);
+        self.next_idx += 1;
+    }
+
+    pub fn next_idx(&self) -> u32 {
+        self.next_idx
+    }
 }
 
 /// Container for the state machine of a deposit factory.
@@ -259,6 +282,23 @@ pub struct DepositEntry {
 impl DepositEntry {
     pub fn idx(&self) -> u32 {
         self.deposit_idx
+    }
+
+    pub fn new(
+        idx: u32,
+        output: OutputRef,
+        operators: Vec<OperatorIdx>,
+        amt: u64,
+        pending_update_txs: Vec<l1::L1TxRef>,
+    ) -> Self {
+        Self {
+            deposit_idx: idx,
+            output,
+            notary_operators: operators,
+            amt,
+            pending_update_txs,
+            state: DepositState::Accepted,
+        }
     }
 
     pub fn next_pending_update_tx(&self) -> Option<&l1::L1TxRef> {

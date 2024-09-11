@@ -3,7 +3,7 @@ use std::sync::Arc;
 use alpen_express_eectl::{
     engine::{BlockStatus, ExecEngineCtl, PayloadStatus},
     errors::{EngineError, EngineResult},
-    messages::{ELDepositData, ExecPayloadData, Op, PayloadEnv},
+    messages::{ExecPayloadData, PayloadEnv},
 };
 use alpen_express_primitives::{
     buf::Buf32,
@@ -12,23 +12,28 @@ use alpen_express_primitives::{
 use alpen_express_state::{
     block::L2BlockBundle,
     bridge_ops,
-    exec_update::{ExecUpdate, UpdateInput, UpdateOutput},
+    exec_update::{ELDepositData, ExecUpdate, Op, UpdateOutput},
     id::L2BlockId,
 };
-use express_reth_node::{ExpressExecutionPayloadEnvelopeV2, ExpressPayloadAttributes};
+use express_reth_node::{
+    ExecutionPayloadFieldV2, ExpressExecutionPayloadEnvelopeV2, ExpressPayloadAttributes,
+};
 use express_storage::L2BlockManager;
 use futures::future::TryFutureExt;
 use reth_primitives::{Address, B256};
 use reth_rpc_types::{
     engine::{
-        ExecutionPayloadFieldV2, ExecutionPayloadInputV2, ForkchoiceState, PayloadAttributes,
-        PayloadId, PayloadStatusEnum,
+        ExecutionPayloadInputV2, ForkchoiceState, PayloadAttributes, PayloadId, PayloadStatusEnum,
     },
     Withdrawal,
 };
 use tokio::{runtime::Handle, sync::Mutex};
 
-use crate::{block::EVML2Block, el_payload::ElPayload, http_client::EngineRpc};
+use crate::{
+    block::EVML2Block,
+    el_payload::{update_input_from_payload_and_ops, ElPayload},
+    http_client::EngineRpc,
+};
 
 fn address_from_slice(slice: &[u8]) -> Option<Address> {
     let slice: Option<[u8; 20]> = slice.try_into().ok();
@@ -111,6 +116,7 @@ impl<T: EngineRpc> RpcExecEngineInner<T> {
                     // 1. Should this error instead of filtering out invalid entries ?
                     // 2. Add monotonically incrementing index ? (reth doesn't complain even if
                     //    missing)
+                    index: deposit_data.intent_idx(),
                     address: address_from_slice(deposit_data.dest_addr())?,
                     amount: sats_to_gwei(deposit_data.amt())?,
                     ..Default::default()
@@ -172,6 +178,7 @@ impl<T: EngineRpc> RpcExecEngineInner<T> {
                     .iter()
                     .map(|withdrawal| {
                         Op::Deposit(ELDepositData::new(
+                            withdrawal.index,
                             gwei_to_sats(withdrawal.amount),
                             withdrawal.address.as_slice().to_vec(),
                         ))
@@ -186,8 +193,8 @@ impl<T: EngineRpc> RpcExecEngineInner<T> {
 
         let el_state_root = el_payload.state_root;
         let accessory_data = borsh::to_vec(&el_payload).unwrap();
-        let update_input =
-            UpdateInput::try_from(el_payload).map_err(|err| EngineError::Other(err.to_string()))?;
+        let update_input = update_input_from_payload_and_ops(el_payload, &ops)
+            .map_err(|err| EngineError::Other(err.to_string()))?;
 
         let withdrawal_intents = rpc_withdrawal_intents
             .into_iter()
@@ -379,12 +386,10 @@ mod tests {
     use alpen_express_eectl::{errors::EngineResult, messages::PayloadEnv};
     use alpen_express_primitives::buf::Buf32;
     use alpen_express_state::block::{L2Block, L2BlockAccessory};
+    use express_reth_node::{ExecutionPayloadEnvelopeV2, ExecutionPayloadFieldV2};
     use rand::Rng;
     use reth_primitives::{revm_primitives::FixedBytes, Bloom, Bytes, U256};
-    use reth_rpc_types::{
-        engine::{ExecutionPayloadEnvelopeV2, ForkchoiceUpdated},
-        ExecutionPayloadV1,
-    };
+    use reth_rpc_types::{engine::ForkchoiceUpdated, ExecutionPayloadV1};
 
     use super::*;
     use crate::http_client::MockEngineRpc;
@@ -566,7 +571,8 @@ mod tests {
             transactions: Default::default(),
         };
         let accessory_data = borsh::to_vec(&el_payload).unwrap();
-        let update_input = UpdateInput::try_from(el_payload).unwrap();
+
+        let update_input = update_input_from_payload_and_ops(el_payload, &[]).unwrap();
         let update_output = UpdateOutput::new_from_state(Buf32::zero());
 
         let payload_data = ExecPayloadData::new(

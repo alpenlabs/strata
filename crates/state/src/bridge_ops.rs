@@ -2,7 +2,7 @@
 
 use alpen_express_primitives::{
     buf::Buf32,
-    l1::{BitcoinAmount, XOnlyPk},
+    l1::{BitcoinAmount, OutputRef, XOnlyPk},
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
@@ -71,4 +71,29 @@ pub struct DepositIntent {
     /// Description of the encoded address. For Ethereum this is the 20-byte
     /// address.
     dest_ident: Vec<u8>,
+
+    /// borsh de/serializable OutputRef useful for creating DepositTable
+    outref: OutputRef,
+}
+
+impl DepositIntent {
+    pub fn new(amt: u64, dest_ident: &[u8], outref: OutputRef) -> Self {
+        Self {
+            amt: BitcoinAmount::from_sat(amt),
+            dest_ident: dest_ident.to_vec(),
+            outref,
+        }
+    }
+
+    pub fn amt(&self) -> u64 {
+        self.amt.to_sat()
+    }
+
+    pub fn dest_ident(&self) -> &[u8] {
+        &self.dest_ident
+    }
+
+    pub fn outref(&self) -> &OutputRef {
+        &self.outref
+    }
 }

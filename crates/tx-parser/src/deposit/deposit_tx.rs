@@ -1,25 +1,35 @@
 //! parser types for Deposit Tx, and later deposit Request Tx
 
+use alpen_express_primitives::l1::OutputRef;
 use alpen_express_state::tx::DepositInfo;
 use bitcoin::{opcodes::all::OP_RETURN, ScriptBuf, Transaction};
+use tracing::trace;
 
 use super::{common::check_bridge_offer_output, error::DepositParseError, DepositTxConfig};
 use crate::utils::{next_bytes, next_op};
 
 /// Extracts the DepositInfo from the Deposit Transaction
 pub fn extract_deposit_info(tx: &Transaction, config: &DepositTxConfig) -> Option<DepositInfo> {
-    if tx.output.len() > 1 {
-        if let Ok(ee_address) = parse_deposit_script(&tx.output[1].script_pubkey, config) {
-            // find the outpoint with taproot address, so that we can extract sent amount from that
-            if check_bridge_offer_output(tx, config).is_ok() {
-                return Some(DepositInfo {
-                    amt: tx.output[0].value.to_sat(),
-                    deposit_outpoint: 0,
-                    address: ee_address.to_vec(),
-                });
+    trace!("{:?}", tx);
+    let tx_out = tx.output.clone();
+    if let Some(output_0) = tx_out.first() {
+        // Ensure the output at index 0 exists first
+        if let Some(tx_out) = tx_out.get(1) {
+            if let Ok(ee_address) = parse_deposit_script(&tx_out.script_pubkey, config) {
+                // Check if this is a valid bridge offer output
+                if check_bridge_offer_output(tx, config).is_ok() {
+                    if let Some(prev_out) = tx.input.first() {
+                        return Some(DepositInfo {
+                            amt: output_0.value.to_sat(),
+                            address: ee_address.to_vec(),
+                            outpoint: OutputRef::from(prev_out.previous_output),
+                        });
+                    }
+                }
             }
         }
     }
+
     None
 }
 

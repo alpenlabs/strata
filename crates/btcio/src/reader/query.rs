@@ -10,6 +10,7 @@ use alpen_express_status::StatusTx;
 use anyhow::bail;
 use bitcoin::BlockHash;
 use strata_tx_parser::{
+    deposit::DepositTxConfig,
     filter::{filter_relevant_txs, TxFilterRule},
     messages::{BlockData, L1Event},
 };
@@ -115,9 +116,12 @@ fn derive_tx_filter_rules<D: Database + 'static>(
 ) -> anyhow::Result<Vec<TxFilterRule>> {
     // TODO: Figure out how to do it from chainstate provider
     // For now we'll just go with filtering Inscription transactions
-    Ok(vec![TxFilterRule::RollupInscription(
-        params.rollup().rollup_name.clone(),
-    )])
+
+    let deposit_provider = DepositTxConfig::from(params.rollup());
+    Ok(vec![
+        TxFilterRule::RollupInscription(params.rollup().rollup_name.clone()),
+        TxFilterRule::Deposit(deposit_provider),
+    ])
 }
 
 /// Inits the reader state by trying to backfill blocks up to a target height.

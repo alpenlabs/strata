@@ -8,12 +8,13 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use tracing::*;
 
 use crate::{
-    bridge_ops,
     bridge_state::{BitcoinBlockHeight, DepositState, DispatchCommand, DispatchedState},
+    bridge_ops::DepositIntent,
     chain_state::ChainState,
     header::L2Header,
     id::L2BlockId,
     l1::{self, L1MaturationEntry},
+    tx::ProtocolOperation::Deposit,
 };
 
 #[derive(Clone, Debug, PartialEq, BorshDeserialize, BorshSerialize)]
@@ -35,8 +36,8 @@ pub enum StateOp {
     /// as a sanity check.
     MatureL1Block(u64),
 
-    /// Inserts a deposit intent into the pending deposits queue.
-    EnqueueDepositIntent(bridge_ops::DepositIntent),
+    /// Remove deposit Intent
+    ConsumeDepositIntent(u64),
 
     /// Creates an operator
     CreateOperator(Buf32, Buf32),
@@ -116,11 +117,13 @@ fn apply_op_to_chainstate(op: &StateOp, state: &mut ChainState) {
         }
 
         StateOp::AcceptL1Block(entry) => {
-            state.l1_state.maturation_queue.push_back(entry.clone());
+            let mqueue = &mut state.l1_state.maturation_queue;
+            mqueue.push_back(entry.clone());
         }
 
         StateOp::MatureL1Block(maturing_idx) => {
             let mqueue = &mut state.l1_state.maturation_queue;
+            let deposits = state.exec_env_state.pending_deposits_mut();
 
             // Checks.
             assert!(mqueue.len() > 1); // make sure we'll still have blocks in the queue
@@ -128,15 +131,51 @@ fn apply_op_to_chainstate(op: &StateOp, state: &mut ChainState) {
             assert_eq!(front_idx, *maturing_idx);
 
             // Actually take the block out so we can do something with it.
-            let _matured_block = mqueue.pop_front();
+            let matured_block = mqueue.pop_front().unwrap();
 
             // TODO add it to the MMR so we can reference it in the future
             // TODO handle the DA txs and the deposit update txs, maybe in other ops
+            let (_, deposit_txs, _) = matured_block.into_parts();
+            for tx in deposit_txs {
+                if let Deposit(deposit_info) = tx.tx().protocol_operation() {
+                    let amt = deposit_info.amt;
+                    let deposit_intent = DepositIntent::new(
+                        amt,
+                        &deposit_info.address,
+                        deposit_info.outpoint.clone(),
+                    );
+                    deposits.push_back(deposit_intent);
+                }
+            }
         }
 
-        StateOp::EnqueueDepositIntent(intent) => {
+        StateOp::ConsumeDepositIntent(to_drop) => {
             let deposits = state.exec_env_state.pending_deposits_mut();
-            deposits.push_back(intent.clone());
+            let operators = state.operator_table.operator_indices();
+
+            let front_idx = deposits
+                .front_idx()
+                .expect("stateop: empty deposit intent queue");
+
+            // check if we have the required deposit
+            if *to_drop > front_idx {
+                panic!("stateop: unable to consume deposit intent");
+            }
+
+            let n_drop = front_idx - to_drop;
+
+            for _ in 0..n_drop {
+                let deposit_info = deposits
+                    .pop_front()
+                    .expect("stateop: unable to consume deposit intent");
+
+                // add to deposit table once DepositEntry has been finalized
+                state.deposits_table.add_deposits(
+                    deposit_info.outref(),
+                    &operators,
+                    deposit_info.amt(),
+                );
+            }
         }
 
         StateOp::CreateOperator(spk, wpk) => {
@@ -227,9 +266,9 @@ impl StateCache {
         ));
     }
 
-    /// Enqueues a deposit intent into the pending deposits queue.
-    pub fn enqueue_deposit_intent(&mut self, intent: bridge_ops::DepositIntent) {
-        self.merge_op(StateOp::EnqueueDepositIntent(intent));
+    /// remove a deposit intent from the pending deposits queue.
+    pub fn consume_deposit_intent(&mut self, idx: u64) {
+        self.merge_op(StateOp::ConsumeDepositIntent(idx));
     }
 
     /// Inserts a new operator with the specified pubkeys into the operator table.
@@ -237,10 +276,12 @@ impl StateCache {
         self.merge_op(StateOp::CreateOperator(signing_pk, wallet_pk));
     }
 
+    /// L1 revert
     pub fn revert_l1_view_to(&mut self, height: u64) {
         self.merge_op(StateOp::RevertL1Height(height));
     }
 
+    /// add l1 block to maturation entry
     pub fn apply_l1_block_entry(&mut self, ent: L1MaturationEntry) {
         self.merge_op(StateOp::AcceptL1Block(ent));
     }

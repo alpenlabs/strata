@@ -2,19 +2,17 @@
 //! we'll replace components with real implementations as we go along.
 #![allow(unused)]
 
-use std::cmp::max;
+use std::{cmp::max, collections::HashMap};
 
-use alpen_express_primitives::{bridge::OperatorIdx, params::RollupParams};
-use alpen_express_state::{
-    block::L1Segment,
-    bridge_ops::{WithdrawalBatch, WithdrawalIntent},
-    bridge_state::{DepositState, DispatchCommand, WithdrawOutput},
-    exec_update,
-    l1::{self, DepositUpdateTx, L1MaturationEntry},
-    prelude::*,
-    state_op::StateCache,
-    state_queue,
+use alpen_express_primitives::{
+    l1::{BitcoinAmount, L1TxRef, OutputRef},
+    params::RollupParams,
 };
+use alpen_express_state::{
+    block::L1Segment, bridge_ops::{DepositIntent, WithdrawalIntent}, bridge_state::{DepositState, DispatchCommand, WithdrawOutput}, exec_env::ExecEnvState, exec_update::{self, ELDepositData, Op}, l1::{self, L1MaturationEntry}, prelude::*, state_op::StateCache, state_queue
+};
+use bitcoin::{OutPoint, Transaction};
+use borsh::BorshDeserialize;
 
 use crate::{
     errors::TsnError,
@@ -77,6 +75,7 @@ fn process_l1_view_update(
     // we need to do a reorg.
     // FIXME this should actually check PoW, it just does it based on block heights
     if !l1seg.new_payloads().is_empty() {
+        let l1v = state.state().l1_view();
         trace!("new payloads {:?}", l1seg.new_payloads());
 
         // Validate the new blocks actually extend the tip.  This is what we have to tweak to make
@@ -108,9 +107,11 @@ fn process_l1_view_update(
             state.revert_l1_view_to(pivot_idx);
         }
 
+        let maturation_threshold = params.l1_reorg_safe_depth as u64;
+
         for e in l1seg.new_payloads() {
             let ment = L1MaturationEntry::from(e.clone());
-            state.apply_l1_block_entry(ment);
+            state.apply_l1_block_entry(ment.clone());
         }
 
         let new_matured_l1_height = max(
@@ -125,6 +126,8 @@ fn process_l1_view_update(
 
     Ok(())
 }
+
+// Returns Some(DepositIntent)  if Tx can be parsed
 
 /// Checks the attested block IDs and parent blkid connections in new blocks.
 // TODO unit tests
@@ -182,7 +185,25 @@ fn process_execution_update<'u>(
     state: &mut StateCache,
     update: &'u exec_update::ExecUpdate,
 ) -> Result<&'u [WithdrawalIntent], TsnError> {
-    // TODO release anything that we need to
+
+    // for all the ops, corresponding to DepositIntent , remove those DepositIntent the ExecEnvState
+    let deposits = state.state().exec_env_state().pending_deposits();
+
+    let applied_ops = update.input().applied_ops();
+
+    let applied_deposit_intent_idx = applied_ops
+        .iter()
+        .filter_map(|op| match op {
+            Op::Deposit(deposit) => Some(deposit.intent_idx()),
+            _ => None,
+        })
+        .max()
+        .unwrap_or(0);
+
+    if applied_deposit_intent_idx > 0 {
+        state.consume_deposit_intent(applied_deposit_intent_idx);
+    }
+
     Ok(update.output().withdrawals())
 }
 

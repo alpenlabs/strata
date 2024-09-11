@@ -45,28 +45,3 @@ fn apply_state_transition(
 
     state_cache.state().to_owned()
 }
-
-#[cfg(test)]
-mod tests {
-    use alpen_test_utils::l2::gen_params;
-
-    use super::*;
-
-    #[test]
-    #[ignore = "needs to be reworked to remove constant values"]
-    fn test_verify_and_transition() {
-        let prev_state_data: &[u8] = include_bytes!("../test-datas/prev_chstate.borsh");
-        let new_state_data: &[u8] = include_bytes!("../test-datas/post_state.borsh");
-        let new_block_data: &[u8] = include_bytes!("../test-datas/final_block.borsh");
-
-        let prev_state: ChainState = borsh::from_slice(prev_state_data).unwrap();
-        let expected_new_state: ChainState = borsh::from_slice(new_state_data).unwrap();
-        let block: L2Block = borsh::from_slice(new_block_data).unwrap();
-        let new_state = verify_and_transition(prev_state, block, gen_params());
-
-        assert_eq!(
-            expected_new_state.compute_state_root(),
-            new_state.compute_state_root()
-        );
-    }
-}

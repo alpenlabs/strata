@@ -14,6 +14,9 @@ pub enum Error {
     #[error("L1 blkid {0:?} missing from database")]
     MissingL1Block(L1BlockId),
 
+    #[error("L1Tx missing from database")]
+    MissingL1Tx,
+
     #[error("L1 block {0} missing from database")]
     MissingL1BlockHeight(u64),
 
@@ -76,6 +79,12 @@ pub enum Error {
 
     #[error("cannot determine pivot point for L1Segment")]
     BlockAssemblyL1SegmentUndetermined,
+
+    #[error("deserializing failed")]
+    Deserialization,
+
+    #[error("deserializing tx failed for index: {0}")]
+    TxDeserializationFailed(u64),
 
     #[error("{0}")]
     Other(String),

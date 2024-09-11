@@ -141,11 +141,15 @@ pub struct L1HeaderPayload {
 }
 
 impl L1HeaderPayload {
-    pub fn new_bare(idx: u64, record: L1HeaderRecord) -> Self {
+    pub fn new_bare(
+        idx: u64,
+        record: L1HeaderRecord,
+        deposit_update_txs: Vec<DepositUpdateTx>,
+    ) -> Self {
         Self {
             idx,
             record,
-            deposit_update_txs: Vec::new(),
+            deposit_update_txs,
             da_txs: Vec::new(),
         }
     }

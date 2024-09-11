@@ -87,6 +87,7 @@ class BitcoinFactory(flexitest.Factory):
             "-txindex",
             "-regtest",
             "-printtoconsole",
+            "-fallbackfee=0.00001",
             f"-datadir={datadir}",
             f"-port={p2p_port}",
             f"-rpcport={rpc_port}",

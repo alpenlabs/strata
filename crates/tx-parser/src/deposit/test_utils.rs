@@ -1,11 +1,12 @@
 use std::str::FromStr;
 
-use alpen_express_primitives::{buf::Buf32, l1::XOnlyPk};
+use alpen_express_primitives::l1::OutputRef;
+use arbitrary::{Arbitrary, Unstructured};
 use bitcoin::{
     absolute::LockTime,
     opcodes::all::OP_RETURN,
     script::{self, PushBytesBuf},
-    Address, Amount, ScriptBuf, Transaction, TxOut,
+    Address, Amount, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Witness,
 };
 
 use super::DepositTxConfig;
@@ -17,16 +18,11 @@ pub fn generic_taproot_addr() -> Address {
         .unwrap()
 }
 
-pub fn generic_pubkey() -> XOnlyPk {
-    XOnlyPk::new(Buf32::zero())
-}
-
 pub fn get_deposit_tx_config() -> DepositTxConfig {
     DepositTxConfig {
         magic_bytes: "expresssss".to_string().as_bytes().to_vec(),
         address_length: 20,
         deposit_quantity: 1_000_000_000,
-        federation_address: generic_pubkey(),
     }
 }
 
@@ -35,6 +31,21 @@ pub fn create_transaction_two_outpoints(
     scr1: &ScriptBuf,
     scr2: &ScriptBuf,
 ) -> Transaction {
+    // construct the inputs
+
+    let random_bytes = vec![0u8; 1024];
+    let mut unstructured = Unstructured::new(&random_bytes);
+    let previous_output = *OutputRef::arbitrary(&mut unstructured)
+        .expect("should be able to generate arbitrary output ref")
+        .outpoint();
+
+    let inputs = vec![TxIn {
+        previous_output,
+        script_sig: Default::default(),
+        sequence: Sequence::ENABLE_RBF_NO_LOCKTIME,
+        witness: Witness::new(),
+    }];
+
     // Construct the outputs
     let outputs = vec![
         TxOut {
@@ -52,7 +63,7 @@ pub fn create_transaction_two_outpoints(
     Transaction {
         version: bitcoin::transaction::Version(2),
         lock_time: LockTime::ZERO,
-        input: vec![],
+        input: inputs,
         output: outputs,
     }
 }

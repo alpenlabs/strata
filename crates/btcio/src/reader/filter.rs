@@ -1,6 +1,7 @@
 // TODO: move this to `strata-tx-parser`
 // Keeping tests here because it requires `writer`
 // Maybe split this crate into multiple crates
+
 #[cfg(test)]
 mod test {
     use std::str::FromStr;
@@ -237,7 +238,7 @@ mod test {
                 "EE address should match"
             );
             assert_eq!(
-                deposit_req_info.tap_ctrl_blk_hash, dummy_block,
+                deposit_req_info.take_back_leaf_hash, dummy_block,
                 "Control block should match"
             );
         } else {

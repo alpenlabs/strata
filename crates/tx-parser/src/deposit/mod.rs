@@ -1,4 +1,4 @@
-use alpen_express_primitives::{l1::XOnlyPk, params::RollupParams};
+use alpen_express_primitives::params::RollupParams;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 pub mod common;
@@ -16,26 +16,24 @@ pub struct DepositTxConfig {
     pub address_length: u8,
     /// deposit amount
     pub deposit_quantity: u64,
-    /// federation address
-    pub federation_address: XOnlyPk,
 }
 
-impl DepositTxConfig {
-    pub fn from_params_with_agg_addr(params: &RollupParams, agg_addr: XOnlyPk) -> Self {
+impl From<&RollupParams> for DepositTxConfig {
+    fn from(params: &RollupParams) -> Self {
         Self {
             magic_bytes: params.rollup_name.clone().into_bytes().to_vec(),
             address_length: params.address_length,
             deposit_quantity: params.deposit_amount,
-            federation_address: agg_addr,
         }
     }
+}
 
-    pub fn new(magic_bytes: &[u8], addr_len: u8, amount: u64, addr: XOnlyPk) -> Self {
+impl DepositTxConfig {
+    pub fn new(magic_bytes: &[u8], addr_len: u8, amount: u64) -> Self {
         Self {
             magic_bytes: magic_bytes.to_vec(),
             address_length: addr_len,
             deposit_quantity: amount,
-            federation_address: addr,
         }
     }
 }

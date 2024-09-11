@@ -71,7 +71,7 @@ impl ExecEngineCtl for StubController {
             // TODO make up a more plausible payload
             let exec = ExecPayloadData::new(
                 ExecUpdate::new(
-                    UpdateInput::new(0, Buf32::zero(), Vec::new()),
+                    UpdateInput::new(0, vec![], Buf32::zero(), Vec::new()),
                     UpdateOutput::new_from_state(Buf32::zero()),
                 ),
                 Vec::new(),
