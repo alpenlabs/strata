@@ -27,7 +27,7 @@ mod test {
         let serialized_block = serialize(&block);
 
         let (proof, _) = prover
-            .prove(&[scan_config.clone()], Some(&[serialized_block]))
+            .prove(&[scan_config.clone()], Some(&[serialized_block]), None)
             .expect("Failed to generate proof");
 
         let _output = Risc0Verifier::extract_public_output::<BlockspaceProofOutput>(&proof)

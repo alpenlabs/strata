@@ -1,5 +1,5 @@
 use express_zkvm::{
-    AggregationInput, Proof, ProverOptions, VerifcationKey, ZKVMHost, ZKVMVerifier,
+    AggregationInput, Proof, ProverOptions, VerificationKey, ZKVMHost, ZKVMVerifier,
 };
 use risc0_zkvm::{
     compute_image_id, get_prover_server, sha::Digest, AssumptionReceipt, ExecutorEnv, ExecutorImpl,
@@ -40,7 +40,7 @@ impl ZKVMHost for RiscZeroHost {
         items: &[T],
         serialized_items: Option<&[Vec<u8>]>,
         agg_inputs: Option<&[AggregationInput]>,
-    ) -> anyhow::Result<(Proof, VerifcationKey)> {
+    ) -> anyhow::Result<(Proof, VerificationKey)> {
         if self.prover_options.use_mock_prover {
             std::env::set_var("RISC0_DEV_MODE", "true");
         }
@@ -86,7 +86,7 @@ impl ZKVMHost for RiscZeroHost {
         let serialized_proof = bincode::serialize(&proof_info.receipt)?;
         Ok((
             Proof::new(serialized_proof),
-            VerifcationKey(verification_key),
+            VerificationKey(verification_key),
         ))
     }
 }
@@ -96,7 +96,7 @@ impl RiscZeroHost {
         &self,
         item: T,
         assumptions: Vec<U>,
-    ) -> anyhow::Result<(Proof, VerifcationKey)> {
+    ) -> anyhow::Result<(Proof, VerificationKey)> {
         if self.prover_options.use_mock_prover {
             std::env::set_var("RISC0_DEV_MODE", "true");
         }
@@ -130,7 +130,7 @@ impl RiscZeroHost {
         let serialized_proof = bincode::serialize(&proof_info.receipt)?;
         Ok((
             Proof::new(serialized_proof),
-            VerifcationKey(verification_key),
+            VerificationKey(verification_key),
         ))
     }
 }
@@ -139,7 +139,7 @@ impl RiscZeroHost {
 pub struct Risc0Verifier;
 
 impl ZKVMVerifier for Risc0Verifier {
-    fn verify(verification_key: &VerifcationKey, proof: &Proof) -> anyhow::Result<()> {
+    fn verify(verification_key: &VerificationKey, proof: &Proof) -> anyhow::Result<()> {
         let receipt: Receipt = bincode::deserialize(proof.as_bytes())?;
         let vk: Digest = bincode::deserialize(&verification_key.0)?;
         receipt.verify(vk)?;
@@ -147,7 +147,7 @@ impl ZKVMVerifier for Risc0Verifier {
     }
 
     fn verify_with_public_params<T: serde::Serialize + serde::de::DeserializeOwned>(
-        verification_key: &VerifcationKey,
+        verification_key: &VerificationKey,
         public_params: T,
         proof: &Proof,
     ) -> anyhow::Result<()> {

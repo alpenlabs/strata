@@ -14,7 +14,7 @@ mod test {
         let prover = RiscZeroHost::init(RETH_RISC0_ELF.into(), Default::default());
 
         let (proof, _) = prover
-            .prove(&vec![input.clone()], None)
+            .prove(&[input.clone()], None, None)
             .expect("Failed to generate proof");
 
         Risc0Verifier::extract_public_output::<ELProofPublicParams>(&proof)
