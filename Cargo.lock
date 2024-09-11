@@ -3813,6 +3813,7 @@ name = "express-prover-client"
 version = "0.1.0"
 dependencies = [
  "alpen-express-common",
+ "alpen-express-db",
  "alpen-express-rocksdb",
  "anyhow",
  "argh",

@@ -32,13 +32,11 @@ async fn main() {
         args.get_reth_rpc_url(),
     );
 
-    let mut vm_map: HashMap<u8, RiscZeroHost> = HashMap::new();
-    vm_map.insert(0, RiscZeroHost::init(vec![], ProverOptions::default()));
-    vm_map.insert(1, RiscZeroHost::init(vec![], ProverOptions::default()));
-    vm_map.insert(2, RiscZeroHost::init(vec![], ProverOptions::default()));
+    let vm_map = get_zkvms();
+    let cfg = Arc::new(ProofGenConfig::Skip);
 
-    let prover: proving::Prover<RiscZeroHost> =
-        proving::Prover::new(3, vm_map, Arc::new(ProofGenConfig::Skip));
+    let prover: proving::Prover<RiscZeroHost> = proving::Prover::new(3, vm_map, cfg);
+
     // Spawn consumer worker
     tokio::spawn(consumer_worker(Arc::clone(&task_tracker), prover));
 
@@ -52,4 +50,12 @@ async fn run_rpc_server(rpc_context: RpcContext, rpc_url: String) -> anyhow::Res
     let rpc_impl = ProverClientRpc::new(rpc_context);
     rpc_server::start(&rpc_impl, rpc_url).await?;
     anyhow::Ok(())
+}
+
+fn get_zkvms() -> HashMap<u8, RiscZeroHost> {
+    let mut vm_map: HashMap<u8, RiscZeroHost> = HashMap::new();
+    vm_map.insert(0, RiscZeroHost::init(vec![], ProverOptions::default()));
+    vm_map.insert(1, RiscZeroHost::init(vec![], ProverOptions::default()));
+    vm_map.insert(2, RiscZeroHost::init(vec![], ProverOptions::default()));
+    vm_map
 }

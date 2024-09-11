@@ -4,7 +4,6 @@ use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
-use zkvm_primitives::ZKVMInput;
 
 use crate::task_tracker::TaskTracker;
 
@@ -12,6 +11,15 @@ use crate::task_tracker::TaskTracker;
 pub enum Witness {
     ElBlock(ELBlockWitness),
     ClBlock(CLBlockWitness),
+}
+
+impl Witness {
+    pub fn get_vm_id(&self) -> u8 {
+        match self {
+            Witness::ElBlock(witness) => witness.get_vm_id(),
+            Witness::ClBlock(witness) => witness.get_vm_id(),
+        }
+    }
 }
 
 impl Default for Witness {
@@ -25,9 +33,21 @@ pub struct ELBlockWitness {
     pub data: Vec<u8>,
 }
 
+impl ELBlockWitness {
+    pub fn get_vm_id(&self) -> u8 {
+        0
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct CLBlockWitness {
     pub data: Vec<u8>,
+}
+
+impl CLBlockWitness {
+    pub fn get_vm_id(&self) -> u8 {
+        1
+    }
 }
 
 // #[derive(Clone)]
