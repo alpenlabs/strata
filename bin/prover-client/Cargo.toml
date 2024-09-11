@@ -30,3 +30,4 @@ rayon = "1.8.0"
 rockbound = { workspace = true }
 express-risc0-adapter = { workspace = true }
 express-sp1-adapter = { workspace = true }
+alpen-express-db = { workspace = true }

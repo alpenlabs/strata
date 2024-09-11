@@ -1,7 +1,7 @@
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
-use crate::models::{ELBlockWitness, Task, TaskStatus, Witness};
+use crate::models::{Task, TaskStatus, Witness};
 
 pub struct TaskTracker {
     tasks: Mutex<Vec<Task>>,
