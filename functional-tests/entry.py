@@ -5,7 +5,7 @@ import os
 import sys
 import time
 from threading import Thread
-from typing import Optional
+from typing import Optional, TypedDict
 
 import flexitest
 import web3
@@ -112,6 +112,17 @@ class BitcoinFactory(flexitest.Factory):
             return svc
 
 
+class BitcoinRpcConfig(TypedDict):
+    bitcoind_sock: str
+    bitcoind_user: str
+    bitcoind_pass: str
+
+
+class RethConfig(TypedDict):
+    reth_socket: str
+    reth_secret_path: str
+
+
 class ExpressFactory(flexitest.Factory):
     def __init__(self, port_range: list[int]):
         super().__init__(port_range)
@@ -119,11 +130,8 @@ class ExpressFactory(flexitest.Factory):
     @flexitest.with_ectx("ctx")
     def create_sequencer(
         self,
-        bitcoind_sock: str,
-        bitcoind_user: str,
-        bitcoind_pass: str,
-        reth_socket: str,
-        reth_secret_path: str,
+        bitcoind_config: BitcoinRpcConfig,
+        reth_config: RethConfig,
         sequencer_address: str,
         rollup_params: Optional[dict],
         ctx: flexitest.EnvContext,
@@ -142,11 +150,11 @@ class ExpressFactory(flexitest.Factory):
             "alpen-express-sequencer",
             "--datadir", datadir,
             "--rpc-port", str(rpc_port),
-            "--bitcoind-host", bitcoind_sock,
-            "--bitcoind-user", bitcoind_user,
-            "--bitcoind-password", bitcoind_pass,
-            "--reth-authrpc", reth_socket,
-            "--reth-jwtsecret", reth_secret_path,
+            "--bitcoind-host", bitcoind_config["bitcoind_sock"],
+            "--bitcoind-user", bitcoind_config["bitcoind_user"],
+            "--bitcoind-password", bitcoind_config["bitcoind_pass"],
+            "--reth-authrpc", reth_config["reth_socket"],
+            "--reth-jwtsecret", reth_config["reth_secret_path"],
             "--network", "regtest",
             "--sequencer-key", keyfile,
             "--sequencer-bitcoin-address", sequencer_address,
@@ -183,11 +191,8 @@ class FullNodeFactory(flexitest.Factory):
     @flexitest.with_ectx("ctx")
     def create_fullnode(
         self,
-        bitcoind_sock: str,
-        bitcoind_user: str,
-        bitcoind_pass: str,
-        reth_socket: str,
-        reth_secret_path: str,
+        bitcoind_config: BitcoinRpcConfig,
+        reth_config: RethConfig,
         sequencer_rpc: str,
         rollup_params: Optional[dict],
         ctx: flexitest.EnvContext,
@@ -204,11 +209,11 @@ class FullNodeFactory(flexitest.Factory):
             "alpen-express-sequencer",
             "--datadir", datadir,
             "--rpc-port", str(rpc_port),
-            "--bitcoind-host", bitcoind_sock,
-            "--bitcoind-user", bitcoind_user,
-            "--bitcoind-password", bitcoind_pass,
-            "--reth-authrpc", reth_socket,
-            "--reth-jwtsecret", reth_secret_path,
+            "--bitcoind-host", bitcoind_config["bitcoind_sock"],
+            "--bitcoind-user", bitcoind_config["bitcoind_user"],
+            "--bitcoind-password", bitcoind_config["bitcoind_pass"],
+            "--reth-authrpc", reth_config["reth_socket"],
+            "--reth-jwtsecret", reth_config["reth_secret_path"],
             "--network", "regtest",
             "--sequencer-rpc", sequencer_rpc,
         ]
@@ -326,9 +331,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
             file.write(generate_jwt_secret())
 
         reth = reth_fac.create_exec_client(0, reth_secret_path)
-
         reth_port = reth.get_prop("rpc_port")
-        reth_socket = f"localhost:{reth_port}"
 
         bitcoind = btc_fac.create_regtest_bitcoin()
         # wait for services to to startup
@@ -352,8 +355,17 @@ class BasicEnvConfig(flexitest.EnvConfig):
         rpc_user = bitcoind.get_prop("rpc_user")
         rpc_pass = bitcoind.get_prop("rpc_password")
         rpc_sock = f"localhost:{rpc_port}/wallet/{walletname}"
+        bitcoind_config = {
+            "bitcoind_sock": rpc_sock,
+            "bitcoind_user": rpc_user,
+            "bitcoind_pass": rpc_pass,
+        }
+        reth_config = {
+            "reth_socket": f"localhost:{reth_port}",
+            "reth_secret_path": reth_secret_path,
+        }
         sequencer = seq_fac.create_sequencer(
-            rpc_sock, rpc_user, rpc_pass, reth_socket, reth_secret_path, seqaddr, self.rollup_params
+            bitcoind_config, reth_config, seqaddr, self.rollup_params
         )
         # Need to wait for at least `genesis_l1_height` blocks to be generated.
         # Sleeping some more for safety
@@ -364,7 +376,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
         return flexitest.LiveEnv(svcs)
 
 
-class FullnodeEnvConfig(flexitest.EnvConfig):
+class HubNetworkEnvConfig(flexitest.EnvConfig):
     def __init__(
         self,
         pre_generate_blocks: int = 0,
@@ -392,7 +404,6 @@ class FullnodeEnvConfig(flexitest.EnvConfig):
         reth = reth_fac.create_exec_client(0, reth_secret_path)
         fullnode_reth = reth_fac.create_exec_client(1, reth_secret_path)
         reth_port = reth.get_prop("rpc_port")
-        reth_socket = f"localhost:{reth_port}"
 
         bitcoind = btc_fac.create_regtest_bitcoin()
         # wait for services to to startup
@@ -416,8 +427,17 @@ class FullnodeEnvConfig(flexitest.EnvConfig):
         rpc_user = bitcoind.get_prop("rpc_user")
         rpc_pass = bitcoind.get_prop("rpc_password")
         rpc_sock = f"localhost:{rpc_port}/wallet/{walletname}"
+        bitcoind_config = {
+            "bitcoind_sock": rpc_sock,
+            "bitcoind_user": rpc_user,
+            "bitcoind_pass": rpc_pass,
+        }
+        reth_config = {
+            "reth_socket": f"localhost:{reth_port}",
+            "reth_secret_path": reth_secret_path,
+        }
         sequencer = seq_fac.create_sequencer(
-            rpc_sock, rpc_user, rpc_pass, reth_socket, reth_secret_path, seqaddr, self.rollup_params
+            bitcoind_config, reth_config, seqaddr, self.rollup_params
         )
         # Need to wait for at least `genesis_l1_height` blocks to be generated.
         # Sleeping some more for safety
@@ -425,26 +445,26 @@ class FullnodeEnvConfig(flexitest.EnvConfig):
             time.sleep(BLOCK_GENERATION_INTERVAL_SECS * 10)
 
         fullnode_reth_port = fullnode_reth.get_prop("rpc_port")
-        fullnode_reth_socket = f"localhost:{fullnode_reth_port}"
+        fullnode_reth_config = {
+            "reth_socket": f"localhost:{fullnode_reth_port}",
+            "reth_secret_path": reth_secret_path,
+        }
 
         sequencer_rpc = f"ws://localhost:{sequencer.get_prop('rpc_port')}"
 
         fullnode = fn_fac.create_fullnode(
-            rpc_sock,
-            rpc_user,
-            rpc_pass,
-            fullnode_reth_socket,
-            reth_secret_path,
+            bitcoind_config,
+            fullnode_reth_config,
             sequencer_rpc,
             self.rollup_params,
         )
 
         svcs = {
             "bitcoin": bitcoind,
-            "sequencer": sequencer,
-            "reth": reth,
-            "fullnode": fullnode,
-            "fullnode_reth": fullnode_reth,
+            "seq_node": sequencer,
+            "seq_reth": reth,
+            "follower_1_node": fullnode,
+            "follower_1_reth": fullnode_reth,
         }
         return flexitest.LiveEnv(svcs)
 
@@ -473,7 +493,7 @@ def main(argv):
         "basic": BasicEnvConfig(),
         "premined_blocks": BasicEnvConfig(101),
         "fast_batches": BasicEnvConfig(101, rollup_params=FAST_BATCH_ROLLUP_PARAMS),
-        "fullnode": FullnodeEnvConfig(),
+        "hub1": HubNetworkEnvConfig(),
     }
 
     rt = flexitest.TestRuntime(global_envs, datadir_root, factories)
