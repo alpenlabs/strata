@@ -74,7 +74,7 @@ pub fn initialize_from_db(
     let mut tracker = UnfinalizedBlockTracker::new_empty(*finalized_blockid);
     tracker
         .load_unfinalized_blocks(finalized_height, tip_height, l2_block_manager)
-        .map_err(|err| L2SyncError::Other(err.to_string()))?;
+        .map_err(|err| L2SyncError::LoadUnfinalizedFailed(err.to_string()))?;
 
     let state = L2SyncState {
         finalized_height,

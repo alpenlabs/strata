@@ -4,16 +4,16 @@ use alpen_express_rpc_api::AlpenApiClient;
 use alpen_express_rpc_types::NodeSyncStatus;
 use alpen_express_state::{block::L2BlockBundle, id::L2BlockId};
 use futures::stream::{self, Stream, StreamExt};
-use tracing::{debug, error};
+use tracing::error;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ClientError {
     #[error("missing block: {0}")]
     MissingBlock(L2BlockId),
     #[error("failed to deserialize block: {0}")]
-    DeserializationError(String),
+    Deserialization(String),
     #[error("network error: {0}")]
-    NetworkError(String),
+    Network(String),
 }
 
 #[async_trait::async_trait]
@@ -54,11 +54,11 @@ impl<RPC: AlpenApiClient + Send + Sync> RpcSyncPeer<RPC> {
             .rpc_client
             .sync_blocks(start_height, end_height)
             .await
-            .map_err(|e| ClientError::NetworkError(e.to_string()))?;
+            .map_err(|e| ClientError::Network(e.to_string()))?;
 
         match borsh::from_slice(&bytes.0) {
             Ok(blocks) => Ok(blocks),
-            Err(err) => Err(ClientError::DeserializationError(err.to_string())),
+            Err(err) => Err(ClientError::Deserialization(err.to_string())),
         }
     }
 }
@@ -70,7 +70,7 @@ impl<RPC: AlpenApiClient + Send + Sync> SyncClient for RpcSyncPeer<RPC> {
             .rpc_client
             .sync_status()
             .await
-            .map_err(|e| ClientError::NetworkError(e.to_string()))?;
+            .map_err(|e| ClientError::Network(e.to_string()))?;
         Ok(status)
     }
 
@@ -104,14 +104,14 @@ impl<RPC: AlpenApiClient + Send + Sync> SyncClient for RpcSyncPeer<RPC> {
             .rpc_client
             .sync_block_by_id(*block_id)
             .await
-            .map_err(|e| ClientError::NetworkError(e.to_string()))?
+            .map_err(|e| ClientError::Network(e.to_string()))?
             .ok_or(ClientError::MissingBlock(*block_id))?;
 
         match borsh::from_slice(&bytes.0) {
             Ok(blocks) => Ok(blocks),
             Err(err) => {
                 error!("failed to deserialize blocks: {err}");
-                Err(ClientError::DeserializationError(err.to_string()))
+                Err(ClientError::Deserialization(err.to_string()))
             }
         }
     }

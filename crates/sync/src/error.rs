@@ -14,12 +14,12 @@ pub enum L2SyncError {
     MissingParent(L2BlockId),
     #[error("missing finalized block: {0}")]
     MissingFinalized(L2BlockId),
+    #[error("failed to load unfinalized blocks: {0}")]
+    LoadUnfinalizedFailed(String),
     #[error("client error: {0}")]
-    ClientError(#[from] ClientError),
+    Client(#[from] ClientError),
     #[error("db error: {0}")]
-    DbError(#[from] DbError),
+    Db(#[from] DbError),
     #[error("chain tip error: {0}")]
-    ChainTipError(#[from] ChainTipError),
-    #[error("{0}")]
-    Other(String),
+    ChainTip(#[from] ChainTipError),
 }

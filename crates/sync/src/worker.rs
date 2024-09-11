@@ -208,7 +208,7 @@ async fn handle_block_finalized(
     }
 
     if !state.has_block(new_finalized_blockid) {
-        return Err(L2SyncError::Other("invalid finalized block".to_string()));
+        return Err(L2SyncError::MissingFinalized(*new_finalized_blockid));
     };
 
     state.update_finalized_tip(new_finalized_blockid, new_finalized_height)?;
