@@ -1,10 +1,7 @@
 use alpen_express_db::traits::{Database, L2DataProvider};
 use alpen_express_primitives::params::Params;
 use alpen_express_state::{
-    batch::CheckPoint,
-    block::L2BlockBundle,
-    client_state::{CheckpointStatus, ClientState},
-    header::L2Header,
+    batch::CheckPoint, block::L2BlockBundle, client_state::ClientState, header::L2Header,
 };
 
 use super::types::{BatchCommitmentDuty, BlockSigningDuty, Duty, Identity};
@@ -48,7 +45,7 @@ fn extract_batch_duties(state: &ClientState, tip: L2BlockBundle) -> Result<Vec<D
         return Err(Error::MissingClientSyncState);
     };
 
-    match state.l1_view().last_checkpoint_state() {
+    match state.l1_view().last_finalized_checkpoint() {
         // No checkpoint is seen, start from 0
         None => {
             let new_checkpt = CheckPoint::new(
@@ -59,7 +56,7 @@ fn extract_batch_duties(state: &ClientState, tip: L2BlockBundle) -> Result<Vec<D
             );
             Ok(vec![Duty::CommitBatch(new_checkpt.clone().into())])
         }
-        Some(checkpt_state) if checkpt_state.status == CheckpointStatus::Finalized => {
+        Some(checkpt_state) => {
             let checkpoint = checkpt_state.checkpoint.clone();
             let l1_range = checkpoint.l1_range.end() + 1..=state.l1_view().tip_height();
             let l2_range = checkpoint.l2_range.end() + 1..=tip.header().blockidx();
@@ -72,6 +69,5 @@ fn extract_batch_duties(state: &ClientState, tip: L2BlockBundle) -> Result<Vec<D
             let duty: BatchCommitmentDuty = new_checkpt.clone().into();
             Ok(vec![Duty::CommitBatch(duty)])
         }
-        _ => Ok(vec![]),
     }
 }

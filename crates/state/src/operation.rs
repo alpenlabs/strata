@@ -7,7 +7,7 @@ use tracing::*;
 
 use crate::{
     batch::CheckPoint,
-    client_state::{CheckPointWithState, CheckpointStatus, ClientState, SyncState},
+    client_state::{CheckPointWithState, ClientState, SyncState},
     id::L2BlockId,
     l1::L1BlockId,
 };
@@ -134,14 +134,11 @@ pub fn apply_writes_to_state(
                 let new_unacc_len = block_height - buried_height;
                 l1v.local_unaccepted_blocks.truncate(new_unacc_len as usize);
 
-                // Remove confirmed blocks that are above the block_height
-                let ss = state.expect_sync_mut();
-                if let Some(pos) = ss
-                    .confirmed_checkpoint_blocks
-                    .iter()
-                    .position(|e| e.0 > block_height)
-                {
-                    ss.confirmed_checkpoint_blocks.drain(pos..);
+                // If the pending checkpoint is at height higher, reset it
+                if let Some(checkpt) = l1v.pending_checkpoint() {
+                    if checkpt.height > block_height {
+                        l1v.pending_checkpoint = None;
+                    }
                 }
             }
 
@@ -194,37 +191,33 @@ pub fn apply_writes_to_state(
             NewCheckpointReceived(height, checkpt) => {
                 // Update next_checkpoint state. This sets the prev_checkpoint status to be
                 // confirmed
-                match &state.l1_view().last_checkpoint_state {
-                    None => {
-                        let info = CheckPointWithState::new_confirmed(checkpt, height);
-                        state.l1_view_mut().last_checkpoint_state = Some(info);
+                match &state.l1_view().pending_checkpoint() {
+                    Some(_) => {
+                        panic!("operation: expect pending checkpoint to be none while new checkpoint is received");
                     }
-                    Some(last_checkpt_info) => {
-                        if checkpt.checkpoint_idx()
-                            != last_checkpt_info.checkpoint.checkpoint_idx() + 1
-                        {
-                            panic!("operation: received out of order checkpoint");
-                        }
-                        if last_checkpt_info.status != CheckpointStatus::Finalized {
-                            panic!("operation: expected last checkpoint to be finalized");
-                        }
-                        state.l1_view_mut().last_checkpoint_state =
-                            Some(CheckPointWithState::new_confirmed(checkpt, height));
+                    None => {
+                        let info = CheckPointWithState::new(checkpt, height);
+                        state.l1_view_mut().pending_checkpoint = Some(info);
                     }
                 }
             }
 
             CheckpointFinalized(height) => {
-                let checkpoint_info = state.l1_view_mut().last_checkpoint_state.as_mut().expect(
-                    "operation: missing next_checkpoint_info while executing UpdateNextBatchInfo write",
-                );
-                if checkpoint_info.status != CheckpointStatus::Confirmed {
-                    panic!("operation: expected previous checkpoint to be confirmed");
+                let l1v = state.l1_view_mut();
+                let pending_checkpt = l1v.pending_checkpoint();
+
+                match pending_checkpt {
+                    None => {
+                        panic!("operation: expect pending checkpoint before it can be finalized");
+                    }
+                    Some(checkpt) => {
+                        if checkpt.height != height {
+                            panic!("operation: mismatched pending checkpoint's l1 height");
+                        }
+                        l1v.last_finalized_checkpoint = Some(checkpt.clone());
+                        l1v.pending_checkpoint = None;
+                    }
                 }
-                if checkpoint_info.height != height {
-                    panic!("operation: mismatched confirmed checkpiont l1 height");
-                }
-                checkpoint_info.set_finalized()
             }
         }
     }

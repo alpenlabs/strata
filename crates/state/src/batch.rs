@@ -15,17 +15,11 @@ pub struct BatchCommitment {
     checkpoint: CheckPoint,
     /// Proof for the batch obtained from prover manager
     proof: Proof,
-    /// L2 block upto which this batch covers
-    l2_blockid: L2BlockId,
 }
 
 impl BatchCommitment {
-    pub fn new(checkpoint: CheckPoint, proof: Proof, l2_blockid: L2BlockId) -> Self {
-        Self {
-            checkpoint,
-            proof,
-            l2_blockid,
-        }
+    pub fn new(checkpoint: CheckPoint, proof: Proof) -> Self {
+        Self { checkpoint, proof }
     }
 
     pub fn checkpoint(&self) -> &CheckPoint {
@@ -36,10 +30,6 @@ impl BatchCommitment {
         &self.proof
     }
 
-    pub fn l2_blockid(&self) -> &L2BlockId {
-        &self.l2_blockid
-    }
-
     pub fn get_sighash(&self) -> Buf32 {
         let mut buf = vec![];
         let checkpt_sighash =
@@ -47,7 +37,7 @@ impl BatchCommitment {
 
         buf.extend(checkpt_sighash);
         buf.extend(self.proof.as_bytes());
-        buf.extend(self.l2_blockid.as_ref());
+        buf.extend(self.checkpoint().l2_blockid.as_ref());
 
         alpen_express_primitives::hash::raw(&buf)
     }
@@ -100,5 +90,9 @@ impl CheckPoint {
 
     pub fn checkpoint_idx(&self) -> u64 {
         self.checkpoint_idx
+    }
+
+    pub fn l2_blockid(&self) -> &L2BlockId {
+        &self.l2_blockid
     }
 }

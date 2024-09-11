@@ -66,30 +66,9 @@ pub fn process_event<D: Database>(
             let maturable_height = next_exp_height.saturating_sub(safe_depth);
 
             if maturable_height > params.rollup().horizon_l1_height && state.is_chain_active() {
-                debug!(%maturable_height, "Emitting UpdateBuried for maturable height");
-                writes.push(ClientStateWrite::UpdateBuried(maturable_height));
-
-                // Add SyncAction for Finalization
-                let to_finalize_blkid = state
-                    .sync()
-                    .expect("sync state should be set")
-                    .get_confirmed_checkpt_block_at(maturable_height);
-
-                if let Some(blkid) = to_finalize_blkid {
-                    writes.push(ClientStateWrite::UpdateFinalized(blkid));
-                    actions.push(SyncAction::FinalizeBlock(blkid));
-                } else {
-                    warn!(
-                    %maturable_height,
-                    "expected to find blockid corresponding to buried l1 height in confirmed_blocks but could not find"
-                    );
-                }
-
-                // If we have a confirmed checkpoint set it as finalized. Validity is handled in the
-                // operation
-                if state.l1_view().last_checkpoint_state().is_some() {
-                    writes.push(ClientStateWrite::CheckpointFinalized(maturable_height))
-                }
+                let (wrs, acts) = handle_maturable_height(maturable_height, state);
+                writes.extend(wrs);
+                actions.extend(acts);
             }
 
             // Activate chain if not already
@@ -150,6 +129,42 @@ pub fn process_event<D: Database>(
     }
 
     Ok(ClientUpdateOutput::new(writes, actions))
+}
+
+fn handle_maturable_height(
+    maturable_height: u64,
+    state: &ClientState,
+) -> (Vec<ClientStateWrite>, Vec<SyncAction>) {
+    let mut writes = Vec::new();
+    let mut actions = Vec::new();
+
+    debug!(%maturable_height, "Emitting UpdateBuried for maturable height");
+    writes.push(ClientStateWrite::UpdateBuried(maturable_height));
+
+    // Add SyncAction for Finalization
+    let pending_checkpt = state.l1_view().pending_checkpoint();
+
+    if let Some(checkpt) = pending_checkpt {
+        let blkid = checkpt.checkpoint.l2_blockid();
+        writes.push(ClientStateWrite::UpdateFinalized(*blkid));
+        actions.push(SyncAction::FinalizeBlock(*blkid));
+    } else {
+        warn!(
+        %maturable_height,
+        "expected to find blockid corresponding to buried l1 height in confirmed_blocks but could not find"
+        );
+    }
+
+    // If there's a checkpoint on the maturable height, mark it as finalized
+    if state
+        .l1_view()
+        .pending_checkpoint()
+        .filter(|checkpt| checkpt.height == maturable_height)
+        .is_some()
+    {
+        writes.push(ClientStateWrite::CheckpointFinalized(maturable_height))
+    }
+    (writes, actions)
 }
 
 fn activate_chain(

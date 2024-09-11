@@ -161,8 +161,11 @@ pub struct LocalL1State {
     /// Next L1 block height we expect to receive
     pub(super) next_expected_block: u64,
 
-    /// Last checkpoint that we expect to see.
-    pub(super) last_checkpoint_state: Option<CheckPointWithState>,
+    /// Last finalized checkpoint
+    pub(super) last_finalized_checkpoint: Option<CheckPointWithState>,
+
+    /// Checkpoint that is seen but yet to be finalized
+    pub(super) pending_checkpoint: Option<CheckPointWithState>,
 }
 
 impl LocalL1State {
@@ -179,7 +182,8 @@ impl LocalL1State {
         Self {
             local_unaccepted_blocks: Vec::new(),
             next_expected_block,
-            last_checkpoint_state: None,
+            pending_checkpoint: None,
+            last_finalized_checkpoint: None,
         }
     }
 
@@ -218,8 +222,12 @@ impl LocalL1State {
         self.local_unaccepted_blocks().last()
     }
 
-    pub fn last_checkpoint_state(&self) -> Option<&CheckPointWithState> {
-        self.last_checkpoint_state.as_ref()
+    pub fn last_finalized_checkpoint(&self) -> Option<&CheckPointWithState> {
+        self.last_finalized_checkpoint.as_ref()
+    }
+
+    pub fn pending_checkpoint(&self) -> Option<&CheckPointWithState> {
+        self.pending_checkpoint.as_ref()
     }
 }
 
@@ -229,36 +237,13 @@ pub struct CheckPointWithState {
     pub checkpoint: CheckPoint,
     /// L1 block height it appears in
     pub height: u64,
-    /// Whether it is confirmed or finalized
-    pub status: CheckpointStatus,
 }
 
 impl CheckPointWithState {
-    pub fn new_confirmed(info: CheckPoint, height: u64) -> Self {
+    pub fn new(info: CheckPoint, height: u64) -> Self {
         Self {
             checkpoint: info,
             height,
-            status: CheckpointStatus::Confirmed,
         }
     }
-
-    pub fn new_finalized(info: CheckPoint, height: u64) -> Self {
-        Self {
-            checkpoint: info,
-            height,
-            status: CheckpointStatus::Finalized,
-        }
-    }
-
-    pub fn set_finalized(&mut self) {
-        self.status = CheckpointStatus::Finalized;
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
-pub enum CheckpointStatus {
-    /// Confirmed on bitcoin
-    Confirmed,
-    /// Finalized on bitcoin
-    Finalized,
 }

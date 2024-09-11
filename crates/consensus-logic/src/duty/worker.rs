@@ -155,9 +155,8 @@ fn update_tracker(
 
     let latest_finalized_batch = state
         .l1_view()
-        .last_checkpoint_state()
-        .map(|x| x.checkpoint.checkpoint_idx())
-        .and_then(|x| if x > 0 { Some(x - 1) } else { None });
+        .last_finalized_checkpoint()
+        .map(|x| x.checkpoint.checkpoint_idx());
 
     let tracker_update = types::StateUpdate::new(
         block_idx,

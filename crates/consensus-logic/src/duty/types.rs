@@ -30,7 +30,7 @@ pub enum Expiry {
 pub enum Duty {
     /// Goal to sign a block.
     SignBlock(BlockSigningDuty),
-    /// Goal to build a batch.
+    /// Goal to build and commit a batch.
     CommitBatch(BatchCommitmentDuty),
 }
 
