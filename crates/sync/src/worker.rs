@@ -76,12 +76,12 @@ pub async fn sync_worker<T: SyncClient>(
 
                 let finalized_blockid = sync.finalized_blkid();
                 let Ok(Some(finalized_block)) = context.l2_block_manager.get_block_async(finalized_blockid).await else {
-                    error!("missing finalized block {}", finalized_blockid);
+                    error!(finalized_blockid = ?finalized_blockid, "missing finalized block");
                     continue;
                 };
                 let finalized_height = finalized_block.header().blockidx();
                 if let Err(err) = handle_block_finalized(state, finalized_blockid, finalized_height).await {
-                    error!("failed to finalize block {}: {err}", sync.finalized_blkid());
+                    error!(finalized_blockid = ?finalized_blockid, err = ?err, "failed to finalize block");
                 }
             }
             _ = interval.tick() => {

@@ -421,7 +421,7 @@ fn process_fc_message<D: Database, E: ExecEngineCtl>(
                 }
 
                 // Block is valid, update the status
-                state.set_block_status(&blkid, BlockStatus::Valid)?;
+                fcm_state.set_block_status(&blkid, BlockStatus::Valid)?;
 
                 // TODO also update engine tip block
 

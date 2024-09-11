@@ -34,7 +34,7 @@ class BlockFinalizationTest(flexitest.Test):
 
 def get_block_at(idx, seqrpc):
     for _ in range(5):  # 5 should be fine for polling block at idx at 0.5s interval
-        blocks = seqrpc.alp_getBlocksAtIdx(idx)
+        blocks = seqrpc.alp_getBlockHeadersAtIdx(idx)
         if blocks:
             # NOTE: This assumes that first item is the block we want. This
             # might change when we have multiple sequencers
