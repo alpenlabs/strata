@@ -3,6 +3,7 @@
 
 use std::{sync::Arc, thread, time};
 
+use alpen_express_crypto::sign_schnorr_sig;
 use alpen_express_db::traits::{
     ChainstateProvider, ClientStateProvider, Database, L1DataProvider, L2DataProvider, L2DataStore,
 };
@@ -15,7 +16,6 @@ use alpen_express_primitives::{
     buf::{Buf32, Buf64},
     params::Params,
 };
-use alpen_express_sig_utils::sign_schnorr_sig;
 use alpen_express_state::{
     block::{ExecSegment, L1Segment, L2BlockAccessory, L2BlockBundle},
     chain_state::ChainState,

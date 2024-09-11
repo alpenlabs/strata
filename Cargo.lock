@@ -710,12 +710,12 @@ name = "alpen-express-consensus-logic"
 version = "0.1.0"
 dependencies = [
  "alpen-express-btcio",
+ "alpen-express-crypto",
  "alpen-express-db",
  "alpen-express-eectl",
  "alpen-express-primitives",
  "alpen-express-rocksdb",
  "alpen-express-rpc-types",
- "alpen-express-sig-utils",
  "alpen-express-state",
  "alpen-express-status",
  "alpen-test-utils",
@@ -731,6 +731,17 @@ dependencies = [
  "threadpool",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "alpen-express-crypto"
+version = "0.1.0"
+dependencies = [
+ "alpen-express-primitives",
+ "borsh",
+ "rand 0.8.5",
+ "secp256k1",
+ "sha2 0.10.8",
 ]
 
 [[package]]
@@ -944,22 +955,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "alpen-express-sig-utils"
-version = "0.1.0"
-dependencies = [
- "alpen-express-primitives",
- "borsh",
- "rand 0.8.5",
- "secp256k1",
- "sha2 0.10.8",
-]
-
-[[package]]
 name = "alpen-express-state"
 version = "0.1.0"
 dependencies = [
+ "alpen-express-crypto",
  "alpen-express-primitives",
- "alpen-express-sig-utils",
  "alpen-test-utils",
  "arbitrary",
  "bitcoin",
@@ -3794,8 +3794,8 @@ dependencies = [
 name = "express-cl-stf"
 version = "0.1.0"
 dependencies = [
+ "alpen-express-crypto",
  "alpen-express-primitives",
- "alpen-express-sig-utils",
  "alpen-express-state",
  "alpen-test-utils",
  "borsh",

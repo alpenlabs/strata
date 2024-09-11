@@ -1,6 +1,6 @@
 [package]
 edition = "2021"
-name = "alpen-express-sig-utils"
+name = "alpen-express-crypto"
 version = "0.1.0"
 
 [dependencies]
@@ -15,4 +15,5 @@ sha2 = { workspace = true }
 rand = { version = "0.8.5", features = ["getrandom", "std_rng"] }
 
 [features]
-default = ["secp256k1/rand-std"]
+default = ["rand"]
+rand = ["secp256k1/rand-std"]
