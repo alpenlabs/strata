@@ -3,7 +3,6 @@ use std::ops::RangeInclusive;
 use alpen_express_primitives::buf::{Buf32, Buf64};
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
-use express_zkvm::Proof;
 
 use crate::id::L2BlockId;
 
@@ -14,11 +13,11 @@ pub struct BatchCommitment {
     /// Information regarding the current batch checkpoint
     checkpoint: CheckPoint,
     /// Proof for the batch obtained from prover manager
-    proof: Proof,
+    proof: Vec<u8>,
 }
 
 impl BatchCommitment {
-    pub fn new(checkpoint: CheckPoint, proof: Proof) -> Self {
+    pub fn new(checkpoint: CheckPoint, proof: Vec<u8>) -> Self {
         Self { checkpoint, proof }
     }
 
@@ -26,7 +25,7 @@ impl BatchCommitment {
         &self.checkpoint
     }
 
-    pub fn proof(&self) -> &Proof {
+    pub fn proof(&self) -> &[u8] {
         &self.proof
     }
 
@@ -36,7 +35,7 @@ impl BatchCommitment {
             borsh::to_vec(&self.checkpoint).expect("could not serialize checkpoint info");
 
         buf.extend(checkpt_sighash);
-        buf.extend(self.proof.as_bytes());
+        buf.extend(self.proof.clone());
         buf.extend(self.checkpoint().l2_blockid.as_ref());
 
         alpen_express_primitives::hash::raw(&buf)

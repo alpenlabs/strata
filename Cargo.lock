@@ -977,7 +977,6 @@ dependencies = [
  "borsh",
  "digest 0.10.7",
  "express-bridge-tx-builder",
- "express-zkvm",
  "hex",
  "num_enum 0.7.2",
  "serde",
@@ -4090,7 +4089,6 @@ name = "express-zkvm"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "borsh",
  "serde",
 ]
 
