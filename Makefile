@@ -51,6 +51,10 @@ cov-unit: ## Run unit tests with coverage.
 cov-report-html: ## Generate an HTML coverage report and open it in the browser.
 	cargo llvm-cov --open --workspace --locked nextest
 
+.PHONY: test-int
+test-int: ## Run integration tests
+	cargo nextest run -p "integration-tests" --status-level=fail --no-capture
+
 .PHONY: mutants-test
 mutants-test: ## Runs `nextest` under `cargo-mutants`. Caution: This can take *really* long to run.
 	cargo mutants --workspace -j2
@@ -191,7 +195,7 @@ test: ## Runs all tests in the workspace including unit and docs tests.
 	make test-doc
 
 .PHONY: pr
-pr: lint sec test-doc test-unit test-functional ## Runs lints (without fixing), audit and tests (run this before creating a PR).
+pr: lint sec test-doc test-unit test-int test-functional ## Runs lints (without fixing), audit and tests (run this before creating a PR).
 	@echo "\n\033[36m======== CHECKS_COMPLETE ========\033[0m\n"
 	@test -z "$$(git status --porcelain)" || echo "WARNNG: You have uncommitted changes"
 	@echo "All good to create a PR!"

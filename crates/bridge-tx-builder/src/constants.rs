@@ -15,7 +15,9 @@ pub const BRIDGE_DENOMINATION: BitcoinAmount = BitcoinAmount::from_int_btc(10);
 pub const MIN_RELAY_FEE: BitcoinAmount = BitcoinAmount::from_sat(3500);
 
 /// Magic bytes to add to the metadata output in transactions to help identify them.
-pub const MAGIC_BYTES: &[u8; 5] = b"alpen";
+/// This is padded with 0's at the end to allow for any extra information we might want to add in
+/// the future.
+pub const MAGIC_BYTES: &[u8; 10] = b"alpen00000";
 
 lazy_static::lazy_static! {
     /// This is an unspendable pubkey.

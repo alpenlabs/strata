@@ -42,6 +42,9 @@ members = [
   "bin/bridge-client",
   "reth",
   "sequencer",
+
+  # integration tests
+  "tests",
 ]
 
 default-members = ["bin/bridge-client", "reth", "sequencer"]

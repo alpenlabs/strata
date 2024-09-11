@@ -72,32 +72,28 @@ pub fn verify_partial_sig(
     aggregated_nonce: &AggNonce,
     message: impl AsRef<[u8]>,
 ) -> BridgeSigResult<()> {
-    let pubkeys = tx_state.pubkeys().0.clone();
-    let pubkeys = pubkeys.values();
-
     let signer_index = signature_info.signer_index();
-    let pubkey_position = tx_state
-        .pubkeys()
-        .0
-        .keys()
-        .position(|idx| signer_index.eq(idx));
 
-    if pubkey_position.is_none() {
+    let individual_pubkey = tx_state.pubkeys().0.get(signer_index);
+
+    if individual_pubkey.is_none() {
         return Err(BridgeSigError::UnauthorizedPubkey);
     }
 
-    let pubkey_position = pubkey_position.unwrap();
+    let individual_pubkey = individual_pubkey.unwrap();
+
+    let pubkeys: Vec<PublicKey> = tx_state
+        .pubkeys()
+        .0
+        .values()
+        .copied()
+        .collect::<Vec<PublicKey>>();
+    let key_agg_ctx = KeyAggContext::new(pubkeys)?;
 
     let individual_pubnonce = tx_state
         .collected_nonces()
         .get(signer_index)
-        .expect("pubnonce should exist at the position in the collection");
-
-    let key_agg_ctx = KeyAggContext::new(pubkeys.copied())?;
-
-    let individual_pubkey: PublicKey = key_agg_ctx
-        .get_pubkey(pubkey_position)
-        .ok_or(BridgeSigError::UnauthorizedPubkey)?;
+        .expect("pubnonce should exist");
 
     let partial_signature = *signature_info.signature().inner();
 
@@ -105,7 +101,7 @@ pub fn verify_partial_sig(
         &key_agg_ctx,
         partial_signature,
         aggregated_nonce,
-        individual_pubkey,
+        *individual_pubkey,
         individual_pubnonce.inner(),
         message,
     )?)
@@ -116,7 +112,7 @@ mod tests {
     use alpen_express_primitives::bridge::{Musig2PartialSig, OperatorIdx};
     use alpen_test_utils::bridge::{
         generate_keypairs, generate_mock_tx_signing_data, generate_mock_unsigned_tx,
-        generate_pubkey_table,
+        generate_pubkey_table, permute,
     };
     use arbitrary::{Arbitrary, Unstructured};
     use bitcoin::{
@@ -272,6 +268,7 @@ mod tests {
         let mut pub_nonces: Vec<PubNonce> = Vec::with_capacity(pks.len());
         let mut sec_nonces: Vec<SecNonce> = Vec::with_capacity(sks.len());
 
+        // check in reverse (or some permutation)
         for sk in sks.iter() {
             let mut nonce_seed = [0u8; 32];
             rand::rngs::OsRng.fill_bytes(&mut nonce_seed);
@@ -297,6 +294,9 @@ mod tests {
         .expect("Failed to create TxState");
 
         let mut nonces_complete = false;
+        let mut permuted_pub_nonces = pub_nonces.clone();
+        permute(&mut permuted_pub_nonces, pub_nonces.len() - 1);
+
         for (i, pub_nonce) in pub_nonces.iter().enumerate() {
             nonces_complete = tx_state
                 .add_nonce(&(i as OperatorIdx), pub_nonce.clone().into())

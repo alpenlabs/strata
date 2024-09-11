@@ -5280,6 +5280,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "integration-tests"
+version = "0.1.0"
+dependencies = [
+ "alpen-express-common",
+ "alpen-express-primitives",
+ "alpen-express-rocksdb",
+ "alpen-test-utils",
+ "anyhow",
+ "bitcoin",
+ "bitcoind",
+ "express-bridge-sig-manager",
+ "express-bridge-tx-builder",
+ "express-storage",
+ "threadpool",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "interprocess"
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -1,12 +1,11 @@
 //! Provides some common, standalone utilities and wrappers over [`bitcoin`](bitcoin) to create
 //! scripts, addresses and transactions.
 
-use std::collections::BTreeSet;
-
+use alpen_express_primitives::bridge::PublickeyTable;
 use bitcoin::{
     absolute::LockTime,
     key::{Secp256k1, UntweakedPublicKey},
-    opcodes::all::{OP_CHECKSIGVERIFY, OP_PUSHBYTES_20, OP_PUSHNUM_1, OP_RETURN},
+    opcodes::all::{OP_CHECKSIG, OP_PUSHBYTES_10, OP_PUSHBYTES_20, OP_PUSHNUM_1, OP_RETURN},
     script::Builder,
     secp256k1::{All, PublicKey, XOnlyPublicKey},
     taproot::{TaprootBuilder, TaprootSpendInfo},
@@ -24,14 +23,14 @@ use super::{
 pub fn n_of_n_script(aggregated_pubkey: &XOnlyPublicKey) -> ScriptBuf {
     Builder::new()
         .push_x_only_key(aggregated_pubkey)
-        .push_opcode(OP_CHECKSIGVERIFY)
+        .push_opcode(OP_CHECKSIG)
         .into_script()
 }
 
 /// Aggregate the pubkeys using [`musig2`] and return the resulting [`XOnlyPublicKey`].
-pub fn get_aggregated_pubkey(pubkeys: &BTreeSet<PublicKey>) -> XOnlyPublicKey {
-    let key_agg_ctx = KeyAggContext::new(pubkeys.iter().copied().collect::<Vec<PublicKey>>())
-        .expect("key aggregation of musig2 pubkeys");
+pub fn get_aggregated_pubkey(pubkeys: PublickeyTable) -> XOnlyPublicKey {
+    let key_agg_ctx =
+        KeyAggContext::new(pubkeys.0.values().copied()).expect("key aggregation of musig2 pubkeys");
 
     let aggregated_pubkey: PublicKey = key_agg_ctx.aggregated_pubkey();
 
@@ -42,7 +41,7 @@ pub fn get_aggregated_pubkey(pubkeys: &BTreeSet<PublicKey>) -> XOnlyPublicKey {
 pub fn metadata_script(el_address: &[u8; 20]) -> ScriptBuf {
     Builder::new()
         .push_opcode(OP_RETURN)
-        .push_opcode(OP_PUSHBYTES_20)
+        .push_opcode(OP_PUSHBYTES_10)
         .push_slice(MAGIC_BYTES)
         .push_opcode(OP_PUSHBYTES_20)
         .push_slice(el_address)

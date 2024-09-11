@@ -5,7 +5,9 @@ use std::{collections::BTreeMap, sync::Arc};
 
 use alpen_express_db::entities::bridge_tx_state::BridgeTxState;
 use alpen_express_primitives::{
-    bridge::{Musig2PubNonce, OperatorIdx, PublickeyTable, SignatureInfo, TxSigningData},
+    bridge::{
+        Musig2PartialSig, Musig2PubNonce, OperatorIdx, PublickeyTable, SignatureInfo, TxSigningData,
+    },
     l1::SpendInfo,
 };
 use bitcoin::{
@@ -14,13 +16,15 @@ use bitcoin::{
         rand::{self, RngCore},
         Keypair,
     },
-    secp256k1::{schnorr::Signature, PublicKey, SecretKey},
+    secp256k1::{schnorr::Signature, PublicKey, SecretKey, XOnlyPublicKey},
     sighash::SighashCache,
     witness::Witness,
     Transaction, Txid,
 };
 use express_storage::ops::bridge::BridgeTxStateOps;
-use musig2::{aggregate_partial_signatures, AggNonce, KeyAggContext, SecNonce};
+use musig2::{
+    aggregate_partial_signatures, secp256k1::SECP256K1, AggNonce, KeyAggContext, SecNonce,
+};
 
 use super::errors::{BridgeSigError, BridgeSigResult};
 use crate::operations::{create_script_spend_hash, sign_state_partial, verify_partial_sig};
@@ -83,6 +87,24 @@ impl SignatureManager {
         Ok(txid)
     }
 
+    /// Get the state stored in the persistence layer for exposing state to an exteranal consumer
+    /// via the [Txid].
+    ///
+    /// # Errors
+    ///
+    /// If the state corresponding to the `txid` is not present in the database
+    /// ([`BridgeSigError::TransactionNotFound`]). Or, if there is an error in the persistence layer
+    /// itself ([`BridgeSigError::StorageError`]).
+    pub async fn get_tx_state(&self, txid: &Txid) -> BridgeSigResult<BridgeTxState> {
+        let entry = self.db_ops.get_tx_state_async(*txid).await?;
+
+        if entry.is_none() {
+            return Err(BridgeSigError::TransactionNotFound);
+        }
+
+        Ok(entry.unwrap())
+    }
+
     /// Generate a random sec nonce.
     fn generate_sec_nonce(&self, txid: &Txid, key_agg_ctx: &KeyAggContext) -> SecNonce {
         let aggregated_pubkey: PublicKey = key_agg_ctx.aggregated_pubkey();
@@ -101,13 +123,7 @@ impl SignatureManager {
 
     /// Get one's own pubnonce for the given [`Txid`].
     pub async fn get_own_nonce(&self, txid: &Txid) -> BridgeSigResult<Musig2PubNonce> {
-        let tx_state = self.db_ops.get_tx_state_async(*txid).await?;
-
-        if tx_state.is_none() {
-            return Err(BridgeSigError::TransactionNotFound);
-        }
-
-        let tx_state = tx_state.unwrap();
+        let tx_state = self.get_tx_state(txid).await?;
 
         let pubnonce = tx_state
             .collected_nonces()
@@ -131,12 +147,7 @@ impl SignatureManager {
         operator_index: OperatorIdx,
         pub_nonce: &Musig2PubNonce,
     ) -> BridgeSigResult<bool> {
-        let tx_state = self.db_ops.get_tx_state_async(*txid).await?;
-        if tx_state.is_none() {
-            return Err(BridgeSigError::TransactionNotFound);
-        }
-
-        let mut tx_state = tx_state.unwrap();
+        let mut tx_state = self.get_tx_state(txid).await?;
 
         let is_complete = tx_state.add_nonce(&operator_index, pub_nonce.clone())?;
         self.db_ops.upsert_tx_state_async(*txid, tx_state).await?;
@@ -165,13 +176,7 @@ impl SignatureManager {
     /// A flag indicating whether the [`alpen_express_primitives::l1::BitcoinPsbt`] being tracked in
     /// the [`BridgeTxState`] has become fully signed after adding the signature.
     pub async fn add_own_partial_sig(&self, txid: &Txid) -> BridgeSigResult<bool> {
-        let tx_state = self.db_ops.get_tx_state_async(*txid).await?;
-
-        if tx_state.is_none() {
-            return Err(BridgeSigError::TransactionNotFound);
-        }
-
-        let mut tx_state = tx_state.unwrap();
+        let mut tx_state = self.get_tx_state(txid).await?;
 
         let aggregated_nonce = self.get_aggregated_nonce(&tx_state)?;
 
@@ -220,6 +225,19 @@ impl SignatureManager {
         Ok(is_fully_signed)
     }
 
+    /// Get this bridge client's own signature for the given input.
+    pub async fn get_own_partial_sig(
+        &self,
+        txid: &Txid,
+        input_index: usize,
+    ) -> BridgeSigResult<Option<Musig2PartialSig>> {
+        let tx_state = self.get_tx_state(txid).await?;
+
+        Ok(tx_state.collected_sigs()[input_index]
+            .get(&self.index)
+            .copied())
+    }
+
     /// Add a partial signature for a [`BridgeTxState`]. The [`SignatureInfo::signer_index`]
     /// may even be the same as [`Self::index`] in which case the nonce is updated. It is assumed
     /// that the upstream duty producer makes sure that the nonce only comes from a node authorized
@@ -235,13 +253,7 @@ impl SignatureManager {
         signature_info: SignatureInfo,
         input_index: usize,
     ) -> BridgeSigResult<bool> {
-        let tx_state = self.db_ops.get_tx_state_async(*txid).await?;
-
-        if tx_state.is_none() {
-            return Err(BridgeSigError::TransactionNotFound);
-        }
-
-        let mut tx_state = tx_state.unwrap();
+        let mut tx_state = self.get_tx_state(txid).await?;
 
         if input_index.ge(&tx_state.unsigned_tx().input.len()) {
             return Err(BridgeSigError::InputIndexOutOfBounds);
@@ -272,13 +284,7 @@ impl SignatureManager {
 
     /// Retrieve the fully signed transaction for broadcasting.
     pub async fn get_fully_signed_transaction(&self, txid: &Txid) -> BridgeSigResult<Transaction> {
-        let tx_state = self.db_ops.get_tx_state_async(*txid).await?;
-
-        if tx_state.is_none() {
-            return Err(BridgeSigError::TransactionNotFound);
-        }
-
-        let tx_state = tx_state.unwrap();
+        let tx_state = self.get_tx_state(txid).await?;
 
         // this fails if not all nonces have been collected yet.
         let aggregated_nonce = self.get_aggregated_nonce(&tx_state)?;
@@ -313,7 +319,7 @@ impl SignatureManager {
             let message =
                 create_script_spend_hash(&mut sighash_cache, input_index, &script, prevouts)?;
 
-            let message = message.as_ref();
+            let message_bytes = message.as_ref();
 
             // OPTIMIZE: we know for sure that we are not gonna visit an index again. So, there may
             // be a hack to get around the borrow checker and avoid cloning here.
@@ -323,8 +329,28 @@ impl SignatureManager {
                 &key_agg_ctx,
                 &aggregated_nonce,
                 partial_signatures,
-                message,
+                message_bytes,
             )?;
+
+            let key_agg_ctx = KeyAggContext::new(
+                tx_state
+                    .pubkeys()
+                    .clone()
+                    .0
+                    .values()
+                    .copied()
+                    .collect::<Vec<PublicKey>>(),
+            )
+            .expect("key aggregation of musig2 pubkeys should work");
+
+            let aggregated_pubkey: PublicKey = key_agg_ctx.aggregated_pubkey();
+            let x_only_pubkey: XOnlyPublicKey = aggregated_pubkey.x_only_public_key().0;
+            assert!(
+                SECP256K1
+                    .verify_schnorr(&signature, &message, &x_only_pubkey)
+                    .is_ok(),
+                "schnorr verification should succeed"
+            );
 
             let mut witness = Witness::new();
             witness.push(signature.as_ref());
@@ -359,7 +385,7 @@ mod tests {
     use alpen_express_primitives::bridge::Musig2PartialSig;
     use alpen_test_utils::bridge::{
         generate_keypairs, generate_mock_tx_signing_data, generate_mock_tx_state_ops,
-        generate_pubkey_table, generate_sec_nonce,
+        generate_pubkey_table, generate_sec_nonce, permute,
     };
     use arbitrary::{Arbitrary, Unstructured};
     use bitcoin::{
@@ -833,7 +859,7 @@ mod tests {
             .await
             .expect("should add state to storage");
 
-        let (_, sec_nonces) =
+        let (_pub_nonces, sec_nonces) =
             collect_nonces(&signature_manager, &txid, &pubkeys, &secret_keys, own_index).await;
 
         let tx_state = signature_manager
@@ -861,8 +887,11 @@ mod tests {
 
         let prevouts = &tx_state.prevouts()[..];
 
+        let mut operator_ids = (0..num_operators).collect::<Vec<usize>>();
+        permute(&mut operator_ids, pubkeys.len());
+
         // Sign each input in the transaction with the other keys
-        for (signer_index, secret_key) in secret_keys.iter().enumerate() {
+        for signer_index in operator_ids {
             if signer_index == own_index {
                 continue;
             }
@@ -879,7 +908,7 @@ mod tests {
                 let external_signature = sign_state_partial(
                     &pubkey_table,
                     &sec_nonces[signer_index].clone().into(),
-                    &Keypair::from_secret_key(SECP256K1, secret_key),
+                    &Keypair::from_secret_key(SECP256K1, &secret_keys[signer_index]),
                     &aggregated_nonce,
                     message.as_ref(),
                 )
@@ -895,8 +924,10 @@ mod tests {
 
                 assert!(
                     result.is_ok(),
-                    "should add external signature but got error: {:?}",
-                    result.err().unwrap()
+                    "should add external signature but got error: {:?} for ({}, {})",
+                    result.err().unwrap(),
+                    input_index,
+                    signer_index
                 );
 
                 // Verify that the signature has been added
@@ -957,9 +988,24 @@ mod tests {
             if i == own_index {
                 continue;
             }
+        }
+
+        // jumble the order of operator ids which determines the order in which nonces are added to
+        // the state
+        let mut operator_ids = (0..pks.len()).collect::<Vec<usize>>();
+        permute(&mut operator_ids, pks.len());
+
+        for operator_id in operator_ids {
+            if operator_id == own_index {
+                continue;
+            }
 
             sig_manager
-                .add_nonce(txid, i as OperatorIdx, &pub_nonce.into())
+                .add_nonce(
+                    txid,
+                    operator_id as OperatorIdx,
+                    &pub_nonces[operator_id].clone().into(),
+                )
                 .await
                 .expect("should be able to add nonce");
         }
