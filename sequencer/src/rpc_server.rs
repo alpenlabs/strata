@@ -7,12 +7,10 @@ use alpen_express_db::{
     types::{L1TxEntry, L1TxStatus},
 };
 use alpen_express_primitives::{buf::Buf32, hash};
-use alpen_express_rpc_api::{
-    AlpenAdminApiServer, AlpenApiServer, AlpenSyncApiServer, HexBytes, HexBytes32,
-};
+use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer};
 use alpen_express_rpc_types::{
-    BlockHeader, ClientStatus, DaBlob, DepositEntry, DepositState, ExecUpdate, L1Status,
-    NodeSyncStatus,
+    BlockHeader, ClientStatus, DaBlob, DepositEntry, DepositState, ExecUpdate, HexBytes,
+    HexBytes32, L1Status, NodeSyncStatus,
 };
 use alpen_express_state::{
     block::L2BlockBundle,
@@ -456,6 +454,63 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
             .await
             .map_err(|e| Error::Other(e.to_string()))?)
     }
+
+    async fn sync_status(&self) -> RpcResult<NodeSyncStatus> {
+        let sync = {
+            let cl = self.status_rx.cl.borrow();
+            cl.sync().unwrap().clone()
+        };
+        Ok(NodeSyncStatus {
+            tip_height: sync.chain_tip_height(),
+            tip_block_id: *sync.chain_tip_blkid(),
+            finalized_block_id: *sync.finalized_blkid(),
+        })
+    }
+
+    async fn sync_blocks(&self, start_height: u64, end_height: u64) -> RpcResult<HexBytes> {
+        let block_ids = futures::future::join_all(
+            (start_height..=end_height)
+                .map(|height| self.l2_block_manager.get_blocks_at_height_async(height)),
+        )
+        .await;
+
+        let block_ids = block_ids
+            .into_iter()
+            .filter_map(|f| f.ok())
+            .flatten()
+            .collect::<Vec<_>>();
+
+        let blocks = futures::future::join_all(
+            block_ids
+                .iter()
+                .map(|blkid| self.l2_block_manager.get_block_async(blkid)),
+        )
+        .await;
+
+        let blocks = blocks
+            .into_iter()
+            .filter_map(|blk| blk.ok().flatten())
+            .collect::<Vec<_>>();
+
+        borsh::to_vec(&blocks)
+            .map(HexBytes)
+            .map_err(to_jsonrpsee_error("failed to serialize"))
+    }
+
+    async fn sync_block_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<HexBytes>> {
+        let block = self
+            .l2_block_manager
+            .get_block_async(&block_id)
+            .await
+            .map_err(|e| Error::Other(e.to_string()))?
+            .map(|block| {
+                borsh::to_vec(&block)
+                    .map(HexBytes)
+                    .map_err(to_jsonrpsee_error("failed to serialize"))
+            })
+            .transpose()?;
+        Ok(block)
+    }
 }
 
 /// Wrapper around [``tokio::task::spawn_blocking``] that handles errors in
@@ -521,95 +576,5 @@ impl AlpenAdminApiServer for AdminServerImpl {
             .map_err(|e| Error::Other(e.to_string()))?;
 
         Ok(txid)
-    }
-}
-
-pub struct AlpenSyncRpcImpl {
-    status_rx: Arc<StatusRx>,
-    l2_block_manager: Arc<L2BlockManager>,
-}
-
-impl AlpenSyncRpcImpl {
-    pub fn new(status_rx: Arc<StatusRx>, l2_block_manager: Arc<L2BlockManager>) -> Self {
-        Self {
-            status_rx,
-            l2_block_manager,
-        }
-    }
-}
-
-#[async_trait]
-impl AlpenSyncApiServer for AlpenSyncRpcImpl {
-    async fn get_sync_status(&self) -> RpcResult<NodeSyncStatus> {
-        let sync = {
-            let cl = self.status_rx.cl.borrow();
-            cl.sync().unwrap().clone()
-        };
-        Ok(NodeSyncStatus {
-            tip_height: sync.chain_tip_height(),
-            tip_block_id: *sync.chain_tip_blkid(),
-            finalized_block_id: *sync.finalized_blkid(),
-        })
-    }
-
-    async fn sync_blocks_by_height(&self, height: u64) -> RpcResult<Vec<u8>> {
-        let block_ids: Vec<L2BlockId> = self
-            .l2_block_manager
-            .get_blocks_at_height_async(height)
-            .await
-            .map_err(|e| Error::Other(e.to_string()))?;
-
-        let blocks = futures::future::join_all(
-            block_ids
-                .iter()
-                .map(|blkid| self.l2_block_manager.get_block_async(blkid)),
-        )
-        .await;
-
-        let blocks = blocks
-            .into_iter()
-            .filter_map(|blk| blk.ok().flatten())
-            .collect::<Vec<_>>();
-
-        borsh::to_vec(&blocks).map_err(to_jsonrpsee_error("failed to serialize"))
-    }
-
-    async fn sync_blocks_by_range(&self, start_height: u64, end_height: u64) -> RpcResult<Vec<u8>> {
-        let block_ids = futures::future::join_all(
-            (start_height..=end_height)
-                .map(|height| self.l2_block_manager.get_blocks_at_height_async(height)),
-        )
-        .await;
-
-        let block_ids = block_ids
-            .into_iter()
-            .filter_map(|f| f.ok())
-            .flatten()
-            .collect::<Vec<_>>();
-
-        let blocks = futures::future::join_all(
-            block_ids
-                .iter()
-                .map(|blkid| self.l2_block_manager.get_block_async(blkid)),
-        )
-        .await;
-
-        let blocks = blocks
-            .into_iter()
-            .filter_map(|blk| blk.ok().flatten())
-            .collect::<Vec<_>>();
-
-        borsh::to_vec(&blocks).map_err(to_jsonrpsee_error("failed to serialize"))
-    }
-
-    async fn sync_block_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<Vec<u8>>> {
-        let block = self
-            .l2_block_manager
-            .get_block_async(&block_id)
-            .await
-            .map_err(|e| Error::Other(e.to_string()))?
-            .map(|block| borsh::to_vec(&block).map_err(to_jsonrpsee_error("failed to serialize")))
-            .transpose()?;
-        Ok(block)
     }
 }

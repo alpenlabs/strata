@@ -420,6 +420,9 @@ fn process_fc_message<D: Database, E: ExecEngineCtl>(
                     return Err(e);
                 }
 
+                // Block is valid, update the status
+                state.set_block_status(&blkid, BlockStatus::Valid)?;
+
                 // TODO also update engine tip block
 
                 // Insert the sync event and submit it to the executor.

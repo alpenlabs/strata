@@ -1,5 +1,8 @@
-mod manager;
-mod sync_peer;
+mod client;
+mod error;
+mod state;
+mod worker;
 
-pub use manager::{L2SyncError, L2SyncManager};
-pub use sync_peer::{RpcSyncPeer, SyncPeer, SyncPeerError};
+pub use client::{ClientError, RpcSyncPeer, SyncClient};
+pub use error::L2SyncError;
+pub use worker::{block_until_csm_ready_and_init_sync_state, sync_worker, L2SyncContext};

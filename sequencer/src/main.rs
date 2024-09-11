@@ -30,16 +30,15 @@ use alpen_express_primitives::{
 use alpen_express_rocksdb::{
     broadcaster::db::BroadcastDatabase, sequencer::db::SequencerDB, DbOpsConfig, SeqDb,
 };
-use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer, AlpenSyncApiServer};
+use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer};
 use alpen_express_rpc_types::L1Status;
 use alpen_express_state::csm_status::CsmStatus;
-// use alpen_express_btcio::broadcaster::manager::BroadcastDbManager;
 use alpen_express_status::{create_status_channel, StatusRx, StatusTx};
 use anyhow::Context;
 use bitcoin::Network;
 use config::{ClientMode, Config};
 use express_storage::L2BlockManager;
-use express_sync::{L2SyncManager, RpcSyncPeer};
+use express_sync::{self, L2SyncContext, RpcSyncPeer};
 use express_tasks::{ShutdownSignal, TaskManager};
 use format_serde_error::SerdeError;
 use reth_rpc_types::engine::{JwtError, JwtSecret};
@@ -339,20 +338,6 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         });
     }
 
-    if let ClientMode::FullNode(fullnode_config) = &config.client.client_mode {
-        let sequencer_rpc = &fullnode_config.sequencer_rpc;
-        info!(?sequencer_rpc, "initing fullnode task");
-
-        let rpc_client = rt.block_on(sync_client(sequencer_rpc));
-        let sync_peer = RpcSyncPeer::new(rpc_client);
-        let l2_sync_manager =
-            L2SyncManager::new(sync_peer, l2_block_manager.clone(), sync_man.clone());
-
-        task_executor.spawn_critical_async("l2-sync-manager", async move {
-            l2_sync_manager.run().await.unwrap();
-        });
-    }
-
     // Start the L1 tasks to get that going.
     let csm_ctl = sync_man.get_csm_ctl();
     l1_reader::start_reader_tasks(
@@ -364,6 +349,26 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         csm_ctl,
         status_tx.clone(),
     )?;
+
+    if let ClientMode::FullNode(fullnode_config) = &config.client.client_mode {
+        let sequencer_rpc = &fullnode_config.sequencer_rpc;
+        info!(?sequencer_rpc, "initing fullnode task");
+
+        let rpc_client = rt.block_on(sync_client(sequencer_rpc));
+        let sync_peer = RpcSyncPeer::new(rpc_client, 10);
+        let l2_sync_context =
+            L2SyncContext::new(sync_peer, l2_block_manager.clone(), sync_man.clone());
+        // NOTE: this might block for some time during first run with empty db until genesis block
+        // is generated
+        let mut l2_sync_state =
+            express_sync::block_until_csm_ready_and_init_sync_state(&l2_sync_context)?;
+
+        task_executor.spawn_critical_async("l2-sync-manager", async move {
+            express_sync::sync_worker(&mut l2_sync_state, &l2_sync_context)
+                .await
+                .unwrap();
+        });
+    }
 
     let shutdown_signal = task_manager.shutdown_signal();
     let db_cloned = database.clone();
@@ -419,8 +424,6 @@ async fn start_rpc<D: Database + Send + Sync + 'static>(
     let mut methods = alp_rpc.into_rpc();
     let admin_rpc = rpc_server::AdminServerImpl::new(inscription_handler, bcast_handle);
     methods.merge(admin_rpc.into_rpc())?;
-    let sync_rpc = rpc_server::AlpenSyncRpcImpl::new(status_rx.clone(), l2_block_manager.clone());
-    methods.merge(sync_rpc.into_rpc())?;
 
     let rpc_port = config.client.rpc_port;
 

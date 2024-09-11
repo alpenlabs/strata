@@ -278,51 +278,6 @@ impl UnfinalizedBlockTracker {
         Ok(())
     }
 
-    pub async fn load_unfinalized_blocks_async(
-        &mut self,
-        finalized_height: u64,
-        chain_tip_height: u64,
-        l2_block_manager: &L2BlockManager,
-    ) -> anyhow::Result<()> {
-        for height in (finalized_height + 1)..=chain_tip_height {
-            let Ok(block_ids) = l2_block_manager.get_blocks_at_height_async(height).await else {
-                return Err(anyhow::anyhow!("failed to get blocks at height {}", height));
-            };
-            let block_ids = block_ids.into_iter().map(|block_id| async move {
-                let Ok(Some(block_status)) =
-                    l2_block_manager.get_block_status_async(&block_id).await
-                else {
-                    // missing block status
-                    warn!("missing block status for block {}", block_id);
-                    return None;
-                };
-                if block_status == BlockStatus::Valid {
-                    Some(block_id)
-                } else {
-                    None
-                }
-            });
-
-            let block_ids = futures::future::join_all(block_ids)
-                .await
-                .into_iter()
-                .flatten()
-                .collect::<Vec<_>>();
-
-            if block_ids.is_empty() {
-                return Err(anyhow::anyhow!("missing blocks at height {}", height));
-            }
-            for block_id in block_ids {
-                if let Some(block) = l2_block_manager.get_block_async(&block_id).await? {
-                    let header = block.header();
-                    let _ = self.attach_block(block_id, header);
-                }
-            }
-        }
-
-        Ok(())
-    }
-
     #[cfg(test)]
     pub fn unchecked_set_finalized_tip(&mut self, id: L2BlockId) {
         self.finalized_tip = id;

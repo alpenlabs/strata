@@ -8,6 +8,12 @@ use alpen_express_state::{bridge_ops::WithdrawalIntent, id::L2BlockId};
 use bitcoin::Txid;
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HexBytes(#[serde(with = "hex::serde")] pub Vec<u8>);
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HexBytes32(#[serde(with = "hex::serde")] pub [u8; 32]);
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct L1Status {
     /// If the last time we tried to poll the client (as of `last_update`)
