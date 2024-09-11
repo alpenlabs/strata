@@ -10,7 +10,7 @@ use alpen_express_primitives::{buf::Buf32, hash};
 use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer};
 use alpen_express_rpc_types::{
     BlockHeader, ClientStatus, DaBlob, DepositEntry, DepositState, ExecUpdate, HexBytes,
-    HexBytes32, L1Status, NodeSyncStatus,
+    HexBytes32, L1Status, NodeSyncStatus, RawBlockWitness,
 };
 use alpen_express_state::{
     block::L2BlockBundle,
@@ -407,6 +407,53 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
             }
             None => Ok(None),
         }
+    }
+
+    async fn get_block_witness_raw(&self, idx: u64) -> RpcResult<Option<RawBlockWitness>> {
+        let blk_manifest_db = self.database.clone();
+        let blk_ids: Vec<L2BlockId> = wait_blocking("l2_blockid", move || {
+            blk_manifest_db
+                .clone()
+                .l2_provider()
+                .get_blocks_at_height(idx)
+                .map_err(Error::Db)
+        })
+        .await?;
+
+        // Check if blk_ids is empty
+        let blkid = match blk_ids.first() {
+            Some(id) => id.to_owned(),
+            None => return Ok(None),
+        };
+
+        let l2_blk_db = self.database.clone();
+        let l2_blk_bundle = wait_blocking("l2_block", move || {
+            let l2_prov = l2_blk_db.l2_provider();
+            fetch_l2blk::<D>(l2_prov, blkid).map_err(|_| Error::MissingL2Block(blkid))
+        })
+        .await?;
+
+        let chain_state_db = self.database.clone();
+        let chain_state = wait_blocking("l2_chain_state", move || {
+            let cs_provider = chain_state_db.chainstate_provider();
+
+            cs_provider
+                .get_toplevel_state(idx - 1)
+                .map_err(Error::Db)?
+                .ok_or(Error::MissingChainstate(idx - 1))
+        })
+        .await?;
+
+        let raw_chain_state = borsh::to_vec(&chain_state)
+            .map_err(|_| Error::Other("Failed to get raw chain state".to_string()))?;
+
+        let raw_l2_block = borsh::to_vec(&l2_blk_bundle.block())
+            .map_err(|_| Error::Other("Failed to get raw l2 block".to_string()))?;
+
+        Ok(Some(RawBlockWitness {
+            raw_chain_state,
+            raw_l2_block,
+        }))
     }
 
     async fn get_current_deposits(&self) -> RpcResult<Vec<u32>> {
