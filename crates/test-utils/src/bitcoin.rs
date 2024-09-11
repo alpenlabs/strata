@@ -1,4 +1,4 @@
-use alpen_express_primitives::l1::L1BlockManifest;
+use alpen_express_primitives::{buf::Buf32, l1::L1BlockManifest};
 use bitcoin::{
     block::Header, consensus::deserialize, hashes::Hash, params::Params, Block, Transaction,
 };
@@ -91,7 +91,7 @@ impl BtcChain {
         )
     }
 
-    pub fn get_header_verification_info(&self, height: u32) -> ([u8; 32], u32, [u32; 11], u32) {
+    pub fn get_header_verification_info(&self, height: u32) -> (Buf32, u32, [u32; 11], u32) {
         let difficulty_adjustment_interval = self.params.difficulty_adjustment_interval() as u32;
 
         // Consider the block before `height` to be the last verified block
@@ -108,7 +108,7 @@ impl BtcChain {
         let h1 = get_difficulty_adjustment_height(0, height, difficulty_adjustment_interval);
 
         (
-            vb.block_hash().as_raw_hash().to_byte_array(),
+            vb.block_hash().as_raw_hash().to_byte_array().into(),
             vb.target().to_compact_lossy().to_consensus(),
             recent_block_timestamps,
             self.get_header(h1).time,

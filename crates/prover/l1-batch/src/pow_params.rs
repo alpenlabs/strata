@@ -29,8 +29,8 @@ impl PowParams {
     }
 }
 
-impl From<Params> for PowParams {
-    fn from(params: Params) -> Self {
+impl From<&Params> for PowParams {
+    fn from(params: &Params) -> Self {
         PowParams {
             max_attainable_target: params.max_attainable_target,
             pow_target_spacing: params.pow_target_spacing as u32,

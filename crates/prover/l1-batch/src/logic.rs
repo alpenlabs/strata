@@ -4,7 +4,7 @@ use btc_blockspace::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::header_verification::HeaderVerificationState;
+use crate::{header_verification::HeaderVerificationState, pow_params::PowParams};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct L1BatchProofInput {
@@ -20,7 +20,7 @@ pub struct L1BatchProofOutput {
     pub state: HeaderVerificationState,
 }
 
-pub fn process_batch_proof(input: L1BatchProofInput) -> L1BatchProofOutput {
+pub fn process_batch_proof(input: L1BatchProofInput, params: &PowParams) -> L1BatchProofOutput {
     let mut state = input.state;
 
     let mut deposits = Vec::new();
@@ -28,7 +28,7 @@ pub fn process_batch_proof(input: L1BatchProofInput) -> L1BatchProofOutput {
     let mut state_updates = Vec::new();
 
     for blockspace in input.batch {
-        state.check_and_update(&blockspace.header);
+        state.check_and_update(&blockspace.header, params);
         deposits.extend(blockspace.deposits);
         forced_inclusions.extend(blockspace.forced_inclusions);
         state_updates.extend(blockspace.state_updates);

@@ -8,9 +8,6 @@ use crate::pow_params::PowParams;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HeaderVerificationState {
-    /// Proof of Work Parameters of the network
-    pub params: PowParams,
-
     /// [Block number](bitcoin::Block::bip34_block_height) of the last verified block
     pub last_verified_block_num: u32,
 
@@ -75,13 +72,13 @@ impl HeaderVerificationState {
     /// # Note
     /// The comments above and the implementation is based on [rust-bitcoin](https://github.com/rust-bitcoin/rust-bitcoin/blob/0d9e8f8c992223869a57162c4afe5a6112d08049/bitcoin/src/pow.rs#L352-L398).
     /// This has not been directly used since it is not available on the current release
-    fn next_target(&mut self, timestamp: u32) -> u32 {
-        if (self.last_verified_block_num + 1) % self.params.difficulty_adjustment_interval() != 0 {
+    fn next_target(&mut self, timestamp: u32, params: &PowParams) -> u32 {
+        if (self.last_verified_block_num + 1) % params.difficulty_adjustment_interval() != 0 {
             return self.next_block_target;
         }
 
-        let min_timespan: u32 = self.params.pow_target_timespan >> 2;
-        let max_timespan: u32 = self.params.pow_target_timespan << 2;
+        let min_timespan: u32 = params.pow_target_timespan >> 2;
+        let max_timespan: u32 = params.pow_target_timespan << 2;
 
         let timespan = timestamp - self.interval_start_timestamp;
         let actual_timespan = timespan.clamp(min_timespan, max_timespan);
@@ -90,12 +87,13 @@ impl HeaderVerificationState {
 
         let mut retarget = U256::from_le_bytes(prev_target.to_le_bytes());
         retarget *= U256::from(actual_timespan);
-        retarget /= U256::from(self.params.pow_target_timespan);
+        retarget /= U256::from(params.pow_target_timespan);
 
         let retarget = Target::from_le_bytes(retarget.to_le_bytes());
 
-        if retarget > Target::MAX_ATTAINABLE_MAINNET {
-            return Target::MAX_ATTAINABLE_MAINNET
+        if retarget > params.max_attainable_target {
+            return params
+                .max_attainable_target
                 .to_compact_lossy()
                 .to_consensus();
         }
@@ -103,18 +101,18 @@ impl HeaderVerificationState {
         retarget.to_compact_lossy().to_consensus()
     }
 
-    fn update_timestamps(&mut self, timestamp: u32) {
+    fn update_timestamps(&mut self, timestamp: u32, params: &PowParams) {
         // Shift existing timestamps to right and insert latest timestamp
         self.last_11_blocks_timestamps.rotate_right(1);
         self.last_11_blocks_timestamps[0] = timestamp;
 
         let new_block_num = self.last_verified_block_num;
-        if new_block_num % self.params.difficulty_adjustment_interval() == 0 {
+        if new_block_num % params.difficulty_adjustment_interval() == 0 {
             self.interval_start_timestamp = timestamp;
         }
     }
 
-    pub fn check_and_update(&mut self, header: &Header) {
+    pub fn check_and_update(&mut self, header: &Header, params: &PowParams) {
         // Check continuity
         assert_eq!(
             Buf32::from(header.prev_blockhash.as_raw_hash().to_byte_array()),
@@ -138,13 +136,13 @@ impl HeaderVerificationState {
         self.last_verified_block_hash = block_hash_raw;
 
         // Update the timestamps
-        self.update_timestamps(header.time);
+        self.update_timestamps(header.time, params);
 
         // Update the total accumulated PoW
         self.total_accumulated_pow += header.difficulty_float();
 
         // Set the target for the next block
-        self.next_block_target = self.next_target(header.time);
+        self.next_block_target = self.next_target(header.time, params);
     }
 }
 
@@ -171,7 +169,7 @@ mod tests {
     use super::*;
 
     fn for_block(block_height: u32, chain: &BtcChain) -> HeaderVerificationState {
-        let params = PowParams::from(Params::MAINNET);
+        let params = PowParams::from(&Params::MAINNET);
 
         // Get the first difficulty adjustment block after `chain.start`
         let h1 = get_difficulty_adjustment_height(1, chain.start, &params);
@@ -192,7 +190,6 @@ mod tests {
             chain.get_last_timestamps(vh, 11).try_into().unwrap();
 
         HeaderVerificationState {
-            params,
             last_verified_block_num: vh,
             last_verified_block_hash: Buf32::from(
                 chain
@@ -214,14 +211,14 @@ mod tests {
 
     #[test]
     fn test_blocks() {
-        let params = PowParams::from(Params::MAINNET);
+        let params = PowParams::from(&Params::MAINNET);
         let chain: BtcChain = get_btc_chain(Params::MAINNET);
         let h1 = get_difficulty_adjustment_height(1, chain.start, &params);
         let r1 = rand::thread_rng().gen_range(h1..chain.end);
         let mut verification_state = for_block(r1, &chain);
 
         for header_idx in r1..chain.end {
-            verification_state.check_and_update(&chain.get_header(header_idx))
+            verification_state.check_and_update(&chain.get_header(header_idx), &params)
         }
     }
 }
