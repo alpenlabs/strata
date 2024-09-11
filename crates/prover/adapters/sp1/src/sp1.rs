@@ -1,6 +1,6 @@
 use anyhow::Ok;
 use express_zkvm::{
-    AggregationInput, Proof, ProverOptions, VerifcationKey, ZKVMHost, ZKVMVerifier,
+    AggregationInput, Proof, ProverOptions, VerificationKey, ZKVMHost, ZKVMVerifier,
 };
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::to_vec;
@@ -28,7 +28,7 @@ impl ZKVMHost for SP1Host {
         inputs: &[T],
         serialized_inputs: Option<&[Vec<u8>]>,
         agg_inputs: Option<&[AggregationInput]>,
-    ) -> anyhow::Result<(Proof, VerifcationKey)> {
+    ) -> anyhow::Result<(Proof, VerificationKey)> {
         // Init the prover
         if self.prover_options.use_mock_prover {
             std::env::set_var("SP1_PROVER", "mock");
@@ -82,7 +82,7 @@ impl ZKVMHost for SP1Host {
 
         Ok((
             Proof::new(serialized_proof),
-            VerifcationKey(verification_key),
+            VerificationKey(verification_key),
         ))
     }
 }
@@ -91,7 +91,7 @@ impl ZKVMHost for SP1Host {
 pub struct SP1Verifier;
 
 impl ZKVMVerifier for SP1Verifier {
-    fn verify(verification_key: &VerifcationKey, proof: &Proof) -> anyhow::Result<()> {
+    fn verify(verification_key: &VerificationKey, proof: &Proof) -> anyhow::Result<()> {
         let proof: SP1ProofWithPublicValues = bincode::deserialize(proof.as_bytes())?;
         let vkey: SP1VerifyingKey = bincode::deserialize(&verification_key.0)?;
 
@@ -102,7 +102,7 @@ impl ZKVMVerifier for SP1Verifier {
     }
 
     fn verify_with_public_params<T: DeserializeOwned + serde::Serialize>(
-        verification_key: &VerifcationKey,
+        verification_key: &VerificationKey,
         public_params: T,
         proof: &Proof,
     ) -> anyhow::Result<()> {
