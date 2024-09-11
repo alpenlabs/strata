@@ -150,7 +150,6 @@ pub struct DepositEntry {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
 pub struct NodeSyncStatus {
     /// Current head L2 slot known to this node
     pub tip_height: u64,
