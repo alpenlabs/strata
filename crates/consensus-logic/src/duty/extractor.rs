@@ -1,6 +1,8 @@
 use alpen_express_db::traits::{Database, L2DataProvider};
 use alpen_express_primitives::params::Params;
 use alpen_express_state::{
+    batch::CheckPoint,
+    block::L2BlockBundle,
     client_state::{CheckpointStatus, ClientState},
     header::L2Header,
 };
@@ -36,26 +38,40 @@ pub fn extract_duties<D: Database>(
     let duty_data = BlockSigningDuty::new_simple(block_idx + 1, tip_blkid);
     let mut duties = vec![Duty::SignBlock(duty_data)];
 
-    duties.extend(extract_batch_duties(state)?);
+    duties.extend(extract_batch_duties(state, block)?);
 
     Ok(duties)
 }
 
-fn extract_batch_duties(state: &ClientState) -> Result<Vec<Duty>, Error> {
+fn extract_batch_duties(state: &ClientState, tip: L2BlockBundle) -> Result<Vec<Duty>, Error> {
     if state.sync().is_none() {
         return Err(Error::MissingClientSyncState);
     };
 
-    let checkpoint_info = state
-        .l1_view()
-        .next_checkpoint_info()
-        .expect("expect checkpoint info to be present");
-
-    // We only create a new batch duty if the prev batch checkpoint is finalized
-    if checkpoint_info.prev_checkpoint_status == CheckpointStatus::Finalized {
-        let duty: BatchCommitmentDuty = checkpoint_info.info.clone().into();
-        Ok(vec![Duty::CommitBatch(duty)])
-    } else {
-        Ok(vec![])
+    match state.l1_view().last_checkpoint_state() {
+        // No checkpoint is seen, start from 0
+        None => {
+            let new_checkpt = CheckPoint::new(
+                0,
+                0..=state.l1_view().tip_height(),
+                0..=tip.header().blockidx(),
+                tip.header().get_blockid(),
+            );
+            Ok(vec![Duty::CommitBatch(new_checkpt.clone().into())])
+        }
+        Some(checkpt_state) if checkpt_state.status == CheckpointStatus::Finalized => {
+            let checkpoint = checkpt_state.checkpoint.clone();
+            let l1_range = checkpoint.l1_range.end() + 1..=state.l1_view().tip_height();
+            let l2_range = checkpoint.l2_range.end() + 1..=tip.header().blockidx();
+            let new_checkpt = CheckPoint::new(
+                checkpoint.checkpoint_idx + 1,
+                l1_range,
+                l2_range,
+                tip.header().get_blockid(),
+            );
+            let duty: BatchCommitmentDuty = new_checkpt.clone().into();
+            Ok(vec![Duty::CommitBatch(duty)])
+        }
+        _ => Ok(vec![]),
     }
 }

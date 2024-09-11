@@ -12,7 +12,7 @@ use crate::id::L2BlockId;
 #[derive(Clone, Debug, PartialEq, BorshDeserialize, BorshSerialize, Arbitrary)]
 pub struct BatchCommitment {
     /// Information regarding the current batch checkpoint
-    checkpoint_info: CheckPointInfo,
+    checkpoint: CheckPoint,
     /// Proof for the batch obtained from prover manager
     proof: Proof,
     /// L2 block upto which this batch covers
@@ -20,16 +20,16 @@ pub struct BatchCommitment {
 }
 
 impl BatchCommitment {
-    pub fn new(checkpoint_info: CheckPointInfo, proof: Proof, l2_blockid: L2BlockId) -> Self {
+    pub fn new(checkpoint: CheckPoint, proof: Proof, l2_blockid: L2BlockId) -> Self {
         Self {
-            checkpoint_info,
+            checkpoint,
             proof,
             l2_blockid,
         }
     }
 
-    pub fn checkpoint_info(&self) -> &CheckPointInfo {
-        &self.checkpoint_info
+    pub fn checkpoint(&self) -> &CheckPoint {
+        &self.checkpoint
     }
 
     pub fn proof(&self) -> &Proof {
@@ -43,7 +43,7 @@ impl BatchCommitment {
     pub fn get_sighash(&self) -> Buf32 {
         let mut buf = vec![];
         let checkpt_sighash =
-            borsh::to_vec(&self.checkpoint_info).expect("could not serialize checkpoint info");
+            borsh::to_vec(&self.checkpoint).expect("could not serialize checkpoint info");
 
         buf.extend(checkpt_sighash);
         buf.extend(self.proof.as_bytes());
@@ -72,35 +72,33 @@ impl From<SignedBatchCommitment> for BatchCommitment {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
-pub struct CheckPointInfo {
+pub struct CheckPoint {
     /// The index of the checkpoint
-    pub(super) checkpoint_idx: u64,
+    pub checkpoint_idx: u64,
     /// L1 height range the checkpoint covers
-    pub(super) l1_range: RangeInclusive<u64>,
+    pub l1_range: RangeInclusive<u64>,
     /// L2 height range the checkpoint covers
-    pub(super) l2_range: RangeInclusive<u64>,
+    pub l2_range: RangeInclusive<u64>,
+    /// L2 block that this checkpoint covers
+    pub l2_blockid: L2BlockId,
 }
 
-impl CheckPointInfo {
+impl CheckPoint {
     pub fn new(
         checkpoint_idx: u64,
         l1_range: RangeInclusive<u64>,
         l2_range: RangeInclusive<u64>,
+        l2_blockid: L2BlockId,
     ) -> Self {
         Self {
             checkpoint_idx,
             l1_range,
             l2_range,
+            l2_blockid,
         }
     }
 
     pub fn checkpoint_idx(&self) -> u64 {
         self.checkpoint_idx
-    }
-
-    pub fn update_next(&mut self, l1_tip: u64, l2_tip: u64) {
-        self.l1_range = self.l1_range.end() + 1..=l1_tip;
-        self.l2_range = self.l2_range.end() + 1..=l2_tip;
-        self.checkpoint_idx += 1;
     }
 }

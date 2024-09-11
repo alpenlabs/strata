@@ -6,7 +6,8 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use tracing::*;
 
 use crate::{
-    client_state::{CheckpointStatus, ClientState, SyncState},
+    batch::CheckPoint,
+    client_state::{CheckPointWithState, CheckpointStatus, ClientState, SyncState},
     id::L2BlockId,
     l1::L1BlockId,
 };
@@ -65,14 +66,14 @@ pub enum ClientStateWrite {
     UpdateBuried(u64),
 
     /// Update the l2 block whose batch proof has been confirmed in L1 at a height.
-    UpdateConfirmed(u64, L2BlockId),
+    //UpdateConfirmed(u64, L2BlockId),
 
     /// Update the l2 block whose batch proof has been finalized.
     UpdateFinalized(L2BlockId),
 
     /// Update the next checkpoint info for which a batch proof needs to be created and posted to
     /// L1. This has l1_tip_height and l2_tip_height, and current height
-    NewCheckpointReceived(u64, u64, u64),
+    NewCheckpointReceived(u64, CheckPoint),
 
     /// The previously confirmed checkpoint is finalized at given l1 height
     CheckpointFinalized(u64),
@@ -190,34 +191,38 @@ pub fn apply_writes_to_state(
                 update_finalized(state, blkid);
             }
 
-            UpdateConfirmed(l1height, blkid) => {
-                let ss = state.expect_sync_mut();
-                ss.confirmed_checkpoint_blocks.push((l1height, blkid));
-            }
-
-            NewCheckpointReceived(l1_tip, l2_tip, height) => {
+            NewCheckpointReceived(height, checkpt) => {
                 // Update next_checkpoint state. This sets the prev_checkpoint status to be
                 // confirmed
-                let checkpoint_info = state.l1_view_mut().next_checkpoint_info.as_mut().expect(
-                    "missing next_checkpoint_info while executing UpdateNextBatchInfo write",
-                );
-                if checkpoint_info.prev_checkpoint_status != CheckpointStatus::Finalized {
-                    panic!("expected previous checkpoint to be finalized");
+                match &state.l1_view().last_checkpoint_state {
+                    None => {
+                        let info = CheckPointWithState::new_confirmed(checkpt, height);
+                        state.l1_view_mut().last_checkpoint_state = Some(info);
+                    }
+                    Some(last_checkpt_info) => {
+                        if checkpt.checkpoint_idx()
+                            != last_checkpt_info.checkpoint.checkpoint_idx() + 1
+                        {
+                            panic!("operation: received out of order checkpoint");
+                        }
+                        if last_checkpt_info.status != CheckpointStatus::Finalized {
+                            panic!("operation: expected last checkpoint to be finalized");
+                        }
+                        state.l1_view_mut().last_checkpoint_state =
+                            Some(CheckPointWithState::new_confirmed(checkpt, height));
+                    }
                 }
-                checkpoint_info.info.update_next(l1_tip, l2_tip);
-                checkpoint_info.prev_checkpoint_l1_height = height;
-                checkpoint_info.prev_checkpoint_status = CheckpointStatus::Confirmed;
             }
 
             CheckpointFinalized(height) => {
-                let checkpoint_info = state.l1_view_mut().next_checkpoint_info.as_mut().expect(
-                    "missing next_checkpoint_info while executing UpdateNextBatchInfo write",
+                let checkpoint_info = state.l1_view_mut().last_checkpoint_state.as_mut().expect(
+                    "operation: missing next_checkpoint_info while executing UpdateNextBatchInfo write",
                 );
-                if checkpoint_info.prev_checkpoint_status != CheckpointStatus::Confirmed {
-                    panic!("expected previous checkpoint to be Confirmed");
+                if checkpoint_info.status != CheckpointStatus::Confirmed {
+                    panic!("operation: expected previous checkpoint to be confirmed");
                 }
-                if checkpoint_info.prev_checkpoint_l1_height != height {
-                    panic!("mismatched confirmed checkpiont l1 height");
+                if checkpoint_info.height != height {
+                    panic!("operation: mismatched confirmed checkpiont l1 height");
                 }
                 checkpoint_info.set_finalized()
             }

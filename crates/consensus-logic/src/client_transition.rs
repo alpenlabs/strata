@@ -85,14 +85,9 @@ pub fn process_event<D: Database>(
                     );
                 }
 
-                // If we have a confirmed checkpoint that is finalized with this block, set it as
-                // finalized
-                if state
-                    .l1_view()
-                    .next_checkpoint_info()
-                    .filter(|x| x.prev_checkpoint_l1_height == maturable_height)
-                    .is_some()
-                {
+                // If we have a confirmed checkpoint set it as finalized. Validity is handled in the
+                // operation
+                if state.l1_view().last_checkpoint_state().is_some() {
                     writes.push(ClientStateWrite::CheckpointFinalized(maturable_height))
                 }
             }
@@ -119,41 +114,19 @@ pub fn process_event<D: Database>(
             writes.push(ClientStateWrite::RollbackL1BlocksTo(*to_height));
         }
 
-        SyncEvent::L1DABatch(height, blkids) => {
-            if blkids.is_empty() {
-                warn!("empty L1DABatch");
-            }
-
-            debug!(%height, ?blkids, "received L1DABatch");
+        SyncEvent::L1DABatch(height, checkpt) => {
+            debug!(%height, "received L1DABatch");
 
             if let Some(ss) = state.sync() {
                 // TODO load it up and figure out what's there, see if we have to
                 // load the state updates from L1 or something
                 let l2prov = database.l2_provider();
 
-                // Get l1,l2 tip idx
-                let tip_blkid = *ss.chain_tip_blkid();
-                let block = l2prov
-                    .get_block_data(tip_blkid)?
-                    .ok_or(Error::MissingL2Block(tip_blkid))?;
-
-                let l2_tip_idx = block.header().blockidx();
-                let l1_tip_idx = state.l1_view().tip_height();
-
-                for id in blkids {
-                    let _block = l2prov
-                        .get_block_data(*id)?
-                        .ok_or(Error::MissingL2Block(*id))?;
-
-                    // TODO do whatever changes we have to to accept the new block
-                }
-
-                let last = blkids.last().unwrap();
                 // When DABatch appears, it is only confirmed at the moment. These will be finalized
                 // only when the corresponding L1 block is buried enough
-                writes.push(ClientStateWrite::UpdateConfirmed(*height, *last));
                 writes.push(ClientStateWrite::NewCheckpointReceived(
-                    l1_tip_idx, l2_tip_idx, *height,
+                    *height,
+                    checkpt.clone(),
                 ));
             } else {
                 // TODO we can expand this later to make more sense

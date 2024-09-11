@@ -1,9 +1,9 @@
 //! Sequencer duties.
 
-use std::time;
+use std::{ops::Deref, time};
 
 use alpen_express_primitives::{buf::Buf32, hash::compute_borsh_hash};
-use alpen_express_state::{batch::CheckPointInfo, id::L2BlockId};
+use alpen_express_state::{batch::CheckPoint, id::L2BlockId};
 use borsh::{BorshDeserialize, BorshSerialize};
 
 /// Describes when we'll stop working to fulfill a duty.
@@ -39,12 +39,16 @@ impl Duty {
     pub fn expiry(&self) -> Expiry {
         match self {
             Self::SignBlock(_) => Expiry::NextBlock,
-            Self::CommitBatch(duty) => Expiry::CheckpointIdxFinalized(duty.inner.checkpoint_idx()),
+            Self::CommitBatch(duty) => Expiry::CheckpointIdxFinalized(duty.checkpoint_idx()),
         }
     }
 
     pub fn id(&self) -> Buf32 {
-        compute_borsh_hash(self)
+        match self {
+            // We want Batch commitment duty to be unique by the checkpoint idx
+            Self::CommitBatch(duty) => compute_borsh_hash(&duty.checkpoint_idx()),
+            _ => compute_borsh_hash(self),
+        }
     }
 }
 
@@ -77,11 +81,19 @@ impl BlockSigningDuty {
 #[derive(Clone, Debug, BorshSerialize)]
 pub struct BatchCommitmentDuty {
     /// Checkpoint/batch info
-    inner: CheckPointInfo,
+    inner: CheckPoint,
 }
 
-impl From<CheckPointInfo> for BatchCommitmentDuty {
-    fn from(value: CheckPointInfo) -> Self {
+impl Deref for BatchCommitmentDuty {
+    type Target = CheckPoint;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl From<CheckPoint> for BatchCommitmentDuty {
+    fn from(value: CheckPoint) -> Self {
         Self { inner: value }
     }
 }

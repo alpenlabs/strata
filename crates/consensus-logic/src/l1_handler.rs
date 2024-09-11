@@ -9,8 +9,7 @@ use alpen_express_primitives::{
     buf::Buf32, l1::L1BlockManifest, params::Params, utils::generate_l1_tx,
 };
 use alpen_express_state::{
-    batch::{BatchCommitment, SignedBatchCommitment},
-    id::L2BlockId,
+    batch::{BatchCommitment, CheckPoint, SignedBatchCommitment},
     sync_event::SyncEvent,
 };
 use bitcoin::{consensus::serialize, hashes::Hash, Block};
@@ -87,9 +86,8 @@ where
             csm_ctl.submit_event(ev)?;
 
             // Check for da batch and send event accordingly
-            let batch = check_for_da_batch(&blockdata);
-            if !batch.is_empty() {
-                let ev = SyncEvent::L1DABatch(height, batch);
+            if let Some(checkpoint) = check_for_da_batch(&blockdata) {
+                let ev = SyncEvent::L1DABatch(height, checkpoint);
                 csm_ctl.submit_event(ev)?;
             }
 
@@ -101,7 +99,7 @@ where
 }
 
 /// Parses inscriptions and checks for batch data in the transactions
-fn check_for_da_batch(blockdata: &BlockData) -> Vec<L2BlockId> {
+fn check_for_da_batch(blockdata: &BlockData) -> Option<CheckPoint> {
     let txs = blockdata
         .relevant_tx_idxs()
         .iter()
@@ -138,10 +136,7 @@ fn check_for_da_batch(blockdata: &BlockData) -> Vec<L2BlockId> {
 
     // We only care about the last found commitment in a block. We'll most likely have only one
     // commmitment in a block, but still
-    if let Some(commitment) = commitments.last() {
-        return vec![*commitment.l2_blockid()];
-    }
-    Vec::default()
+    commitments.last().map(|c| c.checkpoint().clone())
 }
 
 /// Given a block, generates a manifest of the parts we care about that we can

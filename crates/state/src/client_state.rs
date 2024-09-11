@@ -6,7 +6,7 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use crate::{batch::CheckPointInfo, id::L2BlockId, l1::L1BlockId};
+use crate::{batch::CheckPoint, id::L2BlockId, l1::L1BlockId};
 
 /// High level client's state of the network.  This is local to the client, not
 /// coordinated as part of the L2 chain.
@@ -42,7 +42,7 @@ impl ClientState {
         Self {
             chain_active: false,
             sync_state: None,
-            local_l1_view: LocalL1State::new(horizon_l1_height, 0),
+            local_l1_view: LocalL1State::new(horizon_l1_height),
             horizon_l1_height,
             genesis_l1_height,
         }
@@ -161,9 +161,8 @@ pub struct LocalL1State {
     /// Next L1 block height we expect to receive
     pub(super) next_expected_block: u64,
 
-    /// Next checkpoint that we expect to see. This should ideally be None for full nodes and Some
-    /// for sequencer, because full nodes don't need to create checkpoints
-    pub(super) next_checkpoint_info: Option<CheckPointInfoWithStatus>,
+    /// Last checkpoint that we expect to see.
+    pub(super) last_checkpoint_state: Option<CheckPointWithState>,
 }
 
 impl LocalL1State {
@@ -172,25 +171,15 @@ impl LocalL1State {
     /// # Panics
     ///
     /// If we try to construct it in a way that implies we don't have the L1 genesis block.
-    pub fn new(next_expected_block: u64, next_checkpoint_idx: u64) -> Self {
+    pub fn new(next_expected_block: u64) -> Self {
         if next_expected_block == 0 {
             panic!("clientstate: tried to construct without known L1 genesis block");
         }
 
-        let checkpt_info = CheckPointInfo::new(
-            next_checkpoint_idx,
-            next_expected_block..=next_expected_block,
-            0..=0, // Maybe this should also come from arguments
-        );
-        let next_checkpoint_info = Some(CheckPointInfoWithStatus::new_finalized(
-            checkpt_info,
-            next_expected_block - 1,
-        ));
-
         Self {
             local_unaccepted_blocks: Vec::new(),
             next_expected_block,
-            next_checkpoint_info,
+            last_checkpoint_state: None,
         }
     }
 
@@ -229,37 +218,40 @@ impl LocalL1State {
         self.local_unaccepted_blocks().last()
     }
 
-    pub fn next_checkpoint_info(&self) -> Option<&CheckPointInfoWithStatus> {
-        self.next_checkpoint_info.as_ref()
+    pub fn last_checkpoint_state(&self) -> Option<&CheckPointWithState> {
+        self.last_checkpoint_state.as_ref()
     }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
-pub struct CheckPointInfoWithStatus {
-    pub info: CheckPointInfo,
-    pub prev_checkpoint_l1_height: u64,
-    pub prev_checkpoint_status: CheckpointStatus,
+pub struct CheckPointWithState {
+    /// The inner checkpoint info
+    pub checkpoint: CheckPoint,
+    /// L1 block height it appears in
+    pub height: u64,
+    /// Whether it is confirmed or finalized
+    pub status: CheckpointStatus,
 }
 
-impl CheckPointInfoWithStatus {
-    pub fn new_confirmed(info: CheckPointInfo, prev_checkpoint_l1_height: u64) -> Self {
+impl CheckPointWithState {
+    pub fn new_confirmed(info: CheckPoint, height: u64) -> Self {
         Self {
-            info,
-            prev_checkpoint_l1_height,
-            prev_checkpoint_status: CheckpointStatus::Confirmed,
+            checkpoint: info,
+            height,
+            status: CheckpointStatus::Confirmed,
         }
     }
 
-    pub fn new_finalized(info: CheckPointInfo, prev_checkpoint_l1_height: u64) -> Self {
+    pub fn new_finalized(info: CheckPoint, height: u64) -> Self {
         Self {
-            info,
-            prev_checkpoint_l1_height,
-            prev_checkpoint_status: CheckpointStatus::Finalized,
+            checkpoint: info,
+            height,
+            status: CheckpointStatus::Finalized,
         }
     }
 
     pub fn set_finalized(&mut self) {
-        self.prev_checkpoint_status = CheckpointStatus::Finalized;
+        self.status = CheckpointStatus::Finalized;
     }
 }
 
