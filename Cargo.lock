@@ -3850,6 +3850,7 @@ dependencies = [
  "anyhow",
  "argh",
  "async-trait",
+ "bincode",
  "express-prover-client-rpc-api",
  "express-risc0-adapter",
  "express-sp1-adapter",
