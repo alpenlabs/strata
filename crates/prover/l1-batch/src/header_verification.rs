@@ -162,13 +162,13 @@ pub fn get_difficulty_adjustment_height(idx: u32, start: u32, params: &PowParams
 
 #[cfg(test)]
 mod tests {
-    use alpen_test_utils::bitcoin::{get_btc_chain, BtcChain};
+    use alpen_test_utils::bitcoin::{get_btc_chain, BtcChainSegment};
     use bitcoin::params::Params;
     use rand::Rng;
 
     use super::*;
 
-    fn for_block(block_height: u32, chain: &BtcChain) -> HeaderVerificationState {
+    fn for_block(block_height: u32, chain: &BtcChainSegment) -> HeaderVerificationState {
         let params = PowParams::from(&Params::MAINNET);
 
         // Get the first difficulty adjustment block after `chain.start`
@@ -212,7 +212,7 @@ mod tests {
     #[test]
     fn test_blocks() {
         let params = PowParams::from(&Params::MAINNET);
-        let chain: BtcChain = get_btc_chain(Params::MAINNET);
+        let chain: BtcChainSegment = get_btc_chain(Params::MAINNET);
         let h1 = get_difficulty_adjustment_height(1, chain.start, &params);
         let r1 = rand::thread_rng().gen_range(h1..chain.end);
         let mut verification_state = for_block(r1, &chain);

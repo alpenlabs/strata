@@ -52,14 +52,14 @@ pub fn get_difficulty_adjustment_height(
     ((start / difficulty_adjustment_interval) + idx) * difficulty_adjustment_interval
 }
 
-pub struct BtcChain {
+pub struct BtcChainSegment {
     pub params: Params,
     pub headers: Vec<Header>,
     pub start: u32,
     pub end: u32,
 }
 
-impl BtcChain {
+impl BtcChainSegment {
     /// Retrieves the block header at the specified height.
     pub fn get_header(&self, height: u32) -> Header {
         assert!(
@@ -116,7 +116,7 @@ impl BtcChain {
     }
 }
 
-pub fn get_btc_chain(params: Params) -> BtcChain {
+pub fn get_btc_chain(params: Params) -> BtcChainSegment {
     let buffer = include_bytes!("../data/mainnet_blocks_40000-50000.raw");
 
     let chunk_size = Header::SIZE;
@@ -129,7 +129,7 @@ pub fn get_btc_chain(params: Params) -> BtcChain {
         headers.push(header);
     }
 
-    BtcChain {
+    BtcChainSegment {
         params,
         headers,
         start: 40_000,
