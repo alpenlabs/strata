@@ -32,7 +32,7 @@ members = [
   "crates/status",
   "crates/test-utils",
   "crates/util/mmr",
-  "crates/util/credential",
+  "crates/util/signature",
   "crates/vtxjmt",
   "proofs/risc0",
   "proofs/sp1",
@@ -48,7 +48,6 @@ default-members = ["bin/bridge-client", "reth", "sequencer"]
 resolver = "2"
 
 [workspace.dependencies]
-alpen-express-block-credential = { path = "crates/util/credential", default-features = false }
 alpen-express-btcio = { path = "crates/btcio" }
 alpen-express-common = { path = "crates/common" }
 alpen-express-consensus-logic = { path = "crates/consensus-logic" }
@@ -60,6 +59,7 @@ alpen-express-primitives = { path = "crates/primitives" }
 alpen-express-rocksdb = { path = "crates/rocksdb-store" }
 alpen-express-rpc-api = { path = "crates/rpc/api" }
 alpen-express-rpc-types = { path = "crates/rpc/types" }
+alpen-express-sig-utils = { path = "crates/util/signature", default-features = false }
 alpen-express-state = { path = "crates/state" }
 alpen-express-status = { path = "crates/status" }
 alpen-test-utils = { path = "crates/test-utils" }
@@ -76,7 +76,7 @@ express-reth-rpc = { path = "crates/reth/rpc" }
 express-rpc-utils = { path = "crates/rpc/utils" }
 express-storage = { path = "crates/storage" }
 express-tasks = { path = "crates/tasks" }
-express-zkvm = { path = "crates/prover/zkvm" }                                                 # FIXME make these names more consistent?
+express-zkvm = { path = "crates/prover/zkvm" }                                         # FIXME make these names more consistent?
 zkvm = { path = "crates/prover/zkvm" }
 zkvm-primitives = { path = "crates/prover/primitives" }
 

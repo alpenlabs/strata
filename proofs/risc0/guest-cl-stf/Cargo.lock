@@ -144,17 +144,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "alpen-express-block-credential"
-version = "0.1.0"
-dependencies = [
- "alpen-express-primitives",
- "alpen-express-state",
- "borsh",
- "secp256k1",
- "sha2",
-]
-
-[[package]]
 name = "alpen-express-primitives"
 version = "0.1.0"
 dependencies = [
@@ -171,10 +160,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "alpen-express-sig-utils"
+version = "0.1.0"
+dependencies = [
+ "alpen-express-primitives",
+ "borsh",
+ "secp256k1",
+ "sha2",
+]
+
+[[package]]
 name = "alpen-express-state"
 version = "0.1.0"
 dependencies = [
  "alpen-express-primitives",
+ "alpen-express-sig-utils",
  "arbitrary",
  "bitcoin",
  "borsh",
@@ -1029,8 +1029,8 @@ dependencies = [
 name = "express-cl-stf"
 version = "0.1.0"
 dependencies = [
- "alpen-express-block-credential",
  "alpen-express-primitives",
+ "alpen-express-sig-utils",
  "alpen-express-state",
  "borsh",
  "express-chaintsn",

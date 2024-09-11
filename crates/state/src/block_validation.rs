@@ -1,7 +1,11 @@
-use alpen_express_primitives::hash;
+use alpen_express_primitives::{block_credential::CredRule, buf::Buf32, hash, params::Params};
+use alpen_express_sig_utils::verify_schnorr_sig;
 use tracing::warn;
 
-use crate::{block::L2Block, header::L2Header};
+use crate::{
+    block::L2Block,
+    header::{L2Header, SignedL2BlockHeader},
+};
 
 pub fn validate_block_segments(block: &L2Block) -> bool {
     // Check if the l1_segment_hash matches between L2Block and L2BlockHeader
@@ -21,4 +25,16 @@ pub fn validate_block_segments(block: &L2Block) -> bool {
     }
 
     true
+}
+
+pub fn check_block_credential(header: &SignedL2BlockHeader, params: &Params) -> bool {
+    let sigcom = compute_header_sig_commitment(header);
+    match &params.rollup().cred_rule {
+        CredRule::Unchecked => true,
+        CredRule::SchnorrKey(pubkey) => verify_schnorr_sig(header.sig(), &sigcom, pubkey),
+    }
+}
+
+fn compute_header_sig_commitment(header: &SignedL2BlockHeader) -> Buf32 {
+    header.get_blockid().into()
 }

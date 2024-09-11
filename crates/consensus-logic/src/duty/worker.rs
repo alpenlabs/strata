@@ -6,7 +6,6 @@ use std::{
     time,
 };
 
-use alpen_express_block_credential::sign_schnorr_sig;
 use alpen_express_btcio::writer::InscriptionHandle;
 use alpen_express_db::traits::*;
 use alpen_express_eectl::engine::ExecEngineCtl;
@@ -14,6 +13,7 @@ use alpen_express_primitives::{
     buf::{Buf32, Buf64},
     params::Params,
 };
+use alpen_express_sig_utils::sign_schnorr_sig;
 use alpen_express_state::{
     batch::{BatchCommitment, SignedBatchCommitment},
     client_state::ClientState,

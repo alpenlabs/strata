@@ -2,7 +2,6 @@
 
 use std::sync::Arc;
 
-use alpen_express_block_credential;
 use alpen_express_db::{
     errors::DbError,
     traits::{BlockStatus, ChainstateProvider, ChainstateStore, Database},
@@ -442,7 +441,8 @@ fn check_new_block<D: Database>(
     let params = state.params.as_ref();
 
     // Check that the block is correctly signed.
-    let cred_ok = alpen_express_block_credential::check_block_credential(block.header(), params);
+    let cred_ok =
+        alpen_express_state::block_validation::check_block_credential(block.header(), params);
     if !cred_ok {
         warn!(?blkid, "block has invalid credential");
         return Ok(false);
