@@ -13,6 +13,15 @@ pub enum Witness {
     ClBlock(CLBlockWitness),
 }
 
+impl Witness {
+    pub fn get_vm_id(&self) -> u8 {
+        match self {
+            Witness::ElBlock(witness) => witness.get_vm_id(),
+            Witness::ClBlock(witness) => witness.get_vm_id(),
+        }
+    }
+}
+
 impl Default for Witness {
     fn default() -> Self {
         Witness::ElBlock(ELBlockWitness::default())
@@ -24,9 +33,21 @@ pub struct ELBlockWitness {
     pub data: Vec<u8>,
 }
 
+impl ELBlockWitness {
+    pub fn get_vm_id(&self) -> u8 {
+        0
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct CLBlockWitness {
     pub data: Vec<u8>,
+}
+
+impl CLBlockWitness {
+    pub fn get_vm_id(&self) -> u8 {
+        1
+    }
 }
 
 // #[derive(Clone)]
