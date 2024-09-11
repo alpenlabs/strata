@@ -1,4 +1,10 @@
 fn main() {
+    std::env::set_var("CC", "clang");
+    std::env::set_var(
+        "CFLAGS_riscv32im_risc0_zkvm_elf",
+        "-target riscv32-unknown-elf",
+    );
+
     if cfg!(feature = "prover")
         && std::env::var("SKIP_GUEST_BUILD").is_err()
         && std::env::var("CARGO_CFG_CLIPPY").is_err()
@@ -12,6 +18,7 @@ fn main() {
 
         let elf = r#"
             pub const RETH_RISC0_ELF: &[u8] = &[];
+            pub const ALPEN_BTC_BLOCKSPACE_RISC0_PROOF_ELF: &[u8] = &[];
         "#;
 
         std::fs::write(methods_path, elf).expect("Failed to write mock rollup elf");

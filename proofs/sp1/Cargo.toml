@@ -12,13 +12,12 @@ express-sp1-adapter = { path = "../../crates/prover/adapters/sp1", features = [
 sp1-helper = "1.0.1"
 
 [dev-dependencies]
+alpen-test-utils = { workspace = true }
+bitcoin = { workspace = true }
+btc-blockspace = { workspace = true }
 bincode = { workspace = true }
 express-zkvm = { workspace = true }
 zkvm-primitives = { workspace = true }
-
-
-[package.metadata.risc0]
-methods = ["guest-reth-stf"]
 
 [features]
 default = []

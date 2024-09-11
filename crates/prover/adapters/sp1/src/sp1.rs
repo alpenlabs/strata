@@ -19,14 +19,29 @@ impl ZKVMHost for SP1Host {
         }
     }
 
-    fn prove<T: serde::Serialize>(&self, input: T) -> anyhow::Result<(Proof, VerifcationKey)> {
+    fn prove<T: serde::Serialize>(
+        &self,
+        inputs: &[T],
+        serialized_inputs: Option<&[Vec<u8>]>,
+    ) -> anyhow::Result<(Proof, VerifcationKey)> {
         // Init the prover
+        if self.prover_options.use_mock_prover {
+            std::env::set_var("SP1_PROVER", "mock");
+        }
         let client = ProverClient::new();
         let (pk, vk) = client.setup(&self.elf);
 
         // Setup the I/O
         let mut stdin = SP1Stdin::new();
-        stdin.write(&input);
+
+        for input in inputs {
+            stdin.write(&input);
+        }
+        if let Some(serialized_inputs) = serialized_inputs {
+            for serialized_input in serialized_inputs {
+                stdin.write_slice(serialized_input);
+            }
+        }
 
         // Start proving
         let mut prover = client.prove(&pk, stdin);
@@ -112,7 +127,9 @@ mod tests {
         let zkvm = SP1Host::init(TEST_ELF.to_vec(), ProverOptions::default());
 
         // assert proof generation works
-        let (proof, vk) = zkvm.prove(input).expect("Failed to generate proof");
+        let (proof, vk) = zkvm
+            .prove(&[input], None)
+            .expect("Failed to generate proof");
 
         // assert proof verification works
         SP1Verifier::verify(&vk, &proof).expect("Proof verification failed");
@@ -133,7 +150,9 @@ mod tests {
         let zkvm = SP1Host::init(TEST_ELF.to_vec(), ProverOptions::default());
 
         // assert proof generation works
-        let (proof, vk) = zkvm.prove(input).expect("Failed to generate proof");
+        let (proof, vk) = zkvm
+            .prove(&[input], None)
+            .expect("Failed to generate proof");
 
         // assert proof verification works
         SP1Verifier::verify_with_public_params(&vk, input, &proof)

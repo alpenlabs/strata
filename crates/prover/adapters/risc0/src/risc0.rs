@@ -33,13 +33,28 @@ impl ZKVMHost for RiscZeroHost {
         }
     }
 
-    fn prove<T: serde::Serialize>(&self, item: T) -> anyhow::Result<(Proof, VerifcationKey)> {
+    fn prove<T: serde::Serialize>(
+        &self,
+        items: &[T],
+        serialized_items: Option<&[Vec<u8>]>,
+    ) -> anyhow::Result<(Proof, VerifcationKey)> {
         if self.prover_options.use_mock_prover {
             std::env::set_var("RISC0_DEV_MODE", "true");
         }
 
+        let mut env_builder = ExecutorEnv::builder();
+        for item in items {
+            env_builder.write(item)?;
+        }
+        if let Some(serialized_items) = serialized_items {
+            for serialized_item in serialized_items {
+                env_builder.write(&(serialized_item.len() as u32))?;
+                env_builder.write_slice(serialized_item);
+            }
+        }
+        let env = env_builder.build()?;
+
         // Setup the prover
-        let env = ExecutorEnv::builder().write(&item)?.build()?;
         let opts = self.determine_prover_options();
         let prover = get_prover_server(&opts)?;
 
@@ -119,7 +134,9 @@ mod tests {
         let zkvm = RiscZeroHost::init(TEST_ELF.to_vec(), ProverOptions::default());
 
         // assert proof generation works
-        let (proof, vk) = zkvm.prove(input).expect("Failed to generate proof");
+        let (proof, vk) = zkvm
+            .prove(&[input], None)
+            .expect("Failed to generate proof");
 
         // assert proof verification works
         Risc0Verifier::verify(&vk, &proof).expect("Proof verification failed");
@@ -136,7 +153,9 @@ mod tests {
         let zkvm = RiscZeroHost::init(TEST_ELF.to_vec(), ProverOptions::default());
 
         // assert proof generation works
-        let (proof, vk) = zkvm.prove(input).expect("Failed to generate proof");
+        let (proof, vk) = zkvm
+            .prove(&[input], None)
+            .expect("Failed to generate proof");
 
         // assert proof verification works
         Risc0Verifier::verify_with_public_params(&vk, input, &proof)

@@ -1,0 +1,15 @@
+[package]
+edition = "2021"
+name = "btc-blockspace"
+version = "0.1.0"
+
+[dependencies]
+alpen-express-primitives = { workspace = true }
+bitcoin = { workspace = true, features = ["serde"] }
+serde = { workspace = true, features = ["derive"] }
+sha2.workspace = true
+
+[dev-dependencies]
+alpen-test-utils.workspace = true
+hex.workspace = true
+rand.workspace = true
