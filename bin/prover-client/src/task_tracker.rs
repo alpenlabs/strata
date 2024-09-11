@@ -25,6 +25,7 @@ impl TaskTracker {
         let mut tasks = self.tasks.lock().await;
         tasks.push(task);
         task_id
+        // todo: update task scheduler
     }
 
     pub async fn update_task_status(&self, task_id: Uuid, status: TaskStatus) {
@@ -32,6 +33,7 @@ impl TaskTracker {
         if let Some(task) = tasks.iter_mut().find(|t| t.id == task_id) {
             task.status = status;
         }
+        // todo: update task scheduler
     }
 
     pub async fn get_pending_task(&self) -> Option<Task> {

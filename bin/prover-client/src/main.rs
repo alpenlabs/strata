@@ -6,18 +6,18 @@ use alpen_express_common::logging;
 use args::Args;
 use express_risc0_adapter::RiscZeroHost;
 use express_zkvm::{ProverOptions, ZKVMHost};
+use manager::ProvingManager;
 use models::{ProofGenConfig, RpcContext};
 use rpc_server::ProverClientRpc;
 use task_tracker::TaskTracker;
 use tracing::info;
-use worker::consumer_worker;
 
 mod args;
+pub(crate) mod manager;
 pub(crate) mod models;
 pub(crate) mod proving;
 pub(crate) mod rpc_server;
 pub(crate) mod task_tracker;
-pub(crate) mod worker;
 
 #[tokio::main]
 async fn main() {
@@ -34,11 +34,14 @@ async fn main() {
 
     let vm_map = get_zkvms();
     let cfg = Arc::new(ProofGenConfig::Skip);
+    let num_threads = 3;
 
-    let prover: proving::Prover<RiscZeroHost> = proving::Prover::new(3, vm_map, cfg);
-
-    // Spawn consumer worker
-    tokio::spawn(consumer_worker(Arc::clone(&task_tracker), prover));
+    let prover: proving::Prover<RiscZeroHost> = proving::Prover::new(num_threads, vm_map, cfg);
+    let manager = ProvingManager::new(task_tracker.clone(), prover);
+    // run prover manager in background
+    tokio::spawn(async move {
+        manager.run().await;
+    });
 
     let rpc_url = args.get_rpc_url();
     run_rpc_server(rpc_context, rpc_url)

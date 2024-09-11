@@ -50,14 +50,6 @@ impl CLBlockWitness {
     }
 }
 
-// #[derive(Clone)]
-// pub enum Proof {
-//     /// Only public input was generated.
-//     PublicInput(Vec<u8>),
-//     /// The serialized ZK proof.
-//     Full(Vec<u8>),
-// }
-
 /// Represents the possible modes of execution for a zkVM program
 pub enum ProofGenConfig {
     /// Skips proving.
@@ -86,17 +78,6 @@ pub enum ProofSubmissionStatus {
     Success,
     /// Indicates that proof generation is currently in progress.
     ProofGenerationInProgress,
-}
-
-/// An error that occurred during ZKP proving.
-#[derive(Error, Debug)]
-pub enum ProverServiceError {
-    /// Prover is too busy.
-    #[error("Prover is too busy")]
-    ProverBusy,
-    /// Some internal prover error.
-    #[error(transparent)]
-    Other(#[from] anyhow::Error),
 }
 
 /// Represents the current status of proof generation.

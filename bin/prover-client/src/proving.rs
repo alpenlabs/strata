@@ -10,11 +10,11 @@ use alpen_express_rocksdb::{
     DbOpsConfig,
 };
 use express_zkvm::{Proof, ZKVMHost};
+use rockbound::rocksdb::{self};
 use uuid::Uuid;
 
 use crate::models::{
-    ProofGenConfig, ProofProcessingStatus, ProofSubmissionStatus, ProverServiceError, Witness,
-    WitnessSubmissionStatus,
+    ProofGenConfig, ProofProcessingStatus, ProofSubmissionStatus, Witness, WitnessSubmissionStatus,
 };
 
 enum ProverStatus {
@@ -147,7 +147,7 @@ impl<Vm: ZKVMHost> Prover<Vm> {
     pub(crate) fn start_proving(
         &self,
         task_id: Uuid,
-    ) -> Result<ProofProcessingStatus, ProverServiceError>
+    ) -> Result<ProofProcessingStatus, anyhow::Error>
     where
         Vm: ZKVMHost + 'static,
     {
@@ -186,15 +186,15 @@ impl<Vm: ZKVMHost> Prover<Vm> {
                     Ok(ProofProcessingStatus::Busy)
                 }
             }
-            ProverStatus::ProvingInProgress => {
-                Err(anyhow::anyhow!("Proof generation for {:?} still in progress", task_id).into())
-            }
+            ProverStatus::ProvingInProgress => Err(anyhow::anyhow!(
+                "Proof generation for {:?} still in progress",
+                task_id
+            )),
             ProverStatus::Proved(_) => Err(anyhow::anyhow!(
                 "Witness for task id {:?}, submitted multiple times.",
                 task_id,
-            )
-            .into()),
-            ProverStatus::Err(e) => Err(e.into()),
+            )),
+            ProverStatus::Err(e) => Err(e),
         }
     }
 
