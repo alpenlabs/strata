@@ -18,6 +18,7 @@ pub(crate) mod models;
 pub(crate) mod proving;
 pub(crate) mod rpc_server;
 pub(crate) mod task_tracker;
+// include!("methods.rs");
 
 #[tokio::main]
 async fn main() {
@@ -33,7 +34,7 @@ async fn main() {
     );
 
     let vm_map = get_zkvms();
-    let cfg = Arc::new(ProofGenConfig::Skip);
+    let cfg = Arc::new(ProofGenConfig::Execute);
     let num_threads = 3;
 
     let prover: proving::Prover<RiscZeroHost> = proving::Prover::new(num_threads, vm_map, cfg);
@@ -57,8 +58,7 @@ async fn run_rpc_server(rpc_context: RpcContext, rpc_url: String) -> anyhow::Res
 
 fn get_zkvms() -> HashMap<u8, RiscZeroHost> {
     let mut vm_map: HashMap<u8, RiscZeroHost> = HashMap::new();
-    let guest_code = vec![];
-    vm_map.insert(0, RiscZeroHost::init(guest_code, ProverOptions::default()));
+    vm_map.insert(0, RiscZeroHost::init(vec![], ProverOptions::default()));
     vm_map.insert(1, RiscZeroHost::init(vec![], ProverOptions::default()));
     vm_map.insert(2, RiscZeroHost::init(vec![], ProverOptions::default()));
     vm_map

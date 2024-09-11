@@ -232,6 +232,7 @@ cython_debug/
 # functional test folders
 _dd/
 rocksdb/
+rocksdb_prover/
 
 # PyCharm
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can

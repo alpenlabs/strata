@@ -13,7 +13,7 @@ use tokio::sync::oneshot;
 use tracing::{info, warn};
 use zkvm_primitives::ZKVMInput;
 
-use crate::models::{RpcContext, Witness};
+use crate::models::{ELBlockWitness, RpcContext, Witness};
 
 pub(crate) async fn start<T>(rpc_impl: &T, rpc_url: String) -> anyhow::Result<()>
 where
@@ -62,7 +62,7 @@ impl ProverClientRpc {
 impl ExpressProverClientApiServerServer for ProverClientRpc {
     async fn prove_el_block(&self, el_block_num: u64) -> RpcResult<()> {
         // TODO: handle the unwrap here
-        let el_block_witness = self
+        let _zkvm_input = self
             .fetch_el_block_witness(el_block_num)
             .await
             .expect("Failed to get th el block witness from the reth rpc");
@@ -70,12 +70,11 @@ impl ExpressProverClientApiServerServer for ProverClientRpc {
         // Create a new proving task
         {
             let task_tracker = Arc::clone(&self.context.task_tracker);
-            let task_id = task_tracker
-                .create_task(
-                    el_block_num,
-                    crate::models::Witness::ElBlock(Default::default()),
-                )
-                .await;
+            let witness_vec = bincode::serialize(&_zkvm_input).unwrap();
+            let el_block_witness = ELBlockWitness { data: witness_vec };
+            let witness = Witness::ElBlock(el_block_witness);
+
+            let task_id = task_tracker.create_task(el_block_num, witness).await;
             info!("ProverClientRpc: prove_el_block create_task: {}", task_id);
         }
 
