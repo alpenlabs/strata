@@ -101,9 +101,9 @@ pub struct SyncState {
     /// Last L2 block we've chosen as the current tip.
     pub(super) tip_blkid: L2BlockId,
 
-    /// L2 blocks that have been confirmed on L1 and proven along with L1 block height.
+    /// L2 checkpoint blocks that have been confirmed on L1 and proven along with L1 block height.
     /// These are ordered by height
-    pub(super) confirmed_blocks: Vec<(L1BlockHeight, L2BlockId)>,
+    pub(super) confirmed_checkpoint_blocks: Vec<(L1BlockHeight, L2BlockId)>,
 
     /// L2 block that's been finalized on L1 and proven
     pub(super) finalized_blkid: L2BlockId,
@@ -115,7 +115,7 @@ impl SyncState {
     pub fn from_genesis_blkid(gblkid: L2BlockId) -> Self {
         Self {
             tip_blkid: gblkid,
-            confirmed_blocks: Vec::new(),
+            confirmed_checkpoint_blocks: Vec::new(),
             finalized_blkid: gblkid,
         }
     }
@@ -128,12 +128,13 @@ impl SyncState {
         &self.finalized_blkid
     }
 
-    pub fn confirmed_blocks(&self) -> &[(u64, L2BlockId)] {
-        &self.confirmed_blocks
+    pub fn confirmed_checkpoint_blocks(&self) -> &[(u64, L2BlockId)] {
+        &self.confirmed_checkpoint_blocks
     }
 
-    pub fn get_confirmed_block_at(&self, l1_height: u64) -> Option<L2BlockId> {
-        self.confirmed_blocks
+    /// See if there's a checkpoint block at given l1_height
+    pub fn get_confirmed_checkpt_block_at(&self, l1_height: u64) -> Option<L2BlockId> {
+        self.confirmed_checkpoint_blocks
             .iter()
             .find(|(h, _)| *h == l1_height)
             .map(|e| e.1)

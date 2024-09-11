@@ -73,7 +73,7 @@ pub fn process_event<D: Database>(
                 let to_finalize_blkid = state
                     .sync()
                     .expect("sync state should be set")
-                    .get_confirmed_block_at(maturable_height);
+                    .get_confirmed_checkpt_block_at(maturable_height);
 
                 if let Some(blkid) = to_finalize_blkid {
                     writes.push(ClientStateWrite::UpdateFinalized(blkid));

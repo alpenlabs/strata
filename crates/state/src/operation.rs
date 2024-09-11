@@ -128,8 +128,12 @@ pub fn apply_writes_to_state(
 
                 // Remove confirmed blocks that are above the block_height
                 let ss = state.expect_sync_mut();
-                if let Some(pos) = ss.confirmed_blocks.iter().position(|e| e.0 > block_height) {
-                    ss.confirmed_blocks.drain(pos..);
+                if let Some(pos) = ss
+                    .confirmed_checkpoint_blocks
+                    .iter()
+                    .position(|e| e.0 > block_height)
+                {
+                    ss.confirmed_checkpoint_blocks.drain(pos..);
                 }
             }
 
@@ -180,7 +184,7 @@ pub fn apply_writes_to_state(
 
             UpdateConfirmed(l1height, blkid) => {
                 let ss = state.expect_sync_mut();
-                ss.confirmed_blocks.push((l1height, blkid));
+                ss.confirmed_checkpoint_blocks.push((l1height, blkid));
             }
         }
     }
@@ -189,7 +193,7 @@ pub fn apply_writes_to_state(
 fn update_finalized(state: &mut ClientState, blkid: L2BlockId) {
     let ss = state.expect_sync_mut();
     let fin_pos = ss
-        .confirmed_blocks
+        .confirmed_checkpoint_blocks
         .iter()
         .position(|(_, bid)| *bid == blkid)
         .unwrap_or_else(|| {
@@ -198,8 +202,8 @@ fn update_finalized(state: &mut ClientState, blkid: L2BlockId) {
                 blkid
             )
         });
-    ss.finalized_blkid = ss.confirmed_blocks[fin_pos].1;
+    ss.finalized_blkid = ss.confirmed_checkpoint_blocks[fin_pos].1;
 
     // Remove all the blocks before the blkid since they are finalized
-    ss.confirmed_blocks.drain(..fin_pos + 1);
+    ss.confirmed_checkpoint_blocks.drain(..fin_pos + 1);
 }
