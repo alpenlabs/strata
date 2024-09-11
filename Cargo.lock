@@ -10462,7 +10462,6 @@ dependencies = [
  "bitcoin",
  "borsh",
  "btc-blockspace",
- "btc-headerchain",
  "express-chaintsn",
  "express-risc0-adapter",
  "express-zkvm",
@@ -11611,6 +11610,8 @@ dependencies = [
  "btc-blockspace",
  "express-sp1-adapter",
  "express-zkvm",
+ "hex",
+ "l1-batch",
  "sp1-helper",
  "zkvm-primitives",
 ]

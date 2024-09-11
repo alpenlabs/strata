@@ -7,6 +7,7 @@ members = [
   "crates/chaintsn",
   "crates/common",
   "crates/consensus-logic",
+  "crates/crypto",
   "crates/db",
   "crates/eectl",
   "crates/evmexec",
@@ -14,10 +15,10 @@ members = [
   "crates/prover/adapters/risc0",
   "crates/prover/adapters/sp1",
   "crates/prover/btc-blockspace",
+  "crates/prover/cl-stf",
   "crates/prover/l1-batch",
   "crates/prover/primitives",
   "crates/prover/zkvm",
-  "crates/prover/cl-stf",
   "crates/reth/db",
   "crates/reth/exex",
   "crates/reth/node",
@@ -27,13 +28,12 @@ members = [
   "crates/rpc/types",
   "crates/rpc/utils",
   "crates/state",
+  "crates/status",
   "crates/storage",
   "crates/sync",
   "crates/tasks",
-  "crates/status",
   "crates/test-utils",
   "crates/util/mmr",
-  "crates/crypto",
   "crates/vtxjmt",
   "proofs/risc0",
   "proofs/sp1",
@@ -78,7 +78,7 @@ express-rpc-utils = { path = "crates/rpc/utils" }
 express-storage = { path = "crates/storage" }
 express-sync = { path = "crates/sync" }
 express-tasks = { path = "crates/tasks" }
-express-zkvm = { path = "crates/prover/zkvm" }                      # FIXME make these names more consistent?
+express-zkvm = { path = "crates/prover/zkvm" }                              # FIXME make these names more consistent?
 l1-batch = { path = "crates/prover/l1-batch" }
 zkvm-primitives = { path = "crates/prover/primitives" }
 

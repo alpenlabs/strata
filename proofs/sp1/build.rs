@@ -6,7 +6,12 @@ use std::{
 use sp1_helper::build_program;
 
 const RISC_V_COMPILER: &str = "/opt/riscv/bin/riscv-none-elf-gcc";
-const PROGRAMS_TO_BUILD: [&str; 3] = ["guest-reth-stf", "guest-cl-stf", "guest-btc-blockspace"];
+const PROGRAMS_TO_BUILD: [&str; 4] = [
+    "guest-reth-stf",
+    "guest-cl-stf",
+    "guest-btc-blockspace",
+    "guest-l1-batch",
+];
 
 fn main() {
     let guest_programs = get_guest_programs();
