@@ -3,6 +3,7 @@ use std::sync::Arc;
 use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use zkvm_primitives::ZKVMInput;
 
 use crate::task_tracker::TaskTracker;
 

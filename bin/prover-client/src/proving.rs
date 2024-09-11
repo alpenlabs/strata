@@ -1,6 +1,8 @@
 use std::{
     collections::{hash_map::Entry, HashMap},
+    fs,
     ops::Deref,
+    path::PathBuf,
     sync::{Arc, RwLock},
 };
 
@@ -13,6 +15,7 @@ use express_zkvm::{Proof, ZKVMHost};
 use rockbound::rocksdb::{self};
 use tracing::info;
 use uuid::Uuid;
+use zkvm_primitives::ZKVMInput;
 
 use crate::models::{
     ProofGenConfig, ProofProcessingStatus, ProofSubmissionStatus, Witness, WitnessSubmissionStatus,
@@ -94,7 +97,13 @@ where
 {
     match config.deref() {
         ProofGenConfig::Skip => Ok(Proof::new(Vec::default())),
-        ProofGenConfig::Execute => Ok(vm.prove(&[state_transition_data], None).unwrap().0),
+        ProofGenConfig::Execute => {
+            if let Witness::ElBlock(eb) = state_transition_data {
+                let el_input: ZKVMInput = bincode::deserialize(&eb.data).unwrap();
+                return Ok(vm.prove(&[el_input], None).unwrap().0);
+            }
+            todo!("manish will do")
+        }
         ProofGenConfig::Prover => Ok(vm.prove(&[state_transition_data], None).unwrap().0),
     }
 }
@@ -235,7 +244,7 @@ impl<Vm: ZKVMHost> Prover<Vm> {
 
 fn open_rocksdb_database() -> anyhow::Result<Arc<rockbound::OptimisticTransactionDB>> {
     let mut database_dir = PathBuf::default();
-    database_dir.push("rocksdb");
+    database_dir.push("rocksdb_prover");
 
     if !database_dir.exists() {
         fs::create_dir_all(&database_dir)?;
