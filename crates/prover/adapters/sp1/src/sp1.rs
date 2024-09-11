@@ -70,6 +70,9 @@ impl ZKVMHost for SP1Host {
 
         // Start proving
         let mut prover = client.prove(&pk, stdin);
+        if self.prover_options.enable_compression {
+            prover = prover.compressed();
+        }
         if self.prover_options.stark_to_snark_conversion {
             prover = prover.plonk();
         }

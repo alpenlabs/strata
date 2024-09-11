@@ -11549,6 +11549,8 @@ dependencies = [
  "btc-blockspace",
  "express-sp1-adapter",
  "express-zkvm",
+ "hex",
+ "l1-batch",
  "sp1-helper",
  "zkvm-primitives",
 ]
