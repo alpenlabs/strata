@@ -3,7 +3,7 @@
 use std::{
     collections::HashMap,
     sync::{Arc, RwLock},
-    time,
+    time::{self, Duration},
 };
 
 use alpen_express_btcio::writer::InscriptionHandle;
@@ -27,13 +27,15 @@ use tracing::*;
 
 use super::{
     block_assembly, extractor,
-    types::{self, Duty, DutyBatch, Identity, IdentityKey},
+    types::{self, BatchCommitmentDuty, Duty, DutyBatch, Identity, IdentityKey},
 };
 use crate::{
     errors::Error,
     message::{ClientUpdateNotif, ForkChoiceMessage},
     sync_manager::SyncManager,
 };
+
+const BATCH_POLL_INTERVAL: u64 = 5000; // millisecs
 
 pub fn duty_tracker_task<D: Database>(
     shutdown: ShutdownGuard,
@@ -210,6 +212,7 @@ struct DutyExecStatus {
 #[allow(clippy::too_many_arguments)] // FIXME
 pub fn duty_dispatch_task<
     D: Database + Sync + Send + 'static,
+    SD: SequencerDatabase + Sync + Send + 'static,
     E: ExecEngineCtl + Sync + Send + 'static,
 >(
     shutdown: ShutdownGuard,
@@ -218,6 +221,7 @@ pub fn duty_dispatch_task<
     ident_key: IdentityKey,
     sync_man: Arc<SyncManager>,
     database: Arc<D>,
+    seq_db: Arc<SD>,
     engine: Arc<E>,
     inscription_handle: Arc<InscriptionHandle>,
     pool: threadpool::ThreadPool,
@@ -283,12 +287,13 @@ pub fn duty_dispatch_task<
             let ik = ident_key.clone();
             let sm = sync_man.clone();
             let db = database.clone();
+            let sdb = seq_db.clone();
             let e = engine.clone();
             let da_writer = inscription_handle.clone();
             let params: Arc<Params> = params.clone();
             let duty_status_tx_l = duty_status_tx.clone();
             pool.execute(move || {
-                duty_exec_task(d, ik, sm, db, e, da_writer, params, duty_status_tx_l)
+                duty_exec_task(d, ik, sm, db, sdb, e, da_writer, params, duty_status_tx_l)
             });
             trace!(%id, "dispatched duty exec task");
             pending_duties_local.insert(id, ());
@@ -304,11 +309,12 @@ pub fn duty_dispatch_task<
 /// thread pool so we don't have to worry about it blocking *too* much other
 /// work.
 #[allow(clippy::too_many_arguments)] // TODO: fix this
-fn duty_exec_task<D: Database, E: ExecEngineCtl>(
+fn duty_exec_task<D: Database, E: ExecEngineCtl, SD: SequencerDatabase>(
     duty: Duty,
     ik: IdentityKey,
     sync_man: Arc<SyncManager>,
     database: Arc<D>,
+    seq_db: Arc<SD>,
     engine: Arc<E>,
     inscription_handle: Arc<InscriptionHandle>,
     params: Arc<Params>,
@@ -319,6 +325,7 @@ fn duty_exec_task<D: Database, E: ExecEngineCtl>(
         &ik,
         &sync_man,
         database.as_ref(),
+        seq_db.as_ref(),
         engine.as_ref(),
         inscription_handle.as_ref(),
         &params,
@@ -339,6 +346,7 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
     ik: &IdentityKey,
     sync_man: &SyncManager,
     database: &D,
+    seq_db: &impl SequencerDatabase,
     engine: &E,
     inscription_handle: &InscriptionHandle,
     params: &Arc<Params>,
@@ -387,7 +395,7 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
         Duty::CommitBatch(data) => {
             info!(data = ?data, "commit batch");
 
-            let commitment = poll_for_batch_commitment(database)?;
+            let commitment = poll_for_batch_commitment(seq_db, &data)?;
 
             let commitment_sighash = commitment.get_sighash();
             let signature = sign_with_identity_key(&commitment_sighash, ik);
@@ -412,9 +420,20 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
     }
 }
 
-fn poll_for_batch_commitment<D: Database>(_database: &D) -> Result<BatchCommitment, Error> {
-    // TODO: wait until batch proof is found in db
-    todo!()
+fn poll_for_batch_commitment(
+    seq_db: &impl SequencerDatabase,
+    duty: &BatchCommitmentDuty,
+) -> Result<BatchCommitment, Error> {
+    loop {
+        if let Some(commitment) = seq_db
+            .sequencer_provider()
+            .get_batch_commitment(duty.checkpoint_idx())?
+        {
+            return Ok(commitment);
+        }
+
+        std::thread::sleep(Duration::from_millis(BATCH_POLL_INTERVAL));
+    }
 }
 
 fn sign_with_identity_key(msg: &Buf32, ik: &IdentityKey) -> Buf64 {
