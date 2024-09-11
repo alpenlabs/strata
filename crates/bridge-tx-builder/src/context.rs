@@ -42,7 +42,7 @@ impl TxBuilder {
     /// Create a new [`TxBuilder`] with the context required to build transactions of various
     /// [`TxKind`].
     pub fn new(operator_pubkeys: PublickeyTable, network: Network) -> Self {
-        let aggregated_pubkey = get_aggregated_pubkey(&operator_pubkeys.into());
+        let aggregated_pubkey = get_aggregated_pubkey(operator_pubkeys);
 
         Self {
             aggregated_pubkey,

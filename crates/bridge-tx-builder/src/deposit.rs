@@ -246,14 +246,14 @@ impl DepositInfo {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::BTreeSet, str::FromStr};
+    use std::str::FromStr;
 
-    use alpen_express_primitives::buf::Buf20;
+    use alpen_express_primitives::{bridge::PublickeyTable, buf::Buf20};
     use alpen_test_utils::bridge::{generate_keypairs, generate_pubkey_table};
     use bitcoin::{
         hashes::{sha256, Hash},
         hex::{Case, DisplayHex},
-        secp256k1::{PublicKey, Secp256k1},
+        secp256k1::Secp256k1,
         taproot::{self, TaprootBuilder},
         Address, Network,
     };
@@ -273,7 +273,7 @@ mod tests {
         let deposit_request_outpoint = OutPoint::null();
 
         let (drt_output_address, take_back_leaf_hash) =
-            create_drt_taproot_output(&operator_pubkeys.clone().into());
+            create_drt_taproot_output(operator_pubkeys.clone());
 
         let tx_builder = TxBuilder::new(operator_pubkeys, Network::Regtest);
 
@@ -319,7 +319,7 @@ mod tests {
         );
     }
 
-    fn create_drt_taproot_output(pubkeys: &BTreeSet<PublicKey>) -> (Address, TapNodeHash) {
+    fn create_drt_taproot_output(pubkeys: PublickeyTable) -> (Address, TapNodeHash) {
         let aggregated_pubkey = get_aggregated_pubkey(pubkeys);
         let n_of_n_spend_script = n_of_n_script(&aggregated_pubkey);
 

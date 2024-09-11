@@ -1,0 +1,47 @@
+# Runs integration tests.
+
+name: Integration Tests
+
+on:
+  pull_request:
+  merge_group:
+  push:
+    branches: [master]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_LOG: debug
+  RUST_BACKTRACE: full
+
+jobs:
+  test:
+    name: Run integration tests and generate report
+    runs-on: ubuntu-latest
+    timeout-minutes: 40 # better fail-safe than the default 360 in github actions
+    steps:
+      - name: Cleanup space
+        # https://github.com/actions/runner-images/issues/2840#issuecomment-790492173
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /usr/local/.ghcup
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - name: Install latest nextest release
+        uses: taiki-e/install-action@v2
+        with:
+          tool: nextest
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - name: Run tests
+        run: |
+          cargo nextest run -p integration-tests --locked nextest --profile ci --no-capture --verbose
+      - name: Test Summary
+        uses: test-summary/action@v2
+        if: always()
+        with:
+          paths: "target/nextest/ci/junit.xml"

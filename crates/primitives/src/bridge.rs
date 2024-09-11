@@ -1,7 +1,7 @@
 //! Primitive data types related to the bridge.
 
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::BTreeMap,
     io::{Read, Write},
 };
 
@@ -46,16 +46,6 @@ impl TryFrom<BTreeMap<OperatorIdx, PublicKey>> for PublickeyTable {
 impl From<PublickeyTable> for Vec<PublicKey> {
     fn from(value: PublickeyTable) -> Self {
         value.0.values().copied().collect()
-    }
-}
-
-impl From<PublickeyTable> for BTreeSet<PublicKey> {
-    fn from(value: PublickeyTable) -> Self {
-        value.0.values().fold(BTreeSet::new(), |mut set, pk| {
-            set.insert(*pk);
-
-            set
-        })
     }
 }
 

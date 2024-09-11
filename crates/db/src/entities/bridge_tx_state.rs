@@ -150,7 +150,7 @@ impl BridgeTxState {
         let mut ordered_nonces: Vec<PubNonce> =
             Vec::with_capacity(self.collected_nonces.keys().len());
 
-        for operator_idx in self.collected_nonces.keys() {
+        for operator_idx in self.pubkey_table.0.keys() {
             if let Some(nonce) = self.collected_nonces.get(operator_idx) {
                 ordered_nonces.push(nonce.inner().clone());
             }
@@ -260,22 +260,25 @@ impl BridgeTxState {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use alpen_test_utils::bridge::{
-        generate_keypairs, generate_mock_tx_signing_data, generate_pubkey_table, generate_sec_nonce,
+        generate_keypairs, generate_mock_tx_signing_data, generate_pubkey_table,
+        generate_sec_nonce, permute,
     };
     use arbitrary::Unstructured;
     use bitcoin::{key::Secp256k1, secp256k1::All};
+    use musig2::secp256k1::SECP256K1;
 
     use super::*;
     use crate::entities::errors::EntityError;
 
     #[test]
     fn test_has_all_nonces() {
-        let secp = Secp256k1::new();
         let own_index = 0;
         let num_operators = 2;
         let num_inputs = 1;
-        let mut tx_state = create_mock_tx_state(&secp, own_index, num_inputs, num_operators);
+        let mut tx_state = create_mock_tx_state(SECP256K1, own_index, num_inputs, num_operators);
 
         assert!(
             !tx_state.has_all_nonces(),
@@ -303,11 +306,10 @@ mod tests {
 
     #[test]
     fn test_add_nonce() {
-        let secp = Secp256k1::new();
         let own_index = 0;
         let num_operators = 2;
         let num_inputs = 1;
-        let mut tx_state = create_mock_tx_state(&secp, own_index, num_inputs, num_operators);
+        let mut tx_state = create_mock_tx_state(SECP256K1, own_index, num_inputs, num_operators);
 
         let data = vec![0u8; 1024];
         let mut unstructured = Unstructured::new(&data[..]);
@@ -318,18 +320,12 @@ mod tests {
 
             let result = tx_state.add_nonce(&(i as u32), random_nonce);
 
-            assert!(result.is_ok(), "Expected Ok since operator {} exists", i);
+            assert!(result.is_ok(), "operator {} should exist", i);
 
             if (i + 1) < num_operators {
-                assert!(
-                    !result.unwrap(),
-                    "Expected false since not all nonces have been collected"
-                );
+                assert!(!result.unwrap(), "should not have all nonces");
             } else {
-                assert!(
-                    result.unwrap(),
-                    "Expected true since all nonces have been collected"
-                );
+                assert!(result.unwrap(), "should have all nonces");
             }
         }
 
@@ -343,12 +339,62 @@ mod tests {
     }
 
     #[test]
+    fn test_ordered_nonces() {
+        let own_index = 0;
+        let num_operators = 10;
+        let num_inputs = 1;
+        let mut tx_state = create_mock_tx_state(SECP256K1, own_index, num_inputs, num_operators);
+
+        let data = vec![0u8; 1024];
+        let mut unstructured = Unstructured::new(&data[..]);
+
+        let mut operator_ids = (0..num_operators)
+            .map(|v| v as OperatorIdx)
+            .collect::<Vec<OperatorIdx>>();
+        permute(&mut operator_ids, 8);
+
+        let mut nonce_table: BTreeMap<OperatorIdx, PubNonce> = BTreeMap::new();
+        for operator_idx in operator_ids {
+            let operator_idx = operator_idx as OperatorIdx;
+
+            let random_nonce = Musig2PubNonce::arbitrary(&mut unstructured)
+                .expect("should produce random pubnonce");
+
+            nonce_table.insert(operator_idx, random_nonce.inner().clone());
+            let result = tx_state.add_nonce(&operator_idx, random_nonce);
+
+            assert!(result.is_ok(), "operator {} should exist", operator_idx);
+        }
+
+        let ordered_nonces = tx_state
+            .ordered_nonces()
+            .into_iter()
+            .collect::<Vec<PubNonce>>();
+
+        // this is more readable as we are iterating over operator indexes
+        #[allow(clippy::needless_range_loop)]
+        for i in 0..num_operators {
+            // order in the pubkey table
+            assert_eq!(
+                ordered_nonces[i],
+                tx_state
+                    .collected_nonces()
+                    .get(&(i as OperatorIdx))
+                    .unwrap()
+                    .inner()
+                    .clone(),
+                "nonces not ordered, mismatch for index: {}",
+                i
+            );
+        }
+    }
+
+    #[test]
     fn test_is_fully_signed_all_signatures_present() {
-        let secp = Secp256k1::new();
         let own_index = 0;
         let num_operators = 2;
         let num_inputs = 1;
-        let mut tx_state = create_mock_tx_state(&secp, own_index, num_inputs, num_operators);
+        let mut tx_state = create_mock_tx_state(SECP256K1, own_index, num_inputs, num_operators);
 
         for i in 0..num_operators {
             let data = vec![0u8; 32];
@@ -484,6 +530,53 @@ mod tests {
                 panic!(
                     "error should have BridgeSigEntityError::TxinIdxOutOfBounds but got: {}",
                     actual_error
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_ordered_sigs() {
+        let secp = Secp256k1::new();
+        let own_index = 0;
+        let num_operators = 1;
+        let num_inputs = 3;
+        let mut tx_state = create_mock_tx_state(&secp, own_index, num_inputs, num_operators);
+
+        let mut operator_ids = (0..num_operators).collect::<Vec<usize>>();
+        permute(&mut operator_ids, num_operators);
+
+        for input_index in 0..num_inputs {
+            for operator_id in operator_ids.clone() {
+                let data = vec![0u8; 32];
+                let mut unstructured = Unstructured::new(&data);
+                let sig = Musig2PartialSig::arbitrary(&mut unstructured)
+                    .expect("should generate arbitrary signature");
+
+                assert!(tx_state
+                    .add_signature(
+                        SignatureInfo::new(sig, operator_id as OperatorIdx),
+                        input_index
+                    )
+                    .is_ok());
+            }
+        }
+        let ordered_sigs_table = tx_state
+            .ordered_sigs()
+            .into_iter()
+            .collect::<Vec<Vec<PartialSignature>>>();
+
+        for (input_index, ordered_sigs) in ordered_sigs_table.iter().enumerate() {
+            for (i, sig) in ordered_sigs.iter().enumerate().take(num_operators) {
+                assert_eq!(
+                    sig,
+                    tx_state.collected_sigs()[input_index]
+                        .get(&(i as OperatorIdx))
+                        .unwrap()
+                        .inner(),
+                    "ordered sigs should be ...ordered, mismatch at ({}, {})",
+                    input_index,
+                    i
                 );
             }
         }

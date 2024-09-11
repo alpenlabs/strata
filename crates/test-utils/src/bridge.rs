@@ -182,3 +182,29 @@ pub fn generate_sec_nonce(
 
     sec_nonce
 }
+
+/// Permute a list by successively swapping positions in the subslice 0..n, where n <= list.len().
+/// This is used to generate random order for indices in a list (for example, list of pubkeys,
+/// nonces, etc.)
+pub fn permute<T: Clone>(list: &mut [T], n: usize) {
+    assert!(
+        n <= list.len(),
+        "n must be less than list of length, expected <= {}",
+        list.len()
+    );
+
+    if n == 1 {
+        return;
+    }
+
+    for i in 0..n {
+        permute(list, n - 1);
+
+        // Swap elements based on whether n is even or odd
+        if n % 2 == 0 {
+            list.swap(i, n - 1);
+        } else {
+            list.swap(0, n - 1);
+        }
+    }
+}
