@@ -122,108 +122,144 @@ impl<D: ProverDataStore + ProverDataProvider> ProverDatabase for ProverDB<D> {
     }
 }
 
-// #[cfg(feature = "test_utils")]
-// #[cfg(test)]
-// mod tests {
-//     use alpen_express_db::traits::{ProverDataProvider, ProverDataStore};
-//     use alpen_express_primitives::buf::[u8;16];
-//     use alpen_test_utils::ArbitraryGenerator;
-//     use test;
+#[cfg(test)]
+mod tests {
+    use alpen_express_db::{
+        errors::DbError,
+        traits::{ProverDataProvider, ProverDataStore},
+    };
 
-//     use super::*;
-//     use crate::test_utils::get_rocksdb_tmp_instance;
+    use super::*;
+    use crate::test_utils::get_rocksdb_tmp_instance_for_prover;
 
-//     #[test]
-//     fn test_put_blob_new_entry() {
-//         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-//         let seq_db = SeqDb::new(db, db_ops);
+    fn setup_db() -> ProofDb {
+        let (db, db_ops) = get_rocksdb_tmp_instance_for_prover().unwrap();
+        ProofDb::new(db, db_ops)
+    }
 
-//         let blob: BlobEntry = ArbitraryGenerator::new().generate();
-//         let blob_hash: [u8;16] = [0; 32].into();
+    fn generate_l1_task_entry() -> ([u8; 16], Vec<u8>) {
+        let txid = [1u8; 16];
+        let txentry = vec![1u8; 64];
+        (txid, txentry)
+    }
 
-//         seq_db.put_blob_entry(blob_hash, blob.clone()).unwrap();
-//         let idx = seq_db.get_last_blob_idx().unwrap().unwrap();
+    #[test]
+    fn test_add_tx_new_entry() {
+        let db = setup_db();
 
-//         assert_eq!(seq_db.get_blob_id(idx).unwrap(), Some(blob_hash));
+        let (txid, txentry) = generate_l1_task_entry();
 
-//         let stored_blob = seq_db.get_blob_by_id(blob_hash).unwrap();
-//         assert_eq!(stored_blob, Some(blob));
-//     }
+        let idx = db.insert_new_task_entry(txid, txentry.clone()).unwrap();
 
-//     #[test]
-//     fn test_put_blob_existing_entry() {
-//         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-//         let seq_db = SeqDb::new(db, db_ops);
-//         let blob: BlobEntry = ArbitraryGenerator::new().generate();
-//         let blob_hash: [u8;16] = [0; 32].into();
+        assert_eq!(idx, 0);
 
-//         seq_db.put_blob_entry(blob_hash, blob.clone()).unwrap();
+        let stored_entry = db.get_task_entry(idx).unwrap();
+        assert_eq!(stored_entry, Some(txentry));
+    }
 
-//         let result = seq_db.put_blob_entry(blob_hash, blob);
+    #[test]
+    fn test_add_tx_existing_entry() {
+        let proof_db = setup_db();
 
-//         // Should be ok to put to existing key
-//         assert!(result.is_ok());
-//     }
+        let (txid, txentry) = generate_l1_task_entry();
 
-//     #[test]
-//     fn test_update_blob_() {
-//         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-//         let seq_db = SeqDb::new(db, db_ops);
+        let _ = proof_db
+            .insert_new_task_entry(txid, txentry.clone())
+            .unwrap();
 
-//         let blob: BlobEntry = ArbitraryGenerator::new().generate();
-//         let blob_hash: [u8;16] = [0; 32].into();
+        let result = proof_db.insert_new_task_entry(txid, txentry);
 
-//         // Insert
-//         seq_db.put_blob_entry(blob_hash, blob.clone()).unwrap();
+        assert!(result.is_err());
+        if let Err(DbError::Other(err)) = result {
+            assert!(err.contains("Entry already exists for id"));
+        }
+    }
 
-//         let updated_blob: BlobEntry = ArbitraryGenerator::new().generate();
+    #[test]
+    fn test_update_tx() {
+        let proof_db = setup_db();
 
-//         // Update existing idx
-//         seq_db
-//             .put_blob_entry(blob_hash, updated_blob.clone())
-//             .unwrap();
-//         let retrieved_blob = seq_db.get_blob_by_id(blob_hash).unwrap().unwrap();
-//         assert_eq!(updated_blob, retrieved_blob);
-//     }
+        let (txid, txentry) = generate_l1_task_entry();
 
-//     #[test]
-//     fn test_get_blob_by_id() {
-//         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-//         let seq_db = SeqDb::new(db, db_ops);
+        // Attempt to update non-existing entry
+        let result = proof_db.update_task_entry_by_id(txid, txentry.clone());
+        assert!(result.is_err());
 
-//         let blob: BlobEntry = ArbitraryGenerator::new().generate();
-//         let blob_hash: [u8;16] = [0; 32].into();
+        // Add and then update the entry
+        let _ = proof_db
+            .insert_new_task_entry(txid, txentry.clone())
+            .unwrap();
 
-//         seq_db.put_blob_entry(blob_hash, blob.clone()).unwrap();
+        let mut updated_txentry = txentry;
+        updated_txentry.push(2u8);
 
-//         let retrieved = seq_db.get_blob_by_id(blob_hash).unwrap().unwrap();
-//         assert_eq!(retrieved, blob);
-//     }
+        proof_db
+            .update_task_entry_by_id(txid, updated_txentry.clone())
+            .unwrap();
 
-//     #[test]
-//     fn test_get_last_blob_idx() {
-//         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-//         let seq_db = SeqDb::new(db, db_ops);
+        let stored_entry = proof_db.get_task_entry_by_id(txid).unwrap();
+        assert_eq!(stored_entry, Some(updated_txentry));
+    }
 
-//         let blob: BlobEntry = ArbitraryGenerator::new().generate();
-//         let blob_hash: [u8;16] = [0; 32].into();
+    #[test]
+    fn test_update_task_entry() {
+        let proof_db = setup_db();
 
-//         let last_blob_idx = seq_db.get_last_blob_idx().unwrap();
-//         assert_eq!(
-//             last_blob_idx, None,
-//             "There is no last blobidx in the beginning"
-//         );
+        let (txid, txentry) = generate_l1_task_entry();
 
-//         seq_db.put_blob_entry(blob_hash, blob.clone()).unwrap();
-//         // Now the last idx is 0
+        // Attempt to update non-existing index
+        let result = proof_db.update_task_entry(0, txentry.clone());
+        assert!(result.is_err());
 
-//         let blob: BlobEntry = ArbitraryGenerator::new().generate();
-//         let blob_hash: [u8;16] = [1; 32].into();
+        // Add and then update the entry by index
+        let idx = proof_db
+            .insert_new_task_entry(txid, txentry.clone())
+            .unwrap();
 
-//         seq_db.put_blob_entry(blob_hash, blob.clone()).unwrap();
-//         // Now the last idx is 1
+        let mut updated_txentry = txentry;
+        updated_txentry.push(3u8);
 
-//         let last_blob_idx = seq_db.get_last_blob_idx().unwrap();
-//         assert_eq!(last_blob_idx, Some(1));
-//     }
-// }
+        proof_db
+            .update_task_entry(idx, updated_txentry.clone())
+            .unwrap();
+
+        let stored_entry = proof_db.get_task_entry(idx).unwrap();
+        assert_eq!(stored_entry, Some(updated_txentry));
+    }
+
+    #[test]
+    fn test_get_txentry_by_idx() {
+        let proof_db = setup_db();
+
+        // Test non-existing entry
+        let result = proof_db.get_task_entry(0);
+        assert!(result.is_err());
+
+        let (txid, txentry) = generate_l1_task_entry();
+
+        let idx = proof_db
+            .insert_new_task_entry(txid, txentry.clone())
+            .unwrap();
+
+        let stored_entry = proof_db.get_task_entry(idx).unwrap();
+        assert_eq!(stored_entry, Some(txentry));
+    }
+
+    #[test]
+    fn test_get_next_txidx() {
+        let proof_db = setup_db();
+
+        let next_txidx = proof_db.get_next_task_idx().unwrap();
+        assert_eq!(next_txidx, 0, "The next txidx is 0 in the beginning");
+
+        let (txid, txentry) = generate_l1_task_entry();
+
+        let idx = proof_db
+            .insert_new_task_entry(txid, txentry.clone())
+            .unwrap();
+
+        let next_txidx = proof_db.get_next_task_idx().unwrap();
+
+        assert_eq!(next_txidx, idx + 1);
+    }
+}

@@ -34,6 +34,11 @@ pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
     // TODO add col families for other store types
 ];
 
+pub const PROVER_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
+    prover::schemas::ProverTaskIdSchema::COLUMN_FAMILY_NAME,
+    prover::schemas::ProverTaskSchema::COLUMN_FAMILY_NAME,
+];
+
 // Re-exports
 pub use broadcaster::db::BroadcastDb;
 use broadcaster::schemas::{BcastL1TxIdSchema, BcastL1TxSchema};

@@ -76,8 +76,7 @@ impl ExpressProverClientApiServerServer for ProverClientRpc {
                     crate::models::Witness::ElBlock(Default::default()),
                 )
                 .await;
-            tokio::time::sleep(Duration::from_secs(1)).await;
-            info!("Created task: {}", task_id);
+            info!("ProverClientRpc: prove_el_block create_task: {}", task_id);
         }
 
         RpcResult::Ok(())

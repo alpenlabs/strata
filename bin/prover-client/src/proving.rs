@@ -13,6 +13,7 @@ use alpen_express_rocksdb::{
 };
 use express_zkvm::{Proof, ZKVMHost};
 use rockbound::rocksdb::{self};
+use tracing::info;
 use uuid::Uuid;
 
 use crate::models::{
@@ -175,9 +176,9 @@ impl<Vm: ZKVMHost> Prover<Vm> {
                         tracing::info_span!("guest_execution").in_scope(|| {
                             let proof = make_proof(config, witness, vm.clone());
 
+                            info!("make_proof completed for task: {:?} {:?}", task_id, proof);
                             let mut prover_state =
                                 prover_state_clone.write().expect("Lock was poisoned");
-
                             prover_state.set_to_proved(task_id, proof);
                             prover_state.dec_task_count();
                         })
@@ -236,14 +237,14 @@ impl<Vm: ZKVMHost> Prover<Vm> {
 
 fn open_rocksdb_database() -> anyhow::Result<Arc<rockbound::OptimisticTransactionDB>> {
     let mut database_dir = PathBuf::default();
-    database_dir.push("rocksdb_prover");
+    database_dir.push("rocksdb");
 
     if !database_dir.exists() {
         fs::create_dir_all(&database_dir)?;
     }
 
     let dbname = alpen_express_rocksdb::ROCKSDB_NAME;
-    let cfs = alpen_express_rocksdb::STORE_COLUMN_FAMILIES;
+    let cfs = alpen_express_rocksdb::PROVER_COLUMN_FAMILIES;
     let mut opts = rocksdb::Options::default();
     opts.create_if_missing(true);
     opts.create_missing_column_families(true);

@@ -29,7 +29,7 @@ where
         // proof status check and update
         loop {
             if let Some(task) = self.task_tracker.get_pending_task().await {
-                info!("Processing task: {}", task.id);
+                info!("get_pending_task: {}", task.id);
 
                 self.prover.submit_witness(task.id, task.witness);
 
@@ -38,10 +38,15 @@ where
                 self.task_tracker
                     .update_task_status(task.id, TaskStatus::Completed)
                     .await;
-                info!("Completed task: {}", task.id);
-                let _ = self
+                tokio::time::sleep(Duration::from_secs(3)).await;
+
+                let status = self
                     .prover
                     .get_proof_submission_status_and_remove_on_success(task.id);
+                info!(
+                    "get_proof_submission_status_and_remove_on_success: {:?} {:?}",
+                    task.id, status
+                );
             } else {
                 // No pending tasks, wait before checking again
                 tokio::time::sleep(Duration::from_secs(1)).await;
