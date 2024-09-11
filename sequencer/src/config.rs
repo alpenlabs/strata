@@ -6,7 +6,7 @@ use serde::Deserialize;
 
 use crate::args::Args;
 
-#[derive(Deserialize, Debug)]
+#[derive(Debug, Deserialize)]
 pub struct SequencerConfig {
     /// path to sequencer root key
     pub sequencer_key: PathBuf,
@@ -14,20 +14,20 @@ pub struct SequencerConfig {
     pub sequencer_bitcoin_address: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Debug, Deserialize)]
 pub struct FullNodeConfig {
     /// host:port of sequencer rpc
     pub sequencer_rpc: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Debug, Deserialize)]
 #[serde(untagged)]
 pub enum ClientMode {
     Sequencer(SequencerConfig),
     FullNode(FullNodeConfig),
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Debug, Deserialize)]
 pub struct ClientParams {
     pub rpc_port: u16,
     #[serde(flatten)]
@@ -38,7 +38,7 @@ pub struct ClientParams {
     pub db_retry_count: u16,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Debug, Deserialize)]
 pub struct SyncParams {
     pub l1_follow_distance: u64,
     pub max_reorg_depth: u32,
@@ -46,7 +46,7 @@ pub struct SyncParams {
     pub client_checkpoint_interval: u32,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Debug, Deserialize)]
 pub struct BitcoindParams {
     pub rpc_url: String,
     pub rpc_user: String,
@@ -54,18 +54,18 @@ pub struct BitcoindParams {
     pub network: Network,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Debug, Deserialize)]
 pub struct RethELParams {
     pub rpc_url: String,
     pub secret: PathBuf,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Debug, Deserialize)]
 pub struct ExecParams {
     pub reth: RethELParams,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Debug, Deserialize)]
 pub struct Config {
     pub client: ClientParams,
     pub bitcoind_rpc: BitcoindParams,
