@@ -57,7 +57,8 @@ async fn run_rpc_server(rpc_context: RpcContext, rpc_url: String) -> anyhow::Res
 
 fn get_zkvms() -> HashMap<u8, RiscZeroHost> {
     let mut vm_map: HashMap<u8, RiscZeroHost> = HashMap::new();
-    vm_map.insert(0, RiscZeroHost::init(vec![], ProverOptions::default()));
+    let guest_code = vec![];
+    vm_map.insert(0, RiscZeroHost::init(guest_code, ProverOptions::default()));
     vm_map.insert(1, RiscZeroHost::init(vec![], ProverOptions::default()));
     vm_map.insert(2, RiscZeroHost::init(vec![], ProverOptions::default()));
     vm_map
