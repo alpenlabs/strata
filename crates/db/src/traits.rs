@@ -313,23 +313,32 @@ pub trait ProverDatabase {
     fn prover_provider(&self) -> &Arc<Self::ProverProv>;
 }
 
-/// A trait encapsulating  store traits to create/update [`BlobEntry`] in the database
 pub trait ProverDataStore {
-    /// Store the [`BlobEntry`].
-    fn put_blob_entry(&self, blobid: u64, blobentry: Vec<u8>) -> DbResult<()>;
+    /// Adds a new txentry to database
+    fn insert_new_task_entry(&self, txid: [u8; 16], txentry: Vec<u8>) -> DbResult<u64>;
+
+    /// Updates an existing txentry
+    fn update_task_entry_by_id(&self, txid: [u8; 16], txentry: Vec<u8>) -> DbResult<()>;
+
+    /// Updates an existing txentry
+    fn update_task_entry(&self, idx: u64, txentry: Vec<u8>) -> DbResult<()>;
+
+    // TODO: possibly add delete as well
 }
 
-#[cfg_attr(feature = "mocks", automock)]
-/// A trait encapsulating  provider traits to fetch [`BlobEntry`] and indices from the database
+/// All methods related to fetching [`Vec<u8>`]s and indices in the database
 pub trait ProverDataProvider {
-    /// Get a [`BlobEntry`] by its hash
-    fn get_blob_by_id(&self, id: u64) -> DbResult<Option<Vec<u8>>>;
+    /// Fetch [`Vec<u8>`] from db
+    fn get_task_entry_by_id(&self, txid: [u8; 16]) -> DbResult<Option<Vec<u8>>>;
 
-    /// Get the blob ID corresponding to the index
-    fn get_blob_id(&self, blobidx: u64) -> DbResult<Option<Vec<u8>>>;
+    /// Get next index to be inserted to
+    fn get_next_task_idx(&self) -> DbResult<u64>;
 
-    /// Get the last blob index
-    fn get_last_blob_idx(&self) -> DbResult<Option<u64>>;
+    /// Get transaction id for index
+    fn get_taskid(&self, idx: u64) -> DbResult<Option<[u8; 16]>>;
+
+    /// get txentry by idx
+    fn get_task_entry(&self, idx: u64) -> DbResult<Option<Vec<u8>>>;
 }
 
 /// A trait encapsulating the provider and store traits for interacting with the broadcast

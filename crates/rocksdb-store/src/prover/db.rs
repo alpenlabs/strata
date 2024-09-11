@@ -5,9 +5,11 @@ use alpen_express_db::{
     traits::{ProverDataProvider, ProverDataStore, ProverDatabase},
     DbResult,
 };
-use rockbound::{OptimisticTransactionDB, SchemaDBOperationsExt};
+use rockbound::{
+    utils::get_last, OptimisticTransactionDB, SchemaDBOperationsExt, TransactionRetry,
+};
 
-use super::schemas::ProverTaskSchema;
+use super::schemas::{ProverTaskIdSchema, ProverTaskSchema};
 use crate::DbOpsConfig;
 
 pub struct ProofDb {
@@ -16,50 +18,84 @@ pub struct ProofDb {
 }
 
 impl ProofDb {
-    /// Wraps an existing database handle.
-    ///
-    /// Assumes it was opened with column families as defined in `STORE_COLUMN_FAMILIES`.
-    // FIXME Make it better/generic.
     pub fn new(db: Arc<OptimisticTransactionDB>, ops: DbOpsConfig) -> Self {
         Self { db, ops }
     }
 }
 
 impl ProverDataStore for ProofDb {
-    fn put_blob_entry(&self, blob_hash: u64, blob: Vec<u8>) -> DbResult<()> {
+    fn insert_new_task_entry(&self, taskid: [u8; 16], taskentry: Vec<u8>) -> DbResult<u64> {
         self.db
-            .with_optimistic_txn(
-                rockbound::TransactionRetry::Count(self.ops.retry_count),
-                |tx| -> Result<(), DbError> {
-                    // If new, increment idx
-                    if tx.get::<ProverTaskSchema>(&blob_hash)?.is_none() {
-                        let idx = rockbound::utils::get_last::<ProverTaskSchema>(tx)?
-                            .map(|(x, _)| x + 1)
-                            .unwrap_or(0);
+            .with_optimistic_txn(TransactionRetry::Count(self.ops.retry_count), |tx| {
+                if tx.get::<ProverTaskSchema>(&taskid)?.is_some() {
+                    return Err(DbError::Other(format!(
+                        "Entry already exists for id {taskid:?}"
+                    )));
+                }
 
-                        tx.put::<ProverTaskSchema>(&idx, &blob)?;
-                    }
+                let idx = rockbound::utils::get_last::<ProverTaskIdSchema>(tx)?
+                    .map(|(x, _)| x + 1)
+                    .unwrap_or(0);
 
-                    tx.put::<ProverTaskSchema>(&blob_hash, &blob)?;
+                tx.put::<ProverTaskIdSchema>(&idx, &taskid)?;
+                tx.put::<ProverTaskSchema>(&taskid, &taskentry)?;
 
-                    Ok(())
-                },
-            )
+                Ok(idx)
+            })
+            .map_err(|e| DbError::TransactionError(e.to_string()))
+    }
+
+    fn update_task_entry_by_id(&self, taskid: [u8; 16], taskentry: Vec<u8>) -> DbResult<()> {
+        self.db
+            .with_optimistic_txn(TransactionRetry::Count(self.ops.retry_count), |tx| {
+                if tx.get::<ProverTaskSchema>(&taskid)?.is_none() {
+                    return Err(DbError::Other(format!(
+                        "Entry does not exist for id {taskid:?}"
+                    )));
+                }
+                Ok(tx.put::<ProverTaskSchema>(&taskid, &taskentry)?)
+            })
+            .map_err(|e| DbError::TransactionError(e.to_string()))
+    }
+
+    fn update_task_entry(&self, idx: u64, taskentry: Vec<u8>) -> DbResult<()> {
+        self.db
+            .with_optimistic_txn(TransactionRetry::Count(self.ops.retry_count), |tx| {
+                if let Some(id) = tx.get::<ProverTaskIdSchema>(&idx)? {
+                    Ok(tx.put::<ProverTaskSchema>(&id, &taskentry)?)
+                } else {
+                    Err(DbError::Other(format!(
+                        "Entry does not exist for idx {idx:?}"
+                    )))
+                }
+            })
             .map_err(|e| DbError::TransactionError(e.to_string()))
     }
 }
 
 impl ProverDataProvider for ProofDb {
-    fn get_blob_by_id(&self, id: u64) -> DbResult<Option<Vec<u8>>> {
-        Ok(self.db.get::<ProverTaskSchema>(&id)?)
+    fn get_task_entry_by_id(&self, taskid: [u8; 16]) -> DbResult<Option<Vec<u8>>> {
+        Ok(self.db.get::<ProverTaskSchema>(&taskid)?)
     }
 
-    fn get_last_blob_idx(&self) -> DbResult<Option<u64>> {
-        Ok(rockbound::utils::get_last::<ProverTaskSchema>(&*self.db)?.map(|(x, _)| x))
+    fn get_next_task_idx(&self) -> DbResult<u64> {
+        Ok(get_last::<ProverTaskIdSchema>(self.db.as_ref())?
+            .map(|(k, _)| k + 1)
+            .unwrap_or_default())
     }
 
-    fn get_blob_id(&self, blobidx: u64) -> DbResult<Option<Vec<u8>>> {
-        Ok(self.db.get::<ProverTaskSchema>(&blobidx)?)
+    fn get_taskid(&self, idx: u64) -> DbResult<Option<[u8; 16]>> {
+        Ok(self.db.get::<ProverTaskIdSchema>(&idx)?)
+    }
+
+    fn get_task_entry(&self, idx: u64) -> DbResult<Option<Vec<u8>>> {
+        if let Some(id) = self.get_taskid(idx)? {
+            Ok(self.db.get::<ProverTaskSchema>(&id)?)
+        } else {
+            Err(DbError::Other(format!(
+                "Entry does not exist for idx {idx:?}"
+            )))
+        }
     }
 }
 
@@ -90,7 +126,7 @@ impl<D: ProverDataStore + ProverDataProvider> ProverDatabase for ProverDB<D> {
 // #[cfg(test)]
 // mod tests {
 //     use alpen_express_db::traits::{ProverDataProvider, ProverDataStore};
-//     use alpen_express_primitives::buf::Buf32;
+//     use alpen_express_primitives::buf::[u8;16];
 //     use alpen_test_utils::ArbitraryGenerator;
 //     use test;
 
@@ -103,7 +139,7 @@ impl<D: ProverDataStore + ProverDataProvider> ProverDatabase for ProverDB<D> {
 //         let seq_db = SeqDb::new(db, db_ops);
 
 //         let blob: BlobEntry = ArbitraryGenerator::new().generate();
-//         let blob_hash: Buf32 = [0; 32].into();
+//         let blob_hash: [u8;16] = [0; 32].into();
 
 //         seq_db.put_blob_entry(blob_hash, blob.clone()).unwrap();
 //         let idx = seq_db.get_last_blob_idx().unwrap().unwrap();
@@ -119,7 +155,7 @@ impl<D: ProverDataStore + ProverDataProvider> ProverDatabase for ProverDB<D> {
 //         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
 //         let seq_db = SeqDb::new(db, db_ops);
 //         let blob: BlobEntry = ArbitraryGenerator::new().generate();
-//         let blob_hash: Buf32 = [0; 32].into();
+//         let blob_hash: [u8;16] = [0; 32].into();
 
 //         seq_db.put_blob_entry(blob_hash, blob.clone()).unwrap();
 
@@ -135,7 +171,7 @@ impl<D: ProverDataStore + ProverDataProvider> ProverDatabase for ProverDB<D> {
 //         let seq_db = SeqDb::new(db, db_ops);
 
 //         let blob: BlobEntry = ArbitraryGenerator::new().generate();
-//         let blob_hash: Buf32 = [0; 32].into();
+//         let blob_hash: [u8;16] = [0; 32].into();
 
 //         // Insert
 //         seq_db.put_blob_entry(blob_hash, blob.clone()).unwrap();
@@ -156,7 +192,7 @@ impl<D: ProverDataStore + ProverDataProvider> ProverDatabase for ProverDB<D> {
 //         let seq_db = SeqDb::new(db, db_ops);
 
 //         let blob: BlobEntry = ArbitraryGenerator::new().generate();
-//         let blob_hash: Buf32 = [0; 32].into();
+//         let blob_hash: [u8;16] = [0; 32].into();
 
 //         seq_db.put_blob_entry(blob_hash, blob.clone()).unwrap();
 
@@ -170,7 +206,7 @@ impl<D: ProverDataStore + ProverDataProvider> ProverDatabase for ProverDB<D> {
 //         let seq_db = SeqDb::new(db, db_ops);
 
 //         let blob: BlobEntry = ArbitraryGenerator::new().generate();
-//         let blob_hash: Buf32 = [0; 32].into();
+//         let blob_hash: [u8;16] = [0; 32].into();
 
 //         let last_blob_idx = seq_db.get_last_blob_idx().unwrap();
 //         assert_eq!(
@@ -182,7 +218,7 @@ impl<D: ProverDataStore + ProverDataProvider> ProverDatabase for ProverDB<D> {
 //         // Now the last idx is 0
 
 //         let blob: BlobEntry = ArbitraryGenerator::new().generate();
-//         let blob_hash: Buf32 = [1; 32].into();
+//         let blob_hash: [u8;16] = [1; 32].into();
 
 //         seq_db.put_blob_entry(blob_hash, blob.clone()).unwrap();
 //         // Now the last idx is 1

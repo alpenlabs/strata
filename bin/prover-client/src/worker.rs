@@ -11,15 +11,14 @@ pub async fn consumer_worker<Vm: ZKVMHost>(task_tracker: Arc<TaskTracker>, prove
         if let Some(task) = task_tracker.get_pending_task().await {
             info!("Processing task: {}", task.id);
 
-            // Simulate processing
-            tokio::time::sleep(Duration::from_secs(5)).await;
-            prover.submit_witness(task.witness);
-            prover.start_proving(task.id);
+            prover.submit_witness(task.id, task.witness);
+            let _ = prover.start_proving(task.id);
             // Update task status after processing
             task_tracker
                 .update_task_status(task.id, TaskStatus::Completed)
                 .await;
             info!("Completed task: {}", task.id);
+            let _ = prover.get_proof_submission_status_and_remove_on_success(task.id);
         } else {
             // No pending tasks, wait before checking again
             tokio::time::sleep(Duration::from_secs(1)).await;
