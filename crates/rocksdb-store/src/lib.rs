@@ -2,6 +2,7 @@ pub mod bridge;
 pub mod bridge_relay;
 pub mod broadcaster;
 pub mod chain_state;
+pub mod checkpoint;
 pub mod client_state;
 pub mod l1;
 pub mod l2;
@@ -32,7 +33,6 @@ pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
     // Seqdb schemas
     SeqBlobIdSchema::COLUMN_FAMILY_NAME,
     SeqBlobSchema::COLUMN_FAMILY_NAME,
-    BatchCommitmentSchema::COLUMN_FAMILY_NAME,
     // Bcast schemas
     BcastL1TxIdSchema::COLUMN_FAMILY_NAME,
     BcastL1TxSchema::COLUMN_FAMILY_NAME,
@@ -42,6 +42,8 @@ pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
     // Bridge signature schemas
     BridgeTxStateTxidSchema::COLUMN_FAMILY_NAME,
     BridgeTxStateSchema::COLUMN_FAMILY_NAME,
+    // Checkpoint schemas
+    BatchCommitmentSchema::COLUMN_FAMILY_NAME,
     // TODO add col families for other store types
 ];
 
@@ -57,12 +59,14 @@ use bridge_relay::schemas::*;
 pub use broadcaster::db::BroadcastDb;
 use broadcaster::schemas::{BcastL1TxIdSchema, BcastL1TxSchema};
 pub use chain_state::db::ChainStateDb;
+pub use checkpoint::db::RBCheckpointDB;
+use checkpoint::schemas::BatchCommitmentSchema;
 pub use client_state::db::ClientStateDb;
 pub use l1::db::L1Db;
 use l2::schemas::{L2BlockHeightSchema, L2BlockSchema, L2BlockStatusSchema};
 use rockbound::{schema::ColumnFamilyName, Schema};
 pub use sequencer::db::SeqDb;
-use sequencer::schemas::{BatchCommitmentSchema, SeqBlobIdSchema, SeqBlobSchema};
+use sequencer::schemas::{SeqBlobIdSchema, SeqBlobSchema};
 pub use sync_event::db::SyncEventDb;
 
 use crate::{

@@ -209,8 +209,12 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         rbdb.clone(),
         db_ops,
     ));
+    let checkpt_db = Arc::new(alpen_express_rocksdb::RBCheckpointDB::new(
+        rbdb.clone(),
+        db_ops,
+    ));
     let database = Arc::new(alpen_express_db::database::CommonDatabase::new(
-        l1_db, l2_db, sync_ev_db, cs_db, chst_db,
+        l1_db, l2_db, sync_ev_db, cs_db, chst_db, checkpt_db,
     ));
 
     // Set up database managers.

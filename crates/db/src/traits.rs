@@ -10,8 +10,6 @@ use alpen_express_state::{
     prelude::*, state_op::WriteBatch, sync_event::SyncEvent,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
-#[cfg(feature = "mocks")]
-use mockall::automock;
 
 use crate::{
     entities::bridge_tx_state::BridgeTxState,
@@ -22,13 +20,6 @@ use crate::{
 /// Common database interface that we can parameterize worker tasks over if
 /// parameterizing them over each individual trait gets cumbersome or if we need
 /// to use behavior that crosses different interfaces.
-#[cfg_attr(feature = "mocks", automock(
-    type L1Store=MockL1DataStore; type L1Prov=MockL1DataProvider;
-    type L2Store=MockL2DataStore; type L2Prov=MockL2DataProvider;
-    type SeStore=MockSyncEventStore; type SeProv=MockSyncEventProvider;
-    type CsStore=MockClientStateStore; type CsProv=MockClientStateProvider;
-    type ChsStore=MockChainstateStore; type ChsProv=MockChainstateProvider;
-))]
 pub trait Database {
     type L1Store: L1DataStore + Send + Sync;
     type L1Prov: L1DataProvider + Send + Sync;
@@ -40,6 +31,8 @@ pub trait Database {
     type CsProv: ClientStateProvider + Send + Sync;
     type ChsStore: ChainstateStore + Send + Sync;
     type ChsProv: ChainstateProvider + Send + Sync;
+    type ChkPtProv: CheckpointProvider + Send + Sync;
+    type ChkPtStore: CheckpointStore + Send + Sync;
 
     fn l1_store(&self) -> &Arc<Self::L1Store>;
     fn l1_provider(&self) -> &Arc<Self::L1Prov>;
@@ -51,10 +44,11 @@ pub trait Database {
     fn client_state_provider(&self) -> &Arc<Self::CsProv>;
     fn chainstate_store(&self) -> &Arc<Self::ChsStore>;
     fn chainstate_provider(&self) -> &Arc<Self::ChsProv>;
+    fn checkpoint_store(&self) -> &Arc<Self::ChkPtStore>;
+    fn checkpoint_provider(&self) -> &Arc<Self::ChkPtProv>;
 }
 
 /// Storage interface to control our view of L1 data.
-#[cfg_attr(feature = "mocks", automock)]
 pub trait L1DataStore {
     /// Atomically extends the chain with a new block, providing the manifest
     /// and a list of transactions we find relevant.  Returns error if
@@ -74,7 +68,6 @@ pub trait L1DataStore {
 }
 
 /// Provider interface to view L1 data.
-#[cfg_attr(feature = "mocks", automock)]
 pub trait L1DataProvider {
     /// Gets the current chain tip index.
     fn get_chain_tip(&self) -> DbResult<Option<u64>>;
@@ -101,7 +94,6 @@ pub trait L1DataProvider {
 }
 
 /// Store to write new sync events.
-#[cfg_attr(feature = "mocks", automock)]
 pub trait SyncEventStore {
     /// Atomically writes a new sync event, returning its index.
     fn write_sync_event(&self, ev: SyncEvent) -> DbResult<u64>;
@@ -114,7 +106,6 @@ pub trait SyncEventStore {
 
 /// Provider to query sync events.  This does not provide notifications, that
 /// should be handled at a higher level.
-#[cfg_attr(feature = "mocks", automock)]
 pub trait SyncEventProvider {
     /// Returns the index of the most recently written sync event.
     fn get_last_idx(&self) -> DbResult<Option<u64>>;
@@ -127,7 +118,6 @@ pub trait SyncEventProvider {
 }
 
 /// Writes client state updates and checkpoints.
-#[cfg_attr(feature = "mocks", automock)]
 pub trait ClientStateStore {
     /// Writes a new consensus output for a given input index.  These input
     /// indexes correspond to indexes in [``SyncEventStore``] and
@@ -142,7 +132,6 @@ pub trait ClientStateStore {
 }
 
 /// Provides client state writes and checkpoints.
-#[cfg_attr(feature = "mocks", automock)]
 pub trait ClientStateProvider {
     /// Gets the idx of the last written state.  Or returns error if a bootstrap
     /// state has not been written yet.
@@ -169,7 +158,6 @@ pub trait ClientStateProvider {
 
 /// L2 data store for CL blocks.  Does not store anything about what we think
 /// the L2 chain tip is, that's controlled by the consensus state.
-#[cfg_attr(feature = "mocks", automock)]
 pub trait L2DataStore {
     /// Stores an L2 block, does not care about the block height of the L2
     /// block.  Also sets the block's status to "unchecked".
@@ -185,7 +173,6 @@ pub trait L2DataStore {
 }
 
 /// Data provider for L2 blocks.
-#[cfg_attr(feature = "mocks", automock)]
 pub trait L2DataProvider {
     /// Gets the L2 block by its ID, if we have it.
     fn get_block_data(&self, id: L2BlockId) -> DbResult<Option<L2BlockBundle>>;
@@ -219,7 +206,6 @@ pub enum BlockStatus {
 /// like that in the future without *too* much extra effort.  We decide new
 /// states by providing the database with a generic "write batch" and offloading
 /// the effort of deciding how to compute that write batch to the database impl.
-#[cfg_attr(feature = "mocks", automock)]
 pub trait ChainstateStore {
     /// Writes the genesis chainstate at index 0.
     fn write_genesis_state(&self, toplevel: &ChainState) -> DbResult<()>;
@@ -238,7 +224,6 @@ pub trait ChainstateStore {
 
 /// Read trait corresponding to [``ChainstateStore``].  See that trait's doc for
 /// design explanation.
-#[cfg_attr(feature = "mocks", automock)]
 pub trait ChainstateProvider {
     /// Gets the last written state.
     fn get_last_state_idx(&self) -> DbResult<u64>;
@@ -257,7 +242,6 @@ pub trait ChainstateProvider {
 /// NOTE: We might have to merge this with the [`Database`]
 /// A trait encapsulating provider and store traits to interact with the underlying database for
 /// [`BlobEntry`]
-#[cfg_attr(feature = "mocks", automock(type SeqStore=MockSeqDataStore; type SeqProv=MockSeqDataProvider;))]
 pub trait SequencerDatabase {
     type SeqStore: SeqDataStore;
     type SeqProv: SeqDataProvider;
@@ -266,20 +250,12 @@ pub trait SequencerDatabase {
     fn sequencer_provider(&self) -> &Arc<Self::SeqProv>;
 }
 
-#[cfg_attr(feature = "mocks", automock)]
 /// A trait encapsulating  store traits to create/update [`BlobEntry`] in the database
 pub trait SeqDataStore {
     /// Store the [`BlobEntry`].
     fn put_blob_entry(&self, blobid: Buf32, blobentry: BlobEntry) -> DbResult<()>;
-
-    /// Store a [`BatchCommitmentEntry`]
-    ///
-    /// `batchidx` for the BatchCommitment is expected to increase monotonically and
-    /// be equal to the [`alpen_express_state::chain_state::ChainState::checkpoint_period`]
-    fn put_batch_commitment(&self, batchidx: u64, entry: BatchCommitmentEntry) -> DbResult<()>;
 }
 
-#[cfg_attr(feature = "mocks", automock)]
 /// A trait encapsulating  provider traits to fetch [`BlobEntry`] and indices from the database
 pub trait SeqDataProvider {
     /// Get a [`BlobEntry`] by its hash
@@ -290,12 +266,6 @@ pub trait SeqDataProvider {
 
     /// Get the last blob index
     fn get_last_blob_idx(&self) -> DbResult<Option<u64>>;
-
-    /// Get a [`BatchCommitmentEntry`] by it's index
-    fn get_batch_commitment(&self, batchidx: u64) -> DbResult<Option<BatchCommitmentEntry>>;
-
-    /// Get last batch index
-    fn get_last_batch_idx(&self) -> DbResult<Option<u64>>;
 }
 
 /// A trait providing access to both prover data store and prover data provider.
@@ -391,4 +361,33 @@ pub trait BridgeTxDatabase {
 
     /// Fetch [`BridgeTxState`] from db.
     fn get_tx_state(&self, txid: Buf32) -> DbResult<Option<BridgeTxState>>;
+}
+
+/// Database for checkpoints posted/to be posted to L1
+pub trait CheckpointDatabase {
+    type CheckpointStore: CheckpointStore;
+    type CheckpointProv: CheckpointProvider;
+
+    /// Get store
+    fn checkpoint_store(&self) -> &Arc<Self::CheckpointStore>;
+    /// Get provider
+    fn checkpoint_provider(&self) -> &Arc<Self::CheckpointProv>;
+}
+
+/// Provider for Checkpoint data
+pub trait CheckpointProvider {
+    /// Get a [`BatchCommitmentEntry`] by it's index
+    fn get_batch_commitment(&self, batchidx: u64) -> DbResult<Option<BatchCommitmentEntry>>;
+
+    /// Get last batch index
+    fn get_last_batch_idx(&self) -> DbResult<Option<u64>>;
+}
+
+/// Store for Checkpoint data
+pub trait CheckpointStore {
+    /// Store a [`BatchCommitmentEntry`]
+    ///
+    /// `batchidx` for the BatchCommitment is expected to increase monotonically and
+    /// be equal to the [`alpen_express_state::chain_state::ChainState::checkpoint_period`]
+    fn put_batch_commitment(&self, batchidx: u64, entry: BatchCommitmentEntry) -> DbResult<()>;
 }
