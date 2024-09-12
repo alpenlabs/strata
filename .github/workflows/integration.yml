@@ -39,7 +39,7 @@ jobs:
           cache-on-failure: true
       - name: Run tests
         run: |
-          cargo nextest run -p integration-tests --locked nextest --profile ci --no-capture --verbose
+          cargo nextest run -p integration-tests --locked --profile ci --no-capture
       - name: Test Summary
         uses: test-summary/action@v2
         if: always()
