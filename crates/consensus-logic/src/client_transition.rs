@@ -93,7 +93,7 @@ pub fn process_event<D: Database>(
             writes.push(ClientStateWrite::RollbackL1BlocksTo(*to_height));
         }
 
-        SyncEvent::L1DABatch(height, checkpts) => {
+        SyncEvent::L1DABatch(height, commitments) => {
             debug!(%height, "received L1DABatch");
 
             if let Some(ss) = state.sync() {
@@ -105,8 +105,10 @@ pub fn process_event<D: Database>(
                 // only when the corresponding L1 block is buried enough
                 writes.push(ClientStateWrite::NewCheckpointsReceived(
                     *height,
-                    checkpts.clone(),
+                    commitments.iter().map(|x| x.checkpoint().clone()).collect(),
                 ));
+
+                actions.push(SyncAction::WriteCommitments(*height, commitments.clone()));
             } else {
                 // TODO we can expand this later to make more sense
                 return Err(Error::MissingClientSyncState);

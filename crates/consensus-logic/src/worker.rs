@@ -2,7 +2,10 @@
 
 use std::sync::Arc;
 
-use alpen_express_db::traits::*;
+use alpen_express_db::{
+    traits::*,
+    types::{BatchCommitmentEntry, CommitmentStatus},
+};
 use alpen_express_eectl::engine::ExecEngineCtl;
 use alpen_express_primitives::prelude::*;
 use alpen_express_state::{
@@ -79,6 +82,11 @@ impl<D: Database> WorkerState<D> {
     /// Gets a ref to the consensus state from the inner state tracker.
     pub fn cur_state(&self) -> &Arc<ClientState> {
         self.state_tracker.cur_state()
+    }
+
+    /// Gets a reference to the database
+    pub fn db(&self) -> &D {
+        self.database.as_ref()
     }
 }
 
@@ -198,6 +206,22 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
                         Error::GenesisFailed(err.to_string())
                     },
                 )?;
+            }
+
+            SyncAction::WriteCommitments(_height, commitments) => {
+                let checkpoint_store = state.db().checkpoint_store();
+                for c in commitments.iter() {
+                    let idx = c.checkpoint().idx();
+                    let status = CommitmentStatus::Confirmed;
+                    let entry = BatchCommitmentEntry::new(
+                        c.checkpoint().clone(),
+                        c.proof().to_vec(),
+                        status,
+                    );
+
+                    // Store
+                    checkpoint_store.put_batch_commitment(idx, entry)?;
+                }
             }
         }
     }

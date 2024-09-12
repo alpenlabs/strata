@@ -134,11 +134,21 @@ pub enum ExcludeReason {
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct BatchCommitmentEntry {
     /// Infor related to the batch
-    pub checkpoint: CheckPointInfo,
+    checkpoint: CheckPointInfo,
     /// Proof
-    pub proof: Vec<u8>,
+    proof: Vec<u8>,
     /// Status
-    pub status: CommitmentStatus,
+    status: CommitmentStatus,
+}
+
+impl BatchCommitmentEntry {
+    pub fn new(checkpoint: CheckPointInfo, proof: Vec<u8>, status: CommitmentStatus) -> Self {
+        Self {
+            checkpoint,
+            proof,
+            status,
+        }
+    }
 }
 
 impl From<BatchCommitmentEntry> for BatchCommitment {

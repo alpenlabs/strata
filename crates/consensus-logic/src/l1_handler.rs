@@ -9,7 +9,7 @@ use alpen_express_primitives::{
     buf::Buf32, l1::L1BlockManifest, params::Params, utils::generate_l1_tx,
 };
 use alpen_express_state::{
-    batch::{BatchCommitment, CheckPointInfo, SignedBatchCommitment},
+    batch::{BatchCommitment, SignedBatchCommitment},
     sync_event::SyncEvent,
 };
 use bitcoin::{consensus::serialize, hashes::Hash, Block};
@@ -100,7 +100,7 @@ where
 }
 
 /// Parses inscriptions and checks for batch data in the transactions
-fn check_for_da_batch(blockdata: &BlockData) -> Vec<CheckPointInfo> {
+fn check_for_da_batch(blockdata: &BlockData) -> Vec<BatchCommitment> {
     let txs = blockdata
         .relevant_tx_idxs()
         .iter()
@@ -119,7 +119,7 @@ fn check_for_da_batch(blockdata: &BlockData) -> Vec<CheckPointInfo> {
                 .map(|x| (x, tx))
         })
     });
-    let commitments = inscriptions.filter_map(|(insc, tx)| {
+    let signed_commitments = inscriptions.filter_map(|(insc, tx)| {
         borsh::from_slice::<SignedBatchCommitment>(insc.batch_data())
             .map_err(|e| {
                 let txid = tx.compute_txid();
@@ -127,15 +127,12 @@ fn check_for_da_batch(blockdata: &BlockData) -> Vec<CheckPointInfo> {
                 e
             })
             .ok()
-            .map(Into::into)
     });
 
     // NOTE/TODO: this is where we would verify the commitment, i.e, verify block ranges, verify
     // proof, and whatever else that's necessary
 
-    commitments
-        .map(|c: BatchCommitment| c.checkpoint().clone())
-        .collect()
+    signed_commitments.map(Into::into).collect()
 }
 
 /// Given a block, generates a manifest of the parts we care about that we can

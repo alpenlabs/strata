@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
 use alpen_express_db::{
-    errors::DbError,
-    traits::{CheckpointDatabase, CheckpointProvider, CheckpointStore},
+    traits::{CheckpointProvider, CheckpointStore},
     types::BatchCommitmentEntry,
     DbResult,
 };
@@ -13,6 +12,7 @@ use crate::DbOpsConfig;
 
 pub struct RBCheckpointDB {
     db: Arc<OptimisticTransactionDB>,
+    #[allow(dead_code)]
     ops: DbOpsConfig,
 }
 

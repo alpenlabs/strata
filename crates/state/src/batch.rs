@@ -8,7 +8,7 @@ use crate::id::L2BlockId;
 
 /// Public parameters for batch proof to be posted to DA.
 /// Will be updated as prover specs evolve.
-#[derive(Clone, Debug, PartialEq, BorshDeserialize, BorshSerialize, Arbitrary)]
+#[derive(Clone, Debug, PartialEq, Eq, BorshDeserialize, BorshSerialize, Arbitrary)]
 pub struct BatchCommitment {
     /// Information regarding the current batch checkpoint
     checkpoint: CheckPointInfo,
