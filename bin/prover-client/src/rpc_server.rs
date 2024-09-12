@@ -62,7 +62,7 @@ impl ProverClientRpc {
 impl ExpressProverClientApiServerServer for ProverClientRpc {
     async fn prove_el_block(&self, el_block_num: u64) -> RpcResult<()> {
         // TODO: handle the unwrap here
-        let _zkvm_input = self
+        let zkvm_input = self
             .fetch_el_block_witness(el_block_num)
             .await
             .expect("Failed to get th el block witness from the reth rpc");
@@ -70,7 +70,7 @@ impl ExpressProverClientApiServerServer for ProverClientRpc {
         // Create a new proving task
         {
             let task_tracker = Arc::clone(&self.context.task_tracker);
-            let witness_vec = bincode::serialize(&_zkvm_input).unwrap();
+            let witness_vec = bincode::serialize(&zkvm_input).unwrap();
             let el_block_witness = ELBlockWitness { data: witness_vec };
             let witness = Witness::ElBlock(el_block_witness);
 

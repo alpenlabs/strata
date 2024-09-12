@@ -18,10 +18,11 @@ use uuid::Uuid;
 use zkvm_primitives::ZKVMInput;
 
 use crate::models::{
-    ProofGenConfig, ProofProcessingStatus, ProofSubmissionStatus, Witness, WitnessSubmissionStatus,
+    ProofGenConfig, ProofProcessingError, ProofProcessingStatus, ProofSubmissionStatus, Witness,
+    WitnessSubmissionStatus,
 };
 
-enum ProverStatus {
+pub enum ProverStatus {
     WitnessSubmitted(Witness),
     ProvingInProgress,
     Proved(Proof),
@@ -157,7 +158,7 @@ impl<Vm: ZKVMHost> Prover<Vm> {
     pub(crate) fn start_proving(
         &self,
         task_id: Uuid,
-    ) -> Result<ProofProcessingStatus, anyhow::Error>
+    ) -> Result<ProofProcessingStatus, ProofProcessingError>
     where
         Vm: ZKVMHost + 'static,
     {
@@ -166,7 +167,7 @@ impl<Vm: ZKVMHost> Prover<Vm> {
 
         let prover_status = prover_state
             .remove(&task_id)
-            .ok_or_else(|| anyhow::anyhow!("Missing witness for block: {:?}", task_id))?;
+            .ok_or_else(|| ProofProcessingError::MissingWitness)?;
 
         match prover_status {
             ProverStatus::WitnessSubmitted(witness) => {
@@ -196,39 +197,27 @@ impl<Vm: ZKVMHost> Prover<Vm> {
                     Ok(ProofProcessingStatus::Busy)
                 }
             }
-            ProverStatus::ProvingInProgress => Err(anyhow::anyhow!(
-                "Proof generation for {:?} still in progress",
-                task_id
-            )),
-            ProverStatus::Proved(_) => Err(anyhow::anyhow!(
-                "Witness for task id {:?}, submitted multiple times.",
-                task_id,
-            )),
-            ProverStatus::Err(e) => Err(e),
+            ProverStatus::ProvingInProgress => Err(ProofProcessingError::ProvingAlreadyInProgress),
+            ProverStatus::Proved(_) => Err(ProofProcessingError::AlreadyProved),
+            ProverStatus::Err(e) => Err(ProofProcessingError::Other(e)),
         }
     }
 
-    pub(crate) fn get_proof_submission_status_and_remove_on_success(
-        &self,
-        task_id: Uuid,
-    ) -> Result<ProofSubmissionStatus, anyhow::Error> {
+    pub(crate) fn get_proving_status(&self, task_id: Uuid) -> Result<ProverStatus, anyhow::Error> {
         let mut prover_state = self.prover_state.write().unwrap();
         let status = prover_state.get_prover_status(task_id);
 
         match status {
-            Some(ProverStatus::ProvingInProgress) => {
-                Ok(ProofSubmissionStatus::ProofGenerationInProgress)
-            }
+            Some(ProverStatus::ProvingInProgress) => Ok(ProverStatus::ProvingInProgress),
             Some(ProverStatus::Proved(proof)) => {
                 self.save_proof_to_db(task_id, proof)?;
 
                 prover_state.remove(&task_id);
-                Ok(ProofSubmissionStatus::Success)
+                Ok(ProverStatus::Proved(Proof::new(vec![])))
             }
-            Some(ProverStatus::WitnessSubmitted(_)) => Err(anyhow::anyhow!(
-                "Witness for {:?} was submitted, but the proof generation is not triggered.",
-                task_id
-            )),
+            Some(ProverStatus::WitnessSubmitted(_)) => {
+                Ok(ProverStatus::WitnessSubmitted(Witness::default()))
+            }
             Some(ProverStatus::Err(e)) => Err(anyhow::anyhow!(e.to_string())),
             None => Err(anyhow::anyhow!("Missing witness for: {:?}", task_id)),
         }
