@@ -336,8 +336,8 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         let d_executor = task_manager.executor();
         executor.spawn_critical("duty_worker::duty_dispatch_task", move |shutdown| {
             duty_worker::duty_dispatch_task(
-                shutdown, d_executor, duties_rx, idata.key, sm, db2, dbseq, eng_ctl_de, insc_hndlr,
-                pool, d_params,
+                shutdown, d_executor, duties_rx, idata.key, sm, db2, eng_ctl_de, insc_hndlr, pool,
+                d_params,
             )
         });
     }

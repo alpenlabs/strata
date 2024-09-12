@@ -8,7 +8,10 @@ use std::{
 
 use alpen_express_btcio::writer::InscriptionHandle;
 use alpen_express_crypto::sign_schnorr_sig;
-use alpen_express_db::traits::*;
+use alpen_express_db::{
+    traits::*,
+    types::{BatchCommitmentEntry, CommitmentStatus},
+};
 use alpen_express_eectl::engine::ExecEngineCtl;
 use alpen_express_primitives::{
     buf::{Buf32, Buf64},
@@ -212,7 +215,6 @@ struct DutyExecStatus {
 #[allow(clippy::too_many_arguments)] // FIXME
 pub fn duty_dispatch_task<
     D: Database + Sync + Send + 'static,
-    SD: SequencerDatabase + Sync + Send + 'static,
     E: ExecEngineCtl + Sync + Send + 'static,
 >(
     shutdown: ShutdownGuard,
@@ -221,7 +223,6 @@ pub fn duty_dispatch_task<
     ident_key: IdentityKey,
     sync_man: Arc<SyncManager>,
     database: Arc<D>,
-    seq_db: Arc<SD>,
     engine: Arc<E>,
     inscription_handle: Arc<InscriptionHandle>,
     pool: threadpool::ThreadPool,
@@ -287,13 +288,12 @@ pub fn duty_dispatch_task<
             let ik = ident_key.clone();
             let sm = sync_man.clone();
             let db = database.clone();
-            let sdb = seq_db.clone();
             let e = engine.clone();
             let da_writer = inscription_handle.clone();
             let params: Arc<Params> = params.clone();
             let duty_status_tx_l = duty_status_tx.clone();
             pool.execute(move || {
-                duty_exec_task(d, ik, sm, db, sdb, e, da_writer, params, duty_status_tx_l)
+                duty_exec_task(d, ik, sm, db, e, da_writer, params, duty_status_tx_l)
             });
             trace!(%id, "dispatched duty exec task");
             pending_duties_local.insert(id, ());
@@ -309,12 +309,11 @@ pub fn duty_dispatch_task<
 /// thread pool so we don't have to worry about it blocking *too* much other
 /// work.
 #[allow(clippy::too_many_arguments)] // TODO: fix this
-fn duty_exec_task<D: Database, E: ExecEngineCtl, SD: SequencerDatabase>(
+fn duty_exec_task<D: Database, E: ExecEngineCtl>(
     duty: Duty,
     ik: IdentityKey,
     sync_man: Arc<SyncManager>,
     database: Arc<D>,
-    seq_db: Arc<SD>,
     engine: Arc<E>,
     inscription_handle: Arc<InscriptionHandle>,
     params: Arc<Params>,
@@ -325,7 +324,6 @@ fn duty_exec_task<D: Database, E: ExecEngineCtl, SD: SequencerDatabase>(
         &ik,
         &sync_man,
         database.as_ref(),
-        seq_db.as_ref(),
         engine.as_ref(),
         inscription_handle.as_ref(),
         &params,
@@ -347,7 +345,6 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
     ik: &IdentityKey,
     sync_man: &SyncManager,
     database: &D,
-    seq_db: &impl SequencerDatabase,
     engine: &E,
     inscription_handle: &InscriptionHandle,
     params: &Arc<Params>,
@@ -396,7 +393,7 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
         Duty::CommitBatch(data) => {
             info!(data = ?data, "commit batch");
 
-            let commitment = poll_for_batch_commitment(seq_db, data)?;
+            let commitment = get_ready_batch_commitment(database, data)?;
 
             let commitment_sighash = commitment.get_sighash();
             let signature = sign_with_identity_key(&commitment_sighash, ik);
@@ -421,19 +418,35 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
     }
 }
 
-fn poll_for_batch_commitment(
-    seq_db: &impl SequencerDatabase,
+fn get_ready_batch_commitment(
+    db: &impl Database,
     duty: &BatchCommitmentDuty,
 ) -> Result<BatchCommitment, Error> {
+    let idx = duty.idx();
+
+    // If there's no entry in db, create a pending entry and wait until proof is ready
+    if db
+        .checkpoint_provider()
+        .get_batch_commitment(idx)?
+        .is_none()
+    {
+        let entry = BatchCommitmentEntry::new(
+            duty.checkpoint().clone(),
+            vec![],
+            CommitmentStatus::PendingProof,
+        );
+        db.checkpoint_store().put_batch_commitment(idx, entry)?;
+    }
+
+    // Wait until the proof is ready
+    // May also need to have a channel here
     loop {
-        let checkpt_idx = duty.idx();
-        if let Some(commitment) = seq_db
-            .sequencer_provider()
-            .get_batch_commitment(checkpt_idx)?
-        {
-            return Ok(commitment);
+        if let Some(commitment) = db.checkpoint_provider().get_batch_commitment(idx)? {
+            if commitment.has_proof() {
+                return Ok(commitment.into());
+            }
         }
-        debug!(%checkpt_idx, "Polling for batch commitment");
+        debug!(%idx, "Polling for batch commitment");
 
         std::thread::sleep(Duration::from_millis(BATCH_POLL_INTERVAL));
     }

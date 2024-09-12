@@ -1,6 +1,6 @@
 //! Sequencer duties.
 
-use std::{ops::Deref, time};
+use std::time;
 
 use alpen_express_primitives::{buf::Buf32, hash::compute_borsh_hash};
 use alpen_express_state::{batch::CheckPointInfo, id::L2BlockId};
@@ -84,10 +84,12 @@ pub struct BatchCommitmentDuty {
     checkpoint: CheckPointInfo,
 }
 
-impl Deref for BatchCommitmentDuty {
-    type Target = CheckPointInfo;
+impl BatchCommitmentDuty {
+    pub fn idx(&self) -> u64 {
+        self.checkpoint.idx()
+    }
 
-    fn deref(&self) -> &Self::Target {
+    pub fn checkpoint(&self) -> &CheckPointInfo {
         &self.checkpoint
     }
 }

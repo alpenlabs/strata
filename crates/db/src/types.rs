@@ -138,7 +138,7 @@ pub struct BatchCommitmentEntry {
     /// Proof
     proof: Vec<u8>,
     /// Status
-    status: CommitmentStatus,
+    pub status: CommitmentStatus,
 }
 
 impl BatchCommitmentEntry {
@@ -148,6 +148,9 @@ impl BatchCommitmentEntry {
             proof,
             status,
         }
+    }
+    pub fn has_proof(&self) -> bool {
+        self.status != CommitmentStatus::PendingProof
     }
 }
 
@@ -160,8 +163,10 @@ impl From<BatchCommitmentEntry> for BatchCommitment {
 /// Status of the commmitment
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub enum CommitmentStatus {
-    /// Not seen on L1
-    Pending,
+    /// Proof has not been created for this commitment
+    PendingProof,
+    /// Proof is ready
+    ProofCreated,
     /// Confirmed on L1
     Confirmed,
     /// Finalized on L1

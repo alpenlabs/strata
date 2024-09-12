@@ -3,7 +3,7 @@ use std::sync::Arc;
 use alpen_express_db::{
     errors::DbError,
     traits::{SeqDataProvider, SeqDataStore, SequencerDatabase},
-    types::{BatchCommitmentEntry, BlobEntry},
+    types::BlobEntry,
     DbResult,
 };
 use alpen_express_primitives::buf::Buf32;
