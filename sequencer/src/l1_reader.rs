@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use alpen_express_btcio::{
     reader::{messages::L1Event, query::bitcoin_data_reader_task},
-    rpc::traits::BitcoinReader,
+    rpc::traits::Reader,
 };
 use alpen_express_consensus_logic::{ctl::CsmController, l1_handler::bitcoin_data_handler_task};
 use alpen_express_db::traits::{Database, L1DataProvider};
@@ -17,7 +17,7 @@ pub fn start_reader_tasks<D: Database + Send + Sync + 'static>(
     executor: &TaskExecutor,
     params: Arc<Params>,
     config: &Config,
-    rpc_client: Arc<impl BitcoinReader>,
+    rpc_client: Arc<impl Reader + Send + Sync + 'static>,
     db: Arc<D>,
     csm_ctl: Arc<CsmController>,
     status_rx: Arc<StatusTx>,

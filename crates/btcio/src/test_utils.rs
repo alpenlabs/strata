@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 
 use async_trait::async_trait;
 use bitcoin::{
+    bip32::Xpriv,
     consensus::{self, deserialize},
     hashes::Hash,
     Address, Amount, Block, BlockHash, Network, SignedAmount, Transaction, Txid, Work,
@@ -9,7 +10,7 @@ use bitcoin::{
 use bitcoind_json_rpc_types::v26::GetBlockchainInfo;
 
 use crate::rpc::{
-    traits::{BitcoinBroadcaster, BitcoinReader, BitcoinSigner, BitcoinWallet},
+    traits::{Broadcaster, Reader, Signer, Wallet},
     types::{GetTransaction, ListTransactions, ListUnspent, SignRawTransactionWithWallet},
     ClientResult,
 };
@@ -44,7 +45,7 @@ const TEST_BLOCKSTR: &str = "000000207d862a78fcb02ab24ebd154a20b9992af6d2f0c94d3
 pub const SOME_TX: &str = "0100000001a15d57094aa7a21a28cb20b59aab8fc7d1149a3bdbcddba9c622e4f5f6a99ece010000006c493046022100f93bb0e7d8db7bd46e40132d1f8242026e045f03a0efe71bbb8e3f475e970d790221009337cd7f1f929f00cc6ff01f03729b069a7c21b59b1736ddfee5db5946c5da8c0121033b9b137ee87d5a812d6f506efdd37f0affa7ffc310711c06c7f3e097c9447c52ffffffff0100e1f505000000001976a9140389035a9225b3839e2bbf32d826a1e222031fd888ac00000000";
 
 #[async_trait]
-impl BitcoinReader for TestBitcoinClient {
+impl Reader for TestBitcoinClient {
     async fn estimate_smart_fee(&self, _conf_target: u16) -> ClientResult<u64> {
         Ok(3)
     }
@@ -100,7 +101,7 @@ impl BitcoinReader for TestBitcoinClient {
 }
 
 #[async_trait]
-impl BitcoinBroadcaster for TestBitcoinClient {
+impl Broadcaster for TestBitcoinClient {
     // send_raw_transaction sends a raw transaction to the network
     async fn send_raw_transaction(&self, _tx: &Transaction) -> ClientResult<Txid> {
         Ok(Txid::from_slice(&[1u8; 32]).unwrap())
@@ -108,7 +109,7 @@ impl BitcoinBroadcaster for TestBitcoinClient {
 }
 
 #[async_trait]
-impl BitcoinWallet for TestBitcoinClient {
+impl Wallet for TestBitcoinClient {
     async fn get_new_address(&self) -> ClientResult<Address> {
         // taken from https://bitcoin.stackexchange.com/q/91222
         let addr = "bcrt1qs758ursh4q9z627kt3pp5yysm78ddny6txaqgw"
@@ -179,11 +180,7 @@ impl BitcoinWallet for TestBitcoinClient {
 }
 
 #[async_trait]
-impl BitcoinSigner for TestBitcoinClient {
-    async fn send_to_address(&self, _address: &Address, _amount: u64) -> ClientResult<Txid> {
-        Ok(Txid::from_slice(&[1u8; 32]).unwrap())
-    }
-
+impl Signer for TestBitcoinClient {
     async fn sign_raw_transaction_with_wallet(
         &self,
         tx: &Transaction,
@@ -194,5 +191,11 @@ impl BitcoinSigner for TestBitcoinClient {
             complete: true,
             errors: None,
         })
+    }
+    async fn get_xpriv(&self) -> ClientResult<Option<Xpriv>> {
+        // taken from https://docs.rs/bitcoin/0.32.2/src/bitcoin/bip32.rs.html#1090
+        // DO NOT USE THIS BY ANY MEANS IN PRODUCTION WITH REAL FUNDS
+        let xpriv = "xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi".parse::<Xpriv>().unwrap();
+        Ok(Some(xpriv))
     }
 }
