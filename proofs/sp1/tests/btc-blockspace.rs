@@ -6,7 +6,7 @@ mod test {
     use bitcoin::Address;
     use btc_blockspace::logic::{BlockspaceProofOutput, ScanRuleConfig};
     use express_sp1_adapter::{SP1Host, SP1Verifier};
-    use express_zkvm::{ZKVMHost, ZKVMVerifier};
+    use express_zkvm::{ProverInput, ZKVMHost, ZKVMVerifier};
     use sp1_guest_builder::GUEST_BTC_BLOCKSPACE_ELF;
 
     #[test]
@@ -28,8 +28,12 @@ mod test {
 
         let prover = SP1Host::init(GUEST_BTC_BLOCKSPACE_ELF.into(), Default::default());
 
+        let mut prover_input = ProverInput::new();
+        prover_input.write(scan_config.clone());
+        prover_input.write_serialized(serialized_block);
+
         let (proof, _) = prover
-            .prove(&[scan_config], Some(&[serialized_block]), None)
+            .prove(&prover_input)
             .expect("Failed to generate proof");
 
         SP1Verifier::extract_public_output::<BlockspaceProofOutput>(&proof)

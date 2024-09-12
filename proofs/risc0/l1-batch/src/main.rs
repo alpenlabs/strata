@@ -5,15 +5,14 @@ use l1_batch::{
 };
 use risc0_zkvm::{guest::env, serde};
 
-// TODO: read directly from file
-// pub const BTC_BLOCKSPACE_RISC0_ID: [u32; 8] = [
-//     3924733487, 4261975711, 2287119136, 3197699074, 1661616050, 1659118978, 3476255655,
-// 873162380, ];
+// TODO: read vk for BTC_BLOCKSPACE from a file as this changes
+// Ref: https://github.com/risc0/risc0/blob/main/examples/composition/src/main.rs#L15
 
 fn main() {
     let input: L1BatchProofInput = env::read();
 
     for out in &input.batch {
+        // TODO: hardcode vk for BTC_BLOCKSPACE
         let vk: [u32; 8] = env::read();
         env::verify(vk, &serde::to_vec(&out).unwrap()).unwrap();
     }

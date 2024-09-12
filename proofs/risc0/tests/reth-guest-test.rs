@@ -1,7 +1,7 @@
 #[cfg(feature = "prover")]
 mod test {
     use express_risc0_adapter::{Risc0Verifier, RiscZeroHost};
-    use express_zkvm::{ZKVMHost, ZKVMVerifier};
+    use express_zkvm::{ProverInput, ZKVMHost, ZKVMVerifier};
     use risc0_guest_builder::RETH_RISC0_ELF;
     use zkvm_primitives::{ELProofPublicParams, ZKVMInput};
 
@@ -13,8 +13,11 @@ mod test {
         let input: ZKVMInput = bincode::deserialize(ENCODED_PROVER_INPUT).unwrap();
         let prover = RiscZeroHost::init(RETH_RISC0_ELF.into(), Default::default());
 
+        let mut prover_input = ProverInput::new();
+        prover_input.write(input);
+
         let (proof, _) = prover
-            .prove(&[input.clone()], None, None)
+            .prove(&prover_input)
             .expect("Failed to generate proof");
 
         Risc0Verifier::extract_public_output::<ELProofPublicParams>(&proof)

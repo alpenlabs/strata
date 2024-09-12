@@ -1,6 +1,4 @@
-use express_zkvm::{
-    AggregationInput, Proof, ProverOptions, VerificationKey, ZKVMHost, ZKVMVerifier,
-};
+use express_zkvm::{Proof, ProverInput, ProverOptions, VerificationKey, ZKVMHost, ZKVMVerifier};
 use risc0_zkvm::{
     compute_image_id, get_prover_server, sha::Digest, ExecutorEnv, ExecutorImpl, ProverOpts,
     Receipt, VerifierContext,
@@ -37,32 +35,26 @@ impl ZKVMHost for RiscZeroHost {
 
     fn prove<T: serde::Serialize>(
         &self,
-        items: &[T],
-        serialized_items: Option<&[Vec<u8>]>,
-        agg_inputs: Option<&[AggregationInput]>,
+        prover_input: &ProverInput<T>,
     ) -> anyhow::Result<(Proof, VerificationKey)> {
         if self.prover_options.use_mock_prover {
             std::env::set_var("RISC0_DEV_MODE", "true");
         }
 
         let mut env_builder = ExecutorEnv::builder();
-        for item in items {
-            env_builder.write(item)?;
+        for input in &prover_input.inputs {
+            env_builder.write(input)?;
         }
-        if let Some(serialized_items) = serialized_items {
-            for serialized_item in serialized_items {
-                env_builder.write(&(serialized_item.len() as u32))?;
-                env_builder.write_slice(serialized_item);
-            }
+        for serialized_item in &prover_input.serialized_inputs {
+            env_builder.write(&(serialized_item.len() as u32))?;
+            env_builder.write_slice(serialized_item);
         }
-        if let Some(agg_inputs) = agg_inputs {
-            for agg_input in agg_inputs {
-                let receipt: Receipt = bincode::deserialize(agg_input.proof().as_bytes())?;
-                let vk: Digest = bincode::deserialize(agg_input.vk().as_bytes())?;
+        for agg_input in &prover_input.agg_inputs {
+            let receipt: Receipt = bincode::deserialize(agg_input.proof().as_bytes())?;
+            let vk: Digest = bincode::deserialize(agg_input.vk().as_bytes())?;
 
-                env_builder.add_assumption(receipt);
-                env_builder.write(&vk)?;
-            }
+            env_builder.add_assumption(receipt);
+            env_builder.write(&vk)?;
         }
         let env = env_builder.build()?;
 
@@ -146,9 +138,9 @@ mod tests {
         let zkvm = RiscZeroHost::init(TEST_ELF.to_vec(), ProverOptions::default());
 
         // assert proof generation works
-        let (proof, vk) = zkvm
-            .prove(&[input], None, None)
-            .expect("Failed to generate proof");
+        let mut prover_input = ProverInput::new();
+        prover_input.write(input);
+        let (proof, vk) = zkvm.prove(&prover_input).expect("Failed to generate proof");
 
         // assert proof verification works
         Risc0Verifier::verify(&vk, &proof).expect("Proof verification failed");
@@ -165,9 +157,9 @@ mod tests {
         let zkvm = RiscZeroHost::init(TEST_ELF.to_vec(), ProverOptions::default());
 
         // assert proof generation works
-        let (proof, vk) = zkvm
-            .prove(&[input], None, None)
-            .expect("Failed to generate proof");
+        let mut prover_input = ProverInput::new();
+        prover_input.write(input);
+        let (proof, vk) = zkvm.prove(&prover_input).expect("Failed to generate proof");
 
         // assert proof verification works
         Risc0Verifier::verify_with_public_params(&vk, input, &proof)

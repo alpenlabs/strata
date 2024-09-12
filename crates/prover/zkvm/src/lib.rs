@@ -36,6 +36,48 @@ pub struct ProverOptions {
     pub stark_to_snark_conversion: bool,
 }
 
+#[derive(Debug, Clone)]
+pub struct ProverInput<T> {
+    /// A collection of serde-serializable items. These will be automatically
+    /// serialized and deserialized by the zkVM, providing a straightforward way
+    /// to work with commonly supported data types.
+    pub inputs: Vec<T>,
+    /// A collection of pre-serialized byte arrays. Use this field when
+    /// working with custom serializers/deserializers not natively supported by the zkVM, or when
+    /// a custom approach offers performance advantages.
+    pub serialized_inputs: Vec<Vec<u8>>,
+    /// A set of inputs used specifically for the aggregation/composition program
+    pub agg_inputs: Vec<AggregationInput>,
+}
+
+impl<T: serde::Serialize> ProverInput<T> {
+    pub fn new() -> Self {
+        ProverInput {
+            inputs: vec![],
+            serialized_inputs: vec![],
+            agg_inputs: vec![],
+        }
+    }
+
+    pub fn write(&mut self, value: T) {
+        self.inputs.push(value);
+    }
+
+    pub fn write_serialized(&mut self, value: Vec<u8>) {
+        self.serialized_inputs.push(value);
+    }
+
+    pub fn write_proof(&mut self, value: AggregationInput) {
+        self.agg_inputs.push(value);
+    }
+}
+
+impl<T: serde::Serialize> Default for ProverInput<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// A trait implemented by the prover ("host") of a zkVM program.
 pub trait ZKVMHost {
     /// Initializes the ZKVM with the provided ELF program and prover configuration.
@@ -46,9 +88,7 @@ pub trait ZKVMHost {
     // reasons proving can fail.
     fn prove<T: serde::Serialize>(
         &self,
-        items: &[T],
-        serialized_items: Option<&[Vec<u8>]>,
-        agg_inputs: Option<&[AggregationInput]>,
+        input: &ProverInput<T>,
     ) -> anyhow::Result<(Proof, VerificationKey)>;
 }
 

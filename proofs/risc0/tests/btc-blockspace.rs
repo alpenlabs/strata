@@ -5,7 +5,7 @@ mod test {
     use bitcoin::{consensus::serialize, Address};
     use btc_blockspace::logic::{BlockspaceProofOutput, ScanRuleConfig};
     use express_risc0_adapter::{Risc0Verifier, RiscZeroHost};
-    use express_zkvm::{ZKVMHost, ZKVMVerifier};
+    use express_zkvm::{ProverInput, ZKVMHost, ZKVMVerifier};
     use risc0_guest_builder::ALPEN_BTC_BLOCKSPACE_RISC0_PROOF_ELF;
 
     #[test]
@@ -26,8 +26,12 @@ mod test {
         };
         let serialized_block = serialize(&block);
 
+        let mut prover_input = ProverInput::new();
+        prover_input.write(scan_config.clone());
+        prover_input.write_serialized(serialized_block);
+
         let (proof, _) = prover
-            .prove(&[scan_config.clone()], Some(&[serialized_block]), None)
+            .prove(&prover_input)
             .expect("Failed to generate proof");
 
         let _output = Risc0Verifier::extract_public_output::<BlockspaceProofOutput>(&proof)

@@ -3,7 +3,7 @@
 mod test {
     use alpen_express_state::{block::L2Block, chain_state::ChainState};
     use express_sp1_adapter::{SP1Host, SP1Verifier};
-    use express_zkvm::{ZKVMHost, ZKVMVerifier};
+    use express_zkvm::{ProverInput, ZKVMHost, ZKVMVerifier};
     use sp1_guest_builder::GUEST_CL_STF_ELF;
 
     fn get_prover_input() -> (ChainState, L2Block) {
@@ -26,8 +26,11 @@ mod test {
 
         let prover = SP1Host::init(GUEST_CL_STF_ELF.into(), Default::default());
 
+        // TODO: handle this properly
+        let mut prover_input = ProverInput::new();
+        prover_input.write(input_ser);
         let (proof, _) = prover
-            .prove(&[input_ser], None, None)
+            .prove(&prover_input)
             .expect("Failed to generate proof");
 
         let new_state_ser = SP1Verifier::extract_public_output::<Vec<u8>>(&proof)

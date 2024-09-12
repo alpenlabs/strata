@@ -6,7 +6,9 @@ mod test {
     use bitcoin::{params::MAINNET, Address};
     use btc_blockspace::logic::{BlockspaceProofOutput, ScanRuleConfig};
     use express_risc0_adapter::{Risc0Verifier, RiscZeroHost};
-    use express_zkvm::{AggregationInput, ProverOptions, VerificationKey, ZKVMHost, ZKVMVerifier};
+    use express_zkvm::{
+        AggregationInput, ProverInput, ProverOptions, VerificationKey, ZKVMHost, ZKVMVerifier,
+    };
     use l1_batch::{
         header_verification::HeaderVerificationState,
         logic::{L1BatchProofInput, L1BatchProofOutput},
@@ -60,8 +62,8 @@ mod test {
             .flat_map(|&x| x.to_le_bytes())
             .collect();
 
-        let mut blockspace_proofs = Vec::new();
         let mut blockspace_outputs = Vec::new();
+        let mut prover_input = ProverInput::new();
         for (_, raw_block) in mainnet_blocks {
             let block_bytes = hex::decode(&raw_block).unwrap();
             let scan_config = ScanRuleConfig {
@@ -72,14 +74,18 @@ mod test {
                 .assume_checked()
                 .script_pubkey()],
             };
+            let mut inner_prover_input = ProverInput::new();
+            inner_prover_input.write(scan_config.clone());
+            inner_prover_input.write_serialized(block_bytes);
+
             let (proof, _) = prover
-                .prove(&[scan_config.clone()], Some(&[block_bytes]), None)
+                .prove(&inner_prover_input)
                 .expect("Failed to generate proof");
 
             let output = Risc0Verifier::extract_public_output::<BlockspaceProofOutput>(&proof)
                 .expect("Failed to extract public outputs");
 
-            blockspace_proofs.push(AggregationInput::new(
+            prover_input.write_proof(AggregationInput::new(
                 proof,
                 VerificationKey::new(btc_blockspace_elf_id.clone()),
             ));
@@ -92,8 +98,9 @@ mod test {
             state: get_header_verification_state(40321),
         };
 
+        prover_input.write(input);
         let (proof, _) = prover
-            .prove(&[input], None, Some(&blockspace_proofs))
+            .prove(&prover_input)
             .expect("Failed to generate proof");
 
         let _output = Risc0Verifier::extract_public_output::<L1BatchProofOutput>(&proof)
