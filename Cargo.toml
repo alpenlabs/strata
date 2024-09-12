@@ -17,6 +17,7 @@ members = [
   "crates/prover/btc-headerchain",
   "crates/prover/primitives",
   "crates/prover/zkvm",
+  "crates/prover/cl-stf",
   "crates/reth/db",
   "crates/reth/exex",
   "crates/reth/node",
@@ -32,6 +33,7 @@ members = [
   "crates/status",
   "crates/test-utils",
   "crates/util/mmr",
+  "crates/crypto",
   "crates/vtxjmt",
   "proofs/risc0",
   "proofs/sp1",
@@ -50,6 +52,7 @@ resolver = "2"
 alpen-express-btcio = { path = "crates/btcio" }
 alpen-express-common = { path = "crates/common" }
 alpen-express-consensus-logic = { path = "crates/consensus-logic" }
+alpen-express-crypto = { path = "crates/crypto", default-features = false }
 alpen-express-db = { path = "crates/db" }
 alpen-express-eectl = { path = "crates/eectl" }
 alpen-express-evmexec = { path = "crates/evmexec" }
@@ -75,7 +78,7 @@ express-rpc-utils = { path = "crates/rpc/utils" }
 express-storage = { path = "crates/storage" }
 express-sync = { path = "crates/sync" }
 express-tasks = { path = "crates/tasks" }
-express-zkvm = { path = "crates/prover/zkvm" }                      # FIXME make these names more consistent?
+express-zkvm = { path = "crates/prover/zkvm" }                              # FIXME make these names more consistent?
 zkvm = { path = "crates/prover/zkvm" }
 zkvm-primitives = { path = "crates/prover/primitives" }
 
@@ -89,7 +92,7 @@ argh = "0.1"
 async-trait = "0.1.80"
 base64 = "0.22.1"
 bincode = "1.3.3"
-bitcoin = { version = "0.32.1", features = ["serde"] }
+bitcoin = { version = "=0.32.1", features = ["serde"] }
 bitcoind = { version = "0.36.0", features = ["26_0"] }
 bitcoind-json-rpc-types = "0.3.0"
 borsh = { version = "1.5.0", features = ["derive"] }
@@ -148,7 +151,7 @@ revm-primitives = { version = "7.1.0", features = [
   "std",
 ], default-features = false }
 rockbound = { git = "https://github.com/alpenlabs/rockbound", rev = "v2.0.1-alpen.1" }
-secp256k1 = "0.29.0"
+secp256k1 = "=0.29.0"
 serde = { version = "1.0", features = ["derive"] }
 serde-hex = "0.1.0"
 serde_json = { version = "1.0", default-features = false, features = [

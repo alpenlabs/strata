@@ -3,6 +3,7 @@
 
 use std::{sync::Arc, thread, time};
 
+use alpen_express_crypto::sign_schnorr_sig;
 use alpen_express_db::traits::{
     ChainstateProvider, ClientStateProvider, Database, L1DataProvider, L2DataProvider, L2DataStore,
 };
@@ -28,7 +29,7 @@ use alpen_express_state::{
 use tracing::*;
 
 use super::types::*;
-use crate::{credential::sign_schnorr_sig, errors::Error};
+use crate::errors::Error;
 
 /// Signs and stores a block in the database.  Does not submit it to the
 /// forkchoice manager.

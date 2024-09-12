@@ -1,26 +1,11 @@
 //! Logic to check block credentials.
 
-use alpen_express_primitives::{
-    block_credential::CredRule,
-    buf::{Buf32, Buf64},
-    params::Params,
-};
-use alpen_express_state::header::{L2Header, SignedL2BlockHeader};
-use bitcoin::XOnlyPublicKey;
-use secp256k1::{schnorr::Signature, Keypair, Message, Secp256k1, SecretKey};
+use alpen_express_primitives::buf::{Buf32, Buf64};
+use secp256k1::{schnorr::Signature, Message, XOnlyPublicKey};
+#[cfg(feature = "rand")]
+use secp256k1::{Keypair, Secp256k1, SecretKey};
 
-pub fn check_block_credential(header: &SignedL2BlockHeader, params: &Params) -> bool {
-    let sigcom = compute_header_sig_commitment(header);
-    match &params.rollup().cred_rule {
-        CredRule::Unchecked => true,
-        CredRule::SchnorrKey(pubkey) => verify_schnorr_sig(header.sig(), &sigcom, pubkey),
-    }
-}
-
-fn compute_header_sig_commitment(header: &SignedL2BlockHeader) -> Buf32 {
-    header.get_blockid().into()
-}
-
+#[cfg(feature = "rand")]
 pub fn sign_schnorr_sig(msg: &Buf32, sk: &Buf32) -> Buf64 {
     let secp = Secp256k1::new();
     let sk = SecretKey::from_slice(sk.as_ref()).expect("Invalid private key");
@@ -30,7 +15,7 @@ pub fn sign_schnorr_sig(msg: &Buf32, sk: &Buf32) -> Buf64 {
     Buf64::from(sig.serialize())
 }
 
-fn verify_schnorr_sig(sig: &Buf64, msg: &Buf32, pk: &Buf32) -> bool {
+pub fn verify_schnorr_sig(sig: &Buf64, msg: &Buf32, pk: &Buf32) -> bool {
     let msg = match Message::from_digest_slice(msg.as_ref()) {
         Ok(msg) => msg,
         Err(_) => return false,

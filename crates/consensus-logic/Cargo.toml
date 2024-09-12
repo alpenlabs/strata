@@ -5,6 +5,7 @@ version = "0.1.0"
 
 [dependencies]
 alpen-express-btcio = { workspace = true }
+alpen-express-crypto = { workspace = true, default-features = true }
 alpen-express-db = { workspace = true }
 alpen-express-eectl = { workspace = true }
 alpen-express-primitives = { workspace = true }

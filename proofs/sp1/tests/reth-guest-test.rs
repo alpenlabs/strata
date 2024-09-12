@@ -19,7 +19,7 @@ mod test {
         let prover = SP1Host::init(GUEST_RETH_STF_ELF.into(), Default::default());
 
         let (proof, _) = prover
-            .prove(&[input.clone()], None)
+            .prove(&vec![input.clone()], None)
             .expect("Failed to generate proof");
 
         SP1Verifier::extract_public_output::<ELProofPublicParams>(&proof)

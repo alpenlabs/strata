@@ -7,10 +7,10 @@ use alpen_express_db::{
     traits::{BlockStatus, ChainstateProvider, ChainstateStore, Database},
 };
 use alpen_express_eectl::{engine::ExecEngineCtl, messages::ExecPayloadData};
-use alpen_express_primitives::{hash, params::Params};
+use alpen_express_primitives::params::Params;
 use alpen_express_state::{
-    block::L2BlockBundle, client_state::ClientState, operation::SyncAction, prelude::*,
-    state_op::StateCache, sync_event::SyncEvent,
+    block::L2BlockBundle, block_validation::validate_block_segments, client_state::ClientState,
+    operation::SyncAction, prelude::*, state_op::StateCache, sync_event::SyncEvent,
 };
 use express_chaintsn::transition::process_block;
 use express_storage::L2BlockManager;
@@ -19,8 +19,8 @@ use tokio::sync::mpsc;
 use tracing::*;
 
 use crate::{
-    credential, ctl::CsmController, errors::*, message::ForkChoiceMessage, reorg,
-    unfinalized_tracker, unfinalized_tracker::UnfinalizedBlockTracker,
+    ctl::CsmController, errors::*, message::ForkChoiceMessage, reorg, unfinalized_tracker,
+    unfinalized_tracker::UnfinalizedBlockTracker,
 };
 
 /// Tracks the parts of the chain that haven't been finalized on-chain yet.
@@ -451,7 +451,8 @@ fn check_new_block<D: Database>(
     let params = state.params.as_ref();
 
     // Check that the block is correctly signed.
-    let cred_ok = credential::check_block_credential(block.header(), params);
+    let cred_ok =
+        alpen_express_state::block_validation::check_block_credential(block.header(), params);
     if !cred_ok {
         warn!(?blkid, "block has invalid credential");
         return Ok(false);
@@ -465,39 +466,11 @@ fn check_new_block<D: Database>(
         }
     }
 
-    if !check_block_segments(block, blkid) {
+    if !validate_block_segments(block) {
         return Ok(false);
     }
 
     Ok(true)
-}
-
-fn check_block_segments(block: &L2Block, blkid: &L2BlockId) -> bool {
-    // check if the l1_segment_hash matches between L2Block and L2BlockHeader
-    let l1seg_buf = borsh::to_vec(block.l1_segment()).expect("blockasm: enc l1 segment");
-    let l1_segment_hash = hash::raw(&l1seg_buf);
-
-    if l1_segment_hash != *block.header().l1_payload_hash() {
-        warn!(
-            ?blkid,
-            "computed l1_segment_hash doesn't match between L2Block and L2BlockHeader"
-        );
-        return false;
-    }
-
-    // check if the exec_segment_hash matches between L2Block and L2BlockHeader
-    let eseg_buf = borsh::to_vec(block.exec_segment()).expect("blockasm: enc exec segment");
-    let exec_segment_hash = hash::raw(&eseg_buf);
-
-    if exec_segment_hash != *block.header().exec_payload_hash() {
-        warn!(
-            ?blkid,
-            "computed exec_segment_hash doesn't match between L2Block and L2BlockHeader"
-        );
-        return false;
-    }
-
-    true
 }
 
 /// Returns if we should switch to the new fork.  This is dependent on our
@@ -604,37 +577,4 @@ fn apply_tip_update<D: Database>(
     }
 
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use alpen_express_state::{
-        block::{ExecSegment, L1Segment, L2Block, L2BlockBody},
-        header::L2Header,
-    };
-    use alpen_test_utils::ArbitraryGenerator;
-
-    use super::check_block_segments;
-
-    #[test]
-    fn test_verify_block_hashes() {
-        // use arbitrary generator to get the new block
-        let block: L2Block = ArbitraryGenerator::new().generate();
-        let blk_id = block.header().get_blockid();
-
-        assert!(check_block_segments(&block, &blk_id));
-
-        let arb_exec_segment: ExecSegment = ArbitraryGenerator::new().generate();
-        let arb_l1_segment: L1Segment = ArbitraryGenerator::new().generate();
-        // mutate the l2Block's body to create a new block with arbitrary exec segment
-        let blk_body = L2BlockBody::new(block.body().l1_segment().clone(), arb_exec_segment);
-        let arb_exec_block = L2Block::new(block.header().clone(), blk_body);
-        assert!(!check_block_segments(&arb_exec_block, &blk_id));
-
-        // mutate the l2Block's body to create a new block with arbitrary l1 segment
-        let blk_body = L2BlockBody::new(arb_l1_segment, block.body().exec_segment().clone());
-        let arb_l1_block = L2Block::new(block.header().clone(), blk_body);
-
-        assert!(!check_block_segments(&arb_l1_block, &blk_id));
-    }
 }
