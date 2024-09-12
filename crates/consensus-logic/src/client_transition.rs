@@ -140,12 +140,15 @@ pub fn process_event<D: Database>(
 
         SyncEvent::NewTipBlock(blkid) => {
             let l2prov = database.l2_provider();
-            let _block = l2prov
+            let block = l2prov
                 .get_block_data(*blkid)?
                 .ok_or(Error::MissingL2Block(*blkid))?;
 
             // TODO better checks here
-            writes.push(ClientStateWrite::AcceptL2Block(*blkid));
+            writes.push(ClientStateWrite::AcceptL2Block(
+                *blkid,
+                block.block().header().blockidx(),
+            ));
             actions.push(SyncAction::UpdateTip(*blkid));
         }
     }

@@ -98,6 +98,9 @@ impl ClientState {
 // TODO maybe include tip height and finalized height?  or their headers?
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
 pub struct SyncState {
+    /// Height of last L2 block we've chosen as the current tip.
+    pub(super) tip_height: u64,
+
     /// Last L2 block we've chosen as the current tip.
     pub(super) tip_blkid: L2BlockId,
 
@@ -114,6 +117,7 @@ type L1BlockHeight = u64;
 impl SyncState {
     pub fn from_genesis_blkid(gblkid: L2BlockId) -> Self {
         Self {
+            tip_height: 0,
             tip_blkid: gblkid,
             confirmed_checkpoint_blocks: Vec::new(),
             finalized_blkid: gblkid,
@@ -138,6 +142,10 @@ impl SyncState {
             .iter()
             .find(|(h, _)| *h == l1_height)
             .map(|e| e.1)
+    }
+
+    pub fn chain_tip_height(&self) -> u64 {
+        self.tip_height
     }
 }
 

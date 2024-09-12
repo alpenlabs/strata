@@ -548,7 +548,7 @@ dependencies = [
  "alloy-sol-macro-input",
  "const-hex",
  "heck 0.5.0",
- "indexmap 2.2.6",
+ "indexmap 2.5.0",
  "proc-macro-error",
  "proc-macro2",
  "quote",
@@ -724,6 +724,7 @@ dependencies = [
  "express-chaintsn",
  "express-storage",
  "express-tasks",
+ "futures",
  "rand 0.8.5",
  "secp256k1",
  "thiserror",
@@ -922,9 +923,13 @@ dependencies = [
  "argh",
  "async-trait",
  "bitcoin",
+ "borsh",
+ "express-rpc-utils",
  "express-storage",
+ "express-sync",
  "express-tasks",
  "format_serde_error",
+ "futures",
  "hex",
  "jsonrpsee",
  "parking_lot 0.12.3",
@@ -1927,7 +1932,7 @@ dependencies = [
  "bitflags 2.6.0",
  "boa_interner",
  "boa_macros",
- "indexmap 2.2.6",
+ "indexmap 2.5.0",
  "num-bigint 0.4.6",
  "rustc-hash 2.0.0",
 ]
@@ -1953,7 +1958,7 @@ dependencies = [
  "fast-float",
  "hashbrown 0.14.5",
  "icu_normalizer",
- "indexmap 2.2.6",
+ "indexmap 2.5.0",
  "intrusive-collections",
  "itertools 0.13.0",
  "num-bigint 0.4.6",
@@ -1999,7 +2004,7 @@ dependencies = [
  "boa_gc",
  "boa_macros",
  "hashbrown 0.14.5",
- "indexmap 2.2.6",
+ "indexmap 2.5.0",
  "once_cell",
  "phf",
  "rustc-hash 2.0.0",
@@ -3907,6 +3912,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "express-sync"
+version = "0.1.0"
+dependencies = [
+ "alpen-express-consensus-logic",
+ "alpen-express-db",
+ "alpen-express-primitives",
+ "alpen-express-rpc-api",
+ "alpen-express-rpc-types",
+ "alpen-express-state",
+ "anyhow",
+ "arbitrary",
+ "async-trait",
+ "borsh",
+ "express-storage",
+ "futures",
+ "futures-util",
+ "thiserror",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "express-tasks"
 version = "0.1.0"
 dependencies = [
@@ -4415,7 +4442,7 @@ dependencies = [
  "futures-sink",
  "futures-util",
  "http 0.2.12",
- "indexmap 2.2.6",
+ "indexmap 2.5.0",
  "slab",
  "tokio",
  "tokio-util",
@@ -4434,7 +4461,7 @@ dependencies = [
  "futures-core",
  "futures-sink",
  "http 1.1.0",
- "indexmap 2.2.6",
+ "indexmap 2.5.0",
  "slab",
  "tokio",
  "tokio-util",
@@ -5097,9 +5124,9 @@ dependencies = [
 
 [[package]]
 name = "indexmap"
-version = "2.2.6"
+version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "168fb715dda47215e360912c096649d23d58bf392ac62f73919e831745e40f26"
+checksum = "68b900aa2f7301e21c36462b170ee99994de34dff39a4a6a528e80e7376d07e5"
 dependencies = [
  "equivalent",
  "hashbrown 0.14.5",
@@ -6065,7 +6092,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4f0c8427b39666bf970460908b213ec09b3b350f20c0c2eabcbba51704a08e6"
 dependencies = [
  "base64 0.22.1",
- "indexmap 2.2.6",
+ "indexmap 2.5.0",
  "metrics",
  "metrics-util",
  "quanta",
@@ -6097,7 +6124,7 @@ dependencies = [
  "crossbeam-epoch",
  "crossbeam-utils",
  "hashbrown 0.14.5",
- "indexmap 2.2.6",
+ "indexmap 2.5.0",
  "metrics",
  "num_cpus",
  "ordered-float",
@@ -8959,7 +8986,7 @@ dependencies = [
  "byteorder",
  "dashmap 6.0.1",
  "derive_more",
- "indexmap 2.2.6",
+ "indexmap 2.5.0",
  "parking_lot 0.12.3",
  "reth-mdbx-sys",
  "thiserror",
@@ -11086,7 +11113,7 @@ version = "1.0.127"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8043c06d9f82bd7271361ed64f415fe5e12a77fdb52e573e7f06a516dea329ad"
 dependencies = [
- "indexmap 2.2.6",
+ "indexmap 2.5.0",
  "itoa",
  "memchr",
  "ryu",
@@ -11134,7 +11161,7 @@ dependencies = [
  "chrono",
  "hex",
  "indexmap 1.9.3",
- "indexmap 2.2.6",
+ "indexmap 2.5.0",
  "serde",
  "serde_derive",
  "serde_json",
@@ -11172,7 +11199,7 @@ version = "0.9.34+deprecated"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6a8b1a1a2ebf674015cc02edccce75287f1a0130d394307b36743c2f5d504b47"
 dependencies = [
- "indexmap 2.2.6",
+ "indexmap 2.5.0",
  "itoa",
  "ryu",
  "serde",
@@ -12381,7 +12408,7 @@ version = "0.19.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b5bb770da30e5cbfde35a2d7b9b8a2c4b8ef89548a7a6aeab5c9a576e3e7421"
 dependencies = [
- "indexmap 2.2.6",
+ "indexmap 2.5.0",
  "toml_datetime",
  "winnow 0.5.40",
 ]
@@ -12392,7 +12419,7 @@ version = "0.21.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6a8534fd7f78b5405e860340ad6575217ce99f38d4d5c8f2442cb5ecb50090e1"
 dependencies = [
- "indexmap 2.2.6",
+ "indexmap 2.5.0",
  "toml_datetime",
  "winnow 0.5.40",
 ]
@@ -12403,7 +12430,7 @@ version = "0.22.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d59a3a72298453f564e2b111fa896f8d07fabb36f51f06d7e875fc5e0b5a3ef1"
 dependencies = [
- "indexmap 2.2.6",
+ "indexmap 2.5.0",
  "serde",
  "serde_spanned",
  "toml_datetime",
@@ -13659,7 +13686,7 @@ dependencies = [
  "crossbeam-utils",
  "displaydoc",
  "flate2",
- "indexmap 2.2.6",
+ "indexmap 2.5.0",
  "memchr",
  "thiserror",
  "zopfli",

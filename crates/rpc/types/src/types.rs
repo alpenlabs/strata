@@ -4,9 +4,15 @@
 //!  - implementation of RPC client
 //!  - crate for just data structures that represents the JSON responses from Bitcoin core RPC
 
-use alpen_express_state::bridge_ops::WithdrawalIntent;
+use alpen_express_state::{bridge_ops::WithdrawalIntent, id::L2BlockId};
 use bitcoin::Txid;
 use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HexBytes(#[serde(with = "hex::serde")] pub Vec<u8>);
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HexBytes32(#[serde(with = "hex::serde")] pub [u8; 32]);
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct L1Status {
@@ -144,4 +150,13 @@ pub struct DepositEntry {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct L2BlockId(#[serde(with = "hex::serde")] pub [u8; 32]);
+pub struct NodeSyncStatus {
+    /// Current head L2 slot known to this node
+    pub tip_height: u64,
+
+    /// Last L2 block we've chosen as the current tip.
+    pub tip_block_id: L2BlockId,
+
+    /// L2 block that's been finalized and proven on L1.
+    pub finalized_block_id: L2BlockId,
+}

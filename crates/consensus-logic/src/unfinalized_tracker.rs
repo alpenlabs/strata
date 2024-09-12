@@ -2,9 +2,11 @@
 
 use std::collections::*;
 
+use alpen_express_db::traits::BlockStatus;
 use alpen_express_primitives::buf::Buf32;
 use alpen_express_state::prelude::*;
 use express_storage::L2BlockManager;
+use tracing::warn;
 
 use crate::errors::ChainTipError;
 
@@ -55,6 +57,12 @@ impl UnfinalizedBlockTracker {
         &self.finalized_tip
     }
 
+    /// Returns `true` if the block is either the finalized tip or is already
+    /// known to the tracker.
+    pub fn is_seen_block(&self, id: &L2BlockId) -> bool {
+        self.finalized_tip == *id || self.pending_table.contains_key(id)
+    }
+
     /// Gets the parent of a block from within the tree.  Returns `None` if the
     /// block or its parent isn't in the tree.  Returns `None` for the finalized
     /// tip block, since its parent isn't in the tree.
@@ -95,7 +103,8 @@ impl UnfinalizedBlockTracker {
         header: &SignedL2BlockHeader,
     ) -> Result<bool, ChainTipError> {
         if self.pending_table.contains_key(&blkid) {
-            return Err(ChainTipError::BlockAlreadyAttached(blkid));
+            warn!(blkid = ?blkid, "block already attached");
+            return Ok(false);
         }
 
         let parent_blkid = header.parent();
@@ -233,21 +242,39 @@ impl UnfinalizedBlockTracker {
     pub fn load_unfinalized_blocks(
         &mut self,
         finalized_height: u64,
+        chain_tip_height: u64,
         l2_block_manager: &L2BlockManager,
     ) -> anyhow::Result<()> {
-        let mut height = finalized_height;
-        while let Ok(block_ids) = l2_block_manager.get_blocks_at_height_blocking(height) {
+        for height in (finalized_height + 1)..=chain_tip_height {
+            let Ok(block_ids) = l2_block_manager.get_blocks_at_height_blocking(height) else {
+                return Err(anyhow::anyhow!("failed to get blocks at height {}", height));
+            };
+            let block_ids = block_ids
+                .into_iter()
+                .filter(|block_id| {
+                    let Ok(Some(block_status)) =
+                        l2_block_manager.get_block_status_blocking(block_id)
+                    else {
+                        // missing block status
+                        warn!(block_id = ?block_id, "missing block status");
+                        return false;
+                    };
+                    block_status == BlockStatus::Valid
+                })
+                .collect::<Vec<_>>();
+
             if block_ids.is_empty() {
-                break;
+                return Err(anyhow::anyhow!("missing blocks at height {}", height));
             }
+
             for block_id in block_ids {
                 if let Some(block) = l2_block_manager.get_block_blocking(&block_id)? {
                     let header = block.header();
                     let _ = self.attach_block(block_id, header);
                 }
             }
-            height += 1;
         }
+
         Ok(())
     }
 
@@ -314,7 +341,7 @@ impl FinalizeReport {
 mod tests {
     use std::collections::HashSet;
 
-    use alpen_express_db::traits::{Database, L2DataStore};
+    use alpen_express_db::traits::{BlockStatus, Database, L2DataStore};
     use alpen_express_rocksdb::test_utils::get_common_db;
     use alpen_express_state::{header::L2Header, id::L2BlockId};
     use alpen_test_utils::l2::gen_l2_chain;
@@ -348,7 +375,11 @@ mod tests {
             .chain(b_chain.clone())
             .chain(c_chain.clone())
         {
+            let blockid = b.header().get_blockid();
             l2_prov.put_block_data(b).unwrap();
+            l2_prov
+                .set_block_status(blockid, BlockStatus::Valid)
+                .unwrap();
         }
 
         [
@@ -374,7 +405,9 @@ mod tests {
         let mut chain_tracker =
             unfinalized_tracker::UnfinalizedBlockTracker::new_empty(prev_finalized_tip);
 
-        chain_tracker.load_unfinalized_blocks(1, l2_blkman).unwrap();
+        chain_tracker
+            .load_unfinalized_blocks(0, 3, l2_blkman)
+            .unwrap();
 
         let report = chain_tracker
             .update_finalized_tip(&new_finalized_tip)
@@ -400,7 +433,9 @@ mod tests {
         let pool = threadpool::ThreadPool::new(1);
         let blkman = L2BlockManager::new(pool, db);
 
-        chain_tracker.load_unfinalized_blocks(1, &blkman).unwrap();
+        chain_tracker
+            .load_unfinalized_blocks(0, 3, &blkman)
+            .unwrap();
 
         assert_eq!(chain_tracker.get_parent(&g), None);
         assert_eq!(chain_tracker.get_parent(&a1), Some(&g));
@@ -445,7 +480,9 @@ mod tests {
         let pool = threadpool::ThreadPool::new(1);
         let blkman = L2BlockManager::new(pool, db);
 
-        chain_tracker.load_unfinalized_blocks(1, &blkman).unwrap();
+        chain_tracker
+            .load_unfinalized_blocks(0, 3, &blkman)
+            .unwrap();
 
         assert_eq!(
             chain_tracker.get_all_descendants(&g),

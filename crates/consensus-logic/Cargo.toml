@@ -18,6 +18,7 @@ express-tasks = { workspace = true }
 anyhow = { workspace = true }
 bitcoin = { workspace = true }
 borsh = { workspace = true }
+futures = { workspace = true }
 secp256k1 = { workspace = true, features = ["rand-std"] }
 thiserror = { workspace = true }
 threadpool = { workspace = true }
