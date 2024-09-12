@@ -17,11 +17,12 @@ pub struct L1BatchProofOutput {
     pub deposits: Vec<DepositRequestData>,
     pub forced_inclusions: Vec<ForcedInclusion>,
     pub state_updates: Vec<StateUpdate>,
-    pub state: HeaderVerificationState,
+    pub initial_state: HeaderVerificationState,
+    pub final_state: HeaderVerificationState,
 }
 
 pub fn process_batch_proof(input: L1BatchProofInput, params: &PowParams) -> L1BatchProofOutput {
-    let mut state = input.state;
+    let mut state = input.state.clone();
 
     let mut deposits = Vec::new();
     let mut forced_inclusions = Vec::new();
@@ -38,6 +39,7 @@ pub fn process_batch_proof(input: L1BatchProofInput, params: &PowParams) -> L1Ba
         deposits,
         forced_inclusions,
         state_updates,
-        state,
+        initial_state: input.state,
+        final_state: state,
     }
 }
