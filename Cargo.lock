@@ -2165,19 +2165,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "btc-blockspace"
-version = "0.1.0"
-dependencies = [
- "alpen-express-primitives",
- "alpen-test-utils",
- "bitcoin",
- "hex",
- "rand 0.8.5",
- "serde",
- "sha2 0.10.8",
-]
-
-[[package]]
 name = "bumpalo"
 version = "3.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3780,7 +3767,20 @@ dependencies = [
 ]
 
 [[package]]
-name = "express-cl-stf"
+name = "express-proofimpl-btc-blockspace"
+version = "0.1.0"
+dependencies = [
+ "alpen-express-primitives",
+ "alpen-test-utils",
+ "bitcoin",
+ "hex",
+ "rand 0.8.5",
+ "serde",
+ "sha2 0.10.8",
+]
+
+[[package]]
+name = "express-proofimpl-cl-stf"
 version = "0.1.0"
 dependencies = [
  "alpen-express-crypto",
@@ -3793,6 +3793,43 @@ dependencies = [
 ]
 
 [[package]]
+name = "express-proofimpl-evm-ee-stf"
+version = "0.1.0"
+dependencies = [
+ "alloy-eips",
+ "alloy-rlp",
+ "alloy-rlp-derive",
+ "alloy-rpc-types",
+ "anyhow",
+ "bincode",
+ "hex-literal",
+ "k256",
+ "reth-primitives",
+ "reth-trie-common",
+ "revm",
+ "rlp",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
+name = "express-proofimpl-l1-batch"
+version = "0.1.0"
+dependencies = [
+ "alpen-express-primitives",
+ "alpen-test-utils",
+ "anyhow",
+ "bitcoin",
+ "borsh",
+ "ethnum",
+ "express-proofimpl-btc-blockspace",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "express-reth-db"
 version = "0.1.0"
 dependencies = [
@@ -3801,13 +3838,13 @@ dependencies = [
  "anyhow",
  "bincode",
  "borsh",
+ "express-proofimpl-evm-ee-stf",
  "reth-primitives",
  "rockbound",
  "serde",
  "serde_json",
  "tempfile",
  "tracing",
- "zkvm-primitives",
 ]
 
 [[package]]
@@ -3817,6 +3854,7 @@ dependencies = [
  "alloy-rpc-types",
  "anyhow",
  "bincode",
+ "express-proofimpl-evm-ee-stf",
  "express-reth-db",
  "eyre",
  "reth-exex",
@@ -3832,7 +3870,6 @@ dependencies = [
  "thiserror",
  "tokio",
  "tracing",
- "zkvm-primitives",
 ]
 
 [[package]]
@@ -3864,6 +3901,7 @@ name = "express-reth-rpc"
 version = "0.1.0"
 dependencies = [
  "bincode",
+ "express-proofimpl-evm-ee-stf",
  "express-reth-db",
  "express-rpc-utils",
  "eyre",
@@ -3872,7 +3910,6 @@ dependencies = [
  "reth-primitives",
  "serde",
  "tokio",
- "zkvm-primitives",
 ]
 
 [[package]]
@@ -3885,6 +3922,28 @@ dependencies = [
  "risc0-zkvm",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "express-risc0-guest-builder"
+version = "0.1.0"
+dependencies = [
+ "alpen-express-primitives",
+ "alpen-express-state",
+ "alpen-test-utils",
+ "bincode",
+ "bitcoin",
+ "borsh",
+ "express-chaintsn",
+ "express-proofimpl-btc-blockspace",
+ "express-proofimpl-evm-ee-stf",
+ "express-proofimpl-l1-batch",
+ "express-risc0-adapter",
+ "express-zkvm",
+ "hex",
+ "rand 0.8.5",
+ "risc0-build",
+ "risc0-zkvm",
 ]
 
 [[package]]
@@ -3904,6 +3963,25 @@ dependencies = [
  "serde",
  "serde_json",
  "sp1-sdk",
+]
+
+[[package]]
+name = "express-sp1-guest-builder"
+version = "0.1.0"
+dependencies = [
+ "alpen-express-primitives",
+ "alpen-express-state",
+ "alpen-test-utils",
+ "bincode",
+ "bitcoin",
+ "borsh",
+ "express-proofimpl-btc-blockspace",
+ "express-proofimpl-evm-ee-stf",
+ "express-proofimpl-l1-batch",
+ "express-sp1-adapter",
+ "express-zkvm",
+ "hex",
+ "sp1-helper",
 ]
 
 [[package]]
@@ -5634,22 +5712,6 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_yaml 0.9.34+deprecated",
-]
-
-[[package]]
-name = "l1-batch"
-version = "0.1.0"
-dependencies = [
- "alpen-express-primitives",
- "alpen-test-utils",
- "anyhow",
- "bitcoin",
- "borsh",
- "btc-blockspace",
- "ethnum",
- "rand 0.8.5",
- "serde",
- "serde_json",
 ]
 
 [[package]]
@@ -10452,28 +10514,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "risc0-guest-builder"
-version = "0.1.0"
-dependencies = [
- "alpen-express-primitives",
- "alpen-express-state",
- "alpen-test-utils",
- "bincode",
- "bitcoin",
- "borsh",
- "btc-blockspace",
- "express-chaintsn",
- "express-risc0-adapter",
- "express-zkvm",
- "hex",
- "l1-batch",
- "rand 0.8.5",
- "risc0-build",
- "risc0-zkvm",
- "zkvm-primitives",
-]
-
-[[package]]
 name = "risc0-sys"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11595,25 +11635,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.109",
-]
-
-[[package]]
-name = "sp1-guest-builder"
-version = "0.1.0"
-dependencies = [
- "alpen-express-primitives",
- "alpen-express-state",
- "alpen-test-utils",
- "bincode",
- "bitcoin",
- "borsh",
- "btc-blockspace",
- "express-sp1-adapter",
- "express-zkvm",
- "hex",
- "l1-batch",
- "sp1-helper",
- "zkvm-primitives",
 ]
 
 [[package]]
@@ -13757,27 +13778,6 @@ dependencies = [
  "sha2 0.10.8",
  "sha3",
  "subtle",
-]
-
-[[package]]
-name = "zkvm-primitives"
-version = "0.1.0"
-dependencies = [
- "alloy-eips",
- "alloy-rlp",
- "alloy-rlp-derive",
- "alloy-rpc-types",
- "anyhow",
- "bincode",
- "hex-literal",
- "k256",
- "reth-primitives",
- "reth-trie-common",
- "revm",
- "rlp",
- "serde",
- "serde_json",
- "thiserror",
 ]
 
 [[package]]

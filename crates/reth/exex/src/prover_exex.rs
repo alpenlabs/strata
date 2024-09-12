@@ -4,6 +4,10 @@ use std::{
 };
 
 use alloy_rpc_types::EIP1186AccountProofResponse;
+use express_proofimpl_evm_ee_stf::{
+    mpt::{self, proofs_to_tries},
+    ELProofInput,
+};
 use express_reth_db::WitnessStore;
 use eyre::eyre;
 use reth_exex::{ExExContext, ExExEvent};
@@ -13,10 +17,6 @@ use reth_provider::{BlockReader, Chain, ExecutionOutcome, StateProviderFactory};
 use reth_revm::{db::BundleState, primitives::FixedBytes};
 use reth_rpc_types_compat::proof::from_primitive_account_proof;
 use tracing::{debug, error};
-use zkvm_primitives::{
-    mpt::{self, proofs_to_tries},
-    ZKVMInput,
-};
 
 pub struct ProverWitnessGenerator<Node: FullNodeComponents, S: WitnessStore + Clone> {
     ctx: ExExContext<Node>,
@@ -77,7 +77,7 @@ fn extract_zkvm_input<Node: FullNodeComponents>(
     block_id: FixedBytes<32>,
     ctx: &ExExContext<Node>,
     exec_outcome: &ExecutionOutcome,
-) -> eyre::Result<ZKVMInput> {
+) -> eyre::Result<ELProofInput> {
     let current_block = ctx
         .provider()
         .block_by_hash(block_id)?
@@ -150,7 +150,7 @@ fn extract_zkvm_input<Node: FullNodeComponents>(
     )
     .expect("Proof to tries infallible");
 
-    let input = ZKVMInput {
+    let input = ELProofInput {
         beneficiary: current_block.header.beneficiary,
         gas_limit: current_block.gas_limit,
         timestamp: current_block.header.timestamp,

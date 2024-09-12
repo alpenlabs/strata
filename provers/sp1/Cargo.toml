@@ -1,0 +1,29 @@
+[package]
+edition = "2021"
+name = "express-sp1-guest-builder"
+version = "0.1.0"
+
+[dependencies]
+express-sp1-adapter = { path = "../../crates/zkvm/adapters/sp1", features = [
+  "prover",
+], optional = true }
+
+[build-dependencies]
+sp1-helper = "1.0.1"
+
+[dev-dependencies]
+alpen-test-utils = { workspace = true }
+bincode = { workspace = true }
+bitcoin = { workspace = true }
+express-proofimpl-btc-blockspace = { workspace = true }
+express-zkvm = { workspace = true }
+hex = { workspace = true }
+express-proofimpl-l1-batch = { workspace = true }
+express-proofimpl-evm-ee-stf = { workspace = true }
+alpen-express-state.workspace = true
+alpen-express-primitives.workspace = true
+borsh = { workspace = true }
+
+[features]
+default = []
+prover = ["dep:express-sp1-adapter"]

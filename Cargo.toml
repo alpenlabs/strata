@@ -12,13 +12,13 @@ members = [
   "crates/eectl",
   "crates/evmexec",
   "crates/primitives",
-  "crates/prover/adapters/risc0",
-  "crates/prover/adapters/sp1",
-  "crates/prover/btc-blockspace",
-  "crates/prover/cl-stf",
-  "crates/prover/l1-batch",
-  "crates/prover/primitives",
-  "crates/prover/zkvm",
+  "crates/zkvm/adapters/risc0",
+  "crates/zkvm/adapters/sp1",
+  "crates/proof-impl/btc-blockspace",
+  "crates/proof-impl/cl-stf",
+  "crates/proof-impl/evm-ee-stf",
+  "crates/proof-impl/l1-batch",
+  "crates/zkvm/zkvm",
   "crates/reth/db",
   "crates/reth/exex",
   "crates/reth/node",
@@ -35,8 +35,8 @@ members = [
   "crates/test-utils",
   "crates/util/mmr",
   "crates/vtxjmt",
-  "proofs/risc0",
-  "proofs/sp1",
+  "provers/risc0",
+  "provers/sp1",
 
   # binaries listed separately
   "bin/bridge-client",
@@ -64,12 +64,14 @@ alpen-express-rpc-types = { path = "crates/rpc/types" }
 alpen-express-state = { path = "crates/state" }
 alpen-express-status = { path = "crates/status" }
 alpen-test-utils = { path = "crates/test-utils" }
-btc-blockspace = { path = "crates/prover/btc-blockspace" }
 express-bridge-exec = { path = "crates/bridge-exec" }
 express-bridge-rpc-api = { path = "crates/rpc/bridge-api" }
 express-bridge-sig-manager = { path = "crates/bridge-sig-manager" }
 express-bridge-tx-builder = { path = "crates/bridge-tx-builder" }
 express-chaintsn = { path = "crates/chaintsn" }
+express-proofimpl-btc-blockspace = { path = "crates/proof-impl/btc-blockspace" }
+express-proofimpl-evm-ee-stf = { path = "crates/proof-impl/evm-ee-stf" }
+express-proofimpl-l1-batch = { path = "crates/proof-impl/l1-batch" }
 express-reth-db = { path = "crates/reth/db" }
 express-reth-exex = { path = "crates/reth/exex" }
 express-reth-node = { path = "crates/reth/node" }
@@ -78,9 +80,7 @@ express-rpc-utils = { path = "crates/rpc/utils" }
 express-storage = { path = "crates/storage" }
 express-sync = { path = "crates/sync" }
 express-tasks = { path = "crates/tasks" }
-express-zkvm = { path = "crates/prover/zkvm" }                              # FIXME make these names more consistent?
-l1-batch = { path = "crates/prover/l1-batch" }
-zkvm-primitives = { path = "crates/prover/primitives" }
+express-zkvm = { path = "crates/zkvm/zkvm" }                                     # FIXME make these names more consistent?
 
 # IMPORTANT: ensure alloy-* and revm packages are of the same version as inside reth dependency
 alloy-genesis = { version = "0.2", default-features = false }
