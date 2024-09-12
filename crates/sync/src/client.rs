@@ -12,7 +12,7 @@ pub enum ClientError {
     MissingBlock(L2BlockId),
     #[error("failed to deserialize block: {0}")]
     Deserialization(String),
-    #[error("network error: {0}")]
+    #[error("network: {0}")]
     Network(String),
 }
 
@@ -52,14 +52,11 @@ impl<RPC: AlpenApiClient + Send + Sync> RpcSyncPeer<RPC> {
     ) -> Result<Vec<L2BlockBundle>, ClientError> {
         let bytes = self
             .rpc_client
-            .sync_blocks(start_height, end_height)
+            .get_raw_bundles(start_height, end_height)
             .await
             .map_err(|e| ClientError::Network(e.to_string()))?;
 
-        match borsh::from_slice(&bytes.0) {
-            Ok(blocks) => Ok(blocks),
-            Err(err) => Err(ClientError::Deserialization(err.to_string())),
-        }
+        borsh::from_slice(&bytes.0).map_err(|err| ClientError::Deserialization(err.to_string()))
     }
 }
 
@@ -102,17 +99,11 @@ impl<RPC: AlpenApiClient + Send + Sync> SyncClient for RpcSyncPeer<RPC> {
     ) -> Result<Option<L2BlockBundle>, ClientError> {
         let bytes = self
             .rpc_client
-            .sync_block_by_id(*block_id)
+            .get_raw_bundle_by_id(*block_id)
             .await
             .map_err(|e| ClientError::Network(e.to_string()))?
             .ok_or(ClientError::MissingBlock(*block_id))?;
 
-        match borsh::from_slice(&bytes.0) {
-            Ok(blocks) => Ok(blocks),
-            Err(err) => {
-                error!("failed to deserialize blocks: {err}");
-                Err(ClientError::Deserialization(err.to_string()))
-            }
-        }
+        borsh::from_slice(&bytes.0).map_err(|err| ClientError::Deserialization(err.to_string()))
     }
 }

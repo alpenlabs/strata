@@ -28,7 +28,7 @@ pub enum ClientMode {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct ClientParams {
+pub struct ClientConfig {
     pub rpc_port: u16,
     #[serde(flatten)]
     pub client_mode: ClientMode,
@@ -39,7 +39,7 @@ pub struct ClientParams {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct SyncParams {
+pub struct SyncConfig {
     pub l1_follow_distance: u64,
     pub max_reorg_depth: u32,
     pub client_poll_dur_ms: u32,
@@ -47,7 +47,7 @@ pub struct SyncParams {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct BitcoindParams {
+pub struct BitcoindConfig {
     pub rpc_url: String,
     pub rpc_user: String,
     pub rpc_password: String,
@@ -55,29 +55,29 @@ pub struct BitcoindParams {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct RethELParams {
+pub struct RethELConfig {
     pub rpc_url: String,
     pub secret: PathBuf,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct ExecParams {
-    pub reth: RethELParams,
+pub struct ExecConfig {
+    pub reth: RethELConfig,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
-    pub client: ClientParams,
-    pub bitcoind_rpc: BitcoindParams,
-    pub sync: SyncParams,
-    pub exec: ExecParams,
+    pub client: ClientConfig,
+    pub bitcoind_rpc: BitcoindConfig,
+    pub sync: SyncConfig,
+    pub exec: ExecConfig,
 }
 
 impl Config {
     pub fn from_args(args: &Args) -> Result<Config, String> {
         let args = args.clone();
         Ok(Self {
-            bitcoind_rpc: BitcoindParams {
+            bitcoind_rpc: BitcoindConfig {
                 rpc_url: args
                     .bitcoind_host
                     .ok_or_else(|| "args: no bitcoin --rpc-url provided".to_string())?,
@@ -91,7 +91,7 @@ impl Config {
                     .network
                     .ok_or_else(|| "args: no bitcoin --network provided".to_string())?,
             },
-            client: ClientParams {
+            client: ClientConfig {
                 rpc_port: args
                     .rpc_port
                     .ok_or_else(|| "args: no client --rpc-port provided".to_string())?,
@@ -118,14 +118,14 @@ impl Config {
                 l2_blocks_fetch_limit: 1_000,
                 db_retry_count: 5,
             },
-            sync: SyncParams {
+            sync: SyncConfig {
                 l1_follow_distance: 6,
                 max_reorg_depth: 4,
                 client_poll_dur_ms: 200,
                 client_checkpoint_interval: 10,
             },
-            exec: ExecParams {
-                reth: RethELParams {
+            exec: ExecConfig {
+                reth: RethELConfig {
                     rpc_url: args.reth_authrpc.unwrap_or("".to_string()), // TODO: sensible default
                     secret: args.reth_jwtsecret.unwrap_or_default(),      /* TODO: probably
                                                                            * secret should be

@@ -316,7 +316,7 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         Ok(blk_headers)
     }
 
-    async fn get_block_headers_at_idx(&self, idx: u64) -> RpcResult<Option<Vec<BlockHeader>>> {
+    async fn get_headers_at_idx(&self, idx: u64) -> RpcResult<Option<Vec<BlockHeader>>> {
         let cl_state = self.get_client_state().await;
         let tip_blkid = *cl_state
             .sync()
@@ -349,7 +349,7 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         Ok(blk_header)
     }
 
-    async fn get_block_header_by_id(&self, blkid: L2BlockId) -> RpcResult<Option<BlockHeader>> {
+    async fn get_header_by_id(&self, blkid: L2BlockId) -> RpcResult<Option<BlockHeader>> {
         let db = self.database.clone();
         // let blkid = L2BlockId::from(Buf32::from(blkid.0));
 
@@ -467,7 +467,7 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         })
     }
 
-    async fn sync_blocks(&self, start_height: u64, end_height: u64) -> RpcResult<HexBytes> {
+    async fn get_raw_bundles(&self, start_height: u64, end_height: u64) -> RpcResult<HexBytes> {
         let block_ids = futures::future::join_all(
             (start_height..=end_height)
                 .map(|height| self.l2_block_manager.get_blocks_at_height_async(height)),
@@ -497,7 +497,7 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
             .map_err(to_jsonrpsee_error("failed to serialize"))
     }
 
-    async fn sync_block_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<HexBytes>> {
+    async fn get_raw_bundle_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<HexBytes>> {
         let block = self
             .l2_block_manager
             .get_block_async(&block_id)

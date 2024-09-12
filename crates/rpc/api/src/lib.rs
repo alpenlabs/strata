@@ -36,11 +36,11 @@ pub trait AlpenApi {
     #[method(name = "getRecentBlockHeaders")]
     async fn get_recent_block_headers(&self, count: u64) -> RpcResult<Vec<BlockHeader>>;
 
-    #[method(name = "getBlockHeadersAtIdx")]
-    async fn get_block_headers_at_idx(&self, index: u64) -> RpcResult<Option<Vec<BlockHeader>>>;
+    #[method(name = "getHeadersAtIdx")]
+    async fn get_headers_at_idx(&self, index: u64) -> RpcResult<Option<Vec<BlockHeader>>>;
 
-    #[method(name = "getBlockHeaderById")]
-    async fn get_block_header_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<BlockHeader>>;
+    #[method(name = "getHeaderById")]
+    async fn get_header_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<BlockHeader>>;
 
     #[method(name = "getExecUpdateById")]
     async fn get_exec_update_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<ExecUpdate>>;
@@ -58,11 +58,11 @@ pub trait AlpenApi {
     #[method(name = "syncStatus")]
     async fn sync_status(&self) -> RpcResult<NodeSyncStatus>;
 
-    #[method(name = "syncBlocks")]
-    async fn sync_blocks(&self, start_height: u64, end_height: u64) -> RpcResult<HexBytes>;
+    #[method(name = "getRawBundles")]
+    async fn get_raw_bundles(&self, start_height: u64, end_height: u64) -> RpcResult<HexBytes>;
 
-    #[method(name = "syncBlockById")]
-    async fn sync_block_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<HexBytes>>;
+    #[method(name = "getRawBundleById")]
+    async fn get_raw_bundle_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<HexBytes>>;
 }
 
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "alpadmin"))]
