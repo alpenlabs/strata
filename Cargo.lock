@@ -2154,6 +2154,7 @@ dependencies = [
  "bitcoin",
  "hex",
  "rand 0.8.5",
+ "risc0-groth16",
  "serde",
  "sha2 0.10.8",
 ]
@@ -3766,6 +3767,7 @@ version = "0.1.0"
 dependencies = [
  "alpen-express-state",
  "l1-batch",
+ "risc0-groth16",
 ]
 
 [[package]]

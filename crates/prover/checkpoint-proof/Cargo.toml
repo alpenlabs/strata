@@ -6,3 +6,4 @@ edition = "2021"
 [dependencies]
 alpen-express-state.workspace = true
 l1-batch.workspace = true
+risc0-groth16 = "1.0.5"

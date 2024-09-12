@@ -1,7 +1,9 @@
 //! This includes all the filtering logic to filter out and extract
 //! deposits, forced inclusion transactions as well as state updates
 
+use alpen_express_primitives::buf::Buf32;
 use bitcoin::{opcodes::all::OP_RETURN, Block, ScriptBuf, Transaction};
+use risc0_groth16::Seal;
 use serde::{Deserialize, Serialize};
 
 use crate::logic::ScanRuleConfig;
@@ -16,7 +18,14 @@ pub struct DepositRequestData {
 }
 
 pub type ForcedInclusion = Vec<u8>;
-pub type StateUpdate = Vec<u8>;
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StateUpdate {
+    btc_header_verification_state: Buf32,
+    rollup_chain_state: Buf32,
+    groth16_proof: Seal,
+    elf_id: Buf32,
+}
 
 /// Note: This needs to be consistent with the logic in other places
 /// This is used as the placeholder logic for now
