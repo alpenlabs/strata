@@ -26,7 +26,9 @@ mod test {
 
         let prover = SP1Host::init(GUEST_CL_STF_ELF.into(), Default::default());
 
-        let (proof, _) = prover.prove(input_ser).expect("Failed to generate proof");
+        let (proof, _) = prover
+            .prove(&[input_ser], None)
+            .expect("Failed to generate proof");
 
         let new_state_ser = SP1Verifier::extract_public_output::<Vec<u8>>(&proof)
             .expect("Failed to extract public outputs");

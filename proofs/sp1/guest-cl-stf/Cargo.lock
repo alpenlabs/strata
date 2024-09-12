@@ -144,11 +144,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "alpen-express-block-credential"
+name = "alpen-express-crypto"
 version = "0.1.0"
 dependencies = [
  "alpen-express-primitives",
- "alpen-express-state",
  "borsh",
  "secp256k1",
  "sha2",
@@ -165,17 +164,24 @@ dependencies = [
  "hex",
  "reth-primitives",
  "serde",
+ "serde_json",
  "sha2",
+ "thiserror",
 ]
 
 [[package]]
 name = "alpen-express-state"
 version = "0.1.0"
 dependencies = [
+ "alpen-express-crypto",
  "alpen-express-primitives",
  "arbitrary",
+ "bitcoin",
  "borsh",
  "digest 0.10.7",
+ "express-bridge-sig-manager",
+ "express-bridge-tx-builder",
+ "hex",
  "num_enum",
  "serde",
  "sha2",
@@ -844,6 +850,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "express-bridge-sig-manager"
+version = "0.1.0"
+dependencies = [
+ "alpen-express-primitives",
+ "bitcoin",
+ "express-bridge-tx-builder",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
+name = "express-bridge-tx-builder"
+version = "0.1.0"
+dependencies = [
+ "alpen-express-primitives",
+ "bitcoin",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "express-chaintsn"
 version = "0.1.0"
 dependencies = [
@@ -857,11 +884,12 @@ dependencies = [
 name = "express-cl-stf"
 version = "0.1.0"
 dependencies = [
- "alpen-express-block-credential",
+ "alpen-express-crypto",
  "alpen-express-primitives",
  "alpen-express-state",
  "borsh",
  "express-chaintsn",
+ "thiserror",
 ]
 
 [[package]]

@@ -23,9 +23,7 @@ checksum = "5c6cb57a04249c6480766f7f7cef5467412af1490f8d1e243141daddada3264f"
 [[package]]
 name = "alloy-chains"
 version = "0.1.29"
-version = "0.1.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb07629a5d0645d29f68d2fb6f4d0cf15c89ec0965be915f303967180929743f"
 checksum = "bb07629a5d0645d29f68d2fb6f4d0cf15c89ec0965be915f303967180929743f"
 dependencies = [
  "num_enum",
@@ -538,7 +536,6 @@ dependencies = [
  "glob",
  "hex",
  "libc",
- "once_cell",
  "once_cell",
  "serde",
 ]

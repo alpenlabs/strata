@@ -1,5 +1,4 @@
 #[cfg(feature = "prover")]
-
 mod test {
     use alpen_express_state::{block::L2Block, chain_state::ChainState};
     use express_risc0_adapter::{Risc0Verifier, RiscZeroHost};
@@ -25,7 +24,9 @@ mod test {
 
         let prover = RiscZeroHost::init(CL_BLOCK_STF_ELF.into(), Default::default());
 
-        let (proof, _) = prover.prove(input_ser).expect("Failed to generate proof");
+        let (proof, _) = prover
+            .prove(&[input_ser], None)
+            .expect("Failed to generate proof");
 
         let new_state_ser = Risc0Verifier::extract_public_output::<Vec<u8>>(&proof)
             .expect("Failed to extract public outputs");
