@@ -1,6 +1,7 @@
 //! Module for database local types
 
 use alpen_express_primitives::buf::Buf32;
+use alpen_express_state::batch::CheckPointInfo;
 use arbitrary::Arbitrary;
 use bitcoin::{
     consensus::{self, deserialize, serialize},
@@ -127,6 +128,28 @@ pub enum ExcludeReason {
     /// Excluded for other reasons.
     // TODO: add other cases
     Other(String),
+}
+
+/// Entry corresponding to a BatchCommitment
+#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
+pub struct BatchCommitmentEntry {
+    /// Infor related to the batch
+    pub checkpoint: CheckPointInfo,
+    /// Proof
+    pub proof: Vec<u8>,
+    /// Status
+    pub status: CommitmentStatus,
+}
+
+/// Status of the commmitment
+#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
+pub enum CommitmentStatus {
+    /// Not seen on L1
+    Pending,
+    /// Confirmed on L1
+    Confirmed,
+    /// Finalized on L1
+    Finalized,
 }
 
 #[cfg(test)]

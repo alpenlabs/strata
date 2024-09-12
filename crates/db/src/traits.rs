@@ -6,9 +6,8 @@ use std::sync::Arc;
 use alpen_express_mmr::CompactMmr;
 use alpen_express_primitives::{l1::*, prelude::*};
 use alpen_express_state::{
-    batch::BatchCommitment, block::L2BlockBundle, chain_state::ChainState,
-    client_state::ClientState, operation::*, prelude::*, state_op::WriteBatch,
-    sync_event::SyncEvent,
+    block::L2BlockBundle, chain_state::ChainState, client_state::ClientState, operation::*,
+    prelude::*, state_op::WriteBatch, sync_event::SyncEvent,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 #[cfg(feature = "mocks")]
@@ -16,7 +15,7 @@ use mockall::automock;
 
 use crate::{
     entities::bridge_tx_state::BridgeTxState,
-    types::{BlobEntry, L1TxEntry},
+    types::{BatchCommitmentEntry, BlobEntry, L1TxEntry},
     DbResult,
 };
 
@@ -255,6 +254,7 @@ pub trait ChainstateProvider {
     fn get_toplevel_state(&self, idx: u64) -> DbResult<Option<ChainState>>;
 }
 
+/// NOTE: We might have to merge this with the [`Database`]
 /// A trait encapsulating provider and store traits to interact with the underlying database for
 /// [`BlobEntry`]
 #[cfg_attr(feature = "mocks", automock(type SeqStore=MockSeqDataStore; type SeqProv=MockSeqDataProvider;))]
@@ -272,15 +272,11 @@ pub trait SeqDataStore {
     /// Store the [`BlobEntry`].
     fn put_blob_entry(&self, blobid: Buf32, blobentry: BlobEntry) -> DbResult<()>;
 
-    /// Store the [`BatchCommitment`]
+    /// Store a [`BatchCommitmentEntry`]
     ///
     /// `batchidx` for the BatchCommitment is expected to increase monotonically and
     /// be equal to the [`alpen_express_state::chain_state::ChainState::checkpoint_period`]
-    fn put_batch_commitment(
-        &self,
-        batchidx: u64,
-        batch_commitment: BatchCommitment,
-    ) -> DbResult<()>;
+    fn put_batch_commitment(&self, batchidx: u64, entry: BatchCommitmentEntry) -> DbResult<()>;
 }
 
 #[cfg_attr(feature = "mocks", automock)]
@@ -295,8 +291,8 @@ pub trait SeqDataProvider {
     /// Get the last blob index
     fn get_last_blob_idx(&self) -> DbResult<Option<u64>>;
 
-    /// Get a [`BatchCommitment`] by it's index
-    fn get_batch_commitment(&self, batchidx: u64) -> DbResult<Option<BatchCommitment>>;
+    /// Get a [`BatchCommitmentEntry`] by it's index
+    fn get_batch_commitment(&self, batchidx: u64) -> DbResult<Option<BatchCommitmentEntry>>;
 
     /// Get last batch index
     fn get_last_batch_idx(&self) -> DbResult<Option<u64>>;

@@ -1,4 +1,4 @@
-use alpen_express_db::types::BlobEntry;
+use alpen_express_db::types::{BatchCommitmentEntry, BlobEntry};
 use alpen_express_primitives::buf::Buf32;
 use alpen_express_state::batch::BatchCommitment;
 
@@ -19,5 +19,5 @@ define_table_with_default_codec!(
 
 define_table_with_default_codec!(
     /// A table to store idx -> BatchCommitment mapping
-    (BatchCommitmentSchema) u64 => BatchCommitment
+    (BatchCommitmentSchema) u64 => BatchCommitmentEntry
 );

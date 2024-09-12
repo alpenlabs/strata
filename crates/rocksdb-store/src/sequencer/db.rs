@@ -3,11 +3,10 @@ use std::sync::Arc;
 use alpen_express_db::{
     errors::DbError,
     traits::{SeqDataProvider, SeqDataStore, SequencerDatabase},
-    types::BlobEntry,
+    types::{BatchCommitmentEntry, BlobEntry},
     DbResult,
 };
 use alpen_express_primitives::buf::Buf32;
-use alpen_express_state::batch::BatchCommitment;
 use rockbound::{OptimisticTransactionDB, SchemaDBOperationsExt};
 
 use super::schemas::{BatchCommitmentSchema, SeqBlobIdSchema, SeqBlobSchema};
@@ -54,14 +53,11 @@ impl SeqDataStore for SeqDb {
     fn put_batch_commitment(
         &self,
         batchidx: u64,
-        batch_commitment: alpen_express_state::batch::BatchCommitment,
+        batch_commitment: BatchCommitmentEntry,
     ) -> DbResult<()> {
-        if self.db.get::<BatchCommitmentSchema>(&batchidx)?.is_some() {
-            return Err(DbError::OverwriteBatchCommitment(batchidx));
-        };
-        self.db
-            .put::<BatchCommitmentSchema>(&batchidx, &batch_commitment)?;
-        Ok(())
+        Ok(self
+            .db
+            .put::<BatchCommitmentSchema>(&batchidx, &batch_commitment)?)
     }
 }
 
@@ -78,7 +74,7 @@ impl SeqDataProvider for SeqDb {
         Ok(self.db.get::<SeqBlobIdSchema>(&blobidx)?)
     }
 
-    fn get_batch_commitment(&self, batchidx: u64) -> DbResult<Option<BatchCommitment>> {
+    fn get_batch_commitment(&self, batchidx: u64) -> DbResult<Option<BatchCommitmentEntry>> {
         Ok(self.db.get::<BatchCommitmentSchema>(&batchidx)?)
     }
 
@@ -221,7 +217,7 @@ mod tests {
         let seq_db = SeqDb::new(db, db_ops);
 
         let batchidx = 1;
-        let batch: BatchCommitment = ArbitraryGenerator::new().generate();
+        let batch: BatchCommitmentEntry = ArbitraryGenerator::new().generate();
         seq_db
             .put_batch_commitment(batchidx, batch.clone())
             .unwrap();
@@ -236,7 +232,7 @@ mod tests {
         let seq_db = SeqDb::new(db, db_ops);
 
         let batchidx = 1;
-        let batch: BatchCommitment = ArbitraryGenerator::new().generate();
+        let batch: BatchCommitmentEntry = ArbitraryGenerator::new().generate();
         seq_db
             .put_batch_commitment(batchidx, batch.clone())
             .unwrap();
@@ -250,7 +246,7 @@ mod tests {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
         let seq_db = SeqDb::new(db, db_ops);
 
-        let batch: BatchCommitment = ArbitraryGenerator::new().generate();
+        let batch: BatchCommitmentEntry = ArbitraryGenerator::new().generate();
         seq_db.put_batch_commitment(100, batch.clone()).unwrap();
         seq_db.put_batch_commitment(1, batch.clone()).unwrap();
         seq_db.put_batch_commitment(3, batch.clone()).unwrap();
@@ -261,7 +257,7 @@ mod tests {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
         let seq_db = SeqDb::new(db, db_ops);
 
-        let batch: BatchCommitment = ArbitraryGenerator::new().generate();
+        let batch: BatchCommitmentEntry = ArbitraryGenerator::new().generate();
         seq_db.put_batch_commitment(100, batch.clone()).unwrap();
         seq_db.put_batch_commitment(1, batch.clone()).unwrap();
         seq_db.put_batch_commitment(3, batch.clone()).unwrap();
