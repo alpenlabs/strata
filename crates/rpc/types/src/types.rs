@@ -155,8 +155,14 @@ pub struct NodeSyncStatus {
     pub tip_height: u64,
 
     /// Last L2 block we've chosen as the current tip.
-    pub tip_block_id: L2BlockId,
+    pub tip_block_id: alpen_express_state::id::L2BlockId,
 
     /// L2 block that's been finalized and proven on L1.
     pub finalized_block_id: L2BlockId,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct RawBlockWitness {
+    pub raw_l2_block: Vec<u8>,
+    pub raw_chain_state: Vec<u8>,
 }

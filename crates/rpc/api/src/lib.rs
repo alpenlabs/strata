@@ -3,7 +3,7 @@ use alpen_express_db::types::L1TxStatus;
 use alpen_express_primitives::bridge::OperatorIdx;
 use alpen_express_rpc_types::{
     types::{BlockHeader, ClientStatus, DepositEntry, ExecUpdate, L1Status},
-    HexBytes, HexBytes32, NodeSyncStatus,
+    HexBytes, HexBytes32, NodeSyncStatus, RawBlockWitness,
 };
 use alpen_express_state::{bridge_duties::BridgeDuties, id::L2BlockId};
 use bitcoin::{secp256k1::schnorr::Signature, Transaction, Txid};
@@ -44,6 +44,9 @@ pub trait AlpenApi {
 
     #[method(name = "getExecUpdateById")]
     async fn get_exec_update_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<ExecUpdate>>;
+
+    #[method(name = "getBlockWitness")]
+    async fn get_block_witness_raw(&self, index: u64) -> RpcResult<Option<RawBlockWitness>>;
 
     #[method(name = "getCurrentDeposits")]
     async fn get_current_deposits(&self) -> RpcResult<Vec<u32>>;
