@@ -1,7 +1,7 @@
 //! Module for database local types
 
 use alpen_express_primitives::buf::Buf32;
-use alpen_express_state::batch::CheckPointInfo;
+use alpen_express_state::batch::{BatchCommitment, CheckPointInfo};
 use arbitrary::Arbitrary;
 use bitcoin::{
     consensus::{self, deserialize, serialize},
@@ -139,6 +139,12 @@ pub struct BatchCommitmentEntry {
     pub proof: Vec<u8>,
     /// Status
     pub status: CommitmentStatus,
+}
+
+impl From<BatchCommitmentEntry> for BatchCommitment {
+    fn from(entry: BatchCommitmentEntry) -> BatchCommitment {
+        BatchCommitment::new(entry.checkpoint, entry.proof)
+    }
 }
 
 /// Status of the commmitment

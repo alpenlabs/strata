@@ -24,7 +24,7 @@ pub enum ForkChoiceMessage {
     NewBlock(L2BlockId),
 }
 
-/// Package describing a new consensus state produced from a new synce event.
+/// Package describing a new consensus state produced from a new sync event.
 #[derive(Clone, Debug)]
 pub struct ClientUpdateNotif {
     sync_event_idx: u64,

@@ -61,7 +61,7 @@ fn extract_batch_duties(state: &ClientState, tip: L2BlockBundle) -> Result<Vec<D
             let l1_range = checkpoint.l1_range.end() + 1..=state.l1_view().tip_height();
             let l2_range = checkpoint.l2_range.end() + 1..=tip.header().blockidx();
             let new_checkpt = CheckPointInfo::new(
-                checkpoint.checkpoint_idx + 1,
+                checkpoint.idx + 1,
                 l1_range,
                 l2_range,
                 tip.header().get_blockid(),

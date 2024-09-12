@@ -63,7 +63,7 @@ impl From<SignedBatchCommitment> for BatchCommitment {
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
 pub struct CheckPointInfo {
     /// The index of the checkpoint
-    pub checkpoint_idx: u64,
+    pub idx: u64,
     /// L1 height range the checkpoint covers
     pub l1_range: RangeInclusive<u64>,
     /// L2 height range the checkpoint covers
@@ -80,15 +80,15 @@ impl CheckPointInfo {
         l2_blockid: L2BlockId,
     ) -> Self {
         Self {
-            checkpoint_idx,
+            idx: checkpoint_idx,
             l1_range,
             l2_range,
             l2_blockid,
         }
     }
 
-    pub fn checkpoint_idx(&self) -> u64 {
-        self.checkpoint_idx
+    pub fn idx(&self) -> u64 {
+        self.idx
     }
 
     pub fn l2_blockid(&self) -> &L2BlockId {

@@ -158,7 +158,7 @@ fn update_tracker(
     let latest_finalized_batch = state
         .l1_view()
         .last_finalized_checkpoint()
-        .map(|x| x.checkpoint.checkpoint_idx());
+        .map(|x| x.checkpoint.idx());
 
     let tracker_update = types::StateUpdate::new(
         block_idx,
@@ -426,7 +426,7 @@ fn poll_for_batch_commitment(
     duty: &BatchCommitmentDuty,
 ) -> Result<BatchCommitment, Error> {
     loop {
-        let checkpt_idx = duty.checkpoint_idx();
+        let checkpt_idx = duty.idx();
         if let Some(commitment) = seq_db
             .sequencer_provider()
             .get_batch_commitment(checkpt_idx)?

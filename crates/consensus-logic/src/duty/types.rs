@@ -39,14 +39,14 @@ impl Duty {
     pub fn expiry(&self) -> Expiry {
         match self {
             Self::SignBlock(_) => Expiry::NextBlock,
-            Self::CommitBatch(duty) => Expiry::CheckpointIdxFinalized(duty.checkpoint_idx()),
+            Self::CommitBatch(duty) => Expiry::CheckpointIdxFinalized(duty.idx()),
         }
     }
 
     pub fn id(&self) -> Buf32 {
         match self {
             // We want Batch commitment duty to be unique by the checkpoint idx
-            Self::CommitBatch(duty) => compute_borsh_hash(&duty.checkpoint_idx()),
+            Self::CommitBatch(duty) => compute_borsh_hash(&duty.idx()),
             _ => compute_borsh_hash(self),
         }
     }
