@@ -341,6 +341,7 @@ fn duty_exec_task<D: Database, E: ExecEngineCtl, SD: SequencerDatabase>(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn perform_duty<D: Database, E: ExecEngineCtl>(
     duty: &Duty,
     ik: &IdentityKey,
@@ -395,7 +396,7 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
         Duty::CommitBatch(data) => {
             info!(data = ?data, "commit batch");
 
-            let commitment = poll_for_batch_commitment(seq_db, &data)?;
+            let commitment = poll_for_batch_commitment(seq_db, data)?;
 
             let commitment_sighash = commitment.get_sighash();
             let signature = sign_with_identity_key(&commitment_sighash, ik);
@@ -425,12 +426,14 @@ fn poll_for_batch_commitment(
     duty: &BatchCommitmentDuty,
 ) -> Result<BatchCommitment, Error> {
     loop {
+        let checkpt_idx = duty.checkpoint_idx();
         if let Some(commitment) = seq_db
             .sequencer_provider()
-            .get_batch_commitment(duty.checkpoint_idx())?
+            .get_batch_commitment(checkpt_idx)?
         {
             return Ok(commitment);
         }
+        debug!(%checkpt_idx, "Polling for batch commitment");
 
         std::thread::sleep(Duration::from_millis(BATCH_POLL_INTERVAL));
     }

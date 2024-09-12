@@ -9,7 +9,7 @@ use alpen_express_primitives::{
     buf::Buf32, l1::L1BlockManifest, params::Params, utils::generate_l1_tx,
 };
 use alpen_express_state::{
-    batch::{BatchCommitment, CheckPoint, SignedBatchCommitment},
+    batch::{BatchCommitment, CheckPointInfo, SignedBatchCommitment},
     sync_event::SyncEvent,
 };
 use bitcoin::{consensus::serialize, hashes::Hash, Block};
@@ -86,8 +86,9 @@ where
             csm_ctl.submit_event(ev)?;
 
             // Check for da batch and send event accordingly
-            if let Some(checkpoint) = check_for_da_batch(&blockdata) {
-                let ev = SyncEvent::L1DABatch(height, checkpoint);
+            let checkpoints = check_for_da_batch(&blockdata);
+            if !checkpoints.is_empty() {
+                let ev = SyncEvent::L1DABatch(height, checkpoints);
                 csm_ctl.submit_event(ev)?;
             }
 
@@ -99,7 +100,7 @@ where
 }
 
 /// Parses inscriptions and checks for batch data in the transactions
-fn check_for_da_batch(blockdata: &BlockData) -> Option<CheckPoint> {
+fn check_for_da_batch(blockdata: &BlockData) -> Vec<CheckPointInfo> {
     let txs = blockdata
         .relevant_tx_idxs()
         .iter()
@@ -118,25 +119,23 @@ fn check_for_da_batch(blockdata: &BlockData) -> Option<CheckPoint> {
                 .map(|x| (x, tx))
         })
     });
-    let commitments: Vec<BatchCommitment> = inscriptions
-        .filter_map(|(insc, tx)| {
-            borsh::from_slice::<SignedBatchCommitment>(insc.batch_data())
-                .map_err(|e| {
-                    let txid = tx.compute_txid();
-                    warn!(%txid, err = %e, "could not deserialize blob inside inscription");
-                    e
-                })
-                .ok()
-                .map(Into::into)
-        })
-        .collect();
+    let commitments = inscriptions.filter_map(|(insc, tx)| {
+        borsh::from_slice::<SignedBatchCommitment>(insc.batch_data())
+            .map_err(|e| {
+                let txid = tx.compute_txid();
+                warn!(%txid, err = %e, "could not deserialize blob inside inscription");
+                e
+            })
+            .ok()
+            .map(Into::into)
+    });
 
     // NOTE/TODO: this is where we would verify the commitment, i.e, verify block ranges, verify
     // proof, and whatever else that's necessary
 
-    // We only care about the last found commitment in a block. We'll most likely have only one
-    // commmitment in a block, but still
-    commitments.last().map(|c| c.checkpoint().clone())
+    commitments
+        .map(|c: BatchCommitment| c.checkpoint().clone())
+        .collect()
 }
 
 /// Given a block, generates a manifest of the parts we care about that we can

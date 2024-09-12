@@ -1,7 +1,7 @@
 use alpen_express_db::traits::{Database, L2DataProvider};
 use alpen_express_primitives::params::Params;
 use alpen_express_state::{
-    batch::CheckPoint, block::L2BlockBundle, client_state::ClientState, header::L2Header,
+    batch::CheckPointInfo, block::L2BlockBundle, client_state::ClientState, header::L2Header,
 };
 
 use super::types::{BatchCommitmentDuty, BlockSigningDuty, Duty, Identity};
@@ -48,7 +48,7 @@ fn extract_batch_duties(state: &ClientState, tip: L2BlockBundle) -> Result<Vec<D
     match state.l1_view().last_finalized_checkpoint() {
         // No checkpoint is seen, start from 0
         None => {
-            let new_checkpt = CheckPoint::new(
+            let new_checkpt = CheckPointInfo::new(
                 0,
                 0..=state.l1_view().tip_height(),
                 0..=tip.header().blockidx(),
@@ -60,7 +60,7 @@ fn extract_batch_duties(state: &ClientState, tip: L2BlockBundle) -> Result<Vec<D
             let checkpoint = checkpt_state.checkpoint.clone();
             let l1_range = checkpoint.l1_range.end() + 1..=state.l1_view().tip_height();
             let l2_range = checkpoint.l2_range.end() + 1..=tip.header().blockidx();
-            let new_checkpt = CheckPoint::new(
+            let new_checkpt = CheckPointInfo::new(
                 checkpoint.checkpoint_idx + 1,
                 l1_range,
                 l2_range,

@@ -3,7 +3,7 @@
 use std::{ops::Deref, time};
 
 use alpen_express_primitives::{buf::Buf32, hash::compute_borsh_hash};
-use alpen_express_state::{batch::CheckPoint, id::L2BlockId};
+use alpen_express_state::{batch::CheckPointInfo, id::L2BlockId};
 use borsh::{BorshDeserialize, BorshSerialize};
 
 /// Describes when we'll stop working to fulfill a duty.
@@ -81,20 +81,20 @@ impl BlockSigningDuty {
 #[derive(Clone, Debug, BorshSerialize)]
 pub struct BatchCommitmentDuty {
     /// Checkpoint/batch info
-    inner: CheckPoint,
+    checkpoint: CheckPointInfo,
 }
 
 impl Deref for BatchCommitmentDuty {
-    type Target = CheckPoint;
+    type Target = CheckPointInfo;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.checkpoint
     }
 }
 
-impl From<CheckPoint> for BatchCommitmentDuty {
-    fn from(value: CheckPoint) -> Self {
-        Self { inner: value }
+impl From<CheckPointInfo> for BatchCommitmentDuty {
+    fn from(value: CheckPointInfo) -> Self {
+        Self { checkpoint: value }
     }
 }
 

@@ -11,17 +11,17 @@ use crate::id::L2BlockId;
 #[derive(Clone, Debug, PartialEq, BorshDeserialize, BorshSerialize, Arbitrary)]
 pub struct BatchCommitment {
     /// Information regarding the current batch checkpoint
-    checkpoint: CheckPoint,
+    checkpoint: CheckPointInfo,
     /// Proof for the batch obtained from prover manager
     proof: Vec<u8>,
 }
 
 impl BatchCommitment {
-    pub fn new(checkpoint: CheckPoint, proof: Vec<u8>) -> Self {
+    pub fn new(checkpoint: CheckPointInfo, proof: Vec<u8>) -> Self {
         Self { checkpoint, proof }
     }
 
-    pub fn checkpoint(&self) -> &CheckPoint {
+    pub fn checkpoint(&self) -> &CheckPointInfo {
         &self.checkpoint
     }
 
@@ -61,7 +61,7 @@ impl From<SignedBatchCommitment> for BatchCommitment {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
-pub struct CheckPoint {
+pub struct CheckPointInfo {
     /// The index of the checkpoint
     pub checkpoint_idx: u64,
     /// L1 height range the checkpoint covers
@@ -72,7 +72,7 @@ pub struct CheckPoint {
     pub l2_blockid: L2BlockId,
 }
 
-impl CheckPoint {
+impl CheckPointInfo {
     pub fn new(
         checkpoint_idx: u64,
         l1_range: RangeInclusive<u64>,

@@ -93,7 +93,7 @@ pub fn process_event<D: Database>(
             writes.push(ClientStateWrite::RollbackL1BlocksTo(*to_height));
         }
 
-        SyncEvent::L1DABatch(height, checkpt) => {
+        SyncEvent::L1DABatch(height, checkpts) => {
             debug!(%height, "received L1DABatch");
 
             if let Some(ss) = state.sync() {
@@ -103,9 +103,9 @@ pub fn process_event<D: Database>(
 
                 // When DABatch appears, it is only confirmed at the moment. These will be finalized
                 // only when the corresponding L1 block is buried enough
-                writes.push(ClientStateWrite::NewCheckpointReceived(
+                writes.push(ClientStateWrite::NewCheckpointsReceived(
                     *height,
-                    checkpt.clone(),
+                    checkpts.clone(),
                 ));
             } else {
                 // TODO we can expand this later to make more sense
@@ -141,28 +141,25 @@ fn handle_maturable_height(
     debug!(%maturable_height, "Emitting UpdateBuried for maturable height");
     writes.push(ClientStateWrite::UpdateBuried(maturable_height));
 
-    // Add SyncAction for Finalization
-    let pending_checkpt = state.l1_view().pending_checkpoint();
+    // If there are checkpoints at or before the maturable height, mark them as finalized
+    if !state
+        .l1_view()
+        .has_pending_checkpoint_within_height(maturable_height)
+    {
+        writes.push(ClientStateWrite::CheckpointFinalized(maturable_height));
 
-    if let Some(checkpt) = pending_checkpt {
-        let blkid = checkpt.checkpoint.l2_blockid();
-        writes.push(ClientStateWrite::UpdateFinalized(*blkid));
-        actions.push(SyncAction::FinalizeBlock(*blkid));
+        // Emit sync action for finalizing a l2 block
+        if let Some(checkpt) = state
+            .l1_view()
+            .last_pending_checkpoint_within_height(maturable_height)
+        {
+            actions.push(SyncAction::FinalizeBlock(checkpt.checkpoint.l2_blockid));
+        }
     } else {
         warn!(
         %maturable_height,
         "expected to find blockid corresponding to buried l1 height in confirmed_blocks but could not find"
         );
-    }
-
-    // If there's a checkpoint on the maturable height, mark it as finalized
-    if state
-        .l1_view()
-        .pending_checkpoint()
-        .filter(|checkpt| checkpt.height == maturable_height)
-        .is_some()
-    {
-        writes.push(ClientStateWrite::CheckpointFinalized(maturable_height))
     }
     (writes, actions)
 }
