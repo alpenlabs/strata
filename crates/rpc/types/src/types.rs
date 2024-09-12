@@ -4,7 +4,11 @@
 //!  - implementation of RPC client
 //!  - crate for just data structures that represents the JSON responses from Bitcoin core RPC
 
-use alpen_express_state::{bridge_ops::WithdrawalIntent, id::L2BlockId};
+use alpen_express_state::{
+    batch::{BatchCommitment, CheckPointInfo},
+    bridge_ops::WithdrawalIntent,
+    id::L2BlockId,
+};
 use bitcoin::Txid;
 use serde::{Deserialize, Serialize};
 
@@ -165,4 +169,44 @@ pub struct NodeSyncStatus {
 pub struct RawBlockWitness {
     pub raw_l2_block: Vec<u8>,
     pub raw_chain_state: Vec<u8>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct RpcCheckpointInfo {
+    /// The index of the checkpoint
+    pub idx: u64,
+    /// L1 height  the checkpoint covers
+    pub l1_height: u64,
+    /// L2 height the checkpoint covers
+    pub l2_height: u64,
+    /// L2 block that this checkpoint covers
+    pub l2_blockid: L2BlockId,
+}
+
+impl From<CheckPointInfo> for RpcCheckpointInfo {
+    fn from(value: CheckPointInfo) -> Self {
+        Self {
+            idx: value.idx,
+            l1_height: *value.l1_range.end(),
+            l2_height: *value.l2_range.end(),
+            l2_blockid: value.l2_blockid,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct RpcBatchCommitment {
+    /// Checkpoint metadata
+    checkpoint: RpcCheckpointInfo,
+    /// Corresponding proof
+    proof: Vec<u8>,
+}
+
+impl From<BatchCommitment> for RpcBatchCommitment {
+    fn from(value: BatchCommitment) -> Self {
+        Self {
+            checkpoint: value.checkpoint().clone().into(),
+            proof: value.proof().to_vec(),
+        }
+    }
 }

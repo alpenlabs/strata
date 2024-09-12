@@ -3,16 +3,20 @@ use std::sync::Arc;
 use alpen_express_btcio::{broadcaster::L1BroadcastHandle, writer::InscriptionHandle};
 use alpen_express_consensus_logic::sync_manager::SyncManager;
 use alpen_express_db::{
-    traits::{ChainstateProvider, Database, L1DataProvider, L2DataProvider},
-    types::{L1TxEntry, L1TxStatus},
+    traits::{
+        ChainstateProvider, CheckpointProvider, CheckpointStore, Database, L1DataProvider,
+        L2DataProvider,
+    },
+    types::{CommitmentStatus, L1TxEntry, L1TxStatus},
 };
 use alpen_express_primitives::{buf::Buf32, hash};
 use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer};
 use alpen_express_rpc_types::{
     BlockHeader, ClientStatus, DaBlob, DepositEntry, DepositState, ExecUpdate, HexBytes,
-    HexBytes32, L1Status, NodeSyncStatus, RawBlockWitness,
+    HexBytes32, L1Status, NodeSyncStatus, RawBlockWitness, RpcBatchCommitment,
 };
 use alpen_express_state::{
+    batch::BatchCommitment,
     block::L2BlockBundle,
     bridge_ops::WithdrawalIntent,
     chain_state::ChainState,
@@ -72,6 +76,9 @@ pub enum Error {
     #[error("fetch limit reached. max {0}, provided {1}")]
     FetchLimitReached(u64, u64),
 
+    #[error("missing checkpoint for index {0}")]
+    MissingCheckpoint(u64),
+
     /// Generic internal error message.  If this is used often it should be made
     /// into its own error type.
     #[error("{0}")]
@@ -97,6 +104,7 @@ impl Error {
             Self::FetchLimitReached(_, _) => -32608,
             Self::UnknownIdx(_) => -32608,
             Self::MissingL1BlockManifest(_) => -32609,
+            Self::MissingCheckpoint(_) => -32610,
             Self::BlockingAbort(_) => -32001,
             Self::Other(_) => -32000,
             Self::OtherEx(_, _) => -32000,
@@ -567,6 +575,32 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
     async fn submit_bridge_msg(&self, _raw_msg: HexBytes) -> RpcResult<()> {
         warn!("alp_submitBridgeMsg not implemented");
         Ok(())
+    }
+
+    async fn get_checkpoint_info(&self, idx: u64) -> RpcResult<Option<RpcBatchCommitment>> {
+        let entry = self
+            .database
+            .checkpoint_provider()
+            .get_batch_commitment(idx)
+            .map_err(|e| Error::Other(e.to_string()))?;
+        let batch_comm: Option<BatchCommitment> = entry.map(Into::into);
+        Ok(batch_comm.map(Into::into))
+    }
+
+    async fn put_checkpoint_proof(&self, idx: u64, proof: Vec<u8>) -> RpcResult<()> {
+        let mut entry = self
+            .database
+            .checkpoint_provider()
+            .get_batch_commitment(idx)
+            .map_err(|e| Error::Other(e.to_string()))?
+            .ok_or(Error::MissingCheckpoint(idx))?;
+        entry.proof = proof;
+        entry.status = CommitmentStatus::ProofCreated;
+        Ok(self
+            .database
+            .checkpoint_store()
+            .put_batch_commitment(idx, entry)
+            .map_err(|e| Error::Other(e.to_string()))?)
     }
 }
 

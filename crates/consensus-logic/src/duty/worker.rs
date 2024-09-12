@@ -393,7 +393,7 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
         Duty::CommitBatch(data) => {
             info!(data = ?data, "commit batch");
 
-            let commitment = get_ready_batch_commitment(database, data)?;
+            let commitment = check_and_get_batch_commitment(database, data)?;
 
             let commitment_sighash = commitment.get_sighash();
             let signature = sign_with_identity_key(&commitment_sighash, ik);
@@ -418,7 +418,7 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
     }
 }
 
-fn get_ready_batch_commitment(
+fn check_and_get_batch_commitment(
     db: &impl Database,
     duty: &BatchCommitmentDuty,
 ) -> Result<BatchCommitment, Error> {
@@ -439,7 +439,7 @@ fn get_ready_batch_commitment(
     }
 
     // Wait until the proof is ready
-    // May also need to have a channel here
+    // May also need to have a mpsc receiver from RPC where prover manager posts the proof
     loop {
         if let Some(commitment) = db.checkpoint_provider().get_batch_commitment(idx)? {
             if commitment.has_proof() {

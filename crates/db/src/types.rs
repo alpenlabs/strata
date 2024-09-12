@@ -136,7 +136,7 @@ pub struct BatchCommitmentEntry {
     /// Infor related to the batch
     checkpoint: CheckPointInfo,
     /// Proof
-    proof: Vec<u8>,
+    pub proof: Vec<u8>,
     /// Status
     pub status: CommitmentStatus,
 }
