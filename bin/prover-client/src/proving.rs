@@ -1,66 +1,36 @@
 use std::{
-    collections::{hash_map::Entry, HashMap},
     fs,
     path::PathBuf,
     sync::{Arc, RwLock},
 };
 
-use alpen_express_db::traits::{ProverDataStore, ProverDatabase};
+use alpen_express_db::{
+    traits::{ProverDataProvider, ProverDataStore, ProverDatabase},
+    types::{ProvingBundle, ProvingTaskState, TaskId, WitnessType},
+};
 use alpen_express_rocksdb::{
     prover::db::{ProofDb, ProverDB},
     DbOpsConfig,
 };
 use express_zkvm::{Proof, ZKVMHost};
 use risc0_guest_builder::RETH_RISC0_ELF;
-use rockbound::rocksdb::{self};
+use rockbound::rocksdb;
 use tracing::info;
 use uuid::Uuid;
 use zkvm_primitives::ZKVMInput;
 
 use crate::primitives::{
     config::ProofGenConfig,
-    prover_input::ProverInput,
-    tasks_scheduler::{ProofProcessingStatus, ProofSubmissionStatus, WitnessSubmissionStatus},
-    vms::{ProofVm, ZkVMManager},
+    prover_input::{ProverInput, WitnessData},
+    tasks_scheduler::{ProofProcessingError, ProofProcessingStatus, WitnessSubmissionStatus},
+    vms::ZkVMManager,
 };
 
-enum ProverStatus {
-    WitnessSubmitted(ProverInput),
-    ProvingInProgress,
-    Proved(Proof),
-    Err(anyhow::Error),
-}
-
 struct ProverState {
-    prover_status: HashMap<Uuid, ProverStatus>,
     pending_tasks_count: usize,
 }
 
 impl ProverState {
-    fn remove(&mut self, task_id: &Uuid) -> Option<ProverStatus> {
-        self.prover_status.remove(task_id)
-    }
-
-    fn set_to_proving(&mut self, task_id: Uuid) -> Option<ProverStatus> {
-        self.prover_status
-            .insert(task_id, ProverStatus::ProvingInProgress)
-    }
-
-    fn set_to_proved(
-        &mut self,
-        task_id: Uuid,
-        proof: Result<Proof, anyhow::Error>,
-    ) -> Option<ProverStatus> {
-        match proof {
-            Ok(p) => self.prover_status.insert(task_id, ProverStatus::Proved(p)),
-            Err(e) => self.prover_status.insert(task_id, ProverStatus::Err(e)),
-        }
-    }
-
-    fn get_prover_status(&self, task_id: Uuid) -> Option<&ProverStatus> {
-        self.prover_status.get(&task_id)
-    }
-
     fn inc_task_count_if_not_busy(&mut self, num_threads: usize) -> bool {
         if self.pending_tasks_count >= num_threads {
             return false;
@@ -84,7 +54,7 @@ where
 {
     prover_state: Arc<RwLock<ProverState>>,
     config: ProofGenConfig,
-    db: ProverDB<ProofDb>,
+    db: ProverDB,
     num_threads: usize,
     pool: rayon::ThreadPool,
     vm_manager: ZkVMManager<Vm>,
@@ -121,9 +91,9 @@ where
         let db = ProofDb::new(rbdb, db_ops);
 
         let mut zkvm_manager: ZkVMManager<Vm> = ZkVMManager::new();
-        zkvm_manager.add_vm(ProofVm::ELProving, RETH_RISC0_ELF.to_vec());
-        zkvm_manager.add_vm(ProofVm::CLProving, vec![]);
-        zkvm_manager.add_vm(ProofVm::CLAggregation, vec![]);
+        zkvm_manager.add_vm(WitnessType::EL, RETH_RISC0_ELF.to_vec());
+        zkvm_manager.add_vm(WitnessType::CL, vec![]);
+        zkvm_manager.add_vm(WitnessType::CLAgg, vec![]);
 
         Self {
             num_threads,
@@ -133,7 +103,6 @@ where
                 .expect("Failed to initailize prover threadpool worker"),
 
             prover_state: Arc::new(RwLock::new(ProverState {
-                prover_status: Default::default(),
                 pending_tasks_count: Default::default(),
             })),
             db: ProverDB::new(Arc::new(db)),
@@ -145,18 +114,27 @@ where
     pub(crate) fn submit_witness(
         &self,
         task_id: Uuid,
-        state_transition_data: ProverInput,
+        witness: ProverInput,
+        witness_type: WitnessType,
     ) -> WitnessSubmissionStatus {
-        let data = ProverStatus::WitnessSubmitted(state_transition_data);
-
-        let mut prover_state = self.prover_state.write().expect("Lock was poisoned");
-        let entry = prover_state.prover_status.entry(task_id);
-
-        match entry {
-            Entry::Occupied(_) => WitnessSubmissionStatus::WitnessExist,
-            Entry::Vacant(v) => {
-                v.insert(data);
+        let txentry: ProvingBundle = ProvingBundle {
+            state: ProvingTaskState::WitnessSubmitted,
+            witness_type,
+            witness: witness.to_vec(),
+            proof: vec![],
+        };
+        let dbres = self
+            .db
+            .prover_store()
+            .create_new_entry(TaskId::from(*task_id.as_bytes()), txentry);
+        match dbres {
+            Ok(_) => {
+                //v.insert(ProverStatus::WitnessSubmitted(witness));
                 WitnessSubmissionStatus::SubmittedForProving
+            }
+            Err(e) => {
+                tracing::error!("Error creating new entry in DB: {:?}", e);
+                WitnessSubmissionStatus::SubmissionFailed
             }
         }
     }
@@ -164,34 +142,76 @@ where
     pub(crate) fn start_proving(
         &self,
         task_id: Uuid,
-    ) -> Result<ProofProcessingStatus, anyhow::Error> {
+    ) -> Result<ProofProcessingStatus, ProofProcessingError>
+    where
+        Vm: ZKVMHost + 'static,
+    {
         let prover_state_clone = self.prover_state.clone();
         let mut prover_state = self.prover_state.write().expect("Lock was poisoned");
 
-        let prover_status = prover_state
-            .remove(&task_id)
-            .ok_or_else(|| anyhow::anyhow!("Missing witness for block: {:?}", task_id))?;
-
+        let bundle = self.get_proving_state(task_id).unwrap();
+        let prover_status = bundle.state;
         match prover_status {
-            ProverStatus::WitnessSubmitted(witness) => {
+            ProvingTaskState::WitnessSubmitted => {
                 let start_prover = prover_state.inc_task_count_if_not_busy(self.num_threads);
 
                 // Initiate a new proving job only if the prover is not busy.
                 if start_prover {
-                    prover_state.set_to_proving(task_id);
+                    self.update_task_status(task_id, ProvingTaskState::ProvingInProgress)
+                        .unwrap();
                     let config = self.config.clone();
-                    let proof_vm = witness.proof_vm_id();
-                    let vm = self.vm_manager.get(&proof_vm).unwrap().clone();
+                    let vm_id = bundle.witness_type;
+                    let vm = self.vm_manager.get(&vm_id).unwrap().clone();
 
+                    let db = self.db.prover_store().clone();
                     self.pool.spawn(move || {
                         tracing::info_span!("guest_execution").in_scope(|| {
-                            let proof = make_proof(config, witness, vm.clone());
+                            let proof = make_proof(
+                                config,
+                                ProverInput::ElBlock(WitnessData {
+                                    data: bundle.witness,
+                                }),
+                                vm.clone(),
+                            );
 
                             info!("make_proof completed for task: {:?} {:?}", task_id, proof);
-                            let mut prover_state =
-                                prover_state_clone.write().expect("Lock was poisoned");
-                            prover_state.set_to_proved(task_id, proof);
-                            prover_state.dec_task_count();
+                            let _ = match proof {
+                                Ok(proof) => {
+                                    let res = db
+                                        // .prover_provider()
+                                        .get_entry_by_id(TaskId::from(*task_id.as_bytes()));
+                                    match res {
+                                        Ok(Some(mut entry)) => {
+                                            entry.state = ProvingTaskState::Proved;
+                                            entry.proof = proof.as_bytes().to_vec();
+                                            db
+                                                // .prover_store()
+                                                .create_new_entry(*task_id.as_bytes(), entry)
+                                                .unwrap();
+                                            Ok(())
+                                        }
+                                        Ok(None) => Err(anyhow::anyhow!(
+                                            "DB Entry not found for task: {:?}",
+                                            task_id
+                                        )),
+                                        Err(e) => Err(anyhow::anyhow!(e.to_string())),
+                                    }
+                                }
+                                Err(_) => todo!(), /* tracing::error!("Error making proof: {:?}",
+                                                    * e);
+                                                    * self.update_task_status(task_id,
+                                                    * ProvingTaskState::Failed)
+                                                    *     .unwrap();
+                                                    * Err(anyhow::anyhow!(
+                                                    *     "DB Entry not found for task: {:?}",
+                                                    *     task_id
+                                                    * )) */
+                            };
+
+                            prover_state_clone
+                                .write()
+                                .expect("Lock was poisoned")
+                                .dec_task_count();
                         })
                     });
 
@@ -200,49 +220,94 @@ where
                     Ok(ProofProcessingStatus::Busy)
                 }
             }
-            ProverStatus::ProvingInProgress => Err(anyhow::anyhow!(
-                "Proof generation for {:?} still in progress",
-                task_id
-            )),
-            ProverStatus::Proved(_) => Err(anyhow::anyhow!(
-                "Witness for task id {:?}, submitted multiple times.",
-                task_id,
-            )),
-            ProverStatus::Err(e) => Err(e),
+            ProvingTaskState::ProvingInProgress => {
+                Err(ProofProcessingError::ProvingAlreadyInProgress)
+            }
+            ProvingTaskState::Proved => Err(ProofProcessingError::AlreadyProved),
+            ProvingTaskState::Failed => Err(ProofProcessingError::Error),
         }
     }
 
-    pub(crate) fn get_proof_submission_status_and_remove_on_success(
+    fn save_witness_to_db(
         &self,
+        witness_type: WitnessType,
         task_id: Uuid,
-    ) -> Result<ProofSubmissionStatus, anyhow::Error> {
-        let mut prover_state = self.prover_state.write().unwrap();
-        let status = prover_state.get_prover_status(task_id);
-
-        match status {
-            Some(ProverStatus::ProvingInProgress) => {
-                Ok(ProofSubmissionStatus::ProofGenerationInProgress)
-            }
-            Some(ProverStatus::Proved(proof)) => {
-                self.save_proof_to_db(task_id, proof)?;
-
-                prover_state.remove(&task_id);
-                Ok(ProofSubmissionStatus::Success)
-            }
-            Some(ProverStatus::WitnessSubmitted(_)) => Err(anyhow::anyhow!(
-                "Witness for {:?} was submitted, but the proof generation is not triggered.",
-                task_id
-            )),
-            Some(ProverStatus::Err(e)) => Err(anyhow::anyhow!(e.to_string())),
-            None => Err(anyhow::anyhow!("Missing witness for: {:?}", task_id)),
-        }
-    }
-
-    fn save_proof_to_db(&self, task_id: Uuid, proof: &Proof) -> Result<(), anyhow::Error> {
+        witness: &ProverInput,
+    ) -> Result<(), anyhow::Error> {
+        let txentry: ProvingBundle = ProvingBundle {
+            state: ProvingTaskState::WitnessSubmitted,
+            witness_type,
+            witness: witness.to_vec(),
+            proof: vec![],
+        };
         self.db
             .prover_store()
-            .insert_new_task_entry(*task_id.as_bytes(), proof.as_bytes().to_vec())?;
+            .create_new_entry(TaskId::from(*task_id.as_bytes()), txentry)?;
         Ok(())
+    }
+
+    fn update_task_status(
+        &self,
+        task_id: Uuid,
+        state: ProvingTaskState,
+    ) -> Result<(), anyhow::Error> {
+        let res = self
+            .db
+            .prover_provider()
+            .get_entry_by_id(TaskId::from(*task_id.as_bytes()));
+        match res {
+            Ok(Some(mut entry)) => {
+                entry.state = state;
+                self.db
+                    .prover_store()
+                    .create_new_entry(*task_id.as_bytes(), entry)?;
+                Ok(())
+            }
+            Ok(None) => Err(anyhow::anyhow!(
+                "DB Entry not found for task: {:?}",
+                task_id
+            )),
+            Err(e) => Err(anyhow::anyhow!(e.to_string())),
+        }
+    }
+
+    pub(crate) fn save_proof_to_db(
+        db: ProverDB,
+        task_id: Uuid,
+        proof: &Proof,
+    ) -> Result<(), anyhow::Error> {
+        let res = db
+            .prover_provider()
+            .get_entry_by_id(TaskId::from(*task_id.as_bytes()));
+        match res {
+            Ok(Some(mut entry)) => {
+                entry.state = ProvingTaskState::Proved;
+                entry.proof = proof.as_bytes().to_vec();
+                db.prover_store()
+                    .create_new_entry(*task_id.as_bytes(), entry)?;
+                Ok(())
+            }
+            Ok(None) => Err(anyhow::anyhow!(
+                "DB Entry not found for task: {:?}",
+                task_id
+            )),
+            Err(e) => Err(anyhow::anyhow!(e.to_string())),
+        }
+    }
+
+    pub(crate) fn get_proving_state(&self, task_id: Uuid) -> Result<ProvingBundle, anyhow::Error> {
+        let res = self
+            .db
+            .prover_provider()
+            .get_entry_by_id(TaskId::from(*task_id.as_bytes()));
+        match res {
+            Ok(Some(entry)) => Ok(entry),
+            Ok(None) => Err(anyhow::anyhow!(
+                "DB Entry not found for task: {:?}",
+                task_id
+            )),
+            Err(e) => Err(anyhow::anyhow!(e.to_string())),
+        }
     }
 }
 

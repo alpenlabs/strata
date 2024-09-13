@@ -37,7 +37,7 @@ pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
 
 pub const PROVER_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
     prover::schemas::ProverTaskIdSchema::COLUMN_FAMILY_NAME,
-    prover::schemas::ProverTaskSchema::COLUMN_FAMILY_NAME,
+    prover::schemas::ProverProofSchema::COLUMN_FAMILY_NAME,
 ];
 
 // Re-exports

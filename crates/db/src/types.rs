@@ -129,6 +129,34 @@ pub enum ExcludeReason {
     Other(String),
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
+pub enum ProvingTaskState {
+    WitnessSubmitted,
+    ProvingInProgress,
+    Proved,
+    Failed,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary, Hash)]
+pub enum WitnessType {
+    EL,
+    CL,
+    CLAgg,
+    BlkSpace,
+    BlkSpaceAgg,
+    Checkpoint,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
+pub struct ProvingBundle {
+    pub state: ProvingTaskState,
+    pub witness_type: WitnessType,
+    pub witness: Vec<u8>,
+    pub proof: Vec<u8>,
+}
+
+pub type TaskId = [u8; 16];
+
 #[cfg(test)]
 mod tests {
     use serde_json;

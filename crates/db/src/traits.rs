@@ -15,7 +15,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use mockall::automock;
 
 use crate::{
-    types::{BlobEntry, L1TxEntry},
+    types::{BlobEntry, L1TxEntry, ProvingBundle, TaskId},
     DbResult,
 };
 
@@ -302,8 +302,6 @@ pub trait SeqDataProvider {
 }
 
 /// A trait encapsulating provider and store traits to interact with the underlying database for
-/// [`BlobEntry`]
-/// #[cfg_attr(feature = "mocks", automock(type SeqStore=MockSeqDataStore; type SeqProv=MockSeqDataProvider;))]
 pub trait ProverDatabase {
     type ProverStore: ProverDataStore;
     type ProverProv: ProverDataProvider;
@@ -314,30 +312,28 @@ pub trait ProverDatabase {
 
 pub trait ProverDataStore {
     /// Adds a new txentry to database
-    fn insert_new_task_entry(&self, txid: [u8; 16], txentry: Vec<u8>) -> DbResult<u64>;
+    fn create_new_entry(&self, txid: TaskId, txentry: ProvingBundle) -> DbResult<u64>;
 
     /// Updates an existing txentry
-    fn update_task_entry_by_id(&self, txid: [u8; 16], txentry: Vec<u8>) -> DbResult<()>;
+    fn update_entry_by_id(&self, txid: TaskId, txentry: ProvingBundle) -> DbResult<()>;
 
     /// Updates an existing txentry
-    fn update_task_entry(&self, idx: u64, txentry: Vec<u8>) -> DbResult<()>;
-
-    // TODO: possibly add delete as well
+    fn update_entry_by_cursor(&self, idx: u64, txentry: ProvingBundle) -> DbResult<()>;
 }
 
 /// All methods related to fetching [`Vec<u8>`]s and indices in the database
 pub trait ProverDataProvider {
     /// Fetch [`Vec<u8>`] from db
-    fn get_task_entry_by_id(&self, txid: [u8; 16]) -> DbResult<Option<Vec<u8>>>;
+    fn get_entry_by_id(&self, txid: TaskId) -> DbResult<Option<ProvingBundle>>;
 
     /// Get next index to be inserted to
-    fn get_next_task_idx(&self) -> DbResult<u64>;
+    fn get_next_cursor(&self) -> DbResult<u64>;
 
     /// Get transaction id for index
-    fn get_taskid(&self, idx: u64) -> DbResult<Option<[u8; 16]>>;
+    fn get_entry_id(&self, idx: u64) -> DbResult<Option<TaskId>>;
 
     /// get txentry by idx
-    fn get_task_entry(&self, idx: u64) -> DbResult<Option<Vec<u8>>>;
+    fn get_entry_by_index(&self, idx: u64) -> DbResult<Option<ProvingBundle>>;
 }
 
 /// A trait encapsulating the provider and store traits for interacting with the broadcast

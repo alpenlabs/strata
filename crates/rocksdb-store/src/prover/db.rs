@@ -3,13 +3,14 @@ use std::sync::Arc;
 use alpen_express_db::{
     errors::DbError,
     traits::{ProverDataProvider, ProverDataStore, ProverDatabase},
+    types::{ProvingBundle, TaskId},
     DbResult,
 };
 use rockbound::{
     utils::get_last, OptimisticTransactionDB, SchemaDBOperationsExt, TransactionRetry,
 };
 
-use super::schemas::{ProverTaskIdSchema, ProverTaskSchema};
+use super::schemas::{ProverProofSchema, ProverTaskIdSchema};
 use crate::DbOpsConfig;
 
 pub struct ProofDb {
@@ -24,10 +25,10 @@ impl ProofDb {
 }
 
 impl ProverDataStore for ProofDb {
-    fn insert_new_task_entry(&self, taskid: [u8; 16], taskentry: Vec<u8>) -> DbResult<u64> {
+    fn create_new_entry(&self, taskid: TaskId, proof_entry: ProvingBundle) -> DbResult<u64> {
         self.db
             .with_optimistic_txn(TransactionRetry::Count(self.ops.retry_count), |tx| {
-                if tx.get::<ProverTaskSchema>(&taskid)?.is_some() {
+                if tx.get::<ProverProofSchema>(&taskid)?.is_some() {
                     return Err(DbError::Other(format!(
                         "Entry already exists for id {taskid:?}"
                     )));
@@ -38,31 +39,31 @@ impl ProverDataStore for ProofDb {
                     .unwrap_or(0);
 
                 tx.put::<ProverTaskIdSchema>(&idx, &taskid)?;
-                tx.put::<ProverTaskSchema>(&taskid, &taskentry)?;
+                tx.put::<ProverProofSchema>(&taskid, &proof_entry)?;
 
                 Ok(idx)
             })
             .map_err(|e| DbError::TransactionError(e.to_string()))
     }
 
-    fn update_task_entry_by_id(&self, taskid: [u8; 16], taskentry: Vec<u8>) -> DbResult<()> {
+    fn update_entry_by_id(&self, taskid: TaskId, taskentry: ProvingBundle) -> DbResult<()> {
         self.db
             .with_optimistic_txn(TransactionRetry::Count(self.ops.retry_count), |tx| {
-                if tx.get::<ProverTaskSchema>(&taskid)?.is_none() {
+                if tx.get::<ProverProofSchema>(&taskid)?.is_none() {
                     return Err(DbError::Other(format!(
                         "Entry does not exist for id {taskid:?}"
                     )));
                 }
-                Ok(tx.put::<ProverTaskSchema>(&taskid, &taskentry)?)
+                Ok(tx.put::<ProverProofSchema>(&taskid, &taskentry)?)
             })
             .map_err(|e| DbError::TransactionError(e.to_string()))
     }
 
-    fn update_task_entry(&self, idx: u64, taskentry: Vec<u8>) -> DbResult<()> {
+    fn update_entry_by_cursor(&self, idx: u64, taskentry: ProvingBundle) -> DbResult<()> {
         self.db
             .with_optimistic_txn(TransactionRetry::Count(self.ops.retry_count), |tx| {
                 if let Some(id) = tx.get::<ProverTaskIdSchema>(&idx)? {
-                    Ok(tx.put::<ProverTaskSchema>(&id, &taskentry)?)
+                    Ok(tx.put::<ProverProofSchema>(&id, &taskentry)?)
                 } else {
                     Err(DbError::Other(format!(
                         "Entry does not exist for idx {idx:?}"
@@ -74,44 +75,44 @@ impl ProverDataStore for ProofDb {
 }
 
 impl ProverDataProvider for ProofDb {
-    fn get_task_entry_by_id(&self, taskid: [u8; 16]) -> DbResult<Option<Vec<u8>>> {
-        Ok(self.db.get::<ProverTaskSchema>(&taskid)?)
+    fn get_entry_by_id(&self, taskid: TaskId) -> DbResult<Option<ProvingBundle>> {
+        Ok(self.db.get::<ProverProofSchema>(&taskid)?)
     }
 
-    fn get_next_task_idx(&self) -> DbResult<u64> {
-        Ok(get_last::<ProverTaskIdSchema>(self.db.as_ref())?
-            .map(|(k, _)| k + 1)
-            .unwrap_or_default())
-    }
-
-    fn get_taskid(&self, idx: u64) -> DbResult<Option<[u8; 16]>> {
-        Ok(self.db.get::<ProverTaskIdSchema>(&idx)?)
-    }
-
-    fn get_task_entry(&self, idx: u64) -> DbResult<Option<Vec<u8>>> {
-        if let Some(id) = self.get_taskid(idx)? {
-            Ok(self.db.get::<ProverTaskSchema>(&id)?)
+    fn get_entry_by_index(&self, idx: u64) -> DbResult<Option<ProvingBundle>> {
+        if let Some(id) = self.get_entry_id(idx)? {
+            Ok(self.db.get::<ProverProofSchema>(&id)?)
         } else {
             Err(DbError::Other(format!(
                 "Entry does not exist for idx {idx:?}"
             )))
         }
     }
+
+    fn get_next_cursor(&self) -> DbResult<u64> {
+        Ok(get_last::<ProverTaskIdSchema>(self.db.as_ref())?
+            .map(|(k, _)| k + 1)
+            .unwrap_or_default())
+    }
+
+    fn get_entry_id(&self, idx: u64) -> DbResult<Option<TaskId>> {
+        Ok(self.db.get::<ProverTaskIdSchema>(&idx)?)
+    }
 }
 
-pub struct ProverDB<D> {
-    db: Arc<D>,
+pub struct ProverDB {
+    db: Arc<ProofDb>,
 }
 
-impl<D> ProverDB<D> {
-    pub fn new(db: Arc<D>) -> Self {
+impl ProverDB {
+    pub fn new(db: Arc<ProofDb>) -> Self {
         Self { db }
     }
 }
 
-impl<D: ProverDataStore + ProverDataProvider> ProverDatabase for ProverDB<D> {
-    type ProverStore = D;
-    type ProverProv = D;
+impl ProverDatabase for ProverDB {
+    type ProverStore = ProofDb;
+    type ProverProv = ProofDb;
 
     fn prover_store(&self) -> &Arc<Self::ProverStore> {
         &self.db
@@ -127,6 +128,7 @@ mod tests {
     use alpen_express_db::{
         errors::DbError,
         traits::{ProverDataProvider, ProverDataStore},
+        types::{ProvingTaskState, WitnessType},
     };
 
     use super::*;
@@ -137,9 +139,14 @@ mod tests {
         ProofDb::new(db, db_ops)
     }
 
-    fn generate_l1_task_entry() -> ([u8; 16], Vec<u8>) {
+    fn generate_l1_task_entry() -> (TaskId, ProvingBundle) {
         let txid = [1u8; 16];
-        let txentry = vec![1u8; 64];
+        let txentry = ProvingBundle {
+            state: ProvingTaskState::WitnessSubmitted,
+            witness_type: WitnessType::EL,
+            witness: Vec::default(),
+            proof: vec![],
+        };
         (txid, txentry)
     }
 
@@ -149,11 +156,11 @@ mod tests {
 
         let (txid, txentry) = generate_l1_task_entry();
 
-        let idx = db.insert_new_task_entry(txid, txentry.clone()).unwrap();
+        let idx = db.create_new_entry(txid, txentry.clone()).unwrap();
 
         assert_eq!(idx, 0);
 
-        let stored_entry = db.get_task_entry(idx).unwrap();
+        let stored_entry = db.get_entry_by_index(idx).unwrap();
         assert_eq!(stored_entry, Some(txentry));
     }
 
@@ -163,11 +170,9 @@ mod tests {
 
         let (txid, txentry) = generate_l1_task_entry();
 
-        let _ = proof_db
-            .insert_new_task_entry(txid, txentry.clone())
-            .unwrap();
+        let _ = proof_db.create_new_entry(txid, txentry.clone()).unwrap();
 
-        let result = proof_db.insert_new_task_entry(txid, txentry);
+        let result = proof_db.create_new_entry(txid, txentry);
 
         assert!(result.is_err());
         if let Err(DbError::Other(err)) = result {
@@ -182,22 +187,20 @@ mod tests {
         let (txid, txentry) = generate_l1_task_entry();
 
         // Attempt to update non-existing entry
-        let result = proof_db.update_task_entry_by_id(txid, txentry.clone());
+        let result = proof_db.update_entry_by_id(txid, txentry.clone());
         assert!(result.is_err());
 
         // Add and then update the entry
-        let _ = proof_db
-            .insert_new_task_entry(txid, txentry.clone())
-            .unwrap();
+        let _ = proof_db.create_new_entry(txid, txentry.clone()).unwrap();
 
         let mut updated_txentry = txentry;
-        updated_txentry.push(2u8);
+        updated_txentry.state = ProvingTaskState::WitnessSubmitted;
 
         proof_db
-            .update_task_entry_by_id(txid, updated_txentry.clone())
+            .update_entry_by_id(txid, updated_txentry.clone())
             .unwrap();
 
-        let stored_entry = proof_db.get_task_entry_by_id(txid).unwrap();
+        let stored_entry = proof_db.get_entry_by_id(txid).unwrap();
         assert_eq!(stored_entry, Some(updated_txentry));
     }
 
@@ -208,22 +211,20 @@ mod tests {
         let (txid, txentry) = generate_l1_task_entry();
 
         // Attempt to update non-existing index
-        let result = proof_db.update_task_entry(0, txentry.clone());
+        let result = proof_db.update_entry_by_cursor(0, txentry.clone());
         assert!(result.is_err());
 
         // Add and then update the entry by index
-        let idx = proof_db
-            .insert_new_task_entry(txid, txentry.clone())
-            .unwrap();
+        let idx = proof_db.create_new_entry(txid, txentry.clone()).unwrap();
 
         let mut updated_txentry = txentry;
-        updated_txentry.push(3u8);
+        updated_txentry.state = ProvingTaskState::WitnessSubmitted;
 
         proof_db
-            .update_task_entry(idx, updated_txentry.clone())
+            .update_entry_by_cursor(idx, updated_txentry.clone())
             .unwrap();
 
-        let stored_entry = proof_db.get_task_entry(idx).unwrap();
+        let stored_entry = proof_db.get_entry_by_index(idx).unwrap();
         assert_eq!(stored_entry, Some(updated_txentry));
     }
 
@@ -232,16 +233,14 @@ mod tests {
         let proof_db = setup_db();
 
         // Test non-existing entry
-        let result = proof_db.get_task_entry(0);
+        let result = proof_db.get_entry_by_index(0);
         assert!(result.is_err());
 
         let (txid, txentry) = generate_l1_task_entry();
 
-        let idx = proof_db
-            .insert_new_task_entry(txid, txentry.clone())
-            .unwrap();
+        let idx = proof_db.create_new_entry(txid, txentry.clone()).unwrap();
 
-        let stored_entry = proof_db.get_task_entry(idx).unwrap();
+        let stored_entry = proof_db.get_entry_by_index(idx).unwrap();
         assert_eq!(stored_entry, Some(txentry));
     }
 
@@ -249,16 +248,14 @@ mod tests {
     fn test_get_next_txidx() {
         let proof_db = setup_db();
 
-        let next_txidx = proof_db.get_next_task_idx().unwrap();
+        let next_txidx = proof_db.get_next_cursor().unwrap();
         assert_eq!(next_txidx, 0, "The next txidx is 0 in the beginning");
 
         let (txid, txentry) = generate_l1_task_entry();
 
-        let idx = proof_db
-            .insert_new_task_entry(txid, txentry.clone())
-            .unwrap();
+        let idx = proof_db.create_new_entry(txid, txentry.clone()).unwrap();
 
-        let next_txidx = proof_db.get_next_task_idx().unwrap();
+        let next_txidx = proof_db.get_next_cursor().unwrap();
 
         assert_eq!(next_txidx, idx + 1);
     }

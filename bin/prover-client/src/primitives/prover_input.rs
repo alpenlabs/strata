@@ -1,6 +1,5 @@
+use alpen_express_db::types::WitnessType;
 use serde::{Deserialize, Serialize};
-
-use super::vms::ProofVm;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ProverInput {
@@ -9,10 +8,24 @@ pub enum ProverInput {
 }
 
 impl ProverInput {
-    pub fn proof_vm_id(&self) -> ProofVm {
+    pub fn proof_vm_id(&self) -> WitnessType {
         match self {
-            ProverInput::ElBlock(_) => ProofVm::ELProving,
-            ProverInput::ClBlock(_) => ProofVm::CLProving,
+            ProverInput::ElBlock(_) => WitnessType::EL,
+            ProverInput::ClBlock(_) => WitnessType::CL,
+        }
+    }
+
+    pub fn to_vec(&self) -> Vec<u8> {
+        match self {
+            ProverInput::ElBlock(witness) => witness.data.clone(),
+            ProverInput::ClBlock(witness) => witness.data.clone(),
+        }
+    }
+
+    pub fn make_empty(&mut self) {
+        match self {
+            ProverInput::ElBlock(witness) => witness.data.clear(),
+            ProverInput::ClBlock(witness) => witness.data.clear(),
         }
     }
 }
