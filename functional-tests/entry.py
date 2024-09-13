@@ -422,12 +422,8 @@ class BasicEnvConfig(flexitest.EnvConfig):
 
             prover_client_fac = ctx.get_factory("prover_client")
             prover_client = prover_client_fac.create_prover_client(
-<<<<<<< HEAD
-                f"http://localhost:{reth_port}", f"http://localhost:{seq_port}"
-=======
                 f"http://localhost:{seq_port}",
                 f"http://localhost:{reth_rpc_http_port}",
->>>>>>> 79e8ab3 (prover manager fetch el block witness)
             )
             svcs["prover_client"] = prover_client
 

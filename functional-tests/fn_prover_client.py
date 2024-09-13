@@ -16,6 +16,5 @@ class ProverClientTest(flexitest.Test):
         time.sleep(2)
 
         rpc_res = prover_client_rpc.dev_alp_prove_el_block(1)
-        print("got the rpc res: {}",rpc_res)
-        time.sleep(20)
-
+        print("got the rpc res: {}", rpc_res)
+        time.sleep(2)
