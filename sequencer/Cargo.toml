@@ -8,8 +8,7 @@ name = "alpen-express-sequencer"
 path = "src/main.rs"
 
 [dependencies]
-alpen-express-bridge-msg = { workspace = true }
-alpen-express-bridge-msg-manager = { workspace = true }
+alpen-express-bridge-relay = { workspace = true }
 alpen-express-btcio = { workspace = true }
 alpen-express-common = { workspace = true }
 alpen-express-consensus-logic = { workspace = true }

@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use alpen_express_bridge_msg::types::{BridgeMessage, Scope};
+use alpen_express_primitives::relay::types::{BridgeMessage, Scope};
 use alpen_express_db::{traits::BridgeMessageStore, DbError, DbResult};
 use rockbound::{
     utils::get_last, OptimisticTransactionDB as DB, SchemaBatch, SchemaDBOperationsExt,
@@ -100,7 +100,7 @@ impl BridgeMessageStore for BridgeMsgDb {
 mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    use alpen_express_bridge_msg::types::BridgeMessage;
+    use alpen_express_primitives::relay::types::BridgeMessage;
     use alpen_express_primitives::l1::L1TxProof;
     use alpen_test_utils::ArbitraryGenerator;
 

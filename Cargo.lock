@@ -663,31 +663,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "alpen-express-bridge-msg"
+name = "alpen-express-bridge-relay"
 version = "0.1.0"
 dependencies = [
- "alpen-express-primitives",
- "alpen-express-state",
- "alpen-test-utils",
- "anyhow",
- "arbitrary",
- "bincode",
- "borsh",
- "hex",
- "rand 0.8.5",
- "secp256k1",
- "serde",
- "sha2 0.10.8",
- "thiserror",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "alpen-express-bridge-msg-manager"
-version = "0.1.0"
-dependencies = [
- "alpen-express-bridge-msg",
  "alpen-express-btcio",
  "alpen-express-primitives",
  "alpen-express-state",
@@ -749,7 +727,6 @@ dependencies = [
 name = "alpen-express-consensus-logic"
 version = "0.1.0"
 dependencies = [
- "alpen-express-bridge-msg",
  "alpen-express-btcio",
  "alpen-express-db",
  "alpen-express-eectl",
@@ -777,7 +754,6 @@ dependencies = [
 name = "alpen-express-db"
 version = "0.1.0"
 dependencies = [
- "alpen-express-bridge-msg",
  "alpen-express-mmr",
  "alpen-express-primitives",
  "alpen-express-state",
@@ -900,7 +876,6 @@ dependencies = [
 name = "alpen-express-rocksdb"
 version = "0.1.0"
 dependencies = [
- "alpen-express-bridge-msg",
  "alpen-express-db",
  "alpen-express-mmr",
  "alpen-express-primitives",
@@ -922,7 +897,6 @@ dependencies = [
 name = "alpen-express-rpc-api"
 version = "0.1.0"
 dependencies = [
- "alpen-express-bridge-msg",
  "alpen-express-db",
  "alpen-express-primitives",
  "alpen-express-rpc-types",
@@ -952,8 +926,7 @@ dependencies = [
 name = "alpen-express-sequencer"
 version = "0.1.0"
 dependencies = [
- "alpen-express-bridge-msg",
- "alpen-express-bridge-msg-manager",
+ "alpen-express-bridge-relay",
  "alpen-express-btcio",
  "alpen-express-common",
  "alpen-express-consensus-logic",
@@ -3939,7 +3912,6 @@ dependencies = [
 name = "express-storage"
 version = "0.1.0"
 dependencies = [
- "alpen-express-bridge-msg",
  "alpen-express-db",
  "alpen-express-primitives",
  "alpen-express-state",

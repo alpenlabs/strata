@@ -1,6 +1,7 @@
 [workspace]
 members = [
   "crates/bridge-exec",
+  "crates/bridge-relay",
   "crates/bridge-sig-manager",
   "crates/bridge-tx-builder",
   "crates/btcio",
@@ -10,7 +11,6 @@ members = [
   "crates/db",
   "crates/eectl",
   "crates/evmexec",
-  "crates/bridge-msg/manager",
   "crates/primitives",
   "crates/prover/adapters/risc0",
   "crates/prover/adapters/sp1",
@@ -47,7 +47,7 @@ default-members = ["bin/bridge-client", "reth", "sequencer"]
 resolver = "2"
 
 [workspace.dependencies]
-alpen-express-bridge-msg-manager = { path = "crates/bridge-msg/manager" }
+alpen-express-bridge-relay = { path = "crates/bridge-relay" }
 alpen-express-btcio = { path = "crates/btcio" }
 alpen-express-common = { path = "crates/common" }
 alpen-express-consensus-logic = { path = "crates/consensus-logic" }

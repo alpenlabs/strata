@@ -4,7 +4,7 @@ use std::{
     time::{Duration, UNIX_EPOCH},
 };
 
-use alpen_express_bridge_msg::types::BridgeMsgId;
+use alpen_express_primitives::relay::types::BridgeMsgId;
 use tokio::sync::Mutex;
 
 pub struct RecentMessageTracker {

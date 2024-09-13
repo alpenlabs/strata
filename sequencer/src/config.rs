@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use alpen_express_bridge_msg::types::BridgeConfig;
+use alpen_express_primitives::relay::types::BridgeConfig;
 use alpen_express_btcio::reader::config::ReaderConfig;
 use bitcoin::Network;
 use serde::Deserialize;

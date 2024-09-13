@@ -4,7 +4,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use alpen_express_bridge_msg::types::{BridgeConfig, BridgeMessage};
+use alpen_express_primitives::relay::types::{BridgeConfig, BridgeMessage};
 use alpen_express_status::StatusRx;
 use express_storage::ops::bridgemsg::BridgeMsgOps;
 use secp256k1::{All, Secp256k1};
@@ -62,7 +62,7 @@ impl RelayerState {
 
         let chs_state = status_rx.chs.borrow().clone();
         if let Some(chs_state) = chs_state {
-            match alpen_express_bridge_msg::utils::verify_bridge_msg_sig(
+            match alpen_express_primitives::relay::util::verify_bridge_msg_sig(
                 &message,
                 chs_state.operator_table(),
             ) {
@@ -151,7 +151,7 @@ fn get_now_micros_maybe_sub(sub_duration: Option<Duration>) -> u128 {
 mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    use alpen_express_bridge_msg::types::BridgeMsgId;
+    use alpen_express_primitives::relay::types::BridgeMsgId;
     use alpen_test_utils::ArbitraryGenerator;
 
     use super::*;

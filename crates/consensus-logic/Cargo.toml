@@ -4,7 +4,6 @@ name = "alpen-express-consensus-logic"
 version = "0.1.0"
 
 [dependencies]
-alpen-express-bridge-msg = { workspace = true }
 alpen-express-btcio = { workspace = true }
 alpen-express-db = { workspace = true }
 alpen-express-eectl = { workspace = true }

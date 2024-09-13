@@ -2,7 +2,7 @@
 
 use std::{borrow::BorrowMut, sync::Arc};
 
-use alpen_express_bridge_msg::types::BridgeMessage;
+use alpen_express_primitives::relay::types::BridgeMessage;
 use alpen_express_btcio::{broadcaster::L1BroadcastHandle, writer::InscriptionHandle};
 use alpen_express_consensus_logic::sync_manager::SyncManager;
 use alpen_express_db::{

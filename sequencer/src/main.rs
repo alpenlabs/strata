@@ -6,8 +6,7 @@ use std::{
     time::Duration,
 };
 
-use alpen_express_bridge_msg::types::BridgeMessage;
-use alpen_express_bridge_msg_manager::handler::{bridge_msg_worker_task, RelayerState};
+use alpen_express_bridge_relay::handler::{bridge_msg_worker_task, RelayerState};
 use alpen_express_btcio::{
     broadcaster::{spawn_broadcaster_task, L1BroadcastHandle},
     rpc::BitcoinClient,
@@ -28,6 +27,7 @@ use alpen_express_primitives::{
     block_credential,
     buf::Buf32,
     params::{Params, RollupParams, RunParams},
+    relay::types::BridgeMessage,
     utils::get_test_schnorr_keys,
 };
 use alpen_express_rocksdb::{

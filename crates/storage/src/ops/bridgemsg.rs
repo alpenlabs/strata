@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use alpen_express_bridge_msg::types::BridgeMessage;
+use alpen_express_primitives::relay::types::BridgeMessage;
 use alpen_express_db::traits::*;
 
 use crate::exec::*;
