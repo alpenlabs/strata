@@ -10,7 +10,17 @@ borsh = { workspace = true }
 digest = { workspace = true }
 hex = { workspace = true }
 reth-primitives = { workspace = true }
+rand = { workspace = true, optional = true }
+secp256k1 = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
 thiserror = { workspace = true }
+
+[dev-dependencies]
+alpen-test-utils = { workspace = true }
+
+[features]
+default = ["std", "rand"]
+std = ["dep:secp256k1"]
+rand = ["dep:rand"]

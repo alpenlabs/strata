@@ -10,7 +10,6 @@ members = [
   "crates/db",
   "crates/eectl",
   "crates/evmexec",
-  "crates/bridge-msg/core",
   "crates/bridge-msg/manager",
   "crates/primitives",
   "crates/prover/adapters/risc0",
@@ -48,7 +47,6 @@ default-members = ["bin/bridge-client", "reth", "sequencer"]
 resolver = "2"
 
 [workspace.dependencies]
-alpen-express-bridge-msg = { path = "crates/bridge-msg/core" }
 alpen-express-bridge-msg-manager = { path = "crates/bridge-msg/manager" }
 alpen-express-btcio = { path = "crates/btcio" }
 alpen-express-common = { path = "crates/common" }

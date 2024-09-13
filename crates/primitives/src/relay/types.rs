@@ -2,11 +2,12 @@
 
 use core::fmt;
 
-use alpen_express_primitives::buf::{Buf32, Buf64};
 use arbitrary::Arbitrary;
-use borsh::{BorshDeserialize, BorshSerialize};
+use borsh::{io, BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+
+use crate::buf::{Buf32, Buf64};
 
 /// Message container used to direct payloads depending on the context between parties.
 #[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize, Deserialize, Serialize)]
@@ -99,7 +100,7 @@ pub enum Scope {
 
 impl Scope {
     /// Tries to parse the scope from a slice.
-    pub fn try_from_slice(raw: &[u8]) -> anyhow::Result<Scope> {
+    pub fn try_from_slice(raw: &[u8]) -> Result<Scope, io::Error> {
         Ok(borsh::from_slice(raw)?)
     }
 }
@@ -161,11 +162,10 @@ pub struct BridgeConfig {
 
 #[cfg(test)]
 mod tests {
-    use alpen_express_primitives::buf::{Buf32, Buf64};
     use alpen_test_utils::ArbitraryGenerator;
 
-    use super::{BridgeMessage, Scope};
-    use crate::types::BridgeMsgId;
+    use super::{types::BridgeMsgId, BridgeMessage, Scope};
+    use crate::buf::Buf64;
 
     fn get_arb_bridge_msg() -> BridgeMessage {
         let msg: BridgeMessage = ArbitraryGenerator::new().generate();

@@ -1,12 +1,14 @@
 use std::sync::Arc;
 
-use alpen_express_primitives::buf::{Buf32, Buf64};
-use alpen_express_state::bridge_state::OperatorTable;
 use rand::rngs::OsRng;
 use secp256k1::{schnorr::Signature, All, Keypair, Message, Secp256k1, SecretKey, XOnlyPublicKey};
 use thiserror::Error;
 
-use crate::types::{BridgeMessage, Scope};
+use super::types::{BridgeMessage, Scope};
+use crate::{
+    buf::{Buf32, Buf64},
+    operator::OperatorKeyProvider,
+};
 
 /// Contains data needed to construct bridge messages.
 #[derive(Clone)]
@@ -59,6 +61,7 @@ impl MessageSigner {
 }
 
 /// Computes the corresponding x-only pubkey as a buf32 for an sk.
+#[cfg(feature = "std")]
 pub fn compute_pubkey_for_privkey<A: secp256k1::Signing>(sk: &Buf32, secp: &Secp256k1<A>) -> Buf32 {
     let kp = Keypair::from_seckey_slice(secp, sk.as_ref()).unwrap();
     let (xonly_pk, _) = kp.public_key().x_only_public_key();
@@ -66,6 +69,7 @@ pub fn compute_pubkey_for_privkey<A: secp256k1::Signing>(sk: &Buf32, secp: &Secp
 }
 
 /// Generates a signature for the message.
+#[cfg(all(feature = "std", feature = "rand"))]
 pub fn sign_msg_hash<A: secp256k1::Signing>(
     sk: &Buf32,
     msg_hash: &Buf32,
@@ -81,6 +85,7 @@ pub fn sign_msg_hash<A: secp256k1::Signing>(
 }
 
 /// Returns if the signature is correct for the message.
+#[cfg(feature = "std")]
 pub fn verify_sig(pk: &Buf32, msg_hash: &Buf32, sig: &Buf64) -> bool {
     let pk = XOnlyPublicKey::from_slice(pk.as_ref()).unwrap();
     let msg = Message::from_digest(*msg_hash.as_ref());
@@ -102,15 +107,14 @@ pub enum VerifyError {
 /// if the operator exists and verifies the signature using their pubkeys.
 pub fn verify_bridge_msg_sig(
     msg: &BridgeMessage,
-    optbl: &OperatorTable,
+    optbl: &impl OperatorKeyProvider,
 ) -> Result<(), VerifyError> {
-    let op = optbl
-        .get_operator(msg.source_id())
+    let op_signing_pk = optbl
+        .get_operator_signing_pk(msg.source_id())
         .ok_or(VerifyError::UnknownOperator)?;
-    let signing_pk = op.signing_pk();
 
     let msg_hash = msg.compute_id().into_inner();
-    if !verify_sig(signing_pk, &msg_hash, msg.signature()) {
+    if !verify_sig(&op_signing_pk, &msg_hash, msg.signature()) {
         return Err(VerifyError::InvalidSig);
     }
 
