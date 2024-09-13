@@ -58,7 +58,7 @@ where
         .merge(prover_client_api)
         .context("merge prover client api")?;
 
-    info!("conneting to the server {:?}", rpc_url);
+    info!("connecting to the server {:?}", rpc_url);
     let rpc_server = jsonrpsee::server::ServerBuilder::new()
         .build(&rpc_url)
         .await

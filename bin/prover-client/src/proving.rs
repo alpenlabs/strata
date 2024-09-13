@@ -11,7 +11,8 @@ use alpen_express_rocksdb::{
     DbOpsConfig,
 };
 use express_zkvm::{Proof, ZKVMHost};
-use rockbound::rocksdb::{self};
+use risc0_guest_builder::RETH_RISC0_ELF;
+use rockbound::rocksdb;
 use tracing::info;
 use uuid::Uuid;
 use zkvm_primitives::ZKVMInput;
@@ -120,7 +121,7 @@ where
         let db = ProofDb::new(rbdb, db_ops);
 
         let mut zkvm_manager: ZkVMManager<Vm> = ZkVMManager::new();
-        zkvm_manager.add_vm(ProofVm::ELProving, vec![]);
+        zkvm_manager.add_vm(ProofVm::ELProving, RETH_RISC0_ELF.to_vec());
         zkvm_manager.add_vm(ProofVm::CLProving, vec![]);
         zkvm_manager.add_vm(ProofVm::CLAggregation, vec![]);
 
@@ -129,7 +130,7 @@ where
             pool: rayon::ThreadPoolBuilder::new()
                 .num_threads(5)
                 .build()
-                .expect("Failed to initailize prover threadpool worker"),
+                .expect("Failed to initialize prover threadpool worker"),
 
             prover_state: Arc::new(RwLock::new(ProverState {
                 prover_status: Default::default(),
@@ -233,7 +234,7 @@ where
                 task_id
             )),
             Some(ProverStatus::Err(e)) => Err(anyhow::anyhow!(e.to_string())),
-            None => Err(anyhow::anyhow!("Missing witness for: {:?}", task_id)),
+            _ => Err(anyhow::anyhow!("Missing witness for: {:?}", task_id)),
         }
     }
 
