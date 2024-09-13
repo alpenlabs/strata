@@ -3,14 +3,14 @@
 
 use alpen_express_primitives::buf::Buf32;
 use bitcoin::{opcodes::all::OP_RETURN, Block, ScriptBuf, Transaction};
-use risc0_groth16::Seal;
+use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
 use crate::logic::ScanRuleConfig;
 
 const SOME_ALP_MAGIC: [u8; 32] = [1; 32];
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
 pub struct DepositRequestData {
     /// Address of the rollup where the `amount` is deposited
     pub dest_addr: Vec<u8>,
@@ -19,12 +19,12 @@ pub struct DepositRequestData {
 
 pub type ForcedInclusion = Vec<u8>;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
 pub struct StateUpdate {
-    btc_header_verification_state: Buf32,
-    rollup_chain_state: Buf32,
-    groth16_proof: Seal,
-    elf_id: Buf32,
+    pub btc_header_verification_state: Buf32,
+    pub rollup_chain_state: Buf32,
+    pub groth16_proof: Vec<u8>,
+    pub acc_pow: f64,
 }
 
 /// Note: This needs to be consistent with the logic in other places
@@ -97,11 +97,11 @@ pub fn extract_relevant_transactions(
 ) -> (
     Vec<DepositRequestData>,
     Vec<ForcedInclusion>,
-    Vec<StateUpdate>,
+    Option<StateUpdate>,
 ) {
     let mut deposits = Vec::new();
     let mut forced_inclusions = Vec::new();
-    let mut state_updates = Vec::new();
+    let mut state_update = None;
 
     for tx in &block.txdata {
         if let Some(deposit) = extract_deposit(tx, &scan_rule.bridge_scriptbufs) {
@@ -112,12 +112,12 @@ pub fn extract_relevant_transactions(
             forced_inclusions.push(forced_inclusion);
         }
 
-        if let Some(state_update) = extract_state_update(tx) {
-            state_updates.push(state_update);
+        if let Some(update) = extract_state_update(tx) {
+            state_update = Some(update)
         }
     }
 
-    (deposits, forced_inclusions, state_updates)
+    (deposits, forced_inclusions, state_update)
 }
 
 #[cfg(test)]

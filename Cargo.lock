@@ -2152,6 +2152,7 @@ dependencies = [
  "alpen-express-primitives",
  "alpen-test-utils",
  "bitcoin",
+ "borsh",
  "hex",
  "rand 0.8.5",
  "risc0-groth16",
@@ -3765,9 +3766,16 @@ dependencies = [
 name = "express-checkpoint-proof"
 version = "0.1.0"
 dependencies = [
+ "alpen-express-primitives",
  "alpen-express-state",
+ "alpen-test-utils",
+ "borsh",
+ "btc-blockspace",
  "l1-batch",
  "risc0-groth16",
+ "risc0-zkvm",
+ "serde",
+ "sha2 0.10.8",
 ]
 
 [[package]]

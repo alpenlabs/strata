@@ -632,6 +632,8 @@ version = "0.1.0"
 dependencies = [
  "alpen-express-primitives",
  "bitcoin",
+ "borsh",
+ "risc0-groth16",
  "serde",
  "sha2",
 ]

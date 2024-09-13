@@ -2,13 +2,14 @@ use std::io::{Cursor, Write};
 
 use alpen_express_primitives::buf::Buf32;
 use bitcoin::{block::Header, hashes::Hash, BlockHash, CompactTarget, Target};
+use borsh::{BorshDeserialize, BorshSerialize};
 use btc_blockspace::block::compute_block_hash;
 use ethnum::U256;
 use serde::{Deserialize, Serialize};
 
 use crate::pow_params::PowParams;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
 pub struct HeaderVerificationState {
     /// [Block number](bitcoin::Block::bip34_block_height) of the last verified block
     pub last_verified_block_num: u32,
@@ -148,7 +149,7 @@ impl HeaderVerificationState {
     }
 
     pub fn hash(&self) -> Result<Buf32, std::io::Error> {
-        // 4 + 32 + 4 + 4 + 8 + 11*4 =
+        // 4 + 32 + 4 + 4 + 8 + 11*4 = 96
         let mut buf = [0u8; 96];
         let mut cur = Cursor::new(&mut buf[..]);
         cur.write_all(&self.last_verified_block_num.to_be_bytes())?;

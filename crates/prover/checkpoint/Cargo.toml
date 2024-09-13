@@ -1,0 +1,16 @@
+[package]
+name = "express-checkpoint-proof"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+alpen-express-state.workspace = true
+alpen-express-primitives.workspace = true
+serde.workspace = true
+l1-batch.workspace = true
+risc0-groth16 = "1.0.5"
+risc0-zkvm = "1.0.5"
+sha2.workspace = true
+borsh.workspace = true
+alpen-test-utils.workspace = true
+btc-blockspace.workspace = true
