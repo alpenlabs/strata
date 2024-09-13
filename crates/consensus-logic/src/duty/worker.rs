@@ -3,7 +3,7 @@
 use std::{
     collections::HashMap,
     sync::{Arc, RwLock},
-    time::{self, Duration},
+    time::{self},
 };
 
 use alpen_express_btcio::writer::InscriptionHandle;
@@ -227,6 +227,7 @@ pub fn duty_dispatch_task<
     inscription_handle: Arc<InscriptionHandle>,
     pool: threadpool::ThreadPool,
     params: Arc<Params>,
+    checkpoint_tx: Arc<broadcast::Sender<u64>>,
 ) {
     // TODO make this actually work
     let pending_duties = Arc::new(RwLock::new(HashMap::<Buf32, ()>::new()));
@@ -292,8 +293,9 @@ pub fn duty_dispatch_task<
             let da_writer = inscription_handle.clone();
             let params: Arc<Params> = params.clone();
             let duty_status_tx_l = duty_status_tx.clone();
+            let crx = checkpoint_tx.subscribe();
             pool.execute(move || {
-                duty_exec_task(d, ik, sm, db, e, da_writer, params, duty_status_tx_l)
+                duty_exec_task(d, ik, sm, db, e, da_writer, params, duty_status_tx_l, crx)
             });
             trace!(%id, "dispatched duty exec task");
             pending_duties_local.insert(id, ());
@@ -318,6 +320,7 @@ fn duty_exec_task<D: Database, E: ExecEngineCtl>(
     inscription_handle: Arc<InscriptionHandle>,
     params: Arc<Params>,
     duty_status_tx: std::sync::mpsc::Sender<DutyExecStatus>,
+    checkpoint_rx: tokio::sync::broadcast::Receiver<u64>,
 ) {
     let result = perform_duty(
         &duty,
@@ -327,6 +330,7 @@ fn duty_exec_task<D: Database, E: ExecEngineCtl>(
         engine.as_ref(),
         inscription_handle.as_ref(),
         &params,
+        checkpoint_rx,
     );
 
     let status = DutyExecStatus {
@@ -348,6 +352,7 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
     engine: &E,
     inscription_handle: &InscriptionHandle,
     params: &Arc<Params>,
+    checkpoint_rx: tokio::sync::broadcast::Receiver<u64>,
 ) -> Result<(), Error> {
     match duty {
         Duty::SignBlock(data) => {
@@ -393,7 +398,7 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
         Duty::CommitBatch(data) => {
             info!(data = ?data, "commit batch");
 
-            let commitment = check_and_get_batch_commitment(database, data)?;
+            let commitment = check_and_get_batch_commitment(database, data, checkpoint_rx)?;
 
             let commitment_sighash = commitment.get_sighash();
             let signature = sign_with_identity_key(&commitment_sighash, ik);
@@ -421,34 +426,59 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
 fn check_and_get_batch_commitment(
     db: &impl Database,
     duty: &BatchCommitmentDuty,
+    mut checkpoint_rx: tokio::sync::broadcast::Receiver<u64>,
 ) -> Result<BatchCommitment, Error> {
     let idx = duty.idx();
 
     // If there's no entry in db, create a pending entry and wait until proof is ready
-    if db
-        .checkpoint_provider()
-        .get_batch_commitment(idx)?
-        .is_none()
-    {
-        let entry = BatchCommitmentEntry::new(
-            duty.checkpoint().clone(),
-            vec![],
-            CommitmentStatus::PendingProof,
-        );
-        db.checkpoint_store().put_batch_commitment(idx, entry)?;
+    match db.checkpoint_provider().get_batch_commitment(idx)? {
+        // There's no entry in the database, create one so that the prover manager can query the
+        // checkpoint info to create proofs for next
+        None => {
+            let entry = BatchCommitmentEntry::new(
+                duty.checkpoint().clone(),
+                vec![],
+                CommitmentStatus::PendingProof,
+            );
+            db.checkpoint_store().put_batch_commitment(idx, entry)?;
+        }
+        // There's an entry. If status is ProofCreated, return it else we need to wait for prover to
+        // submit proofs.
+        Some(entry) => match entry.status {
+            CommitmentStatus::PendingProof => {
+                // Do nothing, wait for broadcast msg below
+            }
+            _ => {
+                return Ok(entry.into());
+            }
+        },
     }
 
-    // Wait until the proof is ready
-    // May also need to have a mpsc receiver from RPC where prover manager posts the proof
-    loop {
-        if let Some(commitment) = db.checkpoint_provider().get_batch_commitment(idx)? {
-            if commitment.has_proof() {
-                return Ok(commitment.into());
-            }
-        }
-        debug!(%idx, "Polling for batch commitment");
+    let chidx = checkpoint_rx
+        .blocking_recv()
+        .map_err(|e| Error::Other(e.to_string()))?;
 
-        std::thread::sleep(Duration::from_millis(BATCH_POLL_INTERVAL));
+    if chidx != idx {
+        warn!(received = %chidx, expected = %idx, "Received different checkpoint idx than expected");
+        return Err(Error::Other(
+            "Unexpected checkpoint idx received from broadcast channel".to_string(),
+        ));
+    }
+
+    match db.checkpoint_provider().get_batch_commitment(idx)? {
+        None => {
+            warn!(%idx, "Expected checkpoint to be present in db");
+            Err(Error::Other(
+                "Expected checkpoint to be present in db".to_string(),
+            ))
+        }
+        Some(entry) if entry.status == CommitmentStatus::PendingProof => {
+            warn!(%idx, "Expected checkpoint proof to be ready");
+            Err(Error::Other(
+                "Expected checkpoint proof to be ready".to_string(),
+            ))
+        }
+        Some(entry) => Ok(entry.into()),
     }
 }
 

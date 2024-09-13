@@ -276,6 +276,10 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let bcast_handle = Arc::new(bcast_handle);
     let (status_tx, status_rx) = (sync_man.status_tx(), sync_man.status_rx());
 
+    // A channel to communicate checkpoint index, tx own by rpc and rx by duty executor
+    let (checkpt_tx, _) = broadcast::channel::<u64>(10);
+    let checkpt_tx = Arc::new(checkpt_tx);
+
     // If the sequencer key is set, start the sequencer duties task.
     if let ClientMode::Sequencer(sequencer_config) = &config.client.client_mode {
         let seqkey_path = &sequencer_config.sequencer_key;
@@ -334,10 +338,11 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
         let d_params = params.clone();
         let d_executor = task_manager.executor();
+        let ctx_clone = checkpt_tx.clone();
         executor.spawn_critical("duty_worker::duty_dispatch_task", move |shutdown| {
             duty_worker::duty_dispatch_task(
                 shutdown, d_executor, duties_rx, idata.key, sm, db2, eng_ctl_de, insc_hndlr, pool,
-                d_params,
+                d_params, ctx_clone,
             )
         });
     }
@@ -387,6 +392,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             inscription_handler,
             bcast_handle,
             l2_block_manager,
+            checkpt_tx,
         )
         .await
         .unwrap()
@@ -412,6 +418,7 @@ async fn start_rpc<D: Database + Send + Sync + 'static>(
     inscription_handler: Option<Arc<InscriptionHandle>>,
     bcast_handle: Arc<L1BroadcastHandle>,
     l2_block_manager: Arc<L2BlockManager>,
+    checkpt_tx: Arc<broadcast::Sender<u64>>,
 ) -> anyhow::Result<()> {
     let (stop_tx, stop_rx) = oneshot::channel();
 
@@ -423,6 +430,7 @@ async fn start_rpc<D: Database + Send + Sync + 'static>(
         bcast_handle.clone(),
         stop_tx,
         l2_block_manager.clone(),
+        checkpt_tx,
     );
 
     let mut methods = alp_rpc.into_rpc();

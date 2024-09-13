@@ -33,7 +33,7 @@ use express_rpc_utils::to_jsonrpsee_error;
 use express_storage::L2BlockManager;
 use jsonrpsee::{core::RpcResult, types::ErrorObjectOwned};
 use thiserror::Error;
-use tokio::sync::{oneshot, Mutex};
+use tokio::sync::{broadcast, oneshot, Mutex};
 use tracing::*;
 
 #[derive(Debug, Error)]
@@ -139,6 +139,7 @@ pub struct AlpenRpcImpl<D> {
     bcast_handle: Arc<L1BroadcastHandle>,
     stop_tx: Mutex<Option<oneshot::Sender<()>>>,
     l2_block_manager: Arc<L2BlockManager>,
+    checkpoint_tx: Arc<broadcast::Sender<u64>>,
 }
 
 impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
@@ -149,6 +150,7 @@ impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
         bcast_handle: Arc<L1BroadcastHandle>,
         stop_tx: oneshot::Sender<()>,
         l2_block_manager: Arc<L2BlockManager>,
+        checkpoint_tx: Arc<broadcast::Sender<u64>>,
     ) -> Self {
         Self {
             status_rx,
@@ -157,6 +159,7 @@ impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
             bcast_handle,
             stop_tx: Mutex::new(Some(stop_tx)),
             l2_block_manager,
+            checkpoint_tx,
         }
     }
 
@@ -596,11 +599,16 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
             .ok_or(Error::MissingCheckpoint(idx))?;
         entry.proof = proof;
         entry.status = CommitmentStatus::ProofCreated;
-        Ok(self
-            .database
+        self.database
             .checkpoint_store()
             .put_batch_commitment(idx, entry)
-            .map_err(|e| Error::Other(e.to_string()))?)
+            .map_err(|e| Error::Other(e.to_string()))?;
+
+        // Now send the idx to indicate checkpoint proof has been received
+        self.checkpoint_tx
+            .send(idx)
+            .map_err(|e| Error::Other(e.to_string()))?;
+        Ok(())
     }
 }
 
