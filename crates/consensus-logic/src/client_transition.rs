@@ -108,7 +108,7 @@ pub fn process_event<D: Database>(
                     commitments.iter().map(|x| x.checkpoint().clone()).collect(),
                 ));
 
-                actions.push(SyncAction::WriteCommitments(*height, commitments.clone()));
+                actions.push(SyncAction::WriteCheckpoints(*height, commitments.clone()));
             } else {
                 // TODO we can expand this later to make more sense
                 return Err(Error::MissingClientSyncState);

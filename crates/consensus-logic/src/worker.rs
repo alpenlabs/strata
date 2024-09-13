@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use alpen_express_db::{
     traits::*,
-    types::{BatchCommitmentEntry, CommitmentStatus},
+    types::{CheckpointEntry, CheckpointStatus},
 };
 use alpen_express_eectl::engine::ExecEngineCtl;
 use alpen_express_primitives::prelude::*;
@@ -208,19 +208,16 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
                 )?;
             }
 
-            SyncAction::WriteCommitments(_height, commitments) => {
+            SyncAction::WriteCheckpoints(_height, checkpoints) => {
                 let checkpoint_store = state.db().checkpoint_store();
-                for c in commitments.iter() {
+                for c in checkpoints.iter() {
                     let idx = c.checkpoint().idx();
-                    let status = CommitmentStatus::Confirmed;
-                    let entry = BatchCommitmentEntry::new(
-                        c.checkpoint().clone(),
-                        c.proof().to_vec(),
-                        status,
-                    );
+                    let status = CheckpointStatus::Confirmed;
+                    let entry =
+                        CheckpointEntry::new(c.checkpoint().clone(), c.proof().to_vec(), status);
 
                     // Store
-                    checkpoint_store.put_batch_commitment(idx, entry)?;
+                    checkpoint_store.put_batch_checkpoint(idx, entry)?;
                 }
             }
         }

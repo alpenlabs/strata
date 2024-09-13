@@ -7,7 +7,7 @@ use alpen_express_db::{
         ChainstateProvider, CheckpointProvider, CheckpointStore, Database, L1DataProvider,
         L2DataProvider,
     },
-    types::{CommitmentStatus, L1TxEntry, L1TxStatus},
+    types::{CheckpointStatus, L1TxEntry, L1TxStatus},
 };
 use alpen_express_primitives::{buf::Buf32, hash};
 use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer};
@@ -16,7 +16,7 @@ use alpen_express_rpc_types::{
     HexBytes32, L1Status, NodeSyncStatus, RawBlockWitness, RpcCheckpointInfo,
 };
 use alpen_express_state::{
-    batch::BatchCommitment,
+    batch::BatchCheckpoint,
     block::L2BlockBundle,
     bridge_ops::WithdrawalIntent,
     chain_state::ChainState,
@@ -584,9 +584,9 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         let entry = self
             .database
             .checkpoint_provider()
-            .get_batch_commitment(idx)
+            .get_batch_checkpoint(idx)
             .map_err(|e| Error::Other(e.to_string()))?;
-        let batch_comm: Option<BatchCommitment> = entry.map(Into::into);
+        let batch_comm: Option<BatchCheckpoint> = entry.map(Into::into);
         Ok(batch_comm.map(|bc| bc.checkpoint().clone().into()))
     }
 
@@ -594,14 +594,14 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         let mut entry = self
             .database
             .checkpoint_provider()
-            .get_batch_commitment(idx)
+            .get_batch_checkpoint(idx)
             .map_err(|e| Error::Other(e.to_string()))?
             .ok_or(Error::MissingCheckpoint(idx))?;
         entry.proof = proof;
-        entry.status = CommitmentStatus::ProofCreated;
+        entry.status = CheckpointStatus::ProofCreated;
         self.database
             .checkpoint_store()
-            .put_batch_commitment(idx, entry)
+            .put_batch_checkpoint(idx, entry)
             .map_err(|e| Error::Other(e.to_string()))?;
 
         // Now send the idx to indicate checkpoint proof has been received

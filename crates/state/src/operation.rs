@@ -6,7 +6,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use tracing::*;
 
 use crate::{
-    batch::{BatchCommitment, CheckPointInfo},
+    batch::{BatchCheckpoint, CheckPointInfo},
     client_state::{ClientState, L1CheckPoint, SyncState},
     id::L2BlockId,
     l1::L1BlockId,
@@ -95,7 +95,7 @@ pub enum SyncAction {
     L2Genesis(L1BlockId),
 
     /// Indicates to the worker to write the checkpoints to checkpoint db
-    WriteCommitments(u64, Vec<BatchCommitment>),
+    WriteCheckpoints(u64, Vec<BatchCheckpoint>),
 }
 
 /// Applies client state writes to a target state.

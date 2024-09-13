@@ -31,7 +31,7 @@ pub enum Duty {
     /// Goal to sign a block.
     SignBlock(BlockSigningDuty),
     /// Goal to build and commit a batch.
-    CommitBatch(BatchCommitmentDuty),
+    CommitBatch(BatchCheckpointDuty),
 }
 
 impl Duty {
@@ -79,12 +79,12 @@ impl BlockSigningDuty {
 /// When this duty is created, in order to execute the duty, the sequencer looks for corresponding
 /// batch proof in the proof db.
 #[derive(Clone, Debug, BorshSerialize)]
-pub struct BatchCommitmentDuty {
+pub struct BatchCheckpointDuty {
     /// Checkpoint/batch info
     checkpoint: CheckPointInfo,
 }
 
-impl BatchCommitmentDuty {
+impl BatchCheckpointDuty {
     pub fn idx(&self) -> u64 {
         self.checkpoint.idx()
     }
@@ -94,7 +94,7 @@ impl BatchCommitmentDuty {
     }
 }
 
-impl From<CheckPointInfo> for BatchCommitmentDuty {
+impl From<CheckPointInfo> for BatchCheckpointDuty {
     fn from(value: CheckPointInfo) -> Self {
         Self { checkpoint: value }
     }

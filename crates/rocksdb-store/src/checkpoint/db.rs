@@ -2,12 +2,12 @@ use std::sync::Arc;
 
 use alpen_express_db::{
     traits::{CheckpointProvider, CheckpointStore},
-    types::BatchCommitmentEntry,
+    types::CheckpointEntry,
     DbResult,
 };
 use rockbound::{OptimisticTransactionDB, SchemaDBOperationsExt};
 
-use super::schemas::BatchCommitmentSchema;
+use super::schemas::BatchCheckpointSchema;
 use crate::DbOpsConfig;
 
 pub struct RBCheckpointDB {
@@ -27,24 +27,24 @@ impl RBCheckpointDB {
 }
 
 impl CheckpointStore for RBCheckpointDB {
-    fn put_batch_commitment(
+    fn put_batch_checkpoint(
         &self,
         batchidx: u64,
-        batch_commitment: BatchCommitmentEntry,
+        batch_checkpoint: CheckpointEntry,
     ) -> DbResult<()> {
         Ok(self
             .db
-            .put::<BatchCommitmentSchema>(&batchidx, &batch_commitment)?)
+            .put::<BatchCheckpointSchema>(&batchidx, &batch_checkpoint)?)
     }
 }
 
 impl CheckpointProvider for RBCheckpointDB {
-    fn get_batch_commitment(&self, batchidx: u64) -> DbResult<Option<BatchCommitmentEntry>> {
-        Ok(self.db.get::<BatchCommitmentSchema>(&batchidx)?)
+    fn get_batch_checkpoint(&self, batchidx: u64) -> DbResult<Option<CheckpointEntry>> {
+        Ok(self.db.get::<BatchCheckpointSchema>(&batchidx)?)
     }
 
     fn get_last_batch_idx(&self) -> DbResult<Option<u64>> {
-        Ok(rockbound::utils::get_last::<BatchCommitmentSchema>(&*self.db)?.map(|(x, _)| x))
+        Ok(rockbound::utils::get_last::<BatchCheckpointSchema>(&*self.db)?.map(|(x, _)| x))
     }
 }
 
@@ -58,61 +58,65 @@ mod tests {
     use crate::test_utils::get_rocksdb_tmp_instance;
 
     #[test]
-    fn test_batch_commitment_new_entry() {
+    fn test_batch_checkpoint_new_entry() {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
         let seq_db = RBCheckpointDB::new(db, db_ops);
 
         let batchidx = 1;
-        let batch: BatchCommitmentEntry = ArbitraryGenerator::new().generate();
+        let checkpoint: CheckpointEntry = ArbitraryGenerator::new().generate();
         seq_db
-            .put_batch_commitment(batchidx, batch.clone())
+            .put_batch_checkpoint(batchidx, checkpoint.clone())
             .unwrap();
 
-        let retrieved_batch = seq_db.get_batch_commitment(batchidx).unwrap().unwrap();
-        assert_eq!(batch, retrieved_batch);
+        let retrieved_batch = seq_db.get_batch_checkpoint(batchidx).unwrap().unwrap();
+        assert_eq!(checkpoint, retrieved_batch);
     }
 
     #[test]
-    fn test_batch_commitment_existing_entry() {
+    fn test_batch_checkpoint_existing_entry() {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
         let seq_db = RBCheckpointDB::new(db, db_ops);
 
         let batchidx = 1;
-        let batch: BatchCommitmentEntry = ArbitraryGenerator::new().generate();
+        let checkpoint: CheckpointEntry = ArbitraryGenerator::new().generate();
         seq_db
-            .put_batch_commitment(batchidx, batch.clone())
+            .put_batch_checkpoint(batchidx, checkpoint.clone())
             .unwrap();
 
         seq_db
-            .put_batch_commitment(batchidx, batch.clone())
+            .put_batch_checkpoint(batchidx, checkpoint.clone())
             .unwrap();
     }
 
     #[test]
-    fn test_batch_commitment_non_monotonic_entries() {
+    fn test_batch_checkpoint_non_monotonic_entries() {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
         let seq_db = RBCheckpointDB::new(db, db_ops);
 
-        let batch: BatchCommitmentEntry = ArbitraryGenerator::new().generate();
-        seq_db.put_batch_commitment(100, batch.clone()).unwrap();
-        seq_db.put_batch_commitment(1, batch.clone()).unwrap();
-        seq_db.put_batch_commitment(3, batch.clone()).unwrap();
+        let checkpoint: CheckpointEntry = ArbitraryGenerator::new().generate();
+        seq_db
+            .put_batch_checkpoint(100, checkpoint.clone())
+            .unwrap();
+        seq_db.put_batch_checkpoint(1, checkpoint.clone()).unwrap();
+        seq_db.put_batch_checkpoint(3, checkpoint.clone()).unwrap();
     }
 
     #[test]
-    fn test_get_last_batch_commitment_idx() {
+    fn test_get_last_batch_checkpoint_idx() {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
         let seq_db = RBCheckpointDB::new(db, db_ops);
 
-        let batch: BatchCommitmentEntry = ArbitraryGenerator::new().generate();
-        seq_db.put_batch_commitment(100, batch.clone()).unwrap();
-        seq_db.put_batch_commitment(1, batch.clone()).unwrap();
-        seq_db.put_batch_commitment(3, batch.clone()).unwrap();
+        let checkpoint: CheckpointEntry = ArbitraryGenerator::new().generate();
+        seq_db
+            .put_batch_checkpoint(100, checkpoint.clone())
+            .unwrap();
+        seq_db.put_batch_checkpoint(1, checkpoint.clone()).unwrap();
+        seq_db.put_batch_checkpoint(3, checkpoint.clone()).unwrap();
 
         let last_idx = seq_db.get_last_batch_idx().unwrap().unwrap();
         assert_eq!(last_idx, 100);
 
-        seq_db.put_batch_commitment(50, batch.clone()).unwrap();
+        seq_db.put_batch_checkpoint(50, checkpoint.clone()).unwrap();
         let last_idx = seq_db.get_last_batch_idx().unwrap().unwrap();
         assert_eq!(last_idx, 100);
     }

@@ -9,14 +9,14 @@ use crate::id::L2BlockId;
 /// Public parameters for batch proof to be posted to DA.
 /// Will be updated as prover specs evolve.
 #[derive(Clone, Debug, PartialEq, Eq, BorshDeserialize, BorshSerialize, Arbitrary)]
-pub struct BatchCommitment {
+pub struct BatchCheckpoint {
     /// Information regarding the current batch checkpoint
     checkpoint: CheckPointInfo,
     /// Proof for the batch obtained from prover manager
     proof: Vec<u8>,
 }
 
-impl BatchCommitment {
+impl BatchCheckpoint {
     pub fn new(checkpoint: CheckPointInfo, proof: Vec<u8>) -> Self {
         Self { checkpoint, proof }
     }
@@ -43,19 +43,19 @@ impl BatchCommitment {
 }
 
 #[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
-pub struct SignedBatchCommitment {
-    inner: BatchCommitment,
+pub struct SignedBatchCheckpoint {
+    inner: BatchCheckpoint,
     signature: Buf64,
 }
 
-impl SignedBatchCommitment {
-    pub fn new(inner: BatchCommitment, signature: Buf64) -> Self {
+impl SignedBatchCheckpoint {
+    pub fn new(inner: BatchCheckpoint, signature: Buf64) -> Self {
         Self { inner, signature }
     }
 }
 
-impl From<SignedBatchCommitment> for BatchCommitment {
-    fn from(value: SignedBatchCommitment) -> Self {
+impl From<SignedBatchCheckpoint> for BatchCheckpoint {
+    fn from(value: SignedBatchCheckpoint) -> Self {
         value.inner
     }
 }

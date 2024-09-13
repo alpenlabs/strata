@@ -1,7 +1,7 @@
 //! Module for database local types
 
 use alpen_express_primitives::buf::Buf32;
-use alpen_express_state::batch::{BatchCommitment, CheckPointInfo};
+use alpen_express_state::batch::{BatchCheckpoint, CheckPointInfo};
 use arbitrary::Arbitrary;
 use bitcoin::{
     consensus::{self, deserialize, serialize},
@@ -132,17 +132,17 @@ pub enum ExcludeReason {
 
 /// Entry corresponding to a BatchCommitment
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
-pub struct BatchCommitmentEntry {
-    /// Infor related to the batch
+pub struct CheckpointEntry {
+    /// Info related to the batch
     checkpoint: CheckPointInfo,
     /// Proof
     pub proof: Vec<u8>,
     /// Status
-    pub status: CommitmentStatus,
+    pub status: CheckpointStatus,
 }
 
-impl BatchCommitmentEntry {
-    pub fn new(checkpoint: CheckPointInfo, proof: Vec<u8>, status: CommitmentStatus) -> Self {
+impl CheckpointEntry {
+    pub fn new(checkpoint: CheckPointInfo, proof: Vec<u8>, status: CheckpointStatus) -> Self {
         Self {
             checkpoint,
             proof,
@@ -150,20 +150,20 @@ impl BatchCommitmentEntry {
         }
     }
     pub fn has_proof(&self) -> bool {
-        self.status != CommitmentStatus::PendingProof
+        self.status != CheckpointStatus::PendingProof
     }
 }
 
-impl From<BatchCommitmentEntry> for BatchCommitment {
-    fn from(entry: BatchCommitmentEntry) -> BatchCommitment {
-        BatchCommitment::new(entry.checkpoint, entry.proof)
+impl From<CheckpointEntry> for BatchCheckpoint {
+    fn from(entry: CheckpointEntry) -> BatchCheckpoint {
+        BatchCheckpoint::new(entry.checkpoint, entry.proof)
     }
 }
 
 /// Status of the commmitment
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
-pub enum CommitmentStatus {
-    /// Proof has not been created for this commitment
+pub enum CheckpointStatus {
+    /// Proof has not been created for this checkpoint
     PendingProof,
     /// Proof is ready
     ProofCreated,

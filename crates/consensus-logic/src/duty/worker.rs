@@ -10,7 +10,7 @@ use alpen_express_btcio::writer::InscriptionHandle;
 use alpen_express_crypto::sign_schnorr_sig;
 use alpen_express_db::{
     traits::*,
-    types::{BatchCommitmentEntry, CommitmentStatus},
+    types::{CheckpointEntry, CheckpointStatus},
 };
 use alpen_express_eectl::engine::ExecEngineCtl;
 use alpen_express_primitives::{
@@ -18,7 +18,7 @@ use alpen_express_primitives::{
     params::Params,
 };
 use alpen_express_state::{
-    batch::{BatchCommitment, SignedBatchCommitment},
+    batch::{BatchCheckpoint, SignedBatchCheckpoint},
     client_state::ClientState,
     da_blob::{BlobDest, BlobIntent},
     prelude::*,
@@ -30,7 +30,7 @@ use tracing::*;
 
 use super::{
     block_assembly, extractor,
-    types::{self, BatchCommitmentDuty, Duty, DutyBatch, Identity, IdentityKey},
+    types::{self, BatchCheckpointDuty, Duty, DutyBatch, Identity, IdentityKey},
 };
 use crate::{
     errors::Error,
@@ -398,19 +398,19 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
         Duty::CommitBatch(data) => {
             info!(data = ?data, "commit batch");
 
-            let commitment = check_and_get_batch_commitment(database, data, checkpoint_rx)?;
+            let checkpoint = check_and_get_batch_checkpoint(database, data, checkpoint_rx)?;
 
-            let commitment_sighash = commitment.get_sighash();
-            let signature = sign_with_identity_key(&commitment_sighash, ik);
-            let signed_commitment = SignedBatchCommitment::new(commitment, signature);
+            let checkpoint_sighash = checkpoint.get_sighash();
+            let signature = sign_with_identity_key(&checkpoint_sighash, ik);
+            let signed_checkpoint = SignedBatchCheckpoint::new(checkpoint, signature);
 
             // serialize and send to l1 writer
 
             let payload =
-                borsh::to_vec(&signed_commitment).map_err(|e| Error::Other(e.to_string()))?;
-            let blob_intent = BlobIntent::new(BlobDest::L1, commitment_sighash, payload);
+                borsh::to_vec(&signed_checkpoint).map_err(|e| Error::Other(e.to_string()))?;
+            let blob_intent = BlobIntent::new(BlobDest::L1, checkpoint_sighash, payload);
 
-            info!(signed_commitment = ?signed_commitment, "signed commitment");
+            info!(signed_checkpoint = ?signed_checkpoint, "signed checkpoint");
             info!(blob_intent = ?blob_intent, "blob intent");
 
             inscription_handle
@@ -423,29 +423,29 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
     }
 }
 
-fn check_and_get_batch_commitment(
+fn check_and_get_batch_checkpoint(
     db: &impl Database,
-    duty: &BatchCommitmentDuty,
+    duty: &BatchCheckpointDuty,
     mut checkpoint_rx: tokio::sync::broadcast::Receiver<u64>,
-) -> Result<BatchCommitment, Error> {
+) -> Result<BatchCheckpoint, Error> {
     let idx = duty.idx();
 
     // If there's no entry in db, create a pending entry and wait until proof is ready
-    match db.checkpoint_provider().get_batch_commitment(idx)? {
+    match db.checkpoint_provider().get_batch_checkpoint(idx)? {
         // There's no entry in the database, create one so that the prover manager can query the
         // checkpoint info to create proofs for next
         None => {
-            let entry = BatchCommitmentEntry::new(
+            let entry = CheckpointEntry::new(
                 duty.checkpoint().clone(),
                 vec![],
-                CommitmentStatus::PendingProof,
+                CheckpointStatus::PendingProof,
             );
-            db.checkpoint_store().put_batch_commitment(idx, entry)?;
+            db.checkpoint_store().put_batch_checkpoint(idx, entry)?;
         }
         // There's an entry. If status is ProofCreated, return it else we need to wait for prover to
         // submit proofs.
         Some(entry) => match entry.status {
-            CommitmentStatus::PendingProof => {
+            CheckpointStatus::PendingProof => {
                 // Do nothing, wait for broadcast msg below
             }
             _ => {
@@ -465,14 +465,14 @@ fn check_and_get_batch_commitment(
         ));
     }
 
-    match db.checkpoint_provider().get_batch_commitment(idx)? {
+    match db.checkpoint_provider().get_batch_checkpoint(idx)? {
         None => {
             warn!(%idx, "Expected checkpoint to be present in db");
             Err(Error::Other(
                 "Expected checkpoint to be present in db".to_string(),
             ))
         }
-        Some(entry) if entry.status == CommitmentStatus::PendingProof => {
+        Some(entry) if entry.status == CheckpointStatus::PendingProof => {
             warn!(%idx, "Expected checkpoint proof to be ready");
             Err(Error::Other(
                 "Expected checkpoint proof to be ready".to_string(),

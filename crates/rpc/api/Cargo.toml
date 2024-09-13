@@ -19,5 +19,5 @@ serde_with = { workspace = true, features = ["hex"] }
 thiserror = { workspace = true }
 
 [features]
-default = []
 client = ["jsonrpsee/client"]
+default = []

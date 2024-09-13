@@ -4,7 +4,7 @@ use alpen_express_state::{
     batch::CheckPointInfo, block::L2BlockBundle, client_state::ClientState, header::L2Header,
 };
 
-use super::types::{BatchCommitmentDuty, BlockSigningDuty, Duty, Identity};
+use super::types::{BatchCheckpointDuty, BlockSigningDuty, Duty, Identity};
 use crate::errors::Error;
 
 /// Extracts new duties given a consensus state and a identity.
@@ -70,7 +70,7 @@ fn extract_batch_duties(state: &ClientState, tip: L2BlockBundle) -> Result<Vec<D
                 l2_range,
                 tip.header().get_blockid(),
             );
-            let duty: BatchCommitmentDuty = new_checkpt.clone().into();
+            let duty: BatchCheckpointDuty = new_checkpt.clone().into();
             Ok(vec![Duty::CommitBatch(duty)])
         }
     }

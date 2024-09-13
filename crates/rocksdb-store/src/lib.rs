@@ -43,7 +43,7 @@ pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
     BridgeTxStateTxidSchema::COLUMN_FAMILY_NAME,
     BridgeTxStateSchema::COLUMN_FAMILY_NAME,
     // Checkpoint schemas
-    BatchCommitmentSchema::COLUMN_FAMILY_NAME,
+    BatchCheckpointSchema::COLUMN_FAMILY_NAME,
     // TODO add col families for other store types
 ];
 
@@ -60,7 +60,7 @@ pub use broadcaster::db::BroadcastDb;
 use broadcaster::schemas::{BcastL1TxIdSchema, BcastL1TxSchema};
 pub use chain_state::db::ChainStateDb;
 pub use checkpoint::db::RBCheckpointDB;
-use checkpoint::schemas::BatchCommitmentSchema;
+use checkpoint::schemas::BatchCheckpointSchema;
 pub use client_state::db::ClientStateDb;
 pub use l1::db::L1Db;
 use l2::schemas::{L2BlockHeightSchema, L2BlockSchema, L2BlockStatusSchema};

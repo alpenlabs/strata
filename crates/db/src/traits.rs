@@ -13,7 +13,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::{
     entities::bridge_tx_state::BridgeTxState,
-    types::{BatchCommitmentEntry, BlobEntry, L1TxEntry},
+    types::{BlobEntry, CheckpointEntry, L1TxEntry},
     DbResult,
 };
 
@@ -376,8 +376,8 @@ pub trait CheckpointDatabase {
 
 /// Provider for Checkpoint data
 pub trait CheckpointProvider {
-    /// Get a [`BatchCommitmentEntry`] by it's index
-    fn get_batch_commitment(&self, batchidx: u64) -> DbResult<Option<BatchCommitmentEntry>>;
+    /// Get a [`CheckpointEntry`] by it's index
+    fn get_batch_checkpoint(&self, batchidx: u64) -> DbResult<Option<CheckpointEntry>>;
 
     /// Get last batch index
     fn get_last_batch_idx(&self) -> DbResult<Option<u64>>;
@@ -385,9 +385,9 @@ pub trait CheckpointProvider {
 
 /// Store for Checkpoint data
 pub trait CheckpointStore {
-    /// Store a [`BatchCommitmentEntry`]
+    /// Store a [`CheckpointEntry`]
     ///
-    /// `batchidx` for the BatchCommitment is expected to increase monotonically and
+    /// `batchidx` for the Checkpoint is expected to increase monotonically and
     /// be equal to the [`alpen_express_state::chain_state::ChainState::checkpoint_period`]
-    fn put_batch_commitment(&self, batchidx: u64, entry: BatchCommitmentEntry) -> DbResult<()>;
+    fn put_batch_checkpoint(&self, batchidx: u64, entry: CheckpointEntry) -> DbResult<()>;
 }
