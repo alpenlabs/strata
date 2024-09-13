@@ -15,10 +15,10 @@ pub struct ZkVMManager<Vm: ZKVMHost> {
 }
 
 impl<Vm: ZKVMHost> ZkVMManager<Vm> {
-    pub fn new() -> Self {
+    pub fn new(prover_config: ProverOptions) -> Self {
         Self {
             vms: HashMap::new(),
-            prover_config: Default::default(),
+            prover_config,
         }
     }
 

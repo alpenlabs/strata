@@ -8,5 +8,5 @@ use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 pub trait ExpressProverClientApiServer {
     /// Start proving the given el block
     #[method(name = "prove_el_block")]
-    async fn prove_el_block(&self, el_block_num: u64) -> RpcResult<()>;
+    async fn prove_el_block(&self, el_block_num: u64) -> RpcResult<String>;
 }

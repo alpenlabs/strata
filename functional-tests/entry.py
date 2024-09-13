@@ -528,6 +528,8 @@ def main(argv):
     modules = flexitest.runtime.scan_dir_for_modules(test_dir)
     all_tests = flexitest.runtime.load_candidate_modules(modules)
 
+    # Filter the prover test files if not present in argv
+    tests = [test for test in all_tests if "fn_prover" not in test or test in argv]
     tests = [str(argv[1]).removesuffix(".py")] if len(argv) > 1 else all_tests
 
     datadir_root = flexitest.create_datadir_in_workspace(os.path.join(test_dir, DD_ROOT))

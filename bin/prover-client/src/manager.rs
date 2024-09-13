@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
-use express_zkvm::ZKVMHost;
+use express_zkvm::{ProverOptions, ZKVMHost};
 use tokio::time::{sleep, Duration};
 use tracing::info;
 
 use crate::{
     primitives::{
-        config::{ProofGenConfig, NUM_PROVER_WORKER},
+        config::NUM_PROVER_WORKER,
         tasks_scheduler::{ProvingTask, ProvingTaskStatus},
     },
     proving::Prover,
@@ -28,7 +28,7 @@ where
     pub fn new(task_tracker: Arc<TaskTracker>) -> Self {
         Self {
             task_tracker,
-            prover: Prover::new(ProofGenConfig::default(), NUM_PROVER_WORKER),
+            prover: Prover::new(ProverOptions::default(), NUM_PROVER_WORKER),
         }
     }
 

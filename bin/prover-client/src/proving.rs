@@ -10,7 +10,7 @@ use alpen_express_rocksdb::{
     prover::db::{ProofDb, ProverDB},
     DbOpsConfig,
 };
-use express_zkvm::{Proof, ZKVMHost};
+use express_zkvm::{Proof, ProverOptions, ZKVMHost};
 use risc0_guest_builder::RETH_RISC0_ELF;
 use rockbound::rocksdb;
 use tracing::info;
@@ -18,7 +18,6 @@ use uuid::Uuid;
 use zkvm_primitives::ZKVMInput;
 
 use crate::primitives::{
-    config::ProofGenConfig,
     prover_input::ProverInput,
     tasks_scheduler::{ProofProcessingStatus, ProofSubmissionStatus, WitnessSubmissionStatus},
     vms::{ProofVm, ZkVMManager},
@@ -83,31 +82,25 @@ where
     Vm: ZKVMHost + 'static,
 {
     prover_state: Arc<RwLock<ProverState>>,
-    config: ProofGenConfig,
     db: ProverDB<ProofDb>,
     num_threads: usize,
     pool: rayon::ThreadPool,
     vm_manager: ZkVMManager<Vm>,
 }
 
-fn make_proof<Vm>(
-    config: ProofGenConfig,
-    state_transition_data: ProverInput,
-    vm: Vm,
-) -> Result<Proof, anyhow::Error>
+fn make_proof<Vm>(prover_input: ProverInput, vm: Vm) -> Result<Proof, anyhow::Error>
 where
     Vm: ZKVMHost + 'static,
 {
-    match config {
-        ProofGenConfig::Skip => Ok(Proof::new(Vec::default())),
-        ProofGenConfig::Execute => {
-            if let ProverInput::ElBlock(eb) = state_transition_data {
-                let el_input: ZKVMInput = bincode::deserialize(&eb.data).unwrap();
-                return Ok(vm.prove(&[el_input], None).unwrap().0);
-            }
-            todo!("manish will do")
+    match prover_input {
+        ProverInput::ElBlock(el_input) => {
+            let el_input: ZKVMInput = bincode::deserialize(&el_input.data)?;
+            let (proof, _) = vm.prove(&[el_input], None)?;
+            Ok(proof)
         }
-        ProofGenConfig::Prover => Ok(vm.prove(&[state_transition_data], None).unwrap().0),
+        _ => {
+            todo!()
+        }
     }
 }
 
@@ -115,12 +108,12 @@ impl<Vm: ZKVMHost> Prover<Vm>
 where
     Vm: ZKVMHost,
 {
-    pub(crate) fn new(config: ProofGenConfig, num_threads: usize) -> Self {
+    pub(crate) fn new(prover_config: ProverOptions, num_threads: usize) -> Self {
         let rbdb = open_rocksdb_database().unwrap();
         let db_ops = DbOpsConfig { retry_count: 3 };
         let db = ProofDb::new(rbdb, db_ops);
 
-        let mut zkvm_manager: ZkVMManager<Vm> = ZkVMManager::new();
+        let mut zkvm_manager: ZkVMManager<Vm> = ZkVMManager::new(prover_config);
         zkvm_manager.add_vm(ProofVm::ELProving, RETH_RISC0_ELF.to_vec());
         zkvm_manager.add_vm(ProofVm::CLProving, vec![]);
         zkvm_manager.add_vm(ProofVm::CLAggregation, vec![]);
@@ -137,7 +130,6 @@ where
                 pending_tasks_count: Default::default(),
             })),
             db: ProverDB::new(Arc::new(db)),
-            config,
             vm_manager: zkvm_manager,
         }
     }
@@ -179,13 +171,12 @@ where
                 // Initiate a new proving job only if the prover is not busy.
                 if start_prover {
                     prover_state.set_to_proving(task_id);
-                    let config = self.config.clone();
                     let proof_vm = witness.proof_vm_id();
                     let vm = self.vm_manager.get(&proof_vm).unwrap().clone();
 
                     self.pool.spawn(move || {
                         tracing::info_span!("guest_execution").in_scope(|| {
-                            let proof = make_proof(config, witness, vm.clone());
+                            let proof = make_proof(witness, vm.clone());
 
                             info!("make_proof completed for task: {:?} {:?}", task_id, proof);
                             let mut prover_state =
