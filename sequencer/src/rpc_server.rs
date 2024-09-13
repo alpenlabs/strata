@@ -590,14 +590,14 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         Ok(batch_comm.map(|bc| bc.checkpoint().clone().into()))
     }
 
-    async fn put_checkpoint_proof(&self, idx: u64, proof: Vec<u8>) -> RpcResult<()> {
+    async fn put_checkpoint_proof(&self, idx: u64, proof: HexBytes) -> RpcResult<()> {
         let mut entry = self
             .database
             .checkpoint_provider()
             .get_batch_checkpoint(idx)
             .map_err(|e| Error::Other(e.to_string()))?
             .ok_or(Error::MissingCheckpoint(idx))?;
-        entry.proof = proof;
+        entry.proof = proof.0;
         entry.status = CheckpointStatus::ProofCreated;
         self.database
             .checkpoint_store()

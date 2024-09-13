@@ -39,9 +39,9 @@ def check_for_nth_checkpoint_finalization(idx, seqrpc):
     to_finalize_blkid = checkpoint_info["l2_blockid"]
 
     # Post checkpoint proof
-    seqrpc.alp_putCheckpointProof(idx, [1, 2, 3, 4])  ## TODO: hex
+    seqrpc.alp_putCheckpointProof(idx, "abcdef")
 
-    # Wait till checkpoint finalizes, since our finalization depth is 4 and block
+    # Wait till checkpoint finalizes, since our finalization depth is 4 and the block
     # generation time is 0.5s wait ~2 secs
     # Ideally this should be tested with controlled bitcoin block production
     time.sleep(4)
