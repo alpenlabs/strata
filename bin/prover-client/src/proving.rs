@@ -11,6 +11,7 @@ use alpen_express_rocksdb::{
     DbOpsConfig,
 };
 use express_zkvm::{Proof, ZKVMHost};
+use risc0_guest_builder::RETH_RISC0_ELF;
 use rockbound::rocksdb::{self};
 use tracing::info;
 use uuid::Uuid;
@@ -120,7 +121,7 @@ where
         let db = ProofDb::new(rbdb, db_ops);
 
         let mut zkvm_manager: ZkVMManager<Vm> = ZkVMManager::new();
-        zkvm_manager.add_vm(ProofVm::ELProving, vec![]);
+        zkvm_manager.add_vm(ProofVm::ELProving, RETH_RISC0_ELF.to_vec());
         zkvm_manager.add_vm(ProofVm::CLProving, vec![]);
         zkvm_manager.add_vm(ProofVm::CLAggregation, vec![]);
 

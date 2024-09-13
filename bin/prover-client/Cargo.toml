@@ -11,13 +11,14 @@ path = "src/main.rs"
 alpen-express-common = { workspace = true }
 express-prover-client-rpc-api = { workspace = true }
 zkvm-primitives = { workspace = true }
+risc0-guest-builder = { path = "../../proofs/risc0", features = ["prover"] }
 
 
 anyhow = { workspace = true }
 argh = { workspace = true }
 async-trait = { workspace = true }
 bincode = { workspace = true }
-jsonrpsee = { workspace = true }
+jsonrpsee = { workspace = true, features = ["http-client"] }
 reth-rpc-types = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
