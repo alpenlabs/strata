@@ -48,6 +48,10 @@ fn extract_batch_duties(state: &ClientState, tip: L2BlockBundle) -> Result<Vec<D
     match state.l1_view().last_finalized_checkpoint() {
         // No checkpoint is seen, start from 0
         None => {
+            // if tip is genesis, do nothing
+            if tip.header().blockidx() == 0 {
+                return Ok(vec![]);
+            }
             let new_checkpt = CheckPointInfo::new(
                 0,
                 0..=state.l1_view().tip_height(),

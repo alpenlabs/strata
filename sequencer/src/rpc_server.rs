@@ -13,7 +13,7 @@ use alpen_express_primitives::{buf::Buf32, hash};
 use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer};
 use alpen_express_rpc_types::{
     BlockHeader, ClientStatus, DaBlob, DepositEntry, DepositState, ExecUpdate, HexBytes,
-    HexBytes32, L1Status, NodeSyncStatus, RawBlockWitness, RpcBatchCommitment,
+    HexBytes32, L1Status, NodeSyncStatus, RawBlockWitness, RpcCheckpointInfo,
 };
 use alpen_express_state::{
     batch::BatchCommitment,
@@ -577,14 +577,14 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         Ok(())
     }
 
-    async fn get_checkpoint_info(&self, idx: u64) -> RpcResult<Option<RpcBatchCommitment>> {
+    async fn get_checkpoint_info(&self, idx: u64) -> RpcResult<Option<RpcCheckpointInfo>> {
         let entry = self
             .database
             .checkpoint_provider()
             .get_batch_commitment(idx)
             .map_err(|e| Error::Other(e.to_string()))?;
         let batch_comm: Option<BatchCommitment> = entry.map(Into::into);
-        Ok(batch_comm.map(Into::into))
+        Ok(batch_comm.map(|bc| bc.checkpoint().clone().into()))
     }
 
     async fn put_checkpoint_proof(&self, idx: u64, proof: Vec<u8>) -> RpcResult<()> {

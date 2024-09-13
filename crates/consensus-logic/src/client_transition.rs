@@ -144,10 +144,11 @@ fn handle_maturable_height(
     writes.push(ClientStateWrite::UpdateBuried(maturable_height));
 
     // If there are checkpoints at or before the maturable height, mark them as finalized
-    if !state
+    if state
         .l1_view()
         .has_pending_checkpoint_within_height(maturable_height)
     {
+        debug!(%maturable_height, "Writing CheckpointFinalized");
         writes.push(ClientStateWrite::CheckpointFinalized(maturable_height));
 
         // Emit sync action for finalizing a l2 block
@@ -156,12 +157,12 @@ fn handle_maturable_height(
             .last_pending_checkpoint_within_height(maturable_height)
         {
             actions.push(SyncAction::FinalizeBlock(checkpt.checkpoint.l2_blockid));
+        } else {
+            warn!(
+            %maturable_height,
+            "expected to find blockid corresponding to buried l1 height in confirmed_blocks but could not find"
+            );
         }
-    } else {
-        warn!(
-        %maturable_height,
-        "expected to find blockid corresponding to buried l1 height in confirmed_blocks but could not find"
-        );
     }
     (writes, actions)
 }

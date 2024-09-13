@@ -189,7 +189,6 @@ pub fn apply_writes_to_state(
             CheckpointFinalized(height) => {
                 let l1v = state.l1_view_mut();
 
-                l1v.pending_checkpoints.retain(|x| x.height > height);
                 let finalized_checkpts: Vec<_> = l1v
                     .pending_checkpoints
                     .iter()
@@ -198,6 +197,7 @@ pub fn apply_writes_to_state(
 
                 let new_finalized = finalized_checkpts.last().cloned().cloned();
                 let total_finalized = finalized_checkpts.len();
+                debug!(?new_finalized, ?total_finalized, "Finalized checkpoints");
 
                 // Remove the finalized from pending and then mark the last one as last_finalized
                 // checkpoint
