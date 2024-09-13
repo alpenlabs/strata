@@ -208,9 +208,11 @@ pub fn apply_writes_to_state(
                     if !l1v
                         .last_finalized_checkpoint
                         .as_ref()
-                        .map_or(true, |prev_chp| checkpt.height == prev_chp.height + 1)
+                        .map_or(true, |prev_chp| {
+                            checkpt.checkpoint.idx() == prev_chp.checkpoint.idx() + 1
+                        })
                     {
-                        panic!("operation: mismatched height of pending checkpoint");
+                        panic!("operation: mismatched indices of pending checkpoint");
                     }
 
                     let fin_blockid = *checkpt.checkpoint.l2_blockid();

@@ -17,8 +17,14 @@ class BlockFinalizationTest(flexitest.Test):
 
         time.sleep(2)
 
+        for n in range(4):
+            check_for_nth_checkpoint_finalization(n, seqrpc)
+            print(f"Pass checkpoint finalization for checkpoint {n}")
+
+
+
+def check_for_nth_checkpoint_finalization(idx, seqrpc):
         syncstat = seqrpc.alp_syncStatus()
-        idx = 0
         checkpoint_info = seqrpc.alp_getCheckpointInfo(idx)
         print(f"checkpoint info for {idx}", checkpoint_info)
 
@@ -29,18 +35,17 @@ class BlockFinalizationTest(flexitest.Test):
         checkpoint_info_1 = seqrpc.alp_getCheckpointInfo(idx + 1)
 
         assert checkpoint_info["idx"] == idx
-        assert checkpoint_info_1 is None, "There should be no checkpoint info for idx 1"
+        assert checkpoint_info_1 is None, f"There should be no checkpoint info for {idx + 1} index"
 
         to_finalize_blkid = checkpoint_info["l2_blockid"]
 
         # Post checkpoint proof
         seqrpc.alp_putCheckpointProof(idx, [1, 2, 3, 4])  ## TODO: hex
 
-        # Polling interval is 5 secs for sequencer so sleep 1 sec extra
-        time.sleep(6)
-
         # Wait till checkpoint finalizes, since our finalization depth is 4 and block generation time is 0.5s wait ~2 secs
-        time.sleep(3)
+        # Ideally this should be tested with controlled bitcoin block production
+        time.sleep(4)
 
         syncstat = seqrpc.alp_syncStatus()
+        print("Sync Stat", syncstat)
         assert to_finalize_blkid == syncstat["finalized_block_id"], "Block not finalized"
