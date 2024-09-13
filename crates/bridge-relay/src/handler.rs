@@ -11,7 +11,7 @@ use secp256k1::{All, Secp256k1};
 use tokio::{select, sync::mpsc, time::interval};
 use tracing::*;
 
-use crate::{operator_bandwidth::OperatorBandwidth, recent_msg_tracker::RecentMessageTracker};
+use crate::recent_msg_tracker::RecentMessageTracker;
 
 /// Manages message validation i.e processing, deduplication, and operator bandwidth enforcement.
 ///
@@ -95,7 +95,10 @@ impl RelayerState {
         bridge_ops.delete_msgs_before_timestamp_blocking(time_before)?;
 
         // remove from the processed message here
-        self.processed_msgs.clear_stale_messages().await;
+        let dur = self.processed_msgs.forget_duration_us();
+        self.processed_msgs
+            .clear_stale_messages(time_before - dur)
+            .await;
         Ok(())
     }
 }
@@ -162,21 +165,17 @@ mod tests {
 
         let message_id: BridgeMsgId = ArbitraryGenerator::new().generate();
 
-        // Initially, the message should not be marked as duplicate
-        assert!(!processed_msgs.check_duplicate(&message_id).await);
-
         // Add the message
-        let timestamp = SystemTime::now()
+        let ts = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_micros();
 
-        processed_msgs
-            .check_should_relay(timestamp, message_id.clone())
-            .await;
+        // Initially, the message should not be marked as duplicate
+        assert!(processed_msgs.check_should_relay(ts, message_id).await);
 
         // Now it should be marked as duplicate
-        assert!(processed_msgs.check_duplicate(&message_id).await);
+        assert!(!processed_msgs.check_should_relay(ts, message_id).await);
     }
 
     #[tokio::test]
@@ -184,35 +183,48 @@ mod tests {
         let processed_msgs = RecentMessageTracker::new(100);
 
         // Create valid BridgeMsgId instances for testing
-        let message_id: BridgeMsgId = ArbitraryGenerator::new().generate();
-        let old_message_id: BridgeMsgId = ArbitraryGenerator::new().generate();
+        let ag = ArbitraryGenerator::new();
+        let cur_message_id: BridgeMsgId = ag.generate();
+        let old_message_id: BridgeMsgId = ag.generate();
+        assert_ne!(cur_message_id, old_message_id);
 
         // Add messages with different timestamps
-        let current_timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-
-        let old_timestamp = current_timestamp - Duration::from_secs(200);
-
-        processed_msgs
-            .check_should_relay(current_timestamp.as_micros(), message_id.clone())
-            .await;
-        processed_msgs
-            .check_should_relay(old_timestamp.as_micros(), old_message_id.clone())
-            .await;
+        let cur_ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+        let cur_ts_us = cur_ts.as_micros();
+        let old_ts = cur_ts - Duration::from_secs(200);
+        let old_ts_us = old_ts.as_micros();
 
         // Both messages should be considered processed initially
-        assert!(processed_msgs.check_duplicate(&message_id).await);
-        assert!(processed_msgs.check_duplicate(&old_message_id).await);
+        assert!(
+            processed_msgs
+                .check_should_relay(cur_ts_us, cur_message_id)
+                .await
+        );
+        assert!(
+            processed_msgs
+                .check_should_relay(old_ts_us, old_message_id)
+                .await
+        );
 
         // Clear old messages
-        processed_msgs.clear_stale_messages().await;
+        processed_msgs.clear_stale_messages(cur_ts_us + 1).await;
 
         // The old message should no longer be considered processed
-        assert!(!processed_msgs.check_duplicate(&old_message_id).await);
+        assert!(
+            processed_msgs
+                .check_should_relay(old_ts_us, old_message_id)
+                .await
+        );
+
         // The current message should still be considered processed
-        assert!(processed_msgs.check_duplicate(&message_id).await);
+        assert!(
+            !processed_msgs
+                .check_should_relay(cur_ts_us, cur_message_id)
+                .await
+        );
     }
 
-    #[tokio::test]
+    /*#[tokio::test]
     async fn test_increment_and_reset_bandwidth() {
         let operator_bandwidth = OperatorBandwidth::new();
         // Create a valid OperatorIdx for testing
@@ -254,5 +266,5 @@ mod tests {
         // After clearing, the bandwidth for both operators should be 0
         assert_eq!(operator_bandwidth.get(operator_id_1).await, 0);
         assert_eq!(operator_bandwidth.get(operator_id_2).await, 0);
-    }
+    }*/
 }

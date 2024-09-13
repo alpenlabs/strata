@@ -20,6 +20,8 @@ thiserror = { workspace = true }
 [dev-dependencies]
 alpen-test-utils = { workspace = true }
 
+secp256k1 = { workspace = true }
+
 [features]
 default = ["std", "rand"]
 std = ["dep:secp256k1"]

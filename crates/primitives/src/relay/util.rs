@@ -123,15 +123,12 @@ pub fn verify_bridge_msg_sig(
 
 #[cfg(test)]
 mod tests {
-    use alpen_express_primitives::{buf::Buf64, utils::get_test_schnorr_keys};
-    use arbitrary::Arbitrary;
-
     use super::*;
-    use crate::{types::Scope, utils::BridgeMessage};
+    use crate::{buf::Buf32, operator::StubOpKeyProv, relay::types::*};
 
     #[test]
     fn test_sign_verify_raw() {
-        let secp = Secp256k1::new();
+        let secp = secp256k1::Secp256k1::new();
 
         let msg_hash = [
             1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
@@ -146,13 +143,37 @@ mod tests {
     }
 
     #[test]
-    fn test_sign_verify_msg() {
+    fn test_sign_verify_msg_ok() {
         let secp = Arc::new(Secp256k1::new());
         let sk = Buf32::from([1; 32]);
 
-        let signer = MessageSigner::new(4, sk, secp);
+        let idx = 4;
+        let signer = MessageSigner::new(idx, sk, secp);
+        let pk = signer.get_pubkey();
 
         let payload = vec![1, 2, 3, 4, 5];
         let m = signer.sign_scope(&Scope::Misc, payload);
+
+        let stub_prov = StubOpKeyProv::new(idx, pk);
+        assert!(verify_bridge_msg_sig(&m, &stub_prov).is_ok());
     }
+
+    #[test]
+    fn test_sign_verify_msg_fail() {
+        let secp = Arc::new(Secp256k1::new());
+        let sk = Buf32::from([1; 32]);
+
+        let idx = 4;
+        let signer = MessageSigner::new(idx, sk, secp);
+        let pk = signer.get_pubkey();
+
+        let payload = vec![1, 2, 3, 4, 5];
+        let mut m = signer.sign_scope(&Scope::Misc, payload);
+        m.sig = Buf64::zero();
+
+        let stub_prov = StubOpKeyProv::new(idx, pk);
+        assert!(verify_bridge_msg_sig(&m, &stub_prov).is_err());
+    }
+
+    // TODO add verify fail check
 }

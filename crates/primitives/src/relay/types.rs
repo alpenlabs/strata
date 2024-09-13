@@ -164,7 +164,7 @@ pub struct BridgeConfig {
 mod tests {
     use alpen_test_utils::ArbitraryGenerator;
 
-    use super::{types::BridgeMsgId, BridgeMessage, Scope};
+    use super::{BridgeMessage, Scope};
     use crate::buf::Buf64;
 
     fn get_arb_bridge_msg() -> BridgeMessage {
@@ -184,7 +184,6 @@ mod tests {
     #[test]
     fn test_get_scope_raw() {
         let msg = make_bridge_msg();
-
         assert_eq!(msg.scope(), vec![0])
     }
 }

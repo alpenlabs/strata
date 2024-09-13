@@ -2,8 +2,8 @@
 
 use std::sync::Arc;
 
-use alpen_express_primitives::relay::types::{BridgeMessage, Scope};
 use alpen_express_db::{traits::BridgeMessageStore, DbError, DbResult};
+use alpen_express_primitives::relay::types::{BridgeMessage, Scope};
 use rockbound::{
     utils::get_last, OptimisticTransactionDB as DB, SchemaBatch, SchemaDBOperationsExt,
     TransactionRetry,
@@ -100,8 +100,7 @@ impl BridgeMessageStore for BridgeMsgDb {
 mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    use alpen_express_primitives::relay::types::BridgeMessage;
-    use alpen_express_primitives::l1::L1TxProof;
+    use alpen_express_primitives::{l1::L1TxProof, relay::types::BridgeMessage};
     use alpen_test_utils::ArbitraryGenerator;
 
     use super::*;
@@ -176,14 +175,12 @@ mod tests {
         let (timestamp1, mut msg1) = new_bridge_msg();
         let (timestamp2, mut msg2) = new_bridge_msg();
 
-        let scope = msg1.get_scope_raw().unwrap();
-
         // Write messages to the database
         br_db.write_msg(timestamp1, msg1.clone()).unwrap();
         br_db.write_msg(timestamp2, msg2.clone()).unwrap();
 
         // Retrieve messages by scope
-        let result = br_db.get_msgs_by_scope(&scope);
+        let result = br_db.get_msgs_by_scope(msg1.scope());
         assert!(result.is_ok());
 
         assert!(!result.unwrap().is_empty());

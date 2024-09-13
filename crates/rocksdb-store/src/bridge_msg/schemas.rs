@@ -1,4 +1,4 @@
-use alpen_express_primitives::relay::types::{BridgeMessage, Scope};
+use alpen_express_primitives::relay::types::BridgeMessage;
 
 use crate::{
     define_table_with_default_codec, define_table_with_seek_key_codec, define_table_without_codec,
