@@ -4,6 +4,7 @@ pub(super) const RPC_PORT: usize = 4844;
 
 /// Command-line arguments
 #[derive(Debug, FromArgs)]
+
 pub struct Args {
     /// the RPC port to use (optional)
     #[argh(option, description = "JSON-RPC port", default = "RPC_PORT")]

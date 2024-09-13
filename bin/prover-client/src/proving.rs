@@ -1,7 +1,6 @@
 use std::{
     collections::{hash_map::Entry, HashMap},
     fs,
-    ops::Deref,
     path::PathBuf,
     sync::{Arc, RwLock},
 };
@@ -17,12 +16,15 @@ use tracing::info;
 use uuid::Uuid;
 use zkvm_primitives::ZKVMInput;
 
-use crate::models::{
-    ProofGenConfig, ProofProcessingStatus, ProofSubmissionStatus, Witness, WitnessSubmissionStatus,
+use crate::primitives::{
+    config::ProofGenConfig,
+    prover_input::ProverInput,
+    tasks_scheduler::{ProofProcessingStatus, ProofSubmissionStatus, WitnessSubmissionStatus},
+    vms::{ProofVm, ZkVMManager},
 };
 
 enum ProverStatus {
-    WitnessSubmitted(Witness),
+    WitnessSubmitted(ProverInput),
     ProvingInProgress,
     Proved(Proof),
     Err(anyhow::Error),
@@ -80,25 +82,25 @@ where
     Vm: ZKVMHost + 'static,
 {
     prover_state: Arc<RwLock<ProverState>>,
-    config: Arc<ProofGenConfig>,
+    config: ProofGenConfig,
     db: ProverDB<ProofDb>,
     num_threads: usize,
     pool: rayon::ThreadPool,
-    vm: HashMap<u8, Vm>,
+    vm_manager: ZkVMManager<Vm>,
 }
 
 fn make_proof<Vm>(
-    config: Arc<ProofGenConfig>,
-    state_transition_data: Witness,
+    config: ProofGenConfig,
+    state_transition_data: ProverInput,
     vm: Vm,
 ) -> Result<Proof, anyhow::Error>
 where
     Vm: ZKVMHost + 'static,
 {
-    match config.deref() {
+    match config {
         ProofGenConfig::Skip => Ok(Proof::new(Vec::default())),
         ProofGenConfig::Execute => {
-            if let Witness::ElBlock(eb) = state_transition_data {
+            if let ProverInput::ElBlock(eb) = state_transition_data {
                 let el_input: ZKVMInput = bincode::deserialize(&eb.data).unwrap();
                 return Ok(vm.prove(&[el_input], None).unwrap().0);
             }
@@ -108,37 +110,41 @@ where
     }
 }
 
-impl<Vm: ZKVMHost> Prover<Vm> {
-    pub(crate) fn new(
-        num_threads: usize,
-        vm_map: HashMap<u8, Vm>,
-        config: Arc<ProofGenConfig>,
-    ) -> Self {
-        let rbdb = todo!();
+impl<Vm: ZKVMHost> Prover<Vm>
+where
+    Vm: ZKVMHost,
+{
+    pub(crate) fn new(config: ProofGenConfig, num_threads: usize) -> Self {
+        let rbdb = open_rocksdb_database().unwrap();
         let db_ops = DbOpsConfig { retry_count: 3 };
-
         let db = ProofDb::new(rbdb, db_ops);
+
+        let mut zkvm_manager: ZkVMManager<Vm> = ZkVMManager::new();
+        zkvm_manager.add_vm(ProofVm::ELProving, vec![]);
+        zkvm_manager.add_vm(ProofVm::CLProving, vec![]);
+        zkvm_manager.add_vm(ProofVm::CLAggregation, vec![]);
+
         Self {
             num_threads,
             pool: rayon::ThreadPoolBuilder::new()
-                .num_threads(num_threads)
+                .num_threads(5)
                 .build()
-                .unwrap(),
+                .expect("Failed to initailize prover threadpool worker"),
 
             prover_state: Arc::new(RwLock::new(ProverState {
                 prover_status: Default::default(),
                 pending_tasks_count: Default::default(),
             })),
             db: ProverDB::new(Arc::new(db)),
-            vm: vm_map,
             config,
+            vm_manager: zkvm_manager,
         }
     }
 
     pub(crate) fn submit_witness(
         &self,
         task_id: Uuid,
-        state_transition_data: Witness,
+        state_transition_data: ProverInput,
     ) -> WitnessSubmissionStatus {
         let data = ProverStatus::WitnessSubmitted(state_transition_data);
 
@@ -157,10 +163,7 @@ impl<Vm: ZKVMHost> Prover<Vm> {
     pub(crate) fn start_proving(
         &self,
         task_id: Uuid,
-    ) -> Result<ProofProcessingStatus, anyhow::Error>
-    where
-        Vm: ZKVMHost + 'static,
-    {
+    ) -> Result<ProofProcessingStatus, anyhow::Error> {
         let prover_state_clone = self.prover_state.clone();
         let mut prover_state = self.prover_state.write().expect("Lock was poisoned");
 
@@ -176,8 +179,8 @@ impl<Vm: ZKVMHost> Prover<Vm> {
                 if start_prover {
                     prover_state.set_to_proving(task_id);
                     let config = self.config.clone();
-                    let vm_id = witness.get_vm_id();
-                    let vm = self.vm.get(&vm_id).unwrap().clone();
+                    let proof_vm = witness.proof_vm_id();
+                    let vm = self.vm_manager.get(&proof_vm).unwrap().clone();
 
                     self.pool.spawn(move || {
                         tracing::info_span!("guest_execution").in_scope(|| {
