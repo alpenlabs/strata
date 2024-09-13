@@ -1,3 +1,4 @@
+use alpen_express_db::types::WitnessType;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -52,11 +53,22 @@ pub enum TaskStatus {
     ProvingSuccessful,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+pub enum DependencyStatus {
+    Open,
+    Blocked,
+    InProgress,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProvingTask {
     pub id: Uuid,
-    pub el_block_num: u64,
+    pub checkpoint_index: u64,
     pub prover_input: ProverInput,
-    pub status: TaskStatus,
+    pub witness_type: WitnessType,
+    pub dependency_status: DependencyStatus,
+    pub progress_status: TaskStatus,
+    pub block_height: u64,
     pub retry_count: u8,
 }
+// DependencyStatus, CheckpointIndex, WitnessType, BlockIndex, TaskStatus

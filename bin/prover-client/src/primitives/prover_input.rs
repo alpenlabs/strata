@@ -5,6 +5,10 @@ use serde::{Deserialize, Serialize};
 pub enum ProverInput {
     ElBlock(WitnessData),
     ClBlock(WitnessData),
+    ClAgg,
+    BlkSpace(WitnessData),
+    BlkSpaceAgg,
+    Checkpoint,
 }
 
 impl ProverInput {
@@ -12,6 +16,10 @@ impl ProverInput {
         match self {
             ProverInput::ElBlock(_) => WitnessType::EL,
             ProverInput::ClBlock(_) => WitnessType::CL,
+            ProverInput::ClAgg => WitnessType::CLAgg,
+            ProverInput::BlkSpace(_) => WitnessType::BlkSpace,
+            ProverInput::BlkSpaceAgg => WitnessType::BlkSpaceAgg,
+            ProverInput::Checkpoint => WitnessType::Checkpoint,
         }
     }
 
@@ -19,6 +27,8 @@ impl ProverInput {
         match self {
             ProverInput::ElBlock(witness) => witness.data.clone(),
             ProverInput::ClBlock(witness) => witness.data.clone(),
+            ProverInput::BlkSpace(witness) => witness.data.clone(),
+            _ => vec![],
         }
     }
 
@@ -26,6 +36,8 @@ impl ProverInput {
         match self {
             ProverInput::ElBlock(witness) => witness.data.clear(),
             ProverInput::ClBlock(witness) => witness.data.clear(),
+            ProverInput::BlkSpace(witness) => witness.data.clear(),
+            _ => (),
         }
     }
 }

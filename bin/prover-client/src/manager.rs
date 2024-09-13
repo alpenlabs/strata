@@ -38,7 +38,7 @@ where
         let sleep_duration_if_no_task = Duration::from_secs(1);
         loop {
             if let Some(task) = self.task_tracker.get_pending_task().await {
-                if task.status == TaskStatus::Created {
+                if task.progress_status == TaskStatus::Created {
                     let status =
                         self.prover
                             .submit_witness(task.id, task.prover_input, WitnessType::EL); //todo
@@ -51,7 +51,7 @@ where
                         WitnessSubmissionStatus::WitnessExist => todo!(),
                         WitnessSubmissionStatus::SubmissionFailed => todo!(),
                     }
-                } else if task.status == TaskStatus::WitnessSubmitted {
+                } else if task.progress_status == TaskStatus::WitnessSubmitted {
                     info!("get_pending_task: {}", task.id);
 
                     let status = self.prover.start_proving(task.id);
@@ -70,7 +70,7 @@ where
                             tracing::error!("proof_processing_err: {:?}", proof_processing_err);
                         }
                     }
-                } else if task.status == TaskStatus::ProvingBegin {
+                } else if task.progress_status == TaskStatus::ProvingBegin {
                     let status = self.prover.get_proving_state(task.id);
                     match status {
                         Ok(proof_processing_status) => match proof_processing_status.state {

@@ -137,7 +137,18 @@ pub enum ProvingTaskState {
     Failed,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary, Hash)]
+#[derive(
+    Clone,
+    Debug,
+    Eq,
+    PartialEq,
+    Serialize,
+    Deserialize,
+    BorshSerialize,
+    BorshDeserialize,
+    Arbitrary,
+    Hash,
+)]
 pub enum WitnessType {
     EL,
     CL,
@@ -151,7 +162,9 @@ pub enum WitnessType {
 pub struct ProvingBundle {
     pub state: ProvingTaskState,
     pub witness_type: WitnessType,
-    pub witness: Vec<u8>,
+    pub witness_data: Vec<u8>,
+    pub block_height: u64,
+    pub checkpoint_index: u64,
     pub proof: Vec<u8>,
 }
 

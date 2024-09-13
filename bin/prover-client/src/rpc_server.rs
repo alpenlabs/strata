@@ -1,6 +1,7 @@
 //! Bootstraps an RPC server for the prover client.
 use std::sync::Arc;
 
+use alpen_express_db::types::WitnessType;
 use anyhow::{Context, Ok};
 use async_trait::async_trait;
 use express_prover_client_rpc_api::ExpressProverClientApiServerServer;
@@ -93,9 +94,9 @@ impl ProverClientRpc {
 
 #[async_trait]
 impl ExpressProverClientApiServerServer for ProverClientRpc {
-    async fn prove_el_block(&self, el_block_num: u64) -> RpcResult<()> {
+    async fn prove_el_block(&self, cp_index: u64, el_block_num: u64) -> RpcResult<()> {
         // TODO: handle the unwrap here
-        let _zkvm_input = self
+        let zkvm_input = self
             .fetch_el_block_witness(el_block_num)
             .await
             .expect("Failed to get th el block witness from the reth rpc");
@@ -103,12 +104,14 @@ impl ExpressProverClientApiServerServer for ProverClientRpc {
         // Create a new proving task
         {
             let task_tracker = Arc::clone(&self.context.task_tracker);
-            let witness_vec = bincode::serialize(&_zkvm_input).unwrap();
+            let witness_vec = bincode::serialize(&zkvm_input).unwrap();
             let el_block_witness = WitnessData { data: witness_vec };
             let witness = ProverInput::ElBlock(el_block_witness);
 
-            let task_id = task_tracker.create_task(el_block_num, witness).await;
-            info!("ProverClientRpc: prove_el_block create_task: {}", task_id);
+            let task_id = task_tracker
+                .include_task_witness(cp_index, el_block_num, witness, WitnessType::EL)
+                .await;
+            info!("ProverClientRpc: prove_el_block create_task: {:?}", task_id);
         }
 
         RpcResult::Ok(())
@@ -137,4 +140,8 @@ impl ProverClientRpc {
 
         Ok(el_block_witness)
     }
+
+    // fetch_checkpoint_info(&self, checkpoint_index) {
+    // Call create_tasks_using_checkpoint_info
+    // }
 }

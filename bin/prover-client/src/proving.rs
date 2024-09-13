@@ -120,8 +120,10 @@ where
         let txentry: ProvingBundle = ProvingBundle {
             state: ProvingTaskState::WitnessSubmitted,
             witness_type,
-            witness: witness.to_vec(),
+            witness_data: witness.to_vec(),
             proof: vec![],
+            block_height: 0,
+            checkpoint_index: 0,
         };
         let dbres = self
             .db
@@ -169,7 +171,7 @@ where
                             let proof = make_proof(
                                 config,
                                 ProverInput::ElBlock(WitnessData {
-                                    data: bundle.witness,
+                                    data: bundle.witness_data,
                                 }),
                                 vm.clone(),
                             );
@@ -237,8 +239,10 @@ where
         let txentry: ProvingBundle = ProvingBundle {
             state: ProvingTaskState::WitnessSubmitted,
             witness_type,
-            witness: witness.to_vec(),
+            witness_data: witness.to_vec(),
             proof: vec![],
+            block_height: 0,
+            checkpoint_index: 0,
         };
         self.db
             .prover_store()

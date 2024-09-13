@@ -144,8 +144,10 @@ mod tests {
         let txentry = ProvingBundle {
             state: ProvingTaskState::WitnessSubmitted,
             witness_type: WitnessType::EL,
-            witness: Vec::default(),
+            witness_data: Vec::default(),
             proof: vec![],
+            block_height: 0,
+            checkpoint_index: 0,
         };
         (txid, txentry)
     }
