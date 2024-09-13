@@ -100,7 +100,7 @@ where
             pool: rayon::ThreadPoolBuilder::new()
                 .num_threads(5)
                 .build()
-                .expect("Failed to initailize prover threadpool worker"),
+                .expect("Failed to initialize prover threadpool worker"),
 
             prover_state: Arc::new(RwLock::new(ProverState {
                 pending_tasks_count: Default::default(),
