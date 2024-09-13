@@ -34,6 +34,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: llvm-tools-preview
+          toolchain: nightly-2024-07-27
       - name: Install latest nextest release
         uses: taiki-e/install-action@v2
         with:
@@ -68,6 +69,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
+        with:
+          toolchain: nightly-2024-07-27
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
