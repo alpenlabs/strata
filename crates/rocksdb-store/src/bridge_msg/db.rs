@@ -111,7 +111,7 @@ mod tests {
         BridgeMsgDb::new(db, db_ops)
     }
 
-    fn new_bridge_msg() -> (u128, BridgeMessage) {
+    fn make_bridge_msg() -> (u128, BridgeMessage) {
         let arb = ArbitraryGenerator::new();
 
         let msg: BridgeMessage = arb.generate();
@@ -127,17 +127,18 @@ mod tests {
     #[test]
     fn test_write_msgs() {
         let br_db = setup_db();
-        let (timestamp, msg) = new_bridge_msg();
+        let (timestamp, msg) = make_bridge_msg();
 
         let result = br_db.write_msg(timestamp, msg);
         assert!(result.is_ok());
     }
+
     #[test]
     fn test_get_msg_ids_before_timestamp() {
         let br_db = setup_db();
-        let (timestamp1, msg1) = new_bridge_msg();
-        let (timestamp2, _) = new_bridge_msg();
-        let (timestamp3, msg2) = new_bridge_msg();
+        let (timestamp1, msg1) = make_bridge_msg();
+        let (timestamp2, _) = make_bridge_msg();
+        let (timestamp3, msg2) = make_bridge_msg();
 
         // Write messages to the database
         br_db.write_msg(timestamp1, msg1).unwrap();
@@ -154,8 +155,8 @@ mod tests {
     #[test]
     fn test_delete_msgs_before_timestamp() {
         let br_db = setup_db();
-        let (timestamp1, msg1) = new_bridge_msg();
-        let (timestamp2, msg2) = new_bridge_msg();
+        let (timestamp1, msg1) = make_bridge_msg();
+        let (timestamp2, msg2) = make_bridge_msg();
 
         // Write messages to the database
         br_db.write_msg(timestamp1, msg1).unwrap();
@@ -172,8 +173,8 @@ mod tests {
     #[test]
     fn test_get_msgs_by_scope() {
         let br_db = setup_db();
-        let (timestamp1, mut msg1) = new_bridge_msg();
-        let (timestamp2, mut msg2) = new_bridge_msg();
+        let (timestamp1, mut msg1) = make_bridge_msg();
+        let (timestamp2, mut msg2) = make_bridge_msg();
 
         // Write messages to the database
         br_db.write_msg(timestamp1, msg1.clone()).unwrap();
@@ -189,21 +190,26 @@ mod tests {
     #[test]
     fn test_no_messages_for_nonexistent_scope() {
         let br_db = setup_db();
-        let (timestamp, msg) = new_bridge_msg();
+        let (timestamp, msg) = make_bridge_msg();
+        let scope = msg.scope().to_vec();
 
         // Write message to the database
-        br_db.write_msg(timestamp, msg).unwrap();
+        br_db
+            .write_msg(timestamp, msg)
+            .expect("test: insert bridge msg");
 
         // Try to retrieve messages with a different scope
-        let result = br_db.get_msgs_by_scope(&[1, 1, 1]);
-        assert!(result.is_err());
+        let result = br_db
+            .get_msgs_by_scope(&[42])
+            .expect("test: fetch bridge msg");
+        assert!(result.is_empty());
 
         // Try to retrieve messages with a different scope
-        let result = br_db.get_msgs_by_scope(&[0, 10, 0, 0, 0]);
-        assert!(result.is_ok());
+        let result = br_db
+            .get_msgs_by_scope(&scope)
+            .expect("test: fetch bridge msg");
 
-        // Should be empty since no message has the scope [1, 1, 1]
-        let msgs = result.unwrap();
-        assert!(msgs.is_empty());
+        // Should not be empty since we're using the scope of the message we put in.
+        assert!(!result.is_empty());
     }
 }

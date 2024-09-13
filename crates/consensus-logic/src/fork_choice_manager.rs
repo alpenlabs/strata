@@ -621,14 +621,16 @@ mod tests {
 
     #[test]
     fn test_verify_block_hashes() {
+        let ag = ArbitraryGenerator::new();
+
         // use arbitrary generator to get the new block
-        let block: L2Block = ArbitraryGenerator::new().generate();
+        let block: L2Block = ag.generate();
         let blk_id = block.header().get_blockid();
 
         assert!(check_block_segments(&block, &blk_id));
 
-        let arb_exec_segment: ExecSegment = ArbitraryGenerator::new().generate();
-        let arb_l1_segment: L1Segment = ArbitraryGenerator::new().generate();
+        let arb_exec_segment: ExecSegment = ag.generate();
+        let arb_l1_segment: L1Segment = ag.generate();
         // mutate the l2Block's body to create a new block with arbitrary exec segment
         let blk_body = L2BlockBody::new(block.body().l1_segment().clone(), arb_exec_segment);
         let arb_exec_block = L2Block::new(block.header().clone(), blk_body);
