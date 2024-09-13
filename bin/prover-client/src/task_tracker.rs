@@ -1,10 +1,13 @@
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
-use crate::models::{Task, TaskStatus, Witness};
+use crate::primitives::{
+    prover_input::ProverInput,
+    tasks_scheduler::{ProvingTask, ProvingTaskStatus},
+};
 
 pub struct TaskTracker {
-    tasks: Mutex<Vec<Task>>,
+    tasks: Mutex<Vec<ProvingTask>>,
 }
 
 impl TaskTracker {
@@ -14,13 +17,13 @@ impl TaskTracker {
         }
     }
 
-    pub async fn create_task(&self, el_block_num: u64, witness: Witness) -> Uuid {
+    pub async fn create_task(&self, el_block_num: u64, prover_input: ProverInput) -> Uuid {
         let task_id = Uuid::new_v4();
-        let task = Task {
+        let task = ProvingTask {
             id: task_id,
             el_block_num,
-            witness,
-            status: TaskStatus::Pending,
+            prover_input,
+            status: ProvingTaskStatus::Pending,
         };
         let mut tasks = self.tasks.lock().await;
         tasks.push(task);
@@ -28,7 +31,7 @@ impl TaskTracker {
         // todo: update task scheduler
     }
 
-    pub async fn update_task_status(&self, task_id: Uuid, status: TaskStatus) {
+    pub async fn update_task_status(&self, task_id: Uuid, status: ProvingTaskStatus) {
         let mut tasks = self.tasks.lock().await;
         if let Some(task) = tasks.iter_mut().find(|t| t.id == task_id) {
             task.status = status;
@@ -36,12 +39,15 @@ impl TaskTracker {
         // todo: update task scheduler
     }
 
-    pub async fn get_pending_task(&self) -> Option<Task> {
+    pub async fn get_pending_task(&self) -> Option<ProvingTask> {
         let mut tasks = self.tasks.lock().await;
-        if let Some(index) = tasks.iter().position(|t| t.status == TaskStatus::Pending) {
+        if let Some(index) = tasks
+            .iter()
+            .position(|t| t.status == ProvingTaskStatus::Pending)
+        {
             let mut task = tasks[index].clone();
-            task.status = TaskStatus::Processing;
-            tasks[index].status = TaskStatus::Processing;
+            task.status = ProvingTaskStatus::Processing;
+            tasks[index].status = ProvingTaskStatus::Processing;
             Some(task)
         } else {
             None

@@ -1,11 +1,12 @@
 //! Bootstraps an RPC server for the prover client.
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use anyhow::{Context, Ok};
 use async_trait::async_trait;
 use express_prover_client_rpc_api::ExpressProverClientApiServerServer;
 use jsonrpsee::{
     core::{client::ClientT, RpcResult},
+    http_client::{HttpClient, HttpClientBuilder},
     rpc_params, RpcModule,
 };
 use reth_rpc_types::Block;
@@ -13,7 +14,39 @@ use tokio::sync::oneshot;
 use tracing::{info, warn};
 use zkvm_primitives::ZKVMInput;
 
-use crate::models::{ELBlockWitness, RpcContext, Witness};
+use crate::{
+    primitives::prover_input::{ProverInput, WitnessData},
+    task_tracker::TaskTracker,
+};
+
+#[derive(Clone)]
+pub struct RpcContext {
+    pub task_tracker: Arc<TaskTracker>,
+    _sequencer_rpc_url: String,
+    el_rpc_client: HttpClient,
+}
+
+impl RpcContext {
+    pub fn new(
+        task_tracker: Arc<TaskTracker>,
+        _sequencer_rpc_url: String,
+        reth_rpc_url: String,
+    ) -> Self {
+        let el_rpc_client = HttpClientBuilder::default()
+            .build(&reth_rpc_url)
+            .expect("failed to connect to the el client");
+
+        RpcContext {
+            task_tracker,
+            _sequencer_rpc_url,
+            el_rpc_client,
+        }
+    }
+
+    pub fn el_client(&self) -> &HttpClient {
+        &self.el_rpc_client
+    }
+}
 
 pub(crate) async fn start<T>(rpc_impl: &T, rpc_url: String) -> anyhow::Result<()>
 where
@@ -71,8 +104,8 @@ impl ExpressProverClientApiServerServer for ProverClientRpc {
         {
             let task_tracker = Arc::clone(&self.context.task_tracker);
             let witness_vec = bincode::serialize(&_zkvm_input).unwrap();
-            let el_block_witness = ELBlockWitness { data: witness_vec };
-            let witness = Witness::ElBlock(el_block_witness);
+            let el_block_witness = WitnessData { data: witness_vec };
+            let witness = ProverInput::ElBlock(el_block_witness);
 
             let task_id = task_tracker.create_task(el_block_num, witness).await;
             info!("ProverClientRpc: prove_el_block create_task: {}", task_id);
