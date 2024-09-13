@@ -3858,6 +3858,7 @@ dependencies = [
  "jsonrpsee",
  "rayon",
  "reth-rpc-types",
+ "risc0-guest-builder",
  "rockbound",
  "serde",
  "thiserror",
