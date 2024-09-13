@@ -48,16 +48,17 @@ impl BridgeMessageStore for BridgeMsgDb {
 
         self.db.put::<BridgeMsgIdSchema>(&id, &msg);
 
-        if let Some(scopes) = self.db.get::<ScopeMsgIdSchema>(msg.get_scope())? {
+        let scope = msg.scope().to_owned();
+
+        if let Some(scopes) = self.db.get::<ScopeMsgIdSchema>(&scope)? {
             let mut new_scopes = Vec::new();
             new_scopes.extend(&scopes);
             new_scopes.push(id);
-            self.db
-                .put::<ScopeMsgIdSchema>(msg.get_scope(), &new_scopes);
-            return Ok(());
+            self.db.put::<ScopeMsgIdSchema>(&scope, &new_scopes)?;
+        } else {
+            self.db.put::<ScopeMsgIdSchema>(&scope, &vec![id])?;
         }
 
-        self.db.put::<ScopeMsgIdSchema>(msg.get_scope(), &vec![id]);
         Ok(())
     }
 
@@ -74,33 +75,23 @@ impl BridgeMessageStore for BridgeMsgDb {
     }
 
     fn get_msgs_by_scope(&self, scope: &[u8]) -> DbResult<Vec<BridgeMessage>> {
-        let mut msg_scope = Scope::from_raw(scope).ok();
+        // Regular loop for filtering and mapping
+        let Some(msg_ids) = self.db.get(&scope.to_owned())? else {
+            return Ok(Vec::new());
+        };
 
-        if let Some(scope) = msg_scope {
-            let mut msg_ids = Vec::new();
+        let mut msgs = Vec::new();
 
-            // Regular loop for filtering and mapping
-            for msg in (self.db.iter::<ScopeMsgIdSchema>()?).flatten() {
-                let (m_scope, id) = msg.into_tuple();
-                if scope == m_scope {
-                    msg_ids.push(id);
-                }
-            }
+        // Iterating over filtered message IDs to fetch messages
+        for id in msg_ids {
+            let Some(message) = self.db.get::<BridgeMsgIdSchema>(&id)? else {
+                continue;
+            };
 
-            let mut msgs = Vec::new();
-
-            // Iterating over filtered message IDs to fetch messages
-            for message_id_group in msg_ids {
-                for message_id in message_id_group {
-                    if let Ok(Some(message)) = self.db.get::<BridgeMsgIdSchema>(&message_id) {
-                        msgs.push(message);
-                    }
-                }
-            }
-            return Ok(msgs);
+            msgs.push(message);
         }
 
-        Err(DbError::InvalidArgument)
+        Ok(msgs)
     }
 }
 

@@ -7,7 +7,7 @@ use std::{
 };
 
 use alpen_express_bridge_msg::types::BridgeMessage;
-use alpen_express_bridge_msg_manager::handler::{bridge_msg_worker_task, MsgState};
+use alpen_express_bridge_msg_manager::handler::{bridge_msg_worker_task, RelayerState};
 use alpen_express_btcio::{
     broadcaster::{spawn_broadcaster_task, L1BroadcastHandle},
     rpc::BitcoinClient,
@@ -389,7 +389,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let bridge_config = Arc::new(bridge_config);
 
     executor.spawn_critical_async("bridge-msg", async {
-        let msg_mgr = MsgState::new(bridge_config.clone());
+        let msg_mgr = RelayerState::new(&bridge_config);
         bridge_msg_worker_task(
             cloned_bridge_msg_ops,
             cloned_status_rx,

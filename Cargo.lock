@@ -971,6 +971,7 @@ dependencies = [
  "express-storage",
  "express-tasks",
  "format_serde_error",
+ "futures",
  "hex",
  "jsonrpsee",
  "parking_lot 0.12.3",

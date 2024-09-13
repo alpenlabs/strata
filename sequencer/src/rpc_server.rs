@@ -41,6 +41,7 @@ use bitcoin::{
 };
 use borsh::{from_slice, BorshDeserialize};
 use express_storage::ops::bridgemsg::BridgeMsgOps;
+use futures::future::TryFutureExt;
 use jsonrpsee::{
     core::RpcResult,
     types::{ErrorObject, ErrorObjectOwned},
@@ -578,21 +579,15 @@ impl AdminBridgeMsgImpl {
 impl AlpenBridgeMsgApiServer for AdminBridgeMsgImpl {
     async fn get_msgs_by_scope(&self, scope: HexBytes) -> RpcResult<Vec<HexBytes>> {
         // get the database
-        let message = self
+        let msgs = self
             .bridge_msg_ops
             .get_msgs_by_scope_async(Vec::from(scope.as_ref()))
-            .await
-            .map_err(Error::Db)?;
+            .map_err(Error::Db)
+            .await?;
 
-        let serialized_messages = message
+        let serialized_messages = msgs
             .iter()
-            .map(|msg| {
-                let msg = alpen_express_bridge_msg::utils::serialize_bridge_message(msg)
-                    .map_err(|_| Error::Serialization)
-                    .unwrap();
-
-                HexBytes(msg)
-            })
+            .map(|msg| HexBytes(borsh::to_vec(msg).unwrap()))
             .collect::<Vec<HexBytes>>();
 
         Ok(serialized_messages)

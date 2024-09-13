@@ -12,5 +12,5 @@ define_table_with_seek_key_codec!(
 
 define_table_with_default_codec!(
     /// A table to store mapping of scope to Bridge Message Ids
-    (ScopeMsgIdSchema) Scope => Vec<u128>
+    (ScopeMsgIdSchema) Vec<u8> => Vec<u128>
 );
