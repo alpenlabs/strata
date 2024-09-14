@@ -47,5 +47,5 @@ fn upsert_tx_state<D: BridgeTxDatabase + Sync + Send + 'static>(
 ) -> DbResult<()> {
     let bridge_tx_store = context.db.bridge_tx_store();
 
-    bridge_tx_store.upsert_tx_state(txid.into(), tx_state)
+    bridge_tx_store.put_tx_state(txid.into(), tx_state)
 }

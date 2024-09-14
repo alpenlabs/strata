@@ -5,12 +5,13 @@
 
 use alpen_express_primitives::{
     bridge::TxSigningData,
-    l1::{BitcoinAddress, SpendInfo},
+    l1::{BitcoinAddress, BitcoinPsbt, SpendInfo},
 };
 use bitcoin::{
     key::TapTweak,
+    secp256k1::SECP256K1,
     taproot::{self, ControlBlock},
-    Address, Amount, FeeRate, OutPoint, TapNodeHash, Transaction, TxOut,
+    Address, Amount, FeeRate, OutPoint, Psbt, TapNodeHash, Transaction, TxOut,
 };
 use serde::{Deserialize, Serialize};
 
@@ -24,9 +25,9 @@ use super::{
 };
 use crate::{
     constants::BRIDGE_DENOMINATION,
-    context::{BuilderContext, TxBuilder},
+    context::{BuildContext, TxBuildContext},
     operations::create_tx,
-    prelude::create_taproot_addr,
+    prelude::{create_taproot_addr, SpendPath},
 };
 
 /// The deposit information  required to create the Deposit Transaction.
@@ -54,21 +55,25 @@ pub struct DepositInfo {
 }
 
 impl TxKind for DepositInfo {
-    type Context = TxBuilder;
+    type Context = TxBuildContext;
 
     fn construct_signing_data(
         &self,
-        builder: &Self::Context,
+        build_context: &Self::Context,
     ) -> BridgeTxBuilderResult<TxSigningData> {
-        let prevouts = self.compute_prevouts(builder)?;
-        let spend_infos = self.compute_spend_infos(builder)?;
-        let unsigned_tx = self.create_unsigned_tx(builder)?;
+        let prevouts = self.compute_prevouts(build_context)?;
+        let spend_infos = self.compute_spend_infos(build_context)?;
+        let unsigned_tx = self.create_unsigned_tx(build_context)?;
 
-        Ok(TxSigningData {
-            unsigned_tx,
-            spend_infos,
-            prevouts,
-        })
+        let mut psbt = Psbt::from_unsigned_tx(unsigned_tx)?;
+
+        for (i, input) in psbt.inputs.iter_mut().enumerate() {
+            input.witness_utxo = Some(prevouts[i].clone());
+        }
+
+        let psbt = BitcoinPsbt::from(psbt);
+
+        Ok(TxSigningData { psbt, spend_infos })
     }
 }
 
@@ -115,10 +120,10 @@ impl DepositInfo {
 
     fn compute_spend_infos(
         &self,
-        builder: &impl BuilderContext,
+        build_context: &impl BuildContext,
     ) -> BridgeTxBuilderResult<Vec<SpendInfo>> {
         // The Deposit Request (DT) spends the n-of-n multisig leaf
-        let spend_script = n_of_n_script(&builder.aggregated_pubkey());
+        let spend_script = n_of_n_script(&build_context.aggregated_pubkey());
         let spend_script_hash =
             TapNodeHash::from_script(&spend_script, taproot::LeafVersion::TapScript);
 
@@ -127,25 +132,24 @@ impl DepositInfo {
         let merkle_root = TapNodeHash::from_node_hashes(spend_script_hash, *takeback_script_hash);
 
         let address = Address::p2tr(
-            builder.secp(),
+            SECP256K1,
             *UNSPENDABLE_INTERNAL_KEY,
             Some(merkle_root),
-            *builder.network(),
+            *build_context.network(),
         );
 
         let expected_addr = self
             .original_taproot_addr
             .address()
             .clone()
-            .require_network(*builder.network())
+            .require_network(*build_context.network())
             .map_err(|_e| DepositTransactionError::InvalidDRTAddress)?;
 
         if address != expected_addr {
             return Err(DepositTransactionError::InvalidTapLeafHash)?;
         }
 
-        let (output_key, parity) =
-            UNSPENDABLE_INTERNAL_KEY.tap_tweak(builder.secp(), Some(merkle_root));
+        let (output_key, parity) = UNSPENDABLE_INTERNAL_KEY.tap_tweak(SECP256K1, Some(merkle_root));
 
         let control_block = ControlBlock {
             leaf_version: taproot::LeafVersion::TapScript,
@@ -156,11 +160,7 @@ impl DepositInfo {
             output_key_parity: parity,
         };
 
-        if !control_block.verify_taproot_commitment(
-            builder.secp(),
-            output_key.into(),
-            &spend_script,
-        ) {
+        if !control_block.verify_taproot_commitment(SECP256K1, output_key.into(), &spend_script) {
             return Err(DepositTransactionError::ControlBlockError)?;
         }
 
@@ -172,7 +172,7 @@ impl DepositInfo {
         Ok(vec![spend_info])
     }
 
-    fn compute_prevouts(&self, builder: &impl BuilderContext) -> BridgeTxBuilderResult<Vec<TxOut>> {
+    fn compute_prevouts(&self, builder: &impl BuildContext) -> BridgeTxBuilderResult<Vec<TxOut>> {
         let deposit_address = self
             .original_taproot_addr
             .address()
@@ -188,7 +188,7 @@ impl DepositInfo {
 
     fn create_unsigned_tx(
         &self,
-        builder: &impl BuilderContext,
+        build_context: &impl BuildContext,
     ) -> BridgeTxBuilderResult<Transaction> {
         // First, create the inputs
         let outpoint = self.deposit_request_outpoint();
@@ -214,12 +214,13 @@ impl DepositInfo {
         let fee_rate =
             FeeRate::from_sat_per_vb(MIN_RELAY_FEE.to_sat()).expect("invalid MIN_RELAY_FEE set");
 
-        let (bridge_addr, _) = create_taproot_addr(
-            builder.secp(),
-            builder.network(),
-            &[],
-            Some(builder.aggregated_pubkey()),
-        )?;
+        // We are not committing to any script path as the internal key should already be
+        // randomized due to MuSig2 aggregation. See: <https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki#cite_note-23>
+        let spend_path = SpendPath::KeySpend {
+            internal_key: build_context.aggregated_pubkey(),
+        };
+
+        let (bridge_addr, _) = create_taproot_addr(build_context.network(), spend_path)?;
 
         let bridge_in_script_pubkey = bridge_addr.script_pubkey();
         let bridge_in_relay_cost = bridge_in_script_pubkey.minimal_non_dust_custom(fee_rate);
@@ -275,7 +276,7 @@ mod tests {
         let (drt_output_address, take_back_leaf_hash) =
             create_drt_taproot_output(operator_pubkeys.clone());
 
-        let tx_builder = TxBuilder::new(operator_pubkeys, Network::Regtest);
+        let tx_builder = TxBuildContext::new(operator_pubkeys, Network::Regtest);
 
         // Correct merkle proof
         let deposit_info = DepositInfo::new(

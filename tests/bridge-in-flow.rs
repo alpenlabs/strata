@@ -19,7 +19,6 @@ mod common;
 
 #[tokio::test]
 async fn deposit_flow() {
-    // setting this to too high a number will cause issues
     let num_operators = 5;
 
     let (bitcoind, federation) = setup(num_operators).await;

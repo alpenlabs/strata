@@ -8,9 +8,6 @@ pub enum BridgeParseError {
     #[error("nonce table should be sorted by `OperatorIdx`")]
     MalformedNonceTable,
 
-    #[error("public key table should be sorted by `OperatorIdx`")]
-    MalformedPublicKeyTable,
-
     #[error("supplied pubkey is invalid")]
     InvalidPubkey(#[from] secp256k1::Error),
 

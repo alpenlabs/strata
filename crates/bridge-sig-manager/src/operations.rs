@@ -4,7 +4,7 @@ use alpen_express_db::entities::bridge_tx_state::BridgeTxState;
 use alpen_express_primitives::bridge::{Musig2SecNonce, PublickeyTable, SignatureInfo};
 use bitcoin::{
     hashes::Hash,
-    secp256k1::{Keypair, Message, PublicKey, SecretKey},
+    secp256k1::{Keypair, Message, SecretKey},
     sighash::{self, Prevouts, SighashCache},
     taproot::LeafVersion,
     ScriptBuf, TapLeafHash, Transaction, TxOut,
@@ -32,12 +32,16 @@ pub fn create_script_spend_hash(
         sighash_type,
     )?;
 
-    let message = Message::from_digest_slice(sighash.as_byte_array()).expect("should be hash");
+    let message =
+        Message::from_digest_slice(sighash.as_byte_array()).expect("TapSigHash is a hash");
 
     Ok(message)
 }
 
 /// Generate a partial MuSig2 signature for the given message and nonce values.
+///
+/// Please refer to MuSig2 signing section in
+/// [BIP 327](https://github.com/bitcoin/bips/blob/master/bip-0327.mediawiki).
 // TODO: replace this with a call to a wallet.
 pub fn sign_state_partial(
     pubkey_table: &PublickeyTable,
@@ -80,20 +84,15 @@ pub fn verify_partial_sig(
         return Err(BridgeSigError::UnauthorizedPubkey);
     }
 
-    let individual_pubkey = individual_pubkey.unwrap();
+    let individual_pubkey = individual_pubkey.expect("should be some value");
 
-    let pubkeys: Vec<PublicKey> = tx_state
-        .pubkeys()
-        .0
-        .values()
-        .copied()
-        .collect::<Vec<PublicKey>>();
+    let pubkeys = tx_state.pubkeys().0.values().copied();
     let key_agg_ctx = KeyAggContext::new(pubkeys)?;
 
     let individual_pubnonce = tx_state
         .collected_nonces()
         .get(signer_index)
-        .expect("pubnonce should exist");
+        .ok_or(BridgeSigError::PubNonceNotFound)?;
 
     let partial_signature = *signature_info.signature().inner();
 
@@ -109,7 +108,7 @@ pub fn verify_partial_sig(
 
 #[cfg(test)]
 mod tests {
-    use alpen_express_primitives::bridge::{Musig2PartialSig, OperatorIdx};
+    use alpen_express_primitives::bridge::{OperatorIdx, OperatorPartialSig};
     use alpen_test_utils::bridge::{
         generate_keypairs, generate_mock_tx_signing_data, generate_mock_unsigned_tx,
         generate_pubkey_table, permute,
@@ -117,7 +116,7 @@ mod tests {
     use arbitrary::{Arbitrary, Unstructured};
     use bitcoin::{
         key::rand::{self, RngCore},
-        secp256k1::SECP256K1,
+        secp256k1::{PublicKey, SECP256K1},
         Amount,
     };
     use musig2::{PubNonce, SecNonce};
@@ -177,7 +176,7 @@ mod tests {
 
         // Step 2: Verify the partial signature
 
-        let signature_info = SignatureInfo::new(partial_sig.into(), own_index as u32);
+        let signature_info = SignatureInfo::new(partial_sig.into(), own_index as OperatorIdx);
 
         let verify_result = verify_partial_sig(
             &tx_state,
@@ -215,7 +214,7 @@ mod tests {
         // Test 3.2: Wrong signature
         let data = vec![0u8; 1024];
         let mut unstructured = Unstructured::new(&data);
-        let random_partial_sig = Musig2PartialSig::arbitrary(&mut unstructured)
+        let random_partial_sig = OperatorPartialSig::arbitrary(&mut unstructured)
             .expect("should generate an arbitrary partial sig");
         let signature_info = SignatureInfo::new(
             random_partial_sig,
@@ -259,7 +258,7 @@ mod tests {
 
         let num_inputs = 1;
         let tx_output = generate_mock_tx_signing_data(num_inputs);
-        let txid = tx_output.unsigned_tx.compute_txid();
+        let txid = tx_output.psbt.inner().unsigned_tx.compute_txid();
 
         let key_agg_ctx =
             KeyAggContext::new(pks.clone()).expect("generation of key agg context should work");
@@ -295,7 +294,7 @@ mod tests {
 
         let mut nonces_complete = false;
         let mut permuted_pub_nonces = pub_nonces.clone();
-        permute(&mut permuted_pub_nonces, pub_nonces.len() - 1);
+        permute(&mut permuted_pub_nonces);
 
         for (i, pub_nonce) in pub_nonces.iter().enumerate() {
             nonces_complete = tx_state
