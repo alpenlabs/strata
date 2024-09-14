@@ -8,6 +8,7 @@ mod test {
     use express_proofimpl_l1_batch::{
         header_verification::HeaderVerificationState,
         logic::{L1BatchProofInput, L1BatchProofOutput},
+        timestamp_store::TimestampStore,
     };
     use express_risc0_adapter::{Risc0Verifier, RiscZeroHost};
     use express_risc0_guest_builder::{
@@ -23,9 +24,10 @@ mod test {
         let (
             last_verified_block_hash,
             next_block_target,
-            last_11_blocks_timestamps,
+            initial_timestamps,
             interval_start_timestamp,
         ) = chain.get_header_verification_info(height);
+        let last_11_blocks_timestamps = TimestampStore::new(initial_timestamps);
 
         HeaderVerificationState {
             last_verified_block_num: height - 1,

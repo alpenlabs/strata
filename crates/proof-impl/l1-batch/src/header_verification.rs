@@ -4,7 +4,7 @@ use ethnum::U256;
 use express_proofimpl_btc_blockspace::block::compute_block_hash;
 use serde::{Deserialize, Serialize};
 
-use crate::pow_params::PowParams;
+use crate::{pow_params::PowParams, timestamp_store::TimestampStore};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HeaderVerificationState {
@@ -35,16 +35,10 @@ pub struct HeaderVerificationState {
     /// Timestamps of the last 11 blocks in descending order.
     /// The timestamp of the most recent block is at index 0, while the timestamp of the oldest
     /// block is at index 10.
-    pub last_11_blocks_timestamps: [u32; 11],
+    pub last_11_blocks_timestamps: TimestampStore,
 }
 
 impl HeaderVerificationState {
-    fn get_median_timestamp(&self) -> u32 {
-        let mut timestamps = self.last_11_blocks_timestamps;
-        timestamps.sort_unstable();
-        timestamps[5]
-    }
-
     /// Computes the [`CompactTarget`] from a difficulty adjustment.
     ///
     /// ref: <https://github.com/bitcoin/bitcoin/blob/0503cbea9aab47ec0a87d34611e5453158727169/src/pow.cpp>
@@ -102,9 +96,7 @@ impl HeaderVerificationState {
     }
 
     fn update_timestamps(&mut self, timestamp: u32, params: &PowParams) {
-        // Shift existing timestamps to right and insert latest timestamp
-        self.last_11_blocks_timestamps.rotate_right(1);
-        self.last_11_blocks_timestamps[0] = timestamp;
+        self.last_11_blocks_timestamps.insert(timestamp);
 
         let new_block_num = self.last_verified_block_num;
         if new_block_num % params.difficulty_adjustment_interval() == 0 {
@@ -127,7 +119,7 @@ impl HeaderVerificationState {
         header.target().is_met_by(block_hash);
 
         // Check timestamp
-        assert!(header.time > self.get_median_timestamp());
+        assert!(header.time > self.last_11_blocks_timestamps.median());
 
         // Increase the last verified block number by 1
         self.last_verified_block_num += 1;
@@ -186,8 +178,8 @@ mod tests {
 
         // Fetch the previous timestamps of block from `vh`
         // This fetches timestamps of `vh`, `vh-1`, `vh-2`, ...
-        let recent_block_timestamps: [u32; 11] =
-            chain.get_last_timestamps(vh, 11).try_into().unwrap();
+        let initial_timestamps: [u32; 11] = chain.get_last_timestamps(vh, 11).try_into().unwrap();
+        let last_11_blocks_timestamps = TimestampStore::new(initial_timestamps);
 
         HeaderVerificationState {
             last_verified_block_num: vh,
@@ -205,7 +197,7 @@ mod tests {
                 .to_consensus(),
             interval_start_timestamp: chain.get_header(h1).time,
             total_accumulated_pow: 0f64,
-            last_11_blocks_timestamps: recent_block_timestamps,
+            last_11_blocks_timestamps,
         }
     }
 
