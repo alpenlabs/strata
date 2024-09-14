@@ -17,9 +17,13 @@ class BlockFinalizationTest(flexitest.Test):
 
         time.sleep(2)
 
+        check_send_proof_for_non_existent_batch(seqrpc)
+
         for n in range(4):
             check_for_nth_checkpoint_finalization(n, seqrpc)
             print(f"Pass checkpoint finalization for checkpoint {n}")
+
+        check_already_sent_proof(seqrpc)
 
 
 def check_for_nth_checkpoint_finalization(idx, seqrpc):
@@ -39,13 +43,33 @@ def check_for_nth_checkpoint_finalization(idx, seqrpc):
     to_finalize_blkid = checkpoint_info["l2_blockid"]
 
     # Post checkpoint proof
-    seqrpc.alp_putCheckpointProof(idx, "abcdef")
+    proof_hex = "abcdef"
+    seqrpc.alp_putCheckpointProof(idx, proof_hex)
 
     # Wait till checkpoint finalizes, since our finalization depth is 4 and the block
-    # generation time is 0.5s wait ~2 secs
+    # generation time is 0.5s wait slightly more than 2 secs
     # Ideally this should be tested with controlled bitcoin block production
     time.sleep(4)
 
     syncstat = seqrpc.alp_syncStatus()
     print("Sync Stat", syncstat)
     assert to_finalize_blkid == syncstat["finalized_block_id"], "Block not finalized"
+
+
+def check_send_proof_for_non_existent_batch(seqrpc):
+    try:
+        seqrpc.alp_putCheckpointProof(100, "abc123")
+    except Exception as e:
+        assert e.code == -32610
+    else:
+        raise AssertionError("Expected rpc error")
+
+
+def check_already_sent_proof(seqrpc):
+    try:
+        # Proof for checkpoint 1 is already sent
+        seqrpc.alp_putCheckpointProof(1, "abc123")
+    except Exception as e:
+        assert e.code == -32611
+    else:
+        raise AssertionError("Expected rpc error")

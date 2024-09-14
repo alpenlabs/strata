@@ -79,6 +79,9 @@ pub enum Error {
     #[error("missing checkpoint for index {0}")]
     MissingCheckpoint(u64),
 
+    #[error("Proof already created for checkpoint {0}")]
+    ProofAlreadyCreated(u64),
+
     /// Generic internal error message.  If this is used often it should be made
     /// into its own error type.
     #[error("{0}")]
@@ -105,6 +108,7 @@ impl Error {
             Self::UnknownIdx(_) => -32608,
             Self::MissingL1BlockManifest(_) => -32609,
             Self::MissingCheckpoint(_) => -32610,
+            Self::ProofAlreadyCreated(_) => -32611,
             Self::BlockingAbort(_) => -32001,
             Self::Other(_) => -32000,
             Self::OtherEx(_, _) => -32000,
@@ -597,6 +601,13 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
             .get_batch_checkpoint(idx)
             .map_err(|e| Error::Other(e.to_string()))?
             .ok_or(Error::MissingCheckpoint(idx))?;
+
+        // If proof is not pending error out
+        if entry.status != CheckpointStatus::PendingProof {
+            return Err(Error::ProofAlreadyCreated(idx))?;
+        }
+
+        // TODO: verify proof, once proof verification logic is ready
         entry.proof = proof.0;
         entry.status = CheckpointStatus::ProofCreated;
         self.database
