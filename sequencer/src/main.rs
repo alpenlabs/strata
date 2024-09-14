@@ -33,7 +33,7 @@ use alpen_express_primitives::{
 use alpen_express_rocksdb::{
     broadcaster::db::BroadcastDatabase, sequencer::db::SequencerDB, DbOpsConfig, SeqDb,
 };
-use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer, AlpenBridgeMsgApiServer};
+use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer};
 use alpen_express_rpc_types::L1Status;
 use alpen_express_state::csm_status::CsmStatus;
 use alpen_express_status::{create_status_channel, StatusRx, StatusTx};
@@ -416,11 +416,11 @@ async fn start_rpc<D: Database + Send + Sync + 'static>(
     config: Config,
     sync_man: Arc<SyncManager>,
     database: Arc<D>,
-    bridge_ops: Arc<BridgeMsgOps>,
+    bmsg_ops: Arc<BridgeMsgOps>,
     status_rx: Arc<StatusRx>,
     inscription_handler: Option<Arc<InscriptionHandle>>,
     bcast_handle: Arc<L1BroadcastHandle>,
-    message_tx: mpsc::Sender<BridgeMessage>,
+    bmsg_tx: mpsc::Sender<BridgeMessage>,
 ) -> anyhow::Result<()> {
     let (stop_tx, stop_rx) = oneshot::channel();
 
@@ -430,16 +430,15 @@ async fn start_rpc<D: Database + Send + Sync + 'static>(
         database.clone(),
         sync_man.clone(),
         bcast_handle.clone(),
+        bmsg_tx,
+        bmsg_ops,
         stop_tx,
     );
 
-    let mut methods = alp_rpc.into_rpc();
     let admin_rpc = rpc_server::AdminServerImpl::new(inscription_handler, bcast_handle);
 
-    let bridge_rpc = rpc_server::AdminBridgeMsgImpl::new(message_tx, bridge_ops);
-
+    let mut methods = alp_rpc.into_rpc();
     methods.merge(admin_rpc.into_rpc())?;
-    methods.merge(bridge_rpc.into_rpc())?;
 
     let rpc_port = config.client.rpc_port;
 

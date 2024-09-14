@@ -55,6 +55,14 @@ pub trait AlpenApi {
 
     #[method(name = "getTxStatus")]
     async fn get_tx_status(&self, txid: HexBytes32) -> RpcResult<Option<L1TxStatus>>;
+
+    /// Get message by scope, Currently either Deposit or Withdrawal
+    #[method(name = "getMsgsByScope")]
+    async fn get_msgs_by_scope(&self, scope: HexBytes) -> RpcResult<Vec<HexBytes>>;
+
+    /// Submit raw messages
+    #[method(name = "submitBridgeMsg")]
+    async fn submit_bridge_msg(&self, raw_msg: HexBytes) -> RpcResult<()>;
 }
 
 #[serde_as]
@@ -125,16 +133,4 @@ pub trait AlpenBridgeApi {
     // methods may move to another trait later.
     #[method(name = "broadcastTxs")]
     async fn broadcast_transactions(&self, txs: Vec<Transaction>) -> RpcResult<()>;
-}
-
-#[cfg_attr(not(feature = "client"), rpc(server, namespace = "alpbridgemsg"))]
-#[cfg_attr(feature = "client", rpc(server, client, namespace = "alpbridgemsg"))]
-pub trait AlpenBridgeMsgApi {
-    /// Get message by scope, Currently either Deposit or Withdrawal
-    #[method(name = "getMsgsByScope")]
-    async fn get_msgs_by_scope(&self, scope: HexBytes) -> RpcResult<Vec<HexBytes>>;
-
-    /// Submit raw messages
-    #[method(name = "submitRawMsg")]
-    async fn submit_raw_msg(&self, raw_msg: HexBytes) -> RpcResult<()>;
 }

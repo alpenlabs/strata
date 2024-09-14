@@ -2,7 +2,6 @@
 
 use std::{borrow::BorrowMut, sync::Arc};
 
-use alpen_express_primitives::relay::types::BridgeMessage;
 use alpen_express_btcio::{broadcaster::L1BroadcastHandle, writer::InscriptionHandle};
 use alpen_express_consensus_logic::sync_manager::SyncManager;
 use alpen_express_db::{
@@ -13,10 +12,9 @@ use alpen_express_db::{
     types::{L1TxEntry, L1TxStatus},
     DbResult,
 };
-use alpen_express_primitives::{buf::Buf32, hash};
+use alpen_express_primitives::{buf::Buf32, hash, relay::types::BridgeMessage};
 use alpen_express_rpc_api::{
-    AlpenAdminApiServer, AlpenApiServer, AlpenBridgeApiServer, AlpenBridgeMsgApiServer, HexBytes,
-    HexBytes32,
+    AlpenAdminApiServer, AlpenApiServer, AlpenBridgeApiServer, HexBytes, HexBytes32,
 };
 use alpen_express_rpc_types::{
     BlockHeader, ClientStatus, DaBlob, DepositEntry, DepositState, ExecUpdate, L1Status,
@@ -165,6 +163,8 @@ pub struct AlpenRpcImpl<D> {
     database: Arc<D>,
     sync_manager: Arc<SyncManager>,
     bcast_handle: Arc<L1BroadcastHandle>,
+    bmsg_tx: mpsc::Sender<BridgeMessage>,
+    bmsg_ops: Arc<BridgeMsgOps>,
     stop_tx: Mutex<Option<oneshot::Sender<()>>>,
 }
 
@@ -174,6 +174,8 @@ impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
         database: Arc<D>,
         sync_manager: Arc<SyncManager>,
         bcast_handle: Arc<L1BroadcastHandle>,
+        bmsg_tx: mpsc::Sender<BridgeMessage>,
+        bmsg_ops: Arc<BridgeMsgOps>,
         stop_tx: oneshot::Sender<()>,
     ) -> Self {
         Self {
@@ -181,6 +183,8 @@ impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
             database,
             sync_manager,
             bcast_handle,
+            bmsg_tx,
+            bmsg_ops,
             stop_tx: Mutex::new(Some(stop_tx)),
         }
     }
@@ -493,6 +497,33 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
             .await
             .map_err(|e| Error::Other(e.to_string()))?)
     }
+
+    async fn get_msgs_by_scope(&self, scope: HexBytes) -> RpcResult<Vec<HexBytes>> {
+        // get the database
+        let msgs = self
+            .bmsg_ops
+            .get_msgs_by_scope_async(Vec::from(scope.as_ref()))
+            .map_err(Error::Db)
+            .await?;
+
+        let serialized_messages = msgs
+            .iter()
+            .map(|msg| HexBytes(borsh::to_vec(msg).unwrap()))
+            .collect::<Vec<HexBytes>>();
+
+        Ok(serialized_messages)
+    }
+
+    async fn submit_bridge_msg(&self, raw_msg: HexBytes) -> RpcResult<()> {
+        let deserialized_msg: BridgeMessage =
+            from_slice::<BridgeMessage>(raw_msg.as_ref()).map_err(|_| Error::Deserialization)?;
+
+        if let Err(e) = self.bmsg_tx.send(deserialized_msg).await {
+            return Err(Error::Other("failed to send bridge message".to_string()).into());
+        }
+
+        Ok(())
+    }
 }
 
 /// Wrapper around [``tokio::task::spawn_blocking``] that handles errors in
@@ -535,6 +566,7 @@ impl AlpenAdminApiServer for AdminServerImpl {
     async fn submit_da_blob(&self, blob: HexBytes) -> RpcResult<()> {
         let commitment = hash::raw(&blob.0);
         let blobintent = BlobIntent::new(BlobDest::L1, commitment, blob.0);
+
         // NOTE: It would be nice to return reveal txid from the submit method. But creation of txs
         // is deferred to signer in the writer module
         if let Some(writer) = &self.writer {
@@ -542,6 +574,7 @@ impl AlpenAdminApiServer for AdminServerImpl {
                 return Err(Error::Other("".to_string()).into());
             }
         }
+
         Ok(())
     }
 
@@ -558,49 +591,5 @@ impl AlpenAdminApiServer for AdminServerImpl {
             .map_err(|e| Error::Other(e.to_string()))?;
 
         Ok(txid)
-    }
-}
-
-pub struct AdminBridgeMsgImpl {
-    message_tx: mpsc::Sender<BridgeMessage>,
-    bridge_msg_ops: Arc<BridgeMsgOps>,
-}
-
-impl AdminBridgeMsgImpl {
-    pub fn new(message_tx: mpsc::Sender<BridgeMessage>, database: Arc<BridgeMsgOps>) -> Self {
-        Self {
-            message_tx,
-            bridge_msg_ops: database,
-        }
-    }
-}
-
-#[async_trait]
-impl AlpenBridgeMsgApiServer for AdminBridgeMsgImpl {
-    async fn get_msgs_by_scope(&self, scope: HexBytes) -> RpcResult<Vec<HexBytes>> {
-        // get the database
-        let msgs = self
-            .bridge_msg_ops
-            .get_msgs_by_scope_async(Vec::from(scope.as_ref()))
-            .map_err(Error::Db)
-            .await?;
-
-        let serialized_messages = msgs
-            .iter()
-            .map(|msg| HexBytes(borsh::to_vec(msg).unwrap()))
-            .collect::<Vec<HexBytes>>();
-
-        Ok(serialized_messages)
-    }
-
-    async fn submit_raw_msg(&self, raw_msg: HexBytes) -> RpcResult<()> {
-        let deserialized_msg: BridgeMessage =
-            from_slice::<BridgeMessage>(raw_msg.as_ref()).map_err(|_| Error::Deserialization)?;
-
-        if let Err(e) = self.message_tx.send(deserialized_msg).await {
-            return Err(Error::Other("failed to send bridge message".to_string()).into());
-        }
-
-        Ok(())
     }
 }
