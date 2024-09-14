@@ -43,7 +43,7 @@ pub(crate) struct BridgeFederation {
 
 impl BridgeFederation {
     pub(crate) async fn new(num_operators: usize, bitcoind: Arc<Mutex<BitcoinD>>) -> Self {
-        let (pks, sks) = generate_keypairs(SECP256K1, num_operators);
+        let (pks, sks) = generate_keypairs(num_operators);
 
         let mut pubkey_table = BTreeMap::new();
         for (operator_idx, pk) in pks.iter().enumerate() {

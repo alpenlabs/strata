@@ -423,14 +423,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_add_tx_state() {
-        let (_, secret_keys) = generate_keypairs(SECP256K1, 1);
+        let (_, secret_keys) = generate_keypairs(1);
         let self_index = 0;
         let keypair = Keypair::from_secret_key(SECP256K1, &secret_keys[self_index as usize]);
 
         let signature_manager = generate_mock_manager(self_index, keypair);
 
         // Generate keypairs for the UTXO
-        let (pubkeys, _) = generate_keypairs(SECP256K1, 3);
+        let (pubkeys, _) = generate_keypairs(3);
         let pubkey_table = generate_pubkey_table(&pubkeys);
 
         let tx_signing_data = generate_mock_tx_signing_data(1);
@@ -674,7 +674,11 @@ mod tests {
 
         // Ensure the signature is present in the first input
         assert!(
+<<<<<<< HEAD
             collected_sigs.contains_key(&(own_index as OperatorIdx)),
+=======
+            collected_sigs.contains_key(&(own_index as u32)),
+>>>>>>> 437b63e (refactor: address PR comments and squash commits)
             "own signature must be present in collected_sigs = {:?} at index: {}",
             collected_sigs,
             own_index
@@ -827,14 +831,18 @@ mod tests {
             .expect("state should be present");
 
         assert!(
-            stored_tx_state
-                .collected_sigs()
-                .nth(input_index)
-                .expect("collected signatures for input_index must exist")
-                .get(&(external_index as OperatorIdx))
-                .is_some_and(|sig| *sig.inner() == external_signature),
-            "should have the external index at the right place"
-        );
+                    stored_tx_state
+                        .collected_sigs()
+                        .nth(input_index)
+                        .expect("collected signatures for input_index must exist")
+        <<<<<<< HEAD
+                        .get(&(external_index as OperatorIdx))
+        =======
+                        .get(&(external_index as u32))
+        >>>>>>> 437b63e (refactor: address PR comments and squash commits)
+                        .is_some_and(|sig| *sig.inner() == external_signature),
+                    "should have the external index at the right place"
+                );
 
         let result = signature_manager.add_own_partial_sig(&txid).await;
         assert!(
@@ -976,7 +984,11 @@ mod tests {
                     .collected_sigs()
                     .nth(input_index)
                     .expect("collected signatures for input index must exist")
+<<<<<<< HEAD
                     .get(&(signer_index as OperatorIdx))
+=======
+                    .get(&(signer_index as u32))
+>>>>>>> 437b63e (refactor: address PR comments and squash commits)
                     .is_some_and(|sig| *sig.inner() == external_signature));
             }
         }
