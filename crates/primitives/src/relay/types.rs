@@ -152,12 +152,12 @@ impl fmt::Display for BridgeMsgId {
 }
 
 #[derive(Copy, Clone, Deserialize, Debug)]
-pub struct BridgeConfig {
-    // Time for which message is stored and bandwidth is reset
+pub struct RelayerConfig {
+    /// Time we check for purgeable messages.
     pub refresh_interval: u64,
 
-    // max no. of messages corresponding to single operator.
-    pub bandwidth: u32,
+    /// Age after which we'll start to re-relay a message if we recv it again.
+    pub stale_duration: u64,
 }
 
 #[cfg(test)]

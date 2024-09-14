@@ -4,7 +4,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use alpen_express_primitives::relay::types::{BridgeConfig, BridgeMessage};
+use alpen_express_primitives::relay::types::{BridgeMessage, RelayerConfig};
 use alpen_express_status::StatusRx;
 use express_storage::ops::bridgemsg::BridgeMsgOps;
 use secp256k1::{All, Secp256k1};
@@ -19,6 +19,9 @@ use crate::recent_msg_tracker::RecentMessageTracker;
 /// against the current chain state, enforcing operator bandwidth limits to prevent spamming,
 /// and maintaining a record of processed messages to avoid duplication.
 pub struct RelayerState {
+    /// Relayer configuration.
+    config: RelayerConfig,
+
     /// Tracker to avoid duplicating messages.
     processed_msgs: RecentMessageTracker,
 
@@ -28,9 +31,11 @@ pub struct RelayerState {
 
 impl RelayerState {
     /// creates new message state
-    pub fn new(config: &BridgeConfig) -> Self {
-        RelayerState {
-            processed_msgs: RecentMessageTracker::new(config.refresh_interval),
+    pub fn new(config: &RelayerConfig) -> Self {
+        Self {
+            // TODO make this not need clone
+            config: config.clone(),
+            processed_msgs: RecentMessageTracker::new(),
             secp: Arc::new(Secp256k1::new()),
         }
     }
@@ -74,7 +79,7 @@ impl RelayerState {
             }
 
             //  store them in database
-            bridge_ops.write_msg_blocking(timestamp, message)?;
+            bridge_ops.write_msg_async(timestamp, message).await?;
         }
 
         Ok(())
@@ -88,17 +93,16 @@ impl RelayerState {
     /// * `time_before` - The cutoff Unix timestamp; messages older than this will be pruned.
     async fn prune_old_msg_before(
         &mut self,
-        time_before: u128,
+        before_ts: u128,
         bridge_ops: Arc<BridgeMsgOps>,
     ) -> anyhow::Result<()> {
         // check UNIX time and remove very old messages
-        bridge_ops.delete_msgs_before_timestamp_blocking(time_before)?;
+        bridge_ops
+            .delete_msgs_before_timestamp_async(before_ts)
+            .await?;
 
         // remove from the processed message here
-        let dur = self.processed_msgs.forget_duration_us();
-        self.processed_msgs
-            .clear_stale_messages(time_before - dur)
-            .await;
+        self.processed_msgs.clear_stale_messages(before_ts).await;
         Ok(())
     }
 }
@@ -108,10 +112,10 @@ pub async fn bridge_msg_worker_task(
     status_rx: Arc<StatusRx>,
     mut msg_state: RelayerState,
     mut message_rx: mpsc::Receiver<BridgeMessage>,
-    params: Arc<BridgeConfig>,
+    config: Arc<RelayerConfig>,
 ) {
     // arbitrary refresh interval to refresh the number of message particular operator can send
-    let mut refresh_interval = interval(Duration::from_secs(params.refresh_interval));
+    let mut refresh_interval = interval(Duration::from_secs(config.refresh_interval));
     loop {
         select! {
             Some(new_message) = message_rx.recv() => {
@@ -119,11 +123,12 @@ pub async fn bridge_msg_worker_task(
                     warn!(err = %e, "failed to handle new message");
                 }
             }
+
             _ = refresh_interval.tick() => {
                 // prune old messages that cross the threshold duration
-                let duration = get_now_micros_maybe_sub(Some(Duration::from_secs(params.refresh_interval)));
+                let duration = get_now_micros() - config.stale_duration as u128 * 1_000_000;
                 if let Err(e) = msg_state.prune_old_msg_before(duration, bridge_ops.clone()).await {
-                    warn!(err = %e, "Failed to prune old messages");
+                    warn!(err = %e, "failed to purge stale messages");
                 }
             }
         }
@@ -132,21 +137,6 @@ pub async fn bridge_msg_worker_task(
 
 fn get_now_micros() -> u128 {
     let duration = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-    duration.as_micros()
-}
-
-/// Returns the current Unix timestamp in milliseconds, optionally subtracting a given duration.
-///
-/// # Arguments
-///
-/// * `sub_duration` - An optional `Duration` to subtract from the current time.
-///
-/// # Returns
-///
-/// * `u64` - The Unix timestamp in milliseconds
-fn get_now_micros_maybe_sub(sub_duration: Option<Duration>) -> u128 {
-    let duration = SystemTime::now().duration_since(UNIX_EPOCH).unwrap()
-        - sub_duration.unwrap_or(Duration::ZERO);
     duration.as_micros()
 }
 
@@ -161,7 +151,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_add_and_check_duplicate_message() {
-        let processed_msgs = RecentMessageTracker::new(100);
+        let processed_msgs = RecentMessageTracker::new();
 
         let message_id: BridgeMsgId = ArbitraryGenerator::new().generate();
 
@@ -180,7 +170,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_clear_old_messages() {
-        let processed_msgs = RecentMessageTracker::new(100);
+        let processed_msgs = RecentMessageTracker::new();
 
         // Create valid BridgeMsgId instances for testing
         let ag = ArbitraryGenerator::new();
@@ -207,7 +197,7 @@ mod tests {
         );
 
         // Clear old messages
-        processed_msgs.clear_stale_messages(cur_ts_us + 1).await;
+        processed_msgs.clear_stale_messages(cur_ts_us - 1).await;
 
         // The old message should no longer be considered processed
         assert!(

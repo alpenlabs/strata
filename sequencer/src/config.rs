@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
-use alpen_express_primitives::relay::types::BridgeConfig;
 use alpen_express_btcio::reader::config::ReaderConfig;
+use alpen_express_primitives::relay::types::RelayerConfig;
 use bitcoin::Network;
 use serde::Deserialize;
 
@@ -51,7 +51,7 @@ pub struct Config {
     pub bitcoind_rpc: BitcoindParams,
     pub sync: SyncParams,
     pub exec: ExecParams,
-    pub bridge: BridgeConfig,
+    pub bridge: RelayerConfig,
 }
 
 impl Config {
@@ -100,9 +100,9 @@ impl Config {
                                                                            * Option */
                 },
             },
-            bridge: BridgeConfig {
-                refresh_interval: 100,
-                bandwidth: 500,
+            bridge: RelayerConfig {
+                refresh_interval: 10,
+                stale_duration: 120,
             },
         })
     }
@@ -155,7 +155,7 @@ mod test {
     use crate::config::Config;
 
     #[test]
-    fn config_load_test() {
+    fn test_parse_config() {
         let config_string = r#"
             [bitcoind_rpc]
             rpc_url = "http://localhost:18332"
@@ -182,7 +182,7 @@ mod test {
 
             [bridge]
             refresh_interval = 100
-            bandwidth = 500
+            stale_duration = 500
         "#;
 
         assert!(toml::from_str::<Config>(config_string).is_ok());
