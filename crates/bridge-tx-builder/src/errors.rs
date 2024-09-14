@@ -1,6 +1,9 @@
 //! Enumerated errors related to creation and signing of bridge-related transactions.
 
-use bitcoin::taproot::{TaprootBuilder, TaprootBuilderError};
+use bitcoin::{
+    psbt,
+    taproot::{TaprootBuilder, TaprootBuilderError},
+};
 use thiserror::Error;
 
 /// Error during building of bridge-related transactions.
@@ -11,7 +14,7 @@ pub enum BridgeTxBuilderError {
     DepositTransaction(#[from] DepositTransactionError),
 
     /// Error due to there being no script provided to create a taproot address.
-    #[error("noscript taproot address without an internal key not supported")]
+    #[error("noscript taproot address for only script path spend is not possible")]
     EmptyTapscript,
 
     /// Error while building the taproot address.
@@ -27,6 +30,18 @@ pub enum BridgeTxBuilderError {
     // for a particular error.
     #[error("unexpected error occurred: {0}")]
     Unexpected(String),
+
+    /// Could not create psbt from the unsigned transaction.
+    #[error("problem with psbt due to: {0}")]
+    PsbtCreate(String),
+}
+
+/// Manual implementation of conversion from [`psbt::Error`] to [`BridgeTxStateError`] as the
+/// former does not implement [`Clone`] ¯\_(ツ)_/¯.
+impl From<psbt::Error> for BridgeTxBuilderError {
+    fn from(value: psbt::Error) -> Self {
+        Self::PsbtCreate(value.to_string())
+    }
 }
 
 /// Result type alias that has [`BridgeTxBuilderError`] as the error type for succinctness.

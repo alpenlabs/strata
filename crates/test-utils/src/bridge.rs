@@ -6,7 +6,7 @@ use std::{
 use alpen_express_db::stubs::bridge::StubTxStateStorage;
 use alpen_express_primitives::{
     bridge::{OperatorIdx, PublickeyTable, TxSigningData},
-    l1::{BitcoinTxOut, OutputRef, SpendInfo},
+    l1::{BitcoinPsbt, BitcoinTxOut, OutputRef, SpendInfo},
 };
 use arbitrary::{Arbitrary, Unstructured};
 use bitcoin::{
@@ -17,11 +17,11 @@ use bitcoin::{
     secp256k1::{rand, All, Keypair, PublicKey, SecretKey},
     taproot::{LeafVersion, TaprootBuilder, TaprootSpendInfo},
     transaction::Version,
-    Address, Amount, Network, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Witness,
+    Address, Amount, Network, Psbt, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Witness,
 };
 use express_storage::ops::bridge::{BridgeTxStateOps, Context};
 use musig2::{secp256k1::SECP256K1, KeyAggContext, SecNonce};
-use rand::RngCore;
+use rand::{Rng, RngCore};
 use threadpool::ThreadPool;
 
 /// Generate `count` (public key, private key) pairs as two separate [`Vec`].
@@ -46,12 +46,13 @@ pub fn generate_keypairs(secp: &Secp256k1<All>, count: usize) -> (Vec<PublicKey>
 }
 
 pub fn generate_pubkey_table(table: &[PublicKey]) -> PublickeyTable {
-    let mut pubkey_table: BTreeMap<OperatorIdx, PublicKey> = BTreeMap::new();
-    for (idx, pk) in table.iter().enumerate() {
-        pubkey_table.insert(idx as OperatorIdx, *pk);
-    }
+    let pubkey_table = table
+        .iter()
+        .enumerate()
+        .map(|(i, pk)| (i as OperatorIdx, *pk))
+        .collect::<BTreeMap<OperatorIdx, PublicKey>>();
 
-    PublickeyTable::try_from(pubkey_table).expect("indexes in an iter are always sorted")
+    PublickeyTable::from(pubkey_table)
 }
 
 /// Generate a list of arbitrary prevouts.
@@ -145,9 +146,15 @@ pub fn generate_mock_tx_signing_data(num_inputs: usize) -> TxSigningData {
             .expect("should be able to construct control block"),
     };
 
+    let mut psbt = Psbt::from_unsigned_tx(unsigned_tx).expect("should be able to create psbt");
+    for (i, input) in psbt.inputs.iter_mut().enumerate() {
+        input.witness_utxo = Some(prevouts[i].clone());
+    }
+
+    let psbt = BitcoinPsbt::from(psbt);
+
     TxSigningData {
-        unsigned_tx,
-        prevouts,
+        psbt,
         spend_infos: vec![spend_info; num_inputs],
     }
 }
@@ -186,19 +193,19 @@ pub fn generate_sec_nonce(
 /// Permute a list by successively swapping positions in the subslice 0..n, where n <= list.len().
 /// This is used to generate random order for indices in a list (for example, list of pubkeys,
 /// nonces, etc.)
-pub fn permute<T: Clone>(list: &mut [T], n: usize) {
-    assert!(
-        n <= list.len(),
-        "n must be less than list of length, expected <= {}",
-        list.len()
-    );
+pub fn permute<T: Clone>(list: &mut [T]) {
+    let num_permutations = rand::thread_rng().gen_range(0..list.len());
 
+    generate_permutation(list, num_permutations);
+}
+
+fn generate_permutation<T: Clone>(list: &mut [T], n: usize) {
     if n == 1 {
         return;
     }
 
     for i in 0..n {
-        permute(list, n - 1);
+        generate_permutation(list, n - 1);
 
         // Swap elements based on whether n is even or odd
         if n % 2 == 0 {

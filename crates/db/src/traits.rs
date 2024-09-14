@@ -343,8 +343,8 @@ pub trait BcastProvider {
     fn get_tx_entry(&self, idx: u64) -> DbResult<Option<L1TxEntry>>;
 }
 
-/// A trait encapsulating the provider and store traits for interacting with the signature
-/// database of the bridge client.
+/// Provides access to the implementers of provider and store traits for interacting with the
+/// transaction state database of the bridge client.
 ///
 /// This trait assumes that the [`Txid`] is always unique.
 pub trait BridgeTxDatabase {
@@ -353,6 +353,7 @@ pub trait BridgeTxDatabase {
 
     /// Return a reference to the store implementation
     fn bridge_tx_store(&self) -> &Arc<Self::Store>;
+
     /// Return a reference to the provider implementation
     fn bridge_tx_provider(&self) -> &Arc<Self::Provider>;
 }
@@ -360,7 +361,7 @@ pub trait BridgeTxDatabase {
 /// All methods related to storing/mutating [`CollectedSigs`] in the database.
 pub trait BridgeTxStore {
     /// Add [`BridgeTxState`] to the database replacing the existing one if present.
-    fn upsert_tx_state(&self, txid: Buf32, tx_state: BridgeTxState) -> DbResult<()>;
+    fn put_tx_state(&self, txid: Buf32, tx_state: BridgeTxState) -> DbResult<()>;
 
     /// Evict the stored [`BridgeTxState`] from the database and return it. This can be invoked, for
     /// example, when a fully signed Deposit Transaction has been broadcasted. If the `txid` did

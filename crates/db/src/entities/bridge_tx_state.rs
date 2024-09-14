@@ -1,21 +1,21 @@
 //! Defines the [`TxState`] type that tracks the state of signature collection for a particular
 //! [`Psbt`].
 
-use std::{collections::HashMap, ops::Not};
+use std::{collections::BTreeMap, ops::Not};
 
 use alpen_express_primitives::{
     bridge::{
-        Musig2PartialSig, Musig2PubNonce, Musig2SecNonce, OperatorIdx, PublickeyTable,
-        SignatureInfo, TxSigningData,
+        Musig2PubNonce, Musig2SecNonce, OperatorIdx, OperatorPartialSig, PartialSigTable,
+        PublickeyTable, SignatureInfo, TxSigningData,
     },
-    l1::{BitcoinPsbt, BitcoinTxOut, SpendInfo},
+    l1::{BitcoinPsbt, SpendInfo},
 };
 use arbitrary::Arbitrary;
-use bitcoin::{Psbt, Transaction, TxOut, Txid};
+use bitcoin::{Transaction, TxOut, Txid};
 use borsh::{BorshDeserialize, BorshSerialize};
 use musig2::{PartialSignature, PubNonce};
 
-use super::errors::{BridgeTxStateError, EntityError, EntityResult};
+use super::errors::{BridgeTxStateError, EntityResult};
 
 /// The state a transaction is in with respect to the number of signatures that have been collected
 /// from the bridge federation signatories.
@@ -24,18 +24,12 @@ pub struct BridgeTxState {
     /// The partially signed bitcoin transaction that this state tracks.
     psbt: BitcoinPsbt,
 
-    /// The prevouts of the unsigned transaction required for taproot signing.
-    prevouts: Vec<BitcoinTxOut>,
-
     /// The witness elements required to spend a taproot output.
     spend_infos: Vec<SpendInfo>,
 
     /// The table of pubkeys that is used to lock the UTXO present as an input in the psbt.
     /// This table maps the `OperatorIdx` to their corresponding pubkeys.
     pubkey_table: PublickeyTable,
-
-    /// The number of required signatures (same as the length of [`Self::pubkeys`])
-    required_signatures: usize,
 
     /// The private nonce unique to the transaction being tracked by this state.
     // FIXME: storing the secret nonce in the db is not a good practice but since it needs to be
@@ -44,47 +38,29 @@ pub struct BridgeTxState {
     secnonce: Musig2SecNonce,
 
     /// The (public) nonces shared for the particular [`Psbt`] that this state tracks under MuSig2.
-    /// **NOTE**: The keys are not sorted. To get the ordered nonces, use the corresponding
-    /// `ordered_*` getter.
-    collected_nonces: HashMap<OperatorIdx, Musig2PubNonce>,
+    collected_nonces: BTreeMap<OperatorIdx, Musig2PubNonce>,
 
     /// The table of signatures collected so far per operator and per input in the [`Self::psbt`].
-    /// **NOTE**: The keys are not sorted. To get the ordered nonces, use the corresponding
-    /// `ordered_*` getter.
-    collected_sigs: Vec<HashMap<OperatorIdx, Musig2PartialSig>>,
+    collected_sigs: Vec<PartialSigTable>,
 }
 
 impl BridgeTxState {
-    /// Create a new [`TxState`] for the given [`Psbt`] and list of [`PublicKey`].
+    /// Create a new [`TxState`] for the given [`Psbt`] and list of
+    /// [`bitcoin::secp256k1::PublicKey`].
     pub fn new(
         tx_signing_data: TxSigningData,
         pubkey_table: PublickeyTable,
         sec_nonce: Musig2SecNonce,
     ) -> EntityResult<Self> {
-        let num_keys = pubkey_table.0.len();
-        let mut psbt = Psbt::from_unsigned_tx(tx_signing_data.unsigned_tx)
-            .map_err(BridgeTxStateError::from)?;
-        let num_inputs = psbt.inputs.len();
+        let num_inputs = tx_signing_data.psbt.inner().inputs.len();
 
-        let prevouts: Vec<TxOut> = tx_signing_data.prevouts;
+        let collected_sigs = vec![PartialSigTable::from(BTreeMap::new()); num_inputs];
 
-        for (i, each_psbt) in psbt.inputs.iter_mut().enumerate() {
-            each_psbt.witness_utxo = Some(prevouts[i].clone());
-        }
-
-        let collected_sigs = vec![HashMap::new(); num_inputs];
-        let prevouts = prevouts
-            .into_iter()
-            .map(BitcoinTxOut::from)
-            .collect::<Vec<BitcoinTxOut>>();
-
-        let collected_nonces: HashMap<OperatorIdx, Musig2PubNonce> = HashMap::new();
+        let collected_nonces: BTreeMap<OperatorIdx, Musig2PubNonce> = BTreeMap::new();
 
         Ok(Self {
-            psbt: psbt.into(),
-            prevouts,
+            psbt: tx_signing_data.psbt,
             spend_infos: tx_signing_data.spend_infos,
-            required_signatures: num_keys,
             pubkey_table,
             secnonce: sec_nonce,
             collected_nonces,
@@ -102,14 +78,24 @@ impl BridgeTxState {
         &self.spend_infos[..]
     }
 
-    /// Get the relevant previous outputs of the transaction that this state tracks.
+    /// Get the relevant previous outputs of the Psbt that this state tracks.
     pub fn prevouts(&self) -> Vec<TxOut> {
-        self.prevouts.iter().cloned().map(TxOut::from).collect()
+        self.psbt()
+            .inner()
+            .inputs
+            .iter()
+            .map(|input| {
+                input
+                    .witness_utxo
+                    .clone()
+                    .expect("witness UTXO must be present")
+            })
+            .collect()
     }
 
     /// Get the number of required signatures for the [`Psbt`] to be considered fully signed.
-    pub fn required_signatures(&self) -> &usize {
-        &self.required_signatures
+    pub fn required_signatures(&self) -> usize {
+        self.pubkey_table.0.keys().len()
     }
 
     /// Get the private nonce for the transaction being tracked in this state.
@@ -128,47 +114,35 @@ impl BridgeTxState {
         &self.psbt().inner().unsigned_tx
     }
 
-    /// Compute the Transaction ID for the PSBT that this state tracks.
+    /// Compute the Transaction ID for the [`Psbt`](bitcoin::Psbt) that this state tracks.
     pub fn compute_txid(&self) -> Txid {
-        self.psbt.inner().unsigned_tx.compute_txid()
+        self.psbt.compute_txid()
     }
 
     /// Get the map of collected nonces.
-    pub fn collected_nonces(&self) -> &HashMap<OperatorIdx, Musig2PubNonce> {
+    pub fn collected_nonces(&self) -> &BTreeMap<OperatorIdx, Musig2PubNonce> {
         &self.collected_nonces
     }
 
     /// Get table of signatures collected so far per input in the transaction.
-    pub fn collected_sigs(&self) -> &[HashMap<OperatorIdx, Musig2PartialSig>] {
-        &self.collected_sigs
+    pub fn collected_sigs(
+        &self,
+    ) -> impl Iterator<Item = &BTreeMap<OperatorIdx, OperatorPartialSig>> {
+        self.collected_sigs.iter().map(|v| &v.0)
     }
 
     /// Get the ordered list of nonces collected so far.
     // NOTE: As accessing the list of nonces is usually done to `sum` them up, it's convenient to
     // return an iterator over the inner `PubNonce` type.
-    pub fn ordered_nonces(&self) -> impl IntoIterator<Item = PubNonce> {
-        let mut ordered_nonces: Vec<PubNonce> =
-            Vec::with_capacity(self.collected_nonces.keys().len());
-
-        for operator_idx in self.pubkey_table.0.keys() {
-            if let Some(nonce) = self.collected_nonces.get(operator_idx) {
-                ordered_nonces.push(nonce.inner().clone());
-            }
-        }
-
-        // TODO: replace with yield when we get generators
-        ordered_nonces.into_iter()
+    pub fn ordered_nonces(&self) -> impl IntoIterator<Item = PubNonce> + '_ {
+        self.collected_nonces().values().map(|v| v.inner().clone())
     }
 
     /// Check if all the nonces have been received.
-    ///
-    /// # Returns
-    ///
-    /// The aggregated nonce if all the required nonces have been collected, otherwise `None`.
     pub fn has_all_nonces(&self) -> bool {
         // Since we only add valid nonces (by checking the pubkey table), just checking the length
         // should be sufficient.
-        self.collected_nonces.keys().len() == self.required_signatures
+        self.collected_nonces.keys().len() == self.required_signatures()
     }
 
     /// Add a nonce to the collected nonces.
@@ -182,7 +156,7 @@ impl BridgeTxState {
         nonce: Musig2PubNonce,
     ) -> EntityResult<bool> {
         if self.pubkey_table.0.contains_key(operator_index).not() {
-            return Err(EntityError::BridgeOpUnauthorized);
+            return Err(BridgeTxStateError::Unauthorized)?;
         }
 
         self.collected_nonces.insert(*operator_index, nonce);
@@ -197,7 +171,7 @@ impl BridgeTxState {
         // so checking the total number of signatures so far suffices.
         self.collected_sigs
             .iter()
-            .all(|input| input.keys().len() == self.required_signatures)
+            .all(|input| input.0.keys().len() == self.required_signatures())
     }
 
     /// Add a signature to the collection. If the signature corresponding to a particular pubkey has
@@ -236,25 +210,20 @@ impl BridgeTxState {
             return Err(BridgeTxStateError::Unauthorized)?;
         }
 
-        self.collected_sigs[input_index].insert(*signer_index, *signature_info.signature());
+        self.collected_sigs[input_index]
+            .0
+            .insert(*signer_index, *signature_info.signature());
 
         Ok(self.is_fully_signed())
     }
 
     /// Get the ordered signatures per input collected so far.
-    pub fn ordered_sigs(&self) -> Vec<Vec<PartialSignature>> {
-        let num_inputs = self.collected_sigs.len();
-        let mut ordered_sigs = vec![Vec::with_capacity(self.required_signatures); num_inputs];
-
-        for (input_index, sigs) in self.collected_sigs.iter().enumerate() {
-            for operator_idx in self.pubkey_table.0.keys() {
-                if let Some(sig) = sigs.get(operator_idx) {
-                    ordered_sigs[input_index].push(*sig.inner());
-                }
-            }
-        }
-
-        ordered_sigs
+    pub fn ordered_sigs(
+        &self,
+    ) -> impl Iterator<Item = impl Iterator<Item = PartialSignature> + '_> {
+        self.collected_sigs
+            .iter()
+            .map(move |sigs| sigs.0.values().map(|v| *v.inner()))
     }
 }
 
@@ -334,7 +303,7 @@ mod tests {
         let result = tx_state.add_nonce(&(num_operators as u32), random_nonce);
 
         assert!(
-            result.is_err_and(|e| matches!(e, EntityError::BridgeOpUnauthorized)),
+            result.is_err_and(|e| matches!(e, EntityError::BridgeTxState(BridgeTxStateError::Unauthorized))),
             "should result in `BridgeOpUnauthorized` error when adding nonce from an operator that is not part of the federation");
     }
 
@@ -351,7 +320,7 @@ mod tests {
         let mut operator_ids = (0..num_operators)
             .map(|v| v as OperatorIdx)
             .collect::<Vec<OperatorIdx>>();
-        permute(&mut operator_ids, 8);
+        permute(&mut operator_ids);
 
         let mut nonce_table: BTreeMap<OperatorIdx, PubNonce> = BTreeMap::new();
         for operator_idx in operator_ids {
@@ -399,7 +368,7 @@ mod tests {
         for i in 0..num_operators {
             let data = vec![0u8; 32];
             let mut unstructured = Unstructured::new(&data);
-            let sig = Musig2PartialSig::arbitrary(&mut unstructured)
+            let sig = OperatorPartialSig::arbitrary(&mut unstructured)
                 .expect("should generate arbitrary signature");
 
             tx_state
@@ -423,7 +392,7 @@ mod tests {
 
         let data = vec![0u8; 32];
         let mut unstructured = Unstructured::new(&data);
-        let sig = Musig2PartialSig::arbitrary(&mut unstructured)
+        let sig = OperatorPartialSig::arbitrary(&mut unstructured)
             .expect("should generate arbitrary signature");
 
         tx_state
@@ -436,7 +405,7 @@ mod tests {
         );
 
         // Remove the signature and test again
-        tx_state.collected_sigs[0].remove(&(own_index as u32));
+        tx_state.collected_sigs[0].0.remove(&(own_index as u32));
         assert!(
             !tx_state.is_fully_signed(),
             "Expected transaction to not be fully signed"
@@ -453,7 +422,7 @@ mod tests {
 
         let data = vec![0u8; 32];
         let mut unstructured = Unstructured::new(&data);
-        let sig = Musig2PartialSig::arbitrary(&mut unstructured)
+        let sig = OperatorPartialSig::arbitrary(&mut unstructured)
             .expect("should generate arbitrary signature");
 
         for input_index in 0..num_inputs {
@@ -465,7 +434,9 @@ mod tests {
                 .is_ok());
 
             assert_eq!(
-                tx_state.collected_sigs[input_index].get(&(own_index as u32)),
+                tx_state.collected_sigs[input_index]
+                    .0
+                    .get(&(own_index as u32)),
                 Some(sig).as_ref()
             );
         }
@@ -481,7 +452,7 @@ mod tests {
 
         let data = vec![0u8; 32];
         let mut unstructured = Unstructured::new(&data);
-        let sig = Musig2PartialSig::arbitrary(&mut unstructured)
+        let sig = OperatorPartialSig::arbitrary(&mut unstructured)
             .expect("should generate arbitrary signature");
 
         let unauthorized_signer_index = num_operators + 1;
@@ -491,7 +462,7 @@ mod tests {
 
         assert!(matches!(
             result.unwrap_err(),
-            EntityError::BridgeTxStateError(BridgeTxStateError::Unauthorized),
+            EntityError::BridgeTxState(BridgeTxStateError::Unauthorized),
         ));
     }
 
@@ -505,7 +476,7 @@ mod tests {
 
         let data = vec![0u8; 32];
         let mut unstructured = Unstructured::new(&data);
-        let sig = Musig2PartialSig::arbitrary(&mut unstructured)
+        let sig = OperatorPartialSig::arbitrary(&mut unstructured)
             .expect("should generate arbitrary signature");
 
         let invalid_input_index = 1;
@@ -519,7 +490,7 @@ mod tests {
         let actual_error = result.unwrap_err();
 
         match actual_error {
-            EntityError::BridgeTxStateError(BridgeTxStateError::TxinIdxOutOfBounds(
+            EntityError::BridgeTxState(BridgeTxStateError::TxinIdxOutOfBounds(
                 actual_txid,
                 actual_index,
             )) => {
@@ -544,13 +515,13 @@ mod tests {
         let mut tx_state = create_mock_tx_state(&secp, own_index, num_inputs, num_operators);
 
         let mut operator_ids = (0..num_operators).collect::<Vec<usize>>();
-        permute(&mut operator_ids, num_operators);
+        permute(&mut operator_ids);
 
         for input_index in 0..num_inputs {
             for operator_id in operator_ids.clone() {
                 let data = vec![0u8; 32];
                 let mut unstructured = Unstructured::new(&data);
-                let sig = Musig2PartialSig::arbitrary(&mut unstructured)
+                let sig = OperatorPartialSig::arbitrary(&mut unstructured)
                     .expect("should generate arbitrary signature");
 
                 assert!(tx_state
@@ -561,20 +532,19 @@ mod tests {
                     .is_ok());
             }
         }
-        let ordered_sigs_table = tx_state
-            .ordered_sigs()
-            .into_iter()
-            .collect::<Vec<Vec<PartialSignature>>>();
 
-        for (input_index, ordered_sigs) in ordered_sigs_table.iter().enumerate() {
-            for (i, sig) in ordered_sigs.iter().enumerate().take(num_operators) {
+        for (input_index, ordered_sigs) in tx_state.ordered_sigs().enumerate() {
+            for (i, sig) in ordered_sigs.enumerate().take(num_operators) {
                 assert_eq!(
                     sig,
-                    tx_state.collected_sigs()[input_index]
+                    *tx_state
+                        .collected_sigs()
+                        .nth(input_index)
+                        .expect("signature collection must exist at index")
                         .get(&(i as OperatorIdx))
-                        .unwrap()
+                        .expect("signature for operator must exist in the collection")
                         .inner(),
-                    "ordered sigs should be ...ordered, mismatch at ({}, {})",
+                    "ordered sigs should be... ordered, mismatch at ({}, {})",
                     input_index,
                     i
                 );
@@ -597,8 +567,7 @@ mod tests {
 
         let pubkey_table = generate_pubkey_table(&pks);
 
-        let sec_nonce =
-            generate_sec_nonce(&tx_output.unsigned_tx.compute_txid(), pks, sks[own_index]);
+        let sec_nonce = generate_sec_nonce(&tx_output.psbt.compute_txid(), pks, sks[own_index]);
 
         BridgeTxState::new(tx_output, pubkey_table, sec_nonce.into())
             .expect("Failed to create TxState")

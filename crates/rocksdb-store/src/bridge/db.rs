@@ -24,7 +24,7 @@ impl BridgeTxRdbStore {
 }
 
 impl BridgeTxStore for BridgeTxRdbStore {
-    fn upsert_tx_state(&self, txid: Buf32, tx_state: BridgeTxState) -> DbResult<()> {
+    fn put_tx_state(&self, txid: Buf32, tx_state: BridgeTxState) -> DbResult<()> {
         self.db
             .with_optimistic_txn(TransactionRetry::Count(self.ops.retry_count), |txn| {
                 // insert new id if the txid is new
@@ -120,7 +120,7 @@ mod tests {
         let txid = bridge_tx_state.compute_txid().into();
 
         // Test insert
-        let result = store.upsert_tx_state(txid, bridge_tx_state.clone());
+        let result = store.put_tx_state(txid, bridge_tx_state.clone());
         assert!(
             result.is_ok(),
             "should be able to add collected sigs but got: {}",
@@ -144,7 +144,7 @@ mod tests {
 
         // Test update
         let new_state = BridgeTxState::arbitrary(&mut u).unwrap();
-        let result = store.upsert_tx_state(txid, new_state.clone());
+        let result = store.put_tx_state(txid, new_state.clone());
         assert!(
             result.is_ok(),
             "should be able to update existing data at a given Txid but got: {}",

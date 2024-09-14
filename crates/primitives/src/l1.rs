@@ -17,7 +17,7 @@ use bitcoin::{
     taproot::{ControlBlock, TaprootMerkleBranch},
     transaction::Version,
     Address, AddressType, Amount, Block, Network, OutPoint, Psbt, ScriptBuf, Sequence, TapNodeHash,
-    Transaction, TxIn, TxOut, Witness,
+    Transaction, TxIn, TxOut, Txid, Witness,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 use reth_primitives::revm_primitives::FixedBytes;
@@ -463,21 +463,25 @@ impl XOnlyPk {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct BitcoinPsbt(bitcoin::Psbt);
+pub struct BitcoinPsbt(Psbt);
 
 impl BitcoinPsbt {
     pub fn inner(&self) -> &bitcoin::Psbt {
         &self.0
     }
+
+    pub fn compute_txid(&self) -> Txid {
+        self.0.unsigned_tx.compute_txid()
+    }
 }
 
-impl From<bitcoin::Psbt> for BitcoinPsbt {
+impl From<Psbt> for BitcoinPsbt {
     fn from(value: bitcoin::Psbt) -> Self {
         Self(value)
     }
 }
 
-impl From<BitcoinPsbt> for bitcoin::Psbt {
+impl From<BitcoinPsbt> for Psbt {
     fn from(value: BitcoinPsbt) -> Self {
         value.0
     }

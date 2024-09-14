@@ -20,7 +20,7 @@ pub struct StubTxStateStorage {
 pub struct StubTxStateDb(RwLock<HashMap<Buf32, BridgeTxState>>);
 
 impl BridgeTxStore for StubTxStateDb {
-    fn upsert_tx_state(&self, txid: Buf32, tx_state: BridgeTxState) -> DbResult<()> {
+    fn put_tx_state(&self, txid: Buf32, tx_state: BridgeTxState) -> DbResult<()> {
         let mut db = self.0.write().unwrap();
         db.insert(txid, tx_state);
 

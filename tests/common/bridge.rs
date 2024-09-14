@@ -4,7 +4,7 @@ use std::{collections::BTreeMap, ops::Not, sync::Arc, time::Duration};
 
 use alpen_express_common::logging;
 use alpen_express_primitives::bridge::{
-    Musig2PartialSig, Musig2PubNonce, OperatorIdx, PublickeyTable, SignatureInfo,
+    Musig2PubNonce, OperatorIdx, OperatorPartialSig, PublickeyTable, SignatureInfo,
 };
 use alpen_express_rocksdb::{
     bridge::db::{BridgeTxRdbProvider, BridgeTxRdbStore, BridgeTxRocksDb},
@@ -26,7 +26,7 @@ use bitcoind::{
 };
 use express_bridge_sig_manager::prelude::SignatureManager;
 use express_bridge_tx_builder::{
-    prelude::{CooperativeWithdrawalInfo, DepositInfo, TxBuilder},
+    prelude::{CooperativeWithdrawalInfo, DepositInfo, TxBuildContext},
     TxKind,
 };
 use express_storage::ops;
@@ -53,9 +53,7 @@ impl BridgeFederation {
             pubkey_table.insert(operator_idx as OperatorIdx, *pk);
         }
 
-        let pubkey_table: PublickeyTable = pubkey_table
-            .try_into()
-            .expect("vec indexes must always be sorted");
+        let pubkey_table: PublickeyTable = pubkey_table.into();
 
         let queue_size = num_operators * 2; // buffer for nonces and signatures (overkill)
         let (msg_tx, _msg_recv) = broadcast::channel::<Message>(queue_size);
@@ -96,7 +94,7 @@ pub(crate) enum BridgeDuty {
 #[derive(Debug, Clone)]
 pub(crate) enum Message {
     Nonce(Txid, Musig2PubNonce, OperatorIdx),
-    Signature(Txid, Musig2PartialSig, OperatorIdx),
+    Signature(Txid, OperatorPartialSig, OperatorIdx),
 }
 
 /// An operator is an agent that is a member of the bridge federation capable of processing deposits
@@ -112,7 +110,7 @@ pub(crate) struct Operator {
     pub(crate) index: OperatorIdx,
 
     /// The transaction builder for this instance.
-    pub(crate) tx_builder: TxBuilder,
+    pub(crate) tx_builder: TxBuildContext,
 
     /// The signature manager for this operator.
     pub(crate) sig_manager: SignatureManager,
@@ -145,7 +143,7 @@ impl Operator {
         let keypair = Keypair::from_secret_key(SECP256K1, &secret_key);
         let sig_manager = setup_sig_manager(index, keypair);
 
-        let tx_builder = TxBuilder::new(pubkey_table.clone(), Network::Regtest);
+        let tx_builder = TxBuildContext::new(pubkey_table.clone(), Network::Regtest);
 
         Self {
             agent,

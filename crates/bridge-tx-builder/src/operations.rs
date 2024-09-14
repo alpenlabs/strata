@@ -4,19 +4,20 @@
 use alpen_express_primitives::bridge::PublickeyTable;
 use bitcoin::{
     absolute::LockTime,
-    key::{Secp256k1, UntweakedPublicKey},
-    opcodes::all::{OP_CHECKSIG, OP_PUSHBYTES_10, OP_PUSHBYTES_20, OP_PUSHNUM_1, OP_RETURN},
+    key::UntweakedPublicKey,
+    opcodes::all::{OP_CHECKSIG, OP_PUSHBYTES_11, OP_PUSHBYTES_20, OP_PUSHNUM_1, OP_RETURN},
     script::Builder,
-    secp256k1::{All, PublicKey, XOnlyPublicKey},
+    secp256k1::{PublicKey, XOnlyPublicKey},
     taproot::{TaprootBuilder, TaprootSpendInfo},
     transaction, Address, Amount, Network, OutPoint, ScriptBuf, Transaction, TxIn, TxOut, Witness,
 };
-use musig2::{self, KeyAggContext};
+use musig2::{self, secp256k1::SECP256K1, KeyAggContext};
 
 use super::{
     constants::{MAGIC_BYTES, UNSPENDABLE_INTERNAL_KEY},
     errors::BridgeTxBuilderError,
 };
+use crate::errors::BridgeTxBuilderResult;
 
 /// Create a script with the spending condition that all signatures corresponding to the pubkey set
 /// must be provided in (reverse) order.
@@ -28,6 +29,9 @@ pub fn n_of_n_script(aggregated_pubkey: &XOnlyPublicKey) -> ScriptBuf {
 }
 
 /// Aggregate the pubkeys using [`musig2`] and return the resulting [`XOnlyPublicKey`].
+///
+/// Please refer to MuSig2 key aggregation section in
+/// [BIP 327](https://github.com/bitcoin/bips/blob/master/bip-0327.mediawiki).
 pub fn get_aggregated_pubkey(pubkeys: PublickeyTable) -> XOnlyPublicKey {
     let key_agg_ctx =
         KeyAggContext::new(pubkeys.0.values().copied()).expect("key aggregation of musig2 pubkeys");
@@ -41,68 +45,120 @@ pub fn get_aggregated_pubkey(pubkeys: PublickeyTable) -> XOnlyPublicKey {
 pub fn metadata_script(el_address: &[u8; 20]) -> ScriptBuf {
     Builder::new()
         .push_opcode(OP_RETURN)
-        .push_opcode(OP_PUSHBYTES_10)
+        .push_opcode(OP_PUSHBYTES_11)
         .push_slice(MAGIC_BYTES)
         .push_opcode(OP_PUSHBYTES_20)
         .push_slice(el_address)
         .into_script()
 }
 
+/// Different spending paths for a taproot.
+///
+/// It can be a key path spend, a script path spend or both.
+#[derive(Debug, Clone)]
+pub enum SpendPath<'path> {
+    /// Key path spend that requires just an untweaked (internal) public key.
+    KeySpend {
+        /// The internal key used to construct the taproot.
+        internal_key: UntweakedPublicKey,
+    },
+    /// Script path spend that only allows spending via scripts in the taproot tree, with the
+    /// internal key being the [`UNSPENDABLE_INTERNAL_KEY`].
+    ScriptSpend {
+        /// The scripts that live in the leaves of the taproot tree.
+        scripts: &'path [ScriptBuf],
+    },
+    /// Allows spending via either a provided internal key or via scripts in the taproot tree.
+    Both {
+        /// The internal key used to construct the taproot.
+        internal_key: UntweakedPublicKey,
+
+        /// The scripts that live in the leaves of the taproot tree.
+        scripts: &'path [ScriptBuf],
+    },
+}
+
 /// Create a taproot address for the given `scripts` and `internal_key`.
-///
-/// If the `scripts` is empty and some internal key is provided, a taproot address with only
-/// key path spending is created.
-///
-/// And if an internal key is not provided, an [`UNSPENDABLE_INTERNAL_KEY`] is used to create a
-/// taproot address with only script path spending.
 ///
 /// # Errors
 ///
-/// If the scripts is empty and the internal key is not provided (this would result in an
-/// unspendable taproot address).
-pub fn create_taproot_addr(
-    secp: &Secp256k1<All>,
-    network: &Network,
-    scripts: &[ScriptBuf],
-    internal_key: Option<UntweakedPublicKey>,
+/// If the scripts is empty in [`SpendPath::ScriptSpend`].
+pub fn create_taproot_addr<'creator>(
+    network: &'creator Network,
+    spend_path: SpendPath<'creator>,
 ) -> Result<(Address, TaprootSpendInfo), BridgeTxBuilderError> {
-    // there are no leaves in the taproot and there is no internal key either, it is invalid
-    if scripts.is_empty() && internal_key.is_none() {
-        return Err(BridgeTxBuilderError::EmptyTapscript);
-    }
+    match spend_path {
+        SpendPath::KeySpend { internal_key } => build_taptree(internal_key, *network, &[]),
+        SpendPath::ScriptSpend { scripts } => {
+            if scripts.is_empty() {
+                return Err(BridgeTxBuilderError::EmptyTapscript);
+            }
 
+            build_taptree(*UNSPENDABLE_INTERNAL_KEY, *network, scripts)
+        }
+        SpendPath::Both {
+            internal_key,
+            scripts,
+        } => build_taptree(internal_key, *network, scripts),
+    }
+}
+
+/// Constructs the taptree for the given scripts.
+///
+/// A taptree is a merkle tree made up of various scripts. Each script is a leaf in the merkle tree.
+/// If the number of scripts is a power of 2, all the scripts lie at the deepest level (depth = n)
+/// in the tree. If the number is not a power of 2, there are some scripts that will exist at the
+/// penultimate level (depth = n - 1).
+///
+/// This function adds the scripts to the taptree after it computes the depth for each script.
+fn build_taptree(
+    internal_key: UntweakedPublicKey,
+    network: Network,
+    scripts: &[ScriptBuf],
+) -> BridgeTxBuilderResult<(Address, TaprootSpendInfo)> {
     let mut taproot_builder = TaprootBuilder::new();
-
-    let internal_key = internal_key.unwrap_or(*UNSPENDABLE_INTERNAL_KEY);
-
-    if scripts.is_empty() {
-        // We are not committing to any script path as the internal key should already be randomized
-        // due to MuSig aggregation. See: <https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki#cite_note-23>
-        let spend_info = taproot_builder.finalize(secp, internal_key)?;
-
-        return Ok((
-            Address::p2tr(secp, internal_key, None, *network),
-            spend_info,
-        ));
-    }
 
     let num_scripts = scripts.len();
 
-    // compute depth for the taproot
+    // Compute the height of the taptree required to fit in all the scripts.
+    // If the script count <= 1, the depth should be 0. Otherwise, we compute the log. For example,
+    // 2 scripts can fit in a height of 1 (0 being the root node). 4 can fit in a height of 2 and so
+    // on.
     let max_depth = if num_scripts > 1 {
         (num_scripts - 1).ilog2() + 1
     } else {
         0
     };
 
-    // max scripts if all the nodes are filled
+    // Compute the maximum number of scripts that can fit in the taproot. For example, at a depth of
+    // 3, we can fit 8 scripts.
+    //              [Root Hash]
+    //              /          \
+    //             /            \
+    //        [Hash 0]           [Hash 1]
+    //       /        \          /      \
+    //      /          \        /        \
+    // [Hash 00]   [Hash 01] [Hash 10] [Hash 11]
+    //   /   \       /   \     /   \     /   \
+    // S0    S1    S2    S3  S4    S5   S6    S7
     let max_num_scripts = 2usize.pow(max_depth);
 
-    // number of scripts that exist at the penulimate level
-    let num_penultimate_scripts = max_num_scripts - num_scripts;
-
-    // number of scripts that exist at the deepest level
-    let num_deepest_scripts = num_scripts - num_penultimate_scripts;
+    // But we may be given say 5 scripts, in which case the tree would not be fully complete and we
+    // need to add leaves at a shallower point in a way that minimizes the overall height (to reduce
+    // the size of the merkle proof). So, we need to compute how many such scripts exist and add
+    // these, at the appropriate depth.
+    //
+    //              [Root Hash]
+    //              /          \
+    //             /            \
+    //        [Hash 0]          [Hash 1]
+    //       /        \          /    \
+    //      /          \        /      \
+    // [Hash 00]        S2    S4        S5  ---> penultimate depth has 3 scripts
+    //   /   \
+    // S0    S1   ---------> max depth has 2 scripts
+    let num_penultimate_scripts = max_num_scripts.saturating_sub(num_scripts);
+    let num_deepest_scripts = num_scripts.saturating_sub(num_penultimate_scripts);
 
     for (script_idx, script) in scripts.iter().enumerate() {
         let depth = if script_idx < num_deepest_scripts {
@@ -115,20 +171,20 @@ pub fn create_taproot_addr(
         taproot_builder = taproot_builder.add_leaf(depth, script.clone())?;
     }
 
-    let spend_info = taproot_builder.finalize(secp, internal_key)?;
+    let spend_info = taproot_builder.finalize(SECP256K1, internal_key)?;
 
     Ok((
         Address::p2tr(
-            secp,
+            SECP256K1,
             *UNSPENDABLE_INTERNAL_KEY,
             spend_info.merkle_root(),
-            *network,
+            network,
         ),
         spend_info,
     ))
 }
 
-/// Create an output that can be spent by anyone i.e, its script contains `OP_TRUE`.
+/// Create an output that can be spent by anyone, i.e. its script contains a single `OP_TRUE`.
 pub fn anyone_can_spend_txout() -> TxOut {
     // `OP_PUSHNUM_1` is `OP_TRUE` that is it is always yields true for any unlocking script.
     let script = Builder::new().push_opcode(OP_PUSHNUM_1).into_script();
@@ -141,7 +197,7 @@ pub fn anyone_can_spend_txout() -> TxOut {
     }
 }
 
-/// Create a bitcoin [`Transaction`] for the given transaction inputs and outputs.
+/// Create a bitcoin [`Transaction`] for the given inputs and outputs.
 pub fn create_tx(tx_ins: Vec<TxIn>, tx_outs: Vec<TxOut>) -> Transaction {
     Transaction {
         version: transaction::Version(2),
@@ -153,7 +209,7 @@ pub fn create_tx(tx_ins: Vec<TxIn>, tx_outs: Vec<TxOut>) -> Transaction {
 
 /// Create a list of [`TxIn`]'s from given [`OutPoint`]'s.
 ///
-/// This wraps the [`OutPoint`] in a structure that includes a blank `witness`, a blank
+/// This wraps the [`OutPoint`] in a structure that includes an empty `witness`, an empty
 /// `script_sig` and the `sequence` set to enable replace-by-fee with no locktime.
 pub fn create_tx_ins(utxos: impl IntoIterator<Item = OutPoint>) -> Vec<TxIn> {
     let mut tx_ins = Vec::new();
@@ -174,16 +230,13 @@ pub fn create_tx_ins(utxos: impl IntoIterator<Item = OutPoint>) -> Vec<TxIn> {
 pub fn create_tx_outs(
     scripts_and_amounts: impl IntoIterator<Item = (ScriptBuf, Amount)>,
 ) -> Vec<TxOut> {
-    let mut tx_outs: Vec<TxOut> = Vec::new();
-
-    for (script, amount) in scripts_and_amounts {
-        tx_outs.push(TxOut {
-            script_pubkey: script,
-            value: amount,
+    scripts_and_amounts
+        .into_iter()
+        .map(|(script_pubkey, value)| TxOut {
+            script_pubkey,
+            value,
         })
-    }
-
-    tx_outs
+        .collect()
 }
 
 #[cfg(test)]
@@ -202,36 +255,50 @@ mod tests {
         let scripts: Vec<ScriptBuf> = vec![ScriptBuf::from_bytes(vec![2u8; 32]); max_scripts];
 
         let network = Network::Regtest;
-        let secp = Secp256k1::new();
 
+        let spend_path = SpendPath::ScriptSpend {
+            scripts: &scripts[0..1],
+        };
         assert!(
-            create_taproot_addr(&secp, &network, &[], None)
-                .is_err_and(|x| matches!(x, BridgeTxBuilderError::EmptyTapscript)),
-            "should error if there are no scripts and no internal key provided"
-        );
-
-        assert!(
-            create_taproot_addr(&secp, &network, &scripts[0..1], None).is_ok(),
+            create_taproot_addr(&network, spend_path).is_ok(),
             "should work if the number of scripts is exactly 1 i.e., only root node exists"
         );
 
+        let spend_path = SpendPath::ScriptSpend {
+            scripts: &scripts[0..4],
+        };
         assert!(
-            create_taproot_addr(&secp, &network, &scripts[0..4], None).is_ok(),
+            create_taproot_addr(&network, spend_path).is_ok(),
             "should work if the number of scripts is an exact power of 2"
         );
 
+        let spend_path = SpendPath::ScriptSpend {
+            scripts: &scripts[..],
+        };
         assert!(
-            create_taproot_addr(&secp, &network, &scripts[..], None).is_ok(),
+            create_taproot_addr(&network, spend_path).is_ok(),
             "should work if the number of scripts is not an exact power of 2"
         );
 
         let secret_key = SecretKey::new(&mut rand::thread_rng());
-        let keypair = Keypair::from_secret_key(&secp, &secret_key);
+        let keypair = Keypair::from_secret_key(SECP256K1, &secret_key);
         let (x_only_public_key, _) = XOnlyPublicKey::from_keypair(&keypair);
 
+        let spend_path = SpendPath::KeySpend {
+            internal_key: x_only_public_key,
+        };
         assert!(
-            create_taproot_addr(&secp, &network, &[], Some(x_only_public_key)).is_ok(),
+            create_taproot_addr(&network, spend_path).is_ok(),
             "should support empty scripts with some internal key"
+        );
+
+        let spend_path = SpendPath::Both {
+            internal_key: x_only_public_key,
+            scripts: &scripts[..3],
+        };
+        assert!(
+            create_taproot_addr(&network, spend_path).is_ok(),
+            "should support scripts with some internal key"
         );
     }
 }
