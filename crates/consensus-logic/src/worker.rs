@@ -247,6 +247,7 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
     let _ = status_tx.csm.send(status);
     let _ = status_tx.cl.send(client_state);
 
+    debug!(?new_state, "Sending client update notif");
     let update = ClientUpdateNotif::new(ev_idx, outp, new_state);
     if state.cupdate_tx.send(Arc::new(update)).is_err() {
         warn!(%ev_idx, "failed to send broadcast for new CSM update");

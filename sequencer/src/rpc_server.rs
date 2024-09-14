@@ -73,7 +73,7 @@ pub enum Error {
     #[error("fetch limit reached. max {0}, provided {1}")]
     FetchLimitReached(u64, u64),
 
-    #[error("missing checkpoint for index {0}")]
+    #[error("missing checkpoint in database for index {0}")]
     MissingCheckpointInDb(u64),
 
     #[error("Proof already created for checkpoint {0}")]
@@ -591,7 +591,7 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         Ok(batch_comm.map(|bc| bc.checkpoint().clone().into()))
     }
 
-    async fn put_checkpoint_proof(&self, idx: u64, proof: HexBytes) -> RpcResult<()> {
+    async fn submit_checkpoint_proof(&self, idx: u64, proof: HexBytes) -> RpcResult<()> {
         let mut entry = self
             .checkpoint_manager
             .get_checkpoint(idx)

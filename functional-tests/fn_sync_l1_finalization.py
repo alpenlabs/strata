@@ -2,6 +2,8 @@ import time
 
 import flexitest
 
+from constants import SEQ_SLACK_TIME_SECS
+
 
 @flexitest.register
 class BlockFinalizationTest(flexitest.Test):
@@ -15,11 +17,12 @@ class BlockFinalizationTest(flexitest.Test):
 
         seqrpc = seq.create_rpc()
 
-        time.sleep(2)
+        time.sleep(SEQ_SLACK_TIME_SECS)
 
         check_send_proof_for_non_existent_batch(seqrpc)
 
-        for n in range(4):
+        # Check for checkpoints 1,2,3,4
+        for n in range(1, 5):
             check_for_nth_checkpoint_finalization(n, seqrpc)
             print(f"Pass checkpoint finalization for checkpoint {n}")
 
@@ -44,7 +47,7 @@ def check_for_nth_checkpoint_finalization(idx, seqrpc):
 
     # Post checkpoint proof
     proof_hex = "abcdef"
-    seqrpc.alp_putCheckpointProof(idx, proof_hex)
+    seqrpc.alp_submitCheckpointProof(idx, proof_hex)
 
     # Wait till checkpoint finalizes, since our finalization depth is 4 and the block
     # generation time is 0.5s wait slightly more than 2 secs
@@ -58,7 +61,7 @@ def check_for_nth_checkpoint_finalization(idx, seqrpc):
 
 def check_send_proof_for_non_existent_batch(seqrpc):
     try:
-        seqrpc.alp_putCheckpointProof(100, "abc123")
+        seqrpc.alp_submitCheckpointProof(100, "abc123")
     except Exception as e:
         assert e.code == -32610
     else:
@@ -68,7 +71,7 @@ def check_send_proof_for_non_existent_batch(seqrpc):
 def check_already_sent_proof(seqrpc):
     try:
         # Proof for checkpoint 1 is already sent
-        seqrpc.alp_putCheckpointProof(1, "abc123")
+        seqrpc.alp_submitCheckpointProof(1, "abc123")
     except Exception as e:
         assert e.code == -32611
     else:

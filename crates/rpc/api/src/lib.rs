@@ -79,8 +79,8 @@ pub trait AlpenApi {
     #[method(name = "getCheckpointInfo")]
     async fn get_checkpoint_info(&self, idx: u64) -> RpcResult<Option<RpcCheckpointInfo>>;
 
-    #[method(name = "putCheckpointProof")]
-    async fn put_checkpoint_proof(&self, idx: u64, proof: HexBytes) -> RpcResult<()>;
+    #[method(name = "submitCheckpointProof")]
+    async fn submit_checkpoint_proof(&self, idx: u64, proof: HexBytes) -> RpcResult<()>;
 }
 
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "alpadmin"))]

@@ -106,7 +106,6 @@ fn duty_tracker_task_inner(
             &mut duties_tracker,
             new_state,
             &ident,
-            database,
             l2_block_manager,
             params,
         ) {
@@ -129,7 +128,6 @@ fn update_tracker(
     tracker: &mut types::DutyTracker,
     state: &ClientState,
     ident: &Identity,
-    database: &impl Database,
     l2_block_manager: &L2BlockManager,
     params: &Params,
 ) -> Result<(), Error> {
@@ -137,7 +135,7 @@ fn update_tracker(
         return Ok(());
     };
 
-    let new_duties = extractor::extract_duties(state, ident, database, params)?;
+    let new_duties = extractor::extract_duties(state, ident, params)?;
 
     info!(new_duties = ?new_duties, "new duties");
 

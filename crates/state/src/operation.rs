@@ -145,7 +145,7 @@ pub fn apply_writes_to_state(
 
             AcceptL2Block(blkid, height) => {
                 // TODO do any other bookkeeping
-                debug!(%blkid, "received AcceptL2Block");
+                debug!(%height, %blkid, "received AcceptL2Block");
                 let ss = state.expect_sync_mut();
                 ss.tip_blkid = blkid;
                 ss.tip_height = height;
