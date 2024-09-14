@@ -4,7 +4,7 @@ use alpen_express_btcio::{broadcaster::L1BroadcastHandle, writer::InscriptionHan
 use alpen_express_consensus_logic::sync_manager::SyncManager;
 use alpen_express_db::{
     traits::{ChainstateProvider, CheckpointProvider, Database, L1DataProvider, L2DataProvider},
-    types::{CheckpointStatus, L1TxEntry, L1TxStatus},
+    types::{CheckpointProvingStatus, L1TxEntry, L1TxStatus},
 };
 use alpen_express_primitives::{buf::Buf32, hash};
 use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer};
@@ -591,7 +591,7 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         Ok(batch_comm.map(|bc| bc.checkpoint().clone().into()))
     }
 
-    async fn submit_checkpoint_proof(&self, idx: u64, proof: HexBytes) -> RpcResult<()> {
+    async fn submit_checkpoint_proof(&self, idx: u64, proofbytes: HexBytes) -> RpcResult<()> {
         let mut entry = self
             .checkpoint_manager
             .get_checkpoint(idx)
@@ -600,13 +600,13 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
             .ok_or(Error::MissingCheckpointInDb(idx))?;
 
         // If proof is not pending error out
-        if entry.status != CheckpointStatus::PendingProof {
+        if entry.proving_status != CheckpointProvingStatus::PendingProof {
             return Err(Error::ProofAlreadyCreated(idx))?;
         }
 
         // TODO: verify proof, once proof verification logic is ready
-        entry.proof = proof.0;
-        entry.status = CheckpointStatus::ProofCreated;
+        entry.proof = proofbytes.into_inner();
+        entry.proving_status = CheckpointProvingStatus::ProofReady;
         self.checkpoint_manager
             .put_checkpoint(idx, entry)
             .await

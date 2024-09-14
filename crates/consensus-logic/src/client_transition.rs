@@ -103,7 +103,7 @@ pub fn process_event<D: Database>(
 
                 // When DABatch appears, it is only confirmed at the moment. These will be finalized
                 // only when the corresponding L1 block is buried enough
-                writes.push(ClientStateWrite::NewCheckpointsReceived(
+                writes.push(ClientStateWrite::CheckpointsReceived(
                     *height,
                     commitments.iter().map(|x| x.checkpoint().clone()).collect(),
                 ));

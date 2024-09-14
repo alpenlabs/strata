@@ -8,7 +8,7 @@ use alpen_express_db::traits::Database;
 use alpen_express_eectl::engine::ExecEngineCtl;
 use alpen_express_primitives::params::Params;
 use alpen_express_status::{StatusRx, StatusTx};
-use express_storage::L2BlockManager;
+use express_storage::{managers::checkpoint::CheckpointManager, L2BlockManager};
 use express_tasks::TaskExecutor;
 use tokio::sync::{broadcast, mpsc};
 
@@ -75,6 +75,7 @@ impl SyncManager {
 }
 
 /// Starts the sync tasks using provided settings.
+#[allow(clippy::too_many_arguments)]
 pub fn start_sync_tasks<
     D: Database + Sync + Send + 'static,
     E: ExecEngineCtl + Sync + Send + 'static,
@@ -86,6 +87,7 @@ pub fn start_sync_tasks<
     pool: threadpool::ThreadPool,
     params: Arc<Params>,
     status_bundle: (Arc<StatusTx>, Arc<StatusRx>),
+    checkpoint_manager: Arc<CheckpointManager>,
 ) -> anyhow::Result<SyncManager> {
     // Create channels.
     let (fcm_tx, fcm_rx) = mpsc::channel::<ForkChoiceMessage>(64);
@@ -123,6 +125,7 @@ pub fn start_sync_tasks<
         database.clone(),
         l2_block_manager,
         cupdate_tx,
+        checkpoint_manager,
     )?;
 
     let csm_eng = engine.clone();

@@ -4,12 +4,18 @@
 //!  - implementation of RPC client
 //!  - crate for just data structures that represents the JSON responses from Bitcoin core RPC
 
-use alpen_express_state::{batch::CheckPointInfo, bridge_ops::WithdrawalIntent, id::L2BlockId};
+use alpen_express_state::{batch::CheckpointInfo, bridge_ops::WithdrawalIntent, id::L2BlockId};
 use bitcoin::Txid;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HexBytes(#[serde(with = "hex::serde")] pub Vec<u8>);
+
+impl HexBytes {
+    pub fn into_inner(self) -> Vec<u8> {
+        self.0
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HexBytes32(#[serde(with = "hex::serde")] pub [u8; 32]);
@@ -179,8 +185,8 @@ pub struct RpcCheckpointInfo {
     pub l2_blockid: L2BlockId,
 }
 
-impl From<CheckPointInfo> for RpcCheckpointInfo {
-    fn from(value: CheckPointInfo) -> Self {
+impl From<CheckpointInfo> for RpcCheckpointInfo {
+    fn from(value: CheckpointInfo) -> Self {
         Self {
             idx: value.idx,
             l1_height: *value.l1_range.end(),

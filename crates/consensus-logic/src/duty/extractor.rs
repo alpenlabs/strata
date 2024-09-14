@@ -1,8 +1,8 @@
 use alpen_express_primitives::params::Params;
-use alpen_express_state::{batch::CheckPointInfo, client_state::ClientState, id::L2BlockId};
+use alpen_express_state::{batch::CheckpointInfo, client_state::ClientState, id::L2BlockId};
 use tracing::*;
 
-use super::types::{BatchCheckpointDuty, BlockSigningDuty, Duty, Identity};
+use super::types::{BlockSigningDuty, Duty, Identity};
 use crate::errors::Error;
 
 /// Extracts new duties given a consensus state and a identity.
@@ -63,14 +63,16 @@ fn extract_batch_duties(
             // Start from first non-genesis l2 block height
             let l2_range = 1..=tip_height;
 
-            let new_checkpt = CheckPointInfo::new(first_batch_idx, l1_range, l2_range, tip_id);
+            let new_checkpt = CheckpointInfo::new(first_batch_idx, l1_range, l2_range, tip_id);
             Ok(vec![Duty::CommitBatch(new_checkpt.clone().into())])
         }
-        Some(checkpt_state) => {
-            let checkpoint = checkpt_state.checkpoint.clone();
+        Some(l1checkpoint) => {
+            let checkpoint = l1checkpoint.checkpoint.clone();
             let l1_range = checkpoint.l1_range.end() + 1..=state.l1_view().tip_height();
+            // Also, rather than tip heights, we might need to limit the max range a prover will be
+            // proving
             let l2_range = checkpoint.l2_range.end() + 1..=tip_height;
-            let new_checkpt = CheckPointInfo::new(checkpoint.idx + 1, l1_range, l2_range, tip_id);
+            let new_checkpt = CheckpointInfo::new(checkpoint.idx + 1, l1_range, l2_range, tip_id);
             Ok(vec![Duty::CommitBatch(new_checkpt.clone().into())])
         }
     }

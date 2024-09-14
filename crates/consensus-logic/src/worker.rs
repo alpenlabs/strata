@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use alpen_express_db::{
     traits::*,
-    types::{CheckpointEntry, CheckpointStatus},
+    types::{CheckpointConfStatus, CheckpointEntry, CheckpointProvingStatus},
 };
 use alpen_express_eectl::engine::ExecEngineCtl;
 use alpen_express_primitives::prelude::*;
@@ -12,7 +12,7 @@ use alpen_express_state::{
     client_state::ClientState, csm_status::CsmStatus, operation::SyncAction,
 };
 use alpen_express_status::StatusTx;
-use express_storage::L2BlockManager;
+use express_storage::{managers::checkpoint::CheckpointManager, L2BlockManager};
 use express_tasks::ShutdownGuard;
 use tokio::sync::{broadcast, mpsc};
 use tracing::*;
@@ -40,6 +40,9 @@ pub struct WorkerState<D: Database> {
     /// L2 block manager.
     l2_block_manager: Arc<L2BlockManager>,
 
+    /// Checkpoint manager.
+    checkpoint_manager: Arc<CheckpointManager>,
+
     /// Tracker used to remember the current consensus state.
     state_tracker: state_tracker::StateTracker<D>,
 
@@ -55,6 +58,7 @@ impl<D: Database> WorkerState<D> {
         database: Arc<D>,
         l2_block_manager: Arc<L2BlockManager>,
         cupdate_tx: broadcast::Sender<Arc<ClientUpdateNotif>>,
+        checkpoint_manager: Arc<CheckpointManager>,
     ) -> anyhow::Result<Self> {
         let cs_prov = database.client_state_provider().as_ref();
         let (cur_state_idx, cur_state) = state_tracker::reconstruct_cur_state(cs_prov)?;
@@ -71,6 +75,7 @@ impl<D: Database> WorkerState<D> {
             l2_block_manager,
             state_tracker,
             cupdate_tx,
+            checkpoint_manager,
         })
     }
 
@@ -87,6 +92,11 @@ impl<D: Database> WorkerState<D> {
     /// Gets a reference to the database
     pub fn db(&self) -> &D {
         self.database.as_ref()
+    }
+
+    /// Gets a reference to checkpoint manager
+    pub fn checkpoint_manager(&self) -> &CheckpointManager {
+        self.checkpoint_manager.as_ref()
     }
 }
 
@@ -209,15 +219,39 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
             }
 
             SyncAction::WriteCheckpoints(_height, checkpoints) => {
-                let checkpoint_store = state.db().checkpoint_store();
                 for c in checkpoints.iter() {
                     let idx = c.checkpoint().idx();
-                    let status = CheckpointStatus::Confirmed;
-                    let entry =
-                        CheckpointEntry::new(c.checkpoint().clone(), c.proof().to_vec(), status);
+                    let pstatus = CheckpointProvingStatus::ProofReady;
+                    let cstatus = CheckpointConfStatus::Confirmed;
+                    let entry = CheckpointEntry::new(
+                        c.checkpoint().clone(),
+                        c.proof().to_vec(),
+                        pstatus,
+                        cstatus,
+                    );
 
                     // Store
-                    checkpoint_store.put_batch_checkpoint(idx, entry)?;
+                    state
+                        .checkpoint_manager()
+                        .put_checkpoint_blocking(idx, entry)?;
+                }
+            }
+            SyncAction::FinalizeCheckpoints(_height, checkpoints) => {
+                for c in checkpoints.iter() {
+                    let idx = c.checkpoint().idx();
+                    let pstatus = CheckpointProvingStatus::ProofReady;
+                    let cstatus = CheckpointConfStatus::Finalized;
+                    let entry = CheckpointEntry::new(
+                        c.checkpoint().clone(),
+                        c.proof().to_vec(),
+                        pstatus,
+                        cstatus,
+                    );
+
+                    // Update
+                    state
+                        .checkpoint_manager()
+                        .put_checkpoint_blocking(idx, entry)?;
                 }
             }
         }

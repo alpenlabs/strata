@@ -10,7 +10,7 @@ use alpen_express_btcio::writer::InscriptionHandle;
 use alpen_express_crypto::sign_schnorr_sig;
 use alpen_express_db::{
     traits::*,
-    types::{CheckpointEntry, CheckpointStatus},
+    types::{CheckpointEntry, CheckpointProvingStatus},
 };
 use alpen_express_eectl::engine::ExecEngineCtl;
 use alpen_express_primitives::{
@@ -37,8 +37,6 @@ use crate::{
     message::{ClientUpdateNotif, ForkChoiceMessage},
     sync_manager::SyncManager,
 };
-
-const BATCH_POLL_INTERVAL: u64 = 5000; // millisecs
 
 pub fn duty_tracker_task<D: Database>(
     shutdown: ShutdownGuard,
@@ -288,12 +286,12 @@ pub fn duty_dispatch_task<
             let sm = sync_man.clone();
             let db = database.clone();
             let e = engine.clone();
-            let da_writer = inscription_handle.clone();
+            let insc_h = inscription_handle.clone();
             let params: Arc<Params> = params.clone();
-            let duty_status_tx_l = duty_status_tx.clone();
-            let crx = checkpoint_mgr.checkpoint_tx().subscribe();
+            let duty_st_tx = duty_status_tx.clone();
+            let checkpt_mgr = checkpoint_mgr.clone();
             pool.execute(move || {
-                duty_exec_task(d, ik, sm, db, e, da_writer, params, duty_status_tx_l, crx)
+                duty_exec_task(d, ik, sm, db, e, insc_h, params, duty_st_tx, checkpt_mgr)
             });
             trace!(%id, "dispatched duty exec task");
             pending_duties_local.insert(id, ());
@@ -305,7 +303,7 @@ pub fn duty_dispatch_task<
     info!("duty dispatcher task exiting");
 }
 
-/// Toplevel function that's actually performs a job.  This is spawned on a/
+/// Toplevel function that actually performs a job.  This is spawned on a/
 /// thread pool so we don't have to worry about it blocking *too* much other
 /// work.
 #[allow(clippy::too_many_arguments)] // TODO: fix this
@@ -318,7 +316,7 @@ fn duty_exec_task<D: Database, E: ExecEngineCtl>(
     inscription_handle: Arc<InscriptionHandle>,
     params: Arc<Params>,
     duty_status_tx: std::sync::mpsc::Sender<DutyExecStatus>,
-    checkpoint_rx: tokio::sync::broadcast::Receiver<u64>,
+    checkpoint_mgr: Arc<CheckpointManager>,
 ) {
     let result = perform_duty(
         &duty,
@@ -328,7 +326,7 @@ fn duty_exec_task<D: Database, E: ExecEngineCtl>(
         engine.as_ref(),
         inscription_handle.as_ref(),
         &params,
-        checkpoint_rx,
+        checkpoint_mgr.as_ref(),
     );
 
     let status = DutyExecStatus {
@@ -350,7 +348,7 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
     engine: &E,
     inscription_handle: &InscriptionHandle,
     params: &Arc<Params>,
-    checkpoint_rx: tokio::sync::broadcast::Receiver<u64>,
+    checkpt_mgr: &CheckpointManager,
 ) -> Result<(), Error> {
     match duty {
         Duty::SignBlock(data) => {
@@ -396,7 +394,7 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
         Duty::CommitBatch(data) => {
             info!(data = ?data, "commit batch");
 
-            let checkpoint = check_and_get_batch_checkpoint(database, data, checkpoint_rx)?;
+            let checkpoint = check_and_get_batch_checkpoint(data, checkpt_mgr)?;
 
             let checkpoint_sighash = checkpoint.get_sighash();
             let signature = sign_with_identity_key(&checkpoint_sighash, ik);
@@ -422,28 +420,23 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
 }
 
 fn check_and_get_batch_checkpoint(
-    db: &impl Database,
     duty: &BatchCheckpointDuty,
-    mut checkpoint_rx: tokio::sync::broadcast::Receiver<u64>,
+    checkpt_mgr: &CheckpointManager,
 ) -> Result<BatchCheckpoint, Error> {
     let idx = duty.idx();
 
     // If there's no entry in db, create a pending entry and wait until proof is ready
-    match db.checkpoint_provider().get_batch_checkpoint(idx)? {
+    match checkpt_mgr.get_checkpoint_blocking(idx)? {
         // There's no entry in the database, create one so that the prover manager can query the
         // checkpoint info to create proofs for next
         None => {
-            let entry = CheckpointEntry::new(
-                duty.checkpoint().clone(),
-                vec![],
-                CheckpointStatus::PendingProof,
-            );
-            db.checkpoint_store().put_batch_checkpoint(idx, entry)?;
+            let entry = CheckpointEntry::new_pending_proof(duty.checkpoint().clone());
+            checkpt_mgr.put_checkpoint_blocking(idx, entry)?;
         }
         // There's an entry. If status is ProofCreated, return it else we need to wait for prover to
         // submit proofs.
-        Some(entry) => match entry.status {
-            CheckpointStatus::PendingProof => {
+        Some(entry) => match entry.proving_status {
+            CheckpointProvingStatus::PendingProof => {
                 // Do nothing, wait for broadcast msg below
             }
             _ => {
@@ -452,7 +445,9 @@ fn check_and_get_batch_checkpoint(
         },
     }
 
-    let chidx = checkpoint_rx
+    let chidx = checkpt_mgr
+        .checkpoint_tx()
+        .subscribe()
         .blocking_recv()
         .map_err(|e| Error::Other(e.to_string()))?;
 
@@ -463,14 +458,14 @@ fn check_and_get_batch_checkpoint(
         ));
     }
 
-    match db.checkpoint_provider().get_batch_checkpoint(idx)? {
+    match checkpt_mgr.get_checkpoint_blocking(idx)? {
         None => {
             warn!(%idx, "Expected checkpoint to be present in db");
             Err(Error::Other(
                 "Expected checkpoint to be present in db".to_string(),
             ))
         }
-        Some(entry) if entry.status == CheckpointStatus::PendingProof => {
+        Some(entry) if entry.proving_status == CheckpointProvingStatus::PendingProof => {
             warn!(%idx, "Expected checkpoint proof to be ready");
             Err(Error::Other(
                 "Expected checkpoint proof to be ready".to_string(),

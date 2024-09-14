@@ -268,6 +268,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         pool.clone(),
         params.clone(),
         (status_tx.clone(), status_rx.clone()),
+        checkpoint_manager.clone(),
     )?;
     let sync_man = Arc::new(sync_man);
     let mut inscription_handler = None;

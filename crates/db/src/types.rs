@@ -1,7 +1,7 @@
 //! Module for database local types
 
 use alpen_express_primitives::buf::Buf32;
-use alpen_express_state::batch::{BatchCheckpoint, CheckPointInfo};
+use alpen_express_state::batch::{BatchCheckpoint, CheckpointInfo};
 use arbitrary::Arbitrary;
 use bitcoin::{
     consensus::{self, deserialize, serialize},
@@ -134,23 +134,42 @@ pub enum ExcludeReason {
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct CheckpointEntry {
     /// Info related to the batch
-    checkpoint: CheckPointInfo,
+    checkpoint: CheckpointInfo,
     /// Proof
     pub proof: Vec<u8>,
-    /// Status
-    pub status: CheckpointStatus,
+    /// Proving Status
+    pub proving_status: CheckpointProvingStatus,
+
+    /// Confirmation Status
+    pub confirmation_status: CheckpointConfStatus,
 }
 
 impl CheckpointEntry {
-    pub fn new(checkpoint: CheckPointInfo, proof: Vec<u8>, status: CheckpointStatus) -> Self {
+    pub fn new(
+        checkpoint: CheckpointInfo,
+        proof: Vec<u8>,
+        proving_status: CheckpointProvingStatus,
+        confirmation_status: CheckpointConfStatus,
+    ) -> Self {
         Self {
             checkpoint,
             proof,
-            status,
+            proving_status,
+            confirmation_status,
         }
     }
+
+    pub fn new_pending_proof(checkpoint: CheckpointInfo) -> Self {
+        Self::new(
+            checkpoint,
+            vec![],
+            CheckpointProvingStatus::PendingProof,
+            CheckpointConfStatus::Pending,
+        )
+    }
+
     pub fn has_proof(&self) -> bool {
-        self.status != CheckpointStatus::PendingProof
+        self.proving_status == CheckpointProvingStatus::ProofReady
     }
 }
 
@@ -162,11 +181,17 @@ impl From<CheckpointEntry> for BatchCheckpoint {
 
 /// Status of the commmitment
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
-pub enum CheckpointStatus {
+pub enum CheckpointProvingStatus {
     /// Proof has not been created for this checkpoint
     PendingProof,
     /// Proof is ready
-    ProofCreated,
+    ProofReady,
+}
+
+#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
+pub enum CheckpointConfStatus {
+    /// Pending to be posted on L1
+    Pending,
     /// Confirmed on L1
     Confirmed,
     /// Finalized on L1

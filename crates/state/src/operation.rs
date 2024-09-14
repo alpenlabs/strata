@@ -6,7 +6,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use tracing::*;
 
 use crate::{
-    batch::{BatchCheckpoint, CheckPointInfo},
+    batch::{BatchCheckpoint, CheckpointInfo},
     client_state::{ClientState, L1CheckPoint, SyncState},
     id::L2BlockId,
     l1::L1BlockId,
@@ -66,7 +66,7 @@ pub enum ClientStateWrite {
     UpdateBuried(u64),
 
     /// Update the checkpoints
-    NewCheckpointsReceived(u64, Vec<CheckPointInfo>),
+    CheckpointsReceived(u64, Vec<CheckpointInfo>),
 
     /// The previously confirmed checkpoint is finalized at given l1 height
     CheckpointFinalized(u64),
@@ -96,6 +96,9 @@ pub enum SyncAction {
 
     /// Indicates to the worker to write the checkpoints to checkpoint db
     WriteCheckpoints(u64, Vec<BatchCheckpoint>),
+
+    /// Indicates to the worker to write the checkpoints to checkpoint db
+    FinalizeCheckpoints(u64, Vec<BatchCheckpoint>),
 }
 
 /// Applies client state writes to a target state.
@@ -177,7 +180,7 @@ pub fn apply_writes_to_state(
                 // we haven't already
             }
 
-            NewCheckpointsReceived(height, checkpts) => {
+            CheckpointsReceived(height, checkpts) => {
                 // Extend the pending checkpoints
                 state.l1_view_mut().pending_checkpoints.extend(
                     checkpts

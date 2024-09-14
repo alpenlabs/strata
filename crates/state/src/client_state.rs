@@ -6,7 +6,7 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use crate::{batch::CheckPointInfo, id::L2BlockId, l1::L1BlockId};
+use crate::{batch::CheckpointInfo, id::L2BlockId, l1::L1BlockId};
 
 /// High level client's state of the network.  This is local to the client, not
 /// coordinated as part of the L2 chain.
@@ -247,13 +247,13 @@ impl LocalL1State {
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
 pub struct L1CheckPoint {
     /// The inner checkpoint info
-    pub checkpoint: CheckPointInfo,
+    pub checkpoint: CheckpointInfo,
     /// L1 block height it appears in
     pub height: u64,
 }
 
 impl L1CheckPoint {
-    pub fn new(info: CheckPointInfo, height: u64) -> Self {
+    pub fn new(info: CheckpointInfo, height: u64) -> Self {
         Self {
             checkpoint: info,
             height,

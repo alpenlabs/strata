@@ -21,7 +21,7 @@ class BlockFinalizationTest(flexitest.Test):
 
         check_send_proof_for_non_existent_batch(seqrpc)
 
-        # Check for checkpoints 1,2,3,4
+        # Check for first 4 checkpoints
         for n in range(1, 5):
             check_for_nth_checkpoint_finalization(n, seqrpc)
             print(f"Pass checkpoint finalization for checkpoint {n}")
