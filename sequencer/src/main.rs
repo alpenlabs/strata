@@ -37,7 +37,7 @@ use alpen_express_status::{create_status_channel, StatusRx, StatusTx};
 use anyhow::Context;
 use bitcoin::Network;
 use config::{ClientMode, Config};
-use express_storage::L2BlockManager;
+use express_storage::{managers::checkpoint::CheckpointManager, L2BlockManager};
 use express_sync::{self, L2SyncContext, RpcSyncPeer};
 use express_tasks::{ShutdownSignal, TaskManager};
 use format_serde_error::SerdeError;
@@ -219,6 +219,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     // Set up database managers.
     let l2_block_manager = Arc::new(L2BlockManager::new(pool.clone(), database.clone()));
+    let checkpoint_manager = Arc::new(CheckpointManager::new(pool.clone(), database.clone()));
 
     // Set up Bitcoin client RPC.
     let bitcoind_url = format!("http://{}", config.bitcoind_rpc.rpc_url);
@@ -275,10 +276,6 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let bcast_handle = spawn_broadcaster_task(&task_executor, btc_rpc.clone(), bcast_ops);
     let bcast_handle = Arc::new(bcast_handle);
     let (status_tx, status_rx) = (sync_man.status_tx(), sync_man.status_rx());
-
-    // A channel to communicate checkpoint index, tx own by rpc and rx by duty executor
-    let (checkpt_tx, _) = broadcast::channel::<u64>(10);
-    let checkpt_tx = Arc::new(checkpt_tx);
 
     // If the sequencer key is set, start the sequencer duties task.
     if let ClientMode::Sequencer(sequencer_config) = &config.client.client_mode {
@@ -338,11 +335,20 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
         let d_params = params.clone();
         let d_executor = task_manager.executor();
-        let ctx_clone = checkpt_tx.clone();
+        let checkpt_mgr = checkpoint_manager.clone();
         executor.spawn_critical("duty_worker::duty_dispatch_task", move |shutdown| {
             duty_worker::duty_dispatch_task(
-                shutdown, d_executor, duties_rx, idata.key, sm, db2, eng_ctl_de, insc_hndlr, pool,
-                d_params, ctx_clone,
+                shutdown,
+                d_executor,
+                duties_rx,
+                idata.key,
+                sm,
+                db2,
+                eng_ctl_de,
+                insc_hndlr,
+                pool,
+                d_params,
+                checkpt_mgr,
             )
         });
     }
@@ -392,7 +398,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             inscription_handler,
             bcast_handle,
             l2_block_manager,
-            checkpt_tx,
+            checkpoint_manager,
         )
         .await
         .unwrap()
@@ -418,7 +424,7 @@ async fn start_rpc<D: Database + Send + Sync + 'static>(
     inscription_handler: Option<Arc<InscriptionHandle>>,
     bcast_handle: Arc<L1BroadcastHandle>,
     l2_block_manager: Arc<L2BlockManager>,
-    checkpt_tx: Arc<broadcast::Sender<u64>>,
+    checkpt_manager: Arc<CheckpointManager>,
 ) -> anyhow::Result<()> {
     let (stop_tx, stop_rx) = oneshot::channel();
 
@@ -430,7 +436,7 @@ async fn start_rpc<D: Database + Send + Sync + 'static>(
         bcast_handle.clone(),
         stop_tx,
         l2_block_manager.clone(),
-        checkpt_tx,
+        checkpt_manager,
     );
 
     let mut methods = alp_rpc.into_rpc();

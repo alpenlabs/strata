@@ -23,7 +23,7 @@ use alpen_express_state::{
     da_blob::{BlobDest, BlobIntent},
     prelude::*,
 };
-use express_storage::L2BlockManager;
+use express_storage::{managers::checkpoint::CheckpointManager, L2BlockManager};
 use express_tasks::{ShutdownGuard, TaskExecutor};
 use tokio::sync::broadcast;
 use tracing::*;
@@ -227,7 +227,7 @@ pub fn duty_dispatch_task<
     inscription_handle: Arc<InscriptionHandle>,
     pool: threadpool::ThreadPool,
     params: Arc<Params>,
-    checkpoint_tx: Arc<broadcast::Sender<u64>>,
+    checkpoint_mgr: Arc<CheckpointManager>,
 ) {
     // TODO make this actually work
     let pending_duties = Arc::new(RwLock::new(HashMap::<Buf32, ()>::new()));
@@ -293,7 +293,7 @@ pub fn duty_dispatch_task<
             let da_writer = inscription_handle.clone();
             let params: Arc<Params> = params.clone();
             let duty_status_tx_l = duty_status_tx.clone();
-            let crx = checkpoint_tx.subscribe();
+            let crx = checkpoint_mgr.checkpoint_tx().subscribe();
             pool.execute(move || {
                 duty_exec_task(d, ik, sm, db, e, da_writer, params, duty_status_tx_l, crx)
             });

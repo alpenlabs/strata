@@ -3,10 +3,7 @@ use std::sync::Arc;
 use alpen_express_btcio::{broadcaster::L1BroadcastHandle, writer::InscriptionHandle};
 use alpen_express_consensus_logic::sync_manager::SyncManager;
 use alpen_express_db::{
-    traits::{
-        ChainstateProvider, CheckpointProvider, CheckpointStore, Database, L1DataProvider,
-        L2DataProvider,
-    },
+    traits::{ChainstateProvider, CheckpointProvider, Database, L1DataProvider, L2DataProvider},
     types::{CheckpointStatus, L1TxEntry, L1TxStatus},
 };
 use alpen_express_primitives::{buf::Buf32, hash};
@@ -30,10 +27,10 @@ use alpen_express_status::StatusRx;
 use async_trait::async_trait;
 use bitcoin::{consensus::deserialize, hashes::Hash, Transaction as BTransaction, Txid};
 use express_rpc_utils::to_jsonrpsee_error;
-use express_storage::L2BlockManager;
+use express_storage::{managers::checkpoint::CheckpointManager, L2BlockManager};
 use jsonrpsee::{core::RpcResult, types::ErrorObjectOwned};
 use thiserror::Error;
-use tokio::sync::{broadcast, oneshot, Mutex};
+use tokio::sync::{oneshot, Mutex};
 use tracing::*;
 
 #[derive(Debug, Error)]
@@ -77,7 +74,7 @@ pub enum Error {
     FetchLimitReached(u64, u64),
 
     #[error("missing checkpoint for index {0}")]
-    MissingCheckpoint(u64),
+    MissingCheckpointInDb(u64),
 
     #[error("Proof already created for checkpoint {0}")]
     ProofAlreadyCreated(u64),
@@ -107,7 +104,7 @@ impl Error {
             Self::FetchLimitReached(_, _) => -32608,
             Self::UnknownIdx(_) => -32608,
             Self::MissingL1BlockManifest(_) => -32609,
-            Self::MissingCheckpoint(_) => -32610,
+            Self::MissingCheckpointInDb(_) => -32610,
             Self::ProofAlreadyCreated(_) => -32611,
             Self::BlockingAbort(_) => -32001,
             Self::Other(_) => -32000,
@@ -143,7 +140,7 @@ pub struct AlpenRpcImpl<D> {
     bcast_handle: Arc<L1BroadcastHandle>,
     stop_tx: Mutex<Option<oneshot::Sender<()>>>,
     l2_block_manager: Arc<L2BlockManager>,
-    checkpoint_tx: Arc<broadcast::Sender<u64>>,
+    checkpoint_manager: Arc<CheckpointManager>,
 }
 
 impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
@@ -154,7 +151,7 @@ impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
         bcast_handle: Arc<L1BroadcastHandle>,
         stop_tx: oneshot::Sender<()>,
         l2_block_manager: Arc<L2BlockManager>,
-        checkpoint_tx: Arc<broadcast::Sender<u64>>,
+        checkpoint_manager: Arc<CheckpointManager>,
     ) -> Self {
         Self {
             status_rx,
@@ -163,7 +160,7 @@ impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
             bcast_handle,
             stop_tx: Mutex::new(Some(stop_tx)),
             l2_block_manager,
-            checkpoint_tx,
+            checkpoint_manager,
         }
     }
 
@@ -596,11 +593,11 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
 
     async fn put_checkpoint_proof(&self, idx: u64, proof: HexBytes) -> RpcResult<()> {
         let mut entry = self
-            .database
-            .checkpoint_provider()
-            .get_batch_checkpoint(idx)
+            .checkpoint_manager
+            .get_checkpoint(idx)
+            .await
             .map_err(|e| Error::Other(e.to_string()))?
-            .ok_or(Error::MissingCheckpoint(idx))?;
+            .ok_or(Error::MissingCheckpointInDb(idx))?;
 
         // If proof is not pending error out
         if entry.status != CheckpointStatus::PendingProof {
@@ -610,13 +607,14 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         // TODO: verify proof, once proof verification logic is ready
         entry.proof = proof.0;
         entry.status = CheckpointStatus::ProofCreated;
-        self.database
-            .checkpoint_store()
-            .put_batch_checkpoint(idx, entry)
+        self.checkpoint_manager
+            .put_checkpoint(idx, entry)
+            .await
             .map_err(|e| Error::Other(e.to_string()))?;
 
         // Now send the idx to indicate checkpoint proof has been received
-        self.checkpoint_tx
+        self.checkpoint_manager
+            .checkpoint_tx()
             .send(idx)
             .map_err(|e| Error::Other(e.to_string()))?;
         Ok(())
