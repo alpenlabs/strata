@@ -515,12 +515,16 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
     }
 
     async fn submit_bridge_msg(&self, raw_msg: HexBytes) -> RpcResult<()> {
-        let deserialized_msg: BridgeMessage =
+        let msg =
             from_slice::<BridgeMessage>(raw_msg.as_ref()).map_err(|_| Error::Deserialization)?;
 
-        if let Err(e) = self.bmsg_tx.send(deserialized_msg).await {
+        let bmsg_id = msg.compute_id();
+
+        if let Err(e) = self.bmsg_tx.send(msg).await {
             return Err(Error::Other("failed to send bridge message".to_string()).into());
         }
+
+        debug!(%bmsg_id, "queueing bridge msg to relay");
 
         Ok(())
     }

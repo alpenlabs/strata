@@ -4,7 +4,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use alpen_express_primitives::relay::types::{BridgeMessage, RelayerConfig};
+use alpen_express_primitives::relay::types::{BridgeMessage, RelayerConfig, Scope};
 use alpen_express_status::StatusRx;
 use express_storage::ops::bridgemsg::BridgeMsgOps;
 use secp256k1::{All, Secp256k1};
@@ -65,20 +65,34 @@ impl RelayerState {
             return Ok(());
         }
 
+        // Check if the message is a "misc" message.  If it is, then we should
+        // only relay it if we've been set to in the config.
+        let is_misc = if let Some(Scope::Misc) = message.try_parse_scope() {
+            if !self.config.relay_misc {
+                return Ok(());
+            }
+
+            debug!("relaying misc message");
+            true
+        } else {
+            false
+        };
+
         let chs_state = status_rx.chs.borrow().clone();
         if let Some(chs_state) = chs_state {
-            match alpen_express_primitives::relay::util::verify_bridge_msg_sig(
+            let sig_res = alpen_express_primitives::relay::util::verify_bridge_msg_sig(
                 &message,
                 chs_state.operator_table(),
-            ) {
-                Ok(()) => {}
-                Err(e) => {
+            );
+
+            if let Err(e) = sig_res {
+                if !is_misc {
                     trace!(err = %e, "dropping invalid message");
                     return Ok(());
                 }
             }
 
-            //  store them in database
+            // Store it in database.
             bridge_ops.write_msg_async(timestamp, message).await?;
         }
 
@@ -119,6 +133,9 @@ pub async fn bridge_msg_worker_task(
     loop {
         select! {
             Some(new_message) = message_rx.recv() => {
+                let bmsg_id = new_message.compute_id();
+                trace!(%bmsg_id, "handling new bridge msg");
+
                 if let Err(e) = msg_state.handle_new_message(new_message, bridge_ops.clone(), status_rx.clone()).await {
                     warn!(err = %e, "failed to handle new message");
                 }

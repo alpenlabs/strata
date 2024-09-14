@@ -2,7 +2,7 @@ import time
 
 import flexitest
 
-WAIT_TIME = 0.2
+WAIT_TIME = 2
 
 
 @flexitest.register
@@ -16,27 +16,29 @@ class BridgeMsgTest(flexitest.Test):
         # create both btc and sequencer RPC
         seqrpc = seq.create_rpc()
 
-        # BridgeMessage { source_id: 481563127,
-        #                 sig: 747b078c509658461e64699abcf2dc....,
-        #                 scope: [197], payload: [] }
-        blobdata = "".join(
+        # BridgeMessage { source_id: 1,
+        #                 sig: [00] * 64
+        #                 scope: Misc, payload: [42] }
+        raw_msg = "".join(
             [
-                "0000000069b125a60f343e833805e9c55bdd42953b6803ac0e262145",
-                "005dd038e69c91a73d7773ecf4f236fa94b9356c41ab4993e5cd51d1",
-                "ab744f3b4258d47f26e03f01010a0000000700000001020304050607",
+                "01000000",
+                "00" * 64,
+                "01000000" + "00",
+                "01000000" + "42",
             ]
         )
 
-        seqrpc.alp_submitRawMsg(blobdata)
+        seqrpc.alp_submitBridgeMsg(raw_msg)
 
-        time.sleep(WAIT_TIME * 4)
+        time.sleep(WAIT_TIME)
 
         # VODepositSig(10)
-        scope = "010a000000"
+        scope = "00"
         print(scope)
 
-        msg = seqrpc.alpbridgemsg_getMsgsByScope(scope)
-        print(msg)
+        msgs = seqrpc.alp_getMsgsByScope(scope)
+        print(msgs)
 
         # check if received blobdata and sent blobdata are same or not
-        assert blobdata == msg[0]
+        assert len(msgs) == 1, "wrong number of messages in response"
+        assert msgs[0] == raw_msg, "not the message we expected"

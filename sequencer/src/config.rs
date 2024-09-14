@@ -103,6 +103,7 @@ impl Config {
             bridge: RelayerConfig {
                 refresh_interval: 10,
                 stale_duration: 120,
+                relay_misc: true,
             },
         })
     }
@@ -183,6 +184,7 @@ mod test {
             [bridge]
             refresh_interval = 100
             stale_duration = 500
+            relay_misc = false,
         "#;
 
         assert!(toml::from_str::<Config>(config_string).is_ok());
