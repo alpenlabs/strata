@@ -1,0 +1,41 @@
+[package]
+edition = "2021"
+name = "express-risc0-guest-builder"
+version = "0.1.0"
+
+[dependencies]
+express-risc0-adapter = { path = "../../crates/zkvm/adapters/risc0", features = [
+  "prover",
+], optional = true }
+risc0-zkvm = "1.0.5"
+
+
+[dev-dependencies]
+alpen-express-primitives.workspace = true
+alpen-express-state.workspace = true
+alpen-test-utils = { workspace = true }
+bincode = { workspace = true }
+bitcoin = { workspace = true }
+borsh = { workspace = true }
+express-proofimpl-btc-blockspace = { workspace = true }
+express-chaintsn.workspace = true
+express-zkvm = { workspace = true }
+hex = { workspace = true }
+express-proofimpl-l1-batch = { workspace = true }
+rand = { workspace = true }
+express-proofimpl-evm-ee-stf = { workspace = true }
+
+[build-dependencies]
+risc0-build = { version = "1.0.5" }
+
+[package.metadata.risc0]
+methods = [
+  "guest-reth-stf",
+  "guest-cl-stf",
+  "express-proofimpl-btc-blockspace",
+  "express-proofimpl-l1-batch",
+]
+
+[features]
+default = []
+prover = ["dep:express-risc0-adapter"]
