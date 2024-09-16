@@ -5,8 +5,8 @@ use std::{collections::BTreeMap, ops::Not};
 
 use alpen_express_primitives::{
     bridge::{
-        Musig2PubNonce, Musig2SecNonce, OperatorIdx, OperatorPartialSig, PartialSigTable,
-        PublickeyTable, SignatureInfo, TxSigningData,
+        Musig2PartialSig, Musig2PubNonce, Musig2SecNonce, OperatorIdx, OperatorPartialSig,
+        PartialSigTable, PublickeyTable, TxSigningData,
     },
     l1::{BitcoinPsbt, SpendInfo},
 };
@@ -125,9 +125,7 @@ impl BridgeTxState {
     }
 
     /// Get table of signatures collected so far per input in the transaction.
-    pub fn collected_sigs(
-        &self,
-    ) -> impl Iterator<Item = &BTreeMap<OperatorIdx, OperatorPartialSig>> {
+    pub fn collected_sigs(&self) -> impl Iterator<Item = &BTreeMap<OperatorIdx, Musig2PartialSig>> {
         self.collected_sigs.iter().map(|v| &v.0)
     }
 
@@ -194,7 +192,7 @@ impl BridgeTxState {
     /// `input_index` is not part of the [`Psbt`].
     pub fn add_signature(
         &mut self,
-        signature_info: SignatureInfo,
+        signature_info: OperatorPartialSig,
         input_index: usize,
     ) -> EntityResult<bool> {
         if self.psbt().inner().inputs.get(input_index).is_none() {
@@ -368,11 +366,11 @@ mod tests {
         for i in 0..num_operators {
             let data = vec![0u8; 32];
             let mut unstructured = Unstructured::new(&data);
-            let sig = OperatorPartialSig::arbitrary(&mut unstructured)
+            let sig = Musig2PartialSig::arbitrary(&mut unstructured)
                 .expect("should generate arbitrary signature");
 
             tx_state
-                .add_signature(SignatureInfo::new(sig, i as u32), 0)
+                .add_signature(OperatorPartialSig::new(sig, i as u32), 0)
                 .unwrap();
         }
 
@@ -392,11 +390,11 @@ mod tests {
 
         let data = vec![0u8; 32];
         let mut unstructured = Unstructured::new(&data);
-        let sig = OperatorPartialSig::arbitrary(&mut unstructured)
+        let sig = Musig2PartialSig::arbitrary(&mut unstructured)
             .expect("should generate arbitrary signature");
 
         tx_state
-            .add_signature(SignatureInfo::new(sig, 0), 0)
+            .add_signature(OperatorPartialSig::new(sig, 0), 0)
             .unwrap();
 
         assert!(
@@ -422,13 +420,13 @@ mod tests {
 
         let data = vec![0u8; 32];
         let mut unstructured = Unstructured::new(&data);
-        let sig = OperatorPartialSig::arbitrary(&mut unstructured)
+        let sig = Musig2PartialSig::arbitrary(&mut unstructured)
             .expect("should generate arbitrary signature");
 
         for input_index in 0..num_inputs {
             assert!(tx_state
                 .add_signature(
-                    SignatureInfo::new(sig, own_index as OperatorIdx),
+                    OperatorPartialSig::new(sig, own_index as OperatorIdx),
                     input_index
                 )
                 .is_ok());
@@ -452,12 +450,14 @@ mod tests {
 
         let data = vec![0u8; 32];
         let mut unstructured = Unstructured::new(&data);
-        let sig = OperatorPartialSig::arbitrary(&mut unstructured)
+        let sig = Musig2PartialSig::arbitrary(&mut unstructured)
             .expect("should generate arbitrary signature");
 
         let unauthorized_signer_index = num_operators + 1;
-        let result =
-            tx_state.add_signature(SignatureInfo::new(sig, unauthorized_signer_index as u32), 0);
+        let result = tx_state.add_signature(
+            OperatorPartialSig::new(sig, unauthorized_signer_index as u32),
+            0,
+        );
         assert!(result.is_err());
 
         assert!(matches!(
@@ -476,12 +476,12 @@ mod tests {
 
         let data = vec![0u8; 32];
         let mut unstructured = Unstructured::new(&data);
-        let sig = OperatorPartialSig::arbitrary(&mut unstructured)
+        let sig = Musig2PartialSig::arbitrary(&mut unstructured)
             .expect("should generate arbitrary signature");
 
         let invalid_input_index = 1;
         let result = tx_state.add_signature(
-            SignatureInfo::new(sig, own_index as u32),
+            OperatorPartialSig::new(sig, own_index as u32),
             invalid_input_index,
         );
         assert!(result.is_err());
@@ -521,12 +521,12 @@ mod tests {
             for operator_id in operator_ids.clone() {
                 let data = vec![0u8; 32];
                 let mut unstructured = Unstructured::new(&data);
-                let sig = OperatorPartialSig::arbitrary(&mut unstructured)
+                let sig = Musig2PartialSig::arbitrary(&mut unstructured)
                     .expect("should generate arbitrary signature");
 
                 assert!(tx_state
                     .add_signature(
-                        SignatureInfo::new(sig, operator_id as OperatorIdx),
+                        OperatorPartialSig::new(sig, operator_id as OperatorIdx),
                         input_index
                     )
                     .is_ok());

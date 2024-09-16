@@ -112,21 +112,21 @@ impl<'a> Arbitrary<'a> for PublickeyTable {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct OperatorPartialSig(PartialSignature);
+pub struct Musig2PartialSig(PartialSignature);
 
-impl From<PartialSignature> for OperatorPartialSig {
+impl From<PartialSignature> for Musig2PartialSig {
     fn from(value: PartialSignature) -> Self {
         Self(value)
     }
 }
 
-impl OperatorPartialSig {
+impl Musig2PartialSig {
     pub fn inner(&self) -> &PartialSignature {
         &self.0
     }
 }
 
-impl BorshSerialize for OperatorPartialSig {
+impl BorshSerialize for Musig2PartialSig {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         let serialized = self.0.serialize();
 
@@ -134,7 +134,7 @@ impl BorshSerialize for OperatorPartialSig {
     }
 }
 
-impl BorshDeserialize for OperatorPartialSig {
+impl BorshDeserialize for Musig2PartialSig {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         // Buffer size for 32-byte PartialSignature
         let mut partial_sig_bytes = [0u8; MUSIG2_PARTIAL_SIG_SIZE];
@@ -149,7 +149,7 @@ impl BorshDeserialize for OperatorPartialSig {
     }
 }
 
-impl<'a> Arbitrary<'a> for OperatorPartialSig {
+impl<'a> Arbitrary<'a> for Musig2PartialSig {
     fn arbitrary(_u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
         let secret_key = SecretKey::new(&mut rand::thread_rng());
 
@@ -165,10 +165,10 @@ impl<'a> Arbitrary<'a> for OperatorPartialSig {
 #[derive(
     Debug, Clone, PartialEq, Eq, Arbitrary, Serialize, Deserialize, BorshSerialize, BorshDeserialize,
 )]
-pub struct PartialSigTable(pub BTreeMap<OperatorIdx, OperatorPartialSig>);
+pub struct PartialSigTable(pub BTreeMap<OperatorIdx, Musig2PartialSig>);
 
-impl From<BTreeMap<OperatorIdx, OperatorPartialSig>> for PartialSigTable {
-    fn from(value: BTreeMap<OperatorIdx, OperatorPartialSig>) -> Self {
+impl From<BTreeMap<OperatorIdx, Musig2PartialSig>> for PartialSigTable {
+    fn from(value: BTreeMap<OperatorIdx, Musig2PartialSig>) -> Self {
         Self(value)
     }
 }
@@ -189,25 +189,25 @@ pub struct TxSigningData {
 /// pubkey of the signer so that the signature can be verified at the callsite (given a particular
 /// message that was signed).
 #[derive(Debug, Clone, Copy, Arbitrary, Serialize, Deserialize)]
-pub struct SignatureInfo {
+pub struct OperatorPartialSig {
     /// The schnorr signature for a given message.
-    partial_sig: OperatorPartialSig,
+    partial_sig: Musig2PartialSig,
 
     /// The index of the operator that can be used to query the corresponding pubkey.
     signer_index: OperatorIdx,
 }
 
-impl SignatureInfo {
-    /// Create a new [`SignatureInfo`].
-    pub fn new(partial_sig: OperatorPartialSig, signer_index: OperatorIdx) -> Self {
+impl OperatorPartialSig {
+    /// Create a new [`OperatorPartialSig`].
+    pub fn new(partial_sig: Musig2PartialSig, signer_index: OperatorIdx) -> Self {
         Self {
             partial_sig,
             signer_index,
         }
     }
 
-    /// Get the schnorr signature.
-    pub fn signature(&self) -> &OperatorPartialSig {
+    /// Get the partial Musig2 schnorr signature.
+    pub fn signature(&self) -> &Musig2PartialSig {
         &self.partial_sig
     }
 
@@ -325,7 +325,7 @@ mod tests {
     use borsh::{BorshDeserialize, BorshSerialize};
 
     use super::{Musig2PubNonce, PublickeyTable};
-    use crate::bridge::{Musig2SecNonce, OperatorPartialSig};
+    use crate::bridge::{Musig2PartialSig, Musig2SecNonce};
 
     #[test]
     fn test_publickeytable_serialize_deserialize() {
@@ -392,7 +392,7 @@ mod tests {
         let mut u = Unstructured::new(&raw_bytes);
 
         // Generate a random Musig2PartialSig using Arbitrary
-        let musig2_partial_sig = OperatorPartialSig::arbitrary(&mut u);
+        let musig2_partial_sig = Musig2PartialSig::arbitrary(&mut u);
         assert!(
             musig2_partial_sig.is_ok(),
             "should be able to generate musig2 partial sig but got: {}",
@@ -420,8 +420,8 @@ mod tests {
         );
 
         // Deserialize Musig2PartialSig using Borsh
-        let deserialized_sig: OperatorPartialSig =
-            OperatorPartialSig::deserialize(&mut &serialized_sig[..])
+        let deserialized_sig: Musig2PartialSig =
+            Musig2PartialSig::deserialize(&mut &serialized_sig[..])
                 .expect("deserialization should work");
 
         // Ensure the original and deserialized signatures are the same

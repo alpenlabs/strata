@@ -25,7 +25,8 @@ impl<D: BridgeTxDatabase + Sync + Send + 'static> Context<D> {
 inst_ops! {
     (BridgeTxStateOps, Context<D: BridgeTxDatabase>) {
         get_tx_state(txid: Txid) => Option<BridgeTxState>;
-        upsert_tx_state(txid: Txid, tx_state: BridgeTxState) => ();
+        put_tx_state(txid: Txid, tx_state: BridgeTxState) => ();
+        delete_tx_state(txid: Txid) => Option<BridgeTxState>;
     }
 }
 
@@ -36,10 +37,17 @@ fn get_tx_state<D: BridgeTxDatabase + Sync + Send + 'static>(
     context.db.get_tx_state(txid.into())
 }
 
-fn upsert_tx_state<D: BridgeTxDatabase + Sync + Send + 'static>(
+fn put_tx_state<D: BridgeTxDatabase + Sync + Send + 'static>(
     context: &Context<D>,
     txid: Txid,
     tx_state: BridgeTxState,
 ) -> DbResult<()> {
     context.db.put_tx_state(txid.into(), tx_state)
+}
+
+fn delete_tx_state<D: BridgeTxDatabase + Sync + Send + 'static>(
+    context: &Context<D>,
+    txid: Txid,
+) -> DbResult<Option<BridgeTxState>> {
+    context.db.delete_tx_state(txid.into())
 }

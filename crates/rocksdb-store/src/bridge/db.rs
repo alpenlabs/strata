@@ -40,7 +40,7 @@ impl BridgeTxDatabase for BridgeTxRocksDb {
             .map_err(|e: rockbound::TransactionError<_>| DbError::TransactionError(e.to_string()))
     }
 
-    fn evict_tx_state(&self, txid: Buf32) -> DbResult<Option<BridgeTxState>> {
+    fn delete_tx_state(&self, txid: Buf32) -> DbResult<Option<BridgeTxState>> {
         self.db
             .with_optimistic_txn(TransactionRetry::Count(self.ops.retry_count), |txn| {
                 if let Some(state) = txn.get::<BridgeTxStateSchema>(&txid)? {
@@ -124,13 +124,13 @@ mod tests {
         );
 
         // Test evict
-        let evicted_entry = db.evict_tx_state(txid).unwrap();
+        let evicted_entry = db.delete_tx_state(txid).unwrap();
         assert!(
             evicted_entry.is_some_and(|entry| entry == stored_entry.unwrap()),
             "stored entry should be returned after being evicted"
         );
 
-        let re_evicted_entry = db.evict_tx_state(txid).unwrap();
+        let re_evicted_entry = db.delete_tx_state(txid).unwrap();
         assert!(
             re_evicted_entry.is_none(),
             "evicting an already evicted entry should return None"

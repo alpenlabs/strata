@@ -351,12 +351,12 @@ pub trait BridgeTxDatabase {
     /// Add [`BridgeTxState`] to the database replacing the existing one if present.
     fn put_tx_state(&self, txid: Buf32, tx_state: BridgeTxState) -> DbResult<()>;
 
-    /// Evict the stored [`BridgeTxState`] from the database and return it. This can be invoked, for
-    /// example, when a fully signed Deposit Transaction has been broadcasted. If the `txid` did
-    /// not exist, `None` is returned.
+    /// Delete the stored [`BridgeTxState`] from the database and return it. This can be invoked,
+    /// for example, when a fully signed Deposit Transaction has been broadcasted. If the `txid`
+    /// did not exist, `None` is returned.
     ///
     /// *WARNING*: This can have detrimental effects if used at the wrong time.
-    fn evict_tx_state(&self, txid: Buf32) -> DbResult<Option<BridgeTxState>>;
+    fn delete_tx_state(&self, txid: Buf32) -> DbResult<Option<BridgeTxState>>;
 
     /// Fetch [`BridgeTxState`] from db.
     fn get_tx_state(&self, txid: Buf32) -> DbResult<Option<BridgeTxState>>;
