@@ -28,7 +28,7 @@ use musig2::{
 };
 
 use super::errors::{BridgeSigError, BridgeSigResult};
-use crate::operations::{create_script_spend_hash, sign_state_partial, verify_partial_sig};
+use crate::operations::{create_message_hash, sign_state_partial, verify_partial_sig};
 
 /// Handle creation, collection and aggregation of signatures for a [`BridgeTxState`] with the help
 /// of a persistence layer.
@@ -201,13 +201,18 @@ impl SignatureManager {
         let mut is_fully_signed = false;
         for (input_index, _) in inputs.iter().enumerate() {
             let spend_infos = tx_state.spend_infos();
-            let script = &spend_infos[input_index].script_buf;
+            let spend_info_for_input = &spend_infos[input_index];
 
             let mut tx = unsigned_tx.clone();
             let mut sighash_cache = SighashCache::new(&mut tx);
 
-            let message =
-                create_script_spend_hash(&mut sighash_cache, input_index, script, &prevouts[..])?;
+            let message = create_message_hash(
+                &mut sighash_cache,
+                input_index,
+                &prevouts,
+                spend_info_for_input,
+            )?;
+
             let message = message.as_ref();
 
             let signature = sign_state_partial(
@@ -284,11 +289,15 @@ impl SignatureManager {
         let mut sighash_cache = SighashCache::new(&mut unsigned_tx);
 
         let spend_infos = tx_state.spend_infos();
-        let script = &spend_infos[input_index].script_buf;
+        let spend_info_for_input = &spend_infos[input_index];
         let prevouts = tx_state.prevouts();
 
-        let message =
-            create_script_spend_hash(&mut sighash_cache, input_index, script, &prevouts[..])?;
+        let message = create_message_hash(
+            &mut sighash_cache,
+            input_index,
+            &prevouts,
+            spend_info_for_input,
+        )?;
         let message = message.as_ref();
 
         verify_partial_sig(&tx_state, &signature_info, &aggregated_nonce, message)?;
@@ -337,18 +346,20 @@ impl SignatureManager {
         let mut partial_sigs_all_inputs = tx_state.ordered_sigs();
 
         for (input_index, input) in psbt.inputs.iter_mut().enumerate() {
-            let SpendInfo {
-                script_buf: script,
-                control_block,
-            } = spend_infos[input_index].clone();
+            let spend_info_for_input = spend_infos[input_index].clone();
 
             // OPTIMIZE: this message is being created every time we sign a transaction in
             // `add_own_signature` *and* here as well. This is suboptimal computationally but the
             // alternative is to store it in the database for every input on every transaction which
             // is also wasteful (also involves creating a wrapper around `Message` to
             // implement serde*, borsh* and arbitrary traits).
-            let message =
-                create_script_spend_hash(&mut sighash_cache, input_index, &script, prevouts)?;
+
+            let message = create_message_hash(
+                &mut sighash_cache,
+                input_index,
+                prevouts,
+                &spend_info_for_input,
+            )?;
 
             let message_bytes = message.as_ref();
 
@@ -379,8 +390,17 @@ impl SignatureManager {
 
             let mut witness = Witness::new();
             witness.push(signature.as_ref());
-            witness.push(script.to_bytes());
-            witness.push(control_block.serialize());
+
+            // script spend path requires two additional witness elements --
+            // the script and the control block.
+            if let Some(SpendInfo {
+                script_buf,
+                control_block,
+            }) = spend_info_for_input
+            {
+                witness.push(script_buf.to_bytes());
+                witness.push(control_block.serialize());
+            }
 
             // Finalize the psbt as per <https://github.com/rust-bitcoin/rust-bitcoin/blob/bitcoin-0.32.1/bitcoin/examples/taproot-psbt.rs#L315-L327>
             // NOTE: their ecdsa example states that we should use `miniscript` to finalize
@@ -420,6 +440,7 @@ mod tests {
     use musig2::{secp256k1::Message, PubNonce};
 
     use super::*;
+    use crate::operations::create_script_spend_hash;
 
     #[tokio::test]
     async fn test_add_tx_state() {
@@ -477,7 +498,7 @@ mod tests {
 
     #[test]
     fn test_generate_sec_nonce() {
-        let (pks, sks) = generate_keypairs(SECP256K1, 5);
+        let (pks, sks) = generate_keypairs(5);
         let pubkey_table = generate_pubkey_table(&pks);
 
         let key_agg_ctx = KeyAggContext::new(pubkey_table.0.values().copied())
@@ -508,7 +529,7 @@ mod tests {
             "num_operators should be set to greater than 1 and greater than self index"
         );
 
-        let (pks, sks) = generate_keypairs(SECP256K1, num_operators);
+        let (pks, sks) = generate_keypairs(num_operators);
         let pubkey_table = generate_pubkey_table(&pks);
 
         let keypair = Keypair::from_secret_key(SECP256K1, &sks[own_index]);
@@ -557,7 +578,7 @@ mod tests {
             "num_operators should be set to greater than 1 and greater than self index"
         );
 
-        let (pks, sks) = generate_keypairs(SECP256K1, num_operators);
+        let (pks, sks) = generate_keypairs(num_operators);
         let pubkey_table = generate_pubkey_table(&pks);
 
         let keypair = Keypair::from_secret_key(SECP256K1, &sks[own_index]);
@@ -612,7 +633,7 @@ mod tests {
             "num_operators should be set to greater than 1 and greater than self and external index"
         );
 
-        let (pks, sks) = generate_keypairs(SECP256K1, num_operators);
+        let (pks, sks) = generate_keypairs(num_operators);
 
         let keypair = Keypair::from_secret_key(SECP256K1, &sks[own_index]);
 
@@ -674,11 +695,7 @@ mod tests {
 
         // Ensure the signature is present in the first input
         assert!(
-<<<<<<< HEAD
             collected_sigs.contains_key(&(own_index as OperatorIdx)),
-=======
-            collected_sigs.contains_key(&(own_index as u32)),
->>>>>>> 437b63e (refactor: address PR comments and squash commits)
             "own signature must be present in collected_sigs = {:?} at index: {}",
             collected_sigs,
             own_index
@@ -697,7 +714,7 @@ mod tests {
             "this test expects: num_operators == 2, > self_index, > external_index"
         );
 
-        let (pks, sks) = generate_keypairs(SECP256K1, num_operators);
+        let (pks, sks) = generate_keypairs(num_operators);
 
         let self_keypair = Keypair::from_secret_key(SECP256K1, &sks[own_index]);
 
@@ -755,7 +772,10 @@ mod tests {
 
         // Sign the transaction with an external key (at external_index)
         let mut unsigned_tx = tx_state.unsigned_tx().clone();
-        let script = &tx_signing_data.spend_infos[input_index].script_buf;
+        let script = &tx_signing_data.spend_infos[input_index]
+            .clone()
+            .unwrap()
+            .script_buf;
 
         let mut sighash_cache = SighashCache::new(&mut unsigned_tx);
         let message = create_script_spend_hash(
@@ -831,18 +851,14 @@ mod tests {
             .expect("state should be present");
 
         assert!(
-                    stored_tx_state
-                        .collected_sigs()
-                        .nth(input_index)
-                        .expect("collected signatures for input_index must exist")
-        <<<<<<< HEAD
-                        .get(&(external_index as OperatorIdx))
-        =======
-                        .get(&(external_index as u32))
-        >>>>>>> 437b63e (refactor: address PR comments and squash commits)
-                        .is_some_and(|sig| *sig.inner() == external_signature),
-                    "should have the external index at the right place"
-                );
+            stored_tx_state
+                .collected_sigs()
+                .nth(input_index)
+                .expect("collected signatures for input_index must exist")
+                .get(&(external_index as OperatorIdx))
+                .is_some_and(|sig| *sig.inner() == external_signature),
+            "should have the external index at the right place"
+        );
 
         let result = signature_manager.add_own_partial_sig(&txid).await;
         assert!(
@@ -883,7 +899,7 @@ mod tests {
     async fn test_get_fully_signed_transaction() {
         // Generate keypairs for the UTXO
         let num_operators = 4;
-        let (pubkeys, secret_keys) = generate_keypairs(SECP256K1, num_operators);
+        let (pubkeys, secret_keys) = generate_keypairs(num_operators);
         let pubkey_table = generate_pubkey_table(&pubkeys);
 
         let own_index = 2;
@@ -942,7 +958,10 @@ mod tests {
             let mut sighash_cache = SighashCache::new(&mut unsigned_tx);
 
             for input_index in 0..num_inputs {
-                let script = &tx_state.spend_infos()[input_index].script_buf;
+                let script = &tx_state.spend_infos()[input_index]
+                    .clone()
+                    .unwrap()
+                    .script_buf;
                 let message =
                     create_script_spend_hash(&mut sighash_cache, input_index, script, prevouts)
                         .expect("should be able to produce script spend message");
@@ -984,11 +1003,7 @@ mod tests {
                     .collected_sigs()
                     .nth(input_index)
                     .expect("collected signatures for input index must exist")
-<<<<<<< HEAD
                     .get(&(signer_index as OperatorIdx))
-=======
-                    .get(&(signer_index as u32))
->>>>>>> 437b63e (refactor: address PR comments and squash commits)
                     .is_some_and(|sig| *sig.inner() == external_signature));
             }
         }

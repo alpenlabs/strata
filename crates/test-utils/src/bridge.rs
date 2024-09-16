@@ -11,10 +11,9 @@ use alpen_express_primitives::{
 use arbitrary::{Arbitrary, Unstructured};
 use bitcoin::{
     absolute::LockTime,
-    key::Secp256k1,
     opcodes::all::{OP_PUSHNUM_1, OP_RETURN},
     script::Builder,
-    secp256k1::{rand, All, Keypair, PublicKey, SecretKey},
+    secp256k1::{rand, Keypair, PublicKey, SecretKey},
     taproot::{LeafVersion, TaprootBuilder, TaprootSpendInfo},
     transaction::Version,
     Address, Amount, Network, Psbt, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Witness,
@@ -25,7 +24,7 @@ use rand::{Rng, RngCore};
 use threadpool::ThreadPool;
 
 /// Generate `count` (public key, private key) pairs as two separate [`Vec`].
-pub fn generate_keypairs(secp: &Secp256k1<All>, count: usize) -> (Vec<PublicKey>, Vec<SecretKey>) {
+pub fn generate_keypairs(count: usize) -> (Vec<PublicKey>, Vec<SecretKey>) {
     let mut secret_keys: Vec<SecretKey> = Vec::with_capacity(count);
     let mut pubkeys: Vec<PublicKey> = Vec::with_capacity(count);
 
@@ -33,7 +32,7 @@ pub fn generate_keypairs(secp: &Secp256k1<All>, count: usize) -> (Vec<PublicKey>
 
     while pubkeys_set.len() != count {
         let sk = SecretKey::new(&mut rand::thread_rng());
-        let keypair = Keypair::from_secret_key(secp, &sk);
+        let keypair = Keypair::from_secret_key(SECP256K1, &sk);
         let pubkey = PublicKey::from_keypair(&keypair);
 
         if pubkeys_set.insert(pubkey) {
@@ -77,7 +76,7 @@ pub fn generate_mock_prevouts(count: usize) -> Vec<TxOut> {
 /// An unsigned tx has an empty script_sig/witness fields.
 pub fn generate_mock_unsigned_tx(num_inputs: usize) -> (Transaction, TaprootSpendInfo, ScriptBuf) {
     // actually construct a valid taptree order to check PSBT finalization
-    let (pks, _) = generate_keypairs(SECP256K1, 1);
+    let (pks, _) = generate_keypairs(1);
     let internal_key = pks[0].x_only_public_key().0;
 
     let anyone_can_spend = Builder::new().push_opcode(OP_PUSHNUM_1).into_script();
@@ -155,7 +154,7 @@ pub fn generate_mock_tx_signing_data(num_inputs: usize) -> TxSigningData {
 
     TxSigningData {
         psbt,
-        spend_infos: vec![spend_info; num_inputs],
+        spend_infos: vec![Some(spend_info); num_inputs],
     }
 }
 

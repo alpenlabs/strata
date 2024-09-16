@@ -25,7 +25,7 @@ pub struct BridgeTxState {
     psbt: BitcoinPsbt,
 
     /// The witness elements required to spend a taproot output.
-    spend_infos: Vec<SpendInfo>,
+    spend_infos: Vec<Option<SpendInfo>>,
 
     /// The table of pubkeys that is used to lock the UTXO present as an input in the psbt.
     /// This table maps the `OperatorIdx` to their corresponding pubkeys.
@@ -74,7 +74,7 @@ impl BridgeTxState {
     }
 
     /// Get the spend info associated with each input in the PSBT.
-    pub fn spend_infos(&self) -> &[SpendInfo] {
+    pub fn spend_infos(&self) -> &[Option<SpendInfo>] {
         &self.spend_infos[..]
     }
 
@@ -234,8 +234,6 @@ mod tests {
         generate_sec_nonce, permute,
     };
     use arbitrary::Unstructured;
-    use bitcoin::{key::Secp256k1, secp256k1::All};
-    use musig2::secp256k1::SECP256K1;
 
     use super::*;
     use crate::entities::errors::EntityError;
@@ -245,7 +243,7 @@ mod tests {
         let own_index = 0;
         let num_operators = 2;
         let num_inputs = 1;
-        let mut tx_state = create_mock_tx_state(SECP256K1, own_index, num_inputs, num_operators);
+        let mut tx_state = create_mock_tx_state(own_index, num_inputs, num_operators);
 
         assert!(
             !tx_state.has_all_nonces(),
@@ -276,7 +274,7 @@ mod tests {
         let own_index = 0;
         let num_operators = 2;
         let num_inputs = 1;
-        let mut tx_state = create_mock_tx_state(SECP256K1, own_index, num_inputs, num_operators);
+        let mut tx_state = create_mock_tx_state(own_index, num_inputs, num_operators);
 
         let data = vec![0u8; 1024];
         let mut unstructured = Unstructured::new(&data[..]);
@@ -310,7 +308,7 @@ mod tests {
         let own_index = 0;
         let num_operators = 10;
         let num_inputs = 1;
-        let mut tx_state = create_mock_tx_state(SECP256K1, own_index, num_inputs, num_operators);
+        let mut tx_state = create_mock_tx_state(own_index, num_inputs, num_operators);
 
         let data = vec![0u8; 1024];
         let mut unstructured = Unstructured::new(&data[..]);
@@ -361,7 +359,7 @@ mod tests {
         let own_index = 0;
         let num_operators = 2;
         let num_inputs = 1;
-        let mut tx_state = create_mock_tx_state(SECP256K1, own_index, num_inputs, num_operators);
+        let mut tx_state = create_mock_tx_state(own_index, num_inputs, num_operators);
 
         for i in 0..num_operators {
             let data = vec![0u8; 32];
@@ -382,11 +380,10 @@ mod tests {
 
     #[test]
     fn test_is_fully_signed_missing_signature() {
-        let secp = Secp256k1::new();
         let own_index = 0;
         let num_operators = 1;
         let num_inputs = 1;
-        let mut tx_state = create_mock_tx_state(&secp, own_index, num_inputs, num_operators);
+        let mut tx_state = create_mock_tx_state(own_index, num_inputs, num_operators);
 
         let data = vec![0u8; 32];
         let mut unstructured = Unstructured::new(&data);
@@ -412,11 +409,10 @@ mod tests {
 
     #[test]
     fn test_add_signature_success() {
-        let secp = Secp256k1::new();
         let own_index = 0;
         let num_operators = 1;
         let num_inputs = 3;
-        let mut tx_state = create_mock_tx_state(&secp, own_index, num_inputs, num_operators);
+        let mut tx_state = create_mock_tx_state(own_index, num_inputs, num_operators);
 
         let data = vec![0u8; 32];
         let mut unstructured = Unstructured::new(&data);
@@ -442,11 +438,10 @@ mod tests {
 
     #[test]
     fn test_add_signature_invalid_pubkey() {
-        let secp = Secp256k1::new();
         let own_index = 0;
         let num_operators = 1;
         let num_inputs = 1;
-        let mut tx_state = create_mock_tx_state(&secp, own_index, num_inputs, num_operators);
+        let mut tx_state = create_mock_tx_state(own_index, num_inputs, num_operators);
 
         let data = vec![0u8; 32];
         let mut unstructured = Unstructured::new(&data);
@@ -468,11 +463,10 @@ mod tests {
 
     #[test]
     fn test_add_signature_input_index_out_of_bounds() {
-        let secp = Secp256k1::new();
         let own_index = 0;
         let num_operators = 1;
         let num_inputs = 1;
-        let mut tx_state = create_mock_tx_state(&secp, own_index, num_inputs, num_operators);
+        let mut tx_state = create_mock_tx_state(own_index, num_inputs, num_operators);
 
         let data = vec![0u8; 32];
         let mut unstructured = Unstructured::new(&data);
@@ -508,11 +502,10 @@ mod tests {
 
     #[test]
     fn test_ordered_sigs() {
-        let secp = Secp256k1::new();
         let own_index = 0;
         let num_operators = 1;
         let num_inputs = 3;
-        let mut tx_state = create_mock_tx_state(&secp, own_index, num_inputs, num_operators);
+        let mut tx_state = create_mock_tx_state(own_index, num_inputs, num_operators);
 
         let mut operator_ids = (0..num_operators).collect::<Vec<usize>>();
         permute(&mut operator_ids);
@@ -556,12 +549,11 @@ mod tests {
     /// leveraging [`arbitrary::Arbitrary`] since we want more fine-grained control over the created
     /// structure.
     fn create_mock_tx_state(
-        secp: &Secp256k1<All>,
         own_index: usize,
         num_inputs: usize,
         num_operators: usize,
     ) -> BridgeTxState {
-        let (pks, sks) = generate_keypairs(secp, num_operators);
+        let (pks, sks) = generate_keypairs(num_operators);
 
         let tx_output = generate_mock_tx_signing_data(num_inputs);
 

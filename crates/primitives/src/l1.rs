@@ -367,7 +367,7 @@ impl BitcoinAmount {
     pub const SIZE: usize = 8;
 
     /// The number of sats in 1 bitcoin.
-    const SATS_FACTOR: u64 = 100_000_000;
+    pub const SATS_FACTOR: u64 = 100_000_000;
 
     /// Get the number of sats in this [`BitcoinAmount`].
     pub const fn to_sat(&self) -> u64 {

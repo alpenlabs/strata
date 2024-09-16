@@ -1,5 +1,6 @@
 //! Enumerated errors related to creation and signing of bridge-related transactions.
 
+use alpen_express_primitives::errors::BridgeParseError;
 use bitcoin::{
     psbt,
     taproot::{TaprootBuilder, TaprootBuilderError},
@@ -12,6 +13,10 @@ pub enum BridgeTxBuilderError {
     /// Error building the Deposit Transaction.
     #[error("could not build deposit transaction")]
     DepositTransaction(#[from] DepositTransactionError),
+
+    /// Error building the Deposit Transaction.
+    #[error("could not build cooperative withdrawal transaction")]
+    CooperativeWithdrawalTransaction(#[from] CooperativeWithdrawalError),
 
     /// Error due to there being no script provided to create a taproot address.
     #[error("noscript taproot address for only script path spend is not possible")]
@@ -75,4 +80,12 @@ pub enum DepositTransactionError {
     /// The provided tapleaf hash (merkle branch) is invalid.
     #[error("invalid merkle proof")]
     InvalidTapLeafHash,
+}
+
+/// Error while creating the cooperative withdrawal transaction.
+#[derive(Debug, Clone, Error)]
+pub enum CooperativeWithdrawalError {
+    /// The supplied user x-only-pk for the user requesting the withdrawal is incorrect.
+    #[error("the supplied user public key is invalid: {0}")]
+    InvalidUserPk(#[from] BridgeParseError),
 }

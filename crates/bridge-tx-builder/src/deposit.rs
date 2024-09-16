@@ -119,7 +119,7 @@ impl DepositInfo {
     fn compute_spend_infos(
         &self,
         build_context: &impl BuildContext,
-    ) -> BridgeTxBuilderResult<Vec<SpendInfo>> {
+    ) -> BridgeTxBuilderResult<Vec<Option<SpendInfo>>> {
         // The Deposit Request (DT) spends the n-of-n multisig leaf
         let spend_script = n_of_n_script(&build_context.aggregated_pubkey());
         let spend_script_hash =
@@ -162,10 +162,10 @@ impl DepositInfo {
             return Err(DepositTransactionError::ControlBlockError)?;
         }
 
-        let spend_info = SpendInfo {
+        let spend_info = Some(SpendInfo {
             script_buf: spend_script,
             control_block,
-        };
+        });
 
         Ok(vec![spend_info])
     }
@@ -265,16 +265,16 @@ mod tests {
 
     #[test]
     fn test_create_spend_infos() {
-        let secp = Secp256k1::new();
-        let (operator_pubkeys, _) = generate_keypairs(&secp, 10);
+        let (operator_pubkeys, _) = generate_keypairs(10);
         let operator_pubkeys = generate_pubkey_table(&operator_pubkeys);
 
         let deposit_request_outpoint = OutPoint::null();
 
         let (drt_output_address, take_back_leaf_hash) =
             create_drt_taproot_output(operator_pubkeys.clone());
+        let self_index = 0;
 
-        let tx_builder = TxBuildContext::new(operator_pubkeys, Network::Regtest);
+        let tx_builder = TxBuildContext::new(operator_pubkeys, Network::Regtest, self_index);
 
         // Correct merkle proof
         let deposit_info = DepositInfo::new(

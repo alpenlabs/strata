@@ -140,7 +140,7 @@ impl Operator {
         let keypair = Keypair::from_secret_key(SECP256K1, &secret_key);
         let sig_manager = setup_sig_manager(index, keypair);
 
-        let tx_builder = TxBuildContext::new(pubkey_table.clone(), Network::Regtest);
+        let tx_builder = TxBuildContext::new(pubkey_table.clone(), Network::Regtest, index);
 
         Self {
             agent,

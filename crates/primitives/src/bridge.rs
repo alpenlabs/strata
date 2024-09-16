@@ -182,7 +182,10 @@ pub struct TxSigningData {
 
     /// The list of witness elements required to spend each input in the unsigned transaction
     /// respectively.
-    pub spend_infos: Vec<SpendInfo>,
+    ///
+    /// If a key-spend path is being used, there may be no [`SpendInfo`] as this kind of spending
+    /// only requires the signature in the witness stack. See [BIP 341](https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki#constructing-and-spending-taproot-outputs).
+    pub spend_infos: Vec<Option<SpendInfo>>,
 }
 
 /// Information regarding the signature which includes the schnorr signature itself as well as the

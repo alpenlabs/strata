@@ -1,7 +1,10 @@
 //! Provides wallet-like functionalities for creating nonces and signatures.
 
 use alpen_express_db::entities::bridge_tx_state::BridgeTxState;
-use alpen_express_primitives::bridge::{Musig2SecNonce, OperatorPartialSig, PublickeyTable};
+use alpen_express_primitives::{
+    bridge::{Musig2SecNonce, PublickeyTable, SignatureInfo},
+    l1::SpendInfo,
+};
 use bitcoin::{
     hashes::Hash,
     secp256k1::{Keypair, Message, SecretKey},
@@ -12,6 +15,29 @@ use bitcoin::{
 use musig2::{sign_partial, verify_partial, AggNonce, KeyAggContext, PartialSignature};
 
 use crate::errors::{BridgeSigError, BridgeSigResult};
+
+/// Get the message and serialized [`ScriptBuf`] and
+/// [`ControlBlock`](bitcoin::taproot::ControlBlock) from the [`SpendInfo`].
+///
+///
+/// If the `maybe_spend_info` is None, a key spend path hash is returned, and otherwise, a script
+/// spend hash.
+pub fn create_message_hash(
+    sighash_cache: &mut SighashCache<&mut Transaction>,
+    input_index: usize,
+    prevouts: &[TxOut],
+    maybe_spend_info: &Option<SpendInfo>,
+) -> BridgeSigResult<Message> {
+    if let Some(SpendInfo {
+        script_buf,
+        control_block: _,
+    }) = maybe_spend_info
+    {
+        return create_script_spend_hash(sighash_cache, input_index, script_buf, prevouts);
+    }
+
+    create_key_spend_hash(sighash_cache, input_index, prevouts)
+}
 
 /// Generate a sighash message for a taproot `script` spending path at the `input_index` of
 /// all `prevouts`.
@@ -31,6 +57,25 @@ pub fn create_script_spend_hash(
         leaf_hash,
         sighash_type,
     )?;
+
+    let message =
+        Message::from_digest_slice(sighash.as_byte_array()).expect("TapSigHash is a hash");
+
+    Ok(message)
+}
+
+/// Generate a sighash message for a taproot `key` spending path at the `input_index` of
+/// all `prevouts`.
+pub fn create_key_spend_hash(
+    sighash_cache: &mut SighashCache<&mut Transaction>,
+    input_index: usize,
+    prevouts: &[TxOut],
+) -> BridgeSigResult<Message> {
+    let sighash_type = sighash::TapSighashType::Default;
+    let prevouts = Prevouts::All(prevouts);
+
+    let sighash =
+        sighash_cache.taproot_key_spend_signature_hash(input_index, &prevouts, sighash_type)?;
 
     let message =
         Message::from_digest_slice(sighash.as_byte_array()).expect("TapSigHash is a hash");
@@ -253,7 +298,7 @@ mod tests {
     fn setup(num_operators: usize, own_index: usize) -> (Vec<SecretKey>, AggNonce, BridgeTxState) {
         assert!(own_index.lt(&num_operators), "invalid own index set");
 
-        let (pks, sks) = generate_keypairs(SECP256K1, num_operators);
+        let (pks, sks) = generate_keypairs(num_operators);
         let pubkey_table = generate_pubkey_table(&pks);
 
         let num_inputs = 1;
