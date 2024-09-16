@@ -11,6 +11,7 @@ use task_tracker::TaskTracker;
 use tracing::info;
 
 mod args;
+pub(crate) mod config;
 pub(crate) mod manager;
 pub(crate) mod primitives;
 pub(crate) mod proving;
@@ -39,13 +40,17 @@ async fn main() {
 
     // run rpc server
     let rpc_url = args.get_rpc_url();
-    run_rpc_server(rpc_context, rpc_url)
+    run_rpc_server(rpc_context, rpc_url, args.enable_dev_rpcs)
         .await
         .expect("prover client rpc")
 }
 
-async fn run_rpc_server(rpc_context: RpcContext, rpc_url: String) -> anyhow::Result<()> {
+async fn run_rpc_server(
+    rpc_context: RpcContext,
+    rpc_url: String,
+    enable_dev_rpc: bool,
+) -> anyhow::Result<()> {
     let rpc_impl = ProverClientRpc::new(rpc_context);
-    rpc_server::start(&rpc_impl, rpc_url).await?;
+    rpc_server::start(&rpc_impl, rpc_url, enable_dev_rpc).await?;
     anyhow::Ok(())
 }

@@ -48,15 +48,22 @@ impl RpcContext {
     }
 }
 
-pub(crate) async fn start<T>(rpc_impl: &T, rpc_url: String) -> anyhow::Result<()>
+pub(crate) async fn start<T>(
+    rpc_impl: &T,
+    rpc_url: String,
+    enable_dev_rpc: bool,
+) -> anyhow::Result<()>
 where
     T: ExpressProverClientApiServerServer + Clone,
 {
     let mut rpc_module = RpcModule::new(rpc_impl.clone());
-    let prover_client_api = ExpressProverClientApiServerServer::into_rpc(rpc_impl.clone());
-    rpc_module
-        .merge(prover_client_api)
-        .context("merge prover client api")?;
+
+    if enable_dev_rpc {
+        let prover_client_dev_api = ExpressProverClientApiServerServer::into_rpc(rpc_impl.clone());
+        rpc_module
+            .merge(prover_client_dev_api)
+            .context("merge prover client api")?;
+    }
 
     info!("connecting to the server {:?}", rpc_url);
     let rpc_server = jsonrpsee::server::ServerBuilder::new()
@@ -105,7 +112,7 @@ impl ExpressProverClientApiServerServer for ProverClientRpc {
         };
         let witness = ProverInput::ElBlock(el_block_witness);
 
-        let task_tracker = Arc::clone(&self.context.task_tracker);
+        let task_tracker = &self.context.task_tracker.clone();
         let task_id = task_tracker.create_task(el_block_num, witness).await;
 
         RpcResult::Ok(task_id.to_string())

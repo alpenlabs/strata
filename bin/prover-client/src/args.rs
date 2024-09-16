@@ -15,6 +15,9 @@ pub struct Args {
 
     #[argh(option, description = "reth rpc host:port")]
     pub reth_rpc: String,
+
+    #[argh(option, description = "prover client dev rpc", default = "true")]
+    pub enable_dev_rpcs: bool,
 }
 
 impl Args {

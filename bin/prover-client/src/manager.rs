@@ -5,10 +5,8 @@ use tokio::time::{sleep, Duration};
 use tracing::info;
 
 use crate::{
-    primitives::{
-        config::NUM_PROVER_WORKER,
-        tasks_scheduler::{ProvingTask, ProvingTaskStatus},
-    },
+    config::NUM_PROVER_WORKER,
+    primitives::tasks_scheduler::{ProvingTask, ProvingTaskStatus},
     proving::Prover,
     task_tracker::TaskTracker,
 };
