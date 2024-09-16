@@ -5,8 +5,11 @@ use alpen_express_primitives::bridge::PublickeyTable;
 use bitcoin::{
     absolute::LockTime,
     key::UntweakedPublicKey,
-    opcodes::all::{OP_CHECKSIG, OP_PUSHBYTES_11, OP_PUSHBYTES_20, OP_PUSHNUM_1, OP_RETURN},
-    script::Builder,
+    opcodes::{
+        all::{OP_CHECKSIG, OP_RETURN},
+        OP_TRUE,
+    },
+    script::{Builder, PushBytesBuf},
     secp256k1::{PublicKey, XOnlyPublicKey},
     taproot::{TaprootBuilder, TaprootSpendInfo},
     transaction, Address, Amount, Network, OutPoint, ScriptBuf, Transaction, TxIn, TxOut, Witness,
@@ -43,12 +46,15 @@ pub fn get_aggregated_pubkey(pubkeys: PublickeyTable) -> XOnlyPublicKey {
 
 /// Create the metadata script that "stores" the execution layer address information.
 pub fn metadata_script(el_address: &[u8; 20]) -> ScriptBuf {
+    let mut data = PushBytesBuf::new();
+    data.extend_from_slice(MAGIC_BYTES)
+        .expect("MAGIC_BYTES should be within the limit");
+    data.extend_from_slice(&el_address[..])
+        .expect("el_address should be within the limit");
+
     Builder::new()
         .push_opcode(OP_RETURN)
-        .push_opcode(OP_PUSHBYTES_11)
-        .push_slice(MAGIC_BYTES)
-        .push_opcode(OP_PUSHBYTES_20)
-        .push_slice(el_address)
+        .push_slice(data)
         .into_script()
 }
 
@@ -187,7 +193,7 @@ fn build_taptree(
 /// Create an output that can be spent by anyone, i.e. its script contains a single `OP_TRUE`.
 pub fn anyone_can_spend_txout() -> TxOut {
     // `OP_PUSHNUM_1` is `OP_TRUE` that is it is always yields true for any unlocking script.
-    let script = Builder::new().push_opcode(OP_PUSHNUM_1).into_script();
+    let script = Builder::new().push_opcode(OP_TRUE).into_script();
     let script_pubkey = script.to_p2wsh();
     let value = script_pubkey.minimal_non_dust();
 
