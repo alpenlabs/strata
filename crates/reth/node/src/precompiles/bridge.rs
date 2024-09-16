@@ -8,19 +8,19 @@ use crate::primitives::WithdrawalIntentEvent;
 
 // TODO: address?
 pub const BRIDGEOUT_ADDRESS: Address = address!("000000000000000000000000000000000b121d9e");
-const MIN_WITHDRAWAL_WEI: u128 = 1_000_000_000_000_000_000u128;
+const WITHDRAWAL_WEI: u128 = 10 * (1e18 as u128);
 
 /// Custom precompile to burn rollup native token and add bridge out intent of equal amount.
 /// Bridge out intent is created during block payload generation.
 /// This precompile validates transaction and burns the bridge out amount.
 pub struct BridgeoutPrecompile {
-    min_withdrawal_wei: U256,
+    withdrawal_wei: U256,
 }
 
 impl Default for BridgeoutPrecompile {
     fn default() -> Self {
         Self {
-            min_withdrawal_wei: U256::from(MIN_WITHDRAWAL_WEI),
+            withdrawal_wei: U256::from(WITHDRAWAL_WEI),
         }
     }
 }
@@ -34,34 +34,22 @@ impl<DB: Database> ContextStatefulPrecompile<DB> for BridgeoutPrecompile {
     ) -> PrecompileResult {
         // calldata must be 32bytes x-only pubkey
         if bytes.len() != 32 {
-            return Err(PrecompileErrors::Error(PrecompileError::other(
-                "invalid data",
-            )));
+            return Err(PrecompileError::other("invalid data").into());
         }
 
-        // ensure minimum bridgeout amount
+        // bridgeout MUST be for exactly 10BTC
         let value = evmctx.env.tx.value;
-        if value < self.min_withdrawal_wei {
-            return Err(PrecompileErrors::Error(PrecompileError::other(
-                "below min withdrawal amt",
-            )));
+        if value != self.withdrawal_wei {
+            return Err(PrecompileError::other("invalid withdrawal value").into());
         }
 
-        let (sats, rem) = value.div_rem(U256::from(10_000_000_000u128));
-
-        if !rem.is_zero() {
-            // ensure there are no leftovers that get lost.
-            // is this important?
-            return Err(PrecompileErrors::Error(PrecompileError::other(
-                "value must be exact sats",
-            )));
-        }
+        let (sats, _) = value.div_rem(U256::from(10_000_000_000u128));
 
         let Ok(amount) = sats.try_into() else {
-            // should never happen. 2^64 ~ 8700 x total_btc_stats
-            return Err(PrecompileErrors::Error(PrecompileError::other(
-                "above max withdrawal amt",
-            )));
+            // should never happen
+            return Err(PrecompileErrors::Fatal {
+                msg: "above max withdrawal amt".into(),
+            });
         };
 
         // log bridge withdrawal intent
@@ -76,7 +64,23 @@ impl<DB: Database> ContextStatefulPrecompile<DB> for BridgeoutPrecompile {
             data: logdata,
         });
 
-        // TODO: burn value
+        // burn value sent to bridge
+        let Ok((account, _)) = evmctx.load_account(BRIDGEOUT_ADDRESS) else {
+            // should never happen
+            return Err(PrecompileErrors::Fatal {
+                msg: "could not load account".into(),
+            });
+        };
+
+        let (new_balance, overflow) = account.info.balance.overflowing_sub(value);
+        if overflow {
+            // should never happen
+            return Err(PrecompileErrors::Fatal {
+                msg: "invalid balance".into(),
+            });
+        }
+
+        account.info.balance = new_balance;
 
         // TODO: gas for bridge out, using 0 gas currently
         Ok(PrecompileOutput::new(0, Bytes::new()))
