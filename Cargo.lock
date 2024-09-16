@@ -3816,6 +3816,7 @@ dependencies = [
  "alloy-rpc-types",
  "anyhow",
  "bincode",
+ "express-reth-evm",
  "hex-literal",
  "k256",
  "reth-primitives",
@@ -3897,6 +3898,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "express-reth-evm"
+version = "0.1.0"
+dependencies = [
+ "express-reth-primitives",
+ "reth-chainspec",
+ "reth-evm",
+ "reth-evm-ethereum",
+ "reth-node-ethereum",
+ "reth-primitives",
+ "revm",
+ "revm-primitives",
+]
+
+[[package]]
 name = "express-reth-exex"
 version = "0.1.0"
 dependencies = [
@@ -3926,6 +3941,8 @@ name = "express-reth-node"
 version = "0.1.0"
 dependencies = [
  "alloy-sol-types",
+ "express-reth-evm",
+ "express-reth-primitives",
  "eyre",
  "reth",
  "reth-basic-payload-builder",
@@ -3943,6 +3960,15 @@ dependencies = [
  "revm-primitives",
  "serde",
  "tracing",
+]
+
+[[package]]
+name = "express-reth-primitives"
+version = "0.1.0"
+dependencies = [
+ "alloy-sol-types",
+ "reth-primitives",
+ "serde",
 ]
 
 [[package]]

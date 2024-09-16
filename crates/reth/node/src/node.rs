@@ -1,3 +1,4 @@
+use express_reth_evm::ExpressEvmConfig;
 use reth::builder::{
     components::{ComponentsBuilder, ExecutorBuilder},
     BuilderContext, Node,
@@ -9,7 +10,6 @@ use reth_node_ethereum::{
 };
 
 use super::{engine::ExpressEngineTypes, payload_builder::ExpressPayloadServiceBuilder};
-use crate::evm::ExpressEvmConfig;
 
 #[derive(Debug, Clone, Default)]
 #[non_exhaustive]
