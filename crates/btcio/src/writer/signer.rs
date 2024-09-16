@@ -5,7 +5,10 @@ use alpen_express_primitives::buf::Buf32;
 use bitcoin::{consensus, Transaction};
 use tracing::*;
 
-use super::{builder::build_inscription_txs, config::WriterConfig};
+use super::{
+    builder::{build_inscription_txs, InscriptionError},
+    config::WriterConfig,
+};
 use crate::{
     broadcaster::L1BroadcastHandle,
     rpc::traits::{Reader, Signer, Wallet},
@@ -23,11 +26,12 @@ pub async fn create_and_sign_blob_inscriptions(
     bhandle: &L1BroadcastHandle,
     client: Arc<impl Reader + Wallet + Signer>,
     config: &WriterConfig,
-) -> anyhow::Result<(Buf32, Buf32)> {
+) -> Result<(Buf32, Buf32), InscriptionError> {
     trace!("Creating and signing blob inscriptions");
     let (commit, reveal) = build_inscription_txs(&blobentry.blob, &client, config).await?;
 
-    debug!("Signing commit transaction {}", commit.compute_txid());
+    let ctxid = commit.compute_txid();
+    debug!(commit_txid = ?ctxid, "Signing commit transaction");
     let signed_commit = client
         .sign_raw_transaction_with_wallet(&commit)
         .await
@@ -44,8 +48,14 @@ pub async fn create_and_sign_blob_inscriptions(
 
     // These don't need to be atomic. It will be handled by writer task if it does not find both
     // commit-reveal txs in db by triggering re-signing.
-    let _ = bhandle.insert_new_tx_entry(cid, centry).await?;
-    let _ = bhandle.insert_new_tx_entry(rid, rentry).await?;
+    let _ = bhandle
+        .insert_new_tx_entry(cid, centry)
+        .await
+        .map_err(|e| InscriptionError::Other(e.into()))?;
+    let _ = bhandle
+        .insert_new_tx_entry(rid, rentry)
+        .await
+        .map_err(|e| InscriptionError::Other(e.into()))?;
     Ok((cid, rid))
 }
 

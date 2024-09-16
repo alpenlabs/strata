@@ -15,7 +15,7 @@ use crate::{
     broadcaster::L1BroadcastHandle,
     rpc::traits::{Reader, Signer, Wallet},
     status::{apply_status_updates, L1StatusUpdate},
-    writer::signer::create_and_sign_blob_inscriptions,
+    writer::{builder::InscriptionError, signer::create_and_sign_blob_inscriptions},
 };
 
 // TODO: from config
@@ -163,20 +163,33 @@ pub async fn watcher_task(
                 // entry
                 BlobL1Status::Unsigned | BlobL1Status::NeedsResign => {
                     debug!(%curr_blobidx, "Processing unsigned blobentry");
-                    let (cid, rid) = create_and_sign_blob_inscriptions(
+                    match create_and_sign_blob_inscriptions(
                         &blobentry,
                         &bcast_handle,
                         rpc_client.clone(),
                         &config,
                     )
-                    .await?;
-                    let mut updated_entry = blobentry.clone();
-                    updated_entry.status = BlobL1Status::Unpublished;
-                    updated_entry.commit_txid = cid;
-                    updated_entry.reveal_txid = rid;
-                    update_existing_entry(curr_blobidx, updated_entry, &insc_ops).await?;
+                    .await
+                    {
+                        Ok((cid, rid)) => {
+                            let mut updated_entry = blobentry.clone();
+                            updated_entry.status = BlobL1Status::Unpublished;
+                            updated_entry.commit_txid = cid;
+                            updated_entry.reveal_txid = rid;
+                            update_existing_entry(curr_blobidx, updated_entry, &insc_ops).await?;
 
-                    debug!(%curr_blobidx, "Signed blob");
+                            debug!(%curr_blobidx, "Signed blob");
+                        }
+                        Err(InscriptionError::NotEnoughUtxos(required, available)) => {
+                            // Just wait till we have enough utxos and let the status be `Unsigned`
+                            // or `NeedsResign`
+                            // Maybe send an alert
+                            warn!(%required, %available, "Not enough utxos available to create commit/reveal transaction");
+                        }
+                        e => {
+                            e?;
+                        }
+                    }
                 }
                 // If finalized, nothing to do, move on to process next entry
                 BlobL1Status::Finalized => {
