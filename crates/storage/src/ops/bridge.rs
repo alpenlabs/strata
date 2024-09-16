@@ -1,9 +1,7 @@
 use std::sync::Arc;
 
 use alpen_express_db::{
-    entities::bridge_tx_state::BridgeTxState,
-    traits::{BridgeTxDatabase, BridgeTxProvider, BridgeTxStore},
-    DbResult,
+    entities::bridge_tx_state::BridgeTxState, traits::BridgeTxDatabase, DbResult,
 };
 use bitcoin::Txid;
 
@@ -35,9 +33,7 @@ fn get_tx_state<D: BridgeTxDatabase + Sync + Send + 'static>(
     context: &Context<D>,
     txid: Txid,
 ) -> DbResult<Option<BridgeTxState>> {
-    let bridge_sig_provider = context.db.bridge_tx_provider();
-
-    bridge_sig_provider.get_tx_state(txid.into())
+    context.db.get_tx_state(txid.into())
 }
 
 fn upsert_tx_state<D: BridgeTxDatabase + Sync + Send + 'static>(
@@ -45,7 +41,5 @@ fn upsert_tx_state<D: BridgeTxDatabase + Sync + Send + 'static>(
     txid: Txid,
     tx_state: BridgeTxState,
 ) -> DbResult<()> {
-    let bridge_tx_store = context.db.bridge_tx_store();
-
-    bridge_tx_store.put_tx_state(txid.into(), tx_state)
+    context.db.put_tx_state(txid.into(), tx_state)
 }

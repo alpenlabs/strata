@@ -3,7 +3,7 @@ use std::{
     sync::Arc,
 };
 
-use alpen_express_db::stubs::bridge::StubTxStateStorage;
+use alpen_express_db::stubs::bridge::StubTxStateDb;
 use alpen_express_primitives::{
     bridge::{OperatorIdx, PublickeyTable, TxSigningData},
     l1::{BitcoinPsbt, BitcoinTxOut, OutputRef, SpendInfo},
@@ -161,7 +161,7 @@ pub fn generate_mock_tx_signing_data(num_inputs: usize) -> TxSigningData {
 
 /// Create mock database ops to interact with the bridge tx state in a stubbed in-memory database.
 pub fn generate_mock_tx_state_ops(num_threads: usize) -> BridgeTxStateOps {
-    let storage = StubTxStateStorage::default();
+    let storage = StubTxStateDb::default();
     let storage_ctx = Context::new(Arc::new(storage));
 
     let pool = ThreadPool::new(num_threads);
