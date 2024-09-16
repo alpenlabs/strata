@@ -305,7 +305,7 @@ where
                 }
             }
         };
-        warn!("evm-result: {:?}", result);
+        debug!(?result, "EVM transaction executed");
         // drop evm so db is released.
         drop(evm);
         // commit changes

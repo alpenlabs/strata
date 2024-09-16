@@ -13,10 +13,19 @@
     ],
     "rust-analyzer.linkedProjects": [
         "Cargo.toml",
-        "proofs/risc0/guest-reth-stf/Cargo.toml",
-        "proofs/sp1/guest-reth-stf/Cargo.toml",
+        "provers/risc0/guest-btc-blockspace/Cargo.toml",
+        "provers/risc0/guest-evm-ee-stf/Cargo.toml",
+        "provers/risc0/guest-cl-stf/Cargo.toml",
+        "provers/risc0/guest-l1-batch/Cargo.toml",
+        "provers/sp1/guest-btc-blockspace/Cargo.toml",
+        "provers/sp1/guest-evm-ee-stf/Cargo.toml",
+        "provers/sp1/guest-cl-stf/Cargo.toml",
+        "provers/sp1/guest-l1-batch/Cargo.toml",
     ],
     "rust-analyzer.diagnostics.enable": true,
+    // "rust-analyzer.cargo.features": [
+    //     "prover"
+    // ],
     "todohighlight.isEnable": true,
     "todohighlight.isCaseSensitive": true,
     "todohighlight.keywords": [

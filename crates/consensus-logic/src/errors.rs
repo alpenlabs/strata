@@ -71,15 +71,15 @@ pub enum Error {
     #[error("not yet implemented")]
     Unimplemented,
 
+    #[error("block assembly timed out")]
+    BlockAssemblyTimedOut,
+
     #[error("{0}")]
     Other(String),
 }
 
 #[derive(Debug, Error)]
 pub enum ChainTipError {
-    #[error("blockid {0:?} already attached")]
-    BlockAlreadyAttached(L2BlockId),
-
     #[error("tried to attach blkid {0:?} but missing parent blkid {1:?}")]
     AttachMissingParent(L2BlockId, L2BlockId),
 

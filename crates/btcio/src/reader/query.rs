@@ -19,12 +19,12 @@ use crate::{
         messages::{BlockData, L1Event},
         state::ReaderState,
     },
-    rpc::traits::BitcoinReader,
+    rpc::traits::Reader,
     status::{apply_status_updates, L1StatusUpdate},
 };
 
 pub async fn bitcoin_data_reader_task<D: Database + 'static>(
-    client: Arc<impl BitcoinReader>,
+    client: Arc<impl Reader>,
     event_tx: mpsc::Sender<L1Event>,
     target_next_block: u64,
     config: Arc<ReaderConfig>,
@@ -48,7 +48,7 @@ pub async fn bitcoin_data_reader_task<D: Database + 'static>(
 }
 
 async fn do_reader_task<D: Database + 'static>(
-    client: &impl BitcoinReader,
+    client: &impl Reader,
     event_tx: &mpsc::Sender<L1Event>,
     target_next_block: u64,
     config: Arc<ReaderConfig>,
@@ -131,7 +131,7 @@ fn derive_relevant_tx_types<D: Database + 'static>(
 async fn init_reader_state(
     target_next_block: u64,
     lookback: usize,
-    client: &impl BitcoinReader,
+    client: &impl Reader,
 ) -> anyhow::Result<ReaderState> {
     // Init the reader state using the blockid we were given, fill in a few blocks back.
     debug!(%target_next_block, "initializing reader state");
@@ -161,7 +161,7 @@ async fn init_reader_state(
 /// Polls the chain to see if there's new blocks to look at, possibly reorging
 /// if there's a mixup and we have to go back.
 async fn poll_for_new_blocks(
-    client: &impl BitcoinReader,
+    client: &impl Reader,
     event_tx: &mpsc::Sender<L1Event>,
     relevant_tx_types: &[RelevantTxType],
     state: &mut ReaderState,
@@ -226,7 +226,7 @@ async fn poll_for_new_blocks(
 /// Finds the highest block index where we do agree with the node.  If we never
 /// find one then we're really screwed.
 async fn find_pivot_block(
-    client: &impl BitcoinReader,
+    client: &impl Reader,
     state: &ReaderState,
 ) -> anyhow::Result<Option<(u64, BlockHash)>> {
     for (height, l1blkid) in state.iter_blocks_back() {
@@ -247,7 +247,7 @@ async fn find_pivot_block(
 
 async fn fetch_and_process_block(
     height: u64,
-    client: &impl BitcoinReader,
+    client: &impl Reader,
     event_tx: &mpsc::Sender<L1Event>,
     state: &mut ReaderState,
     status_updates: &mut Vec<L1StatusUpdate>,

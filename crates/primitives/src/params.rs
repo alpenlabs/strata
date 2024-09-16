@@ -32,10 +32,15 @@ pub struct RollupParams {
     pub l1_reorg_safe_depth: u32,
 
     /// target batch size in number of l2 blocks
+    // FIXME this name is confusing, is it different from `target_l2_batch_size`?
     pub batch_l2_blocks_target: u64,
 
     /// schnorr keys for operator
+    // FIXME this doesn't make sense, we should have better-defined entries
     pub operator_signing_keys: Vec<SchnorrKeypair>,
+
+    // FIXME how is this different from `batch_l1_blocks_target`?
+    pub target_l2_batch_size: u64,
 }
 
 /// Client sync parameters that are used to make the network work but don't

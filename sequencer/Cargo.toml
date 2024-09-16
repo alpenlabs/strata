@@ -21,7 +21,9 @@ alpen-express-rpc-api = { workspace = true }
 alpen-express-rpc-types = { workspace = true }
 alpen-express-state = { workspace = true }
 alpen-express-status = { workspace = true }
+express-rpc-utils = { workspace = true }
 express-storage = { workspace = true }
+express-sync = { workspace = true }
 express-tasks = { workspace = true }
 
 anyhow = { workspace = true }

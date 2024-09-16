@@ -1,11 +1,18 @@
 use std::sync::Arc;
 
-use alpen_express_btcio::reader::messages::L1Event;
+use alpen_express_btcio::{
+    inscription::InscriptionParser,
+    reader::messages::{BlockData, L1Event},
+};
 use alpen_express_db::traits::{Database, L1DataStore};
 use alpen_express_primitives::{
     buf::Buf32, l1::L1BlockManifest, params::Params, utils::generate_l1_tx,
 };
-use alpen_express_state::sync_event::SyncEvent;
+use alpen_express_state::{
+    batch::{BatchCommitment, SignedBatchCommitment},
+    id::L2BlockId,
+    sync_event::SyncEvent,
+};
 use bitcoin::{consensus::serialize, hashes::Hash, Block};
 use tokio::sync::mpsc;
 use tracing::*;
@@ -20,7 +27,7 @@ pub fn bitcoin_data_handler_task<D: Database + Send + Sync + 'static>(
     params: Arc<Params>,
 ) -> anyhow::Result<()> {
     while let Some(event) = event_rx.blocking_recv() {
-        if let Err(e) = handle_event(event, l1db.as_ref(), csm_ctl.as_ref(), &params) {
+        if let Err(e) = handle_bitcoin_event(event, l1db.as_ref(), csm_ctl.as_ref(), &params) {
             error!(err = %e, "failed to handle L1 event");
         }
     }
@@ -29,7 +36,7 @@ pub fn bitcoin_data_handler_task<D: Database + Send + Sync + 'static>(
     Ok(())
 }
 
-fn handle_event<L1D>(
+fn handle_bitcoin_event<L1D>(
     event: L1Event,
     l1db: &L1D,
     csm_ctl: &CsmController,
@@ -71,7 +78,7 @@ where
                 .map(|idx| generate_l1_tx(*idx, blockdata.block()))
                 .collect();
             let num_txs = l1txs.len();
-            l1db.put_block_data(blockdata.block_num(), manifest, l1txs)?;
+            l1db.put_block_data(blockdata.block_num(), manifest, l1txs.clone())?;
             info!(%height, %l1blkid, txs = %num_txs, "wrote L1 block manifest");
 
             // Write to sync event db if it's something we care about.
@@ -79,9 +86,62 @@ where
             let ev = SyncEvent::L1Block(blockdata.block_num(), blkid.into());
             csm_ctl.submit_event(ev)?;
 
+            // Check for da batch and send event accordingly
+            let batch = check_for_da_batch(&blockdata);
+            if !batch.is_empty() {
+                let ev = SyncEvent::L1DABatch(height, batch);
+                csm_ctl.submit_event(ev)?;
+            }
+
+            // TODO: Check for deposits and forced inclusions and emit appropriate events
+
             Ok(())
         }
     }
+}
+
+/// Parses inscriptions and checks for batch data in the transactions
+fn check_for_da_batch(blockdata: &BlockData) -> Vec<L2BlockId> {
+    let txs = blockdata
+        .relevant_tx_idxs()
+        .iter()
+        .map(|&idx| &blockdata.block().txdata[idx as usize]);
+
+    let inscriptions = txs.filter_map(|tx| {
+        tx.input[0].witness.tapscript().and_then(|scr| {
+            InscriptionParser::new(scr.into())
+                .parse_inscription_data()
+                .map_err(|e| {
+                    let txid = tx.compute_txid();
+                    warn!(%txid, err = %e, "invalid inscription inside transaction which is marked as relevant");
+                    e
+                })
+                .ok()
+                .map(|x| (x, tx))
+        })
+    });
+    let commitments: Vec<BatchCommitment> = inscriptions
+        .filter_map(|(insc, tx)| {
+            borsh::from_slice::<SignedBatchCommitment>(insc.batch_data())
+                .map_err(|e| {
+                    let txid = tx.compute_txid();
+                    warn!(%txid, err = %e, "could not deserialize blob inside inscription");
+                    e
+                })
+                .ok()
+                .map(Into::into)
+        })
+        .collect();
+
+    // NOTE/TODO: this is where we would verify the commitment, i.e, verify block ranges, verify
+    // proof, and whatever else that's necessary
+
+    // We only care about the last found commitment in a block. We'll most likely have only one
+    // commmitment in a block, but still
+    if let Some(commitment) = commitments.last() {
+        return vec![*commitment.l2blockid()];
+    }
+    Vec::default()
 }
 
 /// Given a block, generates a manifest of the parts we care about that we can

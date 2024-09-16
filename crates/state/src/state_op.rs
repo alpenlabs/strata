@@ -5,6 +5,7 @@
 
 use alpen_express_primitives::buf::Buf32;
 use borsh::{BorshDeserialize, BorshSerialize};
+use tracing::*;
 
 use crate::{
     bridge_ops, chain_state::ChainState, header::L2Header, id::L2BlockId, l1, l1::L1MaturationEntry,
@@ -82,6 +83,7 @@ fn apply_op_to_chainstate(op: &StateOp, state: &mut ChainState) {
         }
 
         StateOp::RevertL1Height(to_height) => {
+            debug!(%to_height, "Obtained RevertL1Height Operation");
             let mqueue = &mut state.l1_state.maturation_queue;
             let back_idx = mqueue.back_idx().expect("stateop: maturation queue empty");
 

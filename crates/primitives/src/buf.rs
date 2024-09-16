@@ -8,7 +8,7 @@ use arbitrary::Arbitrary;
 use bitcoin::{hashes::Hash, BlockHash, Txid};
 use borsh::{BorshDeserialize, BorshSerialize};
 use reth_primitives::alloy_primitives::FixedBytes;
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 
 // 20-byte buf
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default)]
@@ -47,7 +47,7 @@ impl fmt::Display for Buf20 {
 }
 
 // 32-byte buf, useful for hashes and schnorr pubkeys
-#[derive(Clone, Copy, Default, Eq, Hash, PartialEq, PartialOrd, Serialize, Ord)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Deserialize, Serialize)]
 pub struct Buf32(pub FixedBytes<32>);
 
 impl Buf32 {
@@ -116,34 +116,6 @@ impl fmt::Display for Buf32 {
         hex::encode_to_slice(&self.0[29..], &mut buf).expect("buf: enc hex");
         f.write_str(unsafe { str::from_utf8_unchecked(&buf) })?;
         Ok(())
-    }
-}
-
-impl<'de> Deserialize<'de> for Buf32 {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        // Deserialize the input as a string
-        let s = <String as Deserialize>::deserialize(deserializer)?;
-
-        // Convert the hexadecimal string to bytes
-        let bytes =
-            hex::decode(s.strip_prefix("0x").unwrap_or(&s)).map_err(serde::de::Error::custom)?;
-
-        // Ensure the byte array is exactly 32 bytes long
-        if bytes.len() != 32 {
-            return Err(serde::de::Error::invalid_length(
-                bytes.len(),
-                &"expected 32 bytes",
-            ));
-        }
-
-        // Convert the byte vector into a fixed-size array
-        let mut buf32 = [0u8; 32];
-        buf32.copy_from_slice(&bytes);
-
-        Ok(Buf32::from(buf32))
     }
 }
 
@@ -283,6 +255,23 @@ mod tests {
                 "\"0x01010101010101010101010101010101010101010101010101010101010101aa\"",
             )
             .unwrap()
+        );
+    }
+
+    #[test]
+    fn test_buf32_serialization() {
+        assert_eq!(
+            serde_json::to_string(&Buf32::from([0; 32])).unwrap(),
+            String::from("\"0x0000000000000000000000000000000000000000000000000000000000000000\"")
+        );
+
+        assert_eq!(
+            serde_json::to_string(&Buf32::from([
+                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                1, 1, 1, 170u8
+            ]))
+            .unwrap(),
+            String::from("\"0x01010101010101010101010101010101010101010101010101010101010101aa\"")
         );
     }
 }

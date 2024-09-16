@@ -28,6 +28,7 @@ pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
     // Seqdb schemas
     SeqBlobIdSchema::COLUMN_FAMILY_NAME,
     SeqBlobSchema::COLUMN_FAMILY_NAME,
+    BatchCommitmentSchema::COLUMN_FAMILY_NAME,
     // Bcast schemas
     BcastL1TxIdSchema::COLUMN_FAMILY_NAME,
     BcastL1TxSchema::COLUMN_FAMILY_NAME,
@@ -47,7 +48,7 @@ pub use l1::db::L1Db;
 use l2::schemas::{L2BlockHeightSchema, L2BlockSchema, L2BlockStatusSchema};
 use rockbound::{schema::ColumnFamilyName, Schema};
 pub use sequencer::db::SeqDb;
-use sequencer::schemas::{SeqBlobIdSchema, SeqBlobSchema};
+use sequencer::schemas::{BatchCommitmentSchema, SeqBlobIdSchema, SeqBlobSchema};
 pub use sync_event::db::SyncEventDb;
 
 use crate::{

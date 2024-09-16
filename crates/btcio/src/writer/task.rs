@@ -13,7 +13,7 @@ use tracing::*;
 use super::config::WriterConfig;
 use crate::{
     broadcaster::L1BroadcastHandle,
-    rpc::traits::{BitcoinReader, BitcoinSigner, BitcoinWallet},
+    rpc::traits::{Reader, Signer, Wallet},
     status::{apply_status_updates, L1StatusUpdate},
     writer::signer::create_and_sign_blob_inscriptions,
 };
@@ -33,18 +33,18 @@ impl InscriptionHandle {
 
     pub fn submit_intent(&self, intent: BlobIntent) -> anyhow::Result<()> {
         if intent.dest() != BlobDest::L1 {
-            warn!("Received intent not meant for L1: {}", intent.commitment());
+            warn!(commitment = %intent.commitment(), "Received intent not meant for L1");
             return Ok(());
         }
 
         let entry = BlobEntry::new_unsigned(intent.payload().to_vec());
-        debug!("Received intent: {}", intent.commitment());
+        debug!(commitment = %intent.commitment(), "Received intent");
         if self
             .ops
             .get_blob_entry_blocking(*intent.commitment())?
             .is_some()
         {
-            warn!("Received duplicate intent {:?}", intent.commitment());
+            warn!(commitment = %intent.commitment(), "Received duplicate intent");
             return Ok(());
         }
 
@@ -55,12 +55,12 @@ impl InscriptionHandle {
 
     pub async fn submit_intent_async(&self, intent: BlobIntent) -> anyhow::Result<()> {
         if intent.dest() != BlobDest::L1 {
-            warn!("Received intent not meant for L1: {}", intent.commitment());
+            warn!(commitment = %intent.commitment(), "Received intent not meant for L1");
             return Ok(());
         }
 
         let entry = BlobEntry::new_unsigned(intent.payload().to_vec());
-        debug!("Received intent: {}", intent.commitment());
+        debug!(commitment = %intent.commitment(), "Received intent");
 
         if self
             .ops
@@ -68,7 +68,7 @@ impl InscriptionHandle {
             .await?
             .is_some()
         {
-            warn!("Received duplicate intent {:?}", intent.commitment());
+            warn!(commitment = %intent.commitment(), "Received duplicate intent");
             return Ok(());
         }
         Ok(self
@@ -88,7 +88,7 @@ impl InscriptionHandle {
 /// [`Result<InscriptionHandle>`](anyhow::Result)
 pub fn start_inscription_task<D: SequencerDatabase + Send + Sync + 'static>(
     executor: &TaskExecutor,
-    rpc_client: Arc<impl BitcoinReader + BitcoinWallet + BitcoinSigner>,
+    rpc_client: Arc<impl Reader + Wallet + Signer + Send + Sync + 'static>,
     config: WriterConfig,
     db: Arc<D>,
     status_tx: Arc<StatusTx>,
@@ -143,7 +143,7 @@ fn get_next_blobidx_to_watch(insc_ops: &InscriptionDataOps) -> anyhow::Result<u6
 /// [`BlobL1Status::Confirmed`], or [`BlobL1Status::Finalized`]
 pub async fn watcher_task(
     next_blbidx_to_watch: u64,
-    rpc_client: Arc<impl BitcoinReader + BitcoinWallet + BitcoinSigner>,
+    rpc_client: Arc<impl Reader + Wallet + Signer>,
     config: WriterConfig,
     insc_ops: Arc<InscriptionDataOps>,
     bcast_handle: Arc<L1BroadcastHandle>,

@@ -1,13 +1,14 @@
 use alpen_express_primitives::buf::{Buf32, Buf64};
+use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::{id::L2BlockId, l1::L1BlockId};
 
 /// Public parameters for batch proof to be posted to DA.
 /// Will be updated as prover specs evolve.
-#[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
+#[derive(Clone, Debug, PartialEq, BorshDeserialize, BorshSerialize, Arbitrary)]
 pub struct BatchCommitment {
-    /// Last safe L1 block for the batch
+    /// Safe L1 block for the batch
     l1blockid: L1BlockId,
     /// Last L2 block covered by the batch
     l2blockid: L2BlockId,
@@ -19,6 +20,14 @@ impl BatchCommitment {
             l1blockid,
             l2blockid,
         }
+    }
+
+    pub fn l1blockid(&self) -> &L1BlockId {
+        &self.l1blockid
+    }
+
+    pub fn l2blockid(&self) -> &L2BlockId {
+        &self.l2blockid
     }
 
     pub fn get_sighash(&self) -> Buf32 {

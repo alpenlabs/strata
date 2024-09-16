@@ -1,0 +1,16 @@
+[package]
+name = "express-proofimpl-cl-stf"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+alpen-express-crypto = { workspace = true }
+alpen-express-primitives.workspace = true
+alpen-express-state.workspace = true
+express-chaintsn.workspace = true
+
+borsh = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+alpen-test-utils.workspace = true

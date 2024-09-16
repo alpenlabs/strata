@@ -7,6 +7,7 @@ use std::{
 };
 
 use alpen_express_btcio::writer::InscriptionHandle;
+use alpen_express_crypto::sign_schnorr_sig;
 use alpen_express_db::traits::*;
 use alpen_express_eectl::engine::ExecEngineCtl;
 use alpen_express_primitives::{
@@ -29,7 +30,6 @@ use super::{
     types::{self, Duty, DutyBatch, Identity, IdentityKey},
 };
 use crate::{
-    credential::sign_schnorr_sig,
     errors::Error,
     message::{ClientUpdateNotif, ForkChoiceMessage},
     sync_manager::SyncManager,
@@ -43,9 +43,9 @@ pub fn duty_tracker_task<D: Database>(
     database: Arc<D>,
     l2_block_manager: Arc<L2BlockManager>,
     params: Arc<Params>,
-) {
+) -> Result<(), Error> {
     let db = database.as_ref();
-    if let Err(e) = duty_tracker_task_inner(
+    duty_tracker_task_inner(
         shutdown,
         cupdate_rx,
         batch_queue,
@@ -53,9 +53,7 @@ pub fn duty_tracker_task<D: Database>(
         db,
         l2_block_manager.as_ref(),
         params.as_ref(),
-    ) {
-        error!(err = %e, "tracker task exited");
-    }
+    )
 }
 
 fn duty_tracker_task_inner(
@@ -345,7 +343,7 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
             let l1_view = client_state.l1_view();
 
             // TODO get the cur client state from the sync manager, the one used
-            // to initiate this dutyn and pass it into `sign_and_store_block`
+            // to initiate this duty and pass it into `sign_and_store_block`
 
             let asm_span = info_span!("blockasm", %target_slot);
             let _span = asm_span.enter();
@@ -395,7 +393,8 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
 
             // serialize and send to l1 writer
 
-            let payload = borsh::to_vec(&signed_commitment).expect("batch serialization");
+            let payload =
+                borsh::to_vec(&signed_commitment).map_err(|e| Error::Other(e.to_string()))?;
             let blob_intent = BlobIntent::new(BlobDest::L1, commitment_sighash, payload);
 
             info!(signed_commitment = ?signed_commitment, "signed commitment");

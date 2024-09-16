@@ -7,20 +7,21 @@ use alpen_express_db::{
     traits::{BlockStatus, ChainstateProvider, ChainstateStore, Database},
 };
 use alpen_express_eectl::{engine::ExecEngineCtl, messages::ExecPayloadData};
-use alpen_express_primitives::{hash, params::Params};
+use alpen_express_primitives::params::Params;
 use alpen_express_state::{
-    block::L2BlockBundle, client_state::ClientState, operation::SyncAction, prelude::*,
-    state_op::StateCache, sync_event::SyncEvent,
+    block::L2BlockBundle, block_validation::validate_block_segments, client_state::ClientState,
+    operation::SyncAction, prelude::*, state_op::StateCache, sync_event::SyncEvent,
 };
 use alpen_express_status::StatusTx;
+use express_chaintsn::transition::process_block;
 use express_storage::L2BlockManager;
 use express_tasks::ShutdownGuard;
 use tokio::sync::mpsc;
 use tracing::*;
 
 use crate::{
-    credential, ctl::CsmController, errors::*, message::ForkChoiceMessage, reorg,
-    unfinalized_tracker, unfinalized_tracker::UnfinalizedBlockTracker,
+    ctl::CsmController, errors::*, message::ForkChoiceMessage, reorg, unfinalized_tracker,
+    unfinalized_tracker::UnfinalizedBlockTracker,
 };
 
 /// Tracks the parts of the chain that haven't been finalized on-chain yet.
@@ -37,11 +38,11 @@ pub struct ForkChoiceManager<D: Database> {
     /// Current CSM state, as of the last time we were updated about it.
     cur_csm_state: Arc<ClientState>,
 
+    /// Chain State watch
+    status_tx: Arc<StatusTx>,
+
     /// Tracks unfinalized block tips.
     chain_tracker: unfinalized_tracker::UnfinalizedBlockTracker,
-
-    /// general status wrapper.
-    status_tx: Arc<StatusTx>,
 
     /// Current best block.
     // TODO make sure we actually want to have this
@@ -59,8 +60,8 @@ impl<D: Database> ForkChoiceManager<D> {
         database: Arc<D>,
         l2_block_manager: Arc<L2BlockManager>,
         cur_csm_state: Arc<ClientState>,
-        chain_tracker: unfinalized_tracker::UnfinalizedBlockTracker,
         status_tx: Arc<StatusTx>,
+        chain_tracker: unfinalized_tracker::UnfinalizedBlockTracker,
         cur_best_block: L2BlockId,
         cur_index: u64,
     ) -> Self {
@@ -69,8 +70,8 @@ impl<D: Database> ForkChoiceManager<D> {
             database,
             l2_block_manager,
             cur_csm_state,
-            chain_tracker,
             status_tx,
+            chain_tracker,
             cur_best_block,
             cur_index,
         }
@@ -120,14 +121,25 @@ pub fn init_forkchoice_manager<D: Database>(
 ) -> anyhow::Result<ForkChoiceManager<D>> {
     // Load data about the last finalized block so we can use that to initialize
     // the finalized tracker.
-    let fin_block = l2_block_manager
-        .get_block_blocking(&fin_tip_blkid)?
-        .ok_or(Error::MissingL2Block(fin_tip_blkid))?;
-    let fin_tip_index = fin_block.header().blockidx();
+    let sync_state = init_csm_state.sync().expect("csm state should be init");
+    let chain_tip_height = sync_state.chain_tip_height();
+
+    let finalized_blockid = *sync_state.finalized_blkid();
+    let finalized_block = l2_block_manager
+        .get_block_blocking(&finalized_blockid)?
+        .ok_or(Error::MissingL2Block(finalized_blockid))?;
+    let finalized_height = finalized_block.header().blockidx();
+
+    debug!(%finalized_height, %chain_tip_height, "finalized and chain tip height");
 
     // Populate the unfinalized block tracker.
-    let mut chain_tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(fin_tip_blkid);
-    chain_tracker.load_unfinalized_blocks(fin_tip_index + 1, l2_block_manager.as_ref())?;
+    let mut chain_tracker =
+        unfinalized_tracker::UnfinalizedBlockTracker::new_empty(finalized_blockid);
+    chain_tracker.load_unfinalized_blocks(
+        finalized_height,
+        chain_tip_height,
+        l2_block_manager.as_ref(),
+    )?;
 
     let (cur_tip_blkid, cur_tip_index) =
         determine_start_tip(&chain_tracker, l2_block_manager.as_ref())?;
@@ -138,8 +150,8 @@ pub fn init_forkchoice_manager<D: Database>(
         database.clone(),
         l2_block_manager.clone(),
         init_csm_state,
-        chain_tracker,
         status_tx,
+        chain_tracker,
         cur_tip_blkid,
         cur_tip_index,
     );
@@ -237,29 +249,29 @@ pub fn tracker_task<D: Database, E: ExecEngineCtl>(
     csm_ctl: Arc<CsmController>,
     params: Arc<Params>,
     status_tx: Arc<StatusTx>,
-) {
+) -> anyhow::Result<()> {
     // Wait until the CSM gives us a state we can start from.
     info!("waiting for CSM ready");
     let init_state = match wait_for_csm_ready(&shutdown, &mut fcm_rx) {
         Ok(s) => s,
         Err(e) => {
             error!(err = %e, "failed to initialize forkchoice manager");
-            return;
+            return Err(e);
         }
     };
 
     // we should have the finalized tips in state at this point
     let Some(ss) = init_state.sync() else {
-        panic!("fcm: tried to resume without sync state");
+        return Err(anyhow::anyhow!("fcm: tried to resume without sync state"));
     };
 
     // If we have an active sync state we just have the finalized tip there already.
 
-    let cur_fin_tip = *ss.finalized_blkid();
+    let finalized_blockid = *ss.finalized_blkid();
 
     // wait for sync is done
 
-    info!(%cur_fin_tip, "starting forkchoice manager");
+    info!(%finalized_blockid, "starting forkchoice manager");
 
     // Now that we have the database state in order, we can actually init the
     // FCM.
@@ -274,14 +286,17 @@ pub fn tracker_task<D: Database, E: ExecEngineCtl>(
         Ok(fcm) => fcm,
         Err(e) => {
             error!(err = %e, "failed to init forkchoice manager!");
-            return;
+            return Err(e);
         }
     };
 
     if let Err(e) = forkchoice_manager_task_inner(&shutdown, fcm, engine.as_ref(), fcm_rx, &csm_ctl)
     {
-        error!(err = %e, "tracker aborted");
+        error!(err = ?e, "tracker aborted");
+        return Err(e);
     }
+
+    Ok(())
 }
 
 fn forkchoice_manager_task_inner<D: Database, E: ExecEngineCtl>(
@@ -302,19 +317,19 @@ fn forkchoice_manager_task_inner<D: Database, E: ExecEngineCtl>(
         };
 
         // TODO decide when errors are actually failures vs when they're okay
-        process_ct_msg(m, &mut state, engine, csm_ctl)?;
+        process_fc_message(m, &mut state, engine, csm_ctl)?;
     }
 
     Ok(())
 }
 
-fn process_ct_msg<D: Database, E: ExecEngineCtl>(
-    fcm: ForkChoiceMessage,
-    state: &mut ForkChoiceManager<D>,
+fn process_fc_message<D: Database, E: ExecEngineCtl>(
+    msg: ForkChoiceMessage,
+    fcm_state: &mut ForkChoiceManager<D>,
     engine: &E,
     csm_ctl: &CsmController,
 ) -> anyhow::Result<()> {
-    match fcm {
+    match msg {
         ForkChoiceMessage::CsmResume(_) => {
             warn!("got unexpected late CSM resume message, ignoring");
         }
@@ -326,12 +341,12 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
             debug!(?csm_tip, "got new CSM state");
 
             // Update the new state.
-            state.cur_csm_state = cs;
+            fcm_state.cur_csm_state = cs;
 
             // TODO use output actions to clear out dangling states now
             for act in output.actions() {
                 if let SyncAction::FinalizeBlock(blkid) = act {
-                    let fin_report = state.chain_tracker.update_finalized_tip(blkid)?;
+                    let fin_report = fcm_state.chain_tracker.update_finalized_tip(blkid)?;
                     info!(?blkid, ?fin_report, "finalized block")
                     // TODO do something with the finalization report
                 }
@@ -342,17 +357,17 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
         }
 
         ForkChoiceMessage::NewBlock(blkid) => {
-            let block_bundle = state
+            let block_bundle = fcm_state
                 .get_block_data(&blkid)?
                 .ok_or(Error::MissingL2Block(blkid))?;
 
             // First, decide if the block seems correctly signed and we haven't
             // already marked it as invalid.
-            let cstate = state.cur_csm_state.clone();
-            let correctly_signed = check_new_block(&blkid, &block_bundle, &cstate, state)?;
+            let cstate = fcm_state.cur_csm_state.clone();
+            let correctly_signed = check_new_block(&blkid, &block_bundle, &cstate, fcm_state)?;
             if !correctly_signed {
                 // It's invalid, write that and return.
-                state.set_block_status(&blkid, BlockStatus::Invalid)?;
+                fcm_state.set_block_status(&blkid, BlockStatus::Invalid)?;
                 return Ok(());
             }
 
@@ -369,15 +384,15 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
             // to pre-sync
             if res == alpen_express_eectl::engine::BlockStatus::Invalid {
                 // It's invalid, write that and return.
-                state.set_block_status(&blkid, BlockStatus::Invalid)?;
+                fcm_state.set_block_status(&blkid, BlockStatus::Invalid)?;
                 return Ok(());
             }
 
             // Insert block into pending block tracker and figure out if we
             // should switch to it as a potential head.  This returns if we
             // created a new tip instead of advancing an existing tip.
-            let cur_tip = state.cur_best_block;
-            let new_tip = state
+            let cur_tip = fcm_state.cur_best_block;
+            let new_tip = fcm_state
                 .chain_tracker
                 .attach_block(blkid, block_bundle.header())?;
             if new_tip {
@@ -386,8 +401,8 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
 
             let best_block = pick_best_block(
                 &cur_tip,
-                state.chain_tracker.chain_tips_iter(),
-                &state.l2_block_manager,
+                fcm_state.chain_tracker.chain_tips_iter(),
+                &fcm_state.l2_block_manager,
             )?;
 
             // Figure out what our job is now.
@@ -395,16 +410,16 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
             // context aware so that we know we're not doing anything abnormal
             // in the normal case
             let depth = 100; // TODO change this
-            let reorg = reorg::compute_reorg(&cur_tip, best_block, depth, &state.chain_tracker)
+            let reorg = reorg::compute_reorg(&cur_tip, best_block, depth, &fcm_state.chain_tracker)
                 .ok_or(Error::UnableToFindReorg(cur_tip, *best_block))?;
 
-            debug!("REORG {reorg:#?}");
+            debug!(reorg = ?reorg, "REORG");
 
             // Only if the update actually does something should we try to
             // change the fork choice tip.
             if !reorg.is_identity() {
                 // Apply the reorg.
-                if let Err(e) = apply_tip_update(&reorg, state) {
+                if let Err(e) = apply_tip_update(&reorg, fcm_state) {
                     warn!("failed to compute CL STF");
 
                     // Specifically state transition errors we want to handle
@@ -416,13 +431,16 @@ fn process_ct_msg<D: Database, E: ExecEngineCtl>(
                             "invalid block on seemingly good fork, rejecting block"
                         );
 
-                        state.set_block_status(inv_blkid, BlockStatus::Invalid)?;
+                        fcm_state.set_block_status(inv_blkid, BlockStatus::Invalid)?;
                         return Ok(());
                     }
 
                     // Everything else we should fail on.
                     return Err(e);
                 }
+
+                // Block is valid, update the status
+                fcm_state.set_block_status(&blkid, BlockStatus::Valid)?;
 
                 // TODO also update engine tip block
 
@@ -452,7 +470,8 @@ fn check_new_block<D: Database>(
     let params = state.params.as_ref();
 
     // Check that the block is correctly signed.
-    let cred_ok = credential::check_block_credential(block.header(), params);
+    let cred_ok =
+        alpen_express_state::block_validation::check_block_credential(block.header(), params);
     if !cred_ok {
         warn!(?blkid, "block has invalid credential");
         return Ok(false);
@@ -466,39 +485,11 @@ fn check_new_block<D: Database>(
         }
     }
 
-    if !check_block_segments(block, blkid) {
+    if !validate_block_segments(block) {
         return Ok(false);
     }
 
     Ok(true)
-}
-
-fn check_block_segments(block: &L2Block, blkid: &L2BlockId) -> bool {
-    // check if the l1_segment_hash matches between L2Block and L2BlockHeader
-    let l1seg_buf = borsh::to_vec(block.l1_segment()).expect("blockasm: enc l1 segment");
-    let l1_segment_hash = hash::raw(&l1seg_buf);
-
-    if l1_segment_hash != *block.header().l1_payload_hash() {
-        warn!(
-            ?blkid,
-            "computed l1_segment_hash doesn't match between L2Block and L2BlockHeader"
-        );
-        return false;
-    }
-
-    // check if the exec_segment_hash matches between L2Block and L2BlockHeader
-    let eseg_buf = borsh::to_vec(block.exec_segment()).expect("blockasm: enc exec segment");
-    let exec_segment_hash = hash::raw(&eseg_buf);
-
-    if exec_segment_hash != *block.header().exec_payload_hash() {
-        warn!(
-            ?blkid,
-            "computed exec_segment_hash doesn't match between L2Block and L2BlockHeader"
-        );
-        return false;
-    }
-
-    true
 }
 
 /// Returns if we should switch to the new fork.  This is dependent on our
@@ -540,14 +531,14 @@ fn pick_best_block<'t>(
 
 fn apply_tip_update<D: Database>(
     reorg: &reorg::Reorg,
-    state: &mut ForkChoiceManager<D>,
+    fc_manager: &mut ForkChoiceManager<D>,
 ) -> anyhow::Result<()> {
-    let chs_store = state.database.chainstate_store();
-    let chs_prov = state.database.chainstate_provider();
+    let chs_store = fc_manager.database.chainstate_store();
+    let chs_prov = fc_manager.database.chainstate_provider();
 
     // See if we need to roll back recent changes.
     let pivot_blkid = reorg.pivot();
-    let pivot_idx = state.get_block_index(pivot_blkid)?;
+    let pivot_idx = fc_manager.get_block_index(pivot_blkid)?;
 
     // Load the post-state of the pivot block as the block to start computing
     // blocks going forwards with.
@@ -566,7 +557,7 @@ fn apply_tip_update<D: Database>(
         // Load the previous block and its post-state.
         // TODO make this not load both of the full blocks, we might have them
         // in memory anyways
-        let block = state
+        let block = fc_manager
             .get_block_data(blkid)?
             .ok_or(Error::MissingL2Block(*blkid))?;
         let block_idx = block.header().blockidx();
@@ -576,9 +567,9 @@ fn apply_tip_update<D: Database>(
 
         // Compute the transition write batch, then compute the new state
         // locally and update our going state.
-        let rparams = state.params.rollup();
+        let rparams = fc_manager.params.rollup();
         let mut prestate_cache = StateCache::new(pre_state);
-        express_chaintsn::transition::process_block(&mut prestate_cache, header, body, rparams)
+        process_block(&mut prestate_cache, header, body, rparams)
             .map_err(|e| Error::InvalidStateTsn(*blkid, e))?;
         let (post_state, wb) = prestate_cache.finalize();
         pre_state = post_state;
@@ -588,13 +579,14 @@ fn apply_tip_update<D: Database>(
         updates.push((block_idx, blkid, wb));
     }
 
-    state.status_tx.update_chain_state(&pre_state);
-
     // Check to see if we need to roll back to a previous state in order to
     // compute new states.
-    if pivot_idx < state.cur_index {
+    if pivot_idx < fc_manager.cur_index {
         debug!(?pivot_blkid, %pivot_idx, "rolling back chainstate");
-        chs_store.rollback_writes_to(pivot_idx)?;
+        let chs = chs_store.rollback_writes_to(pivot_idx)?;
+        if state.status_tx.chs.send(chs).is_err() {
+            warn!("Receiver side dropped");
+        }
     }
 
     // Now that we've verified the new chain is really valid, we can go and
@@ -602,44 +594,9 @@ fn apply_tip_update<D: Database>(
     for (idx, blkid, writes) in updates {
         debug!(?blkid, "applying CL state update");
         chs_store.write_state_update(idx, &writes)?;
-        state.cur_best_block = *blkid;
-        state.cur_index = idx;
+        fc_manager.cur_best_block = *blkid;
+        fc_manager.cur_index = idx;
     }
 
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use alpen_express_state::{
-        block::{ExecSegment, L1Segment, L2Block, L2BlockBody},
-        header::L2Header,
-    };
-    use alpen_test_utils::ArbitraryGenerator;
-
-    use super::check_block_segments;
-
-    #[test]
-    fn test_verify_block_hashes() {
-        let ag = ArbitraryGenerator::new();
-
-        // use arbitrary generator to get the new block
-        let block: L2Block = ag.generate();
-        let blk_id = block.header().get_blockid();
-
-        assert!(check_block_segments(&block, &blk_id));
-
-        let arb_exec_segment: ExecSegment = ag.generate();
-        let arb_l1_segment: L1Segment = ag.generate();
-        // mutate the l2Block's body to create a new block with arbitrary exec segment
-        let blk_body = L2BlockBody::new(block.body().l1_segment().clone(), arb_exec_segment);
-        let arb_exec_block = L2Block::new(block.header().clone(), blk_body);
-        assert!(!check_block_segments(&arb_exec_block, &blk_id));
-
-        // mutate the l2Block's body to create a new block with arbitrary l1 segment
-        let blk_body = L2BlockBody::new(arb_l1_segment, block.body().exec_segment().clone());
-        let arb_l1_block = L2Block::new(block.header().clone(), blk_body);
-
-        assert!(!check_block_segments(&arb_l1_block, &blk_id));
-    }
 }

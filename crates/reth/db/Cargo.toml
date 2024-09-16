@@ -6,7 +6,7 @@ version = "0.1.0"
 [dependencies]
 alpen-express-db = { workspace = true }
 alpen-express-rocksdb = { workspace = true }
-zkvm-primitives = { workspace = true }
+express-proofimpl-evm-ee-stf = { workspace = true }
 
 anyhow = { workspace = true }
 bincode = { workspace = true }

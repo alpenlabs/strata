@@ -7,50 +7,71 @@ use serde::Deserialize;
 
 use crate::args::Args;
 
-#[derive(Deserialize, Debug)]
-pub struct ClientParams {
+#[derive(Debug, Deserialize)]
+pub struct SequencerConfig {
+    /// path to sequencer root key
+    pub sequencer_key: PathBuf,
+    /// address with funds for sequencer transactions
+    pub sequencer_bitcoin_address: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct FullNodeConfig {
+    /// host:port of sequencer rpc
+    pub sequencer_rpc: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub enum ClientMode {
+    Sequencer(SequencerConfig),
+    FullNode(FullNodeConfig),
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ClientConfig {
     pub rpc_port: u16,
-    pub sequencer_key: Option<PathBuf>,
+    #[serde(flatten)]
+    pub client_mode: ClientMode,
     /// The address to which the inscriptions are spent
-    pub sequencer_bitcoin_address: String, // TODO: probably move this to another struct
     pub l2_blocks_fetch_limit: u64,
     pub datadir: PathBuf,
     pub db_retry_count: u16,
 }
 
-#[derive(Deserialize, Debug)]
-pub struct SyncParams {
+#[derive(Debug, Deserialize)]
+pub struct SyncConfig {
     pub l1_follow_distance: u64,
     pub max_reorg_depth: u32,
     pub client_poll_dur_ms: u32,
     pub client_checkpoint_interval: u32,
 }
 
-#[derive(Deserialize, Debug)]
-pub struct BitcoindParams {
+#[derive(Debug, Deserialize)]
+pub struct BitcoindConfig {
     pub rpc_url: String,
     pub rpc_user: String,
     pub rpc_password: String,
     pub network: Network,
 }
 
-#[derive(Deserialize, Debug)]
-pub struct RethELParams {
+#[derive(Debug, Deserialize)]
+pub struct RethELConfig {
     pub rpc_url: String,
     pub secret: PathBuf,
 }
 
-#[derive(Deserialize, Debug)]
-pub struct ExecParams {
-    pub reth: RethELParams,
+#[derive(Debug, Deserialize)]
+pub struct ExecConfig {
+    pub reth: RethELConfig,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Debug, Deserialize)]
 pub struct Config {
-    pub client: ClientParams,
-    pub bitcoind_rpc: BitcoindParams,
-    pub sync: SyncParams,
-    pub exec: ExecParams,
+    pub client: ClientConfig,
+    pub bitcoind_rpc: BitcoindConfig,
+    pub sync: SyncConfig,
+    pub exec: ExecConfig,
     pub bridge: RelayerConfig,
 }
 
@@ -58,7 +79,7 @@ impl Config {
     pub fn from_args(args: &Args) -> Result<Config, String> {
         let args = args.clone();
         Ok(Self {
-            bitcoind_rpc: BitcoindParams {
+            bitcoind_rpc: BitcoindConfig {
                 rpc_url: args
                     .bitcoind_host
                     .ok_or_else(|| "args: no bitcoin --rpc-url provided".to_string())?,
@@ -72,28 +93,41 @@ impl Config {
                     .network
                     .ok_or_else(|| "args: no bitcoin --network provided".to_string())?,
             },
-            client: ClientParams {
+            client: ClientConfig {
                 rpc_port: args
                     .rpc_port
                     .ok_or_else(|| "args: no client --rpc-port provided".to_string())?,
                 datadir: args
                     .datadir
                     .ok_or_else(|| "args: no client --datadir provided".to_string())?,
-                sequencer_key: args.sequencer_key,
+                client_mode: {
+                    if let (Some(sequencer_key), Some(sequencer_bitcoin_address)) =
+                        (args.sequencer_key, args.sequencer_bitcoin_address)
+                    {
+                        ClientMode::Sequencer(SequencerConfig {
+                            sequencer_key,
+                            sequencer_bitcoin_address,
+                        })
+                    } else if let Some(sequencer_rpc) = args.sequencer_rpc {
+                        ClientMode::FullNode(FullNodeConfig { sequencer_rpc })
+                    } else {
+                        return Err(
+                            "args: no client --sequencer-key or --sequencer-bitcion-address provided or --sequencer-rpc provided"
+                                .to_string(),
+                        );
+                    }
+                },
                 l2_blocks_fetch_limit: 1_000,
-                sequencer_bitcoin_address: args
-                    .sequencer_bitcoin_address
-                    .ok_or_else(|| "args: no --sequencer-bitcion-address provided".to_string())?,
                 db_retry_count: 5,
             },
-            sync: SyncParams {
+            sync: SyncConfig {
                 l1_follow_distance: 6,
                 max_reorg_depth: 4,
                 client_poll_dur_ms: 200,
                 client_checkpoint_interval: 10,
             },
-            exec: ExecParams {
-                reth: RethELParams {
+            exec: ExecConfig {
+                reth: RethELConfig {
                     rpc_url: args.reth_authrpc.unwrap_or("".to_string()), // TODO: sensible default
                     secret: args.reth_jwtsecret.unwrap_or_default(),      /* TODO: probably
                                                                            * secret should be
@@ -126,17 +160,23 @@ impl Config {
         if let Some(datadir) = args.datadir {
             self.client.datadir = datadir;
         }
-        if args.sequencer_key.is_some() {
-            self.client.sequencer_key = args.sequencer_key;
+        // sequencer_key has priority over sequencer_rpc if both are provided
+
+        if let (Some(sequencer_key), Some(sequencer_bitcoin_address)) =
+            (args.sequencer_key, args.sequencer_bitcoin_address)
+        {
+            self.client.client_mode = ClientMode::Sequencer(SequencerConfig {
+                sequencer_key,
+                sequencer_bitcoin_address,
+            });
+        } else if let Some(sequencer_rpc) = args.sequencer_rpc {
+            self.client.client_mode = ClientMode::FullNode(FullNodeConfig { sequencer_rpc });
         }
         if let Some(rpc_url) = args.reth_authrpc {
             self.exec.reth.rpc_url = rpc_url;
         }
         if let Some(jwtsecret) = args.reth_jwtsecret {
             self.exec.reth.secret = jwtsecret;
-        }
-        if let Some(seq_addr) = args.sequencer_bitcoin_address {
-            self.client.sequencer_bitcoin_address = seq_addr;
         }
         if let Some(db_retry_count) = args.db_retry_count {
             self.client.db_retry_count = db_retry_count;
@@ -169,6 +209,7 @@ mod test {
             l2_blocks_fetch_limit = 1000
             datadir = "/path/to/data/directory"
             sequencer_bitcoin_address = "some_addr"
+            sequencer_key = "/path/to/sequencer_key"
             db_retry_count = 5
 
             [sync]
@@ -187,6 +228,34 @@ mod test {
             relay_misc = false,
         "#;
 
-        assert!(toml::from_str::<Config>(config_string).is_ok());
+        assert!(toml::from_str::<Config>(config_string_sequencer).is_ok());
+
+        let config_string_fullnode = r#"
+            [bitcoind_rpc]
+            rpc_url = "http://localhost:18332"
+            rpc_user = "alpen"
+            rpc_password = "alpen"
+            network = "regtest"
+
+            [client]
+            rpc_port = 8432
+            l2_blocks_fetch_limit = 1000
+            datadir = "/path/to/data/directory"
+            sequencer_bitcoin_address = "some_addr"
+            sequencer_rpc = "9.9.9.9:8432"
+            db_retry_count = 5
+
+            [sync]
+            l1_follow_distance = 6
+            max_reorg_depth = 4
+            client_poll_dur_ms = 200
+            client_checkpoint_interval = 10
+
+            [exec.reth]
+            rpc_url = "http://localhost:8551"
+            secret = "1234567890abcdef"
+        "#;
+
+        assert!(toml::from_str::<Config>(config_string_fullnode).is_ok());
     }
 }

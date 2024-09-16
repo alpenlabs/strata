@@ -3,14 +3,12 @@ use alpen_express_db::types::L1TxStatus;
 use alpen_express_primitives::bridge::OperatorIdx;
 use alpen_express_rpc_types::{
     types::{BlockHeader, ClientStatus, DepositEntry, ExecUpdate, L1Status},
-    L2BlockId,
+    HexBytes, HexBytes32, NodeSyncStatus, RawBlockWitness,
 };
-use alpen_express_state::bridge_duties::BridgeDuties;
+use alpen_express_state::{bridge_duties::BridgeDuties, id::L2BlockId};
 use bitcoin::{secp256k1::schnorr::Signature, Transaction, Txid};
 use express_bridge_tx_builder::prelude::{CooperativeWithdrawalInfo, DepositInfo};
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
-use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
 
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "alp"))]
 #[cfg_attr(feature = "client", rpc(server, client, namespace = "alp"))]
@@ -35,17 +33,20 @@ pub trait AlpenApi {
     #[method(name = "clientStatus")]
     async fn get_client_status(&self) -> RpcResult<ClientStatus>;
 
-    #[method(name = "getRecentBlocks")]
-    async fn get_recent_blocks(&self, count: u64) -> RpcResult<Vec<BlockHeader>>;
+    #[method(name = "getRecentBlockHeaders")]
+    async fn get_recent_block_headers(&self, count: u64) -> RpcResult<Vec<BlockHeader>>;
 
-    #[method(name = "getBlocksAtIdx")]
-    async fn get_blocks_at_idx(&self, index: u64) -> RpcResult<Option<Vec<BlockHeader>>>;
+    #[method(name = "getHeadersAtIdx")]
+    async fn get_headers_at_idx(&self, index: u64) -> RpcResult<Option<Vec<BlockHeader>>>;
 
-    #[method(name = "getBlockById")]
-    async fn get_block_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<BlockHeader>>;
+    #[method(name = "getHeaderById")]
+    async fn get_header_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<BlockHeader>>;
 
     #[method(name = "getExecUpdateById")]
     async fn get_exec_update_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<ExecUpdate>>;
+
+    #[method(name = "getBlockWitness")]
+    async fn get_block_witness_raw(&self, index: u64) -> RpcResult<Option<RawBlockWitness>>;
 
     #[method(name = "getCurrentDeposits")]
     async fn get_current_deposits(&self) -> RpcResult<Vec<u32>>;
@@ -63,6 +64,15 @@ pub trait AlpenApi {
     /// Submit raw messages
     #[method(name = "submitBridgeMsg")]
     async fn submit_bridge_msg(&self, raw_msg: HexBytes) -> RpcResult<()>;
+
+    #[method(name = "syncStatus")]
+    async fn sync_status(&self) -> RpcResult<NodeSyncStatus>;
+
+    #[method(name = "getRawBundles")]
+    async fn get_raw_bundles(&self, start_height: u64, end_height: u64) -> RpcResult<HexBytes>;
+
+    #[method(name = "getRawBundleById")]
+    async fn get_raw_bundle_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<HexBytes>>;
 }
 
 #[serde_as]

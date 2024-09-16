@@ -67,7 +67,7 @@ pub fn init_genesis_chainstate(
         ExecEnvState::from_base_input(geui.clone(), params.rollup.evm_genesis_block_state_root);
 
     let genesis_blk_rec = L1HeaderRecord::from(pregenesis_mfs.last().unwrap());
-    let l1vs = L1ViewState::new_at_genesis(horizon_blk_height, genesis_blk_height, genesis_blk_rec);
+    let l1vs = L1ViewState::new_at_horizon(horizon_blk_height, genesis_blk_rec);
 
     let mut operator_table = OperatorTable::new_empty();
 

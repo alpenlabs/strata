@@ -83,6 +83,10 @@ pub enum ClientError {
     #[error(transparent)]
     Sign(#[from] SignRawTransactionWithWalletError),
 
+    /// Could not get a [`Xpriv`] from the wallet
+    #[error("Could not get xpriv from wallet")]
+    Xpriv,
+
     /// Unknown error, unlikely to be recoverable
     #[error("{0}")]
     Other(String),

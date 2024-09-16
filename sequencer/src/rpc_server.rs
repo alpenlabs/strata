@@ -1,6 +1,4 @@
-#![allow(unused)]
-
-use std::{borrow::BorrowMut, sync::Arc};
+use std::sync::Arc;
 
 use alpen_express_btcio::{broadcaster::L1BroadcastHandle, writer::InscriptionHandle};
 use alpen_express_consensus_logic::sync_manager::SyncManager;
@@ -10,27 +8,26 @@ use alpen_express_db::{
         SequencerDatabase,
     },
     types::{L1TxEntry, L1TxStatus},
-    DbResult,
 };
 use alpen_express_primitives::{buf::Buf32, hash, relay::types::BridgeMessage};
 use alpen_express_rpc_api::{
     AlpenAdminApiServer, AlpenApiServer, AlpenBridgeApiServer, HexBytes, HexBytes32,
 };
 use alpen_express_rpc_types::{
-    BlockHeader, ClientStatus, DaBlob, DepositEntry, DepositState, ExecUpdate, L1Status,
+    BlockHeader, ClientStatus, DaBlob, DepositEntry, DepositState, ExecUpdate, HexBytes,
+    HexBytes32, L1Status, NodeSyncStatus, RawBlockWitness,
 };
 use alpen_express_state::{
-    block::{L2Block, L2BlockBundle},
+    block::L2BlockBundle,
     bridge_ops::WithdrawalIntent,
     chain_state::ChainState,
     client_state::ClientState,
     da_blob::{BlobDest, BlobIntent},
-    exec_update,
-    header::{L2Header, SignedL2BlockHeader},
+    header::L2Header,
     id::L2BlockId,
     l1::L1BlockId,
 };
-use alpen_express_status::{StatusError, StatusRx};
+use alpen_express_status::StatusRx;
 use async_trait::async_trait;
 use bitcoin::{
     consensus::{deserialize, serde::Hex},
@@ -38,7 +35,8 @@ use bitcoin::{
     Transaction as BTransaction, Txid,
 };
 use borsh::{from_slice, BorshDeserialize};
-use express_storage::ops::bridgemsg::BridgeMsgOps;
+use express_rpc_utils::to_jsonrpsee_error;
+use express_storage::{ops::bridgemsg::BridgeMsgOps, L2BlockManager};
 use futures::future::TryFutureExt;
 use jsonrpsee::{
     core::RpcResult,
@@ -52,10 +50,7 @@ use reth_rpc_types::{
     StateContext, SyncInfo, SyncStatus, Transaction, TransactionRequest, Work,
 };
 use thiserror::Error;
-use tokio::sync::{
-    mpsc::{self, Sender},
-    oneshot, watch, Mutex, RwLock,
-};
+use tokio::sync::{oneshot, Mutex};
 use tracing::*;
 
 #[derive(Debug, Error)]
@@ -166,6 +161,7 @@ pub struct AlpenRpcImpl<D> {
     bmsg_tx: mpsc::Sender<BridgeMessage>,
     bmsg_ops: Arc<BridgeMsgOps>,
     stop_tx: Mutex<Option<oneshot::Sender<()>>>,
+    l2_block_manager: Arc<L2BlockManager>,
 }
 
 impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
@@ -177,6 +173,7 @@ impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
         bmsg_tx: mpsc::Sender<BridgeMessage>,
         bmsg_ops: Arc<BridgeMsgOps>,
         stop_tx: oneshot::Sender<()>,
+        l2_block_manager: Arc<L2BlockManager>,
     ) -> Self {
         Self {
             status_rx,
@@ -186,6 +183,7 @@ impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
             bmsg_tx,
             bmsg_ops,
             stop_tx: Mutex::new(Some(stop_tx)),
+            l2_block_manager,
         }
     }
 
@@ -317,7 +315,7 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         })
     }
 
-    async fn get_recent_blocks(&self, count: u64) -> RpcResult<Vec<BlockHeader>> {
+    async fn get_recent_block_headers(&self, count: u64) -> RpcResult<Vec<BlockHeader>> {
         // FIXME: sync state should have a block number
         let cl_state = self.get_client_state().await;
 
@@ -353,7 +351,7 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         Ok(blk_headers)
     }
 
-    async fn get_blocks_at_idx(&self, idx: u64) -> RpcResult<Option<Vec<BlockHeader>>> {
+    async fn get_headers_at_idx(&self, idx: u64) -> RpcResult<Option<Vec<BlockHeader>>> {
         let cl_state = self.get_client_state().await;
         let tip_blkid = *cl_state
             .sync()
@@ -386,12 +384,9 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         Ok(blk_header)
     }
 
-    async fn get_block_by_id(
-        &self,
-        blkid: alpen_express_rpc_types::L2BlockId,
-    ) -> RpcResult<Option<BlockHeader>> {
+    async fn get_header_by_id(&self, blkid: L2BlockId) -> RpcResult<Option<BlockHeader>> {
         let db = self.database.clone();
-        let blkid = L2BlockId::from(Buf32::from(blkid.0));
+        // let blkid = L2BlockId::from(Buf32::from(blkid.0));
 
         Ok(wait_blocking("fetch_block", move || {
             let l2_prov = db.l2_provider();
@@ -403,12 +398,9 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         .ok())
     }
 
-    async fn get_exec_update_by_id(
-        &self,
-        blkid: alpen_express_rpc_types::L2BlockId,
-    ) -> RpcResult<Option<ExecUpdate>> {
+    async fn get_exec_update_by_id(&self, blkid: L2BlockId) -> RpcResult<Option<ExecUpdate>> {
         let db = self.database.clone();
-        let blkid = L2BlockId::from(Buf32::from(blkid.0));
+        // let blkid = L2BlockId::from(Buf32::from(blkid.0));
 
         let l2_blk = wait_blocking("fetch_block", move || {
             let l2_prov = db.l2_provider();
@@ -450,6 +442,53 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
             }
             None => Ok(None),
         }
+    }
+
+    async fn get_block_witness_raw(&self, idx: u64) -> RpcResult<Option<RawBlockWitness>> {
+        let blk_manifest_db = self.database.clone();
+        let blk_ids: Vec<L2BlockId> = wait_blocking("l2_blockid", move || {
+            blk_manifest_db
+                .clone()
+                .l2_provider()
+                .get_blocks_at_height(idx)
+                .map_err(Error::Db)
+        })
+        .await?;
+
+        // Check if blk_ids is empty
+        let blkid = match blk_ids.first() {
+            Some(id) => id.to_owned(),
+            None => return Ok(None),
+        };
+
+        let l2_blk_db = self.database.clone();
+        let l2_blk_bundle = wait_blocking("l2_block", move || {
+            let l2_prov = l2_blk_db.l2_provider();
+            fetch_l2blk::<D>(l2_prov, blkid).map_err(|_| Error::MissingL2Block(blkid))
+        })
+        .await?;
+
+        let chain_state_db = self.database.clone();
+        let chain_state = wait_blocking("l2_chain_state", move || {
+            let cs_provider = chain_state_db.chainstate_provider();
+
+            cs_provider
+                .get_toplevel_state(idx - 1)
+                .map_err(Error::Db)?
+                .ok_or(Error::MissingChainstate(idx - 1))
+        })
+        .await?;
+
+        let raw_chain_state = borsh::to_vec(&chain_state)
+            .map_err(|_| Error::Other("Failed to get raw chain state".to_string()))?;
+
+        let raw_l2_block = borsh::to_vec(&l2_blk_bundle.block())
+            .map_err(|_| Error::Other("Failed to get raw l2 block".to_string()))?;
+
+        Ok(Some(RawBlockWitness {
+            raw_chain_state,
+            raw_l2_block,
+        }))
     }
 
     async fn get_current_deposits(&self) -> RpcResult<Vec<u32>> {
@@ -528,6 +567,63 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
 
         Ok(())
     }
+
+    async fn sync_status(&self) -> RpcResult<NodeSyncStatus> {
+        let sync = {
+            let cl = self.status_rx.cl.borrow();
+            cl.sync().unwrap().clone()
+        };
+        Ok(NodeSyncStatus {
+            tip_height: sync.chain_tip_height(),
+            tip_block_id: *sync.chain_tip_blkid(),
+            finalized_block_id: *sync.finalized_blkid(),
+        })
+    }
+
+    async fn get_raw_bundles(&self, start_height: u64, end_height: u64) -> RpcResult<HexBytes> {
+        let block_ids = futures::future::join_all(
+            (start_height..=end_height)
+                .map(|height| self.l2_block_manager.get_blocks_at_height_async(height)),
+        )
+        .await;
+
+        let block_ids = block_ids
+            .into_iter()
+            .filter_map(|f| f.ok())
+            .flatten()
+            .collect::<Vec<_>>();
+
+        let blocks = futures::future::join_all(
+            block_ids
+                .iter()
+                .map(|blkid| self.l2_block_manager.get_block_async(blkid)),
+        )
+        .await;
+
+        let blocks = blocks
+            .into_iter()
+            .filter_map(|blk| blk.ok().flatten())
+            .collect::<Vec<_>>();
+
+        borsh::to_vec(&blocks)
+            .map(HexBytes)
+            .map_err(to_jsonrpsee_error("failed to serialize"))
+    }
+
+    async fn get_raw_bundle_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<HexBytes>> {
+        let block = self
+            .l2_block_manager
+            .get_block_async(&block_id)
+            .await
+            .map_err(|e| Error::Other(e.to_string()))?
+            .map(|block| {
+                borsh::to_vec(&block)
+                    .map(HexBytes)
+                    .map_err(to_jsonrpsee_error("failed to serialize"))
+            })
+            .transpose()?;
+        Ok(block)
+    }
 }
 
 /// Wrapper around [``tokio::task::spawn_blocking``] that handles errors in
@@ -575,7 +671,7 @@ impl AlpenAdminApiServer for AdminServerImpl {
         // is deferred to signer in the writer module
         if let Some(writer) = &self.writer {
             if let Err(e) = writer.submit_intent_async(blobintent).await {
-                return Err(Error::Other("".to_string()).into());
+                return Err(Error::Other(e.to_string()).into());
             }
         }
 

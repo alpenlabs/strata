@@ -52,8 +52,8 @@ pub enum ClientStateWrite {
     /// start.
     ActivateChain,
 
-    /// Accept an L2 block and update tip state.
-    AcceptL2Block(L2BlockId),
+    /// Accept an L2 block and its height and update tip state.
+    AcceptL2Block(L2BlockId, u64),
 
     /// Rolls back L1 blocks to this block height.
     RollbackL1BlocksTo(u64),
@@ -64,7 +64,10 @@ pub enum ClientStateWrite {
     /// Updates the buried block index to a higher index.
     UpdateBuried(u64),
 
-    /// Update the finalized block.
+    /// Update the l2 block whose batch proof has been confirmed in L1 at a height.
+    UpdateConfirmed(u64, L2BlockId),
+
+    /// Update the l2 block whose batch proof has been finalized.
     UpdateFinalized(L2BlockId),
 }
 
@@ -122,19 +125,32 @@ pub fn apply_writes_to_state(
 
                 let new_unacc_len = block_height - buried_height;
                 l1v.local_unaccepted_blocks.truncate(new_unacc_len as usize);
+
+                // Remove confirmed blocks that are above the block_height
+                let ss = state.expect_sync_mut();
+                if let Some(pos) = ss
+                    .confirmed_checkpoint_blocks
+                    .iter()
+                    .position(|e| e.0 > block_height)
+                {
+                    ss.confirmed_checkpoint_blocks.drain(pos..);
+                }
             }
 
             AcceptL1Block(l1blkid) => {
+                debug!(?l1blkid, "received AcceptL1Block");
                 // TODO make this also do shit
                 let l1v = state.l1_view_mut();
                 l1v.local_unaccepted_blocks.push(l1blkid);
                 l1v.next_expected_block += 1;
             }
 
-            AcceptL2Block(blkid) => {
+            AcceptL2Block(blkid, height) => {
                 // TODO do any other bookkeeping
+                debug!(%blkid, "received AcceptL2Block");
                 let ss = state.expect_sync_mut();
                 ss.tip_blkid = blkid;
+                ss.tip_height = height;
             }
 
             UpdateBuried(new_idx) => {
@@ -148,7 +164,7 @@ pub fn apply_writes_to_state(
                 }
 
                 // Check that it's not higher than what we know about.
-                if new_idx >= l1v.next_expected_block() {
+                if new_idx > l1v.tip_height() {
                     panic!("operation: new buried height above known L1 tip");
                 }
 
@@ -158,16 +174,37 @@ pub fn apply_writes_to_state(
                     .local_unaccepted_blocks
                     .drain(..diff)
                     .collect::<Vec<_>>();
-                l1v.next_expected_block = new_idx;
 
                 // TODO merge these blocks into the L1 MMR in the client state if
                 // we haven't already
             }
 
             UpdateFinalized(blkid) => {
+                update_finalized(state, blkid);
+            }
+
+            UpdateConfirmed(l1height, blkid) => {
                 let ss = state.expect_sync_mut();
-                ss.finalized_blkid = blkid;
+                ss.confirmed_checkpoint_blocks.push((l1height, blkid));
             }
         }
     }
+}
+
+fn update_finalized(state: &mut ClientState, blkid: L2BlockId) {
+    let ss = state.expect_sync_mut();
+    let fin_pos = ss
+        .confirmed_checkpoint_blocks
+        .iter()
+        .position(|(_, bid)| *bid == blkid)
+        .unwrap_or_else(|| {
+            panic!(
+                "expected to find blockid {} to be finalized in SyncState.confirmed_blocks",
+                blkid
+            )
+        });
+    ss.finalized_blkid = ss.confirmed_checkpoint_blocks[fin_pos].1;
+
+    // Remove all the blocks before the blkid since they are finalized
+    ss.confirmed_checkpoint_blocks.drain(..fin_pos + 1);
 }

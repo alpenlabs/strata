@@ -185,6 +185,20 @@ pub struct SignRawTransactionWithWallet {
     pub errors: Option<Vec<SignRawTransactionWithWalletError>>,
 }
 
+/// Models the result of the JSON-RPC method `listdescriptors`.
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+pub struct ListDescriptors {
+    /// The descriptor.
+    pub descriptors: Vec<ListDescriptor>,
+}
+
+/// Models the Descriptor in the result of the JSON-RPC method `listdescriptors`.
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+pub struct ListDescriptor {
+    /// The descriptor.
+    pub desc: String,
+}
+
 /// Deserializes the amount in BTC into proper [`Amount`]s.
 fn deserialize_bitcoin<'d, D>(deserializer: D) -> Result<Amount, D::Error>
 where
