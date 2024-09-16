@@ -1,50 +1,24 @@
 //! Bootstraps an RPC server for the prover client.
-use std::sync::Arc;
 
 use anyhow::{Context, Ok};
 use async_trait::async_trait;
 use express_prover_client_rpc_api::ExpressProverClientApiServerServer;
-use jsonrpsee::{
-    core::{client::ClientT, RpcResult},
-    http_client::{HttpClient, HttpClientBuilder},
-    rpc_params, RpcModule,
-};
-use reth_rpc_types::Block;
+use jsonrpsee::{core::RpcResult, RpcModule};
 use tokio::sync::oneshot;
 use tracing::{info, warn};
-use zkvm_primitives::ZKVMInput;
 
-use crate::{
-    primitives::prover_input::{ProverInput, WitnessData},
-    task_tracker::TaskTracker,
-};
+use crate::task_dispatcher::ELBlockProvingTaskScheduler;
 
 #[derive(Clone)]
 pub struct RpcContext {
-    pub task_tracker: Arc<TaskTracker>,
-    _sequencer_rpc_url: String,
-    el_rpc_client: HttpClient,
+    pub el_proving_task_scheduler: ELBlockProvingTaskScheduler,
 }
 
 impl RpcContext {
-    pub fn new(
-        task_tracker: Arc<TaskTracker>,
-        _sequencer_rpc_url: String,
-        reth_rpc_url: String,
-    ) -> Self {
-        let el_rpc_client = HttpClientBuilder::default()
-            .build(&reth_rpc_url)
-            .expect("failed to connect to the el client");
-
-        RpcContext {
-            task_tracker,
-            _sequencer_rpc_url,
-            el_rpc_client,
+    pub fn new(el_proving_task_scheduler: ELBlockProvingTaskScheduler) -> Self {
+        Self {
+            el_proving_task_scheduler,
         }
-    }
-
-    pub fn el_client(&self) -> &HttpClient {
-        &self.el_rpc_client
     }
 }
 
@@ -101,44 +75,13 @@ impl ProverClientRpc {
 #[async_trait]
 impl ExpressProverClientApiServerServer for ProverClientRpc {
     async fn prove_el_block(&self, el_block_num: u64) -> RpcResult<String> {
-        // TODO: handle the unwrap here
-        let zkvm_input = self
-            .fetch_el_block_witness(el_block_num)
+        let task_id = self
+            .context
+            .el_proving_task_scheduler
+            .create_proving_task(el_block_num)
             .await
-            .expect("Failed to get th el block witness from the reth rpc");
-
-        let el_block_witness = WitnessData {
-            data: bincode::serialize(&zkvm_input).unwrap(),
-        };
-        let witness = ProverInput::ElBlock(el_block_witness);
-
-        let task_tracker = &self.context.task_tracker.clone();
-        let task_id = task_tracker.create_task(el_block_num, witness).await;
+            .expect("failded to add proving task");
 
         RpcResult::Ok(task_id.to_string())
-    }
-}
-
-impl ProverClientRpc {
-    async fn fetch_el_block_witness(&self, el_block_num: u64) -> anyhow::Result<ZKVMInput> {
-        let el_rpc_client = self.context.el_client();
-
-        let el_block: Block = el_rpc_client
-            .request(
-                "eth_getBlockByNumber",
-                rpc_params![format!("0x{:x}", el_block_num), false],
-            )
-            .await
-            .context("Failed to get the el block")?;
-
-        let el_block_witness: ZKVMInput = el_rpc_client
-            .request(
-                "alpee_getBlockWitness",
-                rpc_params![el_block.header.hash.context("Block hash missing")?, true],
-            )
-            .await
-            .context("Failed to get the EL witness")?;
-
-        Ok(el_block_witness)
     }
 }

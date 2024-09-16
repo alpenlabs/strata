@@ -13,8 +13,9 @@ class ProverClientTest(flexitest.Test):
         prover_client_rpc = prover_client.create_rpc()
 
         # Wait for the some block building
-        time.sleep(2)
+        time.sleep(5)
 
         rpc_res = prover_client_rpc.dev_alp_prove_el_block(1)
         print("got the rpc res: {}", rpc_res)
         assert rpc_res is not None
+        time.sleep(5)

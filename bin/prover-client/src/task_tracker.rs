@@ -1,4 +1,5 @@
 use tokio::sync::Mutex;
+use tracing::info;
 use uuid::Uuid;
 
 use crate::primitives::{
@@ -27,8 +28,8 @@ impl TaskTracker {
         };
         let mut tasks = self.tasks.lock().await;
         tasks.push(task);
+        info!("Added proving task {:?}", task_id);
         task_id
-        // todo: update task scheduler
     }
 
     pub async fn update_task_status(&self, task_id: Uuid, status: ProvingTaskStatus) {

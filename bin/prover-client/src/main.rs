@@ -5,8 +5,10 @@ use std::sync::Arc;
 use alpen_express_common::logging;
 use args::Args;
 use express_risc0_adapter::RiscZeroHost;
+use jsonrpsee::http_client::HttpClientBuilder;
 use manager::ProverManager;
 use rpc_server::{ProverClientRpc, RpcContext};
+use task_dispatcher::ELBlockProvingTaskScheduler;
 use task_tracker::TaskTracker;
 use tracing::info;
 
@@ -14,8 +16,9 @@ mod args;
 pub(crate) mod config;
 pub(crate) mod manager;
 pub(crate) mod primitives;
-pub(crate) mod proving;
+pub(crate) mod prover;
 pub(crate) mod rpc_server;
+pub(crate) mod task_dispatcher;
 pub(crate) mod task_tracker;
 
 #[tokio::main]
@@ -25,17 +28,27 @@ async fn main() {
 
     let args: Args = argh::from_env();
     let task_tracker = Arc::new(TaskTracker::new());
-    let rpc_context = RpcContext::new(
-        task_tracker.clone(),
-        args.get_sequencer_rpc_url(),
-        args.get_reth_rpc_url(),
-    );
 
-    let prover_manager: ProverManager<RiscZeroHost> = ProverManager::new(task_tracker.clone());
+    let el_rpc_client = HttpClientBuilder::default()
+        .build(args.get_reth_rpc_url())
+        .expect("failed to connect to the el client");
+
+    let el_proving_task_scheduler =
+        ELBlockProvingTaskScheduler::new(el_rpc_client, task_tracker.clone());
+    let rpc_context = RpcContext::new(el_proving_task_scheduler.clone());
+    let prover_manager: ProverManager<RiscZeroHost> = ProverManager::new(task_tracker);
 
     // run prover manager in background
     tokio::spawn(async move {
         prover_manager.run().await;
+    });
+
+    // run el proving task dispatcher
+    tokio::spawn(async move {
+        el_proving_task_scheduler
+            .clone()
+            .listen_for_new_blocks()
+            .await
     });
 
     // run rpc server

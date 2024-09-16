@@ -7,7 +7,7 @@ use tracing::info;
 use crate::{
     config::NUM_PROVER_WORKER,
     primitives::tasks_scheduler::{ProvingTask, ProvingTaskStatus},
-    proving::Prover,
+    prover::Prover,
     task_tracker::TaskTracker,
 };
 
