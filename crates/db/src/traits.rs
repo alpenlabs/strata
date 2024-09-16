@@ -348,18 +348,6 @@ pub trait BcastProvider {
 ///
 /// This trait assumes that the [`Txid`] is always unique.
 pub trait BridgeTxDatabase {
-    type Store: BridgeTxStore;
-    type Provider: BridgeTxProvider;
-
-    /// Return a reference to the store implementation
-    fn bridge_tx_store(&self) -> &Arc<Self::Store>;
-
-    /// Return a reference to the provider implementation
-    fn bridge_tx_provider(&self) -> &Arc<Self::Provider>;
-}
-
-/// All methods related to storing/mutating [`CollectedSigs`] in the database.
-pub trait BridgeTxStore {
     /// Add [`BridgeTxState`] to the database replacing the existing one if present.
     fn put_tx_state(&self, txid: Buf32, tx_state: BridgeTxState) -> DbResult<()>;
 
@@ -369,10 +357,7 @@ pub trait BridgeTxStore {
     ///
     /// *WARNING*: This can have detrimental effects if used at the wrong time.
     fn evict_tx_state(&self, txid: Buf32) -> DbResult<Option<BridgeTxState>>;
-}
 
-/// All methods related to fetching [`BridgeTxState`]s in the database
-pub trait BridgeTxProvider {
     /// Fetch [`BridgeTxState`] from db.
     fn get_tx_state(&self, txid: Buf32) -> DbResult<Option<BridgeTxState>>;
 }

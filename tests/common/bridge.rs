@@ -6,10 +6,7 @@ use alpen_express_common::logging;
 use alpen_express_primitives::bridge::{
     Musig2PubNonce, OperatorIdx, OperatorPartialSig, PublickeyTable, SignatureInfo,
 };
-use alpen_express_rocksdb::{
-    bridge::db::{BridgeTxRdbProvider, BridgeTxRdbStore, BridgeTxRocksDb},
-    test_utils::get_rocksdb_tmp_instance,
-};
+use alpen_express_rocksdb::{bridge::db::BridgeTxRocksDb, test_utils::get_rocksdb_tmp_instance};
 use alpen_test_utils::bridge::generate_keypairs;
 use anyhow::Context;
 use bitcoin::{
@@ -531,11 +528,7 @@ pub(crate) fn setup_sig_manager(index: OperatorIdx, keypair: Keypair) -> Signatu
     let (bridge_tx_db, config) =
         get_rocksdb_tmp_instance().expect("should create a tmp rocksdb instance");
 
-    let bridge_tx_store = BridgeTxRdbStore::new(bridge_tx_db.clone(), config);
-    let bridge_tx_provider = BridgeTxRdbProvider::new(bridge_tx_db.clone());
-
-    let bridge_tx_db =
-        BridgeTxRocksDb::new(Arc::new(bridge_tx_store), Arc::new(bridge_tx_provider));
+    let bridge_tx_db = BridgeTxRocksDb::new(bridge_tx_db, config);
 
     let bridge_tx_db_ctx = ops::bridge::Context::new(Arc::new(bridge_tx_db));
 
