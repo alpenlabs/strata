@@ -16,7 +16,7 @@ class ElBridgePrecompileTest(flexitest.Test):
         source = web3.address
         dest = web3.to_checksum_address("0x000000000000000000000000000000000b121d9e")
         # 64 bytes
-        data = "0x" + "00" * 64
+        data = "0x" + "00" * 32
 
         assert web3.is_connected(), "cannot connect to reth"
 

@@ -5,7 +5,10 @@ use alpen_express_eectl::{
     errors::{EngineError, EngineResult},
     messages::{ELDepositData, ExecPayloadData, Op, PayloadEnv},
 };
-use alpen_express_primitives::buf::Buf64;
+use alpen_express_primitives::{
+    buf::Buf32,
+    l1::{BitcoinAmount, XOnlyPk},
+};
 use alpen_express_state::{
     block::L2BlockBundle,
     bridge_ops,
@@ -174,7 +177,7 @@ impl<T: EngineRpc> RpcExecEngineInner<T> {
 
         let withdrawal_intents = rpc_withdrawal_intents
             .into_iter()
-            .map(to_bridge_withdrawal_intents)
+            .map(to_bridge_withdrawal_intent)
             .collect();
 
         let update_output =
@@ -350,11 +353,11 @@ struct ForkchoiceStatePartial {
     pub finalized_block_hash: Option<B256>,
 }
 
-fn to_bridge_withdrawal_intents(
+fn to_bridge_withdrawal_intent(
     rpc_withdrawal_intent: express_reth_node::WithdrawalIntent,
 ) -> bridge_ops::WithdrawalIntent {
     let express_reth_node::WithdrawalIntent { amt, dest_pk } = rpc_withdrawal_intent;
-    bridge_ops::WithdrawalIntent::new(amt, Buf64(dest_pk))
+    bridge_ops::WithdrawalIntent::new(BitcoinAmount::from_sat(amt), XOnlyPk::new(Buf32(dest_pk)))
 }
 
 #[cfg(test)]

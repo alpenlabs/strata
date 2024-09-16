@@ -32,8 +32,8 @@ impl<DB: Database> ContextStatefulPrecompile<DB> for BridgeoutPrecompile {
         _gas_limit: u64,
         evmctx: &mut revm::InnerEvmContext<DB>,
     ) -> PrecompileResult {
-        // ensure valid calldata
-        if bytes.len() != 64 {
+        // calldata must be 32bytes x-only pubkey
+        if bytes.len() != 32 {
             return Err(PrecompileErrors::Error(PrecompileError::other(
                 "invalid data",
             )));
