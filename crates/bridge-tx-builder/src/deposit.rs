@@ -25,7 +25,7 @@ use super::{
 };
 use crate::{
     constants::BRIDGE_DENOMINATION,
-    context::{BuildContext, TxBuildContext},
+    context::BuildContext,
     operations::create_tx,
     prelude::{create_taproot_addr, SpendPath},
 };
@@ -55,11 +55,9 @@ pub struct DepositInfo {
 }
 
 impl TxKind for DepositInfo {
-    type Context = TxBuildContext;
-
-    fn construct_signing_data(
+    fn construct_signing_data<C: BuildContext>(
         &self,
-        build_context: &Self::Context,
+        build_context: &C,
     ) -> BridgeTxBuilderResult<TxSigningData> {
         let prevouts = self.compute_prevouts(build_context)?;
         let spend_infos = self.compute_spend_infos(build_context)?;
@@ -261,7 +259,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        constants::BRIDGE_DENOMINATION, errors::BridgeTxBuilderError,
+        constants::BRIDGE_DENOMINATION, context::TxBuildContext, errors::BridgeTxBuilderError,
         prelude::get_aggregated_pubkey,
     };
 

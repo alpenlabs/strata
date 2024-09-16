@@ -1,7 +1,7 @@
 //! Provides wallet-like functionalities for creating nonces and signatures.
 
 use alpen_express_db::entities::bridge_tx_state::BridgeTxState;
-use alpen_express_primitives::bridge::{Musig2SecNonce, PublickeyTable, SignatureInfo};
+use alpen_express_primitives::bridge::{Musig2SecNonce, OperatorPartialSig, PublickeyTable};
 use bitcoin::{
     hashes::Hash,
     secp256k1::{Keypair, Message, SecretKey},
@@ -72,7 +72,7 @@ pub fn sign_state_partial(
 /// Verify that a partial MuSig2 signature is correct.
 pub fn verify_partial_sig(
     tx_state: &BridgeTxState,
-    signature_info: &SignatureInfo,
+    signature_info: &OperatorPartialSig,
     aggregated_nonce: &AggNonce,
     message: impl AsRef<[u8]>,
 ) -> BridgeSigResult<()> {
@@ -108,7 +108,7 @@ pub fn verify_partial_sig(
 
 #[cfg(test)]
 mod tests {
-    use alpen_express_primitives::bridge::{OperatorIdx, OperatorPartialSig};
+    use alpen_express_primitives::bridge::{Musig2PartialSig, OperatorIdx};
     use alpen_test_utils::bridge::{
         generate_keypairs, generate_mock_tx_signing_data, generate_mock_unsigned_tx,
         generate_pubkey_table, permute,
@@ -176,7 +176,7 @@ mod tests {
 
         // Step 2: Verify the partial signature
 
-        let signature_info = SignatureInfo::new(partial_sig.into(), own_index as OperatorIdx);
+        let signature_info = OperatorPartialSig::new(partial_sig.into(), own_index as OperatorIdx);
 
         let verify_result = verify_partial_sig(
             &tx_state,
@@ -194,7 +194,7 @@ mod tests {
         // Step 3: Check error cases
 
         // Test 3.1: Right signature wrong position
-        let signature_info = SignatureInfo::new(
+        let signature_info = OperatorPartialSig::new(
             partial_sig.into(),
             ((own_index + 1) % num_operators).try_into().unwrap(),
         );
@@ -214,9 +214,9 @@ mod tests {
         // Test 3.2: Wrong signature
         let data = vec![0u8; 1024];
         let mut unstructured = Unstructured::new(&data);
-        let random_partial_sig = OperatorPartialSig::arbitrary(&mut unstructured)
+        let random_partial_sig = Musig2PartialSig::arbitrary(&mut unstructured)
             .expect("should generate an arbitrary partial sig");
-        let signature_info = SignatureInfo::new(
+        let signature_info = OperatorPartialSig::new(
             random_partial_sig,
             ((own_index + 1) % num_operators).try_into().unwrap(),
         );
@@ -235,7 +235,7 @@ mod tests {
 
         // Test 3.3: Wrong index
         let signature_info =
-            SignatureInfo::new(partial_sig.into(), (num_operators + 1).try_into().unwrap());
+            OperatorPartialSig::new(partial_sig.into(), (num_operators + 1).try_into().unwrap());
 
         let verify_result = verify_partial_sig(
             &tx_state,

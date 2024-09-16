@@ -4,7 +4,7 @@ use std::{collections::BTreeMap, ops::Not, sync::Arc, time::Duration};
 
 use alpen_express_common::logging;
 use alpen_express_primitives::bridge::{
-    Musig2PubNonce, OperatorIdx, OperatorPartialSig, PublickeyTable, SignatureInfo,
+    Musig2PartialSig, Musig2PubNonce, OperatorIdx, OperatorPartialSig, PublickeyTable,
 };
 use alpen_express_rocksdb::{bridge::db::BridgeTxRocksDb, test_utils::get_rocksdb_tmp_instance};
 use alpen_test_utils::bridge::generate_keypairs;
@@ -91,7 +91,7 @@ pub(crate) enum BridgeDuty {
 #[derive(Debug, Clone)]
 pub(crate) enum Message {
     Nonce(Txid, Musig2PubNonce, OperatorIdx),
-    Signature(Txid, OperatorPartialSig, OperatorIdx),
+    Signature(Txid, Musig2PartialSig, OperatorIdx),
 }
 
 /// An operator is an agent that is a member of the bridge federation capable of processing deposits
@@ -331,7 +331,7 @@ impl Operator {
 
                     event!(Level::DEBUG, event = "received signature", sender_idx = %sender_idx, operator_idx = %self.index);
 
-                    let signature_info = SignatureInfo::new(partial_sig, sender_idx);
+                    let signature_info = OperatorPartialSig::new(partial_sig, sender_idx);
                     let input_index = 0; // always going to be one input for now
                     let is_complete = self
                         .sig_manager

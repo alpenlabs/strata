@@ -6,7 +6,7 @@ use std::{collections::BTreeMap, sync::Arc};
 use alpen_express_db::entities::bridge_tx_state::BridgeTxState;
 use alpen_express_primitives::{
     bridge::{
-        Musig2PubNonce, OperatorIdx, OperatorPartialSig, PublickeyTable, SignatureInfo,
+        Musig2PartialSig, Musig2PubNonce, OperatorIdx, OperatorPartialSig, PublickeyTable,
         TxSigningData,
     },
     l1::SpendInfo,
@@ -83,7 +83,7 @@ impl SignatureManager {
         let mut tx_state = BridgeTxState::new(tx_signing_data, pubkey_table, sec_nonce.into())?;
         tx_state.add_nonce(&self.index, pub_nonce.into())?;
 
-        self.db_ops.upsert_tx_state_async(txid, tx_state).await?;
+        self.db_ops.put_tx_state_async(txid, tx_state).await?;
 
         Ok(txid)
     }
@@ -99,11 +99,7 @@ impl SignatureManager {
     pub async fn get_tx_state(&self, txid: &Txid) -> BridgeSigResult<BridgeTxState> {
         let entry = self.db_ops.get_tx_state_async(*txid).await?;
 
-        if entry.is_none() {
-            return Err(BridgeSigError::TransactionNotFound);
-        }
-
-        Ok(entry.unwrap())
+        entry.ok_or(BridgeSigError::TransactionNotFound)
     }
 
     /// Generate a random secret nonce.
@@ -165,7 +161,7 @@ impl SignatureManager {
         let mut tx_state = self.get_tx_state(txid).await?;
 
         let is_complete = tx_state.add_nonce(&operator_index, pub_nonce.clone())?;
-        self.db_ops.upsert_tx_state_async(*txid, tx_state).await?;
+        self.db_ops.put_tx_state_async(*txid, tx_state).await?;
 
         Ok(is_complete)
     }
@@ -222,7 +218,7 @@ impl SignatureManager {
                 message,
             )?;
 
-            let own_signature_info = SignatureInfo::new(signature.into(), self.index);
+            let own_signature_info = OperatorPartialSig::new(signature.into(), self.index);
             verify_partial_sig(&tx_state, &own_signature_info, &aggregated_nonce, message)?;
 
             is_fully_signed = tx_state.add_signature(own_signature_info, input_index)?;
@@ -236,7 +232,7 @@ impl SignatureManager {
         }
 
         self.db_ops
-            .upsert_tx_state_async(*txid, tx_state.clone())
+            .put_tx_state_async(*txid, tx_state.clone())
             .await?;
 
         Ok(is_fully_signed)
@@ -247,7 +243,7 @@ impl SignatureManager {
         &self,
         txid: &Txid,
         input_index: usize,
-    ) -> BridgeSigResult<Option<OperatorPartialSig>> {
+    ) -> BridgeSigResult<Option<Musig2PartialSig>> {
         let tx_state = self.get_tx_state(txid).await?;
 
         let collected_sig_for_input = tx_state
@@ -273,7 +269,7 @@ impl SignatureManager {
     pub async fn add_partial_sig(
         &self,
         txid: &Txid,
-        signature_info: SignatureInfo,
+        signature_info: OperatorPartialSig,
         input_index: usize,
     ) -> BridgeSigResult<bool> {
         let mut tx_state = self.get_tx_state(txid).await?;
@@ -299,7 +295,7 @@ impl SignatureManager {
 
         tx_state.add_signature(signature_info, input_index)?;
         self.db_ops
-            .upsert_tx_state_async(*txid, tx_state.clone())
+            .put_tx_state_async(*txid, tx_state.clone())
             .await?;
 
         Ok(tx_state.is_fully_signed())
@@ -369,16 +365,8 @@ impl SignatureManager {
                 message_bytes,
             )?;
 
-            let key_agg_ctx = KeyAggContext::new(
-                tx_state
-                    .pubkeys()
-                    .clone()
-                    .0
-                    .values()
-                    .copied()
-                    .collect::<Vec<PublicKey>>(),
-            )
-            .expect("key aggregation of musig2 pubkeys should work");
+            let key_agg_ctx = KeyAggContext::new(tx_state.pubkeys().0.values().copied())
+                .expect("key aggregation of musig2 pubkeys should work");
 
             let aggregated_pubkey: PublicKey = key_agg_ctx.aggregated_pubkey();
             let x_only_pubkey: XOnlyPublicKey = aggregated_pubkey.x_only_public_key().0;
@@ -419,7 +407,7 @@ impl SignatureManager {
 mod tests {
     use std::{ops::Not, str::FromStr};
 
-    use alpen_express_primitives::bridge::OperatorPartialSig;
+    use alpen_express_primitives::bridge::Musig2PartialSig;
     use alpen_test_utils::bridge::{
         generate_keypairs, generate_mock_tx_signing_data, generate_mock_tx_state_ops,
         generate_pubkey_table, generate_sec_nonce, permute,
@@ -721,11 +709,11 @@ mod tests {
 
         let random_bytes = vec![0u8; 66];
         let mut unstructured = Unstructured::new(&random_bytes);
-        let random_partial_sig = OperatorPartialSig::arbitrary(&mut unstructured)
+        let random_partial_sig = Musig2PartialSig::arbitrary(&mut unstructured)
             .expect("should generate random partial sig");
 
         let invalid_sig_info =
-            SignatureInfo::new(random_partial_sig, external_index as OperatorIdx);
+            OperatorPartialSig::new(random_partial_sig, external_index as OperatorIdx);
 
         let result = signature_manager
             .add_partial_sig(&random_txid, invalid_sig_info, external_index)
@@ -785,7 +773,7 @@ mod tests {
         .unwrap();
 
         let external_signature_info =
-            SignatureInfo::new(external_signature.into(), external_index as OperatorIdx);
+            OperatorPartialSig::new(external_signature.into(), external_index as OperatorIdx);
 
         let result = signature_manager
             .add_partial_sig(&txid, external_signature_info, num_inputs + 1)
@@ -814,7 +802,7 @@ mod tests {
         .expect("should be able to produce partial sig");
 
         let external_signature_info =
-            SignatureInfo::new(external_signature.into(), external_index as OperatorIdx);
+            OperatorPartialSig::new(external_signature.into(), external_index as OperatorIdx);
 
         let result = signature_manager
             .add_partial_sig(&txid, external_signature_info, input_index)
@@ -868,7 +856,7 @@ mod tests {
         )
         .expect("should produce a signature");
 
-        let invalid_external_signature_info = SignatureInfo::new(
+        let invalid_external_signature_info = OperatorPartialSig::new(
             invalid_external_signature.into(),
             external_index as OperatorIdx,
         );
@@ -961,7 +949,7 @@ mod tests {
                 .unwrap();
 
                 let external_signature_info =
-                    SignatureInfo::new(external_signature.into(), signer_index as OperatorIdx);
+                    OperatorPartialSig::new(external_signature.into(), signer_index as OperatorIdx);
 
                 // Add the external signature
                 let result = signature_manager

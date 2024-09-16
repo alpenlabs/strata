@@ -7,11 +7,11 @@ use crate::{
 };
 
 define_table_with_seek_key_codec!(
-    /// A table to store mapping of [`Txid`] to [`CollectedSigs`].
+    /// A table to store mapping of [`Txid`] to [`Buf32`].
     (BridgeTxStateTxidSchema) u64 => Buf32
 );
 
 define_table_with_default_codec!(
-    /// A table to store [`CollectedSigs`]
+    /// A table to map `Buf32` IDs to [`BridgeTxState`].
     (BridgeTxStateSchema) Buf32 => BridgeTxState
 );

@@ -21,12 +21,9 @@ use errors::BridgeTxBuilderResult;
 /// This is implemented by any struct that contains bridge-specific information to create
 /// transactions.
 pub trait TxKind {
-    /// The cryptographic context required to build the transaction.
-    type Context: BuildContext;
-
     /// Create the [`TxSigningData`] required to create the final signed transaction.
-    fn construct_signing_data(
+    fn construct_signing_data<C: BuildContext>(
         &self,
-        build_context: &Self::Context,
+        build_context: &C,
     ) -> BridgeTxBuilderResult<TxSigningData>;
 }
