@@ -1,14 +1,17 @@
+pub mod bridge_relay;
 pub mod broadcaster;
 pub mod chain_state;
 pub mod client_state;
 pub mod l1;
 pub mod l2;
-pub mod macros;
 pub mod sequencer;
 pub mod sync_event;
+
+pub mod macros;
+pub mod utils;
+
 #[cfg(feature = "test_utils")]
 pub mod test_utils;
-pub mod utils;
 
 pub const ROCKSDB_NAME: &str = "express";
 
