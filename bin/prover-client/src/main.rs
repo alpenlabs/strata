@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use alpen_express_common::logging;
 use args::Args;
+use config::EL_START_BLOCK_HEIGHT;
 use express_risc0_adapter::RiscZeroHost;
 use jsonrpsee::http_client::HttpClientBuilder;
 use manager::ProverManager;
@@ -34,8 +35,11 @@ async fn main() {
         .build(args.get_reth_rpc_url())
         .expect("failed to connect to the el client");
 
-    let el_proving_task_scheduler =
-        ELBlockProvingTaskScheduler::new(el_rpc_client, task_tracker.clone());
+    let el_proving_task_scheduler = ELBlockProvingTaskScheduler::new(
+        el_rpc_client,
+        task_tracker.clone(),
+        EL_START_BLOCK_HEIGHT,
+    );
     let rpc_context = RpcContext::new(el_proving_task_scheduler.clone());
     let prover_manager: ProverManager<RiscZeroHost> = ProverManager::new(task_tracker);
 

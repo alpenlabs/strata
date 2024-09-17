@@ -528,9 +528,14 @@ def main(argv):
     modules = flexitest.runtime.scan_dir_for_modules(test_dir)
     all_tests = flexitest.runtime.load_candidate_modules(modules)
 
+    # Avoid running prover related tets while running all the tests
     # Filter the prover test files if not present in argv
-    tests = [test for test in all_tests if "fn_prover" not in test or test in argv]
-    tests = [str(argv[1]).removesuffix(".py")] if len(argv) > 1 else all_tests
+    if len(argv) > 1:
+        # Run the specific test file passed as the first argument (without .py extension)
+        tests = [str(argv[1]).removesuffix(".py")]
+    else:
+        # Run all tests, excluding those containing "fn_prover", unless explicitly passed in argv
+        tests = [test for test in all_tests if "fn_prover" not in test or test in argv]
 
     datadir_root = flexitest.create_datadir_in_workspace(os.path.join(test_dir, DD_ROOT))
 

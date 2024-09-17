@@ -30,10 +30,10 @@ risc0-build = { version = "1.0.5" }
 
 [package.metadata.risc0]
 methods = [
-  "guest-reth-stf",
+  "guest-evm-ee-stf",
   "guest-cl-stf",
-  "express-proofimpl-btc-blockspace",
-  "express-proofimpl-l1-batch",
+  "guest-btc-blockspace",
+  "guest-l1-batch",
 ]
 
 [features]

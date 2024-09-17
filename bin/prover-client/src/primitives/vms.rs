@@ -24,7 +24,7 @@ impl<Vm: ZKVMHost> ZkVMManager<Vm> {
 
     pub fn add_vm(&mut self, proof_vm: ProofVm, init_vector: Vec<u8>) {
         self.vms
-            .insert(proof_vm, Vm::init(init_vector, self.prover_config.clone()));
+            .insert(proof_vm, Vm::init(init_vector, self.prover_config));
     }
 
     pub fn get(&self, proof_vm: &ProofVm) -> Option<Vm> {

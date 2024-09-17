@@ -79,7 +79,7 @@ impl<T: serde::Serialize> Default for ProverInput<T> {
 }
 
 /// A trait implemented by the prover ("host") of a zkVM program.
-pub trait ZKVMHost {
+pub trait ZKVMHost: Send + Sync + Clone {
     /// Initializes the ZKVM with the provided ELF program and prover configuration.
     fn init(guest_code: Vec<u8>, prover_options: ProverOptions) -> Self;
 

@@ -40,7 +40,6 @@ pub enum ProvingTaskStatus {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProvingTask {
     pub id: Uuid,
-    pub el_block_num: u64,
     pub prover_input: ProverInput,
     pub status: ProvingTaskStatus,
 }

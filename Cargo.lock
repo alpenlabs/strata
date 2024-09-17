@@ -3841,6 +3841,9 @@ dependencies = [
  "rand 0.8.5",
  "serde",
  "serde_json",
+]
+
+[[package]]
 name = "express-prover-client"
 version = "0.1.0"
 dependencies = [
@@ -3851,14 +3854,14 @@ dependencies = [
  "argh",
  "async-trait",
  "bincode",
+ "express-proofimpl-evm-ee-stf",
  "express-prover-client-rpc-api",
  "express-risc0-adapter",
- "express-sp1-adapter",
+ "express-risc0-guest-builder",
  "express-zkvm",
  "jsonrpsee",
  "rayon",
  "reth-rpc-types",
- "risc0-guest-builder",
  "rockbound",
  "serde",
  "thiserror",
@@ -3866,7 +3869,6 @@ dependencies = [
  "tracing",
  "tracing-subscriber 0.3.18",
  "uuid 1.10.0",
- "zkvm-primitives",
 ]
 
 [[package]]

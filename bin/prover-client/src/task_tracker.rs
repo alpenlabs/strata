@@ -20,11 +20,10 @@ impl TaskTracker {
         }
     }
 
-    pub async fn create_task(&self, el_block_num: u64, prover_input: ProverInput) -> Uuid {
+    pub async fn create_task(&self, prover_input: ProverInput) -> Uuid {
         let task_id = Uuid::new_v4();
         let task = ProvingTask {
             id: task_id,
-            el_block_num,
             prover_input,
             status: ProvingTaskStatus::Pending,
         };

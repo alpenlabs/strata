@@ -2,7 +2,7 @@
 
 use anyhow::{Context, Ok};
 use async_trait::async_trait;
-use express_prover_client_rpc_api::ExpressProverClientApiServerServer;
+use express_prover_client_rpc_api::ExpressProverClientApiServer;
 use jsonrpsee::{core::RpcResult, RpcModule};
 use tokio::sync::oneshot;
 use tracing::{info, warn};
@@ -28,12 +28,12 @@ pub(crate) async fn start<T>(
     enable_dev_rpc: bool,
 ) -> anyhow::Result<()>
 where
-    T: ExpressProverClientApiServerServer + Clone,
+    T: ExpressProverClientApiServer + Clone,
 {
     let mut rpc_module = RpcModule::new(rpc_impl.clone());
 
     if enable_dev_rpc {
-        let prover_client_dev_api = ExpressProverClientApiServerServer::into_rpc(rpc_impl.clone());
+        let prover_client_dev_api = ExpressProverClientApiServer::into_rpc(rpc_impl.clone());
         rpc_module
             .merge(prover_client_dev_api)
             .context("merge prover client api")?;
@@ -73,7 +73,7 @@ impl ProverClientRpc {
 }
 
 #[async_trait]
-impl ExpressProverClientApiServerServer for ProverClientRpc {
+impl ExpressProverClientApiServer for ProverClientRpc {
     async fn prove_el_block(&self, el_block_num: u64) -> RpcResult<String> {
         let task_id = self
             .context

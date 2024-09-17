@@ -8,13 +8,14 @@ use alpen_express_rocksdb::{
     prover::db::{ProofDb, ProverDB},
     DbOpsConfig,
 };
-use express_zkvm::{Proof, ProverOptions, ZKVMHost};
-use risc0_guest_builder::RETH_RISC0_ELF;
+use express_proofimpl_evm_ee_stf::ELProofInput;
+use express_risc0_guest_builder::GUEST_RISC0_EVM_EE_STF_ELF;
+use express_zkvm::{Proof, ProverInput as ZKVM_INPUT, ProverOptions, ZKVMHost};
 use tracing::info;
 use uuid::Uuid;
-use zkvm_primitives::ZKVMInput;
 
 use crate::{
+    config::NUM_PROVER_WORKER,
     db::open_rocksdb_database,
     primitives::{
         prover_input::ProverInput,
@@ -94,8 +95,10 @@ where
 {
     match prover_input {
         ProverInput::ElBlock(el_input) => {
-            let el_input: ZKVMInput = bincode::deserialize(&el_input.data)?;
-            let (proof, _) = vm.prove(&[el_input], None)?;
+            let el_input: ELProofInput = bincode::deserialize(&el_input.data)?;
+            let mut input = ZKVM_INPUT::new();
+            input.write(el_input);
+            let (proof, _) = vm.prove(&input)?;
             Ok(proof)
         }
         _ => {
@@ -114,14 +117,14 @@ where
         let db = ProofDb::new(rbdb, db_ops);
 
         let mut zkvm_manager: ZkVMManager<Vm> = ZkVMManager::new(prover_config);
-        zkvm_manager.add_vm(ProofVm::ELProving, RETH_RISC0_ELF.to_vec());
+        zkvm_manager.add_vm(ProofVm::ELProving, GUEST_RISC0_EVM_EE_STF_ELF.into());
         zkvm_manager.add_vm(ProofVm::CLProving, vec![]);
         zkvm_manager.add_vm(ProofVm::CLAggregation, vec![]);
 
         Self {
             num_threads,
             pool: rayon::ThreadPoolBuilder::new()
-                .num_threads(5)
+                .num_threads(NUM_PROVER_WORKER)
                 .build()
                 .expect("Failed to initialize prover threadpool worker"),
 
@@ -177,7 +180,6 @@ where
                     self.pool.spawn(move || {
                         tracing::info_span!("guest_execution").in_scope(|| {
                             let proof = make_proof(witness, vm.clone());
-
                             info!("make_proof completed for task: {:?} {:?}", task_id, proof);
                             let mut prover_state =
                                 prover_state_clone.write().expect("Lock was poisoned");

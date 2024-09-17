@@ -12,12 +12,11 @@ required-features = ["prover"]
 alpen-express-common = { workspace = true }
 alpen-express-db = { workspace = true }
 alpen-express-rocksdb = { workspace = true }
+express-proofimpl-evm-ee-stf = { workspace = true }
 express-prover-client-rpc-api = { workspace = true }
 express-risc0-adapter = { workspace = true, features = ["prover"] }
-express-sp1-adapter = { workspace = true, features = ["prover"] }
+express-risc0-guest-builder = { path = "../../provers/risc0" }
 express-zkvm = { workspace = true }
-risc0-guest-builder = { path = "../../proofs/risc0", features = ["prover"] }
-zkvm-primitives = { workspace = true }
 
 
 anyhow = { workspace = true }
@@ -37,4 +36,4 @@ uuid = { version = "1.0", features = ["v4", "serde"] }
 
 
 [features]
-prover = []
+prover = ["express-risc0-guest-builder/prover"]

@@ -302,9 +302,7 @@ pub trait SeqDataProvider {
     fn get_last_batch_idx(&self) -> DbResult<Option<u64>>;
 }
 
-/// A trait encapsulating provider and store traits to interact with the underlying database for
-/// [`BlobEntry`]
-/// #[cfg_attr(feature = "mocks", automock(type SeqStore=MockSeqDataStore; type SeqProv=MockSeqDataProvider;))]
+/// A trait providing access to both prover data store and prover data provider.
 pub trait ProverDatabase {
     type ProverStore: ProverDataStore;
     type ProverProv: ProverDataProvider;
@@ -322,8 +320,6 @@ pub trait ProverDataStore {
 
     /// Updates an existing txentry
     fn update_task_entry(&self, idx: u64, txentry: Vec<u8>) -> DbResult<()>;
-
-    // TODO: possibly add delete as well
 }
 
 /// All methods related to fetching [`Vec<u8>`]s and indices in the database

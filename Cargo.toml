@@ -87,15 +87,12 @@ express-reth-db = { path = "crates/reth/db" }
 express-reth-exex = { path = "crates/reth/exex" }
 express-reth-node = { path = "crates/reth/node" }
 express-reth-rpc = { path = "crates/reth/rpc" }
-express-risc0-adapter = { path = "crates/prover/adapters/risc0" }
+express-risc0-adapter = { path = "crates/zkvm/adapters/risc0" }
 express-rpc-utils = { path = "crates/rpc/utils" }
-express-sp1-adapter = { path = "crates/prover/adapters/sp1" }
 express-storage = { path = "crates/storage" }
 express-sync = { path = "crates/sync" }
 express-tasks = { path = "crates/tasks" }
-express-zkvm = { path = "crates/prover/zkvm" }
-zkvm = { path = "crates/prover/zkvm" }
-zkvm-primitives = { path = "crates/prover/primitives" }
+express-zkvm = { path = "crates/zkvm/zkvm" }                                     # FIXME make these names more consistent?
 
 # IMPORTANT: ensure alloy-* and revm packages are of the same version as inside reth dependency
 alloy-genesis = { version = "0.2", default-features = false }
