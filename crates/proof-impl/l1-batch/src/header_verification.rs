@@ -1,3 +1,5 @@
+use std::io::{Cursor, Write};
+
 use alpen_express_primitives::buf::Buf32;
 use bitcoin::{block::Header, hashes::Hash, BlockHash, CompactTarget, Target};
 use ethnum::U256;
@@ -136,6 +138,29 @@ impl HeaderVerificationState {
         // Set the target for the next block
         self.next_block_target = self.next_target(header.time, params);
     }
+
+    /// Calculate the hash of the verification state
+    pub fn hash(&self) -> Result<Buf32, std::io::Error> {
+        // 4 + 32 + 4 + 4 + 8 + 11*4 = 96
+        let mut buf = [0u8; 96];
+        let mut cur = Cursor::new(&mut buf[..]);
+        cur.write_all(&self.last_verified_block_num.to_be_bytes())?;
+        cur.write_all(self.last_verified_block_hash.as_ref())?;
+        cur.write_all(&self.next_block_target.to_be_bytes())?;
+        cur.write_all(&self.interval_start_timestamp.to_be_bytes())?;
+        cur.write_all(&self.total_accumulated_pow.to_be_bytes())?;
+
+        let serialized_timestamps: [u8; 11 * 4] = self
+            .last_11_blocks_timestamps
+            .timestamps
+            .iter()
+            .flat_map(|&x| x.to_be_bytes())
+            .collect::<Vec<u8>>()
+            .try_into()
+            .unwrap();
+        cur.write_all(&serialized_timestamps)?;
+        Ok(alpen_express_primitives::hash::raw(&buf))
+    }
 }
 
 /// Calculates the height at which a specific difficulty adjustment occurs relative to a
@@ -212,5 +237,16 @@ mod tests {
         for header_idx in r1..chain.end {
             verification_state.check_and_update(&chain.get_header(header_idx), &params)
         }
+    }
+
+    #[test]
+    fn test_hash() {
+        let params = PowParams::from(&Params::MAINNET);
+        let chain: BtcChainSegment = get_btc_chain(Params::MAINNET);
+        let h1 = get_difficulty_adjustment_height(1, chain.start, &params);
+        let r1 = rand::thread_rng().gen_range(h1..chain.end);
+        let verification_state = for_block(r1, &chain);
+        let hash = verification_state.hash();
+        assert!(hash.is_ok());
     }
 }
