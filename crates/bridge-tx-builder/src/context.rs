@@ -4,7 +4,7 @@
 
 use alpen_express_primitives::bridge::{OperatorIdx, PublickeyTable};
 use bitcoin::Network;
-use musig2::secp256k1::{PublicKey, XOnlyPublicKey};
+use musig2::secp256k1::XOnlyPublicKey;
 
 use crate::prelude::get_aggregated_pubkey;
 
@@ -14,11 +14,14 @@ use crate::prelude::get_aggregated_pubkey;
 /// Please refer to MuSig2 in
 /// [BIP 327](https://github.com/bitcoin/bips/blob/master/bip-0327.mediawiki).
 pub trait BuildContext {
+    /// Get the public key table.
+    fn pubkey_table(&self) -> &PublickeyTable;
+
     /// Get the aggregated MuSig2 x-only pubkey used in the spending condition of the multisig.
     fn aggregated_pubkey(&self) -> XOnlyPublicKey;
 
-    /// Get the pubkey associated with this client.
-    fn pubkey(&self) -> PublicKey;
+    /// Get the [`OperatorIdx`] associated with this client.
+    fn own_index(&self) -> OperatorIdx;
 
     /// Get the bitcoin network for which the builder constructs transactions.
     fn network(&self) -> &Network;
@@ -28,10 +31,10 @@ pub trait BuildContext {
 #[derive(Debug, Clone)]
 pub struct TxBuildContext {
     /// A table that maps bridge operator indexes to their respective x-only Schnorr pubkeys.
-    aggregated_pubkey: XOnlyPublicKey,
+    pubkey_table: PublickeyTable,
 
-    /// The pubkey for this bridge client.
-    pubkey: PublicKey,
+    /// The [`OperatorIdx`] for this bridge client.
+    own_index: OperatorIdx,
 
     /// The network to build the transactions for.
     network: Network,
@@ -40,31 +43,29 @@ pub struct TxBuildContext {
 impl TxBuildContext {
     /// Create a new [`TxBuilder`] with the context required to build transactions of various
     /// [`TxKind`].
-    pub fn new(operator_pubkeys: PublickeyTable, network: Network, self_idx: OperatorIdx) -> Self {
-        let pubkey = *operator_pubkeys
-            .0
-            .get(&self_idx)
-            .expect("this bridge client's id must be part of the federation");
-
-        let aggregated_pubkey = get_aggregated_pubkey(operator_pubkeys);
-
+    pub fn new(operator_pubkeys: PublickeyTable, network: Network, own_index: OperatorIdx) -> Self {
         Self {
-            aggregated_pubkey,
-            pubkey,
+            pubkey_table: operator_pubkeys,
+            own_index,
             network,
         }
     }
 }
 
 impl BuildContext for TxBuildContext {
+    /// Get the pubkey table.
+    fn pubkey_table(&self) -> &PublickeyTable {
+        &self.pubkey_table
+    }
+
     /// Get the ordered set operator pubkeys.
     fn aggregated_pubkey(&self) -> XOnlyPublicKey {
-        self.aggregated_pubkey
+        get_aggregated_pubkey(self.pubkey_table.clone())
     }
 
     /// Get the pubkey associated with this client.
-    fn pubkey(&self) -> PublicKey {
-        self.pubkey
+    fn own_index(&self) -> OperatorIdx {
+        self.own_index
     }
 
     /// Get the bitcoin network for which the builder constructs transactions.

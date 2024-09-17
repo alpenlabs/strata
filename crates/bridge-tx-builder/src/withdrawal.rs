@@ -93,6 +93,7 @@ impl CooperativeWithdrawalInfo {
         let (bridge_addr, _) = create_taproot_addr(build_context.network(), spend_path)?;
 
         let script_pubkey = bridge_addr.script_pubkey();
+
         let bridge_in_relay_cost = script_pubkey.minimal_non_dust_custom(fee_rate);
 
         let value = Amount::from(BRIDGE_DENOMINATION)
@@ -114,7 +115,19 @@ impl CooperativeWithdrawalInfo {
         let tx_ins = create_tx_ins([self.deposit_outpoint]);
 
         // create the output for the operator fees
-        let x_only_pubkey = build_context.pubkey().x_only_public_key().0;
+        let pubkey_table = build_context.pubkey_table();
+        let assigned_operator_pubkey = pubkey_table.0.get(&self.assigned_operator_idx);
+
+        if assigned_operator_pubkey.is_none() {
+            return Err(CooperativeWithdrawalError::Unauthorized(
+                self.assigned_operator_idx,
+            ))?;
+        }
+
+        let x_only_pubkey = assigned_operator_pubkey
+            .expect("should be present")
+            .x_only_public_key()
+            .0;
         let spend_path = SpendPath::KeySpend {
             internal_key: x_only_pubkey,
         };

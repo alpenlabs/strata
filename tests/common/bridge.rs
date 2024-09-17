@@ -3,16 +3,18 @@
 use std::{collections::BTreeMap, ops::Not, sync::Arc, time::Duration};
 
 use alpen_express_common::logging;
-use alpen_express_primitives::bridge::{
-    Musig2PartialSig, Musig2PubNonce, OperatorIdx, OperatorPartialSig, PublickeyTable,
+use alpen_express_primitives::{
+    bridge::{Musig2PartialSig, Musig2PubNonce, OperatorIdx, OperatorPartialSig, PublickeyTable},
+    buf::Buf32,
+    l1::XOnlyPk,
 };
 use alpen_express_rocksdb::{bridge::db::BridgeTxRocksDb, test_utils::get_rocksdb_tmp_instance};
 use alpen_test_utils::bridge::generate_keypairs;
 use anyhow::Context;
 use bitcoin::{
     key::Keypair,
-    secp256k1::{PublicKey, SecretKey, SECP256K1},
-    Address, Amount, Network, OutPoint, Transaction, Txid,
+    secp256k1::{PublicKey, SecretKey, XOnlyPublicKey, SECP256K1},
+    Address, Amount, Network, OutPoint, ScriptBuf, Transaction, Txid,
 };
 use bitcoind::{
     bitcoincore_rpc::{
@@ -23,7 +25,10 @@ use bitcoind::{
 };
 use express_bridge_sig_manager::prelude::SignatureManager;
 use express_bridge_tx_builder::{
-    prelude::{CooperativeWithdrawalInfo, DepositInfo, TxBuildContext},
+    prelude::{
+        create_taproot_addr, get_aggregated_pubkey, CooperativeWithdrawalInfo, DepositInfo,
+        SpendPath, TxBuildContext,
+    },
     TxKind,
 };
 use express_storage::ops;
@@ -82,8 +87,10 @@ impl BridgeFederation {
 /// The bridge duties that can be extracted from the chain state in the rollup.
 #[derive(Debug, Clone)]
 pub(crate) enum BridgeDuty {
+    #[allow(unused)] // this is used in `bridge-in-flow` but not in `cooperative-bridge-out-flow`
     Deposit(DepositInfo),
-    #[allow(dead_code)] // to be handled later
+
+    #[allow(unused)] // this is used in `cooperative-bridge-out-flow` but not in `bridge-in-flow`
     Withdrawal(CooperativeWithdrawalInfo),
 }
 
@@ -220,7 +227,66 @@ impl Operator {
             }
             BridgeDuty::Withdrawal(withdrawal_info) => {
                 event!(Level::TRACE, action = "starting to create tx signing data", withdrawal_info = ?withdrawal_info, operator_idx = %self.index);
-                todo!()
+
+                let tx_signing_data = withdrawal_info.construct_signing_data(&self.tx_builder);
+                assert!(
+                    tx_signing_data.is_ok(),
+                    "should be able to construct the signing data but got error: {:?}",
+                    tx_signing_data.unwrap_err()
+                );
+
+                let tx_signing_data = tx_signing_data.unwrap();
+
+                let txid = self
+                    .sig_manager
+                    .add_tx_state(tx_signing_data, self.pubkey_table.clone())
+                    .await;
+                assert!(
+                    txid.is_ok(),
+                    "should be able to add tx state to the sig manager but got: {:?}",
+                    txid.unwrap_err()
+                );
+
+                let txid = txid.unwrap();
+                event!(Level::INFO, event = "added new tx state to sig manager db", txid = %txid, operator_idx=%self.index);
+
+                let timeout_duration = Duration::from_secs(60); // should be more than enough
+
+                let receive_nonces = self.aggregate_nonces(&txid, timeout_duration).await;
+                assert!(
+                    receive_nonces.is_ok(),
+                    "timeout while trying to receive nonces"
+                );
+
+                event!(Level::INFO, event = "all nonces collected", operator_idx=%self.index);
+
+                let receive_signatures = self.agggregate_signatures(&txid, timeout_duration).await;
+                assert!(
+                    receive_signatures.is_ok(),
+                    "timeout while trying to collect signatures"
+                );
+
+                event!(Level::INFO, event = "signature collection complete", operator_idx=%self.index);
+
+                let fully_signed_transaction =
+                    self.sig_manager.get_fully_signed_transaction(&txid).await;
+
+                assert!(
+                    fully_signed_transaction.is_ok(),
+                    "should be able to produce a fully signed transaction but got: {:?}",
+                    fully_signed_transaction.unwrap_err()
+                );
+
+                let signed_tx = fully_signed_transaction.unwrap();
+
+                event!(
+                    Level::WARN,
+                    action = "broadcasting signed withdrawal transaction",
+                    operator_idx = %self.index
+                );
+                let txid = self.agent.broadcast_signed_tx(&signed_tx).await;
+
+                event!(Level::INFO, event = "broadcasted withdrawal transaction", txid = %txid, operator_idx = %self.index);
             }
         }
     }
@@ -365,6 +431,7 @@ impl User {
         Self(Agent::new(id, bitcoind).await)
     }
 
+    #[allow(unused)] // this is used in `bridge-in-flow` but not in `cooperative-bridge-out-flow`
     pub(crate) fn address(&self) -> &Address {
         &self.0.address
     }
@@ -406,6 +473,18 @@ impl Agent {
         };
 
         Self { address, bitcoind }
+    }
+
+    #[allow(unused)] // this is used in `cooperative-bridge-out-flow` but not in `bridge-in-flow`
+    pub(crate) fn pubkey(&self) -> XOnlyPk {
+        let script_pubkey = self.address.script_pubkey();
+        let script_pubkey = &script_pubkey.as_bytes()[2..34];
+
+        let x_only_pk = XOnlyPublicKey::from_slice(script_pubkey).unwrap();
+
+        let x_only_pk = Buf32(x_only_pk.serialize().into());
+
+        XOnlyPk::new(x_only_pk)
     }
 
     /// Mines [`Self::MIN_BLOCKS_TILL_SPENDABLE`] + `num_blocks` to this user's address.
@@ -505,7 +584,7 @@ pub(crate) async fn setup(num_operators: usize) -> (Arc<Mutex<BitcoinD>>, Bridge
     let _guard = span.enter();
 
     let mut conf = Conf::default();
-    conf.args = vec!["-regtest", "-fallbackfee=0.00001", "-maxtxfee=1.1"];
+    conf.args = vec!["-regtest", "-fallbackfee=0.00001", "-maxtxfee=0.0001"];
 
     // Uncomment the following line to view the stdout from `bitcoind`
     // conf.view_stdout = true;
@@ -515,9 +594,30 @@ pub(crate) async fn setup(num_operators: usize) -> (Arc<Mutex<BitcoinD>>, Bridge
     let bitcoind = Arc::new(Mutex::new(bitcoind));
 
     event!(Level::INFO, action = "setting up a bridge federation", num_operator = %num_operators);
-
     let federation = BridgeFederation::new(num_operators, bitcoind.clone()).await;
+
+    let (bridge_addr, bridge_script_pubkey, _) =
+        create_bridge_addr(federation.pubkey_table.clone());
+    event!(Level::DEBUG, event = "bridge address created", bridge_addr = %bridge_addr, script_pubkey = %bridge_script_pubkey);
+
     (bitcoind, federation)
+}
+
+pub(crate) fn create_bridge_addr(
+    pubkey_table: PublickeyTable,
+) -> (Address, ScriptBuf, XOnlyPublicKey) {
+    let aggregated_bridge_pubkey = get_aggregated_pubkey(pubkey_table);
+
+    let spend_path = SpendPath::KeySpend {
+        internal_key: aggregated_bridge_pubkey,
+    };
+
+    let (bridge_addr, _) = create_taproot_addr(&Network::Regtest, spend_path)
+        .expect("should be able to create bridge address");
+
+    let bridge_script_pubkey = bridge_addr.script_pubkey();
+
+    (bridge_addr, bridge_script_pubkey, aggregated_bridge_pubkey)
 }
 
 pub(crate) fn setup_sig_manager(index: OperatorIdx, keypair: Keypair) -> SignatureManager {

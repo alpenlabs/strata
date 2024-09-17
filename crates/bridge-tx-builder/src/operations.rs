@@ -178,21 +178,16 @@ fn build_taptree(
     }
 
     let spend_info = taproot_builder.finalize(SECP256K1, internal_key)?;
+    let merkle_root = spend_info.merkle_root();
 
     Ok((
-        Address::p2tr(
-            SECP256K1,
-            *UNSPENDABLE_INTERNAL_KEY,
-            spend_info.merkle_root(),
-            network,
-        ),
+        Address::p2tr(SECP256K1, internal_key, merkle_root, network),
         spend_info,
     ))
 }
 
 /// Create an output that can be spent by anyone, i.e. its script contains a single `OP_TRUE`.
 pub fn anyone_can_spend_txout() -> TxOut {
-    // `OP_PUSHNUM_1` is `OP_TRUE` that is it is always yields true for any unlocking script.
     let script = Builder::new().push_opcode(OP_TRUE).into_script();
     let script_pubkey = script.to_p2wsh();
     let value = script_pubkey.minimal_non_dust();
