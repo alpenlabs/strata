@@ -11,7 +11,10 @@ use crate::{
         error::{BroadcasterError, BroadcasterResult},
         state::BroadcasterState,
     },
-    rpc::traits::{Broadcaster, Wallet},
+    rpc::{
+        error::ClientError,
+        traits::{Broadcaster, Wallet},
+    },
 };
 
 const FINALITY_DEPTH: u64 = 6;
@@ -176,11 +179,14 @@ enum PublishError {
 }
 
 async fn send_tx(tx: &Transaction, client: &impl Broadcaster) -> Result<(), PublishError> {
-    let _ = client
-        .send_raw_transaction(tx)
-        .await
-        .map_err(|e| PublishError::Other(e.to_string()));
-    Ok(())
+    match client.send_raw_transaction(tx).await {
+        Ok(_) => Ok(()),
+        Err(ClientError::Server(-26, error_msg)) => {
+            warn!(%error_msg, "Failed to send tx to bitcoin");
+            Err(PublishError::MissingInputsOrSpent)
+        }
+        Err(e) => Err(PublishError::Other(e.to_string())),
+    }
 }
 
 #[cfg(test)]
