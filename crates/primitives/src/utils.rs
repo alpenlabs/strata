@@ -3,6 +3,7 @@ use bitcoin::{
     hashes::{sha256d, Hash},
     Block, Wtxid,
 };
+use serde::{Deserialize, Serialize};
 
 use crate::{
     l1::{L1Tx, L1TxProof},
@@ -108,7 +109,7 @@ pub fn generate_l1_tx(idx: u32, block: &Block) -> L1Tx {
 
 /// Temporary schnorr keypair.
 // FIXME why temporary?
-#[derive(Clone, Debug, PartialEq, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct SchnorrKeypair {
     /// Secret key.
     pub sk: Buf32,
