@@ -1,5 +1,5 @@
-//! Defines the [`TxState`] type that tracks the state of signature collection for a particular
-//! [`Psbt`].
+//! Defines the [`BridgeTxState`] type that tracks the state of signature collection for a
+//! particular [`Psbt`].
 
 use std::{collections::BTreeMap, ops::Not};
 

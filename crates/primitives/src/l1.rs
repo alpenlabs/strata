@@ -489,7 +489,7 @@ impl BorshSerialize for BitcoinPsbt {
         // Serialize the PSBT using bitcoin's built-in serialization
         let psbt_bytes = self.0.serialize();
         // First, write the length of the serialized PSBT (as u64)
-        BorshSerialize::serialize(&(psbt_bytes.len() as u64), writer)?;
+        BorshSerialize::serialize(&(psbt_bytes.len() as u32), writer)?;
         // Then, write the actual serialized PSBT bytes
         writer.write_all(&psbt_bytes)?;
         Ok(())
@@ -499,7 +499,7 @@ impl BorshSerialize for BitcoinPsbt {
 impl BorshDeserialize for BitcoinPsbt {
     fn deserialize_reader<R: Read>(reader: &mut R) -> std::io::Result<Self> {
         // First, read the length of the PSBT (as u64)
-        let len = u64::deserialize_reader(reader)? as usize;
+        let len = u32::deserialize_reader(reader)? as usize;
         // Then, create a buffer to hold the PSBT bytes and read them
         let mut psbt_bytes = vec![0u8; len];
         reader.read_exact(&mut psbt_bytes)?;
@@ -544,7 +544,7 @@ impl<'a> Arbitrary<'a> for BitcoinPsbt {
 
 /// A wrapper around [`bitcoin::TxOut`] that implements some additional traits.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct BitcoinTxOut(bitcoin::TxOut);
+pub struct BitcoinTxOut(TxOut);
 
 impl BitcoinTxOut {
     pub fn inner(&self) -> &bitcoin::TxOut {
@@ -552,13 +552,13 @@ impl BitcoinTxOut {
     }
 }
 
-impl From<bitcoin::TxOut> for BitcoinTxOut {
+impl From<TxOut> for BitcoinTxOut {
     fn from(value: bitcoin::TxOut) -> Self {
         Self(value)
     }
 }
 
-impl From<BitcoinTxOut> for bitcoin::TxOut {
+impl From<BitcoinTxOut> for TxOut {
     fn from(value: BitcoinTxOut) -> Self {
         value.0
     }
