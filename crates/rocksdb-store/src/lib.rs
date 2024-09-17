@@ -34,10 +34,15 @@ pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
     // Bcast schemas
     BcastL1TxIdSchema::COLUMN_FAMILY_NAME,
     BcastL1TxSchema::COLUMN_FAMILY_NAME,
+    // Bridge relay schemas
+    BridgeMsgIdSchema::COLUMN_FAMILY_NAME,
+    ScopeMsgIdSchema::COLUMN_FAMILY_NAME,
     // TODO add col families for other store types
 ];
 
 // Re-exports
+pub use bridge_relay::db::BridgeMsgDb;
+use bridge_relay::schemas::*;
 pub use broadcaster::db::BroadcastDb;
 use broadcaster::schemas::{BcastL1TxIdSchema, BcastL1TxSchema};
 pub use chain_state::db::ChainStateDb;
