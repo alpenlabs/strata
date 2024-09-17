@@ -1,11 +1,11 @@
 use std::ops::Deref;
 
-use alpen_express_primitives::prelude::*;
+use alpen_express_primitives::{evm_exec::create_evm_extra_payload, prelude::*};
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::{
-    exec_update,
+    exec_update::{self, ExecUpdate, UpdateInput, UpdateOutput},
     header::{L2BlockHeader, SignedL2BlockHeader},
     id::L2BlockId,
     l1,
@@ -178,6 +178,45 @@ impl Deref for L2BlockBundle {
         &self.block
     }
 }
+
+impl L2BlockBundle {
+    pub fn genesis(params: &Params) -> Self {
+        // Create a dummy exec state that we can build the rest of the genesis block
+        // around and insert into the genesis state.
+        // TODO this might need to talk to the EL to do the genesus setup *properly*
+        let extra_payload = create_evm_extra_payload(params.rollup.evm_genesis_block_hash);
+        let geui = UpdateInput::new(0, Buf32::zero(), extra_payload);
+        let genesis_update = ExecUpdate::new(
+            geui.clone(),
+            UpdateOutput::new_from_state(params.rollup.evm_genesis_block_state_root),
+        );
+
+        // This has to be empty since everyone should have an unambiguous view of the genesis block.
+        let l1_seg = L1Segment::new_empty();
+
+        // TODO this is a total stub, we have to fill it in with something
+        let exec_seg = ExecSegment::new(genesis_update);
+
+        let body = L2BlockBody::new(l1_seg, exec_seg);
+
+        // TODO stub
+        let exec_payload = vec![];
+        let accessory = L2BlockAccessory::new(exec_payload);
+
+        // Assemble the genesis header template, pulling in data from whatever
+        // sources we need.
+        // FIXME this isn't the right timestamp to start the blockchain, this should
+        // definitely be pulled from the database or the rollup parameters maybe
+        let genesis_ts = params.rollup().horizon_l1_height;
+        let zero_blkid = L2BlockId::from(Buf32::zero());
+        let genesis_sr = Buf32::zero();
+        let header = L2BlockHeader::new(0, genesis_ts, zero_blkid, &body, genesis_sr);
+        let signed_genesis_header = SignedL2BlockHeader::new(header, Buf64::zero());
+        let block = L2Block::new(signed_genesis_header, body);
+        L2BlockBundle::new(block, accessory)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use alpen_test_utils::ArbitraryGenerator;

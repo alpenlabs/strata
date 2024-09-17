@@ -4,12 +4,12 @@
 use alpen_express_db::traits::{Database, L1DataProvider, L2DataProvider, L2DataStore};
 use alpen_express_primitives::prelude::*;
 use alpen_express_state::{
-    client_state::*, header::L2Header, id::L2BlockId, l1::L1BlockId, operation::*,
-    sync_event::SyncEvent,
+    block::L2BlockBundle, client_state::*, header::L2Header, id::L2BlockId, l1::L1BlockId,
+    operation::*, sync_event::SyncEvent,
 };
 use tracing::*;
 
-use crate::{errors::*, genesis::make_genesis_block};
+use crate::errors::*;
 
 /// Processes the event given the current consensus state, producing some
 /// output.  This can return database errors.
@@ -174,7 +174,7 @@ fn activate_chain(
     // If necessary, activate the chain!
     if !state.is_chain_active() && height >= genesis_threshold {
         debug!("emitting chain activation");
-        let genesis_block = make_genesis_block(params);
+        let genesis_block = L2BlockBundle::genesis(params);
 
         writes.push(ClientStateWrite::ActivateChain);
         writes.push(ClientStateWrite::ReplaceSync(Box::new(
@@ -362,7 +362,7 @@ mod tests {
 
             let output = process_event(&state, &event, database.as_ref(), &params).unwrap();
 
-            let genesis_block = genesis::make_genesis_block(&params);
+            let genesis_block = L2BlockBundle::genesis(&params);
             let genesis_blockid = genesis_block.header().get_blockid();
 
             let expected_writes = [

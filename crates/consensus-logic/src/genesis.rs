@@ -1,17 +1,10 @@
 use alpen_express_db::{errors::DbError, traits::*};
-use alpen_express_primitives::{
-    buf::{Buf32, Buf64},
-    evm_exec::create_evm_extra_payload,
-    l1::L1BlockManifest,
-    params::Params,
-};
+use alpen_express_primitives::{l1::L1BlockManifest, params::Params};
 use alpen_express_state::{
-    block::{ExecSegment, L1Segment, L2BlockAccessory, L2BlockBundle},
+    block::L2BlockBundle,
     chain_state::ChainState,
     client_state::ClientState,
     exec_env::ExecEnvState,
-    exec_update::{ExecUpdate, UpdateInput, UpdateOutput},
-    header::L2BlockHeader,
     l1::{L1HeaderRecord, L1ViewState},
     prelude::*,
 };
@@ -58,7 +51,7 @@ pub fn init_genesis_chainstate(
         load_pre_genesis_l1_manifests(l1_prov.as_ref(), horizon_blk_height, genesis_blk_height)?;
 
     // Build the genesis block and genesis consensus states.
-    let gblock = make_genesis_block(params);
+    let gblock = L2BlockBundle::genesis(params);
     let genesis_blkid = gblock.header().get_blockid();
 
     let geui = gblock.exec_segment().update().input();
@@ -99,45 +92,6 @@ fn load_pre_genesis_l1_manifests(
     }
 
     Ok(manifests)
-}
-
-/// Create genesis L2 block based on rollup params
-/// NOTE: generate block MUST be deterministic
-/// repeated calls with same params MUST return identical blocks
-pub fn make_genesis_block(params: &Params) -> L2BlockBundle {
-    // Create a dummy exec state that we can build the rest of the genesis block
-    // around and insert into the genesis state.
-    // TODO this might need to talk to the EL to do the genesus setup *properly*
-    let extra_payload = create_evm_extra_payload(params.rollup.evm_genesis_block_hash);
-    let geui = UpdateInput::new(0, Buf32::zero(), extra_payload);
-    let genesis_update = ExecUpdate::new(
-        geui.clone(),
-        UpdateOutput::new_from_state(params.rollup.evm_genesis_block_state_root),
-    );
-
-    // This has to be empty since everyone should have an unambiguous view of the genesis block.
-    let l1_seg = L1Segment::new_empty();
-
-    // TODO this is a total stub, we have to fill it in with something
-    let exec_seg = ExecSegment::new(genesis_update);
-
-    let body = L2BlockBody::new(l1_seg, exec_seg);
-
-    // TODO stub
-    let exec_payload = vec![];
-    let accessory = L2BlockAccessory::new(exec_payload);
-
-    // Assemble the genesis header template, pulling in data from whatever
-    // sources we need.
-    // FIXME this isn't the right timestamp to start the blockchain, this should
-    // definitely be pulled from the database or the rollup parameters maybe
-    let genesis_ts = params.rollup().horizon_l1_height;
-    let zero_blkid = L2BlockId::from(Buf32::zero());
-    let genesis_sr = Buf32::zero();
-    let header = L2BlockHeader::new(0, genesis_ts, zero_blkid, &body, genesis_sr);
-    let signed_genesis_header = SignedL2BlockHeader::new(header, Buf64::zero());
-    let block = L2Block::new(signed_genesis_header, body);
-    L2BlockBundle::new(block, accessory)
 }
 
 /// Check if the database needs to have client init done to it.
