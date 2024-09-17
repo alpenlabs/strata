@@ -287,7 +287,7 @@ fn determine_blob_next_status(
         (_, L1TxStatus::Confirmed { .. }) => BlobL1Status::Confirmed,
         // If reveal is published, both are published
         (_, L1TxStatus::Published) => BlobL1Status::Published,
-        // If commit has invalid inputs, both are invalid
+        // If commit has invalid inputs, these need resign
         (L1TxStatus::InvalidInputs, _) => BlobL1Status::NeedsResign,
         (_, _) => curr_status.clone(),
     };

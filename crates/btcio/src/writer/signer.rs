@@ -18,9 +18,10 @@ type BlobIdx = u64;
 
 /// Create inscription transactions corresponding to a [`BlobEntry`].
 ///
-/// This is useful when receiving a new intent as well as when
-/// broadcasting fails because the input UTXOs have been spent
-/// by something else already.
+/// This is used during one of the cases:
+/// 1. A new blob intent needs to be signed
+/// 2. A signed intent needs to be resigned because somehow its inputs were spent/missing
+/// 3. A confirmed block that includes the tx gets reorged
 pub async fn create_and_sign_blob_inscriptions(
     blobentry: &BlobEntry,
     bhandle: &L1BroadcastHandle,
@@ -49,11 +50,11 @@ pub async fn create_and_sign_blob_inscriptions(
     // These don't need to be atomic. It will be handled by writer task if it does not find both
     // commit-reveal txs in db by triggering re-signing.
     let _ = bhandle
-        .insert_new_tx_entry(cid, centry)
+        .put_tx_entry(cid, centry)
         .await
         .map_err(|e| InscriptionError::Other(e.into()))?;
     let _ = bhandle
-        .insert_new_tx_entry(rid, rentry)
+        .put_tx_entry(rid, rentry)
         .await
         .map_err(|e| InscriptionError::Other(e.into()))?;
     Ok((cid, rid))

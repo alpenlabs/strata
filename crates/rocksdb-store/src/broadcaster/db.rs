@@ -164,7 +164,6 @@ mod tests {
         assert!(result.is_ok());
     }
 
-
     #[test]
     fn test_update_tx_entry() {
         let broadcast_db = setup_db();

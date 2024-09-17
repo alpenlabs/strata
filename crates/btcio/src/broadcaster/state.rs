@@ -147,34 +147,40 @@ mod test {
         // Make some insertions
         let e1 = gen_unpublished_entry();
         let i1 = ops
-            .insert_new_tx_entry_async([1; 32].into(), e1.clone())
+            .put_tx_entry_async([1; 32].into(), e1.clone())
             .await
             .unwrap();
 
         let e2 = gen_confirmed_entry();
         let i2 = ops
-            .insert_new_tx_entry_async([2; 32].into(), e2.clone())
+            .put_tx_entry_async([2; 32].into(), e2.clone())
             .await
             .unwrap();
 
         let e3 = gen_finalized_entry();
         let i3 = ops
-            .insert_new_tx_entry_async([3; 32].into(), e3.clone())
+            .put_tx_entry_async([3; 32].into(), e3.clone())
             .await
             .unwrap();
 
         let e4 = gen_published_entry();
         let i4 = ops
-            .insert_new_tx_entry_async([4; 32].into(), e4.clone())
+            .put_tx_entry_async([4; 32].into(), e4.clone())
             .await
             .unwrap();
 
         let e5 = gen_invalid_entry();
         let i5 = ops
-            .insert_new_tx_entry_async([5; 32].into(), e5.clone())
+            .put_tx_entry_async([5; 32].into(), e5.clone())
             .await
             .unwrap();
-        vec![(i1, e1), (i2, e2), (i3, e3), (i4, e4), (i5, e5)]
+        vec![
+            (i1.unwrap(), e1),
+            (i2.unwrap(), e2),
+            (i3.unwrap(), e3),
+            (i4.unwrap(), e4),
+            (i5.unwrap(), e5),
+        ]
     }
 
     #[tokio::test]
@@ -221,26 +227,26 @@ mod test {
         // Insert two more items to db, one excluded and one published.
         let e = gen_invalid_entry(); // this should not be in new state
         let idx = ops
-            .insert_new_tx_entry_async([6; 32].into(), e.clone())
+            .put_tx_entry_async([6; 32].into(), e.clone())
             .await
             .unwrap();
         let e1 = gen_published_entry(); // this should be in new state
         let idx1 = ops
-            .insert_new_tx_entry_async([7; 32].into(), e1.clone())
+            .put_tx_entry_async([7; 32].into(), e1.clone())
             .await
             .unwrap();
         // Compute next state
         //
         state.next(updated_entries, &ops).await.unwrap();
 
-        assert_eq!(state.next_idx, idx1 + 1);
+        assert_eq!(state.next_idx, idx1.unwrap() + 1);
         assert_eq!(
             state.unfinalized_entries.get(&0).unwrap().status,
             L1TxStatus::InvalidInputs
         );
 
         // check it does not contain idx of reorged but contains that of published tx
-        assert!(!state.unfinalized_entries.contains_key(&idx));
-        assert!(state.unfinalized_entries.contains_key(&idx1));
+        assert!(!state.unfinalized_entries.contains_key(&idx.unwrap()));
+        assert!(state.unfinalized_entries.contains_key(&idx1.unwrap()));
     }
 }

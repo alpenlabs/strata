@@ -81,7 +81,8 @@ async fn process_unfinalized_entries(
             new_txentry.status = status.clone();
 
             // update in db, maybe this should be moved out of this fn to separate concerns??
-            ops.update_tx_entry_async(*idx, new_txentry.clone()).await?;
+            ops.put_tx_entry_by_idx_async(*idx, new_txentry.clone())
+                .await?;
 
             // Remove if finalized or has invalid inputs or reorged
             if matches!(status, L1TxStatus::Finalized { confirmations: _ })
@@ -215,7 +216,7 @@ mod test {
         let e = gen_entry_with_status(L1TxStatus::Unpublished);
 
         // Add tx to db
-        ops.insert_new_tx_entry_async([1; 32].into(), e.clone())
+        ops.put_tx_entry_async([1; 32].into(), e.clone())
             .await
             .unwrap();
 
@@ -239,7 +240,7 @@ mod test {
         let e = gen_entry_with_status(L1TxStatus::Published);
 
         // Add tx to db
-        ops.insert_new_tx_entry_async([1; 32].into(), e.clone())
+        ops.put_tx_entry_async([1; 32].into(), e.clone())
             .await
             .unwrap();
 
@@ -292,7 +293,7 @@ mod test {
         let e = gen_entry_with_status(L1TxStatus::Confirmed { confirmations: 1 });
 
         // Add tx to db
-        ops.insert_new_tx_entry_async([1; 32].into(), e.clone())
+        ops.put_tx_entry_async([1; 32].into(), e.clone())
             .await
             .unwrap();
 
@@ -346,7 +347,7 @@ mod test {
         let e = gen_entry_with_status(L1TxStatus::Finalized { confirmations: 1 });
 
         // Add tx to db
-        ops.insert_new_tx_entry_async([1; 32].into(), e.clone())
+        ops.put_tx_entry_async([1; 32].into(), e.clone())
             .await
             .unwrap();
 
@@ -382,7 +383,7 @@ mod test {
         let e = gen_entry_with_status(L1TxStatus::InvalidInputs);
 
         // Add tx to db
-        ops.insert_new_tx_entry_async([1; 32].into(), e.clone())
+        ops.put_tx_entry_async([1; 32].into(), e.clone())
             .await
             .unwrap();
 
@@ -417,21 +418,12 @@ mod test {
         let ops = get_ops();
         // Add a couple of txs
         let e1 = gen_entry_with_status(L1TxStatus::Unpublished);
-        let i1 = ops
-            .insert_new_tx_entry_async([1; 32].into(), e1)
-            .await
-            .unwrap();
+        let i1 = ops.put_tx_entry_async([1; 32].into(), e1).await.unwrap();
         let e2 = gen_entry_with_status(L1TxStatus::InvalidInputs);
-        let _i2 = ops
-            .insert_new_tx_entry_async([2; 32].into(), e2)
-            .await
-            .unwrap();
+        let _i2 = ops.put_tx_entry_async([2; 32].into(), e2).await.unwrap();
 
         let e3 = gen_entry_with_status(L1TxStatus::Published);
-        let i3 = ops
-            .insert_new_tx_entry_async([3; 32].into(), e3)
-            .await
-            .unwrap();
+        let i3 = ops.put_tx_entry_async([3; 32].into(), e3).await.unwrap();
 
         let state = BroadcasterState::initialize(&ops).await.unwrap();
 
@@ -447,17 +439,17 @@ mod test {
         // The published tx which got finalized should be removed
         assert_eq!(
             to_remove,
-            vec![i3],
+            vec![i3.unwrap()],
             "Finalized tx should be in to_remove list"
         );
 
         assert_eq!(
-            new_entries.get(&i1).unwrap().status,
+            new_entries.get(&i1.unwrap()).unwrap().status,
             L1TxStatus::Published,
             "unpublished tx should be published"
         );
         assert_eq!(
-            new_entries.get(&i3).unwrap().status,
+            new_entries.get(&i3.unwrap()).unwrap().status,
             L1TxStatus::Finalized {
                 confirmations: cl.included_height
             },
