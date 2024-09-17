@@ -9,12 +9,12 @@ withdrawal_intent_event_abi = {
     "anonymous": False,
     "inputs": [
         {"indexed": False, "internalType": "uint64", "name": "amount", "type": "uint64"},
-        {"indexed": False, "internalType": "bytes", "name": "dest_pk", "type": "bytes"},
+        {"indexed": False, "internalType": "bytes", "name": "dest_pk", "type": "bytes32"},
     ],
     "name": "WithdrawalIntentEvent",
     "type": "event",
 }
-event_signature_text = "WithdrawalIntentEvent(uint64,bytes)"
+event_signature_text = "WithdrawalIntentEvent(uint64,bytes32)"
 
 
 @flexitest.register

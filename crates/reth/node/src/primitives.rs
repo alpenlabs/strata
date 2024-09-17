@@ -19,6 +19,6 @@ sol! {
         /// Withdrawal amount in sats
         uint64 amount,
         /// 32 bytes pubkey for withdrawal address in L1
-        bytes dest_pk,
+        bytes32 dest_pk,
     );
 }

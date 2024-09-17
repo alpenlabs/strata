@@ -24,7 +24,7 @@ impl WithdrawalIntent {
         Self { amt, dest_pk }
     }
 
-    pub fn into_parts(&self) -> (u64, &Buf32) {
+    pub fn as_parts(&self) -> (u64, &Buf32) {
         (self.amt.to_sat(), self.dest_pk.buf32())
     }
 
@@ -47,8 +47,8 @@ pub struct WithdrawalBatch {
 impl WithdrawalBatch {
     /// Gets the total value of the batch.  This must be less than the size of
     /// the utxo it's assigned to.
-    pub fn get_total_value(&self) -> u64 {
-        self.intents.iter().map(|wi| wi.amt.to_sat()).sum()
+    pub fn get_total_value(&self) -> BitcoinAmount {
+        self.intents.iter().map(|wi| wi.amt).sum()
     }
 
     pub fn intents(&self) -> &[WithdrawalIntent] {

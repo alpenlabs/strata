@@ -35,7 +35,7 @@ impl ExpressEvmConfig {
             precompiles.extend([(
                 crate::precompiles::bridge::BRIDGEOUT_ADDRESS,
                 ContextPrecompile::ContextStateful(Arc::new(
-                    crate::precompiles::bridge::BridgeoutPrecompile::default(),
+                    crate::precompiles::bridge::BridgeoutPrecompile,
                 )),
             )]);
             precompiles
