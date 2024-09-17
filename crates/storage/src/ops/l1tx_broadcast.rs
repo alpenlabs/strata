@@ -31,8 +31,8 @@ inst_ops! {
         get_tx_status(id: Buf32) => Option<L1TxStatus>;
         get_txid(idx: u64) => Option<Buf32>;
         get_next_tx_idx() => u64;
-        insert_new_tx_entry(id: Buf32, entry: L1TxEntry) => u64;
-        update_tx_entry(idx: u64, entry: L1TxEntry) => ();
+        put_tx_entry(id: Buf32, entry: L1TxEntry) => Option<u64>;
+        put_tx_entry_by_idx(idx: u64, entry: L1TxEntry) => ();
     }
 }
 
@@ -75,22 +75,22 @@ fn get_next_tx_idx<D: TxBroadcastDatabase + Sync + Send + 'static>(
     bcast_prov.get_next_tx_idx()
 }
 
-fn insert_new_tx_entry<D: TxBroadcastDatabase + Sync + Send + 'static>(
+fn put_tx_entry<D: TxBroadcastDatabase + Sync + Send + 'static>(
     context: &Context<D>,
     txid: Buf32,
     entry: L1TxEntry,
-) -> DbResult<u64> {
+) -> DbResult<Option<u64>> {
     trace!(%txid, "insert_new_tx_entry");
     assert!(entry.try_to_tx().is_ok(), "invalid tx entry {entry:?}");
     let bcast_store = context.db.broadcast_store();
-    bcast_store.insert_new_tx_entry(txid, entry)
+    bcast_store.put_tx_entry(txid, entry)
 }
 
-fn update_tx_entry<D: TxBroadcastDatabase + Sync + Send + 'static>(
+fn put_tx_entry_by_idx<D: TxBroadcastDatabase + Sync + Send + 'static>(
     context: &Context<D>,
     idx: u64,
     entry: L1TxEntry,
 ) -> DbResult<()> {
     let bcast_store = context.db.broadcast_store();
-    bcast_store.update_tx_entry(idx, entry)
+    bcast_store.put_tx_entry_by_idx(idx, entry)
 }
