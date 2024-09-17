@@ -3777,6 +3777,7 @@ dependencies = [
  "alpen-test-utils",
  "arbitrary",
  "bitcoin",
+ "express-bridge-tx-builder",
  "express-storage",
  "musig2",
  "thiserror",

@@ -2,7 +2,7 @@
 
 use alpen_express_db::entities::bridge_tx_state::BridgeTxState;
 use alpen_express_primitives::{
-    bridge::{Musig2SecNonce, PublickeyTable, SignatureInfo},
+    bridge::{Musig2SecNonce, OperatorPartialSig, PublickeyTable},
     l1::SpendInfo,
 };
 use bitcoin::{
@@ -16,9 +16,7 @@ use musig2::{sign_partial, verify_partial, AggNonce, KeyAggContext, PartialSigna
 
 use crate::errors::{BridgeSigError, BridgeSigResult};
 
-/// Get the message and serialized [`ScriptBuf`] and
-/// [`ControlBlock`](bitcoin::taproot::ControlBlock) from the [`SpendInfo`].
-///
+/// Get the message hash for signing.
 ///
 /// If the `maybe_spend_info` is None, a key spend path hash is returned, and otherwise, a script
 /// spend hash.
@@ -160,35 +158,105 @@ mod tests {
     };
     use arbitrary::{Arbitrary, Unstructured};
     use bitcoin::{
+        absolute::LockTime,
+        hashes::sha256d,
         key::rand::{self, RngCore},
         secp256k1::{PublicKey, SECP256K1},
-        Amount,
+        transaction::Version,
+        Amount, Network, OutPoint, Sequence, Txid, Witness,
     };
+    use express_bridge_tx_builder::prelude::{create_taproot_addr, SpendPath};
     use musig2::{PubNonce, SecNonce};
 
     use super::*;
 
     #[test]
-    fn test_create_script_spend_hash() {
+    fn test_create_message_hash_for_script_spend() {
         let num_inputs = 1;
-        let (mut tx, _, _) = generate_mock_unsigned_tx(num_inputs);
+        let (mut tx, taproot_spend_info, script_buf) = generate_mock_unsigned_tx(num_inputs);
         let mut sighash_cache = SighashCache::new(&mut tx);
 
         // Create dummy input values
         let input_index = 0;
-        let script = ScriptBuf::new();
         let prevouts = vec![TxOut {
             value: Amount::from_sat(1000),
             script_pubkey: ScriptBuf::new(),
         }];
 
-        let result = create_script_spend_hash(&mut sighash_cache, input_index, &script, &prevouts);
+        let control_block = taproot_spend_info
+            .control_block(&(script_buf.clone(), LeafVersion::TapScript))
+            .expect("should construct control block");
+        let maybe_spend_info = Some(SpendInfo {
+            script_buf,
+            control_block,
+        });
+
+        let result = create_message_hash(
+            &mut sighash_cache,
+            input_index,
+            &prevouts,
+            &maybe_spend_info,
+        );
 
         assert!(
             result.is_ok(),
             "Failed to create script spend hash due to: {}",
             result.err().unwrap()
         );
+
+        let result = create_message_hash(&mut sighash_cache, input_index, &[], &maybe_spend_info);
+        assert!(
+            result.is_err(),
+            "should error if the prevouts does not have an output at input_index"
+        );
+    }
+
+    #[test]
+    fn test_create_message_hash_with_key_spend_info() {
+        // Arrange
+        let (pubkeys, _seckeys) = generate_keypairs(1);
+        let spend_path = SpendPath::KeySpend {
+            internal_key: pubkeys[0].x_only_public_key().0,
+        };
+
+        // Create a taproot address using create_taproot_addr
+        let (address, _taproot_spend_info) = create_taproot_addr(&Network::Regtest, spend_path)
+            .expect("Failed to create taproot address");
+
+        // Extract the script_pubkey from the address
+        let script_pubkey = address.script_pubkey();
+
+        // No SpendInfo (key spend)
+        let maybe_spend_info = None;
+
+        // Create a dummy transaction with one input and one output
+        let deposit_outpoint =
+            OutPoint::new(Txid::from_raw_hash(sha256d::Hash::hash(&[2u8; 32])), 2);
+
+        let output = vec![TxOut {
+            value: Amount::from_sat(2000),
+            script_pubkey: script_pubkey.clone(),
+        }];
+        let mut tx = Transaction {
+            version: Version(2),
+            lock_time: LockTime::ZERO,
+            input: vec![bitcoin::TxIn {
+                previous_output: deposit_outpoint,
+                script_sig: ScriptBuf::new(),
+                sequence: Sequence::ENABLE_RBF_NO_LOCKTIME,
+                witness: Witness::new(),
+            }],
+            output: output.clone(),
+        };
+
+        // Initialize SighashCache
+        let mut sighash_cache = SighashCache::new(&mut tx);
+
+        // Act
+        let message_result = create_message_hash(&mut sighash_cache, 0, &output, &maybe_spend_info);
+
+        // Assert
+        assert!(message_result.is_ok());
     }
 
     #[test]

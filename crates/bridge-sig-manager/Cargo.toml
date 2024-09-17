@@ -25,3 +25,4 @@ thiserror = { workspace = true }
 alpen-test-utils = { workspace = true }
 arbitrary = { workspace = true }
 tokio = { workspace = true }
+express-bridge-tx-builder = { workspace = true }

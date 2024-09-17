@@ -1,6 +1,6 @@
 //! Enumerated errors related to creation and signing of bridge-related transactions.
 
-use alpen_express_primitives::errors::BridgeParseError;
+use alpen_express_primitives::errors::ParseError;
 use bitcoin::{
     psbt,
     taproot::{TaprootBuilder, TaprootBuilderError},
@@ -87,5 +87,5 @@ pub enum DepositTransactionError {
 pub enum CooperativeWithdrawalError {
     /// The supplied user x-only-pk for the user requesting the withdrawal is incorrect.
     #[error("the supplied user public key is invalid: {0}")]
-    InvalidUserPk(#[from] BridgeParseError),
+    InvalidUserPk(#[from] ParseError),
 }

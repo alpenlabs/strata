@@ -8,7 +8,7 @@ use bitcoin::{Amount, FeeRate, OutPoint, Psbt, Transaction, TxOut};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    context::{BuildContext, TxBuildContext},
+    context::BuildContext,
     errors::{BridgeTxBuilderResult, CooperativeWithdrawalError},
     prelude::{
         anyone_can_spend_txout, create_taproot_addr, create_tx, create_tx_ins, create_tx_outs,
@@ -36,11 +36,9 @@ pub struct CooperativeWithdrawalInfo {
 }
 
 impl TxKind for CooperativeWithdrawalInfo {
-    type Context = TxBuildContext;
-
-    fn construct_signing_data(
+    fn construct_signing_data<C: BuildContext>(
         &self,
-        build_context: &Self::Context,
+        build_context: &C,
     ) -> BridgeTxBuilderResult<TxSigningData> {
         let prevout = self.create_prevout(build_context)?;
         let unsigned_tx = self.create_unsigned_tx(build_context, prevout.value)?;
@@ -129,7 +127,7 @@ impl CooperativeWithdrawalInfo {
         // create the output that pays to the user
         let user_addr = self
             .user_pk
-            .to_address(*build_context.network())
+            .to_p2tr_address(*build_context.network())
             .map_err(CooperativeWithdrawalError::InvalidUserPk)?;
         let user_script_pubkey = user_addr.script_pubkey();
 
@@ -152,5 +150,202 @@ impl CooperativeWithdrawalInfo {
         let unsigned_tx = create_tx(tx_ins, tx_outs);
 
         Ok(unsigned_tx)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::ops::Not;
+
+    use alpen_express_primitives::{
+        bridge::OperatorIdx,
+        buf::Buf32,
+        errors::ParseError,
+        l1::{BitcoinAmount, XOnlyPk},
+    };
+    use alpen_test_utils::bridge::{generate_keypairs, generate_pubkey_table};
+    use bitcoin::{
+        hashes::{sha256d, Hash},
+        Amount, Network, OutPoint, Txid,
+    };
+
+    use crate::{
+        context::TxBuildContext,
+        errors::{BridgeTxBuilderError, CooperativeWithdrawalError},
+        prelude::{CooperativeWithdrawalInfo, BRIDGE_DENOMINATION},
+        TxKind,
+    };
+
+    #[test]
+    fn test_construct_signing_data_success() {
+        // Arrange
+        let (pubkeys, _seckeys) = generate_keypairs(3);
+        let pubkey_table = generate_pubkey_table(&pubkeys[..]);
+        let deposit_outpoint =
+            OutPoint::new(Txid::from_raw_hash(sha256d::Hash::hash(&[1u8; 32])), 1);
+
+        let user_index = 0usize;
+        let assigned_operator_idx = 2usize;
+        assert_ne!(
+            user_index, assigned_operator_idx,
+            "use separate indexes for user and assigned operator"
+        );
+
+        let user_pk = XOnlyPk::new(Buf32(
+            pubkeys[user_index].x_only_public_key().0.serialize().into(),
+        ));
+
+        let assigned_operator_idx = assigned_operator_idx as OperatorIdx;
+
+        let withdrawal_info =
+            CooperativeWithdrawalInfo::new(deposit_outpoint, user_pk, assigned_operator_idx);
+
+        let build_context = TxBuildContext::new(
+            pubkey_table,
+            Network::Regtest,
+            assigned_operator_idx as OperatorIdx,
+        );
+
+        // Act
+        let signing_data_result = withdrawal_info.construct_signing_data(&build_context);
+
+        // Assert
+        assert!(signing_data_result.is_ok());
+        let signing_data = signing_data_result.unwrap();
+
+        // Verify that the PSBT has one input and three outputs as per create_unsigned_tx
+        let psbt = signing_data.psbt.inner();
+        assert_eq!(psbt.inputs.len(), 1);
+        assert_eq!(psbt.outputs.len(), 3);
+
+        // Verify spend_infos
+        assert_eq!(signing_data.spend_infos.len(), 1);
+        assert!(signing_data.spend_infos[0].is_none());
+    }
+
+    #[test]
+    fn test_construct_signing_data_invalid_user_pk() {
+        // Arrange
+        let (pubkeys, _seckeys) = generate_keypairs(2);
+        let pubkey_table = generate_pubkey_table(&pubkeys[..]);
+        let deposit_outpoint =
+            OutPoint::new(Txid::from_raw_hash(sha256d::Hash::hash(&[2u8; 32])), 2);
+
+        let user_index = 1usize;
+        let assigned_operator_idx = 0usize;
+        assert_ne!(
+            user_index, assigned_operator_idx,
+            "use separate indexes for user and assigned operator"
+        );
+
+        // Create an invalid XOnlyPublicKey by using an all-zero buffer
+        let invalid_user_pk = XOnlyPk::new(Buf32::zero());
+        let assigned_operator_idx = assigned_operator_idx as OperatorIdx;
+
+        let withdrawal_info = CooperativeWithdrawalInfo::new(
+            deposit_outpoint,
+            invalid_user_pk,
+            assigned_operator_idx,
+        );
+
+        let build_context =
+            TxBuildContext::new(pubkey_table, Network::Regtest, assigned_operator_idx);
+
+        // Act
+        let signing_data_result = withdrawal_info.construct_signing_data(&build_context);
+
+        // Assert
+        assert!(signing_data_result.is_err_and(|e| matches!(
+            e,
+            BridgeTxBuilderError::CooperativeWithdrawalTransaction(
+                CooperativeWithdrawalError::InvalidUserPk(ParseError::InvalidPubkey(_)),
+            ),
+        )));
+    }
+
+    #[test]
+    fn test_create_prevout_success() {
+        // Arrange
+        let (pubkeys, _seckeys) = generate_keypairs(3);
+        let pubkey_table = generate_pubkey_table(&pubkeys[..]);
+        let deposit_outpoint =
+            OutPoint::new(Txid::from_raw_hash(sha256d::Hash::hash(&[3u8; 32])), 3);
+
+        let user_index = 1usize;
+        let assigned_operator_idx = 0usize;
+        assert_ne!(
+            user_index, assigned_operator_idx,
+            "use separate indexes for user and assigned operator"
+        );
+
+        let user_pk = XOnlyPk::new(Buf32(
+            pubkeys[user_index].x_only_public_key().0.serialize().into(),
+        ));
+        let assigned_operator_idx = assigned_operator_idx as OperatorIdx;
+
+        let withdrawal_info =
+            CooperativeWithdrawalInfo::new(deposit_outpoint, user_pk, assigned_operator_idx);
+
+        let build_context =
+            TxBuildContext::new(pubkey_table, Network::Regtest, assigned_operator_idx);
+
+        // Act
+        let prevout_result = withdrawal_info.create_prevout(&build_context);
+
+        // Assert
+        assert!(prevout_result.is_ok());
+        let prevout = prevout_result.unwrap();
+
+        assert!(prevout.script_pubkey.is_empty().not());
+
+        let lower_limit =
+            Amount::from_sat(BRIDGE_DENOMINATION.to_sat() - BitcoinAmount::SATS_FACTOR);
+        let upper_limit = Amount::from(BRIDGE_DENOMINATION);
+
+        assert!(
+            prevout.value.gt(&lower_limit) && prevout.value.lt(&upper_limit),
+            "output amount must be within 1 BTC less than the bridge denomination"
+        );
+    }
+
+    #[test]
+    fn test_create_unsigned_tx_success() {
+        // Arrange
+        let (pubkeys, _seckeys) = generate_keypairs(4);
+        let pubkey_table = generate_pubkey_table(&pubkeys[..]);
+        let deposit_outpoint =
+            OutPoint::new(Txid::from_raw_hash(sha256d::Hash::hash(&[4u8; 32])), 4);
+
+        let user_index = 3usize;
+        let assigned_operator_idx = 0usize;
+        assert_ne!(
+            user_index, assigned_operator_idx,
+            "use separate indexes for user and assigned operator"
+        );
+
+        let user_pk = XOnlyPk::new(Buf32(
+            pubkeys[user_index].x_only_public_key().0.serialize().into(),
+        ));
+        let assigned_operator_idx = assigned_operator_idx as OperatorIdx;
+
+        let withdrawal_info =
+            CooperativeWithdrawalInfo::new(deposit_outpoint, user_pk, assigned_operator_idx);
+
+        let build_context =
+            TxBuildContext::new(pubkey_table, Network::Regtest, assigned_operator_idx);
+
+        // Act
+        let unsigned_tx_result =
+            withdrawal_info.create_unsigned_tx(&build_context, Amount::from(BRIDGE_DENOMINATION));
+
+        // Assert
+        assert!(unsigned_tx_result.is_ok());
+        let unsigned_tx = unsigned_tx_result.unwrap();
+
+        // Verify that the transaction has the correct number of inputs and outputs
+        assert_eq!(unsigned_tx.input.len(), 1);
+        assert_eq!(unsigned_tx.output.len(), 3);
+
+        // Further assertions can be added to verify the contents of the transaction
     }
 }

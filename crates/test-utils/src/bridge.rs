@@ -71,9 +71,17 @@ pub fn generate_mock_prevouts(count: usize) -> Vec<TxOut> {
     prevouts
 }
 
-/// Generate a mock unsigned tx.
+/// Generate a mock unsigned tx with two scripts.
 ///
 /// An unsigned tx has an empty script_sig/witness fields.
+///
+/// # Returns
+///
+/// A tuple containing:
+///
+/// 1) The created unsigned [`Transaction`].
+/// 2) The [`TaprootSpendInfo`] to spend via a [`ScriptBuf`].
+/// 3) The [`ScriptBuf`] that can be spent.
 pub fn generate_mock_unsigned_tx(num_inputs: usize) -> (Transaction, TaprootSpendInfo, ScriptBuf) {
     // actually construct a valid taptree order to check PSBT finalization
     let (pks, _) = generate_keypairs(1);
