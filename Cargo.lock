@@ -3794,6 +3794,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "express-proofimpl-checkpoint"
+version = "0.1.0"
+dependencies = [
+ "alpen-express-primitives",
+ "alpen-express-state",
+ "alpen-test-utils",
+ "anyhow",
+ "bitcoin",
+ "borsh",
+ "ethnum",
+ "express-proofimpl-btc-blockspace",
+ "express-proofimpl-l1-batch",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "express-proofimpl-cl-stf"
 version = "0.1.0"
 dependencies = [
