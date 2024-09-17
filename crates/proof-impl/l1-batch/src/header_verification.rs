@@ -180,60 +180,20 @@ pub fn get_difficulty_adjustment_height(idx: u32, start: u32, params: &PowParams
 
 #[cfg(test)]
 mod tests {
-    use alpen_test_utils::bitcoin::{get_btc_chain, BtcChainSegment};
-    use bitcoin::params::Params;
+    use alpen_test_utils::bitcoin::get_btc_chain;
+    use bitcoin::params::MAINNET;
     use rand::Rng;
 
     use super::*;
-
-    fn for_block(block_height: u32, chain: &BtcChainSegment) -> HeaderVerificationState {
-        let params = PowParams::from(&Params::MAINNET);
-
-        // Get the first difficulty adjustment block after `chain.start`
-        let h1 = get_difficulty_adjustment_height(1, chain.start, &params);
-        assert!(
-            block_height > h1 && block_height < chain.end,
-            "not enough info in the chain"
-        );
-
-        // Get the difficulty adjustment block just before `block_height`
-        let h1 = get_difficulty_adjustment_height(0, block_height, &params);
-
-        // Consider the block before `block_height` to be the last verified block
-        let vh = block_height - 1; // verified_height
-
-        // Fetch the previous timestamps of block from `vh`
-        // This fetches timestamps of `vh`, `vh-1`, `vh-2`, ...
-        let initial_timestamps: [u32; 11] = chain.get_last_timestamps(vh, 11).try_into().unwrap();
-        let last_11_blocks_timestamps = TimestampStore::new(initial_timestamps);
-
-        HeaderVerificationState {
-            last_verified_block_num: vh,
-            last_verified_block_hash: Buf32::from(
-                chain
-                    .get_header(vh)
-                    .block_hash()
-                    .as_raw_hash()
-                    .to_byte_array(),
-            ),
-            next_block_target: chain
-                .get_header(vh)
-                .target()
-                .to_compact_lossy()
-                .to_consensus(),
-            interval_start_timestamp: chain.get_header(h1).time,
-            total_accumulated_pow: 0f64,
-            last_11_blocks_timestamps,
-        }
-    }
+    use crate::{mock::get_verification_state_for_block, pow_params::PowParams};
 
     #[test]
     fn test_blocks() {
-        let params = PowParams::from(&Params::MAINNET);
-        let chain: BtcChainSegment = get_btc_chain(Params::MAINNET);
+        let chain = get_btc_chain();
+        let params = PowParams::from(&MAINNET);
         let h1 = get_difficulty_adjustment_height(1, chain.start, &params);
         let r1 = rand::thread_rng().gen_range(h1..chain.end);
-        let mut verification_state = for_block(r1, &chain);
+        let mut verification_state = get_verification_state_for_block(r1, &params);
 
         for header_idx in r1..chain.end {
             verification_state.check_and_update(&chain.get_header(header_idx), &params)
@@ -242,11 +202,9 @@ mod tests {
 
     #[test]
     fn test_hash() {
-        let params = PowParams::from(&Params::MAINNET);
-        let chain: BtcChainSegment = get_btc_chain(Params::MAINNET);
-        let h1 = get_difficulty_adjustment_height(1, chain.start, &params);
-        let r1 = rand::thread_rng().gen_range(h1..chain.end);
-        let verification_state = for_block(r1, &chain);
+        let params = PowParams::from(&MAINNET);
+        let r1 = 42000;
+        let verification_state = get_verification_state_for_block(r1, &params);
         let hash = verification_state.hash();
         assert!(hash.is_ok());
     }

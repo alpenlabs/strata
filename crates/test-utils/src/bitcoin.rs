@@ -36,25 +36,7 @@ pub fn get_btc_mainnet_block() -> Block {
     block
 }
 
-/// Calculates the height at which a specific difficulty adjustment occurs relative to a
-/// starting height.
-///
-/// # Arguments
-///
-/// * `idx` - The index of the difficulty adjustment (1-based). 1 for the first adjustment, 2 for
-///   the second, and so on.
-/// * `start` - The starting height from which to calculate.
-/// * `difficulty_adjustment_interval` - The adjustment interval.
-pub fn get_difficulty_adjustment_height(
-    idx: u32,
-    start: u32,
-    difficulty_adjustment_interval: u32,
-) -> u32 {
-    ((start / difficulty_adjustment_interval) + idx) * difficulty_adjustment_interval
-}
-
 pub struct BtcChainSegment {
-    pub params: Params,
     pub headers: Vec<Header>,
     pub start: u32,
     pub end: u32,
@@ -83,41 +65,9 @@ impl BtcChainSegment {
         }
         timestamps
     }
-
-    pub fn get_first_difficulty_adjustment_height(&self) -> u32 {
-        get_difficulty_adjustment_height(
-            1,
-            self.start,
-            self.params.difficulty_adjustment_interval() as u32,
-        )
-    }
-
-    pub fn get_header_verification_info(&self, height: u32) -> (Buf32, u32, [u32; 11], u32) {
-        let difficulty_adjustment_interval = self.params.difficulty_adjustment_interval() as u32;
-
-        // Consider the block before `height` to be the last verified block
-        let vh = height - 1; // verified_height
-
-        let vb = self.get_header(vh); // verified block
-
-        // Fetch the previous timestamps of block from `vh`
-        // This fetches timestamps of `vh`, `vh-1`, `vh-2`, ...
-        let recent_block_timestamps: [u32; 11] =
-            self.get_last_timestamps(vh, 11).try_into().unwrap();
-
-        // Get the difficulty adjustment height just before the block
-        let h1 = get_difficulty_adjustment_height(0, height, difficulty_adjustment_interval);
-
-        (
-            vb.block_hash().as_raw_hash().to_byte_array().into(),
-            vb.target().to_compact_lossy().to_consensus(),
-            recent_block_timestamps,
-            self.get_header(h1).time,
-        )
-    }
 }
 
-pub fn get_btc_chain(params: Params) -> BtcChainSegment {
+pub fn get_btc_chain() -> BtcChainSegment {
     let buffer = include_bytes!("../data/mainnet_blocks_40000-50000.raw");
 
     let chunk_size = Header::SIZE;
@@ -131,7 +81,6 @@ pub fn get_btc_chain(params: Params) -> BtcChainSegment {
     }
 
     BtcChainSegment {
-        params,
         headers,
         start: 40_000,
         end: 50_000,

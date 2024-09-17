@@ -1,11 +1,11 @@
 use alpen_express_primitives::buf::Buf32;
 use alpen_express_state::chain_state::ChainState;
+use borsh::{BorshDeserialize, BorshSerialize};
 use express_proofimpl_l1_batch::{
     header_verification::HeaderVerificationState, logic::L1BatchProofOutput,
 };
-use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct CheckpointProofInput {
     pub l1_state: L1BatchProofOutput,
     // pub l2_state: CLBatchProofOutput,
