@@ -18,7 +18,7 @@ bitcoin = { workspace = true }
 express-proofimpl-btc-blockspace = { workspace = true }
 express-zkvm = { workspace = true }
 hex = { workspace = true }
-express-proofimpl-l1-batch = { workspace = true }
+express-proofimpl-l1-batch = { workspace = true, features = ["test-utils"] }
 express-proofimpl-evm-ee-stf = { workspace = true }
 alpen-express-state.workspace = true
 alpen-express-primitives.workspace = true
