@@ -1,7 +1,5 @@
 use std::{
     collections::{hash_map::Entry, HashMap},
-    fs,
-    path::PathBuf,
     sync::{Arc, RwLock},
 };
 
@@ -12,15 +10,17 @@ use alpen_express_rocksdb::{
 };
 use express_zkvm::{Proof, ProverOptions, ZKVMHost};
 use risc0_guest_builder::RETH_RISC0_ELF;
-use rockbound::rocksdb;
 use tracing::info;
 use uuid::Uuid;
 use zkvm_primitives::ZKVMInput;
 
-use crate::primitives::{
-    prover_input::ProverInput,
-    tasks_scheduler::{ProofProcessingStatus, ProofSubmissionStatus, WitnessSubmissionStatus},
-    vms::{ProofVm, ZkVMManager},
+use crate::{
+    db::open_rocksdb_database,
+    primitives::{
+        prover_input::ProverInput,
+        tasks_scheduler::{ProofProcessingStatus, ProofSubmissionStatus, WitnessSubmissionStatus},
+        vms::{ProofVm, ZkVMManager},
+    },
 };
 
 enum ProverStatus {
@@ -235,28 +235,4 @@ where
             .insert_new_task_entry(*task_id.as_bytes(), proof.as_bytes().to_vec())?;
         Ok(())
     }
-}
-
-fn open_rocksdb_database() -> anyhow::Result<Arc<rockbound::OptimisticTransactionDB>> {
-    let mut database_dir = PathBuf::default();
-    database_dir.push("rocksdb_prover");
-
-    if !database_dir.exists() {
-        fs::create_dir_all(&database_dir)?;
-    }
-
-    let dbname = alpen_express_rocksdb::ROCKSDB_NAME;
-    let cfs = alpen_express_rocksdb::PROVER_COLUMN_FAMILIES;
-    let mut opts = rocksdb::Options::default();
-    opts.create_if_missing(true);
-    opts.create_missing_column_families(true);
-
-    let rbdb = rockbound::OptimisticTransactionDB::open(
-        &database_dir,
-        dbname,
-        cfs.iter().map(|s| s.to_string()),
-        &opts,
-    )?;
-
-    Ok(Arc::new(rbdb))
 }

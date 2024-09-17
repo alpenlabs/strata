@@ -12,6 +12,9 @@ use crate::{
     task_tracker::TaskTracker,
 };
 
+/// The `ELBlockProvingTaskScheduler` handles the scheduling of EL block proving tasks.
+/// It listens for new EL blocks via an RPC client, fetches the necessary proving inputs,
+/// and adds these tasks to a shared `TaskTracker` for further processing.
 #[derive(Clone)]
 pub struct ELBlockProvingTaskScheduler {
     el_rpc_client: HttpClient,
@@ -34,7 +37,6 @@ impl ELBlockProvingTaskScheduler {
             let next_block = self.last_block_sent + 1;
             if let Err(e) = self.create_proving_task(next_block).await {
                 error!("Error processing block: {:?}", e);
-                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
             } else {
                 self.last_block_sent = next_block;
             }

@@ -80,7 +80,7 @@ impl ExpressProverClientApiServerServer for ProverClientRpc {
             .el_proving_task_scheduler
             .create_proving_task(el_block_num)
             .await
-            .expect("failded to add proving task");
+            .expect("failed to add proving task");
 
         RpcResult::Ok(task_id.to_string())
     }

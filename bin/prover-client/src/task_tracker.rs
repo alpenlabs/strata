@@ -7,14 +7,16 @@ use crate::primitives::{
     tasks_scheduler::{ProvingTask, ProvingTaskStatus},
 };
 
+/// The `TaskTracker` manages the lifecycle of proving tasks. It provides functionality
+/// to create tasks, update their status, and retrieve tasks based on their current state.
 pub struct TaskTracker {
-    tasks: Mutex<Vec<ProvingTask>>,
+    pending_tasks: Mutex<Vec<ProvingTask>>,
 }
 
 impl TaskTracker {
     pub fn new() -> Self {
         TaskTracker {
-            tasks: Mutex::new(Vec::new()),
+            pending_tasks: Mutex::new(Vec::new()),
         }
     }
 
@@ -26,32 +28,25 @@ impl TaskTracker {
             prover_input,
             status: ProvingTaskStatus::Pending,
         };
-        let mut tasks = self.tasks.lock().await;
+        let mut tasks = self.pending_tasks.lock().await;
         tasks.push(task);
         info!("Added proving task {:?}", task_id);
         task_id
     }
 
     pub async fn update_task_status(&self, task_id: Uuid, status: ProvingTaskStatus) {
-        let mut tasks = self.tasks.lock().await;
+        let mut tasks = self.pending_tasks.lock().await;
         if let Some(task) = tasks.iter_mut().find(|t| t.id == task_id) {
             task.status = status;
         }
-        // todo: update task scheduler
     }
 
-    pub async fn get_pending_task(&self) -> Option<ProvingTask> {
-        let mut tasks = self.tasks.lock().await;
-        if let Some(index) = tasks
+    pub async fn get_tasks_by_status(&self, status: ProvingTaskStatus) -> Vec<ProvingTask> {
+        let tasks = self.pending_tasks.lock().await;
+        tasks
             .iter()
-            .position(|t| t.status == ProvingTaskStatus::Pending)
-        {
-            let mut task = tasks[index].clone();
-            task.status = ProvingTaskStatus::Processing;
-            tasks[index].status = ProvingTaskStatus::Processing;
-            Some(task)
-        } else {
-            None
-        }
+            .filter(|task| task.status == status)
+            .cloned()
+            .collect()
     }
 }

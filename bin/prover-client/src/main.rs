@@ -13,18 +13,19 @@ use task_tracker::TaskTracker;
 use tracing::info;
 
 mod args;
-pub(crate) mod config;
-pub(crate) mod manager;
-pub(crate) mod primitives;
-pub(crate) mod prover;
-pub(crate) mod rpc_server;
-pub(crate) mod task_dispatcher;
-pub(crate) mod task_tracker;
+mod config;
+mod db;
+mod manager;
+mod primitives;
+mod prover;
+mod rpc_server;
+mod task_dispatcher;
+mod task_tracker;
 
 #[tokio::main]
 async fn main() {
     logging::init();
-    info!("running prover client in dev mode");
+    info!("running alpen express prover client in dev mode");
 
     let args: Args = argh::from_env();
     let task_tracker = Arc::new(TaskTracker::new());
@@ -39,9 +40,7 @@ async fn main() {
     let prover_manager: ProverManager<RiscZeroHost> = ProverManager::new(task_tracker);
 
     // run prover manager in background
-    tokio::spawn(async move {
-        prover_manager.run().await;
-    });
+    tokio::spawn(async move { prover_manager.run().await });
 
     // run el proving task dispatcher
     tokio::spawn(async move {

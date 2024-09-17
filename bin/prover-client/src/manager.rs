@@ -2,15 +2,15 @@ use std::sync::Arc;
 
 use express_zkvm::{ProverOptions, ZKVMHost};
 use tokio::time::{sleep, Duration};
-use tracing::info;
 
 use crate::{
-    config::NUM_PROVER_WORKER,
-    primitives::tasks_scheduler::{ProvingTask, ProvingTaskStatus},
+    config::{NUM_PROVER_WORKER, PROVER_MANAGER_WAIT_TIME},
+    primitives::tasks_scheduler::{ProofSubmissionStatus, ProvingTaskStatus},
     prover::Prover,
     task_tracker::TaskTracker,
 };
 
+/// Manages proof generation tasks, including processing and tracking task statuses.
 pub struct ProverManager<Vm>
 where
     Vm: ZKVMHost + 'static,
@@ -30,30 +30,58 @@ where
         }
     }
 
+    /// Main event loop that continuously processes pending tasks and tracks proving progress.
     pub async fn run(&self) {
-        while let Some(task) = self.task_tracker.get_pending_task().await {
-            info!("get_pending_task: {}", task.id);
-            self.process_task(task).await;
+        loop {
+            self.process_pending_tasks().await;
+            self.track_proving_progress().await;
+            sleep(Duration::from_secs(PROVER_MANAGER_WAIT_TIME)).await;
         }
     }
 
-    async fn process_task(&self, task: ProvingTask) {
-        self.prover.submit_witness(task.id, task.prover_input);
-        let _ = self.prover.start_proving(task.id);
-
-        self.task_tracker
-            .update_task_status(task.id, ProvingTaskStatus::Completed)
+    /// Process all tasks that have the `Pending` status.
+    /// This function fetches the pending tasks, submits their witness data to the prover,
+    /// and starts the proving process for each task.
+    /// If starting the proving process fails, the task status is reverted back to `Pending`.
+    async fn process_pending_tasks(&self) {
+        let pending_tasks = self
+            .task_tracker
+            .get_tasks_by_status(ProvingTaskStatus::Pending)
             .await;
 
-        sleep(Duration::from_secs(3)).await;
+        for task in pending_tasks {
+            self.prover.submit_witness(task.id, task.prover_input);
+            if self.prover.start_proving(task.id).is_err() {
+                self.task_tracker
+                    .update_task_status(task.id, ProvingTaskStatus::Pending)
+                    .await;
+            }
+        }
+    }
 
-        let status = self
-            .prover
-            .get_proof_submission_status_and_remove_on_success(task.id);
+    /// Tracks the progress of tasks with the `Processing` status.
+    /// This function checks the proof submission status for each task and,
+    /// upon success, updates the task status to `Completed`.
+    /// Additionally, post-processing hooks may need to be added to handle specific logic,
+    pub async fn track_proving_progress(&self) {
+        let in_progress_tasks = self
+            .task_tracker
+            .get_tasks_by_status(ProvingTaskStatus::Processing)
+            .await;
 
-        info!(
-            "get_proof_submission_status_and_remove_on_success: {:?} {:?}",
-            task.id, status
-        );
+        for task in in_progress_tasks {
+            if let Ok(ProofSubmissionStatus::Success) = self
+                .prover
+                .get_proof_submission_status_and_remove_on_success(task.id)
+            {
+                self.task_tracker
+                    .update_task_status(task.id, ProvingTaskStatus::Completed)
+                    .await;
+
+                // TODO: Implement post-processing hooks.
+                // Example: If the current task is EL proving, this proof should be added
+                // to the witness of the CL proving task to unblock the CL proving task.
+            }
+        }
     }
 }
