@@ -2,13 +2,12 @@
 mod test {
     use std::str::FromStr;
 
-    use alpen_test_utils::bitcoin::get_btc_chain;
     use bitcoin::{params::MAINNET, Address};
     use express_proofimpl_btc_blockspace::logic::{BlockspaceProofOutput, ScanRuleConfig};
     use express_proofimpl_l1_batch::{
-        header_verification::HeaderVerificationState,
         logic::{L1BatchProofInput, L1BatchProofOutput},
-        timestamp_store::TimestampStore,
+        mock::get_verification_state_for_block,
+        pow_params::PowParams,
     };
     use express_risc0_adapter::{Risc0Verifier, RiscZeroHost};
     use express_risc0_guest_builder::{
@@ -17,26 +16,6 @@ mod test {
     use express_zkvm::{
         AggregationInput, ProverInput, ProverOptions, VerificationKey, ZKVMHost, ZKVMVerifier,
     };
-
-    fn get_header_verification_state(height: u32) -> HeaderVerificationState {
-        let chain = get_btc_chain(MAINNET.clone());
-        let (
-            last_verified_block_hash,
-            next_block_target,
-            initial_timestamps,
-            interval_start_timestamp,
-        ) = chain.get_header_verification_info(height);
-        let last_11_blocks_timestamps = TimestampStore::new(initial_timestamps);
-
-        HeaderVerificationState {
-            last_verified_block_num: height - 1,
-            last_verified_block_hash,
-            next_block_target,
-            interval_start_timestamp,
-            total_accumulated_pow: 0f64,
-            last_11_blocks_timestamps,
-        }
-    }
 
     #[test]
     fn test_l1_batch_code_trace_generation() {
@@ -92,7 +71,7 @@ mod test {
         let prover = RiscZeroHost::init(GUEST_RISC0_L1_BATCH_ELF.into(), prover_options);
         let input = L1BatchProofInput {
             batch: blockspace_outputs,
-            state: get_header_verification_state(40321),
+            state: get_verification_state_for_block(40321, &PowParams::from(&MAINNET)),
         };
 
         prover_input.write(input);
