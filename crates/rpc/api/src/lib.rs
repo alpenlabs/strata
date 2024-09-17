@@ -66,6 +66,14 @@ pub trait AlpenApi {
 
     #[method(name = "getRawBundleById")]
     async fn get_raw_bundle_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<HexBytes>>;
+
+    /// Get message by scope, Currently either Deposit or Withdrawal
+    #[method(name = "getBridgeMsgsByScope")]
+    async fn get_msgs_by_scope(&self, scope: HexBytes) -> RpcResult<Vec<HexBytes>>;
+
+    /// Submit raw messages
+    #[method(name = "submitBridgeMsg")]
+    async fn submit_bridge_msg(&self, raw_msg: HexBytes) -> RpcResult<()>;
 }
 
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "alpadmin"))]

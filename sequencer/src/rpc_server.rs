@@ -558,6 +558,16 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
             .transpose()?;
         Ok(block)
     }
+
+    async fn get_msgs_by_scope(&self, _scope: HexBytes) -> RpcResult<Vec<HexBytes>> {
+        warn!("alp_getBridgeMsgsByScope not implemented");
+        Ok(Vec::new())
+    }
+
+    async fn submit_bridge_msg(&self, _raw_msg: HexBytes) -> RpcResult<()> {
+        warn!("alp_submitBridgeMsg not implemented");
+        Ok(())
+    }
 }
 
 /// Wrapper around [``tokio::task::spawn_blocking``] that handles errors in
