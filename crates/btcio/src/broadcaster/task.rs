@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
-use alpen_express_db::types::{ExcludeReason, L1TxEntry, L1TxStatus};
-use bitcoin::{hashes::Hash, Transaction, Txid};
+use alpen_express_db::types::{L1TxEntry, L1TxStatus};
+use bitcoin::{hashes::Hash, Txid};
 use express_storage::{ops::l1tx_broadcast, BroadcastDbOps};
 use tokio::sync::mpsc::Receiver;
 use tracing::*;
@@ -11,10 +11,7 @@ use crate::{
         error::{BroadcasterError, BroadcasterResult},
         state::BroadcasterState,
     },
-    rpc::{
-        error::ClientError,
-        traits::{Broadcaster, Wallet},
-    },
+    rpc::traits::{Broadcaster, Wallet},
 };
 
 const FINALITY_DEPTH: u64 = 6;
@@ -86,9 +83,10 @@ async fn process_unfinalized_entries(
             // update in db, maybe this should be moved out of this fn to separate concerns??
             ops.update_tx_entry_async(*idx, new_txentry.clone()).await?;
 
-            // Remove if finalized
+            // Remove if finalized or has invalid inputs or reorged
             if matches!(status, L1TxStatus::Finalized { confirmations: _ })
-                || matches!(status, L1TxStatus::Excluded { reason: _ })
+                || matches!(status, L1TxStatus::InvalidInputs)
+                || matches!(status, L1TxStatus::Reorged)
             {
                 to_remove.push(*idx);
             }
@@ -118,85 +116,74 @@ async fn handle_entry(
             // Try to publish
             let tx = txentry.try_to_tx().expect("could not deserialize tx");
             trace!(%idx, ?tx, "Publishing tx");
-            match send_tx(&tx, rpc_client).await {
+            match rpc_client.send_raw_transaction(&tx).await {
                 Ok(_) => {
                     info!(%idx, %txid, "Successfully published tx");
                     Ok(Some(L1TxStatus::Published))
                 }
-                Err(PublishError::MissingInputsOrSpent) => {
-                    warn!(
-                        %idx,
-                        %txid,
-                        "tx excluded while broadcasting due to missing or spent inputs"
-                    );
-                    Ok(Some(L1TxStatus::Excluded {
-                        reason: ExcludeReason::MissingInputsOrSpent,
-                    }))
+                Err(err) if err.is_missing_or_invalid_input() => {
+                    warn!(?err, %idx, %txid, "tx excluded due to invalid inputs");
+
+                    Ok(Some(L1TxStatus::InvalidInputs))
                 }
-                Err(PublishError::Other(msg)) => {
-                    warn!(%idx, %msg, %txid, "tx excluded while broadcasting");
-                    Err(BroadcasterError::Other(msg))
+                Err(err) => {
+                    warn!(%idx, ?err, %txid, "errored while broadcasting");
+                    Err(BroadcasterError::Other(err.to_string()))
                 }
             }
         }
         L1TxStatus::Published | L1TxStatus::Confirmed { confirmations: _ } => {
-            // check for confirmations
+            // Check for confirmations
             let txid = Txid::from_slice(txid.0.as_slice())
                 .map_err(|e| BroadcasterError::Other(e.to_string()))?;
-            let txinfo = rpc_client
-                .get_transaction(&txid)
-                .await
-                .map_err(|e| BroadcasterError::Other(e.to_string()))?;
-            match txinfo.confirmations {
-                0 if matches!(txentry.status, L1TxStatus::Confirmed { confirmations: _ }) => {
+            let txinfo_res = rpc_client.get_transaction(&txid).await;
+
+            match txinfo_res {
+                Ok(txinfo)
+                    if txinfo.confirmations == 0
+                        && matches!(txentry.status, L1TxStatus::Confirmed { confirmations: _ }) =>
+                {
                     // If the confirmations of a tx that is already confirmed is 0 then there is
-                    // something wrong, possibly a reorg, so just set it to unpublished
-                    Ok(Some(L1TxStatus::Unpublished))
+                    // a reorg
+                    Ok(Some(L1TxStatus::Reorged))
                 }
-                0 => Ok(None),
-                c if c >= (FINALITY_DEPTH) => Ok(Some(L1TxStatus::Finalized {
+                Ok(txinfo) if txinfo.confirmations == 0 => Ok(None),
+                Ok(txinfo) if txinfo.confirmations >= (FINALITY_DEPTH) => {
+                    Ok(Some(L1TxStatus::Finalized {
+                        confirmations: txinfo.block_height(),
+                    }))
+                }
+                Ok(txinfo) => Ok(Some(L1TxStatus::Confirmed {
                     confirmations: txinfo.block_height(),
                 })),
-                _ => Ok(Some(L1TxStatus::Confirmed {
-                    confirmations: txinfo.block_height(),
-                })),
+                Err(e) => {
+                    // Reorg happened if tx was confirmed before, but cannot be found now
+                    if e.is_tx_not_found() && matches!(txentry.status, L1TxStatus::Confirmed { .. })
+                    {
+                        Ok(Some(L1TxStatus::Reorged))
+                    } else {
+                        Err(BroadcasterError::Other(e.to_string()))
+                    }
+                }
             }
         }
         L1TxStatus::Finalized { confirmations: _ } => Ok(None),
-        L1TxStatus::Excluded { reason: _ } => {
-            // If a tx is excluded due to MissingInputsOrSpent then the downstream task like
-            // writer/signer will be accountable for recreating the tx and asking to broadcast.
-            // If excluded due to Other reason, there's nothing much we can do.
+        L1TxStatus::InvalidInputs => Ok(None),
+        L1TxStatus::Reorged => {
+            // If the transaction is reorged then the status is not changed
             Ok(None)
         }
     }
 }
 
-#[derive(Debug)]
-enum PublishError {
-    MissingInputsOrSpent,
-    Other(String),
-}
-
-async fn send_tx(tx: &Transaction, client: &impl Broadcaster) -> Result<(), PublishError> {
-    match client.send_raw_transaction(tx).await {
-        Ok(_) => Ok(()),
-        Err(ClientError::Server(-26, error_msg)) => {
-            warn!(%error_msg, "Failed to send tx to bitcoin");
-            Err(PublishError::MissingInputsOrSpent)
-        }
-        Err(e) => Err(PublishError::Other(e.to_string())),
-    }
-}
-
 #[cfg(test)]
 mod test {
-    use alpen_express_db::{traits::TxBroadcastDatabase, types::ExcludeReason};
+    use alpen_express_db::traits::TxBroadcastDatabase;
     use alpen_express_rocksdb::{
         broadcaster::db::{BroadcastDatabase, BroadcastDb},
         test_utils::get_rocksdb_tmp_instance,
     };
-    use bitcoin::consensus;
+    use bitcoin::{consensus, Transaction};
     use express_storage::ops::l1tx_broadcast::Context;
 
     use super::*;
@@ -318,8 +305,8 @@ mod test {
             .unwrap();
         assert_eq!(
             res,
-            Some(L1TxStatus::Unpublished),
-            "Status should revert to unpublished if previously confirmed tx has 0 confirmations"
+            Some(L1TxStatus::Reorged),
+            "Status should revert to reorged if previously confirmed tx has 0 confirmations"
         );
 
         // This client will return confirmations to be finality_depth - 1
@@ -392,9 +379,7 @@ mod test {
     #[tokio::test]
     async fn test_handle_excluded_entry() {
         let ops = get_ops();
-        let e = gen_entry_with_status(L1TxStatus::Excluded {
-            reason: ExcludeReason::Other("some reason".to_string()),
-        });
+        let e = gen_entry_with_status(L1TxStatus::InvalidInputs);
 
         // Add tx to db
         ops.insert_new_tx_entry_async([1; 32].into(), e.clone())
@@ -436,9 +421,7 @@ mod test {
             .insert_new_tx_entry_async([1; 32].into(), e1)
             .await
             .unwrap();
-        let e2 = gen_entry_with_status(L1TxStatus::Excluded {
-            reason: ExcludeReason::MissingInputsOrSpent,
-        });
+        let e2 = gen_entry_with_status(L1TxStatus::InvalidInputs);
         let _i2 = ops
             .insert_new_tx_entry_async([2; 32].into(), e2)
             .await

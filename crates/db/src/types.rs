@@ -129,22 +129,11 @@ pub enum L1TxStatus {
     // FIXME this doesn't make sense to be "confirmations"
     Finalized { confirmations: u64 },
 
-    /// The transaction is not included in L1 and has errored with some error code
-    Excluded { reason: ExcludeReason },
-}
+    /// The block that includes the transaction has been reorged
+    Reorged,
 
-/// Reason why the transaction was not included in the bitcoin chain
-#[derive(
-    Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary, Serialize, Deserialize,
-)]
-#[serde(tag = "kind", content = "message")]
-pub enum ExcludeReason {
-    /// Excluded because inputs were spent or not present in the chain/mempool
-    MissingInputsOrSpent,
-
-    /// Excluded for other reasons.
-    // TODO: add other cases
-    Other(String),
+    /// The transaction is not included in L1 because it's inputs were invalid
+    InvalidInputs,
 }
 
 /// Entry corresponding to a BatchCommitment
@@ -241,18 +230,8 @@ mod tests {
                 L1TxStatus::Finalized { confirmations: 100 },
                 r#"{"status":"Finalized","confirmations":100}"#,
             ),
-            (
-                L1TxStatus::Excluded {
-                    reason: ExcludeReason::MissingInputsOrSpent,
-                },
-                r#"{"status":"Excluded","reason":{"kind":"MissingInputsOrSpent"}}"#,
-            ),
-            (
-                L1TxStatus::Excluded {
-                    reason: ExcludeReason::Other("Something went wrong".to_string()),
-                },
-                r#"{"status":"Excluded","reason":{"kind":"Other","message":"Something went wrong"}}"#,
-            ),
+            (L1TxStatus::InvalidInputs, r#"{"status":"InvalidInputs"}"#),
+            (L1TxStatus::Reorged, r#"{"status":"Reorged"}"#),
         ];
 
         // check serialization and deserialization

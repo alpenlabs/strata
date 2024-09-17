@@ -92,6 +92,16 @@ pub enum ClientError {
     Other(String),
 }
 
+impl ClientError {
+    pub fn is_tx_not_found(&self) -> bool {
+        matches!(self, Self::Server(-5, _))
+    }
+
+    pub fn is_missing_or_invalid_input(&self) -> bool {
+        matches!(self, Self::Server(-26, _))
+    }
+}
+
 impl From<SerdeJsonError> for ClientError {
     fn from(value: SerdeJsonError) -> Self {
         Self::Parse(format!("Could not parse {}", value))

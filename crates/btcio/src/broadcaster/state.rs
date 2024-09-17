@@ -61,7 +61,7 @@ impl BroadcasterState {
     }
 }
 
-/// Returns unfinalized and unexcluded [`L1TxEntry`]s from db starting from index `from` until `to`
+/// Returns unfinalized but valid [`L1TxEntry`]s from db starting from index `from` until `to`
 /// non-inclusive.
 async fn filter_unfinalized_from_db(
     ops: &Arc<BroadcastDbOps>,
@@ -78,7 +78,10 @@ async fn filter_unfinalized_from_db(
         let txid = ops.get_txid_async(idx).await?.map(Txid::from);
         debug!(?idx, ?txid, ?status, "TxEntry");
         match txentry.status {
-            L1TxStatus::Finalized { confirmations: _ } | L1TxStatus::Excluded { reason: _ } => {}
+            // Only include if unfinalized but valid
+            L1TxStatus::Finalized { confirmations: _ }
+            | L1TxStatus::InvalidInputs
+            | L1TxStatus::Reorged => {}
             _ => {
                 unfinalized_entries.insert(idx, txentry);
             }
@@ -89,7 +92,7 @@ async fn filter_unfinalized_from_db(
 
 #[cfg(test)]
 mod test {
-    use alpen_express_db::{traits::TxBroadcastDatabase, types::ExcludeReason};
+    use alpen_express_db::traits::TxBroadcastDatabase;
     use alpen_express_rocksdb::{
         broadcaster::db::{BroadcastDatabase, BroadcastDb},
         test_utils::get_rocksdb_tmp_instance,
@@ -136,10 +139,8 @@ mod test {
         gen_entry_with_status(L1TxStatus::Published)
     }
 
-    fn gen_excluded_entry() -> L1TxEntry {
-        gen_entry_with_status(L1TxStatus::Excluded {
-            reason: ExcludeReason::MissingInputsOrSpent,
-        })
+    fn gen_invalid_entry() -> L1TxEntry {
+        gen_entry_with_status(L1TxStatus::InvalidInputs)
     }
 
     async fn populate_broadcast_db(ops: Arc<BroadcastDbOps>) -> Vec<(u64, L1TxEntry)> {
@@ -168,7 +169,7 @@ mod test {
             .await
             .unwrap();
 
-        let e5 = gen_excluded_entry();
+        let e5 = gen_invalid_entry();
         let i5 = ops
             .insert_new_tx_entry_async([5; 32].into(), e5.clone())
             .await
@@ -190,7 +191,7 @@ mod test {
 
         assert_eq!(state.next_idx, i5 + 1);
 
-        // state should contain all but excluded or finalized entries
+        // state should contain all except reorged, invalid or  finalized entries
         assert!(state.unfinalized_entries.contains_key(i1));
         assert!(state.unfinalized_entries.contains_key(i2));
         assert!(state.unfinalized_entries.contains_key(i4));
@@ -213,12 +214,12 @@ mod test {
 
         // Get updated entries where one entry is modified, another is removed
         let mut updated_entries = state.unfinalized_entries.clone();
-        let entry = gen_excluded_entry();
+        let entry = gen_invalid_entry();
         updated_entries.insert(0, entry);
         updated_entries.remove(&1);
 
         // Insert two more items to db, one excluded and one published.
-        let e = gen_excluded_entry(); // this should not be in new state
+        let e = gen_invalid_entry(); // this should not be in new state
         let idx = ops
             .insert_new_tx_entry_async([6; 32].into(), e.clone())
             .await
@@ -235,12 +236,10 @@ mod test {
         assert_eq!(state.next_idx, idx1 + 1);
         assert_eq!(
             state.unfinalized_entries.get(&0).unwrap().status,
-            L1TxStatus::Excluded {
-                reason: ExcludeReason::MissingInputsOrSpent
-            }
+            L1TxStatus::InvalidInputs
         );
 
-        // check it does not contain idx of excluded but contains that of published tx
+        // check it does not contain idx of reorged but contains that of published tx
         assert!(!state.unfinalized_entries.contains_key(&idx));
         assert!(state.unfinalized_entries.contains_key(&idx1));
     }

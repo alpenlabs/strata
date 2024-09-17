@@ -2,7 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use alpen_express_db::{
     traits::SequencerDatabase,
-    types::{BlobEntry, BlobL1Status, ExcludeReason, L1TxEntry, L1TxStatus},
+    types::{BlobEntry, BlobL1Status, L1TxEntry, L1TxStatus},
 };
 use alpen_express_state::da_blob::{BlobDest, BlobIntent};
 use alpen_express_status::StatusTx;
@@ -287,18 +287,8 @@ fn determine_blob_next_status(
         (_, L1TxStatus::Confirmed { .. }) => BlobL1Status::Confirmed,
         // If reveal is published, both are published
         (_, L1TxStatus::Published) => BlobL1Status::Published,
-        // If commit is excluded, both are excluded
-        (
-            L1TxStatus::Excluded {
-                reason: ExcludeReason::MissingInputsOrSpent,
-            },
-            _,
-        ) => BlobL1Status::NeedsResign,
-        (L1TxStatus::Excluded { reason }, _) => {
-            // TODO: error or have a separate status?
-            warn!(?reason, "Inscriptions could not be included in the chain");
-            curr_status.clone()
-        }
+        // If commit has invalid inputs, both are invalid
+        (L1TxStatus::InvalidInputs, _) => BlobL1Status::NeedsResign,
         (_, _) => curr_status.clone(),
     };
     Ok(status)
