@@ -3,13 +3,14 @@ use std::sync::Arc;
 use alpen_express_primitives::bridge::{OperatorIdx, PublickeyTable};
 use bitcoin::{
     key::rand::{self, Rng},
-    Address, Amount, FeeRate, OutPoint, Transaction,
+    Address, Amount, FeeRate, Network, OutPoint, ScriptBuf, Transaction,
 };
 use bitcoind::BitcoinD;
-use common::bridge::{create_bridge_addr, setup, BridgeDuty, User, MIN_FEE};
+use common::bridge::{setup, BridgeDuty, User, MIN_FEE};
 use express_bridge_tx_builder::prelude::{
-    anyone_can_spend_txout, create_tx, create_tx_ins, create_tx_outs, metadata_script,
-    CooperativeWithdrawalInfo, BRIDGE_DENOMINATION, MIN_RELAY_FEE,
+    anyone_can_spend_txout, create_taproot_addr, create_tx, create_tx_ins, create_tx_outs,
+    get_aggregated_pubkey, metadata_script, n_of_n_script, CooperativeWithdrawalInfo, SpendPath,
+    BRIDGE_DENOMINATION, MIN_RELAY_FEE,
 };
 use tokio::sync::Mutex;
 use tracing::{event, span, Level};
@@ -18,16 +19,17 @@ mod common;
 
 #[tokio::test]
 async fn withdrawal_flow() {
+    let num_operators = 3;
+    let (bitcoind, federation) = setup(num_operators).await;
+
     let span = span!(Level::WARN, "starting cooperative withdrawal flow");
     let _guard = span.enter();
 
-    let num_operators = 2;
-
     event!(
-        Level::INFO,
-        action = "setting up the federation with the bitcoind client"
+        Level::WARN,
+        event = "set up the federation with the bitcoind client",
+        num_operators = %num_operators
     );
-    let (bitcoind, federation) = setup(num_operators).await;
 
     let (outpoint, amount, bridge_address) =
         fund_bridge(federation.pubkey_table, bitcoind.clone()).await;
@@ -157,7 +159,7 @@ async fn create_funding_tx(
 ) -> (Transaction, u32, Amount, Address) {
     let input = create_tx_ins([outpoint]);
 
-    let (bridge_addr, bridge_script_pubkey, _) = create_bridge_addr(pubkey_table);
+    let (bridge_addr, bridge_script_pubkey) = create_bridge_addr(pubkey_table);
 
     // Outputs in DT:
     // 1) N/N
@@ -194,4 +196,24 @@ async fn create_funding_tx(
         net_bridge_in_amount,
         bridge_addr,
     )
+}
+
+pub(crate) fn create_bridge_addr(pubkey_table: PublickeyTable) -> (Address, ScriptBuf) {
+    let n_of_n = n_of_n_script(&get_aggregated_pubkey(pubkey_table));
+
+    let spend_path = SpendPath::ScriptSpend {
+        scripts: &[n_of_n.clone()],
+    };
+
+    let (bridge_addr, spend_info) = create_taproot_addr(&Network::Regtest, spend_path)
+        .expect("should be able to create bridge address");
+
+    assert!(
+        spend_info.merkle_root().is_some(),
+        "some merkle root should be present"
+    );
+
+    let bridge_script_pubkey = bridge_addr.script_pubkey();
+
+    (bridge_addr, bridge_script_pubkey)
 }

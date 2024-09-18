@@ -14,7 +14,7 @@ use anyhow::Context;
 use bitcoin::{
     key::Keypair,
     secp256k1::{PublicKey, SecretKey, XOnlyPublicKey, SECP256K1},
-    Address, Amount, Network, OutPoint, ScriptBuf, Transaction, Txid,
+    Address, Amount, Network, OutPoint, Transaction, Txid,
 };
 use bitcoind::{
     bitcoincore_rpc::{
@@ -25,10 +25,7 @@ use bitcoind::{
 };
 use express_bridge_sig_manager::prelude::SignatureManager;
 use express_bridge_tx_builder::{
-    prelude::{
-        create_taproot_addr, get_aggregated_pubkey, CooperativeWithdrawalInfo, DepositInfo,
-        SpendPath, TxBuildContext,
-    },
+    prelude::{CooperativeWithdrawalInfo, DepositInfo, TxBuildContext},
     TxKind,
 };
 use express_storage::ops;
@@ -352,6 +349,11 @@ impl Operator {
     ) -> Result<(), Elapsed> {
         let result = self.sig_manager.add_own_partial_sig(txid).await;
         assert!(
+            result.is_ok(),
+            "should be able to add own signature but got: {:?}",
+            result.unwrap_err()
+        );
+        assert!(
             result.is_ok_and(|is_complete| is_complete.not()),
             "should be able to add own signature but should not complete the collection"
         );
@@ -596,28 +598,7 @@ pub(crate) async fn setup(num_operators: usize) -> (Arc<Mutex<BitcoinD>>, Bridge
     event!(Level::INFO, action = "setting up a bridge federation", num_operator = %num_operators);
     let federation = BridgeFederation::new(num_operators, bitcoind.clone()).await;
 
-    let (bridge_addr, bridge_script_pubkey, _) =
-        create_bridge_addr(federation.pubkey_table.clone());
-    event!(Level::DEBUG, event = "bridge address created", bridge_addr = %bridge_addr, script_pubkey = %bridge_script_pubkey);
-
     (bitcoind, federation)
-}
-
-pub(crate) fn create_bridge_addr(
-    pubkey_table: PublickeyTable,
-) -> (Address, ScriptBuf, XOnlyPublicKey) {
-    let aggregated_bridge_pubkey = get_aggregated_pubkey(pubkey_table);
-
-    let spend_path = SpendPath::KeySpend {
-        internal_key: aggregated_bridge_pubkey,
-    };
-
-    let (bridge_addr, _) = create_taproot_addr(&Network::Regtest, spend_path)
-        .expect("should be able to create bridge address");
-
-    let bridge_script_pubkey = bridge_addr.script_pubkey();
-
-    (bridge_addr, bridge_script_pubkey, aggregated_bridge_pubkey)
 }
 
 pub(crate) fn setup_sig_manager(index: OperatorIdx, keypair: Keypair) -> SignatureManager {

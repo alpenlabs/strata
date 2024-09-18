@@ -212,10 +212,8 @@ impl DepositInfo {
         let fee_rate =
             FeeRate::from_sat_per_vb(MIN_RELAY_FEE.to_sat()).expect("invalid MIN_RELAY_FEE set");
 
-        // We are not committing to any script path as the internal key should already be
-        // randomized due to MuSig2 aggregation. See: <https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki#cite_note-23>
-        let spend_path = SpendPath::KeySpend {
-            internal_key: build_context.aggregated_pubkey(),
+        let spend_path = SpendPath::ScriptSpend {
+            scripts: &[n_of_n_script(&build_context.aggregated_pubkey())],
         };
 
         let (bridge_addr, _) = create_taproot_addr(build_context.network(), spend_path)?;

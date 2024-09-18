@@ -1,4 +1,4 @@
-//! Provides some common, standalone utilities and wrappers over [`bitcoin`](bitcoin) to create
+//! Provides some common, standalone utilities and wrappers over [`bitcoin`] to create
 //! scripts, addresses and transactions.
 
 use alpen_express_primitives::bridge::PublickeyTable;
