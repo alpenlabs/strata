@@ -1,6 +1,7 @@
 //! This includes all the filtering logic to filter out and extract
 //! deposits, forced inclusion transactions as well as state updates
 
+use alpen_express_primitives::buf::Buf32;
 use bitcoin::{opcodes::all::OP_RETURN, Block, ScriptBuf, Transaction};
 use serde::{Deserialize, Serialize};
 
@@ -16,7 +17,12 @@ pub struct DepositRequestData {
 }
 
 pub type ForcedInclusion = Vec<u8>;
-pub type StateUpdate = Vec<u8>;
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StateUpdate {
+    pub l1_state_hash: Buf32,
+    pub l2_state_hash: Buf32,
+    pub acc_pow: f64,
+}
 
 /// Note: This needs to be consistent with the logic in other places
 /// This is used as the placeholder logic for now
@@ -88,11 +94,11 @@ pub fn extract_relevant_transactions(
 ) -> (
     Vec<DepositRequestData>,
     Vec<ForcedInclusion>,
-    Vec<StateUpdate>,
+    Option<StateUpdate>,
 ) {
     let mut deposits = Vec::new();
     let mut forced_inclusions = Vec::new();
-    let mut state_updates = Vec::new();
+    let mut state_update = None;
 
     for tx in &block.txdata {
         if let Some(deposit) = extract_deposit(tx, &scan_rule.bridge_scriptbufs) {
@@ -103,12 +109,10 @@ pub fn extract_relevant_transactions(
             forced_inclusions.push(forced_inclusion);
         }
 
-        if let Some(state_update) = extract_state_update(tx) {
-            state_updates.push(state_update);
-        }
+        state_update = extract_state_update(tx).or(state_update);
     }
 
-    (deposits, forced_inclusions, state_updates)
+    (deposits, forced_inclusions, state_update)
 }
 
 #[cfg(test)]

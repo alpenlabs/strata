@@ -25,7 +25,7 @@ pub struct BlockspaceProofOutput {
     pub header: Header,
     pub deposits: Vec<DepositRequestData>,
     pub forced_inclusions: Vec<ForcedInclusion>,
-    pub state_updates: Vec<StateUpdate>,
+    pub state_updates: Option<StateUpdate>,
 }
 
 pub fn process_blockspace_proof(input: &BlockspaceProofInput) -> BlockspaceProofOutput {
