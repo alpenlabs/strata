@@ -10,6 +10,8 @@ use revm::{
 };
 use revm_primitives::{Address, AnalysisKind, Bytes, CfgEnvWithHandlerCfg, Env, TxEnv, U256};
 
+use crate::{constants::FIXED_WITHDRAWAL_WEI, precompiles};
+
 /// Custom EVM configuration
 #[derive(Debug, Clone, Copy, Default)]
 #[non_exhaustive]
@@ -33,9 +35,9 @@ impl ExpressEvmConfig {
         handler.pre_execution.load_precompiles = Arc::new(move || {
             let mut precompiles = ContextPrecompiles::new(PrecompileSpecId::from_spec_id(spec_id));
             precompiles.extend([(
-                crate::precompiles::bridge::BRIDGEOUT_ADDRESS,
+                precompiles::bridge::BRIDGEOUT_ADDRESS,
                 ContextPrecompile::ContextStateful(Arc::new(
-                    crate::precompiles::bridge::BridgeoutPrecompile,
+                    precompiles::bridge::BridgeoutPrecompile::new(FIXED_WITHDRAWAL_WEI),
                 )),
             )]);
             precompiles

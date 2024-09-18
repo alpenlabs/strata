@@ -5,6 +5,8 @@ import flexitest
 from web3 import Web3
 from web3._utils.events import get_event_data
 
+from constants import PRECOMPILE_BRIDGEOUT_ADDRESS
+
 withdrawal_intent_event_abi = {
     "anonymous": False,
     "inputs": [
@@ -27,7 +29,7 @@ class ElBridgePrecompileTest(flexitest.Test):
         web3: Web3 = reth.create_web3()
 
         source = web3.address
-        dest = web3.to_checksum_address("0x000000000000000000000000000000000b121d9e")
+        dest = web3.to_checksum_address(PRECOMPILE_BRIDGEOUT_ADDRESS)
         # 64 bytes
         dest_pk = os.urandom(32).hex()
         print(dest_pk)

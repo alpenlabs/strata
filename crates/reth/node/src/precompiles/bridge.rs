@@ -2,31 +2,12 @@ use std::array::TryFromSliceError;
 
 use revm::{ContextStatefulPrecompile, Database};
 use revm_primitives::{
-    address, Address, Bytes, FixedBytes, Log, LogData, PrecompileError, PrecompileErrors,
-    PrecompileOutput, PrecompileResult, U256,
+    Bytes, FixedBytes, Log, LogData, PrecompileError, PrecompileErrors, PrecompileOutput,
+    PrecompileResult, U256,
 };
 
-use crate::primitives::WithdrawalIntentEvent;
-
-const fn u256_from(val: u128) -> U256 {
-    U256::from_limbs([(val & ((1 << 64) - 1)) as u64, (val >> 64) as u64, 0, 0])
-}
-
-/// The address for the Bridgeout precompile contract.
-pub const BRIDGEOUT_ADDRESS: Address = address!("000000000000000000000000000000000b121d9e");
-
-/// Number of wei per rollup BTC (1e18).
-const WEI_PER_BTC: u128 = 1_000_000_000_000_000_000u128;
-/// Number of wei per satoshi (1e10).
-const WEI_PER_SAT: U256 = u256_from(10_000_000_000u128);
-/// The fixed withdrawal amount in wei (10 BTC equivalent).
-const FIXED_WITHDRAWAL_WEI: U256 = u256_from(10 * WEI_PER_BTC);
-
-/// Converts wei to satoshis.
-/// Returns a tuple of (satoshis, remainder_in_wei).
-fn wei_to_sats(wei: U256) -> (U256, U256) {
-    wei.div_rem(WEI_PER_SAT)
-}
+pub use crate::constants::BRIDGEOUT_ADDRESS;
+use crate::{primitives::WithdrawalIntentEvent, utils::wei_to_sats};
 
 /// Ensure that input is exactly 32 bytes
 fn try_into_pubkey(maybe_pubkey: &Bytes) -> Result<FixedBytes<32>, TryFromSliceError> {
@@ -36,7 +17,17 @@ fn try_into_pubkey(maybe_pubkey: &Bytes) -> Result<FixedBytes<32>, TryFromSliceE
 /// Custom precompile to burn rollup native token and add bridge out intent of equal amount.
 /// Bridge out intent is created during block payload generation.
 /// This precompile validates transaction and burns the bridge out amount.
-pub struct BridgeoutPrecompile;
+pub struct BridgeoutPrecompile {
+    fixed_withdrawal_wei: U256,
+}
+
+impl BridgeoutPrecompile {
+    pub fn new(fixed_withdrawal_wei: U256) -> Self {
+        Self {
+            fixed_withdrawal_wei,
+        }
+    }
+}
 
 impl<DB: Database> ContextStatefulPrecompile<DB> for BridgeoutPrecompile {
     fn call(
@@ -51,7 +42,7 @@ impl<DB: Database> ContextStatefulPrecompile<DB> for BridgeoutPrecompile {
 
         // Verify that the transaction value matches the required withdrawal amount
         let withdrawal_amount = evmctx.env.tx.value;
-        if withdrawal_amount != FIXED_WITHDRAWAL_WEI {
+        if withdrawal_amount != self.fixed_withdrawal_wei {
             return Err(PrecompileError::other(
                 "Invalid withdrawal value: must be exactly 10 BTC in wei",
             )
@@ -83,18 +74,10 @@ impl<DB: Database> ContextStatefulPrecompile<DB> for BridgeoutPrecompile {
                 msg: "Failed to load BRIDGEOUT_ADDRESS account".into(),
             })?;
 
-        account.info.balance = account
-            .info
-            .balance
-            .checked_sub(withdrawal_amount)
-            // Error case should never occur as `value` has been transfered to this address by evm
-            // before running this precompile
-            .ok_or_else(|| PrecompileErrors::Fatal {
-                msg: "Insufficient balance in BRIDGEOUT_ADDRESS account".into(),
-            })?;
+        account.info.balance = U256::ZERO;
 
         // TODO: Properly calculate and deduct gas for the bridge out operation
-        let gas_cost = 0; // Placeholder
+        let gas_cost = 0;
 
         Ok(PrecompileOutput::new(gas_cost, Bytes::new()))
     }
