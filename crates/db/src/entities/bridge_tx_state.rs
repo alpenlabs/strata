@@ -559,7 +559,8 @@ mod tests {
 
         let pubkey_table = generate_pubkey_table(&pks);
 
-        let sec_nonce = generate_sec_nonce(&tx_output.psbt.compute_txid(), pks, sks[own_index]);
+        let sec_nonce =
+            generate_sec_nonce(&tx_output.psbt.compute_txid(), pks, sks[own_index], false);
 
         BridgeTxState::new(tx_output, pubkey_table, sec_nonce.into())
             .expect("Failed to create TxState")

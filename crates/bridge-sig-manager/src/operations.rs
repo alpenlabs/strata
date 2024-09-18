@@ -92,6 +92,7 @@ pub fn sign_state_partial(
     keypair: &Keypair,
     aggregated_nonce: &AggNonce,
     message: impl AsRef<[u8]>,
+    tweak: bool,
 ) -> BridgeSigResult<PartialSignature> {
     let pubkeys = pubkey_table.0.clone();
     let pubkeys = pubkeys.values();
@@ -99,6 +100,13 @@ pub fn sign_state_partial(
     let secnonce = secnonce.inner().clone();
 
     let key_agg_ctx = KeyAggContext::new(pubkeys.copied())?;
+
+    let key_agg_ctx = if tweak {
+        key_agg_ctx.with_unspendable_taproot_tweak()?
+    } else {
+        key_agg_ctx
+    };
+
     let seckey = SecretKey::from_keypair(keypair);
 
     let partial_sig: PartialSignature = sign_partial(
@@ -118,6 +126,7 @@ pub fn verify_partial_sig(
     signature_info: &OperatorPartialSig,
     aggregated_nonce: &AggNonce,
     message: impl AsRef<[u8]>,
+    tweak: bool,
 ) -> BridgeSigResult<()> {
     let signer_index = signature_info.signer_index();
 
@@ -131,6 +140,11 @@ pub fn verify_partial_sig(
 
     let pubkeys = tx_state.pubkeys().0.values().copied();
     let key_agg_ctx = KeyAggContext::new(pubkeys)?;
+    let key_agg_ctx = if tweak {
+        key_agg_ctx.with_unspendable_taproot_tweak()?
+    } else {
+        key_agg_ctx
+    };
 
     let individual_pubnonce = tx_state
         .collected_nonces()
@@ -260,12 +274,21 @@ mod tests {
     }
 
     #[test]
-    fn test_generate_and_verify_partial_sig() {
+    fn test_generate_and_verify_partial_sig_with_tweak() {
+        test_generate_and_verify_partial_sig(true);
+    }
+
+    #[test]
+    fn test_generate_and_verify_partial_sig_without_tweak() {
+        test_generate_and_verify_partial_sig(false);
+    }
+
+    fn test_generate_and_verify_partial_sig(tweak: bool) {
         // Step 0: Setup
 
         let num_operators = 3;
         let own_index = 1;
-        let (sks, aggregated_nonce, tx_state) = setup(num_operators, own_index);
+        let (sks, aggregated_nonce, tx_state) = setup(num_operators, own_index, tweak);
         let txid = tx_state.unsigned_tx().compute_txid();
 
         // Step 1: Generate a partial signature
@@ -277,6 +300,7 @@ mod tests {
             &keypair,
             &aggregated_nonce,
             txid.as_byte_array(),
+            tweak,
         );
 
         assert!(
@@ -296,6 +320,7 @@ mod tests {
             &signature_info,
             &aggregated_nonce,
             txid.as_byte_array(),
+            tweak,
         );
 
         assert!(
@@ -317,6 +342,7 @@ mod tests {
             &signature_info,
             &aggregated_nonce,
             txid.as_byte_array(),
+            tweak,
         );
 
         assert!(
@@ -339,6 +365,7 @@ mod tests {
             &signature_info,
             &aggregated_nonce,
             txid.as_byte_array(),
+            tweak,
         );
 
         assert!(
@@ -355,6 +382,7 @@ mod tests {
             &signature_info,
             &aggregated_nonce,
             txid.as_byte_array(),
+            tweak,
         );
 
         assert!(
@@ -363,7 +391,11 @@ mod tests {
         );
     }
 
-    fn setup(num_operators: usize, own_index: usize) -> (Vec<SecretKey>, AggNonce, BridgeTxState) {
+    fn setup(
+        num_operators: usize,
+        own_index: usize,
+        tweak: bool,
+    ) -> (Vec<SecretKey>, AggNonce, BridgeTxState) {
         assert!(own_index.lt(&num_operators), "invalid own index set");
 
         let (pks, sks) = generate_keypairs(num_operators);
@@ -375,6 +407,14 @@ mod tests {
 
         let key_agg_ctx =
             KeyAggContext::new(pks.clone()).expect("generation of key agg context should work");
+        let key_agg_ctx = if tweak {
+            key_agg_ctx
+                .with_unspendable_taproot_tweak()
+                .expect("should be able to add unspendable tweak")
+        } else {
+            key_agg_ctx
+        };
+
         let aggregated_pubkey: PublicKey = key_agg_ctx.aggregated_pubkey();
 
         let mut pub_nonces: Vec<PubNonce> = Vec::with_capacity(pks.len());

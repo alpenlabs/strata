@@ -14,7 +14,7 @@ use bitcoind::BitcoinD;
 use common::bridge::{setup, BridgeDuty, User, MIN_FEE, MIN_MINER_REWARD_CONFS};
 use express_bridge_tx_builder::prelude::{
     anyone_can_spend_txout, create_taproot_addr, create_tx, create_tx_ins, create_tx_outs,
-    get_aggregated_pubkey, metadata_script, n_of_n_script, CooperativeWithdrawalInfo, SpendPath,
+    get_aggregated_pubkey, metadata_script, CooperativeWithdrawalInfo, SpendPath,
     BRIDGE_DENOMINATION, MIN_RELAY_FEE,
 };
 use tokio::sync::Mutex;
@@ -222,18 +222,17 @@ async fn create_funding_tx(
 }
 
 pub(crate) fn create_bridge_addr(pubkey_table: PublickeyTable) -> (Address, ScriptBuf) {
-    let n_of_n = n_of_n_script(&get_aggregated_pubkey(pubkey_table));
-
-    let spend_path = SpendPath::ScriptSpend {
-        scripts: &[n_of_n.clone()],
+    let aggregated_pubkey = get_aggregated_pubkey(pubkey_table);
+    let spend_path = SpendPath::KeySpend {
+        internal_key: aggregated_pubkey,
     };
 
     let (bridge_addr, spend_info) = create_taproot_addr(&Network::Regtest, spend_path)
         .expect("should be able to create bridge address");
 
     assert!(
-        spend_info.merkle_root().is_some(),
-        "some merkle root should be present"
+        spend_info.merkle_root().is_none(),
+        "no merkle root should be present"
     );
 
     let bridge_script_pubkey = bridge_addr.script_pubkey();

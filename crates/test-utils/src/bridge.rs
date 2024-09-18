@@ -181,8 +181,17 @@ pub fn generate_sec_nonce(
     msg: &impl AsRef<[u8]>,
     pubkeys: impl IntoIterator<Item = PublicKey>,
     seckey: SecretKey,
+    tweak: bool,
 ) -> SecNonce {
     let key_agg_ctx = KeyAggContext::new(pubkeys).expect("key agg context should be created");
+    let key_agg_ctx = if tweak {
+        key_agg_ctx
+            .with_unspendable_taproot_tweak()
+            .expect("should add unspendable taproot tweak")
+    } else {
+        key_agg_ctx
+    };
+
     let aggregated_pubkey: PublicKey = key_agg_ctx.aggregated_pubkey();
 
     let mut nonce_seed = [0u8; 32];

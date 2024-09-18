@@ -13,7 +13,7 @@ use bitcoind::{
 };
 use common::bridge::{perform_rollup_actions, perform_user_actions, setup, BridgeDuty, User};
 use express_bridge_tx_builder::prelude::{
-    create_taproot_addr, get_aggregated_pubkey, n_of_n_script, CooperativeWithdrawalInfo, SpendPath,
+    create_taproot_addr, get_aggregated_pubkey, CooperativeWithdrawalInfo, SpendPath,
 };
 use tokio::sync::Mutex;
 use tracing::{debug, event, span, Level};
@@ -130,8 +130,8 @@ async fn get_bridge_out_outpoint(
     bitcoind: Arc<Mutex<BitcoinD>>,
 ) -> OutPoint {
     let aggregated_pubkey = get_aggregated_pubkey(pubkey_table);
-    let spend_path = SpendPath::ScriptSpend {
-        scripts: &[n_of_n_script(&aggregated_pubkey)],
+    let spend_path = SpendPath::KeySpend {
+        internal_key: aggregated_pubkey,
     };
     let (bridge_addr, _) = create_taproot_addr(&Network::Regtest, spend_path)
         .expect("should be able to create the address");

@@ -38,6 +38,11 @@ pub struct TxBuildContext {
     /// A table that maps bridge operator indexes to their respective x-only Schnorr pubkeys.
     pubkey_table: PublickeyTable,
 
+    /// The aggregated pubkey computed for the [`PublickeyTable`].
+    ///
+    /// This is fixed for the given [`PublickeyTable`] and so we compute it only once.
+    aggregated_pubkey: XOnlyPublicKey,
+
     /// The [`OperatorIdx`] for this bridge client.
     own_index: OperatorIdx,
 
@@ -46,11 +51,14 @@ pub struct TxBuildContext {
 }
 
 impl TxBuildContext {
-    /// Create a new [`TxBuilder`] with the context required to build transactions of various
+    /// Create a new [`TxBuildContext`] with the context required to build transactions of various
     /// [`TxKind`].
     pub fn new(operator_pubkeys: PublickeyTable, network: Network, own_index: OperatorIdx) -> Self {
+        let aggregated_pubkey = get_aggregated_pubkey(operator_pubkeys.clone());
+
         Self {
             pubkey_table: operator_pubkeys,
+            aggregated_pubkey,
             own_index,
             network,
         }
@@ -63,12 +71,12 @@ impl BuildContext for TxBuildContext {
         &self.pubkey_table
     }
 
-    /// Get the ordered set operator pubkeys.
+    /// Get the aggregated operator pubkeys.
     fn aggregated_pubkey(&self) -> XOnlyPublicKey {
-        get_aggregated_pubkey(self.pubkey_table.clone())
+        self.aggregated_pubkey
     }
 
-    /// Get the pubkey associated with this client.
+    /// Get the index associated with this client.
     fn own_index(&self) -> OperatorIdx {
         self.own_index
     }

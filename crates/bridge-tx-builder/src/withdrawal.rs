@@ -2,9 +2,9 @@
 
 use alpen_express_primitives::{
     bridge::{OperatorIdx, TxSigningData},
-    l1::{BitcoinPsbt, SpendInfo, XOnlyPk},
+    l1::{BitcoinPsbt, XOnlyPk},
 };
-use bitcoin::{taproot::LeafVersion, Amount, FeeRate, Network, OutPoint, Psbt, Transaction, TxOut};
+use bitcoin::{Amount, FeeRate, OutPoint, Psbt, Transaction, TxOut};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -12,8 +12,7 @@ use crate::{
     errors::{BridgeTxBuilderResult, CooperativeWithdrawalError},
     prelude::{
         anyone_can_spend_txout, create_taproot_addr, create_tx, create_tx_ins, create_tx_outs,
-        metadata_script, n_of_n_script, SpendPath, BRIDGE_DENOMINATION, MIN_RELAY_FEE,
-        OPERATOR_FEE,
+        metadata_script, SpendPath, BRIDGE_DENOMINATION, MIN_RELAY_FEE, OPERATOR_FEE,
     },
     TxKind,
 };
@@ -43,7 +42,6 @@ impl TxKind for CooperativeWithdrawalInfo {
     ) -> BridgeTxBuilderResult<TxSigningData> {
         let prevout = self.create_prevout(build_context)?;
         let unsigned_tx = self.create_unsigned_tx(build_context, prevout.value)?;
-        let spend_infos = self.compute_spend_infos(build_context)?;
 
         let mut psbt = Psbt::from_unsigned_tx(unsigned_tx)?;
 
@@ -54,7 +52,10 @@ impl TxKind for CooperativeWithdrawalInfo {
 
         let psbt = BitcoinPsbt::from(psbt);
 
-        Ok(TxSigningData { psbt, spend_infos })
+        Ok(TxSigningData {
+            psbt,
+            spend_infos: vec![None],
+        })
     }
 }
 
@@ -85,8 +86,8 @@ impl CooperativeWithdrawalInfo {
 
         // We are not committing to any script path as the internal key should already be
         // randomized due to MuSig2 aggregation. See: <https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki#cite_note-23>
-        let spend_path = SpendPath::ScriptSpend {
-            scripts: &[n_of_n_script(&build_context.aggregated_pubkey())],
+        let spend_path = SpendPath::KeySpend {
+            internal_key: build_context.aggregated_pubkey(),
         };
 
         let (bridge_addr, _) = create_taproot_addr(build_context.network(), spend_path)?;
@@ -104,30 +105,6 @@ impl CooperativeWithdrawalInfo {
             value,
             script_pubkey,
         })
-    }
-
-    fn compute_spend_infos(
-        &self,
-        build_context: &impl BuildContext,
-    ) -> BridgeTxBuilderResult<Vec<Option<SpendInfo>>> {
-        // The Deposit Request (DT) spends the n-of-n multisig leaf
-        let spend_script = n_of_n_script(&build_context.aggregated_pubkey());
-        let spend_path = SpendPath::ScriptSpend {
-            scripts: &[spend_script.clone()],
-        };
-
-        let (_, spend_info) = create_taproot_addr(&Network::Regtest, spend_path)?;
-
-        let control_block = spend_info
-            .control_block(&(spend_script.clone(), LeafVersion::TapScript))
-            .expect("spend script will always be in the taptree");
-
-        let spend_info = Some(SpendInfo {
-            script_buf: spend_script,
-            control_block,
-        });
-
-        Ok(vec![spend_info])
     }
 
     fn create_unsigned_tx<T: BuildContext>(
@@ -272,8 +249,8 @@ mod tests {
             "signing data should have 1 spend info for the 1 input"
         );
         assert!(
-            signing_data.spend_infos[0].is_some(),
-            "signing data should have some spend info at index 0"
+            signing_data.spend_infos[0].is_none(),
+            "signing data should have no spend info at index 0"
         );
     }
 
@@ -399,7 +376,5 @@ mod tests {
         // Verify that the transaction has the correct number of inputs and outputs
         assert_eq!(unsigned_tx.input.len(), 1);
         assert_eq!(unsigned_tx.output.len(), 3);
-
-        // Further assertions can be added to verify the contents of the transaction
     }
 }

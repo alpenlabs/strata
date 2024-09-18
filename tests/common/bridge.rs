@@ -208,6 +208,9 @@ impl Operator {
     pub(crate) async fn process_duty(&mut self, duty: BridgeDuty) {
         match duty {
             BridgeDuty::Deposit(deposit_info) => {
+                // deposit involves just creating an aggregated pubkey that can be verified with
+                // `OP_CHECKSIG`
+                let tweak = false;
                 event!(Level::TRACE, action = "starting to create tx signing data", deposit_info = ?deposit_info, operator_idx=%self.index);
 
                 let tx_signing_data = deposit_info.construct_signing_data(&self.tx_builder);
@@ -221,7 +224,7 @@ impl Operator {
 
                 let txid = self
                     .sig_manager
-                    .add_tx_state(tx_signing_data, self.pubkey_table.clone())
+                    .add_tx_state(tx_signing_data, self.pubkey_table.clone(), tweak)
                     .await;
                 assert!(
                     txid.is_ok(),
@@ -242,7 +245,9 @@ impl Operator {
 
                 event!(Level::INFO, event = "all nonces collected", operator_idx=%self.index);
 
-                let receive_signatures = self.agggregate_signatures(&txid, timeout_duration).await;
+                let receive_signatures = self
+                    .agggregate_signatures(&txid, timeout_duration, tweak)
+                    .await;
                 assert!(
                     receive_signatures.is_ok(),
                     "timeout while trying to collect signatures"
@@ -250,8 +255,10 @@ impl Operator {
 
                 event!(Level::INFO, event = "signature collection complete", operator_idx=%self.index);
 
-                let fully_signed_transaction =
-                    self.sig_manager.get_fully_signed_transaction(&txid).await;
+                let fully_signed_transaction = self
+                    .sig_manager
+                    .get_fully_signed_transaction(&txid, tweak)
+                    .await;
 
                 assert!(
                     fully_signed_transaction.is_ok(),
@@ -272,6 +279,9 @@ impl Operator {
             }
             BridgeDuty::Withdrawal(withdrawal_info) => {
                 event!(Level::TRACE, action = "starting to create tx signing data", withdrawal_info = ?withdrawal_info, operator_idx = %self.index);
+                // Withdrawal involves spending via key-path a P2TR output whose pubkey has been
+                // tweaked.
+                let tweak = true;
 
                 let tx_signing_data = withdrawal_info.construct_signing_data(&self.tx_builder);
                 assert!(
@@ -284,7 +294,7 @@ impl Operator {
 
                 let txid = self
                     .sig_manager
-                    .add_tx_state(tx_signing_data, self.pubkey_table.clone())
+                    .add_tx_state(tx_signing_data, self.pubkey_table.clone(), tweak)
                     .await;
                 assert!(
                     txid.is_ok(),
@@ -305,7 +315,9 @@ impl Operator {
 
                 event!(Level::INFO, event = "all nonces collected", operator_idx=%self.index);
 
-                let receive_signatures = self.agggregate_signatures(&txid, timeout_duration).await;
+                let receive_signatures = self
+                    .agggregate_signatures(&txid, timeout_duration, tweak)
+                    .await;
                 assert!(
                     receive_signatures.is_ok(),
                     "timeout while trying to collect signatures"
@@ -313,8 +325,10 @@ impl Operator {
 
                 event!(Level::INFO, event = "signature collection complete", operator_idx=%self.index);
 
-                let fully_signed_transaction =
-                    self.sig_manager.get_fully_signed_transaction(&txid).await;
+                let fully_signed_transaction = self
+                    .sig_manager
+                    .get_fully_signed_transaction(&txid, tweak)
+                    .await;
 
                 assert!(
                     fully_signed_transaction.is_ok(),
@@ -394,8 +408,9 @@ impl Operator {
         &mut self,
         txid: &Txid,
         timeout_duration: Duration,
+        tweak: bool,
     ) -> Result<(), Elapsed> {
-        let result = self.sig_manager.add_own_partial_sig(txid).await;
+        let result = self.sig_manager.add_own_partial_sig(txid, tweak).await;
         assert!(
             result.is_ok(),
             "should be able to add own signature but got: {:?}",
@@ -451,7 +466,7 @@ impl Operator {
                     let input_index = 0; // always going to be one input for now
                     let is_complete = self
                         .sig_manager
-                        .add_partial_sig(&txid, signature_info, input_index)
+                        .add_partial_sig(&txid, signature_info, input_index, tweak)
                         .await;
 
                     assert!(
