@@ -34,6 +34,7 @@ methods = [
   "guest-cl-stf",
   "guest-btc-blockspace",
   "guest-l1-batch",
+  "guest-checkpoint",
 ]
 
 [features]
