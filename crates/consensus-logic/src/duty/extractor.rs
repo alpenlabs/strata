@@ -106,7 +106,7 @@ mod tests {
     use alpen_express_primitives::{
         block_credential,
         buf::Buf32,
-        params::{RollupParams, RunParams},
+        params::{RollupParams, SyncParams},
     };
     use alpen_express_rocksdb::test_utils::get_common_db;
     use alpen_express_state::{
@@ -142,7 +142,7 @@ mod tests {
                 l1_reorg_safe_depth: 5,
                 target_l2_batch_size: 64,
             },
-            run: RunParams {
+            run: SyncParams {
                 l2_blocks_fetch_limit: 1000,
                 l1_follow_distance: 3,
                 client_checkpoint_interval: 10,
