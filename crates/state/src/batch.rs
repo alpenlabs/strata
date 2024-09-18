@@ -12,15 +12,40 @@ pub struct BatchCheckpoint {
     checkpoint: CheckpointInfo,
     /// Proof for the batch obtained from prover manager
     proof: Vec<u8>,
+    /// Hash of the HeaderVerificationState
+    l1_state_hash: Buf32,
+    /// Hash of the ChainState
+    l2_state_hash: Buf32,
+    /// Total Accumulated PoW till this checkpoint
+    acc_pow: u128,
 }
 
 impl BatchCheckpoint {
-    pub fn new(checkpoint: CheckpointInfo, proof: Vec<u8>) -> Self {
-        Self { checkpoint, proof }
+    pub fn new(
+        checkpoint: CheckpointInfo,
+        proof: Vec<u8>,
+        l1_state_hash: Buf32,
+        l2_state_hash: Buf32,
+    ) -> Self {
+        Self {
+            checkpoint,
+            proof,
+            l1_state_hash,
+            l2_state_hash,
+            acc_pow: 0u128,
+        }
     }
 
     pub fn checkpoint(&self) -> &CheckpointInfo {
         &self.checkpoint
+    }
+
+    pub fn l1_state_hash(&self) -> &Buf32 {
+        &self.l1_state_hash
+    }
+
+    pub fn l2_state_hash(&self) -> &Buf32 {
+        &self.l2_state_hash
     }
 
     pub fn proof(&self) -> &[u8] {
