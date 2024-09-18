@@ -246,17 +246,35 @@ mod tests {
         let signing_data_result = withdrawal_info.construct_signing_data(&build_context);
 
         // Assert
-        assert!(signing_data_result.is_ok());
+        assert!(
+            signing_data_result.is_ok(),
+            "should be able to construct TxSigningData"
+        );
         let signing_data = signing_data_result.unwrap();
 
         // Verify that the PSBT has one input and three outputs as per create_unsigned_tx
         let psbt = signing_data.psbt.inner();
-        assert_eq!(psbt.inputs.len(), 1);
-        assert_eq!(psbt.outputs.len(), 3);
+        assert_eq!(
+            psbt.inputs.len(),
+            1,
+            "withdrawal psbt should have 1 input (the deposit)"
+        );
+        assert_eq!(
+            psbt.outputs.len(),
+            3,
+            "withdrawal psbt should have 3 outputs -- payout, operator fee, and anybody takes"
+        );
 
         // Verify spend_infos
-        assert_eq!(signing_data.spend_infos.len(), 1);
-        assert!(signing_data.spend_infos[0].is_none());
+        assert_eq!(
+            signing_data.spend_infos.len(),
+            1,
+            "signing data should have 1 spend info for the 1 input"
+        );
+        assert!(
+            signing_data.spend_infos[0].is_some(),
+            "signing data should have some spend info at index 0"
+        );
     }
 
     #[test]

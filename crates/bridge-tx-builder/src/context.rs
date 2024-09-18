@@ -14,7 +14,12 @@ use crate::prelude::get_aggregated_pubkey;
 /// Please refer to MuSig2 in
 /// [BIP 327](https://github.com/bitcoin/bips/blob/master/bip-0327.mediawiki).
 pub trait BuildContext {
-    /// Get the public key table.
+    /// Get the complete public key table.
+    ///
+    /// The whole table is required here as it enables the withdrawals to be processed
+    /// simultaneously by all clients even if they are not assigned. Each such client references the
+    /// table to get the pubkey of the assigned operator and generates the transaction that fulfills
+    /// the withdrawal request of the user and pays some fees to the assigned operator.
     fn pubkey_table(&self) -> &PublickeyTable;
 
     /// Get the aggregated MuSig2 x-only pubkey used in the spending condition of the multisig.

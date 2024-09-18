@@ -212,6 +212,11 @@ impl DepositInfo {
         let fee_rate =
             FeeRate::from_sat_per_vb(MIN_RELAY_FEE.to_sat()).expect("invalid MIN_RELAY_FEE set");
 
+        // HACK: We are using a single script taproot for the deposit since there are a bunch of
+        // issues with using an aggregated pubkey as the internal key for the keypath spend.
+        // The primary issue being that spending the taproot requires a tweaked secret key
+        // while MuSig2 expects an untweaked one. A solution would be store both the tweaked
+        // and untweaked versions of the keys but that is a hassle to maintain.
         let spend_path = SpendPath::ScriptSpend {
             scripts: &[n_of_n_script(&build_context.aggregated_pubkey())],
         };

@@ -5,8 +5,8 @@ use std::{collections::BTreeMap, ops::Not, sync::Arc, time::Duration};
 use alpen_express_common::logging;
 use alpen_express_primitives::{
     bridge::{Musig2PartialSig, Musig2PubNonce, OperatorIdx, OperatorPartialSig, PublickeyTable},
-    buf::Buf32,
-    l1::XOnlyPk,
+    buf::{Buf20, Buf32},
+    l1::{BitcoinAddress, XOnlyPk},
 };
 use alpen_express_rocksdb::{bridge::db::BridgeTxRocksDb, test_utils::get_rocksdb_tmp_instance};
 use alpen_test_utils::bridge::generate_keypairs;
@@ -14,18 +14,23 @@ use anyhow::Context;
 use bitcoin::{
     key::Keypair,
     secp256k1::{PublicKey, SecretKey, XOnlyPublicKey, SECP256K1},
-    Address, Amount, Network, OutPoint, Transaction, Txid,
+    taproot::{LeafVersion, TaprootBuilder},
+    Address, Amount, Network, OutPoint, TapNodeHash, Transaction, Txid,
 };
 use bitcoind::{
     bitcoincore_rpc::{
-        json::{AddressType, SignRawTransactionResult},
+        json::{AddressType, ListUnspentResultEntry, SignRawTransactionResult},
         RpcApi,
     },
     BitcoinD, Conf,
 };
 use express_bridge_sig_manager::prelude::SignatureManager;
 use express_bridge_tx_builder::{
-    prelude::{CooperativeWithdrawalInfo, DepositInfo, TxBuildContext},
+    prelude::{
+        create_tx, create_tx_ins, create_tx_outs, get_aggregated_pubkey, metadata_script,
+        n_of_n_script, CooperativeWithdrawalInfo, DepositInfo, TxBuildContext, BRIDGE_DENOMINATION,
+        UNSPENDABLE_INTERNAL_KEY,
+    },
     TxKind,
 };
 use express_storage::ops;
@@ -37,7 +42,10 @@ use tokio::{
 use tracing::{debug, event, span, trace, Level};
 
 pub(crate) const MIN_FEE: Amount = Amount::from_sat(10000); // some random value; nothing special
+/// Minimum confirmations required for miner rewards to become spendable.
+pub(crate) const MIN_MINER_REWARD_CONFS: u64 = 101;
 
+#[derive(Debug)]
 pub(crate) struct BridgeFederation {
     pub(crate) operators: Vec<Operator>,
     pub(crate) pubkey_table: PublickeyTable,
@@ -64,9 +72,42 @@ impl BridgeFederation {
 
             operators.push(
                 Operator::new(
+                    "operator",
                     sk,
                     pubkey_table.clone(),
                     bitcoind.clone(),
+                    msg_sender,
+                    msg_receiver,
+                )
+                .await,
+            )
+        }
+
+        Self {
+            operators,
+            pubkey_table,
+        }
+    }
+
+    #[allow(dead_code)] // this is used in the `cooperative-bridge-flow` and nowhere else.
+    pub(crate) async fn duplicate(&self, duplicate_id: &str) -> Self {
+        let pubkey_table = self.pubkey_table.clone();
+        let num_operators = pubkey_table.0.keys().len();
+
+        let queue_size = num_operators * 2; // buffer for nonces and signatures (overkill)
+        let (msg_tx, _msg_recv) = broadcast::channel::<Message>(queue_size);
+
+        let mut operators = Vec::with_capacity(num_operators);
+        for operator in self.operators.iter() {
+            let msg_sender = msg_tx.clone();
+            let msg_receiver = msg_tx.subscribe();
+
+            operators.push(
+                Operator::new(
+                    duplicate_id,
+                    operator.secret_key,
+                    pubkey_table.clone(),
+                    operator.agent.bitcoind.clone(),
                     msg_sender,
                     msg_receiver,
                 )
@@ -100,9 +141,13 @@ pub(crate) enum Message {
 
 /// An operator is an agent that is a member of the bridge federation capable of processing deposits
 /// and withdrawals.
+#[derive(Debug)]
 pub(crate) struct Operator {
     /// The agent that manages the operator's keys and the bitcoind client.
     pub(crate) agent: Agent,
+
+    /// The secret key of this operator.
+    secret_key: SecretKey,
 
     /// The table of pubkeys for the federation.
     pub(crate) pubkey_table: PublickeyTable,
@@ -126,6 +171,7 @@ pub(crate) struct Operator {
 impl Operator {
     // too many arguments here, perhaps convert this to a builder?
     pub(crate) async fn new(
+        id: &str,
         secret_key: SecretKey,
         pubkey_table: PublickeyTable,
         bitcoind: Arc<Mutex<BitcoinD>>,
@@ -140,7 +186,8 @@ impl Operator {
             .find_map(|(idx, pk)| if *pk == public_key { Some(idx) } else { None })
             .expect("pubkey should be part of the pubkey table");
 
-        let agent = Agent::new(&index.to_string(), bitcoind).await;
+        let id = format!("{}-{}", id, index);
+        let agent = Agent::new(&id, bitcoind).await;
         let keypair = Keypair::from_secret_key(SECP256K1, &secret_key);
         let sig_manager = setup_sig_manager(index, keypair);
 
@@ -148,6 +195,7 @@ impl Operator {
 
         Self {
             agent,
+            secret_key,
             pubkey_table,
             index,
             tx_builder,
@@ -455,8 +503,6 @@ pub(crate) struct Agent {
 }
 
 impl Agent {
-    const MIN_BLOCKS_TILL_SPENDABLE: u64 = 100;
-
     pub(crate) async fn new(id: &str, bitcoind: Arc<Mutex<BitcoinD>>) -> Self {
         let address = {
             let bitcoind = bitcoind.lock().await;
@@ -495,27 +541,34 @@ impl Agent {
 
         let _ = bitcoind
             .client
-            .generate_to_address(Self::MIN_BLOCKS_TILL_SPENDABLE + num_blocks, &self.address)
+            .generate_to_address(num_blocks, &self.address)
             .context("could not mine blocks")
             .map(|hashes| hashes.len());
 
         // confirm balance
         bitcoind
             .client
-            .get_balance(Some(Self::MIN_BLOCKS_TILL_SPENDABLE as usize), None)
+            .get_balance(None, None)
             .expect("should be able to extract balance")
+    }
+
+    pub(crate) async fn get_unspent_utxos(&self) -> Vec<ListUnspentResultEntry> {
+        let bitcoind = self.bitcoind.lock().await;
+
+        bitcoind
+            .client
+            .list_unspent(None, None, Some(&[&self.address]), Some(false), None)
+            .expect("should get unspent transactions")
     }
 
     pub(crate) async fn select_utxo(
         &self,
         target_amount: Amount,
     ) -> Option<(Address, OutPoint, Amount)> {
+        let unspent_utxos = self.get_unspent_utxos().await;
+
         let bitcoind = self.bitcoind.lock().await;
 
-        let unspent_utxos = bitcoind
-            .client
-            .list_unspent(None, None, Some(&[&self.address]), Some(false), None)
-            .expect("should get unspent transactions");
         let change_address = bitcoind
             .client
             .get_raw_change_address(Some(AddressType::Bech32m))
@@ -620,4 +673,140 @@ pub(crate) fn setup_sig_manager(index: OperatorIdx, keypair: Keypair) -> Signatu
     event!(Level::INFO, event = "database handler initialized");
 
     SignatureManager::new(Arc::new(db_ops), index, keypair)
+}
+
+#[allow(dead_code)] // this not used in the `cooperative-bridge-out-flow`.
+pub(crate) async fn perform_user_actions(
+    user: &User,
+    federation_pubkey_table: PublickeyTable,
+) -> (Txid, TapNodeHash, Address, Vec<u8>) {
+    let span = span!(Level::INFO, "user actions");
+    let _guard = span.enter();
+
+    event!(Level::INFO, action = "sending funds to user's address");
+    let balance = user.agent().mine_blocks(MIN_MINER_REWARD_CONFS).await;
+    event!(Level::INFO, user_balance = %balance);
+
+    assert!(
+        balance.gt(&BRIDGE_DENOMINATION.into()),
+        "user balance must be greater than the bridge denomination, got: {}, expected > {}",
+        balance,
+        BRIDGE_DENOMINATION
+    );
+    event!(Level::INFO, action = "getting available utxos");
+
+    let (change_address, outpoint, amount) = user
+        .agent()
+        .select_utxo(BRIDGE_DENOMINATION.into())
+        .await
+        .expect("should get utxo with enough amount");
+    event!(Level::INFO, event = "got change address and outpoint to use", change_address = %change_address, outpoint = %outpoint, amount = %amount);
+
+    let (drt, take_back_leaf_hash, taproot_addr, el_address) = create_drt(
+        outpoint,
+        federation_pubkey_table,
+        *UNSPENDABLE_INTERNAL_KEY,
+        change_address,
+        amount,
+    );
+    event!(Level::TRACE, event = "created DRT", drt = ?drt);
+
+    event!(Level::INFO, action = "signing DRT with wallet");
+    let signed_tx_result = user.agent().sign_raw_tx(&drt).await;
+    assert!(signed_tx_result.complete, "tx should be fully signed");
+
+    let signed_tx = signed_tx_result
+        .transaction()
+        .expect("should be able to get fully signed transaction");
+
+    event!(Level::INFO, action = "broadcasting signed DRT");
+    let txid = user.agent().broadcast_signed_tx(&signed_tx).await;
+    event!(Level::INFO, event = "broadcasted signed DRT", txid = %txid);
+
+    (txid, take_back_leaf_hash, taproot_addr, el_address)
+}
+
+pub(crate) fn create_drt(
+    outpoint: OutPoint,
+    pubkeys: PublickeyTable,
+    internal_key: XOnlyPublicKey,
+    change_address: Address,
+    total_amt: Amount,
+) -> (Transaction, TapNodeHash, Address, Vec<u8>) {
+    let input = create_tx_ins([outpoint]);
+
+    let (drt_addr, take_back_leaf_hash, el_address) =
+        create_drt_taproot_output(pubkeys, internal_key);
+
+    let output = create_tx_outs([
+        (drt_addr.script_pubkey(), BRIDGE_DENOMINATION.into()),
+        (
+            change_address.script_pubkey(),
+            total_amt - BRIDGE_DENOMINATION.into() - MIN_FEE,
+        ),
+    ]);
+
+    (
+        create_tx(input, output),
+        take_back_leaf_hash,
+        drt_addr,
+        el_address,
+    )
+}
+
+pub(crate) fn create_drt_taproot_output(
+    pubkeys: PublickeyTable,
+    internal_key: XOnlyPublicKey,
+) -> (Address, TapNodeHash, Vec<u8>) {
+    let aggregated_pubkey = get_aggregated_pubkey(pubkeys);
+    let n_of_n_spend_script = n_of_n_script(&aggregated_pubkey);
+
+    // in actual DRT, this will be the take-back leaf.
+    // for testing, this could be any script as we only care about its hash.
+    let el_address = Buf20::default().0 .0;
+    let op_return_script = metadata_script(&el_address[..].try_into().unwrap());
+    let op_return_script_hash = TapNodeHash::from_script(&op_return_script, LeafVersion::TapScript);
+
+    let taproot_builder = TaprootBuilder::new()
+        .add_leaf(1, n_of_n_spend_script.clone())
+        .unwrap()
+        .add_leaf(1, op_return_script)
+        .unwrap();
+
+    let spend_info = taproot_builder.finalize(SECP256K1, internal_key).unwrap();
+
+    (
+        Address::p2tr(
+            SECP256K1,
+            internal_key,
+            spend_info.merkle_root(),
+            Network::Regtest,
+        ),
+        op_return_script_hash,
+        el_address.to_vec(),
+    )
+}
+
+#[allow(dead_code)] // this is not used in the `cooperative-bridge-out-flow`.
+pub(crate) fn perform_rollup_actions(
+    txid: Txid,
+    take_back_leaf_hash: TapNodeHash,
+    original_taproot_addr: Address,
+    el_address: &[u8; 20],
+) -> DepositInfo {
+    let span = span!(Level::INFO, "rollup actions");
+    let _guard = span.enter();
+
+    let deposit_request_outpoint = OutPoint { txid, vout: 0 };
+    let total_amount: Amount = BRIDGE_DENOMINATION.into();
+    let original_taproot_addr = BitcoinAddress::new(original_taproot_addr.as_unchecked().clone());
+
+    event!(Level::INFO, action = "creating deposit info");
+    DepositInfo::new(
+        deposit_request_outpoint,
+        el_address.to_vec(),
+        total_amount,
+        take_back_leaf_hash,
+        original_taproot_addr,
+    )
 }

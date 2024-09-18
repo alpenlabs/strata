@@ -1,3 +1,8 @@
+//! Tests the bridge-out flow.
+//!
+//! This is done by funding the bridge address directly, then manually creating a `WithdrawalInfo`
+//! and involving the appropriate functions to create the final withdrawal transaction.
+
 use std::sync::Arc;
 
 use alpen_express_primitives::bridge::{OperatorIdx, PublickeyTable};
@@ -6,7 +11,7 @@ use bitcoin::{
     Address, Amount, FeeRate, Network, OutPoint, ScriptBuf, Transaction,
 };
 use bitcoind::BitcoinD;
-use common::bridge::{setup, BridgeDuty, User, MIN_FEE};
+use common::bridge::{setup, BridgeDuty, User, MIN_FEE, MIN_MINER_REWARD_CONFS};
 use express_bridge_tx_builder::prelude::{
     anyone_can_spend_txout, create_taproot_addr, create_tx, create_tx_ins, create_tx_outs,
     get_aggregated_pubkey, metadata_script, n_of_n_script, CooperativeWithdrawalInfo, SpendPath,
@@ -19,7 +24,7 @@ mod common;
 
 #[tokio::test]
 async fn withdrawal_flow() {
-    let num_operators = 3;
+    let num_operators = 5;
     let (bitcoind, federation) = setup(num_operators).await;
 
     let span = span!(Level::WARN, "starting cooperative withdrawal flow");
@@ -38,6 +43,9 @@ async fn withdrawal_flow() {
 
     let user = User::new("requester", bitcoind.clone()).await;
     let user_x_only_pk = user.agent().pubkey();
+
+    let unspent_utxos_prewithdrawal = user.agent().get_unspent_utxos().await;
+    event!(Level::DEBUG, event = "got unspent utxos from requester before withdrawal", num_unspent_utxos = %unspent_utxos_prewithdrawal.len());
 
     event!(Level::INFO, event = "created user to initiate withdrawal", user_x_only_pk = ?user_x_only_pk);
 
@@ -64,6 +72,21 @@ async fn withdrawal_flow() {
         handle.await.unwrap();
     }
 
+    let num_blocks = 1;
+    event!(Level::DEBUG, action = "mining some blocks to confirm withdrawal transaction", num_blocks = %num_blocks);
+    // the mining reward from this block won't be available for 100 blocks, so does not count
+    // towards unspent utxos.
+    user.agent().mine_blocks(num_blocks).await;
+
+    let unspent_utxos_postwithdrawal = user.agent().get_unspent_utxos().await;
+    event!(Level::DEBUG, event = "got unspent utxos from requester after withdrawal", num_unspent_utxos = %unspent_utxos_postwithdrawal.len());
+
+    assert_eq!(
+        unspent_utxos_postwithdrawal.len() - unspent_utxos_prewithdrawal.len(),
+        1,
+        "user should have one more unspent utxo"
+    );
+
     event!(Level::INFO, event = "Withdrawal flow complete");
 }
 
@@ -85,7 +108,7 @@ async fn fund_bridge(
         Level::INFO,
         action = "mining blocks to the benefactor's address"
     );
-    let balance = benefactor.agent().mine_blocks(1).await;
+    let balance = benefactor.agent().mine_blocks(MIN_MINER_REWARD_CONFS).await;
 
     assert!(
         balance.gt(&BRIDGE_DENOMINATION.into()),
@@ -128,11 +151,11 @@ async fn fund_bridge(
     let txid = benefactor.agent().broadcast_signed_tx(&signed_tx).await;
     event!(Level::INFO, event = "broadcasted funding transaction", txid = %txid);
 
-    let num_blocks = 0;
+    let num_blocks = 1;
     event!(
         Level::INFO,
         action = "mining some more blocks to confirm the transaction",
-        num_blocks = %(num_blocks + 100)
+        num_blocks = %num_blocks
     );
     benefactor.agent().mine_blocks(num_blocks).await;
 
