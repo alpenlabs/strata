@@ -42,7 +42,6 @@ where
 
 enum BalanceUpdate {
     Add(U256),
-    // Sub(U256),
 }
 
 fn update_account_balance<EXT, DB: Database>(
