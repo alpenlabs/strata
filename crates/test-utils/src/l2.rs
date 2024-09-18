@@ -3,7 +3,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use alpen_express_primitives::{
     block_credential,
     buf::{Buf32, Buf64},
-    params::{Params, RollupParams, RunParams},
+    params::{Params, RollupParams, SyncParams},
 };
 use alpen_express_state::{
     block::{L2Block, L2BlockAccessory, L2BlockBody, L2BlockBundle},
@@ -83,7 +83,7 @@ pub fn gen_params() -> Params {
             l1_reorg_safe_depth: 5,
             target_l2_batch_size: 64,
         },
-        run: RunParams {
+        run: SyncParams {
             l2_blocks_fetch_limit: 1000,
             l1_follow_distance: 3,
             client_checkpoint_interval: 10,

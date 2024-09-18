@@ -1,7 +1,7 @@
 use alpen_express_primitives::{
     block_credential,
     buf::Buf32,
-    params::{Params, RollupParams, RunParams},
+    params::{Params, RollupParams, SyncParams},
 };
 use express_proofimpl_cl_stf::{verify_and_transition, ChainState, L2Block};
 use risc0_zkvm::guest::env;
@@ -37,7 +37,7 @@ fn get_rollup_params() -> Params {
             l1_reorg_safe_depth: 5,
             target_l2_batch_size: 64,
         },
-        run: RunParams {
+        run: SyncParams {
             l2_blocks_fetch_limit: 1000,
             l1_follow_distance: 3,
             client_checkpoint_interval: 10,
