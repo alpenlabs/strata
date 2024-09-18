@@ -18,14 +18,19 @@ fn main() {
 
         let elf = r#"
             pub const GUEST_RISC0_EVM_EE_STF_ELF: &[u8] = &[];
-            pub const GUEST_RISC0_CL_STF_ELF: &[u8] = &[];
-            pub const GUEST_RISC0_BTC_BLOCKSPACE_ELF: &[u8] = &[];
-            pub const GUEST_RISC0_L1_BATCH_ELF: &[u8] = &[];
-
             pub const GUEST_RISC0_EVM_EE_STF_ID: &[u8] = &[];
+
+            pub const GUEST_RISC0_CL_STF_ELF: &[u8] = &[];
             pub const GUEST_RISC0_CL_STF_ID: &[u8] = &[];
+
+            pub const GUEST_RISC0_BTC_BLOCKSPACE_ELF: &[u8] = &[];
             pub const GUEST_RISC0_BTC_BLOCKSPACE_ID: &[u8] = &[];
+
+            pub const GUEST_RISC0_L1_BATCH_ELF: &[u8] = &[];
             pub const GUEST_RISC0_L1_BATCH_ID: &[u8] = &[];
+
+            pub const GUEST_RISC0_CHECKPOINT_ELF: &[u8] = &[];
+            pub const GUEST_RISC0_CHECKPOINT_ID: &[u8] = &[];
         "#;
 
         std::fs::write(methods_path, elf).expect("Failed to write mock rollup elf");
