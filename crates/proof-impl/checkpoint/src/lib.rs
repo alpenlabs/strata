@@ -5,6 +5,8 @@ use express_proofimpl_btc_blockspace::filter::{DepositRequestData, ForcedInclusi
 use express_proofimpl_l1_batch::logic::L1BatchProofOutput;
 use serde::{Deserialize, Serialize};
 
+pub type Groth16Proof = Vec<u8>;
+
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct L2BatchProofOutput {
     pub deposits: Vec<DepositRequestData>,
@@ -39,27 +41,19 @@ pub struct CheckpointProofOutput {
     pub total_acc_pow: f64,
 }
 
-pub struct PreviousCheckpointProof {
-    pub checkpoint: CheckpointProofOutput,
-    pub proof: Vec<u8>,
-    pub image_id: [u32; 8],
-}
-
+// TODO: genesis needs to be hardcoded
 pub fn process_checkpoint_proof(
-    input: &CheckpointProofInput,
-) -> (CheckpointProofOutput, Option<PreviousCheckpointProof>) {
-    // Compute the initial state hashes
-    let CheckpointProofInput {
-        l1_state,
-        l2_state,
-        image_id,
-        genesis,
-    } = input;
+    l1_batch: &L1BatchProofOutput,
+    l2_batch: &L2BatchProofOutput,
+    genesis: &HashedCheckpointState,
+) -> (
+    CheckpointProofOutput,
+    Option<(CheckpointProofOutput, Groth16Proof)>,
+) {
+    let initial_l1_state_hash = l1_batch.initial_state.hash().unwrap();
+    let initial_l2_state_hash = l2_batch.initial_state.compute_state_root();
 
-    let initial_l1_state_hash = l1_state.initial_state.hash().unwrap();
-    let initial_l2_state_hash = l2_state.initial_state.compute_state_root();
-
-    let prev_checkpoint = l1_state
+    let prev_checkpoint = l1_batch
         .state_update
         .as_ref()
         .map(|prev_state_update| {
@@ -79,11 +73,7 @@ pub fn process_checkpoint_proof(
                 total_acc_pow: prev_state_update.acc_pow,
             };
 
-            PreviousCheckpointProof {
-                checkpoint,
-                proof: prev_state_update.proof.clone(),
-                image_id: *image_id,
-            }
+            (checkpoint, prev_state_update.proof.clone())
         })
         .or_else(|| {
             // If no previous state update, verify against genesis
@@ -99,19 +89,19 @@ pub fn process_checkpoint_proof(
         });
 
     assert_eq!(
-        l1_state.deposits, l2_state.deposits,
+        l1_batch.deposits, l2_batch.deposits,
         "Deposits mismatch between L1 and L2"
     );
 
     assert_eq!(
-        l1_state.forced_inclusions, l2_state.forced_inclusions,
+        l1_batch.forced_inclusions, l2_batch.forced_inclusions,
         "Forced inclusion mismatch between L1 and L2"
     );
 
     let output = CheckpointProofOutput {
-        l1_state: l1_state.final_state.hash().unwrap(),
-        l2_state: l2_state.final_state.compute_state_root(),
-        total_acc_pow: l1_state.final_state.total_accumulated_pow,
+        l1_state: l1_batch.final_state.hash().unwrap(),
+        l2_state: l2_batch.final_state.compute_state_root(),
+        total_acc_pow: l1_batch.final_state.total_accumulated_pow,
     };
 
     (output, prev_checkpoint)

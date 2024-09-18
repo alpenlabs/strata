@@ -26,9 +26,9 @@ fn main() {
             pub const GUEST_RISC0_CL_STF_ID: &[u8] = &[];
 
             pub const GUEST_RISC0_EVM_EE_STF_ELF: &[u8] = &[];
-            pub const GUEST_RISC0_EVM_EE_STF_ELF: &[u8] = &[];
+            pub const GUEST_RISC0_EVM_EE_STF_ID: &[u8] = &[];
 
-            pub const GUEST_RISC0_L1_BATCH_ID: &[u8] = &[];
+            pub const GUEST_RISC0_L1_BATCH_ELF: &[u8] = &[];
             pub const GUEST_RISC0_L1_BATCH_ID: &[u8] = &[];
         "#;
 
