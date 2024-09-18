@@ -3,6 +3,7 @@
 pub mod bridge;
 pub mod database;
 pub mod errors;
+pub mod interfaces;
 pub mod traits;
 pub mod types;
 
