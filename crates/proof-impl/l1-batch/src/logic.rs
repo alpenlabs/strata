@@ -1,3 +1,4 @@
+use borsh::{BorshDeserialize, BorshSerialize};
 use express_proofimpl_btc_blockspace::{
     filter::{DepositRequestData, ForcedInclusion, StateUpdate},
     logic::BlockspaceProofOutput,
@@ -12,7 +13,7 @@ pub struct L1BatchProofInput {
     pub state: HeaderVerificationState,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
 pub struct L1BatchProofOutput {
     pub deposits: Vec<DepositRequestData>,
     pub forced_inclusions: Vec<ForcedInclusion>,

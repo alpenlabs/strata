@@ -3787,6 +3787,7 @@ dependencies = [
  "alpen-express-primitives",
  "alpen-test-utils",
  "bitcoin",
+ "borsh",
  "hex",
  "rand 0.8.5",
  "serde",
