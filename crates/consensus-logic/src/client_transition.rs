@@ -210,23 +210,25 @@ mod tests {
         let mut state = gen_client_state(Some(&params));
 
         assert!(!state.is_chain_active());
-        let l1_chain = gen_l1_chain(15);
+        let l1_chain = gen_l1_chain(10);
+
+        let horizon = params.rollup().horizon_l1_height;
+        let genesis = params.rollup().genesis_l1_height;
 
         for (i, b) in l1_chain.iter().enumerate() {
             let l1_store = database.l1_store();
             l1_store
-                .put_block_data(i as u64, b.clone(), Vec::new())
+                .put_block_data(i as u64 + horizon, b.clone(), Vec::new())
                 .expect("test: insert blocks");
         }
 
         let blkids: Vec<L1BlockId> = l1_chain.iter().map(|b| b.block_hash().into()).collect();
-        let horizon = params.rollup().horizon_l1_height;
-        let genesis = params.rollup().genesis_l1_height;
 
         // at horizon block
         {
             let height = horizon;
-            let l1_block_id = l1_chain[height as usize].block_hash().into();
+            let idx = (height - horizon) as usize;
+            let l1_block_id = l1_chain[idx].block_hash().into();
             let event = SyncEvent::L1Block(height, l1_block_id);
 
             let output = process_event(&state, &event, database.as_ref(), &params).unwrap();
@@ -247,14 +249,15 @@ mod tests {
             assert_eq!(state.next_exp_l1_block(), horizon + 1);
             assert_eq!(
                 state.l1_view().local_unaccepted_blocks(),
-                &blkids[height as usize..height as usize + 1]
+                &blkids[idx..idx + 1]
             );
         }
 
         // at horizon block + 1
         {
             let height = params.rollup().horizon_l1_height + 1;
-            let l1_block_id = l1_chain[height as usize].block_hash().into();
+            let idx = height - horizon;
+            let l1_block_id = l1_chain[idx as usize].block_hash().into();
             let event = SyncEvent::L1Block(height, l1_block_id);
 
             let output = process_event(&state, &event, database.as_ref(), &params).unwrap();
@@ -273,16 +276,14 @@ mod tests {
             assert!(!state.is_chain_active());
             assert_eq!(state.most_recent_l1_block(), Some(&l1_block_id));
             assert_eq!(state.next_exp_l1_block(), genesis);
-            assert_eq!(
-                state.l1_view().local_unaccepted_blocks(),
-                &blkids[horizon as usize..horizon as usize + 2]
-            );
+            assert_eq!(state.l1_view().local_unaccepted_blocks(), &blkids[0..2]);
         }
 
         // as the genesis of L2 is reached, but not locked in yet
         {
             let height = genesis;
-            let l1_block_id = l1_chain[height as usize].block_hash().into();
+            let idx = (height - horizon) as usize;
+            let l1_block_id = l1_chain[idx].block_hash().into();
             let event = SyncEvent::L1Block(height, l1_block_id);
 
             let output = process_event(&state, &event, database.as_ref(), &params).unwrap();
@@ -300,14 +301,15 @@ mod tests {
             assert_eq!(state.next_exp_l1_block(), height + 1);
             assert_eq!(
                 state.l1_view().local_unaccepted_blocks(),
-                &blkids[horizon as usize..height as usize + 1]
+                &blkids[0..idx + 1]
             );
         }
 
         // genesis + 1
         {
             let height = genesis + 1;
-            let l1_block_id = l1_chain[height as usize].block_hash().into();
+            let idx = (height - horizon) as usize;
+            let l1_block_id = l1_chain[idx].block_hash().into();
             let event = SyncEvent::L1Block(height, l1_block_id);
 
             let output = process_event(&state, &event, database.as_ref(), &params).unwrap();
@@ -325,14 +327,15 @@ mod tests {
             assert_eq!(state.next_exp_l1_block(), height + 1);
             assert_eq!(
                 state.l1_view().local_unaccepted_blocks(),
-                &blkids[horizon as usize..height as usize + 1]
+                &blkids[0..idx + 1]
             );
         }
 
         // genesis + 2
         {
             let height = genesis + 2;
-            let l1_block_id = l1_chain[height as usize].block_hash().into();
+            let idx = (height - horizon) as usize;
+            let l1_block_id = l1_chain[idx].block_hash().into();
             let event = SyncEvent::L1Block(height, l1_block_id);
 
             let output = process_event(&state, &event, database.as_ref(), &params).unwrap();
@@ -350,14 +353,15 @@ mod tests {
             assert_eq!(state.next_exp_l1_block(), height + 1);
             assert_eq!(
                 state.l1_view().local_unaccepted_blocks(),
-                &blkids[horizon as usize..height as usize + 1]
+                &blkids[0..idx + 1]
             );
         }
 
         // genesis + 3, where we should lock in genesis
         {
             let height = genesis + 3;
-            let l1_block_id = l1_chain[height as usize].block_hash().into();
+            let idx = (height - horizon) as usize;
+            let l1_block_id = l1_chain[idx as usize].block_hash().into();
             let event = SyncEvent::L1Block(height, l1_block_id);
 
             let output = process_event(&state, &event, database.as_ref(), &params).unwrap();
@@ -384,7 +388,7 @@ mod tests {
             assert_eq!(state.next_exp_l1_block(), height + 1);
             assert_eq!(
                 state.l1_view().local_unaccepted_blocks(),
-                &blkids[horizon as usize..height as usize + 1]
+                &blkids[0..idx + 1]
             );
         }
     }
@@ -395,7 +399,7 @@ mod tests {
         let params = gen_params();
         let mut state = gen_client_state(Some(&params));
 
-        let height = 5;
+        let height = params.rollup().genesis_l1_height;
         let event = SyncEvent::L1Revert(height);
 
         let l1_block: L1BlockManifest = ArbitraryGenerator::new().generate();
@@ -406,7 +410,7 @@ mod tests {
 
         let res = process_event(&state, &event, database.as_ref(), &params).unwrap();
         eprintln!("process_event on {event:?} -> {res:?}");
-        let expected_writes = [ClientStateWrite::RollbackL1BlocksTo(5)];
+        let expected_writes = [ClientStateWrite::RollbackL1BlocksTo(height)];
         let expected_actions = [];
 
         assert_eq!(res.actions(), expected_actions);

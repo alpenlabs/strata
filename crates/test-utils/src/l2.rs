@@ -7,11 +7,15 @@ use alpen_express_primitives::{
 };
 use alpen_express_state::{
     block::{L2Block, L2BlockAccessory, L2BlockBody, L2BlockBundle},
+    chain_state::ChainState,
     client_state::ClientState,
+    exec_env::ExecEnvState,
     header::{L2BlockHeader, L2Header, SignedL2BlockHeader},
+    l1::{L1HeaderRecord, L1ViewState},
 };
+use bitcoin::hashes::Hash;
 
-use crate::ArbitraryGenerator;
+use crate::{bitcoin::get_btc_chain, ArbitraryGenerator};
 
 pub fn gen_block(parent: Option<&SignedL2BlockHeader>) -> L2BlockBundle {
     let arb = ArbitraryGenerator::new();
@@ -68,8 +72,8 @@ pub fn gen_params() -> Params {
             rollup_name: "express".to_string(),
             block_time: 1000,
             cred_rule: block_credential::CredRule::Unchecked,
-            horizon_l1_height: 3,
-            genesis_l1_height: 5,
+            horizon_l1_height: 40318,
+            genesis_l1_height: 40320,
             evm_genesis_block_hash: Buf32(
                 "0x37ad61cff1367467a98cf7c54c4ac99e989f1fbb1bc1e646235e90c065c565ba"
                     .parse()
@@ -100,4 +104,23 @@ pub fn gen_client_state(params: Option<&Params>) -> ClientState {
         params.rollup.horizon_l1_height,
         params.rollup.genesis_l1_height,
     )
+}
+
+pub fn get_genesis_chainstate() -> ChainState {
+    let params = gen_params();
+    // Build the genesis block and genesis consensus states.
+    let gblock = L2BlockBundle::genesis(&params);
+    let genesis_blkid = gblock.header().get_blockid();
+
+    let geui = gblock.exec_segment().update().input();
+    let gees =
+        ExecEnvState::from_base_input(geui.clone(), params.rollup.evm_genesis_block_state_root);
+
+    let l1_block = get_btc_chain().get_header(params.rollup.genesis_l1_height as u32);
+    let safe_block = L1HeaderRecord::new(
+        bitcoin::consensus::serialize(&l1_block),
+        Buf32::from(l1_block.merkle_root.as_raw_hash().to_byte_array()),
+    );
+    let l1vs = L1ViewState::new_at_horizon(params.rollup.horizon_l1_height, safe_block);
+    ChainState::from_genesis(genesis_blkid, l1vs, gees)
 }
