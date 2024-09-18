@@ -109,6 +109,18 @@ impl<K: Clone + Eq + Hash, V: Clone> CacheTable<K, V> {
         cache.pop(k);
     }
 
+    /// Purge every entry in the cache.
+    pub async fn purge_all_async(&self) {
+        let mut cache = self.cache.lock().await;
+        cache.clear();
+    }
+
+    /// Purge every enery in the cache.
+    pub fn purge_all_blocking(&self) {
+        let mut cache = self.cache.blocking_lock();
+        cache.clear();
+    }
+
     /// Inserts an entry into the table, dropping the previous value.
     pub async fn insert_async(&self, k: K, v: V) {
         let slot = Arc::new(RwLock::new(SlotState::Ready(v)));
