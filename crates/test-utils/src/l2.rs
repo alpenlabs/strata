@@ -1,5 +1,6 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use alpen_express_consensus_logic::genesis::{construct_operator_table, make_genesis_block};
 use alpen_express_primitives::{
     block_credential,
     buf::{Buf32, Buf64},
@@ -9,11 +10,16 @@ use alpen_express_primitives::{
 };
 use alpen_express_state::{
     block::{L2Block, L2BlockAccessory, L2BlockBody, L2BlockBundle},
+    chain_state::ChainState,
     client_state::ClientState,
+    exec_env::ExecEnvState,
+    genesis::GenesisStateData,
     header::{L2BlockHeader, L2Header, SignedL2BlockHeader},
+    l1::{L1HeaderRecord, L1ViewState},
 };
+use bitcoin::hashes::Hash;
 
-use crate::ArbitraryGenerator;
+use crate::{bitcoin::get_btc_chain, ArbitraryGenerator};
 
 pub fn gen_block(parent: Option<&SignedL2BlockHeader>) -> L2BlockBundle {
     let arb = ArbitraryGenerator::new();
@@ -121,4 +127,28 @@ pub fn gen_client_state(params: Option<&Params>) -> ClientState {
 fn make_dummy_operator_pubkeys() -> OperatorPubkeys {
     // TODO don't use dummy zero keys
     OperatorPubkeys::new(Buf32::zero(), Buf32::zero())
+}
+
+pub fn get_genesis_chainstate() -> ChainState {
+    let params = gen_params();
+    // Build the genesis block and genesis consensus states.
+    let gblock = make_genesis_block(&params);
+    let genesis_blkid = gblock.header().get_blockid();
+
+    let geui = gblock.exec_segment().update().input();
+    let gees =
+        ExecEnvState::from_base_input(geui.clone(), params.rollup.evm_genesis_block_state_root);
+
+    let l1_block = get_btc_chain().get_header(params.rollup.genesis_l1_height as u32);
+    let safe_block = L1HeaderRecord::new(
+        bitcoin::consensus::serialize(&l1_block),
+        Buf32::from(l1_block.merkle_root.as_raw_hash().to_byte_array()),
+    );
+
+    let l1vs = L1ViewState::new_at_horizon(params.rollup.horizon_l1_height, safe_block);
+
+    let optbl = construct_operator_table(&params.rollup().operator_config);
+    let gdata = GenesisStateData::new(genesis_blkid, l1vs, optbl, gees);
+
+    ChainState::from_genesis(&gdata)
 }

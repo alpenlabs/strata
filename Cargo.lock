@@ -1005,6 +1005,7 @@ name = "alpen-test-utils"
 version = "0.1.0"
 dependencies = [
  "alpen-express-btcio",
+ "alpen-express-consensus-logic",
  "alpen-express-db",
  "alpen-express-primitives",
  "alpen-express-state",

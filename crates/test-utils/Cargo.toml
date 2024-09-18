@@ -5,6 +5,7 @@ version = "0.1.0"
 
 [dependencies]
 alpen-express-btcio = { workspace = true }
+alpen-express-consensus-logic = { workspace = true }
 alpen-express-db = { workspace = true, features = ["stubs"] }
 alpen-express-primitives = { workspace = true }
 alpen-express-state = { workspace = true }

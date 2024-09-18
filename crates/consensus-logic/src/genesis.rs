@@ -88,7 +88,7 @@ pub fn init_genesis_chainstate(
     Ok(genesis_blkid)
 }
 
-fn construct_operator_table(opconfig: &OperatorConfig) -> OperatorTable {
+pub fn construct_operator_table(opconfig: &OperatorConfig) -> OperatorTable {
     match opconfig {
         OperatorConfig::Static(oplist) => OperatorTable::from_operator_list(oplist),
     }
