@@ -8,12 +8,12 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct CheckpointProofInput {
-    // pub l2_state: CLBatchProofOutput,
     pub l1_state: L1BatchProofOutput,
-    /// This is the image id (also called ELF Id) of this checkpoint program.
-    /// This needs to be provided for the verification of the groth16 proof of this program
-    /// This cannot be hardcoded becausing changing any part of the program of proof-impl will
-    /// change the image id
+    pub l2_state: L2BatchProofOutput,
+    /// The image ID (also called ELF ID) of this checkpoint program.
+    /// Required for verifying the Groth16 proof of this program.
+    /// Cannot be hardcoded as any change to the program or proof implementation
+    /// will change the image ID.
     pub image_id: Buf32,
     // TODO: genesis will be hardcoded here
     pub genesis: HashedCheckpointState,
@@ -34,34 +34,68 @@ pub struct CheckpointProofOutput {
 
 pub fn process_checkpoint_proof(
     input: &CheckpointProofInput,
-) -> (Option<CheckpointProofOutput>, CheckpointProofOutput) {
+) -> (CheckpointProofOutput, Option<CheckpointProofOutput>) {
     // Compute the initial state hashes
-    let initial_l1_state_hash = input.l1_state.initial_state.hash().unwrap();
-    let initial_l2_state_hash = Buf32::zero();
+    let CheckpointProofInput {
+        l1_state,
+        l2_state,
+        image_id,
+        genesis,
+    } = input;
 
-    let mut prev_checkpoint = None;
+    let initial_l1_state_hash = l1_state.initial_state.hash().unwrap();
+    let initial_l2_state_hash = l2_state.initial_state.compute_state_root();
 
-    // If there is previous state update, it must be equal to the initial state
-    if let Some(prev_state_update) = &input.l1_state.state_update {
-        assert_eq!(initial_l1_state_hash, prev_state_update.l1_state_hash());
-        assert_eq!(initial_l2_state_hash, prev_state_update.l2_state_hash());
+    let prev_checkpoint = l1_state
+        .state_update
+        .as_ref()
+        .map(|prev_state_update| {
+            // Verify that the previous state update matches the initial state
+            assert_eq!(
+                initial_l1_state_hash,
+                prev_state_update.l1_state_hash(),
+                "L1 state mismatch"
+            );
+            assert_eq!(
+                initial_l2_state_hash,
+                prev_state_update.l2_state_hash(),
+                "L2 state mismatch"
+            );
 
-        prev_checkpoint = Some(CheckpointProofOutput {
-            l1_state: initial_l1_state_hash,
-            l2_state: Buf32::zero(),
-            total_acc_pow: 0f64,
+            CheckpointProofOutput {
+                l1_state: initial_l1_state_hash,
+                l2_state: initial_l2_state_hash,
+                total_acc_pow: prev_state_update.acc_pow(),
+            }
+        })
+        .or_else(|| {
+            // If no previous state update, verify against genesis
+            assert_eq!(
+                initial_l1_state_hash, genesis.l1_state,
+                "L1 genesis mismatch"
+            );
+            assert_eq!(
+                initial_l2_state_hash, genesis.l2_state,
+                "L2 genesis mismatch"
+            );
+            None
         });
-    } else {
-        // If no previous state update, the initial state must be the genesis
-        assert_eq!(initial_l1_state_hash, input.genesis.l1_state);
-        assert_eq!(initial_l2_state_hash, input.genesis.l2_state);
-    }
+
+    assert_eq!(
+        l1_state.deposits, l2_state.deposits,
+        "Deposits mismatch between L1 and L2"
+    );
+
+    assert_eq!(
+        l1_state.forced_inclusions, l2_state.forced_inclusions,
+        "Forced inclusion mismatch between L1 and L2"
+    );
 
     let output = CheckpointProofOutput {
-        l1_state: input.l1_state.final_state.hash().unwrap(),
-        l2_state: Buf32::zero(),
-        total_acc_pow: input.l1_state.final_state.total_accumulated_pow,
+        l1_state: l1_state.final_state.hash().unwrap(),
+        l2_state: l2_state.final_state.compute_state_root(),
+        total_acc_pow: l1_state.final_state.total_accumulated_pow,
     };
 
-    (prev_checkpoint, output)
+    (output, prev_checkpoint)
 }
