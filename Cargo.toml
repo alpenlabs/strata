@@ -1,6 +1,7 @@
 [workspace]
 members = [
   "crates/bridge-exec",
+  "crates/bridge-relay",
   "crates/bridge-sig-manager",
   "crates/bridge-tx-builder",
   "crates/btcio",
@@ -75,6 +76,7 @@ alpen-express-state = { path = "crates/state" }
 alpen-express-status = { path = "crates/status" }
 alpen-test-utils = { path = "crates/test-utils" }
 express-bridge-exec = { path = "crates/bridge-exec" }
+express-bridge-relay = { path = "crate/bridge-relay" }
 express-bridge-rpc-api = { path = "crates/rpc/bridge-api" }
 express-bridge-sig-manager = { path = "crates/bridge-sig-manager" }
 express-bridge-tx-builder = { path = "crates/bridge-tx-builder" }

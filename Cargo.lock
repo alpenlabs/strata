@@ -663,6 +663,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "alpen-express-bridge-relay"
+version = "0.1.0"
+dependencies = [
+ "alpen-express-btcio",
+ "alpen-express-primitives",
+ "alpen-express-state",
+ "alpen-express-status",
+ "alpen-test-utils",
+ "anyhow",
+ "bitcoin",
+ "express-storage",
+ "secp256k1",
+ "sha2 0.10.8",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "alpen-express-btcio"
 version = "0.1.0"
 dependencies = [
