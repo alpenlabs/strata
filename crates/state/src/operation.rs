@@ -97,7 +97,8 @@ pub enum SyncAction {
     /// Indicates to the worker to write the checkpoints to checkpoint db
     WriteCheckpoints(u64, Vec<BatchCheckpoint>),
 
-    /// Indicates to the worker to write the checkpoints to checkpoint db
+    /// Indicates the worker to write the checkpoints to checkpoint db that appear in given L1
+    /// height
     FinalizeCheckpoints(u64, Vec<BatchCheckpoint>),
 }
 
@@ -134,8 +135,7 @@ pub fn apply_writes_to_state(
                 l1v.local_unaccepted_blocks.truncate(new_unacc_len as usize);
 
                 // Keep pending checkpoints whose l1 height is less than or equal to rollback height
-                l1v.pending_checkpoints
-                    .retain(|chkpt| chkpt.height <= height);
+                l1v.pending_checkpoints.retain(|ckpt| ckpt.height <= height);
             }
 
             AcceptL1Block(l1blkid) => {
@@ -185,7 +185,7 @@ pub fn apply_writes_to_state(
                 state.l1_view_mut().pending_checkpoints.extend(
                     checkpts
                         .into_iter()
-                        .map(|chkpt| L1CheckPoint::new(chkpt, height)),
+                        .map(|ckpt| L1CheckPoint::new(ckpt, height)),
                 );
             }
 
@@ -195,7 +195,7 @@ pub fn apply_writes_to_state(
                 let finalized_checkpts: Vec<_> = l1v
                     .pending_checkpoints
                     .iter()
-                    .take_while(|chkpt| chkpt.height <= height)
+                    .take_while(|ckpt| ckpt.height <= height)
                     .collect();
 
                 let new_finalized = finalized_checkpts.last().cloned().cloned();

@@ -120,13 +120,14 @@ fn check_for_da_batch(blockdata: &BlockData) -> Vec<BatchCheckpoint> {
         })
     });
     let signed_checkpoints = inscriptions.filter_map(|(insc, tx)| {
-        borsh::from_slice::<SignedBatchCheckpoint>(insc.batch_data())
-            .map_err(|e| {
+        match borsh::from_slice::<SignedBatchCheckpoint>(insc.batch_data()) {
+            Err(e) => {
                 let txid = tx.compute_txid();
                 warn!(%txid, err = %e, "could not deserialize blob inside inscription");
-                e
-            })
-            .ok()
+                None
+            }
+            Ok(v) => Some(v),
+        }
     });
 
     // NOTE/TODO: this is where we would verify the checkpoint, i.e, verify block ranges, verify

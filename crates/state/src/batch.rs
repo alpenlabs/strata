@@ -1,5 +1,3 @@
-use std::ops::RangeInclusive;
-
 use alpen_express_primitives::buf::{Buf32, Buf64};
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -64,10 +62,10 @@ impl From<SignedBatchCheckpoint> for BatchCheckpoint {
 pub struct CheckpointInfo {
     /// The index of the checkpoint
     pub idx: u64,
-    /// L1 height range the checkpoint covers
-    pub l1_range: RangeInclusive<u64>,
-    /// L2 height range the checkpoint covers
-    pub l2_range: RangeInclusive<u64>,
+    /// L1 height range(inclusive) the checkpoint covers
+    pub l1_range: (u64, u64),
+    /// L2 height range(inclusive) the checkpoint covers
+    pub l2_range: (u64, u64),
     /// The last L2 block upto which this checkpoint covers since the previous checkpoint
     pub l2_blockid: L2BlockId,
 }
@@ -75,8 +73,8 @@ pub struct CheckpointInfo {
 impl CheckpointInfo {
     pub fn new(
         checkpoint_idx: u64,
-        l1_range: RangeInclusive<u64>,
-        l2_range: RangeInclusive<u64>,
+        l1_range: (u64, u64),
+        l2_range: (u64, u64),
         l2_blockid: L2BlockId,
     ) -> Self {
         Self {

@@ -89,11 +89,6 @@ impl<D: Database> WorkerState<D> {
         self.state_tracker.cur_state()
     }
 
-    /// Gets a reference to the database
-    pub fn db(&self) -> &D {
-        self.database.as_ref()
-    }
-
     /// Gets a reference to checkpoint manager
     pub fn checkpoint_manager(&self) -> &CheckpointManager {
         self.checkpoint_manager.as_ref()

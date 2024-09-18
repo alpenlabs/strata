@@ -58,20 +58,20 @@ fn extract_batch_duties(
             let first_batch_idx = 1;
 
             // Include genesis l1 height to current seen height
-            let l1_range = state.genesis_l1_height()..=state.l1_view().tip_height();
+            let l1_range = (state.genesis_l1_height(), state.l1_view().tip_height());
 
             // Start from first non-genesis l2 block height
-            let l2_range = 1..=tip_height;
+            let l2_range = (1, tip_height);
 
             let new_checkpt = CheckpointInfo::new(first_batch_idx, l1_range, l2_range, tip_id);
             Ok(vec![Duty::CommitBatch(new_checkpt.clone().into())])
         }
         Some(l1checkpoint) => {
             let checkpoint = l1checkpoint.checkpoint.clone();
-            let l1_range = checkpoint.l1_range.end() + 1..=state.l1_view().tip_height();
+            let l1_range = (checkpoint.l1_range.1 + 1, state.l1_view().tip_height());
             // Also, rather than tip heights, we might need to limit the max range a prover will be
             // proving
-            let l2_range = checkpoint.l2_range.end() + 1..=tip_height;
+            let l2_range = (checkpoint.l2_range.1 + 1, tip_height);
             let new_checkpt = CheckpointInfo::new(checkpoint.idx + 1, l1_range, l2_range, tip_id);
             Ok(vec![Duty::CommitBatch(new_checkpt.clone().into())])
         }

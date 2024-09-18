@@ -189,8 +189,8 @@ impl From<CheckpointInfo> for RpcCheckpointInfo {
     fn from(value: CheckpointInfo) -> Self {
         Self {
             idx: value.idx,
-            l1_height: *value.l1_range.end(),
-            l2_height: *value.l2_range.end(),
+            l1_height: value.l1_range.1,
+            l2_height: value.l2_range.1,
             l2_blockid: value.l2_blockid,
         }
     }
