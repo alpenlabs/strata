@@ -24,6 +24,7 @@ pub struct StateUpdate {
     pub l1_state_hash: Buf32,
     pub l2_state_hash: Buf32,
     pub acc_pow: f64,
+    pub proof: Vec<u8>,
 }
 
 /// Note: This needs to be consistent with the logic in other places
