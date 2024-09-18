@@ -1,6 +1,6 @@
 [package]
-name = "express-proofimpl-cl-stf"
 edition = "2021"
+name = "express-proofimpl-cl-stf"
 version = "0.1.0"
 
 [dependencies]

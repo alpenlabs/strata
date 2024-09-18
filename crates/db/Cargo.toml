@@ -26,5 +26,5 @@ mocks = ["mockall"]
 stubs = []
 
 [dev-dependencies]
-serde_json = { workspace = true }
 alpen-test-utils = { workspace = true }
+serde_json = { workspace = true }
