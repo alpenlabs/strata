@@ -1,5 +1,5 @@
 use alloy_sol_types::SolEvent;
-use express_reth_evm::{constants::BRIDGEOUT_ADDRESS, ExpressEvmConfig};
+use express_reth_evm::constants::BRIDGEOUT_ADDRESS;
 use express_reth_primitives::{WithdrawalIntent, WithdrawalIntentEvent};
 use reth::{
     builder::{components::PayloadServiceBuilder, BuilderContext, PayloadBuilderConfig},
@@ -37,6 +37,7 @@ use tracing::{debug, trace, warn};
 
 use crate::{
     engine::ExpressEngineTypes,
+    evm::ExpressEvmConfig,
     payload::{ExpressBuiltPayload, ExpressPayloadBuilderAttributes},
 };
 

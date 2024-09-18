@@ -3902,11 +3902,6 @@ name = "express-reth-evm"
 version = "0.1.0"
 dependencies = [
  "express-reth-primitives",
- "reth-chainspec",
- "reth-evm",
- "reth-evm-ethereum",
- "reth-node-ethereum",
- "reth-primitives",
  "revm",
  "revm-primitives",
 ]
