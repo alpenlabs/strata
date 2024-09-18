@@ -16,6 +16,7 @@ use tracing::info;
 mod args;
 mod config;
 mod db;
+mod errors;
 mod manager;
 mod primitives;
 mod prover;

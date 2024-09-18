@@ -4,11 +4,13 @@ use anyhow::Context;
 use express_proofimpl_evm_ee_stf::ELProofInput;
 use jsonrpsee::{core::client::ClientT, http_client::HttpClient, rpc_params};
 use reth_rpc_types::Block;
+use tokio::time::{self, Duration};
 use tracing::error;
 use uuid::Uuid;
 
 use crate::{
     config::BLOCK_PROVING_TASK_DISPATCH_INTERVAL,
+    errors::ELProvingTaskError,
     primitives::prover_input::{ProverInput, WitnessData},
     task::TaskTracker,
 };
@@ -46,28 +48,41 @@ impl ELBlockProvingTaskScheduler {
 
     // Start listening for new blocks and process them automatically
     pub async fn listen_for_new_blocks(&mut self) {
+        let mut interval =
+            time::interval(Duration::from_secs(BLOCK_PROVING_TASK_DISPATCH_INTERVAL));
+
         loop {
-            if let Err(e) = self.create_proving_task(self.last_block_sent).await {
-                error!("Error processing block: {:?}", e);
-            } else {
-                self.last_block_sent += 1;
+            match self.create_proving_task(self.last_block_sent).await {
+                Ok(_) => {
+                    self.last_block_sent += 1;
+                }
+                Err(e) => {
+                    error!("Error processing block {}: {:?}", self.last_block_sent, e);
+                }
             }
 
-            tokio::time::sleep(std::time::Duration::from_secs(
-                BLOCK_PROVING_TASK_DISPATCH_INTERVAL,
-            ))
-            .await;
+            interval.tick().await;
         }
     }
 
     // Create proving task for the given block idx
-    pub async fn create_proving_task(&self, block_num: u64) -> anyhow::Result<Uuid> {
-        let prover_input = self.fetch_el_block_prover_input(block_num).await?;
+    pub async fn create_proving_task(&self, block_num: u64) -> Result<Uuid, ELProvingTaskError> {
+        let prover_input = self
+            .fetch_el_block_prover_input(block_num)
+            .await
+            .map_err(|e| ELProvingTaskError::FetchElBlockProverInputError {
+                block_num,
+                source: e,
+            })?;
+
         self.append_proving_task(prover_input).await
     }
 
     // Append the proving task to the task tracker
-    async fn append_proving_task(&self, prover_input: ELProofInput) -> anyhow::Result<Uuid> {
+    async fn append_proving_task(
+        &self,
+        prover_input: ELProofInput,
+    ) -> Result<Uuid, ELProvingTaskError> {
         let el_block_witness = WitnessData {
             data: bincode::serialize(&prover_input)?,
         };

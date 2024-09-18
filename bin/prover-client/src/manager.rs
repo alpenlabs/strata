@@ -4,7 +4,7 @@ use express_zkvm::{ProverOptions, ZKVMHost};
 use tokio::time::{sleep, Duration};
 
 use crate::{
-    config::{NUM_PROVER_WORKER, PROVER_MANAGER_WAIT_TIME},
+    config::PROVER_MANAGER_WAIT_TIME,
     primitives::tasks_scheduler::{ProofSubmissionStatus, ProvingTaskStatus},
     prover::Prover,
     task::TaskTracker,
@@ -26,7 +26,7 @@ where
     pub fn new(task_tracker: Arc<TaskTracker>) -> Self {
         Self {
             task_tracker,
-            prover: Prover::new(ProverOptions::default(), NUM_PROVER_WORKER),
+            prover: Prover::new(ProverOptions::default()),
         }
     }
 

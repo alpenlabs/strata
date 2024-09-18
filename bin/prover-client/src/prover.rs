@@ -24,50 +24,49 @@ use crate::{
     },
 };
 
-enum ProverStatus {
+enum ProvingTaskState {
     WitnessSubmitted(ProverInput),
     ProvingInProgress,
     Proved(Proof),
     Err(anyhow::Error),
 }
 
+/// Represents the internal state of the prover, tracking the status of ongoing proving tasks and
+/// the total count of pending tasks.
 struct ProverState {
-    prover_status: HashMap<Uuid, ProverStatus>,
+    tasks_status: HashMap<Uuid, ProvingTaskState>,
     pending_tasks_count: usize,
 }
 
 impl ProverState {
-    fn remove(&mut self, task_id: &Uuid) -> Option<ProverStatus> {
-        self.prover_status.remove(task_id)
+    fn remove(&mut self, task_id: &Uuid) -> Option<ProvingTaskState> {
+        self.tasks_status.remove(task_id)
     }
 
-    fn set_to_proving(&mut self, task_id: Uuid) -> Option<ProverStatus> {
-        self.prover_status
-            .insert(task_id, ProverStatus::ProvingInProgress)
+    fn set_to_proving(&mut self, task_id: Uuid) -> Option<ProvingTaskState> {
+        self.tasks_status
+            .insert(task_id, ProvingTaskState::ProvingInProgress)
     }
 
     fn set_to_proved(
         &mut self,
         task_id: Uuid,
         proof: Result<Proof, anyhow::Error>,
-    ) -> Option<ProverStatus> {
+    ) -> Option<ProvingTaskState> {
         match proof {
-            Ok(p) => self.prover_status.insert(task_id, ProverStatus::Proved(p)),
-            Err(e) => self.prover_status.insert(task_id, ProverStatus::Err(e)),
+            Ok(p) => self
+                .tasks_status
+                .insert(task_id, ProvingTaskState::Proved(p)),
+            Err(e) => self.tasks_status.insert(task_id, ProvingTaskState::Err(e)),
         }
     }
 
-    fn get_prover_status(&self, task_id: Uuid) -> Option<&ProverStatus> {
-        self.prover_status.get(&task_id)
+    fn get_prover_status(&self, task_id: Uuid) -> Option<&ProvingTaskState> {
+        self.tasks_status.get(&task_id)
     }
 
-    fn inc_task_count_if_not_busy(&mut self, num_threads: usize) -> bool {
-        if self.pending_tasks_count >= num_threads {
-            return false;
-        }
-
+    fn inc_task_count(&mut self) {
         self.pending_tasks_count += 1;
-        true
     }
 
     fn dec_task_count(&mut self) {
@@ -83,8 +82,7 @@ where
     Vm: ZKVMHost + 'static,
 {
     prover_state: Arc<RwLock<ProverState>>,
-    db: ProverDB<ProofDb>,
-    num_threads: usize,
+    db: ProverDB,
     pool: rayon::ThreadPool,
     vm_manager: ZkVMManager<Vm>,
 }
@@ -111,7 +109,7 @@ impl<Vm: ZKVMHost> Prover<Vm>
 where
     Vm: ZKVMHost,
 {
-    pub(crate) fn new(prover_config: ProverOptions, num_threads: usize) -> Self {
+    pub(crate) fn new(prover_config: ProverOptions) -> Self {
         let rbdb = open_rocksdb_database().unwrap();
         let db_ops = DbOpsConfig { retry_count: 3 };
         let db = ProofDb::new(rbdb, db_ops);
@@ -122,14 +120,13 @@ where
         zkvm_manager.add_vm(ProofVm::CLAggregation, vec![]);
 
         Self {
-            num_threads,
             pool: rayon::ThreadPoolBuilder::new()
                 .num_threads(NUM_PROVER_WORKER)
                 .build()
                 .expect("Failed to initialize prover threadpool worker"),
 
             prover_state: Arc::new(RwLock::new(ProverState {
-                prover_status: Default::default(),
+                tasks_status: Default::default(),
                 pending_tasks_count: Default::default(),
             })),
             db: ProverDB::new(Arc::new(db)),
@@ -142,10 +139,10 @@ where
         task_id: Uuid,
         state_transition_data: ProverInput,
     ) -> WitnessSubmissionStatus {
-        let data = ProverStatus::WitnessSubmitted(state_transition_data);
+        let data = ProvingTaskState::WitnessSubmitted(state_transition_data);
 
         let mut prover_state = self.prover_state.write().expect("Lock was poisoned");
-        let entry = prover_state.prover_status.entry(task_id);
+        let entry = prover_state.tasks_status.entry(task_id);
 
         match entry {
             Entry::Occupied(_) => WitnessSubmissionStatus::WitnessExist,
@@ -168,40 +165,36 @@ where
             .ok_or_else(|| anyhow::anyhow!("Missing witness for block: {:?}", task_id))?;
 
         match prover_status {
-            ProverStatus::WitnessSubmitted(witness) => {
-                let start_prover = prover_state.inc_task_count_if_not_busy(self.num_threads);
+            ProvingTaskState::WitnessSubmitted(witness) => {
+                prover_state.inc_task_count();
 
                 // Initiate a new proving job only if the prover is not busy.
-                if start_prover {
-                    prover_state.set_to_proving(task_id);
-                    let proof_vm = witness.proof_vm_id();
-                    let vm = self.vm_manager.get(&proof_vm).unwrap().clone();
+                prover_state.set_to_proving(task_id);
+                let proof_vm = witness.proof_vm_id();
+                let vm = self.vm_manager.get(&proof_vm).unwrap().clone();
 
-                    self.pool.spawn(move || {
-                        tracing::info_span!("guest_execution").in_scope(|| {
-                            let proof = make_proof(witness, vm.clone());
-                            info!("make_proof completed for task: {:?} {:?}", task_id, proof);
-                            let mut prover_state =
-                                prover_state_clone.write().expect("Lock was poisoned");
-                            prover_state.set_to_proved(task_id, proof);
-                            prover_state.dec_task_count();
-                        })
-                    });
+                self.pool.spawn(move || {
+                    tracing::info_span!("guest_execution").in_scope(|| {
+                        let proof = make_proof(witness, vm.clone());
+                        info!("make_proof completed for task: {:?} {:?}", task_id, proof);
+                        let mut prover_state =
+                            prover_state_clone.write().expect("Lock was poisoned");
+                        prover_state.set_to_proved(task_id, proof);
+                        prover_state.dec_task_count();
+                    })
+                });
 
-                    Ok(ProofProcessingStatus::ProvingInProgress)
-                } else {
-                    Ok(ProofProcessingStatus::Busy)
-                }
+                Ok(ProofProcessingStatus::ProvingInProgress)
             }
-            ProverStatus::ProvingInProgress => Err(anyhow::anyhow!(
+            ProvingTaskState::ProvingInProgress => Err(anyhow::anyhow!(
                 "Proof generation for {:?} still in progress",
                 task_id
             )),
-            ProverStatus::Proved(_) => Err(anyhow::anyhow!(
+            ProvingTaskState::Proved(_) => Err(anyhow::anyhow!(
                 "Witness for task id {:?}, submitted multiple times.",
                 task_id,
             )),
-            ProverStatus::Err(e) => Err(e),
+            ProvingTaskState::Err(e) => Err(e),
         }
     }
 
@@ -213,20 +206,20 @@ where
         let status = prover_state.get_prover_status(task_id);
 
         match status {
-            Some(ProverStatus::ProvingInProgress) => {
+            Some(ProvingTaskState::ProvingInProgress) => {
                 Ok(ProofSubmissionStatus::ProofGenerationInProgress)
             }
-            Some(ProverStatus::Proved(proof)) => {
+            Some(ProvingTaskState::Proved(proof)) => {
                 self.save_proof_to_db(task_id, proof)?;
 
                 prover_state.remove(&task_id);
                 Ok(ProofSubmissionStatus::Success)
             }
-            Some(ProverStatus::WitnessSubmitted(_)) => Err(anyhow::anyhow!(
+            Some(ProvingTaskState::WitnessSubmitted(_)) => Err(anyhow::anyhow!(
                 "Witness for {:?} was submitted, but the proof generation is not triggered.",
                 task_id
             )),
-            Some(ProverStatus::Err(e)) => Err(anyhow::anyhow!(e.to_string())),
+            Some(ProvingTaskState::Err(e)) => Err(anyhow::anyhow!(e.to_string())),
             _ => Err(anyhow::anyhow!("Missing witness for: {:?}", task_id)),
         }
     }

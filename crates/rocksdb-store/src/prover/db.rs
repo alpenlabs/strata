@@ -28,9 +28,7 @@ impl ProverDataStore for ProofDb {
         self.db
             .with_optimistic_txn(TransactionRetry::Count(self.ops.retry_count), |tx| {
                 if tx.get::<ProverTaskSchema>(&taskid)?.is_some() {
-                    return Err(DbError::Other(format!(
-                        "Entry already exists for id {taskid:?}"
-                    )));
+                    return Err(DbError::EntryAlreadyExists);
                 }
 
                 let idx = rockbound::utils::get_last::<ProverTaskIdSchema>(tx)?
@@ -64,9 +62,7 @@ impl ProverDataStore for ProofDb {
                 if let Some(id) = tx.get::<ProverTaskIdSchema>(&idx)? {
                     Ok(tx.put::<ProverTaskSchema>(&id, &taskentry)?)
                 } else {
-                    Err(DbError::Other(format!(
-                        "Entry does not exist for idx {idx:?}"
-                    )))
+                    Err(DbError::NonExistentEntry)
                 }
             })
             .map_err(|e| DbError::TransactionError(e.to_string()))
@@ -92,26 +88,24 @@ impl ProverDataProvider for ProofDb {
         if let Some(id) = self.get_taskid(idx)? {
             Ok(self.db.get::<ProverTaskSchema>(&id)?)
         } else {
-            Err(DbError::Other(format!(
-                "Entry does not exist for idx {idx:?}"
-            )))
+            Err(DbError::EntryAlreadyExists)
         }
     }
 }
 
-pub struct ProverDB<D> {
-    db: Arc<D>,
+pub struct ProverDB {
+    db: Arc<ProofDb>,
 }
 
-impl<D> ProverDB<D> {
-    pub fn new(db: Arc<D>) -> Self {
+impl ProverDB {
+    pub fn new(db: Arc<ProofDb>) -> Self {
         Self { db }
     }
 }
 
-impl<D: ProverDataStore + ProverDataProvider> ProverDatabase for ProverDB<D> {
-    type ProverStore = D;
-    type ProverProv = D;
+impl ProverDatabase for ProverDB {
+    type ProverStore = ProofDb;
+    type ProverProv = ProofDb;
 
     fn prover_store(&self) -> &Arc<Self::ProverStore> {
         &self.db
@@ -124,10 +118,7 @@ impl<D: ProverDataStore + ProverDataProvider> ProverDatabase for ProverDB<D> {
 
 #[cfg(test)]
 mod tests {
-    use alpen_express_db::{
-        errors::DbError,
-        traits::{ProverDataProvider, ProverDataStore},
-    };
+    use alpen_express_db::traits::{ProverDataProvider, ProverDataStore};
 
     use super::*;
     use crate::test_utils::get_rocksdb_tmp_instance_for_prover;
@@ -168,11 +159,7 @@ mod tests {
             .unwrap();
 
         let result = proof_db.insert_new_task_entry(txid, txentry);
-
         assert!(result.is_err());
-        if let Err(DbError::Other(err)) = result {
-            assert!(err.contains("Entry already exists for id"));
-        }
     }
 
     #[test]

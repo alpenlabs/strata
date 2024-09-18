@@ -25,8 +25,8 @@ pub enum ProofSubmissionStatus {
 pub enum ProofProcessingStatus {
     /// Indicates that proof generation is currently in progress.
     ProvingInProgress,
-    /// Indicates that the prover is busy and will not initiate a new proving process.
-    Busy,
+    // TODO:Indicates that the prover is busy and will not initiate a new proving process.
+    // Busy,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
