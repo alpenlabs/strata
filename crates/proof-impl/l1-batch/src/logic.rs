@@ -14,18 +14,19 @@ pub struct L1BatchProofInput {
 pub struct L1BatchProofOutput {
     pub deposits: Vec<DepositInfo>,
     pub state_update: Option<BatchCheckpoint>,
-    pub state: HeaderVerificationState,
+    pub initial_state: HeaderVerificationState,
+    pub final_state: HeaderVerificationState,
 }
 
 pub fn process_batch_proof(input: L1BatchProofInput, params: &PowParams) -> L1BatchProofOutput {
-    let mut state = input.state;
-
+    let initial_state = input.state.clone();
     let mut deposits = Vec::new();
     let mut state_update = None;
 
+    let mut final_state = input.state.clone();
     for blockspace in input.batch {
         let header = bitcoin::consensus::deserialize(&blockspace.header_raw).unwrap();
-        state.check_and_update(&header, params);
+        final_state.check_and_update(&header, params);
         deposits.extend(blockspace.deposits);
         state_update = state_update.or(blockspace.state_update);
     }
@@ -33,6 +34,7 @@ pub fn process_batch_proof(input: L1BatchProofInput, params: &PowParams) -> L1Ba
     L1BatchProofOutput {
         deposits,
         state_update,
-        state,
+        initial_state,
+        final_state,
     }
 }
