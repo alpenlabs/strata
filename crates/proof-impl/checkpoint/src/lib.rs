@@ -21,7 +21,7 @@ pub struct CheckpointProofInput {
     /// Required for verifying the Groth16 proof of this program.
     /// Cannot be hardcoded as any change to the program or proof implementation
     /// will change the image ID.
-    pub image_id: Buf32,
+    pub image_id: [u32; 8],
     // TODO: genesis will be hardcoded here
     pub genesis: HashedCheckpointState,
 }
@@ -39,9 +39,15 @@ pub struct CheckpointProofOutput {
     pub total_acc_pow: f64,
 }
 
+pub struct PreviousCheckpointProof {
+    pub checkpoint: CheckpointProofOutput,
+    pub proof: Vec<u8>,
+    pub image_id: [u32; 8],
+}
+
 pub fn process_checkpoint_proof(
     input: &CheckpointProofInput,
-) -> (CheckpointProofOutput, Option<CheckpointProofOutput>) {
+) -> (CheckpointProofOutput, Option<PreviousCheckpointProof>) {
     // Compute the initial state hashes
     let CheckpointProofInput {
         l1_state,
@@ -67,10 +73,16 @@ pub fn process_checkpoint_proof(
                 "L2 state mismatch"
             );
 
-            CheckpointProofOutput {
+            let checkpoint = CheckpointProofOutput {
                 l1_state: initial_l1_state_hash,
                 l2_state: initial_l2_state_hash,
                 total_acc_pow: prev_state_update.acc_pow,
+            };
+
+            PreviousCheckpointProof {
+                checkpoint,
+                proof: prev_state_update.proof.clone(),
+                image_id: *image_id,
             }
         })
         .or_else(|| {
