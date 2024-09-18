@@ -2,7 +2,7 @@ import time
 
 import flexitest
 
-from constants import SEQ_SLACK_TIME_SECS
+from constants import ERROR_PROOF_ALREADY_CREATED, ERROR_CHECKPOINT_DOESNOT_EXIST
 
 
 @flexitest.register
@@ -16,8 +16,6 @@ class BlockFinalizationTest(flexitest.Test):
         seq = ctx.get_service("sequencer")
 
         seqrpc = seq.create_rpc()
-
-        time.sleep(SEQ_SLACK_TIME_SECS)
 
         check_send_proof_for_non_existent_batch(seqrpc)
 
@@ -63,7 +61,7 @@ def check_send_proof_for_non_existent_batch(seqrpc):
     try:
         seqrpc.alp_submitCheckpointProof(100, "abc123")
     except Exception as e:
-        assert e.code == -32610
+        assert e.code == ERROR_CHECKPOINT_DOESNOT_EXIST
     else:
         raise AssertionError("Expected rpc error")
 
@@ -73,6 +71,6 @@ def check_already_sent_proof(seqrpc):
         # Proof for checkpoint 1 is already sent
         seqrpc.alp_submitCheckpointProof(1, "abc123")
     except Exception as e:
-        assert e.code == -32611
+        assert e.code == ERROR_PROOF_ALREADY_CREATED
     else:
         raise AssertionError("Expected rpc error")

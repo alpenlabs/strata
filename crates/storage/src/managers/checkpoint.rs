@@ -30,9 +30,12 @@ impl CheckpointManager {
         self.update_notify_tx.subscribe()
     }
 
-    pub async fn put_checkpoint(&self, idx: u64, entry: CheckpointEntry) -> DbResult<()> {
-        self.ops.put_batch_checkpoint_async(idx, entry).await?;
-        self.checkpoint_cache.purge_async(&idx).await;
+    pub async fn put_checkpoint_and_notify(
+        &self,
+        idx: u64,
+        entry: CheckpointEntry,
+    ) -> DbResult<()> {
+        self.put_checkpoint(idx, entry).await?;
 
         // Now send the idx to indicate checkpoint proof has been received
         if let Err(err) = self.update_notify_tx.send(idx) {
@@ -42,14 +45,16 @@ impl CheckpointManager {
         Ok(())
     }
 
+    pub async fn put_checkpoint(&self, idx: u64, entry: CheckpointEntry) -> DbResult<()> {
+        self.ops.put_batch_checkpoint_async(idx, entry).await?;
+        self.checkpoint_cache.purge_async(&idx).await;
+
+        Ok(())
+    }
+
     pub fn put_checkpoint_blocking(&self, idx: u64, entry: CheckpointEntry) -> DbResult<()> {
         self.ops.put_batch_checkpoint_blocking(idx, entry)?;
         self.checkpoint_cache.purge_blocking(&idx);
-
-        // Now send the idx to indicate checkpoint proof has been received
-        if let Err(err) = self.update_notify_tx.send(idx) {
-            warn!(?err, "Failed to update checkpoint update");
-        }
 
         Ok(())
     }

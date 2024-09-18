@@ -3,7 +3,7 @@ use std::sync::Arc;
 use alpen_express_btcio::{broadcaster::L1BroadcastHandle, writer::InscriptionHandle};
 use alpen_express_consensus_logic::sync_manager::SyncManager;
 use alpen_express_db::{
-    traits::{ChainstateProvider, CheckpointProvider, Database, L1DataProvider, L2DataProvider},
+    traits::{ChainstateProvider, Database, L1DataProvider, L2DataProvider},
     types::{CheckpointProvingStatus, L1TxEntry, L1TxStatus},
 };
 use alpen_express_primitives::{buf::Buf32, hash};
@@ -583,9 +583,9 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
 
     async fn get_checkpoint_info(&self, idx: u64) -> RpcResult<Option<RpcCheckpointInfo>> {
         let entry = self
-            .database
-            .checkpoint_provider()
-            .get_batch_checkpoint(idx)
+            .checkpoint_manager
+            .get_checkpoint(idx)
+            .await
             .map_err(|e| Error::Other(e.to_string()))?;
         let batch_comm: Option<BatchCheckpoint> = entry.map(Into::into);
         Ok(batch_comm.map(|bc| bc.checkpoint().clone().into()))
@@ -608,7 +608,7 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         entry.proof = proofbytes.into_inner();
         entry.proving_status = CheckpointProvingStatus::ProofReady;
         self.checkpoint_manager
-            .put_checkpoint(idx, entry)
+            .put_checkpoint_and_notify(idx, entry)
             .await
             .map_err(|e| Error::Other(e.to_string()))?;
 
