@@ -612,11 +612,6 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
             .await
             .map_err(|e| Error::Other(e.to_string()))?;
 
-        // Now send the idx to indicate checkpoint proof has been received
-        self.checkpoint_manager
-            .checkpoint_tx()
-            .send(idx)
-            .map_err(|e| Error::Other(e.to_string()))?;
         Ok(())
     }
 }

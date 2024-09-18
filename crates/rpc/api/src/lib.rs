@@ -75,7 +75,7 @@ pub trait AlpenApi {
     #[method(name = "submitBridgeMsg")]
     async fn submit_bridge_msg(&self, raw_msg: HexBytes) -> RpcResult<()>;
 
-    /// Get nth chekcpoint info if any
+    /// Get nth checkpoint info if any
     #[method(name = "getCheckpointInfo")]
     async fn get_checkpoint_info(&self, idx: u64) -> RpcResult<Option<RpcCheckpointInfo>>;
 

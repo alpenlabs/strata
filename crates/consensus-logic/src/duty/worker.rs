@@ -446,7 +446,6 @@ fn check_and_get_batch_checkpoint(
     }
 
     let chidx = checkpt_mgr
-        .checkpoint_tx()
         .subscribe()
         .blocking_recv()
         .map_err(|e| Error::Other(e.to_string()))?;
