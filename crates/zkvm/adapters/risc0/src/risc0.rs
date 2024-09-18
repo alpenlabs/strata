@@ -1,7 +1,7 @@
 use express_zkvm::{Proof, ProverInput, ProverOptions, VerificationKey, ZKVMHost, ZKVMVerifier};
 use risc0_zkvm::{
-    compute_image_id, get_prover_server, sha::Digest, ExecutorEnv, ExecutorImpl, ProverOpts,
-    Receipt, VerifierContext,
+    compute_image_id, default_prover, get_prover_server, sha::Digest, ExecutorEnv, ExecutorImpl,
+    ProverOpts, Receipt, VerifierContext,
 };
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::to_vec;
@@ -67,19 +67,19 @@ impl ZKVMHost for RiscZeroHost {
 
         // Setup the prover
         let opts = self.determine_prover_options();
-        let prover = get_prover_server(&opts)?;
+        let prover = default_prover();
 
         // Setup verification key
         let program_id = compute_image_id(&self.elf)?;
         let verification_key = bincode::serialize(&program_id)?;
 
         // Generate the session
-        let mut exec = ExecutorImpl::from_elf(env, &self.elf)?;
-        let session = exec.run()?;
+        // let mut exec = ExecutorImpl::from_elf(env, &self.elf)?;
+        // let session = exec.run()?;
 
         // Generate the proof
-        let ctx = VerifierContext::default();
-        let proof_info = prover.prove_session(&ctx, &session)?;
+        // let ctx = VerifierContext::default();
+        let proof_info = prover.prove_with_opts(env, &self.elf, &opts)?;
 
         // Proof serialization
         let serialized_proof = bincode::serialize(&proof_info.receipt)?;

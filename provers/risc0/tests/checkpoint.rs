@@ -1,6 +1,10 @@
 #[cfg(feature = "prover")]
 mod test {
-    use std::str::FromStr;
+    use std::{
+        fs::File,
+        io::{Read, Write},
+        str::FromStr,
+    };
 
     use alpen_test_utils::l2::get_genesis_chainstate;
     use bitcoin::{params::MAINNET, Address};
@@ -22,8 +26,24 @@ mod test {
         AggregationInput, Proof, ProverInput, ProverOptions, VerificationKey, ZKVMHost,
         ZKVMVerifier,
     };
+    use risc0_zkvm::Receipt;
 
-    // TODO: handle this repeat
+    fn write_proof_to_file(proof: Proof) -> std::io::Result<()> {
+        let file_path = "proof.bin";
+        let mut file = File::create(file_path)?; // Create or truncate the file
+        file.write_all(proof.as_bytes())?; // Write the Vec<u8> to the file
+        Ok(())
+    }
+
+    fn read_proof_from_file() -> std::io::Result<Proof> {
+        let file_path = "proof.bin";
+        let mut file = File::open(file_path)?; // Open the file for reading
+        let mut buffer = Vec::new();
+        file.read_to_end(&mut buffer).unwrap(); // Read the file contents into the buffer
+        Ok(Proof::new(buffer))
+    }
+
+    // TODO: handle this repeating code properly
     fn get_l1_batch_output_and_proof() -> (L1BatchProofOutput, Proof) {
         let mainnet_blocks: Vec<(u32, String)> = vec![
             (40321, "0100000045720d24eae33ade0d10397a2e02989edef834701b965a9b161e864500000000993239a44a83d5c427fd3d7902789ea1a4d66a37d5848c7477a7cf47c2b071cd7690784b5746651c3af7ca030101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff08045746651c02db00ffffffff0100f2052a01000000434104c9f513361104db6a84fb6d5b364ba57a27cd19bd051239bf750d8999c6b437220df8fea6b932a248df3cad1fdebb501791e02b7b893a44718d696542ba92a0acac00000000".to_owned()),
@@ -89,6 +109,24 @@ mod test {
         let output = Risc0Verifier::extract_public_output::<L1BatchProofOutput>(&proof)
             .expect("Failed to extract public outputs");
 
+        // Generate Groth16 proof for testing
+        // TODO: remove this later
+        {
+            if read_proof_from_file().is_err() {
+                let prover_options = ProverOptions {
+                    use_mock_prover: false,
+                    stark_to_snark_conversion: true,
+                    enable_compression: false,
+                };
+                let prover = RiscZeroHost::init(GUEST_RISC0_L1_BATCH_ELF.into(), prover_options);
+                let (proof, _) = prover
+                    .prove(&prover_input)
+                    .expect("Failed to generate proof");
+
+                write_proof_to_file(proof).unwrap();
+            }
+        }
+
         (output, proof)
     }
 
@@ -124,7 +162,7 @@ mod test {
         };
 
         let prover_options = ProverOptions {
-            use_mock_prover: false,
+            use_mock_prover: true,
             stark_to_snark_conversion: false,
             enable_compression: false,
         };
@@ -143,6 +181,12 @@ mod test {
         prover_input.write(l1_batch);
         prover_input.write_serialized(borsh::to_vec(&l2_batch).unwrap());
         prover_input.write_serialized(borsh::to_vec(&genesis).unwrap());
+
+        // TODO: handle how input is done
+        let proof = read_proof_from_file().unwrap();
+        let receipt: Receipt = bincode::deserialize(proof.as_bytes()).unwrap();
+        let seal = receipt.inner.groth16().unwrap().seal.clone();
+        prover_input.write_serialized(seal);
 
         prover_input.write_proof(l1_batch_proof_input);
 
