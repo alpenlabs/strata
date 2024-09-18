@@ -14,6 +14,7 @@ bitcoin = { workspace = true }
 borsh = { workspace = true }
 hex = { workspace = true }
 mockall = { workspace = true, optional = true }
+musig2 = { workspace = true }
 parking_lot = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
@@ -26,3 +27,4 @@ stubs = []
 
 [dev-dependencies]
 serde_json = { workspace = true }
+alpen-test-utils = { workspace = true }

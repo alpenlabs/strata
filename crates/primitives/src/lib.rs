@@ -6,6 +6,7 @@
 pub mod block_credential;
 pub mod bridge;
 pub mod buf;
+pub mod constants;
 pub mod errors;
 pub mod evm_exec;
 pub mod hash;

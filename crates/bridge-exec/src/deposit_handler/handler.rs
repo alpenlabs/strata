@@ -1,13 +1,13 @@
 //! Defines the functions that pertain to handling a deposit.
 
+use alpen_express_primitives::bridge::OperatorPartialSig;
 use bitcoin::secp256k1::schnorr::Signature;
-use express_bridge_sig_manager::signature::SignatureInfo;
 use express_bridge_tx_builder::deposit::DepositInfo;
 
 use super::errors::DepositExecResult;
 
 /// Construct and sign the deposit transaction.
-pub async fn sign_deposit_tx(_deposit_info: &DepositInfo) -> DepositExecResult<SignatureInfo> {
+pub async fn sign_deposit_tx(_deposit_info: &DepositInfo) -> DepositExecResult<OperatorPartialSig> {
     unimplemented!()
 }
 

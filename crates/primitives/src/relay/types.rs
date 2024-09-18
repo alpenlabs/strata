@@ -73,10 +73,10 @@ impl BridgeMessage {
         // No signature because it might be malleable and it doesn't have any
         // useful data in it we'd want to inspect.
         let mut digest = Sha256::default();
-        digest.update(&self.source_id.to_be_bytes());
-        digest.update(&(self.scope.len() as u64).to_be_bytes());
+        digest.update(self.source_id.to_be_bytes());
+        digest.update((self.scope.len() as u64).to_be_bytes());
         digest.update(&self.scope);
-        digest.update(&(self.payload.len() as u64).to_be_bytes());
+        digest.update((self.payload.len() as u64).to_be_bytes());
         digest.update(&self.payload);
 
         let hash: [u8; 32] = digest.finalize().into();
@@ -101,7 +101,8 @@ pub enum Scope {
 impl Scope {
     /// Tries to parse the scope from a slice.
     pub fn try_from_slice(raw: &[u8]) -> Result<Scope, io::Error> {
-        Ok(borsh::from_slice(raw)?)
+        let result = borsh::from_slice(raw)?;
+        Ok(result)
     }
 }
 

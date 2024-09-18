@@ -1,6 +1,8 @@
 use thiserror::Error;
 
-#[derive(Debug, Error)]
+use crate::entities::errors::EntityError;
+
+#[derive(Debug, Error, Clone)]
 pub enum DbError {
     #[error("tried to insert into {0} out-of-order index {1}")]
     OooInsert(&'static str, u64),
@@ -66,6 +68,9 @@ pub enum DbError {
 
     #[error("transaction error {0}")]
     TransactionError(String),
+
+    #[error("problem with entity: {0}")]
+    EntityError(#[from] EntityError),
 
     #[error(" rocksdb {0}")]
     RocksDb(String),

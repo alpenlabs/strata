@@ -1,3 +1,4 @@
+pub mod bridge;
 pub mod bridge_relay;
 pub mod broadcaster;
 pub mod chain_state;
@@ -37,9 +38,13 @@ pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
     // Bridge relay schemas
     BridgeMsgIdSchema::COLUMN_FAMILY_NAME,
     ScopeMsgIdSchema::COLUMN_FAMILY_NAME,
+    // Bridge signature schemas
+    BridgeTxStateTxidSchema::COLUMN_FAMILY_NAME,
+    BridgeTxStateSchema::COLUMN_FAMILY_NAME,
     // TODO add col families for other store types
 ];
 
+use bridge::schemas::{BridgeTxStateSchema, BridgeTxStateTxidSchema};
 // Re-exports
 pub use bridge_relay::db::BridgeMsgDb;
 use bridge_relay::schemas::*;

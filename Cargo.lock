@@ -752,12 +752,14 @@ dependencies = [
  "alpen-express-mmr",
  "alpen-express-primitives",
  "alpen-express-state",
+ "alpen-test-utils",
  "anyhow",
  "arbitrary",
  "bitcoin",
  "borsh",
  "hex",
  "mockall",
+ "musig2",
  "parking_lot 0.12.3",
  "serde",
  "serde_json",
@@ -837,6 +839,7 @@ dependencies = [
  "borsh",
  "digest 0.10.7",
  "hex",
+ "musig2",
  "rand 0.8.5",
  "reth-primitives",
  "secp256k1",
@@ -973,7 +976,6 @@ dependencies = [
  "bitcoin",
  "borsh",
  "digest 0.10.7",
- "express-bridge-sig-manager",
  "express-bridge-tx-builder",
  "hex",
  "num_enum 0.7.2",
@@ -1004,9 +1006,12 @@ dependencies = [
  "anyhow",
  "arbitrary",
  "bitcoin",
+ "express-storage",
  "hex",
+ "musig2",
  "rand 0.8.5",
  "rockbound",
+ "threadpool",
 ]
 
 [[package]]
@@ -3723,7 +3728,6 @@ dependencies = [
  "alpen-express-primitives",
  "async-trait",
  "bitcoin",
- "express-bridge-sig-manager",
  "express-bridge-tx-builder",
  "format_serde_error",
  "serde",
@@ -3742,11 +3746,15 @@ dependencies = [
 name = "express-bridge-sig-manager"
 version = "0.1.0"
 dependencies = [
+ "alpen-express-db",
  "alpen-express-primitives",
+ "alpen-test-utils",
+ "arbitrary",
  "bitcoin",
- "express-bridge-tx-builder",
- "serde",
+ "express-storage",
+ "musig2",
  "thiserror",
+ "tokio",
 ]
 
 [[package]]
@@ -3754,7 +3762,10 @@ name = "express-bridge-tx-builder"
 version = "0.1.0"
 dependencies = [
  "alpen-express-primitives",
+ "alpen-test-utils",
  "bitcoin",
+ "lazy_static",
+ "musig2",
  "serde",
  "thiserror",
 ]
@@ -3996,6 +4007,7 @@ dependencies = [
  "alpen-express-state",
  "anyhow",
  "async-trait",
+ "bitcoin",
  "lru",
  "paste",
  "threadpool",
@@ -5268,6 +5280,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "integration-tests"
+version = "0.1.0"
+dependencies = [
+ "alpen-express-common",
+ "alpen-express-primitives",
+ "alpen-express-rocksdb",
+ "alpen-test-utils",
+ "anyhow",
+ "bitcoin",
+ "bitcoind",
+ "express-bridge-sig-manager",
+ "express-bridge-tx-builder",
+ "express-storage",
+ "threadpool",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "interprocess"
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6407,6 +6438,23 @@ dependencies = [
  "pin-project",
  "smallvec",
  "unsigned-varint 0.7.2",
+]
+
+[[package]]
+name = "musig2"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c89bee285da6010ad76c3467c4de8265bb4fa46fba0017df95ae55cad4436528"
+dependencies = [
+ "base16ct",
+ "hmac 0.12.1",
+ "once_cell",
+ "secp",
+ "secp256k1",
+ "serde",
+ "serdect",
+ "sha2 0.10.8",
+ "subtle",
 ]
 
 [[package]]
@@ -11073,6 +11121,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "secp"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd426921f62c7e334ca27173743cd90a7263566a3be76ef0b47773d631633cf9"
+dependencies = [
+ "base16ct",
+ "once_cell",
+ "secp256k1",
+ "serde",
+ "serdect",
+ "subtle",
+]
+
+[[package]]
 name = "secp256k1"
 version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11282,6 +11344,16 @@ dependencies = [
  "ryu",
  "serde",
  "unsafe-libyaml",
+]
+
+[[package]]
+name = "serdect"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a84f14a19e9a014bb9f4512488d9829a68e04ecabffb0f9904cd1ace94598177"
+dependencies = [
+ "base16ct",
+ "serde",
 ]
 
 [[package]]

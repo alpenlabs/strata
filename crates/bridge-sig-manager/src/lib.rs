@@ -4,6 +4,6 @@
 //! or private key, store the signatures and look them up when necessary.
 
 pub mod errors;
+pub mod manager;
+pub mod operations;
 pub mod prelude;
-pub mod signature;
-pub mod state;
