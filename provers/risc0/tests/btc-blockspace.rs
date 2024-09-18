@@ -5,16 +5,13 @@ mod test {
     use bitcoin::{consensus::serialize, Address};
     use express_proofimpl_btc_blockspace::logic::{BlockspaceProofOutput, ScanRuleConfig};
     use express_risc0_adapter::{Risc0Verifier, RiscZeroHost};
-    use express_risc0_guest_builder::ALPEN_BTC_BLOCKSPACE_RISC0_PROOF_ELF;
+    use express_risc0_guest_builder::GUEST_RISC0_BTC_BLOCKSPACE_ELF;
     use express_zkvm::{ProverInput, ZKVMHost, ZKVMVerifier};
 
     #[test]
     fn test_btc_blockspace_code_trace_generation() {
         let block = alpen_test_utils::bitcoin::get_btc_mainnet_block();
-        let prover = RiscZeroHost::init(
-            ALPEN_BTC_BLOCKSPACE_RISC0_PROOF_ELF.into(),
-            Default::default(),
-        );
+        let prover = RiscZeroHost::init(GUEST_RISC0_BTC_BLOCKSPACE_ELF.into(), Default::default());
 
         let scan_config = ScanRuleConfig {
             bridge_scriptbufs: vec![Address::from_str(
