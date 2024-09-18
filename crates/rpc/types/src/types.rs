@@ -5,7 +5,7 @@
 //!  - crate for just data structures that represents the JSON responses from Bitcoin core RPC
 
 use alpen_express_state::{batch::CheckpointInfo, bridge_ops::WithdrawalIntent, id::L2BlockId};
-use bitcoin::Txid;
+use bitcoin::{Network, Txid};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -44,7 +44,7 @@ impl From<HexBytes> for Vec<u8> {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HexBytes32(#[serde(with = "hex::serde")] pub [u8; 32]);
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct L1Status {
     /// If the last time we tried to poll the client (as of `last_update`)
     /// we were successful.
@@ -68,6 +68,24 @@ pub struct L1Status {
 
     /// UNIX millis time of the last time we got a new update from the L1 connector.
     pub last_update: u64,
+
+    /// Underlying network.
+    pub network: Network,
+}
+
+impl Default for L1Status {
+    fn default() -> Self {
+        Self {
+            bitcoin_rpc_connected: Default::default(),
+            last_rpc_error: Default::default(),
+            cur_height: Default::default(),
+            cur_tip_blkid: Default::default(),
+            last_published_txid: Default::default(),
+            published_inscription_count: Default::default(),
+            last_update: Default::default(),
+            network: Network::Regtest,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

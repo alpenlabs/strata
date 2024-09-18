@@ -3765,13 +3765,17 @@ name = "express-bridge-exec"
 version = "0.1.0"
 dependencies = [
  "alpen-express-primitives",
+ "alpen-express-rpc-api",
  "async-trait",
  "bitcoin",
+ "express-bridge-sig-manager",
  "express-bridge-tx-builder",
  "format_serde_error",
+ "jsonrpsee",
  "serde",
  "thiserror",
  "toml 0.5.11",
+ "tracing",
 ]
 
 [[package]]

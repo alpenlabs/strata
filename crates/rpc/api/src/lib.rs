@@ -1,6 +1,6 @@
 //! Macro trait def for the `alp_` RPC namespace using jsonrpsee.
 use alpen_express_db::types::L1TxStatus;
-use alpen_express_primitives::bridge::OperatorIdx;
+use alpen_express_primitives::bridge::{OperatorIdx, PublickeyTable};
 use alpen_express_rpc_types::{
     types::{BlockHeader, ClientStatus, DepositEntry, ExecUpdate, L1Status},
     HexBytes, HexBytes32, NodeSyncStatus, RawBlockWitness, RpcCheckpointInfo,
@@ -74,6 +74,10 @@ pub trait AlpenApi {
     /// Get nth checkpoint info if any
     #[method(name = "getCheckpointInfo")]
     async fn get_checkpoint_info(&self, idx: u64) -> RpcResult<Option<RpcCheckpointInfo>>;
+
+    /// Get the operators' public key table that is used to sign transactions.
+    #[method(name = "getActiveOperatorChainPubkeySet")]
+    async fn get_active_operator_chain_pubkey_set(&self) -> RpcResult<PublickeyTable>;
 }
 
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "alpadmin"))]

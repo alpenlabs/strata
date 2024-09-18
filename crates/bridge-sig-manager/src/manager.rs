@@ -417,6 +417,12 @@ impl SignatureManager {
 
         Ok(signed_tx)
     }
+
+    /// Returns a reference to the internal abstraction
+    /// over the persistence layer for the signatures.
+    pub fn db_ops(&self) -> &Arc<BridgeTxStateOps> {
+        &self.db_ops
+    }
 }
 
 #[cfg(test)]
