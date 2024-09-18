@@ -3,21 +3,23 @@
 
 use alpen_express_primitives::buf::Buf32;
 use bitcoin::{opcodes::all::OP_RETURN, Block, ScriptBuf, Transaction};
+use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
 use crate::logic::ScanRuleConfig;
 
 const SOME_ALP_MAGIC: [u8; 32] = [1; 32];
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize, PartialEq)]
 pub struct DepositRequestData {
     /// Address of the rollup where the `amount` is deposited
     pub dest_addr: Vec<u8>,
     pub amount: u64,
 }
 
+/// TODO: reuse from [alpen_express_state]
 pub type ForcedInclusion = Vec<u8>;
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
 pub struct StateUpdate {
     pub l1_state_hash: Buf32,
     pub l2_state_hash: Buf32,
