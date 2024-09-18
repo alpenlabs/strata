@@ -9,8 +9,8 @@ use express_risc0_adapter::RiscZeroHost;
 use jsonrpsee::http_client::HttpClientBuilder;
 use manager::ProverManager;
 use rpc_server::{ProverClientRpc, RpcContext};
+use task::TaskTracker;
 use task_dispatcher::ELBlockProvingTaskScheduler;
-use task_tracker::TaskTracker;
 use tracing::info;
 
 mod args;
@@ -20,8 +20,8 @@ mod manager;
 mod primitives;
 mod prover;
 mod rpc_server;
+mod task;
 mod task_dispatcher;
-mod task_tracker;
 
 #[tokio::main]
 async fn main() {
@@ -55,7 +55,7 @@ async fn main() {
     });
 
     // run rpc server
-    let rpc_url = args.get_rpc_url();
+    let rpc_url = args.get_dev_rpc_url();
     run_rpc_server(rpc_context, rpc_url, args.enable_dev_rpcs)
         .await
         .expect("prover client rpc")

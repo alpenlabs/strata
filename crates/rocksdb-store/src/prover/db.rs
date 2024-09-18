@@ -137,7 +137,7 @@ mod tests {
         ProofDb::new(db, db_ops)
     }
 
-    fn generate_l1_task_entry() -> ([u8; 16], Vec<u8>) {
+    fn generate_task_entry() -> ([u8; 16], Vec<u8>) {
         let txid = [1u8; 16];
         let txentry = vec![1u8; 64];
         (txid, txentry)
@@ -147,7 +147,7 @@ mod tests {
     fn test_add_tx_new_entry() {
         let db = setup_db();
 
-        let (txid, txentry) = generate_l1_task_entry();
+        let (txid, txentry) = generate_task_entry();
 
         let idx = db.insert_new_task_entry(txid, txentry.clone()).unwrap();
 
@@ -161,7 +161,7 @@ mod tests {
     fn test_add_tx_existing_entry() {
         let proof_db = setup_db();
 
-        let (txid, txentry) = generate_l1_task_entry();
+        let (txid, txentry) = generate_task_entry();
 
         let _ = proof_db
             .insert_new_task_entry(txid, txentry.clone())
@@ -176,10 +176,10 @@ mod tests {
     }
 
     #[test]
-    fn test_update_tx() {
+    fn test_update_task_by_id() {
         let proof_db = setup_db();
 
-        let (txid, txentry) = generate_l1_task_entry();
+        let (txid, txentry) = generate_task_entry();
 
         // Attempt to update non-existing entry
         let result = proof_db.update_task_entry_by_id(txid, txentry.clone());
@@ -202,10 +202,10 @@ mod tests {
     }
 
     #[test]
-    fn test_update_task_entry() {
+    fn test_update_task_entry_by_idx() {
         let proof_db = setup_db();
 
-        let (txid, txentry) = generate_l1_task_entry();
+        let (txid, txentry) = generate_task_entry();
 
         // Attempt to update non-existing index
         let result = proof_db.update_task_entry(0, txentry.clone());
@@ -235,7 +235,7 @@ mod tests {
         let result = proof_db.get_task_entry(0);
         assert!(result.is_err());
 
-        let (txid, txentry) = generate_l1_task_entry();
+        let (txid, txentry) = generate_task_entry();
 
         let idx = proof_db
             .insert_new_task_entry(txid, txentry.clone())
@@ -252,7 +252,7 @@ mod tests {
         let next_txidx = proof_db.get_next_task_idx().unwrap();
         assert_eq!(next_txidx, 0, "The next txidx is 0 in the beginning");
 
-        let (txid, txentry) = generate_l1_task_entry();
+        let (txid, txentry) = generate_task_entry();
 
         let idx = proof_db
             .insert_new_task_entry(txid, txentry.clone())

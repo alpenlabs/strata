@@ -10,7 +10,7 @@ use uuid::Uuid;
 use crate::{
     config::BLOCK_PROVING_TASK_DISPATCH_INTERVAL,
     primitives::prover_input::{ProverInput, WitnessData},
-    task_tracker::TaskTracker,
+    task::TaskTracker,
 };
 
 /// The `ELBlockProvingTaskScheduler` handles the scheduling of EL block proving tasks.
@@ -18,8 +18,16 @@ use crate::{
 /// and adds these tasks to a shared `TaskTracker` for further processing.
 #[derive(Clone)]
 pub struct ELBlockProvingTaskScheduler {
+    /// The RPC client used to communicate with the EL network.
+    /// It listens for new EL blocks and retrieves necessary data for proving.
     el_rpc_client: HttpClient,
+
+    /// A shared `TaskTracker` instance. It tracks and manages the lifecycle of proving tasks added
+    /// by the scheduler.
     task_tracker: Arc<TaskTracker>,
+
+    /// Stores the identifier of the last EL block that was sent for proving.
+    /// This helps in tracking progress and avoiding duplicate task submissions.
     last_block_sent: u64,
 }
 

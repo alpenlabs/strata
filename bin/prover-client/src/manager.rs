@@ -7,7 +7,7 @@ use crate::{
     config::{NUM_PROVER_WORKER, PROVER_MANAGER_WAIT_TIME},
     primitives::tasks_scheduler::{ProofSubmissionStatus, ProvingTaskStatus},
     prover::Prover,
-    task_tracker::TaskTracker,
+    task::TaskTracker,
 };
 
 /// Manages proof generation tasks, including processing and tracking task statuses.
