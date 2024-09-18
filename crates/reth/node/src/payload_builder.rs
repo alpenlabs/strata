@@ -399,7 +399,7 @@ where
             };
             Some(WithdrawalIntent {
                 amt: evt.amount,
-                dest_pk: evt.dest_pk.as_ref().try_into().unwrap(),
+                dest_pk: evt.dest_pk,
             })
         })
         .collect();

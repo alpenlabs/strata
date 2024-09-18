@@ -19,3 +19,6 @@ FAST_BATCH_ROLLUP_PARAMS = {
     "l1_reorg_safe_depth": 4,
     "target_l2_batch_size": 5,
 }
+
+# custom precompiles
+PRECOMPILE_BRIDGEOUT_ADDRESS = "0x000000000000000000000000000000000b121d9e"

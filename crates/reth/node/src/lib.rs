@@ -6,6 +6,7 @@ mod payload;
 mod payload_builder;
 mod precompiles;
 mod primitives;
+mod utils;
 
 pub use engine::ExpressEngineTypes;
 pub use node::ExpressEthereumNode;
