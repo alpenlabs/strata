@@ -1,0 +1,14 @@
+[package]
+edition = "2021"
+name = "guest-sp1-evm-ee-stf"
+version = "0.1.0"
+
+[workspace]
+
+[dependencies]
+express-proofimpl-evm-ee-stf = { path = "../../../crates/proof-impl/evm-ee-stf" }
+revm = { version = "12.1.0", default-features = false }
+sp1-zkvm = "1.0.1"
+
+[patch.crates-io]
+secp256k1 = { git = "https://github.com/sp1-patches/rust-secp256k1", branch = "patch-secp256k1-v0.29.0-old" }

@@ -7,6 +7,7 @@ use alpen_express_primitives::{
     bridge::OperatorIdx,
     buf::Buf32,
     l1::{self, BitcoinAmount, OutputRef, XOnlyPk},
+    operator::OperatorKeyProvider,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
@@ -27,6 +28,12 @@ pub struct OperatorEntry {
 
     /// Wallet pubkey used to compute MuSig2 pubkey from a set of operators.
     wallet_pk: Buf32,
+}
+
+impl OperatorEntry {
+    pub fn signing_pk(&self) -> &Buf32 {
+        &self.signing_pk
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
@@ -83,6 +90,12 @@ impl OperatorTable {
             .binary_search_by_key(&idx, |e| e.idx)
             .ok()
             .map(|i| &self.operators[i])
+    }
+}
+
+impl OperatorKeyProvider for OperatorTable {
+    fn get_operator_signing_pk(&self, idx: OperatorIdx) -> Option<Buf32> {
+        self.get_operator(idx).map(|ent| ent.signing_pk)
     }
 }
 

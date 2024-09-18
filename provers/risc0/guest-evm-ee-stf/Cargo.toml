@@ -1,0 +1,11 @@
+[package]
+edition = "2021"
+name = "guest-risc0-evm-ee-stf"
+version = "0.1.0"
+
+[workspace]
+
+[dependencies]
+express-proofimpl-evm-ee-stf = { path = "../../../crates/proof-impl/evm-ee-stf" }
+revm = { version = "12.1.0", default-features = false }
+risc0-zkvm = { version = "1.0.5", default-features = false, features = ['std'] }

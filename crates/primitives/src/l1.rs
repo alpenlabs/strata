@@ -544,7 +544,7 @@ impl<'a> Arbitrary<'a> for BitcoinPsbt {
 
 /// A wrapper around [`bitcoin::TxOut`] that implements some additional traits.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct BitcoinTxOut(bitcoin::TxOut);
+pub struct BitcoinTxOut(TxOut);
 
 impl BitcoinTxOut {
     pub fn inner(&self) -> &bitcoin::TxOut {
@@ -552,13 +552,13 @@ impl BitcoinTxOut {
     }
 }
 
-impl From<bitcoin::TxOut> for BitcoinTxOut {
+impl From<TxOut> for BitcoinTxOut {
     fn from(value: bitcoin::TxOut) -> Self {
         Self(value)
     }
 }
 
-impl From<BitcoinTxOut> for bitcoin::TxOut {
+impl From<BitcoinTxOut> for TxOut {
     fn from(value: BitcoinTxOut) -> Self {
         value.0
     }

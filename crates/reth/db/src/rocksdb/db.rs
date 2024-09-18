@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
+use express_proofimpl_evm_ee_stf::ELProofInput;
 use reth_primitives::B256;
 use rockbound::{SchemaDBOperations, SchemaDBOperationsExt};
-use zkvm_primitives::ZKVMInput;
 
 use super::schema::BlockWitnessSchema;
 use crate::{errors::DbError, DbResult, WitnessProvider, WitnessStore};
@@ -29,10 +29,10 @@ impl<DB> WitnessDB<DB> {
 }
 
 impl<DB: SchemaDBOperations> WitnessProvider for WitnessDB<DB> {
-    fn get_block_witness(&self, block_hash: B256) -> DbResult<Option<ZKVMInput>> {
+    fn get_block_witness(&self, block_hash: B256) -> DbResult<Option<ELProofInput>> {
         let raw = self.db.get::<BlockWitnessSchema>(&block_hash)?;
 
-        let parsed: Option<ZKVMInput> = raw
+        let parsed: Option<ELProofInput> = raw
             .map(|bytes| bincode::deserialize(&bytes))
             .transpose()
             .map_err(|err| DbError::CodecError(err.to_string()))?;
@@ -46,7 +46,7 @@ impl<DB: SchemaDBOperations> WitnessProvider for WitnessDB<DB> {
 }
 
 impl<DB: SchemaDBOperations> WitnessStore for WitnessDB<DB> {
-    fn put_block_witness(&self, block_hash: B256, witness: &ZKVMInput) -> crate::DbResult<()> {
+    fn put_block_witness(&self, block_hash: B256, witness: &ELProofInput) -> crate::DbResult<()> {
         let serialized =
             bincode::serialize(witness).map_err(|err| DbError::Other(err.to_string()))?;
         Ok(self
@@ -61,10 +61,10 @@ impl<DB: SchemaDBOperations> WitnessStore for WitnessDB<DB> {
 
 #[cfg(test)]
 mod tests {
+    use express_proofimpl_evm_ee_stf::{ELProofInput, ELProofPublicParams};
     use rockbound::SchemaDBOperations;
     use serde::Deserialize;
     use tempfile::TempDir;
-    use zkvm_primitives::ELProofPublicParams;
 
     use super::*;
 
@@ -89,7 +89,7 @@ mod tests {
 
     #[derive(Deserialize)]
     struct TestData {
-        witness: ZKVMInput,
+        witness: ELProofInput,
         params: ELProofPublicParams,
     }
 
@@ -145,7 +145,7 @@ mod tests {
             .expect("failed to put witness data");
         // assert block is present in the db
         let received_witness = db.get_block_witness(block_hash);
-        assert!(matches!(received_witness, Ok(Some(ZKVMInput { .. }))));
+        assert!(matches!(received_witness, Ok(Some(ELProofInput { .. }))));
 
         // deleting existing block is ok
         let res = db.del_block_witness(block_hash);
