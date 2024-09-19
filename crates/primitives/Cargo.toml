@@ -23,5 +23,5 @@ alpen-test-utils = { workspace = true }
 
 [features]
 default = ["std", "rand"]
-std = ["dep:secp256k1"]
 rand = ["std", "dep:rand"]
+std = ["dep:secp256k1"]

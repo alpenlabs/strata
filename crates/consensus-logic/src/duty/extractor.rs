@@ -1,16 +1,15 @@
-use alpen_express_db::traits::{ChainstateProvider, Database, L2DataProvider};
 use alpen_express_primitives::params::Params;
-use alpen_express_state::{client_state::ClientState, header::L2Header, id::L2BlockId};
+use alpen_express_state::{batch::CheckpointInfo, client_state::ClientState, id::L2BlockId};
+use tracing::*;
 
-use super::types::{BatchCommitmentDuty, BlockSigningDuty, Duty, Identity};
+use super::types::{BlockSigningDuty, Duty, Identity};
 use crate::errors::Error;
 
 /// Extracts new duties given a consensus state and a identity.
-pub fn extract_duties<D: Database>(
+pub fn extract_duties(
     state: &ClientState,
     _ident: &Identity,
-    database: &D,
-    params: &Params,
+    _params: &Params,
 ) -> Result<Vec<Duty>, Error> {
     // If a sync state isn't present then we probably don't have anything we
     // want to do.  We might change this later.
@@ -18,247 +17,63 @@ pub fn extract_duties<D: Database>(
         return Ok(Vec::new());
     };
 
+    let tip_height = ss.chain_tip_height();
     let tip_blkid = *ss.chain_tip_blkid();
-
-    // Figure out the block slot from the tip blockid.
-    // TODO include the block slot in the consensus state
-    let l2prov = database.l2_provider();
-    let block = l2prov
-        .get_block_data(tip_blkid)?
-        .ok_or(Error::MissingL2Block(tip_blkid))?;
-    let block_idx = block.header().blockidx();
 
     // Since we're not rotating sequencers, for now we just *always* produce a
     // new block.
-    let duty_data = BlockSigningDuty::new_simple(block_idx + 1, tip_blkid);
+    let duty_data = BlockSigningDuty::new_simple(tip_height + 1, tip_blkid);
     let mut duties = vec![Duty::SignBlock(duty_data)];
 
-    duties.append(&mut extract_batch_duties(state, _ident, database, params)?);
+    duties.extend(extract_batch_duties(state, tip_height, tip_blkid)?);
 
     Ok(duties)
 }
 
-fn extract_batch_duties<D: Database>(
+fn extract_batch_duties(
     state: &ClientState,
-    _ident: &Identity,
-    database: &D,
-    params: &Params,
+    tip_height: u64,
+    tip_id: L2BlockId,
 ) -> Result<Vec<Duty>, Error> {
-    // If a sync state isn't present then we probably don't have anything we
-    // want to do.  We might change this later.
-    let Some(ss) = state.sync() else {
-        return Ok(Vec::new());
+    if !state.is_chain_active() {
+        debug!("chain not active, no duties created");
+        // There are no duties if the chain is not yet active
+        return Ok(vec![]);
     };
 
-    let finalized_blkid = *ss.finalized_blkid();
+    match state.l1_view().last_finalized_checkpoint() {
+        // Cool, we are producing first batch!
+        None => {
+            debug!(
+                ?tip_height,
+                ?tip_id,
+                "No finalized checkpoint, creating new checkpiont"
+            );
+            // But wait until we've move past genesis, perhaps this can be
+            // configurable. Right now this is not ideal because we will be wasting proving resource
+            // just for a couple of initial blocks in the first batch
+            if tip_height == 0 {
+                return Ok(vec![]);
+            }
+            let first_batch_idx = 1;
 
-    // Generate all valid batches from last finalized block till latest.
-    // Deduplication is managed by duty executor and l1 writer
-    let duties = generate_batches(finalized_blkid, database, params)?
-        .into_iter()
-        .map(|(slot, blockid)| Duty::CommitBatch(BatchCommitmentDuty::new(slot, blockid)))
-        .collect();
+            // Include genesis l1 height to current seen height
+            let l1_range = (state.genesis_l1_height(), state.l1_view().tip_height());
 
-    Ok(duties)
-}
+            // Start from first non-genesis l2 block height
+            let l2_range = (1, tip_height);
 
-// NOTE: generated batches MUST be deterministic for a given finalized_blkid and set of l2 blocks
-fn generate_batches<D: Database>(
-    finalized_blkid: L2BlockId,
-    database: &D,
-    params: &Params,
-) -> Result<Vec<(u64, L2BlockId)>, Error> {
-    let chainstate_provider = database.chainstate_provider();
-    let l2prov = database.l2_provider();
-
-    // should a safety factor be subtracted from this?
-    let tip_blockidx = chainstate_provider.get_last_state_idx()?;
-
-    let finalized_block = l2prov
-        .get_block_data(finalized_blkid)?
-        .ok_or(Error::MissingL2Block(finalized_blkid))?;
-
-    // L2 Block finalization happens at batch level.
-    // So finalized block idx is idx of last block of latest finalized batch.
-    let last_idx = finalized_block.header().blockidx();
-
-    let mut batches = Vec::new();
-
-    let mut next_idx = last_idx + params.rollup.target_l2_batch_size;
-    while next_idx <= tip_blockidx {
-        let chain_state = chainstate_provider
-            .get_toplevel_state(next_idx)?
-            .ok_or(Error::MissingCheckpoint(next_idx))?;
-
-        batches.push((next_idx, chain_state.chain_tip_blockid()));
-
-        // probably more sophisticated way to delimit batches here
-        next_idx += params.rollup.target_l2_batch_size;
-    }
-
-    Ok(batches)
-}
-
-#[cfg(test)]
-mod tests {
-
-    use alpen_express_db::traits::{ChainstateStore, L2DataStore};
-    use alpen_express_primitives::{
-        block_credential,
-        buf::Buf32,
-        params::{RollupParams, SyncParams},
-    };
-    use alpen_express_rocksdb::test_utils::get_common_db;
-    use alpen_express_state::{
-        block::{L2Block, L2BlockBody, L2BlockBundle},
-        chain_state::ChainState,
-        exec_env::ExecEnvState,
-        exec_update::UpdateInput,
-        header::{L2BlockHeader, SignedL2BlockHeader},
-        l1::{L1HeaderRecord, L1ViewState},
-        state_op::{StateOp, WriteBatch},
-    };
-
-    use super::*;
-
-    pub fn gen_params() -> Params {
-        Params {
-            rollup: RollupParams {
-                rollup_name: "express".to_string(),
-                block_time: 1000,
-                cred_rule: block_credential::CredRule::Unchecked,
-                horizon_l1_height: 3,
-                genesis_l1_height: 5,
-                evm_genesis_block_hash: Buf32(
-                    "0x37ad61cff1367467a98cf7c54c4ac99e989f1fbb1bc1e646235e90c065c565ba"
-                        .parse()
-                        .unwrap(),
-                ),
-                evm_genesis_block_state_root: Buf32(
-                    "0x351714af72d74259f45cd7eab0b04527cd40e74836a45abcae50f92d919d988f"
-                        .parse()
-                        .unwrap(),
-                ),
-                l1_reorg_safe_depth: 5,
-                target_l2_batch_size: 64,
-            },
-            run: SyncParams {
-                l2_blocks_fetch_limit: 1000,
-                l1_follow_distance: 3,
-                client_checkpoint_interval: 10,
-            },
+            let new_checkpt = CheckpointInfo::new(first_batch_idx, l1_range, l2_range, tip_id);
+            Ok(vec![Duty::CommitBatch(new_checkpt.clone().into())])
         }
-    }
-
-    fn insert_blocks_chainstate(
-        block_count: u64,
-        evm_genesis_state_root: Buf32,
-        database: &impl Database,
-    ) -> Vec<L2BlockId> {
-        let arb = alpen_test_utils::ArbitraryGenerator::new();
-
-        let blocks: Vec<_> = (0..block_count)
-            .map(|idx| {
-                let block_body: L2BlockBody = arb.generate();
-                let block_header: L2BlockHeader = L2BlockHeader::new(
-                    idx,
-                    arb.generate(),
-                    arb.generate(),
-                    &block_body,
-                    arb.generate(),
-                );
-                L2BlockBundle::new(
-                    L2Block::new(
-                        SignedL2BlockHeader::new(block_header, arb.generate()),
-                        arb.generate(),
-                    ),
-                    arb.generate(),
-                )
-            })
-            .collect();
-        let blockids: Vec<L2BlockId> = blocks
-            .iter()
-            .map(|block| block.header().get_blockid())
-            .collect();
-
-        for block in blocks {
-            database.l2_store().put_block_data(block.clone()).unwrap();
+        Some(l1checkpoint) => {
+            let checkpoint = l1checkpoint.checkpoint.clone();
+            let l1_range = (checkpoint.l1_range.1 + 1, state.l1_view().tip_height());
+            // Also, rather than tip heights, we might need to limit the max range a prover will be
+            // proving
+            let l2_range = (checkpoint.l2_range.1 + 1, tip_height);
+            let new_checkpt = CheckpointInfo::new(checkpoint.idx + 1, l1_range, l2_range, tip_id);
+            Ok(vec![Duty::CommitBatch(new_checkpt.clone().into())])
         }
-
-        let exec_env_state = ExecEnvState::from_base_input(
-            UpdateInput::new(0, Buf32::zero(), Vec::new()),
-            evm_genesis_state_root,
-        );
-
-        let arb_header: [u8; 80] = arb.generate();
-        let genesis_chain_state = ChainState::from_genesis(
-            blockids[0],
-            L1ViewState::new_at_genesis(
-                3,
-                5,
-                L1HeaderRecord::new(arb_header.to_vec(), Buf32::zero()),
-            ),
-            exec_env_state,
-        );
-
-        database
-            .chainstate_store()
-            .write_genesis_state(&genesis_chain_state)
-            .unwrap();
-
-        for idx in 1..block_count {
-            let batch = WriteBatch::new(vec![StateOp::SetSlotAndTipBlock(
-                idx,
-                blockids[idx as usize],
-            )]);
-            database
-                .chainstate_store()
-                .write_state_update(idx, &batch)
-                .unwrap();
-        }
-
-        blockids
-    }
-
-    #[test]
-    fn test_batch_generation() {
-        let mut params = gen_params();
-        params.rollup.target_l2_batch_size = 10;
-
-        let database = get_common_db();
-
-        let blockids = insert_blocks_chainstate(
-            55,
-            params.rollup.evm_genesis_block_state_root,
-            database.as_ref(),
-        );
-
-        // no batches
-        let batches = generate_batches(blockids[50], database.as_ref(), &params).unwrap();
-        assert_eq!(batches, vec![]);
-
-        // single batch
-        let batches = generate_batches(blockids[40], database.as_ref(), &params).unwrap();
-        assert_eq!(batches, vec![(50, blockids[50])]);
-
-        // multiple batch
-        let batches = generate_batches(blockids[20], database.as_ref(), &params).unwrap();
-        assert_eq!(
-            batches,
-            vec![(30, blockids[30]), (40, blockids[40]), (50, blockids[50])]
-        );
-
-        // from genesis
-        let batches = generate_batches(blockids[0], database.as_ref(), &params).unwrap();
-        assert_eq!(
-            batches,
-            vec![
-                (10, blockids[10]),
-                (20, blockids[20]),
-                (30, blockids[30]),
-                (40, blockids[40]),
-                (50, blockids[50])
-            ]
-        );
     }
 }

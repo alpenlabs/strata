@@ -1,7 +1,7 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use crate::{id::L2BlockId, l1::L1BlockId};
+use crate::{batch::BatchCheckpoint, id::L2BlockId, l1::L1BlockId};
 
 /// Sync event that updates our consensus state.
 #[derive(Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize)]
@@ -12,8 +12,8 @@ pub enum SyncEvent {
     /// Revert to a recent-ish L1 block.
     L1Revert(u64),
 
-    /// New L2 blocks were posted to L1 in a DA batch at given height.
-    L1DABatch(u64, Vec<L2BlockId>),
+    /// New checkpoint posted to L1 in a DA batch at given height.
+    L1DABatch(u64, Vec<BatchCheckpoint>),
 
     /// Fork choice manager found a new valid chain tip block.  At this point
     /// we've already asked the EL to check if it's valid and know we *could*

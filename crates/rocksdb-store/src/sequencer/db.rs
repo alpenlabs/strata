@@ -7,10 +7,9 @@ use alpen_express_db::{
     DbResult,
 };
 use alpen_express_primitives::buf::Buf32;
-use alpen_express_state::batch::BatchCommitment;
 use rockbound::{OptimisticTransactionDB, SchemaDBOperationsExt};
 
-use super::schemas::{BatchCommitmentSchema, SeqBlobIdSchema, SeqBlobSchema};
+use super::schemas::{SeqBlobIdSchema, SeqBlobSchema};
 use crate::DbOpsConfig;
 
 pub struct SeqDb {
@@ -50,19 +49,6 @@ impl SeqDataStore for SeqDb {
             )
             .map_err(|e| DbError::TransactionError(e.to_string()))
     }
-
-    fn put_batch_commitment(
-        &self,
-        batchidx: u64,
-        batch_commitment: alpen_express_state::batch::BatchCommitment,
-    ) -> DbResult<()> {
-        if self.db.get::<BatchCommitmentSchema>(&batchidx)?.is_some() {
-            return Err(DbError::OverwriteBatchCommitment(batchidx));
-        };
-        self.db
-            .put::<BatchCommitmentSchema>(&batchidx, &batch_commitment)?;
-        Ok(())
-    }
 }
 
 impl SeqDataProvider for SeqDb {
@@ -76,14 +62,6 @@ impl SeqDataProvider for SeqDb {
 
     fn get_blob_id(&self, blobidx: u64) -> DbResult<Option<Buf32>> {
         Ok(self.db.get::<SeqBlobIdSchema>(&blobidx)?)
-    }
-
-    fn get_batch_commitment(&self, batchidx: u64) -> DbResult<Option<BatchCommitment>> {
-        Ok(self.db.get::<BatchCommitmentSchema>(&batchidx)?)
-    }
-
-    fn get_last_batch_idx(&self) -> DbResult<Option<u64>> {
-        Ok(rockbound::utils::get_last::<BatchCommitmentSchema>(&*self.db)?.map(|(x, _)| x))
     }
 }
 
@@ -213,64 +191,5 @@ mod tests {
 
         let last_blob_idx = seq_db.get_last_blob_idx().unwrap();
         assert_eq!(last_blob_idx, Some(1));
-    }
-
-    #[test]
-    fn test_batch_commitment_new_entry() {
-        let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-        let seq_db = SeqDb::new(db, db_ops);
-
-        let batchidx = 1;
-        let batch: BatchCommitment = ArbitraryGenerator::new().generate();
-        seq_db
-            .put_batch_commitment(batchidx, batch.clone())
-            .unwrap();
-
-        let retrieved_batch = seq_db.get_batch_commitment(batchidx).unwrap().unwrap();
-        assert_eq!(batch, retrieved_batch);
-    }
-
-    #[test]
-    fn test_batch_commitment_existing_entry() {
-        let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-        let seq_db = SeqDb::new(db, db_ops);
-
-        let batchidx = 1;
-        let batch: BatchCommitment = ArbitraryGenerator::new().generate();
-        seq_db
-            .put_batch_commitment(batchidx, batch.clone())
-            .unwrap();
-
-        let res = seq_db.put_batch_commitment(batchidx, batch.clone());
-        assert!(res.is_err_and(|x| matches!(x, DbError::OverwriteBatchCommitment(_batchidx))));
-    }
-
-    #[test]
-    fn test_batch_commitment_non_monotonic_entries() {
-        let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-        let seq_db = SeqDb::new(db, db_ops);
-
-        let batch: BatchCommitment = ArbitraryGenerator::new().generate();
-        seq_db.put_batch_commitment(100, batch.clone()).unwrap();
-        seq_db.put_batch_commitment(1, batch.clone()).unwrap();
-        seq_db.put_batch_commitment(3, batch.clone()).unwrap();
-    }
-
-    #[test]
-    fn test_get_last_batch_commitment_idx() {
-        let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-        let seq_db = SeqDb::new(db, db_ops);
-
-        let batch: BatchCommitment = ArbitraryGenerator::new().generate();
-        seq_db.put_batch_commitment(100, batch.clone()).unwrap();
-        seq_db.put_batch_commitment(1, batch.clone()).unwrap();
-        seq_db.put_batch_commitment(3, batch.clone()).unwrap();
-
-        let last_idx = seq_db.get_last_batch_idx().unwrap().unwrap();
-        assert_eq!(last_idx, 100);
-
-        seq_db.put_batch_commitment(50, batch.clone()).unwrap();
-        let last_idx = seq_db.get_last_batch_idx().unwrap().unwrap();
-        assert_eq!(last_idx, 100);
     }
 }

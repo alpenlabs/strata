@@ -4,12 +4,18 @@
 //!  - implementation of RPC client
 //!  - crate for just data structures that represents the JSON responses from Bitcoin core RPC
 
-use alpen_express_state::{bridge_ops::WithdrawalIntent, id::L2BlockId};
+use alpen_express_state::{batch::CheckpointInfo, bridge_ops::WithdrawalIntent, id::L2BlockId};
 use bitcoin::Txid;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HexBytes(#[serde(with = "hex::serde")] pub Vec<u8>);
+
+impl HexBytes {
+    pub fn into_inner(self) -> Vec<u8> {
+        self.0
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HexBytes32(#[serde(with = "hex::serde")] pub [u8; 32]);
@@ -165,4 +171,27 @@ pub struct NodeSyncStatus {
 pub struct RawBlockWitness {
     pub raw_l2_block: Vec<u8>,
     pub raw_chain_state: Vec<u8>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct RpcCheckpointInfo {
+    /// The index of the checkpoint
+    pub idx: u64,
+    /// L1 height  the checkpoint covers
+    pub l1_height: u64,
+    /// L2 height the checkpoint covers
+    pub l2_height: u64,
+    /// L2 block that this checkpoint covers
+    pub l2_blockid: L2BlockId,
+}
+
+impl From<CheckpointInfo> for RpcCheckpointInfo {
+    fn from(value: CheckpointInfo) -> Self {
+        Self {
+            idx: value.idx,
+            l1_height: value.l1_range.1,
+            l2_height: value.l2_range.1,
+            l2_blockid: value.l2_blockid,
+        }
+    }
 }

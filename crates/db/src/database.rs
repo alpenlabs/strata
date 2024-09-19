@@ -6,47 +6,59 @@ use crate::traits::SequencerDatabase;
 /// Shim database type that assumes that all the database impls are wrapped in
 /// `Arc`s and that the provider and stores are actually the same types.  We
 /// might actually use this in practice, it's just for testing.
-pub struct CommonDatabase<L1, L2, S, Cl, Ch>
+pub struct CommonDatabase<L1, L2, S, Cl, Ch, CP>
 where
     L1: L1DataStore + L1DataProvider + Sync + Send + 'static,
     L2: L2DataStore + L2DataProvider + Sync + Send + 'static,
     S: SyncEventStore + SyncEventProvider + Sync + Send + 'static,
     Cl: ClientStateStore + ClientStateProvider + Sync + Send + 'static,
     Ch: ChainstateStore + ChainstateProvider + Sync + Send + 'static,
+    CP: CheckpointStore + CheckpointProvider + Sync + Send + 'static,
 {
     l1db: Arc<L1>,
     l2db: Arc<L2>,
     sedb: Arc<S>,
     csdb: Arc<Cl>,
     chdb: Arc<Ch>,
+    cpdb: Arc<CP>,
 }
 
-impl<L1, L2, S, Cl, Ch> CommonDatabase<L1, L2, S, Cl, Ch>
+impl<L1, L2, S, Cl, Ch, CP> CommonDatabase<L1, L2, S, Cl, Ch, CP>
 where
     L1: L1DataStore + L1DataProvider + Sync + Send + 'static,
     L2: L2DataStore + L2DataProvider + Sync + Send + 'static,
     S: SyncEventStore + SyncEventProvider + Sync + Send + 'static,
     Cl: ClientStateStore + ClientStateProvider + Sync + Send + 'static,
     Ch: ChainstateStore + ChainstateProvider + Sync + Send + 'static,
+    CP: CheckpointStore + CheckpointProvider + Sync + Send + 'static,
 {
-    pub fn new(l1db: Arc<L1>, l2db: Arc<L2>, sedb: Arc<S>, csdb: Arc<Cl>, chdb: Arc<Ch>) -> Self {
+    pub fn new(
+        l1db: Arc<L1>,
+        l2db: Arc<L2>,
+        sedb: Arc<S>,
+        csdb: Arc<Cl>,
+        chdb: Arc<Ch>,
+        cpdb: Arc<CP>,
+    ) -> Self {
         Self {
             l1db,
             l2db,
             sedb,
             csdb,
             chdb,
+            cpdb,
         }
     }
 }
 
-impl<L1, L2, S, Cl, Ch> Database for CommonDatabase<L1, L2, S, Cl, Ch>
+impl<L1, L2, S, Cl, Ch, CP> Database for CommonDatabase<L1, L2, S, Cl, Ch, CP>
 where
     L1: L1DataStore + L1DataProvider + Sync + Send + 'static,
     L2: L2DataStore + L2DataProvider + Sync + Send + 'static,
     S: SyncEventStore + SyncEventProvider + Sync + Send + 'static,
     Cl: ClientStateStore + ClientStateProvider + Sync + Send + 'static,
     Ch: ChainstateStore + ChainstateProvider + Sync + Send + 'static,
+    CP: CheckpointStore + CheckpointProvider + Sync + Send + 'static,
 {
     type L1Store = L1;
     type L1Prov = L1;
@@ -58,6 +70,8 @@ where
     type CsProv = Cl;
     type ChsStore = Ch;
     type ChsProv = Ch;
+    type ChkPtProv = CP;
+    type ChkPtStore = CP;
 
     fn l1_store(&self) -> &Arc<Self::L1Store> {
         &self.l1db
@@ -97,6 +111,14 @@ where
 
     fn chainstate_provider(&self) -> &Arc<Self::ChsProv> {
         &self.chdb
+    }
+
+    fn checkpoint_store(&self) -> &Arc<Self::ChkPtStore> {
+        &self.cpdb
+    }
+
+    fn checkpoint_provider(&self) -> &Arc<Self::ChkPtProv> {
+        &self.cpdb
     }
 }
 

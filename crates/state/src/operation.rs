@@ -6,7 +6,8 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use tracing::*;
 
 use crate::{
-    client_state::{ClientState, SyncState},
+    batch::{BatchCheckpoint, CheckpointInfo},
+    client_state::{ClientState, L1CheckPoint, SyncState},
     id::L2BlockId,
     l1::L1BlockId,
 };
@@ -64,11 +65,11 @@ pub enum ClientStateWrite {
     /// Updates the buried block index to a higher index.
     UpdateBuried(u64),
 
-    /// Update the l2 block whose batch proof has been confirmed in L1 at a height.
-    UpdateConfirmed(u64, L2BlockId),
+    /// Update the checkpoints
+    CheckpointsReceived(u64, Vec<CheckpointInfo>),
 
-    /// Update the l2 block whose batch proof has been finalized.
-    UpdateFinalized(L2BlockId),
+    /// The previously confirmed checkpoint is finalized at given l1 height
+    CheckpointFinalized(u64),
 }
 
 /// Actions the client state machine directs the node to take to update its own
@@ -92,6 +93,13 @@ pub enum SyncAction {
     /// operations and start the chain sync work, using a particular L1 block
     /// as the genesis lock-in block.
     L2Genesis(L1BlockId),
+
+    /// Indicates to the worker to write the checkpoints to checkpoint db
+    WriteCheckpoints(u64, Vec<BatchCheckpoint>),
+
+    /// Indicates the worker to write the checkpoints to checkpoint db that appear in given L1
+    /// height
+    FinalizeCheckpoints(u64, Vec<BatchCheckpoint>),
 }
 
 /// Applies client state writes to a target state.
@@ -114,27 +122,20 @@ pub fn apply_writes_to_state(
                 state.chain_active = true;
             }
 
-            RollbackL1BlocksTo(block_height) => {
+            RollbackL1BlocksTo(height) => {
                 let l1v = state.l1_view_mut();
                 let buried_height = l1v.buried_l1_height();
 
-                if block_height < buried_height {
-                    error!(%block_height, %buried_height, "unable to roll back past buried height");
+                if height < buried_height {
+                    error!(%height, %buried_height, "unable to roll back past buried height");
                     panic!("operation: emitted invalid write");
                 }
 
-                let new_unacc_len = block_height - buried_height;
+                let new_unacc_len = height - buried_height;
                 l1v.local_unaccepted_blocks.truncate(new_unacc_len as usize);
 
-                // Remove confirmed blocks that are above the block_height
-                let ss = state.expect_sync_mut();
-                if let Some(pos) = ss
-                    .confirmed_checkpoint_blocks
-                    .iter()
-                    .position(|e| e.0 > block_height)
-                {
-                    ss.confirmed_checkpoint_blocks.drain(pos..);
-                }
+                // Keep pending checkpoints whose l1 height is less than or equal to rollback height
+                l1v.pending_checkpoints.retain(|ckpt| ckpt.height <= height);
             }
 
             AcceptL1Block(l1blkid) => {
@@ -147,7 +148,7 @@ pub fn apply_writes_to_state(
 
             AcceptL2Block(blkid, height) => {
                 // TODO do any other bookkeeping
-                debug!(%blkid, "received AcceptL2Block");
+                debug!(%height, %blkid, "received AcceptL2Block");
                 let ss = state.expect_sync_mut();
                 ss.tip_blkid = blkid;
                 ss.tip_height = height;
@@ -179,32 +180,51 @@ pub fn apply_writes_to_state(
                 // we haven't already
             }
 
-            UpdateFinalized(blkid) => {
-                update_finalized(state, blkid);
+            CheckpointsReceived(height, checkpts) => {
+                // Extend the pending checkpoints
+                state.l1_view_mut().pending_checkpoints.extend(
+                    checkpts
+                        .into_iter()
+                        .map(|ckpt| L1CheckPoint::new(ckpt, height)),
+                );
             }
 
-            UpdateConfirmed(l1height, blkid) => {
-                let ss = state.expect_sync_mut();
-                ss.confirmed_checkpoint_blocks.push((l1height, blkid));
+            CheckpointFinalized(height) => {
+                let l1v = state.l1_view_mut();
+
+                let finalized_checkpts: Vec<_> = l1v
+                    .pending_checkpoints
+                    .iter()
+                    .take_while(|ckpt| ckpt.height <= height)
+                    .collect();
+
+                let new_finalized = finalized_checkpts.last().cloned().cloned();
+                let total_finalized = finalized_checkpts.len();
+                debug!(?new_finalized, ?total_finalized, "Finalized checkpoints");
+
+                // Remove the finalized from pending and then mark the last one as last_finalized
+                // checkpoint
+                l1v.pending_checkpoints.drain(..total_finalized);
+
+                if let Some(checkpt) = new_finalized {
+                    // Check if heights match accordingly
+                    if !l1v
+                        .last_finalized_checkpoint
+                        .as_ref()
+                        .map_or(true, |prev_chp| {
+                            checkpt.checkpoint.idx() == prev_chp.checkpoint.idx() + 1
+                        })
+                    {
+                        panic!("operation: mismatched indices of pending checkpoint");
+                    }
+
+                    let fin_blockid = *checkpt.checkpoint.l2_blockid();
+                    l1v.last_finalized_checkpoint = Some(checkpt);
+
+                    // Update finalized blockid in StateSync
+                    state.expect_sync_mut().finalized_blkid = fin_blockid;
+                }
             }
         }
     }
-}
-
-fn update_finalized(state: &mut ClientState, blkid: L2BlockId) {
-    let ss = state.expect_sync_mut();
-    let fin_pos = ss
-        .confirmed_checkpoint_blocks
-        .iter()
-        .position(|(_, bid)| *bid == blkid)
-        .unwrap_or_else(|| {
-            panic!(
-                "expected to find blockid {} to be finalized in SyncState.confirmed_blocks",
-                blkid
-            )
-        });
-    ss.finalized_blkid = ss.confirmed_checkpoint_blocks[fin_pos].1;
-
-    // Remove all the blocks before the blkid since they are finalized
-    ss.confirmed_checkpoint_blocks.drain(..fin_pos + 1);
 }

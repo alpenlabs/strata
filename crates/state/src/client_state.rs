@@ -6,7 +6,7 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use crate::{id::L2BlockId, l1::L1BlockId};
+use crate::{batch::CheckpointInfo, id::L2BlockId, l1::L1BlockId};
 
 /// High level client's state of the network.  This is local to the client, not
 /// coordinated as part of the L2 chain.
@@ -160,6 +160,12 @@ pub struct LocalL1State {
 
     /// Next L1 block height we expect to receive
     pub(super) next_expected_block: u64,
+
+    /// Last finalized checkpoint
+    pub(super) last_finalized_checkpoint: Option<L1CheckPoint>,
+
+    /// Checkpoints that are in L1 but yet to be finalized.
+    pub(super) pending_checkpoints: Vec<L1CheckPoint>,
 }
 
 impl LocalL1State {
@@ -176,6 +182,8 @@ impl LocalL1State {
         Self {
             local_unaccepted_blocks: Vec::new(),
             next_expected_block,
+            pending_checkpoints: Vec::new(),
+            last_finalized_checkpoint: None,
         }
     }
 
@@ -212,5 +220,43 @@ impl LocalL1State {
 
     pub fn tip_blkid(&self) -> Option<&L1BlockId> {
         self.local_unaccepted_blocks().last()
+    }
+
+    pub fn last_finalized_checkpoint(&self) -> Option<&L1CheckPoint> {
+        self.last_finalized_checkpoint.as_ref()
+    }
+
+    pub fn pending_checkpoints(&self) -> &[L1CheckPoint] {
+        &self.pending_checkpoints
+    }
+
+    pub fn has_pending_checkpoint_within_height(&self, height: u64) -> bool {
+        self.pending_checkpoints
+            .iter()
+            .any(|cp| cp.height <= height)
+    }
+
+    pub fn last_pending_checkpoint_within_height(&self, height: u64) -> Option<&L1CheckPoint> {
+        self.pending_checkpoints
+            .iter()
+            .take_while(|cp| cp.height <= height)
+            .last()
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
+pub struct L1CheckPoint {
+    /// The inner checkpoint info
+    pub checkpoint: CheckpointInfo,
+    /// L1 block height it appears in
+    pub height: u64,
+}
+
+impl L1CheckPoint {
+    pub fn new(info: CheckpointInfo, height: u64) -> Self {
+        Self {
+            checkpoint: info,
+            height,
+        }
     }
 }
