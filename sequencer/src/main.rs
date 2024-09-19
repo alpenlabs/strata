@@ -292,13 +292,12 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     // Start relayer task.
     // TODO cleanup, this is ugly
-    let relayer_config = Arc::new(config.relayer.clone());
     let start_relayer_fut = express_bridge_relay::relayer::start_bridge_relayer_task(
         bridge_msg_ops,
         status_rx.clone(),
-        relayer_config.clone(),
+        config.relayer,
         &task_executor,
-    );
+    )?;
 
     // FIXME this init is screwed up because of the blocking
     let relayer_handle = rt.block_on(start_relayer_fut);

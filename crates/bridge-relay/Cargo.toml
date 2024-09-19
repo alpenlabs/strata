@@ -13,7 +13,6 @@ express-tasks = { workspace = true }
 
 anyhow = { workspace = true }
 bitcoin = { workspace = true }
-secp256k1 = { workspace = true, features = ["rand-std"] }
 sha2 = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
