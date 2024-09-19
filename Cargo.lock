@@ -4155,6 +4155,7 @@ dependencies = [
  "bitcoin",
  "borsh",
  "express-proofimpl-btc-blockspace",
+ "express-proofimpl-checkpoint",
  "express-proofimpl-evm-ee-stf",
  "express-proofimpl-l1-batch",
  "express-sp1-adapter",
