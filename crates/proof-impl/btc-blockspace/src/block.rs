@@ -86,7 +86,7 @@ pub fn compute_witness_root(l1_tx: &L1Tx) -> Buf32 {
     Buf32::from(cur_hash)
 }
 
-/// Checks if witness commitment in coinbase matches the corresponding [`L1Tx`](L1Tx).
+/// Checks if witness commitment in coinbase matches the corresponding [`L1Tx`].
 pub fn check_witness_commitment(block: &Block, l1_tx: &L1Tx) -> bool {
     if block.txdata.is_empty() {
         return false;

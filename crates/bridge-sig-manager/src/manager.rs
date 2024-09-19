@@ -105,7 +105,7 @@ impl SignatureManager {
     ///
     /// If the state corresponding to the `txid` is not present in the database
     /// ([`BridgeSigError::TransactionNotFound`]). Or, if there is an error in the persistence layer
-    /// itself ([`BridgeSigError::StorageError`]).
+    /// itself ([`BridgeSigError::Storage`]).
     pub async fn get_tx_state(&self, txid: &Txid) -> BridgeSigResult<BridgeTxState> {
         let entry = self.db_ops.get_tx_state_async(*txid).await?;
 
@@ -153,7 +153,7 @@ impl SignatureManager {
 
     /// Add a nonce to the collection for given [`OperatorIdx`] and [`Txid`].
     ///
-    /// The [`OperatorIdx`] may even be the same as [`Self::index`] in which case the nonce is
+    /// The [`OperatorIdx`] may even be the same as `Self::index` in which case the nonce is
     /// updated. It is assumed that the upstream duty producer makes sure that the nonce only
     /// comes from a node authorized to produce that nonce.
     ///
@@ -286,7 +286,7 @@ impl SignatureManager {
 
     /// Add a partial signature for a [`BridgeTxState`].
     ///
-    /// The [`SignatureInfo::signer_index`] may even be the same as [`Self::index`] in which case
+    /// The [`OperatorPartialSig::signer_index`] may even be the same as `Self::index` in which case
     /// the nonce is updated. It is assumed that the upstream duty producer makes sure that the
     /// nonce only comes from a node authorized to produce that nonce.
     ///

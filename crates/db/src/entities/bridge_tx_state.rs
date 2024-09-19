@@ -1,5 +1,5 @@
 //! Defines the [`BridgeTxState`] type that tracks the state of signature collection for a
-//! particular [`Psbt`].
+//! particular [`Psbt`](bitcoin::Psbt).
 
 use std::{collections::BTreeMap, ops::Not};
 
@@ -28,7 +28,7 @@ pub struct BridgeTxState {
     spend_infos: Vec<Option<SpendInfo>>,
 
     /// The table of pubkeys that is used to lock the UTXO present as an input in the psbt.
-    /// This table maps the `OperatorIdx` to their corresponding pubkeys.
+    /// This table maps the [`OperatorIdx`] to their corresponding pubkeys.
     pubkey_table: PublickeyTable,
 
     /// The private nonce unique to the transaction being tracked by this state.
@@ -37,7 +37,8 @@ pub struct BridgeTxState {
     // For more on nonce security, see [this](https://docs.rs/musig2/latest/musig2/#security).
     secnonce: Musig2SecNonce,
 
-    /// The (public) nonces shared for the particular [`Psbt`] that this state tracks under MuSig2.
+    /// The (public) nonces shared for the particular [`Psbt`](bitcoin::Psbt)
+    /// that this state tracks under MuSig2.
     collected_nonces: BTreeMap<OperatorIdx, Musig2PubNonce>,
 
     /// The table of signatures collected so far per operator and per input in the [`Self::psbt`].
@@ -45,8 +46,8 @@ pub struct BridgeTxState {
 }
 
 impl BridgeTxState {
-    /// Create a new [`TxState`] for the given [`Psbt`] and list of
-    /// [`bitcoin::secp256k1::PublicKey`].
+    /// Create a new [`BridgeTxState`] for the given [`Psbt`](bitcoin::Psbt)
+    /// and list of [`bitcoin::secp256k1::PublicKey`].
     pub fn new(
         tx_signing_data: TxSigningData,
         pubkey_table: PublickeyTable,
@@ -68,17 +69,18 @@ impl BridgeTxState {
         })
     }
 
-    /// Get the [`Psbt`] that this state is associated with.
+    /// Get the [`Psbt`](bitcoin::Psbt) that this state is associated with.
     pub fn psbt(&self) -> &BitcoinPsbt {
         &self.psbt
     }
 
-    /// Get the spend info associated with each input in the PSBT.
+    /// Get the spend info associated with each input in the [`Psbt`](bitcoin::Psbt).
     pub fn spend_infos(&self) -> &[Option<SpendInfo>] {
         &self.spend_infos[..]
     }
 
-    /// Get the relevant previous outputs of the Psbt that this state tracks.
+    /// Get the relevant previous outputs of the [`Psbt`](bitcoin::Psbt)
+    /// that this state tracks.
     pub fn prevouts(&self) -> Vec<TxOut> {
         self.psbt()
             .inner()
@@ -93,7 +95,8 @@ impl BridgeTxState {
             .collect()
     }
 
-    /// Get the number of required signatures for the [`Psbt`] to be considered fully signed.
+    /// Get the number of required signatures for the [`Psbt`](bitcoin::Psbt)
+    /// to be considered fully signed.
     pub fn required_signatures(&self) -> usize {
         self.pubkey_table.0.keys().len()
     }
@@ -109,7 +112,7 @@ impl BridgeTxState {
         &self.pubkey_table
     }
 
-    /// Get the unsigned transaction from the [`Psbt`].
+    /// Get the unsigned transaction from the [`Psbt`](bitcoin::Psbt).
     pub fn unsigned_tx(&self) -> &Transaction {
         &self.psbt().inner().unsigned_tx
     }
@@ -162,7 +165,8 @@ impl BridgeTxState {
         Ok(self.has_all_nonces())
     }
 
-    /// Check if all the required signatures have been collected for the [`Psbt`].
+    /// Check if all the required signatures have been collected for the
+    /// [`Psbt`](bitcoin::Psbt).
     pub fn is_fully_signed(&self) -> bool {
         // for each input, check all signatures have been collected
         // each signature is added only if the signer is part of the `pubkey_table`,
@@ -178,7 +182,7 @@ impl BridgeTxState {
     /// **Note**: This being a database-related operation, no validation is performed on the
     /// provided signature as that requires access to a signing module. The only validation that
     /// this method performs is that the signature comes from an [`OperatorIdx`] that is part of
-    /// the [`Self::pubkey_table`]. It is assumed that all necessary validation has already been
+    /// the `Self::pubkey_table`. It is assumed that all necessary validation has already been
     /// performed at the callsite.
     ///
     /// # Returns
@@ -188,8 +192,8 @@ impl BridgeTxState {
     ///
     /// # Errors
     ///
-    /// If the [`SignatureInfo::signer_index`] is not a part of the required signatories or the
-    /// `input_index` is not part of the [`Psbt`].
+    /// If the [`OperatorPartialSig::signer_index`] is not a part of the required signatories or the
+    /// `input_index` is not part of the [`Psbt`](bitcoin::Psbt).
     pub fn add_signature(
         &mut self,
         signature_info: OperatorPartialSig,

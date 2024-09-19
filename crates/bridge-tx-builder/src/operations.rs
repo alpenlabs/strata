@@ -69,7 +69,7 @@ pub enum SpendPath<'path> {
         internal_key: UntweakedPublicKey,
     },
     /// Script path spend that only allows spending via scripts in the taproot tree, with the
-    /// internal key being the [`UNSPENDABLE_INTERNAL_KEY`].
+    /// internal key being the [`static@UNSPENDABLE_INTERNAL_KEY`].
     ScriptSpend {
         /// The scripts that live in the leaves of the taproot tree.
         scripts: &'path [ScriptBuf],

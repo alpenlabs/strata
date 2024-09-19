@@ -41,7 +41,7 @@ pub enum BridgeTxBuilderError {
     PsbtCreate(String),
 }
 
-/// Manual implementation of conversion from [`psbt::Error`] to [`BridgeTxStateError`] as the
+/// Manual implementation of conversion from [`psbt::Error`] to [`BridgeTxBuilderError`] as the
 /// former does not implement [`Clone`] ¯\_(ツ)_/¯.
 impl From<psbt::Error> for BridgeTxBuilderError {
     fn from(value: psbt::Error) -> Self {

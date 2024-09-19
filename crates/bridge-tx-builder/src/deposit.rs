@@ -49,8 +49,8 @@ pub struct DepositInfo {
 
     /// The original taproot address in the Deposit Request Transaction (DRT) output used to
     /// sanity check computation internally i.e., whether the known information (n/n script spend
-    /// path, [`UNSPENDABLE_INTERNAL_KEY`]) + the [`Self::take_back_leaf_hash`] yields the same
-    /// P2TR address.
+    /// path, [`static@UNSPENDABLE_INTERNAL_KEY`]) + the [`Self::take_back_leaf_hash`] yields the
+    /// same P2TR address.
     original_taproot_addr: BitcoinAddress,
 }
 

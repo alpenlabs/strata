@@ -1,6 +1,8 @@
 name: Docs
 
 on:
+  pull_request:
+  merge_group:
   push:
     branches: [master]
 
@@ -20,14 +22,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-      - run: cargo doc --document-private-items
+      - name: Check docs leaving the dependencies out
         env:
-          RUSTDOCFLAGS: --show-type-layout --enable-index-page -Zunstable-options -D warnings
-      - name: Compress docs artifacts
-        run: tar czf express-core-docs.tar.gz target/doc
-      - name: Archive docs
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: docs
-          path: express-core-docs.tar.gz
+          RUSTDOCFLAGS: --show-type-layout --enable-index-page -Zunstable-options -A rustdoc::private-doc-tests -D warnings
+        run: cargo doc --workspace --no-deps

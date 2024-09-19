@@ -9,8 +9,8 @@ use thiserror::Error;
 /// [`Psbt`](bitcoin::Psbt).
 #[derive(Debug, Clone, Error)]
 pub enum BridgeSigError {
-    /// Failed to build a [`Psbt`] from the unsigned transaction. This can happen if the
-    /// transaction that is being converted to a psbt contains a non-empty script sig or
+    /// Failed to build a [`Psbt`](bitcoin::Psbt) from the unsigned transaction. This can happen if
+    /// the transaction that is being converted to a psbt contains a non-empty script sig or
     /// witness fields.
     #[error("build psbt: {0}")]
     PsbtConstruction(String),

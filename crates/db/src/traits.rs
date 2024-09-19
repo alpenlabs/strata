@@ -381,7 +381,7 @@ pub trait BcastProvider {
 /// Provides access to the implementers of provider and store traits for interacting with the
 /// transaction state database of the bridge client.
 ///
-/// This trait assumes that the [`Txid`] is always unique.
+/// This trait assumes that the [`Txid`](bitcoin::Txid) is always unique.
 pub trait BridgeTxDatabase {
     /// Add [`BridgeTxState`] to the database replacing the existing one if present.
     fn put_tx_state(&self, txid: Buf32, tx_state: BridgeTxState) -> DbResult<()>;

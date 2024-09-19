@@ -15,7 +15,6 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
 use std::{mem, mem::take};
 
 use alloy_eips::eip1559::BaseFeeParams;
@@ -68,7 +67,7 @@ pub struct EvmProcessor<D> {
 impl<D> EvmProcessor<D> {
     /// Validate the header standalone.
     ///
-    /// Reference: https://github.com/paradigmxyz/reth/blob/main/crates/consensus/common/src/validation.rs#L14
+    /// Reference: <https://github.com/paradigmxyz/reth/blob/main/crates/consensus/common/src/validation.rs#L14>
     pub fn validate_header_standalone(&self) {
         let header = self.header.as_ref().unwrap();
 
@@ -80,7 +79,7 @@ impl<D> EvmProcessor<D> {
 
     /// Validates the integrity and consistency of a block header in relation to it's parent.
     ///
-    /// Reference: https://github.com/paradigmxyz/reth/blob/main/crates/primitives/src/header.rs#L800
+    /// Reference: <https://github.com/paradigmxyz/reth/blob/main/crates/primitives/src/header.rs#L800>
     pub fn validate_against_parent(&self) {
         let parent_header = &self.input.parent_header;
         let header = self.header.as_ref().unwrap();
@@ -103,7 +102,7 @@ impl<D> EvmProcessor<D> {
 
     /// Checks the gas limit for consistency between parent and self headers.
     ///
-    /// Reference: https://github.com/paradigmxyz/reth/blob/main/crates/primitives/src/header.rs#L738
+    /// Reference: <https://github.com/paradigmxyz/reth/blob/main/crates/primitives/src/header.rs#L738>
     pub fn validate_gas_limit(&self) {
         let parent_header = &self.input.parent_header;
         let header = self.header.as_ref().unwrap();
@@ -127,7 +126,7 @@ impl<D> EvmProcessor<D> {
 
     /// Validates the header's extradata according to the beacon consensus rules.
     ///
-    /// Reference: https://github.com/paradigmxyz/reth/blob/main/crates/consensus/beacon-core/src/lib.rs#L118
+    /// Reference: <https://github.com/paradigmxyz/reth/blob/main/crates/consensus/beacon-core/src/lib.rs#L118>
     pub fn validate_header_extradata(&self) {
         let header = self.header.as_ref().unwrap();
         if header.extra_data.len() > MAXIMUM_EXTRA_DATA_SIZE {
