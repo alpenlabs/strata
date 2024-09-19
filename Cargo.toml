@@ -50,7 +50,7 @@ members = [
   "crates/tx-parser",
 
   # integration tests
-  "tests",
+  "tests", "bin/strata-cli", "crates/util/hex",
 ]
 
 default-members = [
