@@ -3,7 +3,7 @@
 use std::time;
 
 use alpen_express_primitives::{buf::Buf32, hash::compute_borsh_hash};
-use alpen_express_state::id::L2BlockId;
+use alpen_express_state::{batch::CheckpointInfo, id::L2BlockId};
 use borsh::{BorshDeserialize, BorshSerialize};
 
 /// Describes when we'll stop working to fulfill a duty.
@@ -20,6 +20,9 @@ pub enum Expiry {
 
     /// Duty expires after a specific L2 block is finalized
     BlockIdFinalized(L2BlockId),
+
+    /// Duty expires after a specific checkpoint is finalized on bitcoin
+    CheckpointIdxFinalized(u64),
 }
 
 /// Duties the sequencer might carry out.
@@ -27,8 +30,8 @@ pub enum Expiry {
 pub enum Duty {
     /// Goal to sign a block.
     SignBlock(BlockSigningDuty),
-    /// Goal to write batch data to L1
-    CommitBatch(BatchCommitmentDuty),
+    /// Goal to build and commit a batch.
+    CommitBatch(BatchCheckpointDuty),
 }
 
 impl Duty {
@@ -36,14 +39,16 @@ impl Duty {
     pub fn expiry(&self) -> Expiry {
         match self {
             Self::SignBlock(_) => Expiry::NextBlock,
-            Self::CommitBatch(BatchCommitmentDuty { blockid, .. }) => {
-                Expiry::BlockIdFinalized(*blockid)
-            }
+            Self::CommitBatch(duty) => Expiry::CheckpointIdxFinalized(duty.idx()),
         }
     }
 
     pub fn id(&self) -> Buf32 {
-        compute_borsh_hash(self)
+        match self {
+            // We want Batch commitment duty to be unique by the checkpoint idx
+            Self::CommitBatch(duty) => compute_borsh_hash(&duty.idx()),
+            _ => compute_borsh_hash(self),
+        }
     }
 }
 
@@ -70,21 +75,28 @@ impl BlockSigningDuty {
     }
 }
 
+/// This duty is created whenever a previous batch is found on L1 and verified.
+/// When this duty is created, in order to execute the duty, the sequencer looks for corresponding
+/// batch proof in the proof db.
 #[derive(Clone, Debug, BorshSerialize)]
-pub struct BatchCommitmentDuty {
-    /// Last slot of batch
-    slot: u64,
-    /// Id of block in last slot
-    blockid: L2BlockId,
+pub struct BatchCheckpointDuty {
+    /// Checkpoint/batch info
+    checkpoint: CheckpointInfo,
 }
 
-impl BatchCommitmentDuty {
-    pub fn new(slot: u64, blockid: L2BlockId) -> Self {
-        Self { slot, blockid }
+impl BatchCheckpointDuty {
+    pub fn idx(&self) -> u64 {
+        self.checkpoint.idx()
     }
 
-    pub fn end_slot(&self) -> u64 {
-        self.slot
+    pub fn checkpoint(&self) -> &CheckpointInfo {
+        &self.checkpoint
+    }
+}
+
+impl From<CheckpointInfo> for BatchCheckpointDuty {
+    fn from(value: CheckpointInfo) -> Self {
+        Self { checkpoint: value }
     }
 }
 
@@ -137,6 +149,15 @@ impl DutyTracker {
                 }
                 Expiry::BlockIdFinalized(l2blockid) => {
                     if update.is_finalized(&l2blockid) {
+                        continue;
+                    }
+                }
+                Expiry::CheckpointIdxFinalized(idx) => {
+                    if update
+                        .latest_finalized_batch
+                        .filter(|&x| x >= idx)
+                        .is_some()
+                    {
                         continue;
                     }
                 }
@@ -212,6 +233,9 @@ pub struct StateUpdate {
 
     /// Latest finalized block.
     latest_finalized_block: Option<L2BlockId>,
+
+    /// Latest finalized batch.
+    latest_finalized_batch: Option<u64>,
 }
 
 impl StateUpdate {
@@ -219,6 +243,7 @@ impl StateUpdate {
         last_block_slot: u64,
         cur_timestamp: time::Instant,
         mut newly_finalized_blocks: Vec<L2BlockId>,
+        latest_finalized_batch: Option<u64>,
     ) -> Self {
         // Extract latest finalized block before sorting
         let latest_finalized_block = newly_finalized_blocks.first().cloned();
@@ -230,11 +255,12 @@ impl StateUpdate {
             cur_timestamp,
             newly_finalized_blocks,
             latest_finalized_block,
+            latest_finalized_batch,
         }
     }
 
     pub fn new_simple(last_block_slot: u64, cur_timestamp: time::Instant) -> Self {
-        Self::new(last_block_slot, cur_timestamp, Vec::new())
+        Self::new(last_block_slot, cur_timestamp, Vec::new(), None)
     }
 
     pub fn is_finalized(&self, id: &L2BlockId) -> bool {

@@ -1,6 +1,7 @@
 //! Module for database local types
 
 use alpen_express_primitives::buf::Buf32;
+use alpen_express_state::batch::{BatchCheckpoint, CheckpointInfo};
 use arbitrary::Arbitrary;
 use bitcoin::{
     consensus::{self, deserialize, serialize},
@@ -9,6 +10,8 @@ use bitcoin::{
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
+/// Represents data for a blob we're still planning to inscribe.
+// TODO rename to `BlockInscriptionEntry` to emphasize this isn't just about *all* blobs
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct BlobEntry {
     pub blob: Vec<u8>,
@@ -33,6 +36,7 @@ impl BlobEntry {
     }
 
     /// Create new unsigned blobentry.
+    ///
     /// NOTE: This won't have commit - reveal pairs associated with it.
     ///   Because it is better to defer gathering utxos as late as possible to prevent being spent
     ///   by others. Those will be created and signed in a single step.
@@ -48,17 +52,23 @@ impl BlobEntry {
 pub enum BlobL1Status {
     /// The blob has not been signed yet, i.e commit-reveal transactions have not been created yet.
     Unsigned,
+
     /// The commit-reveal transactions for blob are signed and waiting to be published
     Unpublished,
+
     /// The transactions are published
     Published,
+
     /// The transactions are confirmed
     Confirmed,
+
     /// The transactions are finalized
     Finalized,
+
     /// The transactions need to be resigned.
     /// This could be due to transactions input UTXOs already being spent.
     NeedsResign,
+
     /// The transactions were not included for some reason
     Excluded,
 }
@@ -69,6 +79,7 @@ pub enum BlobL1Status {
 pub struct L1TxEntry {
     /// Raw serialized transaction. This is basically `consensus::serialize()` of [`Transaction`]
     tx_raw: Vec<u8>,
+
     /// The status of the transaction in bitcoin
     pub status: L1TxStatus,
 }
@@ -106,12 +117,18 @@ impl L1TxEntry {
 pub enum L1TxStatus {
     /// The transaction is waiting to be published
     Unpublished,
+
     /// The transaction is published
     Published,
+
     /// The transaction is included in L1 and has `u64` confirmations
+    // FIXME this doesn't make sense to be "confirmations"
     Confirmed { confirmations: u64 },
+
     /// The transaction is finalized in L1 and has `u64` confirmations
+    // FIXME this doesn't make sense to be "confirmations"
     Finalized { confirmations: u64 },
+
     /// The transaction is not included in L1 and has errored with some error code
     Excluded { reason: ExcludeReason },
 }
@@ -124,9 +141,85 @@ pub enum L1TxStatus {
 pub enum ExcludeReason {
     /// Excluded because inputs were spent or not present in the chain/mempool
     MissingInputsOrSpent,
+
     /// Excluded for other reasons.
     // TODO: add other cases
     Other(String),
+}
+
+/// Entry corresponding to a BatchCommitment
+#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
+pub struct CheckpointEntry {
+    /// Info related to the batch
+    pub checkpoint: CheckpointInfo,
+
+    /// Proof
+    pub proof: Vec<u8>,
+
+    /// Proving Status
+    pub proving_status: CheckpointProvingStatus,
+
+    /// Confirmation Status
+    pub confirmation_status: CheckpointConfStatus,
+}
+
+impl CheckpointEntry {
+    pub fn new(
+        checkpoint: CheckpointInfo,
+        proof: Vec<u8>,
+        proving_status: CheckpointProvingStatus,
+        confirmation_status: CheckpointConfStatus,
+    ) -> Self {
+        Self {
+            checkpoint,
+            proof,
+            proving_status,
+            confirmation_status,
+        }
+    }
+
+    /// Creates a new instance for a freshly defined checkpoint.
+    pub fn new_pending_proof(checkpoint: CheckpointInfo) -> Self {
+        Self::new(
+            checkpoint,
+            vec![],
+            CheckpointProvingStatus::PendingProof,
+            CheckpointConfStatus::Pending,
+        )
+    }
+
+    pub fn is_proof_ready(&self) -> bool {
+        self.proving_status == CheckpointProvingStatus::ProofReady
+    }
+
+    pub fn is_proof_nonempty(&self) -> bool {
+        !self.proof.is_empty()
+    }
+}
+
+impl From<CheckpointEntry> for BatchCheckpoint {
+    fn from(entry: CheckpointEntry) -> BatchCheckpoint {
+        BatchCheckpoint::new(entry.checkpoint, entry.proof)
+    }
+}
+
+/// Status of the commmitment
+#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
+pub enum CheckpointProvingStatus {
+    /// Proof has not been created for this checkpoint
+    PendingProof,
+    /// Proof is ready
+    ProofReady,
+}
+
+#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
+pub enum CheckpointConfStatus {
+    /// Pending to be posted on L1
+    Pending,
+    /// Confirmed on L1
+    Confirmed,
+    /// Finalized on L1
+    Finalized,
 }
 
 #[cfg(test)]

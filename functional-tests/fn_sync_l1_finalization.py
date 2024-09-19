@@ -2,52 +2,80 @@ import time
 
 import flexitest
 
-from constants import FAST_BATCH_ROLLUP_PARAMS
+from constants import (
+    ERROR_CHECKPOINT_DOESNOT_EXIST,
+    ERROR_PROOF_ALREADY_CREATED,
+    FAST_BATCH_ROLLUP_PARAMS,
+)
+from entry import BasicEnvConfig
 
 
 @flexitest.register
 class BlockFinalizationTest(flexitest.Test):
-    """
-    This will test that l2 block indexed at batch_size is finalized after certain l1 height.
-    This is because, we create block batches at every batch_size interval.
-    """
+    """ """
 
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env("fast_batches")
+        ctx.set_env(BasicEnvConfig(101, rollup_params=FAST_BATCH_ROLLUP_PARAMS))
 
     def main(self, ctx: flexitest.RunContext):
         seq = ctx.get_service("sequencer")
 
         seqrpc = seq.create_rpc()
 
-        batch_size = FAST_BATCH_ROLLUP_PARAMS["target_l2_batch_size"]
+        check_send_proof_for_non_existent_batch(seqrpc)
 
-        # Check for some finalized batches. We need to for blockids at the
-        # interval of batch size
-        for x in range(1, 5):
-            print("Checking finalized for batch", x)
-            idx = batch_size * x
-            blockid = get_block_at(idx, seqrpc)
-            check_finalized(blockid, seqrpc)
-            print(f"Batch {x} finalized")
+        # Check for first 4 checkpoints
+        for n in range(1, 5):
+            check_for_nth_checkpoint_finalization(n, seqrpc)
+            print(f"Pass checkpoint finalization for checkpoint {n}")
+
+        check_already_sent_proof(seqrpc)
 
 
-def get_block_at(idx, seqrpc):
-    for _ in range(5):  # 5 should be fine for polling block at idx at 0.5s interval
-        blocks = seqrpc.alp_getHeadersAtIdx(idx)
-        if blocks:
-            # NOTE: This assumes that first item is the block we want. This
-            # might change when we have multiple sequencers
-            return blocks[0]["block_id"]
-        time.sleep(0.5)  # 0.5 because this should be good enough time to wait for a block
-    raise AssertionError("Did not see block produced within timeout")
+def check_for_nth_checkpoint_finalization(idx, seqrpc):
+    syncstat = seqrpc.alp_syncStatus()
+    checkpoint_info = seqrpc.alp_getCheckpointInfo(idx)
+    print(f"checkpoint info for {idx}", checkpoint_info)
+
+    assert (
+        syncstat["finalized_block_id"] != checkpoint_info["l2_blockid"]
+    ), "Checkpoint block should not yet finalize"
+
+    checkpoint_info_1 = seqrpc.alp_getCheckpointInfo(idx + 1)
+
+    assert checkpoint_info["idx"] == idx
+    assert checkpoint_info_1 is None, f"There should be no checkpoint info for {idx + 1} index"
+
+    to_finalize_blkid = checkpoint_info["l2_blockid"]
+
+    # Post checkpoint proof
+    proof_hex = "abcdef"
+    seqrpc.alp_submitCheckpointProof(idx, proof_hex)
+
+    # Wait till checkpoint finalizes, since our finalization depth is 4 and the block
+    # generation time is 0.5s wait slightly more than 2 secs
+    # Ideally this should be tested with controlled bitcoin block production
+    time.sleep(4)
+
+    syncstat = seqrpc.alp_syncStatus()
+    print("Sync Stat", syncstat)
+    assert to_finalize_blkid == syncstat["finalized_block_id"], "Block not finalized"
 
 
-def check_finalized(blockid, seqrpc):
-    for _ in range(20):  # 20 should be fine for polling finalized blocks at 0.2s interval
-        client_stat = seqrpc.alp_clientStatus()
-        finalized_id = client_stat["finalized_blkid"]
-        if finalized_id == blockid:
-            return True
-        time.sleep(0.2)
-    raise AssertionError("Did not see finalized blockid within timeout")
+def check_send_proof_for_non_existent_batch(seqrpc):
+    try:
+        seqrpc.alp_submitCheckpointProof(100, "abc123")
+    except Exception as e:
+        assert e.code == ERROR_CHECKPOINT_DOESNOT_EXIST
+    else:
+        raise AssertionError("Expected rpc error")
+
+
+def check_already_sent_proof(seqrpc):
+    try:
+        # Proof for checkpoint 1 is already sent
+        seqrpc.alp_submitCheckpointProof(1, "abc123")
+    except Exception as e:
+        assert e.code == ERROR_PROOF_ALREADY_CREATED
+    else:
+        raise AssertionError("Expected rpc error")

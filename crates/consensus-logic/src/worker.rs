@@ -2,14 +2,17 @@
 
 use std::sync::Arc;
 
-use alpen_express_db::traits::*;
+use alpen_express_db::{
+    traits::*,
+    types::{CheckpointConfStatus, CheckpointEntry, CheckpointProvingStatus},
+};
 use alpen_express_eectl::engine::ExecEngineCtl;
 use alpen_express_primitives::prelude::*;
 use alpen_express_state::{
     client_state::ClientState, csm_status::CsmStatus, operation::SyncAction,
 };
 use alpen_express_status::StatusTx;
-use express_storage::L2BlockManager;
+use express_storage::{managers::checkpoint::CheckpointDbManager, L2BlockManager};
 use express_tasks::ShutdownGuard;
 use tokio::sync::{broadcast, mpsc};
 use tracing::*;
@@ -37,6 +40,9 @@ pub struct WorkerState<D: Database> {
     /// L2 block manager.
     l2_block_manager: Arc<L2BlockManager>,
 
+    /// Checkpoint manager.
+    checkpoint_manager: Arc<CheckpointDbManager>,
+
     /// Tracker used to remember the current consensus state.
     state_tracker: state_tracker::StateTracker<D>,
 
@@ -52,6 +58,7 @@ impl<D: Database> WorkerState<D> {
         database: Arc<D>,
         l2_block_manager: Arc<L2BlockManager>,
         cupdate_tx: broadcast::Sender<Arc<ClientUpdateNotif>>,
+        checkpoint_manager: Arc<CheckpointDbManager>,
     ) -> anyhow::Result<Self> {
         let cs_prov = database.client_state_provider().as_ref();
         let (cur_state_idx, cur_state) = state_tracker::reconstruct_cur_state(cs_prov)?;
@@ -68,6 +75,7 @@ impl<D: Database> WorkerState<D> {
             l2_block_manager,
             state_tracker,
             cupdate_tx,
+            checkpoint_manager,
         })
     }
 
@@ -79,6 +87,11 @@ impl<D: Database> WorkerState<D> {
     /// Gets a ref to the consensus state from the inner state tracker.
     pub fn cur_state(&self) -> &Arc<ClientState> {
         self.state_tracker.cur_state()
+    }
+
+    /// Gets a reference to checkpoint manager
+    pub fn checkpoint_db(&self) -> &CheckpointDbManager {
+        self.checkpoint_manager.as_ref()
     }
 }
 
@@ -199,6 +212,39 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
                     },
                 )?;
             }
+
+            SyncAction::WriteCheckpoints(_height, checkpoints) => {
+                for c in checkpoints.iter() {
+                    let idx = c.checkpoint().idx();
+                    let pstatus = CheckpointProvingStatus::ProofReady;
+                    let cstatus = CheckpointConfStatus::Confirmed;
+                    let entry = CheckpointEntry::new(
+                        c.checkpoint().clone(),
+                        c.proof().to_vec(),
+                        pstatus,
+                        cstatus,
+                    );
+
+                    // Store
+                    state.checkpoint_db().put_checkpoint_blocking(idx, entry)?;
+                }
+            }
+            SyncAction::FinalizeCheckpoints(_height, checkpoints) => {
+                for c in checkpoints.iter() {
+                    let idx = c.checkpoint().idx();
+                    let pstatus = CheckpointProvingStatus::ProofReady;
+                    let cstatus = CheckpointConfStatus::Finalized;
+                    let entry = CheckpointEntry::new(
+                        c.checkpoint().clone(),
+                        c.proof().to_vec(),
+                        pstatus,
+                        cstatus,
+                    );
+
+                    // Update
+                    state.checkpoint_db().put_checkpoint_blocking(idx, entry)?;
+                }
+            }
         }
     }
 
@@ -226,6 +272,7 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
     let _ = status_tx.csm.send(status);
     let _ = status_tx.cl.send(client_state);
 
+    debug!(?new_state, "Sending client update notif");
     let update = ClientUpdateNotif::new(ev_idx, outp, new_state);
     if state.cupdate_tx.send(Arc::new(update)).is_err() {
         warn!(%ev_idx, "failed to send broadcast for new CSM update");

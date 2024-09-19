@@ -3,19 +3,22 @@
 use std::{
     collections::HashMap,
     sync::{Arc, RwLock},
-    time,
+    time::{self},
 };
 
 use alpen_express_btcio::writer::InscriptionHandle;
 use alpen_express_crypto::sign_schnorr_sig;
-use alpen_express_db::traits::*;
+use alpen_express_db::{
+    traits::*,
+    types::{CheckpointEntry, CheckpointProvingStatus},
+};
 use alpen_express_eectl::engine::ExecEngineCtl;
 use alpen_express_primitives::{
     buf::{Buf32, Buf64},
     params::Params,
 };
 use alpen_express_state::{
-    batch::{BatchCommitment, SignedBatchCommitment},
+    batch::{BatchCheckpoint, SignedBatchCheckpoint},
     client_state::ClientState,
     da_blob::{BlobDest, BlobIntent},
     prelude::*,
@@ -27,9 +30,10 @@ use tracing::*;
 
 use super::{
     block_assembly, extractor,
-    types::{self, Duty, DutyBatch, Identity, IdentityKey},
+    types::{self, BatchCheckpointDuty, Duty, DutyBatch, Identity, IdentityKey},
 };
 use crate::{
+    checkpoint::CheckpointHandle,
     errors::Error,
     message::{ClientUpdateNotif, ForkChoiceMessage},
     sync_manager::SyncManager,
@@ -101,7 +105,6 @@ fn duty_tracker_task_inner(
             &mut duties_tracker,
             new_state,
             &ident,
-            database,
             l2_block_manager,
             params,
         ) {
@@ -124,7 +127,6 @@ fn update_tracker(
     tracker: &mut types::DutyTracker,
     state: &ClientState,
     ident: &Identity,
-    database: &impl Database,
     l2_block_manager: &L2BlockManager,
     params: &Params,
 ) -> Result<(), Error> {
@@ -132,7 +134,7 @@ fn update_tracker(
         return Ok(());
     };
 
-    let new_duties = extractor::extract_duties(state, ident, database, params)?;
+    let new_duties = extractor::extract_duties(state, ident, params)?;
 
     info!(new_duties = ?new_duties, "new duties");
 
@@ -153,7 +155,17 @@ fn update_tracker(
         new_finalized,
     )?;
 
-    let tracker_update = types::StateUpdate::new(block_idx, ts, newly_finalized_blocks);
+    let latest_finalized_batch = state
+        .l1_view()
+        .last_finalized_checkpoint()
+        .map(|x| x.checkpoint.idx());
+
+    let tracker_update = types::StateUpdate::new(
+        block_idx,
+        ts,
+        newly_finalized_blocks,
+        latest_finalized_batch,
+    );
     let n_evicted = tracker.update(&tracker_update);
     trace!(%n_evicted, "evicted old duties from new consensus state");
 
@@ -212,6 +224,7 @@ pub fn duty_dispatch_task<
     inscription_handle: Arc<InscriptionHandle>,
     pool: threadpool::ThreadPool,
     params: Arc<Params>,
+    ckpt_handle: Arc<CheckpointHandle>,
 ) {
     // TODO make this actually work
     let pending_duties = Arc::new(RwLock::new(HashMap::<Buf32, ()>::new()));
@@ -274,11 +287,12 @@ pub fn duty_dispatch_task<
             let sm = sync_man.clone();
             let db = database.clone();
             let e = engine.clone();
-            let da_writer = inscription_handle.clone();
+            let insc_h = inscription_handle.clone();
             let params: Arc<Params> = params.clone();
-            let duty_status_tx_l = duty_status_tx.clone();
+            let duty_st_tx = duty_status_tx.clone();
+            let checkpt_mgr = ckpt_handle.clone();
             pool.execute(move || {
-                duty_exec_task(d, ik, sm, db, e, da_writer, params, duty_status_tx_l)
+                duty_exec_task(d, ik, sm, db, e, insc_h, params, duty_st_tx, checkpt_mgr)
             });
             trace!(%id, "dispatched duty exec task");
             pending_duties_local.insert(id, ());
@@ -290,7 +304,7 @@ pub fn duty_dispatch_task<
     info!("duty dispatcher task exiting");
 }
 
-/// Toplevel function that's actually performs a job.  This is spawned on a/
+/// Toplevel function that actually performs a job.  This is spawned on a/
 /// thread pool so we don't have to worry about it blocking *too* much other
 /// work.
 #[allow(clippy::too_many_arguments)] // TODO: fix this
@@ -303,6 +317,7 @@ fn duty_exec_task<D: Database, E: ExecEngineCtl>(
     inscription_handle: Arc<InscriptionHandle>,
     params: Arc<Params>,
     duty_status_tx: std::sync::mpsc::Sender<DutyExecStatus>,
+    ckpt_handle: Arc<CheckpointHandle>,
 ) {
     let result = perform_duty(
         &duty,
@@ -312,6 +327,7 @@ fn duty_exec_task<D: Database, E: ExecEngineCtl>(
         engine.as_ref(),
         inscription_handle.as_ref(),
         &params,
+        ckpt_handle.as_ref(),
     );
 
     let status = DutyExecStatus {
@@ -324,6 +340,7 @@ fn duty_exec_task<D: Database, E: ExecEngineCtl>(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn perform_duty<D: Database, E: ExecEngineCtl>(
     duty: &Duty,
     ik: &IdentityKey,
@@ -332,6 +349,7 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
     engine: &E,
     inscription_handle: &InscriptionHandle,
     params: &Arc<Params>,
+    checkpt_mgr: &CheckpointHandle,
 ) -> Result<(), Error> {
     match duty {
         Duty::SignBlock(data) => {
@@ -376,28 +394,20 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
         }
         Duty::CommitBatch(data) => {
             info!(data = ?data, "commit batch");
-            let end_slot = data.end_slot();
 
-            let end_chain_state = database
-                .chainstate_provider()
-                .get_toplevel_state(end_slot)?
-                .ok_or(Error::MissingIdxChainstate(end_slot))?;
+            let checkpoint = check_and_get_batch_checkpoint(data, checkpt_mgr)?;
 
-            let l2blockid = end_chain_state.chain_tip_blockid();
-            let l1blockid = end_chain_state.l1_view().safe_block().blkid();
-
-            let commitment = BatchCommitment::new(*l1blockid, l2blockid);
-            let commitment_sighash = commitment.get_sighash();
-            let signature = sign_with_identity_key(&commitment_sighash, ik);
-            let signed_commitment = SignedBatchCommitment::new(commitment, signature);
+            let checkpoint_sighash = checkpoint.get_sighash();
+            let signature = sign_with_identity_key(&checkpoint_sighash, ik);
+            let signed_checkpoint = SignedBatchCheckpoint::new(checkpoint, signature);
 
             // serialize and send to l1 writer
 
             let payload =
-                borsh::to_vec(&signed_commitment).map_err(|e| Error::Other(e.to_string()))?;
-            let blob_intent = BlobIntent::new(BlobDest::L1, commitment_sighash, payload);
+                borsh::to_vec(&signed_checkpoint).map_err(|e| Error::Other(e.to_string()))?;
+            let blob_intent = BlobIntent::new(BlobDest::L1, checkpoint_sighash, payload);
 
-            info!(signed_commitment = ?signed_commitment, "signed commitment");
+            info!(signed_checkpoint = ?signed_checkpoint, "signed checkpoint");
             info!(blob_intent = ?blob_intent, "blob intent");
 
             inscription_handle
@@ -407,6 +417,61 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
 
             Ok(())
         }
+    }
+}
+
+fn check_and_get_batch_checkpoint(
+    duty: &BatchCheckpointDuty,
+    checkpt_mgr: &CheckpointHandle,
+) -> Result<BatchCheckpoint, Error> {
+    let idx = duty.idx();
+
+    // If there's no entry in db, create a pending entry and wait until proof is ready
+    match checkpt_mgr.get_checkpoint_blocking(idx)? {
+        // There's no entry in the database, create one so that the prover manager can query the
+        // checkpoint info to create proofs for next
+        None => {
+            let entry = CheckpointEntry::new_pending_proof(duty.checkpoint().clone());
+            checkpt_mgr.put_checkpoint_blocking(idx, entry)?;
+        }
+        // There's an entry. If status is ProofCreated, return it else we need to wait for prover to
+        // submit proofs.
+        Some(entry) => match entry.proving_status {
+            CheckpointProvingStatus::PendingProof => {
+                // Do nothing, wait for broadcast msg below
+            }
+            _ => {
+                return Ok(entry.into());
+            }
+        },
+    }
+
+    let chidx = checkpt_mgr
+        .subscribe()
+        .blocking_recv()
+        .map_err(|e| Error::Other(e.to_string()))?;
+
+    if chidx != idx {
+        warn!(received = %chidx, expected = %idx, "Received different checkpoint idx than expected");
+        return Err(Error::Other(
+            "Unexpected checkpoint idx received from broadcast channel".to_string(),
+        ));
+    }
+
+    match checkpt_mgr.get_checkpoint_blocking(idx)? {
+        None => {
+            warn!(%idx, "Expected checkpoint to be present in db");
+            Err(Error::Other(
+                "Expected checkpoint to be present in db".to_string(),
+            ))
+        }
+        Some(entry) if entry.proving_status == CheckpointProvingStatus::PendingProof => {
+            warn!(%idx, "Expected checkpoint proof to be ready");
+            Err(Error::Other(
+                "Expected checkpoint proof to be ready".to_string(),
+            ))
+        }
+        Some(entry) => Ok(entry.into()),
     }
 }
 

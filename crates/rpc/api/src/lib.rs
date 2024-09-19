@@ -3,7 +3,7 @@ use alpen_express_db::types::L1TxStatus;
 use alpen_express_primitives::bridge::OperatorIdx;
 use alpen_express_rpc_types::{
     types::{BlockHeader, ClientStatus, DepositEntry, ExecUpdate, L1Status},
-    HexBytes, HexBytes32, NodeSyncStatus, RawBlockWitness,
+    HexBytes, HexBytes32, NodeSyncStatus, RawBlockWitness, RpcCheckpointInfo,
 };
 use alpen_express_state::{bridge_duties::BridgeDuties, id::L2BlockId};
 use bitcoin::{secp256k1::schnorr::Signature, Transaction, Txid};
@@ -74,6 +74,13 @@ pub trait AlpenApi {
     /// Submit raw messages
     #[method(name = "submitBridgeMsg")]
     async fn submit_bridge_msg(&self, raw_msg: HexBytes) -> RpcResult<()>;
+
+    /// Get nth checkpoint info if any
+    #[method(name = "getCheckpointInfo")]
+    async fn get_checkpoint_info(&self, idx: u64) -> RpcResult<Option<RpcCheckpointInfo>>;
+
+    #[method(name = "submitCheckpointProof")]
+    async fn submit_checkpoint_proof(&self, idx: u64, proof: HexBytes) -> RpcResult<()>;
 }
 
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "alpadmin"))]
