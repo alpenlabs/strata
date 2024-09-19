@@ -35,6 +35,16 @@ fn address_from_slice(slice: &[u8]) -> Option<Address> {
     slice.map(Address::from)
 }
 
+const fn sats_to_gwei(sats: u64) -> Option<u64> {
+    // 1 BTC = 10^8 sats = 10^9 gwei
+    sats.checked_mul(10)
+}
+
+const fn gwei_to_sats(gwei: u64) -> u64 {
+    // 1 BTC = 10^8 sats = 10^9 gwei
+    gwei / 10
+}
+
 struct RpcExecEngineInner<T: EngineRpc> {
     pub client: T,
     pub fork_choice_state: Mutex<ForkchoiceState>,
@@ -97,8 +107,12 @@ impl<T: EngineRpc> RpcExecEngineInner<T> {
             .iter()
             .filter_map(|op| match op {
                 Op::Deposit(deposit_data) => Some(Withdrawal {
+                    // TODO:
+                    // 1. Should this error instead of filtering out invalid entries ?
+                    // 2. Add monotonically incrementing index ? (reth doesnt complain even if
+                    //    missing)
                     address: address_from_slice(deposit_data.dest_addr())?,
-                    amount: deposit_data.amt(),
+                    amount: sats_to_gwei(deposit_data.amt())?,
                     ..Default::default()
                 }),
             })
@@ -158,7 +172,7 @@ impl<T: EngineRpc> RpcExecEngineInner<T> {
                     .iter()
                     .map(|withdrawal| {
                         Op::Deposit(ELDepositData::new(
-                            withdrawal.amount,
+                            gwei_to_sats(withdrawal.amount),
                             withdrawal.address.as_slice().to_vec(),
                         ))
                     })
@@ -203,7 +217,7 @@ impl<T: EngineRpc> RpcExecEngineInner<T> {
             .filter_map(|op| match op {
                 Op::Deposit(deposit_data) => Some(Withdrawal {
                     address: address_from_slice(deposit_data.dest_addr())?,
-                    amount: deposit_data.amt(),
+                    amount: sats_to_gwei(deposit_data.amt())?,
                     ..Default::default()
                 }),
             })
