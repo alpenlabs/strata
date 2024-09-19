@@ -221,6 +221,11 @@ mod test {
             [exec.reth]
             rpc_url = "http://localhost:8551"
             secret = "1234567890abcdef"
+
+            [relayer]
+            refresh_interval = 10
+            stale_duration = 120
+            relay_misc = true
         "#;
 
         assert!(toml::from_str::<Config>(config_string_sequencer).is_ok());
@@ -249,6 +254,11 @@ mod test {
             [exec.reth]
             rpc_url = "http://localhost:8551"
             secret = "1234567890abcdef"
+
+            [relayer]
+            refresh_interval = 10
+            stale_duration = 120
+            relay_misc = true
         "#;
 
         assert!(toml::from_str::<Config>(config_string_fullnode).is_ok());

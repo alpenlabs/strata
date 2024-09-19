@@ -297,10 +297,10 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         status_rx.clone(),
         config.relayer,
         &task_executor,
-    )?;
+    );
 
-    // FIXME this init is screwed up because of the blocking
-    let relayer_handle = rt.block_on(start_relayer_fut);
+    // FIXME this init is screwed up because of the order we start things
+    let relayer_handle = rt.block_on(start_relayer_fut)?;
 
     // If the sequencer key is set, start the sequencer duties task.
     if let ClientMode::Sequencer(sequencer_config) = &config.client.client_mode {
