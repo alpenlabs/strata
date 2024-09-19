@@ -225,7 +225,6 @@ impl DepositInfo {
             - bridge_in_relay_cost
             - metadata_amount
             - anyone_can_spend_output.value;
-        dbg!(net_bridge_in_amount);
 
         let tx_outs = create_tx_outs([
             (bridge_in_script_pubkey, net_bridge_in_amount),

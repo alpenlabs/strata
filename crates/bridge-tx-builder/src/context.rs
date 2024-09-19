@@ -66,7 +66,7 @@ impl TxBuildContext {
 }
 
 impl BuildContext for TxBuildContext {
-    /// Get the pubkey table.
+    /// Get the operators' pubkey table.
     fn pubkey_table(&self) -> &PublickeyTable {
         &self.pubkey_table
     }
@@ -76,7 +76,7 @@ impl BuildContext for TxBuildContext {
         self.aggregated_pubkey
     }
 
-    /// Get the index associated with this client.
+    /// Get the operator index associated with this client.
     fn own_index(&self) -> OperatorIdx {
         self.own_index
     }

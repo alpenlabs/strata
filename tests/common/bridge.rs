@@ -90,6 +90,7 @@ impl BridgeFederation {
     }
 
     #[allow(dead_code)] // this is used in the `cooperative-bridge-flow` and nowhere else.
+                        // See docstring on this module.
                         // HACK: to get a copy of the federation that we can mutate inside a tokio thread as `Operator`
                         // is not `Clone` due to broadcast receive channel.
     pub(crate) async fn duplicate(&self, duplicate_id: &str) -> Self {
@@ -127,10 +128,14 @@ impl BridgeFederation {
 /// The bridge duties that can be extracted from the chain state in the rollup.
 #[derive(Debug, Clone)]
 pub(crate) enum BridgeDuty {
-    #[allow(unused)] // this is used in `bridge-in-flow` but not in `cooperative-bridge-out-flow`
+    // This is used in `bridge-in-flow` but not in `cooperative-bridge-out-flow`
+    // See docstring on this module.
+    #[allow(unused)]
     Deposit(DepositInfo),
 
-    #[allow(unused)] // this is used in `cooperative-bridge-out-flow` but not in `bridge-in-flow`
+    // This is used in `cooperative-bridge-out-flow` but not in `bridge-in-flow`
+    // See docstring on this module.
+    #[allow(unused)]
     Withdrawal(CooperativeWithdrawalInfo),
 }
 
@@ -510,6 +515,7 @@ impl User {
     }
 
     #[allow(unused)] // this is used in `bridge-in-flow` but not in `cooperative-bridge-out-flow`
+                     // See docstring on this module.
     pub(crate) fn address(&self) -> &Address {
         &self.0.address
     }
@@ -551,7 +557,8 @@ impl Agent {
         Self { address, bitcoind }
     }
 
-    #[allow(unused)] // this is used in `cooperative-bridge-out-flow` but not in `bridge-in-flow`
+    #[allow(unused)] // This is used in `cooperative-bridge-out-flow` but not in `bridge-in-flow`
+                     // See docstring on this module.
     pub(crate) fn pubkey(&self) -> XOnlyPk {
         let script_pubkey = self.address.script_pubkey();
         let script_pubkey = &script_pubkey.as_bytes()[2..34];
@@ -703,7 +710,8 @@ pub(crate) fn setup_sig_manager(index: OperatorIdx, keypair: Keypair) -> Signatu
     SignatureManager::new(Arc::new(db_ops), index, keypair)
 }
 
-#[allow(dead_code)] // this not used in the `cooperative-bridge-out-flow`.
+#[allow(dead_code)] // This not used in the `cooperative-bridge-out-flow`.
+                    // See docstring on this module.
 pub(crate) async fn perform_user_actions(
     user: &User,
     federation_pubkey_table: PublickeyTable,
@@ -815,7 +823,8 @@ pub(crate) fn create_drt_taproot_output(
     )
 }
 
-#[allow(dead_code)] // this is not used in the `cooperative-bridge-out-flow`.
+#[allow(dead_code)] // This is not used in the `cooperative-bridge-out-flow`.
+                    // See docstring on this module.
 pub(crate) fn perform_rollup_actions(
     txid: Txid,
     take_back_leaf_hash: TapNodeHash,
