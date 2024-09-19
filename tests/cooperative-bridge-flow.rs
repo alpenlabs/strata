@@ -25,8 +25,6 @@ async fn full_flow() {
     let num_operators = 3;
 
     let (bitcoind, bridge_in_federation) = setup(num_operators).await;
-    // HACK: to get a copy of the federation that we can mutate inside a tokio thread as `Operator`
-    // is not `Clone` due to broadcast receive channel.
     let bridge_out_federation = bridge_in_federation.duplicate("bridge-out").await;
 
     let deposit_guard = span!(Level::WARN, "Initiating Deposit").entered();
@@ -52,7 +50,7 @@ async fn full_flow() {
     for mut operator in bridge_in_federation.operators {
         let duty = duty.clone();
         handles.push(tokio::spawn(async move {
-            operator.process_duty(duty.clone()).await;
+            operator.process_duty(duty).await;
         }));
     }
 
@@ -99,7 +97,7 @@ async fn full_flow() {
     for mut operator in bridge_out_federation.operators {
         let duty = duty.clone();
         handles.push(tokio::spawn(async move {
-            operator.process_duty(duty.clone()).await;
+            operator.process_duty(duty).await;
         }));
     }
 
@@ -109,8 +107,8 @@ async fn full_flow() {
 
     let blocks_to_confirm_withdrawal = 1;
     event!(Level::DEBUG, action = "mining some blocks to confirm withdrawal transaction", num_blocks = %blocks_to_confirm_withdrawal);
-    // mining this block has the side-effect of confirming one of the blocks pre-mined during
-    // `perform_user_actions`.
+    // mining this block has the side-effect of confirming `blocks_to_confirm_withdrawal` number of
+    // the blocks pre-mined during `perform_user_actions`.
     user.agent().mine_blocks(blocks_to_confirm_withdrawal).await;
 
     let unspent_utxos_postwithdrawal = user.agent().get_unspent_utxos().await;
@@ -119,7 +117,7 @@ async fn full_flow() {
     assert_eq!(
         unspent_utxos_postwithdrawal.len() - unspent_utxos_prewithdrawal.len(),
         (blocks_to_confirm_deposit + blocks_to_confirm_withdrawal) as usize,
-        "user should have two more unspent utxos -- one mined (during deposit) and one withdrawn"
+        "user should have more unspent utxos -- those mined and one withdrawn"
     );
 
     event!(Level::INFO, event = "Withdrawal flow complete");

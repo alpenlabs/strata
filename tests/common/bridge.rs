@@ -1,4 +1,4 @@
-//! This module contains utilities for integratation tests related to the bridge.
+//! This module contains utilities for integration tests related to the bridge.
 
 use std::{collections::BTreeMap, ops::Not, sync::Arc, time::Duration};
 
@@ -90,6 +90,8 @@ impl BridgeFederation {
     }
 
     #[allow(dead_code)] // this is used in the `cooperative-bridge-flow` and nowhere else.
+                        // HACK: to get a copy of the federation that we can mutate inside a tokio thread as `Operator`
+                        // is not `Clone` due to broadcast receive channel.
     pub(crate) async fn duplicate(&self, duplicate_id: &str) -> Self {
         let pubkey_table = self.pubkey_table.clone();
         let num_operators = pubkey_table.0.keys().len();

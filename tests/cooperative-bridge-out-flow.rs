@@ -64,7 +64,7 @@ async fn withdrawal_flow() {
     for mut operator in federation.operators {
         let duty = duty.clone();
         handles.push(tokio::spawn(async move {
-            operator.process_duty(duty.clone()).await;
+            operator.process_duty(duty).await;
         }));
     }
 
