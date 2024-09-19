@@ -32,8 +32,8 @@ pub struct TxBuildContext {
 }
 
 impl TxBuildContext {
-    /// Create a new [`TxBuilder`] with the context required to build transactions of various
-    /// [`TxKind`].
+    /// Create a new [`TxBuildContext`] with the context required to build transactions of various
+    /// [`TxKind`](super::TxKind).
     pub fn new(operator_pubkeys: PublickeyTable, network: Network) -> Self {
         let aggregated_pubkey = get_aggregated_pubkey(operator_pubkeys);
 

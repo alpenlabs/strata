@@ -83,7 +83,7 @@ pub enum ClientError {
     #[error(transparent)]
     Sign(#[from] SignRawTransactionWithWalletError),
 
-    /// Could not get a [`Xpriv`] from the wallet
+    /// Could not get a [`Xpriv`](bitcoin::bip32::Xpriv) from the wallet
     #[error("Could not get xpriv from wallet")]
     Xpriv,
 

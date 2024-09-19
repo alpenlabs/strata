@@ -180,6 +180,7 @@ rustdocs: ## Runs `cargo docs` to generate the Rust documents in the `target/doc
 	RUSTDOCFLAGS="\
 	--show-type-layout \
 	--enable-index-page -Z unstable-options \
+	-A rustdoc::private-doc-tests \
 	-D warnings" \
 	cargo doc \
 	--workspace \
