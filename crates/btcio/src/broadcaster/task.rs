@@ -425,6 +425,9 @@ mod test {
         let e3 = gen_entry_with_status(L1TxStatus::Published);
         let i3 = ops.put_tx_entry_async([3; 32].into(), e3).await.unwrap();
 
+        let e4 = gen_entry_with_status(L1TxStatus::Reorged);
+        let i4 = ops.put_tx_entry_async([4; 32].into(), e4).await.unwrap();
+
         let state = BroadcasterState::initialize(&ops).await.unwrap();
 
         // This client will make the published tx finalized

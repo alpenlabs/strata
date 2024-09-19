@@ -107,6 +107,16 @@ impl L1TxEntry {
     pub fn try_to_tx(&self) -> Result<Transaction, consensus::encode::Error> {
         deserialize(&self.tx_raw)
     }
+
+    pub fn is_valid_and_unfinalized(&self) -> bool {
+        matches!(
+            self.status,
+            L1TxStatus::Reorged
+                | L1TxStatus::Unpublished
+                | L1TxStatus::Published
+                | L1TxStatus::Confirmed { .. }
+        )
+    }
 }
 
 /// The possible statuses of a publishable transaction

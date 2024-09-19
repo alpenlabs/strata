@@ -2,7 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use alpen_express_db::{
     traits::SequencerDatabase,
-    types::{BlobEntry, BlobL1Status, L1TxEntry, L1TxStatus},
+    types::{BlobEntry, BlobL1Status, L1TxStatus},
 };
 use alpen_express_state::da_blob::{BlobDest, BlobIntent};
 use alpen_express_status::StatusTx;
@@ -212,8 +212,11 @@ pub async fn watcher_task(
 
                     match (commit_tx, reveal_tx) {
                         (Some(ctx), Some(rtx)) => {
-                            let new_status =
-                                determine_blob_next_status(&ctx, &rtx, &blobentry.status)?;
+                            let new_status = determine_blob_next_status(
+                                &ctx.status,
+                                &rtx.status,
+                                &blobentry.status,
+                            );
 
                             update_l1_status(&blobentry, &new_status, status_tx.clone()).await;
 
@@ -276,22 +279,29 @@ async fn update_existing_entry(
 /// Determine the status of the `BlobEntry` based on the status of its commit and reveal
 /// transactions in bitcoin.
 fn determine_blob_next_status(
-    commit_tx: &L1TxEntry,
-    reveal_tx: &L1TxEntry,
+    commit_status: &L1TxStatus,
+    reveal_status: &L1TxStatus,
     curr_status: &BlobL1Status,
-) -> anyhow::Result<BlobL1Status> {
-    let status = match (&commit_tx.status, &reveal_tx.status) {
+) -> BlobL1Status {
+    match (&commit_status, &reveal_status) {
         // If reveal is finalized, both are finalized
         (_, L1TxStatus::Finalized { .. }) => BlobL1Status::Finalized,
         // If reveal is confirmed, both are confirmed
         (_, L1TxStatus::Confirmed { .. }) => BlobL1Status::Confirmed,
         // If reveal is published, both are published
         (_, L1TxStatus::Published) => BlobL1Status::Published,
-        // If commit has invalid inputs, these need resign
+        // If commit is unpublished, both are upublished
+        (_, L1TxStatus::Unpublished) => BlobL1Status::Unpublished,
+        // If reveal has invalid inputs, these need resign because we can do nothing with just
+        // commit tx confirmed. This should not occur in practice
+        (_, L1TxStatus::InvalidInputs) => BlobL1Status::NeedsResign,
+        // if commit has invalid inputs, needs resign
         (L1TxStatus::InvalidInputs, _) => BlobL1Status::NeedsResign,
+        // If commit is reorged, these need to be republished
+        (L1TxStatus::Reorged, _) => BlobL1Status::Unpublished,
+        // For other cases just leave the status as is
         (_, _) => curr_status.clone(),
-    };
-    Ok(status)
+    }
 }
 
 #[cfg(test)]
@@ -342,5 +352,46 @@ mod test {
         let idx = get_next_blobidx_to_watch(&iops).unwrap();
 
         assert_eq!(idx, expected_idx);
+    }
+
+    #[test]
+    fn test_determine_blob_next_status() {
+        let curr_status = BlobL1Status::Published;
+
+        // When both are unpublished
+        let (commit_status, reveal_status) = (L1TxStatus::Unpublished, L1TxStatus::Unpublished);
+        let next = determine_blob_next_status(&commit_status, &reveal_status, &curr_status);
+        assert_eq!(next, BlobL1Status::Unpublished);
+
+        // When both are Finalized
+        let fin = L1TxStatus::Finalized { confirmations: 5 };
+        let (commit_status, reveal_status) = (fin.clone(), fin);
+        let next = determine_blob_next_status(&commit_status, &reveal_status, &curr_status);
+        assert_eq!(next, BlobL1Status::Finalized);
+
+        // When both are Confirmed
+        let conf = L1TxStatus::Confirmed { confirmations: 5 };
+        let (commit_status, reveal_status) = (conf.clone(), conf.clone());
+        let next = determine_blob_next_status(&commit_status, &reveal_status, &curr_status);
+        assert_eq!(next, BlobL1Status::Confirmed);
+
+        // When both are Published
+        let publ = L1TxStatus::Published;
+        let (commit_status, reveal_status) = (publ.clone(), publ.clone());
+        let next = determine_blob_next_status(&commit_status, &reveal_status, &curr_status);
+        assert_eq!(next, BlobL1Status::Published);
+
+        // When both have invalid
+        let (commit_status, reveal_status) = (L1TxStatus::InvalidInputs, L1TxStatus::InvalidInputs);
+        let next = determine_blob_next_status(&commit_status, &reveal_status, &curr_status);
+        assert_eq!(next, BlobL1Status::NeedsResign);
+
+        // When reveal has invalid inputs but commit is confirmed. I doubt this would happen in
+        // practice for our case.
+        // Then the blob status should be NeedsResign i.e. the blob should be signed again and
+        // published.
+        let (commit_status, reveal_status) = (conf.clone(), L1TxStatus::InvalidInputs);
+        let next = determine_blob_next_status(&commit_status, &reveal_status, &curr_status);
+        assert_eq!(next, BlobL1Status::NeedsResign);
     }
 }
