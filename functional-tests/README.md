@@ -45,4 +45,9 @@ Make sure you have installed Python 3.10 or higher.
 ./run_test.sh
 ```
 
+## Running prover tasks:
+```
+PROVER_TEST=1 ./run_test.sh fn_prover_client.py
+```
+
 The test harness script will be extended with more functionality as we need it.

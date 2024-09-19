@@ -152,7 +152,10 @@ dependencies = [
  "borsh",
  "digest 0.10.7",
  "hex",
+ "musig2",
+ "rand",
  "reth-primitives",
+ "secp256k1",
  "serde",
  "serde_json",
  "sha2",
@@ -1287,6 +1290,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "musig2"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c89bee285da6010ad76c3467c4de8265bb4fa46fba0017df95ae55cad4436528"
+dependencies = [
+ "base16ct",
+ "hmac",
+ "once_cell",
+ "secp",
+ "secp256k1",
+ "serde",
+ "serdect",
+ "sha2",
+ "subtle",
+]
+
+[[package]]
 name = "num-bigint"
 version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2022,6 +2042,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "secp"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd426921f62c7e334ca27173743cd90a7263566a3be76ef0b47773d631633cf9"
+dependencies = [
+ "base16ct",
+ "once_cell",
+ "secp256k1",
+ "serde",
+ "serdect",
+ "subtle",
+]
+
+[[package]]
 name = "secp256k1"
 version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2109,6 +2143,16 @@ dependencies = [
  "ryu",
  "serde",
  "unsafe-libyaml",
+]
+
+[[package]]
+name = "serdect"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a84f14a19e9a014bb9f4512488d9829a68e04ecabffb0f9904cd1ace94598177"
+dependencies = [
+ "base16ct",
+ "serde",
 ]
 
 [[package]]

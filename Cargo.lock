@@ -3844,6 +3844,41 @@ dependencies = [
 ]
 
 [[package]]
+name = "express-prover-client"
+version = "0.1.0"
+dependencies = [
+ "alpen-express-common",
+ "alpen-express-db",
+ "alpen-express-rocksdb",
+ "anyhow",
+ "argh",
+ "async-trait",
+ "bincode",
+ "express-proofimpl-evm-ee-stf",
+ "express-prover-client-rpc-api",
+ "express-risc0-adapter",
+ "express-risc0-guest-builder",
+ "express-zkvm",
+ "jsonrpsee",
+ "rayon",
+ "reth-rpc-types",
+ "rockbound",
+ "serde",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-subscriber 0.3.18",
+ "uuid 1.10.0",
+]
+
+[[package]]
+name = "express-prover-client-rpc-api"
+version = "0.1.0"
+dependencies = [
+ "jsonrpsee",
+]
+
+[[package]]
 name = "express-reth-db"
 version = "0.1.0"
 dependencies = [
@@ -13095,6 +13130,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "81dfa00651efa65069b0b6b651f4aaa31ba9e3c3ce0137aaad053604ee7e0314"
 dependencies = [
  "getrandom 0.2.15",
+ "serde",
 ]
 
 [[package]]

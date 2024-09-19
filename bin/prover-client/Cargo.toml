@@ -1,0 +1,39 @@
+[package]
+edition = "2021"
+name = "express-prover-client"
+version = "0.1.0"
+
+[[bin]]
+name = "express-prover-client"
+path = "src/main.rs"
+required-features = ["prover"]
+
+[dependencies]
+alpen-express-common = { workspace = true }
+alpen-express-db = { workspace = true }
+alpen-express-rocksdb = { workspace = true }
+express-proofimpl-evm-ee-stf = { workspace = true }
+express-prover-client-rpc-api = { workspace = true }
+express-risc0-adapter = { workspace = true, features = ["prover"] }
+express-risc0-guest-builder = { path = "../../provers/risc0" }
+express-zkvm = { workspace = true }
+
+
+anyhow = { workspace = true }
+argh = { workspace = true }
+async-trait = { workspace = true }
+bincode = { workspace = true }
+jsonrpsee = { workspace = true, features = ["http-client"] }
+rayon = "1.8.0"
+reth-rpc-types = { workspace = true }
+rockbound = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+uuid = { version = "1.0", features = ["v4", "serde"] }
+
+
+[features]
+prover = ["express-risc0-guest-builder/prover"]

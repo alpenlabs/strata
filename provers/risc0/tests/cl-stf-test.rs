@@ -2,7 +2,7 @@
 mod test {
     use alpen_express_state::{block::L2Block, chain_state::ChainState};
     use express_risc0_adapter::{Risc0Verifier, RiscZeroHost};
-    use express_risc0_guest_builder::CL_BLOCK_STF_ELF;
+    use express_risc0_guest_builder::GUEST_RISC0_CL_STF_ELF;
     use express_zkvm::{ProverInput, ZKVMHost, ZKVMVerifier};
 
     fn get_prover_input() -> (ChainState, L2Block) {
@@ -22,7 +22,7 @@ mod test {
         let input = get_prover_input();
         let input_ser = borsh::to_vec(&input).unwrap();
 
-        let prover = RiscZeroHost::init(CL_BLOCK_STF_ELF.into(), Default::default());
+        let prover = RiscZeroHost::init(GUEST_RISC0_CL_STF_ELF.into(), Default::default());
 
         // TODO: handle this properly
         let mut prover_input = ProverInput::new();

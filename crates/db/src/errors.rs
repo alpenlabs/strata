@@ -4,6 +4,12 @@ use crate::entities::errors::EntityError;
 
 #[derive(Debug, Error, Clone)]
 pub enum DbError {
+    #[error("entry with idx does not exist")]
+    NonExistentEntry,
+
+    #[error("entry with idx already exists")]
+    EntryAlreadyExists,
+
     #[error("tried to insert into {0} out-of-order index {1}")]
     OooInsert(&'static str, u64),
 
