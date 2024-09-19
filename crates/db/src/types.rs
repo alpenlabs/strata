@@ -68,9 +68,6 @@ pub enum BlobL1Status {
     /// The transactions need to be resigned.
     /// This could be due to transactions input UTXOs already being spent.
     NeedsResign,
-
-    /// The transactions were not included for some reason
-    Excluded,
 }
 
 /// This is the entry that gets saved to the database corresponding to a bitcoin transaction that

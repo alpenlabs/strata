@@ -140,7 +140,7 @@ fn get_next_blobidx_to_watch(insc_ops: &InscriptionDataOps) -> anyhow::Result<u6
 /// # Note
 ///
 /// The inscription will be monitored until it acquires the status of
-/// [`BlobL1Status::Confirmed`], or [`BlobL1Status::Finalized`]
+/// [`BlobL1Status::Finalized`]
 pub async fn watcher_task(
     next_blbidx_to_watch: u64,
     rpc_client: Arc<impl Reader + Wallet + Signer>,
@@ -195,11 +195,6 @@ pub async fn watcher_task(
                 BlobL1Status::Finalized => {
                     curr_blobidx += 1;
                 }
-                // If excluded, nothing to do, move on to process next entry
-                BlobL1Status::Excluded => {
-                    warn!(%curr_blobidx, "blobentry is excluded, might need to recreate duty");
-                    curr_blobidx += 1;
-                }
                 // If entry is signed but not finalized or excluded yet, check broadcast txs status
                 BlobL1Status::Published | BlobL1Status::Confirmed | BlobL1Status::Unpublished => {
                     debug!(%curr_blobidx, "Checking blobentry's broadcast status");
@@ -225,9 +220,7 @@ pub async fn watcher_task(
                             updated_entry.status = new_status.clone();
                             update_existing_entry(curr_blobidx, updated_entry, &insc_ops).await?;
 
-                            if new_status == BlobL1Status::Finalized
-                                || new_status == BlobL1Status::Confirmed
-                            {
+                            if new_status == BlobL1Status::Finalized {
                                 curr_blobidx += 1;
                             }
                         }
