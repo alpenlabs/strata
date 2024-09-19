@@ -4,9 +4,10 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use alpen_express_primitives::relay::types::{BridgeMessage, RelayerConfig, Scope};
+use alpen_express_primitives::relay::types::{BridgeMessage, BridgeMsgId, RelayerConfig, Scope};
 use alpen_express_status::StatusRx;
 use express_storage::ops::bridge_relay::BridgeMsgOps;
+use express_tasks::TaskExecutor;
 use secp256k1::{All, Secp256k1};
 use tokio::{select, sync::mpsc, time::interval};
 use tracing::*;
@@ -121,7 +122,70 @@ impl RelayerState {
     }
 }
 
-pub async fn bridge_msg_worker_task(
+pub struct RelayerHandle {
+    brmsg_tx: mpsc::Sender<BridgeMessage>,
+    ops: Arc<BridgeMsgOps>,
+}
+
+impl RelayerHandle {
+    pub async fn submit_message_async(&self, msg: BridgeMessage) {
+        if let Err(msg) = self.brmsg_tx.send(msg).await {
+            let msg_id = msg.0.compute_id();
+            warn!(%msg_id, "failed to submit bridge msg");
+        }
+    }
+
+    pub fn submit_message_blocking(&self, msg: BridgeMessage) {
+        if let Err(msg) = self.brmsg_tx.blocking_send(msg) {
+            let msg_id = msg.0.compute_id();
+            warn!(%msg_id, "failed to submit bridge msg");
+        }
+    }
+
+    // TODO refactor this to not require vec
+    pub async fn get_message_by_scope_async(
+        &self,
+        scope: Vec<u8>,
+    ) -> anyhow::Result<Vec<BridgeMessage>> {
+        // TODO refactor this to handle errors
+        Ok(self.ops.get_msgs_by_scope_async(scope).await?)
+    }
+
+    // TODO refactor this to not require vec
+    pub fn get_messages_by_scope_blocking(
+        &self,
+        scope: Vec<u8>,
+    ) -> anyhow::Result<Vec<BridgeMessage>> {
+        Ok(self.ops.get_msgs_by_scope_blocking(scope)?)
+    }
+}
+
+/// Starts the bridge relayer task, returning a handle to submit new messages
+/// for processing.
+// TODO make this a builder
+pub async fn start_bridge_relayer_task(
+    ops: Arc<BridgeMsgOps>,
+    status_rx: Arc<StatusRx>,
+    config: Arc<RelayerConfig>,
+    task_exec: &TaskExecutor,
+) -> Arc<RelayerHandle> {
+    // TODO wrap the messages in a container so we make sure not to send them to
+    // the peer that sent them to us
+    let (brmsg_tx, brmsg_rx) = mpsc::channel::<BridgeMessage>(100);
+
+    let state = RelayerState::new(config.as_ref());
+    let worker_fut = relayer_task(ops.clone(), status_rx, state, brmsg_rx, config);
+
+    // TODO cleanup .expect
+    task_exec
+        .spawn_critical_async("bridge-msg-relayer", worker_fut)
+        .await
+        .expect("init: launch relayer task");
+
+    Arc::new(RelayerHandle { brmsg_tx, ops })
+}
+
+async fn relayer_task(
     bridge_ops: Arc<BridgeMsgOps>,
     status_rx: Arc<StatusRx>,
     mut msg_state: RelayerState,

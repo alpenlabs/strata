@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use alpen_express_btcio::reader::config::ReaderConfig;
+use alpen_express_primitives::relay::types::RelayerConfig;
 use bitcoin::Network;
 use serde::Deserialize;
 
@@ -71,6 +72,7 @@ pub struct Config {
     pub bitcoind_rpc: BitcoindConfig,
     pub sync: SyncConfig,
     pub exec: ExecConfig,
+    pub relayer: RelayerConfig,
 }
 
 impl Config {
@@ -131,6 +133,11 @@ impl Config {
                                                                            * secret should be
                                                                            * Option */
                 },
+            },
+            relayer: RelayerConfig {
+                refresh_interval: 10,
+                stale_duration: 120,
+                relay_misc: true,
             },
         })
     }
