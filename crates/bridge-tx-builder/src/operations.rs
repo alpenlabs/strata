@@ -22,8 +22,8 @@ use super::{
 };
 use crate::errors::BridgeTxBuilderResult;
 
-/// Create a script with the spending condition that all signatures corresponding to the pubkey set
-/// must be provided in (reverse) order.
+/// Create a script with the spending condition that a MuSig2 aggregated signature corresponding to
+/// the pubkey set must be provided.
 pub fn n_of_n_script(aggregated_pubkey: &XOnlyPublicKey) -> ScriptBuf {
     Builder::new()
         .push_x_only_key(aggregated_pubkey)
