@@ -2,7 +2,7 @@
 mod test {
     use express_proofimpl_evm_ee_stf::{ELProofInput, ELProofPublicParams};
     use express_risc0_adapter::{Risc0Verifier, RiscZeroHost};
-    use express_risc0_guest_builder::RETH_RISC0_ELF;
+    use express_risc0_guest_builder::GUEST_RISC0_EVM_EE_STF_ELF;
     use express_zkvm::{ProverInput, ZKVMHost, ZKVMVerifier};
 
     const ENCODED_PROVER_INPUT: &[u8] =
@@ -11,7 +11,7 @@ mod test {
     #[test]
     fn test_reth_stf_guest_code_trace_generation() {
         let input: ELProofInput = bincode::deserialize(ENCODED_PROVER_INPUT).unwrap();
-        let prover = RiscZeroHost::init(RETH_RISC0_ELF.into(), Default::default());
+        let prover = RiscZeroHost::init(GUEST_RISC0_EVM_EE_STF_ELF.into(), Default::default());
 
         let mut prover_input = ProverInput::new();
         prover_input.write(input);

@@ -1,6 +1,9 @@
 //! Types for managing pending bridging operations in the CL state.
 
-use alpen_express_primitives::{buf::Buf64, l1::BitcoinAmount};
+use alpen_express_primitives::{
+    buf::Buf32,
+    l1::{BitcoinAmount, XOnlyPk},
+};
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
@@ -10,26 +13,26 @@ pub const WITHDRAWAL_DENOMINATION: BitcoinAmount = BitcoinAmount::from_int_btc(1
 #[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
 pub struct WithdrawalIntent {
     /// Quantity of L1 asset, for Bitcoin this is sats.
-    amt: u64,
+    amt: BitcoinAmount,
 
     /// Destination public key for the withdrawal
-    pub dest_pk: Buf64,
+    pub dest_pk: XOnlyPk,
 }
 
 impl WithdrawalIntent {
-    pub fn new(amt: u64, dest_pk: Buf64) -> Self {
+    pub fn new(amt: BitcoinAmount, dest_pk: XOnlyPk) -> Self {
         Self { amt, dest_pk }
     }
 
-    pub fn into_parts(&self) -> (u64, Buf64) {
-        (self.amt, self.dest_pk)
+    pub fn as_parts(&self) -> (u64, &Buf32) {
+        (self.amt.to_sat(), self.dest_pk.buf32())
     }
 
-    pub fn amt(&self) -> &u64 {
+    pub fn amt(&self) -> &BitcoinAmount {
         &self.amt
     }
 
-    pub fn dest_pk(&self) -> &Buf64 {
+    pub fn dest_pk(&self) -> &XOnlyPk {
         &self.dest_pk
     }
 }
@@ -44,7 +47,7 @@ pub struct WithdrawalBatch {
 impl WithdrawalBatch {
     /// Gets the total value of the batch.  This must be less than the size of
     /// the utxo it's assigned to.
-    pub fn get_total_value(&self) -> u64 {
+    pub fn get_total_value(&self) -> BitcoinAmount {
         self.intents.iter().map(|wi| wi.amt).sum()
     }
 

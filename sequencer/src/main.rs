@@ -25,7 +25,7 @@ use alpen_express_evmexec::{fork_choice_state_initial, EngineRpcClient};
 use alpen_express_primitives::{
     block_credential,
     buf::Buf32,
-    params::{Params, RollupParams, RunParams},
+    params::{Params, RollupParams, SyncParams},
 };
 use alpen_express_rocksdb::{
     broadcaster::db::BroadcastDatabase, sequencer::db::SequencerDB, DbOpsConfig, SeqDb,
@@ -164,7 +164,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     // Set up block params.
     let params = Params {
         rollup: load_rollup_params_or_default(&args.rollup_params).expect("rollup params"),
-        run: RunParams {
+        run: SyncParams {
             l1_follow_distance: config.sync.l1_follow_distance,
             client_checkpoint_interval: config.sync.client_checkpoint_interval,
             l2_blocks_fetch_limit: config.client.l2_blocks_fetch_limit,

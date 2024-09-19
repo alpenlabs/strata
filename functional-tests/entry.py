@@ -277,7 +277,7 @@ class RethFactory(flexitest.Factory):
             "-vvvv"
         ]
         # fmt: on
-        props = {"rpc_port": authrpc_port}
+        props = {"rpc_port": authrpc_port, "eth_rpc_http_port": ethrpc_http_port}
 
         ethrpc_url = f"ws://localhost:{ethrpc_ws_port}"
 
@@ -306,16 +306,57 @@ class RethFactory(flexitest.Factory):
             return svc
 
 
+class ProverClientFactory(flexitest.Factory):
+    def __init__(self, port_range: list[int]):
+        super().__init__(port_range)
+
+    @flexitest.with_ectx("ctx")
+    def create_prover_client(
+        self,
+        sequencer_url: str,
+        reth_url: str,
+        ctx: flexitest.EnvContext,
+    ):
+        datadir = ctx.make_service_dir("prover_client")
+        rpc_port = self.next_port()
+        logfile = os.path.join(datadir, "service.log")
+
+        rpc_port = self.next_port()
+        rpc_url = f"ws://localhost:{rpc_port}"
+
+        # fmt: off
+        cmd = [
+            "express-prover-client",
+            "--rpc-port", str(rpc_port),
+            "--sequencer-rpc", sequencer_url,
+            "--reth-rpc", reth_url
+        ]
+        # fmt: on
+
+        props = {"rpc_port": rpc_port}
+
+        with open(logfile, "w") as f:
+            svc = flexitest.service.ProcService(props, cmd, stdout=f)
+
+            def _create_rpc():
+                return seqrpc.JsonrpcClient(rpc_url)
+
+            svc.create_rpc = _create_rpc
+            return svc
+
+
 class BasicEnvConfig(flexitest.EnvConfig):
     def __init__(
         self,
         pre_generate_blocks: int = 0,
         rollup_params: Optional[dict] = None,
         auto_generate_blocks=True,
+        enable_prover_client=False,
     ):
         self.pre_generate_blocks = pre_generate_blocks
         self.rollup_params = rollup_params
         self.auto_generate_blocks = auto_generate_blocks
+        self.enable_prover_client = enable_prover_client
         super().__init__()
 
     def init(self, ctx: flexitest.EnvContext) -> flexitest.LiveEnv:
@@ -367,12 +408,25 @@ class BasicEnvConfig(flexitest.EnvConfig):
         sequencer = seq_fac.create_sequencer(
             bitcoind_config, reth_config, seqaddr, self.rollup_params
         )
+
         # Need to wait for at least `genesis_l1_height` blocks to be generated.
         # Sleeping some more for safety
         if self.auto_generate_blocks:
             time.sleep(BLOCK_GENERATION_INTERVAL_SECS * 10)
 
         svcs = {"bitcoin": bitcoind, "sequencer": sequencer, "reth": reth}
+
+        if self.enable_prover_client:
+            seq_port = sequencer.get_prop("rpc_port")
+            reth_rpc_http_port = reth.get_prop("eth_rpc_http_port")
+
+            prover_client_fac = ctx.get_factory("prover_client")
+            prover_client = prover_client_fac.create_prover_client(
+                f"http://localhost:{seq_port}",
+                f"http://localhost:{reth_rpc_http_port}",
+            )
+            svcs["prover_client"] = prover_client
+
         return flexitest.LiveEnv(svcs)
 
 
@@ -474,7 +528,14 @@ def main(argv):
     modules = flexitest.runtime.scan_dir_for_modules(test_dir)
     all_tests = flexitest.runtime.load_candidate_modules(modules)
 
-    tests = [str(argv[1]).removesuffix(".py")] if len(argv) > 1 else all_tests
+    # Avoid running prover related tets while running all the tests
+    # Filter the prover test files if not present in argv
+    if len(argv) > 1:
+        # Run the specific test file passed as the first argument (without .py extension)
+        tests = [str(argv[1]).removesuffix(".py")]
+    else:
+        # Run all tests, excluding those containing "fn_prover", unless explicitly passed in argv
+        tests = [test for test in all_tests if "fn_prover" not in test or test in argv]
 
     datadir_root = flexitest.create_datadir_in_workspace(os.path.join(test_dir, DD_ROOT))
 
@@ -482,18 +543,22 @@ def main(argv):
     seq_fac = ExpressFactory([12400 + i for i in range(20)])
     fullnode_fac = FullNodeFactory([12500 + i for i in range(20)])
     reth_fac = RethFactory([12600 + i for i in range(20 * 3)])
+    prover_client_fac = ProverClientFactory([12700 + i for i in range(20 * 3)])
 
     factories = {
         "bitcoin": btc_fac,
         "sequencer": seq_fac,
         "fullnode": fullnode_fac,
         "reth": reth_fac,
+        "prover_client": prover_client_fac,
     }
+
     global_envs = {
         "basic": BasicEnvConfig(),
         "premined_blocks": BasicEnvConfig(101),
         "fast_batches": BasicEnvConfig(101, rollup_params=FAST_BATCH_ROLLUP_PARAMS),
         "hub1": HubNetworkEnvConfig(),
+        "prover": BasicEnvConfig(enable_prover_client=True),
     }
 
     rt = flexitest.TestRuntime(global_envs, datadir_root, factories)

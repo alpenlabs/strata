@@ -39,7 +39,7 @@ pub struct RollupParams {
 /// strictly have to be pre-agreed.  These have to do with grace periods in
 /// message delivery and whatnot.
 #[derive(Clone, Debug)]
-pub struct RunParams {
+pub struct SyncParams {
     /// Number of blocks that we follow the L1 from.
     pub l1_follow_distance: u64,
     /// Number of events after which we checkpoint the client
@@ -52,7 +52,7 @@ pub struct RunParams {
 #[derive(Clone, Debug)]
 pub struct Params {
     pub rollup: RollupParams,
-    pub run: RunParams,
+    pub run: SyncParams,
 }
 
 impl Params {
@@ -60,7 +60,7 @@ impl Params {
         &self.rollup
     }
 
-    pub fn run(&self) -> &RunParams {
+    pub fn run(&self) -> &SyncParams {
         &self.run
     }
 }

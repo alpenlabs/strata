@@ -25,6 +25,7 @@ members = [
   "crates/reth/rpc",
   "crates/rpc/api",
   "crates/rpc/bridge-api",
+  "crates/rpc/prover-client-api",
   "crates/rpc/types",
   "crates/rpc/utils",
   "crates/state",
@@ -40,6 +41,7 @@ members = [
 
   # binaries listed separately
   "bin/bridge-client",
+  "bin/prover-client",
   "reth",
   "sequencer",
 
@@ -47,7 +49,12 @@ members = [
   "tests",
 ]
 
-default-members = ["bin/bridge-client", "reth", "sequencer"]
+default-members = [
+  "bin/bridge-client",
+  "bin/prover-client",
+  "reth",
+  "sequencer",
+]
 
 resolver = "2"
 
@@ -75,10 +82,12 @@ express-chaintsn = { path = "crates/chaintsn" }
 express-proofimpl-btc-blockspace = { path = "crates/proof-impl/btc-blockspace" }
 express-proofimpl-evm-ee-stf = { path = "crates/proof-impl/evm-ee-stf" }
 express-proofimpl-l1-batch = { path = "crates/proof-impl/l1-batch" }
+express-prover-client-rpc-api = { path = "crates/rpc/prover-client-api" }
 express-reth-db = { path = "crates/reth/db" }
 express-reth-exex = { path = "crates/reth/exex" }
 express-reth-node = { path = "crates/reth/node" }
 express-reth-rpc = { path = "crates/reth/rpc" }
+express-risc0-adapter = { path = "crates/zkvm/adapters/risc0" }
 express-rpc-utils = { path = "crates/rpc/utils" }
 express-storage = { path = "crates/storage" }
 express-sync = { path = "crates/sync" }

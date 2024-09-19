@@ -302,6 +302,41 @@ pub trait SeqDataProvider {
     fn get_last_batch_idx(&self) -> DbResult<Option<u64>>;
 }
 
+/// A trait providing access to both prover data store and prover data provider.
+pub trait ProverDatabase {
+    type ProverStore: ProverDataStore;
+    type ProverProv: ProverDataProvider;
+
+    fn prover_store(&self) -> &Arc<Self::ProverStore>;
+    fn prover_provider(&self) -> &Arc<Self::ProverProv>;
+}
+
+pub trait ProverDataStore {
+    /// Adds a new txentry to database
+    fn insert_new_task_entry(&self, txid: [u8; 16], txentry: Vec<u8>) -> DbResult<u64>;
+
+    /// Updates an existing txentry
+    fn update_task_entry_by_id(&self, txid: [u8; 16], txentry: Vec<u8>) -> DbResult<()>;
+
+    /// Updates an existing txentry
+    fn update_task_entry(&self, idx: u64, txentry: Vec<u8>) -> DbResult<()>;
+}
+
+/// All methods related to fetching [`Vec<u8>`]s and indices in the database
+pub trait ProverDataProvider {
+    /// Fetch [`Vec<u8>`] from db
+    fn get_task_entry_by_id(&self, txid: [u8; 16]) -> DbResult<Option<Vec<u8>>>;
+
+    /// Get next index to be inserted to
+    fn get_next_task_idx(&self) -> DbResult<u64>;
+
+    /// Get transaction id for index
+    fn get_taskid(&self, idx: u64) -> DbResult<Option<[u8; 16]>>;
+
+    /// get txentry by idx
+    fn get_task_entry(&self, idx: u64) -> DbResult<Option<Vec<u8>>>;
+}
+
 /// A trait encapsulating the provider and store traits for interacting with the broadcast
 /// transactions([`L1TxEntry`]), their indices and ids
 pub trait TxBroadcastDatabase {

@@ -5,6 +5,7 @@ pub mod chain_state;
 pub mod client_state;
 pub mod l1;
 pub mod l2;
+pub mod prover;
 pub mod sequencer;
 pub mod sync_event;
 
@@ -45,6 +46,11 @@ pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
 ];
 
 use bridge::schemas::{BridgeTxStateSchema, BridgeTxStateTxidSchema};
+pub const PROVER_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
+    prover::schemas::ProverTaskIdSchema::COLUMN_FAMILY_NAME,
+    prover::schemas::ProverTaskSchema::COLUMN_FAMILY_NAME,
+];
+
 // Re-exports
 pub use bridge_relay::db::BridgeMsgDb;
 use bridge_relay::schemas::*;

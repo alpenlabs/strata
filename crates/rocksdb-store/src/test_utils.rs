@@ -7,9 +7,22 @@ use tempfile::TempDir;
 use crate::{l2::db::L2Db, ChainStateDb, ClientStateDb, DbOpsConfig, L1Db, SyncEventDb};
 
 pub fn get_rocksdb_tmp_instance() -> anyhow::Result<(Arc<OptimisticTransactionDB>, DbOpsConfig)> {
-    let dbname = crate::ROCKSDB_NAME;
     let cfs = crate::STORE_COLUMN_FAMILIES;
+    get_rocksdb_tmp_instance_core(cfs)
+}
+
+pub fn get_rocksdb_tmp_instance_for_prover(
+) -> anyhow::Result<(Arc<OptimisticTransactionDB>, DbOpsConfig)> {
+    let cfs = crate::PROVER_COLUMN_FAMILIES;
+    get_rocksdb_tmp_instance_core(cfs)
+}
+
+fn get_rocksdb_tmp_instance_core(
+    cfs: &[&str],
+) -> anyhow::Result<(Arc<OptimisticTransactionDB>, DbOpsConfig)> {
+    let dbname = crate::ROCKSDB_NAME;
     let mut opts = rocksdb::Options::default();
+
     opts.create_missing_column_families(true);
     opts.create_if_missing(true);
 

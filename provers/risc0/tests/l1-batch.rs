@@ -12,8 +12,7 @@ mod test {
     };
     use express_risc0_adapter::{Risc0Verifier, RiscZeroHost};
     use express_risc0_guest_builder::{
-        ALPEN_BTC_BLOCKSPACE_RISC0_PROOF_ELF, ALPEN_BTC_BLOCKSPACE_RISC0_PROOF_ID,
-        L1_BATCH_RISC0_ELF,
+        GUEST_RISC0_BTC_BLOCKSPACE_ELF, GUEST_RISC0_BTC_BLOCKSPACE_ID, GUEST_RISC0_L1_BATCH_ELF,
     };
     use express_zkvm::{
         AggregationInput, ProverInput, ProverOptions, VerificationKey, ZKVMHost, ZKVMVerifier,
@@ -53,13 +52,9 @@ mod test {
             stark_to_snark_conversion: false,
             enable_compression: false,
         };
-        let prover = RiscZeroHost::init(
-            ALPEN_BTC_BLOCKSPACE_RISC0_PROOF_ELF.into(),
-            // Default::default(),
-            prover_options,
-        );
+        let prover = RiscZeroHost::init(GUEST_RISC0_BTC_BLOCKSPACE_ELF.into(), prover_options);
 
-        let btc_blockspace_elf_id: Vec<u8> = ALPEN_BTC_BLOCKSPACE_RISC0_PROOF_ID
+        let btc_blockspace_elf_id: Vec<u8> = GUEST_RISC0_BTC_BLOCKSPACE_ID
             .iter()
             .flat_map(|&x| x.to_le_bytes())
             .collect();
@@ -94,7 +89,7 @@ mod test {
             blockspace_outputs.push(output);
         }
 
-        let prover = RiscZeroHost::init(L1_BATCH_RISC0_ELF.into(), prover_options);
+        let prover = RiscZeroHost::init(GUEST_RISC0_L1_BATCH_ELF.into(), prover_options);
         let input = L1BatchProofInput {
             batch: blockspace_outputs,
             state: get_header_verification_state(40321),
