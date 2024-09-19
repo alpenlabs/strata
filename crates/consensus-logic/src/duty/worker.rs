@@ -23,7 +23,7 @@ use alpen_express_state::{
     da_blob::{BlobDest, BlobIntent},
     prelude::*,
 };
-use express_storage::{handles::CheckpointHandle, L2BlockManager};
+use express_storage::L2BlockManager;
 use express_tasks::{ShutdownGuard, TaskExecutor};
 use tokio::sync::broadcast;
 use tracing::*;
@@ -33,6 +33,7 @@ use super::{
     types::{self, BatchCheckpointDuty, Duty, DutyBatch, Identity, IdentityKey},
 };
 use crate::{
+    checkpoint::CheckpointHandle,
     errors::Error,
     message::{ClientUpdateNotif, ForkChoiceMessage},
     sync_manager::SyncManager,

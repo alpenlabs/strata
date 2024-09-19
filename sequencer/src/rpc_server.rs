@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use alpen_express_btcio::{broadcaster::L1BroadcastHandle, writer::InscriptionHandle};
-use alpen_express_consensus_logic::sync_manager::SyncManager;
+use alpen_express_consensus_logic::{checkpoint::CheckpointHandle, sync_manager::SyncManager};
 use alpen_express_db::{
     traits::{ChainstateProvider, Database, L1DataProvider, L2DataProvider},
     types::{CheckpointProvingStatus, L1TxEntry, L1TxStatus},
@@ -27,7 +27,7 @@ use alpen_express_status::StatusRx;
 use async_trait::async_trait;
 use bitcoin::{consensus::deserialize, hashes::Hash, Transaction as BTransaction, Txid};
 use express_rpc_utils::to_jsonrpsee_error;
-use express_storage::{handles::CheckpointHandle, L2BlockManager};
+use express_storage::L2BlockManager;
 use jsonrpsee::{core::RpcResult, types::ErrorObjectOwned};
 use thiserror::Error;
 use tokio::sync::{oneshot, Mutex};

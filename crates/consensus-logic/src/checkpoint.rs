@@ -1,26 +1,31 @@
+//! Checkpointing bookkeeping and control logic.
 use std::sync::Arc;
 
 use alpen_express_db::{types::CheckpointEntry, DbResult};
+use express_storage::managers::checkpoint::CheckpointDbManager;
 use tokio::sync::broadcast;
 use tracing::*;
 
-use crate::managers::checkpoint::CheckpointManager;
-
 pub struct CheckpointHandle {
-    manager: Arc<CheckpointManager>,
-    /// Notify listeners about a checkpoint update in db
+    /// Manager for underlying database.
+    db_manager: Arc<CheckpointDbManager>,
+
+    /// Used to notify listeners about a checkpoint update in db.
+    // TODO what does this u64 represent?  do we want to attach additional context?
     update_notify_tx: broadcast::Sender<u64>,
 }
 
 impl CheckpointHandle {
-    pub fn new(manager: Arc<CheckpointManager>) -> Self {
+    pub fn new(db_manager: Arc<CheckpointDbManager>) -> Self {
         let (update_notify_tx, _) = broadcast::channel::<u64>(10);
         Self {
-            manager,
+            db_manager,
             update_notify_tx,
         }
     }
 
+    // TODO this leaks implementation details, we should construct this as we're constructing the
+    // thing that subscribes to it
     pub fn subscribe(&self) -> broadcast::Receiver<u64> {
         self.update_notify_tx.subscribe()
     }
@@ -30,7 +35,7 @@ impl CheckpointHandle {
         idx: u64,
         entry: CheckpointEntry,
     ) -> DbResult<()> {
-        self.manager.put_checkpoint(idx, entry).await?;
+        self.db_manager.put_checkpoint(idx, entry).await?;
 
         // Now send the idx to indicate checkpoint proof has been received
         if let Err(err) = self.update_notify_tx.send(idx) {
@@ -41,18 +46,18 @@ impl CheckpointHandle {
     }
 
     pub async fn put_checkpoint(&self, idx: u64, entry: CheckpointEntry) -> DbResult<()> {
-        self.manager.put_checkpoint(idx, entry).await
+        self.db_manager.put_checkpoint(idx, entry).await
     }
 
     pub fn put_checkpoint_blocking(&self, idx: u64, entry: CheckpointEntry) -> DbResult<()> {
-        self.manager.put_checkpoint_blocking(idx, entry)
+        self.db_manager.put_checkpoint_blocking(idx, entry)
     }
 
     pub async fn get_checkpoint(&self, idx: u64) -> DbResult<Option<CheckpointEntry>> {
-        self.manager.get_checkpoint(idx).await
+        self.db_manager.get_checkpoint(idx).await
     }
 
     pub fn get_checkpoint_blocking(&self, idx: u64) -> DbResult<Option<CheckpointEntry>> {
-        self.manager.get_checkpoint_blocking(idx)
+        self.db_manager.get_checkpoint_blocking(idx)
     }
 }

@@ -12,7 +12,7 @@ use alpen_express_state::{
     client_state::ClientState, csm_status::CsmStatus, operation::SyncAction,
 };
 use alpen_express_status::StatusTx;
-use express_storage::{managers::checkpoint::CheckpointManager, L2BlockManager};
+use express_storage::{managers::checkpoint::CheckpointDbManager, L2BlockManager};
 use express_tasks::ShutdownGuard;
 use tokio::sync::{broadcast, mpsc};
 use tracing::*;
@@ -41,7 +41,7 @@ pub struct WorkerState<D: Database> {
     l2_block_manager: Arc<L2BlockManager>,
 
     /// Checkpoint manager.
-    checkpoint_manager: Arc<CheckpointManager>,
+    checkpoint_manager: Arc<CheckpointDbManager>,
 
     /// Tracker used to remember the current consensus state.
     state_tracker: state_tracker::StateTracker<D>,
@@ -58,7 +58,7 @@ impl<D: Database> WorkerState<D> {
         database: Arc<D>,
         l2_block_manager: Arc<L2BlockManager>,
         cupdate_tx: broadcast::Sender<Arc<ClientUpdateNotif>>,
-        checkpoint_manager: Arc<CheckpointManager>,
+        checkpoint_manager: Arc<CheckpointDbManager>,
     ) -> anyhow::Result<Self> {
         let cs_prov = database.client_state_provider().as_ref();
         let (cur_state_idx, cur_state) = state_tracker::reconstruct_cur_state(cs_prov)?;
@@ -90,7 +90,7 @@ impl<D: Database> WorkerState<D> {
     }
 
     /// Gets a reference to checkpoint manager
-    pub fn checkpoint_manager(&self) -> &CheckpointManager {
+    pub fn checkpoint_db(&self) -> &CheckpointDbManager {
         self.checkpoint_manager.as_ref()
     }
 }
@@ -226,9 +226,7 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
                     );
 
                     // Store
-                    state
-                        .checkpoint_manager()
-                        .put_checkpoint_blocking(idx, entry)?;
+                    state.checkpoint_db().put_checkpoint_blocking(idx, entry)?;
                 }
             }
             SyncAction::FinalizeCheckpoints(_height, checkpoints) => {
@@ -244,9 +242,7 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
                     );
 
                     // Update
-                    state
-                        .checkpoint_manager()
-                        .put_checkpoint_blocking(idx, entry)?;
+                    state.checkpoint_db().put_checkpoint_blocking(idx, entry)?;
                 }
             }
         }

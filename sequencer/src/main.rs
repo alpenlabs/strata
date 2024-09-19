@@ -13,6 +13,7 @@ use alpen_express_btcio::{
 };
 use alpen_express_common::logging;
 use alpen_express_consensus_logic::{
+    checkpoint::CheckpointHandle,
     duty::{
         types::{DutyBatch, Identity, IdentityData, IdentityKey},
         worker::{self as duty_worker},
@@ -37,9 +38,7 @@ use alpen_express_status::{create_status_channel, StatusRx, StatusTx};
 use anyhow::Context;
 use bitcoin::Network;
 use config::{ClientMode, Config};
-use express_storage::{
-    handles::CheckpointHandle, managers::checkpoint::CheckpointManager, L2BlockManager,
-};
+use express_storage::{managers::checkpoint::CheckpointDbManager, L2BlockManager};
 use express_sync::{self, L2SyncContext, RpcSyncPeer};
 use express_tasks::{ShutdownSignal, TaskManager};
 use format_serde_error::SerdeError;
@@ -221,7 +220,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     // Set up database managers.
     let l2_block_manager = Arc::new(L2BlockManager::new(pool.clone(), database.clone()));
-    let checkpoint_manager = Arc::new(CheckpointManager::new(pool.clone(), database.clone()));
+    let checkpoint_manager = Arc::new(CheckpointDbManager::new(pool.clone(), database.clone()));
     let checkpoint_handle = Arc::new(CheckpointHandle::new(checkpoint_manager.clone()));
 
     // Set up Bitcoin client RPC.

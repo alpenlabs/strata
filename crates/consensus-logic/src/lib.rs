@@ -1,6 +1,7 @@
 #![allow(dead_code)] // TODO: remove this once `finalized_tip` fn is used in `ForkChoiceManager`.
 //! Consensus validation logic and core state machine
 
+pub mod checkpoint;
 pub mod client_transition;
 pub mod ctl;
 pub mod duty;
