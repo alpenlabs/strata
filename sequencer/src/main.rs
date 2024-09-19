@@ -38,7 +38,7 @@ use alpen_express_status::{create_status_channel, StatusRx, StatusTx};
 use anyhow::Context;
 use bitcoin::Network;
 use config::{ClientMode, Config};
-use express_bridge_relay::handler::RelayerHandle;
+use express_bridge_relay::relayer::RelayerHandle;
 use express_storage::{managers::checkpoint::CheckpointDbManager, L2BlockManager};
 use express_sync::{self, L2SyncContext, RpcSyncPeer};
 use express_tasks::{ShutdownSignal, TaskManager};
@@ -293,7 +293,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     // Start relayer task.
     // TODO cleanup, this is ugly
     let relayer_config = Arc::new(config.relayer.clone());
-    let start_relayer_fut = express_bridge_relay::handler::start_bridge_relayer_task(
+    let start_relayer_fut = express_bridge_relay::relayer::start_bridge_relayer_task(
         bridge_msg_ops,
         status_rx.clone(),
         relayer_config.clone(),

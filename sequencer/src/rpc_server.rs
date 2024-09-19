@@ -26,7 +26,7 @@ use alpen_express_state::{
 use alpen_express_status::StatusRx;
 use async_trait::async_trait;
 use bitcoin::{consensus::deserialize, hashes::Hash, Transaction as BTransaction, Txid};
-use express_bridge_relay::handler::RelayerHandle;
+use express_bridge_relay::relayer::RelayerHandle;
 use express_rpc_utils::to_jsonrpsee_error;
 use express_storage::L2BlockManager;
 use futures::TryFutureExt;
