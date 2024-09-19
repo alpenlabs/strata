@@ -4045,6 +4045,7 @@ dependencies = [
  "bitcoin",
  "borsh",
  "express-proofimpl-btc-blockspace",
+ "express-proofimpl-checkpoint",
  "express-proofimpl-evm-ee-stf",
  "express-proofimpl-l1-batch",
  "express-sp1-adapter",
@@ -11683,12 +11684,13 @@ dependencies = [
 
 [[package]]
 name = "sp1-build"
-version = "1.1.1"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "65c9c5c2628b485693b6c2e5ba89f1af7ce5cfede39a6a4b041afd2e5b838480"
+checksum = "eae094a567949cc3bbcdb265e45591cf7ac7185f121f6f29ac64a44acb00220e"
 dependencies = [
  "anyhow",
  "cargo_metadata",
+ "chrono",
  "clap",
  "dirs",
 ]
@@ -11769,12 +11771,10 @@ dependencies = [
 
 [[package]]
 name = "sp1-helper"
-version = "1.1.1"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ec6177089127a447ea26b258f722050c0c4f874eba5df7934b246b59088c8f72"
+checksum = "4a17502b73973fedac4ea0d20fbaf33663a0cd0cfc4a6c36a3d095634bec941a"
 dependencies = [
- "cargo_metadata",
- "chrono",
  "sp1-build",
 ]
 
