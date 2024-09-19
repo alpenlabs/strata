@@ -317,7 +317,7 @@ pub trait TxBroadcastDatabase {
 
 /// All methods related to storing/updating [`L1TxEntry`]s in the database
 pub trait BcastStore {
-    /// Updates/Inserts a txentry to database. Returns Some(idx)
+    /// Updates/Inserts a txentry to database. Returns Some(idx) if newly inserted else None
     fn put_tx_entry(&self, txid: Buf32, txentry: L1TxEntry) -> DbResult<Option<u64>>;
 
     /// Updates an existing txentry

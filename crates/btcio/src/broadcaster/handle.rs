@@ -27,8 +27,12 @@ impl L1BroadcastHandle {
         self.ops.get_tx_status_async(txid).await
     }
 
-    /// This inserts an entry to the db, doesn't fail if already exists but updates whatever is
-    /// there
+    /// Insert an entry to the database
+    ///
+    /// # Notes
+    ///
+    /// This function is infallible. If the entry already exists it will update with the new
+    /// `txentry`.
     pub async fn put_tx_entry(&self, txid: Buf32, txentry: L1TxEntry) -> DbResult<Option<u64>> {
         let idx_maybe = self.ops.put_tx_entry_async(txid, txentry.clone()).await?;
 

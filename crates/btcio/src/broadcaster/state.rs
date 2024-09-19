@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-use alpen_express_db::types::{L1TxEntry, L1TxStatus};
+use alpen_express_db::types::L1TxEntry;
 use bitcoin::Txid;
 use express_storage::BroadcastDbOps;
 use tracing::*;
@@ -87,7 +87,7 @@ async fn filter_unfinalized_from_db(
 
 #[cfg(test)]
 mod test {
-    use alpen_express_db::traits::TxBroadcastDatabase;
+    use alpen_express_db::{traits::TxBroadcastDatabase, types::L1TxStatus};
     use alpen_express_rocksdb::{
         broadcaster::db::{BroadcastDatabase, BroadcastDb},
         test_utils::get_rocksdb_tmp_instance,
@@ -149,19 +149,12 @@ mod test {
             .put_tx_entry_async([5; 32].into(), e5.clone())
             .await
             .unwrap();
-
-        let e6 = gen_entry_with_status(L1TxStatus::Reorged);
-        let i6 = ops
-            .put_tx_entry_async([6; 32].into(), e6.clone())
-            .await
-            .unwrap();
         vec![
             (i1.unwrap(), e1),
             (i2.unwrap(), e2),
             (i3.unwrap(), e3),
             (i4.unwrap(), e4),
             (i5.unwrap(), e5),
-            (i6.unwrap(), e6),
         ]
     }
 
@@ -171,20 +164,18 @@ mod test {
         let ops = get_ops();
 
         let pop = populate_broadcast_db(ops.clone()).await;
-        let [(i1, _e1), (i2, _e2), (i3, _e3), (i4, _e4), (i5, _e5), (i6, _e6)] = pop.as_slice()
-        else {
+        let [(i1, _e1), (i2, _e2), (i3, _e3), (i4, _e4), (i5, _e5)] = pop.as_slice() else {
             panic!("Invalid initialization");
         };
         // Now initialize state
         let state = BroadcasterState::initialize(&ops).await.unwrap();
 
-        assert_eq!(state.next_idx, i6 + 1);
+        assert_eq!(state.next_idx, i5 + 1);
 
         // state should contain all except reorged, invalid or  finalized entries
         assert!(state.unfinalized_entries.contains_key(i1));
         assert!(state.unfinalized_entries.contains_key(i2));
         assert!(state.unfinalized_entries.contains_key(i4));
-        assert!(state.unfinalized_entries.contains_key(i6));
 
         assert!(!state.unfinalized_entries.contains_key(i3));
         assert!(!state.unfinalized_entries.contains_key(i5));
@@ -196,9 +187,7 @@ mod test {
         let ops = get_ops();
 
         let pop = populate_broadcast_db(ops.clone()).await;
-        let [(_i1, _e1), (_i2, _e2), (_i3, _e3), (_i4, _e4), (_i5, _e5), (_i6, _e6)] =
-            pop.as_slice()
-        else {
+        let [(_i1, _e1), (_i2, _e2), (_i3, _e3), (_i4, _e4), (_i5, _e5)] = pop.as_slice() else {
             panic!("Invalid initialization");
         };
         // Now initialize state

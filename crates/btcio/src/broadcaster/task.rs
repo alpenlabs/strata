@@ -84,10 +84,9 @@ async fn process_unfinalized_entries(
             ops.put_tx_entry_by_idx_async(*idx, new_txentry.clone())
                 .await?;
 
-            // Remove if finalized or has invalid inputs or reorged
+            // Remove if finalized or has invalid inputs
             if matches!(status, L1TxStatus::Finalized { confirmations: _ })
                 || matches!(status, L1TxStatus::InvalidInputs)
-                || matches!(status, L1TxStatus::Reorged)
             {
                 to_remove.push(*idx);
             }
@@ -140,15 +139,11 @@ async fn handle_entry(
             let txinfo_res = rpc_client.get_transaction(&txid).await;
 
             match txinfo_res {
-                Ok(txinfo)
-                    if txinfo.confirmations == 0
-                        && matches!(txentry.status, L1TxStatus::Confirmed { confirmations: _ }) =>
-                {
-                    // If the confirmations of a tx that is already confirmed is 0 then there is
-                    // a reorg
-                    Ok(Some(L1TxStatus::Reorged))
+                Ok(txinfo) if txinfo.confirmations == 0 => {
+                    // Regardless of whether it was confirmed already(means this is a reorg), we set
+                    // it to published
+                    Ok(Some(L1TxStatus::Published))
                 }
-                Ok(txinfo) if txinfo.confirmations == 0 => Ok(None),
                 Ok(txinfo) if txinfo.confirmations >= (FINALITY_DEPTH) => {
                     Ok(Some(L1TxStatus::Finalized {
                         confirmations: txinfo.block_height(),
@@ -158,10 +153,10 @@ async fn handle_entry(
                     confirmations: txinfo.block_height(),
                 })),
                 Err(e) => {
-                    // Reorg happened if tx was confirmed before, but cannot be found now
-                    if e.is_tx_not_found() && matches!(txentry.status, L1TxStatus::Confirmed { .. })
-                    {
-                        Ok(Some(L1TxStatus::Reorged))
+                    // If for some reasons tx is not found even if it was already
+                    // published/confirmed, set it to unpublished.
+                    if e.is_tx_not_found() {
+                        Ok(Some(L1TxStatus::Unpublished))
                     } else {
                         Err(BroadcasterError::Other(e.to_string()))
                     }
@@ -170,10 +165,6 @@ async fn handle_entry(
         }
         L1TxStatus::Finalized { confirmations: _ } => Ok(None),
         L1TxStatus::InvalidInputs => Ok(None),
-        L1TxStatus::Reorged => {
-            // If the transaction is reorged then the status is not changed
-            Ok(None)
-        }
     }
 }
 
@@ -252,7 +243,8 @@ mod test {
             .await
             .unwrap();
         assert_eq!(
-            res, None,
+            res,
+            Some(L1TxStatus::Published),
             "Status should not change if no confirmations for a published tx"
         );
 
@@ -306,7 +298,7 @@ mod test {
             .unwrap();
         assert_eq!(
             res,
-            Some(L1TxStatus::Reorged),
+            Some(L1TxStatus::Published),
             "Status should revert to reorged if previously confirmed tx has 0 confirmations"
         );
 
@@ -424,9 +416,6 @@ mod test {
 
         let e3 = gen_entry_with_status(L1TxStatus::Published);
         let i3 = ops.put_tx_entry_async([3; 32].into(), e3).await.unwrap();
-
-        let e4 = gen_entry_with_status(L1TxStatus::Reorged);
-        let i4 = ops.put_tx_entry_async([4; 32].into(), e4).await.unwrap();
 
         let state = BroadcasterState::initialize(&ops).await.unwrap();
 

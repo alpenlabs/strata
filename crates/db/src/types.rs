@@ -108,10 +108,7 @@ impl L1TxEntry {
     pub fn is_valid_and_unfinalized(&self) -> bool {
         matches!(
             self.status,
-            L1TxStatus::Reorged
-                | L1TxStatus::Unpublished
-                | L1TxStatus::Published
-                | L1TxStatus::Confirmed { .. }
+            L1TxStatus::Unpublished | L1TxStatus::Published | L1TxStatus::Confirmed { .. }
         )
     }
 }
@@ -135,9 +132,6 @@ pub enum L1TxStatus {
     /// The transaction is finalized in L1 and has `u64` confirmations
     // FIXME this doesn't make sense to be "confirmations"
     Finalized { confirmations: u64 },
-
-    /// The block that includes the transaction has been reorged
-    Reorged,
 
     /// The transaction is not included in L1 because it's inputs were invalid
     InvalidInputs,
@@ -238,7 +232,6 @@ mod tests {
                 r#"{"status":"Finalized","confirmations":100}"#,
             ),
             (L1TxStatus::InvalidInputs, r#"{"status":"InvalidInputs"}"#),
-            (L1TxStatus::Reorged, r#"{"status":"Reorged"}"#),
         ];
 
         // check serialization and deserialization
