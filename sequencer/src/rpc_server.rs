@@ -27,7 +27,7 @@ use alpen_express_status::StatusRx;
 use async_trait::async_trait;
 use bitcoin::{consensus::deserialize, hashes::Hash, Transaction as BTransaction, Txid};
 use express_rpc_utils::to_jsonrpsee_error;
-use express_storage::{managers::checkpoint::CheckpointManager, L2BlockManager};
+use express_storage::{handles::CheckpointHandle, L2BlockManager};
 use jsonrpsee::{core::RpcResult, types::ErrorObjectOwned};
 use thiserror::Error;
 use tokio::sync::{oneshot, Mutex};
@@ -140,7 +140,7 @@ pub struct AlpenRpcImpl<D> {
     bcast_handle: Arc<L1BroadcastHandle>,
     stop_tx: Mutex<Option<oneshot::Sender<()>>>,
     l2_block_manager: Arc<L2BlockManager>,
-    checkpoint_manager: Arc<CheckpointManager>,
+    checkpoint_handle: Arc<CheckpointHandle>,
 }
 
 impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
@@ -151,7 +151,7 @@ impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
         bcast_handle: Arc<L1BroadcastHandle>,
         stop_tx: oneshot::Sender<()>,
         l2_block_manager: Arc<L2BlockManager>,
-        checkpoint_manager: Arc<CheckpointManager>,
+        checkpoint_manager: Arc<CheckpointHandle>,
     ) -> Self {
         Self {
             status_rx,
@@ -160,7 +160,7 @@ impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
             bcast_handle,
             stop_tx: Mutex::new(Some(stop_tx)),
             l2_block_manager,
-            checkpoint_manager,
+            checkpoint_handle: checkpoint_manager,
         }
     }
 
@@ -583,7 +583,7 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
 
     async fn get_checkpoint_info(&self, idx: u64) -> RpcResult<Option<RpcCheckpointInfo>> {
         let entry = self
-            .checkpoint_manager
+            .checkpoint_handle
             .get_checkpoint(idx)
             .await
             .map_err(|e| Error::Other(e.to_string()))?;
@@ -593,7 +593,7 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
 
     async fn submit_checkpoint_proof(&self, idx: u64, proofbytes: HexBytes) -> RpcResult<()> {
         let mut entry = self
-            .checkpoint_manager
+            .checkpoint_handle
             .get_checkpoint(idx)
             .await
             .map_err(|e| Error::Other(e.to_string()))?
@@ -607,7 +607,7 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         // TODO: verify proof, once proof verification logic is ready
         entry.proof = proofbytes.into_inner();
         entry.proving_status = CheckpointProvingStatus::ProofReady;
-        self.checkpoint_manager
+        self.checkpoint_handle
             .put_checkpoint_and_notify(idx, entry)
             .await
             .map_err(|e| Error::Other(e.to_string()))?;

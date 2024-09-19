@@ -37,7 +37,9 @@ use alpen_express_status::{create_status_channel, StatusRx, StatusTx};
 use anyhow::Context;
 use bitcoin::Network;
 use config::{ClientMode, Config};
-use express_storage::{managers::checkpoint::CheckpointManager, L2BlockManager};
+use express_storage::{
+    handles::CheckpointHandle, managers::checkpoint::CheckpointManager, L2BlockManager,
+};
 use express_sync::{self, L2SyncContext, RpcSyncPeer};
 use express_tasks::{ShutdownSignal, TaskManager};
 use format_serde_error::SerdeError;
@@ -220,6 +222,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     // Set up database managers.
     let l2_block_manager = Arc::new(L2BlockManager::new(pool.clone(), database.clone()));
     let checkpoint_manager = Arc::new(CheckpointManager::new(pool.clone(), database.clone()));
+    let checkpoint_handle = Arc::new(CheckpointHandle::new(checkpoint_manager.clone()));
 
     // Set up Bitcoin client RPC.
     let bitcoind_url = format!("http://{}", config.bitcoind_rpc.rpc_url);
@@ -336,20 +339,11 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
         let d_params = params.clone();
         let d_executor = task_manager.executor();
-        let checkpt_mgr = checkpoint_manager.clone();
+        let checkpt_h = checkpoint_handle.clone();
         executor.spawn_critical("duty_worker::duty_dispatch_task", move |shutdown| {
             duty_worker::duty_dispatch_task(
-                shutdown,
-                d_executor,
-                duties_rx,
-                idata.key,
-                sm,
-                db2,
-                eng_ctl_de,
-                insc_hndlr,
-                pool,
-                d_params,
-                checkpt_mgr,
+                shutdown, d_executor, duties_rx, idata.key, sm, db2, eng_ctl_de, insc_hndlr, pool,
+                d_params, checkpt_h,
             )
         });
     }
@@ -399,7 +393,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             inscription_handler,
             bcast_handle,
             l2_block_manager,
-            checkpoint_manager,
+            checkpoint_handle,
         )
         .await
         .unwrap()
@@ -425,7 +419,7 @@ async fn start_rpc<D: Database + Send + Sync + 'static>(
     inscription_handler: Option<Arc<InscriptionHandle>>,
     bcast_handle: Arc<L1BroadcastHandle>,
     l2_block_manager: Arc<L2BlockManager>,
-    checkpt_manager: Arc<CheckpointManager>,
+    checkpt_handle: Arc<CheckpointHandle>,
 ) -> anyhow::Result<()> {
     let (stop_tx, stop_rx) = oneshot::channel();
 
@@ -437,7 +431,7 @@ async fn start_rpc<D: Database + Send + Sync + 'static>(
         bcast_handle.clone(),
         stop_tx,
         l2_block_manager.clone(),
-        checkpt_manager,
+        checkpt_handle,
     );
 
     let mut methods = alp_rpc.into_rpc();

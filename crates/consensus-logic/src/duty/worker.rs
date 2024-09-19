@@ -23,7 +23,7 @@ use alpen_express_state::{
     da_blob::{BlobDest, BlobIntent},
     prelude::*,
 };
-use express_storage::{managers::checkpoint::CheckpointManager, L2BlockManager};
+use express_storage::{handles::CheckpointHandle, L2BlockManager};
 use express_tasks::{ShutdownGuard, TaskExecutor};
 use tokio::sync::broadcast;
 use tracing::*;
@@ -223,7 +223,7 @@ pub fn duty_dispatch_task<
     inscription_handle: Arc<InscriptionHandle>,
     pool: threadpool::ThreadPool,
     params: Arc<Params>,
-    checkpoint_mgr: Arc<CheckpointManager>,
+    ckpt_handle: Arc<CheckpointHandle>,
 ) {
     // TODO make this actually work
     let pending_duties = Arc::new(RwLock::new(HashMap::<Buf32, ()>::new()));
@@ -289,7 +289,7 @@ pub fn duty_dispatch_task<
             let insc_h = inscription_handle.clone();
             let params: Arc<Params> = params.clone();
             let duty_st_tx = duty_status_tx.clone();
-            let checkpt_mgr = checkpoint_mgr.clone();
+            let checkpt_mgr = ckpt_handle.clone();
             pool.execute(move || {
                 duty_exec_task(d, ik, sm, db, e, insc_h, params, duty_st_tx, checkpt_mgr)
             });
@@ -316,7 +316,7 @@ fn duty_exec_task<D: Database, E: ExecEngineCtl>(
     inscription_handle: Arc<InscriptionHandle>,
     params: Arc<Params>,
     duty_status_tx: std::sync::mpsc::Sender<DutyExecStatus>,
-    checkpoint_mgr: Arc<CheckpointManager>,
+    ckpt_handle: Arc<CheckpointHandle>,
 ) {
     let result = perform_duty(
         &duty,
@@ -326,7 +326,7 @@ fn duty_exec_task<D: Database, E: ExecEngineCtl>(
         engine.as_ref(),
         inscription_handle.as_ref(),
         &params,
-        checkpoint_mgr.as_ref(),
+        ckpt_handle.as_ref(),
     );
 
     let status = DutyExecStatus {
@@ -348,7 +348,7 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
     engine: &E,
     inscription_handle: &InscriptionHandle,
     params: &Arc<Params>,
-    checkpt_mgr: &CheckpointManager,
+    checkpt_mgr: &CheckpointHandle,
 ) -> Result<(), Error> {
     match duty {
         Duty::SignBlock(data) => {
@@ -421,7 +421,7 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
 
 fn check_and_get_batch_checkpoint(
     duty: &BatchCheckpointDuty,
-    checkpt_mgr: &CheckpointManager,
+    checkpt_mgr: &CheckpointHandle,
 ) -> Result<BatchCheckpoint, Error> {
     let idx = duty.idx();
 

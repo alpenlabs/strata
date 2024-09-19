@@ -1,5 +1,6 @@
 mod cache;
 mod exec;
+pub mod handles;
 pub mod managers;
 pub mod ops;
 
