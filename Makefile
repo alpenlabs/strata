@@ -184,7 +184,7 @@ rustdocs: ## Runs `cargo docs` to generate the Rust documents in the `target/doc
 	-D warnings" \
 	cargo doc \
 	--workspace \
-	--document-private-items
+	--no-deps
 
 .PHONY: test-doc
 test-doc: ## Runs doctests on the workspace.
