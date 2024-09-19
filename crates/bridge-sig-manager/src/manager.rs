@@ -63,14 +63,14 @@ impl SignatureManager {
     /// Adds a [`BridgeTxState`] to the [`SignatureManager`] replacing if already present for the
     /// computed [`Txid`].
     ///
-    /// The `tweak` parameter determines whether to use the tweaked or untweaked key aggregation.
-    /// Tweaking is necessary when spending from key-path only spend taproot (for example, in the
-    /// case of _spending_ the Deposit UTXO during withdrawal).
+    /// The `keypath_spend_only` parameter determines whether to use the tweaked or untweaked key
+    /// aggregation. Tweaking is necessary when spending from key-path only spend taproot (for
+    /// example, in the case of _spending_ the Deposit UTXO during withdrawal).
     pub async fn add_tx_state(
         &self,
         tx_signing_data: TxSigningData,
         pubkey_table: PublickeyTable,
-        tweak: bool,
+        keypath_spend_only: bool,
     ) -> BridgeSigResult<Txid> {
         let txid = tx_signing_data.psbt.compute_txid();
 
@@ -81,7 +81,7 @@ impl SignatureManager {
         }
 
         let key_agg_ctx = KeyAggContext::new(pubkey_table.0.values().copied())?;
-        let key_agg_ctx = if tweak {
+        let key_agg_ctx = if keypath_spend_only {
             key_agg_ctx.with_unspendable_taproot_tweak()?
         } else {
             key_agg_ctx
@@ -194,15 +194,19 @@ impl SignatureManager {
 
     /// Add this bridge client's signature for the transaction.
     ///
-    /// The `tweak` parameter determines whether to use the tweaked or untweaked key aggregation.
-    /// Tweaking is necessary when spending from key-path only spend taproot (for example, in the
-    /// case of _spending_ the Deposit UTXO during withdrawal).
+    /// The `keypath_spend_only` parameter determines whether to use the tweaked or untweaked key
+    /// aggregation. Tweaking is necessary when spending from key-path only spend taproot (for
+    /// example, in the case of _spending_ the Deposit UTXO during withdrawal).
     ///
     /// # Returns
     ///
     /// A flag indicating whether the [`alpen_express_primitives::l1::BitcoinPsbt`] being tracked in
     /// the [`BridgeTxState`] has become fully signed after adding the signature.
-    pub async fn add_own_partial_sig(&self, txid: &Txid, tweak: bool) -> BridgeSigResult<bool> {
+    pub async fn add_own_partial_sig(
+        &self,
+        txid: &Txid,
+        keypath_spend_only: bool,
+    ) -> BridgeSigResult<bool> {
         let mut tx_state = self.get_tx_state(txid).await?;
 
         let aggregated_nonce = self.get_aggregated_nonce(&tx_state)?;
@@ -235,7 +239,7 @@ impl SignatureManager {
                 &self.keypair,
                 &aggregated_nonce,
                 message,
-                tweak,
+                keypath_spend_only,
             )?;
 
             let own_signature_info = OperatorPartialSig::new(signature.into(), self.index);
@@ -244,7 +248,7 @@ impl SignatureManager {
                 &own_signature_info,
                 &aggregated_nonce,
                 message,
-                tweak,
+                keypath_spend_only,
             )?;
 
             is_fully_signed = tx_state.add_signature(own_signature_info, input_index)?;
@@ -289,9 +293,9 @@ impl SignatureManager {
     /// Please refer to MuSig2 partial signature aggregation section in
     /// [BIP 327](https://github.com/bitcoin/bips/blob/master/bip-0327.mediawiki).
     ///
-    /// The `tweak` parameter determines whether to use the tweaked or untweaked key aggregation.
-    /// Tweaking is necessary when spending from key-path only spend taproot (for example, in the
-    /// case of _spending_ the Deposit UTXO during withdrawal).
+    /// The `keypath_spend_only` parameter determines whether to use the tweaked or untweaked key
+    /// aggregation. Tweaking is necessary when spending from key-path only spend taproot (for
+    /// example, in the case of _spending_ the Deposit UTXO during withdrawal).
     ///
     /// # Returns
     ///
@@ -302,7 +306,7 @@ impl SignatureManager {
         txid: &Txid,
         signature_info: OperatorPartialSig,
         input_index: usize,
-        tweak: bool,
+        keypath_spend_only: bool,
     ) -> BridgeSigResult<bool> {
         let mut tx_state = self.get_tx_state(txid).await?;
 
@@ -332,7 +336,7 @@ impl SignatureManager {
             &signature_info,
             &aggregated_nonce,
             message,
-            tweak,
+            keypath_spend_only,
         )?;
 
         tx_state.add_signature(signature_info, input_index)?;
@@ -345,9 +349,9 @@ impl SignatureManager {
 
     /// Retrieve the fully signed transaction for broadcasting.
     ///
-    /// The `tweak` parameter determines whether to use the tweaked or untweaked key aggregation.
-    /// Tweaking is necessary when spending from key-path only spend taproot (for example, in the
-    /// case of _spending_ the Deposit UTXO during withdrawal).
+    /// The `keypath_spend_only` parameter determines whether to use the tweaked or untweaked key
+    /// aggregation. Tweaking is necessary when spending from key-path only spend taproot (for
+    /// example, in the case of _spending_ the Deposit UTXO during withdrawal).
     ///
     /// # Errors
     ///
@@ -360,10 +364,11 @@ impl SignatureManager {
     /// 5. The collected signatures could not be aggregated.
     /// 6. The aggregated signature is not valid for the given message and aggregated pubkey.
     /// 7. A fully signed transaction could not be created from the [`bitcoin::Psbt`].
+    /// 8. A tweak could not be applied to the key aggregation context for `keypath_spend_only`.
     pub async fn get_fully_signed_transaction(
         &self,
         txid: &Txid,
-        tweak: bool,
+        keypath_spend_only: bool,
     ) -> BridgeSigResult<Transaction> {
         let tx_state = self.get_tx_state(txid).await?;
 
@@ -378,7 +383,7 @@ impl SignatureManager {
         let prevouts = &tx_state.prevouts();
 
         let key_agg_ctx = KeyAggContext::new(tx_state.pubkeys().0.values().clone().copied())?;
-        let tweaked_key_agg_ctx = if tweak {
+        let tweaked_key_agg_ctx = if keypath_spend_only {
             key_agg_ctx.with_unspendable_taproot_tweak()?
         } else {
             key_agg_ctx
@@ -424,7 +429,7 @@ impl SignatureManager {
 
             let aggregated_pubkey: PublicKey = tweaked_key_agg_ctx.aggregated_pubkey_untweaked();
             let x_only_pubkey: XOnlyPublicKey = aggregated_pubkey.x_only_public_key().0;
-            let x_only_pubkey: XOnlyPublicKey = if tweak {
+            let x_only_pubkey: XOnlyPublicKey = if keypath_spend_only {
                 x_only_pubkey.tap_tweak(SECP256K1, None).0.into()
             } else {
                 x_only_pubkey
@@ -573,7 +578,7 @@ mod tests {
     async fn test_get_own_nonce() {
         let own_index = 0;
         let num_operators = 2;
-        let tweak = true;
+        let keypath_spend_only = true;
         assert!(
             num_operators.gt(&1) && num_operators.gt(&own_index),
             "num_operators should be set to greater than 1 and greater than self index"
@@ -597,7 +602,7 @@ mod tests {
         );
 
         sig_manager
-            .add_tx_state(tx_signing_data.clone(), pubkey_table, tweak)
+            .add_tx_state(tx_signing_data.clone(), pubkey_table, keypath_spend_only)
             .await
             .expect("should be able to add tx state");
 
@@ -623,7 +628,7 @@ mod tests {
     async fn test_get_aggregated_nonce() {
         let own_index = 0;
         let num_operators = 2;
-        let tweak = false;
+        let keypath_spend_only = false;
         assert!(
             num_operators.gt(&1) && num_operators.gt(&own_index),
             "num_operators should be set to greater than 1 and greater than self index"
@@ -641,7 +646,7 @@ mod tests {
         let txid = tx_signing_data.psbt.compute_txid();
 
         sig_manager
-            .add_tx_state(tx_signing_data.clone(), pubkey_table, tweak)
+            .add_tx_state(tx_signing_data.clone(), pubkey_table, keypath_spend_only)
             .await
             .expect("should be able to add tx state");
 
@@ -658,7 +663,15 @@ mod tests {
             "should error with IncompleteNonces if not all nonces have been collected yet"
         );
 
-        collect_nonces(&sig_manager, &txid, &pks, &sks, own_index, tweak).await;
+        collect_nonces(
+            &sig_manager,
+            &txid,
+            &pks,
+            &sks,
+            own_index,
+            keypath_spend_only,
+        )
+        .await;
 
         let updated_state = sig_manager
             .db_ops
@@ -679,7 +692,7 @@ mod tests {
     async fn test_add_own_partial_sig() {
         let own_index = 2;
         let num_operators = 3;
-        let tweak = true;
+        let keypath_spend_only = true;
         assert!(
             num_operators.gt(&1) && num_operators.gt(&own_index),
             "num_operators should be set to greater than 1 and greater than self and external index"
@@ -711,20 +724,32 @@ mod tests {
 
         let pubkey_table = generate_pubkey_table(&pks);
         let txid = signature_manager
-            .add_tx_state(tx_signing_data.clone(), pubkey_table, tweak)
+            .add_tx_state(tx_signing_data.clone(), pubkey_table, keypath_spend_only)
             .await
             .expect("should be able to add state");
 
         // Add the bridge client's own signature
-        let result = signature_manager.add_own_partial_sig(&txid, tweak).await;
+        let result = signature_manager
+            .add_own_partial_sig(&txid, keypath_spend_only)
+            .await;
         assert!(
             result.is_err_and(|e| matches!(e, BridgeSigError::IncompleteNonces)),
             "should not be able to add own signature if not all nonces have been collected",
         );
 
-        collect_nonces(&signature_manager, &txid, &pks, &sks, own_index, tweak).await;
+        collect_nonces(
+            &signature_manager,
+            &txid,
+            &pks,
+            &sks,
+            own_index,
+            keypath_spend_only,
+        )
+        .await;
 
-        let result = signature_manager.add_own_partial_sig(&txid, tweak).await;
+        let result = signature_manager
+            .add_own_partial_sig(&txid, keypath_spend_only)
+            .await;
         assert!(
             result.is_ok(),
             "should be able to add one's own signature once all nonces have been collected but got: {:?}", result.err().unwrap()
@@ -761,7 +786,7 @@ mod tests {
         let own_index = 1;
         let external_index = 0;
         let num_operators = 2;
-        let tweak = false;
+        let keypath_spend_only = false;
         assert!(
             num_operators.eq(&2)
                 && num_operators.gt(&own_index)
@@ -792,7 +817,12 @@ mod tests {
             OperatorPartialSig::new(random_partial_sig, external_index as OperatorIdx);
 
         let result = signature_manager
-            .add_partial_sig(&random_txid, invalid_sig_info, external_index, tweak)
+            .add_partial_sig(
+                &random_txid,
+                invalid_sig_info,
+                external_index,
+                keypath_spend_only,
+            )
             .await;
         assert!(
             result.is_err_and(|e| matches!(e, BridgeSigError::TransactionNotFound)),
@@ -801,19 +831,32 @@ mod tests {
 
         let pubkey_table = generate_pubkey_table(&pks);
         let txid = signature_manager
-            .add_tx_state(tx_signing_data.clone(), pubkey_table.clone(), tweak)
+            .add_tx_state(
+                tx_signing_data.clone(),
+                pubkey_table.clone(),
+                keypath_spend_only,
+            )
             .await
             .expect("should be able to add state");
 
         // Add the bridge client's own signature
-        let result = signature_manager.add_own_partial_sig(&txid, tweak).await;
+        let result = signature_manager
+            .add_own_partial_sig(&txid, keypath_spend_only)
+            .await;
         assert!(
             result.is_err_and(|e| matches!(e, BridgeSigError::IncompleteNonces)),
             "should not be able to add own signature if not all nonces have been collected",
         );
 
-        let (_, sec_nonces) =
-            collect_nonces(&signature_manager, &txid, &pks, &sks, own_index, tweak).await;
+        let (_, sec_nonces) = collect_nonces(
+            &signature_manager,
+            &txid,
+            &pks,
+            &sks,
+            own_index,
+            keypath_spend_only,
+        )
+        .await;
 
         let tx_state = signature_manager
             .db_ops
@@ -848,7 +891,7 @@ mod tests {
             &external_keypair,
             &agg_nonce,
             message.as_ref(),
-            tweak,
+            keypath_spend_only,
         )
         .unwrap();
 
@@ -856,7 +899,12 @@ mod tests {
             OperatorPartialSig::new(external_signature.into(), external_index as OperatorIdx);
 
         let result = signature_manager
-            .add_partial_sig(&txid, external_signature_info, num_inputs + 1, tweak)
+            .add_partial_sig(
+                &txid,
+                external_signature_info,
+                num_inputs + 1,
+                keypath_spend_only,
+            )
             .await;
         assert!(
             result.is_err_and(|e| matches!(e, BridgeSigError::InputIndexOutOfBounds)),
@@ -864,7 +912,12 @@ mod tests {
         );
 
         let result = signature_manager
-            .add_partial_sig(&txid, external_signature_info, input_index, tweak)
+            .add_partial_sig(
+                &txid,
+                external_signature_info,
+                input_index,
+                keypath_spend_only,
+            )
             .await;
         assert!(
             result.is_err(),
@@ -878,7 +931,7 @@ mod tests {
             &external_keypair,
             &agg_nonce,
             message.as_ref(),
-            tweak,
+            keypath_spend_only,
         )
         .expect("should be able to produce partial sig");
 
@@ -886,7 +939,12 @@ mod tests {
             OperatorPartialSig::new(external_signature.into(), external_index as OperatorIdx);
 
         let result = signature_manager
-            .add_partial_sig(&txid, external_signature_info, input_index, tweak)
+            .add_partial_sig(
+                &txid,
+                external_signature_info,
+                input_index,
+                keypath_spend_only,
+            )
             .await;
 
         assert!(
@@ -917,7 +975,9 @@ mod tests {
             "should have the external index at the right place"
         );
 
-        let result = signature_manager.add_own_partial_sig(&txid, tweak).await;
+        let result = signature_manager
+            .add_own_partial_sig(&txid, keypath_spend_only)
+            .await;
         assert!(
             result.is_ok(),
             "should be able to add one's own partial sig but got: {}",
@@ -934,7 +994,7 @@ mod tests {
             &external_keypair,
             &agg_nonce,
             random_message.as_ref(),
-            tweak,
+            keypath_spend_only,
         )
         .expect("should produce a signature");
 
@@ -944,7 +1004,12 @@ mod tests {
         );
 
         let result = signature_manager
-            .add_partial_sig(&txid, invalid_external_signature_info, 0, tweak)
+            .add_partial_sig(
+                &txid,
+                invalid_external_signature_info,
+                0,
+                keypath_spend_only,
+            )
             .await;
 
         assert!(
@@ -956,7 +1021,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_fully_signed_transaction() {
         // Generate keypairs for the UTXO
-        let tweak = true;
+        let keypath_spend_only = true;
         let num_operators = 4;
         let (pubkeys, secret_keys) = generate_keypairs(num_operators);
         let pubkey_table = generate_pubkey_table(&pubkeys);
@@ -972,7 +1037,11 @@ mod tests {
 
         // Add TxState to the SignatureManager
         let txid = signature_manager
-            .add_tx_state(tx_signing_data.clone(), pubkey_table.clone(), tweak)
+            .add_tx_state(
+                tx_signing_data.clone(),
+                pubkey_table.clone(),
+                keypath_spend_only,
+            )
             .await
             .expect("should add state to storage");
 
@@ -982,7 +1051,7 @@ mod tests {
             &pubkeys,
             &secret_keys,
             own_index,
-            tweak,
+            keypath_spend_only,
         )
         .await;
 
@@ -998,7 +1067,9 @@ mod tests {
             .expect("should be able to get aggregated nonces");
 
         // Add the bridge client's own signature
-        let result = signature_manager.add_own_partial_sig(&txid, tweak).await;
+        let result = signature_manager
+            .add_own_partial_sig(&txid, keypath_spend_only)
+            .await;
         assert!(
             result.is_ok(),
             "should be able to add one's own partial sig but got error: {}",
@@ -1038,7 +1109,7 @@ mod tests {
                     &Keypair::from_secret_key(SECP256K1, &secret_keys[signer_index]),
                     &aggregated_nonce,
                     message.as_ref(),
-                    tweak,
+                    keypath_spend_only,
                 )
                 .unwrap();
 
@@ -1047,7 +1118,12 @@ mod tests {
 
                 // Add the external signature
                 let result = signature_manager
-                    .add_partial_sig(&txid, external_signature_info, input_index, tweak)
+                    .add_partial_sig(
+                        &txid,
+                        external_signature_info,
+                        input_index,
+                        keypath_spend_only,
+                    )
                     .await;
 
                 assert!(
@@ -1077,7 +1153,7 @@ mod tests {
 
         // Retrieve the fully signed transaction
         let signed_tx = signature_manager
-            .get_fully_signed_transaction(&txid, tweak)
+            .get_fully_signed_transaction(&txid, keypath_spend_only)
             .await;
         assert!(
             signed_tx.is_ok(),
@@ -1104,13 +1180,13 @@ mod tests {
         pks: &[PublicKey],
         sks: &[SecretKey],
         own_index: usize, // should be `u32` but this leads to double conversion
-        tweak: bool,
+        keypath_spend_only: bool,
     ) -> (Vec<PubNonce>, Vec<SecNonce>) {
         let mut pub_nonces = Vec::with_capacity(pks.len());
         let mut sec_nonces = Vec::with_capacity(sks.len());
 
         for (i, sk) in sks.iter().enumerate() {
-            let sec_nonce = generate_sec_nonce(txid, pks.to_vec(), *sk, tweak);
+            let sec_nonce = generate_sec_nonce(txid, pks.to_vec(), *sk, keypath_spend_only);
             let pub_nonce = sec_nonce.public_nonce();
 
             sec_nonces.push(sec_nonce);

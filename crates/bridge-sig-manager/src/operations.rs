@@ -92,7 +92,7 @@ pub fn sign_state_partial(
     keypair: &Keypair,
     aggregated_nonce: &AggNonce,
     message: impl AsRef<[u8]>,
-    tweak: bool,
+    keypath_spend_only: bool,
 ) -> BridgeSigResult<PartialSignature> {
     let pubkeys = pubkey_table.0.clone();
     let pubkeys = pubkeys.values();
@@ -101,7 +101,7 @@ pub fn sign_state_partial(
 
     let key_agg_ctx = KeyAggContext::new(pubkeys.copied())?;
 
-    let key_agg_ctx = if tweak {
+    let key_agg_ctx = if keypath_spend_only {
         key_agg_ctx.with_unspendable_taproot_tweak()?
     } else {
         key_agg_ctx
@@ -126,7 +126,7 @@ pub fn verify_partial_sig(
     signature_info: &OperatorPartialSig,
     aggregated_nonce: &AggNonce,
     message: impl AsRef<[u8]>,
-    tweak: bool,
+    keypath_spend_only: bool,
 ) -> BridgeSigResult<()> {
     let signer_index = signature_info.signer_index();
 
@@ -140,7 +140,7 @@ pub fn verify_partial_sig(
 
     let pubkeys = tx_state.pubkeys().0.values().copied();
     let key_agg_ctx = KeyAggContext::new(pubkeys)?;
-    let key_agg_ctx = if tweak {
+    let key_agg_ctx = if keypath_spend_only {
         key_agg_ctx.with_unspendable_taproot_tweak()?
     } else {
         key_agg_ctx
@@ -274,21 +274,21 @@ mod tests {
     }
 
     #[test]
-    fn test_generate_and_verify_partial_sig_with_tweak() {
+    fn test_generate_and_verify_partial_sig_for_keypath_spend() {
         test_generate_and_verify_partial_sig(true);
     }
 
     #[test]
-    fn test_generate_and_verify_partial_sig_without_tweak() {
+    fn test_generate_and_verify_partial_sig_for_scriptpath_spend() {
         test_generate_and_verify_partial_sig(false);
     }
 
-    fn test_generate_and_verify_partial_sig(tweak: bool) {
+    fn test_generate_and_verify_partial_sig(keypath_spend_only: bool) {
         // Step 0: Setup
 
         let num_operators = 3;
         let own_index = 1;
-        let (sks, aggregated_nonce, tx_state) = setup(num_operators, own_index, tweak);
+        let (sks, aggregated_nonce, tx_state) = setup(num_operators, own_index, keypath_spend_only);
         let txid = tx_state.unsigned_tx().compute_txid();
 
         // Step 1: Generate a partial signature
@@ -300,7 +300,7 @@ mod tests {
             &keypair,
             &aggregated_nonce,
             txid.as_byte_array(),
-            tweak,
+            keypath_spend_only,
         );
 
         assert!(
@@ -320,7 +320,7 @@ mod tests {
             &signature_info,
             &aggregated_nonce,
             txid.as_byte_array(),
-            tweak,
+            keypath_spend_only,
         );
 
         assert!(
@@ -342,7 +342,7 @@ mod tests {
             &signature_info,
             &aggregated_nonce,
             txid.as_byte_array(),
-            tweak,
+            keypath_spend_only,
         );
 
         assert!(
@@ -365,7 +365,7 @@ mod tests {
             &signature_info,
             &aggregated_nonce,
             txid.as_byte_array(),
-            tweak,
+            keypath_spend_only,
         );
 
         assert!(
@@ -382,7 +382,7 @@ mod tests {
             &signature_info,
             &aggregated_nonce,
             txid.as_byte_array(),
-            tweak,
+            keypath_spend_only,
         );
 
         assert!(
@@ -394,7 +394,7 @@ mod tests {
     fn setup(
         num_operators: usize,
         own_index: usize,
-        tweak: bool,
+        keypath_spend_only: bool,
     ) -> (Vec<SecretKey>, AggNonce, BridgeTxState) {
         assert!(own_index.lt(&num_operators), "invalid own index set");
 
@@ -407,7 +407,7 @@ mod tests {
 
         let key_agg_ctx =
             KeyAggContext::new(pks.clone()).expect("generation of key agg context should work");
-        let key_agg_ctx = if tweak {
+        let key_agg_ctx = if keypath_spend_only {
             key_agg_ctx
                 .with_unspendable_taproot_tweak()
                 .expect("should be able to add unspendable tweak")
