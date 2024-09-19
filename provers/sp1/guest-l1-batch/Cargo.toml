@@ -11,7 +11,7 @@ bitcoin = { version = "0.32.1" }
 express-proofimpl-btc-blockspace = { path = "../../../crates/proof-impl/btc-blockspace" }
 express-proofimpl-l1-batch = { path = "../../../crates/proof-impl/l1-batch" }
 sha2 = "0.10.8"
-sp1-zkvm = { version = "1.0.1", features = ["verify"] }
+sp1-zkvm = { version = "2.0.0", features = ["verify"] }
 
 
 [patch.crates-io]
