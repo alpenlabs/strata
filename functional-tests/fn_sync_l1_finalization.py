@@ -2,7 +2,12 @@ import time
 
 import flexitest
 
-from constants import ERROR_PROOF_ALREADY_CREATED, ERROR_CHECKPOINT_DOESNOT_EXIST
+from constants import (
+    ERROR_CHECKPOINT_DOESNOT_EXIST,
+    ERROR_PROOF_ALREADY_CREATED,
+    FAST_BATCH_ROLLUP_PARAMS,
+)
+from entry import BasicEnvConfig
 
 
 @flexitest.register
@@ -10,7 +15,7 @@ class BlockFinalizationTest(flexitest.Test):
     """ """
 
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env("fast_batches")
+        ctx.set_env(BasicEnvConfig(101, rollup_params=FAST_BATCH_ROLLUP_PARAMS))
 
     def main(self, ctx: flexitest.RunContext):
         seq = ctx.get_service("sequencer")
