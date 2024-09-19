@@ -93,8 +93,10 @@ impl<D: Database> StateTracker<D> {
 }
 
 /// Reconstructs the [`ClientState`] by fetching the last available checkpoint
-/// and replaying all relevant [`ClientStateWrite`]s from that checkpoint
-/// up to the specified index `idx`, ensuring an accurate and up-to-date state.
+/// and replaying all relevant
+/// [`ClientStateWrite`](alpen_express_state::operation::ClientStateWrite)
+/// from that checkpoint up to the specified index `idx`,
+/// ensuring an accurate and up-to-date state.
 ///
 /// # Parameters
 ///
@@ -123,10 +125,11 @@ pub fn reconstruct_cur_state(
     Ok((last_write_idx, state))
 }
 
-/// Reconstructs the `[ClientState`].
+/// Reconstructs the
+/// [`ClientStateWrite`](alpen_express_state::operation::ClientStateWrite)
 ///
 /// Under the hood fetches the last available checkpoint
-/// and then replays all the [`ClientStateWrite`]s
+/// and then replays all the [`ClientStateWrite`](alpen_express_state::operation::ClientStateWrite)s
 /// from that checkpoint up to the requested index `idx`
 /// such that we have accurate [`ClientState`].
 ///

@@ -88,7 +88,7 @@ pub trait Broadcaster {
 /// Wallet functionality that any Bitcoin client **without private keys** that
 /// interacts with the Bitcoin network should provide.
 ///
-/// For signing transactions, see [`BitcoinSigner`].
+/// For signing transactions, see [`Signer`].
 ///
 /// # Note
 ///

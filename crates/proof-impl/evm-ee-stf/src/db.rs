@@ -31,9 +31,9 @@ use crate::{
     ELProofInput,
 };
 
-/// A helper trait to extend [InMemoryDB] with additional functionality.
+/// A helper trait to extend [`InMemoryDB`] with additional functionality.
 pub trait InMemoryDBHelper {
-    /// Create an [InMemoryDB] from a given [SP1RethInput].
+    /// Create an [`InMemoryDB`] from a given [`ELProofInput`].
     fn initialize(input: &mut ELProofInput) -> Result<Self>
     where
         Self: Sized;

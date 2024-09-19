@@ -86,7 +86,7 @@ impl L1TxEntry {
     ///
     /// # Note
     ///
-    /// Whenever possible use [`to_tx()`] to deserialize the transaction.
+    /// Whenever possible use [`try_to_tx()`](L1TxEntry::try_to_tx) to deserialize the transaction.
     /// This imposes more strict type checks.
     pub fn tx_raw(&self) -> &[u8] {
         &self.tx_raw

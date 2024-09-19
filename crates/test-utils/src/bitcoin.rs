@@ -43,7 +43,7 @@ pub fn get_btc_mainnet_block() -> Block {
 /// * `idx` - The index of the difficulty adjustment (1-based). 1 for the first adjustment, 2 for
 ///   the second, and so on.
 /// * `start` - The starting height from which to calculate.
-/// * `params` - [PowParams](PowParams) of the network
+/// * `difficulty_adjustment_interval` - The adjustment interval.
 pub fn get_difficulty_adjustment_height(
     idx: u32,
     start: u32,

@@ -208,7 +208,7 @@ impl InscriptionParser {
         Ok((tag, name))
     }
 
-    /// Parse [`InsriptionData`]
+    /// Parse [`InscriptionData`]
     ///
     /// # Errors
     ///

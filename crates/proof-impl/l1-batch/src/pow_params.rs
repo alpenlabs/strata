@@ -1,13 +1,13 @@
 use bitcoin::{params::Params, Target};
 use serde::{Deserialize, Serialize};
 
-/// Subset of [Params](bitcoin::params::Params) that is used in the verification of Header
+/// Subset of [`Params`] that is used in the verification of Header
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PowParams {
     /// The maximum **attainable** target value for these params.
     ///
     /// Not all target values are attainable because consensus code uses the compact format to
-    /// represent targets (see [`CompactTarget`]).
+    /// represent targets (see [`CompactTarget`](bitcoin::CompactTarget)).
     ///
     /// Note that this value differs from Bitcoin Core's powLimit field in that this value is
     /// attainable, but Bitcoin Core's is not. Specifically, because targets in Bitcoin are always

@@ -1,6 +1,6 @@
 //! Data structures for that represents the JSON responses. `rpc` crate should depend on this.
 //!
-//!  Following the https://github.com/rust-bitcoin/rust-bitcoincore-rpc where there are separate crates for
+//!  Following the <https://github.com/rust-bitcoin/rust-bitcoincore-rpc> where there are separate crates for
 //!  - implementation of RPC client
 //!  - crate for just data structures that represents the JSON responses from Bitcoin core RPC
 

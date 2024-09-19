@@ -23,7 +23,7 @@ impl<D: SequencerDatabase + Sync + Send + 'static> Context<D> {
         Self { db }
     }
 
-    /// Convert to [`InscriptionDataOps`] using a [`Threadpool`]
+    /// Convert to [`InscriptionDataOps`] using a [`ThreadPool`]
     pub fn into_ops(self, pool: ThreadPool) -> InscriptionDataOps {
         InscriptionDataOps::new(pool, Arc::new(self))
     }

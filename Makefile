@@ -180,10 +180,11 @@ rustdocs: ## Runs `cargo docs` to generate the Rust documents in the `target/doc
 	RUSTDOCFLAGS="\
 	--show-type-layout \
 	--enable-index-page -Z unstable-options \
+	-A rustdoc::private-doc-tests \
 	-D warnings" \
 	cargo doc \
 	--workspace \
-	--document-private-items
+	--no-deps
 
 .PHONY: test-doc
 test-doc: ## Runs doctests on the workspace.
@@ -195,7 +196,7 @@ test: ## Runs all tests in the workspace including unit and docs tests.
 	make test-doc
 
 .PHONY: pr
-pr: lint sec test-doc test-unit test-int test-functional ## Runs lints (without fixing), audit and tests (run this before creating a PR).
+pr: lint sec rustdocs test-doc test-unit test-int test-functional ## Runs lints (without fixing), audit, docs, and tests (run this before creating a PR).
 	@echo "\n\033[36m======== CHECKS_COMPLETE ========\033[0m\n"
 	@test -z "$$(git status --porcelain)" || echo "WARNNG: You have uncommitted changes"
 	@echo "All good to create a PR!"
