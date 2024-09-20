@@ -78,11 +78,13 @@ impl L1TxProof {
     }
 }
 
+
 /// Tx body with a proof.
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct L1Tx {
     proof: L1TxProof,
     tx: Vec<u8>,
+    // ty: ParsedTx
 }
 
 impl L1Tx {

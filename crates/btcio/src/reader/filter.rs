@@ -1,7 +1,5 @@
 use bitcoin::{Address, Block, Transaction};
 
-use crate::inscription::InscriptionParser;
-
 /// What kind of transactions can be relevant for rollup node to filter
 #[derive(Clone, Debug)]
 pub enum RelevantTxType {
@@ -10,10 +8,13 @@ pub enum RelevantTxType {
     /// Inscription transactions with given Rollup name. This will be parsed by
     /// [`InscriptionParser`] which dictates the structure of inscription.
     RollupInscription(RollupName),
-    // Add other relevant conditions as needed
+    /// Deposit transcation
+    Deposit(RollupName, AddressLength, Amount),
 }
 
 type RollupName = String;
+type AddressLength = u8;
+type Amount = u64;
 
 /// Filter all the relevant [`Transaction`]s in a block based on given [`RelevantTxType`]s
 pub fn filter_relevant_txs(block: &Block, relevent_types: &[RelevantTxType]) -> Vec<u32> {
@@ -28,6 +29,7 @@ pub fn filter_relevant_txs(block: &Block, relevent_types: &[RelevantTxType]) -> 
 
 /// Determines if a [`Transaction`] is relevant based on given [`RelevantTxType`]s
 fn is_relevant(tx: &Transaction, relevant_types: &[RelevantTxType]) -> bool {
+    // work around for a relevant transaction
     relevant_types.iter().any(|rel_type| match rel_type {
         RelevantTxType::SpentToAddress(address) => tx
             .output
@@ -38,14 +40,17 @@ fn is_relevant(tx: &Transaction, relevant_types: &[RelevantTxType]) -> bool {
             None => false,
             // If it is a tapscript, check rollup name
             Some(scr) => {
-                let parser = InscriptionParser::new(scr.into());
-                parser
-                    .parse_rollup_name()
-                    .ok()
-                    .filter(|n| n == name)
-                    .is_some()
+                true
+                // let parser = InscriptionParser::new(scr.into());
+                // parser
+                //     .parse_rollup_name()
+                //     .ok()
+                //     .filter(|n| n == name)
+                //     .is_some()
             }
         },
+        RelevantTxType::Deposit(rollup_name, addr_len, amount) => todo!(),
+
     })
 }
 
