@@ -367,7 +367,7 @@ impl BitcoinAmount {
     pub const SIZE: usize = 8;
 
     /// The number of sats in 1 bitcoin.
-    const SATS_FACTOR: u64 = 100_000_000;
+    pub const SATS_FACTOR: u64 = 100_000_000;
 
     /// Get the number of sats in this [`BitcoinAmount`].
     pub const fn to_sat(&self) -> u64 {
@@ -614,121 +614,174 @@ impl<'a> Arbitrary<'a> for BitcoinTxOut {
     }
 }
 
+/// The components required in the witness stack to spend a taproot output.
+///
+/// If a script-path path is being used, the witness stack needs the script being spent and the
+/// control block in addition to the signature.
+/// See [BIP 341](https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki#constructing-and-spending-taproot-outputs).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct SpendInfo {
-    pub script_buf: ScriptBuf,
-    pub control_block: ControlBlock,
+pub enum TaprootSpendPath {
+    /// Use the keypath spend.
+    ///
+    /// This only requires the signature for the tweaked internal key and nothing else.
+    Key,
+
+    /// Use the script path spend.
+    ///
+    /// This requires the script being spent from as well as the [`ControlBlock`] in addition to
+    /// the elements that fulfill the spending condition in the script.
+    Script {
+        script_buf: ScriptBuf,
+        control_block: ControlBlock,
+    },
 }
 
-// Implement BorshSerialize for SpendInfo
-impl BorshSerialize for SpendInfo {
+impl BorshSerialize for TaprootSpendPath {
     fn serialize<W: Write>(&self, writer: &mut W) -> std::io::Result<()> {
-        // Serialize the ScriptBuf
-        let script_bytes = self.script_buf.to_bytes();
-        BorshSerialize::serialize(&(script_bytes.len() as u64), writer)?;
-        writer.write_all(&script_bytes)?;
+        match self {
+            TaprootSpendPath::Key => {
+                // Variant index for Keypath is 0
+                BorshSerialize::serialize(&0u32, writer)?;
+            }
+            TaprootSpendPath::Script {
+                script_buf,
+                control_block,
+            } => {
+                // Variant index for ScriptPath is 1
+                BorshSerialize::serialize(&1u32, writer)?;
 
-        // Serialize the ControlBlock using bitcoin's serialize method
-        let control_block_bytes = self.control_block.serialize();
-        BorshSerialize::serialize(&(control_block_bytes.len() as u64), writer)?;
-        writer.write_all(&control_block_bytes)?;
+                // Serialize the ScriptBuf
+                let script_bytes = script_buf.to_bytes();
+                BorshSerialize::serialize(&(script_bytes.len() as u64), writer)?;
+                writer.write_all(&script_bytes)?;
 
+                // Serialize the ControlBlock using bitcoin's serialize method
+                let control_block_bytes = control_block.serialize();
+                BorshSerialize::serialize(&(control_block_bytes.len() as u64), writer)?;
+                writer.write_all(&control_block_bytes)?;
+            }
+        }
         Ok(())
     }
 }
 
-// Implement BorshDeserialize for SpendInfo
-impl BorshDeserialize for SpendInfo {
+// Implement BorshDeserialize for TaprootSpendInfo
+impl BorshDeserialize for TaprootSpendPath {
     fn deserialize_reader<R: Read>(reader: &mut R) -> std::io::Result<Self> {
-        // Deserialize the ScriptBuf
-        let script_len = u64::deserialize_reader(reader)? as usize;
-        let mut script_bytes = vec![0u8; script_len];
-        reader.read_exact(&mut script_bytes)?;
-        let script_buf = ScriptBuf::from(script_bytes);
+        // Deserialize the variant index
+        let variant: u32 = BorshDeserialize::deserialize_reader(reader)?;
+        match variant {
+            0 => Ok(TaprootSpendPath::Key),
+            1 => {
+                // Deserialize the ScriptBuf
+                let script_len = u64::deserialize_reader(reader)? as usize;
+                let mut script_bytes = vec![0u8; script_len];
+                reader.read_exact(&mut script_bytes)?;
+                let script_buf = ScriptBuf::from(script_bytes);
 
-        // Deserialize the ControlBlock
-        let control_block_len = u64::deserialize_reader(reader)? as usize;
-        let mut control_block_bytes = vec![0u8; control_block_len];
-        reader.read_exact(&mut control_block_bytes)?;
-        let control_block: ControlBlock =
-            ControlBlock::decode(&control_block_bytes[..]).map_err(|_| {
-                std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid ControlBlock")
-            })?;
+                // Deserialize the ControlBlock
+                let control_block_len = u64::deserialize_reader(reader)? as usize;
+                let mut control_block_bytes = vec![0u8; control_block_len];
+                reader.read_exact(&mut control_block_bytes)?;
+                let control_block: ControlBlock = ControlBlock::decode(&control_block_bytes[..])
+                    .map_err(|_| {
+                        std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid ControlBlock")
+                    })?;
 
-        Ok(SpendInfo {
-            script_buf,
-            control_block,
-        })
+                Ok(TaprootSpendPath::Script {
+                    script_buf,
+                    control_block,
+                })
+            }
+            _ => Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Unknown variant for TaprootSpendInfo",
+            )),
+        }
     }
 }
 
-impl<'a> Arbitrary<'a> for SpendInfo {
+// Implement Arbitrary for TaprootSpendInfo
+impl<'a> Arbitrary<'a> for TaprootSpendPath {
     fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
-        // Arbitrary ScriptBuf (the script part of SpendInfo)
-        let script_len = usize::arbitrary(u)? % 100; // Limit the length of the script for practicality
-        let script_bytes = u.bytes(script_len)?; // Generate random bytes for the script
-        let script_buf = ScriptBuf::from(script_bytes.to_vec());
+        // Randomly decide which variant to generate
+        let variant = u.int_in_range(0..=1)?;
+        match variant {
+            0 => Ok(TaprootSpendPath::Key),
+            1 => {
+                // Arbitrary ScriptBuf (the script part of SpendInfo)
+                let script_len = usize::arbitrary(u)? % 100; // Limit the length of the script for practicality
+                let script_bytes = u.bytes(script_len)?; // Generate random bytes for the script
+                let script_buf = ScriptBuf::from(script_bytes.to_vec());
 
-        // Now we will manually generate the fields of the ControlBlock struct
+                // Now we will manually generate the fields of the ControlBlock struct
 
-        // Arbitrary leaf version
-        let leaf_version = bitcoin::taproot::LeafVersion::TapScript;
+                // Leaf version
+                let leaf_version = bitcoin::taproot::LeafVersion::TapScript;
 
-        // Arbitrary output key parity (Even or Odd)
-        let output_key_parity = if bool::arbitrary(u)? {
-            Parity::Even
-        } else {
-            Parity::Odd
-        };
+                // Output key parity (Even or Odd)
+                let output_key_parity = if bool::arbitrary(u)? {
+                    Parity::Even
+                } else {
+                    Parity::Odd
+                };
 
-        let secret_key = SecretKey::new(&mut rand::thread_rng());
-        let keypair = Keypair::from_secret_key(SECP256K1, &secret_key);
-        let (internal_key, _) = XOnlyPublicKey::from_keypair(&keypair);
+                // Generate a random secret key and derive the internal key
+                let secret_key = SecretKey::new(&mut rand::thread_rng());
+                let keypair = Keypair::from_secret_key(SECP256K1, &secret_key);
+                let (internal_key, _) = XOnlyPublicKey::from_keypair(&keypair);
 
-        // Arbitrary Taproot merkle branch (vector of 32-byte hashes)
-        const BRANCH_LENGTH: usize = 10;
-        let mut tapnode_hashes: Vec<TapNodeHash> = Vec::with_capacity(BRANCH_LENGTH);
-        for _ in 0..BRANCH_LENGTH {
-            let hash = TapNodeHash::from_slice(&<[u8; 32]>::arbitrary(u)?)
-                .map_err(|_e| arbitrary::Error::IncorrectFormat)?;
-            tapnode_hashes.push(hash);
+                // Arbitrary Taproot merkle branch (vector of 32-byte hashes)
+                const BRANCH_LENGTH: usize = 10;
+                let mut tapnode_hashes: Vec<TapNodeHash> = Vec::with_capacity(BRANCH_LENGTH);
+                for _ in 0..BRANCH_LENGTH {
+                    let hash = TapNodeHash::from_slice(&<[u8; 32]>::arbitrary(u)?)
+                        .map_err(|_e| arbitrary::Error::IncorrectFormat)?;
+                    tapnode_hashes.push(hash);
+                }
+
+                let tapnode_hashes: &[TapNodeHash; BRANCH_LENGTH] =
+                    &tapnode_hashes[..BRANCH_LENGTH].try_into().unwrap();
+
+                let merkle_branch = TaprootMerkleBranch::from(*tapnode_hashes);
+
+                // Construct the ControlBlock manually
+                let control_block = ControlBlock {
+                    leaf_version,
+                    output_key_parity,
+                    internal_key,
+                    merkle_branch,
+                };
+
+                // Construct the ScriptPath variant
+                Ok(TaprootSpendPath::Script {
+                    script_buf,
+                    control_block,
+                })
+            }
+            _ => unreachable!(),
         }
-
-        let tapnode_hashes: &[TapNodeHash; BRANCH_LENGTH] =
-            &tapnode_hashes[..BRANCH_LENGTH].try_into().unwrap();
-
-        let merkle_branch = TaprootMerkleBranch::from(*tapnode_hashes);
-
-        // Construct the ControlBlock manually
-        let control_block = ControlBlock {
-            leaf_version,
-            output_key_parity,
-            internal_key,
-            merkle_branch,
-        };
-
-        // Construct the SpendInfo
-        Ok(SpendInfo {
-            script_buf,
-            control_block,
-        })
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::io::Cursor;
+
     use arbitrary::{Arbitrary, Unstructured};
     use bitcoin::{
+        hashes::Hash,
         key::{Keypair, Secp256k1},
         opcodes::all::OP_CHECKSIG,
         script::Builder,
         secp256k1::{All, SecretKey},
-        taproot::{ControlBlock, TaprootBuilder, TaprootMerkleBranch},
+        taproot::{ControlBlock, LeafVersion, TaprootBuilder, TaprootMerkleBranch},
         Address, Amount, Network, ScriptBuf, TapNodeHash, TxOut, XOnlyPublicKey,
     };
+    use secp256k1::{Parity, SECP256K1};
 
     use super::{BitcoinAddress, BitcoinAmount, BorshDeserialize, BorshSerialize, XOnlyPk};
-    use crate::l1::{BitcoinPsbt, BitcoinTxOut, SpendInfo};
+    use crate::l1::{BitcoinPsbt, BitcoinTxOut, TaprootSpendPath};
 
     #[test]
     fn json_serialization_of_bitcoin_address_works() {
@@ -884,39 +937,120 @@ mod tests {
     }
 
     #[test]
-    fn test_spendinfo_serialize_deserialize() {
-        // Create a dummy ScriptBuf
-        let script_buf = Builder::new()
-            .push_opcode(bitcoin::blockdata::opcodes::all::OP_CHECKSIG)
-            .into_script();
+    fn test_borsh_serialize_deserialize_keypath() {
+        let original = TaprootSpendPath::Key;
 
-        // Create a dummy ControlBlock
-        let tapnode_hash: [TapNodeHash; 0] = [];
-        let control_block = ControlBlock {
-            leaf_version: bitcoin::taproot::LeafVersion::TapScript,
-            internal_key: get_random_pubkey_from_slice(&Secp256k1::new(), &[0x12; 32]),
-            merkle_branch: TaprootMerkleBranch::from(tapnode_hash),
-            output_key_parity: bitcoin::key::Parity::Odd,
-        };
-
-        let spend_info = SpendInfo {
-            script_buf,
-            control_block,
-        };
-
-        // Serialize the struct
         let mut serialized = vec![];
-        spend_info
-            .serialize(&mut serialized)
-            .expect("Serialization failed");
+        BorshSerialize::serialize(&original, &mut serialized).expect("borsh serialization");
 
-        // Deserialize the struct
-        let deserialized: SpendInfo =
-            SpendInfo::deserialize(&mut &serialized[..]).expect("Deserialization failed");
+        let mut cursor = Cursor::new(serialized);
+        let deserialized =
+            TaprootSpendPath::deserialize_reader(&mut cursor).expect("borsh deserialization");
 
-        // Ensure the deserialized SpendInfo matches the original
-        assert_eq!(spend_info.script_buf, deserialized.script_buf);
-        assert_eq!(spend_info.control_block, deserialized.control_block);
+        match deserialized {
+            TaprootSpendPath::Key => (),
+            _ => panic!("Deserialized variant does not match original"),
+        }
+    }
+
+    #[test]
+    fn test_borsh_serialize_deserialize_scriptpath() {
+        // Create a sample ScriptBuf
+        let script_bytes = vec![0x51, 0x21, 0xFF]; // Example script
+        let script_buf = ScriptBuf::from(script_bytes.clone());
+
+        // Create a sample ControlBlock
+        let leaf_version = LeafVersion::TapScript;
+        let output_key_parity = Parity::Even;
+
+        // Generate a random internal key
+        let secret_key = SecretKey::new(&mut rand::thread_rng());
+        let keypair = Keypair::from_secret_key(SECP256K1, &secret_key);
+        let (internal_key, _) = XOnlyPublicKey::from_keypair(&keypair);
+
+        // Create dummy TapNodeHash entries
+        let tapnode_hashes = [TapNodeHash::from_byte_array([0u8; 32]); 10];
+
+        let merkle_branch = TaprootMerkleBranch::from(tapnode_hashes);
+
+        let control_block = ControlBlock {
+            leaf_version,
+            output_key_parity,
+            internal_key,
+            merkle_branch,
+        };
+
+        let original = TaprootSpendPath::Script {
+            script_buf: script_buf.clone(),
+            control_block: control_block.clone(),
+        };
+
+        let mut serialized = vec![];
+        BorshSerialize::serialize(&original, &mut serialized).expect("borsh serialization");
+
+        let mut cursor = Cursor::new(serialized);
+        let deserialized =
+            TaprootSpendPath::deserialize_reader(&mut cursor).expect("borsh deserialization");
+
+        match deserialized {
+            TaprootSpendPath::Script {
+                script_buf: deserialized_script_buf,
+                control_block: deserialized_control_block,
+            } => {
+                assert_eq!(script_buf, deserialized_script_buf, "ScriptBuf mismatch");
+
+                // Compare ControlBlock fields
+                assert_eq!(
+                    control_block.leaf_version, deserialized_control_block.leaf_version,
+                    "LeafVersion mismatch"
+                );
+                assert_eq!(
+                    control_block.output_key_parity, deserialized_control_block.output_key_parity,
+                    "OutputKeyParity mismatch"
+                );
+                assert_eq!(
+                    control_block.internal_key, deserialized_control_block.internal_key,
+                    "InternalKey mismatch"
+                );
+                assert_eq!(
+                    control_block.merkle_branch, deserialized_control_block.merkle_branch,
+                    "MerkleBranch mismatch"
+                );
+            }
+            _ => panic!("Deserialized variant does not match original"),
+        }
+    }
+
+    #[test]
+    fn test_arbitrary_borsh_roundtrip() {
+        // Generate arbitrary TaprootSpendInfo
+        let data = vec![0u8; 1024];
+        let mut u = Unstructured::new(&data);
+
+        let original = TaprootSpendPath::arbitrary(&mut u).expect("Arbitrary generation failed");
+
+        // Serialize
+        let mut serialized = vec![];
+        BorshSerialize::serialize(&original, &mut serialized).expect("borsh serialization");
+
+        // Deserialize
+        let mut cursor = Cursor::new(&serialized);
+        let deserialized =
+            TaprootSpendPath::deserialize_reader(&mut cursor).expect("borsh deserialization");
+
+        // Assert equality by serializing both and comparing bytes
+        let mut original_serialized = vec![];
+        BorshSerialize::serialize(&original, &mut original_serialized)
+            .expect("borsh serialization");
+
+        let mut deserialized_serialized = vec![];
+        BorshSerialize::serialize(&deserialized, &mut deserialized_serialized)
+            .expect("borsh serialization of deserialized");
+
+        assert_eq!(
+            original_serialized, deserialized_serialized,
+            "Original and deserialized serialized data do not match"
+        );
     }
 
     #[test]

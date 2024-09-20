@@ -33,3 +33,11 @@ alpen-test-utils = { workspace = true }
 [[test]]
 name = "bridge-in-flow"
 path = "bridge-in-flow.rs"
+
+[[test]]
+name = "cooperative-bridge-out-flow"
+path = "cooperative-bridge-out-flow.rs"
+
+[[test]]
+name = "cooperative-bridge-flow"
+path = "cooperative-bridge-flow.rs"

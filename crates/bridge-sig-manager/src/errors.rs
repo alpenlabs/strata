@@ -2,7 +2,7 @@
 
 use alpen_express_db::{entities::errors::EntityError, DbError};
 use bitcoin::{psbt::ExtractTxError, sighash::TaprootError};
-use musig2::errors::{KeyAggError, SigningError, VerifyError};
+use musig2::errors::{KeyAggError, SigningError, TweakError, VerifyError};
 use thiserror::Error;
 
 /// Errors that may occur during the signing and aggregation of signatures for a particular
@@ -78,6 +78,10 @@ pub enum BridgeSigError {
     /// Issue while producing a partial MuSig2 signature.
     #[error("could not generate partial signature due to: {0}")]
     PartialSigGeneration(#[from] SigningError),
+
+    /// Could not apply tweak.
+    #[error("could not apply tweak due to {0}")]
+    Tweak(#[from] TweakError),
 }
 
 /// Result type alias for the signature manager with [`BridgeSigError`] as the Error variant.

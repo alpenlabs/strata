@@ -6,15 +6,14 @@ use std::{
 use alpen_express_db::stubs::bridge::StubTxStateDb;
 use alpen_express_primitives::{
     bridge::{OperatorIdx, PublickeyTable, TxSigningData},
-    l1::{BitcoinPsbt, BitcoinTxOut, OutputRef, SpendInfo},
+    l1::{BitcoinPsbt, BitcoinTxOut, OutputRef, TaprootSpendPath},
 };
 use arbitrary::{Arbitrary, Unstructured};
 use bitcoin::{
     absolute::LockTime,
-    key::Secp256k1,
     opcodes::all::{OP_PUSHNUM_1, OP_RETURN},
     script::Builder,
-    secp256k1::{rand, All, Keypair, PublicKey, SecretKey},
+    secp256k1::{rand, Keypair, PublicKey, SecretKey},
     taproot::{LeafVersion, TaprootBuilder, TaprootSpendInfo},
     transaction::Version,
     Address, Amount, Network, Psbt, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Witness,
@@ -25,7 +24,7 @@ use rand::{Rng, RngCore};
 use threadpool::ThreadPool;
 
 /// Generate `count` (public key, private key) pairs as two separate [`Vec`].
-pub fn generate_keypairs(secp: &Secp256k1<All>, count: usize) -> (Vec<PublicKey>, Vec<SecretKey>) {
+pub fn generate_keypairs(count: usize) -> (Vec<PublicKey>, Vec<SecretKey>) {
     let mut secret_keys: Vec<SecretKey> = Vec::with_capacity(count);
     let mut pubkeys: Vec<PublicKey> = Vec::with_capacity(count);
 
@@ -33,7 +32,7 @@ pub fn generate_keypairs(secp: &Secp256k1<All>, count: usize) -> (Vec<PublicKey>
 
     while pubkeys_set.len() != count {
         let sk = SecretKey::new(&mut rand::thread_rng());
-        let keypair = Keypair::from_secret_key(secp, &sk);
+        let keypair = Keypair::from_secret_key(SECP256K1, &sk);
         let pubkey = PublicKey::from_keypair(&keypair);
 
         if pubkeys_set.insert(pubkey) {
@@ -55,29 +54,29 @@ pub fn generate_pubkey_table(table: &[PublicKey]) -> PublickeyTable {
     PublickeyTable::from(pubkey_table)
 }
 
-/// Generate a list of arbitrary prevouts.
-///
-/// For now, each prevout is just a script with an `OP_TRUE` output.
-pub fn generate_mock_prevouts(count: usize) -> Vec<TxOut> {
-    let mut prevouts = Vec::with_capacity(count);
+/// Generate an arbitrary prevout.
+pub fn generate_mock_prevouts() -> TxOut {
+    let data = &[0u8; 1024];
+    let mut unstructured = Unstructured::new(&data[..]);
+    let prevout = BitcoinTxOut::arbitrary(&mut unstructured).unwrap();
 
-    for _ in 0..count {
-        let data = &[0u8; 1024];
-        let mut unstructured = Unstructured::new(&data[..]);
-        let txout = BitcoinTxOut::arbitrary(&mut unstructured).unwrap();
-
-        prevouts.push(TxOut::from(txout));
-    }
-
-    prevouts
+    prevout.inner().clone()
 }
 
-/// Generate a mock unsigned tx.
+/// Generate a mock unsigned tx with two scripts.
 ///
 /// An unsigned tx has an empty script_sig/witness fields.
-pub fn generate_mock_unsigned_tx(num_inputs: usize) -> (Transaction, TaprootSpendInfo, ScriptBuf) {
+///
+/// # Returns
+///
+/// A tuple containing:
+///
+/// 1) The created unsigned [`Transaction`].
+/// 2) The [`TaprootSpendInfo`] to spend via a [`ScriptBuf`].
+/// 3) The [`ScriptBuf`] that can be spent.
+pub fn generate_mock_unsigned_tx() -> (Transaction, TaprootSpendInfo, ScriptBuf) {
     // actually construct a valid taptree order to check PSBT finalization
-    let (pks, _) = generate_keypairs(SECP256K1, 1);
+    let (pks, _) = generate_keypairs(1);
     let internal_key = pks[0].x_only_public_key().0;
 
     let anyone_can_spend = Builder::new().push_opcode(OP_PUSHNUM_1).into_script();
@@ -105,15 +104,12 @@ pub fn generate_mock_unsigned_tx(num_inputs: usize) -> (Transaction, TaprootSpen
     let tx = Transaction {
         version: Version(2),
         lock_time: LockTime::ZERO,
-        input: vec![
-            TxIn {
-                previous_output,
-                script_sig: Default::default(),
-                sequence: Sequence::ENABLE_RBF_NO_LOCKTIME,
-                witness: Witness::new(),
-            };
-            num_inputs // XXX: duplicating inputs like this should not have been allowed.
-        ],
+        input: vec![TxIn {
+            previous_output,
+            script_sig: Default::default(),
+            sequence: Sequence::ENABLE_RBF_NO_LOCKTIME,
+            witness: Witness::new(),
+        }],
         output: vec![TxOut {
             value: Amount::from_sat(0), // so that we can add many inputs above
             script_pubkey: address.script_pubkey(), /* this is not accurate, we are actually
@@ -125,38 +121,38 @@ pub fn generate_mock_unsigned_tx(num_inputs: usize) -> (Transaction, TaprootSpen
 }
 
 /// Generate a mock spend info with arbitrary data.
-pub fn generate_mock_spend_info() -> SpendInfo {
+pub fn generate_mock_spend_info() -> TaprootSpendPath {
     let data = &[0u8; 1024];
     let mut unstructured = Unstructured::new(&data[..]);
-    let spend_info: SpendInfo = SpendInfo::arbitrary(&mut unstructured).unwrap();
+    let spend_info: TaprootSpendPath = TaprootSpendPath::arbitrary(&mut unstructured).unwrap();
 
     spend_info
 }
 
-/// Create mock [`TxSigningData`]
-pub fn generate_mock_tx_signing_data(num_inputs: usize) -> TxSigningData {
+/// Create mock [`TxSigningData`].
+pub fn generate_mock_tx_signing_data(keys_spend_only: bool) -> TxSigningData {
     // Create a minimal unsigned transaction
-    let (unsigned_tx, spend_info, script_buf) = generate_mock_unsigned_tx(num_inputs);
-    let prevouts = generate_mock_prevouts(num_inputs);
+    let (unsigned_tx, spend_info, script_buf) = generate_mock_unsigned_tx();
+    let prevout = generate_mock_prevouts();
 
-    let spend_info = SpendInfo {
-        script_buf: script_buf.clone(),
-        control_block: spend_info
-            .control_block(&(script_buf, LeafVersion::TapScript))
-            .expect("should be able to construct control block"),
+    let spend_path = if keys_spend_only {
+        TaprootSpendPath::Key
+    } else {
+        TaprootSpendPath::Script {
+            script_buf: script_buf.clone(),
+            control_block: spend_info
+                .control_block(&(script_buf, LeafVersion::TapScript))
+                .expect("should be able to construct control block"),
+        }
     };
 
     let mut psbt = Psbt::from_unsigned_tx(unsigned_tx).expect("should be able to create psbt");
-    for (i, input) in psbt.inputs.iter_mut().enumerate() {
-        input.witness_utxo = Some(prevouts[i].clone());
-    }
+    let input = psbt.inputs.first_mut().expect("input should exist in psbt");
+    input.witness_utxo = Some(prevout);
 
     let psbt = BitcoinPsbt::from(psbt);
 
-    TxSigningData {
-        psbt,
-        spend_infos: vec![spend_info; num_inputs],
-    }
+    TxSigningData { psbt, spend_path }
 }
 
 /// Create mock database ops to interact with the bridge tx state in a stubbed in-memory database.
@@ -174,8 +170,17 @@ pub fn generate_sec_nonce(
     msg: &impl AsRef<[u8]>,
     pubkeys: impl IntoIterator<Item = PublicKey>,
     seckey: SecretKey,
+    tweak: bool,
 ) -> SecNonce {
     let key_agg_ctx = KeyAggContext::new(pubkeys).expect("key agg context should be created");
+    let key_agg_ctx = if tweak {
+        key_agg_ctx
+            .with_unspendable_taproot_tweak()
+            .expect("should add unspendable taproot tweak")
+    } else {
+        key_agg_ctx
+    };
+
     let aggregated_pubkey: PublicKey = key_agg_ctx.aggregated_pubkey();
 
     let mut nonce_seed = [0u8; 32];

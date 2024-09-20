@@ -5,7 +5,7 @@
 
 use alpen_express_primitives::{
     bridge::TxSigningData,
-    l1::{BitcoinAddress, BitcoinPsbt, SpendInfo},
+    l1::{BitcoinAddress, BitcoinPsbt, TaprootSpendPath},
 };
 use bitcoin::{
     key::TapTweak,
@@ -60,7 +60,7 @@ impl TxKind for DepositInfo {
         build_context: &C,
     ) -> BridgeTxBuilderResult<TxSigningData> {
         let prevouts = self.compute_prevouts(build_context)?;
-        let spend_infos = self.compute_spend_infos(build_context)?;
+        let spend_info = self.compute_spend_infos(build_context)?;
         let unsigned_tx = self.create_unsigned_tx(build_context)?;
 
         let mut psbt = Psbt::from_unsigned_tx(unsigned_tx)?;
@@ -71,7 +71,10 @@ impl TxKind for DepositInfo {
 
         let psbt = BitcoinPsbt::from(psbt);
 
-        Ok(TxSigningData { psbt, spend_infos })
+        Ok(TxSigningData {
+            psbt,
+            spend_path: spend_info,
+        })
     }
 }
 
@@ -119,7 +122,7 @@ impl DepositInfo {
     fn compute_spend_infos(
         &self,
         build_context: &impl BuildContext,
-    ) -> BridgeTxBuilderResult<Vec<SpendInfo>> {
+    ) -> BridgeTxBuilderResult<TaprootSpendPath> {
         // The Deposit Request (DT) spends the n-of-n multisig leaf
         let spend_script = n_of_n_script(&build_context.aggregated_pubkey());
         let spend_script_hash =
@@ -162,12 +165,12 @@ impl DepositInfo {
             return Err(DepositTransactionError::ControlBlockError)?;
         }
 
-        let spend_info = SpendInfo {
+        let spend_info = TaprootSpendPath::Script {
             script_buf: spend_script,
             control_block,
         };
 
-        Ok(vec![spend_info])
+        Ok(spend_info)
     }
 
     fn compute_prevouts(&self, builder: &impl BuildContext) -> BridgeTxBuilderResult<Vec<TxOut>> {
@@ -212,8 +215,6 @@ impl DepositInfo {
         let fee_rate =
             FeeRate::from_sat_per_vb(MIN_RELAY_FEE.to_sat()).expect("invalid MIN_RELAY_FEE set");
 
-        // We are not committing to any script path as the internal key should already be
-        // randomized due to MuSig2 aggregation. See: <https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki#cite_note-23>
         let spend_path = SpendPath::KeySpend {
             internal_key: build_context.aggregated_pubkey(),
         };
@@ -265,16 +266,16 @@ mod tests {
 
     #[test]
     fn test_create_spend_infos() {
-        let secp = Secp256k1::new();
-        let (operator_pubkeys, _) = generate_keypairs(&secp, 10);
+        let (operator_pubkeys, _) = generate_keypairs(10);
         let operator_pubkeys = generate_pubkey_table(&operator_pubkeys);
 
         let deposit_request_outpoint = OutPoint::null();
 
         let (drt_output_address, take_back_leaf_hash) =
             create_drt_taproot_output(operator_pubkeys.clone());
+        let self_index = 0;
 
-        let tx_builder = TxBuildContext::new(operator_pubkeys, Network::Regtest);
+        let tx_builder = TxBuildContext::new(Network::Regtest, operator_pubkeys, self_index);
 
         // Correct merkle proof
         let deposit_info = DepositInfo::new(

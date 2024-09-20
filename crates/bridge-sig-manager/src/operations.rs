@@ -1,7 +1,10 @@
 //! Provides wallet-like functionalities for creating nonces and signatures.
 
 use alpen_express_db::entities::bridge_tx_state::BridgeTxState;
-use alpen_express_primitives::bridge::{Musig2SecNonce, OperatorPartialSig, PublickeyTable};
+use alpen_express_primitives::{
+    bridge::{Musig2SecNonce, OperatorPartialSig, PublickeyTable},
+    l1::TaprootSpendPath,
+};
 use bitcoin::{
     hashes::Hash,
     secp256k1::{Keypair, Message, SecretKey},
@@ -13,11 +16,30 @@ use musig2::{sign_partial, verify_partial, AggNonce, KeyAggContext, PartialSigna
 
 use crate::errors::{BridgeSigError, BridgeSigResult};
 
+/// Get the message hash for signing.
+///
+/// This hash may be for the key path spend or the script path spend depending upon the
+/// `spend_path`.
+pub fn create_message_hash(
+    sighash_cache: &mut SighashCache<&mut Transaction>,
+    prevouts: &[TxOut],
+    spend_path: &TaprootSpendPath,
+) -> BridgeSigResult<Message> {
+    if let TaprootSpendPath::Script {
+        script_buf,
+        control_block: _,
+    } = spend_path
+    {
+        return create_script_spend_hash(sighash_cache, script_buf, prevouts);
+    }
+
+    create_key_spend_hash(sighash_cache, prevouts)
+}
+
 /// Generate a sighash message for a taproot `script` spending path at the `input_index` of
 /// all `prevouts`.
 pub fn create_script_spend_hash(
     sighash_cache: &mut SighashCache<&mut Transaction>,
-    input_index: usize,
     script: &ScriptBuf,
     prevouts: &[TxOut],
 ) -> BridgeSigResult<Message> {
@@ -25,12 +47,25 @@ pub fn create_script_spend_hash(
     let leaf_hash = TapLeafHash::from_script(script, LeafVersion::TapScript);
     let prevouts = Prevouts::All(prevouts);
 
-    let sighash = sighash_cache.taproot_script_spend_signature_hash(
-        input_index,
-        &prevouts,
-        leaf_hash,
-        sighash_type,
-    )?;
+    let sighash =
+        sighash_cache.taproot_script_spend_signature_hash(0, &prevouts, leaf_hash, sighash_type)?;
+
+    let message =
+        Message::from_digest_slice(sighash.as_byte_array()).expect("TapSigHash is a hash");
+
+    Ok(message)
+}
+
+/// Generate a sighash message for a taproot `key` spending path at the `input_index` of
+/// all `prevouts`.
+pub fn create_key_spend_hash(
+    sighash_cache: &mut SighashCache<&mut Transaction>,
+    prevouts: &[TxOut],
+) -> BridgeSigResult<Message> {
+    let sighash_type = sighash::TapSighashType::Default;
+    let prevouts = Prevouts::All(prevouts);
+
+    let sighash = sighash_cache.taproot_key_spend_signature_hash(0, &prevouts, sighash_type)?;
 
     let message =
         Message::from_digest_slice(sighash.as_byte_array()).expect("TapSigHash is a hash");
@@ -49,6 +84,7 @@ pub fn sign_state_partial(
     keypair: &Keypair,
     aggregated_nonce: &AggNonce,
     message: impl AsRef<[u8]>,
+    keypath_spend_only: bool,
 ) -> BridgeSigResult<PartialSignature> {
     let pubkeys = pubkey_table.0.clone();
     let pubkeys = pubkeys.values();
@@ -56,6 +92,13 @@ pub fn sign_state_partial(
     let secnonce = secnonce.inner().clone();
 
     let key_agg_ctx = KeyAggContext::new(pubkeys.copied())?;
+
+    let key_agg_ctx = if keypath_spend_only {
+        key_agg_ctx.with_unspendable_taproot_tweak()?
+    } else {
+        key_agg_ctx
+    };
+
     let seckey = SecretKey::from_keypair(keypair);
 
     let partial_sig: PartialSignature = sign_partial(
@@ -75,6 +118,7 @@ pub fn verify_partial_sig(
     signature_info: &OperatorPartialSig,
     aggregated_nonce: &AggNonce,
     message: impl AsRef<[u8]>,
+    keypath_spend_only: bool,
 ) -> BridgeSigResult<()> {
     let signer_index = signature_info.signer_index();
 
@@ -88,6 +132,11 @@ pub fn verify_partial_sig(
 
     let pubkeys = tx_state.pubkeys().0.values().copied();
     let key_agg_ctx = KeyAggContext::new(pubkeys)?;
+    let key_agg_ctx = if keypath_spend_only {
+        key_agg_ctx.with_unspendable_taproot_tweak()?
+    } else {
+        key_agg_ctx
+    };
 
     let individual_pubnonce = tx_state
         .collected_nonces()
@@ -115,44 +164,115 @@ mod tests {
     };
     use arbitrary::{Arbitrary, Unstructured};
     use bitcoin::{
+        absolute::LockTime,
+        hashes::sha256d,
         key::rand::{self, RngCore},
         secp256k1::{PublicKey, SECP256K1},
-        Amount,
+        transaction::Version,
+        Amount, Network, OutPoint, Sequence, Txid, Witness,
     };
+    use express_bridge_tx_builder::prelude::{create_taproot_addr, SpendPath};
     use musig2::{PubNonce, SecNonce};
 
     use super::*;
 
     #[test]
-    fn test_create_script_spend_hash() {
-        let num_inputs = 1;
-        let (mut tx, _, _) = generate_mock_unsigned_tx(num_inputs);
+    fn test_create_message_hash_for_script_spend() {
+        let (mut tx, taproot_spend_info, script_buf) = generate_mock_unsigned_tx();
         let mut sighash_cache = SighashCache::new(&mut tx);
 
         // Create dummy input values
-        let input_index = 0;
-        let script = ScriptBuf::new();
         let prevouts = vec![TxOut {
             value: Amount::from_sat(1000),
             script_pubkey: ScriptBuf::new(),
         }];
 
-        let result = create_script_spend_hash(&mut sighash_cache, input_index, &script, &prevouts);
+        let control_block = taproot_spend_info
+            .control_block(&(script_buf.clone(), LeafVersion::TapScript))
+            .expect("should construct control block");
+        let spend_path = TaprootSpendPath::Script {
+            script_buf,
+            control_block,
+        };
+
+        let result = create_message_hash(&mut sighash_cache, &prevouts, &spend_path);
 
         assert!(
             result.is_ok(),
             "Failed to create script spend hash due to: {}",
             result.err().unwrap()
         );
+
+        let result = create_message_hash(&mut sighash_cache, &[], &spend_path);
+        assert!(
+            result.is_err(),
+            "should error if the prevouts does not have an output at input_index"
+        );
     }
 
     #[test]
-    fn test_generate_and_verify_partial_sig() {
+    fn test_create_message_hash_with_key_spend_info() {
+        // Arrange
+        let (pubkeys, _seckeys) = generate_keypairs(1);
+        let spend_path = SpendPath::KeySpend {
+            internal_key: pubkeys[0].x_only_public_key().0,
+        };
+
+        // Create a taproot address using create_taproot_addr
+        let (address, _taproot_spend_info) = create_taproot_addr(&Network::Regtest, spend_path)
+            .expect("Failed to create taproot address");
+
+        // Extract the script_pubkey from the address
+        let script_pubkey = address.script_pubkey();
+
+        let spend_path = TaprootSpendPath::Key;
+
+        // Create a dummy transaction with one input and one output
+        let deposit_outpoint =
+            OutPoint::new(Txid::from_raw_hash(sha256d::Hash::hash(&[2u8; 32])), 2);
+
+        let output = vec![TxOut {
+            value: Amount::from_sat(2000),
+            script_pubkey: script_pubkey.clone(),
+        }];
+        let mut tx = Transaction {
+            version: Version(2),
+            lock_time: LockTime::ZERO,
+            input: vec![bitcoin::TxIn {
+                previous_output: deposit_outpoint,
+                script_sig: ScriptBuf::new(),
+                sequence: Sequence::ENABLE_RBF_NO_LOCKTIME,
+                witness: Witness::new(),
+            }],
+            output: output.clone(),
+        };
+
+        // Initialize SighashCache
+        let mut sighash_cache = SighashCache::new(&mut tx);
+
+        // Act
+        let message_result = create_message_hash(&mut sighash_cache, &output, &spend_path);
+
+        // Assert
+        assert!(message_result.is_ok());
+    }
+
+    #[test]
+    fn test_generate_and_verify_partial_sig_for_keypath_spend() {
+        test_generate_and_verify_partial_sig(true);
+    }
+
+    #[test]
+    fn test_generate_and_verify_partial_sig_for_scriptpath_spend() {
+        test_generate_and_verify_partial_sig(false);
+    }
+
+    fn test_generate_and_verify_partial_sig(keypath_spend_only: bool) {
         // Step 0: Setup
 
         let num_operators = 3;
         let own_index = 1;
-        let (sks, aggregated_nonce, tx_state) = setup(num_operators, own_index);
+        let (sks, aggregated_nonce, tx_state) = setup(num_operators, own_index, keypath_spend_only);
         let txid = tx_state.unsigned_tx().compute_txid();
 
         // Step 1: Generate a partial signature
@@ -164,6 +284,7 @@ mod tests {
             &keypair,
             &aggregated_nonce,
             txid.as_byte_array(),
+            keypath_spend_only,
         );
 
         assert!(
@@ -183,6 +304,7 @@ mod tests {
             &signature_info,
             &aggregated_nonce,
             txid.as_byte_array(),
+            keypath_spend_only,
         );
 
         assert!(
@@ -204,6 +326,7 @@ mod tests {
             &signature_info,
             &aggregated_nonce,
             txid.as_byte_array(),
+            keypath_spend_only,
         );
 
         assert!(
@@ -226,6 +349,7 @@ mod tests {
             &signature_info,
             &aggregated_nonce,
             txid.as_byte_array(),
+            keypath_spend_only,
         );
 
         assert!(
@@ -242,6 +366,7 @@ mod tests {
             &signature_info,
             &aggregated_nonce,
             txid.as_byte_array(),
+            keypath_spend_only,
         );
 
         assert!(
@@ -250,18 +375,29 @@ mod tests {
         );
     }
 
-    fn setup(num_operators: usize, own_index: usize) -> (Vec<SecretKey>, AggNonce, BridgeTxState) {
+    fn setup(
+        num_operators: usize,
+        own_index: usize,
+        keypath_spend_only: bool,
+    ) -> (Vec<SecretKey>, AggNonce, BridgeTxState) {
         assert!(own_index.lt(&num_operators), "invalid own index set");
 
-        let (pks, sks) = generate_keypairs(SECP256K1, num_operators);
+        let (pks, sks) = generate_keypairs(num_operators);
         let pubkey_table = generate_pubkey_table(&pks);
 
-        let num_inputs = 1;
-        let tx_output = generate_mock_tx_signing_data(num_inputs);
+        let tx_output = generate_mock_tx_signing_data(keypath_spend_only);
         let txid = tx_output.psbt.inner().unsigned_tx.compute_txid();
 
         let key_agg_ctx =
             KeyAggContext::new(pks.clone()).expect("generation of key agg context should work");
+        let key_agg_ctx = if keypath_spend_only {
+            key_agg_ctx
+                .with_unspendable_taproot_tweak()
+                .expect("should be able to add unspendable tweak")
+        } else {
+            key_agg_ctx
+        };
+
         let aggregated_pubkey: PublicKey = key_agg_ctx.aggregated_pubkey();
 
         let mut pub_nonces: Vec<PubNonce> = Vec::with_capacity(pks.len());

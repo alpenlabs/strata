@@ -15,11 +15,11 @@ pub const BRIDGE_DENOMINATION: BitcoinAmount = BitcoinAmount::from_int_btc(10);
 /// We use a slightly larger value (3_000 in bitcoin-core) to cross the dust threshold.
 pub const MIN_RELAY_FEE: BitcoinAmount = BitcoinAmount::from_sat(3_500);
 
+/// The fee charged by the operator to process a withdrawal.
+pub const OPERATOR_FEE: BitcoinAmount = BitcoinAmount::from_sat(BRIDGE_DENOMINATION.to_sat() / 20); // 5%
+
 /// Magic bytes to add to the metadata output in transactions to help identify them.
-///
-/// This is padded with `0`'s at the end to allow for any extra information that might be added in
-/// the future.
-pub const MAGIC_BYTES: &[u8; 11] = b"alpen000000";
+pub const MAGIC_BYTES: &[u8; 11] = b"alpenstrata";
 
 lazy_static::lazy_static! {
     /// This is an unspendable pubkey.
