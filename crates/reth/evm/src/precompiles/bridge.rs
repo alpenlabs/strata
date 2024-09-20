@@ -1,5 +1,6 @@
 use std::array::TryFromSliceError;
 
+use express_reth_primitives::WithdrawalIntentEvent;
 use revm::{ContextStatefulPrecompile, Database};
 use revm_primitives::{
     Bytes, FixedBytes, Log, LogData, PrecompileError, PrecompileErrors, PrecompileOutput,
@@ -7,7 +8,7 @@ use revm_primitives::{
 };
 
 pub use crate::constants::BRIDGEOUT_ADDRESS;
-use crate::{primitives::WithdrawalIntentEvent, utils::wei_to_sats};
+use crate::utils::wei_to_sats;
 
 /// Ensure that input is exactly 32 bytes
 fn try_into_pubkey(maybe_pubkey: &Bytes) -> Result<FixedBytes<32>, TryFromSliceError> {

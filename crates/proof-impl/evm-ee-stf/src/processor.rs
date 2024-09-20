@@ -20,6 +20,7 @@ use std::{mem, mem::take};
 use alloy_eips::eip1559::BaseFeeParams;
 use alloy_rlp::BufMut;
 use anyhow::anyhow;
+use express_reth_evm::set_evm_handles;
 use reth_primitives::{
     constants::{GWEI_TO_WEI, MAXIMUM_EXTRA_DATA_SIZE, MINIMUM_GAS_LIMIT},
     revm_primitives::Account,
@@ -179,6 +180,7 @@ where
                 blk_env.gas_limit = U256::from(self.header.as_mut().unwrap().gas_limit);
             })
             .with_db(self.db.take().unwrap())
+            .append_handler_register(set_evm_handles)
             .build();
 
         let mut logs_bloom = Bloom::default();
