@@ -27,7 +27,24 @@ pub fn check_magic_bytes(instructions: &mut Instructions,config: &DepositTxConfi
                 config.magic_bytes.clone(),
             ));
         }
+        return Ok(());
     }
-    return Err(DepositParseError::NoMagicBytes);
+
+    Err(DepositParseError::NoMagicBytes)
 }
 
+pub fn extract_ee_bytes(taproot_spend_info: Vec<u8>,instructions: &mut Instructions,config: &DepositTxConfig) -> Result<TapBlkAndAddr, DepositParseError>{
+    match next_bytes(instructions) {
+        Some(ee_bytes) => {
+            if ee_bytes.len() as u8 != config.address_length {
+                return Err(DepositParseError::InvalidDestAddress(
+                    ee_bytes.len() as u8
+                ));
+            }
+            return Ok((taproot_spend_info, ee_bytes));
+        }
+        None => {
+            return Err(DepositParseError::NoAddress);
+        }
+    }
+}

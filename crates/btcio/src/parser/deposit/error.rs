@@ -22,4 +22,7 @@ pub enum DepositParseError {
 
     #[error("No Taproot control block")]
     NoControlBlock,
+
+    #[error("Control block length is not 32")]
+    ControlBlockLen,
 }

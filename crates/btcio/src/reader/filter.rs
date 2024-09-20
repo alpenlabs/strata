@@ -80,7 +80,7 @@ fn check_and_extract_relevancy(
                     return Some(ParsedTx::Deposit(deposit_info));
                 }
 
-                if let Ok(deposit_req_info) = extract_deposit_request_info(tx, config) {
+                if let Some(deposit_req_info) = extract_deposit_request_info(tx, config) {
                     return Some(ParsedTx::DepositRequest(deposit_req_info));
                 }
             }

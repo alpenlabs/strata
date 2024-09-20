@@ -7,6 +7,7 @@ pub mod deposit_request;
 pub mod deposit_tx;
 pub mod common;
 pub mod error;
+pub mod test_utils;
 
 /// Configuration common among deposit and deposit request transaction
 pub struct DepositTxConfig {
