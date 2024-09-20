@@ -301,6 +301,10 @@ impl SignatureManager {
 
     /// Retrieve the fully signed transaction for broadcasting.
     ///
+    /// This is done by aggregating the collected signatures (with aggregated nonces) tweaking the
+    /// aggregation context as necessary. It also performs a schnorr verification on the generated
+    /// signature against the public key (which may be tweaked as necessary).
+    ///
     /// # Errors
     ///
     /// This method can error under the following conditions:
@@ -313,7 +317,7 @@ impl SignatureManager {
     /// 6. The aggregated signature is not valid for the given message and aggregated pubkey.
     /// 7. A fully signed transaction could not be created from the [`bitcoin::Psbt`].
     /// 8. A tweak could not be applied to the key aggregation context for keypath spend.
-    pub async fn get_fully_signed_transaction(&self, txid: &Txid) -> BridgeSigResult<Transaction> {
+    pub async fn finalize_transaction(&self, txid: &Txid) -> BridgeSigResult<Transaction> {
         let tx_state = self.get_tx_state(txid).await?;
 
         // this fails if not all nonces have been collected yet.
@@ -1062,7 +1066,7 @@ mod tests {
         }
 
         // Retrieve the fully signed transaction
-        let signed_tx = signature_manager.get_fully_signed_transaction(&txid).await;
+        let signed_tx = signature_manager.finalize_transaction(&txid).await;
         assert!(
             signed_tx.is_ok(),
             "signed tx must be present but got error = {:?}",

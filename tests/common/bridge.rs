@@ -259,8 +259,7 @@ impl Operator {
 
                 event!(Level::INFO, event = "signature collection complete", operator_idx=%self.index);
 
-                let fully_signed_transaction =
-                    self.sig_manager.get_fully_signed_transaction(&txid).await;
+                let fully_signed_transaction = self.sig_manager.finalize_transaction(&txid).await;
 
                 assert!(
                     fully_signed_transaction.is_ok(),
@@ -321,8 +320,7 @@ impl Operator {
 
                 event!(Level::INFO, event = "signature collection complete", operator_idx=%self.index);
 
-                let fully_signed_transaction =
-                    self.sig_manager.get_fully_signed_transaction(&txid).await;
+                let fully_signed_transaction = self.sig_manager.finalize_transaction(&txid).await;
 
                 assert!(
                     fully_signed_transaction.is_ok(),
