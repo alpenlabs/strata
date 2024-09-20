@@ -1,20 +1,19 @@
+import time
+
 import flexitest
 
 from constants import (
+    ERROR_CHECKPOINT_DOESNOT_EXIST,
     ERROR_PROOF_ALREADY_CREATED,
     FAST_BATCH_ROLLUP_PARAMS,
 )
 from entry import BasicEnvConfig
-from utils import (
-    check_for_nth_checkpoint_finalization,
-    check_send_proof_for_non_existent_batch,
-    wait_until,
-)
+from utils import wait_with_rpc_health_check
 
 
 @flexitest.register
-class BlockFinalizationSeqRestartTest(flexitest.Test):
-    """This tests finalization when sequencer client restarts"""
+class BlockFinalizationTest(flexitest.Test):
+    """ """
 
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env(BasicEnvConfig(101, rollup_params=FAST_BATCH_ROLLUP_PARAMS))
@@ -26,7 +25,7 @@ class BlockFinalizationSeqRestartTest(flexitest.Test):
 
         seqrpc = seq.create_rpc()
 
-        check_send_proof_for_non_existent_batch(seqrpc, 100)
+        check_send_proof_for_non_existent_batch(seqrpc)
 
         # Check for first 2 checkpoints
         for n in range(1, 3):
@@ -40,7 +39,8 @@ class BlockFinalizationSeqRestartTest(flexitest.Test):
         seq.start()
 
         seqrpc = seq.create_rpc()
-        wait_until(seqrpc.alp_syncStatus, timeout=5)
+        wait_with_rpc_health_check(seqrpc.alp_syncStatus, timeout=5)
+
 
         # Check for next 2 checkpoints
         for n in range(3, 5):
@@ -48,6 +48,45 @@ class BlockFinalizationSeqRestartTest(flexitest.Test):
             print(f"Pass checkpoint finalization for checkpoint {n}")
 
         check_already_sent_proof(seqrpc)
+
+
+def check_for_nth_checkpoint_finalization(idx, seqrpc):
+    syncstat = seqrpc.alp_syncStatus()
+    checkpoint_info = seqrpc.alp_getCheckpointInfo(idx)
+    print(f"checkpoint info for {idx}", checkpoint_info)
+
+    assert (
+        syncstat["finalized_block_id"] != checkpoint_info["l2_blockid"]
+    ), "Checkpoint block should not yet finalize"
+
+    checkpoint_info_1 = seqrpc.alp_getCheckpointInfo(idx + 1)
+
+    assert checkpoint_info["idx"] == idx
+    assert checkpoint_info_1 is None, f"There should be no checkpoint info for {idx + 1} index"
+
+    to_finalize_blkid = checkpoint_info["l2_blockid"]
+
+    # Post checkpoint proof
+    proof_hex = "abcdef"
+    seqrpc.alp_submitCheckpointProof(idx, proof_hex)
+
+    # Wait till checkpoint finalizes, since our finalization depth is 4 and the block
+    # generation time is 0.5s wait slightly more than 2 secs
+    # Ideally this should be tested with controlled bitcoin block production
+    time.sleep(4)
+
+    syncstat = seqrpc.alp_syncStatus()
+    print("Sync Stat", syncstat)
+    assert to_finalize_blkid == syncstat["finalized_block_id"], "Block not finalized"
+
+
+def check_send_proof_for_non_existent_batch(seqrpc):
+    try:
+        seqrpc.alp_submitCheckpointProof(100, "abc123")
+    except Exception as e:
+        assert e.code == ERROR_CHECKPOINT_DOESNOT_EXIST
+    else:
+        raise AssertionError("Expected rpc error")
 
 
 def check_already_sent_proof(seqrpc):
