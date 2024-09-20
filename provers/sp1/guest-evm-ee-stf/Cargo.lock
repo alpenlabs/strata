@@ -225,6 +225,7 @@ dependencies = [
  "alloy-primitives",
  "alloy-sol-macro",
  "const-hex",
+ "serde",
 ]
 
 [[package]]
@@ -809,6 +810,7 @@ dependencies = [
  "alloy-rlp-derive",
  "alloy-rpc-types",
  "anyhow",
+ "express-reth-evm",
  "k256",
  "reth-primitives",
  "reth-trie-common",
@@ -816,6 +818,24 @@ dependencies = [
  "rlp",
  "serde",
  "thiserror",
+]
+
+[[package]]
+name = "express-reth-evm"
+version = "0.1.0"
+dependencies = [
+ "express-reth-primitives",
+ "revm",
+ "revm-primitives",
+]
+
+[[package]]
+name = "express-reth-primitives"
+version = "0.1.0"
+dependencies = [
+ "alloy-sol-types",
+ "reth-primitives",
+ "serde",
 ]
 
 [[package]]

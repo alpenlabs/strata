@@ -1,49 +1,15 @@
-use std::sync::Arc;
-
+use express_reth_evm::set_evm_handles;
 use reth_chainspec::{ChainSpec, Head};
 use reth_evm::{ConfigureEvm, ConfigureEvmEnv};
 use reth_node_ethereum::EthEvmConfig;
 use reth_primitives::{Header, TransactionSigned};
-use revm::{
-    handler::register::EvmHandler, inspector_handle_register, precompile::PrecompileSpecId,
-    ContextPrecompile, ContextPrecompiles, Database, Evm, EvmBuilder, GetInspector,
-};
+use revm::{inspector_handle_register, Database, Evm, EvmBuilder, GetInspector};
 use revm_primitives::{Address, AnalysisKind, Bytes, CfgEnvWithHandlerCfg, Env, TxEnv, U256};
-
-use crate::{constants::FIXED_WITHDRAWAL_WEI, precompiles};
 
 /// Custom EVM configuration
 #[derive(Debug, Clone, Copy, Default)]
 #[non_exhaustive]
 pub struct ExpressEvmConfig;
-
-impl ExpressEvmConfig {
-    /// Sets the precompiles to the EVM handler
-    ///
-    /// This will be invoked when the EVM is created via [ConfigureEvm::evm] or
-    /// [ConfigureEvm::evm_with_inspector]
-    ///
-    /// This will use the default mainnet precompiles and add additional precompiles.
-    pub fn set_precompiles<EXT, DB>(handler: &mut EvmHandler<EXT, DB>)
-    where
-        DB: Database,
-    {
-        // first we need the evm spec id, which determines the precompiles
-        let spec_id = handler.cfg.spec_id;
-
-        // install the precompiles
-        handler.pre_execution.load_precompiles = Arc::new(move || {
-            let mut precompiles = ContextPrecompiles::new(PrecompileSpecId::from_spec_id(spec_id));
-            precompiles.extend([(
-                precompiles::bridge::BRIDGEOUT_ADDRESS,
-                ContextPrecompile::ContextStateful(Arc::new(
-                    precompiles::bridge::BridgeoutPrecompile::new(FIXED_WITHDRAWAL_WEI),
-                )),
-            )]);
-            precompiles
-        });
-    }
-}
 
 impl ConfigureEvmEnv for ExpressEvmConfig {
     fn fill_cfg_env(
@@ -92,7 +58,7 @@ impl ConfigureEvm for ExpressEvmConfig {
         EvmBuilder::default()
             .with_db(db)
             // add additional precompiles
-            .append_handler_register(Self::set_precompiles)
+            .append_handler_register(set_evm_handles)
             .build()
     }
 
@@ -105,7 +71,7 @@ impl ConfigureEvm for ExpressEvmConfig {
             .with_db(db)
             .with_external_context(inspector)
             // add additional precompiles
-            .append_handler_register(Self::set_precompiles)
+            .append_handler_register(set_evm_handles)
             .append_handler_register(inspector_handle_register)
             .build()
     }

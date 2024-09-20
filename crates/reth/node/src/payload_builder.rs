@@ -1,4 +1,6 @@
 use alloy_sol_types::SolEvent;
+use express_reth_evm::constants::BRIDGEOUT_ADDRESS;
+use express_reth_primitives::{WithdrawalIntent, WithdrawalIntentEvent};
 use reth::{
     builder::{components::PayloadServiceBuilder, BuilderContext, PayloadBuilderConfig},
     providers::{CanonStateSubscriptions, ExecutionOutcome, StateProviderFactory},
@@ -34,11 +36,9 @@ use revm_primitives::{EVMError, EnvWithHandlerCfg, InvalidTransaction, ResultAnd
 use tracing::{debug, trace, warn};
 
 use crate::{
-    constants::BRIDGEOUT_ADDRESS,
     engine::ExpressEngineTypes,
     evm::ExpressEvmConfig,
     payload::{ExpressBuiltPayload, ExpressPayloadBuilderAttributes},
-    primitives::{WithdrawalIntent, WithdrawalIntentEvent},
 };
 
 #[derive(Debug, Default, Clone)]

@@ -1,14 +1,12 @@
-mod constants;
+#![cfg_attr(not(test), warn(unused_crate_dependencies))]
+
 mod engine;
 mod evm;
 mod node;
 mod payload;
 mod payload_builder;
-mod precompiles;
-mod primitives;
-mod utils;
 
 pub use engine::ExpressEngineTypes;
+pub use express_reth_primitives::WithdrawalIntent;
 pub use node::ExpressEthereumNode;
 pub use payload::{ExpressExecutionPayloadEnvelopeV2, ExpressPayloadAttributes};
-pub use primitives::WithdrawalIntent;

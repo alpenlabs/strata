@@ -1,0 +1,9 @@
+[package]
+edition = "2021"
+name = "express-reth-evm"
+version = "0.1.0"
+
+[dependencies]
+express-reth-primitives = { workspace = true }
+revm = { workspace = true }
+revm-primitives = { workspace = true }

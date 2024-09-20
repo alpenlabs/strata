@@ -1,3 +1,5 @@
+#![cfg_attr(not(test), warn(unused_crate_dependencies))]
+
 use alloy_sol_types::sol;
 use reth_primitives::B256;
 use serde::{Deserialize, Serialize};
