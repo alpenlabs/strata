@@ -78,7 +78,7 @@ async fn filter_unfinalized_from_db(
         let txid = ops.get_txid_async(idx).await?.map(Txid::from);
         debug!(?idx, ?txid, ?status, "TxEntry");
 
-        if txentry.is_valid_and_unfinalized() {
+        if txentry.is_valid() && !txentry.is_finalized() {
             unfinalized_entries.insert(idx, txentry);
         }
     }

@@ -105,11 +105,12 @@ impl L1TxEntry {
         deserialize(&self.tx_raw)
     }
 
-    pub fn is_valid_and_unfinalized(&self) -> bool {
-        matches!(
-            self.status,
-            L1TxStatus::Unpublished | L1TxStatus::Published | L1TxStatus::Confirmed { .. }
-        )
+    pub fn is_valid(&self) -> bool {
+        !matches!(self.status, L1TxStatus::InvalidInputs)
+    }
+
+    pub fn is_finalized(&self) -> bool {
+        matches!(self.status, L1TxStatus::Finalized { .. })
     }
 }
 
