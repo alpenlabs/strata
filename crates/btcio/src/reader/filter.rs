@@ -43,7 +43,7 @@ fn check_and_extract_relevancy(tx: &Transaction, relevant_types: &[RelevantTxTyp
 
             RelevantTxType::RollupInscription(_name) => {
                 if let Some(out) = tx.output.iter().find_map(|out| {
-                    if let Ok(inscription_data) = parse_inscription_data(out.script_pubkey.clone()) {
+                    if let Ok(inscription_data) = parse_inscription_data(&out.script_pubkey) {
                         Some(inscription_data)
                     } else {
                         None

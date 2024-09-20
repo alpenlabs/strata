@@ -1,9 +1,6 @@
 use std::sync::Arc;
 
-use alpen_express_btcio::{
-    inscription::InscriptionParser,
-    reader::messages::{BlockData, L1Event},
-};
+use alpen_express_btcio::{parser::inscription::parse_inscription_data, reader::messages::{BlockData, L1Event}};
 use alpen_express_db::traits::{Database, L1DataStore};
 use alpen_express_primitives::{
     buf::Buf32, l1::L1BlockManifest, params::Params, utils::generate_l1_tx,
@@ -72,9 +69,9 @@ where
 
             let manifest = generate_block_manifest(blockdata.block());
             let l1txs: Vec<_> = blockdata
-                .relevant_tx_idxs()
+                .relevant_tx()
                 .iter()
-                .map(|idx| generate_l1_tx(*idx, blockdata.block()))
+                .map(|(idx, parsed_tx)| generate_l1_tx(*idx, parsed_tx.clone() , blockdata.block()))
                 .collect();
             let num_txs = l1txs.len();
             l1db.put_block_data(blockdata.block_num(), manifest, l1txs.clone())?;
@@ -101,15 +98,17 @@ where
 
 /// Parses inscriptions and checks for batch data in the transactions
 fn check_for_da_batch(blockdata: &BlockData) -> Vec<BatchCheckpoint> {
-    let txs = blockdata
-        .relevant_tx_idxs()
+    let binding = blockdata
+        .relevant_tx_idxs();
+
+    let txs = binding
         .iter()
         .map(|&idx| &blockdata.block().txdata[idx as usize]);
 
     let inscriptions = txs.filter_map(|tx| {
         tx.input[0].witness.tapscript().and_then(|scr| {
-            InscriptionParser::new(scr.into())
-                .parse_inscription_data()
+                let script = scr.to_owned();
+                parse_inscription_data(&script)
                 .map_err(|e| {
                     let txid = tx.compute_txid();
                     warn!(%txid, err = %e, "invalid inscription inside transaction which is marked as relevant");

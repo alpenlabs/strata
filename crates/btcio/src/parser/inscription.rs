@@ -41,7 +41,7 @@ pub enum InscriptionParseError {
 /// # Errors
 ///
 /// This function errors if it cannot parse the [`InscriptionData`]
-pub fn parse_inscription_data(script: ScriptBuf) -> Result<InscriptionData, InscriptionParseError> {
+pub fn parse_inscription_data(script: &ScriptBuf) -> Result<InscriptionData, InscriptionParseError> {
         let mut instructions = script.instructions();
 
         enter_envelope(&mut instructions)?;

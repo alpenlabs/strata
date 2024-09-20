@@ -257,7 +257,7 @@ async fn fetch_and_process_block(
     let txs = block.txdata.len();
 
     let filtered_txs = filter_relevant_txs(&block, relevant_tx_types);
-    let block_data = BlockData::new(height, block, filtered_txs.iter().map(|val| val.0).collect());
+    let block_data = BlockData::new(height, block, filtered_txs);
     let l1blkid = block_data.block().block_hash();
     trace!(%l1blkid, %height, %txs, "fetched block from client");
 
