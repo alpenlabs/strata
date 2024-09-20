@@ -1,6 +1,7 @@
 pub mod cmd;
 pub mod rollup;
 pub mod seed;
+pub mod settings;
 pub mod signet;
 
 use cmd::{

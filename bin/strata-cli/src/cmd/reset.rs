@@ -1,8 +1,8 @@
 use argh::FromArgs;
-use console::Term;
+use console::{style, Term};
 use dialoguer::Confirm;
 
-use crate::seed;
+use crate::{seed, settings::SETTINGS};
 
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "reset")]
@@ -22,7 +22,12 @@ pub async fn reset(args: ResetArgs) {
     let confirm = if args.assume_yes {
         true
     } else {
-        let _ = term.write_line("This will DESTROY ALL DATA.");
+        let _ = term.write_line(
+            &style("This will DESTROY ALL DATA.")
+                .red()
+                .bold()
+                .to_string(),
+        );
         Confirm::new()
             .with_prompt("Do you really want to continue?")
             .interact()
@@ -31,5 +36,7 @@ pub async fn reset(args: ResetArgs) {
 
     if confirm {
         seed::reset().unwrap();
+        std::fs::remove_dir_all(SETTINGS.data_dir.clone()).unwrap();
+        let _ = term.write_line("Wiped data directory");
     }
 }

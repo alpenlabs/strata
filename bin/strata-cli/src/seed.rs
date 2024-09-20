@@ -1,18 +1,32 @@
 use std::str::FromStr;
 
 use aes_gcm_siv::{aead::AeadMutInPlace, Aes256GcmSiv, KeyInit, Nonce, Tag};
+use alloy::{network::EthereumWallet, signers::local::PrivateKeySigner};
 use argon2::Argon2;
+use bdk_wallet::{
+    bitcoin::{bip32::Xpriv, Network},
+    CreateParams, KeychainKind, LoadParams, Wallet,
+};
 use bip39::{Language, Mnemonic};
 use console::Term;
 use dialoguer::{Confirm, Input, Password as InputPassword};
 use keyring::{Credential, Entry, Error};
 use rand::{thread_rng, Rng, RngCore};
+use sha2::{Digest, Sha256};
 use terrors::OneOf;
 
 const SALT_LEN: usize = 16;
 const NONCE_LEN: usize = 12;
 const SEED_LEN: usize = 32;
 const TAG_LEN: usize = 16;
+
+pub struct BaseWallet(LoadParams, CreateParams);
+
+impl BaseWallet {
+    pub fn split(self) -> (LoadParams, CreateParams) {
+        (self.0, self.1)
+    }
+}
 
 pub struct Seed([u8; SEED_LEN]);
 
@@ -53,6 +67,33 @@ impl Seed {
         Ok(EncryptedSeed(buf))
     }
 
+    pub fn signet_wallet(&self) -> BaseWallet {
+        let rootpriv = Xpriv::new_master(Network::Signet, &self.0).expect("valid xpriv");
+        let base_desc = format!("tr({}/86h/0h/0h", rootpriv);
+        let external_desc = format!("{base_desc}/0/*)");
+        let internal_desc = format!("{base_desc}/1/*)");
+        BaseWallet(
+            Wallet::load()
+                .descriptor(KeychainKind::External, Some(external_desc.clone()))
+                .descriptor(KeychainKind::Internal, Some(internal_desc.clone()))
+                .extract_keys(),
+            Wallet::create(external_desc, internal_desc),
+        )
+    }
+
+    pub fn rollup_wallet(&self) -> EthereumWallet {
+        let l2_private_bytes = {
+            let mut hasher = Sha256::new();
+            hasher.update(b"alpen labs strata l2 wallet 2024");
+            hasher.update(self.0);
+            hasher.finalize()
+        };
+
+        let signer = PrivateKeySigner::from_field_bytes(&l2_private_bytes).expect("valid slice");
+
+        EthereumWallet::from(signer)
+    }
+
     pub fn load_or_create() -> Result<
         Seed,
         OneOf<(
@@ -71,7 +112,7 @@ impl Seed {
             match encrypted_seed.decrypt(&mut password) {
                 Ok(seed) => {
                     let _ = term.write_line("Wallet is open");
-                    return Ok(seed);
+                    Ok(seed)
                 }
                 Err(e) => {
                     let narrowed = e.narrow::<aes_gcm_siv::Error, _>();
@@ -80,7 +121,7 @@ impl Seed {
                         return Err(OneOf::new(BadPassword));
                     }
 
-                    return Err(narrowed.unwrap_err().broaden());
+                    Err(narrowed.unwrap_err().broaden())
                 }
             }
         } else {
@@ -90,12 +131,12 @@ impl Seed {
                 .map_err(OneOf::new)?;
 
             let seed = if restore {
-                let mnemonic: String = Input::new()
-                    .with_prompt("Enter your mnemonic")
-                    .interact_text()
-                    .map_err(OneOf::new)?;
-
                 loop {
+                    let mnemonic: String = Input::new()
+                        .with_prompt("Enter your mnemonic")
+                        .interact_text()
+                        .map_err(OneOf::new)?;
+
                     let mnemonic = match Mnemonic::from_str(&mnemonic) {
                         Ok(m) => m,
                         Err(e) => {
@@ -105,7 +146,7 @@ impl Seed {
                     };
                     let entropy = mnemonic.to_entropy();
                     if entropy.len() != SEED_LEN {
-                        let _ = term.write_line(&format!("incorrect entropy length"));
+                        let _ = term.write_line("incorrect entropy length");
                         continue;
                     }
                     let mut buf = [0u8; SEED_LEN];
@@ -161,7 +202,7 @@ impl Password {
 
     fn seed_encryption_key(&mut self, salt: &[u8; SALT_LEN]) -> Result<&[u8; 32], argon2::Error> {
         match self.seed_encryption_key {
-            Some(ref key) => Ok(&key),
+            Some(ref key) => Ok(key),
             None => {
                 let mut sek = [0u8; 32];
                 Argon2::default().hash_password_into(self.inner.as_bytes(), salt, &mut sek)?;
@@ -262,12 +303,12 @@ impl EncryptedSeed {
     const LEN: usize = SALT_LEN + NONCE_LEN + SEED_LEN + TAG_LEN;
 
     fn entry() -> Result<Entry, OneOf<(PlatformFailure, NoStorageAccess)>> {
-        Ok(Entry::new("strata", "default")
+        Entry::new("strata", "default")
             .map_err(keyring_oneof)
             .map_err(|e| {
                 e.subset()
                     .unwrap_or_else(|e| panic!("errored subsetting keychain error: {e:?}"))
-            })?)
+            })
     }
 
     fn save(&self) -> Result<(), OneOf<(PlatformFailure, NoStorageAccess)>> {
@@ -329,7 +370,7 @@ impl EncryptedSeed {
         let nonce = Nonce::from_slice(&salt_and_nonce[SALT_LEN..]);
 
         cipher
-            .decrypt_in_place_detached(&nonce, &[], seed, tag)
+            .decrypt_in_place_detached(nonce, &[], seed, tag)
             .map_err(OneOf::new)?;
 
         Ok(Seed(unsafe { *(seed.as_ptr() as *const [_; SEED_LEN]) }))

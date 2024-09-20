@@ -8,37 +8,65 @@ name = "strata"
 path = "src/main.rs"
 
 [dependencies]
-alloy = { version = "0.3.5", features = ["std", "rpc-client-ws", "network", "signers", "signer-local", "providers", "rpc-types"] }
-bdk_wallet = { version = "1.0.0-beta.4", features = ["rusqlite"] }
-bdk_esplora = { version = "0.18.0", features = [
-  "async-https",
-  "async-https-rustls",
-], default-features = false }
-terrors = "0.3.0"
-tokio = { version = "1.40.0", features = [
-  "macros",
-  "net",
-  "parking_lot",
-  "rt",
-  "time",
+aes-gcm-siv = "0.11.1"
+alloy = { version = "0.3.5", features = [
+    "std",
+    "rpc-client-ws",
+    "network",
+    "signers",
+    "signer-local",
+    "providers",
+    "rpc-types",
 ] }
-sha2 = { version = "0.10.8", features = ["asm", "loongarch64_asm"] }
-rand = "0.8.5"
-keyring = "3.3.0"
-bip39 = { version = "2.0.0", features = ["all-languages"] }
 argh.workspace = true
 argon2 = "0.5.3"
-aes-gcm-siv = "0.11.1"
-hex = { version = "0.1.0", path = "../../crates/util/hex" }
-dialoguer = "0.11.0"
-indicatif = { version = "0.17.8", features = ["improved_unicode", "tokio"] }
+bdk_esplora = { version = "0.18.0", features = [
+    "async-https",
+    "async-https-rustls",
+], default-features = false }
+bdk_wallet = { version = "1.0.0-beta.4", features = ["rusqlite"] }
+bip39 = { version = "2.0.0", features = ["all-languages"] }
+config = { version = "0.14.0", default-features = false, features = ["toml"] }
 console = "0.15.8"
+dialoguer = "0.11.0"
+directories = "5.0.1"
+hex = { version = "0.1.0", path = "../../crates/util/hex", features = [
+    "serde",
+] }
+indicatif = { version = "0.17.8", features = ["improved_unicode", "tokio"] }
+keyring = "3.3.0"
+rand = "0.8.5"
+reqwest = { version = "0.12.7", default-features = false, features = [
+    "http2",
+    "rustls-tls",
+    "charset",
+    "zstd",
+    "json",
+] }
+serde.workspace = true
+sha2 = { version = "0.10.8", features = ["asm", "loongarch64_asm"] }
+terrors = "0.3.0"
+tokio = { version = "1.40.0", features = [
+    "macros",
+    "net",
+    "parking_lot",
+    "rt",
+    "time",
+] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-keyring = { version = "3.3.0", features = ["tokio", "crypto-rust", "async-secret-service"] }
+keyring = { version = "3.3.0", features = [
+    "tokio",
+    "crypto-rust",
+    "async-secret-service",
+] }
 
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
-keyring = { version = "3.3.0", default-features = false, features = ["apple-native"] }
+keyring = { version = "3.3.0", default-features = false, features = [
+    "apple-native",
+] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
-keyring = { version = "3.3.0", default-features = false, features = ["windows-native"] }
+keyring = { version = "3.3.0", default-features = false, features = [
+    "windows-native",
+] }
