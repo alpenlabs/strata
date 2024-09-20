@@ -26,5 +26,5 @@ express-zkvm = { workspace = true }
 hex = { workspace = true }
 
 [features]
-default = ["prover"]
+default = []
 prover = ["dep:express-sp1-adapter"]

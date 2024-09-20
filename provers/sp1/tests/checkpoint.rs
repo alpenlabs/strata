@@ -83,16 +83,16 @@ mod test {
         (output, proof, vk)
     }
 
-    fn get_l1_batch_output() -> L1BatchProofOutput {
-        let params = PowParams::from(&MAINNET);
-        L1BatchProofOutput {
-            deposits: Vec::new(),
-            forced_inclusions: Vec::new(),
-            state_update: None,
-            initial_state: get_verification_state_for_block(40_320, &params),
-            final_state: get_verification_state_for_block(40_321, &params),
-        }
-    }
+    // fn get_l1_batch_output() -> L1BatchProofOutput {
+    //     let params = PowParams::from(&MAINNET);
+    //     L1BatchProofOutput {
+    //         deposits: Vec::new(),
+    //         forced_inclusions: Vec::new(),
+    //         state_update: None,
+    //         initial_state: get_verification_state_for_block(40_320, &params),
+    //         final_state: get_verification_state_for_block(40_321, &params),
+    //     }
+    // }
 
     fn get_l2_batch_output() -> L2BatchProofOutput {
         L2BatchProofOutput {

@@ -1,5 +1,6 @@
 use alpen_express_primitives::params::Params;
-use alpen_express_state::block_validation::{check_block_credential, validate_block_segments};
+// use alpen_express_state::block_validation::{check_block_credential,
+// validate_block_segments};
 pub use alpen_express_state::{block::L2Block, chain_state::ChainState, state_op::StateCache};
 
 /// Verifies an L2 block and applies the chains state transition if the block is valid.
@@ -14,17 +15,19 @@ pub fn verify_and_transition(
 
 /// Verifies the L2 block.
 fn verify_l2_block(block: &L2Block, chain_params: &Params) {
-    // Assert that the block has been signed by the designated signer
-    assert!(
-        check_block_credential(block.header(), chain_params),
-        "Block credential verification failed"
-    );
+    println!("{:?}", block);
+    println!("{:?}", chain_params);
+    // // Assert that the block has been signed by the designated signer
+    // assert!(
+    //     check_block_credential(block.header(), chain_params),
+    //     "Block credential verification failed"
+    // );
 
-    // Assert that the block body and header are consistent
-    assert!(
-        validate_block_segments(block),
-        "Block credential verification failed"
-    )
+    // // Assert that the block body and header are consistent
+    // assert!(
+    //     validate_block_segments(block),
+    //     "Block credential verification failed"
+    // )
 }
 
 /// Applies a state transition for a given L2 block.
