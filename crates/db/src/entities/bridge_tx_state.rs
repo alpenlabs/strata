@@ -25,7 +25,7 @@ pub struct BridgeTxState {
     psbt: BitcoinPsbt,
 
     /// The witness elements required to spend a taproot output.
-    spend_info: TaprootSpendPath,
+    spend_path: TaprootSpendPath,
 
     /// The table of pubkeys that is used to lock the UTXO present as an input in the psbt.
     /// This table maps the [`OperatorIdx`] to their corresponding pubkeys.
@@ -60,7 +60,7 @@ impl BridgeTxState {
 
         Ok(Self {
             psbt: tx_signing_data.psbt,
-            spend_info: tx_signing_data.spend_path,
+            spend_path: tx_signing_data.spend_path,
             pubkey_table,
             secnonce: sec_nonce,
             collected_nonces,
@@ -74,8 +74,8 @@ impl BridgeTxState {
     }
 
     /// Get the spend info associated with each input in the [`Psbt`](bitcoin::Psbt).
-    pub fn spend_info(&self) -> &TaprootSpendPath {
-        &self.spend_info
+    pub fn spend_path(&self) -> &TaprootSpendPath {
+        &self.spend_path
     }
 
     /// Get the relevant previous outputs of the [`Psbt`](bitcoin::Psbt)

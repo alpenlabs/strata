@@ -62,15 +62,10 @@ impl SignatureManager {
 
     /// Adds a [`BridgeTxState`] to the [`SignatureManager`] replacing if already present for the
     /// computed [`Txid`].
-    ///
-    /// The `keypath_spend_only` parameter determines whether to use the tweaked or untweaked key
-    /// aggregation. Tweaking is necessary when spending from key-path only spend taproot (for
-    /// example, in the case of _spending_ the Deposit UTXO during withdrawal).
     pub async fn add_tx_state(
         &self,
         tx_signing_data: TxSigningData,
         pubkey_table: PublickeyTable,
-        keypath_spend_only: bool,
     ) -> BridgeSigResult<Txid> {
         let txid = tx_signing_data.psbt.compute_txid();
 
@@ -81,6 +76,9 @@ impl SignatureManager {
         }
 
         let key_agg_ctx = KeyAggContext::new(pubkey_table.0.values().copied())?;
+
+        let keypath_spend_only = matches!(tx_signing_data.spend_path, TaprootSpendPath::Key);
+
         let key_agg_ctx = if keypath_spend_only {
             key_agg_ctx.with_unspendable_taproot_tweak()?
         } else {
@@ -195,10 +193,6 @@ impl SignatureManager {
 
     /// Add this bridge client's signature for the transaction.
     ///
-    /// The `keypath_spend_only` parameter determines whether to use the tweaked or untweaked key
-    /// aggregation. Tweaking is necessary when spending from key-path only spend taproot (for
-    /// example, in the case of _spending_ the Deposit UTXO during withdrawal).
-    ///
     /// # Returns
     ///
     /// A flag indicating whether the [`alpen_express_primitives::l1::BitcoinPsbt`] being tracked in
@@ -212,7 +206,7 @@ impl SignatureManager {
 
         let prevouts = tx_state.prevouts();
 
-        let spend_info = tx_state.spend_info();
+        let spend_info = tx_state.spend_path();
         let keypath_spend_only = matches!(spend_info, TaprootSpendPath::Key);
 
         let mut tx = unsigned_tx.clone();
@@ -282,7 +276,7 @@ impl SignatureManager {
         let mut unsigned_tx = tx_state.unsigned_tx().clone();
         let mut sighash_cache = SighashCache::new(&mut unsigned_tx);
 
-        let spend_info = tx_state.spend_info();
+        let spend_info = tx_state.spend_path();
         let prevouts = tx_state.prevouts();
 
         let message = create_message_hash(&mut sighash_cache, &prevouts, spend_info)?;
@@ -307,10 +301,6 @@ impl SignatureManager {
 
     /// Retrieve the fully signed transaction for broadcasting.
     ///
-    /// The `keypath_spend_only` parameter determines whether to use the tweaked or untweaked key
-    /// aggregation. Tweaking is necessary when spending from key-path only spend taproot (for
-    /// example, in the case of _spending_ the Deposit UTXO during withdrawal).
-    ///
     /// # Errors
     ///
     /// This method can error under the following conditions:
@@ -322,7 +312,7 @@ impl SignatureManager {
     /// 5. The collected signatures could not be aggregated.
     /// 6. The aggregated signature is not valid for the given message and aggregated pubkey.
     /// 7. A fully signed transaction could not be created from the [`bitcoin::Psbt`].
-    /// 8. A tweak could not be applied to the key aggregation context for `keypath_spend_only`.
+    /// 8. A tweak could not be applied to the key aggregation context for keypath spend.
     pub async fn get_fully_signed_transaction(&self, txid: &Txid) -> BridgeSigResult<Transaction> {
         let tx_state = self.get_tx_state(txid).await?;
 
@@ -333,7 +323,7 @@ impl SignatureManager {
             return Err(BridgeSigError::NotFullySigned);
         }
 
-        let spend_info = tx_state.spend_info();
+        let spend_info = tx_state.spend_path();
         let keypath_spend_only = matches!(spend_info, TaprootSpendPath::Key);
 
         let prevouts = &tx_state.prevouts();
@@ -468,7 +458,7 @@ mod tests {
 
         // Add TxState to the SignatureManager
         let result = signature_manager
-            .add_tx_state(tx_signing_data.clone(), pubkey_table.clone(), true)
+            .add_tx_state(tx_signing_data.clone(), pubkey_table.clone())
             .await;
 
         assert!(
@@ -498,7 +488,7 @@ mod tests {
         );
 
         let result = signature_manager
-            .add_tx_state(tx_signing_data, pubkey_table, true)
+            .add_tx_state(tx_signing_data, pubkey_table)
             .await;
         assert!(
             result.is_err_and(|e| matches!(e, BridgeSigError::DuplicateTransaction)),
@@ -569,7 +559,7 @@ mod tests {
         );
 
         sig_manager
-            .add_tx_state(tx_signing_data.clone(), pubkey_table, keypath_spend_only)
+            .add_tx_state(tx_signing_data.clone(), pubkey_table)
             .await
             .expect("should be able to add tx state");
 
@@ -621,7 +611,7 @@ mod tests {
         let txid = tx_signing_data.psbt.compute_txid();
 
         sig_manager
-            .add_tx_state(tx_signing_data.clone(), pubkey_table, keypath_spend_only)
+            .add_tx_state(tx_signing_data.clone(), pubkey_table)
             .await
             .expect("should be able to add tx state");
 
@@ -705,7 +695,7 @@ mod tests {
 
         let pubkey_table = generate_pubkey_table(&pks);
         let txid = signature_manager
-            .add_tx_state(tx_signing_data.clone(), pubkey_table, keypath_spend_only)
+            .add_tx_state(tx_signing_data.clone(), pubkey_table)
             .await
             .expect("should be able to add state");
 
@@ -808,11 +798,7 @@ mod tests {
         let pubkey_table = generate_pubkey_table(&pks);
         let keypath_spend_only = matches!(tx_signing_data.spend_path, TaprootSpendPath::Key); // sanity-check
         let txid = signature_manager
-            .add_tx_state(
-                tx_signing_data.clone(),
-                pubkey_table.clone(),
-                keypath_spend_only,
-            )
+            .add_tx_state(tx_signing_data.clone(), pubkey_table.clone())
             .await
             .expect("should be able to add state");
 
@@ -850,7 +836,7 @@ mod tests {
         let message = create_message_hash(
             &mut sighash_cache,
             &tx_state.prevouts(),
-            tx_state.spend_info(),
+            tx_state.spend_path(),
         )
         .expect("should be able to produce a message");
 
@@ -982,11 +968,7 @@ mod tests {
 
         // Add TxState to the SignatureManager
         let txid = signature_manager
-            .add_tx_state(
-                tx_signing_data.clone(),
-                pubkey_table.clone(),
-                keypath_spend_only,
-            )
+            .add_tx_state(tx_signing_data.clone(), pubkey_table.clone())
             .await
             .expect("should add state to storage");
 
@@ -1037,7 +1019,7 @@ mod tests {
             let mut unsigned_tx = tx_signing_data.psbt.inner().unsigned_tx.clone();
             let mut sighash_cache = SighashCache::new(&mut unsigned_tx);
 
-            let message = create_message_hash(&mut sighash_cache, prevouts, tx_state.spend_info());
+            let message = create_message_hash(&mut sighash_cache, prevouts, tx_state.spend_path());
             let message = message.expect("should be able to create message");
 
             let external_signature = sign_state_partial(

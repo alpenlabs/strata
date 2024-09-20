@@ -217,7 +217,6 @@ impl Operator {
             BridgeDuty::Deposit(deposit_info) => {
                 // deposit involves just creating an aggregated pubkey that can be verified with
                 // `OP_CHECKSIG`
-                let keypath_spend_only = false;
                 event!(Level::TRACE, action = "starting to create tx signing data", deposit_info = ?deposit_info, operator_idx=%self.index);
 
                 let tx_signing_data = deposit_info.construct_signing_data(&self.tx_builder);
@@ -231,11 +230,7 @@ impl Operator {
 
                 let txid = self
                     .sig_manager
-                    .add_tx_state(
-                        tx_signing_data,
-                        self.pubkey_table.clone(),
-                        keypath_spend_only,
-                    )
+                    .add_tx_state(tx_signing_data, self.pubkey_table.clone())
                     .await;
                 assert!(
                     txid.is_ok(),
@@ -286,10 +281,6 @@ impl Operator {
             }
             BridgeDuty::Withdrawal(withdrawal_info) => {
                 event!(Level::TRACE, action = "starting to create tx signing data", withdrawal_info = ?withdrawal_info, operator_idx = %self.index);
-                // Withdrawal involves spending via key-path a P2TR output whose pubkey has been
-                // tweaked.
-                let keypath_spend_only = true;
-
                 let tx_signing_data = withdrawal_info.construct_signing_data(&self.tx_builder);
                 assert!(
                     tx_signing_data.is_ok(),
@@ -301,11 +292,7 @@ impl Operator {
 
                 let txid = self
                     .sig_manager
-                    .add_tx_state(
-                        tx_signing_data,
-                        self.pubkey_table.clone(),
-                        keypath_spend_only,
-                    )
+                    .add_tx_state(tx_signing_data, self.pubkey_table.clone())
                     .await;
                 assert!(
                     txid.is_ok(),

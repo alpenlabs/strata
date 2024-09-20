@@ -18,8 +18,8 @@ use crate::errors::{BridgeSigError, BridgeSigResult};
 
 /// Get the message hash for signing.
 ///
-/// If the `maybe_spend_info` is None, a key spend hash is returned, and otherwise, a script
-/// spend hash.
+/// This hash may be for the key path spend or the script path spend depending upon the
+/// `spend_path`.
 pub fn create_message_hash(
     sighash_cache: &mut SighashCache<&mut Transaction>,
     prevouts: &[TxOut],
