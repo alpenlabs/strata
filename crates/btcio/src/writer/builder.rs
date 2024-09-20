@@ -1,6 +1,7 @@
 use core::{result::Result::Ok, str::FromStr};
 use std::{cmp::Reverse, sync::Arc};
 
+use alpen_express_primitives::tx::InscriptionData;
 use anyhow::anyhow;
 use bitcoin::{
     absolute::LockTime,
@@ -23,7 +24,6 @@ use rand::RngCore;
 use thiserror::Error;
 
 use crate::{
-    inscription::InscriptionData,
     rpc::{
         traits::{Reader, Signer, Wallet},
         types::ListUnspent,

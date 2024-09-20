@@ -1,7 +1,7 @@
+use alpen_express_primitives::tx::InscriptionData;
 use bitcoin::{opcodes::all::OP_IF, script::{Instruction, Instructions},  ScriptBuf};
 use tracing::debug;
 
-use crate::inscription::InscriptionData;
 use thiserror::Error;
 
 use super::utils::{next_bytes, next_int, next_op};
@@ -144,7 +144,6 @@ pub fn parse_inscription_data(script: ScriptBuf) -> Result<InscriptionData, Insc
 #[cfg(test)]
 mod tests {
 
-    use crate::inscription::InscriptionData;
     use super::*;
 
     #[test]

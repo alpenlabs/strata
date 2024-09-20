@@ -1,4 +1,7 @@
+use alpen_express_primitives::tx::ParsedTx;
 use bitcoin::{Address, Block, Transaction};
+
+use crate::parser::{deposit::{deposit::extract_deposit_info, deposit_request::extract_deposit_request_info, DepositTxConfig}, inscription::parse_inscription_data};
 
 /// What kind of transactions can be relevant for rollup node to filter
 #[derive(Clone, Debug)]
@@ -9,55 +12,73 @@ pub enum RelevantTxType {
     /// [`InscriptionParser`] which dictates the structure of inscription.
     RollupInscription(RollupName),
     /// Deposit transcation
-    Deposit(RollupName, AddressLength, Amount),
+    Deposit(RollupName, FederationAddress ,AddressLength, Amount),
 }
 
 type RollupName = String;
 type AddressLength = u8;
 type Amount = u64;
+type FederationAddress = Address;
 
 /// Filter all the relevant [`Transaction`]s in a block based on given [`RelevantTxType`]s
-pub fn filter_relevant_txs(block: &Block, relevent_types: &[RelevantTxType]) -> Vec<u32> {
+pub fn filter_relevant_txs(block: &Block, relevent_types: &[RelevantTxType]) -> Vec<(u32, ParsedTx)> {
     block
         .txdata
         .iter()
         .enumerate()
-        .filter(|(_, tx)| is_relevant(tx, relevent_types))
-        .map(|(i, _)| i as u32)
+        .filter_map(|(i, tx)| check_and_extract_relevancy(tx, relevent_types).map(|relevant_tx| (i as u32, relevant_tx)))
         .collect()
 }
 
-/// Determines if a [`Transaction`] is relevant based on given [`RelevantTxType`]s
-fn is_relevant(tx: &Transaction, relevant_types: &[RelevantTxType]) -> bool {
-    // work around for a relevant transaction
-    relevant_types.iter().any(|rel_type| match rel_type {
-        RelevantTxType::SpentToAddress(address) => tx
-            .output
-            .iter()
-            .any(|op| address.matches_script_pubkey(&op.script_pubkey)),
-        RelevantTxType::RollupInscription(name) => match tx.input[0].witness.tapscript() {
-            // Definitely not relevant if it is not a tapscript
-            None => false,
-            // If it is a tapscript, check rollup name
-            Some(scr) => {
-                true
-                // let parser = InscriptionParser::new(scr.into());
-                // parser
-                //     .parse_rollup_name()
-                //     .ok()
-                //     .filter(|n| n == name)
-                //     .is_some()
-            }
-        },
-        RelevantTxType::Deposit(rollup_name, addr_len, amount) => todo!(),
+///  if a [`Transaction`] is relevant based on given [`RelevantTxType`]s then we extract relevant
+///  info
+fn check_and_extract_relevancy(tx: &Transaction, relevant_types: &[RelevantTxType]) -> Option<ParsedTx> {
+    for rel_type in relevant_types {
+        match rel_type {
+            RelevantTxType::SpentToAddress(address) => {
+                if let Some(_) = tx.output.iter().find(|op| address.matches_script_pubkey(&op.script_pubkey)) {
+                    return Some(ParsedTx::SpentToAddress(address.script_pubkey().to_bytes()));
+                }
+            },
 
-    })
+            RelevantTxType::RollupInscription(_name) => {
+                if let Some(out) = tx.output.iter().find_map(|out| {
+                    if let Ok(inscription_data) = parse_inscription_data(out.script_pubkey.clone()) {
+                        Some(inscription_data)
+                    } else {
+                        None
+                    }
+                }) {
+                    return Some(ParsedTx::RollupInscription(out));
+                }
+            },
+
+            RelevantTxType::Deposit(rollup_name, federation_address, addr_len, amount) => {
+                let config = &DepositTxConfig {
+                    magic_bytes: rollup_name.to_string().as_bytes().to_vec(),
+                    address_length: *addr_len,
+                    deposit_quantity: *amount,
+                    federation_address: federation_address.clone(),
+                };
+
+                if let Ok(deposit_info) = extract_deposit_info(tx, config) {
+                    return Some(ParsedTx::Deposit(deposit_info));
+                }
+
+                if let Ok(deposit_req_info) = extract_deposit_request_info(tx, config) {
+                    return Some(ParsedTx::DepositRequest(deposit_req_info));
+                }
+            },
+        }
+    }
+
+    None
 }
-
 #[cfg(test)]
 mod test {
     use std::str::FromStr;
 
+    use alpen_express_primitives::tx::InscriptionData;
     use bitcoin::{
         absolute::{Height, LockTime},
         block::{Header, Version as BVersion},
@@ -72,7 +93,7 @@ mod test {
     use rand::RngCore;
 
     use super::*;
-    use crate::{inscription::InscriptionData, writer::builder::build_reveal_transaction};
+    use crate::writer::builder::build_reveal_transaction;
 
     const OTHER_ADDR: &str = "bcrt1q6u6qyya3sryhh42lahtnz2m7zuufe7dlt8j0j5";
     const RELEVANT_ADDR: &str = "bcrt1qwqas84jmu20w6r7x3tqetezg8wx7uc3l57vue6";
@@ -126,7 +147,7 @@ mod test {
         let block = create_test_block(vec![tx1, tx2]);
 
         let result = filter_relevant_txs(&block, &[RelevantTxType::SpentToAddress(address)]);
-        assert_eq!(result, vec![0]); // Only tx1 matches
+        assert_eq!(result[0].0, 0); // Only tx1 matches
     }
 
     // Create an inscription transaction. The focus here is to create a tapscript, rather than a
@@ -166,7 +187,7 @@ mod test {
         let tx = create_inscription_tx(rollup_name.clone());
         let block = create_test_block(vec![tx]);
         let result = filter_relevant_txs(&block, &[RelevantTxType::RollupInscription(rollup_name)]);
-        assert_eq!(result, vec![0], "Should filter valid rollup name");
+        assert_eq!(result[0].0, 0, "Should filter valid rollup name");
 
         // Test with invalid name
         let rollup_name = "TestRollup".to_string();
@@ -212,6 +233,8 @@ mod test {
         let block = create_test_block(vec![tx1, tx2, tx3]);
 
         let result = filter_relevant_txs(&block, &[RelevantTxType::SpentToAddress(address)]);
-        assert_eq!(result, vec![0, 2]); // First and third txs match
+        // First and third txs match
+        assert_eq!(result[0].0, 0);
+        assert_eq!(result[1].0, 2);
     }
 }

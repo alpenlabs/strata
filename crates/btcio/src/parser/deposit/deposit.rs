@@ -1,23 +1,11 @@
 //! parser types for Deposit Tx, and later deposit Request Tx
 
-use bitcoin::{opcodes::all::OP_RETURN, Amount, ScriptBuf, Transaction, TxOut};
+use alpen_express_primitives::tx::DepositInfo;
+use bitcoin::{opcodes::all::OP_RETURN, ScriptBuf, Transaction, TxOut};
 
 use crate::parser::utils::{next_bytes, next_op};
 
 use super::{error::DepositParseError, DepositTxConfig};
-
-/// Deposit Information extracted by Deposit Parser
-#[derive(Clone, Debug)]
-pub struct DepositInfo {
-    /// amount in satoshis
-    pub amt: Amount,
-
-    /// outpoint where amount is present
-    pub deposit_outpoint: u32,
-
-    /// EE address
-    pub address: Vec<u8>,
-}
 
 /// Extracts the DepositInfo from the Deposit Transaction
 pub fn extract_deposit_info(
@@ -29,7 +17,7 @@ pub fn extract_deposit_info(
           // find the outpoint with taproot address, so that we can extract sent amount from that
           if let Some((index, _)) = parse_bridge_offer_output(tx, config) {
               return Ok(DepositInfo {
-                amt: tx.output[index].value,
+                amt: tx.output[index].value.to_sat(),
                 deposit_outpoint: index as u32,
                 address: ee_address,
             })
@@ -161,7 +149,7 @@ mod tests {
         assert!(out.is_ok());
         let out = out.unwrap();
 
-        assert_eq!(out.amt, amt);
+        assert_eq!(out.amt, amt.to_sat());
         assert_eq!(out.address, evm_addr);
     }
 }
