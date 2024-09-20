@@ -1,4 +1,4 @@
-use alpen_express_primitives::tx::ParsedTx;
+use alpen_express_primitives::tx::RelevantTxInfo;
 use bitcoin::Block;
 
 /// L1 events that we observe and want the persistence task to work on.
@@ -17,11 +17,11 @@ pub struct BlockData {
     block_num: u64,
     block: Block,
     /// Transactions in the block that are relevant to rollup
-    relevant_tx: Vec<(u32, ParsedTx)>,
+    relevant_tx: Vec<(u32, RelevantTxInfo)>,
 }
 
 impl BlockData {
-    pub fn new(block_num: u64, block: Block, relevant_tx: Vec<(u32, ParsedTx)>) -> Self {
+    pub fn new(block_num: u64, block: Block, relevant_tx: Vec<(u32, RelevantTxInfo)>) -> Self {
         Self {
             block_num,
             block,
@@ -37,7 +37,7 @@ impl BlockData {
         self.relevant_tx.iter().map(|v| v.0).collect()
     }
 
-    pub fn relevant_tx(&self) -> &[(u32, ParsedTx)] {
+    pub fn relevant_tx(&self) -> &[(u32, RelevantTxInfo)] {
         &self.relevant_tx
     }
 

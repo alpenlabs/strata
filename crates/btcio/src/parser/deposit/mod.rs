@@ -10,6 +10,7 @@ pub mod error;
 pub mod test_utils;
 
 /// Configuration common among deposit and deposit request transaction
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DepositTxConfig {
     /// magic bytes, usually a rollup name
     pub magic_bytes: Vec<u8>,

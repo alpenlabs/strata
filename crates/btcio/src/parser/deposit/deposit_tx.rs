@@ -49,23 +49,10 @@ fn parse_deposit_script(
 #[cfg(test)]
 mod tests {
 
-    use bitcoin::{
-        opcodes::all::OP_RETURN,
-        script::{self, PushBytesBuf},
-        Amount, ScriptBuf,
-    };
+    use bitcoin::Amount;
 
-    use crate::parser::deposit::{deposit_tx::extract_deposit_info, test_utils::{create_transaction_two_outpoints, generic_taproot_addr, get_deposit_tx_config}};
+    use crate::parser::deposit::{deposit_tx::extract_deposit_info, test_utils::{build_test_deposit_script, create_transaction_two_outpoints, generic_taproot_addr, get_deposit_tx_config}};
 
-
-    fn build_test_deposit_script(magic: Vec<u8>, evm_addr: Vec<u8>) -> ScriptBuf {
-        let builder = script::Builder::new()
-            .push_opcode(OP_RETURN)
-            .push_slice(PushBytesBuf::try_from(magic).unwrap())
-            .push_slice(PushBytesBuf::try_from(evm_addr).unwrap());
-
-        builder.into_script()
-    }
 
     #[test]
     fn check_deposit_parser() {

@@ -15,7 +15,7 @@ use tracing::*;
 
 /// Information related to relevant transactions to be stored in L1Tx
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
-pub enum ParsedTx {
+pub enum RelevantTxInfo {
     /// Deposit Transaction
     Deposit(DepositInfo),
     DepositRequest(DepositReqeustInfo),

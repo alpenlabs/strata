@@ -24,7 +24,7 @@ use reth_primitives::revm_primitives::FixedBytes;
 use serde::{Deserialize, Serialize};
 use serde_json;
 
-use crate::{buf::Buf32, errors::ParseError, tx::ParsedTx};
+use crate::{buf::Buf32, errors::ParseError, tx::RelevantTxInfo};
 
 /// Reference to a transaction in a block.  This is the block index and the
 /// position of the transaction in the block.
@@ -83,11 +83,11 @@ impl L1TxProof {
 pub struct L1Tx {
     proof: L1TxProof,
     tx: Vec<u8>,
-    parsed_tx: ParsedTx,
+    parsed_tx: RelevantTxInfo,
 }
 
 impl L1Tx {
-    pub fn new(proof: L1TxProof, tx: Vec<u8>, parsed_tx: ParsedTx) -> Self {
+    pub fn new(proof: L1TxProof, tx: Vec<u8>, parsed_tx: RelevantTxInfo) -> Self {
         Self {
             proof,
             tx,
@@ -103,7 +103,7 @@ impl L1Tx {
         &self.tx
     }
 
-    pub fn parsed_tx(&self) -> &ParsedTx {
+    pub fn parsed_tx(&self) -> &RelevantTxInfo {
         &self.parsed_tx
     }
 }

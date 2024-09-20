@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use bitcoin::{absolute::LockTime, Address, Amount, ScriptBuf, Transaction, TxOut};
+use bitcoin::{absolute::LockTime, opcodes::all::OP_RETURN, script::{self, PushBytesBuf}, Address, Amount, ScriptBuf, Transaction, TxOut};
 
 use super::DepositTxConfig;
 
@@ -42,5 +42,33 @@ pub fn create_transaction_two_outpoints(amt: Amount, scr1: &ScriptBuf, scr2: &Sc
         input: vec![],
         output: outputs,
     }
+}
+
+pub fn build_no_op_deposit_request_script(magic: Vec<u8>,dummy_block: Vec<u8>, evm_addr: Vec<u8>) -> ScriptBuf {
+    let builder = script::Builder::new()
+        .push_slice(PushBytesBuf::try_from(magic).unwrap())
+        .push_slice(PushBytesBuf::try_from(dummy_block).unwrap())
+        .push_slice(PushBytesBuf::try_from(evm_addr).unwrap());
+
+    builder.into_script()
+}
+
+pub fn build_test_deposit_request_script(magic: Vec<u8>,dummy_block: Vec<u8>, evm_addr: Vec<u8>) -> ScriptBuf {
+    let builder = script::Builder::new()
+        .push_opcode(OP_RETURN)
+        .push_slice(PushBytesBuf::try_from(magic).unwrap())
+        .push_slice(PushBytesBuf::try_from(dummy_block).unwrap())
+        .push_slice(PushBytesBuf::try_from(evm_addr).unwrap());
+
+    builder.into_script()
+}
+
+pub fn build_test_deposit_script(magic: Vec<u8>, evm_addr: Vec<u8>) -> ScriptBuf {
+    let builder = script::Builder::new()
+        .push_opcode(OP_RETURN)
+        .push_slice(PushBytesBuf::try_from(magic).unwrap())
+        .push_slice(PushBytesBuf::try_from(evm_addr).unwrap());
+
+    builder.into_script()
 }
 

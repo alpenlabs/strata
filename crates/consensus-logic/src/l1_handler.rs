@@ -103,7 +103,7 @@ fn check_for_da_batch(blockdata: &BlockData) -> Vec<BatchCheckpoint> {
     let inscriptions = binding
         .iter()
         .filter_map(|(idx, parsed_tx)| match parsed_tx {
-            alpen_express_primitives::tx::ParsedTx::RollupInscription(inscription) => {
+            alpen_express_primitives::tx::RelevantTxInfo::RollupInscription(inscription) => {
                 Some((inscription, &blockdata.block().txdata[*idx as usize]))
             }
             _ => None,

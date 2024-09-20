@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     l1::{L1Tx, L1TxProof},
     prelude::Buf32,
-    tx::ParsedTx,
+    tx::RelevantTxInfo,
 };
 
 /// Generates cohashes for an wtxid in particular index with in given slice of wtxids.
@@ -80,7 +80,7 @@ fn get_cohashes_from_wtxids(wtxids: &[Wtxid], index: u32) -> (Vec<Buf32>, Buf32)
 ///
 /// # Panics
 /// - If the `idx` is out of bounds for the block's transaction data.
-pub fn generate_l1_tx(idx: u32, parsed_tx: ParsedTx, block: &Block) -> L1Tx {
+pub fn generate_l1_tx(idx: u32, parsed_tx: RelevantTxInfo, block: &Block) -> L1Tx {
     assert!(
         (idx as usize) < block.txdata.len(),
         "utils: tx idx out of range of block txs"

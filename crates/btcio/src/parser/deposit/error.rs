@@ -11,8 +11,8 @@ pub enum DepositParseError {
     #[error("Magic bytes mismatch {0:?} != {1:?}")]
     MagicBytesMismatch(Vec<u8>, Vec<u8>),
 
-    #[error("No address found")]
-    NoAddress,
+    #[error("No destination address found")]
+    NoDestAddress,
 
     #[error("invalid Destination Address length {0}")]
     InvalidDestAddress(u8),
@@ -24,5 +24,5 @@ pub enum DepositParseError {
     NoControlBlock,
 
     #[error("Control block length is not 32")]
-    ControlBlockLen,
+    ControlBlockLenMismatch,
 }
