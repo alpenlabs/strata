@@ -1,9 +1,7 @@
 use std::sync::Arc;
 
-use alpen_express_db::{
-    entities::bridge_tx_state::BridgeTxState, traits::BridgeTxDatabase, DbResult,
-};
 use bitcoin::Txid;
+use strata_db::{entities::bridge_tx_state::BridgeTxState, traits::BridgeTxDatabase, DbResult};
 
 use crate::exec::*;
 

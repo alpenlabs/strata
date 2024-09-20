@@ -1,4 +1,4 @@
-use alpen_express_state::{client_state::ClientState, operation::ClientUpdateOutput};
+use strata_state::{client_state::ClientState, operation::ClientUpdateOutput};
 
 use crate::{define_table_with_seek_key_codec, define_table_without_codec, impl_borsh_value_codec};
 

@@ -1,6 +1,6 @@
-use alpen_express_eectl::errors::EngineError;
-use alpen_express_state::{id::L2BlockId, l1::L1BlockId};
-use express_chaintsn::errors::TsnError;
+use strata_chaintsn::errors::TsnError;
+use strata_eectl::errors::EngineError;
+use strata_state::{id::L2BlockId, l1::L1BlockId};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -66,7 +66,7 @@ pub enum Error {
     Engine(#[from] EngineError),
 
     #[error("db: {0}")]
-    Db(#[from] alpen_express_db::errors::DbError),
+    Db(#[from] strata_db::errors::DbError),
 
     #[error("not yet implemented")]
     Unimplemented,

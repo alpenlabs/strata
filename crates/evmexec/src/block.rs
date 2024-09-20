@@ -1,7 +1,7 @@
-use alpen_express_primitives::evm_exec::EVMExtraPayload;
-use alpen_express_state::block::{L2Block, L2BlockBundle};
 use borsh::BorshDeserialize;
 use reth_primitives::B256;
+use strata_primitives::evm_exec::EVMExtraPayload;
+use strata_state::block::{L2Block, L2BlockBundle};
 use thiserror::Error;
 
 pub(crate) struct EVML2Block {

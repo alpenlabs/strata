@@ -1,7 +1,7 @@
-use alpen_express_primitives::{buf::Buf32, l1::L1BlockManifest};
 use bitcoin::{
     block::Header, consensus::deserialize, hashes::Hash, params::Params, Block, Transaction,
 };
+use strata_primitives::{buf::Buf32, l1::L1BlockManifest};
 
 use crate::ArbitraryGenerator;
 

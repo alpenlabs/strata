@@ -4,7 +4,7 @@ use argh::FromArgs;
 use bitcoin::Network;
 
 #[derive(Debug, Clone, FromArgs)]
-#[argh(description = "Alpen Express sequencer")]
+#[argh(description = "Alpen Strata sequencer")]
 pub struct Args {
     // TODO: default config location
     #[argh(option, short = 'c', description = "path to configuration")]

@@ -3,9 +3,9 @@
 
 use std::sync::Arc;
 
-use alpen_express_db::traits::*;
-use alpen_express_primitives::params::Params;
-use alpen_express_state::{
+use strata_db::traits::*;
+use strata_primitives::params::Params;
+use strata_state::{
     client_state::ClientState,
     operation::{self, ClientUpdateOutput},
 };
@@ -94,7 +94,7 @@ impl<D: Database> StateTracker<D> {
 
 /// Reconstructs the [`ClientState`] by fetching the last available checkpoint
 /// and replaying all relevant
-/// [`ClientStateWrite`](alpen_express_state::operation::ClientStateWrite)
+/// [`ClientStateWrite`](strata_state::operation::ClientStateWrite)
 /// from that checkpoint up to the specified index `idx`,
 /// ensuring an accurate and up-to-date state.
 ///
@@ -126,10 +126,10 @@ pub fn reconstruct_cur_state(
 }
 
 /// Reconstructs the
-/// [`ClientStateWrite`](alpen_express_state::operation::ClientStateWrite)
+/// [`ClientStateWrite`](strata_state::operation::ClientStateWrite)
 ///
 /// Under the hood fetches the last available checkpoint
-/// and then replays all the [`ClientStateWrite`](alpen_express_state::operation::ClientStateWrite)s
+/// and then replays all the [`ClientStateWrite`](strata_state::operation::ClientStateWrite)s
 /// from that checkpoint up to the requested index `idx`
 /// such that we have accurate [`ClientState`].
 ///
@@ -174,15 +174,15 @@ pub fn reconstruct_state(
 
 #[cfg(test)]
 mod tests {
-    use alpen_express_db::traits::{ClientStateStore, Database};
-    use alpen_express_rocksdb::test_utils::get_common_db;
-    use alpen_express_state::{
+    use strata_db::traits::{ClientStateStore, Database};
+    use strata_rocksdb::test_utils::get_common_db;
+    use strata_state::{
         block::L2Block,
         client_state::{ClientState, SyncState},
         header::L2Header,
         operation::{apply_writes_to_state, ClientStateWrite, ClientUpdateOutput, SyncAction},
     };
-    use alpen_test_utils::ArbitraryGenerator;
+    use test_utils::ArbitraryGenerator;
 
     use super::reconstruct_state;
 

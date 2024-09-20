@@ -3,14 +3,6 @@
 
 use std::{collections::BTreeMap, sync::Arc};
 
-use alpen_express_db::entities::bridge_tx_state::BridgeTxState;
-use alpen_express_primitives::{
-    bridge::{
-        Musig2PartialSig, Musig2PubNonce, OperatorIdx, OperatorPartialSig, PublickeyTable,
-        TxSigningData,
-    },
-    l1::SpendInfo,
-};
 use bitcoin::{
     hashes::Hash,
     key::{
@@ -22,10 +14,18 @@ use bitcoin::{
     witness::Witness,
     Transaction, Txid,
 };
-use express_storage::ops::bridge::BridgeTxStateOps;
 use musig2::{
     aggregate_partial_signatures, secp256k1::SECP256K1, AggNonce, KeyAggContext, SecNonce,
 };
+use strata_db::entities::bridge_tx_state::BridgeTxState;
+use strata_primitives::{
+    bridge::{
+        Musig2PartialSig, Musig2PubNonce, OperatorIdx, OperatorPartialSig, PublickeyTable,
+        TxSigningData,
+    },
+    l1::SpendInfo,
+};
+use strata_storage::ops::bridge::BridgeTxStateOps;
 
 use super::errors::{BridgeSigError, BridgeSigResult};
 use crate::operations::{create_script_spend_hash, sign_state_partial, verify_partial_sig};
@@ -186,7 +186,7 @@ impl SignatureManager {
     ///
     /// # Returns
     ///
-    /// A flag indicating whether the [`alpen_express_primitives::l1::BitcoinPsbt`] being tracked in
+    /// A flag indicating whether the [`strata_primitives::l1::BitcoinPsbt`] being tracked in
     /// the [`BridgeTxState`] has become fully signed after adding the signature.
     pub async fn add_own_partial_sig(&self, txid: &Txid) -> BridgeSigResult<bool> {
         let mut tx_state = self.get_tx_state(txid).await?;
@@ -264,7 +264,7 @@ impl SignatureManager {
     /// [BIP 327](https://github.com/bitcoin/bips/blob/master/bip-0327.mediawiki).
     /// # Returns
     ///
-    /// A flag indicating whether the [`alpen_express_primitives::l1::BitcoinPsbt`] being tracked in
+    /// A flag indicating whether the [`strata_primitives::l1::BitcoinPsbt`] being tracked in
     /// the [`BridgeTxState`] has become fully signed after adding the signature.
     pub async fn add_partial_sig(
         &self,
@@ -407,17 +407,17 @@ impl SignatureManager {
 mod tests {
     use std::{ops::Not, str::FromStr};
 
-    use alpen_express_primitives::bridge::Musig2PartialSig;
-    use alpen_test_utils::bridge::{
-        generate_keypairs, generate_mock_tx_signing_data, generate_mock_tx_state_ops,
-        generate_pubkey_table, generate_sec_nonce, permute,
-    };
     use arbitrary::{Arbitrary, Unstructured};
     use bitcoin::{
         hashes::sha256,
         secp256k1::{PublicKey, SECP256K1},
     };
     use musig2::{secp256k1::Message, PubNonce};
+    use strata_primitives::bridge::Musig2PartialSig;
+    use test_utils::bridge::{
+        generate_keypairs, generate_mock_tx_signing_data, generate_mock_tx_state_ops,
+        generate_pubkey_table, generate_sec_nonce, permute,
+    };
 
     use super::*;
 

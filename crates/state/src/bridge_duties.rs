@@ -1,7 +1,7 @@
 //! Type/traits related to the bridge-related duties.
 
-use express_bridge_tx_builder::prelude::DepositInfo;
 use serde::{Deserialize, Serialize};
+use strata_bridge_tx_builder::prelude::DepositInfo;
 
 use crate::bridge_ops::WithdrawalBatch;
 

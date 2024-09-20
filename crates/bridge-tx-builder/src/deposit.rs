@@ -3,10 +3,6 @@
 //! Contains types, traits and implementations related to creating various transactions used in the
 //! bridge-in dataflow.
 
-use alpen_express_primitives::{
-    bridge::TxSigningData,
-    l1::{BitcoinAddress, BitcoinPsbt, SpendInfo},
-};
 use bitcoin::{
     key::TapTweak,
     secp256k1::SECP256K1,
@@ -14,6 +10,10 @@ use bitcoin::{
     Address, Amount, FeeRate, OutPoint, Psbt, TapNodeHash, Transaction, TxOut,
 };
 use serde::{Deserialize, Serialize};
+use strata_primitives::{
+    bridge::TxSigningData,
+    l1::{BitcoinAddress, BitcoinPsbt, SpendInfo},
+};
 
 use super::{
     constants::{MIN_RELAY_FEE, UNSPENDABLE_INTERNAL_KEY},
@@ -247,8 +247,6 @@ impl DepositInfo {
 mod tests {
     use std::str::FromStr;
 
-    use alpen_express_primitives::{bridge::PublickeyTable, buf::Buf20};
-    use alpen_test_utils::bridge::{generate_keypairs, generate_pubkey_table};
     use bitcoin::{
         hashes::{sha256, Hash},
         hex::{Case, DisplayHex},
@@ -256,6 +254,8 @@ mod tests {
         taproot::{self, TaprootBuilder},
         Address, Network,
     };
+    use strata_primitives::{bridge::PublickeyTable, buf::Buf20};
+    use test_utils::bridge::{generate_keypairs, generate_pubkey_table};
 
     use super::*;
     use crate::{

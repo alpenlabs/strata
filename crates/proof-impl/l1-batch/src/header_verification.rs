@@ -1,8 +1,8 @@
-use alpen_express_primitives::buf::Buf32;
 use bitcoin::{block::Header, hashes::Hash, BlockHash, CompactTarget, Target};
 use ethnum::U256;
-use express_proofimpl_btc_blockspace::block::compute_block_hash;
 use serde::{Deserialize, Serialize};
+use strata_primitives::buf::Buf32;
+use strata_proofimpl_btc_blockspace::block::compute_block_hash;
 
 use crate::{pow_params::PowParams, timestamp_store::TimestampStore};
 
@@ -154,9 +154,9 @@ pub fn get_difficulty_adjustment_height(idx: u32, start: u32, params: &PowParams
 
 #[cfg(test)]
 mod tests {
-    use alpen_test_utils::bitcoin::{get_btc_chain, BtcChainSegment};
     use bitcoin::params::Params;
     use rand::Rng;
+    use test_utils::bitcoin::{get_btc_chain, BtcChainSegment};
 
     use super::*;
 

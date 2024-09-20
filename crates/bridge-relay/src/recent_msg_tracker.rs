@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use alpen_express_primitives::relay::types::BridgeMsgId;
+use strata_primitives::relay::types::BridgeMsgId;
 use tokio::sync::Mutex;
 
 pub struct RecentMessageTracker {

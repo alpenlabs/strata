@@ -1,8 +1,8 @@
 //! Checkpointing bookkeeping and control logic.
 use std::sync::Arc;
 
-use alpen_express_db::{types::CheckpointEntry, DbResult};
-use express_storage::managers::checkpoint::CheckpointDbManager;
+use strata_db::{types::CheckpointEntry, DbResult};
+use strata_storage::managers::checkpoint::CheckpointDbManager;
 use tokio::sync::broadcast;
 use tracing::*;
 

@@ -1,7 +1,7 @@
 use std::iter;
 
-use alpen_express_primitives::{buf::Buf32, hash::sha256d};
 use bitcoin::consensus::Encodable;
+use strata_primitives::{buf::Buf32, hash::sha256d};
 
 /// Calculates the merkle root of an iterator of *hashes* using [RustCrypto's SHA-2 crate](https://github.com/RustCrypto/hashes/tree/master/sha2).
 ///
@@ -65,9 +65,9 @@ fn merkle_root_r(hashes: &mut [Buf32]) -> Buf32 {
 
 #[cfg(test)]
 mod tests {
-    use alpen_express_primitives::buf::Buf32;
     use bitcoin::{hashes::Hash, TxMerkleNode};
     use rand::Rng;
+    use strata_primitives::buf::Buf32;
 
     use super::calculate_root;
 

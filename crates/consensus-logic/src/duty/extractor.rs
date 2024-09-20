@@ -1,5 +1,5 @@
-use alpen_express_primitives::params::Params;
-use alpen_express_state::{batch::CheckpointInfo, client_state::ClientState, id::L2BlockId};
+use strata_primitives::params::Params;
+use strata_state::{batch::CheckpointInfo, client_state::ClientState, id::L2BlockId};
 use tracing::*;
 
 use super::types::{BlockSigningDuty, Duty, Identity};

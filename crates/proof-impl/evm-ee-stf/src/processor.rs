@@ -12,7 +12,7 @@
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either strata or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
 use std::{mem, mem::take};
@@ -20,7 +20,6 @@ use std::{mem, mem::take};
 use alloy_eips::eip1559::BaseFeeParams;
 use alloy_rlp::BufMut;
 use anyhow::anyhow;
-use express_reth_evm::set_evm_handles;
 use reth_primitives::{
     constants::{GWEI_TO_WEI, MAXIMUM_EXTRA_DATA_SIZE, MINIMUM_GAS_LIMIT},
     revm_primitives::Account,
@@ -34,6 +33,7 @@ use revm::{
     primitives::{SpecId, TransactTo, TxEnv},
     Database, DatabaseCommit, Evm,
 };
+use strata_reth_evm::set_evm_handles;
 
 use crate::{
     mpt::{keccak, RlpBytes, StateAccount},

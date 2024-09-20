@@ -1,13 +1,13 @@
 //! Defines traits related to managing the checkpoint for bridge duty executions and
 //! some common implementers.
 
-use alpen_express_primitives::buf::Buf32;
 use async_trait::async_trait;
+use strata_primitives::buf::Buf32;
 
 use super::errors::TrackerError;
 
 /// Defines functionalities to add, update and query duty statuses.
-// TODO: the actual database related traits should go into the `express-db` and `express-storage`
+// TODO: the actual database related traits should go into the `strata-db` and `strata-storage`
 // crates.
 #[async_trait]
 pub trait ManageTaskStatus: Clone + Send + Sync + Sized {

@@ -1,14 +1,14 @@
 use std::sync::Arc;
 
-use alpen_express_btcio::{
+use strata_btcio::{
     reader::{messages::L1Event, query::bitcoin_data_reader_task},
     rpc::traits::Reader,
 };
-use alpen_express_consensus_logic::{ctl::CsmController, l1_handler::bitcoin_data_handler_task};
-use alpen_express_db::traits::{Database, L1DataProvider};
-use alpen_express_primitives::params::Params;
-use alpen_express_status::StatusTx;
-use express_tasks::TaskExecutor;
+use strata_consensus_logic::{ctl::CsmController, l1_handler::bitcoin_data_handler_task};
+use strata_db::traits::{Database, L1DataProvider};
+use strata_primitives::params::Params;
+use strata_status::StatusTx;
+use strata_tasks::TaskExecutor;
 use tokio::sync::mpsc;
 
 use crate::config::Config;
@@ -24,8 +24,8 @@ pub fn start_reader_tasks<D: Database + Send + Sync + 'static>(
 ) -> anyhow::Result<()>
 where
     // TODO how are these not redundant trait bounds???
-    <D as alpen_express_db::traits::Database>::SeStore: Send + Sync + 'static,
-    <D as alpen_express_db::traits::Database>::L1Store: Send + Sync + 'static,
+    <D as strata_db::traits::Database>::SeStore: Send + Sync + 'static,
+    <D as strata_db::traits::Database>::L1Store: Send + Sync + 'static,
 {
     let (ev_tx, ev_rx) = mpsc::channel::<L1Event>(100); // TODO: think about the buffer size
 

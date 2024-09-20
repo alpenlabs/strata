@@ -1,6 +1,6 @@
 use revm::primitives::SpecId;
-use express_proofimpl_evm_ee_stf::processor::EvmConfig;
-use express_proofimpl_evm_ee_stf::{process_block_transaction, ELProofInput};
+use strata_proofimpl_evm_ee_stf::processor::EvmConfig;
+use strata_proofimpl_evm_ee_stf::{process_block_transaction, ELProofInput};
 
 // TODO: Read the evm config from the genesis config. This should be done in compile time.
 const EVM_CONFIG: EvmConfig = EvmConfig {

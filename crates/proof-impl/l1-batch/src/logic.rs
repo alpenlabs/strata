@@ -1,8 +1,8 @@
-use express_proofimpl_btc_blockspace::{
+use serde::{Deserialize, Serialize};
+use strata_proofimpl_btc_blockspace::{
     filter::{DepositRequestData, ForcedInclusion, StateUpdate},
     logic::BlockspaceProofOutput,
 };
-use serde::{Deserialize, Serialize};
 
 use crate::{header_verification::HeaderVerificationState, pow_params::PowParams};
 

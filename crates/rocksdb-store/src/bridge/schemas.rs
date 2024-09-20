@@ -1,5 +1,5 @@
-use alpen_express_db::entities::bridge_tx_state::BridgeTxState;
-use alpen_express_primitives::buf::Buf32;
+use strata_db::entities::bridge_tx_state::BridgeTxState;
+use strata_primitives::buf::Buf32;
 
 use crate::{
     define_table_with_default_codec, define_table_with_seek_key_codec, define_table_without_codec,

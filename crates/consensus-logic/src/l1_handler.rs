@@ -1,18 +1,16 @@
 use std::sync::Arc;
 
-use alpen_express_btcio::{
+use bitcoin::{consensus::serialize, hashes::Hash, Block};
+use strata_btcio::{
     inscription::InscriptionParser,
     reader::messages::{BlockData, L1Event},
 };
-use alpen_express_db::traits::{Database, L1DataStore};
-use alpen_express_primitives::{
-    buf::Buf32, l1::L1BlockManifest, params::Params, utils::generate_l1_tx,
-};
-use alpen_express_state::{
+use strata_db::traits::{Database, L1DataStore};
+use strata_primitives::{buf::Buf32, l1::L1BlockManifest, params::Params, utils::generate_l1_tx};
+use strata_state::{
     batch::{BatchCheckpoint, SignedBatchCheckpoint},
     sync_event::SyncEvent,
 };
-use bitcoin::{consensus::serialize, hashes::Hash, Block};
 use tokio::sync::mpsc;
 use tracing::*;
 

@@ -3,8 +3,8 @@
 //! decide to expand the chain state in the future such that we can't keep it
 //! entire in memory.
 
-use alpen_express_primitives::buf::Buf32;
 use borsh::{BorshDeserialize, BorshSerialize};
+use strata_primitives::buf::Buf32;
 use tracing::*;
 
 use crate::{

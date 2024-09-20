@@ -1,4 +1,4 @@
-# `express-chaintsn`
+# `strata-chaintsn`
 
 Contains core implementation of the rollup chain state transition.
 

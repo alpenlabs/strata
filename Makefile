@@ -30,7 +30,7 @@ help: ## Display this help.
 
 .PHONY: build
 build: ## Build the workspace into the `target` directory.
-	cargo build --workspace --bin "alpen-express-sequencer" --features "$(FEATURES)" --profile "$(PROFILE)"
+	cargo build --workspace --bin "strata-sequencer" --features "$(FEATURES)" --profile "$(PROFILE)"
 
 ##@ Test
 
@@ -120,7 +120,7 @@ fmt-func-tests: ensure-poetry activate ## Apply formatting of python files insid
 lint-check-ws: ## Checks for lint issues in the workspace.
 	cargo clippy \
 	--workspace \
-	--bin "alpen-express-sequencer" \
+	--bin "strata-sequencer" \
 	--lib \
 	--examples \
 	--tests \
@@ -133,7 +133,7 @@ lint-check-ws: ## Checks for lint issues in the workspace.
 lint-fix-ws: ## Lints the workspace and applies fixes where possible.
 	cargo clippy \
 	--workspace \
-	--bin "alpen-express-sequencer" \
+	--bin "strata-sequencer" \
 	--lib \
 	--examples \
 	--tests \

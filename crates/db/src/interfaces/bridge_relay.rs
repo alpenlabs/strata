@@ -1,4 +1,4 @@
-use alpen_express_primitives::relay::types::BridgeMessage;
+use strata_primitives::relay::types::BridgeMessage;
 
 use crate::DbResult;
 

@@ -3,17 +3,17 @@
 
 use std::{collections::BTreeMap, ops::Not};
 
-use alpen_express_primitives::{
+use arbitrary::Arbitrary;
+use bitcoin::{Transaction, TxOut, Txid};
+use borsh::{BorshDeserialize, BorshSerialize};
+use musig2::{PartialSignature, PubNonce};
+use strata_primitives::{
     bridge::{
         Musig2PartialSig, Musig2PubNonce, Musig2SecNonce, OperatorIdx, OperatorPartialSig,
         PartialSigTable, PublickeyTable, TxSigningData,
     },
     l1::{BitcoinPsbt, SpendInfo},
 };
-use arbitrary::Arbitrary;
-use bitcoin::{Transaction, TxOut, Txid};
-use borsh::{BorshDeserialize, BorshSerialize};
-use musig2::{PartialSignature, PubNonce};
 
 use super::errors::{BridgeTxStateError, EntityResult};
 
@@ -233,13 +233,13 @@ impl BridgeTxState {
 mod tests {
     use std::collections::BTreeMap;
 
-    use alpen_test_utils::bridge::{
-        generate_keypairs, generate_mock_tx_signing_data, generate_pubkey_table,
-        generate_sec_nonce, permute,
-    };
     use arbitrary::Unstructured;
     use bitcoin::{key::Secp256k1, secp256k1::All};
     use musig2::secp256k1::SECP256K1;
+    use test_utils::bridge::{
+        generate_keypairs, generate_mock_tx_signing_data, generate_pubkey_table,
+        generate_sec_nonce, permute,
+    };
 
     use super::*;
     use crate::entities::errors::EntityError;

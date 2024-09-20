@@ -2,8 +2,8 @@
 
 use std::str::FromStr;
 
-use alpen_express_primitives::l1::BitcoinAmount;
 use bitcoin::secp256k1::XOnlyPublicKey;
+use strata_primitives::l1::BitcoinAmount;
 
 /// The value of each UTXO in the Bridge Multisig Address.
 ///

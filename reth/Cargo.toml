@@ -1,18 +1,14 @@
 [package]
 edition = "2021"
-name = "alpen-express-reth"
+name = "strata-reth"
 version = "0.1.0"
 
 [[bin]]
-name = "alpen-express-reth"
+name = "strata-reth"
 path = "src/main.rs"
 
 [dependencies]
 clap = "4"
-express-reth-db = { workspace = true }
-express-reth-exex = { workspace = true }
-express-reth-node = { workspace = true }
-express-reth-rpc = { workspace = true }
 eyre = { workspace = true }
 reth = { workspace = true }
 reth-chainspec = { workspace = true }
@@ -22,4 +18,8 @@ reth-db = { workspace = true }
 reth-primitives = { workspace = true }
 rockbound = { workspace = true }
 serde_json = { workspace = true }
+strata-reth-db = { workspace = true }
+strata-reth-exex = { workspace = true }
+strata-reth-node = { workspace = true }
+strata-reth-rpc = { workspace = true }
 tracing = { workspace = true }

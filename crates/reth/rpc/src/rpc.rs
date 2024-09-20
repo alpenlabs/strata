@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use express_reth_db::WitnessProvider;
-use express_rpc_utils::to_jsonrpsee_error;
 use jsonrpsee::core::RpcResult;
 use reth_primitives::B256;
+use strata_reth_db::WitnessProvider;
+use strata_rpc_utils::to_jsonrpsee_error;
 
 use crate::{AlpenRpcApiServer, BlockWitness};
 

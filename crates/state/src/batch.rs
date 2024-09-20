@@ -1,6 +1,6 @@
-use alpen_express_primitives::buf::{Buf32, Buf64};
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
+use strata_primitives::buf::{Buf32, Buf64};
 
 use crate::id::L2BlockId;
 
@@ -36,7 +36,7 @@ impl BatchCheckpoint {
         buf.extend(self.proof.clone());
         buf.extend(self.checkpoint().l2_blockid.as_ref());
 
-        alpen_express_primitives::hash::raw(&buf)
+        strata_primitives::hash::raw(&buf)
     }
 }
 

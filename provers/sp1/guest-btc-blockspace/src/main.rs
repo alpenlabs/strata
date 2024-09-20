@@ -1,5 +1,5 @@
 use bitcoin::Block;
-use express_proofimpl_btc_blockspace::logic::{process_blockspace_proof, BlockspaceProofInput, ScanRuleConfig};
+use strata_proofimpl_btc_blockspace::logic::{process_blockspace_proof, BlockspaceProofInput, ScanRuleConfig};
 
 fn main() {
     let scan_config = sp1_zkvm::io::read::<ScanRuleConfig>();

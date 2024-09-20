@@ -1,6 +1,6 @@
 [package]
 edition = "2021"
-name = "express-bridge-tx-builder"
+name = "strata-bridge-tx-builder"
 version = "0.1.0"
 
 [lints]
@@ -13,7 +13,7 @@ rust.unused_must_use = "deny"
 rustdoc.all = "warn"
 
 [dependencies]
-alpen-express-primitives = { workspace = true }
+strata-primitives = { workspace = true }
 
 bitcoin = { workspace = true, features = ["rand-std"] }
 lazy_static = { workspace = true }
@@ -22,4 +22,4 @@ serde = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
-alpen-test-utils = { workspace = true }
+test-utils = { workspace = true }

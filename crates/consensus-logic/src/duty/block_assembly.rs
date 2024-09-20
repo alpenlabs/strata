@@ -3,20 +3,20 @@
 
 use std::{sync::Arc, thread, time};
 
-use alpen_express_crypto::sign_schnorr_sig;
-use alpen_express_db::traits::{
+use strata_crypto::sign_schnorr_sig;
+use strata_db::traits::{
     ChainstateProvider, ClientStateProvider, Database, L1DataProvider, L2DataProvider, L2DataStore,
 };
-use alpen_express_eectl::{
+use strata_eectl::{
     engine::{ExecEngineCtl, PayloadStatus},
     errors::EngineError,
     messages::{ExecPayloadData, PayloadEnv},
 };
-use alpen_express_primitives::{
+use strata_primitives::{
     buf::{Buf32, Buf64},
     params::Params,
 };
-use alpen_express_state::{
+use strata_state::{
     block::{ExecSegment, L1Segment, L2BlockAccessory, L2BlockBundle},
     chain_state::ChainState,
     client_state::{ClientState, LocalL1State},
@@ -93,7 +93,7 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     // Figure out the save L1 blkid.
     // FIXME this is somewhat janky, should get it from the MMR
     let safe_l1_block_rec = prev_chstate.l1_view().safe_block();
-    let safe_l1_blkid = alpen_express_primitives::hash::sha256d(safe_l1_block_rec.buf());
+    let safe_l1_blkid = strata_primitives::hash::sha256d(safe_l1_block_rec.buf());
 
     // TODO Pull data from CSM state that we've observed from L1, including new
     // headers or any headers needed to perform a reorg if necessary.
@@ -345,7 +345,7 @@ fn compute_post_state(
     params: &Arc<Params>,
 ) -> Result<(ChainState, WriteBatch), Error> {
     let mut state_cache = StateCache::new(prev_chstate);
-    express_chaintsn::transition::process_block(&mut state_cache, header, body, params.rollup())?;
+    strata_chaintsn::transition::process_block(&mut state_cache, header, body, params.rollup())?;
     let (post_state, wb) = state_cache.finalize();
     Ok((post_state, wb))
 }
@@ -369,8 +369,8 @@ fn now_millis() -> u64 {
 mod tests {
     // TODO to improve these tests, they could use a bit more randomization of lengths and offsets
 
-    use alpen_express_state::l1::L1BlockId;
-    use alpen_test_utils::ArbitraryGenerator;
+    use strata_state::l1::L1BlockId;
+    use test_utils::ArbitraryGenerator;
 
     use super::find_pivot_block_height;
 

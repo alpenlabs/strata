@@ -1,11 +1,11 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use alpen_express_primitives::{
+use strata_primitives::{
     block_credential,
     buf::{Buf32, Buf64},
     params::{Params, RollupParams, SyncParams},
 };
-use alpen_express_state::{
+use strata_state::{
     block::{L2Block, L2BlockAccessory, L2BlockBody, L2BlockBundle},
     client_state::ClientState,
     header::{L2BlockHeader, L2Header, SignedL2BlockHeader},
@@ -65,7 +65,7 @@ pub fn gen_l2_chain(parent: Option<SignedL2BlockHeader>, blocks_num: usize) -> V
 pub fn gen_params() -> Params {
     Params {
         rollup: RollupParams {
-            rollup_name: "express".to_string(),
+            rollup_name: "strata".to_string(),
             block_time: 1000,
             cred_rule: block_credential::CredRule::Unchecked,
             horizon_l1_height: 3,

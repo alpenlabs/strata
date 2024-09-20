@@ -1,9 +1,9 @@
 //! Core state transition function.
 #![allow(unused)] // still under development
 
-use alpen_express_db::traits::{Database, L1DataProvider, L2DataProvider, L2DataStore};
-use alpen_express_primitives::prelude::*;
-use alpen_express_state::{
+use strata_db::traits::{Database, L1DataProvider, L2DataProvider, L2DataStore};
+use strata_primitives::prelude::*;
+use strata_state::{
     client_state::*, header::L2Header, id::L2BlockId, l1::L1BlockId, operation::*,
     sync_event::SyncEvent,
 };
@@ -198,11 +198,11 @@ fn activate_chain(
 
 #[cfg(test)]
 mod tests {
-    use alpen_express_db::traits::L1DataStore;
-    use alpen_express_primitives::{block_credential, l1::L1BlockManifest};
-    use alpen_express_rocksdb::test_utils::get_common_db;
-    use alpen_express_state::{l1::L1BlockId, operation};
-    use alpen_test_utils::{
+    use strata_db::traits::L1DataStore;
+    use strata_primitives::{block_credential, l1::L1BlockManifest};
+    use strata_rocksdb::test_utils::get_common_db;
+    use strata_state::{l1::L1BlockId, operation};
+    use test_utils::{
         bitcoin::gen_l1_chain,
         l2::{gen_client_state, gen_params},
         ArbitraryGenerator,

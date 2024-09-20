@@ -2,18 +2,16 @@
 
 use std::sync::Arc;
 
-use alpen_express_db::{
+use strata_db::{
     traits::*,
     types::{CheckpointConfStatus, CheckpointEntry, CheckpointProvingStatus},
 };
-use alpen_express_eectl::engine::ExecEngineCtl;
-use alpen_express_primitives::prelude::*;
-use alpen_express_state::{
-    client_state::ClientState, csm_status::CsmStatus, operation::SyncAction,
-};
-use alpen_express_status::StatusTx;
-use express_storage::{managers::checkpoint::CheckpointDbManager, L2BlockManager};
-use express_tasks::ShutdownGuard;
+use strata_eectl::engine::ExecEngineCtl;
+use strata_primitives::prelude::*;
+use strata_state::{client_state::ClientState, csm_status::CsmStatus, operation::SyncAction};
+use strata_status::StatusTx;
+use strata_storage::{managers::checkpoint::CheckpointDbManager, L2BlockManager};
+use strata_tasks::ShutdownGuard;
 use tokio::sync::{broadcast, mpsc};
 use tracing::*;
 

@@ -1,5 +1,5 @@
 use bitcoin::params::MAINNET;
-use express_proofimpl_l1_batch::{
+use strata_proofimpl_l1_batch::{
     logic::{process_batch_proof, L1BatchProofInput},
     pow_params::PowParams,
 };

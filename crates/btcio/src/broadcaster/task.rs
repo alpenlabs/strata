@@ -1,8 +1,8 @@
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
-use alpen_express_db::types::{ExcludeReason, L1TxEntry, L1TxStatus};
 use bitcoin::{hashes::Hash, Transaction, Txid};
-use express_storage::{ops::l1tx_broadcast, BroadcastDbOps};
+use strata_db::types::{ExcludeReason, L1TxEntry, L1TxStatus};
+use strata_storage::{ops::l1tx_broadcast, BroadcastDbOps};
 use tokio::sync::mpsc::Receiver;
 use tracing::*;
 
@@ -185,13 +185,13 @@ async fn send_tx(tx: &Transaction, client: &impl Broadcaster) -> Result<(), Publ
 
 #[cfg(test)]
 mod test {
-    use alpen_express_db::{traits::TxBroadcastDatabase, types::ExcludeReason};
-    use alpen_express_rocksdb::{
+    use bitcoin::consensus;
+    use strata_db::{traits::TxBroadcastDatabase, types::ExcludeReason};
+    use strata_rocksdb::{
         broadcaster::db::{BroadcastDatabase, BroadcastDb},
         test_utils::get_rocksdb_tmp_instance,
     };
-    use bitcoin::consensus;
-    use express_storage::ops::l1tx_broadcast::Context;
+    use strata_storage::ops::l1tx_broadcast::Context;
 
     use super::*;
     use crate::test_utils::{TestBitcoinClient, SOME_TX};

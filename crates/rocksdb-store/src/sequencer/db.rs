@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
-use alpen_express_db::{
+use rockbound::{OptimisticTransactionDB, SchemaDBOperationsExt};
+use strata_db::{
     errors::DbError,
     traits::{SeqDataProvider, SeqDataStore, SequencerDatabase},
     types::BlobEntry,
     DbResult,
 };
-use alpen_express_primitives::buf::Buf32;
-use rockbound::{OptimisticTransactionDB, SchemaDBOperationsExt};
+use strata_primitives::buf::Buf32;
 
 use super::schemas::{SeqBlobIdSchema, SeqBlobSchema};
 use crate::DbOpsConfig;
@@ -91,10 +91,10 @@ impl<D: SeqDataStore + SeqDataProvider> SequencerDatabase for SequencerDB<D> {
 #[cfg(feature = "test_utils")]
 #[cfg(test)]
 mod tests {
-    use alpen_express_db::traits::{SeqDataProvider, SeqDataStore};
-    use alpen_express_primitives::buf::Buf32;
-    use alpen_test_utils::ArbitraryGenerator;
+    use strata_db::traits::{SeqDataProvider, SeqDataStore};
+    use strata_primitives::buf::Buf32;
     use test;
+    use test_utils::ArbitraryGenerator;
 
     use super::*;
     use crate::test_utils::get_rocksdb_tmp_instance;

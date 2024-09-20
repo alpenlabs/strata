@@ -1,6 +1,6 @@
 [package]
 edition = "2021"
-name = "express-bridge-rpc-api"
+name = "strata-bridge-rpc-api"
 version = "0.1.0"
 
 [lints]

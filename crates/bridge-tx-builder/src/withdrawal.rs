@@ -1,8 +1,8 @@
 //! Provides types/traits associated with the withdrawal process.
 
-use alpen_express_primitives::l1::XOnlyPk;
 use bitcoin::{secp256k1::schnorr::Signature, OutPoint};
 use serde::{Deserialize, Serialize};
+use strata_primitives::l1::XOnlyPk;
 
 /// Details for a reimbursement request first produced by the assigned operator and subsequently
 /// passed by other operators along with their signature, along with the withdrawal batch. This

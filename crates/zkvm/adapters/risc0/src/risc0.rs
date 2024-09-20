@@ -1,10 +1,10 @@
-use express_zkvm::{Proof, ProverInput, ProverOptions, VerificationKey, ZKVMHost, ZKVMVerifier};
 use risc0_zkvm::{
     compute_image_id, get_prover_server, sha::Digest, ExecutorEnv, ExecutorImpl, ProverOpts,
     Receipt, VerifierContext,
 };
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::to_vec;
+use strata_zkvm::{Proof, ProverInput, ProverOptions, VerificationKey, ZKVMHost, ZKVMVerifier};
 
 /// A host for the `RiscZero` zkVM that stores the guest program in ELF format
 /// The `RiscZeroHost` is responsible for program execution and proving

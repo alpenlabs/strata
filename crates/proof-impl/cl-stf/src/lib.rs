@@ -1,6 +1,6 @@
-use alpen_express_primitives::params::Params;
-use alpen_express_state::block_validation::{check_block_credential, validate_block_segments};
-pub use alpen_express_state::{block::L2Block, chain_state::ChainState, state_op::StateCache};
+use strata_primitives::params::Params;
+use strata_state::block_validation::{check_block_credential, validate_block_segments};
+pub use strata_state::{block::L2Block, chain_state::ChainState, state_op::StateCache};
 
 /// Verifies an L2 block and applies the chains state transition if the block is valid.
 pub fn verify_and_transition(
@@ -35,7 +35,7 @@ fn apply_state_transition(
 ) -> ChainState {
     let mut state_cache = StateCache::new(prev_chstate);
 
-    express_chaintsn::transition::process_block(
+    strata_chaintsn::transition::process_block(
         &mut state_cache,
         new_l2_block.header(),
         new_l2_block.body(),
@@ -48,7 +48,7 @@ fn apply_state_transition(
 
 #[cfg(test)]
 mod tests {
-    use alpen_test_utils::l2::gen_params;
+    use test_utils::l2::gen_params;
 
     use super::*;
 

@@ -1,10 +1,10 @@
 #[cfg(feature = "prover")]
 
 mod test {
-    use alpen_express_state::{block::L2Block, chain_state::ChainState};
-    use express_sp1_adapter::{SP1Host, SP1Verifier};
-    use express_sp1_guest_builder::GUEST_CL_STF_ELF;
-    use express_zkvm::{ProverInput, ZKVMHost, ZKVMVerifier};
+    use strata_sp1_adapter::{SP1Host, SP1Verifier};
+    use strata_sp1_guest_builder::GUEST_CL_STF_ELF;
+    use strata_state::{block::L2Block, chain_state::ChainState};
+    use strata_zkvm::{ProverInput, ZKVMHost, ZKVMVerifier};
 
     fn get_prover_input() -> (ChainState, L2Block) {
         let prev_state_data: &[u8] =

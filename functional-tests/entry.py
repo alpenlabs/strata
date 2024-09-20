@@ -123,7 +123,7 @@ class RethConfig(TypedDict):
     reth_secret_path: str
 
 
-class ExpressFactory(flexitest.Factory):
+class StrataFactory(flexitest.Factory):
     def __init__(self, port_range: list[int]):
         super().__init__(port_range)
 
@@ -147,7 +147,7 @@ class ExpressFactory(flexitest.Factory):
 
         # fmt: off
         cmd = [
-            "alpen-express-sequencer",
+            "strata-sequencer",
             "--datadir", datadir,
             "--rpc-port", str(rpc_port),
             "--bitcoind-host", bitcoind_config["bitcoind_sock"],
@@ -206,7 +206,7 @@ class FullNodeFactory(flexitest.Factory):
 
         # fmt: off
         cmd = [
-            "alpen-express-sequencer",
+            "strata-sequencer",
             "--datadir", datadir,
             "--rpc-port", str(rpc_port),
             "--bitcoind-host", bitcoind_config["bitcoind_sock"],
@@ -261,7 +261,7 @@ class RethFactory(flexitest.Factory):
 
         # fmt: off
         cmd = [
-            "alpen-express-reth",
+            "strata-reth",
             "--disable-discovery",
             "--ipcdisable",
             "--datadir", datadir,
@@ -326,7 +326,7 @@ class ProverClientFactory(flexitest.Factory):
 
         # fmt: off
         cmd = [
-            "express-prover-client",
+            "strata-prover-client",
             "--rpc-port", str(rpc_port),
             "--sequencer-rpc", sequencer_url,
             "--reth-rpc", reth_url
@@ -540,7 +540,7 @@ def main(argv):
     datadir_root = flexitest.create_datadir_in_workspace(os.path.join(test_dir, DD_ROOT))
 
     btc_fac = BitcoinFactory([12300 + i for i in range(20)])
-    seq_fac = ExpressFactory([12400 + i for i in range(20)])
+    seq_fac = StrataFactory([12400 + i for i in range(20)])
     fullnode_fac = FullNodeFactory([12500 + i for i in range(20)])
     reth_fac = RethFactory([12600 + i for i in range(20 * 3)])
     prover_client_fac = ProverClientFactory([12700 + i for i in range(20 * 3)])

@@ -16,7 +16,7 @@ pub mod utils;
 #[cfg(feature = "test_utils")]
 pub mod test_utils;
 
-pub const ROCKSDB_NAME: &str = "express";
+pub const ROCKSDB_NAME: &str = "strata";
 
 pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
     ChainStateSchema::COLUMN_FAMILY_NAME,

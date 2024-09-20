@@ -2,11 +2,11 @@
 
 mod rpc;
 
-use express_proofimpl_evm_ee_stf::ELProofInput;
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 use reth_primitives::B256;
 pub use rpc::AlpenRPC;
 use serde::{Deserialize, Serialize};
+use strata_proofimpl_evm_ee_stf::ELProofInput;
 
 #[cfg_attr(not(test), rpc(server, namespace = "alpee"))]
 #[cfg_attr(test, rpc(server, client, namespace = "alpee"))]

@@ -1,6 +1,6 @@
-# Alpen Express Rollup
+# Alpen Strata Rollup
 
-Alpen's prototype rollup, codenamed Express. This is pre-alpha software and
+Alpen's prototype rollup, codenamed Strata. This is pre-alpha software and
 nothing is even close to being usable yet.
 
 ## Repository structure
@@ -76,15 +76,15 @@ Start EL Client:
 
 ```sh
 # Normal mode
-cargo run --bin alpen-express-reth  -- --datadir .data/reth --http -vvvv
+cargo run --bin strata-reth  -- --datadir .data/reth --http -vvvv
 
 # Block witness generation mode
-cargo run --bin alpen-express-reth  -- --datadir .data/reth --http --enable-witness-gen -vvvv
+cargo run --bin strata-reth  -- --datadir .data/reth --http --enable-witness-gen -vvvv
 ```
 
 Start CL Client/Sequencer
 
 ```sh
-cargo run --bin alpen-express-sequencer -- --config config.toml
+cargo run --bin strata-sequencer -- --config config.toml
 ```
 

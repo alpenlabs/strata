@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use express_zkvm::{ProverOptions, ZKVMHost};
+use strata_zkvm::{ProverOptions, ZKVMHost};
 use tokio::time::{sleep, Duration};
 
 use crate::{

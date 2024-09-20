@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
-use alpen_express_consensus_logic::{message::ForkChoiceMessage, sync_manager::SyncManager};
-use alpen_express_state::{
+use futures::StreamExt;
+use strata_consensus_logic::{message::ForkChoiceMessage, sync_manager::SyncManager};
+use strata_state::{
     block::L2BlockBundle, client_state::SyncState, header::L2Header, id::L2BlockId,
 };
-use express_storage::L2BlockManager;
-use futures::StreamExt;
+use strata_storage::L2BlockManager;
 use tracing::{debug, error, warn};
 
 use crate::{

@@ -1,6 +1,6 @@
 [package]
 edition = "2021"
-name = "express-tasks"
+name = "strata-tasks"
 version = "0.1.0"
 
 [dependencies]

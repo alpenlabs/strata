@@ -1,8 +1,8 @@
 use core::fmt;
 
-use alpen_express_primitives::{l1, prelude::*};
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
+use strata_primitives::{l1, prelude::*};
 
 use crate::state_queue::StateQueue;
 
@@ -16,7 +16,7 @@ impl L1BlockId {
     /// Computes the blkid from the header buf.  This expensive in proofs and
     /// should only be done when necessary.
     pub fn compute_from_header_buf(buf: &[u8]) -> L1BlockId {
-        Self::from(alpen_express_primitives::hash::sha256d(buf))
+        Self::from(strata_primitives::hash::sha256d(buf))
     }
 }
 
@@ -69,7 +69,7 @@ pub struct L1HeaderRecord {
 impl L1HeaderRecord {
     pub fn new(buf: Vec<u8>, wtxs_root: Buf32) -> Self {
         // TODO move this hash outside
-        let blkid = alpen_express_primitives::hash::sha256d(&buf).into();
+        let blkid = strata_primitives::hash::sha256d(&buf).into();
         Self {
             blkid,
             buf,
@@ -98,8 +98,8 @@ impl L1HeaderRecord {
     }
 }
 
-impl From<&alpen_express_primitives::l1::L1BlockManifest> for L1HeaderRecord {
-    fn from(value: &alpen_express_primitives::l1::L1BlockManifest) -> Self {
+impl From<&strata_primitives::l1::L1BlockManifest> for L1HeaderRecord {
+    fn from(value: &strata_primitives::l1::L1BlockManifest) -> Self {
         Self {
             blkid: value.block_hash().into(),
             buf: value.header().to_vec(),

@@ -1,13 +1,13 @@
 use std::{sync::Arc, time::Duration};
 
-use alpen_express_db::{
+use strata_db::{
     traits::SequencerDatabase,
     types::{BlobEntry, BlobL1Status, ExcludeReason, L1TxEntry, L1TxStatus},
 };
-use alpen_express_state::da_blob::{BlobDest, BlobIntent};
-use alpen_express_status::StatusTx;
-use express_storage::ops::inscription::{Context, InscriptionDataOps};
-use express_tasks::TaskExecutor;
+use strata_state::da_blob::{BlobDest, BlobIntent};
+use strata_status::StatusTx;
+use strata_storage::ops::inscription::{Context, InscriptionDataOps};
+use strata_tasks::TaskExecutor;
 use tracing::*;
 
 use super::config::WriterConfig;
@@ -293,8 +293,8 @@ fn determine_blob_next_status(
 
 #[cfg(test)]
 mod test {
-    use alpen_express_primitives::buf::Buf32;
-    use alpen_test_utils::ArbitraryGenerator;
+    use strata_primitives::buf::Buf32;
+    use test_utils::ArbitraryGenerator;
 
     use super::*;
     use crate::writer::test_utils::get_inscription_ops;

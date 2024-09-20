@@ -1,5 +1,5 @@
-use alpen_express_primitives::{buf::Buf32, hash::sha256d};
 use bitcoin::{consensus::Encodable, Transaction};
+use strata_primitives::{buf::Buf32, hash::sha256d};
 
 /// Computes the [`Txid`](bitcoin::Txid) using [RustCrypto's SHA-2 crate](https://github.com/RustCrypto/hashes/tree/master/sha2)
 /// for the underlying `sha256d` hash function.
@@ -35,8 +35,8 @@ pub fn compute_wtxid(tx: &Transaction) -> Buf32 {
 
 #[cfg(test)]
 mod tests {
-    use alpen_test_utils::bitcoin::get_btc_mainnet_block;
     use bitcoin::{hashes::Hash, Txid, Wtxid};
+    use test_utils::bitcoin::get_btc_mainnet_block;
 
     use super::*;
 

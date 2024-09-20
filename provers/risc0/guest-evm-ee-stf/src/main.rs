@@ -1,4 +1,4 @@
-use express_proofimpl_evm_ee_stf::{process_block_transaction, processor::EvmConfig, ELProofInput};
+use strata_proofimpl_evm_ee_stf::{process_block_transaction, processor::EvmConfig, ELProofInput};
 use revm::primitives::SpecId;
 use risc0_zkvm::guest::env;
 

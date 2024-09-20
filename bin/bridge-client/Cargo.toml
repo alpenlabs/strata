@@ -1,15 +1,15 @@
 [package]
 edition = "2021"
-name = "express-bridge-client"
+name = "strata-bridge-client"
 version = "0.1.0"
 
 [[bin]]
-name = "express-bridge-client"
+name = "strata-bridge-client"
 path = "src/main.rs"
 
 [dependencies]
-alpen-express-common = { workspace = true }
-express-bridge-rpc-api = { workspace = true }
+strata-bridge-rpc-api = { workspace = true }
+strata-common = { workspace = true }
 
 anyhow = { workspace = true }
 argh = { workspace = true }

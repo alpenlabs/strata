@@ -802,43 +802,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "express-proofimpl-evm-ee-stf"
-version = "0.1.0"
-dependencies = [
- "alloy-eips",
- "alloy-rlp",
- "alloy-rlp-derive",
- "alloy-rpc-types",
- "anyhow",
- "express-reth-evm",
- "k256",
- "reth-primitives",
- "reth-trie-common",
- "revm",
- "rlp",
- "serde",
- "thiserror",
-]
-
-[[package]]
-name = "express-reth-evm"
-version = "0.1.0"
-dependencies = [
- "express-reth-primitives",
- "revm",
- "revm-primitives",
-]
-
-[[package]]
-name = "express-reth-primitives"
-version = "0.1.0"
-dependencies = [
- "alloy-sol-types",
- "reth-primitives",
- "serde",
-]
-
-[[package]]
 name = "fastrand"
 version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -933,9 +896,9 @@ dependencies = [
 name = "guest-sp1-evm-ee-stf"
 version = "0.1.0"
 dependencies = [
- "express-proofimpl-evm-ee-stf",
  "revm",
  "sp1-zkvm",
+ "strata-proofimpl-evm-ee-stf",
 ]
 
 [[package]]
@@ -2012,6 +1975,43 @@ name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
+
+[[package]]
+name = "strata-proofimpl-evm-ee-stf"
+version = "0.1.0"
+dependencies = [
+ "alloy-eips",
+ "alloy-rlp",
+ "alloy-rlp-derive",
+ "alloy-rpc-types",
+ "anyhow",
+ "k256",
+ "reth-primitives",
+ "reth-trie-common",
+ "revm",
+ "rlp",
+ "serde",
+ "strata-reth-evm",
+ "thiserror",
+]
+
+[[package]]
+name = "strata-reth-evm"
+version = "0.1.0"
+dependencies = [
+ "revm",
+ "revm-primitives",
+ "strata-reth-primitives",
+]
+
+[[package]]
+name = "strata-reth-primitives"
+version = "0.1.0"
+dependencies = [
+ "alloy-sol-types",
+ "reth-primitives",
+ "serde",
+]
 
 [[package]]
 name = "strum"

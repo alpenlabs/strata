@@ -1,10 +1,10 @@
 [package]
 edition = "2021"
-name = "express-sp1-guest-builder"
+name = "strata-sp1-guest-builder"
 version = "0.1.0"
 
 [dependencies]
-express-sp1-adapter = { path = "../../crates/zkvm/adapters/sp1", features = [
+strata-sp1-adapter = { path = "../../crates/zkvm/adapters/sp1", features = [
   "prover",
 ], optional = true }
 
@@ -12,18 +12,18 @@ express-sp1-adapter = { path = "../../crates/zkvm/adapters/sp1", features = [
 sp1-helper = "1.0.1"
 
 [dev-dependencies]
-alpen-express-primitives.workspace = true
-alpen-express-state.workspace = true
-alpen-test-utils = { workspace = true }
+strata-primitives.workspace = true
+strata-state.workspace = true
+test-utils = { workspace = true }
 bincode = { workspace = true }
 bitcoin = { workspace = true }
 borsh = { workspace = true }
-express-proofimpl-btc-blockspace = { workspace = true }
-express-proofimpl-evm-ee-stf = { workspace = true }
-express-proofimpl-l1-batch = { workspace = true }
-express-zkvm = { workspace = true }
+strata-proofimpl-btc-blockspace = { workspace = true }
+strata-proofimpl-evm-ee-stf = { workspace = true }
+strata-proofimpl-l1-batch = { workspace = true }
+strata-zkvm = { workspace = true }
 hex = { workspace = true }
 
 [features]
 default = []
-prover = ["dep:express-sp1-adapter"]
+prover = ["dep:strata-sp1-adapter"]

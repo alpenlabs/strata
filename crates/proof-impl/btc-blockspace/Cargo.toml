@@ -1,15 +1,15 @@
 [package]
 edition = "2021"
-name = "express-proofimpl-btc-blockspace"
+name = "strata-proofimpl-btc-blockspace"
 version = "0.1.0"
 
 [dependencies]
-alpen-express-primitives = { workspace = true }
 bitcoin = { workspace = true, features = ["serde"] }
 serde = { workspace = true, features = ["derive"] }
 sha2.workspace = true
+strata-primitives = { workspace = true }
 
 [dev-dependencies]
-alpen-test-utils.workspace = true
+test-utils.workspace = true
 hex.workspace = true
 rand.workspace = true

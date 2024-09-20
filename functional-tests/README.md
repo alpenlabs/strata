@@ -1,4 +1,4 @@
-# Express Functional Tests
+# Strata Functional Tests
 
 Tests will be added here when we have more functionality to test.
 

@@ -1,30 +1,30 @@
 [package]
 edition = "2021"
-name = "alpen-express-sequencer"
+name = "strata-sequencer"
 version = "0.1.0"
 
 [[bin]]
-name = "alpen-express-sequencer"
+name = "strata-sequencer"
 path = "src/main.rs"
 
 [dependencies]
-alpen-express-btcio = { workspace = true }
-alpen-express-common = { workspace = true }
-alpen-express-consensus-logic = { workspace = true }
-alpen-express-db = { workspace = true }
-alpen-express-eectl = { workspace = true }
-alpen-express-evmexec = { workspace = true }
-alpen-express-primitives = { workspace = true }
-alpen-express-rocksdb = { workspace = true }
-alpen-express-rpc-api = { workspace = true }
-alpen-express-rpc-types = { workspace = true }
-alpen-express-state = { workspace = true }
-alpen-express-status = { workspace = true }
-express-bridge-relay = { workspace = true }
-express-rpc-utils = { workspace = true }
-express-storage = { workspace = true }
-express-sync = { workspace = true }
-express-tasks = { workspace = true }
+strata-bridge-relay = { workspace = true }
+strata-btcio = { workspace = true }
+strata-common = { workspace = true }
+strata-consensus-logic = { workspace = true }
+strata-db = { workspace = true }
+strata-eectl = { workspace = true }
+strata-evmexec = { workspace = true }
+strata-primitives = { workspace = true }
+strata-rocksdb = { workspace = true }
+strata-rpc-api = { workspace = true }
+strata-rpc-types = { workspace = true }
+strata-rpc-utils = { workspace = true }
+strata-state = { workspace = true }
+strata-status = { workspace = true }
+strata-storage = { workspace = true }
+strata-sync = { workspace = true }
+strata-tasks = { workspace = true }
 
 anyhow = { workspace = true }
 argh = { workspace = true }

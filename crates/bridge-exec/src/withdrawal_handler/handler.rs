@@ -2,9 +2,9 @@
 
 // TODO: there should be a database that tracks the status of tasks.
 
-use alpen_express_primitives::{bridge::OperatorPartialSig, l1::BitcoinAmount};
 use bitcoin::{address::NetworkChecked, secp256k1::schnorr::Signature, Address, Network, OutPoint};
-use express_bridge_tx_builder::withdrawal::CooperativeWithdrawalInfo;
+use strata_bridge_tx_builder::withdrawal::CooperativeWithdrawalInfo;
+use strata_primitives::{bridge::OperatorPartialSig, l1::BitcoinAmount};
 
 use super::errors::WithdrawalExecResult;
 
@@ -13,7 +13,7 @@ use super::errors::WithdrawalExecResult;
 ///
 /// This involves getting unspent UTXOs in the address and finding an outpoint with enough
 /// bitcoins to service the withdrawal via a transaction chain.
-// TODO: pass bitcoin rpc client after <https://github.com/alpenlabs/express/pull/251> is merged.
+// TODO: pass bitcoin rpc client after <https://github.com/alpenlabs/strata/pull/251> is merged.
 pub fn get_operator_outpoint(
     _reserved_address: Address<NetworkChecked>,
     _network: Network,

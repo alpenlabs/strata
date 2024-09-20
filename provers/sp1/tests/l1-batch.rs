@@ -3,17 +3,17 @@
 mod test {
     use std::str::FromStr;
 
-    use alpen_test_utils::bitcoin::get_btc_chain;
     use bitcoin::{params::MAINNET, Address};
-    use express_proofimpl_btc_blockspace::logic::{BlockspaceProofOutput, ScanRuleConfig};
-    use express_proofimpl_l1_batch::{
+    use strata_proofimpl_btc_blockspace::logic::{BlockspaceProofOutput, ScanRuleConfig};
+    use strata_proofimpl_l1_batch::{
         header_verification::HeaderVerificationState,
         logic::{L1BatchProofInput, L1BatchProofOutput},
         timestamp_store::TimestampStore,
     };
-    use express_sp1_adapter::{SP1Host, SP1Verifier};
-    use express_sp1_guest_builder::{GUEST_BTC_BLOCKSPACE_ELF, GUEST_L1_BATCH_ELF};
-    use express_zkvm::{AggregationInput, ProverInput, ProverOptions, ZKVMHost, ZKVMVerifier};
+    use strata_sp1_adapter::{SP1Host, SP1Verifier};
+    use strata_sp1_guest_builder::{GUEST_BTC_BLOCKSPACE_ELF, GUEST_L1_BATCH_ELF};
+    use strata_zkvm::{AggregationInput, ProverInput, ProverOptions, ZKVMHost, ZKVMVerifier};
+    use test_utils::bitcoin::get_btc_chain;
 
     fn get_header_verification_state(height: u32) -> HeaderVerificationState {
         let chain = get_btc_chain(MAINNET.clone());

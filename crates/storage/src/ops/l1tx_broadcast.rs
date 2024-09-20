@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
-use alpen_express_db::{
+use strata_db::{
     traits::*,
     types::{L1TxEntry, L1TxStatus},
     DbResult,
 };
-use alpen_express_primitives::buf::Buf32;
+use strata_primitives::buf::Buf32;
 
 use crate::exec::*;
 

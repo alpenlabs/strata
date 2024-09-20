@@ -1,6 +1,6 @@
 [package]
 edition = "2021"
-name = "express-bridge-sig-manager"
+name = "strata-bridge-sig-manager"
 version = "0.1.0"
 
 [lints]
@@ -13,15 +13,15 @@ rust.unused_must_use = "deny"
 rustdoc.all = "warn"
 
 [dependencies]
-alpen-express-db = { workspace = true }
-alpen-express-primitives = { workspace = true }
-express-storage = { workspace = true }
+strata-db = { workspace = true }
+strata-primitives = { workspace = true }
+strata-storage = { workspace = true }
 
 bitcoin = { workspace = true, features = ["rand-std"] }
 musig2 = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
-alpen-test-utils = { workspace = true }
+test-utils = { workspace = true }
 arbitrary = { workspace = true }
 tokio = { workspace = true }

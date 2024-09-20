@@ -1,9 +1,9 @@
-use alpen_express_primitives::{
+use strata_primitives::{
     block_credential,
     buf::Buf32,
     params::{Params, RollupParams, SyncParams},
 };
-use express_proofimpl_cl_stf::{verify_and_transition, ChainState, L2Block};
+use strata_proofimpl_cl_stf::{verify_and_transition, ChainState, L2Block};
 use risc0_zkvm::guest::env;
 
 fn main() {
@@ -19,7 +19,7 @@ fn main() {
 fn get_rollup_params() -> Params {
     Params {
         rollup: RollupParams {
-            rollup_name: "express".to_string(),
+            rollup_name: "strata".to_string(),
             block_time: 1000,
             cred_rule: block_credential::CredRule::Unchecked,
             horizon_l1_height: 3,

@@ -2,8 +2,8 @@
 //! we'll replace components with real implementations as we go along.
 #![allow(unused)]
 
-use alpen_express_primitives::params::RollupParams;
-use alpen_express_state::{
+use strata_primitives::params::RollupParams;
+use strata_state::{
     block::L1Segment,
     exec_update,
     l1::{self, L1MaturationEntry},

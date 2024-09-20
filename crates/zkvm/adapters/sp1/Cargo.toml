@@ -1,15 +1,15 @@
 [package]
 edition = "2021"
-name = "express-sp1-adapter"
+name = "strata-sp1-adapter"
 version = "0.1.0"
 
 [dependencies]
 anyhow = { workspace = true }
 bincode = { workspace = true }
-express-zkvm = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sp1-sdk = { version = "1.0.1", optional = true }
+strata-zkvm = { workspace = true }
 
 [features]
 default = []

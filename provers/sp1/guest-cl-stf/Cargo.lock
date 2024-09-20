@@ -144,53 +144,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "alpen-express-crypto"
-version = "0.1.0"
-dependencies = [
- "alpen-express-primitives",
- "borsh",
- "secp256k1",
- "sha2",
-]
-
-[[package]]
-name = "alpen-express-primitives"
-version = "0.1.0"
-dependencies = [
- "arbitrary",
- "bitcoin",
- "borsh",
- "digest 0.10.7",
- "hex",
- "musig2",
- "rand",
- "reth-primitives",
- "secp256k1",
- "serde",
- "serde_json",
- "sha2",
- "thiserror",
-]
-
-[[package]]
-name = "alpen-express-state"
-version = "0.1.0"
-dependencies = [
- "alpen-express-crypto",
- "alpen-express-primitives",
- "arbitrary",
- "bitcoin",
- "borsh",
- "digest 0.10.7",
- "express-bridge-tx-builder",
- "hex",
- "num_enum",
- "serde",
- "sha2",
- "tracing",
-]
-
-[[package]]
 name = "anyhow"
 version = "1.0.86"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -852,40 +805,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "express-bridge-tx-builder"
-version = "0.1.0"
-dependencies = [
- "alpen-express-primitives",
- "bitcoin",
- "lazy_static",
- "musig2",
- "serde",
- "thiserror",
-]
-
-[[package]]
-name = "express-chaintsn"
-version = "0.1.0"
-dependencies = [
- "alpen-express-primitives",
- "alpen-express-state",
- "thiserror",
- "tracing",
-]
-
-[[package]]
-name = "express-proofimpl-cl-stf"
-version = "0.1.0"
-dependencies = [
- "alpen-express-crypto",
- "alpen-express-primitives",
- "alpen-express-state",
- "borsh",
- "express-chaintsn",
- "thiserror",
-]
-
-[[package]]
 name = "fastrand"
 version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -980,11 +899,11 @@ dependencies = [
 name = "guest-sp1-cl-stf"
 version = "0.1.0"
 dependencies = [
- "alpen-express-primitives",
  "bitcoin",
  "borsh",
- "express-proofimpl-cl-stf",
  "sp1-zkvm",
+ "strata-primitives",
+ "strata-proofimpl-cl-stf",
 ]
 
 [[package]]
@@ -2010,6 +1929,87 @@ name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
+
+[[package]]
+name = "strata-bridge-tx-builder"
+version = "0.1.0"
+dependencies = [
+ "bitcoin",
+ "lazy_static",
+ "musig2",
+ "serde",
+ "strata-primitives",
+ "thiserror",
+]
+
+[[package]]
+name = "strata-chaintsn"
+version = "0.1.0"
+dependencies = [
+ "strata-primitives",
+ "strata-state",
+ "thiserror",
+ "tracing",
+]
+
+[[package]]
+name = "strata-crypto"
+version = "0.1.0"
+dependencies = [
+ "borsh",
+ "secp256k1",
+ "sha2",
+ "strata-primitives",
+]
+
+[[package]]
+name = "strata-primitives"
+version = "0.1.0"
+dependencies = [
+ "arbitrary",
+ "bitcoin",
+ "borsh",
+ "digest 0.10.7",
+ "hex",
+ "musig2",
+ "rand",
+ "reth-primitives",
+ "secp256k1",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror",
+]
+
+[[package]]
+name = "strata-proofimpl-cl-stf"
+version = "0.1.0"
+dependencies = [
+ "borsh",
+ "strata-chaintsn",
+ "strata-crypto",
+ "strata-primitives",
+ "strata-state",
+ "thiserror",
+]
+
+[[package]]
+name = "strata-state"
+version = "0.1.0"
+dependencies = [
+ "arbitrary",
+ "bitcoin",
+ "borsh",
+ "digest 0.10.7",
+ "hex",
+ "num_enum",
+ "serde",
+ "sha2",
+ "strata-bridge-tx-builder",
+ "strata-crypto",
+ "strata-primitives",
+ "tracing",
+]
 
 [[package]]
 name = "strum"

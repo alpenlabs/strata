@@ -1,15 +1,15 @@
 [package]
 edition = "2021"
-name = "express-risc0-adapter"
+name = "strata-risc0-adapter"
 version = "0.1.0"
 
 [dependencies]
 anyhow = { workspace = true }
 bincode = { workspace = true }
-express-zkvm = { workspace = true }
 risc0-zkvm = { version = "1.0.3", features = ["prove"], optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+strata-zkvm = { workspace = true }
 
 [features]
 default = []

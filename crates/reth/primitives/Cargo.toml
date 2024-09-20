@@ -1,6 +1,6 @@
 [package]
 edition = "2021"
-name = "express-reth-primitives"
+name = "strata-reth-primitives"
 version = "0.1.0"
 
 [dependencies]

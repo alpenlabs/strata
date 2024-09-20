@@ -1,15 +1,15 @@
 use std::sync::Arc;
 
-use alpen_express_db::{
+use rockbound::{
+    utils::get_last, OptimisticTransactionDB as DB, SchemaDBOperationsExt, TransactionRetry,
+};
+use strata_db::{
     errors::DbError,
     traits::{BcastProvider, BcastStore, TxBroadcastDatabase},
     types::L1TxEntry,
     DbResult,
 };
-use alpen_express_primitives::buf::Buf32;
-use rockbound::{
-    utils::get_last, OptimisticTransactionDB as DB, SchemaDBOperationsExt, TransactionRetry,
-};
+use strata_primitives::buf::Buf32;
 
 use super::schemas::{BcastL1TxIdSchema, BcastL1TxSchema};
 use crate::DbOpsConfig;
@@ -60,11 +60,7 @@ impl BcastStore for BroadcastDb {
             .map_err(|e| DbError::TransactionError(e.to_string()))
     }
 
-    fn update_tx_entry(
-        &self,
-        idx: u64,
-        txentry: alpen_express_db::types::L1TxEntry,
-    ) -> DbResult<()> {
+    fn update_tx_entry(&self, idx: u64, txentry: strata_db::types::L1TxEntry) -> DbResult<()> {
         self.db
             .with_optimistic_txn(TransactionRetry::Count(self.ops.retry_count), |tx| {
                 if let Some(id) = tx.get::<BcastL1TxIdSchema>(&idx)? {
@@ -130,14 +126,14 @@ impl TxBroadcastDatabase for BroadcastDatabase {
 
 #[cfg(test)]
 mod tests {
-    use alpen_express_db::{
+    use bitcoin::hashes::Hash;
+    use strata_db::{
         errors::DbError,
         traits::{BcastProvider, BcastStore},
         types::L1TxStatus,
     };
-    use alpen_express_primitives::buf::Buf32;
-    use alpen_test_utils::bitcoin::get_test_bitcoin_txns;
-    use bitcoin::hashes::Hash;
+    use strata_primitives::buf::Buf32;
+    use test_utils::bitcoin::get_test_bitcoin_txns;
 
     use super::*;
     use crate::test_utils::get_rocksdb_tmp_instance;

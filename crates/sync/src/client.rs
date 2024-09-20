@@ -1,9 +1,9 @@
 use std::cmp::min;
 
-use alpen_express_rpc_api::AlpenApiClient;
-use alpen_express_rpc_types::NodeSyncStatus;
-use alpen_express_state::{block::L2BlockBundle, id::L2BlockId};
 use futures::stream::{self, Stream, StreamExt};
+use strata_rpc_api::AlpenApiClient;
+use strata_rpc_types::NodeSyncStatus;
+use strata_state::{block::L2BlockBundle, id::L2BlockId};
 use tracing::error;
 
 #[derive(Debug, thiserror::Error)]

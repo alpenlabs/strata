@@ -1,8 +1,8 @@
 //! Defines the functions that pertain to handling a deposit.
 
-use alpen_express_primitives::bridge::OperatorPartialSig;
 use bitcoin::secp256k1::schnorr::Signature;
-use express_bridge_tx_builder::deposit::DepositInfo;
+use strata_bridge_tx_builder::deposit::DepositInfo;
+use strata_primitives::bridge::OperatorPartialSig;
 
 use super::errors::DepositExecResult;
 

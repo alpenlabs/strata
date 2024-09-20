@@ -11,10 +11,10 @@ pub struct PowParams {
     ///
     /// Note that this value differs from Bitcoin Core's powLimit field in that this value is
     /// attainable, but Bitcoin Core's is not. Specifically, because targets in Bitcoin are always
-    /// rounded to the nearest float expressible in "compact form", not all targets are attainable.
+    /// rounded to the nearest float strataible in "compact form", not all targets are attainable.
     /// Still, this should not affect consensus as the only place where the non-compact form of
     /// this is used in Bitcoin Core's consensus algorithm is in comparison and there are no
-    /// compact-expressible values between Bitcoin Core's and the limit expressed here.
+    /// compact-strataible values between Bitcoin Core's and the limit strataed here.
     pub max_attainable_target: Target,
     /// Expected amount of time to mine one block.
     pub pow_target_spacing: u32,

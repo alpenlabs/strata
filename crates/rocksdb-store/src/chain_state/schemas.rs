@@ -1,4 +1,4 @@
-use alpen_express_state::{chain_state::ChainState, state_op::WriteBatch};
+use strata_state::{chain_state::ChainState, state_op::WriteBatch};
 
 use crate::{define_table_with_seek_key_codec, define_table_without_codec, impl_borsh_value_codec};
 

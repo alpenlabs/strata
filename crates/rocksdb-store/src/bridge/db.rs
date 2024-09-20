@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use alpen_express_db::{
+use rockbound::{OptimisticTransactionDB as DB, SchemaDBOperationsExt, TransactionRetry};
+use strata_db::{
     entities::bridge_tx_state::BridgeTxState, errors::DbError, traits::BridgeTxDatabase, DbResult,
 };
-use alpen_express_primitives::buf::Buf32;
-use rockbound::{OptimisticTransactionDB as DB, SchemaDBOperationsExt, TransactionRetry};
+use strata_primitives::buf::Buf32;
 
 use super::schemas::{BridgeTxStateSchema, BridgeTxStateTxidSchema};
 use crate::DbOpsConfig;
@@ -60,8 +60,8 @@ impl BridgeTxDatabase for BridgeTxRocksDb {
 
 #[cfg(test)]
 mod tests {
-    use alpen_express_db::traits::BridgeTxDatabase;
     use arbitrary::{Arbitrary, Unstructured};
+    use strata_db::traits::BridgeTxDatabase;
 
     use super::*;
     use crate::test_utils::get_rocksdb_tmp_instance;

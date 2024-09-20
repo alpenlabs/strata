@@ -1,4 +1,4 @@
-use alpen_express_state::prelude::*;
+use strata_state::prelude::*;
 use thiserror::Error;
 
 /// Errors for block state transition.

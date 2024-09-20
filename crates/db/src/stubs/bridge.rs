@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::RwLock};
 
-use alpen_express_primitives::buf::Buf32;
+use strata_primitives::buf::Buf32;
 
 use crate::{entities::bridge_tx_state::BridgeTxState, traits::BridgeTxDatabase, DbResult};
 

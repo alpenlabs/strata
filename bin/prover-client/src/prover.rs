@@ -3,14 +3,14 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use alpen_express_db::traits::{ProverDataStore, ProverDatabase};
-use alpen_express_rocksdb::{
+use strata_db::traits::{ProverDataStore, ProverDatabase};
+use strata_proofimpl_evm_ee_stf::ELProofInput;
+use strata_risc0_guest_builder::GUEST_RISC0_EVM_EE_STF_ELF;
+use strata_rocksdb::{
     prover::db::{ProofDb, ProverDB},
     DbOpsConfig,
 };
-use express_proofimpl_evm_ee_stf::ELProofInput;
-use express_risc0_guest_builder::GUEST_RISC0_EVM_EE_STF_ELF;
-use express_zkvm::{Proof, ProverInput as ZKVM_INPUT, ProverOptions, ZKVMHost};
+use strata_zkvm::{Proof, ProverInput as ZKVM_INPUT, ProverOptions, ZKVMHost};
 use tracing::info;
 use uuid::Uuid;
 

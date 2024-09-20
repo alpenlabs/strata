@@ -1,9 +1,9 @@
 //! Logic to check block credentials.
 
-use alpen_express_primitives::buf::{Buf32, Buf64};
 use secp256k1::{schnorr::Signature, Message, XOnlyPublicKey};
 #[cfg(feature = "rand")]
 use secp256k1::{Keypair, Secp256k1, SecretKey};
+use strata_primitives::buf::{Buf32, Buf64};
 
 #[cfg(feature = "rand")]
 pub fn sign_schnorr_sig(msg: &Buf32, sk: &Buf32) -> Buf64 {
@@ -36,9 +36,9 @@ pub fn verify_schnorr_sig(sig: &Buf64, msg: &Buf32, pk: &Buf32) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use alpen_express_primitives::buf::Buf32;
     use rand::Rng;
     use secp256k1::{Secp256k1, SecretKey};
+    use strata_primitives::buf::Buf32;
 
     use super::{sign_schnorr_sig, verify_schnorr_sig};
 

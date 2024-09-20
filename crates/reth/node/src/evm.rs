@@ -1,17 +1,17 @@
-use express_reth_evm::set_evm_handles;
 use reth_chainspec::{ChainSpec, Head};
 use reth_evm::{ConfigureEvm, ConfigureEvmEnv};
 use reth_node_ethereum::EthEvmConfig;
 use reth_primitives::{Header, TransactionSigned};
 use revm::{inspector_handle_register, Database, Evm, EvmBuilder, GetInspector};
 use revm_primitives::{Address, AnalysisKind, Bytes, CfgEnvWithHandlerCfg, Env, TxEnv, U256};
+use strata_reth_evm::set_evm_handles;
 
 /// Custom EVM configuration
 #[derive(Debug, Clone, Copy, Default)]
 #[non_exhaustive]
-pub struct ExpressEvmConfig;
+pub struct StrataEvmConfig;
 
-impl ConfigureEvmEnv for ExpressEvmConfig {
+impl ConfigureEvmEnv for StrataEvmConfig {
     fn fill_cfg_env(
         &self,
         cfg_env: &mut CfgEnvWithHandlerCfg,
@@ -51,7 +51,7 @@ impl ConfigureEvmEnv for ExpressEvmConfig {
     }
 }
 
-impl ConfigureEvm for ExpressEvmConfig {
+impl ConfigureEvm for StrataEvmConfig {
     type DefaultExternalContext<'a> = ();
 
     fn evm<DB: Database>(&self, db: DB) -> Evm<'_, Self::DefaultExternalContext<'_>, DB> {

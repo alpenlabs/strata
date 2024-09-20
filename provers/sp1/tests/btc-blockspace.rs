@@ -4,10 +4,10 @@ mod test {
     use std::str::FromStr;
 
     use bitcoin::Address;
-    use express_proofimpl_btc_blockspace::logic::{BlockspaceProofOutput, ScanRuleConfig};
-    use express_sp1_adapter::{SP1Host, SP1Verifier};
-    use express_sp1_guest_builder::GUEST_BTC_BLOCKSPACE_ELF;
-    use express_zkvm::{ProverInput, ZKVMHost, ZKVMVerifier};
+    use strata_proofimpl_btc_blockspace::logic::{BlockspaceProofOutput, ScanRuleConfig};
+    use strata_sp1_adapter::{SP1Host, SP1Verifier};
+    use strata_sp1_guest_builder::GUEST_BTC_BLOCKSPACE_ELF;
+    use strata_zkvm::{ProverInput, ZKVMHost, ZKVMVerifier};
 
     #[test]
     fn test_btc_blockspace_code_trace_generation() {
@@ -15,7 +15,7 @@ mod test {
             panic!("SP1 prover runs in release mode only");
         }
 
-        let block = alpen_test_utils::bitcoin::get_btc_mainnet_block();
+        let block = test_utils::bitcoin::get_btc_mainnet_block();
         let scan_config = ScanRuleConfig {
             bridge_scriptbufs: vec![Address::from_str(
                 "bcrt1pf73jc96ujch43wp3k294003xx4llukyzvp0revwwnww62esvk7hqvarg98",

@@ -9,9 +9,9 @@ mod errors;
 mod modes;
 pub(crate) mod rpc_server;
 
-use alpen_express_common::logging;
 use args::{Cli, OperationMode};
 use modes::{challenger, operator};
+use strata_common::logging;
 use tracing::info;
 
 #[tokio::main]

@@ -1,6 +1,6 @@
 [package]
 edition = "2021"
-name = "express-prover-client-rpc-api"
+name = "strata-prover-client-rpc-api"
 version = "0.1.0"
 
 [lints]

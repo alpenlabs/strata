@@ -4,11 +4,6 @@ use std::{
 };
 
 use alloy_rpc_types::EIP1186AccountProofResponse;
-use express_proofimpl_evm_ee_stf::{
-    mpt::{self, proofs_to_tries},
-    ELProofInput,
-};
-use express_reth_db::WitnessStore;
 use eyre::eyre;
 use reth_exex::{ExExContext, ExExEvent};
 use reth_node_api::FullNodeComponents;
@@ -16,6 +11,11 @@ use reth_primitives::{Address, TransactionSignedNoHash, B256};
 use reth_provider::{BlockReader, Chain, ExecutionOutcome, StateProviderFactory};
 use reth_revm::{db::BundleState, primitives::FixedBytes};
 use reth_rpc_types_compat::proof::from_primitive_account_proof;
+use strata_proofimpl_evm_ee_stf::{
+    mpt::{self, proofs_to_tries},
+    ELProofInput,
+};
+use strata_reth_db::WitnessStore;
 use tracing::{debug, error};
 
 pub struct ProverWitnessGenerator<Node: FullNodeComponents, S: WitnessStore + Clone> {

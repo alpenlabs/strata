@@ -1,11 +1,11 @@
 [package]
 edition = "2021"
-name = "express-chaintsn"
+name = "strata-chaintsn"
 version = "0.1.0"
 
 [dependencies]
-alpen-express-primitives = { workspace = true }
-alpen-express-state = { workspace = true }
+strata-primitives = { workspace = true }
+strata-state = { workspace = true }
 
 thiserror = { workspace = true }
 tracing = { workspace = true, optional = true }

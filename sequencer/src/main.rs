@@ -6,13 +6,21 @@ use std::{
     time::Duration,
 };
 
-use alpen_express_btcio::{
+use anyhow::Context;
+use bitcoin::Network;
+use config::{ClientMode, Config};
+use format_serde_error::SerdeError;
+use reth_rpc_types::engine::{JwtError, JwtSecret};
+use rockbound::rocksdb;
+use rpc_client::sync_client;
+use strata_bridge_relay::relayer::RelayerHandle;
+use strata_btcio::{
     broadcaster::{spawn_broadcaster_task, L1BroadcastHandle},
     rpc::BitcoinClient,
     writer::{config::WriterConfig, start_inscription_task, InscriptionHandle},
 };
-use alpen_express_common::logging;
-use alpen_express_consensus_logic::{
+use strata_common::logging;
+use strata_consensus_logic::{
     checkpoint::CheckpointHandle,
     duty::{
         types::{DutyBatch, Identity, IdentityData, IdentityKey},
@@ -21,31 +29,23 @@ use alpen_express_consensus_logic::{
     genesis, state_tracker, sync_manager,
     sync_manager::SyncManager,
 };
-use alpen_express_db::traits::Database;
-use alpen_express_evmexec::{fork_choice_state_initial, EngineRpcClient};
-use alpen_express_primitives::{
+use strata_db::traits::Database;
+use strata_evmexec::{fork_choice_state_initial, EngineRpcClient};
+use strata_primitives::{
     block_credential,
     buf::Buf32,
     params::{Params, RollupParams, SyncParams},
 };
-use alpen_express_rocksdb::{
+use strata_rocksdb::{
     broadcaster::db::BroadcastDatabase, sequencer::db::SequencerDB, DbOpsConfig, SeqDb,
 };
-use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer};
-use alpen_express_rpc_types::L1Status;
-use alpen_express_state::csm_status::CsmStatus;
-use alpen_express_status::{create_status_channel, StatusRx, StatusTx};
-use anyhow::Context;
-use bitcoin::Network;
-use config::{ClientMode, Config};
-use express_bridge_relay::relayer::RelayerHandle;
-use express_storage::{managers::checkpoint::CheckpointDbManager, L2BlockManager};
-use express_sync::{self, L2SyncContext, RpcSyncPeer};
-use express_tasks::{ShutdownSignal, TaskManager};
-use format_serde_error::SerdeError;
-use reth_rpc_types::engine::{JwtError, JwtSecret};
-use rockbound::rocksdb;
-use rpc_client::sync_client;
+use strata_rpc_api::{AlpenAdminApiServer, AlpenApiServer};
+use strata_rpc_types::L1Status;
+use strata_state::csm_status::CsmStatus;
+use strata_status::{create_status_channel, StatusRx, StatusTx};
+use strata_storage::{managers::checkpoint::CheckpointDbManager, L2BlockManager};
+use strata_sync::{self, L2SyncContext, RpcSyncPeer};
+use strata_tasks::{ShutdownSignal, TaskManager};
 use thiserror::Error;
 use tokio::sync::{broadcast, oneshot};
 use tracing::*;
@@ -103,7 +103,7 @@ fn load_rollup_params_or_default(path: &Option<PathBuf>) -> Result<RollupParams,
 fn default_rollup_params() -> RollupParams {
     // TODO: load default params from a json during compile time
     RollupParams {
-        rollup_name: "express".to_string(),
+        rollup_name: "strata".to_string(),
         block_time: 1000,
         cred_rule: block_credential::CredRule::Unchecked,
         horizon_l1_height: 3,
@@ -178,54 +178,33 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     // Start runtime for async IO tasks.
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
-        .thread_name("express-rt")
+        .thread_name("strata-rt")
         .build()
         .expect("init: build rt");
 
     // Init thread pool for batch jobs.
     // TODO switch to num_cpus maybe?  we don't want to compete with tokio though
-    let pool = threadpool::ThreadPool::with_name("express-pool".to_owned(), 8);
+    let pool = threadpool::ThreadPool::with_name("strata-pool".to_owned(), 8);
 
     let task_manager = TaskManager::new(rt.handle().clone());
     let task_executor = task_manager.executor();
 
     // Initialize databases.
-    let l1_db = Arc::new(alpen_express_rocksdb::L1Db::new(rbdb.clone(), db_ops));
-    let l2_db = Arc::new(alpen_express_rocksdb::l2::db::L2Db::new(
-        rbdb.clone(),
-        db_ops,
-    ));
-    let sync_ev_db = Arc::new(alpen_express_rocksdb::SyncEventDb::new(
-        rbdb.clone(),
-        db_ops,
-    ));
-    let cs_db = Arc::new(alpen_express_rocksdb::ClientStateDb::new(
-        rbdb.clone(),
-        db_ops,
-    ));
-    let chst_db = Arc::new(alpen_express_rocksdb::ChainStateDb::new(
-        rbdb.clone(),
-        db_ops,
-    ));
-    let bcast_db = Arc::new(alpen_express_rocksdb::BroadcastDb::new(
-        rbdb.clone(),
-        db_ops,
-    ));
-    let checkpt_db = Arc::new(alpen_express_rocksdb::RBCheckpointDB::new(
-        rbdb.clone(),
-        db_ops,
-    ));
-    let database = Arc::new(alpen_express_db::database::CommonDatabase::new(
+    let l1_db = Arc::new(strata_rocksdb::L1Db::new(rbdb.clone(), db_ops));
+    let l2_db = Arc::new(strata_rocksdb::l2::db::L2Db::new(rbdb.clone(), db_ops));
+    let sync_ev_db = Arc::new(strata_rocksdb::SyncEventDb::new(rbdb.clone(), db_ops));
+    let cs_db = Arc::new(strata_rocksdb::ClientStateDb::new(rbdb.clone(), db_ops));
+    let chst_db = Arc::new(strata_rocksdb::ChainStateDb::new(rbdb.clone(), db_ops));
+    let bcast_db = Arc::new(strata_rocksdb::BroadcastDb::new(rbdb.clone(), db_ops));
+    let checkpt_db = Arc::new(strata_rocksdb::RBCheckpointDB::new(rbdb.clone(), db_ops));
+    let database = Arc::new(strata_db::database::CommonDatabase::new(
         l1_db, l2_db, sync_ev_db, cs_db, chst_db, checkpt_db,
     ));
 
     // Set up bridge messaging stuff.
     // TODO move all of this into relayer task init
-    let bridge_msg_db = Arc::new(alpen_express_rocksdb::BridgeMsgDb::new(
-        rbdb.clone(),
-        db_ops,
-    ));
-    let bridge_msg_ctx = express_storage::ops::bridge_relay::Context::new(bridge_msg_db);
+    let bridge_msg_db = Arc::new(strata_rocksdb::BridgeMsgDb::new(rbdb.clone(), db_ops));
+    let bridge_msg_ctx = strata_storage::ops::bridge_relay::Context::new(bridge_msg_db);
     let bridge_msg_ops = Arc::new(bridge_msg_ctx.into_ops(pool.clone()));
 
     // Set up database managers.
@@ -256,7 +235,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     );
 
     let initial_fcs = fork_choice_state_initial(database.clone(), params.rollup())?;
-    let eng_ctl = alpen_express_evmexec::engine::RpcExecEngineCtl::new(
+    let eng_ctl = strata_evmexec::engine::RpcExecEngineCtl::new(
         client,
         initial_fcs,
         rt.handle().clone(),
@@ -266,7 +245,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     // Set up L1 broadcaster.
     let bcastdb = Arc::new(BroadcastDatabase::new(bcast_db));
-    let bcast_ctx = express_storage::ops::l1tx_broadcast::Context::new(bcastdb.clone());
+    let bcast_ctx = strata_storage::ops::l1tx_broadcast::Context::new(bcastdb.clone());
     let bcast_ops = Arc::new(bcast_ctx.into_ops(pool.clone()));
     //status bundles
     let (status_tx, status_rx) = start_status(database.clone(), params.clone())?;
@@ -292,7 +271,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     // Start relayer task.
     // TODO cleanup, this is ugly
-    let start_relayer_fut = express_bridge_relay::relayer::start_bridge_relayer_task(
+    let start_relayer_fut = strata_bridge_relay::relayer::start_bridge_relayer_task(
         bridge_msg_ops,
         status_rx.clone(),
         config.relayer,
@@ -393,10 +372,10 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         // NOTE: this might block for some time during first run with empty db until genesis block
         // is generated
         let mut l2_sync_state =
-            express_sync::block_until_csm_ready_and_init_sync_state(&l2_sync_context)?;
+            strata_sync::block_until_csm_ready_and_init_sync_state(&l2_sync_context)?;
 
         task_executor.spawn_critical_async("l2-sync-manager", async move {
-            express_sync::sync_worker(&mut l2_sync_state, &l2_sync_context)
+            strata_sync::sync_worker(&mut l2_sync_state, &l2_sync_context)
                 .await
                 .unwrap();
         });
@@ -504,8 +483,8 @@ fn open_rocksdb_database(
         fs::create_dir_all(&database_dir)?;
     }
 
-    let dbname = alpen_express_rocksdb::ROCKSDB_NAME;
-    let cfs = alpen_express_rocksdb::STORE_COLUMN_FAMILIES;
+    let dbname = strata_rocksdb::ROCKSDB_NAME;
+    let cfs = strata_rocksdb::STORE_COLUMN_FAMILIES;
     let mut opts = rocksdb::Options::default();
     opts.create_if_missing(true);
     opts.create_missing_column_families(true);

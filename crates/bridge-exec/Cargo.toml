@@ -1,6 +1,6 @@
 [package]
 edition = "2021"
-name = "express-bridge-exec"
+name = "strata-bridge-exec"
 version = "0.1.0"
 
 [lints]
@@ -13,8 +13,8 @@ rust.unused_must_use = "deny"
 rustdoc.all = "warn"
 
 [dependencies]
-alpen-express-primitives = { workspace = true }
-express-bridge-tx-builder = { workspace = true }
+strata-bridge-tx-builder = { workspace = true }
+strata-primitives = { workspace = true }
 
 async-trait = { workspace = true }
 bitcoin = { workspace = true }

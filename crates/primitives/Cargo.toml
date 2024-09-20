@@ -1,6 +1,6 @@
 [package]
 edition = "2021"
-name = "alpen-express-primitives"
+name = "strata-primitives"
 version = "0.1.0"
 
 [dependencies]
@@ -19,7 +19,7 @@ sha2 = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
-alpen-test-utils = { workspace = true }
+test-utils = { workspace = true }
 
 [features]
 default = ["std", "rand"]

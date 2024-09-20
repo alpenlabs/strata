@@ -1,10 +1,10 @@
 use anyhow::Ok;
-use express_zkvm::{Proof, ProverInput, ProverOptions, VerificationKey, ZKVMHost, ZKVMVerifier};
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::to_vec;
 use sp1_sdk::{
     HashableKey, ProverClient, SP1Proof, SP1ProofWithPublicValues, SP1Stdin, SP1VerifyingKey,
 };
+use strata_zkvm::{Proof, ProverInput, ProverOptions, VerificationKey, ZKVMHost, ZKVMVerifier};
 
 /// A host for the `SP1` zkVM that stores the guest program in ELF format.
 /// The `SP1Host` is responsible for program execution and proving

@@ -10,8 +10,8 @@ pub fn open_rocksdb_database() -> anyhow::Result<Arc<rockbound::OptimisticTransa
         fs::create_dir_all(&database_dir)?;
     }
 
-    let dbname = alpen_express_rocksdb::ROCKSDB_NAME;
-    let cfs = alpen_express_rocksdb::PROVER_COLUMN_FAMILIES;
+    let dbname = strata_rocksdb::ROCKSDB_NAME;
+    let cfs = strata_rocksdb::PROVER_COLUMN_FAMILIES;
     let mut opts = rocksdb::Options::default();
     opts.create_if_missing(true);
     opts.create_missing_column_families(true);

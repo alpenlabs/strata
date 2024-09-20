@@ -379,7 +379,7 @@ impl BitcoinAmount {
         Self(value)
     }
 
-    /// Convert from a value expressing integer values of bitcoins to a [`BitcoinAmount`]
+    /// Convert from a value strataing integer values of bitcoins to a [`BitcoinAmount`]
     /// in const context.
     ///
     /// ## Panics

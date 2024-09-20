@@ -166,7 +166,7 @@ pub struct RelayerConfig {
 
 #[cfg(test)]
 mod tests {
-    use alpen_test_utils::ArbitraryGenerator;
+    use test_utils::ArbitraryGenerator;
 
     use super::{BridgeMessage, Scope};
     use crate::buf::Buf64;

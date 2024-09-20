@@ -1,5 +1,5 @@
-use alpen_express_db::{errors::DbError, DbResult};
 use rockbound::{rocksdb, OptimisticTransactionDB as DB, Schema, SchemaDBOperationsExt};
+use strata_db::{errors::DbError, DbResult};
 
 pub fn get_last_idx<T>(db: &DB) -> DbResult<Option<u64>>
 where

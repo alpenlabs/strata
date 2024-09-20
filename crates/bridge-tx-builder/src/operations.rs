@@ -1,7 +1,6 @@
 //! Provides some common, standalone utilities and wrappers over [`bitcoin`] to create
 //! scripts, addresses and transactions.
 
-use alpen_express_primitives::bridge::PublickeyTable;
 use bitcoin::{
     absolute::LockTime,
     key::UntweakedPublicKey,
@@ -15,6 +14,7 @@ use bitcoin::{
     transaction, Address, Amount, Network, OutPoint, ScriptBuf, Transaction, TxIn, TxOut, Witness,
 };
 use musig2::{self, secp256k1::SECP256K1, KeyAggContext};
+use strata_primitives::bridge::PublickeyTable;
 
 use super::{
     constants::{MAGIC_BYTES, UNSPENDABLE_INTERNAL_KEY},

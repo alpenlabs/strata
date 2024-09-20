@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use alpen_express_primitives::{bridge::PublickeyTable, buf::Buf20, l1::BitcoinAddress};
 use bitcoin::{
     secp256k1::{XOnlyPublicKey, SECP256K1},
     taproot::{LeafVersion, TaprootBuilder},
@@ -8,10 +7,11 @@ use bitcoin::{
 };
 use bitcoind::BitcoinD;
 use common::bridge::{setup, BridgeDuty, User, MIN_FEE};
-use express_bridge_tx_builder::prelude::{
+use strata_bridge_tx_builder::prelude::{
     create_tx, create_tx_ins, create_tx_outs, get_aggregated_pubkey, metadata_script,
     n_of_n_script, DepositInfo, BRIDGE_DENOMINATION, UNSPENDABLE_INTERNAL_KEY,
 };
+use strata_primitives::{bridge::PublickeyTable, buf::Buf20, l1::BitcoinAddress};
 use tokio::sync::Mutex;
 use tracing::{debug, event, info, span, Level};
 

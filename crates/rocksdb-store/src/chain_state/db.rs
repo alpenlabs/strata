@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use alpen_express_db::{errors::DbError, traits::*, DbResult};
-use alpen_express_state::state_op;
 use rockbound::{OptimisticTransactionDB, SchemaBatch, SchemaDBOperationsExt};
+use strata_db::{errors::DbError, traits::*, DbResult};
+use strata_state::state_op;
 
 use super::schemas::{ChainStateSchema, WriteBatchSchema};
 use crate::{
@@ -44,10 +44,7 @@ impl ChainstateProvider for ChainStateDb {
         }
     }
 
-    fn get_writes_at(
-        &self,
-        idx: u64,
-    ) -> DbResult<Option<alpen_express_state::state_op::WriteBatch>> {
+    fn get_writes_at(&self, idx: u64) -> DbResult<Option<strata_state::state_op::WriteBatch>> {
         Ok(self.db.get::<WriteBatchSchema>(&idx)?)
     }
 
@@ -55,7 +52,7 @@ impl ChainstateProvider for ChainStateDb {
     fn get_toplevel_state(
         &self,
         idx: u64,
-    ) -> DbResult<Option<alpen_express_state::chain_state::ChainState>> {
+    ) -> DbResult<Option<strata_state::chain_state::ChainState>> {
         Ok(self.db.get::<ChainStateSchema>(&idx)?)
     }
 }
@@ -63,7 +60,7 @@ impl ChainstateProvider for ChainStateDb {
 impl ChainstateStore for ChainStateDb {
     fn write_genesis_state(
         &self,
-        toplevel: &alpen_express_state::chain_state::ChainState,
+        toplevel: &strata_state::chain_state::ChainState,
     ) -> DbResult<()> {
         let genesis_key = 0;
         if self.get_first_idx()?.is_some() || self.get_last_idx()?.is_some() {
@@ -76,7 +73,7 @@ impl ChainstateStore for ChainStateDb {
     fn write_state_update(
         &self,
         idx: u64,
-        batch: &alpen_express_state::state_op::WriteBatch,
+        batch: &strata_state::state_op::WriteBatch,
     ) -> DbResult<()> {
         if self.db.get::<WriteBatchSchema>(&idx)?.is_some() {
             return Err(DbError::OverwriteStateUpdate(idx));
@@ -148,9 +145,9 @@ impl ChainstateStore for ChainStateDb {
 #[cfg(feature = "test_utils")]
 #[cfg(test)]
 mod tests {
-    use alpen_express_state::chain_state::ChainState;
-    use alpen_test_utils::ArbitraryGenerator;
     use state_op::WriteBatch;
+    use strata_state::chain_state::ChainState;
+    use test_utils::ArbitraryGenerator;
 
     use super::*;
     use crate::test_utils::get_rocksdb_tmp_instance;

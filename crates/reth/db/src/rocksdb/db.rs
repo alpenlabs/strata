@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use express_proofimpl_evm_ee_stf::ELProofInput;
 use reth_primitives::B256;
 use rockbound::{SchemaDBOperations, SchemaDBOperationsExt};
+use strata_proofimpl_evm_ee_stf::ELProofInput;
 
 use super::schema::BlockWitnessSchema;
 use crate::{errors::DbError, DbResult, WitnessProvider, WitnessStore};
@@ -61,9 +61,9 @@ impl<DB: SchemaDBOperations> WitnessStore for WitnessDB<DB> {
 
 #[cfg(test)]
 mod tests {
-    use express_proofimpl_evm_ee_stf::{ELProofInput, ELProofPublicParams};
     use rockbound::SchemaDBOperations;
     use serde::Deserialize;
+    use strata_proofimpl_evm_ee_stf::{ELProofInput, ELProofPublicParams};
     use tempfile::TempDir;
 
     use super::*;

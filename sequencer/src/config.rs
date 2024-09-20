@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
-use alpen_express_btcio::reader::config::ReaderConfig;
-use alpen_express_primitives::relay::types::RelayerConfig;
 use bitcoin::Network;
 use serde::Deserialize;
+use strata_btcio::reader::config::ReaderConfig;
+use strata_primitives::relay::types::RelayerConfig;
 
 use crate::args::Args;
 

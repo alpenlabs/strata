@@ -1,14 +1,14 @@
 //! Macro trait def for the `alp_` RPC namespace using jsonrpsee.
-use alpen_express_db::types::L1TxStatus;
-use alpen_express_primitives::bridge::OperatorIdx;
-use alpen_express_rpc_types::{
+use bitcoin::{secp256k1::schnorr::Signature, Transaction, Txid};
+use jsonrpsee::{core::RpcResult, proc_macros::rpc};
+use strata_bridge_tx_builder::prelude::{CooperativeWithdrawalInfo, DepositInfo};
+use strata_db::types::L1TxStatus;
+use strata_primitives::bridge::OperatorIdx;
+use strata_rpc_types::{
     types::{BlockHeader, ClientStatus, DepositEntry, ExecUpdate, L1Status},
     HexBytes, HexBytes32, NodeSyncStatus, RawBlockWitness, RpcCheckpointInfo,
 };
-use alpen_express_state::{bridge_duties::BridgeDuties, id::L2BlockId};
-use bitcoin::{secp256k1::schnorr::Signature, Transaction, Txid};
-use express_bridge_tx_builder::prelude::{CooperativeWithdrawalInfo, DepositInfo};
-use jsonrpsee::{core::RpcResult, proc_macros::rpc};
+use strata_state::{bridge_duties::BridgeDuties, id::L2BlockId};
 
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "alp"))]
 #[cfg_attr(feature = "client", rpc(server, client, namespace = "alp"))]

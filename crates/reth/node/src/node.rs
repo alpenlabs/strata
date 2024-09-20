@@ -9,34 +9,33 @@ use reth_node_ethereum::{
 };
 
 use crate::{
-    engine::ExpressEngineTypes, evm::ExpressEvmConfig,
-    payload_builder::ExpressPayloadServiceBuilder,
+    engine::StrataEngineTypes, evm::StrataEvmConfig, payload_builder::StrataPayloadServiceBuilder,
 };
 
 #[derive(Debug, Clone, Default)]
 #[non_exhaustive]
-pub struct ExpressEthereumNode;
+pub struct StrataEthereumNode;
 
 /// Configure the node types
-impl NodeTypes for ExpressEthereumNode {
+impl NodeTypes for StrataEthereumNode {
     type Primitives = ();
     // use the custom engine types
-    type Engine = ExpressEngineTypes;
+    type Engine = StrataEngineTypes;
 }
 
 /// Implement the Node trait for the custom node
 ///
 /// This provides a preset configuration for the node
-impl<N> Node<N> for ExpressEthereumNode
+impl<N> Node<N> for StrataEthereumNode
 where
-    N: FullNodeTypes<Engine = ExpressEngineTypes>,
+    N: FullNodeTypes<Engine = StrataEngineTypes>,
 {
     type ComponentsBuilder = ComponentsBuilder<
         N,
         EthereumPoolBuilder,
-        ExpressPayloadServiceBuilder,
+        StrataPayloadServiceBuilder,
         EthereumNetworkBuilder,
-        ExpressExecutorBuilder,
+        StrataExecutorBuilder,
         EthereumConsensusBuilder,
     >;
     type AddOns = EthereumAddOns;
@@ -45,9 +44,9 @@ where
         ComponentsBuilder::default()
             .node_types::<N>()
             .pool(EthereumPoolBuilder::default())
-            .payload(ExpressPayloadServiceBuilder::default())
+            .payload(StrataPayloadServiceBuilder::default())
             .network(EthereumNetworkBuilder::default())
-            .executor(ExpressExecutorBuilder::default())
+            .executor(StrataExecutorBuilder::default())
             .consensus(EthereumConsensusBuilder::default())
     }
 }
@@ -55,13 +54,13 @@ where
 /// Builds a regular ethereum block executor that uses the custom EVM.
 #[derive(Debug, Default, Clone, Copy)]
 #[non_exhaustive]
-pub struct ExpressExecutorBuilder;
+pub struct StrataExecutorBuilder;
 
-impl<Node> ExecutorBuilder<Node> for ExpressExecutorBuilder
+impl<Node> ExecutorBuilder<Node> for StrataExecutorBuilder
 where
     Node: FullNodeTypes,
 {
-    type EVM = ExpressEvmConfig;
+    type EVM = StrataEvmConfig;
     type Executor = EthExecutorProvider<Self::EVM>;
 
     async fn build_evm(
@@ -69,8 +68,8 @@ where
         ctx: &BuilderContext<Node>,
     ) -> eyre::Result<(Self::EVM, Self::Executor)> {
         Ok((
-            ExpressEvmConfig::default(),
-            EthExecutorProvider::new(ctx.chain_spec(), ExpressEvmConfig::default()),
+            StrataEvmConfig::default(),
+            EthExecutorProvider::new(ctx.chain_spec(), StrataEvmConfig::default()),
         ))
     }
 }

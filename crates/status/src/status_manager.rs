@@ -1,10 +1,8 @@
 //! Manages and updates unified status bundles
 use std::sync::Arc;
 
-use alpen_express_rpc_types::L1Status;
-use alpen_express_state::{
-    chain_state::ChainState, client_state::ClientState, csm_status::CsmStatus,
-};
+use strata_rpc_types::L1Status;
+use strata_state::{chain_state::ChainState, client_state::ClientState, csm_status::CsmStatus};
 use thiserror::Error;
 use tokio::sync::watch;
 use tracing::warn;

@@ -1,18 +1,24 @@
 use std::sync::Arc;
 
-use alpen_express_btcio::{broadcaster::L1BroadcastHandle, writer::InscriptionHandle};
-use alpen_express_consensus_logic::{checkpoint::CheckpointHandle, sync_manager::SyncManager};
-use alpen_express_db::{
+use async_trait::async_trait;
+use bitcoin::{consensus::deserialize, hashes::Hash, Transaction as BTransaction, Txid};
+use futures::TryFutureExt;
+use jsonrpsee::{core::RpcResult, types::ErrorObjectOwned};
+use strata_bridge_relay::relayer::RelayerHandle;
+use strata_btcio::{broadcaster::L1BroadcastHandle, writer::InscriptionHandle};
+use strata_consensus_logic::{checkpoint::CheckpointHandle, sync_manager::SyncManager};
+use strata_db::{
     traits::{ChainstateProvider, Database, L1DataProvider, L2DataProvider},
     types::{CheckpointProvingStatus, L1TxEntry, L1TxStatus},
 };
-use alpen_express_primitives::{buf::Buf32, hash};
-use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer};
-use alpen_express_rpc_types::{
+use strata_primitives::{buf::Buf32, hash};
+use strata_rpc_api::{AlpenAdminApiServer, AlpenApiServer};
+use strata_rpc_types::{
     BlockHeader, ClientStatus, DaBlob, DepositEntry, DepositState, ExecUpdate, HexBytes,
     HexBytes32, L1Status, NodeSyncStatus, RawBlockWitness, RpcCheckpointInfo,
 };
-use alpen_express_state::{
+use strata_rpc_utils::to_jsonrpsee_error;
+use strata_state::{
     batch::BatchCheckpoint,
     block::L2BlockBundle,
     bridge_ops::WithdrawalIntent,
@@ -23,21 +29,15 @@ use alpen_express_state::{
     id::L2BlockId,
     l1::L1BlockId,
 };
-use alpen_express_status::StatusRx;
-use async_trait::async_trait;
-use bitcoin::{consensus::deserialize, hashes::Hash, Transaction as BTransaction, Txid};
-use express_bridge_relay::relayer::RelayerHandle;
-use express_rpc_utils::to_jsonrpsee_error;
-use express_storage::L2BlockManager;
-use futures::TryFutureExt;
-use jsonrpsee::{core::RpcResult, types::ErrorObjectOwned};
+use strata_status::StatusRx;
+use strata_storage::L2BlockManager;
 use thiserror::Error;
 use tokio::sync::{oneshot, Mutex};
 use tracing::*;
 
 #[derive(Debug, Error)]
 pub enum Error {
-    /// Unsupported RPCs for express.  Some of these might need to be replaced
+    /// Unsupported RPCs for strata.  Some of these might need to be replaced
     /// with standard unsupported errors.
     #[error("unsupported RPC")]
     Unsupported,
@@ -64,7 +64,7 @@ pub enum Error {
     MissingChainstate(u64),
 
     #[error("db: {0}")]
-    Db(#[from] alpen_express_db::errors::DbError),
+    Db(#[from] strata_db::errors::DbError),
 
     #[error("blocking task '{0}' failed for unknown reason")]
     BlockingAbort(String),
@@ -494,12 +494,10 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
             .ok_or(Error::UnknownIdx(deposit_id))?;
 
         let state = match deposit_entry.deposit_state() {
-            alpen_express_state::bridge_state::DepositState::Created(_) => DepositState::Created,
-            alpen_express_state::bridge_state::DepositState::Accepted => DepositState::Accepted,
-            alpen_express_state::bridge_state::DepositState::Dispatched(_) => {
-                DepositState::Dispatched
-            }
-            alpen_express_state::bridge_state::DepositState::Executed => DepositState::Executed,
+            strata_state::bridge_state::DepositState::Created(_) => DepositState::Created,
+            strata_state::bridge_state::DepositState::Accepted => DepositState::Accepted,
+            strata_state::bridge_state::DepositState::Dispatched(_) => DepositState::Dispatched,
+            strata_state::bridge_state::DepositState::Executed => DepositState::Executed,
         };
 
         Ok(DepositEntry {

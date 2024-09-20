@@ -6,7 +6,7 @@ mod node;
 mod payload;
 mod payload_builder;
 
-pub use engine::ExpressEngineTypes;
-pub use express_reth_primitives::WithdrawalIntent;
-pub use node::ExpressEthereumNode;
-pub use payload::{ExpressExecutionPayloadEnvelopeV2, ExpressPayloadAttributes};
+pub use engine::StrataEngineTypes;
+pub use node::StrataEthereumNode;
+pub use payload::{StrataExecutionPayloadEnvelopeV2, StrataPayloadAttributes};
+pub use strata_reth_primitives::WithdrawalIntent;

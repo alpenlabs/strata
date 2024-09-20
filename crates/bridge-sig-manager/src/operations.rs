@@ -1,7 +1,5 @@
 //! Provides wallet-like functionalities for creating nonces and signatures.
 
-use alpen_express_db::entities::bridge_tx_state::BridgeTxState;
-use alpen_express_primitives::bridge::{Musig2SecNonce, OperatorPartialSig, PublickeyTable};
 use bitcoin::{
     hashes::Hash,
     secp256k1::{Keypair, Message, SecretKey},
@@ -10,6 +8,8 @@ use bitcoin::{
     ScriptBuf, TapLeafHash, Transaction, TxOut,
 };
 use musig2::{sign_partial, verify_partial, AggNonce, KeyAggContext, PartialSignature};
+use strata_db::entities::bridge_tx_state::BridgeTxState;
+use strata_primitives::bridge::{Musig2SecNonce, OperatorPartialSig, PublickeyTable};
 
 use crate::errors::{BridgeSigError, BridgeSigResult};
 
@@ -108,11 +108,6 @@ pub fn verify_partial_sig(
 
 #[cfg(test)]
 mod tests {
-    use alpen_express_primitives::bridge::{Musig2PartialSig, OperatorIdx};
-    use alpen_test_utils::bridge::{
-        generate_keypairs, generate_mock_tx_signing_data, generate_mock_unsigned_tx,
-        generate_pubkey_table, permute,
-    };
     use arbitrary::{Arbitrary, Unstructured};
     use bitcoin::{
         key::rand::{self, RngCore},
@@ -120,6 +115,11 @@ mod tests {
         Amount,
     };
     use musig2::{PubNonce, SecNonce};
+    use strata_primitives::bridge::{Musig2PartialSig, OperatorIdx};
+    use test_utils::bridge::{
+        generate_keypairs, generate_mock_tx_signing_data, generate_mock_unsigned_tx,
+        generate_pubkey_table, permute,
+    };
 
     use super::*;
 

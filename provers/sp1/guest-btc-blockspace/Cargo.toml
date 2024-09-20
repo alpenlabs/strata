@@ -7,8 +7,8 @@ version = "0.1.0"
 
 [dependencies]
 bitcoin = { version = "0.32.1" }
-express-proofimpl-btc-blockspace = { path = "../../../crates/proof-impl/btc-blockspace" }
 sp1-zkvm = "1.0.1"
+strata-proofimpl-btc-blockspace = { path = "../../../crates/proof-impl/btc-blockspace" }
 
 [patch.crates-io]
 sha2-v0-10-6 = { git = "https://github.com/sp1-patches/RustCrypto-hashes", package = "sha2", branch = "patch-sha2-v0.10.6" }

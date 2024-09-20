@@ -2,9 +2,9 @@
 
 use std::time;
 
-use alpen_express_primitives::{buf::Buf32, hash::compute_borsh_hash};
-use alpen_express_state::{batch::CheckpointInfo, id::L2BlockId};
 use borsh::{BorshDeserialize, BorshSerialize};
+use strata_primitives::{buf::Buf32, hash::compute_borsh_hash};
+use strata_state::{batch::CheckpointInfo, id::L2BlockId};
 
 /// Describes when we'll stop working to fulfill a duty.
 #[derive(Clone, Debug)]

@@ -4,9 +4,9 @@
 //!  - implementation of RPC client
 //!  - crate for just data structures that represents the JSON responses from Bitcoin core RPC
 
-use alpen_express_state::{batch::CheckpointInfo, bridge_ops::WithdrawalIntent, id::L2BlockId};
 use bitcoin::Txid;
 use serde::{Deserialize, Serialize};
+use strata_state::{batch::CheckpointInfo, bridge_ops::WithdrawalIntent, id::L2BlockId};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HexBytes(#[serde(with = "hex::serde")] pub Vec<u8>);
@@ -111,7 +111,7 @@ pub struct ExecUpdate {
     pub update_idx: u64,
 
     /// Merkle tree root of the contents of the EL payload, in the order it was
-    /// expressed in the block.
+    /// strataed in the block.
     #[serde(with = "hex::serde")]
     pub entries_root: [u8; 32],
 
@@ -161,7 +161,7 @@ pub struct NodeSyncStatus {
     pub tip_height: u64,
 
     /// Last L2 block we've chosen as the current tip.
-    pub tip_block_id: alpen_express_state::id::L2BlockId,
+    pub tip_block_id: strata_state::id::L2BlockId,
 
     /// L2 block that's been finalized and proven on L1.
     pub finalized_block_id: L2BlockId,
