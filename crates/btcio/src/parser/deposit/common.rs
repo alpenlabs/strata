@@ -33,7 +33,7 @@ pub fn check_magic_bytes(instructions: &mut Instructions,config: &DepositTxConfi
     Err(DepositParseError::NoMagicBytes)
 }
 
-pub fn extract_ee_bytes(taproot_spend_info: Vec<u8>,instructions: &mut Instructions,config: &DepositTxConfig) -> Result<TapBlkAndAddr, DepositParseError>{
+pub fn extract_ee_bytes(instructions: &mut Instructions,config: &DepositTxConfig) -> Result<Vec<u8>, DepositParseError>{
     match next_bytes(instructions) {
         Some(ee_bytes) => {
             if ee_bytes.len() as u8 != config.address_length {
@@ -41,7 +41,7 @@ pub fn extract_ee_bytes(taproot_spend_info: Vec<u8>,instructions: &mut Instructi
                     ee_bytes.len() as u8
                 ));
             }
-            return Ok((taproot_spend_info, ee_bytes));
+            return Ok(ee_bytes);
         }
         None => {
             return Err(DepositParseError::NoAddress);

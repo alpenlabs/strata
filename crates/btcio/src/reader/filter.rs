@@ -76,7 +76,7 @@ fn check_and_extract_relevancy(
                     federation_address: federation_address.clone(),
                 };
 
-                if let Ok(deposit_info) = extract_deposit_info(tx, config) {
+                if let Some(deposit_info) = extract_deposit_info(tx, config) {
                     return Some(ParsedTx::Deposit(deposit_info));
                 }
 

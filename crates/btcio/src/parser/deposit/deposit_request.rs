@@ -15,9 +15,9 @@ pub fn extract_deposit_request_info(
     for output in tx.output.iter() {
         if let Ok((tap_blk, ee_address)) =  parse_deposit_request_script(&output.script_pubkey, config) {
             // find the outpoint with taproot address, so that we can extract sent amount from that
-            if let Some((index, _)) = parse_bridge_offer_output(tx, config) {
+            if let Some((index, tx_out)) = parse_bridge_offer_output(tx, config) {
                 return Some(DepositReqeustInfo {
-                    amt: tx.output[index].value.to_sat(),
+                    amt: tx_out.value.to_sat(),
                     deposit_outpoint: index as u32,
                     address: ee_address,
                     control_block: tap_blk,
@@ -47,7 +47,11 @@ pub fn parse_deposit_request_script(
         Some(taproot_spend_info) => {
             // length of control block is 32
             match taproot_spend_info.len() == 32 {
-                true => extract_ee_bytes(taproot_spend_info, &mut instructions, config),
+                true => {
+                    let ee_bytes = extract_ee_bytes(&mut instructions, config)?;
+
+                    Ok((taproot_spend_info, ee_bytes))
+                }
                 false => Err(DepositParseError::ControlBlockLen),
             }
         }
