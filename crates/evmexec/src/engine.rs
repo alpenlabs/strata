@@ -109,7 +109,7 @@ impl<T: EngineRpc> RpcExecEngineInner<T> {
                 Op::Deposit(deposit_data) => Some(Withdrawal {
                     // TODO:
                     // 1. Should this error instead of filtering out invalid entries ?
-                    // 2. Add monotonically incrementing index ? (reth doesnt complain even if
+                    // 2. Add monotonically incrementing index ? (reth doesn't complain even if
                     //    missing)
                     address: address_from_slice(deposit_data.dest_addr())?,
                     amount: sats_to_gwei(deposit_data.amt())?,
