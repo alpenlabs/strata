@@ -126,6 +126,7 @@ lint-check-ws: ## Checks for lint issues in the workspace.
 	--tests \
 	--benches \
 	--all-features \
+	--no-deps \
 	-- -D warnings
 
 .PHONY: lint-fix-ws
@@ -139,6 +140,7 @@ lint-fix-ws: ## Lints the workspace and applies fixes where possible.
 	--benches \
 	--all-features \
 	--fix \
+	--no-deps \
 	-- -D warnings
 
 ensure-codespell:
