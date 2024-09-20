@@ -4,9 +4,9 @@ pub mod seed;
 pub mod signet;
 
 use cmd::{
-    backup::backup, balance::balance, bridge_in::bridge_in, bridge_out::bridge_out, drain::drain,
-    faucet::faucet, receive::receive, refresh::refresh, reset::reset, send::send, Commands,
-    TopLevel,
+    backup::backup, balance::balance, bridge_in::bridge_in, bridge_out::bridge_out,
+    change_pwd::change_pwd, drain::drain, faucet::faucet, receive::receive, refresh::refresh,
+    reset::reset, send::send, Commands, TopLevel,
 };
 
 #[tokio::main(flavor = "current_thread")]
@@ -23,5 +23,6 @@ async fn main() {
         Commands::Send(args) => send(args).await,
         Commands::Receive(args) => receive(args).await,
         Commands::Reset(args) => reset(args).await,
+        Commands::ChangePwd(args) => change_pwd(args).await,
     }
 }

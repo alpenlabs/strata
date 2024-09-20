@@ -3,6 +3,7 @@ use backup::BackupArgs;
 use balance::BalanceArgs;
 use bridge_in::BridgeInArgs;
 use bridge_out::BridgeOutArgs;
+use change_pwd::ChangePwdArgs;
 use drain::DrainArgs;
 use faucet::FaucetArgs;
 use receive::ReceiveArgs;
@@ -14,6 +15,7 @@ pub mod backup;
 pub mod balance;
 pub mod bridge_in;
 pub mod bridge_out;
+pub mod change_pwd;
 pub mod drain;
 pub mod faucet;
 pub mod receive;
@@ -40,5 +42,6 @@ pub enum Commands {
     Faucet(FaucetArgs),
     Send(SendArgs),
     Receive(ReceiveArgs),
+    ChangePwd(ChangePwdArgs),
     Reset(ResetArgs),
 }
