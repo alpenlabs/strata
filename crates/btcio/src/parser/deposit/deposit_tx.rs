@@ -3,7 +3,7 @@
 use alpen_express_primitives::tx::DepositInfo;
 use bitcoin::{opcodes::all::OP_RETURN, ScriptBuf, Transaction, TxOut};
 
-use super::{error::DepositParseError, DepositTxConfig};
+use super::{error::DepositParseError, common::check_magic_bytes, DepositTxConfig};
 use crate::parser::utils::{next_bytes, next_op};
 
 /// Extracts the DepositInfo from the Deposit Transaction
@@ -12,7 +12,7 @@ pub fn extract_deposit_info(
     config: &DepositTxConfig,
 ) -> Result<DepositInfo, DepositParseError> {
     for output in tx.output.iter() {
-        if let Some(Ok(ee_address)) = extract_ee_address(&output.script_pubkey, config) {
+        if let Ok(ee_address) = extract_ee_address(&output.script_pubkey, config) {
             // find the outpoint with taproot address, so that we can extract sent amount from that
             if let Some((index, _)) = parse_bridge_offer_output(tx, config) {
                 return Ok(DepositInfo {
@@ -23,9 +23,6 @@ pub fn extract_deposit_info(
             }
         }
     }
-    // check the amount
-    // check for validty of n of n valid address
-
     Err(DepositParseError::NoAddress)
 }
 
@@ -33,35 +30,27 @@ pub fn extract_deposit_info(
 fn extract_ee_address(
     script: &ScriptBuf,
     config: &DepositTxConfig,
-) -> Option<Result<Vec<u8>, DepositParseError>> {
+) -> Result<Vec<u8>, DepositParseError> {
     let mut instructions = script.instructions();
 
     // check if OP_RETURN is present and if not just discard it
     if next_op(&mut instructions) != Some(OP_RETURN) {
-        return None;
+        return Err(DepositParseError::NoOpReturn);
     }
 
     // magic bytes
-    if let Some(magic_bytes) = next_bytes(&mut instructions) {
-        if magic_bytes != config.magic_bytes {
-            return Some(Err(DepositParseError::MagicBytesMismatch(
-                magic_bytes,
-                config.magic_bytes.clone(),
-            )));
-        }
-    } else {
-        return Some(Err(DepositParseError::NoMagicBytes));
-    }
+    check_magic_bytes(&mut instructions, config)?;
 
     if let Some(ee_bytes) = next_bytes(&mut instructions) {
         if ee_bytes.len() as u8 != config.address_length {
-            return Some(Err(DepositParseError::InvalidDestAddress(
+            return Err(DepositParseError::InvalidDestAddress(
                 ee_bytes.len() as u8
-            )));
+            ));
         }
-        return Some(Ok(ee_bytes));
+        return Ok(ee_bytes);
+    }else {
+        return Err(DepositParseError::NoAddress);
     }
-    None
 }
 
 fn parse_bridge_offer_output<'a>(

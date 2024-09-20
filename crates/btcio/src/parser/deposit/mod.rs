@@ -5,6 +5,7 @@ use bitcoin::Address;
 
 pub mod deposit_request;
 pub mod deposit_tx;
+pub mod common;
 pub mod error;
 
 /// Configuration common among deposit and deposit request transaction

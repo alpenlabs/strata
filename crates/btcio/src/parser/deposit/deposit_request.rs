@@ -1,9 +1,9 @@
 //! parser types for Deposit Tx, and later deposit Request Tx
 
 use alpen_express_primitives::tx::DepositReqeustInfo;
-use bitcoin::{opcodes::all::OP_RETURN, ScriptBuf, Transaction, TxOut};
+use bitcoin::{opcodes::all::OP_RETURN, script::Instructions, ScriptBuf, Transaction};
 
-use super::{error::DepositParseError, DepositTxConfig};
+use super::{common::{check_magic_bytes, parse_bridge_offer_output, TapBlkAndAddr}, error::DepositParseError, DepositTxConfig};
 use crate::parser::utils::{next_bytes, next_op};
 
 /// Extracts the DepositInfo from the Deposit Transaction
@@ -12,7 +12,7 @@ pub fn extract_deposit_request_info(
     config: &DepositTxConfig,
 ) -> Result<DepositReqeustInfo, DepositParseError> {
     for output in tx.output.iter() {
-        if let Some(Ok((tap_blk, ee_address))) =
+        if let Ok((tap_blk, ee_address)) =
             extract_tapscript_block_and_ee_address(&output.script_pubkey, config)
         {
             // find the outpoint with taproot address, so that we can extract sent amount from that
@@ -26,63 +26,50 @@ pub fn extract_deposit_request_info(
             }
         }
     }
-    // check the amount
-    // check for validty of n of n valid address
 
     Err(DepositParseError::NoAddress)
 }
 
-type TapBlkAndAddr = (Vec<u8>, Vec<u8>);
 /// extracts the taprscript block and EE address given that the script is OP_RETURN type and
 /// contains the Magic Bytes
 fn extract_tapscript_block_and_ee_address(
     script: &ScriptBuf,
     config: &DepositTxConfig,
-) -> Option<Result<TapBlkAndAddr, DepositParseError>> {
+) ->Result<TapBlkAndAddr, DepositParseError> {
     let mut instructions = script.instructions();
 
     // check if OP_RETURN is present and if not just discard it
     if next_op(&mut instructions) != Some(OP_RETURN) {
-        return None;
+        return Err(DepositParseError::NoOpReturn);
     }
 
-    // magic bytes
-    if let Some(magic_bytes) = next_bytes(&mut instructions) {
-        if magic_bytes != config.magic_bytes {
-            return Some(Err(DepositParseError::MagicBytesMismatch(
-                magic_bytes,
-                config.magic_bytes.clone(),
-            )));
+    check_magic_bytes(&mut instructions, config)?;
+
+    match next_bytes(&mut instructions) {
+        Some(taproot_spend_info) => {
+            extract_ee_bytes(taproot_spend_info, &mut instructions, config)
         }
-    } else {
-        return Some(Err(DepositParseError::NoMagicBytes));
+        None => return Err(DepositParseError::NoControlBlock),
     }
+}
 
-    if let Some(taproot_spend_info) = next_bytes(&mut instructions) {
-        if let Some(ee_bytes) = next_bytes(&mut instructions) {
+fn extract_ee_bytes(taproot_spend_info: Vec<u8>,instructions: &mut Instructions,config: &DepositTxConfig) -> Result<TapBlkAndAddr, DepositParseError>{
+    match next_bytes(instructions) {
+        Some(ee_bytes) => {
             if ee_bytes.len() as u8 != config.address_length {
-                return Some(Err(DepositParseError::InvalidDestAddress(
+                return Err(DepositParseError::InvalidDestAddress(
                     ee_bytes.len() as u8
-                )));
+                ));
             }
-            return Some(Ok((taproot_spend_info, ee_bytes)));
+            return Ok((taproot_spend_info, ee_bytes));
+        }
+        None => {
+            return Err(DepositParseError::NoAddress);
         }
     }
 
-    None
 }
 
-fn parse_bridge_offer_output<'a>(
-    tx: &'a Transaction,
-    config: &DepositTxConfig,
-) -> Option<(usize, &'a TxOut)> {
-    tx.output.iter().enumerate().find(|(_, txout)| {
-        config
-            .federation_address
-            .matches_script_pubkey(&txout.script_pubkey)
-            && txout.value.to_sat() == config.deposit_quantity
-    })
-}
 
 #[cfg(test)]
 mod tests {

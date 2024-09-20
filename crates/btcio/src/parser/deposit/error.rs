@@ -2,8 +2,8 @@ use thiserror::Error;
 
 #[derive(Debug, Clone, Error)]
 pub enum DepositParseError {
-    #[error("No OP_RETURN on output {0} of tx")]
-    NoOpReturn(u32),
+    #[error("No OP_RETURN")]
+    NoOpReturn,
 
     #[error("No Magic Bytes")]
     NoMagicBytes,
@@ -19,4 +19,7 @@ pub enum DepositParseError {
 
     #[error("expected amount {0}")]
     ExpectedAmount(u64),
+
+    #[error("No Taproot control block")]
+    NoControlBlock,
 }
