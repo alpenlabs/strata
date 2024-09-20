@@ -13,11 +13,7 @@ use tracing::*;
 
 use crate::recent_msg_tracker::RecentMessageTracker;
 
-/// Manages message validation i.e processing, deduplication, and operator bandwidth enforcement.
-///
-/// The [`MsgManager`] struct is responsible for handling incoming messages, validating them
-/// against the current chain state, enforcing operator bandwidth limits to prevent spamming,
-/// and maintaining a record of processed messages to avoid duplication.
+/// Contains bookkeeping for deduplicating messages and persisting them to disk.
 pub struct RelayerState {
     /// Relayer configuration.
     config: RelayerConfig,
