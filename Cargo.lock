@@ -942,6 +942,7 @@ dependencies = [
  "async-trait",
  "bitcoin",
  "borsh",
+ "express-bridge-relay",
  "express-rpc-utils",
  "express-storage",
  "express-sync",
@@ -3733,6 +3734,24 @@ dependencies = [
  "serde",
  "thiserror",
  "toml 0.5.11",
+]
+
+[[package]]
+name = "express-bridge-relay"
+version = "0.1.0"
+dependencies = [
+ "alpen-express-btcio",
+ "alpen-express-primitives",
+ "alpen-express-state",
+ "alpen-express-status",
+ "alpen-test-utils",
+ "anyhow",
+ "bitcoin",
+ "express-storage",
+ "express-tasks",
+ "sha2 0.10.8",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

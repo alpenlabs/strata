@@ -26,8 +26,10 @@ use alpen_express_state::{
 use alpen_express_status::StatusRx;
 use async_trait::async_trait;
 use bitcoin::{consensus::deserialize, hashes::Hash, Transaction as BTransaction, Txid};
+use express_bridge_relay::relayer::RelayerHandle;
 use express_rpc_utils::to_jsonrpsee_error;
 use express_storage::L2BlockManager;
+use futures::TryFutureExt;
 use jsonrpsee::{core::RpcResult, types::ErrorObjectOwned};
 use thiserror::Error;
 use tokio::sync::{oneshot, Mutex};
@@ -141,9 +143,11 @@ pub struct AlpenRpcImpl<D> {
     stop_tx: Mutex<Option<oneshot::Sender<()>>>,
     l2_block_manager: Arc<L2BlockManager>,
     checkpoint_handle: Arc<CheckpointHandle>,
+    relayer_handle: Arc<RelayerHandle>,
 }
 
 impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         status_rx: Arc<StatusRx>,
         database: Arc<D>,
@@ -151,7 +155,8 @@ impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
         bcast_handle: Arc<L1BroadcastHandle>,
         stop_tx: oneshot::Sender<()>,
         l2_block_manager: Arc<L2BlockManager>,
-        checkpoint_manager: Arc<CheckpointHandle>,
+        checkpoint_handle: Arc<CheckpointHandle>,
+        relayer_handle: Arc<RelayerHandle>,
     ) -> Self {
         Self {
             status_rx,
@@ -160,7 +165,8 @@ impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
             bcast_handle,
             stop_tx: Mutex::new(Some(stop_tx)),
             l2_block_manager,
-            checkpoint_handle: checkpoint_manager,
+            checkpoint_handle,
+            relayer_handle,
         }
     }
 
@@ -571,13 +577,31 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         Ok(block)
     }
 
-    async fn get_msgs_by_scope(&self, _scope: HexBytes) -> RpcResult<Vec<HexBytes>> {
-        warn!("alp_getBridgeMsgsByScope not implemented");
-        Ok(Vec::new())
+    async fn get_msgs_by_scope(&self, scope: HexBytes) -> RpcResult<Vec<HexBytes>> {
+        let msgs = self
+            .relayer_handle
+            .get_message_by_scope_async(scope.0)
+            .map_err(to_jsonrpsee_error("querying relayer db"))
+            .await?;
+
+        let mut raw_msgs = Vec::new();
+        for m in msgs {
+            match borsh::to_vec(&m) {
+                Ok(m) => raw_msgs.push(HexBytes(m)),
+                Err(_) => {
+                    let msg_id = m.compute_id();
+                    warn!(%msg_id, "failed to serialize bridge msg");
+                }
+            }
+        }
+
+        Ok(raw_msgs)
     }
 
-    async fn submit_bridge_msg(&self, _raw_msg: HexBytes) -> RpcResult<()> {
-        warn!("alp_submitBridgeMsg not implemented");
+    async fn submit_bridge_msg(&self, raw_msg: HexBytes) -> RpcResult<()> {
+        let msg =
+            borsh::from_slice(&raw_msg.0).map_err(to_jsonrpsee_error("parse bridge message"))?;
+        self.relayer_handle.submit_message_async(msg).await;
         Ok(())
     }
 

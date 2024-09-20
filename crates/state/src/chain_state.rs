@@ -3,8 +3,11 @@ use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::{
-    bridge_ops, bridge_state, bridge_state::DepositsTable, exec_env, exec_env::ExecEnvState, l1,
-    l1::L1ViewState, prelude::*,
+    bridge_ops,
+    bridge_state::{self, DepositsTable, OperatorTable},
+    exec_env::{self, ExecEnvState},
+    l1::{self, L1ViewState},
+    prelude::*,
 };
 
 /// L2 blockchain state.  This is the state computed as a function of a
@@ -100,6 +103,10 @@ impl ChainState {
             deposits_hash: compute_borsh_hash(&self.deposits_table),
         };
         compute_borsh_hash(&hashed_state)
+    }
+
+    pub fn operator_table(&self) -> &OperatorTable {
+        &self.operator_table
     }
 
     pub fn deposits_table(&self) -> &DepositsTable {

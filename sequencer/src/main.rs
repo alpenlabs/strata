@@ -38,6 +38,7 @@ use alpen_express_status::{create_status_channel, StatusRx, StatusTx};
 use anyhow::Context;
 use bitcoin::Network;
 use config::{ClientMode, Config};
+use express_bridge_relay::relayer::RelayerHandle;
 use express_storage::{managers::checkpoint::CheckpointDbManager, L2BlockManager};
 use express_sync::{self, L2SyncContext, RpcSyncPeer};
 use express_tasks::{ShutdownSignal, TaskManager};
@@ -218,6 +219,15 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         l1_db, l2_db, sync_ev_db, cs_db, chst_db, checkpt_db,
     ));
 
+    // Set up bridge messaging stuff.
+    // TODO move all of this into relayer task init
+    let bridge_msg_db = Arc::new(alpen_express_rocksdb::BridgeMsgDb::new(
+        rbdb.clone(),
+        db_ops,
+    ));
+    let bridge_msg_ctx = express_storage::ops::bridge_relay::Context::new(bridge_msg_db);
+    let bridge_msg_ops = Arc::new(bridge_msg_ctx.into_ops(pool.clone()));
+
     // Set up database managers.
     let l2_block_manager = Arc::new(L2BlockManager::new(pool.clone(), database.clone()));
     let checkpoint_manager = Arc::new(CheckpointDbManager::new(pool.clone(), database.clone()));
@@ -275,10 +285,22 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let sync_man = Arc::new(sync_man);
     let mut inscription_handler = None;
 
-    // start broadcast task
+    // Start broadcast task.
     let bcast_handle = spawn_broadcaster_task(&task_executor, btc_rpc.clone(), bcast_ops);
     let bcast_handle = Arc::new(bcast_handle);
     let (status_tx, status_rx) = (sync_man.status_tx(), sync_man.status_rx());
+
+    // Start relayer task.
+    // TODO cleanup, this is ugly
+    let start_relayer_fut = express_bridge_relay::relayer::start_bridge_relayer_task(
+        bridge_msg_ops,
+        status_rx.clone(),
+        config.relayer,
+        &task_executor,
+    );
+
+    // FIXME this init is screwed up because of the order we start things
+    let relayer_handle = rt.block_on(start_relayer_fut)?;
 
     // If the sequencer key is set, start the sequencer duties task.
     if let ClientMode::Sequencer(sequencer_config) = &config.client.client_mode {
@@ -302,6 +324,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             config.bitcoind_rpc.network,
             params.rollup().rollup_name.clone(),
         )?;
+
         // Initialize SequencerDatabase
         let seqdb = Arc::new(SeqDb::new(rbdb, db_ops));
         let dbseq = Arc::new(SequencerDB::new(seqdb));
@@ -393,6 +416,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             bcast_handle,
             l2_block_manager,
             checkpoint_handle,
+            relayer_handle,
         )
         .await
         .unwrap()
@@ -419,10 +443,11 @@ async fn start_rpc<D: Database + Send + Sync + 'static>(
     bcast_handle: Arc<L1BroadcastHandle>,
     l2_block_manager: Arc<L2BlockManager>,
     checkpt_handle: Arc<CheckpointHandle>,
+    relayer_handle: Arc<RelayerHandle>,
 ) -> anyhow::Result<()> {
     let (stop_tx, stop_rx) = oneshot::channel();
 
-    // Init RPC methods.
+    // Init RPC impls.
     let alp_rpc = rpc_server::AlpenRpcImpl::new(
         status_rx.clone(),
         database.clone(),
@@ -431,10 +456,13 @@ async fn start_rpc<D: Database + Send + Sync + 'static>(
         stop_tx,
         l2_block_manager.clone(),
         checkpt_handle,
+        relayer_handle,
     );
 
-    let mut methods = alp_rpc.into_rpc();
     let admin_rpc = rpc_server::AdminServerImpl::new(inscription_handler, bcast_handle);
+
+    // Construct the full methods table.
+    let mut methods = alp_rpc.into_rpc();
     methods.merge(admin_rpc.into_rpc())?;
 
     let rpc_port = config.client.rpc_port;
@@ -510,6 +538,7 @@ fn load_seqkey(path: &PathBuf) -> anyhow::Result<IdentityData> {
 }
 
 // initializes the status bundle that we can pass around cheaply for as name suggests status/metrics
+// FIXME this is just supposed to handle the status trackers, why are we doing database init here?
 fn start_status<D: Database + Send + Sync + 'static>(
     database: Arc<D>,
     params: Arc<Params>,
