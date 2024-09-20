@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     constants::{MUSIG2_PARTIAL_SIG_SIZE, NONCE_SEED_SIZE, PUB_NONCE_SIZE},
-    l1::{BitcoinPsbt, SpendInfo},
+    l1::{BitcoinPsbt, TaprootSpendPath},
 };
 
 /// The ID of an operator.
@@ -161,18 +161,6 @@ impl<'a> Arbitrary<'a> for Musig2PartialSig {
     }
 }
 
-/// A table of [`musig2`] [`PartialSignature`]'s per operator.
-#[derive(
-    Debug, Clone, PartialEq, Eq, Arbitrary, Serialize, Deserialize, BorshSerialize, BorshDeserialize,
-)]
-pub struct PartialSigTable(pub BTreeMap<OperatorIdx, Musig2PartialSig>);
-
-impl From<BTreeMap<OperatorIdx, Musig2PartialSig>> for PartialSigTable {
-    fn from(value: BTreeMap<OperatorIdx, Musig2PartialSig>) -> Self {
-        Self(value)
-    }
-}
-
 /// All the information necessary to produce a valid signature for a transaction in the bridge.
 #[derive(Debug, Clone)]
 pub struct TxSigningData {
@@ -180,12 +168,13 @@ pub struct TxSigningData {
     /// fields empty).
     pub psbt: BitcoinPsbt,
 
-    /// The list of witness elements required to spend each input in the unsigned transaction
+    /// The spend path for the unsigned taproot input in the transaction
     /// respectively.
     ///
-    /// If a key-spend path is being used, there may be no [`SpendInfo`] as this kind of spending
-    /// only requires the signature in the witness stack. See [BIP 341](https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki#constructing-and-spending-taproot-outputs).
-    pub spend_infos: Vec<Option<SpendInfo>>,
+    /// If a script-path path is being used, the witness stack needs the script being spent and the
+    /// control block in addition to the signature.
+    /// See [BIP 341](https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki#constructing-and-spending-taproot-outputs).
+    pub spend_path: TaprootSpendPath,
 }
 
 /// Information regarding the signature which includes the schnorr signature itself as well as the

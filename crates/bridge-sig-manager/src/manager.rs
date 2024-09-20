@@ -9,7 +9,7 @@ use alpen_express_primitives::{
         Musig2PartialSig, Musig2PubNonce, OperatorIdx, OperatorPartialSig, PublickeyTable,
         TxSigningData,
     },
-    l1::SpendInfo,
+    l1::TaprootSpendPath,
 };
 use bitcoin::{
     hashes::Hash,
@@ -91,6 +91,7 @@ impl SignatureManager {
         let pub_nonce = sec_nonce.public_nonce();
 
         let mut tx_state = BridgeTxState::new(tx_signing_data, pubkey_table, sec_nonce.into())?;
+
         tx_state.add_nonce(&self.index, pub_nonce.into())?;
 
         self.db_ops.put_tx_state_async(txid, tx_state).await?;
@@ -202,84 +203,58 @@ impl SignatureManager {
     ///
     /// A flag indicating whether the [`alpen_express_primitives::l1::BitcoinPsbt`] being tracked in
     /// the [`BridgeTxState`] has become fully signed after adding the signature.
-    pub async fn add_own_partial_sig(
-        &self,
-        txid: &Txid,
-        keypath_spend_only: bool,
-    ) -> BridgeSigResult<bool> {
+    pub async fn add_own_partial_sig(&self, txid: &Txid) -> BridgeSigResult<bool> {
         let mut tx_state = self.get_tx_state(txid).await?;
 
         let aggregated_nonce = self.get_aggregated_nonce(&tx_state)?;
 
         let unsigned_tx = tx_state.unsigned_tx().clone();
-        let inputs = unsigned_tx.input.clone();
 
         let prevouts = tx_state.prevouts();
 
-        let mut is_fully_signed = false;
-        for (input_index, _) in inputs.iter().enumerate() {
-            let spend_infos = tx_state.spend_infos();
-            let spend_info_for_input = &spend_infos[input_index];
+        let spend_info = tx_state.spend_info();
+        let keypath_spend_only = matches!(spend_info, TaprootSpendPath::Key);
 
-            let mut tx = unsigned_tx.clone();
-            let mut sighash_cache = SighashCache::new(&mut tx);
+        let mut tx = unsigned_tx.clone();
+        let mut sighash_cache = SighashCache::new(&mut tx);
 
-            let message = create_message_hash(
-                &mut sighash_cache,
-                input_index,
-                &prevouts,
-                spend_info_for_input,
-            )?;
+        let message = create_message_hash(&mut sighash_cache, &prevouts, spend_info)?;
 
-            let message = message.as_ref();
+        let message = message.as_ref();
 
-            let signature = sign_state_partial(
-                tx_state.pubkeys(),
-                tx_state.secnonce(),
-                &self.keypair,
-                &aggregated_nonce,
-                message,
-                keypath_spend_only,
-            )?;
+        let signature = sign_state_partial(
+            tx_state.pubkeys(),
+            tx_state.secnonce(),
+            &self.keypair,
+            &aggregated_nonce,
+            message,
+            keypath_spend_only,
+        )?;
 
-            let own_signature_info = OperatorPartialSig::new(signature.into(), self.index);
-            verify_partial_sig(
-                &tx_state,
-                &own_signature_info,
-                &aggregated_nonce,
-                message,
-                keypath_spend_only,
-            )?;
+        let own_signature_info = OperatorPartialSig::new(signature.into(), self.index);
+        verify_partial_sig(
+            &tx_state,
+            &own_signature_info,
+            &aggregated_nonce,
+            message,
+            keypath_spend_only,
+        )?;
 
-            is_fully_signed = tx_state.add_signature(own_signature_info, input_index)?;
-
-            // It may be that adding one's own signature causes the psbt to be completely signed.
-            // This can happen if this bridge client receives the transaction information later than
-            // other bridge clients.
-            if is_fully_signed {
-                break;
-            }
-        }
+        let is_fully_signed = tx_state.add_signature(own_signature_info)?;
 
         self.db_ops.put_tx_state_async(*txid, tx_state).await?;
 
         Ok(is_fully_signed)
     }
 
-    /// Get this bridge client's own signature for the given input.
+    /// Get this bridge client's own signature.
     pub async fn get_own_partial_sig(
         &self,
         txid: &Txid,
-        input_index: usize,
     ) -> BridgeSigResult<Option<Musig2PartialSig>> {
         let tx_state = self.get_tx_state(txid).await?;
 
-        let collected_sig_for_input = tx_state
-            .collected_sigs()
-            .nth(input_index)
-            .expect("own signature must exist for the input");
-
-        Ok(collected_sig_for_input.get(&self.index).copied())
+        Ok(tx_state.collected_sigs().get(&self.index).copied())
     }
 
     /// Add a partial signature for a [`BridgeTxState`].
@@ -291,10 +266,6 @@ impl SignatureManager {
     /// Please refer to MuSig2 partial signature aggregation section in
     /// [BIP 327](https://github.com/bitcoin/bips/blob/master/bip-0327.mediawiki).
     ///
-    /// The `keypath_spend_only` parameter determines whether to use the tweaked or untweaked key
-    /// aggregation. Tweaking is necessary when spending from key-path only spend taproot (for
-    /// example, in the case of _spending_ the Deposit UTXO during withdrawal).
-    ///
     /// # Returns
     ///
     /// A flag indicating whether the [`alpen_express_primitives::l1::BitcoinPsbt`] being tracked in
@@ -303,32 +274,21 @@ impl SignatureManager {
         &self,
         txid: &Txid,
         signature_info: OperatorPartialSig,
-        input_index: usize,
-        keypath_spend_only: bool,
     ) -> BridgeSigResult<bool> {
         let mut tx_state = self.get_tx_state(txid).await?;
-
-        if input_index.ge(&tx_state.unsigned_tx().input.len()) {
-            return Err(BridgeSigError::InputIndexOutOfBounds);
-        }
 
         let aggregated_nonce = self.get_aggregated_nonce(&tx_state)?;
 
         let mut unsigned_tx = tx_state.unsigned_tx().clone();
         let mut sighash_cache = SighashCache::new(&mut unsigned_tx);
 
-        let spend_infos = tx_state.spend_infos();
-        let spend_info_for_input = &spend_infos[input_index];
+        let spend_info = tx_state.spend_info();
         let prevouts = tx_state.prevouts();
 
-        let message = create_message_hash(
-            &mut sighash_cache,
-            input_index,
-            &prevouts,
-            spend_info_for_input,
-        )?;
+        let message = create_message_hash(&mut sighash_cache, &prevouts, spend_info)?;
         let message = message.as_ref();
 
+        let keypath_spend_only = matches!(spend_info, TaprootSpendPath::Key);
         verify_partial_sig(
             &tx_state,
             &signature_info,
@@ -337,7 +297,7 @@ impl SignatureManager {
             keypath_spend_only,
         )?;
 
-        tx_state.add_signature(signature_info, input_index)?;
+        tx_state.add_signature(signature_info)?;
         self.db_ops
             .put_tx_state_async(*txid, tx_state.clone())
             .await?;
@@ -363,11 +323,7 @@ impl SignatureManager {
     /// 6. The aggregated signature is not valid for the given message and aggregated pubkey.
     /// 7. A fully signed transaction could not be created from the [`bitcoin::Psbt`].
     /// 8. A tweak could not be applied to the key aggregation context for `keypath_spend_only`.
-    pub async fn get_fully_signed_transaction(
-        &self,
-        txid: &Txid,
-        keypath_spend_only: bool,
-    ) -> BridgeSigResult<Transaction> {
+    pub async fn get_fully_signed_transaction(&self, txid: &Txid) -> BridgeSigResult<Transaction> {
         let tx_state = self.get_tx_state(txid).await?;
 
         // this fails if not all nonces have been collected yet.
@@ -377,7 +333,9 @@ impl SignatureManager {
             return Err(BridgeSigError::NotFullySigned);
         }
 
-        let spend_infos = tx_state.spend_infos();
+        let spend_info = tx_state.spend_info();
+        let keypath_spend_only = matches!(spend_info, TaprootSpendPath::Key);
+
         let prevouts = &tx_state.prevouts();
 
         let key_agg_ctx = KeyAggContext::new(tx_state.pubkeys().0.values().clone().copied())?;
@@ -392,82 +350,74 @@ impl SignatureManager {
 
         let mut psbt = tx_state.psbt().inner().clone();
 
-        let mut partial_sigs_all_inputs = tx_state.ordered_sigs();
+        let partial_signatures = tx_state.ordered_sigs();
 
-        for (input_index, input) in psbt.inputs.iter_mut().enumerate() {
-            let spend_info_for_input = spend_infos[input_index].clone();
+        let input = psbt.inputs.first_mut().expect("input must exist");
+        let spend_info = spend_info.clone();
 
-            // OPTIMIZE: this message is being created every time we sign a transaction in
-            // `add_own_signature` *and* here as well. This is suboptimal computationally but the
-            // alternative is to store it in the database for every input on every transaction which
-            // is also wasteful (also involves creating a wrapper around `Message` to
-            // implement serde*, borsh* and arbitrary traits).
+        // OPTIMIZE: this message is being created every time we sign a transaction in
+        // `add_own_signature` *and* here as well. This is suboptimal computationally but the
+        // alternative is to store it in the database for every input on every transaction which
+        // is also wasteful (also involves creating a wrapper around `Message` to
+        // implement serde*, borsh* and arbitrary traits).
 
-            let message = create_message_hash(
-                &mut sighash_cache,
-                input_index,
-                prevouts,
-                &spend_info_for_input,
-            )?;
+        let message = create_message_hash(&mut sighash_cache, prevouts, &spend_info)?;
 
-            let message_bytes = message.as_ref();
+        let message_bytes = message.as_ref();
 
-            let partial_signatures = partial_sigs_all_inputs
-                // NOTE: this mutates the iterator discarding the previous entries but that should
-                // be fine in this case as we iterate sequentially over all the inputs
-                .nth(input_index)
-                .expect("partial signature collection should exist at the input index");
+        let signature: Signature = aggregate_partial_signatures(
+            &tweaked_key_agg_ctx,
+            &aggregated_nonce,
+            partial_signatures,
+            message_bytes,
+        )?;
 
-            let signature: Signature = aggregate_partial_signatures(
-                &tweaked_key_agg_ctx,
-                &aggregated_nonce,
-                partial_signatures,
-                message_bytes,
-            )?;
+        // Verify that the aggregated signature corresponds to the aggregated pubkey
+        // in the P2TR address. In the keypath spend, the verification is done against the
+        // tweaked pubkey and in the script path spend, it is done against the untweaked pubkey
+        // (as the pubkey is present in the script being spent).
+        let aggregated_pubkey: PublicKey = tweaked_key_agg_ctx.aggregated_pubkey_untweaked();
+        let x_only_pubkey: XOnlyPublicKey = aggregated_pubkey.x_only_public_key().0;
+        let x_only_pubkey: XOnlyPublicKey = if keypath_spend_only {
+            x_only_pubkey.tap_tweak(SECP256K1, None).0.into()
+        } else {
+            x_only_pubkey
+        };
 
-            let aggregated_pubkey: PublicKey = tweaked_key_agg_ctx.aggregated_pubkey_untweaked();
-            let x_only_pubkey: XOnlyPublicKey = aggregated_pubkey.x_only_public_key().0;
-            let x_only_pubkey: XOnlyPublicKey = if keypath_spend_only {
-                x_only_pubkey.tap_tweak(SECP256K1, None).0.into()
-            } else {
-                x_only_pubkey
-            };
+        assert!(
+            SECP256K1
+                .verify_schnorr(&signature, &message, &x_only_pubkey)
+                .is_ok(),
+            "schnorr verification should succeed"
+        );
 
-            assert!(
-                SECP256K1
-                    .verify_schnorr(&signature, &message, &x_only_pubkey)
-                    .is_ok(),
-                "schnorr verification should succeed"
-            );
+        let mut witness = Witness::new();
+        witness.push(signature.as_ref());
 
-            let mut witness = Witness::new();
-            witness.push(signature.as_ref());
-
-            // script spend path requires two additional witness elements --
-            // the script and the control block.
-            if let Some(SpendInfo {
-                script_buf,
-                control_block,
-            }) = spend_info_for_input
-            {
-                witness.push(script_buf.to_bytes());
-                witness.push(control_block.serialize());
-            }
-
-            // Finalize the psbt as per <https://github.com/rust-bitcoin/rust-bitcoin/blob/bitcoin-0.32.1/bitcoin/examples/taproot-psbt.rs#L315-L327>
-            // NOTE: their ecdsa example states that we should use `miniscript` to finalize
-            // PSBTs in production but they don't mention this for taproot.
-
-            // Set final witness
-            input.final_script_witness = Some(witness);
-
-            // And clear all other fields as per the spec
-            input.partial_sigs = BTreeMap::new();
-            input.sighash_type = None;
-            input.redeem_script = None;
-            input.witness_script = None;
-            input.bip32_derivation = BTreeMap::new();
+        // script spend path requires two additional witness elements --
+        // the script and the control block.
+        if let TaprootSpendPath::Script {
+            script_buf,
+            control_block,
+        } = spend_info
+        {
+            witness.push(script_buf.to_bytes());
+            witness.push(control_block.serialize());
         }
+
+        // Finalize the psbt as per <https://github.com/rust-bitcoin/rust-bitcoin/blob/bitcoin-0.32.1/bitcoin/examples/taproot-psbt.rs#L315-L327>
+        // NOTE: their ecdsa example states that we should use `miniscript` to finalize
+        // PSBTs in production but they don't mention this for taproot.
+
+        // Set final witness
+        input.final_script_witness = Some(witness);
+
+        // And clear all other fields as per the spec
+        input.partial_sigs = BTreeMap::new();
+        input.sighash_type = None;
+        input.redeem_script = None;
+        input.witness_script = None;
+        input.bip32_derivation = BTreeMap::new();
 
         let signed_tx = psbt.extract_tx()?;
 
@@ -492,10 +442,18 @@ mod tests {
     use musig2::{secp256k1::Message, PubNonce};
 
     use super::*;
-    use crate::operations::create_script_spend_hash;
 
     #[tokio::test]
-    async fn test_add_tx_state() {
+    async fn test_add_tx_state_keyspend() {
+        test_add_tx_state(true).await;
+    }
+
+    #[tokio::test]
+    async fn test_add_tx_state_scriptspend() {
+        test_add_tx_state(false).await;
+    }
+
+    async fn test_add_tx_state(keypath_spend_only: bool) {
         let (_, secret_keys) = generate_keypairs(1);
         let self_index = 0;
         let keypair = Keypair::from_secret_key(SECP256K1, &secret_keys[self_index as usize]);
@@ -506,7 +464,7 @@ mod tests {
         let (pubkeys, _) = generate_keypairs(3);
         let pubkey_table = generate_pubkey_table(&pubkeys);
 
-        let tx_signing_data = generate_mock_tx_signing_data(1);
+        let tx_signing_data = generate_mock_tx_signing_data(keypath_spend_only);
 
         // Add TxState to the SignatureManager
         let result = signature_manager
@@ -561,7 +519,10 @@ mod tests {
 
         let sig_manager = generate_mock_manager(self_index, keypair);
 
-        let txid = generate_mock_tx_signing_data(1).psbt.compute_txid();
+        let keypath_spend_only = false;
+        let txid = generate_mock_tx_signing_data(keypath_spend_only)
+            .psbt
+            .compute_txid();
 
         let result1 = sig_manager.generate_sec_nonce(&txid, &key_agg_ctx);
         let result2 = sig_manager.generate_sec_nonce(&txid, &key_agg_ctx);
@@ -573,10 +534,18 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_get_own_nonce() {
+    async fn test_get_own_nonce_keyspend() {
+        test_get_own_nonce(true).await;
+    }
+
+    #[tokio::test]
+    async fn test_get_own_nonce_scriptspend() {
+        test_get_own_nonce(false).await;
+    }
+
+    async fn test_get_own_nonce(keypath_spend_only: bool) {
         let own_index = 0;
         let num_operators = 2;
-        let keypath_spend_only = true;
         assert!(
             num_operators.gt(&1) && num_operators.gt(&own_index),
             "num_operators should be set to greater than 1 and greater than self index"
@@ -587,7 +556,7 @@ mod tests {
 
         let keypair = Keypair::from_secret_key(SECP256K1, &sks[own_index]);
 
-        let tx_signing_data = generate_mock_tx_signing_data(1);
+        let tx_signing_data = generate_mock_tx_signing_data(keypath_spend_only);
 
         let sig_manager = generate_mock_manager(own_index as OperatorIdx, keypair);
 
@@ -623,10 +592,18 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_get_aggregated_nonce() {
+    async fn test_get_aggregated_nonce_keyspend() {
+        test_get_aggregated_nonce(true).await;
+    }
+
+    #[tokio::test]
+    async fn test_get_aggregated_nonce_scriptspend() {
+        test_get_aggregated_nonce(false).await;
+    }
+
+    async fn test_get_aggregated_nonce(keypath_spend_only: bool) {
         let own_index = 0;
         let num_operators = 2;
-        let keypath_spend_only = false;
         assert!(
             num_operators.gt(&1) && num_operators.gt(&own_index),
             "num_operators should be set to greater than 1 and greater than self index"
@@ -637,7 +614,7 @@ mod tests {
 
         let keypair = Keypair::from_secret_key(SECP256K1, &sks[own_index]);
 
-        let tx_signing_data = generate_mock_tx_signing_data(1);
+        let tx_signing_data = generate_mock_tx_signing_data(false);
 
         let sig_manager = generate_mock_manager(own_index as OperatorIdx, keypair);
 
@@ -687,10 +664,18 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_add_own_partial_sig() {
+    async fn test_add_own_partial_sig_scriptspend() {
+        test_add_own_partial_sig(true).await;
+    }
+
+    #[tokio::test]
+    async fn test_add_own_partial_sig_keyspend() {
+        test_add_own_partial_sig(false).await;
+    }
+
+    async fn test_add_own_partial_sig(keypath_spend_only: bool) {
         let own_index = 2;
         let num_operators = 3;
-        let keypath_spend_only = true;
         assert!(
             num_operators.gt(&1) && num_operators.gt(&own_index),
             "num_operators should be set to greater than 1 and greater than self and external index"
@@ -700,7 +685,7 @@ mod tests {
 
         let keypair = Keypair::from_secret_key(SECP256K1, &sks[own_index]);
 
-        let tx_signing_data = generate_mock_tx_signing_data(1);
+        let tx_signing_data = generate_mock_tx_signing_data(keypath_spend_only);
 
         let signature_manager = generate_mock_manager(own_index as OperatorIdx, keypair);
 
@@ -708,9 +693,7 @@ mod tests {
             Txid::from_str("4d3f5d9e4efc454d9e4e5f7b3e4c5f7d8e4f5d6e4c7d4f4e4d4d4d4e4d4d4d4d")
                 .unwrap();
 
-        let result = signature_manager
-            .add_own_partial_sig(&random_txid, true)
-            .await;
+        let result = signature_manager.add_own_partial_sig(&random_txid).await;
         assert!(
             result.is_err(),
             "should error if the txid is not found in storage"
@@ -727,9 +710,7 @@ mod tests {
             .expect("should be able to add state");
 
         // Add the bridge client's own signature
-        let result = signature_manager
-            .add_own_partial_sig(&txid, keypath_spend_only)
-            .await;
+        let result = signature_manager.add_own_partial_sig(&txid).await;
         assert!(
             result.is_err_and(|e| matches!(e, BridgeSigError::IncompleteNonces)),
             "should not be able to add own signature if not all nonces have been collected",
@@ -745,9 +726,7 @@ mod tests {
         )
         .await;
 
-        let result = signature_manager
-            .add_own_partial_sig(&txid, keypath_spend_only)
-            .await;
+        let result = signature_manager.add_own_partial_sig(&txid).await;
         assert!(
             result.is_ok(),
             "should be able to add one's own signature once all nonces have been collected but got: {:?}", result.err().unwrap()
@@ -765,10 +744,7 @@ mod tests {
             .expect("read state from db")
             .expect("state should be present");
 
-        let collected_sigs = stored_tx_state
-            .collected_sigs()
-            .next()
-            .expect("the signatures for first input should exist");
+        let collected_sigs = stored_tx_state.collected_sigs();
 
         // Ensure the signature is present in the first input
         assert!(
@@ -780,11 +756,20 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_add_signature() {
+    async fn test_add_signature_keyspend() {
+        test_add_signature(true).await;
+    }
+
+    #[tokio::test]
+    async fn test_add_signature_scriptspend() {
+        test_add_signature(false).await;
+    }
+
+    async fn test_add_signature(keypath_spend_only: bool) {
         let own_index = 1;
         let external_index = 0;
+
         let num_operators = 2;
-        let keypath_spend_only = false;
         assert!(
             num_operators.eq(&2)
                 && num_operators.gt(&own_index)
@@ -796,9 +781,7 @@ mod tests {
 
         let self_keypair = Keypair::from_secret_key(SECP256K1, &sks[own_index]);
 
-        let num_inputs = 1;
-        let tx_signing_data = generate_mock_tx_signing_data(num_inputs);
-        let input_index = 0;
+        let tx_signing_data = generate_mock_tx_signing_data(keypath_spend_only);
 
         let signature_manager = generate_mock_manager(own_index as OperatorIdx, self_keypair);
 
@@ -815,12 +798,7 @@ mod tests {
             OperatorPartialSig::new(random_partial_sig, external_index as OperatorIdx);
 
         let result = signature_manager
-            .add_partial_sig(
-                &random_txid,
-                invalid_sig_info,
-                external_index,
-                keypath_spend_only,
-            )
+            .add_partial_sig(&random_txid, invalid_sig_info)
             .await;
         assert!(
             result.is_err_and(|e| matches!(e, BridgeSigError::TransactionNotFound)),
@@ -828,6 +806,7 @@ mod tests {
         );
 
         let pubkey_table = generate_pubkey_table(&pks);
+        let keypath_spend_only = matches!(tx_signing_data.spend_path, TaprootSpendPath::Key); // sanity-check
         let txid = signature_manager
             .add_tx_state(
                 tx_signing_data.clone(),
@@ -838,9 +817,7 @@ mod tests {
             .expect("should be able to add state");
 
         // Add the bridge client's own signature
-        let result = signature_manager
-            .add_own_partial_sig(&txid, keypath_spend_only)
-            .await;
+        let result = signature_manager.add_own_partial_sig(&txid).await;
         assert!(
             result.is_err_and(|e| matches!(e, BridgeSigError::IncompleteNonces)),
             "should not be able to add own signature if not all nonces have been collected",
@@ -866,19 +843,14 @@ mod tests {
             .get_aggregated_nonce(&tx_state)
             .expect("should be able to get aggregated nonces");
 
-        // Sign the transaction with an external key (at external_index)
+        // Sign the transaction with an external key
         let mut unsigned_tx = tx_state.unsigned_tx().clone();
-        let script = &tx_signing_data.spend_infos[input_index]
-            .clone()
-            .unwrap()
-            .script_buf;
 
         let mut sighash_cache = SighashCache::new(&mut unsigned_tx);
-        let message = create_script_spend_hash(
+        let message = create_message_hash(
             &mut sighash_cache,
-            input_index,
-            script,
             &tx_state.prevouts(),
+            tx_state.spend_info(),
         )
         .expect("should be able to produce a message");
 
@@ -897,25 +869,7 @@ mod tests {
             OperatorPartialSig::new(external_signature.into(), external_index as OperatorIdx);
 
         let result = signature_manager
-            .add_partial_sig(
-                &txid,
-                external_signature_info,
-                num_inputs + 1,
-                keypath_spend_only,
-            )
-            .await;
-        assert!(
-            result.is_err_and(|e| matches!(e, BridgeSigError::InputIndexOutOfBounds)),
-            "should produce error if the input index is out of bounds"
-        );
-
-        let result = signature_manager
-            .add_partial_sig(
-                &txid,
-                external_signature_info,
-                input_index,
-                keypath_spend_only,
-            )
+            .add_partial_sig(&txid, external_signature_info)
             .await;
         assert!(
             result.is_err(),
@@ -937,12 +891,7 @@ mod tests {
             OperatorPartialSig::new(external_signature.into(), external_index as OperatorIdx);
 
         let result = signature_manager
-            .add_partial_sig(
-                &txid,
-                external_signature_info,
-                input_index,
-                keypath_spend_only,
-            )
+            .add_partial_sig(&txid, external_signature_info)
             .await;
 
         assert!(
@@ -966,16 +915,12 @@ mod tests {
         assert!(
             stored_tx_state
                 .collected_sigs()
-                .nth(input_index)
-                .expect("collected signatures for input_index must exist")
                 .get(&(external_index as OperatorIdx))
                 .is_some_and(|sig| *sig.inner() == external_signature),
             "should have the external index at the right place"
         );
 
-        let result = signature_manager
-            .add_own_partial_sig(&txid, keypath_spend_only)
-            .await;
+        let result = signature_manager.add_own_partial_sig(&txid).await;
         assert!(
             result.is_ok(),
             "should be able to add one's own partial sig but got: {}",
@@ -1002,12 +947,7 @@ mod tests {
         );
 
         let result = signature_manager
-            .add_partial_sig(
-                &txid,
-                invalid_external_signature_info,
-                0,
-                keypath_spend_only,
-            )
+            .add_partial_sig(&txid, invalid_external_signature_info)
             .await;
 
         assert!(
@@ -1017,9 +957,17 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_get_fully_signed_transaction() {
+    async fn test_get_fully_signed_transaction_keyspend() {
+        test_get_fully_signed_transaction(true).await;
+    }
+
+    #[tokio::test]
+    async fn test_get_fully_signed_transaction_scriptspend() {
+        test_get_fully_signed_transaction(false).await;
+    }
+
+    async fn test_get_fully_signed_transaction(keypath_spend_only: bool) {
         // Generate keypairs for the UTXO
-        let keypath_spend_only = true;
         let num_operators = 4;
         let (pubkeys, secret_keys) = generate_keypairs(num_operators);
         let pubkey_table = generate_pubkey_table(&pubkeys);
@@ -1030,8 +978,7 @@ mod tests {
         let signature_manager = generate_mock_manager(own_index as OperatorIdx, keypair);
 
         // Create a minimal unsigned transaction
-        let num_inputs = 1;
-        let tx_signing_data = generate_mock_tx_signing_data(num_inputs);
+        let tx_signing_data = generate_mock_tx_signing_data(keypath_spend_only);
 
         // Add TxState to the SignatureManager
         let txid = signature_manager
@@ -1065,9 +1012,7 @@ mod tests {
             .expect("should be able to get aggregated nonces");
 
         // Add the bridge client's own signature
-        let result = signature_manager
-            .add_own_partial_sig(&txid, keypath_spend_only)
-            .await;
+        let result = signature_manager.add_own_partial_sig(&txid).await;
         assert!(
             result.is_ok(),
             "should be able to add one's own partial sig but got error: {}",
@@ -1092,67 +1037,50 @@ mod tests {
             let mut unsigned_tx = tx_signing_data.psbt.inner().unsigned_tx.clone();
             let mut sighash_cache = SighashCache::new(&mut unsigned_tx);
 
-            for input_index in 0..num_inputs {
-                let script = &tx_state.spend_infos()[input_index]
-                    .clone()
-                    .unwrap()
-                    .script_buf;
-                let message =
-                    create_script_spend_hash(&mut sighash_cache, input_index, script, prevouts)
-                        .expect("should be able to produce script spend message");
+            let message = create_message_hash(&mut sighash_cache, prevouts, tx_state.spend_info());
+            let message = message.expect("should be able to create message");
 
-                let external_signature = sign_state_partial(
-                    &pubkey_table,
-                    &sec_nonces[signer_index].clone().into(),
-                    &Keypair::from_secret_key(SECP256K1, &secret_keys[signer_index]),
-                    &aggregated_nonce,
-                    message.as_ref(),
-                    keypath_spend_only,
-                )
-                .unwrap();
+            let external_signature = sign_state_partial(
+                &pubkey_table,
+                &sec_nonces[signer_index].clone().into(),
+                &Keypair::from_secret_key(SECP256K1, &secret_keys[signer_index]),
+                &aggregated_nonce,
+                message.as_ref(),
+                keypath_spend_only,
+            )
+            .unwrap();
 
-                let external_signature_info =
-                    OperatorPartialSig::new(external_signature.into(), signer_index as OperatorIdx);
+            let external_signature_info =
+                OperatorPartialSig::new(external_signature.into(), signer_index as OperatorIdx);
 
-                // Add the external signature
-                let result = signature_manager
-                    .add_partial_sig(
-                        &txid,
-                        external_signature_info,
-                        input_index,
-                        keypath_spend_only,
-                    )
-                    .await;
+            // Add the external signature
+            let result = signature_manager
+                .add_partial_sig(&txid, external_signature_info)
+                .await;
 
-                assert!(
-                    result.is_ok(),
-                    "should add external signature but got error: {:?} for ({}, {})",
-                    result.err().unwrap(),
-                    input_index,
-                    signer_index
-                );
+            assert!(
+                result.is_ok(),
+                "should add external signature but got error: {:?} for {}",
+                result.err().unwrap(),
+                signer_index
+            );
 
-                // Verify that the signature has been added
-                let stored_state = signature_manager
-                    .db_ops
-                    .get_tx_state_async(txid)
-                    .await
-                    .expect("should be able to access storage")
-                    .expect("should have tx state in the storage");
+            // Verify that the signature has been added
+            let stored_state = signature_manager
+                .db_ops
+                .get_tx_state_async(txid)
+                .await
+                .expect("should be able to access storage")
+                .expect("should have tx state in the storage");
 
-                assert!(stored_state
-                    .collected_sigs()
-                    .nth(input_index)
-                    .expect("collected signatures for input index must exist")
-                    .get(&(signer_index as OperatorIdx))
-                    .is_some_and(|sig| *sig.inner() == external_signature));
-            }
+            assert!(stored_state
+                .collected_sigs()
+                .get(&(signer_index as OperatorIdx))
+                .is_some_and(|sig| *sig.inner() == external_signature));
         }
 
         // Retrieve the fully signed transaction
-        let signed_tx = signature_manager
-            .get_fully_signed_transaction(&txid, keypath_spend_only)
-            .await;
+        let signed_tx = signature_manager.get_fully_signed_transaction(&txid).await;
         assert!(
             signed_tx.is_ok(),
             "signed tx must be present but got error = {:?}",

@@ -3,7 +3,7 @@
 use alpen_express_db::entities::bridge_tx_state::BridgeTxState;
 use alpen_express_primitives::{
     bridge::{Musig2SecNonce, OperatorPartialSig, PublickeyTable},
-    l1::SpendInfo,
+    l1::TaprootSpendPath,
 };
 use bitcoin::{
     hashes::Hash,
@@ -22,26 +22,24 @@ use crate::errors::{BridgeSigError, BridgeSigResult};
 /// spend hash.
 pub fn create_message_hash(
     sighash_cache: &mut SighashCache<&mut Transaction>,
-    input_index: usize,
     prevouts: &[TxOut],
-    maybe_spend_info: &Option<SpendInfo>,
+    spend_path: &TaprootSpendPath,
 ) -> BridgeSigResult<Message> {
-    if let Some(SpendInfo {
+    if let TaprootSpendPath::Script {
         script_buf,
         control_block: _,
-    }) = maybe_spend_info
+    } = spend_path
     {
-        return create_script_spend_hash(sighash_cache, input_index, script_buf, prevouts);
+        return create_script_spend_hash(sighash_cache, script_buf, prevouts);
     }
 
-    create_key_spend_hash(sighash_cache, input_index, prevouts)
+    create_key_spend_hash(sighash_cache, prevouts)
 }
 
 /// Generate a sighash message for a taproot `script` spending path at the `input_index` of
 /// all `prevouts`.
 pub fn create_script_spend_hash(
     sighash_cache: &mut SighashCache<&mut Transaction>,
-    input_index: usize,
     script: &ScriptBuf,
     prevouts: &[TxOut],
 ) -> BridgeSigResult<Message> {
@@ -49,12 +47,8 @@ pub fn create_script_spend_hash(
     let leaf_hash = TapLeafHash::from_script(script, LeafVersion::TapScript);
     let prevouts = Prevouts::All(prevouts);
 
-    let sighash = sighash_cache.taproot_script_spend_signature_hash(
-        input_index,
-        &prevouts,
-        leaf_hash,
-        sighash_type,
-    )?;
+    let sighash =
+        sighash_cache.taproot_script_spend_signature_hash(0, &prevouts, leaf_hash, sighash_type)?;
 
     let message =
         Message::from_digest_slice(sighash.as_byte_array()).expect("TapSigHash is a hash");
@@ -66,14 +60,12 @@ pub fn create_script_spend_hash(
 /// all `prevouts`.
 pub fn create_key_spend_hash(
     sighash_cache: &mut SighashCache<&mut Transaction>,
-    input_index: usize,
     prevouts: &[TxOut],
 ) -> BridgeSigResult<Message> {
     let sighash_type = sighash::TapSighashType::Default;
     let prevouts = Prevouts::All(prevouts);
 
-    let sighash =
-        sighash_cache.taproot_key_spend_signature_hash(input_index, &prevouts, sighash_type)?;
+    let sighash = sighash_cache.taproot_key_spend_signature_hash(0, &prevouts, sighash_type)?;
 
     let message =
         Message::from_digest_slice(sighash.as_byte_array()).expect("TapSigHash is a hash");
@@ -186,12 +178,10 @@ mod tests {
 
     #[test]
     fn test_create_message_hash_for_script_spend() {
-        let num_inputs = 1;
-        let (mut tx, taproot_spend_info, script_buf) = generate_mock_unsigned_tx(num_inputs);
+        let (mut tx, taproot_spend_info, script_buf) = generate_mock_unsigned_tx();
         let mut sighash_cache = SighashCache::new(&mut tx);
 
         // Create dummy input values
-        let input_index = 0;
         let prevouts = vec![TxOut {
             value: Amount::from_sat(1000),
             script_pubkey: ScriptBuf::new(),
@@ -200,17 +190,12 @@ mod tests {
         let control_block = taproot_spend_info
             .control_block(&(script_buf.clone(), LeafVersion::TapScript))
             .expect("should construct control block");
-        let maybe_spend_info = Some(SpendInfo {
+        let spend_path = TaprootSpendPath::Script {
             script_buf,
             control_block,
-        });
+        };
 
-        let result = create_message_hash(
-            &mut sighash_cache,
-            input_index,
-            &prevouts,
-            &maybe_spend_info,
-        );
+        let result = create_message_hash(&mut sighash_cache, &prevouts, &spend_path);
 
         assert!(
             result.is_ok(),
@@ -218,7 +203,7 @@ mod tests {
             result.err().unwrap()
         );
 
-        let result = create_message_hash(&mut sighash_cache, input_index, &[], &maybe_spend_info);
+        let result = create_message_hash(&mut sighash_cache, &[], &spend_path);
         assert!(
             result.is_err(),
             "should error if the prevouts does not have an output at input_index"
@@ -240,8 +225,7 @@ mod tests {
         // Extract the script_pubkey from the address
         let script_pubkey = address.script_pubkey();
 
-        // No SpendInfo (key spend)
-        let maybe_spend_info = None;
+        let spend_path = TaprootSpendPath::Key;
 
         // Create a dummy transaction with one input and one output
         let deposit_outpoint =
@@ -267,7 +251,7 @@ mod tests {
         let mut sighash_cache = SighashCache::new(&mut tx);
 
         // Act
-        let message_result = create_message_hash(&mut sighash_cache, 0, &output, &maybe_spend_info);
+        let message_result = create_message_hash(&mut sighash_cache, &output, &spend_path);
 
         // Assert
         assert!(message_result.is_ok());
@@ -401,8 +385,7 @@ mod tests {
         let (pks, sks) = generate_keypairs(num_operators);
         let pubkey_table = generate_pubkey_table(&pks);
 
-        let num_inputs = 1;
-        let tx_output = generate_mock_tx_signing_data(num_inputs);
+        let tx_output = generate_mock_tx_signing_data(keypath_spend_only);
         let txid = tx_output.psbt.inner().unsigned_tx.compute_txid();
 
         let key_agg_ctx =

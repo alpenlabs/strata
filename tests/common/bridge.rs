@@ -256,9 +256,7 @@ impl Operator {
 
                 event!(Level::INFO, event = "all nonces collected", operator_idx=%self.index);
 
-                let receive_signatures = self
-                    .agggregate_signatures(&txid, timeout_duration, keypath_spend_only)
-                    .await;
+                let receive_signatures = self.agggregate_signatures(&txid, timeout_duration).await;
                 assert!(
                     receive_signatures.is_ok(),
                     "timeout while trying to collect signatures"
@@ -266,10 +264,8 @@ impl Operator {
 
                 event!(Level::INFO, event = "signature collection complete", operator_idx=%self.index);
 
-                let fully_signed_transaction = self
-                    .sig_manager
-                    .get_fully_signed_transaction(&txid, keypath_spend_only)
-                    .await;
+                let fully_signed_transaction =
+                    self.sig_manager.get_fully_signed_transaction(&txid).await;
 
                 assert!(
                     fully_signed_transaction.is_ok(),
@@ -330,9 +326,7 @@ impl Operator {
 
                 event!(Level::INFO, event = "all nonces collected", operator_idx=%self.index);
 
-                let receive_signatures = self
-                    .agggregate_signatures(&txid, timeout_duration, keypath_spend_only)
-                    .await;
+                let receive_signatures = self.agggregate_signatures(&txid, timeout_duration).await;
                 assert!(
                     receive_signatures.is_ok(),
                     "timeout while trying to collect signatures"
@@ -340,10 +334,8 @@ impl Operator {
 
                 event!(Level::INFO, event = "signature collection complete", operator_idx=%self.index);
 
-                let fully_signed_transaction = self
-                    .sig_manager
-                    .get_fully_signed_transaction(&txid, keypath_spend_only)
-                    .await;
+                let fully_signed_transaction =
+                    self.sig_manager.get_fully_signed_transaction(&txid).await;
 
                 assert!(
                     fully_signed_transaction.is_ok(),
@@ -423,12 +415,8 @@ impl Operator {
         &mut self,
         txid: &Txid,
         timeout_duration: Duration,
-        keypath_spend_only: bool,
     ) -> Result<(), Elapsed> {
-        let result = self
-            .sig_manager
-            .add_own_partial_sig(txid, keypath_spend_only)
-            .await;
+        let result = self.sig_manager.add_own_partial_sig(txid).await;
         assert!(
             result.is_ok(),
             "should be able to add own signature but got: {:?}",
@@ -441,11 +429,7 @@ impl Operator {
 
         event!(Level::INFO, event = "added own signature", operator_idx=%self.index);
 
-        let input_index = 0; // for now, this is always 0
-        let own_sig = self
-            .sig_manager
-            .get_own_partial_sig(txid, input_index)
-            .await;
+        let own_sig = self.sig_manager.get_own_partial_sig(txid).await;
         assert!(
             own_sig.is_ok(),
             "should be able to get one's own signature: ({})",
@@ -481,11 +465,9 @@ impl Operator {
                     event!(Level::DEBUG, event = "received signature", sender_idx = %sender_idx, operator_idx = %self.index);
 
                     let signature_info = OperatorPartialSig::new(partial_sig, sender_idx);
-                    let input_index = 0; // always going to be one input for now
                     let is_complete = self
                         .sig_manager
-                        .add_partial_sig(&txid, signature_info, input_index, keypath_spend_only)
-                        .await;
+                        .add_partial_sig(&txid, signature_info).await;
 
                     assert!(
                         is_complete.is_ok(),

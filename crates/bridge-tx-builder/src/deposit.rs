@@ -5,7 +5,7 @@
 
 use alpen_express_primitives::{
     bridge::TxSigningData,
-    l1::{BitcoinAddress, BitcoinPsbt, SpendInfo},
+    l1::{BitcoinAddress, BitcoinPsbt, TaprootSpendPath},
 };
 use bitcoin::{
     key::TapTweak,
@@ -60,7 +60,7 @@ impl TxKind for DepositInfo {
         build_context: &C,
     ) -> BridgeTxBuilderResult<TxSigningData> {
         let prevouts = self.compute_prevouts(build_context)?;
-        let spend_infos = self.compute_spend_infos(build_context)?;
+        let spend_info = self.compute_spend_infos(build_context)?;
         let unsigned_tx = self.create_unsigned_tx(build_context)?;
 
         let mut psbt = Psbt::from_unsigned_tx(unsigned_tx)?;
@@ -71,7 +71,10 @@ impl TxKind for DepositInfo {
 
         let psbt = BitcoinPsbt::from(psbt);
 
-        Ok(TxSigningData { psbt, spend_infos })
+        Ok(TxSigningData {
+            psbt,
+            spend_path: spend_info,
+        })
     }
 }
 
@@ -119,7 +122,7 @@ impl DepositInfo {
     fn compute_spend_infos(
         &self,
         build_context: &impl BuildContext,
-    ) -> BridgeTxBuilderResult<Vec<Option<SpendInfo>>> {
+    ) -> BridgeTxBuilderResult<TaprootSpendPath> {
         // The Deposit Request (DT) spends the n-of-n multisig leaf
         let spend_script = n_of_n_script(&build_context.aggregated_pubkey());
         let spend_script_hash =
@@ -162,12 +165,12 @@ impl DepositInfo {
             return Err(DepositTransactionError::ControlBlockError)?;
         }
 
-        let spend_info = Some(SpendInfo {
+        let spend_info = TaprootSpendPath::Script {
             script_buf: spend_script,
             control_block,
-        });
+        };
 
-        Ok(vec![spend_info])
+        Ok(spend_info)
     }
 
     fn compute_prevouts(&self, builder: &impl BuildContext) -> BridgeTxBuilderResult<Vec<TxOut>> {

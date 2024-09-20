@@ -2,7 +2,7 @@
 
 use alpen_express_primitives::{
     bridge::{OperatorIdx, TxSigningData},
-    l1::{BitcoinPsbt, XOnlyPk},
+    l1::{BitcoinPsbt, TaprootSpendPath, XOnlyPk},
 };
 use bitcoin::{Amount, FeeRate, OutPoint, Psbt, Transaction, TxOut};
 use serde::{Deserialize, Serialize};
@@ -54,7 +54,7 @@ impl TxKind for CooperativeWithdrawalInfo {
 
         Ok(TxSigningData {
             psbt,
-            spend_infos: vec![None],
+            spend_path: TaprootSpendPath::Key,
         })
     }
 }
@@ -174,7 +174,7 @@ mod tests {
         bridge::OperatorIdx,
         buf::Buf32,
         errors::ParseError,
-        l1::{BitcoinAmount, XOnlyPk},
+        l1::{BitcoinAmount, TaprootSpendPath, XOnlyPk},
     };
     use alpen_test_utils::bridge::{generate_keypairs, generate_pubkey_table};
     use bitcoin::{
@@ -242,15 +242,9 @@ mod tests {
             "withdrawal psbt should have 3 outputs -- payout, operator fee, and anybody takes"
         );
 
-        // Verify spend_infos
-        assert_eq!(
-            signing_data.spend_infos.len(),
-            1,
-            "signing data should have 1 spend info for the 1 input"
-        );
         assert!(
-            signing_data.spend_infos[0].is_none(),
-            "signing data should have no spend info at index 0"
+            matches!(signing_data.spend_path, TaprootSpendPath::Key),
+            "signing data should have a keypath spend"
         );
     }
 
