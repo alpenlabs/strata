@@ -78,18 +78,21 @@ impl L1TxProof {
     }
 }
 
-
 /// Tx body with a proof.
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct L1Tx {
     proof: L1TxProof,
     tx: Vec<u8>,
-    parsed_tx: ParsedTx
+    parsed_tx: ParsedTx,
 }
 
 impl L1Tx {
     pub fn new(proof: L1TxProof, tx: Vec<u8>, parsed_tx: ParsedTx) -> Self {
-        Self { proof, tx , parsed_tx}
+        Self {
+            proof,
+            tx,
+            parsed_tx,
+        }
     }
 
     pub fn proof(&self) -> &L1TxProof {

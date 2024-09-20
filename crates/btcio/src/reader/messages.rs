@@ -17,11 +17,11 @@ pub struct BlockData {
     block_num: u64,
     block: Block,
     /// Transactions in the block that are relevant to rollup
-    relevant_tx: Vec<(u32,ParsedTx)>,
+    relevant_tx: Vec<(u32, ParsedTx)>,
 }
 
 impl BlockData {
-    pub fn new(block_num: u64, block: Block, relevant_tx: Vec<(u32,ParsedTx)>) -> Self {
+    pub fn new(block_num: u64, block: Block, relevant_tx: Vec<(u32, ParsedTx)>) -> Self {
         Self {
             block_num,
             block,

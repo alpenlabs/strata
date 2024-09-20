@@ -1,12 +1,11 @@
 use std::str::FromStr;
 
 use alpen_express_primitives::params::RollupParams;
-use bitcoin::{Address, Amount};
+use bitcoin::Address;
 
-pub mod deposit;
-pub mod error;
 pub mod deposit_request;
-
+pub mod deposit_tx;
+pub mod error;
 
 /// Configuration common among deposit and deposit request transaction
 pub struct DepositTxConfig {
@@ -17,22 +16,23 @@ pub struct DepositTxConfig {
     /// deposit amount
     pub deposit_quantity: u64,
     /// deposit bridge address
-    pub federation_address: Address
+    pub federation_address: Address,
 }
 
 impl DepositTxConfig {
     pub fn from_params(params: &RollupParams) -> Self {
-        let tap_addr = Address::from_str("bcrt1pnmrmugapastum8ztvgwcn8hvq2avmcwh2j4ssru7rtyygkpqq98q4wyd6s")
-            .unwrap()
-            .require_network(bitcoin::Network::Regtest)
-            .unwrap();
+        let tap_addr =
+            Address::from_str("bcrt1pnmrmugapastum8ztvgwcn8hvq2avmcwh2j4ssru7rtyygkpqq98q4wyd6s")
+                .unwrap()
+                .require_network(bitcoin::Network::Regtest)
+                .unwrap();
 
         // TODO : have params setup
         Self {
             magic_bytes: params.rollup_name.clone().into_bytes().to_vec(),
-            address_length: 10 ,
+            address_length: 10,
             deposit_quantity: 1000000,
-            federation_address: tap_addr
+            federation_address: tap_addr,
         }
     }
 

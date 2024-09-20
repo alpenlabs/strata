@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use alpen_express_btcio::{parser::inscription::parse_inscription_data, reader::messages::{BlockData, L1Event}};
+use alpen_express_btcio::reader::messages::{BlockData, L1Event};
 use alpen_express_db::traits::{Database, L1DataStore};
 use alpen_express_primitives::{
     buf::Buf32, l1::L1BlockManifest, params::Params, utils::generate_l1_tx,
@@ -71,7 +71,7 @@ where
             let l1txs: Vec<_> = blockdata
                 .relevant_tx()
                 .iter()
-                .map(|(idx, parsed_tx)| generate_l1_tx(*idx, parsed_tx.clone() , blockdata.block()))
+                .map(|(idx, parsed_tx)| generate_l1_tx(*idx, parsed_tx.clone(), blockdata.block()))
                 .collect();
             let num_txs = l1txs.len();
             l1db.put_block_data(blockdata.block_num(), manifest, l1txs.clone())?;
@@ -98,26 +98,17 @@ where
 
 /// Parses inscriptions and checks for batch data in the transactions
 fn check_for_da_batch(blockdata: &BlockData) -> Vec<BatchCheckpoint> {
-    let binding = blockdata
-        .relevant_tx_idxs();
+    let binding = blockdata.relevant_tx();
 
-    let txs = binding
+    let inscriptions = binding
         .iter()
-        .map(|&idx| &blockdata.block().txdata[idx as usize]);
+        .filter_map(|(idx, parsed_tx)| match parsed_tx {
+            alpen_express_primitives::tx::ParsedTx::RollupInscription(inscription) => {
+                Some((inscription, &blockdata.block().txdata[*idx as usize]))
+            }
+            _ => None,
+        });
 
-    let inscriptions = txs.filter_map(|tx| {
-        tx.input[0].witness.tapscript().and_then(|scr| {
-                let script = scr.to_owned();
-                parse_inscription_data(&script)
-                .map_err(|e| {
-                    let txid = tx.compute_txid();
-                    warn!(%txid, err = %e, "invalid inscription inside transaction which is marked as relevant");
-                    e
-                })
-                .ok()
-                .map(|x| (x, tx))
-        })
-    });
     let signed_checkpoints = inscriptions.filter_map(|(insc, tx)| {
         match borsh::from_slice::<SignedBatchCheckpoint>(insc.batch_data()) {
             Err(e) => {

@@ -1,5 +1,4 @@
 use arbitrary::Arbitrary;
-use borsh::{BorshDeserialize, BorshSerialize};
 use bitcoin::{
     blockdata::{
         opcodes::{
@@ -11,6 +10,7 @@ use bitcoin::{
     script::PushBytesBuf,
     ScriptBuf,
 };
+use borsh::{BorshDeserialize, BorshSerialize};
 use tracing::*;
 
 /// Information related to relevant transactions to be stored in L1Tx
@@ -20,10 +20,8 @@ pub enum ParsedTx {
     Deposit(DepositInfo),
     DepositRequest(DepositReqeustInfo),
     RollupInscription(InscriptionData),
-    SpentToAddress(Vec<u8>)
+    SpentToAddress(Vec<u8>),
 }
-
-
 
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct DepositInfo {
@@ -51,7 +49,6 @@ pub struct DepositReqeustInfo {
     /// EE address
     pub address: Vec<u8>,
 }
-
 
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct InscriptionData {

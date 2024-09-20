@@ -1,6 +1,8 @@
-use bitcoin::{opcodes::all::OP_PUSHNUM_1,
-    script::{Instruction, Instructions}, Opcode};
-
+use bitcoin::{
+    opcodes::all::OP_PUSHNUM_1,
+    script::{Instruction, Instructions},
+    Opcode,
+};
 
 /// Extract next instruction and try to parse it as an opcode
 pub fn next_op(instructions: &mut Instructions) -> Option<Opcode> {

@@ -3,9 +3,8 @@
 use alpen_express_primitives::tx::DepositInfo;
 use bitcoin::{opcodes::all::OP_RETURN, ScriptBuf, Transaction, TxOut};
 
-use crate::parser::utils::{next_bytes, next_op};
-
 use super::{error::DepositParseError, DepositTxConfig};
+use crate::parser::utils::{next_bytes, next_op};
 
 /// Extracts the DepositInfo from the Deposit Transaction
 pub fn extract_deposit_info(
@@ -14,55 +13,66 @@ pub fn extract_deposit_info(
 ) -> Result<DepositInfo, DepositParseError> {
     for output in tx.output.iter() {
         if let Some(Ok(ee_address)) = extract_ee_address(&output.script_pubkey, config) {
-          // find the outpoint with taproot address, so that we can extract sent amount from that
-          if let Some((index, _)) = parse_bridge_offer_output(tx, config) {
-              return Ok(DepositInfo {
-                amt: tx.output[index].value.to_sat(),
-                deposit_outpoint: index as u32,
-                address: ee_address,
-            })
-          }
+            // find the outpoint with taproot address, so that we can extract sent amount from that
+            if let Some((index, _)) = parse_bridge_offer_output(tx, config) {
+                return Ok(DepositInfo {
+                    amt: tx.output[index].value.to_sat(),
+                    deposit_outpoint: index as u32,
+                    address: ee_address,
+                });
+            }
         }
     }
-// check the amount
+    // check the amount
     // check for validty of n of n valid address
 
     Err(DepositParseError::NoAddress)
 }
 
 /// extracts the EE address given that the script is OP_RETURN type and contains the Magic Bytes
-fn extract_ee_address(script: &ScriptBuf, config: &DepositTxConfig) -> Option<Result<Vec<u8>,DepositParseError>> {
-        let mut instructions = script.instructions();
+fn extract_ee_address(
+    script: &ScriptBuf,
+    config: &DepositTxConfig,
+) -> Option<Result<Vec<u8>, DepositParseError>> {
+    let mut instructions = script.instructions();
 
-        // check if OP_RETURN is present and if not just discard it
-        if next_op(&mut instructions) != Some(OP_RETURN) {
-            return None;
+    // check if OP_RETURN is present and if not just discard it
+    if next_op(&mut instructions) != Some(OP_RETURN) {
+        return None;
+    }
+
+    // magic bytes
+    if let Some(magic_bytes) = next_bytes(&mut instructions) {
+        if magic_bytes != config.magic_bytes {
+            return Some(Err(DepositParseError::MagicBytesMismatch(
+                magic_bytes,
+                config.magic_bytes.clone(),
+            )));
         }
+    } else {
+        return Some(Err(DepositParseError::NoMagicBytes));
+    }
 
-        // magic bytes
-        if let Some(magic_bytes) = next_bytes(&mut instructions) {
-            if magic_bytes != config.magic_bytes {
-                return Some(Err(DepositParseError::MagicBytesMismatch(
-                    magic_bytes,
-                    config.magic_bytes.clone(),
-                )));
-            }
-        } else {
-            return Some(Err(DepositParseError::NoMagicBytes));
+    if let Some(ee_bytes) = next_bytes(&mut instructions) {
+        if ee_bytes.len() as u8 != config.address_length {
+            return Some(Err(DepositParseError::InvalidDestAddress(
+                ee_bytes.len() as u8
+            )));
         }
-
-        if let Some(ee_bytes) = next_bytes(&mut instructions) {
-            if ee_bytes.len() as u8 != config.address_length {
-                return Some(Err(DepositParseError::InvalidDestAddress(ee_bytes.len() as u8)));
-            }
-                return Some(Ok(ee_bytes))
-            }
-        None
+        return Some(Ok(ee_bytes));
+    }
+    None
 }
 
-fn parse_bridge_offer_output<'a, 'b>(tx: &'a Transaction, config: &'b DepositTxConfig) -> Option<(usize, &'a TxOut)> {
+fn parse_bridge_offer_output<'a>(
+    tx: &'a Transaction,
+    config: &DepositTxConfig,
+) -> Option<(usize, &'a TxOut)> {
     tx.output.iter().enumerate().find(|(_, txout)| {
-        config.federation_address.matches_script_pubkey(&txout.script_pubkey) && txout.value.to_sat() == config.deposit_quantity
+        config
+            .federation_address
+            .matches_script_pubkey(&txout.script_pubkey)
+            && txout.value.to_sat() == config.deposit_quantity
     })
 }
 
@@ -97,13 +107,11 @@ mod tests {
             magic_bytes: "expresssss".to_string().as_bytes().to_vec(),
             address_length: 20,
             deposit_quantity: 1000,
-            federation_address: taproot_addr()
+            federation_address: taproot_addr(),
         }
     }
 
-
     fn create_transaction(amt: Amount, evm_addr: &[u8]) -> Transaction {
-
         // Construct the outputs
         let outputs = vec![
             TxOut {

@@ -1,7 +1,13 @@
 use alpen_express_primitives::tx::ParsedTx;
 use bitcoin::{Address, Block, Transaction};
 
-use crate::parser::{deposit::{deposit::extract_deposit_info, deposit_request::extract_deposit_request_info, DepositTxConfig}, inscription::parse_inscription_data};
+use crate::parser::{
+    deposit::{
+        deposit_request::extract_deposit_request_info, deposit_tx::extract_deposit_info,
+        DepositTxConfig,
+    },
+    inscription::parse_inscription_data,
+};
 
 /// What kind of transactions can be relevant for rollup node to filter
 #[derive(Clone, Debug)]
@@ -9,10 +15,10 @@ pub enum RelevantTxType {
     /// Transactions that are spent to an address
     SpentToAddress(Address),
     /// Inscription transactions with given Rollup name. This will be parsed by
-    /// [`InscriptionParser`] which dictates the structure of inscription.
+    /// InscriptionParser which dictates the structure of inscription.
     RollupInscription(RollupName),
-    /// Deposit transcation
-    Deposit(RollupName, FederationAddress ,AddressLength, Amount),
+    /// Deposit transaction
+    Deposit(RollupName, FederationAddress, AddressLength, Amount),
 }
 
 type RollupName = String;
@@ -21,37 +27,46 @@ type Amount = u64;
 type FederationAddress = Address;
 
 /// Filter all the relevant [`Transaction`]s in a block based on given [`RelevantTxType`]s
-pub fn filter_relevant_txs(block: &Block, relevent_types: &[RelevantTxType]) -> Vec<(u32, ParsedTx)> {
+pub fn filter_relevant_txs(
+    block: &Block,
+    relevent_types: &[RelevantTxType],
+) -> Vec<(u32, ParsedTx)> {
     block
         .txdata
         .iter()
         .enumerate()
-        .filter_map(|(i, tx)| check_and_extract_relevancy(tx, relevent_types).map(|relevant_tx| (i as u32, relevant_tx)))
+        .filter_map(|(i, tx)| {
+            check_and_extract_relevancy(tx, relevent_types)
+                .map(|relevant_tx| (i as u32, relevant_tx))
+        })
         .collect()
 }
 
 ///  if a [`Transaction`] is relevant based on given [`RelevantTxType`]s then we extract relevant
 ///  info
-fn check_and_extract_relevancy(tx: &Transaction, relevant_types: &[RelevantTxType]) -> Option<ParsedTx> {
+fn check_and_extract_relevancy(
+    tx: &Transaction,
+    relevant_types: &[RelevantTxType],
+) -> Option<ParsedTx> {
     for rel_type in relevant_types {
         match rel_type {
             RelevantTxType::SpentToAddress(address) => {
-                if let Some(_) = tx.output.iter().find(|op| address.matches_script_pubkey(&op.script_pubkey)) {
+                if tx
+                    .output
+                    .iter()
+                    .any(|op| address.matches_script_pubkey(&op.script_pubkey))
+                {
                     return Some(ParsedTx::SpentToAddress(address.script_pubkey().to_bytes()));
                 }
-            },
+            }
 
-            RelevantTxType::RollupInscription(_name) => {
-                if let Some(out) = tx.output.iter().find_map(|out| {
-                    if let Ok(inscription_data) = parse_inscription_data(&out.script_pubkey) {
-                        Some(inscription_data)
-                    } else {
-                        None
+            RelevantTxType::RollupInscription(name) => {
+                if let Some(scr) = tx.input[0].witness.tapscript() {
+                    if let Ok(inscription_data) = parse_inscription_data(&scr.into(), name) {
+                        return Some(ParsedTx::RollupInscription(inscription_data));
                     }
-                }) {
-                    return Some(ParsedTx::RollupInscription(out));
                 }
-            },
+            }
 
             RelevantTxType::Deposit(rollup_name, federation_address, addr_len, amount) => {
                 let config = &DepositTxConfig {
@@ -68,7 +83,7 @@ fn check_and_extract_relevancy(tx: &Transaction, relevant_types: &[RelevantTxTyp
                 if let Ok(deposit_req_info) = extract_deposit_request_info(tx, config) {
                     return Some(ParsedTx::DepositRequest(deposit_req_info));
                 }
-            },
+            }
         }
     }
 
@@ -187,6 +202,7 @@ mod test {
         let tx = create_inscription_tx(rollup_name.clone());
         let block = create_test_block(vec![tx]);
         let result = filter_relevant_txs(&block, &[RelevantTxType::RollupInscription(rollup_name)]);
+        println!("{:?}", result);
         assert_eq!(result[0].0, 0, "Should filter valid rollup name");
 
         // Test with invalid name
