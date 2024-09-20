@@ -1838,9 +1838,9 @@ dependencies = [
 
 [[package]]
 name = "secp256k1"
-version = "0.29.0"
+version = "0.29.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e0cc0f1cf93f4969faf3ea1c7d8a9faed25918d96affa959720823dfe86d4f3"
+checksum = "9465315bc9d4566e1724f0fffcbcc446268cb522e60f9a27bcded6b19c108113"
 dependencies = [
  "bitcoin_hashes",
  "rand",
@@ -2455,13 +2455,3 @@ dependencies = [
  "quote",
  "syn 2.0.77",
 ]
-
-[[patch.unused]]
-name = "sha2"
-version = "0.10.6"
-source = "git+https://github.com/sp1-patches/RustCrypto-hashes?branch=patch-sha2-v0.10.6#e5f8b7eaaa9801503bd998932a52b65848eee234"
-
-[[patch.unused]]
-name = "sha2"
-version = "0.9.8"
-source = "git+https://github.com/sp1-patches/RustCrypto-hashes?branch=patch-sha2-v0.9.8#afdbfb09c325f8a69c01d540ec9a261e3637725d"

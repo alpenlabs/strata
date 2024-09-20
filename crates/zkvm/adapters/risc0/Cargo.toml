@@ -16,4 +16,4 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [features]
 default = []
-prover = ["risc0-zkvm/prove"]
+prover = []

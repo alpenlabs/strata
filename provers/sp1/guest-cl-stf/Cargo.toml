@@ -10,9 +10,8 @@ alpen-express-primitives = { path = "../../../crates/primitives" }
 bitcoin = { version = "0.32.1", features = ["serde"] }
 borsh = { version = "1.5.0", features = ["derive"] }
 express-proofimpl-cl-stf = { path = "../../../crates/proof-impl/cl-stf" }
-sp1-zkvm = "1.0.1"
-
+sp1-zkvm = "2.0.0"
 
 [patch.crates-io]
-secp256k1 = { git = "https://github.com/sp1-patches/rust-secp256k1", branch = "patch-secp256k1-v0.29.0-old" }
+secp256k1 = { git = "https://github.com/prajwolrg/rust-secp256k1", branch = "0.29.x-sp1-patch" }
 sha2-v0-10-8 = { git = "https://github.com/sp1-patches/RustCrypto-hashes", package = "sha2", branch = "patch-sha2-v0.10.8" }
