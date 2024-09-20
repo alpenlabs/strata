@@ -214,8 +214,8 @@ mod tests {
             CooperativeWithdrawalInfo::new(deposit_outpoint, user_pk, assigned_operator_idx);
 
         let build_context = TxBuildContext::new(
-            pubkey_table,
             Network::Regtest,
+            pubkey_table,
             assigned_operator_idx as OperatorIdx,
         );
 
@@ -280,7 +280,7 @@ mod tests {
         );
 
         let build_context =
-            TxBuildContext::new(pubkey_table, Network::Regtest, assigned_operator_idx);
+            TxBuildContext::new(Network::Regtest, pubkey_table, assigned_operator_idx);
 
         // Act
         let signing_data_result = withdrawal_info.construct_signing_data(&build_context);
@@ -318,7 +318,7 @@ mod tests {
             CooperativeWithdrawalInfo::new(deposit_outpoint, user_pk, assigned_operator_idx);
 
         let build_context =
-            TxBuildContext::new(pubkey_table, Network::Regtest, assigned_operator_idx);
+            TxBuildContext::new(Network::Regtest, pubkey_table, assigned_operator_idx);
 
         // Act
         let prevout_result = withdrawal_info.create_prevout(&build_context);
@@ -363,7 +363,7 @@ mod tests {
             CooperativeWithdrawalInfo::new(deposit_outpoint, user_pk, assigned_operator_idx);
 
         let build_context =
-            TxBuildContext::new(pubkey_table, Network::Regtest, assigned_operator_idx);
+            TxBuildContext::new(Network::Regtest, pubkey_table, assigned_operator_idx);
 
         // Act
         let unsigned_tx_result =

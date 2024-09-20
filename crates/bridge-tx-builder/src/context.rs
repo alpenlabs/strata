@@ -35,6 +35,9 @@ pub trait BuildContext {
 /// A builder for raw transactions related to the bridge.
 #[derive(Debug, Clone)]
 pub struct TxBuildContext {
+    /// The network to build the transactions for.
+    network: Network,
+
     /// A table that maps bridge operator indexes to their respective x-only Schnorr pubkeys.
     pubkey_table: PublickeyTable,
 
@@ -45,22 +48,19 @@ pub struct TxBuildContext {
 
     /// The [`OperatorIdx`] for this bridge client.
     own_index: OperatorIdx,
-
-    /// The network to build the transactions for.
-    network: Network,
 }
 
 impl TxBuildContext {
     /// Create a new [`TxBuildContext`] with the context required to build transactions of various
     /// [`TxKind`](super::TxKind).
-    pub fn new(operator_pubkeys: PublickeyTable, network: Network, own_index: OperatorIdx) -> Self {
+    pub fn new(network: Network, operator_pubkeys: PublickeyTable, own_index: OperatorIdx) -> Self {
         let aggregated_pubkey = get_aggregated_pubkey(operator_pubkeys.clone());
 
         Self {
+            network,
             pubkey_table: operator_pubkeys,
             aggregated_pubkey,
             own_index,
-            network,
         }
     }
 }

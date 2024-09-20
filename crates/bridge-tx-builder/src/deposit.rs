@@ -272,7 +272,7 @@ mod tests {
             create_drt_taproot_output(operator_pubkeys.clone());
         let self_index = 0;
 
-        let tx_builder = TxBuildContext::new(operator_pubkeys, Network::Regtest, self_index);
+        let tx_builder = TxBuildContext::new(Network::Regtest, operator_pubkeys, self_index);
 
         // Correct merkle proof
         let deposit_info = DepositInfo::new(
