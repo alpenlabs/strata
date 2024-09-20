@@ -261,9 +261,7 @@ impl SignatureManager {
             }
         }
 
-        self.db_ops
-            .put_tx_state_async(*txid, tx_state.clone())
-            .await?;
+        self.db_ops.put_tx_state_async(*txid, tx_state).await?;
 
         Ok(is_fully_signed)
     }
