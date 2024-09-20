@@ -83,7 +83,7 @@ impl L1TxProof {
 pub struct L1Tx {
     proof: L1TxProof,
     tx: Vec<u8>,
-    parsed_tx: RelevantTxInfo,
+    relevant_info: RelevantTxInfo,
 }
 
 impl L1Tx {
@@ -91,7 +91,7 @@ impl L1Tx {
         Self {
             proof,
             tx,
-            parsed_tx,
+            relevant_info: parsed_tx,
         }
     }
 
@@ -104,7 +104,7 @@ impl L1Tx {
     }
 
     pub fn parsed_tx(&self) -> &RelevantTxInfo {
-        &self.parsed_tx
+        &self.relevant_info
     }
 }
 

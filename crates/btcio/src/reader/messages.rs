@@ -17,7 +17,7 @@ pub struct BlockData {
     block_num: u64,
     block: Block,
     /// Transactions in the block that are relevant to rollup
-    relevant_tx: Vec<(u32, RelevantTxInfo)>,
+    relevant_tx_infos: Vec<(u32, RelevantTxInfo)>,
 }
 
 impl BlockData {
@@ -25,7 +25,7 @@ impl BlockData {
         Self {
             block_num,
             block,
-            relevant_tx,
+            relevant_tx_infos: relevant_tx,
         }
     }
 
@@ -34,11 +34,11 @@ impl BlockData {
     }
 
     pub fn relevant_tx_idxs(&self) -> Vec<u32> {
-        self.relevant_tx.iter().map(|v| v.0).collect()
+        self.relevant_tx_infos.iter().map(|v| v.0).collect()
     }
 
-    pub fn relevant_tx(&self) -> &[(u32, RelevantTxInfo)] {
-        &self.relevant_tx
+    pub fn relevant_tx_infos(&self) -> &[(u32, RelevantTxInfo)] {
+        &self.relevant_tx_infos
     }
 
     pub fn block_num(&self) -> u64 {

@@ -1,6 +1,11 @@
 use std::str::FromStr;
 
-use bitcoin::{absolute::LockTime, opcodes::all::OP_RETURN, script::{self, PushBytesBuf}, Address, Amount, ScriptBuf, Transaction, TxOut};
+use bitcoin::{
+    absolute::LockTime,
+    opcodes::all::OP_RETURN,
+    script::{self, PushBytesBuf},
+    Address, Amount, ScriptBuf, Transaction, TxOut,
+};
 
 use super::DepositTxConfig;
 
@@ -21,7 +26,11 @@ pub fn get_deposit_tx_config() -> DepositTxConfig {
     }
 }
 
-pub fn create_transaction_two_outpoints(amt: Amount, scr1: &ScriptBuf, scr2: &ScriptBuf ) -> Transaction {
+pub fn create_transaction_two_outpoints(
+    amt: Amount,
+    scr1: &ScriptBuf,
+    scr2: &ScriptBuf,
+) -> Transaction {
     // Construct the outputs
     let outputs = vec![
         TxOut {
@@ -44,7 +53,11 @@ pub fn create_transaction_two_outpoints(amt: Amount, scr1: &ScriptBuf, scr2: &Sc
     }
 }
 
-pub fn build_no_op_deposit_request_script(magic: Vec<u8>,dummy_block: Vec<u8>, evm_addr: Vec<u8>) -> ScriptBuf {
+pub fn build_no_op_deposit_request_script(
+    magic: Vec<u8>,
+    dummy_block: Vec<u8>,
+    evm_addr: Vec<u8>,
+) -> ScriptBuf {
     let builder = script::Builder::new()
         .push_slice(PushBytesBuf::try_from(magic).unwrap())
         .push_slice(PushBytesBuf::try_from(dummy_block).unwrap())
@@ -53,7 +66,11 @@ pub fn build_no_op_deposit_request_script(magic: Vec<u8>,dummy_block: Vec<u8>, e
     builder.into_script()
 }
 
-pub fn build_test_deposit_request_script(magic: Vec<u8>,dummy_block: Vec<u8>, evm_addr: Vec<u8>) -> ScriptBuf {
+pub fn build_test_deposit_request_script(
+    magic: Vec<u8>,
+    dummy_block: Vec<u8>,
+    evm_addr: Vec<u8>,
+) -> ScriptBuf {
     let builder = script::Builder::new()
         .push_opcode(OP_RETURN)
         .push_slice(PushBytesBuf::try_from(magic).unwrap())
@@ -71,4 +88,3 @@ pub fn build_test_deposit_script(magic: Vec<u8>, evm_addr: Vec<u8>) -> ScriptBuf
 
     builder.into_script()
 }
-

@@ -1,8 +1,7 @@
 use bitcoin::{script::Instructions, Transaction, TxOut};
 
-use crate::parser::utils::next_bytes;
-
 use super::{error::DepositParseError, DepositTxConfig};
+use crate::parser::utils::next_bytes;
 
 pub type TapBlkAndAddr = (Vec<u8>, Vec<u8>);
 
@@ -18,7 +17,10 @@ pub fn parse_bridge_offer_output<'a>(
     })
 }
 
-pub fn check_magic_bytes(instructions: &mut Instructions,config: &DepositTxConfig) -> Result<(), DepositParseError> {
+pub fn check_magic_bytes(
+    instructions: &mut Instructions,
+    config: &DepositTxConfig,
+) -> Result<(), DepositParseError> {
     // magic bytes
     if let Some(magic_bytes) = next_bytes(instructions) {
         if magic_bytes != config.magic_bytes {
@@ -33,28 +35,34 @@ pub fn check_magic_bytes(instructions: &mut Instructions,config: &DepositTxConfi
     Err(DepositParseError::NoMagicBytes)
 }
 
-pub fn extract_ee_bytes(instructions: &mut Instructions,config: &DepositTxConfig) -> Result<Vec<u8>, DepositParseError>{
+pub fn extract_ee_bytes(
+    instructions: &mut Instructions,
+    config: &DepositTxConfig,
+) -> Result<Vec<u8>, DepositParseError> {
     match next_bytes(instructions) {
         Some(ee_bytes) => {
             if ee_bytes.len() as u8 != config.address_length {
-                return Err(DepositParseError::InvalidDestAddress(
-                    ee_bytes.len() as u8
-                ));
+                return Err(DepositParseError::InvalidDestAddress(ee_bytes.len() as u8));
             }
-            return Ok(ee_bytes);
+            Ok(ee_bytes)
         }
-        None => {
-            return Err(DepositParseError::NoDestAddress);
-        }
+        None => Err(DepositParseError::NoDestAddress),
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::parser::deposit::{common::{check_magic_bytes, parse_bridge_offer_output}, test_utils::{create_transaction_two_outpoints, get_deposit_tx_config}};
+    use bitcoin::{
+        opcodes::all::OP_RETURN,
+        script::{Builder, PushBytesBuf},
+        Amount, ScriptBuf,
+    };
 
     use super::*;
-    use bitcoin::{opcodes::all::OP_RETURN, script::{Builder, PushBytesBuf}, Amount, ScriptBuf};
+    use crate::parser::deposit::{
+        common::{check_magic_bytes, parse_bridge_offer_output},
+        test_utils::{create_transaction_two_outpoints, get_deposit_tx_config},
+    };
 
     #[test]
     fn test_parse_bridge_offer_output_valid() {
@@ -62,7 +70,7 @@ mod tests {
         let tx = create_transaction_two_outpoints(
             Amount::from_sat(config.deposit_quantity),
             &config.federation_address.script_pubkey(),
-            &ScriptBuf::new()
+            &ScriptBuf::new(),
         );
 
         let result = parse_bridge_offer_output(&tx, &config);
@@ -70,7 +78,10 @@ mod tests {
         let (index, txout) = result.unwrap();
         assert_eq!(index, 0);
         assert_eq!(txout.value.to_sat(), config.deposit_quantity);
-        assert_eq!(txout.script_pubkey, config.federation_address.script_pubkey());
+        assert_eq!(
+            txout.script_pubkey,
+            config.federation_address.script_pubkey()
+        );
     }
 
     #[test]
@@ -79,7 +90,7 @@ mod tests {
         let tx = create_transaction_two_outpoints(
             Amount::from_sat(config.deposit_quantity + 1),
             &ScriptBuf::new(),
-            &ScriptBuf::new()
+            &ScriptBuf::new(),
         );
 
         let result = parse_bridge_offer_output(&tx, &config);
@@ -103,13 +114,18 @@ mod tests {
     fn test_check_magic_bytes_invalid() {
         let config = get_deposit_tx_config();
         let script = Builder::new()
-            .push_slice(PushBytesBuf::try_from("wrong_magic".to_string().as_bytes().to_vec()).unwrap())
+            .push_slice(
+                PushBytesBuf::try_from("wrong_magic".to_string().as_bytes().to_vec()).unwrap(),
+            )
             .push_opcode(OP_RETURN)
             .into_script();
         let mut instructions = script.instructions();
 
         let result = check_magic_bytes(&mut instructions, &config);
-        assert!(matches!(result, Err(DepositParseError::MagicBytesMismatch(_, _))));
+        assert!(matches!(
+            result,
+            Err(DepositParseError::MagicBytesMismatch(_, _))
+        ));
     }
 
     #[test]
@@ -148,7 +164,10 @@ mod tests {
         let mut instructions = script.instructions();
 
         let result = extract_ee_bytes(&mut instructions, &config);
-        assert!(matches!(result, Err(DepositParseError::InvalidDestAddress(_))));
+        assert!(matches!(
+            result,
+            Err(DepositParseError::InvalidDestAddress(_))
+        ));
     }
 
     #[test]

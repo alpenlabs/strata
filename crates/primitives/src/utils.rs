@@ -80,7 +80,7 @@ fn get_cohashes_from_wtxids(wtxids: &[Wtxid], index: u32) -> (Vec<Buf32>, Buf32)
 ///
 /// # Panics
 /// - If the `idx` is out of bounds for the block's transaction data.
-pub fn generate_l1_tx(idx: u32, parsed_tx: RelevantTxInfo, block: &Block) -> L1Tx {
+pub fn generate_l1_tx(idx: u32, relevant_info: RelevantTxInfo, block: &Block) -> L1Tx {
     assert!(
         (idx as usize) < block.txdata.len(),
         "utils: tx idx out of range of block txs"
@@ -105,7 +105,7 @@ pub fn generate_l1_tx(idx: u32, parsed_tx: RelevantTxInfo, block: &Block) -> L1T
     let proof = L1TxProof::new(idx, cohashes);
     let tx = serialize(tx);
 
-    L1Tx::new(proof, tx, parsed_tx)
+    L1Tx::new(proof, tx, relevant_info)
 }
 
 /// Temporary schnorr keypair.

@@ -3,9 +3,9 @@ use std::str::FromStr;
 use alpen_express_primitives::params::RollupParams;
 use bitcoin::Address;
 
+pub mod common;
 pub mod deposit_request;
 pub mod deposit_tx;
-pub mod common;
 pub mod error;
 pub mod test_utils;
 

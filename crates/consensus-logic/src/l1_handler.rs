@@ -69,7 +69,7 @@ where
 
             let manifest = generate_block_manifest(blockdata.block());
             let l1txs: Vec<_> = blockdata
-                .relevant_tx()
+                .relevant_tx_infos()
                 .iter()
                 .map(|(idx, parsed_tx)| generate_l1_tx(*idx, parsed_tx.clone(), blockdata.block()))
                 .collect();
@@ -98,9 +98,9 @@ where
 
 /// Parses inscriptions and checks for batch data in the transactions
 fn check_for_da_batch(blockdata: &BlockData) -> Vec<BatchCheckpoint> {
-    let binding = blockdata.relevant_tx();
+    let relevant_tx_infos = blockdata.relevant_tx_infos();
 
-    let inscriptions = binding
+    let inscriptions = relevant_tx_infos
         .iter()
         .filter_map(|(idx, parsed_tx)| match parsed_tx {
             alpen_express_primitives::tx::RelevantTxInfo::RollupInscription(inscription) => {

@@ -3,9 +3,12 @@
 use alpen_express_primitives::tx::DepositReqeustInfo;
 use bitcoin::{opcodes::all::OP_RETURN, ScriptBuf, Transaction};
 
-use super::{common::{check_magic_bytes, extract_ee_bytes, parse_bridge_offer_output, TapBlkAndAddr}, error::DepositParseError, DepositTxConfig};
+use super::{
+    common::{check_magic_bytes, extract_ee_bytes, parse_bridge_offer_output, TapBlkAndAddr},
+    error::DepositParseError,
+    DepositTxConfig,
+};
 use crate::parser::utils::{next_bytes, next_op};
-
 
 /// Extracts the DepositInfo from the Deposit Transaction
 pub fn extract_deposit_request_info(
@@ -13,7 +16,9 @@ pub fn extract_deposit_request_info(
     config: &DepositTxConfig,
 ) -> Option<DepositReqeustInfo> {
     for output in tx.output.iter() {
-        if let Ok((tap_blk, ee_address)) =  parse_deposit_request_script(&output.script_pubkey, config) {
+        if let Ok((tap_blk, ee_address)) =
+            parse_deposit_request_script(&output.script_pubkey, config)
+        {
             // find the outpoint with taproot address, so that we can extract sent amount from that
             if let Some((index, tx_out)) = parse_bridge_offer_output(tx, config) {
                 return Some(DepositReqeustInfo {
@@ -23,9 +28,9 @@ pub fn extract_deposit_request_info(
                     control_block: tap_blk,
                 });
             }
-            }
         }
-   None
+    }
+    None
 }
 
 /// extracts the tapscript block and EE address given that the script is OP_RETURN type and
@@ -33,7 +38,7 @@ pub fn extract_deposit_request_info(
 pub fn parse_deposit_request_script(
     script: &ScriptBuf,
     config: &DepositTxConfig,
-) ->Result<TapBlkAndAddr, DepositParseError> {
+) -> Result<TapBlkAndAddr, DepositParseError> {
     let mut instructions = script.instructions();
 
     // check if OP_RETURN is present and if not just discard it
@@ -59,20 +64,22 @@ pub fn parse_deposit_request_script(
     }
 }
 
-
-
 #[cfg(test)]
 mod tests {
-    use bitcoin::{
-        absolute::LockTime, Amount, Transaction};
-
-    use crate::parser::deposit::{deposit_request::parse_deposit_request_script, error::DepositParseError, test_utils::{build_no_op_deposit_request_script, build_test_deposit_request_script,  create_transaction_two_outpoints, generic_taproot_addr, get_deposit_tx_config}};
+    use bitcoin::{absolute::LockTime, Amount, Transaction};
 
     use super::extract_deposit_request_info;
+    use crate::parser::deposit::{
+        deposit_request::parse_deposit_request_script,
+        error::DepositParseError,
+        test_utils::{
+            build_no_op_deposit_request_script, build_test_deposit_request_script,
+            create_transaction_two_outpoints, generic_taproot_addr, get_deposit_tx_config,
+        },
+    };
 
     #[test]
     fn check_deposit_parser() {
-
         // values for testing
         let amt = Amount::from_sat(1000);
         let evm_addr = [1; 20];
@@ -80,9 +87,17 @@ mod tests {
         let generic_taproot_addr = generic_taproot_addr();
 
         let config = get_deposit_tx_config();
-        let deposit_request_script = build_test_deposit_request_script(config.magic_bytes, dummy_control_block.to_vec(), evm_addr.to_vec());
+        let deposit_request_script = build_test_deposit_request_script(
+            config.magic_bytes,
+            dummy_control_block.to_vec(),
+            evm_addr.to_vec(),
+        );
 
-        let test_transaction = create_transaction_two_outpoints(Amount::from_sat(config.deposit_quantity),&generic_taproot_addr.script_pubkey(), &deposit_request_script);
+        let test_transaction = create_transaction_two_outpoints(
+            Amount::from_sat(config.deposit_quantity),
+            &generic_taproot_addr.script_pubkey(),
+            &deposit_request_script,
+        );
 
         let out = extract_deposit_request_info(&test_transaction, &get_deposit_tx_config());
 
@@ -100,7 +115,11 @@ mod tests {
         let control_block = [0xFF; 65];
 
         let config = get_deposit_tx_config();
-        let invalid_script = build_no_op_deposit_request_script(config.magic_bytes.clone(), control_block.to_vec(), evm_addr.to_vec());
+        let invalid_script = build_no_op_deposit_request_script(
+            config.magic_bytes.clone(),
+            control_block.to_vec(),
+            evm_addr.to_vec(),
+        );
 
         let out = parse_deposit_request_script(&invalid_script, &config);
 
@@ -115,8 +134,11 @@ mod tests {
 
         let config = get_deposit_tx_config();
 
-
-        let script = build_test_deposit_request_script(config.magic_bytes.clone(),control_block.to_vec(), evm_addr.to_vec());
+        let script = build_test_deposit_request_script(
+            config.magic_bytes.clone(),
+            control_block.to_vec(),
+            evm_addr.to_vec(),
+        );
         let out = parse_deposit_request_script(&script, &config);
 
         // Should return an error as EVM address length is invalid
@@ -129,13 +151,19 @@ mod tests {
         let control_block = [0xFF; 0]; // Missing control block
 
         let config = get_deposit_tx_config();
-        let script_missing_control = build_test_deposit_request_script(config.magic_bytes.clone(), control_block.to_vec(), evm_addr.to_vec());
-
+        let script_missing_control = build_test_deposit_request_script(
+            config.magic_bytes.clone(),
+            control_block.to_vec(),
+            evm_addr.to_vec(),
+        );
 
         let out = parse_deposit_request_script(&script_missing_control, &config);
 
         // Should return an error due to missing control block
-        assert!(matches!(out, Err(DepositParseError::ControlBlockLenMismatch)));
+        assert!(matches!(
+            out,
+            Err(DepositParseError::ControlBlockLenMismatch)
+        ));
     }
 
     #[test]
@@ -145,12 +173,19 @@ mod tests {
         let invalid_magic_bytes = vec![0x00; 4]; // Invalid magic bytes
 
         let config = get_deposit_tx_config();
-        let invalid_script = build_test_deposit_request_script(invalid_magic_bytes, control_block.to_vec(), evm_addr.to_vec());
+        let invalid_script = build_test_deposit_request_script(
+            invalid_magic_bytes,
+            control_block.to_vec(),
+            evm_addr.to_vec(),
+        );
 
         let out = parse_deposit_request_script(&invalid_script, &config);
 
         // Should return an error due to invalid magic bytes
-        assert!(matches!(out, Err(DepositParseError::MagicBytesMismatch(_,_))));
+        assert!(matches!(
+            out,
+            Err(DepositParseError::MagicBytesMismatch(_, _))
+        ));
     }
 
     #[test]
@@ -168,6 +203,6 @@ mod tests {
         let out = extract_deposit_request_info(&test_transaction, &config);
 
         // Should return an error as the transaction has no outputs
-        assert!(matches!(out, None));
+        assert!(out.is_none());
     }
 }
