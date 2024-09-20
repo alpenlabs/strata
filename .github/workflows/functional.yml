@@ -60,6 +60,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install bitcoind
+        env:
+          BITCOIND_VERSION: "27.0"
+          BITCOIND_ARCH: "x86_64-linux-gnu"
+          SHASUM: "2a6974c5486f528793c79d42694b5987401e4a43c97f62b1383abf35bcee44a8"
+        run: |
+          wget -q "https://bitcoin.org/bin/bitcoin-core-${{ env.BITCOIND_VERSION }}/bitcoin-${{ env.BITCOIND_VERSION }}-${{ env.BITCOIND_ARCH }}.tar.gz"
+          sha256sum -c <<< "$SHASUM bitcoin-${{ env.BITCOIND_VERSION }}-${{ env.BITCOIND_ARCH }}.tar.gz"
+          tar xzf "bitcoin-${{ env.BITCOIND_VERSION }}-${{ env.BITCOIND_ARCH }}.tar.gz"
+          sudo install -m 0755 -t /usr/local/bin bitcoin-${{ env.BITCOIND_VERSION }}/bin/*
+          bitcoind --version
+          rm -rf "bitcoin-${{ env.BITCOIND_VERSION }}" "bitcoin-${{ env.BITCOIND_VERSION }}-${{ env.BITCOIND_ARCH }}.tar.gz"
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -86,13 +99,6 @@ jobs:
 
       - name: Build Cargo project
         run: cargo build --locked
-
-      - name: Install bitcoind
-        run: |
-          wget https://bitcoin.org/bin/bitcoin-core-27.0/bitcoin-27.0-x86_64-linux-gnu.tar.gz
-          tar xzf bitcoin-27.0-x86_64-linux-gnu.tar.gz
-          sudo install -m 0755 -t /usr/local/bin bitcoin-27.0/bin/*
-          bitcoind --version
 
       - name: Run functional tests (1)
         id: funcTestsRun1
