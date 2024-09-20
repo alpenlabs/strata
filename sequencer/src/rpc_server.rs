@@ -147,6 +147,7 @@ pub struct AlpenRpcImpl<D> {
 }
 
 impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         status_rx: Arc<StatusRx>,
         database: Arc<D>,
