@@ -1,13 +1,15 @@
-use anyhow::Ok;
+use anyhow::{Context, Ok, Result};
 use express_zkvm::{
     AggregationInput, Proof, ProverOptions, VerificationKey, ZKVMHost, ZKVMInputBuilder,
     ZKVMVerifier,
 };
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::to_vec;
+use snark_bn254_verifier::Groth16Verifier;
 use sp1_sdk::{
     HashableKey, ProverClient, SP1Proof, SP1ProofWithPublicValues, SP1Stdin, SP1VerifyingKey,
 };
+use substrate_bn::Fr;
 
 // A wrapper around SP1Stdin
 pub struct SP1ProofInputBuilder(SP1Stdin);
@@ -100,7 +102,7 @@ impl ZKVMHost for SP1Host {
             prover = prover.compressed();
         }
         if self.prover_options.stark_to_snark_conversion {
-            prover = prover.plonk();
+            prover = prover.groth16();
         }
 
         let proof = prover.run()?;
@@ -159,9 +161,49 @@ impl ZKVMVerifier for SP1Verifier {
     }
 }
 
+// Copied from ~/.sp1/circuits/v2.0.0/groth16_vk.bin
+// This is same for all the SP1 programs that uses v2.0.0
+pub const GROTH16_VK_BYTES: &[u8] = include_bytes!("groth16_vk.bin");
+impl SP1Verifier {
+    pub fn verify_groth16(
+        proof: &[u8],
+        vkey_hash: &[u8],
+        committed_values_digest: &[u8],
+    ) -> Result<()> {
+        let vk = GROTH16_VK_BYTES;
+
+        // Convert vkey_hash to Fr, mapping the error to anyhow::Error
+        let vkey_hash_fr = Fr::from_slice(vkey_hash)
+            .map_err(|e| anyhow::anyhow!(e))
+            .context("Unable to convert vkey_hash to Fr")?;
+
+        // Convert committed_values_digest to Fr, mapping the error to anyhow::Error
+        let committed_values_digest_fr = Fr::from_slice(committed_values_digest)
+            .map_err(|e| anyhow::anyhow!(e))
+            .context("Unable to convert committed_values_digest to Fr")?;
+
+        // Perform the Groth16 verification, mapping any error to anyhow::Error
+        let verification_result =
+            Groth16Verifier::verify(proof, vk, &[vkey_hash_fr, committed_values_digest_fr])
+                .map_err(|e| anyhow::anyhow!(e))
+                .context("Groth16 verification failed")?;
+
+        if verification_result {
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!("Groth16 proof verification returned false"))
+        }
+    }
+}
+
 // NOTE: SP1 prover runs in release mode only; therefore run the tests on release mode only
 #[cfg(test)]
 mod tests {
+
+    use num_bigint::BigUint;
+    use num_traits::Num;
+    use sp1_sdk::{MockProver, Prover};
+
     use super::*;
 
     // Adding compiled guest code `TEST_ELF` to save the build time
@@ -193,8 +235,10 @@ mod tests {
         SP1Verifier::verify(&vk, &proof).expect("Proof verification failed");
 
         // assert public outputs extraction from proof  works
-        let out: u32 =
-            SP1Verifier::extract_public_output(&proof).expect("Failed to extract public outputs");
+        let out: u32 = SP1Verifier::extract_public_output(&proof).expect(
+            "Failed to extract public
+    outputs",
+        );
         assert_eq!(input, out)
     }
 
@@ -217,5 +261,69 @@ mod tests {
         // assert proof verification works
         SP1Verifier::verify_with_public_params(&vk, input, &proof)
             .expect("Proof verification failed");
+    }
+
+    #[test]
+    fn test_groth16_verification() {
+        if cfg!(debug_assertions) {
+            panic!("SP1 prover runs in release mode only");
+        }
+
+        sp1_sdk::utils::setup_logger();
+
+        // let input: u32 = 1;
+
+        // let mut prover_input = ProverInput::new();
+        // prover_input.write(input);
+
+        // // Prover Options to generate Groth16 proof
+        // let prover_options = ProverOptions {
+        //     enable_compression: false,
+        //     use_mock_prover: false,
+        //     stark_to_snark_conversion: true,
+        // };
+        // let zkvm = SP1Host::init(TEST_ELF.to_vec(), prover_options);
+
+        // // assert proof generation works
+        // let (proof, vk) = zkvm.prove(&prover_input).expect("Failed to generate proof");
+
+        // let filename = "proof-groth16.bin";
+        // let mut file = File::create(filename).unwrap();
+        // file.write_all(proof.as_bytes()).unwrap();
+
+        let client = MockProver::new();
+        let (_, vk) = client.setup(TEST_ELF);
+
+        let raw_groth16_proof = include_bytes!("../tests/proofs/proof-groth16.bin");
+        let proof: SP1ProofWithPublicValues =
+            bincode::deserialize(raw_groth16_proof).expect("Failed to deserialize Groth16 proof");
+
+        // assert proof verification works
+        client
+            .verify(&proof, &vk)
+            .expect("Proof verification failed");
+
+        let committed_values_digest = &proof.public_values.hash_bn254().to_bytes_be();
+        let groth16_proof_bytes = proof
+            .proof
+            .try_as_groth_16()
+            .expect("Failed to convert proof to Groth16")
+            .raw_proof;
+        let groth16_proof =
+            hex::decode(&groth16_proof_bytes).expect("Failed to decode Groth16 proof");
+
+        let vkey_hash = BigUint::from_str_radix(
+            vk.bytes32()
+                .strip_prefix("0x")
+                .expect("vkey should start with '0x'"),
+            16,
+        )
+        .expect("Failed to parse vkey hash")
+        .to_bytes_be();
+
+        assert!(
+            SP1Verifier::verify_groth16(&groth16_proof, &vkey_hash, committed_values_digest)
+                .is_ok()
+        );
     }
 }
