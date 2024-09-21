@@ -14,6 +14,7 @@ use bdk_wallet::{
     rusqlite::{self, Connection},
     PersistedWallet,
 };
+use console::Term;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 
 use crate::{seed::BaseWallet, settings::SETTINGS};
@@ -72,6 +73,7 @@ impl SignetWallet {
     }
 
     pub async fn sync(&mut self) -> Result<(), Box<esplora_client::Error>> {
+        let _ = Term::stdout().write_line("Syncing wallet...");
         let sty = ProgressStyle::with_template(
             "[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}",
         )

@@ -9,6 +9,7 @@ use alloy::{
 use argh::FromArgs;
 use bdk_wallet::bitcoin::{hashes::Hash, Address, Amount};
 use console::Term;
+use hex::encode;
 
 use crate::{
     rollup::RollupWallet,
@@ -79,5 +80,10 @@ pub async fn send(args: SendArgs) {
         unreachable!()
     };
 
-    let _ = term.write_line("Sent {amount} to {address} in tx {txid}");
+    let _ = term.write_line(&format!(
+        "Sent {} to {} in tx {}",
+        args.amount,
+        args.address,
+        encode(&txid)
+    ));
 }

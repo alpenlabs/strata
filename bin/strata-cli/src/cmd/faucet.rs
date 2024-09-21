@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use alloy::{primitives::Address as RollupAddress, providers::WalletProvider};
 use argh::FromArgs;
-use bdk_wallet::{bitcoin::Address, rusqlite::Connection, KeychainKind};
+use bdk_wallet::{bitcoin::Address, KeychainKind};
 use console::Term;
 use hex::{encode, Hex};
 use indicatif::ProgressBar;

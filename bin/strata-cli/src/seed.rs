@@ -104,14 +104,15 @@ impl Seed {
             BadPassword,
         )>,
     > {
-        let maybe_encrypted_seed = EncryptedSeed::load().map_err(OneOf::broaden)?;
         let term = Term::stdout();
+        let _ = term.write_line("Loading encrypted seed from OS keychain...");
+        let maybe_encrypted_seed = EncryptedSeed::load().map_err(OneOf::broaden)?;
         if let Some(encrypted_seed) = maybe_encrypted_seed {
-            let _ = term.write_line("Opening wallet");
+            let _ = term.write_line("Opening wallet...");
             let mut password = Password::read(false).map_err(OneOf::new)?;
             match encrypted_seed.decrypt(&mut password) {
                 Ok(seed) => {
-                    let _ = term.write_line("Wallet is open");
+                    let _ = term.write_line("Wallet unlocked");
                     Ok(seed)
                 }
                 Err(e) => {
@@ -387,6 +388,7 @@ pub struct BadPassword;
 /// platform storage system.  The details of the failure can
 /// be retrieved from the attached platform error.
 #[derive(Debug)]
+#[allow(unused)]
 pub struct PlatformFailure(Box<dyn std::error::Error + Send + Sync>);
 /// This indicates that the underlying secure storage
 /// holding saved items could not be accessed.  Typically this
@@ -394,6 +396,7 @@ pub struct PlatformFailure(Box<dyn std::error::Error + Send + Sync>);
 /// might be that the credential store is locked.  The underlying
 /// platform error will typically give the reason.
 #[derive(Debug)]
+#[allow(unused)]
 pub struct NoStorageAccess(Box<dyn std::error::Error + Send + Sync>);
 /// This indicates that there is no underlying credential
 /// entry in the platform for this entry.  Either one was
@@ -404,6 +407,7 @@ pub struct NoEntry;
 /// a UTF-8 string.  The underlying bytes are available
 /// for examination in the attached value.
 #[derive(Debug)]
+#[allow(unused)]
 pub struct BadEncoding(Vec<u8>);
 /// This indicates that one of the entry's credential
 /// attributes exceeded a
@@ -411,6 +415,7 @@ pub struct BadEncoding(Vec<u8>);
 /// attached values give the name of the attribute and
 /// the platform length limit that was exceeded.
 #[derive(Debug)]
+#[allow(unused)]
 pub struct TooLong {
     name: String,
     limit: u32,
@@ -420,6 +425,7 @@ pub struct TooLong {
 /// attached value gives the name of the attribute
 /// and the reason it's invalid.
 #[derive(Debug)]
+#[allow(unused)]
 pub struct Invalid {
     name: String,
     reason: String,
@@ -427,6 +433,7 @@ pub struct Invalid {
 /// This indicates that there is more than one credential found in the store
 /// that matches the entry.  Its value is a vector of the matching credentials.
 #[derive(Debug)]
+#[allow(unused)]
 pub struct Ambiguous(Vec<Box<Credential>>);
 
 type KeyRingErrors = (

@@ -1,6 +1,6 @@
 use alloy::providers::WalletProvider;
 use argh::FromArgs;
-use bdk_wallet::{rusqlite::Connection, KeychainKind};
+use bdk_wallet::KeychainKind;
 use console::Term;
 
 use crate::{rollup::RollupWallet, seed::Seed, signet::SignetWallet};
