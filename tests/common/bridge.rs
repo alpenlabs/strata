@@ -39,10 +39,12 @@ use tokio::{
     sync::{broadcast, Mutex},
     time::{error::Elapsed, timeout},
 };
-use tracing::{debug, event, span, trace, Level};
+use tracing::{debug, event, span, trace, warn, Level};
 
 /// Transaction fee to confirm Deposit Transaction
-pub(crate) const DT_FEE: Amount = Amount::from_sat(5000); // should be more than enough
+///
+/// This value must be greater than 179 based on the current config in the `bitcoind` instance.
+pub(crate) const DT_FEE: Amount = Amount::from_sat(1500); // should be more than enough
 /// Minimum confirmations required for miner rewards to become spendable.
 pub(crate) const MIN_MINER_REWARD_CONFS: u64 = 101;
 
@@ -622,6 +624,36 @@ impl Agent {
             result.unwrap_err()
         );
 
+        let high_priority_fee_rate = Amount::from_sat(8); // high priority
+
+        let total_in_value =
+            tx.input
+                .iter()
+                .fold(Amount::from_int_btc(0), |total_in_value, txin| {
+                    let prev_vout = txin.previous_output.vout;
+                    let prev_txid = txin.previous_output.txid;
+                    let prev_tx = bitcoind
+                        .client
+                        .get_raw_transaction(&prev_txid, None)
+                        .expect("previous transaction should exist");
+
+                    let prev_value = prev_tx.output[prev_vout as usize].value;
+
+                    total_in_value + prev_value
+                });
+
+        let total_out_value: Amount = tx.output.iter().map(|txout| txout.value).sum();
+        let actual_fees = total_in_value - total_out_value;
+
+        let estimated_fees: Amount = high_priority_fee_rate * tx.weight().to_vbytes_ceil();
+
+        warn!(
+            ?high_priority_fee_rate,
+            ?estimated_fees,
+            ?actual_fees,
+            "Fee calculation for the transaction"
+        );
+
         let result = bitcoind.client.send_raw_transaction(tx);
 
         assert!(
@@ -642,7 +674,12 @@ pub(crate) async fn setup(num_operators: usize) -> (Arc<Mutex<BitcoinD>>, Bridge
     let _guard = span.enter();
 
     let mut conf = Conf::default();
-    conf.args = vec!["-regtest", "-fallbackfee=0.00001", "-maxtxfee=0.0001"];
+    conf.args = vec![
+        "-regtest",
+        "-fallbackfee=0.00001",
+        "-maxtxfee=0.0001",
+        "-txindex=1",
+    ];
 
     // Uncomment the following line to view the stdout from `bitcoind`
     // conf.view_stdout = true;

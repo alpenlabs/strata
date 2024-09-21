@@ -125,6 +125,9 @@ impl CooperativeWithdrawalInfo {
             .map_err(CooperativeWithdrawalError::InvalidUserPk)?;
         let user_script_pubkey = user_addr.script_pubkey();
 
+        // This fee pays for the entire transaction.
+        // In the current configuration of `10` for `MIN_RELAY_FEE`, the total transaction fee
+        // computes to ~5.5 SAT (run integration tests with `RUST_LOG=warn` to verify).
         let fee_rate = FeeRate::from_sat_per_vb(MIN_RELAY_FEE.to_sat())
             .expect("MIN_RELAY_FEE should be set correctly");
         let tx_fee = user_script_pubkey.minimal_non_dust_custom(fee_rate);
