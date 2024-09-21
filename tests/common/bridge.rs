@@ -41,7 +41,8 @@ use tokio::{
 };
 use tracing::{debug, event, span, trace, Level};
 
-pub(crate) const MIN_FEE: Amount = Amount::from_sat(10000); // some random value; nothing special
+/// Transaction fee to confirm Deposit Transaction
+pub(crate) const DT_FEE: Amount = Amount::from_sat(5000); // should be more than enough
 /// Minimum confirmations required for miner rewards to become spendable.
 pub(crate) const MIN_MINER_REWARD_CONFS: u64 = 101;
 
@@ -580,7 +581,7 @@ impl Agent {
 
         for entry in unspent_utxos {
             trace!(%entry.amount, %entry.txid, %entry.vout, %entry.confirmations, "checking unspent utxos");
-            if entry.amount > target_amount + MIN_FEE {
+            if entry.amount > target_amount + DT_FEE {
                 return Some((
                     change_address,
                     OutPoint {
@@ -741,12 +742,16 @@ pub(crate) fn create_drt(
     let (drt_addr, take_back_leaf_hash, el_address) =
         create_drt_taproot_output(pubkeys, internal_key);
 
+    let net_bridge_in_amount = Amount::from(BRIDGE_DENOMINATION) + DT_FEE;
+
+    let drt_pubkey = drt_addr.script_pubkey();
+    let change_pubkey = change_address.script_pubkey();
+
+    let tx_fees = drt_pubkey.minimal_non_dust() + change_pubkey.minimal_non_dust();
+
     let output = create_tx_outs([
-        (drt_addr.script_pubkey(), BRIDGE_DENOMINATION.into()),
-        (
-            change_address.script_pubkey(),
-            total_amt - BRIDGE_DENOMINATION.into() - MIN_FEE,
-        ),
+        (drt_pubkey, net_bridge_in_amount),
+        (change_pubkey, total_amt - net_bridge_in_amount - tx_fees),
     ]);
 
     (
@@ -802,7 +807,7 @@ pub(crate) fn perform_rollup_actions(
     let _guard = span.enter();
 
     let deposit_request_outpoint = OutPoint { txid, vout: 0 };
-    let total_amount: Amount = BRIDGE_DENOMINATION.into();
+    let total_amount: Amount = Amount::from(BRIDGE_DENOMINATION) + DT_FEE;
     let original_taproot_addr = BitcoinAddress::new(original_taproot_addr.as_unchecked().clone());
 
     event!(Level::INFO, action = "creating deposit info");

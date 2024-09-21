@@ -3,11 +3,9 @@
 use std::str::FromStr;
 
 use alpen_express_primitives::l1::BitcoinAmount;
-use bitcoin::secp256k1::XOnlyPublicKey;
+use bitcoin::{secp256k1::XOnlyPublicKey, Amount};
 
 /// The value of each UTXO in the Bridge Multisig Address.
-///
-/// The actual value of a UTXO would be slightly less due to miner/relay fees.
 pub const BRIDGE_DENOMINATION: BitcoinAmount = BitcoinAmount::from_int_btc(10);
 
 /// The min relay fee as defined in bitcoin-core with the unit sats/kvB.
@@ -16,7 +14,9 @@ pub const BRIDGE_DENOMINATION: BitcoinAmount = BitcoinAmount::from_int_btc(10);
 pub const MIN_RELAY_FEE: BitcoinAmount = BitcoinAmount::from_sat(3_500);
 
 /// The fee charged by the operator to process a withdrawal.
-pub const OPERATOR_FEE: BitcoinAmount = BitcoinAmount::from_sat(BRIDGE_DENOMINATION.to_sat() / 20); // 5%
+///
+/// This has the type [`Amount`] for convenience.
+pub const OPERATOR_FEE: Amount = Amount::from_sat(BRIDGE_DENOMINATION.to_sat() / 20); // 5%
 
 /// Magic bytes to add to the metadata output in transactions to help identify them.
 pub const MAGIC_BYTES: &[u8; 11] = b"alpenstrata";

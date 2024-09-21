@@ -12,7 +12,7 @@ use crate::{
     errors::{BridgeTxBuilderResult, CooperativeWithdrawalError},
     prelude::{
         anyone_can_spend_txout, create_taproot_addr, create_tx, create_tx_ins, create_tx_outs,
-        metadata_script, SpendPath, BRIDGE_DENOMINATION, MIN_RELAY_FEE, OPERATOR_FEE,
+        SpendPath, BRIDGE_DENOMINATION, MIN_RELAY_FEE, OPERATOR_FEE,
     },
     TxKind,
 };
@@ -74,16 +74,6 @@ impl CooperativeWithdrawalInfo {
     }
 
     fn create_prevout<T: BuildContext>(&self, build_context: &T) -> BridgeTxBuilderResult<TxOut> {
-        let dummy_el_address = &[0u8; 20];
-        let metadata_script = metadata_script(dummy_el_address);
-        let metadata_amount = metadata_script.to_p2wsh().minimal_non_dust();
-
-        let anyone_can_spend_output_amount = anyone_can_spend_txout().value;
-
-        // Finally, create the `TxOut` that sends user funds to the bridge multisig
-        let fee_rate =
-            FeeRate::from_sat_per_vb(MIN_RELAY_FEE.to_sat()).expect("invalid MIN_RELAY_FEE set");
-
         // We are not committing to any script path as the internal key should already be
         // randomized due to MuSig2 aggregation. See: <https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki#cite_note-23>
         let spend_path = SpendPath::KeySpend {
@@ -92,18 +82,9 @@ impl CooperativeWithdrawalInfo {
 
         let (bridge_addr, _) = create_taproot_addr(build_context.network(), spend_path)?;
 
-        let script_pubkey = bridge_addr.script_pubkey();
-
-        let bridge_in_relay_cost = script_pubkey.minimal_non_dust_custom(fee_rate);
-
-        let value = Amount::from(BRIDGE_DENOMINATION)
-            - bridge_in_relay_cost
-            - metadata_amount
-            - anyone_can_spend_output_amount;
-
         Ok(TxOut {
-            value,
-            script_pubkey,
+            value: BRIDGE_DENOMINATION.into(),
+            script_pubkey: bridge_addr.script_pubkey(),
         })
     }
 
@@ -148,11 +129,11 @@ impl CooperativeWithdrawalInfo {
             .expect("MIN_RELAY_FEE should be set correctly");
         let tx_fee = user_script_pubkey.minimal_non_dust_custom(fee_rate);
 
-        let net_amount = total_amount - OPERATOR_FEE.into() - anyone_can_spend_out.value - tx_fee;
+        let net_amount = total_amount - OPERATOR_FEE - anyone_can_spend_out.value - tx_fee;
 
         let tx_outs = create_tx_outs([
-            (user_script_pubkey, net_amount), // payout to the user
-            (operator_addr.script_pubkey(), OPERATOR_FEE.into()), // operator fees
+            (user_script_pubkey, net_amount),              // payout to the user
+            (operator_addr.script_pubkey(), OPERATOR_FEE), // operator fees
             // anyone can spend for CPFP
             (
                 anyone_can_spend_out.script_pubkey,
@@ -174,7 +155,7 @@ mod tests {
         bridge::OperatorIdx,
         buf::Buf32,
         errors::ParseError,
-        l1::{BitcoinAmount, TaprootSpendPath, XOnlyPk},
+        l1::{TaprootSpendPath, XOnlyPk},
     };
     use alpen_test_utils::bridge::{generate_keypairs, generate_pubkey_table};
     use bitcoin::{
@@ -323,13 +304,9 @@ mod tests {
 
         assert!(prevout.script_pubkey.is_empty().not());
 
-        let lower_limit =
-            Amount::from_sat(BRIDGE_DENOMINATION.to_sat() - BitcoinAmount::SATS_FACTOR);
-        let upper_limit = Amount::from(BRIDGE_DENOMINATION);
-
         assert!(
-            prevout.value.gt(&lower_limit) && prevout.value.lt(&upper_limit),
-            "output amount must be within 1 BTC less than the bridge denomination"
+            prevout.value.eq(&BRIDGE_DENOMINATION.into()),
+            "output amount equal to the bridge denomination"
         );
     }
 
