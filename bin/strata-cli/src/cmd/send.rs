@@ -53,9 +53,9 @@ pub async fn send(args: SendArgs) {
             .expect("valid address")
             .require_network(SETTINGS.network)
             .expect("correct network");
-        let mut l1w = SignetWallet::new(seed.signet_wallet()).unwrap();
+        let mut l1w = SignetWallet::new(&seed).unwrap();
         l1w.sync().await.unwrap();
-        let fee_rate = get_fee_rate().await.unwrap().unwrap();
+        let fee_rate = get_fee_rate(1).await.unwrap().unwrap();
         let mut psbt = l1w
             .build_tx()
             .add_recipient(address.script_pubkey(), amount)

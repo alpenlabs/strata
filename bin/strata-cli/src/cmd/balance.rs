@@ -31,7 +31,7 @@ pub async fn balance(args: BalanceArgs) {
 
     let seed = Seed::load_or_create().unwrap();
     if args.signet {
-        let mut l1w = SignetWallet::new(seed.signet_wallet()).unwrap();
+        let mut l1w = SignetWallet::new(&seed).unwrap();
         l1w.sync().await.unwrap();
         let balance = l1w.balance();
         let _ = term.write_line(&format!("Total: {}", balance.total()));

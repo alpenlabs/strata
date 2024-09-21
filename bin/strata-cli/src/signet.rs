@@ -17,22 +17,17 @@ use bdk_wallet::{
 use console::Term;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 
-use crate::{seed::BaseWallet, settings::SETTINGS};
+use crate::{seed::Seed, settings::SETTINGS};
 
 const NETWORK: Network = Network::Signet;
 
 /// Spawns a tokio task that updates the FEE_RATE every 20 seconds
-pub async fn get_fee_rate() -> Result<Option<FeeRate>, esplora_client::Error> {
+pub async fn get_fee_rate(target: u16) -> Result<Option<FeeRate>, esplora_client::Error> {
     Ok(ESPLORA_CLIENT
         .get_fee_estimates()
         .await
-        .map(|frs| frs.get(&1).cloned())?
-        .map(|fr| {
-            (fr as u64)
-                .checked_mul(1000 / 4)
-                .map(FeeRate::from_sat_per_vb)
-        })
-        .flatten()
+        .map(|frs| frs.get(&target).cloned())?
+        .map(|fr| FeeRate::from_sat_per_vb(fr as u64))
         .flatten())
 }
 
@@ -56,8 +51,8 @@ impl SignetWallet {
         Connection::open(Self::db_path("default"))
     }
 
-    pub fn new(base: BaseWallet) -> io::Result<Self> {
-        let (load, create) = base.split();
+    pub fn new(seed: &Seed) -> io::Result<Self> {
+        let (load, create) = seed.signet_wallet().split();
         let mut db = Connection::open(Self::db_path("default")).unwrap();
         Ok(Self(
             load.check_network(NETWORK)

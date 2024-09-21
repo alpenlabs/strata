@@ -31,7 +31,7 @@ impl BaseWallet {
 pub struct Seed([u8; SEED_LEN]);
 
 impl Seed {
-    pub fn gen(rng: &mut impl Rng) -> Self {
+    fn gen(rng: &mut impl Rng) -> Self {
         Self(rng.gen())
     }
 
@@ -39,6 +39,13 @@ impl Seed {
         let term = Term::stdout();
         let mnemonic = Mnemonic::from_entropy_in(language, &self.0).expect("valid entropy");
         let _ = term.write_line(&mnemonic.to_string());
+    }
+
+    pub fn descriptor_recovery_key(&self) -> [u8; 32] {
+        let mut hasher = Sha256::new();
+        hasher.update(b"alpen labs strata descriptor recovery file 2024");
+        hasher.update(self.0);
+        hasher.finalize().into()
     }
 
     fn encrypt(

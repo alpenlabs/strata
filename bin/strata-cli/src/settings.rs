@@ -1,18 +1,23 @@
 use std::{
     fs::{create_dir_all, File},
     path::PathBuf,
+    str::FromStr,
     sync::LazyLock,
+    time::Duration,
 };
 
-use bdk_wallet::bitcoin::Network;
+use alloy::primitives::Address as RollupAddress;
+use bdk_wallet::bitcoin::{Network, XOnlyPublicKey};
 use config::Config;
 use directories::ProjectDirs;
+use hex::decode;
 use serde::{Deserialize, Serialize};
 
 pub static SETTINGS: LazyLock<Settings> = LazyLock::new(|| {
     let proj_dirs =
         ProjectDirs::from("io", "alpenlabs", "strata").expect("project dir should be available");
     let config_file = proj_dirs.config_dir().to_owned().join("config.toml");
+    let descriptor_file = proj_dirs.data_dir().to_owned().join("descriptors");
     create_dir_all(config_file.parent().unwrap()).unwrap();
     let _ = File::create_new(&config_file);
     let from_file = Config::builder()
@@ -31,6 +36,24 @@ pub static SETTINGS: LazyLock<Settings> = LazyLock::new(|| {
         data_dir: proj_dirs.data_dir().to_owned(),
         network: Network::Signet,
         faucet_endpoint: "http://localhost:3000".to_owned(),
+        bridge_musig2_pubkey: XOnlyPublicKey::from_slice(&{
+            let mut buf = [0u8; 32];
+            decode(
+                // just random 32 bytes while we don't have this
+                // CHANGE ME!!!
+                "fbd79b6b8b7fe11bad25ae89a7415221c030978de448775729c3f0a903819dd0",
+                &mut buf,
+            )
+            .expect("valid hex");
+            buf
+        })
+        .expect("valid length"),
+        block_time: Duration::from_secs(30),
+        descriptor_file,
+        bridge_rollup_address: RollupAddress::from_str(
+            "0x000000000000000000000000000000000B121d9E",
+        )
+        .unwrap(),
     }
 });
 
@@ -49,4 +72,8 @@ pub struct Settings {
     pub data_dir: PathBuf,
     pub network: Network,
     pub faucet_endpoint: String,
+    pub bridge_musig2_pubkey: XOnlyPublicKey,
+    pub block_time: Duration,
+    pub descriptor_file: PathBuf,
+    pub bridge_rollup_address: RollupAddress,
 }

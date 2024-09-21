@@ -91,7 +91,7 @@ pub async fn faucet(args: FaucetArgs) {
 
     let url = if args.signet {
         let mut conn = SignetWallet::persister().unwrap();
-        let mut l1w = SignetWallet::new(seed.signet_wallet()).unwrap();
+        let mut l1w = SignetWallet::new(&seed).unwrap();
         let address = match args.address {
             None => {
                 let address_info = l1w.reveal_next_address(KeychainKind::External);

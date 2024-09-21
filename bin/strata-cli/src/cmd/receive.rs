@@ -29,7 +29,7 @@ pub async fn receive(args: ReceiveArgs) {
     let seed = Seed::load_or_create().unwrap();
 
     let address = if args.signet {
-        let mut l1w = SignetWallet::new(seed.signet_wallet()).unwrap();
+        let mut l1w = SignetWallet::new(&seed).unwrap();
         let _ = term.write_line("Syncing signet wallet");
         l1w.sync().await.unwrap();
         let _ = term.write_line("Wallet synced");
