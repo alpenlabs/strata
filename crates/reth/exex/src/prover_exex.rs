@@ -19,7 +19,10 @@ use reth_revm::{
 use reth_rpc_types_compat::proof::from_primitive_account_proof;
 use tracing::{debug, error};
 
-use crate::cache_db_provider::{AccessedState, CacheDBProvider};
+use crate::{
+    alloy2reth::IntoReth,
+    cache_db_provider::{AccessedState, CacheDBProvider},
+};
 
 pub struct ProverWitnessGenerator<Node: FullNodeComponents, S: WitnessStore + Clone> {
     ctx: ExExContext<Node>,
@@ -107,6 +110,14 @@ fn extract_zkvm_input<Node: FullNodeComponents>(
         .ok_or(eyre!("Failed to get current block"))?;
     let current_block_idx = current_block.number;
 
+    let withdrawals = current_block
+        .clone()
+        .withdrawals
+        .unwrap_or_default()
+        .into_iter()
+        .map(|el| el.into_reth())
+        .collect();
+
     let prev_block_idx = current_block_idx - 1;
     let previous_provider = ctx.provider().history_by_block_number(prev_block_idx)?;
     let prev_block = ctx
@@ -121,10 +132,6 @@ fn extract_zkvm_input<Node: FullNodeComponents>(
         .ok_or(eyre!("failed to recover senders"))?;
 
     let accessed_states = get_accessed_states(ctx, &block_execution_input, prev_block_idx)?;
-    println!(
-        "mdteach got the accessed states {:?} for the block {:?}",
-        accessed_states, current_block.number
-    );
 
     let current_block_txns = current_block
         .body
@@ -182,7 +189,7 @@ fn extract_zkvm_input<Node: FullNodeComponents>(
         extra_data: current_block.header.extra_data,
         mix_hash: current_block.header.mix_hash,
         transactions: current_block_txns,
-        withdrawals: Vec::new(),
+        withdrawals,
         parent_state_trie: state_trie,
         parent_storage: storage,
         contracts,
@@ -191,13 +198,6 @@ fn extract_zkvm_input<Node: FullNodeComponents>(
         // Will need to revisit if BLOCKHASH opcode operation is a blocker
         ancestor_headers: Default::default(),
     };
-
-    use std::fs::File;
-
-    use serde_json::{self, to_writer_pretty};
-
-    let file = File::create(format!("witness_{:?}.json", current_block_idx)).unwrap();
-    to_writer_pretty(file, &input).unwrap();
 
     Ok(input)
 }

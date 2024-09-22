@@ -79,11 +79,6 @@ impl DatabaseRef for CacheDBProvider {
             .basic_account(address)?
             .map(|account| account.into());
 
-        println!(
-            "mdteach got the request for the account info ... {:?} and we got {:?}",
-            address, account_info
-        );
-
         // Record the account value to the state.
         self.accounts
             .borrow_mut()
