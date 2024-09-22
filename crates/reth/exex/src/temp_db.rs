@@ -6,7 +6,7 @@ use std::{
 use reth_primitives::{
     revm_primitives::{AccountInfo, Bytecode},
     ruint::Uint,
-    Address, B256, U256,
+    Address, Bytes, B256, U256,
 };
 use reth_provider::{errors::db::DatabaseError, AccountReader, ProviderError, StateProvider};
 use reth_revm::DatabaseRef;
@@ -15,12 +15,13 @@ pub struct CacheDBProvider {
     provider: Box<dyn StateProvider>,
     accounts: RefCell<HashMap<Address, AccountInfo>>,
     storage: RefCell<HashMap<Address, HashMap<U256, U256>>>,
-    bytecodes: RefCell<HashSet<Bytecode>>,
+    bytecodes: RefCell<HashSet<Bytes>>,
 }
 
+#[derive(Debug)]
 pub struct AccessedState {
     pub accessed_accounts: HashMap<Address, Vec<Uint<256, 4>>>,
-    pub accessed_contracts: Vec<Bytecode>,
+    pub accessed_contracts: Vec<Bytes>,
 }
 
 impl CacheDBProvider {
@@ -62,7 +63,7 @@ impl CacheDBProvider {
             .collect()
     }
 
-    fn get_accessed_contracts(&self) -> Vec<Bytecode> {
+    fn get_accessed_contracts(&self) -> Vec<Bytes> {
         self.bytecodes.borrow().iter().cloned().collect()
     }
 }
@@ -78,9 +79,18 @@ impl DatabaseRef for CacheDBProvider {
             .basic_account(address)?
             .map(|account| account.into());
 
+        println!(
+            "mdteach got the request for the account info ... {:?} and we got {:?}",
+            address, account_info
+        );
+
         // Record the account value to the state.
         if let Some(ref info) = account_info {
             self.accounts.borrow_mut().insert(address, info.clone());
+        } else {
+            self.accounts
+                .borrow_mut()
+                .insert(address, Default::default());
         }
 
         Ok(account_info)
@@ -100,7 +110,7 @@ impl DatabaseRef for CacheDBProvider {
             })?;
 
         // Record the storage value to the state
-        self.bytecodes.borrow_mut().insert(bytecode.clone());
+        self.bytecodes.borrow_mut().insert(bytecode.bytes().clone());
 
         Ok(bytecode)
     }

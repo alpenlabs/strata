@@ -1,13 +1,7 @@
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::{collections::HashMap, sync::Arc};
 
 use alloy_rpc_types::EIP1186AccountProofResponse;
-use express_proofimpl_evm_ee_stf::{
-    mpt::{self, proofs_to_tries},
-    ELProofInput,
-};
+use express_proofimpl_evm_ee_stf::{mpt::proofs_to_tries, ELProofInput};
 use express_reth_db::WitnessStore;
 use eyre::eyre;
 use reth_evm::execute::{BlockExecutorProvider, Executor};
@@ -127,6 +121,10 @@ fn extract_zkvm_input<Node: FullNodeComponents>(
         .ok_or(eyre!("failed to recover senders"))?;
 
     let accessed_states = get_accessed_states(ctx, &block_execution_input, prev_block_idx)?;
+    println!(
+        "mdteach got the accessed states {:?} for the block {:?}",
+        accessed_states, current_block.number
+    );
 
     let current_block_txns = current_block
         .body
@@ -139,56 +137,35 @@ fn extract_zkvm_input<Node: FullNodeComponents>(
 
     // Apply empty bundle state over previous block state
     let previous_bundle_state = BundleState::default();
-    let current_bundle_state = exec_outcome.bundle.clone();
 
     let mut parent_proofs: HashMap<Address, EIP1186AccountProofResponse> = HashMap::new();
     let mut current_proofs: HashMap<Address, EIP1186AccountProofResponse> = HashMap::new();
-    let mut contracts = HashSet::new();
+    let contracts = accessed_states.accessed_contracts;
 
     // Accumulate account proof of account in previous block
-    for (accessed_address, accessed_slots) in accessed_states.accessed_accounts {
+    for (accessed_address, accessed_slots) in accessed_states.accessed_accounts.iter() {
         let slots: Vec<B256> = accessed_slots
             .iter()
             .map(|el| B256::from_slice(el.as_le_slice()))
             .collect();
 
-        let proof = previous_provider.proof(&previous_bundle_state, accessed_address, &slots)?;
+        let proof = previous_provider.proof(&previous_bundle_state, *accessed_address, &slots)?;
         let proof = from_primitive_account_proof(proof);
-        parent_proofs.insert(*address, proof);
-    }
 
-    for (address, account) in current_bundle_state.state() {
-        let slots: Vec<B256> = account
-            .storage
-            .keys()
-            .map(|v| B256::from_slice(v.as_le_slice()))
-            .collect();
-
-        // Accumulate contract bytecode
-        if let Some(account_info) = &account.info {
-            if let Some(code) = &account_info.code {
-                if account_info.code_hash() != mpt::KECCAK_EMPTY {
-                    contracts.insert(code.bytecode().clone());
-                }
-            }
-        }
-
-        let proof = previous_provider.proof(&previous_bundle_state, *address, &slots)?;
-        let proof = from_primitive_account_proof(proof);
-        parent_proofs.insert(*address, proof);
+        parent_proofs.insert(*accessed_address, proof);
     }
 
     // Accumulate account proof of account in current block
-    for (address, account) in current_bundle_state.state() {
-        let slots: Vec<B256> = account
-            .storage
-            .keys()
-            .map(|v| B256::from_slice(v.as_le_slice()))
+    for (accessed_address, accessed_slots) in accessed_states.accessed_accounts.iter() {
+        let slots: Vec<B256> = accessed_slots
+            .iter()
+            .map(|el| B256::from_slice(el.as_le_slice()))
             .collect();
 
-        let proof = previous_provider.proof(&exec_outcome.bundle, *address, &slots)?;
+        let proof = previous_provider.proof(&exec_outcome.bundle, *accessed_address, &slots)?;
         let proof = from_primitive_account_proof(proof);
-        current_proofs.insert(*address, proof);
+
+        current_proofs.insert(*accessed_address, proof);
     }
 
     let (state_trie, storage) = proofs_to_tries(
@@ -208,12 +185,19 @@ fn extract_zkvm_input<Node: FullNodeComponents>(
         withdrawals: Vec::new(),
         parent_state_trie: state_trie,
         parent_storage: storage,
-        contracts: contracts.iter().cloned().collect(),
+        contracts,
         parent_header: prev_block.header,
         // NOTE: using default to save prover cost.
         // Will need to revisit if BLOCKHASH opcode operation is a blocker
         ancestor_headers: Default::default(),
     };
+
+    use std::fs::File;
+
+    use serde_json::{self, to_writer_pretty};
+
+    let file = File::create(format!("witness_{:?}.json", current_block_idx)).unwrap();
+    to_writer_pretty(file, &input).unwrap();
 
     Ok(input)
 }

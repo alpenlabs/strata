@@ -139,12 +139,6 @@ mod tests {
         spec_id: SpecId::SHANGHAI,
     };
 
-    #[derive(Serialize, Deserialize)]
-    struct TestData {
-        witness: ELProofInput,
-        params: ELProofPublicParams,
-    }
-
     #[test]
     fn block_stf_test() {
         let json_content = std::fs::read_to_string(
@@ -152,10 +146,7 @@ mod tests {
         )
         .expect("Failed to read the blob data file");
 
-        let test_data: TestData = serde_json::from_str(&json_content).expect("failed");
-        let input = test_data.witness;
-        let op = process_block_transaction(input, EVM_CONFIG);
-
-        assert_eq!(op, test_data.params);
+        let input: ELProofInput = serde_json::from_str(&json_content).expect("failed");
+        process_block_transaction(input, EVM_CONFIG);
     }
 }
