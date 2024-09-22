@@ -775,7 +775,7 @@ impl<'a> Arbitrary<'a> for TaprootSpendPath {
 
 #[cfg(test)]
 mod tests {
-    use std::io::Cursor;
+    use std::{io::Cursor, str::FromStr};
 
     use arbitrary::{Arbitrary, Unstructured};
     use bitcoin::{
@@ -838,6 +838,65 @@ mod tests {
             addr_bytes,
             &serialized_addr[..],
             "original address bytes and serialized address bytes must be the same",
+        );
+    }
+
+    #[test]
+    fn test_borsh_serialization_of_multiple_addresses() {
+        // Sample Bitcoin addresses
+        let addresses = [
+            "1BoatSLRHtKNngkdXEeobR76b53LETtpyT",
+            "3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy",
+            "bc1qpaj2e2ccwqvyzvsfhcyktulrjkkd28fg75wjuc",
+        ];
+
+        // Convert strings to BitcoinAddress instances
+        let bitcoin_addresses: Vec<BitcoinAddress> = addresses
+            .iter()
+            .map(|s| {
+                BitcoinAddress::from_str(s)
+                    .unwrap_or_else(|_e| panic!("random address {s} should be valid"))
+            })
+            .collect();
+
+        // Serialize the vector of BitcoinAddress instances
+        let mut serialized = Vec::new();
+        bitcoin_addresses
+            .serialize(&mut serialized)
+            .expect("serialization should work");
+
+        // Attempt to deserialize back into a vector of BitcoinAddress instances
+        let deserialized: Vec<BitcoinAddress> =
+            Vec::try_from_slice(&serialized).expect("Deserialization failed");
+
+        // Check that the deserialized addresses match the original
+        assert_eq!(bitcoin_addresses, deserialized);
+    }
+
+    #[test]
+    fn test_borsh_serialization_of_address_in_struct() {
+        #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+        struct Test {
+            address: BitcoinAddress,
+            other: u32,
+        }
+
+        let sample_addr = "bc1qpaj2e2ccwqvyzvsfhcyktulrjkkd28fg75wjuc";
+        let original = Test {
+            other: 1,
+            address: BitcoinAddress::from_str(sample_addr).expect("should be valid address"),
+        };
+
+        let mut serialized = vec![];
+        original
+            .serialize(&mut serialized)
+            .expect("should be able to serialize");
+
+        let deserialized: Test = Test::try_from_slice(&serialized).expect("should deserialize");
+
+        assert_eq!(
+            deserialized, original,
+            "deserialized and original structs with address should be the same"
         );
     }
 
