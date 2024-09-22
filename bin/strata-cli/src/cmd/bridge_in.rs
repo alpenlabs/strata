@@ -7,6 +7,7 @@ use bdk_wallet::{
         hashes::Hash, key::Secp256k1, secp256k1::All, taproot::LeafVersion, Address, Amount,
         TapNodeHash, XOnlyPublicKey,
     },
+    chain::ChainOracle,
     descriptor::IntoWalletDescriptor,
     miniscript::{miniscript::Tap, Miniscript},
     template::DescriptorTemplateOut,
@@ -68,6 +69,7 @@ pub async fn bridge_in(args: BridgeInArgs) {
     .expect("valid bridge in descriptor");
 
     let desc = bridge_in_desc
+        .clone()
         .into_wallet_descriptor(l1w.secp_ctx(), SETTINGS.network)
         .expect("valid descriptor");
 
@@ -75,6 +77,14 @@ pub async fn bridge_in(args: BridgeInArgs) {
         .network(SETTINGS.network)
         .create_wallet_no_persist()
         .expect("valid wallet");
+
+    let current_block_height = l1w
+        .local_chain()
+        .get_chain_tip()
+        .expect("valid chain tip")
+        .height;
+
+    let recover_at = current_block_height + 1050;
 
     let bridge_in_address = temp_wallet
         .reveal_next_address(KeychainKind::External)
@@ -119,7 +129,10 @@ pub async fn bridge_in(args: BridgeInArgs) {
     pb.enable_steady_tick(Duration::from_millis(100));
 
     let mut desc_file = DescriptorRecovery::open(&seed).await.unwrap();
-    desc_file.add_desc(&desc.0).await.unwrap();
+    desc_file
+        .add_desc(recover_at, &bridge_in_desc, l1w.secp_ctx())
+        .await
+        .unwrap();
     pb.finish_with_message("Saved output descriptor");
 
     let pb = ProgressBar::new_spinner().with_message("Broadcasting transaction");

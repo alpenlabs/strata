@@ -16,7 +16,7 @@ use cmd::{
 async fn main() {
     let TopLevel { cmd } = argh::from_env();
     match cmd {
-        Commands::Refresh(_) => refresh().await,
+        Commands::Refresh(_) => refresh(None).await,
         Commands::Drain(args) => drain(args).await,
         Commands::Balance(args) => balance(args).await,
         Commands::Backup(args) => backup(args).await,

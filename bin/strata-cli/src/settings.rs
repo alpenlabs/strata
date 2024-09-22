@@ -49,7 +49,7 @@ pub static SETTINGS: LazyLock<Settings> = LazyLock::new(|| {
         })
         .expect("valid length"),
         block_time: Duration::from_secs(30),
-        descriptor_file,
+        descriptor_db: descriptor_file,
         bridge_rollup_address: RollupAddress::from_str(
             "0x000000000000000000000000000000000B121d9E",
         )
@@ -74,6 +74,6 @@ pub struct Settings {
     pub faucet_endpoint: String,
     pub bridge_musig2_pubkey: XOnlyPublicKey,
     pub block_time: Duration,
-    pub descriptor_file: PathBuf,
+    pub descriptor_db: PathBuf,
     pub bridge_rollup_address: RollupAddress,
 }
