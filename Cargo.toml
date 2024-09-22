@@ -95,6 +95,7 @@ express-reth-primitives = { path = "crates/reth/primitives" }
 express-reth-rpc = { path = "crates/reth/rpc" }
 express-risc0-adapter = { path = "crates/zkvm/adapters/risc0" }
 express-rpc-utils = { path = "crates/rpc/utils" }
+express-sp1-adapter = { path = "crates/zkvm/adapters/sp1" }
 express-storage = { path = "crates/storage" }
 express-sync = { path = "crates/sync" }
 express-tasks = { path = "crates/tasks" }

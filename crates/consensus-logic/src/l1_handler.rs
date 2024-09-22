@@ -17,6 +17,7 @@ use bitcoin::{
     hashes::{sha256d, Hash},
     Block, Wtxid,
 };
+use express_sp1_adapter::SP1Verifier;
 use tokio::sync::mpsc;
 use tracing::*;
 
@@ -96,7 +97,7 @@ where
             csm_ctl.submit_event(ev)?;
 
             // Check for da batch and send event accordingly
-            let checkpoints = check_for_da_batch(&blockdata);
+            let checkpoints = check_for_da_batch(&blockdata, params.rollup().rollup_vk_sp1);
             if !checkpoints.is_empty() {
                 let ev = SyncEvent::L1DABatch(height, checkpoints);
                 csm_ctl.submit_event(ev)?;
@@ -110,7 +111,7 @@ where
 }
 
 /// Parses inscriptions and checks for batch data in the transactions
-fn check_for_da_batch(blockdata: &BlockData) -> Vec<BatchCheckpoint> {
+fn check_for_da_batch(blockdata: &BlockData, rollup_vk_sp1: Buf32) -> Vec<BatchCheckpoint> {
     let protocol_ops_txs = blockdata.protocol_ops_txs();
 
     let inscriptions = protocol_ops_txs
@@ -138,6 +139,18 @@ fn check_for_da_batch(blockdata: &BlockData) -> Vec<BatchCheckpoint> {
 
     // NOTE/TODO: this is where we would verify the checkpoint, i.e, verify block ranges, verify
     // proof, and whatever else that's necessary
+    for signed_checkpoint in signed_checkpoints.clone() {
+        let checkpoint: BatchCheckpoint = signed_checkpoint.into();
+        let proof = checkpoint.proof();
+
+        // TODO: fix this
+        // This is expected to fail because the `rollup_vk_sp1` is not for the checkpoint proof
+        let _ = SP1Verifier::verify_groth16(
+            proof,
+            rollup_vk_sp1.as_ref(),
+            &borsh::to_vec(&checkpoint).unwrap(),
+        );
+    }
 
     signed_checkpoints.map(Into::into).collect()
 }

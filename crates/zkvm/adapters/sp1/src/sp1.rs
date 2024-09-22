@@ -7,7 +7,8 @@ use serde::{de::DeserializeOwned, Serialize};
 use serde_json::to_vec;
 use snark_bn254_verifier::Groth16Verifier;
 use sp1_sdk::{
-    HashableKey, ProverClient, SP1Proof, SP1ProofWithPublicValues, SP1Stdin, SP1VerifyingKey,
+    HashableKey, ProverClient, SP1Proof, SP1ProofWithPublicValues, SP1PublicValues, SP1Stdin,
+    SP1VerifyingKey,
 };
 use substrate_bn::Fr;
 
@@ -164,11 +165,12 @@ impl ZKVMVerifier for SP1Verifier {
 // Copied from ~/.sp1/circuits/v2.0.0/groth16_vk.bin
 // This is same for all the SP1 programs that uses v2.0.0
 pub const GROTH16_VK_BYTES: &[u8] = include_bytes!("groth16_vk.bin");
+
 impl SP1Verifier {
     pub fn verify_groth16(
         proof: &[u8],
         vkey_hash: &[u8],
-        committed_values_digest: &[u8],
+        committed_values_raw: &[u8],
     ) -> Result<()> {
         let vk = GROTH16_VK_BYTES;
 
@@ -177,8 +179,12 @@ impl SP1Verifier {
             .map_err(|e| anyhow::anyhow!(e))
             .context("Unable to convert vkey_hash to Fr")?;
 
+        let committed_values_digest = SP1PublicValues::from(committed_values_raw)
+            .hash_bn254()
+            .to_bytes_be();
+
         // Convert committed_values_digest to Fr, mapping the error to anyhow::Error
-        let committed_values_digest_fr = Fr::from_slice(committed_values_digest)
+        let committed_values_digest_fr = Fr::from_slice(&committed_values_digest)
             .map_err(|e| anyhow::anyhow!(e))
             .context("Unable to convert committed_values_digest to Fr")?;
 
@@ -198,6 +204,7 @@ impl SP1Verifier {
 
 // NOTE: SP1 prover runs in release mode only; therefore run the tests on release mode only
 #[cfg(test)]
+#[cfg(feature = "prover")]
 mod tests {
 
     use num_bigint::BigUint;
@@ -294,6 +301,12 @@ mod tests {
         let client = MockProver::new();
         let (_, vk) = client.setup(TEST_ELF);
 
+        // Note: For the fixed ELF and fixed SP1 version, the vk is fixed
+        assert_eq!(
+            vk.bytes32(),
+            "0x00b01ae596b4e51843484ff71ccbd0dd1a030af70b255e6b9aad50b81d81266f"
+        );
+
         let raw_groth16_proof = include_bytes!("../tests/proofs/proof-groth16.bin");
         let proof: SP1ProofWithPublicValues =
             bincode::deserialize(raw_groth16_proof).expect("Failed to deserialize Groth16 proof");
@@ -303,7 +316,6 @@ mod tests {
             .verify(&proof, &vk)
             .expect("Proof verification failed");
 
-        let committed_values_digest = &proof.public_values.hash_bn254().to_bytes_be();
         let groth16_proof_bytes = proof
             .proof
             .try_as_groth_16()
@@ -321,9 +333,11 @@ mod tests {
         .expect("Failed to parse vkey hash")
         .to_bytes_be();
 
-        assert!(
-            SP1Verifier::verify_groth16(&groth16_proof, &vkey_hash, committed_values_digest)
-                .is_ok()
-        );
+        assert!(SP1Verifier::verify_groth16(
+            &groth16_proof,
+            &vkey_hash,
+            proof.public_values.as_slice()
+        )
+        .is_ok());
     }
 }

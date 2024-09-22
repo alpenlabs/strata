@@ -147,6 +147,7 @@ dependencies = [
 name = "alpen-express-primitives"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "arbitrary",
  "bitcoin",
  "borsh",
@@ -160,6 +161,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "thiserror",
+ "tracing",
 ]
 
 [[package]]

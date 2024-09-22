@@ -39,6 +39,9 @@ pub struct RollupParams {
 
     /// max deposit amount in sats
     pub deposit_amount: u64,
+
+    /// SP1 verifying key that is used to verify the Groth16 proof posted on Bitcoin
+    pub rollup_vk_sp1: Buf32,
 }
 
 /// Client sync parameters that are used to make the network work but don't

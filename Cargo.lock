@@ -724,6 +724,7 @@ dependencies = [
  "bitcoin",
  "borsh",
  "express-chaintsn",
+ "express-sp1-adapter",
  "express-storage",
  "express-tasks",
  "futures",
