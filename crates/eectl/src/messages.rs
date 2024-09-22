@@ -34,7 +34,10 @@ impl ExecPayloadData {
         Self {
             exec_update: l2block.block().exec_segment().update().clone(),
             accessory_data: l2block.accessory().exec_payload().to_vec(),
-            ops: vec![],
+            ops: vec![
+                Op::Deposit(ELDepositData::new(1_000_000_000, vec![1u8; 32])),
+                Op::Deposit(ELDepositData::new(1_000_000_000, vec![2u8; 32])),
+            ],
         }
     }
 

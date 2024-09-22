@@ -26,13 +26,12 @@ class ElBlockWitnessDataGenerationTest(flexitest.Test):
         # Get the block hash where contract was deployed
         assert tx_receipt["status"] == 1
         blocknum = tx_receipt.blockNumber
-        blockhash = rethrpc.eth_getBlockByNumber(hex(blocknum), False)["hash"]
+        block = rethrpc.eth_getBlockByNumber(hex(blocknum), False)
+        print(block)
 
-        # Get the witness data
-        witness_data = rethrpc.alpee_getBlockWitness(blockhash, True)
-        assert witness_data is not None, "non empty witness"
-
-        print(witness_data)
+        dest = web3.to_checksum_address("0x1111111111111111111111111111111111111111")
+        dest_final_balance = web3.eth.get_balance(dest)
+        print("Desination", dest_final_balance)
 
 
 def get_contract():

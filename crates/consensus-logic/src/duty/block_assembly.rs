@@ -284,7 +284,15 @@ fn prepare_exec_data<E: ExecEngineCtl>(
     trace!("preparing exec payload");
 
     // Start preparing the EL payload.
-    let payload_env = PayloadEnv::new(timestamp, prev_l2_blkid, safe_l1_block, vec![]);
+    let payload_env = PayloadEnv::new(
+        timestamp,
+        prev_l2_blkid,
+        safe_l1_block,
+        vec![
+            Op::Deposit(ELDepositData::new(1_000_000_000, vec![1u8; 32])),
+            Op::Deposit(ELDepositData::new(1_000_000_000, vec![2u8; 32])),
+        ],
+    );
     let key = engine.prepare_payload(payload_env)?;
     trace!("submitted EL payload job, waiting for completion");
 
