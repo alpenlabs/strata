@@ -10,7 +10,7 @@ use alpen_express_rocksdb::{
 };
 use express_proofimpl_evm_ee_stf::ELProofInput;
 use express_risc0_guest_builder::GUEST_RISC0_EVM_EE_STF_ELF;
-use express_zkvm::{Proof, ProverInput as ZKVM_INPUT, ProverOptions, ZKVMHost};
+use express_zkvm::{Proof, ProverOptions, ZKVMHost, ZKVMInputBuilder};
 use tracing::info;
 use uuid::Uuid;
 
@@ -90,13 +90,15 @@ where
 fn make_proof<Vm>(prover_input: ProverInput, vm: Vm) -> Result<Proof, anyhow::Error>
 where
     Vm: ZKVMHost + 'static,
+    for<'a> Vm::Input<'a>: ZKVMInputBuilder<'a>,
 {
     match prover_input {
         ProverInput::ElBlock(el_input) => {
             let el_input: ELProofInput = bincode::deserialize(&el_input.data)?;
-            let mut input = ZKVM_INPUT::new();
-            input.write(el_input);
-            let (proof, _) = vm.prove(&input)?;
+            let mut input_builder = Vm::Input::new();
+            input_builder.write(&el_input).unwrap();
+            let input = input_builder.build()?;
+            let (proof, _) = vm.prove(input)?;
             Ok(proof)
         }
         _ => {

@@ -36,59 +36,50 @@ pub struct ProverOptions {
     pub stark_to_snark_conversion: bool,
 }
 
-#[derive(Debug, Clone)]
-pub struct ProverInput<T> {
-    /// A collection of serde-serializable items. These will be automatically
-    /// serialized and deserialized by the zkVM, providing a straightforward way
-    /// to work with commonly supported data types.
-    pub inputs: Vec<T>,
-    /// A collection of pre-serialized byte arrays. Use this field when
-    /// working with custom serializers/deserializers not natively supported by the zkVM, or when
-    /// a custom approach offers performance advantages.
-    pub serialized_inputs: Vec<Vec<u8>>,
-    /// A set of inputs used specifically for the aggregation/composition program
-    pub agg_inputs: Vec<AggregationInput>,
-}
+/// A trait for managing inputs to a ZKVM prover. This trait provides methods for
+/// adding inputs in various formats to be used during the proof generation process.
+pub trait ZKVMInputBuilder<'a> {
+    type Input;
 
-impl<T: serde::Serialize> ProverInput<T> {
-    pub fn new() -> Self {
-        ProverInput {
-            inputs: vec![],
-            serialized_inputs: vec![],
-            agg_inputs: vec![],
-        }
-    }
+    /// Creates a new instance of the `ProverInputs` struct.
+    fn new() -> Self;
 
-    pub fn write(&mut self, value: T) {
-        self.inputs.push(value);
-    }
+    /// Serializes the given item using Serde and appends it to the list of inputs.
+    fn write<T: serde::Serialize>(&mut self, item: &T) -> anyhow::Result<()>;
 
-    pub fn write_serialized(&mut self, value: Vec<u8>) {
-        self.serialized_inputs.push(value);
-    }
+    /// Serializes the given item using the Borsh serialization format and appends
+    /// it to the list of inputs.
+    fn write_borsh<T: borsh::BorshSerialize>(&mut self, item: &T) -> anyhow::Result<()>;
 
-    pub fn write_proof(&mut self, value: AggregationInput) {
-        self.agg_inputs.push(value);
-    }
-}
+    /// Appends a pre-serialized byte array to the list of inputs.
+    ///
+    /// This method is intended for cases where the data has already been serialized
+    /// outside of the zkVM's standard serialization methods. It allows you to provide
+    /// serialized inputs directly, bypassing any further serialization.
+    fn write_serialized(&mut self, item: &[u8]);
 
-impl<T: serde::Serialize> Default for ProverInput<T> {
-    fn default() -> Self {
-        Self::new()
-    }
+    /// Adds an `AggregationInput` to the list of aggregation/composition inputs.
+    ///
+    /// This method is specifically used for cases where proof aggregation or composition
+    /// is involved, allowing for complex proof inputs to be provided to the zkVM.
+    fn write_proof(&mut self, item: AggregationInput) -> anyhow::Result<()>;
+
+    fn build(self) -> anyhow::Result<Self::Input>;
 }
 
 /// A trait implemented by the prover ("host") of a zkVM program.
 pub trait ZKVMHost: Send + Sync + Clone {
+    type Input<'a>: ZKVMInputBuilder<'a>;
+
     /// Initializes the ZKVM with the provided ELF program and prover configuration.
     fn init(guest_code: Vec<u8>, prover_options: ProverOptions) -> Self;
 
     /// Executes the guest code within the VM, generating and returning the validity proof.
     // TODO: Consider using custom error types instead of a generic error to capture the different
     // reasons proving can fail.
-    fn prove<T: serde::Serialize>(
+    fn prove<'a>(
         &self,
-        input: &ProverInput<T>,
+        input: <Self::Input<'a> as ZKVMInputBuilder<'a>>::Input,
     ) -> anyhow::Result<(Proof, VerificationKey)>;
 }
 

@@ -5,4 +5,5 @@ version = "0.1.0"
 
 [dependencies]
 anyhow = { workspace = true }
+borsh = { workspace = true }
 serde = { workspace = true }

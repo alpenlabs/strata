@@ -6,11 +6,13 @@ version = "0.1.0"
 [dependencies]
 anyhow = { workspace = true }
 bincode = { workspace = true }
+borsh = { workspace = true }
 express-zkvm = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-sp1-sdk = { version = "1.0.1", optional = true }
+sp1-sdk = { version = "1.0.1" }
 
 [features]
 default = []
-prover = ["dep:sp1-sdk"]
+prover = []
+# prover = ["dep:sp1-sdk"]

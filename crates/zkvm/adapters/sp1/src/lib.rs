@@ -1,4 +1,4 @@
-#[cfg(feature = "prover")]
+// #[cfg(feature = "prover")]
 mod sp1;
-#[cfg(feature = "prover")]
+// #[cfg(feature = "prover")]
 pub use sp1::{SP1Host, SP1Verifier};
