@@ -1,7 +1,9 @@
 use std::{
+    cell::RefCell,
     io,
     ops::{Deref, DerefMut},
     path::PathBuf,
+    rc::Rc,
     sync::LazyLock,
 };
 
@@ -12,7 +14,7 @@ use bdk_esplora::{
 use bdk_wallet::{
     bitcoin::{FeeRate, Network},
     rusqlite::{self, Connection},
-    PersistedWallet,
+    ChangeSet, PersistedWallet, WalletPersister,
 };
 use console::Term;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
@@ -40,7 +42,7 @@ pub static ESPLORA_CLIENT: LazyLock<AsyncClient> = LazyLock::new(|| {
 
 #[derive(Debug)]
 /// A wrapper around BDK's wallet with some custom logic
-pub struct SignetWallet(PersistedWallet<Connection>);
+pub struct SignetWallet(PersistedWallet<Persister>);
 
 impl SignetWallet {
     fn db_path(wallet: &str) -> PathBuf {
@@ -53,22 +55,22 @@ impl SignetWallet {
 
     pub fn new(seed: &Seed) -> io::Result<Self> {
         let (load, create) = seed.signet_wallet().split();
-        let mut db = Connection::open(Self::db_path("default")).unwrap();
         Ok(Self(
             load.check_network(NETWORK)
-                .load_wallet(&mut db)
+                .load_wallet(&mut Persister)
                 .unwrap()
                 .unwrap_or_else(|| {
                     create
                         .network(NETWORK)
-                        .create_wallet(&mut db)
+                        .create_wallet(&mut Persister)
                         .expect("wallet creation to succeed")
                 }),
         ))
     }
 
     pub async fn sync(&mut self) -> Result<(), Box<esplora_client::Error>> {
-        let _ = Term::stdout().write_line("Syncing wallet...");
+        let term = Term::stdout();
+        let _ = term.write_line("Syncing wallet...");
         let sty = ProgressStyle::with_template(
             "[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}",
         )
@@ -110,14 +112,18 @@ impl SignetWallet {
         txids2.finish();
         self.apply_update(update)
             .expect("should be able to connect to db");
-        let mut db = Connection::open(Self::db_path("default")).unwrap();
-        self.persist(&mut db).expect("persist should work");
+        self.persist().expect("persist should work");
+        let _ = term.write_line("Wallet synced");
         Ok(())
+    }
+
+    pub fn persist(&mut self) -> Result<bool, rusqlite::Error> {
+        self.0.persist(&mut Persister)
     }
 }
 
 impl Deref for SignetWallet {
-    type Target = PersistedWallet<Connection>;
+    type Target = PersistedWallet<Persister>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -127,5 +133,47 @@ impl Deref for SignetWallet {
 impl DerefMut for SignetWallet {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
+    }
+}
+
+/// Wrapper around the built-in rusqlite db that allows PersistedWallet to be
+/// shared across multiple threads by lazily initializing per core connections
+/// to the sqlite db and keeping them in local thread storage instead of sharing
+/// the connection across cores
+#[derive(Debug)]
+pub struct Persister;
+
+thread_local! {
+    static DB: Rc<RefCell<Connection>> = RefCell::new(Connection::open(SignetWallet::db_path("default")).unwrap()).into();
+}
+
+impl Persister {
+    fn db() -> Rc<RefCell<Connection>> {
+        DB.with(|db| db.clone())
+    }
+}
+
+impl WalletPersister for Persister {
+    type Error = rusqlite::Error;
+
+    fn initialize(_persister: &mut Self) -> Result<bdk_wallet::ChangeSet, Self::Error> {
+        let db = Self::db();
+        let mut db_ref = db.borrow_mut();
+        let db_tx = db_ref.transaction()?;
+        ChangeSet::init_sqlite_tables(&db_tx)?;
+        let changeset = ChangeSet::from_sqlite(&db_tx)?;
+        db_tx.commit()?;
+        Ok(changeset)
+    }
+
+    fn persist(
+        _persister: &mut Self,
+        changeset: &bdk_wallet::ChangeSet,
+    ) -> Result<(), Self::Error> {
+        let db = Self::db();
+        let mut db_ref = db.borrow_mut();
+        let db_tx = db_ref.transaction()?;
+        changeset.persist_to_sqlite(&db_tx)?;
+        db_tx.commit()
     }
 }

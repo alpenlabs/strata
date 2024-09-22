@@ -25,7 +25,7 @@ pub struct BridgeOutArgs {
     p2tr_address: Option<String>,
 }
 
-pub async fn bridge_out(args: BridgeOutArgs) {
+pub async fn bridge_out(args: BridgeOutArgs, seed: Seed) {
     let address = args.p2tr_address.map(|a| {
         Address::from_str(&a)
             .expect("valid address")
@@ -33,7 +33,6 @@ pub async fn bridge_out(args: BridgeOutArgs) {
             .expect("correct network")
     });
 
-    let seed = Seed::load_or_create().unwrap();
     let mut l1w = SignetWallet::new(&seed).unwrap();
     let l2w = RollupWallet::new(&seed).unwrap();
 
@@ -41,8 +40,7 @@ pub async fn bridge_out(args: BridgeOutArgs) {
         Some(a) => a,
         None => {
             let info = l1w.reveal_next_address(KeychainKind::External);
-            l1w.persist(&mut SignetWallet::persister().unwrap())
-                .unwrap();
+            l1w.persist().unwrap();
             info.address
         }
     };

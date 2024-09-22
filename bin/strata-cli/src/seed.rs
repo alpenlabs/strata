@@ -28,6 +28,7 @@ impl BaseWallet {
     }
 }
 
+#[derive(Clone)]
 pub struct Seed([u8; SEED_LEN]);
 
 impl Seed {
@@ -268,7 +269,9 @@ pub fn reset() -> Result<
     Ok(())
 }
 
-pub fn change_password() -> Result<
+pub fn change_password(
+    seed: Seed,
+) -> Result<
     (),
     OneOf<(
         PlatformFailure,
@@ -279,25 +282,6 @@ pub fn change_password() -> Result<
     )>,
 > {
     let term = Term::stdout();
-    let Some(encrypted_seed) = EncryptedSeed::load().map_err(OneOf::broaden)? else {
-        let _ = term.write_line("You don't have a wallet setup.");
-        std::process::exit(1);
-    };
-
-    let mut old_pw = Password::read(false).map_err(OneOf::new)?;
-    let seed = match encrypted_seed.decrypt(&mut old_pw) {
-        Ok(seed) => seed,
-        Err(e) => {
-            let narrowed = e.narrow::<aes_gcm_siv::Error, _>();
-            if let Ok(_aes_error) = narrowed {
-                let _ = term.write_line("Bad password");
-                std::process::exit(1);
-            }
-
-            return Err(narrowed.unwrap_err().broaden());
-        }
-    };
-
     let mut new_pw = Password::read(true).map_err(OneOf::new)?;
     let encrypted_seed = seed
         .encrypt(&mut new_pw, &mut thread_rng())

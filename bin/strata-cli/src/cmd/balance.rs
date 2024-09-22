@@ -19,7 +19,7 @@ pub struct BalanceArgs {
     rollup: bool,
 }
 
-pub async fn balance(args: BalanceArgs) {
+pub async fn balance(args: BalanceArgs, seed: Seed) {
     let term = Term::stdout();
     if args.signet && args.rollup {
         let _ = term.write_line("Cannot use both --signet and --rollup options at once");
@@ -29,7 +29,6 @@ pub async fn balance(args: BalanceArgs) {
         std::process::exit(1);
     }
 
-    let seed = Seed::load_or_create().unwrap();
     if args.signet {
         let mut l1w = SignetWallet::new(&seed).unwrap();
         l1w.sync().await.unwrap();

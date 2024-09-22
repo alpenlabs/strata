@@ -36,7 +36,7 @@ pub struct PowChallenge {
     difficulty: u8,
 }
 
-pub async fn faucet(args: FaucetArgs) {
+pub async fn faucet(args: FaucetArgs, seed: Seed) {
     let term = Term::stdout();
     if args.signet && args.rollup {
         let _ = term.write_line("Cannot use both --signet and --rollup options at once");
@@ -45,8 +45,6 @@ pub async fn faucet(args: FaucetArgs) {
         let _ = term.write_line("Must specify either --signet and --rollup option");
         std::process::exit(1);
     }
-
-    let seed = Seed::load_or_create().unwrap();
 
     let _ = term.write_line("Fetching challenge from faucet");
 
@@ -73,14 +71,13 @@ pub async fn faucet(args: FaucetArgs) {
         hasher
     };
     let pb = ProgressBar::new_spinner();
-    let mut rng = thread_rng();
     while !pow_valid(
         prehash.clone(),
         challenge.difficulty,
         solution.to_le_bytes(),
     ) {
         solution += 1;
-        if (0..100).sample_single(&mut rng) == 0 {
+        if (0..100).sample_single(&mut thread_rng()) == 0 {
             pb.set_message(format!("Trying {solution}"));
         }
     }
@@ -90,12 +87,11 @@ pub async fn faucet(args: FaucetArgs) {
     ));
 
     let url = if args.signet {
-        let mut conn = SignetWallet::persister().unwrap();
         let mut l1w = SignetWallet::new(&seed).unwrap();
         let address = match args.address {
             None => {
                 let address_info = l1w.reveal_next_address(KeychainKind::External);
-                l1w.persist(&mut conn).unwrap();
+                l1w.persist().unwrap();
                 address_info.address
             }
             Some(address) => {

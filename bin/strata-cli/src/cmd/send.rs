@@ -35,7 +35,7 @@ pub struct SendArgs {
     address: String,
 }
 
-pub async fn send(args: SendArgs) {
+pub async fn send(args: SendArgs, seed: Seed) {
     let term = Term::stdout();
     if args.signet && args.rollup {
         let _ = term.write_line("Cannot use both --signet and --rollup options at once");
@@ -44,8 +44,6 @@ pub async fn send(args: SendArgs) {
         let _ = term.write_line("Must specify either --signet and --rollup option");
         std::process::exit(1);
     }
-
-    let seed = Seed::load_or_create().unwrap();
 
     let txid = if args.signet {
         let amount = Amount::from_sat(args.amount);

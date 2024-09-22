@@ -16,8 +16,7 @@ pub struct BackupArgs {
     language: Option<String>,
 }
 
-pub async fn backup(args: BackupArgs) {
-    let seed = Seed::load_or_create().unwrap();
+pub async fn backup(args: BackupArgs, seed: Seed) {
     let term = Term::stdout();
     let language = match args.language {
         Some(s) => s,

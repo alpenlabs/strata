@@ -34,18 +34,18 @@ pub struct BridgeInArgs {
     rollup_address: Option<String>,
 }
 
-pub async fn bridge_in(args: BridgeInArgs) {
+pub async fn bridge_in(args: BridgeInArgs, seed: Seed) {
     let term = Term::stdout();
     let requested_rollup_address = args
         .rollup_address
         .map(|a| RollupAddress::from_str(&a).expect("bad rollup address"));
-    let seed = Seed::load_or_create().unwrap();
     let mut l1w = SignetWallet::new(&seed).unwrap();
-    l1w.sync().await.unwrap();
     let l2w = RollupWallet::new(&seed).unwrap();
+
+    l1w.sync().await.unwrap();
     let recovery_address = l1w.reveal_next_address(KeychainKind::External).address;
-    l1w.persist(&mut SignetWallet::persister().unwrap())
-        .unwrap();
+    l1w.persist().unwrap();
+
     let rollup_address = requested_rollup_address.unwrap_or(l2w.default_signer_address());
     const AMOUNT: Amount = Amount::from_sat(1_001_000_000); // 10.01 BTC
     let _ = term.write_line(&format!(
@@ -59,12 +59,11 @@ pub async fn bridge_in(args: BridgeInArgs) {
         style(recovery_address.to_string()).yellow()
     ));
 
-    let mut rng = thread_rng();
     let (bridge_in_desc, recovery_script_hash) = bridge_in_descriptor(
         SETTINGS.bridge_musig2_pubkey,
         recovery_address,
         l1w.secp_ctx(),
-        &mut rng,
+        &mut thread_rng(),
     )
     .expect("valid bridge in descriptor");
 

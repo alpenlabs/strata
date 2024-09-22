@@ -17,7 +17,7 @@ pub struct ReceiveArgs {
     rollup: bool,
 }
 
-pub async fn receive(args: ReceiveArgs) {
+pub async fn receive(args: ReceiveArgs, seed: Seed) {
     let term = Term::stdout();
     if args.signet && args.rollup {
         let _ = term.write_line("Cannot use both --signet and --rollup options at once");
@@ -26,7 +26,6 @@ pub async fn receive(args: ReceiveArgs) {
         let _ = term.write_line("Must specify either --signet and --rollup option");
         std::process::exit(1);
     }
-    let seed = Seed::load_or_create().unwrap();
 
     let address = if args.signet {
         let mut l1w = SignetWallet::new(&seed).unwrap();
@@ -34,8 +33,7 @@ pub async fn receive(args: ReceiveArgs) {
         l1w.sync().await.unwrap();
         let _ = term.write_line("Wallet synced");
         let address_info = l1w.reveal_next_address(KeychainKind::External);
-        l1w.persist(&mut SignetWallet::persister().unwrap())
-            .unwrap();
+        l1w.persist().unwrap();
         address_info.address.to_string()
     } else if args.rollup {
         let l2w = RollupWallet::new(&seed).unwrap();
