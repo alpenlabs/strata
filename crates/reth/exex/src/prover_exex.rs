@@ -8,7 +8,7 @@ use reth_evm::execute::{BlockExecutorProvider, Executor};
 // use reth_execution_types::BlockExecutionInput;
 use reth_exex::{ExExContext, ExExEvent};
 use reth_node_api::FullNodeComponents;
-use reth_primitives::{Address, BlockWithSenders, TransactionSignedNoHash, B256, U256};
+use reth_primitives::{Address, BlockWithSenders, TransactionSignedNoHash, B256};
 use reth_provider::{
     BlockExecutionInput, BlockReader, Chain, ExecutionOutcome, StateProviderFactory,
 };
@@ -88,9 +88,9 @@ fn get_accessed_states<'a, Node: FullNodeComponents>(
     let cache_db = CacheDB::new(&cache_db_provider);
 
     let block_exec_input: BlockExecutionInput<'a, BlockWithSenders> =
-        BlockExecutionInput::new(block, U256::ZERO);
+        BlockExecutionInput::new(block, block.difficulty);
 
-    let _block_exec_op = executor.executor(cache_db).execute(block_exec_input)?;
+    executor.executor(cache_db).execute(block_exec_input)?;
 
     let acessed_state = cache_db_provider.get_accessed_state();
     Ok(acessed_state)

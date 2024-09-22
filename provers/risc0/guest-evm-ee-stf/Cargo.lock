@@ -958,7 +958,9 @@ dependencies = [
 name = "express-reth-evm"
 version = "0.1.0"
 dependencies = [
+ "alloy-sol-types",
  "express-reth-primitives",
+ "reth-primitives",
  "revm",
  "revm-primitives",
 ]

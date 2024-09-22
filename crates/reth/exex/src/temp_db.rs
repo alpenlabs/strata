@@ -74,7 +74,7 @@ impl DatabaseRef for CacheDBProvider {
 
     /// Get basic account information.
     fn basic_ref(&self, address: Address) -> Result<Option<AccountInfo>, Self::Error> {
-        let account_info: Option<AccountInfo> = self
+        let account_info = self
             .provider
             .basic_account(address)?
             .map(|account| account.into());
@@ -85,13 +85,9 @@ impl DatabaseRef for CacheDBProvider {
         );
 
         // Record the account value to the state.
-        if let Some(ref info) = account_info {
-            self.accounts.borrow_mut().insert(address, info.clone());
-        } else {
-            self.accounts
-                .borrow_mut()
-                .insert(address, Default::default());
-        }
+        self.accounts
+            .borrow_mut()
+            .insert(address, account_info.clone().unwrap_or_default());
 
         Ok(account_info)
     }
