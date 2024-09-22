@@ -4,9 +4,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[cfg(not(debug_assertions))]
 use sp1_helper::build_program;
+#[cfg(not(debug_assertions))]
 use sp1_sdk::{HashableKey, MockProver, Prover};
-
+#[cfg(not(debug_assertions))]
 const RISC_V_COMPILER: &str = "/opt/riscv/bin/riscv-none-elf-gcc";
 
 const EVM_EE_STF: &str = "guest-evm-ee-stf";
@@ -14,6 +16,7 @@ const CL_STF: &str = "guest-cl-stf";
 const BTC_BLOCKSPACE: &str = "guest-btc-blockspace";
 const L1_BATCH: &str = "guest-l1-batch";
 
+#[cfg(not(debug_assertions))]
 const PROGRAMS_TO_BUILD: &[&str] = &[EVM_EE_STF, CL_STF, BTC_BLOCKSPACE, L1_BATCH];
 
 fn get_program_dependencies() -> HashMap<&'static str, Vec<&'static str>> {
@@ -104,27 +107,16 @@ fn build_program_with_dependencies(
 
     // Now build the current program
     let elf_name = format!("{}_ELF", program.to_uppercase().replace("-", "_"));
-    let (elf_contents, vk_hash_u32) = if is_build_enabled() && PROGRAMS_TO_BUILD.contains(&program)
-    {
-        setup_compiler();
-
-        // Ensure the vks.rs is in place before building the program
-        build_program(program);
-
-        let elf_path = format!("{}/elf/riscv32im-succinct-zkvm-elf", program);
-        generate_elf_contents_and_vk_hash(&elf_path)
-    } else {
-        generate_mock_contents()
-    };
+    let (elf_contents, vk_hash_u32) = generate_elf_contents_and_vk_hash(program);
 
     results.insert(elf_name.clone(), (elf_contents.clone(), vk_hash_u32));
     vk_hashes.insert(program.to_string(), vk_hash_u32);
     built_programs.insert(program.to_string());
 }
 
-fn is_build_enabled() -> bool {
-    env::var("SKIP_GUEST_BUILD").is_err() && env::var("CARGO_CFG_CLIPPY").is_err()
-}
+// fn is_build_enabled() -> bool {
+//     env::var("SKIP_GUEST_BUILD").is_err() && env::var("CARGO_CFG_CLIPPY").is_err()
+// }
 
 fn get_output_dir() -> PathBuf {
     env::var_os("OUT_DIR")
@@ -132,18 +124,24 @@ fn get_output_dir() -> PathBuf {
         .into()
 }
 
-fn setup_compiler() {
+#[cfg(not(debug_assertions))]
+fn generate_elf_contents_and_vk_hash(program: &str) -> (Vec<u8>, [u32; 8]) {
+    // Setup compiler
     env::set_var("CC_riscv32im_succinct_zkvm_elf", RISC_V_COMPILER);
-}
 
-fn generate_elf_contents_and_vk_hash(elf_path: &str) -> (Vec<u8>, [u32; 8]) {
+    // Ensure the vks.rs is in place before building the program
+    build_program(program);
+
+    let elf_path = format!("{}/elf/riscv32im-succinct-zkvm-elf", program);
+
     let contents = fs::read(elf_path).expect("Failed to find SP1 ELF");
     let client = MockProver::new();
     let (_pk, vk) = client.setup(&contents);
     (contents, vk.hash_u32())
 }
 
-fn generate_mock_contents() -> (Vec<u8>, [u32; 8]) {
+#[cfg(debug_assertions)]
+fn generate_elf_contents_and_vk_hash(_program: &str) -> (Vec<u8>, [u32; 8]) {
     (Vec::new(), [0u32; 8])
 }
 

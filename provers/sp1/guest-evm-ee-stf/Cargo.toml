@@ -8,7 +8,7 @@ version = "0.1.0"
 [dependencies]
 express-proofimpl-evm-ee-stf = { path = "../../../crates/proof-impl/evm-ee-stf" }
 revm = { version = "12.1.0", default-features = false }
-sp1-zkvm = { version = "2.0.0" }
+sp1-zkvm = "2.0.0"
 
 [patch.crates-io]
-secp256k1 = { git = "https://github.com/prajwolrg/rust-secp256k1", branch = "0.29.x-sp1-patch" }
+secp256k1 = { git = "https://github.com/sp1-patches/rust-secp256k1", branch = "patch-secp256k1-v0.29.1" }
