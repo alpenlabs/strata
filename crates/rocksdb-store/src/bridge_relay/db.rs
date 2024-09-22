@@ -42,24 +42,30 @@ impl BridgeMsgDb {
 impl BridgeMessageDb for BridgeMsgDb {
     fn write_msg(&self, id: u128, msg: BridgeMessage) -> alpen_express_db::DbResult<()> {
         let mut id = id;
-        while self.db.get::<BridgeMsgIdSchema>(&id)?.is_some() {
-            id += 1;
-        }
 
-        self.db.put::<BridgeMsgIdSchema>(&id, &msg);
+        self.db
+            .with_optimistic_txn(TransactionRetry::Count(self.ops.retry_count), |txn| {
+                while self.db.get::<BridgeMsgIdSchema>(&id)?.is_some() {
+                    id += 1;
+                }
 
-        let scope = msg.scope().to_owned();
+                txn.put::<BridgeMsgIdSchema>(&id, &msg);
 
-        if let Some(scopes) = self.db.get::<ScopeMsgIdSchema>(&scope)? {
-            let mut new_scopes = Vec::new();
-            new_scopes.extend(&scopes);
-            new_scopes.push(id);
-            self.db.put::<ScopeMsgIdSchema>(&scope, &new_scopes)?;
-        } else {
-            self.db.put::<ScopeMsgIdSchema>(&scope, &vec![id])?;
-        }
+                let scope = msg.scope().to_owned();
 
-        Ok(())
+                if let Some(scopes) = txn.get::<ScopeMsgIdSchema>(&scope)? {
+                    let mut new_scopes = Vec::new();
+                    new_scopes.extend(&scopes);
+                    new_scopes.push(id);
+
+                    txn.put::<ScopeMsgIdSchema>(&scope, &new_scopes)?;
+                } else {
+                    txn.put::<ScopeMsgIdSchema>(&scope, &vec![id])?;
+                }
+
+                Ok::<(), DbError>(())
+            })
+            .map_err(|e: rockbound::TransactionError<_>| DbError::TransactionError(e.to_string()))
     }
 
     fn delete_msgs_before_timestamp(&self, msg_id: u128) -> DbResult<()> {
