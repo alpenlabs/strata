@@ -23,7 +23,7 @@ pub fn wei_to_sats(wei: U256) -> (U256, U256) {
 
 /// Collects withdrawal intents from bridge-out events in the receipts.
 /// Returns a vector of `WithdrawalIntent`.
-pub fn collect_bridgeout_intents(receipts: &[Option<Receipt>]) -> Vec<WithdrawalIntent> {
+pub fn collect_withdrawal_intents(receipts: &[Option<Receipt>]) -> Vec<WithdrawalIntent> {
     receipts
         .iter()
         .flatten()

@@ -19,7 +19,7 @@ use reth_revm::{
 use reth_rpc_types_compat::proof::from_primitive_account_proof;
 use tracing::{debug, error};
 
-use crate::temp_db::{AccessedState, CacheDBProvider};
+use crate::cache_db_provider::{AccessedState, CacheDBProvider};
 
 pub struct ProverWitnessGenerator<Node: FullNodeComponents, S: WitnessStore + Clone> {
     ctx: ExExContext<Node>,

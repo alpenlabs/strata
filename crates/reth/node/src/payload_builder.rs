@@ -1,4 +1,4 @@
-use express_reth_evm::collect_bridgeout_intents;
+use express_reth_evm::collect_withdrawal_intents;
 use reth::{
     builder::{components::PayloadServiceBuilder, BuilderContext, PayloadBuilderConfig},
     providers::{CanonStateSubscriptions, ExecutionOutcome, StateProviderFactory},
@@ -386,7 +386,7 @@ where
         attributes.withdrawals().clone(),
     )?;
 
-    let withdrawal_intents = collect_bridgeout_intents(&receipts);
+    let withdrawal_intents = collect_withdrawal_intents(&receipts);
 
     // merge all transitions into bundle state, this would apply the withdrawal balance changes
     // and 4788 contract call

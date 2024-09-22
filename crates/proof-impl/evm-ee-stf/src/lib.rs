@@ -22,6 +22,8 @@ pub mod processor;
 use std::collections::HashMap;
 
 use db::InMemoryDBHelper;
+use express_reth_evm::collect_withdrawal_intents;
+use express_reth_primitives::WithdrawalIntent;
 use mpt::keccak;
 use processor::{EvmConfig, EvmProcessor};
 use reth_primitives::{
@@ -40,7 +42,8 @@ pub struct ELProofPublicParams {
     pub new_blockhash: FixedBytes<32>,
     pub new_state_root: FixedBytes<32>,
     pub txn_root: FixedBytes<32>,
-    pub withdrawals: Vec<FixedBytes<32>>,
+    pub withdrawal_intents: Vec<WithdrawalIntent>,
+    pub deposits_txns_root: FixedBytes<32>,
 }
 
 /// Necessary information to prove the execution of the RETH block.
@@ -109,12 +112,21 @@ pub fn process_block_transaction(
     };
 
     evm_processor.initialize();
-    evm_processor.execute();
+    let receipts = evm_processor.execute();
     evm_processor.finalize();
 
     // Extract the header and compute the new block hash
     let block_header = evm_processor.header.unwrap(); // Ensure header exists before unwrap
     let new_block_hash = B256::from(keccak(alloy_rlp::encode(block_header.clone())));
+
+    // TODO: Optimize receipt iteration by implementing bloom filters or adding hints to
+    // `ELProofInput`. This will allow for efficient filtering of`WithdrawalIntentEvents`.
+    let withdrawal_intents = collect_withdrawal_intents(
+        &receipts
+            .into_iter()
+            .map(|el| Some(el.receipt))
+            .collect::<Vec<_>>(),
+    );
 
     // Construct the public parameters for the proof
     ELProofPublicParams {
@@ -123,7 +135,8 @@ pub fn process_block_transaction(
         new_state_root: block_header.state_root,
         prev_blockhash: previous_block_hash,
         txn_root: block_header.transactions_root,
-        withdrawals: Vec::new(),
+        deposits_txns_root: block_header.withdrawals_root.unwrap_or_default(),
+        withdrawal_intents,
     }
 }
 
@@ -146,7 +159,10 @@ mod tests {
         )
         .expect("Failed to read the blob data file");
 
+        // Testing of withdrwal inent.
+        // TODO: Migrate this this test to the Prover Manager Functional Tests
         let input: ELProofInput = serde_json::from_str(&json_content).expect("failed");
-        process_block_transaction(input, EVM_CONFIG);
+        let public_params = process_block_transaction(input, EVM_CONFIG);
+        assert!(!public_params.withdrawal_intents.is_empty())
     }
 }

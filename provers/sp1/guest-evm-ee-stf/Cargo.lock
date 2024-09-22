@@ -811,6 +811,7 @@ dependencies = [
  "alloy-rpc-types",
  "anyhow",
  "express-reth-evm",
+ "express-reth-primitives",
  "k256",
  "reth-primitives",
  "reth-trie-common",

@@ -12,6 +12,7 @@ alloy-rpc-types = { workspace = true, default-features = false, features = [
 ] }
 anyhow = { workspace = true }
 express-reth-evm = { workspace = true }
+express-reth-primitives = { workspace = true }
 k256 = { version = "=0.13.3", features = [
   "std",
   "ecdsa",
