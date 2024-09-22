@@ -1,3 +1,5 @@
+import time
+
 import flexitest
 from solcx import compile_source, install_solc, set_solc_version
 from web3 import Web3
@@ -27,6 +29,9 @@ class ElBlockWitnessDataGenerationTest(flexitest.Test):
         assert tx_receipt["status"] == 1
         blocknum = tx_receipt.blockNumber
         blockhash = rethrpc.eth_getBlockByNumber(hex(blocknum), False)["hash"]
+
+        # wait for witness data generation
+        time.sleep(1)
 
         # Get the witness data
         witness_data = rethrpc.alpee_getBlockWitness(blockhash, True)

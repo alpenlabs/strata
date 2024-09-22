@@ -167,9 +167,7 @@ pub async fn start_bridge_relayer_task(
     let (brmsg_tx, brmsg_rx) = mpsc::channel::<BridgeMessage>(100);
 
     let state = RelayerState::new(config, ops.clone(), status_rx);
-    task_exec
-        .spawn_critical_async("bridge-msg-relayer", relayer_task(state, brmsg_rx))
-        .await?;
+    task_exec.spawn_critical_async("bridge-msg-relayer", relayer_task(state, brmsg_rx));
 
     let h = RelayerHandle { brmsg_tx, ops };
     Ok(Arc::new(h))
