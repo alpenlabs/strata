@@ -3916,6 +3916,7 @@ dependencies = [
  "express-proofimpl-evm-ee-stf",
  "express-reth-db",
  "eyre",
+ "reth-evm",
  "reth-exex",
  "reth-node-api",
  "reth-primitives",
