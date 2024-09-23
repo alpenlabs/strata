@@ -16,6 +16,25 @@ macro_rules! err {
     }};
 }
 
+#[macro_export]
+macro_rules! hex {
+    ($hex_literal:expr) => {{
+        const HEX_LITERAL: &str = $hex_literal;
+
+        // Calculate the length of the resulting array
+        const BUF_LEN: usize = HEX_LITERAL.len() / 2;
+
+        // Create a buffer with the correct length
+        let mut buf = [0u8; BUF_LEN];
+
+        // Decode the hex string into the buffer
+        match ::hex::decode(HEX_LITERAL, &mut buf) {
+            Ok(_) => buf,
+            Err(e) => panic!("Failed to decode hex literal: {:?}", e),
+        }
+    }};
+}
+
 #[cfg(any(feature = "serde", feature = "axum"))]
 pub struct Hex<T: AsRef<[u8]>>(pub T);
 
