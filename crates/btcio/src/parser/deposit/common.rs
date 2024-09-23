@@ -1,22 +1,23 @@
-use bitcoin::{script::Instructions, Transaction, TxOut};
+use bitcoin::{script::Instructions, Transaction};
 
 use super::{error::DepositParseError, DepositTxConfig};
 use crate::parser::utils::next_bytes;
 
-pub type TapBlkAndAddr = (Vec<u8>, Vec<u8>);
-
-pub fn parse_bridge_offer_output<'a>(
-    tx: &'a Transaction,
-    config: &DepositTxConfig,
-) -> Option<(usize, &'a TxOut)> {
-    tx.output.iter().enumerate().find(|(_, txout)| {
-        config
-            .federation_address
-            .matches_script_pubkey(&txout.script_pubkey)
-            && txout.value.to_sat() == config.deposit_quantity
-    })
+pub struct DepositRequestScriptInfo {
+    pub tap_ctrl_blk_hash: [u8;32],
+    pub ee_bytes: Vec<u8>
 }
 
+/// if the transaction's 0th index is p2tr and amount exceeds the deposit quantity or not
+pub fn check_bridge_offer_output<'a>(
+    tx: &'a Transaction,
+    config: &DepositTxConfig,
+) -> bool {
+    let txout = &tx.output[0];
+    txout.script_pubkey.is_p2tr() && txout.value.to_sat() >= config.deposit_quantity
+}
+
+/// check if magic bytes(unique set of bytes used to identify relevant tx) is present or not
 pub fn check_magic_bytes(
     instructions: &mut Instructions,
     config: &DepositTxConfig,
@@ -35,6 +36,7 @@ pub fn check_magic_bytes(
     Err(DepositParseError::NoMagicBytes)
 }
 
+/// extracts the Execution environment bytes(most possibly EVM bytes)
 pub fn extract_ee_bytes(
     instructions: &mut Instructions,
     config: &DepositTxConfig,
@@ -60,12 +62,12 @@ mod tests {
 
     use super::*;
     use crate::parser::deposit::{
-        common::{check_magic_bytes, parse_bridge_offer_output},
+        common::{check_magic_bytes, check_bridge_offer_output},
         test_utils::{create_transaction_two_outpoints, get_deposit_tx_config},
     };
 
     #[test]
-    fn test_parse_bridge_offer_output_valid() {
+    fn test_check_bridge_offer_output_valid() {
         let config = get_deposit_tx_config();
         let tx = create_transaction_two_outpoints(
             Amount::from_sat(config.deposit_quantity),
@@ -73,19 +75,12 @@ mod tests {
             &ScriptBuf::new(),
         );
 
-        let result = parse_bridge_offer_output(&tx, &config);
-        assert!(result.is_some());
-        let (index, txout) = result.unwrap();
-        assert_eq!(index, 0);
-        assert_eq!(txout.value.to_sat(), config.deposit_quantity);
-        assert_eq!(
-            txout.script_pubkey,
-            config.federation_address.script_pubkey()
-        );
+        let result = check_bridge_offer_output(&tx, &config);
+        assert!(result);
     }
 
     #[test]
-    fn test_parse_bridge_offer_output_invalid() {
+    fn test_check_bridge_offer_output_invalid() {
         let config = get_deposit_tx_config();
         let tx = create_transaction_two_outpoints(
             Amount::from_sat(config.deposit_quantity + 1),
@@ -93,8 +88,8 @@ mod tests {
             &ScriptBuf::new(),
         );
 
-        let result = parse_bridge_offer_output(&tx, &config);
-        assert!(result.is_none());
+        let result = check_bridge_offer_output(&tx, &config);
+        assert!(!result);
     }
 
     #[test]

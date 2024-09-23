@@ -2,9 +2,10 @@
 
 use alpen_express_primitives::tx::DepositReqeustInfo;
 use bitcoin::{opcodes::all::OP_RETURN, ScriptBuf, Transaction};
+use std::convert::TryInto;
 
 use super::{
-    common::{check_magic_bytes, extract_ee_bytes, parse_bridge_offer_output, TapBlkAndAddr},
+    common::{check_bridge_offer_output, check_magic_bytes, extract_ee_bytes, DepositRequestScriptInfo},
     error::DepositParseError,
     DepositTxConfig,
 };
@@ -15,17 +16,17 @@ pub fn extract_deposit_request_info(
     tx: &Transaction,
     config: &DepositTxConfig,
 ) -> Option<DepositReqeustInfo> {
-    for output in tx.output.iter() {
-        if let Ok((tap_blk, ee_address)) =
-            parse_deposit_request_script(&output.script_pubkey, config)
+    // tapscript output and OP_RETURN must be present
+    if tx.output.len() >= 2 {
+        if let Ok(DepositRequestScriptInfo {tap_ctrl_blk_hash, ee_bytes}) =
+            parse_deposit_request_script(&tx.output[1].script_pubkey, config)
         {
             // find the outpoint with taproot address, so that we can extract sent amount from that
-            if let Some((index, tx_out)) = parse_bridge_offer_output(tx, config) {
+            if check_bridge_offer_output(tx, config) {
                 return Some(DepositReqeustInfo {
-                    amt: tx_out.value.to_sat(),
-                    deposit_outpoint: index as u32,
-                    address: ee_address,
-                    control_block: tap_blk,
+                    amt: tx.output[0].value.to_sat(),
+                    address: ee_bytes,
+                    tap_ctrl_blk_hash,
                 });
             }
         }
@@ -38,7 +39,7 @@ pub fn extract_deposit_request_info(
 pub fn parse_deposit_request_script(
     script: &ScriptBuf,
     config: &DepositTxConfig,
-) -> Result<TapBlkAndAddr, DepositParseError> {
+) -> Result<DepositRequestScriptInfo, DepositParseError> {
     let mut instructions = script.instructions();
 
     // check if OP_RETURN is present and if not just discard it
@@ -49,16 +50,10 @@ pub fn parse_deposit_request_script(
     check_magic_bytes(&mut instructions, config)?;
 
     match next_bytes(&mut instructions) {
-        Some(taproot_spend_info) => {
+        Some(ctrl_hash) => {
             // length of control block is 32
-            match taproot_spend_info.len() == 32 {
-                true => {
-                    let ee_bytes = extract_ee_bytes(&mut instructions, config)?;
-
-                    Ok((taproot_spend_info, ee_bytes))
-                }
-                false => Err(DepositParseError::ControlBlockLenMismatch),
-            }
+            let ee_bytes = extract_ee_bytes(&mut instructions, config)?;
+            Ok(DepositRequestScriptInfo {tap_ctrl_blk_hash: ctrl_hash.try_into().map_err(|_| DepositParseError::ControlBlockLenMismatch)?, ee_bytes})
         }
         None => Err(DepositParseError::NoControlBlock),
     }
@@ -106,7 +101,7 @@ mod tests {
 
         assert_eq!(out.amt, amt.to_sat());
         assert_eq!(out.address, evm_addr);
-        assert_eq!(out.control_block, dummy_control_block);
+        assert_eq!(out.tap_ctrl_blk_hash, dummy_control_block);
     }
 
     #[test]
@@ -169,13 +164,13 @@ mod tests {
     #[test]
     fn test_script_with_invalid_magic_bytes() {
         let evm_addr = [1; 20];
-        let control_block = [0xFF; 65];
+        let control_block = vec![0xFF; 65];
         let invalid_magic_bytes = vec![0x00; 4]; // Invalid magic bytes
 
         let config = get_deposit_tx_config();
         let invalid_script = build_test_deposit_request_script(
             invalid_magic_bytes,
-            control_block.to_vec(),
+            control_block,
             evm_addr.to_vec(),
         );
 

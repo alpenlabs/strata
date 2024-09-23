@@ -172,7 +172,7 @@ mod tests {
 
         let parsed_tx: RelevantTxInfo = ArbitraryGenerator::new().generate();
         let r = rand::thread_rng().gen_range(1..block.txdata.len()) as u32;
-        let l1_tx = generate_l1_tx(r, parsed_tx, &block);
+        let l1_tx = generate_l1_tx(&block, r, parsed_tx);
         assert!(check_witness_commitment(&block, &l1_tx));
 
         assert_eq!(

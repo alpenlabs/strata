@@ -9,6 +9,8 @@ use crate::parser::{
     inscription::parse_inscription_data,
 };
 
+use super::messages::ProtocolOpTxRef;
+
 /// What kind of transactions can be relevant for rollup node to filter
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RelevantTxType {
@@ -22,22 +24,21 @@ pub enum RelevantTxType {
 }
 
 type RollupName = String;
-type AddressLength = u8;
-type Amount = u64;
-type FederationAddress = Address;
 
 /// Filter all the relevant [`Transaction`]s in a block based on given [`RelevantTxType`]s
 pub fn filter_relevant_txs(
     block: &Block,
     relevent_types: &[RelevantTxType],
-) -> Vec<(u32, RelevantTxInfo)> {
+) -> Vec<ProtocolOpTxRef> {
     block
         .txdata
         .iter()
         .enumerate()
         .filter_map(|(i, tx)| {
             check_and_extract_relevant_info(tx, relevent_types)
-                .map(|relevant_tx| (i as u32, relevant_tx))
+                .map(|relevant_tx|
+                    ProtocolOpTxRef::new(i as u32, relevant_tx)
+                    )
         })
         .collect()
 }
@@ -63,9 +64,11 @@ fn check_and_extract_relevant_info(
         }
 
         RelevantTxType::RollupInscription(name) => {
-            if let Some(scr) = tx.input[0].witness.tapscript() {
-                if let Ok(inscription_data) = parse_inscription_data(&scr.into(), name) {
-                    return Some(RelevantTxInfo::RollupInscription(inscription_data));
+            if !tx.input.is_empty() {
+                if let Some(scr) = tx.input[0].witness.tapscript() {
+                    if let Ok(inscription_data) = parse_inscription_data(&scr.into(), name) {
+                        return Some(RelevantTxInfo::RollupInscription(inscription_data));
+                    }
                 }
             }
             None
@@ -108,7 +111,7 @@ mod test {
             build_test_deposit_request_script, build_test_deposit_script,
             create_transaction_two_outpoints, generic_taproot_addr, get_deposit_tx_config,
         },
-        writer::builder::build_reveal_transaction,
+        writer::builder::{build_reveal_transaction, generate_inscription_script},
     };
 
     const OTHER_ADDR: &str = "bcrt1q6u6qyya3sryhh42lahtnz2m7zuufe7dlt8j0j5";
@@ -174,8 +177,9 @@ mod test {
     fn create_inscription_tx(rollup_name: String) -> Transaction {
         let address = parse_addr(OTHER_ADDR);
         let inp_tx = create_test_tx(vec![create_test_txout(100000000, &address)]);
-        let inscription_data = InscriptionData::new(rollup_name, vec![0, 1, 2, 3], 1);
-        let script = inscription_data.to_script().unwrap();
+        let inscription_data = InscriptionData::new(vec![0, 1, 2, 3]);
+
+        let script = generate_inscription_script(inscription_data, &rollup_name, 1).unwrap();
 
         // Create controlblock
         let secp256k1 = Secp256k1::new();
@@ -270,9 +274,9 @@ mod test {
     #[test]
     fn test_filter_relevant_txs_deposit() {
         let config = get_deposit_tx_config();
-        let evm_addr = vec![1u8; 20]; // Example EVM address
+        let ee_addr = vec![1u8; 20]; // Example EVM address
         let deposit_script =
-            build_test_deposit_script(config.magic_bytes.clone(), evm_addr.clone());
+            build_test_deposit_script(config.magic_bytes.clone(), ee_addr.clone());
 
         let tx = create_transaction_two_outpoints(
             Amount::from_sat(config.deposit_quantity),
@@ -292,7 +296,7 @@ mod test {
         );
 
         if let RelevantTxInfo::Deposit(deposit_info) = &result[0].1 {
-            assert_eq!(deposit_info.address, evm_addr, "EE address should match");
+            assert_eq!(deposit_info.address, ee_addr, "EE address should match");
             assert_eq!(
                 deposit_info.amt, config.deposit_quantity,
                 "Deposit amount should match"
@@ -305,12 +309,12 @@ mod test {
     #[test]
     fn test_filter_relevant_txs_deposit_request() {
         let config = get_deposit_tx_config();
-        let evm_addr = vec![2u8; 20]; // Example EVM address
-        let dummy_block = vec![0u8; 32]; // Example dummy block
+        let dest_addr = vec![2u8; 20]; // Example EVM address
+        let dummy_block = [0u8; 32]; // Example dummy block
         let deposit_request_script = build_test_deposit_request_script(
             config.magic_bytes.clone(),
-            dummy_block.clone(),
-            evm_addr.clone(),
+            dummy_block.to_vec(),
+            dest_addr.clone(),
         );
 
         let tx = create_transaction_two_outpoints(
@@ -332,11 +336,11 @@ mod test {
 
         if let RelevantTxInfo::DepositRequest(deposit_req_info) = &result[0].1 {
             assert_eq!(
-                deposit_req_info.address, evm_addr,
+                deposit_req_info.address, dest_addr,
                 "EE address should match"
             );
             assert_eq!(
-                deposit_req_info.control_block, dummy_block,
+                deposit_req_info.tap_ctrl_blk_hash, dummy_block,
                 "Control block should match"
             );
         } else {
@@ -367,13 +371,13 @@ mod test {
     #[test]
     fn test_filter_relevant_txs_multiple_deposits() {
         let config = get_deposit_tx_config();
-        let evm_addr1 = vec![3u8; 20];
-        let evm_addr2 = vec![4u8; 20];
+        let dest_addr1 = vec![3u8; 20];
+        let dest_addr2 = vec![4u8; 20];
 
         let deposit_script1 =
-            build_test_deposit_script(config.magic_bytes.clone(), evm_addr1.clone());
+            build_test_deposit_script(config.magic_bytes.clone(), dest_addr1.clone());
         let deposit_script2 =
-            build_test_deposit_script(config.magic_bytes.clone(), evm_addr2.clone());
+            build_test_deposit_script(config.magic_bytes.clone(), dest_addr2.clone());
 
         let tx1 = create_transaction_two_outpoints(
             Amount::from_sat(config.deposit_quantity),
@@ -406,9 +410,9 @@ mod test {
                 assert_eq!(
                     deposit_info.address,
                     if i == 0 {
-                        evm_addr1.clone()
+                        dest_addr1.clone()
                     } else {
-                        evm_addr2.clone()
+                        dest_addr2.clone()
                     },
                     "EVM address should match for transaction {}",
                     i

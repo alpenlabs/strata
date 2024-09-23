@@ -3,13 +3,13 @@ use std::sync::Arc;
 use alpen_express_btcio::reader::messages::{BlockData, L1Event};
 use alpen_express_db::traits::{Database, L1DataStore};
 use alpen_express_primitives::{
-    buf::Buf32, l1::L1BlockManifest, params::Params, utils::generate_l1_tx,
+    buf::Buf32, l1::{L1BlockManifest, L1Tx, L1TxProof}, params::Params, tx::RelevantTxInfo
 };
 use alpen_express_state::{
     batch::{BatchCheckpoint, SignedBatchCheckpoint},
     sync_event::SyncEvent,
 };
-use bitcoin::{consensus::serialize, hashes::Hash, Block};
+use bitcoin::{consensus::serialize, hashes::{sha256d, Hash}, Block, Wtxid};
 use tokio::sync::mpsc;
 use tracing::*;
 
@@ -69,9 +69,9 @@ where
 
             let manifest = generate_block_manifest(blockdata.block());
             let l1txs: Vec<_> = blockdata
-                .relevant_tx_infos()
+                .protocol_ops_txs()
                 .iter()
-                .map(|(idx, parsed_tx)| generate_l1_tx(*idx, parsed_tx.clone(), blockdata.block()))
+                .map(|ops_txs| extract_l1tx_from_block(blockdata.block(),ops_txs.index(), ops_txs.relevant_tx_infos().clone()))
                 .collect();
             let num_txs = l1txs.len();
             l1db.put_block_data(blockdata.block_num(), manifest, l1txs.clone())?;
@@ -98,13 +98,13 @@ where
 
 /// Parses inscriptions and checks for batch data in the transactions
 fn check_for_da_batch(blockdata: &BlockData) -> Vec<BatchCheckpoint> {
-    let relevant_tx_infos = blockdata.relevant_tx_infos();
+    let protocol_ops_txs = blockdata.protocol_ops_txs();
 
-    let inscriptions = relevant_tx_infos
+    let inscriptions = protocol_ops_txs
         .iter()
-        .filter_map(|(idx, parsed_tx)| match parsed_tx {
+        .filter_map(|ops_txs| match ops_txs.relevant_tx_infos() {
             alpen_express_primitives::tx::RelevantTxInfo::RollupInscription(inscription) => {
-                Some((inscription, &blockdata.block().txdata[*idx as usize]))
+                Some((inscription, &blockdata.block().txdata[ops_txs.index() as usize]))
             }
             _ => None,
         });
@@ -138,3 +138,102 @@ fn generate_block_manifest(block: &Block) -> L1BlockManifest {
 
     L1BlockManifest::new(blockid, header, Buf32::from(root))
 }
+
+/// Generates an L1 transaction with proof for a given transaction index in a block.
+///
+/// # Parameters
+/// - `idx`: The index of the transaction within the block's transaction data.
+/// - `relevant_info`: Relevant information gathered after parsing.
+/// - `block`: The block containing the transactions.
+///
+/// # Returns
+/// - An `L1Tx` struct containing the proof and the serialized transaction.
+///
+/// # Panics
+/// - If the `idx` is out of bounds for the block's transaction data.
+fn extract_l1tx_from_block(block: &Block, idx: u32, relevant_info: RelevantTxInfo) -> L1Tx {
+    assert!(
+        (idx as usize) < block.txdata.len(),
+        "utils: tx idx out of range of block txs"
+    );
+    let tx = &block.txdata[idx as usize];
+
+    // Get all witness ids for txs
+    let wtxids = &block
+        .txdata
+        .iter()
+        .enumerate()
+        .map(|(i, x)| {
+            if i == 0 {
+                Wtxid::all_zeros() // Coinbase's wtxid is all zeros
+            } else {
+                x.compute_wtxid()
+            }
+        })
+        .collect::<Vec<_>>();
+    let (cohashes, _wtxroot) = get_cohashes_from_wtxids(wtxids, idx);
+
+    let proof = L1TxProof::new(idx, cohashes);
+    let tx = serialize(tx);
+
+    L1Tx::new(proof, tx, relevant_info)
+}
+
+/// Generates cohashes for an wtxid in particular index with in given slice of wtxids.
+///
+/// # Parameters
+/// - `wtxids`: The witness txids slice
+/// - `index`: The index of the txn for which we want the cohashes
+///
+/// # Returns
+/// - A tuple `(Vec<Buf32>, Buf32)` containing the cohashes and the merkle root
+///
+/// # Panics
+/// - If the `index` is out of bounds for the `wtxids` length
+fn get_cohashes_from_wtxids(wtxids: &[Wtxid], index: u32) -> (Vec<Buf32>, Buf32) {
+    assert!(
+        (index as usize) < wtxids.len(),
+        "The transaction index should be within the txids length"
+    );
+
+    let mut curr_level: Vec<_> = wtxids
+        .iter()
+        .cloned()
+        .map(|x| x.to_raw_hash().to_byte_array())
+        .collect();
+    let mut curr_index = index;
+    let mut proof = Vec::new();
+
+    while curr_level.len() > 1 {
+        let len = curr_level.len();
+        if len % 2 != 0 {
+            curr_level.push(curr_level[len - 1]);
+        }
+
+        let proof_item_index = if curr_index % 2 == 0 {
+            curr_index + 1
+        } else {
+            curr_index - 1
+        };
+
+        let item = curr_level[proof_item_index as usize];
+        proof.push(Buf32(item.into()));
+
+        // construct pairwise hash
+        curr_level = curr_level
+            .chunks(2)
+            .map(|pair| {
+                let [a, b] = pair else {
+                    panic!("utils: cohash chunk should be a pair");
+                };
+                let mut arr = [0u8; 64];
+                arr[..32].copy_from_slice(a);
+                arr[32..].copy_from_slice(b);
+                *sha256d::Hash::hash(&arr).as_byte_array()
+            })
+            .collect::<Vec<_>>();
+        curr_index >>= 1;
+    }
+    (proof, Buf32(curr_level[0].into()))
+}
+

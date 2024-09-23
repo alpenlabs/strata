@@ -1,20 +1,12 @@
-use std::str::FromStr;
-
 use bitcoin::{
-    absolute::LockTime,
-    opcodes::all::OP_RETURN,
-    script::{self, PushBytesBuf},
-    Address, Amount, ScriptBuf, Transaction, TxOut,
+    absolute::LockTime, opcodes::all::OP_RETURN, script::{self, PushBytesBuf}, secp256k1::PublicKey, Amount, ScriptBuf, Transaction, TxOut
 };
 
 use super::DepositTxConfig;
 
-pub fn generic_taproot_addr() -> Address {
-    // Maybe N-of-N Address
-    Address::from_str("bcrt1pnmrmugapastum8ztvgwcn8hvq2avmcwh2j4ssru7rtyygkpqq98q4wyd6s")
-        .unwrap()
-        .require_network(bitcoin::Network::Regtest)
-        .unwrap()
+pub fn generic_taproot_addr() -> PublicKey {
+    let pubkey_bytes = hex::decode("02c72e8f3b6fd307c8edb32e8b53ed69c1f9269792088fc2fb756ce49cf3ad46a8").expect("Decoding failed");
+    PublicKey::from_slice(&pubkey_bytes).expect("Invalid public key")
 }
 
 pub fn get_deposit_tx_config() -> DepositTxConfig {
@@ -56,12 +48,12 @@ pub fn create_transaction_two_outpoints(
 pub fn build_no_op_deposit_request_script(
     magic: Vec<u8>,
     dummy_block: Vec<u8>,
-    evm_addr: Vec<u8>,
+    dest_addr: Vec<u8>,
 ) -> ScriptBuf {
     let builder = script::Builder::new()
         .push_slice(PushBytesBuf::try_from(magic).unwrap())
         .push_slice(PushBytesBuf::try_from(dummy_block).unwrap())
-        .push_slice(PushBytesBuf::try_from(evm_addr).unwrap());
+        .push_slice(PushBytesBuf::try_from(dest_addr).unwrap());
 
     builder.into_script()
 }
@@ -69,22 +61,22 @@ pub fn build_no_op_deposit_request_script(
 pub fn build_test_deposit_request_script(
     magic: Vec<u8>,
     dummy_block: Vec<u8>,
-    evm_addr: Vec<u8>,
+    dest_addr: Vec<u8>,
 ) -> ScriptBuf {
     let builder = script::Builder::new()
         .push_opcode(OP_RETURN)
         .push_slice(PushBytesBuf::try_from(magic).unwrap())
         .push_slice(PushBytesBuf::try_from(dummy_block).unwrap())
-        .push_slice(PushBytesBuf::try_from(evm_addr).unwrap());
+        .push_slice(PushBytesBuf::try_from(dest_addr).unwrap());
 
     builder.into_script()
 }
 
-pub fn build_test_deposit_script(magic: Vec<u8>, evm_addr: Vec<u8>) -> ScriptBuf {
+pub fn build_test_deposit_script(magic: Vec<u8>, dest_addr: Vec<u8>) -> ScriptBuf {
     let builder = script::Builder::new()
         .push_opcode(OP_RETURN)
         .push_slice(PushBytesBuf::try_from(magic).unwrap())
-        .push_slice(PushBytesBuf::try_from(evm_addr).unwrap());
+        .push_slice(PushBytesBuf::try_from(dest_addr).unwrap());
 
     builder.into_script()
 }

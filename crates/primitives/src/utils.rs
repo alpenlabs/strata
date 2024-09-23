@@ -73,6 +73,7 @@ fn get_cohashes_from_wtxids(wtxids: &[Wtxid], index: u32) -> (Vec<Buf32>, Buf32)
 ///
 /// # Parameters
 /// - `idx`: The index of the transaction within the block's transaction data.
+/// - `relevant_info`: Relevant information gathered after parsing.
 /// - `block`: The block containing the transactions.
 ///
 /// # Returns
@@ -80,7 +81,7 @@ fn get_cohashes_from_wtxids(wtxids: &[Wtxid], index: u32) -> (Vec<Buf32>, Buf32)
 ///
 /// # Panics
 /// - If the `idx` is out of bounds for the block's transaction data.
-pub fn generate_l1_tx(idx: u32, relevant_info: RelevantTxInfo, block: &Block) -> L1Tx {
+pub fn generate_l1_tx(block: &Block, idx: u32, relevant_info: RelevantTxInfo) -> L1Tx {
     assert!(
         (idx as usize) < block.txdata.len(),
         "utils: tx idx out of range of block txs"

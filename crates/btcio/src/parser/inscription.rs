@@ -12,8 +12,8 @@ use super::utils::{next_bytes, next_int, next_op};
 #[derive(Debug, Error)]
 pub enum InscriptionParseError {
     /// Does not have an `OP_IF..OP_ENDIF` block
-    #[error("Invalid/Missing envelope: {0}")]
-    InvalidEnvelope(String),
+    #[error("Invalid/Missing envelope(NO OP_IF..OP_ENDIF): ")]
+    InvalidEnvelope,
     /// Does not have a valid name tag
     #[error("Invalid/Missing name tag")]
     InvalidNameTag,
@@ -49,9 +49,6 @@ pub fn parse_inscription_data(
     let mut instructions = script.instructions();
 
     enter_envelope(&mut instructions)?;
-
-    println!("check for rollup name {}", rollup_name);
-
     // Parse name
     let (tag, name) = parse_bytes_pair(&mut instructions)?;
 
@@ -68,7 +65,7 @@ pub fn parse_inscription_data(
 
     // Parse version
     let (tag, ver) = parse_bytes_pair(&mut instructions)?;
-    let version = match (tag.as_slice(), ver.as_slice()) {
+    let _version = match (tag.as_slice(), ver.as_slice()) {
         (InscriptionData::VERSION_TAG, [v]) => Ok(v),
         (InscriptionData::VERSION_TAG, _) => Err(InscriptionParseError::InvalidVersion),
         _ => Err(InscriptionParseError::InvalidVersionTag),
@@ -81,9 +78,7 @@ pub fn parse_inscription_data(
         (InscriptionData::BATCH_DATA_TAG, Some(size)) => {
             let batch_data = extract_n_bytes(size, &mut instructions)?;
             Ok(InscriptionData::new(
-                extracted_rollup_name,
-                batch_data,
-                *version,
+                batch_data
             ))
         }
         (InscriptionData::BATCH_DATA_TAG, None) => Err(InscriptionParseError::InvalidBlob),
@@ -98,9 +93,7 @@ fn enter_envelope(instructions: &mut Instructions) -> Result<(), InscriptionPars
         let next = instructions.next();
         match next {
             None => {
-                return Err(InscriptionParseError::InvalidEnvelope(
-                    "No envelope found".to_string(),
-                ));
+                return Err(InscriptionParseError::InvalidEnvelope);
             }
             // OP_FALSE is basically empty PushBytes
             Some(Ok(Instruction::PushBytes(bytes))) => {
@@ -117,9 +110,7 @@ fn enter_envelope(instructions: &mut Instructions) -> Result<(), InscriptionPars
     // Check if next opcode is OP_IF
     let op_if = next_op(instructions);
     if op_if != Some(OP_IF) {
-        return Err(InscriptionParseError::InvalidEnvelope(
-            "Missing OP_IF".to_string(),
-        ));
+        return Err(InscriptionParseError::InvalidEnvelope);
     }
     Ok(())
 }
@@ -155,15 +146,15 @@ fn extract_n_bytes(
 #[cfg(test)]
 mod tests {
 
+    use crate::writer::builder::generate_inscription_script;
+
     use super::*;
 
     #[test]
     fn test_parse_inscription_data() {
         let bytes = vec![0, 1, 2, 3];
-        let inscription_data = InscriptionData::new("TestRollup".to_string(), bytes.clone(), 1);
-        let script = inscription_data
-            .to_script()
-            .expect("Failed to generate script");
+        let inscription_data = InscriptionData::new(bytes.clone());
+        let script = generate_inscription_script(inscription_data.clone(), "TestRollup", 1).unwrap();
 
         // Parse the rollup name
         let result = parse_inscription_data(&script, "TestRollup").unwrap();
@@ -173,10 +164,8 @@ mod tests {
 
         // Try with larger size
         let bytes = vec![1; 2000];
-        let inscription_data = InscriptionData::new("TestRollup".to_string(), bytes.clone(), 1);
-        let script = inscription_data
-            .to_script()
-            .expect("Failed to generate script");
+        let inscription_data = InscriptionData::new(bytes.clone());
+        let script = generate_inscription_script(inscription_data.clone(), "TestRollup", 1).unwrap();
 
         // Parse the rollup name
         let result = parse_inscription_data(&script, "TestRollup").unwrap();
