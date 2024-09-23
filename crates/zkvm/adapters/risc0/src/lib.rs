@@ -1,4 +1,11 @@
 #[cfg(feature = "prover")]
-mod risc0;
+mod input;
 #[cfg(feature = "prover")]
-pub use risc0::{Risc0Verifier, RiscZeroHost, RiscZeroProofInputBuilder};
+mod prover;
+#[cfg(feature = "prover")]
+pub use input::RiscZeroProofInputBuilder;
+#[cfg(feature = "prover")]
+pub use prover::RiscZeroHost;
+
+mod verifier;
+pub use verifier::Risc0Verifier;
