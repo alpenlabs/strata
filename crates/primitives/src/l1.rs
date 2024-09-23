@@ -1,11 +1,12 @@
 use std::{
     fmt::Display,
-    io::{self, ErrorKind, Read, Write},
+    io::{self, Read, Write},
     iter::Sum,
     ops::Add,
     str::FromStr,
 };
 
+use ::serde::{Deserialize, Deserializer};
 use arbitrary::{Arbitrary, Unstructured};
 use bitcoin::{
     absolute::LockTime,
@@ -21,8 +22,7 @@ use bitcoin::{
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 use reth_primitives::revm_primitives::FixedBytes;
-use serde::{Deserialize, Serialize};
-use serde_json;
+use serde::Serialize;
 
 use crate::{buf::Buf32, errors::ParseError, tx::ProtocolOperation};
 
@@ -254,7 +254,7 @@ pub struct L1Status {
 /// some useful traits on it such as [`serde::Deserialize`], [`borsh::BorshSerialize`] and
 /// [`borsh::BorshDeserialize`].
 // TODO: implement [`arbitrary::Arbitrary`]?
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct BitcoinAddress(Address<NetworkUnchecked>);
 
 impl FromStr for BitcoinAddress {
@@ -267,32 +267,38 @@ impl FromStr for BitcoinAddress {
     }
 }
 
-impl From<Address<NetworkUnchecked>> for BitcoinAddress {
-    fn from(value: Address<NetworkUnchecked>) -> Self {
-        Self(value)
-    }
-}
-
 impl From<Address> for BitcoinAddress {
     fn from(value: Address) -> Self {
         Self(value.as_unchecked().clone())
     }
 }
 
-impl BitcoinAddress {
-    pub fn new(address: Address<NetworkUnchecked>) -> Self {
-        Self(address)
+impl From<Address<NetworkUnchecked>> for BitcoinAddress {
+    fn from(value: Address<NetworkUnchecked>) -> Self {
+        Self(value)
     }
+}
+
+impl BitcoinAddress {
+    const NETWORK_UNCHECKED_PREFIX: &str = "Address<NetworkUnchecked>(";
+    const NETWORK_UNCHECKED_SUFFIX: &str = ")";
 
     pub fn address(&self) -> &Address<NetworkUnchecked> {
         &self.0
+    }
+
+    pub fn address_string(&self) -> String {
+        format!("{:?}", self.0)
+            .trim_start_matches(Self::NETWORK_UNCHECKED_PREFIX)
+            .trim_end_matches(Self::NETWORK_UNCHECKED_SUFFIX)
+            .to_string()
     }
 }
 
 impl<'de> Deserialize<'de> for BitcoinAddress {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: serde::Deserializer<'de>,
+        D: Deserializer<'de>,
     {
         let s: &str = Deserialize::deserialize(deserializer)?;
         BitcoinAddress::from_str(s).map_err(serde::de::Error::custom)
@@ -301,26 +307,15 @@ impl<'de> Deserialize<'de> for BitcoinAddress {
 
 impl BorshSerialize for BitcoinAddress {
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), io::Error> {
-        let addr_str =
-            serde_json::to_string(&self).map_err(|e| io::Error::new(ErrorKind::Other, e))?;
-
-        // address serialization adds `"` to both ends of the string (for JSON compatibility)
-        let addr_str = addr_str.trim_matches('"');
-
-        writer.write_all(addr_str.as_bytes())?;
-        Ok(())
+        BorshSerialize::serialize(&self.address_string(), writer)
     }
 }
 
 impl BorshDeserialize for BitcoinAddress {
     fn deserialize_reader<R: Read>(reader: &mut R) -> Result<Self, io::Error> {
-        let mut addr_bytes = Vec::new();
-        reader.read_to_end(&mut addr_bytes)?;
+        let address_str = String::deserialize_reader(reader)?;
 
-        let addr_str = String::from_utf8(addr_bytes)
-            .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid UTF-8"))?;
-
-        let address = Address::from_str(&addr_str)
+        let address = Address::from_str(&address_str)
             .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid Bitcoin address"))?;
 
         Ok(BitcoinAddress(address))
@@ -818,26 +813,25 @@ mod tests {
     #[test]
     fn borsh_serialization_of_bitcoin_address_works() {
         let mainnet_addr = "bc1qpaj2e2ccwqvyzvsfhcyktulrjkkd28fg75wjuc";
-
-        let addr_bytes = mainnet_addr.as_bytes();
-
-        let deserialized_addr = BitcoinAddress::try_from_slice(addr_bytes);
-
-        assert!(
-            deserialized_addr.is_ok(),
-            "borsh deserialization of bitcoin address must work"
-        );
+        let original_addr: BitcoinAddress =
+            BitcoinAddress::from_str(mainnet_addr).expect("should be a valid address");
 
         let mut serialized_addr: Vec<u8> = vec![];
-        deserialized_addr
-            .unwrap()
+        original_addr
             .serialize(&mut serialized_addr)
             .expect("borsh serialization of bitcoin address must work");
 
+        let deserialized = BitcoinAddress::try_from_slice(&serialized_addr);
+        assert!(
+            deserialized.is_ok(),
+            "deserialization of bitcoin address should work but got: {:?}",
+            deserialized.unwrap_err()
+        );
+
         assert_eq!(
-            addr_bytes,
-            &serialized_addr[..],
-            "original address bytes and serialized address bytes must be the same",
+            deserialized.unwrap(),
+            original_addr,
+            "original address and deserialized address must be the same",
         );
     }
 
@@ -925,7 +919,7 @@ mod tests {
         let unchecked_addr = bitcoin_address.as_unchecked();
 
         let new_taproot_pubkey =
-            XOnlyPk::from_address(&BitcoinAddress::new(unchecked_addr.clone()), network);
+            XOnlyPk::from_address(&BitcoinAddress::from(bitcoin_address.clone()), network);
 
         assert_eq!(
             unchecked_addr,
@@ -977,10 +971,7 @@ mod tests {
 
         let taproot_address = Address::p2tr(secp, internal_pubkey, merkle_root, network);
 
-        (
-            BitcoinAddress::new(taproot_address.as_unchecked().clone()),
-            merkle_root,
-        )
+        (BitcoinAddress::from(taproot_address), merkle_root)
     }
 
     #[test]

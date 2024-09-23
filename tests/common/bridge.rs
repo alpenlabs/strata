@@ -803,7 +803,7 @@ pub(crate) fn perform_rollup_actions(
 
     let deposit_request_outpoint = OutPoint { txid, vout: 0 };
     let total_amount: Amount = BRIDGE_DENOMINATION.into();
-    let original_taproot_addr = BitcoinAddress::new(original_taproot_addr.as_unchecked().clone());
+    let original_taproot_addr = BitcoinAddress::from(original_taproot_addr);
 
     event!(Level::INFO, action = "creating deposit info");
     DepositInfo::new(
