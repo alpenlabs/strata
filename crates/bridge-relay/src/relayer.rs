@@ -76,23 +76,29 @@ impl RelayerState {
             false
         };
 
-        let chs_state = self.status_rx.chs.borrow().clone();
-        if let Some(chs_state) = chs_state {
-            let sig_res = alpen_express_primitives::relay::util::verify_bridge_msg_sig(
-                &message,
-                chs_state.operator_table(),
-            );
+        // If it's not a misc message, then we want to actually do deeper
+        // validation on it.
+        if !is_misc {
+            // We only perform the deeper validation if we're properly synced.
+            // Otherwise it's better for network health to relay them
+            // unconditionally.
+            // TODO make it configurable if we relay or not without chainstate?
+            let chs_state = self.status_rx.chs.borrow().clone();
+            if let Some(chs_state) = chs_state {
+                let sig_res = alpen_express_primitives::relay::util::verify_bridge_msg_sig(
+                    &message,
+                    chs_state.operator_table(),
+                );
 
-            if let Err(e) = sig_res {
-                if !is_misc {
+                if let Err(e) = sig_res {
                     trace!(err = %e, "dropping invalid message");
                     return Ok(());
                 }
             }
-
-            // Store it in database.
-            self.brmsg_ops.write_msg_async(timestamp, message).await?;
         }
+
+        // Store it in database.
+        self.brmsg_ops.write_msg_async(timestamp, message).await?;
 
         Ok(())
     }
@@ -180,7 +186,7 @@ async fn relayer_task(mut state: RelayerState, mut message_rx: mpsc::Receiver<Br
         select! {
             Some(new_message) = message_rx.recv() => {
                 let bmsg_id = new_message.compute_id();
-                trace!(%bmsg_id, "handling new bridge msg");
+                trace!(%bmsg_id, "new bridge msg");
 
                 if let Err(e) = state.handle_new_message(new_message).await {
                     error!(err = %e, "failed to handle new message");
