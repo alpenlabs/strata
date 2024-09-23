@@ -1,21 +1,19 @@
-import time
-
 import flexitest
-
 from constants import (
     ERROR_PROOF_ALREADY_CREATED,
     FAST_BATCH_ROLLUP_PARAMS,
 )
 from entry import BasicEnvConfig
 from utils import (
+    wait_until,
     check_send_proof_for_non_existent_batch,
     check_for_nth_checkpoint_finalization,
 )
 
 
 @flexitest.register
-class BlockFinalizationTest(flexitest.Test):
-    """ """
+class BlockFinalizationSeqRestartTest(flexitest.Test):
+    """This tests finalization when sequencer client restarts"""
 
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env(BasicEnvConfig(101, rollup_params=FAST_BATCH_ROLLUP_PARAMS))
@@ -27,8 +25,23 @@ class BlockFinalizationTest(flexitest.Test):
 
         check_send_proof_for_non_existent_batch(seqrpc, 100)
 
-        # Check for first 4 checkpoints
-        for n in range(1, 5):
+        # Check for first 2 checkpoints
+        for n in range(1, 3):
+            check_for_nth_checkpoint_finalization(n, seqrpc)
+            print(f"Pass checkpoint finalization for checkpoint {n}")
+
+        # Stop sequencer
+        seq.stop()
+
+        # Now restart service
+        seq.start()
+
+        seqrpc = seq.create_rpc()
+        wait_until(seqrpc.alp_syncStatus, timeout=5)
+
+
+        # Check for next 2 checkpoints
+        for n in range(3, 5):
             check_for_nth_checkpoint_finalization(n, seqrpc)
             print(f"Pass checkpoint finalization for checkpoint {n}")
 
