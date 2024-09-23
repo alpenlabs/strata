@@ -239,8 +239,8 @@ mod test {
 
         let block = create_test_block(vec![tx]);
 
-        let relevant_types = vec![TxFilterRule::Deposit(config.clone())];
-        let result = filter_relevant_txs(&block, &relevant_types);
+        let filters = vec![TxFilterRule::Deposit(config.clone())];
+        let result = filter_relevant_txs(&block, &filters);
 
         assert_eq!(result.len(), 1, "Should find one relevant transaction");
         assert_eq!(

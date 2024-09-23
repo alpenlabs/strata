@@ -28,7 +28,7 @@ pub fn get_deposit_tx_config() -> DepositTxConfig {
     DepositTxConfig {
         magic_bytes: "expresssss".to_string().as_bytes().to_vec(),
         address_length: 20,
-        deposit_quantity: 10_000_000_000,
+        deposit_quantity: 1_000_000_000,
         federation_address: generic_pubkey(),
     }
 }
