@@ -68,9 +68,6 @@ pub enum BlobL1Status {
     /// The transactions need to be resigned.
     /// This could be due to transactions input UTXOs already being spent.
     NeedsResign,
-
-    /// The transactions were not included for some reason
-    Excluded,
 }
 
 /// This is the entry that gets saved to the database corresponding to a bitcoin transaction that
@@ -107,6 +104,14 @@ impl L1TxEntry {
     pub fn try_to_tx(&self) -> Result<Transaction, consensus::encode::Error> {
         deserialize(&self.tx_raw)
     }
+
+    pub fn is_valid(&self) -> bool {
+        !matches!(self.status, L1TxStatus::InvalidInputs)
+    }
+
+    pub fn is_finalized(&self) -> bool {
+        matches!(self.status, L1TxStatus::Finalized { .. })
+    }
 }
 
 /// The possible statuses of a publishable transaction
@@ -129,22 +134,8 @@ pub enum L1TxStatus {
     // FIXME this doesn't make sense to be "confirmations"
     Finalized { confirmations: u64 },
 
-    /// The transaction is not included in L1 and has errored with some error code
-    Excluded { reason: ExcludeReason },
-}
-
-/// Reason why the transaction was not included in the bitcoin chain
-#[derive(
-    Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary, Serialize, Deserialize,
-)]
-#[serde(tag = "kind", content = "message")]
-pub enum ExcludeReason {
-    /// Excluded because inputs were spent or not present in the chain/mempool
-    MissingInputsOrSpent,
-
-    /// Excluded for other reasons.
-    // TODO: add other cases
-    Other(String),
+    /// The transaction is not included in L1 because it's inputs were invalid
+    InvalidInputs,
 }
 
 /// Entry corresponding to a BatchCommitment
@@ -241,18 +232,7 @@ mod tests {
                 L1TxStatus::Finalized { confirmations: 100 },
                 r#"{"status":"Finalized","confirmations":100}"#,
             ),
-            (
-                L1TxStatus::Excluded {
-                    reason: ExcludeReason::MissingInputsOrSpent,
-                },
-                r#"{"status":"Excluded","reason":{"kind":"MissingInputsOrSpent"}}"#,
-            ),
-            (
-                L1TxStatus::Excluded {
-                    reason: ExcludeReason::Other("Something went wrong".to_string()),
-                },
-                r#"{"status":"Excluded","reason":{"kind":"Other","message":"Something went wrong"}}"#,
-            ),
+            (L1TxStatus::InvalidInputs, r#"{"status":"InvalidInputs"}"#),
         ];
 
         // check serialization and deserialization

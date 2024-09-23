@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
-use alpen_express_db::types::{ExcludeReason, L1TxEntry, L1TxStatus};
-use bitcoin::{hashes::Hash, Transaction, Txid};
+use alpen_express_db::types::{L1TxEntry, L1TxStatus};
+use bitcoin::{hashes::Hash, Txid};
 use express_storage::{ops::l1tx_broadcast, BroadcastDbOps};
 use tokio::sync::mpsc::Receiver;
 use tracing::*;
@@ -81,11 +81,12 @@ async fn process_unfinalized_entries(
             new_txentry.status = status.clone();
 
             // update in db, maybe this should be moved out of this fn to separate concerns??
-            ops.update_tx_entry_async(*idx, new_txentry.clone()).await?;
+            ops.put_tx_entry_by_idx_async(*idx, new_txentry.clone())
+                .await?;
 
-            // Remove if finalized
+            // Remove if finalized or has invalid inputs
             if matches!(status, L1TxStatus::Finalized { confirmations: _ })
-                || matches!(status, L1TxStatus::Excluded { reason: _ })
+                || matches!(status, L1TxStatus::InvalidInputs)
             {
                 to_remove.push(*idx);
             }
@@ -115,82 +116,69 @@ async fn handle_entry(
             // Try to publish
             let tx = txentry.try_to_tx().expect("could not deserialize tx");
             trace!(%idx, ?tx, "Publishing tx");
-            match send_tx(&tx, rpc_client).await {
+            match rpc_client.send_raw_transaction(&tx).await {
                 Ok(_) => {
                     info!(%idx, %txid, "Successfully published tx");
                     Ok(Some(L1TxStatus::Published))
                 }
-                Err(PublishError::MissingInputsOrSpent) => {
-                    warn!(
-                        %idx,
-                        %txid,
-                        "tx excluded while broadcasting due to missing or spent inputs"
-                    );
-                    Ok(Some(L1TxStatus::Excluded {
-                        reason: ExcludeReason::MissingInputsOrSpent,
-                    }))
+                Err(err) if err.is_missing_or_invalid_input() => {
+                    warn!(?err, %idx, %txid, "tx excluded due to invalid inputs");
+
+                    Ok(Some(L1TxStatus::InvalidInputs))
                 }
-                Err(PublishError::Other(msg)) => {
-                    warn!(%idx, %msg, %txid, "tx excluded while broadcasting");
-                    Err(BroadcasterError::Other(msg))
+                Err(err) => {
+                    warn!(%idx, ?err, %txid, "errored while broadcasting");
+                    Err(BroadcasterError::Other(err.to_string()))
                 }
             }
         }
         L1TxStatus::Published | L1TxStatus::Confirmed { confirmations: _ } => {
-            // check for confirmations
+            // Check for confirmations
             let txid = Txid::from_slice(txid.0.as_slice())
                 .map_err(|e| BroadcasterError::Other(e.to_string()))?;
-            let txinfo = rpc_client
-                .get_transaction(&txid)
-                .await
-                .map_err(|e| BroadcasterError::Other(e.to_string()))?;
-            match txinfo.confirmations {
-                0 if matches!(txentry.status, L1TxStatus::Confirmed { confirmations: _ }) => {
-                    // If the confirmations of a tx that is already confirmed is 0 then there is
-                    // something wrong, possibly a reorg, so just set it to unpublished
-                    Ok(Some(L1TxStatus::Unpublished))
+            let txinfo_res = rpc_client.get_transaction(&txid).await;
+
+            let new_status = match txinfo_res {
+                Ok(info) => {
+                    if info.confirmations == 0 {
+                        // Regardless of whether it was confirmed already(means this is a reorg), we
+                        // set it to published
+                        L1TxStatus::Published
+                    } else if info.confirmations >= FINALITY_DEPTH {
+                        L1TxStatus::Finalized {
+                            confirmations: info.block_height(),
+                        }
+                    } else {
+                        L1TxStatus::Confirmed {
+                            confirmations: info.block_height(),
+                        }
+                    }
                 }
-                0 => Ok(None),
-                c if c >= (FINALITY_DEPTH) => Ok(Some(L1TxStatus::Finalized {
-                    confirmations: txinfo.block_height(),
-                })),
-                _ => Ok(Some(L1TxStatus::Confirmed {
-                    confirmations: txinfo.block_height(),
-                })),
-            }
+                Err(e) => {
+                    // If for some reasons tx is not found even if it was already
+                    // published/confirmed, set it to unpublished.
+                    if e.is_tx_not_found() {
+                        L1TxStatus::Unpublished
+                    } else {
+                        return Err(BroadcasterError::Other(e.to_string()));
+                    }
+                }
+            };
+            Ok(Some(new_status))
         }
         L1TxStatus::Finalized { confirmations: _ } => Ok(None),
-        L1TxStatus::Excluded { reason: _ } => {
-            // If a tx is excluded due to MissingInputsOrSpent then the downstream task like
-            // writer/signer will be accountable for recreating the tx and asking to broadcast.
-            // If excluded due to Other reason, there's nothing much we can do.
-            Ok(None)
-        }
+        L1TxStatus::InvalidInputs => Ok(None),
     }
-}
-
-#[derive(Debug)]
-enum PublishError {
-    MissingInputsOrSpent,
-    Other(String),
-}
-
-async fn send_tx(tx: &Transaction, client: &impl Broadcaster) -> Result<(), PublishError> {
-    let _ = client
-        .send_raw_transaction(tx)
-        .await
-        .map_err(|e| PublishError::Other(e.to_string()));
-    Ok(())
 }
 
 #[cfg(test)]
 mod test {
-    use alpen_express_db::{traits::TxBroadcastDatabase, types::ExcludeReason};
+    use alpen_express_db::traits::TxBroadcastDatabase;
     use alpen_express_rocksdb::{
         broadcaster::db::{BroadcastDatabase, BroadcastDb},
         test_utils::get_rocksdb_tmp_instance,
     };
-    use bitcoin::consensus;
+    use bitcoin::{consensus, Transaction};
     use express_storage::ops::l1tx_broadcast::Context;
 
     use super::*;
@@ -222,7 +210,7 @@ mod test {
         let e = gen_entry_with_status(L1TxStatus::Unpublished);
 
         // Add tx to db
-        ops.insert_new_tx_entry_async([1; 32].into(), e.clone())
+        ops.put_tx_entry_async([1; 32].into(), e.clone())
             .await
             .unwrap();
 
@@ -246,7 +234,7 @@ mod test {
         let e = gen_entry_with_status(L1TxStatus::Published);
 
         // Add tx to db
-        ops.insert_new_tx_entry_async([1; 32].into(), e.clone())
+        ops.put_tx_entry_async([1; 32].into(), e.clone())
             .await
             .unwrap();
 
@@ -258,7 +246,8 @@ mod test {
             .await
             .unwrap();
         assert_eq!(
-            res, None,
+            res,
+            Some(L1TxStatus::Published),
             "Status should not change if no confirmations for a published tx"
         );
 
@@ -299,7 +288,7 @@ mod test {
         let e = gen_entry_with_status(L1TxStatus::Confirmed { confirmations: 1 });
 
         // Add tx to db
-        ops.insert_new_tx_entry_async([1; 32].into(), e.clone())
+        ops.put_tx_entry_async([1; 32].into(), e.clone())
             .await
             .unwrap();
 
@@ -312,8 +301,8 @@ mod test {
             .unwrap();
         assert_eq!(
             res,
-            Some(L1TxStatus::Unpublished),
-            "Status should revert to unpublished if previously confirmed tx has 0 confirmations"
+            Some(L1TxStatus::Published),
+            "Status should revert to reorged if previously confirmed tx has 0 confirmations"
         );
 
         // This client will return confirmations to be finality_depth - 1
@@ -353,7 +342,7 @@ mod test {
         let e = gen_entry_with_status(L1TxStatus::Finalized { confirmations: 1 });
 
         // Add tx to db
-        ops.insert_new_tx_entry_async([1; 32].into(), e.clone())
+        ops.put_tx_entry_async([1; 32].into(), e.clone())
             .await
             .unwrap();
 
@@ -386,12 +375,10 @@ mod test {
     #[tokio::test]
     async fn test_handle_excluded_entry() {
         let ops = get_ops();
-        let e = gen_entry_with_status(L1TxStatus::Excluded {
-            reason: ExcludeReason::Other("some reason".to_string()),
-        });
+        let e = gen_entry_with_status(L1TxStatus::InvalidInputs);
 
         // Add tx to db
-        ops.insert_new_tx_entry_async([1; 32].into(), e.clone())
+        ops.put_tx_entry_async([1; 32].into(), e.clone())
             .await
             .unwrap();
 
@@ -426,23 +413,12 @@ mod test {
         let ops = get_ops();
         // Add a couple of txs
         let e1 = gen_entry_with_status(L1TxStatus::Unpublished);
-        let i1 = ops
-            .insert_new_tx_entry_async([1; 32].into(), e1)
-            .await
-            .unwrap();
-        let e2 = gen_entry_with_status(L1TxStatus::Excluded {
-            reason: ExcludeReason::MissingInputsOrSpent,
-        });
-        let _i2 = ops
-            .insert_new_tx_entry_async([2; 32].into(), e2)
-            .await
-            .unwrap();
+        let i1 = ops.put_tx_entry_async([1; 32].into(), e1).await.unwrap();
+        let e2 = gen_entry_with_status(L1TxStatus::InvalidInputs);
+        let _i2 = ops.put_tx_entry_async([2; 32].into(), e2).await.unwrap();
 
         let e3 = gen_entry_with_status(L1TxStatus::Published);
-        let i3 = ops
-            .insert_new_tx_entry_async([3; 32].into(), e3)
-            .await
-            .unwrap();
+        let i3 = ops.put_tx_entry_async([3; 32].into(), e3).await.unwrap();
 
         let state = BroadcasterState::initialize(&ops).await.unwrap();
 
@@ -458,17 +434,17 @@ mod test {
         // The published tx which got finalized should be removed
         assert_eq!(
             to_remove,
-            vec![i3],
+            vec![i3.unwrap()],
             "Finalized tx should be in to_remove list"
         );
 
         assert_eq!(
-            new_entries.get(&i1).unwrap().status,
+            new_entries.get(&i1.unwrap()).unwrap().status,
             L1TxStatus::Published,
             "unpublished tx should be published"
         );
         assert_eq!(
-            new_entries.get(&i3).unwrap().status,
+            new_entries.get(&i3.unwrap()).unwrap().status,
             L1TxStatus::Finalized {
                 confirmations: cl.included_height
             },

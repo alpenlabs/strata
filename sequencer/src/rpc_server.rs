@@ -698,7 +698,7 @@ impl AlpenAdminApiServer for AdminServerImpl {
         let entry = L1TxEntry::from_tx(&tx);
 
         self.bcast_handle
-            .insert_new_tx_entry(dbid.into(), entry)
+            .put_tx_entry(dbid.into(), entry)
             .await
             .map_err(|e| Error::Other(e.to_string()))?;
 

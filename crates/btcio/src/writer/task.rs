@@ -2,7 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use alpen_express_db::{
     traits::SequencerDatabase,
-    types::{BlobEntry, BlobL1Status, ExcludeReason, L1TxEntry, L1TxStatus},
+    types::{BlobEntry, BlobL1Status, L1TxStatus},
 };
 use alpen_express_state::da_blob::{BlobDest, BlobIntent};
 use alpen_express_status::StatusTx;
@@ -15,7 +15,7 @@ use crate::{
     broadcaster::L1BroadcastHandle,
     rpc::traits::{Reader, Signer, Wallet},
     status::{apply_status_updates, L1StatusUpdate},
-    writer::signer::create_and_sign_blob_inscriptions,
+    writer::{builder::InscriptionError, signer::create_and_sign_blob_inscriptions},
 };
 
 // TODO: from config
@@ -140,7 +140,7 @@ fn get_next_blobidx_to_watch(insc_ops: &InscriptionDataOps) -> anyhow::Result<u6
 /// # Note
 ///
 /// The inscription will be monitored until it acquires the status of
-/// [`BlobL1Status::Confirmed`], or [`BlobL1Status::Finalized`]
+/// [`BlobL1Status::Finalized`]
 pub async fn watcher_task(
     next_blbidx_to_watch: u64,
     rpc_client: Arc<impl Reader + Wallet + Signer>,
@@ -163,28 +163,36 @@ pub async fn watcher_task(
                 // entry
                 BlobL1Status::Unsigned | BlobL1Status::NeedsResign => {
                     debug!(%curr_blobidx, "Processing unsigned blobentry");
-                    let (cid, rid) = create_and_sign_blob_inscriptions(
+                    match create_and_sign_blob_inscriptions(
                         &blobentry,
                         &bcast_handle,
                         rpc_client.clone(),
                         &config,
                     )
-                    .await?;
-                    let mut updated_entry = blobentry.clone();
-                    updated_entry.status = BlobL1Status::Unpublished;
-                    updated_entry.commit_txid = cid;
-                    updated_entry.reveal_txid = rid;
-                    update_existing_entry(curr_blobidx, updated_entry, &insc_ops).await?;
+                    .await
+                    {
+                        Ok((cid, rid)) => {
+                            let mut updated_entry = blobentry.clone();
+                            updated_entry.status = BlobL1Status::Unpublished;
+                            updated_entry.commit_txid = cid;
+                            updated_entry.reveal_txid = rid;
+                            update_existing_entry(curr_blobidx, updated_entry, &insc_ops).await?;
 
-                    debug!(%curr_blobidx, "Signed blob");
+                            debug!(%curr_blobidx, "Signed blob");
+                        }
+                        Err(InscriptionError::NotEnoughUtxos(required, available)) => {
+                            // Just wait till we have enough utxos and let the status be `Unsigned`
+                            // or `NeedsResign`
+                            // Maybe send an alert
+                            error!(%required, %available, "Not enough utxos available to create commit/reveal transaction");
+                        }
+                        e => {
+                            e?;
+                        }
+                    }
                 }
                 // If finalized, nothing to do, move on to process next entry
                 BlobL1Status::Finalized => {
-                    curr_blobidx += 1;
-                }
-                // If excluded, nothing to do, move on to process next entry
-                BlobL1Status::Excluded => {
-                    warn!(%curr_blobidx, "blobentry is excluded, might need to recreate duty");
                     curr_blobidx += 1;
                 }
                 // If entry is signed but not finalized or excluded yet, check broadcast txs status
@@ -199,8 +207,7 @@ pub async fn watcher_task(
 
                     match (commit_tx, reveal_tx) {
                         (Some(ctx), Some(rtx)) => {
-                            let new_status =
-                                determine_blob_next_status(&ctx, &rtx, &blobentry.status)?;
+                            let new_status = determine_blob_next_status(&ctx.status, &rtx.status);
 
                             update_l1_status(&blobentry, &new_status, status_tx.clone()).await;
 
@@ -209,9 +216,7 @@ pub async fn watcher_task(
                             updated_entry.status = new_status.clone();
                             update_existing_entry(curr_blobidx, updated_entry, &insc_ops).await?;
 
-                            if new_status == BlobL1Status::Finalized
-                                || new_status == BlobL1Status::Confirmed
-                            {
+                            if new_status == BlobL1Status::Finalized {
                                 curr_blobidx += 1;
                             }
                         }
@@ -263,32 +268,26 @@ async fn update_existing_entry(
 /// Determine the status of the `BlobEntry` based on the status of its commit and reveal
 /// transactions in bitcoin.
 fn determine_blob_next_status(
-    commit_tx: &L1TxEntry,
-    reveal_tx: &L1TxEntry,
-    curr_status: &BlobL1Status,
-) -> anyhow::Result<BlobL1Status> {
-    let status = match (&commit_tx.status, &reveal_tx.status) {
+    commit_status: &L1TxStatus,
+    reveal_status: &L1TxStatus,
+) -> BlobL1Status {
+    match (&commit_status, &reveal_status) {
         // If reveal is finalized, both are finalized
         (_, L1TxStatus::Finalized { .. }) => BlobL1Status::Finalized,
         // If reveal is confirmed, both are confirmed
         (_, L1TxStatus::Confirmed { .. }) => BlobL1Status::Confirmed,
-        // If reveal is published, both are published
+        // If reveal is published regardless of commit, the blob is published
         (_, L1TxStatus::Published) => BlobL1Status::Published,
-        // If commit is excluded, both are excluded
-        (
-            L1TxStatus::Excluded {
-                reason: ExcludeReason::MissingInputsOrSpent,
-            },
-            _,
-        ) => BlobL1Status::NeedsResign,
-        (L1TxStatus::Excluded { reason }, _) => {
-            // TODO: error or have a separate status?
-            warn!(?reason, "Inscriptions could not be included in the chain");
-            curr_status.clone()
-        }
-        (_, _) => curr_status.clone(),
-    };
-    Ok(status)
+        // if commit has invalid inputs, needs resign
+        (L1TxStatus::InvalidInputs, _) => BlobL1Status::NeedsResign,
+        // If commit is unpublished, both are upublished
+        (L1TxStatus::Unpublished, _) => BlobL1Status::Unpublished,
+        // If commit is published but not reveal, the blob is unpublished
+        (_, L1TxStatus::Unpublished) => BlobL1Status::Unpublished,
+        // If reveal has invalid inputs, these need resign because we can do nothing with just
+        // commit tx confirmed. This should not occur in practice
+        (_, L1TxStatus::InvalidInputs) => BlobL1Status::NeedsResign,
+    }
 }
 
 #[cfg(test)]
@@ -339,5 +338,44 @@ mod test {
         let idx = get_next_blobidx_to_watch(&iops).unwrap();
 
         assert_eq!(idx, expected_idx);
+    }
+
+    #[test]
+    fn test_determine_blob_next_status() {
+        // When both are unpublished
+        let (commit_status, reveal_status) = (L1TxStatus::Unpublished, L1TxStatus::Unpublished);
+        let next = determine_blob_next_status(&commit_status, &reveal_status);
+        assert_eq!(next, BlobL1Status::Unpublished);
+
+        // When both are Finalized
+        let fin = L1TxStatus::Finalized { confirmations: 5 };
+        let (commit_status, reveal_status) = (fin.clone(), fin);
+        let next = determine_blob_next_status(&commit_status, &reveal_status);
+        assert_eq!(next, BlobL1Status::Finalized);
+
+        // When both are Confirmed
+        let conf = L1TxStatus::Confirmed { confirmations: 5 };
+        let (commit_status, reveal_status) = (conf.clone(), conf.clone());
+        let next = determine_blob_next_status(&commit_status, &reveal_status);
+        assert_eq!(next, BlobL1Status::Confirmed);
+
+        // When both are Published
+        let publ = L1TxStatus::Published;
+        let (commit_status, reveal_status) = (publ.clone(), publ.clone());
+        let next = determine_blob_next_status(&commit_status, &reveal_status);
+        assert_eq!(next, BlobL1Status::Published);
+
+        // When both have invalid
+        let (commit_status, reveal_status) = (L1TxStatus::InvalidInputs, L1TxStatus::InvalidInputs);
+        let next = determine_blob_next_status(&commit_status, &reveal_status);
+        assert_eq!(next, BlobL1Status::NeedsResign);
+
+        // When reveal has invalid inputs but commit is confirmed. I doubt this would happen in
+        // practice for our case.
+        // Then the blob status should be NeedsResign i.e. the blob should be signed again and
+        // published.
+        let (commit_status, reveal_status) = (conf.clone(), L1TxStatus::InvalidInputs);
+        let next = determine_blob_next_status(&commit_status, &reveal_status);
+        assert_eq!(next, BlobL1Status::NeedsResign);
     }
 }

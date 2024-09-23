@@ -35,6 +35,10 @@ class BlockFinalizationTest(flexitest.Test):
 def check_for_nth_checkpoint_finalization(idx, seqrpc):
     syncstat = seqrpc.alp_syncStatus()
     checkpoint_info = seqrpc.alp_getCheckpointInfo(idx)
+    while checkpoint_info is None:
+        time.sleep(0.5)
+        checkpoint_info = seqrpc.alp_getCheckpointInfo(idx)
+
     print(f"checkpoint info for {idx}", checkpoint_info)
 
     assert (
@@ -55,7 +59,7 @@ def check_for_nth_checkpoint_finalization(idx, seqrpc):
     # Wait till checkpoint finalizes, since our finalization depth is 4 and the block
     # generation time is 0.5s wait slightly more than 2 secs
     # Ideally this should be tested with controlled bitcoin block production
-    time.sleep(4)
+    time.sleep(5)
 
     syncstat = seqrpc.alp_syncStatus()
     print("Sync Stat", syncstat)

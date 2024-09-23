@@ -40,8 +40,8 @@ const ROLLUP_NAME_TAG: &[u8] = &[3];
 
 #[derive(Debug, Error)]
 pub enum InscriptionError {
-    #[error("Not enough UTXOs for transaction of {0} sats")]
-    NotEnoughUtxos(u64),
+    #[error("insufficient funds for tx (need {0} sats, have {1} sats)")]
+    NotEnoughUtxos(u64, u64),
 
     #[error("Error building taproot")]
     Taproot(#[from] TaprootBuilderError),
@@ -55,7 +55,6 @@ pub async fn build_inscription_txs(
     rpc_client: &Arc<impl Reader + Wallet + Signer>,
     config: &WriterConfig,
 ) -> anyhow::Result<(Transaction, Transaction)> {
-    // let (signature, pub_key) = sign_blob_with_private_key(&payload, &config.private_key)?;
     let network = rpc_client.network().await?;
     let utxos = rpc_client.get_utxos().await?;
 
@@ -241,7 +240,7 @@ fn choose_utxos(
         }
 
         if sum < amount {
-            return Err(InscriptionError::NotEnoughUtxos(amount));
+            return Err(InscriptionError::NotEnoughUtxos(amount, sum));
         }
 
         Ok((chosen_utxos, sum))
@@ -379,7 +378,10 @@ pub fn build_reveal_transaction(
     let input_required = Amount::from_sat(output_value + fee);
     if input_utxo.value < Amount::from_sat(BITCOIN_DUST_LIMIT) || input_utxo.value < input_required
     {
-        return Err(InscriptionError::NotEnoughUtxos(input_required.to_sat()));
+        return Err(InscriptionError::NotEnoughUtxos(
+            input_required.to_sat(),
+            input_utxo.value.to_sat(),
+        ));
     }
     let tx = Transaction {
         lock_time: LockTime::ZERO,
@@ -616,7 +618,7 @@ mod tests {
 
         assert!(matches!(
             res,
-            Err(InscriptionError::NotEnoughUtxos(50_000_000_000))
+            Err(InscriptionError::NotEnoughUtxos(50_000_000_000, _))
         ));
     }
 
@@ -692,7 +694,7 @@ mod tests {
         );
 
         assert!(tx.is_err());
-        assert!(matches!(tx, Err(InscriptionError::NotEnoughUtxos(_))));
+        assert!(matches!(tx, Err(InscriptionError::NotEnoughUtxos(_, _))));
     }
 
     #[test]
