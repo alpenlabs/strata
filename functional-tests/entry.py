@@ -207,6 +207,7 @@ class FullNodeFactory(flexitest.Factory):
         id = self.fn_count
 
         datadir = ctx.make_service_dir(f"fullnode.{id}")
+        rpc_host = "localhost"
         rpc_port = self.next_port()
         logfile = os.path.join(datadir, "service.log")
 
@@ -214,6 +215,7 @@ class FullNodeFactory(flexitest.Factory):
         cmd = [
             "alpen-express-sequencer",
             "--datadir", datadir,
+            "--rpc-host", rpc_host,
             "--rpc-port", str(rpc_port),
             "--bitcoind-host", bitcoind_config["bitcoind_sock"],
             "--bitcoind-user", bitcoind_config["bitcoind_user"],
