@@ -41,7 +41,7 @@ fn main() -> anyhow::Result<()> {
     let args: Args = argh::from_env();
     if let Err(e) = main_inner(args) {
         eprintln!("FATAL ERROR: {e}");
-        eprintln!("trace:\n{e:?}");
+        // eprintln!("trace:\n{e:?}");
         // TODO: error code ?
 
         return Err(e);
@@ -178,7 +178,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         executor.spawn_critical_async("l2-sync-manager", async move {
             express_sync::sync_worker(&mut l2_sync_state, &l2_sync_context)
                 .await
-                .unwrap();
+                .map_err(Into::into)
         });
     }
 
@@ -187,7 +187,8 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     let rpc_params = params.clone();
     let l2block_man = mgr_ctx.l2block_manager.clone();
-    executor.spawn_critical_async("main-rpc", async {
+    executor.spawn_critical_async(
+        "main-rpc",
         start_rpc(
             shutdown_signal,
             config,
@@ -200,16 +201,11 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             checkpoint_handle,
             relayer_handle,
             rpc_params,
-        )
-        .await
-        .unwrap()
-    });
+        ),
+    );
 
     task_manager.start_signal_listeners();
-    if let Err(err) = task_manager.monitor(Some(Duration::from_secs(5))) {
-        // we exited because of a panic
-        return Err(anyhow::Error::from(err));
-    }
+    task_manager.monitor(Some(Duration::from_secs(5)))?;
 
     info!("exiting");
     Ok(())

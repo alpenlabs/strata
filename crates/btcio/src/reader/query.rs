@@ -23,6 +23,7 @@ use crate::{
     status::{apply_status_updates, L1StatusUpdate},
 };
 
+// TODO: remove this
 pub async fn bitcoin_data_reader_task<D: Database + 'static>(
     client: Arc<impl Reader>,
     event_tx: mpsc::Sender<L1Event>,
@@ -31,8 +32,8 @@ pub async fn bitcoin_data_reader_task<D: Database + 'static>(
     status_rx: Arc<StatusTx>,
     chstate_prov: Arc<D::ChainStateProvider>,
     params: Arc<Params>,
-) {
-    if let Err(e) = do_reader_task::<D>(
+) -> anyhow::Result<()> {
+    do_reader_task::<D>(
         client.as_ref(),
         &event_tx,
         target_next_block,
@@ -42,9 +43,6 @@ pub async fn bitcoin_data_reader_task<D: Database + 'static>(
         params,
     )
     .await
-    {
-        error!(err = %e, "reader task exited");
-    }
 }
 
 async fn do_reader_task<D: Database + 'static>(

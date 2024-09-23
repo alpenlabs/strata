@@ -254,7 +254,7 @@ pub fn init_sequencer(
             t_l2blkman,
             t_params,
         )
-        .unwrap()
+        .map_err(Into::into)
     });
 
     let d_params = manager_context.params.clone();

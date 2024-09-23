@@ -64,7 +64,7 @@ where
     executor.spawn_critical_async("l1_broadcaster_task", async move {
         broadcaster_task(l1_rpc_client, ops, bcast_rx)
             .await
-            .unwrap()
+            .map_err(Into::into)
     });
     L1BroadcastHandle::new(bcast_tx, bcast_ops)
 }

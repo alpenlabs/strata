@@ -110,7 +110,6 @@ pub fn start_inscription_task<D: SequencerDatabase + Send + Sync + 'static>(
             status_tx,
         )
         .await
-        .unwrap()
     });
 
     Ok(insc_mgr)

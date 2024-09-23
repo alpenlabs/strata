@@ -223,7 +223,7 @@ pub fn duty_dispatch_task<
     pool: threadpool::ThreadPool,
     params: Arc<Params>,
     ckpt_handle: Arc<CheckpointHandle>,
-) {
+) -> anyhow::Result<()> {
     // TODO make this actually work
     let pending_duties = Arc::new(RwLock::new(HashMap::<Buf32, ()>::new()));
 
@@ -245,7 +245,7 @@ pub fn duty_dispatch_task<
             }
             if shutdown.should_shutdown() {
                 warn!("received shutdown signal");
-                break;
+                break Ok(());
             }
         }
     });
@@ -312,6 +312,7 @@ pub fn duty_dispatch_task<
     }
 
     info!("duty dispatcher task exiting");
+    Ok(())
 }
 
 /// Toplevel function that actually performs a job.  This is spawned on a/

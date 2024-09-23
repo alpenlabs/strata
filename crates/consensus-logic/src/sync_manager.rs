@@ -116,7 +116,6 @@ pub fn start_sync_tasks<
             fcm_csm_ctl,
             fcm_params,
         )
-        .unwrap();
     });
 
     // Prepare the client worker state and start the thread for that.
@@ -134,7 +133,7 @@ pub fn start_sync_tasks<
     let status_tx = status_bundle.0.clone();
     executor.spawn_critical("client_worker_task", |shutdown| {
         worker::client_worker_task(shutdown, cw_state, csm_eng, csm_rx, status_tx, csm_fcm_tx)
-            .unwrap();
+            .map_err(Into::into)
     });
 
     Ok(SyncManager {

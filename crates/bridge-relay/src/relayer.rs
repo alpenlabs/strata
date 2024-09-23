@@ -179,7 +179,10 @@ pub async fn start_bridge_relayer_task(
     Ok(Arc::new(h))
 }
 
-async fn relayer_task(mut state: RelayerState, mut message_rx: mpsc::Receiver<BridgeMessage>) {
+async fn relayer_task(
+    mut state: RelayerState,
+    mut message_rx: mpsc::Receiver<BridgeMessage>,
+) -> anyhow::Result<()> {
     // arbitrary refresh interval to refresh the number of message particular operator can send
     let mut refresh_interval = interval(Duration::from_secs(state.config.refresh_interval));
     loop {
