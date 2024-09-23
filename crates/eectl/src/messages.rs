@@ -34,6 +34,7 @@ impl ExecPayloadData {
         Self {
             exec_update: l2block.block().exec_segment().update().clone(),
             accessory_data: l2block.accessory().exec_payload().to_vec(),
+            // TODO: extract ops from block
             ops: vec![],
         }
     }

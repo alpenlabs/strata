@@ -10,7 +10,7 @@ use alpen_express_db::traits::{
 use alpen_express_eectl::{
     engine::{ExecEngineCtl, PayloadStatus},
     errors::EngineError,
-    messages::{ELDepositData, ExecPayloadData, Op, PayloadEnv},
+    messages::{ExecPayloadData, PayloadEnv},
 };
 use alpen_express_primitives::{
     buf::{Buf32, Buf64},
@@ -284,7 +284,7 @@ fn prepare_exec_data<E: ExecEngineCtl>(
     trace!("preparing exec payload");
 
     // Start preparing the EL payload.
-    let payload_env = PayloadEnv::new(timestamp, prev_l2_blkid, safe_l1_block, vec![]);
+    let payload_env = PayloadEnv::new(timestamp, prev_l2_blkid, safe_l1_block, Vec::new());
     let key = engine.prepare_payload(payload_env)?;
     trace!("submitted EL payload job, waiting for completion");
 

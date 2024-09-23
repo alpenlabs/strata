@@ -121,12 +121,9 @@ pub fn process_block_transaction(
 
     // TODO: Optimize receipt iteration by implementing bloom filters or adding hints to
     // `ELProofInput`. This will allow for efficient filtering of`WithdrawalIntentEvents`.
-    let withdrawal_intents = collect_withdrawal_intents(
-        &receipts
-            .into_iter()
-            .map(|el| Some(el.receipt))
-            .collect::<Vec<_>>(),
-    );
+    let withdrawal_intents =
+        collect_withdrawal_intents(receipts.into_iter().map(|el| Some(el.receipt)))
+            .collect::<Vec<_>>();
 
     // Construct the public parameters for the proof
     ELProofPublicParams {
@@ -152,6 +149,12 @@ mod tests {
         spec_id: SpecId::SHANGHAI,
     };
 
+    #[derive(Serialize, Deserialize)]
+    struct TestData {
+        witness: ELProofInput,
+        params: ELProofPublicParams,
+    }
+
     #[test]
     fn block_stf_test() {
         let json_content = std::fs::read_to_string(
@@ -159,10 +162,10 @@ mod tests {
         )
         .expect("Failed to read the blob data file");
 
-        // Testing of withdrwal inent.
-        // TODO: Migrate this this test to the Prover Manager Functional Tests
-        let input: ELProofInput = serde_json::from_str(&json_content).expect("failed");
-        let public_params = process_block_transaction(input, EVM_CONFIG);
-        assert!(!public_params.withdrawal_intents.is_empty())
+        let test_data: TestData = serde_json::from_str(&json_content).expect("failed");
+        let input = test_data.witness;
+        let op = process_block_transaction(input, EVM_CONFIG);
+
+        assert_eq!(op, test_data.params);
     }
 }

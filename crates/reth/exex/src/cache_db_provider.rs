@@ -11,6 +11,10 @@ use reth_primitives::{
 use reth_provider::{errors::db::DatabaseError, AccountReader, ProviderError, StateProvider};
 use reth_revm::DatabaseRef;
 
+/// `CacheDBProvider` implements a provider for the revm `CacheDB`.
+/// In addition it holds accessed account info, storage values, and bytecodes during
+/// transaction execution, supporting state retrieval for storage proof construction
+/// in EL proof witness generation.
 pub struct CacheDBProvider {
     provider: Box<dyn StateProvider>,
     accounts: RefCell<HashMap<Address, AccountInfo>>,

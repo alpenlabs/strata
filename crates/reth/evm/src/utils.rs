@@ -23,19 +23,19 @@ pub fn wei_to_sats(wei: U256) -> (U256, U256) {
 
 /// Collects withdrawal intents from bridge-out events in the receipts.
 /// Returns a vector of `WithdrawalIntent`.
-pub fn collect_withdrawal_intents(receipts: &[Option<Receipt>]) -> Vec<WithdrawalIntent> {
+pub fn collect_withdrawal_intents(
+    receipts: impl Iterator<Item = Option<Receipt>>,
+) -> impl Iterator<Item = WithdrawalIntent> {
     receipts
-        .iter()
         .flatten()
-        .flat_map(|receipt| &receipt.logs)
+        .flat_map(|receipt| receipt.logs)
         .filter(|log| log.address == BRIDGEOUT_ADDRESS)
         .filter_map(|log| {
-            WithdrawalIntentEvent::decode_log(log, true)
-                .ok()
+            WithdrawalIntentEvent::decode_log(&log, true)
                 .map(|evt| WithdrawalIntent {
                     amt: evt.amount,
                     dest_pk: evt.dest_pk,
                 })
+                .ok()
         })
-        .collect()
 }
