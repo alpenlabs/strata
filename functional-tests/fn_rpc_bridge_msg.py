@@ -30,7 +30,7 @@ class BridgeMsgTest(flexitest.Test):
 
         seqrpc.alp_submitBridgeMsg(raw_msg)
 
-        time.sleep(WAIT_TIME)
+        time.sleep(WAIT_TIME + 2)
 
         # VODepositSig(10)
         scope = "00"

@@ -17,6 +17,9 @@ pub struct Args {
     )]
     pub datadir: Option<PathBuf>,
 
+    #[argh(option, short = 'h', description = "JSON-RPC host")]
+    pub rpc_host: Option<String>,
+
     #[argh(option, short = 'r', description = "JSON-RPC port")]
     pub rpc_port: Option<u16>,
 

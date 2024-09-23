@@ -138,6 +138,7 @@ class ExpressFactory(flexitest.Factory):
     ) -> flexitest.Service:
         datadir = ctx.make_service_dir("sequencer")
         rpc_port = self.next_port()
+        rpc_host = "localhost"
         logfile = os.path.join(datadir, "service.log")
 
         keyfile = os.path.join(datadir, "seqkey.bin")
@@ -149,6 +150,7 @@ class ExpressFactory(flexitest.Factory):
         cmd = [
             "alpen-express-sequencer",
             "--datadir", datadir,
+            "--rpc-host", rpc_host,
             "--rpc-port", str(rpc_port),
             "--bitcoind-host", bitcoind_config["bitcoind_sock"],
             "--bitcoind-user", bitcoind_config["bitcoind_user"],
@@ -168,9 +170,13 @@ class ExpressFactory(flexitest.Factory):
 
             cmd.extend(["--rollup-params", rollup_params_file])
 
-        props = {"rpc_port": rpc_port, "seqkey": seqkey, "address": sequencer_address}
-
-        rpc_url = f"ws://localhost:{rpc_port}"
+        props = {
+            "rpc_host": rpc_host,
+            "rpc_port": rpc_port,
+            "seqkey": seqkey,
+            "address": sequencer_address,
+        }
+        rpc_url = f"ws://{rpc_host}:{rpc_port}"
 
         svc = flexitest.service.ProcService(props, cmd, stdout=logfile)
         svc.start()
@@ -201,6 +207,7 @@ class FullNodeFactory(flexitest.Factory):
         id = self.fn_count
 
         datadir = ctx.make_service_dir(f"fullnode.{id}")
+        rpc_host = "localhost"
         rpc_port = self.next_port()
         logfile = os.path.join(datadir, "service.log")
 
@@ -208,6 +215,7 @@ class FullNodeFactory(flexitest.Factory):
         cmd = [
             "alpen-express-sequencer",
             "--datadir", datadir,
+            "--rpc-host", rpc_host,
             "--rpc-port", str(rpc_port),
             "--bitcoind-host", bitcoind_config["bitcoind_sock"],
             "--bitcoind-user", bitcoind_config["bitcoind_user"],

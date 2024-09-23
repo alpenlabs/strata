@@ -1,0 +1,31 @@
+# Ignore configuration and hidden directories
+.config/
+.git/
+.github/
+.ruff_cache/
+.vscode/
+functional-tests/
+
+# Ignore build artifacts and cache
+target/
+target/*
+
+# Ignore test-related files and directories
+test/
+
+# Ignore cache, temporary, and virtual environment files
+*.log
+*.tmp
+*.swp
+*.pyc
+*.pyo
+*.pyd
+
+# Additional files
+
+.idea/
+.DS_Store
+
+# docs
+docs/
+doc/
