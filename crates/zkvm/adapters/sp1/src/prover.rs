@@ -56,9 +56,13 @@ impl ZKVMHost for SP1Host {
 
 // NOTE: SP1 prover runs in release mode only; therefore run the tests on release mode only
 #[cfg(test)]
+#[cfg(not(debug_assertions))]
 mod tests {
 
+    use std::{fs::File, io::Write};
+
     use express_zkvm::ZKVMVerifier;
+    use sp1_sdk::{HashableKey, SP1VerifyingKey};
 
     use super::*;
     use crate::SP1Verifier;
@@ -74,10 +78,6 @@ mod tests {
 
     #[test]
     fn test_mock_prover() {
-        if cfg!(debug_assertions) {
-            panic!("SP1 prover runs in release mode only");
-        }
-
         let input: u32 = 1;
 
         let mut prover_input_builder = SP1ProofInputBuilder::new();
@@ -101,10 +101,6 @@ mod tests {
 
     #[test]
     fn test_mock_prover_with_public_param() {
-        if cfg!(debug_assertions) {
-            panic!("SP1 prover runs in release mode only");
-        }
-
         let input: u32 = 1;
 
         let mut prover_input_builder = SP1ProofInputBuilder::new();
@@ -118,5 +114,41 @@ mod tests {
         // assert proof verification works
         SP1Verifier::verify_with_public_params(&vk, input, &proof)
             .expect("Proof verification failed");
+    }
+
+    #[test]
+    fn test_groth16_proof_generation() {
+        sp1_sdk::utils::setup_logger();
+
+        let input: u32 = 1;
+
+        let prover_input = SP1ProofInputBuilder::new()
+            .write(&input)
+            .unwrap()
+            .build()
+            .unwrap();
+
+        // Prover Options to generate Groth16 proof
+        let prover_options = ProverOptions {
+            enable_compression: false,
+            use_mock_prover: false,
+            stark_to_snark_conversion: true,
+        };
+        let zkvm = SP1Host::init(TEST_ELF.to_vec(), prover_options);
+
+        // assert proof generation works
+        let (proof, vk) = zkvm.prove(prover_input).expect("Failed to generate proof");
+
+        let vk: SP1VerifyingKey = bincode::deserialize(vk.as_bytes()).unwrap();
+
+        // Note: For the fixed ELF and fixed SP1 version, the vk is fixed
+        assert_eq!(
+            vk.bytes32(),
+            "0x00b01ae596b4e51843484ff71ccbd0dd1a030af70b255e6b9aad50b81d81266f"
+        );
+
+        let filename = "proof-groth16.bin";
+        let mut file = File::create(filename).unwrap();
+        file.write_all(proof.as_bytes()).unwrap();
     }
 }

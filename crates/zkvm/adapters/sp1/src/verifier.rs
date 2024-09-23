@@ -85,69 +85,20 @@ impl ZKVMVerifier for SP1Verifier {
 
 // NOTE: SP1 prover runs in release mode only; therefore run the tests on release mode only
 #[cfg(test)]
-#[cfg(not(debug_assertions))]
 mod tests {
 
     use num_bigint::BigUint;
     use num_traits::Num;
-    use sp1_sdk::{HashableKey, MockProver, Prover};
 
     use super::*;
 
-    // Adding compiled guest code `TEST_ELF` to save the build time
-    // #![no_main]
-    // sp1_zkvm::entrypoint!(main);
-    // fn main() {
-    //     let n = sp1_zkvm::io::read::<u32>();
-    //     sp1_zkvm::io::commit(&n);
-    // }
-    const TEST_ELF: &[u8] = include_bytes!("../tests/elf/riscv32im-succinct-zkvm-elf");
-
     #[test]
     fn test_groth16_verification() {
-        if cfg!(debug_assertions) {
-            panic!("SP1 prover runs in release mode only");
-        }
-
-        sp1_sdk::utils::setup_logger();
-
-        // let input: u32 = 1;
-
-        // let mut prover_input = ProverInput::new();
-        // prover_input.write(input);
-
-        // // Prover Options to generate Groth16 proof
-        // let prover_options = ProverOptions {
-        //     enable_compression: false,
-        //     use_mock_prover: false,
-        //     stark_to_snark_conversion: true,
-        // };
-        // let zkvm = SP1Host::init(TEST_ELF.to_vec(), prover_options);
-
-        // // assert proof generation works
-        // let (proof, vk) = zkvm.prove(&prover_input).expect("Failed to generate proof");
-
-        // let filename = "proof-groth16.bin";
-        // let mut file = File::create(filename).unwrap();
-        // file.write_all(proof.as_bytes()).unwrap();
-
-        let client = MockProver::new();
-        let (_, vk) = client.setup(TEST_ELF);
-
-        // Note: For the fixed ELF and fixed SP1 version, the vk is fixed
-        assert_eq!(
-            vk.bytes32(),
-            "0x00b01ae596b4e51843484ff71ccbd0dd1a030af70b255e6b9aad50b81d81266f"
-        );
+        let vk = "0x00b01ae596b4e51843484ff71ccbd0dd1a030af70b255e6b9aad50b81d81266f";
 
         let raw_groth16_proof = include_bytes!("../tests/proofs/proof-groth16.bin");
         let proof: SP1ProofWithPublicValues =
             bincode::deserialize(raw_groth16_proof).expect("Failed to deserialize Groth16 proof");
-
-        // assert proof verification works
-        client
-            .verify(&proof, &vk)
-            .expect("Proof verification failed");
 
         let groth16_proof_bytes = proof
             .proof
@@ -158,9 +109,7 @@ mod tests {
             hex::decode(&groth16_proof_bytes).expect("Failed to decode Groth16 proof");
 
         let vkey_hash = BigUint::from_str_radix(
-            vk.bytes32()
-                .strip_prefix("0x")
-                .expect("vkey should start with '0x'"),
+            vk.strip_prefix("0x").expect("vkey should start with '0x'"),
             16,
         )
         .expect("Failed to parse vkey hash")

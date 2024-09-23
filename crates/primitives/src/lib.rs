@@ -17,3 +17,4 @@ pub mod prelude;
 pub mod relay;
 pub mod tx;
 pub mod utils;
+pub mod vk;

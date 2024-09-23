@@ -2,6 +2,7 @@ use alpen_express_primitives::{
     block_credential,
     buf::Buf32,
     params::{Params, RollupParams, SyncParams},
+    vk::RollupVerifyingKey,
 };
 use express_proofimpl_cl_stf::{verify_and_transition, ChainState, L2Block};
 use risc0_zkvm::guest::env;
@@ -36,11 +37,11 @@ fn get_rollup_params() -> Params {
             ),
             l1_reorg_safe_depth: 5,
             target_l2_batch_size: 64,
-            rollup_vk_sp1: Buf32(
+            rollup_vk: RollupVerifyingKey::Risc0VerifyingKey(Buf32(
                 "0x00b01ae596b4e51843484ff71ccbd0dd1a030af70b255e6b9aad50b81d81266f"
                     .parse()
                     .unwrap(),
-            ),
+            )),
         },
         run: SyncParams {
             l2_blocks_fetch_limit: 1000,

@@ -724,9 +724,11 @@ dependencies = [
  "bitcoin",
  "borsh",
  "express-chaintsn",
+ "express-risc0-adapter",
  "express-sp1-adapter",
  "express-storage",
  "express-tasks",
+ "express-zkvm",
  "futures",
  "rand 0.8.5",
  "secp256k1",
@@ -4119,6 +4121,8 @@ dependencies = [
  "risc0-zkvm",
  "serde",
  "serde_json",
+ "sha2 0.10.8",
+ "tracing-subscriber 0.3.18",
 ]
 
 [[package]]

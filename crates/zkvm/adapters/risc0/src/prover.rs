@@ -1,5 +1,5 @@
 use express_zkvm::{Proof, ProverOptions, VerificationKey, ZKVMHost, ZKVMInputBuilder};
-use risc0_zkvm::{compute_image_id, get_prover_server, ExecutorImpl, ProverOpts, VerifierContext};
+use risc0_zkvm::{compute_image_id, default_prover, ProverOpts};
 
 use crate::input::RiscZeroProofInputBuilder;
 
@@ -44,19 +44,21 @@ impl ZKVMHost for RiscZeroHost {
 
         // Setup the prover
         let opts = self.determine_prover_options();
-        let prover = get_prover_server(&opts)?;
+        // let prover = get_prover_server(&opts)?;
+        let prover = default_prover();
 
         // Setup verification key
         let program_id = compute_image_id(&self.elf)?;
         let verification_key = bincode::serialize(&program_id)?;
 
         // Generate the session
-        let mut exec = ExecutorImpl::from_elf(prover_input, &self.elf)?;
-        let session = exec.run()?;
+        // let mut exec = ExecutorImpl::from_elf(prover_input, &self.elf)?;
+        // let session = exec.run()?;
 
         // Generate the proof
-        let ctx = VerifierContext::default();
-        let proof_info = prover.prove_session(&ctx, &session)?;
+        // let ctx = VerifierContext::default();
+        // let proof_info = prover.prove_session(&ctx, &session)?;
+        let proof_info = prover.prove_with_opts(prover_input, &self.elf, &opts)?;
 
         // Proof serialization
         let serialized_proof = bincode::serialize(&proof_info.receipt)?;
@@ -69,6 +71,8 @@ impl ZKVMHost for RiscZeroHost {
 
 #[cfg(test)]
 mod tests {
+    use std::{fs::File, io::Write};
+
     use express_zkvm::ZKVMVerifier;
 
     use super::*;
@@ -120,5 +124,46 @@ mod tests {
         // assert proof verification works
         Risc0Verifier::verify_with_public_params(&vk, input, &proof)
             .expect("Proof verification failed");
+    }
+
+    #[test]
+    #[ignore]
+    fn test_groth16_proof_gen() {
+        // Initialize tracing. In order to view logs, run `RUST_LOG=info cargo run`
+        tracing_subscriber::fmt()
+            .with_env_filter(tracing_subscriber::filter::EnvFilter::from_default_env())
+            .init();
+
+        let input: u32 = 1;
+
+        // Prover Options to generate Groth16 proof
+        let prover_options = ProverOptions {
+            enable_compression: false,
+            use_mock_prover: false,
+            stark_to_snark_conversion: true,
+        };
+
+        let zkvm = RiscZeroHost::init(TEST_ELF.to_vec(), prover_options);
+
+        // prepare input
+        let zkvm_input = RiscZeroProofInputBuilder::new()
+            .write(&input)
+            .unwrap()
+            .build()
+            .unwrap();
+
+        // assert proof generation works
+        let (proof, vk) = zkvm.prove(zkvm_input).expect("Failed to generate proof");
+
+        let expected_vk = vec![
+            48, 77, 52, 1, 100, 95, 109, 135, 223, 56, 83, 146, 244, 21, 237, 63, 198, 105, 2, 75,
+            135, 48, 52, 165, 178, 24, 200, 186, 174, 191, 212, 184,
+        ];
+
+        let filename = "proof-groth16.bin";
+        let mut file = File::create(filename).unwrap();
+        file.write_all(proof.as_bytes()).unwrap();
+
+        assert_eq!(vk.as_bytes(), expected_vk);
     }
 }
