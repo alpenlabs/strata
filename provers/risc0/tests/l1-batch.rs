@@ -10,12 +10,12 @@ mod test {
         logic::{L1BatchProofInput, L1BatchProofOutput},
         timestamp_store::TimestampStore,
     };
-    use express_risc0_adapter::{Risc0Verifier, RiscZeroHost};
+    use express_risc0_adapter::{Risc0Verifier, RiscZeroHost, RiscZeroProofInputBuilder};
     use express_risc0_guest_builder::{
         GUEST_RISC0_BTC_BLOCKSPACE_ELF, GUEST_RISC0_BTC_BLOCKSPACE_ID, GUEST_RISC0_L1_BATCH_ELF,
     };
     use express_zkvm::{
-        AggregationInput, ProverInput, ProverOptions, VerificationKey, ZKVMHost, ZKVMVerifier,
+        AggregationInput, ProverOptions, VerificationKey, ZKVMHost, ZKVMInputBuilder, ZKVMVerifier,
     };
 
     fn get_header_verification_state(height: u32) -> HeaderVerificationState {
@@ -60,7 +60,8 @@ mod test {
             .collect();
 
         let mut blockspace_outputs = Vec::new();
-        let mut prover_input = ProverInput::new();
+
+        let mut l1_batch_input_builder = RiscZeroProofInputBuilder::new();
         for (_, raw_block) in mainnet_blocks {
             let block_bytes = hex::decode(&raw_block).unwrap();
             let scan_config = ScanRuleConfig {
@@ -71,21 +72,28 @@ mod test {
                 .assume_checked()
                 .script_pubkey()],
             };
-            let mut inner_prover_input = ProverInput::new();
-            inner_prover_input.write(scan_config.clone());
-            inner_prover_input.write_serialized(block_bytes);
+
+            let blockspace_input = RiscZeroProofInputBuilder::new()
+                .write(&scan_config)
+                .unwrap()
+                .write_serialized(&block_bytes)
+                .unwrap()
+                .build()
+                .unwrap();
 
             let (proof, _) = prover
-                .prove(&inner_prover_input)
+                .prove(blockspace_input)
                 .expect("Failed to generate proof");
 
             let output = Risc0Verifier::extract_public_output::<BlockspaceProofOutput>(&proof)
                 .expect("Failed to extract public outputs");
 
-            prover_input.write_proof(AggregationInput::new(
-                proof,
-                VerificationKey::new(btc_blockspace_elf_id.clone()),
-            ));
+            l1_batch_input_builder
+                .write_proof(AggregationInput::new(
+                    proof,
+                    VerificationKey::new(btc_blockspace_elf_id.clone()),
+                ))
+                .unwrap();
             blockspace_outputs.push(output);
         }
 
@@ -95,9 +103,10 @@ mod test {
             state: get_header_verification_state(40321),
         };
 
-        prover_input.write(input);
+        l1_batch_input_builder.write(&input).unwrap();
+        let l1_batch_input = l1_batch_input_builder.build().unwrap();
         let (proof, _) = prover
-            .prove(&prover_input)
+            .prove(l1_batch_input)
             .expect("Failed to generate proof");
 
         let _output = Risc0Verifier::extract_public_output::<L1BatchProofOutput>(&proof)

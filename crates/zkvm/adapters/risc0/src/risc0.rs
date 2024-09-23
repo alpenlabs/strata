@@ -1,7 +1,9 @@
-use express_zkvm::{Proof, ProverInput, ProverOptions, VerificationKey, ZKVMHost, ZKVMVerifier};
+use express_zkvm::{
+    Proof, ProverOptions, VerificationKey, ZKVMHost, ZKVMInputBuilder, ZKVMVerifier,
+};
 use risc0_zkvm::{
-    compute_image_id, get_prover_server, sha::Digest, ExecutorEnv, ExecutorImpl, ProverOpts,
-    Receipt, VerifierContext,
+    compute_image_id, get_prover_server, sha::Digest, ExecutorEnv, ExecutorEnvBuilder,
+    ExecutorImpl, ProverOpts, Receipt, VerifierContext,
 };
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::to_vec;
@@ -27,7 +29,56 @@ impl RiscZeroHost {
     }
 }
 
+pub struct RiscZeroProofInputBuilder<'a>(ExecutorEnvBuilder<'a>);
+
+impl<'a> ZKVMInputBuilder<'a> for RiscZeroProofInputBuilder<'a> {
+    type Input = ExecutorEnv<'a>;
+
+    fn new() -> Self {
+        let env_builder = ExecutorEnv::builder();
+        Self(env_builder)
+    }
+
+    fn write<T: serde::Serialize>(&mut self, item: &T) -> anyhow::Result<&mut Self> {
+        self.0.write(item)?;
+        Ok(self)
+    }
+
+    fn write_borsh<T: borsh::BorshSerialize>(&mut self, item: &T) -> anyhow::Result<&mut Self> {
+        let slice = borsh::to_vec(item)?;
+        self.write_serialized(&slice)
+    }
+
+    fn write_serialized(&mut self, item: &[u8]) -> anyhow::Result<&mut Self> {
+        let len = item.len() as u32;
+        self.0.write(&len)?;
+        self.0.write_slice(item);
+        Ok(self)
+    }
+
+    fn write_proof(&mut self, item: express_zkvm::AggregationInput) -> anyhow::Result<&mut Self> {
+        // Learn more about assumption and proof compositions at https://dev.risczero.com/api/zkvm/composition
+        let receipt: Receipt = bincode::deserialize(item.proof().as_bytes())?;
+        let vk: Digest = bincode::deserialize(item.vk().as_bytes())?;
+
+        // `add_assumption` makes the receipt to be verified available to the prover.
+        self.0.add_assumption(receipt);
+
+        // Write the verification key of the program that'll be proven in the guest.
+        // Note: The vkey is written here so we don't have to hardcode it in guest code.
+        // TODO: This should be fixed once the guest code is finalized
+        self.0.write(&vk)?;
+        Ok(self)
+    }
+
+    fn build(&mut self) -> anyhow::Result<Self::Input> {
+        self.0.build()
+    }
+}
+
 impl ZKVMHost for RiscZeroHost {
+    type Input<'a> = RiscZeroProofInputBuilder<'a>;
+
     fn init(guest_code: Vec<u8>, prover_options: ProverOptions) -> Self {
         RiscZeroHost {
             elf: guest_code,
@@ -35,37 +86,13 @@ impl ZKVMHost for RiscZeroHost {
         }
     }
 
-    fn prove<T: serde::Serialize>(
+    fn prove<'a>(
         &self,
-        prover_input: &ProverInput<T>,
+        prover_input: <Self::Input<'a> as ZKVMInputBuilder<'a>>::Input,
     ) -> anyhow::Result<(Proof, VerificationKey)> {
         if self.prover_options.use_mock_prover {
             std::env::set_var("RISC0_DEV_MODE", "true");
         }
-
-        let mut env_builder = ExecutorEnv::builder();
-        for input in &prover_input.inputs {
-            env_builder.write(input)?;
-        }
-        for serialized_item in &prover_input.serialized_inputs {
-            env_builder.write(&(serialized_item.len() as u32))?;
-            env_builder.write_slice(serialized_item);
-        }
-
-        // Learn more about assumption and proof compositions at https://dev.risczero.com/api/zkvm/composition
-        for agg_input in &prover_input.agg_inputs {
-            let receipt: Receipt = bincode::deserialize(agg_input.proof().as_bytes())?;
-            let vk: Digest = bincode::deserialize(agg_input.vk().as_bytes())?;
-
-            // `add_assumption` makes the receipt to be verified available to the prover.
-            env_builder.add_assumption(receipt);
-
-            // Write the verification key of the program that'll be proven in the guest.
-            // Note: The vkey is written here so we don't have to hardcode it in guest code.
-            // TODO: This should be fixed once the guest code is finalized
-            env_builder.write(&vk)?;
-        }
-        let env = env_builder.build()?;
 
         // Setup the prover
         let opts = self.determine_prover_options();
@@ -76,7 +103,7 @@ impl ZKVMHost for RiscZeroHost {
         let verification_key = bincode::serialize(&program_id)?;
 
         // Generate the session
-        let mut exec = ExecutorImpl::from_elf(env, &self.elf)?;
+        let mut exec = ExecutorImpl::from_elf(prover_input, &self.elf)?;
         let session = exec.run()?;
 
         // Generate the proof
@@ -146,10 +173,13 @@ mod tests {
         let input: u32 = 1;
         let zkvm = RiscZeroHost::init(TEST_ELF.to_vec(), ProverOptions::default());
 
+        // prepare input
+        let mut zkvm_input_builder = RiscZeroProofInputBuilder::new();
+        zkvm_input_builder.write(&input).unwrap();
+        let zkvm_input = zkvm_input_builder.build().unwrap();
+
         // assert proof generation works
-        let mut prover_input = ProverInput::new();
-        prover_input.write(input);
-        let (proof, vk) = zkvm.prove(&prover_input).expect("Failed to generate proof");
+        let (proof, vk) = zkvm.prove(zkvm_input).expect("Failed to generate proof");
 
         // assert proof verification works
         Risc0Verifier::verify(&vk, &proof).expect("Proof verification failed");
@@ -165,10 +195,13 @@ mod tests {
         let input: u32 = 1;
         let zkvm = RiscZeroHost::init(TEST_ELF.to_vec(), ProverOptions::default());
 
+        // prepare input
+        let mut zkvm_input_builder = RiscZeroProofInputBuilder::new();
+        zkvm_input_builder.write(&input).unwrap();
+        let zkvm_input = zkvm_input_builder.build().unwrap();
+
         // assert proof generation works
-        let mut prover_input = ProverInput::new();
-        prover_input.write(input);
-        let (proof, vk) = zkvm.prove(&prover_input).expect("Failed to generate proof");
+        let (proof, vk) = zkvm.prove(zkvm_input).expect("Failed to generate proof");
 
         // assert proof verification works
         Risc0Verifier::verify_with_public_params(&vk, input, &proof)

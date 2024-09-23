@@ -1,10 +1,70 @@
 use anyhow::Ok;
-use express_zkvm::{Proof, ProverInput, ProverOptions, VerificationKey, ZKVMHost, ZKVMVerifier};
+use express_zkvm::{
+    AggregationInput, Proof, ProverOptions, VerificationKey, ZKVMHost, ZKVMInputBuilder,
+    ZKVMVerifier,
+};
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::to_vec;
 use sp1_sdk::{
     HashableKey, ProverClient, SP1Proof, SP1ProofWithPublicValues, SP1Stdin, SP1VerifyingKey,
 };
+
+// A wrapper around SP1Stdin
+pub struct SP1ProofInputBuilder(SP1Stdin);
+
+impl<'a> ZKVMInputBuilder<'a> for SP1ProofInputBuilder {
+    type Input = SP1Stdin;
+    fn new() -> SP1ProofInputBuilder {
+        SP1ProofInputBuilder(SP1Stdin::new())
+    }
+
+    fn write<T: serde::Serialize>(&mut self, item: &T) -> anyhow::Result<&mut Self> {
+        self.0.write(item);
+        Ok(self)
+    }
+
+    fn write_borsh<T: borsh::BorshSerialize>(&mut self, item: &T) -> anyhow::Result<&mut Self> {
+        let slice = borsh::to_vec(item)?;
+        self.write_serialized(&slice)
+    }
+
+    fn write_serialized(&mut self, item: &[u8]) -> anyhow::Result<&mut Self> {
+        let len = item.len() as u32;
+        self.0.write(&len);
+        self.0.write_slice(item);
+        Ok(self)
+    }
+
+    fn write_proof(&mut self, item: AggregationInput) -> anyhow::Result<&mut Self> {
+        let proof: SP1ProofWithPublicValues = bincode::deserialize(item.proof().as_bytes())?;
+        let vkey: SP1VerifyingKey = bincode::deserialize(item.vk().as_bytes())?;
+
+        // Write the verification key and the public values of the program that'll be proven
+        // inside zkVM.
+        // Note: The vkey is written here so we don't have to hardcode it in guest code.
+        // TODO: This should be fixed once the guest code is finalized
+        self.0.write(&vkey.hash_u32());
+        self.0.write(&proof.public_values);
+
+        // Write the proofs.
+        //
+        // Note: this data will not actually be read by the aggregation program, instead it will
+        // be witnessed by the prover during the recursive aggregation process
+        // inside SP1 itself.
+        match proof.proof {
+            SP1Proof::Compressed(compressed_proof) => {
+                self.0.write_proof(compressed_proof, vkey.vk);
+            }
+            _ => return Err(anyhow::anyhow!("can only handle compressed proofs")),
+        }
+
+        Ok(self)
+    }
+
+    fn build(&mut self) -> anyhow::Result<Self::Input> {
+        anyhow::Ok(self.0.clone())
+    }
+}
 
 /// A host for the `SP1` zkVM that stores the guest program in ELF format.
 /// The `SP1Host` is responsible for program execution and proving
@@ -15,6 +75,7 @@ pub struct SP1Host {
 }
 
 impl ZKVMHost for SP1Host {
+    type Input<'a> = SP1ProofInputBuilder;
     fn init(guest_code: Vec<u8>, prover_options: ProverOptions) -> Self {
         SP1Host {
             elf: guest_code,
@@ -22,9 +83,9 @@ impl ZKVMHost for SP1Host {
         }
     }
 
-    fn prove<T: serde::Serialize>(
+    fn prove<'a>(
         &self,
-        prover_input: &ProverInput<T>,
+        prover_input: <Self::Input<'a> as ZKVMInputBuilder<'a>>::Input,
     ) -> anyhow::Result<(Proof, VerificationKey)> {
         // Init the prover
         if self.prover_options.use_mock_prover {
@@ -33,47 +94,8 @@ impl ZKVMHost for SP1Host {
         let client = ProverClient::new();
         let (pk, vk) = client.setup(&self.elf);
 
-        // Setup the I/O
-        let mut stdin = SP1Stdin::new();
-
-        // Write user input
-        for input in &prover_input.inputs {
-            stdin.write(&input);
-        }
-
-        // Write serialized user input
-        for serialized_input in &prover_input.serialized_inputs {
-            stdin.write_slice(serialized_input);
-        }
-
-        // Learn more about aggregation at https://docs.succinct.xyz/writing-programs/proof-aggregation.html
-        for agg_input in &prover_input.agg_inputs {
-            let proof: SP1ProofWithPublicValues =
-                bincode::deserialize(agg_input.proof().as_bytes())?;
-            let vkey: SP1VerifyingKey = bincode::deserialize(agg_input.vk().as_bytes())?;
-
-            // Write the verification key and the public values of the program that'll be proven
-            // inside zkVM.
-            // Note: The vkey is written here so we don't have to hardcode it in guest code.
-            // TODO: This should be fixed once the guest code is finalized
-            stdin.write(&vkey.hash_u32());
-            stdin.write(&proof.public_values);
-
-            // Write the proofs.
-            //
-            // Note: this data will not actually be read by the aggregation program, instead it will
-            // be witnessed by the prover during the recursive aggregation process
-            // inside SP1 itself.
-            match proof.proof {
-                SP1Proof::Compressed(compressed_proof) => {
-                    stdin.write_proof(compressed_proof, vkey.vk);
-                }
-                _ => return Err(anyhow::anyhow!("can only handle compressed proofs")),
-            }
-        }
-
         // Start proving
-        let mut prover = client.prove(&pk, stdin);
+        let mut prover = client.prove(&pk, prover_input);
         if self.prover_options.enable_compression {
             prover = prover.compressed();
         }
@@ -159,12 +181,13 @@ mod tests {
 
         let input: u32 = 1;
 
-        let mut prover_input = ProverInput::new();
-        prover_input.write(input);
-        let zkvm = SP1Host::init(TEST_ELF.to_vec(), ProverOptions::default());
+        let mut prover_input_builder = SP1ProofInputBuilder::new();
+        prover_input_builder.write(&input).unwrap();
+        let prover_input = prover_input_builder.build().unwrap();
 
         // assert proof generation works
-        let (proof, vk) = zkvm.prove(&prover_input).expect("Failed to generate proof");
+        let zkvm = SP1Host::init(TEST_ELF.to_vec(), ProverOptions::default());
+        let (proof, vk) = zkvm.prove(prover_input).expect("Failed to generate proof");
 
         // assert proof verification works
         SP1Verifier::verify(&vk, &proof).expect("Proof verification failed");
@@ -183,12 +206,13 @@ mod tests {
 
         let input: u32 = 1;
 
-        let mut prover_input = ProverInput::new();
-        prover_input.write(input);
-        let zkvm = SP1Host::init(TEST_ELF.to_vec(), ProverOptions::default());
+        let mut prover_input_builder = SP1ProofInputBuilder::new();
+        prover_input_builder.write(&input).unwrap();
+        let prover_input = prover_input_builder.build().unwrap();
 
         // assert proof generation works
-        let (proof, vk) = zkvm.prove(&prover_input).expect("Failed to generate proof");
+        let zkvm = SP1Host::init(TEST_ELF.to_vec(), ProverOptions::default());
+        let (proof, vk) = zkvm.prove(prover_input).expect("Failed to generate proof");
 
         // assert proof verification works
         SP1Verifier::verify_with_public_params(&vk, input, &proof)

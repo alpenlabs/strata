@@ -5,9 +5,9 @@ mod test {
 
     use bitcoin::Address;
     use express_proofimpl_btc_blockspace::logic::{BlockspaceProofOutput, ScanRuleConfig};
-    use express_sp1_adapter::{SP1Host, SP1Verifier};
+    use express_sp1_adapter::{SP1Host, SP1ProofInputBuilder, SP1Verifier};
     use express_sp1_guest_builder::GUEST_BTC_BLOCKSPACE_ELF;
-    use express_zkvm::{ProverInput, ZKVMHost, ZKVMVerifier};
+    use express_zkvm::{ZKVMHost, ZKVMInputBuilder, ZKVMVerifier};
 
     #[test]
     fn test_btc_blockspace_code_trace_generation() {
@@ -28,12 +28,16 @@ mod test {
 
         let prover = SP1Host::init(GUEST_BTC_BLOCKSPACE_ELF.into(), Default::default());
 
-        let mut prover_input = ProverInput::new();
-        prover_input.write(scan_config.clone());
-        prover_input.write_serialized(serialized_block);
+        let prover_input = SP1ProofInputBuilder::new()
+            .write(&scan_config)
+            .unwrap()
+            .write_serialized(&serialized_block)
+            .unwrap()
+            .build()
+            .unwrap();
 
         let (proof, _) = prover
-            .prove(&prover_input)
+            .prove(prover_input)
             .expect("Failed to generate proof");
 
         SP1Verifier::extract_public_output::<BlockspaceProofOutput>(&proof)
