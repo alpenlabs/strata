@@ -31,6 +31,11 @@ use tracing::*;
 use super::types::*;
 use crate::errors::Error;
 
+/// Max number of L1 block entries to include per L2Block.
+/// This is relevant when sequencer starts at L1 height >> genesis height
+/// to prevent L2Block from becoming very large in size.
+const MAX_L1_ENTRIES_PER_BLOCK: usize = 100;
+
 /// Signs and stores a block in the database.  Does not submit it to the
 /// forkchoice manager.
 // TODO pass in the CSM state we're using to assemble this
@@ -97,7 +102,12 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
 
     // TODO Pull data from CSM state that we've observed from L1, including new
     // headers or any headers needed to perform a reorg if necessary.
-    let l1_seg = prepare_l1_segment(l1_state, &prev_chstate, l1_prov.as_ref())?;
+    let l1_seg = prepare_l1_segment(
+        l1_state,
+        &prev_chstate,
+        l1_prov.as_ref(),
+        MAX_L1_ENTRIES_PER_BLOCK,
+    )?;
 
     // Prepare the execution segment, which right now is just talking to the EVM
     // but will be more advanced later.
@@ -141,6 +151,7 @@ fn prepare_l1_segment(
     local_l1_state: &LocalL1State,
     prev_chstate: &ChainState,
     l1_prov: &impl L1DataProvider,
+    max_l1_entries: usize,
 ) -> Result<L1Segment, Error> {
     let unacc_blocks = local_l1_state.unacc_blocks_iter().collect::<Vec<_>>();
     trace!(unacc_blocks = %unacc_blocks.len(), "figuring out which blocks to include in L1 segment");
@@ -150,9 +161,9 @@ fn prepare_l1_segment(
     let maturation_queue_size = prev_chstate.l1_view().maturation_queue().len();
     if maturation_queue_size == 0 {
         let mut payloads = Vec::new();
-        for (h, _b) in unacc_blocks {
-            let rec = load_header_record(h, l1_prov)?;
-            payloads.push(L1HeaderPayload::new_bare(h, rec));
+        for (h, _b) in unacc_blocks.iter().take(max_l1_entries) {
+            let rec = load_header_record(*h, l1_prov)?;
+            payloads.push(L1HeaderPayload::new_bare(*h, rec));
         }
 
         debug!(n = %payloads.len(), "filling in empty queue with fresh L1 payloads");
@@ -180,7 +191,11 @@ fn prepare_l1_segment(
     // Compute the offset in the unaccepted list for the blocks we want to use.
     let unacc_fresh_offset = (pivot_h - local_l1_state.buried_l1_height()) as usize + 1;
 
-    let fresh_blocks = &unacc_blocks[unacc_fresh_offset..];
+    let fresh_blocks = &unacc_blocks
+        .iter()
+        .skip(unacc_fresh_offset)
+        .take(max_l1_entries)
+        .collect::<Vec<_>>();
 
     // Load the blocks.
     let mut payloads = Vec::new();
