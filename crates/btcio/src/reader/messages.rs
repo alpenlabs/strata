@@ -1,4 +1,4 @@
-use alpen_express_primitives::tx::RelevantTxInfo;
+use alpen_express_primitives::tx::ProtocolOperation;
 use bitcoin::Block;
 
 /// L1 events that we observe and want the persistence task to work on.
@@ -11,26 +11,30 @@ pub enum L1Event {
     RevertTo(u64),
 }
 
+/// Core protocol specific transaction. It can be thought of as relevant transactions for the
+/// Protocol
 #[derive(Clone, Debug)]
 pub struct ProtocolOpTxRef {
+    /// Index of the transaction in the block
     index: u32,
-    relevant_tx_info: RelevantTxInfo,
+    /// The operation that is to be applied on data
+    proto_op: ProtocolOperation,
 }
 
 impl ProtocolOpTxRef {
-    pub fn new(index: u32, relevant_tx_info: RelevantTxInfo) -> Self {
-        Self {
-            index,
-            relevant_tx_info,
-        }
+    /// Creates a new ProtocolOpTxRef
+    pub fn new(index: u32, proto_op: ProtocolOperation) -> Self {
+        Self { index, proto_op }
     }
 
+    /// Returns the index of the transaction
     pub fn index(&self) -> u32 {
         self.index
     }
 
-    pub fn relevant_tx_infos(&self) -> &RelevantTxInfo {
-        &self.relevant_tx_info
+    /// Returns a reference to the protocol operation
+    pub fn proto_op(&self) -> &ProtocolOperation {
+        &self.proto_op
     }
 }
 
@@ -56,7 +60,7 @@ impl BlockData {
         &self.block
     }
 
-    pub fn relevant_tx_idxs(&self) -> impl Iterator<Item = u32> + '_ {
+    pub fn protocol_ops_tx_idxs(&self) -> impl Iterator<Item = u32> + '_ {
         self.protocol_ops_txs.iter().map(|v| v.index)
     }
 

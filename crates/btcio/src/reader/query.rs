@@ -15,7 +15,7 @@ use tracing::*;
 use crate::{
     reader::{
         config::ReaderConfig,
-        filter::{filter_relevant_txs, RelevantTxType},
+        filter::{filter_relevant_txs, TxFilterRule},
         messages::{BlockData, L1Event},
         state::ReaderState,
     },
@@ -75,18 +75,12 @@ async fn do_reader_task<D: Database + 'static>(
         let poll_span = debug_span!("l1poll", %cur_best_height);
 
         // Maybe this should be called outside loop?
-        let relevant_tx_types =
-            derive_relevant_tx_types::<D>(chstate_prov.clone(), params.as_ref())?;
+        let filters = derive_tx_filter_rules::<D>(chstate_prov.clone(), params.as_ref())?;
 
-        if let Err(err) = poll_for_new_blocks(
-            client,
-            event_tx,
-            &relevant_tx_types,
-            &mut state,
-            &mut status_updates,
-        )
-        .instrument(poll_span)
-        .await
+        if let Err(err) =
+            poll_for_new_blocks(client, event_tx, &filters, &mut state, &mut status_updates)
+                .instrument(poll_span)
+                .await
         {
             warn!(%cur_best_height, err = %err, "failed to poll Bitcoin client");
             status_updates.push(L1StatusUpdate::RpcError(err.to_string()));
@@ -116,13 +110,13 @@ async fn do_reader_task<D: Database + 'static>(
     }
 }
 
-fn derive_relevant_tx_types<D: Database + 'static>(
+fn derive_tx_filter_rules<D: Database + 'static>(
     _chstate_prov: Arc<D::ChsProv>,
     params: &Params,
-) -> anyhow::Result<Vec<RelevantTxType>> {
+) -> anyhow::Result<Vec<TxFilterRule>> {
     // TODO: Figure out how to do it from chainstate provider
     // For now we'll just go with filtering Inscription transactions
-    Ok(vec![RelevantTxType::RollupInscription(
+    Ok(vec![TxFilterRule::RollupInscription(
         params.rollup().rollup_name.clone(),
     )])
 }
@@ -163,7 +157,7 @@ async fn init_reader_state(
 async fn poll_for_new_blocks(
     client: &impl Reader,
     event_tx: &mpsc::Sender<L1Event>,
-    relevant_tx_types: &[RelevantTxType],
+    filters: &[TxFilterRule],
     state: &mut ReaderState,
     status_updates: &mut Vec<L1StatusUpdate>,
 ) -> anyhow::Result<()> {
@@ -207,7 +201,7 @@ async fn poll_for_new_blocks(
             event_tx,
             state,
             status_updates,
-            relevant_tx_types,
+            filters,
         )
         .await
         {
@@ -251,12 +245,12 @@ async fn fetch_and_process_block(
     event_tx: &mpsc::Sender<L1Event>,
     state: &mut ReaderState,
     status_updates: &mut Vec<L1StatusUpdate>,
-    relevant_tx_types: &[RelevantTxType],
+    filters: &[TxFilterRule],
 ) -> anyhow::Result<BlockHash> {
     let block = client.get_block_at(height).await?;
     let txs = block.txdata.len();
 
-    let filtered_txs = filter_relevant_txs(&block, relevant_tx_types);
+    let filtered_txs = filter_relevant_txs(&block, filters);
     let block_data = BlockData::new(height, block, filtered_txs);
     let l1blkid = block_data.block().block_hash();
     trace!(%l1blkid, %height, %txs, "fetched block from client");

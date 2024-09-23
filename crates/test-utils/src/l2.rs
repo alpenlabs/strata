@@ -83,7 +83,7 @@ pub fn gen_params() -> Params {
             l1_reorg_safe_depth: 5,
             target_l2_batch_size: 64,
             address_length: 20,
-            deposit_amount: 10_000_000_000,
+            deposit_amount: 1_000_000_000,
         },
         run: SyncParams {
             l2_blocks_fetch_limit: 1000,

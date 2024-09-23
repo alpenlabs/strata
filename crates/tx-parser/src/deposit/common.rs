@@ -1,7 +1,7 @@
 use bitcoin::{script::Instructions, Transaction};
 
 use super::{error::DepositParseError, DepositTxConfig};
-use crate::parser::utils::next_bytes;
+use crate::utils::next_bytes;
 
 pub struct DepositRequestScriptInfo {
     pub tap_ctrl_blk_hash: [u8; 32],
@@ -9,9 +9,21 @@ pub struct DepositRequestScriptInfo {
 }
 
 /// if the transaction's 0th index is p2tr and amount exceeds the deposit quantity or not
-pub fn check_bridge_offer_output<'a>(tx: &'a Transaction, config: &DepositTxConfig) -> bool {
+pub fn check_bridge_offer_output(
+    tx: &Transaction,
+    config: &DepositTxConfig,
+) -> Result<(), DepositParseError> {
     let txout = &tx.output[0];
-    txout.script_pubkey.is_p2tr() && txout.value.to_sat() >= config.deposit_quantity
+    if !txout.script_pubkey.is_p2tr() {
+        return Err(DepositParseError::NoP2TR);
+    }
+    if txout.value.to_sat() < config.deposit_quantity {
+        return Err(DepositParseError::ExpectedAmount(
+            config.deposit_quantity,
+            txout.value.to_sat(),
+        ));
+    }
+    Ok(())
 }
 
 /// check if magic bytes(unique set of bytes used to identify relevant tx) is present or not
@@ -22,10 +34,7 @@ pub fn check_magic_bytes(
     // magic bytes
     if let Some(magic_bytes) = next_bytes(instructions) {
         if magic_bytes != config.magic_bytes {
-            return Err(DepositParseError::MagicBytesMismatch(
-                magic_bytes,
-                config.magic_bytes.clone(),
-            ));
+            return Err(DepositParseError::MagicBytesMismatch);
         }
         return Ok(());
     }
@@ -34,10 +43,10 @@ pub fn check_magic_bytes(
 }
 
 /// extracts the Execution environment bytes(most possibly EVM bytes)
-pub fn extract_ee_bytes(
-    instructions: &mut Instructions,
+pub fn extract_ee_bytes<'a>(
+    instructions: &mut Instructions<'a>,
     config: &DepositTxConfig,
-) -> Result<Vec<u8>, DepositParseError> {
+) -> Result<&'a [u8], DepositParseError> {
     match next_bytes(instructions) {
         Some(ee_bytes) => {
             if ee_bytes.len() as u8 != config.address_length {
@@ -58,7 +67,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::parser::deposit::{
+    use crate::deposit::{
         common::{check_bridge_offer_output, check_magic_bytes},
         test_utils::{
             create_transaction_two_outpoints, generic_taproot_addr, get_deposit_tx_config,
@@ -75,7 +84,7 @@ mod tests {
         );
 
         let result = check_bridge_offer_output(&tx, &config);
-        assert!(result);
+        assert!(result.is_ok());
     }
 
     #[test]
@@ -88,7 +97,7 @@ mod tests {
         );
 
         let result = check_bridge_offer_output(&tx, &config);
-        assert!(!result);
+        assert!(result.is_err());
     }
 
     #[test]
@@ -116,10 +125,7 @@ mod tests {
         let mut instructions = script.instructions();
 
         let result = check_magic_bytes(&mut instructions, &config);
-        assert!(matches!(
-            result,
-            Err(DepositParseError::MagicBytesMismatch(_, _))
-        ));
+        assert!(matches!(result, Err(DepositParseError::MagicBytesMismatch)));
     }
 
     #[test]

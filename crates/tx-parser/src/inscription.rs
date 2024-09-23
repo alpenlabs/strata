@@ -9,6 +9,10 @@ use tracing::debug;
 
 use super::utils::{next_bytes, next_int, next_op};
 
+pub const ROLLUP_NAME_TAG: &[u8] = &[1];
+pub const VERSION_TAG: &[u8] = &[2];
+pub const BATCH_DATA_TAG: &[u8] = &[3];
+
 #[derive(Debug, Error)]
 pub enum InscriptionParseError {
     /// Does not have an `OP_IF..OP_ENDIF` block
@@ -52,10 +56,9 @@ pub fn parse_inscription_data(
     // Parse name
     let (tag, name) = parse_bytes_pair(&mut instructions)?;
 
-    let extracted_rollup_name = match (tag.as_slice(), name) {
-        (InscriptionData::ROLLUP_NAME_TAG, namebytes) => {
-            String::from_utf8(namebytes).map_err(|_| InscriptionParseError::InvalidNameValue)
-        }
+    let extracted_rollup_name = match (tag, name) {
+        (ROLLUP_NAME_TAG, namebytes) => String::from_utf8(namebytes.to_vec())
+            .map_err(|_| InscriptionParseError::InvalidNameValue),
         _ => Err(InscriptionParseError::InvalidNameTag),
     }?;
 
@@ -65,21 +68,21 @@ pub fn parse_inscription_data(
 
     // Parse version
     let (tag, ver) = parse_bytes_pair(&mut instructions)?;
-    let _version = match (tag.as_slice(), ver.as_slice()) {
-        (InscriptionData::VERSION_TAG, [v]) => Ok(v),
-        (InscriptionData::VERSION_TAG, _) => Err(InscriptionParseError::InvalidVersion),
+    let _version = match (tag, ver) {
+        (VERSION_TAG, [v]) => Ok(v),
+        (VERSION_TAG, _) => Err(InscriptionParseError::InvalidVersion),
         _ => Err(InscriptionParseError::InvalidVersionTag),
     }?;
 
     // Parse bytes
     let tag = next_bytes(&mut instructions).ok_or(InscriptionParseError::InvalidBlobTag)?;
     let size = next_int(&mut instructions);
-    match (tag.as_slice(), size) {
-        (InscriptionData::BATCH_DATA_TAG, Some(size)) => {
+    match (tag, size) {
+        (BATCH_DATA_TAG, Some(size)) => {
             let batch_data = extract_n_bytes(size, &mut instructions)?;
             Ok(InscriptionData::new(batch_data))
         }
-        (InscriptionData::BATCH_DATA_TAG, None) => Err(InscriptionParseError::InvalidBlob),
+        (BATCH_DATA_TAG, None) => Err(InscriptionParseError::InvalidBlob),
         _ => Err(InscriptionParseError::InvalidBlobTag),
     }
 }
@@ -113,9 +116,9 @@ fn enter_envelope(instructions: &mut Instructions) -> Result<(), InscriptionPars
     Ok(())
 }
 
-fn parse_bytes_pair(
-    instructions: &mut Instructions,
-) -> Result<(Vec<u8>, Vec<u8>), InscriptionParseError> {
+fn parse_bytes_pair<'a>(
+    instructions: &mut Instructions<'a>,
+) -> Result<(&'a [u8], &'a [u8]), InscriptionParseError> {
     let tag = next_bytes(instructions).ok_or(InscriptionParseError::InvalidFormat)?;
     let name = next_bytes(instructions).ok_or(InscriptionParseError::InvalidFormat)?;
     Ok((tag, name))
@@ -130,7 +133,7 @@ fn extract_n_bytes(
     let mut data = vec![];
     let mut curr_size: u32 = 0;
     while let Some(bytes) = next_bytes(instructions) {
-        data.extend_from_slice(&bytes);
+        data.extend_from_slice(bytes);
         curr_size += bytes.len() as u32;
     }
     if curr_size == size {
@@ -144,8 +147,37 @@ fn extract_n_bytes(
 #[cfg(test)]
 mod tests {
 
+    use bitcoin::{
+        opcodes::{all::OP_ENDIF, OP_FALSE},
+        script::{self, PushBytesBuf},
+    };
+
     use super::*;
-    use crate::writer::builder::generate_inscription_script;
+
+    pub fn generate_inscription_script(
+        inscription_data: InscriptionData,
+        rollup_name: &str,
+        version: u8,
+    ) -> anyhow::Result<ScriptBuf> {
+        let mut builder = script::Builder::new()
+            .push_opcode(OP_FALSE)
+            .push_opcode(OP_IF)
+            .push_slice(PushBytesBuf::try_from(ROLLUP_NAME_TAG.to_vec())?)
+            .push_slice(PushBytesBuf::try_from(rollup_name.as_bytes().to_vec())?)
+            .push_slice(PushBytesBuf::try_from(VERSION_TAG.to_vec())?)
+            .push_slice(PushBytesBuf::from([version]))
+            .push_slice(PushBytesBuf::try_from(BATCH_DATA_TAG.to_vec())?)
+            .push_int(inscription_data.batch_data().len() as i64);
+
+        debug!(batchdata_size = %inscription_data.batch_data().len(), "Inserting batch data");
+        for chunk in inscription_data.batch_data().chunks(520) {
+            debug!(size=%chunk.len(), "inserting chunk");
+            builder = builder.push_slice(PushBytesBuf::try_from(chunk.to_vec())?);
+        }
+        builder = builder.push_opcode(OP_ENDIF);
+
+        Ok(builder.into_script())
+    }
 
     #[test]
     fn test_parse_inscription_data() {

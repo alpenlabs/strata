@@ -12,7 +12,7 @@ use super::{
     error::DepositParseError,
     DepositTxConfig,
 };
-use crate::parser::utils::{next_bytes, next_op};
+use crate::utils::{next_bytes, next_op};
 
 /// Extracts the DepositInfo from the Deposit Transaction
 pub fn extract_deposit_request_info(
@@ -27,7 +27,7 @@ pub fn extract_deposit_request_info(
         }) = parse_deposit_request_script(&tx.output[1].script_pubkey, config)
         {
             // find the outpoint with taproot address, so that we can extract sent amount from that
-            if check_bridge_offer_output(tx, config) {
+            if check_bridge_offer_output(tx, config).is_ok() {
                 return Some(DepositReqeustInfo {
                     amt: tx.output[0].value.to_sat(),
                     address: ee_bytes,
@@ -57,15 +57,15 @@ pub fn parse_deposit_request_script(
     match next_bytes(&mut instructions) {
         Some(ctrl_hash) => {
             // length of control block is 32
-            let ee_bytes = extract_ee_bytes(&mut instructions, config)?;
+            let ee_bytes = extract_ee_bytes(&mut instructions, config)?.to_vec();
             Ok(DepositRequestScriptInfo {
                 tap_ctrl_blk_hash: ctrl_hash
                     .try_into()
-                    .map_err(|_| DepositParseError::ControlBlockLenMismatch)?,
+                    .map_err(|_| DepositParseError::LeafHashLenMismatch)?,
                 ee_bytes,
             })
         }
-        None => Err(DepositParseError::NoControlBlock),
+        None => Err(DepositParseError::NoLeafHash),
     }
 }
 
@@ -74,7 +74,7 @@ mod tests {
     use bitcoin::{absolute::LockTime, Amount, Transaction};
 
     use super::extract_deposit_request_info;
-    use crate::parser::deposit::{
+    use crate::deposit::{
         deposit_request::parse_deposit_request_script,
         error::DepositParseError,
         test_utils::{
@@ -86,12 +86,12 @@ mod tests {
     #[test]
     fn check_deposit_parser() {
         // values for testing
-        let amt = Amount::from_sat(1000);
+        let config = get_deposit_tx_config();
+        let amt = Amount::from_sat(config.deposit_quantity);
         let evm_addr = [1; 20];
         let dummy_control_block = [0xFF; 32];
         let generic_taproot_addr = generic_taproot_addr();
 
-        let config = get_deposit_tx_config();
         let deposit_request_script = build_test_deposit_request_script(
             config.magic_bytes,
             dummy_control_block.to_vec(),
@@ -165,10 +165,7 @@ mod tests {
         let out = parse_deposit_request_script(&script_missing_control, &config);
 
         // Should return an error due to missing control block
-        assert!(matches!(
-            out,
-            Err(DepositParseError::ControlBlockLenMismatch)
-        ));
+        assert!(matches!(out, Err(DepositParseError::LeafHashLenMismatch)));
     }
 
     #[test]
@@ -187,10 +184,7 @@ mod tests {
         let out = parse_deposit_request_script(&invalid_script, &config);
 
         // Should return an error due to invalid magic bytes
-        assert!(matches!(
-            out,
-            Err(DepositParseError::MagicBytesMismatch(_, _))
-        ));
+        assert!(matches!(out, Err(DepositParseError::MagicBytesMismatch)));
     }
 
     #[test]

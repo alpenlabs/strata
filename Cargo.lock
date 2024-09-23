@@ -691,6 +691,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.8",
+ "strata-tx-parser",
  "thiserror",
  "threadpool",
  "tokio",
@@ -11712,12 +11713,13 @@ dependencies = [
 
 [[package]]
 name = "sp1-build"
-version = "1.1.1"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "65c9c5c2628b485693b6c2e5ba89f1af7ce5cfede39a6a4b041afd2e5b838480"
+checksum = "eae094a567949cc3bbcdb265e45591cf7ac7185f121f6f29ac64a44acb00220e"
 dependencies = [
  "anyhow",
  "cargo_metadata",
+ "chrono",
  "clap",
  "dirs",
 ]
@@ -11798,12 +11800,10 @@ dependencies = [
 
 [[package]]
 name = "sp1-helper"
-version = "1.1.1"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ec6177089127a447ea26b258f722050c0c4f874eba5df7934b246b59088c8f72"
+checksum = "4a17502b73973fedac4ea0d20fbaf33663a0cd0cfc4a6c36a3d095634bec941a"
 dependencies = [
- "cargo_metadata",
- "chrono",
  "sp1-build",
 ]
 
@@ -12118,6 +12118,18 @@ name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
+
+[[package]]
+name = "strata-tx-parser"
+version = "0.1.0"
+dependencies = [
+ "alpen-express-primitives",
+ "anyhow",
+ "bitcoin",
+ "hex",
+ "thiserror",
+ "tracing",
+]
 
 [[package]]
 name = "strsim"

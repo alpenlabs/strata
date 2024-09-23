@@ -19,7 +19,7 @@ pub fn generic_taproot_addr() -> Address {
 
 pub fn generic_pubkey() -> PublicKey {
     let pubkey_bytes =
-        hex::decode("02c72e8f3b6fd307c8edb32e8b53ed69c1f9269792088fc2fb756ce49cf3ad46a8")
+        hex::decode("041a787b3a3d4446103afc2886a7a34206cbbe8d4ddea93922c49df094bdb47ff4c25efe9cf6f407447f3c0a006263977c8dc6da04450ddf982463c34825627287")
             .expect("Decoding failed");
     PublicKey::from_slice(&pubkey_bytes).expect("Invalid public key")
 }
@@ -28,7 +28,7 @@ pub fn get_deposit_tx_config() -> DepositTxConfig {
     DepositTxConfig {
         magic_bytes: "expresssss".to_string().as_bytes().to_vec(),
         address_length: 20,
-        deposit_quantity: 1000,
+        deposit_quantity: 10_000_000_000,
         federation_address: generic_pubkey(),
     }
 }

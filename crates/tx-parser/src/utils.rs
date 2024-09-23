@@ -5,7 +5,7 @@ use bitcoin::{
 };
 
 /// Extract next instruction and try to parse it as an opcode
-pub fn next_op(instructions: &mut Instructions) -> Option<Opcode> {
+pub fn next_op(instructions: &mut Instructions<'_>) -> Option<Opcode> {
     let nxt = instructions.next();
     match nxt {
         Some(Ok(Instruction::Op(op))) => Some(op),
@@ -13,16 +13,16 @@ pub fn next_op(instructions: &mut Instructions) -> Option<Opcode> {
     }
 }
 
-/// Extract next instruction and try to parse it as bytes
-pub fn next_bytes(instructions: &mut Instructions) -> Option<Vec<u8>> {
+/// Extract next instruction and try to parse it as a byte slice
+pub fn next_bytes<'a>(instructions: &mut Instructions<'a>) -> Option<&'a [u8]> {
     match instructions.next() {
-        Some(Ok(Instruction::PushBytes(bytes))) => Some(bytes.as_bytes().to_vec()),
+        Some(Ok(Instruction::PushBytes(bytes))) => Some(bytes.as_bytes()),
         _ => None,
     }
 }
 
 /// Extract next integer value(unsigned)
-pub fn next_int(instructions: &mut Instructions) -> Option<u32> {
+pub fn next_int(instructions: &mut Instructions<'_>) -> Option<u32> {
     let n = instructions.next();
     match n {
         Some(Ok(Instruction::PushBytes(bytes))) => {

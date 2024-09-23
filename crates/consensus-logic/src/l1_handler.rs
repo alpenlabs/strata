@@ -6,7 +6,7 @@ use alpen_express_primitives::{
     buf::Buf32,
     l1::{L1BlockManifest, L1Tx, L1TxProof},
     params::Params,
-    tx::RelevantTxInfo,
+    tx::ProtocolOperation,
 };
 use alpen_express_state::{
     batch::{BatchCheckpoint, SignedBatchCheckpoint},
@@ -82,7 +82,7 @@ where
                     extract_l1tx_from_block(
                         blockdata.block(),
                         ops_txs.index(),
-                        ops_txs.relevant_tx_infos().clone(),
+                        ops_txs.proto_op().clone(),
                     )
                 })
                 .collect();
@@ -113,18 +113,17 @@ where
 fn check_for_da_batch(blockdata: &BlockData) -> Vec<BatchCheckpoint> {
     let protocol_ops_txs = blockdata.protocol_ops_txs();
 
-    let inscriptions =
-        protocol_ops_txs
-            .iter()
-            .filter_map(|ops_txs| match ops_txs.relevant_tx_infos() {
-                alpen_express_primitives::tx::RelevantTxInfo::RollupInscription(inscription) => {
-                    Some((
-                        inscription,
-                        &blockdata.block().txdata[ops_txs.index() as usize],
-                    ))
-                }
-                _ => None,
-            });
+    let inscriptions = protocol_ops_txs
+        .iter()
+        .filter_map(|ops_txs| match ops_txs.proto_op() {
+            alpen_express_primitives::tx::ProtocolOperation::RollupInscription(inscription) => {
+                Some((
+                    inscription,
+                    &blockdata.block().txdata[ops_txs.index() as usize],
+                ))
+            }
+            _ => None,
+        });
 
     let signed_checkpoints = inscriptions.filter_map(|(insc, tx)| {
         match borsh::from_slice::<SignedBatchCheckpoint>(insc.batch_data()) {
@@ -160,7 +159,7 @@ fn generate_block_manifest(block: &Block) -> L1BlockManifest {
 ///
 /// # Parameters
 /// - `idx`: The index of the transaction within the block's transaction data.
-/// - `relevant_info`: Relevant information gathered after parsing.
+/// - `proto_op`: Protocol operation data after parsing and gathering relevant tx
 /// - `block`: The block containing the transactions.
 ///
 /// # Returns
@@ -168,7 +167,7 @@ fn generate_block_manifest(block: &Block) -> L1BlockManifest {
 ///
 /// # Panics
 /// - If the `idx` is out of bounds for the block's transaction data.
-fn extract_l1tx_from_block(block: &Block, idx: u32, relevant_info: RelevantTxInfo) -> L1Tx {
+fn extract_l1tx_from_block(block: &Block, idx: u32, proto_op: ProtocolOperation) -> L1Tx {
     assert!(
         (idx as usize) < block.txdata.len(),
         "utils: tx idx out of range of block txs"
@@ -193,7 +192,7 @@ fn extract_l1tx_from_block(block: &Block, idx: u32, relevant_info: RelevantTxInf
     let proof = L1TxProof::new(idx, cohashes);
     let tx = serialize(tx);
 
-    L1Tx::new(proof, tx, relevant_info)
+    L1Tx::new(proof, tx, proto_op)
 }
 
 /// Generates cohashes for an wtxid in particular index with in given slice of wtxids.

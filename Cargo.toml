@@ -46,6 +46,7 @@ members = [
   "bin/prover-client",
   "reth",
   "sequencer",
+  "crates/tx-parser",
 
   # integration tests
   "tests",
@@ -97,7 +98,9 @@ express-rpc-utils = { path = "crates/rpc/utils" }
 express-storage = { path = "crates/storage" }
 express-sync = { path = "crates/sync" }
 express-tasks = { path = "crates/tasks" }
-express-zkvm = { path = "crates/zkvm/zkvm" }                                     # FIXME make these names more consistent?
+express-zkvm = { path = "crates/zkvm/zkvm" }
+strata-tx-parser = { path = "crates/tx-parser" }
+# FIXME make these names more consistent?
 
 # IMPORTANT: ensure alloy-* and revm packages are of the same version as inside reth dependency
 alloy-genesis = { version = "0.2", default-features = false }

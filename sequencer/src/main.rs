@@ -121,7 +121,7 @@ fn default_rollup_params() -> RollupParams {
         l1_reorg_safe_depth: 4,
         target_l2_batch_size: 64,
         address_length: 20,
-        deposit_amount: 10_00_000_000,
+        deposit_amount: 1_000_000_000,
     }
 }
 

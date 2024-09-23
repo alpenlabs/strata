@@ -26,8 +26,9 @@ use bitcoin::{
     Witness,
 };
 use rand::RngCore;
+use strata_tx_parser::inscription::{BATCH_DATA_TAG, ROLLUP_NAME_TAG, VERSION_TAG};
 use thiserror::Error;
-use tracing::debug;
+use tracing::trace;
 
 use crate::{
     rpc::{
@@ -41,9 +42,6 @@ const BITCOIN_DUST_LIMIT: u64 = 546;
 const INSCRIPTION_VERSION: u8 = 1;
 
 // TODO: these might need to be in rollup params
-const BATCH_DATA_TAG: &[u8] = &[1];
-const ROLLUP_NAME_TAG: &[u8] = &[3];
-
 #[derive(Debug, Error)]
 pub enum InscriptionError {
     #[error("insufficient funds for tx (need {0} sats, have {1} sats)")]
@@ -511,22 +509,16 @@ pub fn generate_inscription_script(
     let mut builder = script::Builder::new()
         .push_opcode(OP_FALSE)
         .push_opcode(OP_IF)
-        .push_slice(PushBytesBuf::try_from(
-            InscriptionData::ROLLUP_NAME_TAG.to_vec(),
-        )?)
+        .push_slice(PushBytesBuf::try_from(ROLLUP_NAME_TAG.to_vec())?)
         .push_slice(PushBytesBuf::try_from(rollup_name.as_bytes().to_vec())?)
-        .push_slice(PushBytesBuf::try_from(
-            InscriptionData::VERSION_TAG.to_vec(),
-        )?)
+        .push_slice(PushBytesBuf::try_from(VERSION_TAG.to_vec())?)
         .push_slice(PushBytesBuf::from([version]))
-        .push_slice(PushBytesBuf::try_from(
-            InscriptionData::BATCH_DATA_TAG.to_vec(),
-        )?)
+        .push_slice(PushBytesBuf::try_from(BATCH_DATA_TAG.to_vec())?)
         .push_int(inscription_data.batch_data().len() as i64);
 
-    debug!(batchdata_size = %inscription_data.batch_data().len(), "Inserting batch data");
+    trace!(batchdata_size = %inscription_data.batch_data().len(), "Inserting batch data");
     for chunk in inscription_data.batch_data().chunks(520) {
-        debug!(size=%chunk.len(), "inserting chunk");
+        trace!(size=%chunk.len(), "inserting chunk");
         builder = builder.push_slice(PushBytesBuf::try_from(chunk.to_vec())?);
     }
     builder = builder.push_opcode(OP_ENDIF);

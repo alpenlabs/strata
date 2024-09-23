@@ -3,7 +3,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 
 /// Information related to relevant transactions to be stored in L1Tx
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
-pub enum RelevantTxInfo {
+pub enum ProtocolOperation {
     /// Deposit Transaction
     Deposit(DepositInfo),
     DepositRequest(DepositReqeustInfo),
@@ -42,10 +42,6 @@ pub struct InscriptionData {
 }
 
 impl InscriptionData {
-    pub const ROLLUP_NAME_TAG: &[u8] = &[1];
-    pub const VERSION_TAG: &[u8] = &[2];
-    pub const BATCH_DATA_TAG: &[u8] = &[3];
-
     pub fn new(batch_data: Vec<u8>) -> Self {
         Self { batch_data }
     }
