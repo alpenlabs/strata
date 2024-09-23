@@ -100,16 +100,16 @@ class BitcoinFactory(flexitest.Factory):
             "rpc_password": BD_PASSWORD,
         }
 
-        with open(logfile, "w") as f:
-            svc = flexitest.service.ProcService(props, cmd, stdout=f)
+        svc = flexitest.service.ProcService(props, cmd, stdout=logfile)
+        svc.start()
 
-            def _create_rpc():
-                url = f"http://{BD_USERNAME}:{BD_PASSWORD}@localhost:{rpc_port}"
-                return BitcoindClient(base_url=url, network="regtest")
+        def _create_rpc():
+            url = f"http://{BD_USERNAME}:{BD_PASSWORD}@localhost:{rpc_port}"
+            return BitcoindClient(base_url=url, network="regtest")
 
-            svc.create_rpc = _create_rpc
+        svc.create_rpc = _create_rpc
 
-            return svc
+        return svc
 
 
 class BitcoinRpcConfig(TypedDict):
@@ -172,15 +172,15 @@ class ExpressFactory(flexitest.Factory):
 
         rpc_url = f"ws://localhost:{rpc_port}"
 
-        with open(logfile, "w") as f:
-            svc = flexitest.service.ProcService(props, cmd, stdout=f)
+        svc = flexitest.service.ProcService(props, cmd, stdout=logfile)
+        svc.start()
 
-            def _create_rpc():
-                return seqrpc.JsonrpcClient(rpc_url)
+        def _create_rpc():
+            return seqrpc.JsonrpcClient(rpc_url)
 
-            svc.create_rpc = _create_rpc
+        svc.create_rpc = _create_rpc
 
-            return svc
+        return svc
 
 
 class FullNodeFactory(flexitest.Factory):
@@ -230,15 +230,15 @@ class FullNodeFactory(flexitest.Factory):
 
         rpc_url = f"ws://localhost:{rpc_port}"
 
-        with open(logfile, "w") as f:
-            svc = flexitest.service.ProcService(props, cmd, stdout=f)
+        svc = flexitest.service.ProcService(props, cmd, stdout=logfile)
+        svc.start()
 
-            def _create_rpc():
-                return seqrpc.JsonrpcClient(rpc_url)
+        def _create_rpc():
+            return seqrpc.JsonrpcClient(rpc_url)
 
-            svc.create_rpc = _create_rpc
+        svc.create_rpc = _create_rpc
 
-            return svc
+        return svc
 
 
 class RethFactory(flexitest.Factory):
@@ -281,29 +281,27 @@ class RethFactory(flexitest.Factory):
 
         ethrpc_url = f"ws://localhost:{ethrpc_ws_port}"
 
-        with open(logfile, "w") as f:
-            svc = flexitest.service.ProcService(props, cmd, stdout=f)
+        svc = flexitest.service.ProcService(props, cmd, stdout=logfile)
+        svc.start()
 
-            def _create_rpc():
-                return seqrpc.JsonrpcClient(ethrpc_url)
+        def _create_rpc():
+            return seqrpc.JsonrpcClient(ethrpc_url)
 
-            def _create_web3():
-                http_ethrpc_url = f"http://localhost:{ethrpc_http_port}"
-                w3 = web3.Web3(web3.Web3.HTTPProvider(http_ethrpc_url))
-                # address, pk hardcoded in test genesis config
-                w3.address = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
-                account = w3.eth.account.from_key(
-                    "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
-                )
-                w3.middleware_onion.add(
-                    web3.middleware.SignAndSendRawMiddlewareBuilder.build(account)
-                )
-                return w3
+        def _create_web3():
+            http_ethrpc_url = f"http://localhost:{ethrpc_http_port}"
+            w3 = web3.Web3(web3.Web3.HTTPProvider(http_ethrpc_url))
+            # address, pk hardcoded in test genesis config
+            w3.address = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+            account = w3.eth.account.from_key(
+                "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+            )
+            w3.middleware_onion.add(web3.middleware.SignAndSendRawMiddlewareBuilder.build(account))
+            return w3
 
-            svc.create_rpc = _create_rpc
-            svc.create_web3 = _create_web3
+        svc.create_rpc = _create_rpc
+        svc.create_web3 = _create_web3
 
-            return svc
+        return svc
 
 
 class ProverClientFactory(flexitest.Factory):
@@ -335,14 +333,14 @@ class ProverClientFactory(flexitest.Factory):
 
         props = {"rpc_port": rpc_port}
 
-        with open(logfile, "w") as f:
-            svc = flexitest.service.ProcService(props, cmd, stdout=f)
+        svc = flexitest.service.ProcService(props, cmd, stdout=logfile)
+        svc.start()
 
-            def _create_rpc():
-                return seqrpc.JsonrpcClient(rpc_url)
+        def _create_rpc():
+            return seqrpc.JsonrpcClient(rpc_url)
 
-            svc.create_rpc = _create_rpc
-            return svc
+        svc.create_rpc = _create_rpc
+        return svc
 
 
 class BasicEnvConfig(flexitest.EnvConfig):

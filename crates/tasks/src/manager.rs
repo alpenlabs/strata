@@ -8,7 +8,6 @@ use std::{
         atomic::{AtomicUsize, Ordering},
         Arc,
     },
-    thread::JoinHandle,
     time::Duration,
 };
 
@@ -196,7 +195,7 @@ impl TaskExecutor {
     /// Spawn task in new thread.
     /// Should check `ShutdownGuard` passed to closure to trigger own shutdown.
     /// Panic will trigger shutdown.
-    pub fn spawn_critical<F>(&self, name: &'static str, func: F) -> JoinHandle<()>
+    pub fn spawn_critical<F>(&self, name: &'static str, func: F)
     where
         F: FnOnce(ShutdownGuard) + Send + 'static,
     {
@@ -216,7 +215,7 @@ impl TaskExecutor {
                 error!(%name, err = %task_error, "critical task failed");
                 let _ = panicked_tasks_tx.send(task_error);
             };
-        })
+        });
     }
 
     /// Spawn future as task inside tokio runtime.
@@ -225,7 +224,7 @@ impl TaskExecutor {
         &self,
         name: &'static str,
         fut: impl Future<Output = ()> + Send + 'static,
-    ) -> tokio::task::JoinHandle<()> {
+    ) {
         let panicked_tasks_tx = self.panicked_tasks_tx.clone();
         let shutdown = self.shutdown_signal.subscribe();
 
@@ -246,7 +245,7 @@ impl TaskExecutor {
             let _ = select(shutdown, task).await;
         };
         info!(%name, "Starting critical async task");
-        self.tokio_handle.spawn(task)
+        self.tokio_handle.spawn(task);
     }
 
     /// Spawn future in tokio runtime.
@@ -256,8 +255,7 @@ impl TaskExecutor {
         &self,
         name: &'static str,
         async_func: impl FnOnce(ShutdownGuard) -> F,
-    ) -> tokio::task::JoinHandle<()>
-    where
+    ) where
         F: Future<Output = ()> + Send + 'static,
     {
         let panicked_tasks_tx = self.panicked_tasks_tx.clone();
@@ -277,7 +275,7 @@ impl TaskExecutor {
             })
             .map(drop);
 
-        self.tokio_handle.spawn(task)
+        self.tokio_handle.spawn(task);
     }
 }
 
