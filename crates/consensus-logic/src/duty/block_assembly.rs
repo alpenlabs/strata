@@ -173,8 +173,8 @@ fn prepare_l1_segment(
     let Some((pivot_h, _pivot_id)) = find_pivot_block_height(&unacc_blocks, &maturing_blocks)
     else {
         // Then we're really screwed.
-        warn!("can't determine shared block to insert new maturing blocks");
-        return Ok(L1Segment::new_empty());
+        error!("can't determine shared block to insert new maturing blocks");
+        return Err(Error::BlockAssemblyL1SegmentUndetermined);
     };
 
     // Compute the offset in the unaccepted list for the blocks we want to use.

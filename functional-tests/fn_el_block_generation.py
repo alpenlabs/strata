@@ -2,11 +2,12 @@ import time
 
 import flexitest
 
+from entry import BasicEnvConfig
 
 @flexitest.register
 class ElBlockGenerationTest(flexitest.Test):
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env("basic")
+        ctx.set_env(BasicEnvConfig(1000))
 
     def main(self, ctx: flexitest.RunContext):
         reth = ctx.get_service("reth")
