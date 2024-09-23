@@ -77,9 +77,7 @@ pub fn parse_inscription_data(
     match (tag.as_slice(), size) {
         (InscriptionData::BATCH_DATA_TAG, Some(size)) => {
             let batch_data = extract_n_bytes(size, &mut instructions)?;
-            Ok(InscriptionData::new(
-                batch_data
-            ))
+            Ok(InscriptionData::new(batch_data))
         }
         (InscriptionData::BATCH_DATA_TAG, None) => Err(InscriptionParseError::InvalidBlob),
         _ => Err(InscriptionParseError::InvalidBlobTag),
@@ -146,15 +144,15 @@ fn extract_n_bytes(
 #[cfg(test)]
 mod tests {
 
-    use crate::writer::builder::generate_inscription_script;
-
     use super::*;
+    use crate::writer::builder::generate_inscription_script;
 
     #[test]
     fn test_parse_inscription_data() {
         let bytes = vec![0, 1, 2, 3];
         let inscription_data = InscriptionData::new(bytes.clone());
-        let script = generate_inscription_script(inscription_data.clone(), "TestRollup", 1).unwrap();
+        let script =
+            generate_inscription_script(inscription_data.clone(), "TestRollup", 1).unwrap();
 
         // Parse the rollup name
         let result = parse_inscription_data(&script, "TestRollup").unwrap();
@@ -165,7 +163,8 @@ mod tests {
         // Try with larger size
         let bytes = vec![1; 2000];
         let inscription_data = InscriptionData::new(bytes.clone());
-        let script = generate_inscription_script(inscription_data.clone(), "TestRollup", 1).unwrap();
+        let script =
+            generate_inscription_script(inscription_data.clone(), "TestRollup", 1).unwrap();
 
         // Parse the rollup name
         let result = parse_inscription_data(&script, "TestRollup").unwrap();

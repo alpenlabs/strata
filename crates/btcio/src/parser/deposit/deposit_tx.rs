@@ -12,16 +12,16 @@ use crate::parser::utils::next_op;
 
 /// Extracts the DepositInfo from the Deposit Transaction
 pub fn extract_deposit_info(tx: &Transaction, config: &DepositTxConfig) -> Option<DepositInfo> {
-        if let Ok(ee_address) = parse_deposit_script(&tx.output[1].script_pubkey, config) {
-            // find the outpoint with taproot address, so that we can extract sent amount from that
-            if check_bridge_offer_output(tx, config) {
-                return Some(DepositInfo {
-                    amt: tx.output[0].value.to_sat(),
-                    deposit_outpoint: 0,
-                    address: ee_address,
-                });
-            }
+    if let Ok(ee_address) = parse_deposit_script(&tx.output[1].script_pubkey, config) {
+        // find the outpoint with taproot address, so that we can extract sent amount from that
+        if check_bridge_offer_output(tx, config) {
+            return Some(DepositInfo {
+                amt: tx.output[0].value.to_sat(),
+                deposit_outpoint: 0,
+                address: ee_address,
+            });
         }
+    }
     None
 }
 

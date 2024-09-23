@@ -17,7 +17,7 @@ pub struct DepositTxConfig {
     /// deposit amount
     pub deposit_quantity: u64,
     /// federation address
-    pub federation_address: PublicKey
+    pub federation_address: PublicKey,
 }
 
 impl DepositTxConfig {

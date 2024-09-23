@@ -4,12 +4,26 @@ use std::{cmp::Reverse, sync::Arc};
 use alpen_express_primitives::tx::InscriptionData;
 use anyhow::anyhow;
 use bitcoin::{
-    absolute::LockTime, blockdata::{opcodes::all::OP_CHECKSIG, script}, hashes::Hash, key::{TapTweak, TweakedPublicKey, UntweakedKeypair}, opcodes::{all::{OP_ENDIF, OP_IF}, OP_FALSE}, script::PushBytesBuf, secp256k1::{
+    absolute::LockTime,
+    blockdata::{opcodes::all::OP_CHECKSIG, script},
+    hashes::Hash,
+    key::{TapTweak, TweakedPublicKey, UntweakedKeypair},
+    opcodes::{
+        all::{OP_ENDIF, OP_IF},
+        OP_FALSE,
+    },
+    script::PushBytesBuf,
+    secp256k1::{
         self, constants::SCHNORR_SIGNATURE_SIZE, schnorr::Signature, Secp256k1, XOnlyPublicKey,
-    }, sighash::{Prevouts, SighashCache}, taproot::{
+    },
+    sighash::{Prevouts, SighashCache},
+    taproot::{
         ControlBlock, LeafVersion, TapLeafHash, TaprootBuilder, TaprootBuilderError,
         TaprootSpendInfo,
-    }, transaction::Version, Address, Amount, Network, OutPoint, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Txid, Witness
+    },
+    transaction::Version,
+    Address, Amount, Network, OutPoint, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Txid,
+    Witness,
 };
 use rand::RngCore;
 use thiserror::Error;
@@ -19,7 +33,8 @@ use crate::{
     rpc::{
         traits::{Reader, Signer, Wallet},
         types::ListUnspent,
-    }, writer::config::{InscriptionFeePolicy, WriterConfig}
+    },
+    writer::config::{InscriptionFeePolicy, WriterConfig},
 };
 
 const BITCOIN_DUST_LIMIT: u64 = 546;
@@ -80,12 +95,11 @@ pub fn create_inscription_transactions(
     let key_pair = generate_key_pair(&secp256k1)?;
     let public_key = XOnlyPublicKey::from_keypair(&key_pair).0;
 
-    let insc_data = InscriptionData::new(
-        write_intent.to_vec(),
-    );
+    let insc_data = InscriptionData::new(write_intent.to_vec());
 
     // Start creating inscription content
-    let reveal_script = build_reveal_script(rollup_name,&public_key, insc_data, INSCRIPTION_VERSION)?;
+    let reveal_script =
+        build_reveal_script(rollup_name, &public_key, insc_data, INSCRIPTION_VERSION)?;
 
     // Create spend info for tapscript
     let taproot_spend_info = TaprootBuilder::new()
@@ -396,14 +410,14 @@ fn build_reveal_script(
     rollup_name: &str,
     taproot_public_key: &XOnlyPublicKey,
     insc_data: InscriptionData,
-    version: u8
+    version: u8,
 ) -> Result<ScriptBuf, anyhow::Error> {
     let mut script_bytes = script::Builder::new()
         .push_x_only_key(taproot_public_key)
         .push_opcode(OP_CHECKSIG)
         .into_script()
         .into_bytes();
-    let script = generate_inscription_script(insc_data,rollup_name,version)?;
+    let script = generate_inscription_script(insc_data, rollup_name, version)?;
     script_bytes.extend(script.into_bytes());
     Ok(ScriptBuf::from(script_bytes))
 }
@@ -489,18 +503,25 @@ fn assert_correct_address(
 }
 
 // Generates a [`ScriptBuf`] that consists of `OP_IF .. OP_ENDIF` block
-pub fn generate_inscription_script(inscription_data: InscriptionData,rollup_name: &str, version: u8) -> anyhow::Result<ScriptBuf> {
-
+pub fn generate_inscription_script(
+    inscription_data: InscriptionData,
+    rollup_name: &str,
+    version: u8,
+) -> anyhow::Result<ScriptBuf> {
     let mut builder = script::Builder::new()
         .push_opcode(OP_FALSE)
         .push_opcode(OP_IF)
-        .push_slice(PushBytesBuf::try_from(InscriptionData::ROLLUP_NAME_TAG.to_vec())?)
         .push_slice(PushBytesBuf::try_from(
-            rollup_name.as_bytes().to_vec(),
+            InscriptionData::ROLLUP_NAME_TAG.to_vec(),
         )?)
-        .push_slice(PushBytesBuf::try_from(InscriptionData::VERSION_TAG.to_vec())?)
+        .push_slice(PushBytesBuf::try_from(rollup_name.as_bytes().to_vec())?)
+        .push_slice(PushBytesBuf::try_from(
+            InscriptionData::VERSION_TAG.to_vec(),
+        )?)
         .push_slice(PushBytesBuf::from([version]))
-        .push_slice(PushBytesBuf::try_from(InscriptionData::BATCH_DATA_TAG.to_vec())?)
+        .push_slice(PushBytesBuf::try_from(
+            InscriptionData::BATCH_DATA_TAG.to_vec(),
+        )?)
         .push_int(inscription_data.batch_data().len() as i64);
 
     debug!(batchdata_size = %inscription_data.batch_data().len(), "Inserting batch data");
@@ -763,4 +784,3 @@ mod tests {
 
     // TODO: make the tests more comprehensive
 }
-

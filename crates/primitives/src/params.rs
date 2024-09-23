@@ -38,7 +38,7 @@ pub struct RollupParams {
     pub address_length: u8,
 
     /// max deposit amount in sats
-    pub deposit_amount: u64
+    pub deposit_amount: u64,
 }
 
 /// Client sync parameters that are used to make the network work but don't

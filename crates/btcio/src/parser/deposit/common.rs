@@ -4,15 +4,12 @@ use super::{error::DepositParseError, DepositTxConfig};
 use crate::parser::utils::next_bytes;
 
 pub struct DepositRequestScriptInfo {
-    pub tap_ctrl_blk_hash: [u8;32],
-    pub ee_bytes: Vec<u8>
+    pub tap_ctrl_blk_hash: [u8; 32],
+    pub ee_bytes: Vec<u8>,
 }
 
 /// if the transaction's 0th index is p2tr and amount exceeds the deposit quantity or not
-pub fn check_bridge_offer_output<'a>(
-    tx: &'a Transaction,
-    config: &DepositTxConfig,
-) -> bool {
+pub fn check_bridge_offer_output<'a>(tx: &'a Transaction, config: &DepositTxConfig) -> bool {
     let txout = &tx.output[0];
     txout.script_pubkey.is_p2tr() && txout.value.to_sat() >= config.deposit_quantity
 }
@@ -62,8 +59,10 @@ mod tests {
 
     use super::*;
     use crate::parser::deposit::{
-        common::{check_magic_bytes, check_bridge_offer_output},
-        test_utils::{create_transaction_two_outpoints, get_deposit_tx_config},
+        common::{check_bridge_offer_output, check_magic_bytes},
+        test_utils::{
+            create_transaction_two_outpoints, generic_taproot_addr, get_deposit_tx_config,
+        },
     };
 
     #[test]
@@ -71,7 +70,7 @@ mod tests {
         let config = get_deposit_tx_config();
         let tx = create_transaction_two_outpoints(
             Amount::from_sat(config.deposit_quantity),
-            &config.federation_address.script_pubkey(),
+            &generic_taproot_addr().script_pubkey(),
             &ScriptBuf::new(),
         );
 

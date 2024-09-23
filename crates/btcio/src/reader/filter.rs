@@ -1,6 +1,7 @@
 use alpen_express_primitives::tx::RelevantTxInfo;
 use bitcoin::{Address, Block, Transaction};
 
+use super::messages::ProtocolOpTxRef;
 use crate::parser::{
     deposit::{
         deposit_request::extract_deposit_request_info, deposit_tx::extract_deposit_info,
@@ -8,8 +9,6 @@ use crate::parser::{
     },
     inscription::parse_inscription_data,
 };
-
-use super::messages::ProtocolOpTxRef;
 
 /// What kind of transactions can be relevant for rollup node to filter
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -36,9 +35,7 @@ pub fn filter_relevant_txs(
         .enumerate()
         .filter_map(|(i, tx)| {
             check_and_extract_relevant_info(tx, relevent_types)
-                .map(|relevant_tx|
-                    ProtocolOpTxRef::new(i as u32, relevant_tx)
-                    )
+                .map(|relevant_tx| ProtocolOpTxRef::new(i as u32, relevant_tx))
         })
         .collect()
 }
@@ -165,10 +162,11 @@ mod test {
         let tx2 = create_test_tx(vec![create_test_txout(100, &parse_addr(OTHER_ADDR))]);
         let block = create_test_block(vec![tx1, tx2]);
 
-        let (txids, _): (Vec<u32>, Vec<RelevantTxInfo>) =
+        let txids: Vec<u32> =
             filter_relevant_txs(&block, &[RelevantTxType::SpentToAddress(address)])
-                .into_iter()
-                .unzip();
+                .iter()
+                .map(|a| a.index())
+                .collect();
         assert_eq!(txids[0], 0); // Only tx1 matches
     }
 
@@ -210,10 +208,12 @@ mod test {
         let tx = create_inscription_tx(rollup_name.clone());
         let block = create_test_block(vec![tx]);
 
-        let (txids, _): (Vec<u32>, Vec<RelevantTxInfo>) =
+        let txids: Vec<u32> =
             filter_relevant_txs(&block, &[RelevantTxType::RollupInscription(rollup_name)])
-                .into_iter()
-                .unzip();
+                .iter()
+                .map(|op_refs| op_refs.index())
+                .collect();
+
         assert_eq!(txids[0], 0, "Should filter valid rollup name");
 
         // Test with invalid name
@@ -231,15 +231,16 @@ mod test {
 
     #[test]
     fn test_filter_relevant_txs_no_match() {
-        let address = parse_addr(RELEVANT_ADDR);
         let tx1 = create_test_tx(vec![create_test_txout(1000, &parse_addr(OTHER_ADDR))]);
         let tx2 = create_test_tx(vec![create_test_txout(10000, &parse_addr(OTHER_ADDR))]);
         let block = create_test_block(vec![tx1, tx2]);
+        let rollup_name = "alpenstrata".to_string();
 
-        let (txids, _): (Vec<u32>, Vec<RelevantTxInfo>) =
-            filter_relevant_txs(&block, &[RelevantTxType::SpentToAddress(address)])
-                .into_iter()
-                .unzip();
+        let txids: Vec<u32> =
+            filter_relevant_txs(&block, &[RelevantTxType::RollupInscription(rollup_name)])
+                .iter()
+                .map(|op_refs| op_refs.index())
+                .collect();
         assert!(txids.is_empty()); // No transactions match
     }
 
@@ -261,11 +262,13 @@ mod test {
         let tx2 = create_test_tx(vec![create_test_txout(100, &parse_addr(OTHER_ADDR))]);
         let tx3 = create_test_tx(vec![create_test_txout(1000, &address)]);
         let block = create_test_block(vec![tx1, tx2, tx3]);
+        let rollup_name = "alpenstrata".to_string();
 
-        let (txids, _): (Vec<u32>, Vec<RelevantTxInfo>) =
-            filter_relevant_txs(&block, &[RelevantTxType::SpentToAddress(address)])
-                .into_iter()
-                .unzip();
+        let txids: Vec<u32> =
+            filter_relevant_txs(&block, &[RelevantTxType::RollupInscription(rollup_name)])
+                .iter()
+                .map(|op_refs| op_refs.index())
+                .collect();
         // First and third txs match
         assert_eq!(txids[0], 0);
         assert_eq!(txids[1], 2);
@@ -275,12 +278,11 @@ mod test {
     fn test_filter_relevant_txs_deposit() {
         let config = get_deposit_tx_config();
         let ee_addr = vec![1u8; 20]; // Example EVM address
-        let deposit_script =
-            build_test_deposit_script(config.magic_bytes.clone(), ee_addr.clone());
+        let deposit_script = build_test_deposit_script(config.magic_bytes.clone(), ee_addr.clone());
 
         let tx = create_transaction_two_outpoints(
             Amount::from_sat(config.deposit_quantity),
-            &config.federation_address.script_pubkey(),
+            &generic_taproot_addr().script_pubkey(),
             &deposit_script,
         );
 
@@ -291,11 +293,12 @@ mod test {
 
         assert_eq!(result.len(), 1, "Should find one relevant transaction");
         assert_eq!(
-            result[0].0, 0,
+            result[0].index(),
+            0,
             "The relevant transaction should be the first one"
         );
 
-        if let RelevantTxInfo::Deposit(deposit_info) = &result[0].1 {
+        if let RelevantTxInfo::Deposit(deposit_info) = &result[0].relevant_tx_infos() {
             assert_eq!(deposit_info.address, ee_addr, "EE address should match");
             assert_eq!(
                 deposit_info.amt, config.deposit_quantity,
@@ -330,11 +333,12 @@ mod test {
 
         assert_eq!(result.len(), 1, "Should find one relevant transaction");
         assert_eq!(
-            result[0].0, 0,
+            result[0].index(),
+            0,
             "The relevant transaction should be the first one"
         );
 
-        if let RelevantTxInfo::DepositRequest(deposit_req_info) = &result[0].1 {
+        if let RelevantTxInfo::DepositRequest(deposit_req_info) = &result[0].relevant_tx_infos() {
             assert_eq!(
                 deposit_req_info.address, dest_addr,
                 "EE address should match"
@@ -381,12 +385,12 @@ mod test {
 
         let tx1 = create_transaction_two_outpoints(
             Amount::from_sat(config.deposit_quantity),
-            &config.federation_address.script_pubkey(),
+            &generic_taproot_addr().script_pubkey(),
             &deposit_script1,
         );
         let tx2 = create_transaction_two_outpoints(
             Amount::from_sat(config.deposit_quantity),
-            &config.federation_address.script_pubkey(),
+            &generic_taproot_addr().script_pubkey(),
             &deposit_script2,
         );
 
@@ -397,15 +401,21 @@ mod test {
 
         assert_eq!(result.len(), 2, "Should find two relevant transactions");
         assert_eq!(
-            result[0].0, 0,
+            result[0].index(),
+            0,
             "First relevant transaction should be at index 0"
         );
         assert_eq!(
-            result[1].0, 1,
+            result[1].index(),
+            1,
             "Second relevant transaction should be at index 1"
         );
 
-        for (i, (_, info)) in result.iter().enumerate() {
+        for (i, info) in result
+            .iter()
+            .map(|op_txs| op_txs.relevant_tx_infos())
+            .enumerate()
+        {
             if let RelevantTxInfo::Deposit(deposit_info) = info {
                 assert_eq!(
                     deposit_info.address,

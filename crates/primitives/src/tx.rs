@@ -1,7 +1,6 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
-
 /// Information related to relevant transactions to be stored in L1Tx
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub enum RelevantTxInfo {
@@ -30,7 +29,7 @@ pub struct DepositReqeustInfo {
     pub amt: u64,
 
     /// tapscript control block hash for timelock script
-    pub tap_ctrl_blk_hash: [u8;32],
+    pub tap_ctrl_blk_hash: [u8; 32],
 
     /// EE address
     pub address: Vec<u8>,
@@ -48,13 +47,10 @@ impl InscriptionData {
     pub const BATCH_DATA_TAG: &[u8] = &[3];
 
     pub fn new(batch_data: Vec<u8>) -> Self {
-        Self {
-            batch_data,
-        }
+        Self { batch_data }
     }
 
     pub fn batch_data(&self) -> &[u8] {
         &self.batch_data
     }
-
 }

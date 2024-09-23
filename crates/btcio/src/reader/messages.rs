@@ -14,22 +14,22 @@ pub enum L1Event {
 #[derive(Clone, Debug)]
 pub struct ProtocolOpTxRef {
     index: u32,
-    relevant_tx_info: RelevantTxInfo
+    relevant_tx_info: RelevantTxInfo,
 }
-
 
 impl ProtocolOpTxRef {
     pub fn new(index: u32, relevant_tx_info: RelevantTxInfo) -> Self {
         Self {
-            index, relevant_tx_info
+            index,
+            relevant_tx_info,
         }
     }
 
-    pub fn index(&self) -> u32{
+    pub fn index(&self) -> u32 {
         self.index
     }
 
-    pub fn relevant_tx_infos(&self) -> &RelevantTxInfo{
+    pub fn relevant_tx_infos(&self) -> &RelevantTxInfo {
         &self.relevant_tx_info
     }
 }

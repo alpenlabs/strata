@@ -1,11 +1,14 @@
 //! parser types for Deposit Tx, and later deposit Request Tx
 
-use alpen_express_primitives::tx::DepositReqeustInfo;
-use bitcoin::{opcodes::all::OP_RETURN, ScriptBuf, Transaction};
 use std::convert::TryInto;
 
+use alpen_express_primitives::tx::DepositReqeustInfo;
+use bitcoin::{opcodes::all::OP_RETURN, ScriptBuf, Transaction};
+
 use super::{
-    common::{check_bridge_offer_output, check_magic_bytes, extract_ee_bytes, DepositRequestScriptInfo},
+    common::{
+        check_bridge_offer_output, check_magic_bytes, extract_ee_bytes, DepositRequestScriptInfo,
+    },
     error::DepositParseError,
     DepositTxConfig,
 };
@@ -18,8 +21,10 @@ pub fn extract_deposit_request_info(
 ) -> Option<DepositReqeustInfo> {
     // tapscript output and OP_RETURN must be present
     if tx.output.len() >= 2 {
-        if let Ok(DepositRequestScriptInfo {tap_ctrl_blk_hash, ee_bytes}) =
-            parse_deposit_request_script(&tx.output[1].script_pubkey, config)
+        if let Ok(DepositRequestScriptInfo {
+            tap_ctrl_blk_hash,
+            ee_bytes,
+        }) = parse_deposit_request_script(&tx.output[1].script_pubkey, config)
         {
             // find the outpoint with taproot address, so that we can extract sent amount from that
             if check_bridge_offer_output(tx, config) {
@@ -53,7 +58,12 @@ pub fn parse_deposit_request_script(
         Some(ctrl_hash) => {
             // length of control block is 32
             let ee_bytes = extract_ee_bytes(&mut instructions, config)?;
-            Ok(DepositRequestScriptInfo {tap_ctrl_blk_hash: ctrl_hash.try_into().map_err(|_| DepositParseError::ControlBlockLenMismatch)?, ee_bytes})
+            Ok(DepositRequestScriptInfo {
+                tap_ctrl_blk_hash: ctrl_hash
+                    .try_into()
+                    .map_err(|_| DepositParseError::ControlBlockLenMismatch)?,
+                ee_bytes,
+            })
         }
         None => Err(DepositParseError::NoControlBlock),
     }

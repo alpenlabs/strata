@@ -3,13 +3,20 @@ use std::sync::Arc;
 use alpen_express_btcio::reader::messages::{BlockData, L1Event};
 use alpen_express_db::traits::{Database, L1DataStore};
 use alpen_express_primitives::{
-    buf::Buf32, l1::{L1BlockManifest, L1Tx, L1TxProof}, params::Params, tx::RelevantTxInfo
+    buf::Buf32,
+    l1::{L1BlockManifest, L1Tx, L1TxProof},
+    params::Params,
+    tx::RelevantTxInfo,
 };
 use alpen_express_state::{
     batch::{BatchCheckpoint, SignedBatchCheckpoint},
     sync_event::SyncEvent,
 };
-use bitcoin::{consensus::serialize, hashes::{sha256d, Hash}, Block, Wtxid};
+use bitcoin::{
+    consensus::serialize,
+    hashes::{sha256d, Hash},
+    Block, Wtxid,
+};
 use tokio::sync::mpsc;
 use tracing::*;
 
@@ -71,7 +78,13 @@ where
             let l1txs: Vec<_> = blockdata
                 .protocol_ops_txs()
                 .iter()
-                .map(|ops_txs| extract_l1tx_from_block(blockdata.block(),ops_txs.index(), ops_txs.relevant_tx_infos().clone()))
+                .map(|ops_txs| {
+                    extract_l1tx_from_block(
+                        blockdata.block(),
+                        ops_txs.index(),
+                        ops_txs.relevant_tx_infos().clone(),
+                    )
+                })
                 .collect();
             let num_txs = l1txs.len();
             l1db.put_block_data(blockdata.block_num(), manifest, l1txs.clone())?;
@@ -100,14 +113,18 @@ where
 fn check_for_da_batch(blockdata: &BlockData) -> Vec<BatchCheckpoint> {
     let protocol_ops_txs = blockdata.protocol_ops_txs();
 
-    let inscriptions = protocol_ops_txs
-        .iter()
-        .filter_map(|ops_txs| match ops_txs.relevant_tx_infos() {
-            alpen_express_primitives::tx::RelevantTxInfo::RollupInscription(inscription) => {
-                Some((inscription, &blockdata.block().txdata[ops_txs.index() as usize]))
-            }
-            _ => None,
-        });
+    let inscriptions =
+        protocol_ops_txs
+            .iter()
+            .filter_map(|ops_txs| match ops_txs.relevant_tx_infos() {
+                alpen_express_primitives::tx::RelevantTxInfo::RollupInscription(inscription) => {
+                    Some((
+                        inscription,
+                        &blockdata.block().txdata[ops_txs.index() as usize],
+                    ))
+                }
+                _ => None,
+            });
 
     let signed_checkpoints = inscriptions.filter_map(|(insc, tx)| {
         match borsh::from_slice::<SignedBatchCheckpoint>(insc.batch_data()) {
@@ -236,4 +253,3 @@ fn get_cohashes_from_wtxids(wtxids: &[Wtxid], index: u32) -> (Vec<Buf32>, Buf32)
     }
     (proof, Buf32(curr_level[0].into()))
 }
-
