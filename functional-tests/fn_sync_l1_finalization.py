@@ -6,8 +6,8 @@ from constants import (
 )
 from entry import BasicEnvConfig
 from utils import (
-    check_for_nth_checkpoint_finalization,
     check_send_proof_for_non_existent_batch,
+    check_for_nth_checkpoint_finalization,
 )
 
 
