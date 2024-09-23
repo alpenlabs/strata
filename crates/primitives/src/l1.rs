@@ -24,7 +24,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use reth_primitives::revm_primitives::FixedBytes;
 use serde::Serialize;
 
-use crate::{buf::Buf32, errors::ParseError, tx::ProtocolOperation};
+use crate::{buf::Buf32, constants::HASH_SIZE, errors::ParseError, tx::ProtocolOperation};
 
 /// Reference to a transaction in a block.  This is the block index and the
 /// position of the transaction in the block.
@@ -196,10 +196,9 @@ impl BorshSerialize for OutputRef {
 impl BorshDeserialize for OutputRef {
     fn deserialize_reader<R: Read>(reader: &mut R) -> Result<Self, io::Error> {
         // Read 32 bytes for the transaction ID
-        let mut txid_bytes = [0u8; 32];
+        let mut txid_bytes = [0u8; HASH_SIZE];
         reader.read_exact(&mut txid_bytes)?;
-        let txid = bitcoin::Txid::from_slice(&txid_bytes)
-            .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid Txid"))?;
+        let txid = bitcoin::Txid::from_slice(&txid_bytes).expect("should be a valid txid (hash)");
 
         // Read 4 bytes for the output index
         let mut vout_bytes = [0u8; 4];
@@ -214,7 +213,7 @@ impl BorshDeserialize for OutputRef {
 impl<'a> Arbitrary<'a> for OutputRef {
     fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
         // Generate a random 32-byte array for the transaction ID (txid)
-        let mut txid_bytes = [0u8; 32];
+        let mut txid_bytes = [0u8; HASH_SIZE];
         u.fill_buffer(&mut txid_bytes)?;
         let txid_bytes = &txid_bytes[..];
         let hash = sha256d::Hash::from_slice(txid_bytes).unwrap();
