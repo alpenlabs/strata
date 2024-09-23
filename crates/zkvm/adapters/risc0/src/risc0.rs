@@ -39,22 +39,24 @@ impl<'a> ZKVMInputBuilder<'a> for RiscZeroProofInputBuilder<'a> {
         Self(env_builder)
     }
 
-    fn write<T: serde::Serialize>(&mut self, item: &T) -> anyhow::Result<()> {
+    fn write<T: serde::Serialize>(&mut self, item: &T) -> anyhow::Result<&mut Self> {
         self.0.write(item)?;
-        Ok(())
+        Ok(self)
     }
 
-    fn write_borsh<T: borsh::BorshSerialize>(&mut self, item: &T) -> anyhow::Result<()> {
+    fn write_borsh<T: borsh::BorshSerialize>(&mut self, item: &T) -> anyhow::Result<&mut Self> {
         let slice = borsh::to_vec(item)?;
-        self.0.write_slice(&slice);
-        Ok(())
+        self.write_serialized(&slice)
     }
 
-    fn write_serialized(&mut self, item: &[u8]) {
+    fn write_serialized(&mut self, item: &[u8]) -> anyhow::Result<&mut Self> {
+        let len = item.len() as u32;
+        self.0.write(&len)?;
         self.0.write_slice(item);
+        Ok(self)
     }
 
-    fn write_proof(&mut self, item: express_zkvm::AggregationInput) -> anyhow::Result<()> {
+    fn write_proof(&mut self, item: express_zkvm::AggregationInput) -> anyhow::Result<&mut Self> {
         // Learn more about assumption and proof compositions at https://dev.risczero.com/api/zkvm/composition
         let receipt: Receipt = bincode::deserialize(item.proof().as_bytes())?;
         let vk: Digest = bincode::deserialize(item.vk().as_bytes())?;
@@ -66,10 +68,10 @@ impl<'a> ZKVMInputBuilder<'a> for RiscZeroProofInputBuilder<'a> {
         // Note: The vkey is written here so we don't have to hardcode it in guest code.
         // TODO: This should be fixed once the guest code is finalized
         self.0.write(&vk)?;
-        Ok(())
+        Ok(self)
     }
 
-    fn build(mut self) -> anyhow::Result<Self::Input> {
+    fn build(&mut self) -> anyhow::Result<Self::Input> {
         self.0.build()
     }
 }

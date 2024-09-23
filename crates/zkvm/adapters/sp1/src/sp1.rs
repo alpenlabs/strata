@@ -18,22 +18,24 @@ impl<'a> ZKVMInputBuilder<'a> for SP1ProofInputBuilder {
         SP1ProofInputBuilder(SP1Stdin::new())
     }
 
-    fn write<T: serde::Serialize>(&mut self, item: &T) -> anyhow::Result<()> {
+    fn write<T: serde::Serialize>(&mut self, item: &T) -> anyhow::Result<&mut Self> {
         self.0.write(item);
-        Ok(())
+        Ok(self)
     }
 
-    fn write_borsh<T: borsh::BorshSerialize>(&mut self, item: &T) -> anyhow::Result<()> {
+    fn write_borsh<T: borsh::BorshSerialize>(&mut self, item: &T) -> anyhow::Result<&mut Self> {
         let slice = borsh::to_vec(item)?;
-        self.0.write_slice(&slice);
-        Ok(())
+        self.write_serialized(&slice)
     }
 
-    fn write_serialized(&mut self, item: &[u8]) {
+    fn write_serialized(&mut self, item: &[u8]) -> anyhow::Result<&mut Self> {
+        let len = item.len() as u32;
+        self.0.write(&len);
         self.0.write_slice(item);
+        Ok(self)
     }
 
-    fn write_proof(&mut self, item: AggregationInput) -> anyhow::Result<()> {
+    fn write_proof(&mut self, item: AggregationInput) -> anyhow::Result<&mut Self> {
         let proof: SP1ProofWithPublicValues = bincode::deserialize(item.proof().as_bytes())?;
         let vkey: SP1VerifyingKey = bincode::deserialize(item.vk().as_bytes())?;
 
@@ -56,11 +58,11 @@ impl<'a> ZKVMInputBuilder<'a> for SP1ProofInputBuilder {
             _ => return Err(anyhow::anyhow!("can only handle compressed proofs")),
         }
 
-        Ok(())
+        Ok(self)
     }
 
-    fn build(self) -> anyhow::Result<Self::Input> {
-        anyhow::Ok(self.0)
+    fn build(&mut self) -> anyhow::Result<Self::Input> {
+        anyhow::Ok(self.0.clone())
     }
 }
 

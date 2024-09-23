@@ -95,9 +95,7 @@ where
     match prover_input {
         ProverInput::ElBlock(el_input) => {
             let el_input: ELProofInput = bincode::deserialize(&el_input.data)?;
-            let mut input_builder = Vm::Input::new();
-            input_builder.write(&el_input).unwrap();
-            let input = input_builder.build()?;
+            let input = Vm::Input::new().write(&el_input)?.build()?;
             let (proof, _) = vm.prove(input)?;
             Ok(proof)
         }

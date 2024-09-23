@@ -2,9 +2,9 @@
 
 mod test {
     use alpen_express_state::{block::L2Block, chain_state::ChainState};
-    use express_sp1_adapter::{SP1Host, SP1Verifier};
+    use express_sp1_adapter::{SP1Host, SP1ProofInputBuilder, SP1Verifier};
     use express_sp1_guest_builder::GUEST_CL_STF_ELF;
-    use express_zkvm::{ProverInput, ZKVMHost, ZKVMVerifier};
+    use express_zkvm::{ZKVMHost, ZKVMInputBuilder, ZKVMVerifier};
 
     fn get_prover_input() -> (ChainState, L2Block) {
         let prev_state_data: &[u8] =
@@ -27,10 +27,14 @@ mod test {
         let prover = SP1Host::init(GUEST_CL_STF_ELF.into(), Default::default());
 
         // TODO: handle this properly
-        let mut prover_input = ProverInput::new();
-        prover_input.write(input_ser);
+        let prover_input = SP1ProofInputBuilder::new()
+            .write(&input_ser)
+            .unwrap()
+            .build()
+            .unwrap();
+
         let (proof, _) = prover
-            .prove(&prover_input)
+            .prove(prover_input)
             .expect("Failed to generate proof");
 
         let new_state_ser = SP1Verifier::extract_public_output::<Vec<u8>>(&proof)

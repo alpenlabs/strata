@@ -11,9 +11,9 @@ mod test {
         logic::{L1BatchProofInput, L1BatchProofOutput},
         timestamp_store::TimestampStore,
     };
-    use express_sp1_adapter::{SP1Host, SP1Verifier};
+    use express_sp1_adapter::{SP1Host, SP1ProofInputBuilder, SP1Verifier};
     use express_sp1_guest_builder::{GUEST_BTC_BLOCKSPACE_ELF, GUEST_L1_BATCH_ELF};
-    use express_zkvm::{AggregationInput, ProverInput, ProverOptions, ZKVMHost, ZKVMVerifier};
+    use express_zkvm::{AggregationInput, ProverOptions, ZKVMHost, ZKVMInputBuilder, ZKVMVerifier};
 
     fn get_header_verification_state(height: u32) -> HeaderVerificationState {
         let chain = get_btc_chain(MAINNET.clone());
@@ -56,7 +56,8 @@ mod test {
         );
 
         let mut blockspace_outputs = Vec::new();
-        let mut prover_input = ProverInput::new();
+
+        let mut l1_batch_input_builder = SP1ProofInputBuilder::new();
         for (_, raw_block) in mainnet_blocks {
             let block_bytes = hex::decode(&raw_block).unwrap();
             let scan_config = ScanRuleConfig {
@@ -67,19 +68,26 @@ mod test {
                 .assume_checked()
                 .script_pubkey()],
             };
-            let mut inner_prover_input = ProverInput::new();
-            inner_prover_input.write(scan_config.clone());
-            inner_prover_input.write_serialized(block_bytes);
+
+            let blockspace_input = SP1ProofInputBuilder::new()
+                .write(&scan_config)
+                .unwrap()
+                .write_serialized(&block_bytes)
+                .unwrap()
+                .build()
+                .unwrap();
 
             let (proof, vkey) = prover
-                .prove(&inner_prover_input)
+                .prove(blockspace_input)
                 .expect("Failed to generate proof");
 
             let output = SP1Verifier::extract_public_output::<BlockspaceProofOutput>(&proof)
                 .expect("Failed to extract public outputs");
 
             blockspace_outputs.push(output);
-            prover_input.write_proof(AggregationInput::new(proof, vkey));
+            l1_batch_input_builder
+                .write_proof(AggregationInput::new(proof, vkey))
+                .unwrap();
         }
 
         let prover = SP1Host::init(GUEST_L1_BATCH_ELF.into(), prover_options);
@@ -87,10 +95,14 @@ mod test {
             batch: blockspace_outputs,
             state: get_header_verification_state(40321),
         };
-        prover_input.write(input);
+        let l1_batch_input = l1_batch_input_builder
+            .write(&input)
+            .unwrap()
+            .build()
+            .unwrap();
 
         let (proof, _) = prover
-            .prove(&prover_input)
+            .prove(l1_batch_input)
             .expect("Failed to generate proof");
 
         let _output = SP1Verifier::extract_public_output::<L1BatchProofOutput>(&proof)

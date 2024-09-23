@@ -10,9 +10,8 @@ borsh = { workspace = true }
 express-zkvm = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-sp1-sdk = { version = "1.0.1" }
+sp1-sdk = { version = "1.0.1", optional = true }
 
 [features]
 default = []
-prover = []
-# prover = ["dep:sp1-sdk"]
+prover = ["dep:sp1-sdk"]
