@@ -3,10 +3,7 @@ use std::{str::FromStr, time::Duration};
 use alloy::{primitives::Address as RollupAddress, providers::WalletProvider};
 use argh::FromArgs;
 use bdk_wallet::{
-    bitcoin::{
-        hashes::Hash, key::Secp256k1, secp256k1::All, taproot::LeafVersion, Address, Amount,
-        TapNodeHash, XOnlyPublicKey,
-    },
+    bitcoin::{hashes::Hash, taproot::LeafVersion, Address, Amount, TapNodeHash, XOnlyPublicKey},
     chain::ChainOracle,
     descriptor::IntoWalletDescriptor,
     miniscript::{miniscript::Tap, Miniscript},
@@ -15,7 +12,6 @@ use bdk_wallet::{
 };
 use console::{style, Term};
 use indicatif::ProgressBar;
-use rand::{thread_rng, Rng};
 
 use crate::{
     recovery::DescriptorRecovery,
@@ -23,7 +19,7 @@ use crate::{
     seed::Seed,
     settings::SETTINGS,
     signet::{get_fee_rate, SignetWallet, ESPLORA_CLIENT},
-    taproot::{ExtractP2trPubkey, NotTaprootAddress, UnspendablePublicKey},
+    taproot::{ExtractP2trPubkey, NotTaprootAddress, UNSPENDABLE},
 };
 
 #[derive(FromArgs, PartialEq, Debug)]
@@ -59,13 +55,9 @@ pub async fn bridge_in(args: BridgeInArgs, seed: Seed) {
         style(recovery_address.to_string()).yellow()
     ));
 
-    let (bridge_in_desc, recovery_script_hash) = bridge_in_descriptor(
-        SETTINGS.bridge_musig2_pubkey,
-        recovery_address,
-        l1w.secp_ctx(),
-        &mut thread_rng(),
-    )
-    .expect("valid bridge in descriptor");
+    let (bridge_in_desc, recovery_script_hash) =
+        bridge_in_descriptor(SETTINGS.bridge_musig2_pubkey, recovery_address)
+            .expect("valid bridge in descriptor");
 
     let desc = bridge_in_desc
         .clone()
@@ -150,15 +142,11 @@ pub async fn bridge_in(args: BridgeInArgs, seed: Seed) {
 fn bridge_in_descriptor(
     bridge_pubkey: XOnlyPublicKey,
     recovery_address: Address,
-    secp: &Secp256k1<All>,
-    rng: &mut impl Rng,
 ) -> Result<(DescriptorTemplateOut, TapNodeHash), NotTaprootAddress> {
     let recovery_xonly_pubkey = recovery_address.extract_p2tr_pubkey()?;
 
-    let unspendable_key = XOnlyPublicKey::unspendable(secp, rng);
-
     let desc = bdk_wallet::descriptor!(
-        tr(unspendable_key, {
+        tr(UNSPENDABLE, {
             pk(bridge_pubkey),
             and_v(v:pk(recovery_xonly_pubkey),older(1008))
         })

@@ -1,9 +1,11 @@
+use std::sync::LazyLock;
+
 use bdk_wallet::bitcoin::{
-    key::Secp256k1,
-    secp256k1::{All, PublicKey, SecretKey},
+    key::{Parity, Secp256k1},
+    secp256k1::{PublicKey, SecretKey},
     Address, AddressType, XOnlyPublicKey,
 };
-use rand::{Fill, Rng};
+use hex::hex;
 
 #[derive(Debug)]
 pub struct NotTaprootAddress;
@@ -25,38 +27,48 @@ impl ExtractP2trPubkey for Address {
     }
 }
 
-pub trait UnspendablePublicKey {
-    fn unspendable(secp: &Secp256k1<All>, rng: &mut impl Rng) -> XOnlyPublicKey;
-}
+/// A provably unspendable, static public key from predetermined inputs
+pub static UNSPENDABLE: LazyLock<XOnlyPublicKey> = LazyLock::new(|| {
+    // Step 1: Our "random" point on the curve
+    let h_point = PublicKey::from_x_only_public_key(
+        XOnlyPublicKey::from_slice(&hex!(
+            "50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0"
+        ))
+        .expect("valid xonly pub key"),
+        Parity::Even,
+    );
 
-impl UnspendablePublicKey for XOnlyPublicKey {
-    fn unspendable(secp: &Secp256k1<All>, rng: &mut impl Rng) -> XOnlyPublicKey {
-        // Step 1: Generate a random point on the curve
-        let h_point = loop {
-            // Generate 32 random bytes
-            let mut random_bytes = [0u8; 33];
-            random_bytes[0] = 0x02;
-            (&mut random_bytes[1..])
-                .try_fill(rng)
-                .expect("failed to fill random bytes");
+    // Step 2: Our "random" scalar r
 
-            // Attempt to create a PublicKey from these random bytes
-            if let Ok(key) = PublicKey::from_slice(&random_bytes) {
-                break key;
-            }
-            // If creation fails, the loop continues and tries again
-        };
+    let r = SecretKey::from_slice(
+        &(hex!("82758434e13488368e0781c4a94019d3d6722f854d26c15d2d157acd1f464723")),
+    )
+    .expect("valid r");
 
-        // Step 2: Generate a random scalar r
-        let r = SecretKey::new(rng);
+    // Calculate rG
+    let r_g = r.public_key(&Secp256k1::new());
 
-        // Calculate rG
-        let r_g = r.public_key(secp);
+    // Step 3: Combine H_point with rG to create the final public key: P = H + rG
+    let combined_point = h_point.combine(&r_g).expect("Failed to combine points");
 
-        // Step 3: Combine H_point with rG to create the final public key: P = H + rG
-        let combined_point = h_point.combine(&r_g).expect("Failed to combine points");
+    // Step 4: Convert to the XOnly format
+    combined_point.x_only_public_key().0
+});
 
-        // Step 4: Convert to the XOnly format
-        combined_point.x_only_public_key().0
+#[cfg(test)]
+mod tests {
+    use bdk_wallet::bitcoin::XOnlyPublicKey;
+    use hex::hex;
+
+    use super::UNSPENDABLE;
+    #[test]
+    fn test_unspendable() {
+        assert_eq!(
+            *UNSPENDABLE,
+            XOnlyPublicKey::from_slice(&hex!(
+                "2be4d02127fedf4c956f8e6d8248420b9af78746232315f72894f0b263c80e81"
+            ))
+            .expect("valid pub key")
+        )
     }
 }
