@@ -4,6 +4,8 @@ name = "express-reth-evm"
 version = "0.1.0"
 
 [dependencies]
+alloy-sol-types = { workspace = true }
 express-reth-primitives = { workspace = true }
+reth-primitives = { workspace = true }
 revm = { workspace = true }
 revm-primitives = { workspace = true }

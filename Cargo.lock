@@ -3837,6 +3837,7 @@ dependencies = [
  "anyhow",
  "bincode",
  "express-reth-evm",
+ "express-reth-primitives",
  "hex-literal",
  "k256",
  "reth-primitives",
@@ -3921,7 +3922,9 @@ dependencies = [
 name = "express-reth-evm"
 version = "0.1.0"
 dependencies = [
+ "alloy-sol-types",
  "express-reth-primitives",
+ "reth-primitives",
  "revm",
  "revm-primitives",
 ]
@@ -3936,6 +3939,7 @@ dependencies = [
  "express-proofimpl-evm-ee-stf",
  "express-reth-db",
  "eyre",
+ "reth-evm",
  "reth-exex",
  "reth-node-api",
  "reth-primitives",
@@ -3955,7 +3959,6 @@ dependencies = [
 name = "express-reth-node"
 version = "0.1.0"
 dependencies = [
- "alloy-sol-types",
  "express-reth-evm",
  "express-reth-primitives",
  "eyre",

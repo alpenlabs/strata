@@ -1,6 +1,4 @@
-use alloy_sol_types::SolEvent;
-use express_reth_evm::constants::BRIDGEOUT_ADDRESS;
-use express_reth_primitives::{WithdrawalIntent, WithdrawalIntentEvent};
+use express_reth_evm::collect_withdrawal_intents;
 use reth::{
     builder::{components::PayloadServiceBuilder, BuilderContext, PayloadBuilderConfig},
     providers::{CanonStateSubscriptions, ExecutionOutcome, StateProviderFactory},
@@ -388,21 +386,7 @@ where
         attributes.withdrawals().clone(),
     )?;
 
-    let withdrawal_intents: Vec<WithdrawalIntent> = receipts
-        .iter()
-        .flatten()
-        .flat_map(|receipt| receipt.logs.iter())
-        .filter(|log| log.address == BRIDGEOUT_ADDRESS)
-        .filter_map(|log| {
-            let Ok(evt) = WithdrawalIntentEvent::decode_log(log, true) else {
-                return None;
-            };
-            Some(WithdrawalIntent {
-                amt: evt.amount,
-                dest_pk: evt.dest_pk,
-            })
-        })
-        .collect();
+    let withdrawal_intents = collect_withdrawal_intents(receipts.iter().cloned()).collect();
 
     // merge all transitions into bundle state, this would apply the withdrawal balance changes
     // and 4788 contract call

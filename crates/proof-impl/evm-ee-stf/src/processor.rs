@@ -162,7 +162,7 @@ where
     }
 
     /// Processes each transaction and collect receipts and storage changes.
-    pub fn execute(&mut self) {
+    pub fn execute(&mut self) -> Vec<ReceiptWithBloom> {
         let gwei_to_wei: U256 = U256::from(GWEI_TO_WEI);
         let mut evm = Evm::builder()
             .with_spec_id(self.evm_config.spec_id)
@@ -260,6 +260,8 @@ where
         h.gas_used = cumulative_gas_used.try_into().unwrap();
 
         self.db = Some(evm.context.evm.db.clone());
+
+        receipts
     }
 }
 

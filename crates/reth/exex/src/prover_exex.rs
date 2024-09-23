@@ -1,22 +1,28 @@
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::{collections::HashMap, sync::Arc};
 
 use alloy_rpc_types::EIP1186AccountProofResponse;
-use express_proofimpl_evm_ee_stf::{
-    mpt::{self, proofs_to_tries},
-    ELProofInput,
-};
+use express_proofimpl_evm_ee_stf::{mpt::proofs_to_tries, ELProofInput};
 use express_reth_db::WitnessStore;
 use eyre::eyre;
+use reth_evm::execute::{BlockExecutorProvider, Executor};
+// use reth_execution_types::BlockExecutionInput;
 use reth_exex::{ExExContext, ExExEvent};
 use reth_node_api::FullNodeComponents;
-use reth_primitives::{Address, TransactionSignedNoHash, B256};
-use reth_provider::{BlockReader, Chain, ExecutionOutcome, StateProviderFactory};
-use reth_revm::{db::BundleState, primitives::FixedBytes};
+use reth_primitives::{Address, BlockWithSenders, TransactionSignedNoHash, B256};
+use reth_provider::{
+    BlockExecutionInput, BlockReader, Chain, ExecutionOutcome, StateProviderFactory,
+};
+use reth_revm::{
+    db::{BundleState, CacheDB},
+    primitives::FixedBytes,
+};
 use reth_rpc_types_compat::proof::from_primitive_account_proof;
 use tracing::{debug, error};
+
+use crate::{
+    alloy2reth::IntoReth,
+    cache_db_provider::{AccessedState, CacheDBProvider},
+};
 
 pub struct ProverWitnessGenerator<Node: FullNodeComponents, S: WitnessStore + Clone> {
     ctx: ExExContext<Node>,
@@ -73,6 +79,26 @@ impl<Node: FullNodeComponents, S: WitnessStore + Clone> ProverWitnessGenerator<N
     }
 }
 
+fn get_accessed_states<'a, Node: FullNodeComponents>(
+    ctx: &ExExContext<Node>,
+    block: &'a BlockWithSenders,
+    block_idx: u64,
+) -> eyre::Result<AccessedState> {
+    let executor: <Node as FullNodeComponents>::Executor = ctx.block_executor().clone();
+    let provider = ctx.provider().history_by_block_number(block_idx)?;
+
+    let cache_db_provider = CacheDBProvider::new(provider);
+    let cache_db = CacheDB::new(&cache_db_provider);
+
+    let block_exec_input: BlockExecutionInput<'a, BlockWithSenders> =
+        BlockExecutionInput::new(block, block.difficulty);
+
+    executor.executor(cache_db).execute(block_exec_input)?;
+
+    let acessed_state = cache_db_provider.get_accessed_state();
+    Ok(acessed_state)
+}
+
 fn extract_zkvm_input<Node: FullNodeComponents>(
     block_id: FixedBytes<32>,
     ctx: &ExExContext<Node>,
@@ -84,12 +110,28 @@ fn extract_zkvm_input<Node: FullNodeComponents>(
         .ok_or(eyre!("Failed to get current block"))?;
     let current_block_idx = current_block.number;
 
+    let withdrawals = current_block
+        .clone()
+        .withdrawals
+        .unwrap_or_default()
+        .into_iter()
+        .map(|el| el.into_reth())
+        .collect();
+
     let prev_block_idx = current_block_idx - 1;
     let previous_provider = ctx.provider().history_by_block_number(prev_block_idx)?;
     let prev_block = ctx
         .provider()
         .block_by_number(prev_block_idx)?
         .ok_or(eyre!("Failed to get prev block"))?;
+
+    // Call the magic function here:
+    let block_execution_input = current_block
+        .clone()
+        .with_recovered_senders()
+        .ok_or(eyre!("failed to recover senders"))?;
+
+    let accessed_states = get_accessed_states(ctx, &block_execution_input, prev_block_idx)?;
 
     let current_block_txns = current_block
         .body
@@ -102,45 +144,35 @@ fn extract_zkvm_input<Node: FullNodeComponents>(
 
     // Apply empty bundle state over previous block state
     let previous_bundle_state = BundleState::default();
-    let current_bundle_state = exec_outcome.bundle.clone();
 
     let mut parent_proofs: HashMap<Address, EIP1186AccountProofResponse> = HashMap::new();
     let mut current_proofs: HashMap<Address, EIP1186AccountProofResponse> = HashMap::new();
-    let mut contracts = HashSet::new();
+    let contracts = accessed_states.accessed_contracts;
 
     // Accumulate account proof of account in previous block
-    for (address, account) in current_bundle_state.state() {
-        let slots: Vec<B256> = account
-            .storage
-            .keys()
-            .map(|v| B256::from_slice(v.as_le_slice()))
+    for (accessed_address, accessed_slots) in accessed_states.accessed_accounts.iter() {
+        let slots: Vec<B256> = accessed_slots
+            .iter()
+            .map(|el| B256::from_slice(el.as_le_slice()))
             .collect();
 
-        // Accumulate contract bytecode
-        if let Some(account_info) = &account.info {
-            if let Some(code) = &account_info.code {
-                if account_info.code_hash() != mpt::KECCAK_EMPTY {
-                    contracts.insert(code.bytecode().clone());
-                }
-            }
-        }
-
-        let proof = previous_provider.proof(&previous_bundle_state, *address, &slots)?;
+        let proof = previous_provider.proof(&previous_bundle_state, *accessed_address, &slots)?;
         let proof = from_primitive_account_proof(proof);
-        parent_proofs.insert(*address, proof);
+
+        parent_proofs.insert(*accessed_address, proof);
     }
 
     // Accumulate account proof of account in current block
-    for (address, account) in current_bundle_state.state() {
-        let slots: Vec<B256> = account
-            .storage
-            .keys()
-            .map(|v| B256::from_slice(v.as_le_slice()))
+    for (accessed_address, accessed_slots) in accessed_states.accessed_accounts.iter() {
+        let slots: Vec<B256> = accessed_slots
+            .iter()
+            .map(|el| B256::from_slice(el.as_le_slice()))
             .collect();
 
-        let proof = previous_provider.proof(&exec_outcome.bundle, *address, &slots)?;
+        let proof = previous_provider.proof(&exec_outcome.bundle, *accessed_address, &slots)?;
         let proof = from_primitive_account_proof(proof);
-        current_proofs.insert(*address, proof);
+
+        current_proofs.insert(*accessed_address, proof);
     }
 
     let (state_trie, storage) = proofs_to_tries(
@@ -157,10 +189,10 @@ fn extract_zkvm_input<Node: FullNodeComponents>(
         extra_data: current_block.header.extra_data,
         mix_hash: current_block.header.mix_hash,
         transactions: current_block_txns,
-        withdrawals: Vec::new(),
+        withdrawals,
         parent_state_trie: state_trie,
         parent_storage: storage,
-        contracts: contracts.iter().cloned().collect(),
+        contracts,
         parent_header: prev_block.header,
         // NOTE: using default to save prover cost.
         // Will need to revisit if BLOCKHASH opcode operation is a blocker

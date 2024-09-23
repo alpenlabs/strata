@@ -7,3 +7,4 @@ mod precompiles;
 mod utils;
 
 pub use config::set_evm_handles;
+pub use utils::collect_withdrawal_intents;

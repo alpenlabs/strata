@@ -11,6 +11,7 @@ alloy-rpc-types = { workspace = true }
 anyhow = { workspace = true }
 bincode = { workspace = true }
 eyre = { workspace = true }
+reth-evm = { workspace = true }
 reth-exex = { workspace = true }
 reth-node-api = { workspace = true }
 reth-primitives = { workspace = true }

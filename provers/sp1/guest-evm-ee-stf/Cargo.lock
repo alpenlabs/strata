@@ -811,6 +811,7 @@ dependencies = [
  "alloy-rpc-types",
  "anyhow",
  "express-reth-evm",
+ "express-reth-primitives",
  "k256",
  "reth-primitives",
  "reth-trie-common",
@@ -824,7 +825,9 @@ dependencies = [
 name = "express-reth-evm"
 version = "0.1.0"
 dependencies = [
+ "alloy-sol-types",
  "express-reth-primitives",
+ "reth-primitives",
  "revm",
  "revm-primitives",
 ]
