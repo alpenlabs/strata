@@ -22,8 +22,8 @@ pub fn start_reader_tasks<D: Database + Send + Sync + 'static>(
 ) -> anyhow::Result<()>
 where
     // TODO how are these not redundant trait bounds???
-    <D as alpen_express_db::traits::Database>::SeStore: Send + Sync + 'static,
-    <D as alpen_express_db::traits::Database>::L1Store: Send + Sync + 'static,
+    <D as alpen_express_db::traits::Database>::SyncEventStore: Send + Sync + 'static,
+    <D as alpen_express_db::traits::Database>::L1DataStore: Send + Sync + 'static,
 {
     let (ev_tx, ev_rx) = mpsc::channel::<L1Event>(100); // TODO: think about the buffer size
 
@@ -36,7 +36,7 @@ where
 
     let reader_config = Arc::new(config.get_reader_config());
     let params_r = params.clone();
-    let chprov = db.chainstate_provider().clone();
+    let chprov = db.chain_state_provider().clone();
 
     executor.spawn_critical_async(
         "bitcoin_data_reader_task",

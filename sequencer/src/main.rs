@@ -19,8 +19,8 @@ use express_storage::{managers::checkpoint::CheckpointDbManager, L2BlockManager}
 use express_sync::{self, L2SyncContext, RpcSyncPeer};
 use express_tasks::{ShutdownSignal, TaskManager};
 use helpers::{
-    create_bitcoin_rpc, get_config, init_core_dbs, init_sequencer, init_tasks,
-    initialize_sequencer_database, load_rollup_params_or_default,
+    create_bitcoin_rpc, get_config, init_broadcast_handle, init_core_dbs, init_sequencer,
+    init_tasks, initialize_sequencer_database, load_rollup_params_or_default,
 };
 use rockbound::rocksdb;
 use rpc_client::sync_client;
@@ -75,7 +75,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         retry_count: config.client.db_retry_count,
     };
 
-    let (database, bcast_db) = init_core_dbs(rbdb.clone(), db_ops);
+    let (database, broadcast_database) = init_core_dbs(rbdb.clone(), db_ops);
 
     // Start runtime for async IO tasks.
     let rt = tokio::runtime::Builder::new_multi_thread()
@@ -104,6 +104,9 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let checkpoint_handle = Arc::new(CheckpointHandle::new(checkpoint_manager.clone()));
     let btc_rpc = create_bitcoin_rpc(&config)?;
 
+    let broadcast_handle =
+        init_broadcast_handle(broadcast_database, pool.clone(), &executor, btc_rpc.clone());
+
     let mgr_ctx = init_tasks(
         pool.clone(),
         database.clone(),
@@ -111,9 +114,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         &config,
         &rt,
         &executor,
-        bcast_db.clone(),
-        btc_rpc.clone(),
-        checkpoint_manager.clone(),
+        checkpoint_manager,
     )?;
 
     // Start relayer task.
@@ -140,6 +141,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
                 seq_db,
                 &mgr_ctx,
                 checkpoint_handle.clone(),
+                broadcast_handle.clone(),
             )?)
         } else {
             None
@@ -193,7 +195,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             db_cloned,
             mgr_ctx.status_rx,
             inscription_handler,
-            mgr_ctx.broadcast_handle,
+            broadcast_handle,
             l2block_man,
             checkpoint_handle,
             relayer_handle,
@@ -316,7 +318,7 @@ fn start_status<D: Database + Send + Sync + 'static>(
     params: Arc<Params>,
 ) -> anyhow::Result<(Arc<StatusTx>, Arc<StatusRx>)>
 where
-    <D as Database>::CsProv: Send + Sync + 'static,
+    <D as Database>::ClientStateProvider: Send + Sync + 'static,
 {
     // Check if we have to do genesis.
     if genesis::check_needs_client_init(database.as_ref())? {

@@ -29,7 +29,7 @@ pub async fn bitcoin_data_reader_task<D: Database + 'static>(
     target_next_block: u64,
     config: Arc<ReaderConfig>,
     status_rx: Arc<StatusTx>,
-    chstate_prov: Arc<D::ChsProv>,
+    chstate_prov: Arc<D::ChainStateProvider>,
     params: Arc<Params>,
 ) {
     if let Err(e) = do_reader_task::<D>(
@@ -53,7 +53,7 @@ async fn do_reader_task<D: Database + 'static>(
     target_next_block: u64,
     config: Arc<ReaderConfig>,
     status_rx: Arc<StatusTx>,
-    chstate_prov: Arc<D::ChsProv>,
+    chstate_prov: Arc<D::ChainStateProvider>,
     params: Arc<Params>,
 ) -> anyhow::Result<()> {
     info!(%target_next_block, "started L1 reader task!");
@@ -111,7 +111,7 @@ async fn do_reader_task<D: Database + 'static>(
 }
 
 fn derive_tx_filter_rules<D: Database + 'static>(
-    _chstate_prov: Arc<D::ChsProv>,
+    _chstate_prov: Arc<D::ChainStateProvider>,
     params: &Params,
 ) -> anyhow::Result<Vec<TxFilterRule>> {
     // TODO: Figure out how to do it from chainstate provider

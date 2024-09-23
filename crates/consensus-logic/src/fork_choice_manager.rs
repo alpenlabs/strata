@@ -516,8 +516,8 @@ fn apply_tip_update<D: Database>(
     reorg: &reorg::Reorg,
     fc_manager: &mut ForkChoiceManager<D>,
 ) -> anyhow::Result<()> {
-    let chs_store = fc_manager.database.chainstate_store();
-    let chs_prov = fc_manager.database.chainstate_provider();
+    let chs_store = fc_manager.database.chain_state_store();
+    let chs_prov = fc_manager.database.chain_state_provider();
 
     // See if we need to roll back recent changes.
     let pivot_blkid = reorg.pivot();

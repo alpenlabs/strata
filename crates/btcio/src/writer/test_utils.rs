@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use alpen_express_db::{traits::TxBroadcastDatabase, types::L1TxEntry};
+use alpen_express_db::{traits::L1BroadcastDatabase, types::L1TxEntry};
 use alpen_express_rocksdb::{
     broadcaster::db::BroadcastDatabase, sequencer::db::SequencerDB,
-    test_utils::get_rocksdb_tmp_instance, BroadcastDb, SeqDb,
+    test_utils::get_rocksdb_tmp_instance, L1BroadcastDb, RBSeqBlobDb,
 };
 use bitcoin::{Address, Network};
 use express_storage::ops::{
@@ -17,9 +17,9 @@ use crate::{
 };
 
 /// Returns `Arc` of `SequencerDB` for testing
-pub fn get_db() -> Arc<SequencerDB<SeqDb>> {
+pub fn get_db() -> Arc<SequencerDB<RBSeqBlobDb>> {
     let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-    let seqdb = Arc::new(SeqDb::new(db, db_ops));
+    let seqdb = Arc::new(RBSeqBlobDb::new(db, db_ops));
     Arc::new(SequencerDB::new(seqdb))
 }
 
@@ -32,9 +32,9 @@ pub fn get_inscription_ops() -> Arc<InscriptionDataOps> {
 }
 
 /// Returns `Arc` of `BroadcastDatabase` for testing
-pub fn get_broadcast_db() -> Arc<impl TxBroadcastDatabase> {
+pub fn get_broadcast_db() -> Arc<impl L1BroadcastDatabase> {
     let (db, dbops) = get_rocksdb_tmp_instance().unwrap();
-    let bcastdb = Arc::new(BroadcastDb::new(db, dbops));
+    let bcastdb = Arc::new(L1BroadcastDb::new(db, dbops));
     Arc::new(BroadcastDatabase::new(bcastdb))
 }
 

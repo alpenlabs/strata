@@ -177,9 +177,9 @@ async fn handle_entry(
 
 #[cfg(test)]
 mod test {
-    use alpen_express_db::traits::TxBroadcastDatabase;
+    use alpen_express_db::traits::L1BroadcastDatabase;
     use alpen_express_rocksdb::{
-        broadcaster::db::{BroadcastDatabase, BroadcastDb},
+        broadcaster::db::{BroadcastDatabase, L1BroadcastDb},
         test_utils::get_rocksdb_tmp_instance,
     };
     use bitcoin::{consensus, Transaction};
@@ -188,9 +188,9 @@ mod test {
     use super::*;
     use crate::test_utils::{TestBitcoinClient, SOME_TX};
 
-    fn get_db() -> Arc<impl TxBroadcastDatabase> {
+    fn get_db() -> Arc<impl L1BroadcastDatabase> {
         let (db, dbops) = get_rocksdb_tmp_instance().unwrap();
-        let bcastdb = Arc::new(BroadcastDb::new(db, dbops));
+        let bcastdb = Arc::new(L1BroadcastDb::new(db, dbops));
         Arc::new(BroadcastDatabase::new(bcastdb))
     }
 

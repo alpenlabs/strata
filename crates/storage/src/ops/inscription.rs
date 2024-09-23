@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use alpen_express_db::{
-    traits::{SeqDataProvider, SeqDataStore, SequencerDatabase},
+    traits::{BlobProvider, BlobStore, SequencerDatabase},
     types::BlobEntry,
     DbResult,
 };
@@ -43,12 +43,12 @@ fn get_blob_entry<D: SequencerDatabase>(
     ctx: &Context<D>,
     id: Buf32,
 ) -> DbResult<Option<BlobEntry>> {
-    let provider = ctx.db.sequencer_provider();
+    let provider = ctx.db.blob_provider();
     provider.get_blob_by_id(id)
 }
 
 fn get_blob_entry_id<D: SequencerDatabase>(ctx: &Context<D>, idx: u64) -> DbResult<Option<Buf32>> {
-    let provider = ctx.db.sequencer_provider();
+    let provider = ctx.db.blob_provider();
     provider.get_blob_id(idx)
 }
 
@@ -56,7 +56,7 @@ fn get_blob_entry_by_idx<D: SequencerDatabase>(
     ctx: &Context<D>,
     idx: u64,
 ) -> DbResult<Option<BlobEntry>> {
-    let provider = ctx.db.sequencer_provider();
+    let provider = ctx.db.blob_provider();
     let id_res = provider.get_blob_id(idx)?;
     match id_res {
         Some(id) => provider.get_blob_by_id(id),
@@ -65,7 +65,7 @@ fn get_blob_entry_by_idx<D: SequencerDatabase>(
 }
 
 fn get_next_blob_idx<D: SequencerDatabase>(ctx: &Context<D>) -> DbResult<u64> {
-    let provider = ctx.db.sequencer_provider();
+    let provider = ctx.db.blob_provider();
     provider
         .get_last_blob_idx()
         .map(|x| x.map(|i| i + 1).unwrap_or_default())
@@ -76,6 +76,6 @@ fn put_blob_entry<D: SequencerDatabase>(
     id: Buf32,
     entry: BlobEntry,
 ) -> DbResult<()> {
-    let store = ctx.db.sequencer_store();
+    let store = ctx.db.blob_store();
     store.put_blob_entry(id, entry)
 }

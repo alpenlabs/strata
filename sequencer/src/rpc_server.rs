@@ -52,7 +52,7 @@ use tracing::*;
 use crate::extractor::extract_deposit_requests;
 
 fn fetch_l2blk<D: Database + Sync + Send + 'static>(
-    l2_prov: &Arc<<D as Database>::L2Prov>,
+    l2_prov: &Arc<<D as Database>::L2DataProv>,
     blkid: L2BlockId,
 ) -> Result<L2BlockBundle, Error> {
     l2_prov
@@ -120,7 +120,7 @@ impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
                 .ok_or(Error::MissingL2Block(tip_blkid))?;
             let idx = tip_block.header().blockidx();
 
-            let chs_prov = db.chainstate_provider();
+            let chs_prov = db.chain_state_provider();
             let toplevel_st = chs_prov
                 .get_toplevel_state(idx)?
                 .ok_or(Error::MissingChainstate(idx))?;
@@ -366,7 +366,7 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
 
         let chain_state_db = self.database.clone();
         let chain_state = wait_blocking("l2_chain_state", move || {
-            let cs_provider = chain_state_db.chainstate_provider();
+            let cs_provider = chain_state_db.chain_state_provider();
 
             cs_provider
                 .get_toplevel_state(idx - 1)

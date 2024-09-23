@@ -58,8 +58,8 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     let l1_prov = database.l1_provider();
     let l2_prov = database.l2_provider();
     let cs_prov = database.client_state_provider();
-    let chs_prov = database.chainstate_provider();
-    let chs_store = database.chainstate_store();
+    let chs_prov = database.chain_state_provider();
+    let chs_store = database.chain_state_store();
 
     // Check the block we were supposed to build isn't already in the database,
     // if so then just republish that.  This checks that there just if we have a

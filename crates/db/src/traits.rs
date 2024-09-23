@@ -21,31 +21,31 @@ use crate::{
 /// parameterizing them over each individual trait gets cumbersome or if we need
 /// to use behavior that crosses different interfaces.
 pub trait Database {
-    type L1Store: L1DataStore + Send + Sync;
-    type L1Prov: L1DataProvider + Send + Sync;
-    type L2Store: L2DataStore + Send + Sync;
-    type L2Prov: L2DataProvider + Send + Sync;
-    type SeStore: SyncEventStore + Send + Sync;
-    type SeProv: SyncEventProvider + Send + Sync;
-    type CsStore: ClientStateStore + Send + Sync;
-    type CsProv: ClientStateProvider + Send + Sync;
-    type ChsStore: ChainstateStore + Send + Sync;
-    type ChsProv: ChainstateProvider + Send + Sync;
-    type ChkPtProv: CheckpointProvider + Send + Sync;
-    type ChkPtStore: CheckpointStore + Send + Sync;
+    type L1DataStore: L1DataStore + Send + Sync;
+    type L1Provider: L1DataProvider + Send + Sync;
+    type L2DataStore: L2DataStore + Send + Sync;
+    type L2DataProv: L2DataProvider + Send + Sync;
+    type SyncEventStore: SyncEventStore + Send + Sync;
+    type SyncEventProvider: SyncEventProvider + Send + Sync;
+    type ClientStateStore: ClientStateStore + Send + Sync;
+    type ClientStateProvider: ClientStateProvider + Send + Sync;
+    type ChainStateStore: ChainstateStore + Send + Sync;
+    type ChainStateProvider: ChainstateProvider + Send + Sync;
+    type CheckpointStore: CheckpointStore + Send + Sync;
+    type CheckpointProvider: CheckpointProvider + Send + Sync;
 
-    fn l1_store(&self) -> &Arc<Self::L1Store>;
-    fn l1_provider(&self) -> &Arc<Self::L1Prov>;
-    fn l2_store(&self) -> &Arc<Self::L2Store>;
-    fn l2_provider(&self) -> &Arc<Self::L2Prov>;
-    fn sync_event_store(&self) -> &Arc<Self::SeStore>;
-    fn sync_event_provider(&self) -> &Arc<Self::SeProv>;
-    fn client_state_store(&self) -> &Arc<Self::CsStore>;
-    fn client_state_provider(&self) -> &Arc<Self::CsProv>;
-    fn chainstate_store(&self) -> &Arc<Self::ChsStore>;
-    fn chainstate_provider(&self) -> &Arc<Self::ChsProv>;
-    fn checkpoint_store(&self) -> &Arc<Self::ChkPtStore>;
-    fn checkpoint_provider(&self) -> &Arc<Self::ChkPtProv>;
+    fn l1_store(&self) -> &Arc<Self::L1DataStore>;
+    fn l1_provider(&self) -> &Arc<Self::L1Provider>;
+    fn l2_store(&self) -> &Arc<Self::L2DataStore>;
+    fn l2_provider(&self) -> &Arc<Self::L2DataProv>;
+    fn sync_event_store(&self) -> &Arc<Self::SyncEventStore>;
+    fn sync_event_provider(&self) -> &Arc<Self::SyncEventProvider>;
+    fn client_state_store(&self) -> &Arc<Self::ClientStateStore>;
+    fn client_state_provider(&self) -> &Arc<Self::ClientStateProvider>;
+    fn chain_state_store(&self) -> &Arc<Self::ChainStateStore>;
+    fn chain_state_provider(&self) -> &Arc<Self::ChainStateProvider>;
+    fn checkpoint_store(&self) -> &Arc<Self::CheckpointStore>;
+    fn checkpoint_provider(&self) -> &Arc<Self::CheckpointProvider>;
 }
 
 /// Storage interface to control our view of L1 data.
@@ -254,21 +254,21 @@ pub trait ChainstateProvider {
 /// A trait encapsulating provider and store traits to interact with the underlying database for
 /// [`BlobEntry`]
 pub trait SequencerDatabase {
-    type SeqStore: SeqDataStore;
-    type SeqProv: SeqDataProvider;
+    type BlobStore: BlobStore;
+    type BlobProvider: BlobProvider;
 
-    fn sequencer_store(&self) -> &Arc<Self::SeqStore>;
-    fn sequencer_provider(&self) -> &Arc<Self::SeqProv>;
+    fn blob_store(&self) -> &Arc<Self::BlobStore>;
+    fn blob_provider(&self) -> &Arc<Self::BlobProvider>;
 }
 
 /// A trait encapsulating  store traits to create/update [`BlobEntry`] in the database
-pub trait SeqDataStore {
+pub trait BlobStore {
     /// Store the [`BlobEntry`].
     fn put_blob_entry(&self, blobid: Buf32, blobentry: BlobEntry) -> DbResult<()>;
 }
 
 /// A trait encapsulating  provider traits to fetch [`BlobEntry`] and indices from the database
-pub trait SeqDataProvider {
+pub trait BlobProvider {
     /// Get a [`BlobEntry`] by its hash
     fn get_blob_by_id(&self, id: Buf32) -> DbResult<Option<BlobEntry>>;
 
@@ -316,18 +316,18 @@ pub trait ProverDataProvider {
 
 /// A trait encapsulating the provider and store traits for interacting with the broadcast
 /// transactions([`L1TxEntry`]), their indices and ids
-pub trait TxBroadcastDatabase {
-    type BcastStore: BcastStore;
-    type BcastProv: BcastProvider;
+pub trait L1BroadcastDatabase {
+    type BroadcastStore: L1BroadcastStore;
+    type BroadcastProvider: L1BroadcastProvider;
 
     /// Return a reference to the store implementation
-    fn broadcast_store(&self) -> &Arc<Self::BcastStore>;
+    fn broadcast_store(&self) -> &Arc<Self::BroadcastStore>;
     /// Return a reference to the provider implementation
-    fn broadcast_provider(&self) -> &Arc<Self::BcastProv>;
+    fn broadcast_provider(&self) -> &Arc<Self::BroadcastProvider>;
 }
 
 /// All methods related to storing/updating [`L1TxEntry`]s in the database
-pub trait BcastStore {
+pub trait L1BroadcastStore {
     /// Updates/Inserts a txentry to database. Returns Some(idx) if newly inserted else None
     fn put_tx_entry(&self, txid: Buf32, txentry: L1TxEntry) -> DbResult<Option<u64>>;
 
@@ -338,7 +338,7 @@ pub trait BcastStore {
 }
 
 /// All methods related to fetching [`L1TxEntry`]s and indices in the database
-pub trait BcastProvider {
+pub trait L1BroadcastProvider {
     /// Fetch [`L1TxEntry`] from db
     fn get_tx_entry_by_id(&self, txid: Buf32) -> DbResult<Option<L1TxEntry>>;
 
@@ -369,17 +369,6 @@ pub trait BridgeTxDatabase {
 
     /// Fetch [`BridgeTxState`] from db.
     fn get_tx_state(&self, txid: Buf32) -> DbResult<Option<BridgeTxState>>;
-}
-
-/// Database for checkpoints posted/to be posted to L1
-pub trait CheckpointDatabase {
-    type CheckpointStore: CheckpointStore;
-    type CheckpointProv: CheckpointProvider;
-
-    /// Get store
-    fn checkpoint_store(&self) -> &Arc<Self::CheckpointStore>;
-    /// Get provider
-    fn checkpoint_provider(&self) -> &Arc<Self::CheckpointProv>;
 }
 
 /// Provider for Checkpoint data

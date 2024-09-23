@@ -27,8 +27,8 @@ use alpen_express_primitives::{
     vk::RollupVerifyingKey,
 };
 use alpen_express_rocksdb::{
-    broadcaster::db::BroadcastDatabase, l2::db::L2Db, sequencer::db::SequencerDB, BroadcastDb,
-    ChainStateDb, ClientStateDb, DbOpsConfig, L1Db, RBCheckpointDB, SeqDb, SyncEventDb,
+    broadcaster::db::BroadcastDatabase, l2::db::L2Db, sequencer::db::SequencerDB, ChainStateDb,
+    ClientStateDb, DbOpsConfig, L1BroadcastDb, L1Db, RBCheckpointDB, RBSeqBlobDb, SyncEventDb,
 };
 use alpen_express_status::{StatusRx, StatusTx};
 use bitcoin::Network;
@@ -65,49 +65,36 @@ pub enum InitError {
 pub fn init_core_dbs(
     rbdb: Arc<OptimisticTransactionDB>,
     db_ops: DbOpsConfig,
-) -> (Arc<CommonDb>, Arc<BroadcastDb>) {
+) -> (Arc<CommonDb>, Arc<BroadcastDatabase>) {
     // Initialize databases.
-    let l1_db = Arc::new(alpen_express_rocksdb::L1Db::new(rbdb.clone(), db_ops));
-    let l2_db = Arc::new(alpen_express_rocksdb::l2::db::L2Db::new(
-        rbdb.clone(),
-        db_ops,
-    ));
+    let l1_db = Arc::new(L1Db::new(rbdb.clone(), db_ops));
+    let l2_db = Arc::new(L2Db::new(rbdb.clone(), db_ops));
     let sync_ev_db = Arc::new(alpen_express_rocksdb::SyncEventDb::new(
         rbdb.clone(),
         db_ops,
     ));
-    let cs_db = Arc::new(alpen_express_rocksdb::ClientStateDb::new(
-        rbdb.clone(),
-        db_ops,
-    ));
-    let chst_db = Arc::new(alpen_express_rocksdb::ChainStateDb::new(
-        rbdb.clone(),
-        db_ops,
-    ));
-    let bcast_db = Arc::new(alpen_express_rocksdb::BroadcastDb::new(
-        rbdb.clone(),
-        db_ops,
-    ));
-    let checkpoint_db = Arc::new(alpen_express_rocksdb::RBCheckpointDB::new(
-        rbdb.clone(),
-        db_ops,
-    ));
-    let database = Arc::new(alpen_express_db::database::CommonDatabase::new(
+    let clientstate_db = Arc::new(ClientStateDb::new(rbdb.clone(), db_ops));
+    let chainstate_db = Arc::new(ChainStateDb::new(rbdb.clone(), db_ops));
+    let checkpoint_db = Arc::new(RBCheckpointDB::new(rbdb.clone(), db_ops));
+    let database = Arc::new(CommonDatabase::new(
         l1_db,
         l2_db,
         sync_ev_db,
-        cs_db,
-        chst_db,
+        clientstate_db,
+        chainstate_db,
         checkpoint_db,
     ));
-    (database, bcast_db)
+
+    let l1_broadcast_db = Arc::new(L1BroadcastDb::new(rbdb.clone(), db_ops));
+    let broadcast_database = Arc::new(BroadcastDatabase::new(l1_broadcast_db));
+    (database, broadcast_database)
 }
 
 pub fn initialize_sequencer_database(
     rbdb: Arc<OptimisticTransactionDB>,
     db_ops: DbOpsConfig,
-) -> Arc<SequencerDB<SeqDb>> {
-    let seqdb = Arc::new(SeqDb::new(rbdb, db_ops));
+) -> Arc<SequencerDB<RBSeqBlobDb>> {
+    let seqdb = Arc::new(RBSeqBlobDb::new(rbdb, db_ops));
     Arc::new(SequencerDB::new(seqdb))
 }
 
@@ -210,52 +197,54 @@ pub fn create_bitcoin_rpc(config: &Config) -> anyhow::Result<Arc<BitcoinClient>>
     Ok(btc_rpc)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn init_sequencer(
     seq_config: &SequencerConfig,
     config: &Config,
-    rpc: Arc<BitcoinClient>,
+    bitcoin_client: Arc<BitcoinClient>,
     task_manager: &TaskManager,
-    seq_db: Arc<SequencerDB<SeqDb>>,
-    mgr_ctx: &ManagerContext,
+    seq_db: Arc<SequencerDB<RBSeqBlobDb>>,
+    manager_context: &ManagerContext,
     checkpoint_handle: Arc<CheckpointHandle>,
+    broadcast_handle: Arc<L1BroadcastHandle>,
 ) -> anyhow::Result<Arc<InscriptionHandle>> {
     info!(seqkey_path = ?seq_config.sequencer_key, "initing sequencer duties task");
     let idata = load_seqkey(&seq_config.sequencer_key)?;
 
     // Set up channel and clone some things.
-    let sm = mgr_ctx.sync_manager.clone();
+    let sm = manager_context.sync_manager.clone();
     let cu_rx = sm.create_cstate_subscription();
     let (duties_tx, duties_rx) = broadcast::channel::<DutyBatch>(8);
-    let db = mgr_ctx.db.clone();
-    let db2 = mgr_ctx.db.clone();
-    let eng_ctl_de = mgr_ctx.engine_ctl.clone();
-    let pool = mgr_ctx.pool.clone();
+    let db = manager_context.db.clone();
+    let db2 = manager_context.db.clone();
+    let eng_ctl_de = manager_context.engine_ctl.clone();
+    let pool = manager_context.pool.clone();
 
     // Spawn up writer
     let writer_config = WriterConfig::new(
         seq_config.sequencer_bitcoin_address.clone(),
         config.bitcoind_rpc.network,
-        mgr_ctx.params.rollup().rollup_name.clone(),
+        manager_context.params.rollup().rollup_name.clone(),
     )?;
 
-    let ex = task_manager.executor();
+    let executor = task_manager.executor();
     // Start inscription tasks
-    let insc_hndlr = Arc::new(start_inscription_task(
-        &ex,
-        rpc,
+    let inscription_handle = Arc::new(start_inscription_task(
+        &executor,
+        bitcoin_client,
         writer_config,
         seq_db,
-        mgr_ctx.status_tx.clone(),
+        manager_context.status_tx.clone(),
         pool.clone(),
-        mgr_ctx.broadcast_handle.clone(),
+        broadcast_handle,
     )?);
 
-    let ih = insc_hndlr.clone();
+    let ih = inscription_handle.clone();
 
     // Spawn duty tasks.
-    let t_l2blkman = mgr_ctx.l2block_manager.clone();
-    let t_params = mgr_ctx.params.clone();
-    ex.spawn_critical("duty_worker::duty_tracker_task", move |shutdown| {
+    let t_l2blkman = manager_context.l2block_manager.clone();
+    let t_params = manager_context.params.clone();
+    executor.spawn_critical("duty_worker::duty_tracker_task", move |shutdown| {
         duty_worker::duty_tracker_task(
             shutdown,
             cu_rx,
@@ -268,9 +257,9 @@ pub fn init_sequencer(
         .unwrap()
     });
 
-    let d_params = mgr_ctx.params.clone();
+    let d_params = manager_context.params.clone();
     let d_executor = task_manager.executor();
-    ex.spawn_critical("duty_worker::duty_dispatch_task", move |shutdown| {
+    executor.spawn_critical("duty_worker::duty_dispatch_task", move |shutdown| {
         duty_worker::duty_dispatch_task(
             shutdown,
             d_executor,
@@ -285,7 +274,7 @@ pub fn init_sequencer(
             checkpoint_handle,
         )
     });
-    Ok(insc_hndlr.clone())
+    Ok(inscription_handle.clone())
 }
 
 fn load_seqkey(path: &PathBuf) -> anyhow::Result<IdentityData> {
@@ -308,7 +297,6 @@ pub struct ManagerContext {
     db: Arc<CommonDb>,
     pool: threadpool::ThreadPool,
     params: Arc<Params>,
-    pub broadcast_handle: Arc<L1BroadcastHandle>,
     pub sync_manager: Arc<SyncManager>,
     pub l2block_manager: Arc<L2BlockManager>,
     pub status_tx: Arc<StatusTx>,
@@ -322,7 +310,6 @@ impl ManagerContext {
         db: Arc<CommonDb>,
         pool: threadpool::ThreadPool,
         params: Arc<Params>,
-        broadcast_handle: Arc<L1BroadcastHandle>,
         sync_manager: Arc<SyncManager>,
         l2block_manager: Arc<L2BlockManager>,
         status_tx: Arc<StatusTx>,
@@ -333,7 +320,6 @@ impl ManagerContext {
             db,
             pool,
             params,
-            broadcast_handle,
             sync_manager,
             l2block_manager,
             status_tx,
@@ -351,12 +337,9 @@ pub fn init_tasks(
     config: &Config,
     rt: &Runtime,
     executor: &TaskExecutor,
-    bcast_db: Arc<BroadcastDb>,
-    btc_rpc: Arc<BitcoinClient>,
     checkpoint_manager: Arc<CheckpointDbManager>,
 ) -> anyhow::Result<ManagerContext> {
     let l2block_manager = Arc::new(L2BlockManager::new(pool.clone(), db.clone()));
-    let broadcast_handle = init_broadcast_handle(bcast_db, pool.clone(), executor, btc_rpc);
 
     // init status tasks
     let (status_tx, status_rx) = start_status(db.clone(), params.clone())?;
@@ -386,7 +369,6 @@ pub fn init_tasks(
         pool,
         db,
         l2block_manager,
-        broadcast_handle,
         engine_ctl,
         status_tx,
         status_rx,
@@ -418,17 +400,16 @@ pub fn init_engine_controller(
     Ok(eng_ctl)
 }
 
-fn init_broadcast_handle(
-    bcast_db: Arc<BroadcastDb>,
+pub fn init_broadcast_handle(
+    broadcast_database: Arc<BroadcastDatabase>,
     pool: threadpool::ThreadPool,
     executor: &TaskExecutor,
     btc_rpc: Arc<BitcoinClient>,
 ) -> Arc<L1BroadcastHandle> {
     // Set up L1 broadcaster.
-    let bcastdb = Arc::new(BroadcastDatabase::new(bcast_db));
-    let bcast_ctx = express_storage::ops::l1tx_broadcast::Context::new(bcastdb.clone());
-    let bcast_ops = Arc::new(bcast_ctx.into_ops(pool.clone()));
+    let broadcast_ctx = express_storage::ops::l1tx_broadcast::Context::new(broadcast_database);
+    let broadcast_ops = Arc::new(broadcast_ctx.into_ops(pool));
     // start broadcast task
-    let bcast_handle = spawn_broadcaster_task(executor, btc_rpc.clone(), bcast_ops);
-    Arc::new(bcast_handle)
+    let broadcast_handle = spawn_broadcaster_task(executor, btc_rpc.clone(), broadcast_ops);
+    Arc::new(broadcast_handle)
 }
