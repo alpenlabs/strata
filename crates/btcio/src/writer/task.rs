@@ -184,7 +184,7 @@ pub async fn watcher_task(
                             // Just wait till we have enough utxos and let the status be `Unsigned`
                             // or `NeedsResign`
                             // Maybe send an alert
-                            warn!(%required, %available, "Not enough utxos available to create commit/reveal transaction");
+                            error!(%required, %available, "Not enough utxos available to create commit/reveal transaction");
                         }
                         e => {
                             e?;

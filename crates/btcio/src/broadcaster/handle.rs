@@ -34,17 +34,16 @@ impl L1BroadcastHandle {
     /// This function is infallible. If the entry already exists it will update with the new
     /// `txentry`.
     pub async fn put_tx_entry(&self, txid: Buf32, txentry: L1TxEntry) -> DbResult<Option<u64>> {
-        let idx_maybe = self.ops.put_tx_entry_async(txid, txentry.clone()).await?;
-
-        if let Some(idx) = idx_maybe {
-            if self.sender.send((idx, txentry)).await.is_err() {
-                // Not really an error, it just means it's shutting down, we'll pick
-                // it up when we restart.
-                warn!("L1 tx broadcast worker shutting down");
-            }
+        let Some(idx) = self.ops.put_tx_entry_async(txid, txentry.clone()).await? else {
+            return Ok(None);
+        };
+        if self.sender.send((idx, txentry)).await.is_err() {
+            // Not really an error, it just means it's shutting down, we'll pick
+            // it up when we restart.
+            warn!("L1 tx broadcast worker shutting down");
         }
 
-        Ok(idx_maybe)
+        Ok(Some(idx))
     }
 
     pub async fn get_tx_entry_by_id_async(&self, txid: Buf32) -> DbResult<Option<L1TxEntry>> {

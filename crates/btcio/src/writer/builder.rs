@@ -40,7 +40,7 @@ const ROLLUP_NAME_TAG: &[u8] = &[3];
 
 #[derive(Debug, Error)]
 pub enum InscriptionError {
-    #[error("Not enough UTXOs(found {1} sats) for transaction requiring {0} sats")]
+    #[error("insufficient funds for tx (need {0} sats, have {1} sats)")]
     NotEnoughUtxos(u64, u64),
 
     #[error("Error building taproot")]

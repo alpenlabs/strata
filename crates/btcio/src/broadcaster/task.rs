@@ -138,30 +138,33 @@ async fn handle_entry(
                 .map_err(|e| BroadcasterError::Other(e.to_string()))?;
             let txinfo_res = rpc_client.get_transaction(&txid).await;
 
-            match txinfo_res {
-                Ok(txinfo) if txinfo.confirmations == 0 => {
-                    // Regardless of whether it was confirmed already(means this is a reorg), we set
-                    // it to published
-                    Ok(Some(L1TxStatus::Published))
+            let new_status = match txinfo_res {
+                Ok(info) => {
+                    if info.confirmations == 0 {
+                        // Regardless of whether it was confirmed already(means this is a reorg), we
+                        // set it to published
+                        L1TxStatus::Published
+                    } else if info.confirmations >= FINALITY_DEPTH {
+                        L1TxStatus::Finalized {
+                            confirmations: info.block_height(),
+                        }
+                    } else {
+                        L1TxStatus::Confirmed {
+                            confirmations: info.block_height(),
+                        }
+                    }
                 }
-                Ok(txinfo) if txinfo.confirmations >= (FINALITY_DEPTH) => {
-                    Ok(Some(L1TxStatus::Finalized {
-                        confirmations: txinfo.block_height(),
-                    }))
-                }
-                Ok(txinfo) => Ok(Some(L1TxStatus::Confirmed {
-                    confirmations: txinfo.block_height(),
-                })),
                 Err(e) => {
                     // If for some reasons tx is not found even if it was already
                     // published/confirmed, set it to unpublished.
                     if e.is_tx_not_found() {
-                        Ok(Some(L1TxStatus::Unpublished))
+                        L1TxStatus::Unpublished
                     } else {
-                        Err(BroadcasterError::Other(e.to_string()))
+                        return Err(BroadcasterError::Other(e.to_string()));
                     }
                 }
-            }
+            };
+            Ok(Some(new_status))
         }
         L1TxStatus::Finalized { confirmations: _ } => Ok(None),
         L1TxStatus::InvalidInputs => Ok(None),
