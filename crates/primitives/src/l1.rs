@@ -1,5 +1,5 @@
 use std::{
-    fmt::{self, Display},
+    fmt::Display,
     io::{self, Read, Write},
     iter::Sum,
     ops::Add,
@@ -20,10 +20,7 @@ use bitcoin::{
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 use reth_primitives::revm_primitives::FixedBytes;
-use serde::{
-    de::{self, MapAccess, Visitor},
-    Deserialize, Deserializer, Serialize,
-};
+use serde::{de, Deserialize, Deserializer, Serialize};
 
 use crate::{buf::Buf32, constants::HASH_SIZE, errors::ParseError, tx::ProtocolOperation};
 
@@ -293,86 +290,22 @@ impl<'de> Deserialize<'de> for BitcoinAddress {
     where
         D: Deserializer<'de>,
     {
-        enum Field {
-            Network,
-            Address,
+        #[derive(Deserialize)]
+        struct BitcoinAddressShim {
+            network: Network,
+            address: String,
         }
 
-        impl<'de> Deserialize<'de> for Field {
-            fn deserialize<D>(deserializer: D) -> Result<Field, D::Error>
-            where
-                D: Deserializer<'de>,
-            {
-                struct FieldVisitor;
+        let shim = BitcoinAddressShim::deserialize(deserializer)?;
+        let address = Address::from_str(&shim.address)
+            .map_err(|_| de::Error::custom("invalid bitcoin address"))?
+            .require_network(shim.network)
+            .map_err(|_| de::Error::custom("address invalid for given network"))?;
 
-                impl<'de> Visitor<'de> for FieldVisitor {
-                    type Value = Field;
-
-                    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                        formatter.write_str("`network` or `address`")
-                    }
-
-                    fn visit_str<E>(self, value: &str) -> Result<Field, E>
-                    where
-                        E: de::Error,
-                    {
-                        match value {
-                            "network" => Ok(Field::Network),
-                            "address" => Ok(Field::Address),
-                            _ => Err(de::Error::unknown_field(value, FIELDS)),
-                        }
-                    }
-                }
-
-                deserializer.deserialize_identifier(FieldVisitor)
-            }
-        }
-
-        struct BitcoinAddressVisitor;
-
-        impl<'de> Visitor<'de> for BitcoinAddressVisitor {
-            type Value = BitcoinAddress;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("struct BitcoinAddress")
-            }
-
-            fn visit_map<V>(self, mut map: V) -> Result<BitcoinAddress, V::Error>
-            where
-                V: MapAccess<'de>,
-            {
-                let mut network = None;
-                let mut address = None;
-                while let Some(key) = map.next_key()? {
-                    match key {
-                        Field::Network => {
-                            if network.is_some() {
-                                return Err(de::Error::duplicate_field("network"));
-                            }
-                            network = Some(map.next_value()?);
-                        }
-                        Field::Address => {
-                            if address.is_some() {
-                                return Err(de::Error::duplicate_field("address"));
-                            }
-                            address = Some(map.next_value()?);
-                        }
-                    }
-                }
-                let network = network.ok_or_else(|| de::Error::missing_field("network"))?;
-                let address = address.ok_or_else(|| de::Error::missing_field("address"))?;
-
-                let address = Address::from_str(address)
-                    .map_err(|_| de::Error::custom("invalid bitcoin address"))?
-                    .require_network(network)
-                    .map_err(|_| de::Error::custom("bitcoin address is invalid for the network"))?;
-
-                Ok(BitcoinAddress { network, address })
-            }
-        }
-
-        const FIELDS: &[&str] = &["network", "address"];
-        deserializer.deserialize_struct("BitcoinAddress", FIELDS, BitcoinAddressVisitor)
+        Ok(BitcoinAddress {
+            network: shim.network,
+            address,
+        })
     }
 }
 
@@ -387,7 +320,7 @@ impl BorshSerialize for BitcoinAddress {
             Network::Testnet => 1u8,
             Network::Signet => 2u8,
             Network::Regtest => 3u8,
-            _ => unreachable!("network should always be valid"),
+            other => unreachable!("should handle new variant: {}", other),
         };
 
         BorshSerialize::serialize(&network_byte, writer)?;
