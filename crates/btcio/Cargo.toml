@@ -11,6 +11,7 @@ alpen-express-state = { workspace = true }
 alpen-express-status = { workspace = true }
 express-storage = { workspace = true }
 express-tasks = { workspace = true }
+strata-tx-parser = { workspace = true }
 
 anyhow = { workspace = true }
 async-trait = { workspace = true }

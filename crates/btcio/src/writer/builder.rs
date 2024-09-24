@@ -1,12 +1,18 @@
 use core::{result::Result::Ok, str::FromStr};
 use std::{cmp::Reverse, sync::Arc};
 
+use alpen_express_primitives::tx::InscriptionData;
 use anyhow::anyhow;
 use bitcoin::{
     absolute::LockTime,
     blockdata::{opcodes::all::OP_CHECKSIG, script},
     hashes::Hash,
     key::{TapTweak, TweakedPublicKey, UntweakedKeypair},
+    opcodes::{
+        all::{OP_ENDIF, OP_IF},
+        OP_FALSE,
+    },
+    script::PushBytesBuf,
     secp256k1::{
         self, constants::SCHNORR_SIGNATURE_SIZE, schnorr::Signature, Secp256k1, XOnlyPublicKey,
     },
@@ -20,10 +26,11 @@ use bitcoin::{
     Witness,
 };
 use rand::RngCore;
+use strata_tx_parser::inscription::{BATCH_DATA_TAG, ROLLUP_NAME_TAG, VERSION_TAG};
 use thiserror::Error;
+use tracing::trace;
 
 use crate::{
-    inscription::InscriptionData,
     rpc::{
         traits::{Reader, Signer, Wallet},
         types::ListUnspent,
@@ -35,9 +42,6 @@ const BITCOIN_DUST_LIMIT: u64 = 546;
 const INSCRIPTION_VERSION: u8 = 1;
 
 // TODO: these might need to be in rollup params
-const BATCH_DATA_TAG: &[u8] = &[1];
-const ROLLUP_NAME_TAG: &[u8] = &[3];
-
 #[derive(Debug, Error)]
 pub enum InscriptionError {
     #[error("insufficient funds for tx (need {0} sats, have {1} sats)")]
@@ -89,14 +93,11 @@ pub fn create_inscription_transactions(
     let key_pair = generate_key_pair(&secp256k1)?;
     let public_key = XOnlyPublicKey::from_keypair(&key_pair).0;
 
-    let insc_data = InscriptionData::new(
-        rollup_name.to_string(),
-        write_intent.to_vec(),
-        INSCRIPTION_VERSION,
-    );
+    let insc_data = InscriptionData::new(write_intent.to_vec());
 
     // Start creating inscription content
-    let reveal_script = build_reveal_script(&public_key, insc_data)?;
+    let reveal_script =
+        build_reveal_script(rollup_name, &public_key, insc_data, INSCRIPTION_VERSION)?;
 
     // Create spend info for tapscript
     let taproot_spend_info = TaprootBuilder::new()
@@ -404,15 +405,18 @@ pub fn generate_key_pair(
 /// Builds reveal script such that it contains opcodes for verifying the internal key as well as the
 /// inscription block
 fn build_reveal_script(
+    rollup_name: &str,
     taproot_public_key: &XOnlyPublicKey,
     insc_data: InscriptionData,
+    version: u8,
 ) -> Result<ScriptBuf, anyhow::Error> {
     let mut script_bytes = script::Builder::new()
         .push_x_only_key(taproot_public_key)
         .push_opcode(OP_CHECKSIG)
         .into_script()
         .into_bytes();
-    script_bytes.extend(insc_data.to_script()?.into_bytes());
+    let script = generate_inscription_script(insc_data, rollup_name, version)?;
+    script_bytes.extend(script.into_bytes());
     Ok(ScriptBuf::from(script_bytes))
 }
 
@@ -494,6 +498,32 @@ fn assert_correct_address(
         ),
         *commit_tx_address
     );
+}
+
+// Generates a [`ScriptBuf`] that consists of `OP_IF .. OP_ENDIF` block
+pub fn generate_inscription_script(
+    inscription_data: InscriptionData,
+    rollup_name: &str,
+    version: u8,
+) -> anyhow::Result<ScriptBuf> {
+    let mut builder = script::Builder::new()
+        .push_opcode(OP_FALSE)
+        .push_opcode(OP_IF)
+        .push_slice(PushBytesBuf::try_from(ROLLUP_NAME_TAG.to_vec())?)
+        .push_slice(PushBytesBuf::try_from(rollup_name.as_bytes().to_vec())?)
+        .push_slice(PushBytesBuf::try_from(VERSION_TAG.to_vec())?)
+        .push_slice(PushBytesBuf::from([version]))
+        .push_slice(PushBytesBuf::try_from(BATCH_DATA_TAG.to_vec())?)
+        .push_int(inscription_data.batch_data().len() as i64);
+
+    trace!(batchdata_size = %inscription_data.batch_data().len(), "Inserting batch data");
+    for chunk in inscription_data.batch_data().chunks(520) {
+        trace!(size=%chunk.len(), "inserting chunk");
+        builder = builder.push_slice(PushBytesBuf::try_from(chunk.to_vec())?);
+    }
+    builder = builder.push_opcode(OP_ENDIF);
+
+    Ok(builder.into_script())
 }
 
 #[cfg(test)]

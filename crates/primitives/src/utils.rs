@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     l1::{L1Tx, L1TxProof},
     prelude::Buf32,
+    tx::ProtocolOperation,
 };
 
 /// Generates cohashes for an wtxid in particular index with in given slice of wtxids.
@@ -72,6 +73,7 @@ fn get_cohashes_from_wtxids(wtxids: &[Wtxid], index: u32) -> (Vec<Buf32>, Buf32)
 ///
 /// # Parameters
 /// - `idx`: The index of the transaction within the block's transaction data.
+/// - `proto_op_data`: Relevant information gathered after parsing.
 /// - `block`: The block containing the transactions.
 ///
 /// # Returns
@@ -79,7 +81,7 @@ fn get_cohashes_from_wtxids(wtxids: &[Wtxid], index: u32) -> (Vec<Buf32>, Buf32)
 ///
 /// # Panics
 /// - If the `idx` is out of bounds for the block's transaction data.
-pub fn generate_l1_tx(idx: u32, block: &Block) -> L1Tx {
+pub fn generate_l1_tx(block: &Block, idx: u32, proto_op_data: ProtocolOperation) -> L1Tx {
     assert!(
         (idx as usize) < block.txdata.len(),
         "utils: tx idx out of range of block txs"
@@ -104,7 +106,7 @@ pub fn generate_l1_tx(idx: u32, block: &Block) -> L1Tx {
     let proof = L1TxProof::new(idx, cohashes);
     let tx = serialize(tx);
 
-    L1Tx::new(proof, tx)
+    L1Tx::new(proof, tx, proto_op_data)
 }
 
 /// Temporary schnorr keypair.

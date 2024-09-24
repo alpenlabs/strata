@@ -1,58 +1,76 @@
-use bitcoin::{Address, Block, Transaction};
+use alpen_express_primitives::tx::ProtocolOperation;
+use bitcoin::{Block, Transaction};
+use strata_tx_parser::{
+    deposit::{
+        deposit_request::extract_deposit_request_info, deposit_tx::extract_deposit_info,
+        DepositTxConfig,
+    },
+    inscription::parse_inscription_data,
+};
 
-use crate::inscription::InscriptionParser;
+use super::messages::ProtocolOpTxRef;
 
-/// What kind of transactions can be relevant for rollup node to filter
-#[derive(Clone, Debug)]
-pub enum RelevantTxType {
-    /// Transactions that are spent to an address
-    SpentToAddress(Address),
+/// kind of transactions can be relevant for rollup node to filter
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum TxFilterRule {
     /// Inscription transactions with given Rollup name. This will be parsed by
-    /// [`InscriptionParser`] which dictates the structure of inscription.
+    /// InscriptionParser which dictates the structure of inscription.
     RollupInscription(RollupName),
-    // Add other relevant conditions as needed
+    /// Deposit transaction
+    Deposit(DepositTxConfig),
 }
 
 type RollupName = String;
 
-/// Filter all the relevant [`Transaction`]s in a block based on given [`RelevantTxType`]s
-pub fn filter_relevant_txs(block: &Block, relevent_types: &[RelevantTxType]) -> Vec<u32> {
+/// Filter all the relevant [`Transaction`]s in a block based on given [`TxFilterRule`]s
+pub fn filter_relevant_txs(block: &Block, filters: &[TxFilterRule]) -> Vec<ProtocolOpTxRef> {
     block
         .txdata
         .iter()
         .enumerate()
-        .filter(|(_, tx)| is_relevant(tx, relevent_types))
-        .map(|(i, _)| i as u32)
+        .filter_map(|(i, tx)| {
+            check_and_extract_relevant_info(tx, filters)
+                .map(|relevant_tx| ProtocolOpTxRef::new(i as u32, relevant_tx))
+        })
         .collect()
 }
 
-/// Determines if a [`Transaction`] is relevant based on given [`RelevantTxType`]s
-fn is_relevant(tx: &Transaction, relevant_types: &[RelevantTxType]) -> bool {
-    relevant_types.iter().any(|rel_type| match rel_type {
-        RelevantTxType::SpentToAddress(address) => tx
-            .output
-            .iter()
-            .any(|op| address.matches_script_pubkey(&op.script_pubkey)),
-        RelevantTxType::RollupInscription(name) => match tx.input[0].witness.tapscript() {
-            // Definitely not relevant if it is not a tapscript
-            None => false,
-            // If it is a tapscript, check rollup name
-            Some(scr) => {
-                let parser = InscriptionParser::new(scr.into());
-                parser
-                    .parse_rollup_name()
-                    .ok()
-                    .filter(|n| n == name)
-                    .is_some()
+///  if a [`Transaction`] is relevant based on given [`RelevantTxType`]s then we extract relevant
+///  info
+fn check_and_extract_relevant_info(
+    tx: &Transaction,
+    filters: &[TxFilterRule],
+) -> Option<ProtocolOperation> {
+    filters.iter().find_map(|rel_type| match rel_type {
+        TxFilterRule::RollupInscription(name) => {
+            if !tx.input.is_empty() {
+                if let Some(scr) = tx.input[0].witness.tapscript() {
+                    if let Ok(inscription_data) = parse_inscription_data(&scr.into(), name) {
+                        return Some(ProtocolOperation::RollupInscription(inscription_data));
+                    }
+                }
             }
-        },
+            None
+        }
+
+        TxFilterRule::Deposit(config) => {
+            if let Some(deposit_info) = extract_deposit_info(tx, config) {
+                return Some(ProtocolOperation::Deposit(deposit_info));
+            }
+
+            if let Some(deposit_req_info) = extract_deposit_request_info(tx, config) {
+                return Some(ProtocolOperation::DepositRequest(deposit_req_info));
+            }
+
+            None
+        }
     })
 }
-
 #[cfg(test)]
 mod test {
     use std::str::FromStr;
 
+    use alpen_express_primitives::tx::InscriptionData;
     use bitcoin::{
         absolute::{Height, LockTime},
         block::{Header, Version as BVersion},
@@ -61,13 +79,17 @@ mod test {
         secp256k1::XOnlyPublicKey,
         taproot::{ControlBlock, LeafVersion, TaprootMerkleBranch},
         transaction::Version,
-        Address, Amount, Block, BlockHash, CompactTarget, Network, TapNodeHash, Transaction,
-        TxMerkleNode, TxOut,
+        Address, Amount, Block, BlockHash, CompactTarget, Network, ScriptBuf, TapNodeHash,
+        Transaction, TxMerkleNode, TxOut,
     };
     use rand::RngCore;
+    use strata_tx_parser::deposit::test_utils::{
+        build_test_deposit_request_script, build_test_deposit_script,
+        create_transaction_two_outpoints, generic_taproot_addr, get_deposit_tx_config,
+    };
 
     use super::*;
-    use crate::{inscription::InscriptionData, writer::builder::build_reveal_transaction};
+    use crate::writer::builder::{build_reveal_transaction, generate_inscription_script};
 
     const OTHER_ADDR: &str = "bcrt1q6u6qyya3sryhh42lahtnz2m7zuufe7dlt8j0j5";
     const RELEVANT_ADDR: &str = "bcrt1qwqas84jmu20w6r7x3tqetezg8wx7uc3l57vue6";
@@ -113,24 +135,14 @@ mod test {
             .unwrap()
     }
 
-    #[test]
-    fn test_filter_relevant_txs_spent_to_address() {
-        let address = parse_addr(RELEVANT_ADDR);
-        let tx1 = create_test_tx(vec![create_test_txout(100, &address)]);
-        let tx2 = create_test_tx(vec![create_test_txout(100, &parse_addr(OTHER_ADDR))]);
-        let block = create_test_block(vec![tx1, tx2]);
-
-        let result = filter_relevant_txs(&block, &[RelevantTxType::SpentToAddress(address)]);
-        assert_eq!(result, vec![0]); // Only tx1 matches
-    }
-
     // Create an inscription transaction. The focus here is to create a tapscript, rather than a
     // completely valid control block
     fn create_inscription_tx(rollup_name: String) -> Transaction {
         let address = parse_addr(OTHER_ADDR);
         let inp_tx = create_test_tx(vec![create_test_txout(100000000, &address)]);
-        let inscription_data = InscriptionData::new(rollup_name, vec![0, 1, 2, 3], 1);
-        let script = inscription_data.to_script().unwrap();
+        let inscription_data = InscriptionData::new(vec![0, 1, 2, 3]);
+
+        let script = generate_inscription_script(inscription_data, &rollup_name, 1).unwrap();
 
         // Create controlblock
         let secp256k1 = Secp256k1::new();
@@ -160,8 +172,14 @@ mod test {
         let rollup_name = "TestRollup".to_string();
         let tx = create_inscription_tx(rollup_name.clone());
         let block = create_test_block(vec![tx]);
-        let result = filter_relevant_txs(&block, &[RelevantTxType::RollupInscription(rollup_name)]);
-        assert_eq!(result, vec![0], "Should filter valid rollup name");
+
+        let txids: Vec<u32> =
+            filter_relevant_txs(&block, &[TxFilterRule::RollupInscription(rollup_name)])
+                .iter()
+                .map(|op_refs| op_refs.index())
+                .collect();
+
+        assert_eq!(txids[0], 0, "Should filter valid rollup name");
 
         // Test with invalid name
         let rollup_name = "TestRollup".to_string();
@@ -169,44 +187,201 @@ mod test {
         let block = create_test_block(vec![tx]);
         let result = filter_relevant_txs(
             &block,
-            &[RelevantTxType::RollupInscription(
-                "invalid_name".to_string(),
-            )],
+            &[TxFilterRule::RollupInscription("invalid_name".to_string())],
         );
         assert!(result.is_empty(), "Should filter out invalid name");
     }
 
     #[test]
     fn test_filter_relevant_txs_no_match() {
-        let address = parse_addr(RELEVANT_ADDR);
         let tx1 = create_test_tx(vec![create_test_txout(1000, &parse_addr(OTHER_ADDR))]);
         let tx2 = create_test_tx(vec![create_test_txout(10000, &parse_addr(OTHER_ADDR))]);
         let block = create_test_block(vec![tx1, tx2]);
+        let rollup_name = "alpenstrata".to_string();
 
-        let result = filter_relevant_txs(&block, &[RelevantTxType::SpentToAddress(address)]);
-        assert!(result.is_empty()); // No transactions match
-    }
-
-    #[test]
-    fn test_filter_relevant_txs_empty_block() {
-        let block = create_test_block(vec![]);
-
-        let result = filter_relevant_txs(
-            &block,
-            &[RelevantTxType::SpentToAddress(parse_addr(RELEVANT_ADDR))],
-        );
-        assert!(result.is_empty()); // No transactions match
+        let txids: Vec<u32> =
+            filter_relevant_txs(&block, &[TxFilterRule::RollupInscription(rollup_name)])
+                .iter()
+                .map(|op_refs| op_refs.index())
+                .collect();
+        assert!(txids.is_empty()); // No transactions match
     }
 
     #[test]
     fn test_filter_relevant_txs_multiple_matches() {
-        let address = parse_addr(RELEVANT_ADDR);
-        let tx1 = create_test_tx(vec![create_test_txout(100, &address)]);
+        let rollup_name = "alpenstrata".to_string();
+        let tx1 = create_inscription_tx(rollup_name.clone());
         let tx2 = create_test_tx(vec![create_test_txout(100, &parse_addr(OTHER_ADDR))]);
-        let tx3 = create_test_tx(vec![create_test_txout(1000, &address)]);
+        let tx3 = create_inscription_tx(rollup_name.clone());
         let block = create_test_block(vec![tx1, tx2, tx3]);
 
-        let result = filter_relevant_txs(&block, &[RelevantTxType::SpentToAddress(address)]);
-        assert_eq!(result, vec![0, 2]); // First and third txs match
+        let txids: Vec<u32> =
+            filter_relevant_txs(&block, &[TxFilterRule::RollupInscription(rollup_name)])
+                .iter()
+                .map(|op_refs| op_refs.index())
+                .collect();
+        // First and third txs match
+        assert_eq!(txids[0], 0);
+        assert_eq!(txids[1], 2);
+    }
+
+    #[test]
+    fn test_filter_relevant_txs_deposit() {
+        let config = get_deposit_tx_config();
+        let ee_addr = vec![1u8; 20]; // Example EVM address
+        let deposit_script = build_test_deposit_script(config.magic_bytes.clone(), ee_addr.clone());
+
+        let tx = create_transaction_two_outpoints(
+            Amount::from_sat(config.deposit_quantity),
+            &generic_taproot_addr().script_pubkey(),
+            &deposit_script,
+        );
+
+        let block = create_test_block(vec![tx]);
+
+        let filters = vec![TxFilterRule::Deposit(config.clone())];
+        let result = filter_relevant_txs(&block, &filters);
+
+        assert_eq!(result.len(), 1, "Should find one relevant transaction");
+        assert_eq!(
+            result[0].index(),
+            0,
+            "The relevant transaction should be the first one"
+        );
+
+        if let ProtocolOperation::Deposit(deposit_info) = &result[0].proto_op() {
+            assert_eq!(deposit_info.address, ee_addr, "EE address should match");
+            assert_eq!(
+                deposit_info.amt, config.deposit_quantity,
+                "Deposit amount should match"
+            );
+        } else {
+            panic!("Expected Deposit info");
+        }
+    }
+
+    #[test]
+    fn test_filter_relevant_txs_deposit_request() {
+        let config = get_deposit_tx_config();
+        let dest_addr = vec![2u8; 20]; // Example EVM address
+        let dummy_block = [0u8; 32]; // Example dummy block
+        let deposit_request_script = build_test_deposit_request_script(
+            config.magic_bytes.clone(),
+            dummy_block.to_vec(),
+            dest_addr.clone(),
+        );
+
+        let tx = create_transaction_two_outpoints(
+            Amount::from_sat(config.deposit_quantity), // Any amount
+            &generic_taproot_addr().script_pubkey(),
+            &deposit_request_script,
+        );
+
+        let block = create_test_block(vec![tx]);
+
+        let relevant_types = vec![TxFilterRule::Deposit(config.clone())];
+        let result = filter_relevant_txs(&block, &relevant_types);
+
+        assert_eq!(result.len(), 1, "Should find one relevant transaction");
+        assert_eq!(
+            result[0].index(),
+            0,
+            "The relevant transaction should be the first one"
+        );
+
+        if let ProtocolOperation::DepositRequest(deposit_req_info) = &result[0].proto_op() {
+            assert_eq!(
+                deposit_req_info.address, dest_addr,
+                "EE address should match"
+            );
+            assert_eq!(
+                deposit_req_info.tap_ctrl_blk_hash, dummy_block,
+                "Control block should match"
+            );
+        } else {
+            panic!("Expected DepositRequest info");
+        }
+    }
+
+    #[test]
+    fn test_filter_relevant_txs_no_deposit() {
+        let config = get_deposit_tx_config();
+        let irrelevant_tx = create_transaction_two_outpoints(
+            Amount::from_sat(config.deposit_quantity),
+            &generic_taproot_addr().script_pubkey(),
+            &ScriptBuf::new(),
+        );
+
+        let block = create_test_block(vec![irrelevant_tx]);
+
+        let relevant_types = vec![TxFilterRule::Deposit(config)];
+        let result = filter_relevant_txs(&block, &relevant_types);
+
+        assert!(
+            result.is_empty(),
+            "Should not find any relevant transactions"
+        );
+    }
+
+    #[test]
+    fn test_filter_relevant_txs_multiple_deposits() {
+        let config = get_deposit_tx_config();
+        let dest_addr1 = vec![3u8; 20];
+        let dest_addr2 = vec![4u8; 20];
+
+        let deposit_script1 =
+            build_test_deposit_script(config.magic_bytes.clone(), dest_addr1.clone());
+        let deposit_script2 =
+            build_test_deposit_script(config.magic_bytes.clone(), dest_addr2.clone());
+
+        let tx1 = create_transaction_two_outpoints(
+            Amount::from_sat(config.deposit_quantity),
+            &generic_taproot_addr().script_pubkey(),
+            &deposit_script1,
+        );
+        let tx2 = create_transaction_two_outpoints(
+            Amount::from_sat(config.deposit_quantity),
+            &generic_taproot_addr().script_pubkey(),
+            &deposit_script2,
+        );
+
+        let block = create_test_block(vec![tx1, tx2]);
+
+        let relevant_types = vec![TxFilterRule::Deposit(config.clone())];
+        let result = filter_relevant_txs(&block, &relevant_types);
+
+        assert_eq!(result.len(), 2, "Should find two relevant transactions");
+        assert_eq!(
+            result[0].index(),
+            0,
+            "First relevant transaction should be at index 0"
+        );
+        assert_eq!(
+            result[1].index(),
+            1,
+            "Second relevant transaction should be at index 1"
+        );
+
+        for (i, info) in result.iter().map(|op_txs| op_txs.proto_op()).enumerate() {
+            if let ProtocolOperation::Deposit(deposit_info) = info {
+                assert_eq!(
+                    deposit_info.address,
+                    if i == 0 {
+                        dest_addr1.clone()
+                    } else {
+                        dest_addr2.clone()
+                    },
+                    "EVM address should match for transaction {}",
+                    i
+                );
+                assert_eq!(
+                    deposit_info.amt, config.deposit_quantity,
+                    "Deposit amount should match for transaction {}",
+                    i
+                );
+            } else {
+                panic!("Expected Deposit info for transaction {}", i);
+            }
+        }
     }
 }

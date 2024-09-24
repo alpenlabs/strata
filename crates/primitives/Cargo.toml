@@ -4,6 +4,7 @@ name = "alpen-express-primitives"
 version = "0.1.0"
 
 [dependencies]
+anyhow = { workspace = true }
 arbitrary = { workspace = true }
 bitcoin = { workspace = true, features = ["serde", "rand-std"] }
 borsh = { workspace = true }
@@ -17,6 +18,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
 thiserror = { workspace = true }
+tracing = { workspace = true }
 
 [dev-dependencies]
 alpen-test-utils = { workspace = true }

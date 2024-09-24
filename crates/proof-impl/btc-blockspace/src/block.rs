@@ -138,8 +138,8 @@ pub fn check_pow(block: &Header) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use alpen_express_primitives::utils::generate_l1_tx;
-    use alpen_test_utils::bitcoin::get_btc_mainnet_block;
+    use alpen_express_primitives::{tx::ProtocolOperation, utils::generate_l1_tx};
+    use alpen_test_utils::{bitcoin::get_btc_mainnet_block, ArbitraryGenerator};
     use bitcoin::{hashes::Hash, TxMerkleNode, WitnessMerkleNode};
     use rand::Rng;
 
@@ -170,8 +170,9 @@ mod tests {
         //     )
         // }
 
+        let parsed_tx: ProtocolOperation = ArbitraryGenerator::new().generate();
         let r = rand::thread_rng().gen_range(1..block.txdata.len()) as u32;
-        let l1_tx = generate_l1_tx(r, &block);
+        let l1_tx = generate_l1_tx(&block, r, parsed_tx);
         assert!(check_witness_commitment(&block, &l1_tx));
 
         assert_eq!(

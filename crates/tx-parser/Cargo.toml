@@ -1,0 +1,13 @@
+[package]
+edition = "2021"
+name = "strata-tx-parser"
+version = "0.1.0"
+
+[dependencies]
+alpen-express-primitives = { workspace = true }
+
+anyhow = { workspace = true }
+bitcoin = { workspace = true }
+hex = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }

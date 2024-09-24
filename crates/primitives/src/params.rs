@@ -33,6 +33,12 @@ pub struct RollupParams {
 
     /// target batch size in number of l2 blocks
     pub target_l2_batch_size: u64,
+
+    /// ee address length
+    pub address_length: u8,
+
+    /// max deposit amount in sats
+    pub deposit_amount: u64,
 }
 
 /// Client sync parameters that are used to make the network work but don't

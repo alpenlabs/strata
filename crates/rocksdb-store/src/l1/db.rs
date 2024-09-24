@@ -187,7 +187,7 @@ impl L1DataProvider for L1Db {
 #[cfg(feature = "test_utils")]
 #[cfg(test)]
 mod tests {
-    use alpen_express_primitives::l1::L1TxProof;
+    use alpen_express_primitives::{l1::L1TxProof, tx::ProtocolOperation};
     use alpen_test_utils::ArbitraryGenerator;
 
     use super::*;
@@ -206,7 +206,8 @@ mod tests {
         let txs: Vec<L1Tx> = (0..10)
             .map(|i| {
                 let proof = L1TxProof::new(i, arb.generate());
-                L1Tx::new(proof, arb.generate())
+                let parsed_tx: ProtocolOperation = arb.generate();
+                L1Tx::new(proof, arb.generate(), parsed_tx)
             })
             .collect();
         let mmr: CompactMmr = arb.generate();
