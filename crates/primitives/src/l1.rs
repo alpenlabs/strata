@@ -887,10 +887,59 @@ mod tests {
         taproot::{ControlBlock, LeafVersion, TaprootBuilder, TaprootMerkleBranch},
         Address, Amount, Network, ScriptBuf, TapNodeHash, TxOut, XOnlyPublicKey,
     };
+    use rand::Rng;
     use secp256k1::{Parity, SECP256K1};
 
     use super::{BitcoinAddress, BitcoinAmount, BorshDeserialize, BorshSerialize, XOnlyPk};
-    use crate::l1::{BitcoinPsbt, BitcoinTxOut, TaprootSpendPath};
+    use crate::{
+        errors::ParseError,
+        l1::{BitcoinPsbt, BitcoinTxOut, TaprootSpendPath},
+    };
+
+    #[test]
+    fn test_parse_bitcoin_address_network() {
+        let possible_networks = [
+            // mainnet
+            Network::Bitcoin,
+            // testnets
+            Network::Testnet,
+            Network::Signet,
+            Network::Regtest,
+        ];
+
+        let num_possible_networks = possible_networks.len();
+
+        let (secret_key, _) = SECP256K1.generate_keypair(&mut rand::thread_rng());
+        let keypair = Keypair::from_secret_key(SECP256K1, &secret_key);
+        let (internal_key, _) = XOnlyPublicKey::from_keypair(&keypair);
+
+        for network in possible_networks.iter() {
+            // NOTE: only checking for P2TR addresses for now as those are the ones we use. Other
+            // typs of addresses can also be checked but that shouldn't be necessary.
+            let address = Address::p2tr(SECP256K1, internal_key, None, *network);
+            let address_str = address.to_string();
+
+            BitcoinAddress::parse(&address_str, *network).expect("address should parse");
+
+            let invalid_network = match network {
+                Network::Bitcoin => {
+                    // get one of the testnets
+                    let index = rand::thread_rng().gen_range(1..num_possible_networks);
+
+                    possible_networks[index]
+                }
+                Network::Testnet | Network::Signet | Network::Regtest => Network::Bitcoin,
+                other => unreachable!("this variant needs to be handled: {}", other),
+            };
+
+            assert!(
+                BitcoinAddress::parse(&address_str, invalid_network)
+                    .is_err_and(|e| matches!(e, ParseError::InvalidAddress(_))),
+                "should error with ParseError::InvalidAddress if parse is passed an invalid address/network pair: {}, {}",
+                address_str, invalid_network
+            );
+        }
+    }
 
     #[test]
     fn json_serialization_of_bitcoin_address_works() {
