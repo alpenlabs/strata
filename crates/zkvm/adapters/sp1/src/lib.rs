@@ -1,4 +1,10 @@
 #[cfg(feature = "prover")]
-mod sp1;
+mod prover;
 #[cfg(feature = "prover")]
-pub use sp1::{SP1Host, SP1ProofInputBuilder, SP1Verifier};
+pub use prover::SP1Host;
+
+mod input;
+pub use input::SP1ProofInputBuilder;
+
+mod verifier;
+pub use verifier::SP1Verifier;

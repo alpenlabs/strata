@@ -2,7 +2,7 @@
 
 use serde::Deserialize;
 
-use crate::{block_credential::CredRule, prelude::Buf32};
+use crate::{block_credential::CredRule, prelude::Buf32, vk::RollupVerifyingKey};
 
 /// Consensus parameters that don't change for the lifetime of the network
 /// (unless there's some weird hard fork).
@@ -39,6 +39,9 @@ pub struct RollupParams {
 
     /// max deposit amount in sats
     pub deposit_amount: u64,
+
+    /// SP1 verifying key that is used to verify the Groth16 proof posted on Bitcoin
+    pub rollup_vk: RollupVerifyingKey,
 }
 
 /// Client sync parameters that are used to make the network work but don't

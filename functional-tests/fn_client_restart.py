@@ -1,13 +1,14 @@
 import flexitest
+
 from constants import (
     ERROR_PROOF_ALREADY_CREATED,
     FAST_BATCH_ROLLUP_PARAMS,
 )
 from entry import BasicEnvConfig
 from utils import (
-    wait_until,
-    check_send_proof_for_non_existent_batch,
     check_for_nth_checkpoint_finalization,
+    check_send_proof_for_non_existent_batch,
+    wait_until,
 )
 
 
@@ -38,7 +39,6 @@ class BlockFinalizationSeqRestartTest(flexitest.Test):
 
         seqrpc = seq.create_rpc()
         wait_until(seqrpc.alp_syncStatus, timeout=5)
-
 
         # Check for next 2 checkpoints
         for n in range(3, 5):

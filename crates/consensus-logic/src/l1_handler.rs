@@ -7,6 +7,7 @@ use alpen_express_primitives::{
     l1::{L1BlockManifest, L1Tx, L1TxProof},
     params::Params,
     tx::ProtocolOperation,
+    vk::RollupVerifyingKey,
 };
 use alpen_express_state::{
     batch::{BatchCheckpoint, SignedBatchCheckpoint},
@@ -17,6 +18,9 @@ use bitcoin::{
     hashes::{sha256d, Hash},
     Block, Wtxid,
 };
+use express_risc0_adapter::Risc0Verifier;
+use express_sp1_adapter::SP1Verifier;
+use express_zkvm::ZKVMVerifier;
 use tokio::sync::mpsc;
 use tracing::*;
 
@@ -96,7 +100,7 @@ where
             csm_ctl.submit_event(ev)?;
 
             // Check for da batch and send event accordingly
-            let checkpoints = check_for_da_batch(&blockdata);
+            let checkpoints = check_for_da_batch(&blockdata, params.rollup().rollup_vk);
             if !checkpoints.is_empty() {
                 let ev = SyncEvent::L1DABatch(height, checkpoints);
                 csm_ctl.submit_event(ev)?;
@@ -110,7 +114,10 @@ where
 }
 
 /// Parses inscriptions and checks for batch data in the transactions
-fn check_for_da_batch(blockdata: &BlockData) -> Vec<BatchCheckpoint> {
+fn check_for_da_batch(
+    blockdata: &BlockData,
+    rollup_vk: RollupVerifyingKey,
+) -> Vec<BatchCheckpoint> {
     let protocol_ops_txs = blockdata.protocol_ops_txs();
 
     let inscriptions = protocol_ops_txs
@@ -125,21 +132,45 @@ fn check_for_da_batch(blockdata: &BlockData) -> Vec<BatchCheckpoint> {
             _ => None,
         });
 
-    let signed_checkpoints = inscriptions.filter_map(|(insc, tx)| {
+    let verified_checkpoints = inscriptions.filter_map(|(insc, tx)| {
         match borsh::from_slice::<SignedBatchCheckpoint>(insc.batch_data()) {
             Err(e) => {
                 let txid = tx.compute_txid();
                 warn!(%txid, err = %e, "could not deserialize blob inside inscription");
                 None
             }
-            Ok(v) => Some(v),
+            Ok(signed_checkpoint) => {
+                let checkpoint: BatchCheckpoint = signed_checkpoint.clone().into();
+                let checkpoint_idx = checkpoint.checkpoint().idx();
+                let checkpoint_last_block = checkpoint.checkpoint().l2_blockid();
+
+                let proof = checkpoint.proof();
+                let public_params_raw = borsh::to_vec(&checkpoint).unwrap();
+
+                // NOTE/TODO: this should also verify that this checkpoint is based on top of some previous checkpoint
+                let res = match rollup_vk {
+                    RollupVerifyingKey::Risc0VerifyingKey(vk) => {
+                        Risc0Verifier::verify_groth16(proof, vk.as_ref(), &public_params_raw)
+                    }
+                    RollupVerifyingKey::SP1VerifyingKey(vk) => {
+                        SP1Verifier::verify_groth16(proof, vk.as_ref(), &public_params_raw)
+                    }
+                };
+                match res {
+                    Ok(()) => {
+                        info!(%checkpoint_idx, %checkpoint_last_block, "proof successfully verified");
+                        Some(signed_checkpoint)
+                    }
+                    Err(e) => {
+                        warn!(%checkpoint_idx, %checkpoint_last_block, err = %e, "could not verify proof inside blob");
+                        None
+                    }
+                }
+            }
         }
     });
 
-    // NOTE/TODO: this is where we would verify the checkpoint, i.e, verify block ranges, verify
-    // proof, and whatever else that's necessary
-
-    signed_checkpoints.map(Into::into).collect()
+    verified_checkpoints.map(Into::into).collect()
 }
 
 /// Given a block, generates a manifest of the parts we care about that we can

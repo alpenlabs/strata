@@ -97,6 +97,12 @@ pub trait ZKVMVerifier {
         proof: &Proof,
     ) -> anyhow::Result<()>;
 
+    fn verify_groth16(
+        proof: &[u8],
+        verification_key: &[u8],
+        public_params_raw: &[u8],
+    ) -> anyhow::Result<()>;
+
     /// Extracts the public output from the proof.
     fn extract_public_output<T: Serialize + DeserializeOwned>(proof: &Proof) -> anyhow::Result<T>;
 }

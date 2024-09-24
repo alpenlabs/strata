@@ -13,8 +13,11 @@ alpen-express-rpc-types = { workspace = true }
 alpen-express-state = { workspace = true }
 alpen-express-status = { workspace = true }
 express-chaintsn = { workspace = true }
+express-risc0-adapter = { workspace = true }
+express-sp1-adapter = { workspace = true }
 express-storage = { workspace = true }
 express-tasks = { workspace = true }
+express-zkvm = { workspace = true }
 
 anyhow = { workspace = true }
 bitcoin = { workspace = true }
