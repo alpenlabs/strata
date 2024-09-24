@@ -4,6 +4,7 @@ import flexitest
 
 from entry import BasicEnvConfig
 
+
 @flexitest.register
 class ElBlockGenerationTest(flexitest.Test):
     def __init__(self, ctx: flexitest.InitContext):
