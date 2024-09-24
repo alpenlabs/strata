@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, TypeVar
 
 from bitcoinlib.services.bitcoind import BitcoindClient
+
 from constants import ERROR_CHECKPOINT_DOESNOT_EXIST
 
 
@@ -11,13 +12,13 @@ def wait_until(
     healthcheck_fn: Callable[[], Any],
     error_with: str = "Timed out",
     timeout: int = 5,
-    step: float = 0.5
+    step: float = 0.5,
 ):
     """
     Wait until a function call is successful given a function, time step, and timeout.
     This function waits until function call returns truth value at the interval of 1 sec
     """
-    for _ in range(math.ceil(timeout/step)):
+    for _ in range(math.ceil(timeout / step)):
         try:
             r = healthcheck_fn()
             if not r:
@@ -30,18 +31,20 @@ def wait_until(
 
 
 T = TypeVar("T")
+
+
 def wait_until_with_value(
     fn: Callable[..., T],
     predicate: Callable[[T], bool],
     error_with: str = "Timed out",
     timeout: int = 5,
-    step: float = 0.5
+    step: float = 0.5,
 ) -> T:
     """
     Similar to `wait_until` but this returns the value of the function.
     This also takes another predicate which acts on the function value and returns a bool
     """
-    for _ in range(math.ceil(timeout/step)):
+    for _ in range(math.ceil(timeout / step)):
         try:
             r = fn()
             if not predicate(r):
@@ -60,7 +63,9 @@ class ManualGenBlocksConfig:
     gen_addr: str
 
 
-def check_for_nth_checkpoint_finalization(idx, seqrpc, manual_gen: ManualGenBlocksConfig | None=None):
+def check_for_nth_checkpoint_finalization(
+    idx, seqrpc, manual_gen: ManualGenBlocksConfig | None = None
+):
     """
     This check expects nth checkpoint to be finalized
 
@@ -104,7 +109,9 @@ def check_for_nth_checkpoint_finalization(idx, seqrpc, manual_gen: ManualGenBloc
             timeout=4,
         )
         # Produce l1 blocks so that proof is finalized
-        manual_gen.btcrpc.proxy.generatetoaddress(manual_gen.finality_depth + 1, manual_gen.gen_addr)
+        manual_gen.btcrpc.proxy.generatetoaddress(
+            manual_gen.finality_depth + 1, manual_gen.gen_addr
+        )
 
     # Check if finalized
     wait_until(
