@@ -17,10 +17,6 @@ pub trait AlpenApi {
     #[method(name = "protocolVersion")]
     async fn protocol_version(&self) -> RpcResult<u64>;
 
-    // TODO make this under the admin RPC interface
-    #[method(name = "stop")]
-    async fn stop(&self) -> RpcResult<()>;
-
     #[method(name = "l1connected")]
     async fn get_l1_connection_status(&self) -> RpcResult<bool>;
 
@@ -86,12 +82,16 @@ pub trait AlpenApi {
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "alpadmin"))]
 #[cfg_attr(feature = "client", rpc(server, client, namespace = "alpadmin"))]
 pub trait AlpenAdminApi {
-    #[method(name = "submitDABlob")]
+    /// Stop the node.
+    #[method(name = "stop")]
+    async fn stop(&self) -> RpcResult<()>;
+
     /// Adds L1Write sequencer duty which will be executed by sequencer
+    #[method(name = "submitDABlob")]
     async fn submit_da_blob(&self, blobdata: HexBytes) -> RpcResult<()>;
 
-    #[method(name = "broadcastRawTx")]
     /// Adds an equivalent entry to broadcaster database, which will eventually be broadcasted
+    #[method(name = "broadcastRawTx")]
     async fn broadcast_raw_tx(&self, rawtx: HexBytes) -> RpcResult<Txid>;
 }
 

@@ -461,13 +461,12 @@ async fn start_rpc<D: Database + Send + Sync + 'static>(
         database.clone(),
         sync_man.clone(),
         bcast_handle.clone(),
-        stop_tx,
         l2_block_manager.clone(),
         checkpt_handle,
         relayer_handle,
     );
 
-    let admin_rpc = rpc_server::AdminServerImpl::new(inscription_handler, bcast_handle);
+    let admin_rpc = rpc_server::AdminServerImpl::new(inscription_handler, bcast_handle, stop_tx);
 
     // Construct the full methods table.
     let mut methods = alp_rpc.into_rpc();
