@@ -44,7 +44,7 @@ pub fn process_block(
     // Go through each stage and play out the operations it has.
     process_l1_view_update(state, body.l1_segment(), params)?;
     let ready_withdrawals = process_execution_update(state, body.exec_segment().update())?;
-    process_pending_withdrawals(state, ready_withdrawals)?;
+    process_deposit_updates(state, ready_withdrawals, params)?;
 
     Ok(())
 }
@@ -175,7 +175,7 @@ fn process_execution_update<'c, 'u>(
 /// * Processes L1 withdrawals that are safe to dispatch to specific deposits.
 /// * Reassigns deposits that have passed their deadling to new operators.
 /// * Cleans up deposits that have been handled and can be removed.
-fn process_pending_withdrawals(
+fn process_deposit_updates(
     state: &mut StateCache,
     ready_withdrawals: &[WithdrawalIntent],
     params: &RollupParams,
@@ -236,7 +236,7 @@ fn process_pending_withdrawals(
                 if cur_block_height >= dstate.exec_deadline() {
                     // TODO don't always use pos 0
                     let op_idx = ops_seq[0];
-                    state.reset_deposit_assignee(deposit_idx, op_idx, new_exec_height);
+                    state.reset_deposit_assignee(deposit_idx, op_idx, new_exec_height as u64);
                 }
             }
 
