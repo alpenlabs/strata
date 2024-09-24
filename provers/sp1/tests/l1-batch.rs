@@ -1,11 +1,9 @@
 // NOTE: SP1 prover runs in release mode only; therefore run the tests on release mode only
 #[cfg(feature = "prover")]
 mod test {
-    use std::str::FromStr;
-
-    use alpen_test_utils::bitcoin::get_btc_chain;
-    use bitcoin::{params::MAINNET, Address};
-    use express_proofimpl_btc_blockspace::logic::{BlockspaceProofOutput, ScanRuleConfig};
+    use alpen_test_utils::bitcoin::{get_btc_chain, get_tx_filters};
+    use bitcoin::params::MAINNET;
+    use express_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
     use express_proofimpl_l1_batch::{
         header_verification::HeaderVerificationState,
         logic::{L1BatchProofInput, L1BatchProofOutput},
@@ -60,17 +58,10 @@ mod test {
         let mut l1_batch_input_builder = SP1ProofInputBuilder::new();
         for (_, raw_block) in mainnet_blocks {
             let block_bytes = hex::decode(&raw_block).unwrap();
-            let scan_config = ScanRuleConfig {
-                bridge_scriptbufs: vec![Address::from_str(
-                    "bcrt1pf73jc96ujch43wp3k294003xx4llukyzvp0revwwnww62esvk7hqvarg98",
-                )
-                .unwrap()
-                .assume_checked()
-                .script_pubkey()],
-            };
+            let filters = get_tx_filters();
 
             let blockspace_input = SP1ProofInputBuilder::new()
-                .write(&scan_config)
+                .write_borsh(&filters)
                 .unwrap()
                 .write_serialized(&block_bytes)
                 .unwrap()
@@ -81,8 +72,9 @@ mod test {
                 .prove(blockspace_input)
                 .expect("Failed to generate proof");
 
-            let output = SP1Verifier::extract_public_output::<BlockspaceProofOutput>(&proof)
+            let raw_output = SP1Verifier::extract_public_output::<Vec<u8>>(&proof)
                 .expect("Failed to extract public outputs");
+            let output: BlockspaceProofOutput = borsh::from_slice(&raw_output).unwrap();
 
             blockspace_outputs.push(output);
             l1_batch_input_builder
@@ -96,7 +88,7 @@ mod test {
             state: get_header_verification_state(40321),
         };
         let l1_batch_input = l1_batch_input_builder
-            .write(&input)
+            .write_borsh(&input)
             .unwrap()
             .build()
             .unwrap();
@@ -105,7 +97,8 @@ mod test {
             .prove(l1_batch_input)
             .expect("Failed to generate proof");
 
-        let _output = SP1Verifier::extract_public_output::<L1BatchProofOutput>(&proof)
+        let raw_output = SP1Verifier::extract_public_output::<Vec<u8>>(&proof)
             .expect("Failed to extract public outputs");
+        let _: L1BatchProofOutput = borsh::from_slice(&raw_output).unwrap();
     }
 }

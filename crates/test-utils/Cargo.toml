@@ -4,10 +4,12 @@ name = "alpen-test-utils"
 version = "0.1.0"
 
 [dependencies]
+alpen-express-btcio = { workspace = true }
 alpen-express-db = { workspace = true, features = ["stubs"] }
 alpen-express-primitives = { workspace = true }
 alpen-express-state = { workspace = true }
 express-storage = { workspace = true }
+strata-tx-parser = { workspace = true }
 
 anyhow = { workspace = true }
 arbitrary = { workspace = true }

@@ -1008,6 +1008,7 @@ dependencies = [
 name = "alpen-test-utils"
 version = "0.1.0"
 dependencies = [
+ "alpen-express-btcio",
  "alpen-express-db",
  "alpen-express-primitives",
  "alpen-express-state",
@@ -1019,6 +1020,7 @@ dependencies = [
  "musig2",
  "rand 0.8.5",
  "rockbound",
+ "strata-tx-parser",
  "threadpool",
 ]
 
@@ -3910,14 +3912,18 @@ dependencies = [
 name = "express-proofimpl-btc-blockspace"
 version = "0.1.0"
 dependencies = [
+ "alpen-express-btcio",
  "alpen-express-primitives",
  "alpen-express-state",
  "alpen-test-utils",
  "bitcoin",
+ "borsh",
+ "express-bridge-tx-builder",
  "hex",
  "rand 0.8.5",
  "serde",
  "sha2 0.10.8",
+ "strata-tx-parser",
 ]
 
 [[package]]
@@ -3961,6 +3967,7 @@ name = "express-proofimpl-l1-batch"
 version = "0.1.0"
 dependencies = [
  "alpen-express-primitives",
+ "alpen-express-state",
  "alpen-test-utils",
  "anyhow",
  "bitcoin",
@@ -12431,6 +12438,7 @@ dependencies = [
  "alpen-express-state",
  "anyhow",
  "bitcoin",
+ "borsh",
  "hex",
  "thiserror",
  "tracing",
