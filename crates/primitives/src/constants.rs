@@ -9,5 +9,5 @@ pub const NONCE_SEED_SIZE: usize = 32;
 /// The size (in bytes) of a [`musig2::PubNonce`].
 pub const PUB_NONCE_SIZE: usize = 66;
 
-/// The size (in bytes) of a Hash (such as Txid).
+/// The size (in bytes) of a Hash (such as [`Txid`](bitcoin::Txid)).
 pub const HASH_SIZE: usize = 32;

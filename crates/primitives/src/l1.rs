@@ -3,12 +3,12 @@ use std::{
     io::{self, Read, Write},
     iter::Sum,
     ops::Add,
-    str::FromStr,
 };
 
 use arbitrary::{Arbitrary, Unstructured};
 use bitcoin::{
     absolute::LockTime,
+    address::NetworkUnchecked,
     consensus::serialize,
     hashes::{sha256d, Hash},
     key::{rand, Keypair, Parity, TapTweak},
@@ -262,7 +262,9 @@ pub struct BitcoinAddress {
 
 impl BitcoinAddress {
     pub fn parse(address_str: &str, network: Network) -> Result<Self, ParseError> {
-        let address = Address::from_str(address_str).map_err(ParseError::InvalidAddress)?;
+        let address = address_str
+            .parse::<Address<NetworkUnchecked>>()
+            .map_err(ParseError::InvalidAddress)?;
 
         let checked_address = address
             .require_network(network)
@@ -297,7 +299,9 @@ impl<'de> Deserialize<'de> for BitcoinAddress {
         }
 
         let shim = BitcoinAddressShim::deserialize(deserializer)?;
-        let address = Address::from_str(&shim.address)
+        let address = shim
+            .address
+            .parse::<Address<NetworkUnchecked>>()
             .map_err(|_| de::Error::custom("invalid bitcoin address"))?
             .require_network(shim.network)
             .map_err(|_| de::Error::custom("address invalid for given network"))?;
@@ -347,7 +351,8 @@ impl BorshDeserialize for BitcoinAddress {
             }
         };
 
-        let address = Address::from_str(&address_str)
+        let address = address_str
+            .parse::<Address<NetworkUnchecked>>()
             .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "invalid bitcoin address"))?
             .require_network(network)
             .map_err(|_| {
