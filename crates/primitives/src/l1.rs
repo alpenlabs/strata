@@ -1,9 +1,8 @@
 use std::{
     fmt::Display,
-    io::{self, ErrorKind, Read, Write},
+    io::{self, Read, Write},
     iter::Sum,
     ops::Add,
-    str::FromStr,
 };
 
 use arbitrary::{Arbitrary, Unstructured};
@@ -21,10 +20,9 @@ use bitcoin::{
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 use reth_primitives::revm_primitives::FixedBytes;
-use serde::{Deserialize, Serialize};
-use serde_json;
+use serde::{de, Deserialize, Deserializer, Serialize};
 
-use crate::{buf::Buf32, errors::ParseError, tx::ProtocolOperation};
+use crate::{buf::Buf32, constants::HASH_SIZE, errors::ParseError, tx::ProtocolOperation};
 
 /// Reference to a transaction in a block.  This is the block index and the
 /// position of the transaction in the block.
@@ -196,10 +194,9 @@ impl BorshSerialize for OutputRef {
 impl BorshDeserialize for OutputRef {
     fn deserialize_reader<R: Read>(reader: &mut R) -> Result<Self, io::Error> {
         // Read 32 bytes for the transaction ID
-        let mut txid_bytes = [0u8; 32];
+        let mut txid_bytes = [0u8; HASH_SIZE];
         reader.read_exact(&mut txid_bytes)?;
-        let txid = bitcoin::Txid::from_slice(&txid_bytes)
-            .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid Txid"))?;
+        let txid = bitcoin::Txid::from_slice(&txid_bytes).expect("should be a valid txid (hash)");
 
         // Read 4 bytes for the output index
         let mut vout_bytes = [0u8; 4];
@@ -214,7 +211,7 @@ impl BorshDeserialize for OutputRef {
 impl<'a> Arbitrary<'a> for OutputRef {
     fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
         // Generate a random 32-byte array for the transaction ID (txid)
-        let mut txid_bytes = [0u8; 32];
+        let mut txid_bytes = [0u8; HASH_SIZE];
         u.fill_buffer(&mut txid_bytes)?;
         let txid_bytes = &txid_bytes[..];
         let hash = sha256d::Hash::from_slice(txid_bytes).unwrap();
@@ -250,80 +247,122 @@ pub struct L1Status {
     pub last_update: u64,
 }
 
-/// A wrapper around the [`bitcoin::Address<NetworkUnchecked>`] type created in order to implement
+/// A wrapper around the [`bitcoin::Address<NetworkChecked>`] type created in order to implement
 /// some useful traits on it such as [`serde::Deserialize`], [`borsh::BorshSerialize`] and
 /// [`borsh::BorshDeserialize`].
 // TODO: implement [`arbitrary::Arbitrary`]?
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
-pub struct BitcoinAddress(Address<NetworkUnchecked>);
+pub struct BitcoinAddress {
+    /// The [`bitcoin::Network`] that this address is valid in.
+    network: Network,
 
-impl FromStr for BitcoinAddress {
-    type Err = <Address<NetworkUnchecked> as FromStr>::Err;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let address = Address::from_str(s)?;
-
-        Ok(Self(address))
-    }
+    /// The actual [`Address`] that this type wraps.
+    address: Address,
 }
 
-impl From<Address<NetworkUnchecked>> for BitcoinAddress {
-    fn from(value: Address<NetworkUnchecked>) -> Self {
-        Self(value)
-    }
-}
+impl BitcoinAddress {
+    pub fn parse(address_str: &str, network: Network) -> Result<Self, ParseError> {
+        let address = address_str
+            .parse::<Address<NetworkUnchecked>>()
+            .map_err(ParseError::InvalidAddress)?;
 
-impl From<Address> for BitcoinAddress {
-    fn from(value: Address) -> Self {
-        Self(value.as_unchecked().clone())
+        let checked_address = address
+            .require_network(network)
+            .map_err(ParseError::InvalidAddress)?;
+
+        Ok(Self {
+            network,
+            address: checked_address,
+        })
     }
 }
 
 impl BitcoinAddress {
-    pub fn new(address: Address<NetworkUnchecked>) -> Self {
-        Self(address)
+    pub fn address(&self) -> &Address {
+        &self.address
     }
 
-    pub fn address(&self) -> &Address<NetworkUnchecked> {
-        &self.0
+    pub fn network(&self) -> &Network {
+        &self.network
     }
 }
 
 impl<'de> Deserialize<'de> for BitcoinAddress {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: serde::Deserializer<'de>,
+        D: Deserializer<'de>,
     {
-        let s: &str = Deserialize::deserialize(deserializer)?;
-        BitcoinAddress::from_str(s).map_err(serde::de::Error::custom)
+        #[derive(Deserialize)]
+        struct BitcoinAddressShim {
+            network: Network,
+            address: String,
+        }
+
+        let shim = BitcoinAddressShim::deserialize(deserializer)?;
+        let address = shim
+            .address
+            .parse::<Address<NetworkUnchecked>>()
+            .map_err(|_| de::Error::custom("invalid bitcoin address"))?
+            .require_network(shim.network)
+            .map_err(|_| de::Error::custom("address invalid for given network"))?;
+
+        Ok(BitcoinAddress {
+            network: shim.network,
+            address,
+        })
     }
 }
 
 impl BorshSerialize for BitcoinAddress {
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), io::Error> {
-        let addr_str =
-            serde_json::to_string(&self).map_err(|e| io::Error::new(ErrorKind::Other, e))?;
+        let address_string = self.address.to_string();
 
-        // address serialization adds `"` to both ends of the string (for JSON compatibility)
-        let addr_str = addr_str.trim_matches('"');
+        BorshSerialize::serialize(address_string.as_str(), writer)?;
 
-        writer.write_all(addr_str.as_bytes())?;
+        let network_byte = match self.network {
+            Network::Bitcoin => 0u8,
+            Network::Testnet => 1u8,
+            Network::Signet => 2u8,
+            Network::Regtest => 3u8,
+            other => unreachable!("should handle new variant: {}", other),
+        };
+
+        BorshSerialize::serialize(&network_byte, writer)?;
+
         Ok(())
     }
 }
 
 impl BorshDeserialize for BitcoinAddress {
     fn deserialize_reader<R: Read>(reader: &mut R) -> Result<Self, io::Error> {
-        let mut addr_bytes = Vec::new();
-        reader.read_to_end(&mut addr_bytes)?;
+        let address_str = String::deserialize_reader(reader)?;
 
-        let addr_str = String::from_utf8(addr_bytes)
-            .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid UTF-8"))?;
+        let network_byte = u8::deserialize_reader(reader)?;
+        let network = match network_byte {
+            0u8 => Network::Bitcoin,
+            1u8 => Network::Testnet,
+            2u8 => Network::Signet,
+            3u8 => Network::Regtest,
+            _ => {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("Invalid network byte: {}", network_byte),
+                ));
+            }
+        };
 
-        let address = Address::from_str(&addr_str)
-            .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid Bitcoin address"))?;
+        let address = address_str
+            .parse::<Address<NetworkUnchecked>>()
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "invalid bitcoin address"))?
+            .require_network(network)
+            .map_err(|_| {
+                io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "address invalid for given network",
+                )
+            })?;
 
-        Ok(BitcoinAddress(address))
+        Ok(BitcoinAddress { address, network })
     }
 }
 
@@ -437,9 +476,8 @@ impl XOnlyPk {
     }
 
     /// Convert a [`BitcoinAddress`] into a [`XOnlyPk`].
-    pub fn from_address(address: &BitcoinAddress, network: Network) -> Result<Self, ParseError> {
-        let unchecked_addr = address.address().clone();
-        let checked_addr = unchecked_addr.require_network(network)?;
+    pub fn from_address(checked_addr: &BitcoinAddress) -> Result<Self, ParseError> {
+        let checked_addr = checked_addr.address();
 
         if let Some(AddressType::P2tr) = checked_addr.address_type() {
             let script_pubkey = checked_addr.script_pubkey();
@@ -787,30 +825,77 @@ mod tests {
         taproot::{ControlBlock, LeafVersion, TaprootBuilder, TaprootMerkleBranch},
         Address, Amount, Network, ScriptBuf, TapNodeHash, TxOut, XOnlyPublicKey,
     };
+    use rand::Rng;
     use secp256k1::{Parity, SECP256K1};
 
     use super::{BitcoinAddress, BitcoinAmount, BorshDeserialize, BorshSerialize, XOnlyPk};
-    use crate::l1::{BitcoinPsbt, BitcoinTxOut, TaprootSpendPath};
+    use crate::{
+        errors::ParseError,
+        l1::{BitcoinPsbt, BitcoinTxOut, TaprootSpendPath},
+    };
+
+    #[test]
+    fn test_parse_bitcoin_address_network() {
+        let possible_networks = [
+            // mainnet
+            Network::Bitcoin,
+            // testnets
+            Network::Testnet,
+            Network::Signet,
+            Network::Regtest,
+        ];
+
+        let num_possible_networks = possible_networks.len();
+
+        let (secret_key, _) = SECP256K1.generate_keypair(&mut rand::thread_rng());
+        let keypair = Keypair::from_secret_key(SECP256K1, &secret_key);
+        let (internal_key, _) = XOnlyPublicKey::from_keypair(&keypair);
+
+        for network in possible_networks.iter() {
+            // NOTE: only checking for P2TR addresses for now as those are the ones we use. Other
+            // typs of addresses can also be checked but that shouldn't be necessary.
+            let address = Address::p2tr(SECP256K1, internal_key, None, *network);
+            let address_str = address.to_string();
+
+            BitcoinAddress::parse(&address_str, *network).expect("address should parse");
+
+            let invalid_network = match network {
+                Network::Bitcoin => {
+                    // get one of the testnets
+                    let index = rand::thread_rng().gen_range(1..num_possible_networks);
+
+                    possible_networks[index]
+                }
+                Network::Testnet | Network::Signet | Network::Regtest => Network::Bitcoin,
+                other => unreachable!("this variant needs to be handled: {}", other),
+            };
+
+            assert!(
+                BitcoinAddress::parse(&address_str, invalid_network)
+                    .is_err_and(|e| matches!(e, ParseError::InvalidAddress(_))),
+                "should error with ParseError::InvalidAddress if parse is passed an invalid address/network pair: {}, {}",
+                address_str, invalid_network
+            );
+        }
+    }
 
     #[test]
     fn json_serialization_of_bitcoin_address_works() {
         // this is a random address
         // TODO: implement `Arbitrary` on `BitcoinAddress` and remove this hardcoded value
-        let mainnet_addr = "\"bc1qpaj2e2ccwqvyzvsfhcyktulrjkkd28fg75wjuc\"";
+        let mainnet_addr = "bc1qpaj2e2ccwqvyzvsfhcyktulrjkkd28fg75wjuc";
+        let network = Network::Bitcoin;
 
-        let deserialized_bitcoin_addr: BitcoinAddress =
-            serde_json::from_str(mainnet_addr).expect("deserialization of bitcoin address");
+        let bitcoin_addr = BitcoinAddress::parse(mainnet_addr, network)
+            .expect("address should be valid for the network");
 
-        let serialized_bitcoin_addr = serde_json::to_string(&deserialized_bitcoin_addr);
-
-        assert!(
-            serialized_bitcoin_addr.is_ok(),
-            "serialization of BitcoinAddress must work"
-        );
+        let serialized_bitcoin_addr =
+            serde_json::to_string(&bitcoin_addr).expect("serialization should work");
+        let deserialized_bitcoind_addr: BitcoinAddress =
+            serde_json::from_str(&serialized_bitcoin_addr).expect("deserialization should work");
 
         assert_eq!(
-            mainnet_addr,
-            serialized_bitcoin_addr.unwrap(),
+            bitcoin_addr, deserialized_bitcoind_addr,
             "original and serialized addresses must be the same"
         );
     }
@@ -818,26 +903,88 @@ mod tests {
     #[test]
     fn borsh_serialization_of_bitcoin_address_works() {
         let mainnet_addr = "bc1qpaj2e2ccwqvyzvsfhcyktulrjkkd28fg75wjuc";
-
-        let addr_bytes = mainnet_addr.as_bytes();
-
-        let deserialized_addr = BitcoinAddress::try_from_slice(addr_bytes);
-
-        assert!(
-            deserialized_addr.is_ok(),
-            "borsh deserialization of bitcoin address must work"
-        );
+        let network = Network::Bitcoin;
+        let original_addr: BitcoinAddress =
+            BitcoinAddress::parse(mainnet_addr, network).expect("should be a valid address");
 
         let mut serialized_addr: Vec<u8> = vec![];
-        deserialized_addr
-            .unwrap()
+        original_addr
             .serialize(&mut serialized_addr)
             .expect("borsh serialization of bitcoin address must work");
 
+        let deserialized = BitcoinAddress::try_from_slice(&serialized_addr);
+        assert!(
+            deserialized.is_ok(),
+            "deserialization of bitcoin address should work but got: {:?}",
+            deserialized.unwrap_err()
+        );
+
         assert_eq!(
-            addr_bytes,
-            &serialized_addr[..],
-            "original address bytes and serialized address bytes must be the same",
+            deserialized.unwrap(),
+            original_addr,
+            "original address and deserialized address must be the same",
+        );
+    }
+
+    #[test]
+    fn test_borsh_serialization_of_multiple_addresses() {
+        // Sample Bitcoin addresses
+        let addresses = [
+            "1BoatSLRHtKNngkdXEeobR76b53LETtpyT",
+            "3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy",
+            "bc1qpaj2e2ccwqvyzvsfhcyktulrjkkd28fg75wjuc",
+        ];
+
+        let network = Network::Bitcoin;
+
+        // Convert strings to BitcoinAddress instances
+        let bitcoin_addresses: Vec<BitcoinAddress> = addresses
+            .iter()
+            .map(|s| {
+                BitcoinAddress::parse(s, network)
+                    .unwrap_or_else(|_e| panic!("random address {s} should be valid on: {network}"))
+            })
+            .collect();
+
+        // Serialize the vector of BitcoinAddress instances
+        let mut serialized = Vec::new();
+        bitcoin_addresses
+            .serialize(&mut serialized)
+            .expect("serialization should work");
+
+        // Attempt to deserialize back into a vector of BitcoinAddress instances
+        let deserialized: Vec<BitcoinAddress> =
+            Vec::try_from_slice(&serialized).expect("Deserialization failed");
+
+        // Check that the deserialized addresses match the original
+        assert_eq!(bitcoin_addresses, deserialized);
+    }
+
+    #[test]
+    fn test_borsh_serialization_of_address_in_struct() {
+        #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+        struct Test {
+            address: BitcoinAddress,
+            other: u32,
+        }
+
+        let sample_addr = "bc1qpaj2e2ccwqvyzvsfhcyktulrjkkd28fg75wjuc";
+        let network = Network::Bitcoin;
+        let original = Test {
+            other: 1,
+            address: BitcoinAddress::parse(sample_addr, network).expect("should be valid address"),
+        };
+
+        let mut serialized = vec![];
+        original
+            .serialize(&mut serialized)
+            .expect("should be able to serialize");
+
+        let deserialized: Test = Test::try_from_slice(&serialized).expect("should deserialize");
+
+        assert_eq!(
+            deserialized, original,
+            "deserialized and original structs with address should be the same"
         );
     }
 
@@ -847,7 +994,7 @@ mod tests {
         let network = Network::Bitcoin;
         let (address, _) = get_taproot_address(&secp, network);
 
-        let taproot_pubkey = XOnlyPk::from_address(&address, network);
+        let taproot_pubkey = XOnlyPk::from_address(&address);
 
         assert!(
             taproot_pubkey.is_ok(),
@@ -863,14 +1010,15 @@ mod tests {
         );
 
         let bitcoin_address = bitcoin_address.unwrap();
-        let unchecked_addr = bitcoin_address.as_unchecked();
+        let address_str = bitcoin_address.to_string();
 
-        let new_taproot_pubkey =
-            XOnlyPk::from_address(&BitcoinAddress::new(unchecked_addr.clone()), network);
+        let new_taproot_pubkey = XOnlyPk::from_address(
+            &BitcoinAddress::parse(&address_str, network).expect("should be a valid address"),
+        );
 
         assert_eq!(
-            unchecked_addr,
-            address.address(),
+            bitcoin_address,
+            *address.address(),
             "converted and original addresses must be the same"
         );
 
@@ -919,7 +1067,7 @@ mod tests {
         let taproot_address = Address::p2tr(secp, internal_pubkey, merkle_root, network);
 
         (
-            BitcoinAddress::new(taproot_address.as_unchecked().clone()),
+            BitcoinAddress::parse(&taproot_address.to_string(), network).unwrap(),
             merkle_root,
         )
     }
