@@ -140,7 +140,6 @@ pub struct AlpenRpcImpl<D> {
     database: Arc<D>,
     sync_manager: Arc<SyncManager>,
     bcast_handle: Arc<L1BroadcastHandle>,
-    stop_tx: Mutex<Option<oneshot::Sender<()>>>,
     l2_block_manager: Arc<L2BlockManager>,
     checkpoint_handle: Arc<CheckpointHandle>,
     relayer_handle: Arc<RelayerHandle>,
@@ -153,7 +152,6 @@ impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
         database: Arc<D>,
         sync_manager: Arc<SyncManager>,
         bcast_handle: Arc<L1BroadcastHandle>,
-        stop_tx: oneshot::Sender<()>,
         l2_block_manager: Arc<L2BlockManager>,
         checkpoint_handle: Arc<CheckpointHandle>,
         relayer_handle: Arc<RelayerHandle>,
@@ -163,7 +161,6 @@ impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
             database,
             sync_manager,
             bcast_handle,
-            stop_tx: Mutex::new(Some(stop_tx)),
             l2_block_manager,
             checkpoint_handle,
             relayer_handle,
@@ -226,16 +223,6 @@ fn conv_blk_header_to_rpc(blk_header: &impl L2Header) -> BlockHeader {
 impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
     async fn protocol_version(&self) -> RpcResult<u64> {
         Ok(1)
-    }
-
-    async fn stop(&self) -> RpcResult<()> {
-        let mut opt = self.stop_tx.lock().await;
-        if let Some(stop_tx) = opt.take() {
-            if stop_tx.send(()).is_err() {
-                warn!("tried to send stop signal, channel closed");
-            }
-        }
-        Ok(())
     }
 
     async fn get_l1_status(&self) -> RpcResult<L1Status> {
@@ -661,22 +648,35 @@ pub struct AdminServerImpl {
     // and seq
     pub writer: Option<Arc<InscriptionHandle>>,
     pub bcast_handle: Arc<L1BroadcastHandle>,
+    stop_tx: Mutex<Option<oneshot::Sender<()>>>,
 }
 
 impl AdminServerImpl {
     pub fn new(
         writer: Option<Arc<InscriptionHandle>>,
         bcast_handle: Arc<L1BroadcastHandle>,
+        stop_tx: oneshot::Sender<()>,
     ) -> Self {
         Self {
             writer,
             bcast_handle,
+            stop_tx: Mutex::new(Some(stop_tx)),
         }
     }
 }
 
 #[async_trait]
 impl AlpenAdminApiServer for AdminServerImpl {
+    async fn stop(&self) -> RpcResult<()> {
+        let mut opt = self.stop_tx.lock().await;
+        if let Some(stop_tx) = opt.take() {
+            if stop_tx.send(()).is_err() {
+                warn!("tried to send stop signal, channel closed");
+            }
+        }
+        Ok(())
+    }
+
     async fn submit_da_blob(&self, blob: HexBytes) -> RpcResult<()> {
         let commitment = hash::raw(&blob.0);
         let blobintent = BlobIntent::new(BlobDest::L1, commitment, blob.0);

@@ -19,7 +19,10 @@ FAST_BATCH_ROLLUP_PARAMS = {
     "l1_reorg_safe_depth": 4,
     "target_l2_batch_size": 5,
     "address_length": 20,
-    "deposit_amount": 1000000,
+    "deposit_amount": 1_000_000_000,
+    "rollup_vk": {
+        "risc0_verifying_key": "0x00b01ae596b4e51843484ff71ccbd0dd1a030af70b255e6b9aad50b81d81266f"
+    },
 }
 
 # Error codes
