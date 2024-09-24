@@ -6,7 +6,11 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use crate::{batch::CheckpointInfo, id::L2BlockId, l1::L1BlockId};
+use crate::{
+    batch::{BatchCommitment, CheckpointInfo},
+    id::L2BlockId,
+    l1::L1BlockId,
+};
 
 /// High level client's state of the network.  This is local to the client, not
 /// coordinated as part of the L2 chain.
@@ -110,6 +114,11 @@ pub struct SyncState {
 
     /// L2 block that's been finalized on L1 and proven
     pub(super) finalized_blkid: L2BlockId,
+
+    /// L2 block that's been committed on L1 by sequencer
+    pub(super) committed_blkid: L2BlockId,
+
+    pub(super) committed_height: u64,
 }
 
 type L1BlockHeight = u64;
@@ -121,11 +130,21 @@ impl SyncState {
             tip_blkid: gblkid,
             confirmed_checkpoint_blocks: Vec::new(),
             finalized_blkid: gblkid,
+            committed_blkid: gblkid,
+            committed_height: 0,
         }
     }
 
     pub fn chain_tip_blkid(&self) -> &L2BlockId {
         &self.tip_blkid
+    }
+
+    pub fn committed_blkid(&self) -> &L2BlockId {
+        &self.committed_blkid
+    }
+
+    pub fn committed_height(&self) -> u64 {
+        self.committed_height
     }
 
     pub fn finalized_blkid(&self) -> &L2BlockId {
@@ -164,8 +183,7 @@ pub struct LocalL1State {
     /// Last finalized checkpoint
     pub(super) last_finalized_checkpoint: Option<L1CheckPoint>,
 
-    /// Checkpoints that are in L1 but yet to be finalized.
-    pub(super) pending_checkpoints: Vec<L1CheckPoint>,
+    pub(super) last_finalized_commitment: Option<L1Commitment>,
 }
 
 impl LocalL1State {
@@ -182,8 +200,8 @@ impl LocalL1State {
         Self {
             local_unaccepted_blocks: Vec::new(),
             next_expected_block,
-            pending_checkpoints: Vec::new(),
             last_finalized_checkpoint: None,
+            last_finalized_commitment: None,
         }
     }
 
@@ -225,23 +243,6 @@ impl LocalL1State {
     pub fn last_finalized_checkpoint(&self) -> Option<&L1CheckPoint> {
         self.last_finalized_checkpoint.as_ref()
     }
-
-    pub fn pending_checkpoints(&self) -> &[L1CheckPoint] {
-        &self.pending_checkpoints
-    }
-
-    pub fn has_pending_checkpoint_within_height(&self, height: u64) -> bool {
-        self.pending_checkpoints
-            .iter()
-            .any(|cp| cp.height <= height)
-    }
-
-    pub fn last_pending_checkpoint_within_height(&self, height: u64) -> Option<&L1CheckPoint> {
-        self.pending_checkpoints
-            .iter()
-            .take_while(|cp| cp.height <= height)
-            .last()
-    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
@@ -258,5 +259,17 @@ impl L1CheckPoint {
             checkpoint: info,
             height,
         }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
+pub struct L1Commitment {
+    pub commitment: BatchCommitment,
+    pub height: u64,
+}
+
+impl L1Commitment {
+    pub fn new(commitment: BatchCommitment, height: u64) -> Self {
+        Self { commitment, height }
     }
 }

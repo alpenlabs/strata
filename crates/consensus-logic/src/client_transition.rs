@@ -63,16 +63,6 @@ pub fn process_event<D: Database>(
                 return Err(Error::OutOfOrderL1Block(next_exp_height, *height, *l1blkid));
             }
 
-            // If we have some number of L1 blocks finalized, also emit an `UpdateBuried` write.
-            let safe_depth = params.rollup().l1_reorg_safe_depth as u64;
-            let maturable_height = next_exp_height.saturating_sub(safe_depth);
-
-            if maturable_height > params.rollup().horizon_l1_height && state.is_chain_active() {
-                let (wrs, acts) = handle_maturable_height(maturable_height, state);
-                writes.extend(wrs);
-                actions.extend(acts);
-            }
-
             // Activate chain if not already
             if state.sync().is_none() {
                 debug!(%height, "Chain not active, activating chain. Received block");
@@ -95,7 +85,7 @@ pub fn process_event<D: Database>(
             writes.push(ClientStateWrite::RollbackL1BlocksTo(*to_height));
         }
 
-        SyncEvent::L1DABatch(height, commitments) => {
+        SyncEvent::L1DABatch(height, checkpoints) => {
             debug!(%height, "received L1DABatch");
 
             if let Some(ss) = state.sync() {
@@ -105,12 +95,34 @@ pub fn process_event<D: Database>(
 
                 // When DABatch appears, it is only confirmed at the moment. These will be finalized
                 // only when the corresponding L1 block is buried enough
-                writes.push(ClientStateWrite::CheckpointsReceived(
+                let final_checkpoint = checkpoints
+                    .iter()
+                    .map(|x| x.checkpoint())
+                    .last()
+                    .cloned()
+                    .expect("must be present");
+                let final_blockid = *final_checkpoint.l2_blockid();
+                writes.push(ClientStateWrite::CheckpointFinalized(
                     *height,
-                    commitments.iter().map(|x| x.checkpoint().clone()).collect(),
+                    final_checkpoint,
                 ));
 
-                actions.push(SyncAction::WriteCheckpoints(*height, commitments.clone()));
+                actions.push(SyncAction::WriteCheckpoints(*height, checkpoints.clone()));
+                actions.push(SyncAction::FinalizeBlock(final_blockid));
+            } else {
+                // TODO we can expand this later to make more sense
+                return Err(Error::MissingClientSyncState);
+            }
+        }
+
+        SyncEvent::L1DACommitment(height, commitment) => {
+            if let Some(_ss) = state.sync() {
+                let blockid = *commitment.l2_blockid();
+                writes.push(ClientStateWrite::CommitmentFinalized(
+                    *height,
+                    commitment.clone(),
+                ));
+                actions.push(SyncAction::SafeBlock(blockid));
             } else {
                 // TODO we can expand this later to make more sense
                 return Err(Error::MissingClientSyncState);
@@ -151,37 +163,6 @@ pub fn process_event<D: Database>(
     }
 
     Ok(ClientUpdateOutput::new(writes, actions))
-}
-
-fn handle_maturable_height(
-    maturable_height: u64,
-    state: &ClientState,
-) -> (Vec<ClientStateWrite>, Vec<SyncAction>) {
-    let mut writes = Vec::new();
-    let mut actions = Vec::new();
-
-    // If there are checkpoints at or before the maturable height, mark them as finalized
-    if state
-        .l1_view()
-        .has_pending_checkpoint_within_height(maturable_height)
-    {
-        debug!(%maturable_height, "Writing CheckpointFinalized");
-        writes.push(ClientStateWrite::CheckpointFinalized(maturable_height));
-
-        // Emit sync action for finalizing a l2 block
-        if let Some(checkpt) = state
-            .l1_view()
-            .last_pending_checkpoint_within_height(maturable_height)
-        {
-            actions.push(SyncAction::FinalizeBlock(checkpt.checkpoint.l2_blockid));
-        } else {
-            warn!(
-            %maturable_height,
-            "expected to find blockid corresponding to buried l1 height in confirmed_blocks but could not find"
-            );
-        }
-    }
-    (writes, actions)
 }
 
 fn activate_chain(

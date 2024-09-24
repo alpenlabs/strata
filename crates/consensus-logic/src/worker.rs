@@ -191,6 +191,11 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
                     .put_block_status_blocking(blkid, BlockStatus::Invalid)?;
             }
 
+            SyncAction::SafeBlock(blockid) => {
+                info!(?blockid, "mark safe block");
+                engine.update_safe_block(*blockid)?;
+            }
+
             SyncAction::FinalizeBlock(blkid) => {
                 // For the fork choice manager this gets picked up later.  We don't have
                 // to do anything here *necessarily*.

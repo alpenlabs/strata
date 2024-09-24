@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 
-use alpen_express_btcio::reader::config::ReaderConfig;
 use alpen_express_primitives::relay::types::RelayerConfig;
 use bitcoin::Network;
 use serde::Deserialize;
@@ -42,7 +41,6 @@ pub struct ClientConfig {
 #[derive(Debug, Deserialize)]
 pub struct SyncConfig {
     pub l1_follow_distance: u64,
-    pub max_reorg_depth: u32,
     pub client_poll_dur_ms: u32,
     pub client_checkpoint_interval: u32,
 }
@@ -125,7 +123,6 @@ impl Config {
             },
             sync: SyncConfig {
                 l1_follow_distance: 6,
-                max_reorg_depth: 4,
                 client_poll_dur_ms: 200,
                 client_checkpoint_interval: 10,
             },
@@ -188,13 +185,6 @@ impl Config {
             self.client.db_retry_count = db_retry_count;
         }
     }
-
-    pub fn get_reader_config(&self) -> ReaderConfig {
-        ReaderConfig {
-            max_reorg_depth: self.sync.max_reorg_depth,
-            client_poll_dur_ms: self.sync.client_poll_dur_ms,
-        }
-    }
 }
 
 #[cfg(test)]
@@ -221,7 +211,6 @@ mod test {
 
             [sync]
             l1_follow_distance = 6
-            max_reorg_depth = 4
             client_poll_dur_ms = 200
             client_checkpoint_interval = 10
 
@@ -255,7 +244,6 @@ mod test {
 
             [sync]
             l1_follow_distance = 6
-            max_reorg_depth = 4
             client_poll_dur_ms = 200
             client_checkpoint_interval = 10
 

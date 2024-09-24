@@ -9,6 +9,8 @@ pub enum L1Event {
 
     /// Revert to the provided block height
     RevertTo(u64),
+
+    Matured(u64),
 }
 
 /// Core protocol specific transaction. It can be thought of as relevant transactions for the

@@ -60,12 +60,8 @@ async fn do_reader_task<D: Database + 'static>(
 
     let poll_dur = Duration::from_millis(config.client_poll_dur_ms as u64);
 
-    let mut state = init_reader_state(
-        target_next_block,
-        config.max_reorg_depth as usize * 2,
-        client,
-    )
-    .await?;
+    let mut state =
+        init_reader_state(target_next_block, config.max_reorg_depth as usize, client).await?;
     let best_blkid = state.best_block();
     info!(%best_blkid, "initialized L1 reader state");
 
@@ -263,7 +259,14 @@ async fn fetch_and_process_block(
     }
 
     // Insert to new block, incrementing cur_height.
-    let _deep = state.accept_new_block(l1blkid);
+    let buried = state.accept_new_block(l1blkid);
+
+    if let Some((_blockhash, buried_height)) = buried {
+        if let Err(e) = event_tx.send(L1Event::Matured(buried_height)).await {
+            error!("failed to submit L1 block event, did the persistence task crash?");
+            return Err(e.into());
+        }
+    }
 
     Ok(l1blkid)
 }

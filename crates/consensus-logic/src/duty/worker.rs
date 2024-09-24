@@ -18,7 +18,7 @@ use alpen_express_primitives::{
     params::Params,
 };
 use alpen_express_state::{
-    batch::{BatchCheckpoint, SignedBatchCheckpoint},
+    batch::{BatchCheckpoint, BatchCommitment, BlobPayload, SignedBlobPayload},
     client_state::ClientState,
     da_blob::{BlobDest, BlobIntent},
     prelude::*,
@@ -397,17 +397,17 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
 
             let checkpoint = check_and_get_batch_checkpoint(data, checkpt_mgr)?;
 
-            let checkpoint_sighash = checkpoint.get_sighash();
-            let signature = sign_with_identity_key(&checkpoint_sighash, ik);
-            let signed_checkpoint = SignedBatchCheckpoint::new(checkpoint, signature);
+            let blob = BlobPayload::BatchCheckpoint(checkpoint);
+            let blob_sighash = blob.get_sighash();
+            let signature = sign_with_identity_key(&blob_sighash, ik);
+            let signed_blob = SignedBlobPayload::new(blob, signature);
 
             // serialize and send to l1 writer
 
-            let payload =
-                borsh::to_vec(&signed_checkpoint).map_err(|e| Error::Other(e.to_string()))?;
-            let blob_intent = BlobIntent::new(BlobDest::L1, checkpoint_sighash, payload);
+            let payload = borsh::to_vec(&signed_blob).map_err(|e| Error::Other(e.to_string()))?;
+            let blob_intent = BlobIntent::new(BlobDest::L1, blob_sighash, payload);
 
-            info!(signed_checkpoint = ?signed_checkpoint, "signed checkpoint");
+            info!(signed_blob = ?signed_blob, "signed checkpoint");
             info!(blob_intent = ?blob_intent, "blob intent");
 
             inscription_handle

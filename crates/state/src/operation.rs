@@ -6,8 +6,8 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use tracing::*;
 
 use crate::{
-    batch::{BatchCheckpoint, CheckpointInfo},
-    client_state::{ClientState, L1CheckPoint, SyncState},
+    batch::{BatchCheckpoint, BatchCommitment, CheckpointInfo},
+    client_state::{ClientState, L1CheckPoint, L1Commitment, SyncState},
     id::L2BlockId,
     l1::L1BlockId,
 };
@@ -65,11 +65,10 @@ pub enum ClientStateWrite {
     /// Updates the buried block index to a higher index.
     UpdateBuried(u64),
 
-    /// Update the checkpoints
-    CheckpointsReceived(u64, Vec<CheckpointInfo>),
-
     /// The previously confirmed checkpoint is finalized at given l1 height
-    CheckpointFinalized(u64),
+    CheckpointFinalized(u64, CheckpointInfo),
+
+    CommitmentFinalized(u64, BatchCommitment),
 }
 
 /// Actions the client state machine directs the node to take to update its own
@@ -85,6 +84,8 @@ pub enum SyncAction {
     /// Marks an L2 blockid as invalid and we won't follow any chain that has
     /// it, and will reject it from our peers.
     MarkInvalid(L2BlockId),
+
+    SafeBlock(L2BlockId),
 
     /// Finalizes a block, indicating that it won't be reverted.
     FinalizeBlock(L2BlockId),
@@ -133,9 +134,6 @@ pub fn apply_writes_to_state(
 
                 let new_unacc_len = height - buried_height;
                 l1v.local_unaccepted_blocks.truncate(new_unacc_len as usize);
-
-                // Keep pending checkpoints whose l1 height is less than or equal to rollback height
-                l1v.pending_checkpoints.retain(|ckpt| ckpt.height <= height);
             }
 
             AcceptL1Block(l1blkid) => {
@@ -180,50 +178,21 @@ pub fn apply_writes_to_state(
                 // we haven't already
             }
 
-            CheckpointsReceived(height, checkpts) => {
-                // Extend the pending checkpoints
-                state.l1_view_mut().pending_checkpoints.extend(
-                    checkpts
-                        .into_iter()
-                        .map(|ckpt| L1CheckPoint::new(ckpt, height)),
-                );
+            CheckpointFinalized(height, checkpointinfo) => {
+                // Update finalized blockid in StateSync
+                let fin_blockid = *checkpointinfo.l2_blockid();
+                state.expect_sync_mut().finalized_blkid = fin_blockid;
+
+                let l1v = state.l1_view_mut();
+                l1v.last_finalized_checkpoint = Some(L1CheckPoint::new(checkpointinfo, height));
             }
 
-            CheckpointFinalized(height) => {
-                let l1v = state.l1_view_mut();
+            CommitmentFinalized(height, commitment) => {
+                let committed_blockid = *commitment.l2_blockid();
+                state.expect_sync_mut().committed_blkid = committed_blockid;
 
-                let finalized_checkpts: Vec<_> = l1v
-                    .pending_checkpoints
-                    .iter()
-                    .take_while(|ckpt| ckpt.height <= height)
-                    .collect();
-
-                let new_finalized = finalized_checkpts.last().cloned().cloned();
-                let total_finalized = finalized_checkpts.len();
-                debug!(?new_finalized, ?total_finalized, "Finalized checkpoints");
-
-                // Remove the finalized from pending and then mark the last one as last_finalized
-                // checkpoint
-                l1v.pending_checkpoints.drain(..total_finalized);
-
-                if let Some(checkpt) = new_finalized {
-                    // Check if heights match accordingly
-                    if !l1v
-                        .last_finalized_checkpoint
-                        .as_ref()
-                        .map_or(true, |prev_chp| {
-                            checkpt.checkpoint.idx() == prev_chp.checkpoint.idx() + 1
-                        })
-                    {
-                        panic!("operation: mismatched indices of pending checkpoint");
-                    }
-
-                    let fin_blockid = *checkpt.checkpoint.l2_blockid();
-                    l1v.last_finalized_checkpoint = Some(checkpt);
-
-                    // Update finalized blockid in StateSync
-                    state.expect_sync_mut().finalized_blkid = fin_blockid;
-                }
+                state.l1_view_mut().last_finalized_commitment =
+                    Some(L1Commitment::new(commitment, height));
             }
         }
     }

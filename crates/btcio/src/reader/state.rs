@@ -42,13 +42,14 @@ impl ReaderState {
     /// Returns the idx of the deepest block in the reader state.
     #[allow(unused)]
     fn deepest_block(&self) -> u64 {
-        self.best_block_idx() - self.recent_blocks.len() as u64 + 1
+        self.next_height() - self.recent_blocks.len() as u64
     }
 
     /// Accepts a new block and possibly purges a buried one.
-    pub fn accept_new_block(&mut self, blkhash: BlockHash) -> Option<BlockHash> {
+    pub fn accept_new_block(&mut self, blkhash: BlockHash) -> Option<(BlockHash, u64)> {
         let ret = if self.recent_blocks.len() > self.max_depth {
-            Some(self.recent_blocks.pop_front().unwrap())
+            let buried_height = self.deepest_block();
+            Some((self.recent_blocks.pop_front().unwrap(), buried_height))
         } else {
             None
         };

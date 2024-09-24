@@ -1,22 +1,22 @@
-use std::sync::Arc;
+use std::{sync::Arc};
 
-use alpen_express_btcio::reader::messages::{BlockData, L1Event};
-use alpen_express_db::traits::{Database, L1DataStore};
+use alpen_express_btcio::reader::messages::{L1Event};
+use alpen_express_db::traits::{Database, L1DataProvider, L1DataStore};
 use alpen_express_primitives::{
     buf::Buf32,
     l1::{L1BlockManifest, L1Tx, L1TxProof},
     params::Params,
-    tx::ProtocolOperation,
+    tx::{ProtocolOperation},
     vk::RollupVerifyingKey,
 };
 use alpen_express_state::{
-    batch::{BatchCheckpoint, SignedBatchCheckpoint},
+    batch::{BlobPayload, SignedBlobPayload},
     sync_event::SyncEvent,
 };
 use bitcoin::{
-    consensus::serialize,
+    consensus::{deserialize, serialize},
     hashes::{sha256d, Hash},
-    Block, Wtxid,
+    Block, Transaction, Wtxid,
 };
 use express_risc0_adapter::Risc0Verifier;
 use express_sp1_adapter::SP1Verifier;
@@ -29,12 +29,13 @@ use crate::ctl::CsmController;
 /// Consumes L1 events and reflects them in the database.
 pub fn bitcoin_data_handler_task<D: Database + Send + Sync + 'static>(
     l1db: Arc<D::L1Store>,
+    l1prov: Arc<D::L1Prov>,
     csm_ctl: Arc<CsmController>,
     mut event_rx: mpsc::Receiver<L1Event>,
     params: Arc<Params>,
 ) -> anyhow::Result<()> {
     while let Some(event) = event_rx.blocking_recv() {
-        if let Err(e) = handle_bitcoin_event(event, l1db.as_ref(), csm_ctl.as_ref(), &params) {
+        if let Err(e) = handle_bitcoin_event::<D>(event, &l1db, &l1prov, &csm_ctl, &params) {
             error!(err = %e, "failed to handle L1 event");
         }
     }
@@ -43,15 +44,13 @@ pub fn bitcoin_data_handler_task<D: Database + Send + Sync + 'static>(
     Ok(())
 }
 
-fn handle_bitcoin_event<L1D>(
+fn handle_bitcoin_event<D: Database>(
     event: L1Event,
-    l1db: &L1D,
+    l1db: &D::L1Store,
+    l1prov: &D::L1Prov,
     csm_ctl: &CsmController,
     params: &Arc<Params>,
-) -> anyhow::Result<()>
-where
-    L1D: L1DataStore + Sync + Send + 'static,
-{
+) -> anyhow::Result<()> {
     match event {
         L1Event::RevertTo(revert_blk_num) => {
             // L1 reorgs will be handled in L2 STF, we just have to reflect
@@ -99,78 +98,93 @@ where
             let ev = SyncEvent::L1Block(blockdata.block_num(), blkid.into());
             csm_ctl.submit_event(ev)?;
 
-            // Check for da batch and send event accordingly
-            let checkpoints = check_for_da_batch(&blockdata, params.rollup().rollup_vk);
+            Ok(())
+        }
+
+        L1Event::Matured(height) => {
+            let txrefs = l1prov.get_block_txs(height)?.unwrap_or_default();
+            let l1txns = txrefs
+                .into_iter()
+                .map(|txref| l1prov.get_tx(txref))
+                .collect::<Result<Vec<_>, _>>()?;
+
+            let blobs = l1txns.into_iter().flatten().filter_map(|tx| {
+                match tx.protocol_operation() {
+                    ProtocolOperation::RollupInscription(inscription_data) => {
+                        match borsh::from_slice::<SignedBlobPayload>(inscription_data.batch_data()) {
+                            Err(e) => {
+                                match deserialize::<Transaction>(tx.tx_data()) {
+                                    Ok(txn) => warn!(txid = %txn.compute_txid(), err = %e, "could not deserialize blob inside inscription"),
+                                    Err(_) => warn!(err = %e, "could not deserialize blob inside inscription"),
+                                };
+                                None
+                            }
+                            Ok(signed_blob) => {
+                                // TODO: validate signature
+
+                                let blob_payload: BlobPayload = signed_blob.clone().into();
+
+                                match blob_payload {
+                                    BlobPayload::BatchCommmitment(_) => {
+                                        Some(signed_blob)
+                                    }
+                                    BlobPayload::BatchCheckpoint(checkpoint) => {
+                                        let checkpoint_idx = checkpoint.checkpoint().idx();
+                                        let checkpoint_last_block = checkpoint.checkpoint().l2_blockid();
+                
+                                        let proof = checkpoint.proof();
+                                        let public_params_raw = borsh::to_vec(&checkpoint).unwrap();
+                
+                                        // NOTE/TODO: this should also verify that this checkpoint is based on top of some previous checkpoint
+                                        let res = match params.rollup.rollup_vk {
+                                            RollupVerifyingKey::Risc0VerifyingKey(vk) => {
+                                                Risc0Verifier::verify_groth16(proof, vk.as_ref(), &public_params_raw)
+                                            }
+                                            RollupVerifyingKey::SP1VerifyingKey(vk) => {
+                                                SP1Verifier::verify_groth16(proof, vk.as_ref(), &public_params_raw)
+                                            }
+                                        };
+                                        match res {
+                                            Ok(()) => {
+                                                info!(%checkpoint_idx, %checkpoint_last_block, "proof successfully verified");
+                                                Some(signed_blob)
+                                            }
+                                            Err(e) => {
+                                                warn!(%checkpoint_idx, %checkpoint_last_block, err = %e, "could not verify proof inside blob");
+                                                None
+                                            }
+                                        }
+                                    },
+                                }
+                            }
+                        }
+                    },
+                    _ => None
+                }
+            })
+            .map(BlobPayload::from);
+
+            let mut checkpoints = Vec::new();
+            for blob in blobs {
+                match blob {
+                    BlobPayload::BatchCheckpoint(batch_checkpoint) => {
+                        checkpoints.push(batch_checkpoint)
+                    }
+                    BlobPayload::BatchCommmitment(batch_commitment) => {
+                        let ev = SyncEvent::L1DACommitment(height, batch_commitment);
+                        csm_ctl.submit_event(ev)?;
+                    }
+                };
+            }
+
             if !checkpoints.is_empty() {
                 let ev = SyncEvent::L1DABatch(height, checkpoints);
                 csm_ctl.submit_event(ev)?;
             }
 
-            // TODO: Check for deposits and forced inclusions and emit appropriate events
-
             Ok(())
         }
     }
-}
-
-/// Parses inscriptions and checks for batch data in the transactions
-fn check_for_da_batch(
-    blockdata: &BlockData,
-    rollup_vk: RollupVerifyingKey,
-) -> Vec<BatchCheckpoint> {
-    let protocol_ops_txs = blockdata.protocol_ops_txs();
-
-    let inscriptions = protocol_ops_txs
-        .iter()
-        .filter_map(|ops_txs| match ops_txs.proto_op() {
-            alpen_express_primitives::tx::ProtocolOperation::RollupInscription(inscription) => {
-                Some((
-                    inscription,
-                    &blockdata.block().txdata[ops_txs.index() as usize],
-                ))
-            }
-            _ => None,
-        });
-
-    let verified_checkpoints = inscriptions.filter_map(|(insc, tx)| {
-        match borsh::from_slice::<SignedBatchCheckpoint>(insc.batch_data()) {
-            Err(e) => {
-                let txid = tx.compute_txid();
-                warn!(%txid, err = %e, "could not deserialize blob inside inscription");
-                None
-            }
-            Ok(signed_checkpoint) => {
-                let checkpoint: BatchCheckpoint = signed_checkpoint.clone().into();
-                let checkpoint_idx = checkpoint.checkpoint().idx();
-                let checkpoint_last_block = checkpoint.checkpoint().l2_blockid();
-
-                let proof = checkpoint.proof();
-                let public_params_raw = borsh::to_vec(&checkpoint).unwrap();
-
-                // NOTE/TODO: this should also verify that this checkpoint is based on top of some previous checkpoint
-                let res = match rollup_vk {
-                    RollupVerifyingKey::Risc0VerifyingKey(vk) => {
-                        Risc0Verifier::verify_groth16(proof, vk.as_ref(), &public_params_raw)
-                    }
-                    RollupVerifyingKey::SP1VerifyingKey(vk) => {
-                        SP1Verifier::verify_groth16(proof, vk.as_ref(), &public_params_raw)
-                    }
-                };
-                match res {
-                    Ok(()) => {
-                        info!(%checkpoint_idx, %checkpoint_last_block, "proof successfully verified");
-                        Some(signed_checkpoint)
-                    }
-                    Err(e) => {
-                        warn!(%checkpoint_idx, %checkpoint_last_block, err = %e, "could not verify proof inside blob");
-                        None
-                    }
-                }
-            }
-        }
-    });
-
-    verified_checkpoints.map(Into::into).collect()
 }
 
 /// Given a block, generates a manifest of the parts we care about that we can

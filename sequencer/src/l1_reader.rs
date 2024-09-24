@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use alpen_express_btcio::{
-    reader::{messages::L1Event, query::bitcoin_data_reader_task},
+    reader::{config::ReaderConfig, messages::L1Event, query::bitcoin_data_reader_task},
     rpc::traits::Reader,
 };
 use alpen_express_consensus_logic::{ctl::CsmController, l1_handler::bitcoin_data_handler_task};
@@ -12,6 +12,13 @@ use express_tasks::TaskExecutor;
 use tokio::sync::mpsc;
 
 use crate::config::Config;
+
+fn get_reader_config(config: &Config, params: &Params) -> ReaderConfig {
+    ReaderConfig {
+        max_reorg_depth: params.rollup.l1_reorg_safe_depth,
+        client_poll_dur_ms: config.sync.client_poll_dur_ms,
+    }
+}
 
 pub fn start_reader_tasks<D: Database + Send + Sync + 'static>(
     executor: &TaskExecutor,
@@ -36,7 +43,7 @@ where
         .map(|i| i + 1)
         .unwrap_or(params.rollup().horizon_l1_height);
 
-    let reader_config = Arc::new(config.get_reader_config());
+    let reader_config = Arc::new(get_reader_config(config, &params));
     let params_r = params.clone();
     let chprov = db.chainstate_provider().clone();
 
@@ -54,9 +61,10 @@ where
     );
 
     let l1db = db.l1_store().clone();
+    let l1prov = db.l1_provider().clone();
     let _sedb = db.sync_event_store().clone();
     executor.spawn_critical("bitcoin_data_handler_task", move |_| {
-        bitcoin_data_handler_task::<D>(l1db, csm_ctl, ev_rx, params).unwrap()
+        bitcoin_data_handler_task::<D>(l1db, l1prov, csm_ctl, ev_rx, params).unwrap()
     });
     Ok(())
 }
