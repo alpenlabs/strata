@@ -3914,7 +3914,6 @@ dependencies = [
 name = "express-proofimpl-btc-blockspace"
 version = "0.1.0"
 dependencies = [
- "alpen-express-btcio",
  "alpen-express-primitives",
  "alpen-express-state",
  "alpen-test-utils",

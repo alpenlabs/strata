@@ -1,6 +1,6 @@
-use alpen_express_btcio::reader::filter::TxFilterRule;
 use bitcoin::Block;
 use express_proofimpl_btc_blockspace::logic::{process_blockspace_proof, BlockspaceProofInput};
+use strata_tx_parser::filter::TxFilterRule;
 
 fn main() {
     let serialized_filters = sp1_zkvm::io::read_vec();
