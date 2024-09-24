@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use alpen_express_btcio::reader::messages::{BlockData, L1Event};
 use alpen_express_db::traits::{Database, L1DataStore};
 use alpen_express_primitives::{
     buf::Buf32,
@@ -19,6 +18,7 @@ use bitcoin::{
 use express_risc0_adapter::Risc0Verifier;
 use express_sp1_adapter::SP1Verifier;
 use express_zkvm::ZKVMVerifier;
+use strata_tx_parser::messages::{BlockData, L1Event};
 use tokio::sync::mpsc;
 use tracing::*;
 

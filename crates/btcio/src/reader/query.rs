@@ -9,16 +9,15 @@ use alpen_express_primitives::params::Params;
 use alpen_express_status::StatusTx;
 use anyhow::bail;
 use bitcoin::BlockHash;
+use strata_tx_parser::{
+    filter::{filter_relevant_txs, TxFilterRule},
+    messages::{BlockData, L1Event},
+};
 use tokio::sync::mpsc;
 use tracing::*;
 
 use crate::{
-    reader::{
-        config::ReaderConfig,
-        filter::{filter_relevant_txs, TxFilterRule},
-        messages::{BlockData, L1Event},
-        state::ReaderState,
-    },
+    reader::{config::ReaderConfig, state::ReaderState},
     rpc::traits::Reader,
     status::{apply_status_updates, L1StatusUpdate},
 };

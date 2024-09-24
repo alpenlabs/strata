@@ -1,4 +1,3 @@
-use alpen_express_btcio::reader::filter::TxFilterRule;
 use alpen_express_primitives::{
     buf::Buf32,
     l1::{L1BlockManifest, XOnlyPk},
@@ -6,7 +5,7 @@ use alpen_express_primitives::{
 use bitcoin::{
     block::Header, consensus::deserialize, hashes::Hash, params::Params, Block, Transaction,
 };
-use strata_tx_parser::deposit::DepositTxConfig;
+use strata_tx_parser::{deposit::DepositTxConfig, filter::TxFilterRule};
 
 use crate::{l2::gen_params, ArbitraryGenerator};
 

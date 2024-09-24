@@ -1,12 +1,12 @@
 //! This includes all the filtering logic to filter out and extract
 //! deposits, forced inclusion transactions as well as state updates
 
-use alpen_express_btcio::reader::filter::{filter_relevant_txs, TxFilterRule};
 use alpen_express_state::{
     batch::BatchCheckpoint,
     tx::{DepositInfo, ProtocolOperation},
 };
 use bitcoin::Block;
+use strata_tx_parser::filter::{filter_relevant_txs, TxFilterRule};
 
 pub fn extract_relevant_info(
     block: &Block,

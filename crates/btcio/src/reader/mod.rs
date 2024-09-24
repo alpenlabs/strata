@@ -1,5 +1,4 @@
 pub mod config;
-pub mod filter;
-pub mod messages;
+mod filter;
 pub mod query;
 mod state;

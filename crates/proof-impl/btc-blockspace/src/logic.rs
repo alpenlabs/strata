@@ -1,9 +1,9 @@
 //! Core logic of the Bitcoin Blockspace proof that will be proven
 
-use alpen_express_btcio::reader::filter::TxFilterRule;
 use alpen_express_state::{batch::BatchCheckpoint, tx::DepositInfo};
 use bitcoin::Block;
 use borsh::{BorshDeserialize, BorshSerialize};
+use strata_tx_parser::filter::TxFilterRule;
 
 use crate::{block::check_merkle_root, filter::extract_relevant_info};
 

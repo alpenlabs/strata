@@ -733,6 +733,7 @@ dependencies = [
  "futures",
  "rand 0.8.5",
  "secp256k1",
+ "strata-tx-parser",
  "thiserror",
  "threadpool",
  "tokio",
@@ -966,6 +967,7 @@ dependencies = [
  "rockbound",
  "serde",
  "serde_json",
+ "strata-tx-parser",
  "thiserror",
  "threadpool",
  "tokio",
@@ -12436,10 +12438,12 @@ version = "0.1.0"
 dependencies = [
  "alpen-express-primitives",
  "alpen-express-state",
+ "alpen-test-utils",
  "anyhow",
  "bitcoin",
  "borsh",
  "hex",
+ "rand 0.8.5",
  "thiserror",
  "tracing",
 ]
