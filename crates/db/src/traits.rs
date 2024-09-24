@@ -6,8 +6,8 @@ use std::sync::Arc;
 use alpen_express_mmr::CompactMmr;
 use alpen_express_primitives::{l1::*, prelude::*};
 use alpen_express_state::{
-    block::L2BlockBundle, chain_state::ChainState, client_state::ClientState, operation::*,
-    prelude::*, state_op::WriteBatch, sync_event::SyncEvent,
+    block::L2BlockBundle, chain_state::ChainState, client_state::ClientState, l1::L1Tx,
+    operation::*, prelude::*, state_op::WriteBatch, sync_event::SyncEvent,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 

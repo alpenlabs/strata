@@ -4,8 +4,9 @@ use alpen_express_db::{errors::DbError, traits::*, DbResult};
 use alpen_express_mmr::CompactMmr;
 use alpen_express_primitives::{
     buf::Buf32,
-    l1::{L1BlockManifest, L1Tx, L1TxRef},
+    l1::{L1BlockManifest, L1TxRef},
 };
+use alpen_express_state::l1::L1Tx;
 use rockbound::{
     rocksdb::ReadOptions, schema::KeyEncoder, OptimisticTransactionDB, SchemaBatch,
     SchemaDBOperationsExt,
@@ -187,7 +188,8 @@ impl L1DataProvider for L1Db {
 #[cfg(feature = "test_utils")]
 #[cfg(test)]
 mod tests {
-    use alpen_express_primitives::{l1::L1TxProof, tx::ProtocolOperation};
+    use alpen_express_primitives::l1::L1TxProof;
+    use alpen_express_state::tx::ProtocolOperation;
     use alpen_test_utils::ArbitraryGenerator;
 
     use super::*;

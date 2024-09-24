@@ -1,4 +1,4 @@
-use alpen_express_primitives::tx::ProtocolOperation;
+use alpen_express_state::tx::ProtocolOperation;
 use bitcoin::Block;
 
 /// L1 events that we observe and want the persistence task to work on.

@@ -1,7 +1,7 @@
 use core::{result::Result::Ok, str::FromStr};
 use std::{cmp::Reverse, sync::Arc};
 
-use alpen_express_primitives::tx::InscriptionData;
+use alpen_express_state::tx::InscriptionData;
 use anyhow::anyhow;
 use bitcoin::{
     absolute::LockTime,

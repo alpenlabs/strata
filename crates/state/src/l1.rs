@@ -1,10 +1,11 @@
 use core::fmt;
 
-use alpen_express_primitives::{l1, prelude::*};
+use alpen_express_primitives::{prelude::*, utils::get_cohashes_from_wtxids};
 use arbitrary::Arbitrary;
+use bitcoin::{consensus::serialize, hashes::Hash, Block, Wtxid};
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use crate::state_queue::StateQueue;
+use crate::{l1, state_queue::StateQueue, tx::ProtocolOperation};
 
 /// ID of an L1 block, usually the hash of its header.
 #[derive(
@@ -176,6 +177,76 @@ impl From<L1HeaderPayload> for L1MaturationEntry {
     }
 }
 
+/// Tx body with a proof.
+#[derive(Clone, Debug, BorshSerialize, BorshDeserialize, PartialEq, Eq, Arbitrary)]
+pub struct L1Tx {
+    proof: L1TxProof,
+    tx: Vec<u8>,
+    protocol_operation: ProtocolOperation,
+}
+
+impl L1Tx {
+    pub fn new(proof: L1TxProof, tx: Vec<u8>, protocol_operation: ProtocolOperation) -> Self {
+        Self {
+            proof,
+            tx,
+            protocol_operation,
+        }
+    }
+
+    pub fn proof(&self) -> &L1TxProof {
+        &self.proof
+    }
+
+    pub fn tx_data(&self) -> &[u8] {
+        &self.tx
+    }
+
+    pub fn protocol_operation(&self) -> &ProtocolOperation {
+        &self.protocol_operation
+    }
+}
+
+/// Generates an L1 transaction with proof for a given transaction index in a block.
+///
+/// # Parameters
+/// - `idx`: The index of the transaction within the block's transaction data.
+/// - `proto_op_data`: Relevant information gathered after parsing.
+/// - `block`: The block containing the transactions.
+///
+/// # Returns
+/// - An `L1Tx` struct containing the proof and the serialized transaction.
+///
+/// # Panics
+/// - If the `idx` is out of bounds for the block's transaction data.
+pub fn generate_l1_tx(block: &Block, idx: u32, proto_op_data: ProtocolOperation) -> L1Tx {
+    assert!(
+        (idx as usize) < block.txdata.len(),
+        "utils: tx idx out of range of block txs"
+    );
+    let tx = &block.txdata[idx as usize];
+
+    // Get all witness ids for txs
+    let wtxids = &block
+        .txdata
+        .iter()
+        .enumerate()
+        .map(|(i, x)| {
+            if i == 0 {
+                Wtxid::all_zeros() // Coinbase's wtxid is all zeros
+            } else {
+                x.compute_wtxid()
+            }
+        })
+        .collect::<Vec<_>>();
+    let (cohashes, _wtxroot) = get_cohashes_from_wtxids(wtxids, idx);
+
+    let proof = L1TxProof::new(idx, cohashes);
+    let tx = serialize(tx);
+
+    L1Tx::new(proof, tx, proto_op_data)
+}
+
 /// Describes state relating to the CL's view of L1.  Updated by entries in the
 /// L1 segment of CL blocks.
 #[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
@@ -281,7 +352,7 @@ impl L1MaturationEntry {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
+#[derive(Clone, Debug, Arbitrary, BorshDeserialize, BorshSerialize, PartialEq, Eq)]
 pub struct DepositUpdateTx {
     /// The transaction in the block.
     tx: l1::L1Tx,
@@ -306,7 +377,7 @@ impl DepositUpdateTx {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
+#[derive(Clone, Debug, Arbitrary, BorshDeserialize, BorshSerialize, PartialEq, Eq)]
 pub struct DaTx {
     // TODO other fields that we need to be able to identify the DA
     /// The transaction in the block.

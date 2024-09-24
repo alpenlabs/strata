@@ -1,4 +1,4 @@
-use alpen_express_primitives::tx::ProtocolOperation;
+use alpen_express_state::{batch::SignedBatchCheckpoint, tx::ProtocolOperation};
 use bitcoin::{Block, Transaction};
 use strata_tx_parser::{
     deposit::{
@@ -46,7 +46,11 @@ fn check_and_extract_relevant_info(
             if !tx.input.is_empty() {
                 if let Some(scr) = tx.input[0].witness.tapscript() {
                     if let Ok(inscription_data) = parse_inscription_data(&scr.into(), name) {
-                        return Some(ProtocolOperation::RollupInscription(inscription_data));
+                        if let Ok(signed_batch) = borsh::from_slice::<SignedBatchCheckpoint>(
+                            inscription_data.batch_data(),
+                        ) {
+                            return Some(ProtocolOperation::RollupInscription(signed_batch));
+                        }
                     }
                 }
             }
@@ -70,7 +74,8 @@ fn check_and_extract_relevant_info(
 mod test {
     use std::str::FromStr;
 
-    use alpen_express_primitives::tx::InscriptionData;
+    use alpen_express_state::tx::InscriptionData;
+    use alpen_test_utils::ArbitraryGenerator;
     use bitcoin::{
         absolute::{Height, LockTime},
         block::{Header, Version as BVersion},
@@ -140,7 +145,8 @@ mod test {
     fn create_inscription_tx(rollup_name: String) -> Transaction {
         let address = parse_addr(OTHER_ADDR);
         let inp_tx = create_test_tx(vec![create_test_txout(100000000, &address)]);
-        let inscription_data = InscriptionData::new(vec![0, 1, 2, 3]);
+        let signed_checkpoint: SignedBatchCheckpoint = ArbitraryGenerator::new().generate();
+        let inscription_data = InscriptionData::new(borsh::to_vec(&signed_checkpoint).unwrap());
 
         let script = generate_inscription_script(inscription_data, &rollup_name, 1).unwrap();
 

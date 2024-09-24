@@ -3,7 +3,8 @@
 //! functions are designed to be equivalent to the corresponding methods found in the
 //! [`bitcoin`](bitcoin::Block), providing custom implementations where necessary.
 
-use alpen_express_primitives::{buf::Buf32, hash::sha256d, l1::L1Tx};
+use alpen_express_primitives::{buf::Buf32, hash::sha256d};
+use alpen_express_state::l1::L1Tx;
 use bitcoin::{
     block::Header,
     consensus::{self, Encodable},
@@ -138,7 +139,7 @@ pub fn check_pow(block: &Header) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use alpen_express_primitives::{tx::ProtocolOperation, utils::generate_l1_tx};
+    use alpen_express_state::{l1::generate_l1_tx, tx::ProtocolOperation};
     use alpen_test_utils::{bitcoin::get_btc_mainnet_block, ArbitraryGenerator};
     use bitcoin::{hashes::Hash, TxMerkleNode, WitnessMerkleNode};
     use rand::Rng;

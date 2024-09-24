@@ -681,6 +681,7 @@ dependencies = [
  "bitcoin",
  "bitcoind",
  "bitcoind-json-rpc-types",
+ "borsh",
  "bytes",
  "express-storage",
  "express-tasks",
@@ -3910,6 +3911,7 @@ name = "express-proofimpl-btc-blockspace"
 version = "0.1.0"
 dependencies = [
  "alpen-express-primitives",
+ "alpen-express-state",
  "alpen-test-utils",
  "bitcoin",
  "hex",
@@ -12426,6 +12428,7 @@ name = "strata-tx-parser"
 version = "0.1.0"
 dependencies = [
  "alpen-express-primitives",
+ "alpen-express-state",
  "anyhow",
  "bitcoin",
  "hex",

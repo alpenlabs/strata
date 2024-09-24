@@ -144,6 +144,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "alpen-express-crypto"
+version = "0.1.0"
+dependencies = [
+ "alpen-express-primitives",
+ "borsh",
+ "secp256k1",
+ "sha2",
+]
+
+[[package]]
 name = "alpen-express-primitives"
 version = "0.1.0"
 dependencies = [
@@ -161,6 +171,24 @@ dependencies = [
  "serde_json",
  "sha2",
  "thiserror",
+ "tracing",
+]
+
+[[package]]
+name = "alpen-express-state"
+version = "0.1.0"
+dependencies = [
+ "alpen-express-crypto",
+ "alpen-express-primitives",
+ "arbitrary",
+ "bitcoin",
+ "borsh",
+ "digest 0.10.7",
+ "express-bridge-tx-builder",
+ "hex",
+ "num_enum",
+ "serde",
+ "sha2",
  "tracing",
 ]
 
@@ -831,10 +859,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b90ca2580b73ab6a1f724b76ca11ab632df820fd6040c336200d2c1df7b3c82c"
 
 [[package]]
+name = "express-bridge-tx-builder"
+version = "0.1.0"
+dependencies = [
+ "alpen-express-primitives",
+ "bitcoin",
+ "lazy_static",
+ "musig2",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "express-proofimpl-btc-blockspace"
 version = "0.1.0"
 dependencies = [
  "alpen-express-primitives",
+ "alpen-express-state",
  "bitcoin",
  "serde",
  "sha2",
@@ -1249,6 +1290,7 @@ version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "af1844ef2428cc3e1cb900be36181049ef3d3193c63e43026cfe202983b27a56"
 dependencies = [
+ "proc-macro-crate",
  "proc-macro2",
  "quote",
  "syn 2.0.75",

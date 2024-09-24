@@ -5,6 +5,7 @@ version = "0.1.0"
 
 [dependencies]
 alpen-express-primitives = { workspace = true }
+alpen-express-state = { workspace = true }
 bitcoin = { workspace = true, features = ["serde"] }
 serde = { workspace = true, features = ["derive"] }
 sha2.workspace = true

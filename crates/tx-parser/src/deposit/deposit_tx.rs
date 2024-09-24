@@ -1,6 +1,6 @@
 //! parser types for Deposit Tx, and later deposit Request Tx
 
-use alpen_express_primitives::tx::DepositInfo;
+use alpen_express_state::tx::DepositInfo;
 use bitcoin::{opcodes::all::OP_RETURN, ScriptBuf, Transaction};
 
 use super::{

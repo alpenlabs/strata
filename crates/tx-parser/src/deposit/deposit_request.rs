@@ -2,7 +2,7 @@
 
 use std::convert::TryInto;
 
-use alpen_express_primitives::tx::DepositReqeustInfo;
+use alpen_express_state::tx::DepositReqeustInfo;
 use bitcoin::{opcodes::all::OP_RETURN, ScriptBuf, Transaction};
 
 use super::{
