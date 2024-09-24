@@ -946,6 +946,7 @@ dependencies = [
  "bitcoin",
  "borsh",
  "express-bridge-relay",
+ "express-bridge-tx-builder",
  "express-rpc-utils",
  "express-storage",
  "express-sync",

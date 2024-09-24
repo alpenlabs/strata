@@ -17,6 +17,7 @@ use alpen_express_rpc_types::{
 use alpen_express_state::{
     batch::BatchCheckpoint,
     block::L2BlockBundle,
+    bridge_duties::{BridgeDuties, Duty},
     bridge_ops::WithdrawalIntent,
     chain_state::ChainState,
     client_state::ClientState,
@@ -27,109 +28,17 @@ use alpen_express_state::{
 };
 use alpen_express_status::StatusRx;
 use async_trait::async_trait;
-use bitcoin::{consensus::deserialize, hashes::Hash, Transaction as BTransaction, Txid};
+use bitcoin::{consensus::deserialize, hashes::Hash, Network, Transaction as BTransaction, Txid};
 use express_bridge_relay::relayer::RelayerHandle;
 use express_rpc_utils::to_jsonrpsee_error;
 use express_storage::L2BlockManager;
 use futures::TryFutureExt;
-use jsonrpsee::{core::RpcResult, types::ErrorObjectOwned};
-use thiserror::Error;
+use jsonrpsee::core::RpcResult;
 use tokio::sync::{oneshot, Mutex};
 use tracing::*;
 
-#[derive(Debug, Error)]
-pub enum Error {
-    /// Unsupported RPCs for express.  Some of these might need to be replaced
-    /// with standard unsupported errors.
-    #[error("unsupported RPC")]
-    Unsupported,
-
-    #[error("not yet implemented")]
-    Unimplemented,
-
-    #[error("client not started")]
-    ClientNotStarted,
-
-    #[error("missing L2 block {0:?}")]
-    MissingL2Block(L2BlockId),
-
-    #[error("missing L1 block manifest {0}")]
-    MissingL1BlockManifest(u64),
-
-    #[error("tried to call chain-related method before rollup genesis")]
-    BeforeGenesis,
-
-    #[error("unknown idx {0}")]
-    UnknownIdx(u32),
-
-    #[error("missing chainstate for index {0}")]
-    MissingChainstate(u64),
-
-    #[error("db: {0}")]
-    Db(#[from] alpen_express_db::errors::DbError),
-
-    #[error("blocking task '{0}' failed for unknown reason")]
-    BlockingAbort(String),
-
-    #[error("incorrect parameters: {0}")]
-    IncorrectParameters(String),
-
-    #[error("fetch limit reached. max {0}, provided {1}")]
-    FetchLimitReached(u64, u64),
-
-    #[error("missing checkpoint in database for index {0}")]
-    MissingCheckpointInDb(u64),
-
-    #[error("Proof already created for checkpoint {0}")]
-    ProofAlreadyCreated(u64),
-
-    #[error("Invalid proof for checkpoint {0}: {1}")]
-    InvalidProof(u64, String),
-
-    /// Generic internal error message.  If this is used often it should be made
-    /// into its own error type.
-    #[error("{0}")]
-    Other(String),
-
-    /// Generic internal error message with a payload value.  If this is used
-    /// often it should be made into its own error type.
-    #[error("{0} (+data)")]
-    OtherEx(String, serde_json::Value),
-}
-
-impl Error {
-    pub fn code(&self) -> i32 {
-        match self {
-            Self::Unsupported => -32600,
-            Self::Unimplemented => -32601,
-            Self::IncorrectParameters(_) => -32602,
-            Self::MissingL2Block(_) => -32603,
-            Self::MissingChainstate(_) => -32604,
-            Self::Db(_) => -32605,
-            Self::ClientNotStarted => -32606,
-            Self::BeforeGenesis => -32607,
-            Self::FetchLimitReached(_, _) => -32608,
-            Self::UnknownIdx(_) => -32608,
-            Self::MissingL1BlockManifest(_) => -32609,
-            Self::MissingCheckpointInDb(_) => -32610,
-            Self::ProofAlreadyCreated(_) => -32611,
-            Self::InvalidProof(_, _) => -32612,
-            Self::BlockingAbort(_) => -32001,
-            Self::Other(_) => -32000,
-            Self::OtherEx(_, _) => -32000,
-        }
-    }
-}
-
-impl From<Error> for ErrorObjectOwned {
-    fn from(val: Error) -> Self {
-        let code = val.code();
-        match val {
-            Error::OtherEx(m, b) => ErrorObjectOwned::owned::<_>(code, m.to_string(), Some(b)),
-            _ => ErrorObjectOwned::owned::<serde_json::Value>(code, format!("{}", val), None),
-        }
-    }
-}
+use super::errors::RpcServerError as Error;
+use crate::extractor::extract_deposit_requests;
 
 fn fetch_l2blk<D: Database + Sync + Send + 'static>(
     l2_prov: &Arc<<D as Database>::L2Prov>,
@@ -149,6 +58,7 @@ pub struct AlpenRpcImpl<D> {
     l2_block_manager: Arc<L2BlockManager>,
     checkpoint_handle: Arc<CheckpointHandle>,
     relayer_handle: Arc<RelayerHandle>,
+    bitcoind_network: Network,
 }
 
 impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
@@ -161,6 +71,7 @@ impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
         l2_block_manager: Arc<L2BlockManager>,
         checkpoint_handle: Arc<CheckpointHandle>,
         relayer_handle: Arc<RelayerHandle>,
+        bitcoind_network: Network,
     ) -> Self {
         Self {
             status_rx,
@@ -170,6 +81,7 @@ impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
             l2_block_manager,
             checkpoint_handle,
             relayer_handle,
+            bitcoind_network,
         }
     }
 
@@ -596,6 +508,23 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
             borsh::from_slice(&raw_msg.0).map_err(to_jsonrpsee_error("parse bridge message"))?;
         self.relayer_handle.submit_message_async(msg).await;
         Ok(())
+    }
+
+    async fn get_bridge_duties(&self, block_height: u64) -> RpcResult<BridgeDuties> {
+        let l1_db_provider = self.database.l1_provider();
+        let network = self.bitcoind_network;
+        let deposit_duties = extract_deposit_requests(l1_db_provider, block_height, network)
+            .await?
+            .map(Duty::from);
+
+        // TODO: Extract withdrawal duties as well.
+        let withdrawal_duties = vec![];
+
+        let mut duties = vec![];
+        duties.extend(deposit_duties);
+        duties.extend(withdrawal_duties);
+
+        Ok(duties)
     }
 
     async fn get_checkpoint_info(&self, idx: u64) -> RpcResult<Option<RpcCheckpointInfo>> {

@@ -343,7 +343,7 @@ pub enum DepositState {
     Executed,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
+#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
 pub struct CreatedState {
     /// Destination identifier in EL, probably an encoded address.
     dest_ident: Vec<u8>,
@@ -421,7 +421,7 @@ impl DispatchCommand {
 }
 
 /// An output constructed from [`crate::bridge_ops::WithdrawalIntent`].
-#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
+#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
 pub struct WithdrawOutput {
     /// Taproot Schnorr XOnlyPubkey with the merkle root information.
     dest_addr: XOnlyPk,

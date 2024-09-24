@@ -1,9 +1,7 @@
 //! Type/traits related to the bridge-related duties.
 
-use express_bridge_tx_builder::prelude::DepositInfo;
+use express_bridge_tx_builder::prelude::{CooperativeWithdrawalInfo, DepositInfo};
 use serde::{Deserialize, Serialize};
-
-use crate::bridge_ops::WithdrawalBatch;
 
 /// The various duties that can be assigned to an operator.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -17,15 +15,27 @@ pub enum Duty {
 
     /// The duty to fulfill a withdrawal request that is assigned to a particular operator.
     ///
-    /// This duty is created when a user submits a withdrawal request, and only applies to the
-    /// operator that is assigned the [`WithdrawalBatch`].
+    /// This duty is created when a user requests a withdrawal by calling a precompile in the EL
+    /// and the [`crate::bridge_state::DepositState`] transitions to
+    /// [`crate::bridge_state::DepositState::Dispatched`].
     ///
-    /// As each deposit UTXO is uniquely assigned to an operator during withdrawals, this UTXO can
-    /// be used to query for the complete [`WithdrawalBatch`] information. We are not sending the
-    /// [`WithdrawalBatch`] out directly as
-    FulfillWithdrawal(WithdrawalBatch),
+    /// This kicks off the withdrawal process which involves cooperative signing by the operator
+    /// set, or a more involved unilateral withdrawal process (in the future) if not all operators
+    /// cooperate in the process.
+    FulfillWithdrawal(CooperativeWithdrawalInfo),
 }
 
-/// A container for bridge duties based on the state in rollup.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BridgeDuties(Vec<Duty>);
+impl From<DepositInfo> for Duty {
+    fn from(value: DepositInfo) -> Self {
+        Self::SignDeposit(value)
+    }
+}
+
+impl From<CooperativeWithdrawalInfo> for Duty {
+    fn from(value: CooperativeWithdrawalInfo) -> Self {
+        Self::FulfillWithdrawal(value)
+    }
+}
+
+/// An alias for a list of bridge duties for readability.
+pub type BridgeDuties = Vec<Duty>;
