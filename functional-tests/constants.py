@@ -18,6 +18,8 @@ FAST_BATCH_ROLLUP_PARAMS = {
     "evm_genesis_block_state_root": "351714af72d74259f45cd7eab0b04527cd40e74836a45abcae50f92d919d988f",  # noqa: E501
     "l1_reorg_safe_depth": 4,
     "target_l2_batch_size": 5,
+    "address_length": 20,
+    "deposit_amount": 1000000,
 }
 
 # Error codes
