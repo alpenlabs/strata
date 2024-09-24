@@ -31,6 +31,10 @@ pub struct OperatorEntry {
 }
 
 impl OperatorEntry {
+    pub fn idx(&self) -> OperatorIdx {
+        self.idx
+    }
+
     pub fn signing_pk(&self) -> &Buf32 {
         &self.signing_pk
     }
@@ -68,6 +72,17 @@ impl OperatorTable {
         }
     }
 
+    /// Returns the number of operator entries.
+    pub fn len(&self) -> u32 {
+        self.operators.len() as u32
+    }
+
+    /// Returns if the operator table is empty.  This is practically probably
+    /// never going to be true.
+    pub fn is_empty(&self) -> bool {
+        self.len() > 0
+    }
+
     /// Inserts a new operator entry.
     pub fn insert(&mut self, signing_pk: Buf32, wallet_pk: Buf32) {
         let entry = OperatorEntry {
@@ -90,6 +105,11 @@ impl OperatorTable {
             .binary_search_by_key(&idx, |e| e.idx)
             .ok()
             .map(|i| &self.operators[i])
+    }
+
+    /// Gets a operator entry by its internal position, *ignoring* the indexes.
+    pub fn get_entry_at_pos(&self, pos: u32) -> Option<&OperatorEntry> {
+        self.operators.get(pos as usize)
     }
 }
 

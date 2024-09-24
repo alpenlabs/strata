@@ -16,7 +16,7 @@ use alpen_express_state::{
     state_queue,
 };
 
-use crate::{errors::TsnError, macros::*};
+use crate::{errors::TsnError, macros::*, slot_rng::SlotRng};
 
 /// Processes a block, making writes into the provided state cache that will
 /// then be written to disk.  This does not check the block's credentials, it
@@ -38,15 +38,22 @@ pub fn process_block(
         panic!("transition: state cache not fresh");
     }
 
+    let mut rng = compute_init_slot_rng(state);
+
     // Update basic bookkeeping.
     state.set_cur_header(header);
 
     // Go through each stage and play out the operations it has.
     process_l1_view_update(state, body.l1_segment(), params)?;
     let ready_withdrawals = process_execution_update(state, body.exec_segment().update())?;
-    process_deposit_updates(state, ready_withdrawals, params)?;
+    process_deposit_updates(state, ready_withdrawals, &mut rng, params)?;
 
     Ok(())
+}
+
+fn compute_init_slot_rng(state: &StateCache) -> SlotRng {
+    // TODO seed this correctly
+    SlotRng::new_seeded(0)
 }
 
 /// Update our view of the L1 state, playing out downstream changes from that.
@@ -178,6 +185,7 @@ fn process_execution_update<'c, 'u>(
 fn process_deposit_updates(
     state: &mut StateCache,
     ready_withdrawals: &[WithdrawalIntent],
+    rng: &mut SlotRng,
     params: &RollupParams,
 ) -> Result<(), TsnError> {
     // TODO make this capable of handling multiple denominations, have to decide
@@ -194,10 +202,21 @@ fn process_deposit_updates(
     // Sequence in which we assign the operators to the deposits.  This is kinda
     // shitty because it might not account for available funds but it works for
     // devnet.
+    //
     // TODO make this actually pick operators and not always use the first one,
     // this will be easier when we have operators able to reason about the funds
     // they have available on L1 on the rollup chain, perhaps a nomination queue
-    let ops_seq = vec![0; ready_withdrawals.len()];
+    //
+    // TODO the way we pick assignees right now is a bit weird, we compute a
+    // possible list for all possible new assignees, but then if we encounter a
+    // deposit that needs reassignment we pick it directly at the time we need
+    // it instead of taking it out of the precomputed table, this seems fine and
+    // minimizes total calls to the RNG but feels odd since the order we pick the
+    // numbers isn't the same as the order we've assigned
+    let num_operators = state.state().operator_table().len();
+    let ops_seq = (0..ready_withdrawals.len())
+        .map(|_| rng.next_u32() % num_operators)
+        .collect::<Vec<_>>();
 
     let mut next_intent_to_assign = 0;
     let mut deposit_idxs_to_remove = Vec::new();
@@ -234,8 +253,22 @@ fn process_deposit_updates(
             DepositState::Dispatched(dstate) => {
                 // Check if the deposit is past the threshold.
                 if cur_block_height >= dstate.exec_deadline() {
-                    // TODO don't always use pos 0
-                    let op_idx = ops_seq[0];
+                    // Pick the next assignee, if there are any.
+                    let new_op_pos = if num_operators > 0 {
+                        let op_off = rng.next_u32() % (num_operators - 1);
+                        (dstate.assignee() + op_off) % num_operators
+                    } else {
+                        dstate.assignee()
+                    };
+
+                    // Convert their position in the table to their global index.
+                    let op_idx = state
+                        .state()
+                        .operator_table()
+                        .get_entry_at_pos(new_op_pos)
+                        .expect("chaintsn: inconsistent state")
+                        .idx();
+
                     state.reset_deposit_assignee(deposit_idx, op_idx, new_exec_height as u64);
                 }
             }
@@ -252,6 +285,8 @@ fn process_deposit_updates(
     if next_intent_to_assign != ready_withdrawals.len() {
         return Err(TsnError::InsufficientDepositsForIntents);
     }
+
+    // TODO remove stale deposit idxs
 
     Ok(())
 }
