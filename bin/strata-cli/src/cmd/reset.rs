@@ -2,7 +2,7 @@ use argh::FromArgs;
 use console::{style, Term};
 use dialoguer::Confirm;
 
-use crate::{seed, settings::SETTINGS};
+use crate::{seed::EncryptedSeedPersister, settings::SETTINGS};
 
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "reset")]
@@ -17,7 +17,7 @@ pub struct ResetArgs {
     assume_yes: bool,
 }
 
-pub async fn reset(args: ResetArgs) {
+pub async fn reset(args: ResetArgs, persister: impl EncryptedSeedPersister) {
     let term = Term::stdout();
     let confirm = if args.assume_yes {
         true
@@ -35,7 +35,8 @@ pub async fn reset(args: ResetArgs) {
     };
 
     if confirm {
-        seed::reset().unwrap();
+        persister.delete().unwrap();
+        let _ = term.write_line("Wiped seed");
         std::fs::remove_dir_all(SETTINGS.data_dir.clone()).unwrap();
         let _ = term.write_line("Wiped data directory");
     }

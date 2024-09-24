@@ -11,12 +11,23 @@ use cmd::{
     change_pwd::change_pwd, drain::drain, faucet::faucet, receive::receive, refresh::refresh,
     reset::reset, send::send, Commands, TopLevel,
 };
-use seed::Seed;
+#[cfg(target_os = "linux")]
+use seed::FilePersister;
+#[cfg(not(target_os = "linux"))]
+use seed::KeychainPersister;
+#[cfg(target_os = "linux")]
+use settings::SETTINGS;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     let TopLevel { cmd } = argh::from_env();
-    let seed = Seed::load_or_create().unwrap();
+    #[cfg(not(target_os = "linux"))]
+    let persister = KeychainPersister;
+    #[cfg(target_os = "linux")]
+    let persister = FilePersister {
+        file: SETTINGS.linux_seed_file,
+    };
+    let seed = seed::load_or_create(&persister).unwrap();
 
     match cmd {
         Commands::Refresh(_) => refresh(seed).await,
@@ -28,7 +39,7 @@ async fn main() {
         Commands::Faucet(args) => faucet(args, seed).await,
         Commands::Send(args) => send(args, seed).await,
         Commands::Receive(args) => receive(args, seed).await,
-        Commands::Reset(args) => reset(args).await,
-        Commands::ChangePwd(args) => change_pwd(args, seed).await,
+        Commands::Reset(args) => reset(args, persister).await,
+        Commands::ChangePwd(args) => change_pwd(args, seed, persister).await,
     }
 }

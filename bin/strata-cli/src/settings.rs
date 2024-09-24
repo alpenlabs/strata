@@ -18,6 +18,7 @@ pub static SETTINGS: LazyLock<Settings> = LazyLock::new(|| {
         ProjectDirs::from("io", "alpenlabs", "strata").expect("project dir should be available");
     let config_file = proj_dirs.config_dir().to_owned().join("config.toml");
     let descriptor_file = proj_dirs.data_dir().to_owned().join("descriptors");
+    let linux_seed_file = proj_dirs.data_dir().to_owned().join("seed");
     create_dir_all(config_file.parent().unwrap()).unwrap();
     let _ = File::create_new(&config_file);
     let from_file = Config::builder()
@@ -54,6 +55,7 @@ pub static SETTINGS: LazyLock<Settings> = LazyLock::new(|| {
             "0x000000000000000000000000000000000B121d9E",
         )
         .unwrap(),
+        linux_seed_file,
     }
 });
 
@@ -76,4 +78,5 @@ pub struct Settings {
     pub block_time: Duration,
     pub descriptor_db: PathBuf,
     pub bridge_rollup_address: RollupAddress,
+    pub linux_seed_file: PathBuf,
 }
