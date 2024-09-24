@@ -10,6 +10,7 @@ mod test {
 
     #[test]
     fn test_btc_blockspace_code_trace_generation() {
+        sp1_sdk::utils::setup_logger();
         let block = get_btc_mainnet_block();
         let filters = get_tx_filters();
         let prover = SP1Host::init(GUEST_BTC_BLOCKSPACE_ELF.into(), Default::default());

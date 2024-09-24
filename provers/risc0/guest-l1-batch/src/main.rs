@@ -3,21 +3,25 @@ use express_proofimpl_l1_batch::{
     logic::{process_batch_proof, L1BatchProofInput},
     pow_params::PowParams,
 };
-use risc0_zkvm::{guest::env, serde};
+use risc0_zkvm::guest::env;
 
 // TODO: read vk for BTC_BLOCKSPACE from a file as this changes
 // Ref: https://github.com/risc0/risc0/blob/main/examples/composition/src/main.rs#L15
 
 fn main() {
-    let input: L1BatchProofInput = env::read();
+    let len: u32 = env::read();
+    let mut slice = vec![0u8; len as usize];
+    env::read_slice(&mut slice);
+    let input: L1BatchProofInput = borsh::from_slice(&slice).unwrap();
 
     for out in &input.batch {
         // TODO: hardcode vk for BTC_BLOCKSPACE
         let vk: [u32; 8] = env::read();
-        env::verify(vk, &serde::to_vec(&out).unwrap()).unwrap();
+        let out_raw = borsh::to_vec(out).unwrap();
+        env::verify(vk, &out_raw).unwrap();
     }
 
     let pow_params = PowParams::from(&MAINNET);
     let output = process_batch_proof(input, &pow_params);
-    env::commit(&output);
+    env::commit(&borsh::to_vec(&output).unwrap());
 }

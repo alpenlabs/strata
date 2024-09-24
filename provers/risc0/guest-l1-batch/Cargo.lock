@@ -1131,6 +1131,7 @@ name = "guest-risc0-l1-batch"
 version = "0.1.0"
 dependencies = [
  "bitcoin",
+ "borsh",
  "express-proofimpl-btc-blockspace",
  "express-proofimpl-l1-batch",
  "risc0-zkvm",

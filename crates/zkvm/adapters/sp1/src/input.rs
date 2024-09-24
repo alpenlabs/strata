@@ -22,8 +22,6 @@ impl<'a> ZKVMInputBuilder<'a> for SP1ProofInputBuilder {
     }
 
     fn write_serialized(&mut self, item: &[u8]) -> anyhow::Result<&mut Self> {
-        let len = item.len() as u32;
-        self.0.write(&len);
         self.0.write_slice(item);
         Ok(self)
     }
