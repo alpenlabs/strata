@@ -129,6 +129,10 @@ def check_send_proof_for_non_existent_batch(seqrpc, nonexistent_batch: int):
     try:
         seqrpc.alp_submitCheckpointProof(nonexistent_batch, some_proof_hex)
     except Exception as e:
-        assert e.code == ERROR_CHECKPOINT_DOESNOT_EXIST
+        if hasattr(e, "code"):
+            assert e.code == ERROR_CHECKPOINT_DOESNOT_EXIST
+        else:
+            print("Unexpected exception occurred", e)
+            raise e
     else:
         raise AssertionError("Expected rpc error")
