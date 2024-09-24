@@ -10,10 +10,10 @@ pub const BRIDGE_DENOMINATION: BitcoinAmount = BitcoinAmount::from_int_btc(10);
 
 /// The min relay fee as defined in bitcoin-core with the unit sats/kvB.
 ///
-/// We use a larger value (3 in bitcoin-core) to cross the dust threshold for certain outputs.
-/// Setting this to a very high value may alleviate the need for an `anyone_can_pay` output.
-/// In its current configuration of `10`, the total transaction fee for withdrawal transaction
-/// computes to ~5.5 sats/vB (run integration tests with `RUST_LOG=warn` to verify).
+/// This is set to a larger value (3 in bitcoin-core) to cross the dust threshold for certain
+/// outputs. Setting this to a very high value may alleviate the need for an `anyone_can_pay`
+/// output. In its current configuration of `10`, the total transaction fee for withdrawal
+/// transaction computes to ~5.5 sats/vB (run integration tests with `RUST_LOG=warn` to verify).
 pub const MIN_RELAY_FEE: BitcoinAmount = BitcoinAmount::from_sat(10);
 
 /// The fee charged by the operator to process a withdrawal.

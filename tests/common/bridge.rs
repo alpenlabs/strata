@@ -44,7 +44,7 @@ use tracing::{debug, event, span, trace, warn, Level};
 /// Transaction fee to confirm Deposit Transaction
 ///
 /// This value must be greater than 179 based on the current config in the `bitcoind` instance.
-pub(crate) const DT_FEE: Amount = Amount::from_sat(1500); // should be more than enough
+pub(crate) const DT_FEE: Amount = Amount::from_sat(1_500); // should be more than enough
 /// Minimum confirmations required for miner rewards to become spendable.
 pub(crate) const MIN_MINER_REWARD_CONFS: u64 = 101;
 
