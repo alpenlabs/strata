@@ -3764,6 +3764,7 @@ dependencies = [
 name = "express-bridge-exec"
 version = "0.1.0"
 dependencies = [
+ "alpen-express-btcio",
  "alpen-express-primitives",
  "alpen-express-rpc-api",
  "async-trait",

@@ -11,7 +11,10 @@ use bitcoin::{
     secp256k1::{PublicKey, SecretKey},
 };
 use borsh::{BorshDeserialize, BorshSerialize};
-use musig2::{BinaryEncoding, NonceSeed, PartialSignature, PubNonce, SecNonce};
+use musig2::{
+    errors::KeyAggError, BinaryEncoding, KeyAggContext, NonceSeed, PartialSignature, PubNonce,
+    SecNonce,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -42,6 +45,14 @@ impl From<BTreeMap<OperatorIdx, PublicKey>> for PublickeyTable {
 impl From<PublickeyTable> for Vec<PublicKey> {
     fn from(value: PublickeyTable) -> Self {
         value.0.values().copied().collect()
+    }
+}
+
+impl TryFrom<PublickeyTable> for KeyAggContext {
+    type Error = KeyAggError;
+
+    fn try_from(value: PublickeyTable) -> Result<Self, Self::Error> {
+        KeyAggContext::new(Into::<Vec<PublicKey>>::into(value))
     }
 }
 

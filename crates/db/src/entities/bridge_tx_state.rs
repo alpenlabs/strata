@@ -11,9 +11,12 @@ use alpen_express_primitives::{
     l1::{BitcoinPsbt, TaprootSpendPath},
 };
 use arbitrary::Arbitrary;
-use bitcoin::{Transaction, TxOut, Txid};
+use bitcoin::{hashes::Hash, Transaction, TxOut, Txid};
 use borsh::{BorshDeserialize, BorshSerialize};
-use musig2::{PartialSignature, PubNonce};
+use musig2::{
+    aggregate_partial_signatures, secp256k1::schnorr::Signature, AggNonce, KeyAggContext,
+    PartialSignature, PubNonce,
+};
 
 use super::errors::{BridgeTxStateError, EntityResult};
 
@@ -209,6 +212,23 @@ impl BridgeTxState {
     /// Get the ordered signatures per input collected so far.
     pub fn ordered_sigs(&self) -> impl Iterator<Item = PartialSignature> + '_ {
         self.collected_sigs.values().map(|v| *v.inner())
+    }
+
+    /// Aggregates and extracts the underlying partial signatures as a [`Signature`].
+    pub fn aggregate_signature(&self) -> EntityResult<Signature> {
+        let message = *self.compute_txid().as_byte_array();
+        let key_agg_context: KeyAggContext = self
+            .pubkey_table
+            .clone()
+            .try_into()
+            .map_err(|_| BridgeTxStateError::Unauthorized)?;
+        let pub_nonces = self.collected_nonces.values().map(|n| n.inner().clone());
+        let aggregate_nonce = AggNonce::sum(pub_nonces);
+        let partial_sigs = self.collected_sigs.values().map(|s| *s.inner());
+        let sig: Signature =
+            aggregate_partial_signatures(&key_agg_context, &aggregate_nonce, partial_sigs, message)
+                .map_err(|_| BridgeTxStateError::Unauthorized)?;
+        Ok(sig)
     }
 }
 
