@@ -7,6 +7,7 @@ use alpen_express_primitives::{
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
+// TODO make this not hardcoded!
 pub const WITHDRAWAL_DENOMINATION: BitcoinAmount = BitcoinAmount::from_int_btc(10);
 
 /// Describes an intent to withdraw that hasn't been dispatched yet.
@@ -25,7 +26,7 @@ impl WithdrawalIntent {
     }
 
     pub fn as_parts(&self) -> (u64, &Buf32) {
-        (self.amt.to_sat(), self.dest_pk.buf32())
+        (self.amt.to_sat(), self.dest_pk.inner())
     }
 
     pub fn amt(&self) -> &BitcoinAmount {
@@ -45,6 +46,11 @@ pub struct WithdrawalBatch {
 }
 
 impl WithdrawalBatch {
+    /// Creates a new instance.
+    pub fn new(intents: Vec<WithdrawalIntent>) -> Self {
+        Self { intents }
+    }
+
     /// Gets the total value of the batch.  This must be less than the size of
     /// the utxo it's assigned to.
     pub fn get_total_value(&self) -> BitcoinAmount {

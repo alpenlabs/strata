@@ -18,4 +18,7 @@ pub enum TsnError {
 
     #[error("L1 segment block did not extend the chain tip")]
     L1SegNotExtend,
+
+    #[error("ran out of deposits to assign withdrawals to")]
+    InsufficientDepositsForIntents,
 }

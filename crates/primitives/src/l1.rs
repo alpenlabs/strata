@@ -441,7 +441,7 @@ impl XOnlyPk {
     }
 
     /// Get the underlying [`Buf32`].
-    pub fn buf32(&self) -> &Buf32 {
+    pub fn inner(&self) -> &Buf32 {
         &self.0
     }
 

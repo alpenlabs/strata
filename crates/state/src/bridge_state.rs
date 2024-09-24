@@ -131,6 +131,17 @@ impl DepositsTable {
         }
     }
 
+    /// Returns the number of deposit entries being tracked.
+    pub fn len(&self) -> u32 {
+        self.deposits.len() as u32
+    }
+
+    /// Returns if the deposit table is empty.  This is practically probably
+    /// never going to be true.
+    pub fn is_empty(&self) -> bool {
+        self.len() > 0
+    }
+
     /// Gets a deposit from the table by its idx.
     ///
     /// Does a binary search.
@@ -153,6 +164,11 @@ impl DepositsTable {
 
     pub fn get_all_deposits_idxs_iters_iter(&self) -> impl Iterator<Item = u32> + '_ {
         self.deposits.iter().map(|e| e.deposit_idx)
+    }
+
+    /// Gets a deposit entry by its internal position, *ignoring* the indexes.
+    pub fn get_entry_at_pos(&self, pos: u32) -> Option<&DepositEntry> {
+        self.deposits.get(pos as usize)
     }
 }
 
@@ -183,6 +199,10 @@ pub struct DepositEntry {
 }
 
 impl DepositEntry {
+    pub fn idx(&self) -> u32 {
+        self.deposit_idx
+    }
+
     pub fn next_pending_update_tx(&self) -> Option<&l1::L1TxRef> {
         self.pending_update_txs.first()
     }
@@ -234,20 +254,62 @@ pub struct DispatchedState {
     /// Configuration for outputs to be written to.
     cmd: DispatchCommand,
 
-    /// The index of the operator that the deposit is assigned to for withdrawal reimbursement.
+    /// The index of the operator that's fronting the funds for the withdrawal,
+    /// and who will be reimbursed by the bridge notaries.
     assignee: OperatorIdx,
 
-    /// The bitcoin block height before which the withdrawal must be completed.
-    /// When set to 0, it means that the withdrawal cannot be processed yet.
-    valid_till_blockheight: BitcoinBlockHeight,
+    /// L1 block height before which we expect the dispatch command to be
+    /// executed and after which this assignment command is no longer valid.
+    ///
+    /// If a checkpoint is processed for this L1 height and the withdrawal still
+    /// goes out it won't be honored.
+    exec_deadline: BitcoinBlockHeight,
+}
+
+impl DispatchedState {
+    pub fn new(
+        cmd: DispatchCommand,
+        assignee: OperatorIdx,
+        exec_deadline: BitcoinBlockHeight,
+    ) -> Self {
+        Self {
+            cmd,
+            assignee,
+            exec_deadline,
+        }
+    }
+
+    pub fn cmd(&self) -> &DispatchCommand {
+        &self.cmd
+    }
+
+    pub fn assignee(&self) -> OperatorIdx {
+        self.assignee
+    }
+
+    pub fn exec_deadline(&self) -> BitcoinBlockHeight {
+        self.exec_deadline
+    }
 }
 
 /// Command to operator(s) to initiate the withdrawal.  Describes the set of
 /// outputs we're trying to withdraw to.
+///
+/// May also include future information to deal with fee accounting.
 #[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
 pub struct DispatchCommand {
     /// The table of withdrawal outputs.
     withdraw_outputs: Vec<WithdrawOutput>,
+}
+
+impl DispatchCommand {
+    pub fn new(withdraw_outputs: Vec<WithdrawOutput>) -> Self {
+        Self { withdraw_outputs }
+    }
+
+    pub fn withdraw_outputs(&self) -> &[WithdrawOutput] {
+        &self.withdraw_outputs
+    }
 }
 
 /// An output constructed from [`crate::bridge_ops::WithdrawalIntent`].
@@ -258,4 +320,10 @@ pub struct WithdrawOutput {
 
     /// Amount in sats.
     amt: BitcoinAmount,
+}
+
+impl WithdrawOutput {
+    pub fn new(dest_addr: XOnlyPk, amt: BitcoinAmount) -> Self {
+        Self { dest_addr, amt }
+    }
 }

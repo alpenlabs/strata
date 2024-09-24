@@ -34,17 +34,22 @@ pub struct RollupParams {
     /// target batch size in number of l2 blocks
     pub target_l2_batch_size: u64,
 
-    /// ee address length
+    /// Maximum length of an EE address in a deposit.
+    // FIXME this should be "max address length"
     pub address_length: u8,
 
-    /// max deposit amount in sats
+    /// Exact "at-rest" deposit amount, in sats.
     pub deposit_amount: u64,
 
     /// SP1 verifying key that is used to verify the Groth16 proof posted on Bitcoin
+    // FIXME which proof?  should this be `checkpoint_vk`?
     pub rollup_vk: RollupVerifyingKey,
 
     /// Whether to verify the proofs from L1 or not.
     pub verify_proofs: bool,
+
+    /// Number of Bitcoin blocks a withdrawal dispatch assignment is valid for.
+    pub dispatch_assignment_dur: u32,
 }
 
 /// Client sync parameters that are used to make the network work but don't
@@ -54,8 +59,10 @@ pub struct RollupParams {
 pub struct SyncParams {
     /// Number of blocks that we follow the L1 from.
     pub l1_follow_distance: u64,
+
     /// Number of events after which we checkpoint the client
     pub client_checkpoint_interval: u32,
+
     /// Max number of recent l2 blocks that can be fetched from RPC
     pub l2_blocks_fetch_limit: u64,
 }
