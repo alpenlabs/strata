@@ -1,10 +1,10 @@
 use std::str::FromStr;
 
+use alpen_express_primitives::{buf::Buf32, l1::XOnlyPk};
 use bitcoin::{
     absolute::LockTime,
     opcodes::all::OP_RETURN,
     script::{self, PushBytesBuf},
-    secp256k1::PublicKey,
     Address, Amount, ScriptBuf, Transaction, TxOut,
 };
 
@@ -17,11 +17,8 @@ pub fn generic_taproot_addr() -> Address {
         .unwrap()
 }
 
-pub fn generic_pubkey() -> PublicKey {
-    let pubkey_bytes =
-        hex::decode("041a787b3a3d4446103afc2886a7a34206cbbe8d4ddea93922c49df094bdb47ff4c25efe9cf6f407447f3c0a006263977c8dc6da04450ddf982463c34825627287")
-            .expect("Decoding failed");
-    PublicKey::from_slice(&pubkey_bytes).expect("Invalid public key")
+pub fn generic_pubkey() -> XOnlyPk {
+    XOnlyPk::new(Buf32::zero())
 }
 
 pub fn get_deposit_tx_config() -> DepositTxConfig {

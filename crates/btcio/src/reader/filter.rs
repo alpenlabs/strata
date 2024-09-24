@@ -1,5 +1,6 @@
 use alpen_express_state::{batch::SignedBatchCheckpoint, tx::ProtocolOperation};
 use bitcoin::{Block, Transaction};
+use borsh::{BorshDeserialize, BorshSerialize};
 use strata_tx_parser::{
     deposit::{
         deposit_request::extract_deposit_request_info, deposit_tx::extract_deposit_info,
@@ -11,7 +12,7 @@ use strata_tx_parser::{
 use super::messages::ProtocolOpTxRef;
 
 /// kind of transactions can be relevant for rollup node to filter
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
 pub enum TxFilterRule {
     /// Inscription transactions with given Rollup name. This will be parsed by
     /// InscriptionParser which dictates the structure of inscription.

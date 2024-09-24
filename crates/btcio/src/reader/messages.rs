@@ -1,5 +1,6 @@
 use alpen_express_state::tx::ProtocolOperation;
 use bitcoin::Block;
+use borsh::{BorshDeserialize, BorshSerialize};
 
 /// L1 events that we observe and want the persistence task to work on.
 #[derive(Clone, Debug)]
@@ -13,7 +14,7 @@ pub enum L1Event {
 
 /// Core protocol specific transaction. It can be thought of as relevant transactions for the
 /// Protocol
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, BorshSerialize, BorshDeserialize)]
 pub struct ProtocolOpTxRef {
     /// Index of the transaction in the block
     index: u32,
