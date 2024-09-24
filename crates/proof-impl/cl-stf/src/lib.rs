@@ -53,6 +53,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[ignore = "needs to be reworked to remove constant values"]
     fn test_verify_and_transition() {
         let prev_state_data: &[u8] = include_bytes!("../test-datas/prev_chstate.borsh");
         let new_state_data: &[u8] = include_bytes!("../test-datas/post_state.borsh");

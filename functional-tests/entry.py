@@ -391,9 +391,11 @@ class BasicEnvConfig(flexitest.EnvConfig):
 
         seqaddr = brpc.proxy.getnewaddress()
 
-        if self.pre_generate_blocks > 0:
-            print(f"Pre generating {self.pre_generate_blocks} blocks to address {seqaddr}")
-            brpc.proxy.generatetoaddress(self.pre_generate_blocks, seqaddr)
+        while self.pre_generate_blocks > 0:
+            batch_size = min(self.pre_generate_blocks, 1000)
+            print(f"Pre generating {batch_size} blocks to address {seqaddr}")
+            brpc.proxy.generatetoaddress(batch_size, seqaddr)
+            self.pre_generate_blocks -= batch_size
 
         # generate blocks every 500 millis
         if self.auto_generate_blocks:

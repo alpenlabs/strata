@@ -2,6 +2,8 @@
 //! we'll replace components with real implementations as we go along.
 #![allow(unused)]
 
+use std::cmp::max;
+
 use alpen_express_primitives::params::RollupParams;
 use alpen_express_state::{
     block::L1Segment,
@@ -83,6 +85,7 @@ fn process_l1_view_update(
         let first_new_block_height = new_tip_height - l1seg.new_payloads().len() as u64 + 1;
         let implied_pivot_height = first_new_block_height - 1;
         let cur_tip_height = l1v.tip_height();
+        let cur_safe_height = l1v.safe_height();
 
         // Check that the new chain is actually longer, if it's shorter then we didn't do anything.
         // TODO This probably needs to be adjusted for PoW.
@@ -108,9 +111,16 @@ fn process_l1_view_update(
             let ment = L1MaturationEntry::from(e.clone());
             state.apply_l1_block_entry(ment);
         }
-    }
 
-    // TODO accept sufficiently buried blocks (triggering deposit creation or whatever), etc.
+        let new_matured_l1_height = max(
+            new_tip_height.saturating_sub(params.l1_reorg_safe_depth as u64),
+            cur_safe_height,
+        );
+
+        for idx in (cur_safe_height..=new_matured_l1_height) {
+            state.mature_l1_block(idx);
+        }
+    }
 
     Ok(())
 }

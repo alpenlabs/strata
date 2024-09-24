@@ -1,7 +1,9 @@
 //! Core state transition function.
 #![allow(unused)] // still under development
 
-use alpen_express_db::traits::{Database, L1DataProvider, L2DataProvider, L2DataStore};
+use alpen_express_db::traits::{
+    ChainstateProvider, Database, L1DataProvider, L2DataProvider, L2DataStore,
+};
 use alpen_express_primitives::prelude::*;
 use alpen_express_state::{
     client_state::*, header::L2Header, id::L2BlockId, l1::L1BlockId, operation::*,
@@ -121,6 +123,24 @@ pub fn process_event<D: Database>(
                 .get_block_data(*blkid)?
                 .ok_or(Error::MissingL2Block(*blkid))?;
 
+            // TODO: get chainstate idx from blkid OR pass correct idx in sync event
+            let block_idx = block.header().blockidx();
+            let chainstate_provider = database.chainstate_provider();
+            let chainstate = chainstate_provider
+                .get_toplevel_state(block_idx)?
+                .ok_or(Error::MissingIdxChainstate(block_idx))?;
+
+            // height of last matured L1 block in chain state
+            let chs_last_buried = chainstate.l1_view().safe_height().saturating_sub(1);
+            // buried height in client state
+            let cls_last_buried = state.l1_view().buried_l1_height();
+
+            if chs_last_buried > cls_last_buried {
+                // can bury till last matured block in chainstate
+                // FIXME: if client state blocks count < chs_last_buried ?
+                writes.push(ClientStateWrite::UpdateBuried(chs_last_buried));
+            }
+
             // TODO better checks here
             writes.push(ClientStateWrite::AcceptL2Block(
                 *blkid,
@@ -139,9 +159,6 @@ fn handle_maturable_height(
 ) -> (Vec<ClientStateWrite>, Vec<SyncAction>) {
     let mut writes = Vec::new();
     let mut actions = Vec::new();
-
-    debug!(%maturable_height, "Emitting UpdateBuried for maturable height");
-    writes.push(ClientStateWrite::UpdateBuried(maturable_height));
 
     // If there are checkpoints at or before the maturable height, mark them as finalized
     if state

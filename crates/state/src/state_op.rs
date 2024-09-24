@@ -209,5 +209,9 @@ impl StateCache {
         self.merge_op(StateOp::AcceptL1Block(ent));
     }
 
+    /// remove matured block from maturation entry
+    pub fn mature_l1_block(&mut self, idx: u64) {
+        self.merge_op(StateOp::MatureL1Block(idx));
+    }
     // TODO add more manipulator functions
 }

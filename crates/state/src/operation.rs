@@ -140,7 +140,7 @@ pub fn apply_writes_to_state(
 
             AcceptL1Block(l1blkid) => {
                 debug!(?l1blkid, "received AcceptL1Block");
-                // TODO make this also do shit
+                // TODO make this also do something
                 let l1v = state.l1_view_mut();
                 l1v.local_unaccepted_blocks.push(l1blkid);
                 l1v.next_expected_block += 1;

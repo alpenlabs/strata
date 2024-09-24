@@ -74,6 +74,9 @@ pub enum Error {
     #[error("block assembly timed out")]
     BlockAssemblyTimedOut,
 
+    #[error("cannot determine pivot point for L1Segment")]
+    BlockAssemblyL1SegmentUndetermined,
+
     #[error("{0}")]
     Other(String),
 }
