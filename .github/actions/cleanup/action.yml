@@ -1,0 +1,19 @@
+name: Cleanup GitHub runner bloat
+description: "Removes unnecessary files and frees up disk space on the runner."
+inputs: {}
+outputs: {}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Cleanup space
+      shell: bash
+      # https://github.com/actions/runner-images/issues/2840#issuecomment-790492173
+      run: |
+        echo "Starting cleanup..."
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /usr/local/lib/android
+        sudo rm -rf /usr/local/.ghcup
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"

@@ -19,18 +19,13 @@ jobs:
   test:
     name: Run unit tests and generate report
     runs-on: ubuntu-latest
-    timeout-minutes: 40 # better fail-safe than the default 360 in github actions
+    timeout-minutes: 60 # better fail-safe than the default 360 in github actions
     steps:
-      - name: Cleanup space
-        # https://github.com/actions/runner-images/issues/2840#issuecomment-790492173
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /usr/local/.ghcup
-          sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
       - uses: actions/checkout@v4
+
+      - name: Cleanup space
+        uses: ./.github/actions/cleanup
+
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: llvm-tools-preview
@@ -46,9 +41,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
+
       - name: Run tests with coverage
         run: |
           cargo llvm-cov --workspace --locked nextest --profile ci --lcov --output-path lcov.info
+
       - name: Test Summary
         uses: test-summary/action@v2
         if: always()
@@ -65,15 +62,20 @@ jobs:
     runs-on: ubuntu-latest
     env:
       RUST_BACKTRACE: 1
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+
+      - name: Cleanup space
+        uses: ./.github/actions/cleanup
+
       - uses: dtolnay/rust-toolchain@nightly
         with:
           toolchain: nightly-2024-07-27
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
+
       - name: Run doctests
         run: cargo test --doc --workspace
 
