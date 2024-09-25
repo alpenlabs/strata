@@ -54,10 +54,12 @@ pub fn parse_deposit_request_script(
         return Err(DepositParseError::NoData);
     };
 
+    assert!(data.len() < 80);
+
     // data has expected magic bytes
     let magic_bytes = &config.magic_bytes;
     let magic_len = magic_bytes.len();
-    if data.len() < magic_len || &data[0..magic_len] != magic_bytes {
+    if data.len() < magic_len || &data[..magic_len] != magic_bytes {
         return Err(DepositParseError::MagicBytesMismatch);
     }
 
@@ -66,11 +68,12 @@ pub fn parse_deposit_request_script(
     if data.len() < 32 {
         return Err(DepositParseError::LeafHashLenMismatch);
     }
-    let ctrl_hash: &[u8; 32] = &data[0..32].try_into().expect("ok");
+    let ctrl_hash: &[u8; 32] = &data[..32].try_into().expect("ok");
 
     // configured bytes for address
     let address = &data[32..];
     if address.len() != config.address_length as usize {
+        // casting is safe as address.len() < data.len() < 80
         return Err(DepositParseError::InvalidDestAddress(address.len() as u8));
     }
 

@@ -39,16 +39,19 @@ fn parse_deposit_script<'a>(
         return Err(DepositParseError::NoData);
     };
 
+    assert!(data.len() < 80);
+
     // data has expected magic bytes
     let magic_bytes = &config.magic_bytes;
     let magic_len = magic_bytes.len();
-    if data.len() < magic_len || &data[0..magic_len] != magic_bytes {
+    if data.len() < magic_len || &data[..magic_len] != magic_bytes {
         return Err(DepositParseError::MagicBytesMismatch);
     }
 
     // configured bytes for address
     let address = &data[magic_len..];
     if address.len() != config.address_length as usize {
+        // casting is safe as address.len() < data.len() < 80
         return Err(DepositParseError::InvalidDestAddress(address.len() as u8));
     }
 
