@@ -3,12 +3,8 @@
 use alpen_express_state::tx::DepositInfo;
 use bitcoin::{opcodes::all::OP_RETURN, ScriptBuf, Transaction};
 
-use super::{
-    common::{check_bridge_offer_output, check_magic_bytes, extract_ee_bytes},
-    error::DepositParseError,
-    DepositTxConfig,
-};
-use crate::utils::next_op;
+use super::{common::check_bridge_offer_output, error::DepositParseError, DepositTxConfig};
+use crate::utils::{next_bytes, next_op};
 
 /// Extracts the DepositInfo from the Deposit Transaction
 pub fn extract_deposit_info(tx: &Transaction, config: &DepositTxConfig) -> Option<DepositInfo> {
@@ -39,11 +35,24 @@ fn parse_deposit_script<'a>(
         return Err(DepositParseError::NoOpReturn);
     }
 
-    // magic bytes
-    check_magic_bytes(&mut instructions, config)?;
+    let Some(data) = next_bytes(&mut instructions) else {
+        return Err(DepositParseError::NoData);
+    };
 
-    // EE address
-    extract_ee_bytes(&mut instructions, config)
+    // data has expected magic bytes
+    let magic_bytes = &config.magic_bytes;
+    let magic_len = magic_bytes.len();
+    if data.len() < magic_len || &data[0..magic_len] != magic_bytes {
+        return Err(DepositParseError::MagicBytesMismatch);
+    }
+
+    // configured bytes for address
+    let address = &data[magic_len..];
+    if address.len() != config.address_length as usize {
+        return Err(DepositParseError::InvalidDestAddress(address.len() as u8));
+    }
+
+    Ok(address)
 }
 
 #[cfg(test)]

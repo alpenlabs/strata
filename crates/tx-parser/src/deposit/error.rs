@@ -5,6 +5,9 @@ pub enum DepositParseError {
     #[error("No OP_RETURN")]
     NoOpReturn,
 
+    #[error("No data")]
+    NoData,
+
     #[error("no magic bytes")]
     NoMagicBytes,
 
