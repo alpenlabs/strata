@@ -136,16 +136,21 @@ mod tests {
     use alpen_express_common::logging;
     use alpen_express_db::traits::L1DataStore;
     use alpen_express_mmr::CompactMmr;
-    use alpen_express_primitives::l1::{L1BlockManifest, L1TxProof};
+    use alpen_express_primitives::l1::{BitcoinAmount, L1BlockManifest, L1TxProof, OutputRef};
     use alpen_express_rocksdb::{test_utils::get_rocksdb_tmp_instance, L1Db};
     use alpen_express_state::{l1::L1Tx, tx::DepositRequestInfo};
     use alpen_test_utils::{bridge::generate_mock_unsigned_tx, ArbitraryGenerator};
     use bitcoin::{
+        absolute::LockTime,
         consensus::Encodable,
         key::rand::{self, Rng},
+        opcodes::{OP_FALSE, OP_TRUE},
+        script::Builder,
         taproot::LeafVersion,
-        ScriptBuf,
+        transaction::Version,
+        ScriptBuf, Sequence, TxIn, TxOut, Witness,
     };
+    use express_bridge_tx_builder::prelude::{create_taproot_addr, SpendPath};
 
     use super::*;
 
@@ -162,27 +167,52 @@ mod tests {
         let num_blocks = 5;
         const MAX_TXS_PER_BLOCK: usize = 3;
 
-        let num_valid_duties = populate_db(&l1_db.clone(), num_blocks, MAX_TXS_PER_BLOCK).await;
+        let (tx, protocol_op, expected_deposit_info) = get_needle();
+        let num_valid_duties = populate_db(
+            &l1_db.clone(),
+            num_blocks,
+            MAX_TXS_PER_BLOCK,
+            (tx, protocol_op),
+        )
+        .await;
 
-        let txs = extract_deposit_requests(&l1_db.clone(), 0, Network::Regtest)
+        let deposit_infos = extract_deposit_requests(&l1_db.clone(), 0, Network::Regtest)
             .await
             .expect("should be able to extract deposit requests")
             .collect::<Vec<DepositInfo>>();
 
         // this is almost always true. In fact, it should be around 50%
         assert!(
-            txs.len() < num_blocks * MAX_TXS_PER_BLOCK,
+            deposit_infos.len() < num_blocks * MAX_TXS_PER_BLOCK,
             "only some txs must have deposit requests"
         );
 
         assert_eq!(
-            txs.len(),
+            deposit_infos.len(),
             num_valid_duties,
             "all the valid duties in the db must be returned"
+        );
+
+        let actual_deposit_infos = deposit_infos
+            .iter()
+            .filter_map(|deposit_info| {
+                if expected_deposit_info.eq(deposit_info) {
+                    Some(deposit_info.clone())
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<DepositInfo>>();
+
+        assert!(
+            actual_deposit_infos.len().eq(&1),
+            "there should be a known deposit info in the list"
         );
     }
 
     /// Populates the db with block data.
+    ///
+    /// This data includes the `needle` at some random block within the provided range.
     ///
     /// # Returns
     ///
@@ -191,18 +221,41 @@ mod tests {
         l1_db: &Arc<Store>,
         num_blocks: usize,
         max_txs_per_block: usize,
+        needle: (Vec<u8>, ProtocolOperation),
     ) -> usize {
         let arb = ArbitraryGenerator::new();
+        assert!(
+            num_blocks.gt(&0) && max_txs_per_block.gt(&0),
+            "num_blocks and max_tx_per_block must be at least 1"
+        );
+
+        let random_block = rand::thread_rng().gen_range(1..num_blocks);
 
         let mut num_valid_duties = 0;
         for idx in 0..num_blocks {
+            let num_txs = rand::thread_rng().gen_range(1..max_txs_per_block);
+
+            let known_tx_idx = if idx == random_block {
+                Some(rand::thread_rng().gen_range(0..num_txs))
+            } else {
+                None
+            };
+
             let idx = idx as u64;
-
-            let num_txs = rand::thread_rng().gen_range(0..max_txs_per_block);
-
             let txs: Vec<L1Tx> = (0..num_txs)
                 .map(|i| {
                     let proof = L1TxProof::new(i as u32, arb.generate());
+
+                    // insert the `needle` at the random index in the random block
+                    if let Some(known_tx_idx) = known_tx_idx {
+                        if known_tx_idx == i {
+                            // need clone here because Rust thinks this will be called twice (and
+                            // the needle would already have been moved in the second call).
+                            num_valid_duties += 1;
+                            return L1Tx::new(proof, needle.0.clone(), needle.1.clone());
+                        }
+                    }
+
                     let (tx, protocol_op, valid) = generate_mock_tx();
                     if valid {
                         num_valid_duties += 1;
@@ -226,6 +279,69 @@ mod tests {
         }
 
         num_valid_duties
+    }
+
+    /// Create a known transaction that should be present in some block.
+    fn get_needle() -> (Vec<u8>, ProtocolOperation, DepositInfo) {
+        let arb = ArbitraryGenerator::new();
+        let network = Network::Regtest;
+
+        let el_address: [u8; 20] = arb.generate();
+        let previous_output: OutputRef = arb.generate();
+        let previous_output = *previous_output.outpoint();
+
+        let random_script1 = Builder::new().push_opcode(OP_TRUE).into_script();
+        let random_script2 = Builder::new().push_opcode(OP_FALSE).into_script();
+        let script2_hash = TapNodeHash::from_script(&random_script2, LeafVersion::TapScript);
+        let (taproot_addr, _) = create_taproot_addr(
+            &network,
+            SpendPath::ScriptSpend {
+                scripts: &[random_script1, random_script2],
+            },
+        )
+        .expect("should be able to create a taproot address");
+
+        let num_btc: u64 = 10;
+        let tx = Transaction {
+            version: Version(2),
+            lock_time: LockTime::ZERO,
+            input: vec![TxIn {
+                previous_output,
+                script_sig: Default::default(),
+                sequence: Sequence::ENABLE_RBF_NO_LOCKTIME,
+                witness: Witness::new(),
+            }],
+            output: vec![TxOut {
+                value: Amount::from_int_btc(num_btc),
+                script_pubkey: taproot_addr.script_pubkey(),
+            }],
+        };
+
+        let txid = tx.compute_txid();
+        let deposit_request_outpoint = OutPoint { txid, vout: 0 };
+
+        let mut raw_tx = vec![];
+        tx.consensus_encode(&mut raw_tx)
+            .expect("should be able to encode tx");
+
+        let total_amount = num_btc * BitcoinAmount::SATS_FACTOR;
+        let protocol_op = ProtocolOperation::DepositRequest(DepositRequestInfo {
+            amt: total_amount,
+            tap_ctrl_blk_hash: script2_hash.to_byte_array(),
+            address: el_address.to_vec(),
+        });
+
+        let total_amount = Amount::from_sat(total_amount);
+        let expected_deposit_info = DepositInfo::new(
+            deposit_request_outpoint,
+            el_address.to_vec(),
+            total_amount,
+            script2_hash,
+            BitcoinAddress::parse(&taproot_addr.to_string(), network)
+                .expect("address must be valid"),
+        );
+
+        (raw_tx, protocol_op, expected_deposit_info)
     }
 
     /// Generates a mock transaction either arbitrarily or deterministically.
