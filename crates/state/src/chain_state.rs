@@ -6,6 +6,7 @@ use crate::{
     bridge_ops,
     bridge_state::{self, DepositsTable, OperatorTable},
     exec_env::{self, ExecEnvState},
+    genesis::GenesisStateData,
     l1::{self, L1ViewState},
     prelude::*,
 };
@@ -64,19 +65,15 @@ struct HashedChainState {
 
 impl ChainState {
     // TODO remove genesis blkid since apparently we don't need it anymore
-    pub fn from_genesis(
-        genesis_blkid: L2BlockId,
-        l1_state: l1::L1ViewState,
-        exec_state: exec_env::ExecEnvState,
-    ) -> Self {
+    pub fn from_genesis(gdata: &GenesisStateData) -> Self {
         Self {
-            last_block: genesis_blkid,
+            last_block: gdata.genesis_blkid(),
             slot: 0,
             epoch: 0,
-            l1_state,
+            l1_state: gdata.l1_state().clone(),
             pending_withdraws: StateQueue::new_empty(),
-            exec_env_state: exec_state,
-            operator_table: bridge_state::OperatorTable::new_empty(),
+            exec_env_state: gdata.exec_state().clone(),
+            operator_table: gdata.operator_table().clone(),
             deposits_table: bridge_state::DepositsTable::new_empty(),
         }
     }
@@ -132,10 +129,8 @@ impl ChainState {
 
 impl<'a> Arbitrary<'a> for ChainState {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        let genesis_blkid = L2BlockId::arbitrary(u)?;
-        let l1_state = l1::L1ViewState::arbitrary(u)?;
-        let exec_state = exec_env::ExecEnvState::arbitrary(u)?;
-        Ok(Self::from_genesis(genesis_blkid, l1_state, exec_state))
+        let gdata = GenesisStateData::arbitrary(u)?;
+        Ok(Self::from_genesis(&gdata))
     }
 }
 

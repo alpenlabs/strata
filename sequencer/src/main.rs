@@ -26,7 +26,8 @@ use alpen_express_evmexec::{fork_choice_state_initial, EngineRpcClient};
 use alpen_express_primitives::{
     block_credential,
     buf::Buf32,
-    params::{Params, RollupParams, SyncParams},
+    operator::OperatorPubkeys,
+    params::{OperatorConfig, Params, RollupParams, SyncParams},
     vk::RollupVerifyingKey,
 };
 use alpen_express_rocksdb::{
@@ -102,6 +103,9 @@ fn load_rollup_params_or_default(path: &Option<PathBuf>) -> Result<RollupParams,
 }
 
 fn default_rollup_params() -> RollupParams {
+    // FIXME this is broken, where are the keys?
+    let opkeys = OperatorPubkeys::new(Buf32::zero(), Buf32::zero());
+
     // TODO: load default params from a json during compile time
     RollupParams {
         rollup_name: "express".to_string(),
@@ -109,6 +113,7 @@ fn default_rollup_params() -> RollupParams {
         cred_rule: block_credential::CredRule::Unchecked,
         horizon_l1_height: 3,
         genesis_l1_height: 5,
+        operator_config: OperatorConfig::Static(vec![opkeys]),
         evm_genesis_block_hash: Buf32(
             "0x37ad61cff1367467a98cf7c54c4ac99e989f1fbb1bc1e646235e90c065c565ba"
                 .parse()

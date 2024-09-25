@@ -3,14 +3,16 @@ use alpen_express_primitives::{
     buf::{Buf32, Buf64},
     evm_exec::create_evm_extra_payload,
     l1::L1BlockManifest,
-    params::Params,
+    params::{OperatorConfig, Params},
 };
 use alpen_express_state::{
     block::{ExecSegment, L1Segment, L2BlockAccessory, L2BlockBundle},
+    bridge_state::OperatorTable,
     chain_state::ChainState,
     client_state::ClientState,
     exec_env::ExecEnvState,
     exec_update::{ExecUpdate, UpdateInput, UpdateOutput},
+    genesis::GenesisStateData,
     header::L2BlockHeader,
     l1::{L1HeaderRecord, L1ViewState},
     prelude::*,
@@ -68,7 +70,9 @@ pub fn init_genesis_chainstate(
     let genesis_blk_rec = L1HeaderRecord::from(pregenesis_mfs.last().unwrap());
     let l1vs = L1ViewState::new_at_horizon(horizon_blk_height, genesis_blk_rec);
 
-    let gchstate = ChainState::from_genesis(genesis_blkid, l1vs, gees);
+    let optbl = construct_operator_table(&params.rollup().operator_config);
+    let gdata = GenesisStateData::new(genesis_blkid, l1vs, optbl, gees);
+    let gchstate = ChainState::from_genesis(&gdata);
 
     // Now insert things into the database.
     let chs_store = database.chainstate_store();
@@ -82,6 +86,12 @@ pub fn init_genesis_chainstate(
 
     info!("finished genesis insertions");
     Ok(genesis_blkid)
+}
+
+fn construct_operator_table(opconfig: &OperatorConfig) -> OperatorTable {
+    match opconfig {
+        OperatorConfig::Static(oplist) => OperatorTable::from_operator_list(oplist),
+    }
 }
 
 fn load_pre_genesis_l1_manifests(

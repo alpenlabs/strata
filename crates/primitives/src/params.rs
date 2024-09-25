@@ -1,8 +1,10 @@
 //! Global consensus parameters for the rollup.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-use crate::{block_credential::CredRule, prelude::Buf32, vk::RollupVerifyingKey};
+use crate::{
+    block_credential::CredRule, operator::OperatorPubkeys, prelude::Buf32, vk::RollupVerifyingKey,
+};
 
 /// Consensus parameters that don't change for the lifetime of the network
 /// (unless there's some weird hard fork).
@@ -22,6 +24,9 @@ pub struct RollupParams {
 
     /// Block height we'll construct the L2 genesis block from.
     pub genesis_l1_height: u64,
+
+    /// Config for how the genesis operator table is set up.
+    pub operator_config: OperatorConfig,
 
     /// Hardcoded EL genesis info
     /// TODO: move elsewhere
@@ -82,4 +87,11 @@ impl Params {
     pub fn run(&self) -> &SyncParams {
         &self.run
     }
+}
+
+/// Describes how we determine the list of operators at genesis.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+pub enum OperatorConfig {
+    /// Use this static list of predetermined operators.
+    Static(Vec<OperatorPubkeys>),
 }

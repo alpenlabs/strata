@@ -7,7 +7,7 @@ use alpen_express_primitives::{
     bridge::OperatorIdx,
     buf::Buf32,
     l1::{self, BitcoinAmount, OutputRef, XOnlyPk},
-    operator::OperatorKeyProvider,
+    operator::{OperatorKeyProvider, OperatorPubkeys},
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
@@ -56,6 +56,22 @@ impl OperatorTable {
         Self {
             next_idx: 0,
             operators: Vec::new(),
+        }
+    }
+
+    /// Constructs an operator table from a list of operator indexes.
+    pub fn from_operator_list(entries: &[OperatorPubkeys]) -> Self {
+        Self {
+            next_idx: entries.len() as OperatorIdx,
+            operators: entries
+                .iter()
+                .enumerate()
+                .map(|(i, e)| OperatorEntry {
+                    idx: i as OperatorIdx,
+                    signing_pk: *e.signing_pk(),
+                    wallet_pk: *e.wallet_pk(),
+                })
+                .collect(),
         }
     }
 
@@ -116,6 +132,27 @@ impl OperatorTable {
 impl OperatorKeyProvider for OperatorTable {
     fn get_operator_signing_pk(&self, idx: OperatorIdx) -> Option<Buf32> {
         self.get_operator(idx).map(|ent| ent.signing_pk)
+    }
+}
+
+impl<'a> arbitrary::Arbitrary<'a> for OperatorTable {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let o0 = OperatorEntry {
+            idx: 0,
+            signing_pk: Buf32::arbitrary(u)?,
+            wallet_pk: Buf32::arbitrary(u)?,
+        };
+
+        let o1 = OperatorEntry {
+            idx: 1,
+            signing_pk: Buf32::arbitrary(u)?,
+            wallet_pk: Buf32::arbitrary(u)?,
+        };
+
+        Ok(Self {
+            next_idx: 2,
+            operators: vec![o0, o1],
+        })
     }
 }
 

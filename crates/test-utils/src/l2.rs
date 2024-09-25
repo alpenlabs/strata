@@ -3,7 +3,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use alpen_express_primitives::{
     block_credential,
     buf::{Buf32, Buf64},
-    params::{Params, RollupParams, SyncParams},
+    operator::OperatorPubkeys,
+    params::{OperatorConfig, Params, RollupParams, SyncParams},
     vk::RollupVerifyingKey,
 };
 use alpen_express_state::{
@@ -63,7 +64,9 @@ pub fn gen_l2_chain(parent: Option<SignedL2BlockHeader>, blocks_num: usize) -> V
 
     blocks
 }
+
 pub fn gen_params() -> Params {
+    let opkeys = make_dummy_operator_pubkeys();
     Params {
         rollup: RollupParams {
             rollup_name: "express".to_string(),
@@ -71,6 +74,7 @@ pub fn gen_params() -> Params {
             cred_rule: block_credential::CredRule::Unchecked,
             horizon_l1_height: 3,
             genesis_l1_height: 5,
+            operator_config: OperatorConfig::Static(vec![opkeys]),
             evm_genesis_block_hash: Buf32(
                 "0x37ad61cff1367467a98cf7c54c4ac99e989f1fbb1bc1e646235e90c065c565ba"
                     .parse()
@@ -110,4 +114,9 @@ pub fn gen_client_state(params: Option<&Params>) -> ClientState {
         params.rollup.horizon_l1_height,
         params.rollup.genesis_l1_height,
     )
+}
+
+fn make_dummy_operator_pubkeys() -> OperatorPubkeys {
+    // TODO don't use dummy zero keys
+    OperatorPubkeys::new(Buf32::zero(), Buf32::zero())
 }
