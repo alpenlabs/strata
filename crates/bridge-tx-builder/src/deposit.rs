@@ -11,16 +11,14 @@ use bitcoin::{
     key::TapTweak,
     secp256k1::SECP256K1,
     taproot::{self, ControlBlock},
-    Address, Amount, FeeRate, OutPoint, Psbt, TapNodeHash, Transaction, TxOut,
+    Address, Amount, OutPoint, Psbt, TapNodeHash, Transaction, TxOut,
 };
 use serde::{Deserialize, Serialize};
 
 use super::{
-    constants::{MIN_RELAY_FEE, UNSPENDABLE_INTERNAL_KEY},
+    constants::UNSPENDABLE_INTERNAL_KEY,
     errors::{BridgeTxBuilderResult, DepositTransactionError},
-    operations::{
-        anyone_can_spend_txout, create_tx_ins, create_tx_outs, metadata_script, n_of_n_script,
-    },
+    operations::{create_tx_ins, create_tx_outs, metadata_script, n_of_n_script},
     TxKind,
 };
 use crate::{
@@ -40,7 +38,10 @@ pub struct DepositInfo {
     /// As of now, this is just the 20-byte EVM address.
     el_address: Vec<u8>,
 
-    /// The amount in bitcoins that the user wishes to deposit.
+    /// The amount in bitcoins that the user is sending.
+    ///
+    /// This amount should be greater than the [`BRIDGE_DENOMINATION`] for the deposit to be
+    /// confirmed on bitcoin. The excess amount is used as miner fees for the Deposit Transaction.
     total_amount: Amount,
 
     /// The hash of the take back leaf in the Deposit Request Transaction (DRT) as provided by the
@@ -173,7 +174,7 @@ impl DepositInfo {
 
         Ok(vec![TxOut {
             script_pubkey: deposit_address.script_pubkey(),
-            value: BRIDGE_DENOMINATION.into(),
+            value: self.total_amount,
         }])
     }
 
@@ -194,17 +195,9 @@ impl DepositInfo {
             .map_err(|_e| DepositTransactionError::InvalidElAddressSize(el_addr.len()))?;
 
         let metadata_script = metadata_script(el_addr);
-        let metadata_script_pubkey = metadata_script.to_p2wsh();
-        let metadata_amount = metadata_script_pubkey.minimal_non_dust();
+        let metadata_amount = Amount::from_int_btc(0);
 
-        // Then, create an `anyone-can-spend` output that can be used to confirm this transaction by
-        // anyone using a CPFP strategy.
-        let anyone_can_spend_output = anyone_can_spend_txout();
-
-        // Finally, create the `TxOut` that sends user funds to the bridge multisig
-        let fee_rate =
-            FeeRate::from_sat_per_vb(MIN_RELAY_FEE.to_sat()).expect("invalid MIN_RELAY_FEE set");
-
+        // Then create the taproot script pubkey with keypath spend for the actual deposit
         let spend_path = SpendPath::KeySpend {
             internal_key: build_context.aggregated_pubkey(),
         };
@@ -212,20 +205,10 @@ impl DepositInfo {
         let (bridge_addr, _) = create_taproot_addr(build_context.network(), spend_path)?;
 
         let bridge_in_script_pubkey = bridge_addr.script_pubkey();
-        let bridge_in_relay_cost = bridge_in_script_pubkey.minimal_non_dust_custom(fee_rate);
-
-        let net_bridge_in_amount = *self.total_amount()
-            - bridge_in_relay_cost
-            - metadata_amount
-            - anyone_can_spend_output.value;
 
         let tx_outs = create_tx_outs([
-            (bridge_in_script_pubkey, net_bridge_in_amount),
-            (metadata_script_pubkey, metadata_amount),
-            (
-                anyone_can_spend_output.script_pubkey,
-                anyone_can_spend_output.value,
-            ),
+            (bridge_in_script_pubkey, BRIDGE_DENOMINATION.into()),
+            (metadata_script, metadata_amount),
         ]);
 
         let unsigned_tx = create_tx(tx_ins, tx_outs);

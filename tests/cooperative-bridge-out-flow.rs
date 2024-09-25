@@ -8,14 +8,13 @@ use std::sync::Arc;
 use alpen_express_primitives::bridge::{OperatorIdx, PublickeyTable};
 use bitcoin::{
     key::rand::{self, Rng},
-    Address, Amount, FeeRate, Network, OutPoint, ScriptBuf, Transaction,
+    Address, Amount, Network, OutPoint, ScriptBuf, Transaction,
 };
 use bitcoind::BitcoinD;
-use common::bridge::{setup, BridgeDuty, User, MIN_FEE, MIN_MINER_REWARD_CONFS};
+use common::bridge::{setup, BridgeDuty, User, MIN_MINER_REWARD_CONFS};
 use express_bridge_tx_builder::prelude::{
-    anyone_can_spend_txout, create_taproot_addr, create_tx, create_tx_ins, create_tx_outs,
-    get_aggregated_pubkey, metadata_script, CooperativeWithdrawalInfo, SpendPath,
-    BRIDGE_DENOMINATION, MIN_RELAY_FEE,
+    create_taproot_addr, create_tx, create_tx_ins, create_tx_outs, get_aggregated_pubkey,
+    CooperativeWithdrawalInfo, SpendPath, BRIDGE_DENOMINATION,
 };
 use tokio::sync::Mutex;
 use tracing::{event, span, Level};
@@ -36,10 +35,9 @@ async fn withdrawal_flow() {
         num_operators = %num_operators
     );
 
-    let (outpoint, amount, bridge_address) =
-        fund_bridge(federation.pubkey_table, bitcoind.clone()).await;
+    let (outpoint, bridge_address) = fund_bridge(federation.pubkey_table, bitcoind.clone()).await;
 
-    event!(Level::INFO, event = "bridge address funded with UTXO", outpoint = %outpoint, bridge_address = %bridge_address, amount = %amount);
+    event!(Level::INFO, event = "bridge address funded with UTXO", outpoint = %outpoint, bridge_address = %bridge_address);
 
     let user = User::new("requester", bitcoind.clone()).await;
     let user_x_only_pk = user.agent().pubkey();
@@ -93,7 +91,7 @@ async fn withdrawal_flow() {
 async fn fund_bridge(
     pubkey_table: PublickeyTable,
     bitcoind: Arc<Mutex<BitcoinD>>,
-) -> (OutPoint, Amount, Address) {
+) -> (OutPoint, Address) {
     let span = span!(Level::INFO, "funding the bridge address");
     let _guard = span.enter();
 
@@ -133,7 +131,7 @@ async fn fund_bridge(
         Level::INFO,
         action = "creating transaction to fund the bridge"
     );
-    let (unsigned_tx, vout, net_bridge_in_amount, bridge_addr) =
+    let (unsigned_tx, vout, bridge_addr) =
         create_funding_tx(outpoint, pubkey_table, change_address, total_amount).await;
 
     event!(
@@ -161,7 +159,7 @@ async fn fund_bridge(
 
     let outpoint = OutPoint { txid, vout };
 
-    (outpoint, net_bridge_in_amount, bridge_addr)
+    (outpoint, bridge_addr)
 }
 
 /// Get the transaction that funds the bridge out of a user's UTXO.
@@ -172,53 +170,32 @@ async fn fund_bridge(
 ///
 /// 1. The raw unsigned transaction used to fund the bridge.
 /// 2. The output index of the transaction that actually funds the bridge.
-/// 3. The net amount that was bridged in.
-/// 4. The bridge address where the funds were sent.
+/// 3. The bridge address where the funds were sent.
 async fn create_funding_tx(
     outpoint: OutPoint,
     pubkey_table: PublickeyTable,
     change_address: Address,
     total_amount: Amount,
-) -> (Transaction, u32, Amount, Address) {
+) -> (Transaction, u32, Address) {
     let input = create_tx_ins([outpoint]);
-
-    let (bridge_addr, bridge_script_pubkey) = create_bridge_addr(pubkey_table);
 
     // Outputs in DT:
     // 1) N/N
-    // 2) `OP_RETURN`
-    // 3) Anyone can pay
-    let dummy_el_address = &[0u8; 20];
-    let metadata_script = metadata_script(dummy_el_address);
-    let metadata_amount = metadata_script.to_p2wsh().minimal_non_dust();
-    let anyone_can_spend_output_amount = anyone_can_spend_txout().value;
+    // 2) `OP_RETURN` (with zero amount)
 
-    let fee_rate =
-        FeeRate::from_sat_per_vb(MIN_RELAY_FEE.to_sat()).expect("invalid MIN_RELAY_FEE set");
+    let (bridge_addr, bridge_script_pubkey) = create_bridge_addr(pubkey_table);
 
-    let bridge_in_relay_cost = bridge_script_pubkey.minimal_non_dust_custom(fee_rate);
+    let change_pubkey = change_address.script_pubkey();
 
-    let net_bridge_in_amount = Amount::from(BRIDGE_DENOMINATION)
-        - bridge_in_relay_cost
-        - metadata_amount
-        - anyone_can_spend_output_amount;
-
-    event!(Level::DEBUG, bridge_in_amount = %net_bridge_in_amount);
+    let tx_fees = bridge_script_pubkey.minimal_non_dust() + change_pubkey.minimal_non_dust();
+    let change_amount = total_amount - Amount::from(BRIDGE_DENOMINATION) - tx_fees;
 
     let output = create_tx_outs([
-        (bridge_script_pubkey, net_bridge_in_amount),
-        (
-            change_address.script_pubkey(),
-            total_amount - net_bridge_in_amount - MIN_FEE,
-        ),
+        (bridge_script_pubkey, BRIDGE_DENOMINATION.into()),
+        (change_address.script_pubkey(), change_amount),
     ]);
 
-    (
-        create_tx(input, output),
-        0,
-        net_bridge_in_amount,
-        bridge_addr,
-    )
+    (create_tx(input, output), 0, bridge_addr)
 }
 
 pub(crate) fn create_bridge_addr(pubkey_table: PublickeyTable) -> (Address, ScriptBuf) {

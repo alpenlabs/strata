@@ -39,9 +39,12 @@ use tokio::{
     sync::{broadcast, Mutex},
     time::{error::Elapsed, timeout},
 };
-use tracing::{debug, event, span, trace, Level};
+use tracing::{debug, event, span, trace, warn, Level};
 
-pub(crate) const MIN_FEE: Amount = Amount::from_sat(10000); // some random value; nothing special
+/// Transaction fee to confirm Deposit Transaction
+///
+/// This value must be greater than 179 based on the current config in the `bitcoind` instance.
+pub(crate) const DT_FEE: Amount = Amount::from_sat(1_500); // should be more than enough
 /// Minimum confirmations required for miner rewards to become spendable.
 pub(crate) const MIN_MINER_REWARD_CONFS: u64 = 101;
 
@@ -580,7 +583,7 @@ impl Agent {
 
         for entry in unspent_utxos {
             trace!(%entry.amount, %entry.txid, %entry.vout, %entry.confirmations, "checking unspent utxos");
-            if entry.amount > target_amount + MIN_FEE {
+            if entry.amount > target_amount + DT_FEE {
                 return Some((
                     change_address,
                     OutPoint {
@@ -621,6 +624,36 @@ impl Agent {
             result.unwrap_err()
         );
 
+        let high_priority_fee_rate = Amount::from_sat(8); // high priority
+
+        let total_in_value =
+            tx.input
+                .iter()
+                .fold(Amount::from_int_btc(0), |total_in_value, txin| {
+                    let prev_vout = txin.previous_output.vout;
+                    let prev_txid = txin.previous_output.txid;
+                    let prev_tx = bitcoind
+                        .client
+                        .get_raw_transaction(&prev_txid, None)
+                        .expect("previous transaction should exist");
+
+                    let prev_value = prev_tx.output[prev_vout as usize].value;
+
+                    total_in_value + prev_value
+                });
+
+        let total_out_value: Amount = tx.output.iter().map(|txout| txout.value).sum();
+        let actual_fees = total_in_value - total_out_value;
+
+        let estimated_fees: Amount = high_priority_fee_rate * tx.weight().to_vbytes_ceil();
+
+        warn!(
+            ?high_priority_fee_rate,
+            ?estimated_fees,
+            ?actual_fees,
+            "Fee calculation for the transaction"
+        );
+
         let result = bitcoind.client.send_raw_transaction(tx);
 
         assert!(
@@ -641,7 +674,12 @@ pub(crate) async fn setup(num_operators: usize) -> (Arc<Mutex<BitcoinD>>, Bridge
     let _guard = span.enter();
 
     let mut conf = Conf::default();
-    conf.args = vec!["-regtest", "-fallbackfee=0.00001", "-maxtxfee=0.0001"];
+    conf.args = vec![
+        "-regtest",
+        "-fallbackfee=0.00001",
+        "-maxtxfee=0.0001",
+        "-txindex=1",
+    ];
 
     // Uncomment the following line to view the stdout from `bitcoind`
     // conf.view_stdout = true;
@@ -741,12 +779,16 @@ pub(crate) fn create_drt(
     let (drt_addr, take_back_leaf_hash, el_address) =
         create_drt_taproot_output(pubkeys, internal_key);
 
+    let net_bridge_in_amount = Amount::from(BRIDGE_DENOMINATION) + DT_FEE;
+
+    let drt_pubkey = drt_addr.script_pubkey();
+    let change_pubkey = change_address.script_pubkey();
+
+    let tx_fees = drt_pubkey.minimal_non_dust() + change_pubkey.minimal_non_dust();
+
     let output = create_tx_outs([
-        (drt_addr.script_pubkey(), BRIDGE_DENOMINATION.into()),
-        (
-            change_address.script_pubkey(),
-            total_amt - BRIDGE_DENOMINATION.into() - MIN_FEE,
-        ),
+        (drt_pubkey, net_bridge_in_amount),
+        (change_pubkey, total_amt - net_bridge_in_amount - tx_fees),
     ]);
 
     (
@@ -802,7 +844,7 @@ pub(crate) fn perform_rollup_actions(
     let _guard = span.enter();
 
     let deposit_request_outpoint = OutPoint { txid, vout: 0 };
-    let total_amount: Amount = BRIDGE_DENOMINATION.into();
+    let total_amount: Amount = Amount::from(BRIDGE_DENOMINATION) + DT_FEE;
     let original_taproot_addr =
         BitcoinAddress::parse(&original_taproot_addr.to_string(), Network::Regtest)
             .expect("address should be valid for network");
