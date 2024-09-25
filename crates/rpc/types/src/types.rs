@@ -17,6 +17,30 @@ impl HexBytes {
     }
 }
 
+impl From<Vec<u8>> for HexBytes {
+    fn from(value: Vec<u8>) -> Self {
+        HexBytes(value)
+    }
+}
+
+impl From<&[u8]> for HexBytes {
+    fn from(value: &[u8]) -> Self {
+        HexBytes(value.to_vec())
+    }
+}
+
+impl From<Box<[u8]>> for HexBytes {
+    fn from(value: Box<[u8]>) -> Self {
+        HexBytes(value.into_vec())
+    }
+}
+
+impl From<HexBytes> for Vec<u8> {
+    fn from(value: HexBytes) -> Self {
+        value.0
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HexBytes32(#[serde(with = "hex::serde")] pub [u8; 32]);
 

@@ -1,5 +1,6 @@
-use std::sync::Arc;
+use std::{io, sync::Arc};
 
+use borsh::BorshSerialize;
 use rand::rngs::OsRng;
 use secp256k1::{schnorr::Signature, All, Keypair, Message, Secp256k1, SecretKey, XOnlyPublicKey};
 use thiserror::Error;
@@ -10,7 +11,7 @@ use crate::{
     operator::OperatorKeyProvider,
 };
 
-/// Contains data needed to construct bridge messages.
+/// Contains data needed to construct [`BridgeMessage`]s.
 #[derive(Clone)]
 pub struct MessageSigner {
     operator_idx: u32,
@@ -19,6 +20,13 @@ pub struct MessageSigner {
 }
 
 impl MessageSigner {
+    /// Creates a new [`MessageSigner`].
+    ///
+    /// # Notes
+    ///
+    /// In order to get a [`BridgeMessage`], call [`sign_raw`](Self::sign_raw)
+    /// or [`sign_scope`](Self::sign_scope) on this [`MessageSigner`]
+    /// depending on the use case.
     pub fn new(operator_idx: u32, msg_signing_sk: Buf32, secp: Arc<Secp256k1<All>>) -> Self {
         Self {
             operator_idx,
@@ -38,25 +46,34 @@ impl MessageSigner {
     }
 
     /// Signs a message using a raw scope and payload.
-    pub fn sign_raw(&self, scope: Vec<u8>, payload: Vec<u8>) -> BridgeMessage {
+    pub fn sign_raw<T: BorshSerialize>(
+        &self,
+        scope: &T,
+        payload: &T,
+    ) -> Result<BridgeMessage, io::Error> {
         let mut tmp_m = BridgeMessage {
             source_id: self.operator_idx,
             sig: Buf64::zero(),
-            scope,
-            payload,
+            scope: borsh::to_vec(scope)?,
+            payload: borsh::to_vec(payload)?,
         };
 
         let id: Buf32 = tmp_m.compute_id().into();
         let sig = sign_msg_hash(&self.msg_signing_sk, &id, self.secp.as_ref());
         tmp_m.sig = sig;
 
-        tmp_m
+        Ok(tmp_m)
     }
 
     /// Signs a message with some particular typed scope.
-    pub fn sign_scope(&self, scope: &Scope, payload: Vec<u8>) -> BridgeMessage {
-        let raw_scope = borsh::to_vec(scope).unwrap();
-        self.sign_raw(raw_scope, payload)
+    pub fn sign_scope<T: BorshSerialize>(
+        &self,
+        scope: &Scope,
+        payload: &T,
+    ) -> Result<BridgeMessage, io::Error> {
+        let raw_scope = borsh::to_vec(scope)?;
+        let payload: Vec<u8> = borsh::to_vec(&payload)?;
+        self.sign_raw(&raw_scope, &payload)
     }
 }
 
@@ -152,7 +169,7 @@ mod tests {
         let pk = signer.get_pubkey();
 
         let payload = vec![1, 2, 3, 4, 5];
-        let m = signer.sign_scope(&Scope::Misc, payload);
+        let m = signer.sign_scope(&Scope::Misc, &payload).unwrap();
 
         let stub_prov = StubOpKeyProv::new(idx, pk);
         assert!(verify_bridge_msg_sig(&m, &stub_prov).is_ok());
@@ -168,7 +185,7 @@ mod tests {
         let pk = signer.get_pubkey();
 
         let payload = vec![1, 2, 3, 4, 5];
-        let mut m = signer.sign_scope(&Scope::Misc, payload);
+        let mut m = signer.sign_scope(&Scope::Misc, &payload).unwrap();
         m.sig = Buf64::zero();
 
         let stub_prov = StubOpKeyProv::new(idx, pk);
