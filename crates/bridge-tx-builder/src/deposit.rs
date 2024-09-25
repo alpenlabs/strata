@@ -60,7 +60,7 @@ impl TxKind for DepositInfo {
         &self,
         build_context: &C,
     ) -> BridgeTxBuilderResult<TxSigningData> {
-        let prevouts = self.compute_prevouts(build_context)?;
+        let prevouts = self.compute_prevouts()?;
         let spend_info = self.compute_spend_infos(build_context)?;
         let unsigned_tx = self.create_unsigned_tx(build_context)?;
 
@@ -140,14 +140,9 @@ impl DepositInfo {
             *build_context.network(),
         );
 
-        let expected_addr = self
-            .original_taproot_addr
-            .address()
-            .clone()
-            .require_network(*build_context.network())
-            .map_err(|_e| DepositTransactionError::InvalidDRTAddress)?;
+        let expected_addr = self.original_taproot_addr.address();
 
-        if address != expected_addr {
+        if address != *expected_addr {
             return Err(DepositTransactionError::InvalidTapLeafHash)?;
         }
 
@@ -174,13 +169,8 @@ impl DepositInfo {
         Ok(spend_info)
     }
 
-    fn compute_prevouts(&self, builder: &impl BuildContext) -> BridgeTxBuilderResult<Vec<TxOut>> {
-        let deposit_address = self
-            .original_taproot_addr
-            .address()
-            .clone()
-            .require_network(*builder.network())
-            .map_err(|_e| DepositTransactionError::InvalidDRTAddress)?;
+    fn compute_prevouts(&self) -> BridgeTxBuilderResult<Vec<TxOut>> {
+        let deposit_address = self.original_taproot_addr.address();
 
         Ok(vec![TxOut {
             script_pubkey: deposit_address.script_pubkey(),
@@ -266,7 +256,7 @@ mod tests {
             Buf20::default().0 .0.to_vec(),
             BRIDGE_DENOMINATION.into(),
             take_back_leaf_hash,
-            drt_output_address.clone().into(),
+            drt_output_address.clone(),
         );
 
         let result = deposit_info.compute_spend_infos(&tx_builder);
@@ -285,7 +275,7 @@ mod tests {
             Buf20::default().0 .0.to_vec(),
             BRIDGE_DENOMINATION.into(),
             TapNodeHash::from_str(&random_hash).unwrap(),
-            drt_output_address.clone().into(),
+            drt_output_address.clone(),
         );
 
         let result = deposit_info.compute_spend_infos(&tx_builder);
@@ -302,7 +292,7 @@ mod tests {
         );
     }
 
-    fn create_drt_taproot_output(pubkeys: PublickeyTable) -> (Address, TapNodeHash) {
+    fn create_drt_taproot_output(pubkeys: PublickeyTable) -> (BitcoinAddress, TapNodeHash) {
         let aggregated_pubkey = get_aggregated_pubkey(pubkeys);
         let n_of_n_spend_script = n_of_n_script(&aggregated_pubkey);
 
@@ -323,13 +313,17 @@ mod tests {
             .finalize(&secp, *UNSPENDABLE_INTERNAL_KEY)
             .unwrap();
 
+        let network = Network::Regtest;
+        let address = Address::p2tr(
+            &secp,
+            *UNSPENDABLE_INTERNAL_KEY,
+            spend_info.merkle_root(),
+            network,
+        );
+        let address_str = address.to_string();
+
         (
-            Address::p2tr(
-                &secp,
-                *UNSPENDABLE_INTERNAL_KEY,
-                spend_info.merkle_root(),
-                Network::Regtest,
-            ),
+            BitcoinAddress::parse(&address_str, network).expect("address should be valid"),
             op_return_script_hash,
         )
     }
