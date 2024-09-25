@@ -3,11 +3,8 @@ import time
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 
-from constants import (
-    MAX_HORIZON_POLL_INTERVAL_SECS,
-    SEQ_PUBLISH_BATCH_INTERVAL_SECS,
-    SEQ_SLACK_TIME_SECS,
-)
+from constants import SEQ_PUBLISH_BATCH_INTERVAL_SECS
+from utils import wait_until
 
 
 @flexitest.register
@@ -27,7 +24,11 @@ class L1WriterTest(flexitest.Test):
         l1_status = seqrpc.alp_l1status()
         assert l1_status["last_published_txid"] is None, "Unexpected last_published_txid"
 
-        time.sleep(MAX_HORIZON_POLL_INTERVAL_SECS + SEQ_SLACK_TIME_SECS)
+        # Wait for seq
+        wait_until(
+            lambda: seqrpc.alp_protocolVersion() is not None,
+            error_with="Sequencer did not start on time",
+        )
 
         # Submit blob
         blobdata = "2c4253d512da5bb4223f10e8e6017ede69cc63d6e6126916f4b68a1830b7f805"

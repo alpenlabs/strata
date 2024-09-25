@@ -128,6 +128,7 @@ fn default_rollup_params() -> RollupParams {
                 .parse()
                 .unwrap(),
         )), // TODO: update this with vk for checkpoint proof
+        verify_proofs: true,
     }
 }
 
@@ -413,6 +414,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let shutdown_signal = task_manager.shutdown_signal();
     let db_cloned = database.clone();
 
+    let rpc_params = params.clone();
     task_executor.spawn_critical_async("main-rpc", async {
         start_rpc(
             shutdown_signal,
@@ -425,6 +427,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             l2_block_manager,
             checkpoint_handle,
             relayer_handle,
+            rpc_params,
         )
         .await
         .unwrap()
@@ -452,6 +455,7 @@ async fn start_rpc<D: Database + Send + Sync + 'static>(
     l2_block_manager: Arc<L2BlockManager>,
     checkpt_handle: Arc<CheckpointHandle>,
     relayer_handle: Arc<RelayerHandle>,
+    params: Arc<Params>,
 ) -> anyhow::Result<()> {
     let (stop_tx, stop_rx) = oneshot::channel();
 
@@ -462,11 +466,17 @@ async fn start_rpc<D: Database + Send + Sync + 'static>(
         sync_man.clone(),
         bcast_handle.clone(),
         l2_block_manager.clone(),
-        checkpt_handle,
+        checkpt_handle.clone(),
         relayer_handle,
     );
 
-    let admin_rpc = rpc_server::AdminServerImpl::new(inscription_handler, bcast_handle, stop_tx);
+    let admin_rpc = rpc_server::AdminServerImpl::new(
+        inscription_handler,
+        bcast_handle,
+        stop_tx,
+        params,
+        checkpt_handle.clone(),
+    );
 
     // Construct the full methods table.
     let mut methods = alp_rpc.into_rpc();

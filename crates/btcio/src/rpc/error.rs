@@ -98,7 +98,7 @@ impl ClientError {
     }
 
     pub fn is_missing_or_invalid_input(&self) -> bool {
-        matches!(self, Self::Server(-26, _))
+        matches!(self, Self::Server(-26, _)) || matches!(self, Self::Server(-25, _))
     }
 }
 

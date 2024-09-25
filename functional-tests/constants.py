@@ -23,6 +23,7 @@ FAST_BATCH_ROLLUP_PARAMS = {
     "rollup_vk": {
         "risc0_verifying_key": "0x00b01ae596b4e51843484ff71ccbd0dd1a030af70b255e6b9aad50b81d81266f"
     },
+    "verify_proofs": False,
 }
 
 # Error codes

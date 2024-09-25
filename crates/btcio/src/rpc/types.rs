@@ -217,7 +217,6 @@ where
         where
             E: de::Error,
         {
-            trace!("Deserializing BTCs: {}", v);
             let amount = Amount::from_btc(v).expect("Amount deserialization failed");
             Ok(amount)
         }
@@ -243,7 +242,6 @@ where
         where
             E: de::Error,
         {
-            trace!("Deserializing signed BTCs: {}", v);
             let signed_amount = SignedAmount::from_btc(v).expect("Amount deserialization failed");
             Ok(signed_amount)
         }
@@ -282,7 +280,6 @@ where
         where
             E: de::Error,
         {
-            trace!("Deserializing txid: {}", v);
             let txid = v.parse::<Txid>().expect("invalid txid");
 
             Ok(txid)
@@ -309,7 +306,6 @@ where
         where
             E: de::Error,
         {
-            trace!("Deserializing tx: .{}.", v);
             let tx = consensus::encode::deserialize_hex::<Transaction>(v)
                 .expect("failed to deserialize tx hex");
             Ok(tx)
@@ -340,7 +336,6 @@ where
         where
             E: de::Error,
         {
-            trace!("Deserializing address: {}", v);
             let address = v
                 .parse::<Address<_>>()
                 .expect("Address deserialization failed");
@@ -368,7 +363,6 @@ where
         where
             E: de::Error,
         {
-            trace!("Deserializing blockhash: {}", v);
             let blockhash = consensus::encode::deserialize_hex::<BlockHash>(v)
                 .expect("BlockHash deserialization failed");
             Ok(blockhash)
@@ -395,7 +389,6 @@ where
         where
             E: de::Error,
         {
-            trace!("Deserializing height: {}", v);
             let height = Height::from_consensus(v).expect("Height deserialization failed");
             Ok(height)
         }

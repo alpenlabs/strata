@@ -118,6 +118,7 @@ pub fn process_event<D: Database>(
         }
 
         SyncEvent::NewTipBlock(blkid) => {
+            debug!(?blkid, "Received NewTipBlock");
             let l2prov = database.l2_provider();
             let block = l2prov
                 .get_block_data(*blkid)?
@@ -130,6 +131,7 @@ pub fn process_event<D: Database>(
                 .get_toplevel_state(block_idx)?
                 .ok_or(Error::MissingIdxChainstate(block_idx))?;
 
+            debug!(?chainstate, "Chainstate for new tip block");
             // height of last matured L1 block in chain state
             let chs_last_buried = chainstate.l1_view().safe_height().saturating_sub(1);
             // buried height in client state

@@ -396,6 +396,7 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
             info!(data = ?data, "commit batch");
 
             let checkpoint = check_and_get_batch_checkpoint(data, checkpt_mgr)?;
+            debug!("Got checkpoint proof from db, now signing and sending");
 
             let checkpoint_sighash = checkpoint.get_sighash();
             let signature = sign_with_identity_key(&checkpoint_sighash, ik);
@@ -408,7 +409,7 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
             let blob_intent = BlobIntent::new(BlobDest::L1, checkpoint_sighash, payload);
 
             info!(signed_checkpoint = ?signed_checkpoint, "signed checkpoint");
-            info!(blob_intent = ?blob_intent, "blob intent");
+            info!(blob_intent = ?blob_intent, "sending blob intent");
 
             inscription_handle
                 .submit_intent(blob_intent)
@@ -426,11 +427,13 @@ fn check_and_get_batch_checkpoint(
 ) -> Result<BatchCheckpoint, Error> {
     let idx = duty.idx();
 
+    debug!(%idx, "checking for checkpoint in db");
     // If there's no entry in db, create a pending entry and wait until proof is ready
     match checkpt_mgr.get_checkpoint_blocking(idx)? {
         // There's no entry in the database, create one so that the prover manager can query the
         // checkpoint info to create proofs for next
         None => {
+            debug!(%idx, "Checkpoint not found, creating pending checkpoint");
             let entry = CheckpointEntry::new_pending_proof(duty.checkpoint().clone());
             checkpt_mgr.put_checkpoint_blocking(idx, entry)?;
         }
@@ -445,11 +448,14 @@ fn check_and_get_batch_checkpoint(
             }
         },
     }
+    debug!(%idx, "Waiting for checkpoint proof to be posted");
 
     let chidx = checkpt_mgr
         .subscribe()
         .blocking_recv()
         .map_err(|e| Error::Other(e.to_string()))?;
+
+    debug!(%idx, %chidx, "Received proof from rpc");
 
     if chidx != idx {
         warn!(received = %chidx, expected = %idx, "Received different checkpoint idx than expected");

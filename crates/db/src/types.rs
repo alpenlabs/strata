@@ -169,6 +169,10 @@ impl CheckpointEntry {
         }
     }
 
+    pub fn into_batch_checkpoint(self) -> BatchCheckpoint {
+        BatchCheckpoint::new(self.checkpoint, self.proof)
+    }
+
     /// Creates a new instance for a freshly defined checkpoint.
     pub fn new_pending_proof(checkpoint: CheckpointInfo) -> Self {
         Self::new(

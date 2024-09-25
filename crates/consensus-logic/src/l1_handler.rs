@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{panic, sync::Arc};
 
 use alpen_express_db::traits::{Database, L1DataStore};
 use alpen_express_primitives::{
@@ -10,6 +10,7 @@ use alpen_express_primitives::{
 use alpen_express_state::{
     batch::BatchCheckpoint, l1::L1Tx, sync_event::SyncEvent, tx::ProtocolOperation,
 };
+use anyhow::anyhow;
 use bitcoin::{
     consensus::serialize,
     hashes::{sha256d, Hash},
@@ -98,7 +99,9 @@ where
             csm_ctl.submit_event(ev)?;
 
             // Check for da batch and send event accordingly
-            let checkpoints = check_for_da_batch(&blockdata, params.rollup().rollup_vk);
+            debug!(?height, "Checking for da batch");
+            let checkpoints = check_for_da_batch(&blockdata, params.as_ref());
+            debug!(?checkpoints, "Received checkpoints");
             if !checkpoints.is_empty() {
                 let ev = SyncEvent::L1DABatch(height, checkpoints);
                 csm_ctl.submit_event(ev)?;
@@ -112,10 +115,9 @@ where
 }
 
 /// Parses inscriptions and checks for batch data in the transactions
-fn check_for_da_batch(
-    blockdata: &BlockData,
-    rollup_vk: RollupVerifyingKey,
-) -> Vec<BatchCheckpoint> {
+fn check_for_da_batch(blockdata: &BlockData, params: &Params) -> Vec<BatchCheckpoint> {
+    let rollup_vk = params.rollup().rollup_vk;
+    let verify_proofs = params.rollup().verify_proofs;
     let protocol_ops_txs = blockdata.protocol_ops_txs();
 
     let inscriptions = protocol_ops_txs
@@ -128,36 +130,53 @@ fn check_for_da_batch(
             _ => None,
         });
 
-    let verified_checkpoints = inscriptions.filter_map(|(insc, _)| {
-                let checkpoint: BatchCheckpoint = insc.clone().into();
+    let verified_checkpoints = inscriptions.filter_map(|(insc, tx)| {
+            let checkpoint: BatchCheckpoint = insc.clone().into();
+            if verify_proofs {
                 let checkpoint_idx = checkpoint.checkpoint().idx();
                 let checkpoint_last_block = checkpoint.checkpoint().l2_blockid();
 
-                let proof = checkpoint.proof();
-                let public_params_raw = borsh::to_vec(&checkpoint).unwrap();
-
-                // NOTE/TODO: this should also verify that this checkpoint is based on top of some previous checkpoint
-                let res = match rollup_vk {
-                    RollupVerifyingKey::Risc0VerifyingKey(vk) => {
-                        Risc0Verifier::verify_groth16(proof, vk.as_ref(), &public_params_raw)
-                    }
-                    RollupVerifyingKey::SP1VerifyingKey(vk) => {
-                        SP1Verifier::verify_groth16(proof, vk.as_ref(), &public_params_raw)
-                    }
-                };
-                match res {
+                match verify_proof(&checkpoint, rollup_vk) {
                     Ok(()) => {
                         info!(%checkpoint_idx, %checkpoint_last_block, "proof successfully verified");
                         Some(checkpoint)
-                    }
+                    },
                     Err(e) => {
-                        warn!(%checkpoint_idx, %checkpoint_last_block, err = %e, "could not verify proof inside blob");
+                        let txid = tx.compute_txid();
+                        warn!(?txid, %checkpoint_idx, %checkpoint_last_block, err = %e, "could not verify proof inside blob");
                         None
                     }
                 }
+            } else {
+                Some(checkpoint)
+            }
     });
 
     verified_checkpoints.map(Into::into).collect()
+}
+
+pub fn verify_proof(
+    checkpoint: &BatchCheckpoint,
+    rollup_vk: RollupVerifyingKey,
+) -> anyhow::Result<()> {
+    let public_params_raw = borsh::to_vec(&checkpoint).unwrap();
+    let proof = checkpoint.proof();
+
+    // NOTE/TODO: this should also verify that this checkpoint is based on top of some previous
+    // checkpoint
+    let res = panic::catch_unwind(|| match rollup_vk {
+        RollupVerifyingKey::Risc0VerifyingKey(vk) => {
+            Risc0Verifier::verify_groth16(proof, vk.as_ref(), &public_params_raw)
+        }
+        RollupVerifyingKey::SP1VerifyingKey(vk) => {
+            SP1Verifier::verify_groth16(proof, vk.as_ref(), &public_params_raw)
+        }
+    });
+    match res {
+        Ok(Ok(())) => Ok(()),
+        Ok(Err(e)) => Err(e),
+        Err(_) => Err(anyhow!("Unexpected error occurred while verifying proof")),
+    }
 }
 
 /// Given a block, generates a manifest of the parts we care about that we can

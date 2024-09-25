@@ -42,6 +42,9 @@ pub struct RollupParams {
 
     /// SP1 verifying key that is used to verify the Groth16 proof posted on Bitcoin
     pub rollup_vk: RollupVerifyingKey,
+
+    /// Whether to verify the proofs from L1 or not.
+    pub verify_proofs: bool,
 }
 
 /// Client sync parameters that are used to make the network work but don't

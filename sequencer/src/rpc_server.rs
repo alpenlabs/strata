@@ -1,12 +1,14 @@
 use std::sync::Arc;
 
 use alpen_express_btcio::{broadcaster::L1BroadcastHandle, writer::InscriptionHandle};
-use alpen_express_consensus_logic::{checkpoint::CheckpointHandle, sync_manager::SyncManager};
+use alpen_express_consensus_logic::{
+    checkpoint::CheckpointHandle, l1_handler::verify_proof, sync_manager::SyncManager,
+};
 use alpen_express_db::{
     traits::{ChainstateProvider, Database, L1DataProvider, L2DataProvider},
     types::{CheckpointProvingStatus, L1TxEntry, L1TxStatus},
 };
-use alpen_express_primitives::{buf::Buf32, hash};
+use alpen_express_primitives::{buf::Buf32, hash, params::Params};
 use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer};
 use alpen_express_rpc_types::{
     BlockHeader, ClientStatus, DaBlob, DepositEntry, DepositState, ExecUpdate, HexBytes,
@@ -81,6 +83,9 @@ pub enum Error {
     #[error("Proof already created for checkpoint {0}")]
     ProofAlreadyCreated(u64),
 
+    #[error("Invalid proof for checkpoint {0}: {1}")]
+    InvalidProof(u64, String),
+
     /// Generic internal error message.  If this is used often it should be made
     /// into its own error type.
     #[error("{0}")]
@@ -108,6 +113,7 @@ impl Error {
             Self::MissingL1BlockManifest(_) => -32609,
             Self::MissingCheckpointInDb(_) => -32610,
             Self::ProofAlreadyCreated(_) => -32611,
+            Self::InvalidProof(_, _) => -32612,
             Self::BlockingAbort(_) => -32001,
             Self::Other(_) => -32000,
             Self::OtherEx(_, _) => -32000,
@@ -601,30 +607,6 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         let batch_comm: Option<BatchCheckpoint> = entry.map(Into::into);
         Ok(batch_comm.map(|bc| bc.checkpoint().clone().into()))
     }
-
-    async fn submit_checkpoint_proof(&self, idx: u64, proofbytes: HexBytes) -> RpcResult<()> {
-        let mut entry = self
-            .checkpoint_handle
-            .get_checkpoint(idx)
-            .await
-            .map_err(|e| Error::Other(e.to_string()))?
-            .ok_or(Error::MissingCheckpointInDb(idx))?;
-
-        // If proof is not pending error out
-        if entry.proving_status != CheckpointProvingStatus::PendingProof {
-            return Err(Error::ProofAlreadyCreated(idx))?;
-        }
-
-        // TODO: verify proof, once proof verification logic is ready
-        entry.proof = proofbytes.into_inner();
-        entry.proving_status = CheckpointProvingStatus::ProofReady;
-        self.checkpoint_handle
-            .put_checkpoint_and_notify(idx, entry)
-            .await
-            .map_err(|e| Error::Other(e.to_string()))?;
-
-        Ok(())
-    }
 }
 
 /// Wrapper around [``tokio::task::spawn_blocking``] that handles errors in
@@ -649,6 +631,8 @@ pub struct AdminServerImpl {
     pub writer: Option<Arc<InscriptionHandle>>,
     pub bcast_handle: Arc<L1BroadcastHandle>,
     stop_tx: Mutex<Option<oneshot::Sender<()>>>,
+    checkpoint_handle: Arc<CheckpointHandle>,
+    params: Arc<Params>,
 }
 
 impl AdminServerImpl {
@@ -656,11 +640,15 @@ impl AdminServerImpl {
         writer: Option<Arc<InscriptionHandle>>,
         bcast_handle: Arc<L1BroadcastHandle>,
         stop_tx: oneshot::Sender<()>,
+        params: Arc<Params>,
+        checkpoint_handle: Arc<CheckpointHandle>,
     ) -> Self {
         Self {
             writer,
             bcast_handle,
             stop_tx: Mutex::new(Some(stop_tx)),
+            checkpoint_handle,
+            params,
         }
     }
 }
@@ -703,5 +691,40 @@ impl AlpenAdminApiServer for AdminServerImpl {
             .map_err(|e| Error::Other(e.to_string()))?;
 
         Ok(txid)
+    }
+
+    async fn submit_checkpoint_proof(&self, idx: u64, proofbytes: HexBytes) -> RpcResult<()> {
+        debug!(%idx, "received checkpoint proof request");
+        let mut entry = self
+            .checkpoint_handle
+            .get_checkpoint(idx)
+            .await
+            .map_err(|e| Error::Other(e.to_string()))?
+            .ok_or(Error::MissingCheckpointInDb(idx))?;
+        debug!(%idx, "found checkpoint in db");
+
+        if self.params.rollup().verify_proofs {
+            let rollup_vk = self.params.rollup().rollup_vk;
+            let checkpoint = entry.clone().into_batch_checkpoint();
+            verify_proof(&checkpoint, rollup_vk)
+                .map_err(|e| Error::InvalidProof(idx, e.to_string()))?;
+        }
+
+        // If proof is not pending error out
+        if entry.proving_status != CheckpointProvingStatus::PendingProof {
+            return Err(Error::ProofAlreadyCreated(idx))?;
+        }
+        debug!(%idx, "Proof is pending, setting proof reaedy");
+
+        // TODO: verify proof, once proof verification logic is ready
+        entry.proof = proofbytes.into_inner();
+        entry.proving_status = CheckpointProvingStatus::ProofReady;
+        self.checkpoint_handle
+            .put_checkpoint_and_notify(idx, entry)
+            .await
+            .map_err(|e| Error::Other(e.to_string()))?;
+        debug!(%idx, "Success");
+
+        Ok(())
     }
 }
