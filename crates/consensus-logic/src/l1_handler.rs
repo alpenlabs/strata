@@ -131,32 +131,25 @@ fn check_for_da_batch(blockdata: &BlockData, params: &Params) -> Vec<BatchCheckp
         });
 
     let verified_checkpoints = inscriptions.filter_map(|(insc, tx)| {
-        match borsh::from_slice::<SignedBatchCheckpoint>(insc.batch_data()) {
-            Err(e) => {
-                let txid = tx.compute_txid();
-                warn!(%txid, err = %e, "could not deserialize blob inside inscription");
-                None
-            }
-            Ok(signed_checkpoint) if verify_proofs => {
-                let checkpoint: BatchCheckpoint = signed_checkpoint.clone().into();
+            let checkpoint: BatchCheckpoint = insc.clone().into();
+            if verify_proofs {
                 let checkpoint_idx = checkpoint.checkpoint().idx();
                 let checkpoint_last_block = checkpoint.checkpoint().l2_blockid();
 
                 match verify_proof(&checkpoint, rollup_vk) {
                     Ok(()) => {
                         info!(%checkpoint_idx, %checkpoint_last_block, "proof successfully verified");
-                        Some(signed_checkpoint)
+                        Some(checkpoint)
                     },
                     Err(e) => {
-                        warn!(%checkpoint_idx, %checkpoint_last_block, err = %e, "could not verify proof inside blob");
+                        let txid = tx.compute_txid();
+                        warn!(?txid, %checkpoint_idx, %checkpoint_last_block, err = %e, "could not verify proof inside blob");
                         None
                     }
                 }
+            } else {
+                Some(checkpoint)
             }
-            Ok(signed_checkpoint) => {
-                Some(signed_checkpoint)
-            }
-        }
     });
 
     verified_checkpoints.map(Into::into).collect()
@@ -182,7 +175,7 @@ pub fn verify_proof(
     match res {
         Ok(Ok(())) => Ok(()),
         Ok(Err(e)) => Err(e),
-        Err(_) => Err(anyhow!("Unexpected error occured while verifying proof")),
+        Err(_) => Err(anyhow!("Unexpected error occurred while verifying proof")),
     }
 }
 

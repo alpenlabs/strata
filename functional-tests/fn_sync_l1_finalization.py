@@ -43,7 +43,7 @@ class BlockFinalizationTest(flexitest.Test):
 def check_already_sent_proof(seqrpc):
     try:
         # Proof for checkpoint 1 is already sent
-        seqrpc.alp_submitCheckpointProof(1, "abc123")
+        seqrpc.alpadmin_submitCheckpointProof(1, "abc123")
     except Exception as e:
         assert e.code == ERROR_PROOF_ALREADY_CREATED
     else:

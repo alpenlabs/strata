@@ -115,7 +115,7 @@ def submit_checkpoint(idx: int, seqrpc, manual_gen: ManualGenBlocksConfig | None
     # change the proof accordingly
     proof_hex = "00" * 256  # The expected proof size if 256 bytes
 
-    seqrpc.alp_submitCheckpointProof(idx, proof_hex)
+    seqrpc.alpadmin_submitCheckpointProof(idx, proof_hex)
 
     # Wait a while for it to be posted to l1. This will happen when there
     # is a new published txid in l1status
@@ -143,7 +143,7 @@ def check_submit_proof_fails_for_nonexistent_batch(seqrpc, nonexistent_batch: in
     """
     proof_hex = "00" * 256
     try:
-        seqrpc.alp_submitCheckpointProof(nonexistent_batch, proof_hex)
+        seqrpc.alpadmin_submitCheckpointProof(nonexistent_batch, proof_hex)
     except Exception as e:
         if hasattr(e, "code"):
             assert e.code == ERROR_CHECKPOINT_DOESNOT_EXIST

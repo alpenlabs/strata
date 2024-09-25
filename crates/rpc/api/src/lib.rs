@@ -74,9 +74,6 @@ pub trait AlpenApi {
     /// Get nth checkpoint info if any
     #[method(name = "getCheckpointInfo")]
     async fn get_checkpoint_info(&self, idx: u64) -> RpcResult<Option<RpcCheckpointInfo>>;
-
-    #[method(name = "submitCheckpointProof")]
-    async fn submit_checkpoint_proof(&self, idx: u64, proof: HexBytes) -> RpcResult<()>;
 }
 
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "alpadmin"))]
@@ -93,6 +90,10 @@ pub trait AlpenAdminApi {
     /// Adds an equivalent entry to broadcaster database, which will eventually be broadcasted
     #[method(name = "broadcastRawTx")]
     async fn broadcast_raw_tx(&self, rawtx: HexBytes) -> RpcResult<Txid>;
+
+    /// Verifies and adds the submitted proof to the checkpoint database
+    #[method(name = "submitCheckpointProof")]
+    async fn submit_checkpoint_proof(&self, idx: u64, proof: HexBytes) -> RpcResult<()>;
 }
 
 /// APIs that are invoked by the bridge client to query and execute its duties.
