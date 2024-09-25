@@ -187,7 +187,7 @@ mod tests {
     #[test]
     fn test_script_with_invalid_magic_bytes() {
         let evm_addr = [1; 20];
-        let control_block = vec![0xFF; 65];
+        let control_block = vec![0xFF; 32];
         let invalid_magic_bytes = vec![0x00; 4]; // Invalid magic bytes
 
         let config = get_deposit_tx_config();
