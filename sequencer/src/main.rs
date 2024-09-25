@@ -128,6 +128,7 @@ fn default_rollup_params() -> RollupParams {
                 .parse()
                 .unwrap(),
         )), // TODO: update this with vk for checkpoint proof
+        verify_proofs: true,
     }
 }
 

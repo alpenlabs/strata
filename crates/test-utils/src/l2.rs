@@ -90,6 +90,7 @@ pub fn gen_params() -> Params {
                     .parse()
                     .unwrap(),
             )),
+            verify_proofs: false,
         },
         run: SyncParams {
             l2_blocks_fetch_limit: 1000,
