@@ -1,7 +1,7 @@
 //! Deterministic and non-cryptographically-secure RNG for use when picking
 //! stuff in the CL STF.
 //!
-//! See: https://lemire.me/blog/2019/03/19/the-fastest-conventional-random-number-generator-that-can-pass-big-crush/
+//! See: <https://lemire.me/blog/2019/03/19/the-fastest-conventional-random-number-generator-that-can-pass-big-crush/>
 
 /// RNG used within the scope of a block's slot processing.
 pub struct SlotRng {
