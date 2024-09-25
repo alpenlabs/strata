@@ -31,7 +31,7 @@ async fn main() {
 
     match cmd {
         Commands::Refresh(_) => refresh(seed).await,
-        Commands::Drain(args) => drain(args).await,
+        Commands::Drain(args) => drain(args, seed).await,
         Commands::Balance(args) => balance(args, seed).await,
         Commands::Backup(args) => backup(args, seed).await,
         Commands::BridgeIn(args) => bridge_in(args, seed).await,

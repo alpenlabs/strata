@@ -16,7 +16,7 @@ use bdk_wallet::{
     rusqlite::{self, Connection},
     ChangeSet, PersistedWallet, WalletPersister,
 };
-use console::Term;
+use console::{style, Term};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 
 use crate::{seed::Seed, settings::SETTINGS};
@@ -31,6 +31,13 @@ pub async fn get_fee_rate(target: u16) -> Result<Option<FeeRate>, esplora_client
         .map(|frs| frs.get(&target).cloned())?
         .map(|fr| FeeRate::from_sat_per_vb(fr as u64))
         .flatten())
+}
+
+pub fn log_fee_rate(term: &Term, fr: &FeeRate) {
+    let _ = term.write_line(&format!(
+        "Using {} as feerate",
+        style(format!("~{} sat/vb", fr.to_sat_per_vb_ceil())).green(),
+    ));
 }
 
 /// Shared async client for esplora

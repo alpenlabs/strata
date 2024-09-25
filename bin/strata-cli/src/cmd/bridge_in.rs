@@ -18,7 +18,7 @@ use crate::{
     rollup::RollupWallet,
     seed::Seed,
     settings::SETTINGS,
-    signet::{get_fee_rate, SignetWallet, ESPLORA_CLIENT},
+    signet::{get_fee_rate, log_fee_rate, SignetWallet, ESPLORA_CLIENT},
     taproot::{ExtractP2trPubkey, NotTaprootAddress, UNSPENDABLE},
 };
 
@@ -91,10 +91,7 @@ pub async fn bridge_in(args: BridgeInArgs, seed: Seed) {
         .expect("should get fee rate")
         .expect("should have valid fee rate");
 
-    let _ = term.write_line(&format!(
-        "Using {} as feerate",
-        style(format!("~{} sat/vb", fee_rate.to_sat_per_vb_ceil())).green(),
-    ));
+    log_fee_rate(&term, &fee_rate);
 
     let mut op_return_data = [0u8; 11 + 32 + 20];
     op_return_data[..11].copy_from_slice(b"alpenstrata");
