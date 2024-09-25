@@ -510,12 +510,14 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         Ok(())
     }
 
-    async fn get_bridge_duties(&self, block_height: u64) -> RpcResult<BridgeDuties> {
+    // XXX: Should reorgs have been handled? Do reorgs happen in the DB?
+    async fn get_bridge_duties(&self, block_height: u64) -> RpcResult<(BridgeDuties, u64)> {
         let l1_db_provider = self.database.l1_provider();
         let network = self.bitcoind_network;
-        let deposit_duties = extract_deposit_requests(l1_db_provider, block_height, network)
-            .await?
-            .map(Duty::from);
+        let (deposit_duties, latest_block_height) =
+            extract_deposit_requests(l1_db_provider, block_height, network).await?;
+
+        let deposit_duties = deposit_duties.map(Duty::from);
 
         // TODO: Extract withdrawal duties as well.
         let withdrawal_duties = vec![];
@@ -524,7 +526,7 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         duties.extend(deposit_duties);
         duties.extend(withdrawal_duties);
 
-        Ok(duties)
+        Ok((duties, latest_block_height))
     }
 
     async fn get_checkpoint_info(&self, idx: u64) -> RpcResult<Option<RpcCheckpointInfo>> {

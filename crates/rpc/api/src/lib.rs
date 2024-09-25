@@ -71,7 +71,8 @@ pub trait AlpenApi {
     #[method(name = "submitBridgeMsg")]
     async fn submit_bridge_msg(&self, raw_msg: HexBytes) -> RpcResult<()>;
 
-    /// Get the bridge duties past a certain `block_height`.
+    /// Get the bridge duties from a certain `block_height` as well as the latest L1 `block_height`
+    /// (for deposit duties).
     ///
     /// The `block_height` is a monotonically increasing number with no gaps. So, it is safe to call
     /// this method with any `u64` value. If an entry corresponding to the `block_height` is not
@@ -82,7 +83,7 @@ pub trait AlpenApi {
     /// For devnet, each duty is assigned to every operator. So, we need not pass an
     /// [`OperatorIdx`](alpen_express_primitives::bridge::OperatorIdx).
     #[method(name = "getBridgeDuties")]
-    async fn get_bridge_duties(&self, block_height: u64) -> RpcResult<BridgeDuties>;
+    async fn get_bridge_duties(&self, block_height: u64) -> RpcResult<(BridgeDuties, u64)>;
 
     /// Get nth checkpoint info if any
     #[method(name = "getCheckpointInfo")]

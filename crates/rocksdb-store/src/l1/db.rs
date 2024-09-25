@@ -191,13 +191,13 @@ impl L1DataProvider for L1Db {
         Ok(self.db.get::<L1BlockSchema>(&idx)?)
     }
 
-    fn get_txs_after(&self, start_idx: u64) -> DbResult<Vec<L1Tx>> {
+    fn get_txs_from(&self, start_idx: u64) -> DbResult<(Vec<L1Tx>, u64)> {
         let start_key = KeyEncoder::<L1BlockSchema>::encode_key(&start_idx)
             .map_err(|err| DbError::CodecError(err.to_string()))?;
 
         // Get a snapshot so that we only get the data present in the db at this point in time.
-        // This prevents a possible case when this operation does not yield a result as entries are
-        // added.
+        // This prevents a possible case when this operation does not yield a result as entries keep
+        // on getting added.
         let snapshot = self.db.db().snapshot();
 
         let mut options = ReadOptions::default();
@@ -207,8 +207,11 @@ impl L1DataProvider for L1Db {
         let mut l1_txs = vec![];
         let res = self.db.iter_with_opts::<L1BlockSchema>(options)?;
 
+        let mut latest_index = start_idx;
         for entry in res {
             let entry = entry?;
+            latest_index = entry.key;
+
             let block_hash = entry.into_tuple().1.block_hash();
 
             let l1_tx = self.db.get::<TxnSchema>(&block_hash)?;
@@ -218,7 +221,7 @@ impl L1DataProvider for L1Db {
             }
         }
 
-        Ok(l1_txs)
+        Ok((l1_txs, latest_index))
     }
 }
 
@@ -535,9 +538,14 @@ mod tests {
 
         let offset = rand::thread_rng().gen_range(0..total_num_blocks);
         let expected_num_blocks = total_num_blocks - offset;
-        let actual = db.get_txs_after(offset as u64).unwrap();
+        let (actual, latest_idx) = db.get_txs_from(offset as u64).unwrap();
 
         assert_eq!(actual.len(), expected_num_blocks * num_txs);
+        assert_eq!(
+            latest_idx,
+            (total_num_blocks - 1) as u64,
+            "the latest index must match the total number of blocks inserted"
+        );
 
         let mut index = 0;
         for (block_num, expected) in l1_txs.iter().skip(offset).enumerate() {
@@ -562,12 +570,16 @@ mod tests {
         }
 
         // get past the final index.
-        let actual = db
-            .get_txs_after(total_num_blocks as u64)
-            .expect("should not error");
+        let start_idx = total_num_blocks as u64;
+        let (actual, latest_idx) = db.get_txs_from(start_idx).expect("should not error");
         assert!(
             actual.is_empty(),
             "getting past the last index should return an empty list"
         );
+
+        assert_eq!(
+            latest_idx, start_idx,
+            "returned latest index must be the same as the one the method was called with",
+        )
     }
 }

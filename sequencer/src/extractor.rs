@@ -40,9 +40,9 @@ pub(super) async fn extract_deposit_requests<Provider: L1DataProvider>(
     l1_data_provider: &Arc<Provider>,
     block_height: u64,
     network: Network,
-) -> RpcResult<impl Iterator<Item = DepositInfo>> {
-    let l1_txs = l1_data_provider
-        .get_txs_after(block_height)
+) -> RpcResult<(impl Iterator<Item = DepositInfo>, u64)> {
+    let (l1_txs, latest_idx) = l1_data_provider
+        .get_txs_from(block_height)
         .map_err(RpcServerError::Db)?;
 
     let deposit_info_iter = l1_txs.into_iter().filter_map(move |l1_tx| {
@@ -126,7 +126,7 @@ pub(super) async fn extract_deposit_requests<Provider: L1DataProvider>(
         None
     });
 
-    Ok(deposit_info_iter)
+    Ok((deposit_info_iter, latest_idx))
 }
 
 #[cfg(test)]
@@ -176,10 +176,18 @@ mod tests {
         )
         .await;
 
-        let deposit_infos = extract_deposit_requests(&l1_db.clone(), 0, Network::Regtest)
-            .await
-            .expect("should be able to extract deposit requests")
-            .collect::<Vec<DepositInfo>>();
+        let (deposit_infos, latest_idx) =
+            extract_deposit_requests(&l1_db.clone(), 0, Network::Regtest)
+                .await
+                .expect("should be able to extract deposit requests");
+
+        assert_eq!(
+            latest_idx,
+            (num_blocks - 1) as u64,
+            "the latest index returned must the same as the index of the last block"
+        );
+
+        let deposit_infos = deposit_infos.collect::<Vec<DepositInfo>>();
 
         // this is almost always true. In fact, it should be around 50%
         assert!(
