@@ -64,29 +64,28 @@ pub enum InitError {
 
 pub fn init_core_dbs(
     rbdb: Arc<OptimisticTransactionDB>,
-    db_ops: DbOpsConfig,
+    ops_config: DbOpsConfig,
 ) -> (Arc<CommonDb>, Arc<BroadcastDatabase>) {
     // Initialize databases.
-    let l1_db = Arc::new(L1Db::new(rbdb.clone(), db_ops));
-    let l2_db = Arc::new(L2Db::new(rbdb.clone(), db_ops));
-    let sync_ev_db = Arc::new(alpen_express_rocksdb::SyncEventDb::new(
-        rbdb.clone(),
-        db_ops,
-    ));
-    let clientstate_db = Arc::new(ClientStateDb::new(rbdb.clone(), db_ops));
-    let chainstate_db = Arc::new(ChainStateDb::new(rbdb.clone(), db_ops));
-    let checkpoint_db = Arc::new(RBCheckpointDB::new(rbdb.clone(), db_ops));
-    let database = Arc::new(CommonDatabase::new(
+    let l1_db: Arc<_> = L1Db::new(rbdb.clone(), ops_config).into();
+    let l2_db: Arc<_> = L2Db::new(rbdb.clone(), ops_config).into();
+    let sync_ev_db: Arc<_> =
+        alpen_express_rocksdb::SyncEventDb::new(rbdb.clone(), ops_config).into();
+    let clientstate_db: Arc<_> = ClientStateDb::new(rbdb.clone(), ops_config).into();
+    let chainstate_db: Arc<_> = ChainStateDb::new(rbdb.clone(), ops_config).into();
+    let checkpoint_db: Arc<_> = RBCheckpointDB::new(rbdb.clone(), ops_config).into();
+    let database: Arc<_> = CommonDatabase::new(
         l1_db,
         l2_db,
         sync_ev_db,
         clientstate_db,
         chainstate_db,
         checkpoint_db,
-    ));
+    )
+    .into();
 
-    let l1_broadcast_db = Arc::new(L1BroadcastDb::new(rbdb.clone(), db_ops));
-    let broadcast_database = Arc::new(BroadcastDatabase::new(l1_broadcast_db));
+    let l1_broadcast_db: Arc<_> = L1BroadcastDb::new(rbdb.clone(), ops_config).into();
+    let broadcast_database: Arc<_> = BroadcastDatabase::new(l1_broadcast_db).into();
     (database, broadcast_database)
 }
 
@@ -94,8 +93,8 @@ pub fn initialize_sequencer_database(
     rbdb: Arc<OptimisticTransactionDB>,
     db_ops: DbOpsConfig,
 ) -> Arc<SequencerDB<RBSeqBlobDb>> {
-    let seqdb = Arc::new(RBSeqBlobDb::new(rbdb, db_ops));
-    Arc::new(SequencerDB::new(seqdb))
+    let seqdb = RBSeqBlobDb::new(rbdb, db_ops).into();
+    SequencerDB::new(seqdb).into()
 }
 
 pub fn get_config(args: Args) -> Result<Config, InitError> {
@@ -118,16 +117,14 @@ pub fn get_config(args: Args) -> Result<Config, InitError> {
 
 fn load_configuration(path: &Path) -> Result<Config, InitError> {
     let config_str = fs::read_to_string(path)?;
-    let conf = toml::from_str::<Config>(&config_str)
-        .map_err(|err| SerdeError::new(config_str.to_string(), err))?;
+    let conf =
+        toml::from_str::<Config>(&config_str).map_err(|err| SerdeError::new(config_str, err))?;
     Ok(conf)
 }
 
 pub fn load_jwtsecret(path: &Path) -> Result<JwtSecret, InitError> {
     let secret = fs::read_to_string(path)?;
-    let jwt_secret = JwtSecret::from_hex(secret)?;
-
-    Ok(jwt_secret)
+    Ok(JwtSecret::from_hex(secret)?)
 }
 
 pub fn load_rollup_params_or_default(path: &Option<PathBuf>) -> Result<RollupParams, InitError> {
@@ -135,8 +132,8 @@ pub fn load_rollup_params_or_default(path: &Option<PathBuf>) -> Result<RollupPar
         return Ok(default_rollup_params());
     };
     let json = fs::read_to_string(path)?;
-    let rollup_params = serde_json::from_str::<RollupParams>(&json)
-        .map_err(|err| SerdeError::new(json.to_string(), err))?;
+    let rollup_params =
+        serde_json::from_str::<RollupParams>(&json).map_err(|err| SerdeError::new(json, err))?;
 
     Ok(rollup_params)
 }
@@ -188,13 +185,12 @@ pub fn create_bitcoin_rpc(config: &Config) -> anyhow::Result<Arc<BitcoinClient>>
         config.bitcoind_rpc.rpc_password.clone(),
     )
     .map_err(anyhow::Error::from)?;
-    let btc_rpc = Arc::new(btc_rpc);
 
     // TODO remove this
     if config.bitcoind_rpc.network != Network::Regtest {
         warn!("network not set to regtest, ignoring");
     }
-    Ok(btc_rpc)
+    Ok(btc_rpc.into())
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -353,7 +349,7 @@ pub fn init_tasks(
     )?;
 
     // Start the sync manager.
-    let sync_manager = Arc::new(sync_manager::start_sync_tasks(
+    let sync_manager: Arc<_> = sync_manager::start_sync_tasks(
         executor,
         db.clone(),
         l2block_manager.clone(),
@@ -362,7 +358,8 @@ pub fn init_tasks(
         params.clone(),
         (status_tx.clone(), status_rx.clone()),
         checkpoint_manager,
-    )?);
+    )?
+    .into();
 
     Ok(ManagerContext {
         params,

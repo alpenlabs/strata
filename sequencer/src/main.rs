@@ -53,11 +53,10 @@ fn main() -> anyhow::Result<()> {
 fn main_inner(args: Args) -> anyhow::Result<()> {
     logging::init();
 
-    // initialize the full configuration
     let config = get_config(args.clone())?;
 
     // Set up block params.
-    let params = Arc::new(Params {
+    let params: Arc<_> = Params {
         // FIXME this .expect breaks printing errors
         rollup: load_rollup_params_or_default(&args.rollup_params).expect("rollup params"),
         run: SyncParams {
@@ -66,11 +65,12 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             client_checkpoint_interval: config.sync.client_checkpoint_interval,
             l2_blocks_fetch_limit: config.client.l2_blocks_fetch_limit,
         },
-    });
+    }
+    .into();
 
     // Open and initialize the database.
     let rbdb = open_rocksdb_database(&config)?;
-    // init a database configuration
+
     let db_ops = DbOpsConfig {
         retry_count: config.client.db_retry_count,
     };
@@ -85,7 +85,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         .expect("init: build rt");
 
     // Init thread pool for batch jobs.
-    // TODO switch to num_cpus maybe?  we don't want to compete with tokio though
+    // TODO switch to num_cpus
     let pool = threadpool::ThreadPool::with_name("express-pool".to_owned(), 8);
 
     let task_manager = TaskManager::new(rt.handle().clone());
@@ -100,8 +100,9 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let bridge_msg_ctx = express_storage::ops::bridge_relay::Context::new(bridge_msg_db);
     let bridge_msg_ops = Arc::new(bridge_msg_ctx.into_ops(pool.clone()));
 
-    let checkpoint_manager = Arc::new(CheckpointDbManager::new(pool.clone(), database.clone()));
-    let checkpoint_handle = Arc::new(CheckpointHandle::new(checkpoint_manager.clone()));
+    let checkpoint_manager: Arc<_> =
+        CheckpointDbManager::new(pool.clone(), database.clone()).into();
+    let checkpoint_handle: Arc<_> = CheckpointHandle::new(checkpoint_manager.clone()).into();
     let btc_rpc = create_bitcoin_rpc(&config)?;
 
     let broadcast_handle =
@@ -129,7 +130,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     // FIXME this init is screwed up because of the order we start things
     let relayer_handle = rt.block_on(start_relayer_fut)?;
 
-    // If the sequencer key is set, start the sequencer db and duties task.
+    // If we're a sequencer, start the sequencer db and duties task.
     let inscription_handler =
         if let ClientMode::Sequencer(sequencer_config) = &config.client.client_mode {
             let seq_db = initialize_sequencer_database(rbdb.clone(), db_ops);
@@ -212,7 +213,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn start_rpc<D: Database + Send + Sync + 'static>(
+async fn start_rpc<D>(
     shutdown_signal: ShutdownSignal,
     config: Config,
     sync_man: Arc<SyncManager>,
@@ -224,7 +225,10 @@ async fn start_rpc<D: Database + Send + Sync + 'static>(
     checkpt_handle: Arc<CheckpointHandle>,
     relayer_handle: Arc<RelayerHandle>,
     params: Arc<Params>,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<()>
+where
+    D: Database + Send + Sync + 'static,
+{
     let (stop_tx, stop_rx) = oneshot::channel();
 
     // Init RPC impls.
@@ -308,13 +312,13 @@ fn open_rocksdb_database(
 }
 
 // initializes the status bundle that we can pass around cheaply for as name suggests status/metrics
-// FIXME this is just supposed to handle the status trackers, why are we doing database init here?
-fn start_status<D: Database + Send + Sync + 'static>(
+fn start_status<D>(
     database: Arc<D>,
     params: Arc<Params>,
 ) -> anyhow::Result<(Arc<StatusTx>, Arc<StatusRx>)>
 where
     <D as Database>::ClientStateProvider: Send + Sync + 'static,
+    D: Database + Send + Sync + 'static,
 {
     // Check if we have to do genesis.
     if genesis::check_needs_client_init(database.as_ref())? {

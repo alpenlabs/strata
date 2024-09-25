@@ -175,7 +175,7 @@ impl TaskManager {
         }
     }
 
-    /// Add signal listeners and send shutdown
+    /// Start background handler to send the shutdown signal when a ctrl-c (SIGINT) is received
     pub fn start_signal_listeners(&self) {
         let shutdown_signal = self.shutdown_signal();
 
