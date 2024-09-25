@@ -1,10 +1,9 @@
 #[cfg(feature = "prover")]
 mod test {
-    use std::str::FromStr;
 
-    use alpen_test_utils::l2::get_genesis_chainstate;
-    use bitcoin::{params::MAINNET, Address};
-    use express_proofimpl_btc_blockspace::logic::{BlockspaceProofOutput, ScanRuleConfig};
+    use alpen_test_utils::{bitcoin::get_tx_filters, l2::get_genesis_chainstate};
+    use bitcoin::params::MAINNET;
+    use express_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
     use express_proofimpl_checkpoint::{
         CheckpointProofOutput, HashedCheckpointState, L2BatchProofOutput,
     };
@@ -43,16 +42,9 @@ mod test {
         let mut prover_input = SP1ProofInputBuilder::new();
         for (_, raw_block) in mainnet_blocks {
             let block_bytes = hex::decode(&raw_block).unwrap();
-            let scan_config = ScanRuleConfig {
-                bridge_scriptbufs: vec![Address::from_str(
-                    "bcrt1pf73jc96ujch43wp3k294003xx4llukyzvp0revwwnww62esvk7hqvarg98",
-                )
-                .unwrap()
-                .assume_checked()
-                .script_pubkey()],
-            };
+            let filters = get_tx_filters();
             let inner_prover_input = SP1ProofInputBuilder::new()
-                .write(&scan_config)
+                .write_borsh(&filters)
                 .unwrap()
                 .write_serialized(&block_bytes)
                 .unwrap()
@@ -63,8 +55,9 @@ mod test {
                 .prove(inner_prover_input)
                 .expect("Failed to generate proof");
 
-            let output = SP1Verifier::extract_public_output::<BlockspaceProofOutput>(&proof)
+            let raw_output = SP1Verifier::extract_public_output::<Vec<u8>>(&proof)
                 .expect("Failed to extract public outputs");
+            let output: BlockspaceProofOutput = borsh::from_slice(&raw_output).unwrap();
 
             let _ = prover_input.write_proof(AggregationInput::new(proof, vkey));
             blockspace_outputs.push(output);
@@ -76,13 +69,14 @@ mod test {
             state: get_verification_state_for_block(40321, &PowParams::from(&MAINNET)),
         };
 
-        let prover_input = prover_input.write(&input).unwrap().build().unwrap();
+        let prover_input = prover_input.write_borsh(&input).unwrap().build().unwrap();
         let (proof, vk) = prover
             .prove(prover_input)
             .expect("Failed to generate proof");
 
-        let output = SP1Verifier::extract_public_output::<L1BatchProofOutput>(&proof)
+        let output_raw = SP1Verifier::extract_public_output::<Vec<u8>>(&proof)
             .expect("Failed to extract public outputs");
+        let output: L1BatchProofOutput = borsh::from_slice(&output_raw).unwrap();
 
         (output, proof, vk)
     }
@@ -101,7 +95,6 @@ mod test {
     fn get_l2_batch_output() -> L2BatchProofOutput {
         L2BatchProofOutput {
             deposits: Vec::new(),
-            forced_inclusions: Vec::new(),
             initial_state: get_genesis_chainstate(),
             final_state: get_genesis_chainstate(),
         }
@@ -127,7 +120,7 @@ mod test {
         let l1_batch_proof_input = AggregationInput::new(l1_batch_proof, l1_batch_vk);
 
         let prover_input = SP1ProofInputBuilder::new()
-            .write(&l1_batch)
+            .write_borsh(&l1_batch)
             .unwrap()
             .write_serialized(&borsh::to_vec(&l2_batch).unwrap())
             .unwrap()

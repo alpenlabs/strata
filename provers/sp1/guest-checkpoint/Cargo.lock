@@ -875,10 +875,13 @@ name = "express-proofimpl-btc-blockspace"
 version = "0.1.0"
 dependencies = [
  "alpen-express-primitives",
+ "alpen-express-state",
  "bitcoin",
  "borsh",
+ "express-bridge-tx-builder",
  "serde",
  "sha2",
+ "strata-tx-parser",
 ]
 
 [[package]]
@@ -902,6 +905,7 @@ name = "express-proofimpl-l1-batch"
 version = "0.1.0"
 dependencies = [
  "alpen-express-primitives",
+ "alpen-express-state",
  "anyhow",
  "bitcoin",
  "borsh",
@@ -2218,6 +2222,20 @@ name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
+
+[[package]]
+name = "strata-tx-parser"
+version = "0.1.0"
+dependencies = [
+ "alpen-express-primitives",
+ "alpen-express-state",
+ "anyhow",
+ "bitcoin",
+ "borsh",
+ "hex",
+ "thiserror",
+ "tracing",
+]
 
 [[package]]
 name = "strum"

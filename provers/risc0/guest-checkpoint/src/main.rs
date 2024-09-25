@@ -1,6 +1,6 @@
 use express_proofimpl_checkpoint::{
-    self, process_checkpoint_proof, CheckpointProofInput, CheckpointProofOutput, Groth16Proof,
-    HashedCheckpointState, L2BatchProofOutput,
+    self, process_checkpoint_proof, CheckpointProofOutput, Groth16Proof, HashedCheckpointState,
+    L2BatchProofOutput,
 };
 use express_proofimpl_l1_batch::logic::L1BatchProofOutput;
 use risc0_zkvm::{
@@ -11,8 +11,10 @@ use risc0_zkvm::{
 use sha2::Digest;
 
 fn main() {
-    // TODO: update this
-    let l1_batch: L1BatchProofOutput = env::read();
+    let len: u32 = env::read();
+    let mut slice = vec![0u8; len as usize];
+    env::read_slice(&mut slice);
+    let l1_batch: L1BatchProofOutput = borsh::from_slice(&slice).unwrap();
 
     let len: u32 = env::read();
     let mut slice = vec![0u8; len as usize];
@@ -28,7 +30,11 @@ fn main() {
     // verify l1 proof
     // TODO: l1_batch_vk needs to be hardcoded
     let l1_batch_vk: [u32; 8] = env::read();
-    env::verify(l1_batch_vk, &serde::to_vec(&l1_batch).unwrap()).unwrap();
+    env::verify(
+        l1_batch_vk,
+        &serde::to_vec(&borsh::to_vec(&l1_batch).unwrap()).unwrap(),
+    )
+    .unwrap();
 
     // verify l2 proof
     // let l2_batch_vk: [u32; 8] = env::read();

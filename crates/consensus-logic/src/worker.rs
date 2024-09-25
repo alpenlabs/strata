@@ -223,6 +223,9 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
                         c.proof().to_vec(),
                         pstatus,
                         cstatus,
+                        Buf32::zero(),
+                        Buf32::zero(),
+                        0,
                     );
 
                     // Store
@@ -239,6 +242,9 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
                         c.proof().to_vec(),
                         pstatus,
                         cstatus,
+                        Buf32::zero(),
+                        Buf32::zero(),
+                        0,
                     );
 
                     // Update

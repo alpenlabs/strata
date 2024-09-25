@@ -44,6 +44,7 @@ fn get_rollup_params() -> Params {
                     .parse()
                     .unwrap(),
             )),
+            verify_proofs: true,
         },
         run: SyncParams {
             l2_blocks_fetch_limit: 1000,

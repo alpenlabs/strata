@@ -147,6 +147,10 @@ pub struct CheckpointEntry {
     /// Proof
     pub proof: Vec<u8>,
 
+    l1_state_hash: Buf32,
+    l2_state_hash: Buf32,
+    acc_pow: u128,
+
     /// Proving Status
     pub proving_status: CheckpointProvingStatus,
 
@@ -160,26 +164,46 @@ impl CheckpointEntry {
         proof: Vec<u8>,
         proving_status: CheckpointProvingStatus,
         confirmation_status: CheckpointConfStatus,
+        l1_state_hash: Buf32,
+        l2_state_hash: Buf32,
+        acc_pow: u128,
     ) -> Self {
         Self {
             checkpoint,
             proof,
             proving_status,
             confirmation_status,
+            l1_state_hash,
+            l2_state_hash,
+            acc_pow,
         }
     }
 
     pub fn into_batch_checkpoint(self) -> BatchCheckpoint {
-        BatchCheckpoint::new(self.checkpoint, self.proof)
+        BatchCheckpoint::new(
+            self.checkpoint,
+            self.proof,
+            self.l1_state_hash,
+            self.l2_state_hash,
+            self.acc_pow,
+        )
     }
 
     /// Creates a new instance for a freshly defined checkpoint.
-    pub fn new_pending_proof(checkpoint: CheckpointInfo) -> Self {
+    pub fn new_pending_proof(
+        checkpoint: CheckpointInfo,
+        l1_state_hash: Buf32,
+        l2_state_hash: Buf32,
+        acc_pow: u128,
+    ) -> Self {
         Self::new(
             checkpoint,
             vec![],
             CheckpointProvingStatus::PendingProof,
             CheckpointConfStatus::Pending,
+            l1_state_hash,
+            l2_state_hash,
+            acc_pow,
         )
     }
 
@@ -194,7 +218,13 @@ impl CheckpointEntry {
 
 impl From<CheckpointEntry> for BatchCheckpoint {
     fn from(entry: CheckpointEntry) -> BatchCheckpoint {
-        BatchCheckpoint::new(entry.checkpoint, entry.proof)
+        BatchCheckpoint::new(
+            entry.checkpoint,
+            entry.proof,
+            entry.l1_state_hash,
+            entry.l2_state_hash,
+            entry.acc_pow,
+        )
     }
 }
 

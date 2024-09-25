@@ -26,13 +26,14 @@ impl BatchCheckpoint {
         proof: Vec<u8>,
         l1_state_hash: Buf32,
         l2_state_hash: Buf32,
+        acc_pow: u128,
     ) -> Self {
         Self {
             checkpoint,
             proof,
             l1_state_hash,
             l2_state_hash,
-            acc_pow: 0u128,
+            acc_pow,
         }
     }
 
@@ -46,6 +47,10 @@ impl BatchCheckpoint {
 
     pub fn l2_state_hash(&self) -> &Buf32 {
         &self.l2_state_hash
+    }
+
+    pub fn acc_pow(&self) -> u128 {
+        self.acc_pow
     }
 
     pub fn proof(&self) -> &[u8] {

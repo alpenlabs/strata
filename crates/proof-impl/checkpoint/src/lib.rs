@@ -1,12 +1,17 @@
 use alpen_express_primitives::buf::Buf32;
-use alpen_express_state::chain_state::ChainState;
+use alpen_express_state::{chain_state::ChainState, tx::DepositInfo};
 use borsh::{BorshDeserialize, BorshSerialize};
-use express_proofimpl_l1_batch::{
-    header_verification::HeaderVerificationState, logic::L1BatchProofOutput,
-};
+use express_proofimpl_l1_batch::logic::L1BatchProofOutput;
 use serde::{Deserialize, Serialize};
 
 pub type Groth16Proof = Vec<u8>;
+
+#[derive(Debug, BorshSerialize, BorshDeserialize)]
+pub struct L2BatchProofOutput {
+    pub deposits: Vec<DepositInfo>,
+    pub initial_state: ChainState,
+    pub final_state: ChainState,
+}
 
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct CheckpointProofInput {
@@ -52,12 +57,12 @@ pub fn process_checkpoint_proof(
         .map(|prev_state_update| {
             // Verify that the previous state update matches the initial state
             assert_eq!(
-                initial_l1_state_hash,
+                &initial_l1_state_hash,
                 prev_state_update.l1_state_hash(),
                 "L1 state mismatch"
             );
             assert_eq!(
-                initial_l2_state_hash,
+                &initial_l2_state_hash,
                 prev_state_update.l2_state_hash(),
                 "L2 state mismatch"
             );
@@ -65,10 +70,11 @@ pub fn process_checkpoint_proof(
             let checkpoint = CheckpointProofOutput {
                 l1_state: initial_l1_state_hash,
                 l2_state: initial_l2_state_hash,
-                total_acc_pow: prev_state_update.acc_pow(),
+                // TODO: fix this
+                total_acc_pow: prev_state_update.acc_pow() as f64,
             };
 
-            (checkpoint, prev_state_update.proof.clone())
+            (checkpoint, prev_state_update.proof().to_vec())
         })
         .or_else(|| {
             // If no previous state update, verify against genesis
@@ -86,11 +92,6 @@ pub fn process_checkpoint_proof(
     assert_eq!(
         l1_batch.deposits, l2_batch.deposits,
         "Deposits mismatch between L1 and L2"
-    );
-
-    assert_eq!(
-        l1_batch.forced_inclusions, l2_batch.forced_inclusions,
-        "Forced inclusion mismatch between L1 and L2"
     );
 
     let output = CheckpointProofOutput {

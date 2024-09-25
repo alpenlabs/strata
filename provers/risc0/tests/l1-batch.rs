@@ -1,6 +1,6 @@
 #[cfg(feature = "prover")]
 mod test {
-    use alpen_test_utils::bitcoin::{get_btc_chain, get_tx_filters};
+    use alpen_test_utils::bitcoin::get_tx_filters;
     use bitcoin::params::MAINNET;
     use express_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
     use express_proofimpl_l1_batch::{
