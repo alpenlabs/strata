@@ -136,11 +136,9 @@ mod tests {
     use alpen_express_common::logging;
     use alpen_express_db::traits::L1DataStore;
     use alpen_express_mmr::CompactMmr;
-    use alpen_express_primitives::{
-        l1::{L1BlockManifest, L1Tx, L1TxProof},
-        tx::DepositRequestInfo,
-    };
+    use alpen_express_primitives::l1::{L1BlockManifest, L1TxProof};
     use alpen_express_rocksdb::{test_utils::get_rocksdb_tmp_instance, L1Db};
+    use alpen_express_state::{l1::L1Tx, tx::DepositRequestInfo};
     use alpen_test_utils::{bridge::generate_mock_unsigned_tx, ArbitraryGenerator};
     use bitcoin::{
         consensus::Encodable,
