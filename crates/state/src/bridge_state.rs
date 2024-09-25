@@ -212,6 +212,7 @@ pub struct DepositEntry {
     /// potentially very large set of pending transactions to reason about the
     /// state of the deposits.  This must be kept in sync when we do things
     /// though.
+    // TODO probably removing this actually
     pending_update_txs: Vec<l1::L1TxRef>,
 
     /// Deposit state.
@@ -243,8 +244,16 @@ impl DepositEntry {
         &self.state
     }
 
+    pub fn deposit_state_mut(&mut self) -> &mut DepositState {
+        &mut self.state
+    }
+
     pub fn amt(&self) -> u64 {
         self.amt
+    }
+
+    pub fn set_state(&mut self, new_state: DepositState) {
+        self.state = new_state;
     }
 }
 
@@ -309,6 +318,14 @@ impl DispatchedState {
 
     pub fn exec_deadline(&self) -> BitcoinBlockHeight {
         self.exec_deadline
+    }
+
+    pub fn set_assignee(&mut self, assignee_op_idx: OperatorIdx) {
+        self.assignee = assignee_op_idx;
+    }
+
+    pub fn set_exec_deadline(&mut self, exec_deadline: BitcoinBlockHeight) {
+        self.exec_deadline = exec_deadline;
     }
 }
 

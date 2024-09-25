@@ -22,12 +22,12 @@ pub struct ChainState {
     /// The slot of the last produced block.
     pub(crate) slot: u64,
 
-    /// The index of the checkpoint period we're in, and so the index we expect
-    /// the next checkpoint to be.
+    /// The checkpoint epoch period we're currently in, and so the index we
+    /// expect the next checkpoint to be for.
     ///
     /// Immediately after genesis, this is 0, so the first checkpoint batch is
     /// checkpoint 0, moving us into checkpoint period 1.
-    pub(crate) checkpoint_period: u64,
+    pub(crate) epoch: u64,
 
     /// Rollup's view of L1 state.
     pub(crate) l1_state: l1::L1ViewState,
@@ -54,7 +54,7 @@ pub struct ChainState {
 struct HashedChainState {
     last_block: Buf32,
     slot: u64,
-    checkpoint_period: u64,
+    epoch: u64,
     l1_state_hash: Buf32,
     pending_withdraws_hash: Buf32,
     exec_env_hash: Buf32,
@@ -72,7 +72,7 @@ impl ChainState {
         Self {
             last_block: genesis_blkid,
             slot: 0,
-            checkpoint_period: 0,
+            epoch: 0,
             l1_state,
             pending_withdraws: StateQueue::new_empty(),
             exec_env_state: exec_state,
@@ -81,6 +81,14 @@ impl ChainState {
         }
     }
 
+    /// Returns the slot last processed on the chainstate.
+    pub fn chain_tip_slot(&self) -> u64 {
+        self.slot
+    }
+
+    /// Returns the blockid of the last processed block, which was used to
+    /// construct this chainstate (unless we're currently in the process of
+    /// modifying this chainstate copy).
     pub fn chain_tip_blockid(&self) -> L2BlockId {
         self.last_block
     }
@@ -95,7 +103,7 @@ impl ChainState {
         let hashed_state = HashedChainState {
             last_block: self.last_block.into(),
             slot: self.slot,
-            checkpoint_period: self.checkpoint_period,
+            epoch: self.epoch,
             l1_state_hash: compute_borsh_hash(&self.l1_state),
             pending_withdraws_hash: compute_borsh_hash(&self.pending_withdraws),
             exec_env_hash: compute_borsh_hash(&self.exec_env_state),
@@ -111,6 +119,10 @@ impl ChainState {
 
     pub fn deposits_table(&self) -> &DepositsTable {
         &self.deposits_table
+    }
+
+    pub fn deposits_table_mut(&mut self) -> &mut DepositsTable {
+        &mut self.deposits_table
     }
 
     pub fn exec_env_state(&self) -> &ExecEnvState {

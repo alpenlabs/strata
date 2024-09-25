@@ -8,8 +8,8 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use tracing::*;
 
 use crate::{
-    bridge_ops::{self, WithdrawalBatch},
-    bridge_state::{BitcoinBlockHeight, DispatchCommand},
+    bridge_ops,
+    bridge_state::{BitcoinBlockHeight, DepositState, DispatchCommand, DispatchedState},
     chain_state::ChainState,
     header::L2Header,
     id::L2BlockId,
@@ -42,7 +42,7 @@ pub enum StateOp {
     CreateOperator(Buf32, Buf32),
 
     /// Assigns an assignee a deposit and withdrawal dispatch command to play out.
-    DispatchWithdrawal(u32, OperatorIdx, DispatchCommand),
+    DispatchWithdrawal(u32, OperatorIdx, DispatchCommand, BitcoinBlockHeight),
 
     /// Resets the assignee and block height for a deposit.
     ResetDepositAssignee(u32, OperatorIdx, BitcoinBlockHeight),
@@ -143,14 +143,29 @@ fn apply_op_to_chainstate(op: &StateOp, state: &mut ChainState) {
             state.operator_table.insert(*spk, *wpk);
         }
 
-        StateOp::DispatchWithdrawal(deposit_idx, op_idx, cmd) => {
-            // TODO impl this op
-            unimplemented!();
+        StateOp::DispatchWithdrawal(deposit_idx, op_idx, cmd, exec_height) => {
+            let deposit_ent = state
+                .deposits_table_mut()
+                .get_deposit_mut(*deposit_idx)
+                .expect("stateop: missing deposit idx");
+
+            let state =
+                DepositState::Dispatched(DispatchedState::new(cmd.clone(), *op_idx, *exec_height));
+            deposit_ent.set_state(state);
         }
 
         StateOp::ResetDepositAssignee(deposit_idx, op_idx, exec_height) => {
-            // TODO impl this op
-            unimplemented!();
+            let deposit_ent = state
+                .deposits_table_mut()
+                .get_deposit_mut(*deposit_idx)
+                .expect("stateop: missing deposit idx");
+
+            if let DepositState::Dispatched(dstate) = deposit_ent.deposit_state_mut() {
+                dstate.set_assignee(*op_idx);
+                dstate.set_exec_deadline(*exec_height);
+            } else {
+                panic!("stateop: unexpected deposit state");
+            };
         }
     }
 }
@@ -240,8 +255,14 @@ impl StateCache {
         deposit_idx: u32,
         operator_idx: OperatorIdx,
         cmd: DispatchCommand,
+        exec_height: BitcoinBlockHeight,
     ) {
-        self.merge_op(StateOp::DispatchWithdrawal(deposit_idx, operator_idx, cmd));
+        self.merge_op(StateOp::DispatchWithdrawal(
+            deposit_idx,
+            operator_idx,
+            cmd,
+            exec_height,
+        ));
     }
 
     pub fn reset_deposit_assignee(

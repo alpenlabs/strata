@@ -51,9 +51,19 @@ pub fn process_block(
     Ok(())
 }
 
+/// Constructs the slot RNG used for processing the block.
+///
+/// This is meant to be independent of the block's body so that it's less
+/// manipulatable.  Eventually we want to switch to a randao-ish scheme, but
+/// let's not get ahead of ourselves.
 fn compute_init_slot_rng(state: &StateCache) -> SlotRng {
-    // TODO seed this correctly
-    SlotRng::new_seeded(0)
+    // Just take the prefix of the last block's slot and xor it with the block height.
+    let blkid_buf = *state.state().chain_tip_blockid().as_ref();
+    let mut buf = [0; 8];
+    buf.copy_from_slice(&blkid_buf[..8]);
+
+    let seed = u64::from_be_bytes(buf) ^ state.state().chain_tip_slot();
+    SlotRng::new_seeded(seed)
 }
 
 /// Update our view of the L1 state, playing out downstream changes from that.
@@ -244,7 +254,12 @@ fn process_deposit_updates(
 
                     let outp = WithdrawOutput::new(*intent.dest_pk(), *intent.amt());
                     let cmd = DispatchCommand::new(vec![outp]);
-                    state.assign_withdrawal_command(deposit_idx, op_idx, cmd);
+                    state.assign_withdrawal_command(
+                        deposit_idx,
+                        op_idx,
+                        cmd,
+                        new_exec_height as u64,
+                    );
 
                     next_intent_to_assign += 1;
                 }

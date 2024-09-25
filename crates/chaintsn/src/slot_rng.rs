@@ -3,8 +3,7 @@
 //!
 //! See: https://lemire.me/blog/2019/03/19/the-fastest-conventional-random-number-generator-that-can-pass-big-crush/
 
-use alpen_express_primitives::hash;
-
+/// RNG used within the scope of a block's slot processing.
 pub struct SlotRng {
     // This uses the 64-bit version so that we don't have to keep around 128
     // bits of state data.  Probably isn't a significant improvement to
