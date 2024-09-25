@@ -68,7 +68,9 @@ pub fn parse_deposit_request_script(
     if data.len() < 32 {
         return Err(DepositParseError::LeafHashLenMismatch);
     }
-    let ctrl_hash: &[u8; 32] = &data[..32].try_into().expect("ok");
+    let ctrl_hash: &[u8; 32] = &data[..32]
+        .try_into()
+        .expect("data length must be greater than 32");
 
     // configured bytes for address
     let address = &data[32..];
