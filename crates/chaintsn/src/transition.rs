@@ -224,6 +224,12 @@ fn process_deposit_updates(
     // minimizes total calls to the RNG but feels odd since the order we pick the
     // numbers isn't the same as the order we've assigned
     let num_operators = state.state().operator_table().len();
+
+    // A bit of a sanity check, but also idk it's weird to not have this.
+    if num_operators == 0 {
+        return Err(TsnError::NoOperators);
+    }
+
     let ops_seq = (0..ready_withdrawals.len())
         .map(|_| rng.next_u32() % num_operators)
         .collect::<Vec<_>>();

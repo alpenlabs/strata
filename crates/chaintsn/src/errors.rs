@@ -21,4 +21,7 @@ pub enum TsnError {
 
     #[error("ran out of deposits to assign withdrawals to")]
     InsufficientDepositsForIntents,
+
+    #[error("there are no operators in the chainstate")]
+    NoOperators,
 }
