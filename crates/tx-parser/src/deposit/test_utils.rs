@@ -75,20 +75,23 @@ pub fn build_test_deposit_request_script(
     dummy_block: Vec<u8>,
     dest_addr: Vec<u8>,
 ) -> ScriptBuf {
+    let mut data = magic;
+    data.extend(dummy_block);
+    data.extend(dest_addr);
     let builder = script::Builder::new()
         .push_opcode(OP_RETURN)
-        .push_slice(PushBytesBuf::try_from(magic).unwrap())
-        .push_slice(PushBytesBuf::try_from(dummy_block).unwrap())
-        .push_slice(PushBytesBuf::try_from(dest_addr).unwrap());
+        .push_slice(PushBytesBuf::try_from(data).unwrap());
 
     builder.into_script()
 }
 
 pub fn build_test_deposit_script(magic: Vec<u8>, dest_addr: Vec<u8>) -> ScriptBuf {
+    let mut data = magic;
+    data.extend(dest_addr);
+
     let builder = script::Builder::new()
         .push_opcode(OP_RETURN)
-        .push_slice(PushBytesBuf::try_from(magic).unwrap())
-        .push_slice(PushBytesBuf::try_from(dest_addr).unwrap());
+        .push_slice(PushBytesBuf::try_from(data).unwrap());
 
     builder.into_script()
 }

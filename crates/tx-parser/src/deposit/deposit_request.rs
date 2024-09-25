@@ -6,9 +6,7 @@ use alpen_express_state::tx::DepositReqeustInfo;
 use bitcoin::{opcodes::all::OP_RETURN, ScriptBuf, Transaction};
 
 use super::{
-    common::{
-        check_bridge_offer_output, check_magic_bytes, extract_ee_bytes, DepositRequestScriptInfo,
-    },
+    common::{check_bridge_offer_output, DepositRequestScriptInfo},
     error::DepositParseError,
     DepositTxConfig,
 };
@@ -52,21 +50,39 @@ pub fn parse_deposit_request_script(
         return Err(DepositParseError::NoOpReturn);
     }
 
-    check_magic_bytes(&mut instructions, config)?;
+    let Some(data) = next_bytes(&mut instructions) else {
+        return Err(DepositParseError::NoData);
+    };
 
-    match next_bytes(&mut instructions) {
-        Some(ctrl_hash) => {
-            // length of control block is 32
-            let ee_bytes = extract_ee_bytes(&mut instructions, config)?.to_vec();
-            Ok(DepositRequestScriptInfo {
-                tap_ctrl_blk_hash: ctrl_hash
-                    .try_into()
-                    .map_err(|_| DepositParseError::LeafHashLenMismatch)?,
-                ee_bytes,
-            })
-        }
-        None => Err(DepositParseError::NoLeafHash),
+    assert!(data.len() < 80);
+
+    // data has expected magic bytes
+    let magic_bytes = &config.magic_bytes;
+    let magic_len = magic_bytes.len();
+    if data.len() < magic_len || &data[..magic_len] != magic_bytes {
+        return Err(DepositParseError::MagicBytesMismatch);
     }
+
+    // 32 bytes of control hash
+    let data = &data[magic_len..];
+    if data.len() < 32 {
+        return Err(DepositParseError::LeafHashLenMismatch);
+    }
+    let ctrl_hash: &[u8; 32] = &data[..32]
+        .try_into()
+        .expect("data length must be greater than 32");
+
+    // configured bytes for address
+    let address = &data[32..];
+    if address.len() != config.address_length as usize {
+        // casting is safe as address.len() < data.len() < 80
+        return Err(DepositParseError::InvalidDestAddress(address.len() as u8));
+    }
+
+    Ok(DepositRequestScriptInfo {
+        tap_ctrl_blk_hash: *ctrl_hash,
+        ee_bytes: address.into(),
+    })
 }
 
 #[cfg(test)]
@@ -171,7 +187,7 @@ mod tests {
     #[test]
     fn test_script_with_invalid_magic_bytes() {
         let evm_addr = [1; 20];
-        let control_block = vec![0xFF; 65];
+        let control_block = vec![0xFF; 32];
         let invalid_magic_bytes = vec![0x00; 4]; // Invalid magic bytes
 
         let config = get_deposit_tx_config();
