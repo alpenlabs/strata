@@ -128,3 +128,183 @@ pub(super) async fn extract_deposit_requests<Provider: L1DataProvider>(
 
     Ok(deposit_info_iter)
 }
+
+#[cfg(test)]
+mod tests {
+    use std::ops::Not;
+
+    use alpen_express_common::logging;
+    use alpen_express_db::traits::L1DataStore;
+    use alpen_express_mmr::CompactMmr;
+    use alpen_express_primitives::{
+        l1::{L1BlockManifest, L1Tx, L1TxProof},
+        tx::DepositRequestInfo,
+    };
+    use alpen_express_rocksdb::{test_utils::get_rocksdb_tmp_instance, L1Db};
+    use alpen_test_utils::{bridge::generate_mock_unsigned_tx, ArbitraryGenerator};
+    use bitcoin::{
+        consensus::Encodable,
+        key::rand::{self, Rng},
+        taproot::LeafVersion,
+        ScriptBuf,
+    };
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_extract_deposit_requests() {
+        logging::init();
+
+        let (mock_db, db_config) =
+            get_rocksdb_tmp_instance().expect("should be able to get tmp rocksdb instance");
+
+        let l1_db = L1Db::new(mock_db, db_config);
+        let l1_db = Arc::new(l1_db);
+
+        let num_blocks = 5;
+        const MAX_TXS_PER_BLOCK: usize = 3;
+
+        let num_valid_duties = populate_db(&l1_db.clone(), num_blocks, MAX_TXS_PER_BLOCK).await;
+
+        let txs = extract_deposit_requests(&l1_db.clone(), 0, Network::Regtest)
+            .await
+            .expect("should be able to extract deposit requests")
+            .collect::<Vec<DepositInfo>>();
+
+        // this is almost always true. In fact, it should be around 50%
+        assert!(
+            txs.len() < num_blocks * MAX_TXS_PER_BLOCK,
+            "only some txs must have deposit requests"
+        );
+
+        assert_eq!(
+            txs.len(),
+            num_valid_duties,
+            "all the valid duties in the db must be returned"
+        );
+    }
+
+    /// Populates the db with block data.
+    ///
+    /// # Returns
+    ///
+    /// The number of valid deposit request transactions inserted into the db.
+    async fn populate_db<Store: L1DataStore>(
+        l1_db: &Arc<Store>,
+        num_blocks: usize,
+        max_txs_per_block: usize,
+    ) -> usize {
+        let arb = ArbitraryGenerator::new();
+
+        let mut num_valid_duties = 0;
+        for idx in 0..num_blocks {
+            let idx = idx as u64;
+
+            let num_txs = rand::thread_rng().gen_range(0..max_txs_per_block);
+
+            let txs: Vec<L1Tx> = (0..num_txs)
+                .map(|i| {
+                    let proof = L1TxProof::new(i as u32, arb.generate());
+                    let (tx, protocol_op, valid) = generate_mock_tx();
+                    if valid {
+                        num_valid_duties += 1;
+                    }
+                    L1Tx::new(proof, tx, protocol_op)
+                })
+                .collect();
+
+            let mf: L1BlockManifest = arb.generate();
+
+            // Insert block data
+            let res = l1_db.put_block_data(idx, mf.clone(), txs.clone());
+            assert!(
+                res.is_ok(),
+                "should be able to put block data into the L1Db"
+            );
+
+            // Insert mmr data
+            let mmr: CompactMmr = arb.generate();
+            l1_db.put_mmr_checkpoint(idx, mmr.clone()).unwrap();
+        }
+
+        num_valid_duties
+    }
+
+    /// Generates a mock transaction either arbitrarily or deterministically.
+    ///
+    /// # Returns
+    ///
+    /// 1. The encoded mock (unsigned) transaction.
+    /// 2. The [`ProtocolOperation::DepositRequest`] corresponding to the transaction.
+    /// 3. A flag indicating whether a non-arbitrary [`Transaction`]/[`ProtocolOperation`] pair was
+    ///    generated. The chances of an arbitrarily constructed pair being valid is extremely rare.
+    ///    So, you can assume that this flag represents whether the pair is valid (true) or invalid
+    ///    (false).
+    fn generate_mock_tx() -> (Vec<u8>, ProtocolOperation, bool) {
+        let arb = ArbitraryGenerator::new();
+
+        let should_be_valid: bool = arb.generate();
+
+        if should_be_valid.not() {
+            let (invalid_tx, invalid_protocol_op) = generate_invalid_tx(&arb);
+            return (invalid_tx, invalid_protocol_op, should_be_valid);
+        }
+
+        let (valid_tx, valid_protocol_op) = generate_valid_tx(&arb);
+        (valid_tx, valid_protocol_op, should_be_valid)
+    }
+
+    fn generate_invalid_tx(arb: &ArbitraryGenerator) -> (Vec<u8>, ProtocolOperation) {
+        let random_protocol_op: ProtocolOperation = arb.generate();
+
+        // true => tx invalid
+        // false => script_pubkey in tx output invalid
+        let tx_invalid: bool = rand::thread_rng().gen_bool(0.5);
+
+        if tx_invalid {
+            let mut random_tx: Vec<u8> = arb.generate();
+            while random_tx.is_empty() {
+                random_tx = arb.generate();
+            }
+
+            return (random_tx, random_protocol_op);
+        }
+
+        let (mut valid_tx, _, _) = generate_mock_unsigned_tx();
+        valid_tx.output[0].script_pubkey = ScriptBuf::from_bytes(arb.generate());
+
+        let mut tx_with_invalid_script_pubkey = vec![];
+        valid_tx
+            .consensus_encode(&mut tx_with_invalid_script_pubkey)
+            .expect("should be able to encode tx");
+
+        (tx_with_invalid_script_pubkey, random_protocol_op)
+    }
+
+    fn generate_valid_tx(arb: &ArbitraryGenerator) -> (Vec<u8>, ProtocolOperation) {
+        let (tx, spend_info, script_to_spend) = generate_mock_unsigned_tx();
+
+        let random_hash = *spend_info
+            .control_block(&(script_to_spend, LeafVersion::TapScript))
+            .expect("should be able to generate control block")
+            .merkle_branch
+            .as_slice()
+            .first()
+            .expect("should contain a hash")
+            .as_byte_array();
+
+        let mut raw_tx = vec![];
+        tx.consensus_encode(&mut raw_tx)
+            .expect("should be able to encode transaction");
+
+        let deposit_request_info = DepositRequestInfo {
+            amt: 1_000_000_000,      // 10 BTC
+            address: arb.generate(), // random rollup address (this is fine)
+            tap_ctrl_blk_hash: random_hash,
+        };
+
+        let deposit_request = ProtocolOperation::DepositRequest(deposit_request_info);
+
+        (raw_tx, deposit_request)
+    }
+}
