@@ -180,8 +180,10 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     // Set up block params.
     let params = Params {
+        // FIXME this .expect breaks printing errors
         rollup: load_rollup_params_or_default(&args.rollup_params).expect("rollup params"),
         run: SyncParams {
+            // FIXME these shouldn't be configurable here
             l1_follow_distance: config.sync.l1_follow_distance,
             client_checkpoint_interval: config.sync.client_checkpoint_interval,
             l2_blocks_fetch_limit: config.client.l2_blocks_fetch_limit,

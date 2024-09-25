@@ -90,6 +90,7 @@ impl Params {
 }
 
 /// Describes how we determine the list of operators at genesis.
+// TODO improve how this looks when serialized
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub enum OperatorConfig {
     /// Use this static list of predetermined operators.
