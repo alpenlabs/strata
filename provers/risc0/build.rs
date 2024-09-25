@@ -7,6 +7,7 @@ fn main() {
     if cfg!(feature = "prover")
         && std::env::var("SKIP_GUEST_BUILD").is_err()
         && std::env::var("CARGO_CFG_CLIPPY").is_err()
+        && cfg!(not(debug_assertions))
     {
         risc0_build::embed_methods();
     } else {

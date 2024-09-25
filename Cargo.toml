@@ -174,7 +174,7 @@ revm-primitives = { version = "7.1.0", features = [
   "std",
 ], default-features = false }
 rockbound = { git = "https://github.com/alpenlabs/rockbound", rev = "v2.0.1-alpen.1" }
-secp256k1 = "=0.29.0"
+secp256k1 = "0.29.1"
 serde = { version = "1.0", features = ["derive"] }
 serde-hex = "0.1.0"
 serde_json = { version = "1.0", default-features = false, features = [
@@ -191,3 +191,7 @@ toml = "0.5"
 tower = "0.4"
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+
+# This is needed for custom build of SP1
+[profile.release.build-override]
+opt-level = 3
