@@ -1,8 +1,10 @@
-use std::{io, sync::Arc};
+use std::io;
 
 use borsh::BorshSerialize;
 use rand::rngs::OsRng;
-use secp256k1::{schnorr::Signature, All, Keypair, Message, Secp256k1, SecretKey, XOnlyPublicKey};
+use secp256k1::{
+    schnorr::Signature, Keypair, Message, Secp256k1, SecretKey, XOnlyPublicKey, SECP256K1,
+};
 use thiserror::Error;
 
 use super::types::{BridgeMessage, Scope};
@@ -16,7 +18,6 @@ use crate::{
 pub struct MessageSigner {
     operator_idx: u32,
     msg_signing_sk: Buf32,
-    secp: Arc<Secp256k1<All>>,
 }
 
 impl MessageSigner {
@@ -27,11 +28,10 @@ impl MessageSigner {
     /// In order to get a [`BridgeMessage`], call [`sign_raw`](Self::sign_raw)
     /// or [`sign_scope`](Self::sign_scope) on this [`MessageSigner`]
     /// depending on the use case.
-    pub fn new(operator_idx: u32, msg_signing_sk: Buf32, secp: Arc<Secp256k1<All>>) -> Self {
+    pub fn new(operator_idx: u32, msg_signing_sk: Buf32) -> Self {
         Self {
             operator_idx,
             msg_signing_sk,
-            secp,
         }
     }
 
@@ -42,7 +42,7 @@ impl MessageSigner {
 
     /// Gets the pubkey corresponding to the internal msg signing sk.
     pub fn get_pubkey(&self) -> Buf32 {
-        compute_pubkey_for_privkey(&self.msg_signing_sk, self.secp.as_ref())
+        compute_pubkey_for_privkey(&self.msg_signing_sk, SECP256K1)
     }
 
     /// Signs a message using a raw scope and payload.
@@ -59,7 +59,8 @@ impl MessageSigner {
         };
 
         let id: Buf32 = tmp_m.compute_id().into();
-        let sig = sign_msg_hash(&self.msg_signing_sk, &id, self.secp.as_ref());
+        // WARN: I don't know if a global context is safe here, maybe.
+        let sig = sign_msg_hash(&self.msg_signing_sk, &id, SECP256K1);
         tmp_m.sig = sig;
 
         Ok(tmp_m)
@@ -161,11 +162,10 @@ mod tests {
 
     #[test]
     fn test_sign_verify_msg_ok() {
-        let secp = Arc::new(Secp256k1::new());
         let sk = Buf32::from([1; 32]);
 
         let idx = 4;
-        let signer = MessageSigner::new(idx, sk, secp);
+        let signer = MessageSigner::new(idx, sk);
         let pk = signer.get_pubkey();
 
         let payload = vec![1, 2, 3, 4, 5];
@@ -177,11 +177,10 @@ mod tests {
 
     #[test]
     fn test_sign_verify_msg_fail() {
-        let secp = Arc::new(Secp256k1::new());
         let sk = Buf32::from([1; 32]);
 
         let idx = 4;
-        let signer = MessageSigner::new(idx, sk, secp);
+        let signer = MessageSigner::new(idx, sk);
         let pk = signer.get_pubkey();
 
         let payload = vec![1, 2, 3, 4, 5];
