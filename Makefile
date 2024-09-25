@@ -165,7 +165,7 @@ lint-check-toml: ensure-taplo ## Lints TOML files
 lint-check-func-tests: ensure-poetry activate ## Lints the functional tests
 	cd $(FUNCTIONAL_TESTS_DIR) && poetry run ruff check
 
-.PHONY: lint-fix-functional-tests
+.PHONY: lint-fix-func-tests
 lint-fix-func-tests: ensure-poetry activate ## Lints the functional tests and applies fixes where possible
 	cd $(FUNCTIONAL_TESTS_DIR) && poetry run ruff check --fix
 

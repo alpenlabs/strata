@@ -13,7 +13,7 @@ jobs:
   lint:
     name: Lint test files
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
 
     steps:
       - name: Checkout repository
@@ -47,18 +47,11 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - name: Cleanup space
-        # https://github.com/actions/runner-images/issues/2840#issuecomment-790492173
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /usr/local/.ghcup
-          sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Cleanup Space
+        uses: ./.github/actions/cleanup
 
       - name: Install bitcoind
         env:
