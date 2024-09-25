@@ -7,10 +7,10 @@ use sp1_helper::build_program;
 
 const RISC_V_COMPILER: &str = "/opt/riscv/bin/riscv-none-elf-gcc";
 const PROGRAMS_TO_BUILD: [&str; 4] = [
-    "guest-sp1-evm-ee-stf",
-    "guest-sp1-cl-stf",
-    "guest-sp1-btc-blockspace",
-    "guest-sp1-l1-batch",
+    "guest-btc-blockspace",
+    "guest-l1-batch",
+    "guest-evm-ee-stf",
+    "guest-cl-stf",
 ];
 
 fn main() {

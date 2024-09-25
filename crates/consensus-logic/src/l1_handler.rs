@@ -1,17 +1,14 @@
 use std::sync::Arc;
 
-use alpen_express_btcio::reader::messages::{BlockData, L1Event};
 use alpen_express_db::traits::{Database, L1DataStore};
 use alpen_express_primitives::{
     buf::Buf32,
-    l1::{L1BlockManifest, L1Tx, L1TxProof},
+    l1::{L1BlockManifest, L1TxProof},
     params::Params,
-    tx::ProtocolOperation,
     vk::RollupVerifyingKey,
 };
 use alpen_express_state::{
-    batch::{BatchCheckpoint, SignedBatchCheckpoint},
-    sync_event::SyncEvent,
+    batch::BatchCheckpoint, l1::L1Tx, sync_event::SyncEvent, tx::ProtocolOperation,
 };
 use bitcoin::{
     consensus::serialize,
@@ -21,6 +18,7 @@ use bitcoin::{
 use express_risc0_adapter::Risc0Verifier;
 use express_sp1_adapter::SP1Verifier;
 use express_zkvm::ZKVMVerifier;
+use strata_tx_parser::messages::{BlockData, L1Event};
 use tokio::sync::mpsc;
 use tracing::*;
 
@@ -123,24 +121,15 @@ fn check_for_da_batch(
     let inscriptions = protocol_ops_txs
         .iter()
         .filter_map(|ops_txs| match ops_txs.proto_op() {
-            alpen_express_primitives::tx::ProtocolOperation::RollupInscription(inscription) => {
-                Some((
-                    inscription,
-                    &blockdata.block().txdata[ops_txs.index() as usize],
-                ))
-            }
+            alpen_express_state::tx::ProtocolOperation::RollupInscription(inscription) => Some((
+                inscription,
+                &blockdata.block().txdata[ops_txs.index() as usize],
+            )),
             _ => None,
         });
 
-    let verified_checkpoints = inscriptions.filter_map(|(insc, tx)| {
-        match borsh::from_slice::<SignedBatchCheckpoint>(insc.batch_data()) {
-            Err(e) => {
-                let txid = tx.compute_txid();
-                warn!(%txid, err = %e, "could not deserialize blob inside inscription");
-                None
-            }
-            Ok(signed_checkpoint) => {
-                let checkpoint: BatchCheckpoint = signed_checkpoint.clone().into();
+    let verified_checkpoints = inscriptions.filter_map(|(insc, _)| {
+                let checkpoint: BatchCheckpoint = insc.clone().into();
                 let checkpoint_idx = checkpoint.checkpoint().idx();
                 let checkpoint_last_block = checkpoint.checkpoint().l2_blockid();
 
@@ -159,15 +148,13 @@ fn check_for_da_batch(
                 match res {
                     Ok(()) => {
                         info!(%checkpoint_idx, %checkpoint_last_block, "proof successfully verified");
-                        Some(signed_checkpoint)
+                        Some(checkpoint)
                     }
                     Err(e) => {
                         warn!(%checkpoint_idx, %checkpoint_last_block, err = %e, "could not verify proof inside blob");
                         None
                     }
                 }
-            }
-        }
     });
 
     verified_checkpoints.map(Into::into).collect()

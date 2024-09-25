@@ -1,45 +1,36 @@
 //! Core logic of the Bitcoin Blockspace proof that will be proven
 
-use bitcoin::{block::Header, Block, ScriptBuf};
-use serde::{Deserialize, Serialize};
+use alpen_express_state::{batch::BatchCheckpoint, tx::DepositInfo};
+use bitcoin::Block;
+use borsh::{BorshDeserialize, BorshSerialize};
+use strata_tx_parser::filter::TxFilterRule;
 
-use crate::{
-    block::check_merkle_root,
-    filter::{extract_relevant_transactions, DepositRequestData, ForcedInclusion, StateUpdate},
-};
+use crate::{block::check_merkle_root, filter::extract_relevant_info};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
 pub struct BlockspaceProofInput {
     pub block: Block,
-    pub scan_config: ScanRuleConfig,
+    pub filters: Vec<TxFilterRule>,
     // TODO: add hintings and other necessary params
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ScanRuleConfig {
-    pub bridge_scriptbufs: Vec<ScriptBuf>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct BlockspaceProofOutput {
-    pub header: Header,
-    pub deposits: Vec<DepositRequestData>,
-    pub forced_inclusions: Vec<ForcedInclusion>,
-    pub state_updates: Vec<StateUpdate>,
+    pub header_raw: Vec<u8>,
+    pub deposits: Vec<DepositInfo>,
+    pub state_update: Option<BatchCheckpoint>,
 }
 
 pub fn process_blockspace_proof(input: &BlockspaceProofInput) -> BlockspaceProofOutput {
-    let BlockspaceProofInput { block, scan_config } = input;
+    let BlockspaceProofInput { block, filters } = input;
     assert!(check_merkle_root(block));
     // assert!(check_witness_commitment(block));
 
-    let (deposits, forced_inclusions, state_updates) =
-        extract_relevant_transactions(block, scan_config);
+    let (deposits, state_update) = extract_relevant_info(block, filters);
 
     BlockspaceProofOutput {
-        header: block.header,
+        header_raw: bitcoin::consensus::serialize(&block.header),
         deposits,
-        forced_inclusions,
-        state_updates,
+        state_update,
     }
 }

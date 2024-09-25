@@ -1,22 +1,19 @@
-use express_proofimpl_btc_blockspace::{
-    filter::{DepositRequestData, ForcedInclusion, StateUpdate},
-    logic::BlockspaceProofOutput,
-};
-use serde::{Deserialize, Serialize};
+use alpen_express_state::{batch::BatchCheckpoint, tx::DepositInfo};
+use borsh::{BorshDeserialize, BorshSerialize};
+use express_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
 
 use crate::{header_verification::HeaderVerificationState, pow_params::PowParams};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct L1BatchProofInput {
     pub batch: Vec<BlockspaceProofOutput>,
     pub state: HeaderVerificationState,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct L1BatchProofOutput {
-    pub deposits: Vec<DepositRequestData>,
-    pub forced_inclusions: Vec<ForcedInclusion>,
-    pub state_updates: Vec<StateUpdate>,
+    pub deposits: Vec<DepositInfo>,
+    pub state_update: Option<BatchCheckpoint>,
     pub state: HeaderVerificationState,
 }
 
@@ -24,20 +21,18 @@ pub fn process_batch_proof(input: L1BatchProofInput, params: &PowParams) -> L1Ba
     let mut state = input.state;
 
     let mut deposits = Vec::new();
-    let mut forced_inclusions = Vec::new();
-    let mut state_updates = Vec::new();
+    let mut state_update = None;
 
     for blockspace in input.batch {
-        state.check_and_update(&blockspace.header, params);
+        let header = bitcoin::consensus::deserialize(&blockspace.header_raw).unwrap();
+        state.check_and_update(&header, params);
         deposits.extend(blockspace.deposits);
-        forced_inclusions.extend(blockspace.forced_inclusions);
-        state_updates.extend(blockspace.state_updates);
+        state_update = state_update.or(blockspace.state_update);
     }
 
     L1BatchProofOutput {
         deposits,
-        forced_inclusions,
-        state_updates,
+        state_update,
         state,
     }
 }

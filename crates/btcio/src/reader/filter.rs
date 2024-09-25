@@ -1,76 +1,15 @@
-use alpen_express_primitives::tx::ProtocolOperation;
-use bitcoin::{Block, Transaction};
-use strata_tx_parser::{
-    deposit::{
-        deposit_request::extract_deposit_request_info, deposit_tx::extract_deposit_info,
-        DepositTxConfig,
-    },
-    inscription::parse_inscription_data,
-};
-
-use super::messages::ProtocolOpTxRef;
-
-/// kind of transactions can be relevant for rollup node to filter
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum TxFilterRule {
-    /// Inscription transactions with given Rollup name. This will be parsed by
-    /// InscriptionParser which dictates the structure of inscription.
-    RollupInscription(RollupName),
-    /// Deposit transaction
-    Deposit(DepositTxConfig),
-}
-
-type RollupName = String;
-
-/// Filter all the relevant [`Transaction`]s in a block based on given [`TxFilterRule`]s
-pub fn filter_relevant_txs(block: &Block, filters: &[TxFilterRule]) -> Vec<ProtocolOpTxRef> {
-    block
-        .txdata
-        .iter()
-        .enumerate()
-        .filter_map(|(i, tx)| {
-            check_and_extract_relevant_info(tx, filters)
-                .map(|relevant_tx| ProtocolOpTxRef::new(i as u32, relevant_tx))
-        })
-        .collect()
-}
-
-///  if a [`Transaction`] is relevant based on given [`RelevantTxType`]s then we extract relevant
-///  info
-fn check_and_extract_relevant_info(
-    tx: &Transaction,
-    filters: &[TxFilterRule],
-) -> Option<ProtocolOperation> {
-    filters.iter().find_map(|rel_type| match rel_type {
-        TxFilterRule::RollupInscription(name) => {
-            if !tx.input.is_empty() {
-                if let Some(scr) = tx.input[0].witness.tapscript() {
-                    if let Ok(inscription_data) = parse_inscription_data(&scr.into(), name) {
-                        return Some(ProtocolOperation::RollupInscription(inscription_data));
-                    }
-                }
-            }
-            None
-        }
-
-        TxFilterRule::Deposit(config) => {
-            if let Some(deposit_info) = extract_deposit_info(tx, config) {
-                return Some(ProtocolOperation::Deposit(deposit_info));
-            }
-
-            if let Some(deposit_req_info) = extract_deposit_request_info(tx, config) {
-                return Some(ProtocolOperation::DepositRequest(deposit_req_info));
-            }
-
-            None
-        }
-    })
-}
+// TODO: move this to `strata-tx-parser`
+// Keeping tests here because it requires `writer`
+// Maybe split this crate into multiple crates
 #[cfg(test)]
 mod test {
     use std::str::FromStr;
 
-    use alpen_express_primitives::tx::InscriptionData;
+    use alpen_express_state::{
+        batch::SignedBatchCheckpoint,
+        tx::{InscriptionData, ProtocolOperation},
+    };
+    use alpen_test_utils::ArbitraryGenerator;
     use bitcoin::{
         absolute::{Height, LockTime},
         block::{Header, Version as BVersion},
@@ -83,12 +22,14 @@ mod test {
         Transaction, TxMerkleNode, TxOut,
     };
     use rand::RngCore;
-    use strata_tx_parser::deposit::test_utils::{
-        build_test_deposit_request_script, build_test_deposit_script,
-        create_transaction_two_outpoints, generic_taproot_addr, get_deposit_tx_config,
+    use strata_tx_parser::{
+        deposit::test_utils::{
+            build_test_deposit_request_script, build_test_deposit_script,
+            create_transaction_two_outpoints, generic_taproot_addr, get_deposit_tx_config,
+        },
+        filter::{filter_relevant_txs, TxFilterRule},
     };
 
-    use super::*;
     use crate::writer::builder::{build_reveal_transaction, generate_inscription_script};
 
     const OTHER_ADDR: &str = "bcrt1q6u6qyya3sryhh42lahtnz2m7zuufe7dlt8j0j5";
@@ -140,7 +81,8 @@ mod test {
     fn create_inscription_tx(rollup_name: String) -> Transaction {
         let address = parse_addr(OTHER_ADDR);
         let inp_tx = create_test_tx(vec![create_test_txout(100000000, &address)]);
-        let inscription_data = InscriptionData::new(vec![0, 1, 2, 3]);
+        let signed_checkpoint: SignedBatchCheckpoint = ArbitraryGenerator::new().generate();
+        let inscription_data = InscriptionData::new(borsh::to_vec(&signed_checkpoint).unwrap());
 
         let script = generate_inscription_script(inscription_data, &rollup_name, 1).unwrap();
 

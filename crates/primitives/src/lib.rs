@@ -15,6 +15,5 @@ pub mod operator;
 pub mod params;
 pub mod prelude;
 pub mod relay;
-pub mod tx;
 pub mod utils;
 pub mod vk;

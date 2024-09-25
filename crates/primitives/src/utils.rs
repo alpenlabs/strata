@@ -1,15 +1,10 @@
 use bitcoin::{
-    consensus::serialize,
     hashes::{sha256d, Hash},
-    Block, Wtxid,
+    Wtxid,
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    l1::{L1Tx, L1TxProof},
-    prelude::Buf32,
-    tx::ProtocolOperation,
-};
+use crate::prelude::Buf32;
 
 /// Generates cohashes for an wtxid in particular index with in given slice of wtxids.
 ///
@@ -22,7 +17,7 @@ use crate::{
 ///
 /// # Panics
 /// - If the `index` is out of bounds for the `wtxids` length
-fn get_cohashes_from_wtxids(wtxids: &[Wtxid], index: u32) -> (Vec<Buf32>, Buf32) {
+pub fn get_cohashes_from_wtxids(wtxids: &[Wtxid], index: u32) -> (Vec<Buf32>, Buf32) {
     assert!(
         (index as usize) < wtxids.len(),
         "The transaction index should be within the txids length"
@@ -67,46 +62,6 @@ fn get_cohashes_from_wtxids(wtxids: &[Wtxid], index: u32) -> (Vec<Buf32>, Buf32)
         curr_index >>= 1;
     }
     (proof, Buf32(curr_level[0].into()))
-}
-
-/// Generates an L1 transaction with proof for a given transaction index in a block.
-///
-/// # Parameters
-/// - `idx`: The index of the transaction within the block's transaction data.
-/// - `proto_op_data`: Relevant information gathered after parsing.
-/// - `block`: The block containing the transactions.
-///
-/// # Returns
-/// - An `L1Tx` struct containing the proof and the serialized transaction.
-///
-/// # Panics
-/// - If the `idx` is out of bounds for the block's transaction data.
-pub fn generate_l1_tx(block: &Block, idx: u32, proto_op_data: ProtocolOperation) -> L1Tx {
-    assert!(
-        (idx as usize) < block.txdata.len(),
-        "utils: tx idx out of range of block txs"
-    );
-    let tx = &block.txdata[idx as usize];
-
-    // Get all witness ids for txs
-    let wtxids = &block
-        .txdata
-        .iter()
-        .enumerate()
-        .map(|(i, x)| {
-            if i == 0 {
-                Wtxid::all_zeros() // Coinbase's wtxid is all zeros
-            } else {
-                x.compute_wtxid()
-            }
-        })
-        .collect::<Vec<_>>();
-    let (cohashes, _wtxroot) = get_cohashes_from_wtxids(wtxids, idx);
-
-    let proof = L1TxProof::new(idx, cohashes);
-    let tx = serialize(tx);
-
-    L1Tx::new(proof, tx, proto_op_data)
 }
 
 /// Temporary schnorr keypair.

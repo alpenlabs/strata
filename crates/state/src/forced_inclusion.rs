@@ -2,9 +2,10 @@
 //!
 //! This is all stubs now so that we can define data structures later.
 
-use alpen_express_primitives::l1;
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
+
+use crate::l1;
 
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
 pub struct ForcedInclusion {

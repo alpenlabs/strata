@@ -1,4 +1,4 @@
-use alpen_express_primitives::tx::InscriptionData;
+use alpen_express_state::tx::InscriptionData;
 use bitcoin::{
     opcodes::all::OP_IF,
     script::{Instruction, Instructions},

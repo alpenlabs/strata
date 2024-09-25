@@ -681,6 +681,7 @@ dependencies = [
  "bitcoin",
  "bitcoind",
  "bitcoind-json-rpc-types",
+ "borsh",
  "bytes",
  "express-storage",
  "express-tasks",
@@ -732,6 +733,7 @@ dependencies = [
  "futures",
  "rand 0.8.5",
  "secp256k1",
+ "strata-tx-parser",
  "thiserror",
  "threadpool",
  "tokio",
@@ -965,6 +967,7 @@ dependencies = [
  "rockbound",
  "serde",
  "serde_json",
+ "strata-tx-parser",
  "thiserror",
  "threadpool",
  "tokio",
@@ -1007,6 +1010,7 @@ dependencies = [
 name = "alpen-test-utils"
 version = "0.1.0"
 dependencies = [
+ "alpen-express-btcio",
  "alpen-express-db",
  "alpen-express-primitives",
  "alpen-express-state",
@@ -1018,6 +1022,7 @@ dependencies = [
  "musig2",
  "rand 0.8.5",
  "rockbound",
+ "strata-tx-parser",
  "threadpool",
 ]
 
@@ -3910,12 +3915,16 @@ name = "express-proofimpl-btc-blockspace"
 version = "0.1.0"
 dependencies = [
  "alpen-express-primitives",
+ "alpen-express-state",
  "alpen-test-utils",
  "bitcoin",
+ "borsh",
+ "express-bridge-tx-builder",
  "hex",
  "rand 0.8.5",
  "serde",
  "sha2 0.10.8",
+ "strata-tx-parser",
 ]
 
 [[package]]
@@ -3959,6 +3968,7 @@ name = "express-proofimpl-l1-batch"
 version = "0.1.0"
 dependencies = [
  "alpen-express-primitives",
+ "alpen-express-state",
  "alpen-test-utils",
  "anyhow",
  "bitcoin",
@@ -4189,6 +4199,7 @@ dependencies = [
  "express-zkvm",
  "hex",
  "sp1-helper",
+ "sp1-sdk",
 ]
 
 [[package]]
@@ -11851,9 +11862,9 @@ dependencies = [
 
 [[package]]
 name = "sp1-build"
-version = "1.2.0"
+version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eae094a567949cc3bbcdb265e45591cf7ac7185f121f6f29ac64a44acb00220e"
+checksum = "8216e07a9c463c6ee091cdc817cfc10c25446cfd4d020812818177e0a3d1c943"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -12000,9 +12011,9 @@ dependencies = [
 
 [[package]]
 name = "sp1-helper"
-version = "1.2.0"
+version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a17502b73973fedac4ea0d20fbaf33663a0cd0cfc4a6c36a3d095634bec941a"
+checksum = "7f08124c62d09764810783355cff518477e3f36c8e83343623859afeca6f3eeb"
 dependencies = [
  "sp1-build",
 ]
@@ -12426,9 +12437,13 @@ name = "strata-tx-parser"
 version = "0.1.0"
 dependencies = [
  "alpen-express-primitives",
+ "alpen-express-state",
+ "alpen-test-utils",
  "anyhow",
  "bitcoin",
+ "borsh",
  "hex",
+ "rand 0.8.5",
  "thiserror",
  "tracing",
 ]

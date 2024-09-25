@@ -1,11 +1,9 @@
 // NOTE: SP1 prover runs in release mode only; therefore run the tests on release mode only
 #[cfg(feature = "prover")]
 mod test {
-    use std::str::FromStr;
-
-    use alpen_test_utils::bitcoin::get_btc_chain;
-    use bitcoin::{params::MAINNET, Address};
-    use express_proofimpl_btc_blockspace::logic::{BlockspaceProofOutput, ScanRuleConfig};
+    use alpen_test_utils::bitcoin::{get_btc_chain, get_tx_filters};
+    use bitcoin::params::MAINNET;
+    use express_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
     use express_proofimpl_l1_batch::{
         header_verification::HeaderVerificationState,
         logic::{L1BatchProofInput, L1BatchProofOutput},
@@ -37,6 +35,7 @@ mod test {
 
     #[test]
     fn test_l1_batch_code_trace_generation() {
+        sp1_sdk::utils::setup_logger();
         let mainnet_blocks: Vec<(u32, String)> = vec![
             (40321, "0100000045720d24eae33ade0d10397a2e02989edef834701b965a9b161e864500000000993239a44a83d5c427fd3d7902789ea1a4d66a37d5848c7477a7cf47c2b071cd7690784b5746651c3af7ca030101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff08045746651c02db00ffffffff0100f2052a01000000434104c9f513361104db6a84fb6d5b364ba57a27cd19bd051239bf750d8999c6b437220df8fea6b932a248df3cad1fdebb501791e02b7b893a44718d696542ba92a0acac00000000".to_owned()),
             // (40322, "01000000fd1133cd53d00919b0bd77dd6ca512c4d552a0777cc716c00d64c60d0000000014cf92c7edbe8a75d1e328b4fec0d6143764ecbd0f5600aba9d22116bf165058e590784b5746651c1623dbe00101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff08045746651c020509ffffffff0100f2052a010000004341043eb751f57bd4839a8f2922d5bf1ed15ade9b161774658fb39801f0b9da9c881f226fbe4ee0c240915f17ce5255dd499075ab49b199a7b1f898fb20cc735bc45bac00000000".to_owned()),
@@ -56,21 +55,15 @@ mod test {
         );
 
         let mut blockspace_outputs = Vec::new();
+        let mut blockspace_proofs = Vec::new();
 
         let mut l1_batch_input_builder = SP1ProofInputBuilder::new();
         for (_, raw_block) in mainnet_blocks {
             let block_bytes = hex::decode(&raw_block).unwrap();
-            let scan_config = ScanRuleConfig {
-                bridge_scriptbufs: vec![Address::from_str(
-                    "bcrt1pf73jc96ujch43wp3k294003xx4llukyzvp0revwwnww62esvk7hqvarg98",
-                )
-                .unwrap()
-                .assume_checked()
-                .script_pubkey()],
-            };
+            let filters = get_tx_filters();
 
             let blockspace_input = SP1ProofInputBuilder::new()
-                .write(&scan_config)
+                .write_borsh(&filters)
                 .unwrap()
                 .write_serialized(&block_bytes)
                 .unwrap()
@@ -81,13 +74,12 @@ mod test {
                 .prove(blockspace_input)
                 .expect("Failed to generate proof");
 
-            let output = SP1Verifier::extract_public_output::<BlockspaceProofOutput>(&proof)
+            let raw_output = SP1Verifier::extract_public_output::<Vec<u8>>(&proof)
                 .expect("Failed to extract public outputs");
+            let output: BlockspaceProofOutput = borsh::from_slice(&raw_output).unwrap();
 
             blockspace_outputs.push(output);
-            l1_batch_input_builder
-                .write_proof(AggregationInput::new(proof, vkey))
-                .unwrap();
+            blockspace_proofs.push(AggregationInput::new(proof, vkey));
         }
 
         let prover = SP1Host::init(GUEST_L1_BATCH_ELF.into(), prover_options);
@@ -95,17 +87,20 @@ mod test {
             batch: blockspace_outputs,
             state: get_header_verification_state(40321),
         };
-        let l1_batch_input = l1_batch_input_builder
-            .write(&input)
-            .unwrap()
-            .build()
-            .unwrap();
+        l1_batch_input_builder.write_borsh(&input).unwrap();
+
+        for proof in blockspace_proofs {
+            l1_batch_input_builder.write_proof(proof).unwrap();
+        }
+
+        let l1_batch_input = l1_batch_input_builder.build().unwrap();
 
         let (proof, _) = prover
             .prove(l1_batch_input)
             .expect("Failed to generate proof");
 
-        let _output = SP1Verifier::extract_public_output::<L1BatchProofOutput>(&proof)
+        let raw_output = SP1Verifier::extract_public_output::<Vec<u8>>(&proof)
             .expect("Failed to extract public outputs");
+        let _: L1BatchProofOutput = borsh::from_slice(&raw_output).unwrap();
     }
 }

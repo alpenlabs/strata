@@ -1,12 +1,13 @@
 use alpen_express_primitives::buf::Buf32;
 use bitcoin::{block::Header, hashes::Hash, BlockHash, CompactTarget, Target};
+use borsh::{BorshDeserialize, BorshSerialize};
 use ethnum::U256;
 use express_proofimpl_btc_blockspace::block::compute_block_hash;
 use serde::{Deserialize, Serialize};
 
 use crate::{pow_params::PowParams, timestamp_store::TimestampStore};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
 pub struct HeaderVerificationState {
     /// [Block number](bitcoin::Block::bip34_block_height) of the last verified block
     pub last_verified_block_num: u32,

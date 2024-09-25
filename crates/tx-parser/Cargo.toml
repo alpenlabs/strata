@@ -5,9 +5,15 @@ version = "0.1.0"
 
 [dependencies]
 alpen-express-primitives = { workspace = true }
+alpen-express-state = { workspace = true }
 
 anyhow = { workspace = true }
 bitcoin = { workspace = true }
+borsh = { workspace = true }
 hex = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+
+[dev-dependencies]
+alpen-test-utils = { workspace = true }
+rand = { workspace = true }

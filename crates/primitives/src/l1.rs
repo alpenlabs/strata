@@ -22,7 +22,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use reth_primitives::revm_primitives::FixedBytes;
 use serde::{de, Deserialize, Deserializer, Serialize};
 
-use crate::{buf::Buf32, constants::HASH_SIZE, errors::ParseError, tx::ProtocolOperation};
+use crate::{buf::Buf32, constants::HASH_SIZE, errors::ParseError};
 
 /// Reference to a transaction in a block.  This is the block index and the
 /// position of the transaction in the block.
@@ -73,36 +73,6 @@ impl L1TxProof {
 
     pub fn position(&self) -> u32 {
         self.position
-    }
-}
-
-/// Tx body with a proof.
-#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
-pub struct L1Tx {
-    proof: L1TxProof,
-    tx: Vec<u8>,
-    protocol_operation: ProtocolOperation,
-}
-
-impl L1Tx {
-    pub fn new(proof: L1TxProof, tx: Vec<u8>, protocol_operation: ProtocolOperation) -> Self {
-        Self {
-            proof,
-            tx,
-            protocol_operation,
-        }
-    }
-
-    pub fn proof(&self) -> &L1TxProof {
-        &self.proof
-    }
-
-    pub fn tx_data(&self) -> &[u8] {
-        &self.tx
-    }
-
-    pub fn protocol_operation(&self) -> &ProtocolOperation {
-        &self.protocol_operation
     }
 }
 

@@ -1,6 +1,6 @@
 //! parser types for Deposit Tx, and later deposit Request Tx
 
-use alpen_express_primitives::tx::DepositInfo;
+use alpen_express_state::tx::DepositInfo;
 use bitcoin::{opcodes::all::OP_RETURN, ScriptBuf, Transaction};
 
 use super::{
@@ -12,14 +12,16 @@ use crate::utils::next_op;
 
 /// Extracts the DepositInfo from the Deposit Transaction
 pub fn extract_deposit_info(tx: &Transaction, config: &DepositTxConfig) -> Option<DepositInfo> {
-    if let Ok(ee_address) = parse_deposit_script(&tx.output[1].script_pubkey, config) {
-        // find the outpoint with taproot address, so that we can extract sent amount from that
-        if check_bridge_offer_output(tx, config).is_ok() {
-            return Some(DepositInfo {
-                amt: tx.output[0].value.to_sat(),
-                deposit_outpoint: 0,
-                address: ee_address.to_vec(),
-            });
+    if tx.output.len() > 1 {
+        if let Ok(ee_address) = parse_deposit_script(&tx.output[1].script_pubkey, config) {
+            // find the outpoint with taproot address, so that we can extract sent amount from that
+            if check_bridge_offer_output(tx, config).is_ok() {
+                return Some(DepositInfo {
+                    amt: tx.output[0].value.to_sat(),
+                    deposit_outpoint: 0,
+                    address: ee_address.to_vec(),
+                });
+            }
         }
     }
     None
