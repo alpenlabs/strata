@@ -129,6 +129,7 @@ fn default_rollup_params() -> RollupParams {
                 .unwrap(),
         )), // TODO: update this with vk for checkpoint proof
         verify_proofs: true,
+        dispatch_assignment_dur: 64,
     }
 }
 

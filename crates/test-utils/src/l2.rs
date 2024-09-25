@@ -91,6 +91,7 @@ pub fn gen_params() -> Params {
                     .unwrap(),
             )),
             verify_proofs: false,
+            dispatch_assignment_dur: 64,
         },
         run: SyncParams {
             l2_blocks_fetch_limit: 1000,
