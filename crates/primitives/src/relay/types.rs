@@ -7,13 +7,26 @@ use borsh::{io, BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::buf::{Buf32, Buf64};
+use crate::{
+    bridge::OperatorIdx,
+    buf::{Buf32, Buf64},
+    prelude::BitcoinTxid,
+};
 
 /// Message container used to direct payloads depending on the context between parties.
+///
+/// # Caution
+///
+/// Users should not construct a [`BridgeMessage`] directly,
+/// instead construct a [`MessageSigner`](super::util::MessageSigner) by
+/// calling [`MessageSigner::new`](super::util::MessageSigner::new),
+/// followed by [`sign_raw`](super::util::MessageSigner::sign_raw)
+/// or [`sign_scope`](super::util::MessageSigner::sign_scope)
+/// depending on the use case.
 #[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize, Deserialize, Serialize)]
 pub struct BridgeMessage {
     /// Operator ID
-    pub(crate) source_id: u32,
+    pub(crate) source_id: OperatorIdx,
 
     /// Schnorr signature of the message
     pub(crate) sig: Buf64,
@@ -21,7 +34,7 @@ pub struct BridgeMessage {
     /// Purpose of the message.
     pub(crate) scope: Vec<u8>,
 
-    /// serialized message
+    /// Serialized message
     pub(crate) payload: Vec<u8>,
 }
 
@@ -84,6 +97,52 @@ impl BridgeMessage {
     }
 }
 
+impl TryFrom<Vec<u8>> for BridgeMessage {
+    type Error = io::Error;
+
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+        let result = borsh::from_slice(value.as_ref())?;
+        Ok(result)
+    }
+}
+
+impl TryInto<Vec<u8>> for BridgeMessage {
+    type Error = io::Error;
+
+    fn try_into(self) -> Result<Vec<u8>, Self::Error> {
+        borsh::to_vec(&self)
+            .map_err(|_| io::Error::new(io::ErrorKind::Other, "Serialization error"))
+    }
+}
+
+impl TryFrom<&[u8]> for BridgeMessage {
+    type Error = io::Error;
+
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        let result = borsh::from_slice(value)?;
+        Ok(result)
+    }
+}
+
+impl TryFrom<Box<[u8]>> for BridgeMessage {
+    type Error = io::Error;
+
+    fn try_from(value: Box<[u8]>) -> Result<Self, Self::Error> {
+        let result = borsh::from_slice(value.as_ref())?;
+        Ok(result)
+    }
+}
+
+impl TryInto<Box<[u8]>> for BridgeMessage {
+    type Error = io::Error;
+
+    fn try_into(self) -> Result<Box<[u8]>, Self::Error> {
+        let serialized_vec = borsh::to_vec(&self)
+            .map_err(|_| io::Error::new(io::ErrorKind::Other, "Serialization error"))?;
+        Ok(serialized_vec.into_boxed_slice()) // Convert Vec<u8> to Box<[u8]>
+    }
+}
+
 /// Scope of the [`BridgeMessage`]
 #[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize, Deserialize, Serialize)]
 pub enum Scope {
@@ -92,17 +151,61 @@ pub enum Scope {
 
     /// Deposit Signature with Outpoint.
     // TODO make this contain the outpoint
-    V0DepositSig(u32),
+    V0DepositSig(BitcoinTxid),
+
+    /// Deposit MuSig public nonce
+    V0DepositPubNonce(BitcoinTxid),
 
     /// Withdrawal Signature with Deposit index.
-    V0WithdrawalSig(u32),
+    V0WithdrawalSig(BitcoinTxid),
+
+    /// Withdrawal MuSig public nonce
+    V0WithdrawalPubNonce(BitcoinTxid),
 }
 
-impl Scope {
-    /// Tries to parse the scope from a slice.
-    pub fn try_from_slice(raw: &[u8]) -> Result<Scope, io::Error> {
-        let result = borsh::from_slice(raw)?;
+impl TryFrom<Vec<u8>> for Scope {
+    type Error = io::Error;
+
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+        let result = borsh::from_slice(value.as_ref())?;
         Ok(result)
+    }
+}
+
+impl TryInto<Vec<u8>> for Scope {
+    type Error = io::Error;
+
+    fn try_into(self) -> Result<Vec<u8>, Self::Error> {
+        borsh::to_vec(&self)
+            .map_err(|_| io::Error::new(io::ErrorKind::Other, "Serialization error"))
+    }
+}
+
+impl TryFrom<&[u8]> for Scope {
+    type Error = io::Error;
+
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        let result = borsh::from_slice(value)?;
+        Ok(result)
+    }
+}
+
+impl TryFrom<Box<[u8]>> for Scope {
+    type Error = io::Error;
+
+    fn try_from(value: Box<[u8]>) -> Result<Self, Self::Error> {
+        let result = borsh::from_slice(value.as_ref())?;
+        Ok(result)
+    }
+}
+
+impl TryInto<Box<[u8]>> for Scope {
+    type Error = io::Error;
+
+    fn try_into(self) -> Result<Box<[u8]>, Self::Error> {
+        let serialized_vec = borsh::to_vec(&self)
+            .map_err(|_| io::Error::new(io::ErrorKind::Other, "Serialization error"))?;
+        Ok(serialized_vec.into_boxed_slice()) // Convert Vec<u8> to Box<[u8]>
     }
 }
 

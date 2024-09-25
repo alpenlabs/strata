@@ -8,6 +8,7 @@ use arbitrary::Arbitrary;
 use bitcoin::{hashes::Hash, secp256k1::schnorr, BlockHash, Txid};
 use borsh::{BorshDeserialize, BorshSerialize};
 use reth_primitives::alloy_primitives::FixedBytes;
+use secp256k1::SecretKey;
 use serde::{Deserialize, Serialize};
 
 // 20-byte buf
@@ -90,6 +91,19 @@ impl From<Buf32> for Txid {
         let mut bytes: [u8; 32] = [0; 32];
         bytes.copy_from_slice(value.0.as_slice());
         Txid::from_byte_array(bytes)
+    }
+}
+
+impl From<SecretKey> for Buf32 {
+    fn from(value: SecretKey) -> Self {
+        let bytes: [u8; 32] = value.secret_bytes();
+        bytes.into()
+    }
+}
+
+impl From<Buf32> for SecretKey {
+    fn from(value: Buf32) -> Self {
+        SecretKey::from_slice(value.0.as_slice()).expect("could not convert Buf32 into SecretKey")
     }
 }
 
