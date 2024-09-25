@@ -36,7 +36,7 @@ pub struct HashedCheckpointState {
 pub struct CheckpointProofOutput {
     pub l1_state: Buf32,
     pub l2_state: Buf32,
-    pub total_acc_pow: f64,
+    pub total_acc_pow: u128,
 }
 
 // TODO: genesis needs to be hardcoded
@@ -71,7 +71,7 @@ pub fn process_checkpoint_proof(
                 l1_state: initial_l1_state_hash,
                 l2_state: initial_l2_state_hash,
                 // TODO: fix this
-                total_acc_pow: prev_state_update.acc_pow() as f64,
+                total_acc_pow: prev_state_update.acc_pow(),
             };
 
             (checkpoint, prev_state_update.proof().to_vec())

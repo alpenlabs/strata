@@ -1,17 +1,13 @@
 use alpen_express_primitives::buf::Buf32;
 use alpen_test_utils::bitcoin::get_btc_chain;
-use bitcoin::hashes::Hash;
+use bitcoin::{hashes::Hash, params::Params};
 
 use crate::{
     header_verification::{get_difficulty_adjustment_height, HeaderVerificationState},
-    pow_params::PowParams,
     timestamp_store::TimestampStore,
 };
 
-pub fn get_verification_state_for_block(
-    height: u32,
-    params: &PowParams,
-) -> HeaderVerificationState {
+pub fn get_verification_state_for_block(height: u32, params: &Params) -> HeaderVerificationState {
     let chain = get_btc_chain();
 
     // Get the difficulty adjustment block just before `block_height`
@@ -40,7 +36,7 @@ pub fn get_verification_state_for_block(
             .to_compact_lossy()
             .to_consensus(),
         interval_start_timestamp: chain.get_header(h1).time,
-        total_accumulated_pow: 0f64,
+        total_accumulated_pow: 0u128,
         last_11_blocks_timestamps,
     }
 }

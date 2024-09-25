@@ -1,6 +1,6 @@
 pub mod header_verification;
 pub mod logic;
-#[cfg(feature = "test-utils")]
+#[cfg(any(test, feature = "test-utils"))]
 pub mod mock;
-pub mod pow_params;
+pub mod params;
 pub mod timestamp_store;

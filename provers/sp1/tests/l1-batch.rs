@@ -7,7 +7,6 @@ mod test {
     use express_proofimpl_l1_batch::{
         logic::{L1BatchProofInput, L1BatchProofOutput},
         mock::get_verification_state_for_block,
-        pow_params::PowParams,
     };
     use express_sp1_adapter::{SP1Host, SP1ProofInputBuilder, SP1Verifier};
     use express_sp1_guest_builder::{GUEST_BTC_BLOCKSPACE_ELF, GUEST_L1_BATCH_ELF};
@@ -65,7 +64,7 @@ mod test {
         let prover = SP1Host::init(GUEST_L1_BATCH_ELF.into(), prover_options);
         let input = L1BatchProofInput {
             batch: blockspace_outputs,
-            state: get_verification_state_for_block(40321, &PowParams::from(&MAINNET)),
+            state: get_verification_state_for_block(40321, &MAINNET),
         };
         l1_batch_input_builder.write_borsh(&input).unwrap();
 

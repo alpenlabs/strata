@@ -1,8 +1,9 @@
 use alpen_express_state::{batch::BatchCheckpoint, tx::DepositInfo};
+use bitcoin::params::Params;
 use borsh::{BorshDeserialize, BorshSerialize};
 use express_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
 
-use crate::{header_verification::HeaderVerificationState, pow_params::PowParams};
+use crate::header_verification::HeaderVerificationState;
 
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct L1BatchProofInput {
@@ -18,7 +19,7 @@ pub struct L1BatchProofOutput {
     pub final_state: HeaderVerificationState,
 }
 
-pub fn process_batch_proof(input: L1BatchProofInput, params: &PowParams) -> L1BatchProofOutput {
+pub fn process_batch_proof(input: L1BatchProofInput, params: &Params) -> L1BatchProofOutput {
     let initial_state = input.state.clone();
     let mut deposits = Vec::new();
     let mut state_update = None;

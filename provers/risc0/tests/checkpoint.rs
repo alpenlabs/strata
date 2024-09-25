@@ -9,7 +9,6 @@ mod test {
     use express_proofimpl_l1_batch::{
         logic::{L1BatchProofInput, L1BatchProofOutput},
         mock::get_verification_state_for_block,
-        pow_params::PowParams,
     };
     use express_risc0_adapter::{Risc0Verifier, RiscZeroHost, RiscZeroProofInputBuilder};
     use express_risc0_guest_builder::{
@@ -76,7 +75,7 @@ mod test {
         let prover = RiscZeroHost::init(GUEST_RISC0_L1_BATCH_ELF.into(), prover_options);
         let input = L1BatchProofInput {
             batch: blockspace_outputs,
-            state: get_verification_state_for_block(40321, &PowParams::from(&MAINNET)),
+            state: get_verification_state_for_block(40321, &MAINNET),
         };
 
         let prover_input = prover_input.write_borsh(&input).unwrap().build().unwrap();
