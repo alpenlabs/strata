@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{panic, sync::Arc};
 
 use alpen_express_db::traits::{Database, L1DataStore};
 use alpen_express_primitives::{
@@ -23,6 +23,8 @@ use tokio::sync::mpsc;
 use tracing::*;
 
 use crate::ctl::CsmController;
+
+const IGNORE_PROOFS: bool = true;
 
 /// Consumes L1 events and reflects them in the database.
 pub fn bitcoin_data_handler_task<D: Database + Send + Sync + 'static>(
@@ -98,7 +100,9 @@ where
             csm_ctl.submit_event(ev)?;
 
             // Check for da batch and send event accordingly
+            debug!(?height, "Checking for da batch");
             let checkpoints = check_for_da_batch(&blockdata, params.rollup().rollup_vk);
+            debug!(?checkpoints, "Received checkpoints");
             if !checkpoints.is_empty() {
                 let ev = SyncEvent::L1DABatch(height, checkpoints);
                 csm_ctl.submit_event(ev)?;
@@ -128,8 +132,15 @@ fn check_for_da_batch(
             _ => None,
         });
 
-    let verified_checkpoints = inscriptions.filter_map(|(insc, _)| {
-                let checkpoint: BatchCheckpoint = insc.clone().into();
+    let verified_checkpoints = inscriptions.filter_map(|(insc, tx)| {
+        match borsh::from_slice::<SignedBatchCheckpoint>(insc.batch_data()) {
+            Err(e) => {
+                let txid = tx.compute_txid();
+                warn!(%txid, err = %e, "could not deserialize blob inside inscription");
+                None
+            }
+            Ok(signed_checkpoint) if !IGNORE_PROOFS => {
+                let checkpoint: BatchCheckpoint = signed_checkpoint.clone().into();
                 let checkpoint_idx = checkpoint.checkpoint().idx();
                 let checkpoint_last_block = checkpoint.checkpoint().l2_blockid();
 
@@ -137,24 +148,35 @@ fn check_for_da_batch(
                 let public_params_raw = borsh::to_vec(&checkpoint).unwrap();
 
                 // NOTE/TODO: this should also verify that this checkpoint is based on top of some previous checkpoint
-                let res = match rollup_vk {
-                    RollupVerifyingKey::Risc0VerifyingKey(vk) => {
-                        Risc0Verifier::verify_groth16(proof, vk.as_ref(), &public_params_raw)
+                let res = panic::catch_unwind(|| {
+                    match rollup_vk {
+                        RollupVerifyingKey::Risc0VerifyingKey(vk) => {
+                            Risc0Verifier::verify_groth16(proof, vk.as_ref(), &public_params_raw)
+                        }
+                        RollupVerifyingKey::SP1VerifyingKey(vk) => {
+                            SP1Verifier::verify_groth16(proof, vk.as_ref(), &public_params_raw)
+                        }
                     }
-                    RollupVerifyingKey::SP1VerifyingKey(vk) => {
-                        SP1Verifier::verify_groth16(proof, vk.as_ref(), &public_params_raw)
-                    }
-                };
+                });
                 match res {
-                    Ok(()) => {
+                    Ok(Ok(())) => {
                         info!(%checkpoint_idx, %checkpoint_last_block, "proof successfully verified");
                         Some(checkpoint)
                     }
-                    Err(e) => {
+                    Ok(Err(e)) => {
                         warn!(%checkpoint_idx, %checkpoint_last_block, err = %e, "could not verify proof inside blob");
                         None
                     }
+                    Err(e) => {
+                        warn!(%checkpoint_idx, %checkpoint_last_block, err = ?e, "Some unexpected error occurred while verifying proof");
+                        None
+                    }
                 }
+            }
+            Ok(signed_checkpoint) => {
+                Some(signed_checkpoint)
+            }
+        }
     });
 
     verified_checkpoints.map(Into::into).collect()

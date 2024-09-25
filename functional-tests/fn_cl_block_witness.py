@@ -1,8 +1,6 @@
-import time
-
 import flexitest
 
-from constants import SEQ_SLACK_TIME_SECS
+from utils import wait_until
 
 REORG_DEPTH = 3
 
@@ -16,7 +14,11 @@ class CLBlockWitnessDataGenerationTest(flexitest.Test):
         seq = ctx.get_service("sequencer")
         seqrpc = seq.create_rpc()
 
-        time.sleep(SEQ_SLACK_TIME_SECS)
+        # Wait for seq
+        wait_until(
+            lambda: seqrpc.alp_protocolVersion() is not None,
+            error_with="Sequencer did not start on time",
+        )
 
         witness_1 = seqrpc.alp_getBlockWitness(1)
         assert witness_1 is not None

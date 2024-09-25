@@ -247,6 +247,7 @@ pub fn tracker_task<D: Database, E: ExecEngineCtl>(
             return Err(e);
         }
     };
+    info!("CSM is ready");
 
     // we should have the finalized tips in state at this point
     let Some(ss) = init_state.sync() else {
@@ -270,6 +271,7 @@ pub fn tracker_task<D: Database, E: ExecEngineCtl>(
             return Err(e);
         }
     };
+    info!(%finalized_blockid, "forkchoice manager started");
 
     if let Err(e) = forkchoice_manager_task_inner(&shutdown, fcm, engine.as_ref(), fcm_rx, &csm_ctl)
     {
@@ -550,6 +552,7 @@ fn apply_tip_update<D: Database>(
         // locally and update our going state.
         let rparams = fc_manager.params.rollup();
         let mut prestate_cache = StateCache::new(pre_state);
+        debug!("processing block");
         process_block(&mut prestate_cache, header, body, rparams)
             .map_err(|e| Error::InvalidStateTsn(*blkid, e))?;
         let (post_state, wb) = prestate_cache.finalize();

@@ -603,17 +603,20 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
     }
 
     async fn submit_checkpoint_proof(&self, idx: u64, proofbytes: HexBytes) -> RpcResult<()> {
+        debug!(%idx, "received checkpoint proof request");
         let mut entry = self
             .checkpoint_handle
             .get_checkpoint(idx)
             .await
             .map_err(|e| Error::Other(e.to_string()))?
             .ok_or(Error::MissingCheckpointInDb(idx))?;
+        debug!(%idx, "found checkpoint in db");
 
         // If proof is not pending error out
         if entry.proving_status != CheckpointProvingStatus::PendingProof {
             return Err(Error::ProofAlreadyCreated(idx))?;
         }
+        debug!(%idx, "Proof is pending, setting proof reaedy");
 
         // TODO: verify proof, once proof verification logic is ready
         entry.proof = proofbytes.into_inner();
@@ -622,6 +625,7 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
             .put_checkpoint_and_notify(idx, entry)
             .await
             .map_err(|e| Error::Other(e.to_string()))?;
+        debug!(%idx, "Success");
 
         Ok(())
     }

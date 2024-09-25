@@ -6,8 +6,8 @@ from constants import (
 )
 from entry import BasicEnvConfig
 from utils import (
-    check_send_proof_for_non_existent_batch,
-    check_for_nth_checkpoint_finalization,
+    check_nth_checkpoint_finalized,
+    check_submit_proof_fails_for_nonexistent_batch,
 )
 
 
@@ -16,21 +16,25 @@ class BlockFinalizationTest(flexitest.Test):
     """ """
 
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env(BasicEnvConfig(101, rollup_params=FAST_BATCH_ROLLUP_PARAMS))
+        premine_blocks = 101
+        rollup_params = {
+            **FAST_BATCH_ROLLUP_PARAMS,
+            # Setup reasonal horizon/genesis height
+            "horizon_l1_height": premine_blocks - 3,
+            "genesis_l1_height": premine_blocks + 5,
+        }
+        ctx.set_env(BasicEnvConfig(premine_blocks, rollup_params=rollup_params))
 
     def main(self, ctx: flexitest.RunContext):
-        # FIXME: update and enable after proof is available
-        return
-
         seq = ctx.get_service("sequencer")
 
         seqrpc = seq.create_rpc()
 
-        check_send_proof_for_non_existent_batch(seqrpc, 100)
+        check_submit_proof_fails_for_nonexistent_batch(seqrpc, 100)
 
         # Check for first 4 checkpoints
         for n in range(1, 5):
-            check_for_nth_checkpoint_finalization(n, seqrpc)
+            check_nth_checkpoint_finalized(n, seqrpc)
             print(f"Pass checkpoint finalization for checkpoint {n}")
 
         check_already_sent_proof(seqrpc)

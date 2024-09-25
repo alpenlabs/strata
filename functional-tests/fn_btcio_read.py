@@ -3,8 +3,9 @@ import time
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 
-from constants import MAX_HORIZON_POLL_INTERVAL_SECS, SEQ_SLACK_TIME_SECS
+from constants import MAX_HORIZON_POLL_INTERVAL_SECS
 from entry import BasicEnvConfig, generate_n_blocks
+from utils import wait_until
 
 
 @flexitest.register
@@ -21,9 +22,12 @@ class L1StatusTest(flexitest.Test):
         seqrpc = seq.create_rpc()
         # generate 5 btc blocks
         generate_n_blocks(btcrpc, 5)
-        interval = 5 * MAX_HORIZON_POLL_INTERVAL_SECS + SEQ_SLACK_TIME_SECS
 
-        time.sleep(interval)
+        # Wait for seq
+        wait_until(
+            lambda: seqrpc.alp_protocolVersion() is not None,
+            error_with="Sequencer did not start on time",
+        )
 
         received_block = btcrpc.getblock(btcrpc.proxy.getbestblockhash())
         l1stat = seqrpc.alp_l1status()

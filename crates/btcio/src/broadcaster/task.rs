@@ -73,8 +73,9 @@ async fn process_unfinalized_entries(
     let mut updated_entries = BTreeMap::new();
 
     for (idx, txentry) in unfinalized_entries.iter() {
-        debug!(%idx, "processing txentry");
+        debug!(?txentry.status, %idx, "processing txentry");
         let updated_status = handle_entry(rpc_client, txentry, *idx, ops.as_ref()).await?;
+        debug!(?updated_status, %idx, "updated status handled");
 
         if let Some(status) = updated_status {
             let mut new_txentry = txentry.clone();
@@ -138,19 +139,22 @@ async fn handle_entry(
                 .map_err(|e| BroadcasterError::Other(e.to_string()))?;
             let txinfo_res = rpc_client.get_transaction(&txid).await;
 
+            debug!(?txentry.status, ?txinfo_res, ?txid, "check get transaction");
             let new_status = match txinfo_res {
                 Ok(info) => {
-                    if info.confirmations == 0 {
-                        // Regardless of whether it was confirmed already(means this is a reorg), we
-                        // set it to published
+                    if info.confirmations == 0 && txentry.status == L1TxStatus::Published {
                         L1TxStatus::Published
+                    } else if info.confirmations == 0 {
+                        // If it was confirmed before and now it is 0, L1 reorged.
+                        // So, set it to Unpublished
+                        L1TxStatus::Unpublished
                     } else if info.confirmations >= FINALITY_DEPTH {
                         L1TxStatus::Finalized {
-                            confirmations: info.block_height(),
+                            confirmations: info.confirmations,
                         }
                     } else {
                         L1TxStatus::Confirmed {
-                            confirmations: info.block_height(),
+                            confirmations: info.confirmations,
                         }
                     }
                 }
@@ -261,7 +265,7 @@ mod test {
         assert_eq!(
             res,
             Some(L1TxStatus::Confirmed {
-                confirmations: cl.included_height
+                confirmations: cl.confs
             }),
             "Status should be confirmed if 0 < confirmations < finality_depth"
         );
@@ -276,7 +280,7 @@ mod test {
         assert_eq!(
             res,
             Some(L1TxStatus::Finalized {
-                confirmations: cl.included_height
+                confirmations: cl.confs
             }),
             "Status should be confirmed if confirmations >= finality_depth"
         );
@@ -301,7 +305,7 @@ mod test {
             .unwrap();
         assert_eq!(
             res,
-            Some(L1TxStatus::Published),
+            Some(L1TxStatus::Unpublished),
             "Status should revert to reorged if previously confirmed tx has 0 confirmations"
         );
 
@@ -315,7 +319,7 @@ mod test {
         assert_eq!(
             res,
             Some(L1TxStatus::Confirmed {
-                confirmations: cl.included_height
+                confirmations: cl.confs
             }),
             "Status should be confirmed if 0 < confirmations < finality_depth"
         );
@@ -330,7 +334,7 @@ mod test {
         assert_eq!(
             res,
             Some(L1TxStatus::Finalized {
-                confirmations: cl.included_height
+                confirmations: cl.confs
             }),
             "Status should be confirmed if confirmations >= finality_depth"
         );
@@ -446,7 +450,7 @@ mod test {
         assert_eq!(
             new_entries.get(&i3.unwrap()).unwrap().status,
             L1TxStatus::Finalized {
-                confirmations: cl.included_height
+                confirmations: cl.confs
             },
             "published tx should be finalized"
         );

@@ -5,6 +5,7 @@ from bitcoinlib.services.bitcoind import BitcoindClient
 
 from constants import BLOCK_GENERATION_INTERVAL_SECS, SEQ_SLACK_TIME_SECS
 from entry import BasicEnvConfig
+from utils import wait_until
 
 REORG_DEPTH = 3
 
@@ -24,8 +25,12 @@ class L1ReadReorgTest(flexitest.Test):
 
         # We need at least `REORG_DEPTH` + 1 or more blocks
         # to invalidate `REORG_DEPTH` blocks at the end.
-        wait_time = BLOCK_GENERATION_INTERVAL_SECS * (REORG_DEPTH + 1) + SEQ_SLACK_TIME_SECS
-        time.sleep(wait_time)
+
+        # Wait for seq
+        wait_until(
+            lambda: seqrpc.alp_protocolVersion() is not None,
+            error_with="Sequencer did not start on time",
+        )
         l1stat = seqrpc.alp_l1status()
 
         height_to_invalidate_from = int(l1stat["cur_height"]) - REORG_DEPTH

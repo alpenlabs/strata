@@ -98,6 +98,7 @@ class BitcoinFactory(flexitest.Factory):
             "rpc_port": rpc_port,
             "rpc_user": BD_USERNAME,
             "rpc_password": BD_PASSWORD,
+            "walletname": "testwallet",
         }
 
         svc = flexitest.service.ProcService(props, cmd, stdout=logfile)
@@ -386,7 +387,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
 
         brpc = bitcoind.create_rpc()
 
-        walletname = "dummy"
+        walletname = bitcoind.get_prop("walletname")
         brpc.proxy.createwallet(walletname)
 
         seqaddr = brpc.proxy.getnewaddress()

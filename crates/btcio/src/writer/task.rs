@@ -162,7 +162,7 @@ pub async fn watcher_task(
                 // If unsigned or needs resign, create new signed commit/reveal txs and update the
                 // entry
                 BlobL1Status::Unsigned | BlobL1Status::NeedsResign => {
-                    debug!(%curr_blobidx, "Processing unsigned blobentry");
+                    debug!(?blobentry.status, %curr_blobidx, "Processing unsigned blobentry");
                     match create_and_sign_blob_inscriptions(
                         &blobentry,
                         &bcast_handle,
@@ -208,6 +208,7 @@ pub async fn watcher_task(
                     match (commit_tx, reveal_tx) {
                         (Some(ctx), Some(rtx)) => {
                             let new_status = determine_blob_next_status(&ctx.status, &rtx.status);
+                            debug!(?new_status, "The next status for blob");
 
                             update_l1_status(&blobentry, &new_status, status_tx.clone()).await;
 
