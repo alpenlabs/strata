@@ -226,7 +226,9 @@ impl L1DataProvider for L1Db {
 #[cfg(test)]
 mod tests {
     use alpen_express_primitives::l1::L1TxProof;
+    use alpen_express_state::tx::ProtocolOperation;
     use alpen_test_utils::ArbitraryGenerator;
+    use bitcoin::key::rand::{self, Rng};
 
     use super::*;
     use crate::test_utils::get_rocksdb_tmp_instance;
@@ -236,22 +238,27 @@ mod tests {
         L1Db::new(db, db_ops)
     }
 
-    fn insert_block_data(idx: u64, db: &L1Db) -> (L1BlockManifest, Vec<L1Tx>, CompactMmr) {
+    fn insert_block_data(
+        idx: u64,
+        db: &L1Db,
+        num_txs: usize,
+    ) -> (L1BlockManifest, Vec<L1Tx>, CompactMmr) {
         let arb = ArbitraryGenerator::new();
 
         // TODO maybe tweak this to make it a bit more realistic?
         let mf: L1BlockManifest = arb.generate();
-        let txs: Vec<L1Tx> = (0..10)
+        let txs: Vec<L1Tx> = (0..num_txs)
             .map(|i| {
-                let proof = L1TxProof::new(i, arb.generate());
-                L1Tx::new(proof, arb.generate(), arb.generate())
+                let proof = L1TxProof::new(i as u32, arb.generate());
+                let parsed_tx: ProtocolOperation = arb.generate();
+                L1Tx::new(proof, arb.generate(), parsed_tx)
             })
             .collect();
         let mmr: CompactMmr = arb.generate();
 
         // Insert block data
         let res = db.put_block_data(idx, mf.clone(), txs.clone());
-        assert!(res.is_ok());
+        assert!(res.is_ok(), "put should work but got: {}", res.unwrap_err());
 
         // Insert mmr data
         db.put_mmr_checkpoint(idx, mmr.clone()).unwrap();
@@ -264,20 +271,20 @@ mod tests {
     fn test_insert_into_empty_db() {
         let db = setup_db();
         let idx = 1;
-        insert_block_data(idx, &db);
+        insert_block_data(idx, &db, 10);
         drop(db);
 
         // insert another block with arbitrary id
         let db = setup_db();
         let idx = 200_011;
-        insert_block_data(idx, &db);
+        insert_block_data(idx, &db, 10);
     }
 
     #[test]
     fn test_insert_into_non_empty_db() {
         let db = setup_db();
         let idx = 1_000;
-        insert_block_data(idx, &db); // first insertion
+        insert_block_data(idx, &db, 10); // first insertion
 
         let invalid_idxs = vec![1, 2, 5000, 1000, 1002, 999]; // basically any id beside idx + 1
         for invalid_idx in invalid_idxs {
@@ -304,10 +311,11 @@ mod tests {
     fn test_revert_to_invalid_height() {
         let db = setup_db();
         // First insert a couple of manifests
-        let _ = insert_block_data(1, &db);
-        let _ = insert_block_data(2, &db);
-        let _ = insert_block_data(3, &db);
-        let _ = insert_block_data(4, &db);
+        let num_txs = 10;
+        let _ = insert_block_data(1, &db, num_txs);
+        let _ = insert_block_data(2, &db, num_txs);
+        let _ = insert_block_data(3, &db, num_txs);
+        let _ = insert_block_data(4, &db, num_txs);
 
         // Try reverting to an invalid height, which should fail
         let invalid_heights = [5, 6, 10];
@@ -321,10 +329,11 @@ mod tests {
     fn test_revert_to_zero_height() {
         let db = setup_db();
         // First insert a couple of manifests
-        let _ = insert_block_data(1, &db);
-        let _ = insert_block_data(2, &db);
-        let _ = insert_block_data(3, &db);
-        let _ = insert_block_data(4, &db);
+        let num_txs = 10;
+        let _ = insert_block_data(1, &db, num_txs);
+        let _ = insert_block_data(2, &db, num_txs);
+        let _ = insert_block_data(3, &db, num_txs);
+        let _ = insert_block_data(4, &db, num_txs);
 
         let res = db.revert_to_height(0);
         assert!(res.is_ok(), "Should succeed to revert to height 0");
@@ -334,10 +343,11 @@ mod tests {
     fn test_revert_to_non_zero_height() {
         let db = setup_db();
         // First insert a couple of manifests
-        let _ = insert_block_data(1, &db);
-        let _ = insert_block_data(2, &db);
-        let _ = insert_block_data(3, &db);
-        let _ = insert_block_data(4, &db);
+        let num_txs = 10;
+        let _ = insert_block_data(1, &db, num_txs);
+        let _ = insert_block_data(2, &db, num_txs);
+        let _ = insert_block_data(3, &db, num_txs);
+        let _ = insert_block_data(4, &db, num_txs);
 
         let res = db.revert_to_height(3);
         assert!(res.is_ok(), "Should succeed to revert to non-zero height");
@@ -360,7 +370,7 @@ mod tests {
     #[test]
     fn test_put_mmr_checkpoint_invalid() {
         let db = setup_db();
-        let _ = insert_block_data(1, &db);
+        let _ = insert_block_data(1, &db, 10);
         let mmr: CompactMmr = ArbitraryGenerator::new().generate();
         let invalid_idxs = vec![0, 2, 4, 5, 6, 100, 1000]; // any idx except 1
         for idx in invalid_idxs {
@@ -372,7 +382,7 @@ mod tests {
     #[test]
     fn test_put_mmr_checkpoint_valid() {
         let db = setup_db();
-        let _ = insert_block_data(1, &db);
+        let _ = insert_block_data(1, &db, 10);
         let mmr: CompactMmr = ArbitraryGenerator::new().generate();
         let res = db.put_mmr_checkpoint(1, mmr);
         assert!(res.is_ok());
@@ -386,7 +396,7 @@ mod tests {
         let idx = 1;
 
         // insert
-        let (mf, txs, _) = insert_block_data(idx, &db);
+        let (mf, txs, _) = insert_block_data(idx, &db, 10);
 
         // fetch non existent block
         let non_idx = 200;
@@ -414,7 +424,7 @@ mod tests {
         let db = setup_db();
         let idx = 1; // block number
                      // Insert a block
-        let (_, txns, _) = insert_block_data(idx, &db);
+        let (_, txns, _) = insert_block_data(idx, &db, 10);
         let txidx: u32 = 3; // some tx index
         assert!(txns.len() > txidx as usize);
         let tx_ref: L1TxRef = (1, txidx).into();
@@ -444,9 +454,10 @@ mod tests {
         );
 
         // Insert some block data
-        insert_block_data(1, &db);
+        let num_txs = 10;
+        insert_block_data(1, &db, num_txs);
         assert_eq!(db.get_chain_tip().unwrap(), Some(1));
-        insert_block_data(2, &db);
+        insert_block_data(2, &db, num_txs);
         assert_eq!(db.get_chain_tip().unwrap(), Some(2));
     }
 
@@ -454,9 +465,10 @@ mod tests {
     fn test_get_block_txs() {
         let db = setup_db();
 
-        insert_block_data(1, &db);
-        insert_block_data(2, &db);
-        insert_block_data(3, &db);
+        let num_txs = 10;
+        insert_block_data(1, &db, num_txs);
+        insert_block_data(2, &db, num_txs);
+        insert_block_data(3, &db, num_txs);
 
         let block_txs = db.get_block_txs(2).unwrap().unwrap();
         let expected: Vec<_> = (0..10).map(|i| (2, i).into()).collect(); // 10 because insert_block_data inserts 10 txs
@@ -467,9 +479,10 @@ mod tests {
     fn test_get_blockid_invalid_range() {
         let db = setup_db();
 
-        let _ = insert_block_data(1, &db);
-        let _ = insert_block_data(2, &db);
-        let _ = insert_block_data(3, &db);
+        let num_txs = 10;
+        let _ = insert_block_data(1, &db, num_txs);
+        let _ = insert_block_data(2, &db, num_txs);
+        let _ = insert_block_data(3, &db, num_txs);
 
         let range = db.get_blockid_range(3, 1).unwrap();
         assert_eq!(range.len(), 0);
@@ -479,9 +492,10 @@ mod tests {
     fn test_get_blockid_range() {
         let db = setup_db();
 
-        let (mf1, _, _) = insert_block_data(1, &db);
-        let (mf2, _, _) = insert_block_data(2, &db);
-        let (mf3, _, _) = insert_block_data(3, &db);
+        let num_txs = 10;
+        let (mf1, _, _) = insert_block_data(1, &db, num_txs);
+        let (mf2, _, _) = insert_block_data(2, &db, num_txs);
+        let (mf3, _, _) = insert_block_data(3, &db, num_txs);
 
         let range = db.get_blockid_range(1, 4).unwrap();
         assert_eq!(range.len(), 3);
@@ -497,12 +511,63 @@ mod tests {
         let inexistent_idx = 3;
         let mmr = db.get_last_mmr_to(inexistent_idx).unwrap();
         assert!(mmr.is_none());
-        let (_, _, mmr) = insert_block_data(1, &db);
+        let (_, _, mmr) = insert_block_data(1, &db, 10);
         let mmr_res = db.get_last_mmr_to(inexistent_idx).unwrap();
         assert!(mmr_res.is_none());
 
         // existent mmr
         let observed_mmr = db.get_last_mmr_to(1).unwrap();
         assert_eq!(Some(mmr), observed_mmr);
+    }
+
+    #[test]
+    fn test_get_txs_after() {
+        let db = setup_db();
+
+        let num_txs = 3;
+        let total_num_blocks = 4;
+
+        let mut l1_txs = Vec::with_capacity(total_num_blocks);
+        for i in 0..total_num_blocks {
+            let (_, l1_tx, _) = insert_block_data(i as u64, &db, num_txs);
+            l1_txs.push(l1_tx);
+        }
+
+        let offset = rand::thread_rng().gen_range(0..total_num_blocks);
+        let expected_num_blocks = total_num_blocks - offset;
+        let actual = db.get_txs_after(offset as u64).unwrap();
+
+        assert_eq!(actual.len(), expected_num_blocks * num_txs);
+
+        let mut index = 0;
+        for (block_num, expected) in l1_txs.iter().skip(offset).enumerate() {
+            for (tx_num, expected_l1_tx) in expected.iter().enumerate() {
+                let actual = actual.get(index);
+                assert!(
+                    actual.is_some(),
+                    "index {} must be present corresponding to tx {} in block {}",
+                    index,
+                    tx_num,
+                    block_num
+                );
+
+                let actual = actual.unwrap();
+                assert_eq!(
+                    expected_l1_tx, actual,
+                    "mismatched tx at index: {} for tx {} in block {}",
+                    index, tx_num, block_num
+                );
+                index += 1;
+            }
+        }
+
+        // get past the final index.
+        let actual = db
+            .get_txs_after(total_num_blocks as u64)
+            .expect("should not error");
+        assert!(
+            actual.is_empty(),
+            "getting past the last index should return an empty list"
+        );
     }
 }
