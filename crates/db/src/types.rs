@@ -180,13 +180,7 @@ impl CheckpointEntry {
     }
 
     pub fn into_batch_checkpoint(self) -> BatchCheckpoint {
-        BatchCheckpoint::new(
-            self.checkpoint,
-            self.proof,
-            self.l1_state_hash,
-            self.l2_state_hash,
-            self.acc_pow,
-        )
+        BatchCheckpoint::new(self.checkpoint, self.proof)
     }
 
     /// Creates a new instance for a freshly defined checkpoint.
@@ -218,13 +212,7 @@ impl CheckpointEntry {
 
 impl From<CheckpointEntry> for BatchCheckpoint {
     fn from(entry: CheckpointEntry) -> BatchCheckpoint {
-        BatchCheckpoint::new(
-            entry.checkpoint,
-            entry.proof,
-            entry.l1_state_hash,
-            entry.l2_state_hash,
-            entry.acc_pow,
-        )
+        BatchCheckpoint::new(entry.checkpoint, entry.proof)
     }
 }
 

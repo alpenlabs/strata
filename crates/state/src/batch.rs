@@ -12,45 +12,15 @@ pub struct BatchCheckpoint {
     checkpoint: CheckpointInfo,
     /// Proof for the batch obtained from prover manager
     proof: Vec<u8>,
-    /// Hash of the HeaderVerificationState
-    l1_state_hash: Buf32,
-    /// Hash of the ChainState
-    l2_state_hash: Buf32,
-    /// Total Accumulated PoW till this checkpoint
-    acc_pow: u128,
 }
 
 impl BatchCheckpoint {
-    pub fn new(
-        checkpoint: CheckpointInfo,
-        proof: Vec<u8>,
-        l1_state_hash: Buf32,
-        l2_state_hash: Buf32,
-        acc_pow: u128,
-    ) -> Self {
-        Self {
-            checkpoint,
-            proof,
-            l1_state_hash,
-            l2_state_hash,
-            acc_pow,
-        }
+    pub fn new(checkpoint: CheckpointInfo, proof: Vec<u8>) -> Self {
+        Self { checkpoint, proof }
     }
 
     pub fn checkpoint(&self) -> &CheckpointInfo {
         &self.checkpoint
-    }
-
-    pub fn l1_state_hash(&self) -> &Buf32 {
-        &self.l1_state_hash
-    }
-
-    pub fn l2_state_hash(&self) -> &Buf32 {
-        &self.l2_state_hash
-    }
-
-    pub fn acc_pow(&self) -> u128 {
-        self.acc_pow
     }
 
     pub fn proof(&self) -> &[u8] {
@@ -98,6 +68,12 @@ pub struct CheckpointInfo {
     pub l2_range: (u64, u64),
     /// The last L2 block upto which this checkpoint covers since the previous checkpoint
     pub l2_blockid: L2BlockId,
+    /// Hash of the HeaderVerificationState
+    l1_state_hash: Buf32,
+    /// Hash of the ChainState
+    l2_state_hash: Buf32,
+    /// Total Accumulated PoW till this checkpoint
+    acc_pow: u128,
 }
 
 impl CheckpointInfo {
@@ -106,12 +82,18 @@ impl CheckpointInfo {
         l1_range: (u64, u64),
         l2_range: (u64, u64),
         l2_blockid: L2BlockId,
+        l1_state_hash: Buf32,
+        l2_state_hash: Buf32,
+        acc_pow: u128,
     ) -> Self {
         Self {
             idx: checkpoint_idx,
             l1_range,
             l2_range,
             l2_blockid,
+            l1_state_hash,
+            l2_state_hash,
+            acc_pow,
         }
     }
 
@@ -121,5 +103,17 @@ impl CheckpointInfo {
 
     pub fn l2_blockid(&self) -> &L2BlockId {
         &self.l2_blockid
+    }
+
+    pub fn l1_state_hash(&self) -> &Buf32 {
+        &self.l1_state_hash
+    }
+
+    pub fn l2_state_hash(&self) -> &Buf32 {
+        &self.l2_state_hash
+    }
+
+    pub fn acc_pow(&self) -> u128 {
+        self.acc_pow
     }
 }

@@ -1213,6 +1213,7 @@ name = "guest-risc0-checkpoint"
 version = "0.1.0"
 dependencies = [
  "alpen-express-primitives",
+ "alpen-express-state",
  "bitcoin",
  "borsh",
  "express-proofimpl-btc-blockspace",

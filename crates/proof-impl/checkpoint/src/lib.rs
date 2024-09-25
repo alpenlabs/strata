@@ -1,5 +1,5 @@
 use alpen_express_primitives::buf::Buf32;
-use alpen_express_state::{chain_state::ChainState, tx::DepositInfo};
+use alpen_express_state::{batch::CheckpointInfo, chain_state::ChainState, tx::DepositInfo};
 use borsh::{BorshDeserialize, BorshSerialize};
 use express_proofimpl_l1_batch::logic::L1BatchProofOutput;
 use serde::{Deserialize, Serialize};
@@ -17,11 +17,11 @@ pub struct L2BatchProofOutput {
 pub struct CheckpointProofInput {
     pub l1_state: L1BatchProofOutput,
     pub l2_state: L2BatchProofOutput,
-    /// The image ID (also called ELF ID) of this checkpoint program.
+    /// The verifying key of this checkpoint program.
     /// Required for verifying the Groth16 proof of this program.
     /// Cannot be hardcoded as any change to the program or proof implementation
     /// will change the image ID.
-    pub image_id: [u32; 8],
+    pub verifying_key: [u32; 8],
     // TODO: genesis will be hardcoded here
     pub genesis: HashedCheckpointState,
 }
@@ -32,49 +32,35 @@ pub struct HashedCheckpointState {
     pub l2_state: Buf32,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct CheckpointProofOutput {
-    pub l1_state: Buf32,
-    pub l2_state: Buf32,
-    pub total_acc_pow: u128,
-}
-
 // TODO: genesis needs to be hardcoded
 pub fn process_checkpoint_proof(
     l1_batch: &L1BatchProofOutput,
     l2_batch: &L2BatchProofOutput,
     genesis: &HashedCheckpointState,
-) -> (
-    CheckpointProofOutput,
-    Option<(CheckpointProofOutput, Groth16Proof)>,
-) {
+) -> (CheckpointInfo, Option<(CheckpointInfo, Groth16Proof)>) {
     let initial_l1_state_hash = l1_batch.initial_state.hash().unwrap();
     let initial_l2_state_hash = l2_batch.initial_state.compute_state_root();
+
+    let final_l1_state_hash = l1_batch.final_state.hash().unwrap();
+    let final_l2_state_hash = l2_batch.final_state.compute_state_root();
 
     let prev_checkpoint = l1_batch
         .state_update
         .as_ref()
         .map(|prev_state_update| {
-            // Verify that the previous state update matches the initial state
+            let checkpoint_info = prev_state_update.checkpoint().clone();
             assert_eq!(
                 &initial_l1_state_hash,
-                prev_state_update.l1_state_hash(),
+                checkpoint_info.l1_state_hash(),
                 "L1 state mismatch"
             );
             assert_eq!(
                 &initial_l2_state_hash,
-                prev_state_update.l2_state_hash(),
+                checkpoint_info.l2_state_hash(),
                 "L2 state mismatch"
             );
 
-            let checkpoint = CheckpointProofOutput {
-                l1_state: initial_l1_state_hash,
-                l2_state: initial_l2_state_hash,
-                // TODO: fix this
-                total_acc_pow: prev_state_update.acc_pow(),
-            };
-
-            (checkpoint, prev_state_update.proof().to_vec())
+            (checkpoint_info, prev_state_update.proof().to_vec())
         })
         .or_else(|| {
             // If no previous state update, verify against genesis
@@ -94,11 +80,33 @@ pub fn process_checkpoint_proof(
         "Deposits mismatch between L1 and L2"
     );
 
-    let output = CheckpointProofOutput {
-        l1_state: l1_batch.final_state.hash().unwrap(),
-        l2_state: l2_batch.final_state.compute_state_root(),
-        total_acc_pow: l1_batch.final_state.total_accumulated_pow,
+    let (checkpoint_idx, acc_pow) = match &prev_checkpoint {
+        Some((checkpoint, _)) => (
+            checkpoint.idx + 1,
+            checkpoint.acc_pow() + l1_batch.final_state.total_accumulated_pow,
+        ),
+        None => (0, l1_batch.final_state.total_accumulated_pow),
     };
+
+    let l1_range = (
+        l1_batch.initial_state.last_verified_block_num as u64 + 1,
+        l1_batch.final_state.last_verified_block_num as u64 + 1,
+    );
+
+    let l2_range = (
+        l2_batch.initial_state.chain_tip_slot(),
+        l2_batch.final_state.chain_tip_slot(),
+    );
+
+    let output = CheckpointInfo::new(
+        checkpoint_idx,
+        l1_range,
+        l2_range,
+        l2_batch.final_state.chain_tip_blockid(),
+        final_l1_state_hash,
+        final_l2_state_hash,
+        acc_pow,
+    );
 
     (output, prev_checkpoint)
 }

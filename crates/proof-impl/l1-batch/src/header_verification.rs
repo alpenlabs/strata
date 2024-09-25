@@ -172,7 +172,7 @@ impl HeaderVerificationState {
 /// * `idx` - The index of the difficulty adjustment (1-based). 1 for the first adjustment, 2 for
 ///   the second, and so on.
 /// * `start` - The starting height from which to calculate.
-/// * `params` - [`PowParams`] of the network
+/// * `params` - [`Params`] of the network
 pub fn get_difficulty_adjustment_height(idx: u32, start: u32, params: &Params) -> u32 {
     let difficulty_adjustment_interval = params.difficulty_adjustment_interval() as u32;
     ((start / difficulty_adjustment_interval) + idx) * difficulty_adjustment_interval

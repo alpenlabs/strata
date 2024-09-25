@@ -1,12 +1,11 @@
 #[cfg(feature = "prover")]
 mod test {
 
+    use alpen_express_state::batch::CheckpointInfo;
     use alpen_test_utils::{bitcoin::get_tx_filters, l2::get_genesis_chainstate};
     use bitcoin::params::MAINNET;
     use express_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
-    use express_proofimpl_checkpoint::{
-        CheckpointProofOutput, HashedCheckpointState, L2BatchProofOutput,
-    };
+    use express_proofimpl_checkpoint::{HashedCheckpointState, L2BatchProofOutput};
     use express_proofimpl_l1_batch::{
         logic::{L1BatchProofInput, L1BatchProofOutput},
         mock::get_verification_state_for_block,
@@ -134,7 +133,8 @@ mod test {
             .prove(prover_input)
             .expect("Failed to generate proof");
 
-        let _output = SP1Verifier::extract_public_output::<CheckpointProofOutput>(&proof)
+        let output_raw = SP1Verifier::extract_public_output::<Vec<u8>>(&proof)
             .expect("Failed to extract public outputs");
+        let _: CheckpointInfo = borsh::from_slice(&output_raw).unwrap();
     }
 }

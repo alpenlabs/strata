@@ -90,6 +90,10 @@ impl ChainState {
         self.last_block
     }
 
+    pub fn chain_tip_slot(&self) -> u64 {
+        self.slot
+    }
+
     pub fn l1_view(&self) -> &L1ViewState {
         &self.l1_state
     }

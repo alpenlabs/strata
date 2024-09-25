@@ -1,6 +1,6 @@
+use alpen_express_state::batch::CheckpointInfo;
 use express_proofimpl_checkpoint::{
-    self, process_checkpoint_proof, CheckpointProofOutput, Groth16Proof, HashedCheckpointState,
-    L2BatchProofOutput,
+    self, process_checkpoint_proof, Groth16Proof, HashedCheckpointState, L2BatchProofOutput,
 };
 use express_proofimpl_l1_batch::logic::L1BatchProofOutput;
 use risc0_zkvm::{
@@ -46,15 +46,15 @@ fn main() {
         verify_prev_checkpoint(&prev_checkpoint.0, &prev_checkpoint.1, checkpoint_vk);
     }
 
-    env::write(&output);
+    env::write(&borsh::to_vec(&output).unwrap());
 }
 
 fn verify_prev_checkpoint(
-    prev_checkpoint: &CheckpointProofOutput,
+    prev_checkpoint: &CheckpointInfo,
     proof: &Groth16Proof,
     checkpoint_vk: [u32; 8],
 ) {
-    let buf1: Vec<u8> = to_vec(&prev_checkpoint)
+    let buf1: Vec<u8> = to_vec(&borsh::to_vec(prev_checkpoint).unwrap())
         .unwrap()
         .clone()
         .into_iter()
