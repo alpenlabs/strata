@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 
 use alpen_express_btcio::{broadcaster::L1BroadcastHandle, writer::InscriptionHandle};
 use alpen_express_consensus_logic::{
@@ -33,7 +33,13 @@ use alpen_express_state::{
 };
 use alpen_express_status::StatusRx;
 use async_trait::async_trait;
-use bitcoin::{consensus::deserialize, hashes::Hash, Network, Transaction as BTransaction, Txid};
+use bitcoin::{
+    consensus::deserialize,
+    hashes::Hash,
+    key::Parity,
+    secp256k1::{PublicKey, XOnlyPublicKey},
+    Network, Transaction as BTransaction, Txid,
+};
 use express_bridge_relay::relayer::RelayerHandle;
 use express_rpc_utils::to_jsonrpsee_error;
 use express_storage::L2BlockManager;
@@ -551,7 +557,25 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
     }
 
     async fn get_active_operator_chain_pubkey_set(&self) -> RpcResult<PublickeyTable> {
-        unimplemented!()
+        let (_, chain_state) = self.get_cur_states().await?;
+        let chain_state = chain_state.ok_or(Error::BeforeGenesis)?;
+
+        let operator_table = chain_state.operator_table();
+        let operator_map: BTreeMap<OperatorIdx, PublicKey> = operator_table
+            .operators()
+            .iter()
+            .fold(BTreeMap::new(), |mut map, entry| {
+                let pubkey = XOnlyPublicKey::from_slice(&entry.signing_pk().0 .0)
+                    .expect("something has gone horribly wrong");
+
+                // This is a taproot pubkey so its parity has to be even.
+                let pubkey = pubkey.public_key(Parity::Even);
+
+                map.insert(entry.idx(), pubkey);
+                map
+            });
+
+        Ok(operator_map.into())
     }
 }
 

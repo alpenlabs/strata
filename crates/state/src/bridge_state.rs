@@ -35,8 +35,14 @@ impl OperatorEntry {
         self.idx
     }
 
+    /// Get pubkey used to verify signed messages from the operator.
     pub fn signing_pk(&self) -> &Buf32 {
         &self.signing_pk
+    }
+
+    /// Get wallet pubkey used to compute MuSig2 pubkey from a set of operators.
+    pub fn wallet_pk(&self) -> &Buf32 {
+        &self.wallet_pk
     }
 }
 
@@ -96,7 +102,11 @@ impl OperatorTable {
     /// Returns if the operator table is empty.  This is practically probably
     /// never going to be true.
     pub fn is_empty(&self) -> bool {
-        self.len() > 0
+        self.operators.is_empty()
+    }
+
+    pub fn operators(&self) -> &[OperatorEntry] {
+        &self.operators
     }
 
     /// Inserts a new operator entry.
@@ -136,7 +146,9 @@ impl OperatorTable {
 
 impl OperatorKeyProvider for OperatorTable {
     fn get_operator_signing_pk(&self, idx: OperatorIdx) -> Option<Buf32> {
-        self.get_operator(idx).map(|ent| ent.signing_pk)
+        // TODO: use the `signing_pk` here if we decide to use a different signing scheme for
+        // signing messages.
+        self.get_operator(idx).map(|ent| ent.wallet_pk)
     }
 }
 
