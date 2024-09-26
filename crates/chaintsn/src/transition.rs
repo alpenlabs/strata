@@ -4,7 +4,7 @@
 
 use std::cmp::max;
 
-use alpen_express_primitives::params::RollupParams;
+use alpen_express_primitives::{bridge::OperatorIdx, params::RollupParams};
 use alpen_express_state::{
     block::L1Segment,
     bridge_ops::{WithdrawalBatch, WithdrawalIntent},
@@ -16,7 +16,11 @@ use alpen_express_state::{
     state_queue,
 };
 
-use crate::{errors::TsnError, macros::*, slot_rng::SlotRng};
+use crate::{
+    errors::TsnError,
+    macros::*,
+    slot_rng::{self, SlotRng},
+};
 
 /// Processes a block, making writes into the provided state cache that will
 /// then be written to disk.  This does not check the block's credentials, it
@@ -227,7 +231,7 @@ fn process_deposit_updates(
     }
 
     let ops_seq = (0..ready_withdrawals.len())
-        .map(|_| rng.next_u32() % num_operators)
+        .map(|_| next_rand_op_pos(rng, num_operators))
         .collect::<Vec<_>>();
 
     let mut next_intent_to_assign = 0;
@@ -306,4 +310,14 @@ fn process_deposit_updates(
     // TODO remove stale deposit idxs
 
     Ok(())
+}
+
+/// Wrapper to safely(?) select a random operator index.
+fn next_rand_op_pos(rng: &mut SlotRng, num: u32) -> u32 {
+    // This feels kinda weird.
+    const MASK: u32 = u32::wrapping_sub(0, 1);
+    assert_eq!(MASK.count_ones(), u32::BITS, "mask computed incorrectly");
+
+    let r = rng.next_u32();
+    (r & MASK) % num
 }
