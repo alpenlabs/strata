@@ -3,14 +3,15 @@
 //! This module abstracts away the data extraction logic from the serving logic in
 //! [`super::rpc_server`]. This extraction can happen either from the chain state, the client state
 //! or a database.
-//!
-//! This pattern allows us to test the actual business logic of the RPCs inside a unit test rather
-//! than worry about all the harnessing that is necessary to test the RPC itself.
+
+// This pattern allows testing the actual business logic of the RPCs inside a unit test rather
+// than having to worry about all the harnessing that is necessary to test the RPC itself.
 
 use std::sync::Arc;
 
 use alpen_express_db::traits::L1DataProvider;
 use alpen_express_primitives::l1::BitcoinAddress;
+use alpen_express_rpc_types::RpcServerError;
 use alpen_express_state::tx::ProtocolOperation;
 use bitcoin::{
     consensus::Decodable, hashes::Hash, params::Params, Address, Amount, Network, OutPoint,
@@ -19,8 +20,6 @@ use bitcoin::{
 use express_bridge_tx_builder::prelude::DepositInfo;
 use jsonrpsee::core::RpcResult;
 use tracing::{debug, error};
-
-use crate::errors::RpcServerError;
 
 /// Extract the deposit duties from the [`L1DataProvider`] starting from a given block height.
 ///

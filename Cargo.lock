@@ -916,12 +916,15 @@ dependencies = [
 name = "alpen-express-rpc-types"
 version = "0.1.0"
 dependencies = [
+ "alpen-express-db",
  "alpen-express-state",
  "bitcoin",
  "hex",
+ "jsonrpsee",
  "serde",
  "serde_json",
  "serde_with",
+ "thiserror",
 ]
 
 [[package]]

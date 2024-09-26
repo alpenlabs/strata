@@ -11,8 +11,8 @@ use alpen_express_db::{
 use alpen_express_primitives::{bridge::PublickeyTable, buf::Buf32, hash, params::Params};
 use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer};
 use alpen_express_rpc_types::{
-    BlockHeader, ClientStatus, DaBlob, DepositEntry, DepositState, ExecUpdate, HexBytes,
-    HexBytes32, L1Status, NodeSyncStatus, RawBlockWitness, RpcCheckpointInfo,
+    errors::RpcServerError as Error, BlockHeader, ClientStatus, DaBlob, DepositEntry, DepositState,
+    ExecUpdate, HexBytes, HexBytes32, L1Status, NodeSyncStatus, RawBlockWitness, RpcCheckpointInfo,
 };
 use alpen_express_state::{
     batch::BatchCheckpoint,
@@ -37,7 +37,6 @@ use jsonrpsee::core::RpcResult;
 use tokio::sync::{oneshot, Mutex};
 use tracing::*;
 
-use super::errors::RpcServerError as Error;
 use crate::extractor::extract_deposit_requests;
 
 fn fetch_l2blk<D: Database + Sync + Send + 'static>(

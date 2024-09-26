@@ -6,7 +6,7 @@ use jsonrpsee::types::ErrorObjectOwned;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-pub(super) enum RpcServerError {
+pub enum RpcServerError {
     /// Unsupported RPCs for express.  Some of these might need to be replaced
     /// with standard unsupported errors.
     #[error("unsupported RPC")]

@@ -56,7 +56,6 @@ use crate::args::Args;
 
 mod args;
 mod config;
-mod errors;
 mod extractor;
 mod l1_reader;
 mod rpc_client;
