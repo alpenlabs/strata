@@ -25,7 +25,7 @@ pub async fn refresh(seed: Seed) {
     let _ = term.write_line("Opening descriptor recovery");
     let mut descriptor_file = DescriptorRecovery::open(&seed).await.unwrap();
     let current_height = l1w.local_chain().get_chain_tip().unwrap().height;
-    let _ = term.write_line(&format!("Current chain height: {current_height}"));
+    let _ = term.write_line(&format!("Current signet chain height: {current_height}"));
     let descs = descriptor_file
         .read_descs_after(current_height)
         .await
