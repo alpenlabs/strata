@@ -8,6 +8,7 @@ use bitcoin::{
     Transaction,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
+use express_zkvm::Proof;
 use serde::{Deserialize, Serialize};
 
 /// Represents data for a blob we're still planning to inscribe.
@@ -145,7 +146,7 @@ pub struct CheckpointEntry {
     pub checkpoint: CheckpointInfo,
 
     /// Proof
-    pub proof: Vec<u8>,
+    pub proof: Proof,
 
     l1_state_hash: Buf32,
     l2_state_hash: Buf32,
@@ -161,7 +162,7 @@ pub struct CheckpointEntry {
 impl CheckpointEntry {
     pub fn new(
         checkpoint: CheckpointInfo,
-        proof: Vec<u8>,
+        proof: Proof,
         proving_status: CheckpointProvingStatus,
         confirmation_status: CheckpointConfStatus,
         l1_state_hash: Buf32,
@@ -192,7 +193,7 @@ impl CheckpointEntry {
     ) -> Self {
         Self::new(
             checkpoint,
-            vec![],
+            Proof::new(vec![]),
             CheckpointProvingStatus::PendingProof,
             CheckpointConfStatus::Pending,
             l1_state_hash,
@@ -206,7 +207,7 @@ impl CheckpointEntry {
     }
 
     pub fn is_proof_nonempty(&self) -> bool {
-        !self.proof.is_empty()
+        !self.proof.as_bytes().is_empty()
     }
 }
 

@@ -22,6 +22,7 @@
         "provers/sp1/guest-evm-ee-stf/Cargo.toml",
         "provers/sp1/guest-cl-stf/Cargo.toml",
         "provers/sp1/guest-l1-batch/Cargo.toml",
+        "provers/sp1/guest-checkpoint/Cargo.toml",
     ],
     "rust-analyzer.diagnostics.enable": true,
     // "rust-analyzer.cargo.features": [

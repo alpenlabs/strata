@@ -2,9 +2,8 @@ use alpen_express_primitives::buf::Buf32;
 use alpen_express_state::{batch::CheckpointInfo, id::L2BlockId, tx::DepositInfo};
 use borsh::{BorshDeserialize, BorshSerialize};
 use express_proofimpl_l1_batch::logic::L1BatchProofOutput;
+use express_zkvm::Proof;
 use serde::{Deserialize, Serialize};
-
-pub type Groth16Proof = Vec<u8>;
 
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct ChainStateSnapshot {
@@ -44,7 +43,7 @@ pub fn process_checkpoint_proof(
     l1_batch: &L1BatchProofOutput,
     l2_batch: &L2BatchProofOutput,
     genesis: &HashedCheckpointState,
-) -> (CheckpointInfo, Option<(CheckpointInfo, Groth16Proof)>) {
+) -> (CheckpointInfo, Option<(CheckpointInfo, Proof)>) {
     let prev_checkpoint = match l1_batch.state_update.as_ref() {
         // If no some previous state update, verify that it's sequential
         Some(prev_state_update) => {
@@ -61,7 +60,7 @@ pub fn process_checkpoint_proof(
                 "L2 state mismatch"
             );
 
-            Some((checkpoint_info, prev_state_update.proof().to_vec()))
+            Some((checkpoint_info, prev_state_update.proof().clone()))
         }
         // If no previous state update, verify against genesis
         None => {

@@ -185,6 +185,7 @@ dependencies = [
  "borsh",
  "digest 0.10.7",
  "express-bridge-tx-builder",
+ "express-zkvm",
  "hex",
  "num_enum",
  "serde",
@@ -901,6 +902,16 @@ dependencies = [
  "borsh",
  "express-chaintsn",
  "thiserror",
+]
+
+[[package]]
+name = "express-zkvm"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arbitrary",
+ "borsh",
+ "serde",
 ]
 
 [[package]]

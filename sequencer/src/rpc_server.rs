@@ -720,7 +720,7 @@ impl AlpenAdminApiServer for AdminServerImpl {
         debug!(%idx, "Proof is pending, setting proof reaedy");
 
         // TODO: verify proof, once proof verification logic is ready
-        entry.proof = proofbytes.into_inner();
+        entry.proof = express_zkvm::Proof::new(proofbytes.into_inner());
         entry.proving_status = CheckpointProvingStatus::ProofReady;
         self.checkpoint_handle
             .put_checkpoint_and_notify(idx, entry)

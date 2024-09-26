@@ -185,6 +185,7 @@ dependencies = [
  "borsh",
  "digest 0.10.7",
  "express-bridge-tx-builder",
+ "express-zkvm",
  "hex",
  "num_enum",
  "serde",
@@ -896,6 +897,7 @@ dependencies = [
  "ethnum",
  "express-proofimpl-btc-blockspace",
  "express-proofimpl-l1-batch",
+ "express-zkvm",
  "serde",
  "serde_json",
 ]
@@ -913,6 +915,16 @@ dependencies = [
  "express-proofimpl-btc-blockspace",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "express-zkvm"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arbitrary",
+ "borsh",
+ "serde",
 ]
 
 [[package]]
@@ -1017,6 +1029,7 @@ name = "guest-sp1-checkpoint"
 version = "0.1.0"
 dependencies = [
  "alpen-express-primitives",
+ "alpen-express-state",
  "bincode",
  "bitcoin",
  "borsh",
@@ -2005,9 +2018,9 @@ dependencies = [
 
 [[package]]
 name = "secp256k1"
-version = "0.29.0"
+version = "0.29.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e0cc0f1cf93f4969faf3ea1c7d8a9faed25918d96affa959720823dfe86d4f3"
+checksum = "9465315bc9d4566e1724f0fffcbcc446268cb522e60f9a27bcded6b19c108113"
 dependencies = [
  "bitcoin_hashes",
  "rand",

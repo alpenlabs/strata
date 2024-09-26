@@ -1,6 +1,7 @@
 use alpen_express_primitives::buf::{Buf32, Buf64};
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
+use express_zkvm::Proof;
 
 use crate::id::L2BlockId;
 
@@ -11,11 +12,11 @@ pub struct BatchCheckpoint {
     /// Information regarding the current batch checkpoint
     checkpoint: CheckpointInfo,
     /// Proof for the batch obtained from prover manager
-    proof: Vec<u8>,
+    proof: Proof,
 }
 
 impl BatchCheckpoint {
-    pub fn new(checkpoint: CheckpointInfo, proof: Vec<u8>) -> Self {
+    pub fn new(checkpoint: CheckpointInfo, proof: Proof) -> Self {
         Self { checkpoint, proof }
     }
 
@@ -23,7 +24,7 @@ impl BatchCheckpoint {
         &self.checkpoint
     }
 
-    pub fn proof(&self) -> &[u8] {
+    pub fn proof(&self) -> &Proof {
         &self.proof
     }
 
@@ -33,7 +34,7 @@ impl BatchCheckpoint {
             borsh::to_vec(&self.checkpoint).expect("could not serialize checkpoint info");
 
         buf.extend(checkpt_sighash);
-        buf.extend(self.proof.clone());
+        buf.extend(self.proof.as_bytes());
         buf.extend(self.checkpoint().l2_blockid.as_ref());
 
         alpen_express_primitives::hash::raw(&buf)

@@ -7,9 +7,11 @@ version = "0.1.0"
 # reuse much of reth in this crate so that we can factor it all out eventually.
 
 [dependencies]
+
 alpen-express-crypto = { workspace = true }
 alpen-express-primitives = { workspace = true }
 express-bridge-tx-builder = { workspace = true }
+express-zkvm = { workspace = true }
 
 arbitrary = { workspace = true }
 bitcoin = { workspace = true }

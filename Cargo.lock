@@ -757,6 +757,7 @@ dependencies = [
  "arbitrary",
  "bitcoin",
  "borsh",
+ "express-zkvm",
  "hex",
  "mockall",
  "musig2",
@@ -949,6 +950,7 @@ dependencies = [
  "express-storage",
  "express-sync",
  "express-tasks",
+ "express-zkvm",
  "format_serde_error",
  "futures",
  "hex",
@@ -981,6 +983,7 @@ dependencies = [
  "borsh",
  "digest 0.10.7",
  "express-bridge-tx-builder",
+ "express-zkvm",
  "hex",
  "num_enum 0.7.2",
  "serde",
@@ -3883,6 +3886,7 @@ dependencies = [
  "ethnum",
  "express-proofimpl-btc-blockspace",
  "express-proofimpl-l1-batch",
+ "express-zkvm",
  "rand 0.8.5",
  "serde",
  "serde_json",
@@ -4221,6 +4225,7 @@ name = "express-zkvm"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "arbitrary",
  "borsh",
  "serde",
 ]

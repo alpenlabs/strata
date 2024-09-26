@@ -23,7 +23,7 @@ pub(crate) fn check_and_get_batch_checkpoint(
         // checkpoint info to create proofs for next
         None => {
             debug!(%idx, "Checkpoint not found, creating pending checkpoint");
-            let entry = CheckpointEntry::new_pending_proof(duty.checkpoint().clone());
+            let entry = CheckpointEntry::new_pending_proof(duty.checkpoint_info().clone());
             checkpt_handle.put_checkpoint_blocking(idx, entry)?;
         }
         // There's an entry. If status is ProofCreated, return it else we need to wait for prover to

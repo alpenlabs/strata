@@ -46,7 +46,7 @@ impl ZKVMVerifier for SP1Verifier {
         Ok(())
     }
 
-    fn verify_groth16(proof: &[u8], vkey_hash: &[u8], committed_values_raw: &[u8]) -> Result<()> {
+    fn verify_groth16(proof: &Proof, vkey_hash: &[u8], committed_values_raw: &[u8]) -> Result<()> {
         let vk = GROTH16_VK_BYTES;
 
         // Convert vkey_hash to Fr, mapping the error to anyhow::Error
@@ -64,10 +64,13 @@ impl ZKVMVerifier for SP1Verifier {
             .context("Unable to convert committed_values_digest to Fr")?;
 
         // Perform the Groth16 verification, mapping any error to anyhow::Error
-        let verification_result =
-            Groth16Verifier::verify(proof, vk, &[vkey_hash_fr, committed_values_digest_fr])
-                .map_err(|e| anyhow::anyhow!(e))
-                .context("Groth16 verification failed")?;
+        let verification_result = Groth16Verifier::verify(
+            proof.as_bytes(),
+            vk,
+            &[vkey_hash_fr, committed_values_digest_fr],
+        )
+        .map_err(|e| anyhow::anyhow!(e))
+        .context("Groth16 verification failed")?;
 
         if verification_result {
             Ok(())
@@ -106,7 +109,7 @@ mod tests {
             .expect("Failed to convert proof to Groth16")
             .raw_proof;
         let groth16_proof =
-            hex::decode(&groth16_proof_bytes).expect("Failed to decode Groth16 proof");
+            Proof::new(hex::decode(&groth16_proof_bytes).expect("Failed to decode Groth16 proof"));
 
         let vkey_hash = BigUint::from_str_radix(
             vk.strip_prefix("0x").expect("vkey should start with '0x'"),

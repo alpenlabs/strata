@@ -164,7 +164,7 @@ pub fn verify_proof(
     let proof = checkpoint.proof();
 
     if let ProofPublishMode::Timeout(_) = rollup_params.proof_publish_mode {
-        if proof.is_empty() {
+        if proof.as_bytes().is_empty() {
             warn!("Accepting empty proofs");
             return Ok(());
         }

@@ -25,6 +25,7 @@ express-rpc-utils = { workspace = true }
 express-storage = { workspace = true }
 express-sync = { workspace = true }
 express-tasks = { workspace = true }
+express-zkvm = { workspace = true }
 strata-tx-parser = { workspace = true }
 
 anyhow = { workspace = true }

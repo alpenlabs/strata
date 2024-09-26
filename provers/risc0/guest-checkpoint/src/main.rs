@@ -1,8 +1,9 @@
 use alpen_express_state::batch::CheckpointInfo;
 use express_proofimpl_checkpoint::{
-    self, process_checkpoint_proof, Groth16Proof, HashedCheckpointState, L2BatchProofOutput,
+    self, process_checkpoint_proof, HashedCheckpointState, L2BatchProofOutput,
 };
 use express_proofimpl_l1_batch::logic::L1BatchProofOutput;
+use express_zkvm::Proof;
 use risc0_zkvm::{
     guest::env,
     serde::{self, to_vec},
@@ -51,7 +52,7 @@ fn main() {
 
 fn verify_prev_checkpoint(
     prev_checkpoint: &CheckpointInfo,
-    proof: &Groth16Proof,
+    proof: &Proof,
     checkpoint_vk: [u32; 8],
 ) {
     let buf1: Vec<u8> = to_vec(&borsh::to_vec(prev_checkpoint).unwrap())
@@ -70,9 +71,9 @@ fn verify_prev_checkpoint(
     let claim = MaybePruned::from(claim);
 
     let receipt = Groth16Receipt::new(
-        proof.clone(), // Actual Groth16 Proof(A, B, C)
-        claim,         // Includes both digest and elf
-        input_digest,  // This is not actually used underneath
+        proof.as_bytes().to_vec(), // Actual Groth16 Proof(A, B, C)
+        claim,                     // Includes both digest and elf
+        input_digest,              // This is not actually used underneath
     );
 
     let res = receipt.verify_integrity();
