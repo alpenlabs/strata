@@ -5,7 +5,7 @@ use std::sync::Arc;
 use alpen_express_common::logging;
 use args::Args;
 use config::EL_START_BLOCK_HEIGHT;
-use express_risc0_adapter::RiscZeroHost;
+use express_sp1_adapter::SP1Host;
 use jsonrpsee::http_client::HttpClientBuilder;
 use manager::ProverManager;
 use rpc_server::{ProverClientRpc, RpcContext};
@@ -42,7 +42,7 @@ async fn main() {
         EL_START_BLOCK_HEIGHT,
     );
     let rpc_context = RpcContext::new(el_proving_task_scheduler.clone());
-    let prover_manager: ProverManager<RiscZeroHost> = ProverManager::new(task_tracker);
+    let prover_manager: ProverManager<SP1Host> = ProverManager::new(task_tracker);
 
     // run prover manager in background
     tokio::spawn(async move { prover_manager.run().await });
