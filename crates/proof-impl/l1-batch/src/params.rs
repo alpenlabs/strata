@@ -7,10 +7,16 @@ use bitcoin::params::Params;
 /// # Note
 /// If adjustments to the parameters are required, modify them as shown below:
 /// ```
-/// let mut btc_params = Params::MAINNET;
-/// btc_params.pow_target_spacing = 25 * 30; // Adjusted to 2.5 minutes
-/// btc_params
+/// use bitcoin::params::Params;
+/// fn get_btc_params() -> Params {
+///     let mut btc_params: Params = Params::MAINNET;
+///     btc_params.pow_target_spacing = 25 * 30; // Adjusted to 2.5 minutes
+///     btc_params // Return the modified `btc_params`
+/// }
 /// ```
+///
+/// # Returns
+/// Returns the default Bitcoin Parameters used in our rollup.
 pub fn get_btc_params() -> Params {
     Params::MAINNET
 }

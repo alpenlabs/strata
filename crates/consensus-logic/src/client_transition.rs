@@ -107,7 +107,10 @@ pub fn process_event<D: Database>(
                 // only when the corresponding L1 block is buried enough
                 writes.push(ClientStateWrite::CheckpointsReceived(
                     *height,
-                    commitments.iter().map(|x| x.checkpoint().clone()).collect(),
+                    commitments
+                        .iter()
+                        .map(|x| x.checkpoint().info().clone())
+                        .collect(),
                 ));
 
                 actions.push(SyncAction::WriteCheckpoints(*height, commitments.clone()));

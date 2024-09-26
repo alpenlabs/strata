@@ -97,7 +97,12 @@ pub trait AlpenAdminApi {
 
     /// Verifies and adds the submitted proof to the checkpoint database
     #[method(name = "submitCheckpointProof")]
-    async fn submit_checkpoint_proof(&self, idx: u64, proof: HexBytes) -> RpcResult<()>;
+    async fn submit_checkpoint_proof(
+        &self,
+        idx: u64,
+        proof: HexBytes,
+        state: HexBytes,
+    ) -> RpcResult<()>;
 }
 
 /// APIs that are invoked by the bridge client to query and execute its duties.

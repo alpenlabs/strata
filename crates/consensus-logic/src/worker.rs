@@ -219,13 +219,11 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
                     let pstatus = CheckpointProvingStatus::ProofReady;
                     let cstatus = CheckpointConfStatus::Confirmed;
                     let entry = CheckpointEntry::new(
-                        c.checkpoint().clone(),
+                        c.checkpoint().info().clone(),
+                        c.checkpoint().state().clone(),
                         c.proof().clone(),
                         pstatus,
                         cstatus,
-                        Buf32::zero(),
-                        Buf32::zero(),
-                        0,
                     );
 
                     // Store
@@ -238,13 +236,11 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
                     let pstatus = CheckpointProvingStatus::ProofReady;
                     let cstatus = CheckpointConfStatus::Finalized;
                     let entry = CheckpointEntry::new(
-                        c.checkpoint().clone(),
+                        c.checkpoint().info().clone(),
+                        c.checkpoint().state().clone(),
                         c.proof().clone(),
                         pstatus,
                         cstatus,
-                        Buf32::zero(),
-                        Buf32::zero(),
-                        0,
                     );
 
                     // Update

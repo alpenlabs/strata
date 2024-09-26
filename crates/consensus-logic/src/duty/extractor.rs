@@ -1,4 +1,4 @@
-use alpen_express_primitives::{buf::Buf32, params::Params};
+use alpen_express_primitives::params::Params;
 use alpen_express_state::{batch::CheckpointInfo, client_state::ClientState, id::L2BlockId};
 use tracing::*;
 
@@ -63,15 +63,7 @@ fn extract_batch_duties(
             // Start from first non-genesis l2 block height
             let l2_range = (1, tip_height);
 
-            let new_checkpt = CheckpointInfo::new(
-                first_batch_idx,
-                l1_range,
-                l2_range,
-                tip_id,
-                Buf32::zero(),
-                Buf32::zero(),
-                0,
-            );
+            let new_checkpt = CheckpointInfo::new(first_batch_idx, l1_range, l2_range, tip_id);
             Ok(vec![Duty::CommitBatch(new_checkpt.clone().into())])
         }
         Some(l1checkpoint) => {
@@ -81,13 +73,11 @@ fn extract_batch_duties(
             // proving
             let l2_range = (checkpoint.l2_range.1 + 1, tip_height);
             let new_checkpt = CheckpointInfo::new(
+                // TODO: Update here to get all the info
                 checkpoint.idx + 1,
                 l1_range,
                 l2_range,
                 tip_id,
-                Buf32::zero(),
-                Buf32::zero(),
-                0,
             );
             Ok(vec![Duty::CommitBatch(new_checkpt.clone().into())])
         }

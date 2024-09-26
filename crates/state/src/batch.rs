@@ -10,17 +10,17 @@ use crate::id::L2BlockId;
 #[derive(Clone, Debug, PartialEq, Eq, BorshDeserialize, BorshSerialize, Arbitrary)]
 pub struct BatchCheckpoint {
     /// Information regarding the current batch checkpoint
-    checkpoint: CheckpointInfo,
+    checkpoint: Checkpoint,
     /// Proof for the batch obtained from prover manager
     proof: Proof,
 }
 
 impl BatchCheckpoint {
-    pub fn new(checkpoint: CheckpointInfo, proof: Proof) -> Self {
+    pub fn new(checkpoint: Checkpoint, proof: Proof) -> Self {
         Self { checkpoint, proof }
     }
 
-    pub fn checkpoint(&self) -> &CheckpointInfo {
+    pub fn checkpoint(&self) -> &Checkpoint {
         &self.checkpoint
     }
 
@@ -30,12 +30,11 @@ impl BatchCheckpoint {
 
     pub fn get_sighash(&self) -> Buf32 {
         let mut buf = vec![];
-        let checkpt_sighash =
+        let checkpoint_sighash =
             borsh::to_vec(&self.checkpoint).expect("could not serialize checkpoint info");
 
-        buf.extend(checkpt_sighash);
+        buf.extend(&checkpoint_sighash);
         buf.extend(self.proof.as_bytes());
-        buf.extend(self.checkpoint().l2_blockid.as_ref());
 
         alpen_express_primitives::hash::raw(&buf)
     }
@@ -69,12 +68,6 @@ pub struct CheckpointInfo {
     pub l2_range: (u64, u64),
     /// The last L2 block upto which this checkpoint covers since the previous checkpoint
     pub l2_blockid: L2BlockId,
-    /// Hash of the HeaderVerificationState
-    l1_state_hash: Buf32,
-    /// Hash of the ChainState
-    l2_state_hash: Buf32,
-    /// Total Accumulated PoW till this checkpoint
-    acc_pow: u128,
 }
 
 impl CheckpointInfo {
@@ -83,18 +76,12 @@ impl CheckpointInfo {
         l1_range: (u64, u64),
         l2_range: (u64, u64),
         l2_blockid: L2BlockId,
-        l1_state_hash: Buf32,
-        l2_state_hash: Buf32,
-        acc_pow: u128,
     ) -> Self {
         Self {
             idx: checkpoint_idx,
             l1_range,
             l2_range,
             l2_blockid,
-            l1_state_hash,
-            l2_state_hash,
-            acc_pow,
         }
     }
 
@@ -104,6 +91,26 @@ impl CheckpointInfo {
 
     pub fn l2_blockid(&self) -> &L2BlockId {
         &self.l2_blockid
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, BorshDeserialize, BorshSerialize, Arbitrary, Default)]
+pub struct CheckpointState {
+    /// Hash of the HeaderVerificationState
+    pub l1_state_hash: Buf32,
+    /// Hash of the ChainState
+    pub l2_state_hash: Buf32,
+    /// Total Accumulated PoW till this checkpoint
+    pub acc_pow: u128,
+}
+
+impl CheckpointState {
+    pub fn new(l1_state_hash: Buf32, l2_state_hash: Buf32, acc_pow: u128) -> Self {
+        Self {
+            l1_state_hash,
+            l2_state_hash,
+            acc_pow,
+        }
     }
 
     pub fn l1_state_hash(&self) -> &Buf32 {
@@ -116,5 +123,33 @@ impl CheckpointInfo {
 
     pub fn acc_pow(&self) -> u128 {
         self.acc_pow
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, BorshDeserialize, BorshSerialize, Arbitrary)]
+pub struct Checkpoint {
+    state: CheckpointState,
+    info: CheckpointInfo,
+}
+
+impl Checkpoint {
+    pub fn new(info: CheckpointInfo, state: CheckpointState) -> Self {
+        Self { state, info }
+    }
+
+    pub fn info(&self) -> &CheckpointInfo {
+        &self.info
+    }
+
+    pub fn idx(&self) -> u64 {
+        self.info.idx
+    }
+
+    pub fn state(&self) -> &CheckpointState {
+        &self.state
+    }
+
+    pub fn l2_blockid(&self) -> &L2BlockId {
+        &self.info.l2_blockid
     }
 }

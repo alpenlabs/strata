@@ -1,7 +1,7 @@
 //! Module for database local types
 
 use alpen_express_primitives::buf::Buf32;
-use alpen_express_state::batch::{BatchCheckpoint, CheckpointInfo};
+use alpen_express_state::batch::{BatchCheckpoint, Checkpoint, CheckpointInfo, CheckpointState};
 use arbitrary::Arbitrary;
 use bitcoin::{
     consensus::{self, deserialize, serialize},
@@ -143,14 +143,13 @@ pub enum L1TxStatus {
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct CheckpointEntry {
     /// Info related to the batch
-    pub checkpoint: CheckpointInfo,
+    pub checkpoint_info: CheckpointInfo,
+
+    /// Hashed state of the batch
+    pub checkpoint_state: CheckpointState,
 
     /// Proof
     pub proof: Proof,
-
-    l1_state_hash: Buf32,
-    l2_state_hash: Buf32,
-    acc_pow: u128,
 
     /// Proving Status
     pub proving_status: CheckpointProvingStatus,
@@ -161,44 +160,34 @@ pub struct CheckpointEntry {
 
 impl CheckpointEntry {
     pub fn new(
-        checkpoint: CheckpointInfo,
+        checkpoint_info: CheckpointInfo,
+        checkpoint_state: CheckpointState,
         proof: Proof,
         proving_status: CheckpointProvingStatus,
         confirmation_status: CheckpointConfStatus,
-        l1_state_hash: Buf32,
-        l2_state_hash: Buf32,
-        acc_pow: u128,
     ) -> Self {
         Self {
-            checkpoint,
+            checkpoint_info,
+            checkpoint_state,
             proof,
             proving_status,
             confirmation_status,
-            l1_state_hash,
-            l2_state_hash,
-            acc_pow,
         }
     }
 
     pub fn into_batch_checkpoint(self) -> BatchCheckpoint {
-        BatchCheckpoint::new(self.checkpoint, self.proof)
+        let checkpoint = Checkpoint::new(self.checkpoint_info, self.checkpoint_state);
+        BatchCheckpoint::new(checkpoint, self.proof)
     }
 
     /// Creates a new instance for a freshly defined checkpoint.
-    pub fn new_pending_proof(
-        checkpoint: CheckpointInfo,
-        l1_state_hash: Buf32,
-        l2_state_hash: Buf32,
-        acc_pow: u128,
-    ) -> Self {
+    pub fn new_pending_proof(info: CheckpointInfo) -> Self {
         Self::new(
-            checkpoint,
+            info,
+            CheckpointState::default(),
             Proof::new(vec![]),
             CheckpointProvingStatus::PendingProof,
             CheckpointConfStatus::Pending,
-            l1_state_hash,
-            l2_state_hash,
-            acc_pow,
         )
     }
 
@@ -213,7 +202,7 @@ impl CheckpointEntry {
 
 impl From<CheckpointEntry> for BatchCheckpoint {
     fn from(entry: CheckpointEntry) -> BatchCheckpoint {
-        BatchCheckpoint::new(entry.checkpoint, entry.proof)
+        entry.into_batch_checkpoint()
     }
 }
 
