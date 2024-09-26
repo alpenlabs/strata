@@ -19,7 +19,8 @@ pub static SETTINGS: LazyLock<Settings> = LazyLock::new(|| {
     let config_file = proj_dirs.config_dir().to_owned().join("config.toml");
     let descriptor_file = proj_dirs.data_dir().to_owned().join("descriptors");
     let linux_seed_file = proj_dirs.data_dir().to_owned().join("seed");
-    create_dir_all(config_file.parent().unwrap()).unwrap();
+    create_dir_all(proj_dirs.config_dir()).unwrap();
+    create_dir_all(proj_dirs.data_dir()).unwrap();
     let _ = File::create_new(&config_file);
     let from_file = Config::builder()
         .add_source(config::File::from(config_file))
