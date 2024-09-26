@@ -1,3 +1,6 @@
+//! This crate implements the proof of the chain state transition function (STF) for L2 blocks,
+//! verifying the correct state transitions as new L2 blocks are processed.
+
 use alpen_express_primitives::params::Params;
 use alpen_express_state::block_validation::{check_block_credential, validate_block_segments};
 pub use alpen_express_state::{block::L2Block, chain_state::ChainState, state_op::StateCache};

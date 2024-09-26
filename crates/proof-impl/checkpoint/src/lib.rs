@@ -1,3 +1,7 @@
+//! This crate implements the final batch proof that aggregates both L1 Batch Proof and L2 Batch
+//! Proof. It ensures that the previous batch proof was correctly settled on the L1
+//! chain and that all L1-L2 transactions were processed.
+
 use alpen_express_primitives::buf::Buf32;
 use alpen_express_state::{batch::CheckpointInfo, id::L2BlockId, tx::DepositInfo};
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -26,7 +30,7 @@ pub struct CheckpointProofInput {
     /// The verifying key of this checkpoint program.
     /// Required for verifying the Groth16 proof of this program.
     /// Cannot be hardcoded as any change to the program or proof implementation
-    /// will change the image ID.
+    /// will change verifying_key.
     pub verifying_key: [u32; 8],
     // TODO: genesis will be hardcoded here
     pub genesis: HashedCheckpointState,
