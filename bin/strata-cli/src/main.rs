@@ -24,9 +24,7 @@ async fn main() {
     #[cfg(not(target_os = "linux"))]
     let persister = KeychainPersister;
     #[cfg(target_os = "linux")]
-    let persister = FilePersister {
-        file: SETTINGS.linux_seed_file.clone(),
-    };
+    let persister = FilePersister::new(SETTINGS.linux_seed_file.clone());
     let seed = seed::load_or_create(&persister).unwrap();
 
     match cmd {

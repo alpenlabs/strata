@@ -13,6 +13,12 @@ pub struct FilePersister {
     file: PathBuf,
 }
 
+impl FilePersister {
+    pub fn new(file: PathBuf) -> Self {
+        Self { file }
+    }
+}
+
 impl EncryptedSeedPersister for FilePersister {
     fn save(&self, seed: &EncryptedSeed) -> Result<(), PersisterErr> {
         let mut file = File::options().create(true).write(true).open(&self.file)?;
