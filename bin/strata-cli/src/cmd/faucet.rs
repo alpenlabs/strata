@@ -66,7 +66,7 @@ pub async fn faucet(args: FaucetArgs, seed: Seed) {
     let mut solution = 0u64;
     let prehash = {
         let mut hasher = Sha256::new();
-        hasher.update(b"alpen labs faucet 2024");
+        hasher.update(b"strata faucet 2024");
         hasher.update(challenge.nonce.0);
         hasher
     };
@@ -82,8 +82,7 @@ pub async fn faucet(args: FaucetArgs, seed: Seed) {
         }
     }
     pb.finish_with_message(format!(
-        "✔ Solved challenge after {} attempts. Claiming now.",
-        solution
+        "✔ Solved challenge after {solution} attempts. Claiming now."
     ));
 
     let url = if args.signet {
@@ -131,11 +130,10 @@ pub async fn faucet(args: FaucetArgs, seed: Seed) {
     let status = res.status();
     let body = res.text().await.expect("invalid response");
     if status == StatusCode::OK {
-        let _ = term.write_line(&format!("Successful. Claimed in transaction {}", body));
+        let _ = term.write_line(&format!("Successful. Claimed in transaction {body}"));
     } else {
         let _ = term.write_line(&format!(
-            "Failed: faucet responded with {}: {}",
-            status, body
+            "Failed: faucet responded with {status}: {body}"
         ));
     }
 }

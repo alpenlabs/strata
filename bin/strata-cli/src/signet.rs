@@ -143,7 +143,7 @@ impl DerefMut for SignetWallet {
     }
 }
 
-/// Wrapper around the built-in rusqlite db that allows PersistedWallet to be
+/// Wrapper around the built-in rusqlite db that allows [`PersistedWallet`] to be
 /// shared across multiple threads by lazily initializing per core connections
 /// to the sqlite db and keeping them in local thread storage instead of sharing
 /// the connection across cores

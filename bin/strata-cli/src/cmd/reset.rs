@@ -29,7 +29,7 @@ pub async fn reset(args: ResetArgs, persister: impl EncryptedSeedPersister) {
                 .to_string(),
         );
         Confirm::new()
-            .with_prompt("Do you really want to continue?")
+            .with_prompt("Do you REALLY want to continue?")
             .interact()
             .unwrap()
     };
