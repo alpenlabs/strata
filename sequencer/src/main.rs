@@ -1,6 +1,6 @@
 use std::{fs, sync::Arc, time::Duration};
 
-use alpen_express_btcio::{broadcaster::L1BroadcastHandle, writer::InscriptionHandle};
+use alpen_express_btcio::broadcaster::L1BroadcastHandle;
 use alpen_express_common::logging;
 use alpen_express_consensus_logic::{
     self, checkpoint::CheckpointHandle, genesis, state_tracker, sync_manager::SyncManager,
@@ -8,7 +8,7 @@ use alpen_express_consensus_logic::{
 use alpen_express_db::traits::Database;
 use alpen_express_primitives::params::{Params, SyncParams};
 use alpen_express_rocksdb::DbOpsConfig;
-use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer};
+use alpen_express_rpc_api::AlpenApiServer;
 use alpen_express_rpc_types::L1Status;
 use alpen_express_state::csm_status::CsmStatus;
 use alpen_express_status::{create_status_channel, StatusRx, StatusTx};
@@ -22,6 +22,7 @@ use helpers::{
     create_bitcoin_rpc, get_config, init_broadcast_handle, init_core_dbs, init_sequencer,
     init_tasks, initialize_sequencer_database, load_rollup_params_or_default,
 };
+use jsonrpsee::Methods;
 use rockbound::rocksdb;
 use rpc_client::sync_client;
 use tokio::sync::oneshot;
@@ -68,6 +69,8 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     }
     .into();
 
+    let mut methods = jsonrpsee::Methods::new();
+
     // Open and initialize the database.
     let rbdb = open_rocksdb_database(&config)?;
 
@@ -108,6 +111,8 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let broadcast_handle =
         init_broadcast_handle(broadcast_database, pool.clone(), &executor, btc_rpc.clone());
 
+    let (stop_tx, stop_rx) = oneshot::channel();
+
     let mgr_ctx = init_tasks(
         pool.clone(),
         database.clone(),
@@ -131,22 +136,21 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let relayer_handle = rt.block_on(start_relayer_fut)?;
 
     // If we're a sequencer, start the sequencer db and duties task.
-    let inscription_handler =
-        if let ClientMode::Sequencer(sequencer_config) = &config.client.client_mode {
-            let seq_db = initialize_sequencer_database(rbdb.clone(), db_ops);
-            Some(init_sequencer(
-                sequencer_config,
-                &config,
-                btc_rpc.clone(),
-                &task_manager,
-                seq_db,
-                &mgr_ctx,
-                checkpoint_handle.clone(),
-                broadcast_handle.clone(),
-            )?)
-        } else {
-            None
-        };
+    if let ClientMode::Sequencer(sequencer_config) = &config.client.client_mode {
+        let seq_db = initialize_sequencer_database(rbdb.clone(), db_ops);
+        init_sequencer(
+            sequencer_config,
+            &config,
+            btc_rpc.clone(),
+            &task_manager,
+            seq_db,
+            &mgr_ctx,
+            checkpoint_handle.clone(),
+            broadcast_handle.clone(),
+            stop_tx,
+            &mut methods,
+        )?;
+    };
 
     // Start the L1 tasks to get that going.
     let csm_ctl = mgr_ctx.sync_manager.get_csm_ctl();
@@ -186,7 +190,6 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let shutdown_signal = task_manager.shutdown_signal();
     let db_cloned = database.clone();
 
-    let rpc_params = params.clone();
     let l2block_man = mgr_ctx.l2block_manager.clone();
     executor.spawn_critical_async(
         "main-rpc",
@@ -196,12 +199,12 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             mgr_ctx.sync_manager,
             db_cloned,
             mgr_ctx.status_rx,
-            inscription_handler,
             broadcast_handle,
             l2block_man,
             checkpoint_handle,
             relayer_handle,
-            rpc_params,
+            stop_rx,
+            methods,
         ),
     );
 
@@ -219,18 +222,16 @@ async fn start_rpc<D>(
     sync_man: Arc<SyncManager>,
     database: Arc<D>,
     status_rx: Arc<StatusRx>,
-    inscription_handler: Option<Arc<InscriptionHandle>>,
     bcast_handle: Arc<L1BroadcastHandle>,
     l2_block_manager: Arc<L2BlockManager>,
     checkpt_handle: Arc<CheckpointHandle>,
     relayer_handle: Arc<RelayerHandle>,
-    params: Arc<Params>,
+    stop_rx: oneshot::Receiver<()>,
+    mut methods: Methods,
 ) -> anyhow::Result<()>
 where
     D: Database + Send + Sync + 'static,
 {
-    let (stop_tx, stop_rx) = oneshot::channel();
-
     // Init RPC impls.
     let alp_rpc = rpc_server::AlpenRpcImpl::new(
         status_rx.clone(),
@@ -242,17 +243,7 @@ where
         relayer_handle,
     );
 
-    let admin_rpc = rpc_server::AdminServerImpl::new(
-        inscription_handler,
-        bcast_handle,
-        stop_tx,
-        params,
-        checkpt_handle.clone(),
-    );
-
-    // Construct the full methods table.
-    let mut methods = alp_rpc.into_rpc();
-    methods.merge(admin_rpc.into_rpc())?;
+    methods.merge(alp_rpc.into_rpc())?;
 
     let rpc_host = config.client.rpc_host;
     let rpc_port = config.client.rpc_port;

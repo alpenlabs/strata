@@ -94,25 +94,25 @@ pub fn start_inscription_task<D: SequencerDatabase + Send + Sync + 'static>(
     status_tx: Arc<StatusTx>,
     pool: threadpool::ThreadPool,
     bcast_handle: Arc<L1BroadcastHandle>,
-) -> anyhow::Result<InscriptionHandle> {
-    let ops = Arc::new(Context::new(db).into_ops(pool));
-    let insc_mgr = InscriptionHandle::new(ops.clone());
+) -> anyhow::Result<Arc<InscriptionHandle>> {
+    let inscription_data_ops = Arc::new(Context::new(db).into_ops(pool));
+    let next_watch_blob_idx = get_next_blobidx_to_watch(inscription_data_ops.as_ref())?;
 
-    let next_watch_blob_idx = get_next_blobidx_to_watch(ops.as_ref())?;
+    let inscription_handle = Arc::new(InscriptionHandle::new(inscription_data_ops.clone()));
 
     executor.spawn_critical_async("btcio::watcher_task", async move {
         watcher_task(
             next_watch_blob_idx,
             rpc_client,
             config,
-            ops,
+            inscription_data_ops,
             bcast_handle,
             status_tx,
         )
         .await
     });
 
-    Ok(insc_mgr)
+    Ok(inscription_handle)
 }
 
 /// Looks into the database from descending index order till it reaches 0 or `Finalized`

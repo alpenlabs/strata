@@ -602,8 +602,8 @@ where
 pub struct AdminServerImpl {
     // Currently writer is Some() for sequencer only, but we need bcast_manager for both fullnode
     // and seq
-    pub writer: Option<Arc<InscriptionHandle>>,
-    pub bcast_handle: Arc<L1BroadcastHandle>,
+    pub inscription_handle: Arc<InscriptionHandle>,
+    pub broadcast_handle: Arc<L1BroadcastHandle>,
     stop_tx: Mutex<Option<oneshot::Sender<()>>>,
     checkpoint_handle: Arc<CheckpointHandle>,
     params: Arc<Params>,
@@ -611,18 +611,18 @@ pub struct AdminServerImpl {
 
 impl AdminServerImpl {
     pub fn new(
-        writer: Option<Arc<InscriptionHandle>>,
-        bcast_handle: Arc<L1BroadcastHandle>,
+        inscription_handle: Arc<InscriptionHandle>,
+        broadcast_handle: Arc<L1BroadcastHandle>,
         stop_tx: oneshot::Sender<()>,
         params: Arc<Params>,
         checkpoint_handle: Arc<CheckpointHandle>,
     ) -> Self {
         Self {
-            writer,
-            bcast_handle,
+            inscription_handle,
+            broadcast_handle,
             stop_tx: Mutex::new(Some(stop_tx)),
-            checkpoint_handle,
             params,
+            checkpoint_handle,
         }
     }
 }
@@ -644,10 +644,12 @@ impl AlpenAdminApiServer for AdminServerImpl {
         let blobintent = BlobIntent::new(BlobDest::L1, commitment, blob.0);
         // NOTE: It would be nice to return reveal txid from the submit method. But creation of txs
         // is deferred to signer in the writer module
-        if let Some(writer) = &self.writer {
-            if let Err(e) = writer.submit_intent_async(blobintent).await {
-                return Err(Error::Other(e.to_string()).into());
-            }
+        if let Err(e) = self
+            .inscription_handle
+            .submit_intent_async(blobintent)
+            .await
+        {
+            return Err(Error::Other(e.to_string()).into());
         }
         Ok(())
     }
@@ -659,7 +661,7 @@ impl AlpenAdminApiServer for AdminServerImpl {
 
         let entry = L1TxEntry::from_tx(&tx);
 
-        self.bcast_handle
+        self.broadcast_handle
             .put_tx_entry(dbid.into(), entry)
             .await
             .map_err(|e| Error::Other(e.to_string()))?;

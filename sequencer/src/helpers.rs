@@ -7,7 +7,7 @@ use std::{
 use alpen_express_btcio::{
     broadcaster::{spawn_broadcaster_task, L1BroadcastHandle},
     rpc::BitcoinClient,
-    writer::{config::WriterConfig, start_inscription_task, InscriptionHandle},
+    writer::{config::WriterConfig, start_inscription_task},
 };
 use alpen_express_consensus_logic::{
     checkpoint::CheckpointHandle,
@@ -30,21 +30,26 @@ use alpen_express_rocksdb::{
     broadcaster::db::BroadcastDatabase, l2::db::L2Db, sequencer::db::SequencerDB, ChainStateDb,
     ClientStateDb, DbOpsConfig, L1BroadcastDb, L1Db, RBCheckpointDB, RBSeqBlobDb, SyncEventDb,
 };
+use alpen_express_rpc_api::AlpenAdminApiServer;
 use alpen_express_status::{StatusRx, StatusTx};
 use bitcoin::Network;
 use express_storage::{managers::checkpoint::CheckpointDbManager, L2BlockManager};
 use express_tasks::{TaskExecutor, TaskManager};
 use format_serde_error::SerdeError;
+use jsonrpsee::Methods;
 use reth_rpc_types::engine::{JwtError, JwtSecret};
 use rockbound::OptimisticTransactionDB;
 use thiserror::Error;
-use tokio::{runtime::Runtime, sync::broadcast};
+use tokio::{
+    runtime::Runtime,
+    sync::{broadcast, oneshot},
+};
 use tracing::*;
 
 use crate::{
     args::Args,
     config::{Config, SequencerConfig},
-    start_status,
+    rpc_server, start_status,
 };
 
 type CommonDb =
@@ -203,7 +208,9 @@ pub fn init_sequencer(
     manager_context: &ManagerContext,
     checkpoint_handle: Arc<CheckpointHandle>,
     broadcast_handle: Arc<L1BroadcastHandle>,
-) -> anyhow::Result<Arc<InscriptionHandle>> {
+    stop_tx: oneshot::Sender<()>,
+    methods: &mut Methods,
+) -> anyhow::Result<()> {
     info!(seqkey_path = ?seq_config.sequencer_key, "initing sequencer duties task");
     let idata = load_seqkey(&seq_config.sequencer_key)?;
 
@@ -225,17 +232,24 @@ pub fn init_sequencer(
 
     let executor = task_manager.executor();
     // Start inscription tasks
-    let inscription_handle = Arc::new(start_inscription_task(
+    let inscription_handle = start_inscription_task(
         &executor,
         bitcoin_client,
         writer_config,
         seq_db,
         manager_context.status_tx.clone(),
         pool.clone(),
-        broadcast_handle,
-    )?);
+        broadcast_handle.clone(),
+    )?;
 
-    let ih = inscription_handle.clone();
+    let admin_rpc = rpc_server::AdminServerImpl::new(
+        inscription_handle.clone(),
+        broadcast_handle,
+        stop_tx,
+        manager_context.params.clone(),
+        checkpoint_handle.clone(),
+    );
+    methods.merge(admin_rpc.into_rpc())?;
 
     // Spawn duty tasks.
     let t_l2blkman = manager_context.l2block_manager.clone();
@@ -253,6 +267,7 @@ pub fn init_sequencer(
         .map_err(Into::into)
     });
 
+    let d_inscription_handle = inscription_handle.clone();
     let d_params = manager_context.params.clone();
     let d_executor = task_manager.executor();
     executor.spawn_critical("duty_worker::duty_dispatch_task", move |shutdown| {
@@ -264,13 +279,14 @@ pub fn init_sequencer(
             sm,
             db2,
             eng_ctl_de,
-            ih,
+            d_inscription_handle,
             pool,
             d_params,
             checkpoint_handle,
         )
     });
-    Ok(inscription_handle.clone())
+
+    Ok(())
 }
 
 fn load_seqkey(path: &PathBuf) -> anyhow::Result<IdentityData> {
