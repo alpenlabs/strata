@@ -1,5 +1,5 @@
 #[cfg(target_os = "linux")]
-use std::io::{self, Read};
+use std::io;
 use std::str::FromStr;
 
 use aes_gcm_siv::{aead::AeadMutInPlace, Aes256GcmSiv, KeyInit, Nonce, Tag};
