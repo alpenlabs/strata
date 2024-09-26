@@ -14,6 +14,7 @@ use bdk_wallet::{
     wallet_name_from_descriptor,
 };
 use rand::{thread_rng, Rng};
+use sha2::{Digest, Sha256};
 use terrors::OneOf;
 use tokio::io::AsyncReadExt;
 
@@ -32,11 +33,13 @@ impl DescriptorRecovery {
         // yes, we can't just serialize to bytes 👁️👁️
         let db_key = {
             let mut key = Vec::from(recover_at.to_be_bytes());
-            key.extend_from_slice(
-                wallet_name_from_descriptor(desc.0.clone(), None, SETTINGS.network, secp)
-                    .expect("unique name")
-                    .as_bytes(),
-            );
+            // wallet_name_from_descriptor will actually write the private key inside the descriptor
+            // to the name atm so we hash it just to make sure
+            let name = wallet_name_from_descriptor(desc.0.clone(), None, SETTINGS.network, secp)
+                .expect("valid descriptor");
+            let mut hasher = Sha256::new();
+            hasher.update(name.as_bytes());
+            key.extend_from_slice(hasher.finalize().as_ref());
             key
         };
 
@@ -53,14 +56,23 @@ impl DescriptorRecovery {
                 )
             });
 
+        // descriptor length: u64 le
+        // descriptor: string
+        // keymap length in bytes: u64 le
+        // keymap: [
+        //  pubk_len: u32 le
+        //  pubk
+        //  privk_len: u32 le
+        //  privk
+        // ]
+        // num networks: u8 le
+        // networks: [
+        //  network chain hash: 32 byte
+        // ]
         let mut bytes = Vec::new();
-
-        let nonce = Nonce::from(thread_rng().gen::<[u8; 12]>());
-        bytes.extend_from_slice(nonce.as_ref());
 
         let descriptor = desc.0.to_string();
         let desc_bytes = descriptor.as_bytes();
-
         bytes.extend_from_slice(&(desc_bytes.len() as u64).to_le_bytes());
         bytes.extend_from_slice(desc_bytes);
 
@@ -75,9 +87,9 @@ impl DescriptorRecovery {
 
         for (pubk_len, pubk, privk_len, privk) in keymap_iter {
             bytes.extend_from_slice(&pubk_len);
-            bytes.extend_from_slice(&pubk.as_bytes());
+            bytes.extend_from_slice(pubk.as_bytes());
             bytes.extend_from_slice(&privk_len);
-            bytes.extend_from_slice(&privk.as_bytes());
+            bytes.extend_from_slice(privk.as_bytes());
         }
 
         let networks = desc
@@ -92,10 +104,14 @@ impl DescriptorRecovery {
             bytes.extend_from_slice(&net);
         }
 
-        // nonce (12 bytes) | encrypted_bytes | tag (16 bytes)
+        let nonce = Nonce::from(thread_rng().gen::<[u8; 12]>());
+
+        // encrypted_bytes | tag (16 bytes) | nonce (12 bytes)
         self.1
             .encrypt_in_place(&nonce, &[], &mut bytes)
             .expect("encryption should succeed");
+
+        bytes.extend_from_slice(nonce.as_ref());
 
         self.0.insert(db_key, bytes)?;
         self.0.flush_async().await?;
@@ -116,7 +132,11 @@ impl DescriptorRecovery {
         let mut descs = vec![];
         while let Some(desc_entry) = after_height.next() {
             let mut raw = desc_entry.map_err(OneOf::new)?.1;
-            let (nonce, rest) = raw.split_at_mut(12);
+            if raw.len() <= 12 + 16 {
+                return Err(OneOf::new(EntryTooShort { length: raw.len() }));
+            }
+            let split_at = raw.len() - 12;
+            let (rest, nonce) = raw.split_at_mut(split_at);
             let nonce = Nonce::from_slice(nonce);
             let (encrypted, tag) = rest.split_at_mut(rest.len() - 16);
             let tag = Tag::from_slice(tag);
@@ -193,7 +213,14 @@ pub type ReadDescsAfterError = (
     aes_gcm_siv::Error,
     io::Error,
     sled::Error,
+    EntryTooShort,
 );
+
+#[derive(Debug)]
+#[allow(unused)]
+pub struct EntryTooShort {
+    length: usize,
+}
 
 #[derive(Debug)]
 #[allow(unused)]
