@@ -12,19 +12,16 @@ use crate::{rollup::RollupWallet, seed::Seed, signet::SignetWallet};
 /// Prints the wallet's current balance(s)
 pub struct BalanceArgs {
     #[argh(switch)]
-    /// return only the signet balance
+    /// return the signet balance
     signet: bool,
     #[argh(switch)]
-    /// return only the rollup balance
+    /// return the rollup balance
     rollup: bool,
 }
 
 pub async fn balance(args: BalanceArgs, seed: Seed) {
     let term = Term::stdout();
-    if args.signet && args.rollup {
-        let _ = term.write_line("Cannot use both --signet and --rollup options at once");
-        std::process::exit(1);
-    } else if !args.signet && !args.rollup {
+    if !args.signet && !args.rollup {
         let _ = term.write_line("Must specify either --signet and --rollup option");
         std::process::exit(1);
     }
@@ -41,7 +38,9 @@ pub async fn balance(args: BalanceArgs, seed: Seed) {
             balance.untrusted_pending
         ));
         let _ = term.write_line(&format!("  Immature: {}", balance.immature));
-    } else if args.rollup {
+    }
+
+    if args.rollup {
         let l2w = RollupWallet::new(&seed).unwrap();
         let _ = term.write_line("Getting balance...");
         let balance = l2w.get_balance(l2w.default_signer_address()).await.unwrap();
