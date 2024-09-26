@@ -1,7 +1,9 @@
+#[cfg(not(debug_assertions))]
+use std::path::Path;
 use std::{
     collections::{HashMap, HashSet},
     env, fs,
-    path::{Path, PathBuf},
+    path::PathBuf,
 };
 
 #[cfg(not(debug_assertions))]
@@ -97,7 +99,8 @@ fn build_program_with_dependencies(
             }
         }
 
-        // Only write vks.rs if there are dependencies
+        // Only write vks.rs if there are dependencies and is being built in release mode
+        #[cfg(not(debug_assertions))]
         if !vks_content.is_empty() {
             // Write vks.rs in the program's directory before building it
             let vks_path = Path::new(program).join("src").join("vks.rs");
