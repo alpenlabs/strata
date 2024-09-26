@@ -25,7 +25,7 @@ use crate::errors::{ExecError, ExecResult};
 ///
 /// # Arguments
 ///
-/// - `withdrawal_info`: a pending [`CooperativeWithdrawalInfo`] duty.
+/// - `tx_info`: a pending [`TxKind`]-like duty.
 /// - `l1_rpc_client`: anything that is able to sign transactions and messages; i.e. holds private
 ///   keys.
 /// - `l2_rpc_client`: anything that can communicate with the [`AlpenApiClient`].
