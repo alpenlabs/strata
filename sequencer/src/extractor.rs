@@ -30,7 +30,7 @@ use tracing::{debug, error};
 /// # Returns
 ///
 /// A list of [`DepositInfo`] that can be used to construct an equivalent
-/// [`Duty`](alpen_express_state::bridge_duties::Duty).
+/// [`Duty`](alpen_express_state::bridge_duties::BridgeDuty).
 ///
 /// # Errors
 ///

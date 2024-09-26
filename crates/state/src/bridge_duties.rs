@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 /// The various duties that can be assigned to an operator.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "payload")]
-pub enum Duty {
+pub enum BridgeDuty {
     /// The duty to create and sign a Deposit Transaction so as to move funds from the user to the
     /// Bridge Address.
     ///
@@ -25,17 +25,17 @@ pub enum Duty {
     FulfillWithdrawal(CooperativeWithdrawalInfo),
 }
 
-impl From<DepositInfo> for Duty {
+impl From<DepositInfo> for BridgeDuty {
     fn from(value: DepositInfo) -> Self {
         Self::SignDeposit(value)
     }
 }
 
-impl From<CooperativeWithdrawalInfo> for Duty {
+impl From<CooperativeWithdrawalInfo> for BridgeDuty {
     fn from(value: CooperativeWithdrawalInfo) -> Self {
         Self::FulfillWithdrawal(value)
     }
 }
 
 /// An alias for a list of bridge duties for readability.
-pub type BridgeDuties = Vec<Duty>;
+pub type BridgeDuties = Vec<BridgeDuty>;

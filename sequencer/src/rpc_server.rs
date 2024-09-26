@@ -22,7 +22,7 @@ use alpen_express_rpc_types::{
 use alpen_express_state::{
     batch::BatchCheckpoint,
     block::L2BlockBundle,
-    bridge_duties::{BridgeDuties, Duty},
+    bridge_duties::{BridgeDuties, BridgeDuty},
     bridge_ops::WithdrawalIntent,
     chain_state::ChainState,
     client_state::ClientState,
@@ -527,7 +527,7 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         let (deposit_duties, latest_block_height) =
             extract_deposit_requests(l1_db_provider, block_height, network).await?;
 
-        let deposit_duties = deposit_duties.map(Duty::from);
+        let deposit_duties = deposit_duties.map(BridgeDuty::from);
 
         // TODO: Extract withdrawal duties as well.
         let withdrawal_duties = vec![];
