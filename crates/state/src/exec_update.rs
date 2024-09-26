@@ -5,7 +5,11 @@ use alpen_express_primitives::{buf::Buf32, evm_exec::create_evm_extra_payload};
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use crate::{bridge_ops, da_blob};
+use crate::{
+    bridge_ops::{self, DepositIntent},
+    da_blob,
+    prelude::StateQueue,
+};
 
 /// Full update payload containing inputs and outputs to an EE state update.
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
@@ -154,6 +158,30 @@ impl UpdateOutput {
 pub enum Op {
     /// Deposit some amount.
     Deposit(ELDepositData),
+}
+
+impl Op {
+    pub fn from_deposit_intent(
+        pending_deposits: &StateQueue<DepositIntent>,
+        max_bridge_in_block: u8,
+    ) -> Vec<Op> {
+        let mut pending_deposits = pending_deposits.clone();
+        let mut el_ops = Vec::new();
+        while let Some(idx) = pending_deposits.front_idx() {
+            //  first 16 withdrawals (full or partial) into the withdrawal queue.
+            if el_ops.len() == max_bridge_in_block as usize {
+                break;
+            }
+            let pending_deposit = pending_deposits.pop_front().unwrap();
+
+            el_ops.push(Op::Deposit(ELDepositData::new(
+                idx,
+                pending_deposit.amt(),
+                pending_deposit.dest_ident().to_vec(),
+            )));
+        }
+        el_ops
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize)]

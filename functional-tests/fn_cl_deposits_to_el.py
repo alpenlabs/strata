@@ -40,13 +40,14 @@ class L1ClientStatusTest(flexitest.Test):
 
         print(btcrpc.sendrawtransaction(deposit_tx))
         time.sleep(SEQ_PUBLISH_BATCH_INTERVAL_SECS)
-        time.sleep(6)
+        time.sleep(10)
         deposits = seqrpc.alp_getCurrentDeposits()
         print(deposits)
 
-        assert len(deposits) > 0
+        assert len(deposits) > 0, "deposit entry"
 
         reth = ctx.get_service("reth")
         rethrpc = reth.create_rpc()
         print(rethrpc.eth_blockNumber())
-        print(rethrpc.eth_getBalance(f"0x{evm_addr}"))
+
+        assert int(rethrpc.eth_getBalance(f"0x{evm_addr}"), 16) > 0, "zero eth balance"

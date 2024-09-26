@@ -38,3 +38,6 @@ alpen-test-utils = { workspace = true }
 arbitrary = { workspace = true }
 bitcoind = { workspace = true }
 mockall = { workspace = true }
+
+[features]
+test_utils = []

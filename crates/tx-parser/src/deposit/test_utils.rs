@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use alpen_express_primitives::l1::OutputRef;
-use arbitrary::{Arbitrary, Unstructured};
+use alpen_test_utils::ArbitraryGenerator;
 use bitcoin::{
     absolute::LockTime,
     opcodes::all::OP_RETURN,
@@ -33,14 +33,10 @@ pub fn create_transaction_two_outpoints(
 ) -> Transaction {
     // construct the inputs
 
-    let bytes = vec![0u8; 1024];
-    let mut unstructured = Unstructured::new(&bytes);
-    let previous_output = *OutputRef::arbitrary(&mut unstructured)
-        .expect("should be able to generate arbitrary output ref")
-        .outpoint();
+    let previous_output: OutputRef = ArbitraryGenerator::new().generate();
 
     let inputs = vec![TxIn {
-        previous_output,
+        previous_output: *previous_output.outpoint(),
         script_sig: Default::default(),
         sequence: Sequence::ENABLE_RBF_NO_LOCKTIME,
         witness: Witness::new(),

@@ -54,12 +54,9 @@ fn parse_deposit_script<'a>(
     let magic_bytes = &config.magic_bytes;
     let magic_len = magic_bytes.len();
 
-    println!("magic bytes {:?}", magic_bytes);
     if data.len() < magic_len || &data[..magic_len] != magic_bytes {
         return Err(DepositParseError::MagicBytesMismatch);
     }
-
-    println!("magic bytes matches");
 
     // configured bytes for address
     let address = &data[magic_len..];
@@ -67,8 +64,6 @@ fn parse_deposit_script<'a>(
         // casting is safe as address.len() < data.len() < 80
         return Err(DepositParseError::InvalidDestAddress(address.len() as u8));
     }
-
-    println!("address check {:?}", address);
 
     Ok(address)
 }

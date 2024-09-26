@@ -36,6 +36,7 @@ common_params = {
     "dispatch_assignment_dur": 64,
     "proof_publish_mode": "Strict",
     "deposit_amount": 1000,
+    "max_bridge_in_block": 16,
 }
 
 FAST_BATCH_ROLLUP_PARAMS = {

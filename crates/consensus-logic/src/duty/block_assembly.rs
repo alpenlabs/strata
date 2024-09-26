@@ -15,7 +15,7 @@ use alpen_express_eectl::{
 };
 use alpen_express_primitives::{
     buf::{Buf32, Buf64},
-    params::Params,
+    params::{Params, RollupParams},
 };
 use alpen_express_state::{
     block::{ExecSegment, L1Segment, L2BlockAccessory, L2BlockBundle},
@@ -39,7 +39,6 @@ use crate::errors::Error;
 /// This is relevant when sequencer starts at L1 height >> genesis height
 /// to prevent L2Block from becoming very large in size.
 const MAX_L1_ENTRIES_PER_BLOCK: usize = 100;
-const MAX_BRIDGE_IN_PER_BLOCK: usize = 16;
 
 /// Signs and stores a block in the database.  Does not submit it to the
 /// forkchoice manager.
@@ -126,6 +125,7 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
         &prev_chstate,
         safe_l1_blkid,
         engine,
+        params.rollup(),
     )?;
 
     // Assemble the body and fake header.
@@ -322,6 +322,7 @@ fn find_pivot_block_height<'c>(
 }
 
 /// Prepares the execution segment for the block.
+#[allow(clippy::too_many_arguments)]
 fn prepare_exec_data<E: ExecEngineCtl>(
     slot: u64,
     timestamp: u64,
@@ -330,29 +331,16 @@ fn prepare_exec_data<E: ExecEngineCtl>(
     prev_chstate: &ChainState,
     safe_l1_block: Buf32,
     engine: &E,
+    params: &RollupParams,
 ) -> Result<(ExecSegment, L2BlockAccessory), Error> {
     trace!("preparing exec payload");
 
     // Start preparing the EL payload.
 
     // construct el_ops by looking at chainstate
-    let mut el_ops = Vec::new();
-    let mut pending_deposits = prev_chstate.exec_env_state().pending_deposits().clone();
-    while let Some(idx) = pending_deposits.front_idx() {
-        //  first 16 withdrawals (full or partial) into the withdrawal queue.
-        if el_ops.len() == MAX_BRIDGE_IN_PER_BLOCK {
-            break;
-        }
-        let pending_deposit = pending_deposits.pop_front().unwrap();
-
-        el_ops.push(Op::Deposit(ELDepositData::new(
-            idx,
-            pending_deposit.amt(),
-            pending_deposit.dest_ident().to_vec(),
-        )));
-    }
-
-    let payload_env = PayloadEnv::new(timestamp, prev_l2_blkid, safe_l1_block, el_ops.clone());
+    let pending_deposits = prev_chstate.exec_env_state().pending_deposits();
+    let el_ops = Op::from_deposit_intent(pending_deposits, params.max_bridge_in_block);
+    let payload_env = PayloadEnv::new(timestamp, prev_l2_blkid, safe_l1_block, el_ops);
 
     let key = engine.prepare_payload(payload_env)?;
     trace!("submitted EL payload job, waiting for completion");
