@@ -38,6 +38,7 @@ FAST_BATCH_ROLLUP_PARAMS = {
     },
     "verify_proofs": False,
     "dispatch_assignment_dur": 64,
+    "proof_publish_mode": "Strict",
 }
 
 # Error codes

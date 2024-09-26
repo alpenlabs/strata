@@ -45,6 +45,21 @@ impl CheckpointHandle {
         Ok(())
     }
 
+    pub fn put_checkpoint_and_notify_blocking(
+        &self,
+        idx: u64,
+        entry: CheckpointEntry,
+    ) -> DbResult<()> {
+        self.db_manager.put_checkpoint_blocking(idx, entry)?;
+
+        // Now send the idx to indicate checkpoint proof has been received
+        if let Err(err) = self.update_notify_tx.send(idx) {
+            warn!(?err, "Failed to update checkpoint update");
+        }
+
+        Ok(())
+    }
+
     pub async fn put_checkpoint(&self, idx: u64, entry: CheckpointEntry) -> DbResult<()> {
         self.db_manager.put_checkpoint(idx, entry).await
     }

@@ -55,6 +55,17 @@ pub struct RollupParams {
 
     /// Number of Bitcoin blocks a withdrawal dispatch assignment is valid for.
     pub dispatch_assignment_dur: u32,
+    /// Describes how is proof published
+    pub proof_publish_mode: ProofPublishMode,
+}
+
+/// Describes the proof is generated.
+#[derive(Clone, Debug, PartialEq, Deserialize)]
+pub enum ProofPublishMode {
+    /// Timeout in secs
+    Timeout(u64),
+    /// Expect and wait for proofs
+    Strict,
 }
 
 /// Client sync parameters that are used to make the network work but don't

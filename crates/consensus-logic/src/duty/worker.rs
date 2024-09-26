@@ -3,7 +3,8 @@
 use std::{
     collections::HashMap,
     sync::{Arc, RwLock},
-    time::{self},
+    thread,
+    time::{self, Duration},
 };
 
 use alpen_express_btcio::writer::InscriptionHandle;
@@ -15,7 +16,7 @@ use alpen_express_db::{
 use alpen_express_eectl::engine::ExecEngineCtl;
 use alpen_express_primitives::{
     buf::{Buf32, Buf64},
-    params::Params,
+    params::{Params, ProofPublishMode},
 };
 use alpen_express_state::{
     batch::{BatchCheckpoint, SignedBatchCheckpoint},
@@ -291,8 +292,20 @@ pub fn duty_dispatch_task<
             let params: Arc<Params> = params.clone();
             let duty_st_tx = duty_status_tx.clone();
             let checkpt_mgr = ckpt_handle.clone();
+            let pc = pool.clone();
             pool.execute(move || {
-                duty_exec_task(d, ik, sm, db, e, insc_h, params, duty_st_tx, checkpt_mgr)
+                duty_exec_task(
+                    d,
+                    ik,
+                    sm,
+                    db,
+                    e,
+                    insc_h,
+                    params,
+                    duty_st_tx,
+                    checkpt_mgr,
+                    pc,
+                )
             });
             trace!(%id, "dispatched duty exec task");
             pending_duties_local.insert(id, ());
@@ -318,6 +331,7 @@ fn duty_exec_task<D: Database, E: ExecEngineCtl>(
     params: Arc<Params>,
     duty_status_tx: std::sync::mpsc::Sender<DutyExecStatus>,
     ckpt_handle: Arc<CheckpointHandle>,
+    pool: threadpool::ThreadPool,
 ) {
     let result = perform_duty(
         &duty,
@@ -327,7 +341,8 @@ fn duty_exec_task<D: Database, E: ExecEngineCtl>(
         engine.as_ref(),
         inscription_handle.as_ref(),
         &params,
-        ckpt_handle.as_ref(),
+        ckpt_handle,
+        pool,
     );
 
     let status = DutyExecStatus {
@@ -349,7 +364,8 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
     engine: &E,
     inscription_handle: &InscriptionHandle,
     params: &Arc<Params>,
-    checkpt_mgr: &CheckpointHandle,
+    checkpt_handle: Arc<CheckpointHandle>,
+    pool: threadpool::ThreadPool,
 ) -> Result<(), Error> {
     match duty {
         Duty::SignBlock(data) => {
@@ -395,7 +411,8 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
         Duty::CommitBatch(data) => {
             info!(data = ?data, "commit batch");
 
-            let checkpoint = check_and_get_batch_checkpoint(data, checkpt_mgr)?;
+            let checkpoint =
+                check_and_get_batch_checkpoint(data, checkpt_handle, pool, params.as_ref())?;
             debug!("Got checkpoint proof from db, now signing and sending");
 
             let checkpoint_sighash = checkpoint.get_sighash();
@@ -423,19 +440,21 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
 
 fn check_and_get_batch_checkpoint(
     duty: &BatchCheckpointDuty,
-    checkpt_mgr: &CheckpointHandle,
+    checkpt_handle: Arc<CheckpointHandle>,
+    pool: threadpool::ThreadPool,
+    params: &Params,
 ) -> Result<BatchCheckpoint, Error> {
     let idx = duty.idx();
 
     debug!(%idx, "checking for checkpoint in db");
     // If there's no entry in db, create a pending entry and wait until proof is ready
-    match checkpt_mgr.get_checkpoint_blocking(idx)? {
+    match checkpt_handle.get_checkpoint_blocking(idx)? {
         // There's no entry in the database, create one so that the prover manager can query the
         // checkpoint info to create proofs for next
         None => {
             debug!(%idx, "Checkpoint not found, creating pending checkpoint");
             let entry = CheckpointEntry::new_pending_proof(duty.checkpoint().clone());
-            checkpt_mgr.put_checkpoint_blocking(idx, entry)?;
+            checkpt_handle.put_checkpoint_blocking(idx, entry)?;
         }
         // There's an entry. If status is ProofCreated, return it else we need to wait for prover to
         // submit proofs.
@@ -450,7 +469,11 @@ fn check_and_get_batch_checkpoint(
     }
     debug!(%idx, "Waiting for checkpoint proof to be posted");
 
-    let chidx = checkpt_mgr
+    if let ProofPublishMode::Timeout(timeout) = params.rollup().proof_publish_mode {
+        spawn_proof_timeout(idx, checkpt_handle.clone(), timeout, pool);
+    }
+
+    let chidx = checkpt_handle
         .subscribe()
         .blocking_recv()
         .map_err(|e| Error::Other(e.to_string()))?;
@@ -464,7 +487,7 @@ fn check_and_get_batch_checkpoint(
         ));
     }
 
-    match checkpt_mgr.get_checkpoint_blocking(idx)? {
+    match checkpt_handle.get_checkpoint_blocking(idx)? {
         None => {
             warn!(%idx, "Expected checkpoint to be present in db");
             Err(Error::Other(
@@ -479,6 +502,40 @@ fn check_and_get_batch_checkpoint(
         }
         Some(entry) => Ok(entry.into()),
     }
+}
+
+fn spawn_proof_timeout(
+    idx: u64,
+    checkpt_handle: Arc<CheckpointHandle>,
+    timeout: u64,
+    pool: threadpool::ThreadPool,
+) {
+    pool.execute(move || {
+        // Sleep.
+        debug!(%idx, "Starting timeout for proof");
+        thread::sleep(Duration::from_secs(timeout));
+        debug!(%idx, "Timeout exceeded");
+
+        // Now update and send. Doesn't matter if the receiver is already closed. It means the proof
+        // was submitted in time
+
+        if let Ok(Some(mut entry)) = checkpt_handle.get_checkpoint_blocking(idx) {
+            if entry.proving_status != CheckpointProvingStatus::PendingProof {
+                warn!("Got request for already ready proof");
+                return;
+            }
+            debug!(%idx, "Proof is pending, setting proof ready");
+
+            entry.proving_status = CheckpointProvingStatus::ProofReady;
+            if let Err(e) = checkpt_handle.put_checkpoint_and_notify_blocking(idx, entry) {
+                warn!(?e, "Error updating checkpoint after timeout");
+                return;
+            }
+            debug!(%idx, "Successfully submitted proof after timeout");
+            return;
+        }
+        warn!("Could not find checkpoint in db");
+    });
 }
 
 fn sign_with_identity_key(msg: &Buf32, ik: &IdentityKey) -> Buf64 {
