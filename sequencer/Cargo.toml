@@ -36,7 +36,7 @@ bitcoin = { workspace = true }
 borsh = { workspace = true }
 format_serde_error = { workspace = true }
 futures = { workspace = true }
-hex = { workspace = true }
+hex = { workspace = true, features = ["serde"] }
 jsonrpsee = { workspace = true, features = ["server", "macros"] }
 parking_lot = { workspace = true }
 reth-ipc = { workspace = true }

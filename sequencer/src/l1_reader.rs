@@ -5,6 +5,8 @@ use alpen_express_consensus_logic::{ctl::CsmController, l1_handler::bitcoin_data
 use alpen_express_db::traits::{Database, L1DataProvider};
 use alpen_express_primitives::params::Params;
 use alpen_express_status::StatusTx;
+use anyhow::bail;
+use bitcoin::secp256k1::XOnlyPublicKey;
 use express_tasks::TaskExecutor;
 use strata_tx_parser::messages::L1Event;
 use tokio::sync::mpsc;
@@ -53,8 +55,17 @@ where
 
     let l1db = db.l1_store().clone();
     let _sedb = db.sync_event_store().clone();
+    let seq_pubkey = config.client.seq_pubkey;
+    let seq_pubkey = XOnlyPublicKey::from_slice(&seq_pubkey);
+
+    if seq_pubkey.is_err() {
+        bail!("sequencer's x-only pubkey is invalid");
+    }
+
+    let seq_pubkey = seq_pubkey.expect("pubkey should be valid");
+
     executor.spawn_critical("bitcoin_data_handler_task", move |_| {
-        bitcoin_data_handler_task::<D>(l1db, csm_ctl, ev_rx, params).unwrap()
+        bitcoin_data_handler_task::<D>(l1db, csm_ctl, ev_rx, params, seq_pubkey).unwrap()
     });
     Ok(())
 }

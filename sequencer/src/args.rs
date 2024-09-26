@@ -56,4 +56,10 @@ pub struct Args {
 
     #[argh(option, description = "database retry count")]
     pub db_retry_count: Option<u16>,
+
+    #[argh(
+        option,
+        description = "the hex-encoded x-only public key of the sequencer"
+    )]
+    pub seq_pubkey: Option<String>,
 }

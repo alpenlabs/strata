@@ -19,6 +19,7 @@ use bitcoin::{
 use express_risc0_adapter::Risc0Verifier;
 use express_sp1_adapter::SP1Verifier;
 use express_zkvm::ZKVMVerifier;
+use secp256k1::{schnorr::Signature, Message, XOnlyPublicKey};
 use strata_tx_parser::messages::{BlockData, L1Event};
 use tokio::sync::mpsc;
 use tracing::*;
@@ -31,9 +32,12 @@ pub fn bitcoin_data_handler_task<D: Database + Send + Sync + 'static>(
     csm_ctl: Arc<CsmController>,
     mut event_rx: mpsc::Receiver<L1Event>,
     params: Arc<Params>,
+    seq_pubkey: XOnlyPublicKey,
 ) -> anyhow::Result<()> {
     while let Some(event) = event_rx.blocking_recv() {
-        if let Err(e) = handle_bitcoin_event(event, l1db.as_ref(), csm_ctl.as_ref(), &params) {
+        if let Err(e) =
+            handle_bitcoin_event(event, l1db.as_ref(), csm_ctl.as_ref(), &params, seq_pubkey)
+        {
             error!(err = %e, "failed to handle L1 event");
         }
     }
@@ -47,6 +51,7 @@ fn handle_bitcoin_event<L1D>(
     l1db: &L1D,
     csm_ctl: &CsmController,
     params: &Arc<Params>,
+    seq_pubkey: XOnlyPublicKey,
 ) -> anyhow::Result<()>
 where
     L1D: L1DataStore + Sync + Send + 'static,
@@ -100,7 +105,7 @@ where
 
             // Check for da batch and send event accordingly
             debug!(?height, "Checking for da batch");
-            let checkpoints = check_for_da_batch(&blockdata, params.as_ref());
+            let checkpoints = check_for_da_batch(&blockdata, params.as_ref(), seq_pubkey);
             debug!(?checkpoints, "Received checkpoints");
             if !checkpoints.is_empty() {
                 let ev = SyncEvent::L1DABatch(height, checkpoints);
@@ -115,7 +120,11 @@ where
 }
 
 /// Parses inscriptions and checks for batch data in the transactions
-fn check_for_da_batch(blockdata: &BlockData, params: &Params) -> Vec<BatchCheckpoint> {
+fn check_for_da_batch(
+    blockdata: &BlockData,
+    params: &Params,
+    seq_pubkey: XOnlyPublicKey,
+) -> Vec<BatchCheckpoint> {
     let protocol_ops_txs = blockdata.protocol_ops_txs();
 
     let inscriptions = protocol_ops_txs
@@ -129,21 +138,40 @@ fn check_for_da_batch(blockdata: &BlockData, params: &Params) -> Vec<BatchCheckp
         });
 
     let verified_checkpoints = inscriptions.filter_map(|(insc, tx)| {
-            let checkpoint: BatchCheckpoint = insc.clone().into();
-            let checkpoint_idx = checkpoint.checkpoint().idx();
-            let checkpoint_last_block = checkpoint.checkpoint().l2_blockid();
+        let checkpoint: BatchCheckpoint = insc.clone().into();
 
-            match verify_proof(&checkpoint, params.rollup()) {
-                Ok(()) => {
-                    info!(%checkpoint_idx, %checkpoint_last_block, "proof successfully verified");
-                    Some(checkpoint)
-                },
-                Err(e) => {
-                    let txid = tx.compute_txid();
-                    warn!(?txid, %checkpoint_idx, %checkpoint_last_block, err = %e, "could not verify proof inside blob");
-                    None
+        let digest = checkpoint.get_sighash();
+        let msg = Message::from_digest(digest.0.into());
+
+        match Signature::from_slice(&insc.signature().0[..]) {
+            Ok(sig) => {
+                let valid = sig.verify(&msg, &seq_pubkey);
+                if valid.is_err() {
+                    return None;
                 }
+            },
+            Err(e) => {
+                let txid = tx.compute_txid();
+                error!(?txid, err = %e, "incorrect signature on checkpoint");
+
+                return None;
             }
+        }
+
+        let checkpoint_idx = checkpoint.checkpoint().idx();
+        let checkpoint_last_block = checkpoint.checkpoint().l2_blockid();
+
+        match verify_proof(&checkpoint, params.rollup()) {
+            Ok(()) => {
+                info!(%checkpoint_idx, %checkpoint_last_block, "proof successfully verified");
+                Some(checkpoint)
+            },
+            Err(e) => {
+                let txid = tx.compute_txid();
+                warn!(?txid, %checkpoint_idx, %checkpoint_last_block, err = %e, "could not verify proof inside blob");
+                None
+            }
+        }
     });
 
     verified_checkpoints.map(Into::into).collect()

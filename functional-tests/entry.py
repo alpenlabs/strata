@@ -11,6 +11,7 @@ from typing import Optional, TypedDict
 import flexitest
 import web3
 import web3.middleware
+from bitcoinlib.keys import Key
 from bitcoinlib.services.bitcoind import BitcoindClient
 
 import seqrpc
@@ -23,11 +24,15 @@ from constants import (
 )
 
 
-def generate_seqkey() -> bytes:
+def generate_seqkey() -> tuple[bytes, str]:
     # this is just for fun
     buf = b"alpen" + b"_1337" * 5 + b"xx"
     assert len(buf) == 32, "bad seqkey len"
-    return buf
+
+    key = Key(buf.hex())
+    public_key = key.x_hex
+
+    return key.private_byte, public_key
 
 
 def generate_jwt_secret() -> str:
@@ -145,7 +150,7 @@ class ExpressFactory(flexitest.Factory):
         logfile = os.path.join(datadir, "service.log")
 
         keyfile = os.path.join(datadir, "seqkey.bin")
-        seqkey = generate_seqkey()
+        seqkey, x_only_pubkey = generate_seqkey()
         with open(keyfile, "wb") as f:
             f.write(seqkey)
 
@@ -163,6 +168,7 @@ class ExpressFactory(flexitest.Factory):
             "--network", "regtest",
             "--sequencer-key", keyfile,
             "--sequencer-bitcoin-address", sequencer_address,
+            "--seq-pubkey", x_only_pubkey,
         ]
         # fmt: on
 
@@ -213,6 +219,7 @@ class FullNodeFactory(flexitest.Factory):
         rpc_host = "localhost"
         rpc_port = self.next_port()
         logfile = os.path.join(datadir, "service.log")
+        _, x_only_pubkey = generate_seqkey()
 
         # fmt: off
         cmd = [
@@ -227,6 +234,7 @@ class FullNodeFactory(flexitest.Factory):
             "--reth-jwtsecret", reth_config["reth_secret_path"],
             "--network", "regtest",
             "--sequencer-rpc", sequencer_rpc,
+            "--seq-pubkey", x_only_pubkey
         ]
         # fmt: on
 
