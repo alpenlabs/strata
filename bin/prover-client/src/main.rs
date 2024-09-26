@@ -2,15 +2,17 @@
 
 use std::sync::Arc;
 
+use alpen_express_btcio::rpc::BitcoinClient;
 use alpen_express_common::logging;
 use args::Args;
+use btc_blockspace::task_dispatcher::BtcBlockspaceProvingTaskScheduler;
 use config::EL_START_BLOCK_HEIGHT;
+use evm_ee::task_dispatcher::ELBlockProvingTaskScheduler;
 use express_sp1_adapter::SP1Host;
 use jsonrpsee::http_client::HttpClientBuilder;
 use manager::ProverManager;
 use rpc_server::{ProverClientRpc, RpcContext};
 use task::TaskTracker;
-use task_dispatcher::ELBlockProvingTaskScheduler;
 use tracing::info;
 
 mod args;
@@ -22,7 +24,10 @@ mod primitives;
 mod prover;
 mod rpc_server;
 mod task;
-mod task_dispatcher;
+// mod task_dispatcher;
+
+mod btc_blockspace;
+mod evm_ee;
 
 #[tokio::main]
 async fn main() {
@@ -35,14 +40,36 @@ async fn main() {
     let el_rpc_client = HttpClientBuilder::default()
         .build(args.get_reth_rpc_url())
         .expect("failed to connect to the el client");
+    info!("EL RPC Client");
+
+    // Setup bitcoin client
+    let bitcoind_url = format!("http://{}", args.bitcoind_url);
+    let btc_client = Arc::new(
+        BitcoinClient::new(
+            bitcoind_url,
+            args.bitcoind_user.clone(),
+            args.bitcoind_password.clone(),
+        )
+        .unwrap(),
+    );
+    info!("BTC Client");
 
     let el_proving_task_scheduler = ELBlockProvingTaskScheduler::new(
         el_rpc_client,
         task_tracker.clone(),
         EL_START_BLOCK_HEIGHT,
     );
-    let rpc_context = RpcContext::new(el_proving_task_scheduler.clone());
+    let btc_block_proving_task_scheduler = BtcBlockspaceProvingTaskScheduler::new(
+        btc_client,
+        task_tracker.clone(),
+        EL_START_BLOCK_HEIGHT,
+    );
+    let rpc_context = RpcContext::new(
+        el_proving_task_scheduler.clone(),
+        btc_block_proving_task_scheduler.clone(),
+    );
     let prover_manager: ProverManager<SP1Host> = ProverManager::new(task_tracker);
+    info!("All ready");
 
     // run prover manager in background
     tokio::spawn(async move { prover_manager.run().await });
@@ -50,6 +77,14 @@ async fn main() {
     // run el proving task dispatcher
     tokio::spawn(async move {
         el_proving_task_scheduler
+            .clone()
+            .listen_for_new_blocks()
+            .await
+    });
+
+    // run BTC-blockspace proving task dispatcher
+    tokio::spawn(async move {
+        btc_block_proving_task_scheduler
             .clone()
             .listen_for_new_blocks()
             .await

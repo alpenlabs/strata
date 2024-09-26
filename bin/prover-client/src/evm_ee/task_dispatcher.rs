@@ -8,9 +8,9 @@ use tokio::time::{self, Duration};
 use tracing::error;
 use uuid::Uuid;
 
+use super::errors::ELProvingTaskError;
 use crate::{
     config::BLOCK_PROVING_TASK_DISPATCH_INTERVAL,
-    errors::ELProvingTaskError,
     primitives::prover_input::{ProverInput, WitnessData},
     task::TaskTracker,
 };

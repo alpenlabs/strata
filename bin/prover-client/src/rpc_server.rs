@@ -7,17 +7,25 @@ use jsonrpsee::{core::RpcResult, RpcModule};
 use tokio::sync::oneshot;
 use tracing::{info, warn};
 
-use crate::task_dispatcher::ELBlockProvingTaskScheduler;
+use crate::{
+    btc_blockspace::task_dispatcher::BtcBlockspaceProvingTaskScheduler,
+    evm_ee::task_dispatcher::ELBlockProvingTaskScheduler,
+};
 
 #[derive(Clone)]
 pub struct RpcContext {
     pub el_proving_task_scheduler: ELBlockProvingTaskScheduler,
+    pub btc_blockspace_proving_task_scheduler: BtcBlockspaceProvingTaskScheduler,
 }
 
 impl RpcContext {
-    pub fn new(el_proving_task_scheduler: ELBlockProvingTaskScheduler) -> Self {
+    pub fn new(
+        el_proving_task_scheduler: ELBlockProvingTaskScheduler,
+        btc_blockspace_proving_task_scheduler: BtcBlockspaceProvingTaskScheduler,
+    ) -> Self {
         Self {
             el_proving_task_scheduler,
+            btc_blockspace_proving_task_scheduler,
         }
     }
 }
@@ -79,6 +87,17 @@ impl ExpressProverClientApiServer for ProverClientRpc {
             .context
             .el_proving_task_scheduler
             .create_proving_task(el_block_num)
+            .await
+            .expect("failed to add proving task");
+
+        RpcResult::Ok(task_id.to_string())
+    }
+
+    async fn prove_btc_block(&self, btc_block_num: u64) -> RpcResult<String> {
+        let task_id = self
+            .context
+            .btc_blockspace_proving_task_scheduler
+            .create_proving_task(btc_block_num)
             .await
             .expect("failed to add proving task");
 
