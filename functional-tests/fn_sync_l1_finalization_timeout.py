@@ -19,13 +19,14 @@ class BlockFinalizationTimeoutTest(flexitest.Test):
 
     def __init__(self, ctx: flexitest.InitContext):
         premine_blocks = 101
+        self.timeout = 5
         rollup_params = {
             **FAST_BATCH_ROLLUP_PARAMS,
             # Setup reasonal horizon/genesis height
             "horizon_l1_height": premine_blocks - 3,
             "genesis_l1_height": premine_blocks + 5,
             "proof_publish_mode": {
-                "Timeout": 5,
+                "Timeout": self.timeout,
             },
             "verify_proofs": True,
         }
@@ -38,10 +39,9 @@ class BlockFinalizationTimeoutTest(flexitest.Test):
 
         check_submit_proof_fails_for_nonexistent_batch(seqrpc, 100)
 
-        proof_timeout = 5
         # Check for first 4 checkpoints
         for n in range(1, 5):
-            check_nth_checkpoint_finalized(n, seqrpc, None, proof_timeout=proof_timeout)
+            check_nth_checkpoint_finalized(n, seqrpc, None, proof_timeout=self.timeout)
             print(f"Pass checkpoint finalization for checkpoint {n}")
 
         check_already_sent_proof(seqrpc)
