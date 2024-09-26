@@ -57,13 +57,9 @@ pub fn process_block(
 /// manipulatable.  Eventually we want to switch to a randao-ish scheme, but
 /// let's not get ahead of ourselves.
 fn compute_init_slot_rng(state: &StateCache) -> SlotRng {
-    // Just take the prefix of the last block's slot and xor it with the block height.
+    // Just take the last block's slot.
     let blkid_buf = *state.state().chain_tip_blockid().as_ref();
-    let mut buf = [0; 8];
-    buf.copy_from_slice(&blkid_buf[..8]);
-
-    let seed = u64::from_be_bytes(buf) ^ state.state().chain_tip_slot();
-    SlotRng::new_seeded(seed)
+    SlotRng::new_seeded(blkid_buf)
 }
 
 /// Update our view of the L1 state, playing out downstream changes from that.

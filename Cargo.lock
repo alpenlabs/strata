@@ -3834,6 +3834,8 @@ version = "0.1.0"
 dependencies = [
  "alpen-express-primitives",
  "alpen-express-state",
+ "rand_chacha 0.3.1",
+ "rand_core 0.6.4",
  "thiserror",
  "tracing",
 ]

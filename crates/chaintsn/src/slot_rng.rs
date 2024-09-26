@@ -1,33 +1,28 @@
 //! Deterministic and non-cryptographically-secure RNG for use when picking
 //! stuff in the CL STF.
 //!
-//! See: <https://lemire.me/blog/2019/03/19/the-fastest-conventional-random-number-generator-that-can-pass-big-crush/>
+//! This uses `ChaCha8Rng` from the `rand_chacha` crate.
+
+use rand_core::{RngCore, SeedableRng};
 
 /// RNG used within the scope of a block's slot processing.
 pub struct SlotRng {
     // This uses the 64-bit version so that we don't have to keep around 128
     // bits of state data.  Probably isn't a significant improvement to
     // performance, but it's nice.
-    state: u64,
+    rng: rand_chacha::ChaCha8Rng,
 }
 
 impl SlotRng {
-    pub fn new_seeded(seed: u64) -> Self {
-        Self { state: seed }
+    pub fn new_seeded(seed: [u8; 32]) -> Self {
+        Self {
+            rng: rand_chacha::ChaCha8Rng::from_seed(seed),
+        }
     }
 
     /// Generates the next 64-bit word from the RNG.
     pub fn next_word(&mut self) -> u64 {
-        // These magic numbers don't have any specific meaning, they just
-        // improve the statistical tests.
-        self.state += 0x60bee2bee120fc15;
-
-        let mut tmp = self.state as u128 * 0xa3b195354a39b70d;
-        let m1 = (tmp >> 64) as u64 ^ tmp as u64;
-        tmp = m1 as u128 * 0x1b03738712fad5c9;
-        let m2 = (tmp >> 64) as u64 ^ tmp as u64;
-
-        m2
+        self.rng.next_u64()
     }
 
     /// Returns a randomly generates array of bytes.  For types smaller than 8
