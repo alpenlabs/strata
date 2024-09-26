@@ -21,6 +21,12 @@ use express_bridge_tx_builder::prelude::DepositInfo;
 use jsonrpsee::core::RpcResult;
 use tracing::{debug, error};
 
+/// The `vout` corresponding to the bridge-in related Taproot address on the Deposit Request
+/// Transaction.
+///
+/// This is always going to be the first [`OutPoint`].
+pub const DEPOSIT_REQUEST_VOUT: u32 = 0;
+
 /// Extract the deposit duties from the [`L1DataProvider`] starting from a given block height.
 ///
 /// This duty will be the same for every operator (for now). So, an
@@ -64,7 +70,7 @@ pub(super) async fn extract_deposit_requests<Provider: L1DataProvider>(
 
         let deposit_request_outpoint = OutPoint {
             txid: tx.compute_txid(),
-            vout: 0, // always the first
+            vout: DEPOSIT_REQUEST_VOUT,
         };
 
         let output_script = &tx
