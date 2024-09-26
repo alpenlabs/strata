@@ -76,9 +76,6 @@ impl EncryptedSeedPersister for KeychainPersister {
 // below is wrapper around [`keyring::Error`] so it can be used with OneOf
 // to more precisely handle errors
 
-#[derive(Debug)]
-pub struct BadPassword;
-
 /// This indicates runtime failure in the underlying
 /// platform storage system.  The details of the failure can
 /// be retrieved from the attached platform error.

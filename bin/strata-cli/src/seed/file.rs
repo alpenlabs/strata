@@ -1,3 +1,13 @@
+use std::{
+    fs::{remove_file, File},
+    io::{ErrorKind, Read, Write},
+    path::PathBuf,
+};
+
+use terrors::OneOf;
+
+use super::{EncryptedSeed, EncryptedSeedPersister, PersisterErr};
+
 #[derive(Clone, Debug)]
 pub struct FilePersister {
     file: PathBuf,
@@ -15,7 +25,7 @@ impl EncryptedSeedPersister for FilePersister {
         let mut file = match File::options().read(true).open(&self.file) {
             Ok(f) => f,
             Err(e) if e.kind() == ErrorKind::NotFound => return Ok(None),
-            Err(e) => return Err(e),
+            Err(e) => return Err(OneOf::new(e)),
         };
         let mut buf = [0u8; EncryptedSeed::LEN];
         let bytes_read = file.read(&mut buf)?;
@@ -27,6 +37,6 @@ impl EncryptedSeedPersister for FilePersister {
     }
 
     fn delete(&self) -> Result<(), PersisterErr> {
-        remove_file(&self.file)
+        remove_file(&self.file).map_err(OneOf::new)
     }
 }

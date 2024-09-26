@@ -42,3 +42,6 @@ impl Password {
         }
     }
 }
+
+#[derive(Debug)]
+pub struct BadPassword;

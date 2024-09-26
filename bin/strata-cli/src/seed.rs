@@ -1,10 +1,6 @@
-use std::str::FromStr;
 #[cfg(target_os = "linux")]
-use std::{
-    fs::{remove_file, File},
-    io::{self, ErrorKind, Read, Write},
-    path::PathBuf,
-};
+use std::io::{self, Read};
+use std::str::FromStr;
 
 use aes_gcm_siv::{aead::AeadMutInPlace, Aes256GcmSiv, KeyInit, Nonce, Tag};
 use alloy::{network::EthereumWallet, signers::local::PrivateKeySigner};
@@ -15,7 +11,7 @@ use bdk_wallet::{
 use bip39::{Language, Mnemonic};
 use console::Term;
 use dialoguer::{Confirm, Input};
-use password::Password;
+use password::{BadPassword, Password};
 use rand::{thread_rng, Rng, RngCore};
 use sha2::{Digest, Sha256};
 use terrors::OneOf;
