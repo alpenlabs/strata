@@ -39,7 +39,7 @@ use crate::errors::Error;
 /// This is relevant when sequencer starts at L1 height >> genesis height
 /// to prevent L2Block from becoming very large in size.
 const MAX_L1_ENTRIES_PER_BLOCK: usize = 100;
-const MAX_BEACON_CHAIN_WITHDRAWALS: usize = 16;
+const MAX_BRIDGE_IN_PER_BLOCK: usize = 16;
 
 /// Signs and stores a block in the database.  Does not submit it to the
 /// forkchoice manager.
@@ -340,7 +340,7 @@ fn prepare_exec_data<E: ExecEngineCtl>(
     let mut pending_deposits = prev_chstate.exec_env_state().pending_deposits().clone();
     while let Some(idx) = pending_deposits.front_idx() {
         //  first 16 withdrawals (full or partial) into the withdrawal queue.
-        if el_ops.len() == MAX_BEACON_CHAIN_WITHDRAWALS {
+        if el_ops.len() == MAX_BRIDGE_IN_PER_BLOCK {
             break;
         }
         let pending_deposit = pending_deposits.pop_front().unwrap();

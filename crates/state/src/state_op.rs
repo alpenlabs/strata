@@ -122,6 +122,7 @@ fn apply_op_to_chainstate(op: &StateOp, state: &mut ChainState) {
         }
 
         StateOp::MatureL1Block(maturing_idx) => {
+            let operators: Vec<_> = state.operator_table().indices().collect();
             let mqueue = &mut state.l1_state.maturation_queue;
             let deposits = state.exec_env_state.pending_deposits_mut();
 
@@ -134,24 +135,21 @@ fn apply_op_to_chainstate(op: &StateOp, state: &mut ChainState) {
             let matured_block = mqueue.pop_front().unwrap();
 
             // TODO add it to the MMR so we can reference it in the future
-            // TODO handle the DA txs and the deposit update txs, maybe in other ops
             let (_, deposit_txs, _) = matured_block.into_parts();
             for tx in deposit_txs {
                 if let Deposit(deposit_info) = tx.tx().protocol_operation() {
                     let amt = deposit_info.amt;
-                    let deposit_intent = DepositIntent::new(
-                        amt,
-                        &deposit_info.address,
-                        deposit_info.outpoint.clone(),
-                    );
+                    let deposit_intent = DepositIntent::new(amt, &deposit_info.address);
                     deposits.push_back(deposit_intent);
+                    state
+                        .deposits_table
+                        .add_deposits(&deposit_info.outpoint, &operators, amt)
                 }
             }
         }
 
         StateOp::ConsumeDepositIntent(to_drop) => {
             let deposits = state.exec_env_state.pending_deposits_mut();
-            let operators = state.operator_table.operator_indices();
 
             let front_idx = deposits
                 .front_idx()
@@ -165,16 +163,9 @@ fn apply_op_to_chainstate(op: &StateOp, state: &mut ChainState) {
             let n_drop = front_idx - to_drop;
 
             for _ in 0..n_drop {
-                let deposit_info = deposits
+                deposits
                     .pop_front()
                     .expect("stateop: unable to consume deposit intent");
-
-                // add to deposit table once DepositEntry has been finalized
-                state.deposits_table.add_deposits(
-                    deposit_info.outref(),
-                    &operators,
-                    deposit_info.amt(),
-                );
             }
         }
 

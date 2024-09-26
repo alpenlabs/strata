@@ -9,7 +9,7 @@ use bitcoin::{
     Address, Amount, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Witness,
 };
 
-use super::DepositTxConfig;
+use crate::deposit::DepositTxConfig;
 
 pub fn generic_taproot_addr() -> Address {
     Address::from_str("bcrt1pnmrmugapastum8ztvgwcn8hvq2avmcwh2j4ssru7rtyygkpqq98q4wyd6s")
@@ -33,8 +33,8 @@ pub fn create_transaction_two_outpoints(
 ) -> Transaction {
     // construct the inputs
 
-    let random_bytes = vec![0u8; 1024];
-    let mut unstructured = Unstructured::new(&random_bytes);
+    let bytes = vec![0u8; 1024];
+    let mut unstructured = Unstructured::new(&bytes);
     let previous_output = *OutputRef::arbitrary(&mut unstructured)
         .expect("should be able to generate arbitrary output ref")
         .outpoint();

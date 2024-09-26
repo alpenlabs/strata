@@ -12149,7 +12149,6 @@ version = "0.1.0"
 dependencies = [
  "alpen-express-primitives",
  "alpen-express-state",
- "alpen-test-utils",
  "anyhow",
  "arbitrary",
  "bitcoin",

@@ -18,22 +18,12 @@ pub struct DepositTxConfig {
     pub deposit_quantity: u64,
 }
 
-impl From<&RollupParams> for DepositTxConfig {
-    fn from(params: &RollupParams) -> Self {
+impl DepositTxConfig {
+    pub fn from_rollup_params(params: &RollupParams) -> Self {
         Self {
             magic_bytes: params.rollup_name.clone().into_bytes().to_vec(),
             address_length: params.address_length,
             deposit_quantity: params.deposit_amount,
-        }
-    }
-}
-
-impl DepositTxConfig {
-    pub fn new(magic_bytes: &[u8], addr_len: u8, amount: u64) -> Self {
-        Self {
-            magic_bytes: magic_bytes.to_vec(),
-            address_length: addr_len,
-            deposit_quantity: amount,
         }
     }
 }

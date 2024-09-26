@@ -3,34 +3,33 @@
 use alpen_express_primitives::l1::OutputRef;
 use alpen_express_state::tx::DepositInfo;
 use bitcoin::{opcodes::all::OP_RETURN, ScriptBuf, Transaction};
-use tracing::trace;
 
 use super::{common::check_bridge_offer_output, error::DepositParseError, DepositTxConfig};
 use crate::utils::{next_bytes, next_op};
 
 /// Extracts the DepositInfo from the Deposit Transaction
 pub fn extract_deposit_info(tx: &Transaction, config: &DepositTxConfig) -> Option<DepositInfo> {
-    trace!("{:?}", tx);
-    let tx_out = tx.output.clone();
-    if let Some(output_0) = tx_out.first() {
-        // Ensure the output at index 0 exists first
-        if let Some(tx_out) = tx_out.get(1) {
-            if let Ok(ee_address) = parse_deposit_script(&tx_out.script_pubkey, config) {
-                // Check if this is a valid bridge offer output
-                if check_bridge_offer_output(tx, config).is_ok() {
-                    if let Some(prev_out) = tx.input.first() {
-                        return Some(DepositInfo {
-                            amt: output_0.value.to_sat(),
-                            address: ee_address.to_vec(),
-                            outpoint: OutputRef::from(prev_out.previous_output),
-                        });
-                    }
-                }
-            }
-        }
-    }
+    // Get the first output (index 0)
+    let output_0 = tx.output.first()?;
 
-    None
+    // Get the second output (index 1)
+    let output_1 = tx.output.get(1)?;
+
+    // Parse the deposit script from the second output's script_pubkey
+    let ee_address = parse_deposit_script(&output_1.script_pubkey, config).ok()?;
+
+    // Check if this is a valid bridge offer output
+    check_bridge_offer_output(tx, config).ok()?;
+
+    // Get the first input of the transaction
+    let prev_out = tx.input.first()?;
+
+    // Construct and return the DepositInfo
+    Some(DepositInfo {
+        amt: output_0.value.to_sat(),
+        address: ee_address.to_vec(),
+        outpoint: OutputRef::from(prev_out.previous_output),
+    })
 }
 
 /// extracts the EE address given that the script is OP_RETURN type and contains the Magic Bytes
@@ -54,9 +53,13 @@ fn parse_deposit_script<'a>(
     // data has expected magic bytes
     let magic_bytes = &config.magic_bytes;
     let magic_len = magic_bytes.len();
+
+    println!("magic bytes {:?}", magic_bytes);
     if data.len() < magic_len || &data[..magic_len] != magic_bytes {
         return Err(DepositParseError::MagicBytesMismatch);
     }
+
+    println!("magic bytes matches");
 
     // configured bytes for address
     let address = &data[magic_len..];
@@ -64,6 +67,8 @@ fn parse_deposit_script<'a>(
         // casting is safe as address.len() < data.len() < 80
         return Err(DepositParseError::InvalidDestAddress(address.len() as u8));
     }
+
+    println!("address check {:?}", address);
 
     Ok(address)
 }

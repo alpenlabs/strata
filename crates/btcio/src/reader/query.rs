@@ -116,8 +116,7 @@ fn derive_tx_filter_rules<D: Database + 'static>(
 ) -> anyhow::Result<Vec<TxFilterRule>> {
     // TODO: Figure out how to do it from chainstate provider
     // For now we'll just go with filtering Inscription transactions
-
-    let deposit_provider = DepositTxConfig::from(params.rollup());
+    let deposit_provider = DepositTxConfig::from_rollup_params(params.rollup());
     Ok(vec![
         TxFilterRule::RollupInscription(params.rollup().rollup_name.clone()),
         TxFilterRule::Deposit(deposit_provider),

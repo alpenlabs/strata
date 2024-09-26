@@ -129,8 +129,8 @@ impl OperatorTable {
     }
 
     /// Get all the operator's index
-    pub fn operator_indices(&self) -> Vec<OperatorIdx> {
-        self.operators.iter().map(|operator| operator.idx).collect()
+    pub fn indices(&self) -> impl Iterator<Item = OperatorIdx> + '_ {
+        self.operators.iter().map(|operator| operator.idx)
     }
 }
 
@@ -235,13 +235,7 @@ impl DepositsTable {
 
     pub fn add_deposits(&mut self, tx_ref: &OutputRef, operators: &[u32], amt: u64) {
         // TODO: work out what we want to do with pending update transaction
-        let deposit_entry = DepositEntry::new(
-            self.next_idx(),
-            tx_ref.clone(),
-            operators.to_vec(),
-            amt,
-            Vec::new(),
-        );
+        let deposit_entry = DepositEntry::new(self.next_idx(), tx_ref, operators, amt, Vec::new());
 
         self.deposits.push(deposit_entry);
         self.next_idx += 1;
@@ -286,15 +280,15 @@ impl DepositEntry {
 
     pub fn new(
         idx: u32,
-        output: OutputRef,
-        operators: Vec<OperatorIdx>,
+        output: &OutputRef,
+        operators: &[OperatorIdx],
         amt: u64,
         pending_update_txs: Vec<l1::L1TxRef>,
     ) -> Self {
         Self {
             deposit_idx: idx,
-            output,
-            notary_operators: operators,
+            output: output.clone(),
+            notary_operators: operators.to_vec(),
             amt,
             pending_update_txs,
             state: DepositState::Accepted,

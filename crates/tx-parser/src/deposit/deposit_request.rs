@@ -17,24 +17,25 @@ pub fn extract_deposit_request_info(
     tx: &Transaction,
     config: &DepositTxConfig,
 ) -> Option<DepositRequestInfo> {
-    // tapscript output and OP_RETURN must be present
-    if tx.output.len() >= 2 {
-        if let Ok(DepositRequestScriptInfo {
-            tap_ctrl_blk_hash,
-            ee_bytes,
-        }) = parse_deposit_request_script(&tx.output[1].script_pubkey, config)
-        {
-            // find the outpoint with taproot address, so that we can extract sent amount from that
-            if check_bridge_offer_output(tx, config).is_ok() {
-                return Some(DepositRequestInfo {
-                    amt: tx.output[0].value.to_sat(),
-                    address: ee_bytes,
-                    take_back_leaf_hash: tap_ctrl_blk_hash,
-                });
-            }
-        }
-    }
-    None
+    // Ensure that the transaction has at least 2 outputs
+    let output_0 = tx.output.first()?;
+    let output_1 = tx.output.get(1)?;
+
+    // Parse the deposit request script from the second output's script_pubkey
+    let DepositRequestScriptInfo {
+        tap_ctrl_blk_hash,
+        ee_bytes,
+    } = parse_deposit_request_script(&output_1.script_pubkey, config).ok()?;
+
+    // Check if the bridge offer output is valid
+    check_bridge_offer_output(tx, config).ok()?;
+
+    // Construct and return the DepositRequestInfo
+    Some(DepositRequestInfo {
+        amt: output_0.value.to_sat(),
+        address: ee_bytes,
+        take_back_leaf_hash: tap_ctrl_blk_hash,
+    })
 }
 
 /// extracts the tapscript block and EE address given that the script is OP_RETURN type and

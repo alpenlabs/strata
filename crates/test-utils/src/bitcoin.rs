@@ -140,7 +140,7 @@ pub fn get_btc_chain(params: Params) -> BtcChainSegment {
 
 pub fn get_tx_filters() -> Vec<TxFilterRule> {
     let config = gen_params();
-    let deposit_tx_config = DepositTxConfig::from(config.rollup());
+    let deposit_tx_config = DepositTxConfig::from_rollup_params(config.rollup());
 
     vec![
         TxFilterRule::Deposit(deposit_tx_config),

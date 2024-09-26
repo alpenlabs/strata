@@ -1,7 +1,6 @@
 // TODO: move this to `strata-tx-parser`
 // Keeping tests here because it requires `writer`
 // Maybe split this crate into multiple crates
-
 #[cfg(test)]
 mod test {
     use std::str::FromStr;

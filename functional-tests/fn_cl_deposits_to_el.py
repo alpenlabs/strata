@@ -19,25 +19,34 @@ class L1ClientStatusTest(flexitest.Test):
         seqrpc = seq.create_rpc()
         btcrpc: BitcoindClient = btc.create_rpc()
 
-        deposit_tx = "".join(
-            [
-                "020000000002e8030000000000002251209ec7be23a1ec17cd9c4",
-                "b621d899eec02bacde1d754ab080f9e1ac8445820014e00000000",
-                "0000000021" "6a",  # OP_RETURN
-                "0a65787072657373737373",  # OP_PUSHBYTES_10 expresssss
-                "140101010101010101010101010101010101010101",
-                "00000000",  # OP_PUSHBYTES_20 "01"**20
-            ]
-        )
+        addr = btcrpc.proxy.getnewaddress("", "bech32m")
+        amount_to_send = ROLLUP_BATCH_WITH_FUNDS["deposit_amount"] / 10**8
+        print(amount_to_send)
+        name = ROLLUP_BATCH_WITH_FUNDS["rollup_name"].encode("utf-8").hex()
+        print(name)
+        evm_addr = "deadf001900dca3ebeefdeadf001900dca3ebeef"
 
-        print(deposit_tx)
+        outputs = [{addr: amount_to_send}, {"data": f"{name}{evm_addr}"}]
 
-        funded_tx = btcrpc.proxy.fundrawtransaction(deposit_tx)
-        signed_tx = btcrpc.proxy.signrawtransactionwithwallet(funded_tx["hex"])
+        options = {"changePosition": 2}
 
-        print(btcrpc.sendrawtransaction(signed_tx["hex"]))
+        psbt_result = btcrpc.proxy.walletcreatefundedpsbt([], outputs, 0, options)
+        psbt = psbt_result["psbt"]
 
+        signed_psbt = btcrpc.proxy.walletprocesspsbt(psbt)
+
+        finalized_psbt = btcrpc.proxy.finalizepsbt(signed_psbt["psbt"])
+        deposit_tx = finalized_psbt["hex"]
+
+        print(btcrpc.sendrawtransaction(deposit_tx))
         time.sleep(SEQ_PUBLISH_BATCH_INTERVAL_SECS)
+        time.sleep(6)
         deposits = seqrpc.alp_getCurrentDeposits()
+        print(deposits)
 
         assert len(deposits) > 0
+
+        reth = ctx.get_service("reth")
+        rethrpc = reth.create_rpc()
+        print(rethrpc.eth_blockNumber())
+        print(rethrpc.eth_getBalance(f"0x{evm_addr}"))

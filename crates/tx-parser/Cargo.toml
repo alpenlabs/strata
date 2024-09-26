@@ -16,5 +16,4 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
-alpen-test-utils = { workspace = true }
 rand = { workspace = true }
