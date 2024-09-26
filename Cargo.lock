@@ -4099,6 +4099,7 @@ dependencies = [
  "anyhow",
  "bincode",
  "borsh",
+ "express-sp1-alpen-client",
  "express-zkvm",
  "hex",
  "num-bigint 0.4.6",
@@ -4108,6 +4109,20 @@ dependencies = [
  "snark-bn254-verifier",
  "sp1-sdk",
  "substrate-bn 0.7.0",
+]
+
+[[package]]
+name = "express-sp1-alpen-client"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "borsh",
+ "express-zkvm",
+ "hex",
+ "serde",
+ "serde_json",
+ "sp1-sdk",
 ]
 
 [[package]]

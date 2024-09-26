@@ -15,6 +15,7 @@ members = [
   "crates/primitives",
   "crates/zkvm/adapters/risc0",
   "crates/zkvm/adapters/sp1",
+  'crates/zkvm/adapters/sp1-alpen-client',
   "crates/proof-impl/btc-blockspace",
   "crates/proof-impl/cl-stf",
   "crates/proof-impl/evm-ee-stf",
@@ -96,6 +97,7 @@ express-reth-rpc = { path = "crates/reth/rpc" }
 express-risc0-adapter = { path = "crates/zkvm/adapters/risc0" }
 express-rpc-utils = { path = "crates/rpc/utils" }
 express-sp1-adapter = { path = "crates/zkvm/adapters/sp1" }
+express-sp1-alpen-client = { path = "crates/zkvm/adapters/sp1-alpen-client" }
 express-storage = { path = "crates/storage" }
 express-sync = { path = "crates/sync" }
 express-tasks = { path = "crates/tasks" }

@@ -1,0 +1,18 @@
+[package]
+edition = "2021"
+name = "express-sp1-alpen-client"
+version = "0.1.0"
+
+[dependencies]
+anyhow = { workspace = true }
+bincode = { workspace = true }
+borsh = { workspace = true }
+express-zkvm = { workspace = true }
+hex = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sp1-sdk = { version = "2.0.0" }
+
+[features]
+default = []
+prover = []

@@ -1,4 +1,5 @@
 use anyhow::Ok;
+use express_sp1_alpen_client::prove_using_network;
 use express_zkvm::{Proof, ProverOptions, VerificationKey, ZKVMHost, ZKVMInputBuilder};
 use sp1_sdk::ProverClient;
 
@@ -29,6 +30,12 @@ impl ZKVMHost for SP1Host {
         if self.prover_options.use_mock_prover {
             std::env::set_var("SP1_PROVER", "mock");
         }
+
+        let use_alpen_backend = true;
+        if use_alpen_backend {
+            return prove_using_network(&self.elf, prover_input);
+        }
+
         let client = ProverClient::new();
         let (pk, vk) = client.setup(&self.elf);
 
