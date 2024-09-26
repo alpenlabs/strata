@@ -11,7 +11,7 @@ fi
 
 # Conditionally run cargo build based on PROVER_TEST
 if [ "$PROVER_TEST" = 1 ]; then
-    cargo build -F "prover"
+    cargo build -F "prover" --release
 else
     cargo build
 fi

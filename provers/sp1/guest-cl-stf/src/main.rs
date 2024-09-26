@@ -38,6 +38,7 @@ fn get_rollup_params() -> Params {
             target_l2_batch_size: 64,
             address_length: 20,
             deposit_amount: 1_000_000_000,
+            verify_proofs: false,
             rollup_vk: RollupVerifyingKey::SP1VerifyingKey(Buf32(
                 "0x00b01ae596b4e51843484ff71ccbd0dd1a030af70b255e6b9aad50b81d81266f"
                     .parse()
