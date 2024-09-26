@@ -505,7 +505,7 @@ impl BorshSerialize for BitcoinPsbt {
     fn serialize<W: Write>(&self, writer: &mut W) -> std::io::Result<()> {
         // Serialize the PSBT using bitcoin's built-in serialization
         let psbt_bytes = self.0.serialize();
-        // First, write the length of the serialized PSBT (as u64)
+        // First, write the length of the serialized PSBT (as u32)
         BorshSerialize::serialize(&(psbt_bytes.len() as u32), writer)?;
         // Then, write the actual serialized PSBT bytes
         writer.write_all(&psbt_bytes)?;
@@ -515,7 +515,7 @@ impl BorshSerialize for BitcoinPsbt {
 
 impl BorshDeserialize for BitcoinPsbt {
     fn deserialize_reader<R: Read>(reader: &mut R) -> std::io::Result<Self> {
-        // First, read the length of the PSBT (as u64)
+        // First, read the length of the PSBT (as u32)
         let len = u32::deserialize_reader(reader)? as usize;
         // Then, create a buffer to hold the PSBT bytes and read them
         let mut psbt_bytes = vec![0u8; len];
@@ -556,6 +556,66 @@ impl<'a> Arbitrary<'a> for BitcoinPsbt {
         let psbt = BitcoinPsbt::from(psbt);
 
         Ok(psbt)
+    }
+}
+
+/// [Borsh](borsh)-friendly Bitcoin [`Txid`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BitcoinTxid(Txid);
+
+impl From<Txid> for BitcoinTxid {
+    fn from(value: bitcoin::Txid) -> Self {
+        Self(value)
+    }
+}
+
+impl From<BitcoinTxid> for Txid {
+    fn from(value: BitcoinTxid) -> Self {
+        value.0
+    }
+}
+
+impl BitcoinTxid {
+    /// Creates a new [`BitcoinTxid`] from a [`Txid`].
+    ///
+    /// # Notes
+    ///
+    /// [`Txid`] is [`Copy`].
+    pub fn new(txid: &Txid) -> Self {
+        BitcoinTxid(*txid)
+    }
+
+    /// Gets the inner Bitcoin [`Txid`]
+    pub fn inner(&self) -> Txid {
+        self.0
+    }
+
+    /// Gets the inner Bitcoin [`Txid`] as raw bytes [`Buf32`].
+    pub fn inner_raw(&self) -> Buf32 {
+        self.0.as_raw_hash().to_byte_array().into()
+    }
+}
+
+impl BorshSerialize for BitcoinTxid {
+    fn serialize<W: Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        // Serialize the txid using bitcoin's built-in serialization
+        let txid_bytes = self.0.to_byte_array();
+        // First, write the length of the serialized txid (as u32)
+        BorshSerialize::serialize(&(32_u32), writer)?;
+        // Then, write the actual serialized PSBT bytes
+        writer.write_all(&txid_bytes)?;
+        Ok(())
+    }
+}
+
+impl BorshDeserialize for BitcoinTxid {
+    fn deserialize_reader<R: Read>(reader: &mut R) -> std::io::Result<Self> {
+        // First, create a buffer to hold the txid bytes and read them
+        let mut txid_bytes = [0u8; 32];
+        reader.read_exact(&mut txid_bytes)?;
+        // Use the bitcoin crate's deserialize method to create a Psbt from the bytes
+        let txid = Txid::from_byte_array(txid_bytes);
+        Ok(BitcoinTxid(txid))
     }
 }
 

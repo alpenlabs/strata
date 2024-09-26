@@ -8,7 +8,7 @@ use alpen_express_db::{
     traits::{ChainstateProvider, Database, L1DataProvider, L2DataProvider},
     types::{CheckpointProvingStatus, L1TxEntry, L1TxStatus},
 };
-use alpen_express_primitives::{buf::Buf32, hash, params::Params};
+use alpen_express_primitives::{bridge::PublickeyTable, buf::Buf32, hash, params::Params};
 use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer};
 use alpen_express_rpc_types::{
     BlockHeader, ClientStatus, DaBlob, DepositEntry, DepositState, ExecUpdate, HexBytes,
@@ -606,6 +606,10 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
             .map_err(|e| Error::Other(e.to_string()))?;
         let batch_comm: Option<BatchCheckpoint> = entry.map(Into::into);
         Ok(batch_comm.map(|bc| bc.checkpoint().clone().into()))
+    }
+
+    async fn get_active_operator_chain_pubkey_set(&self) -> RpcResult<PublickeyTable> {
+        unimplemented!()
     }
 }
 

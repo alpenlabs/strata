@@ -1,7 +1,10 @@
-use std::sync::Arc;
+use std::io;
 
+use borsh::BorshSerialize;
 use rand::rngs::OsRng;
-use secp256k1::{schnorr::Signature, All, Keypair, Message, Secp256k1, SecretKey, XOnlyPublicKey};
+use secp256k1::{
+    schnorr::Signature, Keypair, Message, Secp256k1, SecretKey, XOnlyPublicKey, SECP256K1,
+};
 use thiserror::Error;
 
 use super::types::{BridgeMessage, Scope};
@@ -10,20 +13,25 @@ use crate::{
     operator::OperatorKeyProvider,
 };
 
-/// Contains data needed to construct bridge messages.
+/// Contains data needed to construct [`BridgeMessage`]s.
 #[derive(Clone)]
 pub struct MessageSigner {
     operator_idx: u32,
     msg_signing_sk: Buf32,
-    secp: Arc<Secp256k1<All>>,
 }
 
 impl MessageSigner {
-    pub fn new(operator_idx: u32, msg_signing_sk: Buf32, secp: Arc<Secp256k1<All>>) -> Self {
+    /// Creates a new [`MessageSigner`].
+    ///
+    /// # Notes
+    ///
+    /// In order to get a [`BridgeMessage`], call [`sign_raw`](Self::sign_raw)
+    /// or [`sign_scope`](Self::sign_scope) on this [`MessageSigner`]
+    /// depending on the use case.
+    pub fn new(operator_idx: u32, msg_signing_sk: Buf32) -> Self {
         Self {
             operator_idx,
             msg_signing_sk,
-            secp,
         }
     }
 
@@ -34,29 +42,39 @@ impl MessageSigner {
 
     /// Gets the pubkey corresponding to the internal msg signing sk.
     pub fn get_pubkey(&self) -> Buf32 {
-        compute_pubkey_for_privkey(&self.msg_signing_sk, self.secp.as_ref())
+        compute_pubkey_for_privkey(&self.msg_signing_sk, SECP256K1)
     }
 
     /// Signs a message using a raw scope and payload.
-    pub fn sign_raw(&self, scope: Vec<u8>, payload: Vec<u8>) -> BridgeMessage {
+    pub fn sign_raw<T: BorshSerialize>(
+        &self,
+        scope: &T,
+        payload: &T,
+    ) -> Result<BridgeMessage, io::Error> {
         let mut tmp_m = BridgeMessage {
             source_id: self.operator_idx,
             sig: Buf64::zero(),
-            scope,
-            payload,
+            scope: borsh::to_vec(scope)?,
+            payload: borsh::to_vec(payload)?,
         };
 
         let id: Buf32 = tmp_m.compute_id().into();
-        let sig = sign_msg_hash(&self.msg_signing_sk, &id, self.secp.as_ref());
+        // WARN: I don't know if a global context is safe here, maybe.
+        let sig = sign_msg_hash(&self.msg_signing_sk, &id, SECP256K1);
         tmp_m.sig = sig;
 
-        tmp_m
+        Ok(tmp_m)
     }
 
     /// Signs a message with some particular typed scope.
-    pub fn sign_scope(&self, scope: &Scope, payload: Vec<u8>) -> BridgeMessage {
-        let raw_scope = borsh::to_vec(scope).unwrap();
-        self.sign_raw(raw_scope, payload)
+    pub fn sign_scope<T: BorshSerialize>(
+        &self,
+        scope: &Scope,
+        payload: &T,
+    ) -> Result<BridgeMessage, io::Error> {
+        let raw_scope = borsh::to_vec(scope)?;
+        let payload: Vec<u8> = borsh::to_vec(&payload)?;
+        self.sign_raw(&raw_scope, &payload)
     }
 }
 
@@ -144,15 +162,14 @@ mod tests {
 
     #[test]
     fn test_sign_verify_msg_ok() {
-        let secp = Arc::new(Secp256k1::new());
         let sk = Buf32::from([1; 32]);
 
         let idx = 4;
-        let signer = MessageSigner::new(idx, sk, secp);
+        let signer = MessageSigner::new(idx, sk);
         let pk = signer.get_pubkey();
 
         let payload = vec![1, 2, 3, 4, 5];
-        let m = signer.sign_scope(&Scope::Misc, payload);
+        let m = signer.sign_scope(&Scope::Misc, &payload).unwrap();
 
         let stub_prov = StubOpKeyProv::new(idx, pk);
         assert!(verify_bridge_msg_sig(&m, &stub_prov).is_ok());
@@ -160,15 +177,14 @@ mod tests {
 
     #[test]
     fn test_sign_verify_msg_fail() {
-        let secp = Arc::new(Secp256k1::new());
         let sk = Buf32::from([1; 32]);
 
         let idx = 4;
-        let signer = MessageSigner::new(idx, sk, secp);
+        let signer = MessageSigner::new(idx, sk);
         let pk = signer.get_pubkey();
 
         let payload = vec![1, 2, 3, 4, 5];
-        let mut m = signer.sign_scope(&Scope::Misc, payload);
+        let mut m = signer.sign_scope(&Scope::Misc, &payload).unwrap();
         m.sig = Buf64::zero();
 
         let stub_prov = StubOpKeyProv::new(idx, pk);
