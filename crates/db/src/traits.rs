@@ -385,6 +385,6 @@ pub trait CheckpointStore {
     /// Store a [`CheckpointEntry`]
     ///
     /// `batchidx` for the Checkpoint is expected to increase monotonically and
-    /// be equal to the [`alpen_express_state::chain_state::ChainState::checkpoint_period`]
+    /// correspond to the value of [`alpen_express_state::chain_state::ChainState::epoch`].
     fn put_batch_checkpoint(&self, batchidx: u64, entry: CheckpointEntry) -> DbResult<()>;
 }

@@ -6,6 +6,7 @@ use crate::{
     bridge_ops,
     bridge_state::{self, DepositsTable, OperatorTable},
     exec_env::{self, ExecEnvState},
+    genesis::GenesisStateData,
     l1::{self, L1ViewState},
     prelude::*,
 };
@@ -22,12 +23,12 @@ pub struct ChainState {
     /// The slot of the last produced block.
     pub(crate) slot: u64,
 
-    /// The index of the checkpoint period we're in, and so the index we expect
-    /// the next checkpoint to be.
+    /// The checkpoint epoch period we're currently in, and so the index we
+    /// expect the next checkpoint to be for.
     ///
     /// Immediately after genesis, this is 0, so the first checkpoint batch is
     /// checkpoint 0, moving us into checkpoint period 1.
-    pub(crate) checkpoint_period: u64,
+    pub(crate) epoch: u64,
 
     /// Rollup's view of L1 state.
     pub(crate) l1_state: l1::L1ViewState,
@@ -54,7 +55,7 @@ pub struct ChainState {
 struct HashedChainState {
     last_block: Buf32,
     slot: u64,
-    checkpoint_period: u64,
+    epoch: u64,
     l1_state_hash: Buf32,
     pending_withdraws_hash: Buf32,
     exec_env_hash: Buf32,
@@ -64,23 +65,27 @@ struct HashedChainState {
 
 impl ChainState {
     // TODO remove genesis blkid since apparently we don't need it anymore
-    pub fn from_genesis(
-        genesis_blkid: L2BlockId,
-        l1_state: l1::L1ViewState,
-        exec_state: exec_env::ExecEnvState,
-    ) -> Self {
+    pub fn from_genesis(gdata: &GenesisStateData) -> Self {
         Self {
-            last_block: genesis_blkid,
+            last_block: gdata.genesis_blkid(),
             slot: 0,
-            checkpoint_period: 0,
-            l1_state,
+            epoch: 0,
+            l1_state: gdata.l1_state().clone(),
             pending_withdraws: StateQueue::new_empty(),
-            exec_env_state: exec_state,
-            operator_table: bridge_state::OperatorTable::new_empty(),
+            exec_env_state: gdata.exec_state().clone(),
+            operator_table: gdata.operator_table().clone(),
             deposits_table: bridge_state::DepositsTable::new_empty(),
         }
     }
 
+    /// Returns the slot last processed on the chainstate.
+    pub fn chain_tip_slot(&self) -> u64 {
+        self.slot
+    }
+
+    /// Returns the blockid of the last processed block, which was used to
+    /// construct this chainstate (unless we're currently in the process of
+    /// modifying this chainstate copy).
     pub fn chain_tip_blockid(&self) -> L2BlockId {
         self.last_block
     }
@@ -95,7 +100,7 @@ impl ChainState {
         let hashed_state = HashedChainState {
             last_block: self.last_block.into(),
             slot: self.slot,
-            checkpoint_period: self.checkpoint_period,
+            epoch: self.epoch,
             l1_state_hash: compute_borsh_hash(&self.l1_state),
             pending_withdraws_hash: compute_borsh_hash(&self.pending_withdraws),
             exec_env_hash: compute_borsh_hash(&self.exec_env_state),
@@ -113,6 +118,10 @@ impl ChainState {
         &self.deposits_table
     }
 
+    pub fn deposits_table_mut(&mut self) -> &mut DepositsTable {
+        &mut self.deposits_table
+    }
+
     pub fn exec_env_state(&self) -> &ExecEnvState {
         &self.exec_env_state
     }
@@ -120,10 +129,8 @@ impl ChainState {
 
 impl<'a> Arbitrary<'a> for ChainState {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        let genesis_blkid = L2BlockId::arbitrary(u)?;
-        let l1_state = l1::L1ViewState::arbitrary(u)?;
-        let exec_state = exec_env::ExecEnvState::arbitrary(u)?;
-        Ok(Self::from_genesis(genesis_blkid, l1_state, exec_state))
+        let gdata = GenesisStateData::arbitrary(u)?;
+        Ok(Self::from_genesis(&gdata))
     }
 }
 

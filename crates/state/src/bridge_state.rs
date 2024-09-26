@@ -7,7 +7,7 @@ use alpen_express_primitives::{
     bridge::OperatorIdx,
     buf::Buf32,
     l1::{self, BitcoinAmount, OutputRef, XOnlyPk},
-    operator::OperatorKeyProvider,
+    operator::{OperatorKeyProvider, OperatorPubkeys},
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
@@ -31,6 +31,10 @@ pub struct OperatorEntry {
 }
 
 impl OperatorEntry {
+    pub fn idx(&self) -> OperatorIdx {
+        self.idx
+    }
+
     pub fn signing_pk(&self) -> &Buf32 {
         &self.signing_pk
     }
@@ -55,6 +59,22 @@ impl OperatorTable {
         }
     }
 
+    /// Constructs an operator table from a list of operator indexes.
+    pub fn from_operator_list(entries: &[OperatorPubkeys]) -> Self {
+        Self {
+            next_idx: entries.len() as OperatorIdx,
+            operators: entries
+                .iter()
+                .enumerate()
+                .map(|(i, e)| OperatorEntry {
+                    idx: i as OperatorIdx,
+                    signing_pk: *e.signing_pk(),
+                    wallet_pk: *e.wallet_pk(),
+                })
+                .collect(),
+        }
+    }
+
     /// Sanity checks the operator table for sensibility.
     fn sanity_check(&self) {
         if !self.operators.is_sorted_by_key(|e| e.idx) {
@@ -66,6 +86,17 @@ impl OperatorTable {
                 panic!("bridge_state: operators next_idx before last entry");
             }
         }
+    }
+
+    /// Returns the number of operator entries.
+    pub fn len(&self) -> u32 {
+        self.operators.len() as u32
+    }
+
+    /// Returns if the operator table is empty.  This is practically probably
+    /// never going to be true.
+    pub fn is_empty(&self) -> bool {
+        self.len() > 0
     }
 
     /// Inserts a new operator entry.
@@ -91,11 +122,37 @@ impl OperatorTable {
             .ok()
             .map(|i| &self.operators[i])
     }
+
+    /// Gets a operator entry by its internal position, *ignoring* the indexes.
+    pub fn get_entry_at_pos(&self, pos: u32) -> Option<&OperatorEntry> {
+        self.operators.get(pos as usize)
+    }
 }
 
 impl OperatorKeyProvider for OperatorTable {
     fn get_operator_signing_pk(&self, idx: OperatorIdx) -> Option<Buf32> {
         self.get_operator(idx).map(|ent| ent.signing_pk)
+    }
+}
+
+impl<'a> arbitrary::Arbitrary<'a> for OperatorTable {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let o0 = OperatorEntry {
+            idx: 0,
+            signing_pk: Buf32::arbitrary(u)?,
+            wallet_pk: Buf32::arbitrary(u)?,
+        };
+
+        let o1 = OperatorEntry {
+            idx: 1,
+            signing_pk: Buf32::arbitrary(u)?,
+            wallet_pk: Buf32::arbitrary(u)?,
+        };
+
+        Ok(Self {
+            next_idx: 2,
+            operators: vec![o0, o1],
+        })
     }
 }
 
@@ -131,6 +188,17 @@ impl DepositsTable {
         }
     }
 
+    /// Returns the number of deposit entries being tracked.
+    pub fn len(&self) -> u32 {
+        self.deposits.len() as u32
+    }
+
+    /// Returns if the deposit table is empty.  This is practically probably
+    /// never going to be true.
+    pub fn is_empty(&self) -> bool {
+        self.len() > 0
+    }
+
     /// Gets a deposit from the table by its idx.
     ///
     /// Does a binary search.
@@ -154,6 +222,11 @@ impl DepositsTable {
     pub fn get_all_deposits_idxs_iters_iter(&self) -> impl Iterator<Item = u32> + '_ {
         self.deposits.iter().map(|e| e.deposit_idx)
     }
+
+    /// Gets a deposit entry by its internal position, *ignoring* the indexes.
+    pub fn get_entry_at_pos(&self, pos: u32) -> Option<&DepositEntry> {
+        self.deposits.get(pos as usize)
+    }
 }
 
 /// Container for the state machine of a deposit factory.
@@ -176,6 +249,7 @@ pub struct DepositEntry {
     /// potentially very large set of pending transactions to reason about the
     /// state of the deposits.  This must be kept in sync when we do things
     /// though.
+    // TODO probably removing this actually
     pending_update_txs: Vec<l1::L1TxRef>,
 
     /// Deposit state.
@@ -183,6 +257,10 @@ pub struct DepositEntry {
 }
 
 impl DepositEntry {
+    pub fn idx(&self) -> u32 {
+        self.deposit_idx
+    }
+
     pub fn next_pending_update_tx(&self) -> Option<&l1::L1TxRef> {
         self.pending_update_txs.first()
     }
@@ -203,8 +281,16 @@ impl DepositEntry {
         &self.state
     }
 
+    pub fn deposit_state_mut(&mut self) -> &mut DepositState {
+        &mut self.state
+    }
+
     pub fn amt(&self) -> u64 {
         self.amt
+    }
+
+    pub fn set_state(&mut self, new_state: DepositState) {
+        self.state = new_state;
     }
 }
 
@@ -234,20 +320,70 @@ pub struct DispatchedState {
     /// Configuration for outputs to be written to.
     cmd: DispatchCommand,
 
-    /// The index of the operator that the deposit is assigned to for withdrawal reimbursement.
+    /// The index of the operator that's fronting the funds for the withdrawal,
+    /// and who will be reimbursed by the bridge notaries.
     assignee: OperatorIdx,
 
-    /// The bitcoin block height before which the withdrawal must be completed.
-    /// When set to 0, it means that the withdrawal cannot be processed yet.
-    valid_till_blockheight: BitcoinBlockHeight,
+    /// L1 block height before which we expect the dispatch command to be
+    /// executed and after which this assignment command is no longer valid.
+    ///
+    /// If a checkpoint is processed for this L1 height and the withdrawal still
+    /// goes out it won't be honored.
+    exec_deadline: BitcoinBlockHeight,
+}
+
+impl DispatchedState {
+    pub fn new(
+        cmd: DispatchCommand,
+        assignee: OperatorIdx,
+        exec_deadline: BitcoinBlockHeight,
+    ) -> Self {
+        Self {
+            cmd,
+            assignee,
+            exec_deadline,
+        }
+    }
+
+    pub fn cmd(&self) -> &DispatchCommand {
+        &self.cmd
+    }
+
+    pub fn assignee(&self) -> OperatorIdx {
+        self.assignee
+    }
+
+    pub fn exec_deadline(&self) -> BitcoinBlockHeight {
+        self.exec_deadline
+    }
+
+    pub fn set_assignee(&mut self, assignee_op_idx: OperatorIdx) {
+        self.assignee = assignee_op_idx;
+    }
+
+    pub fn set_exec_deadline(&mut self, exec_deadline: BitcoinBlockHeight) {
+        self.exec_deadline = exec_deadline;
+    }
 }
 
 /// Command to operator(s) to initiate the withdrawal.  Describes the set of
 /// outputs we're trying to withdraw to.
+///
+/// May also include future information to deal with fee accounting.
 #[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
 pub struct DispatchCommand {
     /// The table of withdrawal outputs.
     withdraw_outputs: Vec<WithdrawOutput>,
+}
+
+impl DispatchCommand {
+    pub fn new(withdraw_outputs: Vec<WithdrawOutput>) -> Self {
+        Self { withdraw_outputs }
+    }
+
+    pub fn withdraw_outputs(&self) -> &[WithdrawOutput] {
+        &self.withdraw_outputs
+    }
 }
 
 /// An output constructed from [`crate::bridge_ops::WithdrawalIntent`].
@@ -258,4 +394,10 @@ pub struct WithdrawOutput {
 
     /// Amount in sats.
     amt: BitcoinAmount,
+}
+
+impl WithdrawOutput {
+    pub fn new(dest_addr: XOnlyPk, amt: BitcoinAmount) -> Self {
+        Self { dest_addr, amt }
+    }
 }
