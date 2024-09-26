@@ -149,6 +149,11 @@ fn check_for_da_batch(blockdata: &BlockData, params: &Params) -> Vec<BatchCheckp
     verified_checkpoints.map(Into::into).collect()
 }
 
+/// Verify that the provided checkpoint proof is valid for the verifier key.
+///
+/// # Caution
+///
+/// If the checkpoint proof is empty, this function returns an `Ok(())`.
 pub fn verify_proof(
     checkpoint: &BatchCheckpoint,
     rollup_params: &RollupParams,
@@ -165,9 +170,11 @@ pub fn verify_proof(
 
     let proof = checkpoint.proof();
 
+    // FIXME: we are accepting empty proofs for now (devnet) to reduce dependency on the prover
+    // infra.
     if let ProofPublishMode::Timeout(_) = rollup_params.proof_publish_mode {
         if proof.is_empty() {
-            warn!(checkpoint_idx = %checkpoint_idx, "Accepting empty proof");
+            warn!(%checkpoint_idx, "verifying empty proof as correct");
             return Ok(());
         }
     }
