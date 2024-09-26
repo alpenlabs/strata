@@ -1,21 +1,19 @@
-//! Defines the error types associated with executing the deposit duties.
+//! Defines the error types associated with executing the withdrawal duties.
 
 use alpen_express_btcio::rpc::error::ClientError as L1ClientError;
 use express_bridge_tx_builder::errors::BridgeTxBuilderError;
 use jsonrpsee::core::ClientError as L2ClientError;
 use thiserror::Error;
 
-// TODO: use concrete types instead of passing around `String`
-
-/// Error encountered during the deposit duty execution.
+/// Error during execution of the withdrawal duty.
 #[derive(Error, Debug)]
-pub enum DepositExecError {
+pub enum ExecError {
     /// Error creating the [`TxSigningData`](alpen_express_primitives::bridge::TxSigningData).
-    #[error("could not build deposit transaction")]
+    #[error("could not build withdraw transaction")]
     TxBuilder(#[from] BridgeTxBuilderError),
 
-    /// Error occurred while signing a transaction.
-    #[error("signing failed due to: {0}")]
+    /// Error while signing the withdrawal transaction.
+    #[error("signing error: {0}")]
     Signing(String),
 
     /// The request for signature is invalid.
@@ -26,11 +24,15 @@ pub enum DepositExecError {
     #[error("transaction state fetching error: {0}")]
     TxState(String),
 
-    /// Error occurred while broadcasting a message to the p2p network.
-    #[error("transaction broadcast failed due to: {0}")]
+    /// Error while broadcasting the signature/transaction.
+    #[error("transaction broadcast error: {0}")]
     Broadcast(String),
 
-    /// An unexpected error occurred during execution.
+    /// Error while processing withdrawal due to insufficient funds (for front-payments).
+    #[error("insufficient funds")]
+    InsufficientFunds,
+
+    /// Unexpected error during the handling of the withdrawal.
     #[error("execution failed: {0}")]
     Execution(String),
 
@@ -47,5 +49,5 @@ pub enum DepositExecError {
     Xpriv,
 }
 
-/// The result of a deposit duty execution which may produce a [`DepositExecError`].
-pub type DepositExecResult<T> = Result<T, DepositExecError>;
+/// Result of a execution that may produce an [`ExecError`].
+pub type ExecResult<T> = Result<T, ExecError>;

@@ -1,6 +1,6 @@
-//! Defines the functions that pertain to handling a withdrawal request.
+//! Deposit/withdrawal transaction handling module
 
-use std::sync::Arc;
+use std::{fmt::Debug, time::Duration};
 
 use alpen_express_btcio::rpc::traits::Signer;
 use alpen_express_primitives::{
@@ -10,13 +10,16 @@ use alpen_express_primitives::{
 use alpen_express_rpc_api::AlpenApiClient;
 use bitcoin::{secp256k1::SECP256K1, Transaction, Txid};
 use express_bridge_sig_manager::manager::SignatureManager;
-use express_bridge_tx_builder::{prelude::*, withdrawal::CooperativeWithdrawalInfo, TxKind};
-use jsonrpsee::tokio::time::{sleep, Duration};
+use express_bridge_tx_builder::{
+    context::{BuildContext, TxBuildContext},
+    TxKind,
+};
+use jsonrpsee::tokio::time::sleep;
 use tracing::{debug, info};
 
-use crate::withdrawal_handler::errors::{WithdrawalExecError, WithdrawalExecResult};
+use crate::errors::{ExecError, ExecResult};
 
-/// (Partially) signs the withdrawal transaction.
+/// (Partially) signs a transaction.
 ///
 /// Also broadcasts to the bridge transaction database.
 ///
@@ -38,13 +41,18 @@ use crate::withdrawal_handler::errors::{WithdrawalExecError, WithdrawalExecResul
 ///
 /// We don't need mutexes since all functions to [`SignatureManager`] and
 /// [`TxBuildContext`] takes non-mutable references.
-pub async fn sign_withdrawal_tx(
-    withdrawal_info: &CooperativeWithdrawalInfo,
-    l1_rpc_client: &Arc<impl Signer>,
-    l2_rpc_client: &Arc<impl AlpenApiClient + Sync>,
-    sig_manager: &Arc<SignatureManager>,
-    tx_build_context: &Arc<TxBuildContext>,
-) -> WithdrawalExecResult<Txid> {
+pub async fn sign_tx<TxInfo, L2Client, L1Client>(
+    tx_info: &TxInfo,
+    l1_rpc_client: &L1Client,
+    l2_rpc_client: &L2Client,
+    sig_manager: &SignatureManager,
+    tx_build_context: &TxBuildContext,
+) -> ExecResult<Txid>
+where
+    TxInfo: TxKind + Debug,
+    L2Client: AlpenApiClient + Sync,
+    L1Client: Signer,
+{
     info!("starting withdrawal transaction signing");
 
     let operator_pubkeys = tx_build_context.pubkey_table();
@@ -55,7 +63,7 @@ pub async fn sign_withdrawal_tx(
         .expect("could not find operator's pubkey in public key table");
 
     info!(
-        ?withdrawal_info,
+        ?tx_info,
         %own_index,
         %own_pubkey,
         "got the basic self information",
@@ -67,7 +75,7 @@ pub async fn sign_withdrawal_tx(
         let keypair = xpriv.to_keypair(SECP256K1);
 
         // construct the transaction data
-        let tx_signing_data = withdrawal_info.construct_signing_data(tx_build_context.as_ref())?;
+        let tx_signing_data = tx_info.construct_signing_data(tx_build_context)?;
 
         debug!(?tx_signing_data, "got the signing data");
 
@@ -75,7 +83,7 @@ pub async fn sign_withdrawal_tx(
         let txid = sig_manager
             .add_tx_state(tx_signing_data, operator_pubkeys.clone())
             .await
-            .map_err(|e| WithdrawalExecError::Signing(e.to_string()))?;
+            .map_err(|e| ExecError::Signing(e.to_string()))?;
 
         info!(
             %txid,
@@ -88,13 +96,13 @@ pub async fn sign_withdrawal_tx(
         let public_nonce = sig_manager
             .get_own_nonce(&txid)
             .await
-            .map_err(|e| WithdrawalExecError::Signing(e.to_string()))?;
+            .map_err(|e| ExecError::Signing(e.to_string()))?;
 
         let scope = Scope::V0WithdrawalPubNonce(bitcoin_txid);
         debug!(?scope, "create the withdrawal pub nonce scope");
         let message = MessageSigner::new(own_index, keypair.secret_key().into())
             .sign_scope(&scope, &public_nonce)
-            .map_err(|e| WithdrawalExecError::Signing(e.to_string()))?;
+            .map_err(|e| ExecError::Signing(e.to_string()))?;
         debug!(?message, "create the withdrawal pub nonce message");
         let raw_message: Vec<u8> = message
             .try_into()
@@ -111,7 +119,7 @@ pub async fn sign_withdrawal_tx(
             let got_all_nonces = sig_manager
                 .get_tx_state(&txid)
                 .await
-                .map_err(|e| WithdrawalExecError::TxState(e.to_string()))?
+                .map_err(|e| ExecError::TxState(e.to_string()))?
                 .has_all_nonces();
             if got_all_nonces {
                 info!(
@@ -130,7 +138,7 @@ pub async fn sign_withdrawal_tx(
         let flag = sig_manager
             .add_own_partial_sig(&txid)
             .await
-            .map_err(|e| WithdrawalExecError::Signing(e.to_string()))?;
+            .map_err(|e| ExecError::Signing(e.to_string()))?;
 
         info!(%txid, "added own operator's partial signature");
 
@@ -141,11 +149,11 @@ pub async fn sign_withdrawal_tx(
 
         Ok(txid)
     } else {
-        Err(WithdrawalExecError::Xpriv)
+        Err(ExecError::Xpriv)
     }
 }
 
-/// Pools and aggregates signatures for the withdrawal transaction
+/// Pools and aggregates signatures for a withdrawal/deposit transaction
 /// into a fully-signed ready-to-be-broadcasted Bitcoin [`Transaction`].
 ///
 /// Also broadcasts to the bridge transaction database.
@@ -168,14 +176,18 @@ pub async fn sign_withdrawal_tx(
 ///
 /// We don't need mutexes since all functions to [`SignatureManager`] and
 /// [`TxBuildContext`] takes non-mutable references.
-pub async fn aggregate_withdraw_sig(
+pub async fn aggregate_sig<L2Client, L1Client>(
     txid: &Txid,
-    l1_rpc_client: &Arc<impl Signer>,
-    l2_rpc_client: &Arc<impl AlpenApiClient + Sync>,
-    sig_manager: &Arc<SignatureManager>,
-    tx_build_context: &Arc<TxBuildContext>,
-) -> WithdrawalExecResult<Transaction> {
-    info!("starting withdrawal transaction signature aggregation");
+    l1_rpc_client: &L1Client,
+    l2_rpc_client: &L2Client,
+    sig_manager: &SignatureManager,
+    tx_build_context: &TxBuildContext,
+) -> ExecResult<Transaction>
+where
+    L2Client: AlpenApiClient + Sync,
+    L1Client: Signer,
+{
+    info!("starting transaction signature aggregation");
 
     let operator_pubkeys = tx_build_context.pubkey_table();
     let own_index = tx_build_context.own_index();
@@ -194,7 +206,7 @@ pub async fn aggregate_withdraw_sig(
     let tx_state = sig_manager
         .get_tx_state(txid)
         .await
-        .map_err(|e| WithdrawalExecError::TxState(e.to_string()))?;
+        .map_err(|e| ExecError::TxState(e.to_string()))?;
 
     debug!(
         %txid,
@@ -211,7 +223,7 @@ pub async fn aggregate_withdraw_sig(
         let tx = sig_manager
             .finalize_transaction(txid)
             .await
-            .map_err(|e| WithdrawalExecError::Signing(e.to_string()))?;
+            .map_err(|e| ExecError::Signing(e.to_string()))?;
         return Ok(tx);
     }
 
@@ -226,7 +238,7 @@ pub async fn aggregate_withdraw_sig(
             sig_manager
                 .add_own_partial_sig(txid)
                 .await
-                .map_err(|e| WithdrawalExecError::Signing(e.to_string()))?;
+                .map_err(|e| ExecError::Signing(e.to_string()))?;
             info!(
                 %txid,
                 "added own's partial signature to the bridge transaction database",
@@ -237,7 +249,7 @@ pub async fn aggregate_withdraw_sig(
         let partial_sig = sig_manager
             .get_own_partial_sig(txid)
             .await
-            .map_err(|e| WithdrawalExecError::Signing(e.to_string()))?
+            .map_err(|e| ExecError::Signing(e.to_string()))?
             .expect("should've been signed");
 
         info!(
@@ -251,7 +263,7 @@ pub async fn aggregate_withdraw_sig(
         debug!(?scope, "create the withdrawal partial signature scope");
         let message = MessageSigner::new(own_index, keypair.secret_key().into())
             .sign_scope(&scope, &partial_sig)
-            .map_err(|e| WithdrawalExecError::Signing(e.to_string()))?;
+            .map_err(|e| ExecError::Signing(e.to_string()))?;
         debug!(?message, "create the withdrawal partial signature message");
         let raw_message: Vec<u8> = message
             .try_into()
@@ -269,7 +281,7 @@ pub async fn aggregate_withdraw_sig(
             let got_all_sigs = sig_manager
                 .get_tx_state(txid)
                 .await
-                .map_err(|e| WithdrawalExecError::TxState(e.to_string()))?
+                .map_err(|e| ExecError::TxState(e.to_string()))?
                 .is_fully_signed();
             if got_all_sigs {
                 info!(
@@ -286,10 +298,10 @@ pub async fn aggregate_withdraw_sig(
         let tx = sig_manager
             .finalize_transaction(txid)
             .await
-            .map_err(|e| WithdrawalExecError::Signing(e.to_string()))?;
+            .map_err(|e| ExecError::Signing(e.to_string()))?;
         info!(%txid, "done withdrawal transaction signature aggregation");
         Ok(tx)
     } else {
-        Err(WithdrawalExecError::Xpriv)
+        Err(ExecError::Xpriv)
     }
 }

@@ -5,5 +5,5 @@
 
 pub mod book_keeping;
 pub mod config;
-pub mod deposit_handler;
-pub mod withdrawal_handler;
+pub mod errors;
+pub mod handler;
