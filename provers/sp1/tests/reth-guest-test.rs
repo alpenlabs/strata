@@ -1,5 +1,5 @@
 // NOTE: SP1 prover runs in release mode only; therefore run the tests on release mode only
-#[cfg(feature = "prover")]
+#[cfg(all(feature = "prover", not(debug_assertions)))]
 mod test {
     use express_proofimpl_evm_ee_stf::{ELProofInput, ELProofPublicParams};
     use express_sp1_adapter::{SP1Host, SP1ProofInputBuilder, SP1Verifier};

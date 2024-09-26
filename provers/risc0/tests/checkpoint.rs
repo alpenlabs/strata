@@ -1,10 +1,12 @@
 #[cfg(feature = "prover")]
 mod test {
-    use alpen_express_state::batch::CheckpointInfo;
+    use alpen_express_state::{batch::CheckpointInfo, chain_state::ChainState};
     use alpen_test_utils::{bitcoin::get_tx_filters, l2::get_genesis_chainstate};
     use bitcoin::params::MAINNET;
     use express_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
-    use express_proofimpl_checkpoint::{HashedCheckpointState, L2BatchProofOutput};
+    use express_proofimpl_checkpoint::{
+        ChainStateSnapshot, HashedCheckpointState, L2BatchProofOutput,
+    };
     use express_proofimpl_l1_batch::{
         logic::{L1BatchProofInput, L1BatchProofOutput},
         mock::get_verification_state_for_block,
@@ -95,16 +97,24 @@ mod test {
     //         deposits: Vec::new(),
     //         forced_inclusions: Vec::new(),
     //         state_update: None,
-    //         initial_state: get_verification_state_for_block(40_320, &params),
+    //         initial_snapshot: get_verification_state_for_block(40_320, &params),
     //         final_state: get_verification_state_for_block(40_321, &params),
     //     }
     // }
 
+    fn l2_snapshot(state: &ChainState) -> ChainStateSnapshot {
+        ChainStateSnapshot {
+            slot: state.chain_tip_slot(),
+            hash: state.compute_state_root(),
+            l2_blockid: state.chain_tip_blockid(),
+        }
+    }
+
     fn get_l2_batch_output() -> L2BatchProofOutput {
         L2BatchProofOutput {
             deposits: Vec::new(),
-            initial_state: get_genesis_chainstate(),
-            final_state: get_genesis_chainstate(),
+            initial_snapshot: l2_snapshot(&get_genesis_chainstate()),
+            final_snapshot: l2_snapshot(&get_genesis_chainstate()),
         }
     }
 
@@ -115,8 +125,8 @@ mod test {
         let l2_batch = get_l2_batch_output();
 
         let genesis = HashedCheckpointState {
-            l1_state: l1_batch.initial_state.hash().unwrap(),
-            l2_state: l2_batch.initial_state.compute_state_root(),
+            l1_state: l1_batch.initial_snapshot.hash,
+            l2_state: l2_batch.initial_snapshot.hash,
         };
 
         let prover_options = ProverOptions {

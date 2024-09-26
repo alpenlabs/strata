@@ -40,6 +40,20 @@ pub struct HeaderVerificationState {
     pub last_11_blocks_timestamps: TimestampStore,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
+pub struct HeaderVerificationStateSnapshot {
+    /// Hash of the [`HeaderVerificationState`]
+    pub hash: Buf32,
+
+    /// [HeaderVerificationState::last_verified_block_num]
+    ///
+    /// Note: This field and struct is here only since `CheckpointInfo` requires that
+    pub block_num: u64,
+
+    /// Total accumulated [difficulty](bitcoin::pow::Target::difficulty)
+    pub acc_pow: u128,
+}
+
 impl HeaderVerificationState {
     /// Computes the [`CompactTarget`] from a difficulty adjustment.
     ///
@@ -138,6 +152,14 @@ impl HeaderVerificationState {
 
         // Set the target for the next block
         self.next_block_target = self.next_target(header.time, params);
+    }
+
+    pub fn snapshot(&self) -> Result<HeaderVerificationStateSnapshot, std::io::Error> {
+        Ok(HeaderVerificationStateSnapshot {
+            hash: self.hash()?,
+            block_num: self.last_verified_block_num as u64 + 1,
+            acc_pow: self.total_accumulated_pow,
+        })
     }
 
     /// Calculate the hash of the verification state
