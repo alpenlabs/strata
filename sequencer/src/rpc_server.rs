@@ -8,7 +8,12 @@ use alpen_express_db::{
     traits::{ChainstateProvider, Database, L1DataProvider, L2DataProvider},
     types::{CheckpointProvingStatus, L1TxEntry, L1TxStatus},
 };
-use alpen_express_primitives::{bridge::PublickeyTable, buf::Buf32, hash, params::Params};
+use alpen_express_primitives::{
+    bridge::{OperatorIdx, PublickeyTable},
+    buf::Buf32,
+    hash,
+    params::Params,
+};
 use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer};
 use alpen_express_rpc_types::{
     errors::RpcServerError as Error, BlockHeader, ClientStatus, DaBlob, DepositEntry, DepositState,
@@ -509,8 +514,14 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         Ok(())
     }
 
-    // XXX: Should reorgs have been handled? Do reorgs happen in the DB?
-    async fn get_bridge_duties(&self, block_height: u64) -> RpcResult<(BridgeDuties, u64)> {
+    // FIXME: find a way to handle reorgs if that becomes a problem
+    async fn get_bridge_duties(
+        &self,
+        operator_idx: OperatorIdx,
+        block_height: u64,
+    ) -> RpcResult<(BridgeDuties, u64)> {
+        info!(%operator_idx, %block_height, "received request for bridge duties");
+
         let l1_db_provider = self.database.l1_provider();
         let network = self.bitcoind_network;
         let (deposit_duties, latest_block_height) =
@@ -525,6 +536,7 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         duties.extend(deposit_duties);
         duties.extend(withdrawal_duties);
 
+        info!(%operator_idx, %block_height, "dispatching duties");
         Ok((duties, latest_block_height))
     }
 
