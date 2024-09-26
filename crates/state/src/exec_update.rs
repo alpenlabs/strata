@@ -160,28 +160,26 @@ pub enum Op {
     Deposit(ELDepositData),
 }
 
-impl Op {
-    pub fn from_deposit_intent(
-        pending_deposits: &StateQueue<DepositIntent>,
-        max_bridge_in_block: u8,
-    ) -> Vec<Op> {
-        let mut pending_deposits = pending_deposits.clone();
-        let mut el_ops = Vec::new();
-        while let Some(idx) = pending_deposits.front_idx() {
-            //  first 16 withdrawals (full or partial) into the withdrawal queue.
-            if el_ops.len() == max_bridge_in_block as usize {
-                break;
-            }
-            let pending_deposit = pending_deposits.pop_front().unwrap();
-
-            el_ops.push(Op::Deposit(ELDepositData::new(
-                idx,
-                pending_deposit.amt(),
-                pending_deposit.dest_ident().to_vec(),
-            )));
+pub fn construct_ops_from_deposit_intents(
+    pending_deposits: &StateQueue<DepositIntent>,
+    max_deposits_in_block: u8,
+) -> Vec<Op> {
+    let mut pending_deposits = pending_deposits.clone();
+    let mut el_ops = Vec::new();
+    while let Some(idx) = pending_deposits.front_idx() {
+        //  first 16 withdrawals (full or partial) into the withdrawal queue.
+        if el_ops.len() == max_deposits_in_block as usize {
+            break;
         }
-        el_ops
+        let pending_deposit = pending_deposits.pop_front().unwrap();
+
+        el_ops.push(Op::Deposit(ELDepositData::new(
+            idx,
+            pending_deposit.amt(),
+            pending_deposit.dest_ident().to_vec(),
+        )));
     }
+    el_ops
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize)]

@@ -8,7 +8,7 @@ from entry import BasicEnvConfig
 
 
 @flexitest.register
-class L1ClientStatusTest(flexitest.Test):
+class BridgeDepositTest(flexitest.Test):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env(BasicEnvConfig(101, rollup_params=ROLLUP_BATCH_WITH_FUNDS))
 

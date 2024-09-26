@@ -97,7 +97,7 @@ pub fn gen_params() -> Params {
             verify_proofs: false,
             dispatch_assignment_dur: 64,
             proof_publish_mode: ProofPublishMode::Strict,
-            max_bridge_in_block: 16,
+            max_deposits_in_block: 16,
         },
         run: SyncParams {
             l2_blocks_fetch_limit: 1000,

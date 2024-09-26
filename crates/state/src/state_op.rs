@@ -8,8 +8,8 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use tracing::*;
 
 use crate::{
-    bridge_state::{BitcoinBlockHeight, DepositState, DispatchCommand, DispatchedState},
     bridge_ops::DepositIntent,
+    bridge_state::{BitcoinBlockHeight, DepositState, DispatchCommand, DispatchedState},
     chain_state::ChainState,
     header::L2Header,
     id::L2BlockId,
@@ -138,6 +138,7 @@ fn apply_op_to_chainstate(op: &StateOp, state: &mut ChainState) {
             let (_, deposit_txs, _) = matured_block.into_parts();
             for tx in deposit_txs {
                 if let Deposit(deposit_info) = tx.tx().protocol_operation() {
+                    println!("we got some deposit_txs");
                     let amt = deposit_info.amt;
                     let deposit_intent = DepositIntent::new(amt, &deposit_info.address);
                     deposits.push_back(deposit_intent);
@@ -207,6 +208,7 @@ fn apply_op_to_chainstate(op: &StateOp, state: &mut ChainState) {
 /// be made generic over a state provider that exposes access to that and then
 /// the `WriteBatch` will include writes that can be made to that.
 pub struct StateCache {
+    original_state: ChainState,
     state: ChainState,
     write_ops: Vec<StateOp>,
 }
@@ -214,6 +216,7 @@ pub struct StateCache {
 impl StateCache {
     pub fn new(state: ChainState) -> Self {
         Self {
+            original_state: state.clone(),
             state,
             write_ops: Vec::new(),
         }
@@ -221,6 +224,10 @@ impl StateCache {
 
     pub fn state(&self) -> &ChainState {
         &self.state
+    }
+
+    pub fn original_state(&self) -> &ChainState {
+        &self.original_state
     }
 
     /// Finalizes the changes made to the state, exporting it and a write batch

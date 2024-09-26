@@ -59,8 +59,8 @@ pub struct RollupParams {
     /// Describes how is proof published
     pub proof_publish_mode: ProofPublishMode,
 
-    /// max number of bridge in a block
-    pub max_bridge_in_block: u8,
+    /// max number of deposits in a block
+    pub max_deposits_in_block: u8,
 }
 
 /// Describes the proof is generated.

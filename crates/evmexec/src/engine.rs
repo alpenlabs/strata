@@ -31,7 +31,7 @@ use tokio::{runtime::Handle, sync::Mutex};
 
 use crate::{
     block::EVML2Block,
-    el_payload::{update_input_from_payload_and_ops, ElPayload},
+    el_payload::{make_update_input_from_payload_and_ops, ElPayload},
     http_client::EngineRpc,
 };
 
@@ -107,22 +107,21 @@ impl<T: EngineRpc> RpcExecEngineInner<T> {
         prev_block: EVML2Block,
     ) -> EngineResult<u64> {
         // TODO: pass other fields from payload_env
-        let withdrawals: Vec<Withdrawal> = payload_env
+        let withdrawals = payload_env
             .el_ops()
             .iter()
-            .filter_map(|op| match op {
-                Op::Deposit(deposit_data) => Some(Withdrawal {
-                    // TODO:
-                    // 1. Should this error instead of filtering out invalid entries ?
-                    // 2. Add monotonically incrementing index ? (reth doesn't complain even if
-                    //    missing)
+            .map(|op| match op {
+                Op::Deposit(deposit_data) => Ok(Withdrawal {
                     index: deposit_data.intent_idx(),
-                    address: address_from_slice(deposit_data.dest_addr())?,
-                    amount: sats_to_gwei(deposit_data.amt())?,
+                    address: address_from_slice(deposit_data.dest_addr()).ok_or_else(|| {
+                        EngineError::InvalidAddress(deposit_data.dest_addr().to_vec())
+                    })?,
+                    amount: sats_to_gwei(deposit_data.amt())
+                        .ok_or(EngineError::AmountConversion(deposit_data.amt()))?,
                     ..Default::default()
                 }),
             })
-            .collect();
+            .collect::<Result<_, _>>()?;
 
         let payload_attributes = ExpressPayloadAttributes::new_from_eth(PayloadAttributes {
             // evm expects timestamp in seconds
@@ -193,7 +192,7 @@ impl<T: EngineRpc> RpcExecEngineInner<T> {
 
         let el_state_root = el_payload.state_root;
         let accessory_data = borsh::to_vec(&el_payload).unwrap();
-        let update_input = update_input_from_payload_and_ops(el_payload, &ops)
+        let update_input = make_update_input_from_payload_and_ops(el_payload, &ops)
             .map_err(|err| EngineError::Other(err.to_string()))?;
 
         let withdrawal_intents = rpc_withdrawal_intents
@@ -572,7 +571,7 @@ mod tests {
         };
         let accessory_data = borsh::to_vec(&el_payload).unwrap();
 
-        let update_input = update_input_from_payload_and_ops(el_payload, &[]).unwrap();
+        let update_input = make_update_input_from_payload_and_ops(el_payload, &[]).unwrap();
         let update_output = UpdateOutput::new_from_state(Buf32::zero());
 
         let payload_data = ExecPayloadData::new(

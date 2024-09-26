@@ -48,7 +48,7 @@ pub enum ElPayloadError {
     BlockConversionError(String),
 }
 
-pub fn update_input_from_payload_and_ops(
+pub fn make_update_input_from_payload_and_ops(
     el_payload: ElPayload,
     ops: &[Op],
 ) -> Result<UpdateInput, ElPayloadError> {

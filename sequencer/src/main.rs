@@ -136,7 +136,7 @@ fn default_rollup_params() -> RollupParams {
         verify_proofs: true,
         dispatch_assignment_dur: 64,
         proof_publish_mode: ProofPublishMode::Strict,
-        max_bridge_in_block: 16,
+        max_deposits_in_block: 16,
     }
 }
 

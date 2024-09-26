@@ -118,10 +118,13 @@ impl L1DataProvider for L1Db {
         let (block_height, txindex) = tx_ref.into();
         let tx = self
             .db
-            .get::<L1BlockSchema>(&{ block_height })
+            .get::<L1BlockSchema>(&block_height)
             .and_then(|mf_opt| match mf_opt {
                 Some(mf) => {
                     let txs_opt = self.db.get::<TxnSchema>(&mf.block_hash())?;
+                    // we only save subset of transaction in a block, while the txindex refers to
+                    // original position in txblock.
+                    // TODO: txs should be hashmap with original index
                     let tx = txs_opt.and_then(|txs| {
                         txs.iter()
                             .find(|tx| tx.proof().position() == txindex)

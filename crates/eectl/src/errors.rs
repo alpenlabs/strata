@@ -10,6 +10,12 @@ pub enum EngineError {
     #[error("not yet implemented")]
     Unimplemented,
 
+    #[error("amount conversion sats: {0}")]
+    AmountConversion(u64),
+
+    #[error("invalid address {0:?}")]
+    InvalidAddress(Vec<u8>),
+
     #[error("{0}")]
     Other(String),
 }

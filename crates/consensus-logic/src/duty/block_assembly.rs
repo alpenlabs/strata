@@ -22,7 +22,9 @@ use alpen_express_state::{
     bridge_ops::DepositIntent,
     chain_state::ChainState,
     client_state::{ClientState, LocalL1State},
-    exec_update::{ELDepositData, ExecUpdate, Op, UpdateOutput},
+    exec_update::{
+        construct_ops_from_deposit_intents, ELDepositData, ExecUpdate, Op, UpdateOutput,
+    },
     header::L2BlockHeader,
     l1::{DepositUpdateTx, L1HeaderPayload, L1HeaderRecord},
     prelude::*,
@@ -112,7 +114,7 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
         &prev_chstate,
         l1_prov.as_ref(),
         MAX_L1_ENTRIES_PER_BLOCK,
-        params,
+        params.rollup(),
     )?;
 
     // Prepare the execution segment, which right now is just talking to the EVM
@@ -161,7 +163,7 @@ fn prepare_l1_segment(
     prev_chstate: &ChainState,
     l1_prov: &impl L1DataProvider,
     max_l1_entries: usize,
-    params: &Arc<Params>,
+    params: &RollupParams,
 ) -> Result<L1Segment, Error> {
     let unacc_blocks = local_l1_state.unacc_blocks_iter().collect::<Vec<_>>();
     trace!(unacc_blocks = %unacc_blocks.len(), "figuring out which blocks to include in L1 segment");
@@ -173,7 +175,7 @@ fn prepare_l1_segment(
         let mut payloads = Vec::new();
         for (h, _b) in unacc_blocks.iter().take(max_l1_entries) {
             let rec = load_header_record(*h, l1_prov)?;
-            let deposit_update_tx = extract_deposit_update_tx(*h, l1_prov, params)?;
+            let deposit_update_tx = deposit_update_txs_from_db(*h, l1_prov)?;
             payloads.push(L1HeaderPayload::new_bare(*h, rec, deposit_update_tx));
         }
 
@@ -213,7 +215,7 @@ fn prepare_l1_segment(
     let mut payloads = Vec::new();
     for (h, _b) in fresh_blocks {
         let rec = load_header_record(*h, l1_prov)?;
-        let deposit_update_tx = extract_deposit_update_tx(*h, l1_prov, params)?;
+        let deposit_update_tx = deposit_update_txs_from_db(*h, l1_prov)?;
         payloads.push(L1HeaderPayload::new_bare(*h, rec, deposit_update_tx));
     }
 
@@ -232,25 +234,24 @@ fn load_header_record(h: u64, l1_prov: &impl L1DataProvider) -> Result<L1HeaderR
     Ok(L1HeaderRecord::new(mf.header().to_vec(), mf.txs_root()))
 }
 
-fn extract_deposit_update_tx(
+fn deposit_update_txs_from_db(
     h: u64,
     l1_prov: &impl L1DataProvider,
-    params: &Arc<Params>,
 ) -> Result<Vec<DepositUpdateTx>, Error> {
     let relevant_tx_ref = l1_prov
         .get_block_txs(h)?
         .ok_or(Error::MissingL1BlockHeight(h))?;
 
-    let mut deposit_update_tx = Vec::new();
+    let mut deposit_update_txs = Vec::new();
     for tx_ref in relevant_tx_ref {
         let tx = l1_prov.get_tx(tx_ref)?.ok_or(Error::MissingL1Tx)?;
 
         if let Deposit(dep) = tx.protocol_operation() {
-            deposit_update_tx.push(DepositUpdateTx::new(tx, tx_ref.position()));
+            deposit_update_txs.push(DepositUpdateTx::new(tx, tx_ref.position()));
         }
     }
 
-    Ok(deposit_update_tx)
+    Ok(deposit_update_txs)
 }
 
 /// Takes two partially-overlapping lists of block indexes and IDs and returns a
@@ -339,7 +340,7 @@ fn prepare_exec_data<E: ExecEngineCtl>(
 
     // construct el_ops by looking at chainstate
     let pending_deposits = prev_chstate.exec_env_state().pending_deposits();
-    let el_ops = Op::from_deposit_intent(pending_deposits, params.max_bridge_in_block);
+    let el_ops = construct_ops_from_deposit_intents(pending_deposits, params.max_deposits_in_block);
     let payload_env = PayloadEnv::new(timestamp, prev_l2_blkid, safe_l1_block, el_ops);
 
     let key = engine.prepare_payload(payload_env)?;

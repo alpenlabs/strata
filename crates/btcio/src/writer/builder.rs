@@ -54,6 +54,10 @@ pub enum InscriptionError {
     Other(#[from] anyhow::Error),
 }
 
+// This is hacky solution. As `btcio` has `transaction builder` that `tx-parser` depends on. But
+// Btcio depends on `tx-parser`. So this file is behind a feature flag 'test-utils' and on dev
+// dependencies on `tx-parser`, we include {btcio, feature="test_utils"} , so cyclic dependency
+// doesn't happen
 pub async fn build_inscription_txs(
     payload: &[u8],
     rpc_client: &Arc<impl Reader + Wallet + Signer>,

@@ -35,14 +35,14 @@ common_params = {
     "verify_proofs": False,
     "dispatch_assignment_dur": 64,
     "proof_publish_mode": "Strict",
-    "deposit_amount": 1000,
-    "max_bridge_in_block": 16,
+    "deposit_amount": 10**7,
+    "max_deposits_in_block": 16,
 }
 
 FAST_BATCH_ROLLUP_PARAMS = {
     **common_params,
-    "target_l2_batch_size": 5,
     "horizon_l1_height": 3,
+    "target_l2_batch_size": 5,
     "genesis_l1_height": 5,
 }
 
