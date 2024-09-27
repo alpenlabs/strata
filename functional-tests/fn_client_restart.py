@@ -38,7 +38,7 @@ class BlockFinalizationSeqRestartTest(flexitest.Test):
         seq.start()
 
         seqrpc = seq.create_rpc()
-        wait_until(seqrpc.alp_syncStatus, timeout=5)
+        wait_until(seqrpc.alp_protocolVersion, timeout=5)
 
         # Check for next 2 checkpoints
         for n in range(3, 5):

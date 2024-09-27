@@ -549,9 +549,9 @@ def main(argv):
 
     datadir_root = flexitest.create_datadir_in_workspace(os.path.join(test_dir, DD_ROOT))
 
-    btc_fac = BitcoinFactory([12300 + i for i in range(20)])
-    seq_fac = ExpressFactory([12400 + i for i in range(20)])
-    fullnode_fac = FullNodeFactory([12500 + i for i in range(20)])
+    btc_fac = BitcoinFactory([12300 + i for i in range(30)])
+    seq_fac = ExpressFactory([12400 + i for i in range(30)])
+    fullnode_fac = FullNodeFactory([12500 + i for i in range(30)])
     reth_fac = RethFactory([12600 + i for i in range(20 * 3)])
     prover_client_fac = ProverClientFactory([12700 + i for i in range(20 * 3)])
 
