@@ -52,7 +52,7 @@ members = [
   "crates/tx-parser",
 
   # integration tests
-  "tests",
+  "tests", "bin/op-cli",
 ]
 
 default-members = [

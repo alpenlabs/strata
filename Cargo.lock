@@ -7647,6 +7647,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e296cf87e61c9cfc1a61c3c63a0f7f286ed4554e0e22be84e8a38e1d264a2a29"
 
 [[package]]
+name = "op-cli"
+version = "0.1.0"
+dependencies = [
+ "argh",
+ "bech32 0.11.0",
+ "bitcoin",
+ "rand 0.8.5",
+ "terrors",
+]
+
+[[package]]
 name = "opaque-debug"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
