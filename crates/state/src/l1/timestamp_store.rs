@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 const N: usize = 11;
 
-#[derive(Debug, Clone, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, BorshSerialize, BorshDeserialize, Default)]
 pub struct TimestampStore {
     pub timestamps: [u32; N],
     index: usize,

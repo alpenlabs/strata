@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use super::timestamp_store::TimestampStore;
 use crate::l1::utils::compute_block_hash;
 
-#[derive(Debug, Clone, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, BorshSerialize, BorshDeserialize, Default)]
 pub struct HeaderVerificationState {
     /// [Block number](bitcoin::Block::bip34_block_height) of the last verified block
     pub last_verified_block_num: u32,
@@ -220,6 +220,14 @@ mod tests {
         for header_idx in r1..chain.end {
             verification_state.check_and_update(&chain.get_header(header_idx), &MAINNET)
         }
+    }
+
+    #[test]
+    fn test_get_difficulty_adjustment_height() {
+        let start = 0;
+        let idx = rand::thread_rng().gen_range(1..1000);
+        let h = get_difficulty_adjustment_height(idx, start, &MAINNET);
+        assert_eq!(h, MAINNET.difficulty_adjustment_interval() as u32 * idx);
     }
 
     #[test]
