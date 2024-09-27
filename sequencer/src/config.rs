@@ -279,7 +279,7 @@ mod test {
         let config = toml::from_str::<Config>(config_string_fullnode);
         assert!(
             config.is_ok(),
-            "should be able to load fullnode TOML config but got: {:?}",
+            "should be able to load full-node TOML config but got: {:?}",
             config.err()
         );
     }

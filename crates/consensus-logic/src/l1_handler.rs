@@ -41,7 +41,7 @@ pub fn bitcoin_data_handler_task<D: Database + Send + Sync + 'static>(
     let seq_pubkey = match params.rollup.cred_rule {
         CredRule::Unchecked => None,
         CredRule::SchnorrKey(buf32) => Some(
-            XOnlyPublicKey::from_slice(&buf32.0 .0)
+            XOnlyPublicKey::try_from(buf32)
                 .expect("the sequencer pubkey must be valid in the params"),
         ),
     };
@@ -155,7 +155,7 @@ fn check_for_da_batch(
         if let Some(seq_pubkey) = seq_pubkey {
             let sig = signed_batch_checkpoint.signature();
             let msg = checkpoint.get_sighash();
-            let pk = Buf32::from(seq_pubkey.serialize());
+            let pk: Buf32 = seq_pubkey.into();
 
             if !verify_schnorr_sig(&sig, &msg, &pk) {
                 error!(?tx, ?checkpoint, "signature verification failed on checkpoint");
