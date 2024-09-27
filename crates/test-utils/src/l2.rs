@@ -4,7 +4,7 @@ use alpen_express_primitives::{
     block_credential,
     buf::{Buf32, Buf64},
     operator::OperatorPubkeys,
-    params::{OperatorConfig, Params, RollupParams, SyncParams},
+    params::{OperatorConfig, Params, ProofPublishMode, RollupParams, SyncParams},
     vk::RollupVerifyingKey,
 };
 use alpen_express_state::{
@@ -96,6 +96,7 @@ pub fn gen_params() -> Params {
             )),
             verify_proofs: false,
             dispatch_assignment_dur: 64,
+            proof_publish_mode: ProofPublishMode::Strict,
         },
         run: SyncParams {
             l2_blocks_fetch_limit: 1000,

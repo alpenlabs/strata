@@ -4,7 +4,7 @@ use alpen_express_db::traits::{Database, L1DataStore};
 use alpen_express_primitives::{
     buf::Buf32,
     l1::{L1BlockManifest, L1TxProof},
-    params::Params,
+    params::{Params, ProofPublishMode, RollupParams},
     vk::RollupVerifyingKey,
 };
 use alpen_express_state::{
@@ -116,8 +116,6 @@ where
 
 /// Parses inscriptions and checks for batch data in the transactions
 fn check_for_da_batch(blockdata: &BlockData, params: &Params) -> Vec<BatchCheckpoint> {
-    let rollup_vk = params.rollup().rollup_vk;
-    let verify_proofs = params.rollup().verify_proofs;
     let protocol_ops_txs = blockdata.protocol_ops_txs();
 
     let inscriptions = protocol_ops_txs
@@ -132,23 +130,19 @@ fn check_for_da_batch(blockdata: &BlockData, params: &Params) -> Vec<BatchCheckp
 
     let verified_checkpoints = inscriptions.filter_map(|(insc, tx)| {
             let checkpoint: BatchCheckpoint = insc.clone().into();
-            if verify_proofs {
-                let checkpoint_idx = checkpoint.checkpoint().idx();
-                let checkpoint_last_block = checkpoint.checkpoint().l2_blockid();
+            let checkpoint_idx = checkpoint.checkpoint().idx();
+            let checkpoint_last_block = checkpoint.checkpoint().l2_blockid();
 
-                match verify_proof(&checkpoint, rollup_vk) {
-                    Ok(()) => {
-                        info!(%checkpoint_idx, %checkpoint_last_block, "proof successfully verified");
-                        Some(checkpoint)
-                    },
-                    Err(e) => {
-                        let txid = tx.compute_txid();
-                        warn!(?txid, %checkpoint_idx, %checkpoint_last_block, err = %e, "could not verify proof inside blob");
-                        None
-                    }
+            match verify_proof(&checkpoint, params.rollup()) {
+                Ok(()) => {
+                    info!(%checkpoint_idx, %checkpoint_last_block, "proof successfully verified");
+                    Some(checkpoint)
+                },
+                Err(e) => {
+                    let txid = tx.compute_txid();
+                    warn!(?txid, %checkpoint_idx, %checkpoint_last_block, err = %e, "could not verify proof inside blob");
+                    None
                 }
-            } else {
-                Some(checkpoint)
             }
     });
 
@@ -157,10 +151,26 @@ fn check_for_da_batch(blockdata: &BlockData, params: &Params) -> Vec<BatchCheckp
 
 pub fn verify_proof(
     checkpoint: &BatchCheckpoint,
-    rollup_vk: RollupVerifyingKey,
+    rollup_params: &RollupParams,
 ) -> anyhow::Result<()> {
-    let public_params_raw = borsh::to_vec(&checkpoint).unwrap();
+    let rollup_vk = rollup_params.rollup_vk;
+    let verify_proofs = rollup_params.verify_proofs;
+
+    if !verify_proofs {
+        warn!("Not verifying proofs since verify_proofs flag is false");
+        return Ok(());
+    }
+
     let proof = checkpoint.proof();
+
+    if let ProofPublishMode::Timeout(_) = rollup_params.proof_publish_mode {
+        if proof.is_empty() {
+            warn!("Accepting empty proofs");
+            return Ok(());
+        }
+    }
+
+    let public_params_raw = borsh::to_vec(&checkpoint).unwrap();
 
     // NOTE/TODO: this should also verify that this checkpoint is based on top of some previous
     // checkpoint

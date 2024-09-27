@@ -8,17 +8,14 @@ use std::{
 
 use alpen_express_btcio::writer::InscriptionHandle;
 use alpen_express_crypto::sign_schnorr_sig;
-use alpen_express_db::{
-    traits::*,
-    types::{CheckpointEntry, CheckpointProvingStatus},
-};
+use alpen_express_db::traits::*;
 use alpen_express_eectl::engine::ExecEngineCtl;
 use alpen_express_primitives::{
     buf::{Buf32, Buf64},
     params::Params,
 };
 use alpen_express_state::{
-    batch::{BatchCheckpoint, SignedBatchCheckpoint},
+    batch::SignedBatchCheckpoint,
     client_state::ClientState,
     da_blob::{BlobDest, BlobIntent},
     prelude::*,
@@ -30,10 +27,11 @@ use tracing::*;
 
 use super::{
     block_assembly, extractor,
-    types::{self, BatchCheckpointDuty, Duty, DutyBatch, Identity, IdentityKey},
+    types::{self, Duty, DutyBatch, Identity, IdentityKey},
 };
 use crate::{
     checkpoint::CheckpointHandle,
+    duty::checkpoint::check_and_get_batch_checkpoint,
     errors::Error,
     message::{ClientUpdateNotif, ForkChoiceMessage},
     sync_manager::SyncManager,
@@ -291,8 +289,20 @@ pub fn duty_dispatch_task<
             let params: Arc<Params> = params.clone();
             let duty_st_tx = duty_status_tx.clone();
             let checkpt_mgr = ckpt_handle.clone();
+            let pc = pool.clone();
             pool.execute(move || {
-                duty_exec_task(d, ik, sm, db, e, insc_h, params, duty_st_tx, checkpt_mgr)
+                duty_exec_task(
+                    d,
+                    ik,
+                    sm,
+                    db,
+                    e,
+                    insc_h,
+                    params,
+                    duty_st_tx,
+                    checkpt_mgr,
+                    pc,
+                )
             });
             trace!(%id, "dispatched duty exec task");
             pending_duties_local.insert(id, ());
@@ -318,6 +328,7 @@ fn duty_exec_task<D: Database, E: ExecEngineCtl>(
     params: Arc<Params>,
     duty_status_tx: std::sync::mpsc::Sender<DutyExecStatus>,
     ckpt_handle: Arc<CheckpointHandle>,
+    pool: threadpool::ThreadPool,
 ) {
     let result = perform_duty(
         &duty,
@@ -327,7 +338,8 @@ fn duty_exec_task<D: Database, E: ExecEngineCtl>(
         engine.as_ref(),
         inscription_handle.as_ref(),
         &params,
-        ckpt_handle.as_ref(),
+        ckpt_handle,
+        pool,
     );
 
     let status = DutyExecStatus {
@@ -349,7 +361,8 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
     engine: &E,
     inscription_handle: &InscriptionHandle,
     params: &Arc<Params>,
-    checkpt_mgr: &CheckpointHandle,
+    checkpt_handle: Arc<CheckpointHandle>,
+    pool: threadpool::ThreadPool,
 ) -> Result<(), Error> {
     match duty {
         Duty::SignBlock(data) => {
@@ -395,7 +408,8 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
         Duty::CommitBatch(data) => {
             info!(data = ?data, "commit batch");
 
-            let checkpoint = check_and_get_batch_checkpoint(data, checkpt_mgr)?;
+            let checkpoint =
+                check_and_get_batch_checkpoint(data, checkpt_handle, pool, params.as_ref())?;
             debug!("Got checkpoint proof from db, now signing and sending");
 
             let checkpoint_sighash = checkpoint.get_sighash();
@@ -418,66 +432,6 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
 
             Ok(())
         }
-    }
-}
-
-fn check_and_get_batch_checkpoint(
-    duty: &BatchCheckpointDuty,
-    checkpt_mgr: &CheckpointHandle,
-) -> Result<BatchCheckpoint, Error> {
-    let idx = duty.idx();
-
-    debug!(%idx, "checking for checkpoint in db");
-    // If there's no entry in db, create a pending entry and wait until proof is ready
-    match checkpt_mgr.get_checkpoint_blocking(idx)? {
-        // There's no entry in the database, create one so that the prover manager can query the
-        // checkpoint info to create proofs for next
-        None => {
-            debug!(%idx, "Checkpoint not found, creating pending checkpoint");
-            let entry = CheckpointEntry::new_pending_proof(duty.checkpoint().clone());
-            checkpt_mgr.put_checkpoint_blocking(idx, entry)?;
-        }
-        // There's an entry. If status is ProofCreated, return it else we need to wait for prover to
-        // submit proofs.
-        Some(entry) => match entry.proving_status {
-            CheckpointProvingStatus::PendingProof => {
-                // Do nothing, wait for broadcast msg below
-            }
-            _ => {
-                return Ok(entry.into());
-            }
-        },
-    }
-    debug!(%idx, "Waiting for checkpoint proof to be posted");
-
-    let chidx = checkpt_mgr
-        .subscribe()
-        .blocking_recv()
-        .map_err(|e| Error::Other(e.to_string()))?;
-
-    debug!(%idx, %chidx, "Received proof from rpc");
-
-    if chidx != idx {
-        warn!(received = %chidx, expected = %idx, "Received different checkpoint idx than expected");
-        return Err(Error::Other(
-            "Unexpected checkpoint idx received from broadcast channel".to_string(),
-        ));
-    }
-
-    match checkpt_mgr.get_checkpoint_blocking(idx)? {
-        None => {
-            warn!(%idx, "Expected checkpoint to be present in db");
-            Err(Error::Other(
-                "Expected checkpoint to be present in db".to_string(),
-            ))
-        }
-        Some(entry) if entry.proving_status == CheckpointProvingStatus::PendingProof => {
-            warn!(%idx, "Expected checkpoint proof to be ready");
-            Err(Error::Other(
-                "Expected checkpoint proof to be ready".to_string(),
-            ))
-        }
-        Some(entry) => Ok(entry.into()),
     }
 }
 

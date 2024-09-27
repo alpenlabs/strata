@@ -27,7 +27,7 @@ use alpen_express_primitives::{
     block_credential,
     buf::Buf32,
     operator::OperatorPubkeys,
-    params::{OperatorConfig, Params, RollupParams, SyncParams},
+    params::{OperatorConfig, Params, ProofPublishMode, RollupParams, SyncParams},
     vk::RollupVerifyingKey,
 };
 use alpen_express_rocksdb::{
@@ -135,6 +135,7 @@ fn default_rollup_params() -> RollupParams {
         )), // TODO: update this with vk for checkpoint proof
         verify_proofs: true,
         dispatch_assignment_dur: 64,
+        proof_publish_mode: ProofPublishMode::Strict,
     }
 }
 

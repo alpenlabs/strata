@@ -708,9 +708,8 @@ impl AlpenAdminApiServer for AdminServerImpl {
         debug!(%idx, "found checkpoint in db");
 
         if self.params.rollup().verify_proofs {
-            let rollup_vk = self.params.rollup().rollup_vk;
             let checkpoint = entry.clone().into_batch_checkpoint();
-            verify_proof(&checkpoint, rollup_vk)
+            verify_proof(&checkpoint, self.params.rollup())
                 .map_err(|e| Error::InvalidProof(idx, e.to_string()))?;
         }
 

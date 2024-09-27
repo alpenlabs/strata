@@ -59,7 +59,12 @@ class ManualGenBlocksConfig:
     gen_addr: str
 
 
-def check_nth_checkpoint_finalized(idx, seqrpc, manual_gen: ManualGenBlocksConfig | None = None):
+def check_nth_checkpoint_finalized(
+    idx,
+    seqrpc,
+    manual_gen: ManualGenBlocksConfig | None = None,
+    proof_timeout: int | None = None,
+):
     """
     This check expects nth checkpoint to be finalized
 
@@ -87,7 +92,12 @@ def check_nth_checkpoint_finalized(idx, seqrpc, manual_gen: ManualGenBlocksConfi
 
     to_finalize_blkid = checkpoint_info["l2_blockid"]
 
-    submit_checkpoint(idx, seqrpc, manual_gen)
+    # Submit checkpoint if proof_timeout is not set
+    if proof_timeout is None:
+        submit_checkpoint(idx, seqrpc, manual_gen)
+    else:
+        # Just wait until timeout period instead of submitting so that sequencer submits empty proof
+        time.sleep(proof_timeout)
 
     if manual_gen:
         # Produce l1 blocks until proof is finalized
