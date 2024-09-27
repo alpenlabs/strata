@@ -1,12 +1,15 @@
 #[cfg(feature = "prover")]
 mod test {
-    use alpen_express_state::{batch::CheckpointInfo, chain_state::ChainState};
+    use alpen_express_state::{
+        batch::{
+            BootstrapCheckpoint, BootstrapCheckpointInfo, BootstrapCheckpointState, CheckpointInfo,
+        },
+        chain_state::ChainState,
+    };
     use alpen_test_utils::{bitcoin::get_tx_filters, l2::get_genesis_chainstate};
     use bitcoin::params::MAINNET;
     use express_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
-    use express_proofimpl_checkpoint::{
-        ChainStateSnapshot, HashedCheckpointState, L2BatchProofOutput,
-    };
+    use express_proofimpl_checkpoint::{ChainStateSnapshot, L2BatchProofOutput};
     use express_proofimpl_l1_batch::{
         logic::{L1BatchProofInput, L1BatchProofOutput},
         mock::get_verification_state_for_block,
@@ -118,17 +121,39 @@ mod test {
         }
     }
 
+    fn get_bootstrap_checkpoint() -> BootstrapCheckpoint {
+        let gen_chainstate = get_genesis_chainstate();
+
+        let idx = 1;
+        let starting_l1_height = 40321;
+        let starting_l2_height = gen_chainstate.chain_tip_slot();
+        let starting_l2_blkid = gen_chainstate.chain_tip_blockid();
+
+        let info = BootstrapCheckpointInfo::new(
+            idx,
+            starting_l1_height,
+            starting_l2_height,
+            starting_l2_blkid,
+        );
+
+        let state = BootstrapCheckpointState::new(
+            get_verification_state_for_block(starting_l1_height as u32, &MAINNET)
+                .hash()
+                .unwrap(),
+            gen_chainstate.compute_state_root(),
+            0,
+        );
+
+        BootstrapCheckpoint { info, state }
+    }
+
     #[test]
     fn test_checkpoint_proof() {
         let (l1_batch, l1_batch_proof) = get_l1_batch_output_and_proof();
         // let l1_batch = get_l1_batch_output();
         let l2_batch = get_l2_batch_output();
 
-        let genesis = HashedCheckpointState {
-            l1_state: l1_batch.initial_snapshot.hash,
-            l2_state: l2_batch.initial_snapshot.hash,
-        };
-
+        let bootstrap_checkpoint = get_bootstrap_checkpoint();
         let prover_options = ProverOptions {
             use_mock_prover: false,
             stark_to_snark_conversion: false,
@@ -150,7 +175,7 @@ mod test {
             .unwrap()
             .write_serialized(&borsh::to_vec(&l2_batch).unwrap())
             .unwrap()
-            .write_serialized(&borsh::to_vec(&genesis).unwrap())
+            .write_serialized(&borsh::to_vec(&bootstrap_checkpoint).unwrap())
             .unwrap()
             .write_proof(l1_batch_proof_input)
             .unwrap()

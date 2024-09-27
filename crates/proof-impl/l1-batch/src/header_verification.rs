@@ -41,6 +41,8 @@ pub struct HeaderVerificationState {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
+/// Summary of the HeaderVerificationState that is propagated to the CheckpointProof as public
+/// output
 pub struct HeaderVerificationStateSnapshot {
     /// Hash of the [`HeaderVerificationState`]
     pub hash: Buf32,
@@ -157,7 +159,7 @@ impl HeaderVerificationState {
     pub fn snapshot(&self) -> Result<HeaderVerificationStateSnapshot, std::io::Error> {
         Ok(HeaderVerificationStateSnapshot {
             hash: self.hash()?,
-            block_num: self.last_verified_block_num as u64 + 1,
+            block_num: self.last_verified_block_num as u64,
             acc_pow: self.total_accumulated_pow,
         })
     }

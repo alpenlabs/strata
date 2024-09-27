@@ -72,13 +72,7 @@ fn extract_batch_duties(
             // Also, rather than tip heights, we might need to limit the max range a prover will be
             // proving
             let l2_range = (checkpoint.l2_range.1 + 1, tip_height);
-            let new_checkpt = CheckpointInfo::new(
-                // TODO: Update here to get all the info
-                checkpoint.idx + 1,
-                l1_range,
-                l2_range,
-                tip_id,
-            );
+            let new_checkpt = CheckpointInfo::new(checkpoint.idx + 1, l1_range, l2_range, tip_id);
             Ok(vec![Duty::CommitBatch(new_checkpt.clone().into())])
         }
     }

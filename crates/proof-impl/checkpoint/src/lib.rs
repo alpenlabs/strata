@@ -4,7 +4,9 @@
 
 use alpen_express_primitives::buf::Buf32;
 use alpen_express_state::{
-    batch::{BootstrapCheckpoint, Checkpoint, CheckpointInfo, CheckpointState, StateTransition},
+    batch::{
+        BootstrapCheckpoint, Checkpoint, CheckpointInfo, CheckpointTransition, StateTransition,
+    },
     id::L2BlockId,
     tx::DepositInfo,
 };
@@ -46,24 +48,24 @@ pub fn process_checkpoint_proof(
     bootstrap: &BootstrapCheckpoint,
 ) -> (Checkpoint, Option<(Checkpoint, Proof)>) {
     let prev_checkpoint = match l1_batch.state_update.as_ref() {
-        // If no some previous state update, verify that it's sequential
-        Some(prev_state_update) => {
-            let checkpoint_state = prev_state_update.checkpoint().state();
+        // If no some previous state transition, verify that it's sequential
+        Some(prev_checkpoint) => {
+            let prev_transition = prev_checkpoint.checkpoint().transition();
 
             assert_eq!(
                 &l1_batch.initial_snapshot.hash,
-                checkpoint_state.final_l1_state_hash(),
+                prev_transition.final_l1_state_hash(),
                 "L1 state mismatch"
             );
             assert_eq!(
                 &l2_batch.initial_snapshot.hash,
-                checkpoint_state.final_l2_state_hash(),
+                prev_transition.final_l2_state_hash(),
                 "L2 state mismatch"
             );
 
             Some((
-                prev_state_update.checkpoint().clone(),
-                prev_state_update.proof().clone(),
+                prev_checkpoint.checkpoint().clone(),
+                prev_checkpoint.proof().clone(),
             ))
         }
         // If no previous state update, verify against genesis
@@ -89,8 +91,11 @@ pub fn process_checkpoint_proof(
         .as_ref()
         .map_or(bootstrap.info.idx, |(checkpoint, _)| checkpoint.idx() + 1);
 
-    let l1_range = (bootstrap.info.l1_height, l1_batch.final_snapshot.block_num);
-    let l2_range = (bootstrap.info.l2_height, l2_batch.final_snapshot.slot);
+    let l1_range = (
+        bootstrap.info.start_l1_height,
+        l1_batch.final_snapshot.block_num,
+    );
+    let l2_range = (bootstrap.info.start_l2_height, l2_batch.final_snapshot.slot);
 
     let info = CheckpointInfo::new(
         checkpoint_idx,
@@ -99,7 +104,7 @@ pub fn process_checkpoint_proof(
         l2_batch.final_snapshot.l2_blockid,
     );
 
-    let state = CheckpointState::new(
+    let state = CheckpointTransition::new(
         StateTransition::new(l1_batch.initial_snapshot.hash, l1_batch.final_snapshot.hash),
         StateTransition::new(l2_batch.initial_snapshot.hash, l2_batch.final_snapshot.hash),
         l1_batch.final_snapshot.acc_pow,

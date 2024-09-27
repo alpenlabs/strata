@@ -6,6 +6,8 @@ use crate::batch::SignedBatchCheckpoint;
 
 /// Information related to relevant transactions to be stored in L1Tx
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
+#[allow(clippy::large_enum_variant)]
+
 pub enum ProtocolOperation {
     /// Deposit Transaction
     Deposit(DepositInfo),

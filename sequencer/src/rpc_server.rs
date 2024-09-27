@@ -701,7 +701,7 @@ impl AlpenAdminApiServer for AdminServerImpl {
         &self,
         idx: u64,
         proofbytes: HexBytes,
-        state: HexBytes,
+        transition: HexBytes,
     ) -> RpcResult<()> {
         debug!(%idx, "received checkpoint proof request");
         let mut entry = self
@@ -724,13 +724,13 @@ impl AlpenAdminApiServer for AdminServerImpl {
         }
         debug!(%idx, "Proof is pending, setting proof reaedy");
 
-        let checkpoint_state = borsh::from_slice(&state.into_inner())
+        let checkpoint_transition = borsh::from_slice(&transition.into_inner())
             .map_err(to_jsonrpsee_error("parse checkpoint state"))?;
 
         // TODO: verify proof, once proof verification logic is ready
         entry.proof = express_zkvm::Proof::new(proofbytes.into_inner());
 
-        entry.checkpoint_state = checkpoint_state;
+        entry.checkpoint_transition = checkpoint_transition;
         entry.proving_status = CheckpointProvingStatus::ProofReady;
         self.checkpoint_handle
             .put_checkpoint_and_notify(idx, entry)

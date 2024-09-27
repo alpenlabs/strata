@@ -1,7 +1,9 @@
 //! Module for database local types
 
 use alpen_express_primitives::buf::Buf32;
-use alpen_express_state::batch::{BatchCheckpoint, Checkpoint, CheckpointInfo, CheckpointState};
+use alpen_express_state::batch::{
+    BatchCheckpoint, Checkpoint, CheckpointInfo, CheckpointTransition,
+};
 use arbitrary::Arbitrary;
 use bitcoin::{
     consensus::{self, deserialize, serialize},
@@ -146,7 +148,7 @@ pub struct CheckpointEntry {
     pub checkpoint_info: CheckpointInfo,
 
     /// Hashed state of the batch
-    pub checkpoint_state: CheckpointState,
+    pub checkpoint_transition: CheckpointTransition,
 
     /// Proof
     pub proof: Proof,
@@ -161,14 +163,14 @@ pub struct CheckpointEntry {
 impl CheckpointEntry {
     pub fn new(
         checkpoint_info: CheckpointInfo,
-        checkpoint_state: CheckpointState,
+        checkpoint_transition: CheckpointTransition,
         proof: Proof,
         proving_status: CheckpointProvingStatus,
         confirmation_status: CheckpointConfStatus,
     ) -> Self {
         Self {
             checkpoint_info,
-            checkpoint_state,
+            checkpoint_transition,
             proof,
             proving_status,
             confirmation_status,
@@ -176,7 +178,7 @@ impl CheckpointEntry {
     }
 
     pub fn into_batch_checkpoint(self) -> BatchCheckpoint {
-        let checkpoint = Checkpoint::new(self.checkpoint_info, self.checkpoint_state);
+        let checkpoint = Checkpoint::new(self.checkpoint_info, self.checkpoint_transition);
         BatchCheckpoint::new(checkpoint, self.proof)
     }
 
@@ -184,7 +186,7 @@ impl CheckpointEntry {
     pub fn new_pending_proof(info: CheckpointInfo) -> Self {
         Self::new(
             info,
-            CheckpointState::default(),
+            CheckpointTransition::default(),
             Proof::new(vec![]),
             CheckpointProvingStatus::PendingProof,
             CheckpointConfStatus::Pending,
