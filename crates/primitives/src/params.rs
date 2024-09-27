@@ -56,20 +56,21 @@ pub struct RollupParams {
     /// Number of Bitcoin blocks a withdrawal dispatch assignment is valid for.
     pub dispatch_assignment_dur: u32,
 
-    /// Describes how is proof published
+    /// Describes how proof is published
     pub proof_publish_mode: ProofPublishMode,
 
     /// max number of deposits in a block
     pub max_deposits_in_block: u8,
 }
 
-/// Describes the proof is generated.
+/// Describes how the proof is generated.
 #[derive(Clone, Debug, PartialEq, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ProofPublishMode {
-    /// Timeout in secs
+    /// Timeout in secs after which a blank proof is generated.
     Timeout(u64),
-    /// Expect and wait for proofs
+
+    /// Expect and wait for non-empty proofs
     Strict,
 }
 

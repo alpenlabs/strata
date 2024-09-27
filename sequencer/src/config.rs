@@ -4,7 +4,6 @@ use alpen_express_btcio::reader::config::ReaderConfig;
 use alpen_express_primitives::relay::types::RelayerConfig;
 use bitcoin::Network;
 use serde::Deserialize;
-use tracing::warn;
 
 use crate::args::Args;
 
@@ -38,8 +37,6 @@ pub struct ClientConfig {
     pub l2_blocks_fetch_limit: u64,
     pub datadir: PathBuf,
     pub db_retry_count: u16,
-    #[serde(with = "hex::serde")]
-    pub seq_pubkey: [u8; 32],
 }
 
 #[derive(Debug, Deserialize)]
@@ -125,13 +122,6 @@ impl Config {
                 },
                 l2_blocks_fetch_limit: 1_000,
                 db_retry_count: 5,
-                seq_pubkey: {
-                    if let Some(seq_identity) = args.seq_pubkey {
-                        Self::parse_seq_identity_from_arg(&seq_identity)?
-                    } else {
-                        return Err("arg: --seq-pubkey not provided".to_string());
-                    }
-                },
             },
             sync: SyncConfig {
                 l1_follow_distance: 6,
@@ -197,16 +187,6 @@ impl Config {
         if let Some(db_retry_count) = args.db_retry_count {
             self.client.db_retry_count = db_retry_count;
         }
-
-        if let Some(seq_identity) = args.seq_pubkey {
-            let seq_identity_in_config = self.client.seq_pubkey;
-            self.client.seq_pubkey = Self::parse_seq_identity_from_arg(&seq_identity)
-                .unwrap_or_else(|_| {
-                    warn!("ignoring invalid --seq-pubkey from args");
-
-                    seq_identity_in_config
-                });
-        }
     }
 
     pub fn get_reader_config(&self) -> ReaderConfig {
@@ -214,22 +194,6 @@ impl Config {
             max_reorg_depth: self.sync.max_reorg_depth,
             client_poll_dur_ms: self.sync.client_poll_dur_ms,
         }
-    }
-
-    fn parse_seq_identity_from_arg(seq_identity: &str) -> Result<[u8; 32], String> {
-        let seq_identity = hex::decode(seq_identity);
-        if seq_identity.is_err() {
-            return Err("args: invalid --seq-pubkey provided".to_string());
-        }
-
-        let seq_identity = seq_identity.expect("must be present");
-        let seq_identity = TryInto::<[u8; 32]>::try_into(seq_identity);
-
-        if seq_identity.is_err() {
-            return Err("args: invalid --seq-pubkey length provided".to_string());
-        }
-
-        Ok(seq_identity.expect("must be valid"))
     }
 }
 

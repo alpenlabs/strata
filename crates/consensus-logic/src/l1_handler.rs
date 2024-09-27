@@ -1,7 +1,9 @@
 use std::{panic, sync::Arc};
 
+use alpen_express_crypto::verify_schnorr_sig;
 use alpen_express_db::traits::{Database, L1DataStore};
 use alpen_express_primitives::{
+    block_credential::CredRule,
     buf::Buf32,
     l1::{L1BlockManifest, L1TxProof},
     params::{Params, ProofPublishMode, RollupParams},
@@ -19,7 +21,7 @@ use bitcoin::{
 use express_risc0_adapter::Risc0Verifier;
 use express_sp1_adapter::SP1Verifier;
 use express_zkvm::ZKVMVerifier;
-use secp256k1::{schnorr::Signature, Message, XOnlyPublicKey};
+use secp256k1::XOnlyPublicKey;
 use strata_tx_parser::messages::{BlockData, L1Event};
 use tokio::sync::mpsc;
 use tracing::*;
@@ -32,8 +34,18 @@ pub fn bitcoin_data_handler_task<D: Database + Send + Sync + 'static>(
     csm_ctl: Arc<CsmController>,
     mut event_rx: mpsc::Receiver<L1Event>,
     params: Arc<Params>,
-    seq_pubkey: XOnlyPublicKey,
 ) -> anyhow::Result<()> {
+    // Parse the sequencer pubkey once here as this involves and FFI call that we don't want to be
+    // calling per event although it can be generated from the params passed to the relevant event
+    // handler.
+    let seq_pubkey = match params.rollup.cred_rule {
+        CredRule::Unchecked => None,
+        CredRule::SchnorrKey(buf32) => Some(
+            XOnlyPublicKey::from_slice(&buf32.0 .0)
+                .expect("the sequencer pubkey must be valid in the params"),
+        ),
+    };
+
     while let Some(event) = event_rx.blocking_recv() {
         if let Err(e) =
             handle_bitcoin_event(event, l1db.as_ref(), csm_ctl.as_ref(), &params, seq_pubkey)
@@ -51,7 +63,7 @@ fn handle_bitcoin_event<L1D>(
     l1db: &L1D,
     csm_ctl: &CsmController,
     params: &Arc<Params>,
-    seq_pubkey: XOnlyPublicKey,
+    seq_pubkey: Option<XOnlyPublicKey>,
 ) -> anyhow::Result<()>
 where
     L1D: L1DataStore + Sync + Send + 'static,
@@ -123,7 +135,7 @@ where
 fn check_for_da_batch(
     blockdata: &BlockData,
     params: &Params,
-    seq_pubkey: XOnlyPublicKey,
+    seq_pubkey: Option<XOnlyPublicKey>,
 ) -> Vec<BatchCheckpoint> {
     let protocol_ops_txs = blockdata.protocol_ops_txs();
 
@@ -140,20 +152,13 @@ fn check_for_da_batch(
     let verified_checkpoints = inscriptions.filter_map(|(signed_batch_checkpoint, tx)| {
         let checkpoint: BatchCheckpoint = signed_batch_checkpoint.clone().into();
 
-        let digest = checkpoint.get_sighash();
-        let msg = Message::from_digest(digest.0.into());
+        if let Some(seq_pubkey) = seq_pubkey {
+            let sig = signed_batch_checkpoint.signature();
+            let msg = checkpoint.get_sighash();
+            let pk = Buf32::from(seq_pubkey.serialize());
 
-        match Signature::from_slice(&signed_batch_checkpoint.signature().0[..]) {
-            Ok(sig) => {
-                let valid = sig.verify(&msg, &seq_pubkey);
-                if valid.is_err() {
-                    return None;
-                }
-            },
-            Err(e) => {
-                let txid = tx.compute_txid();
-                error!(?txid, err = %e, "incorrect signature on checkpoint");
-
+            if !verify_schnorr_sig(&sig, &msg, &pk) {
+                error!(?tx, ?checkpoint, "signature verification failed on checkpoint");
                 return None;
             }
         }

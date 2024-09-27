@@ -1,12 +1,56 @@
 import logging
 import math
+import os
 import time
 from dataclasses import dataclass
+from threading import Thread
 from typing import Any, Callable, TypeVar
 
 from bitcoinlib.services.bitcoind import BitcoindClient
 
 from constants import ERROR_CHECKPOINT_DOESNOT_EXIST
+
+
+def generate_jwt_secret() -> str:
+    return os.urandom(32).hex()
+
+
+def generate_blocks(
+    bitcoin_rpc: BitcoindClient,
+    wait_dur,
+    addr: str,
+) -> Thread:
+    thr = Thread(
+        target=generate_task,
+        args=(
+            bitcoin_rpc,
+            wait_dur,
+            addr,
+        ),
+    )
+    thr.start()
+    return thr
+
+
+def generate_task(rpc: BitcoindClient, wait_dur, addr):
+    while True:
+        time.sleep(wait_dur)
+        try:
+            rpc.proxy.generatetoaddress(1, addr)
+        except Exception as ex:
+            logging.warning(f"{ex} while generating to address {addr}")
+            return
+
+
+def generate_n_blocks(bitcoin_rpc: BitcoindClient, n: int):
+    addr = bitcoin_rpc.proxy.getnewaddress()
+    print(f"generating {n} blocks to address", addr)
+    try:
+        blk = bitcoin_rpc.proxy.generatetoaddress(n, addr)
+        print("made blocks", blk)
+    except Exception as ex:
+        log.warning(f"{ex} while generating address")
+        return
 
 
 def wait_until(

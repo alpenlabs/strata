@@ -1,17 +1,14 @@
 #!/usr/bin/env python3
 import json
-import logging as log
 import os
 import sys
 import time
 from math import ceil
-from threading import Thread
 from typing import Optional, TypedDict
 
 import flexitest
 import web3
 import web3.middleware
-from bitcoinlib.keys import Key
 from bitcoinlib.services.bitcoind import BitcoindClient
 
 import seqrpc
@@ -22,61 +19,9 @@ from constants import (
     DD_ROOT,
     DEFAULT_ROLLUP_PARAMS,
     FAST_BATCH_ROLLUP_PARAMS,
+    SEQ_KEY,
 )
-
-
-def generate_seqkey() -> tuple[bytes, str]:
-    # this is just for fun
-    buf = b"alpen" + b"_1337" * 5 + b"xx"
-    assert len(buf) == 32, "bad seqkey len"
-
-    key = Key(buf.hex())
-    public_key = key.x_hex
-    print(f"key = {key}, x_pubkey = {public_key}")
-
-    return key.private_byte, public_key
-
-
-def generate_jwt_secret() -> str:
-    return os.urandom(32).hex()
-
-
-def generate_blocks(
-    bitcoin_rpc: BitcoindClient,
-    wait_dur,
-    addr: str,
-) -> Thread:
-    thr = Thread(
-        target=generate_task,
-        args=(
-            bitcoin_rpc,
-            wait_dur,
-            addr,
-        ),
-    )
-    thr.start()
-    return thr
-
-
-def generate_task(rpc: BitcoindClient, wait_dur, addr):
-    while True:
-        time.sleep(wait_dur)
-        try:
-            rpc.proxy.generatetoaddress(1, addr)
-        except Exception as ex:
-            log.warning(f"{ex} while generating to address {addr}")
-            return
-
-
-def generate_n_blocks(bitcoin_rpc: BitcoindClient, n: int):
-    addr = bitcoin_rpc.proxy.getnewaddress()
-    print(f"generating {n} blocks to address", addr)
-    try:
-        blk = bitcoin_rpc.proxy.generatetoaddress(n, addr)
-        print("made blocks", blk)
-    except Exception as ex:
-        log.warning(f"{ex} while generating address")
-        return
+from utils import generate_blocks, generate_jwt_secret
 
 
 class BitcoinFactory(flexitest.Factory):
@@ -152,9 +97,8 @@ class ExpressFactory(flexitest.Factory):
         logfile = os.path.join(datadir, "service.log")
 
         keyfile = os.path.join(datadir, "seqkey.bin")
-        seqkey, x_only_pubkey = generate_seqkey()
         with open(keyfile, "wb") as f:
-            f.write(seqkey)
+            f.write(SEQ_KEY)
 
         # fmt: off
         cmd = [
@@ -170,7 +114,6 @@ class ExpressFactory(flexitest.Factory):
             "--network", "regtest",
             "--sequencer-key", keyfile,
             "--sequencer-bitcoin-address", sequencer_address,
-            "--seq-pubkey", x_only_pubkey,
         ]
         # fmt: on
 
@@ -185,7 +128,7 @@ class ExpressFactory(flexitest.Factory):
         props = {
             "rpc_host": rpc_host,
             "rpc_port": rpc_port,
-            "seqkey": seqkey,
+            "seqkey": SEQ_KEY,
             "address": sequencer_address,
         }
         rpc_url = f"ws://{rpc_host}:{rpc_port}"
@@ -222,7 +165,6 @@ class FullNodeFactory(flexitest.Factory):
         rpc_host = "localhost"
         rpc_port = self.next_port()
         logfile = os.path.join(datadir, "service.log")
-        _, x_only_pubkey = generate_seqkey()
 
         # fmt: off
         cmd = [
@@ -237,7 +179,6 @@ class FullNodeFactory(flexitest.Factory):
             "--reth-jwtsecret", reth_config["reth_secret_path"],
             "--network", "regtest",
             "--sequencer-rpc", sequencer_rpc,
-            "--seq-pubkey", x_only_pubkey
         ]
         # fmt: on
 

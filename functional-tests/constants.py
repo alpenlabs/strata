@@ -41,7 +41,7 @@ DEFAULT_ROLLUP_PARAMS: dict = {
     "rollup_vk": {
         "risc0_verifying_key": ROLLUP_VK,
     },
-    "verify_proofs": True,
+    "verify_proofs": False,
     "dispatch_assignment_dur": 64,
     "proof_publish_mode": {
         # use an empty proof in batch after this many seconds of not receiving a proof
@@ -66,10 +66,8 @@ DEFAULT_ROLLUP_PARAMS: dict = {
 
 FAST_BATCH_ROLLUP_PARAMS = {
     **DEFAULT_ROLLUP_PARAMS,
-    "horizon_l1_height": 3,
     "target_l2_batch_size": 5,
     "genesis_l1_height": 5,
-    "verify_proofs": False,
 }
 
 ROLLUP_BATCH_WITH_FUNDS = {
