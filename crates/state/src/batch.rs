@@ -94,6 +94,29 @@ impl CheckpointInfo {
     }
 }
 
+/// CheckpointInfo to bootstrap the proving process
+///
+/// TODO: This needs to be replaced with GenesisCheckpointInfo if we prove each Checkpoint
+/// recursively. Using a BootstrapCheckpoint is a temporary solution
+#[derive(Clone, Debug, PartialEq, Eq, BorshDeserialize, BorshSerialize, Arbitrary)]
+pub struct BootstrapCheckpointInfo {
+    pub idx: u64,
+    pub l1_height: u64,
+    pub l2_height: u64,
+    pub l2_blockid: L2BlockId,
+}
+
+impl From<CheckpointInfo> for BootstrapCheckpointInfo {
+    fn from(info: CheckpointInfo) -> Self {
+        BootstrapCheckpointInfo {
+            idx: info.idx,
+            l1_height: info.l1_range.1,
+            l2_height: info.l2_range.1,
+            l2_blockid: info.l2_blockid,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, BorshDeserialize, BorshSerialize, Arbitrary, Default)]
 pub struct CheckpointState {
     /// Hash Range of the HeaderVerificationState
@@ -139,6 +162,27 @@ impl CheckpointState {
     }
 }
 
+/// CheckpointState to bootstrap the proving process
+///
+/// TODO: This needs to be replaced with GenesisCheckpointState if we prove each Checkpoint
+/// recursively. Using a BootstrapCheckpoint is a temporary solution
+#[derive(Clone, Debug, PartialEq, Eq, BorshDeserialize, BorshSerialize, Arbitrary)]
+pub struct BootstrapCheckpointState {
+    pub l1_state_hash: Buf32,
+    pub l2_state_hash: Buf32,
+    pub acc_pow: u128,
+}
+
+impl From<CheckpointState> for BootstrapCheckpointState {
+    fn from(state: CheckpointState) -> Self {
+        BootstrapCheckpointState {
+            l1_state_hash: state.l1_transition.to,
+            l2_state_hash: state.l2_transition.to,
+            acc_pow: state.acc_pow,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, BorshDeserialize, BorshSerialize, Arbitrary, Default)]
 pub struct StateTransition {
     pub from: Buf32,
@@ -177,4 +221,14 @@ impl Checkpoint {
     pub fn l2_blockid(&self) -> &L2BlockId {
         &self.info.l2_blockid
     }
+}
+
+/// CheckpointState to bootstrap the proving process
+///
+/// TODO: This needs to be replaced with GenesisCheckpointState if we prove each Checkpoint
+/// recursively. Using a BootstrapCheckpoint is a temporary solution
+#[derive(Clone, Debug, PartialEq, Eq, BorshDeserialize, BorshSerialize, Arbitrary)]
+pub struct BootstrapCheckpoint {
+    pub state: BootstrapCheckpointState,
+    pub info: BootstrapCheckpointInfo,
 }

@@ -4,14 +4,13 @@
 
 use alpen_express_primitives::buf::Buf32;
 use alpen_express_state::{
-    batch::{Checkpoint, CheckpointInfo, CheckpointState, StateTransition},
+    batch::{BootstrapCheckpoint, Checkpoint, CheckpointInfo, CheckpointState, StateTransition},
     id::L2BlockId,
     tx::DepositInfo,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 use express_proofimpl_l1_batch::logic::L1BatchProofOutput;
 use express_zkvm::Proof;
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct ChainStateSnapshot {
@@ -37,20 +36,14 @@ pub struct CheckpointProofInput {
     /// will change verifying_key.
     pub verifying_key: [u32; 8],
     // TODO: genesis will be hardcoded here
-    pub genesis: HashedCheckpointState,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
-pub struct HashedCheckpointState {
-    pub l1_state: Buf32,
-    pub l2_state: Buf32,
+    pub genesis: BootstrapCheckpoint,
 }
 
 // TODO: genesis needs to be hardcoded
 pub fn process_checkpoint_proof(
     l1_batch: &L1BatchProofOutput,
     l2_batch: &L2BatchProofOutput,
-    genesis: &HashedCheckpointState,
+    bootstrap: &BootstrapCheckpoint,
 ) -> (Checkpoint, Option<(Checkpoint, Proof)>) {
     let prev_checkpoint = match l1_batch.state_update.as_ref() {
         // If no some previous state update, verify that it's sequential
@@ -76,11 +69,11 @@ pub fn process_checkpoint_proof(
         // If no previous state update, verify against genesis
         None => {
             assert_eq!(
-                l1_batch.initial_snapshot.hash, genesis.l1_state,
+                l1_batch.initial_snapshot.hash, bootstrap.state.l1_state_hash,
                 "L1 genesis mismatch"
             );
             assert_eq!(
-                l2_batch.initial_snapshot.hash, genesis.l2_state,
+                l2_batch.initial_snapshot.hash, bootstrap.state.l2_state_hash,
                 "L2 genesis mismatch"
             );
             None
@@ -94,14 +87,10 @@ pub fn process_checkpoint_proof(
 
     let checkpoint_idx = prev_checkpoint
         .as_ref()
-        .map_or(0, |(checkpoint, _)| checkpoint.idx() + 1);
+        .map_or(bootstrap.info.idx, |(checkpoint, _)| checkpoint.idx() + 1);
 
-    let l1_range = (
-        l1_batch.initial_snapshot.block_num,
-        l1_batch.final_snapshot.block_num,
-    );
-
-    let l2_range = (l2_batch.initial_snapshot.slot, l2_batch.final_snapshot.slot);
+    let l1_range = (bootstrap.info.l1_height, l1_batch.final_snapshot.block_num);
+    let l2_range = (bootstrap.info.l2_height, l2_batch.final_snapshot.slot);
 
     let info = CheckpointInfo::new(
         checkpoint_idx,
