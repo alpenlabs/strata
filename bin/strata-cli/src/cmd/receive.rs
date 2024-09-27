@@ -33,18 +33,16 @@ pub async fn receive(args: ReceiveArgs, seed: Seed, settings: Settings, esplora:
     }
 
     let address = if args.signet {
-        let mut l1w = SignetWallet::new(&seed).unwrap();
+        let mut l1w = SignetWallet::new(&seed, settings.network).unwrap();
         let _ = term.write_line("Syncing signet wallet");
         l1w.sync(&esplora).await.unwrap();
         let _ = term.write_line("Wallet synced");
         let address_info = l1w.reveal_next_address(KeychainKind::External);
         l1w.persist().unwrap();
         address_info.address.to_string()
-    } else if args.rollup {
+    } else {
         let l2w = RollupWallet::new(&seed, &settings.l2_http_endpoint).unwrap();
         l2w.default_signer_address().to_string()
-    } else {
-        unreachable!()
     };
     let _ = term.write_line(&address);
 }

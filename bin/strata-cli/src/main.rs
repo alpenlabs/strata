@@ -1,4 +1,5 @@
 pub mod cmd;
+pub mod constants;
 pub mod recovery;
 pub mod rollup;
 pub mod seed;

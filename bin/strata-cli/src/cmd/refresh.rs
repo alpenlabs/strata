@@ -19,7 +19,7 @@ pub struct RefreshArgs {}
 
 pub async fn refresh(seed: Seed, settings: Settings, esplora: EsploraClient) {
     let term = Term::stdout();
-    let mut l1w = SignetWallet::new(&seed).unwrap();
+    let mut l1w = SignetWallet::new(&seed, settings.network).unwrap();
     l1w.sync(&esplora).await.unwrap();
 
     let _ = term.write_line("Opening descriptor recovery");
@@ -29,7 +29,7 @@ pub async fn refresh(seed: Seed, settings: Settings, esplora: EsploraClient) {
     let current_height = l1w.local_chain().get_chain_tip().unwrap().height;
     let _ = term.write_line(&format!("Current signet chain height: {current_height}"));
     let descs = descriptor_file
-        .read_descs_after(current_height)
+        .read_descs_after_block(current_height)
         .await
         .unwrap();
 

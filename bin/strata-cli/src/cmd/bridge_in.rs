@@ -3,7 +3,7 @@ use std::{str::FromStr, time::Duration};
 use alloy::{primitives::Address as RollupAddress, providers::WalletProvider};
 use argh::FromArgs;
 use bdk_wallet::{
-    bitcoin::{hashes::Hash, taproot::LeafVersion, Address, Amount, TapNodeHash, XOnlyPublicKey},
+    bitcoin::{hashes::Hash, taproot::LeafVersion, Address, TapNodeHash, XOnlyPublicKey},
     chain::ChainOracle,
     descriptor::IntoWalletDescriptor,
     miniscript::{miniscript::Tap, Miniscript},
@@ -11,15 +11,17 @@ use bdk_wallet::{
     KeychainKind, TxOrdering, Wallet,
 };
 use console::{style, Term};
+use express_bridge_tx_builder::constants::MAGIC_BYTES;
 use indicatif::ProgressBar;
 
 use crate::{
+    constants::{BRIDGE_IN_AMOUNT, RECOVER_AT_DELAY, RECOVER_DELAY, UNSPENDABLE},
     recovery::DescriptorRecovery,
     rollup::RollupWallet,
     seed::Seed,
     settings::Settings,
     signet::{get_fee_rate, log_fee_rate, EsploraClient, SignetWallet},
-    taproot::{ExtractP2trPubkey, NotTaprootAddress, UNSPENDABLE},
+    taproot::{ExtractP2trPubkey, NotTaprootAddress},
 };
 
 #[derive(FromArgs, PartialEq, Debug)]
@@ -36,7 +38,7 @@ pub async fn bridge_in(args: BridgeInArgs, seed: Seed, settings: Settings, esplo
     let requested_rollup_address = args
         .rollup_address
         .map(|a| RollupAddress::from_str(&a).expect("bad rollup address"));
-    let mut l1w = SignetWallet::new(&seed).unwrap();
+    let mut l1w = SignetWallet::new(&seed, settings.network).unwrap();
     let l2w = RollupWallet::new(&seed, &settings.l2_http_endpoint).unwrap();
 
     l1w.sync(&esplora).await.unwrap();
@@ -44,10 +46,9 @@ pub async fn bridge_in(args: BridgeInArgs, seed: Seed, settings: Settings, esplo
     l1w.persist().unwrap();
 
     let rollup_address = requested_rollup_address.unwrap_or(l2w.default_signer_address());
-    const AMOUNT: Amount = Amount::from_sat(1_001_000_000); // 10.01 BTC
     let _ = term.write_line(&format!(
         "Bridging {} to rollup address {}",
-        style(AMOUNT.to_string()).green(),
+        style(BRIDGE_IN_AMOUNT.to_string()).green(),
         style(rollup_address).cyan(),
     ));
 
@@ -76,7 +77,7 @@ pub async fn bridge_in(args: BridgeInArgs, seed: Seed, settings: Settings, esplo
         .expect("valid chain tip")
         .height;
 
-    let recover_at = current_block_height + 1050;
+    let recover_at = current_block_height + RECOVER_AT_DELAY;
 
     let bridge_in_address = temp_wallet
         .reveal_next_address(KeychainKind::External)
@@ -94,15 +95,19 @@ pub async fn bridge_in(args: BridgeInArgs, seed: Seed, settings: Settings, esplo
 
     log_fee_rate(&term, &fee_rate);
 
-    let mut op_return_data = [0u8; 11 + 32 + 20];
-    op_return_data[..11].copy_from_slice(b"alpenstrata");
-    op_return_data[11..11 + 32].copy_from_slice(recovery_script_hash.as_raw_hash().as_byte_array());
-    op_return_data[11 + 32..].copy_from_slice(rollup_address.as_slice());
+    const MBL: usize = MAGIC_BYTES.len();
+    const TNHL: usize = TapNodeHash::LEN;
+    let mut op_return_data = [0u8; MBL + TNHL + RollupAddress::len_bytes()];
+    op_return_data[..MBL].copy_from_slice(MAGIC_BYTES);
+    op_return_data[MBL..MBL + TNHL]
+        .copy_from_slice(recovery_script_hash.as_raw_hash().as_byte_array());
+    op_return_data[MBL + TNHL..].copy_from_slice(rollup_address.as_slice());
 
     let mut psbt = l1w
         .build_tx()
+        // Important: the deposit won't be found by the sequencer if the order isn't correct.
         .ordering(TxOrdering::Untouched)
-        .add_recipient(bridge_in_address.script_pubkey(), AMOUNT)
+        .add_recipient(bridge_in_address.script_pubkey(), BRIDGE_IN_AMOUNT)
         .add_data(&op_return_data)
         .enable_rbf()
         .fee_rate(fee_rate)
@@ -121,12 +126,7 @@ pub async fn bridge_in(args: BridgeInArgs, seed: Seed, settings: Settings, esplo
         .await
         .unwrap();
     desc_file
-        .add_desc(
-            recover_at,
-            &bridge_in_desc,
-            l1w.secp_ctx(),
-            settings.network,
-        )
+        .add_desc(recover_at, &bridge_in_desc)
         .await
         .unwrap();
     pb.finish_with_message("Saved output descriptor");
@@ -150,7 +150,7 @@ fn bridge_in_descriptor(
     let desc = bdk_wallet::descriptor!(
         tr(UNSPENDABLE, {
             pk(bridge_pubkey),
-            and_v(v:pk(recovery_xonly_pubkey),older(1008))
+            and_v(v:pk(recovery_xonly_pubkey),older(RECOVER_DELAY))
         })
     )
     .expect("valid descriptor");

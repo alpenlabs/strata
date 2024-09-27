@@ -11,15 +11,12 @@ use bdk_wallet::{
 use bip39::{Language, Mnemonic};
 use console::Term;
 use dialoguer::{Confirm, Input};
-use password::{BadPassword, Password};
+use password::{IncorrectPassword, Password};
 use rand::{thread_rng, Rng, RngCore};
 use sha2::{Digest, Sha256};
 use terrors::OneOf;
 
-const SALT_LEN: usize = 16;
-const NONCE_LEN: usize = 12;
-const SEED_LEN: usize = 32;
-const TAG_LEN: usize = 16;
+use crate::constants::{AES_NONCE_LEN, AES_TAG_LEN, PW_SALT_LEN, SEED_LEN};
 
 pub struct BaseWallet(LoadParams, CreateParams);
 
@@ -56,23 +53,23 @@ impl Seed {
         rng: &mut impl RngCore,
     ) -> Result<EncryptedSeed, OneOf<(argon2::Error, aes_gcm_siv::Error)>> {
         let mut buf = [0u8; EncryptedSeed::LEN];
-        rng.fill_bytes(&mut buf[..SALT_LEN + NONCE_LEN]);
+        rng.fill_bytes(&mut buf[..PW_SALT_LEN + AES_NONCE_LEN]);
 
         let seed_encryption_key = password
-            .seed_encryption_key(&buf[..SALT_LEN].try_into().expect("cannot fail"))
+            .seed_encryption_key(&buf[..PW_SALT_LEN].try_into().expect("cannot fail"))
             .map_err(OneOf::new)?;
 
-        let (salt_and_nonce, rest) = buf.split_at_mut(SALT_LEN + NONCE_LEN);
+        let (salt_and_nonce, rest) = buf.split_at_mut(PW_SALT_LEN + AES_NONCE_LEN);
         let (seed, _) = rest.split_at_mut(SEED_LEN);
         seed.copy_from_slice(&self.0);
 
         let mut cipher =
             Aes256GcmSiv::new_from_slice(seed_encryption_key).expect("should be correct key size");
-        let nonce = Nonce::from_slice(&salt_and_nonce[SALT_LEN..]);
+        let nonce = Nonce::from_slice(&salt_and_nonce[PW_SALT_LEN..]);
         let tag = cipher
             .encrypt_in_place_detached(nonce, &[], seed)
             .map_err(OneOf::new)?;
-        buf[(EncryptedSeed::LEN - TAG_LEN)..].copy_from_slice(tag.as_slice());
+        buf[(EncryptedSeed::LEN - AES_TAG_LEN)..].copy_from_slice(tag.as_slice());
         Ok(EncryptedSeed(buf))
     }
 
@@ -107,22 +104,22 @@ impl Seed {
 pub struct EncryptedSeed([u8; Self::LEN]);
 
 impl EncryptedSeed {
-    const LEN: usize = SALT_LEN + NONCE_LEN + SEED_LEN + TAG_LEN;
+    const LEN: usize = PW_SALT_LEN + AES_NONCE_LEN + SEED_LEN + AES_TAG_LEN;
 
     fn decrypt(
         mut self,
         password: &mut Password,
     ) -> Result<Seed, OneOf<(argon2::Error, aes_gcm_siv::Error)>> {
         let seed_encryption_key = password
-            .seed_encryption_key(&self.0[..SALT_LEN].try_into().expect("cannot fail"))
+            .seed_encryption_key(&self.0[..PW_SALT_LEN].try_into().expect("cannot fail"))
             .map_err(OneOf::new)?;
 
         let mut cipher =
             Aes256GcmSiv::new_from_slice(seed_encryption_key).expect("should be correct key size");
-        let (salt_and_nonce, rest) = self.0.split_at_mut(SALT_LEN + NONCE_LEN);
+        let (salt_and_nonce, rest) = self.0.split_at_mut(PW_SALT_LEN + AES_NONCE_LEN);
         let (seed, tag) = rest.split_at_mut(SEED_LEN);
         let tag = Tag::from_slice(tag);
-        let nonce = Nonce::from_slice(&salt_and_nonce[SALT_LEN..]);
+        let nonce = Nonce::from_slice(&salt_and_nonce[PW_SALT_LEN..]);
 
         cipher
             .decrypt_in_place_detached(nonce, &[], seed, tag)
@@ -136,7 +133,7 @@ pub fn load_or_create(
     persister: &impl EncryptedSeedPersister,
 ) -> Result<Seed, OneOf<LoadOrCreateErr>> {
     let term = Term::stdout();
-    let _ = term.write_line("Loading encrypted seed from OS keychain...");
+    let _ = term.write_line("Loading encrypted seed...");
     let maybe_encrypted_seed = persister.load().map_err(|e| OneOf::broaden(e))?;
     if let Some(encrypted_seed) = maybe_encrypted_seed {
         let _ = term.write_line("Opening wallet...");
@@ -149,8 +146,8 @@ pub fn load_or_create(
             Err(e) => {
                 let narrowed = e.narrow::<aes_gcm_siv::Error, _>();
                 if let Ok(_aes_error) = narrowed {
-                    let _ = term.write_line("Bad password");
-                    return Err(OneOf::new(BadPassword));
+                    let _ = term.write_line("Incorrect password");
+                    return Err(OneOf::new(IncorrectPassword));
                 }
 
                 Err(narrowed.unwrap_err().broaden())
@@ -215,7 +212,12 @@ type PersisterErr = OneOf<(PlatformFailure, NoStorageAccess)>;
 type PersisterErr = OneOf<(io::Error,)>;
 
 #[cfg(target_os = "linux")]
-type LoadOrCreateErr = (io::Error, dialoguer::Error, argon2::Error, BadPassword);
+type LoadOrCreateErr = (
+    io::Error,
+    dialoguer::Error,
+    argon2::Error,
+    IncorrectPassword,
+);
 
 #[cfg(not(target_os = "linux"))]
 type LoadOrCreateErr = (
@@ -223,7 +225,7 @@ type LoadOrCreateErr = (
     NoStorageAccess,
     dialoguer::Error,
     argon2::Error,
-    BadPassword,
+    IncorrectPassword,
 );
 
 pub trait EncryptedSeedPersister {

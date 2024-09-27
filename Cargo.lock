@@ -13185,6 +13185,7 @@ dependencies = [
  "console",
  "dialoguer",
  "directories",
+ "express-bridge-tx-builder",
  "hex 0.1.0",
  "indicatif",
  "keyring",

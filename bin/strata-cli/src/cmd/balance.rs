@@ -32,7 +32,7 @@ pub async fn balance(args: BalanceArgs, seed: Seed, settings: Settings, esplora:
     }
 
     if args.signet {
-        let mut l1w = SignetWallet::new(&seed).unwrap();
+        let mut l1w = SignetWallet::new(&seed, settings.network).unwrap();
         l1w.sync(&esplora).await.unwrap();
         let balance = l1w.balance();
         let _ = term.write_line(&format!("Total: {}", balance.total()));

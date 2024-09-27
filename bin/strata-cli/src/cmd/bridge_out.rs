@@ -5,22 +5,20 @@ use alloy::{
     rpc::types::TransactionInput,
 };
 use argh::FromArgs;
-use bdk_wallet::{
-    bitcoin::{Address, Amount},
-    KeychainKind,
-};
+use bdk_wallet::{bitcoin::Address, KeychainKind};
 use console::Term;
 use indicatif::ProgressBar;
 
 use crate::{
-    rollup::RollupWallet, seed::Seed, settings::Settings, signet::SignetWallet,
-    taproot::ExtractP2trPubkey,
+    constants::BRIDGE_OUT_AMOUNT, rollup::RollupWallet, seed::Seed, settings::Settings,
+    signet::SignetWallet, taproot::ExtractP2trPubkey,
 };
 
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "bridge-out")]
 /// Bridge 10 BTC from the rollup to signet
 pub struct BridgeOutArgs {
+    /// the signet address to send funds to. defaults to a new internal wallet address
     #[argh(positional)]
     p2tr_address: Option<String>,
 }
@@ -33,7 +31,7 @@ pub async fn bridge_out(args: BridgeOutArgs, seed: Seed, settings: Settings) {
             .expect("correct network")
     });
 
-    let mut l1w = SignetWallet::new(&seed).unwrap();
+    let mut l1w = SignetWallet::new(&seed, settings.network).unwrap();
     let l2w = RollupWallet::new(&seed, &settings.l2_http_endpoint).unwrap();
 
     let address = match address {
@@ -45,15 +43,16 @@ pub async fn bridge_out(args: BridgeOutArgs, seed: Seed, settings: Settings) {
         }
     };
 
-    const AMOUNT: Amount = Amount::from_int_btc(10);
-
     let term = Term::stdout();
-    let _ = term.write_line(&format!("Bridging out {} to {}", AMOUNT, address));
+    let _ = term.write_line(&format!(
+        "Bridging out {} to {}",
+        BRIDGE_OUT_AMOUNT, address
+    ));
 
     let tx = l2w
         .transaction_request()
         .with_to(settings.bridge_rollup_address)
-        .with_value(U256::from(AMOUNT.to_sat() * 1u64.pow(10)))
+        .with_value(U256::from(BRIDGE_OUT_AMOUNT.to_sat() * 1u64.pow(10)))
         .input(TransactionInput::new(
             address
                 .extract_p2tr_pubkey()

@@ -21,8 +21,6 @@ use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 
 use crate::seed::Seed;
 
-const NETWORK: Network = Network::Signet;
-
 /// Retrieves an estimated fee rate to settle a transaction in `target` blocks
 pub async fn get_fee_rate(
     target: u16,
@@ -81,15 +79,15 @@ impl SignetWallet {
         Connection::open(Self::db_path("default", data_dir))
     }
 
-    pub fn new(seed: &Seed) -> io::Result<Self> {
+    pub fn new(seed: &Seed, network: Network) -> io::Result<Self> {
         let (load, create) = seed.signet_wallet().split();
         Ok(Self(
-            load.check_network(NETWORK)
+            load.check_network(network)
                 .load_wallet(&mut Persister)
                 .expect("should be able to load wallet")
                 .unwrap_or_else(|| {
                     create
-                        .network(NETWORK)
+                        .network(network)
                         .create_wallet(&mut Persister)
                         .expect("wallet creation to succeed")
                 }),

@@ -17,12 +17,15 @@ use crate::{rollup::RollupWallet, seed::Seed, settings::Settings, signet::Signet
 #[argh(subcommand, name = "faucet")]
 /// Request some bitcoin from the faucet
 pub struct FaucetArgs {
+    /// request bitcoin on signet
     #[argh(switch)]
-    /// request signet bitcoin
     signet: bool,
+
+    /// request bitcoin on rollup
     #[argh(switch)]
-    /// request rollup bitcoin
     rollup: bool,
+
+    /// address that funds will be sent to. defaults to internal wallet
     #[argh(positional)]
     address: Option<String>,
 }
@@ -86,7 +89,7 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
     ));
 
     let url = if args.signet {
-        let mut l1w = SignetWallet::new(&seed).unwrap();
+        let mut l1w = SignetWallet::new(&seed, settings.network).unwrap();
         let address = match args.address {
             None => {
                 let address_info = l1w.reveal_next_address(KeychainKind::External);
@@ -108,7 +111,7 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
             encode(&solution.to_le_bytes()),
             address
         )
-    } else if args.rollup {
+    } else {
         let l2w = RollupWallet::new(&seed, &settings.l2_http_endpoint).unwrap();
         // they said EVMs were advanced 👁️👁️
         let address = match args.address {
@@ -121,8 +124,6 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
             encode(&solution.to_le_bytes()),
             address
         )
-    } else {
-        unreachable!()
     };
 
     let res = client.get(url).send().await.unwrap();
@@ -137,17 +138,10 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
 }
 
 fn count_leading_zeros(data: &[u8]) -> u8 {
-    let mut leading_zeros = 0;
-    for byte in data {
-        if *byte == 0 {
-            leading_zeros += 8;
-        } else {
-            leading_zeros += byte.leading_zeros() as u8;
-            break;
-        }
-    }
-
-    leading_zeros
+    data.iter()
+        .map(|&byte| byte.leading_zeros() as u8)
+        .take_while(|&zeros| zeros == 8)
+        .sum::<u8>()
 }
 
 fn pow_valid(mut hasher: Sha256, difficulty: u8, solution: Solution) -> bool {

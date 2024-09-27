@@ -21,10 +21,10 @@ use crate::{
 /// signet and rollup addresses
 pub struct DrainArgs {
     #[argh(option, short = 's')]
-    /// an optional signet address for signet funds to be drained to
+    /// a signet address for signet funds to be drained to
     signet_address: Option<String>,
     #[argh(option, short = 'r')]
-    /// an optional rollup address for rollup funds to be drained to
+    /// a rollup address for rollup funds to be drained to
     rollup_address: Option<String>,
 }
 
@@ -52,13 +52,14 @@ pub async fn drain(
         rollup_address.map(|a| RollupAddress::from_str(&a).expect("valid rollup address"));
 
     if let Some(address) = signet_address {
-        let mut l1w = SignetWallet::new(&seed).unwrap();
+        let mut l1w = SignetWallet::new(&seed, settings.network).unwrap();
         l1w.sync(&esplora).await.unwrap();
         let balance = l1w.balance();
         if balance.untrusted_pending > Amount::ZERO {
             let _ = term.write_line(
-                &style("You have pending, untrusted funds on signet that won't be included in the drain")
-                    .yellow().to_string()
+                &style("You have pending funds on signet that won't be included in the drain")
+                    .yellow()
+                    .to_string(),
             );
         }
         let fr = get_fee_rate(1, &esplora).await.unwrap().unwrap();

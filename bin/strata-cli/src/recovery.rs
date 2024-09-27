@@ -8,11 +8,10 @@ use std::{
 
 use aes_gcm_siv::{aead::AeadMutInPlace, Aes256GcmSiv, KeyInit, Nonce, Tag};
 use bdk_wallet::{
-    bitcoin::{constants::ChainHash, key::Secp256k1, secp256k1::All, Network},
+    bitcoin::{constants::ChainHash, Network},
     keys::{DescriptorPublicKey, DescriptorSecretKey},
     miniscript::{descriptor::DescriptorKeyParseError, Descriptor},
     template::DescriptorTemplateOut,
-    wallet_name_from_descriptor,
 };
 use rand::{thread_rng, Rng};
 use sha2::{Digest, Sha256};
@@ -21,32 +20,30 @@ use tokio::io::AsyncReadExt;
 
 use crate::seed::Seed;
 
-pub struct DescriptorRecovery(sled::Db, Aes256GcmSiv);
+pub struct DescriptorRecovery {
+    db: sled::Db,
+    cipher: Aes256GcmSiv,
+}
 
 impl DescriptorRecovery {
     pub async fn add_desc(
         &mut self,
         recover_at: u32,
-        desc: &DescriptorTemplateOut,
-        secp: &Secp256k1<All>,
-        network: Network,
+        (desc, keymap, networks): &DescriptorTemplateOut,
     ) -> io::Result<()> {
         // the amount of allocation here hurts me emotionally
-        // yes, we can't just serialize to bytes 👁️👁️
+        // yes, we can't just serialize desc to bytes 👁️👁️
+        let desc_string = desc.to_string();
         let db_key = {
             let mut key = Vec::from(recover_at.to_be_bytes());
-            // wallet_name_from_descriptor will actually write the private key inside the descriptor
-            // to the name atm so we hash it just to make sure
-            let name = wallet_name_from_descriptor(desc.0.clone(), None, network, secp)
-                .expect("valid descriptor");
+            // this will actually write the private key inside the descriptor so we hash it
             let mut hasher = Sha256::new();
-            hasher.update(name.as_bytes());
+            hasher.update(desc_string.as_bytes());
             key.extend_from_slice(hasher.finalize().as_ref());
             key
         };
 
-        let keymap_iter = desc
-            .1
+        let keymap_iter = keymap
             .iter()
             .map(|(pubk, privk)| [pubk.to_string(), privk.to_string()])
             .map(|[pubk, privk]| {
@@ -73,8 +70,7 @@ impl DescriptorRecovery {
         // ]
         let mut bytes = Vec::new();
 
-        let descriptor = desc.0.to_string();
-        let desc_bytes = descriptor.as_bytes();
+        let desc_bytes = desc_string.as_bytes();
         bytes.extend_from_slice(&(desc_bytes.len() as u64).to_le_bytes());
         bytes.extend_from_slice(desc_bytes);
 
@@ -94,8 +90,7 @@ impl DescriptorRecovery {
             bytes.extend_from_slice(privk.as_bytes());
         }
 
-        let networks = desc
-            .2
+        let networks = networks
             .iter()
             .map(|n| n.chain_hash().to_bytes())
             .collect::<Vec<_>>();
@@ -109,28 +104,31 @@ impl DescriptorRecovery {
         let nonce = Nonce::from(thread_rng().gen::<[u8; 12]>());
 
         // encrypted_bytes | tag (16 bytes) | nonce (12 bytes)
-        self.1
+        self.cipher
             .encrypt_in_place(&nonce, &[], &mut bytes)
             .expect("encryption should succeed");
 
         bytes.extend_from_slice(nonce.as_ref());
 
-        self.0.insert(db_key, bytes)?;
-        self.0.flush_async().await?;
+        self.db.insert(db_key, bytes)?;
+        self.db.flush_async().await?;
         Ok(())
     }
 
     pub async fn open(seed: &Seed, descriptor_db: &Path) -> io::Result<Self> {
         let key = seed.descriptor_recovery_key();
         let cipher = Aes256GcmSiv::new(&key.into());
-        Ok(Self(sled::open(descriptor_db)?, cipher))
+        Ok(Self {
+            db: sled::open(descriptor_db)?,
+            cipher,
+        })
     }
 
-    pub async fn read_descs_after(
+    pub async fn read_descs_after_block(
         &mut self,
         height: u32,
     ) -> Result<Vec<DescriptorTemplateOut>, OneOf<ReadDescsAfterError>> {
-        let mut after_height = self.0.range(height.to_be_bytes()..);
+        let mut after_height = self.db.range(height.to_be_bytes()..);
         let mut descs = vec![];
         while let Some(desc_entry) = after_height.next() {
             let mut raw = desc_entry.map_err(OneOf::new)?.1;
@@ -143,7 +141,7 @@ impl DescriptorRecovery {
             let (encrypted, tag) = rest.split_at_mut(rest.len() - 16);
             let tag = Tag::from_slice(tag);
 
-            self.1
+            self.cipher
                 .decrypt_in_place_detached(&nonce, &[], encrypted, tag)
                 .map_err(OneOf::new)?;
 

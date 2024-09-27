@@ -9,11 +9,7 @@ use crate::{seed::EncryptedSeedPersister, settings::Settings};
 /// Prints a BIP39 mnemonic encoding the internal wallet's seed bytes
 pub struct ResetArgs {
     #[argh(switch, short = 'y')]
-    /// select a language for the BIP39 mnemonic. Defaults to English.
-    /// Options:
-    /// english, chinese-simplified, chinese-traditional,
-    /// czech, french, italian, japanese, korean,
-    /// portuguese or spanish
+    /// dangerous: permit to reset without further confirmation
     assume_yes: bool,
 }
 

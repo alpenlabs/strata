@@ -1,7 +1,7 @@
 use argon2::Argon2;
 use dialoguer::Password as InputPassword;
 
-use super::SALT_LEN;
+use super::PW_SALT_LEN;
 
 pub struct Password {
     inner: String,
@@ -29,7 +29,7 @@ impl Password {
 
     pub fn seed_encryption_key(
         &mut self,
-        salt: &[u8; SALT_LEN],
+        salt: &[u8; PW_SALT_LEN],
     ) -> Result<&[u8; 32], argon2::Error> {
         match self.seed_encryption_key {
             Some(ref key) => Ok(key),
@@ -44,4 +44,4 @@ impl Password {
 }
 
 #[derive(Debug)]
-pub struct BadPassword;
+pub struct IncorrectPassword;
