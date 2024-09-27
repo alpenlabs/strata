@@ -15,7 +15,22 @@ use serde::{Deserialize, Serialize};
 /// The bitcoin block height that a withdrawal command references.
 pub type BitcoinBlockHeight = u64;
 
-/// Entry for an operator.  They have a
+/// Entry for an operator.
+///
+/// Each operator has:
+///
+/// * an `idx` which is used to identify operators uniquely.
+/// * a `signing_pk` which is a [`Buf32`] key used to sign messages sent among each other.
+/// * a `wallet_pk` which is a [`Buf32`] [`XOnlyPublickey`](bitcoin::secp256k1::XOnlyPublicKey) used
+///   to sign bridge transactions.
+///
+/// # Note
+///
+/// The separation between the two keys is so that we can use a different signing mechanism for
+/// signing messages in the future. For the present, only the `wallet_pk` is used.
+///
+/// Also note that the `wallet_pk` corresponds to a [`PublicKey`](bitcoin::secp256k1::PublicKey)
+/// with an even parity as per [BIP 340](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki#design).
 #[derive(
     Clone, Debug, Eq, PartialEq, Hash, BorshDeserialize, BorshSerialize, Serialize, Deserialize,
 )]
