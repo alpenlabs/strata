@@ -1,16 +1,16 @@
+use alpen_express_primitives::l1::OutputRef;
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::batch::SignedBatchCheckpoint;
 
 /// Information related to relevant transactions to be stored in L1Tx
-#[derive(Clone, Debug, BorshSerialize, BorshDeserialize, Arbitrary, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub enum ProtocolOperation {
     /// Deposit Transaction
     Deposit(DepositInfo),
-    DepositRequest(DepositReqeustInfo),
+    DepositRequest(DepositRequestInfo),
     RollupInscription(SignedBatchCheckpoint),
-    SpentToAddress(Vec<u8>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
@@ -18,20 +18,20 @@ pub struct DepositInfo {
     /// amount in satoshis
     pub amt: u64,
 
-    /// outpoint where amount is present
-    pub deposit_outpoint: u16,
+    /// outpoint
+    pub outpoint: OutputRef,
 
     /// EE address
     pub address: Vec<u8>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
-pub struct DepositReqeustInfo {
+pub struct DepositRequestInfo {
     /// amount in satoshis
     pub amt: u64,
 
     /// tapscript control block hash for timelock script
-    pub tap_ctrl_blk_hash: [u8; 32],
+    pub take_back_leaf_hash: [u8; 32],
 
     /// EE address
     pub address: Vec<u8>,

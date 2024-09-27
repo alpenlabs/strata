@@ -3837,8 +3837,15 @@ dependencies = [
 name = "express-chaintsn"
 version = "0.1.0"
 dependencies = [
+ "alpen-express-btcio",
+ "alpen-express-eectl",
  "alpen-express-primitives",
  "alpen-express-state",
+ "alpen-test-utils",
+ "anyhow",
+ "arbitrary",
+ "bitcoin",
+ "borsh",
  "rand_chacha 0.3.1",
  "rand_core 0.6.4",
  "thiserror",
@@ -12142,10 +12149,12 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 name = "strata-tx-parser"
 version = "0.1.0"
 dependencies = [
+ "alpen-express-btcio",
  "alpen-express-primitives",
  "alpen-express-state",
  "alpen-test-utils",
  "anyhow",
+ "arbitrary",
  "bitcoin",
  "borsh",
  "hex",

@@ -2,7 +2,7 @@ use alpen_express_primitives::{
     buf::{Buf20, Buf32},
     evm_exec::create_evm_extra_payload,
 };
-use alpen_express_state::exec_update::UpdateInput;
+use alpen_express_state::exec_update::{Op, UpdateInput};
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use reth_primitives::B256;
@@ -48,21 +48,21 @@ pub enum ElPayloadError {
     BlockConversionError(String),
 }
 
-impl TryFrom<ElPayload> for UpdateInput {
-    type Error = ElPayloadError;
+pub fn make_update_input_from_payload_and_ops(
+    el_payload: ElPayload,
+    ops: &[Op],
+) -> Result<UpdateInput, ElPayloadError> {
+    let extra_payload = create_evm_extra_payload(el_payload.block_hash);
+    let v1_payload = ExecutionPayloadV1::from(el_payload);
+    let evm_block = try_payload_v1_to_block(v1_payload)
+        .map_err(|err| ElPayloadError::BlockConversionError(err.to_string()))?;
 
-    fn try_from(el_payload: ElPayload) -> Result<Self, Self::Error> {
-        let extra_payload = create_evm_extra_payload(el_payload.block_hash);
-        let v1_payload = ExecutionPayloadV1::from(el_payload);
-        let evm_block = try_payload_v1_to_block(v1_payload)
-            .map_err(|err| ElPayloadError::BlockConversionError(err.to_string()))?;
-
-        Ok(Self::new(
-            evm_block.number,
-            Buf32(evm_block.transactions_root),
-            extra_payload,
-        ))
-    }
+    Ok(UpdateInput::new(
+        evm_block.number,
+        ops.to_vec(),
+        Buf32(evm_block.transactions_root),
+        extra_payload,
+    ))
 }
 
 impl From<ExecutionPayloadV1> for ElPayload {

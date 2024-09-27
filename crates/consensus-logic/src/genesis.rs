@@ -119,7 +119,7 @@ pub fn make_genesis_block(params: &Params) -> L2BlockBundle {
     // around and insert into the genesis state.
     // TODO this might need to talk to the EL to do the genesus setup *properly*
     let extra_payload = create_evm_extra_payload(params.rollup.evm_genesis_block_hash);
-    let geui = UpdateInput::new(0, Buf32::zero(), extra_payload);
+    let geui = UpdateInput::new(0, vec![], Buf32::zero(), extra_payload);
     let genesis_update = ExecUpdate::new(
         geui.clone(),
         UpdateOutput::new_from_state(params.rollup.evm_genesis_block_state_root),

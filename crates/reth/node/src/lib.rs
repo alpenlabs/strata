@@ -9,4 +9,7 @@ mod payload_builder;
 pub use engine::ExpressEngineTypes;
 pub use express_reth_primitives::WithdrawalIntent;
 pub use node::ExpressEthereumNode;
-pub use payload::{ExpressExecutionPayloadEnvelopeV2, ExpressPayloadAttributes};
+pub use payload::{
+    ExecutionPayloadEnvelopeV2, ExecutionPayloadFieldV2, ExpressExecutionPayloadEnvelopeV2,
+    ExpressPayloadAttributes,
+};

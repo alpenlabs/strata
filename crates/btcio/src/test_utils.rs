@@ -1,18 +1,23 @@
 use std::collections::BTreeMap;
 
+use alpen_express_state::tx::InscriptionData;
 use async_trait::async_trait;
 use bitcoin::{
     bip32::Xpriv,
     consensus::{self, deserialize},
     hashes::Hash,
-    Address, Amount, Block, BlockHash, Network, SignedAmount, Transaction, Txid, Work,
+    taproot::ControlBlock,
+    Address, Amount, Block, BlockHash, Network, ScriptBuf, SignedAmount, Transaction, Txid, Work,
 };
 use bitcoind_json_rpc_types::v26::GetBlockchainInfo;
 
-use crate::rpc::{
-    traits::{Broadcaster, Reader, Signer, Wallet},
-    types::{GetTransaction, ListTransactions, ListUnspent, SignRawTransactionWithWallet},
-    ClientResult,
+use crate::{
+    rpc::{
+        traits::{Broadcaster, Reader, Signer, Wallet},
+        types::{GetTransaction, ListTransactions, ListUnspent, SignRawTransactionWithWallet},
+        ClientResult,
+    },
+    writer::builder::{build_reveal_transaction, generate_inscription_script, InscriptionError},
 };
 
 /// A test implementation of a Bitcoin client.
@@ -198,4 +203,30 @@ impl Signer for TestBitcoinClient {
         let xpriv = "xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi".parse::<Xpriv>().unwrap();
         Ok(Some(xpriv))
     }
+}
+
+pub fn generate_inscription_script_test(
+    inscription_data: InscriptionData,
+    rollup_name: &str,
+    version: u8,
+) -> anyhow::Result<ScriptBuf> {
+    generate_inscription_script(inscription_data, rollup_name, version)
+}
+
+pub fn build_reveal_transaction_test(
+    input_transaction: Transaction,
+    recipient: Address,
+    output_value: u64,
+    fee_rate: u64,
+    reveal_script: &ScriptBuf,
+    control_block: &ControlBlock,
+) -> Result<Transaction, InscriptionError> {
+    build_reveal_transaction(
+        input_transaction,
+        recipient,
+        output_value,
+        fee_rate,
+        reveal_script,
+        control_block,
+    )
 }

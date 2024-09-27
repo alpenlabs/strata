@@ -5,7 +5,8 @@ use std::{sync::Arc, thread, time};
 
 use alpen_express_crypto::sign_schnorr_sig;
 use alpen_express_db::traits::{
-    ChainstateProvider, ClientStateProvider, Database, L1DataProvider, L2DataProvider, L2DataStore,
+    ChainstateProvider, ChainstateStore, ClientStateProvider, Database, L1DataProvider,
+    L2DataProvider, L2DataStore,
 };
 use alpen_express_eectl::{
     engine::{ExecEngineCtl, PayloadStatus},
@@ -14,18 +15,23 @@ use alpen_express_eectl::{
 };
 use alpen_express_primitives::{
     buf::{Buf32, Buf64},
-    params::Params,
+    params::{Params, RollupParams},
 };
 use alpen_express_state::{
     block::{ExecSegment, L1Segment, L2BlockAccessory, L2BlockBundle},
+    bridge_ops::DepositIntent,
     chain_state::ChainState,
     client_state::{ClientState, LocalL1State},
-    exec_update::{ExecUpdate, UpdateOutput},
+    exec_update::{
+        construct_ops_from_deposit_intents, ELDepositData, ExecUpdate, Op, UpdateOutput,
+    },
     header::L2BlockHeader,
-    l1::{L1HeaderPayload, L1HeaderRecord},
+    l1::{DepositUpdateTx, L1HeaderPayload, L1HeaderRecord},
     prelude::*,
     state_op::*,
+    tx::ProtocolOperation::Deposit,
 };
+use bitcoin::Transaction;
 use tracing::*;
 
 use super::types::*;
@@ -53,6 +59,7 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     let l2_prov = database.l2_provider();
     let cs_prov = database.client_state_provider();
     let chs_prov = database.chainstate_provider();
+    let chs_store = database.chainstate_store();
 
     // Check the block we were supposed to build isn't already in the database,
     // if so then just republish that.  This checks that there just if we have a
@@ -107,6 +114,7 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
         &prev_chstate,
         l1_prov.as_ref(),
         MAX_L1_ENTRIES_PER_BLOCK,
+        params.rollup(),
     )?;
 
     // Prepare the execution segment, which right now is just talking to the EVM
@@ -116,8 +124,10 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
         ts,
         prev_block_id,
         prev_global_sr,
+        &prev_chstate,
         safe_l1_blkid,
         engine,
+        params.rollup(),
     )?;
 
     // Assemble the body and fake header.
@@ -126,7 +136,8 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
 
     // Execute the block to compute the new state root, then assemble the real header.
     // TODO do something with the write batch?  to prepare it in the database?
-    let (post_state, _wb) = compute_post_state(prev_chstate, &fake_header, &body, params)?;
+    let (post_state, wb) = compute_post_state(prev_chstate, &fake_header, &body, params)?;
+
     let new_state_root = post_state.compute_state_root();
 
     let header = L2BlockHeader::new(slot, ts, prev_block_id, &body, new_state_root);
@@ -152,6 +163,7 @@ fn prepare_l1_segment(
     prev_chstate: &ChainState,
     l1_prov: &impl L1DataProvider,
     max_l1_entries: usize,
+    params: &RollupParams,
 ) -> Result<L1Segment, Error> {
     let unacc_blocks = local_l1_state.unacc_blocks_iter().collect::<Vec<_>>();
     trace!(unacc_blocks = %unacc_blocks.len(), "figuring out which blocks to include in L1 segment");
@@ -163,7 +175,8 @@ fn prepare_l1_segment(
         let mut payloads = Vec::new();
         for (h, _b) in unacc_blocks.iter().take(max_l1_entries) {
             let rec = load_header_record(*h, l1_prov)?;
-            payloads.push(L1HeaderPayload::new_bare(*h, rec));
+            let deposit_update_tx = deposit_update_txs_from_db(*h, l1_prov)?;
+            payloads.push(L1HeaderPayload::new_bare(*h, rec, deposit_update_tx));
         }
 
         debug!(n = %payloads.len(), "filling in empty queue with fresh L1 payloads");
@@ -181,6 +194,7 @@ fn prepare_l1_segment(
     // is almost the same thing, but might break in the case of a difficulty adjustment taking place
     // at a reorg exactly on the transition block
     trace!("computing pivot");
+
     let Some((pivot_h, _pivot_id)) = find_pivot_block_height(&unacc_blocks, &maturing_blocks)
     else {
         // Then we're really screwed.
@@ -201,7 +215,8 @@ fn prepare_l1_segment(
     let mut payloads = Vec::new();
     for (h, _b) in fresh_blocks {
         let rec = load_header_record(*h, l1_prov)?;
-        payloads.push(L1HeaderPayload::new_bare(*h, rec));
+        let deposit_update_tx = deposit_update_txs_from_db(*h, l1_prov)?;
+        payloads.push(L1HeaderPayload::new_bare(*h, rec, deposit_update_tx));
     }
 
     if !payloads.is_empty() {
@@ -217,6 +232,26 @@ fn load_header_record(h: u64, l1_prov: &impl L1DataProvider) -> Result<L1HeaderR
         .ok_or(Error::MissingL1BlockHeight(h))?;
     // TODO need to include tx root proof we can verify
     Ok(L1HeaderRecord::new(mf.header().to_vec(), mf.txs_root()))
+}
+
+fn deposit_update_txs_from_db(
+    h: u64,
+    l1_prov: &impl L1DataProvider,
+) -> Result<Vec<DepositUpdateTx>, Error> {
+    let relevant_tx_ref = l1_prov
+        .get_block_txs(h)?
+        .ok_or(Error::MissingL1BlockHeight(h))?;
+
+    let mut deposit_update_txs = Vec::new();
+    for tx_ref in relevant_tx_ref {
+        let tx = l1_prov.get_tx(tx_ref)?.ok_or(Error::MissingL1Tx)?;
+
+        if let Deposit(dep) = tx.protocol_operation() {
+            deposit_update_txs.push(DepositUpdateTx::new(tx, tx_ref.position()));
+        }
+    }
+
+    Ok(deposit_update_txs)
 }
 
 /// Takes two partially-overlapping lists of block indexes and IDs and returns a
@@ -288,18 +323,26 @@ fn find_pivot_block_height<'c>(
 }
 
 /// Prepares the execution segment for the block.
+#[allow(clippy::too_many_arguments)]
 fn prepare_exec_data<E: ExecEngineCtl>(
     slot: u64,
     timestamp: u64,
     prev_l2_blkid: L2BlockId,
     prev_global_sr: Buf32,
+    prev_chstate: &ChainState,
     safe_l1_block: Buf32,
     engine: &E,
+    params: &RollupParams,
 ) -> Result<(ExecSegment, L2BlockAccessory), Error> {
     trace!("preparing exec payload");
 
     // Start preparing the EL payload.
-    let payload_env = PayloadEnv::new(timestamp, prev_l2_blkid, safe_l1_block, Vec::new());
+
+    // construct el_ops by looking at chainstate
+    let pending_deposits = prev_chstate.exec_env_state().pending_deposits();
+    let el_ops = construct_ops_from_deposit_intents(pending_deposits, params.max_deposits_in_block);
+    let payload_env = PayloadEnv::new(timestamp, prev_l2_blkid, safe_l1_block, el_ops);
+
     let key = engine.prepare_payload(payload_env)?;
     trace!("submitted EL payload job, waiting for completion");
 
@@ -315,6 +358,7 @@ fn prepare_exec_data<E: ExecEngineCtl>(
 
     // Reassemble it into an exec update.
     let exec_update = payload_data.exec_update().clone();
+    let applied_ops = payload_data.ops();
     let exec_seg = ExecSegment::new(exec_update);
 
     // And the accessory.

@@ -11,7 +11,6 @@ alpen-express-state = { workspace = true }
 alpen-express-status = { workspace = true }
 express-storage = { workspace = true }
 express-tasks = { workspace = true }
-strata-tx-parser = { workspace = true }
 
 anyhow = { workspace = true }
 async-trait = { workspace = true }
@@ -26,6 +25,7 @@ reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
+strata-tx-parser = { workspace = true }
 thiserror = { workspace = true }
 threadpool = { workspace = true }
 tokio = { workspace = true }
@@ -38,3 +38,6 @@ alpen-test-utils = { workspace = true }
 arbitrary = { workspace = true }
 bitcoind = { workspace = true }
 mockall = { workspace = true }
+
+[features]
+test_utils = []

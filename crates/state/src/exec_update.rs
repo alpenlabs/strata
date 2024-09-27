@@ -5,7 +5,11 @@ use alpen_express_primitives::{buf::Buf32, evm_exec::create_evm_extra_payload};
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use crate::{bridge_ops, da_blob};
+use crate::{
+    bridge_ops::{self, DepositIntent},
+    da_blob,
+    prelude::StateQueue,
+};
 
 /// Full update payload containing inputs and outputs to an EE state update.
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
@@ -49,6 +53,9 @@ pub struct UpdateInput {
     /// Buffer of any other payload data.  This is used with the other fields
     /// here to construct the full EVM header payload.
     extra_payload: Vec<u8>,
+
+    /// last applied Deposit Ops index
+    applied_ops: Vec<Op>,
 }
 
 impl<'a> Arbitrary<'a> for UpdateInput {
@@ -56,20 +63,28 @@ impl<'a> Arbitrary<'a> for UpdateInput {
         let update_idx = u64::arbitrary(u)?;
         let entries_root = Buf32::arbitrary(u)?;
         let block_hash = Buf32::arbitrary(u)?;
+        let applied_ops = Vec::arbitrary(u)?;
         let extra_payload = create_evm_extra_payload(block_hash);
 
         Ok(Self {
             update_idx,
             entries_root,
+            applied_ops,
             extra_payload,
         })
     }
 }
 
 impl UpdateInput {
-    pub fn new(update_idx: u64, entries_root: Buf32, extra_payload: Vec<u8>) -> Self {
+    pub fn new(
+        update_idx: u64,
+        applied_ops: Vec<Op>,
+        entries_root: Buf32,
+        extra_payload: Vec<u8>,
+    ) -> Self {
         Self {
             update_idx,
+            applied_ops,
             entries_root,
             extra_payload,
         }
@@ -81,6 +96,10 @@ impl UpdateInput {
 
     pub fn entries_root(&self) -> &Buf32 {
         &self.entries_root
+    }
+
+    pub fn applied_ops(&self) -> &[Op] {
+        &self.applied_ops
     }
 
     pub fn extra_payload(&self) -> &[u8] {
@@ -129,6 +148,72 @@ impl UpdateOutput {
 
     pub fn da_blobs(&self) -> &[da_blob::BlobSpec] {
         &self.da_blobs
+    }
+}
+
+/// Operation the CL pushes into the EL to perform as part of the block it's
+/// producing.
+
+#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize)]
+pub enum Op {
+    /// Deposit some amount.
+    Deposit(ELDepositData),
+}
+
+pub fn construct_ops_from_deposit_intents(
+    pending_deposits: &StateQueue<DepositIntent>,
+    max_deposits_in_block: u8,
+) -> Vec<Op> {
+    let mut pending_deposits = pending_deposits.clone();
+    let mut el_ops = Vec::new();
+    while let Some(idx) = pending_deposits.front_idx() {
+        //  first 16 withdrawals (full or partial) into the withdrawal queue.
+        if el_ops.len() == max_deposits_in_block as usize {
+            break;
+        }
+        let pending_deposit = pending_deposits.pop_front().unwrap();
+
+        el_ops.push(Op::Deposit(ELDepositData::new(
+            idx,
+            pending_deposit.amt(),
+            pending_deposit.dest_ident().to_vec(),
+        )));
+    }
+    el_ops
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize)]
+pub struct ELDepositData {
+    /// base index of applied deposit intent.
+    intent_idx: u64,
+
+    /// Amount in L1 native asset.  For Bitcoin this is sats.
+    amt: u64,
+
+    /// Dest addr encoded in a portable format, assumed to be valid but must be
+    /// checked by EL before committing to building block.
+    dest_addr: Vec<u8>,
+}
+
+impl ELDepositData {
+    pub fn new(intent_idx: u64, amt: u64, dest_addr: Vec<u8>) -> Self {
+        Self {
+            intent_idx,
+            amt,
+            dest_addr,
+        }
+    }
+
+    pub fn amt(&self) -> u64 {
+        self.amt
+    }
+
+    pub fn dest_addr(&self) -> &[u8] {
+        &self.dest_addr
+    }
+
+    pub fn intent_idx(&self) -> u64 {
+        self.intent_idx
     }
 }
 

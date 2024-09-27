@@ -1,6 +1,7 @@
 use std::convert::Infallible;
 
 use express_reth_primitives::WithdrawalIntent;
+use reth::rpc::compat::engine::payload::block_to_payload_v2;
 use reth_chainspec::ChainSpec;
 use reth_node_api::{
     payload::{EngineApiMessageVersion, EngineObjectValidationError},
@@ -13,10 +14,10 @@ use reth_primitives::{
 };
 use reth_rpc_types::{
     engine::{
-        ExecutionPayloadEnvelopeV2, ExecutionPayloadEnvelopeV3, ExecutionPayloadEnvelopeV4,
+        ExecutionPayloadEnvelopeV3, ExecutionPayloadEnvelopeV4,
         PayloadAttributes as EthPayloadAttributes, PayloadId,
     },
-    ExecutionPayloadV1, Withdrawal,
+    ExecutionPayloadV1, ExecutionPayloadV2, Withdrawal,
 };
 use serde::{Deserialize, Serialize};
 
@@ -141,6 +142,54 @@ impl BuiltPayload for ExpressBuiltPayload {
 impl From<ExpressBuiltPayload> for ExecutionPayloadV1 {
     fn from(value: ExpressBuiltPayload) -> Self {
         value.inner.into()
+    }
+}
+
+/// Custom Execution payload v2
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExecutionPayloadEnvelopeV2 {
+    /// Execution payload, which could be either V1 or V2
+    ///
+    /// V1 (_NO_ withdrawals) MUST be returned if the payload timestamp is lower than the Shanghai
+    /// timestamp
+    ///
+    /// V2 (_WITH_ withdrawals) MUST be returned if the payload timestamp is greater or equal to
+    /// the Shanghai timestamp
+    pub execution_payload: ExecutionPayloadFieldV2,
+    /// The expected value to be received by the feeRecipient in wei
+    pub block_value: U256,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ExecutionPayloadFieldV2 {
+    /// V2 payload
+    V2(ExecutionPayloadV2),
+    /// V1 payload
+    V1(ExecutionPayloadV1),
+}
+
+impl ExecutionPayloadFieldV2 {
+    /// Returns the inner [ExecutionPayloadV1]
+    pub fn into_v1_payload(self) -> ExecutionPayloadV1 {
+        match self {
+            Self::V2(payload) => payload.payload_inner,
+            Self::V1(payload) => payload,
+        }
+    }
+}
+
+impl From<EthBuiltPayload> for ExecutionPayloadEnvelopeV2 {
+    fn from(value: EthBuiltPayload) -> Self {
+        let block = value.block().clone();
+        let fees = value.fees();
+
+        Self {
+            block_value: fees,
+            execution_payload: ExecutionPayloadFieldV2::V2(block_to_payload_v2(block)),
+        }
     }
 }
 

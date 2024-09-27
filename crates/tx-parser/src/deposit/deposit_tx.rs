@@ -1,5 +1,6 @@
 //! parser types for Deposit Tx, and later deposit Request Tx
 
+use alpen_express_primitives::l1::OutputRef;
 use alpen_express_state::tx::DepositInfo;
 use bitcoin::{opcodes::all::OP_RETURN, ScriptBuf, Transaction};
 
@@ -8,19 +9,27 @@ use crate::utils::{next_bytes, next_op};
 
 /// Extracts the DepositInfo from the Deposit Transaction
 pub fn extract_deposit_info(tx: &Transaction, config: &DepositTxConfig) -> Option<DepositInfo> {
-    if tx.output.len() > 1 {
-        if let Ok(ee_address) = parse_deposit_script(&tx.output[1].script_pubkey, config) {
-            // find the outpoint with taproot address, so that we can extract sent amount from that
-            if check_bridge_offer_output(tx, config).is_ok() {
-                return Some(DepositInfo {
-                    amt: tx.output[0].value.to_sat(),
-                    deposit_outpoint: 0,
-                    address: ee_address.to_vec(),
-                });
-            }
-        }
-    }
-    None
+    // Get the first output (index 0)
+    let output_0 = tx.output.first()?;
+
+    // Get the second output (index 1)
+    let output_1 = tx.output.get(1)?;
+
+    // Parse the deposit script from the second output's script_pubkey
+    let ee_address = parse_deposit_script(&output_1.script_pubkey, config).ok()?;
+
+    // Check if this is a valid bridge offer output
+    check_bridge_offer_output(tx, config).ok()?;
+
+    // Get the first input of the transaction
+    let prev_out = tx.input.first()?;
+
+    // Construct and return the DepositInfo
+    Some(DepositInfo {
+        amt: output_0.value.to_sat(),
+        address: ee_address.to_vec(),
+        outpoint: OutputRef::from(prev_out.previous_output),
+    })
 }
 
 /// extracts the EE address given that the script is OP_RETURN type and contains the Magic Bytes
@@ -44,6 +53,7 @@ fn parse_deposit_script<'a>(
     // data has expected magic bytes
     let magic_bytes = &config.magic_bytes;
     let magic_len = magic_bytes.len();
+
     if data.len() < magic_len || &data[..magic_len] != magic_bytes {
         return Err(DepositParseError::MagicBytesMismatch);
     }

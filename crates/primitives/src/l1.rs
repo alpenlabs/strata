@@ -41,6 +41,15 @@ use crate::{buf::Buf32, constants::HASH_SIZE, errors::ParseError};
 )]
 pub struct L1TxRef(u64, u32);
 
+impl L1TxRef {
+    pub fn blk_idx(&self) -> u64 {
+        self.0
+    }
+    pub fn position(&self) -> u32 {
+        self.1
+    }
+}
+
 impl From<L1TxRef> for (u64, u32) {
     fn from(val: L1TxRef) -> Self {
         (val.0, val.1)
@@ -143,6 +152,10 @@ impl From<OutPoint> for OutputRef {
 }
 
 impl OutputRef {
+    pub fn new(txid: Txid, vout: u32) -> Self {
+        Self(OutPoint::new(txid, vout))
+    }
+
     pub fn outpoint(&self) -> &OutPoint {
         &self.0
     }
@@ -340,16 +353,17 @@ impl BorshDeserialize for BitcoinAddress {
 ///
 /// NOTE: This wrapper has been created so that we can implement `Borsh*` traits on it.
 #[derive(
-    Debug,
-    Clone,
-    Copy,
-    Serialize,
-    Deserialize,
-    Eq,
-    PartialEq,
+    Arbitrary,
     BorshSerialize,
     BorshDeserialize,
-    Arbitrary,
+    Clone,
+    Copy,
+    Debug,
+    Deserialize,
+    Eq,
+    Hash,
+    PartialEq,
+    Serialize,
 )]
 pub struct BitcoinAmount(u64);
 

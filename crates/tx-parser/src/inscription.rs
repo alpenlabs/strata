@@ -147,44 +147,16 @@ fn extract_n_bytes(
 #[cfg(test)]
 mod tests {
 
-    use bitcoin::{
-        opcodes::{all::OP_ENDIF, OP_FALSE},
-        script::{self, PushBytesBuf},
-    };
+    use alpen_express_btcio::test_utils::generate_inscription_script_test;
 
     use super::*;
-
-    pub fn generate_inscription_script(
-        inscription_data: InscriptionData,
-        rollup_name: &str,
-        version: u8,
-    ) -> anyhow::Result<ScriptBuf> {
-        let mut builder = script::Builder::new()
-            .push_opcode(OP_FALSE)
-            .push_opcode(OP_IF)
-            .push_slice(PushBytesBuf::try_from(ROLLUP_NAME_TAG.to_vec())?)
-            .push_slice(PushBytesBuf::try_from(rollup_name.as_bytes().to_vec())?)
-            .push_slice(PushBytesBuf::try_from(VERSION_TAG.to_vec())?)
-            .push_slice(PushBytesBuf::from([version]))
-            .push_slice(PushBytesBuf::try_from(BATCH_DATA_TAG.to_vec())?)
-            .push_int(inscription_data.batch_data().len() as i64);
-
-        debug!(batchdata_size = %inscription_data.batch_data().len(), "Inserting batch data");
-        for chunk in inscription_data.batch_data().chunks(520) {
-            debug!(size=%chunk.len(), "inserting chunk");
-            builder = builder.push_slice(PushBytesBuf::try_from(chunk.to_vec())?);
-        }
-        builder = builder.push_opcode(OP_ENDIF);
-
-        Ok(builder.into_script())
-    }
 
     #[test]
     fn test_parse_inscription_data() {
         let bytes = vec![0, 1, 2, 3];
         let inscription_data = InscriptionData::new(bytes.clone());
         let script =
-            generate_inscription_script(inscription_data.clone(), "TestRollup", 1).unwrap();
+            generate_inscription_script_test(inscription_data.clone(), "TestRollup", 1).unwrap();
 
         // Parse the rollup name
         let result = parse_inscription_data(&script, "TestRollup").unwrap();
@@ -196,7 +168,7 @@ mod tests {
         let bytes = vec![1; 2000];
         let inscription_data = InscriptionData::new(bytes.clone());
         let script =
-            generate_inscription_script(inscription_data.clone(), "TestRollup", 1).unwrap();
+            generate_inscription_script_test(inscription_data.clone(), "TestRollup", 1).unwrap();
 
         // Parse the rollup name
         let result = parse_inscription_data(&script, "TestRollup").unwrap();

@@ -2,19 +2,25 @@
 //! we'll replace components with real implementations as we go along.
 #![allow(unused)]
 
-use std::cmp::max;
+use std::{cmp::max, collections::HashMap};
 
-use alpen_express_primitives::{bridge::OperatorIdx, params::RollupParams};
+use alpen_express_primitives::{
+    l1::{BitcoinAmount, L1TxRef, OutputRef},
+    params::RollupParams,
+};
 use alpen_express_state::{
     block::L1Segment,
-    bridge_ops::{WithdrawalBatch, WithdrawalIntent},
+    bridge_ops::{DepositIntent, WithdrawalIntent},
     bridge_state::{DepositState, DispatchCommand, WithdrawOutput},
-    exec_update,
-    l1::{self, DepositUpdateTx, L1MaturationEntry},
+    exec_env::ExecEnvState,
+    exec_update::{self, construct_ops_from_deposit_intents, ELDepositData, Op},
+    l1::{self, L1MaturationEntry},
     prelude::*,
     state_op::StateCache,
     state_queue,
 };
+use bitcoin::{OutPoint, Transaction};
+use borsh::BorshDeserialize;
 
 use crate::{
     errors::TsnError,
@@ -77,7 +83,7 @@ fn process_l1_view_update(
     // we need to do a reorg.
     // FIXME this should actually check PoW, it just does it based on block heights
     if !l1seg.new_payloads().is_empty() {
-        trace!("new payloads {:?}", l1seg.new_payloads());
+        let l1v = state.state().l1_view();
 
         // Validate the new blocks actually extend the tip.  This is what we have to tweak to make
         // more complicated to check the PoW.
@@ -108,9 +114,11 @@ fn process_l1_view_update(
             state.revert_l1_view_to(pivot_idx);
         }
 
+        let maturation_threshold = params.l1_reorg_safe_depth as u64;
+
         for e in l1seg.new_payloads() {
             let ment = L1MaturationEntry::from(e.clone());
-            state.apply_l1_block_entry(ment);
+            state.apply_l1_block_entry(ment.clone());
         }
 
         let new_matured_l1_height = max(
@@ -125,6 +133,8 @@ fn process_l1_view_update(
 
     Ok(())
 }
+
+// Returns Some(DepositIntent)  if Tx can be parsed
 
 /// Checks the attested block IDs and parent blkid connections in new blocks.
 // TODO unit tests
@@ -182,7 +192,24 @@ fn process_execution_update<'u>(
     state: &mut StateCache,
     update: &'u exec_update::ExecUpdate,
 ) -> Result<&'u [WithdrawalIntent], TsnError> {
-    // TODO release anything that we need to
+    // for all the ops, corresponding to DepositIntent , remove those DepositIntent the ExecEnvState
+    let deposits = state.state().exec_env_state().pending_deposits();
+
+    let applied_ops = update.input().applied_ops();
+
+    let applied_deposit_intent_idx = applied_ops
+        .iter()
+        .filter_map(|op| match op {
+            Op::Deposit(deposit) => Some(deposit.intent_idx()),
+            _ => None,
+        })
+        .max()
+        .unwrap_or(0);
+
+    if applied_deposit_intent_idx > 0 {
+        state.consume_deposit_intent(applied_deposit_intent_idx);
+    }
+
     Ok(update.output().withdrawals())
 }
 
@@ -320,4 +347,128 @@ fn next_rand_op_pos(rng: &mut SlotRng, num: u32) -> u32 {
 
     let r = rng.next_u32();
     (r & MASK) % num
+}
+
+#[cfg(test)]
+mod tests {
+    use alpen_express_primitives::{buf::Buf32, params::OperatorConfig};
+    use alpen_express_state::{
+        block::{ExecSegment, L1Segment, L2BlockBody},
+        bridge_state::OperatorTable,
+        chain_state::ChainState,
+        exec_env::ExecEnvState,
+        exec_update::{ExecUpdate, UpdateInput, UpdateOutput},
+        genesis::GenesisStateData,
+        header::{L2BlockHeader, L2Header},
+        id::L2BlockId,
+        l1::{DepositUpdateTx, L1HeaderPayload, L1HeaderRecord, L1Tx, L1ViewState},
+        state_op::StateCache,
+        tx::{DepositInfo, ProtocolOperation},
+    };
+    use alpen_test_utils::{l2::gen_params, ArbitraryGenerator};
+
+    use super::process_block;
+    use crate::transition::process_l1_view_update;
+
+    #[test]
+    fn test_process_l1_view_update_with_deposit_update_tx() {
+        let mut chs: ChainState = ArbitraryGenerator::new().generate();
+        // get the l1 view state of the chain state
+        let params = gen_params();
+        let header_record = chs.l1_view();
+
+        let tip_height = header_record.tip_height();
+        let maturation_queue = header_record.maturation_queue();
+
+        let mut state_cache = StateCache::new(chs);
+        let amt = 100_000_000_000;
+
+        let new_payloads_with_deposit_update_tx: Vec<L1HeaderPayload> = (1..=params
+            .rollup()
+            .l1_reorg_safe_depth
+            + 1)
+            .map(|idx| {
+                let record = ArbitraryGenerator::new_with_size(1 << 15).generate();
+                let proof = ArbitraryGenerator::new_with_size(1 << 12).generate();
+                let tx = ArbitraryGenerator::new_with_size(1 << 8).generate();
+
+                let l1tx = if idx == 1 {
+                    let protocol_op = ProtocolOperation::Deposit(DepositInfo {
+                        amt,
+                        outpoint: ArbitraryGenerator::new().generate(),
+                        address: [0; 20].to_vec(),
+                    });
+                    L1Tx::new(proof, tx, protocol_op)
+                } else {
+                    ArbitraryGenerator::new_with_size(1 << 15).generate()
+                };
+
+                let deposit_update_tx = DepositUpdateTx::new(l1tx, idx);
+                L1HeaderPayload::new_bare(tip_height + idx as u64, record, vec![deposit_update_tx])
+            })
+            .collect();
+
+        let mut l1_segment = L1Segment::new(new_payloads_with_deposit_update_tx);
+
+        let view_update = process_l1_view_update(&mut state_cache, &l1_segment, params.rollup());
+        assert_eq!(
+            state_cache
+                .state()
+                .deposits_table()
+                .get_deposit(0)
+                .unwrap()
+                .amt(),
+            amt
+        );
+    }
+
+    #[test]
+    fn test_process_l1_view_update_with_empty_payload() {
+        let chs: ChainState = ArbitraryGenerator::new().generate();
+        let params = gen_params();
+
+        let mut state_cache = StateCache::new(chs.clone());
+
+        // Empty L1Segment payloads
+        let l1_segment = L1Segment::new(vec![]);
+
+        // let previous_maturation_queue =
+        // Process the empty payload
+        let result = process_l1_view_update(&mut state_cache, &l1_segment, params.rollup());
+        assert_eq!(state_cache.state(), &chs);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_process_l1_view_update_maturation_check() {
+        let mut chs: ChainState = ArbitraryGenerator::new().generate();
+        let params = gen_params();
+        let header_record = chs.l1_view();
+        let old_safe_height = header_record.safe_height();
+        let to_mature_blk_num = 10;
+
+        let mut state_cache = StateCache::new(chs);
+        let maturation_queue_len = state_cache.state().l1_view().maturation_queue().len() as u64;
+
+        // Simulate L1 payloads that have matured
+        let new_payloads_matured: Vec<L1HeaderPayload> = (1..params.rollup().l1_reorg_safe_depth
+            + to_mature_blk_num)
+            .map(|idx| {
+                let record = ArbitraryGenerator::new_with_size(1 << 15).generate();
+                L1HeaderPayload::new_bare(old_safe_height + idx as u64, record, vec![])
+            })
+            .collect();
+
+        let mut l1_segment = L1Segment::new(new_payloads_matured.clone());
+
+        // Process the L1 view update for matured blocks
+        let result = process_l1_view_update(&mut state_cache, &l1_segment, params.rollup());
+        assert!(result.is_ok());
+
+        // Check that blocks were matured
+        assert_eq!(
+            state_cache.state().l1_view().safe_height(),
+            old_safe_height + to_mature_blk_num as u64 + maturation_queue_len
+        );
+    }
 }

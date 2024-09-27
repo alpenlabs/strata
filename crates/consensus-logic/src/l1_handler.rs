@@ -205,9 +205,10 @@ fn generate_block_manifest(block: &Block) -> L1BlockManifest {
 /// Generates an L1 transaction with proof for a given transaction index in a block.
 ///
 /// # Parameters
-/// - `idx`: The index of the transaction within the block's transaction data.
-/// - `proto_op`: Protocol operation data after parsing and gathering relevant tx
 /// - `block`: The block containing the transactions.
+/// - `idx`: The index of the transaction within the block's transaction data.
+/// - `txid_bytes`: computed txid of the Tx in [u8;32] form
+/// - `proto_op`: Protocol operation data after parsing and gathering relevant tx
 ///
 /// # Returns
 /// - An `L1Tx` struct containing the proof and the serialized transaction.

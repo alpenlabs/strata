@@ -8,6 +8,7 @@ alpen-express-primitives = { workspace = true }
 alpen-express-state = { workspace = true }
 
 anyhow = { workspace = true }
+arbitrary = { workspace = true }
 bitcoin = { workspace = true }
 borsh = { workspace = true }
 hex = { workspace = true }
@@ -15,5 +16,6 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
+alpen-express-btcio = { workspace = true, features = ["test_utils"] }
 alpen-test-utils = { workspace = true }
 rand = { workspace = true }

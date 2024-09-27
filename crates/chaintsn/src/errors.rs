@@ -24,4 +24,7 @@ pub enum TsnError {
 
     #[error("there are no operators in the chainstate")]
     NoOperators,
+
+    #[error("applied el ops and el ops from chain state doesn't match")]
+    ElOpsMismatch,
 }

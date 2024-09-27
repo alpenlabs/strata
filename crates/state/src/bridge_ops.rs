@@ -68,7 +68,24 @@ pub struct DepositIntent {
     /// Quantity in the L1 asset, for Bitcoin this is sats.
     amt: BitcoinAmount,
 
-    /// Description of the encoded address. For Ethereum this is the 20-byte
+    /// Description of the encoded address. For EVM this is the 20-byte
     /// address.
     dest_ident: Vec<u8>,
+}
+
+impl DepositIntent {
+    pub fn new(amt: u64, dest_ident: &[u8]) -> Self {
+        Self {
+            amt: BitcoinAmount::from_sat(amt),
+            dest_ident: dest_ident.to_vec(),
+        }
+    }
+
+    pub fn amt(&self) -> u64 {
+        self.amt.to_sat()
+    }
+
+    pub fn dest_ident(&self) -> &[u8] {
+        &self.dest_ident
+    }
 }

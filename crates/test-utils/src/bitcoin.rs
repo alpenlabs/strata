@@ -1,7 +1,4 @@
-use alpen_express_primitives::{
-    buf::Buf32,
-    l1::{L1BlockManifest, XOnlyPk},
-};
+use alpen_express_primitives::{buf::Buf32, l1::L1BlockManifest};
 use bitcoin::{
     block::Header, consensus::deserialize, hashes::Hash, params::Params, Block, Transaction,
 };
@@ -142,9 +139,8 @@ pub fn get_btc_chain(params: Params) -> BtcChainSegment {
 }
 
 pub fn get_tx_filters() -> Vec<TxFilterRule> {
-    let agg_addr = XOnlyPk::new(Buf32::zero());
     let config = gen_params();
-    let deposit_tx_config = DepositTxConfig::from_params_with_agg_addr(config.rollup(), agg_addr);
+    let deposit_tx_config = DepositTxConfig::from_rollup_params(config.rollup());
 
     vec![
         TxFilterRule::Deposit(deposit_tx_config),

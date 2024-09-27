@@ -55,8 +55,12 @@ pub struct RollupParams {
 
     /// Number of Bitcoin blocks a withdrawal dispatch assignment is valid for.
     pub dispatch_assignment_dur: u32,
+
     /// Describes how is proof published
     pub proof_publish_mode: ProofPublishMode,
+
+    /// max number of deposits in a block
+    pub max_deposits_in_block: u8,
 }
 
 /// Describes the proof is generated.
