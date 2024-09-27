@@ -9,7 +9,7 @@ use crate::{
 
 /// Consensus parameters that don't change for the lifetime of the network
 /// (unless there's some weird hard fork).
-#[derive(Clone, Debug, PartialEq, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct RollupParams {
     /// Rollup name
     pub rollup_name: String,
@@ -65,13 +65,16 @@ pub struct RollupParams {
 }
 
 /// Configuration common among deposit and deposit request transaction
-#[derive(Clone, Debug, PartialEq, Deserialize, BorshSerialize, BorshDeserialize)]
+#[derive(Clone, Debug, PartialEq, BorshSerialize, BorshDeserialize, Deserialize, Serialize)]
 pub struct DepositTxParams {
-    /// magic bytes, usually a rollup name
+    /// Magic bytes we use to regonize a deposit with.
     pub magic_bytes: Vec<u8>,
-    /// EE Address length
+
+    /// Maximum EE address length.
+    // TODO rename to be `max_addr_len`
     pub address_length: u8,
-    /// deposit amount
+
+    /// Exact bitcoin amount in the at-rest deposit.
     pub deposit_amount: u64,
 }
 
@@ -85,8 +88,8 @@ impl RollupParams {
     }
 }
 
-/// Describes how proofs are generated.
-#[derive(Clone, Debug, PartialEq, Deserialize)]
+/// Describes how we decide to wait for proofs for checkpoints to generate.
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ProofPublishMode {
     /// Timeout in secs after which a blank proof is generated.
@@ -99,7 +102,7 @@ pub enum ProofPublishMode {
 /// Client sync parameters that are used to make the network work but don't
 /// strictly have to be pre-agreed.  These have to do with grace periods in
 /// message delivery and whatnot.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SyncParams {
     /// Number of blocks that we follow the L1 from.
     pub l1_follow_distance: u64,
@@ -112,7 +115,7 @@ pub struct SyncParams {
 }
 
 /// Combined set of parameters across all the consensus logic.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Params {
     pub rollup: RollupParams,
     pub run: SyncParams,
