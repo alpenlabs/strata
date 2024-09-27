@@ -53,6 +53,48 @@ def generate_n_blocks(bitcoin_rpc: BitcoindClient, n: int):
         return
 
 
+def generate_jwt_secret() -> str:
+    return os.urandom(32).hex()
+
+
+def generate_blocks(
+    bitcoin_rpc: BitcoindClient,
+    wait_dur,
+    addr: str,
+) -> Thread:
+    thr = Thread(
+        target=generate_task,
+        args=(
+            bitcoin_rpc,
+            wait_dur,
+            addr,
+        ),
+    )
+    thr.start()
+    return thr
+
+
+def generate_task(rpc: BitcoindClient, wait_dur, addr):
+    while True:
+        time.sleep(wait_dur)
+        try:
+            rpc.proxy.generatetoaddress(1, addr)
+        except Exception as ex:
+            log.warning(f"{ex} while generating to address {addr}")
+            return
+
+
+def generate_n_blocks(bitcoin_rpc: BitcoindClient, n: int):
+    addr = bitcoin_rpc.proxy.getnewaddress()
+    print(f"generating {n} blocks to address", addr)
+    try:
+        blk = bitcoin_rpc.proxy.generatetoaddress(n, addr)
+        print("made blocks", blk)
+    except Exception as ex:
+        log.warning(f"{ex} while generating address")
+        return
+
+
 def wait_until(
     fn: Callable[[], Any], error_with: str = "Timed out", timeout: int = 5, step: float = 0.5
 ):
