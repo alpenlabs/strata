@@ -227,7 +227,7 @@ where
     fn save_proof_to_db(&self, task_id: Uuid, proof: &Proof) -> Result<(), anyhow::Error> {
         self.db
             .prover_store()
-            .insert_new_task_entry(*task_id.as_bytes(), proof.as_bytes().to_vec())?;
+            .insert_new_task_entry(*task_id.as_bytes(), proof.into())?;
         Ok(())
     }
 }

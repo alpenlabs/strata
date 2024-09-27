@@ -1,11 +1,13 @@
+use std::io::{Cursor, Write};
+
 use alpen_express_primitives::buf::Buf32;
-use bitcoin::{block::Header, hashes::Hash, BlockHash, CompactTarget, Target};
+use bitcoin::{block::Header, hashes::Hash, params::Params, BlockHash, CompactTarget, Target};
 use borsh::{BorshDeserialize, BorshSerialize};
 use ethnum::U256;
 use express_proofimpl_btc_blockspace::block::compute_block_hash;
 use serde::{Deserialize, Serialize};
 
-use crate::{pow_params::PowParams, timestamp_store::TimestampStore};
+use crate::timestamp_store::TimestampStore;
 
 #[derive(Debug, Clone, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
 pub struct HeaderVerificationState {
@@ -29,14 +31,29 @@ pub struct HeaderVerificationState {
     /// (e.g., block 0, 2016, 4032, etc.).
     pub interval_start_timestamp: u32,
 
-    /// Total accumulated [difficulty](bitcoin::pow::Target::difficulty_float)
-    /// TODO: check if using [this](bitcoin::pow::Target::difficulty) makes more sense
-    pub total_accumulated_pow: f64,
+    /// Total accumulated [difficulty](bitcoin::pow::Target::difficulty)
+    pub total_accumulated_pow: u128,
 
     /// Timestamps of the last 11 blocks in descending order.
     /// The timestamp of the most recent block is at index 0, while the timestamp of the oldest
     /// block is at index 10.
     pub last_11_blocks_timestamps: TimestampStore,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
+/// Summary of the HeaderVerificationState that is propagated to the CheckpointProof as public
+/// output
+pub struct HeaderVerificationStateSnapshot {
+    /// Hash of the [`HeaderVerificationState`]
+    pub hash: Buf32,
+
+    /// [HeaderVerificationState::last_verified_block_num]
+    ///
+    /// Note: This field and struct is here only since `CheckpointInfo` requires that
+    pub block_num: u64,
+
+    /// Total accumulated [difficulty](bitcoin::pow::Target::difficulty)
+    pub acc_pow: u128,
 }
 
 impl HeaderVerificationState {
@@ -67,13 +84,14 @@ impl HeaderVerificationState {
     /// # Note
     /// The comments above and the implementation is based on [rust-bitcoin](https://github.com/rust-bitcoin/rust-bitcoin/blob/0d9e8f8c992223869a57162c4afe5a6112d08049/bitcoin/src/pow.rs#L352-L398).
     /// This has not been directly used since it is not available on the current release
-    fn next_target(&mut self, timestamp: u32, params: &PowParams) -> u32 {
-        if (self.last_verified_block_num + 1) % params.difficulty_adjustment_interval() != 0 {
+    fn next_target(&mut self, timestamp: u32, params: &Params) -> u32 {
+        if (self.last_verified_block_num + 1) % params.difficulty_adjustment_interval() as u32 != 0
+        {
             return self.next_block_target;
         }
 
-        let min_timespan: u32 = params.pow_target_timespan >> 2;
-        let max_timespan: u32 = params.pow_target_timespan << 2;
+        let min_timespan: u32 = (params.pow_target_timespan as u32) >> 2;
+        let max_timespan: u32 = (params.pow_target_timespan as u32) << 2;
 
         let timespan = timestamp - self.interval_start_timestamp;
         let actual_timespan = timespan.clamp(min_timespan, max_timespan);
@@ -96,16 +114,16 @@ impl HeaderVerificationState {
         retarget.to_compact_lossy().to_consensus()
     }
 
-    fn update_timestamps(&mut self, timestamp: u32, params: &PowParams) {
+    fn update_timestamps(&mut self, timestamp: u32, params: &Params) {
         self.last_11_blocks_timestamps.insert(timestamp);
 
         let new_block_num = self.last_verified_block_num;
-        if new_block_num % params.difficulty_adjustment_interval() == 0 {
+        if new_block_num % params.difficulty_adjustment_interval() as u32 == 0 {
             self.interval_start_timestamp = timestamp;
         }
     }
 
-    pub fn check_and_update(&mut self, header: &Header, params: &PowParams) {
+    pub fn check_and_update(&mut self, header: &Header, params: &Params) {
         // Check continuity
         assert_eq!(
             Buf32::from(header.prev_blockhash.as_raw_hash().to_byte_array()),
@@ -132,10 +150,38 @@ impl HeaderVerificationState {
         self.update_timestamps(header.time, params);
 
         // Update the total accumulated PoW
-        self.total_accumulated_pow += header.difficulty_float();
+        self.total_accumulated_pow += header.difficulty(params);
 
         // Set the target for the next block
         self.next_block_target = self.next_target(header.time, params);
+    }
+
+    pub fn compute_snapshot(&self) -> HeaderVerificationStateSnapshot {
+        HeaderVerificationStateSnapshot {
+            hash: self.compute_hash().unwrap(),
+            block_num: self.last_verified_block_num as u64,
+            acc_pow: self.total_accumulated_pow,
+        }
+    }
+
+    /// Calculate the hash of the verification state
+    pub fn compute_hash(&self) -> Result<Buf32, std::io::Error> {
+        // 4 + 32 + 4 + 4 + 16 + 11*4 = 104
+        let mut buf = [0u8; 104];
+        let mut cur = Cursor::new(&mut buf[..]);
+        cur.write_all(&self.last_verified_block_num.to_be_bytes())?;
+        cur.write_all(self.last_verified_block_hash.as_ref())?;
+        cur.write_all(&self.next_block_target.to_be_bytes())?;
+        cur.write_all(&self.interval_start_timestamp.to_be_bytes())?;
+        cur.write_all(&self.total_accumulated_pow.to_be_bytes())?;
+
+        let mut serialized_timestamps = [0u8; 11 * 4];
+        for (i, &timestamp) in self.last_11_blocks_timestamps.timestamps.iter().enumerate() {
+            serialized_timestamps[i * 4..(i + 1) * 4].copy_from_slice(&timestamp.to_be_bytes());
+        }
+
+        cur.write_all(&serialized_timestamps)?;
+        Ok(alpen_express_primitives::hash::raw(&buf))
     }
 }
 
@@ -147,71 +193,39 @@ impl HeaderVerificationState {
 /// * `idx` - The index of the difficulty adjustment (1-based). 1 for the first adjustment, 2 for
 ///   the second, and so on.
 /// * `start` - The starting height from which to calculate.
-/// * `params` - [`PowParams`] of the network
-pub fn get_difficulty_adjustment_height(idx: u32, start: u32, params: &PowParams) -> u32 {
-    let difficulty_adjustment_interval = params.difficulty_adjustment_interval();
+/// * `params` - [`Params`] of the network
+pub fn get_difficulty_adjustment_height(idx: u32, start: u32, params: &Params) -> u32 {
+    let difficulty_adjustment_interval = params.difficulty_adjustment_interval() as u32;
     ((start / difficulty_adjustment_interval) + idx) * difficulty_adjustment_interval
 }
 
 #[cfg(test)]
 mod tests {
-    use alpen_test_utils::bitcoin::{get_btc_chain, BtcChainSegment};
-    use bitcoin::params::Params;
+    use alpen_test_utils::bitcoin::get_btc_chain;
     use rand::Rng;
 
     use super::*;
-
-    fn for_block(block_height: u32, chain: &BtcChainSegment) -> HeaderVerificationState {
-        let params = PowParams::from(&Params::MAINNET);
-
-        // Get the first difficulty adjustment block after `chain.start`
-        let h1 = get_difficulty_adjustment_height(1, chain.start, &params);
-        assert!(
-            block_height > h1 && block_height < chain.end,
-            "not enough info in the chain"
-        );
-
-        // Get the difficulty adjustment block just before `block_height`
-        let h1 = get_difficulty_adjustment_height(0, block_height, &params);
-
-        // Consider the block before `block_height` to be the last verified block
-        let vh = block_height - 1; // verified_height
-
-        // Fetch the previous timestamps of block from `vh`
-        // This fetches timestamps of `vh`, `vh-1`, `vh-2`, ...
-        let initial_timestamps: [u32; 11] = chain.get_last_timestamps(vh, 11).try_into().unwrap();
-        let last_11_blocks_timestamps = TimestampStore::new(initial_timestamps);
-
-        HeaderVerificationState {
-            last_verified_block_num: vh,
-            last_verified_block_hash: Buf32::from(
-                chain
-                    .get_header(vh)
-                    .block_hash()
-                    .as_raw_hash()
-                    .to_byte_array(),
-            ),
-            next_block_target: chain
-                .get_header(vh)
-                .target()
-                .to_compact_lossy()
-                .to_consensus(),
-            interval_start_timestamp: chain.get_header(h1).time,
-            total_accumulated_pow: 0f64,
-            last_11_blocks_timestamps,
-        }
-    }
+    use crate::{mock::get_verification_state_for_block, params::get_btc_params};
 
     #[test]
     fn test_blocks() {
-        let params = PowParams::from(&Params::MAINNET);
-        let chain: BtcChainSegment = get_btc_chain(Params::MAINNET);
+        let chain = get_btc_chain();
+        let params = get_btc_params();
         let h1 = get_difficulty_adjustment_height(1, chain.start, &params);
         let r1 = rand::thread_rng().gen_range(h1..chain.end);
-        let mut verification_state = for_block(r1, &chain);
+        let mut verification_state = get_verification_state_for_block(r1, &params);
 
         for header_idx in r1..chain.end {
             verification_state.check_and_update(&chain.get_header(header_idx), &params)
         }
+    }
+
+    #[test]
+    fn test_hash() {
+        let params = get_btc_params();
+        let r1 = 42000;
+        let verification_state = get_verification_state_for_block(r1, &params);
+        let hash = verification_state.compute_hash();
+        assert!(hash.is_ok());
     }
 }

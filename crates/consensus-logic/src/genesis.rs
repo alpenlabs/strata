@@ -61,18 +61,9 @@ pub fn init_genesis_chainstate(
 
     // Build the genesis block and genesis consensus states.
     let gblock = make_genesis_block(params);
+    let gchstate = make_genesis_chainstate(&gblock, pregenesis_mfs, params);
+
     let genesis_blkid = gblock.header().get_blockid();
-
-    let geui = gblock.exec_segment().update().input();
-    let gees =
-        ExecEnvState::from_base_input(geui.clone(), params.rollup.evm_genesis_block_state_root);
-
-    let genesis_blk_rec = L1HeaderRecord::from(pregenesis_mfs.last().unwrap());
-    let l1vs = L1ViewState::new_at_horizon(horizon_blk_height, genesis_blk_rec);
-
-    let optbl = construct_operator_table(&params.rollup().operator_config);
-    let gdata = GenesisStateData::new(genesis_blkid, l1vs, optbl, gees);
-    let gchstate = ChainState::from_genesis(&gdata);
 
     // Now insert things into the database.
     let chs_store = database.chainstate_store();
@@ -88,7 +79,7 @@ pub fn init_genesis_chainstate(
     Ok(genesis_blkid)
 }
 
-fn construct_operator_table(opconfig: &OperatorConfig) -> OperatorTable {
+pub fn construct_operator_table(opconfig: &OperatorConfig) -> OperatorTable {
     match opconfig {
         OperatorConfig::Static(oplist) => OperatorTable::from_operator_list(oplist),
     }
@@ -148,6 +139,26 @@ pub fn make_genesis_block(params: &Params) -> L2BlockBundle {
     let signed_genesis_header = SignedL2BlockHeader::new(header, Buf64::zero());
     let block = L2Block::new(signed_genesis_header, body);
     L2BlockBundle::new(block, accessory)
+}
+
+pub fn make_genesis_chainstate(
+    gblock: &L2BlockBundle,
+    pregenesis_mfs: Vec<L1BlockManifest>,
+    params: &Params,
+) -> ChainState {
+    let genesis_blkid = gblock.header().get_blockid();
+
+    let geui = gblock.exec_segment().update().input();
+    let gees =
+        ExecEnvState::from_base_input(geui.clone(), params.rollup.evm_genesis_block_state_root);
+
+    let horizon_blk_height = params.rollup.horizon_l1_height;
+    let genesis_blk_rec = L1HeaderRecord::from(pregenesis_mfs.last().unwrap());
+    let l1vs = L1ViewState::new_at_horizon(horizon_blk_height, genesis_blk_rec);
+
+    let optbl = construct_operator_table(&params.rollup().operator_config);
+    let gdata = GenesisStateData::new(genesis_blkid, l1vs, optbl, gees);
+    ChainState::from_genesis(&gdata)
 }
 
 /// Check if the database needs to have client init done to it.

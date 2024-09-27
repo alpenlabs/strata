@@ -81,22 +81,22 @@ impl BlockSigningDuty {
 #[derive(Clone, Debug, BorshSerialize)]
 pub struct BatchCheckpointDuty {
     /// Checkpoint/batch info
-    checkpoint: CheckpointInfo,
+    info: CheckpointInfo,
 }
 
 impl BatchCheckpointDuty {
     pub fn idx(&self) -> u64 {
-        self.checkpoint.idx()
+        self.info.idx()
     }
 
-    pub fn checkpoint(&self) -> &CheckpointInfo {
-        &self.checkpoint
+    pub fn checkpoint_info(&self) -> &CheckpointInfo {
+        &self.info
     }
 }
 
 impl From<CheckpointInfo> for BatchCheckpointDuty {
     fn from(value: CheckpointInfo) -> Self {
-        Self { checkpoint: value }
+        Self { info: value }
     }
 }
 

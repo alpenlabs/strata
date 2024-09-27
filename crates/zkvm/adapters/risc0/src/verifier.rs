@@ -34,7 +34,7 @@ impl ZKVMVerifier for Risc0Verifier {
     }
 
     fn verify_groth16(
-        proof: &[u8],
+        proof: &Proof,
         verification_key: &[u8],
         public_params_raw: &[u8],
     ) -> anyhow::Result<()> {
@@ -59,7 +59,7 @@ impl ZKVMVerifier for Risc0Verifier {
         let claim = MaybePruned::from(claim);
 
         let receipt = Groth16Receipt::new(
-            proof.to_vec(),       // Actual Groth16 Proof(A, B, C)
+            proof.into(),         // Actual Groth16 Proof(A, B, C)
             claim,                // Includes both digest and elf
             public_params_digest, // This is not actually used underneath
         );
@@ -99,7 +99,7 @@ mod tests {
 
         let proof = Proof::new(raw_proof.to_vec());
         let receipt: Receipt = bincode::deserialize(proof.as_bytes()).unwrap();
-        let seal = receipt.inner.groth16().unwrap().clone().seal;
+        let seal = Proof::new(receipt.inner.groth16().unwrap().clone().seal);
 
         let public_params_raw: Vec<u8> = to_vec(&input)
             .unwrap()

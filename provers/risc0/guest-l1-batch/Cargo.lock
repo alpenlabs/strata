@@ -185,6 +185,7 @@ dependencies = [
  "borsh",
  "digest 0.10.7",
  "express-bridge-tx-builder",
+ "express-zkvm",
  "hex",
  "num_enum",
  "serde",
@@ -1033,6 +1034,16 @@ dependencies = [
  "express-proofimpl-btc-blockspace",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "express-zkvm"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arbitrary",
+ "borsh",
+ "serde",
 ]
 
 [[package]]
@@ -2293,6 +2304,7 @@ dependencies = [
  "alpen-express-primitives",
  "alpen-express-state",
  "anyhow",
+ "arbitrary",
  "bitcoin",
  "borsh",
  "hex",

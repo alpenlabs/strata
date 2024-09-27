@@ -757,6 +757,7 @@ dependencies = [
  "arbitrary",
  "bitcoin",
  "borsh",
+ "express-zkvm",
  "hex",
  "mockall",
  "musig2",
@@ -949,6 +950,7 @@ dependencies = [
  "express-storage",
  "express-sync",
  "express-tasks",
+ "express-zkvm",
  "format_serde_error",
  "futures",
  "hex",
@@ -981,6 +983,7 @@ dependencies = [
  "borsh",
  "digest 0.10.7",
  "express-bridge-tx-builder",
+ "express-zkvm",
  "hex",
  "num_enum 0.7.2",
  "serde",
@@ -1005,6 +1008,7 @@ name = "alpen-test-utils"
 version = "0.1.0"
 dependencies = [
  "alpen-express-btcio",
+ "alpen-express-consensus-logic",
  "alpen-express-db",
  "alpen-express-primitives",
  "alpen-express-state",
@@ -3870,6 +3874,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "express-proofimpl-checkpoint"
+version = "0.1.0"
+dependencies = [
+ "alpen-express-primitives",
+ "alpen-express-state",
+ "alpen-test-utils",
+ "anyhow",
+ "bitcoin",
+ "borsh",
+ "ethnum",
+ "express-proofimpl-btc-blockspace",
+ "express-proofimpl-l1-batch",
+ "express-zkvm",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "express-proofimpl-cl-stf"
 version = "0.1.0"
 dependencies = [
@@ -4089,6 +4112,7 @@ dependencies = [
  "borsh",
  "express-chaintsn",
  "express-proofimpl-btc-blockspace",
+ "express-proofimpl-checkpoint",
  "express-proofimpl-evm-ee-stf",
  "express-proofimpl-l1-batch",
  "express-risc0-adapter",
@@ -4135,6 +4159,7 @@ dependencies = [
  "bitcoin",
  "borsh",
  "express-proofimpl-btc-blockspace",
+ "express-proofimpl-checkpoint",
  "express-proofimpl-evm-ee-stf",
  "express-proofimpl-l1-batch",
  "express-sp1-adapter",
@@ -4200,6 +4225,7 @@ name = "express-zkvm"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "arbitrary",
  "borsh",
  "serde",
 ]

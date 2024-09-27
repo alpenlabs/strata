@@ -16,6 +16,7 @@ members = [
   "crates/zkvm/adapters/risc0",
   "crates/zkvm/adapters/sp1",
   "crates/proof-impl/btc-blockspace",
+  "crates/proof-impl/checkpoint",
   "crates/proof-impl/cl-stf",
   "crates/proof-impl/evm-ee-stf",
   "crates/proof-impl/l1-batch",
@@ -84,6 +85,7 @@ express-bridge-sig-manager = { path = "crates/bridge-sig-manager" }
 express-bridge-tx-builder = { path = "crates/bridge-tx-builder" }
 express-chaintsn = { path = "crates/chaintsn" }
 express-proofimpl-btc-blockspace = { path = "crates/proof-impl/btc-blockspace" }
+express-proofimpl-checkpoint = { path = "crates/proof-impl/checkpoint" }
 express-proofimpl-evm-ee-stf = { path = "crates/proof-impl/evm-ee-stf" }
 express-proofimpl-l1-batch = { path = "crates/proof-impl/l1-batch" }
 express-prover-client-rpc-api = { path = "crates/rpc/prover-client-api" }

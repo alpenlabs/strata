@@ -1,5 +1,6 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use alpen_express_consensus_logic::genesis::{make_genesis_block, make_genesis_chainstate};
 use alpen_express_primitives::{
     block_credential,
     buf::{Buf32, Buf64},
@@ -9,11 +10,12 @@ use alpen_express_primitives::{
 };
 use alpen_express_state::{
     block::{L2Block, L2BlockAccessory, L2BlockBody, L2BlockBundle},
+    chain_state::ChainState,
     client_state::ClientState,
     header::{L2BlockHeader, L2Header, SignedL2BlockHeader},
 };
 
-use crate::ArbitraryGenerator;
+use crate::{bitcoin::get_btc_chain, ArbitraryGenerator};
 
 pub fn gen_block(parent: Option<&SignedL2BlockHeader>) -> L2BlockBundle {
     let arb = ArbitraryGenerator::new();
@@ -121,4 +123,13 @@ pub fn gen_client_state(params: Option<&Params>) -> ClientState {
 fn make_dummy_operator_pubkeys() -> OperatorPubkeys {
     // TODO don't use dummy zero keys
     OperatorPubkeys::new(Buf32::zero(), Buf32::zero())
+}
+
+pub fn get_genesis_chainstate() -> ChainState {
+    let params = gen_params();
+    // Build the genesis block and genesis consensus states.
+    let gblock = make_genesis_block(&params);
+    let pregenesis_mfs =
+        vec![get_btc_chain().get_block_manifest(params.rollup().horizon_l1_height as u32)];
+    make_genesis_chainstate(&gblock, pregenesis_mfs, &params)
 }

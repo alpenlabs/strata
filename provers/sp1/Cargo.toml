@@ -20,6 +20,7 @@ bincode = { workspace = true }
 bitcoin = { workspace = true }
 borsh = { workspace = true }
 express-proofimpl-btc-blockspace = { workspace = true }
+express-proofimpl-checkpoint = { workspace = true }
 express-proofimpl-evm-ee-stf = { workspace = true }
 express-proofimpl-l1-batch = { workspace = true }
 express-zkvm = { workspace = true }
@@ -27,5 +28,5 @@ hex = { workspace = true }
 sp1-sdk = "2.0.0"
 
 [features]
-default = []
+default = ["prover"]
 prover = ["dep:express-sp1-adapter"]

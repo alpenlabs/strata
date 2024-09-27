@@ -7,6 +7,7 @@ version = "0.1.0"
 alpen-express-mmr = { workspace = true }
 alpen-express-primitives = { workspace = true }
 alpen-express-state = { workspace = true }
+express-zkvm = { workspace = true }
 
 anyhow = { workspace = true }
 arbitrary = { workspace = true }

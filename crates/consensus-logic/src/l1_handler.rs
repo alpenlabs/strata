@@ -156,6 +156,8 @@ pub fn verify_proof(
     let rollup_vk = rollup_params.rollup_vk;
     let verify_proofs = rollup_params.verify_proofs;
 
+    let checkpoint_idx = checkpoint.checkpoint().idx();
+
     if !verify_proofs {
         warn!("Not verifying proofs since verify_proofs flag is false");
         return Ok(());
@@ -165,7 +167,7 @@ pub fn verify_proof(
 
     if let ProofPublishMode::Timeout(_) = rollup_params.proof_publish_mode {
         if proof.is_empty() {
-            warn!("Accepting empty proofs");
+            warn!(checkpoint_idx = %checkpoint_idx, "Accepting empty proof");
             return Ok(());
         }
     }

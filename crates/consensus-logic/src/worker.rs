@@ -219,8 +219,9 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
                     let pstatus = CheckpointProvingStatus::ProofReady;
                     let cstatus = CheckpointConfStatus::Confirmed;
                     let entry = CheckpointEntry::new(
-                        c.checkpoint().clone(),
-                        c.proof().to_vec(),
+                        c.checkpoint().info().clone(),
+                        c.checkpoint().transition().clone(),
+                        c.proof().clone(),
                         pstatus,
                         cstatus,
                     );
@@ -235,8 +236,9 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
                     let pstatus = CheckpointProvingStatus::ProofReady;
                     let cstatus = CheckpointConfStatus::Finalized;
                     let entry = CheckpointEntry::new(
-                        c.checkpoint().clone(),
-                        c.proof().to_vec(),
+                        c.checkpoint().info().clone(),
+                        c.checkpoint().transition().clone(),
+                        c.proof().clone(),
                         pstatus,
                         cstatus,
                     );
