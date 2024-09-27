@@ -559,7 +559,7 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
             .operators()
             .iter()
             .fold(BTreeMap::new(), |mut map, entry| {
-                let pubkey = XOnlyPublicKey::from_slice(&entry.signing_pk().0 .0)
+                let pubkey = XOnlyPublicKey::try_from(*entry.wallet_pk())
                     .expect("something has gone horribly wrong");
 
                 // This is a taproot pubkey so its parity has to be even.
