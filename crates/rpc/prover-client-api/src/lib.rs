@@ -9,4 +9,8 @@ pub trait ExpressProverClientApi {
     /// Start proving the given el block
     #[method(name = "proveELBlock")]
     async fn prove_el_block(&self, el_block_num: u64) -> RpcResult<String>;
+
+    /// Start proving the given el block
+    #[method(name = "getTaskStatus")]
+    async fn get_task_status(&self, task_id: String) -> RpcResult<Option<String>>;
 }

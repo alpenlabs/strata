@@ -48,4 +48,9 @@ impl TaskTracker {
             .cloned()
             .collect()
     }
+
+    pub async fn get_task_by_id(&self, task_id: Uuid) -> Option<ProvingTask> {
+        let tasks = self.pending_tasks.lock().await;
+        tasks.iter().find(|task| task.id == task_id).cloned()
+    }
 }

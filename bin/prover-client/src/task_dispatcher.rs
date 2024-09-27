@@ -15,11 +15,11 @@ use crate::{
     task::TaskTracker,
 };
 
-/// The `ELBlockProvingTaskScheduler` handles the scheduling of EL block proving tasks.
-/// It listens for new EL blocks via an RPC client, fetches the necessary proving inputs,
-/// and adds these tasks to a shared `TaskTracker` for further processing.
+/// The `ELBlockProvingTaskDispatcher` handles the dispatching of EL block proving tasks to the
+/// TaskTracker. It listens for new EL blocks via an RPC client, fetches the necessary proving
+/// inputs, and adds these tasks to a shared `TaskTracker` for further processing.
 #[derive(Clone)]
-pub struct ELBlockProvingTaskScheduler {
+pub struct ELBlockProvingTaskDispatcher {
     /// The RPC client used to communicate with the EL network.
     /// It listens for new EL blocks and retrieves necessary data for proving.
     el_rpc_client: HttpClient,
@@ -33,7 +33,7 @@ pub struct ELBlockProvingTaskScheduler {
     last_block_sent: u64,
 }
 
-impl ELBlockProvingTaskScheduler {
+impl ELBlockProvingTaskDispatcher {
     pub fn new(
         el_rpc_client: HttpClient,
         task_tracker: Arc<TaskTracker>,
@@ -44,6 +44,10 @@ impl ELBlockProvingTaskScheduler {
             task_tracker,
             last_block_sent: start_block_height,
         }
+    }
+
+    pub fn task_tracker(&self) -> &Arc<TaskTracker> {
+        &self.task_tracker
     }
 
     // Start listening for new blocks and process them automatically

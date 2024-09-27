@@ -10,7 +10,7 @@ use jsonrpsee::http_client::HttpClientBuilder;
 use manager::ProverManager;
 use rpc_server::{ProverClientRpc, RpcContext};
 use task::TaskTracker;
-use task_dispatcher::ELBlockProvingTaskScheduler;
+use task_dispatcher::ELBlockProvingTaskDispatcher;
 use tracing::info;
 
 mod args;
@@ -36,7 +36,7 @@ async fn main() {
         .build(args.get_reth_rpc_url())
         .expect("failed to connect to the el client");
 
-    let el_proving_task_scheduler = ELBlockProvingTaskScheduler::new(
+    let el_proving_task_scheduler = ELBlockProvingTaskDispatcher::new(
         el_rpc_client,
         task_tracker.clone(),
         EL_START_BLOCK_HEIGHT,
@@ -48,12 +48,12 @@ async fn main() {
     tokio::spawn(async move { prover_manager.run().await });
 
     // run el proving task dispatcher
-    tokio::spawn(async move {
-        el_proving_task_scheduler
-            .clone()
-            .listen_for_new_blocks()
-            .await
-    });
+    // tokio::spawn(async move {
+    //     el_proving_task_scheduler
+    //         .clone()
+    //         .listen_for_new_blocks()
+    //         .await
+    // });
 
     // run rpc server
     let rpc_url = args.get_dev_rpc_url();

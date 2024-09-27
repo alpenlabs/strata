@@ -1,3 +1,5 @@
+use std::fmt;
+
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -35,6 +37,18 @@ pub enum ProvingTaskStatus {
     Processing,
     Completed,
     Failed,
+}
+
+impl fmt::Display for ProvingTaskStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let status_str = match self {
+            ProvingTaskStatus::Pending => "Pending",
+            ProvingTaskStatus::Processing => "Processing",
+            ProvingTaskStatus::Completed => "Completed",
+            ProvingTaskStatus::Failed => "Failed",
+        };
+        write!(f, "{}", status_str)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

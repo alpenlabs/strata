@@ -55,6 +55,10 @@ where
                 self.task_tracker
                     .update_task_status(task.id, ProvingTaskStatus::Pending)
                     .await;
+            } else {
+                self.task_tracker
+                    .update_task_status(task.id, ProvingTaskStatus::Processing)
+                    .await;
             }
         }
     }

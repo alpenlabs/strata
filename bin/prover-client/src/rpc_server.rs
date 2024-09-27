@@ -1,21 +1,24 @@
 //! Bootstraps an RPC server for the prover client.
 
+use std::str::FromStr;
+
 use anyhow::{Context, Ok};
 use async_trait::async_trait;
 use express_prover_client_rpc_api::ExpressProverClientApiServer;
 use jsonrpsee::{core::RpcResult, RpcModule};
 use tokio::sync::oneshot;
 use tracing::{info, warn};
+use uuid::Uuid;
 
-use crate::task_dispatcher::ELBlockProvingTaskScheduler;
+use crate::task_dispatcher::ELBlockProvingTaskDispatcher;
 
 #[derive(Clone)]
 pub struct RpcContext {
-    pub el_proving_task_scheduler: ELBlockProvingTaskScheduler,
+    pub el_proving_task_scheduler: ELBlockProvingTaskDispatcher,
 }
 
 impl RpcContext {
-    pub fn new(el_proving_task_scheduler: ELBlockProvingTaskScheduler) -> Self {
+    pub fn new(el_proving_task_scheduler: ELBlockProvingTaskDispatcher) -> Self {
         Self {
             el_proving_task_scheduler,
         }
@@ -83,5 +86,17 @@ impl ExpressProverClientApiServer for ProverClientRpc {
             .expect("failed to add proving task");
 
         RpcResult::Ok(task_id.to_string())
+    }
+
+    async fn get_task_status(&self, task_id: String) -> RpcResult<Option<String>> {
+        let task_id = Uuid::from_str(&task_id).expect("invalid UUID params");
+        let task_tracker = self.context.el_proving_task_scheduler.task_tracker();
+
+        if let Some(proving_task) = task_tracker.get_task_by_id(task_id).await {
+            let task_status = proving_task.status.to_string();
+            return RpcResult::Ok(Some(task_status));
+        }
+
+        RpcResult::Ok(None)
     }
 }
