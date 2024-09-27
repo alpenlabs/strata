@@ -1,8 +1,11 @@
-use alpen_express_state::{batch::BatchCheckpoint, tx::DepositInfo};
+use alpen_express_state::{
+    batch::BatchCheckpoint,
+    l1::{HeaderVerificationState, HeaderVerificationStateSnapshot},
+    tx::DepositInfo,
+};
+use bitcoin::params::Params;
 use borsh::{BorshDeserialize, BorshSerialize};
 use express_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
-
-use crate::header_verification::{HeaderVerificationState, HeaderVerificationStateSnapshot};
 
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct L1BatchProofInput {

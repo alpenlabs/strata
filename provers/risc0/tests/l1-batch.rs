@@ -1,12 +1,9 @@
 #[cfg(feature = "prover")]
 mod test {
-    use alpen_test_utils::bitcoin::get_tx_filters;
+    use alpen_test_utils::bitcoin::{get_btc_chain, get_tx_filters};
     use bitcoin::params::MAINNET;
     use express_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
-    use express_proofimpl_l1_batch::{
-        logic::{L1BatchProofInput, L1BatchProofOutput},
-        mock::get_verification_state_for_block,
-    };
+    use express_proofimpl_l1_batch::logic::{L1BatchProofInput, L1BatchProofOutput};
     use express_risc0_adapter::{Risc0Verifier, RiscZeroHost, RiscZeroProofInputBuilder};
     use express_risc0_guest_builder::{
         GUEST_RISC0_BTC_BLOCKSPACE_ELF, GUEST_RISC0_BTC_BLOCKSPACE_ID, GUEST_RISC0_L1_BATCH_ELF,
@@ -31,6 +28,7 @@ mod test {
         };
         let prover = RiscZeroHost::init(GUEST_RISC0_BTC_BLOCKSPACE_ELF.into(), prover_options);
 
+        let btc_chain = get_btc_chain();
         let btc_blockspace_elf_id: Vec<u8> = GUEST_RISC0_BTC_BLOCKSPACE_ID
             .iter()
             .flat_map(|&x| x.to_le_bytes())
@@ -70,7 +68,7 @@ mod test {
         let prover = RiscZeroHost::init(GUEST_RISC0_L1_BATCH_ELF.into(), prover_options);
         let input = L1BatchProofInput {
             batch: blockspace_outputs,
-            state: get_verification_state_for_block(40321, &MAINNET),
+            state: btc_chain.get_verification_state(40321, &MAINNET),
         };
 
         l1_batch_input_builder.write_borsh(&input).unwrap();

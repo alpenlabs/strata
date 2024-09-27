@@ -4,10 +4,10 @@ use alpen_express_primitives::buf::Buf32;
 use bitcoin::{block::Header, hashes::Hash, params::Params, BlockHash, CompactTarget, Target};
 use borsh::{BorshDeserialize, BorshSerialize};
 use ethnum::U256;
-use express_proofimpl_btc_blockspace::block::compute_block_hash;
 use serde::{Deserialize, Serialize};
 
-use crate::timestamp_store::TimestampStore;
+use super::timestamp_store::TimestampStore;
+use crate::l1::utils::compute_block_hash;
 
 #[derive(Debug, Clone, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
 pub struct HeaderVerificationState {
@@ -175,11 +175,14 @@ impl HeaderVerificationState {
         cur.write_all(&self.interval_start_timestamp.to_be_bytes())?;
         cur.write_all(&self.total_accumulated_pow.to_be_bytes())?;
 
-        let mut serialized_timestamps = [0u8; 11 * 4];
-        for (i, &timestamp) in self.last_11_blocks_timestamps.timestamps.iter().enumerate() {
-            serialized_timestamps[i * 4..(i + 1) * 4].copy_from_slice(&timestamp.to_be_bytes());
-        }
-
+        let serialized_timestamps: [u8; 11 * 4] = self
+            .last_11_blocks_timestamps
+            .timestamps
+            .iter()
+            .flat_map(|&x| x.to_be_bytes())
+            .collect::<Vec<u8>>()
+            .try_into()
+            .unwrap();
         cur.write_all(&serialized_timestamps)?;
         Ok(alpen_express_primitives::hash::raw(&buf))
     }
@@ -202,29 +205,28 @@ pub fn get_difficulty_adjustment_height(idx: u32, start: u32, params: &Params) -
 #[cfg(test)]
 mod tests {
     use alpen_test_utils::bitcoin::get_btc_chain;
+    use bitcoin::params::MAINNET;
     use rand::Rng;
 
     use super::*;
-    use crate::{mock::get_verification_state_for_block, params::get_btc_params};
 
     #[test]
     fn test_blocks() {
         let chain = get_btc_chain();
-        let params = get_btc_params();
-        let h1 = get_difficulty_adjustment_height(1, chain.start, &params);
+        let h1 = get_difficulty_adjustment_height(1, chain.start, &MAINNET);
         let r1 = rand::thread_rng().gen_range(h1..chain.end);
-        let mut verification_state = get_verification_state_for_block(r1, &params);
+        let mut verification_state = chain.get_verification_state(r1, &MAINNET);
 
         for header_idx in r1..chain.end {
-            verification_state.check_and_update(&chain.get_header(header_idx), &params)
+            verification_state.check_and_update(&chain.get_header(header_idx), &MAINNET)
         }
     }
 
     #[test]
     fn test_hash() {
-        let params = get_btc_params();
+        let chain = get_btc_chain();
         let r1 = 42000;
-        let verification_state = get_verification_state_for_block(r1, &params);
+        let verification_state = chain.get_verification_state(r1, &MAINNET);
         let hash = verification_state.compute_hash();
         assert!(hash.is_ok());
     }

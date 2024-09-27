@@ -5,7 +5,10 @@ mod test {
         batch::{BootstrapCheckpoint, CheckpointInfo},
         chain_state::ChainState,
     };
-    use alpen_test_utils::{bitcoin::get_tx_filters, l2::get_genesis_chainstate};
+    use alpen_test_utils::{
+        bitcoin::{get_btc_chain, get_tx_filters},
+        l2::get_genesis_chainstate,
+    };
     use bitcoin::params::MAINNET;
     use express_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
     use express_proofimpl_checkpoint::{
@@ -113,6 +116,7 @@ mod test {
 
     fn get_bootstrap_checkpoint() -> BootstrapCheckpoint {
         let gen_chainstate = get_genesis_chainstate();
+        let btc_chain = get_btc_chain();
 
         let idx = 1;
         let starting_l1_height = 40321;
@@ -127,7 +131,8 @@ mod test {
         );
 
         let state = BootstrapCheckpointState::new(
-            get_verification_state_for_block(starting_l1_height as u32, &MAINNET)
+            btc_chain
+                .get_verification_state(40321, &MAINNET)
                 .hash()
                 .unwrap(),
             gen_chainstate.compute_state_root(),
