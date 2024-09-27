@@ -20,11 +20,15 @@ pub struct L2SyncContext<T: SyncClient> {
 }
 
 impl<T: SyncClient> L2SyncContext<T> {
-    pub fn new(client: T, l2_manager: Arc<L2BlockManager>, sync_man: Arc<SyncManager>) -> Self {
+    pub fn new(
+        client: T,
+        l2_block_manager: Arc<L2BlockManager>,
+        sync_manager: Arc<SyncManager>,
+    ) -> Self {
         Self {
             client,
-            l2_block_manager: l2_manager,
-            sync_manager: sync_man,
+            l2_block_manager,
+            sync_manager,
         }
     }
 }

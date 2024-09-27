@@ -14,7 +14,7 @@ use alpen_express_primitives::{
     hash,
     params::Params,
 };
-use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer};
+use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer, AlpenSequencerApiServer};
 use alpen_express_rpc_types::{
     errors::RpcServerError as Error, BlockHeader, BridgeDuties, ClientStatus, DaBlob, DepositEntry,
     DepositState, ExecUpdate, HexBytes, HexBytes32, L1Status, NodeSyncStatus, RawBlockWitness,
@@ -65,7 +65,6 @@ pub struct AlpenRpcImpl<D> {
     status_rx: Arc<StatusRx>,
     database: Arc<D>,
     sync_manager: Arc<SyncManager>,
-    bcast_handle: Arc<L1BroadcastHandle>,
     l2_block_manager: Arc<L2BlockManager>,
     checkpoint_handle: Arc<CheckpointHandle>,
     relayer_handle: Arc<RelayerHandle>,
@@ -77,7 +76,6 @@ impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
         status_rx: Arc<StatusRx>,
         database: Arc<D>,
         sync_manager: Arc<SyncManager>,
-        bcast_handle: Arc<L1BroadcastHandle>,
         l2_block_manager: Arc<L2BlockManager>,
         checkpoint_handle: Arc<CheckpointHandle>,
         relayer_handle: Arc<RelayerHandle>,
@@ -86,7 +84,6 @@ impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
             status_rx,
             database,
             sync_manager,
-            bcast_handle,
             l2_block_manager,
             checkpoint_handle,
             relayer_handle,
@@ -422,17 +419,6 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         })
     }
 
-    async fn get_tx_status(&self, txid: HexBytes32) -> RpcResult<Option<L1TxStatus>> {
-        let mut txid = txid.0;
-        txid.reverse();
-        let id = Buf32::from(txid);
-        Ok(self
-            .bcast_handle
-            .get_tx_status(id)
-            .await
-            .map_err(|e| Error::Other(e.to_string()))?)
-    }
-
     async fn sync_status(&self) -> RpcResult<NodeSyncStatus> {
         let sync = {
             let cl = self.status_rx.cl.borrow();
@@ -600,29 +586,13 @@ where
 }
 
 pub struct AdminServerImpl {
-    // Currently writer is Some() for sequencer only, but we need bcast_manager for both fullnode
-    // and seq
-    pub inscription_handle: Arc<InscriptionHandle>,
-    pub broadcast_handle: Arc<L1BroadcastHandle>,
     stop_tx: Mutex<Option<oneshot::Sender<()>>>,
-    checkpoint_handle: Arc<CheckpointHandle>,
-    params: Arc<Params>,
 }
 
 impl AdminServerImpl {
-    pub fn new(
-        inscription_handle: Arc<InscriptionHandle>,
-        broadcast_handle: Arc<L1BroadcastHandle>,
-        stop_tx: oneshot::Sender<()>,
-        params: Arc<Params>,
-        checkpoint_handle: Arc<CheckpointHandle>,
-    ) -> Self {
+    pub fn new(stop_tx: oneshot::Sender<()>) -> Self {
         Self {
-            inscription_handle,
-            broadcast_handle,
             stop_tx: Mutex::new(Some(stop_tx)),
-            params,
-            checkpoint_handle,
         }
     }
 }
@@ -638,7 +608,33 @@ impl AlpenAdminApiServer for AdminServerImpl {
         }
         Ok(())
     }
+}
 
+pub struct SequencerServerImpl {
+    inscription_handle: Arc<InscriptionHandle>,
+    broadcast_handle: Arc<L1BroadcastHandle>,
+    checkpoint_handle: Arc<CheckpointHandle>,
+    params: Arc<Params>,
+}
+
+impl SequencerServerImpl {
+    pub fn new(
+        inscription_handle: Arc<InscriptionHandle>,
+        broadcast_handle: Arc<L1BroadcastHandle>,
+        params: Arc<Params>,
+        checkpoint_handle: Arc<CheckpointHandle>,
+    ) -> Self {
+        Self {
+            inscription_handle,
+            broadcast_handle,
+            params,
+            checkpoint_handle,
+        }
+    }
+}
+
+#[async_trait]
+impl AlpenSequencerApiServer for SequencerServerImpl {
     async fn submit_da_blob(&self, blob: HexBytes) -> RpcResult<()> {
         let commitment = hash::raw(&blob.0);
         let blobintent = BlobIntent::new(BlobDest::L1, commitment, blob.0);
@@ -711,5 +707,16 @@ impl AlpenAdminApiServer for AdminServerImpl {
         debug!(%idx, "Success");
 
         Ok(())
+    }
+
+    async fn get_tx_status(&self, txid: HexBytes32) -> RpcResult<Option<L1TxStatus>> {
+        let mut txid = txid.0;
+        txid.reverse();
+        let id = Buf32::from(txid);
+        Ok(self
+            .broadcast_handle
+            .get_tx_status(id)
+            .await
+            .map_err(|e| Error::Other(e.to_string()))?)
     }
 }

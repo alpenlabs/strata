@@ -208,7 +208,7 @@ impl TaskManager {
 }
 
 /// A type that can spawn new tasks
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TaskExecutor {
     /// Handle to the tokio runtime.
     tokio_handle: Handle,

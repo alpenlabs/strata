@@ -81,3 +81,9 @@ use crate::{
 pub struct DbOpsConfig {
     pub retry_count: u16,
 }
+
+impl DbOpsConfig {
+    pub fn new(retry_count: u16) -> Self {
+        Self { retry_count }
+    }
+}

@@ -48,9 +48,6 @@ pub trait AlpenApi {
     #[method(name = "getCurrentDepositById")]
     async fn get_current_deposit_by_id(&self, deposit_id: u32) -> RpcResult<DepositEntry>;
 
-    #[method(name = "getTxStatus")]
-    async fn get_tx_status(&self, txid: HexBytes32) -> RpcResult<Option<L1TxStatus>>;
-
     // block sync methods
     #[method(name = "syncStatus")]
     async fn sync_status(&self) -> RpcResult<NodeSyncStatus>;
@@ -104,21 +101,33 @@ pub trait AlpenAdminApi {
     /// Stop the node.
     #[method(name = "stop")]
     async fn stop(&self) -> RpcResult<()>;
+}
 
+/// rpc endpoints that are only available on sequencer
+#[cfg_attr(not(feature = "client"), rpc(server))]
+#[cfg_attr(feature = "client", rpc(server, client))]
+pub trait AlpenSequencerApi {
     /// Adds L1Write sequencer duty which will be executed by sequencer
-    #[method(name = "submitDABlob")]
+    #[method(name = "alpadmin_submitDABlob")]
     async fn submit_da_blob(&self, blobdata: HexBytes) -> RpcResult<()>;
 
-    /// Adds an equivalent entry to broadcaster database, which will eventually be broadcasted
-    #[method(name = "broadcastRawTx")]
-    async fn broadcast_raw_tx(&self, rawtx: HexBytes) -> RpcResult<Txid>;
-
     /// Verifies and adds the submitted proof to the checkpoint database
-    #[method(name = "submitCheckpointProof")]
+    #[method(name = "alpadmin_submitCheckpointProof")]
     async fn submit_checkpoint_proof(
         &self,
         idx: u64,
         proof: HexBytes,
         state: HexBytes,
     ) -> RpcResult<()>;
+
+    // TODO: rpc endpoints that deal with L1 writes are currently limited to sequencer
+    // due to l1 writer using wallet rpcs. Move these to common rpc once writer
+    // can be used independently
+
+    /// Adds an equivalent entry to broadcaster database, which will eventually be broadcasted
+    #[method(name = "alpadmin_broadcastRawTx")]
+    async fn broadcast_raw_tx(&self, rawtx: HexBytes) -> RpcResult<Txid>;
+
+    #[method(name = "alp_getTxStatus")]
+    async fn get_tx_status(&self, txid: HexBytes32) -> RpcResult<Option<L1TxStatus>>;
 }

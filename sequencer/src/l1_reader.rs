@@ -11,7 +11,7 @@ use tokio::sync::mpsc;
 
 use crate::config::Config;
 
-pub fn start_reader_tasks<D: Database + Send + Sync + 'static>(
+pub fn start_reader_tasks<D>(
     executor: &TaskExecutor,
     params: Arc<Params>,
     config: &Config,
@@ -21,9 +21,7 @@ pub fn start_reader_tasks<D: Database + Send + Sync + 'static>(
     status_rx: Arc<StatusTx>,
 ) -> anyhow::Result<()>
 where
-    // TODO how are these not redundant trait bounds???
-    <D as alpen_express_db::traits::Database>::SyncEventStore: Send + Sync + 'static,
-    <D as alpen_express_db::traits::Database>::L1DataStore: Send + Sync + 'static,
+    D: Database + Send + Sync + 'static,
 {
     let (ev_tx, ev_rx) = mpsc::channel::<L1Event>(100); // TODO: think about the buffer size
 
