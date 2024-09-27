@@ -1,5 +1,4 @@
 use alpen_express_state::{batch::BatchCheckpoint, tx::DepositInfo};
-use bitcoin::params::Params;
 use borsh::{BorshDeserialize, BorshSerialize};
 use express_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
 
@@ -19,9 +18,12 @@ pub struct L1BatchProofOutput {
     pub final_snapshot: HeaderVerificationStateSnapshot,
 }
 
-pub fn process_batch_proof(input: L1BatchProofInput, params: &Params) -> L1BatchProofOutput {
+pub fn process_batch_proof(
+    input: L1BatchProofInput,
+    params: &bitcoin::params::Params,
+) -> L1BatchProofOutput {
     let mut state = input.state;
-    let initial_snapshot = state.snapshot().unwrap();
+    let initial_snapshot = state.compute_snapshot();
 
     let mut deposits = Vec::new();
     let mut state_update = None;
@@ -31,7 +33,7 @@ pub fn process_batch_proof(input: L1BatchProofInput, params: &Params) -> L1Batch
         deposits.extend(blockspace.deposits);
         state_update = state_update.or(blockspace.state_update);
     }
-    let final_snapshot = state.snapshot().unwrap();
+    let final_snapshot = state.compute_snapshot();
 
     L1BatchProofOutput {
         deposits,

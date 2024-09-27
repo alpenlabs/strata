@@ -138,7 +138,7 @@ mod test {
 
         let state = BootstrapCheckpointState::new(
             get_verification_state_for_block(starting_l1_height as u32, &MAINNET)
-                .hash()
+                .compute_hash()
                 .unwrap(),
             gen_chainstate.compute_state_root(),
             0,

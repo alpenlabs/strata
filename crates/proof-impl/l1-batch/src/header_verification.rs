@@ -156,16 +156,16 @@ impl HeaderVerificationState {
         self.next_block_target = self.next_target(header.time, params);
     }
 
-    pub fn snapshot(&self) -> Result<HeaderVerificationStateSnapshot, std::io::Error> {
-        Ok(HeaderVerificationStateSnapshot {
-            hash: self.hash()?,
+    pub fn compute_snapshot(&self) -> HeaderVerificationStateSnapshot {
+        HeaderVerificationStateSnapshot {
+            hash: self.compute_hash().unwrap(),
             block_num: self.last_verified_block_num as u64,
             acc_pow: self.total_accumulated_pow,
-        })
+        }
     }
 
     /// Calculate the hash of the verification state
-    pub fn hash(&self) -> Result<Buf32, std::io::Error> {
+    pub fn compute_hash(&self) -> Result<Buf32, std::io::Error> {
         // 4 + 32 + 4 + 4 + 16 + 11*4 = 104
         let mut buf = [0u8; 104];
         let mut cur = Cursor::new(&mut buf[..]);
@@ -175,14 +175,11 @@ impl HeaderVerificationState {
         cur.write_all(&self.interval_start_timestamp.to_be_bytes())?;
         cur.write_all(&self.total_accumulated_pow.to_be_bytes())?;
 
-        let serialized_timestamps: [u8; 11 * 4] = self
-            .last_11_blocks_timestamps
-            .timestamps
-            .iter()
-            .flat_map(|&x| x.to_be_bytes())
-            .collect::<Vec<u8>>()
-            .try_into()
-            .unwrap();
+        let mut serialized_timestamps = [0u8; 11 * 4];
+        for (i, &timestamp) in self.last_11_blocks_timestamps.timestamps.iter().enumerate() {
+            serialized_timestamps[i * 4..(i + 1) * 4].copy_from_slice(&timestamp.to_be_bytes());
+        }
+
         cur.write_all(&serialized_timestamps)?;
         Ok(alpen_express_primitives::hash::raw(&buf))
     }
@@ -228,7 +225,7 @@ mod tests {
         let params = get_btc_params();
         let r1 = 42000;
         let verification_state = get_verification_state_for_block(r1, &params);
-        let hash = verification_state.hash();
+        let hash = verification_state.compute_hash();
         assert!(hash.is_ok());
     }
 }

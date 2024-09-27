@@ -14,6 +14,22 @@ impl Proof {
     pub fn as_bytes(&self) -> &[u8] {
         &self.0
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
+
+impl From<Proof> for Vec<u8> {
+    fn from(value: Proof) -> Self {
+        value.0
+    }
+}
+
+impl From<&Proof> for Vec<u8> {
+    fn from(value: &Proof) -> Self {
+        value.0.clone()
+    }
 }
 
 /// Verification Key required to verify proof generated from `ZKVMHost`

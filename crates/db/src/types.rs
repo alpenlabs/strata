@@ -147,7 +147,8 @@ pub struct CheckpointEntry {
     /// Info related to the batch
     pub checkpoint_info: CheckpointInfo,
 
-    /// Hashed state of the batch
+    /// Includes the initial and final hashed state of both the `L1StateTransition` and
+    /// `L2StateTransition` that happened in this batch
     pub checkpoint_transition: CheckpointTransition,
 
     /// Proof
@@ -198,7 +199,7 @@ impl CheckpointEntry {
     }
 
     pub fn is_proof_nonempty(&self) -> bool {
-        !self.proof.as_bytes().is_empty()
+        !self.proof.is_empty()
     }
 }
 

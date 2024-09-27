@@ -1,5 +1,10 @@
-use alpen_express_primitives::l1::L1BlockManifest;
-use bitcoin::{block::Header, consensus::deserialize, Block, Transaction};
+use alpen_express_primitives::{buf::Buf32, l1::L1BlockManifest};
+use bitcoin::{
+    block::Header,
+    consensus::{deserialize, serialize},
+    hashes::Hash,
+    Block, Transaction,
+};
 use strata_tx_parser::{deposit::DepositTxConfig, filter::TxFilterRule};
 
 use crate::{l2::gen_params, ArbitraryGenerator};
@@ -62,6 +67,15 @@ impl BtcChainSegment {
             timestamps.push(h.time)
         }
         timestamps
+    }
+
+    pub fn get_block_manifest(&self, height: u32) -> L1BlockManifest {
+        let header = self.get_header(height);
+        L1BlockManifest::new(
+            Buf32::from(header.block_hash().as_raw_hash().to_byte_array()),
+            serialize(&header),
+            Buf32::from(header.merkle_root.as_raw_hash().to_byte_array()),
+        )
     }
 }
 

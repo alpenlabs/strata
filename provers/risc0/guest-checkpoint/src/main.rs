@@ -71,9 +71,9 @@ fn verify_prev_checkpoint(
     let claim = MaybePruned::from(claim);
 
     let receipt = Groth16Receipt::new(
-        proof.as_bytes().to_vec(), // Actual Groth16 Proof(A, B, C)
-        claim,                     // Includes both digest and elf
-        input_digest,              // This is not actually used underneath
+        proof.into(), // Actual Groth16 Proof(A, B, C)
+        claim,        // Includes both digest and elf
+        input_digest, // This is not actually used underneath
     );
 
     let res = receipt.verify_integrity();

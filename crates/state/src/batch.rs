@@ -133,27 +133,27 @@ impl BootstrapCheckpointInfo {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, BorshDeserialize, BorshSerialize, Arbitrary, Default)]
 /// Summary of both the L1 and L2 transitions that happened
 ///
-/// `l1_transition` represents transition between `HeaderVerificationState`
-/// `l2_transition` represents transition between `ChainState`
-/// `acc_pow` represents the total Proof of Work that happened for `l1_transition`
+/// - `l1_transition` represents transition between `HeaderVerificationState`
+/// - `l2_transition` represents transition between `ChainState`
+/// - `acc_pow` represents the total Proof of Work that happened for `l1_transition`
+#[derive(Clone, Debug, Default, PartialEq, Eq, BorshDeserialize, BorshSerialize, Arbitrary)]
 pub struct CheckpointTransition {
     /// Hash Range of the HeaderVerificationState
     /// The checkpoint proof guarantees right transition from initial_state to final_state
-    pub l1_transition: StateTransition,
+    pub l1_transition: L1StateTransition,
     /// Hash Range of the ChainState
     /// The checkpoint proof guarantees right transition from initial_state to final_state
-    pub l2_transition: StateTransition,
+    pub l2_transition: L2StateTransition,
     /// Total Accumulated PoW in the given transition
     pub acc_pow: u128,
 }
 
 impl CheckpointTransition {
     pub fn new(
-        l1_transition: StateTransition,
-        l2_transition: StateTransition,
+        l1_transition: L1StateTransition,
+        l2_transition: L2StateTransition,
         acc_pow: u128,
     ) -> Self {
         Self {
@@ -219,20 +219,32 @@ impl From<CheckpointTransition> for BootstrapCheckpointState {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, BorshDeserialize, BorshSerialize, Arbitrary, Default)]
-pub struct StateTransition {
+pub struct L1StateTransition {
     pub from: Buf32,
     pub to: Buf32,
 }
 
-impl StateTransition {
+impl L1StateTransition {
     pub fn new(from: Buf32, to: Buf32) -> Self {
         Self { from, to }
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, BorshDeserialize, BorshSerialize, Arbitrary)]
+#[derive(Clone, Debug, PartialEq, Eq, BorshDeserialize, BorshSerialize, Arbitrary, Default)]
+pub struct L2StateTransition {
+    pub from: Buf32,
+    pub to: Buf32,
+}
+
+impl L2StateTransition {
+    pub fn new(from: Buf32, to: Buf32) -> Self {
+        Self { from, to }
+    }
+}
+
 /// Checkpoint information that is verifiable
 /// It includes both the [`CheckpointInfo`] and [`CheckpointTransition`]
+#[derive(Clone, Debug, PartialEq, Eq, BorshDeserialize, BorshSerialize, Arbitrary)]
 pub struct Checkpoint {
     transition: CheckpointTransition,
     info: CheckpointInfo,

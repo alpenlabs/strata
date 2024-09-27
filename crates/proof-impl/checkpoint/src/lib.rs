@@ -5,7 +5,8 @@
 use alpen_express_primitives::buf::Buf32;
 use alpen_express_state::{
     batch::{
-        BootstrapCheckpoint, Checkpoint, CheckpointInfo, CheckpointTransition, StateTransition,
+        BootstrapCheckpoint, Checkpoint, CheckpointInfo, CheckpointTransition, L1StateTransition,
+        L2StateTransition,
     },
     id::L2BlockId,
     tx::DepositInfo,
@@ -105,8 +106,8 @@ pub fn process_checkpoint_proof(
     );
 
     let state = CheckpointTransition::new(
-        StateTransition::new(l1_batch.initial_snapshot.hash, l1_batch.final_snapshot.hash),
-        StateTransition::new(l2_batch.initial_snapshot.hash, l2_batch.final_snapshot.hash),
+        L1StateTransition::new(l1_batch.initial_snapshot.hash, l1_batch.final_snapshot.hash),
+        L2StateTransition::new(l2_batch.initial_snapshot.hash, l2_batch.final_snapshot.hash),
         l1_batch.final_snapshot.acc_pow,
     );
 
