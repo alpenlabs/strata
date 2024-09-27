@@ -340,7 +340,7 @@ mod tests {
         let total_amount = num_btc * BitcoinAmount::SATS_FACTOR;
         let protocol_op = ProtocolOperation::DepositRequest(DepositRequestInfo {
             amt: total_amount,
-            tap_ctrl_blk_hash: script2_hash.to_byte_array(),
+            take_back_leaf_hash: script2_hash.to_byte_array(),
             address: el_address.to_vec(),
         });
 
@@ -427,7 +427,7 @@ mod tests {
         let deposit_request_info = DepositRequestInfo {
             amt: 1_000_000_000,      // 10 BTC
             address: arb.generate(), // random rollup address (this is fine)
-            tap_ctrl_blk_hash: random_hash,
+            take_back_leaf_hash: random_hash,
         };
 
         let deposit_request = ProtocolOperation::DepositRequest(deposit_request_info);
