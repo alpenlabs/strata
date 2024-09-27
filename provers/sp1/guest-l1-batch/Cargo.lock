@@ -2223,6 +2223,7 @@ dependencies = [
  "alpen-express-primitives",
  "alpen-express-state",
  "anyhow",
+ "arbitrary",
  "bitcoin",
  "borsh",
  "hex",

@@ -1,4 +1,4 @@
-use alpen_express_primitives::{buf::Buf32, l1::L1BlockManifest};
+use alpen_express_primitives::l1::L1BlockManifest;
 use bitcoin::{block::Header, consensus::deserialize, Block, Transaction};
 use strata_tx_parser::{deposit::DepositTxConfig, filter::TxFilterRule};
 
