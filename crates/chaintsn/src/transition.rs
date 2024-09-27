@@ -178,8 +178,8 @@ fn check_chain_integrity(
 /// Note: Currently this returns a ref to the withdrawal intents passed in the
 /// exec update, but really it might need to be a ref into the state cache.
 /// This will probably be substantially refactored in the future though.
-fn process_execution_update<'c, 'u>(
-    state: &'c mut StateCache,
+fn process_execution_update<'u>(
+    state: &mut StateCache,
     update: &'u exec_update::ExecUpdate,
 ) -> Result<&'u [WithdrawalIntent], TsnError> {
     // TODO release anything that we need to

@@ -7,8 +7,8 @@ version = "0.1.0"
 alpen-express-primitives = { workspace = true }
 alpen-express-state = { workspace = true }
 
-rand_core = { workspace = true, default-features = false }
 rand_chacha = { workspace = true, default-features = false }
+rand_core = { workspace = true, default-features = false }
 thiserror = { workspace = true }
 tracing = { workspace = true, optional = true }
 

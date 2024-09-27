@@ -24,7 +24,7 @@ FAST_BATCH_ROLLUP_PARAMS = {
             {
                 "signing_pk": "03" * 32,
                 "wallet_pk": "04" * 32,
-            }
+            },
         ]
     },
     "evm_genesis_block_hash": "37ad61cff1367467a98cf7c54c4ac99e989f1fbb1bc1e646235e90c065c565ba",
