@@ -27,7 +27,7 @@ pub struct BalanceArgs {
 pub async fn balance(args: BalanceArgs, seed: Seed, settings: Settings, esplora: EsploraClient) {
     let term = Term::stdout();
     if !args.signet && !args.rollup {
-        let _ = term.write_line("Must specify either --signet and --rollup option");
+        let _ = term.write_line("Must specify either --signet or --rollup option");
         std::process::exit(1);
     }
 
