@@ -96,33 +96,58 @@ impl CheckpointInfo {
 
 #[derive(Clone, Debug, PartialEq, Eq, BorshDeserialize, BorshSerialize, Arbitrary, Default)]
 pub struct CheckpointState {
-    /// Hash of the HeaderVerificationState
-    pub l1_state_hash: Buf32,
-    /// Hash of the ChainState
-    pub l2_state_hash: Buf32,
+    /// Hash Range of the HeaderVerificationState
+    /// The checkpoint proof guarantees right transition from initial_state to final_state
+    pub l1_transition: StateTransition,
+    /// Final Hash of the HeaderVerificationState
+    pub l2_transition: StateTransition,
     /// Total Accumulated PoW till this checkpoint
     pub acc_pow: u128,
 }
 
 impl CheckpointState {
-    pub fn new(l1_state_hash: Buf32, l2_state_hash: Buf32, acc_pow: u128) -> Self {
+    pub fn new(
+        l1_transition: StateTransition,
+        l2_transition: StateTransition,
+        acc_pow: u128,
+    ) -> Self {
         Self {
-            l1_state_hash,
-            l2_state_hash,
+            l1_transition,
+            l2_transition,
             acc_pow,
         }
     }
 
-    pub fn l1_state_hash(&self) -> &Buf32 {
-        &self.l1_state_hash
+    pub fn initial_l1_state_hash(&self) -> &Buf32 {
+        &self.l1_transition.from
     }
 
-    pub fn l2_state_hash(&self) -> &Buf32 {
-        &self.l2_state_hash
+    pub fn final_l1_state_hash(&self) -> &Buf32 {
+        &self.l1_transition.to
+    }
+
+    pub fn initial_l2_state_hash(&self) -> &Buf32 {
+        &self.l2_transition.from
+    }
+
+    pub fn final_l2_state_hash(&self) -> &Buf32 {
+        &self.l2_transition.to
     }
 
     pub fn acc_pow(&self) -> u128 {
         self.acc_pow
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, BorshDeserialize, BorshSerialize, Arbitrary, Default)]
+pub struct StateTransition {
+    pub from: Buf32,
+    pub to: Buf32,
+}
+
+impl StateTransition {
+    pub fn new(from: Buf32, to: Buf32) -> Self {
+        Self { from, to }
     }
 }
 

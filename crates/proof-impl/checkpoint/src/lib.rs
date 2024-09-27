@@ -4,7 +4,7 @@
 
 use alpen_express_primitives::buf::Buf32;
 use alpen_express_state::{
-    batch::{Checkpoint, CheckpointInfo, CheckpointState},
+    batch::{Checkpoint, CheckpointInfo, CheckpointState, StateTransition},
     id::L2BlockId,
     tx::DepositInfo,
 };
@@ -59,12 +59,12 @@ pub fn process_checkpoint_proof(
 
             assert_eq!(
                 &l1_batch.initial_snapshot.hash,
-                checkpoint_state.l1_state_hash(),
+                checkpoint_state.final_l1_state_hash(),
                 "L1 state mismatch"
             );
             assert_eq!(
                 &l2_batch.initial_snapshot.hash,
-                checkpoint_state.l2_state_hash(),
+                checkpoint_state.final_l2_state_hash(),
                 "L2 state mismatch"
             );
 
@@ -111,8 +111,8 @@ pub fn process_checkpoint_proof(
     );
 
     let state = CheckpointState::new(
-        l1_batch.final_snapshot.hash,
-        l2_batch.final_snapshot.hash,
+        StateTransition::new(l1_batch.initial_snapshot.hash, l1_batch.final_snapshot.hash),
+        StateTransition::new(l2_batch.initial_snapshot.hash, l2_batch.final_snapshot.hash),
         l1_batch.final_snapshot.acc_pow,
     );
 
