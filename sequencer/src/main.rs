@@ -318,7 +318,7 @@ fn start_sequencer_tasks<E: ExecEngineCtl + Send + Sync + 'static>(
     executor: &TaskExecutor,
     seq_db: Arc<SequencerDB<RBSeqBlobDb>>,
     sync_manager: Arc<SyncManager>,
-    db: Arc<CommonDb>,
+    database: Arc<CommonDb>,
     engine_ctl: Arc<E>,
     pool: threadpool::ThreadPool,
     l2_block_manager: Arc<L2BlockManager>,
@@ -331,11 +331,7 @@ fn start_sequencer_tasks<E: ExecEngineCtl + Send + Sync + 'static>(
     let idata = load_seqkey(&seq_config.sequencer_key)?;
 
     // Set up channel and clone some things.
-    let sm = sync_manager.clone();
-    let cu_rx = sm.create_cstate_subscription();
     let (duties_tx, duties_rx) = broadcast::channel::<DutyBatch>(8);
-    let db2 = db.clone();
-    let pool = pool.clone();
 
     // Spawn up writer
     let writer_config = WriterConfig::new(
@@ -364,16 +360,18 @@ fn start_sequencer_tasks<E: ExecEngineCtl + Send + Sync + 'static>(
     methods.merge(admin_rpc.into_rpc())?;
 
     // Spawn duty tasks.
-    let t_l2blkman = l2_block_manager.clone();
+    let cupdate_rx = sync_manager.create_cstate_subscription();
+    let t_l2_block_manager = l2_block_manager.clone();
     let t_params = params.clone();
+    let t_database = database.clone();
     executor.spawn_critical("duty_worker::duty_tracker_task", move |shutdown| {
         duty_worker::duty_tracker_task(
             shutdown,
-            cu_rx,
+            cupdate_rx,
             duties_tx,
             idata.ident,
-            db,
-            t_l2blkman,
+            t_database,
+            t_l2_block_manager,
             t_params,
         )
         .map_err(Into::into)
@@ -386,8 +384,8 @@ fn start_sequencer_tasks<E: ExecEngineCtl + Send + Sync + 'static>(
             d_executor,
             duties_rx,
             idata.key,
-            sm,
-            db2,
+            sync_manager,
+            database,
             engine_ctl,
             inscription_handle,
             pool,
@@ -403,12 +401,12 @@ fn start_broadcaster_tasks(
     broadcast_database: Arc<BroadcastDatabase>,
     pool: threadpool::ThreadPool,
     executor: &TaskExecutor,
-    btc_rpc: Arc<BitcoinClient>,
+    bitcoin_client: Arc<BitcoinClient>,
 ) -> Arc<L1BroadcastHandle> {
     // Set up L1 broadcaster.
     let broadcast_ctx = express_storage::ops::l1tx_broadcast::Context::new(broadcast_database);
     let broadcast_ops = Arc::new(broadcast_ctx.into_ops(pool));
     // start broadcast task
-    let broadcast_handle = spawn_broadcaster_task(executor, btc_rpc.clone(), broadcast_ops);
+    let broadcast_handle = spawn_broadcaster_task(executor, bitcoin_client.clone(), broadcast_ops);
     Arc::new(broadcast_handle)
 }

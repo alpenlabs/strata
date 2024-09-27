@@ -54,17 +54,17 @@ impl L1BroadcastHandle {
 pub fn spawn_broadcaster_task<T>(
     executor: &TaskExecutor,
     l1_rpc_client: Arc<T>,
-    bcast_ops: Arc<BroadcastDbOps>,
+    broadcast_ops: Arc<BroadcastDbOps>,
 ) -> L1BroadcastHandle
 where
     T: Reader + Broadcaster + Wallet + Signer + Send + Sync + 'static,
 {
-    let (bcast_tx, bcast_rx) = mpsc::channel::<(u64, L1TxEntry)>(64);
-    let ops = bcast_ops.clone();
+    let (broadcast_entry_tx, broadcast_entry_rx) = mpsc::channel::<(u64, L1TxEntry)>(64);
+    let ops = broadcast_ops.clone();
     executor.spawn_critical_async("l1_broadcaster_task", async move {
-        broadcaster_task(l1_rpc_client, ops, bcast_rx)
+        broadcaster_task(l1_rpc_client, ops, broadcast_entry_rx)
             .await
             .map_err(Into::into)
     });
-    L1BroadcastHandle::new(bcast_tx, bcast_ops)
+    L1BroadcastHandle::new(broadcast_entry_tx, broadcast_ops)
 }

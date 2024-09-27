@@ -24,7 +24,7 @@ type BlobIdx = u64;
 /// 3. A confirmed block that includes the tx gets reorged
 pub async fn create_and_sign_blob_inscriptions(
     blobentry: &BlobEntry,
-    bhandle: &L1BroadcastHandle,
+    broadcast_handle: &L1BroadcastHandle,
     client: Arc<impl Reader + Wallet + Signer>,
     config: &WriterConfig,
 ) -> Result<(Buf32, Buf32), InscriptionError> {
@@ -49,11 +49,11 @@ pub async fn create_and_sign_blob_inscriptions(
 
     // These don't need to be atomic. It will be handled by writer task if it does not find both
     // commit-reveal txs in db by triggering re-signing.
-    let _ = bhandle
+    let _ = broadcast_handle
         .put_tx_entry(cid, centry)
         .await
         .map_err(|e| InscriptionError::Other(e.into()))?;
-    let _ = bhandle
+    let _ = broadcast_handle
         .put_tx_entry(rid, rentry)
         .await
         .map_err(|e| InscriptionError::Other(e.into()))?;
