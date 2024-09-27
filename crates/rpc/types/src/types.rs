@@ -4,7 +4,9 @@
 //!  - implementation of RPC client
 //!  - crate for just data structures that represents the JSON responses from Bitcoin core RPC
 
-use alpen_express_state::{batch::CheckpointInfo, bridge_ops::WithdrawalIntent, id::L2BlockId};
+use alpen_express_state::{
+    batch::CheckpointInfo, bridge_duties::BridgeDuty, bridge_ops::WithdrawalIntent, id::L2BlockId,
+};
 use bitcoin::{Network, Txid};
 use serde::{Deserialize, Serialize};
 
@@ -236,4 +238,23 @@ impl From<CheckpointInfo> for RpcCheckpointInfo {
             l2_blockid: value.l2_blockid,
         }
     }
+}
+
+/// The duties assigned to an operator within a given range.
+///
+/// # Note
+///
+/// The `index`'s are only relevant for Deposit duties as those are stored off-chain in a database.
+/// The withdrawal duties are fetched from the current chain state.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BridgeDuties {
+    /// The actual [`BridgeDuty`]'s assigned to an operator which includes both the deposit and
+    /// withdrawal duties.
+    pub duties: Vec<BridgeDuty>,
+
+    /// The starting index (inclusive) from which the duties are fetched.
+    pub start_index: u64,
+
+    /// The last block index (inclusive) upto which the duties are feched.
+    pub stop_index: u64,
 }

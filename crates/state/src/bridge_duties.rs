@@ -36,6 +36,3 @@ impl From<CooperativeWithdrawalInfo> for BridgeDuty {
         Self::FulfillWithdrawal(value)
     }
 }
-
-/// An alias for a list of bridge duties for readability.
-pub type BridgeDuties = Vec<BridgeDuty>;

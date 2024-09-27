@@ -16,13 +16,14 @@ use alpen_express_primitives::{
 };
 use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer};
 use alpen_express_rpc_types::{
-    errors::RpcServerError as Error, BlockHeader, ClientStatus, DaBlob, DepositEntry, DepositState,
-    ExecUpdate, HexBytes, HexBytes32, L1Status, NodeSyncStatus, RawBlockWitness, RpcCheckpointInfo,
+    errors::RpcServerError as Error, BlockHeader, BridgeDuties, ClientStatus, DaBlob, DepositEntry,
+    DepositState, ExecUpdate, HexBytes, HexBytes32, L1Status, NodeSyncStatus, RawBlockWitness,
+    RpcCheckpointInfo,
 };
 use alpen_express_state::{
     batch::BatchCheckpoint,
     block::L2BlockBundle,
-    bridge_duties::{BridgeDuties, BridgeDuty},
+    bridge_duties::BridgeDuty,
     bridge_ops::WithdrawalIntent,
     chain_state::ChainState,
     client_state::ClientState,
@@ -38,7 +39,7 @@ use bitcoin::{
     hashes::Hash,
     key::Parity,
     secp256k1::{PublicKey, XOnlyPublicKey},
-    Network, Transaction as BTransaction, Txid,
+    Transaction as BTransaction, Txid,
 };
 use express_bridge_relay::relayer::RelayerHandle;
 use express_rpc_utils::to_jsonrpsee_error;
@@ -68,7 +69,6 @@ pub struct AlpenRpcImpl<D> {
     l2_block_manager: Arc<L2BlockManager>,
     checkpoint_handle: Arc<CheckpointHandle>,
     relayer_handle: Arc<RelayerHandle>,
-    bitcoind_network: Network,
 }
 
 impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
@@ -81,7 +81,6 @@ impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
         l2_block_manager: Arc<L2BlockManager>,
         checkpoint_handle: Arc<CheckpointHandle>,
         relayer_handle: Arc<RelayerHandle>,
-        bitcoind_network: Network,
     ) -> Self {
         Self {
             status_rx,
@@ -91,7 +90,6 @@ impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
             l2_block_manager,
             checkpoint_handle,
             relayer_handle,
-            bitcoind_network,
         }
     }
 
@@ -524,14 +522,16 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
     async fn get_bridge_duties(
         &self,
         operator_idx: OperatorIdx,
-        block_height: u64,
-    ) -> RpcResult<(BridgeDuties, u64)> {
-        info!(%operator_idx, %block_height, "received request for bridge duties");
+        start_index: u64,
+    ) -> RpcResult<BridgeDuties> {
+        info!(%operator_idx, %start_index, "received request for bridge duties");
 
         let l1_db_provider = self.database.l1_provider();
-        let network = self.bitcoind_network;
-        let (deposit_duties, latest_block_height) =
-            extract_deposit_requests(l1_db_provider, block_height, network).await?;
+
+        let network = self.status_rx.l1.borrow().network;
+
+        let (deposit_duties, latest_index) =
+            extract_deposit_requests(l1_db_provider, start_index, network).await?;
 
         let deposit_duties = deposit_duties.map(BridgeDuty::from);
 
@@ -542,18 +542,12 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         duties.extend(deposit_duties);
         duties.extend(withdrawal_duties);
 
-        info!(%operator_idx, %block_height, "dispatching duties");
-        Ok((duties, latest_block_height))
-    }
-
-    async fn get_checkpoint_info(&self, idx: u64) -> RpcResult<Option<RpcCheckpointInfo>> {
-        let entry = self
-            .checkpoint_handle
-            .get_checkpoint(idx)
-            .await
-            .map_err(|e| Error::Other(e.to_string()))?;
-        let batch_comm: Option<BatchCheckpoint> = entry.map(Into::into);
-        Ok(batch_comm.map(|bc| bc.checkpoint().info().clone().into()))
+        info!(%operator_idx, %start_index, "dispatching duties");
+        Ok(BridgeDuties {
+            duties,
+            start_index,
+            stop_index: latest_index,
+        })
     }
 
     async fn get_active_operator_chain_pubkey_set(&self) -> RpcResult<PublickeyTable> {
@@ -576,6 +570,16 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
             });
 
         Ok(operator_map.into())
+    }
+
+    async fn get_checkpoint_info(&self, idx: u64) -> RpcResult<Option<RpcCheckpointInfo>> {
+        let entry = self
+            .checkpoint_handle
+            .get_checkpoint(idx)
+            .await
+            .map_err(|e| Error::Other(e.to_string()))?;
+        let batch_comm: Option<BatchCheckpoint> = entry.map(Into::into);
+        Ok(batch_comm.map(|bc| bc.checkpoint().clone().into()))
     }
 }
 

@@ -3,9 +3,9 @@ use alpen_express_db::types::L1TxStatus;
 use alpen_express_primitives::bridge::{OperatorIdx, PublickeyTable};
 use alpen_express_rpc_types::{
     types::{BlockHeader, ClientStatus, DepositEntry, ExecUpdate, L1Status},
-    HexBytes, HexBytes32, NodeSyncStatus, RawBlockWitness, RpcCheckpointInfo,
+    BridgeDuties, HexBytes, HexBytes32, NodeSyncStatus, RawBlockWitness, RpcCheckpointInfo,
 };
-use alpen_express_state::{bridge_duties::BridgeDuties, id::L2BlockId};
+use alpen_express_state::id::L2BlockId;
 use bitcoin::{secp256k1::schnorr::Signature, Transaction, Txid};
 use express_bridge_tx_builder::prelude::{CooperativeWithdrawalInfo, DepositInfo};
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
@@ -13,7 +13,6 @@ use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "alp"))]
 #[cfg_attr(feature = "client", rpc(server, client, namespace = "alp"))]
 pub trait AlpenApi {
-    // TODO the rest of these
     #[method(name = "protocolVersion")]
     async fn protocol_version(&self) -> RpcResult<u64>;
 
@@ -71,22 +70,17 @@ pub trait AlpenApi {
     #[method(name = "submitBridgeMsg")]
     async fn submit_bridge_msg(&self, raw_msg: HexBytes) -> RpcResult<()>;
 
-    /// Get the bridge duties from a certain `block_height` for a given [`OperatorIdx`] along with
-    /// the latest L1 `block_height` (for deposit duties).
+    /// Get the [`BridgeDuties`] from a certain `start_index` for a given [`OperatorIdx`].
     ///
-    /// The `block_height` is a monotonically increasing number with no gaps. So, it is safe to call
-    /// this method with any `u64` value. If an entry corresponding to the `block_height` is not
+    /// The `start_index` is a monotonically increasing number with no gaps. So, it is safe to call
+    /// this method with any `u64` value. If an entry corresponding to the `start_index` is not
     /// found, an empty list is returned.
     #[method(name = "getBridgeDuties")]
     async fn get_bridge_duties(
         &self,
         operator_idx: OperatorIdx,
-        block_height: u64,
-    ) -> RpcResult<(BridgeDuties, u64)>;
-
-    /// Get nth checkpoint info if any
-    #[method(name = "getCheckpointInfo")]
-    async fn get_checkpoint_info(&self, idx: u64) -> RpcResult<Option<RpcCheckpointInfo>>;
+        start_index: u64,
+    ) -> RpcResult<BridgeDuties>;
 
     /// Get the operators' public key table that is used to sign transactions and messages.
     ///
@@ -99,6 +93,10 @@ pub trait AlpenApi {
     // same as the wallet key if we decide to change the signature scheme.
     #[method(name = "getActiveOperatorChainPubkeySet")]
     async fn get_active_operator_chain_pubkey_set(&self) -> RpcResult<PublickeyTable>;
+
+    /// Get nth checkpoint info if any
+    #[method(name = "getCheckpointInfo")]
+    async fn get_checkpoint_info(&self, idx: u64) -> RpcResult<Option<RpcCheckpointInfo>>;
 }
 
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "alpadmin"))]

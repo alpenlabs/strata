@@ -469,7 +469,6 @@ async fn start_rpc<D: Database + Send + Sync + 'static>(
     params: Arc<Params>,
 ) -> anyhow::Result<()> {
     let (stop_tx, stop_rx) = oneshot::channel();
-    let bitcoind_network = config.bitcoind_rpc.network;
 
     // Init RPC impls.
     let alp_rpc = rpc_server::AlpenRpcImpl::new(
@@ -480,7 +479,6 @@ async fn start_rpc<D: Database + Send + Sync + 'static>(
         l2_block_manager.clone(),
         checkpt_handle.clone(),
         relayer_handle,
-        bitcoind_network,
     );
 
     let admin_rpc = rpc_server::AdminServerImpl::new(
