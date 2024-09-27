@@ -137,50 +137,51 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         bitcoin_client,
     )?;
 
-    // If we're a sequencer, start the sequencer db and duties task.
-    if let ClientMode::Sequencer(sequencer_config) = &config.client.client_mode {
-        let broadcast_database = init_broadcaster_database(rbdb.clone(), ops_config);
-        let broadcast_handle = start_broadcaster_tasks(
-            broadcast_database,
-            ctx.pool.clone(),
-            &executor,
-            ctx.bitcoin_client.clone(),
-        );
-        let seq_db = init_sequencer_database(rbdb.clone(), ops_config);
+    match &config.client.client_mode {
+        // If we're a sequencer, start the sequencer db and duties task.
+        ClientMode::Sequencer(sequencer_config) => {
+            let broadcast_database = init_broadcaster_database(rbdb.clone(), ops_config);
+            let broadcast_handle = start_broadcaster_tasks(
+                broadcast_database,
+                ctx.pool.clone(),
+                &executor,
+                ctx.bitcoin_client.clone(),
+            );
+            let seq_db = init_sequencer_database(rbdb.clone(), ops_config);
 
-        start_sequencer_tasks(
-            ctx.clone(),
-            &config,
-            sequencer_config,
-            &executor,
-            seq_db,
-            checkpoint_handle.clone(),
-            broadcast_handle,
-            &mut methods,
-        )?;
-    };
+            start_sequencer_tasks(
+                ctx.clone(),
+                &config,
+                sequencer_config,
+                &executor,
+                seq_db,
+                checkpoint_handle.clone(),
+                broadcast_handle,
+                &mut methods,
+            )?;
+        }
+        ClientMode::FullNode(fullnode_config) => {
+            let sequencer_rpc = &fullnode_config.sequencer_rpc;
+            info!(?sequencer_rpc, "initing fullnode task");
 
-    if let ClientMode::FullNode(fullnode_config) = &config.client.client_mode {
-        let sequencer_rpc = &fullnode_config.sequencer_rpc;
-        info!(?sequencer_rpc, "initing fullnode task");
+            let rpc_client = runtime.block_on(sync_client(sequencer_rpc));
+            let sync_peer = RpcSyncPeer::new(rpc_client, 10);
+            let l2_sync_context = L2SyncContext::new(
+                sync_peer,
+                ctx.l2_block_manager.clone(),
+                ctx.sync_manager.clone(),
+            );
+            // NOTE: this might block for some time during first run with empty db until genesis
+            // block is generated
+            let mut l2_sync_state =
+                express_sync::block_until_csm_ready_and_init_sync_state(&l2_sync_context)?;
 
-        let rpc_client = runtime.block_on(sync_client(sequencer_rpc));
-        let sync_peer = RpcSyncPeer::new(rpc_client, 10);
-        let l2_sync_context = L2SyncContext::new(
-            sync_peer,
-            ctx.l2_block_manager.clone(),
-            ctx.sync_manager.clone(),
-        );
-        // NOTE: this might block for some time during first run with empty db until genesis block
-        // is generated
-        let mut l2_sync_state =
-            express_sync::block_until_csm_ready_and_init_sync_state(&l2_sync_context)?;
-
-        executor.spawn_critical_async("l2-sync-manager", async move {
-            express_sync::sync_worker(&mut l2_sync_state, &l2_sync_context)
-                .await
-                .map_err(Into::into)
-        });
+            executor.spawn_critical_async("l2-sync-manager", async move {
+                express_sync::sync_worker(&mut l2_sync_state, &l2_sync_context)
+                    .await
+                    .map_err(Into::into)
+            });
+        }
     }
 
     executor.spawn_critical_async(
