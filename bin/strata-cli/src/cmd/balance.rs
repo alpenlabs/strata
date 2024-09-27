@@ -5,7 +5,12 @@ use alloy::{
 use argh::FromArgs;
 use console::Term;
 
-use crate::{rollup::RollupWallet, seed::Seed, signet::SignetWallet};
+use crate::{
+    rollup::RollupWallet,
+    seed::Seed,
+    settings::Settings,
+    signet::{EsploraClient, SignetWallet},
+};
 
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "balance")]
@@ -19,7 +24,7 @@ pub struct BalanceArgs {
     rollup: bool,
 }
 
-pub async fn balance(args: BalanceArgs, seed: Seed) {
+pub async fn balance(args: BalanceArgs, seed: Seed, settings: Settings, esplora: EsploraClient) {
     let term = Term::stdout();
     if !args.signet && !args.rollup {
         let _ = term.write_line("Must specify either --signet and --rollup option");
@@ -28,7 +33,7 @@ pub async fn balance(args: BalanceArgs, seed: Seed) {
 
     if args.signet {
         let mut l1w = SignetWallet::new(&seed).unwrap();
-        l1w.sync().await.unwrap();
+        l1w.sync(&esplora).await.unwrap();
         let balance = l1w.balance();
         let _ = term.write_line(&format!("Total: {}", balance.total()));
         let _ = term.write_line(&format!("  Confirmed: {}", balance.confirmed));
@@ -41,7 +46,7 @@ pub async fn balance(args: BalanceArgs, seed: Seed) {
     }
 
     if args.rollup {
-        let l2w = RollupWallet::new(&seed).unwrap();
+        let l2w = RollupWallet::new(&seed, &settings.l2_http_endpoint).unwrap();
         let _ = term.write_line("Getting balance...");
         let balance = l2w.get_balance(l2w.default_signer_address()).await.unwrap();
         // 1 BTC = 1 ETH

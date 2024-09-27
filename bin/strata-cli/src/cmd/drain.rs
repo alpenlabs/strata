@@ -11,8 +11,8 @@ use console::{style, Term};
 use crate::{
     rollup::RollupWallet,
     seed::Seed,
-    settings::SETTINGS,
-    signet::{get_fee_rate, log_fee_rate, SignetWallet, ESPLORA_CLIENT},
+    settings::Settings,
+    signet::{get_fee_rate, log_fee_rate, EsploraClient, SignetWallet},
 };
 
 #[derive(FromArgs, PartialEq, Debug)]
@@ -34,6 +34,8 @@ pub async fn drain(
         rollup_address,
     }: DrainArgs,
     seed: Seed,
+    settings: Settings,
+    esplora: EsploraClient,
 ) {
     let term = Term::stdout();
     if rollup_address.is_none() && signet_address.is_none() {
@@ -43,7 +45,7 @@ pub async fn drain(
     let signet_address = signet_address.map(|a| {
         Address::from_str(&a)
             .expect("valid signet address")
-            .require_network(SETTINGS.network)
+            .require_network(settings.network)
             .expect("correct network")
     });
     let rollup_address =
@@ -51,7 +53,7 @@ pub async fn drain(
 
     if let Some(address) = signet_address {
         let mut l1w = SignetWallet::new(&seed).unwrap();
-        l1w.sync().await.unwrap();
+        l1w.sync(&esplora).await.unwrap();
         let balance = l1w.balance();
         if balance.untrusted_pending > Amount::ZERO {
             let _ = term.write_line(
@@ -59,7 +61,7 @@ pub async fn drain(
                     .yellow().to_string()
             );
         }
-        let fr = get_fee_rate(1).await.unwrap().unwrap();
+        let fr = get_fee_rate(1, &esplora).await.unwrap().unwrap();
         log_fee_rate(&term, &fr);
         let mut psbt = l1w
             .build_tx()
@@ -70,11 +72,11 @@ pub async fn drain(
             .expect("valid transaction");
         l1w.sign(&mut psbt, Default::default()).unwrap();
         let tx = psbt.extract_tx().expect("fully signed tx");
-        ESPLORA_CLIENT.broadcast(&tx).await.unwrap();
+        esplora.broadcast(&tx).await.unwrap();
     }
 
     if let Some(address) = rollup_address {
-        let l2w = RollupWallet::new(&seed).unwrap();
+        let l2w = RollupWallet::new(&seed, &settings.l2_http_endpoint).unwrap();
         let balance = l2w.get_balance(l2w.default_signer_address()).await.unwrap();
         if balance == U256::ZERO {
             let _ = term.write_line("No rollup funds to send");

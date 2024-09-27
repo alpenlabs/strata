@@ -13,7 +13,7 @@ use console::Term;
 use indicatif::ProgressBar;
 
 use crate::{
-    rollup::RollupWallet, seed::Seed, settings::SETTINGS, signet::SignetWallet,
+    rollup::RollupWallet, seed::Seed, settings::Settings, signet::SignetWallet,
     taproot::ExtractP2trPubkey,
 };
 
@@ -25,16 +25,16 @@ pub struct BridgeOutArgs {
     p2tr_address: Option<String>,
 }
 
-pub async fn bridge_out(args: BridgeOutArgs, seed: Seed) {
+pub async fn bridge_out(args: BridgeOutArgs, seed: Seed, settings: Settings) {
     let address = args.p2tr_address.map(|a| {
         Address::from_str(&a)
             .expect("valid address")
-            .require_network(SETTINGS.network)
+            .require_network(settings.network)
             .expect("correct network")
     });
 
     let mut l1w = SignetWallet::new(&seed).unwrap();
-    let l2w = RollupWallet::new(&seed).unwrap();
+    let l2w = RollupWallet::new(&seed, &settings.l2_http_endpoint).unwrap();
 
     let address = match address {
         Some(a) => a,
@@ -52,7 +52,7 @@ pub async fn bridge_out(args: BridgeOutArgs, seed: Seed) {
 
     let tx = l2w
         .transaction_request()
-        .with_to(SETTINGS.bridge_rollup_address)
+        .with_to(settings.bridge_rollup_address)
         .with_value(U256::from(AMOUNT.to_sat() * 1u64.pow(10)))
         .input(TransactionInput::new(
             address

@@ -17,8 +17,8 @@ use crate::{
     recovery::DescriptorRecovery,
     rollup::RollupWallet,
     seed::Seed,
-    settings::SETTINGS,
-    signet::{get_fee_rate, log_fee_rate, SignetWallet, ESPLORA_CLIENT},
+    settings::Settings,
+    signet::{get_fee_rate, log_fee_rate, EsploraClient, SignetWallet},
     taproot::{ExtractP2trPubkey, NotTaprootAddress, UNSPENDABLE},
 };
 
@@ -31,15 +31,15 @@ pub struct BridgeInArgs {
     rollup_address: Option<String>,
 }
 
-pub async fn bridge_in(args: BridgeInArgs, seed: Seed) {
+pub async fn bridge_in(args: BridgeInArgs, seed: Seed, settings: Settings, esplora: EsploraClient) {
     let term = Term::stdout();
     let requested_rollup_address = args
         .rollup_address
         .map(|a| RollupAddress::from_str(&a).expect("bad rollup address"));
     let mut l1w = SignetWallet::new(&seed).unwrap();
-    let l2w = RollupWallet::new(&seed).unwrap();
+    let l2w = RollupWallet::new(&seed, &settings.l2_http_endpoint).unwrap();
 
-    l1w.sync().await.unwrap();
+    l1w.sync(&esplora).await.unwrap();
     let recovery_address = l1w.reveal_next_address(KeychainKind::External).address;
     l1w.persist().unwrap();
 
@@ -57,16 +57,16 @@ pub async fn bridge_in(args: BridgeInArgs, seed: Seed) {
     ));
 
     let (bridge_in_desc, recovery_script_hash) =
-        bridge_in_descriptor(SETTINGS.bridge_musig2_pubkey, recovery_address)
+        bridge_in_descriptor(settings.bridge_musig2_pubkey, recovery_address)
             .expect("valid bridge in descriptor");
 
     let desc = bridge_in_desc
         .clone()
-        .into_wallet_descriptor(l1w.secp_ctx(), SETTINGS.network)
+        .into_wallet_descriptor(l1w.secp_ctx(), settings.network)
         .expect("valid descriptor");
 
     let mut temp_wallet = Wallet::create_single(desc.clone())
-        .network(SETTINGS.network)
+        .network(settings.network)
         .create_wallet_no_persist()
         .expect("valid wallet");
 
@@ -87,7 +87,7 @@ pub async fn bridge_in(args: BridgeInArgs, seed: Seed) {
         style(bridge_in_address.to_string()).yellow()
     ));
 
-    let fee_rate = get_fee_rate(1)
+    let fee_rate = get_fee_rate(1, &esplora)
         .await
         .expect("should get fee rate")
         .expect("should have valid fee rate");
@@ -117,23 +117,27 @@ pub async fn bridge_in(args: BridgeInArgs, seed: Seed) {
     let pb = ProgressBar::new_spinner().with_message("Saving output descriptor");
     pb.enable_steady_tick(Duration::from_millis(100));
 
-    let mut desc_file = DescriptorRecovery::open(&seed).await.unwrap();
+    let mut desc_file = DescriptorRecovery::open(&seed, &settings.descriptor_db)
+        .await
+        .unwrap();
     desc_file
-        .add_desc(recover_at, &bridge_in_desc, l1w.secp_ctx())
+        .add_desc(
+            recover_at,
+            &bridge_in_desc,
+            l1w.secp_ctx(),
+            settings.network,
+        )
         .await
         .unwrap();
     pb.finish_with_message("Saved output descriptor");
 
     let pb = ProgressBar::new_spinner().with_message("Broadcasting transaction");
     pb.enable_steady_tick(Duration::from_millis(100));
-    ESPLORA_CLIENT
-        .broadcast(&tx)
-        .await
-        .expect("successful broadcast");
+    esplora.broadcast(&tx).await.expect("successful broadcast");
     pb.finish_with_message(format!("Transaction {} broadcasted", tx.compute_txid()));
     let _ = term.write_line(&format!(
         "Expect transaction confirmation in ~{:?}. Funds will take longer than this to be available on rollup.",
-        SETTINGS.block_time
+        settings.block_time
     ));
 }
 

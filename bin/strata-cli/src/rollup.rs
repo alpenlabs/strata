@@ -12,7 +12,7 @@ use alloy::{
     transports::http::{Client, Http},
 };
 
-use crate::{seed::Seed, settings::SETTINGS};
+use crate::seed::Seed;
 
 // alloy moment 💀
 type Provider = FillProvider<
@@ -48,18 +48,13 @@ impl Deref for RollupWallet {
 pub struct L2EndpointParseError;
 
 impl RollupWallet {
-    pub fn new(seed: &Seed) -> Result<Self, L2EndpointParseError> {
+    pub fn new(seed: &Seed, l2_http_endpoint: &str) -> Result<Self, L2EndpointParseError> {
         let wallet = seed.rollup_wallet();
 
         let provider = ProviderBuilder::new()
             .with_recommended_fillers()
             .wallet(wallet)
-            .on_http(
-                SETTINGS
-                    .l2_http_endpoint
-                    .parse()
-                    .map_err(|_| L2EndpointParseError)?,
-            );
+            .on_http(l2_http_endpoint.parse().map_err(|_| L2EndpointParseError)?);
         Ok(Self(provider))
     }
 }

@@ -2,9 +2,9 @@ use std::{
     cell::RefCell,
     io,
     ops::{Deref, DerefMut},
-    path::PathBuf,
+    path::{Path, PathBuf},
     rc::Rc,
-    sync::LazyLock,
+    sync::OnceLock,
 };
 
 use bdk_esplora::{
@@ -19,13 +19,16 @@ use bdk_wallet::{
 use console::{style, Term};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 
-use crate::{seed::Seed, settings::SETTINGS};
+use crate::seed::Seed;
 
 const NETWORK: Network = Network::Signet;
 
 /// Retrieves an estimated fee rate to settle a transaction in `target` blocks
-pub async fn get_fee_rate(target: u16) -> Result<Option<FeeRate>, esplora_client::Error> {
-    Ok(ESPLORA_CLIENT
+pub async fn get_fee_rate(
+    target: u16,
+    esplora_client: &AsyncClient,
+) -> Result<Option<FeeRate>, esplora_client::Error> {
+    Ok(esplora_client
         .get_fee_estimates()
         .await
         .map(|frs| frs.get(&target).cloned())?
@@ -40,24 +43,42 @@ pub fn log_fee_rate(term: &Term, fr: &FeeRate) {
     ));
 }
 
-/// Shared async client for esplora
-pub static ESPLORA_CLIENT: LazyLock<AsyncClient> = LazyLock::new(|| {
-    esplora_client::Builder::new(&SETTINGS.esplora)
-        .build_async()
-        .expect("valid esplora config")
-});
+#[derive(Clone)]
+pub struct EsploraClient(AsyncClient);
+
+impl DerefMut for EsploraClient {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl Deref for EsploraClient {
+    type Target = AsyncClient;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl EsploraClient {
+    pub fn new(esplora_url: &str) -> Result<Self, esplora_client::Error> {
+        Ok(Self(
+            esplora_client::Builder::new(esplora_url).build_async()?,
+        ))
+    }
+}
 
 #[derive(Debug)]
 /// A wrapper around BDK's wallet with some custom logic
 pub struct SignetWallet(PersistedWallet<Persister>);
 
 impl SignetWallet {
-    fn db_path(wallet: &str) -> PathBuf {
-        SETTINGS.data_dir.join(wallet).with_extension("sqlite")
+    fn db_path(wallet: &str, data_dir: &Path) -> PathBuf {
+        data_dir.join(wallet).with_extension("sqlite")
     }
 
-    pub fn persister() -> Result<Connection, rusqlite::Error> {
-        Connection::open(Self::db_path("default"))
+    pub fn persister(data_dir: &Path) -> Result<Connection, rusqlite::Error> {
+        Connection::open(Self::db_path("default", data_dir))
     }
 
     pub fn new(seed: &Seed) -> io::Result<Self> {
@@ -75,7 +96,10 @@ impl SignetWallet {
         ))
     }
 
-    pub async fn sync(&mut self) -> Result<(), Box<esplora_client::Error>> {
+    pub async fn sync(
+        &mut self,
+        esplora_client: &AsyncClient,
+    ) -> Result<(), Box<esplora_client::Error>> {
         let term = Term::stdout();
         let _ = term.write_line("Syncing wallet...");
         let sty = ProgressStyle::with_template(
@@ -113,7 +137,7 @@ impl SignetWallet {
             })
             .build();
 
-        let update = ESPLORA_CLIENT.sync(req, 3).await?;
+        let update = esplora_client.sync(req, 3).await?;
         ops2.finish();
         spks2.finish();
         txids2.finish();
@@ -146,12 +170,25 @@ impl DerefMut for SignetWallet {
 /// Wrapper around the built-in rusqlite db that allows [`PersistedWallet`] to be
 /// shared across multiple threads by lazily initializing per core connections
 /// to the sqlite db and keeping them in local thread storage instead of sharing
-/// the connection across cores
+/// the connection across cores.
+///
+/// WARNING: [`set_data_dir`] **MUST** be called and set before using [`Persister`].
 #[derive(Debug)]
 pub struct Persister;
 
+static DATA_DIR: OnceLock<PathBuf> = OnceLock::new();
+
+/// Sets the data directory static for the thread local DB.
+///
+/// Must be called before accessing [`Persister`].
+///
+/// Can only be set once - will return whether value was set.
+pub fn set_data_dir(data_dir: PathBuf) -> bool {
+    DATA_DIR.set(data_dir).is_ok()
+}
+
 thread_local! {
-    static DB: Rc<RefCell<Connection>> = RefCell::new(Connection::open(SignetWallet::db_path("default")).unwrap()).into();
+    static DB: Rc<RefCell<Connection>> = RefCell::new(Connection::open(SignetWallet::db_path("default", DATA_DIR.get().expect("data dir to be set"))).unwrap()).into();
 }
 
 impl Persister {

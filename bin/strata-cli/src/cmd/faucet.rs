@@ -11,7 +11,7 @@ use reqwest::{StatusCode, Url};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::{rollup::RollupWallet, seed::Seed, settings::SETTINGS, signet::SignetWallet};
+use crate::{rollup::RollupWallet, seed::Seed, settings::Settings, signet::SignetWallet};
 
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "faucet")]
@@ -36,7 +36,7 @@ pub struct PowChallenge {
     difficulty: u8,
 }
 
-pub async fn faucet(args: FaucetArgs, seed: Seed) {
+pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
     let term = Term::stdout();
     if args.signet && args.rollup {
         let _ = term.write_line("Cannot use both --signet and --rollup options at once");
@@ -49,7 +49,7 @@ pub async fn faucet(args: FaucetArgs, seed: Seed) {
     let _ = term.write_line("Fetching challenge from faucet");
 
     let client = reqwest::Client::new();
-    let base = Url::from_str(&SETTINGS.faucet_endpoint).expect("valid url");
+    let base = Url::from_str(&settings.faucet_endpoint).expect("valid url");
     let challenge = client
         .get(base.join("/pow_challenge").unwrap())
         .send()
@@ -96,7 +96,7 @@ pub async fn faucet(args: FaucetArgs, seed: Seed) {
             Some(address) => {
                 let address = Address::from_str(&address).expect("bad address");
                 address
-                    .require_network(SETTINGS.network)
+                    .require_network(settings.network)
                     .expect("wrong bitcoin network")
             }
         };
@@ -109,7 +109,7 @@ pub async fn faucet(args: FaucetArgs, seed: Seed) {
             address
         )
     } else if args.rollup {
-        let l2w = RollupWallet::new(&seed).unwrap();
+        let l2w = RollupWallet::new(&seed, &settings.l2_http_endpoint).unwrap();
         // they said EVMs were advanced 👁️👁️
         let address = match args.address {
             Some(address) => RollupAddress::from_str(&address).expect("bad address"),

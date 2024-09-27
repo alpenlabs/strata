@@ -8,8 +8,8 @@ use console::{style, Term};
 use crate::{
     recovery::DescriptorRecovery,
     seed::Seed,
-    settings::SETTINGS,
-    signet::{get_fee_rate, SignetWallet, ESPLORA_CLIENT},
+    settings::Settings,
+    signet::{get_fee_rate, EsploraClient, SignetWallet},
 };
 
 #[derive(FromArgs, PartialEq, Debug)]
@@ -17,13 +17,15 @@ use crate::{
 /// Runs any background tasks manually
 pub struct RefreshArgs {}
 
-pub async fn refresh(seed: Seed) {
+pub async fn refresh(seed: Seed, settings: Settings, esplora: EsploraClient) {
     let term = Term::stdout();
     let mut l1w = SignetWallet::new(&seed).unwrap();
-    l1w.sync().await.unwrap();
+    l1w.sync(&esplora).await.unwrap();
 
     let _ = term.write_line("Opening descriptor recovery");
-    let mut descriptor_file = DescriptorRecovery::open(&seed).await.unwrap();
+    let mut descriptor_file = DescriptorRecovery::open(&seed, &settings.descriptor_db)
+        .await
+        .unwrap();
     let current_height = l1w.local_chain().get_chain_tip().unwrap().height;
     let _ = term.write_line(&format!("Current signet chain height: {current_height}"));
     let descs = descriptor_file
@@ -36,7 +38,7 @@ pub async fn refresh(seed: Seed) {
         return;
     }
 
-    let fee_rate = get_fee_rate(1)
+    let fee_rate = get_fee_rate(1, &esplora)
         .await
         .expect("request should succeed")
         .expect("valid target");
@@ -44,18 +46,18 @@ pub async fn refresh(seed: Seed) {
     for desc in descs {
         let desc = desc
             .clone()
-            .into_wallet_descriptor(l1w.secp_ctx(), SETTINGS.network)
+            .into_wallet_descriptor(l1w.secp_ctx(), settings.network)
             .expect("valid descriptor");
 
         let mut recovery_wallet = Wallet::create_single(desc)
-            .network(SETTINGS.network)
+            .network(settings.network)
             .create_wallet_no_persist()
             .expect("valid wallet");
 
         // reveal the address for the wallet so we can sync it
         let address = recovery_wallet.reveal_next_address(KeychainKind::External);
         let req = recovery_wallet.start_sync_with_revealed_spks().build();
-        let update = ESPLORA_CLIENT.sync(req, 3).await.unwrap();
+        let update = esplora.sync(req, 3).await.unwrap();
         recovery_wallet.apply_update(update).unwrap();
         let needs_recovery = recovery_wallet.balance().confirmed > Amount::ZERO;
 
@@ -89,7 +91,7 @@ pub async fn refresh(seed: Seed) {
             .expect("valid sign op");
 
         let tx = psbt.extract_tx().unwrap();
-        ESPLORA_CLIENT
+        esplora
             .broadcast(&tx)
             .await
             .expect("successful tx broadcast");

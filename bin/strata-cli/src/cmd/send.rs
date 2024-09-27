@@ -14,8 +14,8 @@ use hex::encode;
 use crate::{
     rollup::RollupWallet,
     seed::Seed,
-    settings::SETTINGS,
-    signet::{get_fee_rate, SignetWallet, ESPLORA_CLIENT},
+    settings::Settings,
+    signet::{get_fee_rate, EsploraClient, SignetWallet},
 };
 
 #[derive(FromArgs, PartialEq, Debug)]
@@ -35,7 +35,7 @@ pub struct SendArgs {
     address: String,
 }
 
-pub async fn send(args: SendArgs, seed: Seed) {
+pub async fn send(args: SendArgs, seed: Seed, settings: Settings, esplora: EsploraClient) {
     let term = Term::stdout();
     if args.signet && args.rollup {
         let _ = term.write_line("Cannot use both --signet and --rollup options at once");
@@ -49,11 +49,11 @@ pub async fn send(args: SendArgs, seed: Seed) {
         let amount = Amount::from_sat(args.amount);
         let address = Address::from_str(&args.address)
             .expect("valid address")
-            .require_network(SETTINGS.network)
+            .require_network(settings.network)
             .expect("correct network");
         let mut l1w = SignetWallet::new(&seed).unwrap();
-        l1w.sync().await.unwrap();
-        let fee_rate = get_fee_rate(1).await.unwrap().unwrap();
+        l1w.sync(&esplora).await.unwrap();
+        let fee_rate = get_fee_rate(1, &esplora).await.unwrap().unwrap();
         let mut psbt = l1w
             .build_tx()
             .add_recipient(address.script_pubkey(), amount)
@@ -64,10 +64,10 @@ pub async fn send(args: SendArgs, seed: Seed) {
             .unwrap();
         l1w.sign(&mut psbt, Default::default()).unwrap();
         let tx = psbt.extract_tx().unwrap();
-        ESPLORA_CLIENT.broadcast(&tx).await.unwrap();
+        esplora.broadcast(&tx).await.unwrap();
         tx.compute_txid().as_raw_hash().to_byte_array()
     } else if args.rollup {
-        let l2w = RollupWallet::new(&seed).unwrap();
+        let l2w = RollupWallet::new(&seed, &settings.l2_http_endpoint).unwrap();
         let address = RollupAddress::from_str(&args.address).expect("valid address");
         let tx = TransactionRequest::default()
             .with_to(address)

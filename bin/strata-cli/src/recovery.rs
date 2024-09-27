@@ -1,6 +1,7 @@
 use std::{
     collections::{BTreeMap, HashSet},
     io::{self, Cursor, Read},
+    path::Path,
     str::FromStr,
     string::FromUtf8Error,
 };
@@ -18,7 +19,7 @@ use sha2::{Digest, Sha256};
 use terrors::OneOf;
 use tokio::io::AsyncReadExt;
 
-use crate::{seed::Seed, settings::SETTINGS};
+use crate::seed::Seed;
 
 pub struct DescriptorRecovery(sled::Db, Aes256GcmSiv);
 
@@ -28,6 +29,7 @@ impl DescriptorRecovery {
         recover_at: u32,
         desc: &DescriptorTemplateOut,
         secp: &Secp256k1<All>,
+        network: Network,
     ) -> io::Result<()> {
         // the amount of allocation here hurts me emotionally
         // yes, we can't just serialize to bytes 👁️👁️
@@ -35,7 +37,7 @@ impl DescriptorRecovery {
             let mut key = Vec::from(recover_at.to_be_bytes());
             // wallet_name_from_descriptor will actually write the private key inside the descriptor
             // to the name atm so we hash it just to make sure
-            let name = wallet_name_from_descriptor(desc.0.clone(), None, SETTINGS.network, secp)
+            let name = wallet_name_from_descriptor(desc.0.clone(), None, network, secp)
                 .expect("valid descriptor");
             let mut hasher = Sha256::new();
             hasher.update(name.as_bytes());
@@ -118,10 +120,10 @@ impl DescriptorRecovery {
         Ok(())
     }
 
-    pub async fn open(seed: &Seed) -> io::Result<Self> {
+    pub async fn open(seed: &Seed, descriptor_db: &Path) -> io::Result<Self> {
         let key = seed.descriptor_recovery_key();
         let cipher = Aes256GcmSiv::new(&key.into());
-        Ok(Self(sled::open(&SETTINGS.descriptor_db)?, cipher))
+        Ok(Self(sled::open(descriptor_db)?, cipher))
     }
 
     pub async fn read_descs_after(
