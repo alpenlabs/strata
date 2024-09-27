@@ -4,6 +4,7 @@ import logging as log
 import os
 import sys
 import time
+from math import ceil
 from threading import Thread
 from typing import Optional, TypedDict
 
@@ -393,10 +394,20 @@ class BasicEnvConfig(flexitest.EnvConfig):
 
         seqaddr = brpc.proxy.getnewaddress()
 
+        chunk_size = 500
         while self.pre_generate_blocks > 0:
             batch_size = min(self.pre_generate_blocks, 1000)
-            print(f"Pre generating {batch_size} blocks to address {seqaddr}")
-            brpc.proxy.generatetoaddress(batch_size, seqaddr)
+
+            # generate blocks in chunks to avoid timeout
+            num_chunks = ceil(batch_size / chunk_size)
+            for i in range(0, batch_size, chunk_size):
+                chunk = int(i / chunk_size) + 1
+                num_blocks = int(min(chunk_size, batch_size - (chunk - 1) * chunk_size))
+                chunk = f"{chunk}/{num_chunks}"
+
+                print(f"Pre generating {num_blocks} blocks to address {seqaddr}; chunk = {chunk}")
+                brpc.proxy.generatetoaddress(chunk_size, seqaddr)
+
             self.pre_generate_blocks -= batch_size
 
         # generate blocks every 500 millis

@@ -90,6 +90,17 @@ pub trait L1DataProvider {
     /// state.
     fn get_last_mmr_to(&self, idx: u64) -> DbResult<Option<CompactMmr>>;
 
+    /// Get the [`L1Tx`]'s from a certain index (including the index) in a single flattened list
+    /// along with the latest index.
+    ///
+    /// This is an infallible RPC. If the `start_idx` is invalid, an empty `Vec` is returned along
+    /// with whatever `start_idx` this method was called with.
+    ///
+    /// # Errors
+    ///
+    /// This only errors if there is an error from the underlying persistence layer.
+    fn get_txs_from(&self, start_idx: u64) -> DbResult<(Vec<L1Tx>, u64)>;
+
     // TODO DA queries
 }
 

@@ -4,6 +4,7 @@ use std::convert::TryInto;
 
 use alpen_express_state::tx::DepositRequestInfo;
 use bitcoin::{opcodes::all::OP_RETURN, ScriptBuf, Transaction};
+use tracing::debug;
 
 use super::{
     common::{check_bridge_offer_output, DepositRequestScriptInfo},
@@ -48,10 +49,12 @@ pub fn parse_deposit_request_script(
 
     // check if OP_RETURN is present and if not just discard it
     if next_op(&mut instructions) != Some(OP_RETURN) {
+        debug!(?instructions, "missing op_return");
         return Err(DepositParseError::NoOpReturn);
     }
 
     let Some(data) = next_bytes(&mut instructions) else {
+        debug!("no data after OP_RETURN");
         return Err(DepositParseError::NoData);
     };
 
@@ -60,13 +63,16 @@ pub fn parse_deposit_request_script(
     // data has expected magic bytes
     let magic_bytes = &config.magic_bytes;
     let magic_len = magic_bytes.len();
-    if data.len() < magic_len || &data[..magic_len] != magic_bytes {
+    let actual_magic_bytes = &data[..magic_len];
+    if data.len() < magic_len || actual_magic_bytes != magic_bytes {
+        debug!(expected_magic_bytes = ?magic_bytes, ?actual_magic_bytes, "mismatched magic bytes");
         return Err(DepositParseError::MagicBytesMismatch);
     }
 
     // 32 bytes of control hash
     let data = &data[magic_len..];
     if data.len() < 32 {
+        debug!(?data, expected = 32, got = %data.len(), "incorrect number of bytes in hash");
         return Err(DepositParseError::LeafHashLenMismatch);
     }
     let ctrl_hash: &[u8; 32] = &data[..32]
@@ -77,6 +83,7 @@ pub fn parse_deposit_request_script(
     let address = &data[32..];
     if address.len() != config.address_length as usize {
         // casting is safe as address.len() < data.len() < 80
+        debug!(?data, expected = config.address_length, got = %address.len(), "incorrect number of bytes in address");
         return Err(DepositParseError::InvalidDestAddress(address.len() as u8));
     }
 

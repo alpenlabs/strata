@@ -5,11 +5,17 @@ use std::{
 };
 
 use arbitrary::Arbitrary;
-use bitcoin::{hashes::Hash, secp256k1::schnorr, BlockHash, Txid};
+use bitcoin::{
+    hashes::Hash,
+    secp256k1::{schnorr, XOnlyPublicKey},
+    BlockHash, Txid,
+};
 use borsh::{BorshDeserialize, BorshSerialize};
 use reth_primitives::alloy_primitives::FixedBytes;
 use secp256k1::SecretKey;
 use serde::{Deserialize, Serialize};
+
+use crate::errors::ParseError;
 
 // 20-byte buf
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default)]
@@ -104,6 +110,20 @@ impl From<SecretKey> for Buf32 {
 impl From<Buf32> for SecretKey {
     fn from(value: Buf32) -> Self {
         SecretKey::from_slice(value.0.as_slice()).expect("could not convert Buf32 into SecretKey")
+    }
+}
+
+impl TryFrom<Buf32> for XOnlyPublicKey {
+    type Error = ParseError;
+
+    fn try_from(value: Buf32) -> Result<Self, Self::Error> {
+        XOnlyPublicKey::from_slice(&value.0 .0).map_err(|_| ParseError::InvalidPoint(value))
+    }
+}
+
+impl From<XOnlyPublicKey> for Buf32 {
+    fn from(value: XOnlyPublicKey) -> Self {
+        Self::from(value.serialize())
     }
 }
 

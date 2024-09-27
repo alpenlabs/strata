@@ -7,10 +7,12 @@ SEQ_SLACK_TIME_SECS = 2  # to account for thread sync and startup times
 BLOCK_GENERATION_INTERVAL_SECS = 0.5
 SEQ_PUBLISH_BATCH_INTERVAL_SECS = 5
 
-common_params = {
-    "rollup_name": "expresssss",
+DEFAULT_ROLLUP_PARAMS = {
+    "rollup_name": "express",
     "block_time": 1000,
     "cred_rule": "Unchecked",
+    "horizon_l1_height": 3,
+    "genesis_l1_height": 5,
     "operator_config": {
         "Static": [
             {
@@ -31,23 +33,23 @@ common_params = {
     "rollup_vk": {
         "risc0_verifying_key": "0x00b01ae596b4e51843484ff71ccbd0dd1a030af70b255e6b9aad50b81d81266f"
     },
+    "target_l2_batch_size": 64,
     "address_length": 20,
+    "deposit_amount": 1_000_000_000,
     "verify_proofs": False,
     "dispatch_assignment_dur": 64,
     "proof_publish_mode": "Strict",
-    "deposit_amount": 10**7,
     "max_deposits_in_block": 16,
 }
 
 FAST_BATCH_ROLLUP_PARAMS = {
-    **common_params,
-    "horizon_l1_height": 3,
+    **DEFAULT_ROLLUP_PARAMS,
     "target_l2_batch_size": 5,
     "genesis_l1_height": 5,
 }
 
 ROLLUP_BATCH_WITH_FUNDS = {
-    **common_params,
+    **DEFAULT_ROLLUP_PARAMS,
     "horizon_l1_height": 4,
     "target_l2_batch_size": 100,
     "genesis_l1_height": 102,

@@ -15,7 +15,22 @@ use serde::{Deserialize, Serialize};
 /// The bitcoin block height that a withdrawal command references.
 pub type BitcoinBlockHeight = u64;
 
-/// Entry for an operator.  They have a
+/// Entry for an operator.
+///
+/// Each operator has:
+///
+/// * an `idx` which is used to identify operators uniquely.
+/// * a `signing_pk` which is a [`Buf32`] key used to sign messages sent among each other.
+/// * a `wallet_pk` which is a [`Buf32`] [`XOnlyPublickey`](bitcoin::secp256k1::XOnlyPublicKey) used
+///   to sign bridge transactions.
+///
+/// # Note
+///
+/// The separation between the two keys is so that we can use a different signing mechanism for
+/// signing messages in the future. For the present, only the `wallet_pk` is used.
+///
+/// Also note that the `wallet_pk` corresponds to a [`PublicKey`](bitcoin::secp256k1::PublicKey)
+/// with an even parity as per [BIP 340](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki#design).
 #[derive(
     Clone, Debug, Eq, PartialEq, Hash, BorshDeserialize, BorshSerialize, Serialize, Deserialize,
 )]
@@ -35,8 +50,14 @@ impl OperatorEntry {
         self.idx
     }
 
+    /// Get pubkey used to verify signed messages from the operator.
     pub fn signing_pk(&self) -> &Buf32 {
         &self.signing_pk
+    }
+
+    /// Get wallet pubkey used to compute MuSig2 pubkey from a set of operators.
+    pub fn wallet_pk(&self) -> &Buf32 {
+        &self.wallet_pk
     }
 }
 
@@ -96,7 +117,11 @@ impl OperatorTable {
     /// Returns if the operator table is empty.  This is practically probably
     /// never going to be true.
     pub fn is_empty(&self) -> bool {
-        self.len() > 0
+        self.operators.is_empty()
+    }
+
+    pub fn operators(&self) -> &[OperatorEntry] {
+        &self.operators
     }
 
     /// Inserts a new operator entry.
@@ -136,7 +161,9 @@ impl OperatorTable {
 
 impl OperatorKeyProvider for OperatorTable {
     fn get_operator_signing_pk(&self, idx: OperatorIdx) -> Option<Buf32> {
-        self.get_operator(idx).map(|ent| ent.signing_pk)
+        // TODO: use the `signing_pk` here if we decide to use a different signing scheme for
+        // signing messages.
+        self.get_operator(idx).map(|ent| ent.wallet_pk)
     }
 }
 
@@ -343,7 +370,7 @@ pub enum DepositState {
     Executed,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
+#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
 pub struct CreatedState {
     /// Destination identifier in EL, probably an encoded address.
     dest_ident: Vec<u8>,
@@ -421,7 +448,7 @@ impl DispatchCommand {
 }
 
 /// An output constructed from [`crate::bridge_ops::WithdrawalIntent`].
-#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
+#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
 pub struct WithdrawOutput {
     /// Taproot Schnorr XOnlyPubkey with the merkle root information.
     dest_addr: XOnlyPk,

@@ -916,12 +916,15 @@ dependencies = [
 name = "alpen-express-rpc-types"
 version = "0.1.0"
 dependencies = [
+ "alpen-express-db",
  "alpen-express-state",
  "bitcoin",
  "hex",
+ "jsonrpsee",
  "serde",
  "serde_json",
  "serde_with",
+ "thiserror",
 ]
 
 [[package]]
@@ -934,18 +937,22 @@ dependencies = [
  "alpen-express-db",
  "alpen-express-eectl",
  "alpen-express-evmexec",
+ "alpen-express-mmr",
  "alpen-express-primitives",
  "alpen-express-rocksdb",
  "alpen-express-rpc-api",
  "alpen-express-rpc-types",
  "alpen-express-state",
  "alpen-express-status",
+ "alpen-test-utils",
  "anyhow",
+ "arbitrary",
  "argh",
  "async-trait",
  "bitcoin",
  "borsh",
  "express-bridge-relay",
+ "express-bridge-tx-builder",
  "express-rpc-utils",
  "express-storage",
  "express-sync",

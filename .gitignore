@@ -251,3 +251,5 @@ elf
 data/
 jwt.hex
 seq_key.bin
+# the proof verification key generated at build time
+provers/sp1/guest-l1-batch/src/vks.rs

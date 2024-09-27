@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 
 use alpen_express_btcio::{broadcaster::L1BroadcastHandle, writer::InscriptionHandle};
 use alpen_express_consensus_logic::{
@@ -8,15 +8,22 @@ use alpen_express_db::{
     traits::{ChainstateProvider, Database, L1DataProvider, L2DataProvider},
     types::{CheckpointProvingStatus, L1TxEntry, L1TxStatus},
 };
-use alpen_express_primitives::{bridge::PublickeyTable, buf::Buf32, hash, params::Params};
+use alpen_express_primitives::{
+    bridge::{OperatorIdx, PublickeyTable},
+    buf::Buf32,
+    hash,
+    params::Params,
+};
 use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer};
 use alpen_express_rpc_types::{
-    BlockHeader, ClientStatus, DaBlob, DepositEntry, DepositState, ExecUpdate, HexBytes,
-    HexBytes32, L1Status, NodeSyncStatus, RawBlockWitness, RpcCheckpointInfo,
+    errors::RpcServerError as Error, BlockHeader, BridgeDuties, ClientStatus, DaBlob, DepositEntry,
+    DepositState, ExecUpdate, HexBytes, HexBytes32, L1Status, NodeSyncStatus, RawBlockWitness,
+    RpcCheckpointInfo,
 };
 use alpen_express_state::{
     batch::BatchCheckpoint,
     block::L2BlockBundle,
+    bridge_duties::BridgeDuty,
     bridge_ops::WithdrawalIntent,
     chain_state::ChainState,
     client_state::ClientState,
@@ -27,109 +34,22 @@ use alpen_express_state::{
 };
 use alpen_express_status::StatusRx;
 use async_trait::async_trait;
-use bitcoin::{consensus::deserialize, hashes::Hash, Transaction as BTransaction, Txid};
+use bitcoin::{
+    consensus::deserialize,
+    hashes::Hash,
+    key::Parity,
+    secp256k1::{PublicKey, XOnlyPublicKey},
+    Transaction as BTransaction, Txid,
+};
 use express_bridge_relay::relayer::RelayerHandle;
 use express_rpc_utils::to_jsonrpsee_error;
 use express_storage::L2BlockManager;
 use futures::TryFutureExt;
-use jsonrpsee::{core::RpcResult, types::ErrorObjectOwned};
-use thiserror::Error;
+use jsonrpsee::core::RpcResult;
 use tokio::sync::{oneshot, Mutex};
 use tracing::*;
 
-#[derive(Debug, Error)]
-pub enum Error {
-    /// Unsupported RPCs for express.  Some of these might need to be replaced
-    /// with standard unsupported errors.
-    #[error("unsupported RPC")]
-    Unsupported,
-
-    #[error("not yet implemented")]
-    Unimplemented,
-
-    #[error("client not started")]
-    ClientNotStarted,
-
-    #[error("missing L2 block {0:?}")]
-    MissingL2Block(L2BlockId),
-
-    #[error("missing L1 block manifest {0}")]
-    MissingL1BlockManifest(u64),
-
-    #[error("tried to call chain-related method before rollup genesis")]
-    BeforeGenesis,
-
-    #[error("unknown idx {0}")]
-    UnknownIdx(u32),
-
-    #[error("missing chainstate for index {0}")]
-    MissingChainstate(u64),
-
-    #[error("db: {0}")]
-    Db(#[from] alpen_express_db::errors::DbError),
-
-    #[error("blocking task '{0}' failed for unknown reason")]
-    BlockingAbort(String),
-
-    #[error("incorrect parameters: {0}")]
-    IncorrectParameters(String),
-
-    #[error("fetch limit reached. max {0}, provided {1}")]
-    FetchLimitReached(u64, u64),
-
-    #[error("missing checkpoint in database for index {0}")]
-    MissingCheckpointInDb(u64),
-
-    #[error("Proof already created for checkpoint {0}")]
-    ProofAlreadyCreated(u64),
-
-    #[error("Invalid proof for checkpoint {0}: {1}")]
-    InvalidProof(u64, String),
-
-    /// Generic internal error message.  If this is used often it should be made
-    /// into its own error type.
-    #[error("{0}")]
-    Other(String),
-
-    /// Generic internal error message with a payload value.  If this is used
-    /// often it should be made into its own error type.
-    #[error("{0} (+data)")]
-    OtherEx(String, serde_json::Value),
-}
-
-impl Error {
-    pub fn code(&self) -> i32 {
-        match self {
-            Self::Unsupported => -32600,
-            Self::Unimplemented => -32601,
-            Self::IncorrectParameters(_) => -32602,
-            Self::MissingL2Block(_) => -32603,
-            Self::MissingChainstate(_) => -32604,
-            Self::Db(_) => -32605,
-            Self::ClientNotStarted => -32606,
-            Self::BeforeGenesis => -32607,
-            Self::FetchLimitReached(_, _) => -32608,
-            Self::UnknownIdx(_) => -32608,
-            Self::MissingL1BlockManifest(_) => -32609,
-            Self::MissingCheckpointInDb(_) => -32610,
-            Self::ProofAlreadyCreated(_) => -32611,
-            Self::InvalidProof(_, _) => -32612,
-            Self::BlockingAbort(_) => -32001,
-            Self::Other(_) => -32000,
-            Self::OtherEx(_, _) => -32000,
-        }
-    }
-}
-
-impl From<Error> for ErrorObjectOwned {
-    fn from(val: Error) -> Self {
-        let code = val.code();
-        match val {
-            Error::OtherEx(m, b) => ErrorObjectOwned::owned::<_>(code, m.to_string(), Some(b)),
-            _ => ErrorObjectOwned::owned::<serde_json::Value>(code, format!("{}", val), None),
-        }
-    }
-}
+use crate::extractor::extract_deposit_requests;
 
 fn fetch_l2blk<D: Database + Sync + Send + 'static>(
     l2_prov: &Arc<<D as Database>::L2Prov>,
@@ -598,6 +518,60 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         Ok(())
     }
 
+    // FIXME: find a way to handle reorgs if that becomes a problem
+    async fn get_bridge_duties(
+        &self,
+        operator_idx: OperatorIdx,
+        start_index: u64,
+    ) -> RpcResult<BridgeDuties> {
+        info!(%operator_idx, %start_index, "received request for bridge duties");
+
+        let l1_db_provider = self.database.l1_provider();
+
+        let network = self.status_rx.l1.borrow().network;
+
+        let (deposit_duties, latest_index) =
+            extract_deposit_requests(l1_db_provider, start_index, network).await?;
+
+        let deposit_duties = deposit_duties.map(BridgeDuty::from);
+
+        // TODO: Extract withdrawal duties as well.
+        let withdrawal_duties = vec![];
+
+        let mut duties = vec![];
+        duties.extend(deposit_duties);
+        duties.extend(withdrawal_duties);
+
+        info!(%operator_idx, %start_index, "dispatching duties");
+        Ok(BridgeDuties {
+            duties,
+            start_index,
+            stop_index: latest_index,
+        })
+    }
+
+    async fn get_active_operator_chain_pubkey_set(&self) -> RpcResult<PublickeyTable> {
+        let (_, chain_state) = self.get_cur_states().await?;
+        let chain_state = chain_state.ok_or(Error::BeforeGenesis)?;
+
+        let operator_table = chain_state.operator_table();
+        let operator_map: BTreeMap<OperatorIdx, PublicKey> = operator_table
+            .operators()
+            .iter()
+            .fold(BTreeMap::new(), |mut map, entry| {
+                let pubkey = XOnlyPublicKey::try_from(*entry.wallet_pk())
+                    .expect("something has gone horribly wrong");
+
+                // This is a taproot pubkey so its parity has to be even.
+                let pubkey = pubkey.public_key(Parity::Even);
+
+                map.insert(entry.idx(), pubkey);
+                map
+            });
+
+        Ok(operator_map.into())
+    }
+
     async fn get_checkpoint_info(&self, idx: u64) -> RpcResult<Option<RpcCheckpointInfo>> {
         let entry = self
             .checkpoint_handle
@@ -606,10 +580,6 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
             .map_err(|e| Error::Other(e.to_string()))?;
         let batch_comm: Option<BatchCheckpoint> = entry.map(Into::into);
         Ok(batch_comm.map(|bc| bc.checkpoint().info().clone().into()))
-    }
-
-    async fn get_active_operator_chain_pubkey_set(&self) -> RpcResult<PublickeyTable> {
-        unimplemented!()
     }
 }
 

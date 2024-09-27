@@ -112,8 +112,7 @@ pub fn generate_mock_unsigned_tx() -> (Transaction, TaprootSpendInfo, ScriptBuf)
         }],
         output: vec![TxOut {
             value: Amount::from_sat(0), // so that we can add many inputs above
-            script_pubkey: address.script_pubkey(), /* this is not accurate, we are actually
-                                         * spending from this pubkey */
+            script_pubkey: address.script_pubkey(),
         }],
     };
 

@@ -29,7 +29,7 @@ use crate::{
 };
 
 /// The deposit information  required to create the Deposit Transaction.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DepositInfo {
     /// The deposit request transaction outpoints from the users.
     deposit_request_outpoint: OutPoint,
