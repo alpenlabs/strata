@@ -27,7 +27,7 @@ impl ExtractP2trPubkey for Address {
     }
 }
 
-/// A provably unspendable, static public key from predetermined inputs
+/// A provably unspendable, static public key from predetermined inputs created using method specified in [BIP-341](https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki#cite_note-23)
 pub static UNSPENDABLE: LazyLock<XOnlyPublicKey> = LazyLock::new(|| {
     // Step 1: Our "random" point on the curve
     let h_point = PublicKey::from_x_only_public_key(

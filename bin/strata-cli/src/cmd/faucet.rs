@@ -132,9 +132,7 @@ pub async fn faucet(args: FaucetArgs, seed: Seed) {
     if status == StatusCode::OK {
         let _ = term.write_line(&format!("Successful. Claimed in transaction {body}"));
     } else {
-        let _ = term.write_line(&format!(
-            "Failed: faucet responded with {status}: {body}"
-        ));
+        let _ = term.write_line(&format!("Failed: faucet responded with {status}: {body}"));
     }
 }
 

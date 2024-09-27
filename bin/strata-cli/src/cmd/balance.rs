@@ -11,11 +11,11 @@ use crate::{rollup::RollupWallet, seed::Seed, signet::SignetWallet};
 #[argh(subcommand, name = "balance")]
 /// Prints the wallet's current balance(s)
 pub struct BalanceArgs {
-    #[argh(switch)]
     /// return the signet balance
-    signet: bool,
     #[argh(switch)]
+    signet: bool,
     /// return the rollup balance
+    #[argh(switch)]
     rollup: bool,
 }
 

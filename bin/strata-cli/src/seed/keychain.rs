@@ -73,57 +73,54 @@ impl EncryptedSeedPersister for KeychainPersister {
     }
 }
 
-// below is wrapper around [`keyring::Error`] so it can be used with OneOf
-// to more precisely handle errors
+// below is wrapper around [`keyring::Error`] so it can be used with OneOf to more precisely handle
+// errors
 
-/// This indicates runtime failure in the underlying
-/// platform storage system.  The details of the failure can
-/// be retrieved from the attached platform error.
+/// This indicates runtime failure in the underlying platform storage system. The details of the
+/// failure can be retrieved from the attached platform error.
 #[derive(Debug)]
 #[allow(unused)]
 pub struct PlatformFailure(Box<dyn std::error::Error + Send + Sync>);
-/// This indicates that the underlying secure storage
-/// holding saved items could not be accessed. Typically this
-/// is because of access rules in the platform; for example, it
-/// might be that the credential store is locked. The underlying
-/// platform error will typically give the reason.
+
+/// This indicates that the underlying secure storage holding saved items could not be accessed.
+/// Typically this is because of access rules in the platform; for example, it might be that the
+/// credential store is locked. The underlying platform error will typically give the reason.
 #[derive(Debug)]
 #[allow(unused)]
 pub struct NoStorageAccess(Box<dyn std::error::Error + Send + Sync>);
-/// This indicates that there is no underlying credential
-/// entry in the platform for this entry. Either one was
-/// never set, or it was deleted.
+
+/// This indicates that there is no underlying credential entry in the platform for this entry.
+/// Either one was never set, or it was deleted.
 #[derive(Debug)]
 pub struct NoEntry;
-/// This indicates that the retrieved password blob was not
-/// a UTF-8 string. The underlying bytes are available
-/// for examination in the attached value.
+
+/// This indicates that the retrieved password blob was not a UTF-8 string. The underlying bytes are
+/// available for examination in the attached value.
 #[derive(Debug)]
 #[allow(unused)]
 pub struct BadEncoding(Vec<u8>);
-/// This indicates that one of the entry's credential
-/// attributes exceeded a
-/// length limit in the underlying platform. The
-/// attached values give the name of the attribute and
-/// the platform length limit that was exceeded.
+
+/// This indicates that one of the entry's credential attributes exceeded a length limit in the
+/// underlying platform. The attached values give the name of the attribute and the platform length
+/// limit that was exceeded.
 #[derive(Debug)]
 #[allow(unused)]
 pub struct TooLong {
     name: String,
     limit: u32,
 }
-/// This indicates that one of the entry's required credential
-/// attributes was invalid. The
-/// attached value gives the name of the attribute
-/// and the reason it's invalid.
+
+/// This indicates that one of the entry's required credential attributes was invalid. The attached
+/// value gives the name of the attribute and the reason it's invalid.
 #[derive(Debug)]
 #[allow(unused)]
 pub struct Invalid {
     name: String,
     reason: String,
 }
-/// This indicates that there is more than one credential found in the store
-/// that matches the entry. Its value is a vector of the matching credentials.
+
+/// This indicates that there is more than one credential found in the store that matches the entry.
+/// Its value is a vector of the matching credentials.
 #[derive(Debug)]
 #[allow(unused)]
 pub struct Ambiguous(Vec<Box<Credential>>);

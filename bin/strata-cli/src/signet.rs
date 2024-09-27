@@ -23,7 +23,7 @@ use crate::{seed::Seed, settings::SETTINGS};
 
 const NETWORK: Network = Network::Signet;
 
-/// Spawns a tokio task that updates the FEE_RATE every 20 seconds
+/// Retrieves an estimated fee rate to settle a transaction in `target` blocks
 pub async fn get_fee_rate(target: u16) -> Result<Option<FeeRate>, esplora_client::Error> {
     Ok(ESPLORA_CLIENT
         .get_fee_estimates()
@@ -65,7 +65,7 @@ impl SignetWallet {
         Ok(Self(
             load.check_network(NETWORK)
                 .load_wallet(&mut Persister)
-                .unwrap()
+                .expect("should be able to load wallet")
                 .unwrap_or_else(|| {
                     create
                         .network(NETWORK)
