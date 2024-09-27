@@ -12,8 +12,6 @@ use alpen_express_consensus_logic::{
     genesis,
     sync_manager::{self, SyncManager},
 };
-use alpen_express_db::traits::Database;
-use alpen_express_eectl::engine::ExecEngineCtl;
 use alpen_express_evmexec::{engine::RpcExecEngineCtl, EngineRpcClient};
 use alpen_express_primitives::params::{Params, SyncParams};
 use alpen_express_rocksdb::{
@@ -23,7 +21,9 @@ use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer, AlpenSequencerA
 use alpen_express_status::{StatusRx, StatusTx};
 use config::{ClientMode, Config, SequencerConfig};
 use express_bridge_relay::relayer::RelayerHandle;
-use express_storage::{managers::checkpoint::CheckpointDbManager, L2BlockManager};
+use express_storage::{
+    managers::checkpoint::CheckpointDbManager, ops::bridge_relay::BridgeMsgOps, L2BlockManager,
+};
 use express_sync::{self, L2SyncContext, RpcSyncPeer};
 use express_tasks::{ShutdownSignal, TaskExecutor, TaskManager};
 use helpers::{
@@ -33,7 +33,10 @@ use helpers::{
 };
 use jsonrpsee::Methods;
 use rpc_client::sync_client;
-use tokio::sync::{broadcast, oneshot};
+use tokio::{
+    runtime::Runtime,
+    sync::{broadcast, oneshot},
+};
 use tracing::*;
 
 use crate::args::Args;
@@ -66,8 +69,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     // Set up block params.
     let params: Arc<_> = Params {
-        // FIXME this .expect breaks printing errors
-        rollup: load_rollup_params_or_default(&args.rollup_params).expect("rollup params"),
+        rollup: load_rollup_params_or_default(&args.rollup_params).map_err(anyhow::Error::from)?,
         run: SyncParams {
             // FIXME these shouldn't be configurable here
             l1_follow_distance: config.sync.l1_follow_distance,
@@ -87,7 +89,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let database = init_core_dbs(rbdb.clone(), ops_config);
 
     // Start runtime for async IO tasks.
-    let rt = tokio::runtime::Builder::new_multi_thread()
+    let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .thread_name("express-rt")
         .build()
@@ -97,7 +99,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     // TODO switch to num_cpus
     let pool = threadpool::ThreadPool::with_name("express-pool".to_owned(), 8);
 
-    let task_manager = TaskManager::new(rt.handle().clone());
+    let task_manager = TaskManager::new(runtime.handle().clone());
     let executor = task_manager.executor();
 
     // Set up bridge messaging stuff.
@@ -122,73 +124,36 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         genesis::init_client_state(&params, database.as_ref())?;
     }
 
-    // init status tasks
-    let (status_tx, status_rx) = init_status_channel(database.as_ref())?;
-
-    let engine_ctl = init_engine_controller(
-        &config,
-        database.clone(),
-        params.as_ref(),
-        l2_block_manager.clone(),
-        &rt,
-    )?;
-
-    // Start the sync manager.
-    let sync_manager: Arc<_> = sync_manager::start_sync_tasks(
+    let ctx = start_core_tasks(
         &executor,
-        database.clone(),
-        l2_block_manager.clone(),
-        engine_ctl.clone(),
-        pool.clone(),
-        params.clone(),
-        (status_tx.clone(), status_rx.clone()),
+        pool,
+        &runtime,
+        &config,
+        params,
+        database,
+        l2_block_manager,
         checkpoint_manager,
-    )?
-    .into();
-
-    // Start the L1 tasks to get that going.
-    l1_reader::start_reader_tasks(
-        &executor,
-        sync_manager.get_params(),
-        &config,
-        bitcoin_client.clone(),
-        database.clone(),
-        sync_manager.get_csm_ctl(),
-        status_tx.clone(),
-    )?;
-
-    // Start relayer task.
-    let relayer_handle = express_bridge_relay::relayer::start_bridge_relayer_task(
         bridge_msg_ops,
-        status_rx.clone(),
-        config.relayer,
-        &executor,
-    );
+        bitcoin_client,
+    )?;
 
     // If we're a sequencer, start the sequencer db and duties task.
     if let ClientMode::Sequencer(sequencer_config) = &config.client.client_mode {
         let broadcast_database = init_broadcaster_database(rbdb.clone(), ops_config);
         let broadcast_handle = start_broadcaster_tasks(
             broadcast_database,
-            pool.clone(),
+            ctx.pool.clone(),
             &executor,
-            bitcoin_client.clone(),
+            ctx.bitcoin_client.clone(),
         );
         let seq_db = init_sequencer_database(rbdb.clone(), ops_config);
 
         start_sequencer_tasks(
-            sequencer_config,
+            ctx.clone(),
             &config,
-            params.clone(),
-            bitcoin_client,
+            sequencer_config,
             &executor,
             seq_db,
-            sync_manager.clone(),
-            database.clone(),
-            engine_ctl.clone(),
-            pool.clone(),
-            l2_block_manager.clone(),
-            status_tx,
             checkpoint_handle.clone(),
             broadcast_handle,
             &mut methods,
@@ -199,10 +164,13 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         let sequencer_rpc = &fullnode_config.sequencer_rpc;
         info!(?sequencer_rpc, "initing fullnode task");
 
-        let rpc_client = rt.block_on(sync_client(sequencer_rpc));
+        let rpc_client = runtime.block_on(sync_client(sequencer_rpc));
         let sync_peer = RpcSyncPeer::new(rpc_client, 10);
-        let l2_sync_context =
-            L2SyncContext::new(sync_peer, l2_block_manager.clone(), sync_manager.clone());
+        let l2_sync_context = L2SyncContext::new(
+            sync_peer,
+            ctx.l2_block_manager.clone(),
+            ctx.sync_manager.clone(),
+        );
         // NOTE: this might block for some time during first run with empty db until genesis block
         // is generated
         let mut l2_sync_state =
@@ -218,14 +186,10 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     executor.spawn_critical_async(
         "main-rpc",
         start_rpc(
+            ctx,
             task_manager.shutdown_signal(),
             config,
-            sync_manager,
-            database,
-            status_rx,
-            l2_block_manager,
             checkpoint_handle,
-            relayer_handle,
             methods,
         ),
     );
@@ -237,105 +201,122 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
-async fn start_rpc<D>(
-    shutdown_signal: ShutdownSignal,
-    config: Config,
-    sync_manager: Arc<SyncManager>,
-    database: Arc<D>,
-    status_rx: Arc<StatusRx>,
-    l2_block_manager: Arc<L2BlockManager>,
-    checkpoint_handle: Arc<CheckpointHandle>,
-    relayer_handle: Arc<RelayerHandle>,
-    mut methods: Methods,
-) -> anyhow::Result<()>
-where
-    D: Database + Send + Sync + 'static,
-{
-    let (stop_tx, stop_rx) = oneshot::channel();
-
-    // Init RPC impls.
-    let alp_rpc = rpc_server::AlpenRpcImpl::new(
-        status_rx,
-        database,
-        sync_manager,
-        l2_block_manager,
-        checkpoint_handle,
-        relayer_handle,
-    );
-    methods.merge(alp_rpc.into_rpc())?;
-
-    let admin_rpc = rpc_server::AdminServerImpl::new(stop_tx);
-    methods.merge(admin_rpc.into_rpc())?;
-
-    let rpc_host = config.client.rpc_host;
-    let rpc_port = config.client.rpc_port;
-
-    let rpc_server = jsonrpsee::server::ServerBuilder::new()
-        .build(format!("{rpc_host}:{rpc_port}"))
-        .await
-        .expect("init: build rpc server");
-
-    let rpc_handle = rpc_server.start(methods);
-
-    // start a Btcio event handler
-    info!("started RPC server");
-
-    // Wait for a stop signal.
-    let _ = stop_rx.await;
-
-    // Send shutdown to all tasks
-    shutdown_signal.send();
-
-    // Now start shutdown tasks.
-    if rpc_handle.stop().is_err() {
-        warn!("RPC server already stopped");
-    }
-
-    // wait for rpc to stop
-    rpc_handle.stopped().await;
-
-    Ok(())
-}
-
+#[derive(Clone)]
 pub struct CoreContext {
-    pub db: Arc<CommonDb>,
+    pub database: Arc<CommonDb>,
     pub pool: threadpool::ThreadPool,
     pub params: Arc<Params>,
     pub sync_manager: Arc<SyncManager>,
-    pub l2block_manager: Arc<L2BlockManager>,
+    pub l2_block_manager: Arc<L2BlockManager>,
     pub status_tx: Arc<StatusTx>,
     pub status_rx: Arc<StatusRx>,
-    pub engine_ctl: Arc<RpcExecEngineCtl<EngineRpcClient>>,
+    pub engine: Arc<RpcExecEngineCtl<EngineRpcClient>>,
+    pub relayer_handle: Arc<RelayerHandle>,
+    pub bitcoin_client: Arc<BitcoinClient>,
 }
 
 #[allow(clippy::too_many_arguments)]
-fn start_sequencer_tasks<E: ExecEngineCtl + Send + Sync + 'static>(
-    seq_config: &SequencerConfig,
+fn start_core_tasks(
+    executor: &TaskExecutor,
+    pool: threadpool::ThreadPool,
+    runtime: &Runtime,
     config: &Config,
     params: Arc<Params>,
+    database: Arc<CommonDb>,
+    l2_block_manager: Arc<L2BlockManager>,
+    checkpoint_manager: Arc<CheckpointDbManager>,
+    bridge_msg_ops: Arc<BridgeMsgOps>,
     bitcoin_client: Arc<BitcoinClient>,
+) -> anyhow::Result<CoreContext> {
+    // init status tasks
+    let (status_tx, status_rx) = init_status_channel(database.as_ref())?;
+
+    let engine = init_engine_controller(
+        config,
+        database.clone(),
+        params.as_ref(),
+        l2_block_manager.clone(),
+        runtime,
+    )?;
+
+    // Start the sync manager.
+    let sync_manager: Arc<_> = sync_manager::start_sync_tasks(
+        executor,
+        database.clone(),
+        l2_block_manager.clone(),
+        engine.clone(),
+        pool.clone(),
+        params.clone(),
+        (status_tx.clone(), status_rx.clone()),
+        checkpoint_manager,
+    )?
+    .into();
+
+    // Start the L1 tasks to get that going.
+    l1_reader::start_reader_tasks(
+        executor,
+        sync_manager.get_params(),
+        config,
+        bitcoin_client.clone(),
+        database.clone(),
+        sync_manager.get_csm_ctl(),
+        status_tx.clone(),
+    )?;
+
+    // Start relayer task.
+    let relayer_handle = express_bridge_relay::relayer::start_bridge_relayer_task(
+        bridge_msg_ops,
+        status_rx.clone(),
+        config.relayer,
+        executor,
+    );
+
+    Ok(CoreContext {
+        database,
+        pool,
+        params,
+        sync_manager,
+        l2_block_manager,
+        status_tx,
+        status_rx,
+        engine,
+        relayer_handle,
+        bitcoin_client,
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn start_sequencer_tasks(
+    ctx: CoreContext,
+    config: &Config,
+    sequencer_config: &SequencerConfig,
     executor: &TaskExecutor,
     seq_db: Arc<SequencerDB<RBSeqBlobDb>>,
-    sync_manager: Arc<SyncManager>,
-    database: Arc<CommonDb>,
-    engine_ctl: Arc<E>,
-    pool: threadpool::ThreadPool,
-    l2_block_manager: Arc<L2BlockManager>,
-    status_tx: Arc<StatusTx>,
     checkpoint_handle: Arc<CheckpointHandle>,
     broadcast_handle: Arc<L1BroadcastHandle>,
     methods: &mut Methods,
 ) -> anyhow::Result<()> {
-    info!(seqkey_path = ?seq_config.sequencer_key, "initing sequencer duties task");
-    let idata = load_seqkey(&seq_config.sequencer_key)?;
+    let CoreContext {
+        database,
+        pool,
+        params,
+        sync_manager,
+        l2_block_manager,
+        status_tx,
+        engine,
+        bitcoin_client,
+        ..
+    } = ctx;
+
+    info!(seqkey_path = ?sequencer_config.sequencer_key, "initing sequencer duties task");
+    let idata = load_seqkey(&sequencer_config.sequencer_key)?;
 
     // Set up channel and clone some things.
     let (duties_tx, duties_rx) = broadcast::channel::<DutyBatch>(8);
 
     // Spawn up writer
     let writer_config = WriterConfig::new(
-        seq_config.sequencer_bitcoin_address.clone(),
+        sequencer_config.sequencer_bitcoin_address.clone(),
         config.bitcoind_rpc.network,
         params.rollup().rollup_name.clone(),
     )?;
@@ -386,7 +367,7 @@ fn start_sequencer_tasks<E: ExecEngineCtl + Send + Sync + 'static>(
             idata.key,
             sync_manager,
             database,
-            engine_ctl,
+            engine,
             inscription_handle,
             pool,
             params,
@@ -409,4 +390,66 @@ fn start_broadcaster_tasks(
     // start broadcast task
     let broadcast_handle = spawn_broadcaster_task(executor, bitcoin_client.clone(), broadcast_ops);
     Arc::new(broadcast_handle)
+}
+
+async fn start_rpc(
+    ctx: CoreContext,
+    shutdown_signal: ShutdownSignal,
+    config: Config,
+    checkpoint_handle: Arc<CheckpointHandle>,
+    mut methods: Methods,
+) -> anyhow::Result<()> {
+    let CoreContext {
+        database,
+        sync_manager,
+        l2_block_manager,
+        status_rx,
+        relayer_handle,
+        ..
+    } = ctx;
+
+    let (stop_tx, stop_rx) = oneshot::channel();
+
+    // Init RPC impls.
+    let alp_rpc = rpc_server::AlpenRpcImpl::new(
+        status_rx,
+        database,
+        sync_manager,
+        l2_block_manager,
+        checkpoint_handle,
+        relayer_handle,
+    );
+    methods.merge(alp_rpc.into_rpc())?;
+
+    let admin_rpc = rpc_server::AdminServerImpl::new(stop_tx);
+    methods.merge(admin_rpc.into_rpc())?;
+
+    let rpc_host = config.client.rpc_host;
+    let rpc_port = config.client.rpc_port;
+
+    let rpc_server = jsonrpsee::server::ServerBuilder::new()
+        .build(format!("{rpc_host}:{rpc_port}"))
+        .await
+        .expect("init: build rpc server");
+
+    let rpc_handle = rpc_server.start(methods);
+
+    // start a Btcio event handler
+    info!("started RPC server");
+
+    // Wait for a stop signal.
+    let _ = stop_rx.await;
+
+    // Send shutdown to all tasks
+    shutdown_signal.send();
+
+    // Now start shutdown tasks.
+    if rpc_handle.stop().is_err() {
+        warn!("RPC server already stopped");
+    }
+
+    // wait for rpc to stop
+    rpc_handle.stopped().await;
+
+    Ok(())
 }

@@ -254,7 +254,7 @@ pub fn init_engine_controller(
     db: Arc<CommonDb>,
     params: &Params,
     l2_block_manager: Arc<L2BlockManager>,
-    rt: &Runtime,
+    runtime: &Runtime,
 ) -> anyhow::Result<Arc<RpcExecEngineCtl<EngineRpcClient>>> {
     let reth_jwtsecret = load_jwtsecret(&config.exec.reth.secret)?;
     let client = EngineRpcClient::from_url_secret(
@@ -266,7 +266,7 @@ pub fn init_engine_controller(
     let eng_ctl = alpen_express_evmexec::engine::RpcExecEngineCtl::new(
         client,
         initial_fcs,
-        rt.handle().clone(),
+        runtime.handle().clone(),
         l2_block_manager.clone(),
     );
     let eng_ctl = Arc::new(eng_ctl);
