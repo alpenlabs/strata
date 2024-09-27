@@ -20,6 +20,7 @@ from constants import (
     BD_USERNAME,
     BLOCK_GENERATION_INTERVAL_SECS,
     DD_ROOT,
+    DEFAULT_ROLLUP_PARAMS,
     FAST_BATCH_ROLLUP_PARAMS,
 )
 
@@ -31,6 +32,7 @@ def generate_seqkey() -> tuple[bytes, str]:
 
     key = Key(buf.hex())
     public_key = key.x_hex
+    print(f"key = {key}, x_pubkey = {public_key}")
 
     return key.private_byte, public_key
 
@@ -141,7 +143,7 @@ class ExpressFactory(flexitest.Factory):
         bitcoind_config: BitcoinRpcConfig,
         reth_config: RethConfig,
         sequencer_address: str,
-        rollup_params: Optional[dict],
+        custom_rollup_params: Optional[dict],
         ctx: flexitest.EnvContext,
     ) -> flexitest.Service:
         datadir = ctx.make_service_dir("sequencer")
@@ -172,12 +174,13 @@ class ExpressFactory(flexitest.Factory):
         ]
         # fmt: on
 
-        if rollup_params:
-            rollup_params_file = os.path.join(datadir, "rollup_params.json")
-            with open(rollup_params_file, "w") as f:
-                json.dump(rollup_params, f)
+        rollup_params_file = os.path.join(datadir, "rollup_params.json")
+        rollup_params = custom_rollup_params if custom_rollup_params else DEFAULT_ROLLUP_PARAMS
 
-            cmd.extend(["--rollup-params", rollup_params_file])
+        with open(rollup_params_file, "w") as f:
+            json.dump(rollup_params, f)
+
+        cmd.extend(["--rollup-params", rollup_params_file])
 
         props = {
             "rpc_host": rpc_host,
@@ -209,7 +212,7 @@ class FullNodeFactory(flexitest.Factory):
         bitcoind_config: BitcoinRpcConfig,
         reth_config: RethConfig,
         sequencer_rpc: str,
-        rollup_params: Optional[dict],
+        custom_rollup_params: Optional[dict],
         ctx: flexitest.EnvContext,
     ) -> flexitest.Service:
         self.fn_count += 1
@@ -238,12 +241,13 @@ class FullNodeFactory(flexitest.Factory):
         ]
         # fmt: on
 
-        if rollup_params:
-            rollup_params_file = os.path.join(datadir, "rollup_params.json")
-            with open(rollup_params_file, "w") as f:
-                json.dump(rollup_params, f)
+        rollup_params_file = os.path.join(datadir, "rollup_params.json")
+        rollup_params = custom_rollup_params if custom_rollup_params else DEFAULT_ROLLUP_PARAMS
 
-            cmd.extend(["--rollup-params", rollup_params_file])
+        with open(rollup_params_file, "w") as f:
+            json.dump(rollup_params, f)
+
+        cmd.extend(["--rollup-params", rollup_params_file])
 
         props = {"rpc_port": rpc_port, "id": id}
 

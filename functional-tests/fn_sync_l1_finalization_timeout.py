@@ -26,9 +26,8 @@ class BlockFinalizationTimeoutTest(flexitest.Test):
             "horizon_l1_height": premine_blocks - 3,
             "genesis_l1_height": premine_blocks + 5,
             "proof_publish_mode": {
-                "Timeout": self.timeout,
+                "timeout": self.timeout,
             },
-            "verify_proofs": True,
         }
         ctx.set_env(BasicEnvConfig(premine_blocks, rollup_params=rollup_params))
 

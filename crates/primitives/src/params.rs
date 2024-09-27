@@ -65,6 +65,7 @@ pub struct RollupParams {
 
 /// Describes the proof is generated.
 #[derive(Clone, Debug, PartialEq, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ProofPublishMode {
     /// Timeout in secs
     Timeout(u64),
@@ -107,6 +108,7 @@ impl Params {
 /// Describes how we determine the list of operators at genesis.
 // TODO improve how this looks when serialized
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum OperatorConfig {
     /// Use this static list of predetermined operators.
     Static(Vec<OperatorPubkeys>),

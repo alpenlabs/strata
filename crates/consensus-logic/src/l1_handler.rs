@@ -137,13 +137,13 @@ fn check_for_da_batch(
             _ => None,
         });
 
-    let verified_checkpoints = inscriptions.filter_map(|(insc, tx)| {
-        let checkpoint: BatchCheckpoint = insc.clone().into();
+    let verified_checkpoints = inscriptions.filter_map(|(signed_batch_checkpoint, tx)| {
+        let checkpoint: BatchCheckpoint = signed_batch_checkpoint.clone().into();
 
         let digest = checkpoint.get_sighash();
         let msg = Message::from_digest(digest.0.into());
 
-        match Signature::from_slice(&insc.signature().0[..]) {
+        match Signature::from_slice(&signed_batch_checkpoint.signature().0[..]) {
             Ok(sig) => {
                 let valid = sig.verify(&msg, &seq_pubkey);
                 if valid.is_err() {
