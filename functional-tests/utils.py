@@ -1,3 +1,4 @@
+import logging
 import math
 import time
 from dataclasses import dataclass
@@ -181,3 +182,20 @@ def check_submit_proof_fails_for_nonexistent_batch(seqrpc, nonexistent_batch: in
             raise e
     else:
         raise AssertionError("Expected rpc error")
+
+
+def get_logger(name: str, level=logging.DEBUG) -> logging.Logger:
+    logger = logging.getLogger(name)
+
+    if not logger.handlers:
+        handler = logging.StreamHandler()
+        logger.setLevel(level)
+        formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s"
+        )
+        handler.setFormatter(formatter)
+
+        # Add the handler to the logger
+        logger.addHandler(handler)
+
+    return logger
