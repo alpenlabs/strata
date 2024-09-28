@@ -53,6 +53,7 @@ where
 
     let l1db = db.l1_store().clone();
     let _sedb = db.sync_event_store().clone();
+
     executor.spawn_critical("bitcoin_data_handler_task", move |_| {
         bitcoin_data_handler_task::<D>(l1db, csm_ctl, ev_rx, params).unwrap()
     });

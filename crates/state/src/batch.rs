@@ -50,6 +50,10 @@ impl SignedBatchCheckpoint {
     pub fn new(inner: BatchCheckpoint, signature: Buf64) -> Self {
         Self { inner, signature }
     }
+
+    pub fn signature(&self) -> Buf64 {
+        self.signature
+    }
 }
 
 impl From<SignedBatchCheckpoint> for BatchCheckpoint {

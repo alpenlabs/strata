@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 import json
-import logging as log
 import os
 import sys
 import time
 from math import ceil
-from threading import Thread
 from typing import Optional, TypedDict
 
 import flexitest
@@ -19,57 +17,11 @@ from constants import (
     BD_USERNAME,
     BLOCK_GENERATION_INTERVAL_SECS,
     DD_ROOT,
+    DEFAULT_ROLLUP_PARAMS,
     FAST_BATCH_ROLLUP_PARAMS,
+    SEQ_KEY,
 )
-
-
-def generate_seqkey() -> bytes:
-    # this is just for fun
-    buf = b"alpen" + b"_1337" * 5 + b"xx"
-    assert len(buf) == 32, "bad seqkey len"
-    return buf
-
-
-def generate_jwt_secret() -> str:
-    return os.urandom(32).hex()
-
-
-def generate_blocks(
-    bitcoin_rpc: BitcoindClient,
-    wait_dur,
-    addr: str,
-) -> Thread:
-    thr = Thread(
-        target=generate_task,
-        args=(
-            bitcoin_rpc,
-            wait_dur,
-            addr,
-        ),
-    )
-    thr.start()
-    return thr
-
-
-def generate_task(rpc: BitcoindClient, wait_dur, addr):
-    while True:
-        time.sleep(wait_dur)
-        try:
-            rpc.proxy.generatetoaddress(1, addr)
-        except Exception as ex:
-            log.warning(f"{ex} while generating to address {addr}")
-            return
-
-
-def generate_n_blocks(bitcoin_rpc: BitcoindClient, n: int):
-    addr = bitcoin_rpc.proxy.getnewaddress()
-    print(f"generating {n} blocks to address", addr)
-    try:
-        blk = bitcoin_rpc.proxy.generatetoaddress(n, addr)
-        print("made blocks", blk)
-    except Exception as ex:
-        log.warning(f"{ex} while generating address")
-        return
+from utils import generate_blocks, generate_jwt_secret
 
 
 class BitcoinFactory(flexitest.Factory):
@@ -136,7 +88,7 @@ class ExpressFactory(flexitest.Factory):
         bitcoind_config: BitcoinRpcConfig,
         reth_config: RethConfig,
         sequencer_address: str,
-        rollup_params: Optional[dict],
+        custom_rollup_params: Optional[dict],
         ctx: flexitest.EnvContext,
     ) -> flexitest.Service:
         datadir = ctx.make_service_dir("sequencer")
@@ -145,9 +97,8 @@ class ExpressFactory(flexitest.Factory):
         logfile = os.path.join(datadir, "service.log")
 
         keyfile = os.path.join(datadir, "seqkey.bin")
-        seqkey = generate_seqkey()
         with open(keyfile, "wb") as f:
-            f.write(seqkey)
+            f.write(SEQ_KEY)
 
         # fmt: off
         cmd = [
@@ -166,17 +117,18 @@ class ExpressFactory(flexitest.Factory):
         ]
         # fmt: on
 
-        if rollup_params:
-            rollup_params_file = os.path.join(datadir, "rollup_params.json")
-            with open(rollup_params_file, "w") as f:
-                json.dump(rollup_params, f)
+        rollup_params_file = os.path.join(datadir, "rollup_params.json")
+        rollup_params = custom_rollup_params if custom_rollup_params else DEFAULT_ROLLUP_PARAMS
 
-            cmd.extend(["--rollup-params", rollup_params_file])
+        with open(rollup_params_file, "w") as f:
+            json.dump(rollup_params, f)
+
+        cmd.extend(["--rollup-params", rollup_params_file])
 
         props = {
             "rpc_host": rpc_host,
             "rpc_port": rpc_port,
-            "seqkey": seqkey,
+            "seqkey": SEQ_KEY,
             "address": sequencer_address,
         }
         rpc_url = f"ws://{rpc_host}:{rpc_port}"
@@ -203,7 +155,7 @@ class FullNodeFactory(flexitest.Factory):
         bitcoind_config: BitcoinRpcConfig,
         reth_config: RethConfig,
         sequencer_rpc: str,
-        rollup_params: Optional[dict],
+        custom_rollup_params: Optional[dict],
         ctx: flexitest.EnvContext,
     ) -> flexitest.Service:
         self.fn_count += 1
@@ -230,12 +182,13 @@ class FullNodeFactory(flexitest.Factory):
         ]
         # fmt: on
 
-        if rollup_params:
-            rollup_params_file = os.path.join(datadir, "rollup_params.json")
-            with open(rollup_params_file, "w") as f:
-                json.dump(rollup_params, f)
+        rollup_params_file = os.path.join(datadir, "rollup_params.json")
+        rollup_params = custom_rollup_params if custom_rollup_params else DEFAULT_ROLLUP_PARAMS
 
-            cmd.extend(["--rollup-params", rollup_params_file])
+        with open(rollup_params_file, "w") as f:
+            json.dump(rollup_params, f)
+
+        cmd.extend(["--rollup-params", rollup_params_file])
 
         props = {"rpc_port": rpc_port, "id": id}
 

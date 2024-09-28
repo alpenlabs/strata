@@ -1,7 +1,9 @@
 use std::{panic, sync::Arc};
 
+use alpen_express_crypto::verify_schnorr_sig;
 use alpen_express_db::traits::{Database, L1DataStore};
 use alpen_express_primitives::{
+    block_credential::CredRule,
     buf::Buf32,
     l1::{L1BlockManifest, L1TxProof},
     params::{Params, ProofPublishMode, RollupParams},
@@ -19,6 +21,7 @@ use bitcoin::{
 use express_risc0_adapter::Risc0Verifier;
 use express_sp1_adapter::SP1Verifier;
 use express_zkvm::ZKVMVerifier;
+use secp256k1::XOnlyPublicKey;
 use strata_tx_parser::messages::{BlockData, L1Event};
 use tokio::sync::mpsc;
 use tracing::*;
@@ -32,8 +35,21 @@ pub fn bitcoin_data_handler_task<D: Database + Send + Sync + 'static>(
     mut event_rx: mpsc::Receiver<L1Event>,
     params: Arc<Params>,
 ) -> anyhow::Result<()> {
+    // Parse the sequencer pubkey once here as this involves and FFI call that we don't want to be
+    // calling per event although it can be generated from the params passed to the relevant event
+    // handler.
+    let seq_pubkey = match params.rollup.cred_rule {
+        CredRule::Unchecked => None,
+        CredRule::SchnorrKey(buf32) => Some(
+            XOnlyPublicKey::try_from(buf32)
+                .expect("the sequencer pubkey must be valid in the params"),
+        ),
+    };
+
     while let Some(event) = event_rx.blocking_recv() {
-        if let Err(e) = handle_bitcoin_event(event, l1db.as_ref(), csm_ctl.as_ref(), &params) {
+        if let Err(e) =
+            handle_bitcoin_event(event, l1db.as_ref(), csm_ctl.as_ref(), &params, seq_pubkey)
+        {
             error!(err = %e, "failed to handle L1 event");
         }
     }
@@ -47,6 +63,7 @@ fn handle_bitcoin_event<L1D>(
     l1db: &L1D,
     csm_ctl: &CsmController,
     params: &Arc<Params>,
+    seq_pubkey: Option<XOnlyPublicKey>,
 ) -> anyhow::Result<()>
 where
     L1D: L1DataStore + Sync + Send + 'static,
@@ -100,7 +117,7 @@ where
 
             // Check for da batch and send event accordingly
             debug!(?height, "Checking for da batch");
-            let checkpoints = check_for_da_batch(&blockdata, params.as_ref());
+            let checkpoints = check_for_da_batch(&blockdata, params.as_ref(), seq_pubkey);
             debug!(?checkpoints, "Received checkpoints");
             if !checkpoints.is_empty() {
                 let ev = SyncEvent::L1DABatch(height, checkpoints);
@@ -115,7 +132,11 @@ where
 }
 
 /// Parses inscriptions and checks for batch data in the transactions
-fn check_for_da_batch(blockdata: &BlockData, params: &Params) -> Vec<BatchCheckpoint> {
+fn check_for_da_batch(
+    blockdata: &BlockData,
+    params: &Params,
+    seq_pubkey: Option<XOnlyPublicKey>,
+) -> Vec<BatchCheckpoint> {
     let protocol_ops_txs = blockdata.protocol_ops_txs();
 
     let inscriptions = protocol_ops_txs
@@ -128,27 +149,44 @@ fn check_for_da_batch(blockdata: &BlockData, params: &Params) -> Vec<BatchCheckp
             _ => None,
         });
 
-    let verified_checkpoints = inscriptions.filter_map(|(insc, tx)| {
-            let checkpoint: BatchCheckpoint = insc.clone().into();
-            let checkpoint_idx = checkpoint.checkpoint().idx();
-            let checkpoint_last_block = checkpoint.checkpoint().l2_blockid();
+    let verified_checkpoints = inscriptions.filter_map(|(signed_batch_checkpoint, tx)| {
+        let checkpoint: BatchCheckpoint = signed_batch_checkpoint.clone().into();
 
-            match verify_proof(&checkpoint, params.rollup()) {
-                Ok(()) => {
-                    info!(%checkpoint_idx, %checkpoint_last_block, "proof successfully verified");
-                    Some(checkpoint)
-                },
-                Err(e) => {
-                    let txid = tx.compute_txid();
-                    warn!(?txid, %checkpoint_idx, %checkpoint_last_block, err = %e, "could not verify proof inside blob");
-                    None
-                }
+        if let Some(seq_pubkey) = seq_pubkey {
+            let sig = signed_batch_checkpoint.signature();
+            let msg = checkpoint.get_sighash();
+            let pk: Buf32 = seq_pubkey.into();
+
+            if !verify_schnorr_sig(&sig, &msg, &pk) {
+                error!(?tx, ?checkpoint, "signature verification failed on checkpoint");
+                return None;
             }
+        }
+
+        let checkpoint_idx = checkpoint.checkpoint().idx();
+        let checkpoint_last_block = checkpoint.checkpoint().l2_blockid();
+
+        match verify_proof(&checkpoint, params.rollup()) {
+            Ok(()) => {
+                info!(%checkpoint_idx, %checkpoint_last_block, "proof successfully verified");
+                Some(checkpoint)
+            },
+            Err(e) => {
+                let txid = tx.compute_txid();
+                warn!(?txid, %checkpoint_idx, %checkpoint_last_block, err = %e, "could not verify proof inside blob");
+                None
+            }
+        }
     });
 
     verified_checkpoints.map(Into::into).collect()
 }
 
+/// Verify that the provided checkpoint proof is valid for the verifier key.
+///
+/// # Caution
+///
+/// If the checkpoint proof is empty, this function returns an `Ok(())`.
 pub fn verify_proof(
     checkpoint: &BatchCheckpoint,
     rollup_params: &RollupParams,
@@ -165,9 +203,11 @@ pub fn verify_proof(
 
     let proof = checkpoint.proof();
 
+    // FIXME: we are accepting empty proofs for now (devnet) to reduce dependency on the prover
+    // infra.
     if let ProofPublishMode::Timeout(_) = rollup_params.proof_publish_mode {
         if proof.is_empty() {
-            warn!(checkpoint_idx = %checkpoint_idx, "Accepting empty proof");
+            warn!(%checkpoint_idx, "verifying empty proof as correct");
             return Ok(());
         }
     }

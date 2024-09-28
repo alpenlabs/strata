@@ -1,12 +1,56 @@
-import logging
+import logging as log
 import math
+import os
 import time
 from dataclasses import dataclass
+from threading import Thread
 from typing import Any, Callable, TypeVar
 
 from bitcoinlib.services.bitcoind import BitcoindClient
 
 from constants import ERROR_CHECKPOINT_DOESNOT_EXIST
+
+
+def generate_jwt_secret() -> str:
+    return os.urandom(32).hex()
+
+
+def generate_blocks(
+    bitcoin_rpc: BitcoindClient,
+    wait_dur,
+    addr: str,
+) -> Thread:
+    thr = Thread(
+        target=generate_task,
+        args=(
+            bitcoin_rpc,
+            wait_dur,
+            addr,
+        ),
+    )
+    thr.start()
+    return thr
+
+
+def generate_task(rpc: BitcoindClient, wait_dur, addr):
+    while True:
+        time.sleep(wait_dur)
+        try:
+            rpc.proxy.generatetoaddress(1, addr)
+        except Exception as ex:
+            log.warning(f"{ex} while generating to address {addr}")
+            return
+
+
+def generate_n_blocks(bitcoin_rpc: BitcoindClient, n: int):
+    addr = bitcoin_rpc.proxy.getnewaddress()
+    print(f"generating {n} blocks to address", addr)
+    try:
+        blk = bitcoin_rpc.proxy.generatetoaddress(n, addr)
+        print("made blocks", blk)
+    except Exception as ex:
+        log.warning(f"{ex} while generating address")
+        return
 
 
 def wait_until(
@@ -184,13 +228,13 @@ def check_submit_proof_fails_for_nonexistent_batch(seqrpc, nonexistent_batch: in
         raise AssertionError("Expected rpc error")
 
 
-def get_logger(name: str, level=logging.DEBUG) -> logging.Logger:
-    logger = logging.getLogger(name)
+def get_logger(name: str, level=log.DEBUG) -> log.Logger:
+    logger = log.getLogger(name)
 
     if not logger.handlers:
-        handler = logging.StreamHandler()
+        handler = log.StreamHandler()
         logger.setLevel(level)
-        formatter = logging.Formatter(
+        formatter = log.Formatter(
             "%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s"
         )
         handler.setFormatter(formatter)

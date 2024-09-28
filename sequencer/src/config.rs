@@ -217,6 +217,7 @@ mod test {
             datadir = "/path/to/data/directory"
             sequencer_bitcoin_address = "some_addr"
             sequencer_key = "/path/to/sequencer_key"
+            seq_pubkey = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
             db_retry_count = 5
 
             [sync]
@@ -235,7 +236,12 @@ mod test {
             relay_misc = true
         "#;
 
-        assert!(toml::from_str::<Config>(config_string_sequencer).is_ok());
+        let config = toml::from_str::<Config>(config_string_sequencer);
+        assert!(
+            config.is_ok(),
+            "should be able to load sequencer TOML config but got: {:?}",
+            config.err()
+        );
 
         let config_string_fullnode = r#"
             [bitcoind_rpc]
@@ -251,6 +257,7 @@ mod test {
             datadir = "/path/to/data/directory"
             sequencer_bitcoin_address = "some_addr"
             sequencer_rpc = "9.9.9.9:8432"
+            seq_pubkey = "123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0"
             db_retry_count = 5
 
             [sync]
@@ -269,6 +276,11 @@ mod test {
             relay_misc = true
         "#;
 
-        assert!(toml::from_str::<Config>(config_string_fullnode).is_ok());
+        let config = toml::from_str::<Config>(config_string_fullnode);
+        assert!(
+            config.is_ok(),
+            "should be able to load full-node TOML config but got: {:?}",
+            config.err()
+        );
     }
 }
