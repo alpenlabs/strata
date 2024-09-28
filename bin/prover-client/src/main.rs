@@ -5,24 +5,24 @@ use std::sync::Arc;
 use alpen_express_common::logging;
 use args::Args;
 use config::EL_START_BLOCK_HEIGHT;
+use dispatchers::el_task_dispatcher::ELBlockProvingTaskDispatcher;
 use express_sp1_adapter::SP1Host;
 use jsonrpsee::http_client::HttpClientBuilder;
 use manager::ProverManager;
 use rpc_server::{ProverClientRpc, RpcContext};
 use task::TaskTracker;
-use task_dispatcher::ELBlockProvingTaskDispatcher;
 use tracing::info;
 
 mod args;
 mod config;
 mod db;
+mod dispatchers;
 mod errors;
 mod manager;
 mod primitives;
 mod prover;
 mod rpc_server;
 mod task;
-mod task_dispatcher;
 
 #[tokio::main]
 async fn main() {

@@ -10,7 +10,7 @@ use tokio::sync::oneshot;
 use tracing::{info, warn};
 use uuid::Uuid;
 
-use crate::task_dispatcher::ELBlockProvingTaskDispatcher;
+use crate::dispatchers::el_task_dispatcher::ELBlockProvingTaskDispatcher;
 
 #[derive(Clone)]
 pub struct RpcContext {
@@ -78,6 +78,17 @@ impl ProverClientRpc {
 #[async_trait]
 impl ExpressProverClientApiServer for ProverClientRpc {
     async fn prove_el_block(&self, el_block_num: u64) -> RpcResult<String> {
+        let task_id = self
+            .context
+            .el_proving_task_scheduler
+            .create_proving_task(el_block_num)
+            .await
+            .expect("failed to add proving task");
+
+        RpcResult::Ok(task_id.to_string())
+    }
+
+    async fn prove_cl_block(&self, el_block_num: u64) -> RpcResult<String> {
         let task_id = self
             .context
             .el_proving_task_scheduler

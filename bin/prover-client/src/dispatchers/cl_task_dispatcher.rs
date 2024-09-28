@@ -10,37 +10,37 @@ use uuid::Uuid;
 
 use crate::{
     config::BLOCK_PROVING_TASK_DISPATCH_INTERVAL,
-    errors::ELProvingTaskError,
+    errors::{BlockType, ProvingTaskError},
     primitives::prover_input::{ProverInput, WitnessData},
     task::TaskTracker,
 };
 
-/// The `ELBlockProvingTaskDispatcher` handles the dispatching of EL block proving tasks to the
-/// TaskTracker. It listens for new EL blocks via an RPC client, fetches the necessary proving
+/// The `CLBlockProvingTaskDispatcher` handles the dispatching of CL block proving tasks to the
+/// TaskTracker. It listens for new CL blocks via an RPC client, fetches the necessary proving
 /// inputs, and adds these tasks to a shared `TaskTracker` for further processing.
 #[derive(Clone)]
-pub struct ELBlockProvingTaskDispatcher {
-    /// The RPC client used to communicate with the EL network.
-    /// It listens for new EL blocks and retrieves necessary data for proving.
+pub struct CLBlockProvingTaskDispatcher {
+    /// The RPC client used to communicate with the CL network.
+    /// It listens for new CL blocks and retrieves necessary data for proving.
     el_rpc_client: HttpClient,
 
     /// A shared `TaskTracker` instance. It tracks and manages the lifecycle of proving tasks added
     /// by the scheduler.
     task_tracker: Arc<TaskTracker>,
 
-    /// Stores the identifier of the last EL block that was sent for proving.
+    /// Stores the identifier of the last CL block that was sent for proving.
     /// This helps in tracking progress and avoiding duplicate task submissions.
     last_block_sent: u64,
 }
 
-impl ELBlockProvingTaskDispatcher {
+impl CLBlockProvingTaskDispatcher {
     pub fn new(
-        el_rpc_client: HttpClient,
+        sequencer_rpc_client: HttpClient,
         task_tracker: Arc<TaskTracker>,
         start_block_height: u64,
     ) -> Self {
         Self {
-            el_rpc_client,
+            el_rpc_client: sequencer_rpc_client,
             task_tracker,
             last_block_sent: start_block_height,
         }
@@ -70,12 +70,13 @@ impl ELBlockProvingTaskDispatcher {
     }
 
     // Create proving task for the given block idx
-    pub async fn create_proving_task(&self, block_num: u64) -> Result<Uuid, ELProvingTaskError> {
+    pub async fn create_proving_task(&self, block_num: u64) -> Result<Uuid, ProvingTaskError> {
         let prover_input = self
-            .fetch_el_block_prover_input(block_num)
+            .fetch_cl_block_prover_input(block_num)
             .await
-            .map_err(|e| ELProvingTaskError::FetchElBlockProverInputError {
+            .map_err(|e| ProvingTaskError::FetchBlockProverInputError {
                 block_num,
+                task_type: BlockType::CL,
                 source: e,
             })?;
 
@@ -86,7 +87,7 @@ impl ELBlockProvingTaskDispatcher {
     async fn append_proving_task(
         &self,
         prover_input: ELProofInput,
-    ) -> Result<Uuid, ELProvingTaskError> {
+    ) -> Result<Uuid, ProvingTaskError> {
         let el_block_witness = WitnessData {
             data: bincode::serialize(&prover_input)?,
         };
@@ -95,8 +96,8 @@ impl ELBlockProvingTaskDispatcher {
         Ok(task_id)
     }
 
-    // Fetch EL block prover input from the RPC client
-    async fn fetch_el_block_prover_input(&self, el_block_num: u64) -> anyhow::Result<ELProofInput> {
+    // Fetch CL block prover input from the RPC client
+    async fn fetch_cl_block_prover_input(&self, el_block_num: u64) -> anyhow::Result<ELProofInput> {
         let el_block: Block = self
             .el_rpc_client
             .request(
@@ -104,7 +105,7 @@ impl ELBlockProvingTaskDispatcher {
                 rpc_params![format!("0x{:x}", el_block_num), false],
             )
             .await
-            .context("Failed to get the el block")?;
+            .context("Failed to get the CL block")?;
 
         let el_block_witness: ELProofInput = self
             .el_rpc_client
@@ -113,7 +114,7 @@ impl ELBlockProvingTaskDispatcher {
                 rpc_params![el_block.header.hash.context("Block hash missing")?, true],
             )
             .await
-            .context("Failed to get the EL witness")?;
+            .context("Failed to get the CL witness")?;
 
         Ok(el_block_witness)
     }

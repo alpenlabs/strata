@@ -1,4 +1,5 @@
 import flexitest
+import time
 
 from utils import wait_until
 
@@ -22,6 +23,8 @@ class CLBlockWitnessDataGenerationTest(flexitest.Test):
 
         witness_1 = seqrpc.alp_getBlockWitness(1)
         assert witness_1 is not None
+
+        time.sleep(2)
 
         witness_2 = seqrpc.alp_getBlockWitness(2)
         assert witness_2 is not None
