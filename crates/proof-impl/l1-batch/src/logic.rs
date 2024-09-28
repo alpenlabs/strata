@@ -3,7 +3,6 @@ use alpen_express_state::{
     l1::{HeaderVerificationState, HeaderVerificationStateSnapshot},
     tx::DepositInfo,
 };
-use bitcoin::params::Params;
 use borsh::{BorshDeserialize, BorshSerialize};
 use express_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
 

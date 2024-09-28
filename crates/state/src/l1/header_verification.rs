@@ -1,6 +1,7 @@
 use std::io::{Cursor, Write};
 
 use alpen_express_primitives::buf::Buf32;
+use arbitrary::Arbitrary;
 use bitcoin::{block::Header, hashes::Hash, params::Params, BlockHash, CompactTarget, Target};
 use borsh::{BorshDeserialize, BorshSerialize};
 use ethnum::U256;
@@ -9,7 +10,18 @@ use serde::{Deserialize, Serialize};
 use super::timestamp_store::TimestampStore;
 use crate::l1::utils::compute_block_hash;
 
-#[derive(Debug, Clone, Serialize, Deserialize, BorshSerialize, BorshDeserialize, Default)]
+#[derive(
+    Debug,
+    Clone,
+    Default,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    BorshSerialize,
+    BorshDeserialize,
+    Arbitrary,
+)]
 pub struct HeaderVerificationState {
     /// [Block number](bitcoin::Block::bip34_block_height) of the last verified block
     pub last_verified_block_num: u32,

@@ -112,6 +112,15 @@ impl BtcChainSegment {
             Buf32::from(header.merkle_root.as_raw_hash().to_byte_array()),
         )
     }
+
+    pub fn get_block_manifests(&self, from_height: u32, len: usize) -> Vec<L1BlockManifest> {
+        let mut blocks = Vec::with_capacity(len);
+        for i in 0..len {
+            let block = self.get_block_manifest(from_height + i as u32);
+            blocks.push(block);
+        }
+        blocks
+    }
 }
 
 pub fn get_btc_chain() -> BtcChainSegment {

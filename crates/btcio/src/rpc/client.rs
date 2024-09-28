@@ -270,8 +270,12 @@ impl Reader for BitcoinClient {
         const N: usize = 11;
         let mut timestamps: [u32; 11] = [0u32; 11];
         for i in (0..N).rev() {
-            let h = self.get_block_at(vh - i as u64).await?;
-            timestamps[i] = h.header.time;
+            if vh > i as u64 {
+                let h = self.get_block_at(vh - i as u64).await?;
+                timestamps[i] = h.header.time;
+            } else {
+                timestamps[i] = 0;
+            }
         }
         let last_11_blocks_timestamps = TimestampStore::new(timestamps);
 

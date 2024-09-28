@@ -8,7 +8,7 @@ use alpen_express_db::traits::Database;
 use alpen_express_primitives::params::Params;
 use alpen_express_status::StatusTx;
 use anyhow::bail;
-use bitcoin::BlockHash;
+use bitcoin::{params::MAINNET, BlockHash};
 use strata_tx_parser::{
     deposit::DepositTxConfig,
     filter::{filter_relevant_txs, TxFilterRule},
@@ -75,10 +75,16 @@ async fn do_reader_task<D: Database + 'static>(
         // Maybe this should be called outside loop?
         let filters = derive_tx_filter_rules::<D>(chstate_prov.clone(), params.as_ref())?;
 
-        if let Err(err) =
-            poll_for_new_blocks(client, event_tx, &filters, &mut state, &mut status_updates)
-                .instrument(poll_span)
-                .await
+        if let Err(err) = poll_for_new_blocks(
+            client,
+            event_tx,
+            &filters,
+            &mut state,
+            &mut status_updates,
+            params.as_ref(),
+        )
+        .instrument(poll_span)
+        .await
         {
             warn!(%cur_best_height, err = %err, "failed to poll Bitcoin client");
             status_updates.push(L1StatusUpdate::RpcError(err.to_string()));
@@ -160,6 +166,7 @@ async fn poll_for_new_blocks(
     filters: &[TxFilterRule],
     state: &mut ReaderState,
     status_updates: &mut Vec<L1StatusUpdate>,
+    params: &Params,
 ) -> anyhow::Result<()> {
     let chain_info = client.get_blockchain_info().await?;
     status_updates.push(L1StatusUpdate::RpcConnected(true));
@@ -202,6 +209,7 @@ async fn poll_for_new_blocks(
             state,
             status_updates,
             filters,
+            params,
         )
         .await
         {
@@ -246,6 +254,7 @@ async fn fetch_and_process_block(
     state: &mut ReaderState,
     status_updates: &mut Vec<L1StatusUpdate>,
     filters: &[TxFilterRule],
+    params: &Params,
 ) -> anyhow::Result<BlockHash> {
     let block = client.get_block_at(height).await?;
     let txs = block.txdata.len();
@@ -253,10 +262,34 @@ async fn fetch_and_process_block(
     let filtered_txs = filter_relevant_txs(&block, filters);
     let block_data = BlockData::new(height, block, filtered_txs);
     let l1blkid = block_data.block().block_hash();
-    trace!(%l1blkid, %height, %txs, "fetched block from client");
+    trace!(%height, %l1blkid, %txs, "fetched block from client");
 
     status_updates.push(L1StatusUpdate::CurHeight(height));
     status_updates.push(L1StatusUpdate::CurTip(l1blkid.to_string()));
+
+    let threshold = params.rollup.l1_reorg_safe_depth;
+    let genesis_ht = params.rollup.genesis_l1_height;
+    let genesis_threshold = genesis_ht + threshold as u64;
+
+    trace!(%genesis_ht, %threshold, %genesis_threshold, "should genesis?");
+
+    if height == genesis_threshold {
+        info!(%height, %genesis_ht, "time for genesis");
+        let l1_verification_state = client
+            .get_verification_state(genesis_ht + 1, &MAINNET)
+            .await?;
+        if let Err(e) = event_tx
+            .send(L1Event::GenesisVerificationState(
+                height,
+                l1_verification_state,
+            ))
+            .await
+        {
+            error!("failed to submit L1 block event, did the persistence task crash?");
+            return Err(e.into());
+        }
+    }
+
     if let Err(e) = event_tx.send(L1Event::BlockData(block_data)).await {
         error!("failed to submit L1 block event, did the persistence task crash?");
         return Err(e.into());

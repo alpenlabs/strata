@@ -9,7 +9,7 @@ use crate::{
     batch::{BatchCheckpoint, CheckpointInfo},
     client_state::{ClientState, L1CheckPoint, SyncState},
     id::L2BlockId,
-    l1::L1BlockId,
+    l1::{HeaderVerificationState, L1BlockId},
 };
 
 /// Output of a consensus state transition.  Both the consensus state writes and
@@ -51,7 +51,7 @@ pub enum ClientStateWrite {
 
     /// Sets the flag that the chain is now active, kicking off the FCM to
     /// start.
-    ActivateChain,
+    ActivateChain(HeaderVerificationState),
 
     /// Accept an L2 block and its height and update tip state.
     AcceptL2Block(L2BlockId, u64),
@@ -116,9 +116,12 @@ pub fn apply_writes_to_state(
                 state.set_sync_state(*nss);
             }
 
-            ActivateChain => {
+            ActivateChain(l1_verification_state) => {
                 // This is all this does.  Actually setting the finalized tip is
                 // done by some sync event emitted by the FCM.
+                state.genesis_l1_verification_state =
+                    Some(l1_verification_state.compute_hash().unwrap());
+                state.l1_view_mut().header_verification_state = Some(l1_verification_state);
                 state.chain_active = true;
             }
 
