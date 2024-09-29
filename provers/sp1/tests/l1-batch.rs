@@ -62,7 +62,7 @@ mod test {
         let prover = SP1Host::init(GUEST_L1_BATCH_ELF.into(), prover_options);
         let input = L1BatchProofInput {
             batch: blockspace_outputs,
-            state: btc_chain.get_verification_state(40321, &MAINNET),
+            state: btc_chain.get_verification_state(40321, &MAINNET.clone().into()),
         };
         l1_batch_input_builder.write_borsh(&input).unwrap();
 

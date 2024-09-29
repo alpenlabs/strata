@@ -27,10 +27,12 @@ impl BtcParams {
 /// # Note
 /// If adjustments to the parameters are required, modify them as shown below:
 /// ```
+/// use alpen_express_state::l1::BtcParams;
+/// use bitcoin::params::MAINNET;
 /// fn get_btc_params() -> BtcParams {
 ///     let mut btc_params = MAINNET.clone();
 ///     btc_params.pow_target_spacing = 25 * 30; // Adjusted to 2.5 minutes
-///     BtcParams(btc_params) // Return the modified `btc_params`
+///     BtcParams::from(btc_params) // Return the modified `btc_params`
 /// }
 /// ```
 ///

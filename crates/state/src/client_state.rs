@@ -39,7 +39,9 @@ pub struct ClientState {
     /// Height at which we'll create the L2 genesis block from.
     pub(super) genesis_l1_height: u64,
 
-    pub(super) genesis_l1_verification_state: Option<Buf32>,
+    /// Hash of verification state at `genesis_l1_height`. The hash is computed via
+    /// [`super::l1::HeaderVerificationState::compute_hash`]
+    pub(super) genesis_l1_verification_state_hash: Option<Buf32>,
 }
 
 impl ClientState {
@@ -52,7 +54,7 @@ impl ClientState {
             local_l1_view: LocalL1State::new(horizon_l1_height),
             horizon_l1_height,
             genesis_l1_height,
-            genesis_l1_verification_state: None,
+            genesis_l1_verification_state_hash: None,
         }
     }
 
@@ -99,6 +101,10 @@ impl ClientState {
 
     pub fn genesis_l1_height(&self) -> u64 {
         self.genesis_l1_height
+    }
+
+    pub fn genesis_verification_hash(&self) -> Option<Buf32> {
+        self.genesis_l1_verification_state_hash
     }
 }
 

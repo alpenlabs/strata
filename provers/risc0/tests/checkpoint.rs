@@ -1,9 +1,7 @@
 #[cfg(feature = "prover")]
 mod test {
     use alpen_express_state::{
-        batch::{
-            BootstrapCheckpoint, BootstrapCheckpointInfo, BootstrapCheckpointState, CheckpointInfo,
-        },
+        batch::{BootstrapCheckpointInfo, CheckpointInfo},
         chain_state::ChainState,
     };
     use alpen_test_utils::{
@@ -13,7 +11,7 @@ mod test {
     use bitcoin::params::MAINNET;
     use express_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
     use express_proofimpl_checkpoint::{ChainStateSnapshot, L2BatchProofOutput};
-    use express_proofimpl_l1_batch::logic::{L1BatchProofInput, L1BatchProofOutput};
+    use express_proofimpl_l1_batch::{L1BatchProofInput, L1BatchProofOutput};
     use express_risc0_adapter::{Risc0Verifier, RiscZeroHost, RiscZeroProofInputBuilder};
     use express_risc0_guest_builder::{
         GUEST_RISC0_BTC_BLOCKSPACE_ELF, GUEST_RISC0_BTC_BLOCKSPACE_ID, GUEST_RISC0_CHECKPOINT_ELF,
@@ -80,7 +78,7 @@ mod test {
         let prover = RiscZeroHost::init(GUEST_RISC0_L1_BATCH_ELF.into(), prover_options);
         let input = L1BatchProofInput {
             batch: blockspace_outputs,
-            state: btc_chain.get_verification_state(40321, &MAINNET),
+            state: btc_chain.get_verification_state(40321, &MAINNET.clone().into()),
         };
 
         let prover_input = prover_input.write_borsh(&input).unwrap().build().unwrap();
@@ -122,32 +120,25 @@ mod test {
         }
     }
 
-    fn get_bootstrap_checkpoint() -> BootstrapCheckpoint {
+    fn get_bootstrap_checkpoint() -> BootstrapCheckpointInfo {
         let gen_chainstate = get_genesis_chainstate();
         let btc_chain = get_btc_chain();
 
         let idx = 1;
         let starting_l1_height = 40321;
         let starting_l2_height = gen_chainstate.chain_tip_slot();
-        let starting_l2_blkid = gen_chainstate.chain_tip_blockid();
 
-        let info = BootstrapCheckpointInfo::new(
+        BootstrapCheckpointInfo::new(
             idx,
             starting_l1_height,
-            starting_l2_height,
-            starting_l2_blkid,
-        );
-
-        let state = BootstrapCheckpointState::new(
             btc_chain
-                .get_verification_state(40321, &MAINNET)
+                .get_verification_state(40321, &MAINNET.clone().into())
                 .compute_hash()
                 .unwrap(),
+            starting_l2_height,
             gen_chainstate.compute_state_root(),
             0,
-        );
-
-        BootstrapCheckpoint { info, state }
+        )
     }
 
     #[test]

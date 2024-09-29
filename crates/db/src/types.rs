@@ -1,9 +1,7 @@
 //! Module for database local types
 
 use alpen_express_primitives::buf::Buf32;
-use alpen_express_state::batch::{
-    BatchCheckpoint, Checkpoint, CheckpointInfo, CheckpointTransition,
-};
+use alpen_express_state::batch::{BatchCheckpoint, BootstrapCheckpointInfo, CheckpointInfo};
 use arbitrary::Arbitrary;
 use bitcoin::{
     consensus::{self, deserialize, serialize},
@@ -149,7 +147,7 @@ pub struct CheckpointEntry {
 
     /// Includes the initial and final hashed state of both the `L1StateTransition` and
     /// `L2StateTransition` that happened in this batch
-    pub checkpoint_transition: CheckpointTransition,
+    pub bootstrap: BootstrapCheckpointInfo,
 
     /// Proof
     pub proof: Proof,
@@ -164,14 +162,14 @@ pub struct CheckpointEntry {
 impl CheckpointEntry {
     pub fn new(
         checkpoint_info: CheckpointInfo,
-        checkpoint_transition: CheckpointTransition,
+        bootstrap: BootstrapCheckpointInfo,
         proof: Proof,
         proving_status: CheckpointProvingStatus,
         confirmation_status: CheckpointConfStatus,
     ) -> Self {
         Self {
             checkpoint_info,
-            checkpoint_transition,
+            bootstrap,
             proof,
             proving_status,
             confirmation_status,
@@ -179,15 +177,14 @@ impl CheckpointEntry {
     }
 
     pub fn into_batch_checkpoint(self) -> BatchCheckpoint {
-        let checkpoint = Checkpoint::new(self.checkpoint_info, self.checkpoint_transition);
-        BatchCheckpoint::new(checkpoint, self.proof)
+        BatchCheckpoint::new(self.checkpoint_info, self.bootstrap, self.proof)
     }
 
     /// Creates a new instance for a freshly defined checkpoint.
-    pub fn new_pending_proof(info: CheckpointInfo) -> Self {
+    pub fn new_pending_proof(info: CheckpointInfo, bootstrap: BootstrapCheckpointInfo) -> Self {
         Self::new(
             info,
-            CheckpointTransition::default(),
+            bootstrap,
             Proof::new(vec![]),
             CheckpointProvingStatus::PendingProof,
             CheckpointConfStatus::Pending,

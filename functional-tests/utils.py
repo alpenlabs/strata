@@ -171,14 +171,7 @@ def submit_checkpoint(idx: int, seqrpc, manual_gen: ManualGenBlocksConfig | None
     proof_hex = "00" * 256  # The expected proof size if 256 bytes
 
     # This is arbitrary
-    # TODO: fix this
-    checkpoint_transition_hex = (
-        "bb3d99b5b335e08ee93350cb99e493cd19d48d6bd003db7601b8c944e77394d52a26d41a9b958c704d158804a3432ff5"
-        "c391b2c2ba2e0a8fb2892232c46bb81a750ef336fdd9458c1b543d4d4f84e25055a8cd9b9004776348cabf78b6561de4"
-        "1ca021d172c6cf5d01e148d50c28fb9b6b7691d99b4b916dac6a86a4e06038a9947730d6a678d6ff08f7825122ecd829"
-    )
-
-    seqrpc.alpadmin_submitCheckpointProof(idx, proof_hex, checkpoint_transition_hex)
+    seqrpc.alpadmin_submitCheckpointProof(idx, proof_hex)
 
     # Wait a while for it to be posted to l1. This will happen when there
     # is a new published txid in l1status
@@ -206,17 +199,8 @@ def check_submit_proof_fails_for_nonexistent_batch(seqrpc, nonexistent_batch: in
     """
     proof_hex = "00" * 256
 
-    # This is arbitrary
-    checkpoint_transition_hex = (
-        "bb3d99b5b335e08ee93350cb99e493cd19d48d6bd003db7601b8c944e77394d52a26d41a9b958c704d158804a3432ff5"
-        "c391b2c2ba2e0a8fb2892232c46bb81a750ef336fdd9458c1b543d4d4f84e25055a8cd9b9004776348cabf78b6561de4"
-        "1ca021d172c6cf5d01e148d50c28fb9b6b7691d99b4b916dac6a86a4e06038a9947730d6a678d6ff08f7825122ecd829"
-    )
-
     try:
-        seqrpc.alpadmin_submitCheckpointProof(
-            nonexistent_batch, proof_hex, checkpoint_transition_hex
-        )
+        seqrpc.alpadmin_submitCheckpointProof(nonexistent_batch, proof_hex)
     except Exception as e:
         if hasattr(e, "code"):
             print(e)

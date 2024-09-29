@@ -565,7 +565,7 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
             .await
             .map_err(|e| Error::Other(e.to_string()))?;
         let batch_comm: Option<BatchCheckpoint> = entry.map(Into::into);
-        Ok(batch_comm.map(|bc| bc.checkpoint().info().clone().into()))
+        Ok(batch_comm.map(|bc| bc.checkpoint().clone().into()))
     }
 }
 
@@ -665,12 +665,7 @@ impl AlpenSequencerApiServer for SequencerServerImpl {
         Ok(txid)
     }
 
-    async fn submit_checkpoint_proof(
-        &self,
-        idx: u64,
-        proofbytes: HexBytes,
-        transition: HexBytes,
-    ) -> RpcResult<()> {
+    async fn submit_checkpoint_proof(&self, idx: u64, proofbytes: HexBytes) -> RpcResult<()> {
         debug!(%idx, "received checkpoint proof request");
         let mut entry = self
             .checkpoint_handle
@@ -692,13 +687,9 @@ impl AlpenSequencerApiServer for SequencerServerImpl {
         }
         debug!(%idx, "Proof is pending, setting proof reaedy");
 
-        let checkpoint_transition = borsh::from_slice(&transition.into_inner())
-            .map_err(to_jsonrpsee_error("parse checkpoint state"))?;
-
         // TODO: verify proof, once proof verification logic is ready
         entry.proof = express_zkvm::Proof::new(proofbytes.into_inner());
 
-        entry.checkpoint_transition = checkpoint_transition;
         entry.proving_status = CheckpointProvingStatus::ProofReady;
         self.checkpoint_handle
             .put_checkpoint_and_notify(idx, entry)

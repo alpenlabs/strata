@@ -121,7 +121,7 @@ pub fn apply_writes_to_state(
             ActivateChain(l1_verification_state) => {
                 // This is all this does.  Actually setting the finalized tip is
                 // done by some sync event emitted by the FCM.
-                state.genesis_l1_verification_state =
+                state.genesis_l1_verification_state_hash =
                     Some(l1_verification_state.compute_hash().unwrap());
 
                 state.l1_view_mut().header_verification_state = Some(l1_verification_state);

@@ -51,13 +51,7 @@ class BlockFinalizationSeqRestartTest(flexitest.Test):
 def check_already_sent_proof(seqrpc):
     try:
         # Proof for checkpoint 1 is already sent
-        # TODO: fix this
-        checkpoint_transition_hex = (
-            "bb3d99b5b335e08ee93350cb99e493cd19d48d6bd003db7601b8c944e77394d52a26d41a9b958c704d158804a3432ff5"
-            "c391b2c2ba2e0a8fb2892232c46bb81a750ef336fdd9458c1b543d4d4f84e25055a8cd9b9004776348cabf78b6561de4"
-            "1ca021d172c6cf5d01e148d50c28fb9b6b7691d99b4b916dac6a86a4e06038a9947730d6a678d6ff08f7825122ecd829"
-        )
-        seqrpc.alpadmin_submitCheckpointProof(1, "abc123", checkpoint_transition_hex)
+        seqrpc.alpadmin_submitCheckpointProof(1, "abc123")
     except Exception as e:
         assert e.code == ERROR_PROOF_ALREADY_CREATED
     else:
