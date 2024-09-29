@@ -75,20 +75,20 @@ async fn main() {
     tokio::spawn(async move { prover_manager.run().await });
 
     // run el proving task dispatcher
-    tokio::spawn(async move {
-        el_proving_task_scheduler
-            .clone()
-            .listen_for_new_blocks()
-            .await
-    });
+    // tokio::spawn(async move {
+    //     el_proving_task_scheduler
+    //         .clone()
+    //         .listen_for_new_blocks()
+    //         .await
+    // });
 
     // run BTC-blockspace proving task dispatcher
-    tokio::spawn(async move {
-        btc_block_proving_task_scheduler
-            .clone()
-            .listen_for_new_blocks()
-            .await
-    });
+    // tokio::spawn(async move {
+    //     btc_block_proving_task_scheduler
+    //         .clone()
+    //         .listen_for_new_blocks()
+    //         .await
+    // });
 
     // run rpc server
     let rpc_url = args.get_dev_rpc_url();

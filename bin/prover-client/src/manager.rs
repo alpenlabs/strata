@@ -55,6 +55,11 @@ where
                 self.task_tracker
                     .update_task_status(task.id, ProvingTaskStatus::Pending)
                     .await;
+            } else {
+                self.task_tracker
+                    .update_task_status(task.id, ProvingTaskStatus::Processing)
+                    .await;
+                println!("setting the task {:?} to prcess", task.id);
             }
         }
     }
@@ -81,6 +86,7 @@ where
                 // TODO: Implement post-processing hooks.
                 // Example: If the current task is EL proving, this proof should be added
                 // to the witness of the CL proving task to unblock the CL proving task.
+                println!("completed proving task the task {:?} to prcess", task.id);
             }
         }
     }
