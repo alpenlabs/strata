@@ -5,6 +5,8 @@ use alpen_express_primitives::params::Params;
 use alpen_express_state::block_validation::{check_block_credential, validate_block_segments};
 pub use alpen_express_state::{block::L2Block, chain_state::ChainState, state_op::StateCache};
 
+pub type CLProofInput = (ChainState, L2Block);
+
 /// Verifies an L2 block and applies the chains state transition if the block is valid.
 pub fn verify_and_transition(
     prev_chstate: ChainState,

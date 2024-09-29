@@ -1,9 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::Context;
-use express_proofimpl_evm_ee_stf::ELProofInput;
 use jsonrpsee::{core::client::ClientT, http_client::HttpClient, rpc_params};
-use reth_rpc_types::Block;
 use tokio::time::{self, Duration};
 use tracing::error;
 use uuid::Uuid;
@@ -22,7 +20,7 @@ use crate::{
 pub struct CLBlockProvingTaskDispatcher {
     /// The RPC client used to communicate with the CL network.
     /// It listens for new CL blocks and retrieves necessary data for proving.
-    el_rpc_client: HttpClient,
+    sequnecer_rpc_client: HttpClient,
 
     /// A shared `TaskTracker` instance. It tracks and manages the lifecycle of proving tasks added
     /// by the scheduler.
@@ -40,7 +38,7 @@ impl CLBlockProvingTaskDispatcher {
         start_block_height: u64,
     ) -> Self {
         Self {
-            el_rpc_client: sequencer_rpc_client,
+            sequnecer_rpc_client: sequencer_rpc_client,
             task_tracker,
             last_block_sent: start_block_height,
         }
@@ -71,51 +69,49 @@ impl CLBlockProvingTaskDispatcher {
 
     // Create proving task for the given block idx
     pub async fn create_proving_task(&self, block_num: u64) -> Result<Uuid, ProvingTaskError> {
-        let prover_input = self
-            .fetch_cl_block_prover_input(block_num)
-            .await
-            .map_err(|e| ProvingTaskError::FetchBlockProverInputError {
-                block_num,
-                task_type: BlockType::CL,
-                source: e,
-            })?;
+        if let Some(raw_witness) =
+            self.fetch_cl_block_prover_input(block_num)
+                .await
+                .map_err(|e| ProvingTaskError::FetchBlockProverInputError {
+                    block_num,
+                    task_type: BlockType::CL,
+                    source: e,
+                })?
+        {
+            return self.append_proving_task(raw_witness).await;
+        }
 
-        self.append_proving_task(prover_input).await
+        Err(ProvingTaskError::FetchBlockProverInputError {
+            block_num,
+            task_type: BlockType::CL,
+            source: anyhow::anyhow!(
+                "Failed to find the raw witness for the CL block {:?}",
+                block_num
+            ),
+        })
     }
 
     // Append the proving task to the task tracker
-    async fn append_proving_task(
-        &self,
-        prover_input: ELProofInput,
-    ) -> Result<Uuid, ProvingTaskError> {
+    async fn append_proving_task(&self, prover_input: Vec<u8>) -> Result<Uuid, ProvingTaskError> {
         let el_block_witness = WitnessData {
             data: bincode::serialize(&prover_input)?,
         };
-        let witness = ProverInput::ElBlock(el_block_witness);
+        let witness = ProverInput::ClBlock(el_block_witness);
         let task_id = self.task_tracker.create_task(witness).await;
         Ok(task_id)
     }
 
     // Fetch CL block prover input from the RPC client
-    async fn fetch_cl_block_prover_input(&self, el_block_num: u64) -> anyhow::Result<ELProofInput> {
-        let el_block: Block = self
-            .el_rpc_client
-            .request(
-                "eth_getBlockByNumber",
-                rpc_params![format!("0x{:x}", el_block_num), false],
-            )
-            .await
-            .context("Failed to get the CL block")?;
-
-        let el_block_witness: ELProofInput = self
-            .el_rpc_client
-            .request(
-                "alpee_getBlockWitness",
-                rpc_params![el_block.header.hash.context("Block hash missing")?, true],
-            )
+    async fn fetch_cl_block_prover_input(
+        &self,
+        cl_block_num: u64,
+    ) -> anyhow::Result<Option<Vec<u8>>> {
+        let cl_block_witness: Option<Vec<u8>> = self
+            .sequnecer_rpc_client
+            .request("alp_getBlockWitness", rpc_params![cl_block_num])
             .await
             .context("Failed to get the CL witness")?;
 
-        Ok(el_block_witness)
+        Ok(cl_block_witness)
     }
 }

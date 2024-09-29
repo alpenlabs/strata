@@ -10,17 +10,25 @@ use tokio::sync::oneshot;
 use tracing::{info, warn};
 use uuid::Uuid;
 
-use crate::dispatchers::el_task_dispatcher::ELBlockProvingTaskDispatcher;
+use crate::dispatchers::{
+    cl_task_dispatcher::CLBlockProvingTaskDispatcher,
+    el_task_dispatcher::ELBlockProvingTaskDispatcher,
+};
 
 #[derive(Clone)]
 pub struct RpcContext {
-    pub el_proving_task_scheduler: ELBlockProvingTaskDispatcher,
+    pub el_proving_task_dispatcher: ELBlockProvingTaskDispatcher,
+    pub cl_proving_task_dispatcher: CLBlockProvingTaskDispatcher,
 }
 
 impl RpcContext {
-    pub fn new(el_proving_task_scheduler: ELBlockProvingTaskDispatcher) -> Self {
+    pub fn new(
+        el_proving_task_scheduler: ELBlockProvingTaskDispatcher,
+        cl_proving_task_scheduler: CLBlockProvingTaskDispatcher,
+    ) -> Self {
         Self {
-            el_proving_task_scheduler,
+            el_proving_task_dispatcher: el_proving_task_scheduler,
+            cl_proving_task_dispatcher: cl_proving_task_scheduler,
         }
     }
 }
@@ -80,7 +88,7 @@ impl ExpressProverClientApiServer for ProverClientRpc {
     async fn prove_el_block(&self, el_block_num: u64) -> RpcResult<String> {
         let task_id = self
             .context
-            .el_proving_task_scheduler
+            .el_proving_task_dispatcher
             .create_proving_task(el_block_num)
             .await
             .expect("failed to add proving task");
@@ -88,11 +96,11 @@ impl ExpressProverClientApiServer for ProverClientRpc {
         RpcResult::Ok(task_id.to_string())
     }
 
-    async fn prove_cl_block(&self, el_block_num: u64) -> RpcResult<String> {
+    async fn prove_cl_block(&self, cl_block_num: u64) -> RpcResult<String> {
         let task_id = self
             .context
-            .el_proving_task_scheduler
-            .create_proving_task(el_block_num)
+            .cl_proving_task_dispatcher
+            .create_proving_task(cl_block_num)
             .await
             .expect("failed to add proving task");
 
@@ -101,7 +109,7 @@ impl ExpressProverClientApiServer for ProverClientRpc {
 
     async fn get_task_status(&self, task_id: String) -> RpcResult<Option<String>> {
         let task_id = Uuid::from_str(&task_id).expect("invalid UUID params");
-        let task_tracker = self.context.el_proving_task_scheduler.task_tracker();
+        let task_tracker = self.context.el_proving_task_dispatcher.task_tracker();
 
         if let Some(proving_task) = task_tracker.get_task_by_id(task_id).await {
             let task_status = proving_task.status.to_string();

@@ -12,7 +12,7 @@ pub trait ExpressProverClientApi {
 
     /// Start proving the given cl block
     #[method(name = "proveCLBlock")]
-    async fn prove_cl_block(&self, el_block_num: u64) -> RpcResult<String>;
+    async fn prove_cl_block(&self, cl_block_num: u64) -> RpcResult<String>;
 
     /// Start proving the given el block
     #[method(name = "getTaskStatus")]

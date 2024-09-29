@@ -9,3 +9,4 @@ pub const BLOCK_PROVING_TASK_DISPATCH_INTERVAL: u64 = 1;
 
 // Starting block height for EL block proving tasks
 pub const EL_START_BLOCK_HEIGHT: u64 = 1;
+pub const CL_START_BLOCK_HEIGHT: u64 = 1;

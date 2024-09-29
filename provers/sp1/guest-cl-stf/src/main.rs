@@ -4,12 +4,12 @@ use alpen_express_primitives::{
     params::{Params, RollupParams, SyncParams},
     vk::RollupVerifyingKey,
 };
-use express_proofimpl_cl_stf::{verify_and_transition, ChainState, L2Block};
+use express_proofimpl_cl_stf::{verify_and_transition, CLProofInput};
 
 fn main() {
     let params = get_rollup_params();
     let input: Vec<u8> = sp1_zkvm::io::read();
-    let (prev_state, block): (ChainState, L2Block) = borsh::from_slice(&input).unwrap();
+    let (prev_state, block): CLProofInput = borsh::from_slice(&input).unwrap();
 
     let new_state = verify_and_transition(prev_state, block, params);
     sp1_zkvm::io::commit(&borsh::to_vec(&new_state).unwrap());

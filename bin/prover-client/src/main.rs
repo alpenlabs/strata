@@ -4,8 +4,11 @@ use std::sync::Arc;
 
 use alpen_express_common::logging;
 use args::Args;
-use config::EL_START_BLOCK_HEIGHT;
-use dispatchers::el_task_dispatcher::ELBlockProvingTaskDispatcher;
+use config::{CL_START_BLOCK_HEIGHT, EL_START_BLOCK_HEIGHT};
+use dispatchers::{
+    cl_task_dispatcher::CLBlockProvingTaskDispatcher,
+    el_task_dispatcher::ELBlockProvingTaskDispatcher,
+};
 use express_sp1_adapter::SP1Host;
 use jsonrpsee::http_client::HttpClientBuilder;
 use manager::ProverManager;
@@ -36,12 +39,26 @@ async fn main() {
         .build(args.get_reth_rpc_url())
         .expect("failed to connect to the el client");
 
+    let cl_rpc_client = HttpClientBuilder::default()
+        .build(args.get_sequencer_rpc_url())
+        .expect("failed to connect to the el client");
+
     let el_proving_task_scheduler = ELBlockProvingTaskDispatcher::new(
-        el_rpc_client,
+        el_rpc_client.clone(),
         task_tracker.clone(),
         EL_START_BLOCK_HEIGHT,
     );
-    let rpc_context = RpcContext::new(el_proving_task_scheduler.clone());
+
+    let cl_proving_task_scheduler = CLBlockProvingTaskDispatcher::new(
+        cl_rpc_client,
+        task_tracker.clone(),
+        CL_START_BLOCK_HEIGHT,
+    );
+
+    let rpc_context = RpcContext::new(
+        el_proving_task_scheduler.clone(),
+        cl_proving_task_scheduler.clone(),
+    );
     let prover_manager: ProverManager<SP1Host> = ProverManager::new(task_tracker);
 
     // run prover manager in background

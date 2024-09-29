@@ -191,12 +191,6 @@ pub struct NodeSyncStatus {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct RawBlockWitness {
-    pub raw_l2_block: Vec<u8>,
-    pub raw_chain_state: Vec<u8>,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RpcCheckpointInfo {
     /// The index of the checkpoint
     pub idx: u64,

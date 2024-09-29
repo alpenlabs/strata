@@ -17,12 +17,15 @@ express-prover-client-rpc-api = { workspace = true }
 express-sp1-adapter = { workspace = true, features = ["prover"] }
 express-sp1-guest-builder = { path = "../../provers/sp1" }
 express-zkvm = { workspace = true }
+alpen-express-rpc-types = { workspace = true }
+alpen-express-state = { workspace = true }
 
 
 anyhow = { workspace = true }
 argh = { workspace = true }
 async-trait = { workspace = true }
 bincode = { workspace = true }
+borsh = { workspace = true }
 jsonrpsee = { workspace = true, features = ["http-client"] }
 rayon = "1.8.0"
 reth-rpc-types = { workspace = true }
