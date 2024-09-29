@@ -26,6 +26,7 @@ express-proofimpl-l1-batch = { workspace = true }
 express-zkvm = { workspace = true }
 hex = { workspace = true }
 sp1-sdk = "2.0.0"
+serde_json = { workspace = true }
 
 [features]
 default = ["prover"]

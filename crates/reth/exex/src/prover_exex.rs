@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, fs::File, sync::Arc};
 
 use alloy_rpc_types::EIP1186AccountProofResponse;
 use express_proofimpl_evm_ee_stf::{mpt::proofs_to_tries, ELProofInput};
@@ -198,6 +198,10 @@ fn extract_zkvm_input<Node: FullNodeComponents>(
         // Will need to revisit if BLOCKHASH opcode operation is a blocker
         ancestor_headers: Default::default(),
     };
+
+    use serde_json;
+    let file = File::create(format!("el_witness_{:?}.json", current_block_idx)).unwrap();
+    serde_json::to_writer_pretty(file, &input).unwrap();
 
     Ok(input)
 }

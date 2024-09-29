@@ -4,10 +4,9 @@ mod test {
     use express_proofimpl_evm_ee_stf::{ELProofInput, ELProofPublicParams};
     use express_sp1_adapter::{SP1Host, SP1ProofInputBuilder, SP1Verifier};
     use express_sp1_guest_builder::GUEST_EVM_EE_STF_ELF;
-    use express_zkvm::{ZKVMHost, ZKVMInputBuilder, ZKVMVerifier};
+    use express_zkvm::{ProverOptions, ZKVMHost, ZKVMInputBuilder, ZKVMVerifier};
 
-    const ENCODED_PROVER_INPUT: &[u8] =
-        include_bytes!("../../test-util/el_block_witness_input.bin");
+    const ENCODED_PROVER_INPUT: &[u8] = include_bytes!("../../test-util/el_witness_2.json");
 
     #[test]
     fn test_reth_stf_guest_code_trace_generation() {
@@ -15,8 +14,16 @@ mod test {
             panic!("SP1 prover runs in release mode only");
         }
 
-        let input: ELProofInput = bincode::deserialize(ENCODED_PROVER_INPUT).unwrap();
-        let prover = SP1Host::init(GUEST_EVM_EE_STF_ELF.into(), Default::default());
+        let json_str =
+            std::str::from_utf8(ENCODED_PROVER_INPUT).expect("Failed to convert bytes to string");
+        let input: ELProofInput = serde_json::from_str(json_str).unwrap();
+
+        let prover_options = ProverOptions {
+            use_mock_prover: false,
+            stark_to_snark_conversion: false,
+            enable_compression: true,
+        };
+        let prover = SP1Host::init(GUEST_EVM_EE_STF_ELF.into(), prover_options);
 
         let proof_input = SP1ProofInputBuilder::new()
             .write(&input)
@@ -24,7 +31,20 @@ mod test {
             .build()
             .unwrap();
 
-        let (proof, _) = prover.prove(proof_input).expect("Failed to generate proof");
+        let (proof, vk) = prover.prove(proof_input).expect("Failed to generate proof");
+
+        use std::{
+            fs::File,
+            io::{self, Write},
+        };
+
+        let file_path = "el_vkey.bin";
+        let mut file = File::create(file_path).unwrap();
+        file.write_all(vk.as_bytes()).unwrap();
+
+        let file_path = "el_proof_2.bin";
+        let mut file = File::create(file_path).unwrap();
+        file.write_all(proof.as_bytes()).unwrap();
 
         SP1Verifier::extract_public_output::<ELProofPublicParams>(&proof)
             .expect("Failed to extract public outputs");

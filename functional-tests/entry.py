@@ -280,7 +280,7 @@ class ProverClientFactory(flexitest.Factory):
         ctx: flexitest.EnvContext,
     ):
         datadir = ctx.make_service_dir("prover_client")
-        rpc_port = self.next_port()
+        # rpc_port = self.next_port()
         logfile = os.path.join(datadir, "service.log")
 
         rpc_port = self.next_port()

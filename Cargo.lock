@@ -3916,6 +3916,7 @@ dependencies = [
  "alpen-test-utils",
  "borsh",
  "express-chaintsn",
+ "express-proofimpl-evm-ee-stf",
  "thiserror",
 ]
 
@@ -4182,6 +4183,7 @@ dependencies = [
  "express-sp1-adapter",
  "express-zkvm",
  "hex",
+ "serde_json",
  "sp1-helper",
  "sp1-sdk",
 ]

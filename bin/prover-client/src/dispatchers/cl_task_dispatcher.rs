@@ -78,6 +78,11 @@ impl CLBlockProvingTaskDispatcher {
                     source: e,
                 })?
         {
+            let file_name = format!("cl_block_{:?}", block_num);
+            use std::{fs::File, io::Write};
+            let mut file = File::create(file_name).unwrap();
+            file.write_all(&raw_witness).unwrap();
+
             return self.append_proving_task(raw_witness).await;
         }
 
@@ -108,7 +113,7 @@ impl CLBlockProvingTaskDispatcher {
     ) -> anyhow::Result<Option<Vec<u8>>> {
         let cl_block_witness: Option<Vec<u8>> = self
             .sequnecer_rpc_client
-            .request("alp_getBlockWitness", rpc_params![cl_block_num])
+            .request("alp_getCLBlockWitness", rpc_params![cl_block_num])
             .await
             .context("Failed to get the CL witness")?;
 

@@ -337,7 +337,7 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         }
     }
 
-    async fn get_block_witness_raw(&self, idx: u64) -> RpcResult<Option<Vec<u8>>> {
+    async fn get_cl_block_witness_raw(&self, idx: u64) -> RpcResult<Option<Vec<u8>>> {
         let blk_manifest_db = self.database.clone();
         let blk_ids: Vec<L2BlockId> = wait_blocking("l2_blockid", move || {
             blk_manifest_db
@@ -376,6 +376,7 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         let raw_cl_block_witness = borsh::to_vec(&cl_block_witness)
             .map_err(|_| Error::Other("Failed to get raw cl block witness".to_string()))?;
 
+        println!("Abishek! I was called :D {:?}", raw_cl_block_witness);
         Ok(Some(raw_cl_block_witness))
     }
 

@@ -21,12 +21,13 @@ class CLBlockWitnessDataGenerationTest(flexitest.Test):
             error_with="Sequencer did not start on time",
         )
 
-        witness_1 = seqrpc.alp_getBlockWitness(1)
+        witness_1 = seqrpc.alp_getCLBlockWitness(1)
+        print("got the block witness ", witness_1)
         assert witness_1 is not None
 
         time.sleep(2)
 
-        witness_2 = seqrpc.alp_getBlockWitness(2)
+        witness_2 = seqrpc.alp_getCLBlockWitness(2)
         assert witness_2 is not None
 
         return True

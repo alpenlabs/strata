@@ -26,9 +26,9 @@ impl ZKVMHost for SP1Host {
         prover_input: <Self::Input<'a> as ZKVMInputBuilder<'a>>::Input,
     ) -> anyhow::Result<(Proof, VerificationKey)> {
         // Init the prover
-        if self.prover_options.use_mock_prover {
-            std::env::set_var("SP1_PROVER", "mock");
-        }
+        // if self.prover_options.use_mock_prover {
+        //     std::env::set_var("SP1_PROVER", "mock");
+        // }
         let client = ProverClient::new();
         let (pk, vk) = client.setup(&self.elf);
 
