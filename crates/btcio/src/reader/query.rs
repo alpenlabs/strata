@@ -6,9 +6,10 @@ use std::{
 
 use alpen_express_db::traits::Database;
 use alpen_express_primitives::params::Params;
+use alpen_express_state::l1::get_btc_params;
 use alpen_express_status::StatusTx;
 use anyhow::bail;
-use bitcoin::{params::MAINNET, BlockHash};
+use bitcoin::BlockHash;
 use strata_tx_parser::{
     deposit::DepositTxConfig,
     filter::{filter_relevant_txs, TxFilterRule},
@@ -276,7 +277,7 @@ async fn fetch_and_process_block(
     if height == genesis_threshold {
         info!(%height, %genesis_ht, "time for genesis");
         let l1_verification_state = client
-            .get_verification_state(genesis_ht + 1, &MAINNET)
+            .get_verification_state(genesis_ht + 1, &get_btc_params())
             .await?;
         if let Err(e) = event_tx
             .send(L1Event::GenesisVerificationState(

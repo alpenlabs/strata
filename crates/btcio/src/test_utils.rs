@@ -1,12 +1,14 @@
 use std::collections::BTreeMap;
 
-use alpen_express_state::{l1::HeaderVerificationState, tx::InscriptionData};
+use alpen_express_state::{
+    l1::{BtcParams, HeaderVerificationState},
+    tx::InscriptionData,
+};
 use async_trait::async_trait;
 use bitcoin::{
     bip32::Xpriv,
     consensus::{self, deserialize},
     hashes::Hash,
-    params::Params,
     taproot::ControlBlock,
     Address, Amount, Block, BlockHash, Network, ScriptBuf, SignedAmount, Transaction, Txid, Work,
 };
@@ -108,7 +110,7 @@ impl Reader for TestBitcoinClient {
     async fn get_verification_state(
         &self,
         _height: u64,
-        _params: &Params,
+        _params: &BtcParams,
     ) -> ClientResult<HeaderVerificationState> {
         Ok(HeaderVerificationState::default())
     }

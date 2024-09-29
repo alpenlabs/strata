@@ -6,13 +6,15 @@ use alpen_express_db::traits::{
 };
 use alpen_express_primitives::prelude::*;
 use alpen_express_state::{
+    block,
     client_state::*,
     header::L2Header,
     id::L2BlockId,
-    l1::{HeaderVerificationState, L1BlockId},
+    l1::{get_btc_params, HeaderVerificationState, L1BlockId},
     operation::*,
     sync_event::SyncEvent,
 };
+use bitcoin::block::Header;
 use tracing::*;
 
 use crate::{errors::*, genesis::make_genesis_block};
@@ -42,11 +44,30 @@ pub fn process_event<D: Database>(
             // FIXME this doesn't do any SPV checks to make sure we only go to
             // a longer chain, it just does it unconditionally
             let l1prov = database.l1_provider();
-            let _new_block_mf = l1prov.get_block_manifest(*height)?;
+            let block_mf = l1prov
+                .get_block_manifest(*height)?
+                .ok_or(Error::MissingL1BlockHeight(*height))?;
 
             let l1v = state.l1_view();
+            let l1_vs = state.l1_view().tip_verification_state();
 
-            // TODO do the consensus checks
+            // Do the consensus checks
+            if let Some(l1_vs) = l1_vs {
+                let l1_vs_height = l1_vs.last_verified_block_num as u64;
+                let mut updated_l1vs = l1_vs.clone();
+                if l1_vs_height < l1v.tip_height() {
+                    for height in (l1_vs_height..l1v.tip_height()) {
+                        let block_mf = l1prov
+                            .get_block_manifest(height)?
+                            .ok_or(Error::MissingL1BlockHeight(height))?;
+                        let header: Header =
+                            bitcoin::consensus::deserialize(block_mf.header()).unwrap();
+                        updated_l1vs = updated_l1vs
+                            .check_and_update_continuity_new(&header, &get_btc_params());
+                    }
+                }
+                writes.push(ClientStateWrite::UpdateVerificationState(updated_l1vs))
+            }
 
             // Only accept the block if it's the next block in the chain we expect to accept.
             let cur_seen_tip_height = l1v.tip_height();
@@ -97,8 +118,6 @@ pub fn process_event<D: Database>(
 
             debug!(%genesis_threshold, %genesis_ht, active=%state.is_chain_active(), "Inside activate chain");
 
-            let l1blkid = l1_verification_state.last_verified_block_hash.into();
-
             // If necessary, activate the chain!
             if !state.is_chain_active() && *height >= genesis_threshold {
                 debug!("emitting chain activation");
@@ -110,7 +129,9 @@ pub fn process_event<D: Database>(
                 writes.push(ClientStateWrite::ReplaceSync(Box::new(
                     SyncState::from_genesis_blkid(genesis_block.header().get_blockid()),
                 )));
-                actions.push(SyncAction::L2Genesis(l1blkid));
+                actions.push(SyncAction::L2Genesis(
+                    l1_verification_state.last_verified_block_hash,
+                ));
             }
         }
 
@@ -252,7 +273,8 @@ mod tests {
 
         let chain = get_btc_chain();
         let l1_chain = chain.get_block_manifests(horizon as u32, 10);
-        let l1_verification_state = chain.get_verification_state(genesis as u32 + 1, &MAINNET);
+        let l1_verification_state =
+            chain.get_verification_state(genesis as u32 + 1, &MAINNET.clone().into());
 
         for (i, b) in l1_chain.iter().enumerate() {
             let l1_store = database.l1_store();

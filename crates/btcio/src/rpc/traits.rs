@@ -1,8 +1,6 @@
-use alpen_express_state::l1::HeaderVerificationState;
+use alpen_express_state::l1::{BtcParams, HeaderVerificationState};
 use async_trait::async_trait;
-use bitcoin::{
-    bip32::Xpriv, params::Params, Address, Block, BlockHash, Network, Transaction, Txid,
-};
+use bitcoin::{bip32::Xpriv, Address, Block, BlockHash, Network, Transaction, Txid};
 use bitcoind_json_rpc_types::v26::GetBlockchainInfo;
 
 use crate::rpc::{
@@ -68,7 +66,7 @@ pub trait Reader {
     async fn get_verification_state(
         &self,
         height: u64,
-        params: &Params,
+        params: &BtcParams,
     ) -> ClientResult<HeaderVerificationState>;
 }
 

@@ -2,32 +2,21 @@ use std::io::{Cursor, Write};
 
 use alpen_express_primitives::buf::Buf32;
 use arbitrary::Arbitrary;
-use bitcoin::{block::Header, hashes::Hash, params::Params, BlockHash, CompactTarget, Target};
+use bitcoin::{block::Header, hashes::Hash, BlockHash, CompactTarget, Target};
 use borsh::{BorshDeserialize, BorshSerialize};
 use ethnum::U256;
 use serde::{Deserialize, Serialize};
 
-use super::timestamp_store::TimestampStore;
-use crate::l1::utils::compute_block_hash;
+use super::{timestamp_store::TimestampStore, L1BlockId};
+use crate::l1::{params::BtcParams, utils::compute_block_hash};
 
-#[derive(
-    Debug,
-    Clone,
-    Default,
-    PartialEq,
-    Eq,
-    Serialize,
-    Deserialize,
-    BorshSerialize,
-    BorshDeserialize,
-    Arbitrary,
-)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct HeaderVerificationState {
     /// [Block number](bitcoin::Block::bip34_block_height) of the last verified block
     pub last_verified_block_num: u32,
 
     /// [Hash](bitcoin::block::Header::block_hash) of the last verified block
-    pub last_verified_block_hash: Buf32,
+    pub last_verified_block_hash: L1BlockId,
 
     /// [Target](bitcoin::pow::CompactTarget) for the next block to verify
     pub next_block_target: u32,
@@ -96,7 +85,8 @@ impl HeaderVerificationState {
     /// # Note
     /// The comments above and the implementation is based on [rust-bitcoin](https://github.com/rust-bitcoin/rust-bitcoin/blob/0d9e8f8c992223869a57162c4afe5a6112d08049/bitcoin/src/pow.rs#L352-L398).
     /// This has not been directly used since it is not available on the current release
-    fn next_target(&mut self, timestamp: u32, params: &Params) -> u32 {
+    fn next_target(&mut self, timestamp: u32, params: &BtcParams) -> u32 {
+        let params = params.inner();
         if (self.last_verified_block_num + 1) % params.difficulty_adjustment_interval() as u32 != 0
         {
             return self.next_block_target;
@@ -126,21 +116,20 @@ impl HeaderVerificationState {
         retarget.to_compact_lossy().to_consensus()
     }
 
-    fn update_timestamps(&mut self, timestamp: u32, params: &Params) {
+    fn update_timestamps(&mut self, timestamp: u32, params: &BtcParams) {
         self.last_11_blocks_timestamps.insert(timestamp);
 
         let new_block_num = self.last_verified_block_num;
-        if new_block_num % params.difficulty_adjustment_interval() as u32 == 0 {
+        if new_block_num % params.inner().difficulty_adjustment_interval() as u32 == 0 {
             self.interval_start_timestamp = timestamp;
         }
     }
 
-    pub fn check_and_update(&mut self, header: &Header, params: &Params) {
+    pub fn check_and_update_full(&mut self, header: &Header, params: &BtcParams) {
         // Check continuity
-        assert_eq!(
-            Buf32::from(header.prev_blockhash.as_raw_hash().to_byte_array()),
-            self.last_verified_block_hash,
-        );
+        let prev_blockhash: L1BlockId =
+            Buf32::from(header.prev_blockhash.as_raw_hash().to_byte_array()).into();
+        assert_eq!(prev_blockhash, self.last_verified_block_hash,);
 
         let block_hash_raw = compute_block_hash(header);
         let block_hash = BlockHash::from_byte_array(*block_hash_raw.as_ref());
@@ -156,16 +145,66 @@ impl HeaderVerificationState {
         self.last_verified_block_num += 1;
 
         // Set the header block hash as the last verified block hash
-        self.last_verified_block_hash = block_hash_raw;
+        self.last_verified_block_hash = block_hash_raw.into();
 
         // Update the timestamps
         self.update_timestamps(header.time, params);
 
         // Update the total accumulated PoW
-        self.total_accumulated_pow += header.difficulty(params);
+        self.total_accumulated_pow += header.difficulty(params.inner());
 
         // Set the target for the next block
         self.next_block_target = self.next_target(header.time, params);
+    }
+
+    // TODO: add errors
+    pub fn check_and_update_continuity(&mut self, header: &Header, params: &BtcParams) {
+        // Check continuity
+        let prev_blockhash: L1BlockId =
+            Buf32::from(header.prev_blockhash.as_raw_hash().to_byte_array()).into();
+        assert_eq!(prev_blockhash, self.last_verified_block_hash,);
+
+        let block_hash_raw = compute_block_hash(header);
+
+        // Increase the last verified block number by 1
+        self.last_verified_block_num += 1;
+
+        // Set the header block hash as the last verified block hash
+        self.last_verified_block_hash = block_hash_raw.into();
+
+        // Update the timestamps
+        self.update_timestamps(header.time, params);
+
+        // Update the total accumulated PoW
+        self.total_accumulated_pow += header.difficulty(params.inner());
+    }
+
+    // TODO: add errors
+    pub fn check_and_update_continuity_new(&self, header: &Header, params: &BtcParams) -> Self {
+        let mut new_self = self.clone();
+
+        // TODO: skipping this for now
+        // Check continuity
+        // assert_eq!(
+        //     Buf32::from(header.prev_blockhash.as_raw_hash().to_byte_array()),
+        //     new_self.last_verified_block_hash,
+        // );
+
+        let block_hash_raw = compute_block_hash(header);
+
+        // Increase the last verified block number by 1
+        new_self.last_verified_block_num += 1;
+
+        // Set the header block hash as the last verified block hash
+        new_self.last_verified_block_hash = block_hash_raw.into();
+
+        // Update the timestamps
+        new_self.update_timestamps(header.time, params);
+
+        // Update the total accumulated PoW
+        new_self.total_accumulated_pow += header.difficulty(params.inner());
+
+        new_self
     }
 
     pub fn compute_snapshot(&self) -> HeaderVerificationStateSnapshot {
@@ -209,8 +248,8 @@ impl HeaderVerificationState {
 ///   the second, and so on.
 /// * `start` - The starting height from which to calculate.
 /// * `params` - [`Params`] of the network
-pub fn get_difficulty_adjustment_height(idx: u32, start: u32, params: &Params) -> u32 {
-    let difficulty_adjustment_interval = params.difficulty_adjustment_interval() as u32;
+pub fn get_difficulty_adjustment_height(idx: u32, start: u32, params: &BtcParams) -> u32 {
+    let difficulty_adjustment_interval = params.inner().difficulty_adjustment_interval() as u32;
     ((start / difficulty_adjustment_interval) + idx) * difficulty_adjustment_interval
 }
 
@@ -225,12 +264,15 @@ mod tests {
     #[test]
     fn test_blocks() {
         let chain = get_btc_chain();
-        let h1 = get_difficulty_adjustment_height(1, chain.start, &MAINNET);
+        // TODO: figure out why passing btc_params to `check_and_update_full` doesn't work
+        let btc_params: BtcParams = MAINNET.clone().into();
+        let h1 = get_difficulty_adjustment_height(1, chain.start, &btc_params);
         let r1 = rand::thread_rng().gen_range(h1..chain.end);
-        let mut verification_state = chain.get_verification_state(r1, &MAINNET);
+        let mut verification_state = chain.get_verification_state(r1, &MAINNET.clone().into());
 
         for header_idx in r1..chain.end {
-            verification_state.check_and_update(&chain.get_header(header_idx), &MAINNET)
+            verification_state
+                .check_and_update_full(&chain.get_header(header_idx), &MAINNET.clone().into())
         }
     }
 
@@ -238,7 +280,7 @@ mod tests {
     fn test_get_difficulty_adjustment_height() {
         let start = 0;
         let idx = rand::thread_rng().gen_range(1..1000);
-        let h = get_difficulty_adjustment_height(idx, start, &MAINNET);
+        let h = get_difficulty_adjustment_height(idx, start, &MAINNET.clone().into());
         assert_eq!(h, MAINNET.difficulty_adjustment_interval() as u32 * idx);
     }
 
@@ -246,7 +288,7 @@ mod tests {
     fn test_hash() {
         let chain = get_btc_chain();
         let r1 = 42000;
-        let verification_state = chain.get_verification_state(r1, &MAINNET);
+        let verification_state = chain.get_verification_state(r1, &MAINNET.clone().into());
         let hash = verification_state.compute_hash();
         assert!(hash.is_ok());
     }

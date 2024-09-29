@@ -1,12 +1,11 @@
 use alpen_express_primitives::{buf::Buf32, l1::L1BlockManifest};
 use alpen_express_state::l1::{
-    get_difficulty_adjustment_height, HeaderVerificationState, TimestampStore,
+    get_difficulty_adjustment_height, BtcParams, HeaderVerificationState, L1BlockId, TimestampStore,
 };
 use bitcoin::{
     block::Header,
     consensus::{deserialize, serialize},
     hashes::Hash,
-    params::Params,
     Block, Transaction,
 };
 use strata_tx_parser::{deposit::DepositTxConfig, filter::TxFilterRule};
@@ -73,7 +72,11 @@ impl BtcChainSegment {
         timestamps
     }
 
-    pub fn get_verification_state(&self, height: u32, params: &Params) -> HeaderVerificationState {
+    pub fn get_verification_state(
+        &self,
+        height: u32,
+        params: &BtcParams,
+    ) -> HeaderVerificationState {
         // Get the difficulty adjustment block just before `block_height`
         let h1 = get_difficulty_adjustment_height(0, height, params);
 
@@ -85,14 +88,17 @@ impl BtcChainSegment {
         let initial_timestamps: [u32; 11] = self.get_last_timestamps(vh, 11).try_into().unwrap();
         let last_11_blocks_timestamps = TimestampStore::new(initial_timestamps);
 
+        let last_verified_block_hash: L1BlockId = Buf32::from(
+            self.get_header(vh)
+                .block_hash()
+                .as_raw_hash()
+                .to_byte_array(),
+        )
+        .into();
+
         HeaderVerificationState {
             last_verified_block_num: vh,
-            last_verified_block_hash: Buf32::from(
-                self.get_header(vh)
-                    .block_hash()
-                    .as_raw_hash()
-                    .to_byte_array(),
-            ),
+            last_verified_block_hash,
             next_block_target: self
                 .get_header(vh)
                 .target()

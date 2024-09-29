@@ -12,7 +12,7 @@ use alpen_express_state::{
     tx::DepositInfo,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
-use express_proofimpl_l1_batch::logic::L1BatchProofOutput;
+use express_proofimpl_l1_batch::L1BatchProofOutput;
 use express_zkvm::Proof;
 
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
