@@ -134,8 +134,6 @@ fn process_l1_view_update(
     Ok(())
 }
 
-// Returns Some(DepositIntent)  if Tx can be parsed
-
 /// Checks the attested block IDs and parent blkid connections in new blocks.
 // TODO unit tests
 fn check_chain_integrity(

@@ -1,14 +1,14 @@
-use alpen_express_primitives::{buf::Buf32, l1::L1BlockManifest};
 use alpen_express_state::l1::{
     get_difficulty_adjustment_height, BtcParams, HeaderVerificationState, L1BlockId, TimestampStore,
 };
+use alpen_express_primitives::{buf::Buf32, l1::L1BlockManifest, params::RollupParams};
 use bitcoin::{
     block::Header,
     consensus::{deserialize, serialize},
     hashes::Hash,
     Block, Transaction,
 };
-use strata_tx_parser::{deposit::DepositTxConfig, filter::TxFilterRule};
+use strata_tx_parser::filter::TxFilterRule;
 
 use crate::{l2::gen_params, ArbitraryGenerator};
 
@@ -151,7 +151,7 @@ pub fn get_btc_chain() -> BtcChainSegment {
 
 pub fn get_tx_filters() -> Vec<TxFilterRule> {
     let config = gen_params();
-    let deposit_tx_config = DepositTxConfig::from_rollup_params(config.rollup());
+    let deposit_tx_config = RollupParams::get_deposit_config(config.rollup());
 
     vec![
         TxFilterRule::Deposit(deposit_tx_config),

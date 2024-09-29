@@ -1,14 +1,14 @@
 //! parser types for Deposit Tx, and later deposit Request Tx
 
-use alpen_express_primitives::l1::OutputRef;
+use alpen_express_primitives::{l1::OutputRef, params::DepositTxParams};
 use alpen_express_state::tx::DepositInfo;
 use bitcoin::{opcodes::all::OP_RETURN, ScriptBuf, Transaction};
 
-use super::{common::check_bridge_offer_output, error::DepositParseError, DepositTxConfig};
+use super::{common::check_bridge_offer_output, error::DepositParseError};
 use crate::utils::{next_bytes, next_op};
 
 /// Extracts the DepositInfo from the Deposit Transaction
-pub fn extract_deposit_info(tx: &Transaction, config: &DepositTxConfig) -> Option<DepositInfo> {
+pub fn extract_deposit_info(tx: &Transaction, config: &DepositTxParams) -> Option<DepositInfo> {
     // Get the first output (index 0)
     let output_0 = tx.output.first()?;
 
@@ -35,7 +35,7 @@ pub fn extract_deposit_info(tx: &Transaction, config: &DepositTxConfig) -> Optio
 /// extracts the EE address given that the script is OP_RETURN type and contains the Magic Bytes
 fn parse_deposit_script<'a>(
     script: &'a ScriptBuf,
-    config: &DepositTxConfig,
+    config: &DepositTxParams,
 ) -> Result<&'a [u8], DepositParseError> {
     let mut instructions = script.instructions();
 

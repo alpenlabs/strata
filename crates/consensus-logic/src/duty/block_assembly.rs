@@ -245,7 +245,7 @@ fn load_header_record(h: u64, l1_prov: &impl L1DataProvider) -> Result<L1HeaderR
     ))
 }
 
-fn deposit_update_txs_from_db(
+fn fetch_deposit_update_txs(
     h: u64,
     l1_prov: &impl L1DataProvider,
 ) -> Result<Vec<DepositUpdateTx>, Error> {

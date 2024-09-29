@@ -93,6 +93,12 @@ pub trait AlpenApi {
     /// Get nth checkpoint info if any
     #[method(name = "getCheckpointInfo")]
     async fn get_checkpoint_info(&self, idx: u64) -> RpcResult<Option<RpcCheckpointInfo>>;
+
+    /// Get the finalization status of the l2block from its height
+    /// This assumes that the block finalization is always sequential. i.e all the blocks before the
+    /// last finalized block are also finalized
+    #[method(name = "getBlockFinalized")]
+    async fn get_l2_block_finalization_status(&self, block_height: u64) -> RpcResult<bool>;
 }
 
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "alpadmin"))]

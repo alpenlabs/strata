@@ -166,11 +166,9 @@ fn apply_op_to_chainstate(op: &StateOp, state: &mut ChainState) {
 
             let n_drop = front_idx - to_drop;
 
-            for _ in 0..n_drop {
-                deposits
-                    .pop_front()
-                    .expect("stateop: unable to consume deposit intent");
-            }
+            deposits
+                .pop_front_n_runtime(n_drop as usize)
+                .expect("stateop: unable to consume deposit intent");
         }
 
         StateOp::CreateOperator(spk, wpk) => {

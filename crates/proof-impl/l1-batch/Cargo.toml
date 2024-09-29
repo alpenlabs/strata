@@ -15,5 +15,8 @@ serde.workspace = true
 serde_json = "1.0.127"
 
 [dev-dependencies]
-rand.workspace = true
-alpen-test-utils.workspace = true
+alpen-test-utils = { workspace = true }
+rand =  { workspace = true }
+
+[features]
+test-utils = []

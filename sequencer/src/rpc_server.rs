@@ -560,6 +560,17 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         let batch_comm: Option<BatchCheckpoint> = entry.map(Into::into);
         Ok(batch_comm.map(|bc| bc.checkpoint().clone().into()))
     }
+
+    async fn get_l2_block_finalization_status(&self, block_height: u64) -> RpcResult<bool> {
+        let cl_state = self.get_client_state().await;
+        if let Some(last_checkpoint) = cl_state.l1_view().last_finalized_checkpoint() {
+            let (_, last_l2_height) = last_checkpoint.checkpoint.l2_range;
+            if block_height < last_l2_height {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
 }
 
 /// Wrapper around [``tokio::task::spawn_blocking``] that handles errors in
