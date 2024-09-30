@@ -199,9 +199,7 @@ pub fn load_or_create(
                 return Err(narrowed.unwrap_err().broaden());
             }
         };
-        persister
-            .save(&encrypted_seed)
-            .map_err(OneOf::broaden)?;
+        persister.save(&encrypted_seed).map_err(OneOf::broaden)?;
         Ok(seed)
     }
 }
