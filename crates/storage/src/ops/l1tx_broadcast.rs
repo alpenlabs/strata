@@ -10,11 +10,11 @@ use alpen_express_primitives::buf::Buf32;
 use crate::exec::*;
 
 /// Database context for an database operation interface.
-pub struct Context<D: TxBroadcastDatabase + Sync + Send + 'static> {
+pub struct Context<D: L1BroadcastDatabase + Sync + Send + 'static> {
     db: Arc<D>,
 }
 
-impl<D: TxBroadcastDatabase + Sync + Send + 'static> Context<D> {
+impl<D: L1BroadcastDatabase + Sync + Send + 'static> Context<D> {
     pub fn new(db: Arc<D>) -> Self {
         Self { db }
     }
@@ -25,7 +25,7 @@ impl<D: TxBroadcastDatabase + Sync + Send + 'static> Context<D> {
 }
 
 inst_ops! {
-    (BroadcastDbOps, Context<D: TxBroadcastDatabase>) {
+    (BroadcastDbOps, Context<D: L1BroadcastDatabase>) {
         get_tx_entry(idx: u64) => Option<L1TxEntry>;
         get_tx_entry_by_id(id: Buf32) => Option<L1TxEntry>;
         get_tx_status(id: Buf32) => Option<L1TxStatus>;
@@ -36,7 +36,7 @@ inst_ops! {
     }
 }
 
-fn get_tx_entry<D: TxBroadcastDatabase + Sync + Send + 'static>(
+fn get_tx_entry<D: L1BroadcastDatabase + Sync + Send + 'static>(
     context: &Context<D>,
     idx: u64,
 ) -> DbResult<Option<L1TxEntry>> {
@@ -44,7 +44,7 @@ fn get_tx_entry<D: TxBroadcastDatabase + Sync + Send + 'static>(
     bcast_prov.get_tx_entry(idx)
 }
 
-fn get_tx_entry_by_id<D: TxBroadcastDatabase + Sync + Send + 'static>(
+fn get_tx_entry_by_id<D: L1BroadcastDatabase + Sync + Send + 'static>(
     context: &Context<D>,
     id: Buf32,
 ) -> DbResult<Option<L1TxEntry>> {
@@ -52,7 +52,7 @@ fn get_tx_entry_by_id<D: TxBroadcastDatabase + Sync + Send + 'static>(
     bcast_prov.get_tx_entry_by_id(id)
 }
 
-fn get_txid<D: TxBroadcastDatabase + Sync + Send + 'static>(
+fn get_txid<D: L1BroadcastDatabase + Sync + Send + 'static>(
     context: &Context<D>,
     idx: u64,
 ) -> DbResult<Option<Buf32>> {
@@ -60,7 +60,7 @@ fn get_txid<D: TxBroadcastDatabase + Sync + Send + 'static>(
     bcast_prov.get_txid(idx)
 }
 
-fn get_tx_status<D: TxBroadcastDatabase + Sync + Send + 'static>(
+fn get_tx_status<D: L1BroadcastDatabase + Sync + Send + 'static>(
     context: &Context<D>,
     id: Buf32,
 ) -> DbResult<Option<L1TxStatus>> {
@@ -68,14 +68,14 @@ fn get_tx_status<D: TxBroadcastDatabase + Sync + Send + 'static>(
     Ok(bcast_prov.get_tx_entry_by_id(id)?.map(|entry| entry.status))
 }
 
-fn get_next_tx_idx<D: TxBroadcastDatabase + Sync + Send + 'static>(
+fn get_next_tx_idx<D: L1BroadcastDatabase + Sync + Send + 'static>(
     context: &Context<D>,
 ) -> DbResult<u64> {
     let bcast_prov = context.db.broadcast_provider();
     bcast_prov.get_next_tx_idx()
 }
 
-fn put_tx_entry<D: TxBroadcastDatabase + Sync + Send + 'static>(
+fn put_tx_entry<D: L1BroadcastDatabase + Sync + Send + 'static>(
     context: &Context<D>,
     txid: Buf32,
     entry: L1TxEntry,
@@ -86,7 +86,7 @@ fn put_tx_entry<D: TxBroadcastDatabase + Sync + Send + 'static>(
     bcast_store.put_tx_entry(txid, entry)
 }
 
-fn put_tx_entry_by_idx<D: TxBroadcastDatabase + Sync + Send + 'static>(
+fn put_tx_entry_by_idx<D: L1BroadcastDatabase + Sync + Send + 'static>(
     context: &Context<D>,
     idx: u64,
     entry: L1TxEntry,

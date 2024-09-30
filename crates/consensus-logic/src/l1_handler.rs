@@ -30,7 +30,7 @@ use crate::ctl::CsmController;
 
 /// Consumes L1 events and reflects them in the database.
 pub fn bitcoin_data_handler_task<D: Database + Send + Sync + 'static>(
-    l1db: Arc<D::L1Store>,
+    l1db: Arc<D::L1DataStore>,
     csm_ctl: Arc<CsmController>,
     mut event_rx: mpsc::Receiver<L1Event>,
     params: Arc<Params>,

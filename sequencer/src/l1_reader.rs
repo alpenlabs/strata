@@ -11,7 +11,7 @@ use tokio::sync::mpsc;
 
 use crate::config::Config;
 
-pub fn start_reader_tasks<D: Database + Send + Sync + 'static>(
+pub fn start_reader_tasks<D>(
     executor: &TaskExecutor,
     params: Arc<Params>,
     config: &Config,
@@ -21,9 +21,7 @@ pub fn start_reader_tasks<D: Database + Send + Sync + 'static>(
     status_rx: Arc<StatusTx>,
 ) -> anyhow::Result<()>
 where
-    // TODO how are these not redundant trait bounds???
-    <D as alpen_express_db::traits::Database>::SeStore: Send + Sync + 'static,
-    <D as alpen_express_db::traits::Database>::L1Store: Send + Sync + 'static,
+    D: Database + Send + Sync + 'static,
 {
     let (ev_tx, ev_rx) = mpsc::channel::<L1Event>(100); // TODO: think about the buffer size
 
@@ -36,7 +34,7 @@ where
 
     let reader_config = Arc::new(config.get_reader_config());
     let params_r = params.clone();
-    let chprov = db.chainstate_provider().clone();
+    let chprov = db.chain_state_provider().clone();
 
     executor.spawn_critical_async(
         "bitcoin_data_reader_task",
@@ -55,7 +53,7 @@ where
     let _sedb = db.sync_event_store().clone();
 
     executor.spawn_critical("bitcoin_data_handler_task", move |_| {
-        bitcoin_data_handler_task::<D>(l1db, csm_ctl, ev_rx, params).unwrap()
+        bitcoin_data_handler_task::<D>(l1db, csm_ctl, ev_rx, params)
     });
     Ok(())
 }

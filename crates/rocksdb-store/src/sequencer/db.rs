@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use alpen_express_db::{
     errors::DbError,
-    traits::{SeqDataProvider, SeqDataStore, SequencerDatabase},
+    traits::{BlobProvider, BlobStore, SequencerDatabase},
     types::BlobEntry,
     DbResult,
 };
@@ -12,12 +12,12 @@ use rockbound::{OptimisticTransactionDB, SchemaDBOperationsExt};
 use super::schemas::{SeqBlobIdSchema, SeqBlobSchema};
 use crate::DbOpsConfig;
 
-pub struct SeqDb {
+pub struct RBSeqBlobDb {
     db: Arc<OptimisticTransactionDB>,
     ops: DbOpsConfig,
 }
 
-impl SeqDb {
+impl RBSeqBlobDb {
     /// Wraps an existing database handle.
     ///
     /// Assumes it was opened with column families as defined in `STORE_COLUMN_FAMILIES`.
@@ -27,7 +27,7 @@ impl SeqDb {
     }
 }
 
-impl SeqDataStore for SeqDb {
+impl BlobStore for RBSeqBlobDb {
     fn put_blob_entry(&self, blob_hash: Buf32, blob: BlobEntry) -> DbResult<()> {
         self.db
             .with_optimistic_txn(
@@ -51,7 +51,7 @@ impl SeqDataStore for SeqDb {
     }
 }
 
-impl SeqDataProvider for SeqDb {
+impl BlobProvider for RBSeqBlobDb {
     fn get_blob_by_id(&self, id: Buf32) -> DbResult<Option<BlobEntry>> {
         Ok(self.db.get::<SeqBlobSchema>(&id)?)
     }
@@ -75,15 +75,15 @@ impl<D> SequencerDB<D> {
     }
 }
 
-impl<D: SeqDataStore + SeqDataProvider> SequencerDatabase for SequencerDB<D> {
-    type SeqStore = D;
-    type SeqProv = D;
+impl<B: BlobStore + BlobProvider> SequencerDatabase for SequencerDB<B> {
+    type BlobStore = B;
+    type BlobProvider = B;
 
-    fn sequencer_store(&self) -> &Arc<Self::SeqStore> {
+    fn blob_store(&self) -> &Arc<Self::BlobStore> {
         &self.db
     }
 
-    fn sequencer_provider(&self) -> &Arc<Self::SeqProv> {
+    fn blob_provider(&self) -> &Arc<Self::BlobProvider> {
         &self.db
     }
 }
@@ -91,7 +91,7 @@ impl<D: SeqDataStore + SeqDataProvider> SequencerDatabase for SequencerDB<D> {
 #[cfg(feature = "test_utils")]
 #[cfg(test)]
 mod tests {
-    use alpen_express_db::traits::{SeqDataProvider, SeqDataStore};
+    use alpen_express_db::traits::{BlobProvider, BlobStore};
     use alpen_express_primitives::buf::Buf32;
     use alpen_test_utils::ArbitraryGenerator;
     use test;
@@ -102,7 +102,7 @@ mod tests {
     #[test]
     fn test_put_blob_new_entry() {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-        let seq_db = SeqDb::new(db, db_ops);
+        let seq_db = RBSeqBlobDb::new(db, db_ops);
 
         let blob: BlobEntry = ArbitraryGenerator::new().generate();
         let blob_hash: Buf32 = [0; 32].into();
@@ -119,7 +119,7 @@ mod tests {
     #[test]
     fn test_put_blob_existing_entry() {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-        let seq_db = SeqDb::new(db, db_ops);
+        let seq_db = RBSeqBlobDb::new(db, db_ops);
         let blob: BlobEntry = ArbitraryGenerator::new().generate();
         let blob_hash: Buf32 = [0; 32].into();
 
@@ -134,7 +134,7 @@ mod tests {
     #[test]
     fn test_update_blob_() {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-        let seq_db = SeqDb::new(db, db_ops);
+        let seq_db = RBSeqBlobDb::new(db, db_ops);
 
         let blob: BlobEntry = ArbitraryGenerator::new().generate();
         let blob_hash: Buf32 = [0; 32].into();
@@ -155,7 +155,7 @@ mod tests {
     #[test]
     fn test_get_blob_by_id() {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-        let seq_db = SeqDb::new(db, db_ops);
+        let seq_db = RBSeqBlobDb::new(db, db_ops);
 
         let blob: BlobEntry = ArbitraryGenerator::new().generate();
         let blob_hash: Buf32 = [0; 32].into();
@@ -169,7 +169,7 @@ mod tests {
     #[test]
     fn test_get_last_blob_idx() {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-        let seq_db = SeqDb::new(db, db_ops);
+        let seq_db = RBSeqBlobDb::new(db, db_ops);
 
         let blob: BlobEntry = ArbitraryGenerator::new().generate();
         let blob_hash: Buf32 = [0; 32].into();

@@ -88,32 +88,31 @@ impl InscriptionHandle {
 /// [`Result<InscriptionHandle>`](anyhow::Result)
 pub fn start_inscription_task<D: SequencerDatabase + Send + Sync + 'static>(
     executor: &TaskExecutor,
-    rpc_client: Arc<impl Reader + Wallet + Signer + Send + Sync + 'static>,
+    bitcoin_client: Arc<impl Reader + Wallet + Signer + Send + Sync + 'static>,
     config: WriterConfig,
     db: Arc<D>,
     status_tx: Arc<StatusTx>,
     pool: threadpool::ThreadPool,
-    bcast_handle: Arc<L1BroadcastHandle>,
-) -> anyhow::Result<InscriptionHandle> {
-    let ops = Arc::new(Context::new(db).into_ops(pool));
-    let insc_mgr = InscriptionHandle::new(ops.clone());
+    broadcast_handle: Arc<L1BroadcastHandle>,
+) -> anyhow::Result<Arc<InscriptionHandle>> {
+    let inscription_data_ops = Arc::new(Context::new(db).into_ops(pool));
+    let next_watch_blob_idx = get_next_blobidx_to_watch(inscription_data_ops.as_ref())?;
 
-    let next_watch_blob_idx = get_next_blobidx_to_watch(ops.as_ref())?;
+    let inscription_handle = Arc::new(InscriptionHandle::new(inscription_data_ops.clone()));
 
     executor.spawn_critical_async("btcio::watcher_task", async move {
         watcher_task(
             next_watch_blob_idx,
-            rpc_client,
+            bitcoin_client,
             config,
-            ops,
-            bcast_handle,
+            inscription_data_ops,
+            broadcast_handle,
             status_tx,
         )
         .await
-        .unwrap()
     });
 
-    Ok(insc_mgr)
+    Ok(inscription_handle)
 }
 
 /// Looks into the database from descending index order till it reaches 0 or `Finalized`
@@ -143,10 +142,10 @@ fn get_next_blobidx_to_watch(insc_ops: &InscriptionDataOps) -> anyhow::Result<u6
 /// [`BlobL1Status::Finalized`]
 pub async fn watcher_task(
     next_blbidx_to_watch: u64,
-    rpc_client: Arc<impl Reader + Wallet + Signer>,
+    bitcoin_client: Arc<impl Reader + Wallet + Signer>,
     config: WriterConfig,
     insc_ops: Arc<InscriptionDataOps>,
-    bcast_handle: Arc<L1BroadcastHandle>,
+    broadcast_handle: Arc<L1BroadcastHandle>,
     status_tx: Arc<StatusTx>,
 ) -> anyhow::Result<()> {
     info!("Starting L1 writer's watcher task");
@@ -165,8 +164,8 @@ pub async fn watcher_task(
                     debug!(?blobentry.status, %curr_blobidx, "Processing unsigned blobentry");
                     match create_and_sign_blob_inscriptions(
                         &blobentry,
-                        &bcast_handle,
-                        rpc_client.clone(),
+                        &broadcast_handle,
+                        bitcoin_client.clone(),
                         &config,
                     )
                     .await
@@ -198,10 +197,10 @@ pub async fn watcher_task(
                 // If entry is signed but not finalized or excluded yet, check broadcast txs status
                 BlobL1Status::Published | BlobL1Status::Confirmed | BlobL1Status::Unpublished => {
                     debug!(%curr_blobidx, "Checking blobentry's broadcast status");
-                    let commit_tx = bcast_handle
+                    let commit_tx = broadcast_handle
                         .get_tx_entry_by_id_async(blobentry.commit_txid)
                         .await?;
-                    let reveal_tx = bcast_handle
+                    let reveal_tx = broadcast_handle
                         .get_tx_entry_by_id_async(blobentry.reveal_txid)
                         .await?;
 

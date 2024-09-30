@@ -56,7 +56,7 @@ pub const PROVER_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
 // Re-exports
 pub use bridge_relay::db::BridgeMsgDb;
 use bridge_relay::schemas::*;
-pub use broadcaster::db::BroadcastDb;
+pub use broadcaster::db::L1BroadcastDb;
 use broadcaster::schemas::{BcastL1TxIdSchema, BcastL1TxSchema};
 pub use chain_state::db::ChainStateDb;
 pub use checkpoint::db::RBCheckpointDB;
@@ -65,7 +65,7 @@ pub use client_state::db::ClientStateDb;
 pub use l1::db::L1Db;
 use l2::schemas::{L2BlockHeightSchema, L2BlockSchema, L2BlockStatusSchema};
 use rockbound::{schema::ColumnFamilyName, Schema};
-pub use sequencer::db::SeqDb;
+pub use sequencer::db::RBSeqBlobDb;
 use sequencer::schemas::{SeqBlobIdSchema, SeqBlobSchema};
 pub use sync_event::db::SyncEventDb;
 
@@ -80,4 +80,10 @@ use crate::{
 #[derive(Clone, Copy, Debug)]
 pub struct DbOpsConfig {
     pub retry_count: u16,
+}
+
+impl DbOpsConfig {
+    pub fn new(retry_count: u16) -> Self {
+        Self { retry_count }
+    }
 }

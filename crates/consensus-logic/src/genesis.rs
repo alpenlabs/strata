@@ -66,7 +66,7 @@ pub fn init_genesis_chainstate(
     let genesis_blkid = gblock.header().get_blockid();
 
     // Now insert things into the database.
-    let chs_store = database.chainstate_store();
+    let chs_store = database.chain_state_store();
     let l2store = database.l2_store();
     chs_store.write_genesis_state(&gchstate)?;
     l2store.put_block_data(gblock)?;

@@ -235,7 +235,7 @@ pub fn tracker_task<D: Database, E: ExecEngineCtl>(
     l2_block_manager: Arc<L2BlockManager>,
     engine: Arc<E>,
     mut fcm_rx: mpsc::Receiver<ForkChoiceMessage>,
-    csm_ctl: Arc<CsmController>,
+    csm_controller: Arc<CsmController>,
     params: Arc<Params>,
 ) -> anyhow::Result<()> {
     // Wait until the CSM gives us a state we can start from.
@@ -273,7 +273,8 @@ pub fn tracker_task<D: Database, E: ExecEngineCtl>(
     };
     info!(%finalized_blockid, "forkchoice manager started");
 
-    if let Err(e) = forkchoice_manager_task_inner(&shutdown, fcm, engine.as_ref(), fcm_rx, &csm_ctl)
+    if let Err(e) =
+        forkchoice_manager_task_inner(&shutdown, fcm, engine.as_ref(), fcm_rx, &csm_controller)
     {
         error!(err = ?e, "tracker aborted");
         return Err(e);
@@ -516,8 +517,8 @@ fn apply_tip_update<D: Database>(
     reorg: &reorg::Reorg,
     fc_manager: &mut ForkChoiceManager<D>,
 ) -> anyhow::Result<()> {
-    let chs_store = fc_manager.database.chainstate_store();
-    let chs_prov = fc_manager.database.chainstate_provider();
+    let chs_store = fc_manager.database.chain_state_store();
+    let chs_prov = fc_manager.database.chain_state_provider();
 
     // See if we need to roll back recent changes.
     let pivot_blkid = reorg.pivot();

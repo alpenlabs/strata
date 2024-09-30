@@ -162,12 +162,12 @@ impl RelayerHandle {
 /// Starts the bridge relayer task, returning a handle to submit new messages
 /// for processing.
 // TODO make this a builder
-pub async fn start_bridge_relayer_task(
+pub fn start_bridge_relayer_task(
     ops: Arc<BridgeMsgOps>,
     status_rx: Arc<StatusRx>,
     config: RelayerConfig,
     task_exec: &TaskExecutor,
-) -> anyhow::Result<Arc<RelayerHandle>> {
+) -> Arc<RelayerHandle> {
     // TODO wrap the messages in a container so we make sure not to send them to
     // the peer that sent them to us
     let (brmsg_tx, brmsg_rx) = mpsc::channel::<BridgeMessage>(100);
@@ -176,10 +176,13 @@ pub async fn start_bridge_relayer_task(
     task_exec.spawn_critical_async("bridge-msg-relayer", relayer_task(state, brmsg_rx));
 
     let h = RelayerHandle { brmsg_tx, ops };
-    Ok(Arc::new(h))
+    Arc::new(h)
 }
 
-async fn relayer_task(mut state: RelayerState, mut message_rx: mpsc::Receiver<BridgeMessage>) {
+async fn relayer_task(
+    mut state: RelayerState,
+    mut message_rx: mpsc::Receiver<BridgeMessage>,
+) -> anyhow::Result<()> {
     // arbitrary refresh interval to refresh the number of message particular operator can send
     let mut refresh_interval = interval(Duration::from_secs(state.config.refresh_interval));
     loop {

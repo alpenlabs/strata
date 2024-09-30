@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use alpen_express_db::{
     errors::DbError,
-    traits::{BcastProvider, BcastStore, TxBroadcastDatabase},
+    traits::{L1BroadcastDatabase, L1BroadcastProvider, L1BroadcastStore},
     types::L1TxEntry,
     DbResult,
 };
@@ -14,18 +14,18 @@ use rockbound::{
 use super::schemas::{BcastL1TxIdSchema, BcastL1TxSchema};
 use crate::DbOpsConfig;
 
-pub struct BroadcastDb {
+pub struct L1BroadcastDb {
     db: Arc<DB>,
     ops: DbOpsConfig,
 }
 
-impl BroadcastDb {
+impl L1BroadcastDb {
     pub fn new(db: Arc<DB>, ops: DbOpsConfig) -> Self {
         Self { db, ops }
     }
 }
 
-impl BcastStore for BroadcastDb {
+impl L1BroadcastStore for L1BroadcastDb {
     fn put_tx_entry(&self, txid: Buf32, txentry: L1TxEntry) -> DbResult<Option<u64>> {
         self.db
             .with_optimistic_txn(
@@ -62,7 +62,7 @@ impl BcastStore for BroadcastDb {
     }
 }
 
-impl BcastProvider for BroadcastDb {
+impl L1BroadcastProvider for L1BroadcastDb {
     fn get_tx_entry_by_id(&self, txid: Buf32) -> DbResult<Option<L1TxEntry>> {
         Ok(self.db.get::<BcastL1TxSchema>(&txid)?)
     }
@@ -89,32 +89,32 @@ impl BcastProvider for BroadcastDb {
 }
 
 pub struct BroadcastDatabase {
-    db: Arc<BroadcastDb>,
+    l1_broadcast_db: Arc<L1BroadcastDb>,
 }
 
 impl BroadcastDatabase {
-    pub fn new(db: Arc<BroadcastDb>) -> Self {
-        Self { db }
+    pub fn new(l1_broadcast_db: Arc<L1BroadcastDb>) -> Self {
+        Self { l1_broadcast_db }
     }
 }
 
-impl TxBroadcastDatabase for BroadcastDatabase {
-    type BcastStore = BroadcastDb;
-    type BcastProv = BroadcastDb;
+impl L1BroadcastDatabase for BroadcastDatabase {
+    type BroadcastStore = L1BroadcastDb;
+    type BroadcastProvider = L1BroadcastDb;
 
-    fn broadcast_store(&self) -> &Arc<Self::BcastStore> {
-        &self.db
+    fn broadcast_store(&self) -> &Arc<Self::BroadcastStore> {
+        &self.l1_broadcast_db
     }
 
-    fn broadcast_provider(&self) -> &Arc<Self::BcastProv> {
-        &self.db
+    fn broadcast_provider(&self) -> &Arc<Self::BroadcastProvider> {
+        &self.l1_broadcast_db
     }
 }
 
 #[cfg(test)]
 mod tests {
     use alpen_express_db::{
-        traits::{BcastProvider, BcastStore},
+        traits::{L1BroadcastProvider, L1BroadcastStore},
         types::L1TxStatus,
     };
     use alpen_express_primitives::buf::Buf32;
@@ -124,9 +124,9 @@ mod tests {
     use super::*;
     use crate::test_utils::get_rocksdb_tmp_instance;
 
-    fn setup_db() -> BroadcastDb {
+    fn setup_db() -> L1BroadcastDb {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-        BroadcastDb::new(db, db_ops)
+        L1BroadcastDb::new(db, db_ops)
     }
 
     fn generate_l1_tx_entry() -> (Buf32, L1TxEntry) {

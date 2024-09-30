@@ -129,7 +129,7 @@ pub fn process_event<D: Database>(
 
             // TODO: get chainstate idx from blkid OR pass correct idx in sync event
             let block_idx = block.header().blockidx();
-            let chainstate_provider = database.chainstate_provider();
+            let chainstate_provider = database.chain_state_provider();
             let chainstate = chainstate_provider
                 .get_toplevel_state(block_idx)?
                 .ok_or(Error::MissingIdxChainstate(block_idx))?;

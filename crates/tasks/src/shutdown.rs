@@ -1,9 +1,11 @@
 use std::sync::{
-    atomic::{AtomicBool, AtomicUsize, Ordering},
+    atomic::{AtomicBool, Ordering},
     Arc,
 };
 
 use tokio::sync::{futures::Notified, Notify};
+
+use crate::pending_tasks::PendingTasks;
 
 /// Allows to send a signal to trigger shutdown
 #[derive(Debug, Clone)]
@@ -50,11 +52,11 @@ impl Shutdown {
 
 /// Receiver for shutdown signal.
 /// Also manages an atomic counter to keep track of live tasks.
-pub struct ShutdownGuard(Shutdown, Arc<AtomicUsize>);
+pub struct ShutdownGuard(Shutdown, Arc<PendingTasks>);
 
 impl ShutdownGuard {
-    pub(crate) fn new(shutdown: Shutdown, counter: Arc<AtomicUsize>) -> Self {
-        counter.fetch_add(1, Ordering::SeqCst);
+    pub(crate) fn new(shutdown: Shutdown, counter: Arc<PendingTasks>) -> Self {
+        counter.increment();
         Self(shutdown, counter)
     }
 
@@ -71,6 +73,6 @@ impl ShutdownGuard {
 
 impl Drop for ShutdownGuard {
     fn drop(&mut self) {
-        self.1.fetch_sub(1, Ordering::SeqCst);
+        self.1.decrement();
     }
 }

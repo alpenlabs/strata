@@ -215,15 +215,15 @@ pub fn duty_dispatch_task<
     shutdown: ShutdownGuard,
     executor: TaskExecutor,
     mut updates: broadcast::Receiver<DutyBatch>,
-    ident_key: IdentityKey,
-    sync_man: Arc<SyncManager>,
+    identity_key: IdentityKey,
+    sync_manager: Arc<SyncManager>,
     database: Arc<D>,
     engine: Arc<E>,
     inscription_handle: Arc<InscriptionHandle>,
     pool: threadpool::ThreadPool,
     params: Arc<Params>,
-    ckpt_handle: Arc<CheckpointHandle>,
-) {
+    checkpoint_handle: Arc<CheckpointHandle>,
+) -> anyhow::Result<()> {
     // TODO make this actually work
     let pending_duties = Arc::new(RwLock::new(HashMap::<Buf32, ()>::new()));
 
@@ -245,7 +245,7 @@ pub fn duty_dispatch_task<
             }
             if shutdown.should_shutdown() {
                 warn!("received shutdown signal");
-                break;
+                break Ok(());
             }
         }
     });
@@ -280,28 +280,28 @@ pub fn duty_dispatch_task<
 
             // Clone some things, spawn the task, then remember the join handle.
             // TODO make this use a thread pool
-            let d = duty.duty().clone();
-            let ik = ident_key.clone();
-            let sm = sync_man.clone();
-            let db = database.clone();
-            let e = engine.clone();
-            let insc_h = inscription_handle.clone();
-            let params: Arc<Params> = params.clone();
-            let duty_st_tx = duty_status_tx.clone();
-            let checkpt_mgr = ckpt_handle.clone();
-            let pc = pool.clone();
+            let duty = duty.duty().clone();
+            let identiy_key = identity_key.clone();
+            let sync_manager = sync_manager.clone();
+            let database = database.clone();
+            let engine = engine.clone();
+            let inscription_handle = inscription_handle.clone();
+            let params = params.clone();
+            let duty_status_tx = duty_status_tx.clone();
+            let checkpoint_handle = checkpoint_handle.clone();
+            let d_pool = pool.clone();
             pool.execute(move || {
                 duty_exec_task(
-                    d,
-                    ik,
-                    sm,
-                    db,
-                    e,
-                    insc_h,
+                    duty,
+                    identiy_key,
+                    sync_manager,
+                    database,
+                    engine,
+                    inscription_handle,
                     params,
-                    duty_st_tx,
-                    checkpt_mgr,
-                    pc,
+                    duty_status_tx,
+                    checkpoint_handle,
+                    d_pool,
                 )
             });
             trace!(%id, "dispatched duty exec task");
@@ -312,6 +312,7 @@ pub fn duty_dispatch_task<
     }
 
     info!("duty dispatcher task exiting");
+    Ok(())
 }
 
 /// Toplevel function that actually performs a job.  This is spawned on a/
@@ -320,25 +321,25 @@ pub fn duty_dispatch_task<
 #[allow(clippy::too_many_arguments)] // TODO: fix this
 fn duty_exec_task<D: Database, E: ExecEngineCtl>(
     duty: Duty,
-    ik: IdentityKey,
-    sync_man: Arc<SyncManager>,
+    identity_key: IdentityKey,
+    sync_manager: Arc<SyncManager>,
     database: Arc<D>,
     engine: Arc<E>,
     inscription_handle: Arc<InscriptionHandle>,
     params: Arc<Params>,
     duty_status_tx: std::sync::mpsc::Sender<DutyExecStatus>,
-    ckpt_handle: Arc<CheckpointHandle>,
+    checkpoint_handle: Arc<CheckpointHandle>,
     pool: threadpool::ThreadPool,
 ) {
     let result = perform_duty(
         &duty,
-        &ik,
-        &sync_man,
+        &identity_key,
+        &sync_manager,
         database.as_ref(),
         engine.as_ref(),
         inscription_handle.as_ref(),
         &params,
-        ckpt_handle,
+        checkpoint_handle,
         pool,
     );
 
@@ -355,13 +356,13 @@ fn duty_exec_task<D: Database, E: ExecEngineCtl>(
 #[allow(clippy::too_many_arguments)]
 fn perform_duty<D: Database, E: ExecEngineCtl>(
     duty: &Duty,
-    ik: &IdentityKey,
-    sync_man: &SyncManager,
+    identity_key: &IdentityKey,
+    sync_manager: &SyncManager,
     database: &D,
     engine: &E,
     inscription_handle: &InscriptionHandle,
     params: &Arc<Params>,
-    checkpt_handle: Arc<CheckpointHandle>,
+    checkpoint_handle: Arc<CheckpointHandle>,
     pool: threadpool::ThreadPool,
 ) -> Result<(), Error> {
     match duty {
@@ -369,7 +370,7 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
             let target_slot = data.target_slot();
             let parent = data.parent();
 
-            let client_state = sync_man.status_rx().cl.borrow().clone();
+            let client_state = sync_manager.status_rx().cl.borrow().clone();
 
             let l1_view = client_state.l1_view();
 
@@ -383,7 +384,7 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
                 target_slot,
                 parent,
                 l1_view,
-                ik,
+                identity_key,
                 database,
                 engine,
                 params,
@@ -395,7 +396,7 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
             // Submit it to the fork choice manager to update the consensus state
             // with it.
             let ctm = ForkChoiceMessage::NewBlock(blkid);
-            if !sync_man.submit_chain_tip_msg(ctm) {
+            if !sync_manager.submit_chain_tip_msg(ctm) {
                 error!(?blkid, "failed to submit new block to fork choice manager");
             }
 
@@ -409,11 +410,11 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
             info!(data = ?data, "commit batch");
 
             let checkpoint =
-                check_and_get_batch_checkpoint(data, checkpt_handle, pool, params.as_ref())?;
+                check_and_get_batch_checkpoint(data, checkpoint_handle, pool, params.as_ref())?;
             debug!("Got checkpoint proof from db, now signing and sending");
 
             let checkpoint_sighash = checkpoint.get_sighash();
-            let signature = sign_with_identity_key(&checkpoint_sighash, ik);
+            let signature = sign_with_identity_key(&checkpoint_sighash, identity_key);
             let signed_checkpoint = SignedBatchCheckpoint::new(checkpoint, signature);
 
             // serialize and send to l1 writer
