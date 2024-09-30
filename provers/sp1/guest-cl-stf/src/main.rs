@@ -22,10 +22,10 @@ fn main() {
 
     // Verify the EL proof
     let public_values_digest = Sha256::digest(&el_pp);
-    sp1_zkvm::lib::verify::verify_sp1_proof(&el_vkey, &public_values_digest.into());
+    sp1_zkvm::lib::verify::verify_sp1_proof(el_vkey, &public_values_digest.into());
     let el_pp_deserialized: ELProofPublicParams = bincode::deserialize(&el_pp).unwrap();
 
-    let new_state = verify_and_transition(prev_state, block, params);
+    let new_state = verify_and_transition(prev_state, block, el_pp_deserialized, params);
     sp1_zkvm::io::commit(&borsh::to_vec(&new_state).unwrap());
 }
 
