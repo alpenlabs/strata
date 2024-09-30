@@ -1,9 +1,6 @@
 use std::collections::BTreeMap;
 
-use alpen_express_state::{
-    l1::{BtcParams, HeaderVerificationState},
-    tx::InscriptionData,
-};
+use alpen_express_state::tx::InscriptionData;
 use async_trait::async_trait;
 use bitcoin::{
     bip32::Xpriv,
@@ -105,14 +102,6 @@ impl Reader for TestBitcoinClient {
 
     async fn network(&self) -> ClientResult<Network> {
         Ok(Network::Regtest)
-    }
-
-    async fn get_verification_state(
-        &self,
-        _height: u64,
-        _params: &BtcParams,
-    ) -> ClientResult<HeaderVerificationState> {
-        Ok(HeaderVerificationState::default())
     }
 }
 

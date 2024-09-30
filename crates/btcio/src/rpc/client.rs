@@ -5,15 +5,11 @@ use std::{
     time::Duration,
 };
 
-use alpen_express_primitives::buf::Buf32;
-use alpen_express_state::l1::{
-    get_difficulty_adjustment_height, BtcParams, HeaderVerificationState, L1BlockId, TimestampStore,
-};
 use async_trait::async_trait;
 use base64::{engine::general_purpose, Engine};
 use bitcoin::{
-    bip32::Xpriv, consensus::encode::serialize_hex, hashes::Hash, Address, Block, BlockHash,
-    Network, Transaction, Txid,
+    bip32::Xpriv, consensus::encode::serialize_hex, Address, Block, BlockHash, Network,
+    Transaction, Txid,
 };
 use bitcoind_json_rpc_types::v26::{GetBlockVerbosityZero, GetBlockchainInfo, GetNewAddress};
 use reqwest::{
@@ -250,45 +246,6 @@ impl Reader for BitcoinClient {
             .chain
             .parse::<Network>()
             .map_err(|e| ClientError::Parse(e.to_string()))?)
-    }
-
-    async fn get_verification_state(
-        &self,
-        height: u64,
-        params: &BtcParams,
-    ) -> ClientResult<HeaderVerificationState> {
-        // Get the difficulty adjustment block just before `block_height`
-        let h1 = get_difficulty_adjustment_height(0, height as u32, params);
-        let b1 = self.get_block_at(h1 as u64).await?;
-
-        // Consider the block before `block_height` to be the last verified block
-        let vh = height - 1; // verified_height
-        let vb = self.get_block_at(vh).await?; // verified_block
-
-        // Fetch the previous timestamps of block from `vh`
-        // This fetches timestamps of `vh`, `vh-1`, `vh-2`, ...
-        const N: usize = 11;
-        let mut timestamps: [u32; 11] = [0u32; 11];
-        for i in (0..N).rev() {
-            if vh > i as u64 {
-                let h = self.get_block_at(vh - i as u64).await?;
-                timestamps[i] = h.header.time;
-            } else {
-                timestamps[i] = 0;
-            }
-        }
-        let last_11_blocks_timestamps = TimestampStore::new(timestamps);
-
-        let l1_blkid: L1BlockId =
-            Buf32::from(vb.header.block_hash().as_raw_hash().to_byte_array()).into();
-        Ok(HeaderVerificationState {
-            last_verified_block_num: vh as u32,
-            last_verified_block_hash: l1_blkid,
-            next_block_target: vb.header.target().to_compact_lossy().to_consensus(),
-            interval_start_timestamp: b1.header.time,
-            total_accumulated_pow: 0u128,
-            last_11_blocks_timestamps,
-        })
     }
 }
 

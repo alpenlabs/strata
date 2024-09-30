@@ -74,14 +74,14 @@ impl BtcChainSegment {
 
     pub fn get_verification_state(
         &self,
-        height: u32,
+        block_height: u32,
         params: &BtcParams,
     ) -> HeaderVerificationState {
         // Get the difficulty adjustment block just before `block_height`
-        let h1 = get_difficulty_adjustment_height(0, height, params);
+        let h1 = get_difficulty_adjustment_height(0, block_height, params);
 
         // Consider the block before `block_height` to be the last verified block
-        let vh = height - 1; // verified_height
+        let vh = block_height - 1; // verified_height
 
         // Fetch the previous timestamps of block from `vh`
         // This fetches timestamps of `vh`, `vh-1`, `vh-2`, ...

@@ -27,14 +27,17 @@ pub struct L1HeaderRecord {
 }
 
 impl L1HeaderRecord {
-    pub fn new(buf: Vec<u8>, wtxs_root: Buf32) -> Self {
-        // TODO move this hash outside
-        let blkid = alpen_express_primitives::hash::sha256d(&buf).into();
+    pub fn new(blkid: L1BlockId, buf: Vec<u8>, wtxs_root: Buf32) -> Self {
         Self {
             blkid,
             buf,
             wtxs_root,
         }
+    }
+
+    pub fn create_from_serialized_header(buf: Vec<u8>, wtxs_root: Buf32) -> Self {
+        let blkid = alpen_express_primitives::hash::sha256d(&buf).into();
+        Self::new(blkid, buf, wtxs_root)
     }
 
     pub fn blkid(&self) -> &L1BlockId {
@@ -74,7 +77,10 @@ impl<'a> Arbitrary<'a> for L1HeaderRecord {
         // However, we don't want to hardcode the data structure like that *just
         // in case*.
         let arr = <[u8; 80]>::arbitrary(u)?;
-        Ok(Self::new(arr.to_vec(), Buf32::arbitrary(u)?))
+        Ok(Self::create_from_serialized_header(
+            arr.to_vec(),
+            Buf32::arbitrary(u)?,
+        ))
     }
 }
 
@@ -100,16 +106,31 @@ pub struct L1HeaderPayload {
 }
 
 impl L1HeaderPayload {
-    pub fn new_bare(
-        idx: u64,
-        record: L1HeaderRecord,
-        deposit_update_txs: Vec<DepositUpdateTx>,
-    ) -> Self {
+    pub fn new(idx: u64, record: L1HeaderRecord) -> Self {
         Self {
             idx,
             record,
-            deposit_update_txs,
+            deposit_update_txs: Vec::new(),
             da_txs: Vec::new(),
+        }
+    }
+
+    pub fn with_deposit_update_txs(mut self, txs: Vec<DepositUpdateTx>) -> Self {
+        self.deposit_update_txs = txs;
+        self
+    }
+
+    pub fn with_da_txs(mut self, txs: Vec<DaTx>) -> Self {
+        self.da_txs = txs;
+        self
+    }
+
+    pub fn build(self) -> L1HeaderPayload {
+        L1HeaderPayload {
+            idx: self.idx,
+            record: self.record,
+            deposit_update_txs: self.deposit_update_txs,
+            da_txs: self.da_txs,
         }
     }
 

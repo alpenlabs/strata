@@ -123,7 +123,8 @@ pub fn process_event<D: Database>(
                 debug!("emitting chain activation");
                 let genesis_block = make_genesis_block(params);
 
-                writes.push(ClientStateWrite::ActivateChain(
+                writes.push(ClientStateWrite::ActivateChain);
+                writes.push(ClientStateWrite::UpdateVerificationState(
                     l1_verification_state.clone(),
                 ));
                 writes.push(ClientStateWrite::ReplaceSync(Box::new(
@@ -433,7 +434,8 @@ mod tests {
             let genesis_blockid = genesis_block.header().get_blockid();
 
             let expected_writes1 = [
-                ClientStateWrite::ActivateChain(l1_verification_state.clone()),
+                ClientStateWrite::ActivateChain,
+                ClientStateWrite::UpdateVerificationState(l1_verification_state.clone()),
                 ClientStateWrite::ReplaceSync(Box::new(SyncState::from_genesis_blkid(
                     genesis_blockid,
                 ))),

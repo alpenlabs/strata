@@ -51,7 +51,7 @@ pub enum ClientStateWrite {
 
     /// Sets the flag that the chain is now active, kicking off the FCM to
     /// start.
-    ActivateChain(HeaderVerificationState),
+    ActivateChain,
 
     /// Accept an L2 block and its height and update tip state.
     AcceptL2Block(L2BlockId, u64),
@@ -118,18 +118,20 @@ pub fn apply_writes_to_state(
                 state.set_sync_state(*nss);
             }
 
-            ActivateChain(l1_verification_state) => {
+            ActivateChain => {
                 // This is all this does.  Actually setting the finalized tip is
                 // done by some sync event emitted by the FCM.
-                state.genesis_l1_verification_state_hash =
-                    Some(l1_verification_state.compute_hash().unwrap());
-
-                state.l1_view_mut().header_verification_state = Some(l1_verification_state);
                 state.chain_active = true;
             }
 
             UpdateVerificationState(l1_vs) => {
-                state.l1_view_mut().header_verification_state = Some(l1_vs)
+                debug!(?l1_vs, "received HeaderVerificationState");
+                if state.genesis_verification_hash().is_none() {
+                    info!(?l1_vs, "Setting genesis L1 verification state");
+                    state.genesis_l1_verification_state_hash = Some(l1_vs.compute_hash().unwrap());
+                }
+
+                state.l1_view_mut().header_verification_state = Some(l1_vs);
             }
 
             RollbackL1BlocksTo(height) => {

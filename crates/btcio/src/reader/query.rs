@@ -5,11 +5,14 @@ use std::{
 };
 
 use alpen_express_db::traits::Database;
-use alpen_express_primitives::params::Params;
-use alpen_express_state::l1::get_btc_params;
+use alpen_express_primitives::{buf::Buf32, params::Params};
+use alpen_express_state::l1::{
+    get_btc_params, get_difficulty_adjustment_height, BtcParams, HeaderVerificationState,
+    L1BlockId, TimestampStore,
+};
 use alpen_express_status::StatusTx;
 use anyhow::bail;
-use bitcoin::BlockHash;
+use bitcoin::{hashes::Hash, BlockHash};
 use strata_tx_parser::{
     deposit::DepositTxConfig,
     filter::{filter_relevant_txs, TxFilterRule},
@@ -276,9 +279,8 @@ async fn fetch_and_process_block(
 
     if height == genesis_threshold {
         info!(%height, %genesis_ht, "time for genesis");
-        let l1_verification_state = client
-            .get_verification_state(genesis_ht + 1, &get_btc_params())
-            .await?;
+        let l1_verification_state =
+            get_verification_state(client, genesis_ht + 1, &get_btc_params()).await?;
         if let Err(e) = event_tx
             .send(L1Event::GenesisVerificationState(
                 height,
@@ -300,4 +302,44 @@ async fn fetch_and_process_block(
     let _deep = state.accept_new_block(l1blkid);
 
     Ok(l1blkid)
+}
+
+/// Gets the [`HeaderVerificationState`] for the particular block
+async fn get_verification_state(
+    client: &impl Reader,
+    height: u64,
+    params: &BtcParams,
+) -> anyhow::Result<HeaderVerificationState> {
+    // Get the difficulty adjustment block just before `block_height`
+    let h1 = get_difficulty_adjustment_height(0, height as u32, params);
+    let b1 = client.get_block_at(h1 as u64).await?;
+
+    // Consider the block before `block_height` to be the last verified block
+    let vh = height - 1; // verified_height
+    let vb = client.get_block_at(vh).await?; // verified_block
+
+    // Fetch the previous timestamps of block from `vh`
+    // This fetches timestamps of `vh`, `vh-1`, `vh-2`, ...
+    const N: usize = 11;
+    let mut timestamps: [u32; 11] = [0u32; 11];
+    for i in (0..N).rev() {
+        if vh > i as u64 {
+            let h = client.get_block_at(vh - i as u64).await?;
+            timestamps[i] = h.header.time;
+        } else {
+            timestamps[i] = 0;
+        }
+    }
+    let last_11_blocks_timestamps = TimestampStore::new(timestamps);
+
+    let l1_blkid: L1BlockId =
+        Buf32::from(vb.header.block_hash().as_raw_hash().to_byte_array()).into();
+    Ok(HeaderVerificationState {
+        last_verified_block_num: vh as u32,
+        last_verified_block_hash: l1_blkid,
+        next_block_target: vb.header.target().to_compact_lossy().to_consensus(),
+        interval_start_timestamp: b1.header.time,
+        total_accumulated_pow: 0u128,
+        last_11_blocks_timestamps,
+    })
 }

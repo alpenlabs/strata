@@ -1,4 +1,3 @@
-use alpen_express_state::l1::{BtcParams, HeaderVerificationState};
 use async_trait::async_trait;
 use bitcoin::{bip32::Xpriv, Address, Block, BlockHash, Network, Transaction, Txid};
 use bitcoind_json_rpc_types::v26::GetBlockchainInfo;
@@ -62,12 +61,6 @@ pub trait Reader {
 
     /// Gets the underlying [`Network`] information.
     async fn network(&self) -> ClientResult<Network>;
-
-    async fn get_verification_state(
-        &self,
-        height: u64,
-        params: &BtcParams,
-    ) -> ClientResult<HeaderVerificationState>;
 }
 
 /// Broadcasting functionality that any Bitcoin client that interacts with the

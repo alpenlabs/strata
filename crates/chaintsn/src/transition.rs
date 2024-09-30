@@ -383,30 +383,30 @@ mod tests {
         let mut state_cache = StateCache::new(chs);
         let amt = 100_000_000_000;
 
-        let new_payloads_with_deposit_update_tx: Vec<L1HeaderPayload> = (1..=params
-            .rollup()
-            .l1_reorg_safe_depth
-            + 1)
-            .map(|idx| {
-                let record = ArbitraryGenerator::new_with_size(1 << 15).generate();
-                let proof = ArbitraryGenerator::new_with_size(1 << 12).generate();
-                let tx = ArbitraryGenerator::new_with_size(1 << 8).generate();
+        let new_payloads_with_deposit_update_tx: Vec<L1HeaderPayload> =
+            (1..=params.rollup().l1_reorg_safe_depth + 1)
+                .map(|idx| {
+                    let record = ArbitraryGenerator::new_with_size(1 << 15).generate();
+                    let proof = ArbitraryGenerator::new_with_size(1 << 12).generate();
+                    let tx = ArbitraryGenerator::new_with_size(1 << 8).generate();
 
-                let l1tx = if idx == 1 {
-                    let protocol_op = ProtocolOperation::Deposit(DepositInfo {
-                        amt,
-                        outpoint: ArbitraryGenerator::new().generate(),
-                        address: [0; 20].to_vec(),
-                    });
-                    L1Tx::new(proof, tx, protocol_op)
-                } else {
-                    ArbitraryGenerator::new_with_size(1 << 15).generate()
-                };
+                    let l1tx = if idx == 1 {
+                        let protocol_op = ProtocolOperation::Deposit(DepositInfo {
+                            amt,
+                            outpoint: ArbitraryGenerator::new().generate(),
+                            address: [0; 20].to_vec(),
+                        });
+                        L1Tx::new(proof, tx, protocol_op)
+                    } else {
+                        ArbitraryGenerator::new_with_size(1 << 15).generate()
+                    };
 
-                let deposit_update_tx = DepositUpdateTx::new(l1tx, idx);
-                L1HeaderPayload::new_bare(tip_height + idx as u64, record, vec![deposit_update_tx])
-            })
-            .collect();
+                    let deposit_update_tx = DepositUpdateTx::new(l1tx, idx);
+                    L1HeaderPayload::new(tip_height + idx as u64, record)
+                        .with_deposit_update_txs(vec![deposit_update_tx])
+                        .build()
+                })
+                .collect();
 
         let mut l1_segment = L1Segment::new(new_payloads_with_deposit_update_tx);
 
@@ -455,7 +455,9 @@ mod tests {
             + to_mature_blk_num)
             .map(|idx| {
                 let record = ArbitraryGenerator::new_with_size(1 << 15).generate();
-                L1HeaderPayload::new_bare(old_safe_height + idx as u64, record, vec![])
+                L1HeaderPayload::new(old_safe_height + idx as u64, record)
+                    .with_deposit_update_txs(vec![])
+                    .build()
             })
             .collect();
 

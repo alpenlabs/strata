@@ -105,7 +105,7 @@ fn duty_tracker_task_inner(
             &ident,
             l2_block_manager,
             params,
-            &**database.chainstate_provider(),
+            &**database.chain_state_provider(),
         ) {
             error!(err = %e, "failed to update duties tracker");
         }

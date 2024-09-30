@@ -10,6 +10,24 @@ use serde::{Deserialize, Serialize};
 use super::{timestamp_store::TimestampStore, L1BlockId};
 use crate::l1::{params::BtcParams, utils::compute_block_hash};
 
+/// A struct containing all necessary information for validating a Bitcoin block header.
+///
+/// The validation process includes:
+///
+/// 1. Ensuring that the block's hash is below the current target, which is a threshold representing
+///    a hash with a specified number of leading zeros. This target is directly related to the
+///    block's difficulty.
+///
+/// 2. Verifying that the encoded previous block hash in the current block matches the actual hash
+///    of the previous block.
+///
+/// 3. Checking that the block's timestamp is not lower than the median of the last eleven blocks'
+///    timestamps and does not exceed the network time by more than two hours.
+///
+/// 4. Ensuring that the correct target is encoded in the block. If a retarget event occurred,
+///    validating that the new target was accurately derived from the epoch timestamps.
+///
+/// Ref: [A light introduction to ZeroSync](https://geometry.xyz/notebook/A-light-introduction-to-ZeroSync)
 #[derive(Debug, Clone, Default, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct HeaderVerificationState {
     /// [Block number](bitcoin::Block::bip34_block_height) of the last verified block
@@ -116,6 +134,7 @@ impl HeaderVerificationState {
         retarget.to_compact_lossy().to_consensus()
     }
 
+    // Note/TODO: Figure out a better way so we don't have to params each time.
     fn update_timestamps(&mut self, timestamp: u32, params: &BtcParams) {
         self.last_11_blocks_timestamps.insert(timestamp);
 
@@ -226,14 +245,11 @@ impl HeaderVerificationState {
         cur.write_all(&self.interval_start_timestamp.to_be_bytes())?;
         cur.write_all(&self.total_accumulated_pow.to_be_bytes())?;
 
-        let serialized_timestamps: [u8; 11 * 4] = self
-            .last_11_blocks_timestamps
-            .timestamps
-            .iter()
-            .flat_map(|&x| x.to_be_bytes())
-            .collect::<Vec<u8>>()
-            .try_into()
-            .unwrap();
+        let mut serialized_timestamps = [0u8; 11 * 4];
+        for (i, &timestamp) in self.last_11_blocks_timestamps.timestamps.iter().enumerate() {
+            serialized_timestamps[i * 4..(i + 1) * 4].copy_from_slice(&timestamp.to_be_bytes());
+        }
+
         cur.write_all(&serialized_timestamps)?;
         Ok(alpen_express_primitives::hash::raw(&buf))
     }
