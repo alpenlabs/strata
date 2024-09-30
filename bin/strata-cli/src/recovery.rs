@@ -128,9 +128,9 @@ impl DescriptorRecovery {
         &mut self,
         height: u32,
     ) -> Result<Vec<DescriptorTemplateOut>, OneOf<ReadDescsAfterError>> {
-        let mut after_height = self.db.range(height.to_be_bytes()..);
+        let after_height = self.db.range(height.to_be_bytes()..);
         let mut descs = vec![];
-        while let Some(desc_entry) = after_height.next() {
+        for desc_entry in after_height {
             let mut raw = desc_entry.map_err(OneOf::new)?.1;
             if raw.len() <= 12 + 16 {
                 return Err(OneOf::new(EntryTooShort { length: raw.len() }));
@@ -142,7 +142,7 @@ impl DescriptorRecovery {
             let tag = Tag::from_slice(tag);
 
             self.cipher
-                .decrypt_in_place_detached(&nonce, &[], encrypted, tag)
+                .decrypt_in_place_detached(nonce, &[], encrypted, tag)
                 .map_err(OneOf::new)?;
 
             let decrypted = encrypted;

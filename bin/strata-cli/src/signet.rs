@@ -30,8 +30,7 @@ pub async fn get_fee_rate(
         .get_fee_estimates()
         .await
         .map(|frs| frs.get(&target).cloned())?
-        .map(|fr| FeeRate::from_sat_per_vb(fr as u64))
-        .flatten())
+        .and_then(|fr| FeeRate::from_sat_per_vb(fr as u64)))
 }
 
 pub fn log_fee_rate(term: &Term, fr: &FeeRate) {

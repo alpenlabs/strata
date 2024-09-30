@@ -134,7 +134,7 @@ pub fn load_or_create(
 ) -> Result<Seed, OneOf<LoadOrCreateErr>> {
     let term = Term::stdout();
     let _ = term.write_line("Loading encrypted seed...");
-    let maybe_encrypted_seed = persister.load().map_err(|e| OneOf::broaden(e))?;
+    let maybe_encrypted_seed = persister.load().map_err(OneOf::broaden)?;
     if let Some(encrypted_seed) = maybe_encrypted_seed {
         let _ = term.write_line("Opening wallet...");
         let mut password = Password::read(false).map_err(OneOf::new)?;
@@ -201,7 +201,7 @@ pub fn load_or_create(
         };
         persister
             .save(&encrypted_seed)
-            .map_err(|e| OneOf::broaden(e))?;
+            .map_err(OneOf::broaden)?;
         Ok(seed)
     }
 }

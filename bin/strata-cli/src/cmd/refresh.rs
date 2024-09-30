@@ -34,7 +34,7 @@ pub async fn refresh(seed: Seed, settings: Settings, esplora: EsploraClient) {
         .await
         .unwrap();
 
-    if descs.len() == 0 {
+    if descs.is_empty() {
         let _ = term.write_line("Nothing to recover");
         return;
     }
