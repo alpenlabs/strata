@@ -36,6 +36,10 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 uuid = { version = "1.0", features = ["v4", "serde"] }
+alpen-express-btcio.workspace = true
+alpen-express-primitives.workspace = true
+bitcoin.workspace = true
+strata-tx-parser.workspace = true
 
 
 [features]

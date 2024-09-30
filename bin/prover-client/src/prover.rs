@@ -9,7 +9,7 @@ use alpen_express_rocksdb::{
     DbOpsConfig,
 };
 use express_proofimpl_evm_ee_stf::ELProofInput;
-use express_sp1_guest_builder::GUEST_EVM_EE_STF_ELF;
+use express_sp1_guest_builder::{GUEST_BTC_BLOCKSPACE_ELF, GUEST_EVM_EE_STF_ELF};
 use express_zkvm::{Proof, ProverOptions, ZKVMHost, ZKVMInputBuilder};
 use tracing::info;
 use uuid::Uuid;
@@ -99,6 +99,14 @@ where
             let (proof, _) = vm.prove(input)?;
             Ok(proof)
         }
+        ProverInput::BtcBlock(block, tx_filters) => {
+            let input = Vm::Input::new()
+                .write_serialized(&bitcoin::consensus::serialize(&block))?
+                .write_borsh(&tx_filters)?
+                .build()?;
+            let (proof, _) = vm.prove(input)?;
+            Ok(proof)
+        }
         _ => {
             todo!()
         }
@@ -115,6 +123,7 @@ where
         let db = ProofDb::new(rbdb, db_ops);
 
         let mut zkvm_manager: ZkVMManager<Vm> = ZkVMManager::new(prover_config);
+        zkvm_manager.add_vm(ProofVm::BtcProving, GUEST_BTC_BLOCKSPACE_ELF.into());
         zkvm_manager.add_vm(ProofVm::ELProving, GUEST_EVM_EE_STF_ELF.into());
         zkvm_manager.add_vm(ProofVm::CLProving, vec![]);
         zkvm_manager.add_vm(ProofVm::CLAggregation, vec![]);

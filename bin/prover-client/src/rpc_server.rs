@@ -11,22 +11,26 @@ use tracing::{info, warn};
 use uuid::Uuid;
 
 use crate::dispatchers::{
+    btc_task_dispatcher::BtcBlockspaceProvingTaskScheduler,
     cl_task_dispatcher::CLBlockProvingTaskDispatcher,
     el_task_dispatcher::ELBlockProvingTaskDispatcher,
 };
 
 #[derive(Clone)]
 pub struct RpcContext {
+    pub btc_proving_task_dispatcher: BtcBlockspaceProvingTaskScheduler,
     pub el_proving_task_dispatcher: ELBlockProvingTaskDispatcher,
     pub cl_proving_task_dispatcher: CLBlockProvingTaskDispatcher,
 }
 
 impl RpcContext {
     pub fn new(
+        btc_proving_task_scheduler: BtcBlockspaceProvingTaskScheduler,
         el_proving_task_scheduler: ELBlockProvingTaskDispatcher,
         cl_proving_task_scheduler: CLBlockProvingTaskDispatcher,
     ) -> Self {
         Self {
+            btc_proving_task_dispatcher: btc_proving_task_scheduler,
             el_proving_task_dispatcher: el_proving_task_scheduler,
             cl_proving_task_dispatcher: cl_proving_task_scheduler,
         }
@@ -85,6 +89,17 @@ impl ProverClientRpc {
 
 #[async_trait]
 impl ExpressProverClientApiServer for ProverClientRpc {
+    async fn prove_btc_block(&self, btc_block_num: u64) -> RpcResult<String> {
+        let task_id = self
+            .context
+            .btc_proving_task_dispatcher
+            .create_proving_task(btc_block_num)
+            .await
+            .expect("failed to add proving task");
+
+        RpcResult::Ok(task_id.to_string())
+    }
+
     async fn prove_el_block(&self, el_block_num: u64) -> RpcResult<String> {
         let task_id = self
             .context

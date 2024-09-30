@@ -51,7 +51,7 @@ impl fmt::Display for ProvingTaskStatus {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct ProvingTask {
     pub id: Uuid,
     pub prover_input: ProverInput,

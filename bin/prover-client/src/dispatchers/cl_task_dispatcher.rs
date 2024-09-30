@@ -7,7 +7,7 @@ use tracing::error;
 use uuid::Uuid;
 
 use crate::{
-    config::BLOCK_PROVING_TASK_DISPATCH_INTERVAL,
+    config::L2_BLOCK_PROVING_TASK_DISPATCH_INTERVAL,
     errors::{BlockType, ProvingTaskError},
     primitives::prover_input::{ProverInput, WitnessData},
     task::TaskTracker,
@@ -20,7 +20,7 @@ use crate::{
 pub struct CLBlockProvingTaskDispatcher {
     /// The RPC client used to communicate with the CL network.
     /// It listens for new CL blocks and retrieves necessary data for proving.
-    sequnecer_rpc_client: HttpClient,
+    sequencer_rpc_client: HttpClient,
 
     /// A shared `TaskTracker` instance. It tracks and manages the lifecycle of proving tasks added
     /// by the scheduler.
@@ -38,7 +38,7 @@ impl CLBlockProvingTaskDispatcher {
         start_block_height: u64,
     ) -> Self {
         Self {
-            sequnecer_rpc_client: sequencer_rpc_client,
+            sequencer_rpc_client,
             task_tracker,
             last_block_sent: start_block_height,
         }
@@ -51,7 +51,7 @@ impl CLBlockProvingTaskDispatcher {
     // Start listening for new blocks and process them automatically
     pub async fn listen_for_new_blocks(&mut self) {
         let mut interval =
-            time::interval(Duration::from_secs(BLOCK_PROVING_TASK_DISPATCH_INTERVAL));
+            time::interval(Duration::from_secs(L2_BLOCK_PROVING_TASK_DISPATCH_INTERVAL));
 
         loop {
             match self.create_proving_task(self.last_block_sent).await {
@@ -112,7 +112,7 @@ impl CLBlockProvingTaskDispatcher {
         cl_block_num: u64,
     ) -> anyhow::Result<Option<Vec<u8>>> {
         let cl_block_witness: Option<Vec<u8>> = self
-            .sequnecer_rpc_client
+            .sequencer_rpc_client
             .request("alp_getCLBlockWitness", rpc_params![cl_block_num])
             .await
             .context("Failed to get the CL witness")?;

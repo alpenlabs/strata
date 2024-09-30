@@ -1,9 +1,12 @@
+use bitcoin::Block;
 use serde::{Deserialize, Serialize};
+use strata_tx_parser::filter::TxFilterRule;
 
 use super::vms::ProofVm;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub enum ProverInput {
+    BtcBlock(Block, Vec<TxFilterRule>),
     ElBlock(WitnessData),
     ClBlock(WitnessData),
 }
@@ -11,15 +14,10 @@ pub enum ProverInput {
 impl ProverInput {
     pub fn proof_vm_id(&self) -> ProofVm {
         match self {
+            ProverInput::BtcBlock(_, _) => ProofVm::BtcProving,
             ProverInput::ElBlock(_) => ProofVm::ELProving,
             ProverInput::ClBlock(_) => ProofVm::CLProving,
         }
-    }
-}
-
-impl Default for ProverInput {
-    fn default() -> Self {
-        ProverInput::ElBlock(WitnessData::default())
     }
 }
 

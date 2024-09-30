@@ -32,6 +32,15 @@ pub struct Args {
     #[argh(option, description = "reth rpc host:port")]
     pub reth_rpc: String,
 
+    #[argh(option, description = "bitcoind RPC host")]
+    pub bitcoind_url: String,
+
+    #[argh(option, description = "bitcoind RPC user")]
+    pub bitcoind_user: String,
+
+    #[argh(option, description = "bitcoind RPC password")]
+    pub bitcoind_password: String,
+
     #[argh(option, description = "enable prover client dev rpc", default = "true")]
     pub enable_dev_rpcs: bool,
 }
@@ -52,5 +61,9 @@ impl Args {
 
     pub fn get_reth_rpc_url(&self) -> String {
         self.reth_rpc.to_string()
+    }
+
+    pub fn get_btc_rpc_url(&self) -> String {
+        format!("http://{}", self.bitcoind_url)
     }
 }

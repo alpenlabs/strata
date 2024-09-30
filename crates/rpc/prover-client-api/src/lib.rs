@@ -7,6 +7,10 @@ use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 #[cfg_attr(feature = "client", rpc(server, client, namespace = "dev_alp"))]
 pub trait ExpressProverClientApi {
     /// Start proving the given el block
+    #[method(name = "proveBtcBlock")]
+    async fn prove_btc_block(&self, el_block_num: u64) -> RpcResult<String>;
+
+    /// Start proving the given el block
     #[method(name = "proveELBlock")]
     async fn prove_el_block(&self, el_block_num: u64) -> RpcResult<String>;
 

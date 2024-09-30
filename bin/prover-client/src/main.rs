@@ -2,10 +2,12 @@
 
 use std::sync::Arc;
 
+use alpen_express_btcio::rpc::BitcoinClient;
 use alpen_express_common::logging;
 use args::Args;
 use config::{CL_START_BLOCK_HEIGHT, EL_START_BLOCK_HEIGHT};
 use dispatchers::{
+    btc_task_dispatcher::BtcBlockspaceProvingTaskScheduler,
     cl_task_dispatcher::CLBlockProvingTaskDispatcher,
     el_task_dispatcher::ELBlockProvingTaskDispatcher,
 };
@@ -43,6 +45,15 @@ async fn main() {
         .build(args.get_sequencer_rpc_url())
         .expect("failed to connect to the el client");
 
+    let btc_rpc_client = Arc::new(
+        BitcoinClient::new(
+            args.get_btc_rpc_url(),
+            args.bitcoind_user.clone(),
+            args.bitcoind_password.clone(),
+        )
+        .unwrap(),
+    );
+
     let el_proving_task_scheduler = ELBlockProvingTaskDispatcher::new(
         el_rpc_client.clone(),
         task_tracker.clone(),
@@ -55,7 +66,14 @@ async fn main() {
         CL_START_BLOCK_HEIGHT,
     );
 
+    let btc_proving_task_scheduler = BtcBlockspaceProvingTaskScheduler::new(
+        btc_rpc_client,
+        task_tracker.clone(),
+        CL_START_BLOCK_HEIGHT,
+    );
+
     let rpc_context = RpcContext::new(
+        btc_proving_task_scheduler.clone(),
         el_proving_task_scheduler.clone(),
         cl_proving_task_scheduler.clone(),
     );

@@ -9,7 +9,7 @@ use tracing::error;
 use uuid::Uuid;
 
 use crate::{
-    config::BLOCK_PROVING_TASK_DISPATCH_INTERVAL,
+    config::L2_BLOCK_PROVING_TASK_DISPATCH_INTERVAL,
     errors::{BlockType, ProvingTaskError},
     primitives::prover_input::{ProverInput, WitnessData},
     task::TaskTracker,
@@ -53,7 +53,7 @@ impl ELBlockProvingTaskDispatcher {
     // Start listening for new blocks and process them automatically
     pub async fn listen_for_new_blocks(&mut self) {
         let mut interval =
-            time::interval(Duration::from_secs(BLOCK_PROVING_TASK_DISPATCH_INTERVAL));
+            time::interval(Duration::from_secs(L2_BLOCK_PROVING_TASK_DISPATCH_INTERVAL));
 
         loop {
             match self.create_proving_task(self.last_block_sent).await {

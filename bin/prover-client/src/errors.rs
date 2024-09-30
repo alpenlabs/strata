@@ -19,6 +19,7 @@ pub enum ProvingTaskError {
 // Define BlockType enum to represent EL and CL
 #[derive(Debug, Clone, Copy)]
 pub enum BlockType {
+    BTC,
     EL,
     CL,
 }
@@ -26,6 +27,7 @@ pub enum BlockType {
 impl std::fmt::Display for BlockType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let block_type_str = match self {
+            BlockType::BTC => "BTC",
             BlockType::EL => "EL",
             BlockType::CL => "CL",
         };
