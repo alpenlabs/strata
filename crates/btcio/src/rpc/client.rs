@@ -210,9 +210,10 @@ impl Reader for BitcoinClient {
     async fn get_block(&self, hash: &BlockHash) -> ClientResult<Block> {
         let get_block = self
             .call::<GetBlockVerbosityZero>("getblock", &[to_value(hash.to_string())?, to_value(0)?])
-            .await
-            .expect("get_block failed");
-        let block = get_block.block().expect("block failed");
+            .await?;
+        let block = get_block
+            .block()
+            .map_err(|err| ClientError::Other(format!("block decode: {}", err)))?;
         Ok(block)
     }
 
