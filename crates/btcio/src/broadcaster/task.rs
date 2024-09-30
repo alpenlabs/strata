@@ -1,6 +1,7 @@
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 use alpen_express_db::types::{L1TxEntry, L1TxStatus};
+use alpen_express_primitives::params::Params;
 use bitcoin::{hashes::Hash, Txid};
 use express_storage::{ops::l1tx_broadcast, BroadcastDbOps};
 use tokio::sync::mpsc::Receiver;
@@ -14,7 +15,6 @@ use crate::{
     rpc::traits::{Broadcaster, Wallet},
 };
 
-const FINALITY_DEPTH: u64 = 6;
 const BROADCAST_POLL_INTERVAL: u64 = 1_000; // millis
 
 /// Broadcasts the next blob to be sent
@@ -22,6 +22,7 @@ pub async fn broadcaster_task(
     rpc_client: Arc<impl Broadcaster + Wallet>,
     ops: Arc<l1tx_broadcast::BroadcastDbOps>,
     mut entry_receiver: Receiver<(u64, L1TxEntry)>,
+    params: Arc<Params>,
 ) -> BroadcasterResult<()> {
     info!("Starting Broadcaster task");
     let interval = tokio::time::interval(Duration::from_millis(BROADCAST_POLL_INTERVAL));
@@ -48,6 +49,7 @@ pub async fn broadcaster_task(
             &state.unfinalized_entries,
             ops.clone(),
             rpc_client.as_ref(),
+            params.as_ref(),
         )
         .await
         .map_err(|e| {
@@ -68,13 +70,14 @@ async fn process_unfinalized_entries(
     unfinalized_entries: &BTreeMap<u64, L1TxEntry>,
     ops: Arc<BroadcastDbOps>,
     rpc_client: &(impl Broadcaster + Wallet),
+    params: &Params,
 ) -> BroadcasterResult<(BTreeMap<u64, L1TxEntry>, Vec<u64>)> {
     let mut to_remove = Vec::new();
     let mut updated_entries = BTreeMap::new();
 
     for (idx, txentry) in unfinalized_entries.iter() {
         debug!(?txentry.status, %idx, "processing txentry");
-        let updated_status = handle_entry(rpc_client, txentry, *idx, ops.as_ref()).await?;
+        let updated_status = handle_entry(rpc_client, txentry, *idx, ops.as_ref(), params).await?;
         debug!(?updated_status, %idx, "updated status handled");
 
         if let Some(status) = updated_status {
@@ -107,6 +110,7 @@ async fn handle_entry(
     txentry: &L1TxEntry,
     idx: u64,
     ops: &BroadcastDbOps,
+    params: &Params,
 ) -> BroadcasterResult<Option<L1TxStatus>> {
     let txid = ops
         .get_txid_async(idx)
@@ -148,7 +152,7 @@ async fn handle_entry(
                         // If it was confirmed before and now it is 0, L1 reorged.
                         // So, set it to Unpublished
                         L1TxStatus::Unpublished
-                    } else if info.confirmations >= FINALITY_DEPTH {
+                    } else if info.confirmations >= params.rollup().l1_reorg_safe_depth.into() {
                         L1TxStatus::Finalized {
                             confirmations: info.confirmations,
                         }
@@ -182,6 +186,7 @@ mod test {
         broadcaster::db::{BroadcastDatabase, L1BroadcastDb},
         test_utils::get_rocksdb_tmp_instance,
     };
+    use alpen_test_utils::l2::gen_params;
     use bitcoin::{consensus, Transaction};
     use express_storage::ops::l1tx_broadcast::Context;
 
@@ -208,6 +213,10 @@ mod test {
         entry
     }
 
+    fn get_params() -> Arc<Params> {
+        Arc::new(gen_params())
+    }
+
     #[tokio::test]
     async fn test_handle_unpublished_entry() {
         let ops = get_ops();
@@ -222,7 +231,7 @@ mod test {
         let client = TestBitcoinClient::new(0);
         let cl = Arc::new(client);
 
-        let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref())
+        let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref(), get_params().as_ref())
             .await
             .unwrap();
         assert_eq!(
@@ -245,8 +254,9 @@ mod test {
         // This client will return confirmations to be 0
         let client = TestBitcoinClient::new(0);
         let cl = Arc::new(client);
+        let params = get_params();
 
-        let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref())
+        let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref(), params.as_ref())
             .await
             .unwrap();
         assert_eq!(
@@ -255,11 +265,12 @@ mod test {
             "Status should not change if no confirmations for a published tx"
         );
 
+        let reorg_depth: u64 = params.rollup().l1_reorg_safe_depth.into();
         // This client will return confirmations to be finality_depth - 1
-        let client = TestBitcoinClient::new(FINALITY_DEPTH - 1);
+        let client = TestBitcoinClient::new(reorg_depth - 1);
         let cl = Arc::new(client);
 
-        let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref())
+        let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref(), params.as_ref())
             .await
             .unwrap();
         assert_eq!(
@@ -271,10 +282,10 @@ mod test {
         );
 
         // This client will return confirmations to be finality_depth
-        let client = TestBitcoinClient::new(FINALITY_DEPTH);
+        let client = TestBitcoinClient::new(reorg_depth);
         let cl = Arc::new(client);
 
-        let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref())
+        let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref(), params.as_ref())
             .await
             .unwrap();
         assert_eq!(
@@ -300,7 +311,8 @@ mod test {
         let client = TestBitcoinClient::new(0);
         let cl = Arc::new(client);
 
-        let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref())
+        let params = get_params();
+        let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref(), params.as_ref())
             .await
             .unwrap();
         assert_eq!(
@@ -309,11 +321,12 @@ mod test {
             "Status should revert to reorged if previously confirmed tx has 0 confirmations"
         );
 
+        let reorg_depth = params.rollup().l1_reorg_safe_depth as u64;
         // This client will return confirmations to be finality_depth - 1
-        let client = TestBitcoinClient::new(FINALITY_DEPTH - 1);
+        let client = TestBitcoinClient::new(reorg_depth - 1);
         let cl = Arc::new(client);
 
-        let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref())
+        let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref(), params.as_ref())
             .await
             .unwrap();
         assert_eq!(
@@ -325,10 +338,10 @@ mod test {
         );
 
         // This client will return confirmations to be finality_depth
-        let client = TestBitcoinClient::new(FINALITY_DEPTH);
+        let client = TestBitcoinClient::new(reorg_depth);
         let cl = Arc::new(client);
 
-        let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref())
+        let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref(), params.as_ref())
             .await
             .unwrap();
         assert_eq!(
@@ -350,11 +363,13 @@ mod test {
             .await
             .unwrap();
 
+        let params = get_params();
+        let reorg_depth = params.rollup().l1_reorg_safe_depth as u64;
         // This client will return confirmations to be Finality depth
-        let client = TestBitcoinClient::new(FINALITY_DEPTH);
+        let client = TestBitcoinClient::new(reorg_depth);
         let cl = Arc::new(client);
 
-        let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref())
+        let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref(), params.as_ref())
             .await
             .unwrap();
         assert_eq!(
@@ -367,7 +382,7 @@ mod test {
         let client = TestBitcoinClient::new(0);
         let cl = Arc::new(client);
 
-        let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref())
+        let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref(), params.as_ref())
             .await
             .unwrap();
         assert_eq!(
@@ -386,11 +401,13 @@ mod test {
             .await
             .unwrap();
 
+        let params = get_params();
+        let reorg_depth = params.rollup().l1_reorg_safe_depth as u64;
         // This client will return confirmations to be Finality depth
-        let client = TestBitcoinClient::new(FINALITY_DEPTH);
+        let client = TestBitcoinClient::new(reorg_depth);
         let cl = Arc::new(client);
 
-        let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref())
+        let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref(), params.as_ref())
             .await
             .unwrap();
         assert_eq!(
@@ -403,7 +420,7 @@ mod test {
         let client = TestBitcoinClient::new(0);
         let cl = Arc::new(client);
 
-        let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref())
+        let res = handle_entry(cl.as_ref(), &e, 0, ops.as_ref(), params.as_ref())
             .await
             .unwrap();
         assert_eq!(
@@ -426,14 +443,20 @@ mod test {
 
         let state = BroadcasterState::initialize(&ops).await.unwrap();
 
+        let params = get_params();
+        let reorg_depth = params.rollup().l1_reorg_safe_depth as u64;
         // This client will make the published tx finalized
-        let client = TestBitcoinClient::new(FINALITY_DEPTH);
+        let client = TestBitcoinClient::new(reorg_depth);
         let cl = Arc::new(client);
 
-        let (new_entries, to_remove) =
-            process_unfinalized_entries(&state.unfinalized_entries, ops, cl.as_ref())
-                .await
-                .unwrap();
+        let (new_entries, to_remove) = process_unfinalized_entries(
+            &state.unfinalized_entries,
+            ops,
+            cl.as_ref(),
+            params.as_ref(),
+        )
+        .await
+        .unwrap();
 
         // The published tx which got finalized should be removed
         assert_eq!(
