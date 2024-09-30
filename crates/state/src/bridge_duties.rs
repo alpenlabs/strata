@@ -1,5 +1,8 @@
 //! Type/traits related to the bridge-related duties.
 
+use alpen_express_primitives::bridge::OperatorIdx;
+use arbitrary::Arbitrary;
+use borsh::{BorshDeserialize, BorshSerialize};
 use express_bridge_tx_builder::prelude::{CooperativeWithdrawalInfo, DepositInfo};
 use serde::{Deserialize, Serialize};
 
@@ -34,5 +37,73 @@ impl From<DepositInfo> for BridgeDuty {
 impl From<CooperativeWithdrawalInfo> for BridgeDuty {
     fn from(value: CooperativeWithdrawalInfo) -> Self {
         Self::FulfillWithdrawal(value)
+    }
+}
+
+/// The various states a bridge duty may be in.
+///
+/// The state transtion looks as follows:
+///
+/// `Received` --|`CollectingNonces`|--> `CollectedNonces` --|`CollectingPartialSigs`|-->
+/// `CollectedSignatures` --|`Broadcasting`|--> `Executed`.
+#[derive(
+    Debug, Clone, PartialEq, Eq, Arbitrary, Serialize, Deserialize, BorshSerialize, BorshDeserialize,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum BridgeDutyStatus {
+    /// The duty has been received.
+    ///
+    /// This usually entails collecting nonces before the corresponding transaction can be
+    /// partially signed.
+    Received,
+
+    /// The required nonces are being collected.
+    CollectingNonces {
+        /// The number of nonces collected so far.
+        collected: u32,
+
+        /// The indexes of operators that are yet to provide nonces.
+        remaining: Vec<OperatorIdx>,
+    },
+
+    /// The required nonces have been collected.
+    ///
+    /// This state can be inferred from the previous state but might still be useful as the
+    /// required number of nonces is context-driven and it cannot be determined whether all
+    /// nonces have been collected by looking at the above variant alone.
+    CollectedNonces,
+
+    /// The partial signatures are being collected.
+    CollectingSignatures {
+        /// The number of nonces collected so far.
+        collected: u32,
+
+        /// The indexes of operators that are yet to provide partial signatures.
+        remaining: Vec<OperatorIdx>,
+    },
+
+    /// The required partial signatures have been collected.
+    ///
+    /// This state can be inferred from the previous state but might still be useful as the
+    /// required number of signatures is context-driven and it cannot be determined whether all
+    /// partial signatures have been collected by looking at the above variant alone.
+    CollectedSignatures,
+
+    /// The duty has been executed.
+    ///
+    /// This means that the required transaction has been fully signed and broadcasted to Bitcoin.
+    Executed,
+}
+
+impl Default for BridgeDutyStatus {
+    fn default() -> Self {
+        Self::Received
+    }
+}
+
+impl BridgeDutyStatus {
+    /// Checks if the [`BridgeDutyStatus`] is in its final state.
+    pub fn is_done(&self) -> bool {
+        matches!(self, BridgeDutyStatus::Executed)
     }
 }

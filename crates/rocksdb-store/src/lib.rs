@@ -42,12 +42,20 @@ pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
     // Bridge signature schemas
     BridgeTxStateTxidSchema::COLUMN_FAMILY_NAME,
     BridgeTxStateSchema::COLUMN_FAMILY_NAME,
+    // Bridge duty schemas
+    BridgeDutyTxidSchema::COLUMN_FAMILY_NAME,
+    BridgeDutyStatusSchema::COLUMN_FAMILY_NAME,
+    // Bridge duty checkpoint
+    BridgeDutyCheckpointSchema::COLUMN_FAMILY_NAME,
     // Checkpoint schemas
     BatchCheckpointSchema::COLUMN_FAMILY_NAME,
     // TODO add col families for other store types
 ];
 
-use bridge::schemas::{BridgeTxStateSchema, BridgeTxStateTxidSchema};
+use bridge::schemas::{
+    BridgeDutyCheckpointSchema, BridgeDutyStatusSchema, BridgeDutyTxidSchema, BridgeTxStateSchema,
+    BridgeTxStateTxidSchema,
+};
 pub const PROVER_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
     prover::schemas::ProverTaskIdSchema::COLUMN_FAMILY_NAME,
     prover::schemas::ProverTaskSchema::COLUMN_FAMILY_NAME,

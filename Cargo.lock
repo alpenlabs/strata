@@ -3780,6 +3780,7 @@ dependencies = [
  "alpen-express-btcio",
  "alpen-express-primitives",
  "alpen-express-rpc-api",
+ "alpen-express-state",
  "async-trait",
  "bitcoin",
  "express-bridge-sig-manager",

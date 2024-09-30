@@ -635,6 +635,15 @@ impl BorshDeserialize for BitcoinTxid {
     }
 }
 
+impl<'a> Arbitrary<'a> for BitcoinTxid {
+    fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
+        let value = Buf32::arbitrary(u)?;
+        let txid = Txid::from(value);
+
+        Ok(Self(txid))
+    }
+}
+
 /// A wrapper around [`bitcoin::TxOut`] that implements some additional traits.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BitcoinTxOut(TxOut);
