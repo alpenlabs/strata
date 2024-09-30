@@ -5,10 +5,14 @@ use std::{
 };
 
 use alpen_express_db::traits::Database;
-use alpen_express_primitives::params::Params;
+use alpen_express_primitives::{buf::Buf32, params::Params};
+use alpen_express_state::l1::{
+    get_btc_params, get_difficulty_adjustment_height, BtcParams, HeaderVerificationState,
+    L1BlockId, TimestampStore,
+};
 use alpen_express_status::StatusTx;
 use anyhow::bail;
-use bitcoin::BlockHash;
+use bitcoin::{hashes::Hash, BlockHash};
 use strata_tx_parser::{
     deposit::DepositTxConfig,
     filter::{filter_relevant_txs, TxFilterRule},
@@ -75,10 +79,16 @@ async fn do_reader_task<D: Database + 'static>(
         // Maybe this should be called outside loop?
         let filters = derive_tx_filter_rules::<D>(chstate_prov.clone(), params.as_ref())?;
 
-        if let Err(err) =
-            poll_for_new_blocks(client, event_tx, &filters, &mut state, &mut status_updates)
-                .instrument(poll_span)
-                .await
+        if let Err(err) = poll_for_new_blocks(
+            client,
+            event_tx,
+            &filters,
+            &mut state,
+            &mut status_updates,
+            params.as_ref(),
+        )
+        .instrument(poll_span)
+        .await
         {
             warn!(%cur_best_height, err = %err, "failed to poll Bitcoin client");
             status_updates.push(L1StatusUpdate::RpcError(err.to_string()));
@@ -160,6 +170,7 @@ async fn poll_for_new_blocks(
     filters: &[TxFilterRule],
     state: &mut ReaderState,
     status_updates: &mut Vec<L1StatusUpdate>,
+    params: &Params,
 ) -> anyhow::Result<()> {
     let chain_info = client.get_blockchain_info().await?;
     status_updates.push(L1StatusUpdate::RpcConnected(true));
@@ -202,6 +213,7 @@ async fn poll_for_new_blocks(
             state,
             status_updates,
             filters,
+            params,
         )
         .await
         {
@@ -246,6 +258,7 @@ async fn fetch_and_process_block(
     state: &mut ReaderState,
     status_updates: &mut Vec<L1StatusUpdate>,
     filters: &[TxFilterRule],
+    params: &Params,
 ) -> anyhow::Result<BlockHash> {
     let block = client.get_block_at(height).await?;
     let txs = block.txdata.len();
@@ -253,10 +266,33 @@ async fn fetch_and_process_block(
     let filtered_txs = filter_relevant_txs(&block, filters);
     let block_data = BlockData::new(height, block, filtered_txs);
     let l1blkid = block_data.block().block_hash();
-    trace!(%l1blkid, %height, %txs, "fetched block from client");
+    trace!(%height, %l1blkid, %txs, "fetched block from client");
 
     status_updates.push(L1StatusUpdate::CurHeight(height));
     status_updates.push(L1StatusUpdate::CurTip(l1blkid.to_string()));
+
+    let threshold = params.rollup.l1_reorg_safe_depth;
+    let genesis_ht = params.rollup.genesis_l1_height;
+    let genesis_threshold = genesis_ht + threshold as u64;
+
+    trace!(%genesis_ht, %threshold, %genesis_threshold, "should genesis?");
+
+    if height == genesis_threshold {
+        info!(%height, %genesis_ht, "time for genesis");
+        let l1_verification_state =
+            get_verification_state(client, genesis_ht + 1, &get_btc_params()).await?;
+        if let Err(e) = event_tx
+            .send(L1Event::GenesisVerificationState(
+                height,
+                l1_verification_state,
+            ))
+            .await
+        {
+            error!("failed to submit L1 block event, did the persistence task crash?");
+            return Err(e.into());
+        }
+    }
+
     if let Err(e) = event_tx.send(L1Event::BlockData(block_data)).await {
         error!("failed to submit L1 block event, did the persistence task crash?");
         return Err(e.into());
@@ -266,4 +302,44 @@ async fn fetch_and_process_block(
     let _deep = state.accept_new_block(l1blkid);
 
     Ok(l1blkid)
+}
+
+/// Gets the [`HeaderVerificationState`] for the particular block
+async fn get_verification_state(
+    client: &impl Reader,
+    height: u64,
+    params: &BtcParams,
+) -> anyhow::Result<HeaderVerificationState> {
+    // Get the difficulty adjustment block just before `block_height`
+    let h1 = get_difficulty_adjustment_height(0, height as u32, params);
+    let b1 = client.get_block_at(h1 as u64).await?;
+
+    // Consider the block before `block_height` to be the last verified block
+    let vh = height - 1; // verified_height
+    let vb = client.get_block_at(vh).await?; // verified_block
+
+    // Fetch the previous timestamps of block from `vh`
+    // This fetches timestamps of `vh`, `vh-1`, `vh-2`, ...
+    const N: usize = 11;
+    let mut timestamps: [u32; 11] = [0u32; 11];
+    for i in (0..N).rev() {
+        if vh > i as u64 {
+            let h = client.get_block_at(vh - i as u64).await?;
+            timestamps[i] = h.header.time;
+        } else {
+            timestamps[i] = 0;
+        }
+    }
+    let last_11_blocks_timestamps = TimestampStore::new(timestamps);
+
+    let l1_blkid: L1BlockId =
+        Buf32::from(vb.header.block_hash().as_raw_hash().to_byte_array()).into();
+    Ok(HeaderVerificationState {
+        last_verified_block_num: vh as u32,
+        last_verified_block_hash: l1_blkid,
+        next_block_target: vb.header.target().to_compact_lossy().to_consensus(),
+        interval_start_timestamp: b1.header.time,
+        total_accumulated_pow: 0u128,
+        last_11_blocks_timestamps,
+    })
 }

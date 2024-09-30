@@ -176,7 +176,11 @@ fn prepare_l1_segment(
         for (h, _b) in unacc_blocks.iter().take(max_l1_entries) {
             let rec = load_header_record(*h, l1_prov)?;
             let deposit_update_tx = deposit_update_txs_from_db(*h, l1_prov)?;
-            payloads.push(L1HeaderPayload::new_bare(*h, rec, deposit_update_tx));
+            payloads.push(
+                L1HeaderPayload::new(*h, rec)
+                    .with_deposit_update_txs(deposit_update_tx)
+                    .build(),
+            );
         }
 
         debug!(n = %payloads.len(), "filling in empty queue with fresh L1 payloads");
@@ -216,7 +220,11 @@ fn prepare_l1_segment(
     for (h, _b) in fresh_blocks {
         let rec = load_header_record(*h, l1_prov)?;
         let deposit_update_tx = deposit_update_txs_from_db(*h, l1_prov)?;
-        payloads.push(L1HeaderPayload::new_bare(*h, rec, deposit_update_tx));
+        payloads.push(
+            L1HeaderPayload::new(*h, rec)
+                .with_deposit_update_txs(deposit_update_tx)
+                .build(),
+        );
     }
 
     if !payloads.is_empty() {
@@ -231,7 +239,10 @@ fn load_header_record(h: u64, l1_prov: &impl L1DataProvider) -> Result<L1HeaderR
         .get_block_manifest(h)?
         .ok_or(Error::MissingL1BlockHeight(h))?;
     // TODO need to include tx root proof we can verify
-    Ok(L1HeaderRecord::new(mf.header().to_vec(), mf.txs_root()))
+    Ok(L1HeaderRecord::create_from_serialized_header(
+        mf.header().to_vec(),
+        mf.txs_root(),
+    ))
 }
 
 fn deposit_update_txs_from_db(

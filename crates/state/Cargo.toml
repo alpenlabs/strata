@@ -17,6 +17,7 @@ arbitrary = { workspace = true }
 bitcoin = { workspace = true }
 borsh = { workspace = true }
 digest = { workspace = true }
+ethnum = "1.5.0"
 hex = { workspace = true }
 num_enum = { workspace = true }
 serde = { workspace = true }
@@ -26,3 +27,4 @@ tracing = { workspace = true }   # ideally this shouldn't be in this trait
 
 [dev-dependencies]
 alpen-test-utils = { workspace = true }
+rand = { workspace = true }

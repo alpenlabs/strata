@@ -1,4 +1,7 @@
 use alpen_express_primitives::{buf::Buf32, l1::L1BlockManifest};
+use alpen_express_state::l1::{
+    get_difficulty_adjustment_height, BtcParams, HeaderVerificationState, L1BlockId, TimestampStore,
+};
 use bitcoin::{
     block::Header,
     consensus::{deserialize, serialize},
@@ -69,6 +72,44 @@ impl BtcChainSegment {
         timestamps
     }
 
+    pub fn get_verification_state(
+        &self,
+        block_height: u32,
+        params: &BtcParams,
+    ) -> HeaderVerificationState {
+        // Get the difficulty adjustment block just before `block_height`
+        let h1 = get_difficulty_adjustment_height(0, block_height, params);
+
+        // Consider the block before `block_height` to be the last verified block
+        let vh = block_height - 1; // verified_height
+
+        // Fetch the previous timestamps of block from `vh`
+        // This fetches timestamps of `vh`, `vh-1`, `vh-2`, ...
+        let initial_timestamps: [u32; 11] = self.get_last_timestamps(vh, 11).try_into().unwrap();
+        let last_11_blocks_timestamps = TimestampStore::new(initial_timestamps);
+
+        let last_verified_block_hash: L1BlockId = Buf32::from(
+            self.get_header(vh)
+                .block_hash()
+                .as_raw_hash()
+                .to_byte_array(),
+        )
+        .into();
+
+        HeaderVerificationState {
+            last_verified_block_num: vh,
+            last_verified_block_hash,
+            next_block_target: self
+                .get_header(vh)
+                .target()
+                .to_compact_lossy()
+                .to_consensus(),
+            interval_start_timestamp: self.get_header(h1).time,
+            total_accumulated_pow: 0u128,
+            last_11_blocks_timestamps,
+        }
+    }
+
     pub fn get_block_manifest(&self, height: u32) -> L1BlockManifest {
         let header = self.get_header(height);
         L1BlockManifest::new(
@@ -76,6 +117,15 @@ impl BtcChainSegment {
             serialize(&header),
             Buf32::from(header.merkle_root.as_raw_hash().to_byte_array()),
         )
+    }
+
+    pub fn get_block_manifests(&self, from_height: u32, len: usize) -> Vec<L1BlockManifest> {
+        let mut blocks = Vec::with_capacity(len);
+        for i in 0..len {
+            let block = self.get_block_manifest(from_height + i as u32);
+            blocks.push(block);
+        }
+        blocks
     }
 }
 

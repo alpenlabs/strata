@@ -86,6 +86,9 @@ pub enum Error {
     #[error("deserializing tx failed for index: {0}")]
     TxDeserializationFailed(u64),
 
+    #[error("chain is not active yet")]
+    ChainInactive,
+
     #[error("{0}")]
     Other(String),
 }

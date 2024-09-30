@@ -95,17 +95,7 @@ where
             let l1blkid = blockdata.block().block_hash();
 
             let manifest = generate_block_manifest(blockdata.block());
-            let l1txs: Vec<_> = blockdata
-                .protocol_ops_txs()
-                .iter()
-                .map(|ops_txs| {
-                    extract_l1tx_from_block(
-                        blockdata.block(),
-                        ops_txs.index(),
-                        ops_txs.proto_op().clone(),
-                    )
-                })
-                .collect();
+            let l1txs: Vec<_> = generate_l1txs(&blockdata);
             let num_txs = l1txs.len();
             l1db.put_block_data(blockdata.block_num(), manifest, l1txs.clone())?;
             info!(%height, %l1blkid, txs = %num_txs, "wrote L1 block manifest");
@@ -126,6 +116,12 @@ where
 
             // TODO: Check for deposits and forced inclusions and emit appropriate events
 
+            Ok(())
+        }
+
+        L1Event::GenesisVerificationState(height, header_verification_state) => {
+            let ev = SyncEvent::L1BlockGenesis(height, header_verification_state);
+            csm_ctl.submit_event(ev)?;
             Ok(())
         }
     }
@@ -242,6 +238,20 @@ fn generate_block_manifest(block: &Block) -> L1BlockManifest {
     let header = serialize(&block.header);
 
     L1BlockManifest::new(blockid, header, Buf32::from(root))
+}
+
+fn generate_l1txs(blockdata: &BlockData) -> Vec<L1Tx> {
+    blockdata
+        .protocol_ops_txs()
+        .iter()
+        .map(|ops_txs| {
+            extract_l1tx_from_block(
+                blockdata.block(),
+                ops_txs.index(),
+                ops_txs.proto_op().clone(),
+            )
+        })
+        .collect()
 }
 
 /// Generates an L1 transaction with proof for a given transaction index in a block.

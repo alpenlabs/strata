@@ -6,9 +6,15 @@ use alpen_express_db::traits::{
 };
 use alpen_express_primitives::prelude::*;
 use alpen_express_state::{
-    client_state::*, header::L2Header, id::L2BlockId, l1::L1BlockId, operation::*,
+    block,
+    client_state::*,
+    header::L2Header,
+    id::L2BlockId,
+    l1::{get_btc_params, HeaderVerificationState, L1BlockId},
+    operation::*,
     sync_event::SyncEvent,
 };
+use bitcoin::block::Header;
 use tracing::*;
 
 use crate::{errors::*, genesis::make_genesis_block};
@@ -38,11 +44,30 @@ pub fn process_event<D: Database>(
             // FIXME this doesn't do any SPV checks to make sure we only go to
             // a longer chain, it just does it unconditionally
             let l1prov = database.l1_provider();
-            let _new_block_mf = l1prov.get_block_manifest(*height)?;
+            let block_mf = l1prov
+                .get_block_manifest(*height)?
+                .ok_or(Error::MissingL1BlockHeight(*height))?;
 
             let l1v = state.l1_view();
+            let l1_vs = state.l1_view().tip_verification_state();
 
-            // TODO do the consensus checks
+            // Do the consensus checks
+            if let Some(l1_vs) = l1_vs {
+                let l1_vs_height = l1_vs.last_verified_block_num as u64;
+                let mut updated_l1vs = l1_vs.clone();
+                if l1_vs_height < l1v.tip_height() {
+                    for height in (l1_vs_height..l1v.tip_height()) {
+                        let block_mf = l1prov
+                            .get_block_manifest(height)?
+                            .ok_or(Error::MissingL1BlockHeight(height))?;
+                        let header: Header =
+                            bitcoin::consensus::deserialize(block_mf.header()).unwrap();
+                        updated_l1vs = updated_l1vs
+                            .check_and_update_continuity_new(&header, &get_btc_params());
+                    }
+                }
+                writes.push(ClientStateWrite::UpdateVerificationState(updated_l1vs))
+            }
 
             // Only accept the block if it's the next block in the chain we expect to accept.
             let cur_seen_tip_height = l1v.tip_height();
@@ -72,15 +97,43 @@ pub fn process_event<D: Database>(
                 writes.extend(wrs);
                 actions.extend(acts);
             }
+        }
 
-            // Activate chain if not already
-            if state.sync().is_none() {
-                debug!(%height, "Chain not active, activating chain. Received block");
-                let (wrs, acts) = activate_chain(params, state, *height, l1blkid);
-                writes.extend(wrs);
-                actions.extend(acts);
+        SyncEvent::L1BlockGenesis(height, l1_verification_state) => {
+            debug!(%height, "Received L1BlockGenesis");
+            let horizon_ht = params.rollup.horizon_l1_height;
+            let genesis_ht = params.rollup.genesis_l1_height;
+
+            let state_ht = l1_verification_state.last_verified_block_num as u64;
+            if genesis_ht != state_ht {
+                let error_msg = format!(
+                    "Expected height: {} Found height: {} in state",
+                    genesis_ht, state_ht
+                );
+                return Err(Error::GenesisFailed(error_msg));
             }
-            // NOTE: might need to do something if chain is activated
+
+            let threshold = params.rollup.l1_reorg_safe_depth;
+            let genesis_threshold = genesis_ht + threshold as u64;
+
+            debug!(%genesis_threshold, %genesis_ht, active=%state.is_chain_active(), "Inside activate chain");
+
+            // If necessary, activate the chain!
+            if !state.is_chain_active() && *height >= genesis_threshold {
+                debug!("emitting chain activation");
+                let genesis_block = make_genesis_block(params);
+
+                writes.push(ClientStateWrite::ActivateChain);
+                writes.push(ClientStateWrite::UpdateVerificationState(
+                    l1_verification_state.clone(),
+                ));
+                writes.push(ClientStateWrite::ReplaceSync(Box::new(
+                    SyncState::from_genesis_blkid(genesis_block.header().get_blockid()),
+                )));
+                actions.push(SyncAction::L2Genesis(
+                    l1_verification_state.last_verified_block_hash,
+                ));
+            }
         }
 
         SyncEvent::L1Revert(to_height) => {
@@ -107,10 +160,7 @@ pub fn process_event<D: Database>(
                 // only when the corresponding L1 block is buried enough
                 writes.push(ClientStateWrite::CheckpointsReceived(
                     *height,
-                    commitments
-                        .iter()
-                        .map(|x| x.checkpoint().info().clone())
-                        .collect(),
+                    commitments.iter().map(|x| x.checkpoint().clone()).collect(),
                 ));
 
                 actions.push(SyncAction::WriteCheckpoints(*height, commitments.clone()));
@@ -189,35 +239,6 @@ fn handle_maturable_height(
     (writes, actions)
 }
 
-fn activate_chain(
-    params: &Params,
-    state: &ClientState,
-    height: u64,
-    l1blkid: &L1BlockId,
-) -> (Vec<ClientStateWrite>, Vec<SyncAction>) {
-    let mut writes = Vec::new();
-    let mut actions = Vec::new();
-    let horizon_ht = params.rollup.horizon_l1_height;
-    let genesis_ht = params.rollup.genesis_l1_height;
-
-    // TODO make params configurable
-    let genesis_threshold = genesis_ht + 3;
-    debug!(%genesis_threshold, %genesis_ht, active=%state.is_chain_active(), "Inside activate chain");
-
-    // If necessary, activate the chain!
-    if !state.is_chain_active() && height >= genesis_threshold {
-        debug!("emitting chain activation");
-        let genesis_block = make_genesis_block(params);
-
-        writes.push(ClientStateWrite::ActivateChain);
-        writes.push(ClientStateWrite::ReplaceSync(Box::new(
-            SyncState::from_genesis_blkid(genesis_block.header().get_blockid()),
-        )));
-        actions.push(SyncAction::L2Genesis(*l1blkid));
-    }
-    (writes, actions)
-}
-
 #[cfg(test)]
 mod tests {
     use alpen_express_db::traits::L1DataStore;
@@ -225,10 +246,11 @@ mod tests {
     use alpen_express_rocksdb::test_utils::get_common_db;
     use alpen_express_state::{l1::L1BlockId, operation};
     use alpen_test_utils::{
-        bitcoin::gen_l1_chain,
+        bitcoin::{gen_l1_chain, get_btc_chain},
         l2::{gen_client_state, gen_params},
         ArbitraryGenerator,
     };
+    use bitcoin::params::MAINNET;
 
     use super::*;
     use crate::genesis;
@@ -243,10 +265,14 @@ mod tests {
         let mut state = gen_client_state(Some(&params));
 
         assert!(!state.is_chain_active());
-        let l1_chain = gen_l1_chain(10);
 
         let horizon = params.rollup().horizon_l1_height;
         let genesis = params.rollup().genesis_l1_height;
+
+        let chain = get_btc_chain();
+        let l1_chain = chain.get_block_manifests(horizon as u32, 10);
+        let l1_verification_state =
+            chain.get_verification_state(genesis as u32 + 1, &MAINNET.clone().into());
 
         for (i, b) in l1_chain.iter().enumerate() {
             let l1_store = database.l1_store();
@@ -393,28 +419,40 @@ mod tests {
         // genesis + 3, where we should lock in genesis
         {
             let height = genesis + 3;
-            let idx = (height - horizon) as usize;
-            let l1_block_id = l1_chain[idx as usize].block_hash().into();
-            let event = SyncEvent::L1Block(height, l1_block_id);
 
-            let output = process_event(&state, &event, database.as_ref(), &params).unwrap();
+            let idx = (height - horizon) as usize;
+            let genesis_id = l1_chain[(genesis - horizon) as usize].block_hash().into();
+            let l1_block_id = l1_chain[idx as usize].block_hash().into();
+
+            let event1 = SyncEvent::L1BlockGenesis(height, l1_verification_state.clone());
+            let event2 = SyncEvent::L1Block(height, l1_block_id);
+
+            let output1 = process_event(&state, &event1, database.as_ref(), &params).unwrap();
+            let output2 = process_event(&state, &event2, database.as_ref(), &params).unwrap();
 
             let genesis_block = genesis::make_genesis_block(&params);
             let genesis_blockid = genesis_block.header().get_blockid();
 
-            let expected_writes = [
-                ClientStateWrite::AcceptL1Block(l1_block_id),
+            let expected_writes1 = [
                 ClientStateWrite::ActivateChain,
+                ClientStateWrite::UpdateVerificationState(l1_verification_state.clone()),
                 ClientStateWrite::ReplaceSync(Box::new(SyncState::from_genesis_blkid(
                     genesis_blockid,
                 ))),
             ];
-            let expected_actions = [SyncAction::L2Genesis(l1_block_id)];
+            let expected_writes2 = [ClientStateWrite::AcceptL1Block(l1_block_id)];
 
-            assert_eq!(output.writes(), expected_writes);
-            assert_eq!(output.actions(), expected_actions);
+            let expected_actions1 = [SyncAction::L2Genesis(genesis_id)];
+            let expected_actions2 = [];
 
-            operation::apply_writes_to_state(&mut state, output.writes().iter().cloned());
+            assert_eq!(output1.writes(), expected_writes1);
+            assert_eq!(output1.actions(), expected_actions1);
+
+            assert_eq!(output2.writes(), expected_writes2);
+            assert_eq!(output2.actions(), expected_actions2);
+
+            operation::apply_writes_to_state(&mut state, output1.writes().iter().cloned());
+            operation::apply_writes_to_state(&mut state, output2.writes().iter().cloned());
 
             assert!(state.is_chain_active());
             assert_eq!(state.most_recent_l1_block(), Some(&l1_block_id));

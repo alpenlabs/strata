@@ -184,6 +184,7 @@ dependencies = [
  "bitcoin",
  "borsh",
  "digest 0.10.7",
+ "ethnum",
  "express-bridge-tx-builder",
  "express-zkvm",
  "hex",

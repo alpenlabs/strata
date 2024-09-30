@@ -105,6 +105,7 @@ fn duty_tracker_task_inner(
             &ident,
             l2_block_manager,
             params,
+            &**database.chain_state_provider(),
         ) {
             error!(err = %e, "failed to update duties tracker");
         }
@@ -127,12 +128,13 @@ fn update_tracker(
     ident: &Identity,
     l2_block_manager: &L2BlockManager,
     params: &Params,
+    chs_provider: &impl ChainstateProvider,
 ) -> Result<(), Error> {
     let Some(ss) = state.sync() else {
         return Ok(());
     };
 
-    let new_duties = extractor::extract_duties(state, ident, params)?;
+    let new_duties = extractor::extract_duties(state, ident, params, chs_provider)?;
 
     info!(new_duties = ?new_duties, "new duties");
 

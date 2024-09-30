@@ -1,4 +1,4 @@
-use alpen_express_state::tx::ProtocolOperation;
+use alpen_express_state::{l1::HeaderVerificationState, tx::ProtocolOperation};
 use bitcoin::Block;
 use borsh::{BorshDeserialize, BorshSerialize};
 
@@ -10,6 +10,11 @@ pub enum L1Event {
 
     /// Revert to the provided block height
     RevertTo(u64),
+
+    /// HeaderVerificationState for the block after genesis
+    ///
+    /// Note: This event is expected to emit only once after the genesis_block has reached maturity
+    GenesisVerificationState(u64, HeaderVerificationState),
 }
 
 /// Core protocol specific transaction. It can be thought of as relevant transactions for the

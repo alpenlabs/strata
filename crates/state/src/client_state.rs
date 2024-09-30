@@ -3,10 +3,15 @@
 //! implement the consensus logic.
 // TODO move this to another crate that contains our sync logic
 
+use alpen_express_primitives::buf::Buf32;
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use crate::{batch::CheckpointInfo, id::L2BlockId, l1::L1BlockId};
+use crate::{
+    batch::CheckpointInfo,
+    id::L2BlockId,
+    l1::{HeaderVerificationState, L1BlockId},
+};
 
 /// High level client's state of the network.  This is local to the client, not
 /// coordinated as part of the L2 chain.
@@ -33,6 +38,10 @@ pub struct ClientState {
 
     /// Height at which we'll create the L2 genesis block from.
     pub(super) genesis_l1_height: u64,
+
+    /// Hash of verification state at `genesis_l1_height`. The hash is computed via
+    /// [`super::l1::HeaderVerificationState::compute_hash`]
+    pub(super) genesis_l1_verification_state_hash: Option<Buf32>,
 }
 
 impl ClientState {
@@ -45,6 +54,7 @@ impl ClientState {
             local_l1_view: LocalL1State::new(horizon_l1_height),
             horizon_l1_height,
             genesis_l1_height,
+            genesis_l1_verification_state_hash: None,
         }
     }
 
@@ -91,6 +101,10 @@ impl ClientState {
 
     pub fn genesis_l1_height(&self) -> u64 {
         self.genesis_l1_height
+    }
+
+    pub fn genesis_verification_hash(&self) -> Option<Buf32> {
+        self.genesis_l1_verification_state_hash
     }
 }
 
@@ -166,6 +180,9 @@ pub struct LocalL1State {
 
     /// Checkpoints that are in L1 but yet to be finalized.
     pub(super) pending_checkpoints: Vec<L1CheckPoint>,
+
+    /// This state is used to verify the `next_expected_block`
+    pub(super) header_verification_state: Option<HeaderVerificationState>,
 }
 
 impl LocalL1State {
@@ -184,6 +201,7 @@ impl LocalL1State {
             next_expected_block,
             pending_checkpoints: Vec::new(),
             last_finalized_checkpoint: None,
+            header_verification_state: None,
         }
     }
 
@@ -241,6 +259,10 @@ impl LocalL1State {
             .iter()
             .take_while(|cp| cp.height <= height)
             .last()
+    }
+
+    pub fn tip_verification_state(&self) -> Option<&HeaderVerificationState> {
+        self.header_verification_state.as_ref()
     }
 }
 

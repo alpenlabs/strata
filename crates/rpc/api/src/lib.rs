@@ -113,12 +113,7 @@ pub trait AlpenSequencerApi {
 
     /// Verifies and adds the submitted proof to the checkpoint database
     #[method(name = "alpadmin_submitCheckpointProof")]
-    async fn submit_checkpoint_proof(
-        &self,
-        idx: u64,
-        proof: HexBytes,
-        state: HexBytes,
-    ) -> RpcResult<()>;
+    async fn submit_checkpoint_proof(&self, idx: u64, proof: HexBytes) -> RpcResult<()>;
 
     // TODO: rpc endpoints that deal with L1 writes are currently limited to sequencer
     // due to l1 writer using wallet rpcs. Move these to common rpc once writer

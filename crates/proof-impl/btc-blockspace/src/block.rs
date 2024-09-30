@@ -4,7 +4,7 @@
 //! [`bitcoin`](bitcoin::Block), providing custom implementations where necessary.
 
 use alpen_express_primitives::{buf::Buf32, hash::sha256d};
-use alpen_express_state::l1::L1Tx;
+use alpen_express_state::l1::{compute_block_hash, L1Tx};
 use bitcoin::{
     block::Header,
     consensus::{self, Encodable},
@@ -50,17 +50,6 @@ pub fn compute_witness_commitment(
         .expect("engines don't error");
     vec.extend(witness_reserved_value);
     WitnessCommitment::from_byte_array(*sha256d(&vec).as_ref())
-}
-
-/// Returns the block hash.
-///
-/// Equivalent to [`compute_block_hash`](Header::block_hash)
-pub fn compute_block_hash(header: &Header) -> Buf32 {
-    let mut vec = Vec::with_capacity(80);
-    header
-        .consensus_encode(&mut vec)
-        .expect("engines don't error");
-    sha256d(&vec)
 }
 
 /// Computes the block witness root from corresponding proof in [`L1Tx`]

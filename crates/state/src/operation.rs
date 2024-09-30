@@ -9,7 +9,7 @@ use crate::{
     batch::{BatchCheckpoint, CheckpointInfo},
     client_state::{ClientState, L1CheckPoint, SyncState},
     id::L2BlockId,
-    l1::L1BlockId,
+    l1::{HeaderVerificationState, L1BlockId},
 };
 
 /// Output of a consensus state transition.  Both the consensus state writes and
@@ -70,6 +70,8 @@ pub enum ClientStateWrite {
 
     /// The previously confirmed checkpoint is finalized at given l1 height
     CheckpointFinalized(u64),
+
+    UpdateVerificationState(HeaderVerificationState),
 }
 
 /// Actions the client state machine directs the node to take to update its own
@@ -122,6 +124,16 @@ pub fn apply_writes_to_state(
                 state.chain_active = true;
             }
 
+            UpdateVerificationState(l1_vs) => {
+                debug!(?l1_vs, "received HeaderVerificationState");
+                if state.genesis_verification_hash().is_none() {
+                    info!(?l1_vs, "Setting genesis L1 verification state");
+                    state.genesis_l1_verification_state_hash = Some(l1_vs.compute_hash().unwrap());
+                }
+
+                state.l1_view_mut().header_verification_state = Some(l1_vs);
+            }
+
             RollbackL1BlocksTo(height) => {
                 let l1v = state.l1_view_mut();
                 let buried_height = l1v.buried_l1_height();
@@ -131,8 +143,16 @@ pub fn apply_writes_to_state(
                     panic!("operation: emitted invalid write");
                 }
 
-                let new_unacc_len = height - buried_height;
-                l1v.local_unaccepted_blocks.truncate(new_unacc_len as usize);
+                let new_unacc_len = (height - buried_height) as usize;
+                let l1_vs = l1v.tip_verification_state();
+                if let Some(l1_vs) = l1_vs {
+                    // TODO: handle other things
+                    let mut rollbacked_l1_vs = l1_vs.clone();
+                    rollbacked_l1_vs.last_verified_block_num = height as u32;
+                    rollbacked_l1_vs.last_verified_block_hash =
+                        l1v.local_unaccepted_blocks[new_unacc_len];
+                }
+                l1v.local_unaccepted_blocks.truncate(new_unacc_len);
 
                 // Keep pending checkpoints whose l1 height is less than or equal to rollback height
                 l1v.pending_checkpoints.retain(|ckpt| ckpt.height <= height);
