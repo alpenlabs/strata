@@ -246,6 +246,15 @@ impl<T: EngineRpc> RpcExecEngineInner<T> {
             PayloadStatusEnum::Accepted => EngineResult::Err(EngineError::Unimplemented), // TODO
         }
     }
+
+    async fn check_block_exists(&self, block_hash: B256) -> EngineResult<bool> {
+        let block = self
+            .client
+            .block_by_hash(block_hash)
+            .await
+            .map_err(|err| EngineError::Other(err.to_string()))?;
+        Ok(block.is_some())
+    }
 }
 
 pub struct RpcExecEngineCtl<T: EngineRpc> {
@@ -270,20 +279,21 @@ impl<T: EngineRpc> RpcExecEngineCtl<T> {
 }
 
 impl<T: EngineRpc> RpcExecEngineCtl<T> {
-    fn get_l2block(&self, l2_block_id: &L2BlockId) -> anyhow::Result<L2BlockBundle> {
+    fn get_l2block(&self, l2_block_id: &L2BlockId) -> EngineResult<L2BlockBundle> {
         self.l2_block_manager
-            .get_block_blocking(l2_block_id)?
-            .ok_or(anyhow::anyhow!("missing L2Block"))
+            .get_block_blocking(l2_block_id)
+            .map_err(|err| EngineError::Other(err.to_string()))?
+            .ok_or(EngineError::DbMissingBlock(*l2_block_id))
     }
 
-    fn get_evm_block_hash(&self, l2_block_id: &L2BlockId) -> anyhow::Result<B256> {
+    fn get_evm_block_hash(&self, l2_block_id: &L2BlockId) -> EngineResult<B256> {
         self.get_l2block(l2_block_id)
             .and_then(|l2block| self.get_block_info(l2block))
             .map(|evm_block| evm_block.block_hash())
     }
 
-    fn get_block_info(&self, l2block: L2BlockBundle) -> anyhow::Result<EVML2Block> {
-        EVML2Block::try_from(l2block).map_err(anyhow::Error::msg)
+    fn get_block_info(&self, l2block: L2BlockBundle) -> EngineResult<EVML2Block> {
+        EVML2Block::try_from(l2block).map_err(|err| EngineError::Other(err.to_string()))
     }
 }
 
@@ -360,6 +370,15 @@ impl<T: EngineRpc> ExecEngineCtl for RpcExecEngineCtl<T> {
                 .await
                 .map(|_| ())
         })
+    }
+
+    fn is_block_available(&self, id: L2BlockId) -> EngineResult<bool> {
+        let block = self
+            .get_l2block(&id)
+            .and_then(|l2block| self.get_block_info(l2block))?;
+        let block_hash = block.block_hash();
+        self.tokio_handle
+            .block_on(self.inner.check_block_exists(block_hash))
     }
 }
 

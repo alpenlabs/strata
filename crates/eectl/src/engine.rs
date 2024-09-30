@@ -42,6 +42,9 @@ pub trait ExecEngineCtl {
     /// Updates the (L2) block that we treat as being deeply buried and won't
     /// reorg.
     fn update_finalized_block(&self, id: L2BlockId) -> EngineResult<()>;
+
+    /// Check if a block exists on the chain
+    fn is_block_available(&self, id: L2BlockId) -> EngineResult<bool>;
 }
 
 /// The status of a block that we've just set chain fork.
