@@ -10,15 +10,16 @@ use crate::{
     signet::{EsploraClient, SignetWallet},
 };
 
+/// Prints a new address for the internal wallet
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "receive")]
-/// Prints a new address for the internal wallet
 pub struct ReceiveArgs {
-    #[argh(switch)]
     /// prints a new signet address
-    signet: bool,
     #[argh(switch)]
+    signet: bool,
+
     /// prints the rollup address
+    #[argh(switch)]
     rollup: bool,
 }
 

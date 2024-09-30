@@ -14,9 +14,9 @@ use crate::{
     signet::SignetWallet, taproot::ExtractP2trPubkey,
 };
 
+/// Bridge 10 BTC from the rollup to signet
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "bridge-out")]
-/// Bridge 10 BTC from the rollup to signet
 pub struct BridgeOutArgs {
     /// the signet address to send funds to. defaults to a new internal wallet address
     #[argh(positional)]

@@ -23,8 +23,8 @@ pub mod refresh;
 pub mod reset;
 pub mod send;
 
-#[derive(FromArgs, PartialEq, Debug)]
 /// A CLI for interacting with Alpen Labs' devnet signet and rollup.
+#[derive(FromArgs, PartialEq, Debug)]
 pub struct TopLevel {
     #[argh(subcommand)]
     pub cmd: Commands,

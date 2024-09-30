@@ -66,8 +66,8 @@ impl EsploraClient {
     }
 }
 
-#[derive(Debug)]
 /// A wrapper around BDK's wallet with some custom logic
+#[derive(Debug)]
 pub struct SignetWallet(PersistedWallet<Persister>);
 
 impl SignetWallet {

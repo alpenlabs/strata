@@ -4,9 +4,9 @@ use rand::thread_rng;
 
 use crate::seed::{password::Password, EncryptedSeedPersister, Seed};
 
+/// Changes the seed's encryption password
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "change-password")]
-/// Changes the seed's encryption password
 pub struct ChangePwdArgs {}
 
 pub async fn change_pwd(_args: ChangePwdArgs, seed: Seed, persister: impl EncryptedSeedPersister) {

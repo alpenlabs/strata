@@ -18,9 +18,9 @@ use crate::{
     signet::{get_fee_rate, EsploraClient, SignetWallet},
 };
 
+/// Send some bitcoin from the internal wallet.
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "send")]
-/// Send some bitcoin from the internal wallet.
 pub struct SendArgs {
     /// send via signet
     #[argh(switch)]

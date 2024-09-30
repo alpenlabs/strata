@@ -13,9 +13,9 @@ use sha2::{Digest, Sha256};
 
 use crate::{rollup::RollupWallet, seed::Seed, settings::Settings, signet::SignetWallet};
 
+/// Request some bitcoin from the faucet
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "faucet")]
-/// Request some bitcoin from the faucet
 pub struct FaucetArgs {
     /// request bitcoin on signet
     #[argh(switch)]

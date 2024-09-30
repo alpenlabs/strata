@@ -24,10 +24,10 @@ use crate::{
     taproot::{ExtractP2trPubkey, NotTaprootAddress},
 };
 
-#[derive(FromArgs, PartialEq, Debug)]
-#[argh(subcommand, name = "bridge-in")]
 /// Bridge 10 BTC from signet to the rollup. If an address is not provided, the wallet's internal
 /// rollup address will be used.
+#[derive(FromArgs, PartialEq, Debug)]
+#[argh(subcommand, name = "bridge-in")]
 pub struct BridgeInArgs {
     #[argh(positional)]
     rollup_address: Option<String>,

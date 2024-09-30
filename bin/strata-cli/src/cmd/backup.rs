@@ -8,11 +8,11 @@ use crate::seed::Seed;
 #[argh(subcommand, name = "backup")]
 /// Prints a BIP39 mnemonic encoding the internal wallet's seed bytes
 pub struct BackupArgs {
-    #[argh(option)]
     /// select a language for the BIP39 mnemonic. Defaults to English.
     /// Options:
     /// en, cn, cn-trad,
     /// cz, fr, it, jp, kr or es
+    #[argh(option)]
     language: Option<String>,
 }
 

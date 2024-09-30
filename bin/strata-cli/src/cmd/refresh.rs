@@ -12,9 +12,10 @@ use crate::{
     signet::{get_fee_rate, EsploraClient, SignetWallet},
 };
 
+/// Runs any background tasks manually. Currently performs recovery of old
+/// bridge in transactions
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "refresh")]
-/// Runs any background tasks manually
 pub struct RefreshArgs {}
 
 pub async fn refresh(seed: Seed, settings: Settings, esplora: EsploraClient) {

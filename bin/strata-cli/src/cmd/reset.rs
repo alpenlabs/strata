@@ -4,12 +4,12 @@ use dialoguer::Confirm;
 
 use crate::{seed::EncryptedSeedPersister, settings::Settings};
 
+/// Prints a BIP39 mnemonic encoding the internal wallet's seed bytes
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "reset")]
-/// Prints a BIP39 mnemonic encoding the internal wallet's seed bytes
 pub struct ResetArgs {
-    #[argh(switch, short = 'y')]
     /// dangerous: permit to reset without further confirmation
+    #[argh(switch, short = 'y')]
     assume_yes: bool,
 }
 

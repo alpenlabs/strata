@@ -12,9 +12,9 @@ use crate::{
     signet::{EsploraClient, SignetWallet},
 };
 
+/// Prints the wallet's current balance(s)
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "balance")]
-/// Prints the wallet's current balance(s)
 pub struct BalanceArgs {
     /// return the signet balance
     #[argh(switch)]

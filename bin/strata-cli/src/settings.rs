@@ -21,9 +21,9 @@ pub struct SettingsFromFile {
     pub faucet_endpoint: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
 /// Settings struct filled with either config values or
 /// opinionated defaults
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Settings {
     pub esplora: String,
     pub l2_http_endpoint: String,

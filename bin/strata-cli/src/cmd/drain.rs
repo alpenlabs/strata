@@ -15,16 +15,16 @@ use crate::{
     signet::{get_fee_rate, log_fee_rate, EsploraClient, SignetWallet},
 };
 
-#[derive(FromArgs, PartialEq, Debug)]
-#[argh(subcommand, name = "drain")]
 /// Drains the internal wallet to the provided
 /// signet and rollup addresses
+#[derive(FromArgs, PartialEq, Debug)]
+#[argh(subcommand, name = "drain")]
 pub struct DrainArgs {
-    #[argh(option, short = 's')]
     /// a signet address for signet funds to be drained to
+    #[argh(option, short = 's')]
     signet_address: Option<String>,
-    #[argh(option, short = 'r')]
     /// a rollup address for rollup funds to be drained to
+    #[argh(option, short = 'r')]
     rollup_address: Option<String>,
 }
 
