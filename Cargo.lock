@@ -3855,7 +3855,6 @@ dependencies = [
 name = "express-chaintsn"
 version = "0.1.0"
 dependencies = [
- "alpen-express-btcio",
  "alpen-express-eectl",
  "alpen-express-primitives",
  "alpen-express-state",
