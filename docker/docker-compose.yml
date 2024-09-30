@@ -41,18 +41,23 @@ services:
       SEQUENCER_RPC: ${RPC_URL:-"ws://0.0.0.0:12332"}
       BTC_ADDRESS: ${BTC_ADDRESS}
       SECRETKEY: ${SECRETKEY}
-      DB_RETRY_COUNT: ${DB_RETRY_COUNT:-5}
+      DB_RETRY_COUNT: ${DB_RETRY_COUNT:-56}
       L2_BLOCKS_FETCH_LIMIT: ${L2_BLOCKS_FETCH_LIMIT:-100}
       L1_FOLLOW_DISTANCE: ${L1_FOLLOW_DISTANCE:-6}
       MAX_REORG_DEPTH: ${MAX_REORG_DEPTH:-4}
       CLIENT_POLL_DUR_MS: ${CLIENT_POLL_DUR_MS:-2000}
       CHECKPOINT_INTERVAL: ${CHECKPOINT_INTERVAL:-20}
       RUST_LOG: ${RUST_LOG:-info}
+      RELAY_REFRESH_INTERVAL: ${RELAY_REFRESH_INTERVAL:-10}
+      RELAY_STALE_DURATION: ${RELAY_STALE_DURATION:-10}
+      RELAY_MISC: ${RELAY_MISC:-true}
     container_name: strata_client
     ports:
       - "${RPC_PORT:-12332}:${RPC_PORT:-12332}"
     volumes:
       - ./data/data-bitcoind:/root/.bitcoin/
+      - ./data/data-sequencer:/app/sequencer/
+
     depends_on:
       - bitcoind
       - reth

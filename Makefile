@@ -7,6 +7,8 @@ BUILD_PATH = "target"
 
 FUNCTIONAL_TESTS_DIR  = functional-tests
 FUNCTIONAL_TESTS_DATADIR = _dd
+DOCKER_DIR = docker
+DOCKER_DATADIR = .data
 
 # Cargo profile for builds. Default is for local builds, CI uses an override.
 PROFILE ?= release
@@ -78,6 +80,20 @@ activate: ensure-poetry ## Activate poetry environment for integration tests.
 .PHONY: clean-dd
 clean-dd: ## Remove the data directory used by functional tests.
 	rm -rf $(FUNCTIONAL_TESTS_DIR)/$(FUNCTIONAL_TESTS_DATADIR) 2>/dev/null
+
+.PHONY: clean-docker-data
+clean-docker-data: ## Remove docker data files inside /docker/.data
+	rm -rf $(DOCKER_DIR)/$(DOCKER_DATADIR) 2>/dev/null
+
+.PHONY: docker-up
+docker-up: ## docker compose up
+	cd $(DOCKER_DIR) && docker compose up -d
+
+.PHONY: docker-down
+docker-down: ## docker compose down
+	cd $(DOCKER_DIR) && docker compose down && \
+	rm -rf $(DOCKER_DIR)/$(DOCKER_DATADIR) 2>/dev/null
+
 
 .PHONY: test-functional
 test-functional: ensure-poetry activate clean-dd ## Runs functional tests.
