@@ -65,7 +65,7 @@ mod test {
                 .expect("Failed to extract public outputs");
             let output: BlockspaceProofOutput = borsh::from_slice(&raw_output).unwrap();
 
-            let _ = prover_input.write_proof(AggregationInput::new(proof, vkey));
+            let _ = prover_input.write_proof_with_vkey(AggregationInput::new(proof, vkey));
             blockspace_outputs.push(output);
         }
 
@@ -165,7 +165,7 @@ mod test {
             .unwrap()
             .write_serialized(&borsh::to_vec(&bootstrap_checkpoint).unwrap())
             .unwrap()
-            .write_proof(l1_batch_proof_input)
+            .write_proof_with_vkey(l1_batch_proof_input)
             .unwrap()
             .build()
             .unwrap();

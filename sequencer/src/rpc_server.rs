@@ -338,7 +338,7 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         }
     }
 
-    async fn get_block_witness_raw(&self, idx: u64) -> RpcResult<Option<RawBlockWitness>> {
+    async fn get_cl_block_witness_raw(&self, idx: u64) -> RpcResult<Option<Vec<u8>>> {
         let blk_manifest_db = self.database.clone();
         let blk_ids: Vec<L2BlockId> = wait_blocking("l2_blockid", move || {
             blk_manifest_db
@@ -373,16 +373,19 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         })
         .await?;
 
-        let raw_chain_state = borsh::to_vec(&chain_state)
-            .map_err(|_| Error::Other("Failed to get raw chain state".to_string()))?;
+        let cl_block_witness = (chain_state, l2_blk_bundle.block());
+        let raw_cl_block_witness = borsh::to_vec(&cl_block_witness)
+            .map_err(|_| Error::Other("Failed to get raw cl block witness".to_string()))?;
 
-        let raw_l2_block = borsh::to_vec(&l2_blk_bundle.block())
-            .map_err(|_| Error::Other("Failed to get raw l2 block".to_string()))?;
+        // use std::{
+        //     fs::File,
+        //     io::{self, Write},
+        // };
+        // let file_path = format!("cl_witness_{:?}", idx);
+        // let mut file = File::create(file_path).unwrap();
+        // file.write_all(&raw_cl_block_witness).unwrap();
 
-        Ok(Some(RawBlockWitness {
-            raw_chain_state,
-            raw_l2_block,
-        }))
+        Ok(Some(raw_cl_block_witness))
     }
 
     async fn get_current_deposits(&self) -> RpcResult<Vec<u32>> {

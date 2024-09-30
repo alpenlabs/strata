@@ -1,6 +1,4 @@
-use express_proofimpl_checkpoint::{
-    self, process_checkpoint_proof, HashedCheckpointState, L2BatchProofOutput,
-};
+use express_proofimpl_checkpoint::{self, process_checkpoint_proof, L2BatchProofOutput};
 use express_proofimpl_l1_batch::logic::L1BatchProofOutput;
 use sha2::{Digest, Sha256};
 use sp1_zkvm::io;
@@ -15,7 +13,7 @@ fn main() {
 
     // TODO: hardcode genesis
     let slice = io::read_vec();
-    let genesis: HashedCheckpointState = borsh::from_slice(&slice).unwrap();
+    // let genesis: HashedCheckpointState = borsh::from_slice(&slice).unwrap();
 
     // verify l1 proof
     // TODO: l1_batch_vk needs to be hardcoded
@@ -26,11 +24,11 @@ fn main() {
 
     // TODO: verify l2 proof
 
-    let (output, prev_checkpoint) = process_checkpoint_proof(&l1_batch, &l2_batch, &genesis);
-    if let Some(prev_checkpoint) = prev_checkpoint {
-        let checkpoint_vk: [u32; 8] = io::read();
-        // verify_prev_checkpoint(&prev_checkpoint.0, &prev_checkpoint.1, checkpoint_vk);
-    }
+    // let (output, prev_checkpoint) = process_checkpoint_proof(&l1_batch, &l2_batch, &genesis);
+    // if let Some(prev_checkpoint) = prev_checkpoint {
+    // let checkpoint_vk: [u32; 8] = io::read();
+    // verify_prev_checkpoint(&prev_checkpoint.0, &prev_checkpoint.1, checkpoint_vk);
+    // }
 
-    io::commit_slice(&borsh::to_vec(&output).unwrap());
+    // io::commit_slice(&borsh::to_vec(&output).unwrap());
 }

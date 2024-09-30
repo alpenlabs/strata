@@ -6,11 +6,24 @@ use alpen_express_primitives::{
     vk::RollupVerifyingKey,
 };
 use express_proofimpl_cl_stf::{verify_and_transition, ChainState, L2Block};
+use express_proofimpl_evm_ee_stf::ELProofPublicParams;
+use sha2::{Digest, Sha256};
+
+mod vks;
 
 fn main() {
     let params = get_rollup_params();
+    let _ = sp1_zkvm::io::read::<[u32; 8]>();
+    let el_vkey = vks::GUEST_EVM_EE_STF_ELF_ID;
+
+    let el_pp = sp1_zkvm::io::read::<Vec<u8>>();
     let input: Vec<u8> = sp1_zkvm::io::read();
     let (prev_state, block): (ChainState, L2Block) = borsh::from_slice(&input).unwrap();
+
+    // Verify the EL proof
+    let public_values_digest = Sha256::digest(&el_pp);
+    sp1_zkvm::lib::verify::verify_sp1_proof(&el_vkey, &public_values_digest.into());
+    let el_pp_deserialized: ELProofPublicParams = bincode::deserialize(&el_pp).unwrap();
 
     let new_state = verify_and_transition(prev_state, block, params);
     sp1_zkvm::io::commit(&borsh::to_vec(&new_state).unwrap());

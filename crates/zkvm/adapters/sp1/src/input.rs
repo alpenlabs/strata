@@ -1,5 +1,5 @@
 use anyhow::Ok;
-use express_zkvm::{AggregationInput, ZKVMInputBuilder};
+use express_zkvm::{AggregationInput, Proof, ZKVMInputBuilder};
 use sp1_sdk::{HashableKey, SP1Proof, SP1ProofWithPublicValues, SP1Stdin, SP1VerifyingKey};
 
 // A wrapper around SP1Stdin
@@ -26,7 +26,7 @@ impl<'a> ZKVMInputBuilder<'a> for SP1ProofInputBuilder {
         Ok(self)
     }
 
-    fn write_proof(&mut self, item: AggregationInput) -> anyhow::Result<&mut Self> {
+    fn write_proof_with_vkey(&mut self, item: AggregationInput) -> anyhow::Result<&mut Self> {
         let proof: SP1ProofWithPublicValues = bincode::deserialize(item.proof().as_bytes())?;
         let vkey: SP1VerifyingKey = bincode::deserialize(item.vk().as_bytes())?;
 
@@ -50,6 +50,10 @@ impl<'a> ZKVMInputBuilder<'a> for SP1ProofInputBuilder {
         }
 
         Ok(self)
+    }
+
+    fn write_proof(&mut self, _item: Proof) -> anyhow::Result<&mut Self> {
+        todo!()
     }
 
     fn build(&mut self) -> anyhow::Result<Self::Input> {

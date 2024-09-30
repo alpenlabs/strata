@@ -1,4 +1,4 @@
-use express_zkvm::ZKVMInputBuilder;
+use express_zkvm::{Proof, ZKVMInputBuilder};
 use risc0_zkvm::{sha::Digest, ExecutorEnv, ExecutorEnvBuilder, Receipt};
 
 pub struct RiscZeroProofInputBuilder<'a>(ExecutorEnvBuilder<'a>);
@@ -28,7 +28,10 @@ impl<'a> ZKVMInputBuilder<'a> for RiscZeroProofInputBuilder<'a> {
         Ok(self)
     }
 
-    fn write_proof(&mut self, item: express_zkvm::AggregationInput) -> anyhow::Result<&mut Self> {
+    fn write_proof_with_vkey(
+        &mut self,
+        item: express_zkvm::AggregationInput,
+    ) -> anyhow::Result<&mut Self> {
         // Learn more about assumption and proof compositions at https://dev.risczero.com/api/zkvm/composition
         let receipt: Receipt = bincode::deserialize(item.proof().as_bytes())?;
         let vk: Digest = bincode::deserialize(item.vk().as_bytes())?;
@@ -40,6 +43,15 @@ impl<'a> ZKVMInputBuilder<'a> for RiscZeroProofInputBuilder<'a> {
         // Note: The vkey is written here so we don't have to hardcode it in guest code.
         // TODO: This should be fixed once the guest code is finalized
         self.0.write(&vk)?;
+        Ok(self)
+    }
+
+    fn write_proof(&mut self, item: Proof) -> anyhow::Result<&mut Self> {
+        let receipt: Receipt = bincode::deserialize(item.as_bytes())?;
+
+        // `add_assumption` makes the receipt to be verified available to the prover.
+        self.0.add_assumption(receipt);
+
         Ok(self)
     }
 

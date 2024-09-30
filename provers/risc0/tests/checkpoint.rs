@@ -67,7 +67,7 @@ mod test {
             let output: BlockspaceProofOutput = borsh::from_slice(&raw_output).unwrap();
 
             prover_input
-                .write_proof(AggregationInput::new(
+                .write_proof_with_vkey(AggregationInput::new(
                     proof,
                     VerificationKey::new(btc_blockspace_elf_id.clone()),
                 ))
@@ -171,7 +171,7 @@ mod test {
             .unwrap()
             .write_serialized(&borsh::to_vec(&bootstrap_checkpoint).unwrap())
             .unwrap()
-            .write_proof(l1_batch_proof_input)
+            .write_proof_with_vkey(l1_batch_proof_input)
             .unwrap()
             .build()
             .unwrap();
