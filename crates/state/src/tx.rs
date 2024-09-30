@@ -1,4 +1,4 @@
-use alpen_express_primitives::l1::OutputRef;
+use alpen_express_primitives::l1::{BitcoinAmount, OutputRef};
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
@@ -16,8 +16,8 @@ pub enum ProtocolOperation {
 
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct DepositInfo {
-    /// amount in satoshis
-    pub amt: u64,
+    /// Bitcoin amount
+    pub amt: BitcoinAmount,
 
     /// outpoint
     pub outpoint: OutputRef,

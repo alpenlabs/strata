@@ -38,6 +38,8 @@ use crate::{buf::Buf32, constants::HASH_SIZE, errors::ParseError};
     Arbitrary,
     BorshDeserialize,
     BorshSerialize,
+    Serialize,
+    Deserialize,
 )]
 pub struct L1TxRef(u64, u32);
 

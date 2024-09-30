@@ -16,15 +16,15 @@ use alpen_express_primitives::{
 };
 use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer, AlpenSequencerApiServer};
 use alpen_express_rpc_types::{
-    errors::RpcServerError as Error, BlockHeader, BridgeDuties, ClientStatus, DaBlob, DepositEntry,
-    DepositState, ExecUpdate, HexBytes, HexBytes32, L1Status, NodeSyncStatus, RawBlockWitness,
-    RpcCheckpointInfo,
+    errors::RpcServerError as Error, BlockHeader, BridgeDuties, ClientStatus, DaBlob, ExecUpdate,
+    HexBytes, HexBytes32, L1Status, NodeSyncStatus, RawBlockWitness, RpcCheckpointInfo,
 };
 use alpen_express_state::{
     batch::BatchCheckpoint,
     block::L2BlockBundle,
     bridge_duties::BridgeDuty,
     bridge_ops::WithdrawalIntent,
+    bridge_state::DepositEntry,
     chain_state::ChainState,
     client_state::ClientState,
     da_blob::{BlobDest, BlobIntent},
@@ -49,7 +49,7 @@ use jsonrpsee::core::RpcResult;
 use tokio::sync::{oneshot, Mutex};
 use tracing::*;
 
-use crate::extractor::extract_deposit_requests;
+use crate::extractor::{extract_deposit_requests, extract_withdrawal_infos};
 
 fn fetch_l2blk<D: Database + Sync + Send + 'static>(
     l2_prov: &Arc<<D as Database>::L2DataProv>,
@@ -403,20 +403,7 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
             .get_deposit(deposit_id)
             .ok_or(Error::UnknownIdx(deposit_id))?;
 
-        let state = match deposit_entry.deposit_state() {
-            alpen_express_state::bridge_state::DepositState::Created(_) => DepositState::Created,
-            alpen_express_state::bridge_state::DepositState::Accepted => DepositState::Accepted,
-            alpen_express_state::bridge_state::DepositState::Dispatched(_) => {
-                DepositState::Dispatched
-            }
-            alpen_express_state::bridge_state::DepositState::Executed => DepositState::Executed,
-        };
-
-        Ok(DepositEntry {
-            deposit_idx: deposit_id,
-            amt: deposit_entry.amt(),
-            state,
-        })
+        Ok(deposit_entry.clone())
     }
 
     async fn sync_status(&self) -> RpcResult<NodeSyncStatus> {
@@ -512,8 +499,12 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
     ) -> RpcResult<BridgeDuties> {
         info!(%operator_idx, %start_index, "received request for bridge duties");
 
-        let l1_db_provider = self.database.l1_provider();
+        // OPTIMIZE: the extraction of deposit and withdrawal duties can happen in parallel as they
+        // depend on independent sources of information. This optimization can be done if this RPC
+        // call takes a lot of time (for example, when there are hundreds of thousands of
+        // deposits/withdrawals).
 
+        let l1_db_provider = self.database.l1_provider();
         let network = self.status_rx.l1.borrow().network;
 
         let (deposit_duties, latest_index) =
@@ -521,8 +512,10 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
 
         let deposit_duties = deposit_duties.map(BridgeDuty::from);
 
-        // TODO: Extract withdrawal duties as well.
-        let withdrawal_duties = vec![];
+        let (_, current_states) = self.get_cur_states().await?;
+        let chain_state = current_states.ok_or(Error::BeforeGenesis)?;
+
+        let withdrawal_duties = extract_withdrawal_infos(&chain_state).map(BridgeDuty::from);
 
         let mut duties = vec![];
         duties.extend(deposit_duties);

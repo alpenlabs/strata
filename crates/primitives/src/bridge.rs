@@ -28,6 +28,9 @@ use crate::{
 /// mathematical operations on it while managing the operator table.
 pub type OperatorIdx = u32;
 
+/// The bitcoin block height that a withdrawal command references.
+pub type BitcoinBlockHeight = u64;
+
 /// A table that maps [`OperatorIdx`] to the corresponding [`PublicKey`].
 ///
 /// We use a [`PublicKey`] instead of an [`bitcoin::secp256k1::XOnlyPublicKey`] for convenience

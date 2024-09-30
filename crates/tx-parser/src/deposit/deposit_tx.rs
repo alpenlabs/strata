@@ -26,7 +26,7 @@ pub fn extract_deposit_info(tx: &Transaction, config: &DepositTxConfig) -> Optio
 
     // Construct and return the DepositInfo
     Some(DepositInfo {
-        amt: output_0.value.to_sat(),
+        amt: output_0.value.into(),
         address: ee_address.to_vec(),
         outpoint: OutputRef::from(prev_out.previous_output),
     })
@@ -103,7 +103,7 @@ mod tests {
         assert!(out.is_some());
         let out = out.unwrap();
 
-        assert_eq!(out.amt, amt.to_sat());
+        assert_eq!(out.amt, amt.into());
         assert_eq!(out.address, ee_addr);
     }
 }

@@ -3,13 +3,16 @@
 //! decide to expand the chain state in the future such that we can't keep it
 //! entire in memory.
 
-use alpen_express_primitives::{bridge::OperatorIdx, buf::Buf32};
+use alpen_express_primitives::{
+    bridge::{BitcoinBlockHeight, OperatorIdx},
+    buf::Buf32,
+};
 use borsh::{BorshDeserialize, BorshSerialize};
 use tracing::*;
 
 use crate::{
     bridge_ops::DepositIntent,
-    bridge_state::{BitcoinBlockHeight, DepositState, DispatchCommand, DispatchedState},
+    bridge_state::{DepositState, DispatchCommand, DispatchedState},
     chain_state::ChainState,
     header::L2Header,
     id::L2BlockId,
@@ -138,7 +141,7 @@ fn apply_op_to_chainstate(op: &StateOp, state: &mut ChainState) {
             let (_, deposit_txs, _) = matured_block.into_parts();
             for tx in deposit_txs {
                 if let Deposit(deposit_info) = tx.tx().protocol_operation() {
-                    println!("we got some deposit_txs");
+                    trace!("we got some deposit_txs");
                     let amt = deposit_info.amt;
                     let deposit_intent = DepositIntent::new(amt, &deposit_info.address);
                     deposits.push_back(deposit_intent);

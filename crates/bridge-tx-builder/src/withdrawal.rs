@@ -1,7 +1,7 @@
 //! Provides types/traits associated with the withdrawal process.
 
 use alpen_express_primitives::{
-    bridge::{OperatorIdx, TxSigningData},
+    bridge::{BitcoinBlockHeight, OperatorIdx, TxSigningData},
     l1::{BitcoinPsbt, TaprootSpendPath, XOnlyPk},
 };
 use bitcoin::{Amount, FeeRate, OutPoint, Psbt, Transaction, TxOut};
@@ -21,7 +21,7 @@ use crate::{
 ///
 /// It has all the information required to create a transaction for fulfilling a user's withdrawal
 /// request and pay operator fees.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CooperativeWithdrawalInfo {
     /// The [`OutPoint`] of the UTXO in the Bridge Address that is to be used to service the
     /// withdrawal request.
@@ -33,6 +33,12 @@ pub struct CooperativeWithdrawalInfo {
 
     /// The index of the operator that is assigned the withdrawal.
     assigned_operator_idx: OperatorIdx,
+
+    /// The bitcoin block height before which the withdrawal has to be processed.
+    ///
+    /// Any withdrawal request whose `exec_deadline` is before the current bitcoin block height is
+    /// considered stale and must be ignored.
+    exec_deadline: BitcoinBlockHeight,
 }
 
 impl TxKind for CooperativeWithdrawalInfo {
@@ -65,12 +71,19 @@ impl CooperativeWithdrawalInfo {
         deposit_outpoint: OutPoint,
         user_pk: XOnlyPk,
         assigned_operator_idx: OperatorIdx,
+        exec_deadline: BitcoinBlockHeight,
     ) -> Self {
         Self {
             deposit_outpoint,
             user_pk,
             assigned_operator_idx,
+            exec_deadline,
         }
+    }
+
+    /// Check if the passed bitcoin block height is greater than the deadline for the withdrawal.
+    pub fn is_expired_at(&self, block_height: BitcoinBlockHeight) -> bool {
+        self.exec_deadline < block_height
     }
 
     fn create_prevout<T: BuildContext>(&self, build_context: &T) -> BridgeTxBuilderResult<TxOut> {
@@ -195,7 +208,7 @@ mod tests {
         let assigned_operator_idx = assigned_operator_idx as OperatorIdx;
 
         let withdrawal_info =
-            CooperativeWithdrawalInfo::new(deposit_outpoint, user_pk, assigned_operator_idx);
+            CooperativeWithdrawalInfo::new(deposit_outpoint, user_pk, assigned_operator_idx, 0);
 
         let build_context = TxBuildContext::new(
             Network::Regtest,
@@ -255,6 +268,7 @@ mod tests {
             deposit_outpoint,
             invalid_user_pk,
             assigned_operator_idx,
+            0,
         );
 
         let build_context =
@@ -293,7 +307,7 @@ mod tests {
         let assigned_operator_idx = assigned_operator_idx as OperatorIdx;
 
         let withdrawal_info =
-            CooperativeWithdrawalInfo::new(deposit_outpoint, user_pk, assigned_operator_idx);
+            CooperativeWithdrawalInfo::new(deposit_outpoint, user_pk, assigned_operator_idx, 0);
 
         let build_context =
             TxBuildContext::new(Network::Regtest, pubkey_table, assigned_operator_idx);
@@ -334,7 +348,7 @@ mod tests {
         let assigned_operator_idx = assigned_operator_idx as OperatorIdx;
 
         let withdrawal_info =
-            CooperativeWithdrawalInfo::new(deposit_outpoint, user_pk, assigned_operator_idx);
+            CooperativeWithdrawalInfo::new(deposit_outpoint, user_pk, assigned_operator_idx, 0);
 
         let build_context =
             TxBuildContext::new(Network::Regtest, pubkey_table, assigned_operator_idx);
