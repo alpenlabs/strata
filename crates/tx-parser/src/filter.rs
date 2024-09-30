@@ -79,6 +79,7 @@ mod test {
     use alpen_express_btcio::test_utils::{
         build_reveal_transaction_test, generate_inscription_script_test,
     };
+    use alpen_express_primitives::l1::BitcoinAmount;
     use alpen_express_state::{
         batch::SignedBatchCheckpoint,
         tx::{InscriptionData, ProtocolOperation},
@@ -266,7 +267,8 @@ mod test {
         if let ProtocolOperation::Deposit(deposit_info) = &result[0].proto_op() {
             assert_eq!(deposit_info.address, ee_addr, "EE address should match");
             assert_eq!(
-                deposit_info.amt, config.deposit_quantity,
+                deposit_info.amt,
+                BitcoinAmount::from_sat(config.deposit_quantity),
                 "Deposit amount should match"
             );
         } else {
@@ -389,7 +391,8 @@ mod test {
                     i
                 );
                 assert_eq!(
-                    deposit_info.amt, config.deposit_quantity,
+                    deposit_info.amt,
+                    BitcoinAmount::from_sat(config.deposit_quantity),
                     "Deposit amount should match for transaction {}",
                     i
                 );

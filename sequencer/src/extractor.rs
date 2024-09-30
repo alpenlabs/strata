@@ -12,12 +12,14 @@ use std::sync::Arc;
 use alpen_express_db::traits::L1DataProvider;
 use alpen_express_primitives::l1::BitcoinAddress;
 use alpen_express_rpc_types::RpcServerError;
-use alpen_express_state::tx::ProtocolOperation;
+use alpen_express_state::{
+    bridge_state::DepositState, chain_state::ChainState, tx::ProtocolOperation,
+};
 use bitcoin::{
     consensus::Decodable, hashes::Hash, params::Params, Address, Amount, Network, OutPoint,
     TapNodeHash, Transaction,
 };
-use express_bridge_tx_builder::prelude::DepositInfo;
+use express_bridge_tx_builder::prelude::{CooperativeWithdrawalInfo, DepositInfo};
 use jsonrpsee::core::RpcResult;
 use tracing::{debug, error};
 
@@ -134,6 +136,47 @@ pub(super) async fn extract_deposit_requests<Provider: L1DataProvider>(
     Ok((deposit_info_iter, latest_idx))
 }
 
+/// Extract the withdrawal duties from the chain state.
+///
+/// This can be expensive if the chain state has a lot of deposits.
+///
+/// As this is an internal API, it does need an
+/// [`OperatorIdx`](alpen_express_primitives::bridge::OperatorIdx) to be passed in as a withdrawal
+/// duty is relevant for all operators for now.
+pub(super) fn extract_withdrawal_infos(
+    chain_state: &Arc<ChainState>,
+) -> impl Iterator<Item = CooperativeWithdrawalInfo> + '_ {
+    let deposits_table = chain_state.deposits_table();
+    let deposits = deposits_table.deposits();
+
+    let withdrawal_infos = deposits.filter_map(|deposit| {
+        if let DepositState::Dispatched(dispatched_state) = deposit.deposit_state() {
+            let deposit_outpoint = deposit.output().outpoint();
+            let user_pk = dispatched_state
+                .cmd()
+                .withdraw_outputs()
+                .first()
+                .expect("there should be a withdraw output in a dispatched deposit")
+                .dest_addr();
+            let assigned_operator_idx = dispatched_state.assignee();
+            let exec_deadline = dispatched_state.exec_deadline();
+
+            let withdrawal_info = CooperativeWithdrawalInfo::new(
+                *deposit_outpoint,
+                *user_pk,
+                assigned_operator_idx,
+                exec_deadline,
+            );
+
+            return Some(withdrawal_info);
+        }
+
+        None
+    });
+
+    withdrawal_infos
+}
+
 #[cfg(test)]
 mod tests {
     use std::ops::Not;
@@ -141,9 +184,24 @@ mod tests {
     use alpen_express_common::logging;
     use alpen_express_db::traits::L1DataStore;
     use alpen_express_mmr::CompactMmr;
-    use alpen_express_primitives::l1::{BitcoinAmount, L1BlockManifest, L1TxProof, OutputRef};
+    use alpen_express_primitives::{
+        bridge::OperatorIdx,
+        buf::Buf32,
+        l1::{BitcoinAmount, L1BlockManifest, L1TxProof, OutputRef, XOnlyPk},
+    };
     use alpen_express_rocksdb::{test_utils::get_rocksdb_tmp_instance, L1Db};
-    use alpen_express_state::{l1::L1Tx, tx::DepositRequestInfo};
+    use alpen_express_state::{
+        bridge_state::{
+            DepositEntry, DepositsTable, DispatchCommand, DispatchedState, OperatorTable,
+            WithdrawOutput,
+        },
+        exec_env::ExecEnvState,
+        exec_update::UpdateInput,
+        genesis::GenesisStateData,
+        id::L2BlockId,
+        l1::{L1BlockId, L1HeaderRecord, L1Tx, L1ViewState},
+        tx::DepositRequestInfo,
+    };
     use alpen_test_utils::{bridge::generate_mock_unsigned_tx, ArbitraryGenerator};
     use bitcoin::{
         absolute::LockTime,
@@ -221,6 +279,49 @@ mod tests {
             actual_deposit_infos.len().eq(&1),
             "there should be a known deposit info in the list"
         );
+    }
+
+    #[test]
+    fn test_extract_withdrawal_infos() {
+        let num_deposits = 10;
+        let (chain_state, num_withdrawals, needle) =
+            generate_empty_chain_state_with_deposits(num_deposits);
+        let chain_state = Arc::new(chain_state);
+
+        let withdrawal_infos =
+            extract_withdrawal_infos(&chain_state).collect::<Vec<CooperativeWithdrawalInfo>>();
+
+        assert_eq!(
+            withdrawal_infos.len(),
+            num_withdrawals,
+            "number of withdrawals generated and extracted must be the same"
+        );
+
+        let deposit_state = needle.deposit_state();
+        if let DepositState::Dispatched(dispatched_state) = deposit_state {
+            let withdraw_output = dispatched_state
+                .cmd()
+                .withdraw_outputs()
+                .first()
+                .expect("should have at least one `WithdrawOutput");
+            let user_pk = withdraw_output.dest_addr();
+
+            let expected_info = CooperativeWithdrawalInfo::new(
+                *needle.output().outpoint(),
+                *user_pk,
+                dispatched_state.assignee(),
+                dispatched_state.exec_deadline(),
+            );
+
+            assert!(
+                withdrawal_infos
+                    .into_iter()
+                    .any(|info| info == expected_info),
+                "should be able to find the expected withdrawal info in the list of withdrawal infos"
+            );
+        } else {
+            unreachable!("needle must be in dispatched state");
+        }
     }
 
     /// Populates the db with block data.
@@ -433,5 +534,106 @@ mod tests {
         let deposit_request = ProtocolOperation::DepositRequest(deposit_request_info);
 
         (raw_tx, deposit_request)
+    }
+
+    /// Generate a random chain state with some dispatched deposits.
+    ///
+    /// # Returns
+    ///
+    /// A tuple containing:
+    ///
+    /// * a random empty chain state with some deposits.
+    /// * the number of deposits currently dispatched (which is nearly half of all the deposits).
+    /// * a random [`DepositEntry`] that has been dispatched.
+    fn generate_empty_chain_state_with_deposits(
+        num_deposits: usize,
+    ) -> (ChainState, usize, DepositEntry) {
+        let l1_block_id = L1BlockId::from(Buf32::zero());
+        let safe_block = L1HeaderRecord::new(l1_block_id, vec![], Buf32::zero());
+        let l1_state = L1ViewState::new_at_horizon(0, safe_block);
+
+        let operator_table = OperatorTable::new_empty();
+
+        let base_input = UpdateInput::new(0, vec![], Buf32::zero(), vec![]);
+        let exec_state = ExecEnvState::from_base_input(base_input, Buf32::zero());
+
+        let l2_block_id = L2BlockId::from(Buf32::zero());
+        let gdata = GenesisStateData::new(l2_block_id, l1_state, operator_table, exec_state);
+
+        let mut empty_chain_state = ChainState::from_genesis(&gdata);
+
+        let empty_deposits = empty_chain_state.deposits_table_mut();
+        let mut deposits_table = DepositsTable::new_empty();
+
+        let arb = ArbitraryGenerator::new();
+
+        let mut operators: Vec<OperatorIdx> = arb.generate();
+        loop {
+            if operators.is_empty() {
+                operators = arb.generate();
+                continue;
+            }
+
+            break;
+        }
+
+        let mut rng = rand::thread_rng();
+
+        let random_assignee = rng.gen_range(0..operators.len());
+        let random_assignee = operators[random_assignee];
+
+        let mut dispatched_deposits = vec![];
+        let mut num_dispatched = 0;
+
+        for _ in 0..num_deposits {
+            let tx_ref: OutputRef = arb.generate();
+            let amt: BitcoinAmount = arb.generate();
+
+            deposits_table.add_deposits(&tx_ref, &operators, amt);
+
+            // dispatch about half of the deposits
+            let should_dispatch = rng.gen_bool(0.5);
+            if should_dispatch.not() {
+                continue;
+            }
+
+            num_dispatched += 1;
+
+            let random_buf: Buf32 = arb.generate();
+            let dest_addr = XOnlyPk::new(random_buf);
+
+            let dispatched_state = DepositState::Dispatched(DispatchedState::new(
+                DispatchCommand::new(vec![WithdrawOutput::new(dest_addr, amt)]),
+                random_assignee,
+                0,
+            ));
+
+            let cur_idx = deposits_table.next_idx() - 1;
+            let entry = deposits_table.get_deposit_mut(cur_idx).unwrap();
+
+            entry.set_state(dispatched_state);
+
+            dispatched_deposits.push(entry.idx());
+        }
+
+        assert!(
+            dispatched_deposits.is_empty().not(),
+            "some deposits should have been randomly dispatched"
+        );
+
+        let needle_index = rand::thread_rng().gen_range(0..dispatched_deposits.len());
+
+        let needle = dispatched_deposits
+            .get(needle_index)
+            .expect("at least one dispatched duty must be present");
+
+        let needle = deposits_table
+            .get_deposit(*needle)
+            .expect("deposit entry must exist at index")
+            .clone();
+
+        *empty_deposits = deposits_table;
+
+        (empty_chain_state, num_dispatched, needle)
     }
 }

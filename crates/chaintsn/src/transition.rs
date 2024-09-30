@@ -351,7 +351,7 @@ fn next_rand_op_pos(rng: &mut SlotRng, num: u32) -> u32 {
 
 #[cfg(test)]
 mod tests {
-    use alpen_express_primitives::{buf::Buf32, params::OperatorConfig};
+    use alpen_express_primitives::{buf::Buf32, l1::BitcoinAmount, params::OperatorConfig};
     use alpen_express_state::{
         block::{ExecSegment, L1Segment, L2BlockBody},
         bridge_state::OperatorTable,
@@ -381,7 +381,7 @@ mod tests {
         let maturation_queue = header_record.maturation_queue();
 
         let mut state_cache = StateCache::new(chs);
-        let amt = 100_000_000_000;
+        let amt: BitcoinAmount = ArbitraryGenerator::new().generate();
 
         let new_payloads_with_deposit_update_tx: Vec<L1HeaderPayload> =
             (1..=params.rollup().l1_reorg_safe_depth + 1)

@@ -4,16 +4,13 @@
 //! extended to a more sophisticated design when we have that specced out.
 
 use alpen_express_primitives::{
-    bridge::OperatorIdx,
+    bridge::{BitcoinBlockHeight, OperatorIdx},
     buf::Buf32,
     l1::{self, BitcoinAmount, OutputRef, XOnlyPk},
     operator::{OperatorKeyProvider, OperatorPubkeys},
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
-
-/// The bitcoin block height that a withdrawal command references.
-pub type BitcoinBlockHeight = u64;
 
 /// Entry for an operator.
 ///
@@ -260,7 +257,7 @@ impl DepositsTable {
         self.deposits.get(pos as usize)
     }
 
-    pub fn add_deposits(&mut self, tx_ref: &OutputRef, operators: &[u32], amt: u64) {
+    pub fn add_deposits(&mut self, tx_ref: &OutputRef, operators: &[u32], amt: BitcoinAmount) {
         // TODO: work out what we want to do with pending update transaction
         let deposit_entry = DepositEntry::new(self.next_idx(), tx_ref, operators, amt, Vec::new());
 
@@ -271,10 +268,14 @@ impl DepositsTable {
     pub fn next_idx(&self) -> u32 {
         self.next_idx
     }
+
+    pub fn deposits(&self) -> impl Iterator<Item = &DepositEntry> {
+        self.deposits.iter()
+    }
 }
 
 /// Container for the state machine of a deposit factory.
-#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
+#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
 pub struct DepositEntry {
     deposit_idx: u32,
 
@@ -285,8 +286,8 @@ pub struct DepositEntry {
     // TODO convert this to a windowed bitmap or something
     notary_operators: Vec<OperatorIdx>,
 
-    /// Deposit amount, in the native asset.  For Bitcoin this is sats.
-    amt: u64,
+    /// Deposit amount, in the native asset.
+    amt: BitcoinAmount,
 
     /// Refs to txs in the maturation queue that will update the deposit entry
     /// when they mature.  This is here so that we don't have to scan a
@@ -309,7 +310,7 @@ impl DepositEntry {
         idx: u32,
         output: &OutputRef,
         operators: &[OperatorIdx],
-        amt: u64,
+        amt: BitcoinAmount,
         pending_update_txs: Vec<l1::L1TxRef>,
     ) -> Self {
         Self {
@@ -346,8 +347,12 @@ impl DepositEntry {
         &mut self.state
     }
 
-    pub fn amt(&self) -> u64 {
+    pub fn amt(&self) -> BitcoinAmount {
         self.amt
+    }
+
+    pub fn output(&self) -> &OutputRef {
+        &self.output
     }
 
     pub fn set_state(&mut self, new_state: DepositState) {
@@ -355,7 +360,8 @@ impl DepositEntry {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
+#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum DepositState {
     /// Deposit utxo has been recognized.
     Created(CreatedState),
@@ -376,7 +382,7 @@ pub struct CreatedState {
     dest_ident: Vec<u8>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
+#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
 pub struct DispatchedState {
     /// Configuration for outputs to be written to.
     cmd: DispatchCommand,
@@ -431,7 +437,13 @@ impl DispatchedState {
 /// outputs we're trying to withdraw to.
 ///
 /// May also include future information to deal with fee accounting.
-#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
+///
+/// # Note
+///
+/// This is mostly here in order to support withdrawal batching (i.e., sub-denomination withdrawal
+/// amounts that can be batched and then serviced together). At the moment, the underlying `Vec` of
+/// [`WithdrawOutput`] always has a single element.
+#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
 pub struct DispatchCommand {
     /// The table of withdrawal outputs.
     withdraw_outputs: Vec<WithdrawOutput>,
@@ -449,6 +461,7 @@ impl DispatchCommand {
 
 /// An output constructed from [`crate::bridge_ops::WithdrawalIntent`].
 #[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub struct WithdrawOutput {
     /// Taproot Schnorr XOnlyPubkey with the merkle root information.
     dest_addr: XOnlyPk,
@@ -460,5 +473,9 @@ pub struct WithdrawOutput {
 impl WithdrawOutput {
     pub fn new(dest_addr: XOnlyPk, amt: BitcoinAmount) -> Self {
         Self { dest_addr, amt }
+    }
+
+    pub fn dest_addr(&self) -> &XOnlyPk {
+        &self.dest_addr
     }
 }

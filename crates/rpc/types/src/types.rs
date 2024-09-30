@@ -178,27 +178,6 @@ pub struct ExecUpdate {
     pub da_blobs: Vec<DaBlob>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum DepositState {
-    Created,
-    Accepted,
-    Dispatched,
-    Executed,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct DepositEntry {
-    /// The index of the deposit, used to identify or track the deposit within the system.
-    pub deposit_idx: u32,
-
-    /// The amount of currency deposited.
-    pub amt: u64,
-
-    /// Deposit state.
-    pub state: DepositState,
-}
-
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct NodeSyncStatus {
     /// Current head L2 slot known to this node
