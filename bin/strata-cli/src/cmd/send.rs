@@ -9,7 +9,7 @@ use alloy::{
 use argh::FromArgs;
 use bdk_wallet::bitcoin::{hashes::Hash, Address, Amount};
 use console::Term;
-use hex::encode;
+use shrex::encode;
 
 use crate::{
     rollup::RollupWallet,

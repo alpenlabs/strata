@@ -4,12 +4,12 @@ use alloy::{primitives::Address as RollupAddress, providers::WalletProvider};
 use argh::FromArgs;
 use bdk_wallet::{bitcoin::Address, KeychainKind};
 use console::Term;
-use hex::{encode, Hex};
 use indicatif::ProgressBar;
 use rand::{distributions::uniform::SampleRange, thread_rng};
 use reqwest::{StatusCode, Url};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use shrex::{encode, Hex};
 
 use crate::{rollup::RollupWallet, seed::Seed, settings::Settings, signet::SignetWallet};
 

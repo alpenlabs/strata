@@ -10,8 +10,8 @@ use alloy::primitives::Address as RollupAddress;
 use bdk_wallet::bitcoin::{Network, XOnlyPublicKey};
 use config::Config;
 use directories::ProjectDirs;
-use hex::decode;
 use serde::{Deserialize, Serialize};
+use shrex::decode;
 use terrors::OneOf;
 
 #[derive(Serialize, Deserialize)]

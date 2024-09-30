@@ -5,7 +5,7 @@ use bdk_wallet::bitcoin::{
     secp256k1::{PublicKey, SecretKey},
     Amount, XOnlyPublicKey,
 };
-use hex::hex;
+use shrex::hex;
 
 /// Number of blocks after bridge in transaction confirmation that the recovery path can be spent.
 pub const RECOVER_DELAY: u32 = 1008;
@@ -61,7 +61,7 @@ pub static UNSPENDABLE: LazyLock<XOnlyPublicKey> = LazyLock::new(|| {
 #[cfg(test)]
 mod tests {
     use bdk_wallet::bitcoin::XOnlyPublicKey;
-    use hex::hex;
+    use shrex::hex;
 
     use super::UNSPENDABLE;
     #[test]

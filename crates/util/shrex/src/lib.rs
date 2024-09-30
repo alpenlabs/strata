@@ -28,7 +28,7 @@ macro_rules! hex {
         let mut buf = [0u8; BUF_LEN];
 
         // Decode the hex string into the buffer
-        match ::hex::decode(HEX_LITERAL, &mut buf) {
+        match ::shrex::decode(HEX_LITERAL, &mut buf) {
             Ok(_) => buf,
             Err(e) => panic!("Failed to decode hex literal: {:?}", e),
         }
