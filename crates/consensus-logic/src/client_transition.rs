@@ -1,6 +1,8 @@
 //! Core state transition function.
 #![allow(unused)] // still under development
 
+use std::cmp::min;
+
 use alpen_express_db::traits::{
     ChainstateProvider, Database, L1DataProvider, L2DataProvider, L2DataStore,
 };
@@ -192,8 +194,14 @@ pub fn process_event<D: Database>(
 
             if chs_last_buried > cls_last_buried {
                 // can bury till last matured block in chainstate
-                // FIXME: if client state blocks count < chs_last_buried ?
-                writes.push(ClientStateWrite::UpdateBuried(chs_last_buried));
+                // FIXME: this logic is not necessary for fullnode.
+                // Need to refactor this part for block builder only.
+                let client_state_bury_height = min(
+                    chs_last_buried,
+                    // keep atleast 1 item
+                    state.l1_view().tip_height().saturating_sub(1),
+                );
+                writes.push(ClientStateWrite::UpdateBuried(client_state_bury_height));
             }
 
             // TODO better checks here
