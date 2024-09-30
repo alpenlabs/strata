@@ -14,6 +14,43 @@ pub(crate) struct Cli {
         description = "what mode to run the client in, either Operator (alias: op) or Challenger (alias: ch)"
     )]
     pub mode: String,
+
+    #[argh(positional, description = "url for the bitcoin RPC client")]
+    pub btc_url: String,
+
+    #[argh(positional, description = "username for the bitcoin RPC client")]
+    pub btc_user: String,
+
+    #[argh(positional, description = "password for the bitcoin RPC client")]
+    pub btc_pass: String,
+
+    #[argh(positional, description = "url for the rollup RPC client")]
+    pub rollup_url: String,
+
+    #[argh(
+        option,
+        description = "bridge duty polling interval in milliseconds (default: rollup block time according to the rollup RPC client)"
+    )]
+    pub duty_interval: Option<u64>, // default: same as rollup block time
+
+    #[argh(
+        option,
+        description = "bridge message polling interval in milliseconds (default: half of the block time according to the rollup RPC client)"
+    )]
+    #[allow(dead_code)] // FIXME: the bridge client also needs to pool for messages
+    pub message_interval: Option<u64>, // default: half value of duty
+
+    #[argh(
+        option,
+        description = "path to the directory where to store the rocksdb databases (default: $HOME/.local/share/strata/)"
+    )]
+    pub data_dir: Option<String>,
+
+    #[argh(
+        option,
+        description = "retry count for the rocksdb database (default = 3)"
+    )]
+    pub retry_count: Option<u16>,
 }
 
 #[derive(Debug, Clone)]
