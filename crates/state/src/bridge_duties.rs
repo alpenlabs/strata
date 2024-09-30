@@ -42,10 +42,18 @@ impl From<CooperativeWithdrawalInfo> for BridgeDuty {
 
 /// The various states a bridge duty may be in.
 ///
-/// The state transtion looks as follows:
+/// The full state transition looks as follows:
 ///
 /// `Received` --|`CollectingNonces`|--> `CollectedNonces` --|`CollectingPartialSigs`|-->
 /// `CollectedSignatures` --|`Broadcasting`|--> `Executed`.
+///
+/// # Note
+///
+/// This type does not dictate the exact state transition path. A transition from `Received` to
+/// `Executed` is perfectly valid to allow for maximum flexibility.
+// TODO: use a typestate pattern with a `next` method that does the state transition. This can
+// be left as is to allow for flexible level of granularity. For example, one could just have
+// `Received`, `CollectedSignatures` and `Executed`.
 #[derive(
     Debug, Clone, PartialEq, Eq, Arbitrary, Serialize, Deserialize, BorshSerialize, BorshDeserialize,
 )]

@@ -143,9 +143,9 @@ impl BridgeDutyIndexDatabase for BridgeDutyIndexRocksDb {
 #[cfg(test)]
 mod tests {
     use alpen_express_db::traits::BridgeTxDatabase;
-    use arbitrary::{Arbitrary, Unstructured};
     use alpen_express_primitives::l1::BitcoinTxid;
     use alpen_test_utils::ArbitraryGenerator;
+    use arbitrary::{Arbitrary, Unstructured};
 
     use super::*;
     use crate::test_utils::get_rocksdb_tmp_instance;

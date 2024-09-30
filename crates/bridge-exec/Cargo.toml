@@ -16,11 +16,9 @@ rustdoc.all = "warn"
 alpen-express-btcio = { workspace = true }
 alpen-express-primitives = { workspace = true }
 alpen-express-rpc-api = { workspace = true, features = ["client"] }
-alpen-express-state = { workspace = true }
 express-bridge-sig-manager = { workspace = true }
 express-bridge-tx-builder = { workspace = true }
 
-async-trait = { workspace = true }
 bitcoin = { workspace = true, features = ["rand-std"] }
 format_serde_error = { workspace = true }
 jsonrpsee = { workspace = true }
