@@ -10,19 +10,19 @@ path = "src/main.rs"
 [dependencies]
 aes-gcm-siv = "0.11.1"
 alloy = { version = "0.3.5", features = [
-    "std",
-    "rpc-client-ws",
-    "network",
-    "signers",
-    "signer-local",
-    "providers",
-    "rpc-types",
+  "std",
+  "rpc-client-ws",
+  "network",
+  "signers",
+  "signer-local",
+  "providers",
+  "rpc-types",
 ] }
 argh = { workspace = true }
 argon2 = "0.5.3"
 bdk_esplora = { version = "0.18.0", features = [
-    "async-https",
-    "async-https-rustls",
+  "async-https",
+  "async-https-rustls",
 ], default-features = false }
 bdk_wallet = { version = "1.0.0-beta.4", features = ["rusqlite"] }
 bip39 = { version = "2.0.0", features = ["all-languages"] }
@@ -32,7 +32,7 @@ dialoguer = "0.11.0"
 directories = "5.0.1"
 express-bridge-tx-builder = { workspace = true }
 hex = { version = "0.1.0", path = "../../crates/util/hex", features = [
-    "serde",
+  "serde",
 ] }
 indicatif = { version = "0.17.8", features = ["improved_unicode", "tokio"] }
 rand = { workspace = true }
@@ -48,10 +48,10 @@ sha2 = { version = "0.10.8", features = ["asm", "loongarch64_asm"] }
 
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
 keyring = { version = "3.3.0", default-features = false, features = [
-    "apple-native",
+  "apple-native",
 ] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 keyring = { version = "3.3.0", default-features = false, features = [
-    "windows-native",
+  "windows-native",
 ] }
