@@ -129,7 +129,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         pool,
         &runtime,
         &config,
-        params,
+        params.clone(),
         database,
         l2_block_manager,
         checkpoint_manager,
@@ -146,6 +146,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
                 ctx.pool.clone(),
                 &executor,
                 ctx.bitcoin_client.clone(),
+                params.clone(),
             );
             let seq_db = init_sequencer_database(rbdb.clone(), ops_config);
 
@@ -384,12 +385,14 @@ fn start_broadcaster_tasks(
     pool: threadpool::ThreadPool,
     executor: &TaskExecutor,
     bitcoin_client: Arc<BitcoinClient>,
+    params: Arc<Params>,
 ) -> Arc<L1BroadcastHandle> {
     // Set up L1 broadcaster.
     let broadcast_ctx = express_storage::ops::l1tx_broadcast::Context::new(broadcast_database);
     let broadcast_ops = Arc::new(broadcast_ctx.into_ops(pool));
     // start broadcast task
-    let broadcast_handle = spawn_broadcaster_task(executor, bitcoin_client.clone(), broadcast_ops);
+    let broadcast_handle =
+        spawn_broadcaster_task(executor, bitcoin_client.clone(), broadcast_ops, params);
     Arc::new(broadcast_handle)
 }
 

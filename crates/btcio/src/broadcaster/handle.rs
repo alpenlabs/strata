@@ -4,7 +4,7 @@ use alpen_express_db::{
     types::{L1TxEntry, L1TxStatus},
     DbResult,
 };
-use alpen_express_primitives::buf::Buf32;
+use alpen_express_primitives::{buf::Buf32, params::Params};
 use express_storage::BroadcastDbOps;
 use express_tasks::TaskExecutor;
 use tokio::sync::mpsc;
@@ -55,6 +55,7 @@ pub fn spawn_broadcaster_task<T>(
     executor: &TaskExecutor,
     l1_rpc_client: Arc<T>,
     broadcast_ops: Arc<BroadcastDbOps>,
+    params: Arc<Params>,
 ) -> L1BroadcastHandle
 where
     T: Reader + Broadcaster + Wallet + Signer + Send + Sync + 'static,
@@ -62,7 +63,7 @@ where
     let (broadcast_entry_tx, broadcast_entry_rx) = mpsc::channel::<(u64, L1TxEntry)>(64);
     let ops = broadcast_ops.clone();
     executor.spawn_critical_async("l1_broadcaster_task", async move {
-        broadcaster_task(l1_rpc_client, ops, broadcast_entry_rx)
+        broadcaster_task(l1_rpc_client, ops, broadcast_entry_rx, params)
             .await
             .map_err(Into::into)
     });

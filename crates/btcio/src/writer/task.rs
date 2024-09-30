@@ -18,9 +18,6 @@ use crate::{
     writer::{builder::InscriptionError, signer::create_and_sign_blob_inscriptions},
 };
 
-// TODO: from config
-const FINALITY_DEPTH: u64 = 6;
-
 /// A handle to the Inscription task.
 pub struct InscriptionHandle {
     ops: Arc<InscriptionDataOps>,
