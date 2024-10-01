@@ -7650,6 +7650,7 @@ checksum = "e296cf87e61c9cfc1a61c3c63a0f7f286ed4554e0e22be84e8a38e1d264a2a29"
 name = "op-cli"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "argh",
  "bech32 0.11.0",
  "bitcoin",

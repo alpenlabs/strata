@@ -1,3 +1,6 @@
+use std::path::PathBuf;
+
+use argh::FromArgs;
 use bech32::{Bech32m, EncodeError, Hrp};
 use bitcoin::{
     bip32::{ChildNumber, DerivationPath, Xpriv, Xpub},
@@ -5,11 +8,102 @@ use bitcoin::{
     secp256k1::All,
     Network,
 };
-use rand::{thread_rng, Rng};
+use rand::{rngs::OsRng, thread_rng, Rng};
 
 const NETWORK: Network = Network::Signet;
 
+/// Args.
+#[derive(FromArgs)]
+pub struct Args {
+    #[argh(option, description = "network name [signet, regtest]", short = 'b')]
+    bitcoin_network: Option<String>,
+
+    #[argh(subcommand)]
+    subc: Subcommand,
+}
+
+#[derive(FromArgs, PartialEq, Debug)]
+#[argh(subcommand)]
+pub enum Subcommand {
+    GenSeqPubkey(SubcGenSeqPubkey),
+    GenOpXpub(SubcGenOpXpub),
+    GenParams(SubcGenParams),
+}
+
+/// Generate the sequencer pubkey to pass around.
+#[derive(FromArgs, PartialEq, Debug)]
+#[argh(subcommand, name = "genseqpubkey")]
+pub struct SubcGenSeqPubkey {
+    #[argh(option, description = "reads key from specified file", short = 'f')]
+    key_file: Option<PathBuf>,
+
+    #[argh(
+        switch,
+        description = "reads key from envvar STRATA_SEQ_KEY",
+        short = 'E'
+    )]
+    key_from_env: bool,
+}
+
+/// Generate operator xpub to pass around.
+#[derive(FromArgs, PartialEq, Debug)]
+#[argh(subcommand, name = "genopxpub")]
+pub struct SubcGenOpXpub {
+    #[argh(option, description = "reads key from specified file", short = 'f')]
+    key_file: Option<PathBuf>,
+
+    #[argh(
+        switch,
+        description = "reads key from envvar STRATA_OP_KEY",
+        short = 'E'
+    )]
+    key_from_env: bool,
+}
+
+/// Generate a network's param file from inputs.
+#[derive(FromArgs, PartialEq, Debug)]
+#[argh(subcommand, name = "genparams")]
+pub struct SubcGenParams {
+    #[argh(option, description = "network name (default random)", short = 'n')]
+    name: Option<String>,
+
+    #[argh(option, description = "output file path .json (default network name)")]
+    output: Option<PathBuf>,
+
+    #[argh(option, description = "sequencer pubkey")]
+    seqkey: Option<String>,
+
+    #[argh(option, description = "add an operator key (must be at least one)")]
+    opkey: Vec<String>,
+
+    #[argh(option, description = "read operator keys by line from file")]
+    opkeys: Option<PathBuf>,
+}
+
+pub struct Context {
+    /// Resolved datadir for the network.
+    datadir: PathBuf,
+
+    /// The network we're using.
+    network: Network,
+
+    /// Shared RNG, just `OsRng` for now.
+    rng: OsRng,
+}
+
 fn main() {
+    let args: Args = argh::from_env();
+
+    let mut ctx = Context {
+        datadir: PathBuf::from("."),
+        network: resolve_network(args.bitcoin_network.as_ref().map(|s| s.as_str())),
+        rng: OsRng,
+    };
+
+    if let Err(e) = exec_subc(args.subc, &mut ctx) {
+        panic!("{e} {e:?}")
+    }
+
     let secp = Secp256k1::new();
     let master_priv = gen_priv(&mut thread_rng());
 
@@ -26,6 +120,35 @@ fn main() {
     let keys = Keys::derive(Key::Private(master_priv), &secp);
     println!("sequencer key: {}", keys.sequencer);
     println!("operator key: {}", keys.operator);
+}
+
+fn resolve_network(arg: Option<&str>) -> Network {
+    match arg {
+        Some("signet") => Network::Signet,
+        Some("regtest") => Network::Regtest,
+        Some(n) => panic!("unsupported network option: {n}"),
+        None => NETWORK,
+    }
+}
+
+fn exec_subc(cmd: Subcommand, ctx: &mut Context) -> anyhow::Result<()> {
+    match cmd {
+        Subcommand::GenSeqPubkey(subc) => {}
+        Subcommand::GenOpXpub(subc) => {}
+        Subcommand::GenParams(subc) => {}
+    }
+})
+
+fn exec_genseqpubkey(cmd: SubcGenSeqPubkey, ctx: &mut Context) -> anyhow::Result<()> {
+    unimplemented!()
+}
+
+fn exec_genopxpub(cmd: SubcGenOpXpub, ctx: &mut Context) -> anyhow::Result<()> {
+    unimplemented!()
+}
+
+fn exec_genparams(cmd: SubcGenParams, ctx: &mut Context) -> anyhow::Result<()> {
+    unimplemented!()
 }
 
 fn gen_priv(rng: &mut impl Rng) -> Xpriv {
