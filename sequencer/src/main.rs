@@ -269,8 +269,7 @@ fn do_startup_checks(
         Ok(false) => {
             // Current chain tip tip block is not known by the EL.
             // TODO: Try to sync EL using existing block payloads from DB.
-            warn!("missing expected evm block, block_id = {}", chain_tip);
-            // anyhow::bail!("missing expected evm block, block_id = {}", chain_tip);
+            anyhow::bail!("missing expected evm block, block_id = {}", chain_tip);
         }
         Err(error) => {
             // Likely network issue
