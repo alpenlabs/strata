@@ -59,6 +59,7 @@ use bridge::schemas::{
     BridgeTxStateTxidSchema,
 };
 pub const PROVER_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
+    SequenceSchema::COLUMN_FAMILY_NAME,
     prover::schemas::ProverTaskIdSchema::COLUMN_FAMILY_NAME,
     prover::schemas::ProverTaskSchema::COLUMN_FAMILY_NAME,
 ];
