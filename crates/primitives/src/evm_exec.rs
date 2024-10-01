@@ -1,6 +1,4 @@
 use borsh::{BorshDeserialize, BorshSerialize};
-use hex::FromHex;
-use reth_primitives::B256;
 
 use crate::buf::Buf32;
 

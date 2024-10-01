@@ -33,7 +33,7 @@ mod test {
         let prover_ops = ProverOptions {
             enable_compression: true,
             stark_to_snark_conversion: false,
-            use_mock_prover: true,
+            use_mock_prover: false,
         };
         let prover = SP1Host::init(GUEST_CL_STF_ELF.into(), prover_ops);
 
@@ -45,11 +45,17 @@ mod test {
             .build()
             .unwrap();
 
-        let (proof, _) = prover
+        let (proof, vk) = prover
             .prove(prover_input)
             .expect("Failed to generate proof");
 
         let _new_state_ser = SP1Verifier::extract_public_output::<CLProofPublicParams>(&proof)
             .expect("Failed to extract public outputs");
+
+        use std::{fs::File, io::Write};
+        let mut file = File::create("cl_proof_1.bin").unwrap();
+        file.write_all(proof.as_bytes()).unwrap();
+        let mut file = File::create("cl_vkey.bin").unwrap();
+        file.write_all(vk.as_bytes()).unwrap();
     }
 }
