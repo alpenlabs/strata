@@ -256,7 +256,7 @@ fn do_startup_checks(
             anyhow::bail!("Missing expected block: {}", block_hash);
         }
         Err(client_error) => {
-            anyhow::bail!("could not connect to bitcoing, err = {}", client_error);
+            anyhow::bail!("could not connect to bitcoin, err = {}", client_error);
         }
     }
 
