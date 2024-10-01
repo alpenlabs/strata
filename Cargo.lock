@@ -789,6 +789,7 @@ dependencies = [
  "anyhow",
  "arbitrary",
  "borsh",
+ "express-reth-evm",
  "express-reth-node",
  "express-storage",
  "futures",
@@ -870,6 +871,7 @@ dependencies = [
  "reth-primitives",
  "rockbound",
  "serde_json",
+ "shellexpand",
  "tracing",
 ]
 

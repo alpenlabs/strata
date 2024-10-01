@@ -17,7 +17,7 @@ class ElBalanceTransferTest(flexitest.Test):
         source = web3.address
         dest = web3.to_checksum_address("0x0000000000000000000000000000000000000001")
         basefee_address = web3.to_checksum_address("5400000000000000000000000000000000000010")
-        beneficiary_address = web3.to_checksum_address("0x0000000000000000000000000000000000000000")
+        beneficiary_address = web3.to_checksum_address("5400000000000000000000000000000000000011")
 
         print(web3.is_connected())
         original_block_no = web3.eth.block_number

@@ -22,4 +22,5 @@ reth-db = { workspace = true }
 reth-primitives = { workspace = true }
 rockbound = { workspace = true }
 serde_json = { workspace = true }
+shellexpand = "3.0.0"
 tracing = { workspace = true }

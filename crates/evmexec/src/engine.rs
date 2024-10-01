@@ -15,6 +15,7 @@ use alpen_express_state::{
     exec_update::{ELDepositData, ExecUpdate, Op, UpdateOutput},
     id::L2BlockId,
 };
+use express_reth_evm::constants::COINBASE_ADDRESS;
 use express_reth_node::{
     ExecutionPayloadFieldV2, ExpressExecutionPayloadEnvelopeV2, ExpressPayloadAttributes,
 };
@@ -129,7 +130,7 @@ impl<T: EngineRpc> RpcExecEngineInner<T> {
             prev_randao: B256::ZERO,
             withdrawals: Some(withdrawals),
             parent_beacon_block_root: None,
-            suggested_fee_recipient: Address::ZERO,
+            suggested_fee_recipient: COINBASE_ADDRESS,
         });
 
         let mut fcs = *self.fork_choice_state.lock().await;
