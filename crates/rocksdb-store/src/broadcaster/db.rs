@@ -12,7 +12,7 @@ use rockbound::{
 };
 
 use super::schemas::{BcastL1TxIdSchema, BcastL1TxSchema};
-use crate::DbOpsConfig;
+use crate::{index::get_next_index, DbOpsConfig};
 
 pub struct L1BroadcastDb {
     db: Arc<DB>,
@@ -32,9 +32,7 @@ impl L1BroadcastStore for L1BroadcastDb {
                 TransactionRetry::Count(self.ops.retry_count),
                 |txn| -> Result<Option<u64>, anyhow::Error> {
                     if txn.get::<BcastL1TxSchema>(&txid)?.is_none() {
-                        let idx = rockbound::utils::get_last::<BcastL1TxIdSchema>(txn)?
-                            .map(|(x, _)| x + 1)
-                            .unwrap_or(0);
+                        let idx = get_next_index::<BcastL1TxIdSchema, DB>(txn)?;
                         txn.put::<BcastL1TxIdSchema>(&idx, &txid)?;
                         txn.put::<BcastL1TxSchema>(&txid, &txentry)?;
                         Ok(Some(idx))

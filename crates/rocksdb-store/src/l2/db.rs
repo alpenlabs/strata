@@ -34,7 +34,7 @@ impl L2DataStore for L2Db {
                 rockbound::TransactionRetry::Count(self.ops.retry_count),
                 |txn| {
                     let mut block_height_data = txn
-                        .get::<L2BlockHeightSchema>(&block_height)?
+                        .get_for_update::<L2BlockHeightSchema>(&block_height)?
                         .unwrap_or(Vec::new());
                     if !block_height_data.contains(&block_id) {
                         block_height_data.push(block_id);
@@ -66,7 +66,7 @@ impl L2DataStore for L2Db {
                 rockbound::TransactionRetry::Count(self.ops.retry_count),
                 |txn| {
                     let mut block_height_data = txn
-                        .get::<L2BlockHeightSchema>(&block_height)?
+                        .get_for_update::<L2BlockHeightSchema>(&block_height)?
                         .unwrap_or(Vec::new());
                     block_height_data.retain(|&block_id| block_id != id);
 
