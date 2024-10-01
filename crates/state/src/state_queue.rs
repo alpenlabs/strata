@@ -118,7 +118,7 @@ impl<T> StateQueue<T> {
     /// ones over if we want to take out multiple elements
     ///
     /// Returns `None` if there are not enough elements to pop.
-    pub fn pop_front_n_runtime(&mut self, n: usize) -> Option<Vec<T>> {
+    pub fn pop_front_n_vec(&mut self, n: usize) -> Option<Vec<T>> {
         if self.entries.len() < n {
             return None;
         }
@@ -142,7 +142,7 @@ impl<T> StateQueue<T> {
     /// single elements out of the vec with `.pop_front()` and move the later
     /// ones over if we want to take out multiple elements, and it provides a
     /// check to ensure that it can really be done atomically.
-    pub fn pop_front_n_compile_time<const N: usize>(&mut self) -> Option<[T; N]> {
+    pub fn pop_front_n_arr<const N: usize>(&mut self) -> Option<[T; N]> {
         if self.entries.len() < N {
             return None;
         }
@@ -205,7 +205,7 @@ mod tests {
         let n0 = q.next_idx();
         assert_eq!(n0, 8);
 
-        let arr = q.pop_front_n_compile_time::<3>();
+        let arr = q.pop_front_n_arr::<3>();
         assert_eq!(arr, Some([5, 6, 7]));
         let b0 = q.base_idx();
         assert_eq!(b0, 3);
@@ -221,9 +221,9 @@ mod tests {
         let n2 = q.next_idx();
         assert_eq!(n2, 8);
 
-        let arr2 = q.pop_front_n_compile_time::<10>();
+        let arr2 = q.pop_front_n_arr::<10>();
         assert_eq!(arr2, None);
-        let arr3 = q.pop_front_n_compile_time::<4>();
+        let arr3 = q.pop_front_n_arr::<4>();
         assert_eq!(arr3, Some([9, 15, 20, 25]));
 
         let to_pop_len = 4;
@@ -231,7 +231,7 @@ mod tests {
         q.push_back(11);
         q.push_back(12);
         q.push_back(13);
-        let vec1 = q.pop_front_n_runtime(to_pop_len);
+        let vec1 = q.pop_front_n_vec(to_pop_len);
         assert_eq!(vec1, Some(vec![10, 11, 12, 13]));
 
         let n3 = q.next_idx();

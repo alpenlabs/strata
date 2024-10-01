@@ -75,7 +75,7 @@ pub struct DepositTxParams {
 }
 
 impl RollupParams {
-    pub fn get_deposit_config(&self) -> DepositTxParams {
+    pub fn get_deposit_params(&self) -> DepositTxParams {
         DepositTxParams {
             magic_bytes: self.rollup_name.clone().into_bytes().to_vec(),
             address_length: self.address_length,

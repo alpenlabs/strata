@@ -106,7 +106,7 @@ pub fn start_inscription_task<D: SequencerDatabase + Send + Sync + 'static>(
             broadcast_handle,
             status_tx,
         )
-        .await
+        .await.unwrap()
     });
 
     Ok(inscription_handle)

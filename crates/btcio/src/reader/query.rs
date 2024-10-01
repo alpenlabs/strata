@@ -10,7 +10,7 @@ use alpen_express_state::l1::{
     get_btc_params, get_difficulty_adjustment_height, BtcParams, HeaderVerificationState,
     L1BlockId, TimestampStore,
 };
-use alpen_express_primitives::params::{Params, RollupParams};
+use alpen_express_primitives::params::Params;
 use alpen_express_status::StatusTx;
 use anyhow::bail;
 use bitcoin::{hashes::Hash, BlockHash};
@@ -124,7 +124,7 @@ fn derive_tx_filter_rules<D: Database + 'static>(
 ) -> anyhow::Result<Vec<TxFilterRule>> {
     // TODO: Figure out how to do it from chainstate provider
     // For now we'll just go with filtering Inscription transactions
-    let deposit_provider = RollupParams::get_deposit_config(params.rollup());
+    let deposit_provider = params.rollup().get_deposit_params();
     Ok(vec![
         TxFilterRule::RollupInscription(params.rollup().rollup_name.clone()),
         TxFilterRule::Deposit(deposit_provider),

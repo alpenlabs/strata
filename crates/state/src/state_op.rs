@@ -167,7 +167,7 @@ fn apply_op_to_chainstate(op: &StateOp, state: &mut ChainState) {
             let n_drop = front_idx - to_drop;
 
             deposits
-                .pop_front_n_runtime(n_drop as usize)
+                .pop_front_n_vec(n_drop as usize)
                 .expect("stateop: unable to consume deposit intent");
         }
 

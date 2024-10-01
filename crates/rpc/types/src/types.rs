@@ -237,3 +237,10 @@ pub struct BridgeDuties {
     /// The last block index (inclusive) upto which the duties are feched.
     pub stop_index: u64,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum L2BlockFinalizationStatus {
+    Unfinalized,
+    Pending,
+    Finalized
+}

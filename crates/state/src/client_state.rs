@@ -264,6 +264,12 @@ impl LocalL1State {
     pub fn tip_verification_state(&self) -> Option<&HeaderVerificationState> {
         self.header_verification_state.as_ref()
     }
+
+    pub fn is_l2_block_pending(&self, block_height: u64) -> bool {
+        self.pending_checkpoints
+            .iter()
+            .any(|v| v.checkpoint.l2_range.0 < block_height && v.checkpoint.l2_range.1 > block_height)
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
