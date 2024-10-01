@@ -107,7 +107,7 @@ where
 
             // Check for da batch and send event accordingly
             debug!(?height, "Checking for da batch");
-            let checkpoints = check_for_da_batch(&blockdata, params.as_ref(), seq_pubkey);
+            let checkpoints = check_for_da_batch(&blockdata, seq_pubkey);
             debug!(?checkpoints, "Received checkpoints");
             if !checkpoints.is_empty() {
                 let ev = SyncEvent::L1DABatch(height, checkpoints);
@@ -130,12 +130,11 @@ where
 /// Parses inscriptions and checks for batch data in the transactions
 fn check_for_da_batch(
     blockdata: &BlockData,
-    params: &Params,
     seq_pubkey: Option<XOnlyPublicKey>,
 ) -> Vec<BatchCheckpoint> {
     let protocol_ops_txs = blockdata.protocol_ops_txs();
 
-    let inscriptions = protocol_ops_txs
+    let signed_checkpts = protocol_ops_txs
         .iter()
         .filter_map(|ops_txs| match ops_txs.proto_op() {
             alpen_express_state::tx::ProtocolOperation::RollupInscription(inscription) => Some((
@@ -145,37 +144,25 @@ fn check_for_da_batch(
             _ => None,
         });
 
-    let verified_checkpoints = inscriptions.filter_map(|(signed_batch_checkpoint, tx)| {
-        let checkpoint: BatchCheckpoint = signed_batch_checkpoint.clone().into();
-
+    let sig_verified_checkpoints = signed_checkpts.filter_map(|(signed_checkpoint, tx)| {
         if let Some(seq_pubkey) = seq_pubkey {
-            let sig = signed_batch_checkpoint.signature();
-            let msg = checkpoint.get_sighash();
+            let sig = signed_checkpoint.signature();
+            let msg = signed_checkpoint.checkpoint().get_sighash();
             let pk: Buf32 = seq_pubkey.into();
 
             if !verify_schnorr_sig(&sig, &msg, &pk) {
-                error!(?tx, ?checkpoint, "signature verification failed on checkpoint");
+                error!(
+                    ?tx,
+                    ?signed_checkpoint,
+                    "signature verification failed on checkpoint"
+                );
                 return None;
             }
         }
-
-        let checkpoint_idx = checkpoint.checkpoint().idx();
-        let checkpoint_last_block = checkpoint.checkpoint().l2_blockid();
-
-        match verify_proof(&checkpoint, params.rollup()) {
-            Ok(()) => {
-                info!(%checkpoint_idx, %checkpoint_last_block, "proof successfully verified");
-                Some(checkpoint)
-            },
-            Err(e) => {
-                let txid = tx.compute_txid();
-                warn!(?txid, %checkpoint_idx, %checkpoint_last_block, err = %e, "could not verify proof inside blob");
-                None
-            }
-        }
+        let checkpoint: BatchCheckpoint = signed_checkpoint.clone().into();
+        Some(checkpoint)
     });
-
-    verified_checkpoints.map(Into::into).collect()
+    sig_verified_checkpoints.collect()
 }
 
 /// Verify that the provided checkpoint proof is valid for the verifier key.

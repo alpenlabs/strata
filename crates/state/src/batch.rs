@@ -68,6 +68,10 @@ impl SignedBatchCheckpoint {
     pub fn signature(&self) -> Buf64 {
         self.signature
     }
+
+    pub fn checkpoint(&self) -> &BatchCheckpoint {
+        &self.inner
+    }
 }
 
 impl From<SignedBatchCheckpoint> for BatchCheckpoint {

@@ -8,6 +8,7 @@ use alpen_express_db::traits::{
 };
 use alpen_express_primitives::prelude::*;
 use alpen_express_state::{
+    batch::{BatchCheckpoint, CheckpointInfo},
     block,
     client_state::*,
     header::L2Header,
@@ -19,7 +20,7 @@ use alpen_express_state::{
 use bitcoin::block::Header;
 use tracing::*;
 
-use crate::{errors::*, genesis::make_genesis_block};
+use crate::{errors::*, genesis::make_genesis_block, l1_handler::verify_proof};
 
 /// Processes the event given the current consensus state, producing some
 /// output.  This can return database errors.
@@ -150,7 +151,7 @@ pub fn process_event<D: Database>(
             writes.push(ClientStateWrite::RollbackL1BlocksTo(*to_height));
         }
 
-        SyncEvent::L1DABatch(height, commitments) => {
+        SyncEvent::L1DABatch(height, checkpoints) => {
             debug!(%height, "received L1DABatch");
 
             if let Some(ss) = state.sync() {
@@ -158,14 +159,23 @@ pub fn process_event<D: Database>(
                 // load the state updates from L1 or something
                 let l2prov = database.l2_provider();
 
+                let proof_verified_checkpoints =
+                    filter_verified_checkpoints(state, checkpoints, params.rollup());
+
                 // When DABatch appears, it is only confirmed at the moment. These will be finalized
                 // only when the corresponding L1 block is buried enough
                 writes.push(ClientStateWrite::CheckpointsReceived(
                     *height,
-                    commitments.iter().map(|x| x.checkpoint().clone()).collect(),
+                    proof_verified_checkpoints
+                        .iter()
+                        .map(|x| x.checkpoint().clone())
+                        .collect(),
                 ));
 
-                actions.push(SyncAction::WriteCheckpoints(*height, commitments.clone()));
+                actions.push(SyncAction::WriteCheckpoints(
+                    *height,
+                    proof_verified_checkpoints,
+                ));
             } else {
                 // TODO we can expand this later to make more sense
                 return Err(Error::MissingClientSyncState);
@@ -226,7 +236,7 @@ fn handle_maturable_height(
     // If there are checkpoints at or before the maturable height, mark them as finalized
     if state
         .l1_view()
-        .has_pending_checkpoint_within_height(maturable_height)
+        .has_verified_checkpoint_before(maturable_height)
     {
         debug!(%maturable_height, "Writing CheckpointFinalized");
         writes.push(ClientStateWrite::CheckpointFinalized(maturable_height));
@@ -234,7 +244,7 @@ fn handle_maturable_height(
         // Emit sync action for finalizing a l2 block
         if let Some(checkpt) = state
             .l1_view()
-            .last_pending_checkpoint_within_height(maturable_height)
+            .get_last_verified_checkpoint_before(maturable_height)
         {
             actions.push(SyncAction::FinalizeBlock(checkpt.checkpoint.l2_blockid));
         } else {
@@ -245,6 +255,97 @@ fn handle_maturable_height(
         }
     }
     (writes, actions)
+}
+
+/// Filters a list of `BatchCheckpoint`s, returning only those that form a valid sequence
+/// of checkpoints. Valid sequence is build starting from `last_finalized_checkpoint` and
+/// subsequently moving forward through the `verified_checkpoints` and then through the list of
+/// checkpoints provided.
+///
+/// A valid checkpoint is one whose proof passes verification, and its index follows
+/// sequentially from the previous valid checkpoint.
+///
+/// # Arguments
+/// * `state` - The client's current state, which provides the L1 view and pending checkpoints.
+/// * `checkpoints` - A slice of `BatchCheckpoint`s to be filtered.
+/// * `params` - Parameters required for verifying checkpoint proofs.
+///
+/// # Returns
+/// A vector containing the valid sequence of `BatchCheckpoint`s, starting from the first valid one.
+pub fn filter_verified_checkpoints(
+    state: &ClientState,
+    checkpoints: &[BatchCheckpoint],
+    params: &RollupParams,
+) -> Vec<BatchCheckpoint> {
+    if checkpoints.is_empty() {
+        return Vec::new();
+    }
+    let l1_view = state.l1_view();
+    let verified_checkpoints = l1_view.verified_checkpoints();
+    let last_finalized = l1_view.last_finalized_checkpoint();
+
+    // If we don't have any finalized checkpoints and confirmed checkpoints, look for one in the
+    // checkpoints received.
+    let mut result_checkpoints = Vec::new();
+    let initial_idx = 1;
+
+    let (start_idx, mut last_valid_checkpoint) =
+        if verified_checkpoints.is_empty() && last_finalized.is_none() {
+            // If there are no checkpoints seen on L1 previously, look for the base checkpoint in
+            // the provided list, which should have checkpoint index 1
+            if let Some(idx) = checkpoints
+                .iter()
+                .position(|x| x.checkpoint().idx == initial_idx && verify_proof(x, params).is_ok())
+            {
+                result_checkpoints.push(checkpoints[idx].clone());
+                (idx + 1, checkpoints[idx].checkpoint())
+            } else {
+                // Means there's no valid checkpoint present, return empty
+                trace!("Returning because no valid checkpoints were provided");
+                return Vec::new();
+            }
+        } else {
+            // If we have something in verified_checkpoints, set the
+            // `last_valid_checkpoint` to that value or else use `last_finalized`
+            let checkpt = &verified_checkpoints
+                .last()
+                .unwrap_or(last_finalized.unwrap())
+                .checkpoint;
+            (0, checkpt)
+        };
+    debug!(%start_idx, ?last_valid_checkpoint, "Checkpoint stats");
+
+    // Now we have found the last valid checkpoint and index to start checking for valid
+    // checkpoints, loop forward to check proofs and checkpoint chain
+    for checkpoint in checkpoints.iter().skip(start_idx) {
+        let expected_idx = last_valid_checkpoint.idx() + 1;
+        let obtained_idx = checkpoint.checkpoint().idx;
+
+        if obtained_idx != expected_idx {
+            warn!(%expected_idx, %obtained_idx, "Received invalid checkpoint idx, ignoring.");
+            continue;
+        }
+        let last_l1_tsn = last_valid_checkpoint.l1_transition;
+        let last_l2_tsn = last_valid_checkpoint.l2_transition;
+        let l1_tsn = checkpoint.checkpoint().l1_transition;
+        let l2_tsn = checkpoint.checkpoint().l2_transition;
+
+        if l1_tsn.0 == last_l1_tsn.1 {
+            warn!(obtained = ?l1_tsn.0, expected = ?last_l1_tsn.1, "Received invalid checkpoint l1 transition, ignoring.");
+            continue;
+        }
+        if l2_tsn.0 == last_l2_tsn.1 {
+            warn!(obtained = ?l2_tsn.0, expected = ?last_l2_tsn.1, "Received invalid checkpoint l2 transition, ignoring.");
+            continue;
+        }
+        if verify_proof(checkpoint, params).is_ok() {
+            last_valid_checkpoint = checkpoint.checkpoint();
+            result_checkpoints.push(checkpoint.clone());
+        } else {
+            warn!(%expected_idx, %obtained_idx, "Received invalid checkpoint proof, ignoring.");
+        }
+    }
+    result_checkpoints
 }
 
 #[cfg(test)]

@@ -248,13 +248,13 @@ impl LocalL1State {
         &self.verified_checkpoints
     }
 
-    pub fn has_pending_checkpoint_within_height(&self, height: u64) -> bool {
+    pub fn has_verified_checkpoint_before(&self, height: u64) -> bool {
         self.verified_checkpoints
             .iter()
             .any(|cp| cp.height <= height)
     }
 
-    pub fn last_pending_checkpoint_within_height(&self, height: u64) -> Option<&L1CheckPoint> {
+    pub fn get_last_verified_checkpoint_before(&self, height: u64) -> Option<&L1CheckPoint> {
         self.verified_checkpoints
             .iter()
             .take_while(|cp| cp.height <= height)
