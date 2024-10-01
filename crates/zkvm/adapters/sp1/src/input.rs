@@ -26,7 +26,7 @@ impl<'a> ZKVMInputBuilder<'a> for SP1ProofInputBuilder {
         Ok(self)
     }
 
-    fn write_proof_with_vkey(&mut self, item: AggregationInput) -> anyhow::Result<&mut Self> {
+    fn write_proof(&mut self, item: AggregationInput) -> anyhow::Result<&mut Self> {
         let proof: SP1ProofWithPublicValues = bincode::deserialize(item.proof().as_bytes())?;
         let vkey: SP1VerifyingKey = bincode::deserialize(item.vk().as_bytes())?;
 

@@ -28,7 +28,7 @@ impl<'a> ZKVMInputBuilder<'a> for RiscZeroProofInputBuilder<'a> {
         Ok(self)
     }
 
-    fn write_proof_with_vkey(
+    fn write_proof(
         &mut self,
         item: express_zkvm::AggregationInput,
     ) -> anyhow::Result<&mut Self> {

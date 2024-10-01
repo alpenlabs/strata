@@ -67,7 +67,7 @@ mod test {
         l1_batch_input_builder.write_borsh(&input).unwrap();
 
         for proof in blockspace_proofs {
-            l1_batch_input_builder.write_proof_with_vkey(proof).unwrap();
+            l1_batch_input_builder.write_proof(proof).unwrap();
         }
 
         let l1_batch_input = l1_batch_input_builder.build().unwrap();

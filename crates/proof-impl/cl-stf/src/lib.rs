@@ -11,7 +11,7 @@ pub use alpen_express_state::{block::L2Block, chain_state::ChainState, state_op:
 use express_proofimpl_evm_ee_stf::ELProofPublicParams;
 use serde::{Deserialize, Serialize};
 
-/// Verifies an L2 block and applies the chains state transition if the block is valid.
+/// Verifies an L2 block and applies the chain state transition if the block is valid.
 pub fn verify_and_transition(
     prev_chstate: ChainState,
     new_l2_block: L2Block,

@@ -44,9 +44,7 @@ mod test {
         let mut prover_input_builder = SP1ProofInputBuilder::new();
         prover_input_builder.write(&NUM_SLOTS).unwrap();
         for agg_proof in agg_proof_inputs {
-            prover_input_builder
-                .write_proof_with_vkey(agg_proof)
-                .unwrap();
+            prover_input_builder.write_proof(agg_proof).unwrap();
         }
 
         let prover_input = prover_input_builder.build().unwrap();

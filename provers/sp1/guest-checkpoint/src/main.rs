@@ -1,15 +1,15 @@
 use express_proofimpl_checkpoint::{self, process_checkpoint_proof, L2BatchProofOutput};
-use express_proofimpl_l1_batch::logic::L1BatchProofOutput;
+use express_proofimpl_l1_batch::L1BatchProofOutput;
 use sha2::{Digest, Sha256};
 use sp1_zkvm::io;
 
 fn main() {
     // TODO: update this
-    let slice = io::read_vec();
-    let l1_batch: L1BatchProofOutput = borsh::from_slice(&slice).unwrap();
+    // let slice = io::read_vec();
+    // let l1_batch: L1BatchProofOutput = borsh::from_slice(&slice).unwrap();
 
-    let slice = io::read_vec();
-    let l2_batch: L2BatchProofOutput = borsh::from_slice(&slice).unwrap();
+    // let slice = io::read_vec();
+    // let l2_batch: L2BatchProofOutput = borsh::from_slice(&slice).unwrap();
 
     // TODO: hardcode genesis
     let slice = io::read_vec();
