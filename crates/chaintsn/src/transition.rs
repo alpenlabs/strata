@@ -467,8 +467,6 @@ mod tests {
         let result = process_l1_view_update(&mut state_cache, &l1_segment, params.rollup());
         assert!(result.is_ok());
 
-        eprintln!("{:#?}", state_cache.state().l1_view());
-
         // Check that blocks were matured
         assert_eq!(
             state_cache.state().l1_view().safe_height(),
