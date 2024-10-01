@@ -1,12 +1,10 @@
 #[cfg(feature = "prover")]
-
+#[cfg(all(feature = "prover", not(debug_assertions)))]
 mod test {
-    use express_proofimpl_cl_stf::CLProofPublicParams;
-    use express_sp1_adapter::{SP1Host, SP1ProofInputBuilder, SP1Verifier};
+    use express_sp1_adapter::{SP1Host, SP1ProofInputBuilder};
     use express_sp1_guest_builder::GUEST_CL_AGG_ELF;
     use express_zkvm::{
         AggregationInput, Proof, ProverOptions, VerificationKey, ZKVMHost, ZKVMInputBuilder,
-        ZKVMVerifier,
     };
 
     const NUM_SLOTS: usize = 2;

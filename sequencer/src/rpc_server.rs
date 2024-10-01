@@ -17,8 +17,7 @@ use alpen_express_primitives::{
 use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer, AlpenSequencerApiServer};
 use alpen_express_rpc_types::{
     errors::RpcServerError as Error, BlockHeader, BridgeDuties, ClientStatus, DaBlob, ExecUpdate,
-    HexBytes, HexBytes32, L1Status, L2BlockStatus, NodeSyncStatus, RawBlockWitness,
-    RpcCheckpointInfo,
+    HexBytes, HexBytes32, L1Status, L2BlockStatus, NodeSyncStatus, RpcCheckpointInfo,
 };
 use alpen_express_state::{
     batch::BatchCheckpoint,
