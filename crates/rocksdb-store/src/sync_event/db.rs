@@ -9,7 +9,7 @@ use alpen_express_state::sync_event::SyncEvent;
 use rockbound::{OptimisticTransactionDB, SchemaBatch, SchemaDBOperationsExt};
 
 use super::schemas::{SyncEventSchema, SyncEventWithTimestamp};
-use crate::{index::get_next_index_opts, DbOpsConfig};
+use crate::{sequence::get_next_id_opts, DbOpsConfig};
 
 pub struct SyncEventDb {
     db: Arc<OptimisticTransactionDB>,
@@ -43,7 +43,7 @@ impl SyncEventStore for SyncEventDb {
                 rockbound::TransactionRetry::Count(self.ops.retry_count),
                 move |txn| {
                     // autoincrementing, starting from index 1
-                    let id = get_next_index_opts::<SyncEventSchema, OptimisticTransactionDB>(
+                    let id = get_next_id_opts::<SyncEventSchema, OptimisticTransactionDB>(
                         txn,
                         |v| v + 1,
                         1,

@@ -10,8 +10,8 @@ pub mod prover;
 pub mod sequencer;
 pub mod sync_event;
 
-mod index;
 pub mod macros;
+mod sequence;
 pub mod utils;
 
 #[cfg(feature = "test_utils")]
@@ -20,7 +20,7 @@ pub mod test_utils;
 pub const ROCKSDB_NAME: &str = "express";
 
 pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
-    IndexSchema::COLUMN_FAMILY_NAME,
+    SequenceSchema::COLUMN_FAMILY_NAME,
     ChainStateSchema::COLUMN_FAMILY_NAME,
     ClientUpdateOutputSchema::COLUMN_FAMILY_NAME,
     ClientStateSchema::COLUMN_FAMILY_NAME,
@@ -82,8 +82,8 @@ pub use sync_event::db::SyncEventDb;
 use crate::{
     chain_state::schemas::{ChainStateSchema, WriteBatchSchema},
     client_state::schemas::{ClientStateSchema, ClientUpdateOutputSchema},
-    index::IndexSchema,
     l1::schemas::{L1BlockSchema, MmrSchema, TxnSchema},
+    sequence::SequenceSchema,
     sync_event::schemas::SyncEventSchema,
 };
 

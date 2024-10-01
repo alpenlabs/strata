@@ -10,7 +10,7 @@ use alpen_express_primitives::buf::Buf32;
 use rockbound::{OptimisticTransactionDB, SchemaDBOperationsExt};
 
 use super::schemas::{SeqBlobIdSchema, SeqBlobSchema};
-use crate::{index::get_next_index, DbOpsConfig};
+use crate::{sequence::get_next_id, DbOpsConfig};
 
 pub struct RBSeqBlobDb {
     db: Arc<OptimisticTransactionDB>,
@@ -35,7 +35,7 @@ impl BlobStore for RBSeqBlobDb {
                 |tx| -> Result<(), DbError> {
                     // If new, increment idx
                     if tx.get::<SeqBlobSchema>(&blob_hash)?.is_none() {
-                        let idx = get_next_index::<SeqBlobIdSchema, OptimisticTransactionDB>(tx)?;
+                        let idx = get_next_id::<SeqBlobIdSchema, OptimisticTransactionDB>(tx)?;
 
                         tx.put::<SeqBlobIdSchema>(&idx, &blob_hash)?;
                     }

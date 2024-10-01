@@ -82,7 +82,7 @@ impl BridgeMessageDb for BridgeMsgDb {
 
     fn get_msgs_by_scope(&self, scope: &[u8]) -> DbResult<Vec<BridgeMessage>> {
         // Regular loop for filtering and mapping
-        let Some(msg_ids) = self.db.get(&scope.to_owned())? else {
+        let Some(msg_ids) = self.db.get::<ScopeMsgIdSchema>(&scope.to_owned())? else {
             return Ok(Vec::new());
         };
 
