@@ -372,7 +372,7 @@ impl<T: EngineRpc> ExecEngineCtl for RpcExecEngineCtl<T> {
         })
     }
 
-    fn is_block_available(&self, id: L2BlockId) -> EngineResult<bool> {
+    fn check_block_exists(&self, id: L2BlockId) -> EngineResult<bool> {
         let block = self
             .get_l2block(&id)
             .and_then(|l2block| self.get_block_info(l2block))?;

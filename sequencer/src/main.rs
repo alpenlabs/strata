@@ -262,14 +262,13 @@ fn do_startup_checks(
 
     // Check that tip L2 block exists (and engine can be connected to)
     let chain_tip = last_chain_state.chain_tip_blockid();
-    match engine.is_block_available(chain_tip) {
+    match engine.check_block_exists(chain_tip) {
         Ok(true) => {
             info!("startup: last l2 block is synced")
         }
         Ok(false) => {
             // Current chain tip tip block is not known by the EL.
             // TODO: Try to sync EL using existing block payloads from DB.
-            // anyhow::bail!("missing expected evm block, block_id = {}", chain_tip);
             warn!("missing expected evm block, block_id = {}", chain_tip);
             // anyhow::bail!("missing expected evm block, block_id = {}", chain_tip);
         }

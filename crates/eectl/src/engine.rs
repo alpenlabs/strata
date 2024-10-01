@@ -43,8 +43,10 @@ pub trait ExecEngineCtl {
     /// reorg.
     fn update_finalized_block(&self, id: L2BlockId) -> EngineResult<()>;
 
-    /// Check if a block exists on the chain
-    fn is_block_available(&self, id: L2BlockId) -> EngineResult<bool>;
+    /// Check if a block exists on the chain.
+    /// If this returns true, it should be safe to use this id
+    /// in any of update_*_block methods, submit_payload and prepare_payload
+    fn check_block_exists(&self, id: L2BlockId) -> EngineResult<bool>;
 }
 
 /// The status of a block that we've just set chain fork.
