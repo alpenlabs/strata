@@ -21,7 +21,11 @@ impl FilePersister {
 
 impl EncryptedSeedPersister for FilePersister {
     fn save(&self, seed: &EncryptedSeed) -> Result<(), PersisterErr> {
-        let mut file = File::options().create(true).write(true).open(&self.file)?;
+        let mut file = File::options()
+            .create(true)
+            .truncate(true)
+            .write(true)
+            .open(&self.file)?;
         file.write_all(&seed.0)?;
         file.sync_all()?;
         Ok(())
