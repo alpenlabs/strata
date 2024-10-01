@@ -1,7 +1,7 @@
+use alpen_express_primitives::{buf::Buf32, l1::L1BlockManifest};
 use alpen_express_state::l1::{
     get_difficulty_adjustment_height, BtcParams, HeaderVerificationState, L1BlockId, TimestampStore,
 };
-use alpen_express_primitives::{buf::Buf32, l1::L1BlockManifest, params::RollupParams};
 use bitcoin::{
     block::Header,
     consensus::{deserialize, serialize},

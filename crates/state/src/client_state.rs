@@ -266,9 +266,9 @@ impl LocalL1State {
     }
 
     pub fn is_l2_block_pending(&self, block_height: u64) -> bool {
-        self.pending_checkpoints
-            .iter()
-            .any(|v| v.checkpoint.l2_range.0 < block_height && v.checkpoint.l2_range.1 > block_height)
+        self.pending_checkpoints.iter().any(|v| {
+            v.checkpoint.l2_range.0 < block_height && v.checkpoint.l2_range.1 > block_height
+        })
     }
 }
 

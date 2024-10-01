@@ -5,12 +5,11 @@ use std::{
 };
 
 use alpen_express_db::traits::Database;
-use alpen_express_primitives::buf::Buf32;
+use alpen_express_primitives::{buf::Buf32, params::Params};
 use alpen_express_state::l1::{
     get_btc_params, get_difficulty_adjustment_height, BtcParams, HeaderVerificationState,
     L1BlockId, TimestampStore,
 };
-use alpen_express_primitives::params::Params;
 use alpen_express_status::StatusTx;
 use anyhow::bail;
 use bitcoin::{hashes::Hash, BlockHash};

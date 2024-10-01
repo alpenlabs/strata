@@ -2,7 +2,9 @@
 use alpen_express_db::types::L1TxStatus;
 use alpen_express_primitives::bridge::{OperatorIdx, PublickeyTable};
 use alpen_express_rpc_types::{
-    types::{BlockHeader, ClientStatus, ExecUpdate, L1Status}, BridgeDuties, HexBytes, HexBytes32, L2BlockFinalizationStatus, NodeSyncStatus, RawBlockWitness, RpcCheckpointInfo
+    types::{BlockHeader, ClientStatus, ExecUpdate, L1Status},
+    BridgeDuties, HexBytes, HexBytes32, L2BlockFinalizationStatus, NodeSyncStatus, RawBlockWitness,
+    RpcCheckpointInfo,
 };
 use alpen_express_state::{bridge_state::DepositEntry, id::L2BlockId};
 use bitcoin::Txid;
@@ -97,7 +99,10 @@ pub trait AlpenApi {
     /// This assumes that the block finalization is always sequential. i.e all the blocks before the
     /// last finalized block are also finalized
     #[method(name = "getBlockFinalizationStatus")]
-    async fn get_l2_block_finalization_status(&self, block_height: u64) -> RpcResult<L2BlockFinalizationStatus>;
+    async fn get_l2_block_finalization_status(
+        &self,
+        block_height: u64,
+    ) -> RpcResult<L2BlockFinalizationStatus>;
 }
 
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "alpadmin"))]

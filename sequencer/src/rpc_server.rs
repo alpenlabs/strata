@@ -16,7 +16,9 @@ use alpen_express_primitives::{
 };
 use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer, AlpenSequencerApiServer};
 use alpen_express_rpc_types::{
-    errors::RpcServerError as Error, BlockHeader, BridgeDuties, ClientStatus, DaBlob, DepositEntry, DepositState, ExecUpdate, HexBytes, HexBytes32, L1Status, L2BlockFinalizationStatus, NodeSyncStatus, RawBlockWitness, RpcCheckpointInfo
+    errors::RpcServerError as Error, BlockHeader, BridgeDuties, ClientStatus, DaBlob, ExecUpdate,
+    HexBytes, HexBytes32, L1Status, L2BlockFinalizationStatus, NodeSyncStatus, RawBlockWitness,
+    RpcCheckpointInfo,
 };
 use alpen_express_state::{
     batch::BatchCheckpoint,
@@ -560,7 +562,10 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         Ok(batch_comm.map(|bc| bc.checkpoint().clone().into()))
     }
 
-    async fn get_l2_block_finalization_status(&self, block_height: u64) -> RpcResult<L2BlockFinalizationStatus> {
+    async fn get_l2_block_finalization_status(
+        &self,
+        block_height: u64,
+    ) -> RpcResult<L2BlockFinalizationStatus> {
         let cl_state = self.get_client_state().await;
         if let Some(last_checkpoint) = cl_state.l1_view().last_finalized_checkpoint() {
             if last_checkpoint.checkpoint.includes_l2_block(block_height) {

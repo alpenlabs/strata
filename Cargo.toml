@@ -122,6 +122,7 @@ borsh = { version = "1.5.0", features = ["derive"] }
 bytes = { version = "1.6.0" }
 chrono = { version = "0.4.38" }
 digest = "0.10"
+ethnum = "1.5.0"
 eyre = "0.6"
 format_serde_error = { git = "https://github.com/AlexanderThaller/format_serde_error" }
 futures = "0.3"
@@ -192,7 +193,6 @@ thiserror = "1.0"
 threadpool = "1.8"
 tokio = { version = "1.37", features = ["full"] }
 toml = "0.5"
-ethnum = "1.5.0"
 tower = "0.4"
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }

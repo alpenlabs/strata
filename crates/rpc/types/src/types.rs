@@ -242,5 +242,5 @@ pub struct BridgeDuties {
 pub enum L2BlockFinalizationStatus {
     Unfinalized,
     Pending,
-    Finalized
+    Finalized,
 }

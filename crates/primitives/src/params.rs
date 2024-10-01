@@ -1,5 +1,6 @@
 //! Global consensus parameters for the rollup.
 
+use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -64,7 +65,7 @@ pub struct RollupParams {
 }
 
 /// Configuration common among deposit and deposit request transaction
-#[derive(Clone, Debug, PartialEq, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, BorshSerialize, BorshDeserialize)]
 pub struct DepositTxParams {
     /// magic bytes, usually a rollup name
     pub magic_bytes: Vec<u8>,

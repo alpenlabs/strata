@@ -82,15 +82,15 @@ clean-dd: ## Remove the data directory used by functional tests.
 	rm -rf $(FUNCTIONAL_TESTS_DIR)/$(FUNCTIONAL_TESTS_DATADIR) 2>/dev/null
 
 .PHONY: clean-cargo
-clean-dd: ## Remove the data directory used by functional tests.
- 	cargo clean
+clean-cargo: ## cargo clean
+	cargo clean 2>/dev/null
 
 .PHONY: clean-docker-data
 clean-docker-data: ## Remove docker data files inside /docker/.data
 	rm -rf $(DOCKER_DIR)/$(DOCKER_DATADIR) 2>/dev/null
 
 .PHONY: clean
-clean: clean-dd clean-docker-data clean-cargo ## complete cleaning
+clean: clean-dd clean-docker-data clean-cargo ## clean functional tests directory, cargo clean, clean docker data
 	@echo "\n\033[36m======== CLEAN_COMPLETE ========\033[0m\n"
 
 .PHONY: docker-up
