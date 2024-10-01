@@ -6,7 +6,8 @@ mod test {
     use express_sp1_guest_builder::GUEST_EVM_EE_STF_ELF;
     use express_zkvm::{ProverOptions, ZKVMHost, ZKVMInputBuilder, ZKVMVerifier};
 
-    const ENCODED_PROVER_INPUT: &[u8] = include_bytes!("../../test-util/el_witness_2.json");
+    const ID: u32 = 2;
+    const ENCODED_PROVER_INPUT: &[u8] = include_bytes!("../../test-util/witness_2.json");
 
     #[test]
     fn test_reth_stf_guest_code_trace_generation() {
@@ -42,7 +43,7 @@ mod test {
         let mut file = File::create(file_path).unwrap();
         file.write_all(vk.as_bytes()).unwrap();
 
-        let file_path = "el_proof_2.bin";
+        let file_path = format!("el_proof_{:?}.bin", ID);
         let mut file = File::create(file_path).unwrap();
         file.write_all(proof.as_bytes()).unwrap();
 

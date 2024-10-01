@@ -199,5 +199,11 @@ fn extract_zkvm_input<Node: FullNodeComponents>(
         ancestor_headers: Default::default(),
     };
 
+    use std::fs::File;
+
+    use serde_json::{self, to_writer_pretty};
+    let file = File::create(format!("witness_{:?}.json", current_block_idx)).unwrap();
+    to_writer_pretty(file, &input).unwrap();
+
     Ok(input)
 }

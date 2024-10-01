@@ -5,7 +5,7 @@ use alpen_express_primitives::{
     prelude::ProofPublishMode,
     vk::RollupVerifyingKey,
 };
-use express_proofimpl_cl_stf::{verify_and_transition, ChainState, L2Block};
+use express_proofimpl_cl_stf::{verify_and_transition, CLProofPublicParams, ChainState, L2Block};
 use express_proofimpl_evm_ee_stf::ELProofPublicParams;
 use sha2::{Digest, Sha256};
 
@@ -19,14 +19,22 @@ fn main() {
     let el_pp = sp1_zkvm::io::read::<Vec<u8>>();
     let input: Vec<u8> = sp1_zkvm::io::read();
     let (prev_state, block): (ChainState, L2Block) = borsh::from_slice(&input).unwrap();
+    let prev_state_root = prev_state.compute_state_root();
 
     // Verify the EL proof
     let public_values_digest = Sha256::digest(&el_pp);
     sp1_zkvm::lib::verify::verify_sp1_proof(el_vkey, &public_values_digest.into());
-    let el_pp_deserialized: ELProofPublicParams = bincode::deserialize(&el_pp).unwrap();
+    // let el_pp_deserialized: ELProofPublicParams = bincode::deserialize(&el_pp).unwrap();
 
-    let new_state = verify_and_transition(prev_state, block, el_pp_deserialized, params);
-    sp1_zkvm::io::commit(&borsh::to_vec(&new_state).unwrap());
+    // let new_state = verify_and_transition(prev_state, block, el_pp_deserialized, params);
+    // let new_state_root = new_state.compute_state_root();
+
+    // let public_params = CLProofPublicParams {
+    //     prev_state_root: *prev_state_root.as_ref(),
+    //     new_state_root: *new_state_root.as_ref(),
+    // };
+
+    // sp1_zkvm::io::commit(&public_params);
 }
 
 // TODO: Should be read from config file and evaluated on compile time

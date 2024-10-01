@@ -5,17 +5,20 @@ mod test {
     use express_sp1_adapter::{SP1Host, SP1ProofInputBuilder, SP1Verifier};
     use express_sp1_guest_builder::GUEST_CL_STF_ELF;
     use express_zkvm::{
-        AggregationInput, Proof, VerificationKey, ZKVMHost, ZKVMInputBuilder, ZKVMVerifier,
+        AggregationInput, Proof, ProverOptions, VerificationKey, ZKVMHost, ZKVMInputBuilder,
+        ZKVMVerifier,
     };
 
     fn get_prover_input() -> (ChainState, L2Block, AggregationInput) {
-        let cl_witness: &[u8] = include_bytes!("../../test-util/cl_block_1");
+        let cl_witness: &[u8] = include_bytes!("../../test-util/cl_witness_1");
         let el_proof: &[u8] = include_bytes!("../../test-util/el_proof_1.bin");
         let el_vkey: &[u8] = include_bytes!("../../test-util/el_vkey.bin");
         let (prev_state, block): (ChainState, L2Block) = borsh::from_slice(cl_witness).unwrap();
 
         let proof = Proof::new(el_proof.to_vec());
+        println!("proof {:?}", proof.as_bytes().len());
         let vk = VerificationKey::new(el_vkey.to_vec());
+        println!("vk {:?}", vk);
         let agg_input = AggregationInput::new(proof, vk);
 
         (prev_state, block, agg_input)
@@ -27,7 +30,13 @@ mod test {
         let (prev_state, block, agg_input) = get_prover_input();
         let input = (prev_state, block);
         let input_ser = borsh::to_vec(&input).unwrap();
-        let prover = SP1Host::init(GUEST_CL_STF_ELF.into(), Default::default());
+
+        let prover_ops = ProverOptions {
+            enable_compression: true,
+            stark_to_snark_conversion: false,
+            use_mock_prover: false,
+        };
+        let prover = SP1Host::init(GUEST_CL_STF_ELF.into(), prover_ops);
 
         println!("now writing the inputs...");
         let prover_input = SP1ProofInputBuilder::new()

@@ -3918,6 +3918,7 @@ dependencies = [
  "borsh",
  "express-chaintsn",
  "express-proofimpl-evm-ee-stf",
+ "serde",
  "thiserror",
 ]
 

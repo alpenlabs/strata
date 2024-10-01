@@ -11,7 +11,9 @@ express-chaintsn.workspace = true
 express-proofimpl-evm-ee-stf = { workspace = true }
 
 borsh = { workspace = true }
+serde = { workspace = true }
 thiserror = { workspace = true }
+
 
 [dev-dependencies]
 alpen-test-utils.workspace = true
