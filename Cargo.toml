@@ -37,6 +37,7 @@ members = [
   "crates/sync",
   "crates/tasks",
   "crates/test-utils",
+  "crates/tx-parser",
   "crates/util/mmr",
   "crates/vtxjmt",
   "provers/risc0",
@@ -47,7 +48,6 @@ members = [
   "bin/prover-client",
   "reth",
   "sequencer",
-  "crates/tx-parser",
 
   # integration tests
   "tests",
@@ -138,6 +138,8 @@ lru = "0.12"
 mockall = "0.11"
 musig2 = { version = "0.1.0", features = ["serde"] }
 num_enum = "0.7"
+opentelemetry-otlp = "0.17"
+opentelemetry_sdk = { version = "0.25", features = ["rt-tokio-current-thread"] }
 parking_lot = "0.12.3"
 paste = "1.0"
 rand = "0.8.5"
@@ -191,10 +193,11 @@ sha2 = "0.10"
 tempfile = "3.10.1"
 thiserror = "1.0"
 threadpool = "1.8"
-tokio = { version = "1.37", features = ["full"] }
+tokio = { version = "^1.39", features = ["full"] }
 toml = "0.5"
 tower = "0.4"
 tracing = "0.1.40"
+tracing-opentelemetry = "0.17"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 
 # This is needed for custom build of SP1
