@@ -10,7 +10,7 @@ use rockbound::{
 };
 
 use super::schemas::{ProverTaskIdSchema, ProverTaskSchema};
-use crate::DbOpsConfig;
+use crate::{sequence::get_next_id, DbOpsConfig};
 
 pub struct ProofDb {
     db: Arc<OptimisticTransactionDB>,
@@ -31,9 +31,7 @@ impl ProverDataStore for ProofDb {
                     return Err(DbError::EntryAlreadyExists);
                 }
 
-                let idx = rockbound::utils::get_last::<ProverTaskIdSchema>(tx)?
-                    .map(|(x, _)| x + 1)
-                    .unwrap_or(0);
+                let idx = get_next_id::<ProverTaskIdSchema, OptimisticTransactionDB>(tx)?;
 
                 tx.put::<ProverTaskIdSchema>(&idx, &taskid)?;
                 tx.put::<ProverTaskSchema>(&taskid, &taskentry)?;

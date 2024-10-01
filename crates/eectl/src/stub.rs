@@ -92,4 +92,8 @@ impl ExecEngineCtl for StubController {
     fn update_finalized_block(&self, _id: L2BlockId) -> EngineResult<()> {
         Ok(())
     }
+
+    fn check_block_exists(&self, _id: L2BlockId) -> EngineResult<bool> {
+        Ok(true)
+    }
 }

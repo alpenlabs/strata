@@ -138,7 +138,7 @@ fn apply_op_to_chainstate(op: &StateOp, state: &mut ChainState) {
             let matured_block = mqueue.pop_front().unwrap();
 
             // TODO add it to the MMR so we can reference it in the future
-            let (_, deposit_txs, _) = matured_block.into_parts();
+            let (header_record, deposit_txs, _) = matured_block.into_parts();
             for tx in deposit_txs {
                 if let Deposit(deposit_info) = tx.tx().protocol_operation() {
                     trace!("we got some deposit_txs");
@@ -150,6 +150,7 @@ fn apply_op_to_chainstate(op: &StateOp, state: &mut ChainState) {
                         .add_deposits(&deposit_info.outpoint, &operators, amt)
                 }
             }
+            state.l1_state.safe_block = header_record;
         }
 
         StateOp::ConsumeDepositIntent(to_drop) => {

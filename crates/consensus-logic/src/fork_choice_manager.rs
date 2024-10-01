@@ -404,7 +404,7 @@ fn process_fc_message<D: Database, E: ExecEngineCtl>(
             if !reorg.is_identity() {
                 // Apply the reorg.
                 if let Err(e) = apply_tip_update(&reorg, fcm_state) {
-                    warn!("failed to compute CL STF");
+                    warn!(err = ?e, "failed to compute CL STF");
 
                     // Specifically state transition errors we want to handle
                     // specially so that we can remember to not accept the block again.

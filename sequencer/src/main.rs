@@ -2,7 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use alpen_express_btcio::{
     broadcaster::{spawn_broadcaster_task, L1BroadcastHandle},
-    rpc::BitcoinClient,
+    rpc::{traits::Reader, BitcoinClient},
     writer::{config::WriterConfig, start_inscription_task},
 };
 use alpen_express_common::logging;
@@ -12,6 +12,11 @@ use alpen_express_consensus_logic::{
     genesis,
     sync_manager::{self, SyncManager},
 };
+use alpen_express_db::{
+    traits::{ChainstateProvider, Database},
+    DbError,
+};
+use alpen_express_eectl::engine::ExecEngineCtl;
 use alpen_express_evmexec::{engine::RpcExecEngineCtl, EngineRpcClient};
 use alpen_express_primitives::params::{Params, SyncParams};
 use alpen_express_rocksdb::{
@@ -19,6 +24,7 @@ use alpen_express_rocksdb::{
 };
 use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer, AlpenSequencerApiServer};
 use alpen_express_status::{StatusRx, StatusTx};
+use bitcoin::{hashes::Hash, BlockHash};
 use config::{ClientMode, Config, SequencerConfig};
 use express_bridge_relay::relayer::RelayerHandle;
 use express_storage::{
@@ -217,6 +223,65 @@ pub struct CoreContext {
     pub bitcoin_client: Arc<BitcoinClient>,
 }
 
+fn do_startup_checks(
+    database: &impl Database,
+    engine: &impl ExecEngineCtl,
+    bitcoin_client: &impl Reader,
+    runtime: &Runtime,
+) -> anyhow::Result<()> {
+    let chain_state_prov = database.chain_state_provider();
+    let last_state_idx = match chain_state_prov.get_last_state_idx() {
+        Ok(idx) => idx,
+        Err(DbError::NotBootstrapped) => {
+            // genesis is not done
+            info!("startup: awaiting genesis");
+            return Ok(());
+        }
+        err => err?,
+    };
+    let Some(last_chain_state) = chain_state_prov.get_toplevel_state(last_state_idx)? else {
+        anyhow::bail!(format!("Missing chain state idx: {}", last_state_idx));
+    };
+
+    // Check that we can connect to bitcoin client and block we believe to be matured in L1 is
+    // actually present
+    let safe_l1blockid = last_chain_state.l1_view().safe_block().blkid();
+    let block_hash = BlockHash::from_slice(safe_l1blockid.as_ref())?;
+
+    match runtime.block_on(bitcoin_client.get_block(&block_hash)) {
+        Ok(_block) => {
+            info!("startup: last matured block: {}", block_hash);
+        }
+        Err(client_error) if client_error.is_block_not_found() => {
+            anyhow::bail!("Missing expected block: {}", block_hash);
+        }
+        Err(client_error) => {
+            anyhow::bail!("could not connect to bitcoin, err = {}", client_error);
+        }
+    }
+
+    // Check that tip L2 block exists (and engine can be connected to)
+    let chain_tip = last_chain_state.chain_tip_blockid();
+    match engine.check_block_exists(chain_tip) {
+        Ok(true) => {
+            info!("startup: last l2 block is synced")
+        }
+        Ok(false) => {
+            // Current chain tip tip block is not known by the EL.
+            // TODO: Try to sync EL using existing block payloads from DB.
+            anyhow::bail!("missing expected evm block, block_id = {}", chain_tip);
+        }
+        Err(error) => {
+            // Likely network issue
+            anyhow::bail!("could not connect to exec engine, err = {}", error);
+        }
+    }
+
+    // everything looks ok
+    info!("Startup checks passed");
+    Ok(())
+}
+
 #[allow(clippy::too_many_arguments)]
 fn start_core_tasks(
     executor: &TaskExecutor,
@@ -238,6 +303,14 @@ fn start_core_tasks(
         database.clone(),
         params.as_ref(),
         l2_block_manager.clone(),
+        runtime,
+    )?;
+
+    // do startup checks
+    do_startup_checks(
+        database.as_ref(),
+        engine.as_ref(),
+        bitcoin_client.as_ref(),
         runtime,
     )?;
 

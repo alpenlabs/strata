@@ -1,3 +1,4 @@
+use alpen_express_state::id::L2BlockId;
 use thiserror::Error;
 
 pub type EngineResult<T> = Result<T, EngineError>;
@@ -15,6 +16,9 @@ pub enum EngineError {
 
     #[error("invalid address {0:?}")]
     InvalidAddress(Vec<u8>),
+
+    #[error("missing block in db {0}")]
+    DbMissingBlock(L2BlockId),
 
     #[error("{0}")]
     Other(String),

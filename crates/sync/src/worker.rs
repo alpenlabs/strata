@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use alpen_express_consensus_logic::{message::ForkChoiceMessage, sync_manager::SyncManager};
 use alpen_express_state::{
@@ -131,6 +131,8 @@ async fn sync_blocks_by_range<T: SyncClient>(
 
     while let Some(block) = blockstream.next().await {
         handle_new_block(state, context, block).await?;
+        // HACK: remove throttle after fixing fcm - csm channel deadlock
+        tokio::time::sleep(Duration::from_millis(10)).await;
     }
 
     Ok(())
@@ -194,10 +196,13 @@ async fn handle_new_block<T: SyncClient>(
             .l2_block_manager
             .put_block_async(block.clone())
             .await?;
+        let block_idx = block.header().blockidx();
+        debug!(%block_idx, "l2 sync: sending chain tip msg");
         context
             .sync_manager
             .submit_chain_tip_msg_async(ForkChoiceMessage::NewBlock(block.header().get_blockid()))
             .await;
+        debug!(%block_idx, "l2 sync: sending chain tip sent");
     }
     Ok(())
 }

@@ -122,7 +122,7 @@ fn process_l1_view_update(
         }
 
         let new_matured_l1_height = max(
-            new_tip_height.saturating_sub(params.l1_reorg_safe_depth as u64),
+            new_tip_height.saturating_sub(maturation_threshold),
             cur_safe_height,
         );
 
@@ -467,7 +467,7 @@ mod tests {
         // Check that blocks were matured
         assert_eq!(
             state_cache.state().l1_view().safe_height(),
-            old_safe_height + to_mature_blk_num as u64 + maturation_queue_len
+            old_safe_height + to_mature_blk_num as u64
         );
     }
 }

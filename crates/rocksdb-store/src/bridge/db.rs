@@ -14,7 +14,7 @@ use super::schemas::{
     BridgeDutyCheckpointSchema, BridgeDutyStatusSchema, BridgeDutyTxidSchema, BridgeTxStateSchema,
     BridgeTxStateTxidSchema,
 };
-use crate::DbOpsConfig;
+use crate::{sequence::get_next_id, DbOpsConfig};
 
 pub struct BridgeTxRocksDb {
     db: Arc<DB>,
@@ -33,9 +33,7 @@ impl BridgeTxDatabase for BridgeTxRocksDb {
             .with_optimistic_txn(TransactionRetry::Count(self.ops.retry_count), |txn| {
                 // insert new id if the txid is new
                 if txn.get::<BridgeTxStateSchema>(&txid)?.is_none() {
-                    let idx = rockbound::utils::get_last::<BridgeTxStateTxidSchema>(txn)?
-                        .map(|(x, _)| x + 1)
-                        .unwrap_or(0);
+                    let idx = get_next_id::<BridgeTxStateTxidSchema, DB>(txn)?;
 
                     txn.put::<BridgeTxStateTxidSchema>(&idx, &txid)?;
                 }
@@ -85,9 +83,7 @@ impl BridgeDutyDatabase for BridgeDutyRocksDb {
         self.db
             .with_optimistic_txn(TransactionRetry::Count(self.ops.retry_count), |txn| {
                 if txn.get::<BridgeDutyStatusSchema>(&txid)?.is_none() {
-                    let idx = rockbound::utils::get_last::<BridgeDutyTxidSchema>(txn)?
-                        .map(|(x, _)| x + 1)
-                        .unwrap_or(0);
+                    let idx = get_next_id::<BridgeDutyTxidSchema, DB>(txn)?;
 
                     txn.put::<BridgeDutyTxidSchema>(&idx, &txid)?;
                 }
