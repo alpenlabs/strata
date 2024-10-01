@@ -1,15 +1,14 @@
 mod db;
 
-use std::{future::Future, sync::Arc};
+use std::{fs, future::Future, path::PathBuf, sync::Arc};
 
 use clap::Parser;
 use express_reth_db::rocksdb::WitnessDB;
 use express_reth_exex::ProverWitnessGenerator;
 use express_reth_node::ExpressEthereumNode;
 use express_reth_rpc::{AlpenRPC, AlpenRpcApiServer};
-use eyre::Ok;
 use reth::{
-    args::LogArgs,
+    args::{utils::chain_help, LogArgs},
     builder::{NodeBuilder, WithLaunchContext},
     CliRunner,
 };
@@ -18,7 +17,8 @@ use reth_cli_commands::node::NodeCommand;
 use reth_primitives::Genesis;
 use tracing::info;
 
-const ALPEN_CHAIN_SPEC: &str = include_str!("../res/alpen-dev-chain.json");
+const DEFAULT_CHAIN_SPEC: &str = include_str!("../res/devnet-chain.json");
+const DEV_CHAIN_SPEC: &str = include_str!("../res/alpen-dev-chain.json");
 
 fn main() {
     reth_cli_util::sigsegv_handler::install();
@@ -29,8 +29,9 @@ fn main() {
     }
 
     let mut command = NodeCommand::<AdditionalConfig>::parse();
+
     // use provided alpen chain spec
-    command.chain = parse_chain_spec(ALPEN_CHAIN_SPEC).expect("valid chainspec");
+    command.chain = command.ext.custom_chain.clone();
     // disable peer discovery
     command.network.discovery.disable_discovery = true;
 
@@ -70,8 +71,48 @@ pub struct AdditionalConfig {
     #[command(flatten)]
     pub logs: LogArgs,
 
+    /// The chain this node is running.
+    ///
+    /// Possible values are either a built-in chain or the path to a chain specification file.
+    /// Cannot override existing `chain` arg, so this is a workaround.
+    #[arg(
+        long,
+        value_name = "CHAIN_OR_PATH",
+        long_help = chain_help(),
+        default_value = "devnet",
+        value_parser = chain_value_parser,
+        required = false,
+    )]
+    pub custom_chain: Arc<ChainSpec>,
+
     #[arg(long, default_value_t = false)]
     pub enable_witness_gen: bool,
+}
+
+pub fn chain_value_parser(s: &str) -> eyre::Result<Arc<ChainSpec>, eyre::Error> {
+    Ok(match s {
+        "devnet" => parse_chain_spec(DEFAULT_CHAIN_SPEC)?,
+        "dev" => parse_chain_spec(DEV_CHAIN_SPEC)?,
+        _ => {
+            // try to read json from path first
+            let raw = match fs::read_to_string(PathBuf::from(shellexpand::full(s)?.into_owned())) {
+                Ok(raw) => raw,
+                Err(io_err) => {
+                    // valid json may start with "\n", but must contain "{"
+                    if s.contains('{') {
+                        s.to_string()
+                    } else {
+                        return Err(io_err.into()); // assume invalid path
+                    }
+                }
+            };
+
+            // both serialized Genesis and ChainSpec structs supported
+            let genesis: Genesis = serde_json::from_str(&raw)?;
+
+            Arc::new(genesis.into())
+        }
+    })
 }
 
 fn parse_chain_spec(chain_json: &str) -> eyre::Result<Arc<ChainSpec>> {

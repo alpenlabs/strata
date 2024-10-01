@@ -238,6 +238,8 @@ class RethFactory(flexitest.Factory):
             "--http.port", str(ethrpc_http_port),
             "--color", "never",
             "--enable-witness-gen",
+            # TODO: update tests to use new chain config 
+            "--custom-chain", "dev",
             "-vvvv"
         ]
         # fmt: on
