@@ -185,7 +185,7 @@ impl CheckpointInfo {
     /// check for whether the l2 block is covered by the checkpoint
     pub fn includes_l2_block(&self, block_height: u64) -> bool {
         let (_, last_l2_height) = self.l2_range;
-        if block_height < last_l2_height {
+        if block_height <= last_l2_height {
             return true;
         }
         false

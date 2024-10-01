@@ -72,7 +72,7 @@ pub struct DepositTxParams {
     /// EE Address length
     pub address_length: u8,
     /// deposit amount
-    pub deposit_quantity: u64,
+    pub deposit_amount: u64,
 }
 
 impl RollupParams {
@@ -80,7 +80,7 @@ impl RollupParams {
         DepositTxParams {
             magic_bytes: self.rollup_name.clone().into_bytes().to_vec(),
             address_length: self.address_length,
-            deposit_quantity: self.deposit_amount,
+            deposit_amount: self.deposit_amount,
         }
     }
 }

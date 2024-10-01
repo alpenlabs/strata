@@ -243,7 +243,7 @@ pub struct BridgeDuties {
 pub enum L2BlockStatus {
     /// Unknown block height
     Unknown,
-    /// Block is recieved and present in the longest chain
+    /// Block is received and present in the longest chain
     Confirmed,
     /// Block is now conformed on L1, and present at certain L1 height
     Verified(u64),

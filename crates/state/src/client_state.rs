@@ -244,7 +244,7 @@ impl LocalL1State {
         self.last_finalized_checkpoint.as_ref()
     }
 
-    pub fn pending_checkpoints(&self) -> &[L1CheckPoint] {
+    pub fn verified_checkpoints(&self) -> &[L1CheckPoint] {
         &self.verified_checkpoints
     }
 
@@ -265,9 +265,13 @@ impl LocalL1State {
         self.header_verification_state.as_ref()
     }
 
-    pub fn is_l2_block_verified(&self, block_height: u64) -> bool {
-        self.verified_checkpoints.iter().any(|v| {
-            v.checkpoint.l2_range.0 < block_height && v.checkpoint.l2_range.1 > block_height
+    pub fn get_verified_l1_height(&self, block_height: u64) -> Option<u64> {
+        self.verified_checkpoints.last().and_then(|ch| {
+            if ch.checkpoint.includes_l2_block(block_height) {
+                Some(ch.height)
+            } else {
+                None
+            }
         })
     }
 }

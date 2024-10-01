@@ -566,11 +566,11 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         let cl_state = self.get_client_state().await;
         if let Some(last_checkpoint) = cl_state.l1_view().last_finalized_checkpoint() {
             if last_checkpoint.checkpoint.includes_l2_block(block_height) {
-                return Ok(L2BlockStatus::Finalized(1));
+                return Ok(L2BlockStatus::Finalized(last_checkpoint.height));
             }
         }
-        if cl_state.l1_view().is_l2_block_verified(block_height) {
-            return Ok(L2BlockStatus::Verified(1));
+        if let Some(l1_height) = cl_state.l1_view().get_verified_l1_height(block_height) {
+            return Ok(L2BlockStatus::Verified(l1_height));
         }
 
         if let Some(sync_status) = cl_state.sync() {

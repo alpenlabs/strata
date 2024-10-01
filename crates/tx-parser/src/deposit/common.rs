@@ -18,9 +18,9 @@ pub fn check_bridge_offer_output(
     if !txout.script_pubkey.is_p2tr() {
         return Err(DepositParseError::NoP2TR);
     }
-    if txout.value.to_sat() < config.deposit_quantity {
+    if txout.value.to_sat() < config.deposit_amount {
         return Err(DepositParseError::ExpectedAmount(
-            config.deposit_quantity,
+            config.deposit_amount,
             txout.value.to_sat(),
         ));
     }
@@ -79,7 +79,7 @@ mod tests {
     fn test_check_bridge_offer_output_valid() {
         let config = get_deposit_tx_config();
         let tx = create_transaction_two_outpoints(
-            Amount::from_sat(config.deposit_quantity),
+            Amount::from_sat(config.deposit_amount),
             &generic_taproot_addr().script_pubkey(),
             &ScriptBuf::new(),
         );
@@ -92,7 +92,7 @@ mod tests {
     fn test_check_bridge_offer_output_invalid() {
         let config = get_deposit_tx_config();
         let tx = create_transaction_two_outpoints(
-            Amount::from_sat(config.deposit_quantity + 1),
+            Amount::from_sat(config.deposit_amount + 1),
             &ScriptBuf::new(),
             &ScriptBuf::new(),
         );

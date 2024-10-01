@@ -20,7 +20,7 @@ pub fn get_deposit_tx_config() -> DepositTxParams {
     DepositTxParams {
         magic_bytes: "expresssss".to_string().as_bytes().to_vec(),
         address_length: 20,
-        deposit_quantity: 1_000_000_000,
+        deposit_amount: 1_000_000_000,
     }
 }
 

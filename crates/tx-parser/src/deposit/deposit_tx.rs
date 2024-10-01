@@ -85,7 +85,7 @@ mod tests {
     fn check_deposit_parser() {
         // values for testing
         let config = get_deposit_tx_config();
-        let amt = Amount::from_sat(config.deposit_quantity);
+        let amt = Amount::from_sat(config.deposit_amount);
         let ee_addr = [1; 20];
         let generic_taproot_addr = generic_taproot_addr();
 
@@ -93,7 +93,7 @@ mod tests {
             build_test_deposit_script(config.magic_bytes, ee_addr.to_vec());
 
         let test_transaction = create_transaction_two_outpoints(
-            Amount::from_sat(config.deposit_quantity),
+            Amount::from_sat(config.deposit_amount),
             &generic_taproot_addr.script_pubkey(),
             &deposit_request_script,
         );
