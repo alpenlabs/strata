@@ -4,7 +4,7 @@ use express_zkvm::{ProverOptions, ZKVMHost};
 use tokio::time::{sleep, Duration};
 
 use crate::{
-    config::PROVER_MANAGER_WAIT_TIME,
+    config::PROVER_MANAGER_INTERVAL,
     primitives::tasks_scheduler::{ProofSubmissionStatus, ProvingTaskStatus},
     prover::Prover,
     task::TaskTracker,
@@ -35,7 +35,7 @@ where
         loop {
             self.process_pending_tasks().await;
             self.track_proving_progress().await;
-            sleep(Duration::from_secs(PROVER_MANAGER_WAIT_TIME)).await;
+            sleep(Duration::from_secs(PROVER_MANAGER_INTERVAL)).await;
         }
     }
 
@@ -53,11 +53,11 @@ where
             self.prover.submit_witness(task.id, task.prover_input);
             if self.prover.start_proving(task.id).is_err() {
                 self.task_tracker
-                    .update_task_status(task.id, ProvingTaskStatus::Pending)
+                    .update_status(task.id, ProvingTaskStatus::Pending)
                     .await;
             } else {
                 self.task_tracker
-                    .update_task_status(task.id, ProvingTaskStatus::Processing)
+                    .update_status(task.id, ProvingTaskStatus::Processing)
                     .await;
             }
         }
@@ -79,7 +79,7 @@ where
                 .get_proof_submission_status_and_remove_on_success(task.id)
             {
                 self.task_tracker
-                    .update_task_status(task.id, ProvingTaskStatus::Completed)
+                    .update_status(task.id, ProvingTaskStatus::Completed)
                     .await;
 
                 // TODO: Implement post-processing hooks.

@@ -1,19 +1,16 @@
 //! Prover client.
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use alpen_express_btcio::rpc::BitcoinClient;
 use alpen_express_common::logging;
 use args::Args;
-use config::{CL_START_BLOCK_HEIGHT, EL_START_BLOCK_HEIGHT};
-use dispatchers::{
-    btc_task_dispatcher::BtcBlockspaceProvingTaskScheduler,
-    cl_task_dispatcher::CLBlockProvingTaskDispatcher,
-    el_task_dispatcher::ELBlockProvingTaskDispatcher,
-};
+use config::{BTC_DISPATCH_INTERVAL, BTC_START_BLOCK, L2_DISPATCH_INTERVAL, L2_START_BLOCK};
+use dispatcher::TaskDispatcher;
 use express_sp1_adapter::SP1Host;
 use jsonrpsee::http_client::HttpClientBuilder;
 use manager::ProverManager;
+use proving_ops::{btc_ops::BtcOperations, cl_ops::ClOperations, el_ops::ElOperations};
 use rpc_server::{ProverClientRpc, RpcContext};
 use task::TaskTracker;
 use tracing::info;
@@ -21,11 +18,12 @@ use tracing::info;
 mod args;
 mod config;
 mod db;
-mod dispatchers;
+mod dispatcher;
 mod errors;
 mod manager;
 mod primitives;
 mod prover;
+mod proving_ops;
 mod rpc_server;
 mod task;
 
@@ -37,15 +35,15 @@ async fn main() {
     let args: Args = argh::from_env();
     let task_tracker = Arc::new(TaskTracker::new());
 
-    let el_rpc_client = HttpClientBuilder::default()
+    let el_client = HttpClientBuilder::default()
         .build(args.get_reth_rpc_url())
         .expect("failed to connect to the el client");
 
-    let cl_rpc_client = HttpClientBuilder::default()
+    let cl_client = HttpClientBuilder::default()
         .build(args.get_sequencer_rpc_url())
         .expect("failed to connect to the el client");
 
-    let btc_rpc_client = Arc::new(
+    let btc_client = Arc::new(
         BitcoinClient::new(
             args.get_btc_rpc_url(),
             args.bitcoind_user.clone(),
@@ -54,41 +52,48 @@ async fn main() {
         .unwrap(),
     );
 
-    let el_proving_task_scheduler = ELBlockProvingTaskDispatcher::new(
-        el_rpc_client.clone(),
+    // Create operations
+    let btc_ops = BtcOperations::new(btc_client.clone());
+    let el_ops = ElOperations::new(el_client.clone());
+    let cl_ops = ClOperations::new(cl_client.clone());
+
+    // Create dispatchers
+    let mut btc_dispatcher = TaskDispatcher::new(
+        btc_ops,
         task_tracker.clone(),
-        EL_START_BLOCK_HEIGHT,
+        BTC_START_BLOCK,
+        Duration::from_secs(BTC_DISPATCH_INTERVAL),
     );
 
-    let cl_proving_task_scheduler = CLBlockProvingTaskDispatcher::new(
-        cl_rpc_client,
+    let mut el_dispatcher = TaskDispatcher::new(
+        el_ops,
         task_tracker.clone(),
-        CL_START_BLOCK_HEIGHT,
+        L2_START_BLOCK,
+        Duration::from_secs(L2_DISPATCH_INTERVAL),
     );
 
-    let btc_proving_task_scheduler = BtcBlockspaceProvingTaskScheduler::new(
-        btc_rpc_client,
+    let mut cl_dispatcher = TaskDispatcher::new(
+        cl_ops,
         task_tracker.clone(),
-        CL_START_BLOCK_HEIGHT,
+        L2_START_BLOCK,
+        Duration::from_secs(L2_DISPATCH_INTERVAL),
     );
 
     let rpc_context = RpcContext::new(
-        btc_proving_task_scheduler.clone(),
-        el_proving_task_scheduler.clone(),
-        cl_proving_task_scheduler.clone(),
+        btc_dispatcher.clone(),
+        el_dispatcher.clone(),
+        cl_dispatcher.clone(),
     );
+
+    // Run dispatchers in background
+    tokio::spawn(async move { btc_dispatcher.start().await });
+    tokio::spawn(async move { el_dispatcher.start().await });
+    tokio::spawn(async move { cl_dispatcher.start().await });
+
     let prover_manager: ProverManager<SP1Host> = ProverManager::new(task_tracker);
 
     // run prover manager in background
     tokio::spawn(async move { prover_manager.run().await });
-
-    // run el proving task dispatcher
-    // tokio::spawn(async move {
-    //     el_proving_task_scheduler
-    //         .clone()
-    //         .listen_for_new_blocks()
-    //         .await
-    // });
 
     // run rpc server
     let rpc_url = args.get_dev_rpc_url();

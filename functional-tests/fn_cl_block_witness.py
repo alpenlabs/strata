@@ -1,5 +1,6 @@
-import flexitest
 import time
+
+import flexitest
 
 from utils import wait_until
 

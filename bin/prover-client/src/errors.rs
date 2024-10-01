@@ -6,7 +6,7 @@ pub enum ProvingTaskError {
     #[error(
         "Failed to fetch {task_type} block prover input for block number {block_num}: {source}"
     )]
-    FetchBlockProverInputError {
+    FetchInputError {
         block_num: u64,
         task_type: BlockType,
         source: anyhow::Error,
@@ -19,7 +19,7 @@ pub enum ProvingTaskError {
 // Define BlockType enum to represent EL and CL
 #[derive(Debug, Clone, Copy)]
 pub enum BlockType {
-    BTC,
+    Btc,
     EL,
     CL,
 }
@@ -27,7 +27,7 @@ pub enum BlockType {
 impl std::fmt::Display for BlockType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let block_type_str = match self {
-            BlockType::BTC => "BTC",
+            BlockType::Btc => "BTC",
             BlockType::EL => "EL",
             BlockType::CL => "CL",
         };

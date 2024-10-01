@@ -8,6 +8,8 @@ pub enum ProofVm {
     ELProving,
     CLProving,
     CLAggregation,
+    L1Batch,
+    Checkpoint,
 }
 
 pub struct ZkVMManager<Vm: ZKVMHost> {

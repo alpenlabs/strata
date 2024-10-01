@@ -5,10 +5,12 @@ use strata_tx_parser::filter::TxFilterRule;
 use super::vms::ProofVm;
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum ProverInput {
     BtcBlock(Block, Vec<TxFilterRule>),
     ElBlock(WitnessData),
     ClBlock(WitnessData),
+    L1Batch(WitnessData),
 }
 
 impl ProverInput {
@@ -17,6 +19,7 @@ impl ProverInput {
             ProverInput::BtcBlock(_, _) => ProofVm::BtcProving,
             ProverInput::ElBlock(_) => ProofVm::ELProving,
             ProverInput::ClBlock(_) => ProofVm::CLProving,
+            ProverInput::L1Batch(_) => ProofVm::L1Batch,
         }
     }
 }

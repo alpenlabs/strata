@@ -9,6 +9,7 @@ use crate::primitives::{
 
 /// The `TaskTracker` manages the lifecycle of proving tasks. It provides functionality
 /// to create tasks, update their status, and retrieve tasks based on their current state.
+#[derive(Debug)]
 pub struct TaskTracker {
     pending_tasks: Mutex<Vec<ProvingTask>>,
 }
@@ -33,7 +34,7 @@ impl TaskTracker {
         task_id
     }
 
-    pub async fn update_task_status(&self, task_id: Uuid, status: ProvingTaskStatus) {
+    pub async fn update_status(&self, task_id: Uuid, status: ProvingTaskStatus) {
         let mut tasks = self.pending_tasks.lock().await;
         if let Some(task) = tasks.iter_mut().find(|t| t.id == task_id) {
             task.status = status;
@@ -49,7 +50,7 @@ impl TaskTracker {
             .collect()
     }
 
-    pub async fn get_task_by_id(&self, task_id: Uuid) -> Option<ProvingTask> {
+    pub async fn get_task(&self, task_id: Uuid) -> Option<ProvingTask> {
         let tasks = self.pending_tasks.lock().await;
         tasks.iter().find(|task| task.id == task_id).cloned()
     }

@@ -9,13 +9,16 @@ use alpen_express_rocksdb::{
     DbOpsConfig,
 };
 use express_proofimpl_evm_ee_stf::ELProofInput;
-use express_sp1_guest_builder::{GUEST_BTC_BLOCKSPACE_ELF, GUEST_EVM_EE_STF_ELF};
+use express_sp1_guest_builder::{
+    GUEST_BTC_BLOCKSPACE_ELF, GUEST_CHECKPOINT_ELF, GUEST_CL_STF_ELF, GUEST_EVM_EE_STF_ELF,
+    GUEST_L1_BATCH_ELF,
+};
 use express_zkvm::{Proof, ProverOptions, ZKVMHost, ZKVMInputBuilder};
 use tracing::info;
 use uuid::Uuid;
 
 use crate::{
-    config::NUM_PROVER_WORKER,
+    config::NUM_PROVER_WORKERS,
     db::open_rocksdb_database,
     primitives::{
         prover_input::ProverInput,
@@ -124,13 +127,15 @@ where
 
         let mut zkvm_manager: ZkVMManager<Vm> = ZkVMManager::new(prover_config);
         zkvm_manager.add_vm(ProofVm::BtcProving, GUEST_BTC_BLOCKSPACE_ELF.into());
+        zkvm_manager.add_vm(ProofVm::L1Batch, GUEST_L1_BATCH_ELF.into());
         zkvm_manager.add_vm(ProofVm::ELProving, GUEST_EVM_EE_STF_ELF.into());
-        zkvm_manager.add_vm(ProofVm::CLProving, vec![]);
+        zkvm_manager.add_vm(ProofVm::CLProving, GUEST_CL_STF_ELF.into());
         zkvm_manager.add_vm(ProofVm::CLAggregation, vec![]);
+        zkvm_manager.add_vm(ProofVm::Checkpoint, GUEST_CHECKPOINT_ELF.into());
 
         Self {
             pool: rayon::ThreadPoolBuilder::new()
-                .num_threads(NUM_PROVER_WORKER)
+                .num_threads(NUM_PROVER_WORKERS)
                 .build()
                 .expect("Failed to initialize prover threadpool worker"),
 

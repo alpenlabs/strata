@@ -10,24 +10,23 @@ use tokio::sync::oneshot;
 use tracing::{info, warn};
 use uuid::Uuid;
 
-use crate::dispatchers::{
-    btc_task_dispatcher::BtcBlockspaceProvingTaskScheduler,
-    cl_task_dispatcher::CLBlockProvingTaskDispatcher,
-    el_task_dispatcher::ELBlockProvingTaskDispatcher,
+use crate::{
+    dispatcher::TaskDispatcher,
+    proving_ops::{btc_ops::BtcOperations, cl_ops::ClOperations, el_ops::ElOperations},
 };
 
 #[derive(Clone)]
 pub struct RpcContext {
-    pub btc_proving_task_dispatcher: BtcBlockspaceProvingTaskScheduler,
-    pub el_proving_task_dispatcher: ELBlockProvingTaskDispatcher,
-    pub cl_proving_task_dispatcher: CLBlockProvingTaskDispatcher,
+    pub btc_proving_task_dispatcher: TaskDispatcher<BtcOperations>,
+    pub el_proving_task_dispatcher: TaskDispatcher<ElOperations>,
+    pub cl_proving_task_dispatcher: TaskDispatcher<ClOperations>,
 }
 
 impl RpcContext {
     pub fn new(
-        btc_proving_task_scheduler: BtcBlockspaceProvingTaskScheduler,
-        el_proving_task_scheduler: ELBlockProvingTaskDispatcher,
-        cl_proving_task_scheduler: CLBlockProvingTaskDispatcher,
+        btc_proving_task_scheduler: TaskDispatcher<BtcOperations>,
+        el_proving_task_scheduler: TaskDispatcher<ElOperations>,
+        cl_proving_task_scheduler: TaskDispatcher<ClOperations>,
     ) -> Self {
         Self {
             btc_proving_task_dispatcher: btc_proving_task_scheduler,
@@ -93,7 +92,7 @@ impl ExpressProverClientApiServer for ProverClientRpc {
         let task_id = self
             .context
             .btc_proving_task_dispatcher
-            .create_proving_task(btc_block_num)
+            .create_task(btc_block_num)
             .await
             .expect("failed to add proving task");
 
@@ -104,7 +103,7 @@ impl ExpressProverClientApiServer for ProverClientRpc {
         let task_id = self
             .context
             .el_proving_task_dispatcher
-            .create_proving_task(el_block_num)
+            .create_task(el_block_num)
             .await
             .expect("failed to add proving task");
 
@@ -115,7 +114,7 @@ impl ExpressProverClientApiServer for ProverClientRpc {
         let task_id = self
             .context
             .cl_proving_task_dispatcher
-            .create_proving_task(cl_block_num)
+            .create_task(cl_block_num)
             .await
             .expect("failed to add proving task");
 
@@ -126,7 +125,7 @@ impl ExpressProverClientApiServer for ProverClientRpc {
         let task_id = Uuid::from_str(&task_id).expect("invalid UUID params");
         let task_tracker = self.context.el_proving_task_dispatcher.task_tracker();
 
-        if let Some(proving_task) = task_tracker.get_task_by_id(task_id).await {
+        if let Some(proving_task) = task_tracker.get_task(task_id).await {
             let task_status = proving_task.status.to_string();
             return RpcResult::Ok(Some(task_status));
         }

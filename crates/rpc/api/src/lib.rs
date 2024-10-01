@@ -39,7 +39,7 @@ pub trait AlpenApi {
     #[method(name = "getExecUpdateById")]
     async fn get_exec_update_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<ExecUpdate>>;
 
-    #[method(name = "getCLBlockWitness") ]
+    #[method(name = "getCLBlockWitness")]
     async fn get_cl_block_witness_raw(&self, index: u64) -> RpcResult<Option<Vec<u8>>>;
 
     #[method(name = "getCurrentDeposits")]

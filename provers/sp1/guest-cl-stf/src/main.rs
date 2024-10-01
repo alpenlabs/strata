@@ -11,7 +11,7 @@ use sha2::{Digest, Sha256};
 // mod vks;
 
 fn main() {
-    println!("Wokring on this abishek");
+    println!("Working on this abishek");
     // let params = get_rollup_params();
 
     // Read the input from the host

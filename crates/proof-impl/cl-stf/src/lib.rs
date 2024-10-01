@@ -1,8 +1,6 @@
 //! This crate implements the proof of the chain state transition function (STF) for L2 blocks,
 //! verifying the correct state transitions as new L2 blocks are processed.
 
-use alpen_express_primitives::params::Params;
-use alpen_express_state::block_validation::{check_block_credential, validate_block_segments};
 use alpen_express_primitives::{buf::Buf32, evm_exec::create_evm_extra_payload, params::Params};
 use alpen_express_state::{
     block::ExecSegment,
@@ -10,6 +8,7 @@ use alpen_express_state::{
     exec_update::{ExecUpdate, UpdateInput, UpdateOutput},
 };
 pub use alpen_express_state::{block::L2Block, chain_state::ChainState, state_op::StateCache};
+use express_proofimpl_evm_ee_stf::ELProofPublicParams;
 
 pub type CLProofInput = (ChainState, L2Block);
 pub type CLProofPublicParams = ([u8; 32], [u8; 32]);
@@ -40,8 +39,8 @@ fn verify_l2_block(block: &L2Block, el_proof_pp: &ELProofPublicParams, chain_par
     );
 
     // Verify proof public params matches the exec segment
-    let proof_exec_segment = create_exec_segment(el_proof_pp);
-    let block_exec_segment = block.body().exec_segment().clone();
+    let _proof_exec_segment = create_exec_segment(el_proof_pp);
+    let _block_exec_segment = block.body().exec_segment().clone();
 }
 
 /// Generates an execution segment from the given ELProof public parameters.
@@ -49,6 +48,7 @@ fn create_exec_segment(el_proof_pp: &ELProofPublicParams) -> ExecSegment {
     // create_evm_extra_payload
     let update_input = UpdateInput::new(
         el_proof_pp.block_idx,
+        vec![],
         Buf32(el_proof_pp.txn_root),
         create_evm_extra_payload(Buf32(el_proof_pp.new_blockhash)),
     );
@@ -78,27 +78,27 @@ fn apply_state_transition(
     state_cache.state().to_owned()
 }
 
-#[cfg(test)]
-mod tests {
-    use alpen_test_utils::l2::gen_params;
+// #[cfg(test)]
+// mod tests {
+//     use alpen_test_utils::l2::gen_params;
 
-    use super::*;
+//     use super::*;
 
-    #[test]
-    #[ignore = "needs to be reworked to remove constant values"]
-    fn test_verify_and_transition() {
-        let prev_state_data: &[u8] = include_bytes!("../test-datas/prev_chstate.borsh");
-        let new_state_data: &[u8] = include_bytes!("../test-datas/post_state.borsh");
-        let new_block_data: &[u8] = include_bytes!("../test-datas/final_block.borsh");
+//     #[test]
+//     #[ignore = "needs to be reworked to remove constant values"]
+//     fn test_verify_and_transition() {
+//         let prev_state_data: &[u8] = include_bytes!("../test-datas/prev_chstate.borsh");
+//         let new_state_data: &[u8] = include_bytes!("../test-datas/post_state.borsh");
+//         let new_block_data: &[u8] = include_bytes!("../test-datas/final_block.borsh");
 
-        let prev_state: ChainState = borsh::from_slice(prev_state_data).unwrap();
-        let expected_new_state: ChainState = borsh::from_slice(new_state_data).unwrap();
-        let block: L2Block = borsh::from_slice(new_block_data).unwrap();
-        // let new_state = verify_and_transition(prev_state, block, gen_params());
+//         let prev_state: ChainState = borsh::from_slice(prev_state_data).unwrap();
+//         let expected_new_state: ChainState = borsh::from_slice(new_state_data).unwrap();
+//         let block: L2Block = borsh::from_slice(new_block_data).unwrap();
+//         // let new_state = verify_and_transition(prev_state, block, gen_params());
 
-        // assert_eq!(
-        //     expected_new_state.compute_state_root(),
-        //     new_state.compute_state_root()
-        // );
-    }
-}
+//         // assert_eq!(
+//         //     expected_new_state.compute_state_root(),
+//         //     new_state.compute_state_root()
+//         // );
+//     }
+// }
