@@ -149,6 +149,10 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         Ok(1)
     }
 
+    async fn block_time(&self) -> RpcResult<u64> {
+        Ok(self.sync_manager.params().rollup.block_time)
+    }
+
     async fn get_l1_status(&self) -> RpcResult<L1Status> {
         Ok(self.status_rx.l1.borrow().clone())
     }
