@@ -37,6 +37,7 @@ members = [
   "crates/sync",
   "crates/tasks",
   "crates/test-utils",
+  "crates/tx-parser",
   "crates/util/mmr",
   "crates/util/shrex",
   "crates/vtxjmt",
@@ -46,12 +47,9 @@ members = [
   # binaries listed separately
   "bin/bridge-client",
   "bin/datatool",
-  "bin/prover-client",
   "bin/strata-cli",
-  "bin/strata-client",
+  "bin/prover-client",
   "bin/strata-reth",
-  "bin/datatool",
-  "crates/tx-parser",
 
   # integration tests
   "tests",
@@ -144,6 +142,8 @@ miniscript = "12.2.0"
 mockall = "0.11"
 musig2 = { version = "0.1.0", features = ["serde"] }
 num_enum = "0.7"
+opentelemetry-otlp = "0.17"
+opentelemetry_sdk = { version = "0.25", features = ["rt-tokio-current-thread"] }
 parking_lot = "0.12.3"
 paste = "1.0"
 rand = "0.8.5"
@@ -206,10 +206,11 @@ tempfile = "3.10.1"
 terrors = "0.3.0"
 thiserror = "1.0"
 threadpool = "1.8"
-tokio = { version = "1.37", features = ["full"] }
+tokio = { version = "^1.39", features = ["full"] }
 toml = "0.5"
 tower = "0.4"
 tracing = "0.1.40"
+tracing-opentelemetry = "0.17"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 uuid = { version = "1.0", features = ["v4", "serde"] }
 
