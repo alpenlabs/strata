@@ -97,7 +97,7 @@ fn duty_tracker_task_inner(
         let ev_idx = update.sync_event_idx();
         let new_state = update.new_state();
         trace!(%ev_idx, "new consensus state, updating duties");
-        trace!("STATE: {new_state:#?}");
+        trace!("STATE: {new_state:?}");
 
         if let Err(e) = update_tracker(
             &mut duties_tracker,

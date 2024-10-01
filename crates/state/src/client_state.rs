@@ -179,7 +179,7 @@ pub struct LocalL1State {
     pub(super) last_finalized_checkpoint: Option<L1CheckPoint>,
 
     /// Checkpoints that are in L1 but yet to be finalized.
-    pub(super) pending_checkpoints: Vec<L1CheckPoint>,
+    pub(super) verified_checkpoints: Vec<L1CheckPoint>,
 
     /// This state is used to verify the `next_expected_block`
     pub(super) header_verification_state: Option<HeaderVerificationState>,
@@ -199,7 +199,7 @@ impl LocalL1State {
         Self {
             local_unaccepted_blocks: Vec::new(),
             next_expected_block,
-            pending_checkpoints: Vec::new(),
+            verified_checkpoints: Vec::new(),
             last_finalized_checkpoint: None,
             header_verification_state: None,
         }
@@ -245,17 +245,17 @@ impl LocalL1State {
     }
 
     pub fn pending_checkpoints(&self) -> &[L1CheckPoint] {
-        &self.pending_checkpoints
+        &self.verified_checkpoints
     }
 
     pub fn has_pending_checkpoint_within_height(&self, height: u64) -> bool {
-        self.pending_checkpoints
+        self.verified_checkpoints
             .iter()
             .any(|cp| cp.height <= height)
     }
 
     pub fn last_pending_checkpoint_within_height(&self, height: u64) -> Option<&L1CheckPoint> {
-        self.pending_checkpoints
+        self.verified_checkpoints
             .iter()
             .take_while(|cp| cp.height <= height)
             .last()
@@ -265,8 +265,8 @@ impl LocalL1State {
         self.header_verification_state.as_ref()
     }
 
-    pub fn is_l2_block_pending(&self, block_height: u64) -> bool {
-        self.pending_checkpoints.iter().any(|v| {
+    pub fn is_l2_block_verified(&self, block_height: u64) -> bool {
+        self.verified_checkpoints.iter().any(|v| {
             v.checkpoint.l2_range.0 < block_height && v.checkpoint.l2_range.1 > block_height
         })
     }
