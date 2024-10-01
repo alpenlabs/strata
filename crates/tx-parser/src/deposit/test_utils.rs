@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use alpen_express_primitives::l1::OutputRef;
+use alpen_express_primitives::{l1::OutputRef, params::DepositTxParams};
 use alpen_test_utils::ArbitraryGenerator;
 use bitcoin::{
     absolute::LockTime,
@@ -9,8 +9,6 @@ use bitcoin::{
     Address, Amount, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Witness,
 };
 
-use crate::deposit::DepositTxConfig;
-
 pub fn generic_taproot_addr() -> Address {
     Address::from_str("bcrt1pnmrmugapastum8ztvgwcn8hvq2avmcwh2j4ssru7rtyygkpqq98q4wyd6s")
         .unwrap()
@@ -18,11 +16,11 @@ pub fn generic_taproot_addr() -> Address {
         .unwrap()
 }
 
-pub fn get_deposit_tx_config() -> DepositTxConfig {
-    DepositTxConfig {
+pub fn get_deposit_tx_config() -> DepositTxParams {
+    DepositTxParams {
         magic_bytes: "expresssss".to_string().as_bytes().to_vec(),
         address_length: 20,
-        deposit_quantity: 1_000_000_000,
+        deposit_amount: 1_000_000_000,
     }
 }
 

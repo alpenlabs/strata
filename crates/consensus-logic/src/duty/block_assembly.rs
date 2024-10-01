@@ -175,7 +175,7 @@ fn prepare_l1_segment(
         let mut payloads = Vec::new();
         for (h, _b) in unacc_blocks.iter().take(max_l1_entries) {
             let rec = load_header_record(*h, l1_prov)?;
-            let deposit_update_tx = deposit_update_txs_from_db(*h, l1_prov)?;
+            let deposit_update_tx = fetch_deposit_update_txs(*h, l1_prov)?;
             payloads.push(
                 L1HeaderPayload::new(*h, rec)
                     .with_deposit_update_txs(deposit_update_tx)
@@ -219,7 +219,7 @@ fn prepare_l1_segment(
     let mut payloads = Vec::new();
     for (h, _b) in fresh_blocks {
         let rec = load_header_record(*h, l1_prov)?;
-        let deposit_update_tx = deposit_update_txs_from_db(*h, l1_prov)?;
+        let deposit_update_tx = fetch_deposit_update_txs(*h, l1_prov)?;
         payloads.push(
             L1HeaderPayload::new(*h, rec)
                 .with_deposit_update_txs(deposit_update_tx)
@@ -245,7 +245,7 @@ fn load_header_record(h: u64, l1_prov: &impl L1DataProvider) -> Result<L1HeaderR
     ))
 }
 
-fn deposit_update_txs_from_db(
+fn fetch_deposit_update_txs(
     h: u64,
     l1_prov: &impl L1DataProvider,
 ) -> Result<Vec<DepositUpdateTx>, Error> {

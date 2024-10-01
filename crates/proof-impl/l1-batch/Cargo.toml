@@ -4,16 +4,20 @@ name = "express-proofimpl-l1-batch"
 version = "0.1.0"
 
 [dependencies]
-alpen-express-primitives.workspace = true
-alpen-express-state.workspace = true
-anyhow.workspace = true
-bitcoin.workspace = true
-borsh.workspace = true
-ethnum = "1.5.0"
-express-proofimpl-btc-blockspace.workspace = true
-serde.workspace = true
+alpen-express-primitives = { workspace = true }
+alpen-express-state = { workspace = true }
+alpen-test-utils = { workspace = true, optional = true }
+anyhow = { workspace = true }
+bitcoin = { workspace = true }
+borsh = { workspace = true }
+ethnum = { workspace = true }
+express-proofimpl-btc-blockspace = { workspace = true }
+serde = { workspace = true }
 serde_json = "1.0.127"
 
 [dev-dependencies]
-rand.workspace = true
-alpen-test-utils.workspace = true
+alpen-test-utils = { workspace = true }
+rand = { workspace = true }
+
+[features]
+test-utils = []

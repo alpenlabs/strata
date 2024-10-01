@@ -111,13 +111,38 @@ impl<T> StateQueue<T> {
         }
     }
 
-    /// Pops the front N element of the queue, only if they can all be popped.
+    /// Pops the front `n` elements from the queue, only if they can all be popped.
+    ///
+    /// This is a batch operation so that we don't have to repeatedly take
+    /// single elements out of the vec with `.pop_front()` and move the later
+    /// ones over if we want to take out multiple elements
+    ///
+    /// Returns `None` if there are not enough elements to pop.
+    pub fn pop_front_n_vec(&mut self, n: usize) -> Option<Vec<T>> {
+        if self.entries.len() < n {
+            return None;
+        }
+
+        // Split the queue entries we want to keep into its own vec.
+        let out = {
+            let mut new_entries = self.entries.split_off(n);
+            std::mem::swap(&mut self.entries, &mut new_entries);
+            new_entries
+        };
+
+        // Now adjust the base index.
+        self.base_idx += n as u64;
+        Some(out)
+    }
+
+    /// Pops the front N element of the queue, only if they can be poppped
+    /// N is const, because this uses compile time guarantees to convert
     ///
     /// This is a batch operation so that we don't have to repeatedly take
     /// single elements out of the vec with `.pop_front()` and move the later
     /// ones over if we want to take out multiple elements, and it provides a
     /// check to ensure that it can really be done atomically.
-    pub fn pop_front_n<const N: usize>(&mut self) -> Option<[T; N]> {
+    pub fn pop_front_n_arr<const N: usize>(&mut self) -> Option<[T; N]> {
         if self.entries.len() < N {
             return None;
         }
@@ -180,7 +205,7 @@ mod tests {
         let n0 = q.next_idx();
         assert_eq!(n0, 8);
 
-        let arr = q.pop_front_n::<3>();
+        let arr = q.pop_front_n_arr::<3>();
         assert_eq!(arr, Some([5, 6, 7]));
         let b0 = q.base_idx();
         assert_eq!(b0, 3);
@@ -196,16 +221,24 @@ mod tests {
         let n2 = q.next_idx();
         assert_eq!(n2, 8);
 
-        let arr2 = q.pop_front_n::<10>();
+        let arr2 = q.pop_front_n_arr::<10>();
         assert_eq!(arr2, None);
-        let arr3 = q.pop_front_n::<4>();
+        let arr3 = q.pop_front_n_arr::<4>();
         assert_eq!(arr3, Some([9, 15, 20, 25]));
 
+        let to_pop_len = 4;
+        q.push_back(10);
+        q.push_back(11);
+        q.push_back(12);
+        q.push_back(13);
+        let vec1 = q.pop_front_n_vec(to_pop_len);
+        assert_eq!(vec1, Some(vec![10, 11, 12, 13]));
+
         let n3 = q.next_idx();
-        assert_eq!(n3, 8);
+        assert_eq!(n3, 12);
 
         assert!(q.is_empty());
         let b2 = q.base_idx();
-        assert_eq!(b2, 8);
+        assert_eq!(b2, 12);
     }
 }

@@ -1,6 +1,7 @@
+use alpen_express_primitives::params::DepositTxParams;
 use bitcoin::{script::Instructions, Transaction};
 
-use super::{error::DepositParseError, DepositTxConfig};
+use super::error::DepositParseError;
 use crate::utils::next_bytes;
 
 pub struct DepositRequestScriptInfo {
@@ -11,15 +12,15 @@ pub struct DepositRequestScriptInfo {
 /// if the transaction's 0th index is p2tr and amount exceeds the deposit quantity or not
 pub fn check_bridge_offer_output(
     tx: &Transaction,
-    config: &DepositTxConfig,
+    config: &DepositTxParams,
 ) -> Result<(), DepositParseError> {
     let txout = &tx.output[0];
     if !txout.script_pubkey.is_p2tr() {
         return Err(DepositParseError::NoP2TR);
     }
-    if txout.value.to_sat() < config.deposit_quantity {
+    if txout.value.to_sat() < config.deposit_amount {
         return Err(DepositParseError::ExpectedAmount(
-            config.deposit_quantity,
+            config.deposit_amount,
             txout.value.to_sat(),
         ));
     }
@@ -29,7 +30,7 @@ pub fn check_bridge_offer_output(
 /// check if magic bytes(unique set of bytes used to identify relevant tx) is present or not
 pub fn check_magic_bytes(
     instructions: &mut Instructions,
-    config: &DepositTxConfig,
+    config: &DepositTxParams,
 ) -> Result<(), DepositParseError> {
     // magic bytes
     if let Some(magic_bytes) = next_bytes(instructions) {
@@ -45,7 +46,7 @@ pub fn check_magic_bytes(
 /// extracts the Execution environment bytes(most possibly EVM bytes)
 pub fn extract_ee_bytes<'a>(
     instructions: &mut Instructions<'a>,
-    config: &DepositTxConfig,
+    config: &DepositTxParams,
 ) -> Result<&'a [u8], DepositParseError> {
     match next_bytes(instructions) {
         Some(ee_bytes) => {
@@ -78,7 +79,7 @@ mod tests {
     fn test_check_bridge_offer_output_valid() {
         let config = get_deposit_tx_config();
         let tx = create_transaction_two_outpoints(
-            Amount::from_sat(config.deposit_quantity),
+            Amount::from_sat(config.deposit_amount),
             &generic_taproot_addr().script_pubkey(),
             &ScriptBuf::new(),
         );
@@ -91,7 +92,7 @@ mod tests {
     fn test_check_bridge_offer_output_invalid() {
         let config = get_deposit_tx_config();
         let tx = create_transaction_two_outpoints(
-            Amount::from_sat(config.deposit_quantity + 1),
+            Amount::from_sat(config.deposit_amount + 1),
             &ScriptBuf::new(),
             &ScriptBuf::new(),
         );

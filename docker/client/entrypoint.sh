@@ -55,6 +55,11 @@ client_checkpoint_interval = $CHECKPOINT_INTERVAL
 rpc_url = "$RETH_URL"
 secret = "jwt.hex"
 
+[relayer]
+refresh_interval = $RELAY_REFRESH_INTERVAL
+stale_duration = $RELAY_STALE_DURATION
+relay_misc = $RELAY_MISC
+
 [client]
 rpc_host = $RPC_HOST
 rpc_port = $RPC_PORT

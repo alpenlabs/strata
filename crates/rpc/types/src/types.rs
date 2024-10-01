@@ -237,3 +237,16 @@ pub struct BridgeDuties {
     /// The last block index (inclusive) upto which the duties are feched.
     pub stop_index: u64,
 }
+
+/// status of L2 Block
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum L2BlockStatus {
+    /// Unknown block height
+    Unknown,
+    /// Block is received and present in the longest chain
+    Confirmed,
+    /// Block is now conformed on L1, and present at certain L1 height
+    Verified(u64),
+    /// Block is now finalized, certain depth has been reached in L1
+    Finalized(u64),
+}

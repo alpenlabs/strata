@@ -155,7 +155,8 @@ pub fn apply_writes_to_state(
                 l1v.local_unaccepted_blocks.truncate(new_unacc_len);
 
                 // Keep pending checkpoints whose l1 height is less than or equal to rollback height
-                l1v.pending_checkpoints.retain(|ckpt| ckpt.height <= height);
+                l1v.verified_checkpoints
+                    .retain(|ckpt| ckpt.height <= height);
             }
 
             AcceptL1Block(l1blkid) => {
@@ -202,7 +203,7 @@ pub fn apply_writes_to_state(
 
             CheckpointsReceived(height, checkpts) => {
                 // Extend the pending checkpoints
-                state.l1_view_mut().pending_checkpoints.extend(
+                state.l1_view_mut().verified_checkpoints.extend(
                     checkpts
                         .into_iter()
                         .map(|ckpt| L1CheckPoint::new(ckpt, height)),
@@ -213,7 +214,7 @@ pub fn apply_writes_to_state(
                 let l1v = state.l1_view_mut();
 
                 let finalized_checkpts: Vec<_> = l1v
-                    .pending_checkpoints
+                    .verified_checkpoints
                     .iter()
                     .take_while(|ckpt| ckpt.height <= height)
                     .collect();
@@ -224,7 +225,7 @@ pub fn apply_writes_to_state(
 
                 // Remove the finalized from pending and then mark the last one as last_finalized
                 // checkpoint
-                l1v.pending_checkpoints.drain(..total_finalized);
+                l1v.verified_checkpoints.drain(..total_finalized);
 
                 if let Some(checkpt) = new_finalized {
                     // Check if heights match accordingly

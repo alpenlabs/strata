@@ -8,7 +8,7 @@ use bitcoin::{
     hashes::Hash,
     Block, Transaction,
 };
-use strata_tx_parser::{deposit::DepositTxConfig, filter::TxFilterRule};
+use strata_tx_parser::filter::TxFilterRule;
 
 use crate::{l2::gen_params, ArbitraryGenerator};
 
@@ -151,7 +151,7 @@ pub fn get_btc_chain() -> BtcChainSegment {
 
 pub fn get_tx_filters() -> Vec<TxFilterRule> {
     let config = gen_params();
-    let deposit_tx_config = DepositTxConfig::from_rollup_params(config.rollup());
+    let deposit_tx_config = config.rollup().get_deposit_params();
 
     vec![
         TxFilterRule::Deposit(deposit_tx_config),

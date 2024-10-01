@@ -1,24 +1,22 @@
+use alpen_express_primitives::params::DepositTxParams;
 use alpen_express_state::{batch::SignedBatchCheckpoint, tx::ProtocolOperation};
 use bitcoin::{Block, Transaction};
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use super::messages::ProtocolOpTxRef;
 use crate::{
-    deposit::{
-        deposit_request::extract_deposit_request_info, deposit_tx::extract_deposit_info,
-        DepositTxConfig,
-    },
+    deposit::{deposit_request::extract_deposit_request_info, deposit_tx::extract_deposit_info},
     inscription::parse_inscription_data,
 };
 
 /// kind of transactions can be relevant for rollup node to filter
-#[derive(Clone, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
+#[derive(Clone, Debug, PartialEq, BorshSerialize, BorshDeserialize)]
 pub enum TxFilterRule {
     /// Inscription transactions with given Rollup name. This will be parsed by
     /// InscriptionParser which dictates the structure of inscription.
     RollupInscription(RollupName),
     /// Deposit transaction
-    Deposit(DepositTxConfig),
+    Deposit(DepositTxParams),
 }
 
 type RollupName = String;
@@ -247,7 +245,7 @@ mod test {
         let deposit_script = build_test_deposit_script(config.magic_bytes.clone(), ee_addr.clone());
 
         let tx = create_transaction_two_outpoints(
-            Amount::from_sat(config.deposit_quantity),
+            Amount::from_sat(config.deposit_amount),
             &generic_taproot_addr().script_pubkey(),
             &deposit_script,
         );
@@ -268,7 +266,7 @@ mod test {
             assert_eq!(deposit_info.address, ee_addr, "EE address should match");
             assert_eq!(
                 deposit_info.amt,
-                BitcoinAmount::from_sat(config.deposit_quantity),
+                BitcoinAmount::from_sat(config.deposit_amount),
                 "Deposit amount should match"
             );
         } else {
@@ -288,7 +286,7 @@ mod test {
         );
 
         let tx = create_transaction_two_outpoints(
-            Amount::from_sat(config.deposit_quantity), // Any amount
+            Amount::from_sat(config.deposit_amount), // Any amount
             &generic_taproot_addr().script_pubkey(),
             &deposit_request_script,
         );
@@ -323,7 +321,7 @@ mod test {
     fn test_filter_relevant_txs_no_deposit() {
         let config = get_deposit_tx_config();
         let irrelevant_tx = create_transaction_two_outpoints(
-            Amount::from_sat(config.deposit_quantity),
+            Amount::from_sat(config.deposit_amount),
             &generic_taproot_addr().script_pubkey(),
             &ScriptBuf::new(),
         );
@@ -351,12 +349,12 @@ mod test {
             build_test_deposit_script(config.magic_bytes.clone(), dest_addr2.clone());
 
         let tx1 = create_transaction_two_outpoints(
-            Amount::from_sat(config.deposit_quantity),
+            Amount::from_sat(config.deposit_amount),
             &generic_taproot_addr().script_pubkey(),
             &deposit_script1,
         );
         let tx2 = create_transaction_two_outpoints(
-            Amount::from_sat(config.deposit_quantity),
+            Amount::from_sat(config.deposit_amount),
             &generic_taproot_addr().script_pubkey(),
             &deposit_script2,
         );
@@ -392,7 +390,7 @@ mod test {
                 );
                 assert_eq!(
                     deposit_info.amt,
-                    BitcoinAmount::from_sat(config.deposit_quantity),
+                    BitcoinAmount::from_sat(config.deposit_amount),
                     "Deposit amount should match for transaction {}",
                     i
                 );

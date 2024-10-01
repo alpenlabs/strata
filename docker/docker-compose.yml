@@ -48,11 +48,16 @@ services:
       CLIENT_POLL_DUR_MS: ${CLIENT_POLL_DUR_MS:-2000}
       CHECKPOINT_INTERVAL: ${CHECKPOINT_INTERVAL:-20}
       RUST_LOG: ${RUST_LOG:-info}
+      RELAY_REFRESH_INTERVAL: ${RELAY_REFRESH_INTERVAL:-10}
+      RELAY_STALE_DURATION: ${RELAY_STALE_DURATION:-10}
+      RELAY_MISC: ${RELAY_MISC:-true}
     container_name: strata_client
     ports:
       - "${RPC_PORT:-12332}:${RPC_PORT:-12332}"
     volumes:
       - ./data/data-bitcoind:/root/.bitcoin/
+      - ./data/data-sequencer:/app/sequencer/
+
     depends_on:
       - bitcoind
       - reth

@@ -134,8 +134,6 @@ fn process_l1_view_update(
     Ok(())
 }
 
-// Returns Some(DepositIntent)  if Tx can be parsed
-
 /// Checks the attested block IDs and parent blkid connections in new blocks.
 // TODO unit tests
 fn check_chain_integrity(
@@ -203,11 +201,10 @@ fn process_execution_update<'u>(
             Op::Deposit(deposit) => Some(deposit.intent_idx()),
             _ => None,
         })
-        .max()
-        .unwrap_or(0);
+        .max();
 
-    if applied_deposit_intent_idx > 0 {
-        state.consume_deposit_intent(applied_deposit_intent_idx);
+    if let Some(intent_idx) = applied_deposit_intent_idx {
+        state.consume_deposit_intent(intent_idx);
     }
 
     Ok(update.output().withdrawals())

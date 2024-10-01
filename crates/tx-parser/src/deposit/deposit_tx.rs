@@ -1,14 +1,14 @@
 //! parser types for Deposit Tx, and later deposit Request Tx
 
-use alpen_express_primitives::l1::OutputRef;
+use alpen_express_primitives::{l1::OutputRef, params::DepositTxParams};
 use alpen_express_state::tx::DepositInfo;
 use bitcoin::{opcodes::all::OP_RETURN, ScriptBuf, Transaction};
 
-use super::{common::check_bridge_offer_output, error::DepositParseError, DepositTxConfig};
+use super::{common::check_bridge_offer_output, error::DepositParseError};
 use crate::utils::{next_bytes, next_op};
 
 /// Extracts the DepositInfo from the Deposit Transaction
-pub fn extract_deposit_info(tx: &Transaction, config: &DepositTxConfig) -> Option<DepositInfo> {
+pub fn extract_deposit_info(tx: &Transaction, config: &DepositTxParams) -> Option<DepositInfo> {
     // Get the first output (index 0)
     let output_0 = tx.output.first()?;
 
@@ -35,7 +35,7 @@ pub fn extract_deposit_info(tx: &Transaction, config: &DepositTxConfig) -> Optio
 /// extracts the EE address given that the script is OP_RETURN type and contains the Magic Bytes
 fn parse_deposit_script<'a>(
     script: &'a ScriptBuf,
-    config: &DepositTxConfig,
+    config: &DepositTxParams,
 ) -> Result<&'a [u8], DepositParseError> {
     let mut instructions = script.instructions();
 
@@ -85,7 +85,7 @@ mod tests {
     fn check_deposit_parser() {
         // values for testing
         let config = get_deposit_tx_config();
-        let amt = Amount::from_sat(config.deposit_quantity);
+        let amt = Amount::from_sat(config.deposit_amount);
         let ee_addr = [1; 20];
         let generic_taproot_addr = generic_taproot_addr();
 
@@ -93,7 +93,7 @@ mod tests {
             build_test_deposit_script(config.magic_bytes, ee_addr.to_vec());
 
         let test_transaction = create_transaction_two_outpoints(
-            Amount::from_sat(config.deposit_quantity),
+            Amount::from_sat(config.deposit_amount),
             &generic_taproot_addr.script_pubkey(),
             &deposit_request_script,
         );

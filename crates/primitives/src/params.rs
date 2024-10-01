@@ -1,5 +1,6 @@
 //! Global consensus parameters for the rollup.
 
+use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -61,6 +62,27 @@ pub struct RollupParams {
 
     /// max number of deposits in a block
     pub max_deposits_in_block: u8,
+}
+
+/// Configuration common among deposit and deposit request transaction
+#[derive(Clone, Debug, PartialEq, Deserialize, BorshSerialize, BorshDeserialize)]
+pub struct DepositTxParams {
+    /// magic bytes, usually a rollup name
+    pub magic_bytes: Vec<u8>,
+    /// EE Address length
+    pub address_length: u8,
+    /// deposit amount
+    pub deposit_amount: u64,
+}
+
+impl RollupParams {
+    pub fn get_deposit_params(&self) -> DepositTxParams {
+        DepositTxParams {
+            magic_bytes: self.rollup_name.clone().into_bytes().to_vec(),
+            address_length: self.address_length,
+            deposit_amount: self.deposit_amount,
+        }
+    }
 }
 
 /// Describes how proofs are generated.

@@ -2,6 +2,7 @@
 
 use std::convert::TryInto;
 
+use alpen_express_primitives::params::DepositTxParams;
 use alpen_express_state::tx::DepositRequestInfo;
 use bitcoin::{opcodes::all::OP_RETURN, ScriptBuf, Transaction};
 use tracing::debug;
@@ -9,14 +10,13 @@ use tracing::debug;
 use super::{
     common::{check_bridge_offer_output, DepositRequestScriptInfo},
     error::DepositParseError,
-    DepositTxConfig,
 };
 use crate::utils::{next_bytes, next_op};
 
 /// Extracts the DepositInfo from the Deposit Transaction
 pub fn extract_deposit_request_info(
     tx: &Transaction,
-    config: &DepositTxConfig,
+    config: &DepositTxParams,
 ) -> Option<DepositRequestInfo> {
     // Ensure that the transaction has at least 2 outputs
     let output_0 = tx.output.first()?;
@@ -43,7 +43,7 @@ pub fn extract_deposit_request_info(
 /// contains the Magic Bytes
 pub fn parse_deposit_request_script(
     script: &ScriptBuf,
-    config: &DepositTxConfig,
+    config: &DepositTxParams,
 ) -> Result<DepositRequestScriptInfo, DepositParseError> {
     let mut instructions = script.instructions();
 
@@ -111,7 +111,7 @@ mod tests {
     fn check_deposit_parser() {
         // values for testing
         let config = get_deposit_tx_config();
-        let amt = Amount::from_sat(config.deposit_quantity);
+        let amt = Amount::from_sat(config.deposit_amount);
         let evm_addr = [1; 20];
         let dummy_control_block = [0xFF; 32];
         let generic_taproot_addr = generic_taproot_addr();
@@ -123,7 +123,7 @@ mod tests {
         );
 
         let test_transaction = create_transaction_two_outpoints(
-            Amount::from_sat(config.deposit_quantity),
+            Amount::from_sat(config.deposit_amount),
             &generic_taproot_addr.script_pubkey(),
             &deposit_request_script,
         );
