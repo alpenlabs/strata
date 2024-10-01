@@ -19,7 +19,6 @@ alpen-express-rpc-api = { workspace = true, features = ["client"] }
 express-bridge-sig-manager = { workspace = true }
 express-bridge-tx-builder = { workspace = true }
 
-async-trait = { workspace = true }
 bitcoin = { workspace = true, features = ["rand-std"] }
 format_serde_error = { workspace = true }
 jsonrpsee = { workspace = true }

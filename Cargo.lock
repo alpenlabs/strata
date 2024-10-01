@@ -3760,12 +3760,16 @@ name = "express-bridge-client"
 version = "0.1.0"
 dependencies = [
  "alpen-express-common",
+ "alpen-express-primitives",
+ "alpen-express-rpc-types",
+ "alpen-express-state",
  "anyhow",
  "argh",
  "async-trait",
  "bitcoin",
  "chrono",
  "express-bridge-rpc-api",
+ "express-storage",
  "jsonrpsee",
  "thiserror",
  "tokio",
@@ -3780,7 +3784,6 @@ dependencies = [
  "alpen-express-btcio",
  "alpen-express-primitives",
  "alpen-express-rpc-api",
- "async-trait",
  "bitcoin",
  "express-bridge-sig-manager",
  "express-bridge-tx-builder",
@@ -3814,6 +3817,8 @@ dependencies = [
 name = "express-bridge-rpc-api"
 version = "0.1.0"
 dependencies = [
+ "alpen-express-state",
+ "bitcoin",
  "jsonrpsee",
 ]
 

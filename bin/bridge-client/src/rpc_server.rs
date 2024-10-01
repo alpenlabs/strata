@@ -1,14 +1,23 @@
 //! Bootstraps an RPC server for the operator.
+use std::sync::Arc;
+
+use alpen_express_rpc_types::RpcServerError;
+use alpen_express_state::bridge_duties::BridgeDutyStatus;
 use anyhow::Context;
 use async_trait::async_trait;
+use bitcoin::Txid;
 use chrono::{DateTime, Utc};
-use express_bridge_rpc_api::{ExpressBridgeControlApiServer, ExpressBridgeNetworkApiServer};
+use express_bridge_rpc_api::{
+    ExpressBridgeControlApiServer, ExpressBridgeNetworkApiServer, ExpressBridgeTrackerApiServer,
+};
+use express_storage::ops::bridge_duty::BridgeDutyOps;
 use jsonrpsee::{core::RpcResult, RpcModule};
 use tokio::sync::oneshot;
 use tracing::{info, warn};
 
 use crate::constants::{RPC_PORT, RPC_SERVER};
 
+#[allow(unused)] // FIXME: remove once the RPC server is implemented
 pub(crate) async fn start<T>(rpc_impl: &T) -> anyhow::Result<()>
 where
     T: ExpressBridgeControlApiServer + ExpressBridgeNetworkApiServer + Clone,
@@ -45,17 +54,20 @@ where
     Ok(())
 }
 
-/// Struct to implement the `express_bridge_rpc_api::ExpressBridgeNetworkApiServer` on. Contains
+/// Struct to implement the [`express_bridge_rpc_api::ExpressBridgeNetworkApiServer`] on. Contains
 /// fields corresponding the global context for the RPC.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub(crate) struct BridgeRpc {
     start_time: DateTime<Utc>,
+    duty_ops: Arc<BridgeDutyOps>,
 }
 
-impl Default for BridgeRpc {
-    fn default() -> Self {
+impl BridgeRpc {
+    #[allow(unused)] // FIXME: remove once the RPC server is implemented
+    pub fn new(duty_ops: BridgeDutyOps) -> Self {
         Self {
             start_time: Utc::now(),
+            duty_ops: Arc::new(duty_ops),
         }
     }
 }
@@ -87,5 +99,16 @@ impl ExpressBridgeControlApiServer for BridgeRpc {
 impl ExpressBridgeNetworkApiServer for BridgeRpc {
     async fn ping(&self) -> RpcResult<()> {
         unimplemented!("ping")
+    }
+}
+
+#[async_trait]
+impl ExpressBridgeTrackerApiServer for BridgeRpc {
+    async fn get_status(&self, txid: Txid) -> RpcResult<Option<BridgeDutyStatus>> {
+        Ok(self
+            .duty_ops
+            .get_status_async(txid)
+            .await
+            .map_err(RpcServerError::Db)?)
     }
 }
