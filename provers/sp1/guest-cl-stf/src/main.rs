@@ -13,6 +13,9 @@ mod vks;
 
 fn main() {
     let params = get_rollup_params();
+
+    // TODO: AggProofInput avoid wiriting vkey to guest.
+    // vkey is already embedded to the guest
     let _ = sp1_zkvm::io::read::<[u32; 8]>();
     let el_vkey = vks::GUEST_EVM_EE_STF_ELF_ID;
 
@@ -24,17 +27,17 @@ fn main() {
     // Verify the EL proof
     let public_values_digest = Sha256::digest(&el_pp);
     sp1_zkvm::lib::verify::verify_sp1_proof(el_vkey, &public_values_digest.into());
-    // let el_pp_deserialized: ELProofPublicParams = bincode::deserialize(&el_pp).unwrap();
+    let el_pp_deserialized: ELProofPublicParams = bincode::deserialize(&el_pp).unwrap();
 
-    // let new_state = verify_and_transition(prev_state, block, el_pp_deserialized, params);
-    // let new_state_root = new_state.compute_state_root();
+    let new_state = verify_and_transition(prev_state, block, el_pp_deserialized, params);
+    let new_state_root = new_state.compute_state_root();
 
-    // let public_params = CLProofPublicParams {
-    //     prev_state_root: *prev_state_root.as_ref(),
-    //     new_state_root: *new_state_root.as_ref(),
-    // };
+    let public_params = CLProofPublicParams {
+        prev_state_root: *prev_state_root.as_ref(),
+        new_state_root: *new_state_root.as_ref(),
+    };
 
-    // sp1_zkvm::io::commit(&public_params);
+    sp1_zkvm::io::commit(&public_params);
 }
 
 // TODO: Should be read from config file and evaluated on compile time

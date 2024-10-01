@@ -22,6 +22,7 @@ borsh = { workspace = true }
 express-proofimpl-btc-blockspace = { workspace = true }
 express-proofimpl-checkpoint = { workspace = true }
 express-proofimpl-evm-ee-stf = { workspace = true }
+express-proofimpl-cl-stf = { workspace = true }
 express-proofimpl-l1-batch = { workspace = true }
 express-zkvm = { workspace = true }
 hex = { workspace = true }

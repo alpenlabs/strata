@@ -82,13 +82,6 @@ pub trait ZKVMInputBuilder<'a> {
     /// is involved, allowing for proof and verification inputs to be provided to the zkVM.
     fn write_proof_with_vkey(&mut self, item: AggregationInput) -> anyhow::Result<&mut Self>;
 
-    /// Adds an `Proof` to the list of aggregation/composition inputs.
-    ///
-    /// This method is used for aggregation or composition
-    /// is involved, where proof is supplied as input and verification key is already present at the
-    /// guest code.
-    fn write_proof(&mut self, item: Proof) -> anyhow::Result<&mut Self>;
-
     fn build(&mut self) -> anyhow::Result<Self::Input>;
 }
 

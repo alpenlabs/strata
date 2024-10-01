@@ -377,14 +377,6 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         let raw_cl_block_witness = borsh::to_vec(&cl_block_witness)
             .map_err(|_| Error::Other("Failed to get raw cl block witness".to_string()))?;
 
-        use std::{
-            fs::File,
-            io::{self, Write},
-        };
-        let file_path = format!("cl_witness_{:?}", idx);
-        let mut file = File::create(file_path).unwrap();
-        file.write_all(&raw_cl_block_witness).unwrap();
-
         Ok(Some(raw_cl_block_witness))
     }
 
