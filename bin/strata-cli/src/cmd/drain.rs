@@ -9,6 +9,7 @@ use bdk_wallet::bitcoin::{Address, Amount};
 use console::{style, Term};
 
 use crate::{
+    constants::NETWORK,
     rollup::RollupWallet,
     seed::Seed,
     settings::Settings,
@@ -45,14 +46,14 @@ pub async fn drain(
     let signet_address = signet_address.map(|a| {
         Address::from_str(&a)
             .expect("valid signet address")
-            .require_network(settings.network)
+            .require_network(NETWORK)
             .expect("correct network")
     });
     let rollup_address =
         rollup_address.map(|a| RollupAddress::from_str(&a).expect("valid rollup address"));
 
     if let Some(address) = signet_address {
-        let mut l1w = SignetWallet::new(&seed, settings.network).unwrap();
+        let mut l1w = SignetWallet::new(&seed, NETWORK).unwrap();
         l1w.sync(&esplora).await.unwrap();
         let balance = l1w.balance();
         if balance.untrusted_pending > Amount::ZERO {

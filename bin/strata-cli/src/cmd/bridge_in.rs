@@ -15,7 +15,9 @@ use express_bridge_tx_builder::constants::MAGIC_BYTES;
 use indicatif::ProgressBar;
 
 use crate::{
-    constants::{BRIDGE_IN_AMOUNT, RECOVER_AT_DELAY, RECOVER_DELAY, UNSPENDABLE},
+    constants::{
+        BRIDGE_IN_AMOUNT, L2_BLOCK_TIME, NETWORK, RECOVER_AT_DELAY, RECOVER_DELAY, UNSPENDABLE,
+    },
     recovery::DescriptorRecovery,
     rollup::RollupWallet,
     seed::Seed,
@@ -38,7 +40,7 @@ pub async fn bridge_in(args: BridgeInArgs, seed: Seed, settings: Settings, esplo
     let requested_rollup_address = args
         .rollup_address
         .map(|a| RollupAddress::from_str(&a).expect("bad rollup address"));
-    let mut l1w = SignetWallet::new(&seed, settings.network).unwrap();
+    let mut l1w = SignetWallet::new(&seed, NETWORK).unwrap();
     let l2w = RollupWallet::new(&seed, &settings.l2_http_endpoint).unwrap();
 
     l1w.sync(&esplora).await.unwrap();
@@ -63,11 +65,11 @@ pub async fn bridge_in(args: BridgeInArgs, seed: Seed, settings: Settings, esplo
 
     let desc = bridge_in_desc
         .clone()
-        .into_wallet_descriptor(l1w.secp_ctx(), settings.network)
+        .into_wallet_descriptor(l1w.secp_ctx(), NETWORK)
         .expect("valid descriptor");
 
     let mut temp_wallet = Wallet::create_single(desc.clone())
-        .network(settings.network)
+        .network(NETWORK)
         .create_wallet_no_persist()
         .expect("valid wallet");
 
@@ -137,7 +139,7 @@ pub async fn bridge_in(args: BridgeInArgs, seed: Seed, settings: Settings, esplo
     pb.finish_with_message(format!("Transaction {} broadcasted", tx.compute_txid()));
     let _ = term.write_line(&format!(
         "Expect transaction confirmation in ~{:?}. Funds will take longer than this to be available on rollup.",
-        settings.block_time
+        L2_BLOCK_TIME
     ));
 }
 

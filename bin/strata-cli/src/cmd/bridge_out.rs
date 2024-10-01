@@ -10,8 +10,12 @@ use console::Term;
 use indicatif::ProgressBar;
 
 use crate::{
-    constants::BRIDGE_OUT_AMOUNT, rollup::RollupWallet, seed::Seed, settings::Settings,
-    signet::SignetWallet, taproot::ExtractP2trPubkey,
+    constants::{BRIDGE_OUT_AMOUNT, NETWORK},
+    rollup::RollupWallet,
+    seed::Seed,
+    settings::Settings,
+    signet::SignetWallet,
+    taproot::ExtractP2trPubkey,
 };
 
 /// Bridge 10 BTC from the rollup to signet
@@ -27,11 +31,11 @@ pub async fn bridge_out(args: BridgeOutArgs, seed: Seed, settings: Settings) {
     let address = args.p2tr_address.map(|a| {
         Address::from_str(&a)
             .expect("valid address")
-            .require_network(settings.network)
+            .require_network(NETWORK)
             .expect("correct network")
     });
 
-    let mut l1w = SignetWallet::new(&seed, settings.network).unwrap();
+    let mut l1w = SignetWallet::new(&seed, NETWORK).unwrap();
     let l2w = RollupWallet::new(&seed, &settings.l2_http_endpoint).unwrap();
 
     let address = match address {

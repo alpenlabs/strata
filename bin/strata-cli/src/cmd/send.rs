@@ -12,6 +12,7 @@ use console::Term;
 use shrex::encode;
 
 use crate::{
+    constants::NETWORK,
     rollup::RollupWallet,
     seed::Seed,
     settings::Settings,
@@ -53,9 +54,9 @@ pub async fn send(args: SendArgs, seed: Seed, settings: Settings, esplora: Esplo
         let amount = Amount::from_sat(args.amount);
         let address = Address::from_str(&args.address)
             .expect("valid address")
-            .require_network(settings.network)
+            .require_network(NETWORK)
             .expect("correct network");
-        let mut l1w = SignetWallet::new(&seed, settings.network).expect("valid wallet");
+        let mut l1w = SignetWallet::new(&seed, NETWORK).expect("valid wallet");
         l1w.sync(&esplora).await.unwrap();
         let fee_rate = get_fee_rate(1, &esplora)
             .await

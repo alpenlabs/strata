@@ -6,6 +6,7 @@ use bdk_wallet::{
 use console::{style, Term};
 
 use crate::{
+    constants::NETWORK,
     recovery::DescriptorRecovery,
     seed::Seed,
     settings::Settings,
@@ -20,7 +21,7 @@ pub struct RefreshArgs {}
 
 pub async fn refresh(seed: Seed, settings: Settings, esplora: EsploraClient) {
     let term = Term::stdout();
-    let mut l1w = SignetWallet::new(&seed, settings.network).unwrap();
+    let mut l1w = SignetWallet::new(&seed, NETWORK).unwrap();
     l1w.sync(&esplora).await.unwrap();
 
     let _ = term.write_line("Opening descriptor recovery");
@@ -47,11 +48,11 @@ pub async fn refresh(seed: Seed, settings: Settings, esplora: EsploraClient) {
     for desc in descs {
         let desc = desc
             .clone()
-            .into_wallet_descriptor(l1w.secp_ctx(), settings.network)
+            .into_wallet_descriptor(l1w.secp_ctx(), NETWORK)
             .expect("valid descriptor");
 
         let mut recovery_wallet = Wallet::create_single(desc)
-            .network(settings.network)
+            .network(NETWORK)
             .create_wallet_no_persist()
             .expect("valid wallet");
 

@@ -1,9 +1,9 @@
-use std::sync::LazyLock;
+use std::{sync::LazyLock, time::Duration};
 
 use bdk_wallet::bitcoin::{
     key::{Parity, Secp256k1},
     secp256k1::{PublicKey, SecretKey},
-    Amount, XOnlyPublicKey,
+    Amount, Network, XOnlyPublicKey,
 };
 use shrex::hex;
 
@@ -29,6 +29,17 @@ pub const AES_NONCE_LEN: usize = 12;
 pub const SEED_LEN: usize = 32;
 /// AES-256-GCM-SIV tag len
 pub const AES_TAG_LEN: usize = 16;
+
+pub const NETWORK: Network = Network::Signet;
+pub const BRIDGE_ROLLUP_ADDRESS: &str = "0x000000000000000000000000000000000B121d9E";
+pub const L2_BLOCK_TIME: Duration = Duration::from_secs(30);
+
+// CHANGE ALL BELOW!!!
+pub const DEFAULT_ESPLORA: &str = "https://explorer.bc-2.jp/api";
+pub const DEFAULT_L2_HTTP_ENDPOINT: &str = "https://ethereum-rpc.publicnode.com";
+pub const DEFAULT_FAUCET_ENDPOINT: &str = "http://localhost:3000";
+pub const BRIDGE_MUSIG2_PUBKEY: &str =
+    "fbd79b6b8b7fe11bad25ae89a7415221c030978de448775729c3f0a903819dd0";
 
 /// A provably unspendable, static public key from predetermined inputs created using method specified in [BIP-341](https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki#cite_note-23)
 pub static UNSPENDABLE: LazyLock<XOnlyPublicKey> = LazyLock::new(|| {

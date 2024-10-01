@@ -11,7 +11,9 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use shrex::{encode, Hex};
 
-use crate::{rollup::RollupWallet, seed::Seed, settings::Settings, signet::SignetWallet};
+use crate::{
+    constants::NETWORK, rollup::RollupWallet, seed::Seed, settings::Settings, signet::SignetWallet,
+};
 
 /// Request some bitcoin from the faucet
 #[derive(FromArgs, PartialEq, Debug)]
@@ -89,7 +91,7 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
     ));
 
     let url = if args.signet {
-        let mut l1w = SignetWallet::new(&seed, settings.network).unwrap();
+        let mut l1w = SignetWallet::new(&seed, NETWORK).unwrap();
         let address = match args.address {
             None => {
                 let address_info = l1w.reveal_next_address(KeychainKind::External);
@@ -99,7 +101,7 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
             Some(address) => {
                 let address = Address::from_str(&address).expect("bad address");
                 address
-                    .require_network(settings.network)
+                    .require_network(NETWORK)
                     .expect("wrong bitcoin network")
             }
         };
