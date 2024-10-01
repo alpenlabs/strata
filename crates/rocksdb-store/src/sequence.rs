@@ -20,7 +20,7 @@ pub(crate) fn get_next_id<S: Schema, DB: TransactionDBMarker>(
         .get_for_update::<SequenceSchema>(&sequence_key)?
         .map(|last_idx| last_idx + 1)
         .unwrap_or(0);
-    txn.put(&sequence_key, &next_idx)?;
+    txn.put::<SequenceSchema>(&sequence_key, &next_idx)?;
     Ok(next_idx)
 }
 
@@ -39,8 +39,6 @@ pub(crate) fn get_next_id_opts<S: Schema, DB: TransactionDBMarker>(
         .get_for_update::<SequenceSchema>(&index_key)?
         .map(increment)
         .unwrap_or(default);
-    txn.put(&index_key, &next_idx)?;
+    txn.put::<SequenceSchema>(&index_key, &next_idx)?;
     Ok(next_idx)
 }
-
-// TODO: this could be useable for beyond just table ids.
