@@ -45,18 +45,21 @@ members = [
 
   # binaries listed separately
   "bin/bridge-client",
+  "bin/datatool",
   "bin/prover-client",
   "bin/strata-cli",
   "reth",
   "sequencer",
+  "bin/datatool",
   "crates/tx-parser",
 
   # integration tests
-  "tests", "bin/op-cli",
+  "tests",
 ]
 
 default-members = [
   "bin/bridge-client",
+  "bin/datatool",
   "bin/prover-client",
   "reth",
   "sequencer",
