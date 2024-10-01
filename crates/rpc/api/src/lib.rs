@@ -99,10 +99,7 @@ pub trait AlpenApi {
     /// This assumes that the block finalization is always sequential. i.e all the blocks before the
     /// last finalized block are also finalized
     #[method(name = "getBlockFinalizationStatus")]
-    async fn get_l2_block_status(
-        &self,
-        block_height: u64,
-    ) -> RpcResult<L2BlockStatus>;
+    async fn get_l2_block_status(&self, block_height: u64) -> RpcResult<L2BlockStatus>;
 }
 
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "alpadmin"))]

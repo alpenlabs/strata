@@ -155,7 +155,8 @@ pub fn apply_writes_to_state(
                 l1v.local_unaccepted_blocks.truncate(new_unacc_len);
 
                 // Keep pending checkpoints whose l1 height is less than or equal to rollback height
-                l1v.verified_checkpoints.retain(|ckpt| ckpt.height <= height);
+                l1v.verified_checkpoints
+                    .retain(|ckpt| ckpt.height <= height);
             }
 
             AcceptL1Block(l1blkid) => {
