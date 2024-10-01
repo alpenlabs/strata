@@ -198,7 +198,7 @@ pub fn process_event<D: Database>(
                 // Need to refactor this part for block builder only.
                 let client_state_bury_height = min(
                     chs_last_buried,
-                    // keep atleast 1 item
+                    // keep at least 1 item
                     state.l1_view().tip_height().saturating_sub(1),
                 );
                 writes.push(ClientStateWrite::UpdateBuried(client_state_bury_height));
