@@ -83,9 +83,7 @@ impl BridgeDutyDatabase for BridgeDutyRocksDb {
         self.db
             .with_optimistic_txn(TransactionRetry::Count(self.ops.retry_count), |txn| {
                 if txn.get::<BridgeDutyStatusSchema>(&txid)?.is_none() {
-                    let idx = rockbound::utils::get_last::<BridgeDutyTxidSchema>(txn)?
-                        .map(|(x, _)| x + 1)
-                        .unwrap_or(0);
+                    let idx = get_next_id::<BridgeDutyTxidSchema, DB>(txn)?;
 
                     txn.put::<BridgeDutyTxidSchema>(&idx, &txid)?;
                 }
