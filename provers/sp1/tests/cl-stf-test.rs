@@ -1,6 +1,5 @@
 mod helpers;
 
-#[cfg(feature = "prover")]
 #[cfg(all(feature = "prover", not(debug_assertions)))]
 mod test {
     use std::path::Path;

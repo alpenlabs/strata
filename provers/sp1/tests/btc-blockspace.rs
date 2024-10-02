@@ -1,13 +1,13 @@
 mod helpers;
 // NOTE: SP1 prover runs in release mode only; therefore run the tests on release mode only
-// #[cfg(all(feature = "prover", not(debug_assertions)))]
+#[cfg(all(feature = "prover", not(debug_assertions)))]
 mod test {
     use alpen_test_utils::bitcoin::get_btc_chain;
     use express_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
     use express_sp1_adapter::SP1Verifier;
-    use express_zkvm::ZKVMVerifier;
+    use express_zkvm::{ProverOptions, ZKVMVerifier};
 
-    use crate::helpers::get_btc_block_proof;
+    use crate::helpers::{BtcBlockProofGenerator, ProofGenerator};
 
     #[test]
     fn test_btc_blockspace_code_trace_generation() {
@@ -15,7 +15,15 @@ mod test {
         let btc_chain = get_btc_chain();
         let block = btc_chain.get_block(40321);
 
-        let (proof, _) = get_btc_block_proof(block).unwrap();
+        let prover_options = ProverOptions {
+            enable_compression: true,
+            use_mock_prover: false,
+            ..Default::default()
+        };
+
+        let (proof, _) = BtcBlockProofGenerator::new()
+            .get_proof(block, &prover_options)
+            .unwrap();
 
         // TODO: add `extract_public_output_borsh` function to Verifier
         let raw_output = SP1Verifier::extract_public_output::<Vec<u8>>(&proof)

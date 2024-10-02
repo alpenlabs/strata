@@ -1,13 +1,14 @@
 #![allow(unused_imports)]
 mod btc;
 mod cl;
-mod common;
 mod el;
 mod l1_batch;
 mod l2_batch;
+mod proof_generator;
 
-pub use btc::get_btc_block_proof;
-pub use cl::get_cl_stf_proof;
-pub use el::get_el_block_proof;
-pub use l1_batch::get_l1_batch_proof;
-pub use l2_batch::get_cl_batch_proof;
+pub use btc::BtcBlockProofGenerator;
+pub use cl::ClProofGenerator;
+pub use el::ElProofGenerator;
+pub use l1_batch::L1BatchProofGenerator;
+pub use l2_batch::L2BatchProofGenerator;
+pub use proof_generator::ProofGenerator;

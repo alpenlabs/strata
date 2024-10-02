@@ -21,7 +21,6 @@ sp1-core-machine = { version = "2.0.0" }
 sp1-zkvm = { version = "2.0.0", features = ["verify"] }
 substrate-bn = { git = "https://github.com/sp1-patches/bn", branch = "patch-v0.7.0" }
 
-
 [patch.crates-io]
 sha2-v0-10-6 = { git = "https://github.com/sp1-patches/RustCrypto-hashes", package = "sha2", branch = "patch-sha2-v0.10.6" }
 sha2-v0-10-8 = { git = "https://github.com/sp1-patches/RustCrypto-hashes", package = "sha2", branch = "patch-sha2-v0.10.8" }

@@ -44,10 +44,10 @@ fn read_and_validate_next_proof() -> L2BatchProofOutput {
     sp1_zkvm::lib::verify::verify_sp1_proof(cl_block_vkey, &public_values_digest.into());
 
     let cl_proof_pp_serialized: Vec<u8> = bincode::deserialize(&cl_proof_pp).unwrap();
-    let res = borsh::from_slice(&cl_proof_pp_serialized).unwrap();
-    res
+    borsh::from_slice(&cl_proof_pp_serialized).unwrap()
 }
 
+// TODO: Debug and fix this
 // fn validate_proof_consistency(
 //     current_proof_cs_snap: &L2BatchProofOutput,
 //     next_proof_cs_snap: &L2BatchProofOutput,

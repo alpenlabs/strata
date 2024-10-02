@@ -49,7 +49,7 @@ pub const GROTH16_VK_BYTES: &[u8] =
 
 /// Verifies the Groth16 proof posted on chain
 ///
-/// Note: SP1Verifier::verify_groth16 is not directly used becuase it depends on `sp1-sdk` which
+/// Note: SP1Verifier::verify_groth16 is not directly used because it depends on `sp1-sdk` which
 /// cannot be compiled inside guest code.
 fn verify_groth16(proof: &Proof, vkey_hash: &[u8], committed_values_raw: &[u8]) -> bool {
     // Convert vkey_hash to Fr, mapping the error to anyhow::Error
