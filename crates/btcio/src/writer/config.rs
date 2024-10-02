@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use bitcoin::Address;
 
 #[derive(Debug, Clone)]
@@ -21,14 +19,9 @@ pub struct WriterConfig {
 }
 
 impl WriterConfig {
-    pub fn new(
-        address: String,
-        network: bitcoin::Network,
-        rollup_name: String,
-    ) -> anyhow::Result<Self> {
-        let addr = Address::from_str(&address)?.require_network(network)?;
+    pub fn new(sequencer_address: Address, rollup_name: String) -> anyhow::Result<Self> {
         Ok(Self {
-            sequencer_address: addr,
+            sequencer_address,
             rollup_name,
             // TODO: get these from config as well
             inscription_fee_policy: InscriptionFeePolicy::Smart,

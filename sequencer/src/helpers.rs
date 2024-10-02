@@ -2,9 +2,10 @@ use std::{
     fs,
     path::{Path, PathBuf},
     sync::Arc,
+    time::Duration,
 };
 
-use alpen_express_btcio::rpc::BitcoinClient;
+use alpen_express_btcio::rpc::{traits::Wallet, BitcoinClient};
 use alpen_express_consensus_logic::{
     duty::types::{Identity, IdentityData, IdentityKey},
     state_tracker,
@@ -23,7 +24,7 @@ use alpen_express_rpc_types::L1Status;
 use alpen_express_state::csm_status::CsmStatus;
 use alpen_express_status::{create_status_channel, StatusRx, StatusTx};
 use anyhow::Context;
-use bitcoin::Network;
+use bitcoin::{Address, Network};
 use express_storage::L2BlockManager;
 use format_serde_error::SerdeError;
 use reth_rpc_types::engine::JwtSecret;
@@ -237,4 +238,28 @@ pub fn init_engine_controller(
     );
     let eng_ctl = Arc::new(eng_ctl);
     Ok(eng_ctl)
+}
+
+/// Get an address controller by sequencer's bitcoin wallet
+pub async fn generate_sequencer_address(bitcoin_client: &BitcoinClient) -> anyhow::Result<Address> {
+    let mut last_err = None;
+    tokio::time::timeout(Duration::from_secs(10), async {
+        loop {
+            match bitcoin_client.get_new_address().await {
+                Ok(address) => return address,
+                Err(err) => {
+                    warn!(err = ?err, "failed to generate address");
+                    last_err.replace(err);
+                    continue;
+                }
+            }
+        }
+    })
+    .await
+    .map_err(|_| match last_err {
+        None => anyhow::Error::msg("failed to generate address; timeout"),
+        Some(client_error) => {
+            anyhow::Error::from(client_error).context("failed to generate address")
+        }
+    })
 }
