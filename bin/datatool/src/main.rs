@@ -7,21 +7,17 @@ use alpen_express_primitives::{
     block_credential,
     buf::Buf32,
     operator::OperatorPubkeys,
-    params::{RollupParams, SyncParams},
+    params::{ProofPublishMode, RollupParams},
     vk::RollupVerifyingKey,
 };
-use anyhow::Context;
 use argh::FromArgs;
-use bech32::{Bech32m, EncodeError, Hrp};
 use bitcoin::{
     bip32::{ChildNumber, DerivationPath, Xpriv, Xpub},
-    key::Secp256k1,
-    params::Params,
-    secp256k1::All,
     Network,
 };
-use rand::{rngs::OsRng, thread_rng, Rng};
+use rand::{rngs::OsRng, Rng};
 
+// TODO move some of these into a keyderiv crate
 const DERIV_BASE_IDX: u32 = 56;
 const DERIV_SEQ_IDX: u32 = 10;
 const DERIV_OP_IDX: u32 = 20;
@@ -36,6 +32,13 @@ const DEFAULT_NETWORK: Network = Network::Signet;
 pub struct Args {
     #[argh(option, description = "network name [signet, regtest]", short = 'b')]
     bitcoin_network: Option<String>,
+
+    #[argh(
+        option,
+        description = "data directory (unused) (default cwd)",
+        short = 'd'
+    )]
+    datadir: Option<PathBuf>,
 
     #[argh(subcommand)]
     subc: Subcommand,
@@ -113,7 +116,11 @@ pub struct SubcGenParams {
     #[argh(option, description = "output file path .json (default network name)")]
     output: Option<PathBuf>,
 
-    #[argh(option, description = "network name (default random)", short = 'n')]
+    #[argh(
+        option,
+        description = "network name, used for magics (default random)",
+        short = 'n'
+    )]
     name: Option<String>,
 
     #[argh(
@@ -137,7 +144,7 @@ pub struct SubcGenParams {
     )]
     opkeys: Option<PathBuf>,
 
-    #[argh(option, description = "deposit amt in sats (default 10M)")]
+    #[argh(option, description = "deposit amount in sats (default 1G -> 10 BTC)")]
     deposit_sats: Option<u64>,
 
     #[argh(option, description = "genesis trigger height (default 100)")]
@@ -151,14 +158,21 @@ pub struct SubcGenParams {
 
     #[argh(option, description = "epoch duration in slots (default 64)")]
     epoch_slots: Option<u32>,
+
+    #[argh(
+        option,
+        description = "permit blank proofs after timeout in millis (default strict)"
+    )]
+    proof_timeout: Option<u32>,
 }
 
 pub struct CmdContext {
     /// Resolved datadir for the network.
+    #[allow(unused)]
     datadir: PathBuf,
 
-    /// The network we're using.
-    network: Network,
+    /// The Bitcoin network we're building on top of.
+    bitcoin_network: Network,
 
     /// Shared RNG, just `OsRng` for now.
     rng: OsRng,
@@ -166,42 +180,31 @@ pub struct CmdContext {
 
 fn main() {
     let args: Args = argh::from_env();
-
-    let mut ctx = CmdContext {
-        datadir: PathBuf::from("."),
-        network: resolve_network(args.bitcoin_network.as_ref().map(|s| s.as_str())),
-        rng: OsRng,
-    };
-
-    if let Err(e) = exec_subc(args.subc, &mut ctx) {
+    if let Err(e) = main_inner(args) {
         eprintln!("{e}\n{e:?}");
         return;
     }
-
-    /*let secp = Secp256k1::new();
-    let master_priv = gen_priv(&mut thread_rng(), DEFAULT_NETWORK);
-    println!(
-        "Private: {}",
-        master_priv.strata_encode().expect("successful encode")
-    );
-    let master_pub = Xpub::from_priv(&secp, &master_priv);
-    println!(
-        "Public: {}",
-        master_pub.strata_encode().expect("successful encode")
-    );
-
-    let keys = Keys::derive(Key::Private(master_priv), &secp);
-    println!("sequencer key: {}", keys.sequencer);
-    println!("operator key: {}", keys.operator);
-     */
 }
 
-fn resolve_network(arg: Option<&str>) -> Network {
+fn main_inner(args: Args) -> anyhow::Result<()> {
+    let network = resolve_network(args.bitcoin_network.as_ref().map(|s| s.as_str()))?;
+
+    let mut ctx = CmdContext {
+        datadir: args.datadir.unwrap_or_else(|| PathBuf::from(".")),
+        bitcoin_network: network,
+        rng: OsRng,
+    };
+
+    exec_subc(args.subc, &mut ctx)?;
+    Ok(())
+}
+
+fn resolve_network(arg: Option<&str>) -> anyhow::Result<Network> {
     match arg {
-        Some("signet") => Network::Signet,
-        Some("regtest") => Network::Regtest,
-        Some(n) => panic!("unsupported network option: {n}"),
-        None => DEFAULT_NETWORK,
+        Some("signet") => Ok(Network::Signet),
+        Some("regtest") => Ok(Network::Regtest),
+        Some(n) => anyhow::bail!("unsupported network option: {n}"),
+        None => Ok(DEFAULT_NETWORK),
     }
 }
 
@@ -219,7 +222,7 @@ fn exec_genseed(cmd: SubcGenSeed, ctx: &mut CmdContext) -> anyhow::Result<()> {
         anyhow::bail!("not overwiting file, add --force to overwrite");
     }
 
-    let xpriv = gen_priv(&mut ctx.rng, ctx.network);
+    let xpriv = gen_priv(&mut ctx.rng, ctx.bitcoin_network);
     let buf = xpriv.encode();
     let s = bitcoin::base58::encode_check(&buf);
     fs::write(&cmd.path, s.as_bytes())?;
@@ -259,6 +262,7 @@ fn exec_genopxpub(cmd: SubcGenOpXpub, _ctx: &mut CmdContext) -> anyhow::Result<(
 
 fn exec_genparams(cmd: SubcGenParams, ctx: &mut CmdContext) -> anyhow::Result<()> {
     // TODO update this with vk for checkpoint proof
+    // TODO make configurable
     let rollup_vk_buf =
         hex::decode("00b01ae596b4e51843484ff71ccbd0dd1a030af70b255e6b9aad50b81d81266f").unwrap();
     let Ok(rollup_vk) = Buf32::try_from(rollup_vk_buf.as_slice()) else {
@@ -303,6 +307,7 @@ fn exec_genparams(cmd: SubcGenParams, ctx: &mut CmdContext) -> anyhow::Result<()
 
     let config = ParamsConfig {
         name: cmd.name.unwrap_or_else(|| "strata-testnet".to_string()),
+        bitcoin_network: ctx.bitcoin_network,
         // TODO make these consts
         block_time_ms: cmd.block_time_ms.unwrap_or(15_000),
         epoch_slots: cmd.epoch_slots.unwrap_or(64),
@@ -312,6 +317,7 @@ fn exec_genparams(cmd: SubcGenParams, ctx: &mut CmdContext) -> anyhow::Result<()
         rollup_vk,
         // TODO make a const
         deposit_sats: cmd.deposit_sats.unwrap_or(1_000_000_000),
+        proof_timeout: cmd.proof_timeout,
     };
 
     let params = construct_params(config);
@@ -422,6 +428,7 @@ fn derive_op_purpose_xpubs(op_xpub: &Xpub) -> (Xpub, Xpub) {
 /// Describes inputs for how we want to set params.
 pub struct ParamsConfig {
     name: String,
+    bitcoin_network: Network,
     block_time_ms: u64,
     epoch_slots: u32,
     genesis_trigger: u64,
@@ -429,6 +436,7 @@ pub struct ParamsConfig {
     opkeys: Vec<Xpub>,
     rollup_vk: Buf32,
     deposit_sats: u64,
+    proof_timeout: Option<u32>,
 }
 
 // TODO conver this to also initialize the sync params
@@ -453,9 +461,11 @@ fn construct_params(config: ParamsConfig) -> alpen_express_primitives::params::R
         rollup_name: config.name,
         block_time: config.block_time_ms,
         cred_rule: cr,
+        // TODO do we want to remove this?
         horizon_l1_height: config.genesis_trigger / 2,
         genesis_l1_height: config.genesis_trigger,
         operator_config: alpen_express_primitives::params::OperatorConfig::Static(opkeys),
+        // TODO make configurable
         evm_genesis_block_hash: Buf32(
             "0x37ad61cff1367467a98cf7c54c4ac99e989f1fbb1bc1e646235e90c065c565ba"
                 .parse()
@@ -466,14 +476,20 @@ fn construct_params(config: ParamsConfig) -> alpen_express_primitives::params::R
                 .parse()
                 .unwrap(),
         ),
+        // TODO make configurable
         l1_reorg_safe_depth: 4,
         target_l2_batch_size: config.epoch_slots as u64,
         address_length: 20,
         deposit_amount: config.deposit_sats,
         rollup_vk: RollupVerifyingKey::SP1VerifyingKey(config.rollup_vk),
         verify_proofs: true,
+        // TODO make configurable
         dispatch_assignment_dur: 64,
-        proof_publish_mode: alpen_express_primitives::params::ProofPublishMode::Strict,
+        proof_publish_mode: config
+            .proof_timeout
+            .map(|t| ProofPublishMode::Timeout(t as u64))
+            .unwrap_or(ProofPublishMode::Strict),
+        // TODO make configurable
         max_deposits_in_block: 16,
     }
 }
