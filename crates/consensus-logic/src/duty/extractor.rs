@@ -63,7 +63,7 @@ fn extract_batch_duties(
             if tip_height == 0 {
                 return Ok(vec![]);
             }
-            let first_batch_idx = 1;
+            let first_checkpoint_idx = 0;
 
             // Include genesis l1 height to current seen height
             let l1_range = (state.genesis_l1_height(), state.l1_view().tip_height());
@@ -93,7 +93,7 @@ fn extract_batch_duties(
             let l2_transition = (initial_chain_state_root, current_chain_state_root);
 
             let new_checkpt = CheckpointInfo::new(
-                first_batch_idx,
+                first_checkpoint_idx,
                 l1_range,
                 l2_range,
                 l1_transition,
