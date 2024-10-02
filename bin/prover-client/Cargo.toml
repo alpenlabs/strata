@@ -9,31 +9,36 @@ path = "src/main.rs"
 required-features = ["prover"]
 
 [dependencies]
+alpen-express-btcio = { workspace = true }
 alpen-express-common = { workspace = true }
 alpen-express-db = { workspace = true }
+alpen-express-primitives = { workspace = true }
 alpen-express-rocksdb = { workspace = true }
+alpen-express-rpc-types = { workspace = true }
+alpen-express-state = { workspace = true }
 express-proofimpl-evm-ee-stf = { workspace = true }
 express-prover-client-rpc-api = { workspace = true }
 express-sp1-adapter = { workspace = true, features = ["prover"] }
 express-sp1-guest-builder = { path = "../../provers/sp1" }
 express-zkvm = { workspace = true }
 
-
 anyhow = { workspace = true }
 argh = { workspace = true }
 async-trait = { workspace = true }
 bincode = { workspace = true }
+bitcoin = { workspace = true }
+borsh = { workspace = true }
 jsonrpsee = { workspace = true, features = ["http-client"] }
 rayon = "1.8.0"
 reth-rpc-types = { workspace = true }
 rockbound = { workspace = true }
 serde = { workspace = true }
+strata-tx-parser = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
-uuid = { version = "1.0", features = ["v4", "serde"] }
-
+uuid = { workspace = true }
 
 [features]
 prover = []

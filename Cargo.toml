@@ -197,6 +197,8 @@ toml = "0.5"
 tower = "0.4"
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+uuid = { version = "1.0", features = ["v4", "serde"] }
+
 
 # This is needed for custom build of SP1
 [profile.release.build-override]

@@ -4,7 +4,7 @@ use express_zkvm::{ProverOptions, ZKVMHost};
 use tokio::time::{sleep, Duration};
 
 use crate::{
-    config::PROVER_MANAGER_WAIT_TIME,
+    config::PROVER_MANAGER_INTERVAL,
     primitives::tasks_scheduler::{ProofSubmissionStatus, ProvingTaskStatus},
     prover::Prover,
     task::TaskTracker,
@@ -35,7 +35,7 @@ where
         loop {
             self.process_pending_tasks().await;
             self.track_proving_progress().await;
-            sleep(Duration::from_secs(PROVER_MANAGER_WAIT_TIME)).await;
+            sleep(Duration::from_secs(PROVER_MANAGER_INTERVAL)).await;
         }
     }
 
@@ -53,7 +53,11 @@ where
             self.prover.submit_witness(task.id, task.prover_input);
             if self.prover.start_proving(task.id).is_err() {
                 self.task_tracker
-                    .update_task_status(task.id, ProvingTaskStatus::Pending)
+                    .update_status(task.id, ProvingTaskStatus::Pending)
+                    .await;
+            } else {
+                self.task_tracker
+                    .update_status(task.id, ProvingTaskStatus::Processing)
                     .await;
             }
         }
@@ -70,13 +74,11 @@ where
             .await;
 
         for task in in_progress_tasks {
-            if let Ok(ProofSubmissionStatus::Success) = self
+            if let Ok(ProofSubmissionStatus::Success(proof)) = self
                 .prover
                 .get_proof_submission_status_and_remove_on_success(task.id)
             {
-                self.task_tracker
-                    .update_task_status(task.id, ProvingTaskStatus::Completed)
-                    .await;
+                self.task_tracker.mark_task_completed(task.id, proof).await;
 
                 // TODO: Implement post-processing hooks.
                 // Example: If the current task is EL proving, this proof should be added

@@ -1,3 +1,6 @@
+use std::fmt;
+
+use express_zkvm::Proof;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -15,7 +18,7 @@ pub enum WitnessSubmissionStatus {
 #[derive(Debug, Eq, PartialEq)]
 pub enum ProofSubmissionStatus {
     /// Indicates successful submission of the proof to the DA.
-    Success,
+    Success(Proof),
     /// Indicates that proof generation is currently in progress.
     ProofGenerationInProgress,
 }
@@ -35,11 +38,26 @@ pub enum ProvingTaskStatus {
     Processing,
     Completed,
     Failed,
+    WaitingForDependencies,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+impl fmt::Display for ProvingTaskStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let status_str = match self {
+            ProvingTaskStatus::Pending => "Pending",
+            ProvingTaskStatus::Processing => "Processing",
+            ProvingTaskStatus::Completed => "Completed",
+            ProvingTaskStatus::Failed => "Failed",
+            ProvingTaskStatus::WaitingForDependencies => "WaitingForDependencies",
+        };
+        write!(f, "{}", status_str)
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct ProvingTask {
     pub id: Uuid,
     pub prover_input: ProverInput,
     pub status: ProvingTaskStatus,
+    pub dependencies: Vec<Uuid>,
 }
