@@ -62,9 +62,7 @@ impl ProvingOperations for ElOperations {
         task_tracker: Arc<TaskTracker>,
         input: Self::Input,
     ) -> Result<Uuid, ProvingTaskError> {
-        let data = WitnessData {
-            data: bincode::serialize(&input)?,
-        };
+        let data = WitnessData { data: input };
         let prover_input = ProverInput::ElBlock(data);
         let task_id = task_tracker.create_task(prover_input, vec![]).await;
         Ok(task_id)

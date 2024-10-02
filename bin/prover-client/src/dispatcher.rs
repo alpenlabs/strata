@@ -1,6 +1,6 @@
 use std::{fmt::Debug, sync::Arc};
 
-use tracing::debug;
+use tracing::{debug, info};
 use uuid::Uuid;
 
 use crate::{errors::ProvingTaskError, proving_ops::ops::ProvingOperations, task::TaskTracker};
@@ -30,7 +30,7 @@ where
 
     /// Creates a proving task for the given params.
     pub async fn create_task(&self, param: O::Params) -> Result<Uuid, ProvingTaskError> {
-        debug!("Creating proving task for block {:?}", param);
+        info!("Creating proving task for block {:?}", param);
         let input = self
             .operations
             .fetch_input(param.clone())
