@@ -1,5 +1,5 @@
 use std::{
-    fs, io,
+    fs,
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -12,11 +12,8 @@ use alpen_express_consensus_logic::{
 use alpen_express_db::{database::CommonDatabase, traits::Database};
 use alpen_express_evmexec::{engine::RpcExecEngineCtl, fork_choice_state_initial, EngineRpcClient};
 use alpen_express_primitives::{
-    block_credential,
     buf::Buf32,
-    operator::OperatorPubkeys,
-    params::{OperatorConfig, Params, ProofPublishMode, RollupParams},
-    vk::RollupVerifyingKey,
+    params::{Params, RollupParams},
 };
 use alpen_express_rocksdb::{
     broadcaster::db::BroadcastDatabase, l2::db::L2Db, sequencer::db::SequencerDB, ChainStateDb,
@@ -29,28 +26,15 @@ use anyhow::Context;
 use bitcoin::Network;
 use express_storage::L2BlockManager;
 use format_serde_error::SerdeError;
-use reth_rpc_types::engine::{JwtError, JwtSecret};
+use reth_rpc_types::engine::JwtSecret;
 use rockbound::{rocksdb, OptimisticTransactionDB};
-use thiserror::Error;
 use tokio::runtime::Runtime;
 use tracing::*;
 
-use crate::{args::Args, config::Config};
+use crate::{args::Args, config::Config, errors::InitError, network};
 
 pub type CommonDb =
     CommonDatabase<L1Db, L2Db, SyncEventDb, ClientStateDb, ChainStateDb, RBCheckpointDB>;
-
-#[derive(Debug, Error)]
-pub enum InitError {
-    #[error("io: {0}")]
-    Io(#[from] io::Error),
-
-    #[error("config: {0}")]
-    MalformedConfig(#[from] SerdeError),
-
-    #[error("jwt: {0}")]
-    MalformedSecret(#[from] JwtError),
-}
 
 pub fn init_core_dbs(rbdb: Arc<OptimisticTransactionDB>, ops_config: DbOpsConfig) -> Arc<CommonDb> {
     // Initialize databases.
@@ -119,53 +103,35 @@ pub fn load_jwtsecret(path: &Path) -> Result<JwtSecret, InitError> {
     Ok(JwtSecret::from_hex(secret)?)
 }
 
-pub fn load_rollup_params_or_default(path: &Option<PathBuf>) -> Result<RollupParams, InitError> {
-    let Some(path) = path else {
-        return Ok(default_rollup_params());
-    };
+/// Resolves the rollup params file to use, possibly from a path, and validates
+/// it to ensure it passes sanity checks.
+pub fn resolve_and_validate_rollup_params(path: Option<&Path>) -> Result<RollupParams, InitError> {
+    let params = resolve_rollup_params(path)?;
+    params.check_well_formed()?;
+    Ok(params)
+}
+
+/// Resolves the rollup params file to use, possibly from a path.
+pub fn resolve_rollup_params(path: Option<&Path>) -> Result<RollupParams, InitError> {
+    // If a path is set from arg load that.
+    if let Some(p) = path {
+        return Ok(load_rollup_params(p)?);
+    }
+
+    // Otherwise check from envvar.
+    if let Some(p) = network::get_envvar_params()? {
+        return Ok(p);
+    }
+
+    // *Otherwise*, use the fallback.
+    Ok(network::get_default_rollup_params()?)
+}
+
+fn load_rollup_params(path: &Path) -> Result<RollupParams, InitError> {
     let json = fs::read_to_string(path)?;
     let rollup_params =
         serde_json::from_str::<RollupParams>(&json).map_err(|err| SerdeError::new(json, err))?;
-
     Ok(rollup_params)
-}
-
-fn default_rollup_params() -> RollupParams {
-    // FIXME this is broken, where are the keys?
-    let opkeys = OperatorPubkeys::new(Buf32::zero(), Buf32::zero());
-
-    // TODO: load default params from a json during compile time
-    RollupParams {
-        rollup_name: "express".to_string(),
-        block_time: 1000,
-        cred_rule: block_credential::CredRule::Unchecked,
-        horizon_l1_height: 3,
-        genesis_l1_height: 5,
-        operator_config: OperatorConfig::Static(vec![opkeys]),
-        evm_genesis_block_hash: Buf32(
-            "0x37ad61cff1367467a98cf7c54c4ac99e989f1fbb1bc1e646235e90c065c565ba"
-                .parse()
-                .unwrap(),
-        ),
-        evm_genesis_block_state_root: Buf32(
-            "0x351714af72d74259f45cd7eab0b04527cd40e74836a45abcae50f92d919d988f"
-                .parse()
-                .unwrap(),
-        ),
-        l1_reorg_safe_depth: 4,
-        target_l2_batch_size: 64,
-        address_length: 20,
-        deposit_amount: 1_000_000_000,
-        rollup_vk: RollupVerifyingKey::SP1VerifyingKey(Buf32(
-            "0x00b01ae596b4e51843484ff71ccbd0dd1a030af70b255e6b9aad50b81d81266f"
-                .parse()
-                .unwrap(),
-        )), // TODO: update this with vk for checkpoint proof
-        verify_proofs: true,
-        dispatch_assignment_dur: 64,
-        proof_publish_mode: ProofPublishMode::Strict,
-        max_deposits_in_block: 16,
-    }
 }
 
 pub fn create_bitcoin_rpc_client(config: &Config) -> anyhow::Result<Arc<BitcoinClient>> {

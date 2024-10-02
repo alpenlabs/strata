@@ -2,6 +2,7 @@
 
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 use crate::{
     block_credential::CredRule, operator::OperatorPubkeys, prelude::Buf32, vk::RollupVerifyingKey,
@@ -62,6 +63,60 @@ pub struct RollupParams {
 
     /// max number of deposits in a block
     pub max_deposits_in_block: u8,
+}
+
+impl RollupParams {
+    pub fn check_well_formed(&self) -> Result<(), ParamsError> {
+        if self.horizon_l1_height > self.genesis_l1_height {
+            return Err(ParamsError::HorizonAfterGenesis(
+                self.horizon_l1_height,
+                self.genesis_l1_height,
+            ));
+        }
+
+        if self.rollup_name.is_empty() {
+            return Err(ParamsError::EmptyRollupName);
+        }
+
+        match &self.operator_config {
+            OperatorConfig::Static(optbl) => {
+                if optbl.is_empty() {
+                    return Err(ParamsError::NoOperators);
+                }
+            }
+        }
+
+        // TODO maybe make all these be a macro?
+        if self.block_time == 0 {
+            return Err(ParamsError::ZeroProperty("block_time"));
+        }
+
+        if self.l1_reorg_safe_depth == 0 {
+            return Err(ParamsError::ZeroProperty("l1_reorg_safe_depth"));
+        }
+
+        if self.target_l2_batch_size == 0 {
+            return Err(ParamsError::ZeroProperty("target_l2_batch_size"));
+        }
+
+        if self.address_length == 0 {
+            return Err(ParamsError::ZeroProperty("max_address_length"));
+        }
+
+        if self.deposit_amount == 0 {
+            return Err(ParamsError::ZeroProperty("deposit_amount"));
+        }
+
+        if self.dispatch_assignment_dur == 0 {
+            return Err(ParamsError::ZeroProperty("dispatch_assignment_dur"));
+        }
+
+        if self.max_deposits_in_block == 0 {
+            return Err(ParamsError::ZeroProperty("max_deposits_in_block"));
+        }
+
+        Ok(())
+    }
 }
 
 /// Configuration common among deposit and deposit request transaction
@@ -138,4 +193,20 @@ impl Params {
 pub enum OperatorConfig {
     /// Use this static list of predetermined operators.
     Static(Vec<OperatorPubkeys>),
+}
+
+/// Error that can arise during params validation.
+#[derive(Debug, Error)]
+pub enum ParamsError {
+    #[error("rollup name empty")]
+    EmptyRollupName,
+
+    #[error("{0} must not be 0")]
+    ZeroProperty(&'static str),
+
+    #[error("horizon block {0} after genesis trigger block {1}")]
+    HorizonAfterGenesis(u64, u64),
+
+    #[error("no operators set")]
+    NoOperators,
 }
