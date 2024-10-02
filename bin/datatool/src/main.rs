@@ -1,4 +1,7 @@
-use std::path::PathBuf;
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 use argh::FromArgs;
 use bech32::{Bech32m, EncodeError, Hrp};
@@ -10,7 +13,14 @@ use bitcoin::{
 };
 use rand::{rngs::OsRng, thread_rng, Rng};
 
-const NETWORK: Network = Network::Signet;
+const DERIV_BASE_IDX: u32 = 56;
+const DERIV_SEQ_IDX: u32 = 10;
+const DERIV_OP_IDX: u32 = 20;
+const DERIV_OP_SIGNING_IDX: u32 = 100;
+const DERIV_OP_WALLET_IDX: u32 = 101;
+const SEQKEY_ENVVAR: &str = "STRATA_SEQ_KEY";
+const OPKEY_ENVVAR: &str = "STRATA_OP_KEY";
+const DEFAULT_NETWORK: Network = Network::Signet;
 
 /// Args.
 #[derive(FromArgs)]
@@ -25,14 +35,33 @@ pub struct Args {
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand)]
 pub enum Subcommand {
+    GenSeed(SubcGenSeed),
     GenSeqPubkey(SubcGenSeqPubkey),
     GenOpXpub(SubcGenOpXpub),
     GenParams(SubcGenParams),
 }
 
+#[derive(FromArgs, PartialEq, Debug)]
+#[argh(
+    subcommand,
+    name = "genseed",
+    description = "generates a xpriv and writes it to a file"
+)]
+pub struct SubcGenSeed {
+    #[argh(positional, description = "output path")]
+    path: PathBuf,
+
+    #[argh(switch, description = "force overwrite", short = 'f')]
+    force: bool,
+}
+
 /// Generate the sequencer pubkey to pass around.
 #[derive(FromArgs, PartialEq, Debug)]
-#[argh(subcommand, name = "genseqpubkey")]
+#[argh(
+    subcommand,
+    name = "genseqpubkey",
+    description = "generates a sequencer pubkey from seed"
+)]
 pub struct SubcGenSeqPubkey {
     #[argh(option, description = "reads key from specified file", short = 'f')]
     key_file: Option<PathBuf>,
@@ -47,7 +76,11 @@ pub struct SubcGenSeqPubkey {
 
 /// Generate operator xpub to pass around.
 #[derive(FromArgs, PartialEq, Debug)]
-#[argh(subcommand, name = "genopxpub")]
+#[argh(
+    subcommand,
+    name = "genopxpub",
+    description = "generates an operator xpub from seed"
+)]
 pub struct SubcGenOpXpub {
     #[argh(option, description = "reads key from specified file", short = 'f')]
     key_file: Option<PathBuf>,
@@ -62,7 +95,11 @@ pub struct SubcGenOpXpub {
 
 /// Generate a network's param file from inputs.
 #[derive(FromArgs, PartialEq, Debug)]
-#[argh(subcommand, name = "genparams")]
+#[argh(
+    subcommand,
+    name = "genparams",
+    description = "generates network params from inputs"
+)]
 pub struct SubcGenParams {
     #[argh(option, description = "network name (default random)", short = 'n')]
     name: Option<String>,
@@ -101,12 +138,12 @@ fn main() {
     };
 
     if let Err(e) = exec_subc(args.subc, &mut ctx) {
-        panic!("{e} {e:?}")
+        eprintln!("{e}\n{e:?}");
+        return;
     }
 
-    let secp = Secp256k1::new();
-    let master_priv = gen_priv(&mut thread_rng());
-
+    /*let secp = Secp256k1::new();
+    let master_priv = gen_priv(&mut thread_rng(), DEFAULT_NETWORK);
     println!(
         "Private: {}",
         master_priv.strata_encode().expect("successful encode")
@@ -120,6 +157,7 @@ fn main() {
     let keys = Keys::derive(Key::Private(master_priv), &secp);
     println!("sequencer key: {}", keys.sequencer);
     println!("operator key: {}", keys.operator);
+     */
 }
 
 fn resolve_network(arg: Option<&str>) -> Network {
@@ -127,130 +165,136 @@ fn resolve_network(arg: Option<&str>) -> Network {
         Some("signet") => Network::Signet,
         Some("regtest") => Network::Regtest,
         Some(n) => panic!("unsupported network option: {n}"),
-        None => NETWORK,
+        None => DEFAULT_NETWORK,
     }
 }
 
 fn exec_subc(cmd: Subcommand, ctx: &mut Context) -> anyhow::Result<()> {
     match cmd {
-        Subcommand::GenSeqPubkey(subc) => {}
-        Subcommand::GenOpXpub(subc) => {}
-        Subcommand::GenParams(subc) => {}
+        Subcommand::GenSeed(subc) => exec_genseed(subc, ctx),
+        Subcommand::GenSeqPubkey(subc) => exec_genseqpubkey(subc, ctx),
+        Subcommand::GenOpXpub(subc) => exec_genopxpub(subc, ctx),
+        Subcommand::GenParams(subc) => exec_genparams(subc, ctx),
     }
-})
-
-fn exec_genseqpubkey(cmd: SubcGenSeqPubkey, ctx: &mut Context) -> anyhow::Result<()> {
-    unimplemented!()
 }
 
-fn exec_genopxpub(cmd: SubcGenOpXpub, ctx: &mut Context) -> anyhow::Result<()> {
-    unimplemented!()
+fn exec_genseed(cmd: SubcGenSeed, ctx: &mut Context) -> anyhow::Result<()> {
+    if cmd.path.exists() && !cmd.force {
+        anyhow::bail!("not overwiting file, add --force to overwrite");
+    }
+
+    let xpriv = gen_priv(&mut ctx.rng, ctx.network);
+    let buf = xpriv.encode();
+    let s = bitcoin::base58::encode_check(&buf);
+    fs::write(&cmd.path, s.as_bytes())?;
+
+    Ok(())
+}
+
+fn exec_genseqpubkey(cmd: SubcGenSeqPubkey, _ctx: &mut Context) -> anyhow::Result<()> {
+    let Some(xpriv) = resolve_key(&cmd.key_file, cmd.key_from_env, &SEQKEY_ENVVAR)? else {
+        anyhow::bail!("privkey unset");
+    };
+
+    let seq_xpriv = derive_seq_xpriv(&xpriv)?;
+    let seq_xpub = Xpub::from_priv(bitcoin::secp256k1::SECP256K1, &seq_xpriv);
+    let raw_buf = seq_xpub.to_x_only_pub().serialize();
+    let s = bitcoin::base58::encode_check(&raw_buf);
+
+    eprintln!("{s}");
+
+    Ok(())
+}
+
+fn exec_genopxpub(cmd: SubcGenOpXpub, _ctx: &mut Context) -> anyhow::Result<()> {
+    let Some(xpriv) = resolve_key(&cmd.key_file, cmd.key_from_env, &OPKEY_ENVVAR)? else {
+        anyhow::bail!("privkey unset");
+    };
+
+    let op_xpriv = derive_op_root_xpub(&xpriv)?;
+    let op_xpub = Xpub::from_priv(bitcoin::secp256k1::SECP256K1, &op_xpriv);
+    let raw_buf = op_xpub.encode();
+    let s = bitcoin::base58::encode_check(&raw_buf);
+
+    eprintln!("{s}");
+
+    Ok(())
 }
 
 fn exec_genparams(cmd: SubcGenParams, ctx: &mut Context) -> anyhow::Result<()> {
     unimplemented!()
 }
 
-fn gen_priv(rng: &mut impl Rng) -> Xpriv {
+/// Generates a new xpriv.
+fn gen_priv(rng: &mut impl Rng, net: Network) -> Xpriv {
     let seed: [u8; 32] = rng.gen();
-    Xpriv::new_master(NETWORK, &seed).expect("valid seed")
+    Xpriv::new_master(net, &seed).expect("valid seed")
 }
 
-enum Key {
-    Public(Xpub),
-    Private(Xpriv),
+/// Reads an xprv from file as a string, verifying the checksom.
+fn read_xpriv(path: &Path) -> anyhow::Result<Xpriv> {
+    let raw_buf = fs::read(path)?;
+    let str_buf = std::str::from_utf8(&raw_buf)?;
+    let buf = bitcoin::base58::decode_check(str_buf)?;
+    Ok(Xpriv::decode(&buf)?)
 }
 
-impl Key {
-    fn decode(value: String) -> Option<Key> {
-        let (hrp, data) = bech32::decode(&value).ok()?;
-        if hrp == Xpriv::HRP {
-            let master = Xpriv::decode(&data).ok()?;
-            Some(Key::Private(master))
-        } else if hrp == Xpub::HRP {
-            let public = Xpub::decode(&data).ok()?;
-            Some(Key::Public(public))
-        } else {
-            None
+/// Resolves a key from set vars and whatnot.
+fn resolve_key(
+    path: &Option<PathBuf>,
+    from_env: bool,
+    env: &'static str,
+) -> anyhow::Result<Option<Xpriv>> {
+    match (path, from_env) {
+        (Some(_), true) => anyhow::bail!("got key path and --key-from-env, pick a lane"),
+        (Some(path), false) => Ok(Some(read_xpriv(path)?)),
+        (None, true) => {
+            let Ok(val) = std::env::var(env) else {
+                anyhow::bail!("got --key-from-env but {env} not set or invalid");
+            };
+
+            let buf = bitcoin::base58::decode_check(&val)?;
+            Ok(Some(Xpriv::decode(&buf)?))
         }
+        _ => Ok(None),
     }
 }
 
-impl std::fmt::Display for Key {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let value = match self {
-            Key::Public(xpub) => xpub.strata_encode(),
-            Key::Private(xpriv) => xpriv.strata_encode(),
-        }
-        .expect("successful encode");
-        f.write_str(&value)
-    }
+fn derive_strata_scheme_xpriv(master: &Xpriv, last: u32) -> anyhow::Result<Xpriv> {
+    let derivation_path = DerivationPath::master().extend(&[
+        ChildNumber::from_hardened_idx(DERIV_BASE_IDX).unwrap(),
+        ChildNumber::from_hardened_idx(last).unwrap(),
+    ]);
+    Ok(master.derive_priv(bitcoin::secp256k1::SECP256K1, &derivation_path)?)
 }
 
-struct Keys {
-    operator: Key,
-    sequencer: Key,
+/// Derives the sequencer xpriv.
+fn derive_seq_xpriv(master: &Xpriv) -> anyhow::Result<Xpriv> {
+    derive_strata_scheme_xpriv(master, DERIV_SEQ_IDX)
 }
 
-impl Keys {
-    fn derive(master: Key, secp: &Secp256k1<All>) -> Self {
-        let derivation_path = DerivationPath::master().extend(&[
-            ChildNumber::from_hardened_idx(86).expect("valid child number"),
-            ChildNumber::from_hardened_idx(0).expect("valid child number"),
-            ChildNumber::from_hardened_idx(0).expect("valid child number"),
-            ChildNumber::from_normal_idx(0).expect("valid child number"),
-        ]);
-        let operator_path =
-            derivation_path.extend(ChildNumber::from_normal_idx(0).expect("valid child number"));
-        let sequencer_path =
-            derivation_path.extend(ChildNumber::from_normal_idx(1).expect("valid child number"));
-        match master {
-            Key::Public(xpub) => {
-                let operator_pubk = xpub.derive_pub(&secp, &operator_path).expect("valid path");
-                let sequencer_pubk = xpub.derive_pub(&secp, &sequencer_path).expect("valid path");
-                Keys {
-                    operator: Key::Public(operator_pubk),
-                    sequencer: Key::Public(sequencer_pubk),
-                }
-            }
-            Key::Private(xpriv) => {
-                let operator_privk = xpriv
-                    .derive_priv(&secp, &operator_path)
-                    .expect("valid path");
-                let sequencer_privk = xpriv
-                    .derive_priv(&secp, &sequencer_path)
-                    .expect("valid path");
-                Keys {
-                    operator: Key::Private(operator_privk),
-                    sequencer: Key::Private(sequencer_privk),
-                }
-            }
-        }
-    }
+/// Derives the root xpub for a Strata operator which can be turned into an xpub
+/// and used in network init.
+fn derive_op_root_xpub(master: &Xpriv) -> anyhow::Result<Xpriv> {
+    derive_strata_scheme_xpriv(master, DERIV_OP_IDX)
 }
 
-trait StrataKeyEncodable {
-    const HRP: Hrp;
+/// Derives the signing and wallet xprivs for a Strata operator.
+fn derive_op_signing_xpriv(master: &Xpriv) -> anyhow::Result<(Xpriv, Xpriv)> {
+    let signing_path = DerivationPath::master().extend(&[
+        ChildNumber::from_hardened_idx(DERIV_BASE_IDX).unwrap(),
+        ChildNumber::from_hardened_idx(DERIV_OP_IDX).unwrap(),
+        ChildNumber::from_hardened_idx(DERIV_OP_SIGNING_IDX).unwrap(),
+    ]);
 
-    fn as_bytes(&self) -> [u8; 78];
+    let wallet_path = DerivationPath::master().extend(&[
+        ChildNumber::from_hardened_idx(DERIV_BASE_IDX).unwrap(),
+        ChildNumber::from_hardened_idx(DERIV_OP_IDX).unwrap(),
+        ChildNumber::from_hardened_idx(DERIV_OP_WALLET_IDX).unwrap(),
+    ]);
 
-    fn strata_encode(&self) -> Result<String, EncodeError> {
-        bech32::encode::<Bech32m>(Self::HRP, &self.as_bytes())
-    }
-}
+    let signing_xpriv = master.derive_priv(bitcoin::secp256k1::SECP256K1, &signing_path)?;
+    let wallet_xpriv = master.derive_priv(bitcoin::secp256k1::SECP256K1, &wallet_path)?;
 
-impl StrataKeyEncodable for Xpriv {
-    const HRP: Hrp = Hrp::parse_unchecked("strata_sec");
-
-    fn as_bytes(&self) -> [u8; 78] {
-        self.encode()
-    }
-}
-
-impl StrataKeyEncodable for Xpub {
-    const HRP: Hrp = Hrp::parse_unchecked("strata_pub");
-
-    fn as_bytes(&self) -> [u8; 78] {
-        self.encode()
-    }
+    Ok((signing_xpriv, wallet_xpriv))
 }
