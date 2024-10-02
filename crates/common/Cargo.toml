@@ -4,5 +4,8 @@ name = "alpen-express-common"
 version = "0.1.0"
 
 [dependencies]
+opentelemetry-otlp = { workspace = true }
+opentelemetry_sdk = { workspace = true }
 tracing = { workspace = true }
+tracing-opentelemetry = { workspace = true }
 tracing-subscriber = { workspace = true }
