@@ -3917,6 +3917,9 @@ dependencies = [
  "alpen-test-utils",
  "borsh",
  "express-chaintsn",
+ "express-proofimpl-checkpoint",
+ "express-proofimpl-evm-ee-stf",
+ "serde",
  "thiserror",
 ]
 
@@ -4170,18 +4173,22 @@ dependencies = [
  "alpen-express-primitives",
  "alpen-express-state",
  "alpen-test-utils",
+ "anyhow",
  "bincode",
  "bitcoin",
  "borsh",
  "express-proofimpl-btc-blockspace",
  "express-proofimpl-checkpoint",
+ "express-proofimpl-cl-stf",
  "express-proofimpl-evm-ee-stf",
  "express-proofimpl-l1-batch",
  "express-sp1-adapter",
  "express-zkvm",
  "hex",
+ "serde_json",
  "sp1-helper",
  "sp1-sdk",
+ "tempfile",
 ]
 
 [[package]]

@@ -12,14 +12,14 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use express_proofimpl_l1_batch::L1BatchProofOutput;
 use express_zkvm::Proof;
 
-#[derive(Debug, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
 pub struct ChainStateSnapshot {
     pub hash: Buf32,
     pub slot: u64,
     pub l2_blockid: L2BlockId,
 }
 
-#[derive(Debug, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
 pub struct L2BatchProofOutput {
     pub deposits: Vec<DepositInfo>,
     pub initial_snapshot: ChainStateSnapshot,

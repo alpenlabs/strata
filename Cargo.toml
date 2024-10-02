@@ -86,6 +86,7 @@ express-bridge-tx-builder = { path = "crates/bridge-tx-builder" }
 express-chaintsn = { path = "crates/chaintsn" }
 express-proofimpl-btc-blockspace = { path = "crates/proof-impl/btc-blockspace" }
 express-proofimpl-checkpoint = { path = "crates/proof-impl/checkpoint" }
+express-proofimpl-cl-stf = { path = "crates/proof-impl/cl-stf" }
 express-proofimpl-evm-ee-stf = { path = "crates/proof-impl/evm-ee-stf" }
 express-proofimpl-l1-batch = { path = "crates/proof-impl/l1-batch" }
 express-prover-client-rpc-api = { path = "crates/rpc/prover-client-api" }

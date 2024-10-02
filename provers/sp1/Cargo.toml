@@ -13,6 +13,7 @@ sp1-helper = "2.0.0"
 sp1-sdk = "2.0.0"
 
 [dev-dependencies]
+anyhow = { workspace = true }
 alpen-express-primitives.workspace = true
 alpen-express-state.workspace = true
 alpen-test-utils = { workspace = true }
@@ -22,10 +23,13 @@ borsh = { workspace = true }
 express-proofimpl-btc-blockspace = { workspace = true }
 express-proofimpl-checkpoint = { workspace = true }
 express-proofimpl-evm-ee-stf = { workspace = true }
+express-proofimpl-cl-stf = { workspace = true }
 express-proofimpl-l1-batch = { workspace = true }
 express-zkvm = { workspace = true }
 hex = { workspace = true }
 sp1-sdk = "2.0.0"
+serde_json = { workspace = true }
+tempfile = { workspace = true }
 
 [features]
 default = ["prover"]

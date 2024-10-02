@@ -1,4 +1,5 @@
 #[cfg(feature = "prover")]
+#[cfg(all(feature = "prover", not(debug_assertions)))]
 mod test {
     use alpen_express_state::{block::L2Block, chain_state::ChainState};
     use express_risc0_adapter::{Risc0Verifier, RiscZeroHost, RiscZeroProofInputBuilder};

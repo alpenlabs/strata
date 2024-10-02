@@ -1238,16 +1238,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "guest-sp1-cl-stf"
+name = "guest-sp1-cl-agg"
 version = "0.1.0"
 dependencies = [
  "alpen-express-primitives",
  "bincode",
- "bitcoin",
  "borsh",
  "express-proofimpl-checkpoint",
  "express-proofimpl-cl-stf",
- "express-proofimpl-evm-ee-stf",
  "sha2",
  "sp1-zkvm",
 ]

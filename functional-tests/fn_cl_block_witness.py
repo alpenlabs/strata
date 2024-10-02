@@ -1,3 +1,5 @@
+import time
+
 import flexitest
 
 from utils import wait_until
@@ -19,11 +21,13 @@ class CLBlockWitnessDataGenerationTest(flexitest.Test):
             lambda: seqrpc.alp_protocolVersion() is not None,
             error_with="Sequencer did not start on time",
         )
+        time.sleep(1)
 
-        witness_1 = seqrpc.alp_getBlockWitness(1)
+        witness_1 = seqrpc.alp_getCLBlockWitness(1)
         assert witness_1 is not None
 
-        witness_2 = seqrpc.alp_getBlockWitness(2)
+        time.sleep(1)
+        witness_2 = seqrpc.alp_getCLBlockWitness(2)
         assert witness_2 is not None
 
         return True
