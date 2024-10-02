@@ -1,7 +1,14 @@
+use alpen_express_primitives::{buf::Buf32, l1::BitcoinAddress};
+use anyhow::anyhow;
 use bitcoin::{
     opcodes::all::OP_PUSHNUM_1,
     script::{Instruction, Instructions},
-    Opcode,
+    taproot::TaprootBuilder,
+    Address, Network, Opcode, XOnlyPublicKey,
+};
+use musig2::{
+    secp256k1::{PublicKey, SECP256K1},
+    KeyAggContext,
 };
 
 /// Extract next instruction and try to parse it as an opcode
@@ -46,4 +53,32 @@ pub fn next_int(instructions: &mut Instructions<'_>) -> Option<u32> {
         }
         _ => None,
     }
+}
+
+pub fn generate_taproot_address(
+    operator_wallet_pks: &[Buf32],
+    network: Network,
+) -> anyhow::Result<BitcoinAddress> {
+    let keys = operator_wallet_pks.iter().map(|op| {
+        PublicKey::from_x_only_public_key(
+            XOnlyPublicKey::from_slice(op.as_ref()).expect("slice not an x-only public key"),
+            bitcoin::key::Parity::Even,
+        )
+    });
+
+    let x_only_pub_key = KeyAggContext::new(keys)?
+        .aggregated_pubkey::<PublicKey>()
+        .x_only_public_key()
+        .0;
+
+    let taproot_builder = TaprootBuilder::new();
+    let spend_info = taproot_builder
+        .finalize(SECP256K1, x_only_pub_key)
+        .map_err(|_| anyhow!("taproot finalization"))?;
+    let merkle_root = spend_info.merkle_root();
+
+    let addr = Address::p2tr(SECP256K1, x_only_pub_key, merkle_root, network);
+    let addr = BitcoinAddress::parse(&addr.to_string(), network)?;
+
+    Ok(addr)
 }

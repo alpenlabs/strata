@@ -1,4 +1,8 @@
-use alpen_express_primitives::params::{DepositTxParams, RollupParams};
+use alpen_express_primitives::{
+    buf::Buf32,
+    params::{OperatorConfig, RollupParams},
+    prelude::DepositTxParams,
+};
 use alpen_express_state::{batch::SignedBatchCheckpoint, tx::ProtocolOperation};
 use bitcoin::{Block, Transaction};
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -7,6 +11,7 @@ use super::messages::ProtocolOpTxRef;
 use crate::{
     deposit::{deposit_request::extract_deposit_request_info, deposit_tx::extract_deposit_info},
     inscription::parse_inscription_data,
+    utils::generate_taproot_address,
 };
 
 /// kind of transactions can be relevant for rollup node to filter
@@ -15,20 +20,33 @@ pub enum TxFilterRule {
     /// Inscription transactions with given Rollup name. This will be parsed by
     /// InscriptionParser which dictates the structure of inscription.
     RollupInscription(RollupName),
-    /// Deposit transaction
+    /// Deposit Request transaction
+    DepositRequest(DepositTxParams),
+    /// Deposit transaction with deposit config and address
     Deposit(DepositTxParams),
 }
 
 type RollupName = String;
 
-pub fn derive_tx_filter_rules(params: &RollupParams) -> Vec<TxFilterRule> {
-    let deposit_provider = params.get_deposit_params();
-    vec![
-        TxFilterRule::RollupInscription(params.rollup_name.clone()),
-        TxFilterRule::Deposit(deposit_provider),
-    ]
+/// Reads the operator wallet public keys from Rollup params. Returns None if
+/// not yet bootstrapped
+/// FIXME: This is only for devnet as these pks have to be read from the chain state
+fn get_operator_wallet_pks(params: &RollupParams) -> Vec<Buf32> {
+    let OperatorConfig::Static(operator_table) = &params.operator_config;
+
+    operator_table.iter().map(|op| *op.wallet_pk()).collect()
 }
 
+pub fn derive_tx_filter_rules(params: &RollupParams) -> anyhow::Result<Vec<TxFilterRule>> {
+    let operator_wallet_pks = get_operator_wallet_pks(params);
+    let address = generate_taproot_address(&operator_wallet_pks, params.network)?;
+    let deposit_provider = params.get_deposit_params(address);
+    Ok(vec![
+        TxFilterRule::RollupInscription(params.rollup_name.clone()),
+        TxFilterRule::DepositRequest(deposit_provider.clone()),
+        TxFilterRule::Deposit(deposit_provider),
+    ])
+}
 /// Filter all the relevant [`Transaction`]s in a block based on given [`TxFilterRule`]s
 pub fn filter_relevant_txs(block: &Block, filters: &[TxFilterRule]) -> Vec<ProtocolOpTxRef> {
     block
@@ -64,17 +82,11 @@ fn check_and_extract_relevant_info(
             None
         }
 
-        TxFilterRule::Deposit(config) => {
-            if let Some(deposit_info) = extract_deposit_info(tx, config) {
-                return Some(ProtocolOperation::Deposit(deposit_info));
-            }
+        TxFilterRule::DepositRequest(config) => extract_deposit_request_info(tx, config)
+            .map(|deposit_req_info| Some(ProtocolOperation::DepositRequest(deposit_req_info)))?,
 
-            if let Some(deposit_req_info) = extract_deposit_request_info(tx, config) {
-                return Some(ProtocolOperation::DepositRequest(deposit_req_info));
-            }
-
-            None
-        }
+        TxFilterRule::Deposit(config) => extract_deposit_info(tx, config)
+            .map(|deposit_info| Some(ProtocolOperation::Deposit(deposit_info)))?,
     })
 }
 
@@ -107,7 +119,7 @@ mod test {
     use crate::{
         deposit::test_utils::{
             build_test_deposit_request_script, build_test_deposit_script,
-            create_transaction_two_outpoints, generic_taproot_addr, get_deposit_tx_config,
+            create_transaction_two_outpoints, get_deposit_tx_config, test_taproot_addr,
         },
         filter::{filter_relevant_txs, TxFilterRule},
     };
@@ -254,7 +266,7 @@ mod test {
 
         let tx = create_transaction_two_outpoints(
             Amount::from_sat(config.deposit_amount),
-            &generic_taproot_addr().script_pubkey(),
+            &config.address.address().script_pubkey(),
             &deposit_script,
         );
 
@@ -284,7 +296,9 @@ mod test {
 
     #[test]
     fn test_filter_relevant_txs_deposit_request() {
-        let config = get_deposit_tx_config();
+        let mut config = get_deposit_tx_config();
+        let extra_amt = 10000;
+        config.deposit_amount += extra_amt;
         let dest_addr = vec![2u8; 20]; // Example EVM address
         let dummy_block = [0u8; 32]; // Example dummy block
         let deposit_request_script = build_test_deposit_request_script(
@@ -295,13 +309,13 @@ mod test {
 
         let tx = create_transaction_two_outpoints(
             Amount::from_sat(config.deposit_amount), // Any amount
-            &generic_taproot_addr().script_pubkey(),
+            &test_taproot_addr().address().script_pubkey(),
             &deposit_request_script,
         );
 
         let block = create_test_block(vec![tx]);
 
-        let relevant_types = vec![TxFilterRule::Deposit(config.clone())];
+        let relevant_types = vec![TxFilterRule::DepositRequest(config.clone())];
         let result = filter_relevant_txs(&block, &relevant_types);
 
         assert_eq!(result.len(), 1, "Should find one relevant transaction");
@@ -330,7 +344,7 @@ mod test {
         let config = get_deposit_tx_config();
         let irrelevant_tx = create_transaction_two_outpoints(
             Amount::from_sat(config.deposit_amount),
-            &generic_taproot_addr().script_pubkey(),
+            &test_taproot_addr().address().script_pubkey(),
             &ScriptBuf::new(),
         );
 
@@ -358,12 +372,12 @@ mod test {
 
         let tx1 = create_transaction_two_outpoints(
             Amount::from_sat(config.deposit_amount),
-            &generic_taproot_addr().script_pubkey(),
+            &test_taproot_addr().address().script_pubkey(),
             &deposit_script1,
         );
         let tx2 = create_transaction_two_outpoints(
             Amount::from_sat(config.deposit_amount),
-            &generic_taproot_addr().script_pubkey(),
+            &test_taproot_addr().address().script_pubkey(),
             &deposit_script2,
         );
 

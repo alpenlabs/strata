@@ -1,7 +1,7 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::Arc};
 
 use alpen_express_btcio::reader::config::ReaderConfig;
-use alpen_express_primitives::relay::types::RelayerConfig;
+use alpen_express_primitives::{params::Params, relay::types::RelayerConfig};
 use bitcoin::Network;
 use serde::Deserialize;
 
@@ -185,11 +185,12 @@ impl Config {
         }
     }
 
-    pub fn get_reader_config(&self) -> ReaderConfig {
-        ReaderConfig {
-            max_reorg_depth: self.sync.max_reorg_depth,
-            client_poll_dur_ms: self.sync.client_poll_dur_ms,
-        }
+    pub fn get_reader_config(&self, params: Arc<Params>) -> ReaderConfig {
+        ReaderConfig::new(
+            self.sync.max_reorg_depth,
+            self.sync.client_poll_dur_ms,
+            params,
+        )
     }
 }
 

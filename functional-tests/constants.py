@@ -47,22 +47,10 @@ DEFAULT_ROLLUP_PARAMS: dict = {
         # use an empty proof in batch after this many seconds of not receiving a proof
         "timeout": 30,
     },
-    "operator_config": {
-        "static": [
-            {
-                "signing_pk": "01" * 32,
-                "wallet_pk": "02" * 32,
-            },
-            {
-                "signing_pk": "03" * 32,
-                "wallet_pk": "04" * 32,
-            },
-        ]
-    },
     "max_deposits_in_block": 16,
+    "operator_config": {"static": [{"signing_pk": "01" * 32, "wallet_pk": "02" * 32}]},
+    "network": "regtest",
 }
-
-# post batch every 5 l2 blocks
 
 FAST_BATCH_ROLLUP_PARAMS = {
     **DEFAULT_ROLLUP_PARAMS,
@@ -70,9 +58,18 @@ FAST_BATCH_ROLLUP_PARAMS = {
     "genesis_l1_height": 5,
 }
 
-ROLLUP_BATCH_WITH_FUNDS = {
+# static operator config with pregenerated 100 blocks for deposit transaction
+ROLLUP_PARAMS_FOR_DEPOSIT_TX = {
     **DEFAULT_ROLLUP_PARAMS,
     "horizon_l1_height": 4,
     "target_l2_batch_size": 100,
     "genesis_l1_height": 102,
+    "operator_config": {
+        "static": [
+            {
+                "signing_pk": "01" * 32,
+                "wallet_pk": "02b4634c515a62e47b3f3eb62b8a6f6320fdb2baed5f2e6657f472b0f2a33221",
+            }
+        ]
+    },
 }

@@ -14,7 +14,7 @@ use alpen_express_status::StatusTx;
 use anyhow::bail;
 use bitcoin::{hashes::Hash, BlockHash};
 use strata_tx_parser::{
-    filter::{filter_relevant_txs, TxFilterRule},
+    filter::{derive_tx_filter_rules, filter_relevant_txs, TxFilterRule},
     messages::{BlockData, L1Event},
 };
 use tokio::sync::mpsc;
@@ -33,29 +33,24 @@ pub async fn bitcoin_data_reader_task<D: Database + 'static>(
     target_next_block: u64,
     config: Arc<ReaderConfig>,
     status_rx: Arc<StatusTx>,
-    chstate_prov: Arc<D::ChainStateProvider>,
-    params: Arc<Params>,
+    _chstate_prov: Arc<D::ChainStateProvider>,
 ) -> anyhow::Result<()> {
-    do_reader_task::<D>(
+    do_reader_task(
         client.as_ref(),
         &event_tx,
         target_next_block,
         config,
         status_rx.clone(),
-        chstate_prov,
-        params,
     )
     .await
 }
 
-async fn do_reader_task<D: Database + 'static>(
+async fn do_reader_task(
     client: &impl Reader,
     event_tx: &mpsc::Sender<L1Event>,
     target_next_block: u64,
     config: Arc<ReaderConfig>,
     status_rx: Arc<StatusTx>,
-    chstate_prov: Arc<D::ChainStateProvider>,
-    params: Arc<Params>,
 ) -> anyhow::Result<()> {
     info!(%target_next_block, "started L1 reader task!");
 
@@ -76,7 +71,7 @@ async fn do_reader_task<D: Database + 'static>(
         let poll_span = debug_span!("l1poll", %cur_best_height);
 
         // Maybe this should be called outside loop?
-        let filters = derive_tx_filter_rules::<D>(chstate_prov.clone(), params.as_ref())?;
+        let filters = derive_tx_filter_rules(config.params.rollup())?;
 
         if let Err(err) = poll_for_new_blocks(
             client,
@@ -84,7 +79,7 @@ async fn do_reader_task<D: Database + 'static>(
             &filters,
             &mut state,
             &mut status_updates,
-            params.as_ref(),
+            config.params.as_ref(),
         )
         .instrument(poll_span)
         .await
@@ -115,17 +110,6 @@ async fn do_reader_task<D: Database + 'static>(
 
         apply_status_updates(&status_updates, status_rx.clone()).await;
     }
-}
-
-fn derive_tx_filter_rules<D: Database + 'static>(
-    _chstate_prov: Arc<D::ChainStateProvider>,
-    params: &Params,
-) -> anyhow::Result<Vec<TxFilterRule>> {
-    // TODO: Figure out how to do it from chainstate provider
-    // For now we'll just go with filtering Inscription transactions
-    Ok(strata_tx_parser::filter::derive_tx_filter_rules(
-        params.rollup(),
-    ))
 }
 
 /// Inits the reader state by trying to backfill blocks up to a target height.

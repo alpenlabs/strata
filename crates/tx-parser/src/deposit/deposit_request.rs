@@ -5,12 +5,10 @@ use std::convert::TryInto;
 use alpen_express_primitives::params::DepositTxParams;
 use alpen_express_state::tx::DepositRequestInfo;
 use bitcoin::{opcodes::all::OP_RETURN, ScriptBuf, Transaction};
+use express_bridge_tx_builder::prelude::BRIDGE_DENOMINATION;
 use tracing::debug;
 
-use super::{
-    common::{check_bridge_offer_output, DepositRequestScriptInfo},
-    error::DepositParseError,
-};
+use super::{common::DepositRequestScriptInfo, error::DepositParseError};
 use crate::utils::{next_bytes, next_op};
 
 /// Extracts the DepositInfo from the Deposit Transaction
@@ -19,21 +17,24 @@ pub fn extract_deposit_request_info(
     config: &DepositTxParams,
 ) -> Option<DepositRequestInfo> {
     // Ensure that the transaction has at least 2 outputs
-    let output_0 = tx.output.first()?;
-    let output_1 = tx.output.get(1)?;
+    let addr_txn = tx.output.first()?;
+    let op_return_txn = tx.output.get(1)?;
 
     // Parse the deposit request script from the second output's script_pubkey
     let DepositRequestScriptInfo {
         tap_ctrl_blk_hash,
         ee_bytes,
-    } = parse_deposit_request_script(&output_1.script_pubkey, config).ok()?;
+    } = parse_deposit_request_script(&op_return_txn.script_pubkey, config).ok()?;
 
-    // Check if the bridge offer output is valid
-    check_bridge_offer_output(tx, config).ok()?;
+    // if sent value is less than equal to what we expect for bridge denomination. The extra amount
+    // is used for fees to create deposit transaction
+    if addr_txn.value.to_sat() <= BRIDGE_DENOMINATION.to_sat() {
+        return None;
+    }
 
     // Construct and return the DepositRequestInfo
     Some(DepositRequestInfo {
-        amt: output_0.value.to_sat(),
+        amt: addr_txn.value.to_sat(),
         address: ee_bytes,
         take_back_leaf_hash: tap_ctrl_blk_hash,
     })
@@ -103,32 +104,34 @@ mod tests {
         error::DepositParseError,
         test_utils::{
             build_no_op_deposit_request_script, build_test_deposit_request_script,
-            create_transaction_two_outpoints, generic_taproot_addr, get_deposit_tx_config,
+            create_transaction_two_outpoints, get_deposit_tx_config, test_taproot_addr,
         },
     };
 
     #[test]
     fn check_deposit_parser() {
         // values for testing
-        let config = get_deposit_tx_config();
+        let mut config = get_deposit_tx_config();
+        let extra_amt = 100000;
+        config.deposit_amount += extra_amt;
         let amt = Amount::from_sat(config.deposit_amount);
         let evm_addr = [1; 20];
         let dummy_control_block = [0xFF; 32];
-        let generic_taproot_addr = generic_taproot_addr();
+        let test_taproot_addr = test_taproot_addr();
 
         let deposit_request_script = build_test_deposit_request_script(
-            config.magic_bytes,
+            config.magic_bytes.clone(),
             dummy_control_block.to_vec(),
             evm_addr.to_vec(),
         );
 
         let test_transaction = create_transaction_two_outpoints(
             Amount::from_sat(config.deposit_amount),
-            &generic_taproot_addr.script_pubkey(),
+            &test_taproot_addr.address().script_pubkey(),
             &deposit_request_script,
         );
 
-        let out = extract_deposit_request_info(&test_transaction, &get_deposit_tx_config());
+        let out = extract_deposit_request_info(&test_transaction, &config);
 
         assert!(out.is_some());
         let out = out.unwrap();

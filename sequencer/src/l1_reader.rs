@@ -32,8 +32,7 @@ where
         .map(|i| i + 1)
         .unwrap_or(params.rollup().horizon_l1_height);
 
-    let reader_config = Arc::new(config.get_reader_config());
-    let params_r = params.clone();
+    let reader_config = Arc::new(config.get_reader_config(params.clone()));
     let chprov = db.chain_state_provider().clone();
 
     executor.spawn_critical_async(
@@ -45,7 +44,6 @@ where
             reader_config,
             status_rx.clone(),
             chprov,
-            params_r,
         ),
     );
 
