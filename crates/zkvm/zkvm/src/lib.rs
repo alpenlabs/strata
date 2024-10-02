@@ -37,7 +37,9 @@ impl From<&Proof> for Vec<u8> {
 }
 
 /// Verification Key required to verify proof generated from `ZKVMHost`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Serialize, Deserialize, BorshSerialize, BorshDeserialize, PartialEq, Eq, Arbitrary,
+)]
 pub struct VerificationKey(pub Vec<u8>);
 
 impl VerificationKey {
@@ -171,7 +173,7 @@ impl Default for ProverOptions {
 /// An input to the aggregation program.
 ///
 /// Consists of a proof and a verification key.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AggregationInput {
     proof: Proof,
     vk: VerificationKey,

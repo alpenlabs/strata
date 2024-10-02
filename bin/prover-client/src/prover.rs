@@ -21,7 +21,7 @@ use crate::{
     config::NUM_PROVER_WORKERS,
     db::open_rocksdb_database,
     primitives::{
-        prover_input::ProverInput,
+        prover_input::{ProofWithVkey, ProverInput},
         tasks_scheduler::{ProofProcessingStatus, ProofSubmissionStatus, WitnessSubmissionStatus},
         vms::{ProofVm, ZkVMManager},
     },
@@ -32,7 +32,7 @@ use crate::{
 enum ProvingTaskState {
     WitnessSubmitted(ProverInput),
     ProvingInProgress,
-    Proved(Proof),
+    Proved(ProofWithVkey),
     Err(String),
 }
 
@@ -56,7 +56,7 @@ impl ProverState {
     fn set_to_proved(
         &mut self,
         task_id: Uuid,
-        proof: Result<Proof, anyhow::Error>,
+        proof: Result<ProofWithVkey, anyhow::Error>,
     ) -> Option<ProvingTaskState> {
         match proof {
             Ok(p) => {
@@ -98,7 +98,7 @@ where
     vm_manager: ZkVMManager<Vm>,
 }
 
-fn make_proof<Vm>(prover_input: ProverInput, vm: Vm) -> Result<Proof, anyhow::Error>
+fn make_proof<Vm>(prover_input: ProverInput, vm: Vm) -> Result<ProofWithVkey, anyhow::Error>
 where
     Vm: ZKVMHost + 'static,
     for<'a> Vm::Input<'a>: ZKVMInputBuilder<'a>,
@@ -107,23 +107,34 @@ where
         ProverInput::ElBlock(el_input) => {
             let el_input: ELProofInput = bincode::deserialize(&el_input.data)?;
             let input = Vm::Input::new().write(&el_input)?.build()?;
-            let (proof, _) = vm.prove(input)?;
-            Ok(proof)
+
+            let (proof, vk) = vm.prove(input)?;
+            let agg_input = ProofWithVkey::new(proof, vk);
+            Ok(agg_input)
         }
         ProverInput::BtcBlock(block, tx_filters) => {
             let input = Vm::Input::new()
                 .write_serialized(&bitcoin::consensus::serialize(&block))?
                 .write_borsh(&tx_filters)?
                 .build()?;
-            let (proof, _) = vm.prove(input)?;
-            Ok(proof)
+
+            let (proof, vk) = vm.prove(input)?;
+            let agg_input = ProofWithVkey::new(proof, vk);
+            Ok(agg_input)
         }
         ProverInput::ClBlock(cl_proof_input) => {
             let input = Vm::Input::new()
+                .write_proof(
+                    cl_proof_input
+                        .el_proof
+                        .expect("CL Proving was sent without EL proof"),
+                )?
                 .write(&cl_proof_input.cl_raw_witness)?
                 .build()?;
-            let (proof, _) = vm.prove(input)?;
-            Ok(proof)
+
+            let (proof, vk) = vm.prove(input)?;
+            let agg_input = ProofWithVkey::new(proof, vk);
+            Ok(agg_input)
         }
         _ => {
             todo!()
@@ -243,7 +254,7 @@ where
                 Ok(ProofSubmissionStatus::ProofGenerationInProgress)
             }
             Some(ProvingTaskState::Proved(proof)) => {
-                self.save_proof_to_db(task_id, &proof)?;
+                self.save_proof_to_db(task_id, proof.proof())?;
 
                 prover_state.remove(&task_id);
                 Ok(ProofSubmissionStatus::Success(proof.clone()))

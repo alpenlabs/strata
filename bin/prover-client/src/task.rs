@@ -1,12 +1,11 @@
 use std::collections::HashMap;
 
-use express_zkvm::Proof;
 use tokio::sync::Mutex;
 use tracing::info;
 use uuid::Uuid;
 
 use crate::primitives::{
-    prover_input::ProverInput,
+    prover_input::{ProofWithVkey, ProverInput},
     tasks_scheduler::{ProvingTask, ProvingTaskStatus},
 };
 
@@ -51,7 +50,7 @@ impl TaskTracker {
         }
     }
 
-    pub async fn mark_task_completed(&self, task_id: Uuid, proof: Proof) {
+    pub async fn mark_task_completed(&self, task_id: Uuid, proof: ProofWithVkey) {
         info!("Task {:?} marked as completed", task_id);
         let mut tasks = self.tasks.lock().await;
         if let Some(task) = tasks.get_mut(&task_id) {
@@ -105,28 +104,33 @@ impl TaskTracker {
             .collect()
     }
 
-    fn update_prover_input(&self, prover_input: &mut ProverInput, task_id: Uuid, proof: Proof) {
+    fn update_prover_input(
+        &self,
+        prover_input: &mut ProverInput,
+        task_id: Uuid,
+        proof_input: ProofWithVkey,
+    ) {
         match prover_input {
             ProverInput::L1Batch(ref mut input) => {
                 if let Some(index) = input.btc_task_ids.iter().position(|id| *id == task_id) {
-                    input.proofs[index] = Some(proof);
+                    input.proofs[index] = Some(proof_input);
                 }
             }
             ProverInput::L2Batch(ref mut input) => {
                 if let Some(index) = input.cl_task_ids.iter().position(|id| *id == task_id) {
-                    input.proofs[index] = Some(proof);
+                    input.proofs[index] = Some(proof_input);
                 }
             }
             ProverInput::Checkpoint(ref mut input) => {
                 if input.l1_batch_id == task_id {
-                    input.l1_batch_proof = Some(proof.clone());
+                    input.l1_batch_proof = Some(proof_input.clone());
                 }
                 if input.l2_batch_id == task_id {
-                    input.l2_batch_proof = Some(proof);
+                    input.l2_batch_proof = Some(proof_input);
                 }
             }
             ProverInput::ClBlock(ref mut input) => {
-                input.proof = Some(proof);
+                input.el_proof = Some(proof_input);
             }
             _ => {}
         }

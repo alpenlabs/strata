@@ -1,4 +1,5 @@
 use bitcoin::Block;
+use express_zkvm::AggregationInput;
 use serde::{Deserialize, Serialize};
 use strata_tx_parser::filter::TxFilterRule;
 
@@ -7,6 +8,8 @@ use crate::proving_ops::{
     checkpoint_ops::CheckpointInput, cl_ops::CLProverInput, l1_batch_ops::L1BatchInput,
     l2_batch_ops::L2BatchInput,
 };
+
+pub type ProofWithVkey = AggregationInput;
 
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
