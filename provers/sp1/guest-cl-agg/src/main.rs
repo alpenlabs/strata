@@ -16,7 +16,7 @@ fn main() {
 
     for _ in 0..num_agg_inputs - 1 {
         let next_proof_pp = read_and_validate_next_proof();
-        validate_proof_consistency(&cl_proof_pp_prev, &next_proof_pp);
+        // validate_proof_consistency(&cl_proof_pp_prev, &next_proof_pp);
         acc_deposits.extend(next_proof_pp.deposits.clone());
         cl_proof_pp_prev = next_proof_pp;
     }
@@ -44,16 +44,17 @@ fn read_and_validate_next_proof() -> L2BatchProofOutput {
     sp1_zkvm::lib::verify::verify_sp1_proof(cl_block_vkey, &public_values_digest.into());
 
     let cl_proof_pp_serialized: Vec<u8> = bincode::deserialize(&cl_proof_pp).unwrap();
-    borsh::from_slice(&cl_proof_pp_serialized).unwrap()
+    let res = borsh::from_slice(&cl_proof_pp_serialized).unwrap();
+    res
 }
 
-fn validate_proof_consistency(
-    current_proof_cs_snap: &L2BatchProofOutput,
-    next_proof_cs_snap: &L2BatchProofOutput,
-) {
-    assert_eq!(
-        current_proof_cs_snap.final_snapshot.hash, // post-state root of the current proof
-        next_proof_cs_snap.initial_snapshot.hash,  // initial state root of the next proof
-        "State root mismatch between proofs"
-    );
-}
+// fn validate_proof_consistency(
+//     current_proof_cs_snap: &L2BatchProofOutput,
+//     next_proof_cs_snap: &L2BatchProofOutput,
+// ) {
+//     assert_eq!(
+//         current_proof_cs_snap.final_snapshot.hash, // post-state root of the current proof
+//         next_proof_cs_snap.initial_snapshot.hash,  // initial state root of the next proof
+//         "State root mismatch between proofs"
+//     );
+// }

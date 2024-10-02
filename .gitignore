@@ -258,3 +258,5 @@ provers/sp1/guest-l1-batch/src/vks.rs
 provers/**/vks.rs
 provers/test-util/el/el_proofs/
 provers/test-util/cl/cl_proofs/
+
+provers/proofs/

@@ -5024,6 +5024,8 @@ dependencies = [
  "express-sp1-adapter",
  "express-zkvm",
  "hex",
+ "num-bigint 0.4.6",
+ "num-traits",
  "serde_json",
  "sp1-helper",
  "sp1-sdk",

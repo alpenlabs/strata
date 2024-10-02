@@ -18,27 +18,34 @@ const CL_STF: &str = "guest-cl-stf";
 const BTC_BLOCKSPACE: &str = "guest-btc-blockspace";
 const L1_BATCH: &str = "guest-l1-batch";
 const CL_AGG: &str = "guest-cl-agg";
+const CHECKPOINT: &str = "guest-checkpoint";
 
-#[cfg(not(debug_assertions))]
-const PROGRAMS_TO_BUILD: &[&str] = &[EVM_EE_STF, CL_STF, BTC_BLOCKSPACE, L1_BATCH, CL_AGG];
+const PROGRAMS_TO_BUILD: &[&str] = &[
+    EVM_EE_STF,
+    CL_STF,
+    CL_AGG,
+    BTC_BLOCKSPACE,
+    L1_BATCH,
+    CHECKPOINT,
+];
 
 fn get_program_dependencies() -> HashMap<&'static str, Vec<&'static str>> {
     let mut dependencies = HashMap::new();
     dependencies.insert(L1_BATCH, vec![BTC_BLOCKSPACE]);
     dependencies.insert(CL_STF, vec![EVM_EE_STF]);
     dependencies.insert(CL_AGG, vec![CL_STF]);
+    dependencies.insert(CHECKPOINT, vec![L1_BATCH, CL_AGG]);
     dependencies
 }
 
 fn main() {
-    let guest_programs = get_guest_programs();
     let mut methods_file_content = String::new();
     let mut built_programs = HashSet::new();
     let dependencies = get_program_dependencies();
     let mut results = HashMap::new();
     let mut vk_hashes = HashMap::new();
 
-    for program in &guest_programs {
+    for program in PROGRAMS_TO_BUILD {
         build_program_with_dependencies(
             program,
             &dependencies,
@@ -150,22 +157,22 @@ fn generate_elf_contents_and_vk_hash(_program: &str) -> (Vec<u8>, [u32; 8]) {
     (Vec::new(), [0u32; 8])
 }
 
-fn get_guest_programs() -> Vec<String> {
-    let prefix = "guest-";
-    fs::read_dir(".")
-        .expect("Unable to read current directory")
-        .filter_map(|entry| {
-            let entry = entry.ok()?;
-            if entry.file_type().ok()?.is_dir() {
-                let name = entry.file_name().into_string().ok()?;
-                if name.starts_with(prefix) {
-                    Some(name)
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        })
-        .collect()
-}
+// fn get_guest_programs() -> Vec<String> {
+//     let prefix = "guest-";
+//     fs::read_dir(".")
+//         .expect("Unable to read current directory")
+//         .filter_map(|entry| {
+//             let entry = entry.ok()?;
+//             if entry.file_type().ok()?.is_dir() {
+//                 let name = entry.file_name().into_string().ok()?;
+//                 if name.starts_with(prefix) {
+//                     Some(name)
+//                 } else {
+//                     None
+//                 }
+//             } else {
+//                 None
+//             }
+//         })
+//         .collect()
+// }

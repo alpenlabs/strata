@@ -27,6 +27,8 @@ express-proofimpl-evm-ee-stf = { workspace = true }
 express-proofimpl-l1-batch = { workspace = true }
 express-zkvm = { workspace = true }
 hex = { workspace = true }
+num-bigint = "0.4.6"
+num-traits = "0.2.19"
 serde_json = { workspace = true }
 sp1-sdk = "2.0.0"
 tempfile = { workspace = true }

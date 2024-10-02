@@ -1,6 +1,6 @@
 mod helpers;
 #[cfg(feature = "prover")]
-#[cfg(all(feature = "prover", not(debug_assertions)))]
+// #[cfg(all(feature = "prover", not(debug_assertions)))]
 mod test {
     use express_sp1_adapter::{SP1Host, SP1ProofInputBuilder, SP1Verifier};
     use express_sp1_guest_builder::GUEST_CL_AGG_ELF;
@@ -31,6 +31,7 @@ mod test {
 
     #[test]
     fn test_cl_agg_guest_code_trace_generation() {
+        sp1_sdk::utils::setup_logger();
         let agg_proof_inputs = get_prover_input();
 
         let prover_ops = ProverOptions {
@@ -48,7 +49,7 @@ mod test {
         }
 
         let prover_input = prover_input_builder.build().unwrap();
-        let (_proof, _vk) = prover
+        let (_, _) = prover
             .prove(prover_input)
             .expect("Failed to generate proof");
     }

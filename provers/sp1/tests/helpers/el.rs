@@ -10,6 +10,11 @@ use express_proofimpl_evm_ee_stf::ELProofInput;
 use express_sp1_adapter::{SP1Host, SP1ProofInputBuilder};
 use express_sp1_guest_builder::GUEST_EVM_EE_STF_ELF;
 use express_zkvm::{Proof, ProverOptions, VerificationKey, ZKVMHost, ZKVMInputBuilder};
+use sp1_sdk::{MockProver, Prover, SP1ProofWithPublicValues};
+
+use crate::helpers::common::{
+    read_proof_from_file, verify_proof_independently, write_proof_to_file,
+};
 
 pub fn get_el_block_proof(witness_path: &Path) -> Result<(Proof, VerificationKey)> {
     let json_file = fs::read_to_string(witness_path)
@@ -28,33 +33,17 @@ pub fn get_el_block_proof(witness_path: &Path) -> Result<(Proof, VerificationKey
     let proof_file = proofs_dir.join(format!("proof_{}.bin", block_num));
     if proof_file.exists() {
         println!("Proof found in cache, returning the cached proof ...");
-        return read_proof_from_file(&proof_file);
+        let (proof, vk) = read_proof_from_file(&proof_file)?;
+        verify_proof_independently(&proof, GUEST_EVM_EE_STF_ELF)?;
+        return Ok((proof, vk));
     }
 
     println!("Proof not found in cache, generating the proof ...");
     let proof_res = generate_proof(el_proof_input)?;
+
     write_proof_to_file(&proof_res, &proof_file)?;
 
     Ok(proof_res)
-}
-
-fn read_proof_from_file(proof_file: &Path) -> Result<(Proof, VerificationKey)> {
-    let mut file = fs::File::open(proof_file)
-        .with_context(|| format!("Failed to open existing proof file at {:?}", proof_file))?;
-    let mut buffer = Vec::new();
-    file.read_to_end(&mut buffer)
-        .context("Failed to read proof file")?;
-    let proof = bincode::deserialize(&buffer).context("Failed to deserialize proof")?;
-    Ok(proof)
-}
-
-fn write_proof_to_file(proof_res: &(Proof, VerificationKey), proof_file: &Path) -> Result<()> {
-    let serialized_proof = bincode::serialize(proof_res).context("Failed to serialize proof")?;
-    let mut file = fs::File::create(proof_file)
-        .with_context(|| format!("Failed to create proof file at {:?}", proof_file))?;
-    file.write_all(&serialized_proof)
-        .context("Failed to write proof to file")?;
-    Ok(())
 }
 
 fn generate_proof(el_proof_input: ELProofInput) -> Result<(Proof, VerificationKey)> {

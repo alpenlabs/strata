@@ -34,7 +34,7 @@ pub struct CheckpointProofInput {
     /// Required for verifying the Groth16 proof of this program.
     /// Cannot be hardcoded as any change to the program or proof implementation
     /// will change verifying_key.
-    pub verifying_key: [u32; 8],
+    pub verifying_key: Vec<u8>,
     // TODO: genesis will be hardcoded here
     pub genesis: BootstrapCheckpointInfo,
 }

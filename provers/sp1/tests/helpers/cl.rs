@@ -11,8 +11,12 @@ use express_sp1_guest_builder::GUEST_CL_STF_ELF;
 use express_zkvm::{
     AggregationInput, Proof, ProverOptions, VerificationKey, ZKVMHost, ZKVMInputBuilder,
 };
+use sp1_sdk::{MockProver, Prover, SP1ProofWithPublicValues};
 
-use crate::helpers::get_el_block_proof;
+use crate::helpers::{
+    common::{read_proof_from_file, verify_proof_independently, write_proof_to_file},
+    get_el_block_proof,
+};
 
 pub fn get_cl_stf_proof(block_num: u32) -> Result<(Proof, VerificationKey)> {
     // Construct paths
@@ -34,7 +38,9 @@ pub fn get_cl_stf_proof(block_num: u32) -> Result<(Proof, VerificationKey)> {
 
     if proof_file.exists() {
         println!("CL Proof found in cache, returning the cached proof...");
-        return read_proof_from_file(&proof_file);
+        let (proof, vk) = read_proof_from_file(&proof_file)?;
+        verify_proof_independently(&proof, GUEST_CL_STF_ELF)?;
+        return Ok((proof, vk));
     }
 
     // Prepare the CL Witness and EL Proofs
@@ -52,32 +58,6 @@ pub fn get_cl_stf_proof(block_num: u32) -> Result<(Proof, VerificationKey)> {
     write_proof_to_file(&proof_res, &proof_file)?;
 
     Ok(proof_res)
-}
-
-fn read_proof_from_file(proof_file: &Path) -> Result<(Proof, VerificationKey)> {
-    let mut file = File::open(proof_file)
-        .with_context(|| format!("Failed to open proof file {:?}", proof_file))?;
-
-    let mut buffer = Vec::new();
-    file.read_to_end(&mut buffer)
-        .context("Failed to read proof file")?;
-
-    let proof = bincode::deserialize(&buffer).context("Failed to deserialize proof")?;
-
-    Ok(proof)
-}
-
-fn write_proof_to_file(proof_res: &(Proof, VerificationKey), proof_file: &Path) -> Result<()> {
-    let serialized_proof =
-        bincode::serialize(proof_res).context("Failed to serialize proof for writing")?;
-
-    let mut file = File::create(proof_file)
-        .with_context(|| format!("Failed to create proof file {:?}", proof_file))?;
-
-    file.write_all(&serialized_proof)
-        .context("Failed to write proof to file")?;
-
-    Ok(())
 }
 
 fn generate_proof(
