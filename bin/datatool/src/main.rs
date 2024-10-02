@@ -113,7 +113,7 @@ pub struct SubcGenOpXpub {
     description = "generates network params from inputs"
 )]
 pub struct SubcGenParams {
-    #[argh(option, description = "output file path .json (default network name)")]
+    #[argh(option, description = "output file path .json (default stdout)")]
     output: Option<PathBuf>,
 
     #[argh(
@@ -145,16 +145,24 @@ pub struct SubcGenParams {
     opkeys: Option<PathBuf>,
 
     #[argh(option, description = "deposit amount in sats (default 1G -> 10 BTC)")]
-    deposit_sats: Option<u64>,
+    deposit_sats: Option<String>,
 
-    #[argh(option, description = "genesis trigger height (default 100)")]
+    #[argh(
+        option,
+        description = "genesis trigger height (default 100)",
+        short = 'g'
+    )]
     genesis_trigger_height: Option<u64>,
 
     #[argh(option, description = "SP1 verification key")]
     rollup_vk: Option<String>,
 
-    #[argh(option, description = "block time in millis (default 15k)")]
-    block_time_ms: Option<u64>,
+    #[argh(
+        option,
+        description = "block time in seconds (default 15)",
+        short = 't'
+    )]
+    block_time: Option<u64>,
 
     #[argh(option, description = "epoch duration in slots (default 64)")]
     epoch_slots: Option<u32>,
@@ -305,18 +313,24 @@ fn exec_genparams(cmd: SubcGenParams, ctx: &mut CmdContext) -> anyhow::Result<()
         opkeys.push(parse_xpub(&k)?);
     }
 
+    let deposit_sats = cmd
+        .deposit_sats
+        .map(|s| parse_abbr_amt(&s))
+        .transpose()?
+        .unwrap_or(1_000_000_000);
+
     let config = ParamsConfig {
         name: cmd.name.unwrap_or_else(|| "strata-testnet".to_string()),
         bitcoin_network: ctx.bitcoin_network,
         // TODO make these consts
-        block_time_ms: cmd.block_time_ms.unwrap_or(15_000),
+        block_time_sec: cmd.block_time.unwrap_or(15),
         epoch_slots: cmd.epoch_slots.unwrap_or(64),
         genesis_trigger: cmd.genesis_trigger_height.unwrap_or(100),
         seqkey,
         opkeys,
         rollup_vk,
         // TODO make a const
-        deposit_sats: cmd.deposit_sats.unwrap_or(1_000_000_000),
+        deposit_sats,
         proof_timeout: cmd.proof_timeout,
     };
 
@@ -429,7 +443,7 @@ fn derive_op_purpose_xpubs(op_xpub: &Xpub) -> (Xpub, Xpub) {
 pub struct ParamsConfig {
     name: String,
     bitcoin_network: Network,
-    block_time_ms: u64,
+    block_time_sec: u64,
     epoch_slots: u32,
     genesis_trigger: u64,
     seqkey: Option<Buf32>,
@@ -457,9 +471,11 @@ fn construct_params(config: ParamsConfig) -> alpen_express_primitives::params::R
         })
         .collect::<Vec<_>>();
 
+    // TODO add in bitcoin network
+
     RollupParams {
         rollup_name: config.name,
-        block_time: config.block_time_ms,
+        block_time: config.block_time_sec * 1000,
         cred_rule: cr,
         // TODO do we want to remove this?
         horizon_l1_height: config.genesis_trigger / 2,
@@ -505,4 +521,29 @@ fn parse_xpub(s: &str) -> anyhow::Result<Xpub> {
     };
 
     Ok(xpk)
+}
+
+fn parse_abbr_amt(s: &str) -> anyhow::Result<u64> {
+    // Thousand.
+    if let Some(v) = s.strip_suffix("K") {
+        return Ok(v.parse::<u64>()? * 1000);
+    }
+
+    // Million.
+    if let Some(v) = s.strip_suffix("M") {
+        return Ok(v.parse::<u64>()? * 1_000_000);
+    }
+
+    // Billion.
+    if let Some(v) = s.strip_suffix("G") {
+        return Ok(v.parse::<u64>()? * 1_000_000_000);
+    }
+
+    // Trillion, probably not necessary.
+    if let Some(v) = s.strip_suffix("T") {
+        return Ok(v.parse::<u64>()? * 1_000_000_000_000);
+    }
+
+    // Simple value.
+    Ok(s.parse::<u64>()?)
 }
