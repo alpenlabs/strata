@@ -2,33 +2,28 @@
 
 ## Entry point for Dockerfile
 
-# fail if env is missing
-set -eu
+# Exit on error
+set -e
 
 mkdir -p /app/reth
-
-# save the JWTSECRET to file
-echo "$JWTSECRET" > jwt.hex
-
-cat <<EOF > p2p.pem
------BEGIN PRIVATE KEY-----
-$P2P_SECRET_KEY
------END PRIVATE KEY-----
-" > p2p.bin
-EOF
 
 echo "starting Reth"
 
 strata-reth \
     --disable-discovery \
-    --datadir /app/reth \
+    --datadir ${DATADIR:-/app/reth} \
+    --port 30303 \
+    --p2p-secret-key ${P2P_SECRET_KEY:-p2p.hex} \
     --authrpc.addr 0.0.0.0 \
-    --authrpc.port $RETH_AUTH_RPC_PORT \
+    --authrpc.port 8551 \
+    --authrpc.jwtsecret ${JWTSECRET:-jwt.hex} \
     --http \
     --http.addr 0.0.0.0 \
-    --http.port $RETH_PORT \
-    --authrpc.jwtsecret jwt.hex \
+    --http.port 8545 \
+    --http.api ${HTTP_API-eth,net,web3,txpool} \
+    --ws \
+    --ws.addr 0.0.0.0 \
+    --ws.port 8546 \
+    --ws.api ${WS_API-eth,net,web3,txpool} \
     --color never \
-    --enable-witness-gen \
-    --p2p-secret-key p2p.bin \
     -vvvv $@

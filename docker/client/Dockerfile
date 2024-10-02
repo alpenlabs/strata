@@ -46,7 +46,7 @@ RUN apt-get update && \
 COPY --from=builder /app/strata-sequencer /usr/local/bin/strata-sequencer
 COPY ./docker/client/entrypoint.sh entrypoint.sh
 
-EXPOSE $RPC_PORT
+EXPOSE 8432
 
 # Make the entrypoint script executable
 RUN chmod +x entrypoint.sh

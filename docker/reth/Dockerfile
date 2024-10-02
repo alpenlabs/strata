@@ -48,6 +48,6 @@ COPY ./docker/reth/entrypoint.sh entrypoint.sh
 
 RUN chmod +x /app/entrypoint.sh
 
-EXPOSE $RETH_AUTH_RPC_PORT $RETH_PORT
+EXPOSE 30303 8545 8546 8551
 
 ENTRYPOINT ["/app/entrypoint.sh"]

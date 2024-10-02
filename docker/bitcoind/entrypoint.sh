@@ -7,8 +7,7 @@ regtest=1
 [regtest]
 rpcuser=${BITCOIND_RPC_USER}
 rpcpassword=${BITCOIND_RPC_PASSWORD}
-rpcport=${BITCOIND_RPC_PORT}
-rpcbind=${RPC_BIND}
+rpcbind=0.0.0.0
 rpcallowip=${RPC_ALLOW_IP}
 server=1
 txindex=1
@@ -21,7 +20,7 @@ bcli() {
 }
 
 # Start bitcoind in the background
-bitcoind -conf=/root/.bitcoin/bitcoin.conf -regtest &
+bitcoind -conf=/root/.bitcoin/bitcoin.conf -regtest $@ &
 
 # Function to check if a wallet exists and is loaded, mainly for docker cache
 check_wallet_exists() {
@@ -68,7 +67,7 @@ fi
 
 # create wallet
 if ! check_wallet_exists; then
-    bcli createwallet "${BITCOIND_WALLET}" false false "" false true
+    bcli -named createwallet wallet_name="${BITCOIND_WALLET}" descriptors=true
 fi
 
 VAL=$(bitcoin-cli getblockcount)

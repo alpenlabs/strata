@@ -18,11 +18,13 @@ RUN apt-get update && \
 # Create a directory for Bitcoin data
 RUN mkdir -p /root/.bitcoin
 
-COPY ./docker/bitcoind/entrypoint.sh entrypoint.sh
+COPY entrypoint.sh entrypoint.sh
+COPY bcli.sh bcli.sh
 
-RUN chmod +x /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh && \
+    chmod +x /app/bcli.sh
 
-EXPOSE $BITCOIND_RPC_PORT
+EXPOSE 18443 18444
 
 # Start the bitcoind in regtest mode
-CMD ["/app/entrypoint.sh"]
+ENTRYPOINT ["/app/entrypoint.sh"]
