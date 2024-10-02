@@ -1,7 +1,6 @@
-use std::{fmt::Debug, sync::Arc, time::Duration};
+use std::{fmt::Debug, sync::Arc};
 
-use tokio::time;
-use tracing::{debug, error};
+use tracing::debug;
 use uuid::Uuid;
 
 use crate::{errors::ProvingTaskError, proving_ops::ops::ProvingOperations, task::TaskTracker};
@@ -14,8 +13,6 @@ where
 {
     operations: O,
     task_tracker: Arc<TaskTracker>,
-    last_param: O::Params,
-    interval: Duration,
 }
 
 impl<O> TaskDispatcher<O>
@@ -24,33 +21,10 @@ where
     O::Params: Debug + Clone,
 {
     /// Creates a new task dispatcher.
-    pub fn new(
-        operations: O,
-        task_tracker: Arc<TaskTracker>,
-        last_param: O::Params,
-        interval: Duration,
-    ) -> Self {
+    pub fn new(operations: O, task_tracker: Arc<TaskTracker>) -> Self {
         Self {
             operations,
             task_tracker,
-            last_param,
-            interval,
-        }
-    }
-
-    /// Starts listening for new blocks and processes them automatically.
-    pub async fn start(&mut self) {
-        let mut ticker = time::interval(self.interval);
-        loop {
-            match self.create_task(self.last_param.clone()).await {
-                Ok(_) => {
-                    self.update_last_param();
-                }
-                Err(e) => {
-                    error!("Error processing block {:?}: {:?}", self.last_param, e);
-                }
-            }
-            ticker.tick().await;
         }
     }
 

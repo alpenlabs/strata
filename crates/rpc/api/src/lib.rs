@@ -95,6 +95,10 @@ pub trait AlpenApi {
     #[method(name = "getCheckpointInfo")]
     async fn get_checkpoint_info(&self, idx: u64) -> RpcResult<Option<RpcCheckpointInfo>>;
 
+    /// Get last checkpoint info
+    #[method(name = "getLastCheckpointInfo")]
+    async fn get_last_checkpoint_info(&self) -> RpcResult<Option<RpcCheckpointInfo>>;
+
     /// Get the l2block status from its height
     /// This assumes that the block finalization is always sequential. i.e all the blocks before the
     /// last finalized block are also finalized
