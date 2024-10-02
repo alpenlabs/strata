@@ -4,6 +4,7 @@ name = "strata-common"
 version = "0.1.0"
 
 [dependencies]
+opentelemetry.workspace = true
 opentelemetry-otlp.workspace = true
 opentelemetry_sdk.workspace = true
 tracing.workspace = true
