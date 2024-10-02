@@ -180,7 +180,8 @@ pub fn open_rocksdb_database(
 }
 
 pub fn load_seqkey(path: &PathBuf) -> anyhow::Result<IdentityData> {
-    let Ok(raw_key) = <[u8; 32]>::try_from(fs::read(path)?) else {
+    let secret_str = fs::read_to_string(path)?;
+    let Ok(raw_key) = <[u8; 32]>::try_from(hex::decode(secret_str)?) else {
         error!("malformed seqkey");
         anyhow::bail!("malformed seqkey");
     };

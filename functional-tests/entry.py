@@ -97,8 +97,9 @@ class ExpressFactory(flexitest.Factory):
         logfile = os.path.join(datadir, "service.log")
 
         keyfile = os.path.join(datadir, "seqkey.bin")
-        with open(keyfile, "wb") as f:
-            f.write(SEQ_KEY)
+        seq_key = SEQ_KEY.hex()
+        with open(keyfile, "w") as f:
+            f.write(seq_key)
 
         # fmt: off
         cmd = [
@@ -128,7 +129,7 @@ class ExpressFactory(flexitest.Factory):
         props = {
             "rpc_host": rpc_host,
             "rpc_port": rpc_port,
-            "seqkey": SEQ_KEY,
+            "seqkey": seq_key,
             "address": sequencer_address,
         }
         rpc_url = f"ws://{rpc_host}:{rpc_port}"
