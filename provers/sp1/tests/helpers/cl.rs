@@ -1,66 +1,104 @@
+#![allow(dead_code)]
 use std::{
-    fs,
+    fs::{self, File},
     io::{Read, Write},
     path::{Path, PathBuf},
 };
 
-use express_proofimpl_evm_ee_stf::ELProofInput;
+use anyhow::{Context, Result};
 use express_sp1_adapter::{SP1Host, SP1ProofInputBuilder};
-use express_sp1_guest_builder::GUEST_EVM_EE_STF_ELF;
-use express_zkvm::{Proof, ProverOptions, VerificationKey, ZKVMHost, ZKVMInputBuilder};
+use express_sp1_guest_builder::GUEST_CL_STF_ELF;
+use express_zkvm::{
+    AggregationInput, Proof, ProverOptions, VerificationKey, ZKVMHost, ZKVMInputBuilder,
+};
 
-pub fn get_cl_stf_proof(witness_path: &Path) -> (Proof, VerificationKey) {
-    let json_file = fs::read_to_string(witness_path).expect("Failed to read JSON file");
-    let el_proof_input: ELProofInput =
-        serde_json::from_str(&json_file).expect("Failed to parse JSON");
-    let block_num = el_proof_input.parent_header.number + 1;
-    let witness_dir = witness_path
+use crate::helpers::get_el_block_proof;
+
+pub fn get_cl_stf_proof(block_num: u32) -> Result<(Proof, VerificationKey)> {
+    // Construct paths
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let cl_witness_path =
+        manifest_dir.join(format!("../test-util/cl/cl_witness_{}.bin", block_num));
+    println!("Looking for the CL witness path: {:?}", cl_witness_path);
+
+    let cl_proofs_dir = cl_witness_path
         .parent()
-        .expect("Witness path has no parent directory");
-    let proofs_dir: PathBuf = witness_dir.join("el_proofs");
-    if !proofs_dir.exists() {
-        fs::create_dir(&proofs_dir)
-            .expect("Failed to create el_proofs directory inside witness folder");
+        .context("Failed to get parent directory of CL witness path")?
+        .join("cl_proofs");
+
+    if !cl_proofs_dir.exists() {
+        fs::create_dir(&cl_proofs_dir).context("Failed to create 'cl_proofs' directory")?;
     }
-    let proof_file = proofs_dir.join(format!("proof_{}.bin", block_num));
+
+    let proof_file = cl_proofs_dir.join(format!("proof_{}.bin", block_num));
+
     if proof_file.exists() {
-        println!("Proof found in cache, returing the cached proof ...");
+        println!("CL Proof found in cache, returning the cached proof...");
         return read_proof_from_file(&proof_file);
     }
 
-    println!("Proof not found in cache, generating the proof ...");
-    let proof_res = generate_proof(el_proof_input);
-    write_proof_to_file(&proof_res, &proof_file);
+    // Prepare the CL Witness and EL Proofs
+    let el_witness_path = manifest_dir.join(format!("../test-util/el/witness_{}.json", block_num));
+    let (el_proof, vk) = get_el_block_proof(&el_witness_path)?;
 
-    proof_res
+    let agg_input = AggregationInput::new(el_proof, vk);
+
+    let cl_witness = fs::read(&cl_witness_path)
+        .with_context(|| format!("Failed to read CL witness file {:?}", cl_witness_path))?;
+
+    println!("CL Proof not found in cache, generating the proof...");
+    let proof_res = generate_proof(cl_witness, agg_input)?;
+
+    write_proof_to_file(&proof_res, &proof_file)?;
+
+    Ok(proof_res)
 }
 
-fn read_proof_from_file(proof_file: &Path) -> (Proof, VerificationKey) {
-    let mut file = fs::File::open(proof_file).expect("Failed to open existing proof file");
+fn read_proof_from_file(proof_file: &Path) -> Result<(Proof, VerificationKey)> {
+    let mut file = File::open(proof_file)
+        .with_context(|| format!("Failed to open proof file {:?}", proof_file))?;
+
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer)
-        .expect("Failed to read proof file");
-    bincode::deserialize(&buffer).expect("Failed to deserialize proof")
+        .context("Failed to read proof file")?;
+
+    let proof = bincode::deserialize(&buffer).context("Failed to deserialize proof")?;
+
+    Ok(proof)
 }
 
-fn write_proof_to_file(proof_res: &(Proof, VerificationKey), proof_file: &Path) {
-    let serialized_proof = bincode::serialize(proof_res).expect("Failed to serialize proof");
-    let mut file = fs::File::create(proof_file).expect("Failed to create proof file");
+fn write_proof_to_file(proof_res: &(Proof, VerificationKey), proof_file: &Path) -> Result<()> {
+    let serialized_proof =
+        bincode::serialize(proof_res).context("Failed to serialize proof for writing")?;
+
+    let mut file = File::create(proof_file)
+        .with_context(|| format!("Failed to create proof file {:?}", proof_file))?;
+
     file.write_all(&serialized_proof)
-        .expect("Failed to write proof to file");
+        .context("Failed to write proof to file")?;
+
+    Ok(())
 }
 
-fn generate_proof(el_proof_input: ELProofInput) -> (Proof, VerificationKey) {
+fn generate_proof(
+    cl_raw_witness: Vec<u8>,
+    agg_proof: AggregationInput,
+) -> Result<(Proof, VerificationKey)> {
     let prover_ops = ProverOptions {
         enable_compression: true,
         use_mock_prover: false,
         ..Default::default()
     };
-    let prover = SP1Host::init(GUEST_EVM_EE_STF_ELF.into(), prover_ops);
+    let prover = SP1Host::init(GUEST_CL_STF_ELF.into(), prover_ops);
+
     let proof_input = SP1ProofInputBuilder::new()
-        .write(&el_proof_input)
-        .unwrap()
-        .build()
-        .unwrap();
-    prover.prove(proof_input).expect("Failed to generate proof")
+        .write_proof(agg_proof)?
+        .write(&cl_raw_witness)?
+        .build()?;
+
+    let proof = prover
+        .prove(proof_input)
+        .context("Failed to generate proof")?;
+
+    Ok(proof)
 }

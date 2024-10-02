@@ -9,7 +9,6 @@ use alpen_express_state::{
 };
 pub use alpen_express_state::{block::L2Block, chain_state::ChainState, state_op::StateCache};
 use express_proofimpl_evm_ee_stf::ELProofPublicParams;
-use serde::{Deserialize, Serialize};
 
 /// Verifies an L2 block and applies the chain state transition if the block is valid.
 pub fn verify_and_transition(
@@ -37,13 +36,13 @@ fn verify_l2_block(block: &L2Block, el_proof_pp: &ELProofPublicParams, chain_par
     );
 
     // Verify proof public params matches the exec segment
-    let proof_exec_segment = create_exec_segment(el_proof_pp);
+    let proof_exec_segment = reconstruct_exec_segment(el_proof_pp);
     let block_exec_segment = block.body().exec_segment().clone();
     assert_eq!(proof_exec_segment, block_exec_segment);
 }
 
 /// Generates an execution segment from the given ELProof public parameters.
-fn create_exec_segment(el_proof_pp: &ELProofPublicParams) -> ExecSegment {
+fn reconstruct_exec_segment(el_proof_pp: &ELProofPublicParams) -> ExecSegment {
     // create_evm_extra_payload
     let update_input = UpdateInput::new(
         el_proof_pp.block_idx,
@@ -75,11 +74,4 @@ fn apply_state_transition(
     .expect("Failed to process the L2 block");
 
     state_cache.state().to_owned()
-}
-
-/// Public Parameter of the CL STF proof
-#[derive(Serialize, Deserialize, Debug)]
-pub struct CLProofPublicParams {
-    pub prev_state_root: [u8; 32],
-    pub new_state_root: [u8; 32],
 }
