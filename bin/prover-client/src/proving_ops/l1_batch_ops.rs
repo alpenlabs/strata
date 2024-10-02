@@ -1,14 +1,13 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use express_zkvm::Proof;
 use uuid::Uuid;
 
 use super::{btc_ops::BtcOperations, ops::ProvingOperations};
 use crate::{
     dispatcher::TaskDispatcher,
     errors::{BlockType, ProvingTaskError},
-    primitives::prover_input::ProverInput,
+    primitives::prover_input::{ProofWithVkey, ProverInput},
     task::TaskTracker,
 };
 
@@ -28,8 +27,8 @@ impl L1BatchOperations {
 #[derive(Debug, Clone)]
 pub struct L1BatchInput {
     pub l1_range: (u64, u64),
-    pub btc_task_ids: Vec<Uuid>,    // Task Ids of btc_ops tasks, in order
-    pub proofs: Vec<Option<Proof>>, // Collected proofs from btc_ops tasks
+    pub btc_task_ids: Vec<Uuid>, // Task Ids of btc_ops tasks, in order
+    pub proofs: Vec<Option<ProofWithVkey>>, // Collected proofs from btc_ops tasks
 }
 
 #[async_trait]

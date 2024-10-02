@@ -1,9 +1,7 @@
 use std::sync::Arc;
 
-use alpen_express_state::{block::L2Block, chain_state::ChainState};
 use anyhow::Context;
 use async_trait::async_trait;
-use express_zkvm::Proof;
 use jsonrpsee::{core::client::ClientT, http_client::HttpClient, rpc_params};
 use tracing::debug;
 use uuid::Uuid;
@@ -12,7 +10,7 @@ use super::{el_ops::ElOperations, ops::ProvingOperations};
 use crate::{
     dispatcher::TaskDispatcher,
     errors::{BlockType, ProvingTaskError},
-    primitives::prover_input::{ProverInput, WitnessData},
+    primitives::prover_input::{ProofWithVkey, ProverInput},
     task::TaskTracker,
 };
 
@@ -37,7 +35,7 @@ impl ClOperations {
 pub struct CLProverInput {
     pub block_num: u64,
     pub cl_raw_witness: Vec<u8>,
-    pub proof: Option<Proof>,
+    pub el_proof: Option<ProofWithVkey>,
 }
 
 #[async_trait]
@@ -60,7 +58,7 @@ impl ProvingOperations for ClOperations {
         Ok(CLProverInput {
             block_num,
             cl_raw_witness,
-            proof: None,
+            el_proof: None,
         })
     }
 

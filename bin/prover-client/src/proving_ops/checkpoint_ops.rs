@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use alpen_express_rpc_types::RpcCheckpointInfo;
 use async_trait::async_trait;
-use express_zkvm::Proof;
 use uuid::Uuid;
 
 use super::{
@@ -11,7 +10,7 @@ use super::{
 use crate::{
     dispatcher::TaskDispatcher,
     errors::{BlockType, ProvingTaskError},
-    primitives::prover_input::ProverInput,
+    primitives::prover_input::{ProofWithVkey, ProverInput},
     task::TaskTracker,
 };
 
@@ -40,8 +39,8 @@ pub struct CheckpointInput {
     pub info: RpcCheckpointInfo,
     pub l1_batch_id: Uuid,
     pub l2_batch_id: Uuid,
-    pub l1_batch_proof: Option<Proof>,
-    pub l2_batch_proof: Option<Proof>,
+    pub l1_batch_proof: Option<ProofWithVkey>,
+    pub l2_batch_proof: Option<ProofWithVkey>,
 }
 
 #[async_trait]

@@ -1,6 +1,6 @@
 use std::{fmt::Debug, sync::Arc};
 
-use tracing::{debug, info};
+use tracing::info;
 use uuid::Uuid;
 
 use crate::{errors::ProvingTaskError, proving_ops::ops::ProvingOperations, task::TaskTracker};

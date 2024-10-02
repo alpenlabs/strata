@@ -1,10 +1,9 @@
 use std::fmt;
 
-use express_zkvm::Proof;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use super::prover_input::ProverInput;
+use super::prover_input::{ProofWithVkey, ProverInput};
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum WitnessSubmissionStatus {
@@ -18,7 +17,7 @@ pub enum WitnessSubmissionStatus {
 #[derive(Debug, Eq, PartialEq)]
 pub enum ProofSubmissionStatus {
     /// Indicates successful submission of the proof to the DA.
-    Success(Proof),
+    Success(ProofWithVkey),
     /// Indicates that proof generation is currently in progress.
     ProofGenerationInProgress,
 }
