@@ -1,11 +1,14 @@
 // Number of prover workers to spawn
-pub const NUM_PROVER_WORKER: usize = 10;
+pub const NUM_PROVER_WORKERS: usize = 10;
 
-// Wait time in seconds for the prover manager loop, in seconds
-pub const PROVER_MANAGER_WAIT_TIME: u64 = 5;
+// Wait time in seconds for the prover manager loop
+pub const PROVER_MANAGER_INTERVAL: u64 = 5;
 
-// Interval between dispatching block proving tasks, in seconds
-pub const BLOCK_PROVING_TASK_DISPATCH_INTERVAL: u64 = 1;
+// Dispatch intervals and starting blocks for BTC and L2 (both EL & CL) proving tasks
+pub const BTC_DISPATCH_INTERVAL: u64 = 10;
+pub const BTC_START_BLOCK: u64 = 1;
 
-// Starting block height for EL block proving tasks
-pub const EL_START_BLOCK_HEIGHT: u64 = 1;
+pub const L2_DISPATCH_INTERVAL: u64 = 1;
+pub const L2_START_BLOCK: u64 = 1;
+
+pub const L1_BATCH_DISPATCH_INTERVAL: u64 = 60;

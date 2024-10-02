@@ -3,19 +3,22 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use alpen_express_db::traits::{ProverDataStore, ProverDatabase};
+use alpen_express_db::traits::{ProverDataProvider, ProverDataStore, ProverDatabase};
 use alpen_express_rocksdb::{
     prover::db::{ProofDb, ProverDB},
     DbOpsConfig,
 };
 use express_proofimpl_evm_ee_stf::ELProofInput;
-use express_sp1_guest_builder::GUEST_EVM_EE_STF_ELF;
+use express_sp1_guest_builder::{
+    GUEST_BTC_BLOCKSPACE_ELF, GUEST_CHECKPOINT_ELF, GUEST_CL_STF_ELF, GUEST_EVM_EE_STF_ELF,
+    GUEST_L1_BATCH_ELF,
+};
 use express_zkvm::{Proof, ProverOptions, ZKVMHost, ZKVMInputBuilder};
 use tracing::info;
 use uuid::Uuid;
 
 use crate::{
-    config::NUM_PROVER_WORKER,
+    config::NUM_PROVER_WORKERS,
     db::open_rocksdb_database,
     primitives::{
         prover_input::ProverInput,
@@ -24,11 +27,13 @@ use crate::{
     },
 };
 
+#[derive(Debug, Clone)]
+#[allow(clippy::large_enum_variant)]
 enum ProvingTaskState {
     WitnessSubmitted(ProverInput),
     ProvingInProgress,
     Proved(Proof),
-    Err(anyhow::Error),
+    Err(String),
 }
 
 /// Represents the internal state of the prover, tracking the status of ongoing proving tasks and
@@ -57,7 +62,9 @@ impl ProverState {
             Ok(p) => self
                 .tasks_status
                 .insert(task_id, ProvingTaskState::Proved(p)),
-            Err(e) => self.tasks_status.insert(task_id, ProvingTaskState::Err(e)),
+            Err(e) => self
+                .tasks_status
+                .insert(task_id, ProvingTaskState::Err(e.to_string())),
         }
     }
 
@@ -99,6 +106,14 @@ where
             let (proof, _) = vm.prove(input)?;
             Ok(proof)
         }
+        ProverInput::BtcBlock(block, tx_filters) => {
+            let input = Vm::Input::new()
+                .write_serialized(&bitcoin::consensus::serialize(&block))?
+                .write_borsh(&tx_filters)?
+                .build()?;
+            let (proof, _) = vm.prove(input)?;
+            Ok(proof)
+        }
         _ => {
             todo!()
         }
@@ -115,13 +130,16 @@ where
         let db = ProofDb::new(rbdb, db_ops);
 
         let mut zkvm_manager: ZkVMManager<Vm> = ZkVMManager::new(prover_config);
+        zkvm_manager.add_vm(ProofVm::BtcProving, GUEST_BTC_BLOCKSPACE_ELF.into());
+        zkvm_manager.add_vm(ProofVm::L1Batch, GUEST_L1_BATCH_ELF.into());
         zkvm_manager.add_vm(ProofVm::ELProving, GUEST_EVM_EE_STF_ELF.into());
-        zkvm_manager.add_vm(ProofVm::CLProving, vec![]);
+        zkvm_manager.add_vm(ProofVm::CLProving, GUEST_CL_STF_ELF.into());
         zkvm_manager.add_vm(ProofVm::CLAggregation, vec![]);
+        zkvm_manager.add_vm(ProofVm::Checkpoint, GUEST_CHECKPOINT_ELF.into());
 
         Self {
             pool: rayon::ThreadPoolBuilder::new()
-                .num_threads(NUM_PROVER_WORKER)
+                .num_threads(NUM_PROVER_WORKERS)
                 .build()
                 .expect("Failed to initialize prover threadpool worker"),
 
@@ -194,7 +212,7 @@ where
                 "Witness for task id {:?}, submitted multiple times.",
                 task_id,
             )),
-            ProvingTaskState::Err(e) => Err(e),
+            ProvingTaskState::Err(e) => Err(anyhow::anyhow!(e)),
         }
     }
 
@@ -202,25 +220,29 @@ where
         &self,
         task_id: Uuid,
     ) -> Result<ProofSubmissionStatus, anyhow::Error> {
-        let mut prover_state = self.prover_state.write().unwrap();
-        let status = prover_state.get_prover_status(task_id);
+        let mut prover_state = self
+            .prover_state
+            .write()
+            .map_err(|_| anyhow::anyhow!("Failed to acquire write lock"))?;
+
+        let status = prover_state.get_prover_status(task_id).cloned();
 
         match status {
             Some(ProvingTaskState::ProvingInProgress) => {
                 Ok(ProofSubmissionStatus::ProofGenerationInProgress)
             }
             Some(ProvingTaskState::Proved(proof)) => {
-                self.save_proof_to_db(task_id, proof)?;
+                self.save_proof_to_db(task_id, &proof)?;
 
                 prover_state.remove(&task_id);
-                Ok(ProofSubmissionStatus::Success)
+                Ok(ProofSubmissionStatus::Success(proof.clone()))
             }
             Some(ProvingTaskState::WitnessSubmitted(_)) => Err(anyhow::anyhow!(
                 "Witness for {:?} was submitted, but the proof generation is not triggered.",
                 task_id
             )),
             Some(ProvingTaskState::Err(e)) => Err(anyhow::anyhow!(e.to_string())),
-            _ => Err(anyhow::anyhow!("Missing witness for: {:?}", task_id)),
+            None => Err(anyhow::anyhow!("Missing witness for: {:?}", task_id)),
         }
     }
 
@@ -229,5 +251,18 @@ where
             .prover_store()
             .insert_new_task_entry(*task_id.as_bytes(), proof.into())?;
         Ok(())
+    }
+
+    // This might be used later?
+    #[allow(dead_code)]
+    fn read_proof_from_db(&self, task_id: Uuid) -> Result<Proof, anyhow::Error> {
+        let proof_entry = self
+            .db
+            .prover_provider()
+            .get_task_entry_by_id(*task_id.as_bytes())?;
+        match proof_entry {
+            Some(raw_proof) => Ok(Proof::new(raw_proof)),
+            None => Err(anyhow::anyhow!("Proof not found for {:?}", task_id)),
+        }
     }
 }

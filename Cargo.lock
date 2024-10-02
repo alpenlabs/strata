@@ -4807,13 +4807,19 @@ dependencies = [
 name = "express-prover-client"
 version = "0.1.0"
 dependencies = [
+ "alpen-express-btcio",
  "alpen-express-common",
  "alpen-express-db",
+ "alpen-express-primitives",
  "alpen-express-rocksdb",
+ "alpen-express-rpc-types",
+ "alpen-express-state",
  "anyhow",
  "argh",
  "async-trait",
  "bincode",
+ "bitcoin",
+ "borsh",
  "express-proofimpl-evm-ee-stf",
  "express-prover-client-rpc-api",
  "express-sp1-adapter",
@@ -4824,6 +4830,7 @@ dependencies = [
  "reth-rpc-types",
  "rockbound",
  "serde",
+ "strata-tx-parser",
  "thiserror",
  "tokio",
  "tracing",
@@ -4835,7 +4842,9 @@ dependencies = [
 name = "express-prover-client-rpc-api"
 version = "0.1.0"
 dependencies = [
+ "alpen-express-rpc-types",
  "jsonrpsee",
+ "uuid 1.10.0",
 ]
 
 [[package]]
