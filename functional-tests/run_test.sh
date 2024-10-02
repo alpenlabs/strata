@@ -10,13 +10,12 @@ else
 fi
 
 # Conditionally run cargo build based on PROVER_TEST
-if [ "$PROVER_TEST" = 1 ]; then
-    cargo build -F "prover" --release
-    export PATH=$(realpath ../target/release/):$PATH
+if [ -z "$PROVER_TEST" ]; then
+    # cargo build -F "prover" --release
+    cargo build -F "prover"
 else
     cargo build
 fi
-
 
 poetry run python entry.py $@
 
