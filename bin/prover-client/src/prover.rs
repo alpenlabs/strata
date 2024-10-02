@@ -14,7 +14,7 @@ use express_sp1_guest_builder::{
     GUEST_L1_BATCH_ELF,
 };
 use express_zkvm::{Proof, ProverOptions, ZKVMHost, ZKVMInputBuilder};
-use tracing::info;
+use tracing::{error, info};
 use uuid::Uuid;
 
 use crate::{
@@ -59,12 +59,16 @@ impl ProverState {
         proof: Result<Proof, anyhow::Error>,
     ) -> Option<ProvingTaskState> {
         match proof {
-            Ok(p) => self
-                .tasks_status
-                .insert(task_id, ProvingTaskState::Proved(p)),
-            Err(e) => self
-                .tasks_status
-                .insert(task_id, ProvingTaskState::Err(e.to_string())),
+            Ok(p) => {
+                info!("Completed proving task {:?}", task_id);
+                self.tasks_status
+                    .insert(task_id, ProvingTaskState::Proved(p))
+            }
+            Err(e) => {
+                error!("Error proving {:?} {:?}", task_id, e);
+                self.tasks_status
+                    .insert(task_id, ProvingTaskState::Err(e.to_string()))
+            }
         }
     }
 
