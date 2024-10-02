@@ -34,7 +34,7 @@ pub const NETWORK: Network = Network::Signet;
 pub const BRIDGE_ROLLUP_ADDRESS: &str = "0x000000000000000000000000000000000B121d9E";
 pub const L2_BLOCK_TIME: Duration = Duration::from_secs(30);
 
-// CHANGE ALL BELOW!!!
+// FIXME: CHANGE ALL BELOW!!!
 pub const DEFAULT_ESPLORA: &str = "https://explorer.bc-2.jp/api";
 pub const DEFAULT_L2_HTTP_ENDPOINT: &str = "https://ethereum-rpc.publicnode.com";
 pub const DEFAULT_FAUCET_ENDPOINT: &str = "http://localhost:3000";
