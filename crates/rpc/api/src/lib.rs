@@ -16,6 +16,9 @@ pub trait AlpenApi {
     #[method(name = "protocolVersion")]
     async fn protocol_version(&self) -> RpcResult<u64>;
 
+    #[method(name = "blockTime")]
+    async fn block_time(&self) -> RpcResult<u64>;
+
     #[method(name = "l1connected")]
     async fn get_l1_connection_status(&self) -> RpcResult<bool>;
 

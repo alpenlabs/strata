@@ -4427,8 +4427,11 @@ checksum = "b90ca2580b73ab6a1f724b76ca11ab632df820fd6040c336200d2c1df7b3c82c"
 name = "express-bridge-client"
 version = "0.1.0"
 dependencies = [
+ "alpen-express-btcio",
  "alpen-express-common",
  "alpen-express-primitives",
+ "alpen-express-rocksdb",
+ "alpen-express-rpc-api",
  "alpen-express-rpc-types",
  "alpen-express-state",
  "anyhow",
@@ -4436,13 +4439,18 @@ dependencies = [
  "async-trait",
  "bitcoin",
  "chrono",
+ "directories",
+ "express-bridge-exec",
  "express-bridge-rpc-api",
+ "express-bridge-sig-manager",
+ "express-bridge-tx-builder",
  "express-storage",
  "jsonrpsee",
+ "rockbound",
  "thiserror",
+ "threadpool",
  "tokio",
  "tracing",
- "tracing-subscriber 0.3.18",
 ]
 
 [[package]]
