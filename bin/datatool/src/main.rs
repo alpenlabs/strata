@@ -3,11 +3,20 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use alpen_express_primitives::{
+    block_credential,
+    buf::Buf32,
+    operator::OperatorPubkeys,
+    params::{RollupParams, SyncParams},
+    vk::RollupVerifyingKey,
+};
+use anyhow::Context;
 use argh::FromArgs;
 use bech32::{Bech32m, EncodeError, Hrp};
 use bitcoin::{
     bip32::{ChildNumber, DerivationPath, Xpriv, Xpub},
     key::Secp256k1,
+    params::Params,
     secp256k1::All,
     Network,
 };
@@ -101,23 +110,50 @@ pub struct SubcGenOpXpub {
     description = "generates network params from inputs"
 )]
 pub struct SubcGenParams {
-    #[argh(option, description = "network name (default random)", short = 'n')]
-    name: Option<String>,
-
     #[argh(option, description = "output file path .json (default network name)")]
     output: Option<PathBuf>,
 
-    #[argh(option, description = "sequencer pubkey")]
+    #[argh(option, description = "network name (default random)", short = 'n')]
+    name: Option<String>,
+
+    #[argh(
+        option,
+        description = "sequencer pubkey (default unchecked)",
+        short = 's'
+    )]
     seqkey: Option<String>,
 
-    #[argh(option, description = "add an operator key (must be at least one)")]
+    #[argh(
+        option,
+        description = "add a bridge operator key (must be at least one, appended after file keys)",
+        short = 'b'
+    )]
     opkey: Vec<String>,
 
-    #[argh(option, description = "read operator keys by line from file")]
+    #[argh(
+        option,
+        description = "read bridge operator keys by line from file",
+        short = 'B'
+    )]
     opkeys: Option<PathBuf>,
+
+    #[argh(option, description = "deposit amt in sats (default 10M)")]
+    deposit_sats: Option<u64>,
+
+    #[argh(option, description = "genesis trigger height (default 100)")]
+    genesis_trigger_height: Option<u64>,
+
+    #[argh(option, description = "SP1 verification key")]
+    rollup_vk: Option<String>,
+
+    #[argh(option, description = "block time in millis (default 15k)")]
+    block_time_ms: Option<u64>,
+
+    #[argh(option, description = "epoch duration in slots (default 64)")]
+    epoch_slots: Option<u32>,
 }
 
-pub struct Context {
+pub struct CmdContext {
     /// Resolved datadir for the network.
     datadir: PathBuf,
 
@@ -131,7 +167,7 @@ pub struct Context {
 fn main() {
     let args: Args = argh::from_env();
 
-    let mut ctx = Context {
+    let mut ctx = CmdContext {
         datadir: PathBuf::from("."),
         network: resolve_network(args.bitcoin_network.as_ref().map(|s| s.as_str())),
         rng: OsRng,
@@ -169,7 +205,7 @@ fn resolve_network(arg: Option<&str>) -> Network {
     }
 }
 
-fn exec_subc(cmd: Subcommand, ctx: &mut Context) -> anyhow::Result<()> {
+fn exec_subc(cmd: Subcommand, ctx: &mut CmdContext) -> anyhow::Result<()> {
     match cmd {
         Subcommand::GenSeed(subc) => exec_genseed(subc, ctx),
         Subcommand::GenSeqPubkey(subc) => exec_genseqpubkey(subc, ctx),
@@ -178,7 +214,7 @@ fn exec_subc(cmd: Subcommand, ctx: &mut Context) -> anyhow::Result<()> {
     }
 }
 
-fn exec_genseed(cmd: SubcGenSeed, ctx: &mut Context) -> anyhow::Result<()> {
+fn exec_genseed(cmd: SubcGenSeed, ctx: &mut CmdContext) -> anyhow::Result<()> {
     if cmd.path.exists() && !cmd.force {
         anyhow::bail!("not overwiting file, add --force to overwrite");
     }
@@ -191,7 +227,7 @@ fn exec_genseed(cmd: SubcGenSeed, ctx: &mut Context) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn exec_genseqpubkey(cmd: SubcGenSeqPubkey, _ctx: &mut Context) -> anyhow::Result<()> {
+fn exec_genseqpubkey(cmd: SubcGenSeqPubkey, _ctx: &mut CmdContext) -> anyhow::Result<()> {
     let Some(xpriv) = resolve_key(&cmd.key_file, cmd.key_from_env, &SEQKEY_ENVVAR)? else {
         anyhow::bail!("privkey unset");
     };
@@ -206,7 +242,7 @@ fn exec_genseqpubkey(cmd: SubcGenSeqPubkey, _ctx: &mut Context) -> anyhow::Resul
     Ok(())
 }
 
-fn exec_genopxpub(cmd: SubcGenOpXpub, _ctx: &mut Context) -> anyhow::Result<()> {
+fn exec_genopxpub(cmd: SubcGenOpXpub, _ctx: &mut CmdContext) -> anyhow::Result<()> {
     let Some(xpriv) = resolve_key(&cmd.key_file, cmd.key_from_env, &OPKEY_ENVVAR)? else {
         anyhow::bail!("privkey unset");
     };
@@ -221,8 +257,74 @@ fn exec_genopxpub(cmd: SubcGenOpXpub, _ctx: &mut Context) -> anyhow::Result<()> 
     Ok(())
 }
 
-fn exec_genparams(cmd: SubcGenParams, ctx: &mut Context) -> anyhow::Result<()> {
-    unimplemented!()
+fn exec_genparams(cmd: SubcGenParams, ctx: &mut CmdContext) -> anyhow::Result<()> {
+    // TODO update this with vk for checkpoint proof
+    let rollup_vk_buf =
+        hex::decode("00b01ae596b4e51843484ff71ccbd0dd1a030af70b255e6b9aad50b81d81266f").unwrap();
+    let Ok(rollup_vk) = Buf32::try_from(rollup_vk_buf.as_slice()) else {
+        anyhow::bail!("malformed verification key");
+    };
+
+    // Parse the sequencer key.
+    let seqkey = match cmd.seqkey {
+        Some(seqkey) => {
+            let Ok(buf) = bitcoin::base58::decode_check(&seqkey) else {
+                anyhow::bail!("failed to parse sequencer key: {seqkey}");
+            };
+
+            let Ok(buf) = Buf32::try_from(buf.as_slice()) else {
+                anyhow::bail!("invalid sequencer key (must be 32 bytes): {seqkey}");
+            };
+
+            Some(buf)
+        }
+        None => None,
+    };
+
+    // Parse each of the operator keys.
+    let mut opkeys = Vec::new();
+
+    if let Some(opkeys_path) = cmd.opkeys {
+        let opkeys_str = fs::read_to_string(opkeys_path)?;
+
+        for l in opkeys_str.lines() {
+            // skip lines that are empty or look like comments
+            if l.trim().is_empty() || l.starts_with("#") {
+                continue;
+            }
+
+            opkeys.push(parse_xpub(l)?);
+        }
+    }
+
+    for k in cmd.opkey {
+        opkeys.push(parse_xpub(&k)?);
+    }
+
+    let config = ParamsConfig {
+        name: cmd.name.unwrap_or_else(|| "strata-testnet".to_string()),
+        // TODO make these consts
+        block_time_ms: cmd.block_time_ms.unwrap_or(15_000),
+        epoch_slots: cmd.epoch_slots.unwrap_or(64),
+        genesis_trigger: cmd.genesis_trigger_height.unwrap_or(100),
+        seqkey,
+        opkeys,
+        rollup_vk,
+        // TODO make a const
+        deposit_sats: cmd.deposit_sats.unwrap_or(1_000_000_000),
+    };
+
+    let params = construct_params(config);
+    let params_buf = serde_json::to_string_pretty(&params)?;
+
+    if let Some(out_path) = &cmd.output {
+        fs::write(out_path, params_buf)?;
+        eprintln!("wrote to file {out_path:?}");
+    } else {
+        println!("{params_buf}");
+    }
+
+    Ok(())
 }
 
 /// Generates a new xpriv.
@@ -280,21 +382,111 @@ fn derive_op_root_xpub(master: &Xpriv) -> anyhow::Result<Xpriv> {
 }
 
 /// Derives the signing and wallet xprivs for a Strata operator.
-fn derive_op_signing_xpriv(master: &Xpriv) -> anyhow::Result<(Xpriv, Xpriv)> {
+fn derive_op_purpose_xprivs(master: &Xpriv) -> anyhow::Result<(Xpriv, Xpriv)> {
     let signing_path = DerivationPath::master().extend(&[
         ChildNumber::from_hardened_idx(DERIV_BASE_IDX).unwrap(),
         ChildNumber::from_hardened_idx(DERIV_OP_IDX).unwrap(),
-        ChildNumber::from_hardened_idx(DERIV_OP_SIGNING_IDX).unwrap(),
+        ChildNumber::from_normal_idx(DERIV_OP_SIGNING_IDX).unwrap(),
     ]);
 
     let wallet_path = DerivationPath::master().extend(&[
         ChildNumber::from_hardened_idx(DERIV_BASE_IDX).unwrap(),
         ChildNumber::from_hardened_idx(DERIV_OP_IDX).unwrap(),
-        ChildNumber::from_hardened_idx(DERIV_OP_WALLET_IDX).unwrap(),
+        ChildNumber::from_normal_idx(DERIV_OP_WALLET_IDX).unwrap(),
     ]);
 
     let signing_xpriv = master.derive_priv(bitcoin::secp256k1::SECP256K1, &signing_path)?;
     let wallet_xpriv = master.derive_priv(bitcoin::secp256k1::SECP256K1, &wallet_path)?;
 
     Ok((signing_xpriv, wallet_xpriv))
+}
+
+/// Derives the signing and wallet xprivs for a Strata operator.
+fn derive_op_purpose_xpubs(op_xpub: &Xpub) -> (Xpub, Xpub) {
+    let signing_path = DerivationPath::master()
+        .extend(&[ChildNumber::from_normal_idx(DERIV_OP_SIGNING_IDX).unwrap()]);
+
+    let wallet_path = DerivationPath::master()
+        .extend(&[ChildNumber::from_normal_idx(DERIV_OP_WALLET_IDX).unwrap()]);
+
+    let signing_xpub = op_xpub
+        .derive_pub(bitcoin::secp256k1::SECP256K1, &signing_path)
+        .unwrap();
+    let wallet_xpub = op_xpub
+        .derive_pub(bitcoin::secp256k1::SECP256K1, &wallet_path)
+        .unwrap();
+
+    (signing_xpub, wallet_xpub)
+}
+
+/// Describes inputs for how we want to set params.
+pub struct ParamsConfig {
+    name: String,
+    block_time_ms: u64,
+    epoch_slots: u32,
+    genesis_trigger: u64,
+    seqkey: Option<Buf32>,
+    opkeys: Vec<Xpub>,
+    rollup_vk: Buf32,
+    deposit_sats: u64,
+}
+
+// TODO conver this to also initialize the sync params
+fn construct_params(config: ParamsConfig) -> alpen_express_primitives::params::RollupParams {
+    let cr = config
+        .seqkey
+        .map(|k| block_credential::CredRule::SchnorrKey(k))
+        .unwrap_or(block_credential::CredRule::Unchecked);
+
+    let opkeys = config
+        .opkeys
+        .into_iter()
+        .map(|xpk| {
+            let (signing_key, wallet_key) = derive_op_purpose_xpubs(&xpk);
+            let signing_key_buf = signing_key.to_x_only_pub().serialize().into();
+            let wallet_key_buf = wallet_key.to_x_only_pub().serialize().into();
+            OperatorPubkeys::new(signing_key_buf, wallet_key_buf)
+        })
+        .collect::<Vec<_>>();
+
+    RollupParams {
+        rollup_name: config.name,
+        block_time: config.block_time_ms,
+        cred_rule: cr,
+        horizon_l1_height: config.genesis_trigger / 2,
+        genesis_l1_height: config.genesis_trigger,
+        operator_config: alpen_express_primitives::params::OperatorConfig::Static(opkeys),
+        evm_genesis_block_hash: Buf32(
+            "0x37ad61cff1367467a98cf7c54c4ac99e989f1fbb1bc1e646235e90c065c565ba"
+                .parse()
+                .unwrap(),
+        ),
+        evm_genesis_block_state_root: Buf32(
+            "0x351714af72d74259f45cd7eab0b04527cd40e74836a45abcae50f92d919d988f"
+                .parse()
+                .unwrap(),
+        ),
+        l1_reorg_safe_depth: 4,
+        target_l2_batch_size: config.epoch_slots as u64,
+        address_length: 20,
+        deposit_amount: config.deposit_sats,
+        rollup_vk: RollupVerifyingKey::SP1VerifyingKey(config.rollup_vk),
+        verify_proofs: true,
+        dispatch_assignment_dur: 64,
+        proof_publish_mode: alpen_express_primitives::params::ProofPublishMode::Strict,
+        max_deposits_in_block: 16,
+    }
+}
+
+/// Parses an xpub from str, richly generating anyhow results from it.
+fn parse_xpub(s: &str) -> anyhow::Result<Xpub> {
+    let Ok(buf) = bitcoin::base58::decode_check(s) else {
+        anyhow::bail!("failed to parse key: {s}");
+    };
+
+    let Ok(xpk) = Xpub::decode(&buf) else {
+        anyhow::bail!("failed to decode key: {s}");
+    };
+
+    Ok(xpk)
 }
