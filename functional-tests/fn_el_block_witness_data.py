@@ -23,7 +23,7 @@ class ElBlockWitnessDataGenerationTest(flexitest.Test):
         abi, bytecode = get_contract()
         contract = web3.eth.contract(abi=abi, bytecode=bytecode)
         tx_hash = contract.constructor().transact()
-        tx_receipt = web3.eth.wait_for_transaction_receipt(tx_hash)
+        tx_receipt = web3.eth.wait_for_transaction_receipt(tx_hash, timeout=30)
 
         # Get the block hash where contract was deployed
         assert tx_receipt["status"] == 1
