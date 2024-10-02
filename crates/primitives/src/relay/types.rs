@@ -143,7 +143,19 @@ impl TryInto<Box<[u8]>> for BridgeMessage {
     }
 }
 
-/// Scope of the [`BridgeMessage`]
+/// Scope of the [`BridgeMessage`].
+///
+/// As V0 deposits and withdrawals can be uniquely identified via the [`BitcoinTxid`], there is no
+/// need to have separate variants for `Deposits` and `Withdrawals`. From the POV of the
+/// bridge-relay, a deposit signature is indistinguishable from a withdrawal signature i.e.,
+/// nothing special is being done here with that kind of distinction.
+///
+/// Tracking the status of duties is done on the client side and the identification of such duties
+/// can be identified using the outpoint of the transaction that is being spent i.e, the deposit
+/// request outpoint can be used to track the status of deposit duties and the deposit outpoint can
+/// be used to track the withdrawal duty. Furthermore, since the underlying bridge transactions all
+/// spend the first outpoint (vout = 0), it suffices to just use the [`Txid`](bitcoin::Txid) for the
+/// tracking instead of the full [`OutPoint`](bitcoin::OutPoint).
 #[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize, Deserialize, Serialize)]
 pub enum Scope {
     /// Used for debugging purposes.

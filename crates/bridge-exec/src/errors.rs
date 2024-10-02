@@ -1,18 +1,18 @@
-//! Defines the error types associated with executing the withdrawal duties.
+//! Defines the error types associated with executing the transaction duties.
 
 use alpen_express_btcio::rpc::error::ClientError as L1ClientError;
 use express_bridge_tx_builder::errors::BridgeTxBuilderError;
 use jsonrpsee::core::ClientError as L2ClientError;
 use thiserror::Error;
 
-/// Error during execution of the withdrawal duty.
+/// Error during execution of the duty.
 #[derive(Error, Debug)]
 pub enum ExecError {
     /// Error creating the [`TxSigningData`](alpen_express_primitives::bridge::TxSigningData).
     #[error("could not build withdraw transaction")]
     TxBuilder(#[from] BridgeTxBuilderError),
 
-    /// Error while signing the withdrawal transaction.
+    /// Error while signing the transaction.
     #[error("signing error: {0}")]
     Signing(String),
 
@@ -28,11 +28,11 @@ pub enum ExecError {
     #[error("transaction broadcast error: {0}")]
     Broadcast(String),
 
-    /// Error while processing withdrawal due to insufficient funds (for front-payments).
+    /// Error while processing transaction due to insufficient funds (for front-payments).
     #[error("insufficient funds")]
     InsufficientFunds,
 
-    /// Unexpected error during the handling of the withdrawal.
+    /// Unexpected error during the handling of the transaction.
     #[error("execution failed: {0}")]
     Execution(String),
 

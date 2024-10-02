@@ -47,6 +47,8 @@ impl From<CooperativeWithdrawalInfo> for BridgeDuty {
 /// `Received` --|`CollectingNonces`|--> `CollectedNonces` --|`CollectingPartialSigs`|-->
 /// `CollectedSignatures` --|`Broadcasting`|--> `Executed`.
 ///
+/// The duty execution might fail as well at any step in which case the status would be `Failed`.
+///
 /// # Note
 ///
 /// This type does not dictate the exact state transition path. A transition from `Received` to
@@ -101,6 +103,13 @@ pub enum BridgeDutyStatus {
     ///
     /// This means that the required transaction has been fully signed and broadcasted to Bitcoin.
     Executed,
+
+    /// The duty could not be executed.
+    ///
+    /// Holds the error message as a [`String`] for context.
+    // TODO: this should hold `express-bridge-exec::ExecError` instead but that requires
+    // implementing `BorshSerialize` and `BorshDeserialize`.
+    Failed(String),
 }
 
 impl Default for BridgeDutyStatus {

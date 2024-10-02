@@ -17,10 +17,14 @@ use tracing::{info, warn};
 
 use crate::constants::{RPC_PORT, RPC_SERVER};
 
-#[allow(unused)] // FIXME: remove once the RPC server is implemented
 pub(crate) async fn start<T>(rpc_impl: &T) -> anyhow::Result<()>
 where
-    T: ExpressBridgeControlApiServer + ExpressBridgeNetworkApiServer + Clone,
+    T: ExpressBridgeControlApiServer
+        + ExpressBridgeNetworkApiServer
+        + ExpressBridgeTrackerApiServer
+        + Clone
+        + Sync
+        + Send,
 {
     let mut rpc_module = RpcModule::new(rpc_impl.clone());
 
@@ -63,11 +67,10 @@ pub(crate) struct BridgeRpc {
 }
 
 impl BridgeRpc {
-    #[allow(unused)] // FIXME: remove once the RPC server is implemented
-    pub fn new(duty_ops: BridgeDutyOps) -> Self {
+    pub fn new(duty_ops: Arc<BridgeDutyOps>) -> Self {
         Self {
             start_time: Utc::now(),
-            duty_ops: Arc::new(duty_ops),
+            duty_ops,
         }
     }
 }

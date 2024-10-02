@@ -2,20 +2,22 @@
 
 use std::{fmt::Debug, time::Duration};
 
-use alpen_express_btcio::rpc::traits::Signer;
 use alpen_express_primitives::{
+    bridge::{Musig2PartialSig, Musig2PubNonce, OperatorIdx, OperatorPartialSig},
     l1::BitcoinTxid,
-    relay::{types::Scope, util::MessageSigner},
+    relay::{
+        types::{BridgeMessage, Scope},
+        util::MessageSigner,
+    },
 };
 use alpen_express_rpc_api::AlpenApiClient;
-use bitcoin::{secp256k1::SECP256K1, Transaction, Txid};
+use alpen_express_rpc_types::HexBytes;
+use bitcoin::{key::Keypair, secp256k1::PublicKey, Transaction, Txid};
+use borsh::{BorshDeserialize, BorshSerialize};
 use express_bridge_sig_manager::manager::SignatureManager;
-use express_bridge_tx_builder::{
-    context::{BuildContext, TxBuildContext},
-    TxKind,
-};
+use express_bridge_tx_builder::{context::BuildContext, TxKind};
 use jsonrpsee::tokio::time::sleep;
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 use crate::errors::{ExecError, ExecResult};
 
@@ -24,68 +26,68 @@ use crate::errors::{ExecError, ExecResult};
 // TODO: this is hardcoded, maybe move this to a user-configurable Config
 pub const POLL_INTERVAL: Duration = Duration::from_millis(100);
 
-/// (Partially) signs a transaction.
-///
-/// Also adds to the bridge transaction database.
-///
-/// # Arguments
-///
-/// - `tx_info`: a pending [`TxKind`]-like duty.
-/// - `l1_rpc_client`: anything that is able to sign transactions and messages; i.e. holds private
-///   keys.
-/// - `l2_rpc_client`: anything that can communicate with the [`AlpenApiClient`].
-/// - `sig_manager`: a stateful [`SignatureManager`].
-/// - `tx_build_context`: stateful [`TxBuildContext`].
-///
-/// # Notes
-///
-/// Both the [`SignatureManager`] and the [`TxBuildContext`] can be reused
-/// for multiple signing sessions if the operators'
-/// [`PublickeyTable`](alpen_express_primitives::bridge::PublickeyTable)
-/// does _not_ change.
-///
-/// We don't need mutexes since all functions to [`SignatureManager`] and
-/// [`TxBuildContext`] takes non-mutable references.
-pub async fn sign_tx<TxInfo, L2Client, L1Client>(
-    tx_info: &TxInfo,
-    l1_rpc_client: &L1Client,
-    l2_rpc_client: &L2Client,
-    sig_manager: &SignatureManager,
-    tx_build_context: &TxBuildContext,
-) -> ExecResult<Txid>
+/// The execution context for handling bridge-related signing activities.
+#[derive(Clone)]
+pub struct ExecHandler<
+    L2Client: AlpenApiClient + Sync + Send,
+    TxBuildContext: BuildContext + Sync + Send,
+> {
+    /// The build context required to create transaction data needed for signing.
+    pub tx_build_ctx: TxBuildContext,
+
+    /// The signature manager that handles nonce and signature aggregation.
+    pub sig_manager: SignatureManager,
+
+    /// The RPC client to connect to the RPC full node.
+    pub l2_rpc_client: L2Client,
+
+    /// The keypair for this client used to sign bridge-related messages.
+    pub keypair: Keypair,
+
+    /// This client's position in the MuSig2 signing ceremony.
+    pub own_index: OperatorIdx,
+}
+
+impl<L2Client, TxBuildContext> ExecHandler<L2Client, TxBuildContext>
 where
-    TxInfo: TxKind + Debug,
-    L2Client: AlpenApiClient + Sync,
-    L1Client: Signer,
+    L2Client: AlpenApiClient + Sync + Send,
+    TxBuildContext: BuildContext + Sync + Send,
 {
-    info!("starting withdrawal transaction signing");
+    /// Construct and sign a transaction based on the provided `TxInfo`.
+    ///
+    /// # Returns
+    ///
+    /// The transaction ID of the constructed transaction.
+    pub async fn sign_tx<TxInfo>(&self, tx_info: TxInfo) -> ExecResult<Txid>
+    where
+        TxInfo: TxKind + Debug,
+    {
+        info!("starting withdrawal transaction signing");
 
-    let operator_pubkeys = tx_build_context.pubkey_table();
-    let own_index = tx_build_context.own_index();
-    let own_pubkey = operator_pubkeys
-        .0
-        .get(&own_index)
-        .expect("could not find operator's pubkey in public key table");
+        let operator_pubkeys = self.tx_build_ctx.pubkey_table();
+        let own_index = self.tx_build_ctx.own_index();
+        let own_pubkey = operator_pubkeys
+            .0
+            .get(&own_index)
+            .expect("could not find operator's pubkey in public key table");
 
-    info!(
-        ?tx_info,
-        %own_index,
-        %own_pubkey,
-        "got the basic self information",
-    );
+        info!(
+            ?tx_info,
+            %self.own_index,
+            %own_pubkey,
+            "got the basic self information",
+        );
 
-    // sign the transaction with MuSig2 and put inside the OperatorPartialSig
-    let xpriv = l1_rpc_client.get_xpriv().await?;
-    if let Some(xpriv) = xpriv {
-        let keypair = xpriv.to_keypair(SECP256K1);
+        // sign the transaction with MuSig2 and put inside the OperatorPartialSig
 
         // construct the transaction data
-        let tx_signing_data = tx_info.construct_signing_data(tx_build_context)?;
+        let tx_signing_data = tx_info.construct_signing_data(&self.tx_build_ctx)?;
 
         debug!(?tx_signing_data, "got the signing data");
 
         // add the tx_state to the sig_manager in order to generate a sec_nonce and pub_nonce
-        let txid = sig_manager
+        let txid = self
+            .sig_manager
             .add_tx_state(tx_signing_data, operator_pubkeys.clone())
             .await
             .map_err(|e| ExecError::Signing(e.to_string()))?;
@@ -95,161 +97,149 @@ where
             "added the public nonce to the bridge transaction database",
         );
 
-        // Then, submit_message RPC call
-        let bitcoin_txid: BitcoinTxid = txid.into();
+        Ok(txid)
+    }
 
-        let public_nonce = sig_manager
-            .get_own_nonce(&txid)
+    /// Add this client's own nonce and poll for nonces for a given [`Txid`] at [`POLL_INTERVAL`].
+    pub async fn collect_nonces(&self, txid: &Txid) -> Result<(), ExecError> {
+        let bitcoin_txid = BitcoinTxid::from(*txid);
+        let public_nonce = self
+            .sig_manager
+            .get_own_nonce(txid)
             .await
             .map_err(|e| ExecError::Signing(e.to_string()))?;
 
         let scope = Scope::V0WithdrawalPubNonce(bitcoin_txid);
         debug!(?scope, "create the withdrawal pub nonce scope");
-        let message = MessageSigner::new(own_index, keypair.secret_key().into())
-            .sign_scope(&scope, &public_nonce)
+
+        self.broadcast_msg(&scope, public_nonce, txid).await?;
+
+        // TODO: use tokio::select to add a timeout path to prevent thread leaks.
+        self.poll_for_nonces(scope, txid, POLL_INTERVAL).await?;
+
+        Ok(())
+    }
+
+    async fn broadcast_msg<S: BorshSerialize + Debug>(
+        &self,
+        scope: &Scope,
+        payload: S,
+        txid: &Txid,
+    ) -> Result<(), ExecError> {
+        let message = MessageSigner::new(self.own_index, self.keypair.secret_key().into())
+            .sign_scope(scope, &payload)
             .map_err(|e| ExecError::Signing(e.to_string()))?;
-        debug!(?message, "create the withdrawal pub nonce message");
+        debug!(?message, "created the message");
+
         let raw_message: Vec<u8> = message
             .try_into()
             .expect("could not serialize bridge message into raw bytes");
+        self.l2_rpc_client
+            .submit_bridge_msg(raw_message.into())
+            .await?;
 
-        l2_rpc_client.submit_bridge_msg(raw_message.into()).await?;
-        info!("broadcasted the withdrawal pub nonce message");
-
-        // Wait for all the pub nonces to be broadcasted by other operators.
-        // Collect all nonces.
-        // Then signing will not fail.
-        loop {
-            debug!("trying to get all pub nonces from the bridge transaction database, waiting for other operators' nonces");
-            let got_all_nonces = sig_manager
-                .get_tx_state(&txid)
-                .await
-                .map_err(|e| ExecError::TxState(e.to_string()))?
-                .has_all_nonces();
-            if got_all_nonces {
-                info!(
-                    %got_all_nonces, "got all pub nonces from the bridge transaction database",
-                );
-                break;
-            } else {
-                sleep(POLL_INTERVAL).await;
-            }
-        }
-
-        // adds the operator's partial signature
-        // NOTE: this should be not fail now since we have all the pub nonces
-        let flag = sig_manager
-            .add_own_partial_sig(&txid)
-            .await
-            .map_err(|e| ExecError::Signing(e.to_string()))?;
-
-        info!(%txid, "added own operator's partial signature");
-
-        // if the flag is true, then the PSBT is fully signed by all required operators
-        if flag {
-            info!(%txid, "withdrawal transaction fully signed");
-        }
-
-        Ok(txid)
-    } else {
-        Err(ExecError::Xpriv)
+        info!(%txid, ?scope, "broadcasted message");
+        Ok(())
     }
-}
 
-/// Pools and aggregates signatures for a withdrawal/deposit transaction
-/// into a fully-signed ready-to-be-broadcasted Bitcoin [`Transaction`].
-///
-/// Also adds the collected signatures to the bridge transaction database.
-///
-/// # Arguments
-///
-/// - `txid`: a [`Txid`] that is in the bridge transaction database.
-/// - `l1_rpc_client`: anything that is able to sign transactions and messages; i.e. holds private
-///   keys.
-/// - `l2_rpc_client`: anything that can communicate with the [`AlpenApiClient`].
-/// - `sig_manager`: a stateful [`SignatureManager`].
-/// - `tx_build_context`: stateful [`TxBuildContext`].
-///
-/// # Notes
-///
-/// Both the [`SignatureManager`] and the [`TxBuildContext`] can be reused
-/// for multiple signing sessions if the operators'
-/// [`PublickeyTable`](alpen_express_primitives::bridge::PublickeyTable)
-/// does _not_ change.
-///
-/// We don't need mutexes since all functions to [`SignatureManager`] and
-/// [`TxBuildContext`] takes non-mutable references.
-pub async fn aggregate_sig<L2Client, L1Client>(
-    txid: &Txid,
-    l1_rpc_client: &L1Client,
-    l2_rpc_client: &L2Client,
-    sig_manager: &SignatureManager,
-    tx_build_context: &TxBuildContext,
-) -> ExecResult<Transaction>
-where
-    L2Client: AlpenApiClient + Sync,
-    L1Client: Signer,
-{
-    info!("starting transaction signature aggregation");
+    /// Poll for nonces until all nonces have been collected.
+    // TODO: use long-polling here instead.
+    async fn poll_for_nonces(
+        &self,
+        scope: Scope,
+        txid: &Txid,
+        poll_interval: Duration,
+    ) -> Result<(), ExecError> {
+        debug!(%txid, "polling for other operators' nonces");
 
-    let operator_pubkeys = tx_build_context.pubkey_table();
-    let own_index = tx_build_context.own_index();
-    let own_pubkey = operator_pubkeys
-        .0
-        .get(&own_index)
-        .expect("could not find operator's pubkey in public key table");
+        loop {
+            let received_nonces = self.parse_messages::<Musig2PubNonce>(scope.clone()).await?;
 
-    info!(
-        %txid,
-        %own_index,
-        %own_pubkey,
-        "got the basic self information",
-    );
+            let mut all_done = false;
+            for pub_nonce in received_nonces {
+                all_done = self
+                    .sig_manager
+                    .add_nonce(txid, self.own_index, &pub_nonce.1)
+                    .await
+                    .map_err(|e| ExecError::Execution(e.to_string()))?;
 
-    let tx_state = sig_manager
-        .get_tx_state(txid)
-        .await
-        .map_err(|e| ExecError::TxState(e.to_string()))?;
+                if all_done {
+                    break;
+                }
+            }
 
-    debug!(
-        %txid,
-        ?tx_state,
-        "got transaction state from bridge database",
-    );
+            if all_done {
+                info!("got all pub nonces from the bridge transaction database");
+                break;
+            }
 
-    // Fully signed and in the database, nothing to do here...
-    if tx_state.is_fully_signed() {
+            sleep(poll_interval).await;
+        }
+
+        Ok(())
+    }
+
+    /// Add this client's own partial signature and poll for partial signatures from other clients
+    /// for the given [`Txid`] at [`POLL_INTERVAL`].
+    ///
+    /// Once all the signatures are collected, this function also aggregates the signatures and
+    /// creates the fully signed transaction.
+    ///
+    /// # Returns
+    ///
+    /// Fully signed transaction.
+    pub async fn collect_signatures(&self, txid: &Txid) -> ExecResult<Transaction> {
+        info!("starting transaction signature aggregation");
+
+        let own_pubkey = self.get_own_pubkey();
+
         info!(
             %txid,
-            "withdrawal transaction fully signed and in the bridge database",
+            %self.own_index,
+            %own_pubkey,
+            "got the basic self information",
         );
-        let tx = sig_manager
-            .finalize_transaction(txid)
+
+        let tx_state = self
+            .sig_manager
+            .get_tx_state(txid)
             .await
-            .map_err(|e| ExecError::Signing(e.to_string()))?;
-        return Ok(tx);
-    }
+            .map_err(|e| ExecError::TxState(e.to_string()))?;
 
-    // Not fully signed, then partially sign transaction, construct, and sign a message
-    let xpriv = l1_rpc_client.get_xpriv().await?;
-    if let Some(xpriv) = xpriv {
-        let keypair = xpriv.to_keypair(SECP256K1);
+        debug!(
+            %txid,
+            ?tx_state,
+            "got transaction state from bridge database",
+        );
 
-        // First check if it needs this operator's partial signature
-        let needs_our_sig = tx_state.collected_sigs().get(&own_index).is_none();
-        if needs_our_sig {
-            sig_manager
-                .add_own_partial_sig(txid)
-                .await
-                .map_err(|e| ExecError::Signing(e.to_string()))?;
+        // Fully signed and in the database, nothing to do here...
+        if tx_state.is_fully_signed() {
             info!(
                 %txid,
-                "added own's partial signature to the bridge transaction database",
+                "transaction already fully signed and in the database",
             );
+            let tx = self
+                .sig_manager
+                .finalize_transaction(txid)
+                .await
+                .map_err(|e| ExecError::Signing(e.to_string()))?;
+
+            return Ok(tx);
         }
 
-        // Now, get this operator's partial sig
-        let partial_sig = sig_manager
+        // First add this operator's own partial signature.
+        self.sig_manager
+            .add_own_partial_sig(txid)
+            .await
+            .map_err(|e| ExecError::Signing(e.to_string()))?;
+        info!(
+            %txid,
+            "added own's partial signature to the bridge transaction database",
+        );
+
+        // Now, get the added partial sig
+        let partial_sig = self
+            .sig_manager
             .get_own_partial_sig(txid)
             .await
             .map_err(|e| ExecError::Signing(e.to_string()))?
@@ -257,52 +247,126 @@ where
 
         info!(
             ?partial_sig,
-            "got own's partial signature from the bridge transaction database",
+            "got own partial signature from the bridge transaction database",
         );
 
         // submit_message RPC call
         let bitcoin_txid: BitcoinTxid = (*txid).into();
-        let scope = Scope::V0WithdrawalSig(bitcoin_txid);
-        debug!(?scope, "create the withdrawal partial signature scope");
-        let message = MessageSigner::new(own_index, keypair.secret_key().into())
-            .sign_scope(&scope, &partial_sig)
-            .map_err(|e| ExecError::Signing(e.to_string()))?;
-        debug!(?message, "create the withdrawal partial signature message");
-        let raw_message: Vec<u8> = message
-            .try_into()
-            .expect("could not serialize bridge message into raw bytes");
 
-        l2_rpc_client.submit_bridge_msg(raw_message.into()).await?;
-        info!("broadcasted the withdrawal partial signature message");
+        let scope = Scope::V0WithdrawalSig(bitcoin_txid);
+
+        self.broadcast_msg(&scope, partial_sig, txid).await?;
 
         // Wait for all the partial signatures to be broadcasted by other operators.
-        // Collect all partial signature.
-        loop {
-            debug!(
-                "trying to get all partial signatures from the bridge transaction database, waiting for other operators' signatures"
-            );
-            let got_all_sigs = sig_manager
-                .get_tx_state(txid)
-                .await
-                .map_err(|e| ExecError::TxState(e.to_string()))?
-                .is_fully_signed();
-            if got_all_sigs {
-                info!(
-                    %got_all_sigs,
-                    "got all partial signatures from the bridge transaction database",
-                );
-                break;
-            } else {
-                sleep(POLL_INTERVAL).await;
-            }
-        }
-        let tx = sig_manager
+        // TODO: use tokio::select to add a timeout path to prevent thread leaks.
+        self.poll_for_signatures(scope, txid, POLL_INTERVAL).await?;
+
+        let tx = self
+            .sig_manager
             .finalize_transaction(txid)
             .await
             .map_err(|e| ExecError::Signing(e.to_string()))?;
-        info!(%txid, "done withdrawal transaction signature aggregation");
+        info!(%txid, "transaction signature aggregation completed");
+
         Ok(tx)
-    } else {
-        Err(ExecError::Xpriv)
+    }
+
+    // TODO: use long-polling here instead.
+    async fn poll_for_signatures(
+        &self,
+        scope: Scope,
+        txid: &Txid,
+        poll_interval: Duration,
+    ) -> Result<(), ExecError> {
+        debug!("waiting for other operators' signatures");
+
+        loop {
+            let signatures = self
+                .parse_messages::<Musig2PartialSig>(scope.clone())
+                .await?;
+
+            let mut all_signed = false;
+            for partial_sig in signatures {
+                let signature_info = OperatorPartialSig::new(partial_sig.1, partial_sig.0);
+                all_signed = self
+                    .sig_manager
+                    .add_partial_sig(txid, signature_info)
+                    .await
+                    .map_err(|e| ExecError::Execution(e.to_string()))?;
+
+                if all_signed {
+                    break;
+                }
+            }
+
+            if all_signed {
+                info!("all signatues have been collected");
+                break;
+            }
+
+            sleep(poll_interval).await;
+        }
+
+        Ok(())
+    }
+
+    fn get_own_pubkey(&self) -> PublicKey {
+        let operator_pubkeys = self.tx_build_ctx.pubkey_table();
+        let own_index = self.tx_build_ctx.own_index();
+        *operator_pubkeys
+            .0
+            .get(&own_index)
+            .expect("could not find operator's pubkey in public key table")
+    }
+
+    async fn parse_messages<Payload>(
+        &self,
+        scope: Scope,
+    ) -> Result<impl Iterator<Item = (OperatorIdx, Payload)> + '_, ExecError>
+    where
+        Payload: BorshDeserialize,
+    {
+        let raw_scope: Vec<u8> = scope.clone().try_into().expect("serialization should work");
+
+        let raw_scope: HexBytes = raw_scope.into();
+        let received_payloads = self
+            .l2_rpc_client
+            .get_msgs_by_scope(raw_scope)
+            .await?
+            .into_iter()
+            .filter_map(move |msg| {
+                let msg = borsh::from_slice::<BridgeMessage>(&msg.0);
+                if let Ok(msg) = msg {
+                    let payload = msg.payload();
+                    let payload = borsh::from_slice::<Payload>(payload);
+
+                    if let Ok(payload) = payload {
+                        Some((msg.source_id(), payload))
+                    } else {
+                        warn!(?scope, "skipping faulty message");
+                        None
+                    }
+                } else {
+                    warn!(?scope, "skipping faulty message");
+                    None
+                }
+            });
+
+        Ok(received_payloads)
+    }
+}
+
+impl<L2Client, TxBuildContext> Debug for ExecHandler<L2Client, TxBuildContext>
+where
+    L2Client: AlpenApiClient + Sync + Send,
+    TxBuildContext: BuildContext + Sync + Send,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Handler Context index: {}, pubkey: {}",
+            self.own_index,
+            self.keypair.public_key()
+        )
     }
 }

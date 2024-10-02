@@ -81,6 +81,11 @@ impl CooperativeWithdrawalInfo {
         }
     }
 
+    /// Get the outpoint of the deposit UTXO that this withdrawal spends.
+    pub fn deposit_outpoint(&self) -> OutPoint {
+        self.deposit_outpoint
+    }
+
     /// Check if the passed bitcoin block height is greater than the deadline for the withdrawal.
     pub fn is_expired_at(&self, block_height: BitcoinBlockHeight) -> bool {
         self.exec_deadline < block_height
