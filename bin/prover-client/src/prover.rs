@@ -118,6 +118,13 @@ where
             let (proof, _) = vm.prove(input)?;
             Ok(proof)
         }
+        ProverInput::ClBlock(cl_proof_input) => {
+            let input = Vm::Input::new()
+                .write(&cl_proof_input.cl_raw_witness)?
+                .build()?;
+            let (proof, _) = vm.prove(input)?;
+            Ok(proof)
+        }
         _ => {
             todo!()
         }

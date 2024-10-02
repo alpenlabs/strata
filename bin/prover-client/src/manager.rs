@@ -78,11 +78,10 @@ where
                 .prover
                 .get_proof_submission_status_and_remove_on_success(task.id)
             {
-                self.task_tracker.mark_task_completed(task.id, proof).await;
-
-                // TODO: Implement post-processing hooks.
+                // Implement post-processing hooks.
                 // Example: If the current task is EL proving, this proof should be added
                 // to the witness of the CL proving task to unblock the CL proving task.
+                self.task_tracker.mark_task_completed(task.id, proof).await;
             }
         }
     }
