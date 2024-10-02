@@ -161,17 +161,11 @@ pub enum Scope {
     /// Used for debugging purposes.
     Misc,
 
-    /// Deposit signature with the corresponding [`BitcoinTxid`]
-    V0DepositSig(BitcoinTxid),
+    /// Signature with the corresponding [`BitcoinTxid`]
+    V0Sig(BitcoinTxid),
 
-    /// Deposit MuSig public nonce with the corresponding [`BitcoinTxid`]
-    V0DepositPubNonce(BitcoinTxid),
-
-    /// Withdrawal signature with the corresponding [`BitcoinTxid`]
-    V0WithdrawalSig(BitcoinTxid),
-
-    /// Withdrawal MuSig public nonce with the corresponding [`BitcoinTxid`]
-    V0WithdrawalPubNonce(BitcoinTxid),
+    /// MuSig public nonce with the corresponding [`BitcoinTxid`]
+    V0PubNonce(BitcoinTxid),
 }
 
 impl TryFrom<Vec<u8>> for Scope {

@@ -109,7 +109,7 @@ where
             .await
             .map_err(|e| ExecError::Signing(e.to_string()))?;
 
-        let scope = Scope::V0WithdrawalPubNonce(bitcoin_txid);
+        let scope = Scope::V0PubNonce(bitcoin_txid);
         debug!(?scope, "create the withdrawal pub nonce scope");
 
         self.broadcast_msg(&scope, public_nonce, txid).await?;
@@ -253,7 +253,7 @@ where
         // submit_message RPC call
         let bitcoin_txid: BitcoinTxid = (*txid).into();
 
-        let scope = Scope::V0WithdrawalSig(bitcoin_txid);
+        let scope = Scope::V0Sig(bitcoin_txid);
 
         self.broadcast_msg(&scope, partial_sig, txid).await?;
 
