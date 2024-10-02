@@ -38,6 +38,7 @@ members = [
   "crates/tasks",
   "crates/test-utils",
   "crates/util/mmr",
+  "crates/util/shrex",
   "crates/vtxjmt",
   "provers/risc0",
   "provers/sp1",
@@ -45,6 +46,7 @@ members = [
   # binaries listed separately
   "bin/bridge-client",
   "bin/prover-client",
+  "bin/strata-cli",
   "reth",
   "sequencer",
   "crates/tx-parser",
@@ -102,8 +104,9 @@ express-sp1-adapter = { path = "crates/zkvm/adapters/sp1" }
 express-storage = { path = "crates/storage" }
 express-sync = { path = "crates/sync" }
 express-tasks = { path = "crates/tasks" }
-express-zkvm = { path = "crates/zkvm/zkvm" }
+express-zkvm = { path = "crates/zkvm/zkvm" }                                     # FIXME make these names more consistent?
 strata-tx-parser = { path = "crates/tx-parser" }
+terrors = "0.3.0"
 # FIXME make these names more consistent?
 
 # IMPORTANT: ensure alloy-* and revm packages are of the same version as inside reth dependency
@@ -144,7 +147,13 @@ paste = "1.0"
 rand = "0.8.5"
 rand_chacha = "0.3.1"
 rand_core = "0.6"
-reqwest = { version = "0.12.4", features = ["json"] }
+reqwest = { version = "0.12.7", default-features = false, features = [
+  "http2",
+  "rustls-tls",
+  "charset",
+  "zstd",
+  "json",
+] }
 reth = { git = "https://github.com/alpenlabs/reth.git", rev = "v1.0.3-alpen.1" }
 reth-basic-payload-builder = { git = "https://github.com/alpenlabs/reth.git", rev = "v1.0.3-alpen.1" }
 reth-chainspec = { git = "https://github.com/alpenlabs/reth.git", rev = "v1.0.3-alpen.1" }

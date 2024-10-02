@@ -1,0 +1,19 @@
+[package]
+name = "shrex"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+axum = { version = "0.7.5", optional = true, default-features = false }
+serde = { workspace = true, optional = true }
+terrors = "0.3.0"
+
+[features]
+# Implements serde {de,}serialization of the Hex wrapper
+# by using the encode/decoders
+serde = ["dep:serde"]
+# Implements IntoResponse for Hex<T>
+axum = ["dep:axum"]
+
+[dev-dependencies]
+rand.workspace = true
