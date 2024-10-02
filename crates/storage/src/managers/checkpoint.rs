@@ -42,4 +42,12 @@ impl CheckpointDbManager {
         self.checkpoint_cache
             .get_or_fetch_blocking(&idx, || self.ops.get_batch_checkpoint_blocking(idx))
     }
+
+    pub fn get_last_checkpoint_blocking(&self) -> DbResult<Option<u64>> {
+        self.ops.get_last_checkpoint_idx_blocking()
+    }
+
+    pub async fn get_last_checkpoint(&self) -> DbResult<Option<u64>> {
+        self.ops.get_last_checkpoint_idx_async().await
+    }
 }

@@ -24,6 +24,7 @@ impl<D: Database + Sync + Send + 'static> Context<D> {
 inst_ops! {
     (CheckpointDataOps, Context<D: Database>) {
         get_batch_checkpoint(idx: u64) => Option<CheckpointEntry>;
+        get_last_checkpoint_idx() => Option<u64>;
         put_batch_checkpoint(idx: u64, entry: CheckpointEntry) => ();
     }
 }
@@ -43,4 +44,9 @@ fn put_batch_checkpoint<D: Database>(
 ) -> DbResult<()> {
     let checkpt_store = context.db.checkpoint_store();
     checkpt_store.put_batch_checkpoint(idx, entry)
+}
+
+fn get_last_checkpoint_idx<D: Database>(context: &Context<D>) -> DbResult<Option<u64>> {
+    let checkpt_prov = context.db.checkpoint_provider();
+    checkpt_prov.get_last_batch_idx()
 }
