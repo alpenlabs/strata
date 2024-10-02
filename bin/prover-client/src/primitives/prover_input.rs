@@ -1,11 +1,11 @@
-use alpen_express_state::{block::L2Block, chain_state::ChainState};
 use bitcoin::Block;
 use serde::{Deserialize, Serialize};
 use strata_tx_parser::filter::TxFilterRule;
 
 use super::vms::ProofVm;
 use crate::proving_ops::{
-    checkpoint_ops::CheckpointInput, l1_batch_ops::L1BatchInput, l2_batch_ops::L2BatchInput,
+    checkpoint_ops::CheckpointInput, cl_ops::CLProverInput, l1_batch_ops::L1BatchInput,
+    l2_batch_ops::L2BatchInput,
 };
 
 #[derive(Debug, Clone)]
@@ -14,7 +14,7 @@ use crate::proving_ops::{
 pub enum ProverInput {
     BtcBlock(Block, Vec<TxFilterRule>),
     ElBlock(WitnessData),
-    ClBlock(ChainState, L2Block),
+    ClBlock(CLProverInput),
     L1Batch(L1BatchInput),
     L2Batch(L2BatchInput),
     Checkpoint(CheckpointInput),
@@ -25,7 +25,7 @@ impl ProverInput {
         match self {
             ProverInput::BtcBlock(_, _) => ProofVm::BtcProving,
             ProverInput::ElBlock(_) => ProofVm::ELProving,
-            ProverInput::ClBlock(_, _) => ProofVm::CLProving,
+            ProverInput::ClBlock(_) => ProofVm::CLProving,
             ProverInput::L1Batch(_) => ProofVm::L1Batch,
             ProverInput::L2Batch(_) => ProofVm::CLAggregation,
             ProverInput::Checkpoint(_) => ProofVm::Checkpoint,

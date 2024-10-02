@@ -105,7 +105,7 @@ impl ExpressProverClientApiServer for ProverClientRpc {
             .btc_proving_task_dispatcher
             .create_task(btc_block_num)
             .await
-            .expect("failed to add proving task");
+            .expect("failed to add proving task, l1 block");
 
         RpcResult::Ok(task_id)
     }
@@ -116,7 +116,7 @@ impl ExpressProverClientApiServer for ProverClientRpc {
             .el_proving_task_dispatcher
             .create_task(el_block_num)
             .await
-            .expect("failed to add proving task");
+            .expect("failed to add proving task, el block");
 
         RpcResult::Ok(task_id)
     }
@@ -127,7 +127,7 @@ impl ExpressProverClientApiServer for ProverClientRpc {
             .cl_proving_task_dispatcher
             .create_task(cl_block_num)
             .await
-            .expect("failed to add proving task");
+            .expect("failed to add proving task, cl block");
 
         RpcResult::Ok(task_id)
     }
@@ -138,7 +138,7 @@ impl ExpressProverClientApiServer for ProverClientRpc {
             .l1_batch_task_dispatcher
             .create_task(l1_range)
             .await
-            .expect("failed to add proving task");
+            .expect("failed to add proving task, l1 batch");
 
         RpcResult::Ok(task_id)
     }
@@ -149,7 +149,7 @@ impl ExpressProverClientApiServer for ProverClientRpc {
             .l2_batch_task_dispatcher
             .create_task(l2_range)
             .await
-            .expect("failed to add proving task");
+            .expect("failed to add proving task, cl batch");
 
         RpcResult::Ok(task_id)
     }
@@ -160,7 +160,7 @@ impl ExpressProverClientApiServer for ProverClientRpc {
             .checkpoint_dispatcher
             .create_task(checkpoint_info)
             .await
-            .expect("failed to add proving task");
+            .expect("failed to add proving task, checkpoint");
 
         RpcResult::Ok(task_id)
     }

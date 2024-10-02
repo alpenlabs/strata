@@ -12,9 +12,9 @@ fi
 # Conditionally run cargo build based on PROVER_TEST
 if [ ! -z $PROVER_TEST ]; then
     echo "Running on prover mode"
-    cargo build -F "prover" --release
-    # cargo build -F "prover"
-	export PATH=$(realpath ../target/release/):$PATH
+    cargo build -F "prover"
+    # cargo build -F "prover" --release
+	# export PATH=$(realpath ../target/release/):$PATH
 else
     echo "Running on seq mode"
     cargo build

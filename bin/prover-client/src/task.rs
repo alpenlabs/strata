@@ -52,6 +52,7 @@ impl TaskTracker {
     }
 
     pub async fn mark_task_completed(&self, task_id: Uuid, proof: Proof) {
+        info!("Task {:?} marked as completed", task_id);
         let mut tasks = self.tasks.lock().await;
         if let Some(task) = tasks.get_mut(&task_id) {
             task.status = ProvingTaskStatus::Completed;
@@ -71,47 +72,19 @@ impl TaskTracker {
             })
             .collect();
 
+        info!(
+            "Processing {:?} dependents, found {:?} dependents",
+            task_id,
+            dependent_updates.len()
+        );
+
         // Update dependent tasks based on collected data
         for (dep_id, all_dependencies_completed) in dependent_updates {
             if let Some(dependent_task) = tasks.get_mut(&dep_id) {
-                // For L1Batch tasks, collect proofs from dependencies
-                if let ProverInput::L1Batch(ref mut l1_batch_input) = dependent_task.prover_input {
-                    if let Some(index) = l1_batch_input
-                        .btc_task_ids
-                        .iter()
-                        .position(|id| *id == task_id)
-                    {
-                        l1_batch_input.proofs[index] = Some(proof.clone());
-                    }
-                }
-
-                // For L2Batch tasks, collect proofs from dependencies
-                if let ProverInput::L2Batch(ref mut l2_batch_input) = dependent_task.prover_input {
-                    if let Some(index) = l2_batch_input
-                        .cl_task_ids
-                        .iter()
-                        .position(|id| *id == task_id)
-                    {
-                        l2_batch_input.proofs[index] = Some(proof.clone());
-                    }
-                }
-
-                // For L2Batch tasks, collect proofs from dependencies
-                if let ProverInput::Checkpoint(ref mut checkpoint_input) =
-                    dependent_task.prover_input
-                {
-                    if checkpoint_input.l1_batch_id == task_id {
-                        checkpoint_input.l1_batch_proof = Some(proof.clone());
-                    }
-
-                    if checkpoint_input.l2_batch_id == task_id {
-                        checkpoint_input.l2_batch_proof = Some(proof.clone())
-                    }
-                }
-
-                // Update status if all dependencies are completed
+                self.update_prover_input(&mut dependent_task.prover_input, task_id, proof.clone());
                 if all_dependencies_completed {
                     dependent_task.status = ProvingTaskStatus::Pending;
+                    info!("Dependent Task {:?} is now ready for proving", dep_id);
                 }
             }
         }
@@ -130,5 +103,32 @@ impl TaskTracker {
             .filter(|task| task.status == status)
             .cloned()
             .collect()
+    }
+
+    fn update_prover_input(&self, prover_input: &mut ProverInput, task_id: Uuid, proof: Proof) {
+        match prover_input {
+            ProverInput::L1Batch(ref mut input) => {
+                if let Some(index) = input.btc_task_ids.iter().position(|id| *id == task_id) {
+                    input.proofs[index] = Some(proof);
+                }
+            }
+            ProverInput::L2Batch(ref mut input) => {
+                if let Some(index) = input.cl_task_ids.iter().position(|id| *id == task_id) {
+                    input.proofs[index] = Some(proof);
+                }
+            }
+            ProverInput::Checkpoint(ref mut input) => {
+                if input.l1_batch_id == task_id {
+                    input.l1_batch_proof = Some(proof.clone());
+                }
+                if input.l2_batch_id == task_id {
+                    input.l2_batch_proof = Some(proof);
+                }
+            }
+            ProverInput::ClBlock(ref mut input) => {
+                input.proof = Some(proof);
+            }
+            _ => {}
+        }
     }
 }

@@ -30,7 +30,11 @@ where
 
     /// Creates a proving task for the given params.
     pub async fn create_task(&self, param: O::Params) -> Result<Uuid, ProvingTaskError> {
-        info!("Creating proving task for block {:?}", param);
+        info!(
+            "Creating proving task for block {:?} {:?}",
+            param,
+            self.operations.block_type()
+        );
         let input = self
             .operations
             .fetch_input(param.clone())
