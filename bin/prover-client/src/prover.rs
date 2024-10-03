@@ -10,8 +10,8 @@ use alpen_express_rocksdb::{
 };
 use express_proofimpl_evm_ee_stf::ELProofInput;
 use express_sp1_guest_builder::{
-    GUEST_BTC_BLOCKSPACE_ELF, GUEST_CHECKPOINT_ELF, GUEST_CL_STF_ELF, GUEST_EVM_EE_STF_ELF,
-    GUEST_L1_BATCH_ELF,
+    GUEST_BTC_BLOCKSPACE_ELF, GUEST_CHECKPOINT_ELF, GUEST_CL_AGG_ELF, GUEST_CL_STF_ELF,
+    GUEST_EVM_EE_STF_ELF, GUEST_L1_BATCH_ELF,
 };
 use express_zkvm::{Proof, ProverOptions, ZKVMHost, ZKVMInputBuilder};
 use tracing::{error, info};
@@ -122,39 +122,6 @@ where
             let agg_input = ProofWithVkey::new(proof, vk);
             Ok(agg_input)
         }
-        ProverInput::ClBlock(cl_proof_input) => {
-            let input = Vm::Input::new()
-                // TODO: Handle the aggeration input
-                // .write_proof(
-                //     cl_proof_input
-                //         .el_proof
-                //         .expect("CL Proving was sent without EL proof"),
-                // )?
-                .write(&cl_proof_input.cl_raw_witness)?
-                .build()?;
-
-            let (proof, vk) = vm.prove(input)?;
-            let agg_input = ProofWithVkey::new(proof, vk);
-            Ok(agg_input)
-        }
-        ProverInput::L2Batch(l2_batch_input) => {
-            // TODO: Use agg inputs
-            // let agg_proof = l2_batch_input.get_proofs();
-
-            let input = Vm::Input::new()
-                // TODO: Handle the aggeration input
-                // .write_proof(
-                //     cl_proof_input
-                //         .el_proof
-                //         .expect("CL Proving was sent without EL proof"),
-                // )?
-                .write(&l2_batch_input.cl_task_ids.len())?
-                .build()?;
-
-            let (proof, vk) = vm.prove(input)?;
-            let agg_input = ProofWithVkey::new(proof, vk);
-            Ok(agg_input)
-        }
         ProverInput::L1Batch(l1_batch_input) => {
             // TODO: Handle the aggeration input
             let input = Vm::Input::new()
@@ -164,6 +131,41 @@ where
             let agg_input = ProofWithVkey::new(proof, vk);
             Ok(agg_input)
         }
+        ProverInput::ClBlock(cl_proof_input) => {
+            let input = Vm::Input::new()
+                .write_proof(
+                    cl_proof_input
+                        .el_proof
+                        .expect("CL Proving was sent without EL proof"),
+                )?
+                .write(&cl_proof_input.cl_raw_witness)?
+                .build()?;
+
+            let (proof, vk) = vm.prove(input)?;
+            let agg_input = ProofWithVkey::new(proof, vk);
+            Ok(agg_input)
+        }
+        ProverInput::L2Batch(l2_batch_input) => {
+            let mut input_builder = Vm::Input::new();
+
+            // Write the number of task IDs
+            let task_count = l2_batch_input.cl_task_ids.len();
+            input_builder.write(&task_count)?;
+
+            // Write each proof input
+            for proof_input in l2_batch_input.get_proofs() {
+                input_builder.write_proof(proof_input)?;
+            }
+
+            // Build the input
+            let input = input_builder.build()?;
+
+            // Generate proof and verification key
+            let (proof, vk) = vm.prove(input)?;
+            let agg_input = ProofWithVkey::new(proof, vk);
+            Ok(agg_input)
+        }
+
         ProverInput::Checkpoint(checkpoint_input) => {
             // TODO: Handle the aggeration input
             let input = Vm::Input::new()
@@ -190,7 +192,7 @@ where
         zkvm_manager.add_vm(ProofVm::L1Batch, GUEST_L1_BATCH_ELF.into());
         zkvm_manager.add_vm(ProofVm::ELProving, GUEST_EVM_EE_STF_ELF.into());
         zkvm_manager.add_vm(ProofVm::CLProving, GUEST_CL_STF_ELF.into());
-        zkvm_manager.add_vm(ProofVm::CLAggregation, vec![]);
+        zkvm_manager.add_vm(ProofVm::CLAggregation, GUEST_CL_AGG_ELF.into());
         zkvm_manager.add_vm(ProofVm::Checkpoint, GUEST_CHECKPOINT_ELF.into());
 
         Self {

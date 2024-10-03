@@ -7,6 +7,7 @@ use alpen_express_common::logging;
 use args::Args;
 use dispatcher::TaskDispatcher;
 use express_sp1_adapter::SP1Host;
+use express_zkvm::ProverOptions;
 use jsonrpsee::http_client::HttpClientBuilder;
 use manager::ProverManager;
 use proving_ops::{
@@ -88,7 +89,12 @@ async fn main() {
         checkpoint_dispatcher.clone(),
     );
 
-    let prover_manager: ProverManager<SP1Host> = ProverManager::new(task_tracker);
+    let prover_options = ProverOptions {
+        use_mock_prover: false,
+        enable_compression: true,
+        ..Default::default()
+    };
+    let prover_manager: ProverManager<SP1Host> = ProverManager::new(task_tracker, prover_options);
 
     // run prover manager in background
     tokio::spawn(async move { prover_manager.run().await });
