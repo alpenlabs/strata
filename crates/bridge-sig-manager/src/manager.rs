@@ -191,7 +191,8 @@ impl SignatureManager {
         Ok(tx_state.ordered_nonces().into_iter().sum())
     }
 
-    /// Add this bridge client's signature for the transaction.
+    /// Add this bridge client's signature for the transaction replacing an existing one if already
+    /// present.
     ///
     /// # Returns
     ///

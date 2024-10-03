@@ -5,6 +5,7 @@
 
 mod args;
 pub(crate) mod constants;
+pub(crate) mod db;
 mod errors;
 mod modes;
 pub(crate) mod rpc_server;
@@ -20,7 +21,7 @@ async fn main() {
 
     let cli_args: Cli = argh::from_env();
 
-    let mode: OperationMode = match cli_args.mode.try_into() {
+    let mode: OperationMode = match cli_args.mode.clone().try_into() {
         Ok(mode) => mode,
         Err(err) => {
             panic!("{}", err);
@@ -31,7 +32,7 @@ async fn main() {
 
     match mode {
         OperationMode::Operator => {
-            operator::bootstrap()
+            operator::bootstrap(cli_args)
                 .await
                 .expect("bootstrap operator node");
         }

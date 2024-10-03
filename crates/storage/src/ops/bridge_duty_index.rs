@@ -14,13 +14,13 @@ impl<D: BridgeDutyIndexDatabase + Sync + Send + 'static> Context<D> {
         Self { db }
     }
 
-    pub fn into_ops(self, pool: threadpool::ThreadPool) -> BridgeCheckpointOps {
-        BridgeCheckpointOps::new(pool, Arc::new(self))
+    pub fn into_ops(self, pool: threadpool::ThreadPool) -> BridgeDutyIndexOps {
+        BridgeDutyIndexOps::new(pool, Arc::new(self))
     }
 }
 
 inst_ops! {
-    (BridgeCheckpointOps, Context<D: BridgeDutyIndexDatabase>) {
+    (BridgeDutyIndexOps, Context<D: BridgeDutyIndexDatabase>) {
         get_index() => Option<u64>;
         set_index(index: u64) => ();
     }
