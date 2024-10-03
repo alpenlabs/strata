@@ -17,6 +17,8 @@ alpen-express-rocksdb = { workspace = true }
 alpen-express-rpc-types = { workspace = true }
 alpen-express-state = { workspace = true }
 express-proofimpl-evm-ee-stf = { workspace = true }
+express-proofimpl-btc-blockspace = { workspace = true }
+express-proofimpl-l1-batch = { workspace = true }
 express-prover-client-rpc-api = { workspace = true }
 express-sp1-adapter = { workspace = true, features = ["prover"] }
 express-sp1-guest-builder = { path = "../../provers/sp1" }

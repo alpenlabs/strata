@@ -8,12 +8,15 @@ use alpen_express_rocksdb::{
     prover::db::{ProofDb, ProverDB},
     DbOpsConfig,
 };
+use express_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
 use express_proofimpl_evm_ee_stf::ELProofInput;
+use express_proofimpl_l1_batch::{L1BatchProofInput, L1BatchProofOutput};
+use express_sp1_adapter::SP1Verifier;
 use express_sp1_guest_builder::{
     GUEST_BTC_BLOCKSPACE_ELF, GUEST_CHECKPOINT_ELF, GUEST_CL_AGG_ELF, GUEST_CL_STF_ELF,
     GUEST_EVM_EE_STF_ELF, GUEST_L1_BATCH_ELF,
 };
-use express_zkvm::{Proof, ProverOptions, ZKVMHost, ZKVMInputBuilder};
+use express_zkvm::{Proof, ProverOptions, ZKVMHost, ZKVMInputBuilder, ZKVMVerifier};
 use tracing::{error, info};
 use uuid::Uuid;
 
@@ -114,8 +117,8 @@ where
         }
         ProverInput::BtcBlock(block, tx_filters) => {
             let input = Vm::Input::new()
-                .write_serialized(&bitcoin::consensus::serialize(&block))?
                 .write_borsh(&tx_filters)?
+                .write_serialized(&bitcoin::consensus::serialize(&block))?
                 .build()?;
 
             let (proof, vk) = vm.prove(input)?;
@@ -124,9 +127,30 @@ where
         }
         ProverInput::L1Batch(l1_batch_input) => {
             // TODO: Handle the aggeration input
-            let input = Vm::Input::new()
-                .write(&l1_batch_input.btc_task_ids.len())?
-                .build()?;
+            let proofs_with_vkey = l1_batch_input.clone().get_proofs();
+            let mut blockspace_outputs = Vec::new();
+            for proof_with_vkey in proofs_with_vkey {
+                let raw_output: Vec<u8> =
+                    SP1Verifier::extract_public_output(proof_with_vkey.proof())
+                        .expect("Failed to extract public outputs");
+                let output: BlockspaceProofOutput = borsh::from_slice(&raw_output).unwrap();
+                blockspace_outputs.push(output);
+            }
+
+            let batch_input = L1BatchProofInput {
+                batch: blockspace_outputs,
+                state: l1_batch_input.clone().header_verification_state,
+            };
+
+            let mut input_builder = Vm::Input::new();
+            input_builder.write_borsh(&batch_input)?;
+
+            // Write each proof input
+            for proof_input in l1_batch_input.get_proofs() {
+                input_builder.write_proof(proof_input)?;
+            }
+
+            let input = input_builder.build()?;
             let (proof, vk) = vm.prove(input)?;
             let agg_input = ProofWithVkey::new(proof, vk);
             Ok(agg_input)
