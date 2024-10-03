@@ -1,7 +1,7 @@
 #[cfg(feature = "prover")]
 mod test {
     use alpen_express_state::{
-        batch::{BootstrapCheckpointInfo, CheckpointInfo},
+        batch::{BatchInfo, BootstrapState},
         chain_state::ChainState,
     };
     use alpen_test_utils::{
@@ -120,7 +120,7 @@ mod test {
         }
     }
 
-    fn get_bootstrap_checkpoint() -> BootstrapCheckpointInfo {
+    fn get_bootstrap_checkpoint() -> BootstrapState {
         let gen_chainstate = get_genesis_chainstate();
         let btc_chain = get_btc_chain();
 
@@ -128,7 +128,7 @@ mod test {
         let starting_l1_height = 40321;
         let starting_l2_height = gen_chainstate.chain_tip_slot();
 
-        BootstrapCheckpointInfo::new(
+        BootstrapState::new(
             idx,
             starting_l1_height,
             btc_chain
@@ -182,6 +182,6 @@ mod test {
 
         let output_raw = Risc0Verifier::extract_public_output::<Vec<u8>>(&proof)
             .expect("Failed to extract public outputs");
-        let _: CheckpointInfo = borsh::from_slice(&output_raw).unwrap();
+        let _: BatchInfo = borsh::from_slice(&output_raw).unwrap();
     }
 }

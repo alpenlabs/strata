@@ -28,16 +28,19 @@ fn main() {
     println!("verified l2 batch proof");
 
     let (output, prev_checkpoint) =
-        process_checkpoint_proof(&input.l1_state, &input.l2_state, &input.genesis);
+        process_checkpoint_proof(&input.l1_state, &input.l2_state, &input.vk);
 
     if let Some(prev_checkpoint) = prev_checkpoint {
         let (checkpoint, proof) = prev_checkpoint;
         assert!(verify_groth16(
             &proof,
-            &input.verifying_key,
+            &input.vk,
             &bincode::serialize(&borsh::to_vec(&checkpoint).unwrap()).unwrap(),
         ));
     }
+
+    // Ensure we are using the same verifying key
+    assert_eq!(input.vk, output.vk);
 
     sp1_zkvm::io::commit(&borsh::to_vec(&output).unwrap());
 }

@@ -1,6 +1,6 @@
 use alpen_express_db::traits::ChainstateProvider;
 use alpen_express_primitives::params::Params;
-use alpen_express_state::{batch::CheckpointInfo, client_state::ClientState, id::L2BlockId};
+use alpen_express_state::{batch::BatchInfo, client_state::ClientState, id::L2BlockId};
 use tracing::*;
 
 use super::types::{BlockSigningDuty, Duty, Identity};
@@ -92,7 +92,7 @@ fn extract_batch_duties(
             let current_chain_state_root = current_chain_state.compute_state_root();
             let l2_transition = (initial_chain_state_root, current_chain_state_root);
 
-            let new_checkpt = CheckpointInfo::new(
+            let new_batch = BatchInfo::new(
                 first_checkpoint_idx,
                 l1_range,
                 l2_range,
@@ -102,8 +102,8 @@ fn extract_batch_duties(
                 (0, current_l1_state.total_accumulated_pow),
             );
 
-            let genesis_bootstrap = new_checkpt.to_bootstrap_initial();
-            let batch_duty = BatchCheckpointDuty::new(new_checkpt, genesis_bootstrap);
+            let genesis_bootstrap = new_batch.initial_bootstrap_state();
+            let batch_duty = BatchCheckpointDuty::new(new_batch, genesis_bootstrap);
             Ok(vec![Duty::CommitBatch(batch_duty)])
         }
         Some(l1checkpoint) => {
@@ -126,7 +126,7 @@ fn extract_batch_duties(
             let current_chain_state_root = current_chain_state.compute_state_root();
             let l2_transition = (checkpoint.l2_transition.0, current_chain_state_root);
 
-            let new_checkpt = CheckpointInfo::new(
+            let new_batch = BatchInfo::new(
                 checkpoint.idx + 1,
                 l1_range,
                 l2_range,
@@ -140,8 +140,8 @@ fn extract_batch_duties(
             );
 
             let batch_duty = BatchCheckpointDuty::new(
-                new_checkpt,
-                l1checkpoint.checkpoint.to_bootstrap_initial(),
+                new_batch,
+                l1checkpoint.checkpoint.initial_bootstrap_state(),
             );
             Ok(vec![Duty::CommitBatch(batch_duty)])
         }

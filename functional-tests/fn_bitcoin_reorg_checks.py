@@ -104,8 +104,8 @@ def check_nth_checkpoint_finalized_on_reorg(checkpt_idx: int, seq: Service, btc:
     # Create enough blocks to finalize
     btcrpc.proxy.generatetoaddress(finality_depth + 1, new_addr)
 
-    checkpoint_info = seqrpc.alp_getCheckpointInfo(checkpt_idx)
-    to_finalize_blkid = checkpoint_info["l2_blockid"]
+    batch_info = seqrpc.alp_getCheckpointInfo(checkpt_idx)
+    to_finalize_blkid = batch_info["l2_blockid"]
 
     # Check finalized
     wait_until(

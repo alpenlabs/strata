@@ -4,7 +4,7 @@ use std::time;
 
 use alpen_express_primitives::{buf::Buf32, hash::compute_borsh_hash};
 use alpen_express_state::{
-    batch::{BootstrapCheckpointInfo, CheckpointInfo},
+    batch::{BatchInfo, BootstrapState},
     id::L2BlockId,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -85,14 +85,14 @@ impl BlockSigningDuty {
 #[derive(Clone, Debug, BorshSerialize)]
 pub struct BatchCheckpointDuty {
     /// Checkpoint/batch info which needs to be proven
-    info: CheckpointInfo,
+    info: BatchInfo,
 
     /// Bootstrapping info based on which the `info` will be verified
-    bootstrap: BootstrapCheckpointInfo,
+    bootstrap: BootstrapState,
 }
 
 impl BatchCheckpointDuty {
-    pub fn new(info: CheckpointInfo, bootstrap: BootstrapCheckpointInfo) -> Self {
+    pub fn new(info: BatchInfo, bootstrap: BootstrapState) -> Self {
         Self { info, bootstrap }
     }
 
@@ -100,11 +100,11 @@ impl BatchCheckpointDuty {
         self.info.idx()
     }
 
-    pub fn checkpoint_info(&self) -> &CheckpointInfo {
+    pub fn batch_info(&self) -> &BatchInfo {
         &self.info
     }
 
-    pub fn bootstrap(&self) -> &BootstrapCheckpointInfo {
+    pub fn bootstrap(&self) -> &BootstrapState {
         &self.bootstrap
     }
 }

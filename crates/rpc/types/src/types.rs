@@ -5,7 +5,7 @@
 //!  - crate for just data structures that represents the JSON responses from Bitcoin core RPC
 
 use alpen_express_state::{
-    batch::CheckpointInfo, bridge_duties::BridgeDuty, bridge_ops::WithdrawalIntent, id::L2BlockId,
+    batch::BatchInfo, bridge_duties::BridgeDuty, bridge_ops::WithdrawalIntent, id::L2BlockId,
 };
 use bitcoin::{Network, Txid};
 use serde::{Deserialize, Serialize};
@@ -208,8 +208,8 @@ pub struct RpcCheckpointInfo {
     pub l2_blockid: L2BlockId,
 }
 
-impl From<CheckpointInfo> for RpcCheckpointInfo {
-    fn from(value: CheckpointInfo) -> Self {
+impl From<BatchInfo> for RpcCheckpointInfo {
+    fn from(value: BatchInfo) -> Self {
         Self {
             idx: value.idx,
             l1_height: value.l1_range.1,

@@ -177,7 +177,7 @@ pub fn verify_proof(
     let rollup_vk = rollup_params.rollup_vk;
     let verify_proofs = rollup_params.verify_proofs;
 
-    let checkpoint_idx = checkpoint.checkpoint().idx();
+    let checkpoint_idx = checkpoint.batch_info().idx();
 
     if !verify_proofs {
         warn!("Not verifying proofs since verify_proofs flag is false");

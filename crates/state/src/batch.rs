@@ -10,31 +10,27 @@ use crate::id::L2BlockId;
 #[derive(Clone, Debug, PartialEq, Eq, BorshDeserialize, BorshSerialize, Arbitrary)]
 pub struct BatchCheckpoint {
     /// Information regarding the current batch checkpoint
-    checkpoint: CheckpointInfo,
+    batch_info: BatchInfo,
     /// Bootstrap info based on which the checkpoint transition and proof is verified
-    bootstrap: BootstrapCheckpointInfo,
+    bootstrap: BootstrapState,
     /// Proof for the batch obtained from prover manager
     proof: Proof,
 }
 
 impl BatchCheckpoint {
-    pub fn new(
-        checkpoint: CheckpointInfo,
-        bootstrap: BootstrapCheckpointInfo,
-        proof: Proof,
-    ) -> Self {
+    pub fn new(batch_info: BatchInfo, bootstrap: BootstrapState, proof: Proof) -> Self {
         Self {
-            checkpoint,
+            batch_info,
             bootstrap,
             proof,
         }
     }
 
-    pub fn checkpoint(&self) -> &CheckpointInfo {
-        &self.checkpoint
+    pub fn batch_info(&self) -> &BatchInfo {
+        &self.batch_info
     }
 
-    pub fn bootstrap(&self) -> &BootstrapCheckpointInfo {
+    pub fn bootstrap(&self) -> &BootstrapState {
         &self.bootstrap
     }
 
@@ -45,7 +41,7 @@ impl BatchCheckpoint {
     pub fn get_sighash(&self) -> Buf32 {
         let mut buf = vec![];
         let checkpoint_sighash =
-            borsh::to_vec(&self.checkpoint).expect("could not serialize checkpoint info");
+            borsh::to_vec(&self.batch_info).expect("could not serialize checkpoint info");
 
         buf.extend(&checkpoint_sighash);
         buf.extend(self.proof.as_bytes());
@@ -81,7 +77,7 @@ impl From<SignedBatchCheckpoint> for BatchCheckpoint {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
-pub struct CheckpointInfo {
+pub struct BatchInfo {
     /// The index of the checkpoint
     pub idx: u64,
     /// L1 height range(inclusive) the checkpoint covers
@@ -104,7 +100,7 @@ pub struct CheckpointInfo {
     pub l1_pow_transition: (u128, u128),
 }
 
-impl CheckpointInfo {
+impl BatchInfo {
     pub fn new(
         checkpoint_idx: u64,
         l1_range: (u64, u64),
@@ -157,12 +153,9 @@ impl CheckpointInfo {
         self.l1_pow_transition.1
     }
 
-    /// Creates a [`BootstrapCheckpointInfo`] that can be used to verify other checkpoint proofs.
-    /// This function is used when the new checkpoint is being built by successfully verifying
-    /// the current checkpoint proof. It sets up the necessary parameters to bootstrap the
-    /// verification process for subsequent checkpoints.
-    pub fn to_bootstrap_initial(&self) -> BootstrapCheckpointInfo {
-        BootstrapCheckpointInfo::new(
+    /// Creates a [`BootstrapState`] by taking the initial state of the [`BatchInfo`]
+    pub fn initial_bootstrap_state(&self) -> BootstrapState {
+        BootstrapState::new(
             self.idx,
             self.l1_range.0,
             self.l1_transition.0,
@@ -172,12 +165,9 @@ impl CheckpointInfo {
         )
     }
 
-    /// Creates a [`BootstrapCheckpointInfo`] that can be used to verify other checkpoint proofs,
-    /// but without verifying the current checkpoint proof. This function is used when a timeout
-    /// or other issue prevents the current checkpoint proof from being submitted, meaning it
-    /// cannot be verified. Instead, the process proceeds with final values from the checkpoint.
-    pub fn to_bootstrap_final(&self) -> BootstrapCheckpointInfo {
-        BootstrapCheckpointInfo::new(
+    /// Creates a [`BootstrapState`] by taking the initial state of the [`BatchInfo`]
+    pub fn final_bootstrap_state(&self) -> BootstrapState {
+        BootstrapState::new(
             self.idx,
             self.l1_range.1,
             self.l1_transition.1,
@@ -196,12 +186,12 @@ impl CheckpointInfo {
     }
 }
 
-/// CheckpointInfo to bootstrap the proving process
+/// Initial state to bootstrap the proving process
 ///
-/// TODO: This needs to be replaced with GenesisCheckpointInfo if we prove each Checkpoint
-/// recursively. Using a BootstrapCheckpoint is a temporary solution
+/// TODO: This needs to be replaced with GenesisState if we prove each Checkpoint
+/// recursively. Using a BootstrapState is a temporary solution
 #[derive(Clone, Debug, PartialEq, Eq, BorshDeserialize, BorshSerialize, Arbitrary)]
-pub struct BootstrapCheckpointInfo {
+pub struct BootstrapState {
     pub idx: u64,
     pub start_l1_height: u64,
     pub initial_l1_state: Buf32,
@@ -210,7 +200,7 @@ pub struct BootstrapCheckpointInfo {
     pub total_acc_pow: u128,
 }
 
-impl BootstrapCheckpointInfo {
+impl BootstrapState {
     pub fn new(
         idx: u64,
         start_l1_height: u64,
@@ -227,17 +217,5 @@ impl BootstrapCheckpointInfo {
             initial_l2_state,
             total_acc_pow,
         }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, BorshDeserialize, BorshSerialize, Arbitrary)]
-pub struct Checkpoint {
-    pub info: CheckpointInfo,
-    pub bootstrap: BootstrapCheckpointInfo,
-}
-
-impl Checkpoint {
-    pub fn new(info: CheckpointInfo, bootstrap: BootstrapCheckpointInfo) -> Checkpoint {
-        Self { info, bootstrap }
     }
 }

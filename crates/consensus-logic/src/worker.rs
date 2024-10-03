@@ -215,11 +215,11 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
 
             SyncAction::WriteCheckpoints(_height, checkpoints) => {
                 for c in checkpoints.iter() {
-                    let idx = c.checkpoint().idx();
+                    let idx = c.batch_info().idx();
                     let pstatus = CheckpointProvingStatus::ProofReady;
                     let cstatus = CheckpointConfStatus::Confirmed;
                     let entry = CheckpointEntry::new(
-                        c.checkpoint().clone(),
+                        c.batch_info().clone(),
                         c.bootstrap().clone(),
                         c.proof().clone(),
                         pstatus,
@@ -232,11 +232,11 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
             }
             SyncAction::FinalizeCheckpoints(_height, checkpoints) => {
                 for c in checkpoints.iter() {
-                    let idx = c.checkpoint().idx();
+                    let idx = c.batch_info().idx();
                     let pstatus = CheckpointProvingStatus::ProofReady;
                     let cstatus = CheckpointConfStatus::Finalized;
                     let entry = CheckpointEntry::new(
-                        c.checkpoint().clone(),
+                        c.batch_info().clone(),
                         c.bootstrap().clone(),
                         c.proof().clone(),
                         pstatus,

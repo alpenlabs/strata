@@ -68,7 +68,7 @@ pub struct HeaderVerificationStateSnapshot {
 
     /// [HeaderVerificationState::last_verified_block_num]
     ///
-    /// Note: This field and struct is here only since `CheckpointInfo` requires that
+    /// Note: This field and struct is here only since `BatchInfo` requires that
     pub block_num: u64,
 
     /// Total accumulated [difficulty](bitcoin::pow::Target::difficulty)

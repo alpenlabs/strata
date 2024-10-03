@@ -1,9 +1,10 @@
 mod helpers;
-#[cfg(all(feature = "prover", not(debug_assertions)))]
+// #[cfg(all(feature = "prover", not(debug_assertions)))]
 mod test {
 
-    use alpen_express_state::batch::{Checkpoint, CheckpointInfo};
-    use express_proofimpl_checkpoint::{CheckpointProofInput, L2BatchProofOutput};
+    use express_proofimpl_checkpoint::{
+        CheckpointProofInput, CheckpointProofOutput, L2BatchProofOutput,
+    };
     use express_proofimpl_l1_batch::L1BatchProofOutput;
     use express_sp1_adapter::{SP1Host, SP1ProofInputBuilder, SP1Verifier};
     use express_sp1_guest_builder::GUEST_CHECKPOINT_ELF;
@@ -55,35 +56,16 @@ mod test {
 
         let prover = SP1Host::init(GUEST_CHECKPOINT_ELF.into(), prover_options);
 
-        let l1_range = (l1_start_height as u64, l1_start_height as u64);
-        let l2_range = (l1_start_height as u64, l1_start_height as u64);
-        let l1_transition = (l1_batch.initial_snapshot.hash, l1_batch.final_snapshot.hash);
-        let l1_pow_transition = (
-            l1_batch.initial_snapshot.acc_pow,
-            l1_batch.final_snapshot.acc_pow,
-        );
-        let l2_transition = (l2_batch.initial_snapshot.hash, l2_batch.final_snapshot.hash); // TODO: fix this
-        let checkpoint_info = CheckpointInfo::new(
-            1,
-            l1_range,
-            l2_range,
-            l1_transition,
-            l2_transition,
-            l2_batch.final_snapshot.l2_blockid,
-            l1_pow_transition,
-        );
-
         let mock_prover = MockProver::new();
         let (_, vk) = mock_prover.setup(GUEST_CHECKPOINT_ELF);
-        let vk_u8_32 = BigUint::from_str_radix(vk.bytes32().strip_prefix("0x").unwrap(), 16)
+        let vk = BigUint::from_str_radix(vk.bytes32().strip_prefix("0x").unwrap(), 16)
             .unwrap()
             .to_bytes_be();
 
         let checkpoint_proof_input = CheckpointProofInput {
             l1_state: l1_batch,
             l2_state: l2_batch,
-            verifying_key: vk_u8_32,
-            genesis: checkpoint_info.to_bootstrap_initial(),
+            vk,
         };
 
         let prover_input = SP1ProofInputBuilder::new()
@@ -102,6 +84,6 @@ mod test {
 
         let output_raw = SP1Verifier::extract_public_output::<Vec<u8>>(&proof)
             .expect("Failed to extract public outputs");
-        let _: Checkpoint = borsh::from_slice(&output_raw).unwrap();
+        let _: CheckpointProofOutput = borsh::from_slice(&output_raw).unwrap();
     }
 }

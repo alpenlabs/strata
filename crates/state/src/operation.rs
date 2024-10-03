@@ -6,7 +6,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use tracing::*;
 
 use crate::{
-    batch::{BatchCheckpoint, CheckpointInfo},
+    batch::{BatchCheckpoint, BatchInfo},
     client_state::{ClientState, L1CheckPoint, SyncState},
     id::L2BlockId,
     l1::{HeaderVerificationState, L1BlockId},
@@ -66,7 +66,7 @@ pub enum ClientStateWrite {
     UpdateBuried(u64),
 
     /// Update the checkpoints
-    CheckpointsReceived(u64, Vec<CheckpointInfo>),
+    CheckpointsReceived(u64, Vec<BatchInfo>),
 
     /// The previously confirmed checkpoint is finalized at given l1 height
     CheckpointFinalized(u64),

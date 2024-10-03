@@ -8,7 +8,7 @@ use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::{
-    batch::CheckpointInfo,
+    batch::BatchInfo,
     id::L2BlockId,
     l1::{HeaderVerificationState, L1BlockId},
 };
@@ -279,13 +279,13 @@ impl LocalL1State {
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
 pub struct L1CheckPoint {
     /// The inner checkpoint info
-    pub checkpoint: CheckpointInfo,
+    pub checkpoint: BatchInfo,
     /// L1 block height it appears in
     pub height: u64,
 }
 
 impl L1CheckPoint {
-    pub fn new(info: CheckpointInfo, height: u64) -> Self {
+    pub fn new(info: BatchInfo, height: u64) -> Self {
         Self {
             checkpoint: info,
             height,
