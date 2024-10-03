@@ -15,16 +15,16 @@ pub(crate) struct Cli {
     )]
     pub mode: String,
 
-    #[argh(positional, description = "url for the bitcoin RPC client")]
+    #[argh(option, description = "url for the bitcoin RPC client")]
     pub btc_url: String,
 
-    #[argh(positional, description = "username for the bitcoin RPC client")]
+    #[argh(option, description = "username for the bitcoin RPC client")]
     pub btc_user: String,
 
-    #[argh(positional, description = "password for the bitcoin RPC client")]
+    #[argh(option, description = "password for the bitcoin RPC client")]
     pub btc_pass: String,
 
-    #[argh(positional, description = "url for the rollup RPC client")]
+    #[argh(option, description = "url for the rollup RPC client")]
     pub rollup_url: String,
 
     #[argh(
