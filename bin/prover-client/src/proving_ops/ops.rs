@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use uuid::Uuid;
 
 use crate::{
-    errors::{BlockType, ProvingTaskError},
+    errors::{ProvingTaskType, ProvingTaskError},
     task::TaskTracker,
 };
 
@@ -15,7 +15,7 @@ pub trait ProvingOperations: Send + Sync {
     type Params: Send + Sync;
 
     /// Returns the block type (e.g., BTC, EL, CL).
-    fn block_type(&self) -> BlockType;
+    fn block_type(&self) -> ProvingTaskType;
 
     /// Fetches the prover input for the given block number.
     async fn fetch_input(&self, params: Self::Params) -> Result<Self::Input, anyhow::Error>;

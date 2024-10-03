@@ -10,7 +10,7 @@ use uuid::Uuid;
 
 use super::ops::ProvingOperations;
 use crate::{
-    errors::{BlockType, ProvingTaskError},
+    errors::{ProvingTaskType, ProvingTaskError},
     primitives::prover_input::{ProverInput, WitnessData},
     task::TaskTracker,
 };
@@ -35,8 +35,8 @@ impl ProvingOperations for ElOperations {
     type Input = Vec<u8>;
     type Params = u64;
 
-    fn block_type(&self) -> BlockType {
-        BlockType::EL
+    fn block_type(&self) -> ProvingTaskType {
+        ProvingTaskType::EL
     }
 
     async fn fetch_input(&self, block_num: u64) -> Result<Self::Input, anyhow::Error> {

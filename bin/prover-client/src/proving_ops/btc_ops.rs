@@ -16,7 +16,7 @@ use uuid::Uuid;
 
 use super::ops::ProvingOperations;
 use crate::{
-    errors::{BlockType, ProvingTaskError},
+    errors::{ProvingTaskError, ProvingTaskType},
     primitives::prover_input::ProverInput,
     task::TaskTracker,
 };
@@ -39,8 +39,8 @@ impl ProvingOperations for BtcOperations {
     type Input = (Block, Vec<TxFilterRule>);
     type Params = u64; // params is the block height
 
-    fn block_type(&self) -> BlockType {
-        BlockType::Btc
+    fn block_type(&self) -> ProvingTaskType {
+        ProvingTaskType::Btc
     }
 
     async fn fetch_input(&self, block_num: u64) -> Result<Self::Input, anyhow::Error> {

@@ -9,7 +9,7 @@ use uuid::Uuid;
 use super::{el_ops::ElOperations, ops::ProvingOperations};
 use crate::{
     dispatcher::TaskDispatcher,
-    errors::{BlockType, ProvingTaskError},
+    errors::{ProvingTaskError, ProvingTaskType},
     primitives::prover_input::{ProofWithVkey, ProverInput},
     task::TaskTracker,
 };
@@ -43,8 +43,8 @@ impl ProvingOperations for ClOperations {
     type Input = CLProverInput;
     type Params = u64;
 
-    fn block_type(&self) -> BlockType {
-        BlockType::CL
+    fn block_type(&self) -> ProvingTaskType {
+        ProvingTaskType::CL
     }
 
     async fn fetch_input(&self, block_num: u64) -> Result<Self::Input, anyhow::Error> {

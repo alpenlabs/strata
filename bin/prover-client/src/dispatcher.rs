@@ -52,8 +52,4 @@ where
     pub fn task_tracker(&self) -> Arc<TaskTracker> {
         self.task_tracker.clone()
     }
-
-    fn update_last_param(&mut self) {
-        todo!("need to do this")
-    }
 }
