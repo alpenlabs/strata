@@ -13,7 +13,7 @@ pub fn extract_relevant_info(
     filters: &[TxFilterRule],
 ) -> (Vec<DepositInfo>, Option<BatchCheckpoint>) {
     let mut deposits = Vec::new();
-    let mut state_update = None;
+    let mut prev_checkpoint = None;
 
     let relevant_txs = filter_relevant_txs(block, filters);
 
@@ -26,11 +26,11 @@ pub fn extract_relevant_info(
                 // TODO: Verify the signature
                 // TODO: This assumes we will have one proper update, but there can be many
                 let batch: BatchCheckpoint = signed_batch.clone().into();
-                state_update = state_update.or(Some(batch));
+                prev_checkpoint = prev_checkpoint.or(Some(batch));
             }
             _ => {}
         }
     }
 
-    (deposits, state_update)
+    (deposits, prev_checkpoint)
 }

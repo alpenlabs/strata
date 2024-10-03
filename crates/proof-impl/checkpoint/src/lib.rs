@@ -46,14 +46,22 @@ pub struct CheckpointProofOutput {
     /// Cannot be hardcoded as any change to the program or proof implementation
     /// will change verifying_key.
     pub vk: Vec<u8>,
+    /// Commitment of the filters that were used to filter L1 transactions
+    pub l1_tx_filters_commitment: Buf32,
 }
 
 impl CheckpointProofOutput {
-    pub fn new(info: BatchInfo, bootstrap: BootstrapState, vk: Vec<u8>) -> CheckpointProofOutput {
+    pub fn new(
+        info: BatchInfo,
+        bootstrap: BootstrapState,
+        vk: Vec<u8>,
+        l1_tx_filters_commitment: Buf32,
+    ) -> CheckpointProofOutput {
         Self {
             info,
             bootstrap_state: bootstrap,
             vk,
+            l1_tx_filters_commitment,
         }
     }
 }
@@ -95,6 +103,7 @@ pub fn process_checkpoint_proof(
             l1_batch_output.initial_snapshot.acc_pow,
             l1_batch_output.final_snapshot.acc_pow,
         ),
+        l1_batch_output.filters_commitment,
     );
 
     let (bootstrap, opt_prev_output) = match l1_batch_output.prev_checkpoint.as_ref() {
@@ -106,6 +115,11 @@ pub fn process_checkpoint_proof(
             assert_eq!(
                 prev_checkpoint.batch_info().final_bootstrap_state(),
                 batch_info.initial_bootstrap_state()
+            );
+
+            assert_eq!(
+                prev_checkpoint.batch_info().l1_tx_filters_commitment(),
+                batch_info.l1_tx_filters_commitment()
             );
 
             batch_info.idx = prev_checkpoint.batch_info().idx + 1;
@@ -122,6 +136,7 @@ pub fn process_checkpoint_proof(
                     prev_checkpoint.batch_info().clone(),
                     bootstrap.clone(),
                     vk.to_vec(),
+                    l1_batch_output.filters_commitment,
                 );
                 let prev_checkpoint_proof = prev_checkpoint.proof().clone();
                 (
@@ -131,6 +146,11 @@ pub fn process_checkpoint_proof(
             }
         }
     };
-    let output = CheckpointProofOutput::new(batch_info, bootstrap, vk.to_vec());
+    let output = CheckpointProofOutput::new(
+        batch_info,
+        bootstrap,
+        vk.to_vec(),
+        l1_batch_output.filters_commitment,
+    );
     (output, opt_prev_output)
 }

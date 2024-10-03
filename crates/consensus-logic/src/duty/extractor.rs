@@ -1,5 +1,5 @@
 use alpen_express_db::traits::ChainstateProvider;
-use alpen_express_primitives::params::Params;
+use alpen_express_primitives::{buf::Buf32, params::Params};
 use alpen_express_state::{batch::BatchInfo, client_state::ClientState, id::L2BlockId};
 use tracing::*;
 
@@ -12,6 +12,7 @@ pub fn extract_duties(
     _ident: &Identity,
     _params: &Params,
     chs_provider: &impl ChainstateProvider,
+    l1_tx_filters_provider: Buf32,
 ) -> Result<Vec<Duty>, Error> {
     // If a sync state isn't present then we probably don't have anything we
     // want to do.  We might change this later.
@@ -32,6 +33,7 @@ pub fn extract_duties(
         tip_height,
         tip_blkid,
         chs_provider,
+        l1_tx_filters_provider,
     )?);
 
     Ok(duties)
@@ -42,6 +44,7 @@ fn extract_batch_duties(
     tip_height: u64,
     tip_id: L2BlockId,
     chs_provider: &impl ChainstateProvider,
+    l1_tx_filters_commitment: Buf32,
 ) -> Result<Vec<Duty>, Error> {
     if !state.is_chain_active() {
         debug!("chain not active, no duties created");
@@ -100,6 +103,7 @@ fn extract_batch_duties(
                 l2_transition,
                 tip_id,
                 (0, current_l1_state.total_accumulated_pow),
+                l1_tx_filters_commitment,
             );
 
             let genesis_bootstrap = new_batch.initial_bootstrap_state();
@@ -115,16 +119,16 @@ fn extract_batch_duties(
                 .tip_verification_state()
                 .ok_or(Error::ChainInactive)?;
             let current_l1_state_hash = current_l1_state.compute_hash().unwrap();
-            let l1_transition = (checkpoint.l1_transition.0, current_l1_state_hash);
+            let l1_transition = (checkpoint.l1_transition.1, current_l1_state_hash);
 
             // Also, rather than tip heights, we might need to limit the max range a prover will be
             // proving
-            let l2_range = (checkpoint.l2_range.0, tip_height);
+            let l2_range = (checkpoint.l2_range.1 + 1, tip_height);
             let current_chain_state = chs_provider
                 .get_toplevel_state(tip_height)?
                 .ok_or(Error::MissingIdxChainstate(0))?;
             let current_chain_state_root = current_chain_state.compute_state_root();
-            let l2_transition = (checkpoint.l2_transition.0, current_chain_state_root);
+            let l2_transition = (checkpoint.l2_transition.1, current_chain_state_root);
 
             let new_batch = BatchInfo::new(
                 checkpoint.idx + 1,
@@ -137,6 +141,7 @@ fn extract_batch_duties(
                     checkpoint.l1_pow_transition.1,
                     current_l1_state.total_accumulated_pow,
                 ),
+                l1_tx_filters_commitment,
             );
 
             let batch_duty = BatchCheckpointDuty::new(

@@ -11,10 +11,12 @@ fn main() {
     let mut state: HeaderVerificationState = borsh::from_slice(&state_raw).unwrap();
 
     let num_inputs: u32 = sp1_zkvm::io::read();
+    assert!(num_inputs > 0);
 
     let initial_snapshot = state.compute_snapshot();
     let mut deposits = Vec::new();
-    let mut state_update = None;
+    let mut prev_checkpoint = None;
+    let mut filters_commitment = None;
 
     let vk = vks::GUEST_BTC_BLOCKSPACE_ELF_ID;
     for _ in 0..num_inputs {
@@ -29,15 +31,23 @@ fn main() {
 
         state.check_and_update_continuity(&header, &get_btc_params());
         deposits.extend(blkpo.deposits);
-        state_update = state_update.or(blkpo.state_update);
+        prev_checkpoint = prev_checkpoint.or(blkpo.prev_checkpoint);
+
+        // Ensure that the filters commitment used are same for all blocks
+        if let Some(filters_comm) = filters_commitment {
+            assert_eq!(blkpo.filters_commitment, filters_comm);
+        } else {
+            filters_commitment = Some(blkpo.filters_commitment);
+        }
     }
     let final_snapshot = state.compute_snapshot();
 
     let output = L1BatchProofOutput {
         deposits,
-        state_update,
+        prev_checkpoint,
         initial_snapshot,
         final_snapshot,
+        filters_commitment: filters_commitment.unwrap(),
     };
 
     sp1_zkvm::io::commit(&borsh::to_vec(&output).unwrap());

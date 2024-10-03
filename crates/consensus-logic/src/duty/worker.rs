@@ -12,6 +12,7 @@ use alpen_express_db::traits::*;
 use alpen_express_eectl::engine::ExecEngineCtl;
 use alpen_express_primitives::{
     buf::{Buf32, Buf64},
+    hash::compute_borsh_hash,
     params::Params,
 };
 use alpen_express_state::{
@@ -22,6 +23,7 @@ use alpen_express_state::{
 };
 use express_storage::L2BlockManager;
 use express_tasks::{ShutdownGuard, TaskExecutor};
+use strata_tx_parser::filter::derive_tx_filter_rules;
 use tokio::sync::broadcast;
 use tracing::*;
 
@@ -77,6 +79,11 @@ fn duty_tracker_task_inner(
     };
     duties_tracker.set_finalized_block(last_finalized_blk);
 
+    // TODO: figure out where the l1_tx_filters_commitment is stored
+    // Maybe in the chain state?
+    let l1_tx_filters = derive_tx_filter_rules(params);
+    let l1_tx_filters_commitment = compute_borsh_hash(&l1_tx_filters);
+
     loop {
         if shutdown.should_shutdown() {
             warn!("received shutdown signal");
@@ -106,6 +113,7 @@ fn duty_tracker_task_inner(
             l2_block_manager,
             params,
             &**database.chain_state_provider(),
+            l1_tx_filters_commitment,
         ) {
             error!(err = %e, "failed to update duties tracker");
         }
@@ -129,12 +137,14 @@ fn update_tracker(
     l2_block_manager: &L2BlockManager,
     params: &Params,
     chs_provider: &impl ChainstateProvider,
+    l1_tx_filters_commitment: Buf32,
 ) -> Result<(), Error> {
     let Some(ss) = state.sync() else {
         return Ok(());
     };
 
-    let new_duties = extractor::extract_duties(state, ident, params, chs_provider)?;
+    let new_duties =
+        extractor::extract_duties(state, ident, params, chs_provider, l1_tx_filters_commitment)?;
 
     info!(new_duties = ?new_duties, "new duties");
 

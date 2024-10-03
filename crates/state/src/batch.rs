@@ -98,9 +98,12 @@ pub struct BatchInfo {
     pub l2_blockid: L2BlockId,
     /// PoW transition in the given `l1_range`
     pub l1_pow_transition: (u128, u128),
+    /// Commitment of the `TxFilterRule` used to scan L1 transactions
+    pub l1_tx_filters_commitment: Buf32,
 }
 
 impl BatchInfo {
+    #[allow(clippy::too_many_arguments)] // FIXME
     pub fn new(
         checkpoint_idx: u64,
         l1_range: (u64, u64),
@@ -109,6 +112,7 @@ impl BatchInfo {
         l2_transition: (Buf32, Buf32),
         l2_blockid: L2BlockId,
         l1_pow_transition: (u128, u128),
+        l1_tx_filters_commitment: Buf32,
     ) -> Self {
         Self {
             idx: checkpoint_idx,
@@ -118,6 +122,7 @@ impl BatchInfo {
             l2_transition,
             l2_blockid,
             l1_pow_transition,
+            l1_tx_filters_commitment,
         }
     }
 
@@ -151,6 +156,10 @@ impl BatchInfo {
 
     pub fn final_acc_pow(&self) -> u128 {
         self.l1_pow_transition.1
+    }
+
+    pub fn l1_tx_filters_commitment(&self) -> Buf32 {
+        self.l1_tx_filters_commitment
     }
 
     /// Creates a [`BootstrapState`] by taking the initial state of the [`BatchInfo`]
