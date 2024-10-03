@@ -51,7 +51,7 @@ class BitcoinReorgChecksTest(flexitest.Test):
         manual_gen = ManualGenBlocksConfig(btcrpc, finality_depth, seq_addr)
 
         # Sanity Check for first checkpoint
-        idx = 1
+        idx = 0
         check_nth_checkpoint_finalized(idx, seqrpc, manual_gen)
         print(f"Pass checkpoint finalization for checkpoint {idx}")
 

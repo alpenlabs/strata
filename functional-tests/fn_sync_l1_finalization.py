@@ -33,7 +33,7 @@ class BlockFinalizationTest(flexitest.Test):
         check_submit_proof_fails_for_nonexistent_batch(seqrpc, 100)
 
         # Check for first 4 checkpoints
-        for n in range(1, 5):
+        for n in range(4):
             check_nth_checkpoint_finalized(n, seqrpc)
             print(f"Pass checkpoint finalization for checkpoint {n}")
 
@@ -42,8 +42,8 @@ class BlockFinalizationTest(flexitest.Test):
 
 def check_already_sent_proof(seqrpc):
     try:
-        # Proof for checkpoint 1 is already sent
-        seqrpc.alpadmin_submitCheckpointProof(1, "abc123")
+        # Proof for checkpoint 0 is already sent
+        seqrpc.alpadmin_submitCheckpointProof(0, "abc123")
     except Exception as e:
         print(e)
         assert e.code == ERROR_PROOF_ALREADY_CREATED
