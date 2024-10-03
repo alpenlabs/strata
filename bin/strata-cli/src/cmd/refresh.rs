@@ -82,7 +82,6 @@ pub async fn refresh(seed: Seed, settings: Settings, esplora: EsploraClient) {
         let mut psbt = recovery_wallet
             .build_tx()
             .drain_to(recover_to.script_pubkey())
-            .enable_rbf()
             .fee_rate(fee_rate)
             .clone()
             .finish()

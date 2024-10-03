@@ -81,7 +81,6 @@ pub async fn send(args: SendArgs, seed: Seed, settings: Settings, esplora: Esplo
             let mut psbt = l1w
                 .build_tx()
                 .add_recipient(address.script_pubkey(), amount)
-                .enable_rbf()
                 .fee_rate(fee_rate)
                 .clone()
                 .finish()
