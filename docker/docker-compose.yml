@@ -18,10 +18,13 @@ services:
   reth:
     <<: *base-reth
     container_name: strata_reth
+    environment:
+      JWTSECRET: "configs/jwt.hex"
     volumes:
       - ./.data/data-reth:/app/reth
-      - ./configs/p2p.seq.hex:/app/p2p.hex
-      - ./configs/jwt.seq.hex:/app/jwt.hex
+      - ./configs:/app/configs
+      # - ./configs/p2p.seq.hex:/app/p2p.hex
+      # - ./configs/jwt.seq.hex:/app/jwt.hex
     command:
       - "--enable-witness-gen"
     ports:
@@ -32,10 +35,13 @@ services:
   reth-fn:
     <<: *base-reth
     container_name: strata_reth_fn
+    environment:
+      JWTSECRET: "configs/jwt.fn.hex"
     volumes:
       - ./.data/data-reth-fn:/app/reth
-      - ./configs/p2p.fn.hex:/app/p2p.hex
-      - ./configs/jwt.fn.hex:/app/jwt.hex
+      - ./configs:/app/configs
+      # - ./configs/p2p.fn.hex:/app/p2p.hex
+      # - ./configs/jwt.fn.hex:/app/jwt.hex
     ports:
       # - 8561:8551
       - 8555:8545
@@ -46,12 +52,16 @@ services:
     container_name: strata_sequencer
     ports:
       - 8432:8432
+    environment:
+      CONFIG_PATH: "configs/config.seq.toml"
+      PARAM_PATH: "configs/params.json"
     volumes:
       - ./.data/data-sequencer:/app/data
-      - ./configs/config.seq.toml:/app/config.toml
-      - ./configs/params.devnet.json:/app/params.json
-      - ./configs/sequencer.key:/app/sequencer.key
-      - ./configs/jwt.seq.hex:/app/jwt.hex
+      - ./configs:/app/configs
+      # - ./configs/config.seq.toml:/app/config.toml
+      # - ./configs/params.devnet.json:/app/params.json
+      # - ./configs/sequencer.key:/app/sequencer.key
+      # - ./configs/jwt.seq.hex:/app/jwt.hex
     depends_on:
       - bitcoind
       - reth
@@ -61,12 +71,15 @@ services:
     container_name: strata_fullnode
     ports:
       - 8433:8432
+    environment:
+      CONFIG_PATH: "configs/config.fn.toml"
+      PARAM_PATH: "configs/params.json"
     volumes:
       - ./.data/data-fullnode:/app/data
-      - ./configs/config.fn.toml:/app/config.toml
-      - ./configs/params.devnet.json:/app/params.json
-      - ./configs/jwt.fn.hex:/app/jwt.hex
-    # need to wait for sequencer to start
+      - ./configs:/app/configs
+      # - ./configs/params.json:/app/params.json
+      # - ./configs/jwt.fn.hex:/app/jwt.hex
+      # need to wait for sequencer to start
     entrypoint: /bin/sh -c "sleep 10 && /app/entrypoint.sh \"$@\"" --
     depends_on:
       - bitcoind
