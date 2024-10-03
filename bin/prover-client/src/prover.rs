@@ -138,6 +138,9 @@ where
             Ok(agg_input)
         }
         ProverInput::L2Batch(l2_batch_input) => {
+            // TODO: Use agg inputs
+            // let agg_proof = l2_batch_input.get_proofs();
+
             let input = Vm::Input::new()
                 // TODO: Handle the aggeration input
                 // .write_proof(

@@ -108,29 +108,27 @@ impl TaskTracker {
         &self,
         prover_input: &mut ProverInput,
         task_id: Uuid,
-        proof_input: ProofWithVkey,
+        proof: ProofWithVkey,
     ) {
         match prover_input {
             ProverInput::L1Batch(ref mut input) => {
                 if let Some(index) = input.btc_task_ids.iter().position(|id| *id == task_id) {
-                    input.proofs[index] = Some(proof_input);
+                    input.proofs[index] = Some(proof);
                 }
             }
-            ProverInput::L2Batch(ref mut input) => {
-                if let Some(index) = input.cl_task_ids.iter().position(|id| *id == task_id) {
-                    input.proofs[index] = Some(proof_input);
-                }
+            ProverInput::L2Batch(ref mut l2_batch_input) => {
+                l2_batch_input.insert_proof(task_id, proof);
             }
             ProverInput::Checkpoint(ref mut input) => {
                 if input.l1_batch_id == task_id {
-                    input.l1_batch_proof = Some(proof_input.clone());
+                    input.l1_batch_proof = Some(proof.clone());
                 }
                 if input.l2_batch_id == task_id {
-                    input.l2_batch_proof = Some(proof_input);
+                    input.l2_batch_proof = Some(proof);
                 }
             }
             ProverInput::ClBlock(ref mut input) => {
-                input.el_proof = Some(proof_input);
+                input.el_proof = Some(proof);
             }
             _ => {}
         }
