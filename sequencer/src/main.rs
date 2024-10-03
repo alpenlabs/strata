@@ -71,9 +71,8 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let config = get_config(args.clone())?;
 
     // Set up block params.
-    let rparams =
-        resolve_and_validate_rollup_params(args.rollup_params.as_ref().map(|v| v.as_path()))
-            .map_err(anyhow::Error::from)?;
+    let rparams = resolve_and_validate_rollup_params(args.rollup_params.as_deref())
+        .map_err(anyhow::Error::from)?;
     let params: Arc<_> = Params {
         rollup: rparams,
         run: SyncParams {

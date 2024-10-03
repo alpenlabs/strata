@@ -97,12 +97,15 @@ pub fn get_envvar_params() -> anyhow::Result<Option<RollupParams>> {
 
 #[cfg(test)]
 mod tests {
-    use super::DEFAULT_NETWORK_PARAMS;
+    use alpen_express_primitives::params::RollupParams;
+
+    use super::DEFAULT_NETWORK_ROLLUP_PARAMS;
 
     #[test]
     fn test_params_well_formed() {
-        if let Some(params_str) = DEFAULT_NETWORK_PARAMS {
-            let params = serde_json::from_str(params_str).expect("test: parse network params");
+        if let Some(params_str) = DEFAULT_NETWORK_ROLLUP_PARAMS {
+            let params: RollupParams =
+                serde_json::from_str(params_str).expect("test: parse network params");
             params
                 .check_well_formed()
                 .expect("test: check network params");

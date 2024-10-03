@@ -115,7 +115,7 @@ pub fn resolve_and_validate_rollup_params(path: Option<&Path>) -> Result<RollupP
 pub fn resolve_rollup_params(path: Option<&Path>) -> Result<RollupParams, InitError> {
     // If a path is set from arg load that.
     if let Some(p) = path {
-        return Ok(load_rollup_params(p)?);
+        return load_rollup_params(p);
     }
 
     // Otherwise check from envvar.
