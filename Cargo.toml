@@ -142,6 +142,7 @@ jsonrpsee = "0.23"
 jsonrpsee-types = "0.23"
 lazy_static = "1.5.0"
 lru = "0.12"
+miniscript = "12.2.0"
 mockall = "0.11"
 musig2 = { version = "0.1.0", features = ["serde"] }
 num_enum = "0.7"

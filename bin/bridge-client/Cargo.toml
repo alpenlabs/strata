@@ -38,3 +38,6 @@ thiserror.workspace = true
 threadpool.workspace = true
 tokio.workspace = true
 tracing.workspace = true
+
+[dev-dependencies]
+bitcoind.workspace = true
