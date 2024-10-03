@@ -27,6 +27,7 @@ pub enum ProvingTaskType {
     EL,
     CL,
     ClBatch,
+    BtcBatch,
 }
 
 impl std::fmt::Display for ProvingTaskType {
@@ -36,6 +37,7 @@ impl std::fmt::Display for ProvingTaskType {
             ProvingTaskType::EL => "EL",
             ProvingTaskType::CL => "CL",
             ProvingTaskType::ClBatch => "CL Batch",
+            ProvingTaskType::BtcBatch => "BTC Batch",
         };
         write!(f, "{}", block_type_str)
     }
