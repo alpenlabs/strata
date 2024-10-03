@@ -32,6 +32,15 @@ pub trait ExpressProverClientApi {
     #[method(name = "proveCheckpoint")]
     async fn prove_checkpoint(&self, checkpoint: RpcCheckpointInfo) -> RpcResult<Uuid>;
 
+    /// Start proving the given cl block
+    #[method(name = "proveCheckpointRaw")]
+    async fn prove_checkpoint_raw(
+        &self,
+        checkpoint_idx: u64,
+        l1_range: (u64, u64),
+        l2_range: (u64, u64),
+    ) -> RpcResult<Uuid>;
+
     /// Start proving the given el block
     #[method(name = "getTaskStatus")]
     async fn get_task_status(&self, task_id: Uuid) -> RpcResult<Option<String>>;
