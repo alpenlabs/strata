@@ -27,7 +27,7 @@ jobs:
   crate-checks:
     name: Check that crates compile on their own
     runs-on: ubuntu-latest
-    timeout-minutes: 60 # cold run takes a lot of time as each crate is compiled separately
+    timeout-minutes: 90 # cold run takes a lot of time as each crate is compiled separately
     steps:
       - uses: actions/checkout@v4
 

@@ -199,12 +199,11 @@ fn main() {
     let args: Args = argh::from_env();
     if let Err(e) = main_inner(args) {
         eprintln!("{e}\n{e:?}");
-        return;
     }
 }
 
 fn main_inner(args: Args) -> anyhow::Result<()> {
-    let network = resolve_network(args.bitcoin_network.as_ref().map(|s| s.as_str()))?;
+    let network = resolve_network(args.bitcoin_network.as_deref())?;
 
     let mut ctx = CmdContext {
         datadir: args.datadir.unwrap_or_else(|| PathBuf::from(".")),
@@ -236,7 +235,7 @@ fn exec_subc(cmd: Subcommand, ctx: &mut CmdContext) -> anyhow::Result<()> {
 
 fn exec_genseed(cmd: SubcGenSeed, ctx: &mut CmdContext) -> anyhow::Result<()> {
     if cmd.path.exists() && !cmd.force {
-        anyhow::bail!("not overwiting file, add --force to overwrite");
+        anyhow::bail!("not overwriting file, add --force to overwrite");
     }
 
     let xpriv = gen_priv(&mut ctx.rng, ctx.bitcoin_network);
@@ -248,7 +247,7 @@ fn exec_genseed(cmd: SubcGenSeed, ctx: &mut CmdContext) -> anyhow::Result<()> {
 }
 
 fn exec_genseqpubkey(cmd: SubcGenSeqPubkey, _ctx: &mut CmdContext) -> anyhow::Result<()> {
-    let Some(xpriv) = resolve_xpriv(&cmd.key_file, cmd.key_from_env, &SEQKEY_ENVVAR)? else {
+    let Some(xpriv) = resolve_xpriv(&cmd.key_file, cmd.key_from_env, SEQKEY_ENVVAR)? else {
         anyhow::bail!("privkey unset");
     };
 
@@ -263,7 +262,7 @@ fn exec_genseqpubkey(cmd: SubcGenSeqPubkey, _ctx: &mut CmdContext) -> anyhow::Re
 }
 
 fn exec_genopxpub(cmd: SubcGenOpXpub, _ctx: &mut CmdContext) -> anyhow::Result<()> {
-    let Some(xpriv) = resolve_xpriv(&cmd.key_file, cmd.key_from_env, &OPKEY_ENVVAR)? else {
+    let Some(xpriv) = resolve_xpriv(&cmd.key_file, cmd.key_from_env, OPKEY_ENVVAR)? else {
         anyhow::bail!("privkey unset");
     };
 
@@ -402,7 +401,7 @@ fn resolve_xpriv(
 }
 
 fn derive_strata_scheme_xpriv(master: &Xpriv, last: u32) -> anyhow::Result<Xpriv> {
-    let derivation_path = DerivationPath::master().extend(&[
+    let derivation_path = DerivationPath::master().extend([
         ChildNumber::from_hardened_idx(DERIV_BASE_IDX).unwrap(),
         ChildNumber::from_hardened_idx(last).unwrap(),
     ]);
@@ -423,13 +422,13 @@ fn derive_op_root_xpub(master: &Xpriv) -> anyhow::Result<Xpriv> {
 /// Derives the signing and wallet xprivs for a Strata operator.
 #[allow(unused)]
 fn derive_op_purpose_xprivs(master: &Xpriv) -> anyhow::Result<(Xpriv, Xpriv)> {
-    let signing_path = DerivationPath::master().extend(&[
+    let signing_path = DerivationPath::master().extend([
         ChildNumber::from_hardened_idx(DERIV_BASE_IDX).unwrap(),
         ChildNumber::from_hardened_idx(DERIV_OP_IDX).unwrap(),
         ChildNumber::from_normal_idx(DERIV_OP_SIGNING_IDX).unwrap(),
     ]);
 
-    let wallet_path = DerivationPath::master().extend(&[
+    let wallet_path = DerivationPath::master().extend([
         ChildNumber::from_hardened_idx(DERIV_BASE_IDX).unwrap(),
         ChildNumber::from_hardened_idx(DERIV_OP_IDX).unwrap(),
         ChildNumber::from_normal_idx(DERIV_OP_WALLET_IDX).unwrap(),
@@ -444,10 +443,10 @@ fn derive_op_purpose_xprivs(master: &Xpriv) -> anyhow::Result<(Xpriv, Xpriv)> {
 /// Derives the signing and wallet xprivs for a Strata operator.
 fn derive_op_purpose_xpubs(op_xpub: &Xpub) -> (Xpub, Xpub) {
     let signing_path = DerivationPath::master()
-        .extend(&[ChildNumber::from_normal_idx(DERIV_OP_SIGNING_IDX).unwrap()]);
+        .extend([ChildNumber::from_normal_idx(DERIV_OP_SIGNING_IDX).unwrap()]);
 
     let wallet_path = DerivationPath::master()
-        .extend(&[ChildNumber::from_normal_idx(DERIV_OP_WALLET_IDX).unwrap()]);
+        .extend([ChildNumber::from_normal_idx(DERIV_OP_WALLET_IDX).unwrap()]);
 
     let signing_xpub = op_xpub
         .derive_pub(bitcoin::secp256k1::SECP256K1, &signing_path)
@@ -474,11 +473,11 @@ pub struct ParamsConfig {
     proof_timeout: Option<u32>,
 }
 
-// TODO conver this to also initialize the sync params
+// TODO convert this to also initialize the sync params
 fn construct_params(config: ParamsConfig) -> alpen_express_primitives::params::RollupParams {
     let cr = config
         .seqkey
-        .map(|k| block_credential::CredRule::SchnorrKey(k))
+        .map(block_credential::CredRule::SchnorrKey)
         .unwrap_or(block_credential::CredRule::Unchecked);
 
     let opkeys = config

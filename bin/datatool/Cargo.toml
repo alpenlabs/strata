@@ -1,7 +1,7 @@
 [package]
+edition = "2021"
 name = "strata-datatool"
 version = "0.1.0"
-edition = "2021"
 
 [[bin]]
 name = "strata-datatool"
@@ -10,8 +10,8 @@ path = "src/main.rs"
 [dependencies]
 alpen-express-primitives = { workspace = true }
 
-argh = { workspace = true }
 anyhow = { workspace = true }
+argh = { workspace = true }
 bech32 = "0.11.0"
 bitcoin = { workspace = true, features = ["std"] }
 hex = { workspace = true }
