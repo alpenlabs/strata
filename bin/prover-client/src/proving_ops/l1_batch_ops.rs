@@ -1,5 +1,13 @@
 use std::{collections::HashMap, sync::Arc};
 
+use alpen_express_btcio::{
+    reader::query::get_verification_state,
+    rpc::{traits::Reader, BitcoinClient},
+};
+use alpen_express_state::l1::{
+    get_btc_params, get_difficulty_adjustment_height, BtcParams, HeaderVerificationState,
+    L1BlockId, TimestampStore,
+};
 use async_trait::async_trait;
 use bitcoin::params::MAINNET;
 use uuid::Uuid;
@@ -16,12 +24,19 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct L1BatchOperations {
     btc_dispatcher: Arc<TaskDispatcher<BtcOperations>>,
+    btc_client: Arc<BitcoinClient>,
 }
 
 impl L1BatchOperations {
     /// Creates a new BTC operations instance.
-    pub fn new(btc_dispatcher: Arc<TaskDispatcher<BtcOperations>>) -> Self {
-        Self { btc_dispatcher }
+    pub fn new(
+        btc_dispatcher: Arc<TaskDispatcher<BtcOperations>>,
+        btc_client: Arc<BitcoinClient>,
+    ) -> Self {
+        Self {
+            btc_dispatcher,
+            btc_client,
+        }
     }
 }
 
@@ -30,6 +45,7 @@ pub struct L1BatchInput {
     pub btc_block_range: (u64, u64),
     pub btc_task_ids: HashMap<Uuid, u64>,
     pub proofs: HashMap<u64, ProofWithVkey>,
+    pub header_verification_state: HeaderVerificationState,
 }
 
 impl L1BatchInput {
@@ -63,10 +79,16 @@ impl ProvingOperations for L1BatchOperations {
     }
 
     async fn fetch_input(&self, btc_block_range: (u64, u64)) -> Result<Self::Input, anyhow::Error> {
+        let st_height = btc_block_range.0;
+        let header_verification_state =
+            get_verification_state(self.btc_client.as_ref(), st_height, &MAINNET.clone().into())
+                .await?;
+
         let input: Self::Input = L1BatchInput {
             btc_block_range,
             btc_task_ids: HashMap::new(),
             proofs: HashMap::new(),
+            header_verification_state,
         };
         Ok(input)
     }

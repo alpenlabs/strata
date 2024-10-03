@@ -12,7 +12,7 @@ use alpen_express_state::l1::{
 };
 use alpen_express_status::StatusTx;
 use anyhow::bail;
-use bitcoin::{hashes::Hash, params::MAINNET, BlockHash};
+use bitcoin::{hashes::Hash, BlockHash};
 use strata_tx_parser::{
     filter::{filter_relevant_txs, TxFilterRule},
     messages::{BlockData, L1Event},
@@ -304,7 +304,7 @@ async fn fetch_and_process_block(
 }
 
 /// Gets the [`HeaderVerificationState`] for the particular block
-async fn get_verification_state(
+pub async fn get_verification_state(
     client: &impl Reader,
     height: u64,
     params: &BtcParams,
