@@ -98,7 +98,6 @@ mod tests {
     };
     use alpen_express_common::logging;
     use bitcoind::BitcoinD;
-    use tokio;
 
     use super::*;
 
