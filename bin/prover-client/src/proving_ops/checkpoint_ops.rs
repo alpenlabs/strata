@@ -9,7 +9,7 @@ use super::{
 };
 use crate::{
     dispatcher::TaskDispatcher,
-    errors::{BlockType, ProvingTaskError},
+    errors::{ProvingTaskType, ProvingTaskError},
     primitives::prover_input::{ProofWithVkey, ProverInput},
     task::TaskTracker,
 };
@@ -49,8 +49,8 @@ impl ProvingOperations for CheckpointOperations {
     type Input = CheckpointInput;
     type Params = RpcCheckpointInfo;
 
-    fn block_type(&self) -> BlockType {
-        BlockType::Btc
+    fn block_type(&self) -> ProvingTaskType {
+        ProvingTaskType::Btc
     }
 
     async fn fetch_input(&self, info: RpcCheckpointInfo) -> Result<Self::Input, anyhow::Error> {

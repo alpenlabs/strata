@@ -6,7 +6,7 @@ pub enum ProvingTaskError {
     #[error("Failed to fetch {task_type} input for {param}: {source}")]
     FetchInput {
         param: String,
-        task_type: BlockType,
+        task_type: ProvingTaskType,
         source: anyhow::Error,
     },
 
@@ -20,20 +20,22 @@ pub enum ProvingTaskError {
     DependencyTaskCreation(String),
 }
 
-// Define BlockType enum to represent EL and CL
+// Define ProvingTaskType enum to represent EL and CL
 #[derive(Debug, Clone, Copy)]
-pub enum BlockType {
+pub enum ProvingTaskType {
     Btc,
     EL,
     CL,
+    ClBatch,
 }
 
-impl std::fmt::Display for BlockType {
+impl std::fmt::Display for ProvingTaskType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let block_type_str = match self {
-            BlockType::Btc => "BTC",
-            BlockType::EL => "EL",
-            BlockType::CL => "CL",
+            ProvingTaskType::Btc => "BTC",
+            ProvingTaskType::EL => "EL",
+            ProvingTaskType::CL => "CL",
+            ProvingTaskType::ClBatch => "CL Batch",
         };
         write!(f, "{}", block_type_str)
     }

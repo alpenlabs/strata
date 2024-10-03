@@ -6,7 +6,7 @@ use uuid::Uuid;
 use super::{btc_ops::BtcOperations, ops::ProvingOperations};
 use crate::{
     dispatcher::TaskDispatcher,
-    errors::{BlockType, ProvingTaskError},
+    errors::{ProvingTaskType, ProvingTaskError},
     primitives::prover_input::{ProofWithVkey, ProverInput},
     task::TaskTracker,
 };
@@ -37,8 +37,8 @@ impl ProvingOperations for L1BatchOperations {
     type Input = L1BatchInput;
     type Params = (u64, u64);
 
-    fn block_type(&self) -> BlockType {
-        BlockType::Btc
+    fn block_type(&self) -> ProvingTaskType {
+        ProvingTaskType::Btc
     }
 
     async fn fetch_input(&self, l1_range: (u64, u64)) -> Result<Self::Input, anyhow::Error> {

@@ -6,7 +6,7 @@ use uuid::Uuid;
 use super::{cl_ops::ClOperations, ops::ProvingOperations};
 use crate::{
     dispatcher::TaskDispatcher,
-    errors::{BlockType, ProvingTaskError},
+    errors::{ProvingTaskError, ProvingTaskType},
     primitives::prover_input::{ProofWithVkey, ProverInput},
     task::TaskTracker,
 };
@@ -26,7 +26,7 @@ impl L2BatchOperations {
 
 #[derive(Debug, Clone)]
 pub struct L2BatchInput {
-    pub l2_range: (u64, u64),
+    pub cl_block_range: (u64, u64),
     pub cl_task_ids: Vec<Uuid>, // Task Ids of btc_ops tasks, in order
     pub proofs: Vec<Option<ProofWithVkey>>, // Collected proofs from btc_ops tasks
 }
@@ -37,18 +37,18 @@ impl ProvingOperations for L2BatchOperations {
     type Input = L2BatchInput;
     type Params = (u64, u64);
 
-    fn block_type(&self) -> BlockType {
-        BlockType::Btc
+    fn block_type(&self) -> ProvingTaskType {
+        ProvingTaskType::ClBatch
     }
 
-    async fn fetch_input(&self, l2_range: (u64, u64)) -> Result<Self::Input, anyhow::Error> {
+    async fn fetch_input(&self, cl_block_range: (u64, u64)) -> Result<Self::Input, anyhow::Error> {
         // No additional fetching required
-        let (start, end) = l2_range;
+        let (start, end) = cl_block_range;
         let size = (end - start) as usize;
         let proofs = vec![None; size];
         let cl_task_ids = Vec::with_capacity(size);
         let input: Self::Input = L2BatchInput {
-            l2_range,
+            cl_block_range,
             cl_task_ids,
             proofs,
         };
@@ -63,11 +63,11 @@ impl ProvingOperations for L2BatchOperations {
         let mut dependencies = vec![];
 
         // Create CL tasks for each block in the l2 range
-        let (start, end) = input.l2_range;
-        for block_height in start..end {
+        let (start, end) = input.cl_block_range;
+        for cl_block_idx in start..=end {
             let cl_task_id = self
                 .cl_dispatcher
-                .create_task(block_height)
+                .create_task(cl_block_idx)
                 .await
                 .map_err(|e| ProvingTaskError::DependencyTaskCreation(e.to_string()))?;
             dependencies.push(cl_task_id);

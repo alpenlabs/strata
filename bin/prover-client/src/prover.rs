@@ -124,12 +124,28 @@ where
         }
         ProverInput::ClBlock(cl_proof_input) => {
             let input = Vm::Input::new()
-                .write_proof(
-                    cl_proof_input
-                        .el_proof
-                        .expect("CL Proving was sent without EL proof"),
-                )?
+                // TODO: Handle the aggeration input
+                // .write_proof(
+                //     cl_proof_input
+                //         .el_proof
+                //         .expect("CL Proving was sent without EL proof"),
+                // )?
                 .write(&cl_proof_input.cl_raw_witness)?
+                .build()?;
+
+            let (proof, vk) = vm.prove(input)?;
+            let agg_input = ProofWithVkey::new(proof, vk);
+            Ok(agg_input)
+        }
+        ProverInput::L2Batch(l2_batch_input) => {
+            let input = Vm::Input::new()
+                // TODO: Handle the aggeration input
+                // .write_proof(
+                //     cl_proof_input
+                //         .el_proof
+                //         .expect("CL Proving was sent without EL proof"),
+                // )?
+                .write(&l2_batch_input.cl_task_ids.len())?
                 .build()?;
 
             let (proof, vk) = vm.prove(input)?;
@@ -216,7 +232,6 @@ where
                 self.pool.spawn(move || {
                     tracing::info_span!("guest_execution").in_scope(|| {
                         let proof = make_proof(witness, vm.clone());
-                        info!("make_proof completed for task: {:?} {:?}", task_id, proof);
                         let mut prover_state =
                             prover_state_clone.write().expect("Lock was poisoned");
                         prover_state.set_to_proved(task_id, proof);
