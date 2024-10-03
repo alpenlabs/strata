@@ -12,6 +12,7 @@ use alpen_express_primitives::{
 };
 use argh::FromArgs;
 use bitcoin::{
+    base58,
     bip32::{ChildNumber, DerivationPath, Xpriv, Xpub},
     Network,
 };
@@ -26,6 +27,14 @@ const DERIV_OP_WALLET_IDX: u32 = 101;
 const SEQKEY_ENVVAR: &str = "STRATA_SEQ_KEY";
 const OPKEY_ENVVAR: &str = "STRATA_OP_KEY";
 const DEFAULT_NETWORK: Network = Network::Signet;
+
+/// List of keys that are used in examples that we don't want people to actually
+/// use.  If any of these are present in a command invocation we abort immediately.
+const KEY_BLACKLIST: &[&str] = &[
+    "XGUgTAJNpexzrjgnbMvGtDBCZEwxd6KQE4PNDWE6YLZYBTGoS",
+    "tpubDASVk1m5cxpmUbwVEZEQb8maDVx9kDxBhSLCqsKHJJmZ8htSegpHx7G3RFudZCdDLtNKTosQiBLbbFsVA45MemurWenzn16Y1ft7NkQekcD",
+    "tpubDBX9KQsqK2LMCszkDHvANftHzhJdhipe9bi9MNUD3S2bsY1ikWEZxE53VBgYN8WoNXk9g9eRzhx6UfJcQr3XqkA27aSxXvKu5TYFZJEAjCd"
+];
 
 /// Args.
 #[derive(FromArgs)]
@@ -144,7 +153,7 @@ pub struct SubcGenParams {
     )]
     opkeys: Option<PathBuf>,
 
-    #[argh(option, description = "deposit amount in sats (default 1G -> 10 BTC)")]
+    #[argh(option, description = "deposit amount in sats (default \"10 BTC\")")]
     deposit_sats: Option<String>,
 
     #[argh(
@@ -182,7 +191,7 @@ pub struct CmdContext {
     /// The Bitcoin network we're building on top of.
     bitcoin_network: Network,
 
-    /// Shared RNG, just `OsRng` for now.
+    /// Shared RNG, just [`OsRng`] for now.
     rng: OsRng,
 }
 
@@ -232,21 +241,21 @@ fn exec_genseed(cmd: SubcGenSeed, ctx: &mut CmdContext) -> anyhow::Result<()> {
 
     let xpriv = gen_priv(&mut ctx.rng, ctx.bitcoin_network);
     let buf = xpriv.encode();
-    let s = bitcoin::base58::encode_check(&buf);
+    let s = base58::encode_check(&buf);
     fs::write(&cmd.path, s.as_bytes())?;
 
     Ok(())
 }
 
 fn exec_genseqpubkey(cmd: SubcGenSeqPubkey, _ctx: &mut CmdContext) -> anyhow::Result<()> {
-    let Some(xpriv) = resolve_key(&cmd.key_file, cmd.key_from_env, &SEQKEY_ENVVAR)? else {
+    let Some(xpriv) = resolve_xpriv(&cmd.key_file, cmd.key_from_env, &SEQKEY_ENVVAR)? else {
         anyhow::bail!("privkey unset");
     };
 
     let seq_xpriv = derive_seq_xpriv(&xpriv)?;
     let seq_xpub = Xpub::from_priv(bitcoin::secp256k1::SECP256K1, &seq_xpriv);
     let raw_buf = seq_xpub.to_x_only_pub().serialize();
-    let s = bitcoin::base58::encode_check(&raw_buf);
+    let s = base58::encode_check(&raw_buf);
 
     eprintln!("{s}");
 
@@ -254,14 +263,14 @@ fn exec_genseqpubkey(cmd: SubcGenSeqPubkey, _ctx: &mut CmdContext) -> anyhow::Re
 }
 
 fn exec_genopxpub(cmd: SubcGenOpXpub, _ctx: &mut CmdContext) -> anyhow::Result<()> {
-    let Some(xpriv) = resolve_key(&cmd.key_file, cmd.key_from_env, &OPKEY_ENVVAR)? else {
+    let Some(xpriv) = resolve_xpriv(&cmd.key_file, cmd.key_from_env, &OPKEY_ENVVAR)? else {
         anyhow::bail!("privkey unset");
     };
 
     let op_xpriv = derive_op_root_xpub(&xpriv)?;
     let op_xpub = Xpub::from_priv(bitcoin::secp256k1::SECP256K1, &op_xpriv);
     let raw_buf = op_xpub.encode();
-    let s = bitcoin::base58::encode_check(&raw_buf);
+    let s = base58::encode_check(&raw_buf);
 
     eprintln!("{s}");
 
@@ -269,18 +278,10 @@ fn exec_genopxpub(cmd: SubcGenOpXpub, _ctx: &mut CmdContext) -> anyhow::Result<(
 }
 
 fn exec_genparams(cmd: SubcGenParams, ctx: &mut CmdContext) -> anyhow::Result<()> {
-    // TODO update this with vk for checkpoint proof
-    // TODO make configurable
-    let rollup_vk_buf =
-        hex::decode("00b01ae596b4e51843484ff71ccbd0dd1a030af70b255e6b9aad50b81d81266f").unwrap();
-    let Ok(rollup_vk) = Buf32::try_from(rollup_vk_buf.as_slice()) else {
-        anyhow::bail!("malformed verification key");
-    };
-
     // Parse the sequencer key.
     let seqkey = match cmd.seqkey {
         Some(seqkey) => {
-            let Ok(buf) = bitcoin::base58::decode_check(&seqkey) else {
+            let Ok(buf) = base58::decode_check(&seqkey) else {
                 anyhow::bail!("failed to parse sequencer key: {seqkey}");
             };
 
@@ -313,11 +314,29 @@ fn exec_genparams(cmd: SubcGenParams, ctx: &mut CmdContext) -> anyhow::Result<()
         opkeys.push(parse_xpub(&k)?);
     }
 
+    // Parse the deposit size str.
     let deposit_sats = cmd
         .deposit_sats
         .map(|s| parse_abbr_amt(&s))
         .transpose()?
         .unwrap_or(1_000_000_000);
+
+    // Parse the checkpoint verification key.
+    let rollup_vk = {
+        let vk_buf = match cmd.rollup_vk {
+            Some(s) => hex::decode(s)?,
+
+            // TODO update this with vk for checkpoint proof
+            None => hex::decode("00b01ae596b4e51843484ff71ccbd0dd1a030af70b255e6b9aad50b81d81266f")
+                .unwrap(),
+        };
+
+        let Ok(vk) = Buf32::try_from(vk_buf.as_slice()) else {
+            anyhow::bail!("malformed verification key");
+        };
+
+        vk
+    };
 
     let config = ParamsConfig {
         name: cmd.name.unwrap_or_else(|| "strata-testnet".to_string()),
@@ -357,12 +376,12 @@ fn gen_priv(rng: &mut impl Rng, net: Network) -> Xpriv {
 fn read_xpriv(path: &Path) -> anyhow::Result<Xpriv> {
     let raw_buf = fs::read(path)?;
     let str_buf = std::str::from_utf8(&raw_buf)?;
-    let buf = bitcoin::base58::decode_check(str_buf)?;
+    let buf = base58::decode_check(str_buf)?;
     Ok(Xpriv::decode(&buf)?)
 }
 
 /// Resolves a key from set vars and whatnot.
-fn resolve_key(
+fn resolve_xpriv(
     path: &Option<PathBuf>,
     from_env: bool,
     env: &'static str,
@@ -375,7 +394,7 @@ fn resolve_key(
                 anyhow::bail!("got --key-from-env but {env} not set or invalid");
             };
 
-            let buf = bitcoin::base58::decode_check(&val)?;
+            let buf = base58::decode_check(&val)?;
             Ok(Some(Xpriv::decode(&buf)?))
         }
         _ => Ok(None),
@@ -402,6 +421,7 @@ fn derive_op_root_xpub(master: &Xpriv) -> anyhow::Result<Xpriv> {
 }
 
 /// Derives the signing and wallet xprivs for a Strata operator.
+#[allow(unused)]
 fn derive_op_purpose_xprivs(master: &Xpriv) -> anyhow::Result<(Xpriv, Xpriv)> {
     let signing_path = DerivationPath::master().extend(&[
         ChildNumber::from_hardened_idx(DERIV_BASE_IDX).unwrap(),
@@ -442,6 +462,7 @@ fn derive_op_purpose_xpubs(op_xpub: &Xpub) -> (Xpub, Xpub) {
 /// Describes inputs for how we want to set params.
 pub struct ParamsConfig {
     name: String,
+    #[allow(unused)]
     bitcoin_network: Network,
     block_time_sec: u64,
     epoch_slots: u32,
@@ -510,9 +531,22 @@ fn construct_params(config: ParamsConfig) -> alpen_express_primitives::params::R
     }
 }
 
-/// Parses an xpub from str, richly generating anyhow results from it.
+/// Returns an `Err` if the provided key we're trying to parse is on the blacklist.
+fn check_key_not_blacklisted(s: &str) -> anyhow::Result<()> {
+    let ts = s.trim();
+    if KEY_BLACKLIST.contains(&ts) {
+        anyhow::bail!("that was an example!  generate your own keys!");
+    }
+
+    Ok(())
+}
+
+/// Parses an [`Xpub`] from [`&str`], richly generating [`anyhow::Result`]s from
+/// it.
 fn parse_xpub(s: &str) -> anyhow::Result<Xpub> {
-    let Ok(buf) = bitcoin::base58::decode_check(s) else {
+    check_key_not_blacklisted(s)?;
+
+    let Ok(buf) = base58::decode_check(s) else {
         anyhow::bail!("failed to parse key: {s}");
     };
 

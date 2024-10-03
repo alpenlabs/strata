@@ -1,5 +1,5 @@
 [package]
-name = "op-cli"
+name = "strata-datatool"
 version = "0.1.0"
 edition = "2021"
 
