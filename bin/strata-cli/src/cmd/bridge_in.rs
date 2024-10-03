@@ -111,7 +111,6 @@ pub async fn bridge_in(args: BridgeInArgs, seed: Seed, settings: Settings, esplo
         .ordering(TxOrdering::Untouched)
         .add_recipient(bridge_in_address.script_pubkey(), BRIDGE_IN_AMOUNT)
         .add_data(&op_return_data)
-        .enable_rbf()
         .fee_rate(fee_rate)
         .clone()
         .finish()
