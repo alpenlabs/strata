@@ -106,6 +106,7 @@ where
     Vm: ZKVMHost + 'static,
     for<'a> Vm::Input<'a>: ZKVMInputBuilder<'a>,
 {
+    println!("Abishek match proof was called");
     match prover_input {
         ProverInput::ElBlock(el_input) => {
             let el_input: ELProofInput = bincode::deserialize(&el_input.data)?;
