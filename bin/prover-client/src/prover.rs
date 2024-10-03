@@ -164,8 +164,14 @@ where
             let agg_input = ProofWithVkey::new(proof, vk);
             Ok(agg_input)
         }
-        _ => {
-            todo!()
+        ProverInput::Checkpoint(checkpoint_input) => {
+            // TODO: Handle the aggeration input
+            let input = Vm::Input::new()
+                .write(&checkpoint_input.l1_batch_id)?
+                .build()?;
+            let (proof, vk) = vm.prove(input)?;
+            let agg_input = ProofWithVkey::new(proof, vk);
+            Ok(agg_input)
         }
     }
 }
