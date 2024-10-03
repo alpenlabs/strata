@@ -111,10 +111,8 @@ impl TaskTracker {
         proof: ProofWithVkey,
     ) {
         match prover_input {
-            ProverInput::L1Batch(ref mut input) => {
-                if let Some(index) = input.btc_task_ids.iter().position(|id| *id == task_id) {
-                    input.proofs[index] = Some(proof);
-                }
+            ProverInput::L1Batch(ref mut btc_batch_input) => {
+                btc_batch_input.insert_proof(task_id, proof);
             }
             ProverInput::L2Batch(ref mut l2_batch_input) => {
                 l2_batch_input.insert_proof(task_id, proof);

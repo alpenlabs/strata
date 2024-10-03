@@ -155,6 +155,15 @@ where
             let agg_input = ProofWithVkey::new(proof, vk);
             Ok(agg_input)
         }
+        ProverInput::L1Batch(l1_batch_input) => {
+            // TODO: Handle the aggeration input
+            let input = Vm::Input::new()
+                .write(&l1_batch_input.btc_task_ids.len())?
+                .build()?;
+            let (proof, vk) = vm.prove(input)?;
+            let agg_input = ProofWithVkey::new(proof, vk);
+            Ok(agg_input)
+        }
         _ => {
             todo!()
         }
