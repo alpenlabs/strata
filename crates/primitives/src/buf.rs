@@ -121,6 +121,20 @@ impl TryFrom<Buf32> for XOnlyPublicKey {
     }
 }
 
+impl<'a> TryFrom<&'a [u8]> for Buf32 {
+    type Error = &'a [u8];
+
+    fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
+        if value.len() == 32 {
+            let mut arr = [0; 32];
+            arr.copy_from_slice(value);
+            Ok(Self(arr.into()))
+        } else {
+            Err(value)
+        }
+    }
+}
+
 impl From<XOnlyPublicKey> for Buf32 {
     fn from(value: XOnlyPublicKey) -> Self {
         Self::from(value.serialize())

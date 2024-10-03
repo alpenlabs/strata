@@ -2,6 +2,7 @@
 
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 use crate::{
     block_credential::CredRule, operator::OperatorPubkeys, prelude::Buf32, vk::RollupVerifyingKey,
@@ -9,7 +10,7 @@ use crate::{
 
 /// Consensus parameters that don't change for the lifetime of the network
 /// (unless there's some weird hard fork).
-#[derive(Clone, Debug, PartialEq, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct RollupParams {
     /// Rollup name
     pub rollup_name: String,
@@ -64,14 +65,71 @@ pub struct RollupParams {
     pub max_deposits_in_block: u8,
 }
 
+impl RollupParams {
+    pub fn check_well_formed(&self) -> Result<(), ParamsError> {
+        if self.horizon_l1_height > self.genesis_l1_height {
+            return Err(ParamsError::HorizonAfterGenesis(
+                self.horizon_l1_height,
+                self.genesis_l1_height,
+            ));
+        }
+
+        if self.rollup_name.is_empty() {
+            return Err(ParamsError::EmptyRollupName);
+        }
+
+        match &self.operator_config {
+            OperatorConfig::Static(optbl) => {
+                if optbl.is_empty() {
+                    return Err(ParamsError::NoOperators);
+                }
+            }
+        }
+
+        // TODO maybe make all these be a macro?
+        if self.block_time == 0 {
+            return Err(ParamsError::ZeroProperty("block_time"));
+        }
+
+        if self.l1_reorg_safe_depth == 0 {
+            return Err(ParamsError::ZeroProperty("l1_reorg_safe_depth"));
+        }
+
+        if self.target_l2_batch_size == 0 {
+            return Err(ParamsError::ZeroProperty("target_l2_batch_size"));
+        }
+
+        if self.address_length == 0 {
+            return Err(ParamsError::ZeroProperty("max_address_length"));
+        }
+
+        if self.deposit_amount == 0 {
+            return Err(ParamsError::ZeroProperty("deposit_amount"));
+        }
+
+        if self.dispatch_assignment_dur == 0 {
+            return Err(ParamsError::ZeroProperty("dispatch_assignment_dur"));
+        }
+
+        if self.max_deposits_in_block == 0 {
+            return Err(ParamsError::ZeroProperty("max_deposits_in_block"));
+        }
+
+        Ok(())
+    }
+}
+
 /// Configuration common among deposit and deposit request transaction
-#[derive(Clone, Debug, PartialEq, Deserialize, BorshSerialize, BorshDeserialize)]
+#[derive(Clone, Debug, PartialEq, BorshSerialize, BorshDeserialize, Deserialize, Serialize)]
 pub struct DepositTxParams {
-    /// magic bytes, usually a rollup name
+    /// Magic bytes we use to regonize a deposit with.
     pub magic_bytes: Vec<u8>,
-    /// EE Address length
+
+    /// Maximum EE address length.
+    // TODO rename to be `max_addr_len`
     pub address_length: u8,
-    /// deposit amount
+
+    /// Exact bitcoin amount in the at-rest deposit.
     pub deposit_amount: u64,
 }
 
@@ -85,8 +143,8 @@ impl RollupParams {
     }
 }
 
-/// Describes how proofs are generated.
-#[derive(Clone, Debug, PartialEq, Deserialize)]
+/// Describes how we decide to wait for proofs for checkpoints to generate.
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ProofPublishMode {
     /// Timeout in secs after which a blank proof is generated.
@@ -99,7 +157,7 @@ pub enum ProofPublishMode {
 /// Client sync parameters that are used to make the network work but don't
 /// strictly have to be pre-agreed.  These have to do with grace periods in
 /// message delivery and whatnot.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SyncParams {
     /// Number of blocks that we follow the L1 from.
     pub l1_follow_distance: u64,
@@ -112,7 +170,7 @@ pub struct SyncParams {
 }
 
 /// Combined set of parameters across all the consensus logic.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Params {
     pub rollup: RollupParams,
     pub run: SyncParams,
@@ -135,4 +193,20 @@ impl Params {
 pub enum OperatorConfig {
     /// Use this static list of predetermined operators.
     Static(Vec<OperatorPubkeys>),
+}
+
+/// Error that can arise during params validation.
+#[derive(Debug, Error)]
+pub enum ParamsError {
+    #[error("rollup name empty")]
+    EmptyRollupName,
+
+    #[error("{0} must not be 0")]
+    ZeroProperty(&'static str),
+
+    #[error("horizon block {0} after genesis trigger block {1}")]
+    HorizonAfterGenesis(u64, u64),
+
+    #[error("no operators set")]
+    NoOperators,
 }

@@ -32,11 +32,6 @@ use express_storage::{
 };
 use express_sync::{self, L2SyncContext, RpcSyncPeer};
 use express_tasks::{ShutdownSignal, TaskExecutor, TaskManager};
-use helpers::{
-    create_bitcoin_rpc_client, get_config, init_broadcaster_database, init_core_dbs,
-    init_engine_controller, init_sequencer_database, init_status_channel,
-    load_rollup_params_or_default, load_seqkey, open_rocksdb_database, CommonDb,
-};
 use jsonrpsee::Methods;
 use rpc_client::sync_client;
 use tokio::{
@@ -45,13 +40,15 @@ use tokio::{
 };
 use tracing::*;
 
-use crate::args::Args;
+use crate::{args::Args, helpers::*};
 
 mod args;
 mod config;
+mod errors;
 mod extractor;
 mod helpers;
 mod l1_reader;
+mod network;
 mod rpc_client;
 mod rpc_server;
 
@@ -74,8 +71,11 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let config = get_config(args.clone())?;
 
     // Set up block params.
+    let rparams =
+        resolve_and_validate_rollup_params(args.rollup_params.as_ref().map(|v| v.as_path()))
+            .map_err(anyhow::Error::from)?;
     let params: Arc<_> = Params {
-        rollup: load_rollup_params_or_default(&args.rollup_params).map_err(anyhow::Error::from)?,
+        rollup: rparams,
         run: SyncParams {
             // FIXME these shouldn't be configurable here
             l1_follow_distance: config.sync.l1_follow_distance,
