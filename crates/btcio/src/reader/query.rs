@@ -12,7 +12,7 @@ use alpen_express_state::l1::{
 };
 use alpen_express_status::StatusTx;
 use anyhow::bail;
-use bitcoin::{hashes::Hash, BlockHash};
+use bitcoin::{hashes::Hash, params::MAINNET, BlockHash};
 use strata_tx_parser::{
     filter::{filter_relevant_txs, TxFilterRule},
     messages::{BlockData, L1Event},

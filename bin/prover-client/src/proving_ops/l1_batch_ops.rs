@@ -1,6 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
+use bitcoin::params::MAINNET;
 use uuid::Uuid;
 
 use super::{btc_ops::BtcOperations, ops::ProvingOperations};

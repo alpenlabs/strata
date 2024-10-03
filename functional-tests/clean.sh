@@ -1,2 +1,2 @@
 #!/bin/bash
-rm -rv _dd/*
+rm -rf _dd/*

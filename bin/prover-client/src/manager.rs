@@ -23,10 +23,10 @@ impl<Vm> ProverManager<Vm>
 where
     Vm: ZKVMHost,
 {
-    pub fn new(task_tracker: Arc<TaskTracker>) -> Self {
+    pub fn new(task_tracker: Arc<TaskTracker>, prover_options: ProverOptions) -> Self {
         Self {
             task_tracker,
-            prover: Prover::new(ProverOptions::default()),
+            prover: Prover::new(prover_options),
         }
     }
 
