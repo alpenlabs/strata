@@ -185,20 +185,41 @@ pub struct SignRawTransactionWithWallet {
     pub errors: Option<Vec<SignRawTransactionWithWalletError>>,
 }
 
-/// Models the result of the JSON-RPC method `listdescriptors`.
+/// Models the result of the JSON-RPC method `listdescriptors`
+/// or the argument to `importdescriptors`.
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct ListDescriptors {
-    /// The descriptor.
+    /// The descriptors
     pub descriptors: Vec<ListDescriptor>,
 }
 
-/// Models the Descriptor in the result of the JSON-RPC method `listdescriptors`.
+/// Models the Descriptor in the result of the JSON-RPC method `listdescriptors`
+/// or the argument to `importdescriptors`.
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct ListDescriptor {
     /// The descriptor.
     pub desc: String,
+    /// Set this descriptor to be the active descriptor
+    /// for the corresponding output type/externality.
+    pub active: Option<bool>,
+    /// Time from which to start rescanning the blockchain for this descriptor,
+    /// in UNIX epoch time. Can also be a string "now"
+    pub timestamp: String,
 }
 
+/// Models the result of the JSON-RPC method `importdescriptors`.
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+pub struct ImportDescriptors {
+    /// The descriptors
+    pub descriptors: Vec<ImportDescriptor>,
+}
+
+/// Models the Descriptor in the result of the JSON-RPC method `importdescriptors`.
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+pub struct ImportDescriptor {
+    /// Result.
+    pub success: bool,
+}
 /// Deserializes the amount in BTC into proper [`Amount`]s.
 fn deserialize_bitcoin<'d, D>(deserializer: D) -> Result<Amount, D::Error>
 where

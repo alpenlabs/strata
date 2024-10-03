@@ -14,7 +14,10 @@ use bitcoind_json_rpc_types::v26::GetBlockchainInfo;
 use crate::{
     rpc::{
         traits::{Broadcaster, Reader, Signer, Wallet},
-        types::{GetTransaction, ListTransactions, ListUnspent, SignRawTransactionWithWallet},
+        types::{
+            GetTransaction, ImportDescriptor, ListDescriptor, ListTransactions, ListUnspent,
+            SignRawTransactionWithWallet,
+        },
         ClientResult,
     },
     writer::builder::{build_reveal_transaction, generate_inscription_script, InscriptionError},
@@ -202,6 +205,13 @@ impl Signer for TestBitcoinClient {
         // DO NOT USE THIS BY ANY MEANS IN PRODUCTION WITH REAL FUNDS
         let xpriv = "xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi".parse::<Xpriv>().unwrap();
         Ok(Some(xpriv))
+    }
+
+    async fn import_descriptors(
+        &self,
+        _descriptors: Vec<ListDescriptor>,
+    ) -> ClientResult<Vec<ImportDescriptor>> {
+        Ok(vec![ImportDescriptor { success: true }])
     }
 }
 

@@ -24,11 +24,13 @@ use serde_json::{
 use tokio::time::sleep;
 use tracing::*;
 
-use super::types::ListDescriptors;
 use crate::rpc::{
     error::{BitcoinRpcError, ClientError},
     traits::{Broadcaster, Reader, Signer, Wallet},
-    types::{GetTransaction, ListTransactions, ListUnspent, SignRawTransactionWithWallet},
+    types::{
+        GetTransaction, ImportDescriptor, ListDescriptor, ListDescriptors, ListTransactions,
+        ListUnspent, SignRawTransactionWithWallet,
+    },
 };
 
 /// This is an alias for the result type returned by the [`BitcoinClient`].
@@ -355,6 +357,16 @@ impl Signer for BitcoinClient {
         let xpriv = xpriv_str.parse::<Xpriv>().map_err(|_| ClientError::Xpriv)?;
         Ok(Some(xpriv))
     }
+
+    async fn import_descriptors(
+        &self,
+        descriptors: Vec<ListDescriptor>,
+    ) -> ClientResult<Vec<ImportDescriptor>> {
+        let result = self
+            .call::<Vec<ImportDescriptor>>("importdescriptors", &[to_value(descriptors)?])
+            .await?;
+        Ok(result)
+    }
 }
 
 #[cfg(test)]
@@ -491,6 +503,19 @@ mod test {
         // listdescriptors
         let got = client.get_xpriv().await.unwrap().unwrap().network;
         let expected = NetworkKind::Test;
+        assert_eq!(expected, got);
+
+        // importdescriptors
+        // taken from https://github.com/rust-bitcoin/rust-bitcoin/blob/bb38aeb786f408247d5bbc88b9fa13616c74c009/bitcoin/examples/taproot-psbt.rs#L18C38-L18C149
+        let descriptor_string = "tr([e61b318f/56'/20']tprv8ZgxMBicQKsPd4arFr7sKjSnKFDVMR2JHw9Y8L9nXN4kiok4u28LpHijEudH3mMYoL4pM5UL9Bgdz2M4Cy8EzfErmU9m86ZTw6hCzvFeTg7/101/*)#zz430whl".to_owned();
+        let timestamp = "now".to_owned();
+        let list_descriptors = vec![ListDescriptor {
+            desc: descriptor_string,
+            active: Some(true),
+            timestamp,
+        }];
+        let got = client.import_descriptors(list_descriptors).await.unwrap();
+        let expected = vec![ImportDescriptor { success: true }];
         assert_eq!(expected, got);
     }
 }
