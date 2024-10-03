@@ -32,33 +32,21 @@ impl ProofGenerator<(u32, u32)> for L1BatchProofGenerator {
         prover_options: &ProverOptions,
     ) -> Result<(Proof, VerificationKey)> {
         let (start_height, end_height) = *heights;
-        let mut blockspace_outputs = Vec::new();
-        let mut blockspace_proofs = Vec::new();
         let btc_chain = get_btc_chain();
-
-        for height in start_height..end_height {
-            let block = btc_chain.get_block(height);
-            let (proof, vk) = self.btc_proof_generator.get_proof(block, prover_options)?;
-            let raw_output =
-                express_sp1_adapter::SP1Verifier::extract_public_output::<Vec<u8>>(&proof)
-                    .context("Failed to extract public outputs")?;
-            let output: BlockspaceProofOutput = borsh::from_slice(&raw_output)?;
-            blockspace_outputs.push(output);
-            blockspace_proofs.push(AggregationInput::new(proof, vk));
-        }
-
-        let input = L1BatchProofInput {
-            batch: blockspace_outputs,
-            state: btc_chain.get_verification_state(start_height, &MAINNET.clone().into()),
-        };
 
         let prover = SP1Host::init(GUEST_L1_BATCH_ELF.into(), *prover_options);
 
+        let state = btc_chain.get_verification_state(start_height, &MAINNET.clone().into());
         let mut input_builder = SP1ProofInputBuilder::new();
-        input_builder.write_borsh(&input)?;
+        input_builder.write_borsh(&state)?;
 
-        for agg_proof in blockspace_proofs {
-            input_builder.write_proof(agg_proof)?;
+        let len: u32 = end_height - start_height + 1; // because inclusive
+        input_builder.write(&len)?;
+
+        for height in start_height..=end_height {
+            let block = btc_chain.get_block(height);
+            let (proof, vk) = self.btc_proof_generator.get_proof(block, prover_options)?;
+            input_builder.write_proof(AggregationInput::new(proof, vk))?;
         }
 
         let proof_input = input_builder.build()?;

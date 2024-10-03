@@ -1,6 +1,6 @@
 use anyhow::Ok;
 use express_zkvm::{AggregationInput, ZKVMInputBuilder};
-use sp1_sdk::{HashableKey, SP1Proof, SP1ProofWithPublicValues, SP1Stdin, SP1VerifyingKey};
+use sp1_sdk::{SP1Proof, SP1ProofWithPublicValues, SP1Stdin, SP1VerifyingKey};
 
 // A wrapper around SP1Stdin
 pub struct SP1ProofInputBuilder(SP1Stdin);
@@ -32,9 +32,6 @@ impl<'a> ZKVMInputBuilder<'a> for SP1ProofInputBuilder {
 
         // Write the verification key and the public values of the program that'll be proven
         // inside zkVM.
-        // Note: The vkey is written here so we don't have to hardcode it in guest code.
-        // TODO: This should be fixed once the guest code is finalized
-        self.0.write(&vkey.hash_u32());
         self.0.write(&proof.public_values);
 
         // Write the proofs.

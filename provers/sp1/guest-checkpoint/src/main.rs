@@ -14,18 +14,15 @@ fn main() {
 
     // verify l1 proof
     let l1_batch_vk = vks::GUEST_L1_BATCH_ELF_ID;
-
     let l1_batch_pp_digest =
         Sha256::digest(bincode::serialize(&borsh::to_vec(&input.l1_state).unwrap()).unwrap());
     sp1_zkvm::lib::verify::verify_sp1_proof(l1_batch_vk, &l1_batch_pp_digest.into());
-    println!("verified l1 batch proof");
 
     // verify l2 proof
     let l2_batch_vk = vks::GUEST_CL_AGG_ELF_ID;
     let l2_batch_pp_digest =
         Sha256::digest(bincode::serialize(&borsh::to_vec(&input.l2_state).unwrap()).unwrap());
     sp1_zkvm::lib::verify::verify_sp1_proof(l2_batch_vk, &l2_batch_pp_digest.into());
-    println!("verified l2 batch proof");
 
     let (output, prev_checkpoint) =
         process_checkpoint_proof(&input.l1_state, &input.l2_state, &input.vk);

@@ -40,7 +40,7 @@ pub struct CheckpointProofInput {
 #[derive(Clone, Debug, PartialEq, Eq, BorshDeserialize, BorshSerialize)]
 pub struct CheckpointProofOutput {
     pub info: BatchInfo,
-    pub bootstrap: BootstrapState,
+    pub bootstrap_state: BootstrapState,
     /// The verifying key of this checkpoint program.
     /// Required for verifying the Groth16 proof of this program.
     /// Cannot be hardcoded as any change to the program or proof implementation
@@ -52,22 +52,22 @@ impl CheckpointProofOutput {
     pub fn new(info: BatchInfo, bootstrap: BootstrapState, vk: Vec<u8>) -> CheckpointProofOutput {
         Self {
             info,
-            bootstrap,
+            bootstrap_state: bootstrap,
             vk,
         }
     }
 }
 
 pub fn process_checkpoint_proof(
-    l1_batch: &L1BatchProofOutput,
-    l2_batch: &L2BatchProofOutput,
+    l1_batch_output: &L1BatchProofOutput,
+    l2_batch_output: &L2BatchProofOutput,
     vk: &[u8],
 ) -> (
     CheckpointProofOutput,
     Option<(CheckpointProofOutput, Proof)>,
 ) {
     assert_eq!(
-        l1_batch.deposits, l2_batch.deposits,
+        l1_batch_output.deposits, l2_batch_output.deposits,
         "Deposits mismatch between L1 and L2"
     );
 
@@ -75,31 +75,34 @@ pub fn process_checkpoint_proof(
     let mut batch_info = BatchInfo::new(
         0,
         (
-            l1_batch.initial_snapshot.block_num,
-            l1_batch.final_snapshot.block_num,
+            l1_batch_output.initial_snapshot.block_num,
+            l1_batch_output.final_snapshot.block_num,
         ),
-        (l2_batch.initial_snapshot.slot, l2_batch.final_snapshot.slot),
-        (l1_batch.initial_snapshot.hash, l1_batch.final_snapshot.hash),
-        (l2_batch.initial_snapshot.hash, l2_batch.final_snapshot.hash),
-        l2_batch.final_snapshot.l2_blockid,
         (
-            l1_batch.initial_snapshot.acc_pow,
-            l1_batch.final_snapshot.acc_pow,
+            l2_batch_output.initial_snapshot.slot,
+            l2_batch_output.final_snapshot.slot,
+        ),
+        (
+            l1_batch_output.initial_snapshot.hash,
+            l1_batch_output.final_snapshot.hash,
+        ),
+        (
+            l2_batch_output.initial_snapshot.hash,
+            l2_batch_output.final_snapshot.hash,
+        ),
+        l2_batch_output.final_snapshot.l2_blockid,
+        (
+            l1_batch_output.initial_snapshot.acc_pow,
+            l1_batch_output.final_snapshot.acc_pow,
         ),
     );
 
-    match l1_batch.state_update.as_ref() {
-        // If no previous batch info, this means that this is the genesis batch. Set the `curr_idx`
-        // as 0 and set the initial information of batch_info as bootstrap.
-        None => {
-            let bootstrap = batch_info.initial_bootstrap_state();
-            (
-                CheckpointProofOutput::new(batch_info, bootstrap, vk.to_vec()),
-                None,
-            )
-        }
+    let (bootstrap, opt_prev_output) = match l1_batch_output.prev_checkpoint.as_ref() {
+        // Genesis batch: initialize with initial bootstrap state
+        None => (batch_info.initial_bootstrap_state(), None),
         Some(prev_checkpoint) => {
-            // If some previous state transition, verify that it's sequential
+            // Ensure sequential state transition
+
             assert_eq!(
                 prev_checkpoint.batch_info().final_bootstrap_state(),
                 batch_info.initial_bootstrap_state()
@@ -107,23 +110,14 @@ pub fn process_checkpoint_proof(
 
             batch_info.idx = prev_checkpoint.batch_info().idx + 1;
 
-            // Select the bootstrap state for this batch.
             // If there exist proof for the prev_batch, use the prev_batch bootstrap state, else set
             // the current batch initial info as bootstrap
             if prev_checkpoint.proof().is_empty() {
-                let output = CheckpointProofOutput::new(
-                    batch_info.clone(),
-                    batch_info.initial_bootstrap_state(),
-                    vk.to_vec(),
-                );
-                (output, None)
+                // No proof in previous checkpoint: use initial bootstrap state
+                (batch_info.initial_bootstrap_state(), None)
             } else {
+                // Use previous checkpoint's bootstrap state and include previous proof
                 let bootstrap = prev_checkpoint.bootstrap().clone();
-                let new_checkpoint_output = CheckpointProofOutput::new(
-                    batch_info,
-                    prev_checkpoint.bootstrap().clone(),
-                    vk.to_vec(),
-                );
                 let prev_checkpoint_output = CheckpointProofOutput::new(
                     prev_checkpoint.batch_info().clone(),
                     bootstrap.clone(),
@@ -131,10 +125,12 @@ pub fn process_checkpoint_proof(
                 );
                 let prev_checkpoint_proof = prev_checkpoint.proof().clone();
                 (
-                    new_checkpoint_output,
+                    bootstrap,
                     Some((prev_checkpoint_output, prev_checkpoint_proof)),
                 )
             }
         }
-    }
+    };
+    let output = CheckpointProofOutput::new(batch_info, bootstrap, vk.to_vec());
+    (output, opt_prev_output)
 }

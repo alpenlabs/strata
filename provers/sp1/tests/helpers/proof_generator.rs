@@ -17,17 +17,18 @@ pub trait ProofGenerator<T> {
         let elf = self.get_elf();
 
         // 1. Create the unique proof ID
-        let proof_id = self.get_proof_id(input);
-        let proof_file = get_cache_dir().join(format!(
+        let proof_id = format!(
             "{}_{}.{}proof",
-            proof_id,
+            self.get_proof_id(input),
             short_program_id(elf),
             options
-        ));
+        );
+        println!("Getting proof for {}", proof_id);
+        let proof_file = get_cache_dir().join(proof_id);
 
         // 2. Check if the proof file exists
         if proof_file.exists() {
-            println!("Proof found in cache, returning the cached proof...");
+            println!("Proof found in cache, returning the cached proof...",);
             let proof_res = read_proof_from_file(&proof_file)?;
             verify_proof(&proof_res.0, elf)?;
             return Ok(proof_res);

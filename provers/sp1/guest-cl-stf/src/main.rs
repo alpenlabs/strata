@@ -14,10 +14,6 @@ mod vks;
 
 fn main() {
     let params = get_rollup_params();
-
-    // TODO: AggProofInput avoid wiriting vkey to guest.
-    // vkey is already embedded to the guest
-    let _ = sp1_zkvm::io::read::<[u32; 8]>();
     let el_vkey = vks::GUEST_EVM_EE_STF_ELF_ID;
 
     let el_pp = sp1_zkvm::io::read::<Vec<u8>>();

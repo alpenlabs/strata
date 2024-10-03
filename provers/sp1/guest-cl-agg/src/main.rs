@@ -33,9 +33,6 @@ fn main() {
 }
 
 fn read_and_validate_next_proof() -> L2BatchProofOutput {
-    // TODO: AggProofInput avoid wiriting vkey to guest.
-    // vkey is already embedded to the guest
-    let _ = sp1_zkvm::io::read::<[u32; 8]>();
     let cl_block_vkey = vks::GUEST_CL_STF_ELF_ID;
     let cl_proof_pp: Vec<u8> = sp1_zkvm::io::read();
 

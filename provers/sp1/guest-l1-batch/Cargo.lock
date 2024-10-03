@@ -1012,6 +1012,7 @@ dependencies = [
 name = "guest-sp1-l1-batch"
 version = "0.1.0"
 dependencies = [
+ "alpen-express-state",
  "bincode",
  "bitcoin",
  "borsh",

@@ -17,7 +17,7 @@ pub struct L1BatchProofInput {
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct L1BatchProofOutput {
     pub deposits: Vec<DepositInfo>,
-    pub state_update: Option<BatchCheckpoint>,
+    pub prev_checkpoint: Option<BatchCheckpoint>,
     pub initial_snapshot: HeaderVerificationStateSnapshot,
     pub final_snapshot: HeaderVerificationStateSnapshot,
 }
@@ -39,7 +39,7 @@ pub fn process_batch_proof(input: L1BatchProofInput) -> L1BatchProofOutput {
 
     L1BatchProofOutput {
         deposits,
-        state_update,
+        prev_checkpoint: state_update,
         initial_snapshot,
         final_snapshot,
     }
