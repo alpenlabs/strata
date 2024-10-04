@@ -1,10 +1,10 @@
 [package]
 edition = "2021"
-name = "express-prover-client"
+name = "strata-prover-client"
 version = "0.1.0"
 
 [[bin]]
-name = "express-prover-client"
+name = "strata-prover-client"
 path = "src/main.rs"
 required-features = ["prover"]
 

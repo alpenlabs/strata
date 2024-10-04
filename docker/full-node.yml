@@ -20,7 +20,7 @@ services:
       - ${RETH_AUTH_RPC_PORT:-8551}
       - ${RETH_PORT:-8545}
     networks:
-      - alpen_rollup
+      - strata_network
 
   client:
     build:
@@ -61,7 +61,7 @@ services:
       - bitcoind
       - reth
     networks:
-      - alpen_rollup
+      - strata_network
 
   bitcoind:
     build:
@@ -84,9 +84,9 @@ services:
     expose:
       - ${BITCOIND_RPC_PORT:-9823}
     networks:
-      - alpen_rollup
+      - strata_network
 
 networks:
-  alpen_rollup:
+  strata_network:
     driver: bridge
-    name: alpen_rollup
+    name: strata_network

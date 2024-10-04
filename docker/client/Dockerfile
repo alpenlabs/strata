@@ -20,12 +20,12 @@ COPY . .
 RUN --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,sharing=private,target=/app/target \
-    cargo build --release --bin alpen-express-sequencer
+    cargo build --release --bin strata-client
 
 RUN --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,sharing=private,target=/app/target \
-    cp /app/target/release/alpen-express-sequencer /app/strata-sequencer
+    cp /app/target/release/strata-client /app/strata-client
 
 FROM ubuntu:24.04 AS runtime
 WORKDIR /app
@@ -43,7 +43,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy the built binaries and the entrypoint script from the builder stage
-COPY --from=builder /app/strata-sequencer /usr/local/bin/strata-sequencer
+COPY --from=builder /app/strata-client /usr/local/bin/strata-client
 COPY ./docker/client/entrypoint.sh entrypoint.sh
 
 EXPOSE 8432

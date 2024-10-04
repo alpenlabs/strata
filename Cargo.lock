@@ -4733,34 +4733,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "express-prover-client"
-version = "0.1.0"
-dependencies = [
- "alpen-express-common",
- "alpen-express-db",
- "alpen-express-rocksdb",
- "anyhow",
- "argh",
- "async-trait",
- "bincode",
- "express-proofimpl-evm-ee-stf",
- "express-prover-client-rpc-api",
- "express-sp1-adapter",
- "express-sp1-guest-builder",
- "express-zkvm",
- "jsonrpsee",
- "rayon",
- "reth-rpc-types",
- "rockbound",
- "serde",
- "thiserror",
- "tokio",
- "tracing",
- "tracing-subscriber 0.3.18",
- "uuid 1.10.0",
-]
-
-[[package]]
 name = "express-prover-client-rpc-api"
 version = "0.1.0"
 dependencies = [
@@ -13361,6 +13333,34 @@ dependencies = [
  "secp256k1",
  "serde_json",
  "terrors",
+]
+
+[[package]]
+name = "strata-prover-client"
+version = "0.1.0"
+dependencies = [
+ "alpen-express-common",
+ "alpen-express-db",
+ "alpen-express-rocksdb",
+ "anyhow",
+ "argh",
+ "async-trait",
+ "bincode",
+ "express-proofimpl-evm-ee-stf",
+ "express-prover-client-rpc-api",
+ "express-sp1-adapter",
+ "express-sp1-guest-builder",
+ "express-zkvm",
+ "jsonrpsee",
+ "rayon",
+ "reth-rpc-types",
+ "rockbound",
+ "serde",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-subscriber 0.3.18",
+ "uuid 1.10.0",
 ]
 
 [[package]]

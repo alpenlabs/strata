@@ -103,7 +103,7 @@ class ExpressFactory(flexitest.Factory):
 
         # fmt: off
         cmd = [
-            "alpen-express-sequencer",
+            "strata-client",
             "--datadir", datadir,
             "--rpc-host", rpc_host,
             "--rpc-port", str(rpc_port),
@@ -169,7 +169,7 @@ class FullNodeFactory(flexitest.Factory):
 
         # fmt: off
         cmd = [
-            "alpen-express-sequencer",
+            "strata-client",
             "--datadir", datadir,
             "--rpc-host", rpc_host,
             "--rpc-port", str(rpc_port),
@@ -226,7 +226,7 @@ class RethFactory(flexitest.Factory):
 
         # fmt: off
         cmd = [
-            "alpen-express-reth",
+            "strata-reth",
             "--disable-discovery",
             "--ipcdisable",
             "--datadir", datadir,
@@ -239,7 +239,7 @@ class RethFactory(flexitest.Factory):
             "--http.port", str(ethrpc_http_port),
             "--color", "never",
             "--enable-witness-gen",
-            # TODO: update tests to use new chain config 
+            # TODO: update tests to use new chain config
             "--custom-chain", "dev",
             "-vvvv"
         ]
@@ -291,7 +291,7 @@ class ProverClientFactory(flexitest.Factory):
 
         # fmt: off
         cmd = [
-            "express-prover-client",
+            "strata-prover-client",
             "--rpc-port", str(rpc_port),
             "--sequencer-rpc", sequencer_url,
             "--reth-rpc", reth_url
