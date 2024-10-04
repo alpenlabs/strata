@@ -168,6 +168,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "arbitrary",
+ "bincode",
  "bitcoin",
  "borsh",
  "digest 0.10.7",

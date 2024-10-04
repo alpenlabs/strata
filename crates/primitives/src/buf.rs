@@ -65,6 +65,10 @@ impl Buf32 {
     pub fn is_zero(&self) -> bool {
         *self.as_ref() == [0; 32]
     }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        self.0.as_slice()
+    }
 }
 
 impl From<[u8; 32]> for Buf32 {

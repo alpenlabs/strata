@@ -16,7 +16,7 @@ fn main() {
     let initial_snapshot = state.compute_snapshot();
     let mut deposits = Vec::new();
     let mut prev_checkpoint = None;
-    let mut filters_commitment = None;
+    let mut rollup_params_commitment = None;
 
     let vk = vks::GUEST_BTC_BLOCKSPACE_ELF_ID;
     for _ in 0..num_inputs {
@@ -33,11 +33,11 @@ fn main() {
         deposits.extend(blkpo.deposits);
         prev_checkpoint = prev_checkpoint.or(blkpo.prev_checkpoint);
 
-        // Ensure that the filters commitment used are same for all blocks
-        if let Some(filters_comm) = filters_commitment {
-            assert_eq!(blkpo.filters_commitment, filters_comm);
+        // Ensure that the rollup parameters used are same for all blocks
+        if let Some(filters_comm) = rollup_params_commitment {
+            assert_eq!(blkpo.rollup_params_commitment, filters_comm);
         } else {
-            filters_commitment = Some(blkpo.filters_commitment);
+            rollup_params_commitment = Some(blkpo.rollup_params_commitment);
         }
     }
     let final_snapshot = state.compute_snapshot();
@@ -47,7 +47,7 @@ fn main() {
         prev_checkpoint,
         initial_snapshot,
         final_snapshot,
-        filters_commitment: filters_commitment.unwrap(),
+        rollup_params_commitment: rollup_params_commitment.unwrap(),
     };
 
     sp1_zkvm::io::commit(&borsh::to_vec(&output).unwrap());

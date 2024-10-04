@@ -14,9 +14,15 @@ fn main() {
     let mut cl_proof_pp_prev = cl_proof_pp_start.clone();
     let mut acc_deposits = cl_proof_pp_start.deposits.clone();
 
+    let rollup_params_commitment = cl_proof_pp_start.rollup_params_commitment();
+
     for _ in 0..num_agg_inputs - 1 {
         let next_proof_pp = read_and_validate_next_proof();
         // validate_proof_consistency(&cl_proof_pp_prev, &next_proof_pp);
+        assert_eq!(
+            rollup_params_commitment,
+            next_proof_pp.rollup_params_commitment()
+        );
         acc_deposits.extend(next_proof_pp.deposits.clone());
         cl_proof_pp_prev = next_proof_pp;
     }
@@ -27,6 +33,7 @@ fn main() {
         deposits: acc_deposits,
         initial_snapshot: cl_proof_pp_start.initial_snapshot,
         final_snapshot: cl_proof_pp_prev.final_snapshot,
+        rollup_params_commitment,
     };
 
     sp1_zkvm::io::commit(&borsh::to_vec(&public_params).unwrap());

@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+use alpen_test_utils::l2::gen_params;
 use anyhow::{Context, Result};
 use express_sp1_adapter::{SP1Host, SP1ProofInputBuilder};
 use express_sp1_guest_builder::GUEST_CL_STF_ELF;
@@ -41,10 +42,14 @@ impl ProofGenerator<u32> for ClProofGenerator {
         let cl_witness = std::fs::read(&cl_witness_path)
             .with_context(|| format!("Failed to read CL witness file {:?}", cl_witness_path))?;
 
+        let params = gen_params();
+        let rollup_params = params.rollup();
+
         // Generate CL proof
         let prover = SP1Host::init(self.get_elf().into(), *prover_options);
 
         let proof_input = SP1ProofInputBuilder::new()
+            .write(rollup_params)?
             .write_proof(agg_input)?
             .write(&cl_witness)?
             .build()?;

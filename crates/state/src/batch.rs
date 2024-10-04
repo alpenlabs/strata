@@ -98,8 +98,9 @@ pub struct BatchInfo {
     pub l2_blockid: L2BlockId,
     /// PoW transition in the given `l1_range`
     pub l1_pow_transition: (u128, u128),
-    /// Commitment of the `TxFilterRule` used to scan L1 transactions
-    pub l1_tx_filters_commitment: Buf32,
+    /// Commitment of the `RollupParams` calculated by
+    /// [`alpen_express_primitives::params::RollupParams::compute_hash`]
+    pub rollup_params_commitment: Buf32,
 }
 
 impl BatchInfo {
@@ -112,7 +113,7 @@ impl BatchInfo {
         l2_transition: (Buf32, Buf32),
         l2_blockid: L2BlockId,
         l1_pow_transition: (u128, u128),
-        l1_tx_filters_commitment: Buf32,
+        rollup_params_commitment: Buf32,
     ) -> Self {
         Self {
             idx: checkpoint_idx,
@@ -122,7 +123,7 @@ impl BatchInfo {
             l2_transition,
             l2_blockid,
             l1_pow_transition,
-            l1_tx_filters_commitment,
+            rollup_params_commitment,
         }
     }
 
@@ -158,8 +159,8 @@ impl BatchInfo {
         self.l1_pow_transition.1
     }
 
-    pub fn l1_tx_filters_commitment(&self) -> Buf32 {
-        self.l1_tx_filters_commitment
+    pub fn rollup_params_commitment(&self) -> Buf32 {
+        self.rollup_params_commitment
     }
 
     /// Creates a [`BootstrapState`] by taking the initial state of the [`BatchInfo`]

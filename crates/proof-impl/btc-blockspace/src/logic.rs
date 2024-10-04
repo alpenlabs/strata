@@ -1,17 +1,17 @@
 //! Core logic of the Bitcoin Blockspace proof that will be proven
 
-use alpen_express_primitives::{buf::Buf32, hash::compute_borsh_hash};
+use alpen_express_primitives::{buf::Buf32, params::RollupParams};
 use alpen_express_state::{batch::BatchCheckpoint, tx::DepositInfo};
 use bitcoin::Block;
 use borsh::{BorshDeserialize, BorshSerialize};
-use strata_tx_parser::filter::TxFilterRule;
+use strata_tx_parser::filter::derive_tx_filter_rules;
 
 use crate::{block::check_merkle_root, filter::extract_relevant_info};
 
 #[derive(Debug)]
 pub struct BlockspaceProofInput {
     pub block: Block,
-    pub filters: Vec<TxFilterRule>,
+    pub rollup_params: RollupParams,
     // TODO: add hintings and other necessary params
 }
 
@@ -20,21 +20,25 @@ pub struct BlockspaceProofOutput {
     pub header_raw: Vec<u8>,
     pub deposits: Vec<DepositInfo>,
     pub prev_checkpoint: Option<BatchCheckpoint>,
-    pub filters_commitment: Buf32,
+    pub rollup_params_commitment: Buf32,
 }
 
 pub fn process_blockspace_proof(input: &BlockspaceProofInput) -> BlockspaceProofOutput {
-    let BlockspaceProofInput { block, filters } = input;
+    let BlockspaceProofInput {
+        block,
+        rollup_params,
+    } = input;
     assert!(check_merkle_root(block));
     // assert!(check_witness_commitment(block));
+    let filters = derive_tx_filter_rules(rollup_params);
 
-    let (deposits, prev_checkpoint) = extract_relevant_info(block, filters);
-    let filters_commitment = compute_borsh_hash(&filters);
+    let (deposits, prev_checkpoint) = extract_relevant_info(block, &filters);
+    let rollup_params_commitment = rollup_params.compute_hash();
 
     BlockspaceProofOutput {
         header_raw: bitcoin::consensus::serialize(&block.header),
         deposits,
         prev_checkpoint,
-        filters_commitment,
+        rollup_params_commitment,
     }
 }

@@ -1,3 +1,4 @@
+use alpen_express_primitives::{params::RollupParams, vk::RollupVerifyingKey};
 use express_proofimpl_checkpoint::{self, process_checkpoint_proof, CheckpointProofInput};
 use express_zkvm::Proof;
 use sha2::{Digest, Sha256};
@@ -9,6 +10,12 @@ use substrate_bn::Fr;
 mod vks;
 
 fn main() {
+    let rollup_params: RollupParams = io::read();
+    let rollup_vk = match rollup_params.rollup_vk() {
+        RollupVerifyingKey::SP1VerifyingKey(sp1_vk) => sp1_vk,
+        _ => panic!("Need SP1VerifyingKey"),
+    };
+
     let slice = io::read_vec();
     let input: CheckpointProofInput = borsh::from_slice(&slice).unwrap();
 
@@ -24,20 +31,16 @@ fn main() {
         Sha256::digest(bincode::serialize(&borsh::to_vec(&input.l2_state).unwrap()).unwrap());
     sp1_zkvm::lib::verify::verify_sp1_proof(l2_batch_vk, &l2_batch_pp_digest.into());
 
-    let (output, prev_checkpoint) =
-        process_checkpoint_proof(&input.l1_state, &input.l2_state, &input.vk);
+    let (output, prev_checkpoint) = process_checkpoint_proof(&input.l1_state, &input.l2_state);
 
     if let Some(prev_checkpoint) = prev_checkpoint {
         let (checkpoint, proof) = prev_checkpoint;
         assert!(verify_groth16(
             &proof,
-            &input.vk,
+            rollup_vk.as_bytes(),
             &bincode::serialize(&borsh::to_vec(&checkpoint).unwrap()).unwrap(),
         ));
     }
-
-    // Ensure we are using the same verifying key
-    assert_eq!(input.vk, output.vk);
 
     sp1_zkvm::io::commit(&borsh::to_vec(&output).unwrap());
 }

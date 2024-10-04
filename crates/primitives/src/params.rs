@@ -117,6 +117,15 @@ impl RollupParams {
 
         Ok(())
     }
+
+    pub fn compute_hash(&self) -> Buf32 {
+        let raw_bytes = bincode::serialize(&self).expect("rollup params serialization failed");
+        crate::hash::raw(&raw_bytes)
+    }
+
+    pub fn rollup_vk(&self) -> RollupVerifyingKey {
+        self.rollup_vk
+    }
 }
 
 /// Configuration common among deposit and deposit request transaction

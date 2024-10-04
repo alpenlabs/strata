@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use alpen_test_utils::bitcoin::get_tx_filters;
+use alpen_test_utils::l2::gen_params;
 use anyhow::{Context, Result};
 use bitcoin::{consensus::serialize, Block};
 use express_sp1_adapter::{SP1Host, SP1ProofInputBuilder};
@@ -24,13 +24,14 @@ impl ProofGenerator<Block> for BtcBlockProofGenerator {
         block: &Block,
         prover_options: &ProverOptions,
     ) -> Result<(Proof, VerificationKey)> {
-        let filters = get_tx_filters();
+        let params = gen_params();
+        let rollup_params = params.rollup();
         let prover = SP1Host::init(self.get_elf().into(), *prover_options);
 
         let serialized_block = serialize(block);
 
         let input = SP1ProofInputBuilder::new()
-            .write_borsh(&filters)?
+            .write(rollup_params)?
             .write_serialized(&serialized_block)?
             .build()?;
 

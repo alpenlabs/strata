@@ -21,7 +21,13 @@ pub struct L1BatchProofOutput {
     pub prev_checkpoint: Option<BatchCheckpoint>,
     pub initial_snapshot: HeaderVerificationStateSnapshot,
     pub final_snapshot: HeaderVerificationStateSnapshot,
-    pub filters_commitment: Buf32,
+    pub rollup_params_commitment: Buf32,
+}
+
+impl L1BatchProofOutput {
+    pub fn rollup_params_commitment(&self) -> Buf32 {
+        self.rollup_params_commitment
+    }
 }
 
 pub fn process_batch_proof(input: L1BatchProofInput) -> L1BatchProofOutput {
@@ -30,7 +36,7 @@ pub fn process_batch_proof(input: L1BatchProofInput) -> L1BatchProofOutput {
     let params = get_btc_params();
 
     assert!(!input.batch.is_empty());
-    let filters_commitment = input.batch[0].filters_commitment;
+    let rollup_params_commitment = input.batch[0].rollup_params_commitment;
 
     let mut deposits = Vec::new();
     let mut prev_checkpoint = None;
@@ -39,7 +45,10 @@ pub fn process_batch_proof(input: L1BatchProofInput) -> L1BatchProofOutput {
         state.check_and_update_full(&header, &params);
         deposits.extend(blockspace.deposits);
         prev_checkpoint = prev_checkpoint.or(blockspace.prev_checkpoint);
-        assert_eq!(blockspace.filters_commitment, filters_commitment);
+        assert_eq!(
+            blockspace.rollup_params_commitment,
+            rollup_params_commitment
+        );
     }
     let final_snapshot = state.compute_snapshot();
 
@@ -48,6 +57,6 @@ pub fn process_batch_proof(input: L1BatchProofInput) -> L1BatchProofOutput {
         prev_checkpoint,
         initial_snapshot,
         final_snapshot,
-        filters_commitment,
+        rollup_params_commitment,
     }
 }

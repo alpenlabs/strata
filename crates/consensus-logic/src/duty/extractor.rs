@@ -12,7 +12,7 @@ pub fn extract_duties(
     _ident: &Identity,
     _params: &Params,
     chs_provider: &impl ChainstateProvider,
-    l1_tx_filters_provider: Buf32,
+    rollup_params_commitment: Buf32,
 ) -> Result<Vec<Duty>, Error> {
     // If a sync state isn't present then we probably don't have anything we
     // want to do.  We might change this later.
@@ -33,7 +33,7 @@ pub fn extract_duties(
         tip_height,
         tip_blkid,
         chs_provider,
-        l1_tx_filters_provider,
+        rollup_params_commitment,
     )?);
 
     Ok(duties)
@@ -44,7 +44,7 @@ fn extract_batch_duties(
     tip_height: u64,
     tip_id: L2BlockId,
     chs_provider: &impl ChainstateProvider,
-    l1_tx_filters_commitment: Buf32,
+    rollup_params_commitment: Buf32,
 ) -> Result<Vec<Duty>, Error> {
     if !state.is_chain_active() {
         debug!("chain not active, no duties created");
@@ -103,7 +103,7 @@ fn extract_batch_duties(
                 l2_transition,
                 tip_id,
                 (0, current_l1_state.total_accumulated_pow),
-                l1_tx_filters_commitment,
+                rollup_params_commitment,
             );
 
             let genesis_bootstrap = new_batch.get_initial_bootstrap_state();
@@ -141,7 +141,7 @@ fn extract_batch_duties(
                     checkpoint.l1_pow_transition.1,
                     current_l1_state.total_accumulated_pow,
                 ),
-                l1_tx_filters_commitment,
+                rollup_params_commitment,
             );
 
             // If prev checkpoint was proved, use the bootstrap state of the prev checkpoint

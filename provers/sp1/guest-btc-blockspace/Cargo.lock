@@ -159,6 +159,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "arbitrary",
+ "bincode",
  "bitcoin",
  "borsh",
  "digest 0.10.7",
@@ -991,6 +992,7 @@ dependencies = [
 name = "guest-sp1-btc-blockspace"
 version = "0.1.0"
 dependencies = [
+ "alpen-express-primitives",
  "bitcoin",
  "borsh",
  "express-proofimpl-btc-blockspace",

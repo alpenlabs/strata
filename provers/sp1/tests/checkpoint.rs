@@ -1,7 +1,8 @@
 mod helpers;
-#[cfg(all(feature = "prover", not(debug_assertions)))]
+// #[cfg(all(feature = "prover", not(debug_assertions)))]
 mod test {
 
+    use alpen_test_utils::l2::gen_params;
     use express_proofimpl_checkpoint::{
         CheckpointProofInput, CheckpointProofOutput, L2BatchProofOutput,
     };
@@ -22,8 +23,10 @@ mod test {
     fn test_checkpoint_proof() {
         sp1_sdk::utils::setup_logger();
 
-        let l1_start_height = 40321;
-        let l1_end_height = 40323;
+        let params = gen_params();
+        let rollup_params = params.rollup();
+        let l1_start_height = (rollup_params.genesis_l1_height + 1) as u32;
+        let l1_end_height = l1_start_height + 2;
 
         let l2_start_height = 1;
         let l2_end_height = 3;
@@ -69,6 +72,8 @@ mod test {
         };
 
         let prover_input = SP1ProofInputBuilder::new()
+            .write(&rollup_params)
+            .unwrap()
             .write_borsh(&checkpoint_proof_input)
             .unwrap()
             .write_proof(l1_batch_proof_agg_input)

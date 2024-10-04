@@ -123,7 +123,9 @@ fn derive_tx_filter_rules<D: Database + 'static>(
 ) -> anyhow::Result<Vec<TxFilterRule>> {
     // TODO: Figure out how to do it from chainstate provider
     // For now we'll just go with filtering Inscription transactions
-    Ok(strata_tx_parser::filter::derive_tx_filter_rules(params))
+    Ok(strata_tx_parser::filter::derive_tx_filter_rules(
+        params.rollup(),
+    ))
 }
 
 /// Inits the reader state by trying to backfill blocks up to a target height.
