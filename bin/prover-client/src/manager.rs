@@ -2,10 +2,11 @@ use std::sync::Arc;
 
 use express_zkvm::{ProverOptions, ZKVMHost};
 use tokio::time::{sleep, Duration};
+use tracing::info;
 
 use crate::{
     config::PROVER_MANAGER_INTERVAL,
-    primitives::tasks_scheduler::{ProofSubmissionStatus, ProvingTaskStatus},
+    primitives::tasks_scheduler::{ProofSubmissionStatus, ProvingTask, ProvingTaskStatus},
     prover::Prover,
     task::TaskTracker,
 };
@@ -74,14 +75,29 @@ where
             .await;
 
         for task in in_progress_tasks {
-            if let Ok(ProofSubmissionStatus::Success(proof)) = self
+            match self
                 .prover
                 .get_proof_submission_status_and_remove_on_success(task.id)
             {
-                // Implement post-processing hooks.
-                // Example: If the current task is EL proving, this proof should be added
-                // to the witness of the CL proving task to unblock the CL proving task.
+                Ok(status) => self.apply_proof_status_update(task, status).await,
+                Err(e) => {
+                    tracing::error!(
+                        "Failed to get proof submission status for task {}: {}",
+                        task.id,
+                        e
+                    );
+                }
+            }
+        }
+    }
+
+    async fn apply_proof_status_update(&self, task: ProvingTask, status: ProofSubmissionStatus) {
+        match status {
+            ProofSubmissionStatus::Success(proof) => {
                 self.task_tracker.mark_task_completed(task.id, proof).await;
+            }
+            ProofSubmissionStatus::ProofGenerationInProgress => {
+                info!("Task {} proof generation in progress", task.id);
             }
         }
     }
