@@ -333,3 +333,27 @@ def generate_params(
     res = subprocess.run(cmd, capture_output=True)
     res.check_returncode()
     return str(res.stdout, "utf8")
+
+
+def generate_simple_params(
+        base_path: str,
+        block_time_sec: int,
+        epoch_slots: int,
+        genesis_trigger: int,
+        operator_cnt: int,
+) -> dict:
+    """
+    Creates a network with params data and a list of operator seed paths.
+
+    Result options are `params` and `opseedpaths`.
+    """
+    seqseedpath = os.path.join(base_path, "seqkey.bin")
+    opseedpaths = [os.path.join(base_path, "opkey%s.bin" % i for i in range(operator_cnt))]
+    for p in [seqseedpath] + opseedpaths:
+        generate_seed_at(p)
+
+    seqkey = generate_seqpubkey_from_seed(seqseedpath)
+    opxpubs = [generate_opxpub_from_seed(p) for p in opseedpaths]
+
+    params = generate_params(block_time_sec, epoch_slots, genesis_trigger, seqkey, opxpubs)
+    return {"params": params, "opseedpaths": opseedpaths}
