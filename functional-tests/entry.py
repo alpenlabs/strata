@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 import json
 import os
 import sys
@@ -12,15 +13,7 @@ import web3.middleware
 from bitcoinlib.services.bitcoind import BitcoindClient
 
 import seqrpc
-from constants import (
-    BD_PASSWORD,
-    BD_USERNAME,
-    BLOCK_GENERATION_INTERVAL_SECS,
-    DD_ROOT,
-    DEFAULT_ROLLUP_PARAMS,
-    FAST_BATCH_ROLLUP_PARAMS,
-    SEQ_KEY,
-)
+from constants import *
 from utils import generate_blocks, generate_jwt_secret
 
 
@@ -78,6 +71,16 @@ class RethConfig(TypedDict):
     reth_secret_path: str
 
 
+def gen_simple_params(initdir: str) -> dict:
+    return utils.generate_simple_params(
+        initdir,
+        DEFAULT_BLOCK_TIME_SEC,
+        DEFAULT_EPOCH_SLOTS,
+        DEFAULT_GENESIS_TRIGGER,
+        DEFAULT_OPERATOR_CNT,
+    )
+
+
 class StrataFactory(flexitest.Factory):
     def __init__(self, port_range: list[int]):
         super().__init__(port_range)
@@ -88,7 +91,7 @@ class StrataFactory(flexitest.Factory):
         bitcoind_config: BitcoinRpcConfig,
         reth_config: RethConfig,
         sequencer_address: str,
-        custom_rollup_params: Optional[dict],
+        rollup_params: str,
         ctx: flexitest.EnvContext,
     ) -> flexitest.Service:
         datadir = ctx.make_service_dir("sequencer")
@@ -119,10 +122,8 @@ class StrataFactory(flexitest.Factory):
         # fmt: on
 
         rollup_params_file = os.path.join(datadir, "rollup_params.json")
-        rollup_params = custom_rollup_params if custom_rollup_params else DEFAULT_ROLLUP_PARAMS
-
         with open(rollup_params_file, "w") as f:
-            json.dump(rollup_params, f)
+            f.write(rollup_params)
 
         cmd.extend(["--rollup-params", rollup_params_file])
 
@@ -156,7 +157,7 @@ class FullNodeFactory(flexitest.Factory):
         bitcoind_config: BitcoinRpcConfig,
         reth_config: RethConfig,
         sequencer_rpc: str,
-        custom_rollup_params: Optional[dict],
+        rollup_params: str,
         ctx: flexitest.EnvContext,
     ) -> flexitest.Service:
         self.fn_count += 1
@@ -184,10 +185,9 @@ class FullNodeFactory(flexitest.Factory):
         # fmt: on
 
         rollup_params_file = os.path.join(datadir, "rollup_params.json")
-        rollup_params = custom_rollup_params if custom_rollup_params else DEFAULT_ROLLUP_PARAMS
-
         with open(rollup_params_file, "w") as f:
-            json.dump(rollup_params, f)
+            f.write(rollup_params)
+
 
         cmd.extend(["--rollup-params", rollup_params_file])
 
@@ -321,7 +321,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
     def __init__(
         self,
         pre_generate_blocks: int = 0,
-        rollup_params: Optional[dict] = None,
+        rollup_params: Optional[str] = None,
         auto_generate_blocks=True,
         enable_prover_client=False,
     ):
@@ -335,6 +335,14 @@ class BasicEnvConfig(flexitest.EnvConfig):
         btc_fac = ctx.get_factory("bitcoin")
         seq_fac = ctx.get_factory("sequencer")
         reth_fac = ctx.get_factory("reth")
+
+        # set up network params
+        initdir = ctx.make_service_dir("_init")
+        params = self.rollup_params
+        if params is None:
+            gen_data = gen_simple_params(initdir)
+            params = gen_data["params"]
+            # TODO also grab operator keys and launch operators
 
         # reth needs some time to startup, start it first
         secret_dir = ctx.make_service_dir("secret")
@@ -390,7 +398,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
             "reth_secret_path": reth_secret_path,
         }
         sequencer = seq_fac.create_sequencer(
-            bitcoind_config, reth_config, seqaddr, self.rollup_params
+            bitcoind_config, reth_config, seqaddr, params
         )
 
         # Need to wait for at least `genesis_l1_height` blocks to be generated.
@@ -419,7 +427,7 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
     def __init__(
         self,
         pre_generate_blocks: int = 0,
-        rollup_params: Optional[dict] = None,
+        rollup_params: Optional[str] = None,
         auto_generate_blocks=True,
     ):
         self.pre_generate_blocks = pre_generate_blocks
@@ -432,6 +440,14 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
         seq_fac = ctx.get_factory("sequencer")
         reth_fac = ctx.get_factory("reth")
         fn_fac = ctx.get_factory("fullnode")
+
+        # set up network params
+        initdir = ctx.make_service_dir("_init")
+        params = self.rollup_params
+        if params is None:
+            gen_data = gen_simple_params(initdir)
+            params = gen_data["params"]
+            # TODO also grab operator keys and launch operators
 
         # reth needs some time to startup, start it first
         secret_dir = ctx.make_service_dir("secret")
@@ -479,7 +495,7 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
             "reth_secret_path": reth_secret_path,
         }
         sequencer = seq_fac.create_sequencer(
-            bitcoind_config, reth_config, seqaddr, self.rollup_params
+            bitcoind_config, reth_config, seqaddr, params
         )
         # Need to wait for at least `genesis_l1_height` blocks to be generated.
         # Sleeping some more for safety
@@ -498,7 +514,7 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
             bitcoind_config,
             fullnode_reth_config,
             sequencer_rpc,
-            self.rollup_params,
+            params,
         )
 
         svcs = {
