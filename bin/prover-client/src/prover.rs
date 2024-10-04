@@ -28,6 +28,7 @@ use crate::{
         tasks_scheduler::{ProofProcessingStatus, ProofSubmissionStatus, WitnessSubmissionStatus},
         vms::{ProofVm, ZkVMManager},
     },
+    proving_ops::btc_ops::get_pm_rollup_params,
 };
 
 #[derive(Debug, Clone)]
@@ -118,21 +119,6 @@ where
             .build()?,
 
         ZKVMInput::L1Batch(l1_batch_input) => {
-            // let proofs_with_vkey = l1_batch_input.clone().get_proofs();
-            // let mut blockspace_outputs = Vec::new();
-            // for proof_with_vkey in proofs_with_vkey {
-            //     let raw_output: Vec<u8> =
-            //         SP1Verifier::extract_public_output(proof_with_vkey.proof())
-            //             .expect("Failed to extract public outputs");
-            //     let output: BlockspaceProofOutput = borsh::from_slice(&raw_output).unwrap();
-            //     blockspace_outputs.push(output);
-            // }
-
-            // let batch_input = L1BatchProofInput {
-            //     batch: blockspace_outputs,
-            //     state: l1_batch_input.clone().header_verification_state,
-            // };
-
             let mut input_builder = Vm::Input::new();
             input_builder.write_borsh(&l1_batch_input.header_verification_state)?;
             input_builder.write(&l1_batch_input.btc_task_ids.len())?;
@@ -145,6 +131,7 @@ where
         }
 
         ZKVMInput::ClBlock(cl_proof_input) => Vm::Input::new()
+            .write(&get_pm_rollup_params())?
             .write_proof(
                 cl_proof_input
                     .el_proof
@@ -169,6 +156,7 @@ where
         }
 
         ZKVMInput::Checkpoint(checkpoint_input) => Vm::Input::new()
+            .write(&get_pm_rollup_params())?
             .write(&checkpoint_input.l1_batch_id)?
             .build()?,
     };
