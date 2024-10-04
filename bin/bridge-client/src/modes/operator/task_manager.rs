@@ -50,18 +50,25 @@ where
                 let bridge_duty_ops = self.bridge_duty_db_ops.clone();
                 let broadcaster = self.broadcaster.clone();
                 handles.spawn(async move {
-                    process_duty(exec_handler, bridge_duty_ops, broadcaster, &duty).await;
+                    process_duty(exec_handler, bridge_duty_ops, broadcaster, &duty).await
                 });
             }
 
-            handles.join_all().await;
+            let any_failed = handles.join_all().await.iter().any(|res| res.is_err());
 
-            if let Err(e) = self
-                .bridge_duty_idx_db_ops
-                .set_index_async(stop_index)
-                .await
-            {
-                error!(error = %e, "could not update duty index");
+            // if none of the duties failed, update the duty index so that the
+            // next batch is fetched in the next poll.
+            //
+            // otherwise, don't update the index so that the current batch is refetched and
+            // ones that were not executed successfully are executed again.
+            if !any_failed {
+                if let Err(e) = self
+                    .bridge_duty_idx_db_ops
+                    .set_index_async(stop_index)
+                    .await
+                {
+                    error!(error = %e, "could not update duty index");
+                }
             }
 
             sleep(duty_polling_interval).await;
@@ -136,16 +143,16 @@ where
 
 /// Processes a duty.
 ///
-/// This function is infallible. It either updates the duty status in case of
-/// failures or logs the error if writing to the database is not possible.
+/// # Errors
 ///
-/// Crashing every time a duty fails to be processed is too extreme.
+/// If the duty fails to be processed.
 async fn process_duty<L2Client, TxBuildContext, Bcast>(
     exec_handler: Arc<ExecHandler<L2Client, TxBuildContext>>,
     duty_status_ops: Arc<BridgeDutyOps>,
     broadcaster: Arc<Bcast>,
     duty: &BridgeDuty,
-) where
+) -> ExecResult<()>
+where
     L2Client: AlpenApiClient + Sync + Send,
     TxBuildContext: BuildContext + Sync + Send,
     Bcast: Broadcaster,
@@ -160,7 +167,7 @@ async fn process_duty<L2Client, TxBuildContext, Bcast>(
                 tracker_txid,
                 deposit_info.clone(),
             )
-            .await;
+            .await?;
         }
         BridgeDuty::FulfillWithdrawal(cooperative_withdrawal_info) => {
             let tracker_txid = cooperative_withdrawal_info.deposit_outpoint().txid;
@@ -171,12 +178,20 @@ async fn process_duty<L2Client, TxBuildContext, Bcast>(
                 tracker_txid,
                 cooperative_withdrawal_info.clone(),
             )
-            .await;
+            .await?;
         }
-    }
+    };
+
+    Ok(())
 }
 
 /// Executes a duty.
+///
+/// It also updates the status of the duty to either [`BridgeDutyStatus::Executed`] or
+/// [`BridgeDutyStatus::Failed`] depending upon the result of the execution. This can lead to false
+/// positives if the duties are malformed but it is better to get some false negatives than false
+/// positives because the latter would mean missing valid duties (for example, not redoing a valid
+/// duty because the rollup crashed while the client is polling for nonces).
 ///
 /// # Params
 ///
@@ -185,18 +200,33 @@ async fn process_duty<L2Client, TxBuildContext, Bcast>(
 /// `broadcaster`: can be used to broadcast transactions.
 /// `tracker_txid`: [`Txid`] to track status of duties.
 /// `duty_status_ops`: a database handle to update the status of duties.
+///
+/// # Errors
+///
+/// If there is an error during the execution of the duty.
 async fn execute_duty<L2Client, TxBuildContext, Tx, Bcast>(
     exec_handler: Arc<ExecHandler<L2Client, TxBuildContext>>,
     broadcaster: Arc<Bcast>,
     duty_status_ops: Arc<BridgeDutyOps>,
     tracker_txid: Txid,
     tx_info: Tx,
-) where
+) -> ExecResult<()>
+where
     L2Client: AlpenApiClient + Sync + Send,
     TxBuildContext: BuildContext + Sync + Send,
     Tx: TxKind + Debug,
     Bcast: Broadcaster,
 {
+    if let Err(e) = duty_status_ops
+        .put_duty_status_async(tracker_txid, BridgeDutyStatus::Received)
+        .await
+    {
+        // just a warning since the rest of the handlers only care if the duty status is `Failed` or
+        // `Executed`. The `Received` status is only for auditing purposes (for example, to check if
+        // a duty was received pre-crash).
+        warn!(error = %e, %tracker_txid, status=?BridgeDutyStatus::Received, "could not update duty status")
+    }
+
     match exec_handler.sign_tx(tx_info).await {
         Ok(constructed_txid) => {
             if let Err(e) = aggregate_and_broadcast(
@@ -206,25 +236,38 @@ async fn execute_duty<L2Client, TxBuildContext, Tx, Bcast>(
             )
             .await
             {
-                error!(error = %e, "could not execute duty");
+                error!(error = %e, %tracker_txid, "could not execute duty");
                 if let Err(e) = duty_status_ops
                     .put_duty_status_async(tracker_txid, BridgeDutyStatus::Failed(e.to_string()))
                     .await
                 {
-                    error!(db_err = %e, "and could not update status in db either");
+                    error!(db_err = %e, %tracker_txid, status="failed", "and could not update status in db either");
                 }
+
+                return Err(e);
             }
         }
         Err(e) => {
-            error!(err = %e, "could not process duty");
+            error!(error = %e, %tracker_txid, "could not execute duty");
             if let Err(e) = duty_status_ops
                 .put_duty_status_async(tracker_txid, BridgeDutyStatus::Failed(e.to_string()))
                 .await
             {
-                error!(db_err = %e, "and could not update status in db either");
+                error!(db_err = %e, %tracker_txid, status="failed", "and could not update status in db either");
             }
+
+            return Err(e);
         }
     };
+
+    if let Err(e) = duty_status_ops
+        .put_duty_status_async(tracker_txid, BridgeDutyStatus::Executed)
+        .await
+    {
+        error!(db_err = %e, %tracker_txid, status=?BridgeDutyStatus::Executed, "could not update status in db");
+    }
+
+    Ok(())
 }
 
 /// Aggregates nonces and signatures for a given [`Txid`] and then, broadcasts the fully signed
