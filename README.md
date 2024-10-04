@@ -88,6 +88,14 @@ Start CL Client/Sequencer
 cargo run --bin strata-client -- --config config.toml
 ```
 
+## Contributing
+
+Contributions are generally welcome.
+If you intend to make larger changes please discuss them in an issue
+before opening a PR to avoid duplicate work and architectural mismatches.
+
+For more information please see [`CONTRIBUTING.md`](/CONTRIBUTING.md).
+
 ## License
 
 This work is dual-licensed under MIT and Apache 2.0.
