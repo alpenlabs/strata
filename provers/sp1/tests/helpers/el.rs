@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use alpen_express_primitives::params::RollupParams;
 use anyhow::{Context, Result};
 use express_proofimpl_evm_ee_stf::ELProofInput;
 use express_sp1_adapter::{SP1Host, SP1ProofInputBuilder};

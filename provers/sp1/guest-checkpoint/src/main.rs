@@ -1,5 +1,6 @@
 use alpen_express_primitives::{params::RollupParams, vk::RollupVerifyingKey};
-use express_proofimpl_checkpoint::{self, process_checkpoint_proof, CheckpointProofInput};
+use express_proofimpl_checkpoint::{self, process_checkpoint_proof, L2BatchProofOutput};
+use express_proofimpl_l1_batch::L1BatchProofOutput;
 use express_zkvm::Proof;
 use sha2::{Digest, Sha256};
 use snark_bn254_verifier::Groth16Verifier;
@@ -16,22 +17,20 @@ fn main() {
         _ => panic!("Need SP1VerifyingKey"),
     };
 
-    let slice = io::read_vec();
-    let input: CheckpointProofInput = borsh::from_slice(&slice).unwrap();
-
     // verify l1 proof
-    let l1_batch_vk = vks::GUEST_L1_BATCH_ELF_ID;
-    let l1_batch_pp_digest =
-        Sha256::digest(bincode::serialize(&borsh::to_vec(&input.l1_state).unwrap()).unwrap());
-    sp1_zkvm::lib::verify::verify_sp1_proof(l1_batch_vk, &l1_batch_pp_digest.into());
+    let l1_batch_pp_raw: Vec<u8> = sp1_zkvm::io::read();
+    let l1_batch_pp_digest = Sha256::digest(&l1_batch_pp_raw);
+    sp1_zkvm::lib::verify::verify_sp1_proof(vks::GUEST_L1_BATCH_ELF_ID, &l1_batch_pp_digest.into());
+    let l1_batch_pp_serialized: Vec<u8> = bincode::deserialize(&l1_batch_pp_raw).unwrap();
+    let l1_batch_output: L1BatchProofOutput = borsh::from_slice(&l1_batch_pp_serialized).unwrap();
 
-    // verify l2 proof
-    let l2_batch_vk = vks::GUEST_CL_AGG_ELF_ID;
-    let l2_batch_pp_digest =
-        Sha256::digest(bincode::serialize(&borsh::to_vec(&input.l2_state).unwrap()).unwrap());
-    sp1_zkvm::lib::verify::verify_sp1_proof(l2_batch_vk, &l2_batch_pp_digest.into());
+    let l2_batch_pp_raw: Vec<u8> = sp1_zkvm::io::read();
+    let l2_batch_pp_digest = Sha256::digest(&l2_batch_pp_raw);
+    sp1_zkvm::lib::verify::verify_sp1_proof(vks::GUEST_CL_AGG_ELF_ID, &l2_batch_pp_digest.into());
+    let l2_batch_pp_serialized: Vec<u8> = bincode::deserialize(&l2_batch_pp_raw).unwrap();
+    let l2_batch_output: L2BatchProofOutput = borsh::from_slice(&l2_batch_pp_serialized).unwrap();
 
-    let (output, prev_checkpoint) = process_checkpoint_proof(&input.l1_state, &input.l2_state);
+    let (output, prev_checkpoint) = process_checkpoint_proof(&l1_batch_output, &l2_batch_output);
 
     if let Some(prev_checkpoint) = prev_checkpoint {
         let (checkpoint, proof) = prev_checkpoint;

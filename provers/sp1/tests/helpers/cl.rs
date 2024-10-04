@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+use alpen_express_primitives::params::RollupParams;
 use alpen_test_utils::l2::gen_params;
 use anyhow::{Context, Result};
 use express_sp1_adapter::{SP1Host, SP1ProofInputBuilder};
@@ -13,11 +14,15 @@ use crate::helpers::{el::ElProofGenerator, proof_generator::ProofGenerator};
 
 pub struct ClProofGenerator {
     pub el_proof_generator: ElProofGenerator,
+    pub rollup_params: RollupParams,
 }
 
 impl ClProofGenerator {
-    pub fn new(el_proof_generator: ElProofGenerator) -> Self {
-        Self { el_proof_generator }
+    pub fn new(el_proof_generator: ElProofGenerator, rollup_params: &RollupParams) -> Self {
+        Self {
+            el_proof_generator,
+            rollup_params: rollup_params.clone(),
+        }
     }
 }
 
@@ -42,14 +47,11 @@ impl ProofGenerator<u32> for ClProofGenerator {
         let cl_witness = std::fs::read(&cl_witness_path)
             .with_context(|| format!("Failed to read CL witness file {:?}", cl_witness_path))?;
 
-        let params = gen_params();
-        let rollup_params = params.rollup();
-
         // Generate CL proof
         let prover = SP1Host::init(self.get_elf().into(), *prover_options);
 
         let proof_input = SP1ProofInputBuilder::new()
-            .write(rollup_params)?
+            .write(&self.rollup_params)?
             .write_proof(agg_input)?
             .write(&cl_witness)?
             .build()?;

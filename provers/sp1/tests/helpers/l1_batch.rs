@@ -1,3 +1,4 @@
+use alpen_express_primitives::params::RollupParams;
 use alpen_test_utils::bitcoin::get_btc_chain;
 use anyhow::{Context, Result};
 use bitcoin::params::MAINNET;

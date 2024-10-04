@@ -27,6 +27,7 @@ fn main() {
 
         let blkpo_raw_serialized: Vec<u8> = bincode::deserialize(&blkpo_raw).unwrap();
         let blkpo: BlockspaceProofOutput = borsh::from_slice(&blkpo_raw_serialized).unwrap();
+        println!("{:?}", blkpo);
         let header: Header = bitcoin::consensus::deserialize(&blkpo.header_raw).unwrap();
 
         state.check_and_update_continuity(&header, &get_btc_params());
@@ -34,8 +35,8 @@ fn main() {
         prev_checkpoint = prev_checkpoint.or(blkpo.prev_checkpoint);
 
         // Ensure that the rollup parameters used are same for all blocks
-        if let Some(filters_comm) = rollup_params_commitment {
-            assert_eq!(blkpo.rollup_params_commitment, filters_comm);
+        if let Some(rollup_params_comm) = rollup_params_commitment {
+            assert_eq!(blkpo.rollup_params_commitment, rollup_params_comm);
         } else {
             rollup_params_commitment = Some(blkpo.rollup_params_commitment);
         }

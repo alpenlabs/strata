@@ -1,3 +1,4 @@
+use alpen_express_primitives::params::RollupParams;
 use anyhow::{Context, Result};
 use express_sp1_adapter::{SP1Host, SP1ProofInputBuilder};
 use express_sp1_guest_builder::GUEST_CL_AGG_ELF;

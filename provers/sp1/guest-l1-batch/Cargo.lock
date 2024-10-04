@@ -2229,7 +2229,9 @@ dependencies = [
  "arbitrary",
  "bitcoin",
  "borsh",
+ "express-bridge-tx-builder",
  "hex",
+ "musig2",
  "thiserror",
  "tracing",
 ]

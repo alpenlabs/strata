@@ -24,7 +24,7 @@ mod test {
             enable_compression: true,
         };
 
-        let btc_proof_generator = BtcBlockProofGenerator::new();
+        let btc_proof_generator = BtcBlockProofGenerator::new(rollup_params);
         let (proof, _) = L1BatchProofGenerator::new(btc_proof_generator)
             .get_proof(&(l1_start_height, l1_end_height), &prover_options)
             .unwrap();
