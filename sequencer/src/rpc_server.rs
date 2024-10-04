@@ -557,13 +557,13 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
             .await
             .map_err(|e| Error::Other(e.to_string()))?;
         let batch_comm: Option<BatchCheckpoint> = entry.map(Into::into);
-        Ok(batch_comm.map(|bc| bc.checkpoint().clone().into()))
+        Ok(batch_comm.map(|bc| bc.batch_info().clone().into()))
     }
 
     async fn get_l2_block_status(&self, block_height: u64) -> RpcResult<L2BlockStatus> {
         let cl_state = self.get_client_state().await;
         if let Some(last_checkpoint) = cl_state.l1_view().last_finalized_checkpoint() {
-            if last_checkpoint.checkpoint.includes_l2_block(block_height) {
+            if last_checkpoint.batch_info.includes_l2_block(block_height) {
                 return Ok(L2BlockStatus::Finalized(last_checkpoint.height));
             }
         }

@@ -1,5 +1,7 @@
 use alpen_express_crypto::verify_schnorr_sig;
-use alpen_express_primitives::{block_credential::CredRule, buf::Buf32, hash, params::Params};
+use alpen_express_primitives::{
+    block_credential::CredRule, buf::Buf32, hash, params::RollupParams,
+};
 use tracing::warn;
 
 use crate::{
@@ -27,9 +29,9 @@ pub fn validate_block_segments(block: &L2Block) -> bool {
     true
 }
 
-pub fn check_block_credential(header: &SignedL2BlockHeader, params: &Params) -> bool {
+pub fn check_block_credential(header: &SignedL2BlockHeader, rollup_params: &RollupParams) -> bool {
     let sigcom = compute_header_sig_commitment(header);
-    match &params.rollup().cred_rule {
+    match &rollup_params.cred_rule {
         CredRule::Unchecked => true,
         CredRule::SchnorrKey(pubkey) => verify_schnorr_sig(header.sig(), &sigcom, pubkey),
     }

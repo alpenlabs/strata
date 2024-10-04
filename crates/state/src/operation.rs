@@ -6,7 +6,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use tracing::*;
 
 use crate::{
-    batch::{BatchCheckpoint, CheckpointInfo},
+    batch::BatchCheckpoint,
     client_state::{ClientState, L1CheckPoint, SyncState},
     id::L2BlockId,
     l1::{HeaderVerificationState, L1BlockId},
@@ -66,11 +66,12 @@ pub enum ClientStateWrite {
     UpdateBuried(u64),
 
     /// Update the checkpoints
-    CheckpointsReceived(u64, Vec<CheckpointInfo>),
+    CheckpointsReceived(Vec<L1CheckPoint>),
 
     /// The previously confirmed checkpoint is finalized at given l1 height
     CheckpointFinalized(u64),
 
+    /// Updates the L1 header verification state
     UpdateVerificationState(HeaderVerificationState),
 }
 
@@ -201,13 +202,9 @@ pub fn apply_writes_to_state(
                 // we haven't already
             }
 
-            CheckpointsReceived(height, checkpts) => {
+            CheckpointsReceived(checkpts) => {
                 // Extend the pending checkpoints
-                state.l1_view_mut().verified_checkpoints.extend(
-                    checkpts
-                        .into_iter()
-                        .map(|ckpt| L1CheckPoint::new(ckpt, height)),
-                );
+                state.l1_view_mut().verified_checkpoints.extend(checkpts);
             }
 
             CheckpointFinalized(height) => {
@@ -233,13 +230,13 @@ pub fn apply_writes_to_state(
                         .last_finalized_checkpoint
                         .as_ref()
                         .map_or(true, |prev_chp| {
-                            checkpt.checkpoint.idx() == prev_chp.checkpoint.idx() + 1
+                            checkpt.batch_info.idx() == prev_chp.batch_info.idx() + 1
                         })
                     {
                         panic!("operation: mismatched indices of pending checkpoint");
                     }
 
-                    let fin_blockid = *checkpt.checkpoint.l2_blockid();
+                    let fin_blockid = *checkpt.batch_info.l2_blockid();
                     l1v.last_finalized_checkpoint = Some(checkpt);
 
                     // Update finalized blockid in StateSync

@@ -1,6 +1,6 @@
 use alpen_express_db::traits::ChainstateProvider;
-use alpen_express_primitives::params::Params;
-use alpen_express_state::{batch::CheckpointInfo, client_state::ClientState, id::L2BlockId};
+use alpen_express_primitives::{buf::Buf32, params::Params};
+use alpen_express_state::{batch::BatchInfo, client_state::ClientState, id::L2BlockId};
 use tracing::*;
 
 use super::types::{BlockSigningDuty, Duty, Identity};
@@ -12,6 +12,7 @@ pub fn extract_duties(
     _ident: &Identity,
     _params: &Params,
     chs_provider: &impl ChainstateProvider,
+    rollup_params_commitment: Buf32,
 ) -> Result<Vec<Duty>, Error> {
     // If a sync state isn't present then we probably don't have anything we
     // want to do.  We might change this later.
@@ -32,6 +33,7 @@ pub fn extract_duties(
         tip_height,
         tip_blkid,
         chs_provider,
+        rollup_params_commitment,
     )?);
 
     Ok(duties)
@@ -42,6 +44,7 @@ fn extract_batch_duties(
     tip_height: u64,
     tip_id: L2BlockId,
     chs_provider: &impl ChainstateProvider,
+    rollup_params_commitment: Buf32,
 ) -> Result<Vec<Duty>, Error> {
     if !state.is_chain_active() {
         debug!("chain not active, no duties created");
@@ -92,7 +95,7 @@ fn extract_batch_duties(
             let current_chain_state_root = current_chain_state.compute_state_root();
             let l2_transition = (initial_chain_state_root, current_chain_state_root);
 
-            let new_checkpt = CheckpointInfo::new(
+            let new_batch = BatchInfo::new(
                 first_checkpoint_idx,
                 l1_range,
                 l2_range,
@@ -100,14 +103,15 @@ fn extract_batch_duties(
                 l2_transition,
                 tip_id,
                 (0, current_l1_state.total_accumulated_pow),
+                rollup_params_commitment,
             );
 
-            let genesis_bootstrap = new_checkpt.to_bootstrap_initial();
-            let batch_duty = BatchCheckpointDuty::new(new_checkpt, genesis_bootstrap);
+            let genesis_bootstrap = new_batch.get_initial_bootstrap_state();
+            let batch_duty = BatchCheckpointDuty::new(new_batch, genesis_bootstrap);
             Ok(vec![Duty::CommitBatch(batch_duty)])
         }
-        Some(l1checkpoint) => {
-            let checkpoint = l1checkpoint.checkpoint.clone();
+        Some(prev_checkpoint) => {
+            let checkpoint = prev_checkpoint.batch_info.clone();
 
             let l1_range = (checkpoint.l1_range.1 + 1, state.l1_view().tip_height());
             let current_l1_state = state
@@ -115,18 +119,18 @@ fn extract_batch_duties(
                 .tip_verification_state()
                 .ok_or(Error::ChainInactive)?;
             let current_l1_state_hash = current_l1_state.compute_hash().unwrap();
-            let l1_transition = (checkpoint.l1_transition.0, current_l1_state_hash);
+            let l1_transition = (checkpoint.l1_transition.1, current_l1_state_hash);
 
             // Also, rather than tip heights, we might need to limit the max range a prover will be
             // proving
-            let l2_range = (checkpoint.l2_range.0, tip_height);
+            let l2_range = (checkpoint.l2_range.1 + 1, tip_height);
             let current_chain_state = chs_provider
                 .get_toplevel_state(tip_height)?
                 .ok_or(Error::MissingIdxChainstate(0))?;
             let current_chain_state_root = current_chain_state.compute_state_root();
-            let l2_transition = (checkpoint.l2_transition.0, current_chain_state_root);
+            let l2_transition = (checkpoint.l2_transition.1, current_chain_state_root);
 
-            let new_checkpt = CheckpointInfo::new(
+            let new_batch = BatchInfo::new(
                 checkpoint.idx + 1,
                 l1_range,
                 l2_range,
@@ -137,12 +141,17 @@ fn extract_batch_duties(
                     checkpoint.l1_pow_transition.1,
                     current_l1_state.total_accumulated_pow,
                 ),
+                rollup_params_commitment,
             );
 
-            let batch_duty = BatchCheckpointDuty::new(
-                new_checkpt,
-                l1checkpoint.checkpoint.to_bootstrap_initial(),
-            );
+            // If prev checkpoint was proved, use the bootstrap state of the prev checkpoint
+            // else create a bootstrap state based on initial info of this batch
+            let bootstrap_state = if prev_checkpoint.is_proved {
+                prev_checkpoint.bootstrap_state.clone()
+            } else {
+                new_batch.get_initial_bootstrap_state()
+            };
+            let batch_duty = BatchCheckpointDuty::new(new_batch, bootstrap_state);
             Ok(vec![Duty::CommitBatch(batch_duty)])
         }
     }

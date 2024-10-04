@@ -6,6 +6,7 @@ version = "0.1.0"
 [dependencies]
 anyhow = { workspace = true }
 arbitrary = { workspace = true }
+bincode = { workspace = true }
 bitcoin = { workspace = true, features = ["serde", "rand-std"] }
 borsh = { workspace = true }
 digest = { workspace = true }

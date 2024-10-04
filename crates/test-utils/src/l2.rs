@@ -74,8 +74,8 @@ pub fn gen_params() -> Params {
             rollup_name: "express".to_string(),
             block_time: 1000,
             cred_rule: block_credential::CredRule::Unchecked,
-            horizon_l1_height: 42003,
-            genesis_l1_height: 42005,
+            horizon_l1_height: 40318,
+            genesis_l1_height: 40320, // we have mainnet blocks from this height test-utils
             operator_config: OperatorConfig::Static(vec![opkeys]),
             evm_genesis_block_hash: Buf32(
                 "0x37ad61cff1367467a98cf7c54c4ac99e989f1fbb1bc1e646235e90c065c565ba"

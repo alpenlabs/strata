@@ -121,7 +121,7 @@ def check_nth_checkpoint_finalized(
     syncstat = seqrpc.alp_syncStatus()
 
     # Wait until we find our expected checkpoint.
-    checkpoint_info = wait_until_with_value(
+    batch_info = wait_until_with_value(
         lambda: seqrpc.alp_getCheckpointInfo(idx),
         predicate=lambda v: v is not None,
         error_with="Could not find checkpoint info",
@@ -129,13 +129,13 @@ def check_nth_checkpoint_finalized(
     )
 
     assert (
-        syncstat["finalized_block_id"] != checkpoint_info["l2_blockid"]
+        syncstat["finalized_block_id"] != batch_info["l2_blockid"]
     ), "Checkpoint block should not yet finalize"
-    assert checkpoint_info["idx"] == idx
+    assert batch_info["idx"] == idx
     checkpoint_info_next = seqrpc.alp_getCheckpointInfo(idx + 1)
     assert checkpoint_info_next is None, f"There should be no checkpoint info for {idx + 1} index"
 
-    to_finalize_blkid = checkpoint_info["l2_blockid"]
+    to_finalize_blkid = batch_info["l2_blockid"]
 
     # Submit checkpoint if proof_timeout is not set
     if proof_timeout is None:

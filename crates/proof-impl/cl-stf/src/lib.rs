@@ -1,7 +1,9 @@
 //! This crate implements the proof of the chain state transition function (STF) for L2 blocks,
 //! verifying the correct state transitions as new L2 blocks are processed.
 
-use alpen_express_primitives::{buf::Buf32, evm_exec::create_evm_extra_payload, params::Params};
+use alpen_express_primitives::{
+    buf::Buf32, evm_exec::create_evm_extra_payload, params::RollupParams,
+};
 use alpen_express_state::{
     block::ExecSegment,
     block_validation::{check_block_credential, validate_block_segments},
@@ -15,14 +17,18 @@ pub fn verify_and_transition(
     prev_chstate: ChainState,
     new_l2_block: L2Block,
     el_proof_pp: ELProofPublicParams,
-    chain_params: Params,
+    rollup_params: &RollupParams,
 ) -> ChainState {
-    verify_l2_block(&new_l2_block, &el_proof_pp, &chain_params);
-    apply_state_transition(prev_chstate, &new_l2_block, &chain_params)
+    verify_l2_block(&new_l2_block, &el_proof_pp, rollup_params);
+    apply_state_transition(prev_chstate, &new_l2_block, rollup_params)
 }
 
 /// Verifies the L2 block.
-fn verify_l2_block(block: &L2Block, el_proof_pp: &ELProofPublicParams, chain_params: &Params) {
+fn verify_l2_block(
+    block: &L2Block,
+    el_proof_pp: &ELProofPublicParams,
+    chain_params: &RollupParams,
+) {
     // Assert that the block has been signed by the designated signer
     assert!(
         check_block_credential(block.header(), chain_params),
@@ -61,7 +67,7 @@ fn reconstruct_exec_segment(el_proof_pp: &ELProofPublicParams) -> ExecSegment {
 fn apply_state_transition(
     prev_chstate: ChainState,
     new_l2_block: &L2Block,
-    chain_params: &Params,
+    chain_params: &RollupParams,
 ) -> ChainState {
     let mut state_cache = StateCache::new(prev_chstate);
 
@@ -69,7 +75,7 @@ fn apply_state_transition(
         &mut state_cache,
         new_l2_block.header(),
         new_l2_block.body(),
-        chain_params.rollup(),
+        chain_params,
     )
     .expect("Failed to process the L2 block");
 

@@ -1,8 +1,9 @@
 //! This crate implements the aggregation of consecutive L1 blocks to form a single proof
 
+use alpen_express_primitives::buf::Buf32;
 use alpen_express_state::{
     batch::BatchCheckpoint,
-    l1::{BtcParams, HeaderVerificationState, HeaderVerificationStateSnapshot},
+    l1::{get_btc_params, HeaderVerificationState, HeaderVerificationStateSnapshot},
     tx::DepositInfo,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -17,29 +18,45 @@ pub struct L1BatchProofInput {
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct L1BatchProofOutput {
     pub deposits: Vec<DepositInfo>,
-    pub state_update: Option<BatchCheckpoint>,
+    pub prev_checkpoint: Option<BatchCheckpoint>,
     pub initial_snapshot: HeaderVerificationStateSnapshot,
     pub final_snapshot: HeaderVerificationStateSnapshot,
+    pub rollup_params_commitment: Buf32,
 }
 
-pub fn process_batch_proof(input: L1BatchProofInput, params: &BtcParams) -> L1BatchProofOutput {
+impl L1BatchProofOutput {
+    pub fn rollup_params_commitment(&self) -> Buf32 {
+        self.rollup_params_commitment
+    }
+}
+
+pub fn process_batch_proof(input: L1BatchProofInput) -> L1BatchProofOutput {
     let mut state = input.state;
     let initial_snapshot = state.compute_snapshot();
+    let params = get_btc_params();
+
+    assert!(!input.batch.is_empty());
+    let rollup_params_commitment = input.batch[0].rollup_params_commitment;
 
     let mut deposits = Vec::new();
-    let mut state_update = None;
+    let mut prev_checkpoint = None;
     for blockspace in input.batch {
         let header = bitcoin::consensus::deserialize(&blockspace.header_raw).unwrap();
-        state.check_and_update_full(&header, params);
+        state.check_and_update_full(&header, &params);
         deposits.extend(blockspace.deposits);
-        state_update = state_update.or(blockspace.state_update);
+        prev_checkpoint = prev_checkpoint.or(blockspace.prev_checkpoint);
+        assert_eq!(
+            blockspace.rollup_params_commitment,
+            rollup_params_commitment
+        );
     }
     let final_snapshot = state.compute_snapshot();
 
     L1BatchProofOutput {
         deposits,
-        state_update,
+        prev_checkpoint,
         initial_snapshot,
         final_snapshot,
+        rollup_params_commitment,
     }
 }

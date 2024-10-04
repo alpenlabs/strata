@@ -1,7 +1,7 @@
 //! Module for database local types
 
 use alpen_express_primitives::buf::Buf32;
-use alpen_express_state::batch::{BatchCheckpoint, BootstrapCheckpointInfo, CheckpointInfo};
+use alpen_express_state::batch::{BatchCheckpoint, BatchInfo, BootstrapState};
 use arbitrary::Arbitrary;
 use bitcoin::{
     consensus::{self, deserialize, serialize},
@@ -143,11 +143,11 @@ pub enum L1TxStatus {
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct CheckpointEntry {
     /// Info related to the batch
-    pub checkpoint_info: CheckpointInfo,
+    pub batch_info: BatchInfo,
 
     /// Includes the initial and final hashed state of both the `L1StateTransition` and
     /// `L2StateTransition` that happened in this batch
-    pub bootstrap: BootstrapCheckpointInfo,
+    pub bootstrap: BootstrapState,
 
     /// Proof
     pub proof: Proof,
@@ -161,14 +161,14 @@ pub struct CheckpointEntry {
 
 impl CheckpointEntry {
     pub fn new(
-        checkpoint_info: CheckpointInfo,
-        bootstrap: BootstrapCheckpointInfo,
+        batch_info: BatchInfo,
+        bootstrap: BootstrapState,
         proof: Proof,
         proving_status: CheckpointProvingStatus,
         confirmation_status: CheckpointConfStatus,
     ) -> Self {
         Self {
-            checkpoint_info,
+            batch_info,
             bootstrap,
             proof,
             proving_status,
@@ -177,11 +177,11 @@ impl CheckpointEntry {
     }
 
     pub fn into_batch_checkpoint(self) -> BatchCheckpoint {
-        BatchCheckpoint::new(self.checkpoint_info, self.bootstrap, self.proof)
+        BatchCheckpoint::new(self.batch_info, self.bootstrap, self.proof)
     }
 
     /// Creates a new instance for a freshly defined checkpoint.
-    pub fn new_pending_proof(info: CheckpointInfo, bootstrap: BootstrapCheckpointInfo) -> Self {
+    pub fn new_pending_proof(info: BatchInfo, bootstrap: BootstrapState) -> Self {
         Self::new(
             info,
             bootstrap,

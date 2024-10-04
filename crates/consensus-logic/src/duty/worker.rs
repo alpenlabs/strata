@@ -77,6 +77,10 @@ fn duty_tracker_task_inner(
     };
     duties_tracker.set_finalized_block(last_finalized_blk);
 
+    // TODO: figure out where the l1_tx_filters_commitment is stored
+    // Maybe in the chain state?
+    let rollup_params_commitment = params.rollup().compute_hash();
+
     loop {
         if shutdown.should_shutdown() {
             warn!("received shutdown signal");
@@ -106,6 +110,7 @@ fn duty_tracker_task_inner(
             l2_block_manager,
             params,
             &**database.chain_state_provider(),
+            rollup_params_commitment,
         ) {
             error!(err = %e, "failed to update duties tracker");
         }
@@ -129,12 +134,14 @@ fn update_tracker(
     l2_block_manager: &L2BlockManager,
     params: &Params,
     chs_provider: &impl ChainstateProvider,
+    rollup_params_commitment: Buf32,
 ) -> Result<(), Error> {
     let Some(ss) = state.sync() else {
         return Ok(());
     };
 
-    let new_duties = extractor::extract_duties(state, ident, params, chs_provider)?;
+    let new_duties =
+        extractor::extract_duties(state, ident, params, chs_provider, rollup_params_commitment)?;
 
     info!(new_duties = ?new_duties, "new duties");
 
@@ -158,7 +165,7 @@ fn update_tracker(
     let latest_finalized_batch = state
         .l1_view()
         .last_finalized_checkpoint()
-        .map(|x| x.checkpoint.idx());
+        .map(|x| x.batch_info.idx());
 
     let tracker_update = types::StateUpdate::new(
         block_idx,

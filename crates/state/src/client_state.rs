@@ -8,7 +8,7 @@ use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::{
-    batch::CheckpointInfo,
+    batch::{BatchInfo, BootstrapState},
     id::L2BlockId,
     l1::{HeaderVerificationState, L1BlockId},
 };
@@ -267,7 +267,7 @@ impl LocalL1State {
 
     pub fn get_verified_l1_height(&self, block_height: u64) -> Option<u64> {
         self.verified_checkpoints.last().and_then(|ch| {
-            if ch.checkpoint.includes_l2_block(block_height) {
+            if ch.batch_info.includes_l2_block(block_height) {
                 Some(ch.height)
             } else {
                 None
@@ -278,16 +278,27 @@ impl LocalL1State {
 
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
 pub struct L1CheckPoint {
-    /// The inner checkpoint info
-    pub checkpoint: CheckpointInfo,
+    /// The inner checkpoint batch info
+    pub batch_info: BatchInfo,
+    /// The inner checkpoint batch info
+    pub bootstrap_state: BootstrapState,
+    /// If the checkpoint included proof
+    pub is_proved: bool,
     /// L1 block height it appears in
     pub height: u64,
 }
 
 impl L1CheckPoint {
-    pub fn new(info: CheckpointInfo, height: u64) -> Self {
+    pub fn new(
+        batch_info: BatchInfo,
+        bootstrap_state: BootstrapState,
+        is_proved: bool,
+        height: u64,
+    ) -> Self {
         Self {
-            checkpoint: info,
+            batch_info,
+            bootstrap_state,
+            is_proved,
             height,
         }
     }

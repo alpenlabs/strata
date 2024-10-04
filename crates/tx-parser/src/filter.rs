@@ -1,4 +1,4 @@
-use alpen_express_primitives::params::DepositTxParams;
+use alpen_express_primitives::params::{DepositTxParams, RollupParams};
 use alpen_express_state::{batch::SignedBatchCheckpoint, tx::ProtocolOperation};
 use bitcoin::{Block, Transaction};
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -20,6 +20,14 @@ pub enum TxFilterRule {
 }
 
 type RollupName = String;
+
+pub fn derive_tx_filter_rules(params: &RollupParams) -> Vec<TxFilterRule> {
+    let deposit_provider = params.get_deposit_params();
+    vec![
+        TxFilterRule::RollupInscription(params.rollup_name.clone()),
+        TxFilterRule::Deposit(deposit_provider),
+    ]
+}
 
 /// Filter all the relevant [`Transaction`]s in a block based on given [`TxFilterRule`]s
 pub fn filter_relevant_txs(block: &Block, filters: &[TxFilterRule]) -> Vec<ProtocolOpTxRef> {

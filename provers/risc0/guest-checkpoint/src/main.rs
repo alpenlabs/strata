@@ -1,4 +1,4 @@
-use alpen_express_state::batch::CheckpointInfo;
+use alpen_express_state::batch::BatchInfo;
 use express_proofimpl_checkpoint::{
     self, process_checkpoint_proof, HashedCheckpointState, L2BatchProofOutput,
 };
@@ -50,11 +50,7 @@ fn main() {
     env::write(&borsh::to_vec(&output).unwrap());
 }
 
-fn verify_prev_checkpoint(
-    prev_checkpoint: &CheckpointInfo,
-    proof: &Proof,
-    checkpoint_vk: [u32; 8],
-) {
+fn verify_prev_checkpoint(prev_checkpoint: &BatchInfo, proof: &Proof, checkpoint_vk: [u32; 8]) {
     let buf1: Vec<u8> = to_vec(&borsh::to_vec(prev_checkpoint).unwrap())
         .unwrap()
         .clone()
