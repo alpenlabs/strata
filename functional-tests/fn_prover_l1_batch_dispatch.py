@@ -13,7 +13,7 @@ class ProverClientTest(flexitest.Test):
         prover_client_rpc = prover_client.create_rpc()
 
         # Wait for the some block building
-        time.sleep(3)
+        time.sleep(4)
 
         rpc_res = prover_client_rpc.dev_alp_proveL1Batch((1, 3))
         print("got the rpc res: {}", rpc_res)

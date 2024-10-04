@@ -19,7 +19,15 @@ class ProverClientTest(flexitest.Test):
         print("got the rpc res: {}", rpc_res)
         assert rpc_res is not None
 
+        rpc_res = prover_client_rpc.dev_alp_proveBtcBlock(2)
+        print("got the rpc res: {}", rpc_res)
+        assert rpc_res is not None
+
+        rpc_res = prover_client_rpc.dev_alp_proveBtcBlock(3)
+        print("got the rpc res: {}", rpc_res)
+        assert rpc_res is not None
+
         # rpc_res = prover_client_rpc.dev_alp_proveBtcBlock(2)
         # print("got the rpc res: {}", rpc_res)
         # assert rpc_res is not None
-        time.sleep(120)
+        time.sleep(150)

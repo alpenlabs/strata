@@ -118,24 +118,24 @@ where
             .build()?,
 
         ZKVMInput::L1Batch(l1_batch_input) => {
-            let proofs_with_vkey = l1_batch_input.clone().get_proofs();
-            let mut blockspace_outputs = Vec::new();
-            for proof_with_vkey in proofs_with_vkey {
-                let raw_output: Vec<u8> =
-                    SP1Verifier::extract_public_output(proof_with_vkey.proof())
-                        .expect("Failed to extract public outputs");
-                let output: BlockspaceProofOutput = borsh::from_slice(&raw_output).unwrap();
-                blockspace_outputs.push(output);
-            }
+            // let proofs_with_vkey = l1_batch_input.clone().get_proofs();
+            // let mut blockspace_outputs = Vec::new();
+            // for proof_with_vkey in proofs_with_vkey {
+            //     let raw_output: Vec<u8> =
+            //         SP1Verifier::extract_public_output(proof_with_vkey.proof())
+            //             .expect("Failed to extract public outputs");
+            //     let output: BlockspaceProofOutput = borsh::from_slice(&raw_output).unwrap();
+            //     blockspace_outputs.push(output);
+            // }
 
-            let batch_input = L1BatchProofInput {
-                batch: blockspace_outputs,
-                state: l1_batch_input.clone().header_verification_state,
-            };
+            // let batch_input = L1BatchProofInput {
+            //     batch: blockspace_outputs,
+            //     state: l1_batch_input.clone().header_verification_state,
+            // };
 
             let mut input_builder = Vm::Input::new();
-            input_builder.write_borsh(&batch_input)?;
-
+            input_builder.write_borsh(&l1_batch_input.header_verification_state)?;
+            input_builder.write(&l1_batch_input.btc_task_ids.len())?;
             // Write each proof input
             for proof_input in l1_batch_input.get_proofs() {
                 input_builder.write_proof(proof_input)?;

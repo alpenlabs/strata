@@ -62,18 +62,6 @@ impl ProvingOperations for BtcOperations {
     }
 }
 
-/// Generates transaction filters for BTC blocks.
-fn get_tx_filters() -> Vec<TxFilterRule> {
-    let rollup_params = get_pm_rollup_params();
-    let rollup_name = rollup_params.rollup_name.clone();
-    // let deposit_config = DepositTxConfig::from_rollup_params(&rollup_params);
-    vec![
-        // TODO:
-        // TxFilterRule::Deposit(deposit_config),
-        TxFilterRule::RollupInscription(rollup_name),
-    ]
-}
-
 pub fn get_pm_rollup_params() -> RollupParams {
     // FIXME this is broken, where are the keys?
     let opkeys = OperatorPubkeys::new(Buf32::zero(), Buf32::zero());
