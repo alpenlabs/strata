@@ -16,6 +16,7 @@ use bitcoin::{
     bip32::{ChildNumber, DerivationPath, Xpriv, Xpub},
     Network,
 };
+use express_sp1_guest_builder::GUEST_CHECKPOINT_ELF_STR;
 use rand::{rngs::OsRng, Rng};
 
 // TODO move some of these into a keyderiv crate
@@ -326,8 +327,7 @@ fn exec_genparams(cmd: SubcGenParams, ctx: &mut CmdContext) -> anyhow::Result<()
             Some(s) => hex::decode(s)?,
 
             // TODO update this with vk for checkpoint proof
-            None => hex::decode("00b01ae596b4e51843484ff71ccbd0dd1a030af70b255e6b9aad50b81d81266f")
-                .unwrap(),
+            None => hex::decode(GUEST_CHECKPOINT_ELF_STR.strip_prefix("0x").unwrap()).unwrap(),
         };
 
         let Ok(vk) = Buf32::try_from(vk_buf.as_slice()) else {

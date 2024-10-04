@@ -48,20 +48,16 @@ fn main() {
     }
 
     // Write the methods.rs file with ELF contents and VK hashes
-    for (elf_name, (elf_contents, vk_hash_u32)) in &results {
+    for (elf_name, (elf_contents, vk_hash_u32, vk_hash_str)) in &results {
         let elf_name_id = format!("{}_ID", elf_name);
-        let contents_str = elf_contents
-            .iter()
-            .map(|byte| format!("{:#04x}", byte))
-            .collect::<Vec<_>>()
-            .join(", ");
-
+        let elf_name_str = format!("{}_STR", elf_name);
         methods_file_content.push_str(&format!(
             r#"
-pub const {}: &[u8] = &[{}];
+pub const {}: &[u8] = &{:?};
 pub const {}: &[u32] = &{:?};
+pub const {}: &str = "{}";
 "#,
-            elf_name, contents_str, elf_name_id, vk_hash_u32
+            elf_name, elf_contents, elf_name_id, vk_hash_u32, elf_name_str, vk_hash_str
         ));
     }
 
@@ -74,7 +70,7 @@ fn build_program_with_dependencies(
     program: &str,
     dependencies: &HashMap<&str, Vec<&str>>,
     built_programs: &mut HashSet<String>,
-    results: &mut HashMap<String, (Vec<u8>, [u32; 8])>,
+    results: &mut HashMap<String, (Vec<u8>, [u32; 8], String)>,
     vk_hashes: &mut HashMap<String, [u32; 8]>,
 ) {
     if built_programs.contains(program) {
@@ -111,9 +107,12 @@ fn build_program_with_dependencies(
 
     // Now build the current program
     let elf_name = format!("{}_ELF", program.to_uppercase().replace("-", "_"));
-    let (elf_contents, vk_hash_u32) = generate_elf_contents_and_vk_hash(program);
+    let (elf_contents, vk_hash_u32, vk_hash_str) = generate_elf_contents_and_vk_hash(program);
 
-    results.insert(elf_name.clone(), (elf_contents.clone(), vk_hash_u32));
+    results.insert(
+        elf_name.clone(),
+        (elf_contents.clone(), vk_hash_u32, vk_hash_str),
+    );
     vk_hashes.insert(program.to_string(), vk_hash_u32);
     built_programs.insert(program.to_string());
 }
@@ -129,7 +128,7 @@ fn get_output_dir() -> PathBuf {
 }
 
 #[cfg(not(debug_assertions))]
-fn generate_elf_contents_and_vk_hash(program: &str) -> (Vec<u8>, [u32; 8]) {
+fn generate_elf_contents_and_vk_hash(program: &str) -> (Vec<u8>, [u32; 8], String) {
     // Setup compiler
     env::set_var("CC_riscv32im_succinct_zkvm_elf", RISC_V_COMPILER);
 
@@ -141,12 +140,16 @@ fn generate_elf_contents_and_vk_hash(program: &str) -> (Vec<u8>, [u32; 8]) {
     let contents = fs::read(elf_path).expect("Failed to find SP1 ELF");
     let client = MockProver::new();
     let (_pk, vk) = client.setup(&contents);
-    (contents, vk.hash_u32())
+    (contents, vk.hash_u32(), vk.bytes32())
 }
 
 #[cfg(debug_assertions)]
-fn generate_elf_contents_and_vk_hash(_program: &str) -> (Vec<u8>, [u32; 8]) {
-    (Vec::new(), [0u32; 8])
+fn generate_elf_contents_and_vk_hash(_program: &str) -> (Vec<u8>, [u32; 8], String) {
+    (
+        Vec::new(),
+        [0u32; 8],
+        "0x0000000000000000000000000000000000000000000000000000000000000000".to_owned(),
+    )
 }
 
 fn get_guest_programs() -> Vec<String> {
