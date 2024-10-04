@@ -1,3 +1,5 @@
+import time
+
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 
@@ -6,7 +8,7 @@ from entry import BasicEnvConfig
 from utils import wait_until
 
 EVM_WAIT_TIME = 2
-
+SATS_TO_WEI = 10**10
 
 @flexitest.register
 class BridgeDepositTest(flexitest.Test):
@@ -58,3 +60,13 @@ class BridgeDepositTest(flexitest.Test):
             error_with="zero eth balance",
             timeout=EVM_WAIT_TIME,
         )
+
+        block_num = rethrpc.eth_blockNumber()
+        balance = int(rethrpc.eth_getBalance(f"0x{evm_addr}"), 16)
+        assert balance == ROLLUP_PARAMS_FOR_DEPOSIT_TX["deposit_amount"] * SATS_TO_WEI, f"invalid deposit amount: {balance}"
+        # sleep time > block production time
+        time.sleep(2)
+        block_num_after = rethrpc.eth_blockNumber()
+        assert block_num_after > block_num, "not building blocks"
+        balance = int(rethrpc.eth_getBalance(f"0x{evm_addr}"), 16)
+        assert balance == ROLLUP_PARAMS_FOR_DEPOSIT_TX["deposit_amount"] * SATS_TO_WEI, f"deposit processed multiple times: {balance}"
