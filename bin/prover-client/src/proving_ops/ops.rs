@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use uuid::Uuid;
 
 use crate::{
-    errors::{ProvingTaskType, ProvingTaskError},
+    errors::{ProvingTaskError, ProvingTaskType},
     task::TaskTracker,
 };
 

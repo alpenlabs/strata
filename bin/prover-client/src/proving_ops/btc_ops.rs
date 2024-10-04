@@ -17,7 +17,7 @@ use uuid::Uuid;
 use super::ops::ProvingOperations;
 use crate::{
     errors::{ProvingTaskError, ProvingTaskType},
-    primitives::prover_input::ProverInput,
+    primitives::prover_input::ZKVMInput,
     task::TaskTracker,
 };
 
@@ -57,7 +57,7 @@ impl ProvingOperations for BtcOperations {
         input: Self::Input,
     ) -> Result<Uuid, ProvingTaskError> {
         let (block, filters) = input;
-        let prover_input = ProverInput::BtcBlock(block, filters);
+        let prover_input = ZKVMInput::BtcBlock(block, filters);
         let task_id = task_tracker.create_task(prover_input, vec![]).await;
         Ok(task_id)
     }

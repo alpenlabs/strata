@@ -1,13 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
-use alpen_express_btcio::{
-    reader::query::get_verification_state,
-    rpc::{traits::Reader, BitcoinClient},
-};
-use alpen_express_state::l1::{
-    get_btc_params, get_difficulty_adjustment_height, BtcParams, HeaderVerificationState,
-    L1BlockId, TimestampStore,
-};
+use alpen_express_btcio::{reader::query::get_verification_state, rpc::BitcoinClient};
+use alpen_express_state::l1::HeaderVerificationState;
 use async_trait::async_trait;
 use bitcoin::params::MAINNET;
 use uuid::Uuid;
@@ -16,7 +10,7 @@ use super::{btc_ops::BtcOperations, ops::ProvingOperations};
 use crate::{
     dispatcher::TaskDispatcher,
     errors::{ProvingTaskError, ProvingTaskType},
-    primitives::prover_input::{ProofWithVkey, ProverInput},
+    primitives::prover_input::{ProofWithVkey, ZKVMInput},
     task::TaskTracker,
 };
 
@@ -114,7 +108,7 @@ impl ProvingOperations for L1BatchOperations {
 
         // Create the l1_batch task with dependencies on btc tasks
         let task_id = task_tracker
-            .create_task(ProverInput::L1Batch(input), dependencies)
+            .create_task(ZKVMInput::L1Batch(input), dependencies)
             .await;
         Ok(task_id)
     }

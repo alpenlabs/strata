@@ -14,7 +14,7 @@ pub type ProofWithVkey = AggregationInput;
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 #[allow(clippy::large_enum_variant)]
-pub enum ProverInput {
+pub enum ZKVMInput {
     BtcBlock(Block, Vec<TxFilterRule>),
     ElBlock(WitnessData),
     ClBlock(CLProverInput),
@@ -23,15 +23,15 @@ pub enum ProverInput {
     Checkpoint(CheckpointInput),
 }
 
-impl ProverInput {
+impl ZKVMInput {
     pub fn proof_vm_id(&self) -> ProofVm {
         match self {
-            ProverInput::BtcBlock(_, _) => ProofVm::BtcProving,
-            ProverInput::ElBlock(_) => ProofVm::ELProving,
-            ProverInput::ClBlock(_) => ProofVm::CLProving,
-            ProverInput::L1Batch(_) => ProofVm::L1Batch,
-            ProverInput::L2Batch(_) => ProofVm::CLAggregation,
-            ProverInput::Checkpoint(_) => ProofVm::Checkpoint,
+            ZKVMInput::BtcBlock(_, _) => ProofVm::BtcProving,
+            ZKVMInput::ElBlock(_) => ProofVm::ELProving,
+            ZKVMInput::ClBlock(_) => ProofVm::CLProving,
+            ZKVMInput::L1Batch(_) => ProofVm::L1Batch,
+            ZKVMInput::L2Batch(_) => ProofVm::CLAggregation,
+            ZKVMInput::Checkpoint(_) => ProofVm::Checkpoint,
         }
     }
 }
