@@ -4,15 +4,15 @@ name = "express-storage"
 version = "0.1.0"
 
 [dependencies]
-alpen-express-db = { workspace = true }
-alpen-express-primitives = { workspace = true }
-alpen-express-state = { workspace = true }
+alpen-express-db.workspace = true
+alpen-express-primitives.workspace = true
+alpen-express-state.workspace = true
 
-anyhow = { workspace = true }
-async-trait = { workspace = true }
-bitcoin = { workspace = true }
-lru = { workspace = true }
-paste = { workspace = true }
-threadpool = { workspace = true }
-tokio = { workspace = true }
-tracing = { workspace = true }
+anyhow.workspace = true
+async-trait.workspace = true
+bitcoin.workspace = true
+lru.workspace = true
+paste.workspace = true
+threadpool.workspace = true
+tokio.workspace = true
+tracing.workspace = true

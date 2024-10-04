@@ -13,8 +13,8 @@ rust.unused_must_use = "deny"
 rustdoc.all = "warn"
 
 [dependencies]
-alpen-express-state = { workspace = true }
-bitcoin = { workspace = true }
+alpen-express-state.workspace = true
+bitcoin.workspace = true
 jsonrpsee = { workspace = true, features = ["server", "macros"] }
 
 [features]

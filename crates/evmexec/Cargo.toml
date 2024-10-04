@@ -4,35 +4,35 @@ name = "alpen-express-evmexec"
 version = "0.1.0"
 
 [dependencies]
-alpen-express-db = { workspace = true }
-alpen-express-eectl = { workspace = true }
-alpen-express-primitives = { workspace = true }
-alpen-express-state = { workspace = true }
-express-reth-evm = { workspace = true }
-express-reth-node = { workspace = true }
-express-storage = { workspace = true }
+alpen-express-db.workspace = true
+alpen-express-eectl.workspace = true
+alpen-express-primitives.workspace = true
+alpen-express-state.workspace = true
+express-reth-evm.workspace = true
+express-reth-node.workspace = true
+express-storage.workspace = true
 
-anyhow = { workspace = true }
-arbitrary = { workspace = true }
-borsh = { workspace = true }
-futures = { workspace = true }
-http = { workspace = true }
-hyper = { workspace = true }
+anyhow.workspace = true
+arbitrary.workspace = true
+borsh.workspace = true
+futures.workspace = true
+http.workspace = true
+hyper.workspace = true
 jsonrpsee = { workspace = true, features = ["jsonrpsee-http-client"] }
-reth-node-ethereum = { workspace = true }
+reth-node-ethereum.workspace = true
 reth-primitives = { workspace = true, features = ["default"] }
-reth-rpc = { workspace = true }
-reth-rpc-api = { workspace = true }
-reth-rpc-layer = { workspace = true }
-reth-rpc-types = { workspace = true }
-reth-rpc-types-compat = { workspace = true }
-serde = { workspace = true }
-thiserror = { workspace = true }
-tokio = { workspace = true }
-tower = { workspace = true }
-tracing = { workspace = true }
+reth-rpc.workspace = true
+reth-rpc-api.workspace = true
+reth-rpc-layer.workspace = true
+reth-rpc-types.workspace = true
+reth-rpc-types-compat.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tower.workspace = true
+tracing.workspace = true
 
 [dev-dependencies]
-alpen-test-utils = { workspace = true }
-mockall = { workspace = true }
-rand = { workspace = true }
+alpen-test-utils.workspace = true
+mockall.workspace = true
+rand.workspace = true

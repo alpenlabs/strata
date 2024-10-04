@@ -13,22 +13,22 @@ rust.unused_must_use = "deny"
 rustdoc.all = "warn"
 
 [dependencies]
-alpen-express-common = { workspace = true }
-alpen-express-primitives = { workspace = true }
-alpen-express-rocksdb = { workspace = true }
-express-bridge-sig-manager = { workspace = true }
-express-bridge-tx-builder = { workspace = true }
-express-storage = { workspace = true }
+alpen-express-common.workspace = true
+alpen-express-primitives.workspace = true
+alpen-express-rocksdb.workspace = true
+express-bridge-sig-manager.workspace = true
+express-bridge-tx-builder.workspace = true
+express-storage.workspace = true
 
-anyhow = { workspace = true }                           # anyhow should be fine for tests
+anyhow.workspace = true                                 # anyhow should be fine for tests
 bitcoin = { workspace = true, features = ["rand-std"] }
-bitcoind = { workspace = true }
-threadpool = { workspace = true }
-tokio = { workspace = true }
-tracing = { workspace = true }
+bitcoind.workspace = true
+threadpool.workspace = true
+tokio.workspace = true
+tracing.workspace = true
 
 [dev-dependencies]
-alpen-test-utils = { workspace = true }
+alpen-test-utils.workspace = true
 
 [[test]]
 name = "bridge-in-flow"

@@ -4,14 +4,14 @@ name = "express-risc0-adapter"
 version = "0.1.0"
 
 [dependencies]
-anyhow = { workspace = true }
-bincode = { workspace = true }
-borsh = { workspace = true }
-express-zkvm = { workspace = true }
+anyhow.workspace = true
+bincode.workspace = true
+borsh.workspace = true
+express-zkvm.workspace = true
 risc0-zkvm = "1.0.3"
-serde = { workspace = true }
-serde_json = { workspace = true }
-sha2 = { workspace = true }
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [features]

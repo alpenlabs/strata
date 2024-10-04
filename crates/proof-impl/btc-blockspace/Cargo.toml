@@ -4,14 +4,14 @@ name = "express-proofimpl-btc-blockspace"
 version = "0.1.0"
 
 [dependencies]
-alpen-express-primitives = { workspace = true }
-alpen-express-state = { workspace = true }
+alpen-express-primitives.workspace = true
+alpen-express-state.workspace = true
 bitcoin = { workspace = true, features = ["serde"] }
-borsh = { workspace = true }
-express-bridge-tx-builder = { workspace = true }
+borsh.workspace = true
+express-bridge-tx-builder.workspace = true
 serde = { workspace = true, features = ["derive"] }
-sha2 = { workspace = true }
-strata-tx-parser = { workspace = true }
+sha2.workspace = true
+strata-tx-parser.workspace = true
 
 [dev-dependencies]
 alpen-test-utils.workspace = true

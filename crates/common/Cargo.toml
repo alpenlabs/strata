@@ -4,5 +4,5 @@ name = "alpen-express-common"
 version = "0.1.0"
 
 [dependencies]
-tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
+tracing.workspace = true
+tracing-subscriber.workspace = true

@@ -4,15 +4,15 @@ name = "express-sp1-adapter"
 version = "0.1.0"
 
 [dependencies]
-anyhow = { workspace = true }
-bincode = { workspace = true }
-borsh = { workspace = true }
-express-zkvm = { workspace = true }
-hex = { workspace = true }
+anyhow.workspace = true
+bincode.workspace = true
+borsh.workspace = true
+express-zkvm.workspace = true
+hex.workspace = true
 num-bigint = "0.4.6"
 num-traits = "0.2.19"
-serde = { workspace = true }
-serde_json = { workspace = true }
+serde.workspace = true
+serde_json.workspace = true
 snark-bn254-verifier = { git = "https://github.com/succinctlabs/snark-bn254-verifier.git", branch = "bhargav/groth16-verf" } # Note: This is unstable
 sp1-sdk = "2.0.0"
 substrate-bn = { git = "https://github.com/sp1-patches/bn", branch = "patch-v0.7.0" }

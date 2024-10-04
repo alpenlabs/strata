@@ -4,42 +4,42 @@ name = "alpen-express-btcio"
 version = "0.1.0"
 
 [dependencies]
-alpen-express-db = { workspace = true }
-alpen-express-primitives = { workspace = true }
-alpen-express-rpc-types = { workspace = true }
-alpen-express-state = { workspace = true }
-alpen-express-status = { workspace = true }
-express-bridge-tx-builder = { workspace = true }
-express-storage = { workspace = true }
-express-tasks = { workspace = true }
+alpen-express-db.workspace = true
+alpen-express-primitives.workspace = true
+alpen-express-rpc-types.workspace = true
+alpen-express-state.workspace = true
+alpen-express-status.workspace = true
+express-bridge-tx-builder.workspace = true
+express-storage.workspace = true
+express-tasks.workspace = true
 
-anyhow = { workspace = true }
-async-trait = { workspace = true }
-base64 = { workspace = true }
-bitcoin = { workspace = true }
-bitcoind-json-rpc-types = { workspace = true }
-borsh = { workspace = true }
-bytes = { workspace = true }
-hex = { workspace = true }
+anyhow.workspace = true
+async-trait.workspace = true
+base64.workspace = true
+bitcoin.workspace = true
+bitcoind-json-rpc-types.workspace = true
+borsh.workspace = true
+bytes.workspace = true
+hex.workspace = true
 musig2 = { workspace = true, features = ["serde"] }
-rand = { workspace = true }
-reqwest = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-sha2 = { workspace = true }
-strata-tx-parser = { workspace = true }
-thiserror = { workspace = true }
-threadpool = { workspace = true }
-tokio = { workspace = true }
-tracing = { workspace = true }
+rand.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+strata-tx-parser.workspace = true
+thiserror.workspace = true
+threadpool.workspace = true
+tokio.workspace = true
+tracing.workspace = true
 
 [dev-dependencies]
-alpen-express-common = { workspace = true }
+alpen-express-common.workspace = true
 alpen-express-rocksdb = { workspace = true, features = ["test_utils"] }
-alpen-test-utils = { workspace = true }
-arbitrary = { workspace = true }
-bitcoind = { workspace = true }
-mockall = { workspace = true }
+alpen-test-utils.workspace = true
+arbitrary.workspace = true
+bitcoind.workspace = true
+mockall.workspace = true
 
 [features]
 test_utils = []
