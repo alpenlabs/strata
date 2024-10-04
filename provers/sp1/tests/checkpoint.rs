@@ -1,5 +1,5 @@
 mod helpers;
-// #[cfg(all(feature = "prover", not(debug_assertions)))]
+#[cfg(all(feature = "prover", not(debug_assertions)))]
 mod test {
 
     use alpen_test_utils::l2::gen_params;

@@ -1,6 +1,5 @@
 use std::{panic, sync::Arc};
 
-use alpen_express_crypto::verify_schnorr_sig;
 use alpen_express_db::traits::{Database, L1DataStore};
 use alpen_express_primitives::{
     block_credential::CredRule,
@@ -146,11 +145,7 @@ fn check_for_da_batch(
 
     let sig_verified_checkpoints = signed_checkpts.filter_map(|(signed_checkpoint, tx)| {
         if let Some(seq_pubkey) = seq_pubkey {
-            let sig = signed_checkpoint.signature();
-            let msg = signed_checkpoint.checkpoint().get_sighash();
-            let pk: Buf32 = seq_pubkey.into();
-
-            if !verify_schnorr_sig(&sig, &msg, &pk) {
+            if !signed_checkpoint.verify_sig(seq_pubkey.into()) {
                 error!(
                     ?tx,
                     ?signed_checkpoint,

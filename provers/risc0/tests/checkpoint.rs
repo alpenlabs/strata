@@ -1,5 +1,6 @@
 #[cfg(feature = "prover")]
 mod test {
+    use alpen_express_primitives::buf::Buf32;
     use alpen_express_state::{
         batch::{BatchInfo, BootstrapState},
         chain_state::ChainState,
@@ -117,6 +118,7 @@ mod test {
             deposits: Vec::new(),
             initial_snapshot: l2_snapshot(&get_genesis_chainstate()),
             final_snapshot: l2_snapshot(&get_genesis_chainstate()),
+            rollup_params_commitment: Buf32::zero(), // FIXME
         }
     }
 

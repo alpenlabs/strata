@@ -1,3 +1,4 @@
+use alpen_express_crypto::verify_schnorr_sig;
 use alpen_express_primitives::buf::{Buf32, Buf64};
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -67,6 +68,11 @@ impl SignedBatchCheckpoint {
 
     pub fn checkpoint(&self) -> &BatchCheckpoint {
         &self.inner
+    }
+
+    pub fn verify_sig(&self, pub_key: Buf32) -> bool {
+        let msg = self.checkpoint().get_sighash();
+        verify_schnorr_sig(&self.signature, &msg, &pub_key)
     }
 }
 

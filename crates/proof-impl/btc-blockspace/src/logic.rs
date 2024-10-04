@@ -4,7 +4,6 @@ use alpen_express_primitives::{buf::Buf32, params::RollupParams};
 use alpen_express_state::{batch::BatchCheckpoint, tx::DepositInfo};
 use bitcoin::Block;
 use borsh::{BorshDeserialize, BorshSerialize};
-use strata_tx_parser::filter::derive_tx_filter_rules;
 
 use crate::{block::check_merkle_root, filter::extract_relevant_info};
 
@@ -30,9 +29,8 @@ pub fn process_blockspace_proof(input: &BlockspaceProofInput) -> BlockspaceProof
     } = input;
     assert!(check_merkle_root(block));
     // assert!(check_witness_commitment(block));
-    let filters = derive_tx_filter_rules(rollup_params);
 
-    let (deposits, prev_checkpoint) = extract_relevant_info(block, &filters);
+    let (deposits, prev_checkpoint) = extract_relevant_info(block, rollup_params);
     let rollup_params_commitment = rollup_params.compute_hash();
 
     BlockspaceProofOutput {

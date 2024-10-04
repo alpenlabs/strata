@@ -3936,13 +3936,3 @@ dependencies = [
  "quote",
  "syn 2.0.79",
 ]
-
-[[patch.unused]]
-name = "sha2"
-version = "0.10.6"
-source = "git+https://github.com/sp1-patches/RustCrypto-hashes?branch=patch-sha2-v0.10.6#e5f8b7eaaa9801503bd998932a52b65848eee234"
-
-[[patch.unused]]
-name = "sha2"
-version = "0.9.8"
-source = "git+https://github.com/sp1-patches/RustCrypto-hashes?branch=patch-sha2-v0.9.8#afdbfb09c325f8a69c01d540ec9a261e3637725d"
