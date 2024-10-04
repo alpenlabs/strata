@@ -39,7 +39,7 @@ pub(crate) fn resolve_xpriv(cli_arg: Option<String>) -> anyhow::Result<Xpriv> {
 /// The current descriptor handling is not easy to do as a type,
 /// hence this does all internals checks and then returns the descriptor
 /// as a [`String`].
-pub(crate) fn parse_xpriv(xpriv: Xpriv) -> anyhow::Result<String> {
+pub(crate) fn generate_descriptor_prom_xpriv(xpriv: Xpriv) -> anyhow::Result<String> {
     let hardened_path = DerivationPath::master().extend([
         ChildNumber::from_hardened_idx(DERIV_BASE_IDX).expect("bad child index"),
         ChildNumber::from_hardened_idx(DERIV_OP_IDX).expect("bad child index"),
@@ -51,7 +51,7 @@ pub(crate) fn parse_xpriv(xpriv: Xpriv) -> anyhow::Result<String> {
     let fingerprint = xpriv.xkey_fingerprint(SECP256K1);
     let descriptor_str = format!("tr([{fingerprint}/{hardened_path}]{xpriv}/{normal_path}/*)");
     let checksum = desc_checksum(&descriptor_str).expect("could not calculate descriptor checksum");
-    // tr(derived_xpriv/*)#checksum
+    // tr([fingerprint/hardened_path]/normal_path/*)#checksum
     let descriptor_str = format!("{descriptor_str}#{checksum}");
 
     Ok(descriptor_str)
@@ -72,7 +72,7 @@ pub(crate) async fn check_or_load_descriptor_into_wallet(
         Ok(())
     } else {
         // load the descriptor
-        let descriptor = parse_xpriv(xpriv)?;
+        let descriptor = generate_descriptor_prom_xpriv(xpriv)?;
         let descriptors = vec![ImportDescriptor {
             desc: descriptor,
             active: Some(true),
@@ -116,7 +116,7 @@ mod tests {
     fn parse_xpriv_to_descriptor_string() {
         let expected = "tr([e61b318f/56'/20']tprv8ZgxMBicQKsPd4arFr7sKjSnKFDVMR2JHw9Y8L9nXN4kiok4u28LpHijEudH3mMYoL4pM5UL9Bgdz2M4Cy8EzfErmU9m86ZTw6hCzvFeTg7/101/*)#zz430whl";
         let xpriv = XPRIV_STR.parse::<Xpriv>().unwrap();
-        let got = parse_xpriv(xpriv).unwrap();
+        let got = generate_descriptor_prom_xpriv(xpriv).unwrap();
         assert_eq!(got, expected);
     }
 
@@ -129,7 +129,7 @@ mod tests {
         let client = BitcoinClient::new(url, user, password).unwrap();
 
         let xpriv = XPRIV_STR.parse::<Xpriv>().unwrap();
-        let descriptor_string = parse_xpriv(xpriv).unwrap();
+        let descriptor_string = generate_descriptor_prom_xpriv(xpriv).unwrap();
         let timestamp = "now".to_owned();
         let list_descriptors = vec![ImportDescriptor {
             desc: descriptor_string,
