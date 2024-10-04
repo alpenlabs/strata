@@ -21,8 +21,8 @@ We accept contributions in the following forms (non-exhaustive):
 
 ## Code of Conduct
 
-All contributors are expected to show respect and cortesy to others.
-To make clear what is expect, everyone contributing is required to conform to
+All contributors are expected to show respect and courtesy to others.
+To make clear what is expected, everyone contributing is required to conform to
 the Code of Conduct.
 
 We are dedicated to providing a welcoming and supportive environment for all people,
