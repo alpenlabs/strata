@@ -1,11 +1,11 @@
 use std::array::TryFromSliceError;
 
-use express_reth_primitives::WithdrawalIntentEvent;
 use revm::{ContextStatefulPrecompile, Database};
 use revm_primitives::{
     Bytes, FixedBytes, Log, LogData, PrecompileError, PrecompileErrors, PrecompileOutput,
     PrecompileResult, U256,
 };
+use strata_reth_primitives::WithdrawalIntentEvent;
 
 pub use crate::constants::BRIDGEOUT_ADDRESS;
 use crate::utils::wei_to_sats;

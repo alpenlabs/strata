@@ -13,12 +13,12 @@ rust.unused_must_use = "deny"
 rustdoc.all = "warn"
 
 [dependencies]
-alpen-express-common.workspace = true
-alpen-express-primitives.workspace = true
-alpen-express-rocksdb.workspace = true
-express-bridge-sig-manager.workspace = true
-express-bridge-tx-builder.workspace = true
-express-storage.workspace = true
+strata-bridge-sig-manager.workspace = true
+strata-bridge-tx-builder.workspace = true
+strata-common.workspace = true
+strata-primitives.workspace = true
+strata-rocksdb.workspace = true
+strata-storage.workspace = true
 
 anyhow.workspace = true                                 # anyhow should be fine for tests
 bitcoin = { workspace = true, features = ["rand-std"] }
@@ -28,7 +28,7 @@ tokio.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]
-alpen-test-utils.workspace = true
+strata-test-utils.workspace = true
 
 [[test]]
 name = "bridge-in-flow"

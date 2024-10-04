@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use alpen_express_status::StatusTx;
 use bitcoin::Txid;
+use strata_status::StatusTx;
 use tracing::error;
 
 #[derive(Debug, Clone)]

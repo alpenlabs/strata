@@ -1,6 +1,6 @@
-use alpen_express_state::{l1::HeaderVerificationState, tx::ProtocolOperation};
 use bitcoin::Block;
 use borsh::{BorshDeserialize, BorshSerialize};
+use strata_state::{l1::HeaderVerificationState, tx::ProtocolOperation};
 
 /// L1 events that we observe and want the persistence task to work on.
 #[derive(Clone, Debug)]

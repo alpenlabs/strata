@@ -54,7 +54,10 @@ def generate_n_blocks(bitcoin_rpc: BitcoindClient, n: int):
 
 
 def wait_until(
-    fn: Callable[[], Any], error_with: str = "Timed out", timeout: int = 5, step: float = 0.5
+    fn: Callable[[], Any],
+    error_with: str = "Timed out",
+    timeout: int = 5,
+    step: float = 0.5,
 ):
     """
     Wait until a function call returns truth value, given time step, and timeout.
@@ -118,11 +121,11 @@ def check_nth_checkpoint_finalized(
         - seqrpc: The sequencer rpc
         - manual_gen: If we need to generate blocks manually
     """
-    syncstat = seqrpc.alp_syncStatus()
+    syncstat = seqrpc.strata_syncStatus()
 
     # Wait until we find our expected checkpoint.
     batch_info = wait_until_with_value(
-        lambda: seqrpc.alp_getCheckpointInfo(idx),
+        lambda: seqrpc.strata_getCheckpointInfo(idx),
         predicate=lambda v: v is not None,
         error_with="Could not find checkpoint info",
         timeout=3,
@@ -132,7 +135,7 @@ def check_nth_checkpoint_finalized(
         syncstat["finalized_block_id"] != batch_info["l2_blockid"]
     ), "Checkpoint block should not yet finalize"
     assert batch_info["idx"] == idx
-    checkpoint_info_next = seqrpc.alp_getCheckpointInfo(idx + 1)
+    checkpoint_info_next = seqrpc.strata_getCheckpointInfo(idx + 1)
     assert checkpoint_info_next is None, f"There should be no checkpoint info for {idx + 1} index"
 
     to_finalize_blkid = batch_info["l2_blockid"]
@@ -152,7 +155,7 @@ def check_nth_checkpoint_finalized(
 
     # Check if finalized
     wait_until(
-        lambda: seqrpc.alp_syncStatus()["finalized_block_id"] == to_finalize_blkid,
+        lambda: seqrpc.strata_syncStatus()["finalized_block_id"] == to_finalize_blkid,
         error_with="Block not finalized",
         timeout=10,
     )
@@ -162,7 +165,7 @@ def submit_checkpoint(idx: int, seqrpc, manual_gen: ManualGenBlocksConfig | None
     """
     Submits checkpoint and if manual_gen, waits till it is present in l1
     """
-    last_published_txid = seqrpc.alp_l1status()["last_published_txid"]
+    last_published_txid = seqrpc.strata_l1status()["last_published_txid"]
 
     # Post checkpoint proof
     # NOTE: This random proof posted will fail to make blocks finalized in l2
@@ -171,12 +174,12 @@ def submit_checkpoint(idx: int, seqrpc, manual_gen: ManualGenBlocksConfig | None
     proof_hex = "00" * 256  # The expected proof size if 256 bytes
 
     # This is arbitrary
-    seqrpc.alpadmin_submitCheckpointProof(idx, proof_hex)
+    seqrpc.strataadmin_submitCheckpointProof(idx, proof_hex)
 
     # Wait a while for it to be posted to l1. This will happen when there
     # is a new published txid in l1status
     published_txid = wait_until_with_value(
-        lambda: seqrpc.alp_l1status()["last_published_txid"],
+        lambda: seqrpc.strata_l1status()["last_published_txid"],
         predicate=lambda v: v != last_published_txid,
         error_with="Proof was not published to bitcoin",
         timeout=5,
@@ -200,7 +203,7 @@ def check_submit_proof_fails_for_nonexistent_batch(seqrpc, nonexistent_batch: in
     proof_hex = "00" * 256
 
     try:
-        seqrpc.alpadmin_submitCheckpointProof(nonexistent_batch, proof_hex)
+        seqrpc.strataadmin_submitCheckpointProof(nonexistent_batch, proof_hex)
     except Exception as e:
         if hasattr(e, "code"):
             print(e)

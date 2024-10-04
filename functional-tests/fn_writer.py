@@ -21,23 +21,23 @@ class L1WriterTest(flexitest.Test):
         # Generate some funds to sequencer
         seqaddr = seq.get_prop("address")
 
-        l1_status = seqrpc.alp_l1status()
+        l1_status = seqrpc.strata_l1status()
         assert l1_status["last_published_txid"] is None, "Unexpected last_published_txid"
 
         # Wait for seq
         wait_until(
-            lambda: seqrpc.alp_protocolVersion() is not None,
+            lambda: seqrpc.strata_protocolVersion() is not None,
             error_with="Sequencer did not start on time",
         )
 
         # Submit blob
         blobdata = "2c4253d512da5bb4223f10e8e6017ede69cc63d6e6126916f4b68a1830b7f805"
-        _ = seqrpc.alpadmin_submitDABlob(blobdata)
+        _ = seqrpc.strataadmin_submitDABlob(blobdata)
 
         # Allow some time for sequencer to publish blob
         time.sleep(SEQ_PUBLISH_BATCH_INTERVAL_SECS)
 
-        l1_status = seqrpc.alp_l1status()
+        l1_status = seqrpc.strata_l1status()
         txid = l1_status["last_published_txid"]
 
         # Calculate scriptbpubkey for sequencer address

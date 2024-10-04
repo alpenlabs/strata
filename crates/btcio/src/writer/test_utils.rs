@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
-use alpen_express_db::{traits::L1BroadcastDatabase, types::L1TxEntry};
-use alpen_express_rocksdb::{
+use bitcoin::{Address, Network};
+use strata_db::{traits::L1BroadcastDatabase, types::L1TxEntry};
+use strata_rocksdb::{
     broadcaster::db::BroadcastDatabase, sequencer::db::SequencerDB,
     test_utils::get_rocksdb_tmp_instance, L1BroadcastDb, RBSeqBlobDb,
 };
-use bitcoin::{Address, Network};
-use express_storage::ops::{
+use strata_storage::ops::{
     inscription::{Context, InscriptionDataOps},
     l1tx_broadcast::Context as BContext,
 };
@@ -57,7 +57,7 @@ pub fn get_config() -> WriterConfig {
         .unwrap();
     WriterConfig {
         sequencer_address: addr,
-        rollup_name: "alpen".to_string(),
+        rollup_name: "strata".to_string(),
         inscription_fee_policy: InscriptionFeePolicy::Fixed(100),
         poll_duration_ms: 1000,
         amount_for_reveal_txn: 1000,

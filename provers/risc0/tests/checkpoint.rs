@@ -1,24 +1,24 @@
 #[cfg(feature = "prover")]
 mod test {
-    use alpen_express_primitives::buf::Buf32;
-    use alpen_express_state::{
-        batch::{BatchInfo, BootstrapState},
-        chain_state::ChainState,
-    };
-    use alpen_test_utils::{
-        bitcoin::{get_btc_chain, get_tx_filters},
-        l2::get_genesis_chainstate,
-    };
     use bitcoin::params::MAINNET;
-    use express_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
-    use express_proofimpl_checkpoint::{ChainStateSnapshot, L2BatchProofOutput};
-    use express_proofimpl_l1_batch::{L1BatchProofInput, L1BatchProofOutput};
-    use express_risc0_adapter::{Risc0Verifier, RiscZeroHost, RiscZeroProofInputBuilder};
-    use express_risc0_guest_builder::{
+    use strata_primitives::buf::Buf32;
+    use strata_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
+    use strata_proofimpl_checkpoint::{ChainStateSnapshot, L2BatchProofOutput};
+    use strata_proofimpl_l1_batch::{L1BatchProofInput, L1BatchProofOutput};
+    use strata_risc0_adapter::{Risc0Verifier, RiscZeroHost, RiscZeroProofInputBuilder};
+    use strata_risc0_guest_builder::{
         GUEST_RISC0_BTC_BLOCKSPACE_ELF, GUEST_RISC0_BTC_BLOCKSPACE_ID, GUEST_RISC0_CHECKPOINT_ELF,
         GUEST_RISC0_L1_BATCH_ELF, GUEST_RISC0_L1_BATCH_ID,
     };
-    use express_zkvm::{
+    use strata_state::{
+        batch::{BatchInfo, BootstrapState},
+        chain_state::ChainState,
+    };
+    use strata_test_utils::{
+        bitcoin::{get_btc_chain, get_tx_filters},
+        l2::get_genesis_chainstate,
+    };
+    use strata_zkvm::{
         AggregationInput, Proof, ProverOptions, VerificationKey, ZKVMHost, ZKVMInputBuilder,
         ZKVMVerifier,
     };

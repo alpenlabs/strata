@@ -1,8 +1,8 @@
 //! Defines errors associated with the signature manager.
 
-use alpen_express_db::{entities::errors::EntityError, DbError};
 use bitcoin::{psbt::ExtractTxError, sighash::TaprootError};
 use musig2::errors::{KeyAggError, SigningError, TweakError, VerifyError};
+use strata_db::{entities::errors::EntityError, DbError};
 use thiserror::Error;
 
 /// Errors that may occur during the signing and aggregation of signatures for a particular

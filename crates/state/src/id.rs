@@ -1,9 +1,9 @@
 use std::fmt;
 
-use alpen_express_primitives::buf::Buf32;
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
+use strata_primitives::buf::Buf32;
 
 /// ID of an L2 block, usually the hash of its root header.
 #[derive(

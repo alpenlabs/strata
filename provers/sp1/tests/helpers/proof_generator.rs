@@ -1,8 +1,8 @@
 use std::{fs, path::PathBuf};
 
 use anyhow::Result;
-use express_zkvm::{Proof, ProverOptions, VerificationKey};
 use sp1_sdk::{HashableKey, Prover};
+use strata_zkvm::{Proof, ProverOptions, VerificationKey};
 
 pub trait ProofGenerator<T> {
     /// Generates a proof based on the input.

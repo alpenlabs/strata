@@ -1,12 +1,12 @@
 use std::cmp::max;
 
-use alpen_express_consensus_logic::unfinalized_tracker::UnfinalizedBlockTracker;
-use alpen_express_state::{
+use strata_consensus_logic::unfinalized_tracker::UnfinalizedBlockTracker;
+use strata_state::{
     client_state::SyncState,
     header::{L2Header, SignedL2BlockHeader},
     id::L2BlockId,
 };
-use express_storage::L2BlockManager;
+use strata_storage::L2BlockManager;
 use tracing::debug;
 
 use crate::L2SyncError;

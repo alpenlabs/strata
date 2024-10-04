@@ -1,14 +1,14 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use alpen_express_consensus_logic::genesis::{make_genesis_block, make_genesis_chainstate};
-use alpen_express_primitives::{
+use strata_consensus_logic::genesis::{make_genesis_block, make_genesis_chainstate};
+use strata_primitives::{
     block_credential,
     buf::{Buf32, Buf64},
     operator::OperatorPubkeys,
     params::{OperatorConfig, Params, ProofPublishMode, RollupParams, SyncParams},
     vk::RollupVerifyingKey,
 };
-use alpen_express_state::{
+use strata_state::{
     block::{L2Block, L2BlockAccessory, L2BlockBody, L2BlockBundle},
     chain_state::ChainState,
     client_state::ClientState,
@@ -71,7 +71,7 @@ pub fn gen_params() -> Params {
     let opkeys = make_dummy_operator_pubkeys();
     Params {
         rollup: RollupParams {
-            rollup_name: "express".to_string(),
+            rollup_name: "strata".to_string(),
             block_time: 1000,
             cred_rule: block_credential::CredRule::Unchecked,
             horizon_l1_height: 40318,

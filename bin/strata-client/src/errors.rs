@@ -1,8 +1,8 @@
 use std::io;
 
-use alpen_express_primitives::params::ParamsError;
 use format_serde_error::SerdeError;
 use reth_rpc_types::engine::JwtError;
+use strata_primitives::params::ParamsError;
 use thiserror::Error;
 
 #[derive(Debug, Error)]

@@ -1,6 +1,6 @@
-use alpen_express_primitives::l1::L1TxProof;
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
+use strata_primitives::l1::L1TxProof;
 
 use crate::tx::ProtocolOperation;
 

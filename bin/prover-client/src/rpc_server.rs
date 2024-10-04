@@ -2,8 +2,8 @@
 
 use anyhow::{Context, Ok};
 use async_trait::async_trait;
-use express_prover_client_rpc_api::ExpressProverClientApiServer;
 use jsonrpsee::{core::RpcResult, RpcModule};
+use strata_prover_client_rpc_api::StrataProverClientApiServer;
 use tokio::sync::oneshot;
 use tracing::{info, warn};
 
@@ -28,12 +28,12 @@ pub(crate) async fn start<T>(
     enable_dev_rpc: bool,
 ) -> anyhow::Result<()>
 where
-    T: ExpressProverClientApiServer + Clone,
+    T: StrataProverClientApiServer + Clone,
 {
     let mut rpc_module = RpcModule::new(rpc_impl.clone());
 
     if enable_dev_rpc {
-        let prover_client_dev_api = ExpressProverClientApiServer::into_rpc(rpc_impl.clone());
+        let prover_client_dev_api = StrataProverClientApiServer::into_rpc(rpc_impl.clone());
         rpc_module
             .merge(prover_client_dev_api)
             .context("merge prover client api")?;
@@ -59,7 +59,7 @@ where
     Ok(())
 }
 
-/// Struct to implement the `express_prover_client_rpc_api::ExpressProverClientApiServer` on.
+/// Struct to implement the `strata_prover_client_rpc_api::StrataProverClientApiServer` on.
 /// Contains fields corresponding the global context for the RPC.
 #[derive(Clone)]
 pub(crate) struct ProverClientRpc {
@@ -73,7 +73,7 @@ impl ProverClientRpc {
 }
 
 #[async_trait]
-impl ExpressProverClientApiServer for ProverClientRpc {
+impl StrataProverClientApiServer for ProverClientRpc {
     async fn prove_el_block(&self, el_block_num: u64) -> RpcResult<String> {
         let task_id = self
             .context

@@ -1,6 +1,6 @@
-use alpen_express_primitives::{buf::Buf32, hash::compute_borsh_hash};
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
+use strata_primitives::{buf::Buf32, hash::compute_borsh_hash};
 
 use crate::{
     bridge_ops,

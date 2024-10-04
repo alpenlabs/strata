@@ -1,4 +1,3 @@
-use express_reth_evm::collect_withdrawal_intents;
 use reth::{
     builder::{components::PayloadServiceBuilder, BuilderContext, PayloadBuilderConfig},
     providers::{CanonStateSubscriptions, ExecutionOutcome, StateProviderFactory},
@@ -31,28 +30,29 @@ use revm::{
     DatabaseCommit,
 };
 use revm_primitives::{EVMError, EnvWithHandlerCfg, InvalidTransaction, ResultAndState, U256};
+use strata_reth_evm::collect_withdrawal_intents;
 use tracing::{debug, trace, warn};
 
 use crate::{
-    engine::ExpressEngineTypes,
-    evm::ExpressEvmConfig,
-    payload::{ExpressBuiltPayload, ExpressPayloadBuilderAttributes},
+    engine::StrataEngineTypes,
+    evm::StrataEvmConfig,
+    payload::{StrataBuiltPayload, StrataPayloadBuilderAttributes},
 };
 
 #[derive(Debug, Default, Clone)]
 #[non_exhaustive]
-pub struct ExpressPayloadBuilder {
+pub struct StrataPayloadBuilder {
     /// The type responsible for creating the evm.
-    evm_config: ExpressEvmConfig,
+    evm_config: StrataEvmConfig,
 }
 
-impl<Pool, Client> PayloadBuilder<Pool, Client> for ExpressPayloadBuilder
+impl<Pool, Client> PayloadBuilder<Pool, Client> for StrataPayloadBuilder
 where
     Client: StateProviderFactory,
     Pool: TransactionPool,
 {
-    type Attributes = ExpressPayloadBuilderAttributes;
-    type BuiltPayload = ExpressBuiltPayload;
+    type Attributes = StrataPayloadBuilderAttributes;
+    type BuiltPayload = StrataBuiltPayload;
 
     fn try_build(
         &self,
@@ -91,18 +91,18 @@ where
                     chain_spec,
                 },
             )?;
-        Ok(ExpressBuiltPayload::new(eth_build_payload, Vec::new()))
+        Ok(StrataBuiltPayload::new(eth_build_payload, Vec::new()))
     }
 }
 
 /// A custom payload service builder that supports the custom engine types
 #[derive(Debug, Default, Clone)]
 #[non_exhaustive]
-pub struct ExpressPayloadServiceBuilder;
+pub struct StrataPayloadServiceBuilder;
 
-impl<Node, Pool> PayloadServiceBuilder<Node, Pool> for ExpressPayloadServiceBuilder
+impl<Node, Pool> PayloadServiceBuilder<Node, Pool> for StrataPayloadServiceBuilder
 where
-    Node: FullNodeTypes<Engine = ExpressEngineTypes>,
+    Node: FullNodeTypes<Engine = StrataEngineTypes>,
     Pool: TransactionPool + Unpin + 'static,
 {
     async fn spawn_payload_service(
@@ -110,7 +110,7 @@ where
         ctx: &BuilderContext<Node>,
         pool: Pool,
     ) -> eyre::Result<PayloadBuilderHandle<Node::Engine>> {
-        let payload_builder = ExpressPayloadBuilder::default();
+        let payload_builder = StrataPayloadBuilder::default();
         let conf = ctx.payload_builder_config();
 
         let payload_job_config = BasicPayloadJobGeneratorConfig::default()
@@ -148,8 +148,8 @@ where
 #[inline]
 pub fn try_build_payload<EvmConfig, Pool, Client>(
     evm_config: EvmConfig,
-    args: BuildArguments<Pool, Client, ExpressPayloadBuilderAttributes, ExpressBuiltPayload>,
-) -> Result<BuildOutcome<ExpressBuiltPayload>, PayloadBuilderError>
+    args: BuildArguments<Pool, Client, StrataPayloadBuilderAttributes, StrataBuiltPayload>,
+) -> Result<BuildOutcome<StrataBuiltPayload>, PayloadBuilderError>
 where
     EvmConfig: ConfigureEvm,
     Client: StateProviderFactory,
@@ -487,7 +487,7 @@ where
     // extend the payload with the blob sidecars from the executed txs
     eth_payload.extend_sidecars(blob_sidecars);
 
-    let payload = ExpressBuiltPayload::new(eth_payload, withdrawal_intents);
+    let payload = StrataBuiltPayload::new(eth_payload, withdrawal_intents);
 
     Ok(BuildOutcome::Better {
         payload,

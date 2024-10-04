@@ -1,15 +1,15 @@
 use std::sync::Arc;
 
-use alpen_express_db::{
+use rockbound::{
+    utils::get_last, OptimisticTransactionDB as DB, SchemaDBOperationsExt, TransactionRetry,
+};
+use strata_db::{
     errors::DbError,
     traits::{L1BroadcastDatabase, L1BroadcastProvider, L1BroadcastStore},
     types::L1TxEntry,
     DbResult,
 };
-use alpen_express_primitives::buf::Buf32;
-use rockbound::{
-    utils::get_last, OptimisticTransactionDB as DB, SchemaDBOperationsExt, TransactionRetry,
-};
+use strata_primitives::buf::Buf32;
 
 use super::schemas::{BcastL1TxIdSchema, BcastL1TxSchema};
 use crate::{sequence::get_next_id, DbOpsConfig};
@@ -111,13 +111,13 @@ impl L1BroadcastDatabase for BroadcastDatabase {
 
 #[cfg(test)]
 mod tests {
-    use alpen_express_db::{
+    use bitcoin::hashes::Hash;
+    use strata_db::{
         traits::{L1BroadcastProvider, L1BroadcastStore},
         types::L1TxStatus,
     };
-    use alpen_express_primitives::buf::Buf32;
-    use alpen_test_utils::bitcoin::get_test_bitcoin_txns;
-    use bitcoin::hashes::Hash;
+    use strata_primitives::buf::Buf32;
+    use strata_test_utils::bitcoin::get_test_bitcoin_txns;
 
     use super::*;
     use crate::test_utils::get_rocksdb_tmp_instance;

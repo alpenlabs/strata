@@ -1,6 +1,6 @@
-use alpen_express_mmr::CompactMmr;
-use alpen_express_primitives::{buf::Buf32, l1::L1BlockManifest};
-use alpen_express_state::l1::L1Tx;
+use strata_mmr::CompactMmr;
+use strata_primitives::{buf::Buf32, l1::L1BlockManifest};
+use strata_state::l1::L1Tx;
 
 use crate::{
     define_table_with_default_codec, define_table_with_seek_key_codec, define_table_without_codec,

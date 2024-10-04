@@ -1,11 +1,11 @@
 #[cfg(feature = "prover")]
 mod test {
-    use alpen_test_utils::bitcoin::{get_btc_mainnet_block, get_tx_filters};
     use bitcoin::consensus::serialize;
-    use express_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
-    use express_risc0_adapter::{Risc0Verifier, RiscZeroHost, RiscZeroProofInputBuilder};
-    use express_risc0_guest_builder::GUEST_RISC0_BTC_BLOCKSPACE_ELF;
-    use express_zkvm::{ZKVMHost, ZKVMInputBuilder, ZKVMVerifier};
+    use strata_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
+    use strata_risc0_adapter::{Risc0Verifier, RiscZeroHost, RiscZeroProofInputBuilder};
+    use strata_risc0_guest_builder::GUEST_RISC0_BTC_BLOCKSPACE_ELF;
+    use strata_test_utils::bitcoin::{get_btc_mainnet_block, get_tx_filters};
+    use strata_zkvm::{ZKVMHost, ZKVMInputBuilder, ZKVMVerifier};
 
     #[test]
     fn test_btc_blockspace_code_trace_generation() {

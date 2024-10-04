@@ -1,9 +1,9 @@
-use alpen_express_state::tx::InscriptionData;
 use bitcoin::{
     opcodes::all::OP_IF,
     script::{Instruction, Instructions},
     ScriptBuf,
 };
+use strata_state::tx::InscriptionData;
 use thiserror::Error;
 use tracing::debug;
 
@@ -147,7 +147,7 @@ fn extract_n_bytes(
 #[cfg(test)]
 mod tests {
 
-    use alpen_express_btcio::test_utils::generate_inscription_script_test;
+    use strata_btcio::test_utils::generate_inscription_script_test;
 
     use super::*;
 

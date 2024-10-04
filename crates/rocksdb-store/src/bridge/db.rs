@@ -1,14 +1,14 @@
 use std::sync::Arc;
 
-use alpen_express_db::{
+use rockbound::{OptimisticTransactionDB as DB, SchemaDBOperationsExt, TransactionRetry};
+use strata_db::{
     entities::bridge_tx_state::BridgeTxState,
     errors::DbError,
     traits::{BridgeDutyDatabase, BridgeDutyIndexDatabase, BridgeTxDatabase},
     DbResult,
 };
-use alpen_express_primitives::buf::Buf32;
-use alpen_express_state::bridge_duties::BridgeDutyStatus;
-use rockbound::{OptimisticTransactionDB as DB, SchemaDBOperationsExt, TransactionRetry};
+use strata_primitives::buf::Buf32;
+use strata_state::bridge_duties::BridgeDutyStatus;
 
 use super::schemas::{
     BridgeDutyCheckpointSchema, BridgeDutyStatusSchema, BridgeDutyTxidSchema, BridgeTxStateSchema,
@@ -138,10 +138,10 @@ impl BridgeDutyIndexDatabase for BridgeDutyIndexRocksDb {
 
 #[cfg(test)]
 mod tests {
-    use alpen_express_db::traits::BridgeTxDatabase;
-    use alpen_express_primitives::l1::BitcoinTxid;
-    use alpen_test_utils::ArbitraryGenerator;
     use arbitrary::{Arbitrary, Unstructured};
+    use strata_db::traits::BridgeTxDatabase;
+    use strata_primitives::l1::BitcoinTxid;
+    use strata_test_utils::ArbitraryGenerator;
 
     use super::*;
     use crate::test_utils::get_rocksdb_tmp_instance;

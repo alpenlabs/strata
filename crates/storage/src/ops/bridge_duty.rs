@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use alpen_express_db::{traits::BridgeDutyDatabase, DbResult};
-use alpen_express_state::bridge_duties::BridgeDutyStatus;
 use bitcoin::Txid;
+use strata_db::{traits::BridgeDutyDatabase, DbResult};
+use strata_state::bridge_duties::BridgeDutyStatus;
 
 use crate::exec::*;
 

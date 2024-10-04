@@ -1,6 +1,6 @@
-use alpen_express_db::traits::ChainstateProvider;
-use alpen_express_primitives::{buf::Buf32, params::Params};
-use alpen_express_state::{batch::BatchInfo, client_state::ClientState, id::L2BlockId};
+use strata_db::traits::ChainstateProvider;
+use strata_primitives::{buf::Buf32, params::Params};
+use strata_state::{batch::BatchInfo, client_state::ClientState, id::L2BlockId};
 use tracing::*;
 
 use super::types::{BlockSigningDuty, Duty, Identity};

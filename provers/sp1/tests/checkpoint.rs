@@ -2,17 +2,17 @@ mod helpers;
 #[cfg(all(feature = "prover", not(debug_assertions)))]
 mod test {
 
-    use alpen_test_utils::l2::gen_params;
-    use express_proofimpl_checkpoint::{
-        CheckpointProofInput, CheckpointProofOutput, L2BatchProofOutput,
-    };
-    use express_proofimpl_l1_batch::L1BatchProofOutput;
-    use express_sp1_adapter::{SP1Host, SP1ProofInputBuilder, SP1Verifier};
-    use express_sp1_guest_builder::GUEST_CHECKPOINT_ELF;
-    use express_zkvm::{AggregationInput, ProverOptions, ZKVMHost, ZKVMInputBuilder, ZKVMVerifier};
     use num_bigint::BigUint;
     use num_traits::Num;
     use sp1_sdk::{HashableKey, MockProver, Prover};
+    use strata_proofimpl_checkpoint::{
+        CheckpointProofInput, CheckpointProofOutput, L2BatchProofOutput,
+    };
+    use strata_proofimpl_l1_batch::L1BatchProofOutput;
+    use strata_sp1_adapter::{SP1Host, SP1ProofInputBuilder, SP1Verifier};
+    use strata_sp1_guest_builder::GUEST_CHECKPOINT_ELF;
+    use strata_test_utils::l2::gen_params;
+    use strata_zkvm::{AggregationInput, ProverOptions, ZKVMHost, ZKVMInputBuilder, ZKVMVerifier};
 
     use crate::helpers::{
         BtcBlockProofGenerator, ClProofGenerator, ElProofGenerator, L1BatchProofGenerator,

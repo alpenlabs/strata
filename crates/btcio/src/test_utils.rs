@@ -1,6 +1,5 @@
 use std::collections::BTreeMap;
 
-use alpen_express_state::tx::InscriptionData;
 use async_trait::async_trait;
 use bitcoin::{
     bip32::Xpriv,
@@ -10,6 +9,7 @@ use bitcoin::{
     Address, Amount, Block, BlockHash, Network, ScriptBuf, SignedAmount, Transaction, Txid, Work,
 };
 use bitcoind_json_rpc_types::v26::GetBlockchainInfo;
+use strata_state::tx::InscriptionData;
 
 use crate::{
     rpc::{

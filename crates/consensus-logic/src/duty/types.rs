@@ -2,12 +2,12 @@
 
 use std::time;
 
-use alpen_express_primitives::{buf::Buf32, hash::compute_borsh_hash};
-use alpen_express_state::{
+use borsh::{BorshDeserialize, BorshSerialize};
+use strata_primitives::{buf::Buf32, hash::compute_borsh_hash};
+use strata_state::{
     batch::{BatchInfo, BootstrapState},
     id::L2BlockId,
 };
-use borsh::{BorshDeserialize, BorshSerialize};
 
 /// Describes when we'll stop working to fulfill a duty.
 #[derive(Clone, Debug)]

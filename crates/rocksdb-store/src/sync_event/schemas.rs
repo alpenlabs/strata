@@ -1,7 +1,7 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use alpen_express_state::sync_event::SyncEvent;
 use borsh::{BorshDeserialize, BorshSerialize};
+use strata_state::sync_event::SyncEvent;
 
 use crate::{define_table_with_seek_key_codec, define_table_without_codec, impl_borsh_value_codec};
 

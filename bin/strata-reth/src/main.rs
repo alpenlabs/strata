@@ -3,10 +3,6 @@ mod db;
 use std::{fs, future::Future, path::PathBuf, sync::Arc};
 
 use clap::Parser;
-use express_reth_db::rocksdb::WitnessDB;
-use express_reth_exex::ProverWitnessGenerator;
-use express_reth_node::ExpressEthereumNode;
-use express_reth_rpc::{AlpenRPC, AlpenRpcApiServer};
 use reth::{
     args::{utils::chain_help, LogArgs},
     builder::{NodeBuilder, WithLaunchContext},
@@ -15,6 +11,10 @@ use reth::{
 use reth_chainspec::ChainSpec;
 use reth_cli_commands::node::NodeCommand;
 use reth_primitives::Genesis;
+use strata_reth_db::rocksdb::WitnessDB;
+use strata_reth_exex::ProverWitnessGenerator;
+use strata_reth_node::StrataEthereumNode;
+use strata_reth_rpc::{StrataRPC, StrataRpcApiServer};
 use tracing::info;
 
 const DEFAULT_CHAIN_SPEC: &str = include_str!("../res/devnet-chain.json");
@@ -37,7 +37,7 @@ fn main() {
 
     if let Err(err) = run(command, |builder, ext| async move {
         let datadir = builder.config().datadir().data_dir().to_path_buf();
-        let mut node_builder = builder.node(ExpressEthereumNode::default());
+        let mut node_builder = builder.node(StrataEthereumNode::default());
 
         // Install Prover Input ExEx, persist to DB, and add RPC for querying block witness.
         if ext.enable_witness_gen {
@@ -47,8 +47,8 @@ fn main() {
 
             node_builder = node_builder
                 .extend_rpc_modules(|ctx| {
-                    let alpen_rpc = AlpenRPC::new(rpc_db);
-                    ctx.modules.merge_configured(alpen_rpc.into_rpc())?;
+                    let rpc = StrataRPC::new(rpc_db);
+                    ctx.modules.merge_configured(rpc.into_rpc())?;
 
                     Ok(())
                 })

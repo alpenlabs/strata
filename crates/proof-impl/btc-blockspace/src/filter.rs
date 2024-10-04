@@ -1,12 +1,12 @@
 //! This includes all the filtering logic to filter out and extract
 //! deposits, forced inclusion transactions as well as state updates
 
-use alpen_express_primitives::{block_credential::CredRule, params::RollupParams};
-use alpen_express_state::{
+use bitcoin::Block;
+use strata_primitives::{block_credential::CredRule, params::RollupParams};
+use strata_state::{
     batch::BatchCheckpoint,
     tx::{DepositInfo, ProtocolOperation},
 };
-use bitcoin::Block;
 use strata_tx_parser::filter::{derive_tx_filter_rules, filter_relevant_txs};
 
 pub fn extract_relevant_info(

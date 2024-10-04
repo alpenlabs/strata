@@ -3,11 +3,11 @@
 //! decide to expand the chain state in the future such that we can't keep it
 //! entire in memory.
 
-use alpen_express_primitives::{
+use borsh::{BorshDeserialize, BorshSerialize};
+use strata_primitives::{
     bridge::{BitcoinBlockHeight, OperatorIdx},
     buf::Buf32,
 };
-use borsh::{BorshDeserialize, BorshSerialize};
 use tracing::*;
 
 use crate::{

@@ -1,9 +1,9 @@
 #[cfg(feature = "prover")]
 mod test {
-    use express_proofimpl_evm_ee_stf::{ELProofInput, ELProofPublicParams};
-    use express_risc0_adapter::{Risc0Verifier, RiscZeroHost, RiscZeroProofInputBuilder};
-    use express_risc0_guest_builder::GUEST_RISC0_EVM_EE_STF_ELF;
-    use express_zkvm::{ZKVMHost, ZKVMInputBuilder, ZKVMVerifier};
+    use strata_proofimpl_evm_ee_stf::{ELProofInput, ELProofPublicParams};
+    use strata_risc0_adapter::{Risc0Verifier, RiscZeroHost, RiscZeroProofInputBuilder};
+    use strata_risc0_guest_builder::GUEST_RISC0_EVM_EE_STF_ELF;
+    use strata_zkvm::{ZKVMHost, ZKVMInputBuilder, ZKVMVerifier};
 
     const ENCODED_PROVER_INPUT: &[u8] =
         include_bytes!("../../test-util/el_block_witness_input.bin");

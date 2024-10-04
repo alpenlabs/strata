@@ -2,25 +2,25 @@
 
 use std::{path::PathBuf, sync::Arc, time::Duration};
 
-use alpen_express_btcio::rpc::{
+use bitcoin::secp256k1::SECP256K1;
+use jsonrpsee::{core::client::async_client::Client as L2RpcClient, ws_client::WsClientBuilder};
+use strata_bridge_exec::handler::ExecHandler;
+use strata_bridge_sig_manager::prelude::SignatureManager;
+use strata_bridge_tx_builder::prelude::TxBuildContext;
+use strata_btcio::rpc::{
     traits::{Reader, Signer},
     BitcoinClient,
 };
-use alpen_express_primitives::bridge::OperatorIdx;
-use alpen_express_rocksdb::{
+use strata_primitives::bridge::OperatorIdx;
+use strata_rocksdb::{
     bridge::db::{BridgeDutyIndexRocksDb, BridgeDutyRocksDb, BridgeTxRocksDb},
     DbOpsConfig,
 };
-use alpen_express_rpc_api::AlpenApiClient;
-use bitcoin::secp256k1::SECP256K1;
-use express_bridge_exec::handler::ExecHandler;
-use express_bridge_sig_manager::prelude::SignatureManager;
-use express_bridge_tx_builder::prelude::TxBuildContext;
-use express_storage::ops::{
+use strata_rpc_api::StrataApiClient;
+use strata_storage::ops::{
     bridge::Context as TxContext, bridge_duty::Context as DutyContext,
     bridge_duty_index::Context as DutyIndexContext,
 };
-use jsonrpsee::{core::client::async_client::Client as L2RpcClient, ws_client::WsClientBuilder};
 use threadpool::ThreadPool;
 use tracing::error;
 
@@ -131,7 +131,7 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
         bridge_duty_idx_db_ops,
     };
 
-    // TODO: wrap these in `express-tasks`
+    // TODO: wrap these in `strata-tasks`
     let duty_task = tokio::spawn(async move {
         if let Err(e) = task_manager.start(duty_polling_interval).await {
             error!(error = %e, "could not start task manager");

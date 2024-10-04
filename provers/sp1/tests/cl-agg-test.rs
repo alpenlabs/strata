@@ -1,9 +1,9 @@
 mod helpers;
 #[cfg(all(feature = "prover", not(debug_assertions)))]
 mod test {
-    use express_proofimpl_checkpoint::L2BatchProofOutput;
-    use express_sp1_adapter::SP1Verifier;
-    use express_zkvm::{ProverOptions, ZKVMVerifier};
+    use strata_proofimpl_checkpoint::L2BatchProofOutput;
+    use strata_sp1_adapter::SP1Verifier;
+    use strata_zkvm::{ProverOptions, ZKVMVerifier};
 
     use crate::helpers::{
         ClProofGenerator, ElProofGenerator, L2BatchProofGenerator, ProofGenerator,

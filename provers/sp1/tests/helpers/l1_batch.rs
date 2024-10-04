@@ -1,15 +1,15 @@
-use alpen_test_utils::bitcoin::get_btc_chain;
 use anyhow::{Context, Result};
 use bitcoin::params::MAINNET;
-use express_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
-use express_proofimpl_l1_batch::L1BatchProofInput;
-use express_sp1_adapter::{SP1Host, SP1ProofInputBuilder};
-use express_sp1_guest_builder::GUEST_L1_BATCH_ELF;
-use express_zkvm::{
+use sp1_sdk::Prover;
+use strata_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
+use strata_proofimpl_l1_batch::L1BatchProofInput;
+use strata_sp1_adapter::{SP1Host, SP1ProofInputBuilder};
+use strata_sp1_guest_builder::GUEST_L1_BATCH_ELF;
+use strata_test_utils::bitcoin::get_btc_chain;
+use strata_zkvm::{
     AggregationInput, Proof, ProverOptions, VerificationKey, ZKVMHost, ZKVMInputBuilder,
     ZKVMVerifier,
 };
-use sp1_sdk::Prover;
 
 use crate::helpers::{btc::BtcBlockProofGenerator, proof_generator::ProofGenerator};
 

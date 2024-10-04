@@ -1,6 +1,6 @@
 [package]
 edition = "2021"
-name = "express-proofimpl-evm-ee-stf"
+name = "strata-proofimpl-evm-ee-stf"
 version = "0.1.0"
 
 [dependencies]
@@ -11,8 +11,6 @@ alloy-rpc-types = { workspace = true, default-features = false, features = [
   "eth",
 ] }
 anyhow.workspace = true
-express-reth-evm.workspace = true
-express-reth-primitives.workspace = true
 k256 = { version = "=0.13.3", features = [
   "std",
   "ecdsa",
@@ -22,6 +20,8 @@ reth-trie-common.workspace = true
 revm.workspace = true
 rlp = "0.5.2"
 serde.workspace = true
+strata-reth-evm.workspace = true
+strata-reth-primitives.workspace = true
 thiserror = "1.0"
 
 [dev-dependencies]

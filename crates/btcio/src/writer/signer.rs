@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use alpen_express_db::types::{BlobEntry, L1TxEntry};
-use alpen_express_primitives::buf::Buf32;
 use bitcoin::{consensus, Transaction};
+use strata_db::types::{BlobEntry, L1TxEntry};
+use strata_primitives::buf::Buf32;
 use tracing::*;
 
 use super::{
@@ -64,8 +64,8 @@ pub async fn create_and_sign_blob_inscriptions(
 mod test {
     use std::sync::Arc;
 
-    use alpen_express_db::types::{BlobEntry, BlobL1Status};
-    use alpen_express_primitives::hash;
+    use strata_db::types::{BlobEntry, BlobL1Status};
+    use strata_primitives::hash;
 
     use super::*;
     use crate::{

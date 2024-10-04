@@ -1,9 +1,9 @@
 use std::cmp::min;
 
-use alpen_express_rpc_api::AlpenApiClient;
-use alpen_express_rpc_types::NodeSyncStatus;
-use alpen_express_state::{block::L2BlockBundle, id::L2BlockId};
 use futures::stream::{self, Stream, StreamExt};
+use strata_rpc_api::StrataApiClient;
+use strata_rpc_types::NodeSyncStatus;
+use strata_state::{block::L2BlockBundle, id::L2BlockId};
 use tracing::error;
 
 #[derive(Debug, thiserror::Error)]
@@ -32,12 +32,12 @@ pub trait SyncClient {
     ) -> Result<Option<L2BlockBundle>, ClientError>;
 }
 
-pub struct RpcSyncPeer<RPC: AlpenApiClient + Send + Sync> {
+pub struct RpcSyncPeer<RPC: StrataApiClient + Send + Sync> {
     rpc_client: RPC,
     download_batch_size: usize,
 }
 
-impl<RPC: AlpenApiClient + Send + Sync> RpcSyncPeer<RPC> {
+impl<RPC: StrataApiClient + Send + Sync> RpcSyncPeer<RPC> {
     pub fn new(rpc_client: RPC, download_batch_size: usize) -> Self {
         Self {
             rpc_client,
@@ -61,7 +61,7 @@ impl<RPC: AlpenApiClient + Send + Sync> RpcSyncPeer<RPC> {
 }
 
 #[async_trait::async_trait]
-impl<RPC: AlpenApiClient + Send + Sync> SyncClient for RpcSyncPeer<RPC> {
+impl<RPC: StrataApiClient + Send + Sync> SyncClient for RpcSyncPeer<RPC> {
     async fn get_sync_status(&self) -> Result<NodeSyncStatus, ClientError> {
         let status = self
             .rpc_client

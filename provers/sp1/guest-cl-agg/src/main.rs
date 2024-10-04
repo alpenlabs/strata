@@ -1,4 +1,4 @@
-use express_proofimpl_checkpoint::L2BatchProofOutput;
+use strata_proofimpl_checkpoint::L2BatchProofOutput;
 use sha2::{Digest, Sha256};
 
 mod vks;

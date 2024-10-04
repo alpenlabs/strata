@@ -1,14 +1,14 @@
 //! Defines the error types associated with executing the transaction duties.
 
-use alpen_express_btcio::rpc::error::ClientError as L1ClientError;
-use express_bridge_tx_builder::errors::BridgeTxBuilderError;
 use jsonrpsee::core::ClientError as L2ClientError;
+use strata_bridge_tx_builder::errors::BridgeTxBuilderError;
+use strata_btcio::rpc::error::ClientError as L1ClientError;
 use thiserror::Error;
 
 /// Error during execution of the duty.
 #[derive(Error, Debug)]
 pub enum ExecError {
-    /// Error creating the [`TxSigningData`](alpen_express_primitives::bridge::TxSigningData).
+    /// Error creating the [`TxSigningData`](strata_primitives::bridge::TxSigningData).
     #[error("could not build withdraw transaction")]
     TxBuilder(#[from] BridgeTxBuilderError),
 

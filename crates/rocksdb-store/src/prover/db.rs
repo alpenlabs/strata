@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
-use alpen_express_db::{
+use rockbound::{
+    utils::get_last, OptimisticTransactionDB, SchemaDBOperationsExt, TransactionRetry,
+};
+use strata_db::{
     errors::DbError,
     traits::{ProverDataProvider, ProverDataStore, ProverDatabase},
     DbResult,
-};
-use rockbound::{
-    utils::get_last, OptimisticTransactionDB, SchemaDBOperationsExt, TransactionRetry,
 };
 
 use super::schemas::{ProverTaskIdSchema, ProverTaskSchema};
@@ -116,7 +116,7 @@ impl ProverDatabase for ProverDB {
 
 #[cfg(test)]
 mod tests {
-    use alpen_express_db::traits::{ProverDataProvider, ProverDataStore};
+    use strata_db::traits::{ProverDataProvider, ProverDataStore};
 
     use super::*;
     use crate::test_utils::get_rocksdb_tmp_instance_for_prover;

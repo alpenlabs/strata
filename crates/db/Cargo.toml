@@ -1,13 +1,13 @@
 [package]
 edition = "2021"
-name = "alpen-express-db"
+name = "strata-db"
 version = "0.1.0"
 
 [dependencies]
-alpen-express-mmr.workspace = true
-alpen-express-primitives.workspace = true
-alpen-express-state.workspace = true
-express-zkvm.workspace = true
+strata-mmr.workspace = true
+strata-primitives.workspace = true
+strata-state.workspace = true
+strata-zkvm.workspace = true
 
 anyhow.workspace = true
 arbitrary.workspace = true
@@ -27,5 +27,5 @@ mocks = ["mockall"]
 stubs = []
 
 [dev-dependencies]
-alpen-test-utils.workspace = true
 serde_json.workspace = true
+strata-test-utils.workspace = true

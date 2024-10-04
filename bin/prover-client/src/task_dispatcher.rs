@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 use anyhow::Context;
-use express_proofimpl_evm_ee_stf::ELProofInput;
 use jsonrpsee::{core::client::ClientT, http_client::HttpClient, rpc_params};
 use reth_rpc_types::Block;
+use strata_proofimpl_evm_ee_stf::ELProofInput;
 use tokio::time::{self, Duration};
 use tracing::error;
 use uuid::Uuid;
@@ -105,7 +105,7 @@ impl ELBlockProvingTaskScheduler {
         let el_block_witness: ELProofInput = self
             .el_rpc_client
             .request(
-                "alpee_getBlockWitness",
+                "strataee_getBlockWitness",
                 rpc_params![el_block.header.hash.context("Block hash missing")?, true],
             )
             .await

@@ -3,13 +3,6 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use alpen_express_primitives::{
-    block_credential,
-    buf::Buf32,
-    operator::OperatorPubkeys,
-    params::{ProofPublishMode, RollupParams},
-    vk::RollupVerifyingKey,
-};
 use argh::FromArgs;
 use bitcoin::{
     base58,
@@ -17,6 +10,13 @@ use bitcoin::{
     Network,
 };
 use rand::{rngs::OsRng, Rng};
+use strata_primitives::{
+    block_credential,
+    buf::Buf32,
+    operator::OperatorPubkeys,
+    params::{ProofPublishMode, RollupParams},
+    vk::RollupVerifyingKey,
+};
 
 // TODO move some of these into a keyderiv crate
 const DERIV_BASE_IDX: u32 = 56;
@@ -474,7 +474,7 @@ pub struct ParamsConfig {
 }
 
 // TODO convert this to also initialize the sync params
-fn construct_params(config: ParamsConfig) -> alpen_express_primitives::params::RollupParams {
+fn construct_params(config: ParamsConfig) -> strata_primitives::params::RollupParams {
     let cr = config
         .seqkey
         .map(block_credential::CredRule::SchnorrKey)
@@ -500,7 +500,7 @@ fn construct_params(config: ParamsConfig) -> alpen_express_primitives::params::R
         // TODO do we want to remove this?
         horizon_l1_height: config.genesis_trigger / 2,
         genesis_l1_height: config.genesis_trigger,
-        operator_config: alpen_express_primitives::params::OperatorConfig::Static(opkeys),
+        operator_config: strata_primitives::params::OperatorConfig::Static(opkeys),
         // TODO make configurable
         evm_genesis_block_hash: Buf32(
             "0x37ad61cff1367467a98cf7c54c4ac99e989f1fbb1bc1e646235e90c065c565ba"

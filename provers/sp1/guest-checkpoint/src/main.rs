@@ -1,6 +1,6 @@
-use alpen_express_primitives::{params::RollupParams, vk::RollupVerifyingKey};
-use express_proofimpl_checkpoint::{self, process_checkpoint_proof, CheckpointProofInput};
-use express_zkvm::Proof;
+use strata_primitives::{params::RollupParams, vk::RollupVerifyingKey};
+use strata_proofimpl_checkpoint::{self, process_checkpoint_proof, CheckpointProofInput};
+use strata_zkvm::Proof;
 use sha2::{Digest, Sha256};
 use snark_bn254_verifier::Groth16Verifier;
 use sp1_core_machine::io::SP1PublicValues;

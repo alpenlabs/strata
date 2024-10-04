@@ -1,6 +1,6 @@
-use alpen_express_primitives::l1::{BitcoinAmount, OutputRef};
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
+use strata_primitives::l1::{BitcoinAmount, OutputRef};
 
 use crate::batch::SignedBatchCheckpoint;
 

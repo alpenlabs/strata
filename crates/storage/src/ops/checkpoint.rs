@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use alpen_express_db::{traits::*, types::CheckpointEntry};
+use strata_db::{traits::*, types::CheckpointEntry};
 
 use crate::exec::*;
 

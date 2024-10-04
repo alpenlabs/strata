@@ -3,14 +3,14 @@
 //! This just implements a very simple n-of-n multisig bridge.  It will be
 //! extended to a more sophisticated design when we have that specced out.
 
-use alpen_express_primitives::{
+use borsh::{BorshDeserialize, BorshSerialize};
+use serde::{Deserialize, Serialize};
+use strata_primitives::{
     bridge::{BitcoinBlockHeight, OperatorIdx},
     buf::Buf32,
     l1::{self, BitcoinAmount, OutputRef, XOnlyPk},
     operator::{OperatorKeyProvider, OperatorPubkeys},
 };
-use borsh::{BorshDeserialize, BorshSerialize};
-use serde::{Deserialize, Serialize};
 
 /// Entry for an operator.
 ///

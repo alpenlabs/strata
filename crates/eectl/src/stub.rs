@@ -7,8 +7,8 @@
 
 use std::{collections::*, sync::Mutex, time};
 
-use alpen_express_primitives::buf::Buf32;
-use alpen_express_state::{
+use strata_primitives::buf::Buf32;
+use strata_state::{
     exec_update::{ExecUpdate, UpdateInput, UpdateOutput},
     prelude::*,
 };

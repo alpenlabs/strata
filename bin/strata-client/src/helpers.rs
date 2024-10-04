@@ -5,30 +5,30 @@ use std::{
     time::Duration,
 };
 
-use alpen_express_btcio::rpc::{traits::Wallet, BitcoinClient};
-use alpen_express_consensus_logic::{
-    duty::types::{Identity, IdentityData, IdentityKey},
-    state_tracker,
-};
-use alpen_express_db::{database::CommonDatabase, traits::Database};
-use alpen_express_evmexec::{engine::RpcExecEngineCtl, fork_choice_state_initial, EngineRpcClient};
-use alpen_express_primitives::{
-    buf::Buf32,
-    params::{Params, RollupParams},
-};
-use alpen_express_rocksdb::{
-    broadcaster::db::BroadcastDatabase, l2::db::L2Db, sequencer::db::SequencerDB, ChainStateDb,
-    ClientStateDb, DbOpsConfig, L1BroadcastDb, L1Db, RBCheckpointDB, RBSeqBlobDb, SyncEventDb,
-};
-use alpen_express_rpc_types::L1Status;
-use alpen_express_state::csm_status::CsmStatus;
-use alpen_express_status::{create_status_channel, StatusRx, StatusTx};
 use anyhow::Context;
 use bitcoin::{Address, Network};
-use express_storage::L2BlockManager;
 use format_serde_error::SerdeError;
 use reth_rpc_types::engine::JwtSecret;
 use rockbound::{rocksdb, OptimisticTransactionDB};
+use strata_btcio::rpc::{traits::Wallet, BitcoinClient};
+use strata_consensus_logic::{
+    duty::types::{Identity, IdentityData, IdentityKey},
+    state_tracker,
+};
+use strata_db::{database::CommonDatabase, traits::Database};
+use strata_evmexec::{engine::RpcExecEngineCtl, fork_choice_state_initial, EngineRpcClient};
+use strata_primitives::{
+    buf::Buf32,
+    params::{Params, RollupParams},
+};
+use strata_rocksdb::{
+    broadcaster::db::BroadcastDatabase, l2::db::L2Db, sequencer::db::SequencerDB, ChainStateDb,
+    ClientStateDb, DbOpsConfig, L1BroadcastDb, L1Db, RBCheckpointDB, RBSeqBlobDb, SyncEventDb,
+};
+use strata_rpc_types::L1Status;
+use strata_state::csm_status::CsmStatus;
+use strata_status::{create_status_channel, StatusRx, StatusTx};
+use strata_storage::L2BlockManager;
 use tokio::runtime::Runtime;
 use tracing::*;
 
@@ -41,8 +41,7 @@ pub fn init_core_dbs(rbdb: Arc<OptimisticTransactionDB>, ops_config: DbOpsConfig
     // Initialize databases.
     let l1_db: Arc<_> = L1Db::new(rbdb.clone(), ops_config).into();
     let l2_db: Arc<_> = L2Db::new(rbdb.clone(), ops_config).into();
-    let sync_ev_db: Arc<_> =
-        alpen_express_rocksdb::SyncEventDb::new(rbdb.clone(), ops_config).into();
+    let sync_ev_db: Arc<_> = strata_rocksdb::SyncEventDb::new(rbdb.clone(), ops_config).into();
     let clientstate_db: Arc<_> = ClientStateDb::new(rbdb.clone(), ops_config).into();
     let chainstate_db: Arc<_> = ChainStateDb::new(rbdb.clone(), ops_config).into();
     let checkpoint_db: Arc<_> = RBCheckpointDB::new(rbdb.clone(), ops_config).into();
@@ -162,8 +161,8 @@ pub fn open_rocksdb_database(
         fs::create_dir_all(&database_dir)?;
     }
 
-    let dbname = alpen_express_rocksdb::ROCKSDB_NAME;
-    let cfs = alpen_express_rocksdb::STORE_COLUMN_FAMILIES;
+    let dbname = strata_rocksdb::ROCKSDB_NAME;
+    let cfs = strata_rocksdb::STORE_COLUMN_FAMILIES;
     let mut opts = rocksdb::Options::default();
     opts.create_if_missing(true);
     opts.create_missing_column_families(true);
@@ -231,7 +230,7 @@ pub fn init_engine_controller(
     );
 
     let initial_fcs = fork_choice_state_initial(db, params.rollup())?;
-    let eng_ctl = alpen_express_evmexec::engine::RpcExecEngineCtl::new(
+    let eng_ctl = strata_evmexec::engine::RpcExecEngineCtl::new(
         client,
         initial_fcs,
         runtime.handle().clone(),

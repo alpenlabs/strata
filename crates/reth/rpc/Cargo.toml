@@ -1,16 +1,16 @@
 [package]
 edition = "2021"
-name = "express-reth-rpc"
+name = "strata-reth-rpc"
 version = "0.1.0"
 
 [dependencies]
 bincode.workspace = true
-express-proofimpl-evm-ee-stf.workspace = true
-express-reth-db.workspace = true
-express-rpc-utils.workspace = true
 eyre.workspace = true
 hex.workspace = true
 jsonrpsee = { workspace = true, features = ["server", "macros"] }
 reth-primitives.workspace = true
 serde.workspace = true
+strata-proofimpl-evm-ee-stf.workspace = true
+strata-reth-db.workspace = true
+strata-rpc-utils.workspace = true
 tokio = { workspace = true, features = ["macros", "sync"] }

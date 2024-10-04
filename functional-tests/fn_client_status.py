@@ -15,15 +15,15 @@ class L1ClientStatusTest(flexitest.Test):
 
         # Wait for seq
         wait_until(
-            lambda: seqrpc.alp_protocolVersion() is not None,
+            lambda: seqrpc.strata_protocolVersion() is not None,
             error_with="Sequencer did not start on time",
         )
 
-        proto_ver = seqrpc.alp_protocolVersion()
+        proto_ver = seqrpc.strata_protocolVersion()
         print("protocol version", proto_ver)
         assert proto_ver == 1, "query protocol version"
 
-        client_status = seqrpc.alp_clientStatus()
+        client_status = seqrpc.strata_clientStatus()
         print("client status", client_status)
 
         return True

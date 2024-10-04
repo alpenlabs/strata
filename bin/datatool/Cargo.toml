@@ -8,7 +8,7 @@ name = "strata-datatool"
 path = "src/main.rs"
 
 [dependencies]
-alpen-express-primitives.workspace = true
+strata-primitives.workspace = true
 
 anyhow.workspace = true
 argh.workspace = true

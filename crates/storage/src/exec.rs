@@ -5,7 +5,7 @@
 
 use std::sync::Arc;
 
-pub use alpen_express_db::{errors::DbError, DbResult};
+pub use strata_db::{errors::DbError, DbResult};
 pub use tracing::*;
 
 /// Handle for receiving a result from a database operation on another thread.

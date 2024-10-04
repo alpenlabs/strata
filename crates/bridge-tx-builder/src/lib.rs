@@ -11,9 +11,9 @@ pub mod operations;
 pub mod prelude;
 pub mod withdrawal;
 
-use alpen_express_primitives::bridge::TxSigningData;
 use context::BuildContext;
 use errors::BridgeTxBuilderResult;
+use strata_primitives::bridge::TxSigningData;
 
 /// Defines a method that any bridge transaction must implement in order to create a
 /// structure that can be signed.

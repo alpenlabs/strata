@@ -2,19 +2,19 @@
 
 use std::sync::Arc;
 
-use alpen_express_db::{
+use strata_chaintsn::transition::process_block;
+use strata_db::{
     errors::DbError,
     traits::{BlockStatus, ChainstateProvider, ChainstateStore, Database},
 };
-use alpen_express_eectl::{engine::ExecEngineCtl, messages::ExecPayloadData};
-use alpen_express_primitives::params::Params;
-use alpen_express_state::{
+use strata_eectl::{engine::ExecEngineCtl, messages::ExecPayloadData};
+use strata_primitives::params::Params;
+use strata_state::{
     block::L2BlockBundle, block_validation::validate_block_segments, client_state::ClientState,
     operation::SyncAction, prelude::*, state_op::StateCache, sync_event::SyncEvent,
 };
-use express_chaintsn::transition::process_block;
-use express_storage::L2BlockManager;
-use express_tasks::ShutdownGuard;
+use strata_storage::L2BlockManager;
+use strata_tasks::ShutdownGuard;
 use tokio::sync::mpsc;
 use tracing::*;
 
@@ -366,7 +366,7 @@ fn process_fc_message<D: Database, E: ExecEngineCtl>(
             // being invalid and return too.
             // TODO verify this is reasonable behavior, especially with regard
             // to pre-sync
-            if res == alpen_express_eectl::engine::BlockStatus::Invalid {
+            if res == strata_eectl::engine::BlockStatus::Invalid {
                 // It's invalid, write that and return.
                 fcm_state.set_block_status(&blkid, BlockStatus::Invalid)?;
                 return Ok(());
@@ -454,10 +454,8 @@ fn check_new_block<D: Database>(
     let params = state.params.as_ref();
 
     // Check that the block is correctly signed.
-    let cred_ok = alpen_express_state::block_validation::check_block_credential(
-        block.header(),
-        params.rollup(),
-    );
+    let cred_ok =
+        strata_state::block_validation::check_block_credential(block.header(), params.rollup());
     if !cred_ok {
         warn!(?blkid, "block has invalid credential");
         return Ok(false);
@@ -465,7 +463,7 @@ fn check_new_block<D: Database>(
 
     // Check that we haven't already marked the block as invalid.
     if let Some(status) = state.get_block_status(blkid)? {
-        if status == alpen_express_db::traits::BlockStatus::Invalid {
+        if status == strata_db::traits::BlockStatus::Invalid {
             warn!(?blkid, "rejecting block that fails EL validation");
             return Ok(false);
         }

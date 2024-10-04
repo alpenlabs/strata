@@ -1,10 +1,10 @@
 //! Enumerated errors related to creation and signing of bridge-related transactions.
 
-use alpen_express_primitives::{bridge::OperatorIdx, errors::ParseError};
 use bitcoin::{
     psbt,
     taproot::{TaprootBuilder, TaprootBuilderError},
 };
+use strata_primitives::{bridge::OperatorIdx, errors::ParseError};
 use thiserror::Error;
 
 /// Error during building of bridge-related transactions.

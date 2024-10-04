@@ -2,9 +2,9 @@
 
 use std::{fs, path::PathBuf, sync::Arc};
 
-use alpen_express_rocksdb::{ROCKSDB_NAME, STORE_COLUMN_FAMILIES};
 use directories::ProjectDirs;
 use rockbound::{rocksdb, OptimisticTransactionDB};
+use strata_rocksdb::{ROCKSDB_NAME, STORE_COLUMN_FAMILIES};
 
 /// Open or creates a rocksdb database.
 ///

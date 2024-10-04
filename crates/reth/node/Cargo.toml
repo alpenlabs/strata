@@ -1,11 +1,9 @@
 [package]
 edition = "2021"
-name = "express-reth-node"
+name = "strata-reth-node"
 version = "0.1.0"
 
 [dependencies]
-express-reth-evm.workspace = true
-express-reth-primitives.workspace = true
 eyre.workspace = true
 reth.workspace = true
 reth-basic-payload-builder.workspace = true
@@ -22,4 +20,6 @@ reth-rpc-types.workspace = true
 revm.workspace = true
 revm-primitives.workspace = true
 serde.workspace = true
+strata-reth-evm.workspace = true
+strata-reth-primitives.workspace = true
 tracing.workspace = true

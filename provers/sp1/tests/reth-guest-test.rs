@@ -1,10 +1,10 @@
 // NOTE: SP1 prover runs in release mode only; therefore run the tests on release mode only
 #[cfg(all(feature = "prover", not(debug_assertions)))]
 mod test {
-    use express_proofimpl_evm_ee_stf::{ELProofInput, ELProofPublicParams};
-    use express_sp1_adapter::{SP1Host, SP1ProofInputBuilder, SP1Verifier};
-    use express_sp1_guest_builder::GUEST_EVM_EE_STF_ELF;
-    use express_zkvm::{ZKVMHost, ZKVMInputBuilder, ZKVMVerifier};
+    use strata_proofimpl_evm_ee_stf::{ELProofInput, ELProofPublicParams};
+    use strata_sp1_adapter::{SP1Host, SP1ProofInputBuilder, SP1Verifier};
+    use strata_sp1_guest_builder::GUEST_EVM_EE_STF_ELF;
+    use strata_zkvm::{ZKVMHost, ZKVMInputBuilder, ZKVMVerifier};
 
     const ENCODED_PROVER_INPUT: &[u8] =
         include_bytes!("../../test-util/el_block_witness_input.bin");

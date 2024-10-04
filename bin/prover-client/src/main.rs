@@ -2,13 +2,13 @@
 
 use std::sync::Arc;
 
-use alpen_express_common::logging;
 use args::Args;
 use config::EL_START_BLOCK_HEIGHT;
-use express_sp1_adapter::SP1Host;
 use jsonrpsee::http_client::HttpClientBuilder;
 use manager::ProverManager;
 use rpc_server::{ProverClientRpc, RpcContext};
+use strata_common::logging;
+use strata_sp1_adapter::SP1Host;
 use task::TaskTracker;
 use task_dispatcher::ELBlockProvingTaskScheduler;
 use tracing::info;
@@ -27,7 +27,7 @@ mod task_dispatcher;
 #[tokio::main]
 async fn main() {
     logging::init();
-    info!("running alpen express prover client in dev mode");
+    info!("running alpen strata prover client in dev mode");
 
     let args: Args = argh::from_env();
     let task_tracker = Arc::new(TaskTracker::new());

@@ -2,7 +2,7 @@
 
 use std::{hash::Hash, num::NonZeroUsize, sync::Arc};
 
-use alpen_express_db::{DbError, DbResult};
+use strata_db::{DbError, DbResult};
 use tokio::sync::{broadcast, Mutex, RwLock};
 use tracing::*;
 
@@ -223,7 +223,7 @@ impl<K: Clone + Eq + Hash, V: Clone> CacheTable<K, V> {
 
 #[cfg(test)]
 mod tests {
-    use alpen_express_db::DbError;
+    use strata_db::DbError;
 
     use super::CacheTable;
 

@@ -1,8 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
 use alloy_rpc_types::EIP1186AccountProofResponse;
-use express_proofimpl_evm_ee_stf::{mpt::proofs_to_tries, ELProofInput};
-use express_reth_db::WitnessStore;
 use eyre::eyre;
 use reth_evm::execute::{BlockExecutorProvider, Executor};
 // use reth_execution_types::BlockExecutionInput;
@@ -17,6 +15,8 @@ use reth_revm::{
     primitives::FixedBytes,
 };
 use reth_rpc_types_compat::proof::from_primitive_account_proof;
+use strata_proofimpl_evm_ee_stf::{mpt::proofs_to_tries, ELProofInput};
+use strata_reth_db::WitnessStore;
 use tracing::{debug, error};
 
 use crate::{

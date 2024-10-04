@@ -1,10 +1,10 @@
 //! Type/traits related to the bridge-related duties.
 
-use alpen_express_primitives::bridge::OperatorIdx;
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
-use express_bridge_tx_builder::prelude::{CooperativeWithdrawalInfo, DepositInfo};
 use serde::{Deserialize, Serialize};
+use strata_bridge_tx_builder::prelude::{CooperativeWithdrawalInfo, DepositInfo};
+use strata_primitives::bridge::OperatorIdx;
 
 /// The various duties that can be assigned to an operator.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -107,7 +107,7 @@ pub enum BridgeDutyStatus {
     /// The duty could not be executed.
     ///
     /// Holds the error message as a [`String`] for context.
-    // TODO: this should hold `express-bridge-exec::ExecError` instead but that requires
+    // TODO: this should hold `strata-bridge-exec::ExecError` instead but that requires
     // implementing `BorshSerialize` and `BorshDeserialize`.
     Failed(String),
 }

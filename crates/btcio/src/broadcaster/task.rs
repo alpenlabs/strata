@@ -1,9 +1,9 @@
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
-use alpen_express_db::types::{L1TxEntry, L1TxStatus};
-use alpen_express_primitives::params::Params;
 use bitcoin::{hashes::Hash, Txid};
-use express_storage::{ops::l1tx_broadcast, BroadcastDbOps};
+use strata_db::types::{L1TxEntry, L1TxStatus};
+use strata_primitives::params::Params;
+use strata_storage::{ops::l1tx_broadcast, BroadcastDbOps};
 use tokio::sync::mpsc::Receiver;
 use tracing::*;
 
@@ -181,14 +181,14 @@ async fn handle_entry(
 
 #[cfg(test)]
 mod test {
-    use alpen_express_db::traits::L1BroadcastDatabase;
-    use alpen_express_rocksdb::{
+    use bitcoin::{consensus, Transaction};
+    use strata_db::traits::L1BroadcastDatabase;
+    use strata_rocksdb::{
         broadcaster::db::{BroadcastDatabase, L1BroadcastDb},
         test_utils::get_rocksdb_tmp_instance,
     };
-    use alpen_test_utils::l2::gen_params;
-    use bitcoin::{consensus, Transaction};
-    use express_storage::ops::l1tx_broadcast::Context;
+    use strata_storage::ops::l1tx_broadcast::Context;
+    use strata_test_utils::l2::gen_params;
 
     use super::*;
     use crate::test_utils::{TestBitcoinClient, SOME_TX};

@@ -2,14 +2,6 @@
 
 use std::{collections::BTreeMap, ops::Not, sync::Arc, time::Duration};
 
-use alpen_express_common::logging;
-use alpen_express_primitives::{
-    bridge::{Musig2PartialSig, Musig2PubNonce, OperatorIdx, OperatorPartialSig, PublickeyTable},
-    buf::{Buf20, Buf32},
-    l1::{BitcoinAddress, XOnlyPk},
-};
-use alpen_express_rocksdb::{bridge::db::BridgeTxRocksDb, test_utils::get_rocksdb_tmp_instance};
-use alpen_test_utils::bridge::generate_keypairs;
 use anyhow::Context;
 use bitcoin::{
     key::Keypair,
@@ -24,8 +16,8 @@ use bitcoind::{
     },
     BitcoinD, Conf,
 };
-use express_bridge_sig_manager::prelude::SignatureManager;
-use express_bridge_tx_builder::{
+use strata_bridge_sig_manager::prelude::SignatureManager;
+use strata_bridge_tx_builder::{
     prelude::{
         create_tx, create_tx_ins, create_tx_outs, get_aggregated_pubkey, metadata_script,
         n_of_n_script, CooperativeWithdrawalInfo, DepositInfo, TxBuildContext, BRIDGE_DENOMINATION,
@@ -33,7 +25,15 @@ use express_bridge_tx_builder::{
     },
     TxKind,
 };
-use express_storage::ops;
+use strata_common::logging;
+use strata_primitives::{
+    bridge::{Musig2PartialSig, Musig2PubNonce, OperatorIdx, OperatorPartialSig, PublickeyTable},
+    buf::{Buf20, Buf32},
+    l1::{BitcoinAddress, XOnlyPk},
+};
+use strata_rocksdb::{bridge::db::BridgeTxRocksDb, test_utils::get_rocksdb_tmp_instance};
+use strata_storage::ops;
+use strata_test_utils::bridge::generate_keypairs;
 use threadpool::ThreadPool;
 use tokio::{
     sync::{broadcast, Mutex},

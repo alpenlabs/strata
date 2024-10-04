@@ -1,6 +1,6 @@
-use alpen_express_consensus_logic::errors::ChainTipError;
-use alpen_express_db::DbError;
-use alpen_express_state::id::L2BlockId;
+use strata_consensus_logic::errors::ChainTipError;
+use strata_db::DbError;
+use strata_state::id::L2BlockId;
 
 use crate::ClientError;
 

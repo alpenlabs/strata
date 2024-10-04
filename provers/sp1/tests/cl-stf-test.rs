@@ -4,11 +4,11 @@ mod helpers;
 mod test {
     use std::path::Path;
 
-    use alpen_express_state::{block::L2Block, chain_state::ChainState};
-    use express_proofimpl_checkpoint::L2BatchProofOutput;
-    use express_sp1_adapter::{SP1Host, SP1ProofInputBuilder, SP1Verifier};
-    use express_sp1_guest_builder::GUEST_CL_STF_ELF;
-    use express_zkvm::{AggregationInput, ProverOptions, ZKVMHost, ZKVMInputBuilder, ZKVMVerifier};
+    use strata_proofimpl_checkpoint::L2BatchProofOutput;
+    use strata_sp1_adapter::{SP1Host, SP1ProofInputBuilder, SP1Verifier};
+    use strata_sp1_guest_builder::GUEST_CL_STF_ELF;
+    use strata_state::{block::L2Block, chain_state::ChainState};
+    use strata_zkvm::{AggregationInput, ProverOptions, ZKVMHost, ZKVMInputBuilder, ZKVMVerifier};
 
     use super::helpers::get_el_block_proof;
 

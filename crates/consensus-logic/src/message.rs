@@ -1,8 +1,6 @@
 use std::sync::Arc;
 
-use alpen_express_state::{
-    client_state::ClientState, id::L2BlockId, operation::ClientUpdateOutput,
-};
+use strata_state::{client_state::ClientState, id::L2BlockId, operation::ClientUpdateOutput};
 
 /// Sync control message.
 #[derive(Copy, Clone, Debug)]

@@ -1,25 +1,37 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-use alpen_express_btcio::{broadcaster::L1BroadcastHandle, writer::InscriptionHandle};
-use alpen_express_consensus_logic::{
+use async_trait::async_trait;
+use bitcoin::{
+    consensus::deserialize,
+    hashes::Hash,
+    key::Parity,
+    secp256k1::{PublicKey, XOnlyPublicKey},
+    Transaction as BTransaction, Txid,
+};
+use futures::TryFutureExt;
+use jsonrpsee::core::RpcResult;
+use strata_bridge_relay::relayer::RelayerHandle;
+use strata_btcio::{broadcaster::L1BroadcastHandle, writer::InscriptionHandle};
+use strata_consensus_logic::{
     checkpoint::CheckpointHandle, l1_handler::verify_proof, sync_manager::SyncManager,
 };
-use alpen_express_db::{
+use strata_db::{
     traits::{ChainstateProvider, Database, L1DataProvider, L2DataProvider},
     types::{CheckpointProvingStatus, L1TxEntry, L1TxStatus},
 };
-use alpen_express_primitives::{
+use strata_primitives::{
     bridge::{OperatorIdx, PublickeyTable},
     buf::Buf32,
     hash,
     params::Params,
 };
-use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer, AlpenSequencerApiServer};
-use alpen_express_rpc_types::{
+use strata_rpc_api::{StrataAdminApiServer, StrataApiServer, StrataSequencerApiServer};
+use strata_rpc_types::{
     errors::RpcServerError as Error, BlockHeader, BridgeDuties, ClientStatus, DaBlob, ExecUpdate,
     HexBytes, HexBytes32, L1Status, L2BlockStatus, NodeSyncStatus, RpcCheckpointInfo,
 };
-use alpen_express_state::{
+use strata_rpc_utils::to_jsonrpsee_error;
+use strata_state::{
     batch::BatchCheckpoint,
     block::L2BlockBundle,
     bridge_duties::BridgeDuty,
@@ -32,20 +44,8 @@ use alpen_express_state::{
     id::L2BlockId,
     l1::L1BlockId,
 };
-use alpen_express_status::StatusRx;
-use async_trait::async_trait;
-use bitcoin::{
-    consensus::deserialize,
-    hashes::Hash,
-    key::Parity,
-    secp256k1::{PublicKey, XOnlyPublicKey},
-    Transaction as BTransaction, Txid,
-};
-use express_bridge_relay::relayer::RelayerHandle;
-use express_rpc_utils::to_jsonrpsee_error;
-use express_storage::L2BlockManager;
-use futures::TryFutureExt;
-use jsonrpsee::core::RpcResult;
+use strata_status::StatusRx;
+use strata_storage::L2BlockManager;
 use tokio::sync::{oneshot, Mutex};
 use tracing::*;
 
@@ -61,7 +61,7 @@ fn fetch_l2blk<D: Database + Sync + Send + 'static>(
         .ok_or(Error::MissingL2Block(blkid))
 }
 
-pub struct AlpenRpcImpl<D> {
+pub struct StrataRpcImpl<D> {
     status_rx: Arc<StatusRx>,
     database: Arc<D>,
     sync_manager: Arc<SyncManager>,
@@ -70,7 +70,7 @@ pub struct AlpenRpcImpl<D> {
     relayer_handle: Arc<RelayerHandle>,
 }
 
-impl<D: Database + Sync + Send + 'static> AlpenRpcImpl<D> {
+impl<D: Database + Sync + Send + 'static> StrataRpcImpl<D> {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         status_rx: Arc<StatusRx>,
@@ -143,7 +143,7 @@ fn conv_blk_header_to_rpc(blk_header: &impl L2Header) -> BlockHeader {
 }
 
 #[async_trait]
-impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
+impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
     async fn protocol_version(&self) -> RpcResult<u64> {
         Ok(1)
     }
@@ -610,7 +610,7 @@ impl AdminServerImpl {
 }
 
 #[async_trait]
-impl AlpenAdminApiServer for AdminServerImpl {
+impl StrataAdminApiServer for AdminServerImpl {
     async fn stop(&self) -> RpcResult<()> {
         let mut opt = self.stop_tx.lock().await;
         if let Some(stop_tx) = opt.take() {
@@ -646,7 +646,7 @@ impl SequencerServerImpl {
 }
 
 #[async_trait]
-impl AlpenSequencerApiServer for SequencerServerImpl {
+impl StrataSequencerApiServer for SequencerServerImpl {
     async fn submit_da_blob(&self, blob: HexBytes) -> RpcResult<()> {
         let commitment = hash::raw(&blob.0);
         let blobintent = BlobIntent::new(BlobDest::L1, commitment, blob.0);
@@ -700,7 +700,7 @@ impl AlpenSequencerApiServer for SequencerServerImpl {
         debug!(%idx, "Proof is pending, setting proof reaedy");
 
         // TODO: verify proof, once proof verification logic is ready
-        entry.proof = express_zkvm::Proof::new(proofbytes.into_inner());
+        entry.proof = strata_zkvm::Proof::new(proofbytes.into_inner());
 
         entry.proving_status = CheckpointProvingStatus::ProofReady;
         self.checkpoint_handle

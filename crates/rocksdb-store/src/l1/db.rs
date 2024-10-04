@@ -1,16 +1,16 @@
 use std::sync::Arc;
 
-use alpen_express_db::{errors::DbError, traits::*, DbResult};
-use alpen_express_mmr::CompactMmr;
-use alpen_express_primitives::{
-    buf::Buf32,
-    l1::{L1BlockManifest, L1TxRef},
-};
-use alpen_express_state::l1::L1Tx;
 use rockbound::{
     rocksdb::ReadOptions, schema::KeyEncoder, OptimisticTransactionDB, SchemaBatch,
     SchemaDBOperations, SchemaDBOperationsExt,
 };
+use strata_db::{errors::DbError, traits::*, DbResult};
+use strata_mmr::CompactMmr;
+use strata_primitives::{
+    buf::Buf32,
+    l1::{L1BlockManifest, L1TxRef},
+};
+use strata_state::l1::L1Tx;
 use tracing::*;
 
 use super::schemas::{L1BlockSchema, MmrSchema, TxnSchema};
@@ -228,10 +228,10 @@ impl L1DataProvider for L1Db {
 #[cfg(feature = "test_utils")]
 #[cfg(test)]
 mod tests {
-    use alpen_express_primitives::l1::L1TxProof;
-    use alpen_express_state::tx::ProtocolOperation;
-    use alpen_test_utils::ArbitraryGenerator;
     use bitcoin::key::rand::{self, Rng};
+    use strata_primitives::l1::L1TxProof;
+    use strata_state::tx::ProtocolOperation;
+    use strata_test_utils::ArbitraryGenerator;
 
     use super::*;
     use crate::test_utils::get_rocksdb_tmp_instance;

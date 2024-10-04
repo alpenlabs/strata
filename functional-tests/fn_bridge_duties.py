@@ -58,7 +58,7 @@ class BridgeDepositTest(flexitest.Test):
         self.logger.debug(
             f"getting bridge duties for operator_idx: {operator_idx} from index: {start_index}"
         )
-        duties_resp = seqrpc.alp_getBridgeDuties(operator_idx, start_index)
+        duties_resp = seqrpc.strata_getBridgeDuties(operator_idx, start_index)
         duties: List = duties_resp["duties"]
 
         expected_duties = []

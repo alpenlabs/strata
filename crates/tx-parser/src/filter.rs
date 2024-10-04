@@ -1,11 +1,11 @@
-use alpen_express_primitives::{
+use bitcoin::{Block, Transaction};
+use borsh::{BorshDeserialize, BorshSerialize};
+use strata_primitives::{
     buf::Buf32,
     params::{OperatorConfig, RollupParams},
     prelude::DepositTxParams,
 };
-use alpen_express_state::{batch::SignedBatchCheckpoint, tx::ProtocolOperation};
-use bitcoin::{Block, Transaction};
-use borsh::{BorshDeserialize, BorshSerialize};
+use strata_state::{batch::SignedBatchCheckpoint, tx::ProtocolOperation};
 
 use super::messages::ProtocolOpTxRef;
 use crate::{
@@ -94,15 +94,6 @@ fn check_and_extract_relevant_info(
 mod test {
     use std::str::FromStr;
 
-    use alpen_express_btcio::test_utils::{
-        build_reveal_transaction_test, generate_inscription_script_test,
-    };
-    use alpen_express_primitives::l1::BitcoinAmount;
-    use alpen_express_state::{
-        batch::SignedBatchCheckpoint,
-        tx::{InscriptionData, ProtocolOperation},
-    };
-    use alpen_test_utils::ArbitraryGenerator;
     use bitcoin::{
         absolute::{Height, LockTime},
         block::{Header, Version as BVersion},
@@ -115,6 +106,15 @@ mod test {
         Transaction, TxMerkleNode, TxOut,
     };
     use rand::RngCore;
+    use strata_btcio::test_utils::{
+        build_reveal_transaction_test, generate_inscription_script_test,
+    };
+    use strata_primitives::l1::BitcoinAmount;
+    use strata_state::{
+        batch::SignedBatchCheckpoint,
+        tx::{InscriptionData, ProtocolOperation},
+    };
+    use strata_test_utils::ArbitraryGenerator;
 
     use crate::{
         deposit::test_utils::{

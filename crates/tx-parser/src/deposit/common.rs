@@ -1,5 +1,5 @@
-use alpen_express_primitives::params::DepositTxParams;
 use bitcoin::script::Instructions;
+use strata_primitives::params::DepositTxParams;
 
 use super::error::DepositParseError;
 use crate::utils::next_bytes;

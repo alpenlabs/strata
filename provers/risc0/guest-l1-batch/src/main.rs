@@ -1,4 +1,4 @@
-use express_proofimpl_l1_batch::{
+use strata_proofimpl_l1_batch::{
     logic::{process_batch_proof, L1BatchProofInput},
     params::get_btc_params,
 };

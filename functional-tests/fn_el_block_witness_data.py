@@ -34,7 +34,7 @@ class ElBlockWitnessDataGenerationTest(flexitest.Test):
         time.sleep(1)
 
         # Get the witness data
-        witness_data = rethrpc.alpee_getBlockWitness(blockhash, True)
+        witness_data = rethrpc.strataee_getBlockWitness(blockhash, True)
         assert witness_data is not None, "non empty witness"
 
         print(witness_data)

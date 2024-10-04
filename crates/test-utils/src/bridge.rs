@@ -3,11 +3,6 @@ use std::{
     sync::Arc,
 };
 
-use alpen_express_db::stubs::bridge::StubTxStateDb;
-use alpen_express_primitives::{
-    bridge::{OperatorIdx, PublickeyTable, TxSigningData},
-    l1::{BitcoinPsbt, BitcoinTxOut, OutputRef, TaprootSpendPath},
-};
 use arbitrary::{Arbitrary, Unstructured};
 use bitcoin::{
     absolute::LockTime,
@@ -18,9 +13,14 @@ use bitcoin::{
     transaction::Version,
     Address, Amount, Network, Psbt, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Witness,
 };
-use express_storage::ops::bridge::{BridgeTxStateOps, Context};
 use musig2::{secp256k1::SECP256K1, KeyAggContext, SecNonce};
 use rand::{Rng, RngCore};
+use strata_db::stubs::bridge::StubTxStateDb;
+use strata_primitives::{
+    bridge::{OperatorIdx, PublickeyTable, TxSigningData},
+    l1::{BitcoinPsbt, BitcoinTxOut, OutputRef, TaprootSpendPath},
+};
+use strata_storage::ops::bridge::{BridgeTxStateOps, Context};
 use threadpool::ThreadPool;
 
 /// Generate `count` (public key, private key) pairs as two separate [`Vec`].

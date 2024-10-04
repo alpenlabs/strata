@@ -11,8 +11,8 @@ use bdk_wallet::{
     KeychainKind, TxOrdering, Wallet,
 };
 use console::{style, Term};
-use express_bridge_tx_builder::constants::MAGIC_BYTES;
 use indicatif::ProgressBar;
+use strata_bridge_tx_builder::constants::MAGIC_BYTES;
 
 use crate::{
     constants::{

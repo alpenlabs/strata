@@ -44,7 +44,7 @@ class BridgeDepositTest(flexitest.Test):
         print(btcrpc.sendrawtransaction(deposit_tx))
         # check if we are getting deposits
         wait_until(
-            lambda: len(seqrpc.alp_getCurrentDeposits()) > 0,
+            lambda: len(seqrpc.strata_getCurrentDeposits()) > 0,
             error_with="seem not be getting deposits",
             timeout=SEQ_PUBLISH_BATCH_INTERVAL_SECS,
         )

@@ -1,7 +1,5 @@
-use alpen_express_crypto::verify_schnorr_sig;
-use alpen_express_primitives::{
-    block_credential::CredRule, buf::Buf32, hash, params::RollupParams,
-};
+use strata_crypto::verify_schnorr_sig;
+use strata_primitives::{block_credential::CredRule, buf::Buf32, hash, params::RollupParams};
 use tracing::warn;
 
 use crate::{

@@ -1,16 +1,16 @@
-//! alpen custom reth rpc
+//! Strata custom reth rpc
 
 mod rpc;
 
-use express_proofimpl_evm_ee_stf::ELProofInput;
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 use reth_primitives::B256;
-pub use rpc::AlpenRPC;
+pub use rpc::StrataRPC;
 use serde::{Deserialize, Serialize};
+use strata_proofimpl_evm_ee_stf::ELProofInput;
 
-#[cfg_attr(not(test), rpc(server, namespace = "alpee"))]
-#[cfg_attr(test, rpc(server, client, namespace = "alpee"))]
-pub trait AlpenRpcApi {
+#[cfg_attr(not(test), rpc(server, namespace = "strataee"))]
+#[cfg_attr(test, rpc(server, client, namespace = "strataee"))]
+pub trait StrataRpcApi {
     /// Returns the state changesets with storage proofs for requested blocks.
     /// Used as part of input to riscvm during proof generation
     #[method(name = "getBlockWitness")]

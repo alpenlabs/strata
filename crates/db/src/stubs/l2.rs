@@ -1,7 +1,7 @@
 use std::collections::*;
 
-use alpen_express_state::{block::L2BlockBundle, prelude::*};
 use parking_lot::Mutex;
+use strata_state::{block::L2BlockBundle, prelude::*};
 
 use crate::{
     traits::{BlockStatus, *},

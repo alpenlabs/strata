@@ -38,7 +38,7 @@ class BlockFinalizationSeqRestartTest(flexitest.Test):
         seq.start()
 
         seqrpc = seq.create_rpc()
-        wait_until(seqrpc.alp_protocolVersion, timeout=5)
+        wait_until(seqrpc.strata_protocolVersion, timeout=5)
 
         # Check for next 2 checkpoints
         for n in range(2, 4):
@@ -51,7 +51,7 @@ class BlockFinalizationSeqRestartTest(flexitest.Test):
 def check_already_sent_proof(seqrpc):
     try:
         # Proof for checkpoint 0 is already sent
-        seqrpc.alpadmin_submitCheckpointProof(0, "abc123")
+        seqrpc.strataadmin_submitCheckpointProof(0, "abc123")
     except Exception as e:
         assert e.code == ERROR_PROOF_ALREADY_CREATED
     else:

@@ -1,11 +1,11 @@
 use std::io::{Cursor, Write};
 
-use alpen_express_primitives::buf::Buf32;
 use arbitrary::Arbitrary;
 use bitcoin::{block::Header, hashes::Hash, BlockHash, CompactTarget, Target};
 use borsh::{BorshDeserialize, BorshSerialize};
 use ethnum::U256;
 use serde::{Deserialize, Serialize};
+use strata_primitives::buf::Buf32;
 
 use super::{timestamp_store::TimestampStore, L1BlockId};
 use crate::l1::{params::BtcParams, utils::compute_block_hash};
@@ -251,7 +251,7 @@ impl HeaderVerificationState {
         }
 
         cur.write_all(&serialized_timestamps)?;
-        Ok(alpen_express_primitives::hash::raw(&buf))
+        Ok(strata_primitives::hash::raw(&buf))
     }
 }
 
@@ -271,9 +271,9 @@ pub fn get_difficulty_adjustment_height(idx: u32, start: u32, params: &BtcParams
 
 #[cfg(test)]
 mod tests {
-    use alpen_test_utils::bitcoin::get_btc_chain;
     use bitcoin::params::MAINNET;
     use rand::Rng;
+    use strata_test_utils::bitcoin::get_btc_chain;
 
     use super::*;
 
