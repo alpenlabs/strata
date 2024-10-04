@@ -201,9 +201,9 @@ pub struct RpcCheckpointInfo {
     /// The index of the checkpoint
     pub idx: u64,
     /// L1 height  the checkpoint covers
-    pub l1_height: u64,
+    pub l1_range: (u64, u64),
     /// L2 height the checkpoint covers
-    pub l2_height: u64,
+    pub l2_range: (u64, u64),
     /// L2 block that this checkpoint covers
     pub l2_blockid: L2BlockId,
 }
@@ -212,8 +212,8 @@ impl From<CheckpointInfo> for RpcCheckpointInfo {
     fn from(value: CheckpointInfo) -> Self {
         Self {
             idx: value.idx,
-            l1_height: value.l1_range.1,
-            l2_height: value.l2_range.1,
+            l1_range: value.l1_range,
+            l2_range: value.l2_range,
             l2_blockid: value.l2_blockid,
         }
     }

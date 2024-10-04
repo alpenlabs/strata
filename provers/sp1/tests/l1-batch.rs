@@ -1,5 +1,5 @@
 // NOTE: SP1 prover runs in release mode only; therefore run the tests on release mode only
-#[cfg(all(feature = "prover", not(debug_assertions)))]
+// #[cfg(all(feature = "prover", not(debug_assertions)))]
 mod test {
     use alpen_test_utils::bitcoin::{get_btc_chain, get_tx_filters};
     use bitcoin::params::MAINNET;

@@ -75,4 +75,12 @@ impl CheckpointHandle {
     pub fn get_checkpoint_blocking(&self, idx: u64) -> DbResult<Option<CheckpointEntry>> {
         self.db_manager.get_checkpoint_blocking(idx)
     }
+
+    pub async fn get_last_checkpoint_idx(&self) -> DbResult<Option<u64>> {
+        self.db_manager.get_last_checkpoint().await
+    }
+
+    pub fn get_last_checkpoint_idx_blocking(&self) -> DbResult<Option<u64>> {
+        self.db_manager.get_last_checkpoint_blocking()
+    }
 }
