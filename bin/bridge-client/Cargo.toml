@@ -33,6 +33,7 @@ bitcoin.workspace = true
 chrono.workspace = true
 directories = "5.0.1"
 jsonrpsee.workspace = true
+miniscript.workspace = true
 rockbound.workspace = true
 thiserror.workspace = true
 threadpool.workspace = true
