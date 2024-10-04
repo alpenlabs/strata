@@ -24,13 +24,13 @@ RUN --mount=type=cache,target=/usr/local/cargo/git \
 RUN --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,sharing=private,target=/app/target \
-    cargo build --release --bin alpen-express-reth
+    cargo build --release --bin strata-reth
 
 
 RUN --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,sharing=private,target=/app/target \
-    cp /app/target/release/alpen-express-reth /app/strata-reth
+    cp /app/target/release/strata-reth /app/strata-reth
 
 FROM ubuntu:24.04 AS runtime
 WORKDIR /app

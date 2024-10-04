@@ -22,5 +22,5 @@ fi
 
 export RUST_LOG=${RUST_LOG:-info}
 
-# Start the Alpen Express Sequencer
-strata-sequencer --config "$CONFIG_PATH" --rollup-params "$PARAM_PATH" $@
+# Start the Strata Client
+strata-client --config "$CONFIG_PATH" --rollup-params "$PARAM_PATH" $@

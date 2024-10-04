@@ -48,8 +48,8 @@ members = [
   "bin/datatool",
   "bin/prover-client",
   "bin/strata-cli",
-  "reth",
-  "sequencer",
+  "bin/strata-client",
+  "bin/strata-reth",
   "bin/datatool",
   "crates/tx-parser",
 
@@ -61,8 +61,8 @@ default-members = [
   "bin/bridge-client",
   "bin/datatool",
   "bin/prover-client",
-  "reth",
-  "sequencer",
+  "bin/strata-reth",
+  "bin/strata-client",
 ]
 
 resolver = "2"

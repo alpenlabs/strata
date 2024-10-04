@@ -76,16 +76,16 @@ Start EL Client:
 
 ```sh
 # Normal mode
-cargo run --bin alpen-express-reth  -- --datadir .data/reth --http -vvvv
+cargo run --bin strata-reth  -- --datadir .data/reth --http -vvvv
 
 # Block witness generation mode
-cargo run --bin alpen-express-reth  -- --datadir .data/reth --http --enable-witness-gen -vvvv
+cargo run --bin strata-reth  -- --datadir .data/reth --http --enable-witness-gen -vvvv
 ```
 
 Start CL Client/Sequencer
 
 ```sh
-cargo run --bin alpen-express-sequencer -- --config config.toml
+cargo run --bin strata-client -- --config config.toml
 ```
 
 ## License

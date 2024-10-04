@@ -4,7 +4,7 @@ x-base-client: &base-client
     dockerfile: ./docker/client/Dockerfile
   image: "strata_client:v0.1.0"
   networks:
-    - alpen_rollup
+    - strata_network
 
 x-base-reth: &base-reth
   build:
@@ -12,7 +12,7 @@ x-base-reth: &base-reth
     dockerfile: ./docker/reth/Dockerfile
   image: "strata_reth:v0.1.0"
   networks:
-    - alpen_rollup
+    - strata_network
 
 services:
   reth:
@@ -101,9 +101,9 @@ services:
     ports:
       - "18443:18443"
     networks:
-      - alpen_rollup
+      - strata_network
 
 networks:
-  alpen_rollup:
+  strata_network:
     driver: bridge
-    name: alpen_rollup
+    name: strata_network

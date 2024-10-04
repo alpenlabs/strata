@@ -1,6 +1,6 @@
 [tool.poetry]
 version = "0.1.0"
-name = "alpen-express-test"
+name = "strata-test"
 description = ""
 authors = []
 
