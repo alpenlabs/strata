@@ -185,18 +185,30 @@ pub struct SignRawTransactionWithWallet {
     pub errors: Option<Vec<SignRawTransactionWithWalletError>>,
 }
 
-/// Models the result of the JSON-RPC method `listdescriptors`
-/// or the argument to `importdescriptors`.
+/// Models the result of the JSON-RPC method `listdescriptors`.
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct ListDescriptors {
     /// The descriptors
     pub descriptors: Vec<ListDescriptor>,
 }
 
-/// Models the Descriptor in the result of the JSON-RPC method `listdescriptors`
-/// or the argument to `importdescriptors`.
+/// Models the Descriptor in the result of the JSON-RPC method `listdescriptors`.
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct ListDescriptor {
+    /// The descriptor.
+    pub desc: String,
+}
+
+/// Models the result of the JSON-RPC method `importdescriptors`.
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+pub struct ImportDescriptors {
+    /// The descriptors
+    pub descriptors: Vec<ListDescriptor>,
+}
+
+/// Models the Descriptor in the result of the JSON-RPC method `importdescriptors`.
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+pub struct ImportDescriptor {
     /// The descriptor.
     pub desc: String,
     /// Set this descriptor to be the active descriptor
@@ -206,17 +218,9 @@ pub struct ListDescriptor {
     /// in UNIX epoch time. Can also be a string "now"
     pub timestamp: String,
 }
-
-/// Models the result of the JSON-RPC method `importdescriptors`.
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
-pub struct ImportDescriptors {
-    /// The descriptors
-    pub descriptors: Vec<ImportDescriptor>,
-}
-
 /// Models the Descriptor in the result of the JSON-RPC method `importdescriptors`.
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
-pub struct ImportDescriptor {
+pub struct ImportDescriptorResult {
     /// Result.
     pub success: bool,
 }

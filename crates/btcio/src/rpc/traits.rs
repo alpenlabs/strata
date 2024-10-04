@@ -5,7 +5,7 @@ use bitcoind_json_rpc_types::v26::GetBlockchainInfo;
 use crate::rpc::{
     client::ClientResult,
     types::{
-        GetTransaction, ImportDescriptor, ListDescriptor, ListTransactions, ListUnspent,
+        GetTransaction, ImportDescriptor, ImportDescriptorResult, ListTransactions, ListUnspent,
         SignRawTransactionWithWallet,
     },
 };
@@ -162,7 +162,7 @@ pub trait Signer {
     /// Imports the descriptors into the wallet.
     async fn import_descriptors(
         &self,
-        descriptors: Vec<ListDescriptor>,
+        descriptors: Vec<ImportDescriptor>,
         wallet_name: String,
-    ) -> ClientResult<Vec<ImportDescriptor>>;
+    ) -> ClientResult<Vec<ImportDescriptorResult>>;
 }

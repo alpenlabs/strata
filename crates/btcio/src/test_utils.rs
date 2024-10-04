@@ -15,8 +15,8 @@ use crate::{
     rpc::{
         traits::{Broadcaster, Reader, Signer, Wallet},
         types::{
-            GetTransaction, ImportDescriptor, ListDescriptor, ListTransactions, ListUnspent,
-            SignRawTransactionWithWallet,
+            GetTransaction, ImportDescriptor, ImportDescriptorResult, ListTransactions,
+            ListUnspent, SignRawTransactionWithWallet,
         },
         ClientResult,
     },
@@ -209,10 +209,10 @@ impl Signer for TestBitcoinClient {
 
     async fn import_descriptors(
         &self,
-        _descriptors: Vec<ListDescriptor>,
+        _descriptors: Vec<ImportDescriptor>,
         _wallet_name: String,
-    ) -> ClientResult<Vec<ImportDescriptor>> {
-        Ok(vec![ImportDescriptor { success: true }])
+    ) -> ClientResult<Vec<ImportDescriptorResult>> {
+        Ok(vec![ImportDescriptorResult { success: true }])
     }
 }
 

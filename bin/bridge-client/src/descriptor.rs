@@ -2,7 +2,7 @@
 
 use std::env;
 
-use alpen_express_btcio::rpc::{traits::Signer, types::ListDescriptor};
+use alpen_express_btcio::rpc::{traits::Signer, types::ImportDescriptor};
 use bitcoin::{
     bip32::{ChildNumber, DerivationPath, Xpriv},
     secp256k1::SECP256K1,
@@ -73,7 +73,7 @@ pub(crate) async fn check_or_load_descriptor_into_wallet(
     } else {
         // load the descriptor
         let descriptor = parse_xpriv(xpriv)?;
-        let descriptors = vec![ListDescriptor {
+        let descriptors = vec![ImportDescriptor {
             desc: descriptor,
             active: Some(true),
             timestamp: "now".to_owned(),
@@ -94,7 +94,7 @@ pub(crate) async fn check_or_load_descriptor_into_wallet(
 mod tests {
     use alpen_express_btcio::rpc::{
         traits::Signer,
-        types::{ImportDescriptor, ListDescriptor},
+        types::{ImportDescriptor, ImportDescriptorResult},
         BitcoinClient,
     };
     use alpen_express_common::logging;
@@ -131,7 +131,7 @@ mod tests {
         let xpriv = XPRIV_STR.parse::<Xpriv>().unwrap();
         let descriptor_string = parse_xpriv(xpriv).unwrap();
         let timestamp = "now".to_owned();
-        let list_descriptors = vec![ListDescriptor {
+        let list_descriptors = vec![ImportDescriptor {
             desc: descriptor_string,
             active: Some(true),
             timestamp,
@@ -140,7 +140,7 @@ mod tests {
             .import_descriptors(list_descriptors, WALLET_NAME.to_string())
             .await
             .unwrap();
-        let expected = vec![ImportDescriptor { success: true }];
+        let expected = vec![ImportDescriptorResult { success: true }];
         assert_eq!(expected, got);
     }
 }
