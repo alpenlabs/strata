@@ -220,6 +220,20 @@ pub struct ImportDescriptor {
     /// Result.
     pub success: bool,
 }
+
+/// Models the `createwallet` JSON-RPC method.
+///
+/// # Note
+///
+/// This can also be used for the `loadwallet` JSON-RPC method.
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+pub struct CreateWallet {
+    /// Wallet name
+    pub wallet_name: String,
+    /// Load on startup
+    pub load_on_startup: Option<bool>,
+}
+
 /// Deserializes the amount in BTC into proper [`Amount`]s.
 fn deserialize_bitcoin<'d, D>(deserializer: D) -> Result<Amount, D::Error>
 where

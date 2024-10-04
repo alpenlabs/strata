@@ -28,8 +28,8 @@ use crate::rpc::{
     error::{BitcoinRpcError, ClientError},
     traits::{Broadcaster, Reader, Signer, Wallet},
     types::{
-        GetTransaction, ImportDescriptor, ListDescriptor, ListDescriptors, ListTransactions,
-        ListUnspent, SignRawTransactionWithWallet,
+        CreateWallet, GetTransaction, ImportDescriptor, ListDescriptor, ListDescriptors,
+        ListTransactions, ListUnspent, SignRawTransactionWithWallet,
     },
 };
 
@@ -361,7 +361,23 @@ impl Signer for BitcoinClient {
     async fn import_descriptors(
         &self,
         descriptors: Vec<ListDescriptor>,
+        wallet_name: String,
     ) -> ClientResult<Vec<ImportDescriptor>> {
+        let wallet_args = CreateWallet {
+            wallet_name,
+            load_on_startup: Some(true),
+        };
+
+        // TODO: this should check for -35 error code which is good,
+        //       means that is already created
+        let _wallet_create = self
+            .call::<Value>("createwallet", &[to_value(wallet_args.clone())?])
+            .await;
+        // TODO: this should check for -35 error code which is good, -18 is bad.
+        let _wallet_load = self
+            .call::<Value>("loadwallet", &[to_value(wallet_args)?])
+            .await;
+
         let result = self
             .call::<Vec<ImportDescriptor>>("importdescriptors", &[to_value(descriptors)?])
             .await?;
@@ -514,7 +530,10 @@ mod test {
             active: Some(true),
             timestamp,
         }];
-        let got = client.import_descriptors(list_descriptors).await.unwrap();
+        let got = client
+            .import_descriptors(list_descriptors, "strata".to_owned())
+            .await
+            .unwrap();
         let expected = vec![ImportDescriptor { success: true }];
         assert_eq!(expected, got);
     }

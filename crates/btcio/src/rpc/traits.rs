@@ -163,5 +163,6 @@ pub trait Signer {
     async fn import_descriptors(
         &self,
         descriptors: Vec<ListDescriptor>,
+        wallet_name: String,
     ) -> ClientResult<Vec<ImportDescriptor>>;
 }

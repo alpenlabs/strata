@@ -210,6 +210,7 @@ impl Signer for TestBitcoinClient {
     async fn import_descriptors(
         &self,
         _descriptors: Vec<ListDescriptor>,
+        _wallet_name: String,
     ) -> ClientResult<Vec<ImportDescriptor>> {
         Ok(vec![ImportDescriptor { success: true }])
     }

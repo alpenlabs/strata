@@ -14,6 +14,7 @@ const DERIV_BASE_IDX: u32 = 56;
 const DERIV_OP_IDX: u32 = 20;
 const DERIV_OP_WALLET_IDX: u32 = 101;
 const OPXPRIV_ENVVAR: &str = "STRATA_OP_XPRIV";
+const WALLET_NAME: &str = "strata";
 
 /// Resolves a key from ENV vars or CLI.
 pub(crate) fn resolve_xpriv(cli_arg: Option<String>) -> anyhow::Result<Xpriv> {
@@ -78,7 +79,7 @@ pub(crate) async fn check_or_load_descriptor_into_wallet(
             timestamp: "now".to_owned(),
         }];
         let result = l1_client
-            .import_descriptors(descriptors)
+            .import_descriptors(descriptors, WALLET_NAME.to_string())
             .await
             .expect("could not get the importdescriptors call from the bitcoin RPC");
         assert!(
@@ -135,7 +136,10 @@ mod tests {
             active: Some(true),
             timestamp,
         }];
-        let got = client.import_descriptors(list_descriptors).await.unwrap();
+        let got = client
+            .import_descriptors(list_descriptors, WALLET_NAME.to_string())
+            .await
+            .unwrap();
         let expected = vec![ImportDescriptor { success: true }];
         assert_eq!(expected, got);
     }
