@@ -18,7 +18,7 @@ alloy = { version = "0.3.5", features = [
   "providers",
   "rpc-types",
 ] }
-argh = { workspace = true }
+argh.workspace = true
 argon2 = "0.5.3"
 bdk_esplora = { version = "0.19.0", features = [
   "async-https",
@@ -30,18 +30,18 @@ config = { version = "0.14.0", default-features = false, features = ["toml"] }
 console = "0.15.8"
 dialoguer = "0.11.0"
 directories = "5.0.1"
-express-bridge-tx-builder = { workspace = true }
+express-bridge-tx-builder.workspace = true
 indicatif = { version = "0.17.8", features = ["improved_unicode", "tokio"] }
-rand = { workspace = true }
-reqwest = { workspace = true }
+rand.workspace = true
+reqwest.workspace = true
 serde.workspace = true
 sha2 = { version = "0.10.8", features = ["loongarch64_asm"] }
 shrex = { version = "0.1.0", path = "../../crates/util/shrex", features = [
   "serde",
 ] }
 sled = "0.34.7"
-terrors = { workspace = true }
-tokio = { workspace = true }
+terrors.workspace = true
+tokio.workspace = true
 
 # sha2 fails to compile on windows with the "asm" feature
 [target.'cfg(not(target_os = "windows"))'.dependencies]

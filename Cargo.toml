@@ -126,8 +126,8 @@ bitcoin = { version = "=0.32.1", features = ["serde"] }
 bitcoind = { version = "0.36.0", features = ["26_0"] }
 bitcoind-json-rpc-types = "0.3.0"
 borsh = { version = "1.5.0", features = ["derive"] }
-bytes = { version = "1.6.0" }
-chrono = { version = "0.4.38" }
+bytes = "1.6.0"
+chrono = "0.4.38"
 digest = "0.10"
 ethnum = "1.5.0"
 eyre = "0.6"
@@ -199,7 +199,7 @@ serde_json = { version = "1.0", default-features = false, features = [
   "alloc",
   "raw_value",
 ] }
-serde_with = { version = "3.9.0" }
+serde_with = "3.9.0"
 sha2 = "0.10"
 tempfile = "3.10.1"
 thiserror = "1.0"

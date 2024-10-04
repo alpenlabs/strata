@@ -8,14 +8,14 @@ version = "0.1.0"
 [dependencies]
 alpen-express-primitives = { path = "../../../crates/primitives" }
 alpen-express-state = { path = "../../../crates/state" }
-bitcoin = { version = "0.32.1" }
+bitcoin = "0.32.1"
 borsh = { version = "1.5.0", features = ["derive"] }
 express-proofimpl-btc-blockspace = { path = "../../../crates/proof-impl/btc-blockspace" }
 express-proofimpl-checkpoint = { path = "../../../crates/proof-impl/checkpoint" }
 express-proofimpl-l1-batch = { path = "../../../crates/proof-impl/l1-batch" }
 express-zkvm = { path = "../../../crates/zkvm/zkvm" }
 risc0-zkvm = { version = "1.0.5", default-features = false, features = ['std'] }
-sha2 = { version = "0.10.8" }
+sha2 = "0.10.8"
 
 [patch.crates-io]
 sha2 = { git = "https://github.com/risc0/RustCrypto-hashes", tag = "sha2-v0.10.8-risczero.0" }

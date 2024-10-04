@@ -9,18 +9,18 @@ path = "src/main.rs"
 
 [dependencies]
 clap = "4"
-express-reth-db = { workspace = true }
-express-reth-exex = { workspace = true }
-express-reth-node = { workspace = true }
-express-reth-rpc = { workspace = true }
-eyre = { workspace = true }
-reth = { workspace = true }
-reth-chainspec = { workspace = true }
-reth-cli-commands = { workspace = true }
-reth-cli-util = { workspace = true }
-reth-db = { workspace = true }
-reth-primitives = { workspace = true }
-rockbound = { workspace = true }
-serde_json = { workspace = true }
+express-reth-db.workspace = true
+express-reth-exex.workspace = true
+express-reth-node.workspace = true
+express-reth-rpc.workspace = true
+eyre.workspace = true
+reth.workspace = true
+reth-chainspec.workspace = true
+reth-cli-commands.workspace = true
+reth-cli-util.workspace = true
+reth-db.workspace = true
+reth-primitives.workspace = true
+rockbound.workspace = true
+serde_json.workspace = true
 shellexpand = "3.0.0"
-tracing = { workspace = true }
+tracing.workspace = true

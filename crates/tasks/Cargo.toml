@@ -4,11 +4,11 @@ name = "express-tasks"
 version = "0.1.0"
 
 [dependencies]
-anyhow = { workspace = true }
-futures-util = { workspace = true }
-thiserror = { workspace = true }
-tokio = { workspace = true }
-tracing = { workspace = true }
+anyhow.workspace = true
+futures-util.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
 
 [dev-dependencies]
-arbitrary = { workspace = true }
+arbitrary.workspace = true

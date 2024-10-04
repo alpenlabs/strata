@@ -6,7 +6,7 @@ version = "0.1.0"
 [workspace]
 
 [dependencies]
-bitcoin = { version = "0.32.1" }
+bitcoin = "0.32.1"
 borsh = { version = "1.5.0", features = ["derive"] }
 express-proofimpl-btc-blockspace = { path = "../../../crates/proof-impl/btc-blockspace" }
 risc0-zkvm = { version = "1.0.5", default-features = false, features = ['std'] }

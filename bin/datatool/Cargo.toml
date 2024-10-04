@@ -8,14 +8,14 @@ name = "strata-datatool"
 path = "src/main.rs"
 
 [dependencies]
-alpen-express-primitives = { workspace = true }
+alpen-express-primitives.workspace = true
 
-anyhow = { workspace = true }
-argh = { workspace = true }
+anyhow.workspace = true
+argh.workspace = true
 bech32 = "0.11.0"
 bitcoin = { workspace = true, features = ["std"] }
-hex = { workspace = true }
-rand = { workspace = true }
+hex.workspace = true
+rand.workspace = true
 secp256k1 = { workspace = true, features = ["global-context", "std"] }
-serde_json = { workspace = true }
+serde_json.workspace = true
 terrors = "0.3.0"

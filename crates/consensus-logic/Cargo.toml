@@ -4,34 +4,34 @@ name = "alpen-express-consensus-logic"
 version = "0.1.0"
 
 [dependencies]
-alpen-express-btcio = { workspace = true }
+alpen-express-btcio.workspace = true
 alpen-express-crypto = { workspace = true, default-features = true }
-alpen-express-db = { workspace = true }
-alpen-express-eectl = { workspace = true }
-alpen-express-primitives = { workspace = true }
-alpen-express-rpc-types = { workspace = true }
-alpen-express-state = { workspace = true }
-alpen-express-status = { workspace = true }
-express-chaintsn = { workspace = true }
-express-risc0-adapter = { workspace = true }
-express-sp1-adapter = { workspace = true }
-express-storage = { workspace = true }
-express-tasks = { workspace = true }
-express-zkvm = { workspace = true }
-strata-tx-parser = { workspace = true }
+alpen-express-db.workspace = true
+alpen-express-eectl.workspace = true
+alpen-express-primitives.workspace = true
+alpen-express-rpc-types.workspace = true
+alpen-express-state.workspace = true
+alpen-express-status.workspace = true
+express-chaintsn.workspace = true
+express-risc0-adapter.workspace = true
+express-sp1-adapter.workspace = true
+express-storage.workspace = true
+express-tasks.workspace = true
+express-zkvm.workspace = true
+strata-tx-parser.workspace = true
 
-anyhow = { workspace = true }
-bitcoin = { workspace = true }
-borsh = { workspace = true }
-futures = { workspace = true }
+anyhow.workspace = true
+bitcoin.workspace = true
+borsh.workspace = true
+futures.workspace = true
 secp256k1 = { workspace = true, features = ["rand-std"] }
-thiserror = { workspace = true }
-threadpool = { workspace = true }
-tokio = { workspace = true }
-tracing = { workspace = true }
+thiserror.workspace = true
+threadpool.workspace = true
+tokio.workspace = true
+tracing.workspace = true
 
 [dev-dependencies]
 alpen-express-db = { workspace = true, features = ["stubs"] }
 alpen-express-rocksdb = { workspace = true, features = ["test_utils"] }
-alpen-test-utils = { workspace = true }
+alpen-test-utils.workspace = true
 rand = { version = "0.8.5", features = ["getrandom", "std_rng"] }
