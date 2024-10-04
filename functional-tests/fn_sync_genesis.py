@@ -27,7 +27,7 @@ class SyncGenesisTest(flexitest.Test):
             assert tries <= MAX_GENESIS_TRIES, "did not observe genesis before timeout"
 
             print("waiting for genesis")
-            stat = seqrpc.alp_clientStatus()
+            stat = seqrpc.strata_clientStatus()
             print(stat)
             if stat["finalized_blkid"] != UNSET_ID:
                 last_slot = stat["chain_tip_slot"]
@@ -44,7 +44,7 @@ class SyncGenesisTest(flexitest.Test):
         stat = None
         for _ in range(5):
             time.sleep(3)
-            stat = seqrpc.alp_clientStatus()
+            stat = seqrpc.strata_clientStatus()
             tip_slot = stat["chain_tip_slot"]
             tip_blkid = stat["chain_tip"]
             print("cur tip slot", tip_slot, "blkid", tip_blkid)

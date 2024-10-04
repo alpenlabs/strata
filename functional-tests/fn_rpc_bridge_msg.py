@@ -28,7 +28,7 @@ class BridgeMsgTest(flexitest.Test):
             ]
         )
 
-        seqrpc.alp_submitBridgeMsg(raw_msg)
+        seqrpc.strata_submitBridgeMsg(raw_msg)
 
         time.sleep(WAIT_TIME + 2)
 
@@ -36,7 +36,7 @@ class BridgeMsgTest(flexitest.Test):
         scope = "00"
         print(scope)
 
-        msgs = seqrpc.alp_getBridgeMsgsByScope(scope)
+        msgs = seqrpc.strata_getBridgeMsgsByScope(scope)
         print(msgs)
 
         # check if received blobdata and sent blobdata are same or not

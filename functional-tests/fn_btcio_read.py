@@ -25,12 +25,12 @@ class L1StatusTest(flexitest.Test):
 
         # Wait for seq
         wait_until(
-            lambda: seqrpc.alp_protocolVersion() is not None,
+            lambda: seqrpc.strata_protocolVersion() is not None,
             error_with="Sequencer did not start on time",
         )
 
         received_block = btcrpc.getblock(btcrpc.proxy.getbestblockhash())
-        l1stat = seqrpc.alp_l1status()
+        l1stat = seqrpc.strata_l1status()
 
         # Time is in millis
         cur_time = l1stat["last_update"] // 1000
@@ -50,7 +50,7 @@ class L1StatusTest(flexitest.Test):
         generate_n_blocks(btcrpc, 2)
         time.sleep(MAX_HORIZON_POLL_INTERVAL_SECS * 2)
 
-        next_l1stat = seqrpc.alp_l1status()
+        next_l1stat = seqrpc.strata_l1status()
         elapsed_time = next_l1stat["last_update"] // 1000
 
         # check if L1 reader is seeing new L1 activity

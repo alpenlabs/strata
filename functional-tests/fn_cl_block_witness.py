@@ -18,16 +18,16 @@ class CLBlockWitnessDataGenerationTest(flexitest.Test):
 
         # Wait for seq
         wait_until(
-            lambda: seqrpc.alp_protocolVersion() is not None,
+            lambda: seqrpc.strata_protocolVersion() is not None,
             error_with="Sequencer did not start on time",
         )
         time.sleep(1)
 
-        witness_1 = seqrpc.alp_getCLBlockWitness(1)
+        witness_1 = seqrpc.strata_getCLBlockWitness(1)
         assert witness_1 is not None
 
         time.sleep(1)
-        witness_2 = seqrpc.alp_getCLBlockWitness(2)
+        witness_2 = seqrpc.strata_getCLBlockWitness(2)
         assert witness_2 is not None
 
         return True

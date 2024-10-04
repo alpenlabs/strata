@@ -28,21 +28,21 @@ class L1ReadReorgTest(flexitest.Test):
 
         # Wait for seq
         wait_until(
-            lambda: seqrpc.alp_protocolVersion() is not None,
+            lambda: seqrpc.strata_protocolVersion() is not None,
             error_with="Sequencer did not start on time",
         )
-        l1stat = seqrpc.alp_l1status()
+        l1stat = seqrpc.strata_l1status()
 
         height_to_invalidate_from = int(l1stat["cur_height"]) - REORG_DEPTH
         print("height to invalidate from", height_to_invalidate_from)
         block_to_invalidate_from = btcrpc.proxy.getblockhash(height_to_invalidate_from)
-        to_be_invalid_block = seqrpc.alp_getL1blockHash(height_to_invalidate_from + 1)
+        to_be_invalid_block = seqrpc.strata_getL1blockHash(height_to_invalidate_from + 1)
         print("invalidating block", to_be_invalid_block)
         btcrpc.proxy.invalidateblock(block_to_invalidate_from)
 
         # Wait for at least 1 block to be added after invalidating `REORG_DEPTH` blocks.
         time.sleep(BLOCK_GENERATION_INTERVAL_SECS * 1 + SEQ_SLACK_TIME_SECS)
-        block_from_invalidated_height = seqrpc.alp_getL1blockHash(height_to_invalidate_from + 1)
+        block_from_invalidated_height = seqrpc.strata_getL1blockHash(height_to_invalidate_from + 1)
         print("now have block", block_from_invalidated_height)
 
         assert to_be_invalid_block != block_from_invalidated_height, "Expected reorg from block 3"

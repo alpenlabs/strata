@@ -30,7 +30,7 @@ class BroadcastTest(flexitest.Test):
         signed_tx = btcrpc.proxy.signrawtransactionwithwallet(raw_tx)["hex"]
         print("Signed Tx", signed_tx)
 
-        txid = seqrpc.alpadmin_broadcastRawTx(signed_tx)
+        txid = seqrpc.strataadmin_broadcastRawTx(signed_tx)
         print("Rpc returned txid", txid)
 
         # Now poll for the tx in chain
@@ -48,7 +48,7 @@ class BroadcastTest(flexitest.Test):
 
         # Also check from rpc, wait for a while
         time.sleep(1)
-        st = seqrpc.alp_getTxStatus(txid)
+        st = seqrpc.strata_getTxStatus(txid)
         assert st["status"] == "Confirmed"
 
         return True

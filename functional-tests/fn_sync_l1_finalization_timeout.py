@@ -49,7 +49,7 @@ class BlockFinalizationTimeoutTest(flexitest.Test):
 def check_already_sent_proof(seqrpc):
     try:
         # Proof for checkpoint 0 is already sent
-        seqrpc.alpadmin_submitCheckpointProof(0, "abc123")
+        seqrpc.strataadmin_submitCheckpointProof(0, "abc123")
     except Exception as e:
         assert e.code == ERROR_PROOF_ALREADY_CREATED
     else:

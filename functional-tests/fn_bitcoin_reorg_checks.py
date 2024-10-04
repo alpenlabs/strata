@@ -40,7 +40,7 @@ class BitcoinReorgChecksTest(flexitest.Test):
 
         # Wait for seq
         wait_until(
-            lambda: seqrpc.alp_protocolVersion() is not None,
+            lambda: seqrpc.strata_protocolVersion() is not None,
             error_with="Sequencer did not start on time",
         )
 
@@ -71,7 +71,7 @@ def check_nth_checkpoint_finalized_on_reorg(checkpt_idx: int, seq: Service, btc:
     btcrpc.proxy.generatetoaddress(3, seq_addr)
 
     submit_checkpoint(checkpt_idx, seqrpc, manual_gen)
-    published_txid = seqrpc.alp_l1status()["last_published_txid"]
+    published_txid = seqrpc.strata_l1status()["last_published_txid"]
 
     # wait until it gets confirmed
     btcrpc.proxy.generatetoaddress(1, seq_addr)
@@ -104,12 +104,12 @@ def check_nth_checkpoint_finalized_on_reorg(checkpt_idx: int, seq: Service, btc:
     # Create enough blocks to finalize
     btcrpc.proxy.generatetoaddress(finality_depth + 1, new_addr)
 
-    batch_info = seqrpc.alp_getCheckpointInfo(checkpt_idx)
+    batch_info = seqrpc.strata_getCheckpointInfo(checkpt_idx)
     to_finalize_blkid = batch_info["l2_blockid"]
 
     # Check finalized
     wait_until(
-        lambda: seqrpc.alp_syncStatus()["finalized_block_id"] == to_finalize_blkid,
+        lambda: seqrpc.strata_syncStatus()["finalized_block_id"] == to_finalize_blkid,
         error_with="Block not finalized",
         timeout=10,
     )

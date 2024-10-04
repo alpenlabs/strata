@@ -15,7 +15,7 @@ class ExecUpdateTest(flexitest.Test):
         seqrpc = seq.create_rpc()
         time.sleep(2)
 
-        recent_blks = seqrpc.alp_getRecentBlockHeaders(1)
-        exec_update = seqrpc.alp_getExecUpdateById(recent_blks[0]["block_id"])
+        recent_blks = seqrpc.strata_getRecentBlockHeaders(1)
+        exec_update = seqrpc.strata_getExecUpdateById(recent_blks[0]["block_id"])
         print(exec_update)
         assert exec_update["update_idx"] == recent_blks[0]["block_idx"]
