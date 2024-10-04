@@ -188,7 +188,7 @@ pub struct SignRawTransactionWithWallet {
 /// Models the result of the JSON-RPC method `listdescriptors`.
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct ListDescriptors {
-    /// The descriptor.
+    /// The descriptors
     pub descriptors: Vec<ListDescriptor>,
 }
 
@@ -197,6 +197,45 @@ pub struct ListDescriptors {
 pub struct ListDescriptor {
     /// The descriptor.
     pub desc: String,
+}
+
+/// Models the result of the JSON-RPC method `importdescriptors`.
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+pub struct ImportDescriptors {
+    /// The descriptors
+    pub descriptors: Vec<ListDescriptor>,
+}
+
+/// Models the Descriptor in the result of the JSON-RPC method `importdescriptors`.
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+pub struct ImportDescriptor {
+    /// The descriptor.
+    pub desc: String,
+    /// Set this descriptor to be the active descriptor
+    /// for the corresponding output type/externality.
+    pub active: Option<bool>,
+    /// Time from which to start rescanning the blockchain for this descriptor,
+    /// in UNIX epoch time. Can also be a string "now"
+    pub timestamp: String,
+}
+/// Models the Descriptor in the result of the JSON-RPC method `importdescriptors`.
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+pub struct ImportDescriptorResult {
+    /// Result.
+    pub success: bool,
+}
+
+/// Models the `createwallet` JSON-RPC method.
+///
+/// # Note
+///
+/// This can also be used for the `loadwallet` JSON-RPC method.
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+pub struct CreateWallet {
+    /// Wallet name
+    pub wallet_name: String,
+    /// Load on startup
+    pub load_on_startup: Option<bool>,
 }
 
 /// Deserializes the amount in BTC into proper [`Amount`]s.

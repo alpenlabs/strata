@@ -6,6 +6,7 @@
 mod args;
 pub(crate) mod constants;
 pub(crate) mod db;
+mod descriptor;
 mod errors;
 mod modes;
 pub(crate) mod rpc_server;

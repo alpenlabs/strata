@@ -4,7 +4,10 @@ use bitcoind_json_rpc_types::v26::GetBlockchainInfo;
 
 use crate::rpc::{
     client::ClientResult,
-    types::{GetTransaction, ListTransactions, ListUnspent, SignRawTransactionWithWallet},
+    types::{
+        GetTransaction, ImportDescriptor, ImportDescriptorResult, ListTransactions, ListUnspent,
+        SignRawTransactionWithWallet,
+    },
 };
 
 /// Basic functionality that any Bitcoin client that interacts with the
@@ -155,4 +158,11 @@ pub trait Signer {
 
     /// Gets the underlying [`Xpriv`] from the wallet.
     async fn get_xpriv(&self) -> ClientResult<Option<Xpriv>>;
+
+    /// Imports the descriptors into the wallet.
+    async fn import_descriptors(
+        &self,
+        descriptors: Vec<ImportDescriptor>,
+        wallet_name: String,
+    ) -> ClientResult<Vec<ImportDescriptorResult>>;
 }

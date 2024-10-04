@@ -15,6 +15,12 @@ pub(crate) struct Cli {
     )]
     pub mode: String,
 
+    #[argh(
+        option,
+        description = "xpriv to be loaded into the bitcoin wallet using the RPC client (default: read from envvar STRATA_OP_XPRIV)"
+    )]
+    pub xpriv_str: Option<String>,
+
     #[argh(option, description = "url for the bitcoin RPC client")]
     pub btc_url: String,
 

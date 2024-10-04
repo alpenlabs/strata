@@ -29,6 +29,7 @@ use crate::{
     args::Cli,
     constants::ROCKSDB_RETRY_COUNT,
     db::open_rocksdb_database,
+    descriptor::{check_or_load_descriptor_into_wallet, resolve_xpriv},
     rpc_server::{self, BridgeRpc},
 };
 
@@ -65,6 +66,10 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
         .build(args.rollup_url)
         .await
         .expect("failed to connect to the rollup RPC server");
+
+    // Check or load the xpriv as a descriptor into the l1_rpc_client wallet
+    let xpriv = resolve_xpriv(args.xpriv_str)?;
+    check_or_load_descriptor_into_wallet(&(*l1_rpc_client), xpriv).await?;
 
     // Get this client's pubkey from the bitcoin wallet.
     let operator_pubkeys = l2_rpc_client.get_active_operator_chain_pubkey_set().await?;
