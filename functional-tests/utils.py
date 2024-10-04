@@ -322,8 +322,9 @@ def generate_params(
         "--name", "strata",
         "--block-time", str(block_time),
         "--epoch-slots", str(epoch_slots),
-        "--seqkey", seqpubkey,
+        "--genesis-trigger-height", str(genesis_trigger),
         "--proof-timeout", str(30),
+        "--seqkey", seqpubkey,
     ]
     # fmt: on
 
