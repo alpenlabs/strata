@@ -106,8 +106,6 @@ where
     Vm: ZKVMHost + 'static,
     for<'a> Vm::Input<'a>: ZKVMInputBuilder<'a>,
 {
-    println!("Abishek match proof was called");
-
     let zkvm_input = match zkvm_input {
         ZKVMInput::ElBlock(el_input) => {
             let el_input: ELProofInput = bincode::deserialize(&el_input.data)?;
@@ -252,7 +250,7 @@ where
                 let vm = self.vm_manager.get(&proof_vm).unwrap().clone();
 
                 self.pool.spawn(move || {
-                    tracing::info_span!("guest_execution").in_scope(|| {
+                    tracing::info_span!("prover_worker").in_scope(|| {
                         let proof = make_proof(witness, vm.clone());
                         let mut prover_state =
                             prover_state_clone.write().expect("Lock was poisoned");

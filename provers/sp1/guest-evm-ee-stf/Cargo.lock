@@ -1960,8 +1960,7 @@ dependencies = [
 [[package]]
 name = "sha2"
 version = "0.10.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "793db75ad2bcafc3ffa7c68b215fee268f537982cd901d132f89c6343f3a3dc8"
+source = "git+https://github.com/sp1-patches/RustCrypto-hashes?branch=patch-sha2-v0.10.8#1f224388fdede7cef649bce0d63876d1a9e3f515"
 dependencies = [
  "cfg-if",
  "cpufeatures",
@@ -2227,9 +2226,9 @@ dependencies = [
 [[package]]
 name = "tiny-keccak"
 version = "2.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c9d3793400a45f954c52e73d068316d76b6f4e36977e3fcebb13a2721e80237"
+source = "git+https://github.com/sp1-patches/tiny-keccak?branch=patch-v2.0.2#bf0b28f63510a90c7b6c21ac6ff461c93ecd2331"
 dependencies = [
+ "cfg-if",
  "crunchy",
 ]
 
@@ -2481,3 +2480,13 @@ dependencies = [
  "quote",
  "syn 2.0.78",
 ]
+
+[[patch.unused]]
+name = "revm"
+version = "8.0.0"
+source = "git+https://github.com/sp1-patches/revm-new?branch=john/update-for-v1#eb53e9f613f4c309851144260696791918b31383"
+
+[[patch.unused]]
+name = "revm-primitives"
+version = "3.1.1"
+source = "git+https://github.com/sp1-patches/revm-new?branch=john/update-for-v1#eb53e9f613f4c309851144260696791918b31383"
