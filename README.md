@@ -88,3 +88,7 @@ Start CL Client/Sequencer
 cargo run --bin alpen-express-sequencer -- --config config.toml
 ```
 
+## License
+
+This work is dual-licensed under MIT and Apache 2.0.
+You can choose between one of them if you use this work.
