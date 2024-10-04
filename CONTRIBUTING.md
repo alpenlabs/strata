@@ -74,50 +74,19 @@ Examples of unacceptable behaviour:
 Please install the following tools in your development environment to make sure that
 you can run the basic CI checks in your local environment:
 
-- `taplo`
+- [`taplo`](https://taplo.tamasfe.dev/cli/installation/binary.html):
+  used to lint and format `TOML` files.
+- [`codespell`](https://github.com/codespell-project/codespell):
+  used to check for common misspellings in code.
+- [`cargo-nextest`](https://nexte.st):
+  modern test runner for Rust.
+- [`cargo-audit`](https://docs.rs/cargo-audit/latest/cargo_audit/):
+  tool to check `Cargo.lock` files for security vulnerabilities.
+- Functional test runner:
+  to run functional tests, see instructions in its
+  [`README.md`](./functional-tests/README.md).
 
-  This is a tool that is used to lint and format `TOML` files. You can install it with:
-  
-  ```bash
-  brew install taplo
-  ```
-  
-  You can learn more [here](https://taplo.tamasfe.dev/cli/installation/binary.html).
-
-- `codespell`
-
-  This is a tool that is used to check for common misspellings in code. You can install it with:
-  
-  ```bash
-  pip install codespell # or `pip3 install codespell`
-  ```
-  
-  You can learn more [here](https://github.com/codespell-project/codespell).
-
-- `nextest`
-
-  This is a modern test runner for Rust. You can install it with:
-  
-  ```bash
-  cargo install --locked nextest
-  ```
-  
-  Learn more [here](https://nexte.st).
-
-- `cargo audit`
-
-  This is a tool to check Cargo.lock files for crates containing security vulnerabilities.
-
-  ```bash
-  cargo install --locked cargo-audit
-  ```
-  Learn more [here](https://docs.rs/cargo-audit/latest/cargo_audit/).
-
-- Functional test runner
-
-  For dependencies required to run functional tests, see instructions in its [`README.md`](./functional-tests/README.md).
-
-## Before Creating a PR
+## Locally running CI
 
 Before you create a PR, make sure that all the required CI checks pass locally.
 For your convenience, a `Makefile` recipe has been created which you can run via:
