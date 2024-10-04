@@ -1,10 +1,10 @@
 [package]
 edition = "2021"
-name = "alpen-express-sequencer"
+name = "strata-client"
 version = "0.1.0"
 
 [[bin]]
-name = "alpen-express-sequencer"
+name = "strata-client"
 path = "src/main.rs"
 
 [dependencies]

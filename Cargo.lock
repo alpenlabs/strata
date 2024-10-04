@@ -1381,28 +1381,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "alpen-express-reth"
-version = "0.1.0"
-dependencies = [
- "clap",
- "express-reth-db",
- "express-reth-exex",
- "express-reth-node",
- "express-reth-rpc",
- "eyre",
- "reth",
- "reth-chainspec",
- "reth-cli-commands",
- "reth-cli-util",
- "reth-db",
- "reth-primitives",
- "rockbound",
- "serde_json",
- "shellexpand",
- "tracing",
-]
-
-[[package]]
 name = "alpen-express-rocksdb"
 version = "0.1.0"
 dependencies = [
@@ -1454,57 +1432,6 @@ dependencies = [
  "serde_json",
  "serde_with",
  "thiserror",
-]
-
-[[package]]
-name = "alpen-express-sequencer"
-version = "0.1.0"
-dependencies = [
- "alpen-express-btcio",
- "alpen-express-common",
- "alpen-express-consensus-logic",
- "alpen-express-db",
- "alpen-express-eectl",
- "alpen-express-evmexec",
- "alpen-express-mmr",
- "alpen-express-primitives",
- "alpen-express-rocksdb",
- "alpen-express-rpc-api",
- "alpen-express-rpc-types",
- "alpen-express-state",
- "alpen-express-status",
- "alpen-test-utils",
- "anyhow",
- "arbitrary",
- "argh",
- "async-trait",
- "bitcoin",
- "borsh",
- "express-bridge-relay",
- "express-bridge-tx-builder",
- "express-rpc-utils",
- "express-storage",
- "express-sync",
- "express-tasks",
- "express-zkvm",
- "format_serde_error",
- "futures",
- "hex",
- "jsonrpsee",
- "parking_lot 0.12.3",
- "reth-ipc",
- "reth-primitives",
- "reth-rpc-api",
- "reth-rpc-types",
- "rockbound",
- "serde",
- "serde_json",
- "strata-tx-parser",
- "thiserror",
- "threadpool",
- "tokio",
- "toml 0.5.11",
- "tracing",
 ]
 
 [[package]]
@@ -13370,6 +13297,57 @@ dependencies = [
 ]
 
 [[package]]
+name = "strata-client"
+version = "0.1.0"
+dependencies = [
+ "alpen-express-btcio",
+ "alpen-express-common",
+ "alpen-express-consensus-logic",
+ "alpen-express-db",
+ "alpen-express-eectl",
+ "alpen-express-evmexec",
+ "alpen-express-mmr",
+ "alpen-express-primitives",
+ "alpen-express-rocksdb",
+ "alpen-express-rpc-api",
+ "alpen-express-rpc-types",
+ "alpen-express-state",
+ "alpen-express-status",
+ "alpen-test-utils",
+ "anyhow",
+ "arbitrary",
+ "argh",
+ "async-trait",
+ "bitcoin",
+ "borsh",
+ "express-bridge-relay",
+ "express-bridge-tx-builder",
+ "express-rpc-utils",
+ "express-storage",
+ "express-sync",
+ "express-tasks",
+ "express-zkvm",
+ "format_serde_error",
+ "futures",
+ "hex",
+ "jsonrpsee",
+ "parking_lot 0.12.3",
+ "reth-ipc",
+ "reth-primitives",
+ "reth-rpc-api",
+ "reth-rpc-types",
+ "rockbound",
+ "serde",
+ "serde_json",
+ "strata-tx-parser",
+ "thiserror",
+ "threadpool",
+ "tokio",
+ "toml 0.5.11",
+ "tracing",
+]
+
+[[package]]
 name = "strata-datatool"
 version = "0.1.0"
 dependencies = [
@@ -13383,6 +13361,28 @@ dependencies = [
  "secp256k1",
  "serde_json",
  "terrors",
+]
+
+[[package]]
+name = "strata-reth"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "express-reth-db",
+ "express-reth-exex",
+ "express-reth-node",
+ "express-reth-rpc",
+ "eyre",
+ "reth",
+ "reth-chainspec",
+ "reth-cli-commands",
+ "reth-cli-util",
+ "reth-db",
+ "reth-primitives",
+ "rockbound",
+ "serde_json",
+ "shellexpand",
+ "tracing",
 ]
 
 [[package]]
