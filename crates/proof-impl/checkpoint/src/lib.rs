@@ -108,13 +108,13 @@ pub fn process_checkpoint_proof(
 
     let (bootstrap, opt_prev_output) = match l1_batch_output.prev_checkpoint.as_ref() {
         // Genesis batch: initialize with initial bootstrap state
-        None => (batch_info.initial_bootstrap_state(), None),
+        None => (batch_info.get_initial_bootstrap_state(), None),
         Some(prev_checkpoint) => {
             // Ensure sequential state transition
 
             assert_eq!(
-                prev_checkpoint.batch_info().final_bootstrap_state(),
-                batch_info.initial_bootstrap_state()
+                prev_checkpoint.batch_info().get_final_bootstrap_state(),
+                batch_info.get_initial_bootstrap_state()
             );
 
             assert_eq!(
@@ -128,10 +128,10 @@ pub fn process_checkpoint_proof(
             // the current batch initial info as bootstrap
             if prev_checkpoint.proof().is_empty() {
                 // No proof in previous checkpoint: use initial bootstrap state
-                (batch_info.initial_bootstrap_state(), None)
+                (batch_info.get_initial_bootstrap_state(), None)
             } else {
                 // Use previous checkpoint's bootstrap state and include previous proof
-                let bootstrap = prev_checkpoint.bootstrap().clone();
+                let bootstrap = prev_checkpoint.bootstrap_state().clone();
                 let prev_checkpoint_output = CheckpointProofOutput::new(
                     prev_checkpoint.batch_info().clone(),
                     bootstrap.clone(),

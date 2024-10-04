@@ -106,12 +106,12 @@ fn extract_batch_duties(
                 l1_tx_filters_commitment,
             );
 
-            let genesis_bootstrap = new_batch.initial_bootstrap_state();
+            let genesis_bootstrap = new_batch.get_initial_bootstrap_state();
             let batch_duty = BatchCheckpointDuty::new(new_batch, genesis_bootstrap);
             Ok(vec![Duty::CommitBatch(batch_duty)])
         }
-        Some(l1checkpoint) => {
-            let checkpoint = l1checkpoint.checkpoint.clone();
+        Some(prev_checkpoint) => {
+            let checkpoint = prev_checkpoint.batch_info.clone();
 
             let l1_range = (checkpoint.l1_range.1 + 1, state.l1_view().tip_height());
             let current_l1_state = state
@@ -144,10 +144,14 @@ fn extract_batch_duties(
                 l1_tx_filters_commitment,
             );
 
-            let batch_duty = BatchCheckpointDuty::new(
-                new_batch,
-                l1checkpoint.checkpoint.initial_bootstrap_state(),
-            );
+            // If prev checkpoint was proved, use the bootstrap state of the prev checkpoint
+            // else create a bootstrap state based on initial info of this batch
+            let bootstrap_state = if prev_checkpoint.is_proved {
+                prev_checkpoint.bootstrap_state.clone()
+            } else {
+                new_batch.get_initial_bootstrap_state()
+            };
+            let batch_duty = BatchCheckpointDuty::new(new_batch, bootstrap_state);
             Ok(vec![Duty::CommitBatch(batch_duty)])
         }
     }

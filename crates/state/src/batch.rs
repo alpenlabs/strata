@@ -30,7 +30,7 @@ impl BatchCheckpoint {
         &self.batch_info
     }
 
-    pub fn bootstrap(&self) -> &BootstrapState {
+    pub fn bootstrap_state(&self) -> &BootstrapState {
         &self.bootstrap
     }
 
@@ -163,7 +163,7 @@ impl BatchInfo {
     }
 
     /// Creates a [`BootstrapState`] by taking the initial state of the [`BatchInfo`]
-    pub fn initial_bootstrap_state(&self) -> BootstrapState {
+    pub fn get_initial_bootstrap_state(&self) -> BootstrapState {
         BootstrapState::new(
             self.idx,
             self.l1_range.0,
@@ -174,8 +174,8 @@ impl BatchInfo {
         )
     }
 
-    /// Creates a [`BootstrapState`] by taking the initial state of the [`BatchInfo`]
-    pub fn final_bootstrap_state(&self) -> BootstrapState {
+    /// Creates a [`BootstrapState`] by taking the final state of the [`BatchInfo`]
+    pub fn get_final_bootstrap_state(&self) -> BootstrapState {
         BootstrapState::new(
             self.idx,
             self.l1_range.1,

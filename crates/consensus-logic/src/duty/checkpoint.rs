@@ -25,7 +25,7 @@ pub(crate) fn check_and_get_batch_checkpoint(
             debug!(%idx, "Checkpoint not found, creating pending checkpoint");
             let entry = CheckpointEntry::new_pending_proof(
                 duty.batch_info().clone(),
-                duty.bootstrap().clone(),
+                duty.bootstrap_state().clone(),
             );
             checkpt_handle.put_checkpoint_blocking(idx, entry)?;
         }
@@ -98,8 +98,6 @@ fn spawn_proof_timeout(
                     return;
                 }
                 debug!(%idx, "Proof is pending, setting proof ready");
-
-                entry.bootstrap = entry.batch_info.final_bootstrap_state();
 
                 entry.proving_status = CheckpointProvingStatus::ProofReady;
                 if let Err(e) = checkpt_handle.put_checkpoint_and_notify_blocking(idx, entry) {

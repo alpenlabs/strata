@@ -220,7 +220,7 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
                     let cstatus = CheckpointConfStatus::Confirmed;
                     let entry = CheckpointEntry::new(
                         c.batch_info().clone(),
-                        c.bootstrap().clone(),
+                        c.bootstrap_state().clone(),
                         c.proof().clone(),
                         pstatus,
                         cstatus,
@@ -237,7 +237,7 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
                     let cstatus = CheckpointConfStatus::Finalized;
                     let entry = CheckpointEntry::new(
                         c.batch_info().clone(),
-                        c.bootstrap().clone(),
+                        c.bootstrap_state().clone(),
                         c.proof().clone(),
                         pstatus,
                         cstatus,

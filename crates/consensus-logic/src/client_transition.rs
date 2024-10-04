@@ -165,8 +165,17 @@ pub fn process_event<D: Database>(
                 // When DABatch appears, it is only confirmed at the moment. These will be finalized
                 // only when the corresponding L1 block is buried enough
                 writes.push(ClientStateWrite::CheckpointsReceived(
-                    *height,
-                    checkpoints.iter().map(|x| x.batch_info().clone()).collect(),
+                    checkpoints
+                        .iter()
+                        .map(|x| {
+                            L1CheckPoint::new(
+                                x.batch_info().clone(),
+                                x.bootstrap_state().clone(),
+                                !x.proof().is_empty(),
+                                *height,
+                            )
+                        })
+                        .collect(),
                 ));
 
                 actions.push(SyncAction::WriteCheckpoints(
@@ -243,7 +252,7 @@ fn handle_maturable_height(
             .l1_view()
             .get_last_verified_checkpoint_before(maturable_height)
         {
-            actions.push(SyncAction::FinalizeBlock(checkpt.checkpoint.l2_blockid));
+            actions.push(SyncAction::FinalizeBlock(checkpt.batch_info.l2_blockid));
         } else {
             warn!(
             %maturable_height,
@@ -283,7 +292,7 @@ pub fn filter_verified_checkpoints(
     } else {
         last_finalized
     }
-    .map(|x| (x.checkpoint.idx() + 1, Some(&x.checkpoint)))
+    .map(|x| (x.batch_info.idx() + 1, Some(&x.batch_info)))
     .unwrap_or((0, None)); // expect the first checkpoint
 
     let mut result_checkpoints = Vec::new();

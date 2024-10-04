@@ -85,27 +85,30 @@ impl BlockSigningDuty {
 #[derive(Clone, Debug, BorshSerialize)]
 pub struct BatchCheckpointDuty {
     /// Checkpoint/batch info which needs to be proven
-    info: BatchInfo,
+    batch_info: BatchInfo,
 
     /// Bootstrapping info based on which the `info` will be verified
-    bootstrap: BootstrapState,
+    bootstrap_state: BootstrapState,
 }
 
 impl BatchCheckpointDuty {
-    pub fn new(info: BatchInfo, bootstrap: BootstrapState) -> Self {
-        Self { info, bootstrap }
+    pub fn new(batch_info: BatchInfo, bootstrap_state: BootstrapState) -> Self {
+        Self {
+            batch_info,
+            bootstrap_state,
+        }
     }
 
     pub fn idx(&self) -> u64 {
-        self.info.idx()
+        self.batch_info.idx()
     }
 
     pub fn batch_info(&self) -> &BatchInfo {
-        &self.info
+        &self.batch_info
     }
 
-    pub fn bootstrap(&self) -> &BootstrapState {
-        &self.bootstrap
+    pub fn bootstrap_state(&self) -> &BootstrapState {
+        &self.bootstrap_state
     }
 }
 
