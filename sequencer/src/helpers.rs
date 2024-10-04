@@ -241,7 +241,7 @@ pub fn init_engine_controller(
     Ok(eng_ctl)
 }
 
-/// Get an address controller by sequencer's bitcoin wallet
+/// Get an address controlled by sequencer's bitcoin wallet
 pub async fn generate_sequencer_address(bitcoin_client: &BitcoinClient) -> anyhow::Result<Address> {
     let mut last_err = None;
     tokio::time::timeout(Duration::from_secs(10), async {
