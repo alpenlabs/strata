@@ -13,8 +13,8 @@ rust.unused_must_use = "deny"
 rustdoc.all = "warn"
 
 [dependencies]
-jsonrpsee = { workspace = true, features = ["server", "macros"] }
 alpen-express-rpc-types = { workspace = true }
+jsonrpsee = { workspace = true, features = ["server", "macros"] }
 uuid = { workspace = true }
 
 [features]

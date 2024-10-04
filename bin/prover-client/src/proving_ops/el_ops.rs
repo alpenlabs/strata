@@ -10,8 +10,8 @@ use uuid::Uuid;
 
 use super::ops::ProvingOperations;
 use crate::{
-    errors::{ProvingTaskType, ProvingTaskError},
-    primitives::prover_input::{ProverInput, WitnessData},
+    errors::{ProvingTaskError, ProvingTaskType},
+    primitives::prover_input::{WitnessData, ZKVMInput},
     task::TaskTracker,
 };
 
@@ -63,7 +63,7 @@ impl ProvingOperations for ElOperations {
         input: Self::Input,
     ) -> Result<Uuid, ProvingTaskError> {
         let data = WitnessData { data: input };
-        let prover_input = ProverInput::ElBlock(data);
+        let prover_input = ZKVMInput::ElBlock(data);
         let task_id = task_tracker.create_task(prover_input, vec![]).await;
         Ok(task_id)
     }

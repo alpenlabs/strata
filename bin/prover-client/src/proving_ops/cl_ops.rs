@@ -10,7 +10,7 @@ use super::{el_ops::ElOperations, ops::ProvingOperations};
 use crate::{
     dispatcher::TaskDispatcher,
     errors::{ProvingTaskError, ProvingTaskType},
-    primitives::prover_input::{ProofWithVkey, ProverInput},
+    primitives::prover_input::{ProofWithVkey, ZKVMInput},
     task::TaskTracker,
 };
 
@@ -69,7 +69,7 @@ impl ProvingOperations for ClOperations {
     ) -> Result<Uuid, ProvingTaskError> {
         let el_task_id = self.el_dispatcher.create_task(input.block_num).await?;
 
-        let prover_input = ProverInput::ClBlock(input);
+        let prover_input = ZKVMInput::ClBlock(input);
 
         let task_id = task_tracker
             .create_task(prover_input, vec![el_task_id])

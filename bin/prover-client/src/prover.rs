@@ -10,7 +10,7 @@ use alpen_express_rocksdb::{
 };
 use express_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
 use express_proofimpl_evm_ee_stf::ELProofInput;
-use express_proofimpl_l1_batch::{L1BatchProofInput, L1BatchProofOutput};
+use express_proofimpl_l1_batch::L1BatchProofInput;
 use express_sp1_adapter::SP1Verifier;
 use express_sp1_guest_builder::{
     GUEST_BTC_BLOCKSPACE_ELF, GUEST_CHECKPOINT_ELF, GUEST_CL_AGG_ELF, GUEST_CL_STF_ELF,
@@ -24,7 +24,7 @@ use crate::{
     config::NUM_PROVER_WORKERS,
     db::open_rocksdb_database,
     primitives::{
-        prover_input::{ProofWithVkey, ProverInput},
+        prover_input::{ProofWithVkey, ZKVMInput},
         tasks_scheduler::{ProofProcessingStatus, ProofSubmissionStatus, WitnessSubmissionStatus},
         vms::{ProofVm, ZkVMManager},
     },
@@ -33,7 +33,7 @@ use crate::{
 #[derive(Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
 enum ProvingTaskState {
-    WitnessSubmitted(ProverInput),
+    WitnessSubmitted(ZKVMInput),
     ProvingInProgress,
     Proved(ProofWithVkey),
     Err(String),
@@ -101,33 +101,25 @@ where
     vm_manager: ZkVMManager<Vm>,
 }
 
-fn make_proof<Vm>(prover_input: ProverInput, vm: Vm) -> Result<ProofWithVkey, anyhow::Error>
+fn make_proof<Vm>(zkvm_input: ZKVMInput, vm: Vm) -> Result<ProofWithVkey, anyhow::Error>
 where
     Vm: ZKVMHost + 'static,
     for<'a> Vm::Input<'a>: ZKVMInputBuilder<'a>,
 {
     println!("Abishek match proof was called");
-    match prover_input {
-        ProverInput::ElBlock(el_input) => {
+
+    let zkvm_input = match zkvm_input {
+        ZKVMInput::ElBlock(el_input) => {
             let el_input: ELProofInput = bincode::deserialize(&el_input.data)?;
-            let input = Vm::Input::new().write(&el_input)?.build()?;
-
-            let (proof, vk) = vm.prove(input)?;
-            let agg_input = ProofWithVkey::new(proof, vk);
-            Ok(agg_input)
+            Vm::Input::new().write(&el_input)?.build()?
         }
-        ProverInput::BtcBlock(block, tx_filters) => {
-            let input = Vm::Input::new()
-                .write_borsh(&tx_filters)?
-                .write_serialized(&bitcoin::consensus::serialize(&block))?
-                .build()?;
 
-            let (proof, vk) = vm.prove(input)?;
-            let agg_input = ProofWithVkey::new(proof, vk);
-            Ok(agg_input)
-        }
-        ProverInput::L1Batch(l1_batch_input) => {
-            // TODO: Handle the aggeration input
+        ZKVMInput::BtcBlock(block, tx_filters) => Vm::Input::new()
+            .write_borsh(&tx_filters)?
+            .write_serialized(&bitcoin::consensus::serialize(&block))?
+            .build()?,
+
+        ZKVMInput::L1Batch(l1_batch_input) => {
             let proofs_with_vkey = l1_batch_input.clone().get_proofs();
             let mut blockspace_outputs = Vec::new();
             for proof_with_vkey in proofs_with_vkey {
@@ -151,26 +143,19 @@ where
                 input_builder.write_proof(proof_input)?;
             }
 
-            let input = input_builder.build()?;
-            let (proof, vk) = vm.prove(input)?;
-            let agg_input = ProofWithVkey::new(proof, vk);
-            Ok(agg_input)
+            input_builder.build()?
         }
-        ProverInput::ClBlock(cl_proof_input) => {
-            let input = Vm::Input::new()
-                .write_proof(
-                    cl_proof_input
-                        .el_proof
-                        .expect("CL Proving was sent without EL proof"),
-                )?
-                .write(&cl_proof_input.cl_raw_witness)?
-                .build()?;
 
-            let (proof, vk) = vm.prove(input)?;
-            let agg_input = ProofWithVkey::new(proof, vk);
-            Ok(agg_input)
-        }
-        ProverInput::L2Batch(l2_batch_input) => {
+        ZKVMInput::ClBlock(cl_proof_input) => Vm::Input::new()
+            .write_proof(
+                cl_proof_input
+                    .el_proof
+                    .expect("CL Proving was sent without EL proof"),
+            )?
+            .write(&cl_proof_input.cl_raw_witness)?
+            .build()?,
+
+        ZKVMInput::L2Batch(l2_batch_input) => {
             let mut input_builder = Vm::Input::new();
 
             // Write the number of task IDs
@@ -182,25 +167,17 @@ where
                 input_builder.write_proof(proof_input)?;
             }
 
-            // Build the input
-            let input = input_builder.build()?;
-
-            // Generate proof and verification key
-            let (proof, vk) = vm.prove(input)?;
-            let agg_input = ProofWithVkey::new(proof, vk);
-            Ok(agg_input)
+            input_builder.build()?
         }
 
-        ProverInput::Checkpoint(checkpoint_input) => {
-            // TODO: Handle the aggeration input
-            let input = Vm::Input::new()
-                .write(&checkpoint_input.l1_batch_id)?
-                .build()?;
-            let (proof, vk) = vm.prove(input)?;
-            let agg_input = ProofWithVkey::new(proof, vk);
-            Ok(agg_input)
-        }
-    }
+        ZKVMInput::Checkpoint(checkpoint_input) => Vm::Input::new()
+            .write(&checkpoint_input.l1_batch_id)?
+            .build()?,
+    };
+
+    let (proof, vk) = vm.prove(zkvm_input)?;
+    let agg_input = ProofWithVkey::new(proof, vk);
+    Ok(agg_input)
 }
 
 impl<Vm: ZKVMHost> Prover<Vm>
@@ -238,7 +215,7 @@ where
     pub(crate) fn submit_witness(
         &self,
         task_id: Uuid,
-        state_transition_data: ProverInput,
+        state_transition_data: ZKVMInput,
     ) -> WitnessSubmissionStatus {
         let data = ProvingTaskState::WitnessSubmitted(state_transition_data);
 
