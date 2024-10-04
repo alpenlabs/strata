@@ -12,7 +12,7 @@ pub struct SequencerConfig {
     /// path to sequencer root key
     pub sequencer_key: PathBuf,
     /// address with funds for sequencer transactions
-    pub sequencer_bitcoin_address: String,
+    pub sequencer_bitcoin_address: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -104,12 +104,10 @@ impl Config {
                     .datadir
                     .ok_or_else(|| "args: no client --datadir provided".to_string())?,
                 client_mode: {
-                    if let (Some(sequencer_key), Some(sequencer_bitcoin_address)) =
-                        (args.sequencer_key, args.sequencer_bitcoin_address)
-                    {
+                    if let Some(sequencer_key) = args.sequencer_key {
                         ClientMode::Sequencer(SequencerConfig {
                             sequencer_key,
-                            sequencer_bitcoin_address,
+                            sequencer_bitcoin_address: args.sequencer_bitcoin_address,
                         })
                     } else if let Some(sequencer_rpc) = args.sequencer_rpc {
                         ClientMode::FullNode(FullNodeConfig { sequencer_rpc })
@@ -168,12 +166,10 @@ impl Config {
         }
         // sequencer_key has priority over sequencer_rpc if both are provided
 
-        if let (Some(sequencer_key), Some(sequencer_bitcoin_address)) =
-            (args.sequencer_key, args.sequencer_bitcoin_address)
-        {
+        if let Some(sequencer_key) = args.sequencer_key {
             self.client.client_mode = ClientMode::Sequencer(SequencerConfig {
                 sequencer_key,
-                sequencer_bitcoin_address,
+                sequencer_bitcoin_address: args.sequencer_bitcoin_address,
             });
         } else if let Some(sequencer_rpc) = args.sequencer_rpc {
             self.client.client_mode = ClientMode::FullNode(FullNodeConfig { sequencer_rpc });

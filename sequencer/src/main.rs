@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::{str::FromStr, sync::Arc, time::Duration};
 
 use alpen_express_btcio::{
     broadcaster::{spawn_broadcaster_task, L1BroadcastHandle},
@@ -24,7 +24,7 @@ use alpen_express_rocksdb::{
 };
 use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer, AlpenSequencerApiServer};
 use alpen_express_status::{StatusRx, StatusTx};
-use bitcoin::{hashes::Hash, BlockHash};
+use bitcoin::{hashes::Hash, Address, BlockHash};
 use config::{ClientMode, Config, SequencerConfig};
 use express_bridge_relay::relayer::RelayerHandle;
 use express_storage::{
@@ -160,6 +160,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
                 &config,
                 sequencer_config,
                 &executor,
+                &runtime,
                 seq_db,
                 checkpoint_handle.clone(),
                 broadcast_handle,
@@ -365,6 +366,7 @@ fn start_sequencer_tasks(
     config: &Config,
     sequencer_config: &SequencerConfig,
     executor: &TaskExecutor,
+    runtime: &Runtime,
     seq_db: Arc<SequencerDB<RBSeqBlobDb>>,
     checkpoint_handle: Arc<CheckpointHandle>,
     broadcast_handle: Arc<L1BroadcastHandle>,
@@ -388,10 +390,17 @@ fn start_sequencer_tasks(
     // Set up channel and clone some things.
     let (duties_tx, duties_rx) = broadcast::channel::<DutyBatch>(8);
 
+    // Use provided address or generate an address owned by the sequencer's bitcoin wallet
+    let sequencer_bitcoin_address = match sequencer_config.sequencer_bitcoin_address.as_ref() {
+        Some(address) => {
+            Address::from_str(address)?.require_network(config.bitcoind_rpc.network)?
+        }
+        None => runtime.block_on(generate_sequencer_address(&bitcoin_client))?,
+    };
+
     // Spawn up writer
     let writer_config = WriterConfig::new(
-        sequencer_config.sequencer_bitcoin_address.clone(),
-        config.bitcoind_rpc.network,
+        sequencer_bitcoin_address,
         params.rollup().rollup_name.clone(),
     )?;
 

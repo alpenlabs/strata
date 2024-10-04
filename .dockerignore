@@ -5,10 +5,12 @@
 .ruff_cache/
 .vscode/
 functional-tests/
+docker/.data
 
 # Ignore build artifacts and cache
 target/
 target/*
+**/target/
 
 # Ignore test-related files and directories
 test/

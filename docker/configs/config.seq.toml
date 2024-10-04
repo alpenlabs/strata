@@ -1,0 +1,30 @@
+# adjust according to deployment
+
+[client]
+rpc_host = "0.0.0.0"
+rpc_port = 8432
+l2_blocks_fetch_limit = 1_000
+datadir = "data"
+db_retry_count = 5
+sequencer_key = "configs/sequencer.key.hex"
+
+[bitcoind_rpc]
+rpc_url = "bitcoind:18443"
+rpc_user = "rpcuser"
+rpc_password = "rpcpassword"
+network = "regtest"
+
+[sync]
+l1_follow_distance = 6
+max_reorg_depth = 4
+client_poll_dur_ms = 2000
+client_checkpoint_interval = 10
+
+[exec.reth]
+rpc_url = "reth:8551"
+secret = "configs/jwt.hex"
+
+[relayer]
+refresh_interval = 10
+stale_duration = 120
+relay_misc = true
