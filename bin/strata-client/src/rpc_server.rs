@@ -408,7 +408,7 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
     async fn sync_status(&self) -> RpcResult<NodeSyncStatus> {
         let sync = {
             let cl = self.status_rx.cl.borrow();
-            cl.sync().unwrap().clone()
+            cl.sync().ok_or(Error::ClientNotStarted)?.clone()
         };
         Ok(NodeSyncStatus {
             tip_height: sync.chain_tip_height(),
