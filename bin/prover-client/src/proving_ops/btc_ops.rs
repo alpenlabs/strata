@@ -36,7 +36,7 @@ impl BtcOperations {
 
 #[async_trait]
 impl ProvingOperations for BtcOperations {
-    type Input = (Block, Vec<TxFilterRule>);
+    type Input = (Block, RollupParams);
     type Params = u64; // params is the block height
 
     fn block_type(&self) -> ProvingTaskType {
@@ -45,10 +45,9 @@ impl ProvingOperations for BtcOperations {
 
     async fn fetch_input(&self, block_num: u64) -> Result<Self::Input, anyhow::Error> {
         debug!(%block_num, "Fetching BTC block input");
-        let filters = get_tx_filters();
         let block = self.btc_client.get_block_at(block_num).await?;
         debug!("Fetched BTC block {}", block_num);
-        Ok((block, filters))
+        Ok((block, get_pm_rollup_params()))
     }
 
     async fn append_task(
@@ -56,8 +55,8 @@ impl ProvingOperations for BtcOperations {
         task_tracker: Arc<TaskTracker>,
         input: Self::Input,
     ) -> Result<Uuid, ProvingTaskError> {
-        let (block, filters) = input;
-        let prover_input = ZKVMInput::BtcBlock(block, filters);
+        let (block, rollup_params) = input;
+        let prover_input = ZKVMInput::BtcBlock(block, rollup_params);
         let task_id = task_tracker.create_task(prover_input, vec![]).await;
         Ok(task_id)
     }
@@ -65,7 +64,7 @@ impl ProvingOperations for BtcOperations {
 
 /// Generates transaction filters for BTC blocks.
 fn get_tx_filters() -> Vec<TxFilterRule> {
-    let rollup_params = default_rollup_params();
+    let rollup_params = get_pm_rollup_params();
     let rollup_name = rollup_params.rollup_name.clone();
     // let deposit_config = DepositTxConfig::from_rollup_params(&rollup_params);
     vec![
@@ -75,7 +74,7 @@ fn get_tx_filters() -> Vec<TxFilterRule> {
     ]
 }
 
-fn default_rollup_params() -> RollupParams {
+pub fn get_pm_rollup_params() -> RollupParams {
     // FIXME this is broken, where are the keys?
     let opkeys = OperatorPubkeys::new(Buf32::zero(), Buf32::zero());
 

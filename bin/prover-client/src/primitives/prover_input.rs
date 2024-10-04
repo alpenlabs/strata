@@ -1,3 +1,4 @@
+use alpen_express_primitives::params::RollupParams;
 use bitcoin::Block;
 use express_zkvm::AggregationInput;
 use serde::{Deserialize, Serialize};
@@ -15,7 +16,7 @@ pub type ProofWithVkey = AggregationInput;
 #[allow(dead_code)]
 #[allow(clippy::large_enum_variant)]
 pub enum ZKVMInput {
-    BtcBlock(Block, Vec<TxFilterRule>),
+    BtcBlock(Block, RollupParams),
     ElBlock(WitnessData),
     ClBlock(CLProverInput),
     L1Batch(L1BatchInput),

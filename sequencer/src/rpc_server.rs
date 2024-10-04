@@ -561,14 +561,7 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
     }
 
     async fn get_last_checkpoint_info(&self) -> RpcResult<Option<RpcCheckpointInfo>> {
-        let latest_check_point = 1;
-        let entry = self
-            .checkpoint_handle
-            .get_checkpoint(latest_check_point)
-            .await
-            .map_err(|e| Error::Other(e.to_string()))?;
-        let batch_comm: Option<BatchCheckpoint> = entry.map(Into::into);
-        Ok(batch_comm.map(|bc| bc.checkpoint().clone().into()))
+        Ok(None)
     }
 
     async fn get_l2_block_status(&self, block_height: u64) -> RpcResult<L2BlockStatus> {

@@ -112,8 +112,8 @@ where
             Vm::Input::new().write(&el_input)?.build()?
         }
 
-        ZKVMInput::BtcBlock(block, tx_filters) => Vm::Input::new()
-            .write_borsh(&tx_filters)?
+        ZKVMInput::BtcBlock(block, rollup_params) => Vm::Input::new()
+            .write(&rollup_params)?
             .write_serialized(&bitcoin::consensus::serialize(&block))?
             .build()?,
 
