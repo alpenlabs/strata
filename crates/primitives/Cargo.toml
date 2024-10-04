@@ -1,6 +1,6 @@
 [package]
 edition = "2021"
-name = "alpen-express-primitives"
+name = "strata-primitives"
 version = "0.1.0"
 
 [dependencies]
@@ -22,7 +22,7 @@ thiserror.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]
-alpen-test-utils.workspace = true
+strata-test-utils.workspace = true
 
 [features]
 default = ["std", "rand"]

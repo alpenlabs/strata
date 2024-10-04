@@ -1,17 +1,17 @@
 //! Bootstraps an RPC server for the operator.
 use std::sync::Arc;
 
-use alpen_express_rpc_types::RpcServerError;
-use alpen_express_state::bridge_duties::BridgeDutyStatus;
 use anyhow::Context;
 use async_trait::async_trait;
 use bitcoin::Txid;
 use chrono::{DateTime, Utc};
-use express_bridge_rpc_api::{
-    ExpressBridgeControlApiServer, ExpressBridgeNetworkApiServer, ExpressBridgeTrackerApiServer,
-};
-use express_storage::ops::bridge_duty::BridgeDutyOps;
 use jsonrpsee::{core::RpcResult, RpcModule};
+use strata_bridge_rpc_api::{
+    StrataBridgeControlApiServer, StrataBridgeNetworkApiServer, StrataBridgeTrackerApiServer,
+};
+use strata_rpc_types::RpcServerError;
+use strata_state::bridge_duties::BridgeDutyStatus;
+use strata_storage::ops::bridge_duty::BridgeDutyOps;
 use tokio::sync::oneshot;
 use tracing::{info, warn};
 
@@ -19,17 +19,17 @@ use crate::constants::{RPC_PORT, RPC_SERVER};
 
 pub(crate) async fn start<T>(rpc_impl: &T) -> anyhow::Result<()>
 where
-    T: ExpressBridgeControlApiServer
-        + ExpressBridgeNetworkApiServer
-        + ExpressBridgeTrackerApiServer
+    T: StrataBridgeControlApiServer
+        + StrataBridgeNetworkApiServer
+        + StrataBridgeTrackerApiServer
         + Clone
         + Sync
         + Send,
 {
     let mut rpc_module = RpcModule::new(rpc_impl.clone());
 
-    let control_api = ExpressBridgeControlApiServer::into_rpc(rpc_impl.clone());
-    let network_api = ExpressBridgeNetworkApiServer::into_rpc(rpc_impl.clone());
+    let control_api = StrataBridgeControlApiServer::into_rpc(rpc_impl.clone());
+    let network_api = StrataBridgeNetworkApiServer::into_rpc(rpc_impl.clone());
 
     rpc_module.merge(control_api).context("merge control api")?;
     rpc_module.merge(network_api).context("merge network api")?;
@@ -42,7 +42,7 @@ where
 
     let rpc_handle = rpc_server.start(rpc_module);
     // Using `_` for `_stop_tx` as the variable causes it to be dropped immediately!
-    // NOTE: The `_stop_tx` should be used by the shutdown manager (see the `express-tasks` crate).
+    // NOTE: The `_stop_tx` should be used by the shutdown manager (see the `strata-tasks` crate).
     // At the moment, the impl below just stops the client from stopping.
     let (_stop_tx, stop_rx): (oneshot::Sender<bool>, oneshot::Receiver<bool>) = oneshot::channel();
 
@@ -58,7 +58,7 @@ where
     Ok(())
 }
 
-/// Struct to implement the [`express_bridge_rpc_api::ExpressBridgeNetworkApiServer`] on. Contains
+/// Struct to implement the [`strata_bridge_rpc_api::StrataBridgeNetworkApiServer`] on. Contains
 /// fields corresponding the global context for the RPC.
 #[derive(Clone)]
 pub(crate) struct BridgeRpc {
@@ -76,7 +76,7 @@ impl BridgeRpc {
 }
 
 #[async_trait]
-impl ExpressBridgeControlApiServer for BridgeRpc {
+impl StrataBridgeControlApiServer for BridgeRpc {
     async fn get_client_version(&self) -> RpcResult<String> {
         Ok(env!("CARGO_PKG_VERSION").to_string())
     }
@@ -99,14 +99,14 @@ impl ExpressBridgeControlApiServer for BridgeRpc {
 }
 
 #[async_trait]
-impl ExpressBridgeNetworkApiServer for BridgeRpc {
+impl StrataBridgeNetworkApiServer for BridgeRpc {
     async fn ping(&self) -> RpcResult<()> {
         unimplemented!("ping")
     }
 }
 
 #[async_trait]
-impl ExpressBridgeTrackerApiServer for BridgeRpc {
+impl StrataBridgeTrackerApiServer for BridgeRpc {
     async fn get_status(&self, txid: Txid) -> RpcResult<Option<BridgeDutyStatus>> {
         Ok(self
             .duty_ops

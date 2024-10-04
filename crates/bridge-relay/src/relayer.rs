@@ -4,10 +4,10 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use alpen_express_primitives::relay::types::{BridgeMessage, RelayerConfig, Scope};
-use alpen_express_status::StatusRx;
-use express_storage::ops::bridge_relay::BridgeMsgOps;
-use express_tasks::TaskExecutor;
+use strata_primitives::relay::types::{BridgeMessage, RelayerConfig, Scope};
+use strata_status::StatusRx;
+use strata_storage::ops::bridge_relay::BridgeMsgOps;
+use strata_tasks::TaskExecutor;
 use tokio::{select, sync::mpsc, time::interval};
 use tracing::*;
 
@@ -85,7 +85,7 @@ impl RelayerState {
             // TODO make it configurable if we relay or not without chainstate?
             let chs_state = self.status_rx.chs.borrow().clone();
             if let Some(chs_state) = chs_state {
-                let sig_res = alpen_express_primitives::relay::util::verify_bridge_msg_sig(
+                let sig_res = strata_primitives::relay::util::verify_bridge_msg_sig(
                     &message,
                     chs_state.operator_table(),
                 );
@@ -216,8 +216,8 @@ fn get_now_micros() -> u128 {
 mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    use alpen_express_primitives::relay::types::BridgeMsgId;
-    use alpen_test_utils::ArbitraryGenerator;
+    use strata_primitives::relay::types::BridgeMsgId;
+    use strata_test_utils::ArbitraryGenerator;
 
     use super::*;
 

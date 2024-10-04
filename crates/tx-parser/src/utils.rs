@@ -1,4 +1,3 @@
-use alpen_express_primitives::{buf::Buf32, l1::BitcoinAddress};
 use anyhow::anyhow;
 use bitcoin::{
     opcodes::all::OP_PUSHNUM_1,
@@ -10,6 +9,7 @@ use musig2::{
     secp256k1::{PublicKey, SECP256K1},
     KeyAggContext,
 };
+use strata_primitives::{buf::Buf32, l1::BitcoinAddress};
 
 /// Extract next instruction and try to parse it as an opcode
 pub fn next_op(instructions: &mut Instructions<'_>) -> Option<Opcode> {

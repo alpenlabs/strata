@@ -1,9 +1,9 @@
 //! Chain data types relating to the CL's updating view of an execution
 //! environment's state.  For now the EVM EL is the only execution environment.
 
-use alpen_express_primitives::{buf::Buf32, evm_exec::create_evm_extra_payload};
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
+use strata_primitives::{buf::Buf32, evm_exec::create_evm_extra_payload};
 
 use crate::{
     bridge_ops::{self, DepositIntent},
@@ -47,7 +47,7 @@ pub struct UpdateInput {
     update_idx: u64,
 
     /// Merkle tree root of the contents of the EL payload, in the order it was
-    /// expressed in the block.
+    /// strataed in the block.
     entries_root: Buf32,
 
     /// Buffer of any other payload data.  This is used with the other fields

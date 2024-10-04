@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use alpen_express_db::{
+use strata_db::{
     traits::{BlockStatus, Database},
     DbResult,
 };
-use alpen_express_state::{block::L2BlockBundle, header::L2Header, id::L2BlockId};
+use strata_state::{block::L2BlockBundle, header::L2Header, id::L2BlockId};
 use threadpool::ThreadPool;
 
 use crate::{cache, ops};

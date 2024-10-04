@@ -1,7 +1,7 @@
 use alloy_sol_types::SolEvent;
-use express_reth_primitives::{WithdrawalIntent, WithdrawalIntentEvent};
 use reth_primitives::Receipt;
 use revm_primitives::U256;
+use strata_reth_primitives::{WithdrawalIntent, WithdrawalIntentEvent};
 
 use crate::constants::BRIDGEOUT_ADDRESS;
 

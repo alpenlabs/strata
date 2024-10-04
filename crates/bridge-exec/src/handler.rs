@@ -2,7 +2,12 @@
 
 use std::{fmt::Debug, time::Duration};
 
-use alpen_express_primitives::{
+use bitcoin::{key::Keypair, secp256k1::PublicKey, Transaction, Txid};
+use borsh::{BorshDeserialize, BorshSerialize};
+use jsonrpsee::tokio::time::sleep;
+use strata_bridge_sig_manager::manager::SignatureManager;
+use strata_bridge_tx_builder::{context::BuildContext, TxKind};
+use strata_primitives::{
     bridge::{Musig2PartialSig, Musig2PubNonce, OperatorIdx, OperatorPartialSig},
     l1::BitcoinTxid,
     relay::{
@@ -10,13 +15,8 @@ use alpen_express_primitives::{
         util::MessageSigner,
     },
 };
-use alpen_express_rpc_api::AlpenApiClient;
-use alpen_express_rpc_types::HexBytes;
-use bitcoin::{key::Keypair, secp256k1::PublicKey, Transaction, Txid};
-use borsh::{BorshDeserialize, BorshSerialize};
-use express_bridge_sig_manager::manager::SignatureManager;
-use express_bridge_tx_builder::{context::BuildContext, TxKind};
-use jsonrpsee::tokio::time::sleep;
+use strata_rpc_api::StrataApiClient;
+use strata_rpc_types::HexBytes;
 use tracing::{debug, info, warn};
 
 use crate::errors::{ExecError, ExecResult};
@@ -29,7 +29,7 @@ pub const POLL_INTERVAL: Duration = Duration::from_millis(100);
 /// The execution context for handling bridge-related signing activities.
 #[derive(Clone)]
 pub struct ExecHandler<
-    L2Client: AlpenApiClient + Sync + Send,
+    L2Client: StrataApiClient + Sync + Send,
     TxBuildContext: BuildContext + Sync + Send,
 > {
     /// The build context required to create transaction data needed for signing.
@@ -50,7 +50,7 @@ pub struct ExecHandler<
 
 impl<L2Client, TxBuildContext> ExecHandler<L2Client, TxBuildContext>
 where
-    L2Client: AlpenApiClient + Sync + Send,
+    L2Client: StrataApiClient + Sync + Send,
     TxBuildContext: BuildContext + Sync + Send,
 {
     /// Construct and sign a transaction based on the provided `TxInfo`.
@@ -358,7 +358,7 @@ where
 
 impl<L2Client, TxBuildContext> Debug for ExecHandler<L2Client, TxBuildContext>
 where
-    L2Client: AlpenApiClient + Sync + Send,
+    L2Client: StrataApiClient + Sync + Send,
     TxBuildContext: BuildContext + Sync + Send,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

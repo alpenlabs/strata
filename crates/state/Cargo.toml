@@ -1,6 +1,6 @@
 [package]
 edition = "2021"
-name = "alpen-express-state"
+name = "strata-state"
 version = "0.1.0"
 
 # Note: Since we want to keep the core consensus logic generic, we shouldn't
@@ -8,10 +8,10 @@ version = "0.1.0"
 
 [dependencies]
 
-alpen-express-crypto.workspace = true
-alpen-express-primitives.workspace = true
-express-bridge-tx-builder.workspace = true
-express-zkvm.workspace = true
+strata-bridge-tx-builder.workspace = true
+strata-crypto.workspace = true
+strata-primitives.workspace = true
+strata-zkvm.workspace = true
 
 arbitrary.workspace = true
 bitcoin.workspace = true
@@ -26,5 +26,5 @@ tracing.workspace = true   # ideally this shouldn't be in this trait
 
 
 [dev-dependencies]
-alpen-test-utils.workspace = true
 rand.workspace = true
+strata-test-utils.workspace = true

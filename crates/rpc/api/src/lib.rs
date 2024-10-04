@@ -1,18 +1,18 @@
-//! Macro trait def for the `alp_` RPC namespace using jsonrpsee.
-use alpen_express_db::types::L1TxStatus;
-use alpen_express_primitives::bridge::{OperatorIdx, PublickeyTable};
-use alpen_express_rpc_types::{
+//! Macro trait def for the `strata_` RPC namespace using jsonrpsee.
+use bitcoin::Txid;
+use jsonrpsee::{core::RpcResult, proc_macros::rpc};
+use strata_db::types::L1TxStatus;
+use strata_primitives::bridge::{OperatorIdx, PublickeyTable};
+use strata_rpc_types::{
     types::{BlockHeader, ClientStatus, L1Status},
     BridgeDuties, ExecUpdate, HexBytes, HexBytes32, L2BlockStatus, NodeSyncStatus,
     RpcCheckpointInfo,
 };
-use alpen_express_state::{bridge_state::DepositEntry, id::L2BlockId};
-use bitcoin::Txid;
-use jsonrpsee::{core::RpcResult, proc_macros::rpc};
+use strata_state::{bridge_state::DepositEntry, id::L2BlockId};
 
-#[cfg_attr(not(feature = "client"), rpc(server, namespace = "alp"))]
-#[cfg_attr(feature = "client", rpc(server, client, namespace = "alp"))]
-pub trait AlpenApi {
+#[cfg_attr(not(feature = "client"), rpc(server, namespace = "strata"))]
+#[cfg_attr(feature = "client", rpc(server, client, namespace = "strata"))]
+pub trait StrataApi {
     #[method(name = "protocolVersion")]
     async fn protocol_version(&self) -> RpcResult<u64>;
 
@@ -105,9 +105,9 @@ pub trait AlpenApi {
     async fn get_l2_block_status(&self, block_height: u64) -> RpcResult<L2BlockStatus>;
 }
 
-#[cfg_attr(not(feature = "client"), rpc(server, namespace = "alpadmin"))]
-#[cfg_attr(feature = "client", rpc(server, client, namespace = "alpadmin"))]
-pub trait AlpenAdminApi {
+#[cfg_attr(not(feature = "client"), rpc(server, namespace = "strataadmin"))]
+#[cfg_attr(feature = "client", rpc(server, client, namespace = "strataadmin"))]
+pub trait StrataAdminApi {
     /// Stop the node.
     #[method(name = "stop")]
     async fn stop(&self) -> RpcResult<()>;
@@ -116,13 +116,13 @@ pub trait AlpenAdminApi {
 /// rpc endpoints that are only available on sequencer
 #[cfg_attr(not(feature = "client"), rpc(server))]
 #[cfg_attr(feature = "client", rpc(server, client))]
-pub trait AlpenSequencerApi {
+pub trait StrataSequencerApi {
     /// Adds L1Write sequencer duty which will be executed by sequencer
-    #[method(name = "alpadmin_submitDABlob")]
+    #[method(name = "strataadmin_submitDABlob")]
     async fn submit_da_blob(&self, blobdata: HexBytes) -> RpcResult<()>;
 
     /// Verifies and adds the submitted proof to the checkpoint database
-    #[method(name = "alpadmin_submitCheckpointProof")]
+    #[method(name = "strataadmin_submitCheckpointProof")]
     async fn submit_checkpoint_proof(&self, idx: u64, proof: HexBytes) -> RpcResult<()>;
 
     // TODO: rpc endpoints that deal with L1 writes are currently limited to sequencer
@@ -130,9 +130,9 @@ pub trait AlpenSequencerApi {
     // can be used independently
 
     /// Adds an equivalent entry to broadcaster database, which will eventually be broadcasted
-    #[method(name = "alpadmin_broadcastRawTx")]
+    #[method(name = "strataadmin_broadcastRawTx")]
     async fn broadcast_raw_tx(&self, rawtx: HexBytes) -> RpcResult<Txid>;
 
-    #[method(name = "alp_getTxStatus")]
+    #[method(name = "strata_getTxStatus")]
     async fn get_tx_status(&self, txid: HexBytes32) -> RpcResult<Option<L1TxStatus>>;
 }

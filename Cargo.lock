@@ -1181,315 +1181,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "alpen-express-btcio"
-version = "0.1.0"
-dependencies = [
- "alpen-express-common",
- "alpen-express-db",
- "alpen-express-primitives",
- "alpen-express-rocksdb",
- "alpen-express-rpc-types",
- "alpen-express-state",
- "alpen-express-status",
- "alpen-test-utils",
- "anyhow",
- "arbitrary",
- "async-trait",
- "base64 0.22.1",
- "bitcoin",
- "bitcoind",
- "bitcoind-json-rpc-types",
- "borsh",
- "bytes",
- "express-bridge-tx-builder",
- "express-storage",
- "express-tasks",
- "hex",
- "mockall",
- "musig2",
- "rand 0.8.5",
- "reqwest 0.12.7",
- "serde",
- "serde_json",
- "sha2 0.10.8",
- "strata-tx-parser",
- "thiserror",
- "threadpool",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "alpen-express-common"
-version = "0.1.0"
-dependencies = [
- "tracing",
- "tracing-subscriber 0.3.18",
-]
-
-[[package]]
-name = "alpen-express-consensus-logic"
-version = "0.1.0"
-dependencies = [
- "alpen-express-btcio",
- "alpen-express-crypto",
- "alpen-express-db",
- "alpen-express-eectl",
- "alpen-express-primitives",
- "alpen-express-rocksdb",
- "alpen-express-rpc-types",
- "alpen-express-state",
- "alpen-express-status",
- "alpen-test-utils",
- "anyhow",
- "bitcoin",
- "borsh",
- "express-chaintsn",
- "express-risc0-adapter",
- "express-sp1-adapter",
- "express-storage",
- "express-tasks",
- "express-zkvm",
- "futures",
- "rand 0.8.5",
- "secp256k1",
- "strata-tx-parser",
- "thiserror",
- "threadpool",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "alpen-express-crypto"
-version = "0.1.0"
-dependencies = [
- "alpen-express-primitives",
- "borsh",
- "rand 0.8.5",
- "secp256k1",
- "sha2 0.10.8",
-]
-
-[[package]]
-name = "alpen-express-db"
-version = "0.1.0"
-dependencies = [
- "alpen-express-mmr",
- "alpen-express-primitives",
- "alpen-express-state",
- "alpen-test-utils",
- "anyhow",
- "arbitrary",
- "bitcoin",
- "borsh",
- "express-zkvm",
- "hex",
- "mockall",
- "musig2",
- "parking_lot 0.12.3",
- "serde",
- "serde_json",
- "thiserror",
- "tracing",
-]
-
-[[package]]
-name = "alpen-express-eectl"
-version = "0.1.0"
-dependencies = [
- "alpen-express-primitives",
- "alpen-express-state",
- "thiserror",
-]
-
-[[package]]
-name = "alpen-express-evmexec"
-version = "0.1.0"
-dependencies = [
- "alpen-express-db",
- "alpen-express-eectl",
- "alpen-express-primitives",
- "alpen-express-state",
- "alpen-test-utils",
- "anyhow",
- "arbitrary",
- "borsh",
- "express-reth-evm",
- "express-reth-node",
- "express-storage",
- "futures",
- "http 1.1.0",
- "hyper 0.14.30",
- "jsonrpsee",
- "mockall",
- "rand 0.8.5",
- "reth-node-ethereum",
- "reth-primitives",
- "reth-rpc",
- "reth-rpc-api",
- "reth-rpc-layer",
- "reth-rpc-types",
- "reth-rpc-types-compat",
- "serde",
- "thiserror",
- "tokio",
- "tower 0.4.13",
- "tracing",
-]
-
-[[package]]
-name = "alpen-express-jmt"
-version = "0.1.0"
-dependencies = [
- "jmt",
-]
-
-[[package]]
-name = "alpen-express-mmr"
-version = "0.1.0"
-dependencies = [
- "arbitrary",
- "borsh",
- "digest 0.10.7",
- "hex",
- "sha2 0.10.8",
- "thiserror",
-]
-
-[[package]]
-name = "alpen-express-primitives"
-version = "0.1.0"
-dependencies = [
- "alpen-test-utils",
- "anyhow",
- "arbitrary",
- "bincode",
- "bitcoin",
- "borsh",
- "digest 0.10.7",
- "hex",
- "musig2",
- "rand 0.8.5",
- "reth-primitives",
- "secp256k1",
- "serde",
- "serde_json",
- "sha2 0.10.8",
- "thiserror",
- "tracing",
-]
-
-[[package]]
-name = "alpen-express-rocksdb"
-version = "0.1.0"
-dependencies = [
- "alpen-express-db",
- "alpen-express-mmr",
- "alpen-express-primitives",
- "alpen-express-state",
- "alpen-test-utils",
- "anyhow",
- "arbitrary",
- "bincode",
- "bitcoin",
- "borsh",
- "reth-db",
- "rockbound",
- "tempfile",
- "thiserror",
- "tracing",
-]
-
-[[package]]
-name = "alpen-express-rpc-api"
-version = "0.1.0"
-dependencies = [
- "alpen-express-db",
- "alpen-express-primitives",
- "alpen-express-rpc-types",
- "alpen-express-state",
- "bitcoin",
- "express-bridge-sig-manager",
- "express-bridge-tx-builder",
- "hex",
- "jsonrpsee",
- "serde",
- "serde_with",
- "thiserror",
-]
-
-[[package]]
-name = "alpen-express-rpc-types"
-version = "0.1.0"
-dependencies = [
- "alpen-express-db",
- "alpen-express-state",
- "bitcoin",
- "hex",
- "jsonrpsee",
- "serde",
- "serde_json",
- "serde_with",
- "thiserror",
-]
-
-[[package]]
-name = "alpen-express-state"
-version = "0.1.0"
-dependencies = [
- "alpen-express-crypto",
- "alpen-express-primitives",
- "alpen-test-utils",
- "arbitrary",
- "bitcoin",
- "borsh",
- "digest 0.10.7",
- "ethnum",
- "express-bridge-tx-builder",
- "express-zkvm",
- "hex",
- "num_enum 0.7.2",
- "rand 0.8.5",
- "serde",
- "sha2 0.10.8",
- "tracing",
-]
-
-[[package]]
-name = "alpen-express-status"
-version = "0.1.0"
-dependencies = [
- "alpen-express-primitives",
- "alpen-express-rpc-types",
- "alpen-express-state",
- "thiserror",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "alpen-test-utils"
-version = "0.1.0"
-dependencies = [
- "alpen-express-btcio",
- "alpen-express-consensus-logic",
- "alpen-express-db",
- "alpen-express-primitives",
- "alpen-express-state",
- "anyhow",
- "arbitrary",
- "bitcoin",
- "express-storage",
- "hex",
- "musig2",
- "rand 0.8.5",
- "rockbound",
- "strata-tx-parser",
- "threadpool",
-]
-
-[[package]]
 name = "android-tzdata"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4517,487 +4208,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "express-bridge-client"
-version = "0.1.0"
-dependencies = [
- "alpen-express-btcio",
- "alpen-express-common",
- "alpen-express-primitives",
- "alpen-express-rocksdb",
- "alpen-express-rpc-api",
- "alpen-express-rpc-types",
- "alpen-express-state",
- "anyhow",
- "argh",
- "async-trait",
- "bitcoin",
- "bitcoind",
- "chrono",
- "directories",
- "express-bridge-exec",
- "express-bridge-rpc-api",
- "express-bridge-sig-manager",
- "express-bridge-tx-builder",
- "express-storage",
- "jsonrpsee",
- "miniscript",
- "rockbound",
- "thiserror",
- "threadpool",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "express-bridge-exec"
-version = "0.1.0"
-dependencies = [
- "alpen-express-btcio",
- "alpen-express-primitives",
- "alpen-express-rpc-api",
- "alpen-express-rpc-types",
- "bitcoin",
- "borsh",
- "express-bridge-sig-manager",
- "express-bridge-tx-builder",
- "format_serde_error",
- "jsonrpsee",
- "serde",
- "thiserror",
- "toml 0.5.11",
- "tracing",
-]
-
-[[package]]
-name = "express-bridge-relay"
-version = "0.1.0"
-dependencies = [
- "alpen-express-btcio",
- "alpen-express-primitives",
- "alpen-express-state",
- "alpen-express-status",
- "alpen-test-utils",
- "anyhow",
- "bitcoin",
- "express-storage",
- "express-tasks",
- "sha2 0.10.8",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "express-bridge-rpc-api"
-version = "0.1.0"
-dependencies = [
- "alpen-express-state",
- "bitcoin",
- "jsonrpsee",
-]
-
-[[package]]
-name = "express-bridge-sig-manager"
-version = "0.1.0"
-dependencies = [
- "alpen-express-db",
- "alpen-express-primitives",
- "alpen-test-utils",
- "arbitrary",
- "bitcoin",
- "express-bridge-tx-builder",
- "express-storage",
- "musig2",
- "thiserror",
- "tokio",
-]
-
-[[package]]
-name = "express-bridge-tx-builder"
-version = "0.1.0"
-dependencies = [
- "alpen-express-primitives",
- "alpen-test-utils",
- "bitcoin",
- "lazy_static",
- "musig2",
- "serde",
- "thiserror",
-]
-
-[[package]]
-name = "express-chaintsn"
-version = "0.1.0"
-dependencies = [
- "alpen-express-eectl",
- "alpen-express-primitives",
- "alpen-express-state",
- "alpen-test-utils",
- "anyhow",
- "arbitrary",
- "bitcoin",
- "borsh",
- "rand_chacha 0.3.1",
- "rand_core 0.6.4",
- "thiserror",
- "tracing",
-]
-
-[[package]]
-name = "express-proofimpl-btc-blockspace"
-version = "0.1.0"
-dependencies = [
- "alpen-express-primitives",
- "alpen-express-state",
- "alpen-test-utils",
- "bitcoin",
- "borsh",
- "express-bridge-tx-builder",
- "hex",
- "rand 0.8.5",
- "serde",
- "sha2 0.10.8",
- "strata-tx-parser",
-]
-
-[[package]]
-name = "express-proofimpl-checkpoint"
-version = "0.1.0"
-dependencies = [
- "alpen-express-primitives",
- "alpen-express-state",
- "alpen-test-utils",
- "anyhow",
- "bitcoin",
- "borsh",
- "ethnum",
- "express-proofimpl-btc-blockspace",
- "express-proofimpl-l1-batch",
- "express-zkvm",
- "rand 0.8.5",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "express-proofimpl-cl-stf"
-version = "0.1.0"
-dependencies = [
- "alpen-express-crypto",
- "alpen-express-primitives",
- "alpen-express-state",
- "alpen-test-utils",
- "borsh",
- "express-chaintsn",
- "express-proofimpl-checkpoint",
- "express-proofimpl-evm-ee-stf",
- "serde",
- "thiserror",
-]
-
-[[package]]
-name = "express-proofimpl-evm-ee-stf"
-version = "0.1.0"
-dependencies = [
- "alloy-eips 0.2.0",
- "alloy-rlp",
- "alloy-rlp-derive",
- "alloy-rpc-types 0.2.0",
- "anyhow",
- "bincode",
- "express-reth-evm",
- "express-reth-primitives",
- "hex-literal",
- "k256",
- "reth-primitives",
- "reth-trie-common",
- "revm",
- "rlp",
- "serde",
- "serde_json",
- "thiserror",
-]
-
-[[package]]
-name = "express-proofimpl-l1-batch"
-version = "0.1.0"
-dependencies = [
- "alpen-express-primitives",
- "alpen-express-state",
- "alpen-test-utils",
- "anyhow",
- "bitcoin",
- "borsh",
- "ethnum",
- "express-proofimpl-btc-blockspace",
- "rand 0.8.5",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "express-prover-client-rpc-api"
-version = "0.1.0"
-dependencies = [
- "jsonrpsee",
-]
-
-[[package]]
-name = "express-reth-db"
-version = "0.1.0"
-dependencies = [
- "alpen-express-db",
- "alpen-express-rocksdb",
- "anyhow",
- "bincode",
- "borsh",
- "express-proofimpl-evm-ee-stf",
- "reth-primitives",
- "rockbound",
- "serde",
- "serde_json",
- "tempfile",
- "tracing",
-]
-
-[[package]]
-name = "express-reth-evm"
-version = "0.1.0"
-dependencies = [
- "alloy-sol-types 0.7.7",
- "express-reth-primitives",
- "reth-primitives",
- "revm",
- "revm-primitives",
-]
-
-[[package]]
-name = "express-reth-exex"
-version = "0.1.0"
-dependencies = [
- "alloy-rpc-types 0.2.0",
- "anyhow",
- "bincode",
- "express-proofimpl-evm-ee-stf",
- "express-reth-db",
- "eyre",
- "reth-evm",
- "reth-exex",
- "reth-node-api",
- "reth-primitives",
- "reth-provider",
- "reth-revm",
- "reth-rpc-types-compat",
- "rockbound",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "express-reth-node"
-version = "0.1.0"
-dependencies = [
- "express-reth-evm",
- "express-reth-primitives",
- "eyre",
- "reth",
- "reth-basic-payload-builder",
- "reth-chainspec",
- "reth-errors",
- "reth-ethereum-payload-builder",
- "reth-evm",
- "reth-evm-ethereum",
- "reth-node-api",
- "reth-node-ethereum",
- "reth-payload-builder",
- "reth-primitives",
- "reth-rpc-types",
- "revm",
- "revm-primitives",
- "serde",
- "tracing",
-]
-
-[[package]]
-name = "express-reth-primitives"
-version = "0.1.0"
-dependencies = [
- "alloy-sol-types 0.7.7",
- "reth-primitives",
- "serde",
-]
-
-[[package]]
-name = "express-reth-rpc"
-version = "0.1.0"
-dependencies = [
- "bincode",
- "express-proofimpl-evm-ee-stf",
- "express-reth-db",
- "express-rpc-utils",
- "eyre",
- "hex",
- "jsonrpsee",
- "reth-primitives",
- "serde",
- "tokio",
-]
-
-[[package]]
-name = "express-risc0-adapter"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bincode",
- "borsh",
- "express-zkvm",
- "risc0-zkvm",
- "serde",
- "serde_json",
- "sha2 0.10.8",
- "tracing-subscriber 0.3.18",
-]
-
-[[package]]
-name = "express-risc0-guest-builder"
-version = "0.1.0"
-dependencies = [
- "alpen-express-primitives",
- "alpen-express-state",
- "alpen-test-utils",
- "bincode",
- "bitcoin",
- "borsh",
- "express-chaintsn",
- "express-proofimpl-btc-blockspace",
- "express-proofimpl-checkpoint",
- "express-proofimpl-evm-ee-stf",
- "express-proofimpl-l1-batch",
- "express-risc0-adapter",
- "express-zkvm",
- "hex",
- "rand 0.8.5",
- "risc0-build",
- "risc0-zkvm",
-]
-
-[[package]]
-name = "express-rpc-utils"
-version = "0.1.0"
-dependencies = [
- "jsonrpsee",
-]
-
-[[package]]
-name = "express-sp1-adapter"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bincode",
- "borsh",
- "express-zkvm",
- "hex",
- "num-bigint 0.4.6",
- "num-traits",
- "serde",
- "serde_json",
- "snark-bn254-verifier",
- "sp1-sdk",
- "substrate-bn 0.7.0",
-]
-
-[[package]]
-name = "express-sp1-guest-builder"
-version = "0.1.0"
-dependencies = [
- "alpen-express-primitives",
- "alpen-express-state",
- "alpen-test-utils",
- "anyhow",
- "bincode",
- "bitcoin",
- "borsh",
- "express-proofimpl-btc-blockspace",
- "express-proofimpl-checkpoint",
- "express-proofimpl-cl-stf",
- "express-proofimpl-evm-ee-stf",
- "express-proofimpl-l1-batch",
- "express-sp1-adapter",
- "express-zkvm",
- "hex",
- "num-bigint 0.4.6",
- "num-traits",
- "serde_json",
- "sp1-helper",
- "sp1-sdk",
- "tempfile",
-]
-
-[[package]]
-name = "express-storage"
-version = "0.1.0"
-dependencies = [
- "alpen-express-db",
- "alpen-express-primitives",
- "alpen-express-state",
- "anyhow",
- "async-trait",
- "bitcoin",
- "lru",
- "paste",
- "threadpool",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "express-sync"
-version = "0.1.0"
-dependencies = [
- "alpen-express-consensus-logic",
- "alpen-express-db",
- "alpen-express-primitives",
- "alpen-express-rpc-api",
- "alpen-express-rpc-types",
- "alpen-express-state",
- "anyhow",
- "arbitrary",
- "async-trait",
- "borsh",
- "express-storage",
- "futures",
- "futures-util",
- "thiserror",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "express-tasks"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "arbitrary",
- "futures-util",
- "thiserror",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "express-zkvm"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "arbitrary",
- "borsh",
- "serde",
-]
-
-[[package]]
 name = "eyre"
 version = "0.6.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6300,16 +5510,16 @@ dependencies = [
 name = "integration-tests"
 version = "0.1.0"
 dependencies = [
- "alpen-express-common",
- "alpen-express-primitives",
- "alpen-express-rocksdb",
- "alpen-test-utils",
  "anyhow",
  "bitcoin",
  "bitcoind",
- "express-bridge-sig-manager",
- "express-bridge-tx-builder",
- "express-storage",
+ "strata-bridge-sig-manager",
+ "strata-bridge-tx-builder",
+ "strata-common",
+ "strata-primitives",
+ "strata-rocksdb",
+ "strata-storage",
+ "strata-test-utils",
  "threadpool",
  "tokio",
  "tracing",
@@ -13243,6 +12453,171 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
+name = "strata-bridge-client"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "argh",
+ "async-trait",
+ "bitcoin",
+ "bitcoind",
+ "chrono",
+ "directories",
+ "jsonrpsee",
+ "miniscript",
+ "rockbound",
+ "strata-bridge-exec",
+ "strata-bridge-rpc-api",
+ "strata-bridge-sig-manager",
+ "strata-bridge-tx-builder",
+ "strata-btcio",
+ "strata-common",
+ "strata-primitives",
+ "strata-rocksdb",
+ "strata-rpc-api",
+ "strata-rpc-types",
+ "strata-state",
+ "strata-storage",
+ "thiserror",
+ "threadpool",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "strata-bridge-exec"
+version = "0.1.0"
+dependencies = [
+ "bitcoin",
+ "borsh",
+ "format_serde_error",
+ "jsonrpsee",
+ "serde",
+ "strata-bridge-sig-manager",
+ "strata-bridge-tx-builder",
+ "strata-btcio",
+ "strata-primitives",
+ "strata-rpc-api",
+ "strata-rpc-types",
+ "thiserror",
+ "toml 0.5.11",
+ "tracing",
+]
+
+[[package]]
+name = "strata-bridge-relay"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bitcoin",
+ "sha2 0.10.8",
+ "strata-btcio",
+ "strata-primitives",
+ "strata-state",
+ "strata-status",
+ "strata-storage",
+ "strata-tasks",
+ "strata-test-utils",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "strata-bridge-rpc-api"
+version = "0.1.0"
+dependencies = [
+ "bitcoin",
+ "jsonrpsee",
+ "strata-state",
+]
+
+[[package]]
+name = "strata-bridge-sig-manager"
+version = "0.1.0"
+dependencies = [
+ "arbitrary",
+ "bitcoin",
+ "musig2",
+ "strata-bridge-tx-builder",
+ "strata-db",
+ "strata-primitives",
+ "strata-storage",
+ "strata-test-utils",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "strata-bridge-tx-builder"
+version = "0.1.0"
+dependencies = [
+ "bitcoin",
+ "lazy_static",
+ "musig2",
+ "serde",
+ "strata-primitives",
+ "strata-test-utils",
+ "thiserror",
+]
+
+[[package]]
+name = "strata-btcio"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arbitrary",
+ "async-trait",
+ "base64 0.22.1",
+ "bitcoin",
+ "bitcoind",
+ "bitcoind-json-rpc-types",
+ "borsh",
+ "bytes",
+ "hex",
+ "mockall",
+ "musig2",
+ "rand 0.8.5",
+ "reqwest 0.12.7",
+ "serde",
+ "serde_json",
+ "sha2 0.10.8",
+ "strata-bridge-tx-builder",
+ "strata-common",
+ "strata-db",
+ "strata-primitives",
+ "strata-rocksdb",
+ "strata-rpc-types",
+ "strata-state",
+ "strata-status",
+ "strata-storage",
+ "strata-tasks",
+ "strata-test-utils",
+ "strata-tx-parser",
+ "thiserror",
+ "threadpool",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "strata-chaintsn"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arbitrary",
+ "bitcoin",
+ "borsh",
+ "rand_chacha 0.3.1",
+ "rand_core 0.6.4",
+ "strata-eectl",
+ "strata-primitives",
+ "strata-state",
+ "strata-test-utils",
+ "thiserror",
+ "tracing",
+]
+
+[[package]]
 name = "strata-cli"
 version = "0.1.0"
 dependencies = [
@@ -13257,7 +12632,6 @@ dependencies = [
  "console",
  "dialoguer",
  "directories",
- "express-bridge-tx-builder",
  "indicatif",
  "keyring",
  "rand 0.8.5",
@@ -13266,6 +12640,7 @@ dependencies = [
  "sha2 0.10.8",
  "shrex",
  "sled",
+ "strata-bridge-tx-builder",
  "terrors",
  "tokio",
 ]
@@ -13274,33 +12649,12 @@ dependencies = [
 name = "strata-client"
 version = "0.1.0"
 dependencies = [
- "alpen-express-btcio",
- "alpen-express-common",
- "alpen-express-consensus-logic",
- "alpen-express-db",
- "alpen-express-eectl",
- "alpen-express-evmexec",
- "alpen-express-mmr",
- "alpen-express-primitives",
- "alpen-express-rocksdb",
- "alpen-express-rpc-api",
- "alpen-express-rpc-types",
- "alpen-express-state",
- "alpen-express-status",
- "alpen-test-utils",
  "anyhow",
  "arbitrary",
  "argh",
  "async-trait",
  "bitcoin",
  "borsh",
- "express-bridge-relay",
- "express-bridge-tx-builder",
- "express-rpc-utils",
- "express-storage",
- "express-sync",
- "express-tasks",
- "express-zkvm",
  "format_serde_error",
  "futures",
  "hex",
@@ -13313,7 +12667,28 @@ dependencies = [
  "rockbound",
  "serde",
  "serde_json",
+ "strata-bridge-relay",
+ "strata-bridge-tx-builder",
+ "strata-btcio",
+ "strata-common",
+ "strata-consensus-logic",
+ "strata-db",
+ "strata-eectl",
+ "strata-evmexec",
+ "strata-mmr",
+ "strata-primitives",
+ "strata-rocksdb",
+ "strata-rpc-api",
+ "strata-rpc-types",
+ "strata-rpc-utils",
+ "strata-state",
+ "strata-status",
+ "strata-storage",
+ "strata-sync",
+ "strata-tasks",
+ "strata-test-utils",
  "strata-tx-parser",
+ "strata-zkvm",
  "thiserror",
  "threadpool",
  "tokio",
@@ -13322,10 +12697,61 @@ dependencies = [
 ]
 
 [[package]]
+name = "strata-common"
+version = "0.1.0"
+dependencies = [
+ "tracing",
+ "tracing-subscriber 0.3.18",
+]
+
+[[package]]
+name = "strata-consensus-logic"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bitcoin",
+ "borsh",
+ "futures",
+ "rand 0.8.5",
+ "secp256k1",
+ "strata-btcio",
+ "strata-chaintsn",
+ "strata-crypto",
+ "strata-db",
+ "strata-eectl",
+ "strata-primitives",
+ "strata-risc0-adapter",
+ "strata-rocksdb",
+ "strata-rpc-types",
+ "strata-sp1-adapter",
+ "strata-state",
+ "strata-status",
+ "strata-storage",
+ "strata-tasks",
+ "strata-test-utils",
+ "strata-tx-parser",
+ "strata-zkvm",
+ "thiserror",
+ "threadpool",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "strata-crypto"
+version = "0.1.0"
+dependencies = [
+ "borsh",
+ "rand 0.8.5",
+ "secp256k1",
+ "sha2 0.10.8",
+ "strata-primitives",
+]
+
+[[package]]
 name = "strata-datatool"
 version = "0.1.0"
 dependencies = [
- "alpen-express-primitives",
  "anyhow",
  "argh",
  "bech32 0.11.0",
@@ -13334,30 +12760,232 @@ dependencies = [
  "rand 0.8.5",
  "secp256k1",
  "serde_json",
+ "strata-primitives",
  "terrors",
+]
+
+[[package]]
+name = "strata-db"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arbitrary",
+ "bitcoin",
+ "borsh",
+ "hex",
+ "mockall",
+ "musig2",
+ "parking_lot 0.12.3",
+ "serde",
+ "serde_json",
+ "strata-mmr",
+ "strata-primitives",
+ "strata-state",
+ "strata-test-utils",
+ "strata-zkvm",
+ "thiserror",
+ "tracing",
+]
+
+[[package]]
+name = "strata-eectl"
+version = "0.1.0"
+dependencies = [
+ "strata-primitives",
+ "strata-state",
+ "thiserror",
+]
+
+[[package]]
+name = "strata-evmexec"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arbitrary",
+ "borsh",
+ "futures",
+ "http 1.1.0",
+ "hyper 0.14.30",
+ "jsonrpsee",
+ "mockall",
+ "rand 0.8.5",
+ "reth-node-ethereum",
+ "reth-primitives",
+ "reth-rpc",
+ "reth-rpc-api",
+ "reth-rpc-layer",
+ "reth-rpc-types",
+ "reth-rpc-types-compat",
+ "serde",
+ "strata-db",
+ "strata-eectl",
+ "strata-primitives",
+ "strata-reth-evm",
+ "strata-reth-node",
+ "strata-state",
+ "strata-storage",
+ "strata-test-utils",
+ "thiserror",
+ "tokio",
+ "tower 0.4.13",
+ "tracing",
+]
+
+[[package]]
+name = "strata-jmt"
+version = "0.1.0"
+dependencies = [
+ "jmt",
+]
+
+[[package]]
+name = "strata-mmr"
+version = "0.1.0"
+dependencies = [
+ "arbitrary",
+ "borsh",
+ "digest 0.10.7",
+ "hex",
+ "sha2 0.10.8",
+ "thiserror",
+]
+
+[[package]]
+name = "strata-primitives"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arbitrary",
+ "bincode",
+ "bitcoin",
+ "borsh",
+ "digest 0.10.7",
+ "hex",
+ "musig2",
+ "rand 0.8.5",
+ "reth-primitives",
+ "secp256k1",
+ "serde",
+ "serde_json",
+ "sha2 0.10.8",
+ "strata-test-utils",
+ "thiserror",
+ "tracing",
+]
+
+[[package]]
+name = "strata-proofimpl-btc-blockspace"
+version = "0.1.0"
+dependencies = [
+ "bitcoin",
+ "borsh",
+ "hex",
+ "rand 0.8.5",
+ "serde",
+ "sha2 0.10.8",
+ "strata-bridge-tx-builder",
+ "strata-primitives",
+ "strata-state",
+ "strata-test-utils",
+ "strata-tx-parser",
+]
+
+[[package]]
+name = "strata-proofimpl-checkpoint"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bitcoin",
+ "borsh",
+ "ethnum",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+ "strata-primitives",
+ "strata-proofimpl-btc-blockspace",
+ "strata-proofimpl-l1-batch",
+ "strata-state",
+ "strata-test-utils",
+ "strata-zkvm",
+]
+
+[[package]]
+name = "strata-proofimpl-cl-stf"
+version = "0.1.0"
+dependencies = [
+ "borsh",
+ "serde",
+ "strata-chaintsn",
+ "strata-crypto",
+ "strata-primitives",
+ "strata-proofimpl-checkpoint",
+ "strata-proofimpl-evm-ee-stf",
+ "strata-state",
+ "strata-test-utils",
+ "thiserror",
+]
+
+[[package]]
+name = "strata-proofimpl-evm-ee-stf"
+version = "0.1.0"
+dependencies = [
+ "alloy-eips 0.2.0",
+ "alloy-rlp",
+ "alloy-rlp-derive",
+ "alloy-rpc-types 0.2.0",
+ "anyhow",
+ "bincode",
+ "hex-literal",
+ "k256",
+ "reth-primitives",
+ "reth-trie-common",
+ "revm",
+ "rlp",
+ "serde",
+ "serde_json",
+ "strata-reth-evm",
+ "strata-reth-primitives",
+ "thiserror",
+]
+
+[[package]]
+name = "strata-proofimpl-l1-batch"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bitcoin",
+ "borsh",
+ "ethnum",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+ "strata-primitives",
+ "strata-proofimpl-btc-blockspace",
+ "strata-state",
+ "strata-test-utils",
 ]
 
 [[package]]
 name = "strata-prover-client"
 version = "0.1.0"
 dependencies = [
- "alpen-express-common",
- "alpen-express-db",
- "alpen-express-rocksdb",
  "anyhow",
  "argh",
  "async-trait",
  "bincode",
- "express-proofimpl-evm-ee-stf",
- "express-prover-client-rpc-api",
- "express-sp1-adapter",
- "express-sp1-guest-builder",
- "express-zkvm",
  "jsonrpsee",
  "rayon",
  "reth-rpc-types",
  "rockbound",
  "serde",
+ "strata-common",
+ "strata-db",
+ "strata-proofimpl-evm-ee-stf",
+ "strata-prover-client-rpc-api",
+ "strata-rocksdb",
+ "strata-sp1-adapter",
+ "strata-sp1-guest-builder",
+ "strata-zkvm",
  "thiserror",
  "tokio",
  "tracing",
@@ -13366,14 +12994,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "strata-prover-client-rpc-api"
+version = "0.1.0"
+dependencies = [
+ "jsonrpsee",
+]
+
+[[package]]
 name = "strata-reth"
 version = "0.1.0"
 dependencies = [
  "clap",
- "express-reth-db",
- "express-reth-exex",
- "express-reth-node",
- "express-reth-rpc",
  "eyre",
  "reth",
  "reth-chainspec",
@@ -13384,27 +13015,396 @@ dependencies = [
  "rockbound",
  "serde_json",
  "shellexpand",
+ "strata-reth-db",
+ "strata-reth-exex",
+ "strata-reth-node",
+ "strata-reth-rpc",
  "tracing",
+]
+
+[[package]]
+name = "strata-reth-db"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "borsh",
+ "reth-primitives",
+ "rockbound",
+ "serde",
+ "serde_json",
+ "strata-db",
+ "strata-proofimpl-evm-ee-stf",
+ "strata-rocksdb",
+ "tempfile",
+ "tracing",
+]
+
+[[package]]
+name = "strata-reth-evm"
+version = "0.1.0"
+dependencies = [
+ "alloy-sol-types 0.7.7",
+ "reth-primitives",
+ "revm",
+ "revm-primitives",
+ "strata-reth-primitives",
+]
+
+[[package]]
+name = "strata-reth-exex"
+version = "0.1.0"
+dependencies = [
+ "alloy-rpc-types 0.2.0",
+ "anyhow",
+ "bincode",
+ "eyre",
+ "reth-evm",
+ "reth-exex",
+ "reth-node-api",
+ "reth-primitives",
+ "reth-provider",
+ "reth-revm",
+ "reth-rpc-types-compat",
+ "rockbound",
+ "serde",
+ "serde_json",
+ "strata-proofimpl-evm-ee-stf",
+ "strata-reth-db",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "strata-reth-node"
+version = "0.1.0"
+dependencies = [
+ "eyre",
+ "reth",
+ "reth-basic-payload-builder",
+ "reth-chainspec",
+ "reth-errors",
+ "reth-ethereum-payload-builder",
+ "reth-evm",
+ "reth-evm-ethereum",
+ "reth-node-api",
+ "reth-node-ethereum",
+ "reth-payload-builder",
+ "reth-primitives",
+ "reth-rpc-types",
+ "revm",
+ "revm-primitives",
+ "serde",
+ "strata-reth-evm",
+ "strata-reth-primitives",
+ "tracing",
+]
+
+[[package]]
+name = "strata-reth-primitives"
+version = "0.1.0"
+dependencies = [
+ "alloy-sol-types 0.7.7",
+ "reth-primitives",
+ "serde",
+]
+
+[[package]]
+name = "strata-reth-rpc"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "eyre",
+ "hex",
+ "jsonrpsee",
+ "reth-primitives",
+ "serde",
+ "strata-proofimpl-evm-ee-stf",
+ "strata-reth-db",
+ "strata-rpc-utils",
+ "tokio",
+]
+
+[[package]]
+name = "strata-risc0-adapter"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "borsh",
+ "risc0-zkvm",
+ "serde",
+ "serde_json",
+ "sha2 0.10.8",
+ "strata-zkvm",
+ "tracing-subscriber 0.3.18",
+]
+
+[[package]]
+name = "strata-risc0-guest-builder"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "bitcoin",
+ "borsh",
+ "hex",
+ "rand 0.8.5",
+ "risc0-build",
+ "risc0-zkvm",
+ "strata-chaintsn",
+ "strata-primitives",
+ "strata-proofimpl-btc-blockspace",
+ "strata-proofimpl-checkpoint",
+ "strata-proofimpl-evm-ee-stf",
+ "strata-proofimpl-l1-batch",
+ "strata-risc0-adapter",
+ "strata-state",
+ "strata-test-utils",
+ "strata-zkvm",
+]
+
+[[package]]
+name = "strata-rocksdb"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arbitrary",
+ "bincode",
+ "bitcoin",
+ "borsh",
+ "reth-db",
+ "rockbound",
+ "strata-db",
+ "strata-mmr",
+ "strata-primitives",
+ "strata-state",
+ "strata-test-utils",
+ "tempfile",
+ "thiserror",
+ "tracing",
+]
+
+[[package]]
+name = "strata-rpc-api"
+version = "0.1.0"
+dependencies = [
+ "bitcoin",
+ "hex",
+ "jsonrpsee",
+ "serde",
+ "serde_with",
+ "strata-bridge-sig-manager",
+ "strata-bridge-tx-builder",
+ "strata-db",
+ "strata-primitives",
+ "strata-rpc-types",
+ "strata-state",
+ "thiserror",
+]
+
+[[package]]
+name = "strata-rpc-types"
+version = "0.1.0"
+dependencies = [
+ "bitcoin",
+ "hex",
+ "jsonrpsee",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "strata-db",
+ "strata-state",
+ "thiserror",
+]
+
+[[package]]
+name = "strata-rpc-utils"
+version = "0.1.0"
+dependencies = [
+ "jsonrpsee",
+]
+
+[[package]]
+name = "strata-sp1-adapter"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "borsh",
+ "hex",
+ "num-bigint 0.4.6",
+ "num-traits",
+ "serde",
+ "serde_json",
+ "snark-bn254-verifier",
+ "sp1-sdk",
+ "strata-zkvm",
+ "substrate-bn 0.7.0",
+]
+
+[[package]]
+name = "strata-sp1-guest-builder"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "bitcoin",
+ "borsh",
+ "hex",
+ "num-bigint 0.4.6",
+ "num-traits",
+ "serde_json",
+ "sp1-helper",
+ "sp1-sdk",
+ "strata-primitives",
+ "strata-proofimpl-btc-blockspace",
+ "strata-proofimpl-checkpoint",
+ "strata-proofimpl-cl-stf",
+ "strata-proofimpl-evm-ee-stf",
+ "strata-proofimpl-l1-batch",
+ "strata-sp1-adapter",
+ "strata-state",
+ "strata-test-utils",
+ "strata-zkvm",
+ "tempfile",
+]
+
+[[package]]
+name = "strata-state"
+version = "0.1.0"
+dependencies = [
+ "arbitrary",
+ "bitcoin",
+ "borsh",
+ "digest 0.10.7",
+ "ethnum",
+ "hex",
+ "num_enum 0.7.2",
+ "rand 0.8.5",
+ "serde",
+ "sha2 0.10.8",
+ "strata-bridge-tx-builder",
+ "strata-crypto",
+ "strata-primitives",
+ "strata-test-utils",
+ "strata-zkvm",
+ "tracing",
+]
+
+[[package]]
+name = "strata-status"
+version = "0.1.0"
+dependencies = [
+ "strata-primitives",
+ "strata-rpc-types",
+ "strata-state",
+ "thiserror",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "strata-storage"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bitcoin",
+ "lru",
+ "paste",
+ "strata-db",
+ "strata-primitives",
+ "strata-state",
+ "threadpool",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "strata-sync"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arbitrary",
+ "async-trait",
+ "borsh",
+ "futures",
+ "futures-util",
+ "strata-consensus-logic",
+ "strata-db",
+ "strata-primitives",
+ "strata-rpc-api",
+ "strata-rpc-types",
+ "strata-state",
+ "strata-storage",
+ "thiserror",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "strata-tasks"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arbitrary",
+ "futures-util",
+ "thiserror",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "strata-test-utils"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arbitrary",
+ "bitcoin",
+ "hex",
+ "musig2",
+ "rand 0.8.5",
+ "rockbound",
+ "strata-btcio",
+ "strata-consensus-logic",
+ "strata-db",
+ "strata-primitives",
+ "strata-state",
+ "strata-storage",
+ "strata-tx-parser",
+ "threadpool",
 ]
 
 [[package]]
 name = "strata-tx-parser"
 version = "0.1.0"
 dependencies = [
- "alpen-express-btcio",
- "alpen-express-primitives",
- "alpen-express-state",
- "alpen-test-utils",
  "anyhow",
  "arbitrary",
  "bitcoin",
  "borsh",
- "express-bridge-tx-builder",
  "hex",
  "musig2",
  "rand 0.8.5",
+ "strata-bridge-tx-builder",
+ "strata-btcio",
+ "strata-primitives",
+ "strata-state",
+ "strata-test-utils",
  "thiserror",
  "tracing",
+]
+
+[[package]]
+name = "strata-zkvm"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arbitrary",
+ "borsh",
+ "serde",
 ]
 
 [[package]]

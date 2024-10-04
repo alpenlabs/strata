@@ -1,9 +1,9 @@
 //! parser types for Deposit Tx, and later deposit Request Tx
 
-use alpen_express_primitives::{l1::OutputRef, prelude::DepositTxParams};
-use alpen_express_state::tx::DepositInfo;
 use bitcoin::{opcodes::all::OP_RETURN, ScriptBuf, Transaction};
-use express_bridge_tx_builder::prelude::BRIDGE_DENOMINATION;
+use strata_bridge_tx_builder::prelude::BRIDGE_DENOMINATION;
+use strata_primitives::{l1::OutputRef, prelude::DepositTxParams};
+use strata_state::tx::DepositInfo;
 
 use crate::{
     deposit::error::DepositParseError,

@@ -5,16 +5,16 @@
 
 use std::sync::Arc;
 
-use alpen_express_primitives::bridge::PublickeyTable;
 use bitcoin::{Amount, Network};
 use bitcoind::{
     bitcoincore_rpc::{json::ScanTxOutRequest, RpcApi},
     BitcoinD,
 };
 use common::bridge::{perform_rollup_actions, perform_user_actions, setup, BridgeDuty, User};
-use express_bridge_tx_builder::prelude::{
+use strata_bridge_tx_builder::prelude::{
     create_taproot_addr, get_aggregated_pubkey, SpendPath, BRIDGE_DENOMINATION,
 };
+use strata_primitives::bridge::PublickeyTable;
 use tokio::sync::Mutex;
 use tracing::{debug, event, info, Level};
 

@@ -1,27 +1,27 @@
 use std::{panic, sync::Arc};
 
-use alpen_express_db::traits::{Database, L1DataStore};
-use alpen_express_primitives::{
-    block_credential::CredRule,
-    buf::Buf32,
-    l1::{L1BlockManifest, L1TxProof},
-    params::{Params, ProofPublishMode, RollupParams},
-    vk::RollupVerifyingKey,
-};
-use alpen_express_state::{
-    batch::BatchCheckpoint, l1::L1Tx, sync_event::SyncEvent, tx::ProtocolOperation,
-};
 use anyhow::anyhow;
 use bitcoin::{
     consensus::serialize,
     hashes::{sha256d, Hash},
     Block, Wtxid,
 };
-use express_risc0_adapter::Risc0Verifier;
-use express_sp1_adapter::SP1Verifier;
-use express_zkvm::ZKVMVerifier;
 use secp256k1::XOnlyPublicKey;
+use strata_db::traits::{Database, L1DataStore};
+use strata_primitives::{
+    block_credential::CredRule,
+    buf::Buf32,
+    l1::{L1BlockManifest, L1TxProof},
+    params::{Params, ProofPublishMode, RollupParams},
+    vk::RollupVerifyingKey,
+};
+use strata_risc0_adapter::Risc0Verifier;
+use strata_sp1_adapter::SP1Verifier;
+use strata_state::{
+    batch::BatchCheckpoint, l1::L1Tx, sync_event::SyncEvent, tx::ProtocolOperation,
+};
 use strata_tx_parser::messages::{BlockData, L1Event};
+use strata_zkvm::ZKVMVerifier;
 use tokio::sync::mpsc;
 use tracing::*;
 
@@ -136,7 +136,7 @@ fn check_for_da_batch(
     let signed_checkpts = protocol_ops_txs
         .iter()
         .filter_map(|ops_txs| match ops_txs.proto_op() {
-            alpen_express_state::tx::ProtocolOperation::RollupInscription(inscription) => Some((
+            strata_state::tx::ProtocolOperation::RollupInscription(inscription) => Some((
                 inscription,
                 &blockdata.block().txdata[ops_txs.index() as usize],
             )),

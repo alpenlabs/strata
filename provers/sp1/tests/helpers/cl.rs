@@ -1,13 +1,13 @@
 use std::path::{Path, PathBuf};
 
-use alpen_test_utils::l2::gen_params;
 use anyhow::{Context, Result};
-use express_sp1_adapter::{SP1Host, SP1ProofInputBuilder};
-use express_sp1_guest_builder::GUEST_CL_STF_ELF;
-use express_zkvm::{
+use sp1_sdk::Prover;
+use strata_sp1_adapter::{SP1Host, SP1ProofInputBuilder};
+use strata_sp1_guest_builder::GUEST_CL_STF_ELF;
+use strata_test_utils::l2::gen_params;
+use strata_zkvm::{
     AggregationInput, Proof, ProverOptions, VerificationKey, ZKVMHost, ZKVMInputBuilder,
 };
-use sp1_sdk::Prover;
 
 use crate::helpers::{el::ElProofGenerator, proof_generator::ProofGenerator};
 

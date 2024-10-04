@@ -1,8 +1,8 @@
 use std::{sync::Arc, thread, time::Duration};
 
-use alpen_express_db::types::{CheckpointEntry, CheckpointProvingStatus};
-use alpen_express_primitives::params::{Params, ProofPublishMode};
-use alpen_express_state::batch::BatchCheckpoint;
+use strata_db::types::{CheckpointEntry, CheckpointProvingStatus};
+use strata_primitives::params::{Params, ProofPublishMode};
+use strata_state::batch::BatchCheckpoint;
 use tracing::*;
 
 use super::types::BatchCheckpointDuty;

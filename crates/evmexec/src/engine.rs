@@ -1,25 +1,5 @@
 use std::sync::Arc;
 
-use alpen_express_eectl::{
-    engine::{BlockStatus, ExecEngineCtl, PayloadStatus},
-    errors::{EngineError, EngineResult},
-    messages::{ExecPayloadData, PayloadEnv},
-};
-use alpen_express_primitives::{
-    buf::Buf32,
-    l1::{BitcoinAmount, XOnlyPk},
-};
-use alpen_express_state::{
-    block::L2BlockBundle,
-    bridge_ops,
-    exec_update::{ELDepositData, ExecUpdate, Op, UpdateOutput},
-    id::L2BlockId,
-};
-use express_reth_evm::constants::COINBASE_ADDRESS;
-use express_reth_node::{
-    ExecutionPayloadFieldV2, ExpressExecutionPayloadEnvelopeV2, ExpressPayloadAttributes,
-};
-use express_storage::L2BlockManager;
 use futures::future::TryFutureExt;
 use reth_primitives::{Address, B256};
 use reth_rpc_types::{
@@ -28,6 +8,26 @@ use reth_rpc_types::{
     },
     Withdrawal,
 };
+use strata_eectl::{
+    engine::{BlockStatus, ExecEngineCtl, PayloadStatus},
+    errors::{EngineError, EngineResult},
+    messages::{ExecPayloadData, PayloadEnv},
+};
+use strata_primitives::{
+    buf::Buf32,
+    l1::{BitcoinAmount, XOnlyPk},
+};
+use strata_reth_evm::constants::COINBASE_ADDRESS;
+use strata_reth_node::{
+    ExecutionPayloadFieldV2, StrataExecutionPayloadEnvelopeV2, StrataPayloadAttributes,
+};
+use strata_state::{
+    block::L2BlockBundle,
+    bridge_ops,
+    exec_update::{ELDepositData, ExecUpdate, Op, UpdateOutput},
+    id::L2BlockId,
+};
+use strata_storage::L2BlockManager;
 use tokio::{runtime::Handle, sync::Mutex};
 
 use crate::{
@@ -124,7 +124,7 @@ impl<T: EngineRpc> RpcExecEngineInner<T> {
             })
             .collect::<Result<_, _>>()?;
 
-        let payload_attributes = ExpressPayloadAttributes::new_from_eth(PayloadAttributes {
+        let payload_attributes = StrataPayloadAttributes::new_from_eth(PayloadAttributes {
             // evm expects timestamp in seconds
             timestamp: payload_env.timestamp() / 1000,
             prev_randao: B256::ZERO,
@@ -161,7 +161,7 @@ impl<T: EngineRpc> RpcExecEngineInner<T> {
             .map_err(|_| EngineError::UnknownPayloadId(payload_id))
             .await?;
 
-        let ExpressExecutionPayloadEnvelopeV2 {
+        let StrataExecutionPayloadEnvelopeV2 {
             inner: execution_payload_v2,
             withdrawal_intents: rpc_withdrawal_intents,
         } = payload;
@@ -394,21 +394,21 @@ struct ForkchoiceStatePartial {
 }
 
 fn to_bridge_withdrawal_intent(
-    rpc_withdrawal_intent: express_reth_node::WithdrawalIntent,
+    rpc_withdrawal_intent: strata_reth_node::WithdrawalIntent,
 ) -> bridge_ops::WithdrawalIntent {
-    let express_reth_node::WithdrawalIntent { amt, dest_pk } = rpc_withdrawal_intent;
+    let strata_reth_node::WithdrawalIntent { amt, dest_pk } = rpc_withdrawal_intent;
     bridge_ops::WithdrawalIntent::new(BitcoinAmount::from_sat(amt), XOnlyPk::new(Buf32(dest_pk)))
 }
 
 #[cfg(test)]
 mod tests {
-    use alpen_express_eectl::{errors::EngineResult, messages::PayloadEnv};
-    use alpen_express_primitives::buf::Buf32;
-    use alpen_express_state::block::{L2Block, L2BlockAccessory};
-    use express_reth_node::{ExecutionPayloadEnvelopeV2, ExecutionPayloadFieldV2};
     use rand::Rng;
     use reth_primitives::{revm_primitives::FixedBytes, Bloom, Bytes, U256};
     use reth_rpc_types::{engine::ForkchoiceUpdated, ExecutionPayloadV1};
+    use strata_eectl::{errors::EngineResult, messages::PayloadEnv};
+    use strata_primitives::buf::Buf32;
+    use strata_reth_node::{ExecutionPayloadEnvelopeV2, ExecutionPayloadFieldV2};
+    use strata_state::block::{L2Block, L2BlockAccessory};
 
     use super::*;
     use crate::http_client::MockEngineRpc;
@@ -519,7 +519,7 @@ mod tests {
 
         let el_payload = random_el_payload();
 
-        let arb = alpen_test_utils::ArbitraryGenerator::new();
+        let arb = strata_test_utils::ArbitraryGenerator::new();
         let l2block: L2Block = arb.generate();
         let accessory = L2BlockAccessory::new(borsh::to_vec(&el_payload).unwrap());
         let l2block_bundle = L2BlockBundle::new(l2block, accessory);
@@ -552,7 +552,7 @@ mod tests {
         let fcs = ForkchoiceState::default();
 
         mock_client.expect_get_payload_v2().returning(move |_| {
-            Ok(ExpressExecutionPayloadEnvelopeV2 {
+            Ok(StrataExecutionPayloadEnvelopeV2 {
                 inner: ExecutionPayloadEnvelopeV2 {
                     execution_payload: ExecutionPayloadFieldV2::V1(random_execution_payload_v1()),
                     block_value: U256::from(100),

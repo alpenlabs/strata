@@ -1,6 +1,6 @@
-use alpen_express_primitives::buf::Buf32;
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
+use strata_primitives::buf::Buf32;
 
 use super::{DaTx, DepositUpdateTx, L1BlockId};
 
@@ -36,7 +36,7 @@ impl L1HeaderRecord {
     }
 
     pub fn create_from_serialized_header(buf: Vec<u8>, wtxs_root: Buf32) -> Self {
-        let blkid = alpen_express_primitives::hash::sha256d(&buf).into();
+        let blkid = strata_primitives::hash::sha256d(&buf).into();
         Self::new(blkid, buf, wtxs_root)
     }
 
@@ -61,8 +61,8 @@ impl L1HeaderRecord {
     }
 }
 
-impl From<&alpen_express_primitives::l1::L1BlockManifest> for L1HeaderRecord {
-    fn from(value: &alpen_express_primitives::l1::L1BlockManifest) -> Self {
+impl From<&strata_primitives::l1::L1BlockManifest> for L1HeaderRecord {
+    fn from(value: &strata_primitives::l1::L1BlockManifest) -> Self {
         Self {
             blkid: value.block_hash().into(),
             buf: value.header().to_vec(),

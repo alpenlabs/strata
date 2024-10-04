@@ -2,12 +2,12 @@
 
 use std::sync::Arc;
 
-use alpen_express_db::{
+use strata_db::{
     traits::{BlobProvider, BlobStore, SequencerDatabase},
     types::BlobEntry,
     DbResult,
 };
-use alpen_express_primitives::buf::Buf32;
+use strata_primitives::buf::Buf32;
 use threadpool::ThreadPool;
 
 use crate::exec::*;

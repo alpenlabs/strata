@@ -1,30 +1,30 @@
 [package]
 edition = "2021"
-name = "express-risc0-guest-builder"
+name = "strata-risc0-guest-builder"
 version = "0.1.0"
 
 [dependencies]
-express-risc0-adapter = { path = "../../crates/zkvm/adapters/risc0", features = [
+risc0-zkvm = "1.0.5"
+strata-risc0-adapter = { path = "../../crates/zkvm/adapters/risc0", features = [
   "prover",
 ], optional = true }
-risc0-zkvm = "1.0.5"
 
 
 [dev-dependencies]
-alpen-express-primitives.workspace = true
-alpen-express-state.workspace = true
-alpen-test-utils.workspace = true
 bincode.workspace = true
 bitcoin.workspace = true
 borsh.workspace = true
-express-chaintsn.workspace = true
-express-proofimpl-btc-blockspace.workspace = true
-express-proofimpl-checkpoint.workspace = true
-express-proofimpl-evm-ee-stf.workspace = true
-express-proofimpl-l1-batch.workspace = true
-express-zkvm.workspace = true
 hex.workspace = true
 rand.workspace = true
+strata-chaintsn.workspace = true
+strata-primitives.workspace = true
+strata-proofimpl-btc-blockspace.workspace = true
+strata-proofimpl-checkpoint.workspace = true
+strata-proofimpl-evm-ee-stf.workspace = true
+strata-proofimpl-l1-batch.workspace = true
+strata-state.workspace = true
+strata-test-utils.workspace = true
+strata-zkvm.workspace = true
 
 [build-dependencies]
 risc0-build = "1.0.5"
@@ -39,4 +39,4 @@ methods = [
 
 [features]
 default = []
-prover = ["dep:express-risc0-adapter"]
+prover = ["dep:strata-risc0-adapter"]

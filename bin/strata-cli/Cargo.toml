@@ -30,7 +30,6 @@ config = { version = "0.14.0", default-features = false, features = ["toml"] }
 console = "0.15.8"
 dialoguer = "0.11.0"
 directories = "5.0.1"
-express-bridge-tx-builder.workspace = true
 indicatif = { version = "0.17.8", features = ["improved_unicode", "tokio"] }
 rand.workspace = true
 reqwest.workspace = true
@@ -40,6 +39,7 @@ shrex = { version = "0.1.0", path = "../../crates/util/shrex", features = [
   "serde",
 ] }
 sled = "0.34.7"
+strata-bridge-tx-builder.workspace = true
 terrors.workspace = true
 tokio.workspace = true
 

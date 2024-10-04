@@ -1,6 +1,6 @@
 [package]
 edition = "2021"
-name = "express-bridge-rpc-api"
+name = "strata-bridge-rpc-api"
 version = "0.1.0"
 
 [lints]
@@ -13,9 +13,9 @@ rust.unused_must_use = "deny"
 rustdoc.all = "warn"
 
 [dependencies]
-alpen-express-state.workspace = true
 bitcoin.workspace = true
 jsonrpsee = { workspace = true, features = ["server", "macros"] }
+strata-state.workspace = true
 
 [features]
 client = ["jsonrpsee/client"]

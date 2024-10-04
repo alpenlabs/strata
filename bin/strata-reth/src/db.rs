@@ -11,8 +11,8 @@ pub fn open_rocksdb_database(datadir: PathBuf) -> eyre::Result<Arc<DB>> {
         fs::create_dir_all(&database_dir)?;
     }
 
-    let dbname = express_reth_db::rocksdb::ROCKSDB_NAME;
-    let cfs = express_reth_db::rocksdb::STORE_COLUMN_FAMILIES;
+    let dbname = strata_reth_db::rocksdb::ROCKSDB_NAME;
+    let cfs = strata_reth_db::rocksdb::STORE_COLUMN_FAMILIES;
     let mut opts = rocksdb::Options::default();
     opts.create_if_missing(true);
     opts.create_missing_column_families(true);

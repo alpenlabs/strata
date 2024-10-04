@@ -1,13 +1,13 @@
 //! This crate implements the aggregation of consecutive L1 blocks to form a single proof
 
-use alpen_express_primitives::buf::Buf32;
-use alpen_express_state::{
+use borsh::{BorshDeserialize, BorshSerialize};
+use strata_primitives::buf::Buf32;
+use strata_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
+use strata_state::{
     batch::BatchCheckpoint,
     l1::{get_btc_params, HeaderVerificationState, HeaderVerificationStateSnapshot},
     tx::DepositInfo,
 };
-use borsh::{BorshDeserialize, BorshSerialize};
-use express_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
 
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct L1BatchProofInput {

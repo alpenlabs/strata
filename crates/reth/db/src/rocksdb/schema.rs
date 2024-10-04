@@ -1,7 +1,7 @@
-use alpen_express_rocksdb::{
+use reth_primitives::B256;
+use strata_rocksdb::{
     define_table_with_seek_key_codec, define_table_without_codec, impl_borsh_value_codec,
 };
-use reth_primitives::B256;
 
 // NOTE: using seek_key_codec as B256 does not derive borsh serialization
 define_table_with_seek_key_codec!(

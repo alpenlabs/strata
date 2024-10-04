@@ -1,10 +1,10 @@
 [package]
 edition = "2021"
-name = "alpen-express-crypto"
+name = "strata-crypto"
 version = "0.1.0"
 
 [dependencies]
-alpen-express-primitives.workspace = true
+strata-primitives.workspace = true
 
 borsh.workspace = true
 secp256k1.workspace = true

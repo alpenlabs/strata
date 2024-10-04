@@ -3,11 +3,12 @@
 
 use std::cmp::min;
 
-use alpen_express_db::traits::{
+use bitcoin::block::Header;
+use strata_db::traits::{
     ChainstateProvider, Database, L1DataProvider, L2DataProvider, L2DataStore,
 };
-use alpen_express_primitives::prelude::*;
-use alpen_express_state::{
+use strata_primitives::prelude::*;
+use strata_state::{
     batch::{BatchCheckpoint, BatchInfo},
     block,
     client_state::*,
@@ -17,7 +18,6 @@ use alpen_express_state::{
     operation::*,
     sync_event::SyncEvent,
 };
-use bitcoin::block::Header;
 use tracing::*;
 
 use crate::{errors::*, genesis::make_genesis_block, l1_handler::verify_proof};
@@ -341,16 +341,16 @@ pub fn filter_verified_checkpoints(
 
 #[cfg(test)]
 mod tests {
-    use alpen_express_db::traits::L1DataStore;
-    use alpen_express_primitives::{block_credential, l1::L1BlockManifest};
-    use alpen_express_rocksdb::test_utils::get_common_db;
-    use alpen_express_state::{l1::L1BlockId, operation};
-    use alpen_test_utils::{
+    use bitcoin::params::MAINNET;
+    use strata_db::traits::L1DataStore;
+    use strata_primitives::{block_credential, l1::L1BlockManifest};
+    use strata_rocksdb::test_utils::get_common_db;
+    use strata_state::{l1::L1BlockId, operation};
+    use strata_test_utils::{
         bitcoin::{gen_l1_chain, get_btc_chain},
         l2::{gen_client_state, gen_params},
         ArbitraryGenerator,
     };
-    use bitcoin::params::MAINNET;
 
     use super::*;
     use crate::genesis;

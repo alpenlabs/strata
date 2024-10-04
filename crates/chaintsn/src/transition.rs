@@ -4,11 +4,13 @@
 
 use std::{cmp::max, collections::HashMap};
 
-use alpen_express_primitives::{
+use bitcoin::{OutPoint, Transaction};
+use borsh::BorshDeserialize;
+use strata_primitives::{
     l1::{BitcoinAmount, L1TxRef, OutputRef},
     params::RollupParams,
 };
-use alpen_express_state::{
+use strata_state::{
     block::L1Segment,
     bridge_ops::{DepositIntent, WithdrawalIntent},
     bridge_state::{DepositState, DispatchCommand, WithdrawOutput},
@@ -19,8 +21,6 @@ use alpen_express_state::{
     state_op::StateCache,
     state_queue,
 };
-use bitcoin::{OutPoint, Transaction};
-use borsh::BorshDeserialize;
 
 use crate::{
     errors::TsnError,
@@ -348,8 +348,8 @@ fn next_rand_op_pos(rng: &mut SlotRng, num: u32) -> u32 {
 
 #[cfg(test)]
 mod tests {
-    use alpen_express_primitives::{buf::Buf32, l1::BitcoinAmount, params::OperatorConfig};
-    use alpen_express_state::{
+    use strata_primitives::{buf::Buf32, l1::BitcoinAmount, params::OperatorConfig};
+    use strata_state::{
         block::{ExecSegment, L1Segment, L2BlockBody},
         bridge_state::OperatorTable,
         chain_state::ChainState,
@@ -362,7 +362,7 @@ mod tests {
         state_op::StateCache,
         tx::{DepositInfo, ProtocolOperation},
     };
-    use alpen_test_utils::{l2::gen_params, ArbitraryGenerator};
+    use strata_test_utils::{l2::gen_params, ArbitraryGenerator};
 
     use super::process_block;
     use crate::transition::process_l1_view_update;

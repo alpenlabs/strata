@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use alpen_express_db::database::CommonDatabase;
 use rockbound::{rocksdb, OptimisticTransactionDB};
+use strata_db::database::CommonDatabase;
 use tempfile::TempDir;
 
 use crate::{

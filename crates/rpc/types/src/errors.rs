@@ -1,13 +1,13 @@
 //! Defines an [`RpcServerError`] type to represent errors from any RPC methods as well as
 //! converters to appropriate json-rpc error codes.
 
-use alpen_express_state::id::L2BlockId;
 use jsonrpsee::types::ErrorObjectOwned;
+use strata_state::id::L2BlockId;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum RpcServerError {
-    /// Unsupported RPCs for express.  Some of these might need to be replaced
+    /// Unsupported RPCs for strata.  Some of these might need to be replaced
     /// with standard unsupported errors.
     #[error("unsupported RPC")]
     Unsupported,
@@ -34,7 +34,7 @@ pub enum RpcServerError {
     MissingChainstate(u64),
 
     #[error("db: {0}")]
-    Db(#[from] alpen_express_db::errors::DbError),
+    Db(#[from] strata_db::errors::DbError),
 
     #[error("blocking task '{0}' failed for unknown reason")]
     BlockingAbort(String),

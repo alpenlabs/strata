@@ -1,5 +1,5 @@
 use bitcoin::{consensus::deserialize, Block};
-use express_proofimpl_btc_blockspace::logic::{process_blockspace_proof, BlockspaceProofInput};
+use strata_proofimpl_btc_blockspace::logic::{process_blockspace_proof, BlockspaceProofInput};
 use risc0_zkvm::guest::env;
 use strata_tx_parser::filter::TxFilterRule;
 

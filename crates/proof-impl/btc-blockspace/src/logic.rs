@@ -1,9 +1,9 @@
 //! Core logic of the Bitcoin Blockspace proof that will be proven
 
-use alpen_express_primitives::{buf::Buf32, params::RollupParams};
-use alpen_express_state::{batch::BatchCheckpoint, tx::DepositInfo};
 use bitcoin::Block;
 use borsh::{BorshDeserialize, BorshSerialize};
+use strata_primitives::{buf::Buf32, params::RollupParams};
+use strata_state::{batch::BatchCheckpoint, tx::DepositInfo};
 
 use crate::{block::check_merkle_root, filter::extract_relevant_info};
 

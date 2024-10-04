@@ -2,10 +2,10 @@
 
 use std::convert::TryInto;
 
-use alpen_express_primitives::params::DepositTxParams;
-use alpen_express_state::tx::DepositRequestInfo;
 use bitcoin::{opcodes::all::OP_RETURN, ScriptBuf, Transaction};
-use express_bridge_tx_builder::prelude::BRIDGE_DENOMINATION;
+use strata_bridge_tx_builder::prelude::BRIDGE_DENOMINATION;
+use strata_primitives::params::DepositTxParams;
+use strata_state::tx::DepositRequestInfo;
 use tracing::debug;
 
 use super::{common::DepositRequestScriptInfo, error::DepositParseError};

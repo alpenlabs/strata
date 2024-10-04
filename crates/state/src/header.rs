@@ -1,11 +1,11 @@
 use std::io::{self, Cursor, Write};
 
-use alpen_express_primitives::{
+use arbitrary::Arbitrary;
+use borsh::{BorshDeserialize, BorshSerialize};
+use strata_primitives::{
     buf::{Buf32, Buf64},
     hash,
 };
-use arbitrary::Arbitrary;
-use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::{block::L2BlockBody, id::L2BlockId};
 
@@ -71,7 +71,7 @@ impl L2BlockHeader {
         // 8 + 8 + 32 + 32 + 32 + 32 = 144
         let mut buf = [0; 144];
         fill_sighash_buf(self, &mut buf).expect("blockasm: compute sighash");
-        alpen_express_primitives::hash::raw(&buf)
+        strata_primitives::hash::raw(&buf)
     }
 }
 

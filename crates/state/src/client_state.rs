@@ -3,9 +3,9 @@
 //! implement the consensus logic.
 // TODO move this to another crate that contains our sync logic
 
-use alpen_express_primitives::buf::Buf32;
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
+use strata_primitives::buf::Buf32;
 
 use crate::{
     batch::{BatchInfo, BootstrapState},

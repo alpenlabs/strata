@@ -1,8 +1,8 @@
 use core::fmt;
 
-use alpen_express_primitives::buf::Buf32;
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
+use strata_primitives::buf::Buf32;
 /// ID of an L1 block, usually the hash of its header.
 #[derive(
     Copy,
@@ -23,7 +23,7 @@ impl L1BlockId {
     /// Computes the blkid from the header buf.  This expensive in proofs and
     /// should only be done when necessary.
     pub fn compute_from_header_buf(buf: &[u8]) -> L1BlockId {
-        Self::from(alpen_express_primitives::hash::sha256d(buf))
+        Self::from(strata_primitives::hash::sha256d(buf))
     }
 }
 

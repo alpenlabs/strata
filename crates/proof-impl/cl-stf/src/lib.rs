@@ -1,16 +1,14 @@
 //! This crate implements the proof of the chain state transition function (STF) for L2 blocks,
 //! verifying the correct state transitions as new L2 blocks are processed.
 
-use alpen_express_primitives::{
-    buf::Buf32, evm_exec::create_evm_extra_payload, params::RollupParams,
-};
-use alpen_express_state::{
+use strata_primitives::{buf::Buf32, evm_exec::create_evm_extra_payload, params::RollupParams};
+use strata_proofimpl_evm_ee_stf::ELProofPublicParams;
+use strata_state::{
     block::ExecSegment,
     block_validation::{check_block_credential, validate_block_segments},
     exec_update::{ExecUpdate, UpdateInput, UpdateOutput},
 };
-pub use alpen_express_state::{block::L2Block, chain_state::ChainState, state_op::StateCache};
-use express_proofimpl_evm_ee_stf::ELProofPublicParams;
+pub use strata_state::{block::L2Block, chain_state::ChainState, state_op::StateCache};
 
 /// Verifies an L2 block and applies the chain state transition if the block is valid.
 pub fn verify_and_transition(
@@ -71,7 +69,7 @@ fn apply_state_transition(
 ) -> ChainState {
     let mut state_cache = StateCache::new(prev_chstate);
 
-    express_chaintsn::transition::process_block(
+    strata_chaintsn::transition::process_block(
         &mut state_cache,
         new_l2_block.header(),
         new_l2_block.body(),

@@ -1,7 +1,7 @@
-use alpen_express_primitives::{
+use bitcoin::{block::Header, consensus::Encodable, hashes::Hash, Block, Wtxid};
+use strata_primitives::{
     buf::Buf32, hash::sha256d, l1::L1TxProof, utils::get_cohashes_from_wtxids,
 };
-use bitcoin::{block::Header, consensus::Encodable, hashes::Hash, Block, Wtxid};
 
 use crate::{l1::L1Tx, tx::ProtocolOperation};
 
@@ -63,8 +63,8 @@ pub fn generate_l1_tx(block: &Block, idx: u32, proto_op_data: ProtocolOperation)
 
 #[cfg(test)]
 mod tests {
-    use alpen_test_utils::bitcoin::get_btc_mainnet_block;
     use bitcoin::hashes::Hash;
+    use strata_test_utils::bitcoin::get_btc_mainnet_block;
 
     use super::*;
 

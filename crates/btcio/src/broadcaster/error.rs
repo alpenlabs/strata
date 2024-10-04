@@ -1,4 +1,4 @@
-use alpen_express_db::errors::DbError;
+use strata_db::errors::DbError;
 use thiserror::Error;
 
 #[derive(Debug, Error)]

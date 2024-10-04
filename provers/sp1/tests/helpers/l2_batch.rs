@@ -1,10 +1,10 @@
 use anyhow::{Context, Result};
-use express_sp1_adapter::{SP1Host, SP1ProofInputBuilder};
-use express_sp1_guest_builder::GUEST_CL_AGG_ELF;
-use express_zkvm::{
+use sp1_sdk::Prover;
+use strata_sp1_adapter::{SP1Host, SP1ProofInputBuilder};
+use strata_sp1_guest_builder::GUEST_CL_AGG_ELF;
+use strata_zkvm::{
     AggregationInput, Proof, ProverOptions, VerificationKey, ZKVMHost, ZKVMInputBuilder,
 };
-use sp1_sdk::Prover;
 
 use crate::helpers::{cl::ClProofGenerator, proof_generator::ProofGenerator};
 

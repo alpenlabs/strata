@@ -3,14 +3,14 @@
 
 use std::sync::Arc;
 
-use alpen_express_mmr::CompactMmr;
-use alpen_express_primitives::{l1::*, prelude::*};
-use alpen_express_state::{
+use borsh::{BorshDeserialize, BorshSerialize};
+use strata_mmr::CompactMmr;
+use strata_primitives::{l1::*, prelude::*};
+use strata_state::{
     block::L2BlockBundle, bridge_duties::BridgeDutyStatus, chain_state::ChainState,
     client_state::ClientState, l1::L1Tx, operation::*, prelude::*, state_op::WriteBatch,
     sync_event::SyncEvent,
 };
-use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::{
     entities::bridge_tx_state::BridgeTxState,
@@ -420,6 +420,6 @@ pub trait CheckpointStore {
     /// Store a [`CheckpointEntry`]
     ///
     /// `batchidx` for the Checkpoint is expected to increase monotonically and
-    /// correspond to the value of [`alpen_express_state::chain_state::ChainState::epoch`].
+    /// correspond to the value of [`strata_state::chain_state::ChainState::epoch`].
     fn put_batch_checkpoint(&self, batchidx: u64, entry: CheckpointEntry) -> DbResult<()>;
 }

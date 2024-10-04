@@ -1,7 +1,6 @@
 use core::{result::Result::Ok, str::FromStr};
 use std::{cmp::Reverse, sync::Arc};
 
-use alpen_express_state::tx::InscriptionData;
 use anyhow::anyhow;
 use bitcoin::{
     absolute::LockTime,
@@ -26,6 +25,7 @@ use bitcoin::{
     Witness,
 };
 use rand::RngCore;
+use strata_state::tx::InscriptionData;
 use strata_tx_parser::inscription::{BATCH_DATA_TAG, ROLLUP_NAME_TAG, VERSION_TAG};
 use thiserror::Error;
 use tracing::trace;
@@ -56,8 +56,8 @@ pub enum InscriptionError {
 
 // This is hacky solution. As `btcio` has `transaction builder` that `tx-parser` depends on. But
 // Btcio depends on `tx-parser`. So this file is behind a feature flag 'test-utils' and on dev
-// dependencies on `tx-parser`, we include {btcio, feature="test_utils"} , so cyclic dependency
-// doesn't happen
+// dependencies on `tx-parser`, we include {btcio, feature="strata_test_utils"} , so cyclic
+// dependency doesn't happen
 pub async fn build_inscription_txs(
     payload: &[u8],
     rpc_client: &Arc<impl Reader + Wallet + Signer>,

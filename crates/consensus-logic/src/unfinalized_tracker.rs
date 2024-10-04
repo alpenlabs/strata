@@ -2,10 +2,10 @@
 
 use std::collections::*;
 
-use alpen_express_db::traits::BlockStatus;
-use alpen_express_primitives::buf::Buf32;
-use alpen_express_state::prelude::*;
-use express_storage::L2BlockManager;
+use strata_db::traits::BlockStatus;
+use strata_primitives::buf::Buf32;
+use strata_state::prelude::*;
+use strata_storage::L2BlockManager;
 use tracing::warn;
 
 use crate::errors::ChainTipError;
@@ -341,11 +341,11 @@ impl FinalizeReport {
 mod tests {
     use std::collections::HashSet;
 
-    use alpen_express_db::traits::{BlockStatus, Database, L2DataStore};
-    use alpen_express_rocksdb::test_utils::get_common_db;
-    use alpen_express_state::{header::L2Header, id::L2BlockId};
-    use alpen_test_utils::l2::gen_l2_chain;
-    use express_storage::L2BlockManager;
+    use strata_db::traits::{BlockStatus, Database, L2DataStore};
+    use strata_rocksdb::test_utils::get_common_db;
+    use strata_state::{header::L2Header, id::L2BlockId};
+    use strata_storage::L2BlockManager;
+    use strata_test_utils::l2::gen_l2_chain;
 
     use crate::unfinalized_tracker;
 

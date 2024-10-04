@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use alpen_express_db::{traits::Database, types::CheckpointEntry, DbResult};
+use strata_db::{traits::Database, types::CheckpointEntry, DbResult};
 use threadpool::ThreadPool;
 
 use crate::{cache, ops};

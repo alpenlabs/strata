@@ -6,8 +6,8 @@ use argh::FromArgs;
 use crate::errors::InitError;
 
 #[derive(Debug, FromArgs)]
-#[argh(name = "express-bridge-client")]
-#[argh(description = "The bridge client for Express")]
+#[argh(name = "strata-bridge-client")]
+#[argh(description = "The bridge client for Strata")]
 pub(crate) struct Cli {
     #[argh(
         positional,

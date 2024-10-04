@@ -2,12 +2,12 @@
 
 use std::sync::Arc;
 
-use alpen_express_db::{interfaces::bridge_relay::BridgeMessageDb, DbError, DbResult};
-use alpen_express_primitives::relay::types::{BridgeMessage, Scope};
 use rockbound::{
     utils::get_last, OptimisticTransactionDB as DB, SchemaBatch, SchemaDBOperationsExt,
     TransactionRetry,
 };
+use strata_db::{interfaces::bridge_relay::BridgeMessageDb, DbError, DbResult};
+use strata_primitives::relay::types::{BridgeMessage, Scope};
 
 use super::schemas::{BridgeMsgIdSchema, ScopeMsgIdSchema};
 use crate::DbOpsConfig;
@@ -40,7 +40,7 @@ impl BridgeMsgDb {
 }
 
 impl BridgeMessageDb for BridgeMsgDb {
-    fn write_msg(&self, id: u128, msg: BridgeMessage) -> alpen_express_db::DbResult<()> {
+    fn write_msg(&self, id: u128, msg: BridgeMessage) -> strata_db::DbResult<()> {
         let mut id = id;
 
         self.db
@@ -106,8 +106,8 @@ impl BridgeMessageDb for BridgeMsgDb {
 mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    use alpen_express_primitives::{l1::L1TxProof, relay::types::BridgeMessage};
-    use alpen_test_utils::ArbitraryGenerator;
+    use strata_primitives::{l1::L1TxProof, relay::types::BridgeMessage};
+    use strata_test_utils::ArbitraryGenerator;
 
     use super::*;
     use crate::test_utils::get_rocksdb_tmp_instance;

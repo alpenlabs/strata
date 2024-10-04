@@ -1,6 +1,6 @@
 use anyhow::Ok;
-use express_zkvm::{AggregationInput, ZKVMInputBuilder};
 use sp1_sdk::{SP1Proof, SP1ProofWithPublicValues, SP1Stdin, SP1VerifyingKey};
+use strata_zkvm::{AggregationInput, ZKVMInputBuilder};
 
 // A wrapper around SP1Stdin
 pub struct SP1ProofInputBuilder(SP1Stdin);

@@ -12,31 +12,31 @@ use reth_rpc_types::{
 use serde::{Deserialize, Serialize};
 
 use super::payload::{
-    ExpressBuiltPayload, ExpressExecutionPayloadEnvelopeV2, ExpressPayloadAttributes,
-    ExpressPayloadBuilderAttributes,
+    StrataBuiltPayload, StrataExecutionPayloadEnvelopeV2, StrataPayloadAttributes,
+    StrataPayloadBuilderAttributes,
 };
 
-/// Custom engine types for express to use custom payload attributes and payload
+/// Custom engine types for strata to use custom payload attributes and payload
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[non_exhaustive]
-pub struct ExpressEngineTypes;
+pub struct StrataEngineTypes;
 
-impl PayloadTypes for ExpressEngineTypes {
-    type BuiltPayload = ExpressBuiltPayload;
-    type PayloadAttributes = ExpressPayloadAttributes;
-    type PayloadBuilderAttributes = ExpressPayloadBuilderAttributes;
+impl PayloadTypes for StrataEngineTypes {
+    type BuiltPayload = StrataBuiltPayload;
+    type PayloadAttributes = StrataPayloadAttributes;
+    type PayloadBuilderAttributes = StrataPayloadBuilderAttributes;
 }
 
-impl EngineTypes for ExpressEngineTypes {
+impl EngineTypes for StrataEngineTypes {
     type ExecutionPayloadV1 = ExecutionPayloadV1;
-    type ExecutionPayloadV2 = ExpressExecutionPayloadEnvelopeV2;
+    type ExecutionPayloadV2 = StrataExecutionPayloadEnvelopeV2;
     type ExecutionPayloadV3 = ExecutionPayloadEnvelopeV3;
     type ExecutionPayloadV4 = ExecutionPayloadEnvelopeV4;
 
     fn validate_version_specific_fields(
         chain_spec: &ChainSpec,
         version: EngineApiMessageVersion,
-        payload_or_attrs: PayloadOrAttributes<'_, ExpressPayloadAttributes>,
+        payload_or_attrs: PayloadOrAttributes<'_, StrataPayloadAttributes>,
     ) -> Result<(), EngineObjectValidationError> {
         validate_version_specific_fields(chain_spec, version, payload_or_attrs)
     }

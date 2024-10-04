@@ -9,11 +9,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use alpen_express_primitives::l1::BitcoinAddress;
 use bitcoin::Network;
 use errors::ConfigResult;
 use format_serde_error::SerdeError;
 use serde::{Deserialize, Serialize};
+use strata_primitives::l1::BitcoinAddress;
 
 /// The configuration for the bridge client that is supplied by the user.
 #[derive(Debug, Clone, Serialize, Deserialize)]

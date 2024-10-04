@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
-use alpen_express_db::{
+use rockbound::{OptimisticTransactionDB, SchemaDBOperationsExt};
+use strata_db::{
     traits::{CheckpointProvider, CheckpointStore},
     types::CheckpointEntry,
     DbResult,
 };
-use rockbound::{OptimisticTransactionDB, SchemaDBOperationsExt};
 
 use super::schemas::BatchCheckpointSchema;
 use crate::DbOpsConfig;
@@ -51,7 +51,7 @@ impl CheckpointProvider for RBCheckpointDB {
 #[cfg(feature = "test_utils")]
 #[cfg(test)]
 mod tests {
-    use alpen_test_utils::ArbitraryGenerator;
+    use strata_test_utils::ArbitraryGenerator;
     use test;
 
     use super::*;

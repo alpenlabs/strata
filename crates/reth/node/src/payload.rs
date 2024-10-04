@@ -1,6 +1,5 @@
 use std::convert::Infallible;
 
-use express_reth_primitives::WithdrawalIntent;
 use reth::rpc::compat::engine::payload::block_to_payload_v2;
 use reth_chainspec::ChainSpec;
 use reth_node_api::{
@@ -20,16 +19,17 @@ use reth_rpc_types::{
     ExecutionPayloadV1, ExecutionPayloadV2, Withdrawal,
 };
 use serde::{Deserialize, Serialize};
+use strata_reth_primitives::WithdrawalIntent;
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct ExpressPayloadAttributes {
+pub struct StrataPayloadAttributes {
     /// An inner payload type
     #[serde(flatten)]
     pub inner: EthPayloadAttributes,
     // additional custom fields to be added
 }
 
-impl ExpressPayloadAttributes {
+impl StrataPayloadAttributes {
     pub fn new_from_eth(payload_attributes: EthPayloadAttributes) -> Self {
         Self {
             inner: payload_attributes,
@@ -38,7 +38,7 @@ impl ExpressPayloadAttributes {
     }
 }
 
-impl PayloadAttributes for ExpressPayloadAttributes {
+impl PayloadAttributes for StrataPayloadAttributes {
     fn timestamp(&self) -> u64 {
         self.inner.timestamp()
     }
@@ -64,13 +64,13 @@ impl PayloadAttributes for ExpressPayloadAttributes {
 
 /// New type around the payload builder attributes type
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ExpressPayloadBuilderAttributes(pub(crate) EthPayloadBuilderAttributes);
+pub struct StrataPayloadBuilderAttributes(pub(crate) EthPayloadBuilderAttributes);
 
-impl PayloadBuilderAttributes for ExpressPayloadBuilderAttributes {
-    type RpcPayloadAttributes = ExpressPayloadAttributes;
+impl PayloadBuilderAttributes for StrataPayloadBuilderAttributes {
+    type RpcPayloadAttributes = StrataPayloadAttributes;
     type Error = Infallible;
 
-    fn try_new(parent: B256, attributes: ExpressPayloadAttributes) -> Result<Self, Infallible> {
+    fn try_new(parent: B256, attributes: StrataPayloadAttributes) -> Result<Self, Infallible> {
         Ok(Self(EthPayloadBuilderAttributes::new(
             parent,
             attributes.inner,
@@ -115,12 +115,12 @@ impl PayloadBuilderAttributes for ExpressPayloadBuilderAttributes {
 }
 
 #[derive(Debug, Clone)]
-pub struct ExpressBuiltPayload {
+pub struct StrataBuiltPayload {
     pub(crate) inner: EthBuiltPayload,
     pub(crate) withdrawal_intents: Vec<WithdrawalIntent>,
 }
 
-impl ExpressBuiltPayload {
+impl StrataBuiltPayload {
     pub(crate) fn new(inner: EthBuiltPayload, withdrawal_intents: Vec<WithdrawalIntent>) -> Self {
         Self {
             inner,
@@ -129,7 +129,7 @@ impl ExpressBuiltPayload {
     }
 }
 
-impl BuiltPayload for ExpressBuiltPayload {
+impl BuiltPayload for StrataBuiltPayload {
     fn block(&self) -> &SealedBlock {
         self.inner.block()
     }
@@ -139,8 +139,8 @@ impl BuiltPayload for ExpressBuiltPayload {
     }
 }
 
-impl From<ExpressBuiltPayload> for ExecutionPayloadV1 {
-    fn from(value: ExpressBuiltPayload) -> Self {
+impl From<StrataBuiltPayload> for ExecutionPayloadV1 {
+    fn from(value: StrataBuiltPayload) -> Self {
         value.inner.into()
     }
 }
@@ -195,20 +195,20 @@ impl From<EthBuiltPayload> for ExecutionPayloadEnvelopeV2 {
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ExpressExecutionPayloadEnvelopeV2 {
+pub struct StrataExecutionPayloadEnvelopeV2 {
     #[serde(flatten)]
     pub inner: ExecutionPayloadEnvelopeV2,
     pub withdrawal_intents: Vec<WithdrawalIntent>,
 }
 
-impl ExpressExecutionPayloadEnvelopeV2 {
+impl StrataExecutionPayloadEnvelopeV2 {
     pub fn inner(&self) -> &ExecutionPayloadEnvelopeV2 {
         &self.inner
     }
 }
 
-impl From<ExpressBuiltPayload> for ExpressExecutionPayloadEnvelopeV2 {
-    fn from(value: ExpressBuiltPayload) -> Self {
+impl From<StrataBuiltPayload> for StrataExecutionPayloadEnvelopeV2 {
+    fn from(value: StrataBuiltPayload) -> Self {
         Self {
             inner: value.inner.into(),
             withdrawal_intents: value.withdrawal_intents,
@@ -216,14 +216,14 @@ impl From<ExpressBuiltPayload> for ExpressExecutionPayloadEnvelopeV2 {
     }
 }
 
-impl From<ExpressBuiltPayload> for ExecutionPayloadEnvelopeV3 {
-    fn from(value: ExpressBuiltPayload) -> Self {
+impl From<StrataBuiltPayload> for ExecutionPayloadEnvelopeV3 {
+    fn from(value: StrataBuiltPayload) -> Self {
         value.inner.into()
     }
 }
 
-impl From<ExpressBuiltPayload> for ExecutionPayloadEnvelopeV4 {
-    fn from(value: ExpressBuiltPayload) -> Self {
+impl From<StrataBuiltPayload> for ExecutionPayloadEnvelopeV4 {
+    fn from(value: StrataBuiltPayload) -> Self {
         value.inner.into()
     }
 }

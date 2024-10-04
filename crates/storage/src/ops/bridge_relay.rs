@@ -2,8 +2,8 @@
 
 use std::sync::Arc;
 
-use alpen_express_db::interfaces::bridge_relay::BridgeMessageDb;
-use alpen_express_primitives::relay::types::BridgeMessage;
+use strata_db::interfaces::bridge_relay::BridgeMessageDb;
+use strata_primitives::relay::types::BridgeMessage;
 
 use crate::exec::*;
 

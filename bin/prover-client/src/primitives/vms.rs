@@ -1,6 +1,6 @@
 use std::{collections::HashMap, hash::Hash};
 
-use express_zkvm::{ProverOptions, ZKVMHost};
+use strata_zkvm::{ProverOptions, ZKVMHost};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ProofVm {

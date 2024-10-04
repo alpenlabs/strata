@@ -3,14 +3,14 @@
 //! functions are designed to be equivalent to the corresponding methods found in the
 //! [`bitcoin`](bitcoin::Block), providing custom implementations where necessary.
 
-use alpen_express_primitives::{buf::Buf32, hash::sha256d};
-use alpen_express_state::l1::{compute_block_hash, L1Tx};
 use bitcoin::{
     block::Header,
     consensus::{self, Encodable},
     hashes::Hash,
     Block, BlockHash, Transaction, TxMerkleNode, WitnessCommitment, WitnessMerkleNode,
 };
+use strata_primitives::{buf::Buf32, hash::sha256d};
+use strata_state::l1::{compute_block_hash, L1Tx};
 
 use crate::{
     merkle::calculate_root,
@@ -128,10 +128,10 @@ pub fn check_pow(block: &Header) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use alpen_express_state::{l1::generate_l1_tx, tx::ProtocolOperation};
-    use alpen_test_utils::{bitcoin::get_btc_mainnet_block, ArbitraryGenerator};
     use bitcoin::{hashes::Hash, TxMerkleNode, WitnessMerkleNode};
     use rand::Rng;
+    use strata_state::{l1::generate_l1_tx, tx::ProtocolOperation};
+    use strata_test_utils::{bitcoin::get_btc_mainnet_block, ArbitraryGenerator};
 
     use super::compute_merkle_root;
     use crate::block::{check_pow, check_witness_commitment, compute_witness_root};

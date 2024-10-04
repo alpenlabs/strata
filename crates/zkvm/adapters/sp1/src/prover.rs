@@ -1,6 +1,6 @@
 use anyhow::Ok;
-use express_zkvm::{Proof, ProverOptions, VerificationKey, ZKVMHost, ZKVMInputBuilder};
 use sp1_sdk::ProverClient;
+use strata_zkvm::{Proof, ProverOptions, VerificationKey, ZKVMHost, ZKVMInputBuilder};
 
 use crate::input::SP1ProofInputBuilder;
 
@@ -61,8 +61,8 @@ mod tests {
 
     use std::{fs::File, io::Write};
 
-    use express_zkvm::ZKVMVerifier;
     use sp1_sdk::{HashableKey, SP1VerifyingKey};
+    use strata_zkvm::ZKVMVerifier;
 
     use super::*;
     use crate::SP1Verifier;

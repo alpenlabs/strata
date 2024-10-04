@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use alpen_express_primitives::params::Params;
+use strata_primitives::params::Params;
 
 #[derive(Clone, Debug)]
 pub struct ReaderConfig {

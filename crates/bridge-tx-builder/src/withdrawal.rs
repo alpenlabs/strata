@@ -1,11 +1,11 @@
 //! Provides types/traits associated with the withdrawal process.
 
-use alpen_express_primitives::{
+use bitcoin::{Amount, FeeRate, OutPoint, Psbt, Transaction, TxOut};
+use serde::{Deserialize, Serialize};
+use strata_primitives::{
     bridge::{BitcoinBlockHeight, OperatorIdx, TxSigningData},
     l1::{BitcoinPsbt, TaprootSpendPath, XOnlyPk},
 };
-use bitcoin::{Amount, FeeRate, OutPoint, Psbt, Transaction, TxOut};
-use serde::{Deserialize, Serialize};
 
 use crate::{
     context::BuildContext,
@@ -172,17 +172,17 @@ impl CooperativeWithdrawalInfo {
 mod tests {
     use std::ops::Not;
 
-    use alpen_express_primitives::{
+    use bitcoin::{
+        hashes::{sha256d, Hash},
+        Amount, Network, OutPoint, Txid,
+    };
+    use strata_primitives::{
         bridge::OperatorIdx,
         buf::Buf32,
         errors::ParseError,
         l1::{TaprootSpendPath, XOnlyPk},
     };
-    use alpen_test_utils::bridge::{generate_keypairs, generate_pubkey_table};
-    use bitcoin::{
-        hashes::{sha256d, Hash},
-        Amount, Network, OutPoint, Txid,
-    };
+    use strata_test_utils::bridge::{generate_keypairs, generate_pubkey_table};
 
     use crate::{
         context::TxBuildContext,

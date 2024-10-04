@@ -2,8 +2,8 @@
 
 use std::str::FromStr;
 
-use alpen_express_primitives::l1::BitcoinAmount;
 use bitcoin::{secp256k1::XOnlyPublicKey, Amount};
+use strata_primitives::l1::BitcoinAmount;
 
 /// The value of each UTXO in the Bridge Multisig Address.
 pub const BRIDGE_DENOMINATION: BitcoinAmount = BitcoinAmount::from_int_btc(10);

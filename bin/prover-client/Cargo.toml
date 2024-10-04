@@ -9,14 +9,14 @@ path = "src/main.rs"
 required-features = ["prover"]
 
 [dependencies]
-alpen-express-common.workspace = true
-alpen-express-db.workspace = true
-alpen-express-rocksdb.workspace = true
-express-proofimpl-evm-ee-stf.workspace = true
-express-prover-client-rpc-api.workspace = true
-express-sp1-adapter = { workspace = true, features = ["prover"] }
-express-sp1-guest-builder = { path = "../../provers/sp1" }
-express-zkvm.workspace = true
+strata-common.workspace = true
+strata-db.workspace = true
+strata-proofimpl-evm-ee-stf.workspace = true
+strata-prover-client-rpc-api.workspace = true
+strata-rocksdb.workspace = true
+strata-sp1-adapter = { workspace = true, features = ["prover"] }
+strata-sp1-guest-builder = { path = "../../provers/sp1" }
+strata-zkvm.workspace = true
 
 
 anyhow.workspace = true

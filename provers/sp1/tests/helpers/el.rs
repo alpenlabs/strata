@@ -1,11 +1,11 @@
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
-use express_proofimpl_evm_ee_stf::ELProofInput;
-use express_sp1_adapter::{SP1Host, SP1ProofInputBuilder};
-use express_sp1_guest_builder::GUEST_EVM_EE_STF_ELF;
-use express_zkvm::{Proof, ProverOptions, VerificationKey, ZKVMHost, ZKVMInputBuilder};
 use sp1_sdk::Prover;
+use strata_proofimpl_evm_ee_stf::ELProofInput;
+use strata_sp1_adapter::{SP1Host, SP1ProofInputBuilder};
+use strata_sp1_guest_builder::GUEST_EVM_EE_STF_ELF;
+use strata_zkvm::{Proof, ProverOptions, VerificationKey, ZKVMHost, ZKVMInputBuilder};
 
 use crate::helpers::proof_generator::ProofGenerator;
 

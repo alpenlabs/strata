@@ -1,6 +1,6 @@
-use alpen_express_primitives::params::RollupParams;
+use strata_primitives::params::RollupParams;
 use bitcoin::Block;
-use express_proofimpl_btc_blockspace::logic::{process_blockspace_proof, BlockspaceProofInput};
+use strata_proofimpl_btc_blockspace::logic::{process_blockspace_proof, BlockspaceProofInput};
 
 fn main() {
     let rollup_params: RollupParams = sp1_zkvm::io::read();

@@ -1,8 +1,8 @@
 use std::ops::Deref;
 
-use alpen_express_primitives::prelude::*;
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
+use strata_primitives::prelude::*;
 
 use crate::{
     exec_update,
@@ -180,7 +180,7 @@ impl Deref for L2BlockBundle {
 }
 #[cfg(test)]
 mod tests {
-    use alpen_test_utils::ArbitraryGenerator;
+    use strata_test_utils::ArbitraryGenerator;
 
     use super::*;
     use crate::block_validation::validate_block_segments;

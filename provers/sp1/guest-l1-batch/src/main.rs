@@ -1,7 +1,7 @@
-use alpen_express_state::l1::{get_btc_params, HeaderVerificationState};
+use strata_state::l1::{get_btc_params, HeaderVerificationState};
 use bitcoin::block::Header;
-use express_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
-use express_proofimpl_l1_batch::L1BatchProofOutput;
+use strata_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
+use strata_proofimpl_l1_batch::L1BatchProofOutput;
 use sha2::{Digest, Sha256};
 
 mod vks;

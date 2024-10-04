@@ -5,17 +5,17 @@
 
 use std::sync::Arc;
 
-use alpen_express_primitives::bridge::{OperatorIdx, PublickeyTable};
 use bitcoin::{
     key::rand::{self, Rng},
     Address, Amount, Network, OutPoint, ScriptBuf, Transaction,
 };
 use bitcoind::BitcoinD;
 use common::bridge::{setup, BridgeDuty, User, MIN_MINER_REWARD_CONFS};
-use express_bridge_tx_builder::prelude::{
+use strata_bridge_tx_builder::prelude::{
     create_taproot_addr, create_tx, create_tx_ins, create_tx_outs, get_aggregated_pubkey,
     CooperativeWithdrawalInfo, SpendPath, BRIDGE_DENOMINATION,
 };
+use strata_primitives::bridge::{OperatorIdx, PublickeyTable};
 use tokio::sync::Mutex;
 use tracing::{event, span, Level};
 

@@ -4,23 +4,23 @@
 
 use std::{fmt::Debug, sync::Arc, time::Duration};
 
-use alpen_express_btcio::rpc::traits::Broadcaster;
-use alpen_express_rpc_api::AlpenApiClient;
-use alpen_express_rpc_types::BridgeDuties;
-use alpen_express_state::bridge_duties::{BridgeDuty, BridgeDutyStatus};
 use bitcoin::Txid;
-use express_bridge_exec::{
+use strata_bridge_exec::{
     errors::{ExecError, ExecResult},
     handler::ExecHandler,
 };
-use express_bridge_tx_builder::{prelude::BuildContext, TxKind};
-use express_storage::ops::{bridge_duty::BridgeDutyOps, bridge_duty_index::BridgeDutyIndexOps};
+use strata_bridge_tx_builder::{prelude::BuildContext, TxKind};
+use strata_btcio::rpc::traits::Broadcaster;
+use strata_rpc_api::StrataApiClient;
+use strata_rpc_types::BridgeDuties;
+use strata_state::bridge_duties::{BridgeDuty, BridgeDutyStatus};
+use strata_storage::ops::{bridge_duty::BridgeDutyOps, bridge_duty_index::BridgeDutyIndexOps};
 use tokio::{task::JoinSet, time::sleep};
 use tracing::{error, info, warn};
 
 pub(super) struct TaskManager<L2Client, TxBuildContext, Bcast>
 where
-    L2Client: AlpenApiClient + Sync + Send,
+    L2Client: StrataApiClient + Sync + Send,
     TxBuildContext: BuildContext + Sync + Send,
     Bcast: Broadcaster,
 {
@@ -32,7 +32,7 @@ where
 
 impl<L2Client, TxBuildContext, Bcast> TaskManager<L2Client, TxBuildContext, Bcast>
 where
-    L2Client: AlpenApiClient + Sync + Send + 'static,
+    L2Client: StrataApiClient + Sync + Send + 'static,
     TxBuildContext: BuildContext + Sync + Send + 'static,
     Bcast: Broadcaster + Sync + Send + 'static,
 {
@@ -153,7 +153,7 @@ async fn process_duty<L2Client, TxBuildContext, Bcast>(
     duty: &BridgeDuty,
 ) -> ExecResult<()>
 where
-    L2Client: AlpenApiClient + Sync + Send,
+    L2Client: StrataApiClient + Sync + Send,
     TxBuildContext: BuildContext + Sync + Send,
     Bcast: Broadcaster,
 {
@@ -212,7 +212,7 @@ async fn execute_duty<L2Client, TxBuildContext, Tx, Bcast>(
     tx_info: Tx,
 ) -> ExecResult<()>
 where
-    L2Client: AlpenApiClient + Sync + Send,
+    L2Client: StrataApiClient + Sync + Send,
     TxBuildContext: BuildContext + Sync + Send,
     Tx: TxKind + Debug,
     Bcast: Broadcaster,
@@ -278,7 +278,7 @@ async fn aggregate_and_broadcast<L2Client, TxBuildContext, Bcast>(
     txid: &Txid,
 ) -> ExecResult<()>
 where
-    L2Client: AlpenApiClient + Sync + Send,
+    L2Client: StrataApiClient + Sync + Send,
     TxBuildContext: BuildContext + Sync + Send,
     Bcast: Broadcaster,
 {

@@ -9,18 +9,16 @@
 
 use std::sync::Arc;
 
-use alpen_express_db::traits::L1DataProvider;
-use alpen_express_primitives::l1::BitcoinAddress;
-use alpen_express_rpc_types::RpcServerError;
-use alpen_express_state::{
-    bridge_state::DepositState, chain_state::ChainState, tx::ProtocolOperation,
-};
 use bitcoin::{
     consensus::Decodable, hashes::Hash, params::Params, Address, Amount, Network, OutPoint,
     TapNodeHash, Transaction,
 };
-use express_bridge_tx_builder::prelude::{CooperativeWithdrawalInfo, DepositInfo};
 use jsonrpsee::core::RpcResult;
+use strata_bridge_tx_builder::prelude::{CooperativeWithdrawalInfo, DepositInfo};
+use strata_db::traits::L1DataProvider;
+use strata_primitives::l1::BitcoinAddress;
+use strata_rpc_types::RpcServerError;
+use strata_state::{bridge_state::DepositState, chain_state::ChainState, tx::ProtocolOperation};
 use tracing::{debug, error};
 
 /// The `vout` corresponding to the bridge-in related Taproot address on the Deposit Request
@@ -32,13 +30,13 @@ pub const DEPOSIT_REQUEST_VOUT: u32 = 0;
 /// Extract the deposit duties from the [`L1DataProvider`] starting from a given block height.
 ///
 /// This duty will be the same for every operator (for now). So, an
-/// [`OperatorIdx`](alpen_express_primitives::bridge::OperatorIdx) need not be passed as a
+/// [`OperatorIdx`](strata_primitives::bridge::OperatorIdx) need not be passed as a
 /// parameter.
 ///
 /// # Returns
 ///
 /// A list of [`DepositInfo`] that can be used to construct an equivalent
-/// [`Duty`](alpen_express_state::bridge_duties::BridgeDuty).
+/// [`Duty`](strata_state::bridge_duties::BridgeDuty).
 ///
 /// # Errors
 ///
@@ -141,7 +139,7 @@ pub(super) async fn extract_deposit_requests<Provider: L1DataProvider>(
 /// This can be expensive if the chain state has a lot of deposits.
 ///
 /// As this is an internal API, it does need an
-/// [`OperatorIdx`](alpen_express_primitives::bridge::OperatorIdx) to be passed in as a withdrawal
+/// [`OperatorIdx`](strata_primitives::bridge::OperatorIdx) to be passed in as a withdrawal
 /// duty is relevant for all operators for now.
 pub(super) fn extract_withdrawal_infos(
     chain_state: &Arc<ChainState>,
@@ -181,16 +179,27 @@ pub(super) fn extract_withdrawal_infos(
 mod tests {
     use std::ops::Not;
 
-    use alpen_express_common::logging;
-    use alpen_express_db::traits::L1DataStore;
-    use alpen_express_mmr::CompactMmr;
-    use alpen_express_primitives::{
+    use bitcoin::{
+        absolute::LockTime,
+        consensus::Encodable,
+        key::rand::{self, Rng},
+        opcodes::{OP_FALSE, OP_TRUE},
+        script::Builder,
+        taproot::LeafVersion,
+        transaction::Version,
+        ScriptBuf, Sequence, TxIn, TxOut, Witness,
+    };
+    use strata_bridge_tx_builder::prelude::{create_taproot_addr, SpendPath};
+    use strata_common::logging;
+    use strata_db::traits::L1DataStore;
+    use strata_mmr::CompactMmr;
+    use strata_primitives::{
         bridge::OperatorIdx,
         buf::Buf32,
         l1::{BitcoinAmount, L1BlockManifest, L1TxProof, OutputRef, XOnlyPk},
     };
-    use alpen_express_rocksdb::{test_utils::get_rocksdb_tmp_instance, L1Db};
-    use alpen_express_state::{
+    use strata_rocksdb::{test_utils::get_rocksdb_tmp_instance, L1Db};
+    use strata_state::{
         bridge_state::{
             DepositEntry, DepositsTable, DispatchCommand, DispatchedState, OperatorTable,
             WithdrawOutput,
@@ -202,18 +211,7 @@ mod tests {
         l1::{L1BlockId, L1HeaderRecord, L1Tx, L1ViewState},
         tx::DepositRequestInfo,
     };
-    use alpen_test_utils::{bridge::generate_mock_unsigned_tx, ArbitraryGenerator};
-    use bitcoin::{
-        absolute::LockTime,
-        consensus::Encodable,
-        key::rand::{self, Rng},
-        opcodes::{OP_FALSE, OP_TRUE},
-        script::Builder,
-        taproot::LeafVersion,
-        transaction::Version,
-        ScriptBuf, Sequence, TxIn, TxOut, Witness,
-    };
-    use express_bridge_tx_builder::prelude::{create_taproot_addr, SpendPath};
+    use strata_test_utils::{bridge::generate_mock_unsigned_tx, ArbitraryGenerator};
 
     use super::*;
 

@@ -1,11 +1,11 @@
 [package]
 edition = "2021"
-name = "express-reth-exex"
+name = "strata-reth-exex"
 version = "0.1.0"
 
 [dependencies]
-express-proofimpl-evm-ee-stf.workspace = true
-express-reth-db.workspace = true
+strata-proofimpl-evm-ee-stf.workspace = true
+strata-reth-db.workspace = true
 
 alloy-rpc-types.workspace = true
 anyhow.workspace = true

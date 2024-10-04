@@ -1,16 +1,16 @@
 use std::str::FromStr;
 
-use alpen_express_primitives::{
-    l1::{BitcoinAddress, OutputRef},
-    params::DepositTxParams,
-};
-use alpen_test_utils::ArbitraryGenerator;
 use bitcoin::{
     absolute::LockTime,
     opcodes::all::OP_RETURN,
     script::{self, PushBytesBuf},
     Address, Amount, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Witness,
 };
+use strata_primitives::{
+    l1::{BitcoinAddress, OutputRef},
+    params::DepositTxParams,
+};
+use strata_test_utils::ArbitraryGenerator;
 
 pub fn test_taproot_addr() -> BitcoinAddress {
     let addr =
@@ -24,7 +24,7 @@ pub fn test_taproot_addr() -> BitcoinAddress {
 
 pub fn get_deposit_tx_config() -> DepositTxParams {
     DepositTxParams {
-        magic_bytes: "expresssss".to_string().as_bytes().to_vec(),
+        magic_bytes: "stratasss".to_string().as_bytes().to_vec(),
         address_length: 20,
         deposit_amount: 1_000_000_000,
         address: test_taproot_addr(),

@@ -1,11 +1,11 @@
 [package]
 edition = "2021"
-name = "alpen-express-rpc-types"
+name = "strata-rpc-types"
 version = "0.1.0"
 
 [dependencies]
-alpen-express-db.workspace = true
-alpen-express-state.workspace = true
+strata-db.workspace = true
+strata-state.workspace = true
 
 bitcoin.workspace = true
 hex.workspace = true

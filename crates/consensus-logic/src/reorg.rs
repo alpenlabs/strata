@@ -1,6 +1,6 @@
 //! Reorg planning types.
 
-use alpen_express_state::id::L2BlockId;
+use strata_state::id::L2BlockId;
 
 use crate::unfinalized_tracker;
 
@@ -125,8 +125,8 @@ pub fn compute_reorg(
 
 #[cfg(test)]
 mod tests {
-    use alpen_express_state::id::L2BlockId;
     use rand::RngCore;
+    use strata_state::id::L2BlockId;
 
     use super::{compute_reorg, Reorg};
     use crate::unfinalized_tracker;
@@ -136,7 +136,7 @@ mod tests {
         let mut rng = OsRng;
         let mut buf = [0; 32];
         rng.fill_bytes(&mut buf);
-        L2BlockId::from(alpen_express_primitives::buf::Buf32::from(buf))
+        L2BlockId::from(strata_primitives::buf::Buf32::from(buf))
     }
 
     #[test]

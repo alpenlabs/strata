@@ -1,8 +1,8 @@
-use alpen_express_crypto::verify_schnorr_sig;
-use alpen_express_primitives::buf::{Buf32, Buf64};
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
-use express_zkvm::Proof;
+use strata_crypto::verify_schnorr_sig;
+use strata_primitives::buf::{Buf32, Buf64};
+use strata_zkvm::Proof;
 
 use crate::id::L2BlockId;
 
@@ -47,7 +47,7 @@ impl BatchCheckpoint {
         buf.extend(&checkpoint_sighash);
         buf.extend(self.proof.as_bytes());
 
-        alpen_express_primitives::hash::raw(&buf)
+        strata_primitives::hash::raw(&buf)
     }
 }
 
@@ -105,7 +105,7 @@ pub struct BatchInfo {
     /// PoW transition in the given `l1_range`
     pub l1_pow_transition: (u128, u128),
     /// Commitment of the `RollupParams` calculated by
-    /// [`alpen_express_primitives::params::RollupParams::compute_hash`]
+    /// [`strata_primitives::params::RollupParams::compute_hash`]
     pub rollup_params_commitment: Buf32,
 }
 

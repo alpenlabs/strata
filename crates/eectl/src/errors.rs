@@ -1,4 +1,4 @@
-use alpen_express_state::id::L2BlockId;
+use strata_state::id::L2BlockId;
 use thiserror::Error;
 
 pub type EngineResult<T> = Result<T, EngineError>;

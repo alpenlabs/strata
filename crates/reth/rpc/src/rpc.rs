@@ -1,26 +1,26 @@
 use std::sync::Arc;
 
-use express_reth_db::WitnessProvider;
-use express_rpc_utils::to_jsonrpsee_error;
 use jsonrpsee::core::RpcResult;
 use reth_primitives::B256;
+use strata_reth_db::WitnessProvider;
+use strata_rpc_utils::to_jsonrpsee_error;
 
-use crate::{AlpenRpcApiServer, BlockWitness};
+use crate::{BlockWitness, StrataRpcApiServer};
 
 /// rpc implementation
 #[derive(Debug, Clone)]
-pub struct AlpenRPC<DB: Clone + Sized> {
+pub struct StrataRPC<DB: Clone + Sized> {
     db: Arc<DB>,
 }
 
-impl<DB: Clone + Sized> AlpenRPC<DB> {
+impl<DB: Clone + Sized> StrataRPC<DB> {
     /// Create new instance
     pub fn new(db: Arc<DB>) -> Self {
         Self { db }
     }
 }
 
-impl<DB> AlpenRpcApiServer for AlpenRPC<DB>
+impl<DB> StrataRpcApiServer for StrataRPC<DB>
 where
     DB: WitnessProvider + Send + Sync + Clone + 'static,
 {

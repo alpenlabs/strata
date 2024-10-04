@@ -2,12 +2,12 @@
 
 use std::env;
 
-use alpen_express_btcio::rpc::{traits::Signer, types::ImportDescriptor};
 use bitcoin::{
     bip32::{ChildNumber, DerivationPath, Xpriv},
     secp256k1::SECP256K1,
 };
 use miniscript::descriptor::{checksum::desc_checksum, InnerXKey};
+use strata_btcio::rpc::{traits::Signer, types::ImportDescriptor};
 
 // TODO move some of these into a keyderiv crate
 const DERIV_BASE_IDX: u32 = 56;
@@ -92,13 +92,13 @@ pub(crate) async fn check_or_load_descriptor_into_wallet(
 
 #[cfg(test)]
 mod tests {
-    use alpen_express_btcio::rpc::{
+    use bitcoind::BitcoinD;
+    use strata_btcio::rpc::{
         traits::Signer,
         types::{ImportDescriptor, ImportDescriptorResult},
         BitcoinClient,
     };
-    use alpen_express_common::logging;
-    use bitcoind::BitcoinD;
+    use strata_common::logging;
 
     use super::*;
 

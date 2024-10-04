@@ -1,39 +1,39 @@
 use std::{str::FromStr, sync::Arc, time::Duration};
 
-use alpen_express_btcio::{
+use bitcoin::{hashes::Hash, Address, BlockHash};
+use config::{ClientMode, Config, SequencerConfig};
+use jsonrpsee::Methods;
+use rpc_client::sync_client;
+use strata_bridge_relay::relayer::RelayerHandle;
+use strata_btcio::{
     broadcaster::{spawn_broadcaster_task, L1BroadcastHandle},
     rpc::{traits::Reader, BitcoinClient},
     writer::{config::WriterConfig, start_inscription_task},
 };
-use alpen_express_common::logging;
-use alpen_express_consensus_logic::{
+use strata_common::logging;
+use strata_consensus_logic::{
     checkpoint::CheckpointHandle,
     duty::{types::DutyBatch, worker as duty_worker},
     genesis,
     sync_manager::{self, SyncManager},
 };
-use alpen_express_db::{
+use strata_db::{
     traits::{ChainstateProvider, Database},
     DbError,
 };
-use alpen_express_eectl::engine::ExecEngineCtl;
-use alpen_express_evmexec::{engine::RpcExecEngineCtl, EngineRpcClient};
-use alpen_express_primitives::params::{Params, SyncParams};
-use alpen_express_rocksdb::{
+use strata_eectl::engine::ExecEngineCtl;
+use strata_evmexec::{engine::RpcExecEngineCtl, EngineRpcClient};
+use strata_primitives::params::{Params, SyncParams};
+use strata_rocksdb::{
     broadcaster::db::BroadcastDatabase, sequencer::db::SequencerDB, DbOpsConfig, RBSeqBlobDb,
 };
-use alpen_express_rpc_api::{AlpenAdminApiServer, AlpenApiServer, AlpenSequencerApiServer};
-use alpen_express_status::{StatusRx, StatusTx};
-use bitcoin::{hashes::Hash, Address, BlockHash};
-use config::{ClientMode, Config, SequencerConfig};
-use express_bridge_relay::relayer::RelayerHandle;
-use express_storage::{
+use strata_rpc_api::{StrataAdminApiServer, StrataApiServer, StrataSequencerApiServer};
+use strata_status::{StatusRx, StatusTx};
+use strata_storage::{
     managers::checkpoint::CheckpointDbManager, ops::bridge_relay::BridgeMsgOps, L2BlockManager,
 };
-use express_sync::{self, L2SyncContext, RpcSyncPeer};
-use express_tasks::{ShutdownSignal, TaskExecutor, TaskManager};
-use jsonrpsee::Methods;
-use rpc_client::sync_client;
+use strata_sync::{self, L2SyncContext, RpcSyncPeer};
+use strata_tasks::{ShutdownSignal, TaskExecutor, TaskManager};
 use tokio::{
     runtime::Runtime,
     sync::{broadcast, oneshot},
@@ -96,24 +96,21 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     // Start runtime for async IO tasks.
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
-        .thread_name("express-rt")
+        .thread_name("strata-rt")
         .build()
         .expect("init: build rt");
 
     // Init thread pool for batch jobs.
     // TODO switch to num_cpus
-    let pool = threadpool::ThreadPool::with_name("express-pool".to_owned(), 8);
+    let pool = threadpool::ThreadPool::with_name("strata-pool".to_owned(), 8);
 
     let task_manager = TaskManager::new(runtime.handle().clone());
     let executor = task_manager.executor();
 
     // Set up bridge messaging stuff.
     // TODO move all of this into relayer task init
-    let bridge_msg_db = Arc::new(alpen_express_rocksdb::BridgeMsgDb::new(
-        rbdb.clone(),
-        ops_config,
-    ));
-    let bridge_msg_ctx = express_storage::ops::bridge_relay::Context::new(bridge_msg_db);
+    let bridge_msg_db = Arc::new(strata_rocksdb::BridgeMsgDb::new(rbdb.clone(), ops_config));
+    let bridge_msg_ctx = strata_storage::ops::bridge_relay::Context::new(bridge_msg_db);
     let bridge_msg_ops = Arc::new(bridge_msg_ctx.into_ops(pool.clone()));
 
     let checkpoint_manager: Arc<_> =
@@ -181,10 +178,10 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             // NOTE: this might block for some time during first run with empty db until genesis
             // block is generated
             let mut l2_sync_state =
-                express_sync::block_until_csm_ready_and_init_sync_state(&l2_sync_context)?;
+                strata_sync::block_until_csm_ready_and_init_sync_state(&l2_sync_context)?;
 
             executor.spawn_critical_async("l2-sync-manager", async move {
-                express_sync::sync_worker(&mut l2_sync_state, &l2_sync_context)
+                strata_sync::sync_worker(&mut l2_sync_state, &l2_sync_context)
                     .await
                     .map_err(Into::into)
             });
@@ -339,7 +336,7 @@ fn start_core_tasks(
     )?;
 
     // Start relayer task.
-    let relayer_handle = express_bridge_relay::relayer::start_bridge_relayer_task(
+    let relayer_handle = strata_bridge_relay::relayer::start_bridge_relayer_task(
         bridge_msg_ops,
         status_rx.clone(),
         config.relayer,
@@ -469,7 +466,7 @@ fn start_broadcaster_tasks(
     params: Arc<Params>,
 ) -> Arc<L1BroadcastHandle> {
     // Set up L1 broadcaster.
-    let broadcast_ctx = express_storage::ops::l1tx_broadcast::Context::new(broadcast_database);
+    let broadcast_ctx = strata_storage::ops::l1tx_broadcast::Context::new(broadcast_database);
     let broadcast_ops = Arc::new(broadcast_ctx.into_ops(pool));
     // start broadcast task
     let broadcast_handle =
@@ -496,7 +493,7 @@ async fn start_rpc(
     let (stop_tx, stop_rx) = oneshot::channel();
 
     // Init RPC impls.
-    let alp_rpc = rpc_server::AlpenRpcImpl::new(
+    let strata_rpc = rpc_server::StrataRpcImpl::new(
         status_rx,
         database,
         sync_manager,
@@ -504,7 +501,7 @@ async fn start_rpc(
         checkpoint_handle,
         relayer_handle,
     );
-    methods.merge(alp_rpc.into_rpc())?;
+    methods.merge(strata_rpc.into_rpc())?;
 
     let admin_rpc = rpc_server::AdminServerImpl::new(stop_tx);
     methods.merge(admin_rpc.into_rpc())?;

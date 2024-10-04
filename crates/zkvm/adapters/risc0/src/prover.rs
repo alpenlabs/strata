@@ -1,5 +1,5 @@
-use express_zkvm::{Proof, ProverOptions, VerificationKey, ZKVMHost, ZKVMInputBuilder};
 use risc0_zkvm::{compute_image_id, default_prover, ProverOpts};
+use strata_zkvm::{Proof, ProverOptions, VerificationKey, ZKVMHost, ZKVMInputBuilder};
 
 use crate::input::RiscZeroProofInputBuilder;
 
@@ -73,7 +73,7 @@ impl ZKVMHost for RiscZeroHost {
 mod tests {
     use std::{fs::File, io::Write};
 
-    use express_zkvm::ZKVMVerifier;
+    use strata_zkvm::ZKVMVerifier;
 
     use super::*;
     use crate::{Risc0Verifier, RiscZeroProofInputBuilder};

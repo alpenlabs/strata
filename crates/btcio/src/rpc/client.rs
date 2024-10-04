@@ -389,9 +389,9 @@ impl Signer for BitcoinClient {
 mod test {
     use std::env::set_var;
 
-    use alpen_express_common::logging;
     use bitcoin::{consensus, hashes::Hash, NetworkKind};
     use bitcoind::{bitcoincore_rpc::RpcApi, BitcoinD};
+    use strata_common::logging;
 
     use super::*;
 

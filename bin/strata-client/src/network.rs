@@ -5,7 +5,7 @@ use std::{
     fs,
 };
 
-use alpen_express_primitives::{
+use strata_primitives::{
     block_credential::CredRule,
     operator::OperatorPubkeys,
     params::{OperatorConfig, RollupParams},
@@ -40,7 +40,7 @@ fn get_deprecated_fallback() -> RollupParams {
 
     // TODO: load default params from a json during compile time
     RollupParams {
-        rollup_name: "express".to_string(),
+        rollup_name: "strata".to_string(),
         block_time: 1000,
         cred_rule: CredRule::Unchecked,
         horizon_l1_height: 3,
@@ -98,7 +98,7 @@ pub fn get_envvar_params() -> anyhow::Result<Option<RollupParams>> {
 
 #[cfg(test)]
 mod tests {
-    use alpen_express_primitives::params::RollupParams;
+    use strata_primitives::params::RollupParams;
 
     use super::DEFAULT_NETWORK_ROLLUP_PARAMS;
 

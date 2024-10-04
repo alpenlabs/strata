@@ -64,7 +64,7 @@ impl From<(u64, u32)> for L1TxRef {
     }
 }
 
-/// TODO: This is duplicate with alpen_state::l1::L1TxProof
+/// TODO: This is duplicate with state::l1::L1TxProof
 /// Merkle proof for a TXID within a block.
 // TODO rework this, make it possible to generate proofs, etc.
 #[derive(Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize)]
@@ -413,7 +413,7 @@ impl BitcoinAmount {
         Self(value)
     }
 
-    /// Convert from a value expressing integer values of bitcoins to a [`BitcoinAmount`]
+    /// Convert from a value strataing integer values of bitcoins to a [`BitcoinAmount`]
     /// in const context.
     ///
     /// ## Panics

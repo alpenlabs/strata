@@ -1,15 +1,15 @@
 //! Module for database local types
 
-use alpen_express_primitives::buf::Buf32;
-use alpen_express_state::batch::{BatchCheckpoint, BatchInfo, BootstrapState};
 use arbitrary::Arbitrary;
 use bitcoin::{
     consensus::{self, deserialize, serialize},
     Transaction,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
-use express_zkvm::Proof;
 use serde::{Deserialize, Serialize};
+use strata_primitives::buf::Buf32;
+use strata_state::batch::{BatchCheckpoint, BatchInfo, BootstrapState};
+use strata_zkvm::Proof;
 
 /// Represents data for a blob we're still planning to inscribe.
 // TODO rename to `BlockInscriptionEntry` to emphasize this isn't just about *all* blobs

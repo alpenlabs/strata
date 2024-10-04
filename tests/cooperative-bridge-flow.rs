@@ -2,7 +2,6 @@
 
 use std::sync::Arc;
 
-use alpen_express_primitives::bridge::{OperatorIdx, PublickeyTable};
 use bitcoin::{
     key::rand::{self, Rng},
     Network, OutPoint,
@@ -12,9 +11,10 @@ use bitcoind::{
     BitcoinD,
 };
 use common::bridge::{perform_rollup_actions, perform_user_actions, setup, BridgeDuty, User};
-use express_bridge_tx_builder::prelude::{
+use strata_bridge_tx_builder::prelude::{
     create_taproot_addr, get_aggregated_pubkey, CooperativeWithdrawalInfo, SpendPath,
 };
+use strata_primitives::bridge::{OperatorIdx, PublickeyTable};
 use tokio::sync::Mutex;
 use tracing::{debug, event, span, Level};
 

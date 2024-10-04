@@ -12,7 +12,7 @@
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either strata or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
 pub mod db;
@@ -22,8 +22,6 @@ pub mod processor;
 use std::collections::HashMap;
 
 use db::InMemoryDBHelper;
-use express_reth_evm::collect_withdrawal_intents;
-use express_reth_primitives::WithdrawalIntent;
 use mpt::keccak;
 use processor::{EvmConfig, EvmProcessor};
 use reth_primitives::{
@@ -31,6 +29,8 @@ use reth_primitives::{
 };
 use revm::InMemoryDB;
 use serde::{Deserialize, Serialize};
+use strata_reth_evm::collect_withdrawal_intents;
+use strata_reth_primitives::WithdrawalIntent;
 
 use crate::mpt::{MptNode, StorageEntry};
 

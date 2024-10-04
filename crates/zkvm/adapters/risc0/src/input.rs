@@ -1,5 +1,5 @@
-use express_zkvm::ZKVMInputBuilder;
 use risc0_zkvm::{sha::Digest, ExecutorEnv, ExecutorEnvBuilder, Receipt};
+use strata_zkvm::ZKVMInputBuilder;
 
 pub struct RiscZeroProofInputBuilder<'a>(ExecutorEnvBuilder<'a>);
 
@@ -28,7 +28,7 @@ impl<'a> ZKVMInputBuilder<'a> for RiscZeroProofInputBuilder<'a> {
         Ok(self)
     }
 
-    fn write_proof(&mut self, item: express_zkvm::AggregationInput) -> anyhow::Result<&mut Self> {
+    fn write_proof(&mut self, item: strata_zkvm::AggregationInput) -> anyhow::Result<&mut Self> {
         // Learn more about assumption and proof compositions at https://dev.risczero.com/api/zkvm/composition
         let receipt: Receipt = bincode::deserialize(item.proof().as_bytes())?;
         let vk: Digest = bincode::deserialize(item.vk().as_bytes())?;

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use alpen_express_db::{traits::BridgeDutyIndexDatabase, DbResult};
+use strata_db::{traits::BridgeDutyIndexDatabase, DbResult};
 
 use crate::exec::*;
 

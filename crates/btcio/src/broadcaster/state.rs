@@ -1,8 +1,8 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-use alpen_express_db::types::L1TxEntry;
 use bitcoin::Txid;
-use express_storage::BroadcastDbOps;
+use strata_db::types::L1TxEntry;
+use strata_storage::BroadcastDbOps;
 use tracing::*;
 
 use super::error::{BroadcasterError, BroadcasterResult};
@@ -87,13 +87,13 @@ async fn filter_unfinalized_from_db(
 
 #[cfg(test)]
 mod test {
-    use alpen_express_db::{traits::L1BroadcastDatabase, types::L1TxStatus};
-    use alpen_express_rocksdb::{
+    use bitcoin::{consensus, Transaction};
+    use strata_db::{traits::L1BroadcastDatabase, types::L1TxStatus};
+    use strata_rocksdb::{
         broadcaster::db::{BroadcastDatabase, L1BroadcastDb},
         test_utils::get_rocksdb_tmp_instance,
     };
-    use bitcoin::{consensus, Transaction};
-    use express_storage::ops::l1tx_broadcast::Context;
+    use strata_storage::ops::l1tx_broadcast::Context;
 
     use super::*;
     use crate::test_utils::SOME_TX;

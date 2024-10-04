@@ -5,7 +5,7 @@ use reth_primitives::B256;
 use serde::{Deserialize, Serialize};
 
 /// Type for withdrawal_intents in rpc.
-/// Distinct from `alpen_express_state::bridge_ops::WithdrawalIntent`
+/// Distinct from `strata_state::bridge_ops::WithdrawalIntent`
 /// as this will live in reth repo eventually
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct WithdrawalIntent {

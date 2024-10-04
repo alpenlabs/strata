@@ -2,15 +2,15 @@
 //! Proof. It ensures that the previous batch proof was correctly settled on the L1
 //! chain and that all L1-L2 transactions were processed.
 
-use alpen_express_primitives::buf::Buf32;
-use alpen_express_state::{
+use borsh::{BorshDeserialize, BorshSerialize};
+use strata_primitives::buf::Buf32;
+use strata_proofimpl_l1_batch::L1BatchProofOutput;
+use strata_state::{
     batch::{BatchInfo, BootstrapState},
     id::L2BlockId,
     tx::DepositInfo,
 };
-use borsh::{BorshDeserialize, BorshSerialize};
-use express_proofimpl_l1_batch::L1BatchProofOutput;
-use express_zkvm::Proof;
+use strata_zkvm::Proof;
 
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
 pub struct ChainStateSnapshot {

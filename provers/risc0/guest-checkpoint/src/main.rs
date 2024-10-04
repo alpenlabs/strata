@@ -1,9 +1,9 @@
-use alpen_express_state::batch::BatchInfo;
-use express_proofimpl_checkpoint::{
+use strata_state::batch::BatchInfo;
+use strata_proofimpl_checkpoint::{
     self, process_checkpoint_proof, HashedCheckpointState, L2BatchProofOutput,
 };
-use express_proofimpl_l1_batch::logic::L1BatchProofOutput;
-use express_zkvm::Proof;
+use strata_proofimpl_l1_batch::logic::L1BatchProofOutput;
+use strata_zkvm::Proof;
 use risc0_zkvm::{
     guest::env,
     serde::{self, to_vec},
