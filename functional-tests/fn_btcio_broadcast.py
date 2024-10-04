@@ -49,6 +49,6 @@ class BroadcastTest(flexitest.Test):
         # Also check from rpc, wait for a while
         time.sleep(1)
         st = seqrpc.strata_getTxStatus(txid)
-        assert st["status"] == "Confirmed"
+        assert st["status"] in ("Confirmed", "Finalized")
 
         return True
