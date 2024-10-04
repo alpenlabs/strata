@@ -527,6 +527,7 @@ fn construct_params(config: ParamsConfig) -> alpen_express_primitives::params::R
             .unwrap_or(ProofPublishMode::Strict),
         // TODO make configurable
         max_deposits_in_block: 16,
+        network: config.bitcoin_network,
     }
 }
 

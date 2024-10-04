@@ -8,7 +8,7 @@ BUILD_PATH = "target"
 FUNCTIONAL_TESTS_DIR  = functional-tests
 FUNCTIONAL_TESTS_DATADIR = _dd
 DOCKER_DIR = docker
-DOCKER_DATADIR = .data
+DOCKER_DATADIR = data
 
 # Cargo profile for builds. Default is for local builds, CI uses an override.
 PROFILE ?= release

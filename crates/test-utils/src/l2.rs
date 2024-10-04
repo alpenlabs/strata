@@ -100,6 +100,7 @@ pub fn gen_params() -> Params {
             dispatch_assignment_dur: 64,
             proof_publish_mode: ProofPublishMode::Strict,
             max_deposits_in_block: 16,
+            network: bitcoin::Network::Regtest,
         },
         run: SyncParams {
             l2_blocks_fetch_limit: 1000,

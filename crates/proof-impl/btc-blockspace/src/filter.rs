@@ -13,7 +13,7 @@ pub fn extract_relevant_info(
     block: &Block,
     rollup_params: &RollupParams,
 ) -> (Vec<DepositInfo>, Option<BatchCheckpoint>) {
-    let filters = derive_tx_filter_rules(rollup_params);
+    let filters = derive_tx_filter_rules(rollup_params).expect("derive tx-filter rules");
 
     let mut deposits = Vec::new();
     let mut prev_checkpoint = None;

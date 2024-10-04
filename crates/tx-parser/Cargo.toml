@@ -6,12 +6,14 @@ version = "0.1.0"
 [dependencies]
 alpen-express-primitives = { workspace = true }
 alpen-express-state = { workspace = true }
+express-bridge-tx-builder = { workspace = true }
 
 anyhow = { workspace = true }
 arbitrary = { workspace = true }
 bitcoin = { workspace = true }
 borsh = { workspace = true }
 hex = { workspace = true }
+musig2 = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 

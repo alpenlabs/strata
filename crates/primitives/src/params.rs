@@ -5,7 +5,8 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{
-    block_credential::CredRule, operator::OperatorPubkeys, prelude::Buf32, vk::RollupVerifyingKey,
+    block_credential::CredRule, l1::BitcoinAddress, operator::OperatorPubkeys, prelude::Buf32,
+    vk::RollupVerifyingKey,
 };
 
 /// Consensus parameters that don't change for the lifetime of the network
@@ -63,6 +64,9 @@ pub struct RollupParams {
 
     /// max number of deposits in a block
     pub max_deposits_in_block: u8,
+
+    /// network the l1 is set on
+    pub network: bitcoin::Network,
 }
 
 impl RollupParams {
@@ -140,14 +144,18 @@ pub struct DepositTxParams {
 
     /// Exact bitcoin amount in the at-rest deposit.
     pub deposit_amount: u64,
+
+    /// federation address derived from operator entries
+    pub address: BitcoinAddress,
 }
 
 impl RollupParams {
-    pub fn get_deposit_params(&self) -> DepositTxParams {
+    pub fn get_deposit_params(&self, address: BitcoinAddress) -> DepositTxParams {
         DepositTxParams {
             magic_bytes: self.rollup_name.clone().into_bytes().to_vec(),
             address_length: self.address_length,
             deposit_amount: self.deposit_amount,
+            address,
         }
     }
 }
@@ -193,6 +201,10 @@ impl Params {
     pub fn run(&self) -> &SyncParams {
         &self.run
     }
+
+    pub fn network(&self) -> bitcoin::Network {
+        self.rollup.network
+    }
 }
 
 /// Describes how we determine the list of operators at genesis.
@@ -218,4 +230,13 @@ pub enum ParamsError {
 
     #[error("no operators set")]
     NoOperators,
+}
+
+impl OperatorConfig {
+    #[cfg(test)]
+    pub fn get_static_operator_keys(&self) -> &[OperatorPubkeys] {
+        match self {
+            OperatorConfig::Static(op_keys) => op_keys.as_ref(),
+        }
+    }
 }

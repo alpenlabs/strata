@@ -1,32 +1,42 @@
 //! parser types for Deposit Tx, and later deposit Request Tx
 
-use alpen_express_primitives::{l1::OutputRef, params::DepositTxParams};
+use alpen_express_primitives::{l1::OutputRef, prelude::DepositTxParams};
 use alpen_express_state::tx::DepositInfo;
 use bitcoin::{opcodes::all::OP_RETURN, ScriptBuf, Transaction};
+use express_bridge_tx_builder::prelude::BRIDGE_DENOMINATION;
 
-use super::{common::check_bridge_offer_output, error::DepositParseError};
-use crate::utils::{next_bytes, next_op};
+use crate::{
+    deposit::error::DepositParseError,
+    utils::{next_bytes, next_op},
+};
 
 /// Extracts the DepositInfo from the Deposit Transaction
 pub fn extract_deposit_info(tx: &Transaction, config: &DepositTxParams) -> Option<DepositInfo> {
     // Get the first output (index 0)
-    let output_0 = tx.output.first()?;
+    let send_addr_out = tx.output.first()?;
 
     // Get the second output (index 1)
-    let output_1 = tx.output.get(1)?;
+    let op_return_out = tx.output.get(1)?;
 
     // Parse the deposit script from the second output's script_pubkey
-    let ee_address = parse_deposit_script(&output_1.script_pubkey, config).ok()?;
+    let ee_address = parse_deposit_script(&op_return_out.script_pubkey, config).ok()?;
 
-    // Check if this is a valid bridge offer output
-    check_bridge_offer_output(tx, config).ok()?;
+    // check if it is exact BRIDGE_DENOMINATION amount
+    if send_addr_out.value.to_sat() != BRIDGE_DENOMINATION.to_sat() {
+        return None;
+    }
+
+    // check if p2tr address matches
+    if send_addr_out.script_pubkey != config.address.address().script_pubkey() {
+        return None;
+    }
 
     // Get the first input of the transaction
     let prev_out = tx.input.first()?;
 
     // Construct and return the DepositInfo
     Some(DepositInfo {
-        amt: output_0.value.into(),
+        amt: send_addr_out.value.into(),
         address: ee_address.to_vec(),
         outpoint: OutputRef::from(prev_out.previous_output),
     })
@@ -76,8 +86,8 @@ mod tests {
     use crate::deposit::{
         deposit_tx::extract_deposit_info,
         test_utils::{
-            build_test_deposit_script, create_transaction_two_outpoints, generic_taproot_addr,
-            get_deposit_tx_config,
+            build_test_deposit_script, create_transaction_two_outpoints, get_deposit_tx_config,
+            test_taproot_addr,
         },
     };
 
@@ -87,14 +97,13 @@ mod tests {
         let config = get_deposit_tx_config();
         let amt = Amount::from_sat(config.deposit_amount);
         let ee_addr = [1; 20];
-        let generic_taproot_addr = generic_taproot_addr();
 
         let deposit_request_script =
             build_test_deposit_script(config.magic_bytes, ee_addr.to_vec());
 
         let test_transaction = create_transaction_two_outpoints(
             Amount::from_sat(config.deposit_amount),
-            &generic_taproot_addr.script_pubkey(),
+            &test_taproot_addr().address().script_pubkey(),
             &deposit_request_script,
         );
 

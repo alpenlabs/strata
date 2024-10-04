@@ -9,6 +9,7 @@ rpcuser=${BITCOIND_RPC_USER}
 rpcpassword=${BITCOIND_RPC_PASSWORD}
 rpcbind=0.0.0.0
 rpcallowip=${RPC_ALLOW_IP}
+fallbackfee=0.00001
 server=1
 txindex=1
 EOF
