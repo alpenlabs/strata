@@ -257,3 +257,79 @@ def wait_for_proof_with_time_out(prover_client_rpc, task_id, time_out=3600):
         elapsed_time = time.time() - start_time  # Calculate elapsed time
         if elapsed_time >= time_out:
             raise TimeoutError(f"Operation timed out after {time_out} seconds.")
+
+
+def generate_seed_at(path: str):
+    """Generates a seed file at specified path."""
+    # fmt: off
+    cmd = [
+        "strata-datatool",
+        "-b", "regtest"
+        "genseed",
+        "-f", path
+    ]
+    # fmt: on
+
+    res = subprocess.run(cmd)
+    res.check_returncode()
+
+
+def generate_seqkey_from_seed(path: str) -> str:
+    """Generates a sequencer pubkey from the seed at file path."""
+    # fmt: off
+    cmd = [
+        "strata-datatool",
+        "-b", "regtest",
+        "genseqpubkey",
+        "-f", path
+    ]
+    # fmt: on
+
+    res = subprocess.run(cmd)
+    res.check_returncode()
+    return str(res.stdout, "utf8")
+
+
+def generate_opxpub_from_seed(path: str) -> str:
+    """Generates operate pubkey from seed at file path."""
+    # fmt: off
+    cmd = [
+        "strata-datatool",
+        "-b", "regtest",
+        "genopxpub",
+        "-f", path
+    ]
+    # fmt: on
+
+    res = subprocess.run(cmd)
+    res.check_returncode()
+    return str(res.stdout, "utf8")
+
+
+def generate_params(
+        block_time_sec: int,
+        epoch_slots: int,
+        genesis_trigger: int,
+        seqpubkey: str,
+        oppubkeys: list[str]
+) -> str:
+    """Generates a params file from config values."""
+    # fmt: off
+    cmd = [
+        "strata-datatool",
+        "-b", "regtest",
+        "genparams",
+        "--name", "strata",
+        "--block-time", str(block_time),
+        "--epoch-slots", str(epoch_slots),
+        "--seqkey", seqpubkey,
+        "--proof-timeout", str(30),
+    ]
+    # fmt: on
+
+    for k in oppubkeys:
+        cmd.extend(["--opkey", k])
+
+    res = subprocess.run(cmd, capture_output=True)
+    res.check_returncode()
+    return str(res.stdout, "utf8")
