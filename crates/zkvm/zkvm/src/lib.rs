@@ -156,6 +156,11 @@ pub trait ZKVMVerifier {
 
     /// Extracts the public output from the proof.
     fn extract_public_output<T: Serialize + DeserializeOwned>(proof: &Proof) -> anyhow::Result<T>;
+
+    /// Extracts the public output from the proof.
+    fn extract_borsh_public_output<T: BorshSerialize + BorshDeserialize>(
+        proof: &Proof,
+    ) -> anyhow::Result<T>;
 }
 
 impl Default for ProverOptions {

@@ -14,5 +14,5 @@ fn main() {
     };
     let output = process_blockspace_proof(&input);
 
-    sp1_zkvm::io::commit(&borsh::to_vec(&output).unwrap());
+    sp1_zkvm::io::commit_slice(&borsh::to_vec(&output).unwrap());
 }

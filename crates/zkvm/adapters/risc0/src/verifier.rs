@@ -76,6 +76,14 @@ impl ZKVMVerifier for Risc0Verifier {
         let receipt: Receipt = bincode::deserialize(proof.as_bytes())?;
         Ok(receipt.journal.decode()?)
     }
+
+    fn extract_borsh_public_output<T: borsh::BorshSerialize + borsh::BorshDeserialize>(
+        proof: &Proof,
+    ) -> anyhow::Result<T> {
+        let proof: Receipt = bincode::deserialize(proof.as_bytes())?;
+        let public_params_raw = proof.journal.bytes;
+        Ok(borsh::from_slice(&public_params_raw).unwrap())
+    }
 }
 
 #[cfg(test)]
