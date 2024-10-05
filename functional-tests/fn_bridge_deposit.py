@@ -1,6 +1,7 @@
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 
+import net_settings
 from constants import ROLLUP_PARAMS_FOR_DEPOSIT_TX, SEQ_PUBLISH_BATCH_INTERVAL_SECS
 from entry import BasicEnvConfig
 from utils import wait_until
@@ -12,7 +13,7 @@ SATS_TO_WEI = 10**10
 @flexitest.register
 class BridgeDepositTest(flexitest.Test):
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env(BasicEnvConfig(101, rollup_params=ROLLUP_PARAMS_FOR_DEPOSIT_TX))
+        ctx.set_env(BasicEnvConfig(101, rollup_settings=net_settings.get_fast_batch_settings()))
 
     def main(self, ctx: flexitest.RunContext):
         evm_addr = "deadf001900dca3ebeefdeadf001900dca3ebeef"
@@ -32,6 +33,7 @@ class BridgeDepositTest(flexitest.Test):
         seqrpc = seq.create_rpc()
         btcrpc: BitcoindClient = btc.create_rpc()
 
+        # FIXME change this to fetch from the params
         amount_to_send = ROLLUP_PARAMS_FOR_DEPOSIT_TX["deposit_amount"] / 10**8
         name = ROLLUP_PARAMS_FOR_DEPOSIT_TX["rollup_name"].encode("utf-8").hex()
 

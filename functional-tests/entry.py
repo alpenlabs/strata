@@ -75,16 +75,6 @@ class RethConfig(TypedDict):
     reth_secret_path: str
 
 
-def gen_simple_params(initdir: str) -> dict:
-    return utils.generate_simple_params(
-        initdir,
-        DEFAULT_BLOCK_TIME_SEC,
-        DEFAULT_EPOCH_SLOTS,
-        DEFAULT_GENESIS_TRIGGER,
-        DEFAULT_OPERATOR_CNT,
-    )
-
-
 class StrataFactory(flexitest.Factory):
     def __init__(self, port_range: list[int]):
         super().__init__(port_range)
@@ -343,7 +333,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
         # set up network params
         initdir = ctx.make_service_dir("_init")
         settings = self.rollup_settings or RollupParamsSettings.new_default()
-        params_gen_data = utils.generate_simple_params(initdir, settings, self.n_operators)
+        params_gen_data = generate_simple_params(initdir, settings, self.n_operators)
         params = params_gen_data["params"]
         # TODO also grab operator keys and launch operators
 
@@ -449,7 +439,7 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
         # set up network params
         initdir = ctx.make_service_dir("_init")
         settings = self.rollup_settings or RollupParamsSettings.new_default()
-        params_gen_data = utils.generate_simple_params(initdir, settings, self.n_operators)
+        params_gen_data = generate_simple_params(initdir, settings, self.n_operators)
         params = params_gen_data["params"]
         # TODO also grab operator keys and launch operators
 

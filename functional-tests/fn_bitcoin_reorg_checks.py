@@ -4,6 +4,7 @@ import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 from flexitest.service import Service
 
+import net_settings
 from constants import FAST_BATCH_ROLLUP_PARAMS
 from entry import BasicEnvConfig
 from utils import (
@@ -17,13 +18,13 @@ from utils import (
 
 @flexitest.register
 class BitcoinReorgChecksTest(flexitest.Test):
-    """This tests finalization when there is reorg on l1"""
+    """This tests finalization when there is reorg on L1"""
 
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env(
             BasicEnvConfig(
                 0,
-                rollup_params=FAST_BATCH_ROLLUP_PARAMS,
+                rollup_settings=net_settings.get_fast_batch_settings(),
                 auto_generate_blocks=False,
             )
         )
@@ -36,6 +37,7 @@ class BitcoinReorgChecksTest(flexitest.Test):
         btcrpc: BitcoindClient = btc.create_rpc()
         seq_addr = seq.get_prop("address")
 
+        # FIXME change this to fetch from the params
         finality_depth = FAST_BATCH_ROLLUP_PARAMS["l1_reorg_safe_depth"]
 
         # Wait for seq
