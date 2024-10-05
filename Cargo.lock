@@ -4918,6 +4918,7 @@ dependencies = [
  "bincode",
  "bitcoin",
  "borsh",
+ "express-chaintsn",
  "express-proofimpl-btc-blockspace",
  "express-proofimpl-checkpoint",
  "express-proofimpl-cl-stf",

@@ -1,6 +1,8 @@
 mod helpers;
 #[cfg(all(feature = "prover", not(debug_assertions)))]
 mod test {
+    use alpen_express_primitives::params;
+    use alpen_test_utils::l2::gen_params;
     use express_proofimpl_checkpoint::L2BatchProofOutput;
     use express_sp1_adapter::SP1Verifier;
     use express_zkvm::{ProverOptions, ZKVMVerifier};
@@ -13,6 +15,7 @@ mod test {
     fn test_cl_agg_guest_code_trace_generation() {
         sp1_sdk::utils::setup_logger();
 
+        let params = gen_params();
         let prover_options = ProverOptions {
             enable_compression: true,
             stark_to_snark_conversion: false,
@@ -20,7 +23,7 @@ mod test {
         };
 
         let el_prover = ElProofGenerator::new();
-        let cl_prover = ClProofGenerator::new(el_prover);
+        let cl_prover = ClProofGenerator::new(el_prover, params.rollup());
         let cl_agg_prover = L2BatchProofGenerator::new(cl_prover);
 
         let (proof, _) = cl_agg_prover.get_proof(&(1, 3), &prover_options).unwrap();
