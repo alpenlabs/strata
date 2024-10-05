@@ -52,6 +52,10 @@ mod network;
 mod rpc_client;
 mod rpc_server;
 
+// TODO: this might need to come from config.
+const BITCOIN_POLL_INTERVAL: u64 = 200; // millis
+const SEQ_ADDR_GENERATION_TIMEOUT: u64 = 10; // seconds
+
 fn main() -> anyhow::Result<()> {
     let args: Args = argh::from_env();
     if let Err(e) = main_inner(args) {
@@ -392,7 +396,11 @@ fn start_sequencer_tasks(
         Some(address) => {
             Address::from_str(address)?.require_network(config.bitcoind_rpc.network)?
         }
-        None => runtime.block_on(generate_sequencer_address(&bitcoin_client))?,
+        None => runtime.block_on(generate_sequencer_address(
+            &bitcoin_client,
+            SEQ_ADDR_GENERATION_TIMEOUT,
+            BITCOIN_POLL_INTERVAL,
+        ))?,
     };
 
     // Spawn up writer

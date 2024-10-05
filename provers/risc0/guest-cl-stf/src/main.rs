@@ -1,3 +1,4 @@
+use risc0_zkvm::guest::env;
 use strata_primitives::{
     block_credential,
     buf::Buf32,
@@ -5,7 +6,6 @@ use strata_primitives::{
     vk::RollupVerifyingKey,
 };
 use strata_proofimpl_cl_stf::{verify_and_transition, ChainState, L2Block};
-use risc0_zkvm::guest::env;
 
 fn main() {
     let params = get_rollup_params();
@@ -44,7 +44,6 @@ fn get_rollup_params() -> Params {
                     .parse()
                     .unwrap(),
             )),
-            verify_proofs: false,
         },
         run: SyncParams {
             l2_blocks_fetch_limit: 1000,

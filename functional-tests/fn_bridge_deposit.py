@@ -1,5 +1,3 @@
-import time
-
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 
@@ -67,10 +65,9 @@ class BridgeDepositTest(flexitest.Test):
         assert (
             balance == ROLLUP_PARAMS_FOR_DEPOSIT_TX["deposit_amount"] * SATS_TO_WEI
         ), f"invalid deposit amount: {balance}"
-        # sleep time > block production time
-        time.sleep(2)
-        block_num_after = rethrpc.eth_blockNumber()
-        assert block_num_after > block_num, "not building blocks"
+
+        wait_until(lambda: rethrpc.eth_blockNumber() > block_num, error_with="not building blocks")
+
         balance = int(rethrpc.eth_getBalance(f"0x{evm_addr}"), 16)
         assert (
             balance == ROLLUP_PARAMS_FOR_DEPOSIT_TX["deposit_amount"] * SATS_TO_WEI

@@ -41,7 +41,6 @@ DEFAULT_ROLLUP_PARAMS: dict = {
     "rollup_vk": {
         "risc0_verifying_key": ROLLUP_VK,
     },
-    "verify_proofs": False,
     "dispatch_assignment_dur": 64,
     "proof_publish_mode": {
         # use an empty proof in batch after this many seconds of not receiving a proof

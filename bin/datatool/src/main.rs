@@ -497,7 +497,6 @@ fn construct_params(config: ParamsConfig) -> strata_primitives::params::RollupPa
         address_length: 20,
         deposit_amount: config.deposit_sats,
         rollup_vk: RollupVerifyingKey::SP1VerifyingKey(config.rollup_vk),
-        verify_proofs: true,
         // TODO make configurable
         dispatch_assignment_dur: 64,
         proof_publish_mode: config

@@ -168,10 +168,12 @@ def submit_checkpoint(idx: int, seqrpc, manual_gen: ManualGenBlocksConfig | None
     last_published_txid = seqrpc.strata_l1status()["last_published_txid"]
 
     # Post checkpoint proof
-    # NOTE: This random proof posted will fail to make blocks finalized in l2
-    # once we have checkpoint verification logic implemented. Will need to
-    # change the proof accordingly
-    proof_hex = "00" * 256  # The expected proof size if 256 bytes
+    # FIXME/NOTE: Since operating in timeout mode is supported, i.e. sequencer
+    # will post empty post if prover doesn't submit proofs in time, we can send
+    # empty proof hex.
+    # NOTE: The functional tests for verifying proofs need to provide non-empty
+    # proofs
+    proof_hex = ""
 
     # This is arbitrary
     seqrpc.strataadmin_submitCheckpointProof(idx, proof_hex)
@@ -200,7 +202,7 @@ def check_submit_proof_fails_for_nonexistent_batch(seqrpc, nonexistent_batch: in
     """
     This check requires that subnitting nonexistent batch proof fails
     """
-    proof_hex = "00" * 256
+    proof_hex = ""
 
     try:
         seqrpc.strataadmin_submitCheckpointProof(nonexistent_batch, proof_hex)
