@@ -41,7 +41,7 @@ fn main() {
         ));
     }
 
-    sp1_zkvm::io::commit(&borsh::to_vec(&output).unwrap());
+    sp1_zkvm::io::commit_slice(&borsh::to_vec(&output).unwrap());
 }
 
 // Copied from ~/.sp1/circuits/v2.0.0/groth16_vk.bin

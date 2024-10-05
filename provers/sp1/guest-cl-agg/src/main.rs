@@ -38,7 +38,7 @@ fn main() {
         rollup_params_commitment,
     };
 
-    sp1_zkvm::io::commit(&borsh::to_vec(&public_params).unwrap());
+    sp1_zkvm::io::commit_slice(&borsh::to_vec(&public_params).unwrap());
 }
 
 fn read_and_validate_next_proof() -> L2BatchProofOutput {

@@ -32,7 +32,7 @@ impl<'a> ZKVMInputBuilder<'a> for SP1ProofInputBuilder {
 
         // Write the verification key and the public values of the program that'll be proven
         // inside zkVM.
-        self.0.write(&proof.public_values);
+        self.0.write_slice(proof.public_values.as_slice());
 
         // Write the proofs.
         //

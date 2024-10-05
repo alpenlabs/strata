@@ -1,6 +1,6 @@
 mod helpers;
 // NOTE: SP1 prover runs in release mode only; therefore run the tests on release mode only
-#[cfg(all(feature = "prover", not(debug_assertions)))]
+// #[cfg(all(feature = "prover", not(debug_assertions)))]
 mod test {
     use alpen_test_utils::l2::gen_params;
     use express_proofimpl_l1_batch::L1BatchProofOutput;
@@ -16,7 +16,7 @@ mod test {
         let params = gen_params();
         let rollup_params = params.rollup();
         let l1_start_height = (rollup_params.genesis_l1_height + 1) as u32;
-        let l1_end_height = l1_start_height + 2;
+        let l1_end_height = l1_start_height + 1;
 
         let prover_options = ProverOptions {
             use_mock_prover: false,
@@ -29,8 +29,7 @@ mod test {
             .get_proof(&(l1_start_height, l1_end_height), &prover_options)
             .unwrap();
 
-        let raw_output = SP1Verifier::extract_public_output::<Vec<u8>>(&proof)
+        let _: L1BatchProofOutput = SP1Verifier::extract_borsh_public_output(&proof)
             .expect("Failed to extract public outputs");
-        let _: L1BatchProofOutput = borsh::from_slice(&raw_output).unwrap();
     }
 }

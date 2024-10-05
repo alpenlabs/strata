@@ -20,13 +20,11 @@ fn main() {
 
     let vk = vks::GUEST_BTC_BLOCKSPACE_ELF_ID;
     for _ in 0..num_inputs {
-        let blkpo_raw: Vec<u8> = sp1_zkvm::io::read();
+        let blkpo_raw: Vec<u8> = sp1_zkvm::io::read_vec();
+        let blkpo_raw_digest = Sha256::digest(&blkpo_raw);
+        sp1_zkvm::lib::verify::verify_sp1_proof(vk, &blkpo_raw_digest.into());
 
-        let public_values_digest = Sha256::digest(&blkpo_raw);
-        sp1_zkvm::lib::verify::verify_sp1_proof(vk, &public_values_digest.into());
-
-        let blkpo_raw_serialized: Vec<u8> = bincode::deserialize(&blkpo_raw).unwrap();
-        let blkpo: BlockspaceProofOutput = borsh::from_slice(&blkpo_raw_serialized).unwrap();
+        let blkpo: BlockspaceProofOutput = borsh::from_slice(&blkpo_raw).unwrap();
         println!("{:?}", blkpo);
         let header: Header = bitcoin::consensus::deserialize(&blkpo.header_raw).unwrap();
 
@@ -51,5 +49,5 @@ fn main() {
         rollup_params_commitment: rollup_params_commitment.unwrap(),
     };
 
-    sp1_zkvm::io::commit(&borsh::to_vec(&output).unwrap());
+    sp1_zkvm::io::commit_slice(&borsh::to_vec(&output).unwrap());
 }

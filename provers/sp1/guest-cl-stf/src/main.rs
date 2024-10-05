@@ -46,5 +46,5 @@ fn main() {
         rollup_params_commitment: rollup_params.compute_hash(),
     };
 
-    sp1_zkvm::io::commit(&borsh::to_vec(&cl_stf_public_params).unwrap());
+    sp1_zkvm::io::commit_slice(&borsh::to_vec(&cl_stf_public_params).unwrap());
 }
