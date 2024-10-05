@@ -13,8 +13,9 @@ import web3.middleware
 from bitcoinlib.services.bitcoind import BitcoindClient
 
 import seqrpc
+import net_settings
 from constants import *
-from utils import generate_blocks, generate_jwt_secret
+from utils import *
 
 
 class BitcoinFactory(flexitest.Factory):
@@ -32,6 +33,8 @@ class BitcoinFactory(flexitest.Factory):
             "bitcoind",
             "-txindex",
             "-regtest",
+            "-listen",
+            "-port={p2p_port}",
             "-printtoconsole",
             "-fallbackfee=0.00001",
             f"-datadir={datadir}",
@@ -42,6 +45,7 @@ class BitcoinFactory(flexitest.Factory):
         ]
 
         props = {
+            "p2p_port": p2p_port,
             "rpc_port": rpc_port,
             "rpc_user": BD_USERNAME,
             "rpc_password": BD_PASSWORD,
@@ -188,11 +192,9 @@ class FullNodeFactory(flexitest.Factory):
         with open(rollup_params_file, "w") as f:
             f.write(rollup_params)
 
-
         cmd.extend(["--rollup-params", rollup_params_file])
 
         props = {"rpc_port": rpc_port, "id": id}
-
         rpc_url = f"ws://localhost:{rpc_port}"
 
         svc = flexitest.service.ProcService(props, cmd, stdout=logfile)
@@ -319,17 +321,19 @@ class ProverClientFactory(flexitest.Factory):
 
 class BasicEnvConfig(flexitest.EnvConfig):
     def __init__(
-        self,
-        pre_generate_blocks: int = 0,
-        rollup_params: Optional[str] = None,
-        auto_generate_blocks=True,
-        enable_prover_client=False,
+            self,
+            pre_generate_blocks: int = 0,
+            rollup_settings: Optional[RollupParamsSettings] = None,
+            auto_generate_blocks: bool = True,
+            enable_prover_client: bool = True,
+            n_operators: int = 2
     ):
+        super().__init__()
         self.pre_generate_blocks = pre_generate_blocks
-        self.rollup_params = rollup_params
+        self.rollup_settings = rollup_settings
         self.auto_generate_blocks = auto_generate_blocks
         self.enable_prover_client = enable_prover_client
-        super().__init__()
+        self.n_operators = n_operators
 
     def init(self, ctx: flexitest.EnvContext) -> flexitest.LiveEnv:
         btc_fac = ctx.get_factory("bitcoin")
@@ -338,11 +342,10 @@ class BasicEnvConfig(flexitest.EnvConfig):
 
         # set up network params
         initdir = ctx.make_service_dir("_init")
-        params = self.rollup_params
-        if params is None:
-            gen_data = gen_simple_params(initdir)
-            params = gen_data["params"]
-            # TODO also grab operator keys and launch operators
+        settings = self.rollup_settings or RollupParamsSettings.new_default()
+        params_gen_data = utils.generate_simple_params(initdir, settings, self.n_operators)
+        params = params_gen_data["params"]
+        # TODO also grab operator keys and launch operators
 
         # reth needs some time to startup, start it first
         secret_dir = ctx.make_service_dir("secret")
@@ -425,14 +428,16 @@ class BasicEnvConfig(flexitest.EnvConfig):
 
 class HubNetworkEnvConfig(flexitest.EnvConfig):
     def __init__(
-        self,
-        pre_generate_blocks: int = 0,
-        rollup_params: Optional[str] = None,
-        auto_generate_blocks=True,
+            self,
+            pre_generate_blocks: int = 0,
+            rollup_params: Optional[str] = None,
+            auto_generate_blocks: bool = True,
+            n_operators: int = 2,
     ):
         self.pre_generate_blocks = pre_generate_blocks
         self.rollup_params = rollup_params
         self.auto_generate_blocks = auto_generate_blocks
+        self.n_operators = n_operators
         super().__init__()
 
     def init(self, ctx: flexitest.EnvContext) -> flexitest.LiveEnv:
@@ -443,11 +448,10 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
 
         # set up network params
         initdir = ctx.make_service_dir("_init")
-        params = self.rollup_params
-        if params is None:
-            gen_data = gen_simple_params(initdir)
-            params = gen_data["params"]
-            # TODO also grab operator keys and launch operators
+        settings = self.rollup_settings or RollupParamsSettings.new_default()
+        params_gen_data = utils.generate_simple_params(initdir, settings, self.n_operators)
+        params = params_gen_data["params"]
+        # TODO also grab operator keys and launch operators
 
         # reth needs some time to startup, start it first
         secret_dir = ctx.make_service_dir("secret")
@@ -560,7 +564,7 @@ def main(argv):
     global_envs = {
         "basic": BasicEnvConfig(),
         "premined_blocks": BasicEnvConfig(101),
-        "fast_batches": BasicEnvConfig(101, rollup_params=FAST_BATCH_ROLLUP_PARAMS),
+        "fast_batches": BasicEnvConfig(101, rollup_settings=net_settings.get_fast_batch_settings()),
         "hub1": HubNetworkEnvConfig(),
         "prover": BasicEnvConfig(101, enable_prover_client=True),
     }

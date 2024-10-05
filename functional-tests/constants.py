@@ -18,7 +18,7 @@ PRECOMPILE_BRIDGEOUT_ADDRESS = "0x5400000000000000000000000000000000000001"
 
 # Network times and stuff
 DEFAULT_BLOCK_TIME_SEC = 1
-DEFUALT_EPOCH_SLOTS = 64
+DEFAULT_EPOCH_SLOTS = 64
 DEFAULT_GENESIS_TRIGGER_HT = 5
 DEFAULT_OPERATOR_CNT = 2
 
@@ -33,7 +33,7 @@ SEQ_PUBKEY = Key(SEQ_KEY.hex()).x_hex
 # TODO initialize this with the new genesis tool instead of having it hardcoded
 DEFAULT_ROLLUP_PARAMS: dict = {
     "rollup_name": "strata",
-    "block_time": DEFAULT_BLOCK_TIME * 1000,
+    "block_time": DEFAULT_BLOCK_TIME_SEC * 1000,
     "cred_rule": {
         "schnorr_key": SEQ_PUBKEY,
     },

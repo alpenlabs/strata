@@ -8,7 +8,7 @@ from typing import Any, Callable, TypeVar
 
 from bitcoinlib.services.bitcoind import BitcoindClient
 
-from constants import ERROR_CHECKPOINT_DOESNOT_EXIST
+from constants import *
 
 
 def generate_jwt_secret() -> str:
@@ -105,6 +105,22 @@ class ManualGenBlocksConfig:
     btcrpc: BitcoindClient
     finality_depth: int
     gen_addr: str
+
+
+@dataclass
+class RollupParamsSettings:
+    block_time_sec: int
+    epoch_slots: int
+    genesis_trigger: int
+
+    # FIXME add type annotation?
+    @staticmethod
+    def new_default():
+        return RollupParamsSettings(
+            block_time_sec = DEFAULT_BLOCK_TIME_SEC,
+            epoch_slots = DEFAULT_EPOCH_SLOTS,
+            genesis_trigger = DEFAULT_GENESIS_TRIGGER_HT,
+        )
 
 
 def check_nth_checkpoint_finalized(
@@ -307,9 +323,7 @@ def generate_opxpub_from_seed(path: str) -> str:
 
 
 def generate_params(
-        block_time_sec: int,
-        epoch_slots: int,
-        genesis_trigger: int,
+        settings: RollupParamsSettings,
         seqpubkey: str,
         oppubkeys: list[str]
 ) -> str:
@@ -320,9 +334,9 @@ def generate_params(
         "-b", "regtest",
         "genparams",
         "--name", "strata",
-        "--block-time", str(block_time),
-        "--epoch-slots", str(epoch_slots),
-        "--genesis-trigger-height", str(genesis_trigger),
+        "--block-time", str(settings.block_time),
+        "--epoch-slots", str(settings.epoch_slots),
+        "--genesis-trigger-height", str(settings.genesis_trigger),
         "--proof-timeout", str(30),
         "--seqkey", seqpubkey,
     ]
@@ -338,9 +352,7 @@ def generate_params(
 
 def generate_simple_params(
         base_path: str,
-        block_time_sec: int,
-        epoch_slots: int,
-        genesis_trigger: int,
+        settings: RollupParamsSettings,
         operator_cnt: int,
 ) -> dict:
     """
@@ -349,12 +361,12 @@ def generate_simple_params(
     Result options are `params` and `opseedpaths`.
     """
     seqseedpath = os.path.join(base_path, "seqkey.bin")
-    opseedpaths = [os.path.join(base_path, "opkey%s.bin" % i for i in range(operator_cnt))]
+    opseedpaths = [os.path.join(base_path, "opkey%s.bin") % i for i in range(operator_cnt)]
     for p in [seqseedpath] + opseedpaths:
         generate_seed_at(p)
 
     seqkey = generate_seqpubkey_from_seed(seqseedpath)
     opxpubs = [generate_opxpub_from_seed(p) for p in opseedpaths]
 
-    params = generate_params(block_time_sec, epoch_slots, genesis_trigger, seqkey, opxpubs)
+    params = generate_params(settings, seqkey, opxpubs)
     return {"params": params, "opseedpaths": opseedpaths}
