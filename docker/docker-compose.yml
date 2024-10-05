@@ -135,6 +135,16 @@ services:
     ports:
       - 4782:4781
 
+  prover-client:
+    build:
+      context: ../
+      dockerfile: ./docker/prover-client/Dockerfile
+    image: "strata_prover_client:v0.1.0"
+    ports:
+      - "9851:9851"
+    networks:
+      - strata_network
+
 networks:
   strata_network:
     driver: bridge
