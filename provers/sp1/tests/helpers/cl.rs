@@ -2,10 +2,12 @@ use std::path::{Path, PathBuf};
 
 use alpen_test_utils::l2::gen_params;
 use anyhow::{Context, Result};
-use express_sp1_adapter::{SP1Host, SP1ProofInputBuilder};
+use express_proofimpl_checkpoint::L2BatchProofOutput;
+use express_sp1_adapter::{SP1Host, SP1ProofInputBuilder, SP1Verifier};
 use express_sp1_guest_builder::GUEST_CL_STF_ELF;
 use express_zkvm::{
     AggregationInput, Proof, ProverOptions, VerificationKey, ZKVMHost, ZKVMInputBuilder,
+    ZKVMVerifier,
 };
 use sp1_sdk::Prover;
 
@@ -54,11 +56,18 @@ impl ProofGenerator<u32> for ClProofGenerator {
             .write(&cl_witness)?
             .build()?;
 
-        let proof = prover
+        let (proof, vk) = prover
             .prove(proof_input)
             .context("Failed to generate CL proof")?;
 
-        Ok(proof)
+        let cpp: Vec<u8> = SP1Verifier::extract_public_output(&proof).unwrap();
+        let cpp_1: L2BatchProofOutput = borsh::from_slice(&cpp).unwrap();
+        println!(
+            "Proof for the block {:?} ckp {:?} -> ckp {:?}",
+            block_num, cpp_1.initial_snapshot, cpp_1.final_snapshot
+        );
+
+        Ok((proof, vk))
     }
 
     fn get_proof_id(&self, block_num: &u32) -> String {

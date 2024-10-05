@@ -22,6 +22,7 @@ express-proofimpl-l1-batch = { workspace = true }
 express-prover-client-rpc-api = { workspace = true }
 express-sp1-adapter = { workspace = true, features = ["prover"] }
 express-sp1-guest-builder = { path = "../../provers/sp1" }
+express-proofimpl-checkpoint = { workspace = true }
 express-zkvm = { workspace = true }
 
 anyhow = { workspace = true }

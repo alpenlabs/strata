@@ -9,6 +9,7 @@ use alpen_express_rocksdb::{
     DbOpsConfig,
 };
 use express_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
+use express_proofimpl_checkpoint::L2BatchProofOutput;
 use express_proofimpl_evm_ee_stf::ELProofInput;
 use express_proofimpl_l1_batch::L1BatchProofInput;
 use express_sp1_adapter::SP1Verifier;
@@ -149,6 +150,12 @@ where
 
             // Write each proof input
             for proof_input in l2_batch_input.get_proofs() {
+                let cpp: Vec<u8> = SP1Verifier::extract_public_output(proof_input.proof()).unwrap();
+                let cpp_1: L2BatchProofOutput = borsh::from_slice(&cpp).unwrap();
+                println!(
+                    "***Abishek*** Proof for the l2 batch ckp {:#?} -> ckp {:#?}",
+                    cpp_1.initial_snapshot, cpp_1.final_snapshot
+                );
                 input_builder.write_proof(proof_input)?;
             }
 

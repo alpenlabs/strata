@@ -87,7 +87,7 @@ pub fn gen_params() -> Params {
                     .parse()
                     .unwrap(),
             ),
-            l1_reorg_safe_depth: 3,
+            l1_reorg_safe_depth: 4,
             target_l2_batch_size: 64,
             address_length: 20,
             deposit_amount: 1_000_000_000,

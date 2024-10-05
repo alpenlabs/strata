@@ -30,4 +30,8 @@ class CLBlockWitnessDataGenerationTest(flexitest.Test):
         witness_2 = seqrpc.alp_getCLBlockWitness(2)
         assert witness_2 is not None
 
+        time.sleep(1)
+        witness_2 = seqrpc.alp_getCLBlockWitness(3)
+        assert witness_2 is not None
+
         return True

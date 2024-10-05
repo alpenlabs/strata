@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, sync::Arc};
+use std::{collections::BTreeMap, io::Write, sync::Arc};
 
 use alpen_express_btcio::{broadcaster::L1BroadcastHandle, writer::InscriptionHandle};
 use alpen_express_consensus_logic::{
@@ -379,6 +379,10 @@ impl<D: Database + Send + Sync + 'static> AlpenApiServer for AlpenRpcImpl<D> {
         let cl_block_witness = (chain_state, l2_blk_bundle.block());
         let raw_cl_block_witness = borsh::to_vec(&cl_block_witness)
             .map_err(|_| Error::Other("Failed to get raw cl block witness".to_string()))?;
+
+        use std::fs::File;
+        let mut file = File::create(format!("cl_witness_{}.bin", idx)).unwrap();
+        file.write_all(&raw_cl_block_witness).unwrap();
 
         Ok(Some(raw_cl_block_witness))
     }

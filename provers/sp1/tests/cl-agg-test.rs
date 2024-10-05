@@ -1,5 +1,5 @@
 mod helpers;
-#[cfg(all(feature = "prover", not(debug_assertions)))]
+// #[cfg(all(feature = "prover", not(debug_assertions)))]
 mod test {
     use express_proofimpl_checkpoint::L2BatchProofOutput;
     use express_sp1_adapter::SP1Verifier;

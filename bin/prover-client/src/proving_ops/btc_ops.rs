@@ -68,7 +68,7 @@ pub fn get_pm_rollup_params() -> RollupParams {
 
     // TODO: load default params from a json during compile time
     RollupParams {
-        rollup_name: "express".to_string(),
+        rollup_name: "strata".to_string(),
         block_time: 1000,
         cred_rule: block_credential::CredRule::Unchecked,
         horizon_l1_height: 3,
