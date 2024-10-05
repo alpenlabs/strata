@@ -2,15 +2,15 @@
 
 use std::{path::PathBuf, sync::Arc, time::Duration};
 
-use bitcoin::secp256k1::SECP256K1;
+use bitcoin::{
+    key::Parity,
+    secp256k1::{PublicKey, SecretKey, XOnlyPublicKey, SECP256K1},
+};
 use jsonrpsee::{core::client::async_client::Client as L2RpcClient, ws_client::WsClientBuilder};
 use strata_bridge_exec::handler::ExecHandler;
 use strata_bridge_sig_manager::prelude::SignatureManager;
 use strata_bridge_tx_builder::prelude::TxBuildContext;
-use strata_btcio::rpc::{
-    traits::{Reader, Signer},
-    BitcoinClient,
-};
+use strata_btcio::rpc::{traits::Reader, BitcoinClient};
 use strata_primitives::bridge::OperatorIdx;
 use strata_rocksdb::{
     bridge::db::{BridgeDutyIndexRocksDb, BridgeDutyRocksDb, BridgeTxRocksDb},
@@ -22,14 +22,14 @@ use strata_storage::ops::{
     bridge_duty_index::Context as DutyIndexContext,
 };
 use threadpool::ThreadPool;
-use tracing::error;
+use tracing::{error, info};
 
 use super::{constants::DB_THREAD_COUNT, task_manager::TaskManager};
 use crate::{
     args::Cli,
     constants::ROCKSDB_RETRY_COUNT,
     db::open_rocksdb_database,
-    descriptor::{check_or_load_descriptor_into_wallet, resolve_xpriv},
+    descriptor::{derive_op_purpose_xprivs, resolve_xpriv},
     rpc_server::{self, BridgeRpc},
 };
 
@@ -67,23 +67,30 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
         .await
         .expect("failed to connect to the rollup RPC server");
 
-    // Check or load the xpriv as a descriptor into the l1_rpc_client wallet
-    let xpriv = resolve_xpriv(args.xpriv_str)?;
-    check_or_load_descriptor_into_wallet(&(*l1_rpc_client), xpriv).await?;
+    // Get the keypair after deriving the wallet xpriv.
+    let master_xpriv = resolve_xpriv(args.xpriv_str)?;
+    let (_, wallet_xpriv) = derive_op_purpose_xprivs(&master_xpriv)?;
+    let keypair = wallet_xpriv.to_keypair(SECP256K1);
+
+    let mut sk = SecretKey::from_keypair(&keypair);
+
+    // adjust for parity, which should always be even
+    let (_, parity) = XOnlyPublicKey::from_keypair(&keypair);
+    if matches!(parity, Parity::Odd) {
+        sk = sk.negate();
+    };
+
+    let pubkey = PublicKey::from_secret_key(SECP256K1, &sk);
 
     // Get this client's pubkey from the bitcoin wallet.
     let operator_pubkeys = l2_rpc_client.get_active_operator_chain_pubkey_set().await?;
-    let keypair = l1_rpc_client
-        .get_xpriv()
-        .await?
-        .expect("could not get a valid xpriv from the bitcoin wallet")
-        .to_keypair(SECP256K1);
-    let pubkey = keypair.public_key();
     let own_index: OperatorIdx = operator_pubkeys
         .0
         .iter()
         .find_map(|(id, pk)| if pk == &pubkey { Some(*id) } else { None })
         .expect("could not find this operator's pubkey in the rollup pubkey table");
+
+    info!(%own_index, "got own index");
 
     // Set up the signature manager.
     let bridge_tx_db = BridgeTxRocksDb::new(rbdb, ops_config);

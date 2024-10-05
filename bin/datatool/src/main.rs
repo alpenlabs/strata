@@ -256,7 +256,7 @@ fn exec_genseqpubkey(cmd: SubcGenSeqPubkey, _ctx: &mut CmdContext) -> anyhow::Re
     let raw_buf = seq_xpub.to_x_only_pub().serialize();
     let s = base58::encode_check(&raw_buf);
 
-    eprintln!("{s}");
+    println!("{s}");
 
     Ok(())
 }
@@ -271,7 +271,7 @@ fn exec_genopxpub(cmd: SubcGenOpXpub, _ctx: &mut CmdContext) -> anyhow::Result<(
     let raw_buf = op_xpub.encode();
     let s = base58::encode_check(&raw_buf);
 
-    eprintln!("{s}");
+    println!("{s}");
 
     Ok(())
 }
@@ -417,27 +417,6 @@ fn derive_seq_xpriv(master: &Xpriv) -> anyhow::Result<Xpriv> {
 /// and used in network init.
 fn derive_op_root_xpub(master: &Xpriv) -> anyhow::Result<Xpriv> {
     derive_strata_scheme_xpriv(master, DERIV_OP_IDX)
-}
-
-/// Derives the signing and wallet xprivs for a Strata operator.
-#[allow(unused)]
-fn derive_op_purpose_xprivs(master: &Xpriv) -> anyhow::Result<(Xpriv, Xpriv)> {
-    let signing_path = DerivationPath::master().extend([
-        ChildNumber::from_hardened_idx(DERIV_BASE_IDX).unwrap(),
-        ChildNumber::from_hardened_idx(DERIV_OP_IDX).unwrap(),
-        ChildNumber::from_normal_idx(DERIV_OP_SIGNING_IDX).unwrap(),
-    ]);
-
-    let wallet_path = DerivationPath::master().extend([
-        ChildNumber::from_hardened_idx(DERIV_BASE_IDX).unwrap(),
-        ChildNumber::from_hardened_idx(DERIV_OP_IDX).unwrap(),
-        ChildNumber::from_normal_idx(DERIV_OP_WALLET_IDX).unwrap(),
-    ]);
-
-    let signing_xpriv = master.derive_priv(bitcoin::secp256k1::SECP256K1, &signing_path)?;
-    let wallet_xpriv = master.derive_priv(bitcoin::secp256k1::SECP256K1, &wallet_path)?;
-
-    Ok((signing_xpriv, wallet_xpriv))
 }
 
 /// Derives the signing and wallet xprivs for a Strata operator.

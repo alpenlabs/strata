@@ -9,11 +9,13 @@ use bitcoin::{
 use miniscript::descriptor::{checksum::desc_checksum, InnerXKey};
 use strata_btcio::rpc::{traits::Signer, types::ImportDescriptor};
 
-// TODO move some of these into a keyderiv crate
+// TODO: move some of these into a keyderiv crate
 const DERIV_BASE_IDX: u32 = 56;
 const DERIV_OP_IDX: u32 = 20;
+const DERIV_OP_SIGNING_IDX: u32 = 100;
 const DERIV_OP_WALLET_IDX: u32 = 101;
 const OPXPRIV_ENVVAR: &str = "STRATA_OP_XPRIV";
+#[allow(unused)] // TODO: uncomment when we need to store the xpriv directly in the wallet.
 const WALLET_NAME: &str = "strata";
 
 /// Resolves a key from ENV vars or CLI.
@@ -32,6 +34,26 @@ pub(crate) fn resolve_xpriv(cli_arg: Option<String>) -> anyhow::Result<Xpriv> {
     }
 }
 
+/// Derives the signing and wallet xprivs for a Strata bridge client.
+pub(crate) fn derive_op_purpose_xprivs(master: &Xpriv) -> anyhow::Result<(Xpriv, Xpriv)> {
+    let signing_path = DerivationPath::master().extend([
+        ChildNumber::from_hardened_idx(DERIV_BASE_IDX).unwrap(),
+        ChildNumber::from_hardened_idx(DERIV_OP_IDX).unwrap(),
+        ChildNumber::from_normal_idx(DERIV_OP_SIGNING_IDX).unwrap(),
+    ]);
+
+    let wallet_path = DerivationPath::master().extend([
+        ChildNumber::from_hardened_idx(DERIV_BASE_IDX).unwrap(),
+        ChildNumber::from_hardened_idx(DERIV_OP_IDX).unwrap(),
+        ChildNumber::from_normal_idx(DERIV_OP_WALLET_IDX).unwrap(),
+    ]);
+
+    let signing_xpriv = master.derive_priv(bitcoin::secp256k1::SECP256K1, &signing_path)?;
+    let wallet_xpriv = master.derive_priv(bitcoin::secp256k1::SECP256K1, &wallet_path)?;
+
+    Ok((signing_xpriv, wallet_xpriv))
+}
+
 /// Parses an [`Xpriv`] into a **Taproot** descriptor ready to be imported by Bitcoin core.
 ///
 /// # Note
@@ -39,7 +61,8 @@ pub(crate) fn resolve_xpriv(cli_arg: Option<String>) -> anyhow::Result<Xpriv> {
 /// The current descriptor handling is not easy to do as a type,
 /// hence this does all internals checks and then returns the descriptor
 /// as a [`String`].
-pub(crate) fn generate_descriptor_prom_xpriv(xpriv: Xpriv) -> anyhow::Result<String> {
+#[allow(unused)] // TODO: uncomment when we need to store the xpriv directly in the wallet.
+pub(crate) fn generate_descriptor_from_xpriv(xpriv: Xpriv) -> anyhow::Result<String> {
     let hardened_path = DerivationPath::master().extend([
         ChildNumber::from_hardened_idx(DERIV_BASE_IDX).expect("bad child index"),
         ChildNumber::from_hardened_idx(DERIV_OP_IDX).expect("bad child index"),
@@ -58,6 +81,7 @@ pub(crate) fn generate_descriptor_prom_xpriv(xpriv: Xpriv) -> anyhow::Result<Str
 }
 
 /// Checks if the wallet has the descriptor or loads it into the wallet.
+#[allow(unused)] // TODO: uncomment when we need to store the xpriv directly in the wallet.
 pub(crate) async fn check_or_load_descriptor_into_wallet(
     l1_client: &impl Signer,
     xpriv: Xpriv,
@@ -72,7 +96,7 @@ pub(crate) async fn check_or_load_descriptor_into_wallet(
         Ok(())
     } else {
         // load the descriptor
-        let descriptor = generate_descriptor_prom_xpriv(xpriv)?;
+        let descriptor = generate_descriptor_from_xpriv(xpriv)?;
         let descriptors = vec![ImportDescriptor {
             desc: descriptor,
             active: Some(true),
@@ -116,7 +140,7 @@ mod tests {
     fn parse_xpriv_to_descriptor_string() {
         let expected = "tr([e61b318f/56'/20']tprv8ZgxMBicQKsPd4arFr7sKjSnKFDVMR2JHw9Y8L9nXN4kiok4u28LpHijEudH3mMYoL4pM5UL9Bgdz2M4Cy8EzfErmU9m86ZTw6hCzvFeTg7/101/*)#zz430whl";
         let xpriv = XPRIV_STR.parse::<Xpriv>().unwrap();
-        let got = generate_descriptor_prom_xpriv(xpriv).unwrap();
+        let got = generate_descriptor_from_xpriv(xpriv).unwrap();
         assert_eq!(got, expected);
     }
 
@@ -129,7 +153,7 @@ mod tests {
         let client = BitcoinClient::new(url, user, password).unwrap();
 
         let xpriv = XPRIV_STR.parse::<Xpriv>().unwrap();
-        let descriptor_string = generate_descriptor_prom_xpriv(xpriv).unwrap();
+        let descriptor_string = generate_descriptor_from_xpriv(xpriv).unwrap();
         let timestamp = "now".to_owned();
         let list_descriptors = vec![ImportDescriptor {
             desc: descriptor_string,
