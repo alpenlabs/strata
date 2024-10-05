@@ -1,32 +1,28 @@
+mod helpers;
 // NOTE: SP1 prover runs in release mode only; therefore run the tests on release mode only
 #[cfg(all(feature = "prover", not(debug_assertions)))]
 mod test {
-    use strata_proofimpl_evm_ee_stf::{ELProofInput, ELProofPublicParams};
-    use strata_sp1_adapter::{SP1Host, SP1ProofInputBuilder, SP1Verifier};
-    use strata_sp1_guest_builder::GUEST_EVM_EE_STF_ELF;
-    use strata_zkvm::{ZKVMHost, ZKVMInputBuilder, ZKVMVerifier};
+    use strata_proofimpl_evm_ee_stf::ELProofPublicParams;
+    use strata_sp1_adapter::SP1Verifier;
+    use strata_zkvm::{ProverOptions, ZKVMVerifier};
 
-    const ENCODED_PROVER_INPUT: &[u8] =
-        include_bytes!("../../test-util/el_block_witness_input.bin");
+    use crate::helpers::{ElProofGenerator, ProofGenerator};
 
     #[test]
     fn test_reth_stf_guest_code_trace_generation() {
-        if cfg!(debug_assertions) {
-            panic!("SP1 prover runs in release mode only");
-        }
+        sp1_sdk::utils::setup_logger();
+        let height = 1;
 
-        let input: ELProofInput = bincode::deserialize(ENCODED_PROVER_INPUT).unwrap();
-        let prover = SP1Host::init(GUEST_EVM_EE_STF_ELF.into(), Default::default());
+        let prover_ops = ProverOptions {
+            enable_compression: true,
+            stark_to_snark_conversion: false,
+            use_mock_prover: true,
+        };
+        let el_prover = ElProofGenerator::new();
 
-        let proof_input = SP1ProofInputBuilder::new()
-            .write(&input)
-            .unwrap()
-            .build()
-            .unwrap();
+        let (proof, _) = el_prover.get_proof(&height, &prover_ops).unwrap();
 
-        let (proof, _) = prover.prove(proof_input).expect("Failed to generate proof");
-
-        SP1Verifier::extract_public_output::<ELProofPublicParams>(&proof)
+        let _ = SP1Verifier::extract_public_output::<ELProofPublicParams>(&proof)
             .expect("Failed to extract public outputs");
     }
 }

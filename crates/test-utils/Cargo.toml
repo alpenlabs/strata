@@ -5,9 +5,12 @@ version = "0.1.0"
 
 [dependencies]
 strata-btcio.workspace = true
+strata-chaintsn.workspace = true
 strata-consensus-logic.workspace = true
 strata-db = { workspace = true, features = ["stubs"] }
 strata-primitives.workspace = true
+strata-proofimpl-cl-stf.workspace = true
+strata-proofimpl-evm-ee-stf.workspace = true
 strata-state.workspace = true
 strata-storage.workspace = true
 strata-tx-parser.workspace = true
@@ -18,5 +21,7 @@ bitcoin = { workspace = true, features = ["rand-std"] }
 hex.workspace = true
 musig2.workspace = true
 rand.workspace = true
+revm.workspace = true
 rockbound.workspace = true
+serde_json.workspace = true
 threadpool.workspace = true

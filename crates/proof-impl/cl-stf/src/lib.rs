@@ -46,7 +46,7 @@ fn verify_l2_block(
 }
 
 /// Generates an execution segment from the given ELProof public parameters.
-fn reconstruct_exec_segment(el_proof_pp: &ELProofPublicParams) -> ExecSegment {
+pub fn reconstruct_exec_segment(el_proof_pp: &ELProofPublicParams) -> ExecSegment {
     // create_evm_extra_payload
     let update_input = UpdateInput::new(
         el_proof_pp.block_idx,

@@ -1,8 +1,8 @@
+use sha2::{Digest, Sha256};
 use strata_primitives::params::RollupParams;
 use strata_proofimpl_checkpoint::{ChainStateSnapshot, L2BatchProofOutput};
 use strata_proofimpl_cl_stf::{verify_and_transition, ChainState, L2Block};
 use strata_proofimpl_evm_ee_stf::ELProofPublicParams;
-use sha2::{Digest, Sha256};
 
 mod vks;
 

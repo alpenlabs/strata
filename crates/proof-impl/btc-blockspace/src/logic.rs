@@ -40,3 +40,21 @@ pub fn process_blockspace_proof(input: &BlockspaceProofInput) -> BlockspaceProof
         rollup_params_commitment,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use strata_test_utils::{bitcoin::get_btc_chain, l2::gen_params};
+
+    use super::{process_blockspace_proof, BlockspaceProofInput};
+    #[test]
+    fn test_process_blockspace_proof() {
+        let params = gen_params();
+        let rollup_params = params.rollup();
+        let btc_block = get_btc_chain().get_block(40321).clone();
+        let input = BlockspaceProofInput {
+            block: btc_block,
+            rollup_params: rollup_params.clone(),
+        };
+        let _ = process_blockspace_proof(&input);
+    }
+}
