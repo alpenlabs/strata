@@ -153,22 +153,21 @@ fn apply_op_to_chainstate(op: &StateOp, state: &mut ChainState) {
             state.l1_state.safe_block = header_record;
         }
 
-        StateOp::ConsumeDepositIntent(to_drop) => {
+        StateOp::ConsumeDepositIntent(to_drop_idx) => {
             let deposits = state.exec_env_state.pending_deposits_mut();
 
             let front_idx = deposits
                 .front_idx()
                 .expect("stateop: empty deposit intent queue");
 
-            // check if we have the required deposit
-            if *to_drop > front_idx {
-                panic!("stateop: unable to consume deposit intent");
-            }
-
-            let n_drop = front_idx - to_drop;
+            // deposit intent indices processed sequentially, without any gaps
+            let to_drop_count = to_drop_idx
+                .checked_sub(front_idx) // ensures to_drop_idx >= front_idx
+                .expect("stateop: unable to consume deposit intent")
+                + 1;
 
             deposits
-                .pop_front_n_vec(n_drop as usize)
+                .pop_front_n_vec(to_drop_count as usize) // ensures to_drop_idx < front_idx + len
                 .expect("stateop: unable to consume deposit intent");
         }
 

@@ -153,58 +153,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "alpen-express-crypto"
-version = "0.1.0"
-dependencies = [
- "alpen-express-primitives",
- "borsh",
- "secp256k1",
- "sha2",
-]
-
-[[package]]
-name = "alpen-express-primitives"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "arbitrary",
- "bincode",
- "bitcoin",
- "borsh",
- "digest 0.10.7",
- "hex",
- "musig2",
- "rand",
- "reth-primitives",
- "secp256k1",
- "serde",
- "serde_json",
- "sha2",
- "thiserror",
- "tracing",
-]
-
-[[package]]
-name = "alpen-express-state"
-version = "0.1.0"
-dependencies = [
- "alpen-express-crypto",
- "alpen-express-primitives",
- "arbitrary",
- "bitcoin",
- "borsh",
- "digest 0.10.7",
- "ethnum",
- "express-bridge-tx-builder",
- "express-zkvm",
- "hex",
- "num_enum 0.7.3",
- "serde",
- "sha2",
- "tracing",
-]
-
-[[package]]
 name = "android-tzdata"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1166,74 +1114,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b90ca2580b73ab6a1f724b76ca11ab632df820fd6040c336200d2c1df7b3c82c"
 
 [[package]]
-name = "express-bridge-tx-builder"
-version = "0.1.0"
-dependencies = [
- "alpen-express-primitives",
- "bitcoin",
- "lazy_static",
- "musig2",
- "serde",
- "thiserror",
-]
-
-[[package]]
-name = "express-proofimpl-btc-blockspace"
-version = "0.1.0"
-dependencies = [
- "alpen-express-primitives",
- "alpen-express-state",
- "bitcoin",
- "borsh",
- "express-bridge-tx-builder",
- "serde",
- "sha2",
- "strata-tx-parser",
-]
-
-[[package]]
-name = "express-proofimpl-checkpoint"
-version = "0.1.0"
-dependencies = [
- "alpen-express-primitives",
- "alpen-express-state",
- "anyhow",
- "bitcoin",
- "borsh",
- "ethnum",
- "express-proofimpl-btc-blockspace",
- "express-proofimpl-l1-batch",
- "express-zkvm",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "express-proofimpl-l1-batch"
-version = "0.1.0"
-dependencies = [
- "alpen-express-primitives",
- "alpen-express-state",
- "anyhow",
- "bitcoin",
- "borsh",
- "ethnum",
- "express-proofimpl-btc-blockspace",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "express-zkvm"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "arbitrary",
- "borsh",
- "serde",
-]
-
-[[package]]
 name = "eyre"
 version = "0.6.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1360,19 +1240,19 @@ dependencies = [
 name = "guest-sp1-checkpoint"
 version = "0.1.0"
 dependencies = [
- "alpen-express-primitives",
- "alpen-express-state",
  "bincode",
  "bitcoin",
  "borsh",
- "express-proofimpl-btc-blockspace",
- "express-proofimpl-checkpoint",
- "express-proofimpl-l1-batch",
- "express-zkvm",
  "sha2",
  "snark-bn254-verifier",
  "sp1-core-machine",
  "sp1-zkvm",
+ "strata-primitives",
+ "strata-proofimpl-btc-blockspace",
+ "strata-proofimpl-checkpoint",
+ "strata-proofimpl-l1-batch",
+ "strata-state",
+ "strata-zkvm",
  "substrate-bn",
 ]
 
@@ -3264,18 +3144,140 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
+name = "strata-bridge-tx-builder"
+version = "0.1.0"
+dependencies = [
+ "bitcoin",
+ "lazy_static",
+ "musig2",
+ "serde",
+ "strata-primitives",
+ "thiserror",
+]
+
+[[package]]
+name = "strata-crypto"
+version = "0.1.0"
+dependencies = [
+ "borsh",
+ "secp256k1",
+ "sha2",
+ "strata-primitives",
+]
+
+[[package]]
+name = "strata-primitives"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arbitrary",
+ "bincode",
+ "bitcoin",
+ "borsh",
+ "digest 0.10.7",
+ "hex",
+ "musig2",
+ "rand",
+ "reth-primitives",
+ "secp256k1",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror",
+ "tracing",
+]
+
+[[package]]
+name = "strata-proofimpl-btc-blockspace"
+version = "0.1.0"
+dependencies = [
+ "bitcoin",
+ "borsh",
+ "serde",
+ "sha2",
+ "strata-bridge-tx-builder",
+ "strata-primitives",
+ "strata-state",
+ "strata-tx-parser",
+]
+
+[[package]]
+name = "strata-proofimpl-checkpoint"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bitcoin",
+ "borsh",
+ "ethnum",
+ "serde",
+ "serde_json",
+ "strata-primitives",
+ "strata-proofimpl-btc-blockspace",
+ "strata-proofimpl-l1-batch",
+ "strata-state",
+ "strata-zkvm",
+]
+
+[[package]]
+name = "strata-proofimpl-l1-batch"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bitcoin",
+ "borsh",
+ "ethnum",
+ "serde",
+ "serde_json",
+ "strata-primitives",
+ "strata-proofimpl-btc-blockspace",
+ "strata-state",
+]
+
+[[package]]
+name = "strata-state"
+version = "0.1.0"
+dependencies = [
+ "arbitrary",
+ "bitcoin",
+ "borsh",
+ "digest 0.10.7",
+ "ethnum",
+ "hex",
+ "num_enum 0.7.3",
+ "serde",
+ "sha2",
+ "strata-bridge-tx-builder",
+ "strata-crypto",
+ "strata-primitives",
+ "strata-zkvm",
+ "tracing",
+]
+
+[[package]]
 name = "strata-tx-parser"
 version = "0.1.0"
 dependencies = [
- "alpen-express-primitives",
- "alpen-express-state",
  "anyhow",
  "arbitrary",
  "bitcoin",
  "borsh",
  "hex",
+ "musig2",
+ "strata-bridge-tx-builder",
+ "strata-primitives",
+ "strata-state",
  "thiserror",
  "tracing",
+]
+
+[[package]]
+name = "strata-zkvm"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arbitrary",
+ "borsh",
+ "serde",
 ]
 
 [[package]]
