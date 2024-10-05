@@ -12761,6 +12761,7 @@ dependencies = [
  "secp256k1",
  "serde_json",
  "strata-primitives",
+ "strata-sp1-guest-builder",
  "terrors",
 ]
 
