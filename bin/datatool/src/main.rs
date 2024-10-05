@@ -143,7 +143,11 @@ pub struct SubcGenOpXpub {
     description = "generates network params from inputs"
 )]
 pub struct SubcGenParams {
-    #[argh(option, description = "output file path .json (default stdout)")]
+    #[argh(
+        option,
+        description = "output file path .json (default stdout)",
+        short = 'o'
+    )]
     output: Option<PathBuf>,
 
     #[argh(
