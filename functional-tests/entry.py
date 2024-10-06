@@ -291,6 +291,7 @@ class ProverClientFactory(flexitest.Factory):
         rpc_url = f"ws://localhost:{rpc_port}"
 
         # fmt: off
+        print("Prover inited with the seq url ", sequencer_url)
         cmd = [
             "strata-prover-client",
             "--rpc-port", str(rpc_port),
@@ -403,7 +404,8 @@ class BasicEnvConfig(flexitest.EnvConfig):
             prover_client_fac = ctx.get_factory("prover_client")
             prover_client = prover_client_fac.create_prover_client(
                 bitcoind_config,
-                f"http://0.0.0.0:{seq_port}",
+                # f"http://0.0.0.0:{seq_port}",
+                f"http://localhost:{seq_port}",
                 f"http://localhost:{reth_rpc_http_port}",
             )
             svcs["prover_client"] = prover_client

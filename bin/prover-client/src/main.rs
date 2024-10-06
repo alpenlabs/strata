@@ -36,12 +36,12 @@ async fn main() {
     info!("running alpen express prover client in dev mode");
 
     let args: Args = argh::from_env();
-    println!("got the args {:?}", args);
 
     let el_client = HttpClientBuilder::default()
         .build(args.get_reth_rpc_url())
         .expect("failed to connect to the el client");
 
+    println!("Running the sequer with {:?} ", args.get_sequencer_rpc_url());
     let cl_client = HttpClientBuilder::default()
         .build(args.get_sequencer_rpc_url())
         .expect("failed to connect to the el client");

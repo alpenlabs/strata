@@ -11,23 +11,23 @@ use crate::{input::SP1ProofInputBuilder, utils::get_proving_keys};
 #[derive(Clone)]
 pub struct SP1Host {
     prover_options: ProverOptions,
-    proving_key: SP1ProvingKey,
-    prover_client: Arc<ProverClient>,
-    vkey: SP1VerifyingKey,
+    // proving_key: SP1ProvingKey,
+    // prover_client: Arc<ProverClient>,
+    // vkey: SP1VerifyingKey,
 }
 
 impl ZKVMHost for SP1Host {
     type Input<'a> = SP1ProofInputBuilder;
     fn init(guest_code: Vec<u8>, prover_options: ProverOptions) -> Self {
-        let prover_client = ProverClient::new();
-        let (proving_key, vkey) =
-            get_proving_keys(&prover_client, &guest_code, prover_options.use_cached_keys);
+        // let prover_client = ProverClient::new();
+        // let (proving_key, vkey) =
+        //     get_proving_keys(&prover_client, &guest_code, prover_options.use_cached_keys);
 
         SP1Host {
             prover_options,
-            prover_client: Arc::new(prover_client),
-            proving_key,
-            vkey,
+            // prover_client: Arc::new(prover_client),
+            // proving_key,
+            // vkey,
         }
     }
 
@@ -44,11 +44,13 @@ impl ZKVMHost for SP1Host {
 
             return Ok((mock_proof, mock_vk));
         }
-        // let client = ProverClient::new();
-        let client = self.prover_client.clone();
+        let client = ProverClient::new();
+        // let client = self.prover_client.clone();
+        let (proving_key, vk) = client.setup(&vec![]);
+
 
         // Start proving
-        let mut prover = client.prove(&self.proving_key, prover_input);
+        let mut prover = client.prove(&proving_key, prover_input);
         if self.prover_options.enable_compression {
             prover = prover.compressed();
         }
@@ -60,7 +62,7 @@ impl ZKVMHost for SP1Host {
 
         // Proof serialization
         let serialized_proof = bincode::serialize(&proof)?;
-        let verification_key = bincode::serialize(&self.vkey)?;
+        let verification_key = bincode::serialize(&vk)?;
 
         Ok((
             Proof::new(serialized_proof),

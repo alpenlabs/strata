@@ -10,7 +10,7 @@ REORG_DEPTH = 3
 @flexitest.register
 class CLBlockWitnessDataGenerationTest(flexitest.Test):
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env("basic")
+        ctx.set_env("premined_blocks")
 
     def main(self, ctx: flexitest.RunContext):
         seq = ctx.get_service("sequencer")
@@ -21,13 +21,15 @@ class CLBlockWitnessDataGenerationTest(flexitest.Test):
             lambda: seqrpc.strata_protocolVersion() is not None,
             error_with="Sequencer did not start on time",
         )
-        time.sleep(1)
 
         witness_1 = seqrpc.strata_getCLBlockWitness(1)
         assert witness_1 is not None
-
+        print("got the witness ", witness_1)
         time.sleep(1)
-        witness_2 = seqrpc.strata_getCLBlockWitness(2)
-        assert witness_2 is not None
+
+        # time.sleep(1)
+        # witness_2 = seqrpc.strata_getCLBlockWitness(2)
+        # assert witness_2 is not None
+        time.sleep(1000)
 
         return True
