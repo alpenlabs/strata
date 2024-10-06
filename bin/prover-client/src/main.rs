@@ -2,58 +2,102 @@
 
 use std::sync::Arc;
 
+use strata_btcio::rpc::BitcoinClient;
+use strata_common::logging;
 use args::Args;
-use config::EL_START_BLOCK_HEIGHT;
+use dispatcher::TaskDispatcher;
+use strata_sp1_adapter::SP1Host;
+use strata_zkvm::ProverOptions;
 use jsonrpsee::http_client::HttpClientBuilder;
 use manager::ProverManager;
+use proving_ops::{
+    btc_ops::BtcOperations, checkpoint_ops::CheckpointOperations, cl_ops::ClOperations,
+    el_ops::ElOperations, l1_batch_ops::L1BatchOperations, l2_batch_ops::L2BatchOperations,
+};
 use rpc_server::{ProverClientRpc, RpcContext};
-use strata_common::logging;
-use strata_sp1_adapter::SP1Host;
 use task::TaskTracker;
-use task_dispatcher::ELBlockProvingTaskScheduler;
 use tracing::info;
 
 mod args;
 mod config;
 mod db;
+mod dispatcher;
 mod errors;
 mod manager;
 mod primitives;
 mod prover;
+mod proving_ops;
 mod rpc_server;
 mod task;
-mod task_dispatcher;
 
 #[tokio::main]
 async fn main() {
     logging::init();
-    info!("running alpen strata prover client in dev mode");
+    info!("running alpen express prover client in dev mode");
 
     let args: Args = argh::from_env();
-    let task_tracker = Arc::new(TaskTracker::new());
 
-    let el_rpc_client = HttpClientBuilder::default()
+    let el_client = HttpClientBuilder::default()
         .build(args.get_reth_rpc_url())
         .expect("failed to connect to the el client");
 
-    let el_proving_task_scheduler = ELBlockProvingTaskScheduler::new(
-        el_rpc_client,
-        task_tracker.clone(),
-        EL_START_BLOCK_HEIGHT,
+    let cl_client = HttpClientBuilder::default()
+        .build(args.get_sequencer_rpc_url())
+        .expect("failed to connect to the el client");
+
+    let btc_client = Arc::new(
+        BitcoinClient::new(
+            args.get_btc_rpc_url(),
+            args.bitcoind_user.clone(),
+            args.bitcoind_password.clone(),
+        )
+        .unwrap(),
     );
-    let rpc_context = RpcContext::new(el_proving_task_scheduler.clone());
-    let prover_manager: ProverManager<SP1Host> = ProverManager::new(task_tracker);
+
+    let task_tracker = Arc::new(TaskTracker::new());
+
+    // Create L1 operations
+    let btc_ops = BtcOperations::new(btc_client.clone());
+    let btc_dispatcher = TaskDispatcher::new(btc_ops, task_tracker.clone());
+
+    // Create EL  operations
+    let el_ops = ElOperations::new(el_client.clone());
+    let el_dispatcher = TaskDispatcher::new(el_ops, task_tracker.clone());
+
+    let cl_ops = ClOperations::new(cl_client.clone(), Arc::new(el_dispatcher.clone()));
+    let cl_dispatcher = TaskDispatcher::new(cl_ops, task_tracker.clone());
+
+    let l1_batch_ops = L1BatchOperations::new(Arc::new(btc_dispatcher.clone()), btc_client.clone());
+    let l1_batch_dispatcher = TaskDispatcher::new(l1_batch_ops, task_tracker.clone());
+
+    let l2_batch_ops = L2BatchOperations::new(Arc::new(cl_dispatcher.clone()).clone());
+    let l2_batch_dispatcher = TaskDispatcher::new(l2_batch_ops, task_tracker.clone());
+
+    let checkpoint_ops = CheckpointOperations::new(
+        Arc::new(l1_batch_dispatcher.clone()),
+        Arc::new(l2_batch_dispatcher.clone()),
+    );
+
+    let checkpoint_dispatcher = TaskDispatcher::new(checkpoint_ops, task_tracker.clone());
+
+    let rpc_context = RpcContext::new(
+        btc_dispatcher.clone(),
+        el_dispatcher.clone(),
+        cl_dispatcher.clone(),
+        l1_batch_dispatcher.clone(),
+        l2_batch_dispatcher.clone(),
+        checkpoint_dispatcher.clone(),
+    );
+
+    let prover_options = ProverOptions {
+        use_mock_prover: false,
+        enable_compression: true,
+        ..Default::default()
+    };
+    let prover_manager: ProverManager<SP1Host> = ProverManager::new(task_tracker, prover_options);
 
     // run prover manager in background
     tokio::spawn(async move { prover_manager.run().await });
-
-    // run el proving task dispatcher
-    tokio::spawn(async move {
-        el_proving_task_scheduler
-            .clone()
-            .listen_for_new_blocks()
-            .await
-    });
 
     // run rpc server
     let rpc_url = args.get_dev_rpc_url();
