@@ -4,9 +4,12 @@ use strata_zkvm::{ProverOptions, ZKVMHost};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ProofVm {
+    BtcProving,
     ELProving,
     CLProving,
     CLAggregation,
+    L1Batch,
+    Checkpoint,
 }
 
 pub struct ZkVMManager<Vm: ZKVMHost> {

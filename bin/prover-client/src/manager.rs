@@ -2,10 +2,11 @@ use std::sync::Arc;
 
 use strata_zkvm::{ProverOptions, ZKVMHost};
 use tokio::time::{sleep, Duration};
+use tracing::info;
 
 use crate::{
-    config::PROVER_MANAGER_WAIT_TIME,
-    primitives::tasks_scheduler::{ProofSubmissionStatus, ProvingTaskStatus},
+    config::PROVER_MANAGER_INTERVAL,
+    primitives::tasks_scheduler::{ProofSubmissionStatus, ProvingTask, ProvingTaskStatus},
     prover::Prover,
     task::TaskTracker,
 };
@@ -23,10 +24,10 @@ impl<Vm> ProverManager<Vm>
 where
     Vm: ZKVMHost,
 {
-    pub fn new(task_tracker: Arc<TaskTracker>) -> Self {
+    pub fn new(task_tracker: Arc<TaskTracker>, prover_options: ProverOptions) -> Self {
         Self {
             task_tracker,
-            prover: Prover::new(ProverOptions::default()),
+            prover: Prover::new(prover_options),
         }
     }
 
@@ -35,7 +36,7 @@ where
         loop {
             self.process_pending_tasks().await;
             self.track_proving_progress().await;
-            sleep(Duration::from_secs(PROVER_MANAGER_WAIT_TIME)).await;
+            sleep(Duration::from_secs(PROVER_MANAGER_INTERVAL)).await;
         }
     }
 
@@ -53,7 +54,11 @@ where
             self.prover.submit_witness(task.id, task.prover_input);
             if self.prover.start_proving(task.id).is_err() {
                 self.task_tracker
-                    .update_task_status(task.id, ProvingTaskStatus::Pending)
+                    .update_status(task.id, ProvingTaskStatus::Pending)
+                    .await;
+            } else {
+                self.task_tracker
+                    .update_status(task.id, ProvingTaskStatus::Processing)
                     .await;
             }
         }
@@ -70,17 +75,29 @@ where
             .await;
 
         for task in in_progress_tasks {
-            if let Ok(ProofSubmissionStatus::Success) = self
+            match self
                 .prover
                 .get_proof_submission_status_and_remove_on_success(task.id)
             {
-                self.task_tracker
-                    .update_task_status(task.id, ProvingTaskStatus::Completed)
-                    .await;
+                Ok(status) => self.apply_proof_status_update(task, status).await,
+                Err(e) => {
+                    tracing::error!(
+                        "Failed to get proof submission status for task {}: {}",
+                        task.id,
+                        e
+                    );
+                }
+            }
+        }
+    }
 
-                // TODO: Implement post-processing hooks.
-                // Example: If the current task is EL proving, this proof should be added
-                // to the witness of the CL proving task to unblock the CL proving task.
+    async fn apply_proof_status_update(&self, task: ProvingTask, status: ProofSubmissionStatus) {
+        match status {
+            ProofSubmissionStatus::Success(proof) => {
+                self.task_tracker.mark_task_completed(task.id, proof).await;
+            }
+            ProofSubmissionStatus::ProofGenerationInProgress => {
+                info!("Task {} proof generation in progress", task.id);
             }
         }
     }

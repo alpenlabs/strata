@@ -1,12 +1,12 @@
 # Express Prover Client
-The `strata-prover-client` handles fetching the witness from the EE and Sequencer, generating proofs, and storing the generated proofs. 
+The `express-prover-client` handles fetching the witness from the EE and Sequencer, generating proofs, and storing the generated proofs. 
 
 ## Building the Project
 
 To build the project, run the following command:
 
 ```bash
-cargo run --bin strata-prover-client -F "prover" -- [OPTIONS]
+cargo run --bin express-prover-client -F "prover" -- [OPTIONS]
 ```
 
 Available Options
@@ -18,7 +18,7 @@ Available Options
 
 Example Usage
 ```bash
-cargo run --bin strata-prover-client -F "prover" -- \
+cargo run --bin express-prover-client -F "prover" -- \
   --rpc-port 8545 \
   --sequencer-rpc http://sequencer.local:8545 \
   --reth-rpc http://reth.local:8545

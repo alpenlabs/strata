@@ -286,7 +286,7 @@ async fn fetch_and_process_block(
 }
 
 /// Gets the [`HeaderVerificationState`] for the particular block
-async fn get_verification_state(
+pub async fn get_verification_state(
     client: &impl Reader,
     height: u64,
     params: &BtcParams,
