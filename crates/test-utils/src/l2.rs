@@ -96,7 +96,6 @@ pub fn gen_params() -> Params {
                     .parse()
                     .unwrap(),
             )),
-            verify_proofs: false,
             dispatch_assignment_dur: 64,
             proof_publish_mode: ProofPublishMode::Strict,
             max_deposits_in_block: 16,

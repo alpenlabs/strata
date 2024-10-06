@@ -241,18 +241,23 @@ pub fn init_engine_controller(
 }
 
 /// Get an address controlled by sequencer's bitcoin wallet
-pub async fn generate_sequencer_address(bitcoin_client: &BitcoinClient) -> anyhow::Result<Address> {
+pub async fn generate_sequencer_address(
+    bitcoin_client: &BitcoinClient,
+    timeout: u64,
+    poll_interval: u64,
+) -> anyhow::Result<Address> {
     let mut last_err = None;
-    tokio::time::timeout(Duration::from_secs(10), async {
+    tokio::time::timeout(Duration::from_secs(timeout), async {
         loop {
             match bitcoin_client.get_new_address().await {
                 Ok(address) => return address,
                 Err(err) => {
                     warn!(err = ?err, "failed to generate address");
                     last_err.replace(err);
-                    continue;
                 }
             }
+            // Sleep for a while just to prevent excessive continuous calls in short time
+            tokio::time::sleep(Duration::from_millis(poll_interval)).await;
         }
     })
     .await

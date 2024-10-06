@@ -687,11 +687,9 @@ impl StrataSequencerApiServer for SequencerServerImpl {
             .ok_or(Error::MissingCheckpointInDb(idx))?;
         debug!(%idx, "found checkpoint in db");
 
-        if self.params.rollup().verify_proofs {
-            let checkpoint = entry.clone().into_batch_checkpoint();
-            verify_proof(&checkpoint, self.params.rollup())
-                .map_err(|e| Error::InvalidProof(idx, e.to_string()))?;
-        }
+        let checkpoint = entry.clone().into_batch_checkpoint();
+        verify_proof(&checkpoint, self.params.rollup())
+            .map_err(|e| Error::InvalidProof(idx, e.to_string()))?;
 
         // If proof is not pending error out
         if entry.proving_status != CheckpointProvingStatus::PendingProof {

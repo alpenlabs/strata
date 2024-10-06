@@ -65,7 +65,6 @@ fn get_deprecated_fallback() -> RollupParams {
                 .parse()
                 .unwrap(),
         )), // TODO: update this with vk for checkpoint proof
-        verify_proofs: true,
         dispatch_assignment_dur: 64,
         proof_publish_mode: ProofPublishMode::Timeout(5),
         max_deposits_in_block: 16,

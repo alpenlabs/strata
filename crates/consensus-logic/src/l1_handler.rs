@@ -12,7 +12,7 @@ use strata_primitives::{
     block_credential::CredRule,
     buf::Buf32,
     l1::{L1BlockManifest, L1TxProof},
-    params::{Params, ProofPublishMode, RollupParams},
+    params::{Params, RollupParams},
     vk::RollupVerifyingKey,
 };
 use strata_risc0_adapter::Risc0Verifier;
@@ -170,24 +170,14 @@ pub fn verify_proof(
     rollup_params: &RollupParams,
 ) -> anyhow::Result<()> {
     let rollup_vk = rollup_params.rollup_vk;
-    let verify_proofs = rollup_params.verify_proofs;
-
     let checkpoint_idx = checkpoint.batch_info().idx();
-
-    if !verify_proofs {
-        warn!("Not verifying proofs since verify_proofs flag is false");
-        return Ok(());
-    }
-
     let proof = checkpoint.proof();
 
     // FIXME: we are accepting empty proofs for now (devnet) to reduce dependency on the prover
     // infra.
-    if let ProofPublishMode::Timeout(_) = rollup_params.proof_publish_mode {
-        if proof.is_empty() {
-            warn!(%checkpoint_idx, "verifying empty proof as correct");
-            return Ok(());
-        }
+    if rollup_params.proof_publish_mode.allow_empty() && proof.is_empty() {
+        warn!(%checkpoint_idx, "verifying empty proof as correct");
+        return Ok(());
     }
 
     let public_params_raw = borsh::to_vec(&checkpoint).unwrap();

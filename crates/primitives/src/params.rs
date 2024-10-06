@@ -53,9 +53,6 @@ pub struct RollupParams {
     // FIXME which proof?  should this be `checkpoint_vk`?
     pub rollup_vk: RollupVerifyingKey,
 
-    /// Whether to verify the proofs from L1 or not.
-    pub verify_proofs: bool,
-
     /// Number of Bitcoin blocks a withdrawal dispatch assignment is valid for.
     pub dispatch_assignment_dur: u32,
 
@@ -169,6 +166,12 @@ pub enum ProofPublishMode {
 
     /// Expect and wait for non-empty proofs
     Strict,
+}
+
+impl ProofPublishMode {
+    pub fn allow_empty(&self) -> bool {
+        !matches!(self, Self::Strict)
+    }
 }
 
 /// Client sync parameters that are used to make the network work but don't
