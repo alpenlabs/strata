@@ -20,6 +20,7 @@ strata-proofimpl-btc-blockspace = { workspace = true }
 strata-proofimpl-evm-ee-stf = { workspace = true }
 strata-proofimpl-l1-batch = { workspace = true }
 strata-prover-client-rpc-api = { workspace = true }
+strata-proofimpl-checkpoint = { workspace = true }
 strata-sp1-adapter = { workspace = true, features = ["prover"] }
 strata-sp1-guest-builder = { path = "../../provers/sp1" }
 strata-zkvm = { workspace = true }
@@ -44,6 +45,9 @@ bitcoin = { workspace = true, features = ["rand-std"] }
 hex.workspace = true
 musig2.workspace = true
 rand.workspace = true
+sp1-sdk = "2.0.0"
+num-bigint = "0.4.6"
+num-traits = "0.2.19"
 
 [features]
 prover = []

@@ -1,5 +1,5 @@
-
 use std::sync::Arc;
+
 use anyhow::Ok;
 use sp1_sdk::{ProverClient, SP1ProvingKey, SP1VerifyingKey};
 use strata_zkvm::{Proof, ProverOptions, VerificationKey, ZKVMHost, ZKVMInputBuilder};
@@ -66,6 +66,11 @@ impl ZKVMHost for SP1Host {
             Proof::new(serialized_proof),
             VerificationKey(verification_key),
         ))
+    }
+
+    fn get_verification_key(&self) -> VerificationKey {
+        let verification_key = bincode::serialize(&self.vkey).unwrap();
+        VerificationKey::new(verification_key)
     }
 }
 

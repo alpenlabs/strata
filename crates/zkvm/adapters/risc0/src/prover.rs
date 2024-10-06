@@ -67,6 +67,10 @@ impl ZKVMHost for RiscZeroHost {
             VerificationKey(verification_key),
         ))
     }
+
+    fn get_verification_key(&self) -> VerificationKey {
+        todo!()
+    }
 }
 
 #[cfg(test)]

@@ -3,17 +3,23 @@ use std::{
     sync::{Arc, RwLock},
 };
 
+use num_bigint::BigUint;
+use num_traits::Num;
+use sp1_sdk::{HashableKey, SP1VerifyingKey};
 use strata_db::traits::{ProverDataProvider, ProverDataStore, ProverDatabase};
+use strata_proofimpl_checkpoint::{CheckpointProofInput, L2BatchProofOutput};
+use strata_proofimpl_evm_ee_stf::ELProofInput;
+use strata_proofimpl_l1_batch::L1BatchProofOutput;
 use strata_rocksdb::{
     prover::db::{ProofDb, ProverDB},
     DbOpsConfig,
 };
-use strata_proofimpl_evm_ee_stf::ELProofInput;
+use strata_sp1_adapter::SP1Verifier;
 use strata_sp1_guest_builder::{
     GUEST_BTC_BLOCKSPACE_ELF, GUEST_CHECKPOINT_ELF, GUEST_CL_AGG_ELF, GUEST_CL_STF_ELF,
     GUEST_EVM_EE_STF_ELF, GUEST_L1_BATCH_ELF,
 };
-use strata_zkvm::{Proof, ProverOptions, ZKVMHost, ZKVMInputBuilder};
+use strata_zkvm::{Proof, ProverOptions, ZKVMHost, ZKVMInputBuilder, ZKVMVerifier};
 use tracing::{error, info};
 use uuid::Uuid;
 
@@ -152,10 +158,55 @@ where
             input_builder.build()?
         }
 
-        ZKVMInput::Checkpoint(checkpoint_input) => Vm::Input::new()
-            .write(&get_pm_rollup_params())?
-            .write(&checkpoint_input.l1_batch_id)?
-            .build()?,
+        ZKVMInput::Checkpoint(checkpoint_input) => {
+            let l1_batch_proof = checkpoint_input
+                .l1_batch_proof
+                .ok_or_else(|| anyhow::anyhow!("L1 Batch Proof Not Ready"))?;
+
+            let l2_batch_proof = checkpoint_input
+                .l2_batch_proof
+                .ok_or_else(|| anyhow::anyhow!("L2 Batch Proof Not Ready"))?;
+
+            let l1_batch_pp: L1BatchProofOutput = {
+                let raw_l1_batch_pp: Vec<u8> =
+                    SP1Verifier::extract_public_output(l1_batch_proof.proof())?;
+                borsh::from_slice(&raw_l1_batch_pp)?
+            };
+
+            let l2_batch_pp: L2BatchProofOutput = {
+                let raw_l2_batch_pp: Vec<u8> =
+                    SP1Verifier::extract_public_output(l2_batch_proof.proof())?;
+                borsh::from_slice(&raw_l2_batch_pp)?
+            };
+
+            let vk = {
+                let zkvm_vkey = vm.get_verification_key();
+                let sp1_vkey: SP1VerifyingKey = bincode::deserialize(zkvm_vkey.as_bytes())?;
+
+                BigUint::from_str_radix(
+                    sp1_vkey
+                        .bytes32()
+                        .strip_prefix("0x")
+                        .expect("Verification key to bytes infallible"),
+                    16,
+                )?
+                .to_bytes_be()
+            };
+
+            let checkpoint_proof_input = CheckpointProofInput {
+                l1_state: l1_batch_pp,
+                l2_state: l2_batch_pp,
+                vk,
+            };
+
+            let mut input_builder = Vm::Input::new();
+            input_builder.write(&get_pm_rollup_params())?;
+            input_builder.write_borsh(&checkpoint_proof_input)?;
+            input_builder.write_proof(l1_batch_proof)?;
+            input_builder.write_proof(l2_batch_proof)?;
+
+            input_builder.build()?
+        }
     };
 
     let (proof, vk) = vm.prove(zkvm_input)?;
