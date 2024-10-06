@@ -34,8 +34,7 @@ impl ProofGenerator<(u64, u64)> for L2BatchProofGenerator {
                 .cl_proof_generator
                 .get_proof(&block_num, prover_options)?;
 
-            let output_raw: Vec<u8> = SP1Verifier::extract_public_output(&proof)?;
-            let _output: L2BatchProofOutput = borsh::from_slice(&output_raw).unwrap();
+            let _output: L2BatchProofOutput = SP1Verifier::extract_borsh_public_output(&proof)?;
             agg_proof_inputs.push(AggregationInput::new(proof, vk));
         }
 

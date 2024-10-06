@@ -29,8 +29,7 @@ mod test {
             .get_proof(&(l1_start_height, l1_end_height), &prover_options)
             .unwrap();
 
-        let raw_output = SP1Verifier::extract_public_output::<Vec<u8>>(&proof)
+        let _: L1BatchProofOutput = SP1Verifier::extract_borsh_public_output(&proof)
             .expect("Failed to extract public outputs");
-        let _: L1BatchProofOutput = borsh::from_slice(&raw_output).unwrap();
     }
 }

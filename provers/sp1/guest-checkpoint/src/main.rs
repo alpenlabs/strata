@@ -1,10 +1,10 @@
-use strata_primitives::{params::RollupParams, vk::RollupVerifyingKey};
-use strata_proofimpl_checkpoint::{self, process_checkpoint_proof, CheckpointProofInput};
-use strata_zkvm::Proof;
 use sha2::{Digest, Sha256};
 use snark_bn254_verifier::Groth16Verifier;
 use sp1_core_machine::io::SP1PublicValues;
 use sp1_zkvm::io;
+use strata_primitives::{params::RollupParams, vk::RollupVerifyingKey};
+use strata_proofimpl_checkpoint::{self, process_checkpoint_proof};
+use strata_zkvm::Proof;
 use substrate_bn::Fr;
 
 mod vks;
@@ -16,22 +16,21 @@ fn main() {
         _ => panic!("Need SP1VerifyingKey"),
     };
 
-    let slice = io::read_vec();
-    let input: CheckpointProofInput = borsh::from_slice(&slice).unwrap();
-
     // verify l1 proof
     let l1_batch_vk = vks::GUEST_L1_BATCH_ELF_ID;
-    let l1_batch_pp_digest =
-        Sha256::digest(bincode::serialize(&borsh::to_vec(&input.l1_state).unwrap()).unwrap());
+    let l1_batch_pp_raw = io::read_vec();
+    let l1_batch_pp = borsh::from_slice(&l1_batch_pp_raw).unwrap();
+    let l1_batch_pp_digest = Sha256::digest(&l1_batch_pp_raw);
     sp1_zkvm::lib::verify::verify_sp1_proof(l1_batch_vk, &l1_batch_pp_digest.into());
 
     // verify l2 proof
     let l2_batch_vk = vks::GUEST_CL_AGG_ELF_ID;
-    let l2_batch_pp_digest =
-        Sha256::digest(bincode::serialize(&borsh::to_vec(&input.l2_state).unwrap()).unwrap());
+    let l2_batch_pp_raw = io::read_vec();
+    let l2_batch_pp = borsh::from_slice(&l2_batch_pp_raw).unwrap();
+    let l2_batch_pp_digest = Sha256::digest(l2_batch_pp_raw);
     sp1_zkvm::lib::verify::verify_sp1_proof(l2_batch_vk, &l2_batch_pp_digest.into());
 
-    let (output, prev_checkpoint) = process_checkpoint_proof(&input.l1_state, &input.l2_state);
+    let (output, prev_checkpoint) = process_checkpoint_proof(&l1_batch_pp, &l2_batch_pp);
 
     if let Some(prev_checkpoint) = prev_checkpoint {
         let (checkpoint, proof) = prev_checkpoint;
@@ -42,7 +41,7 @@ fn main() {
         ));
     }
 
-    sp1_zkvm::io::commit(&borsh::to_vec(&output).unwrap());
+    sp1_zkvm::io::commit_slice(&borsh::to_vec(&output).unwrap());
 }
 
 // Copied from ~/.sp1/circuits/v2.0.0/groth16_vk.bin

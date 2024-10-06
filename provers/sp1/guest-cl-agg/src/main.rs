@@ -36,19 +36,17 @@ fn main() {
         rollup_params_commitment,
     };
 
-    sp1_zkvm::io::commit(&borsh::to_vec(&public_params).unwrap());
+    sp1_zkvm::io::commit_slice(&borsh::to_vec(&public_params).unwrap());
 }
 
 fn read_and_validate_next_proof() -> L2BatchProofOutput {
     let cl_block_vkey = vks::GUEST_CL_STF_ELF_ID;
-    let cl_proof_pp: Vec<u8> = sp1_zkvm::io::read();
+    let cl_proof_pp_raw = sp1_zkvm::io::read_vec();
 
     // Verify the CL block proof
-    let public_values_digest = Sha256::digest(&cl_proof_pp);
+    let public_values_digest = Sha256::digest(&cl_proof_pp_raw);
     sp1_zkvm::lib::verify::verify_sp1_proof(cl_block_vkey, &public_values_digest.into());
-
-    let cl_proof_pp_serialized: Vec<u8> = bincode::deserialize(&cl_proof_pp).unwrap();
-    borsh::from_slice(&cl_proof_pp_serialized).unwrap()
+    borsh::from_slice(&cl_proof_pp_raw).unwrap()
 }
 
 fn validate_proof_consistency(

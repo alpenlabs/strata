@@ -44,15 +44,13 @@ impl ProofGenerator<u64> for ClProofGenerator {
         let l2_block = l2_segment.get_block(*block_num);
         let pre_state = l2_segment.get_pre_state(*block_num);
 
-        let cl_witness = borsh::to_vec(&(pre_state, l2_block)).unwrap();
-
         // Generate CL proof
         let prover = SP1Host::init(self.get_elf().into(), *prover_options);
 
         let proof_input = SP1ProofInputBuilder::new()
             .write(rollup_params)?
+            .write_borsh(&(pre_state, l2_block))?
             .write_proof(agg_input)?
-            .write(&cl_witness)?
             .build()?;
 
         let proof = prover
