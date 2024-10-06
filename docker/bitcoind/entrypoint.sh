@@ -86,8 +86,16 @@ if [[ $VAL -eq 0 ]]; then
     bcli generatetoaddress 120 "$ADDRESS"
 fi
 
-wait -n
-
-exit $?
+# generate single blocks
+if [ ! -z $GENERATE_BLOCKS ];then
+while :
+do
+    bcli generatetoaddress 1 "$ADDRESS"
+    sleep $GENERATE_BLOCKS
+done
+else
+    wait -n
+    exit $?
+fi
 
 

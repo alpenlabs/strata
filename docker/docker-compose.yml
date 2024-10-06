@@ -43,8 +43,9 @@ services:
       # - ./configs/jwt.seq.hex:/app/jwt.hex
     command:
       - "--enable-witness-gen"
+      - "--custom-chain dev"
     ports:
-      # - 8551:8551
+      - 8551:8551
       - 8545:8545
       - 8546:8546
 
@@ -111,6 +112,7 @@ services:
       BITCOIND_RPC_USER: rpcuser
       BITCOIND_RPC_PASSWORD: rpcpassword
       BITCOIND_WALLET: default
+      GENERATE_BLOCKS: 1
     container_name: strata_bitcoind
     volumes:
       - ./.data/data-bitcoind:/root/.bitcoin/
