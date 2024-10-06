@@ -1,10 +1,12 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
+use bitcoin::block;
 use sp1_sdk::Prover;
 use strata_sp1_adapter::{SP1Host, SP1ProofInputBuilder};
 use strata_sp1_guest_builder::GUEST_CL_STF_ELF;
-use strata_test_utils::l2::gen_params;
+use strata_state::header::L2Header;
+use strata_test_utils::{evm_ee::L2Segment, l2::gen_params};
 use strata_zkvm::{
     AggregationInput, Proof, ProverOptions, VerificationKey, ZKVMHost, ZKVMInputBuilder,
 };
@@ -21,29 +23,28 @@ impl ClProofGenerator {
     }
 }
 
-impl ProofGenerator<u32> for ClProofGenerator {
+impl ProofGenerator<u64> for ClProofGenerator {
     fn gen_proof(
         &self,
-        block_num: &u32,
+        block_num: &u64,
         prover_options: &ProverOptions,
     ) -> Result<(Proof, VerificationKey)> {
         // Generate EL proof required for aggregation
-        let witness_file = format!("witness_{}.json", block_num);
-        let witness_path = get_witness_dir("el").join(&witness_file);
         let (el_proof, vk) = self
             .el_proof_generator
-            .get_proof(&witness_path, prover_options)?;
+            .get_proof(block_num, prover_options)?;
 
         let agg_input = AggregationInput::new(el_proof, vk);
 
         // Read CL witness data
-        let cl_witness_file = format!("cl_witness_{}.bin", block_num);
-        let cl_witness_path = get_witness_dir("cl").join(&cl_witness_file);
-        let cl_witness = std::fs::read(&cl_witness_path)
-            .with_context(|| format!("Failed to read CL witness file {:?}", cl_witness_path))?;
-
         let params = gen_params();
         let rollup_params = params.rollup();
+
+        let l2_segment = L2Segment::initialize_from_saved_evm_ee_data(*block_num);
+        let l2_block = l2_segment.get_block(*block_num);
+        let pre_state = l2_segment.get_pre_state(*block_num);
+
+        let cl_witness = borsh::to_vec(&(pre_state, l2_block)).unwrap();
 
         // Generate CL proof
         let prover = SP1Host::init(self.get_elf().into(), *prover_options);
@@ -61,16 +62,11 @@ impl ProofGenerator<u32> for ClProofGenerator {
         Ok(proof)
     }
 
-    fn get_proof_id(&self, block_num: &u32) -> String {
+    fn get_proof_id(&self, block_num: &u64) -> String {
         format!("cl_block_{}", block_num)
     }
 
     fn get_elf(&self) -> &[u8] {
         GUEST_CL_STF_ELF
     }
-}
-
-pub fn get_witness_dir(dir: &str) -> PathBuf {
-    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    manifest_dir.join(format!("../test-util/{}", dir))
 }

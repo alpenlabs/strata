@@ -1,5 +1,8 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use bitcoin::key::Secp256k1;
+use musig2::secp256k1::SecretKey;
+use rand::{rngs::StdRng, SeedableRng};
 use strata_consensus_logic::genesis::{make_genesis_block, make_genesis_chainstate};
 use strata_primitives::{
     block_credential,
@@ -67,8 +70,8 @@ pub fn gen_l2_chain(parent: Option<SignedL2BlockHeader>, blocks_num: usize) -> V
     blocks
 }
 
-pub fn gen_params() -> Params {
-    let opkeys = make_dummy_operator_pubkeys();
+pub fn gen_params_with_seed(seed: u64) -> Params {
+    let opkeys = make_dummy_operator_pubkeys_with_seed(seed);
     Params {
         rollup: RollupParams {
             rollup_name: "strata".to_string(),
@@ -109,6 +112,11 @@ pub fn gen_params() -> Params {
     }
 }
 
+pub fn gen_params() -> Params {
+    // TODO: create a random seed if we really need random op_pubkeys every time this is called
+    gen_params_with_seed(0)
+}
+
 pub fn gen_client_state(params: Option<&Params>) -> ClientState {
     let params = match params {
         Some(p) => p,
@@ -120,9 +128,12 @@ pub fn gen_client_state(params: Option<&Params>) -> ClientState {
     )
 }
 
-fn make_dummy_operator_pubkeys() -> OperatorPubkeys {
-    // TODO don't use dummy zero keys
-    OperatorPubkeys::new(Buf32::zero(), Buf32::zero())
+pub fn make_dummy_operator_pubkeys_with_seed(seed: u64) -> OperatorPubkeys {
+    let secp = Secp256k1::new();
+    let mut rng = StdRng::seed_from_u64(seed);
+    let sk = SecretKey::new(&mut rng);
+    let (pk, _) = sk.x_only_public_key(&secp);
+    OperatorPubkeys::new(pk.into(), pk.into())
 }
 
 pub fn get_genesis_chainstate() -> ChainState {

@@ -1,5 +1,5 @@
-use strata_proofimpl_checkpoint::L2BatchProofOutput;
 use sha2::{Digest, Sha256};
+use strata_proofimpl_checkpoint::L2BatchProofOutput;
 
 mod vks;
 
@@ -16,9 +16,9 @@ fn main() {
 
     let rollup_params_commitment = cl_proof_pp_start.rollup_params_commitment();
 
-    for _ in 0..num_agg_inputs - 1 {
+    for _ in 0..(num_agg_inputs - 1) {
         let next_proof_pp = read_and_validate_next_proof();
-        // validate_proof_consistency(&cl_proof_pp_prev, &next_proof_pp);
+        validate_proof_consistency(&cl_proof_pp_prev, &next_proof_pp);
         assert_eq!(
             rollup_params_commitment,
             next_proof_pp.rollup_params_commitment()
@@ -51,14 +51,13 @@ fn read_and_validate_next_proof() -> L2BatchProofOutput {
     borsh::from_slice(&cl_proof_pp_serialized).unwrap()
 }
 
-// TODO: Debug and fix this
-// fn validate_proof_consistency(
-//     current_proof_cs_snap: &L2BatchProofOutput,
-//     next_proof_cs_snap: &L2BatchProofOutput,
-// ) {
-//     assert_eq!(
-//         current_proof_cs_snap.final_snapshot.hash, // post-state root of the current proof
-//         next_proof_cs_snap.initial_snapshot.hash,  // initial state root of the next proof
-//         "State root mismatch between proofs"
-//     );
-// }
+fn validate_proof_consistency(
+    current_proof_cs_snap: &L2BatchProofOutput,
+    next_proof_cs_snap: &L2BatchProofOutput,
+) {
+    assert_eq!(
+        current_proof_cs_snap.final_snapshot.hash, // post-state root of the current proof
+        next_proof_cs_snap.initial_snapshot.hash,  // initial state root of the next proof
+        "State root mismatch between proofs"
+    );
+}

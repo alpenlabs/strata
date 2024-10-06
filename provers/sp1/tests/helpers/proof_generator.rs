@@ -49,6 +49,9 @@ pub trait ProofGenerator<T> {
 
     /// Returns the ELF binary (used for verification).
     fn get_elf(&self) -> &[u8];
+
+    // Simulate the proof. This is different than running the in the MOCK_PROVER mode
+    // fn simulate(&self, input: T) -> U
 }
 
 /// Returns the cache directory for proofs.

@@ -5,6 +5,7 @@ use rand::RngCore;
 
 pub mod bitcoin;
 pub mod bridge;
+pub mod evm_ee;
 pub mod l2;
 
 const ARB_GEN_LEN: usize = 1 << 24; // 16 MiB

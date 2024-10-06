@@ -5,6 +5,7 @@ use sp1_sdk::Prover;
 use strata_proofimpl_evm_ee_stf::ELProofInput;
 use strata_sp1_adapter::{SP1Host, SP1ProofInputBuilder};
 use strata_sp1_guest_builder::GUEST_EVM_EE_STF_ELF;
+use strata_test_utils::evm_ee::EvmSegment;
 use strata_zkvm::{Proof, ProverOptions, VerificationKey, ZKVMHost, ZKVMInputBuilder};
 
 use crate::helpers::proof_generator::ProofGenerator;
@@ -17,18 +18,17 @@ impl ElProofGenerator {
     }
 }
 
-impl ProofGenerator<PathBuf> for ElProofGenerator {
+impl ProofGenerator<u64> for ElProofGenerator {
     fn gen_proof(
         &self,
-        witness_path: &PathBuf,
+        block_num: &u64,
         prover_options: &ProverOptions,
     ) -> Result<(Proof, VerificationKey)> {
-        let json_file = std::fs::read_to_string(witness_path)
-            .with_context(|| format!("Failed to read JSON file at {:?}", witness_path))?;
-        let el_proof_input: ELProofInput =
-            serde_json::from_str(&json_file).context("Failed to parse JSON into ELProofInput")?;
-
         let prover = SP1Host::init(self.get_elf().into(), *prover_options);
+
+        let el_proof_input = EvmSegment::initialize_from_saved_ee_data(*block_num, *block_num)
+            .get_input(block_num)
+            .clone();
 
         let proof_input = SP1ProofInputBuilder::new()
             .write(&el_proof_input)?
@@ -41,9 +41,8 @@ impl ProofGenerator<PathBuf> for ElProofGenerator {
         Ok(proof)
     }
 
-    fn get_proof_id(&self, witness_path: &PathBuf) -> String {
-        let file_stem = witness_path.file_stem().unwrap().to_string_lossy();
-        format!("el_{}", file_stem)
+    fn get_proof_id(&self, block_num: &u64) -> String {
+        format!("el_{}", block_num)
     }
 
     fn get_elf(&self) -> &[u8] {
