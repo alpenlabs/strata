@@ -80,9 +80,10 @@ if [[ $VAL -eq 0 ]]; then
     echo "Generated new address: $ADDRESS"
     echo $ADDRESS > /root/.bitcoin/bitcoin-address
 
-    # Generate 102 blocks to the new address (101 to mature the coinbase transactions)
-    echo "Generating 102 blocks..."
-    bcli generatetoaddress 102 "$ADDRESS"
+    # Generate 120 blocks to the new address
+    # (101 to mature the coinbase transactions and a few more for rollup genesis)
+    echo "Generating 120 blocks..."
+    bcli generatetoaddress 120 "$ADDRESS"
 fi
 
 wait -n

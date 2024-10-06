@@ -12,8 +12,8 @@ use strata_state::bridge_duties::BridgeDutyStatus;
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "stratabridge"))]
 #[cfg_attr(feature = "client", rpc(server, client, namespace = "stratabridge"))]
 pub trait StrataBridgeControlApi {
-    /// Get the bridge protocol version.
-    #[method(name = "getProtocolVersion")]
+    /// Get the bridge client version.
+    #[method(name = "getClientVersion")]
     async fn get_client_version(&self) -> RpcResult<String>;
 
     /// Get the uptime for the client in seconds assuming the clock is strictly monotonically
