@@ -21,6 +21,15 @@ pub(crate) struct Cli {
     )]
     pub xpriv_str: Option<String>,
 
+    #[argh(
+        option,
+        description = "host to run the rpc server on (default: 0.0.0.0)"
+    )]
+    pub rpc_host: Option<String>,
+
+    #[argh(option, description = "port to run the rpc server on (default: 4781)")]
+    pub rpc_port: Option<u32>,
+
     #[argh(option, description = "url for the bitcoin RPC client")]
     pub btc_url: String,
 

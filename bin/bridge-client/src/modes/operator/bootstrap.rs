@@ -27,7 +27,7 @@ use tracing::{error, info};
 use super::{constants::DB_THREAD_COUNT, task_manager::TaskManager};
 use crate::{
     args::Cli,
-    constants::ROCKSDB_RETRY_COUNT,
+    constants::{DEFAULT_RPC_HOST, DEFAULT_RPC_PORT, ROCKSDB_RETRY_COUNT},
     db::open_rocksdb_database,
     descriptor::{derive_op_purpose_xprivs, resolve_xpriv},
     rpc_server::{self, BridgeRpc},
@@ -70,8 +70,8 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
     // Get the keypair after deriving the wallet xpriv.
     let master_xpriv = resolve_xpriv(args.xpriv_str)?;
     let (_, wallet_xpriv) = derive_op_purpose_xprivs(&master_xpriv)?;
-    let keypair = wallet_xpriv.to_keypair(SECP256K1);
 
+    let keypair = wallet_xpriv.to_keypair(SECP256K1);
     let mut sk = SecretKey::from_keypair(&keypair);
 
     // adjust for parity, which should always be even
@@ -116,8 +116,12 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
     // Spawn RPC server.
     let bridge_rpc = BridgeRpc::new(bridge_duty_db_ops.clone());
 
+    let rpc_host = args.rpc_host.as_deref().unwrap_or(DEFAULT_RPC_HOST);
+    let rpc_port = args.rpc_port.unwrap_or(DEFAULT_RPC_PORT);
+    let rpc_addr = format!("{rpc_host}:{rpc_port}");
+
     let rpc_task = tokio::spawn(async move {
-        if let Err(e) = rpc_server::start(&bridge_rpc).await {
+        if let Err(e) = rpc_server::start(&bridge_rpc, rpc_addr.as_str()).await {
             error!(error = %e, "could not start RPC server");
         }
     });

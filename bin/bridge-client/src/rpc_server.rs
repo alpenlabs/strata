@@ -15,9 +15,7 @@ use strata_storage::ops::bridge_duty::BridgeDutyOps;
 use tokio::sync::oneshot;
 use tracing::{info, warn};
 
-use crate::constants::{RPC_PORT, RPC_SERVER};
-
-pub(crate) async fn start<T>(rpc_impl: &T) -> anyhow::Result<()>
+pub(crate) async fn start<T>(rpc_impl: &T, rpc_addr: &str) -> anyhow::Result<()>
 where
     T: StrataBridgeControlApiServer
         + StrataBridgeNetworkApiServer
@@ -36,9 +34,9 @@ where
     rpc_module.merge(network_api).context("merge network api")?;
     rpc_module.merge(tracker_api).context("merge network api")?;
 
-    let addr = format!("{RPC_SERVER}:{RPC_PORT}");
+    info!("Starting bridge RPC server at: {rpc_addr}");
     let rpc_server = jsonrpsee::server::ServerBuilder::new()
-        .build(&addr)
+        .build(&rpc_addr)
         .await
         .expect("build bridge rpc server");
 
@@ -48,7 +46,7 @@ where
     // At the moment, the impl below just stops the client from stopping.
     let (_stop_tx, stop_rx): (oneshot::Sender<bool>, oneshot::Receiver<bool>) = oneshot::channel();
 
-    info!("bridge RPC server started at: {addr}");
+    info!("bridge RPC server started at: {rpc_addr}");
 
     let _ = stop_rx.await;
     info!("stopping RPC server");
