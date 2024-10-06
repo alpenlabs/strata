@@ -17,6 +17,7 @@ mod test {
             enable_compression: true,
             stark_to_snark_conversion: false,
             use_mock_prover: false,
+            use_cached_keys: true,
         };
 
         let el_prover = ElProofGenerator::new();

@@ -51,7 +51,7 @@ impl ProvingOperations for ElOperations {
         let block_hash = block.header.hash.context("Block hash missing")?;
         let witness: ELProofInput = self
             .el_client
-            .request("alpee_getBlockWitness", rpc_params![block_hash, true])
+            .request("strataee_getBlockWitness", rpc_params![block_hash, true])
             .await?;
         debug!("Fetched EL block witness for block {}", block_num);
         Ok(bincode::serialize(&witness).unwrap())

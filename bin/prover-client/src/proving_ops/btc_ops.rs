@@ -13,7 +13,6 @@ use musig2::secp256k1::SecretKey;
 use rand::{rngs::StdRng, SeedableRng};
 use async_trait::async_trait;
 use bitcoin::Block;
-use strata_tx_parser::filter::TxFilterRule;
 use tracing::debug;
 use uuid::Uuid;
 

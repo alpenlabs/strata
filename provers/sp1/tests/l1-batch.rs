@@ -22,6 +22,7 @@ mod test {
             use_mock_prover: false,
             stark_to_snark_conversion: false,
             enable_compression: true,
+            use_cached_keys: true,
         };
 
         let btc_proof_generator = BtcBlockProofGenerator::new();

@@ -49,11 +49,14 @@ impl ProvingOperations for ClOperations {
 
     async fn fetch_input(&self, block_num: u64) -> Result<Self::Input, anyhow::Error> {
         debug!(%block_num, "Fetching CL block input");
+        println!("**Abishek ping***");
         let witness: Option<Vec<u8>> = self
             .cl_client
-            .request("alp_getCLBlockWitness", rpc_params![block_num])
-            .await?;
-        let cl_raw_witness = witness.context("Failed to get the CL witness")?;
+            .request("strata_getCLBlockWitness", rpc_params![block_num])
+            .await.unwrap();
+        // let cl_raw_witness = witness.context("Failed to get the CL witness")?;
+        let cl_raw_witness = witness.unwrap();
+        println!("**Abishek pong***");
 
         Ok(CLProverInput {
             block_num,

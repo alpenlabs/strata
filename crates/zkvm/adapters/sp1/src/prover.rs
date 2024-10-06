@@ -1,23 +1,33 @@
+
+use std::sync::Arc;
 use anyhow::Ok;
-use sp1_sdk::ProverClient;
+use sp1_sdk::{ProverClient, SP1ProvingKey, SP1VerifyingKey};
 use strata_zkvm::{Proof, ProverOptions, VerificationKey, ZKVMHost, ZKVMInputBuilder};
 
-use crate::input::SP1ProofInputBuilder;
+use crate::{input::SP1ProofInputBuilder, utils::get_proving_keys};
 
 /// A host for the `SP1` zkVM that stores the guest program in ELF format.
 /// The `SP1Host` is responsible for program execution and proving
 #[derive(Clone)]
 pub struct SP1Host {
-    elf: Vec<u8>,
     prover_options: ProverOptions,
+    proving_key: SP1ProvingKey,
+    prover_client: Arc<ProverClient>,
+    vkey: SP1VerifyingKey,
 }
 
 impl ZKVMHost for SP1Host {
     type Input<'a> = SP1ProofInputBuilder;
     fn init(guest_code: Vec<u8>, prover_options: ProverOptions) -> Self {
+        let prover_client = ProverClient::new();
+        let (proving_key, vkey) =
+            get_proving_keys(&prover_client, &guest_code, prover_options.use_cached_keys);
+
         SP1Host {
-            elf: guest_code,
             prover_options,
+            prover_client: Arc::new(prover_client),
+            proving_key,
+            vkey,
         }
     }
 
@@ -28,12 +38,17 @@ impl ZKVMHost for SP1Host {
         // Init the prover
         if self.prover_options.use_mock_prover {
             std::env::set_var("SP1_PROVER", "mock");
+
+            let mock_proof = Proof::new(vec![1, 2, 3, 4, 5]);
+            let mock_vk = VerificationKey::new(vec![1, 2, 3, 4, 5]);
+
+            return Ok((mock_proof, mock_vk));
         }
-        let client = ProverClient::new();
-        let (pk, vk) = client.setup(&self.elf);
+        // let client = ProverClient::new();
+        let client = self.prover_client.clone();
 
         // Start proving
-        let mut prover = client.prove(&pk, prover_input);
+        let mut prover = client.prove(&self.proving_key, prover_input);
         if self.prover_options.enable_compression {
             prover = prover.compressed();
         }
@@ -45,7 +60,7 @@ impl ZKVMHost for SP1Host {
 
         // Proof serialization
         let serialized_proof = bincode::serialize(&proof)?;
-        let verification_key = bincode::serialize(&vk)?;
+        let verification_key = bincode::serialize(&self.vkey)?;
 
         Ok((
             Proof::new(serialized_proof),
@@ -133,6 +148,7 @@ mod tests {
             enable_compression: false,
             use_mock_prover: false,
             stark_to_snark_conversion: true,
+            use_cached_keys: true,
         };
         let zkvm = SP1Host::init(TEST_ELF.to_vec(), prover_options);
 

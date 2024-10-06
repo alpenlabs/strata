@@ -36,6 +36,7 @@ async fn main() {
     info!("running alpen express prover client in dev mode");
 
     let args: Args = argh::from_env();
+    println!("got the args {:?}", args);
 
     let el_client = HttpClientBuilder::default()
         .build(args.get_reth_rpc_url())

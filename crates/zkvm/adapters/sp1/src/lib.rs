@@ -4,6 +4,7 @@ mod prover;
 pub use prover::SP1Host;
 
 mod input;
+mod utils;
 pub use input::SP1ProofInputBuilder;
 
 mod verifier;

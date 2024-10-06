@@ -25,6 +25,7 @@ mod test {
             use_mock_prover: false,
             stark_to_snark_conversion: false,
             enable_compression: false,
+            use_cached_keys: true,
         };
         let prover = RiscZeroHost::init(GUEST_RISC0_BTC_BLOCKSPACE_ELF.into(), prover_options);
 

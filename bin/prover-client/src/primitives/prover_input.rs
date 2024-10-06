@@ -2,7 +2,6 @@ use strata_primitives::params::RollupParams;
 use bitcoin::Block;
 use strata_zkvm::AggregationInput;
 use serde::{Deserialize, Serialize};
-use strata_tx_parser::filter::TxFilterRule;
 
 use super::vms::ProofVm;
 use crate::proving_ops::{
