@@ -30,9 +30,11 @@ where
 
     let control_api = StrataBridgeControlApiServer::into_rpc(rpc_impl.clone());
     let network_api = StrataBridgeNetworkApiServer::into_rpc(rpc_impl.clone());
+    let tracker_api = StrataBridgeTrackerApiServer::into_rpc(rpc_impl.clone());
 
     rpc_module.merge(control_api).context("merge control api")?;
     rpc_module.merge(network_api).context("merge network api")?;
+    rpc_module.merge(tracker_api).context("merge network api")?;
 
     let addr = format!("{RPC_SERVER}:{RPC_PORT}");
     let rpc_server = jsonrpsee::server::ServerBuilder::new()
