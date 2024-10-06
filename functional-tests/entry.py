@@ -283,12 +283,13 @@ class ProverClientFactory(flexitest.Factory):
     @flexitest.with_ectx("ctx")
     def create_prover_client(
         self,
+        bitcoind_config: BitcoinRpcConfig,
         sequencer_url: str,
         reth_url: str,
         ctx: flexitest.EnvContext,
     ):
         datadir = ctx.make_service_dir("prover_client")
-        rpc_port = self.next_port()
+        # rpc_port = self.next_port()
         logfile = os.path.join(datadir, "service.log")
 
         rpc_port = self.next_port()
@@ -299,10 +300,12 @@ class ProverClientFactory(flexitest.Factory):
             "strata-prover-client",
             "--rpc-port", str(rpc_port),
             "--sequencer-rpc", sequencer_url,
-            "--reth-rpc", reth_url
+            "--reth-rpc", reth_url,
+            "--bitcoind-url", bitcoind_config["bitcoind_sock"],
+            "--bitcoind-user", bitcoind_config["bitcoind_user"],
+            "--bitcoind-password", bitcoind_config["bitcoind_pass"],
         ]
         # fmt: on
-
         props = {"rpc_port": rpc_port}
 
         svc = flexitest.service.ProcService(props, cmd, stdout=logfile)
@@ -404,6 +407,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
 
             prover_client_fac = ctx.get_factory("prover_client")
             prover_client = prover_client_fac.create_prover_client(
+                bitcoind_config,
                 f"http://localhost:{seq_port}",
                 f"http://localhost:{reth_rpc_http_port}",
             )
@@ -543,7 +547,7 @@ def main(argv):
         "premined_blocks": BasicEnvConfig(101),
         "fast_batches": BasicEnvConfig(101, rollup_params=FAST_BATCH_ROLLUP_PARAMS),
         "hub1": HubNetworkEnvConfig(),
-        "prover": BasicEnvConfig(enable_prover_client=True),
+        "prover": BasicEnvConfig(101, enable_prover_client=True),
     }
 
     rt = flexitest.TestRuntime(global_envs, datadir_root, factories)

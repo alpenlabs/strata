@@ -28,11 +28,11 @@ pub trait StrataProverClientApi {
     #[method(name = "proveL2Batch")]
     async fn prove_l2_batch(&self, l2_range: (u64, u64)) -> RpcResult<Uuid>;
 
-    /// Start proving the given cl block
+    /// Start proving the given checkpoint info
     #[method(name = "proveCheckpoint")]
     async fn prove_checkpoint(&self, checkpoint: RpcCheckpointInfo) -> RpcResult<Uuid>;
 
-    /// Start proving the given cl block
+    /// Start proving the given checkpoint info
     #[method(name = "proveCheckpointRaw")]
     async fn prove_checkpoint_raw(
         &self,

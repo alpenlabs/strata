@@ -51,8 +51,8 @@ impl ProvingOperations for ClOperations {
         debug!(%block_num, "Fetching CL block input");
         let witness: Option<Vec<u8>> = self
             .cl_client
-            .request("alp_getCLBlockWitness", rpc_params![block_num])
-            .await?;
+            .request("strata_getCLBlockWitness", rpc_params![block_num])
+            .await.unwrap();
         let cl_raw_witness = witness.context("Failed to get the CL witness")?;
 
         Ok(CLProverInput {

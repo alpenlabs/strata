@@ -58,6 +58,7 @@ pub struct ProverOptions {
     pub enable_compression: bool,
     pub use_mock_prover: bool,
     pub stark_to_snark_conversion: bool,
+    pub use_cached_keys: bool,
 }
 
 // Compact representation of the prover options
@@ -173,6 +174,7 @@ impl Default for ProverOptions {
             enable_compression: false,
             use_mock_prover: true,
             stark_to_snark_conversion: false,
+            use_cached_keys: true,
         }
     }
 }

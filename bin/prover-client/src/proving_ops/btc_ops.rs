@@ -13,7 +13,6 @@ use musig2::secp256k1::SecretKey;
 use rand::{rngs::StdRng, SeedableRng};
 use async_trait::async_trait;
 use bitcoin::Block;
-use strata_tx_parser::filter::TxFilterRule;
 use tracing::debug;
 use uuid::Uuid;
 
@@ -77,8 +76,8 @@ fn gen_params_with_seed(seed: u64) -> Params {
             rollup_name: "strata".to_string(),
             block_time: 1000,
             cred_rule: block_credential::CredRule::Unchecked,
-            horizon_l1_height: 40318,
-            genesis_l1_height: 40320, // we have mainnet blocks from this height test-utils
+            horizon_l1_height: 3,
+            genesis_l1_height: 5, // we have mainnet blocks from this height test-utils
             operator_config: OperatorConfig::Static(vec![opkeys]),
             evm_genesis_block_hash: Buf32(
                 "0x37ad61cff1367467a98cf7c54c4ac99e989f1fbb1bc1e646235e90c065c565ba"
@@ -90,7 +89,7 @@ fn gen_params_with_seed(seed: u64) -> Params {
                     .parse()
                     .unwrap(),
             ),
-            l1_reorg_safe_depth: 3,
+            l1_reorg_safe_depth: 4,
             target_l2_batch_size: 64,
             address_length: 20,
             deposit_amount: 1_000_000_000,

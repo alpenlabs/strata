@@ -12,3 +12,7 @@ strata-proofimpl-evm-ee-stf = { path = "../../../crates/proof-impl/evm-ee-stf" }
 
 [patch.crates-io]
 secp256k1 = { git = "https://github.com/sp1-patches/rust-secp256k1", branch = "patch-secp256k1-v0.29.1" }
+tiny-keccak = { git = "https://github.com/sp1-patches/tiny-keccak", branch = "patch-v2.0.2" }
+sha2-v0-10-8 = { git = "https://github.com/sp1-patches/RustCrypto-hashes", package = "sha2", branch = "patch-sha2-v0.10.8" }
+revm = { git = "https://github.com/sp1-patches/revm-new", branch = "john/update-for-v1" }
+revm-primitives = { git = "https://github.com/sp1-patches/revm-new", branch = "john/update-for-v1" }

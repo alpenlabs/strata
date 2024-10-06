@@ -13259,6 +13259,7 @@ dependencies = [
  "num-traits",
  "serde",
  "serde_json",
+ "sha2 0.10.8",
  "snark-bn254-verifier",
  "sp1-sdk",
  "strata-zkvm",
