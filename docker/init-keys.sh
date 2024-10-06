@@ -43,7 +43,7 @@ op2pubkey=$($DATATOOL_PATH -b regtest genopxpub -f ${OP2_SEED_FILE})
 ROLLUP_PARAMS_FILE=$CONFIG_FILE/params.json
 $DATATOOL_PATH -b regtest genparams -n "alpenstrata" -s $seqkey -b $op1pubkey -b $op2pubkey --output $ROLLUP_PARAMS_FILE
 
-echo "Decoding the privkey to hex-encoded private key"
+echo "Decoding the xpriv to hex-encoded private key"
 # decode in base58 => hex-encode => reverse => get the first 64 chars (32 bytes) = reverse again for the original (removing new lines along the way)
 SEQ_KEY_FILE=$CONFIG_FILE/sequencer.key.hex
 cat $SEQ_SEED_FILE | base58 -dc | xxd -p | tr -d '\n' | rev | cut -c 1-64 | rev | tr -d '\n' | tee $SEQ_KEY_FILE
