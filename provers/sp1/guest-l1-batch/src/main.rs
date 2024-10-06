@@ -1,8 +1,8 @@
-use strata_state::l1::{get_btc_params, HeaderVerificationState};
 use bitcoin::block::Header;
+use sha2::{Digest, Sha256};
 use strata_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
 use strata_proofimpl_l1_batch::L1BatchProofOutput;
-use sha2::{Digest, Sha256};
+use strata_state::l1::{get_btc_params, HeaderVerificationState};
 
 mod vks;
 
@@ -20,13 +20,12 @@ fn main() {
 
     let vk = vks::GUEST_BTC_BLOCKSPACE_ELF_ID;
     for _ in 0..num_inputs {
-        let blkpo_raw: Vec<u8> = sp1_zkvm::io::read();
+        let blkpo_raw = sp1_zkvm::io::read_vec();
 
-        let public_values_digest = Sha256::digest(&blkpo_raw);
-        sp1_zkvm::lib::verify::verify_sp1_proof(vk, &public_values_digest.into());
+        let blkpo_raw_digest = Sha256::digest(&blkpo_raw);
+        sp1_zkvm::lib::verify::verify_sp1_proof(vk, &blkpo_raw_digest.into());
 
-        let blkpo_raw_serialized: Vec<u8> = bincode::deserialize(&blkpo_raw).unwrap();
-        let blkpo: BlockspaceProofOutput = borsh::from_slice(&blkpo_raw_serialized).unwrap();
+        let blkpo: BlockspaceProofOutput = borsh::from_slice(&blkpo_raw).unwrap();
         let header: Header = bitcoin::consensus::deserialize(&blkpo.header_raw).unwrap();
 
         state.check_and_update_continuity(&header, &get_btc_params());
@@ -50,5 +49,5 @@ fn main() {
         rollup_params_commitment: rollup_params_commitment.unwrap(),
     };
 
-    sp1_zkvm::io::commit(&borsh::to_vec(&output).unwrap());
+    sp1_zkvm::io::commit_slice(&borsh::to_vec(&output).unwrap());
 }

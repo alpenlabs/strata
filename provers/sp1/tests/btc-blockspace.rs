@@ -17,7 +17,7 @@ mod test {
 
         let prover_options = ProverOptions {
             enable_compression: true,
-            use_mock_prover: false,
+            use_mock_prover: true,
             ..Default::default()
         };
 
@@ -25,10 +25,7 @@ mod test {
             .get_proof(block, &prover_options)
             .unwrap();
 
-        // TODO: add `extract_public_output_borsh` function to Verifier
-        let raw_output = SP1Verifier::extract_public_output::<Vec<u8>>(&proof)
+        let _: BlockspaceProofOutput = SP1Verifier::extract_borsh_public_output(&proof)
             .expect("Failed to extract public outputs");
-
-        let _: BlockspaceProofOutput = borsh::from_slice(&raw_output).unwrap();
     }
 }

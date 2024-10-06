@@ -30,9 +30,8 @@ impl<'a> ZKVMInputBuilder<'a> for SP1ProofInputBuilder {
         let proof: SP1ProofWithPublicValues = bincode::deserialize(item.proof().as_bytes())?;
         let vkey: SP1VerifyingKey = bincode::deserialize(item.vk().as_bytes())?;
 
-        // Write the verification key and the public values of the program that'll be proven
-        // inside zkVM.
-        self.0.write(&proof.public_values);
+        // Write the public values of the program that'll be proven inside zkVM.
+        self.0.write_slice(proof.public_values.as_slice());
 
         // Write the proofs.
         //

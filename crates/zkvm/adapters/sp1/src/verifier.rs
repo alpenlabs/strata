@@ -84,6 +84,15 @@ impl ZKVMVerifier for SP1Verifier {
         let public_params: T = proof.public_values.read();
         Ok(public_params)
     }
+
+    fn extract_borsh_public_output<T: borsh::BorshSerialize + borsh::BorshDeserialize>(
+        proof: &Proof,
+    ) -> anyhow::Result<T> {
+        let proof: SP1ProofWithPublicValues = bincode::deserialize(proof.as_bytes())?;
+        let buffer = proof.public_values.as_slice();
+        let output: T = borsh::from_slice(buffer)?;
+        Ok(output)
+    }
 }
 
 // NOTE: SP1 prover runs in release mode only; therefore run the tests on release mode only

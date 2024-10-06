@@ -1,5 +1,5 @@
-use strata_primitives::params::RollupParams;
 use bitcoin::Block;
+use strata_primitives::params::RollupParams;
 use strata_proofimpl_btc_blockspace::logic::{process_blockspace_proof, BlockspaceProofInput};
 
 fn main() {
@@ -14,5 +14,5 @@ fn main() {
     };
     let output = process_blockspace_proof(&input);
 
-    sp1_zkvm::io::commit(&borsh::to_vec(&output).unwrap());
+    sp1_zkvm::io::commit_slice(&borsh::to_vec(&output).unwrap());
 }

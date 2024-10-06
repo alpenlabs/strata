@@ -8,16 +8,16 @@ mod vks;
 
 fn main() {
     let rollup_params: RollupParams = sp1_zkvm::io::read();
-    let el_vkey = vks::GUEST_EVM_EE_STF_ELF_ID;
 
-    let el_pp = sp1_zkvm::io::read::<Vec<u8>>();
-    let input: Vec<u8> = sp1_zkvm::io::read();
-    let (prev_state, block): (ChainState, L2Block) = borsh::from_slice(&input).unwrap();
+    let input_raw = sp1_zkvm::io::read_vec();
+    let (prev_state, block): (ChainState, L2Block) = borsh::from_slice(&input_raw).unwrap();
 
     // Verify the EL proof
-    let public_values_digest = Sha256::digest(&el_pp);
-    sp1_zkvm::lib::verify::verify_sp1_proof(el_vkey, &public_values_digest.into());
-    let el_pp_deserialized: ELProofPublicParams = bincode::deserialize(&el_pp).unwrap();
+    let el_vkey = vks::GUEST_EVM_EE_STF_ELF_ID;
+    let el_pp_raw = sp1_zkvm::io::read_vec();
+    let el_pp_raw_digest = Sha256::digest(&el_pp_raw);
+    sp1_zkvm::lib::verify::verify_sp1_proof(el_vkey, &el_pp_raw_digest.into());
+    let el_pp_deserialized: ELProofPublicParams = bincode::deserialize(&el_pp_raw).unwrap();
 
     let new_state = verify_and_transition(
         prev_state.clone(),
@@ -46,5 +46,5 @@ fn main() {
         rollup_params_commitment: rollup_params.compute_hash(),
     };
 
-    sp1_zkvm::io::commit(&borsh::to_vec(&cl_stf_public_params).unwrap());
+    sp1_zkvm::io::commit_slice(&borsh::to_vec(&cl_stf_public_params).unwrap());
 }
