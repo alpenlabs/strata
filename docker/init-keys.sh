@@ -61,6 +61,7 @@ $DATATOOL_PATH -b regtest genparams \
     --output $ROLLUP_PARAMS_FILE
 
 echo "Decoding the xpriv to hex-encoded private key"
+seq_priv=$($DATATOOL_PATH -b regtest genseqprivkey -f ${SEQ_SEED_FILE})
 # decode in base58 => hex-encode => reverse => get the first 64 chars (32 bytes) = reverse again for the original (removing new lines along the way)
 SEQ_KEY_FILE=$CONFIG_FILE/sequencer.key.hex
-cat $SEQ_SEED_FILE | base58 -dc | xxd -p | tr -d '\n' | rev | cut -c 1-64 | rev | tr -d '\n' | tee $SEQ_KEY_FILE
+echo $seq_priv | base58 -dc | xxd -p | tr -d '\n' | rev | cut -c 1-64 | rev | tr -d '\n' | tee $SEQ_KEY_FILE
