@@ -281,17 +281,17 @@ def generate_seed_at(path: str):
     # fmt: off
     cmd = [
         "strata-datatool",
-        "-b", "regtest"
+        "-b", "regtest",
         "genseed",
         "-f", path
     ]
     # fmt: on
 
-    res = subprocess.run(cmd)
+    res = subprocess.run(cmd, stdout=subprocess.PIPE)
     res.check_returncode()
 
 
-def generate_seqkey_from_seed(path: str) -> str:
+def generate_seqpubkey_from_seed(path: str) -> str:
     """Generates a sequencer pubkey from the seed at file path."""
     # fmt: off
     cmd = [
@@ -302,9 +302,11 @@ def generate_seqkey_from_seed(path: str) -> str:
     ]
     # fmt: on
 
-    res = subprocess.run(cmd)
+    res = subprocess.run(cmd, stdout=subprocess.PIPE)
     res.check_returncode()
-    return str(res.stdout, "utf8")
+    res = str(res.stdout, "utf8").strip()
+    assert len(res) > 0, "no output generated"
+    return res
 
 
 def generate_opxpub_from_seed(path: str) -> str:
@@ -318,9 +320,11 @@ def generate_opxpub_from_seed(path: str) -> str:
     ]
     # fmt: on
 
-    res = subprocess.run(cmd)
+    res = subprocess.run(cmd, stdout=subprocess.PIPE)
     res.check_returncode()
-    return str(res.stdout, "utf8")
+    res = str(res.stdout, "utf8").strip()
+    assert len(res) > 0, "no output generated"
+    return res
 
 
 def generate_params(
@@ -335,7 +339,7 @@ def generate_params(
         "-b", "regtest",
         "genparams",
         "--name", "strata",
-        "--block-time", str(settings.block_time),
+        "--block-time", str(settings.block_time_sec),
         "--epoch-slots", str(settings.epoch_slots),
         "--genesis-trigger-height", str(settings.genesis_trigger),
         "--proof-timeout", str(30),
@@ -346,9 +350,11 @@ def generate_params(
     for k in oppubkeys:
         cmd.extend(["--opkey", k])
 
-    res = subprocess.run(cmd, capture_output=True)
+    res = subprocess.run(cmd, stdout=subprocess.PIPE)
     res.check_returncode()
-    return str(res.stdout, "utf8")
+    res = str(res.stdout, "utf8").strip()
+    assert len(res) > 0, "no output generated"
+    return res
 
 
 def generate_simple_params(

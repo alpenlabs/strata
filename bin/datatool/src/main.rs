@@ -220,7 +220,7 @@ pub struct CmdContext {
 fn main() {
     let args: Args = argh::from_env();
     if let Err(e) = main_inner(args) {
-        eprintln!("{e}\n{e:?}");
+        eprintln!("ERROR\n{e:?}");
     }
 }
 
@@ -314,15 +314,18 @@ fn exec_genopxpub(cmd: SubcGenOpXpub, _ctx: &mut CmdContext) -> anyhow::Result<(
 }
 
 fn exec_genparams(cmd: SubcGenParams, ctx: &mut CmdContext) -> anyhow::Result<()> {
-    // Parse the sequencer key.
-    let seqkey = match cmd.seqkey {
+    // Parse the sequencer key, trimming whitespace for convenience.
+    let seqkey = match cmd.seqkey.as_ref().map(|s| s.trim()) {
         Some(seqkey) => {
-            let Ok(buf) = base58::decode_check(&seqkey) else {
-                anyhow::bail!("failed to parse sequencer key: {seqkey}");
+            let buf = match base58::decode_check(&seqkey) {
+                Ok(v) => v,
+                Err(e) => {
+                    anyhow::bail!("failed to parse sequencer key '{seqkey}': {e}");
+                }
             };
 
             let Ok(buf) = Buf32::try_from(buf.as_slice()) else {
-                anyhow::bail!("invalid sequencer key (must be 32 bytes): {seqkey}");
+                anyhow::bail!("invalid sequencer key '{seqkey}' (must be 32 bytes)");
             };
 
             Some(buf)

@@ -34,11 +34,10 @@ class BitcoinFactory(flexitest.Factory):
             "-txindex",
             "-regtest",
             "-listen",
-            "-port={p2p_port}",
+            f"-port={p2p_port}",
             "-printtoconsole",
             "-fallbackfee=0.00001",
             f"-datadir={datadir}",
-            f"-port={p2p_port}",
             f"-rpcport={rpc_port}",
             f"-rpcuser={BD_USERNAME}",
             f"-rpcpassword={BD_PASSWORD}",
@@ -341,8 +340,8 @@ class BasicEnvConfig(flexitest.EnvConfig):
         secret_dir = ctx.make_service_dir("secret")
         reth_secret_path = os.path.join(secret_dir, "jwt.hex")
 
-        with open(reth_secret_path, "w") as file:
-            file.write(generate_jwt_secret())
+        with open(reth_secret_path, "w") as f:
+            f.write(generate_jwt_secret())
 
         reth = reth_fac.create_exec_client(0, reth_secret_path, None)
         reth_port = reth.get_prop("rpc_port")
@@ -420,12 +419,12 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
     def __init__(
             self,
             pre_generate_blocks: int = 0,
-            rollup_params: Optional[str] = None,
+            rollup_settings: Optional[RollupParamsSettings] = None,
             auto_generate_blocks: bool = True,
             n_operators: int = 2,
     ):
         self.pre_generate_blocks = pre_generate_blocks
-        self.rollup_params = rollup_params
+        self.rollup_settings = rollup_settings
         self.auto_generate_blocks = auto_generate_blocks
         self.n_operators = n_operators
         super().__init__()
