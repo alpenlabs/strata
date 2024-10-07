@@ -34,10 +34,10 @@ pub const NETWORK: Network = Network::Signet;
 pub const BRIDGE_ROLLUP_ADDRESS: &str = "0x000000000000000000000000000000000B121d9E";
 pub const L2_BLOCK_TIME: Duration = Duration::from_secs(30);
 
+pub const DEFAULT_ESPLORA: &str = "https://esploraapi.devnet-annapurna.stratabtc.org";
+pub const DEFAULT_L2_HTTP_ENDPOINT: &str = "https://stratareth.devnet-annapurna.stratabtc.org";
+pub const DEFAULT_FAUCET_ENDPOINT: &str = "https://faucet.devnet-annapurna.stratabtc.org";
 // FIXME: CHANGE BELOW!!!
-pub const DEFAULT_ESPLORA: &str = "https://electrs.018235aabb3fe7.stratabtc.org";
-pub const DEFAULT_L2_HTTP_ENDPOINT: &str = "https://stratareth.018235aabb3fe7.stratabtc.org/";
-pub const DEFAULT_FAUCET_ENDPOINT: &str = "https://faucet.018235aabb3fe7.stratabtc.org";
 pub const BRIDGE_MUSIG2_PUBKEY: &str =
     "fbd79b6b8b7fe11bad25ae89a7415221c030978de448775729c3f0a903819dd0";
 
