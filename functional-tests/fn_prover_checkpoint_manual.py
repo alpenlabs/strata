@@ -14,12 +14,17 @@ class ProverClientTest(flexitest.Test):
         prover_client = ctx.get_service("prover_client")
         prover_client_rpc = prover_client.create_rpc()
 
-        # Wait for the some block building
+        # Wait for the Prover Manager setup
         time.sleep(60)
 
-        # Dispatch the prover task
-        task_id = prover_client_rpc.dev_strata_proveELBlock(1)
-        print("got the taks id: {}", task_id)
+        # Test on with manual checkpoint
+        checkpoint_idx = 1
+        l1_range = (1, 5)
+        l2_range = (1, 5)
+        task_id = prover_client_rpc.dev_strata_proveCheckpointRaw(
+            checkpoint_idx, l1_range, l2_range
+        )
+        print("got the task id: {}", task_id)
         assert task_id is not None
 
         time_out = 10 * 60

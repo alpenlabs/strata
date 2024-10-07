@@ -48,6 +48,18 @@ pub struct CheckpointInput {
     pub l2_batch_proof: Option<ProofWithVkey>,
 }
 
+impl CheckpointInput {
+    pub fn get_default_input(rpc_ckp_info: RpcCheckpointInfo) -> Self {
+        Self {
+            info: rpc_ckp_info,
+            l1_batch_id: Uuid::nil(),
+            l2_batch_id: Uuid::nil(),
+            l1_batch_proof: None,
+            l2_batch_proof: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum CheckpointOpsParam {
     Latest,
@@ -62,10 +74,10 @@ impl ProvingOperations for CheckpointOperations {
     type Params = CheckpointOpsParam;
 
     fn block_type(&self) -> ProvingTaskType {
-        ProvingTaskType::Btc
+        ProvingTaskType::Checkpoint
     }
 
-    async fn fetch_input(&self, info: CheckpointOpsParam) -> Result<Self::Input, anyhow::Error> {
+    async fn fetch_input(&self, info: Self::Params) -> Result<Self::Input, anyhow::Error> {
         let rpc_ckp_info = match info {
             CheckpointOpsParam::Latest => {
                 debug!("Fetching latest checkpoint from the sequencer");
@@ -86,7 +98,7 @@ impl ProvingOperations for CheckpointOperations {
                     })?
             }
             CheckpointOpsParam::CheckPointIndex(ckp_idx) => {
-                let mut res = self
+                let mut ckp_info = self
                     .cl_client
                     .request::<Option<RpcCheckpointInfo>, _>(
                         "strata_getCheckpointInfo",
@@ -98,19 +110,14 @@ impl ProvingOperations for CheckpointOperations {
                     })?;
 
                 // TODO: TempFix
-                res.l1_range = (1, 1);
-                res
+                println!("Got the initial ckpt range {:?}", ckp_info);
+                ckp_info.l1_range = (1, 1);
+                ckp_info
             }
             CheckpointOpsParam::Manual(ckp_info) => ckp_info,
         };
 
-        Ok(CheckpointInput {
-            info: rpc_ckp_info,
-            l1_batch_id: Uuid::nil(),
-            l2_batch_id: Uuid::nil(),
-            l1_batch_proof: None,
-            l2_batch_proof: None,
-        })
+        Ok(CheckpointInput::get_default_input(rpc_ckp_info))
     }
 
     async fn append_task(

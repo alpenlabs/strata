@@ -47,12 +47,13 @@ impl ProvingOperations for ClOperations {
         ProvingTaskType::CL
     }
 
-    async fn fetch_input(&self, block_num: u64) -> Result<Self::Input, anyhow::Error> {
+    async fn fetch_input(&self, block_num: Self::Params) -> Result<Self::Input, anyhow::Error> {
         debug!(%block_num, "Fetching CL block input");
         let witness: Option<Vec<u8>> = self
             .cl_client
             .request("strata_getCLBlockWitness", rpc_params![block_num])
-            .await.unwrap();
+            .await
+            .unwrap();
         let cl_raw_witness = witness.context("Failed to get the CL witness")?;
 
         Ok(CLProverInput {

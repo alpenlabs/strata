@@ -1,18 +1,17 @@
 use std::sync::Arc;
 
+use async_trait::async_trait;
+use bitcoin::{key::Secp256k1, Block};
+use musig2::secp256k1::SecretKey;
+use rand::{rngs::StdRng, SeedableRng};
 use strata_btcio::rpc::{traits::Reader, BitcoinClient};
 use strata_primitives::{
     block_credential,
     buf::Buf32,
     operator::OperatorPubkeys,
-    params::{Params, OperatorConfig, ProofPublishMode, RollupParams, SyncParams},
+    params::{OperatorConfig, Params, ProofPublishMode, RollupParams, SyncParams},
     vk::RollupVerifyingKey,
 };
-use bitcoin::key::Secp256k1;
-use musig2::secp256k1::SecretKey;
-use rand::{rngs::StdRng, SeedableRng};
-use async_trait::async_trait;
-use bitcoin::Block;
 use tracing::debug;
 use uuid::Uuid;
 
@@ -45,7 +44,7 @@ impl ProvingOperations for BtcOperations {
         ProvingTaskType::Btc
     }
 
-    async fn fetch_input(&self, block_num: u64) -> Result<Self::Input, anyhow::Error> {
+    async fn fetch_input(&self, block_num: Self::Params) -> Result<Self::Input, anyhow::Error> {
         debug!(%block_num, "Fetching BTC block input");
         let block = self.btc_client.get_block_at(block_num).await?;
         debug!("Fetched BTC block {}", block_num);
@@ -64,6 +63,7 @@ impl ProvingOperations for BtcOperations {
     }
 }
 
+// TODO: Move from manual param generation to importing params from the file
 pub fn get_pm_rollup_params() -> RollupParams {
     // TODO: create a random seed if we really need random op_pubkeys every time this is called
     gen_params_with_seed(0).rollup

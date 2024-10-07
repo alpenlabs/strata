@@ -21,7 +21,6 @@ class CLBlockWitnessDataGenerationTest(flexitest.Test):
             lambda: seqrpc.strata_protocolVersion() is not None,
             error_with="Sequencer did not start on time",
         )
-        time.sleep(1)
 
         witness_1 = seqrpc.strata_getCLBlockWitness(1)
         assert witness_1 is not None

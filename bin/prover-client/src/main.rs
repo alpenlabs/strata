@@ -17,7 +17,7 @@ use strata_common::logging;
 use strata_sp1_adapter::SP1Host;
 use strata_zkvm::ProverOptions;
 use task::TaskTracker;
-use tracing::info;
+use tracing::{debug, info};
 
 mod args;
 mod ckp_runner;
@@ -35,10 +35,10 @@ mod task;
 #[tokio::main]
 async fn main() {
     logging::init();
-    info!("running alpen express prover client in dev mode");
+    info!("Running strata prover client in dev mode");
 
     let args: Args = argh::from_env();
-    println!("got the args {:?}", args);
+    debug!("Running prover client with args {:?}", args);
 
     let el_client = HttpClientBuilder::default()
         .build(args.get_reth_rpc_url())

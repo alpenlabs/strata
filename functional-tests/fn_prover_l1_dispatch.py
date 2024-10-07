@@ -2,6 +2,8 @@ import time
 
 import flexitest
 
+from utils import wait_for_proof_with_time_out
+
 
 @flexitest.register
 class ProverClientTest(flexitest.Test):
@@ -12,22 +14,13 @@ class ProverClientTest(flexitest.Test):
         prover_client = ctx.get_service("prover_client")
         prover_client_rpc = prover_client.create_rpc()
 
-        # Wait for the some block building
+        # Wait for the Prover Manager setup
         time.sleep(60)
 
-        rpc_res = prover_client_rpc.dev_strata_proveBtcBlock(1)
-        print("got the rpc res: {}", rpc_res)
-        assert rpc_res is not None
+        # Dispatch the prover task
+        task_id = prover_client_rpc.dev_strata_proveBtcBlock(1)
+        print("got the taks id: {}", task_id)
+        assert task_id is not None
 
-        # rpc_res = prover_client_rpc.dev_strata_proveBtcBlock(2)
-        # print("got the rpc res: {}", rpc_res)
-        # assert rpc_res is not None
-
-        # rpc_res = prover_client_rpc.dev_strata_proveBtcBlock(3)
-        # print("got the rpc res: {}", rpc_res)
-        # assert rpc_res is not None
-
-        # rpc_res = prover_client_rpc.dev_strata_proveBtcBlock(2)
-        # print("got the rpc res: {}", rpc_res)
-        # assert rpc_res is not None
-        time.sleep(150)
+        time_out = 10 * 60
+        wait_for_proof_with_time_out(prover_client_rpc, task_id, time_out=time_out)

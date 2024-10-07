@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use anyhow::Context;
 use async_trait::async_trait;
-use strata_proofimpl_evm_ee_stf::ELProofInput;
 use jsonrpsee::{core::client::ClientT, http_client::HttpClient, rpc_params};
 use reth_rpc_types::Block;
+use strata_proofimpl_evm_ee_stf::ELProofInput;
 use tracing::debug;
 use uuid::Uuid;
 
@@ -39,7 +39,7 @@ impl ProvingOperations for ElOperations {
         ProvingTaskType::EL
     }
 
-    async fn fetch_input(&self, block_num: u64) -> Result<Self::Input, anyhow::Error> {
+    async fn fetch_input(&self, block_num: Self::Params) -> Result<Self::Input, anyhow::Error> {
         debug!(%block_num, "Fetching EL block input");
         let block: Block = self
             .el_client

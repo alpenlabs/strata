@@ -61,7 +61,10 @@ impl ProvingOperations for L2BatchOperations {
         ProvingTaskType::ClBatch
     }
 
-    async fn fetch_input(&self, cl_block_range: (u64, u64)) -> Result<Self::Input, anyhow::Error> {
+    async fn fetch_input(
+        &self,
+        cl_block_range: Self::Params,
+    ) -> Result<Self::Input, anyhow::Error> {
         // Init the proof
         let proofs: HashMap<u64, ProofWithVkey> = HashMap::new();
 

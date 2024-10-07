@@ -14,11 +14,11 @@ class ProverClientTest(flexitest.Test):
         prover_client = ctx.get_service("prover_client")
         prover_client_rpc = prover_client.create_rpc()
 
-        # Wait for the some block building
+        # Wait for the Prover Manager setup
         time.sleep(60)
 
-        # Dispatch the prover task
-        task_id = prover_client_rpc.dev_strata_proveELBlock(1)
+        # Test on with the latest checkpoint
+        task_id = prover_client_rpc.dev_strata_proveLatestCheckPoint()
         print("got the taks id: {}", task_id)
         assert task_id is not None
 

@@ -1,9 +1,9 @@
 use std::{collections::HashMap, sync::Arc};
 
-use strata_btcio::{reader::query::get_verification_state, rpc::BitcoinClient};
-use strata_state::l1::HeaderVerificationState;
 use async_trait::async_trait;
 use bitcoin::params::MAINNET;
+use strata_btcio::{reader::query::get_verification_state, rpc::BitcoinClient};
+use strata_state::l1::HeaderVerificationState;
 use uuid::Uuid;
 
 use super::{btc_ops::BtcOperations, ops::ProvingOperations};
@@ -72,7 +72,10 @@ impl ProvingOperations for L1BatchOperations {
         ProvingTaskType::BtcBatch
     }
 
-    async fn fetch_input(&self, btc_block_range: (u64, u64)) -> Result<Self::Input, anyhow::Error> {
+    async fn fetch_input(
+        &self,
+        btc_block_range: Self::Params,
+    ) -> Result<Self::Input, anyhow::Error> {
         let st_height = btc_block_range.0;
         let header_verification_state =
             get_verification_state(self.btc_client.as_ref(), st_height, &MAINNET.clone().into())

@@ -232,3 +232,27 @@ def get_logger(name: str, level=log.DEBUG) -> log.Logger:
         logger.addHandler(handler)
 
     return logger
+
+
+def wait_for_proof_with_time_out(prover_client_rpc, task_id, time_out=3600):
+    """
+    Waits for a proof task to complete within a specified timeout period.
+
+    This function continuously polls the status of a proof task identified by `task_id` using
+    the `prover_client_rpc` client. It checks the status every 2 seconds and waits until the
+    proof task status is "Completed" or the specified `time_out` (in seconds) is reached.
+    """
+
+    start_time = time.time()
+    while True:
+        # Fetch the proof status
+        proof_status = prover_client_rpc.dev_get_task_status(task_id)
+        assert proof_status is not None
+        print(f"Got the proof status {proof_status}")
+        if proof_status == "Completed":
+            print("Print")
+
+        time.sleep(2)
+        elapsed_time = time.time() - start_time  # Calculate elapsed time
+        if elapsed_time >= time_out:
+            raise TimeoutError(f"Operation timed out after {time_out} seconds.")
