@@ -1,7 +1,7 @@
-import time
-
 import flexitest
 from web3 import Web3
+
+from utils import wait_until
 
 
 @flexitest.register
@@ -14,7 +14,7 @@ class FullnodeElBlockGenerationTest(flexitest.Test):
         fn_web3: Web3 = ctx.get_service("follower_1_reth").create_web3()
 
         # give some time for the sequencer to start up and generate blocks
-        time.sleep(3)
+        wait_until(lambda: seq_web3.eth.get_block_number() > 1)
 
         dest = fn_web3.to_checksum_address("deadf001900dca3ebeefdeadf001900dca3ebeef")
 
