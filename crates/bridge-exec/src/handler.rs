@@ -2,7 +2,7 @@
 
 use std::{fmt::Debug, time::Duration};
 
-use bitcoin::{key::Keypair, secp256k1::PublicKey, Transaction, Txid};
+use bitcoin::{key::Keypair, Transaction, Txid};
 use borsh::{BorshDeserialize, BorshSerialize};
 use jsonrpsee::tokio::time::sleep;
 use strata_bridge_sig_manager::manager::SignatureManager;
@@ -62,21 +62,11 @@ where
     where
         TxInfo: TxKind + Debug,
     {
-        info!("starting withdrawal transaction signing");
+        info!("starting transaction signing");
 
         let operator_pubkeys = self.tx_build_ctx.pubkey_table();
-        let own_index = self.tx_build_ctx.own_index();
-        let own_pubkey = operator_pubkeys
-            .0
-            .get(&own_index)
-            .expect("could not find operator's pubkey in public key table");
 
-        info!(
-            ?tx_info,
-            %self.own_index,
-            %own_pubkey,
-            "got the basic self information",
-        );
+        info!(?tx_info, "received transaction details",);
 
         // sign the transaction with MuSig2 and put inside the OperatorPartialSig
 
@@ -110,12 +100,13 @@ where
             .map_err(|e| ExecError::Signing(e.to_string()))?;
 
         let scope = Scope::V0PubNonce(bitcoin_txid);
-        debug!(?scope, "create the withdrawal pub nonce scope");
+        debug!(?scope, "created the pub nonce scope");
 
-        self.broadcast_msg(&scope, public_nonce, txid).await?;
+        let message = self.broadcast_msg(&scope, public_nonce, txid).await?;
 
         // TODO: use tokio::select to add a timeout path to prevent thread leaks.
-        self.poll_for_nonces(scope, txid, POLL_INTERVAL).await?;
+        self.poll_for_nonces(message.scope(), txid, POLL_INTERVAL)
+            .await?;
 
         Ok(())
     }
@@ -125,41 +116,42 @@ where
         scope: &Scope,
         payload: S,
         txid: &Txid,
-    ) -> Result<(), ExecError> {
-        let message = MessageSigner::new(self.own_index, self.keypair.secret_key().into())
+    ) -> Result<BridgeMessage, ExecError> {
+        let signed_message = MessageSigner::new(self.own_index, self.keypair.secret_key().into())
             .sign_scope(scope, &payload)
             .map_err(|e| ExecError::Signing(e.to_string()))?;
-        debug!(?message, "created the message");
+        debug!(?signed_message, "created the message");
 
-        let raw_message: Vec<u8> = message
+        let raw_message: Vec<u8> = signed_message
+            .clone()
             .try_into()
             .expect("could not serialize bridge message into raw bytes");
         self.l2_rpc_client
             .submit_bridge_msg(raw_message.into())
             .await?;
 
-        info!(%txid, ?scope, "broadcasted message");
-        Ok(())
+        info!(%txid, ?scope, ?payload, "broadcasted message");
+        Ok(signed_message)
     }
 
     /// Poll for nonces until all nonces have been collected.
     // TODO: use long-polling here instead.
     async fn poll_for_nonces(
         &self,
-        scope: Scope,
+        scope: &[u8],
         txid: &Txid,
         poll_interval: Duration,
     ) -> Result<(), ExecError> {
         debug!(%txid, "polling for other operators' nonces");
 
         loop {
-            let received_nonces = self.parse_messages::<Musig2PubNonce>(scope.clone()).await?;
+            let received_nonces = self.parse_messages::<Musig2PubNonce>(scope).await?;
 
             let mut all_done = false;
-            for pub_nonce in received_nonces {
+            for (sender_idx, pub_nonce) in received_nonces {
                 all_done = self
                     .sig_manager
-                    .add_nonce(txid, self.own_index, &pub_nonce.1)
+                    .add_nonce(txid, sender_idx, &pub_nonce)
                     .await
                     .map_err(|e| ExecError::Execution(e.to_string()))?;
 
@@ -189,17 +181,7 @@ where
     ///
     /// Fully signed transaction.
     pub async fn collect_signatures(&self, txid: &Txid) -> ExecResult<Transaction> {
-        info!("starting transaction signature aggregation");
-
-        let own_pubkey = self.get_own_pubkey();
-
-        info!(
-            %txid,
-            %self.own_index,
-            %own_pubkey,
-            "got the basic self information",
-        );
-
+        info!(%txid, "starting transaction signature aggregation");
         let tx_state = self
             .sig_manager
             .get_tx_state(txid)
@@ -255,11 +237,12 @@ where
 
         let scope = Scope::V0Sig(bitcoin_txid);
 
-        self.broadcast_msg(&scope, partial_sig, txid).await?;
+        let message = self.broadcast_msg(&scope, partial_sig, txid).await?;
 
         // Wait for all the partial signatures to be broadcasted by other operators.
         // TODO: use tokio::select to add a timeout path to prevent thread leaks.
-        self.poll_for_signatures(scope, txid, POLL_INTERVAL).await?;
+        self.poll_for_signatures(message.scope(), txid, POLL_INTERVAL)
+            .await?;
 
         let tx = self
             .sig_manager
@@ -274,16 +257,14 @@ where
     // TODO: use long-polling here instead.
     async fn poll_for_signatures(
         &self,
-        scope: Scope,
+        scope: &[u8],
         txid: &Txid,
         poll_interval: Duration,
     ) -> Result<(), ExecError> {
         debug!("waiting for other operators' signatures");
 
         loop {
-            let signatures = self
-                .parse_messages::<Musig2PartialSig>(scope.clone())
-                .await?;
+            let signatures = self.parse_messages::<Musig2PartialSig>(scope).await?;
 
             let mut all_signed = false;
             for partial_sig in signatures {
@@ -310,25 +291,15 @@ where
         Ok(())
     }
 
-    fn get_own_pubkey(&self) -> PublicKey {
-        let operator_pubkeys = self.tx_build_ctx.pubkey_table();
-        let own_index = self.tx_build_ctx.own_index();
-        *operator_pubkeys
-            .0
-            .get(&own_index)
-            .expect("could not find operator's pubkey in public key table")
-    }
-
-    async fn parse_messages<Payload>(
-        &self,
-        scope: Scope,
-    ) -> Result<impl Iterator<Item = (OperatorIdx, Payload)> + '_, ExecError>
+    async fn parse_messages<'parser, Payload>(
+        &'parser self,
+        scope: &'parser [u8],
+    ) -> Result<impl Iterator<Item = (OperatorIdx, Payload)> + 'parser, ExecError>
     where
-        Payload: BorshDeserialize,
+        Payload: BorshDeserialize + Debug,
     {
-        let raw_scope: Vec<u8> = scope.clone().try_into().expect("serialization should work");
-
-        let raw_scope: HexBytes = raw_scope.into();
+        let raw_scope: HexBytes = scope.into();
+        info!(scope=?scope, raw_scope=?raw_scope, "getting messages from the L2 Client");
         let received_payloads = self
             .l2_rpc_client
             .get_msgs_by_scope(raw_scope)
@@ -339,11 +310,15 @@ where
                 if let Ok(msg) = msg {
                     let payload = msg.payload();
                     let payload = borsh::from_slice::<Payload>(payload);
+                    // remove length tag added by borsh on dynamic containers
+                    let payload = &payload[4..];
+                    let parsed_payload = borsh::from_slice::<Payload>(payload);
 
-                    if let Ok(payload) = payload {
+                    if let Ok(payload) = parsed_payload {
                         Some((msg.source_id(), payload))
                     } else {
-                        warn!(?scope, "skipping faulty message");
+                        let err = parsed_payload.unwrap_err();
+                        warn!(?scope, ?payload, error=?err, "skipping faulty message payload");
                         None
                     }
                 } else {

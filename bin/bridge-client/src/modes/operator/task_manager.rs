@@ -16,7 +16,7 @@ use strata_rpc_types::BridgeDuties;
 use strata_state::bridge_duties::{BridgeDuty, BridgeDutyStatus};
 use strata_storage::ops::{bridge_duty::BridgeDutyOps, bridge_duty_index::BridgeDutyIndexOps};
 use tokio::{task::JoinSet, time::sleep};
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 pub(super) struct TaskManager<L2Client, TxBuildContext, Bcast>
 where
@@ -289,6 +289,9 @@ where
         .send_raw_transaction(&signed_tx)
         .await
         .map_err(|e| ExecError::Broadcast(e.to_string()))?;
+
+    info!(%txid, "broadcasted fully signed transaction");
+    debug!(?signed_tx, "broadcasted fully signed transaction");
 
     Ok(())
 }

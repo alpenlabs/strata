@@ -9,7 +9,7 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum ExecError {
     /// Error creating the [`TxSigningData`](strata_primitives::bridge::TxSigningData).
-    #[error("could not build withdraw transaction")]
+    #[error("could not build transaction caused by: {0}")]
     TxBuilder(#[from] BridgeTxBuilderError),
 
     /// Error while signing the transaction.
