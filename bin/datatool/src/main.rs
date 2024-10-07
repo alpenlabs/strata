@@ -58,6 +58,7 @@ pub struct Args {
 pub enum Subcommand {
     GenSeed(SubcGenSeed),
     GenSeqPubkey(SubcGenSeqPubkey),
+    GenSeqPrivkey(SubcGenSeqPrivkey),
     GenOpXpub(SubcGenOpXpub),
     GenParams(SubcGenParams),
 }
@@ -84,6 +85,25 @@ pub struct SubcGenSeed {
     description = "generates a sequencer pubkey from seed"
 )]
 pub struct SubcGenSeqPubkey {
+    #[argh(option, description = "reads key from specified file", short = 'f')]
+    key_file: Option<PathBuf>,
+
+    #[argh(
+        switch,
+        description = "reads key from envvar STRATA_SEQ_KEY",
+        short = 'E'
+    )]
+    key_from_env: bool,
+}
+
+/// Generate the sequencer pubkey to pass around.
+#[derive(FromArgs, PartialEq, Debug)]
+#[argh(
+    subcommand,
+    name = "genseqprivkey",
+    description = "generates a sequencer privkey from seed"
+)]
+pub struct SubcGenSeqPrivkey {
     #[argh(option, description = "reads key from specified file", short = 'f')]
     key_file: Option<PathBuf>,
 
@@ -228,6 +248,7 @@ fn exec_subc(cmd: Subcommand, ctx: &mut CmdContext) -> anyhow::Result<()> {
     match cmd {
         Subcommand::GenSeed(subc) => exec_genseed(subc, ctx),
         Subcommand::GenSeqPubkey(subc) => exec_genseqpubkey(subc, ctx),
+        Subcommand::GenSeqPrivkey(subc) => exec_genseqprivkey(subc, ctx),
         Subcommand::GenOpXpub(subc) => exec_genopxpub(subc, ctx),
         Subcommand::GenParams(subc) => exec_genparams(subc, ctx),
     }
@@ -254,6 +275,20 @@ fn exec_genseqpubkey(cmd: SubcGenSeqPubkey, _ctx: &mut CmdContext) -> anyhow::Re
     let seq_xpriv = derive_seq_xpriv(&xpriv)?;
     let seq_xpub = Xpub::from_priv(bitcoin::secp256k1::SECP256K1, &seq_xpriv);
     let raw_buf = seq_xpub.to_x_only_pub().serialize();
+    let s = base58::encode_check(&raw_buf);
+
+    println!("{s}");
+
+    Ok(())
+}
+
+fn exec_genseqprivkey(cmd: SubcGenSeqPrivkey, _ctx: &mut CmdContext) -> anyhow::Result<()> {
+    let Some(xpriv) = resolve_xpriv(&cmd.key_file, cmd.key_from_env, SEQKEY_ENVVAR)? else {
+        anyhow::bail!("privkey unset");
+    };
+
+    let seq_xpriv = derive_seq_xpriv(&xpriv)?;
+    let raw_buf = seq_xpriv.to_priv().to_bytes();
     let s = base58::encode_check(&raw_buf);
 
     println!("{s}");
