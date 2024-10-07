@@ -314,7 +314,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
             pre_generate_blocks: int = 0,
             rollup_settings: Optional[RollupParamsSettings] = None,
             auto_generate_blocks: bool = True,
-            enable_prover_client: bool = True,
+            enable_prover_client: bool = False,
             n_operators: int = 2
     ):
         super().__init__()
