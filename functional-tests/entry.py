@@ -88,7 +88,7 @@ class StrataFactory(flexitest.Factory):
     ) -> flexitest.Service:
         datadir = ctx.make_service_dir("sequencer")
         rpc_port = self.next_port()
-        rpc_host = "localhost"
+        rpc_host = "127.0.0.1"
         logfile = os.path.join(datadir, "service.log")
 
         seqkey_path = os.path.join(ctx.envdd_path, "_init", "seqkey.bin")
@@ -137,7 +137,12 @@ class StrataFactory(flexitest.Factory):
 class FullNodeFactory(flexitest.Factory):
     def __init__(self, port_range: list[int]):
         super().__init__(port_range)
-        self.fn_count = 0
+        self.next_idx = 1
+
+    def next_idx(self) -> int:
+        idx = self.next_idx
+        self.next_idx += 1
+        return idx
 
     @flexitest.with_ectx("ctx")
     def create_fullnode(
@@ -148,11 +153,10 @@ class FullNodeFactory(flexitest.Factory):
         rollup_params: str,
         ctx: flexitest.EnvContext,
     ) -> flexitest.Service:
-        self.fn_count += 1
-        id = self.fn_count
+        idx = self.next_idx()
 
-        datadir = ctx.make_service_dir(f"fullnode.{id}")
-        rpc_host = "localhost"
+        datadir = ctx.make_service_dir(f"fullnode.{idx}")
+        rpc_host = "127.0.0.1"
         rpc_port = self.next_port()
         logfile = os.path.join(datadir, "service.log")
 
@@ -178,7 +182,7 @@ class FullNodeFactory(flexitest.Factory):
 
         cmd.extend(["--rollup-params", rollup_params_file])
 
-        props = {"rpc_port": rpc_port, "id": id}
+        props = {"rpc_port": rpc_port, "id": idx}
         rpc_url = f"ws://localhost:{rpc_port}"
 
         svc = flexitest.service.ProcService(props, cmd, stdout=logfile)
