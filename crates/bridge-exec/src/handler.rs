@@ -236,7 +236,6 @@ where
 
         let scope = Scope::V0Sig(bitcoin_txid);
 
-        dbg!("own_sig", partial_sig);
         let message = self.broadcast_msg(&scope, partial_sig, txid).await?;
 
         // Wait for all the partial signatures to be broadcasted by other operators.
@@ -283,7 +282,7 @@ where
             }
 
             if all_signed {
-                info!("all signatues have been collected");
+                info!("all signatures have been collected");
                 break;
             }
 
@@ -309,11 +308,8 @@ where
             .into_iter()
             .filter_map(move |msg| {
                 let msg = borsh::from_slice::<BridgeMessage>(&msg.0);
-                dbg!(&msg);
                 if let Ok(msg) = msg {
                     let payload = msg.payload();
-                    // HACK: remove the extra length tag added by borsh on dynamic containers
-                    let payload = &payload[4..];
                     let parsed_payload = borsh::from_slice::<Payload>(payload);
 
                     if let Ok(payload) = parsed_payload {

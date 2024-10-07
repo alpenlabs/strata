@@ -46,16 +46,12 @@ impl MessageSigner {
     }
 
     /// Signs a message using a raw scope and payload.
-    pub fn sign_raw<T: BorshSerialize>(
-        &self,
-        scope: &T,
-        payload: &T,
-    ) -> Result<BridgeMessage, io::Error> {
+    pub fn sign_raw(&self, scope: Vec<u8>, payload: Vec<u8>) -> Result<BridgeMessage, io::Error> {
         let mut tmp_m = BridgeMessage {
             source_id: self.operator_idx,
             sig: Buf64::zero(),
-            scope: borsh::to_vec(scope)?,
-            payload: borsh::to_vec(payload)?,
+            scope,
+            payload,
         };
 
         let id: Buf32 = tmp_m.compute_id().into();
@@ -74,7 +70,7 @@ impl MessageSigner {
     ) -> Result<BridgeMessage, io::Error> {
         let raw_scope = borsh::to_vec(scope)?;
         let payload: Vec<u8> = borsh::to_vec(&payload)?;
-        self.sign_raw(&raw_scope, &payload)
+        self.sign_raw(raw_scope, payload)
     }
 }
 
@@ -141,8 +137,13 @@ pub fn verify_bridge_msg_sig(
 
 #[cfg(test)]
 mod tests {
+    use strata_test_utils::ArbitraryGenerator;
+
     use super::*;
-    use crate::{buf::Buf32, operator::StubOpKeyProv, relay::types::*};
+    use crate::{
+        bridge::Musig2PubNonce, buf::Buf32, l1::BitcoinTxid, operator::StubOpKeyProv,
+        relay::types::*,
+    };
 
     #[test]
     fn test_sign_verify_raw() {
@@ -189,6 +190,33 @@ mod tests {
 
         let stub_prov = StubOpKeyProv::new(idx, pk);
         assert!(verify_bridge_msg_sig(&m, &stub_prov).is_err());
+    }
+
+    #[test]
+    fn test_message_signer_serde() {
+        let generator = ArbitraryGenerator::new();
+        let txid: BitcoinTxid = generator.generate();
+        let scope = Scope::V0PubNonce(txid);
+        let payload: Musig2PubNonce = generator.generate();
+        let keypair = Keypair::new(SECP256K1, &mut rand::thread_rng());
+        let msg_signer = MessageSigner::new(0, keypair.secret_key().into());
+
+        let signed_message = msg_signer
+            .sign_scope(&scope, &payload)
+            .expect("scope signing should work");
+
+        let serialized_msg = borsh::to_vec::<BridgeMessage>(&signed_message)
+            .expect("BridgeMessage serialization should work");
+        let deserialized_msg = borsh::from_slice::<BridgeMessage>(&serialized_msg)
+            .expect("BridgeMessage deserialization should work");
+
+        let deserialized_scope = borsh::from_slice::<Scope>(&deserialized_msg.scope)
+            .expect("scope deserialization should work");
+
+        assert_eq!(
+            deserialized_scope, scope,
+            "original and scope from signed message must match"
+        );
     }
 
     // TODO add verify fail check
