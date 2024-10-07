@@ -24,7 +24,7 @@ use crate::errors::{ExecError, ExecResult};
 /// The interval that the bridge duty exec functions will poll for
 /// bridge messages, such as public nonces and partial signatures.
 // TODO: this is hardcoded, maybe move this to a user-configurable Config
-pub const POLL_INTERVAL: Duration = Duration::from_millis(100);
+pub const POLL_INTERVAL: Duration = Duration::from_millis(1_000);
 
 /// The execution context for handling bridge-related signing activities.
 #[derive(Clone)]
@@ -122,10 +122,9 @@ where
             .map_err(|e| ExecError::Signing(e.to_string()))?;
         debug!(?signed_message, "created the message");
 
-        let raw_message: Vec<u8> = signed_message
-            .clone()
-            .try_into()
-            .expect("could not serialize bridge message into raw bytes");
+        let raw_message = borsh::to_vec::<BridgeMessage>(&signed_message)
+            .expect("should be able to borsh serialize raw message");
+
         self.l2_rpc_client
             .submit_bridge_msg(raw_message.into())
             .await?;
@@ -237,6 +236,7 @@ where
 
         let scope = Scope::V0Sig(bitcoin_txid);
 
+        dbg!("own_sig", partial_sig);
         let message = self.broadcast_msg(&scope, partial_sig, txid).await?;
 
         // Wait for all the partial signatures to be broadcasted by other operators.
@@ -267,13 +267,15 @@ where
             let signatures = self.parse_messages::<Musig2PartialSig>(scope).await?;
 
             let mut all_signed = false;
-            for partial_sig in signatures {
-                let signature_info = OperatorPartialSig::new(partial_sig.1, partial_sig.0);
-                all_signed = self
-                    .sig_manager
-                    .add_partial_sig(txid, signature_info)
-                    .await
-                    .map_err(|e| ExecError::Execution(e.to_string()))?;
+            for (signer_index, partial_sig) in signatures {
+                let signature_info = OperatorPartialSig::new(partial_sig, signer_index);
+                let result = self.sig_manager.add_partial_sig(txid, signature_info).await;
+
+                if let Err(e) = result {
+                    warn!(err=%e, %signer_index, "discarding invalid signature");
+                } else {
+                    all_signed = result.expect("must never error");
+                }
 
                 if all_signed {
                     break;
@@ -307,10 +309,10 @@ where
             .into_iter()
             .filter_map(move |msg| {
                 let msg = borsh::from_slice::<BridgeMessage>(&msg.0);
+                dbg!(&msg);
                 if let Ok(msg) = msg {
                     let payload = msg.payload();
-                    let payload = borsh::from_slice::<Payload>(payload);
-                    // remove length tag added by borsh on dynamic containers
+                    // HACK: remove the extra length tag added by borsh on dynamic containers
                     let payload = &payload[4..];
                     let parsed_payload = borsh::from_slice::<Payload>(payload);
 

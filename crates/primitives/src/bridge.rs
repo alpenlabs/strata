@@ -11,14 +11,11 @@ use bitcoin::{
     secp256k1::{PublicKey, SecretKey},
 };
 use borsh::{BorshDeserialize, BorshSerialize};
-use musig2::{
-    errors::KeyAggError, BinaryEncoding, KeyAggContext, NonceSeed, PartialSignature, PubNonce,
-    SecNonce,
-};
+use musig2::{errors::KeyAggError, KeyAggContext, NonceSeed, PartialSignature, PubNonce, SecNonce};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    constants::{MUSIG2_PARTIAL_SIG_SIZE, NONCE_SEED_SIZE, PUB_NONCE_SIZE},
+    constants::{MUSIG2_PARTIAL_SIG_SIZE, NONCE_SEED_SIZE, PUB_NONCE_SIZE, SEC_NONCE_SIZE},
     l1::{BitcoinPsbt, TaprootSpendPath},
 };
 
@@ -142,14 +139,28 @@ impl Musig2PartialSig {
 
 impl BorshSerialize for Musig2PartialSig {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
-        let serialized = self.0.serialize();
+        let sig_bytes = self.0.serialize();
 
-        writer.write_all(&serialized)
+        borsh::BorshSerialize::serialize(&(sig_bytes.len() as u32), writer)?;
+
+        writer.write_all(&sig_bytes)
     }
 }
 
 impl BorshDeserialize for Musig2PartialSig {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let len = u32::deserialize_reader(reader)? as usize;
+
+        if len != MUSIG2_PARTIAL_SIG_SIZE {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "Invalid Musig2PartialSig size, expected: {}, got: {}",
+                    MUSIG2_PARTIAL_SIG_SIZE, len
+                ),
+            ));
+        }
+
         // Buffer size for 32-byte PartialSignature
         let mut partial_sig_bytes = [0u8; MUSIG2_PARTIAL_SIG_SIZE];
         reader.read_exact(&mut partial_sig_bytes)?;
@@ -240,18 +251,39 @@ impl From<PubNonce> for Musig2PubNonce {
 
 impl BorshSerialize for Musig2PubNonce {
     fn serialize<W: Write>(&self, writer: &mut W) -> std::io::Result<()> {
-        writer.write_all(&self.0.serialize())?;
+        // Serialize self.0 (the PubNonce) into bytes
+        let nonce_bytes = self.0.serialize();
 
-        Ok(())
+        // Write the length prefix as a u32 (little-endian)
+        borsh::BorshSerialize::serialize(&(nonce_bytes.len() as u32), writer)?;
+
+        // Write the nonce bytes
+        writer.write_all(&nonce_bytes)
     }
 }
 
 impl BorshDeserialize for Musig2PubNonce {
     fn deserialize_reader<R: Read>(reader: &mut R) -> std::io::Result<Self> {
-        let mut nonce_bytes = [0u8; PUB_NONCE_SIZE];
+        // Read the length prefix as a u32 (little-endian)
+        let len = u32::deserialize_reader(reader)? as usize;
+
+        if len != PUB_NONCE_SIZE {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "Invalid Musig2PubNonce size, expected: {}, got: {}",
+                    PUB_NONCE_SIZE, len
+                ),
+            ));
+        }
+
+        // Read the nonce bytes based on the length
+        let mut nonce_bytes = vec![0u8; PUB_NONCE_SIZE];
         reader.read_exact(&mut nonce_bytes)?;
+
+        // Convert the bytes into the PubNonce object
         let nonce = PubNonce::from_bytes(&nonce_bytes).map_err(|_e| {
-            std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid pubnonce")
+            std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid pubnonce bytes")
         })?;
 
         Ok(Self(nonce))
@@ -287,22 +319,42 @@ impl From<SecNonce> for Musig2SecNonce {
 }
 
 impl BorshSerialize for Musig2SecNonce {
-    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
-        writer.write_all(&self.0.to_bytes())
+    fn serialize<W: Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        let nonce_bytes = self.0.serialize();
+
+        // Write the length prefix as a u32 (little-endian)
+        borsh::BorshSerialize::serialize(&(nonce_bytes.len() as u32), writer)?;
+
+        // Write the nonce bytes
+        writer.write_all(&nonce_bytes)
     }
 }
 
 impl BorshDeserialize for Musig2SecNonce {
-    fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
-        let mut sec_nonce_bytes = [0u8; 64];
-        reader.read_exact(&mut sec_nonce_bytes)?;
+    fn deserialize_reader<R: Read>(reader: &mut R) -> std::io::Result<Self> {
+        // Read the length prefix as a u32 (little-endian)
+        let len = u32::deserialize_reader(reader)? as usize;
 
-        // Create SecNonce from bytes
-        let sec_nonce = SecNonce::from_bytes(&sec_nonce_bytes).map_err(|_| {
-            std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid SecNonce")
+        if len != SEC_NONCE_SIZE {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "Invalid Musig2SecNonce size, expected: {}, got: {}",
+                    PUB_NONCE_SIZE, len
+                ),
+            ));
+        }
+
+        // Read the nonce bytes based on the length
+        let mut nonce_bytes = vec![0u8; SEC_NONCE_SIZE];
+        reader.read_exact(&mut nonce_bytes)?;
+
+        // Convert the bytes into the PubNonce object
+        let nonce = SecNonce::from_bytes(&nonce_bytes).map_err(|_e| {
+            std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid secnonce bytes")
         })?;
 
-        Ok(Musig2SecNonce(sec_nonce))
+        Ok(Self(nonce))
     }
 }
 
@@ -331,7 +383,12 @@ mod tests {
     use borsh::{BorshDeserialize, BorshSerialize};
 
     use super::{Musig2PubNonce, PublickeyTable};
-    use crate::bridge::{Musig2PartialSig, Musig2SecNonce};
+    use crate::{
+        bridge::{Musig2PartialSig, Musig2SecNonce},
+        constants::{MUSIG2_PARTIAL_SIG_SIZE, PUB_NONCE_SIZE, SEC_NONCE_SIZE},
+    };
+
+    const BORSH_LENGTH_PREFIX_SIZE: usize = 4;
 
     #[test]
     fn test_publickeytable_serialize_deserialize() {
@@ -417,11 +474,12 @@ mod tests {
             result.err().unwrap()
         );
 
-        // Ensure we wrote exactly 32 bytes
+        let expected_length = BORSH_LENGTH_PREFIX_SIZE + MUSIG2_PARTIAL_SIG_SIZE;
         assert_eq!(
             serialized_sig.len(),
-            32,
-            "serialized PartialSignature should be 32 bytes but got {} bytes",
+            expected_length,
+            "serialized PartialSignature should be {} bytes but got {} bytes",
+            expected_length,
             serialized_sig.len()
         );
 
@@ -434,6 +492,26 @@ mod tests {
         assert_eq!(
             deserialized_sig.0, musig2_partial_sig.0,
             "deserialized and original MuSig2 partial sigs should be the same"
+        );
+
+        // check that serde works when sig is embedded
+        #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+        struct TestSigContainer {
+            sig: Musig2PartialSig,
+        }
+
+        let test_sig_container = TestSigContainer {
+            sig: deserialized_sig,
+        };
+        let serialized = borsh::to_vec(&test_sig_container)
+            .expect("container serialization of MuSig2 partial sig should work");
+
+        let deserialized = borsh::from_slice(&serialized)
+            .expect("container deserialization of MuSig2 partial sig should work");
+
+        assert_eq!(
+            test_sig_container, deserialized,
+            "deserialized and original sig containers should be the same"
         );
     }
 
@@ -448,8 +526,7 @@ mod tests {
             Musig2PubNonce::arbitrary(&mut u).expect("Failed to generate arbitrary NonceTable");
 
         // Serialize the PubNonce
-        let mut serialized_nonce = vec![];
-        let result = orig_nonce.serialize(&mut serialized_nonce);
+        let result = borsh::to_vec(&orig_nonce);
 
         assert!(
             result.is_ok(),
@@ -458,14 +535,43 @@ mod tests {
         );
 
         // Deserialize the PubNonce
-        let deserialized_nonce: Musig2PubNonce =
-            Musig2PubNonce::deserialize(&mut &serialized_nonce[..])
-                .expect("deserialization of PubNonce should work");
+        let serialized_nonce = result.unwrap();
+        let expected_size = BORSH_LENGTH_PREFIX_SIZE + PUB_NONCE_SIZE;
+        assert_eq!(
+            serialized_nonce.len(),
+            expected_size,
+            "pubnonce should have a length of {} but got {}",
+            expected_size,
+            serialized_nonce.len(),
+        );
+
+        let deserialized_nonce = borsh::from_slice::<Musig2PubNonce>(&serialized_nonce)
+            .expect("deserialization of PubNonce should work");
 
         // Assert that the serialized and deserialized PubNonce values match
         assert_eq!(
             deserialized_nonce, orig_nonce,
             "Deserialized PubNonce does not match the original",
+        );
+
+        // check that serde works when pubnonce is embedded
+        #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+        struct TestNonceContainer {
+            nonce: Musig2PubNonce,
+        }
+
+        let test_nonce_container = TestNonceContainer {
+            nonce: deserialized_nonce,
+        };
+        let serialized = borsh::to_vec(&test_nonce_container)
+            .expect("container serialization of MuSig2 partial sig should work");
+
+        let deserialized = borsh::from_slice(&serialized)
+            .expect("container deserialization of MuSig2 partial sig should work");
+
+        assert_eq!(
+            test_nonce_container, deserialized,
+            "deserialized and original pubnonce containers should be the same"
         );
     }
 
@@ -486,8 +592,7 @@ mod tests {
         let musig2_sec_nonce = musig2_sec_nonce.unwrap();
 
         // Serialize Musig2SecNonce using Borsh
-        let mut serialized_secnonce = vec![];
-        let result = musig2_sec_nonce.serialize(&mut serialized_secnonce);
+        let result = borsh::to_vec(&musig2_sec_nonce);
 
         assert!(
             result.is_ok(),
@@ -495,20 +600,44 @@ mod tests {
             result.err().unwrap()
         );
 
+        let serialized_secnonce = result.unwrap();
+        let expected_size = BORSH_LENGTH_PREFIX_SIZE + SEC_NONCE_SIZE;
         assert_eq!(
             serialized_secnonce.len(),
-            64,
-            "secnonce should have a length of 66"
+            expected_size,
+            "secnonce should have a length of {} but got {}",
+            expected_size,
+            serialized_secnonce.len(),
         );
+
         // Deserialize Musig2SecNonce using Borsh
-        let deserialized_secnonce: Musig2SecNonce =
-            Musig2SecNonce::deserialize(&mut &serialized_secnonce[..])
-                .expect("deserialization should work");
+        let deserialized_secnonce = borsh::from_slice::<Musig2SecNonce>(&serialized_secnonce)
+            .expect("deserialization should work");
 
         // Assert that the serialized and deserialized SecNonce values match
         assert_eq!(
             deserialized_secnonce, musig2_sec_nonce,
             "Deserialized SecNonce does not match the original"
+        );
+
+        // check that serde works when secnonce is embedded
+        #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+        struct TestSecNonceContainer {
+            nonce: Musig2SecNonce,
+        }
+
+        let test_nonce_container = TestSecNonceContainer {
+            nonce: deserialized_secnonce,
+        };
+        let serialized = borsh::to_vec(&test_nonce_container)
+            .expect("container serialization of MuSig2 partial sig should work");
+
+        let deserialized = borsh::from_slice(&serialized)
+            .expect("container deserialization of MuSig2 partial sig should work");
+
+        assert_eq!(
+            test_nonce_container, deserialized,
+            "deserialized and original pubnonce containers should be the same"
         );
     }
 
