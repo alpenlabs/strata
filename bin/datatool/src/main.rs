@@ -14,7 +14,7 @@ use strata_primitives::{
     block_credential,
     buf::Buf32,
     operator::OperatorPubkeys,
-    params::{ProofPublishMode, RollupParams},
+    params::{DepositTxParams, ProofPublishMode, RollupParams, TransactionParams},
     vk::RollupVerifyingKey,
 };
 use strata_sp1_guest_builder::GUEST_CHECKPOINT_ELF_STR;
@@ -499,13 +499,13 @@ fn construct_params(config: ParamsConfig) -> strata_primitives::params::RollupPa
     // TODO add in bitcoin network
 
     RollupParams {
-        rollup_name: config.name,
+        rollup_name: config.name.clone(),
         block_time: config.block_time_sec * 1000,
         cred_rule: cr,
         // TODO do we want to remove this?
         horizon_l1_height: config.genesis_trigger / 2,
         genesis_l1_height: config.genesis_trigger,
-        operator_config: strata_primitives::params::OperatorConfig::Static(opkeys),
+        operator_config: strata_primitives::params::OperatorConfig::Static(opkeys.clone()),
         // TODO make configurable
         evm_genesis_block_hash: Buf32(
             "0x37ad61cff1367467a98cf7c54c4ac99e989f1fbb1bc1e646235e90c065c565ba"
@@ -520,8 +520,6 @@ fn construct_params(config: ParamsConfig) -> strata_primitives::params::RollupPa
         // TODO make configurable
         l1_reorg_safe_depth: 4,
         target_l2_batch_size: config.epoch_slots as u64,
-        address_length: 20,
-        deposit_amount: config.deposit_sats,
         rollup_vk: RollupVerifyingKey::SP1VerifyingKey(config.rollup_vk),
         // TODO make configurable
         dispatch_assignment_dur: 64,
@@ -532,6 +530,13 @@ fn construct_params(config: ParamsConfig) -> strata_primitives::params::RollupPa
         // TODO make configurable
         max_deposits_in_block: 16,
         network: config.bitcoin_network,
+        tx_params: TransactionParams {
+            deposit: DepositTxParams {
+                magic_bytes: config.name.into_bytes().to_vec(),
+                max_address_length: 20,
+                deposit_amount: config.deposit_sats,
+            },
+        },
     }
 }
 

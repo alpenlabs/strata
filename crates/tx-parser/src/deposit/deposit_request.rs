@@ -4,7 +4,7 @@ use std::convert::TryInto;
 
 use bitcoin::{opcodes::all::OP_RETURN, ScriptBuf, Transaction};
 use strata_bridge_tx_builder::prelude::BRIDGE_DENOMINATION;
-use strata_primitives::params::DepositTxParams;
+use strata_primitives::params::DepositTxConfig;
 use strata_state::tx::DepositRequestInfo;
 use tracing::debug;
 
@@ -14,7 +14,7 @@ use crate::utils::{next_bytes, next_op};
 /// Extracts the DepositInfo from the Deposit Transaction
 pub fn extract_deposit_request_info(
     tx: &Transaction,
-    config: &DepositTxParams,
+    params: &DepositTxConfig,
 ) -> Option<DepositRequestInfo> {
     // Ensure that the transaction has at least 2 outputs
     let addr_txn = tx.output.first()?;
@@ -24,7 +24,7 @@ pub fn extract_deposit_request_info(
     let DepositRequestScriptInfo {
         tap_ctrl_blk_hash,
         ee_bytes,
-    } = parse_deposit_request_script(&op_return_txn.script_pubkey, config).ok()?;
+    } = parse_deposit_request_script(&op_return_txn.script_pubkey, params).ok()?;
 
     // if sent value is less than equal to what we expect for bridge denomination. The extra amount
     // is used for fees to create deposit transaction
@@ -44,7 +44,7 @@ pub fn extract_deposit_request_info(
 /// contains the Magic Bytes
 pub fn parse_deposit_request_script(
     script: &ScriptBuf,
-    config: &DepositTxParams,
+    config: &DepositTxConfig,
 ) -> Result<DepositRequestScriptInfo, DepositParseError> {
     let mut instructions = script.instructions();
 
@@ -69,7 +69,7 @@ pub fn parse_deposit_request_script(
     assert!(data.len() < 80);
 
     // data has expected magic bytes
-    let magic_bytes = &config.magic_bytes;
+    let magic_bytes = &config.params.magic_bytes;
     let magic_len = magic_bytes.len();
     let actual_magic_bytes = &data[..magic_len];
     if data.len() < magic_len || actual_magic_bytes != magic_bytes {
@@ -90,9 +90,9 @@ pub fn parse_deposit_request_script(
 
     // configured bytes for address
     let address = &data[32..];
-    if address.len() != config.address_length as usize {
+    if address.len() != config.params.max_address_length as usize {
         // casting is safe as address.len() < data.len() < 80
-        debug!(?data, expected = config.address_length, got = %address.len(), "incorrect number of bytes in address");
+        debug!(?data, expected = config.params.max_address_length, got = %address.len(), "incorrect number of bytes in address");
         return Err(DepositParseError::InvalidDestAddress(address.len() as u8));
     }
 
@@ -121,20 +121,20 @@ mod tests {
         // values for testing
         let mut config = get_deposit_tx_config();
         let extra_amt = 100000;
-        config.deposit_amount += extra_amt;
-        let amt = Amount::from_sat(config.deposit_amount);
+        config.params.deposit_amount += extra_amt;
+        let amt = Amount::from_sat(config.params.deposit_amount);
         let evm_addr = [1; 20];
         let dummy_control_block = [0xFF; 32];
         let test_taproot_addr = test_taproot_addr();
 
         let deposit_request_script = build_test_deposit_request_script(
-            config.magic_bytes.clone(),
+            config.params.magic_bytes.clone(),
             dummy_control_block.to_vec(),
             evm_addr.to_vec(),
         );
 
         let test_transaction = create_transaction_two_outpoints(
-            Amount::from_sat(config.deposit_amount),
+            Amount::from_sat(config.params.deposit_amount),
             &test_taproot_addr.address().script_pubkey(),
             &deposit_request_script,
         );
@@ -156,7 +156,7 @@ mod tests {
 
         let config = get_deposit_tx_config();
         let invalid_script = build_no_op_deposit_request_script(
-            config.magic_bytes.clone(),
+            config.params.magic_bytes.clone(),
             control_block.to_vec(),
             evm_addr.to_vec(),
         );
@@ -175,7 +175,7 @@ mod tests {
         let config = get_deposit_tx_config();
 
         let script = build_test_deposit_request_script(
-            config.magic_bytes.clone(),
+            config.params.magic_bytes.clone(),
             control_block.to_vec(),
             evm_addr.to_vec(),
         );
@@ -192,7 +192,7 @@ mod tests {
 
         let config = get_deposit_tx_config();
         let script_missing_control = build_test_deposit_request_script(
-            config.magic_bytes.clone(),
+            config.params.magic_bytes.clone(),
             control_block.to_vec(),
             evm_addr.to_vec(),
         );

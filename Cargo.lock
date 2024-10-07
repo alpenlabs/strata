@@ -12758,6 +12758,7 @@ dependencies = [
  "bech32 0.11.0",
  "bitcoin",
  "hex",
+ "musig2",
  "rand 0.8.5",
  "secp256k1",
  "serde_json",

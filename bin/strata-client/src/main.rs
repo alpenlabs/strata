@@ -173,7 +173,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             let sequencer_rpc = &fullnode_config.sequencer_rpc;
             info!(?sequencer_rpc, "initing fullnode task");
 
-            let rpc_client = runtime.block_on(sync_client(sequencer_rpc));
+            let rpc_client = sync_client(sequencer_rpc);
             let sync_peer = RpcSyncPeer::new(rpc_client, 10);
             let l2_sync_context = L2SyncContext::new(
                 sync_peer,

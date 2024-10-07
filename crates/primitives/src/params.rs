@@ -31,6 +31,9 @@ pub struct RollupParams {
     /// Config for how the genesis operator table is set up.
     pub operator_config: OperatorConfig,
 
+    /// Config for various transactions
+    pub tx_params: TransactionParams,
+
     /// Hardcoded EL genesis info
     /// TODO: move elsewhere
     pub evm_genesis_block_hash: Buf32,
@@ -41,13 +44,6 @@ pub struct RollupParams {
 
     /// target batch size in number of l2 blocks
     pub target_l2_batch_size: u64,
-
-    /// Maximum length of an EE address in a deposit.
-    // FIXME this should be "max address length"
-    pub address_length: u8,
-
-    /// Exact "at-rest" deposit amount, in sats.
-    pub deposit_amount: u64,
 
     /// SP1 verifying key that is used to verify the Groth16 proof posted on Bitcoin
     // FIXME which proof?  should this be `checkpoint_vk`?
@@ -100,14 +96,6 @@ impl RollupParams {
             return Err(ParamsError::ZeroProperty("target_l2_batch_size"));
         }
 
-        if self.address_length == 0 {
-            return Err(ParamsError::ZeroProperty("max_address_length"));
-        }
-
-        if self.deposit_amount == 0 {
-            return Err(ParamsError::ZeroProperty("deposit_amount"));
-        }
-
         if self.dispatch_assignment_dur == 0 {
             return Err(ParamsError::ZeroProperty("dispatch_assignment_dur"));
         }
@@ -126,34 +114,6 @@ impl RollupParams {
 
     pub fn rollup_vk(&self) -> RollupVerifyingKey {
         self.rollup_vk
-    }
-}
-
-/// Configuration common among deposit and deposit request transaction
-#[derive(Clone, Debug, PartialEq, BorshSerialize, BorshDeserialize, Deserialize, Serialize)]
-pub struct DepositTxParams {
-    /// Magic bytes we use to regonize a deposit with.
-    pub magic_bytes: Vec<u8>,
-
-    /// Maximum EE address length.
-    // TODO rename to be `max_addr_len`
-    pub address_length: u8,
-
-    /// Exact bitcoin amount in the at-rest deposit.
-    pub deposit_amount: u64,
-
-    /// federation address derived from operator entries
-    pub address: BitcoinAddress,
-}
-
-impl RollupParams {
-    pub fn get_deposit_params(&self, address: BitcoinAddress) -> DepositTxParams {
-        DepositTxParams {
-            magic_bytes: self.rollup_name.clone().into_bytes().to_vec(),
-            address_length: self.address_length,
-            deposit_amount: self.deposit_amount,
-            address,
-        }
     }
 }
 
@@ -217,6 +177,34 @@ impl Params {
 pub enum OperatorConfig {
     /// Use this static list of predetermined operators.
     Static(Vec<OperatorPubkeys>),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub struct TransactionParams {
+    pub deposit: DepositTxParams,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize, BorshSerialize, BorshDeserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct DepositTxParams {
+    /// Magic bytes we use to regonize a deposit with.
+    pub magic_bytes: Vec<u8>,
+
+    /// Maximum EE address length.
+    pub max_address_length: u8,
+
+    /// Exact bitcoin amount in the at-rest deposit.
+    pub deposit_amount: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize, BorshSerialize, BorshDeserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct DepositTxConfig {
+    /// configuration from rollup params
+    pub params: DepositTxParams,
+    /// Bitcoin address
+    pub addr: BitcoinAddress,
 }
 
 /// Error that can arise during params validation.

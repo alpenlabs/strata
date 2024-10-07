@@ -6,11 +6,15 @@ use bitcoin::{
     hashes::Hash,
     Block, Transaction,
 };
-use strata_primitives::{buf::Buf32, l1::L1BlockManifest, params::OperatorConfig};
+use strata_primitives::{
+    buf::Buf32,
+    l1::L1BlockManifest,
+    params::{DepositTxConfig, OperatorConfig},
+};
 use strata_state::l1::{
     get_difficulty_adjustment_height, BtcParams, HeaderVerificationState, L1BlockId, TimestampStore,
 };
-use strata_tx_parser::{filter::TxFilterRule, utils::generate_taproot_address};
+use strata_tx_parser::{filter::TxFilterRule, utils::derive_taproot_address};
 
 use crate::{l2::gen_params, ArbitraryGenerator};
 
@@ -173,9 +177,8 @@ pub fn get_btc_chain() -> BtcChainSegment {
 }
 
 pub fn get_tx_filters() -> Vec<TxFilterRule> {
-    let config = gen_params();
-
-    let operator_config = config.rollup().operator_config.clone();
+    let params = gen_params();
+    let operator_config = params.rollup().operator_config.clone();
     let OperatorConfig::Static(operator_pubkeys) = operator_config;
 
     let operator_pubkeys = operator_pubkeys
@@ -183,12 +186,16 @@ pub fn get_tx_filters() -> Vec<TxFilterRule> {
         .map(|op| *op.wallet_pk())
         .collect::<Vec<Buf32>>();
 
-    let addr = generate_taproot_address(&operator_pubkeys, bitcoin::Network::Regtest)
-        .expect("taproot address");
-    let deposit_tx_params = config.rollup().get_deposit_params(addr);
+    let addr = derive_taproot_address(&operator_pubkeys, bitcoin::Network::Regtest).unwrap();
+
+    let deposit_tx_params = DepositTxConfig {
+        params: params.rollup().tx_params.deposit.clone(),
+        addr,
+    };
 
     vec![
-        TxFilterRule::Deposit(deposit_tx_params),
-        TxFilterRule::RollupInscription(config.rollup().rollup_name.clone()),
+        TxFilterRule::Deposit(deposit_tx_params.clone()),
+        TxFilterRule::DepositRequest(deposit_tx_params.clone()),
+        TxFilterRule::RollupInscription(params.rollup().rollup_name.clone()),
     ]
 }
