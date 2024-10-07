@@ -1,13 +1,12 @@
 #[cfg(feature = "prover")]
 mod test {
-    use bitcoin::params::MAINNET;
     use strata_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
-    use strata_proofimpl_l1_batch::{L1BatchProofInput, L1BatchProofOutput};
+    use strata_proofimpl_l1_batch::L1BatchProofOutput;
     use strata_risc0_adapter::{Risc0Verifier, RiscZeroHost, RiscZeroProofInputBuilder};
     use strata_risc0_guest_builder::{
         GUEST_RISC0_BTC_BLOCKSPACE_ELF, GUEST_RISC0_BTC_BLOCKSPACE_ID, GUEST_RISC0_L1_BATCH_ELF,
     };
-    use strata_test_utils::bitcoin::{get_btc_chain, get_tx_filters};
+    use strata_test_utils::bitcoin::get_tx_filters;
     use strata_zkvm::{
         AggregationInput, ProverOptions, VerificationKey, ZKVMHost, ZKVMInputBuilder, ZKVMVerifier,
     };
@@ -29,7 +28,6 @@ mod test {
         };
         let prover = RiscZeroHost::init(GUEST_RISC0_BTC_BLOCKSPACE_ELF.into(), prover_options);
 
-        let btc_chain = get_btc_chain();
         let btc_blockspace_elf_id: Vec<u8> = GUEST_RISC0_BTC_BLOCKSPACE_ID
             .iter()
             .flat_map(|&x| x.to_le_bytes())
@@ -67,12 +65,6 @@ mod test {
         }
 
         let prover = RiscZeroHost::init(GUEST_RISC0_L1_BATCH_ELF.into(), prover_options);
-        let input = L1BatchProofInput {
-            batch: blockspace_outputs,
-            state: btc_chain.get_verification_state(40321, &MAINNET.clone().into()),
-        };
-
-        l1_batch_input_builder.write_borsh(&input).unwrap();
         let l1_batch_input = l1_batch_input_builder.build().unwrap();
         let (proof, _) = prover
             .prove(l1_batch_input)

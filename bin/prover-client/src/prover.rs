@@ -13,7 +13,7 @@ use strata_sp1_guest_builder::{
     GUEST_BTC_BLOCKSPACE_ELF, GUEST_CHECKPOINT_ELF, GUEST_CL_AGG_ELF, GUEST_CL_STF_ELF,
     GUEST_EVM_EE_STF_ELF, GUEST_L1_BATCH_ELF,
 };
-use strata_zkvm::{Proof, ProverOptions, ZKVMHost, ZKVMInputBuilder};
+use strata_zkvm::{ProofWithMetadata, ProverOptions, ZKVMHost, ZKVMInputBuilder};
 use tracing::{error, info};
 use uuid::Uuid;
 
@@ -300,22 +300,26 @@ where
         }
     }
 
-    fn save_proof_to_db(&self, task_id: Uuid, proof: &Proof) -> Result<(), anyhow::Error> {
+    fn save_proof_to_db(
+        &self,
+        task_id: Uuid,
+        proof: &ProofWithMetadata,
+    ) -> Result<(), anyhow::Error> {
         self.db
             .prover_store()
-            .insert_new_task_entry(*task_id.as_bytes(), proof.into())?;
+            .insert_new_task_entry(*task_id.as_bytes(), proof.as_bytes().to_vec())?;
         Ok(())
     }
 
     // This might be used later?
     #[allow(dead_code)]
-    fn read_proof_from_db(&self, task_id: Uuid) -> Result<Proof, anyhow::Error> {
+    fn read_proof_from_db(&self, task_id: Uuid) -> Result<ProofWithMetadata, anyhow::Error> {
         let proof_entry = self
             .db
             .prover_provider()
             .get_task_entry_by_id(*task_id.as_bytes())?;
         match proof_entry {
-            Some(raw_proof) => Ok(Proof::new(raw_proof)),
+            Some(raw_proof) => Ok(bincode::deserialize(&raw_proof)?),
             None => Err(anyhow::anyhow!("Proof not found for {:?}", task_id)),
         }
     }

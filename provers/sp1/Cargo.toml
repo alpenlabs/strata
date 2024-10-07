@@ -30,8 +30,10 @@ strata-proofimpl-evm-ee-stf.workspace = true
 strata-proofimpl-l1-batch.workspace = true
 strata-state.workspace = true
 strata-test-utils.workspace = true
+strata-tx-parser.workspace = true
 strata-zkvm.workspace = true
 tempfile.workspace = true
+tracing.workspace = true
 
 [features]
 default = ["prover"]

@@ -11,9 +11,10 @@ risc0-zkvm = "1.0.3"
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
+strata-primitives.workspace = true
 strata-zkvm.workspace = true
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [features]
-default = []
+default = ["prover"]
 prover = []
