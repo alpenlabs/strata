@@ -94,9 +94,9 @@ pub trait StrataApi {
     #[method(name = "getActiveOperatorChainPubkeySet")]
     async fn get_active_operator_chain_pubkey_set(&self) -> RpcResult<PublickeyTable>;
 
-    /// Get nth checkpoint info if any
+    /// Get latest checkpoint info
     #[method(name = "getLatestCheckpointIndex")]
-    async fn get_latest_checkpoint_index(&self) -> RpcResult<u64>;
+    async fn get_latest_checkpoint_index(&self) -> RpcResult<Option<u64>>;
 
     /// Get nth checkpoint info if any
     #[method(name = "getCheckpointInfo")]

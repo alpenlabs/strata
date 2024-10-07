@@ -35,7 +35,7 @@ pub async fn run_checkpoint_runner(
 
         let new_checkpoint_idx =
             fetch_latest_checkpoint_index(&sequencer_client, current_checkpoint_idx).await;
-        println!("got the new checkpoint index {:?}", new_checkpoint_idx);
+
         if new_checkpoint_idx > current_checkpoint_idx || !is_started {
             match handle_new_checkpoint(new_checkpoint_idx, &ckp_task_dispatcher, &task_tracker)
                 .await
@@ -74,7 +74,11 @@ async fn fetch_latest_checkpoint_index(
         .request("strata_getLatestCheckpointIndex", rpc_params![])
         .await
     {
-        Ok(idx) => idx,
+        Ok(Some(idx)) => idx,
+        Ok(None) => {
+            error!("Failed to fetch current checkpoint");
+            current_checkpoint_idx
+        }
         Err(e) => {
             error!("Failed to fetch current checkpoint index: {}", e);
             current_checkpoint_idx
@@ -87,8 +91,10 @@ async fn handle_new_checkpoint(
     ckp_task_dispatcher: &TaskDispatcher<CheckpointOperations>,
     task_tracker: &Arc<TaskTracker>,
 ) -> Result<Uuid, ()> {
+    // Discard ongoing tasks
     task_tracker.clear_tasks().await;
 
+    // Create proving task for the new checkpoint
     match ckp_task_dispatcher
         .create_task(CheckpointOpsParam::CheckPointIndex(new_checkpoint_idx))
         .await

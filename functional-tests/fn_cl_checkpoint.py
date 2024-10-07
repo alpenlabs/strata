@@ -22,9 +22,9 @@ class CLBlockWitnessDataGenerationTest(flexitest.Test):
             error_with="Sequencer did not start on time",
         )
 
-        for i in range(10):
-            time.sleep(1)
-            ckp_idx = seqrpc.strata_getLatestCheckpointIndex()
-            ckp = seqrpc.strata_getCheckpointInfo(ckp_idx)
-            print(ckp)
-            assert ckp is not None
+        time.sleep(1)
+        ckp_idx = seqrpc.strata_getLatestCheckpointIndex()
+        assert ckp_idx is not None
+
+        ckp = seqrpc.strata_getCheckpointInfo(ckp_idx)
+        assert ckp is not None

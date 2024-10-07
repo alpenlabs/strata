@@ -69,41 +69,39 @@ impl ProvingOperations for CheckpointOperations {
         let rpc_ckp_info = match info {
             CheckpointOpsParam::Latest => {
                 debug!("Fetching latest checkpoint from the sequencer");
-                let ckp_idx: u64 = self
+                let ckp_idx = self
                     .cl_client
-                    .request("strata_getLatestCheckpointIndex", rpc_params![])
-                    .await?;
+                    .request::<Option<u64>, _>("strata_getLatestCheckpointIndex", rpc_params![])
+                    .await?
+                    .ok_or_else(|| anyhow::anyhow!("Checkpoint information not found"))?;
 
-                let rpc_res: Option<RpcCheckpointInfo> = self
+                self.cl_client
+                    .request::<Option<RpcCheckpointInfo>, _>(
+                        "strata_getCheckpointInfo",
+                        rpc_params![ckp_idx],
+                    )
+                    .await?
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("Checkpoint information not found for index {}", ckp_idx)
+                    })?
+            }
+            CheckpointOpsParam::CheckPointIndex(ckp_idx) => {
+                let mut res = self
                     .cl_client
-                    .request("strata_getCheckpointInfo", rpc_params![ckp_idx])
-                    .await?;
-
-                println!("Got the rpc res 1 as {:?}", ckp_idx);
-                println!("Got the rpc res 2 as {:?}", rpc_res);
-                let mut res = rpc_res.ok_or_else(|| {
-                    anyhow::anyhow!("Checkpoint information not found for index {}", ckp_idx)
-                })?;
+                    .request::<Option<RpcCheckpointInfo>, _>(
+                        "strata_getCheckpointInfo",
+                        rpc_params![ckp_idx],
+                    )
+                    .await?
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("Checkpoint information not found for index {}", ckp_idx)
+                    })?;
 
                 // TODO: TempFix
                 res.l1_range = (1, 1);
                 res
             }
             CheckpointOpsParam::Manual(ckp_info) => ckp_info,
-            CheckpointOpsParam::CheckPointIndex(ckp_idx) => {
-                let rpc_res: Option<RpcCheckpointInfo> = self
-                    .cl_client
-                    .request("strata_getCheckpointInfo", rpc_params![ckp_idx])
-                    .await?;
-
-                let mut res = rpc_res.ok_or_else(|| {
-                    anyhow::anyhow!("Checkpoint information not found for index {}", ckp_idx)
-                })?;
-
-                // TODO: TempFix
-                res.l1_range = (1, 1);
-                res
-            }
         };
 
         Ok(CheckpointInput {
