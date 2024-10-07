@@ -137,11 +137,11 @@ class StrataFactory(flexitest.Factory):
 class FullNodeFactory(flexitest.Factory):
     def __init__(self, port_range: list[int]):
         super().__init__(port_range)
-        self.next_idx = 1
+        self._next_idx = 1
 
     def next_idx(self) -> int:
-        idx = self.next_idx
-        self.next_idx += 1
+        idx = self._next_idx
+        self._next_idx += 1
         return idx
 
     @flexitest.with_ectx("ctx")

@@ -305,12 +305,13 @@ def generate_seqpubkey_from_seed(path: str) -> str:
     ]
     # fmt: on
 
+    with open(path) as f:
+        print("sequencer root privkey", f.read())
+
     res = subprocess.run(cmd, stdout=subprocess.PIPE)
     res.check_returncode()
     res = str(res.stdout, "utf8").strip()
     assert len(res) > 0, "no output generated"
-    with open(path) as f:
-        print("prikey", f.read())
     print("SEQ PUBKEY", res)
     return res
 
