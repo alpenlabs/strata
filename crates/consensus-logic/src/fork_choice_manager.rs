@@ -454,8 +454,10 @@ fn check_new_block<D: Database>(
     let params = state.params.as_ref();
 
     // Check that the block is correctly signed.
-    let cred_ok =
-        strata_state::block_validation::check_block_credential(block.header(), params.rollup());
+    let cred_ok = strata_state::block_validation::check_block_credential(
+        block.header(),
+        &params.rollup().cred_rule,
+    );
     if !cred_ok {
         warn!(?blkid, "block has invalid credential");
         return Ok(false);
