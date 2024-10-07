@@ -181,7 +181,7 @@ pub fn open_rocksdb_database(
 pub fn load_seqkey(path: &Path) -> anyhow::Result<IdentityData> {
     let raw_buf = fs::read(path)?;
     let str_buf = std::str::from_utf8(&raw_buf)?;
-    debug!(%str_buf, ?raw_buf, "loading sequencer root key");
+    debug!(?path, "loading sequencer root key");
     let buf = base58::decode_check(str_buf)?;
     let root_xpriv = Xpriv::decode(&buf)?;
 
