@@ -930,9 +930,11 @@ dependencies = [
  "borsh",
  "sha2",
  "sp1-zkvm",
+ "strata-primitives",
  "strata-proofimpl-btc-blockspace",
  "strata-proofimpl-l1-batch",
  "strata-state",
+ "strata-tx-parser",
 ]
 
 [[package]]

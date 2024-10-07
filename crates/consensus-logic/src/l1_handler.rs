@@ -145,7 +145,7 @@ fn check_for_da_batch(
 
     let sig_verified_checkpoints = signed_checkpts.filter_map(|(signed_checkpoint, tx)| {
         if let Some(seq_pubkey) = seq_pubkey {
-            if !signed_checkpoint.verify_sig(seq_pubkey.into()) {
+            if !signed_checkpoint.verify_sig(&seq_pubkey.into()) {
                 error!(
                     ?tx,
                     ?signed_checkpoint,

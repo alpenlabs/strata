@@ -75,9 +75,9 @@ impl SignedBatchCheckpoint {
         &self.inner
     }
 
-    pub fn verify_sig(&self, pub_key: Buf32) -> bool {
+    pub fn verify_sig(&self, pub_key: &Buf32) -> bool {
         let msg = self.checkpoint().get_sighash();
-        verify_schnorr_sig(&self.signature, &msg, &pub_key)
+        verify_schnorr_sig(&self.signature, &msg, pub_key)
     }
 }
 
