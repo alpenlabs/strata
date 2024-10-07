@@ -14,6 +14,8 @@ if [ ! -f "$KEYFILE" ]; then
 fi
 
 XPRIV_STR=$(cat $KEYFILE | tr -d '\n')
+RPC_HOST=${RPC_HOST:-127.0.0.1}
+RPC_PORT=${RPC_PORT:-4781}
 
 # delayed start to allow other containers to spin up first
 # this is not enough for rollup genesis to be triggered
@@ -24,6 +26,8 @@ sleep 10
 # Start the Strata Operator Client
 strata-bridge-client operator \
   --xpriv-str $XPRIV_STR \
+  --rpc-host $RPC_HOST \
+  --rpc-port $RPC_PORT \
   --btc-url $BTC_URL \
   --btc-user $BTC_USER \
   --btc-pass $BTC_PASS \
