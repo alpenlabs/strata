@@ -23,6 +23,8 @@ x-base-bridge-client: &base-bridge-client
     BTC_URL: "http://bitcoind:18443"
     BTC_USER: rpcuser
     BTC_PASS: rpcpassword
+    RPC_HOST: "0.0.0.0"
+    RPC_PORT: 4781 # default
     ROLLUP_URL: "ws://sequencer:8432"
     DATADIR: .data # default
   networks:
@@ -128,6 +130,7 @@ services:
     container_name: bridge-client-1
     volumes:
       - ./configs/operator1.bin:/app/.secrets/xpriv.bin
+      - ./.data/bridge-client-1:/app/.data
     ports:
       - 4781:4781
 
@@ -136,6 +139,7 @@ services:
     container_name: bridge-client-2
     volumes:
       - ./configs/operator2.bin:/app/.secrets/xpriv.bin
+      - ./.data/bridge-client-2:/app/.data
     ports:
       - 4782:4781
 

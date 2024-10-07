@@ -23,7 +23,7 @@ pub(crate) struct Cli {
 
     #[argh(
         option,
-        description = "host to run the rpc server on (default: 0.0.0.0)"
+        description = "host to run the rpc server on (default: 127.0.0.1)"
     )]
     pub rpc_host: Option<String>,
 
