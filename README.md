@@ -21,14 +21,13 @@ with features such as:
 - **Vaults**, "transfers must wait `N` days after being initiated to be effectuated,
   and can be cancelled in the mean time"
 
-- **Transfer limits**, "only `X%` or less of the current balance
-  can be immediately with a single signature,
-  larger amounts can only be transferred with multiple signatures"
+- **Subscriptions**, "address `0x123...9a` can withdraw up to `v` BTC 
+  per month from this account"
 
 - **Strong privacy**, "transaction details are end-to-end encrypted
   and verified using a zero-knowledge proof"
 
-- **Economically secured zero-confirmation payments**,
+- **Economically-secured zero-confirmation payments**,
   "if a double-spend from this sender is reported,
   the reporter gets to claim the sender's full wallet balance"
 
