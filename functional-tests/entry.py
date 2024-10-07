@@ -215,6 +215,7 @@ class RethFactory(flexitest.Factory):
         self,
         id: int,
         reth_secret_path: str,
+        sequencer_reth_rpc: Optional[str],
         ctx: flexitest.EnvContext,
     ) -> flexitest.Service:
         datadir = ctx.make_service_dir(f"reth.{id}")
@@ -244,6 +245,10 @@ class RethFactory(flexitest.Factory):
             "-vvvv"
         ]
         # fmt: on
+
+        if sequencer_reth_rpc is not None:
+            cmd.extend(["--sequencer-http", sequencer_reth_rpc])
+
         props = {"rpc_port": authrpc_port, "eth_rpc_http_port": ethrpc_http_port}
 
         ethrpc_url = f"ws://localhost:{ethrpc_ws_port}"
@@ -336,7 +341,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
         with open(reth_secret_path, "w") as file:
             file.write(generate_jwt_secret())
 
-        reth = reth_fac.create_exec_client(0, reth_secret_path)
+        reth = reth_fac.create_exec_client(0, reth_secret_path, None)
         reth_port = reth.get_prop("rpc_port")
 
         bitcoind = btc_fac.create_regtest_bitcoin()
@@ -432,9 +437,12 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
         with open(reth_secret_path, "w") as file:
             file.write(generate_jwt_secret())
 
-        reth = reth_fac.create_exec_client(0, reth_secret_path)
-        fullnode_reth = reth_fac.create_exec_client(1, reth_secret_path)
-        reth_port = reth.get_prop("rpc_port")
+        reth = reth_fac.create_exec_client(0, reth_secret_path, None)
+        seq_reth_rpc_port = reth.get_prop("eth_rpc_http_port")
+        fullnode_reth = reth_fac.create_exec_client(
+            1, reth_secret_path, f"http://localhost:{seq_reth_rpc_port}"
+        )
+        reth_authrpc_port = reth.get_prop("rpc_port")
 
         bitcoind = btc_fac.create_regtest_bitcoin()
         # wait for services to to startup
@@ -464,7 +472,7 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
             "bitcoind_pass": rpc_pass,
         }
         reth_config = {
-            "reth_socket": f"localhost:{reth_port}",
+            "reth_socket": f"localhost:{reth_authrpc_port}",
             "reth_secret_path": reth_secret_path,
         }
         sequencer = seq_fac.create_sequencer(

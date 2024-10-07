@@ -1,4 +1,5 @@
 mod db;
+mod rpc;
 
 use std::{fs, future::Future, path::PathBuf, sync::Arc};
 
@@ -39,23 +40,36 @@ fn main() {
         let datadir = builder.config().datadir().data_dir().to_path_buf();
         let mut node_builder = builder.node(StrataEthereumNode::default());
 
+        let sequencer_http = ext.sequencer_http.clone();
+        let mut extend_rpc = None;
+
         // Install Prover Input ExEx, persist to DB, and add RPC for querying block witness.
         if ext.enable_witness_gen {
             let rbdb = db::open_rocksdb_database(datadir.clone()).expect("open rocksdb");
             let db = Arc::new(WitnessDB::new(rbdb));
             let rpc_db = db.clone();
 
-            node_builder = node_builder
-                .extend_rpc_modules(|ctx| {
-                    let rpc = StrataRPC::new(rpc_db);
-                    ctx.modules.merge_configured(rpc.into_rpc())?;
+            extend_rpc.replace(StrataRPC::new(rpc_db));
 
-                    Ok(())
-                })
-                .install_exex("prover_input", |ctx| async {
-                    Ok(ProverWitnessGenerator::new(ctx, db).start())
-                });
+            node_builder = node_builder.install_exex("prover_input", |ctx| async {
+                Ok(ProverWitnessGenerator::new(ctx, db).start())
+            });
         }
+
+        // Note: can only add single hook
+        node_builder = node_builder.extend_rpc_modules(|ctx| {
+            if let Some(rpc) = extend_rpc {
+                ctx.modules.merge_configured(rpc.into_rpc())?;
+            }
+
+            if let Some(sequencer_http) = sequencer_http {
+                // register sequencer tx forwarder
+                ctx.registry.set_eth_raw_transaction_forwarder(Arc::new(
+                    rpc::SequencerClient::new(sequencer_http),
+                ));
+            }
+            Ok(())
+        });
 
         let handle = node_builder.launch().await?;
         handle.node_exit_future.await
@@ -87,6 +101,10 @@ pub struct AdditionalConfig {
 
     #[arg(long, default_value_t = false)]
     pub enable_witness_gen: bool,
+
+    /// Rpc of sequener's reth node to forward transactions to.
+    #[arg(long, required = false)]
+    pub sequencer_http: Option<String>,
 }
 
 pub fn chain_value_parser(s: &str) -> eyre::Result<Arc<ChainSpec>, eyre::Error> {

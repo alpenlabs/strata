@@ -8,14 +8,20 @@ name = "strata-reth"
 path = "src/main.rs"
 
 [dependencies]
+async-trait.workspace = true
 clap = "4"
 eyre.workspace = true
+jsonrpsee-types.workspace = true
+reqwest.workspace = true
 reth.workspace = true
 reth-chainspec.workspace = true
 reth-cli-commands.workspace = true
 reth-cli-util.workspace = true
 reth-db.workspace = true
 reth-primitives.workspace = true
+reth-rpc-eth-api.workspace = true
+reth-rpc-eth-types.workspace = true
+reth-rpc-types.workspace = true
 rockbound.workspace = true
 serde_json.workspace = true
 shellexpand = "3.0.0"
@@ -23,4 +29,5 @@ strata-reth-db.workspace = true
 strata-reth-exex.workspace = true
 strata-reth-node.workspace = true
 strata-reth-rpc.workspace = true
+thiserror.workspace = true
 tracing.workspace = true
