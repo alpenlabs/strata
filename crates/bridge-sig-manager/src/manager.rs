@@ -69,12 +69,6 @@ impl SignatureManager {
     ) -> BridgeSigResult<Txid> {
         let txid = tx_signing_data.psbt.compute_txid();
 
-        // Catching this error will help avoid the tx from being replaced *after* the nonces have
-        // already been shared. The flip side is that transactions cannot be replaced at all.
-        if self.db_ops.get_tx_state_async(txid).await?.is_some() {
-            return Err(BridgeSigError::DuplicateTransaction);
-        }
-
         let key_agg_ctx = KeyAggContext::new(pubkey_table.0.values().copied())?;
 
         let keypath_spend_only = matches!(tx_signing_data.spend_path, TaprootSpendPath::Key);
@@ -490,14 +484,6 @@ mod tests {
             stored_tx_state.psbt(),
             &tx_signing_data.psbt,
             "unsigned transaction in the storage and the one inserted must be the same"
-        );
-
-        let result = signature_manager
-            .add_tx_state(tx_signing_data, pubkey_table)
-            .await;
-        assert!(
-            result.is_err_and(|e| matches!(e, BridgeSigError::DuplicateTransaction)),
-            "attempt to replace an existing tx state should fail with `DuplicateTransaction` error"
         );
     }
 
