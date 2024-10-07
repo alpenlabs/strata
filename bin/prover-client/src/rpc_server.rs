@@ -1,10 +1,10 @@
 //! Bootstraps an RPC server for the prover client.
 
-use strata_rpc_types::RpcCheckpointInfo;
 use anyhow::{Context, Ok};
 use async_trait::async_trait;
-use strata_prover_client_rpc_api::StrataProverClientApiServer;
 use jsonrpsee::{core::RpcResult, RpcModule};
+use strata_prover_client_rpc_api::StrataProverClientApiServer;
+use strata_rpc_types::RpcCheckpointInfo;
 use tokio::sync::oneshot;
 use tracing::{info, warn};
 use uuid::Uuid;
@@ -12,8 +12,12 @@ use uuid::Uuid;
 use crate::{
     dispatcher::TaskDispatcher,
     proving_ops::{
-        btc_ops::BtcOperations, checkpoint_ops::CheckpointOperations, cl_ops::ClOperations,
-        el_ops::ElOperations, l1_batch_ops::L1BatchOperations, l2_batch_ops::L2BatchOperations,
+        btc_ops::BtcOperations,
+        checkpoint_ops::{CheckpointOperations, CheckpointOpsParam},
+        cl_ops::ClOperations,
+        el_ops::ElOperations,
+        l1_batch_ops::L1BatchOperations,
+        l2_batch_ops::L2BatchOperations,
     },
 };
 
@@ -154,11 +158,11 @@ impl StrataProverClientApiServer for ProverClientRpc {
         RpcResult::Ok(task_id)
     }
 
-    async fn prove_checkpoint(&self, checkpoint_info: RpcCheckpointInfo) -> RpcResult<Uuid> {
+    async fn prove_latest_checkpoint(&self) -> RpcResult<Uuid> {
         let task_id = self
             .context
             .checkpoint_dispatcher
-            .create_task(checkpoint_info)
+            .create_task(CheckpointOpsParam::Latest)
             .await
             .expect("failed to add proving task, checkpoint");
 
@@ -181,7 +185,7 @@ impl StrataProverClientApiServer for ProverClientRpc {
         let task_id = self
             .context
             .checkpoint_dispatcher
-            .create_task(checkpoint_info)
+            .create_task(CheckpointOpsParam::Manual(checkpoint_info))
             .await
             .expect("failed to add proving task, checkpoint");
 

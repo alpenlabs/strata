@@ -2,12 +2,9 @@
 
 use std::sync::Arc;
 
-use strata_btcio::rpc::BitcoinClient;
-use strata_common::logging;
 use args::Args;
+use ckp_runner::run_checkpoint_runner;
 use dispatcher::TaskDispatcher;
-use strata_sp1_adapter::SP1Host;
-use strata_zkvm::ProverOptions;
 use jsonrpsee::http_client::HttpClientBuilder;
 use manager::ProverManager;
 use proving_ops::{
@@ -15,10 +12,15 @@ use proving_ops::{
     el_ops::ElOperations, l1_batch_ops::L1BatchOperations, l2_batch_ops::L2BatchOperations,
 };
 use rpc_server::{ProverClientRpc, RpcContext};
+use strata_btcio::rpc::BitcoinClient;
+use strata_common::logging;
+use strata_sp1_adapter::SP1Host;
+use strata_zkvm::ProverOptions;
 use task::TaskTracker;
 use tracing::info;
 
 mod args;
+mod ckp_runner;
 mod config;
 mod db;
 mod dispatcher;
@@ -52,7 +54,7 @@ async fn main() {
             args.bitcoind_user.clone(),
             args.bitcoind_password.clone(),
         )
-        .unwrap(),
+        .expect("failed to connect to the btc client"),
     );
 
     let task_tracker = Arc::new(TaskTracker::new());
@@ -75,6 +77,7 @@ async fn main() {
     let l2_batch_dispatcher = TaskDispatcher::new(l2_batch_ops, task_tracker.clone());
 
     let checkpoint_ops = CheckpointOperations::new(
+        cl_client.clone(),
         Arc::new(l1_batch_dispatcher.clone()),
         Arc::new(l2_batch_dispatcher.clone()),
     );
@@ -95,12 +98,24 @@ async fn main() {
         enable_compression: true,
         ..Default::default()
     };
-    let prover_manager: ProverManager<SP1Host> = ProverManager::new(task_tracker, prover_options);
+    let prover_manager: ProverManager<SP1Host> =
+        ProverManager::new(task_tracker.clone(), prover_options);
 
     // run prover manager in background
     tokio::spawn(async move { prover_manager.run().await });
 
+    // run checkpoint runner
+    tokio::spawn(async move {
+        run_checkpoint_runner(
+            cl_client.clone(),
+            checkpoint_dispatcher.clone(),
+            task_tracker.clone(),
+        )
+        .await
+    });
+
     // run rpc server
+    // TODO: Run this on dev mode only
     let rpc_url = args.get_dev_rpc_url();
     run_rpc_server(rpc_context, rpc_url, args.enable_dev_rpcs)
         .await

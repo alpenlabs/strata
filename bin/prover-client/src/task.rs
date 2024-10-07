@@ -23,6 +23,11 @@ impl TaskTracker {
         }
     }
 
+    pub async fn clear_tasks(&self) {
+        let mut tasks = self.tasks.lock().await;
+        tasks.clear();
+    }
+
     pub async fn create_task(&self, prover_input: ZKVMInput, dependencies: Vec<Uuid>) -> Uuid {
         let task_id = Uuid::new_v4();
         let status = if dependencies.is_empty() {
@@ -35,6 +40,7 @@ impl TaskTracker {
             prover_input,
             status,
             dependencies,
+            proof: None,
         };
         let mut tasks = self.tasks.lock().await;
         tasks.insert(task_id, task);
@@ -55,6 +61,7 @@ impl TaskTracker {
         let mut tasks = self.tasks.lock().await;
         if let Some(task) = tasks.get_mut(&task_id) {
             task.status = ProvingTaskStatus::Completed;
+            task.proof = Some(proof.clone());
         }
 
         // Collect dependent tasks and their completion status

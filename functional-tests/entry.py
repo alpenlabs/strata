@@ -547,6 +547,7 @@ def main(argv):
         "premined_blocks": BasicEnvConfig(101),
         "fast_batches": BasicEnvConfig(101, rollup_params=FAST_BATCH_ROLLUP_PARAMS),
         "hub1": HubNetworkEnvConfig(),
+        # "prover": BasicEnvConfig(enable_prover_client=True),
         "prover": BasicEnvConfig(101, enable_prover_client=True),
     }
 

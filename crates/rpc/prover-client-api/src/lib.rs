@@ -29,10 +29,6 @@ pub trait StrataProverClientApi {
     async fn prove_l2_batch(&self, l2_range: (u64, u64)) -> RpcResult<Uuid>;
 
     /// Start proving the given checkpoint info
-    #[method(name = "proveCheckpoint")]
-    async fn prove_checkpoint(&self, checkpoint: RpcCheckpointInfo) -> RpcResult<Uuid>;
-
-    /// Start proving the given checkpoint info
     #[method(name = "proveCheckpointRaw")]
     async fn prove_checkpoint_raw(
         &self,
@@ -41,9 +37,11 @@ pub trait StrataProverClientApi {
         l2_range: (u64, u64),
     ) -> RpcResult<Uuid>;
 
+    /// Start proving the latest checkpoint info from the sequencer
+    #[method(name = "proveLatestCheckPoint")]
+    async fn prove_latest_checkpoint(&self) -> RpcResult<Uuid>;
+
     /// Start proving the given el block
     #[method(name = "getTaskStatus")]
     async fn get_task_status(&self, task_id: Uuid) -> RpcResult<Option<String>>;
-
-
 }

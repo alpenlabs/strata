@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
-use strata_rpc_types::RpcCheckpointInfo;
 use async_trait::async_trait;
+use jsonrpsee::{core::client::ClientT, http_client::HttpClient, rpc_params};
+use strata_rpc_types::RpcCheckpointInfo;
+use tracing::debug;
 use uuid::Uuid;
 
 use super::{
@@ -17,6 +19,7 @@ use crate::{
 /// Operations required for BTC block proving tasks.
 #[derive(Debug, Clone)]
 pub struct CheckpointOperations {
+    cl_client: HttpClient,
     l1_batch_dispatcher: Arc<TaskDispatcher<L1BatchOperations>>,
     l2_batch_dispatcher: Arc<TaskDispatcher<L2BatchOperations>>,
 }
@@ -24,10 +27,12 @@ pub struct CheckpointOperations {
 impl CheckpointOperations {
     /// Creates a new BTC operations instance.
     pub fn new(
+        cl_client: HttpClient,
         l1_batch_dispatcher: Arc<TaskDispatcher<L1BatchOperations>>,
         l2_batch_dispatcher: Arc<TaskDispatcher<L2BatchOperations>>,
     ) -> Self {
         Self {
+            cl_client,
             l1_batch_dispatcher,
             l2_batch_dispatcher,
         }
@@ -43,25 +48,71 @@ pub struct CheckpointInput {
     pub l2_batch_proof: Option<ProofWithVkey>,
 }
 
+#[derive(Debug, Clone)]
+pub enum CheckpointOpsParam {
+    Latest,
+    Manual(RpcCheckpointInfo),
+    CheckPointIndex(u64),
+}
+
 #[async_trait]
 impl ProvingOperations for CheckpointOperations {
     // Range of l1 blocks
     type Input = CheckpointInput;
-    type Params = RpcCheckpointInfo;
+    type Params = CheckpointOpsParam;
 
     fn block_type(&self) -> ProvingTaskType {
         ProvingTaskType::Btc
     }
 
-    async fn fetch_input(&self, info: RpcCheckpointInfo) -> Result<Self::Input, anyhow::Error> {
-        let input: Self::Input = CheckpointInput {
-            info,
+    async fn fetch_input(&self, info: CheckpointOpsParam) -> Result<Self::Input, anyhow::Error> {
+        let rpc_ckp_info = match info {
+            CheckpointOpsParam::Latest => {
+                debug!("Fetching latest checkpoint from the sequencer");
+                let ckp_idx: u64 = self
+                    .cl_client
+                    .request("strata_getLatestCheckpointIndex", rpc_params![])
+                    .await?;
+
+                let rpc_res: Option<RpcCheckpointInfo> = self
+                    .cl_client
+                    .request("strata_getCheckpointInfo", rpc_params![ckp_idx])
+                    .await?;
+
+                println!("Got the rpc res 1 as {:?}", ckp_idx);
+                println!("Got the rpc res 2 as {:?}", rpc_res);
+                let mut res = rpc_res.ok_or_else(|| {
+                    anyhow::anyhow!("Checkpoint information not found for index {}", ckp_idx)
+                })?;
+
+                // TODO: TempFix
+                res.l1_range = (1, 1);
+                res
+            }
+            CheckpointOpsParam::Manual(ckp_info) => ckp_info,
+            CheckpointOpsParam::CheckPointIndex(ckp_idx) => {
+                let rpc_res: Option<RpcCheckpointInfo> = self
+                    .cl_client
+                    .request("strata_getCheckpointInfo", rpc_params![ckp_idx])
+                    .await?;
+
+                let mut res = rpc_res.ok_or_else(|| {
+                    anyhow::anyhow!("Checkpoint information not found for index {}", ckp_idx)
+                })?;
+
+                // TODO: TempFix
+                res.l1_range = (1, 1);
+                res
+            }
+        };
+
+        Ok(CheckpointInput {
+            info: rpc_ckp_info,
             l1_batch_id: Uuid::nil(),
             l2_batch_id: Uuid::nil(),
             l1_batch_proof: None,
             l2_batch_proof: None,
-        };
-        Ok(input)
+        })
     }
 
     async fn append_task(

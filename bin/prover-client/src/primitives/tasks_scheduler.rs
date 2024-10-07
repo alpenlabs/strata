@@ -59,4 +59,5 @@ pub struct ProvingTask {
     pub prover_input: ZKVMInput,
     pub status: ProvingTaskStatus,
     pub dependencies: Vec<Uuid>,
+    pub proof: Option<ProofWithVkey>,
 }
