@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use alloy::{primitives::Address as RollupAddress, providers::WalletProvider};
+use alloy::{primitives::Address as StrataAddress, providers::WalletProvider};
 use argh::FromArgs;
 use bdk_wallet::{bitcoin::Address, KeychainKind};
 use console::Term;
@@ -12,20 +12,21 @@ use sha2::{Digest, Sha256};
 use shrex::{encode, Hex};
 
 use crate::{
-    constants::NETWORK, rollup::RollupWallet, seed::Seed, settings::Settings, signet::SignetWallet,
+    constants::NETWORK,
+    net_type::{net_type_or_exit, NetworkType},
+    seed::Seed,
+    settings::Settings,
+    signet::SignetWallet,
+    strata::StrataWallet,
 };
 
 /// Request some bitcoin from the faucet
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "faucet")]
 pub struct FaucetArgs {
-    /// request bitcoin on signet
-    #[argh(switch)]
-    signet: bool,
-
-    /// request bitcoin on rollup
-    #[argh(switch)]
-    rollup: bool,
+    /// either "signet" or "strata"
+    #[argh(positional)]
+    network_type: String,
 
     /// address that funds will be sent to. defaults to internal wallet
     #[argh(positional)]
@@ -43,13 +44,7 @@ pub struct PowChallenge {
 
 pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
     let term = Term::stdout();
-    if args.signet && args.rollup {
-        let _ = term.write_line("Cannot use both --signet and --rollup options at once");
-        std::process::exit(1);
-    } else if !args.signet && !args.rollup {
-        let _ = term.write_line("Must specify either --signet and --rollup option");
-        std::process::exit(1);
-    }
+    let network_type = net_type_or_exit(&args.network_type, &term);
 
     let _ = term.write_line("Fetching challenge from faucet");
 
@@ -90,42 +85,45 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
         "✔ Solved challenge after {solution} attempts. Claiming now."
     ));
 
-    let url = if args.signet {
-        let mut l1w = SignetWallet::new(&seed, NETWORK).unwrap();
-        let address = match args.address {
-            None => {
-                let address_info = l1w.reveal_next_address(KeychainKind::External);
-                l1w.persist().unwrap();
-                address_info.address
-            }
-            Some(address) => {
-                let address = Address::from_str(&address).expect("bad address");
+    let url = match network_type {
+        NetworkType::Signet => {
+            let mut l1w = SignetWallet::new(&seed, NETWORK).unwrap();
+            let address = match args.address {
+                None => {
+                    let address_info = l1w.reveal_next_address(KeychainKind::External);
+                    l1w.persist().unwrap();
+                    address_info.address
+                }
+                Some(address) => {
+                    let address = Address::from_str(&address).expect("bad address");
+                    address
+                        .require_network(NETWORK)
+                        .expect("wrong bitcoin network")
+                }
+            };
+
+            let _ = term.write_line(&format!("Claiming to signet address {}", address));
+
+            format!(
+                "{base}claim_l1/{}/{}",
+                encode(&solution.to_le_bytes()),
                 address
-                    .require_network(NETWORK)
-                    .expect("wrong bitcoin network")
-            }
-        };
-
-        let _ = term.write_line(&format!("Claiming to signet address {}", address));
-
-        format!(
-            "{base}claim_l1/{}/{}",
-            encode(&solution.to_le_bytes()),
-            address
-        )
-    } else {
-        let l2w = RollupWallet::new(&seed, &settings.l2_http_endpoint).unwrap();
-        // they said EVMs were advanced 👁️👁️
-        let address = match args.address {
-            Some(address) => RollupAddress::from_str(&address).expect("bad address"),
-            None => l2w.default_signer_address(),
-        };
-        let _ = term.write_line(&format!("Claiming to rollup address {}", address));
-        format!(
-            "{base}claim_l2/{}/{}",
-            encode(&solution.to_le_bytes()),
-            address
-        )
+            )
+        }
+        NetworkType::Strata => {
+            let l2w = StrataWallet::new(&seed, &settings.l2_http_endpoint).unwrap();
+            // they said EVMs were advanced 👁️👁️
+            let address = match args.address {
+                Some(address) => StrataAddress::from_str(&address).expect("bad address"),
+                None => l2w.default_signer_address(),
+            };
+            let _ = term.write_line(&format!("Claiming to Strata address {}", address));
+            format!(
+                "{base}claim_l2/{}/{}",
+                encode(&solution.to_le_bytes()),
+                address
+            )
+        }
     };
 
     let res = client.get(url).send().await.unwrap();

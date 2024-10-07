@@ -11,14 +11,14 @@ use indicatif::ProgressBar;
 
 use crate::{
     constants::{BRIDGE_OUT_AMOUNT, NETWORK},
-    rollup::RollupWallet,
     seed::Seed,
     settings::Settings,
     signet::SignetWallet,
+    strata::StrataWallet,
     taproot::ExtractP2trPubkey,
 };
 
-/// Bridge 10 BTC from the rollup to signet
+/// Bridge 10 BTC from Strata to signet
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "bridge-out")]
 pub struct BridgeOutArgs {
@@ -36,7 +36,7 @@ pub async fn bridge_out(args: BridgeOutArgs, seed: Seed, settings: Settings) {
     });
 
     let mut l1w = SignetWallet::new(&seed, NETWORK).unwrap();
-    let l2w = RollupWallet::new(&seed, &settings.l2_http_endpoint).unwrap();
+    let l2w = StrataWallet::new(&seed, &settings.l2_http_endpoint).unwrap();
 
     let address = match address {
         Some(a) => a,
@@ -55,7 +55,7 @@ pub async fn bridge_out(args: BridgeOutArgs, seed: Seed, settings: Settings) {
 
     let tx = l2w
         .transaction_request()
-        .with_to(settings.bridge_rollup_address)
+        .with_to(settings.bridge_strata_address)
         .with_value(U256::from(BRIDGE_OUT_AMOUNT.to_sat() * 1u64.pow(10)))
         .input(TransactionInput::new(
             address

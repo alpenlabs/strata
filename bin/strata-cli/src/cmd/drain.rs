@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use alloy::{
-    primitives::{Address as RollupAddress, U256},
+    primitives::{Address as StrataAddress, U256},
     providers::{utils::Eip1559Estimation, Provider, WalletProvider},
 };
 use argh::FromArgs;
@@ -10,37 +10,37 @@ use console::{style, Term};
 
 use crate::{
     constants::NETWORK,
-    rollup::RollupWallet,
     seed::Seed,
     settings::Settings,
     signet::{get_fee_rate, log_fee_rate, EsploraClient, SignetWallet},
+    strata::StrataWallet,
 };
 
 /// Drains the internal wallet to the provided
-/// signet and rollup addresses
+/// signet and Strata addresses
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "drain")]
 pub struct DrainArgs {
     /// a signet address for signet funds to be drained to
     #[argh(option, short = 's')]
     signet_address: Option<String>,
-    /// a rollup address for rollup funds to be drained to
+    /// a Strata address for Strata funds to be drained to
     #[argh(option, short = 'r')]
-    rollup_address: Option<String>,
+    strata_address: Option<String>,
 }
 
 pub async fn drain(
     DrainArgs {
         signet_address,
-        rollup_address,
+        strata_address,
     }: DrainArgs,
     seed: Seed,
     settings: Settings,
     esplora: EsploraClient,
 ) {
     let term = Term::stdout();
-    if rollup_address.is_none() && signet_address.is_none() {
-        let _ = term.write_line("Either signet or rollup address should be provided");
+    if strata_address.is_none() && signet_address.is_none() {
+        let _ = term.write_line("Either signet or Strata address should be provided");
     }
 
     let signet_address = signet_address.map(|a| {
@@ -49,8 +49,8 @@ pub async fn drain(
             .require_network(NETWORK)
             .expect("correct network")
     });
-    let rollup_address =
-        rollup_address.map(|a| RollupAddress::from_str(&a).expect("valid rollup address"));
+    let strata_address =
+        strata_address.map(|a| StrataAddress::from_str(&a).expect("valid Strata address"));
 
     if let Some(address) = signet_address {
         let mut l1w = SignetWallet::new(&seed, NETWORK).unwrap();
@@ -77,11 +77,11 @@ pub async fn drain(
         esplora.broadcast(&tx).await.unwrap();
     }
 
-    if let Some(address) = rollup_address {
-        let l2w = RollupWallet::new(&seed, &settings.l2_http_endpoint).unwrap();
+    if let Some(address) = strata_address {
+        let l2w = StrataWallet::new(&seed, &settings.l2_http_endpoint).unwrap();
         let balance = l2w.get_balance(l2w.default_signer_address()).await.unwrap();
         if balance == U256::ZERO {
-            let _ = term.write_line("No rollup funds to send");
+            let _ = term.write_line("No Strata bitcoin to send");
         }
         let Eip1559Estimation {
             max_fee_per_gas,

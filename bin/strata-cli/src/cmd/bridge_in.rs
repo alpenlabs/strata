@@ -1,6 +1,6 @@
 use std::{str::FromStr, time::Duration};
 
-use alloy::{primitives::Address as RollupAddress, providers::WalletProvider};
+use alloy::{primitives::Address as StrataAddress, providers::WalletProvider};
 use argh::FromArgs;
 use bdk_wallet::{
     bitcoin::{hashes::Hash, taproot::LeafVersion, Address, TapNodeHash, XOnlyPublicKey},
@@ -19,39 +19,39 @@ use crate::{
         BRIDGE_IN_AMOUNT, L2_BLOCK_TIME, NETWORK, RECOVER_AT_DELAY, RECOVER_DELAY, UNSPENDABLE,
     },
     recovery::DescriptorRecovery,
-    rollup::RollupWallet,
     seed::Seed,
     settings::Settings,
     signet::{get_fee_rate, log_fee_rate, EsploraClient, SignetWallet},
+    strata::StrataWallet,
     taproot::{ExtractP2trPubkey, NotTaprootAddress},
 };
 
-/// Bridge 10 BTC from signet to the rollup. If an address is not provided, the wallet's internal
-/// rollup address will be used.
+/// Bridge 10 BTC from signet to Strata. If an address is not provided, the wallet's internal
+/// Strata address will be used.
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "bridge-in")]
 pub struct BridgeInArgs {
     #[argh(positional)]
-    rollup_address: Option<String>,
+    strata_address: Option<String>,
 }
 
 pub async fn bridge_in(args: BridgeInArgs, seed: Seed, settings: Settings, esplora: EsploraClient) {
     let term = Term::stdout();
-    let requested_rollup_address = args
-        .rollup_address
-        .map(|a| RollupAddress::from_str(&a).expect("bad rollup address"));
+    let requested_strata_address = args
+        .strata_address
+        .map(|a| StrataAddress::from_str(&a).expect("bad strata address"));
     let mut l1w = SignetWallet::new(&seed, NETWORK).unwrap();
-    let l2w = RollupWallet::new(&seed, &settings.l2_http_endpoint).unwrap();
+    let l2w = StrataWallet::new(&seed, &settings.l2_http_endpoint).unwrap();
 
     l1w.sync(&esplora).await.unwrap();
     let recovery_address = l1w.reveal_next_address(KeychainKind::External).address;
     l1w.persist().unwrap();
 
-    let rollup_address = requested_rollup_address.unwrap_or(l2w.default_signer_address());
+    let strata_address = requested_strata_address.unwrap_or(l2w.default_signer_address());
     let _ = term.write_line(&format!(
-        "Bridging {} to rollup address {}",
+        "Bridging {} to Strata address {}",
         style(BRIDGE_IN_AMOUNT.to_string()).green(),
-        style(rollup_address).cyan(),
+        style(strata_address).cyan(),
     ));
 
     let _ = term.write_line(&format!(
@@ -99,11 +99,11 @@ pub async fn bridge_in(args: BridgeInArgs, seed: Seed, settings: Settings, esplo
 
     const MBL: usize = MAGIC_BYTES.len();
     const TNHL: usize = TapNodeHash::LEN;
-    let mut op_return_data = [0u8; MBL + TNHL + RollupAddress::len_bytes()];
+    let mut op_return_data = [0u8; MBL + TNHL + StrataAddress::len_bytes()];
     op_return_data[..MBL].copy_from_slice(MAGIC_BYTES);
     op_return_data[MBL..MBL + TNHL]
         .copy_from_slice(recovery_script_hash.as_raw_hash().as_byte_array());
-    op_return_data[MBL + TNHL..].copy_from_slice(rollup_address.as_slice());
+    op_return_data[MBL + TNHL..].copy_from_slice(strata_address.as_slice());
 
     let mut psbt = l1w
         .build_tx()
@@ -137,7 +137,7 @@ pub async fn bridge_in(args: BridgeInArgs, seed: Seed, settings: Settings, esplo
     esplora.broadcast(&tx).await.expect("successful broadcast");
     pb.finish_with_message(format!("Transaction {} broadcasted", tx.compute_txid()));
     let _ = term.write_line(&format!(
-        "Expect transaction confirmation in ~{:?}. Funds will take longer than this to be available on rollup.",
+        "Expect transaction confirmation in ~{:?}. Funds will take longer than this to be available on Strata.",
         L2_BLOCK_TIME
     ));
 }
