@@ -66,7 +66,7 @@ where
 
         let operator_pubkeys = self.tx_build_ctx.pubkey_table();
 
-        info!(?tx_info, "received transaction details",);
+        info!(?tx_info, "received transaction details");
 
         // sign the transaction with MuSig2 and put inside the OperatorPartialSig
 

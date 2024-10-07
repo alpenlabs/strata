@@ -26,6 +26,7 @@ use strata_primitives::{
     l1::TaprootSpendPath,
 };
 use strata_storage::ops::bridge::BridgeTxStateOps;
+use tracing::info;
 
 use super::errors::{BridgeSigError, BridgeSigResult};
 use crate::operations::{create_message_hash, sign_state_partial, verify_partial_sig};
@@ -60,14 +61,26 @@ impl SignatureManager {
         }
     }
 
-    /// Adds a [`BridgeTxState`] to the [`SignatureManager`] replacing if already present for the
-    /// computed [`Txid`].
+    /// Adds a [`BridgeTxState`] to the [`SignatureManager`]
+    ///
+    /// If the computed [`Txid`] is already present in the database, it is not updated but simply
+    /// returned.
     pub async fn add_tx_state(
         &self,
         tx_signing_data: TxSigningData,
         pubkey_table: PublickeyTable,
     ) -> BridgeSigResult<Txid> {
         let txid = tx_signing_data.psbt.compute_txid();
+
+        // if the state is already present, then there is no need to generate a new secnonce,
+        // the pubnonces and signatures can all be deterministically generated once the secnonce is
+        // fixed.
+        //
+        // A collision between `Txid`'s is practically impossible.
+        if self.db_ops.get_tx_state_async(txid).await?.is_some() {
+            info!(%txid, "not replacing tx_state that is already present in the tx_db");
+            return Ok(txid);
+        }
 
         let key_agg_ctx = KeyAggContext::new(pubkey_table.0.values().copied())?;
 
