@@ -5,7 +5,7 @@ import subprocess
 import time
 from dataclasses import dataclass
 from threading import Thread
-from typing import Any, Callable, TypeVar
+from typing import Any, Callable, TypeVar, Optional
 
 from bitcoinlib.services.bitcoind import BitcoindClient
 
@@ -113,14 +113,17 @@ class RollupParamsSettings:
     block_time_sec: int
     epoch_slots: int
     genesis_trigger: int
+    proof_timeout: Optional[int] = None
 
-    # FIXME add type annotation?
-    @staticmethod
-    def new_default():
-        return RollupParamsSettings(
+    # NOTE: type annnotation: Ideally we would use `Self` but couldn't use it
+    # even after changing python version to 3.12
+    @classmethod
+    def new_default(cls) -> "RollupParamsSettings":
+        return cls(
             block_time_sec = DEFAULT_BLOCK_TIME_SEC,
             epoch_slots = DEFAULT_EPOCH_SLOTS,
             genesis_trigger = DEFAULT_GENESIS_TRIGGER_HT,
+            proof_timeout = DEFAULT_PROOF_TIMEOUT,
         )
 
 
@@ -144,7 +147,7 @@ def check_nth_checkpoint_finalized(
     batch_info = wait_until_with_value(
         lambda: seqrpc.strata_getCheckpointInfo(idx),
         predicate=lambda v: v is not None,
-        error_with="Could not find checkpoint info",
+        error_with=f"Could not find checkpoint info for index {idx}",
         timeout=3,
     )
 
@@ -162,7 +165,8 @@ def check_nth_checkpoint_finalized(
         submit_checkpoint(idx, seqrpc, manual_gen)
     else:
         # Just wait until timeout period instead of submitting so that sequencer submits empty proof
-        time.sleep(proof_timeout)
+        delta = 1
+        time.sleep(proof_timeout + delta)
 
     if manual_gen:
         # Produce l1 blocks until proof is finalized
@@ -225,7 +229,6 @@ def check_submit_proof_fails_for_nonexistent_batch(seqrpc, nonexistent_batch: in
         seqrpc.strataadmin_submitCheckpointProof(nonexistent_batch, proof_hex)
     except Exception as e:
         if hasattr(e, "code"):
-            print(e)
             assert e.code == ERROR_CHECKPOINT_DOESNOT_EXIST
         else:
             print("Unexpected error occurred")
@@ -306,6 +309,9 @@ def generate_seqpubkey_from_seed(path: str) -> str:
     res.check_returncode()
     res = str(res.stdout, "utf8").strip()
     assert len(res) > 0, "no output generated"
+    with open(path) as f:
+        print("prikey", f.read())
+    print("SEQ PUBKEY", res)
     return res
 
 
@@ -342,9 +348,10 @@ def generate_params(
         "--block-time", str(settings.block_time_sec),
         "--epoch-slots", str(settings.epoch_slots),
         "--genesis-trigger-height", str(settings.genesis_trigger),
-        "--proof-timeout", str(30),
         "--seqkey", seqpubkey,
     ]
+    if settings.proof_timeout is not None:
+        cmd.extend(["--proof-timeout", str(settings.proof_timeout)])
     # fmt: on
 
     for k in oppubkeys:
@@ -376,4 +383,5 @@ def generate_simple_params(
     opxpubs = [generate_opxpub_from_seed(p) for p in opseedpaths]
 
     params = generate_params(settings, seqkey, opxpubs)
+    print("Params", params)
     return {"params": params, "opseedpaths": opseedpaths}

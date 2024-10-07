@@ -6,7 +6,11 @@ use std::{
 };
 
 use anyhow::Context;
-use bitcoin::{Address, Network};
+use bitcoin::{
+    base58,
+    bip32::{Xpriv, Xpub},
+    Address, Network,
+};
 use format_serde_error::SerdeError;
 use reth_rpc_types::engine::JwtSecret;
 use rockbound::{rocksdb, OptimisticTransactionDB};
@@ -179,18 +183,20 @@ pub fn open_rocksdb_database(
 }
 
 pub fn load_seqkey(path: &PathBuf) -> anyhow::Result<IdentityData> {
-    let secret_str = fs::read_to_string(path)?;
-    let Ok(raw_key) = <[u8; 32]>::try_from(hex::decode(secret_str)?) else {
-        error!("malformed seqkey");
-        anyhow::bail!("malformed seqkey");
-    };
+    let raw_buf = fs::read(path)?;
+    let str_buf = std::str::from_utf8(&raw_buf)?;
+    debug!(%str_buf, ?raw_buf, "Loading seq key");
+    let buf = base58::decode_check(str_buf)?;
+    let xpriv = Xpriv::decode(&buf)?;
 
-    let key = Buf32::from(raw_key);
-
-    // FIXME all this needs to be changed to use actual cryptographic keys
+    let key = Buf32::from(xpriv.private_key.secret_bytes());
     let ik = IdentityKey::Sequencer(key);
-    let ident = Identity::Sequencer(key);
+
+    let seq_xpub = Xpub::from_priv(bitcoin::secp256k1::SECP256K1, &xpriv);
+    let pubkey = seq_xpub.to_x_only_pub().serialize();
+    let ident = Identity::Sequencer(Buf32::from(pubkey));
     let idata = IdentityData::new(ident, ik);
+    debug!(?idata, "SEQKEY");
 
     Ok(idata)
 }

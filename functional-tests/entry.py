@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import json
 import os
 import sys
 import time
@@ -92,11 +91,7 @@ class StrataFactory(flexitest.Factory):
         rpc_host = "localhost"
         logfile = os.path.join(datadir, "service.log")
 
-        keyfile = os.path.join(datadir, "seqkey.bin")
-        seq_key = SEQ_KEY.hex()
-        with open(keyfile, "w") as f:
-            f.write(seq_key)
-
+        seqkey_path = os.path.join(ctx.envdd_path, "_init", "seqkey.bin")
         # fmt: off
         cmd = [
             "strata-client",
@@ -109,7 +104,7 @@ class StrataFactory(flexitest.Factory):
             "--reth-authrpc", reth_config["reth_socket"],
             "--reth-jwtsecret", reth_config["reth_secret_path"],
             "--network", "regtest",
-            "--sequencer-key", keyfile,
+            "--sequencer-key", seqkey_path,
             "--sequencer-bitcoin-address", sequencer_address,
         ]
         # fmt: on
@@ -123,7 +118,7 @@ class StrataFactory(flexitest.Factory):
         props = {
             "rpc_host": rpc_host,
             "rpc_port": rpc_port,
-            "seqkey": seq_key,
+            "seqkey": seqkey_path,
             "address": sequencer_address,
         }
         rpc_url = f"ws://{rpc_host}:{rpc_port}"

@@ -317,7 +317,7 @@ fn exec_genparams(cmd: SubcGenParams, ctx: &mut CmdContext) -> anyhow::Result<()
     // Parse the sequencer key, trimming whitespace for convenience.
     let seqkey = match cmd.seqkey.as_ref().map(|s| s.trim()) {
         Some(seqkey) => {
-            let buf = match base58::decode_check(&seqkey) {
+            let buf = match base58::decode_check(seqkey) {
                 Ok(v) => v,
                 Err(e) => {
                     anyhow::bail!("failed to parse sequencer key '{seqkey}': {e}");
