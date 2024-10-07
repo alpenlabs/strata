@@ -2,11 +2,13 @@ use std::str::FromStr;
 
 use console::Term;
 
+/// Represents a type of network, either Alpen's signet or Strata
 pub enum NetworkType {
     Signet,
     Strata,
 }
 
+/// Attempted to parse a string into [`NetworkType`] but the input was invalid.
 pub struct InvalidNetworkType;
 
 impl FromStr for NetworkType {
