@@ -53,6 +53,10 @@ services:
     container_name: strata_reth_fn
     environment:
       JWTSECRET: "configs/jwt.fn.hex"
+    command:
+      - "--sequencer-http"
+      - "http://strata_reth:8545"
+
     volumes:
       - ./.data/data-reth-fn:/app/reth
       - ./configs:/app/configs

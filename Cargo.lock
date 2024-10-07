@@ -6915,7 +6915,7 @@ version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "681030a937600a36906c185595136d26abfebb4aa9c65701cefcaf8578bb982b"
 dependencies = [
- "proc-macro-crate 3.1.0",
+ "proc-macro-crate 1.3.1",
  "proc-macro2",
  "quote",
  "syn 2.0.71",
@@ -13004,14 +13004,20 @@ dependencies = [
 name = "strata-reth"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "clap",
  "eyre",
+ "jsonrpsee-types",
+ "reqwest 0.12.7",
  "reth",
  "reth-chainspec",
  "reth-cli-commands",
  "reth-cli-util",
  "reth-db",
  "reth-primitives",
+ "reth-rpc-eth-api",
+ "reth-rpc-eth-types",
+ "reth-rpc-types",
  "rockbound",
  "serde_json",
  "shellexpand",
@@ -13019,6 +13025,7 @@ dependencies = [
  "strata-reth-exex",
  "strata-reth-node",
  "strata-reth-rpc",
+ "thiserror",
  "tracing",
 ]
 

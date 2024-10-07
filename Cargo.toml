@@ -178,6 +178,8 @@ reth-provider = { git = "https://github.com/alpenlabs/reth.git", rev = "v1.0.3-a
 reth-revm = { git = "https://github.com/alpenlabs/reth.git", rev = "v1.0.3-alpen.1" }
 reth-rpc = { git = "https://github.com/alpenlabs/reth.git", rev = "v1.0.3-alpen.1" }
 reth-rpc-api = { git = "https://github.com/alpenlabs/reth.git", rev = "v1.0.3-alpen.1" }
+reth-rpc-eth-api = { git = "https://github.com/alpenlabs/reth.git", rev = "v1.0.3-alpen.1" }
+reth-rpc-eth-types = { git = "https://github.com/alpenlabs/reth.git", rev = "v1.0.3-alpen.1" }
 reth-rpc-layer = { git = "https://github.com/alpenlabs/reth.git", rev = "v1.0.3-alpen.1" }
 reth-rpc-types = { git = "https://github.com/alpenlabs/reth.git", rev = "v1.0.3-alpen.1" }
 reth-rpc-types-compat = { git = "https://github.com/alpenlabs/reth.git", rev = "v1.0.3-alpen.1" }
