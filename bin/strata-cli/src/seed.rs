@@ -87,7 +87,7 @@ impl Seed {
         )
     }
 
-    pub fn rollup_wallet(&self) -> EthereumWallet {
+    pub fn strata_wallet(&self) -> EthereumWallet {
         let l2_private_bytes = {
             let mut hasher = Sha256::new();
             hasher.update(b"alpen labs strata l2 wallet 2024");

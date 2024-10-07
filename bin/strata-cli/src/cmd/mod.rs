@@ -23,7 +23,7 @@ pub mod refresh;
 pub mod reset;
 pub mod send;
 
-/// A CLI for interacting with Alpen Labs' devnet signet and rollup.
+/// A CLI for interacting with Strata and Alpen Labs' bitcoin signet
 #[derive(FromArgs, PartialEq, Debug)]
 pub struct TopLevel {
     #[argh(subcommand)]

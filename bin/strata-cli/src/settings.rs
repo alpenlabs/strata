@@ -5,7 +5,7 @@ use std::{
     str::FromStr,
 };
 
-use alloy::primitives::Address as RollupAddress;
+use alloy::primitives::Address as StrataAddress;
 use bdk_wallet::bitcoin::XOnlyPublicKey;
 use config::Config;
 use directories::ProjectDirs;
@@ -14,7 +14,7 @@ use shrex::decode;
 use terrors::OneOf;
 
 use crate::constants::{
-    BRIDGE_MUSIG2_PUBKEY, BRIDGE_ROLLUP_ADDRESS, DEFAULT_ESPLORA, DEFAULT_FAUCET_ENDPOINT,
+    BRIDGE_MUSIG2_PUBKEY, BRIDGE_STRATA_ADDRESS, DEFAULT_ESPLORA, DEFAULT_FAUCET_ENDPOINT,
     DEFAULT_L2_HTTP_ENDPOINT,
 };
 
@@ -35,7 +35,7 @@ pub struct Settings {
     pub faucet_endpoint: String,
     pub bridge_musig2_pubkey: XOnlyPublicKey,
     pub descriptor_db: PathBuf,
-    pub bridge_rollup_address: RollupAddress,
+    pub bridge_strata_address: StrataAddress,
     pub linux_seed_file: PathBuf,
 }
 
@@ -71,8 +71,8 @@ impl Settings {
             })
             .expect("valid length"),
             descriptor_db: descriptor_file,
-            bridge_rollup_address: RollupAddress::from_str(BRIDGE_ROLLUP_ADDRESS)
-                .expect("valid rollup address"),
+            bridge_strata_address: StrataAddress::from_str(BRIDGE_STRATA_ADDRESS)
+                .expect("valid strata address"),
             linux_seed_file,
         })
     }

@@ -7,32 +7,27 @@ use console::Term;
 
 use crate::{
     constants::NETWORK,
-    rollup::RollupWallet,
+    net_type::{net_type_or_exit, NetworkType},
     seed::Seed,
     settings::Settings,
     signet::{EsploraClient, SignetWallet},
+    strata::StrataWallet,
 };
 
 /// Prints the wallet's current balance(s)
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "balance")]
 pub struct BalanceArgs {
-    /// return the signet balance
-    #[argh(switch)]
-    signet: bool,
-    /// return the rollup balance
-    #[argh(switch)]
-    rollup: bool,
+    /// either "signet" or "strata"
+    #[argh(positional)]
+    network_type: String,
 }
 
 pub async fn balance(args: BalanceArgs, seed: Seed, settings: Settings, esplora: EsploraClient) {
     let term = Term::stdout();
-    if !args.signet && !args.rollup {
-        let _ = term.write_line("Must specify either --signet or --rollup option");
-        std::process::exit(1);
-    }
+    let network_type = net_type_or_exit(&args.network_type, &term);
 
-    if args.signet {
+    if let NetworkType::Signet = network_type {
         let mut l1w = SignetWallet::new(&seed, NETWORK).unwrap();
         l1w.sync(&esplora).await.unwrap();
         let balance = l1w.balance();
@@ -46,8 +41,8 @@ pub async fn balance(args: BalanceArgs, seed: Seed, settings: Settings, esplora:
         let _ = term.write_line(&format!("  Immature: {}", balance.immature));
     }
 
-    if args.rollup {
-        let l2w = RollupWallet::new(&seed, &settings.l2_http_endpoint).unwrap();
+    if let NetworkType::Strata = network_type {
+        let l2w = StrataWallet::new(&seed, &settings.l2_http_endpoint).unwrap();
         let _ = term.write_line("Getting balance...");
         let balance = l2w.get_balance(l2w.default_signer_address()).await.unwrap();
         // 1 BTC = 1 ETH

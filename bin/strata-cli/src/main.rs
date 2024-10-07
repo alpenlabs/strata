@@ -1,10 +1,11 @@
 pub mod cmd;
 pub mod constants;
+pub mod net_type;
 pub mod recovery;
-pub mod rollup;
 pub mod seed;
 pub mod settings;
 pub mod signet;
+pub mod strata;
 pub mod taproot;
 
 use cmd::{
