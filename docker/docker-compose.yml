@@ -112,7 +112,7 @@ services:
       BITCOIND_RPC_USER: rpcuser
       BITCOIND_RPC_PASSWORD: rpcpassword
       BITCOIND_WALLET: default
-      GENERATE_BLOCKS: 1
+      GENERATE_BLOCKS: 1 # if env is set then blocks are generated. the number is number of seconds between L1 blocks
     container_name: strata_bitcoind
     volumes:
       - ./.data/data-bitcoind:/root/.bitcoin/

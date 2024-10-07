@@ -17,25 +17,28 @@ RUN apt-get update && apt-get -y upgrade && apt-get install -y \
     xz-utils \
     build-essential \
     curl \
-    libclang-dev
+    libclang-dev \
+    apt clean && rm -rf /var/lib/apt/lists/*
 
-RUN curl -L https://sp1.succinct.xyz | bash && ~/.sp1/bin/sp1up --c-toolchain
+# setup sp1up
+RUN curl -fsSL --proto'=https' --tlsv1.2 https://sp1.succinct.xyz | bash && ~/.sp1/bin/sp1up --c-toolchain
 ENV PATH="/root/.sp1/bin:$PATH"
+# check sp1 is setup properly
 RUN cargo prove --version
-RUN ls ~/.sp1/riscv/
 RUN RUSTUP_TOOLCHAIN=succinct cargo --version
-ENV CC_riscv32im_succinct_zkvm_elf="/root/.sp1/riscv/riscv32im-linux-x86_64/bin/riscv32-unknown-elf-gcc"
-RUN curl -LO "https://github.com/xpack-dev-tools/riscv-none-elf-gcc-xpack/releases/download/v14.2.0-2/xpack-riscv-none-elf-gcc-14.2.0-2-linux-x64.tar.gz"
+
+# install riscv toolchain and move to opt
+RUN curl -fsSLO --proto'=https' --tlsv1.2 "https://github.com/xpack-dev-tools/riscv-none-elf-gcc-xpack/releases/download/v14.2.0-2/xpack-riscv-none-elf-gcc-14.2.0-2-linux-x64.tar.gz"
 RUN tar xzvf xpack-riscv-none-elf-gcc-14.2.0-2-linux-x64.tar.gz && mv xpack-riscv-none-elf-gcc-14.2.0-2/ riscv/
 RUN mv riscv/ /opt
 
 COPY . .
-# Build dependencies in release mode
 
+# Build dependencies in release mode
 RUN --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,sharing=private,target=/app/target \
-    CC_riscv32im_succinct_zkvm_elf="/root/.sp1/riscv/riscv32im-linux-x86_64/bin/riscv32-unknown-elf-gcc" cargo build --release --bin strata-prover-client --features="prover"
+    cargo build --release --bin strata-prover-client --features="prover"
 
 
 RUN --mount=type=cache,target=/usr/local/cargo/git \
