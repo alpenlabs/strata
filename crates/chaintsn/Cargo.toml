@@ -11,8 +11,8 @@ strata-state.workspace = true
 anyhow.workspace = true
 bitcoin.workspace = true
 borsh.workspace = true
-rand_chacha = { workspace = true, default-features = false }
-rand_core = { workspace = true, default-features = false }
+rand_chacha.workspace = true
+rand_core.workspace = true
 thiserror.workspace = true
 tracing = { workspace = true, optional = true }
 
