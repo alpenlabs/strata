@@ -3,7 +3,7 @@
 use std::{path::PathBuf, sync::Arc, time::Duration};
 
 use bitcoin::{
-    key::Parity,
+    key::{Keypair, Parity},
     secp256k1::{PublicKey, SecretKey, XOnlyPublicKey, SECP256K1},
 };
 use jsonrpsee::{core::client::async_client::Client as L2RpcClient, ws_client::WsClientBuilder};
@@ -71,13 +71,14 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
     let master_xpriv = resolve_xpriv(args.xpriv_str)?;
     let (_, wallet_xpriv) = derive_op_purpose_xprivs(&master_xpriv)?;
 
-    let keypair = wallet_xpriv.to_keypair(SECP256K1);
+    let mut keypair = wallet_xpriv.to_keypair(SECP256K1);
     let mut sk = SecretKey::from_keypair(&keypair);
 
     // adjust for parity, which should always be even
     let (_, parity) = XOnlyPublicKey::from_keypair(&keypair);
     if matches!(parity, Parity::Odd) {
         sk = sk.negate();
+        keypair = Keypair::from_secret_key(SECP256K1, &sk);
     };
 
     let pubkey = PublicKey::from_secret_key(SECP256K1, &sk);
