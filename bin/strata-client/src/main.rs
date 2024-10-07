@@ -47,6 +47,7 @@ mod config;
 mod errors;
 mod extractor;
 mod helpers;
+mod keyderiv;
 mod l1_reader;
 mod network;
 mod rpc_client;

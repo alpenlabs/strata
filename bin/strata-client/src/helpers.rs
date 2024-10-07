@@ -1,9 +1,4 @@
-use std::{
-    fs,
-    path::{Path, PathBuf},
-    sync::Arc,
-    time::Duration,
-};
+use std::{fs, path::Path, sync::Arc, time::Duration};
 
 use anyhow::Context;
 use bitcoin::{
@@ -36,7 +31,7 @@ use strata_storage::L2BlockManager;
 use tokio::runtime::Runtime;
 use tracing::*;
 
-use crate::{args::Args, config::Config, errors::InitError, network};
+use crate::{args::Args, config::Config, errors::InitError, keyderiv, network};
 
 pub type CommonDb =
     CommonDatabase<L1Db, L2Db, SyncEventDb, ClientStateDb, ChainStateDb, RBCheckpointDB>;
@@ -182,22 +177,27 @@ pub fn open_rocksdb_database(
     Ok(Arc::new(rbdb))
 }
 
-pub fn load_seqkey(path: &PathBuf) -> anyhow::Result<IdentityData> {
+/// Loads sequencer identity data from the root key at the specified path.
+pub fn load_seqkey(path: &Path) -> anyhow::Result<IdentityData> {
     let raw_buf = fs::read(path)?;
     let str_buf = std::str::from_utf8(&raw_buf)?;
-    debug!(%str_buf, ?raw_buf, "Loading seq key");
+    debug!(%str_buf, ?raw_buf, "loading sequencer root key");
     let buf = base58::decode_check(str_buf)?;
-    let xpriv = Xpriv::decode(&buf)?;
+    let root_xpriv = Xpriv::decode(&buf)?;
 
-    let key = Buf32::from(xpriv.private_key.secret_bytes());
-    let ik = IdentityKey::Sequencer(key);
+    // Actually do the key derivation from the root key and then derive the pubkey from that.
+    let seq_xpriv = keyderiv::derive_seq_xpriv(&root_xpriv)?;
+    let seq_sk = Buf32::from(seq_xpriv.private_key.secret_bytes());
+    let seq_xpub = Xpub::from_priv(bitcoin::secp256k1::SECP256K1, &seq_xpriv);
+    let seq_pk = seq_xpub.to_x_only_pub().serialize();
 
-    let seq_xpub = Xpub::from_priv(bitcoin::secp256k1::SECP256K1, &xpriv);
-    let pubkey = seq_xpub.to_x_only_pub().serialize();
-    let ident = Identity::Sequencer(Buf32::from(pubkey));
+    let ik = IdentityKey::Sequencer(seq_sk);
+    let ident = Identity::Sequencer(Buf32::from(seq_pk));
+
+    // Changed this to the pubkey so that we don't just log our privkey.
+    debug!(?ident, "ready to sign as sequencer");
+
     let idata = IdentityData::new(ident, ik);
-    debug!(?idata, "SEQKEY");
-
     Ok(idata)
 }
 
