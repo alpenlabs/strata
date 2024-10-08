@@ -54,6 +54,9 @@ class BitcoinFactory(flexitest.Factory):
         svc.start()
 
         def _create_rpc():
+            st = svc.check_status()
+            if not st:
+                raise RuntimeError("service isn't active")
             url = f"http://{BD_USERNAME}:{BD_PASSWORD}@localhost:{rpc_port}"
             return BitcoindClient(base_url=url, network="regtest")
 
@@ -125,12 +128,7 @@ class StrataFactory(flexitest.Factory):
 
         svc = flexitest.service.ProcService(props, cmd, stdout=logfile)
         svc.start()
-
-        def _create_rpc():
-            return seqrpc.JsonrpcClient(rpc_url)
-
-        svc.create_rpc = _create_rpc
-
+        _inject_service_create_rpc(svc, rpc_url)
         return svc
 
 
@@ -187,12 +185,7 @@ class FullNodeFactory(flexitest.Factory):
 
         svc = flexitest.service.ProcService(props, cmd, stdout=logfile)
         svc.start()
-
-        def _create_rpc():
-            return seqrpc.JsonrpcClient(rpc_url)
-
-        svc.create_rpc = _create_rpc
-
+        _inject_service_create_rpc(svc, rpc_url)
         return svc
 
 
@@ -246,9 +239,6 @@ class RethFactory(flexitest.Factory):
         svc = flexitest.service.ProcService(props, cmd, stdout=logfile)
         svc.start()
 
-        def _create_rpc():
-            return seqrpc.JsonrpcClient(ethrpc_url)
-
         def _create_web3():
             http_ethrpc_url = f"http://localhost:{ethrpc_http_port}"
             w3 = web3.Web3(web3.Web3.HTTPProvider(http_ethrpc_url))
@@ -260,7 +250,7 @@ class RethFactory(flexitest.Factory):
             w3.middleware_onion.add(web3.middleware.SignAndSendRawMiddlewareBuilder.build(account))
             return w3
 
-        svc.create_rpc = _create_rpc
+        _inject_service_create_rpc(svc, ethrpc_url)
         svc.create_web3 = _create_web3
 
         return svc
@@ -299,12 +289,29 @@ class ProverClientFactory(flexitest.Factory):
 
         svc = flexitest.service.ProcService(props, cmd, stdout=logfile)
         svc.start()
-
-        def _create_rpc():
-            return seqrpc.JsonrpcClient(rpc_url)
-
-        svc.create_rpc = _create_rpc
+        _inject_service_create_rpc(svc, rpc_url)
         return svc
+
+
+def _inject_service_create_rpc(svc: flexitest.service.ProcService, rpc_url: str):
+    """
+    Injects a `create_rpc` method using JSON-RPC onto a `ProcService`, checking
+    its status before each call.
+    """
+
+    def _status_ck(method: str):
+        """
+        Hook to check that the process is still running before every call.
+        """
+        if not svc.check_status():
+            raise RuntimeError("sequencer failed")
+
+    def _create_rpc():
+        rpc = seqrpc.JsonrpcClient(rpc_url)
+        rpc._pre_call_hook = _status_ck
+        return rpc
+
+    svc.create_rpc = _create_rpc
 
 
 class BasicEnvConfig(flexitest.EnvConfig):
