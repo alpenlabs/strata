@@ -9,6 +9,7 @@ path = "src/main.rs"
 
 [dependencies]
 strata-primitives.workspace = true
+strata-sp1-guest-builder = { path = "../../provers/sp1" }
 
 anyhow.workspace = true
 argh.workspace = true

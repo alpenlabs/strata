@@ -17,6 +17,7 @@ use strata_primitives::{
     params::{ProofPublishMode, RollupParams},
     vk::RollupVerifyingKey,
 };
+use strata_sp1_guest_builder::GUEST_CHECKPOINT_ELF_STR;
 
 // TODO move some of these into a keyderiv crate
 const DERIV_BASE_IDX: u32 = 56;
@@ -182,9 +183,6 @@ pub struct SubcGenParams {
         short = 'g'
     )]
     genesis_trigger_height: Option<u64>,
-
-    #[argh(option, description = "SP1 verification key")]
-    rollup_vk: Option<String>,
 
     #[argh(
         option,
@@ -356,21 +354,7 @@ fn exec_genparams(cmd: SubcGenParams, ctx: &mut CmdContext) -> anyhow::Result<()
         .unwrap_or(1_000_000_000);
 
     // Parse the checkpoint verification key.
-    let rollup_vk = {
-        let vk_buf = match cmd.rollup_vk {
-            Some(s) => hex::decode(s)?,
-
-            // TODO update this with vk for checkpoint proof
-            None => hex::decode("00b01ae596b4e51843484ff71ccbd0dd1a030af70b255e6b9aad50b81d81266f")
-                .unwrap(),
-        };
-
-        let Ok(vk) = Buf32::try_from(vk_buf.as_slice()) else {
-            anyhow::bail!("malformed verification key");
-        };
-
-        vk
-    };
+    let rollup_vk = Buf32(GUEST_CHECKPOINT_ELF_STR.parse().unwrap());
 
     let config = ParamsConfig {
         name: cmd.name.unwrap_or_else(|| "strata-testnet".to_string()),
