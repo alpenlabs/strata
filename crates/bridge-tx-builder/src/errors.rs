@@ -11,11 +11,11 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum BridgeTxBuilderError {
     /// Error building the Deposit Transaction.
-    #[error("could not build deposit transaction")]
+    #[error("could not build deposit transaction: {0}")]
     DepositTransaction(#[from] DepositTransactionError),
 
     /// Error building the Deposit Transaction.
-    #[error("could not build cooperative withdrawal transaction")]
+    #[error("could not build cooperative withdrawal transaction: {0}")]
     CooperativeWithdrawalTransaction(#[from] CooperativeWithdrawalError),
 
     /// Error due to there being no script provided to create a taproot address.
@@ -23,7 +23,7 @@ pub enum BridgeTxBuilderError {
     EmptyTapscript,
 
     /// Error while building the taproot address.
-    #[error("could not build taproot address")]
+    #[error("could not build taproot address: {0}")]
     BuildFailed(#[from] TaprootBuilderError),
 
     /// Error while adding a leaf to to a [`TaprootBuilder`].

@@ -277,14 +277,18 @@ mod tests {
     use strata_test_utils::ArbitraryGenerator;
 
     use super::{BridgeMessage, Scope};
-    use crate::buf::Buf64;
+    use crate::{
+        bridge::{Musig2PartialSig, Musig2PubNonce},
+        buf::Buf64,
+        l1::BitcoinTxid,
+    };
 
     fn get_arb_bridge_msg() -> BridgeMessage {
         let msg: BridgeMessage = ArbitraryGenerator::new().generate();
         msg
     }
 
-    fn make_bridge_msg() -> BridgeMessage {
+    fn make_misc_bridge_msg() -> BridgeMessage {
         BridgeMessage {
             source_id: 1,
             sig: Buf64::from([0; 64]),
@@ -295,7 +299,83 @@ mod tests {
 
     #[test]
     fn test_get_scope_raw() {
-        let msg = make_bridge_msg();
+        let msg = make_misc_bridge_msg();
         assert_eq!(msg.scope(), vec![0])
+    }
+
+    #[test]
+    fn test_scoped_nonce_bridge_msg_serde() {
+        let txid: BitcoinTxid = ArbitraryGenerator::new().generate();
+        let scope = Scope::V0PubNonce(txid);
+        let nonce: Musig2PubNonce = ArbitraryGenerator::new().generate();
+
+        let msg = make_nonce_bridge_msg(&scope, &nonce);
+        let serialized_msg = borsh::to_vec(&msg).unwrap();
+
+        let deserialized_msg = borsh::from_slice::<BridgeMessage>(&serialized_msg)
+            .expect("should be able to deserialize BridgeMessage");
+
+        let deserialized_scope = borsh::from_slice::<Scope>(&deserialized_msg.scope)
+            .expect("should be able to deserialize Scope");
+
+        assert_eq!(
+            scope, deserialized_scope,
+            "original and deserialized scopes must be the same"
+        );
+
+        let deserialized_payload = borsh::from_slice::<Musig2PubNonce>(&deserialized_msg.payload)
+            .expect("should be able to deserialize Payload");
+
+        assert_eq!(
+            nonce, deserialized_payload,
+            "original and deserialized payloads must be the same"
+        );
+    }
+
+    fn make_nonce_bridge_msg(scope: &Scope, nonce: &Musig2PubNonce) -> BridgeMessage {
+        BridgeMessage {
+            source_id: 1,
+            sig: Buf64::zero(),
+            scope: borsh::to_vec(scope).unwrap(),
+            payload: borsh::to_vec(nonce).unwrap(),
+        }
+    }
+
+    #[test]
+    fn test_scoped_sig_bridge_msg_serde() {
+        let txid: BitcoinTxid = ArbitraryGenerator::new().generate();
+        let scope = Scope::V0PubNonce(txid);
+        let sig: Musig2PartialSig = ArbitraryGenerator::new().generate();
+
+        let msg = make_sig_bridge_msg(&scope, &sig);
+        let serialized_msg = borsh::to_vec(&msg).unwrap();
+
+        let deserialized_msg = borsh::from_slice::<BridgeMessage>(&serialized_msg)
+            .expect("should be able to deserialize BridgeMessage");
+
+        let deserialized_scope = borsh::from_slice::<Scope>(&deserialized_msg.scope)
+            .expect("should be able to deserialize Scope");
+
+        assert_eq!(
+            scope, deserialized_scope,
+            "original and deserialized scopes must be the same"
+        );
+
+        let deserialized_payload = borsh::from_slice::<Musig2PartialSig>(&deserialized_msg.payload)
+            .expect("should be able to deserialize Payload");
+
+        assert_eq!(
+            sig, deserialized_payload,
+            "original and deserialized payloads must be the same"
+        );
+    }
+
+    fn make_sig_bridge_msg(scope: &Scope, sig: &Musig2PartialSig) -> BridgeMessage {
+        BridgeMessage {
+            source_id: 1,
+            sig: Buf64::zero(),
+            scope: borsh::to_vec(scope).unwrap(),
+            payload: borsh::to_vec(sig).unwrap(),
+        }
     }
 }

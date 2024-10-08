@@ -16,7 +16,7 @@ use strata_rpc_types::BridgeDuties;
 use strata_state::bridge_duties::{BridgeDuty, BridgeDutyStatus};
 use strata_storage::ops::{bridge_duty::BridgeDutyOps, bridge_duty_index::BridgeDutyIndexOps};
 use tokio::{task::JoinSet, time::sleep};
-use tracing::{error, info, warn};
+use tracing::{error, info, trace, warn};
 
 pub(super) struct TaskManager<L2Client, TxBuildContext, Bcast>
 where
@@ -40,7 +40,7 @@ where
         loop {
             let BridgeDuties {
                 duties,
-                start_index: _,
+                start_index,
                 stop_index,
             } = self.poll_duties().await?;
 
@@ -62,12 +62,13 @@ where
             // otherwise, don't update the index so that the current batch is refetched and
             // ones that were not executed successfully are executed again.
             if !any_failed {
+                info!(%start_index, %stop_index, "updating duty index");
                 if let Err(e) = self
                     .bridge_duty_idx_db_ops
                     .set_index_async(stop_index)
                     .await
                 {
-                    error!(error = %e, "could not update duty index");
+                    error!(error = %e, %start_index, %stop_index, "could not update duty index");
                 }
             }
 
@@ -110,15 +111,15 @@ where
              * need to compute the txid themselves.
              *
              */
-            let txid = match &duty {
+            let tracker_txid = match &duty {
                 BridgeDuty::SignDeposit(deposit) => deposit.deposit_request_outpoint().txid,
                 BridgeDuty::FulfillWithdrawal(withdrawal) => withdrawal.deposit_outpoint().txid,
             };
 
-            let status = match self.bridge_duty_db_ops.get_status_async(txid).await {
+            let status = match self.bridge_duty_db_ops.get_status_async(tracker_txid).await {
                 Ok(status) => status,
                 Err(e) => {
-                    warn!(%e, %txid, "could not fetch duty status assuming undone");
+                    warn!(%e, %tracker_txid, "could not fetch duty status assuming undone");
                     Some(BridgeDutyStatus::Received)
                 }
             };
@@ -127,7 +128,10 @@ where
                 Some(BridgeDutyStatus::Executed) => {
                     // because fetching starts from the `next_index` value from the last fetch,
                     // every fetch will potentially have duties that have already been processed.
-                    info!(%txid, "duty already executed");
+                    //
+                    // at the moment, old withdrawal duties are not discarded after
+                    // it is fulfilled on bitcoin which makes this log very noisy.
+                    trace!(%tracker_txid, "duty already executed");
                 }
                 _ => todo_duties.push(duty), // need to do something here
             }
@@ -160,6 +164,8 @@ where
     match duty {
         BridgeDuty::SignDeposit(deposit_info) => {
             let tracker_txid = deposit_info.deposit_request_outpoint().txid;
+            trace!(%tracker_txid, "fulfilling deposit duty");
+
             execute_duty(
                 exec_handler,
                 broadcaster,
@@ -171,6 +177,8 @@ where
         }
         BridgeDuty::FulfillWithdrawal(cooperative_withdrawal_info) => {
             let tracker_txid = cooperative_withdrawal_info.deposit_outpoint().txid;
+            trace!(%tracker_txid, "fulfilling withdrawal duty");
+
             execute_duty(
                 exec_handler,
                 broadcaster,
@@ -285,10 +293,20 @@ where
     exec_handler.collect_nonces(txid).await?;
     let signed_tx = exec_handler.collect_signatures(txid).await?;
 
-    broadcaster
-        .send_raw_transaction(&signed_tx)
-        .await
-        .map_err(|e| ExecError::Broadcast(e.to_string()))?;
+    match broadcaster.send_raw_transaction(&signed_tx).await {
+        Ok(_) => {}
+        Err(e) => {
+            if !e.is_missing_or_invalid_input() {
+                return Err(ExecError::Broadcast(e.to_string()));
+            }
+
+            warn!(%txid, "input UTXO has already been spent or missing");
+            return Ok(());
+        }
+    }
+
+    info!(%txid, "broadcasted fully signed transaction");
+    trace!(?signed_tx, "broadcasted fully signed transaction");
 
     Ok(())
 }

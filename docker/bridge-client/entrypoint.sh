@@ -32,4 +32,4 @@ strata-bridge-client operator \
   --btc-user $BTC_USER \
   --btc-pass $BTC_PASS \
   --rollup-url $ROLLUP_URL \
-  --data-dir $DATADIR
+  --data-dir $DATADIR $@

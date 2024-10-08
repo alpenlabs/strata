@@ -3,7 +3,7 @@
 use std::{path::PathBuf, sync::Arc, time::Duration};
 
 use bitcoin::{
-    key::Parity,
+    key::{Keypair, Parity},
     secp256k1::{PublicKey, SecretKey, XOnlyPublicKey, SECP256K1},
 };
 use jsonrpsee::{core::client::async_client::Client as L2RpcClient, ws_client::WsClientBuilder};
@@ -71,13 +71,14 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
     let master_xpriv = resolve_xpriv(args.xpriv_str)?;
     let (_, wallet_xpriv) = derive_op_purpose_xprivs(&master_xpriv)?;
 
-    let keypair = wallet_xpriv.to_keypair(SECP256K1);
+    let mut keypair = wallet_xpriv.to_keypair(SECP256K1);
     let mut sk = SecretKey::from_keypair(&keypair);
 
     // adjust for parity, which should always be even
     let (_, parity) = XOnlyPublicKey::from_keypair(&keypair);
     if matches!(parity, Parity::Odd) {
         sk = sk.negate();
+        keypair = Keypair::from_secret_key(SECP256K1, &sk);
     };
 
     let pubkey = PublicKey::from_secret_key(SECP256K1, &sk);
@@ -102,17 +103,6 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
     let network = l1_rpc_client.network().await?;
     let tx_context = TxBuildContext::new(network, operator_pubkeys, own_index);
 
-    // Default: rollup block time.
-    let duty_polling_interval = args.duty_interval.map_or(
-        Duration::from_millis(
-            l2_rpc_client
-                .block_time()
-                .await
-                .expect("could not get default block time from rollup RPC client"),
-        ),
-        Duration::from_millis,
-    );
-
     // Spawn RPC server.
     let bridge_rpc = BridgeRpc::new(bridge_duty_db_ops.clone());
 
@@ -126,6 +116,16 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
         }
     });
 
+    let rollup_block_time = l2_rpc_client
+        .block_time()
+        .await
+        .expect("should be able to get block time from rollup RPC client");
+
+    let msg_polling_interval = args.message_interval.map_or(
+        Duration::from_millis(rollup_block_time / 2),
+        Duration::from_millis,
+    );
+
     // Spawn poll duties task.
     let exec_handler = ExecHandler {
         tx_build_ctx: tx_context,
@@ -133,6 +133,7 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
         l2_rpc_client,
         keypair,
         own_index,
+        msg_polling_interval,
     };
 
     let task_manager = TaskManager {
@@ -141,6 +142,11 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
         bridge_duty_db_ops,
         bridge_duty_idx_db_ops,
     };
+
+    let duty_polling_interval = args.duty_interval.map_or(
+        Duration::from_millis(rollup_block_time),
+        Duration::from_millis,
+    );
 
     // TODO: wrap these in `strata-tasks`
     let duty_task = tokio::spawn(async move {

@@ -23,7 +23,7 @@ pub(crate) struct Cli {
 
     #[argh(
         option,
-        description = "host to run the rpc server on (default: 0.0.0.0)"
+        description = "host to run the rpc server on (default: 127.0.0.1)"
     )]
     pub rpc_host: Option<String>,
 
@@ -52,8 +52,7 @@ pub(crate) struct Cli {
         option,
         description = "bridge message polling interval in milliseconds (default: half of the block time according to the rollup RPC client)"
     )]
-    #[allow(dead_code)] // FIXME: the bridge client also needs to pool for messages
-    pub message_interval: Option<u64>, // default: half value of duty
+    pub message_interval: Option<u64>, // default: half of the rollup block time
 
     #[argh(
         option,

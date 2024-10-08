@@ -626,8 +626,18 @@ impl BorshSerialize for BitcoinTxid {
 
 impl BorshDeserialize for BitcoinTxid {
     fn deserialize_reader<R: Read>(reader: &mut R) -> std::io::Result<Self> {
+        // First, read the length tag
+        let len = u32::deserialize_reader(reader)? as usize;
+
+        if len != HASH_SIZE {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Invalid Txid size, expected: {}, got: {}", HASH_SIZE, len),
+            ));
+        }
+
         // First, create a buffer to hold the txid bytes and read them
-        let mut txid_bytes = [0u8; 32];
+        let mut txid_bytes = [0u8; HASH_SIZE];
         reader.read_exact(&mut txid_bytes)?;
         // Use the bitcoin crate's deserialize method to create a Psbt from the bytes
         let txid = Txid::from_byte_array(txid_bytes);
@@ -882,8 +892,11 @@ mod tests {
     };
     use rand::Rng;
     use secp256k1::{Parity, SECP256K1};
+    use strata_test_utils::ArbitraryGenerator;
 
-    use super::{BitcoinAddress, BitcoinAmount, BorshDeserialize, BorshSerialize, XOnlyPk};
+    use super::{
+        BitcoinAddress, BitcoinAmount, BitcoinTxid, BorshDeserialize, BorshSerialize, XOnlyPk,
+    };
     use crate::{
         errors::ParseError,
         l1::{BitcoinPsbt, BitcoinTxOut, TaprootSpendPath},
@@ -1299,5 +1312,21 @@ mod tests {
         let (pk, _) = XOnlyPublicKey::from_keypair(&keypair);
 
         pk
+    }
+
+    #[test]
+    fn test_bitcoin_txid_serialize_deserialize() {
+        let generator = ArbitraryGenerator::new();
+        let txid: BitcoinTxid = generator.generate();
+
+        let serialized_txid =
+            borsh::to_vec::<BitcoinTxid>(&txid).expect("should be able to serialize BitcoinTxid");
+        let deserialized_txid = borsh::from_slice::<BitcoinTxid>(&serialized_txid)
+            .expect("should be able to deserialize BitcoinTxid");
+
+        assert_eq!(
+            deserialized_txid, txid,
+            "original and deserialized txid must be the same"
+        );
     }
 }
