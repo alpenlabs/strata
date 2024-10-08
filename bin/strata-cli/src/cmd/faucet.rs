@@ -119,7 +119,7 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
             )
         }
         NetworkType::Strata => {
-            let l2w = StrataWallet::new(&seed, &settings.l2_http_endpoint).unwrap();
+            let l2w = StrataWallet::new(&seed, &settings.strata_endpoint).unwrap();
             // they said EVMs were advanced 👁️👁️
             let address = match args.address {
                 Some(address) => StrataAddress::from_str(&address).expect("bad address"),
