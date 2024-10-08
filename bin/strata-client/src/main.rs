@@ -297,7 +297,7 @@ fn start_core_tasks(
     bitcoin_client: Arc<BitcoinClient>,
 ) -> anyhow::Result<CoreContext> {
     // init status tasks
-    let (status_tx, status_rx) = init_status_channel(database.as_ref())?;
+    let (status_tx, status_rx) = init_status_channel(database.as_ref(), params.network())?;
 
     let engine = init_engine_controller(
         config,
