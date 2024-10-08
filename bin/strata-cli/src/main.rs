@@ -47,6 +47,6 @@ async fn main() {
         Commands::Receive(args) => receive(args, seed, settings, esplora).await,
         Commands::Reset(args) => reset(args, persister, settings).await,
         Commands::ChangePwd(args) => change_pwd(args, seed, persister).await,
-        Commands::Scan(args) => scan(args, seed, esplora).await,
+        Commands::Scan(args) => scan(args, seed, settings, esplora).await,
     }
 }

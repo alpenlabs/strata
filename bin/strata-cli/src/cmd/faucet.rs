@@ -15,7 +15,6 @@ use sha2::{Digest, Sha256};
 use shrex::{encode, Hex};
 
 use crate::{
-    constants::NETWORK,
     // net_type::{net_type_or_exit, NetworkType},
     seed::Seed,
     settings::Settings,
@@ -106,7 +105,7 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
     // };
 
     let url = {
-        let mut l1w = SignetWallet::new(&seed, NETWORK).unwrap();
+        let mut l1w = SignetWallet::new(&seed, settings.network).unwrap();
         let address = match args.address {
             None => {
                 let address_info = l1w.reveal_next_address(KeychainKind::External);
@@ -116,7 +115,7 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
             Some(address) => {
                 let address = Address::from_str(&address).expect("bad address");
                 address
-                    .require_network(NETWORK)
+                    .require_network(settings.network)
                     .expect("wrong bitcoin network")
             }
         };

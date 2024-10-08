@@ -9,7 +9,6 @@ use bdk_wallet::bitcoin::{Address, Amount};
 use console::{style, Term};
 
 use crate::{
-    constants::NETWORK,
     seed::Seed,
     settings::Settings,
     signet::{fee_rate_or_crash, log_fee_rate, print_explorer_url, EsploraClient, SignetWallet},
@@ -52,14 +51,14 @@ pub async fn drain(
     let signet_address = signet_address.map(|a| {
         Address::from_str(&a)
             .expect("valid signet address")
-            .require_network(NETWORK)
+            .require_network(settings.network)
             .expect("correct network")
     });
     let strata_address =
         strata_address.map(|a| StrataAddress::from_str(&a).expect("valid Strata address"));
 
     if let Some(address) = signet_address {
-        let mut l1w = SignetWallet::new(&seed, NETWORK).unwrap();
+        let mut l1w = SignetWallet::new(&seed, settings.network).unwrap();
         l1w.sync(&esplora).await.unwrap();
         let balance = l1w.balance();
         if balance.untrusted_pending > Amount::ZERO {

@@ -15,9 +15,7 @@ use indicatif::ProgressBar;
 use strata_bridge_tx_builder::constants::MAGIC_BYTES;
 
 use crate::{
-    constants::{
-        BRIDGE_IN_AMOUNT, L2_BLOCK_TIME, NETWORK, RECOVER_AT_DELAY, RECOVER_DELAY, UNSPENDABLE,
-    },
+    constants::{BRIDGE_IN_AMOUNT, L2_BLOCK_TIME, RECOVER_AT_DELAY, RECOVER_DELAY, UNSPENDABLE},
     recovery::DescriptorRecovery,
     seed::Seed,
     settings::Settings,
@@ -51,7 +49,7 @@ pub async fn bridge_in(
     let term = Term::stdout();
     let requested_strata_address =
         strata_address.map(|a| StrataAddress::from_str(&a).expect("bad strata address"));
-    let mut l1w = SignetWallet::new(&seed, NETWORK).unwrap();
+    let mut l1w = SignetWallet::new(&seed, settings.network).unwrap();
     let l2w = StrataWallet::new(&seed, &settings.l2_http_endpoint).unwrap();
 
     l1w.sync(&esplora).await.unwrap();
@@ -76,11 +74,11 @@ pub async fn bridge_in(
 
     let desc = bridge_in_desc
         .clone()
-        .into_wallet_descriptor(l1w.secp_ctx(), NETWORK)
+        .into_wallet_descriptor(l1w.secp_ctx(), settings.network)
         .expect("valid descriptor");
 
     let mut temp_wallet = Wallet::create_single(desc.clone())
-        .network(NETWORK)
+        .network(settings.network)
         .create_wallet_no_persist()
         .expect("valid wallet");
 

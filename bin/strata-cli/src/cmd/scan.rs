@@ -1,8 +1,8 @@
 use argh::FromArgs;
 
 use crate::{
-    constants::NETWORK,
     seed::Seed,
+    settings::Settings,
     signet::{EsploraClient, SignetWallet},
 };
 
@@ -11,7 +11,7 @@ use crate::{
 #[argh(subcommand, name = "scan")]
 pub struct ScanArgs {}
 
-pub async fn scan(_args: ScanArgs, seed: Seed, esplora: EsploraClient) {
-    let mut l1w = SignetWallet::new(&seed, NETWORK).unwrap();
+pub async fn scan(_args: ScanArgs, seed: Seed, settings: Settings, esplora: EsploraClient) {
+    let mut l1w = SignetWallet::new(&seed, settings.network).unwrap();
     l1w.scan(&esplora).await.unwrap();
 }
