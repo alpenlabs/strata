@@ -9,6 +9,7 @@ use faucet::FaucetArgs;
 use receive::ReceiveArgs;
 use refresh::RefreshArgs;
 use reset::ResetArgs;
+use scan::ScanArgs;
 use send::SendArgs;
 
 pub mod backup;
@@ -21,6 +22,7 @@ pub mod faucet;
 pub mod receive;
 pub mod refresh;
 pub mod reset;
+pub mod scan;
 pub mod send;
 
 /// A CLI for interacting with Strata and Alpen Labs' bitcoin signet
@@ -44,4 +46,5 @@ pub enum Commands {
     Receive(ReceiveArgs),
     ChangePwd(ChangePwdArgs),
     Reset(ResetArgs),
+    Scan(ScanArgs),
 }
