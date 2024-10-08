@@ -49,7 +49,7 @@ pub fn print_explorer_url(txid: &Txid, term: &Term) -> Result<(), io::Error> {
 }
 
 pub async fn fee_rate_or_crash(user_provided: Option<u64>, esplora: &EsploraClient) -> FeeRate {
-    match user_provided.and_then(|fr| FeeRate::from_sat_per_vb(fr)) {
+    match user_provided.and_then(FeeRate::from_sat_per_vb) {
         Some(fr) => fr,
         None => get_fee_rate(1, esplora)
             .await
