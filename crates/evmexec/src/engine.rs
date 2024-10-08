@@ -223,9 +223,10 @@ impl<T: EngineRpc> RpcExecEngineInner<T> {
             .iter()
             .filter_map(|op| match op {
                 Op::Deposit(deposit_data) => Some(Withdrawal {
+                    index: deposit_data.intent_idx(),
                     address: address_from_slice(deposit_data.dest_addr())?,
                     amount: sats_to_gwei(deposit_data.amt())?,
-                    ..Default::default()
+                    validator_index: 0,
                 }),
             })
             .collect();
