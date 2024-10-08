@@ -44,13 +44,13 @@ class JsonrpcClient:
         # Hook that lets us add a check that runs before every call.
         self._pre_call_hook = None
 
-    def _do_pre_call_check(m: str):
+    def _do_pre_call_check(self, m: str):
         """Calls the pre-call hook if set."""
         if self._pre_call_hook is not None:
             h = self._pre_call_hook
             r = h(m)
             if type(r) is bool:
-                if r == False:
+                if not r:
                     raise RuntimeError(f"failed precheck on call to '{m}'")
 
     def _call(self, method: str, args):

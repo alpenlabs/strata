@@ -128,7 +128,7 @@ class StrataFactory(flexitest.Factory):
 
         svc = flexitest.service.ProcService(props, cmd, stdout=logfile)
         svc.start()
-        _inject_service_create_rpc(svc, rpc_url)
+        _inject_service_create_rpc(svc, rpc_url, "sequencer")
         return svc
 
 
@@ -152,8 +152,9 @@ class FullNodeFactory(flexitest.Factory):
         ctx: flexitest.EnvContext,
     ) -> flexitest.Service:
         idx = self.next_idx()
+        name = f"fullnode.{idx}"
 
-        datadir = ctx.make_service_dir(f"fullnode.{idx}")
+        datadir = ctx.make_service_dir(name)
         rpc_host = "127.0.0.1"
         rpc_port = self.next_port()
         logfile = os.path.join(datadir, "service.log")
@@ -185,7 +186,7 @@ class FullNodeFactory(flexitest.Factory):
 
         svc = flexitest.service.ProcService(props, cmd, stdout=logfile)
         svc.start()
-        _inject_service_create_rpc(svc, rpc_url)
+        _inject_service_create_rpc(svc, rpc_url, name)
         return svc
 
 
@@ -201,7 +202,8 @@ class RethFactory(flexitest.Factory):
         sequencer_reth_rpc: Optional[str],
         ctx: flexitest.EnvContext,
     ) -> flexitest.Service:
-        datadir = ctx.make_service_dir(f"reth.{id}")
+        name = f"reth.{id}"
+        datadir = ctx.make_service_dir(name)
         authrpc_port = self.next_port()
         listener_port = self.next_port()
         ethrpc_ws_port = self.next_port()
@@ -250,7 +252,7 @@ class RethFactory(flexitest.Factory):
             w3.middleware_onion.add(web3.middleware.SignAndSendRawMiddlewareBuilder.build(account))
             return w3
 
-        _inject_service_create_rpc(svc, ethrpc_url)
+        _inject_service_create_rpc(svc, ethrpc_url, name)
         svc.create_web3 = _create_web3
 
         return svc
@@ -289,11 +291,11 @@ class ProverClientFactory(flexitest.Factory):
 
         svc = flexitest.service.ProcService(props, cmd, stdout=logfile)
         svc.start()
-        _inject_service_create_rpc(svc, rpc_url)
+        _inject_service_create_rpc(svc, rpc_url, "prover")
         return svc
 
 
-def _inject_service_create_rpc(svc: flexitest.service.ProcService, rpc_url: str):
+def _inject_service_create_rpc(svc: flexitest.service.ProcService, rpc_url: str, name: str):
     """
     Injects a `create_rpc` method using JSON-RPC onto a `ProcService`, checking
     its status before each call.
@@ -304,7 +306,8 @@ def _inject_service_create_rpc(svc: flexitest.service.ProcService, rpc_url: str)
         Hook to check that the process is still running before every call.
         """
         if not svc.check_status():
-            raise RuntimeError("sequencer failed")
+            print(f"service '{name}' seems to have crashed as of call to {method}")
+            raise RuntimeError(f"process '{name}' crashed")
 
     def _create_rpc():
         rpc = seqrpc.JsonrpcClient(rpc_url)
@@ -557,7 +560,8 @@ def main(argv):
     }
 
     global_envs = {
-        "basic": BasicEnvConfig(),
+        "basic": BasicEnvConfig(101),
+        # TODO can we consolidate this with the basic env now?
         "premined_blocks": BasicEnvConfig(101),
         "fast_batches": BasicEnvConfig(101, rollup_settings=net_settings.get_fast_batch_settings()),
         "hub1": HubNetworkEnvConfig(),
