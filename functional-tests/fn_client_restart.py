@@ -3,7 +3,6 @@ import flexitest
 import net_settings
 from constants import (
     ERROR_PROOF_ALREADY_CREATED,
-    FAST_BATCH_ROLLUP_PARAMS,
 )
 from entry import BasicEnvConfig
 from utils import (

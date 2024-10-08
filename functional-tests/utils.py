@@ -5,7 +5,7 @@ import subprocess
 import time
 from dataclasses import dataclass
 from threading import Thread
-from typing import Any, Callable, TypeVar, Optional
+from typing import Any, Callable, Optional, TypeVar
 
 from bitcoinlib.services.bitcoind import BitcoindClient
 

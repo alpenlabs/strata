@@ -11,8 +11,8 @@ import web3
 import web3.middleware
 from bitcoinlib.services.bitcoind import BitcoindClient
 
-import seqrpc
 import net_settings
+import seqrpc
 from constants import *
 from utils import *
 
