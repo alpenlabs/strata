@@ -15,13 +15,13 @@ use terrors::OneOf;
 
 use crate::constants::{
     BRIDGE_MUSIG2_PUBKEY, BRIDGE_STRATA_ADDRESS, DEFAULT_ESPLORA, DEFAULT_FAUCET_ENDPOINT,
-    DEFAULT_L2_HTTP_ENDPOINT, DEFAULT_NETWORK,
+    DEFAULT_NETWORK, DEFAULT_STRATA_ENDPOINT,
 };
 
 #[derive(Serialize, Deserialize)]
 pub struct SettingsFromFile {
     pub esplora: Option<String>,
-    pub l2_http_endpoint: Option<String>,
+    pub strata_endpoint: Option<String>,
     pub faucet_endpoint: Option<String>,
     pub bridge_pubkey: Option<Hex<[u8; 32]>>,
     pub network: Option<Network>,
@@ -32,7 +32,7 @@ pub struct SettingsFromFile {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Settings {
     pub esplora: String,
-    pub l2_http_endpoint: String,
+    pub strata_endpoint: String,
     pub data_dir: PathBuf,
     pub faucet_endpoint: String,
     pub bridge_musig2_pubkey: XOnlyPublicKey,
@@ -68,9 +68,9 @@ impl Settings {
 
         Ok(Settings {
             esplora: from_file.esplora.unwrap_or(DEFAULT_ESPLORA.to_owned()),
-            l2_http_endpoint: from_file
-                .l2_http_endpoint
-                .unwrap_or(DEFAULT_L2_HTTP_ENDPOINT.to_owned()),
+            strata_endpoint: from_file
+                .strata_endpoint
+                .unwrap_or(DEFAULT_STRATA_ENDPOINT.to_owned()),
             data_dir: proj_dirs.data_dir().to_owned(),
             faucet_endpoint: from_file
                 .faucet_endpoint

@@ -32,7 +32,7 @@ pub async fn bridge_out(args: BridgeOutArgs, seed: Seed, settings: Settings) {
     });
 
     let mut l1w = SignetWallet::new(&seed, settings.network).unwrap();
-    let l2w = StrataWallet::new(&seed, &settings.l2_http_endpoint).unwrap();
+    let l2w = StrataWallet::new(&seed, &settings.strata_endpoint).unwrap();
 
     let address = match address {
         Some(a) => a,

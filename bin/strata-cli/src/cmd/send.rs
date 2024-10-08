@@ -68,7 +68,7 @@ pub async fn send(args: SendArgs, seed: Seed, settings: Settings, esplora: Esplo
             let _ = print_explorer_url(&tx.compute_txid(), &term);
         }
         NetworkType::Strata => {
-            let l2w = StrataWallet::new(&seed, &settings.l2_http_endpoint).expect("valid wallet");
+            let l2w = StrataWallet::new(&seed, &settings.strata_endpoint).expect("valid wallet");
             let address = StrataAddress::from_str(&args.address).expect("valid address");
             let tx = TransactionRequest::default()
                 .with_to(address)

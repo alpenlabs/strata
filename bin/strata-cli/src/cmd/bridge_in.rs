@@ -50,7 +50,7 @@ pub async fn bridge_in(
     let requested_strata_address =
         strata_address.map(|a| StrataAddress::from_str(&a).expect("bad strata address"));
     let mut l1w = SignetWallet::new(&seed, settings.network).unwrap();
-    let l2w = StrataWallet::new(&seed, &settings.l2_http_endpoint).unwrap();
+    let l2w = StrataWallet::new(&seed, &settings.strata_endpoint).unwrap();
 
     l1w.sync(&esplora).await.unwrap();
     let recovery_address = l1w.reveal_next_address(KeychainKind::External).address;
