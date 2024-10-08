@@ -103,17 +103,6 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
     let network = l1_rpc_client.network().await?;
     let tx_context = TxBuildContext::new(network, operator_pubkeys, own_index);
 
-    // Default: rollup block time.
-    let duty_polling_interval = args.duty_interval.map_or(
-        Duration::from_millis(
-            l2_rpc_client
-                .block_time()
-                .await
-                .expect("could not get default block time from rollup RPC client"),
-        ),
-        Duration::from_millis,
-    );
-
     // Spawn RPC server.
     let bridge_rpc = BridgeRpc::new(bridge_duty_db_ops.clone());
 
@@ -127,6 +116,16 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
         }
     });
 
+    let rollup_block_time = l2_rpc_client
+        .block_time()
+        .await
+        .expect("should be able to get block time from rollup RPC client");
+
+    let msg_polling_interval = args.message_interval.map_or(
+        Duration::from_millis(rollup_block_time / 2),
+        Duration::from_millis,
+    );
+
     // Spawn poll duties task.
     let exec_handler = ExecHandler {
         tx_build_ctx: tx_context,
@@ -134,6 +133,7 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
         l2_rpc_client,
         keypair,
         own_index,
+        msg_polling_interval,
     };
 
     let task_manager = TaskManager {
@@ -142,6 +142,11 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
         bridge_duty_db_ops,
         bridge_duty_idx_db_ops,
     };
+
+    let duty_polling_interval = args.duty_interval.map_or(
+        Duration::from_millis(rollup_block_time),
+        Duration::from_millis,
+    );
 
     // TODO: wrap these in `strata-tasks`
     let duty_task = tokio::spawn(async move {

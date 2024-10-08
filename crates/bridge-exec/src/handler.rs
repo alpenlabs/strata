@@ -21,11 +21,6 @@ use tracing::{debug, info, warn};
 
 use crate::errors::{ExecError, ExecResult};
 
-/// The interval that the bridge duty exec functions will poll for
-/// bridge messages, such as public nonces and partial signatures.
-// TODO: this is hardcoded, maybe move this to a user-configurable Config
-pub const POLL_INTERVAL: Duration = Duration::from_millis(1_000);
-
 /// The execution context for handling bridge-related signing activities.
 #[derive(Clone)]
 pub struct ExecHandler<
@@ -46,6 +41,9 @@ pub struct ExecHandler<
 
     /// This client's position in the MuSig2 signing ceremony.
     pub own_index: OperatorIdx,
+
+    /// The interval for polling bridge messages.
+    pub msg_polling_interval: Duration,
 }
 
 impl<L2Client, TxBuildContext> ExecHandler<L2Client, TxBuildContext>
@@ -90,7 +88,7 @@ where
         Ok(txid)
     }
 
-    /// Add this client's own nonce and poll for nonces for a given [`Txid`] at [`POLL_INTERVAL`].
+    /// Add this client's own nonce and poll for nonces for a given [`Txid`].
     pub async fn collect_nonces(&self, txid: &Txid) -> Result<(), ExecError> {
         let bitcoin_txid = BitcoinTxid::from(*txid);
         let public_nonce = self
@@ -105,8 +103,7 @@ where
         let message = self.broadcast_msg(&scope, public_nonce, txid).await?;
 
         // TODO: use tokio::select to add a timeout path to prevent thread leaks.
-        self.poll_for_nonces(message.scope(), txid, POLL_INTERVAL)
-            .await?;
+        self.poll_for_nonces(message.scope(), txid).await?;
 
         Ok(())
     }
@@ -135,12 +132,7 @@ where
 
     /// Poll for nonces until all nonces have been collected.
     // TODO: use long-polling here instead.
-    async fn poll_for_nonces(
-        &self,
-        scope: &[u8],
-        txid: &Txid,
-        poll_interval: Duration,
-    ) -> Result<(), ExecError> {
+    async fn poll_for_nonces(&self, scope: &[u8], txid: &Txid) -> Result<(), ExecError> {
         debug!(%txid, "polling for other operators' nonces");
 
         loop {
@@ -164,14 +156,14 @@ where
                 break;
             }
 
-            sleep(poll_interval).await;
+            sleep(self.msg_polling_interval).await;
         }
 
         Ok(())
     }
 
     /// Add this client's own partial signature and poll for partial signatures from other clients
-    /// for the given [`Txid`] at [`POLL_INTERVAL`].
+    /// for the given [`Txid`].
     ///
     /// Once all the signatures are collected, this function also aggregates the signatures and
     /// creates the fully signed transaction.
@@ -240,8 +232,7 @@ where
 
         // Wait for all the partial signatures to be broadcasted by other operators.
         // TODO: use tokio::select to add a timeout path to prevent thread leaks.
-        self.poll_for_signatures(message.scope(), txid, POLL_INTERVAL)
-            .await?;
+        self.poll_for_signatures(message.scope(), txid).await?;
 
         let tx = self
             .sig_manager
@@ -254,12 +245,7 @@ where
     }
 
     // TODO: use long-polling here instead.
-    async fn poll_for_signatures(
-        &self,
-        scope: &[u8],
-        txid: &Txid,
-        poll_interval: Duration,
-    ) -> Result<(), ExecError> {
+    async fn poll_for_signatures(&self, scope: &[u8], txid: &Txid) -> Result<(), ExecError> {
         debug!("waiting for other operators' signatures");
 
         loop {
@@ -286,7 +272,7 @@ where
                 break;
             }
 
-            sleep(poll_interval).await;
+            sleep(self.msg_polling_interval).await;
         }
 
         Ok(())
@@ -300,7 +286,7 @@ where
         Payload: BorshDeserialize + Debug,
     {
         let raw_scope: HexBytes = scope.into();
-        info!(scope=?scope, raw_scope=?raw_scope, "getting messages from the L2 Client");
+        info!(scope=?scope, "getting messages from the L2 Client");
         let received_payloads = self
             .l2_rpc_client
             .get_msgs_by_scope(raw_scope)
@@ -312,12 +298,12 @@ where
                     let payload = msg.payload();
                     let parsed_payload = borsh::from_slice::<Payload>(payload);
 
-                    if let Ok(payload) = parsed_payload {
-                        Some((msg.source_id(), payload))
-                    } else {
-                        let err = parsed_payload.unwrap_err();
-                        warn!(?scope, ?payload, error=?err, "skipping faulty message payload");
-                        None
+                    match parsed_payload {
+                        Ok(payload) => Some((msg.source_id(), payload)),
+                        Err(err) => {
+                            warn!(?scope, ?payload, error=?err, "skipping faulty message payload");
+                            None
+                        }
                     }
                 } else {
                     warn!(?scope, "skipping faulty message");
