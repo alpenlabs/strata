@@ -150,6 +150,10 @@ impl SignedL2BlockHeader {
     pub fn sig(&self) -> &Buf64 {
         &self.signature
     }
+
+    pub fn header(&self) -> &L2BlockHeader {
+        &self.header
+    }
 }
 
 impl L2Header for SignedL2BlockHeader {

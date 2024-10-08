@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import json
+
 import os
 import sys
 import time
@@ -11,17 +11,10 @@ import web3
 import web3.middleware
 from bitcoinlib.services.bitcoind import BitcoindClient
 
+import net_settings
 import seqrpc
-from constants import (
-    BD_PASSWORD,
-    BD_USERNAME,
-    BLOCK_GENERATION_INTERVAL_SECS,
-    DD_ROOT,
-    DEFAULT_ROLLUP_PARAMS,
-    FAST_BATCH_ROLLUP_PARAMS,
-    SEQ_KEY,
-)
-from utils import generate_blocks, generate_jwt_secret
+from constants import *
+from utils import *
 
 
 class BitcoinFactory(flexitest.Factory):
@@ -39,16 +32,18 @@ class BitcoinFactory(flexitest.Factory):
             "bitcoind",
             "-txindex",
             "-regtest",
+            "-listen",
+            f"-port={p2p_port}",
             "-printtoconsole",
             "-fallbackfee=0.00001",
             f"-datadir={datadir}",
-            f"-port={p2p_port}",
             f"-rpcport={rpc_port}",
             f"-rpcuser={BD_USERNAME}",
             f"-rpcpassword={BD_PASSWORD}",
         ]
 
         props = {
+            "p2p_port": p2p_port,
             "rpc_port": rpc_port,
             "rpc_user": BD_USERNAME,
             "rpc_password": BD_PASSWORD,
@@ -59,6 +54,9 @@ class BitcoinFactory(flexitest.Factory):
         svc.start()
 
         def _create_rpc():
+            st = svc.check_status()
+            if not st:
+                raise RuntimeError("service isn't active")
             url = f"http://{BD_USERNAME}:{BD_PASSWORD}@localhost:{rpc_port}"
             return BitcoindClient(base_url=url, network="regtest")
 
@@ -88,19 +86,15 @@ class StrataFactory(flexitest.Factory):
         bitcoind_config: BitcoinRpcConfig,
         reth_config: RethConfig,
         sequencer_address: str,
-        custom_rollup_params: Optional[dict],
+        rollup_params: str,
         ctx: flexitest.EnvContext,
     ) -> flexitest.Service:
         datadir = ctx.make_service_dir("sequencer")
         rpc_port = self.next_port()
-        rpc_host = "localhost"
+        rpc_host = "127.0.0.1"
         logfile = os.path.join(datadir, "service.log")
 
-        keyfile = os.path.join(datadir, "seqkey.bin")
-        seq_key = SEQ_KEY.hex()
-        with open(keyfile, "w") as f:
-            f.write(seq_key)
-
+        seqkey_path = os.path.join(ctx.envdd_path, "_init", "seqkey.bin")
         # fmt: off
         cmd = [
             "strata-client",
@@ -113,42 +107,40 @@ class StrataFactory(flexitest.Factory):
             "--reth-authrpc", reth_config["reth_socket"],
             "--reth-jwtsecret", reth_config["reth_secret_path"],
             "--network", "regtest",
-            "--sequencer-key", keyfile,
+            "--sequencer-key", seqkey_path,
             "--sequencer-bitcoin-address", sequencer_address,
         ]
         # fmt: on
 
         rollup_params_file = os.path.join(datadir, "rollup_params.json")
-        rollup_params = custom_rollup_params if custom_rollup_params else DEFAULT_ROLLUP_PARAMS
-
         with open(rollup_params_file, "w") as f:
-            json.dump(rollup_params, f)
+            f.write(rollup_params)
 
         cmd.extend(["--rollup-params", rollup_params_file])
 
         props = {
             "rpc_host": rpc_host,
             "rpc_port": rpc_port,
-            "seqkey": seq_key,
+            "seqkey": seqkey_path,
             "address": sequencer_address,
         }
         rpc_url = f"ws://{rpc_host}:{rpc_port}"
 
         svc = flexitest.service.ProcService(props, cmd, stdout=logfile)
         svc.start()
-
-        def _create_rpc():
-            return seqrpc.JsonrpcClient(rpc_url)
-
-        svc.create_rpc = _create_rpc
-
+        _inject_service_create_rpc(svc, rpc_url, "sequencer")
         return svc
 
 
 class FullNodeFactory(flexitest.Factory):
     def __init__(self, port_range: list[int]):
         super().__init__(port_range)
-        self.fn_count = 0
+        self._next_idx = 1
+
+    def next_idx(self) -> int:
+        idx = self._next_idx
+        self._next_idx += 1
+        return idx
 
     @flexitest.with_ectx("ctx")
     def create_fullnode(
@@ -156,14 +148,14 @@ class FullNodeFactory(flexitest.Factory):
         bitcoind_config: BitcoinRpcConfig,
         reth_config: RethConfig,
         sequencer_rpc: str,
-        custom_rollup_params: Optional[dict],
+        rollup_params: str,
         ctx: flexitest.EnvContext,
     ) -> flexitest.Service:
-        self.fn_count += 1
-        id = self.fn_count
+        idx = self.next_idx()
+        name = f"fullnode.{idx}"
 
-        datadir = ctx.make_service_dir(f"fullnode.{id}")
-        rpc_host = "localhost"
+        datadir = ctx.make_service_dir(name)
+        rpc_host = "127.0.0.1"
         rpc_port = self.next_port()
         logfile = os.path.join(datadir, "service.log")
 
@@ -184,25 +176,17 @@ class FullNodeFactory(flexitest.Factory):
         # fmt: on
 
         rollup_params_file = os.path.join(datadir, "rollup_params.json")
-        rollup_params = custom_rollup_params if custom_rollup_params else DEFAULT_ROLLUP_PARAMS
-
         with open(rollup_params_file, "w") as f:
-            json.dump(rollup_params, f)
+            f.write(rollup_params)
 
         cmd.extend(["--rollup-params", rollup_params_file])
 
-        props = {"rpc_port": rpc_port, "id": id}
-
+        props = {"rpc_port": rpc_port, "id": idx}
         rpc_url = f"ws://localhost:{rpc_port}"
 
         svc = flexitest.service.ProcService(props, cmd, stdout=logfile)
         svc.start()
-
-        def _create_rpc():
-            return seqrpc.JsonrpcClient(rpc_url)
-
-        svc.create_rpc = _create_rpc
-
+        _inject_service_create_rpc(svc, rpc_url, name)
         return svc
 
 
@@ -218,7 +202,8 @@ class RethFactory(flexitest.Factory):
         sequencer_reth_rpc: Optional[str],
         ctx: flexitest.EnvContext,
     ) -> flexitest.Service:
-        datadir = ctx.make_service_dir(f"reth.{id}")
+        name = f"reth.{id}"
+        datadir = ctx.make_service_dir(name)
         authrpc_port = self.next_port()
         listener_port = self.next_port()
         ethrpc_ws_port = self.next_port()
@@ -256,9 +241,6 @@ class RethFactory(flexitest.Factory):
         svc = flexitest.service.ProcService(props, cmd, stdout=logfile)
         svc.start()
 
-        def _create_rpc():
-            return seqrpc.JsonrpcClient(ethrpc_url)
-
         def _create_web3():
             http_ethrpc_url = f"http://localhost:{ethrpc_http_port}"
             w3 = web3.Web3(web3.Web3.HTTPProvider(http_ethrpc_url))
@@ -270,7 +252,7 @@ class RethFactory(flexitest.Factory):
             w3.middleware_onion.add(web3.middleware.SignAndSendRawMiddlewareBuilder.build(account))
             return w3
 
-        svc.create_rpc = _create_rpc
+        _inject_service_create_rpc(svc, ethrpc_url, name)
         svc.create_web3 = _create_web3
 
         return svc
@@ -309,39 +291,66 @@ class ProverClientFactory(flexitest.Factory):
 
         svc = flexitest.service.ProcService(props, cmd, stdout=logfile)
         svc.start()
-
-        def _create_rpc():
-            return seqrpc.JsonrpcClient(rpc_url)
-
-        svc.create_rpc = _create_rpc
+        _inject_service_create_rpc(svc, rpc_url, "prover")
         return svc
+
+
+def _inject_service_create_rpc(svc: flexitest.service.ProcService, rpc_url: str, name: str):
+    """
+    Injects a `create_rpc` method using JSON-RPC onto a `ProcService`, checking
+    its status before each call.
+    """
+
+    def _status_ck(method: str):
+        """
+        Hook to check that the process is still running before every call.
+        """
+        if not svc.check_status():
+            print(f"service '{name}' seems to have crashed as of call to {method}")
+            raise RuntimeError(f"process '{name}' crashed")
+
+    def _create_rpc():
+        rpc = seqrpc.JsonrpcClient(rpc_url)
+        rpc._pre_call_hook = _status_ck
+        return rpc
+
+    svc.create_rpc = _create_rpc
 
 
 class BasicEnvConfig(flexitest.EnvConfig):
     def __init__(
         self,
         pre_generate_blocks: int = 0,
-        rollup_params: Optional[dict] = None,
-        auto_generate_blocks=True,
-        enable_prover_client=False,
+        rollup_settings: Optional[RollupParamsSettings] = None,
+        auto_generate_blocks: bool = True,
+        enable_prover_client: bool = False,
+        n_operators: int = 2,
     ):
+        super().__init__()
         self.pre_generate_blocks = pre_generate_blocks
-        self.rollup_params = rollup_params
+        self.rollup_settings = rollup_settings
         self.auto_generate_blocks = auto_generate_blocks
         self.enable_prover_client = enable_prover_client
-        super().__init__()
+        self.n_operators = n_operators
 
     def init(self, ctx: flexitest.EnvContext) -> flexitest.LiveEnv:
         btc_fac = ctx.get_factory("bitcoin")
         seq_fac = ctx.get_factory("sequencer")
         reth_fac = ctx.get_factory("reth")
 
+        # set up network params
+        initdir = ctx.make_service_dir("_init")
+        settings = self.rollup_settings or RollupParamsSettings.new_default()
+        params_gen_data = generate_simple_params(initdir, settings, self.n_operators)
+        params = params_gen_data["params"]
+        # TODO also grab operator keys and launch operators
+
         # reth needs some time to startup, start it first
         secret_dir = ctx.make_service_dir("secret")
         reth_secret_path = os.path.join(secret_dir, "jwt.hex")
 
-        with open(reth_secret_path, "w") as file:
-            file.write(generate_jwt_secret())
+        with open(reth_secret_path, "w") as f:
+            f.write(generate_jwt_secret())
 
         reth = reth_fac.create_exec_client(0, reth_secret_path, None)
         reth_port = reth.get_prop("rpc_port")
@@ -389,9 +398,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
             "reth_socket": f"localhost:{reth_port}",
             "reth_secret_path": reth_secret_path,
         }
-        sequencer = seq_fac.create_sequencer(
-            bitcoind_config, reth_config, seqaddr, self.rollup_params
-        )
+        sequencer = seq_fac.create_sequencer(bitcoind_config, reth_config, seqaddr, params)
 
         # Need to wait for at least `genesis_l1_height` blocks to be generated.
         # Sleeping some more for safety
@@ -419,12 +426,14 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
     def __init__(
         self,
         pre_generate_blocks: int = 0,
-        rollup_params: Optional[dict] = None,
-        auto_generate_blocks=True,
+        rollup_settings: Optional[RollupParamsSettings] = None,
+        auto_generate_blocks: bool = True,
+        n_operators: int = 2,
     ):
         self.pre_generate_blocks = pre_generate_blocks
-        self.rollup_params = rollup_params
+        self.rollup_settings = rollup_settings
         self.auto_generate_blocks = auto_generate_blocks
+        self.n_operators = n_operators
         super().__init__()
 
     def init(self, ctx: flexitest.EnvContext) -> flexitest.LiveEnv:
@@ -432,6 +441,13 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
         seq_fac = ctx.get_factory("sequencer")
         reth_fac = ctx.get_factory("reth")
         fn_fac = ctx.get_factory("fullnode")
+
+        # set up network params
+        initdir = ctx.make_service_dir("_init")
+        settings = self.rollup_settings or RollupParamsSettings.new_default()
+        params_gen_data = generate_simple_params(initdir, settings, self.n_operators)
+        params = params_gen_data["params"]
+        # TODO also grab operator keys and launch operators
 
         # reth needs some time to startup, start it first
         secret_dir = ctx.make_service_dir("secret")
@@ -478,9 +494,7 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
             "reth_socket": f"localhost:{reth_authrpc_port}",
             "reth_secret_path": reth_secret_path,
         }
-        sequencer = seq_fac.create_sequencer(
-            bitcoind_config, reth_config, seqaddr, self.rollup_params
-        )
+        sequencer = seq_fac.create_sequencer(bitcoind_config, reth_config, seqaddr, params)
         # Need to wait for at least `genesis_l1_height` blocks to be generated.
         # Sleeping some more for safety
         if self.auto_generate_blocks:
@@ -498,7 +512,7 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
             bitcoind_config,
             fullnode_reth_config,
             sequencer_rpc,
-            self.rollup_params,
+            params,
         )
 
         svcs = {
@@ -542,9 +556,10 @@ def main(argv):
     }
 
     global_envs = {
-        "basic": BasicEnvConfig(),
+        "basic": BasicEnvConfig(101),
+        # TODO can we consolidate this with the basic env now?
         "premined_blocks": BasicEnvConfig(101),
-        "fast_batches": BasicEnvConfig(101, rollup_params=FAST_BATCH_ROLLUP_PARAMS),
+        "fast_batches": BasicEnvConfig(101, rollup_settings=net_settings.get_fast_batch_settings()),
         "hub1": HubNetworkEnvConfig(),
         "prover": BasicEnvConfig(101, enable_prover_client=True),
     }

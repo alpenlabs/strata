@@ -1,8 +1,8 @@
 import flexitest
 
+import net_settings
 from constants import (
     ERROR_PROOF_ALREADY_CREATED,
-    FAST_BATCH_ROLLUP_PARAMS,
 )
 from entry import BasicEnvConfig
 from utils import (
@@ -19,17 +19,12 @@ class BlockFinalizationTimeoutTest(flexitest.Test):
 
     def __init__(self, ctx: flexitest.InitContext):
         premine_blocks = 101
-        self.timeout = 5
-        rollup_params = {
-            **FAST_BATCH_ROLLUP_PARAMS,
-            # Setup reasonal horizon/genesis height
-            "horizon_l1_height": premine_blocks - 3,
-            "genesis_l1_height": premine_blocks + 5,
-            "proof_publish_mode": {
-                "timeout": self.timeout,
-            },
-        }
-        ctx.set_env(BasicEnvConfig(premine_blocks, rollup_params=rollup_params))
+        self.proof_timeout = 5
+        settings = net_settings.get_fast_batch_settings()
+        settings.genesis_trigger = premine_blocks + 5
+        settings.proof_timeout = self.proof_timeout
+
+        ctx.set_env(BasicEnvConfig(premine_blocks, rollup_settings=settings))
 
     def main(self, ctx: flexitest.RunContext):
         seq = ctx.get_service("sequencer")
@@ -40,7 +35,7 @@ class BlockFinalizationTimeoutTest(flexitest.Test):
 
         # Check for first 4 checkpoints
         for n in range(4):
-            check_nth_checkpoint_finalized(n, seqrpc, None, proof_timeout=self.timeout)
+            check_nth_checkpoint_finalized(n, seqrpc, None, proof_timeout=self.proof_timeout)
             print(f"Pass checkpoint finalization for checkpoint {n}")
 
         check_already_sent_proof(seqrpc)

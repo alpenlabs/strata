@@ -1,5 +1,5 @@
 use strata_crypto::verify_schnorr_sig;
-use strata_primitives::{block_credential::CredRule, buf::Buf32, hash, params::RollupParams};
+use strata_primitives::{block_credential::CredRule, hash, params::RollupParams};
 use tracing::warn;
 
 use crate::{
@@ -28,13 +28,9 @@ pub fn validate_block_segments(block: &L2Block) -> bool {
 }
 
 pub fn check_block_credential(header: &SignedL2BlockHeader, rollup_params: &RollupParams) -> bool {
-    let sigcom = compute_header_sig_commitment(header);
+    let sigcom = header.header().get_sighash();
     match &rollup_params.cred_rule {
         CredRule::Unchecked => true,
         CredRule::SchnorrKey(pubkey) => verify_schnorr_sig(header.sig(), &sigcom, pubkey),
     }
-}
-
-fn compute_header_sig_commitment(header: &SignedL2BlockHeader) -> Buf32 {
-    header.get_blockid().into()
 }
