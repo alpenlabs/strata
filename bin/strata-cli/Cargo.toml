@@ -3,6 +3,9 @@ edition = "2021"
 name = "strata-cli"
 version = "0.1.0"
 
+[features]
+strata_faucet = []
+
 [[bin]]
 name = "strata"
 path = "src/main.rs"

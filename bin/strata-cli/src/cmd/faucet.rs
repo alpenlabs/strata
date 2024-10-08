@@ -1,5 +1,7 @@
 use std::str::FromStr;
 
+#[cfg(feature = "strata_faucet")]
+use alloy::{primitives::Address as StrataAddress, providers::WalletProvider};
 use argh::FromArgs;
 use bdk_wallet::{
     bitcoin::{Address, Txid},
@@ -13,6 +15,11 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use shrex::{encode, Hex};
 
+#[cfg(feature = "strata_faucet")]
+use crate::{
+    net_type::{net_type_or_exit, NetworkType},
+    strata::StrataWallet,
+};
 use crate::{
     seed::Seed,
     settings::Settings,
@@ -23,6 +30,10 @@ use crate::{
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "faucet")]
 pub struct FaucetArgs {
+    /// either "signet" or "strata"
+    #[cfg(feature = "strata_faucet")]
+    #[argh(positional)]
+    network_type: String,
     /// address that funds will be sent to. defaults to internal wallet
     #[argh(positional)]
     address: Option<String>,
@@ -40,6 +51,9 @@ pub struct PowChallenge {
 pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
     let term = Term::stdout();
     let _ = term.write_line("Fetching challenge from faucet");
+
+    #[cfg(feature = "strata_faucet")]
+    let network_type = net_type_or_exit(&args.network_type, &term);
 
     let client = reqwest::Client::new();
     let base = Url::from_str(&settings.faucet_endpoint).expect("valid url");
@@ -78,6 +92,49 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
         "✔ Solved challenge after {solution} attempts. Claiming now."
     ));
 
+    #[cfg(feature = "strata_faucet")]
+    let url = match network_type {
+        NetworkType::Signet => {
+            let mut l1w = SignetWallet::new(&seed, settings.network).unwrap();
+            let address = match args.address {
+                None => {
+                    let address_info = l1w.reveal_next_address(KeychainKind::External);
+                    l1w.persist().unwrap();
+                    address_info.address
+                }
+                Some(address) => {
+                    let address = Address::from_str(&address).expect("bad address");
+                    address
+                        .require_network(settings.network)
+                        .expect("wrong bitcoin network")
+                }
+            };
+
+            let _ = term.write_line(&format!("Claiming to signet address {}", address));
+
+            format!(
+                "{base}claim_l1/{}/{}",
+                encode(&solution.to_le_bytes()),
+                address
+            )
+        }
+        NetworkType::Strata => {
+            let l2w = StrataWallet::new(&seed, &settings.l2_http_endpoint).unwrap();
+            // they said EVMs were advanced 👁️👁️
+            let address = match args.address {
+                Some(address) => StrataAddress::from_str(&address).expect("bad address"),
+                None => l2w.default_signer_address(),
+            };
+            let _ = term.write_line(&format!("Claiming to Strata address {}", address));
+            format!(
+                "{base}claim_l2/{}/{}",
+                encode(&solution.to_le_bytes()),
+                address
+            )
+        }
+    };
+
+    #[cfg(not(feature = "strata_faucet"))]
     let url = {
         let mut l1w = SignetWallet::new(&seed, settings.network).unwrap();
         let address = match args.address {
@@ -108,6 +165,11 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
     let status = res.status();
     let body = res.text().await.expect("invalid response");
     if status == StatusCode::OK {
+        #[cfg(feature = "strata_faucet")]
+        if network_type == NetworkType::Signet {
+            let _ = print_explorer_url(&Txid::from_str(&body).expect("valid txid"), &term);
+        }
+        #[cfg(not(feature = "strata_faucet"))]
         let _ = print_explorer_url(&Txid::from_str(&body).expect("valid txid"), &term);
         let _ = term.write_line(&format!("Successful. Claimed in transaction {body}"));
     } else {
