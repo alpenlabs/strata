@@ -7,7 +7,7 @@ use change_pwd::ChangePwdArgs;
 use drain::DrainArgs;
 use faucet::FaucetArgs;
 use receive::ReceiveArgs;
-use refresh::RefreshArgs;
+use recover::RecoverArgs;
 use reset::ResetArgs;
 use scan::ScanArgs;
 use send::SendArgs;
@@ -20,7 +20,7 @@ pub mod change_pwd;
 pub mod drain;
 pub mod faucet;
 pub mod receive;
-pub mod refresh;
+pub mod recover;
 pub mod reset;
 pub mod scan;
 pub mod send;
@@ -35,7 +35,7 @@ pub struct TopLevel {
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand)]
 pub enum Commands {
-    Refresh(RefreshArgs),
+    Recover(RecoverArgs),
     Drain(DrainArgs),
     Balance(BalanceArgs),
     Backup(BackupArgs),

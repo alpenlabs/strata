@@ -36,7 +36,7 @@ pub struct BridgeInArgs {
 
     /// override signet fee rate in sat/vbyte. must be >1
     #[argh(option)]
-    fee_rate: Option<String>,
+    fee_rate: Option<u64>,
 }
 
 pub async fn bridge_in(
