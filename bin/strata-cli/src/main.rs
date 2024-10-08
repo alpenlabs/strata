@@ -10,8 +10,8 @@ pub mod taproot;
 
 use cmd::{
     backup::backup, balance::balance, bridge_in::bridge_in, bridge_out::bridge_out,
-    change_pwd::change_pwd, drain::drain, faucet::faucet, receive::receive, recover::recover,
-    reset::reset, scan::scan, send::send, Commands, TopLevel,
+    change_pwd::change_pwd, config::config, drain::drain, faucet::faucet, receive::receive,
+    recover::recover, reset::reset, scan::scan, send::send, Commands, TopLevel,
 };
 #[cfg(target_os = "linux")]
 use seed::FilePersister;
@@ -25,14 +25,19 @@ async fn main() {
     let TopLevel { cmd } = argh::from_env();
     let settings = Settings::load().unwrap();
 
+    if let Commands::Config(args) = cmd {
+        config(args, settings).await;
+        return;
+    }
+
     #[cfg(not(target_os = "linux"))]
     let persister = KeychainPersister;
     #[cfg(target_os = "linux")]
     let persister = FilePersister::new(settings.linux_seed_file.clone());
 
-    let seed = seed::load_or_create(&persister).unwrap();
-
     assert!(set_data_dir(settings.data_dir.clone()));
+
+    let seed = seed::load_or_create(&persister).unwrap();
     let esplora = EsploraClient::new(&settings.esplora).expect("valid esplora url");
 
     match cmd {
@@ -48,5 +53,6 @@ async fn main() {
         Commands::Reset(args) => reset(args, persister, settings).await,
         Commands::ChangePwd(args) => change_pwd(args, seed, persister).await,
         Commands::Scan(args) => scan(args, seed, settings, esplora).await,
+        _ => {}
     }
 }

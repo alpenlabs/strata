@@ -40,6 +40,7 @@ pub struct Settings {
     pub bridge_strata_address: StrataAddress,
     pub linux_seed_file: PathBuf,
     pub network: Network,
+    pub config_file: PathBuf,
 }
 
 impl Settings {
@@ -59,7 +60,7 @@ impl Settings {
         // create config file if not exists
         let _ = File::create_new(&config_file);
         let from_file = Config::builder()
-            .add_source(config::File::from(config_file))
+            .add_source(config::File::from(config_file.clone()))
             .build()
             .map_err(OneOf::new)?
             .try_deserialize::<SettingsFromFile>()
@@ -83,6 +84,7 @@ impl Settings {
                 }
             })
             .expect("valid length"),
+            config_file,
             network: from_file.network.unwrap_or(DEFAULT_NETWORK),
             descriptor_db: descriptor_file,
             bridge_strata_address: StrataAddress::from_str(BRIDGE_STRATA_ADDRESS)

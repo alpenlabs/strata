@@ -4,6 +4,7 @@ use balance::BalanceArgs;
 use bridge_in::BridgeInArgs;
 use bridge_out::BridgeOutArgs;
 use change_pwd::ChangePwdArgs;
+use config::ConfigArgs;
 use drain::DrainArgs;
 use faucet::FaucetArgs;
 use receive::ReceiveArgs;
@@ -17,6 +18,7 @@ pub mod balance;
 pub mod bridge_in;
 pub mod bridge_out;
 pub mod change_pwd;
+pub mod config;
 pub mod drain;
 pub mod faucet;
 pub mod receive;
@@ -47,4 +49,5 @@ pub enum Commands {
     ChangePwd(ChangePwdArgs),
     Reset(ResetArgs),
     Scan(ScanArgs),
+    Config(ConfigArgs),
 }
