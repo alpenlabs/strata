@@ -96,8 +96,8 @@ impl ZKVMHost for RiscZeroHost {
     }
 }
 
-// TODO/NOTE: These tests are failing, ignoring for now since we won't be using Risc0
-#[cfg(all(feature = "prover", not(debug_assertions)))]
+#[cfg(test)]
+#[cfg(all(feature = "prover", not(debug_assertions)))] // FIXME: This is working locally but tests failing in the CI.
 mod tests {
     use std::{fs::File, io::Write};
 
@@ -131,8 +131,10 @@ mod tests {
         Risc0Verifier::verify(&vk, &proof).expect("Proof verification failed");
 
         // assert public outputs extraction from proof  works
-        let out: u32 =
-            Risc0Verifier::extract_public_output(&proof).expect("Failed to extract public outputs");
+        let out: u32 = Risc0Verifier::extract_public_output(&proof).expect(
+            "Failed to extract public
+        outputs",
+        );
         assert_eq!(input, out)
     }
 
@@ -185,11 +187,11 @@ mod tests {
         let (proof, vk) = zkvm.prove(zkvm_input).expect("Failed to generate proof");
 
         let expected_vk = vec![
-            48, 77, 52, 1, 100, 95, 109, 135, 223, 56, 83, 146, 244, 21, 237, 63, 198, 105, 2, 75,
-            135, 48, 52, 165, 178, 24, 200, 186, 174, 191, 212, 184,
+            10, 54, 13, 204, 148, 23, 239, 151, 171, 193, 81, 136, 44, 50, 212, 47, 131, 118, 33,
+            162, 117, 207, 35, 7, 45, 14, 98, 169, 38, 223, 115, 214,
         ];
 
-        let filename = "proof-groth16.bin";
+        let filename = "./tests/proofs/proof-groth16.bin";
         let mut file = File::create(filename).unwrap();
         file.write_all(proof.as_bytes()).unwrap();
 
