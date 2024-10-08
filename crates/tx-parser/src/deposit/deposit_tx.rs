@@ -1,6 +1,6 @@
 //! parser types for Deposit Tx, and later deposit Request Tx
 
-use bitcoin::{opcodes::all::OP_RETURN, ScriptBuf, Transaction};
+use bitcoin::{opcodes::all::OP_RETURN, OutPoint, ScriptBuf, Transaction};
 use strata_bridge_tx_builder::prelude::BRIDGE_DENOMINATION;
 use strata_primitives::{l1::OutputRef, prelude::DepositTxParams};
 use strata_state::tx::DepositInfo;
@@ -32,13 +32,16 @@ pub fn extract_deposit_info(tx: &Transaction, config: &DepositTxParams) -> Optio
     }
 
     // Get the first input of the transaction
-    let prev_out = tx.input.first()?;
+    let deposit_outpoint = OutputRef::from(OutPoint {
+        txid: tx.compute_txid(),
+        vout: 0, // deposit must always exist in the first output
+    });
 
     // Construct and return the DepositInfo
     Some(DepositInfo {
         amt: send_addr_out.value.into(),
         address: ee_address.to_vec(),
-        outpoint: OutputRef::from(prev_out.previous_output),
+        outpoint: deposit_outpoint,
     })
 }
 
