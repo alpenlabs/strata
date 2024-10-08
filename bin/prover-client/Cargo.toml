@@ -25,12 +25,12 @@ strata-sp1-guest-builder = { path = "../../provers/sp1" }
 strata-state = { workspace = true }
 strata-zkvm = { workspace = true }
 
-anyhow = { workspace = true }
-argh = { workspace = true }
-async-trait = { workspace = true }
-bincode = { workspace = true }
+anyhow.workspace = true
+argh.workspace = true
+async-trait.workspace = true
+bincode.workspace = true
 bitcoin = { workspace = true, features = ["rand-std"] }
-borsh = { workspace = true }
+borsh.workspace = true
 hex.workspace = true
 jsonrpsee = { workspace = true, features = ["http-client"] }
 musig2.workspace = true

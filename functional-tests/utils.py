@@ -1,14 +1,15 @@
 import logging as log
 import math
 import os
+import subprocess
 import time
 from dataclasses import dataclass
 from threading import Thread
-from typing import Any, Callable, TypeVar
+from typing import Any, Callable, Optional, TypeVar
 
 from bitcoinlib.services.bitcoind import BitcoindClient
 
-from constants import ERROR_CHECKPOINT_DOESNOT_EXIST
+from constants import *
 
 
 def generate_jwt_secret() -> str:
@@ -107,6 +108,25 @@ class ManualGenBlocksConfig:
     gen_addr: str
 
 
+@dataclass
+class RollupParamsSettings:
+    block_time_sec: int
+    epoch_slots: int
+    genesis_trigger: int
+    proof_timeout: Optional[int] = None
+
+    # NOTE: type annotation: Ideally we would use `Self` but couldn't use it
+    # even after changing python version to 3.12
+    @classmethod
+    def new_default(cls) -> "RollupParamsSettings":
+        return cls(
+            block_time_sec=DEFAULT_BLOCK_TIME_SEC,
+            epoch_slots=DEFAULT_EPOCH_SLOTS,
+            genesis_trigger=DEFAULT_GENESIS_TRIGGER_HT,
+            proof_timeout=DEFAULT_PROOF_TIMEOUT,
+        )
+
+
 def check_nth_checkpoint_finalized(
     idx,
     seqrpc,
@@ -127,7 +147,7 @@ def check_nth_checkpoint_finalized(
     batch_info = wait_until_with_value(
         lambda: seqrpc.strata_getCheckpointInfo(idx),
         predicate=lambda v: v is not None,
-        error_with="Could not find checkpoint info",
+        error_with=f"Could not find checkpoint info for index {idx}",
         timeout=3,
     )
 
@@ -145,7 +165,8 @@ def check_nth_checkpoint_finalized(
         submit_checkpoint(idx, seqrpc, manual_gen)
     else:
         # Just wait until timeout period instead of submitting so that sequencer submits empty proof
-        time.sleep(proof_timeout)
+        delta = 1
+        time.sleep(proof_timeout + delta)
 
     if manual_gen:
         # Produce l1 blocks until proof is finalized
@@ -208,7 +229,6 @@ def check_submit_proof_fails_for_nonexistent_batch(seqrpc, nonexistent_batch: in
         seqrpc.strataadmin_submitCheckpointProof(nonexistent_batch, proof_hex)
     except Exception as e:
         if hasattr(e, "code"):
-            print(e)
             assert e.code == ERROR_CHECKPOINT_DOESNOT_EXIST
         else:
             print("Unexpected error occurred")
@@ -257,3 +277,108 @@ def wait_for_proof_with_time_out(prover_client_rpc, task_id, time_out=3600):
         elapsed_time = time.time() - start_time  # Calculate elapsed time
         if elapsed_time >= time_out:
             raise TimeoutError(f"Operation timed out after {time_out} seconds.")
+
+
+def generate_seed_at(path: str):
+    """Generates a seed file at specified path."""
+    # fmt: off
+    cmd = [
+        "strata-datatool",
+        "-b", "regtest",
+        "genseed",
+        "-f", path
+    ]
+    # fmt: on
+
+    res = subprocess.run(cmd, stdout=subprocess.PIPE)
+    res.check_returncode()
+
+
+def generate_seqpubkey_from_seed(path: str) -> str:
+    """Generates a sequencer pubkey from the seed at file path."""
+    # fmt: off
+    cmd = [
+        "strata-datatool",
+        "-b", "regtest",
+        "genseqpubkey",
+        "-f", path
+    ]
+    # fmt: on
+
+    with open(path) as f:
+        print("sequencer root privkey", f.read())
+
+    res = subprocess.run(cmd, stdout=subprocess.PIPE)
+    res.check_returncode()
+    res = str(res.stdout, "utf8").strip()
+    assert len(res) > 0, "no output generated"
+    print("SEQ PUBKEY", res)
+    return res
+
+
+def generate_opxpub_from_seed(path: str) -> str:
+    """Generates operate pubkey from seed at file path."""
+    # fmt: off
+    cmd = [
+        "strata-datatool",
+        "-b", "regtest",
+        "genopxpub",
+        "-f", path
+    ]
+    # fmt: on
+
+    res = subprocess.run(cmd, stdout=subprocess.PIPE)
+    res.check_returncode()
+    res = str(res.stdout, "utf8").strip()
+    assert len(res) > 0, "no output generated"
+    return res
+
+
+def generate_params(settings: RollupParamsSettings, seqpubkey: str, oppubkeys: list[str]) -> str:
+    """Generates a params file from config values."""
+    # fmt: off
+    cmd = [
+        "strata-datatool",
+        "-b", "regtest",
+        "genparams",
+        "--name", "strata",
+        "--block-time", str(settings.block_time_sec),
+        "--epoch-slots", str(settings.epoch_slots),
+        "--genesis-trigger-height", str(settings.genesis_trigger),
+        "--seqkey", seqpubkey,
+    ]
+    if settings.proof_timeout is not None:
+        cmd.extend(["--proof-timeout", str(settings.proof_timeout)])
+    # fmt: on
+
+    for k in oppubkeys:
+        cmd.extend(["--opkey", k])
+
+    res = subprocess.run(cmd, stdout=subprocess.PIPE)
+    res.check_returncode()
+    res = str(res.stdout, "utf8").strip()
+    assert len(res) > 0, "no output generated"
+    return res
+
+
+def generate_simple_params(
+    base_path: str,
+    settings: RollupParamsSettings,
+    operator_cnt: int,
+) -> dict:
+    """
+    Creates a network with params data and a list of operator seed paths.
+
+    Result options are `params` and `opseedpaths`.
+    """
+    seqseedpath = os.path.join(base_path, "seqkey.bin")
+    opseedpaths = [os.path.join(base_path, "opkey%s.bin") % i for i in range(operator_cnt)]
+    for p in [seqseedpath] + opseedpaths:
+        generate_seed_at(p)
+
+    seqkey = generate_seqpubkey_from_seed(seqseedpath)
+    opxpubs = [generate_opxpub_from_seed(p) for p in opseedpaths]
+
+    params = generate_params(settings, seqkey, opxpubs)
+    print("Params", params)
+    return {"params": params, "opseedpaths": opseedpaths}

@@ -50,15 +50,22 @@ pub fn parse_deposit_request_script(
 
     // check if OP_RETURN is present and if not just discard it
     if next_op(&mut instructions) != Some(OP_RETURN) {
-        debug!(?instructions, "missing op_return");
+        // Commented out these logs since they're really verbose and not
+        // helpful.  We shouldn't be emitting a log message for every single tx
+        // we see on chain.
+        //debug!(?instructions, "missing op_return");
         return Err(DepositParseError::NoOpReturn);
     }
 
     let Some(data) = next_bytes(&mut instructions) else {
-        debug!("no data after OP_RETURN");
+        //debug!("no data after OP_RETURN");
         return Err(DepositParseError::NoData);
     };
 
+    // Added a cfg to assert since it feels like it could crash us in
+    // production.  I believe this is just a tx standardness policy, not a
+    // consensus rule.
+    #[cfg(debug_assertions)]
     assert!(data.len() < 80);
 
     // data has expected magic bytes
@@ -66,14 +73,15 @@ pub fn parse_deposit_request_script(
     let magic_len = magic_bytes.len();
     let actual_magic_bytes = &data[..magic_len];
     if data.len() < magic_len || actual_magic_bytes != magic_bytes {
-        debug!(expected_magic_bytes = ?magic_bytes, ?actual_magic_bytes, "mismatched magic bytes");
+        //debug!(expected_magic_bytes = ?magic_bytes, ?actual_magic_bytes, "mismatched magic
+        // bytes");
         return Err(DepositParseError::MagicBytesMismatch);
     }
 
     // 32 bytes of control hash
     let data = &data[magic_len..];
     if data.len() < 32 {
-        debug!(?data, expected = 32, got = %data.len(), "incorrect number of bytes in hash");
+        //debug!(?data, expected = 32, got = %data.len(), "incorrect number of bytes in hash");
         return Err(DepositParseError::LeafHashLenMismatch);
     }
     let ctrl_hash: &[u8; 32] = &data[..32]

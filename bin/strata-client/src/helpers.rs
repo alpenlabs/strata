@@ -1,12 +1,11 @@
-use std::{
-    fs,
-    path::{Path, PathBuf},
-    sync::Arc,
-    time::Duration,
-};
+use std::{fs, path::Path, sync::Arc, time::Duration};
 
 use anyhow::Context;
-use bitcoin::{Address, Network};
+use bitcoin::{
+    base58,
+    bip32::{Xpriv, Xpub},
+    Address, Network,
+};
 use format_serde_error::SerdeError;
 use reth_rpc_types::engine::JwtSecret;
 use rockbound::{rocksdb, OptimisticTransactionDB};
@@ -32,7 +31,7 @@ use strata_storage::L2BlockManager;
 use tokio::runtime::Runtime;
 use tracing::*;
 
-use crate::{args::Args, config::Config, errors::InitError, network};
+use crate::{args::Args, config::Config, errors::InitError, keyderiv, network};
 
 pub type CommonDb =
     CommonDatabase<L1Db, L2Db, SyncEventDb, ClientStateDb, ChainStateDb, RBCheckpointDB>;
@@ -178,20 +177,27 @@ pub fn open_rocksdb_database(
     Ok(Arc::new(rbdb))
 }
 
-pub fn load_seqkey(path: &PathBuf) -> anyhow::Result<IdentityData> {
-    let secret_str = fs::read_to_string(path)?;
-    let Ok(raw_key) = <[u8; 32]>::try_from(hex::decode(secret_str)?) else {
-        error!("malformed seqkey");
-        anyhow::bail!("malformed seqkey");
-    };
+/// Loads sequencer identity data from the root key at the specified path.
+pub fn load_seqkey(path: &Path) -> anyhow::Result<IdentityData> {
+    let raw_buf = fs::read(path)?;
+    let str_buf = std::str::from_utf8(&raw_buf)?;
+    debug!(?path, "loading sequencer root key");
+    let buf = base58::decode_check(str_buf)?;
+    let root_xpriv = Xpriv::decode(&buf)?;
 
-    let key = Buf32::from(raw_key);
+    // Actually do the key derivation from the root key and then derive the pubkey from that.
+    let seq_xpriv = keyderiv::derive_seq_xpriv(&root_xpriv)?;
+    let seq_sk = Buf32::from(seq_xpriv.private_key.secret_bytes());
+    let seq_xpub = Xpub::from_priv(bitcoin::secp256k1::SECP256K1, &seq_xpriv);
+    let seq_pk = seq_xpub.to_x_only_pub().serialize();
 
-    // FIXME all this needs to be changed to use actual cryptographic keys
-    let ik = IdentityKey::Sequencer(key);
-    let ident = Identity::Sequencer(key);
+    let ik = IdentityKey::Sequencer(seq_sk);
+    let ident = Identity::Sequencer(Buf32::from(seq_pk));
+
+    // Changed this to the pubkey so that we don't just log our privkey.
+    debug!(?ident, "ready to sign as sequencer");
+
     let idata = IdentityData::new(ident, ik);
-
     Ok(idata)
 }
 

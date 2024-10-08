@@ -1,8 +1,8 @@
 import flexitest
 
+import net_settings
 from constants import (
     ERROR_PROOF_ALREADY_CREATED,
-    FAST_BATCH_ROLLUP_PARAMS,
 )
 from entry import BasicEnvConfig
 from utils import (
@@ -17,7 +17,7 @@ class BlockFinalizationSeqRestartTest(flexitest.Test):
     """This tests finalization when sequencer client restarts"""
 
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env(BasicEnvConfig(101, rollup_params=FAST_BATCH_ROLLUP_PARAMS))
+        ctx.set_env(BasicEnvConfig(101, rollup_settings=net_settings.get_fast_batch_settings()))
 
     def main(self, ctx: flexitest.RunContext):
         seq = ctx.get_service("sequencer")

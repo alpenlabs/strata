@@ -14,11 +14,13 @@ class RpcError(Exception):
 
 
 def _make_request(method: str, req_id: int, params) -> str:
+    """Assembles a request body from parts."""
     req = {"jsonrpc": "2.0", "method": method, "id": req_id, "params": params}
     return json.dumps(req)
 
 
 def _handle_response(resp_str: str):
+    """Takes a response body and extracts the result or raises the error."""
     resp = json.loads(resp_str)
     if "error" in resp:
         e = resp["error"]
@@ -39,8 +41,20 @@ class JsonrpcClient:
     def __init__(self, url: str):
         self.url = url
         self.req_idx = 0
+        # Hook that lets us add a check that runs before every call.
+        self._pre_call_hook = None
+
+    def _do_pre_call_check(self, m: str):
+        """Calls the pre-call hook if set."""
+        if self._pre_call_hook is not None:
+            h = self._pre_call_hook
+            r = h(m)
+            if type(r) is bool:
+                if not r:
+                    raise RuntimeError(f"failed precheck on call to '{m}'")
 
     def _call(self, method: str, args):
+        self._do_pre_call_check(method)
         req = _make_request(method, self.req_idx, args)
         self.req_idx += 1
         resp = _send_single_ws_request(self.url, req)
