@@ -35,7 +35,7 @@ pub async fn receive(args: ReceiveArgs, seed: Seed, settings: Settings, esplora:
             address_info.address.to_string()
         }
         NetworkType::Strata => {
-            let l2w = StrataWallet::new(&seed, &settings.l2_http_endpoint).unwrap();
+            let l2w = StrataWallet::new(&seed, &settings.strata_endpoint).unwrap();
             l2w.default_signer_address().to_string()
         }
     };

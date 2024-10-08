@@ -41,7 +41,7 @@ pub async fn balance(args: BalanceArgs, seed: Seed, settings: Settings, esplora:
     }
 
     if let NetworkType::Strata = network_type {
-        let l2w = StrataWallet::new(&seed, &settings.l2_http_endpoint).unwrap();
+        let l2w = StrataWallet::new(&seed, &settings.strata_endpoint).unwrap();
         let _ = term.write_line("Getting balance...");
         let balance = l2w.get_balance(l2w.default_signer_address()).await.unwrap();
         // 1 BTC = 1 ETH

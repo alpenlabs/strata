@@ -26,7 +26,7 @@ pub const PW_SALT_LEN: usize = 16;
 /// Length of nonce in bytes
 pub const AES_NONCE_LEN: usize = 12;
 /// Length of seed in bytes
-pub const SEED_LEN: usize = 32;
+pub const SEED_LEN: usize = 16;
 /// AES-256-GCM-SIV tag len
 pub const AES_TAG_LEN: usize = 16;
 
@@ -35,7 +35,7 @@ pub const BRIDGE_STRATA_ADDRESS: &str = "0x000000000000000000000000000000000B121
 pub const L2_BLOCK_TIME: Duration = Duration::from_secs(30);
 
 pub const DEFAULT_ESPLORA: &str = "https://esploraapi.devnet-annapurna.stratabtc.org";
-pub const DEFAULT_L2_HTTP_ENDPOINT: &str = "https://stratareth.devnet-annapurna.stratabtc.org";
+pub const DEFAULT_STRATA_ENDPOINT: &str = "https://stratareth.devnet-annapurna.stratabtc.org";
 pub const DEFAULT_FAUCET_ENDPOINT: &str = "https://faucet.devnet-annapurna.stratabtc.org";
 pub const DEFAULT_MEMPOOL_ENDPOINT: &str = "https://mempool.devnet-annapurna.stratabtc.org";
 pub const BRIDGE_MUSIG2_PUBKEY: &str =

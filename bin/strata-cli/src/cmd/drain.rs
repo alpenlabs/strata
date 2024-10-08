@@ -85,7 +85,7 @@ pub async fn drain(
     }
 
     if let Some(address) = strata_address {
-        let l2w = StrataWallet::new(&seed, &settings.l2_http_endpoint).unwrap();
+        let l2w = StrataWallet::new(&seed, &settings.strata_endpoint).unwrap();
         let balance = l2w.get_balance(l2w.default_signer_address()).await.unwrap();
         if balance == U256::ZERO {
             let _ = term.write_line("No Strata bitcoin to send");
