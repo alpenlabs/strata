@@ -13,13 +13,12 @@ use crate::{
     signet::{get_fee_rate, EsploraClient, SignetWallet},
 };
 
-/// Runs any background tasks manually. Currently performs recovery of old
-/// bridge in transactions
+/// Attempt recovery of old bridge-in transactions
 #[derive(FromArgs, PartialEq, Debug)]
-#[argh(subcommand, name = "refresh")]
-pub struct RefreshArgs {}
+#[argh(subcommand, name = "recover")]
+pub struct RecoverArgs {}
 
-pub async fn refresh(seed: Seed, settings: Settings, esplora: EsploraClient) {
+pub async fn recover(seed: Seed, settings: Settings, esplora: EsploraClient) {
     let term = Term::stdout();
     let mut l1w = SignetWallet::new(&seed, NETWORK).unwrap();
     l1w.sync(&esplora).await.unwrap();

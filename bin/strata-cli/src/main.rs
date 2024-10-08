@@ -10,7 +10,7 @@ pub mod taproot;
 
 use cmd::{
     backup::backup, balance::balance, bridge_in::bridge_in, bridge_out::bridge_out,
-    change_pwd::change_pwd, drain::drain, faucet::faucet, receive::receive, refresh::refresh,
+    change_pwd::change_pwd, drain::drain, faucet::faucet, receive::receive, recover::recover,
     reset::reset, scan::scan, send::send, Commands, TopLevel,
 };
 #[cfg(target_os = "linux")]
@@ -36,7 +36,7 @@ async fn main() {
     let esplora = EsploraClient::new(&settings.esplora).expect("valid esplora url");
 
     match cmd {
-        Commands::Refresh(_) => refresh(seed, settings, esplora).await,
+        Commands::Recover(_) => recover(seed, settings, esplora).await,
         Commands::Drain(args) => drain(args, seed, settings, esplora).await,
         Commands::Balance(args) => balance(args, seed, settings, esplora).await,
         Commands::Backup(args) => backup(args, seed).await,
