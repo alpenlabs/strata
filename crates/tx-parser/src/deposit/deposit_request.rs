@@ -62,8 +62,9 @@ pub fn parse_deposit_request_script(
         return Err(DepositParseError::NoData);
     };
 
-    // Added a cfg to assert since it feels like it could crash us in prodction.
-    // I believe this is just a tx standardness policy, not a consensus rule.
+    // Added a cfg to assert since it feels like it could crash us in
+    // production.  I believe this is just a tx standardness policy, not a
+    // consensus rule.
     #[cfg(debug_assertions)]
     assert!(data.len() < 80);
 

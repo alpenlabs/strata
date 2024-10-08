@@ -44,7 +44,7 @@ ignore = [
   "F405",
   "F403",
   # if block stuff
-  "SIM102"
+  "SIM102",
 ]
 
 [tool.ruff.lint.pycodestyle]

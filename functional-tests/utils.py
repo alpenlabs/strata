@@ -115,7 +115,7 @@ class RollupParamsSettings:
     genesis_trigger: int
     proof_timeout: Optional[int] = None
 
-    # NOTE: type annnotation: Ideally we would use `Self` but couldn't use it
+    # NOTE: type annotation: Ideally we would use `Self` but couldn't use it
     # even after changing python version to 3.12
     @classmethod
     def new_default(cls) -> "RollupParamsSettings":
