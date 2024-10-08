@@ -141,26 +141,12 @@ impl BorshSerialize for Musig2PartialSig {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         let sig_bytes = self.0.serialize();
 
-        borsh::BorshSerialize::serialize(&(sig_bytes.len() as u32), writer)?;
-
         writer.write_all(&sig_bytes)
     }
 }
 
 impl BorshDeserialize for Musig2PartialSig {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
-        let len = u32::deserialize_reader(reader)? as usize;
-
-        if len != MUSIG2_PARTIAL_SIG_SIZE {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                format!(
-                    "Invalid Musig2PartialSig size, expected: {}, got: {}",
-                    MUSIG2_PARTIAL_SIG_SIZE, len
-                ),
-            ));
-        }
-
         // Buffer size for 32-byte PartialSignature
         let mut partial_sig_bytes = [0u8; MUSIG2_PARTIAL_SIG_SIZE];
         reader.read_exact(&mut partial_sig_bytes)?;
@@ -254,9 +240,6 @@ impl BorshSerialize for Musig2PubNonce {
         // Serialize self.0 (the PubNonce) into bytes
         let nonce_bytes = self.0.serialize();
 
-        // Write the length prefix as a u32 (little-endian)
-        borsh::BorshSerialize::serialize(&(nonce_bytes.len() as u32), writer)?;
-
         // Write the nonce bytes
         writer.write_all(&nonce_bytes)
     }
@@ -264,19 +247,6 @@ impl BorshSerialize for Musig2PubNonce {
 
 impl BorshDeserialize for Musig2PubNonce {
     fn deserialize_reader<R: Read>(reader: &mut R) -> std::io::Result<Self> {
-        // Read the length prefix as a u32 (little-endian)
-        let len = u32::deserialize_reader(reader)? as usize;
-
-        if len != PUB_NONCE_SIZE {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                format!(
-                    "Invalid Musig2PubNonce size, expected: {}, got: {}",
-                    PUB_NONCE_SIZE, len
-                ),
-            ));
-        }
-
         // Read the nonce bytes based on the length
         let mut nonce_bytes = vec![0u8; PUB_NONCE_SIZE];
         reader.read_exact(&mut nonce_bytes)?;
@@ -322,9 +292,6 @@ impl BorshSerialize for Musig2SecNonce {
     fn serialize<W: Write>(&self, writer: &mut W) -> std::io::Result<()> {
         let nonce_bytes = self.0.serialize();
 
-        // Write the length prefix as a u32 (little-endian)
-        borsh::BorshSerialize::serialize(&(nonce_bytes.len() as u32), writer)?;
-
         // Write the nonce bytes
         writer.write_all(&nonce_bytes)
     }
@@ -332,19 +299,6 @@ impl BorshSerialize for Musig2SecNonce {
 
 impl BorshDeserialize for Musig2SecNonce {
     fn deserialize_reader<R: Read>(reader: &mut R) -> std::io::Result<Self> {
-        // Read the length prefix as a u32 (little-endian)
-        let len = u32::deserialize_reader(reader)? as usize;
-
-        if len != SEC_NONCE_SIZE {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                format!(
-                    "Invalid Musig2SecNonce size, expected: {}, got: {}",
-                    PUB_NONCE_SIZE, len
-                ),
-            ));
-        }
-
         // Read the nonce bytes based on the length
         let mut nonce_bytes = vec![0u8; SEC_NONCE_SIZE];
         reader.read_exact(&mut nonce_bytes)?;
@@ -387,8 +341,6 @@ mod tests {
         bridge::{Musig2PartialSig, Musig2SecNonce},
         constants::{MUSIG2_PARTIAL_SIG_SIZE, PUB_NONCE_SIZE, SEC_NONCE_SIZE},
     };
-
-    const BORSH_LENGTH_PREFIX_SIZE: usize = 4;
 
     #[test]
     fn test_publickeytable_serialize_deserialize() {
@@ -474,7 +426,7 @@ mod tests {
             result.err().unwrap()
         );
 
-        let expected_length = BORSH_LENGTH_PREFIX_SIZE + MUSIG2_PARTIAL_SIG_SIZE;
+        let expected_length = MUSIG2_PARTIAL_SIG_SIZE;
         assert_eq!(
             serialized_sig.len(),
             expected_length,
@@ -536,7 +488,7 @@ mod tests {
 
         // Deserialize the PubNonce
         let serialized_nonce = result.unwrap();
-        let expected_size = BORSH_LENGTH_PREFIX_SIZE + PUB_NONCE_SIZE;
+        let expected_size = PUB_NONCE_SIZE;
         assert_eq!(
             serialized_nonce.len(),
             expected_size,
@@ -601,7 +553,7 @@ mod tests {
         );
 
         let serialized_secnonce = result.unwrap();
-        let expected_size = BORSH_LENGTH_PREFIX_SIZE + SEC_NONCE_SIZE;
+        let expected_size = SEC_NONCE_SIZE;
         assert_eq!(
             serialized_secnonce.len(),
             expected_size,
