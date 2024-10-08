@@ -39,7 +39,7 @@ pub const DEFAULT_STRATA_ENDPOINT: &str = "https://stratareth.devnet-annapurna.s
 pub const DEFAULT_FAUCET_ENDPOINT: &str = "https://faucet.devnet-annapurna.stratabtc.org";
 pub const DEFAULT_MEMPOOL_ENDPOINT: &str = "https://mempool.devnet-annapurna.stratabtc.org";
 pub const BRIDGE_MUSIG2_PUBKEY: &str =
-    "51acd1574ef6b1fb98ed000db6e31a7cb8d3dba302fa22e2c99a03f4cbfc2438";
+    "14ced579c6a92533fa68ccc16da93b41073993cfc6cc982320645d8e9a63ee65";
 
 /// A provably unspendable, static public key from predetermined inputs created using method specified in [BIP-341](https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki#cite_note-23)
 pub static UNSPENDABLE: LazyLock<XOnlyPublicKey> = LazyLock::new(|| {
