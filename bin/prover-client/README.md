@@ -1,4 +1,4 @@
-# Express Prover Client
+# Strata Prover Client
 The `strata-prover-client` handles fetching the witness from the EE and Sequencer, generating proofs, and storing the generated proofs. 
 
 ## Building the Project

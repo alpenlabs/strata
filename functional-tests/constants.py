@@ -44,7 +44,8 @@ DEFAULT_ROLLUP_PARAMS: dict = {
     "dispatch_assignment_dur": 64,
     "proof_publish_mode": {
         # use an empty proof in batch after this many seconds of not receiving a proof
-        "timeout": 30,
+        # "timeout": 30,
+        "timeout": 60 * 10,
     },
     "max_deposits_in_block": 16,
     "operator_config": {"static": [{"signing_pk": "01" * 32, "wallet_pk": "02" * 32}]},

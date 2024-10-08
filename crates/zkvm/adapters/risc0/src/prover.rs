@@ -67,6 +67,10 @@ impl ZKVMHost for RiscZeroHost {
             VerificationKey(verification_key),
         ))
     }
+
+    fn get_verification_key(&self) -> VerificationKey {
+        todo!()
+    }
 }
 
 #[cfg(test)]
@@ -141,6 +145,7 @@ mod tests {
             enable_compression: false,
             use_mock_prover: false,
             stark_to_snark_conversion: true,
+            use_cached_keys: true,
         };
 
         let zkvm = RiscZeroHost::init(TEST_ELF.to_vec(), prover_options);

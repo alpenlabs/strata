@@ -12974,18 +12974,34 @@ dependencies = [
  "argh",
  "async-trait",
  "bincode",
+ "bitcoin",
+ "borsh",
+ "hex",
  "jsonrpsee",
+ "musig2",
+ "num-bigint 0.4.6",
+ "num-traits",
+ "rand 0.8.5",
  "rayon",
  "reth-rpc-types",
  "rockbound",
  "serde",
+ "sp1-sdk",
+ "strata-btcio",
  "strata-common",
  "strata-db",
+ "strata-primitives",
+ "strata-proofimpl-btc-blockspace",
+ "strata-proofimpl-checkpoint",
  "strata-proofimpl-evm-ee-stf",
+ "strata-proofimpl-l1-batch",
  "strata-prover-client-rpc-api",
  "strata-rocksdb",
+ "strata-rpc-types",
  "strata-sp1-adapter",
  "strata-sp1-guest-builder",
+ "strata-state",
+ "strata-tx-parser",
  "strata-zkvm",
  "thiserror",
  "tokio",
@@ -12999,6 +13015,8 @@ name = "strata-prover-client-rpc-api"
 version = "0.1.0"
 dependencies = [
  "jsonrpsee",
+ "strata-rpc-types",
+ "uuid 1.10.0",
 ]
 
 [[package]]
@@ -13246,10 +13264,12 @@ dependencies = [
  "num-traits",
  "serde",
  "serde_json",
+ "sha2 0.10.8",
  "snark-bn254-verifier",
  "sp1-sdk",
  "strata-zkvm",
  "substrate-bn 0.7.0",
+ "tracing",
 ]
 
 [[package]]

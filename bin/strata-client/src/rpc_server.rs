@@ -560,6 +560,16 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
         Ok(batch_comm.map(|bc| bc.batch_info().clone().into()))
     }
 
+    async fn get_latest_checkpoint_index(&self) -> RpcResult<Option<u64>> {
+        let idx = self
+            .checkpoint_handle
+            .get_last_checkpoint_idx()
+            .await
+            .map_err(|e| Error::Other(e.to_string()))?;
+
+        return Ok(idx);
+    }
+
     async fn get_l2_block_status(&self, block_height: u64) -> RpcResult<L2BlockStatus> {
         let cl_state = self.get_client_state().await;
         if let Some(last_checkpoint) = cl_state.l1_view().last_finalized_checkpoint() {
