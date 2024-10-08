@@ -97,16 +97,21 @@ impl ProvingOperations for CheckpointOperations {
                         anyhow::anyhow!("Checkpoint information not found for index {}", ckp_idx)
                     })?
             }
-            CheckpointOpsParam::CheckPointIndex(ckp_idx) => self
-                .cl_client
-                .request::<Option<RpcCheckpointInfo>, _>(
-                    "strata_getCheckpointInfo",
-                    rpc_params![ckp_idx],
-                )
-                .await?
-                .ok_or_else(|| {
-                    anyhow::anyhow!("Checkpoint information not found for index {}", ckp_idx)
-                })?,
+            CheckpointOpsParam::CheckPointIndex(ckp_idx) => {
+                let mut res = self
+                    .cl_client
+                    .request::<Option<RpcCheckpointInfo>, _>(
+                        "strata_getCheckpointInfo",
+                        rpc_params![ckp_idx],
+                    )
+                    .await?
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("Checkpoint information not found for index {}", ckp_idx)
+                    })?;
+
+                res.l1_range = (1, 1);
+                res
+            }
             CheckpointOpsParam::Manual(ckp_info) => ckp_info,
         };
 
