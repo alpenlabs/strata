@@ -39,6 +39,13 @@ select = [
   # isort
   "I",
 ]
+ignore = [
+  # related to star imports
+  "F405",
+  "F403",
+  # if block stuff
+  "SIM102"
+]
 
 [tool.ruff.lint.pycodestyle]
 max-line-length = 100
