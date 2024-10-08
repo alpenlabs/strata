@@ -120,10 +120,10 @@ class RollupParamsSettings:
     @classmethod
     def new_default(cls) -> "RollupParamsSettings":
         return cls(
-            block_time_sec = DEFAULT_BLOCK_TIME_SEC,
-            epoch_slots = DEFAULT_EPOCH_SLOTS,
-            genesis_trigger = DEFAULT_GENESIS_TRIGGER_HT,
-            proof_timeout = DEFAULT_PROOF_TIMEOUT,
+            block_time_sec=DEFAULT_BLOCK_TIME_SEC,
+            epoch_slots=DEFAULT_EPOCH_SLOTS,
+            genesis_trigger=DEFAULT_GENESIS_TRIGGER_HT,
+            proof_timeout=DEFAULT_PROOF_TIMEOUT,
         )
 
 
@@ -334,11 +334,7 @@ def generate_opxpub_from_seed(path: str) -> str:
     return res
 
 
-def generate_params(
-        settings: RollupParamsSettings,
-        seqpubkey: str,
-        oppubkeys: list[str]
-) -> str:
+def generate_params(settings: RollupParamsSettings, seqpubkey: str, oppubkeys: list[str]) -> str:
     """Generates a params file from config values."""
     # fmt: off
     cmd = [
@@ -366,9 +362,9 @@ def generate_params(
 
 
 def generate_simple_params(
-        base_path: str,
-        settings: RollupParamsSettings,
-        operator_cnt: int,
+    base_path: str,
+    settings: RollupParamsSettings,
+    operator_cnt: int,
 ) -> dict:
     """
     Creates a network with params data and a list of operator seed paths.

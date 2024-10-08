@@ -319,12 +319,12 @@ def _inject_service_create_rpc(svc: flexitest.service.ProcService, rpc_url: str,
 
 class BasicEnvConfig(flexitest.EnvConfig):
     def __init__(
-            self,
-            pre_generate_blocks: int = 0,
-            rollup_settings: Optional[RollupParamsSettings] = None,
-            auto_generate_blocks: bool = True,
-            enable_prover_client: bool = False,
-            n_operators: int = 2
+        self,
+        pre_generate_blocks: int = 0,
+        rollup_settings: Optional[RollupParamsSettings] = None,
+        auto_generate_blocks: bool = True,
+        enable_prover_client: bool = False,
+        n_operators: int = 2,
     ):
         super().__init__()
         self.pre_generate_blocks = pre_generate_blocks
@@ -398,9 +398,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
             "reth_socket": f"localhost:{reth_port}",
             "reth_secret_path": reth_secret_path,
         }
-        sequencer = seq_fac.create_sequencer(
-            bitcoind_config, reth_config, seqaddr, params
-        )
+        sequencer = seq_fac.create_sequencer(bitcoind_config, reth_config, seqaddr, params)
 
         # Need to wait for at least `genesis_l1_height` blocks to be generated.
         # Sleeping some more for safety
@@ -426,11 +424,11 @@ class BasicEnvConfig(flexitest.EnvConfig):
 
 class HubNetworkEnvConfig(flexitest.EnvConfig):
     def __init__(
-            self,
-            pre_generate_blocks: int = 0,
-            rollup_settings: Optional[RollupParamsSettings] = None,
-            auto_generate_blocks: bool = True,
-            n_operators: int = 2,
+        self,
+        pre_generate_blocks: int = 0,
+        rollup_settings: Optional[RollupParamsSettings] = None,
+        auto_generate_blocks: bool = True,
+        n_operators: int = 2,
     ):
         self.pre_generate_blocks = pre_generate_blocks
         self.rollup_settings = rollup_settings
@@ -496,9 +494,7 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
             "reth_socket": f"localhost:{reth_authrpc_port}",
             "reth_secret_path": reth_secret_path,
         }
-        sequencer = seq_fac.create_sequencer(
-            bitcoind_config, reth_config, seqaddr, params
-        )
+        sequencer = seq_fac.create_sequencer(bitcoind_config, reth_config, seqaddr, params)
         # Need to wait for at least `genesis_l1_height` blocks to be generated.
         # Sleeping some more for safety
         if self.auto_generate_blocks:
