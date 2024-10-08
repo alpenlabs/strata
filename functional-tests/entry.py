@@ -289,7 +289,6 @@ class ProverClientFactory(flexitest.Factory):
         ctx: flexitest.EnvContext,
     ):
         datadir = ctx.make_service_dir("prover_client")
-        # rpc_port = self.next_port()
         logfile = os.path.join(datadir, "service.log")
 
         rpc_port = self.next_port()
@@ -547,7 +546,6 @@ def main(argv):
         "premined_blocks": BasicEnvConfig(101),
         "fast_batches": BasicEnvConfig(101, rollup_params=FAST_BATCH_ROLLUP_PARAMS),
         "hub1": HubNetworkEnvConfig(),
-        # "prover": BasicEnvConfig(enable_prover_client=True),
         "prover": BasicEnvConfig(101, enable_prover_client=True),
     }
 

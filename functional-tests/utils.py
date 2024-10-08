@@ -246,11 +246,12 @@ def wait_for_proof_with_time_out(prover_client_rpc, task_id, time_out=3600):
     start_time = time.time()
     while True:
         # Fetch the proof status
-        proof_status = prover_client_rpc.dev_get_task_status(task_id)
+        proof_status = prover_client_rpc.dev_strata_getTaskStatus(task_id)
         assert proof_status is not None
         print(f"Got the proof status {proof_status}")
         if proof_status == "Completed":
-            print("Print")
+            print(f"Completed the proof generation for {task_id}")
+            break
 
         time.sleep(2)
         elapsed_time = time.time() - start_time  # Calculate elapsed time

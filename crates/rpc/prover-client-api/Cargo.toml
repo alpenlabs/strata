@@ -13,8 +13,8 @@ rust.unused_must_use = "deny"
 rustdoc.all = "warn"
 
 [dependencies]
-strata-rpc-types = { workspace = true }
 jsonrpsee = { workspace = true, features = ["server", "macros"] }
+strata-rpc-types = { workspace = true }
 uuid = { workspace = true }
 
 [features]

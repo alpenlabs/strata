@@ -196,7 +196,6 @@ pub struct RawBlockWitness {
     pub raw_chain_state: Vec<u8>,
 }
 
-
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RpcCheckpointInfo {
     /// The index of the checkpoint

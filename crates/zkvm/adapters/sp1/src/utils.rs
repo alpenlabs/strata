@@ -6,6 +6,7 @@ use std::{
 
 use sha2::{Digest, Sha256};
 use sp1_sdk::{ProverClient, SP1ProvingKey, SP1VerifyingKey};
+use tracing::{debug, error};
 
 /// Generates or retrieves proving and verifying keys for the given guest code.
 ///
@@ -21,7 +22,7 @@ pub fn get_proving_keys(
         // Compute the SHA-256 hash of the guest_code
         let mut hasher = Sha256::new();
         hasher.update(guest_code);
-        let hash = format!("{:x}", hasher.finalize());
+        let proving_key_file_name = format!("{:x}", hasher.finalize());
 
         // Define the cache directory and file path
         let cache_dir = PathBuf::from("proving_keys");
@@ -29,14 +30,17 @@ pub fn get_proving_keys(
         // Create cache directory if it doesn't exist
         let _ = fs::create_dir_all(&cache_dir); // Ignore errors
 
-        let cache_file_path = cache_dir.join(format!("{}.bin", hash));
+        let cache_file_path = cache_dir.join(format!("{}.bin", proving_key_file_name));
 
         // Attempt to read from cache
         if let Ok(mut file) = File::open(&cache_file_path) {
             let mut buffer = Vec::new();
             if file.read_to_end(&mut buffer).is_ok() {
                 if let Ok(keys) = bincode::deserialize(&buffer) {
-                    println!("Reading the proving key from cache {:?}", hash);
+                    debug!(
+                        "Reading the proving key from cache {:?}",
+                        proving_key_file_name
+                    );
                     return keys;
                 }
             }
@@ -44,13 +48,20 @@ pub fn get_proving_keys(
         }
 
         // Generate keys using client.setup
-        println!("Not found the proving key in cache {:?}, generating...", hash);
+        debug!(
+            "Proving key '{:?}' not found in cache generating new...",
+            proving_key_file_name
+        );
         let keys = client.setup(guest_code);
 
         // Attempt to save to cache
         if let Ok(encoded) = bincode::serialize(&keys) {
             if let Ok(mut file) = File::create(&cache_file_path) {
                 let _ = file.write_all(&encoded);
+                error!(
+                    "Failed to write the Proving key {:?}",
+                    proving_key_file_name
+                );
                 // Ignore errors when writing to cache
             }
         }

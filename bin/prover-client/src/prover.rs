@@ -3,23 +3,17 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use num_bigint::BigUint;
-use num_traits::Num;
-use sp1_sdk::{HashableKey, SP1VerifyingKey};
 use strata_db::traits::{ProverDataProvider, ProverDataStore, ProverDatabase};
-use strata_proofimpl_checkpoint::{CheckpointProofInput, L2BatchProofOutput};
 use strata_proofimpl_evm_ee_stf::ELProofInput;
-use strata_proofimpl_l1_batch::L1BatchProofOutput;
 use strata_rocksdb::{
     prover::db::{ProofDb, ProverDB},
     DbOpsConfig,
 };
-use strata_sp1_adapter::SP1Verifier;
 use strata_sp1_guest_builder::{
     GUEST_BTC_BLOCKSPACE_ELF, GUEST_CHECKPOINT_ELF, GUEST_CL_AGG_ELF, GUEST_CL_STF_ELF,
     GUEST_EVM_EE_STF_ELF, GUEST_L1_BATCH_ELF,
 };
-use strata_zkvm::{Proof, ProverOptions, ZKVMHost, ZKVMInputBuilder, ZKVMVerifier};
+use strata_zkvm::{Proof, ProverOptions, ZKVMHost, ZKVMInputBuilder};
 use tracing::{error, info};
 use uuid::Uuid;
 
@@ -60,7 +54,7 @@ impl ProverState {
             .insert(task_id, ProvingTaskState::ProvingInProgress)
     }
 
-    fn set_to_proved(
+    fn set_status(
         &mut self,
         task_id: Uuid,
         proof: Result<ProofWithVkey, anyhow::Error>,
@@ -135,12 +129,12 @@ where
 
         ZKVMInput::ClBlock(cl_proof_input) => Vm::Input::new()
             .write(&get_pm_rollup_params())?
+            .write_serialized(&cl_proof_input.cl_raw_witness)?
             .write_proof(
                 cl_proof_input
                     .el_proof
                     .expect("CL Proving was sent without EL proof"),
             )?
-            .write(&cl_proof_input.cl_raw_witness)?
             .build()?,
 
         ZKVMInput::L2Batch(l2_batch_input) => {
@@ -167,41 +161,8 @@ where
                 .l2_batch_proof
                 .ok_or_else(|| anyhow::anyhow!("L2 Batch Proof Not Ready"))?;
 
-            let l1_batch_pp: L1BatchProofOutput = {
-                let raw_l1_batch_pp: Vec<u8> =
-                    SP1Verifier::extract_public_output(l1_batch_proof.proof())?;
-                borsh::from_slice(&raw_l1_batch_pp)?
-            };
-
-            let l2_batch_pp: L2BatchProofOutput = {
-                let raw_l2_batch_pp: Vec<u8> =
-                    SP1Verifier::extract_public_output(l2_batch_proof.proof())?;
-                borsh::from_slice(&raw_l2_batch_pp)?
-            };
-
-            let vk = {
-                let zkvm_vkey = vm.get_verification_key();
-                let sp1_vkey: SP1VerifyingKey = bincode::deserialize(zkvm_vkey.as_bytes())?;
-
-                BigUint::from_str_radix(
-                    sp1_vkey
-                        .bytes32()
-                        .strip_prefix("0x")
-                        .expect("Verification key to bytes infallible"),
-                    16,
-                )?
-                .to_bytes_be()
-            };
-
-            let checkpoint_proof_input = CheckpointProofInput {
-                l1_state: l1_batch_pp,
-                l2_state: l2_batch_pp,
-                vk,
-            };
-
             let mut input_builder = Vm::Input::new();
             input_builder.write(&get_pm_rollup_params())?;
-            input_builder.write_borsh(&checkpoint_proof_input)?;
             input_builder.write_proof(l1_batch_proof)?;
             input_builder.write_proof(l2_batch_proof)?;
 
@@ -290,7 +251,7 @@ where
                         let proof = make_proof(witness, vm.clone());
                         let mut prover_state =
                             prover_state_clone.write().expect("Lock was poisoned");
-                        prover_state.set_to_proved(task_id, proof);
+                        prover_state.set_status(task_id, proof);
                         prover_state.dec_task_count();
                     })
                 });

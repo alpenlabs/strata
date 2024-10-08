@@ -43,7 +43,7 @@ impl ProvingOperations for ClOperations {
     type Input = CLProverInput;
     type Params = u64;
 
-    fn block_type(&self) -> ProvingTaskType {
+    fn proving_task_type(&self) -> ProvingTaskType {
         ProvingTaskType::CL
     }
 

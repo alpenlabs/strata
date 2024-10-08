@@ -35,7 +35,7 @@ impl ProvingOperations for ElOperations {
     type Input = Vec<u8>;
     type Params = u64;
 
-    fn block_type(&self) -> ProvingTaskType {
+    fn proving_task_type(&self) -> ProvingTaskType {
         ProvingTaskType::EL
     }
 

@@ -73,7 +73,7 @@ impl ProvingOperations for CheckpointOperations {
     type Input = CheckpointInput;
     type Params = CheckpointOpsParam;
 
-    fn block_type(&self) -> ProvingTaskType {
+    fn proving_task_type(&self) -> ProvingTaskType {
         ProvingTaskType::Checkpoint
     }
 
@@ -97,23 +97,16 @@ impl ProvingOperations for CheckpointOperations {
                         anyhow::anyhow!("Checkpoint information not found for index {}", ckp_idx)
                     })?
             }
-            CheckpointOpsParam::CheckPointIndex(ckp_idx) => {
-                let mut ckp_info = self
-                    .cl_client
-                    .request::<Option<RpcCheckpointInfo>, _>(
-                        "strata_getCheckpointInfo",
-                        rpc_params![ckp_idx],
-                    )
-                    .await?
-                    .ok_or_else(|| {
-                        anyhow::anyhow!("Checkpoint information not found for index {}", ckp_idx)
-                    })?;
-
-                // TODO: TempFix
-                println!("Got the initial ckpt range {:?}", ckp_info);
-                ckp_info.l1_range = (1, 1);
-                ckp_info
-            }
+            CheckpointOpsParam::CheckPointIndex(ckp_idx) => self
+                .cl_client
+                .request::<Option<RpcCheckpointInfo>, _>(
+                    "strata_getCheckpointInfo",
+                    rpc_params![ckp_idx],
+                )
+                .await?
+                .ok_or_else(|| {
+                    anyhow::anyhow!("Checkpoint information not found for index {}", ckp_idx)
+                })?,
             CheckpointOpsParam::Manual(ckp_info) => ckp_info,
         };
 

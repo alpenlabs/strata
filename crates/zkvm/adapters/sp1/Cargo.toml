@@ -17,6 +17,7 @@ snark-bn254-verifier = { git = "https://github.com/succinctlabs/snark-bn254-veri
 sp1-sdk = "2.0.0"
 strata-zkvm.workspace = true
 substrate-bn = { git = "https://github.com/sp1-patches/bn", branch = "patch-v0.7.0" }
+tracing = { workspace = true }
 
 [features]
 default = []

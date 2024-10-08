@@ -57,7 +57,7 @@ impl ProvingOperations for L2BatchOperations {
     type Input = L2BatchInput;
     type Params = (u64, u64);
 
-    fn block_type(&self) -> ProvingTaskType {
+    fn proving_task_type(&self) -> ProvingTaskType {
         ProvingTaskType::ClBatch
     }
 

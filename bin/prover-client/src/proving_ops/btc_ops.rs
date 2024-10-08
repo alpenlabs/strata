@@ -40,7 +40,7 @@ impl ProvingOperations for BtcOperations {
     type Input = (Block, RollupParams);
     type Params = u64; // params is the block height
 
-    fn block_type(&self) -> ProvingTaskType {
+    fn proving_task_type(&self) -> ProvingTaskType {
         ProvingTaskType::Btc
     }
 

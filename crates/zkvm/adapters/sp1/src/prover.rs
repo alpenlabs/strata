@@ -38,13 +38,11 @@ impl ZKVMHost for SP1Host {
         // Init the prover
         if self.prover_options.use_mock_prover {
             std::env::set_var("SP1_PROVER", "mock");
-
-            let mock_proof = Proof::new(vec![1, 2, 3, 4, 5]);
-            let mock_vk = VerificationKey::new(vec![1, 2, 3, 4, 5]);
-
+            let mock_proof = Proof::new(vec![]);
+            let mock_vk = VerificationKey::new(vec![]);
             return Ok((mock_proof, mock_vk));
         }
-        // let client = ProverClient::new();
+
         let client = self.prover_client.clone();
 
         // Start proving

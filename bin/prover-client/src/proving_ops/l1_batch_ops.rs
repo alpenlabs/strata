@@ -68,7 +68,7 @@ impl ProvingOperations for L1BatchOperations {
     type Input = L1BatchInput;
     type Params = (u64, u64);
 
-    fn block_type(&self) -> ProvingTaskType {
+    fn proving_task_type(&self) -> ProvingTaskType {
         ProvingTaskType::BtcBatch
     }
 

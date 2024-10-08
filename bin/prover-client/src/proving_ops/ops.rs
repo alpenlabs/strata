@@ -15,7 +15,7 @@ pub trait ProvingOperations: Send + Sync {
     type Params: Send + Sync;
 
     /// Returns the block type (e.g., BTC, EL, CL).
-    fn block_type(&self) -> ProvingTaskType;
+    fn proving_task_type(&self) -> ProvingTaskType;
 
     /// Fetches the prover input for the given block number.
     async fn fetch_input(&self, params: Self::Params) -> Result<Self::Input, anyhow::Error>;

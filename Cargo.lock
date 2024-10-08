@@ -13268,6 +13268,7 @@ dependencies = [
  "sp1-sdk",
  "strata-zkvm",
  "substrate-bn 0.7.0",
+ "tracing",
 ]
 
 [[package]]

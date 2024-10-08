@@ -18,7 +18,7 @@ class ProverClientTest(flexitest.Test):
         time.sleep(60)
 
         task_id = prover_client_rpc.dev_strata_proveL1Batch((1, 2))
-        print("got the taks id: {}", task_id)
+        print("got the task id: {}", task_id)
         assert task_id is not None
 
         time_out = 10 * 60

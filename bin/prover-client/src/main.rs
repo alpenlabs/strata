@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use args::Args;
-use ckp_runner::run_checkpoint_runner;
+use ckp_runner::start_checkpoints_task;
 use dispatcher::TaskDispatcher;
 use jsonrpsee::http_client::HttpClientBuilder;
 use manager::ProverManager;
@@ -106,7 +106,7 @@ async fn main() {
 
     // run checkpoint runner
     tokio::spawn(async move {
-        run_checkpoint_runner(
+        start_checkpoints_task(
             cl_client.clone(),
             checkpoint_dispatcher.clone(),
             task_tracker.clone(),
@@ -114,12 +114,14 @@ async fn main() {
         .await
     });
 
-    // run rpc server
-    // TODO: Run this on dev mode only
-    let rpc_url = args.get_dev_rpc_url();
-    run_rpc_server(rpc_context, rpc_url, args.enable_dev_rpcs)
-        .await
-        .expect("prover client rpc")
+    // Run prover manager in dev mode or runner mode
+    if args.enable_dev_rpcs {
+        // Run the rpc server on dev mode only
+        let rpc_url = args.get_dev_rpc_url();
+        run_rpc_server(rpc_context, rpc_url, args.enable_dev_rpcs)
+            .await
+            .expect("prover client rpc")
+    }
 }
 
 async fn run_rpc_server(

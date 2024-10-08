@@ -1,7 +1,7 @@
-use strata_primitives::params::RollupParams;
 use bitcoin::Block;
-use strata_zkvm::AggregationInput;
 use serde::{Deserialize, Serialize};
+use strata_primitives::params::RollupParams;
+use strata_zkvm::AggregationInput;
 
 use super::vms::ProofVm;
 use crate::proving_ops::{
@@ -12,8 +12,6 @@ use crate::proving_ops::{
 pub type ProofWithVkey = AggregationInput;
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
-#[allow(clippy::large_enum_variant)]
 pub enum ZKVMInput {
     BtcBlock(Block, RollupParams),
     ElBlock(WitnessData),

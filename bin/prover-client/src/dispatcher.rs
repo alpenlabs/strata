@@ -33,7 +33,7 @@ where
         info!(
             "Creating proving task for block {:?} {:?}",
             param,
-            self.operations.block_type()
+            self.operations.proving_task_type()
         );
         let input = self
             .operations
@@ -41,7 +41,7 @@ where
             .await
             .map_err(|e| ProvingTaskError::FetchInput {
                 param: format!("{:?}", param),
-                task_type: self.operations.block_type(),
+                task_type: self.operations.proving_task_type(),
                 source: e,
             })?;
         self.operations
