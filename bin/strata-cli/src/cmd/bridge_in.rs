@@ -21,7 +21,7 @@ use crate::{
     recovery::DescriptorRecovery,
     seed::Seed,
     settings::Settings,
-    signet::{get_fee_rate, log_fee_rate, EsploraClient, SignetWallet},
+    signet::{fee_rate_or_crash, log_fee_rate, print_explorer_url, EsploraClient, SignetWallet},
     strata::StrataWallet,
     taproot::{ExtractP2trPubkey, NotTaprootAddress},
 };
@@ -33,13 +33,24 @@ use crate::{
 pub struct BridgeInArgs {
     #[argh(positional)]
     strata_address: Option<String>,
+
+    /// override signet fee rate in sat/vbyte. must be >1
+    #[argh(option)]
+    fee_rate: Option<String>,
 }
 
-pub async fn bridge_in(args: BridgeInArgs, seed: Seed, settings: Settings, esplora: EsploraClient) {
+pub async fn bridge_in(
+    BridgeInArgs {
+        strata_address,
+        fee_rate,
+    }: BridgeInArgs,
+    seed: Seed,
+    settings: Settings,
+    esplora: EsploraClient,
+) {
     let term = Term::stdout();
-    let requested_strata_address = args
-        .strata_address
-        .map(|a| StrataAddress::from_str(&a).expect("bad strata address"));
+    let requested_strata_address =
+        strata_address.map(|a| StrataAddress::from_str(&a).expect("bad strata address"));
     let mut l1w = SignetWallet::new(&seed, NETWORK).unwrap();
     let l2w = StrataWallet::new(&seed, &settings.l2_http_endpoint).unwrap();
 
@@ -90,11 +101,7 @@ pub async fn bridge_in(args: BridgeInArgs, seed: Seed, settings: Settings, esplo
         style(bridge_in_address.to_string()).yellow()
     ));
 
-    let fee_rate = get_fee_rate(1, &esplora)
-        .await
-        .expect("should get fee rate")
-        .expect("should have valid fee rate");
-
+    let fee_rate = fee_rate_or_crash(fee_rate, &esplora).await;
     log_fee_rate(&term, &fee_rate);
 
     const MBL: usize = MAGIC_BYTES.len();
@@ -135,7 +142,9 @@ pub async fn bridge_in(args: BridgeInArgs, seed: Seed, settings: Settings, esplo
     let pb = ProgressBar::new_spinner().with_message("Broadcasting transaction");
     pb.enable_steady_tick(Duration::from_millis(100));
     esplora.broadcast(&tx).await.expect("successful broadcast");
-    pb.finish_with_message(format!("Transaction {} broadcasted", tx.compute_txid()));
+    let txid = tx.compute_txid();
+    pb.finish_with_message(format!("Transaction {} broadcasted", txid));
+    let _ = print_explorer_url(&txid, &term);
     let _ = term.write_line(&format!(
         "Expect transaction confirmation in ~{:?}. Funds will take longer than this to be available on Strata.",
         L2_BLOCK_TIME

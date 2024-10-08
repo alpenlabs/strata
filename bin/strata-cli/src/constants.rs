@@ -37,6 +37,7 @@ pub const L2_BLOCK_TIME: Duration = Duration::from_secs(30);
 pub const DEFAULT_ESPLORA: &str = "https://esploraapi.devnet-annapurna.stratabtc.org";
 pub const DEFAULT_L2_HTTP_ENDPOINT: &str = "https://stratareth.devnet-annapurna.stratabtc.org";
 pub const DEFAULT_FAUCET_ENDPOINT: &str = "https://faucet.devnet-annapurna.stratabtc.org";
+pub const DEFAULT_MEMPOOL_ENDPOINT: &str = "https://mempool.devnet-annapurna.stratabtc.org";
 // FIXME: CHANGE BELOW!!!
 pub const BRIDGE_MUSIG2_PUBKEY: &str =
     "fbd79b6b8b7fe11bad25ae89a7415221c030978de448775729c3f0a903819dd0";

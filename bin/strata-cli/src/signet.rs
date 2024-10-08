@@ -1,9 +1,11 @@
 use std::{
     cell::RefCell,
+    collections::BTreeSet,
     io,
     ops::{Deref, DerefMut},
     path::{Path, PathBuf},
     rc::Rc,
+    str::FromStr,
     sync::OnceLock,
 };
 
@@ -12,14 +14,14 @@ use bdk_esplora::{
     EsploraAsyncExt,
 };
 use bdk_wallet::{
-    bitcoin::{FeeRate, Network},
+    bitcoin::{FeeRate, Network, Txid},
     rusqlite::{self, Connection},
-    ChangeSet, PersistedWallet, WalletPersister,
+    ChangeSet, KeychainKind, PersistedWallet, WalletPersister,
 };
 use console::{style, Term};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 
-use crate::seed::Seed;
+use crate::{constants::DEFAULT_MEMPOOL_ENDPOINT, seed::Seed};
 
 /// Retrieves an estimated fee rate to settle a transaction in `target` blocks
 pub async fn get_fee_rate(
@@ -36,8 +38,25 @@ pub async fn get_fee_rate(
 pub fn log_fee_rate(term: &Term, fr: &FeeRate) {
     let _ = term.write_line(&format!(
         "Using {} as feerate",
-        style(format!("~{} sat/vb", fr.to_sat_per_vb_ceil())).green(),
+        style(format!("{} sat/vb", fr.to_sat_per_vb_ceil())).green(),
     ));
+}
+
+pub fn print_explorer_url(txid: &Txid, term: &Term) -> Result<(), io::Error> {
+    term.write_line(&format!(
+        "View transaction at {}",
+        style(format!("{DEFAULT_MEMPOOL_ENDPOINT}/tx/{txid}")).blue()
+    ))
+}
+
+pub async fn fee_rate_or_crash(user_provided: Option<String>, esplora: &EsploraClient) -> FeeRate {
+    match user_provided.and_then(|fr| FeeRate::from_sat_per_vb(u64::from_str(&fr).ok()?)) {
+        Some(fr) => fr,
+        None => get_fee_rate(1, esplora)
+            .await
+            .expect("esplora API should return fee rates")
+            .expect("esplora API should give us a valid fee rate"),
+    }
 }
 
 #[derive(Clone)]
@@ -138,10 +157,39 @@ impl SignetWallet {
         ops2.finish();
         spks2.finish();
         txids2.finish();
+        let _ = term.write_line("Persisting updates");
         self.apply_update(update)
             .expect("should be able to connect to db");
         self.persist().expect("persist should work");
         let _ = term.write_line("Wallet synced");
+        Ok(())
+    }
+
+    pub async fn scan(
+        &mut self,
+        esplora_client: &AsyncClient,
+    ) -> Result<(), Box<esplora_client::Error>> {
+        let bar = ProgressBar::new_spinner();
+        let bar2 = bar.clone();
+        let req = self
+            .start_full_scan()
+            .inspect({
+                let mut once = BTreeSet::<KeychainKind>::new();
+                move |keychain, spk_i, script| {
+                    if once.insert(keychain) {
+                        bar2.println(format!("\nScanning keychain [{:?}]", keychain));
+                    }
+                    bar2.println(format!("- idx {spk_i}: {script}"));
+                }
+            })
+            .build();
+
+        let update = esplora_client.full_scan(req, 5, 3).await?;
+        bar.set_message("Persisting updates");
+        self.apply_update(update)
+            .expect("should be able to connect to db");
+        self.persist().expect("persist should work");
+        bar.finish_with_message("Scan complete");
         Ok(())
     }
 

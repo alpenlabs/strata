@@ -11,7 +11,7 @@ pub mod taproot;
 use cmd::{
     backup::backup, balance::balance, bridge_in::bridge_in, bridge_out::bridge_out,
     change_pwd::change_pwd, drain::drain, faucet::faucet, receive::receive, refresh::refresh,
-    reset::reset, send::send, Commands, TopLevel,
+    reset::reset, scan::scan, send::send, Commands, TopLevel,
 };
 #[cfg(target_os = "linux")]
 use seed::FilePersister;
@@ -47,5 +47,6 @@ async fn main() {
         Commands::Receive(args) => receive(args, seed, settings, esplora).await,
         Commands::Reset(args) => reset(args, persister, settings).await,
         Commands::ChangePwd(args) => change_pwd(args, seed, persister).await,
+        Commands::Scan(args) => scan(args, seed, esplora).await,
     }
 }

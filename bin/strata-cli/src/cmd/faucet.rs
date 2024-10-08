@@ -2,7 +2,10 @@ use std::str::FromStr;
 
 use alloy::{primitives::Address as StrataAddress, providers::WalletProvider};
 use argh::FromArgs;
-use bdk_wallet::{bitcoin::Address, KeychainKind};
+use bdk_wallet::{
+    bitcoin::{Address, Txid},
+    KeychainKind,
+};
 use console::Term;
 use indicatif::ProgressBar;
 use rand::{distributions::uniform::SampleRange, thread_rng};
@@ -16,7 +19,7 @@ use crate::{
     net_type::{net_type_or_exit, NetworkType},
     seed::Seed,
     settings::Settings,
-    signet::SignetWallet,
+    signet::{print_explorer_url, SignetWallet},
     strata::StrataWallet,
 };
 
@@ -131,6 +134,9 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
     let status = res.status();
     let body = res.text().await.expect("invalid response");
     if status == StatusCode::OK {
+        if network_type == NetworkType::Signet {
+            let _ = print_explorer_url(&Txid::from_str(&body).expect("valid txid"), &term);
+        }
         let _ = term.write_line(&format!("Successful. Claimed in transaction {body}"));
     } else {
         let _ = term.write_line(&format!("Failed: faucet responded with {status}: {body}"));

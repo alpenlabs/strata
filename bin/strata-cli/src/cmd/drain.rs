@@ -12,7 +12,7 @@ use crate::{
     constants::NETWORK,
     seed::Seed,
     settings::Settings,
-    signet::{get_fee_rate, log_fee_rate, EsploraClient, SignetWallet},
+    signet::{fee_rate_or_crash, log_fee_rate, print_explorer_url, EsploraClient, SignetWallet},
     strata::StrataWallet,
 };
 
@@ -24,15 +24,21 @@ pub struct DrainArgs {
     /// a signet address for signet funds to be drained to
     #[argh(option, short = 's')]
     signet_address: Option<String>,
+
     /// a Strata address for Strata funds to be drained to
     #[argh(option, short = 'r')]
     strata_address: Option<String>,
+
+    /// override signet fee rate in sat/vbyte. must be >1
+    #[argh(option)]
+    fee_rate: Option<String>,
 }
 
 pub async fn drain(
     DrainArgs {
         signet_address,
         strata_address,
+        fee_rate,
     }: DrainArgs,
     seed: Seed,
     settings: Settings,
@@ -63,8 +69,9 @@ pub async fn drain(
                     .to_string(),
             );
         }
-        let fr = get_fee_rate(1, &esplora).await.unwrap().unwrap();
+        let fr = fee_rate_or_crash(fee_rate, &esplora).await;
         log_fee_rate(&term, &fr);
+
         let mut psbt = l1w
             .build_tx()
             .drain_to(address.script_pubkey())
@@ -75,6 +82,7 @@ pub async fn drain(
         l1w.sign(&mut psbt, Default::default()).unwrap();
         let tx = psbt.extract_tx().expect("fully signed tx");
         esplora.broadcast(&tx).await.unwrap();
+        let _ = print_explorer_url(&tx.compute_txid(), &term);
     }
 
     if let Some(address) = strata_address {
