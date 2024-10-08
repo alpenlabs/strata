@@ -4,7 +4,7 @@ name = "strata-risc0-guest-builder"
 version = "0.1.0"
 
 [dependencies]
-risc0-zkvm = "1.0.5"
+risc0-zkvm = "1.1.2"
 strata-risc0-adapter = { path = "../../crates/zkvm/adapters/risc0", features = [
   "prover",
 ], optional = true }
@@ -27,7 +27,7 @@ strata-test-utils.workspace = true
 strata-zkvm.workspace = true
 
 [build-dependencies]
-risc0-build = "1.0.5"
+risc0-build = "1.1.2"
 
 [package.metadata.risc0]
 methods = [
