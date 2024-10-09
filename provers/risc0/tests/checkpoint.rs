@@ -63,13 +63,13 @@ mod test {
                 .prove(inner_prover_input)
                 .expect("Failed to generate proof");
 
-            let raw_output = Risc0Verifier::extract_public_output::<Vec<u8>>(&proof)
+            let raw_output = Risc0Verifier::extract_public_output::<Vec<u8>>(proof.proof())
                 .expect("Failed to extract public outputs");
             let output: BlockspaceProofOutput = borsh::from_slice(&raw_output).unwrap();
 
             prover_input
                 .write_proof(AggregationInput::new(
-                    proof,
+                    proof.into(),
                     VerificationKey::new(btc_blockspace_elf_id.clone()),
                 ))
                 .unwrap();
@@ -82,7 +82,7 @@ mod test {
             .prove(prover_input)
             .expect("Failed to generate proof");
 
-        let output_raw = Risc0Verifier::extract_public_output::<Vec<u8>>(&proof)
+        let output_raw = Risc0Verifier::extract_public_output::<Vec<u8>>(proof.proof())
             .expect("Failed to extract public outputs");
         let output: L1BatchProofOutput = borsh::from_slice(&output_raw).unwrap();
 
@@ -158,7 +158,7 @@ mod test {
             .flat_map(|&x| x.to_le_bytes())
             .collect();
         let l1_batch_proof_input = AggregationInput::new(
-            l1_batch_proof,
+            l1_batch_proof.into(),
             VerificationKey::new(l1_batch_image_id.clone()),
         );
 
@@ -178,7 +178,7 @@ mod test {
             .prove(prover_input)
             .expect("Failed to generate proof");
 
-        let output_raw = Risc0Verifier::extract_public_output::<Vec<u8>>(&proof)
+        let output_raw = Risc0Verifier::extract_public_output::<Vec<u8>>(proof.proof())
             .expect("Failed to extract public outputs");
         let _: BatchInfo = borsh::from_slice(&output_raw).unwrap();
     }

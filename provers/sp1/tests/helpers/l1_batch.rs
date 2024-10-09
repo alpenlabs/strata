@@ -56,7 +56,7 @@ impl ProofGenerator<(u32, u32)> for L1BatchProofGenerator {
             let block = btc_chain.get_block(height);
             let (proof, vk) = self.btc_proof_generator.get_proof(block, &prover_options)?;
             debug!(%height, "Fetched BTC Block proof for agg input");
-            input_builder.write_proof(AggregationInput::new(proof, vk))?;
+            input_builder.write_proof(AggregationInput::new(proof.into(), vk))?;
         }
         input_builder.build()
     }

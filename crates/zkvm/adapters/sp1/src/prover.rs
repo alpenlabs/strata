@@ -71,6 +71,7 @@ impl ZKVMHost for SP1Host {
         }
 
         let (remote_id, proof_data) = if client.prover.id() == ProverType::Network {
+            println!("Remote prover");
             let network_prover =
                 unsafe { &*(client.prover.as_ref() as *const _ as *const NetworkProver) };
 
@@ -78,10 +79,11 @@ impl ZKVMHost for SP1Host {
                 self.prover_options.enable_compression,
                 self.prover_options.stark_to_snark_conversion,
             ) {
-                (true, _) => ProofMode::Compressed,
                 (_, true) => ProofMode::Groth16,
+                (true, _) => ProofMode::Compressed,
                 (_, _) => ProofMode::default(),
             };
+            println!("Prover Mode: {:?}", mode);
 
             let remote_id =
                 block_on(network_prover.request_proof(&self.elf, prover_input.clone(), mode))?;
@@ -200,10 +202,10 @@ mod tests {
         let (proof, vk) = zkvm.prove(prover_input).expect("Failed to generate proof");
 
         // assert proof verification works
-        SP1Verifier::verify(&vk, &proof).expect("Proof verification failed");
+        SP1Verifier::verify(&vk, proof.proof()).expect("Proof verification failed");
 
         // assert public outputs extraction from proof  works
-        let out: u32 = SP1Verifier::extract_public_output(&proof).expect(
+        let out: u32 = SP1Verifier::extract_public_output(proof.proof()).expect(
             "Failed to extract public
     outputs",
         );
@@ -220,7 +222,7 @@ mod tests {
         let (proof, vk) = zkvm.prove(prover_input).expect("Failed to generate proof");
 
         // assert proof verification works
-        SP1Verifier::verify_with_public_params(&vk, input, &proof)
+        SP1Verifier::verify_with_public_params(&vk, input, proof.proof())
             .expect("Proof verification failed");
     }
 
