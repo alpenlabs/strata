@@ -108,21 +108,12 @@ mod tests {
 
     #[test]
     fn test_groth16_verification() {
+        let expected_output: u32 = 1;
         let vk = "0x00b01ae596b4e51843484ff71ccbd0dd1a030af70b255e6b9aad50b81d81266f";
 
-        let groth16_proof = include_bytes!("../tests/proofs/proof-groth16.bin");
+        let raw_proof = include_bytes!("../tests/proofs/proof-groth16.bin");
         let proof: ProofWithMetadata =
-            bincode::deserialize(groth16_proof).expect("Failed to deserialize Groth16 proof");
-
-        let sp1_proof: SP1ProofWithPublicValues = bincode::deserialize(proof.as_bytes()).unwrap();
-        let groth16_proof_string = sp1_proof
-            .proof
-            .try_as_groth_16()
-            .expect("Failed to convert proof to Groth16")
-            .raw_proof;
-
-        let groth16_proof =
-            Proof::new(hex::decode(&groth16_proof_string).expect("Failed to decode Groth16 proof"));
+            bincode::deserialize(raw_proof).expect("Failed to deserialize Groth16 proof");
 
         let vkey_hash = BigUint::from_str_radix(
             vk.strip_prefix("0x").expect("vkey should start with '0x'"),
@@ -132,9 +123,9 @@ mod tests {
         .to_bytes_be();
 
         assert!(SP1Verifier::verify_groth16(
-            &groth16_proof,
+            proof.proof(),
             &vkey_hash,
-            sp1_proof.public_values.as_slice()
+            &expected_output.to_le_bytes()
         )
         .is_ok());
     }

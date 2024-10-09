@@ -87,6 +87,10 @@ impl ProofWithMetadata {
         self.proof.as_bytes()
     }
 
+    pub fn proof(&self) -> &Proof {
+        &self.proof
+    }
+
     pub fn is_empty(&self) -> bool {
         self.proof.is_empty()
     }
