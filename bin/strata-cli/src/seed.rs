@@ -15,6 +15,7 @@ use password::{HashVersion, IncorrectPassword, Password};
 use rand::{thread_rng, Rng, RngCore};
 use sha2::{Digest, Sha256};
 use terrors::OneOf;
+use zxcvbn::Score;
 
 use crate::constants::{AES_NONCE_LEN, AES_TAG_LEN, PW_SALT_LEN, SEED_LEN};
 
@@ -194,6 +195,16 @@ pub fn load_or_create(
         };
 
         let mut password = Password::read(true).map_err(OneOf::new)?;
+        let entropy = password.entropy();
+        if entropy.score() <= Score::Two {
+            let _ = term.write_line(
+                format!(
+                    "Password is weak. {}",
+                    entropy.feedback().expect("No feedback")
+                )
+                .as_str(),
+            );
+        }
         let encrypted_seed = match seed.encrypt(&mut password, &mut thread_rng()) {
             Ok(es) => es,
             Err(e) => {

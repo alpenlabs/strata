@@ -1,5 +1,6 @@
 use argon2::{Algorithm, Argon2, Params, Version};
 use dialoguer::Password as InputPassword;
+use zxcvbn::{zxcvbn, Entropy};
 
 use super::PW_SALT_LEN;
 
@@ -47,6 +48,11 @@ impl Password {
             inner: password,
             seed_encryption_key: None,
         })
+    }
+
+    /// Returns the password entropy.
+    pub fn entropy(&self) -> Entropy {
+        zxcvbn(self.inner.as_str(), &[])
     }
 
     pub fn seed_encryption_key(
