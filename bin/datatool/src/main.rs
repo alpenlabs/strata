@@ -9,7 +9,7 @@ use bitcoin::{
     bip32::{ChildNumber, DerivationPath, Xpriv, Xpub},
     Network,
 };
-use rand::{rngs::OsRng, Rng};
+use rand::{rngs::OsRng, CryptoRng, RngCore};
 use strata_primitives::{
     block_credential,
     buf::Buf32,
@@ -392,8 +392,9 @@ fn exec_genparams(cmd: SubcGenParams, ctx: &mut CmdContext) -> anyhow::Result<()
 }
 
 /// Generates a new xpriv.
-fn gen_priv(rng: &mut impl Rng, net: Network) -> Xpriv {
-    let seed: [u8; 32] = rng.gen();
+fn gen_priv<R: CryptoRng + RngCore>(rng: &mut R, net: Network) -> Xpriv {
+    let mut seed = [0u8; 32];
+    rng.fill_bytes(&mut seed);
     Xpriv::new_master(net, &seed).expect("valid seed")
 }
 
