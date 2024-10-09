@@ -11,7 +11,7 @@ use bdk_wallet::{
 use bip39::{Language, Mnemonic};
 use console::Term;
 use dialoguer::{Confirm, Input};
-use password::{IncorrectPassword, Password};
+use password::{HashVersion, IncorrectPassword, Password};
 use rand::{thread_rng, Rng, RngCore};
 use sha2::{Digest, Sha256};
 use terrors::OneOf;
@@ -56,7 +56,10 @@ impl Seed {
         rng.fill_bytes(&mut buf[..PW_SALT_LEN + AES_NONCE_LEN]);
 
         let seed_encryption_key = password
-            .seed_encryption_key(&buf[..PW_SALT_LEN].try_into().expect("cannot fail"))
+            .seed_encryption_key(
+                &buf[..PW_SALT_LEN].try_into().expect("cannot fail"),
+                HashVersion::V0,
+            )
             .map_err(OneOf::new)?;
 
         let (salt_and_nonce, rest) = buf.split_at_mut(PW_SALT_LEN + AES_NONCE_LEN);
@@ -111,7 +114,10 @@ impl EncryptedSeed {
         password: &mut Password,
     ) -> Result<Seed, OneOf<(argon2::Error, aes_gcm_siv::Error)>> {
         let seed_encryption_key = password
-            .seed_encryption_key(&self.0[..PW_SALT_LEN].try_into().expect("cannot fail"))
+            .seed_encryption_key(
+                &self.0[..PW_SALT_LEN].try_into().expect("cannot fail"),
+                HashVersion::V0,
+            )
             .map_err(OneOf::new)?;
 
         let mut cipher =
