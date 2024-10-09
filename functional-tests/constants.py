@@ -31,7 +31,7 @@ DEFAULT_ROLLUP_PARAMS: dict = {
         "schnorr_key": SEQ_PUBKEY,
     },
     "horizon_l1_height": 3,
-    "genesis_l1_height": 5,
+    "genesis_l1_height": 400,
     "evm_genesis_block_hash": EVM_GENESIS_BLOCK_STATE_HASH,
     "evm_genesis_block_state_root": EVM_GENESIS_BLOCK_STATE_ROOT,
     "l1_reorg_safe_depth": 4,

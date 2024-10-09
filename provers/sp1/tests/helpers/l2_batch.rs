@@ -39,8 +39,9 @@ impl ProofGenerator<(u64, u64)> for L2BatchProofGenerator {
                 .cl_proof_generator
                 .get_proof(&block_num, &prover_options)?;
 
-            let output: L2BatchProofOutput = SP1Verifier::extract_borsh_public_output(&proof)?;
-            agg_proof_inputs.push(AggregationInput::new(proof, vk));
+            let output: L2BatchProofOutput =
+                SP1Verifier::extract_borsh_public_output(proof.proof())?;
+            agg_proof_inputs.push(AggregationInput::new(proof.into(), vk));
             info!(?output, "Received CL Proof as input for L2 Batch");
         }
 

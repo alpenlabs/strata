@@ -94,20 +94,9 @@ impl ZKVMHost for SP1Host {
             (None, proof_data)
         };
 
-        let proof_data = if self.prover_options.stark_to_snark_conversion {
-            let groth16_proof_string = proof_data
-                .proof
-                .try_as_groth_16()
-                .expect("Failed to convert proof to groth16")
-                .raw_proof;
-            hex::decode(groth16_proof_string)?
-        } else {
-            bincode::serialize(&proof_data)?
-        };
-
         // Proof serialization
         let verification_key = bincode::serialize(&self.vkey)?;
-        let proof = Proof::new(proof_data);
+        let proof = Proof::new(bincode::serialize(&proof_data)?);
 
         Ok((
             ProofWithMetadata::new(proof_id, proof, remote_id),
@@ -211,10 +200,10 @@ mod tests {
         let (proof, vk) = zkvm.prove(prover_input).expect("Failed to generate proof");
 
         // assert proof verification works
-        SP1Verifier::verify(&vk, &proof).expect("Proof verification failed");
+        SP1Verifier::verify(&vk, proof.proof()).expect("Proof verification failed");
 
         // assert public outputs extraction from proof  works
-        let out: u32 = SP1Verifier::extract_public_output(&proof).expect(
+        let out: u32 = SP1Verifier::extract_public_output(proof.proof()).expect(
             "Failed to extract public
     outputs",
         );
@@ -231,7 +220,7 @@ mod tests {
         let (proof, vk) = zkvm.prove(prover_input).expect("Failed to generate proof");
 
         // assert proof verification works
-        SP1Verifier::verify_with_public_params(&vk, input, &proof)
+        SP1Verifier::verify_with_public_params(&vk, input, proof.proof())
             .expect("Proof verification failed");
     }
 

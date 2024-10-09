@@ -61,16 +61,18 @@ impl ProofGenerator<CheckpointBatchInfo> for CheckpointProofGenerator {
                 &prover_options,
             )
             .unwrap();
-        let output: L1BatchProofOutput = SP1Verifier::extract_borsh_public_output(&l1_batch_proof)?;
-        let l1_batch_proof_agg_input = AggregationInput::new(l1_batch_proof, l1_batch_vk);
+        let output: L1BatchProofOutput =
+            SP1Verifier::extract_borsh_public_output(l1_batch_proof.proof())?;
+        let l1_batch_proof_agg_input = AggregationInput::new(l1_batch_proof.into(), l1_batch_vk);
         info!(?output, "Received L1 Batch Proof as input for checkpoint");
 
         let (l2_batch_proof, l2_batch_vk) = self
             .l2_batch_prover
             .get_proof(&(l2_start_height, l2_end_height), &prover_options)
             .unwrap();
-        let output: L2BatchProofOutput = SP1Verifier::extract_borsh_public_output(&l2_batch_proof)?;
-        let l2_batch_proof_agg_input = AggregationInput::new(l2_batch_proof, l2_batch_vk);
+        let output: L2BatchProofOutput =
+            SP1Verifier::extract_borsh_public_output(l2_batch_proof.proof())?;
+        let l2_batch_proof_agg_input = AggregationInput::new(l2_batch_proof.into(), l2_batch_vk);
         info!(?output, "Received L2 Batch Proof as input for checkpoint");
 
         SP1ProofInputBuilder::new()
