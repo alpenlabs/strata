@@ -41,7 +41,7 @@ impl ProofGenerator<u64> for ClProofGenerator {
             .el_proof_generator
             .get_proof(block_num, &prover_options)?;
 
-        let agg_input = AggregationInput::new(el_proof, vk);
+        let agg_input = AggregationInput::new(el_proof.into(), vk);
         info!(%block_num, "Received EL Proof as input for CL Block");
 
         // Read CL witness data

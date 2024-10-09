@@ -80,7 +80,7 @@ fn gen_params_with_seed(seed: u64) -> Params {
             block_time: 1000,
             cred_rule: block_credential::CredRule::Unchecked,
             horizon_l1_height: 3,
-            genesis_l1_height: 5, // we have mainnet blocks from this height test-utils
+            genesis_l1_height: 500, // we have mainnet blocks from this height test-utils
             operator_config: OperatorConfig::Static(vec![opkeys]),
             evm_genesis_block_hash: Buf32(
                 "0x37ad61cff1367467a98cf7c54c4ac99e989f1fbb1bc1e646235e90c065c565ba"
@@ -97,7 +97,7 @@ fn gen_params_with_seed(seed: u64) -> Params {
             address_length: 20,
             deposit_amount: 1_000_000_000,
             rollup_vk: RollupVerifyingKey::SP1VerifyingKey(Buf32(
-                "0x00b01ae596b4e51843484ff71ccbd0dd1a030af70b255e6b9aad50b81d81266f"
+                "0x0055041ccd102ed3fc51ecec79bb752e77606643e86ecac388e8ea3aedbf414e"
                     .parse()
                     .unwrap(),
             )),

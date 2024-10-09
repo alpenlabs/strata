@@ -18,7 +18,10 @@ use strata_primitives::{
 use strata_risc0_adapter::Risc0Verifier;
 use strata_sp1_adapter::SP1Verifier;
 use strata_state::{
-    batch::BatchCheckpoint, l1::L1Tx, sync_event::SyncEvent, tx::ProtocolOperation,
+    batch::{BatchCheckpoint, CheckpointProofOutput},
+    l1::L1Tx,
+    sync_event::SyncEvent,
+    tx::ProtocolOperation,
 };
 use strata_tx_parser::messages::{BlockData, L1Event};
 use strata_zkvm::ZKVMVerifier;
@@ -169,6 +172,19 @@ pub fn verify_proof(
     checkpoint: &BatchCheckpoint,
     rollup_params: &RollupParams,
 ) -> anyhow::Result<()> {
+    println!("****** Saving the proof!! ********");
+
+    fn save_as_bin(file_name: String, data: Vec<u8>) {
+        use std::{fs::File, io::Write};
+        let mut file = File::create(file_name).unwrap();
+        file.write_all(&data).unwrap();
+    }
+
+    save_as_bin(
+        "sp1_batch_checkpoint.bin".to_string(),
+        borsh::to_vec(&checkpoint).unwrap(),
+    );
+
     let rollup_vk = rollup_params.rollup_vk;
     let checkpoint_idx = checkpoint.batch_info().idx();
     let proof = checkpoint.proof();
@@ -180,10 +196,30 @@ pub fn verify_proof(
         return Ok(());
     }
 
-    let public_params_raw = borsh::to_vec(&checkpoint).unwrap();
+    let public_params_raw = borsh::to_vec(&checkpoint.proof_output()).unwrap();
 
     // NOTE/TODO: this should also verify that this checkpoint is based on top of some previous
     // checkpoint
+
+    let sp1_proof = checkpoint.proof();
+    let sp1_proof_pp_ser: Vec<u8> = SP1Verifier::extract_borsh_public_output(&sp1_proof).unwrap();
+    let obtained_public_params: CheckpointProofOutput =
+        borsh::from_slice(&sp1_proof_pp_ser).unwrap();
+    let expected_public_params: CheckpointProofOutput = checkpoint.proof_output();
+
+    save_as_bin(
+        "sp1_proof.bin".to_string(),
+        borsh::to_vec(&sp1_proof).unwrap(),
+    );
+    save_as_bin(
+        "expected.bin".to_string(),
+        borsh::to_vec(&expected_public_params).unwrap(),
+    );
+    save_as_bin(
+        "obtained.bin".to_string(),
+        borsh::to_vec(&obtained_public_params).unwrap(),
+    );
+
     let res = panic::catch_unwind(|| match rollup_vk {
         RollupVerifyingKey::Risc0VerifyingKey(vk) => {
             Risc0Verifier::verify_groth16(proof, vk.as_ref(), &public_params_raw)

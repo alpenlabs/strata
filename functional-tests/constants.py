@@ -19,7 +19,7 @@ PRECOMPILE_BRIDGEOUT_ADDRESS = "0x5400000000000000000000000000000000000001"
 # magic values
 EVM_GENESIS_BLOCK_STATE_HASH = "0x37ad61cff1367467a98cf7c54c4ac99e989f1fbb1bc1e646235e90c065c565ba"
 EVM_GENESIS_BLOCK_STATE_ROOT = "0x351714af72d74259f45cd7eab0b04527cd40e74836a45abcae50f92d919d988f"
-ROLLUP_VK = "0x00b01ae596b4e51843484ff71ccbd0dd1a030af70b255e6b9aad50b81d81266f"
+ROLLUP_VK = "0x0055041ccd102ed3fc51ecec79bb752e77606643e86ecac388e8ea3aedbf414e"
 SEQ_KEY = b"alpen" + b"_1337" * 5 + b"xx"  # must be 32 bytes
 SEQ_PUBKEY = Key(SEQ_KEY.hex()).x_hex
 
@@ -31,7 +31,7 @@ DEFAULT_ROLLUP_PARAMS: dict = {
         "schnorr_key": SEQ_PUBKEY,
     },
     "horizon_l1_height": 3,
-    "genesis_l1_height": 5,
+    "genesis_l1_height": 500,
     "evm_genesis_block_hash": EVM_GENESIS_BLOCK_STATE_HASH,
     "evm_genesis_block_state_root": EVM_GENESIS_BLOCK_STATE_ROOT,
     "l1_reorg_safe_depth": 4,
@@ -39,7 +39,7 @@ DEFAULT_ROLLUP_PARAMS: dict = {
     "address_length": 20,
     "deposit_amount": 1_000_000_000,
     "rollup_vk": {
-        "risc0_verifying_key": ROLLUP_VK,
+        "s_p1_verifying_key": ROLLUP_VK,
     },
     "dispatch_assignment_dur": 64,
     "proof_publish_mode": {
