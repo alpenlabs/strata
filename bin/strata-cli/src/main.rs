@@ -9,9 +9,9 @@ pub mod strata;
 pub mod taproot;
 
 use cmd::{
-    backup::backup, balance::balance, bridge_in::bridge_in, bridge_out::bridge_out,
-    change_pwd::change_pwd, config::config, drain::drain, faucet::faucet, receive::receive,
-    recover::recover, reset::reset, scan::scan, send::send, Commands, TopLevel,
+    backup::backup, balance::balance, change_pwd::change_pwd, config::config, deposit::deposit,
+    drain::drain, faucet::faucet, receive::receive, recover::recover, reset::reset, scan::scan,
+    send::send, withdraw::withdraw, Commands, TopLevel,
 };
 #[cfg(target_os = "linux")]
 use seed::FilePersister;
@@ -50,8 +50,8 @@ async fn main() {
         Commands::Drain(args) => drain(args, seed, settings, esplora).await,
         Commands::Balance(args) => balance(args, seed, settings, esplora).await,
         Commands::Backup(args) => backup(args, seed).await,
-        Commands::BridgeIn(args) => bridge_in(args, seed, settings, esplora).await,
-        Commands::BridgeOut(args) => bridge_out(args, seed, settings).await,
+        Commands::Deposit(args) => deposit(args, seed, settings, esplora).await,
+        Commands::Withdraw(args) => withdraw(args, seed, settings).await,
         Commands::Faucet(args) => faucet(args, seed, settings).await,
         Commands::Send(args) => send(args, seed, settings, esplora).await,
         Commands::Receive(args) => receive(args, seed, settings, esplora).await,

@@ -1,10 +1,9 @@
 use argh::FromArgs;
 use backup::BackupArgs;
 use balance::BalanceArgs;
-use bridge_in::BridgeInArgs;
-use bridge_out::BridgeOutArgs;
 use change_pwd::ChangePwdArgs;
 use config::ConfigArgs;
+use deposit::DepositArgs;
 use drain::DrainArgs;
 use faucet::FaucetArgs;
 use receive::ReceiveArgs;
@@ -12,13 +11,13 @@ use recover::RecoverArgs;
 use reset::ResetArgs;
 use scan::ScanArgs;
 use send::SendArgs;
+use withdraw::WithdrawArgs;
 
 pub mod backup;
 pub mod balance;
-pub mod bridge_in;
-pub mod bridge_out;
 pub mod change_pwd;
 pub mod config;
+pub mod deposit;
 pub mod drain;
 pub mod faucet;
 pub mod receive;
@@ -26,6 +25,7 @@ pub mod recover;
 pub mod reset;
 pub mod scan;
 pub mod send;
+pub mod withdraw;
 
 /// A CLI for interacting with Strata and Alpen Labs' bitcoin signet
 #[derive(FromArgs, PartialEq, Debug)]
@@ -41,8 +41,8 @@ pub enum Commands {
     Drain(DrainArgs),
     Balance(BalanceArgs),
     Backup(BackupArgs),
-    BridgeIn(BridgeInArgs),
-    BridgeOut(BridgeOutArgs),
+    Deposit(DepositArgs),
+    Withdraw(WithdrawArgs),
     Faucet(FaucetArgs),
     Send(SendArgs),
     Receive(ReceiveArgs),
