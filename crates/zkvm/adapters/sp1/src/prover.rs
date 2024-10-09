@@ -94,9 +94,20 @@ impl ZKVMHost for SP1Host {
             (None, proof_data)
         };
 
+        let proof_data = if self.prover_options.stark_to_snark_conversion {
+            let groth16_proof_string = proof_data
+                .proof
+                .try_as_groth_16()
+                .expect("Failed to convert proof to groth16")
+                .raw_proof;
+            hex::decode(groth16_proof_string)?
+        } else {
+            bincode::serialize(&proof_data)?
+        };
+
         // Proof serialization
         let verification_key = bincode::serialize(&self.vkey)?;
-        let proof = Proof::new(bincode::serialize(&proof_data)?);
+        let proof = Proof::new(proof_data);
 
         Ok((
             ProofWithMetadata::new(proof_id, proof, remote_id),
@@ -146,7 +157,7 @@ impl ZKVMHost for SP1Host {
 
 // NOTE: SP1 prover runs in release mode only; therefore run the tests on release mode only
 #[cfg(test)]
-#[cfg(not(debug_assertions))]
+// #[cfg(not(debug_assertions))]
 mod tests {
 
     use std::{fs::File, io::Write};
