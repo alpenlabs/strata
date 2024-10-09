@@ -180,7 +180,7 @@ pub fn verify_proof(
         return Ok(());
     }
 
-    let public_params_raw = borsh::to_vec(&checkpoint).unwrap();
+    let public_params_raw = borsh::to_vec(&checkpoint.proof_output()).unwrap();
 
     // NOTE/TODO: this should also verify that this checkpoint is based on top of some previous
     // checkpoint
