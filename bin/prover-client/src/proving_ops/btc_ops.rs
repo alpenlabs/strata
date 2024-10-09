@@ -1,8 +1,10 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use bitcoin::Block;
-use musig2::secp256k1::{SecretKey, SECP256K1};
+use bitcoin::{
+    secp256k1::{SecretKey, SECP256K1},
+    Block,
+};
 use rand::{rngs::StdRng, SeedableRng};
 use strata_btcio::rpc::{traits::Reader, BitcoinClient};
 use strata_primitives::{
