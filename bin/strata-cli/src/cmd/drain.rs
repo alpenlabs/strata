@@ -73,6 +73,7 @@ pub async fn drain(
 
         let mut psbt = l1w
             .build_tx()
+            .drain_wallet()
             .drain_to(address.script_pubkey())
             .fee_rate(fr)
             .clone()
@@ -98,7 +99,7 @@ pub async fn drain(
         let estimate_tx = l2w
             .transaction_request()
             .to(address)
-            .value(balance) // Use full balance for estimation
+            .value(U256::from(1))
             .max_fee_per_gas(max_fee_per_gas)
             .max_priority_fee_per_gas(max_priority_fee_per_gas);
 
