@@ -492,7 +492,7 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
             "reth_secret_path": reth_secret_path,
         }
 
-        sequencer_rpc = f"ws://localhost:{sequencer.get_prop('rpc_port')}"
+        sequencer_rpc = f"http://localhost:{sequencer.get_prop('rpc_port')}"
 
         fullnode = fn_fac.create_fullnode(
             bitcoind_config,
@@ -545,7 +545,7 @@ def main(argv):
         "basic": BasicEnvConfig(),
         "premined_blocks": BasicEnvConfig(101),
         "fast_batches": BasicEnvConfig(101, rollup_params=FAST_BATCH_ROLLUP_PARAMS),
-        "hub1": HubNetworkEnvConfig(),
+        "hub1": HubNetworkEnvConfig(101),
         "prover": BasicEnvConfig(101, enable_prover_client=True),
     }
 

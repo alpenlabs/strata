@@ -173,9 +173,9 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             let sequencer_rpc = &fullnode_config.sequencer_rpc;
             info!(?sequencer_rpc, "initing fullnode task");
 
-            let rpc_client = runtime.block_on(sync_client(sequencer_rpc));
+            let rpc_client = sync_client(sequencer_rpc);
             let download_batch_size = parse_env_or(SYNC_BATCH_SIZE_ENVVAR, 10);
-            let sync_peer = RpcSyncPeer::new(rpc_client, download_batch_size);
+            let sync_peer = RpcSyncPeer::new(rpc_client, 10);
             let l2_sync_context = L2SyncContext::new(
                 sync_peer,
                 ctx.l2_block_manager.clone(),
