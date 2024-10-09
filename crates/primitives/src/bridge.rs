@@ -332,7 +332,7 @@ mod tests {
     use arbitrary::{Arbitrary, Unstructured};
     use bitcoin::{
         key::constants::SECRET_KEY_SIZE,
-        secp256k1::{PublicKey, Secp256k1, SecretKey},
+        secp256k1::{PublicKey, SecretKey, SECP256K1},
     };
     use borsh::{BorshDeserialize, BorshSerialize};
 
@@ -595,9 +595,8 @@ mod tests {
 
     // Helper function to create a random secp256k1 PublicKey
     fn generate_public_key() -> PublicKey {
-        let secp = Secp256k1::new();
         let secret_key =
             SecretKey::from_slice(&[0x01; SECRET_KEY_SIZE]).expect("32 bytes, within curve order");
-        PublicKey::from_secret_key(&secp, &secret_key)
+        PublicKey::from_secret_key(SECP256K1, &secret_key)
     }
 }

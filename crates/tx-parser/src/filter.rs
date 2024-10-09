@@ -98,8 +98,8 @@ mod test {
         absolute::{Height, LockTime},
         block::{Header, Version as BVersion},
         hashes::Hash,
-        key::{Parity, Secp256k1, UntweakedKeypair},
-        secp256k1::XOnlyPublicKey,
+        key::{Parity, UntweakedKeypair},
+        secp256k1::{XOnlyPublicKey, SECP256K1},
         taproot::{ControlBlock, LeafVersion, TaprootMerkleBranch},
         transaction::Version,
         Address, Amount, Block, BlockHash, CompactTarget, Network, ScriptBuf, TapNodeHash,
@@ -178,10 +178,9 @@ mod test {
         let script = generate_inscription_script_test(inscription_data, &rollup_name, 1).unwrap();
 
         // Create controlblock
-        let secp256k1 = Secp256k1::new();
         let mut rand_bytes = [0; 32];
         rand::thread_rng().fill_bytes(&mut rand_bytes);
-        let key_pair = UntweakedKeypair::from_seckey_slice(&secp256k1, &rand_bytes).unwrap();
+        let key_pair = UntweakedKeypair::from_seckey_slice(SECP256K1, &rand_bytes).unwrap();
         let public_key = XOnlyPublicKey::from_keypair(&key_pair).0;
         let nodehash: [TapNodeHash; 0] = [];
         let cb = ControlBlock {

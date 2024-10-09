@@ -2,7 +2,10 @@
 //! Key derivation logic, copied from datatool.  Pending reorganizataion into
 //! its own crate.
 
-use bitcoin::bip32::{ChildNumber, DerivationPath, Xpriv};
+use bitcoin::{
+    bip32::{ChildNumber, DerivationPath, Xpriv},
+    secp256k1::SECP256K1,
+};
 
 // TODO move some of these into a keyderiv crate
 const DERIV_BASE_IDX: u32 = 56;
@@ -16,7 +19,7 @@ fn derive_strata_scheme_xpriv(master: &Xpriv, last: u32) -> anyhow::Result<Xpriv
         ChildNumber::from_hardened_idx(DERIV_BASE_IDX).unwrap(),
         ChildNumber::from_hardened_idx(last).unwrap(),
     ]);
-    Ok(master.derive_priv(bitcoin::secp256k1::SECP256K1, &derivation_path)?)
+    Ok(master.derive_priv(SECP256K1, &derivation_path)?)
 }
 
 /// Derives the sequencer xpriv.

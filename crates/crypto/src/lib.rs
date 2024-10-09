@@ -2,16 +2,15 @@
 
 use secp256k1::{schnorr::Signature, Message, XOnlyPublicKey};
 #[cfg(feature = "rand")]
-use secp256k1::{Keypair, Secp256k1, SecretKey};
+use secp256k1::{Keypair, SecretKey, SECP256K1};
 use strata_primitives::buf::{Buf32, Buf64};
 
 #[cfg(feature = "rand")]
 pub fn sign_schnorr_sig(msg: &Buf32, sk: &Buf32) -> Buf64 {
-    let secp = Secp256k1::new();
     let sk = SecretKey::from_slice(sk.as_ref()).expect("Invalid private key");
-    let kp = Keypair::from_secret_key(&secp, &sk);
+    let kp = Keypair::from_secret_key(SECP256K1, &sk);
     let msg = Message::from_digest_slice(msg.as_ref()).expect("Invalid message hash");
-    let sig = secp.sign_schnorr(&msg, &kp);
+    let sig = SECP256K1.sign_schnorr(&msg, &kp);
     Buf64::from(sig.serialize())
 }
 
@@ -37,14 +36,13 @@ pub fn verify_schnorr_sig(sig: &Buf64, msg: &Buf32, pk: &Buf32) -> bool {
 #[cfg(test)]
 mod tests {
     use rand::Rng;
-    use secp256k1::{Secp256k1, SecretKey};
+    use secp256k1::{SecretKey, SECP256K1};
     use strata_primitives::buf::Buf32;
 
     use super::{sign_schnorr_sig, verify_schnorr_sig};
 
     #[test]
     fn test_schnorr_signature_pass() {
-        let secp = Secp256k1::new();
         let mut rng = rand::thread_rng();
         let msg: [u8; 32] = [(); 32].map(|_| rng.gen());
 
@@ -52,7 +50,7 @@ mod tests {
         mod_msg.swap(1, 2);
 
         let sk = SecretKey::new(&mut rng);
-        let (pk, _) = sk.x_only_public_key(&secp);
+        let (pk, _) = sk.x_only_public_key(SECP256K1);
 
         let msg = Buf32::from(msg);
         let sk = Buf32::from(*sk.as_ref());
