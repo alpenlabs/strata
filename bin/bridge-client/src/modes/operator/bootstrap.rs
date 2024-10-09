@@ -38,7 +38,7 @@ use crate::{
 /// site (main function) itself.
 pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
     // Parse the data_dir
-    let data_dir = args.data_dir.map(PathBuf::from);
+    let data_dir = args.datadir.map(PathBuf::from);
 
     // Initialize a rocksdb instance with the required column families.
     let rbdb = open_rocksdb_database(data_dir)?;
@@ -68,8 +68,8 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
         .expect("failed to connect to the rollup RPC server");
 
     // Get the keypair after deriving the wallet xpriv.
-    let master_xpriv = resolve_xpriv(args.xpriv_str)?;
-    let (_, wallet_xpriv) = derive_op_purpose_xprivs(&master_xpriv)?;
+    let root_xpriv = resolve_xpriv(args.root_xpriv)?;
+    let (_, wallet_xpriv) = derive_op_purpose_xprivs(&root_xpriv)?;
 
     let mut keypair = wallet_xpriv.to_keypair(SECP256K1);
     let mut sk = SecretKey::from_keypair(&keypair);
