@@ -16,7 +16,7 @@ use crate::{
 
 /// Withdraw 10 BTC from Strata to signet
 #[derive(FromArgs, PartialEq, Debug)]
-#[argh(subcommand, name = "bridge-out")]
+#[argh(subcommand, name = "withdraw")]
 pub struct WithdrawArgs {
     /// the signet address to send funds to. defaults to a new internal wallet address
     #[argh(positional)]
