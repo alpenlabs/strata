@@ -1,6 +1,7 @@
 import time
 
 import flexitest
+from entry import HubNetworkEnvConfig
 
 from utils import (
     wait_until,
@@ -8,11 +9,11 @@ from utils import (
 
 
 @flexitest.register
-class BlockFinalizationSeqRestartTest(flexitest.Test):
-    """This tests finalization when sequencer client restarts"""
+class FullNodeSyncTest(flexitest.Test):
+    """This tests checks if full node syncs with sequencer and what happens when sequencer/full node goes down"""
 
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env("hub1")
+        ctx.set_env(HubNetworkEnvConfig(101))
 
     def main(self, ctx: flexitest.RunContext):
         seq = ctx.get_service("seq_node")
