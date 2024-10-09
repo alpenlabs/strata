@@ -1,5 +1,5 @@
 use strata_crypto::verify_schnorr_sig;
-use strata_primitives::{block_credential::CredRule, buf::Buf32, hash};
+use strata_primitives::{block_credential::CredRule, hash};
 use tracing::warn;
 
 use crate::{

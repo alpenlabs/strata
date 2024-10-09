@@ -3,10 +3,14 @@ use std::{collections::HashMap, sync::Arc};
 use async_trait::async_trait;
 use bitcoin::params::MAINNET;
 use strata_btcio::{reader::query::get_verification_state, rpc::BitcoinClient};
+use strata_primitives::params::RollupParams;
 use strata_state::l1::HeaderVerificationState;
 use uuid::Uuid;
 
-use super::{btc_ops::BtcOperations, ops::ProvingOperations};
+use super::{
+    btc_ops::{get_pm_rollup_params, BtcOperations},
+    ops::ProvingOperations,
+};
 use crate::{
     dispatcher::TaskDispatcher,
     errors::{ProvingTaskError, ProvingTaskType},
@@ -40,6 +44,7 @@ pub struct L1BatchInput {
     pub btc_task_ids: HashMap<Uuid, u64>,
     pub proofs: HashMap<u64, ProofWithVkey>,
     pub header_verification_state: HeaderVerificationState,
+    pub rollup_params: RollupParams,
 }
 
 impl L1BatchInput {
@@ -80,12 +85,14 @@ impl ProvingOperations for L1BatchOperations {
         let header_verification_state =
             get_verification_state(self.btc_client.as_ref(), st_height, &MAINNET.clone().into())
                 .await?;
+        let rollup_params = get_pm_rollup_params();
 
         let input: Self::Input = L1BatchInput {
             btc_block_range,
             btc_task_ids: HashMap::new(),
             proofs: HashMap::new(),
             header_verification_state,
+            rollup_params,
         };
         Ok(input)
     }

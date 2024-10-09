@@ -27,14 +27,13 @@ impl ProofGenerator<Block> for BtcBlockProofGenerator {
         let rollup_params = params.rollup();
 
         let tx_filters = derive_tx_filter_rules(rollup_params)?;
-        let serialized_tx_filters = borsh::to_vec(&tx_filters)?;
         let serialized_block = serialize(block);
 
         info!("Building input for BTC Blockspace Proof");
         SP1ProofInputBuilder::new()
             .write(&rollup_params.cred_rule)?
             .write_serialized(&serialized_block)?
-            .write_serialized(&serialized_tx_filters)?
+            .write_borsh(&tx_filters)?
             .build()
     }
 
