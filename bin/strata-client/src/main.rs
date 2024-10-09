@@ -198,6 +198,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             ctx,
             task_manager.shutdown_signal(),
             config,
+            args,
             checkpoint_handle,
             methods,
         ),
@@ -486,6 +487,7 @@ async fn start_rpc(
     ctx: CoreContext,
     shutdown_signal: ShutdownSignal,
     config: Config,
+    args: Args,
     checkpoint_handle: Arc<CheckpointHandle>,
     mut methods: Methods,
 ) -> anyhow::Result<()> {
@@ -511,8 +513,10 @@ async fn start_rpc(
     );
     methods.merge(strata_rpc.into_rpc())?;
 
-    let admin_rpc = rpc_server::AdminServerImpl::new(stop_tx);
-    methods.merge(admin_rpc.into_rpc())?;
+    if args.enable_admin_rpc {
+        let admin_rpc = rpc_server::AdminServerImpl::new(stop_tx);
+        methods.merge(admin_rpc.into_rpc())?;
+    }
 
     let rpc_host = config.client.rpc_host;
     let rpc_port = config.client.rpc_port;
