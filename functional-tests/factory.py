@@ -114,13 +114,14 @@ class StrataFactory(flexitest.Factory):
 
         cmd.extend(["--rollup-params", rollup_params_file])
 
+        rpc_url = f"ws://{rpc_host}:{rpc_port}"
         props = {
             "rpc_host": rpc_host,
             "rpc_port": rpc_port,
+            "rpc_url": rpc_url,
             "seqkey": seqkey_path,
             "address": sequencer_address,
         }
-        rpc_url = f"ws://{rpc_host}:{rpc_port}"
 
         svc = flexitest.service.ProcService(props, cmd, stdout=logfile)
         svc.start()
@@ -128,6 +129,7 @@ class StrataFactory(flexitest.Factory):
         return svc
 
 
+# TODO merge with `StrataFactory` to reuse most of the init steps
 class FullNodeFactory(flexitest.Factory):
     def __init__(self, port_range: list[int]):
         super().__init__(port_range)
@@ -177,8 +179,12 @@ class FullNodeFactory(flexitest.Factory):
 
         cmd.extend(["--rollup-params", rollup_params_file])
 
-        props = {"rpc_port": rpc_port, "id": idx}
         rpc_url = f"ws://localhost:{rpc_port}"
+        props = {
+            "id": idx,
+            "rpc_port": rpc_port,
+            "rpc_url": rpc_url,
+        }
 
         svc = flexitest.service.ProcService(props, cmd, stdout=logfile)
         svc.start()
@@ -290,6 +296,63 @@ class ProverClientFactory(flexitest.Factory):
         _inject_service_create_rpc(svc, rpc_url, "prover")
         return svc
 
+
+class BridgeClientFactory(flexitest.Factory):
+    def __init__(self, port_range: list[int]):
+        super().__init__(port_range)
+        self._next_idx = 1
+
+    def next_idx(self) -> int:
+        idx = self._next_idx
+        self._next_idx += 1
+        return idx
+
+    @flexitest.with_ectx("ctx")
+    def create_operator(
+        self,
+        root_xpriv: str,
+        node_url: str,
+        bitcoind_config: dict,
+        ctx: flexitest.EnvContext,
+    ):
+        idx = self.next_idx()
+        name = f"bridge.{idx}"
+        datadir = ctx.make_service_dir(name)
+        rpc_host = "127.0.0.1"
+        rpc_port = self.next_port()
+        logfile = os.path.join(datadir, "service.log")
+
+        # fmt: off
+        cmd = [
+            "strata-bridge-client",
+            "operator",
+            "--datadir", datadir,
+            "--root-xpriv", root_xpriv,
+            "--rpc-host", rpc_host,
+            "--rpc-port", str(rpc_port),
+            "--btc-url", "http://" + bitcoind_config["bitcoind_sock"],
+            "--btc-user", bitcoind_config["bitcoind_user"],
+            "--btc-pass", bitcoind_config["bitcoind_pass"],
+            "--rollup-url", node_url,
+        ]
+        # fmt: on
+
+        # TODO add a way to expose this
+        envvars = {
+            "STRATA_OP_XPRIV": root_xpriv,
+        }
+
+        props = {
+            "id": idx,
+            "rpc_host": rpc_host,
+            "rpc_port": rpc_port
+        }
+        rpc_url = f"ws://localhost:{rpc_port}"
+
+        svc = flexitest.service.ProcService(props, cmd, stdout=logfile)
+        svc.start()
+        _inject_service_create_rpc(svc, rpc_url, name)
+        return svc
 
 def _inject_service_create_rpc(svc: flexitest.service.ProcService, rpc_url: str, name: str):
     """

@@ -38,6 +38,9 @@ class BasicEnvConfig(flexitest.EnvConfig):
         btc_fac = ctx.get_factory("bitcoin")
         seq_fac = ctx.get_factory("sequencer")
         reth_fac = ctx.get_factory("reth")
+        bridge_fac = ctx.get_factory("bridge_client")
+
+        svcs = {}
 
         # set up network params
         initdir = ctx.make_service_dir("_init")
@@ -57,14 +60,12 @@ class BasicEnvConfig(flexitest.EnvConfig):
         reth_port = reth.get_prop("rpc_port")
 
         bitcoind = btc_fac.create_regtest_bitcoin()
-        # wait for services to to startup
+        svcs["bitcoin"] = bitcoind
         time.sleep(BLOCK_GENERATION_INTERVAL_SECS)
 
         brpc = bitcoind.create_rpc()
-
         walletname = bitcoind.get_prop("walletname")
         brpc.proxy.createwallet(walletname)
-
         seqaddr = brpc.proxy.getnewaddress()
 
         chunk_size = 500
@@ -86,6 +87,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
         # generate blocks every 500 millis
         if self.auto_generate_blocks:
             generate_blocks(brpc, BLOCK_GENERATION_INTERVAL_SECS, seqaddr)
+
         rpc_port = bitcoind.get_prop("rpc_port")
         rpc_user = bitcoind.get_prop("rpc_user")
         rpc_pass = bitcoind.get_prop("rpc_password")
@@ -106,7 +108,19 @@ class BasicEnvConfig(flexitest.EnvConfig):
         if self.auto_generate_blocks:
             time.sleep(BLOCK_GENERATION_INTERVAL_SECS * 10)
 
-        svcs = {"bitcoin": bitcoind, "sequencer": sequencer, "reth": reth}
+        svcs["sequencer"] = sequencer
+        svcs["reth"] = reth
+
+        # Create all the bridge clients.
+        for i in range(self.n_operators):
+            xpriv_path = params_gen_data["opseedpaths"][i]
+            xpriv = None
+            with open(xpriv_path, "r") as f:
+                xpriv = f.read().strip()
+            seq_url = sequencer.get_prop("rpc_url")
+            br = bridge_fac.create_operator(xpriv, seq_url, bitcoind_config)
+            name = f"bridge.{i}"
+            svcs[name] = br
 
         if self.enable_prover_client:
             seq_port = sequencer.get_prop("rpc_port")
@@ -142,6 +156,7 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
         seq_fac = ctx.get_factory("sequencer")
         reth_fac = ctx.get_factory("reth")
         fn_fac = ctx.get_factory("fullnode")
+        bridge_fac = ctx.get_factory("bridge_client")
 
         # set up network params
         initdir = ctx.make_service_dir("_init")
@@ -223,6 +238,18 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
             "follower_1_node": fullnode,
             "follower_1_reth": fullnode_reth,
         }
+
+        # Create all the bridge clients.
+        for i in range(self.n_operators):
+            xpriv_path = params_gen_data["opseedpaths"][i]
+            xpriv = None
+            with open(xpriv_path, "r") as f:
+                xpriv = f.read().strip()
+            seq_url = sequencer.get_prop("rpc_url")
+            br = bridge_fac.create_operator(xpriv, seq_url, bitcoind_config)
+            name = f"bridge.{i}"
+            svcs[name] = br
+
         return flexitest.LiveEnv(svcs)
 
 
@@ -247,6 +274,7 @@ def main(argv):
     fullnode_fac = factory.FullNodeFactory([12500 + i for i in range(30)])
     reth_fac = factory.RethFactory([12600 + i for i in range(20 * 3)])
     prover_client_fac = factory.ProverClientFactory([12700 + i for i in range(20 * 3)])
+    bridge_client_fac = factory.BridgeClientFactory([12800 + i for i in range(30)])
 
     factories = {
         "bitcoin": btc_fac,
@@ -254,6 +282,7 @@ def main(argv):
         "fullnode": fullnode_fac,
         "reth": reth_fac,
         "prover_client": prover_client_fac,
+        "bridge_client": bridge_client_fac,
     }
 
     global_envs = {
