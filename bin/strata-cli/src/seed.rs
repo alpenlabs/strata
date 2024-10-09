@@ -12,7 +12,7 @@ use bip39::{Language, Mnemonic};
 use console::Term;
 use dialoguer::{Confirm, Input};
 use password::{IncorrectPassword, Password};
-use rand::{thread_rng, Rng, RngCore};
+use rand::{rngs::OsRng, Rng, RngCore};
 use sha2::{Digest, Sha256};
 use terrors::OneOf;
 
@@ -184,11 +184,11 @@ pub fn load_or_create(
             }
         } else {
             let _ = term.write_line("Creating new wallet");
-            Seed::gen(&mut thread_rng())
+            Seed::gen(&mut OsRng)
         };
 
         let mut password = Password::read(true).map_err(OneOf::new)?;
-        let encrypted_seed = match seed.encrypt(&mut password, &mut thread_rng()) {
+        let encrypted_seed = match seed.encrypt(&mut password, &mut OsRng) {
             Ok(es) => es,
             Err(e) => {
                 let narrowed = e.narrow::<aes_gcm_siv::Error, _>();

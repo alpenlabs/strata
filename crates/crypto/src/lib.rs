@@ -45,7 +45,7 @@ mod tests {
     #[test]
     fn test_schnorr_signature_pass() {
         let secp = Secp256k1::new();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rngs::OsRng;
         let msg: [u8; 32] = [(); 32].map(|_| rng.gen());
 
         let mut mod_msg = msg;

@@ -839,7 +839,7 @@ impl<'a> Arbitrary<'a> for TaprootSpendPath {
                 };
 
                 // Generate a random secret key and derive the internal key
-                let secret_key = SecretKey::new(&mut rand::thread_rng());
+                let secret_key = SecretKey::new(&mut rand::rngs::OsRng);
                 let keypair = Keypair::from_secret_key(SECP256K1, &secret_key);
                 let (internal_key, _) = XOnlyPublicKey::from_keypair(&keypair);
 
@@ -915,7 +915,7 @@ mod tests {
 
         let num_possible_networks = possible_networks.len();
 
-        let (secret_key, _) = SECP256K1.generate_keypair(&mut rand::thread_rng());
+        let (secret_key, _) = SECP256K1.generate_keypair(&mut rand::rngs::OsRng);
         let keypair = Keypair::from_secret_key(SECP256K1, &secret_key);
         let (internal_key, _) = XOnlyPublicKey::from_keypair(&keypair);
 
@@ -930,7 +930,7 @@ mod tests {
             let invalid_network = match network {
                 Network::Bitcoin => {
                     // get one of the testnets
-                    let index = rand::thread_rng().gen_range(1..num_possible_networks);
+                    let index = rand::rngs::OsRng.gen_range(1..num_possible_networks);
 
                     possible_networks[index]
                 }
@@ -1189,7 +1189,7 @@ mod tests {
         let output_key_parity = Parity::Even;
 
         // Generate a random internal key
-        let secret_key = SecretKey::new(&mut rand::thread_rng());
+        let secret_key = SecretKey::new(&mut rand::rngs::OsRng);
         let keypair = Keypair::from_secret_key(SECP256K1, &secret_key);
         let (internal_key, _) = XOnlyPublicKey::from_keypair(&keypair);
 

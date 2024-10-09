@@ -402,7 +402,7 @@ pub fn generate_key_pair(
     secp256k1: &Secp256k1<secp256k1::All>,
 ) -> Result<UntweakedKeypair, anyhow::Error> {
     let mut rand_bytes = [0; 32];
-    rand::thread_rng().fill_bytes(&mut rand_bytes);
+    rand::rngs::OsRng.fill_bytes(&mut rand_bytes);
     Ok(UntweakedKeypair::from_seckey_slice(secp256k1, &rand_bytes)?)
 }
 
@@ -465,7 +465,7 @@ fn sign_reveal_transaction(
     )?;
 
     let mut randbytes = [0; 32];
-    rand::thread_rng().fill_bytes(&mut randbytes);
+    rand::rngs::OsRng.fill_bytes(&mut randbytes);
 
     let signature = secp256k1.sign_schnorr_with_aux_rand(
         &secp256k1::Message::from_digest_slice(signature_hash.as_byte_array())?,

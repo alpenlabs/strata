@@ -335,20 +335,22 @@ mod tests {
         max_txs_per_block: usize,
         needle: (Vec<u8>, ProtocolOperation),
     ) -> usize {
+        use rand::rngs::OsRng;
+
         let arb = ArbitraryGenerator::new();
         assert!(
             num_blocks.gt(&0) && max_txs_per_block.gt(&0),
             "num_blocks and max_tx_per_block must be at least 1"
         );
 
-        let random_block = rand::thread_rng().gen_range(1..num_blocks);
+        let random_block = OsRng.gen_range(1..num_blocks);
 
         let mut num_valid_duties = 0;
         for idx in 0..num_blocks {
-            let num_txs = rand::thread_rng().gen_range(1..max_txs_per_block);
+            let num_txs = OsRng.gen_range(1..max_txs_per_block);
 
             let known_tx_idx = if idx == random_block {
-                Some(rand::thread_rng().gen_range(0..num_txs))
+                Some(OsRng.gen_range(0..num_txs))
             } else {
                 None
             };
@@ -485,7 +487,7 @@ mod tests {
 
         // true => tx invalid
         // false => script_pubkey in tx output invalid
-        let tx_invalid: bool = rand::thread_rng().gen_bool(0.5);
+        let tx_invalid: bool = rand::rngs::OsRng.gen_bool(0.5);
 
         if tx_invalid {
             let mut random_tx: Vec<u8> = arb.generate();
@@ -575,7 +577,7 @@ mod tests {
             break;
         }
 
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rngs::OsRng;
 
         let random_assignee = rng.gen_range(0..operators.len());
         let random_assignee = operators[random_assignee];
@@ -619,7 +621,7 @@ mod tests {
             "some deposits should have been randomly dispatched"
         );
 
-        let needle_index = rand::thread_rng().gen_range(0..dispatched_deposits.len());
+        let needle_index = rand::rngs::OsRng.gen_range(0..dispatched_deposits.len());
 
         let needle = dispatched_deposits
             .get(needle_index)

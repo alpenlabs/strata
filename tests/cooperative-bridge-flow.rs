@@ -82,7 +82,7 @@ async fn full_flow() {
     let unspent_utxos_prewithdrawal = user.agent().get_unspent_utxos().await;
     event!(Level::DEBUG, event = "got unspent utxos from requester before withdrawal", num_unspent_utxos = %unspent_utxos_prewithdrawal.len());
 
-    let assigned_operator_idx = rand::thread_rng().gen_range(0..num_operators) as OperatorIdx;
+    let assigned_operator_idx = rand::rngs::OsRng.gen_range(0..num_operators) as OperatorIdx;
     event!(Level::INFO, event = "assigning withdrawal", operator_idx = %assigned_operator_idx);
 
     let withdrawal_info =

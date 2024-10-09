@@ -47,7 +47,7 @@ async fn withdrawal_flow() {
 
     event!(Level::INFO, event = "created user to initiate withdrawal", user_x_only_pk = ?user_x_only_pk);
 
-    let assigned_operator_idx = rand::thread_rng().gen_range(0..num_operators) as OperatorIdx;
+    let assigned_operator_idx = rand::rngs::OsRng.gen_range(0..num_operators) as OperatorIdx;
     event!(Level::INFO, event = "assigning withdrawal", operator_idx = %assigned_operator_idx);
 
     let withdrawal_info =

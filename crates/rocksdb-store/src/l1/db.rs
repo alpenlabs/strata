@@ -536,7 +536,7 @@ mod tests {
             l1_txs.push(l1_tx);
         }
 
-        let offset = rand::thread_rng().gen_range(0..total_num_blocks);
+        let offset = rand::rngs::OsRng.gen_range(0..total_num_blocks);
         let expected_num_blocks = total_num_blocks - offset;
         let (actual, latest_idx) = db.get_txs_from(offset as u64).unwrap();
 
