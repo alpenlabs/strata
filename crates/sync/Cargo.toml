@@ -9,6 +9,7 @@ async-trait.workspace = true
 borsh.workspace = true
 futures.workspace = true
 futures-util.workspace = true
+strata-common.workspace = true
 strata-consensus-logic.workspace = true
 strata-db.workspace = true
 strata-primitives.workspace = true
