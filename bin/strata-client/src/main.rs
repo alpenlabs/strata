@@ -10,7 +10,7 @@ use strata_btcio::{
     rpc::{traits::Reader, BitcoinClient},
     writer::{config::WriterConfig, start_inscription_task},
 };
-use strata_common::logging;
+use strata_common::{env::parse_env_or, logging};
 use strata_consensus_logic::{
     checkpoint::CheckpointHandle,
     duty::{types::DutyBatch, worker as duty_worker},
@@ -55,6 +55,7 @@ mod rpc_server;
 // TODO: this might need to come from config.
 const BITCOIN_POLL_INTERVAL: u64 = 200; // millis
 const SEQ_ADDR_GENERATION_TIMEOUT: u64 = 10; // seconds
+const SYNC_BATCH_SIZE_ENVVAR: &str = "SYNC_BATCH_SIZE";
 
 fn main() -> anyhow::Result<()> {
     let args: Args = argh::from_env();
@@ -173,7 +174,8 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             info!(?sequencer_rpc, "initing fullnode task");
 
             let rpc_client = runtime.block_on(sync_client(sequencer_rpc));
-            let sync_peer = RpcSyncPeer::new(rpc_client, 10);
+            let download_batch_size = parse_env_or(SYNC_BATCH_SIZE_ENVVAR, 10);
+            let sync_peer = RpcSyncPeer::new(rpc_client, download_batch_size);
             let l2_sync_context = L2SyncContext::new(
                 sync_peer,
                 ctx.l2_block_manager.clone(),

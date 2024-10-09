@@ -4,6 +4,7 @@
 
 use std::sync::Arc;
 
+use strata_common::env::parse_env_or;
 use strata_db::traits::Database;
 use strata_eectl::engine::ExecEngineCtl;
 use strata_primitives::params::Params;
@@ -18,6 +19,10 @@ use crate::{
     message::{ClientUpdateNotif, CsmMessage, ForkChoiceMessage},
     worker,
 };
+
+const FCM_QUEUE_SIZE_ENVVAR: &str = "FCM_QUEUE_SIZE";
+const CSM_QUEUE_SIZE_ENVVAR: &str = "CSM_QUEUE_SIZE";
+const CUP_QUEUE_SIZE_ENVVAR: &str = "CUP_QUEUE_SIZE";
 
 /// Handle to the core pipeline tasks.
 pub struct SyncManager {
@@ -89,14 +94,18 @@ pub fn start_sync_tasks<
     status_bundle: (Arc<StatusTx>, Arc<StatusRx>),
     checkpoint_manager: Arc<CheckpointDbManager>,
 ) -> anyhow::Result<SyncManager> {
+    let fcm_channel_size = parse_env_or(FCM_QUEUE_SIZE_ENVVAR, 1024);
+    let csm_channel_size = parse_env_or(CSM_QUEUE_SIZE_ENVVAR, 1024);
+    let cup_channel_size = parse_env_or(CUP_QUEUE_SIZE_ENVVAR, 1024);
+
     // Create channels.
-    let (fcm_tx, fcm_rx) = mpsc::channel::<ForkChoiceMessage>(64);
-    let (csm_tx, csm_rx) = mpsc::channel::<CsmMessage>(64);
+    let (fcm_tx, fcm_rx) = mpsc::channel::<ForkChoiceMessage>(fcm_channel_size);
+    let (csm_tx, csm_rx) = mpsc::channel::<CsmMessage>(csm_channel_size);
     let csm_controller = Arc::new(CsmController::new(database.clone(), pool, csm_tx));
 
     // TODO should this be in an `Arc`?  it's already fairly compact so we might
     // not be benefitting from the reduced cloning
-    let (cupdate_tx, cupdate_rx) = broadcast::channel::<Arc<ClientUpdateNotif>>(64);
+    let (cupdate_tx, cupdate_rx) = broadcast::channel::<Arc<ClientUpdateNotif>>(cup_channel_size);
 
     // Start the fork choice manager thread.  If we haven't done genesis yet
     // this will just wait until the CSM says we have.
