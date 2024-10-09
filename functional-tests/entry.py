@@ -492,7 +492,7 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
             "reth_secret_path": reth_secret_path,
         }
 
-        sequencer_rpc = f"ws://localhost:{sequencer.get_prop('rpc_port')}"
+        sequencer_rpc = f"http://localhost:{sequencer.get_prop('rpc_port')}"
 
         fullnode = fn_fac.create_fullnode(
             bitcoind_config,
