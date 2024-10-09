@@ -1,7 +1,6 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use bitcoin::key::Secp256k1;
-use musig2::secp256k1::SecretKey;
+use bitcoin::secp256k1::{SecretKey, SECP256K1};
 use rand::{rngs::StdRng, SeedableRng};
 use strata_consensus_logic::genesis::{make_genesis_block, make_genesis_chainstate};
 use strata_primitives::{
@@ -129,10 +128,10 @@ pub fn gen_client_state(params: Option<&Params>) -> ClientState {
 }
 
 pub fn make_dummy_operator_pubkeys_with_seed(seed: u64) -> OperatorPubkeys {
-    let secp = Secp256k1::new();
     let mut rng = StdRng::seed_from_u64(seed);
     let sk = SecretKey::new(&mut rng);
-    let (pk, _) = sk.x_only_public_key(&secp);
+    let x_only_public_key = sk.x_only_public_key(SECP256K1);
+    let (pk, _) = x_only_public_key;
     OperatorPubkeys::new(pk.into(), pk.into())
 }
 

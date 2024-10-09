@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use bitcoin::{key::Secp256k1, Block};
-use musig2::secp256k1::SecretKey;
+use bitcoin::Block;
+use musig2::secp256k1::{SecretKey, SECP256K1};
 use rand::{rngs::StdRng, SeedableRng};
 use strata_btcio::rpc::{traits::Reader, BitcoinClient};
 use strata_primitives::{
@@ -112,9 +112,8 @@ fn gen_params_with_seed(seed: u64) -> Params {
 }
 
 pub fn make_dummy_operator_pubkeys_with_seed(seed: u64) -> OperatorPubkeys {
-    let secp = Secp256k1::new();
     let mut rng = StdRng::seed_from_u64(seed);
     let sk = SecretKey::new(&mut rng);
-    let (pk, _) = sk.x_only_public_key(&secp);
+    let (pk, _) = sk.x_only_public_key(SECP256K1);
     OperatorPubkeys::new(pk.into(), pk.into())
 }

@@ -224,7 +224,6 @@ mod tests {
     use bitcoin::{
         hashes::{sha256, Hash},
         hex::{Case, DisplayHex},
-        secp256k1::Secp256k1,
         taproot::{self, TaprootBuilder},
         Address, Network,
     };
@@ -308,14 +307,13 @@ mod tests {
             .add_leaf(1, op_return_script)
             .unwrap();
 
-        let secp = Secp256k1::new();
         let spend_info = taproot_builder
-            .finalize(&secp, *UNSPENDABLE_INTERNAL_KEY)
+            .finalize(SECP256K1, *UNSPENDABLE_INTERNAL_KEY)
             .unwrap();
 
         let network = Network::Regtest;
         let address = Address::p2tr(
-            &secp,
+            SECP256K1,
             *UNSPENDABLE_INTERNAL_KEY,
             spend_info.merkle_root(),
             network,

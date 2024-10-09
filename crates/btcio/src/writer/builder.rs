@@ -13,7 +13,7 @@ use bitcoin::{
     },
     script::PushBytesBuf,
     secp256k1::{
-        self, constants::SCHNORR_SIGNATURE_SIZE, schnorr::Signature, Secp256k1, XOnlyPublicKey,
+        constants::SCHNORR_SIGNATURE_SIZE, schnorr::Signature, Message, XOnlyPublicKey, SECP256K1,
     },
     sighash::{Prevouts, SighashCache},
     taproot::{
@@ -93,8 +93,7 @@ pub fn create_inscription_transactions(
     network: Network,
 ) -> Result<(Transaction, Transaction), InscriptionError> {
     // Create commit key
-    let secp256k1 = Secp256k1::new();
-    let key_pair = generate_key_pair(&secp256k1)?;
+    let key_pair = generate_key_pair()?;
     let public_key = XOnlyPublicKey::from_keypair(&key_pair).0;
 
     let insc_data = InscriptionData::new(write_intent.to_vec());
@@ -106,12 +105,12 @@ pub fn create_inscription_transactions(
     // Create spend info for tapscript
     let taproot_spend_info = TaprootBuilder::new()
         .add_leaf(0, reveal_script.clone())?
-        .finalize(&secp256k1, public_key)
+        .finalize(SECP256K1, public_key)
         .map_err(|_| anyhow!("Could not build taproot spend info"))?;
 
     // Create reveal address
     let reveal_address = Address::p2tr(
-        &secp256k1,
+        SECP256K1,
         public_key,
         taproot_spend_info.merkle_root(),
         network,
@@ -151,7 +150,6 @@ pub fn create_inscription_transactions(
 
     // Sign reveal tx
     sign_reveal_transaction(
-        &secp256k1,
         &mut reveal_tx,
         &output_to_reveal,
         &reveal_script,
@@ -160,13 +158,7 @@ pub fn create_inscription_transactions(
     )?;
 
     // Check if inscription is locked to the correct address
-    assert_correct_address(
-        &secp256k1,
-        &key_pair,
-        &taproot_spend_info,
-        &reveal_address,
-        network,
-    );
+    assert_correct_address(&key_pair, &taproot_spend_info, &reveal_address, network);
 
     Ok((unsigned_commit_tx, reveal_tx))
 }
@@ -398,12 +390,10 @@ pub fn build_reveal_transaction(
     Ok(tx)
 }
 
-pub fn generate_key_pair(
-    secp256k1: &Secp256k1<secp256k1::All>,
-) -> Result<UntweakedKeypair, anyhow::Error> {
+pub fn generate_key_pair() -> Result<UntweakedKeypair, anyhow::Error> {
     let mut rand_bytes = [0; 32];
     rand::thread_rng().fill_bytes(&mut rand_bytes);
-    Ok(UntweakedKeypair::from_seckey_slice(secp256k1, &rand_bytes)?)
+    Ok(UntweakedKeypair::from_seckey_slice(SECP256K1, &rand_bytes)?)
 }
 
 /// Builds reveal script such that it contains opcodes for verifying the internal key as well as the
@@ -449,7 +439,6 @@ fn calculate_commit_output_value(
 }
 
 fn sign_reveal_transaction(
-    secp256k1: &Secp256k1<secp256k1::All>,
     reveal_tx: &mut Transaction,
     output_to_reveal: &TxOut,
     reveal_script: &script::ScriptBuf,
@@ -467,8 +456,8 @@ fn sign_reveal_transaction(
     let mut randbytes = [0; 32];
     rand::thread_rng().fill_bytes(&mut randbytes);
 
-    let signature = secp256k1.sign_schnorr_with_aux_rand(
-        &secp256k1::Message::from_digest_slice(signature_hash.as_byte_array())?,
+    let signature = SECP256K1.sign_schnorr_with_aux_rand(
+        &Message::from_digest_slice(signature_hash.as_byte_array())?,
         key_pair,
         &randbytes,
     );
@@ -487,13 +476,12 @@ fn sign_reveal_transaction(
 }
 
 fn assert_correct_address(
-    secp256k1: &Secp256k1<secp256k1::All>,
     key_pair: &UntweakedKeypair,
     taproot_spend_info: &TaprootSpendInfo,
     commit_tx_address: &Address,
     network: Network,
 ) {
-    let recovery_key_pair = key_pair.tap_tweak(secp256k1, taproot_spend_info.merkle_root());
+    let recovery_key_pair = key_pair.tap_tweak(SECP256K1, taproot_spend_info.merkle_root());
     let x_only_pub_key = recovery_key_pair.to_inner().x_only_public_key().0;
     assert_eq!(
         Address::p2tr_tweaked(

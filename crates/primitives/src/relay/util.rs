@@ -2,9 +2,7 @@ use std::io;
 
 use borsh::BorshSerialize;
 use rand::rngs::OsRng;
-use secp256k1::{
-    schnorr::Signature, Keypair, Message, Secp256k1, SecretKey, XOnlyPublicKey, SECP256K1,
-};
+use secp256k1::{schnorr::Signature, Keypair, Message, SecretKey, XOnlyPublicKey, SECP256K1};
 use thiserror::Error;
 
 use super::types::{BridgeMessage, Scope};
@@ -42,7 +40,7 @@ impl MessageSigner {
 
     /// Gets the pubkey corresponding to the internal msg signing sk.
     pub fn get_pubkey(&self) -> Buf32 {
-        compute_pubkey_for_privkey(&self.msg_signing_sk, SECP256K1)
+        compute_pubkey_for_privkey(&self.msg_signing_sk)
     }
 
     /// Signs a message using a raw scope and payload.
@@ -56,7 +54,7 @@ impl MessageSigner {
 
         let id: Buf32 = tmp_m.compute_id().into();
         // WARN: I don't know if a global context is safe here, maybe.
-        let sig = sign_msg_hash(&self.msg_signing_sk, &id, SECP256K1);
+        let sig = sign_msg_hash(&self.msg_signing_sk, &id);
         tmp_m.sig = sig;
 
         Ok(tmp_m)
@@ -76,24 +74,20 @@ impl MessageSigner {
 
 /// Computes the corresponding x-only pubkey as a buf32 for an sk.
 #[cfg(feature = "std")]
-pub fn compute_pubkey_for_privkey<A: secp256k1::Signing>(sk: &Buf32, secp: &Secp256k1<A>) -> Buf32 {
-    let kp = Keypair::from_seckey_slice(secp, sk.as_ref()).unwrap();
+pub fn compute_pubkey_for_privkey(sk: &Buf32) -> Buf32 {
+    let kp = Keypair::from_seckey_slice(SECP256K1, sk.as_ref()).unwrap();
     let (xonly_pk, _) = kp.public_key().x_only_public_key();
     Buf32::from(xonly_pk.serialize())
 }
 
 /// Generates a signature for the message.
 #[cfg(all(feature = "std", feature = "rand"))]
-pub fn sign_msg_hash<A: secp256k1::Signing>(
-    sk: &Buf32,
-    msg_hash: &Buf32,
-    secp: &Secp256k1<A>,
-) -> Buf64 {
+pub fn sign_msg_hash(sk: &Buf32, msg_hash: &Buf32) -> Buf64 {
     let mut rng = OsRng;
 
-    let keypair = Keypair::from_secret_key(secp, &SecretKey::from_slice(sk.as_ref()).unwrap());
+    let keypair = Keypair::from_secret_key(SECP256K1, &SecretKey::from_slice(sk.as_ref()).unwrap());
     let msg = Message::from_digest(*msg_hash.as_ref());
-    let sig = secp.sign_schnorr_with_rng(&msg, &keypair, &mut rng);
+    let sig = SECP256K1.sign_schnorr_with_rng(&msg, &keypair, &mut rng);
 
     Buf64::from(*sig.as_ref())
 }
@@ -147,17 +141,15 @@ mod tests {
 
     #[test]
     fn test_sign_verify_raw() {
-        let secp = secp256k1::Secp256k1::new();
-
         let msg_hash = [
             1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
             25, 26, 27, 28, 29, 30, 31, 32,
         ];
         let msg_hash = Buf32::from(msg_hash);
         let sk = Buf32::from([3; 32]);
-        let pk = compute_pubkey_for_privkey(&sk, &secp);
+        let pk = compute_pubkey_for_privkey(&sk);
 
-        let sig = sign_msg_hash(&sk, &msg_hash, &secp);
+        let sig = sign_msg_hash(&sk, &msg_hash);
         assert!(verify_sig(&pk, &msg_hash, &sig));
     }
 
