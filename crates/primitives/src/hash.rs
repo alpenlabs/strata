@@ -47,7 +47,7 @@ mod tests {
 
     #[test]
     fn test_sha256d_equivalence() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rngs::OsRng;
         let mut array = [0u8; 32];
         rng.fill(&mut array);
 

@@ -162,7 +162,7 @@ impl BorshDeserialize for Musig2PartialSig {
 
 impl<'a> Arbitrary<'a> for Musig2PartialSig {
     fn arbitrary(_u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
-        let secret_key = SecretKey::new(&mut rand::thread_rng());
+        let secret_key = SecretKey::new(&mut rand::rngs::OsRng);
 
         // Create a PartialSignature from the secret key bytes
         let partial_sig = PartialSignature::from_slice(secret_key.as_ref())

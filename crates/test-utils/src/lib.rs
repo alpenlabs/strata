@@ -27,7 +27,7 @@ impl ArbitraryGenerator {
     }
 
     pub fn new_with_size(n: usize) -> Self {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rngs::OsRng;
         let mut buf = vec![0; n];
         rng.fill_bytes(&mut buf); // 128 wasn't enough
         let off = AtomicUsize::new(0);

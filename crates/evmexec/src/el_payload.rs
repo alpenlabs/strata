@@ -125,7 +125,7 @@ mod tests {
     #[test]
     fn into() {
         let mut rand_data = vec![0u8; 1024];
-        rand::thread_rng().fill_bytes(&mut rand_data);
+        rand::rngs::OsRng.fill_bytes(&mut rand_data);
         let mut unstructured = Unstructured::new(&rand_data);
 
         let el_payload = ElPayload::arbitrary(&mut unstructured).unwrap();

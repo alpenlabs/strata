@@ -180,7 +180,7 @@ mod test {
         // Create controlblock
         let secp256k1 = Secp256k1::new();
         let mut rand_bytes = [0; 32];
-        rand::thread_rng().fill_bytes(&mut rand_bytes);
+        rand::rngs::OsRng.fill_bytes(&mut rand_bytes);
         let key_pair = UntweakedKeypair::from_seckey_slice(&secp256k1, &rand_bytes).unwrap();
         let public_key = XOnlyPublicKey::from_keypair(&key_pair).0;
         let nodehash: [TapNodeHash; 0] = [];

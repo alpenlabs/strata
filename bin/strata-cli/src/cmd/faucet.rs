@@ -5,7 +5,7 @@ use argh::FromArgs;
 use bdk_wallet::{bitcoin::Address, KeychainKind};
 use console::Term;
 use indicatif::ProgressBar;
-use rand::{distributions::uniform::SampleRange, thread_rng};
+use rand::{distributions::uniform::SampleRange, rngs::OsRng};
 use reqwest::{StatusCode, Url};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -77,7 +77,7 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
         solution.to_le_bytes(),
     ) {
         solution += 1;
-        if (0..100).sample_single(&mut thread_rng()) == 0 {
+        if (0..100).sample_single(&mut OsRng) == 0 {
             pb.set_message(format!("Trying {solution}"));
         }
     }

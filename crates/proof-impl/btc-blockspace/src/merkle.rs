@@ -73,7 +73,7 @@ mod tests {
 
     #[test]
     fn test_merkle_root() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rngs::OsRng;
 
         let n = rng.gen_range(1..1_000);
         let mut btc_hashes = Vec::with_capacity(n);

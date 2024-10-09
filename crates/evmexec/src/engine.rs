@@ -419,7 +419,7 @@ mod tests {
     }
 
     fn random_execution_payload_v1() -> ExecutionPayloadV1 {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rngs::OsRng;
 
         ExecutionPayloadV1 {
             parent_hash: B256::random(),
