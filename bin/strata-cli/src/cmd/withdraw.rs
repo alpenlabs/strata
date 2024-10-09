@@ -14,16 +14,16 @@ use crate::{
     strata::StrataWallet, taproot::ExtractP2trPubkey,
 };
 
-/// Bridge 10 BTC from Strata to signet
+/// Withdraw 10 BTC from Strata to signet
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "bridge-out")]
-pub struct BridgeOutArgs {
+pub struct WithdrawArgs {
     /// the signet address to send funds to. defaults to a new internal wallet address
     #[argh(positional)]
     p2tr_address: Option<String>,
 }
 
-pub async fn bridge_out(args: BridgeOutArgs, seed: Seed, settings: Settings) {
+pub async fn withdraw(args: WithdrawArgs, seed: Seed, settings: Settings) {
     let address = args.p2tr_address.map(|a| {
         Address::from_str(&a)
             .expect("valid address")

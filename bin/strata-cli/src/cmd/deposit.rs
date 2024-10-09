@@ -24,11 +24,11 @@ use crate::{
     taproot::{ExtractP2trPubkey, NotTaprootAddress},
 };
 
-/// Bridge 10 BTC from signet to Strata. If an address is not provided, the wallet's internal
+/// Deposit 10 BTC from signet to Strata. If an address is not provided, the wallet's internal
 /// Strata address will be used.
 #[derive(FromArgs, PartialEq, Debug)]
-#[argh(subcommand, name = "bridge-in")]
-pub struct BridgeInArgs {
+#[argh(subcommand, name = "deposit")]
+pub struct DepositArgs {
     #[argh(positional)]
     strata_address: Option<String>,
 
@@ -37,11 +37,11 @@ pub struct BridgeInArgs {
     fee_rate: Option<u64>,
 }
 
-pub async fn bridge_in(
-    BridgeInArgs {
+pub async fn deposit(
+    DepositArgs {
         strata_address,
         fee_rate,
-    }: BridgeInArgs,
+    }: DepositArgs,
     seed: Seed,
     settings: Settings,
     esplora: EsploraClient,
