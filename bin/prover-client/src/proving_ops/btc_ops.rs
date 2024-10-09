@@ -6,12 +6,13 @@ use musig2::secp256k1::SecretKey;
 use rand::{rngs::StdRng, SeedableRng};
 use strata_btcio::rpc::{traits::Reader, BitcoinClient};
 use strata_primitives::{
-    block_credential,
+    block_credential::{self, CredRule},
     buf::Buf32,
     operator::OperatorPubkeys,
     params::{OperatorConfig, Params, ProofPublishMode, RollupParams, SyncParams},
     vk::RollupVerifyingKey,
 };
+use strata_tx_parser::filter::{derive_tx_filter_rules, TxFilterRule};
 use tracing::debug;
 use uuid::Uuid;
 
@@ -37,7 +38,7 @@ impl BtcOperations {
 
 #[async_trait]
 impl ProvingOperations for BtcOperations {
-    type Input = (Block, RollupParams);
+    type Input = (Block, Vec<TxFilterRule>, CredRule);
     type Params = u64; // params is the block height
 
     fn proving_task_type(&self) -> ProvingTaskType {
@@ -48,7 +49,9 @@ impl ProvingOperations for BtcOperations {
         debug!(%block_num, "Fetching BTC block input");
         let block = self.btc_client.get_block_at(block_num).await?;
         debug!("Fetched BTC block {}", block_num);
-        Ok((block, get_pm_rollup_params()))
+        let tx_filters = derive_tx_filter_rules(&get_pm_rollup_params())?;
+        let cred_rule = get_pm_rollup_params().cred_rule;
+        Ok((block, tx_filters, cred_rule))
     }
 
     async fn append_task(
@@ -56,8 +59,8 @@ impl ProvingOperations for BtcOperations {
         task_tracker: Arc<TaskTracker>,
         input: Self::Input,
     ) -> Result<Uuid, ProvingTaskError> {
-        let (block, rollup_params) = input;
-        let prover_input = ZKVMInput::BtcBlock(block, rollup_params);
+        let (block, tx_filters, cred_rule) = input;
+        let prover_input = ZKVMInput::BtcBlock(block, cred_rule, tx_filters);
         let task_id = task_tracker.create_task(prover_input, vec![]).await;
         Ok(task_id)
     }
