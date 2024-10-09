@@ -25,7 +25,8 @@ x-base-bridge-client: &base-bridge-client
     BTC_PASS: rpcpassword
     RPC_HOST: "0.0.0.0"
     RPC_PORT: 4781 # default
-    ROLLUP_URL: "http://sequencer:8432"
+    ROLLUP_URL: "ws://sequencer:8432"
+    MAX_DUTY_RETRIES: 3 # for local environments
     DATADIR: .data # default
   networks:
     - strata_network

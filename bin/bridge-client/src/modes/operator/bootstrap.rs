@@ -24,7 +24,10 @@ use strata_storage::ops::{
 use threadpool::ThreadPool;
 use tracing::{error, info};
 
-use super::{constants::DB_THREAD_COUNT, task_manager::TaskManager};
+use super::{
+    constants::{DB_THREAD_COUNT, DEFAULT_DUTY_RETRY_COUNT},
+    task_manager::TaskManager,
+};
 use crate::{
     args::Cli,
     constants::{DEFAULT_RPC_HOST, DEFAULT_RPC_PORT, ROCKSDB_RETRY_COUNT},
@@ -116,6 +119,9 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
         }
     });
 
+    // should not have to call this if `message_interval` and `duty_interval` are set from the
+    // command-line but since this value is used in both places and the RPC call is simple, this
+    // overhead should be fine.
     let rollup_block_time = l2_rpc_client
         .block_time()
         .await
@@ -136,11 +142,13 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
         msg_polling_interval,
     };
 
+    let max_retry_count = args.max_duty_retries.unwrap_or(DEFAULT_DUTY_RETRY_COUNT);
     let task_manager = TaskManager {
         exec_handler: Arc::new(exec_handler),
         broadcaster: l1_rpc_client,
         bridge_duty_db_ops,
         bridge_duty_idx_db_ops,
+        max_retry_count,
     };
 
     let duty_polling_interval = args.duty_interval.map_or(
