@@ -110,13 +110,15 @@ where
             Vm::Input::new().write(&el_input)?.build()?
         }
 
-        ZKVMInput::BtcBlock(block, rollup_params) => Vm::Input::new()
-            .write(&rollup_params)?
+        ZKVMInput::BtcBlock(block, cred_rule, tx_filters) => Vm::Input::new()
+            .write(&cred_rule)?
             .write_serialized(&bitcoin::consensus::serialize(&block))?
+            .write_borsh(&tx_filters)?
             .build()?,
 
         ZKVMInput::L1Batch(l1_batch_input) => {
             let mut input_builder = Vm::Input::new();
+            input_builder.write(&l1_batch_input.rollup_params)?;
             input_builder.write_borsh(&l1_batch_input.header_verification_state)?;
             input_builder.write(&l1_batch_input.btc_task_ids.len())?;
             // Write each proof input
