@@ -28,6 +28,7 @@ where
     pub(super) broadcaster: Arc<Bcast>,
     pub(super) bridge_duty_db_ops: Arc<BridgeDutyOps>,
     pub(super) bridge_duty_idx_db_ops: Arc<BridgeDutyIndexOps>,
+    pub(super) max_retry_count: u32,
 }
 
 impl<L2Client, TxBuildContext, Bcast> TaskManager<L2Client, TxBuildContext, Bcast>
@@ -49,8 +50,16 @@ where
                 let exec_handler = self.exec_handler.clone();
                 let bridge_duty_ops = self.bridge_duty_db_ops.clone();
                 let broadcaster = self.broadcaster.clone();
+                let max_retry_count = self.max_retry_count;
                 handles.spawn(async move {
-                    process_duty(exec_handler, bridge_duty_ops, broadcaster, &duty).await
+                    process_duty(
+                        exec_handler,
+                        bridge_duty_ops,
+                        broadcaster,
+                        &duty,
+                        max_retry_count,
+                    )
+                    .await
                 });
             }
 
@@ -133,6 +142,9 @@ where
                     // it is fulfilled on bitcoin which makes this log very noisy.
                     trace!(%tracker_txid, "duty already executed");
                 }
+                Some(BridgeDutyStatus::Discarded(e)) => {
+                    trace!(%tracker_txid, last_err=%e, "ignoring discarded duty");
+                }
                 _ => todo_duties.push(duty), // need to do something here
             }
         }
@@ -155,6 +167,7 @@ async fn process_duty<L2Client, TxBuildContext, Bcast>(
     duty_status_ops: Arc<BridgeDutyOps>,
     broadcaster: Arc<Bcast>,
     duty: &BridgeDuty,
+    max_retry_count: u32,
 ) -> ExecResult<()>
 where
     L2Client: StrataApiClient + Sync + Send,
@@ -172,6 +185,7 @@ where
                 duty_status_ops,
                 tracker_txid,
                 deposit_info.clone(),
+                max_retry_count,
             )
             .await?;
         }
@@ -185,6 +199,7 @@ where
                 duty_status_ops,
                 tracker_txid,
                 cooperative_withdrawal_info.clone(),
+                max_retry_count,
             )
             .await?;
         }
@@ -208,6 +223,7 @@ where
 /// `broadcaster`: can be used to broadcast transactions.
 /// `tracker_txid`: [`Txid`] to track status of duties.
 /// `duty_status_ops`: a database handle to update the status of duties.
+/// `max_retry_count`: max number of times to retry a failed duty.
 ///
 /// # Errors
 ///
@@ -218,6 +234,7 @@ async fn execute_duty<L2Client, TxBuildContext, Tx, Bcast>(
     duty_status_ops: Arc<BridgeDutyOps>,
     tracker_txid: Txid,
     tx_info: Tx,
+    max_retry_count: u32,
 ) -> ExecResult<()>
 where
     L2Client: StrataApiClient + Sync + Send,
@@ -225,46 +242,35 @@ where
     Tx: TxKind + Debug,
     Bcast: Broadcaster,
 {
-    if let Err(e) = duty_status_ops
-        .put_duty_status_async(tracker_txid, BridgeDutyStatus::Received)
-        .await
-    {
-        // just a warning since the rest of the handlers only care if the duty status is `Failed` or
-        // `Executed`. The `Received` status is only for auditing purposes (for example, to check if
-        // a duty was received pre-crash).
-        warn!(error = %e, %tracker_txid, status=?BridgeDutyStatus::Received, "could not update duty status")
-    }
-
     match exec_handler.sign_tx(tx_info).await {
         Ok(constructed_txid) => {
-            if let Err(e) = aggregate_and_broadcast(
+            if let Err(exec_err) = aggregate_and_broadcast(
                 exec_handler.clone(),
                 broadcaster.clone(),
                 &constructed_txid,
             )
             .await
             {
-                error!(error = %e, %tracker_txid, "could not execute duty");
-                if let Err(e) = duty_status_ops
-                    .put_duty_status_async(tracker_txid, BridgeDutyStatus::Failed(e.to_string()))
-                    .await
-                {
-                    error!(db_err = %e, %tracker_txid, status="failed", "and could not update status in db either");
-                }
+                error!(error = %exec_err, %tracker_txid, "could not execute duty");
 
-                return Err(e);
+                update_failed_status_in_db(
+                    &duty_status_ops,
+                    tracker_txid,
+                    &exec_err,
+                    max_retry_count,
+                )
+                .await;
+
+                return Err(exec_err);
             }
         }
-        Err(e) => {
-            error!(error = %e, %tracker_txid, "could not execute duty");
-            if let Err(e) = duty_status_ops
-                .put_duty_status_async(tracker_txid, BridgeDutyStatus::Failed(e.to_string()))
-                .await
-            {
-                error!(db_err = %e, %tracker_txid, status="failed", "and could not update status in db either");
-            }
+        Err(exec_err) => {
+            error!(error = %exec_err, %tracker_txid, "could not execute duty");
 
-            return Err(e);
+            update_failed_status_in_db(&duty_status_ops, tracker_txid, &exec_err, max_retry_count)
+                .await;
+
+            return Err(exec_err);
         }
     };
 
@@ -276,6 +282,58 @@ where
     }
 
     Ok(())
+}
+
+async fn update_failed_status_in_db(
+    duty_status_ops: &Arc<BridgeDutyOps>,
+    tracker_txid: Txid,
+    exec_err: &ExecError,
+    max_retry_count: u32,
+) {
+    let status = match duty_status_ops.get_status_async(tracker_txid).await {
+        Ok(status) => status,
+        Err(db_err) => {
+            error!(%db_err, %tracker_txid, status="failed", "and could not update status in db either");
+
+            return;
+        }
+    };
+
+    let new_status = match status {
+        // update existing state by either incrementing the `retry_count` or setting status to
+        // `Discarded`.
+        Some(BridgeDutyStatus::Failed {
+            error_msg,
+            num_retries,
+        }) => {
+            let num_retries = num_retries.saturating_add(1);
+
+            // if `max_retry_count` is 0, keep retrying indefinitely
+            if max_retry_count != 0 && num_retries > max_retry_count {
+                error!(%num_retries, %tracker_txid, "discarding duty as retry count reached the limit");
+                BridgeDutyStatus::Discarded(error_msg)
+            } else {
+                info!(%num_retries, %tracker_txid, "duty failed again");
+                BridgeDutyStatus::Failed {
+                    error_msg,
+                    num_retries,
+                }
+            }
+        }
+
+        // insert a new failure state.
+        _ => BridgeDutyStatus::Failed {
+            error_msg: exec_err.to_string(),
+            num_retries: 0,
+        },
+    };
+
+    if let Err(db_err) = duty_status_ops
+        .put_duty_status_async(tracker_txid, new_status)
+        .await
+    {
+        error!(%db_err, %tracker_txid, status="failed", "and could not update status in db either");
+    }
 }
 
 /// Aggregates nonces and signatures for a given [`Txid`] and then, broadcasts the fully signed
