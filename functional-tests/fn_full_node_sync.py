@@ -20,7 +20,6 @@ class BlockFinalizationSeqRestartTest(flexitest.Test):
 
         seqrpc = seq.create_rpc()
         noderpc = full_node.create_rpc()
-
         # wait until full sync with sequencer completely
         wait_until(
             lambda: noderpc.strata_syncStatus()["tip_height"]
@@ -32,6 +31,7 @@ class BlockFinalizationSeqRestartTest(flexitest.Test):
         blk_count = seqrpc.strata_syncStatus()["tip_height"]
         # stop noderpc so that sequencer has more blocks
         full_node.stop()
+        time.sleep(1)
 
         # sequencer produces 5 more blocks while full node is stopped
         wait_until(

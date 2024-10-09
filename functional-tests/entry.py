@@ -560,7 +560,7 @@ def main(argv):
         # TODO can we consolidate this with the basic env now?
         "premined_blocks": BasicEnvConfig(101),
         "fast_batches": BasicEnvConfig(101, rollup_settings=net_settings.get_fast_batch_settings()),
-        "hub1": HubNetworkEnvConfig(),
+        "hub1": HubNetworkEnvConfig(101),
         "prover": BasicEnvConfig(101, enable_prover_client=True),
     }
 

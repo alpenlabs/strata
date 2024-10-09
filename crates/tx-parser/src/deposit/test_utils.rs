@@ -1,7 +1,10 @@
 use std::str::FromStr;
 
 use bitcoin::{
-    absolute::LockTime, opcodes::all::OP_RETURN, script::{self, PushBytesBuf}, Address, Amount, Network, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Witness
+    absolute::LockTime,
+    opcodes::all::OP_RETURN,
+    script::{self, PushBytesBuf},
+    Address, Amount, Network, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Witness,
 };
 use strata_primitives::{
     l1::{BitcoinAddress, OutputRef},
