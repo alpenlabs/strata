@@ -12,7 +12,7 @@ use crate::{
     signet::{get_fee_rate, EsploraClient, SignetWallet},
 };
 
-/// Attempt recovery of old bridge-in transactions
+/// Attempt recovery of old deposit transactions
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "recover")]
 pub struct RecoverArgs {}
@@ -71,7 +71,7 @@ pub async fn recover(seed: Seed, settings: Settings, esplora: EsploraClient) {
 
         let recover_to = l1w.reveal_next_address(KeychainKind::External).address;
         let _ = term.write_line(&format!(
-            "Recovering a bridge-in transaction from address {} to {}",
+            "Recovering a deposit transaction from address {} to {}",
             style(address).yellow(),
             style(&recover_to).yellow()
         ));
