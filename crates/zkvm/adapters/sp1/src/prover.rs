@@ -71,6 +71,7 @@ impl ZKVMHost for SP1Host {
         }
 
         let (remote_id, proof_data) = if client.prover.id() == ProverType::Network {
+            println!("Remote prover");
             let network_prover =
                 unsafe { &*(client.prover.as_ref() as *const _ as *const NetworkProver) };
 
@@ -78,10 +79,11 @@ impl ZKVMHost for SP1Host {
                 self.prover_options.enable_compression,
                 self.prover_options.stark_to_snark_conversion,
             ) {
-                (true, _) => ProofMode::Compressed,
                 (_, true) => ProofMode::Groth16,
+                (true, _) => ProofMode::Compressed,
                 (_, _) => ProofMode::default(),
             };
+            println!("Prover Mode: {:?}", mode);
 
             let remote_id =
                 block_on(network_prover.request_proof(&self.elf, prover_input.clone(), mode))?;
