@@ -4,6 +4,7 @@ use anyhow::Context;
 use bitcoin::{
     base58,
     bip32::{Xpriv, Xpub},
+    secp256k1::SECP256K1,
     Address, Network,
 };
 use format_serde_error::SerdeError;
@@ -188,7 +189,7 @@ pub fn load_seqkey(path: &Path) -> anyhow::Result<IdentityData> {
     // Actually do the key derivation from the root key and then derive the pubkey from that.
     let seq_xpriv = keyderiv::derive_seq_xpriv(&root_xpriv)?;
     let seq_sk = Buf32::from(seq_xpriv.private_key.secret_bytes());
-    let seq_xpub = Xpub::from_priv(bitcoin::secp256k1::SECP256K1, &seq_xpriv);
+    let seq_xpub = Xpub::from_priv(SECP256K1, &seq_xpriv);
     let seq_pk = seq_xpub.to_x_only_pub().serialize();
 
     let ik = IdentityKey::Sequencer(seq_sk);

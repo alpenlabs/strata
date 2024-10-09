@@ -434,9 +434,9 @@ mod tests {
     use arbitrary::{Arbitrary, Unstructured};
     use bitcoin::{
         hashes::sha256,
-        secp256k1::{PublicKey, SECP256K1},
+        secp256k1::{Message, PublicKey, SECP256K1},
     };
-    use musig2::{secp256k1::Message, PubNonce};
+    use musig2::PubNonce;
     use strata_primitives::bridge::Musig2PartialSig;
     use strata_test_utils::bridge::{
         generate_keypairs, generate_mock_tx_signing_data, generate_mock_tx_state_ops,

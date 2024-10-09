@@ -2,8 +2,7 @@
 //! [`rust-bitcoin`](bitcoin). These utilities are common to both the bridge-in and bridge-out
 //! processes.
 
-use bitcoin::Network;
-use musig2::secp256k1::XOnlyPublicKey;
+use bitcoin::{secp256k1::XOnlyPublicKey, Network};
 use strata_primitives::bridge::{OperatorIdx, PublickeyTable};
 
 use crate::prelude::get_aggregated_pubkey;

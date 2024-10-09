@@ -2,13 +2,11 @@ use anyhow::anyhow;
 use bitcoin::{
     opcodes::all::OP_PUSHNUM_1,
     script::{Instruction, Instructions},
+    secp256k1::{PublicKey, SECP256K1},
     taproot::TaprootBuilder,
     Address, Network, Opcode, XOnlyPublicKey,
 };
-use musig2::{
-    secp256k1::{PublicKey, SECP256K1},
-    KeyAggContext,
-};
+use musig2::KeyAggContext;
 use strata_primitives::{buf::Buf32, l1::BitcoinAddress};
 
 /// Extract next instruction and try to parse it as an opcode

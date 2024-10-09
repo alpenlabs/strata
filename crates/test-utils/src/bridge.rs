@@ -8,12 +8,12 @@ use bitcoin::{
     absolute::LockTime,
     opcodes::all::{OP_PUSHNUM_1, OP_RETURN},
     script::Builder,
-    secp256k1::{rand, Keypair, PublicKey, SecretKey},
+    secp256k1::{Keypair, PublicKey, SecretKey, SECP256K1},
     taproot::{LeafVersion, TaprootBuilder, TaprootSpendInfo},
     transaction::Version,
     Address, Amount, Network, Psbt, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Witness,
 };
-use musig2::{secp256k1::SECP256K1, KeyAggContext, SecNonce};
+use musig2::{KeyAggContext, SecNonce};
 use rand::{Rng, RngCore};
 use strata_db::stubs::bridge::StubTxStateDb;
 use strata_primitives::{
