@@ -15,7 +15,9 @@ use indicatif::ProgressBar;
 use strata_bridge_tx_builder::constants::MAGIC_BYTES;
 
 use crate::{
-    constants::{BRIDGE_IN_AMOUNT, L2_BLOCK_TIME, RECOVER_AT_DELAY, RECOVER_DELAY, UNSPENDABLE},
+    constants::{
+        BRIDGE_IN_AMOUNT, RECOVER_AT_DELAY, RECOVER_DELAY, SIGNET_BLOCK_TIME, UNSPENDABLE,
+    },
     recovery::DescriptorRecovery,
     seed::Seed,
     settings::Settings,
@@ -142,10 +144,10 @@ pub async fn deposit(
     esplora.broadcast(&tx).await.expect("successful broadcast");
     let txid = tx.compute_txid();
     pb.finish_with_message(format!("Transaction {} broadcasted", txid));
-    let _ = print_explorer_url(&txid, &term);
+    let _ = print_explorer_url(&txid, &term, &settings);
     let _ = term.write_line(&format!(
         "Expect transaction confirmation in ~{:?}. Funds will take longer than this to be available on Strata.",
-        L2_BLOCK_TIME
+        SIGNET_BLOCK_TIME
     ));
 }
 

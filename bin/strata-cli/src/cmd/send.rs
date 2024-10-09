@@ -65,7 +65,7 @@ pub async fn send(args: SendArgs, seed: Seed, settings: Settings, esplora: Esplo
                 .expect("signable psbt");
             let tx = psbt.extract_tx().expect("signed tx");
             esplora.broadcast(&tx).await.expect("successful broadcast");
-            let _ = print_explorer_url(&tx.compute_txid(), &term);
+            let _ = print_explorer_url(&tx.compute_txid(), &term, &settings);
         }
         NetworkType::Strata => {
             let l2w = StrataWallet::new(&seed, &settings.strata_endpoint).expect("valid wallet");
