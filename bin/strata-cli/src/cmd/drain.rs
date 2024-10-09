@@ -82,7 +82,7 @@ pub async fn drain(
         l1w.sign(&mut psbt, Default::default()).unwrap();
         let tx = psbt.extract_tx().expect("fully signed tx");
         esplora.broadcast(&tx).await.unwrap();
-        let _ = print_explorer_url(&tx.compute_txid(), &term);
+        let _ = print_explorer_url(&tx.compute_txid(), &term, &settings);
     }
 
     if let Some(address) = strata_address {

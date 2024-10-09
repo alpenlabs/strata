@@ -32,12 +32,8 @@ pub const AES_TAG_LEN: usize = 16;
 
 pub const DEFAULT_NETWORK: Network = Network::Signet;
 pub const BRIDGE_STRATA_ADDRESS: &str = "0x5400000000000000000000000000000000000001";
-pub const L2_BLOCK_TIME: Duration = Duration::from_secs(30);
+pub const SIGNET_BLOCK_TIME: Duration = Duration::from_secs(30);
 
-pub const DEFAULT_ESPLORA: &str = "https://esploraapi.devnet-annapurna.stratabtc.org";
-pub const DEFAULT_STRATA_ENDPOINT: &str = "https://stratareth.devnet-annapurna.stratabtc.org";
-pub const DEFAULT_FAUCET_ENDPOINT: &str = "https://faucet.devnet-annapurna.stratabtc.org";
-pub const DEFAULT_MEMPOOL_ENDPOINT: &str = "https://mempool.devnet-annapurna.stratabtc.org";
 pub const BRIDGE_MUSIG2_PUBKEY: &str =
     "14ced579c6a92533fa68ccc16da93b41073993cfc6cc982320645d8e9a63ee65";
 

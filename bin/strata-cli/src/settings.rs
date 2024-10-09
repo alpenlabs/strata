@@ -13,16 +13,14 @@ use serde::{Deserialize, Serialize};
 use shrex::{decode, Hex};
 use terrors::OneOf;
 
-use crate::constants::{
-    BRIDGE_MUSIG2_PUBKEY, BRIDGE_STRATA_ADDRESS, DEFAULT_ESPLORA, DEFAULT_FAUCET_ENDPOINT,
-    DEFAULT_NETWORK, DEFAULT_STRATA_ENDPOINT,
-};
+use crate::constants::{BRIDGE_MUSIG2_PUBKEY, BRIDGE_STRATA_ADDRESS, DEFAULT_NETWORK};
 
 #[derive(Serialize, Deserialize)]
 pub struct SettingsFromFile {
-    pub esplora: Option<String>,
-    pub strata_endpoint: Option<String>,
-    pub faucet_endpoint: Option<String>,
+    pub esplora: String,
+    pub strata_endpoint: String,
+    pub faucet_endpoint: String,
+    pub mempool_endpoint: String,
     pub bridge_pubkey: Option<Hex<[u8; 32]>>,
     pub network: Option<Network>,
 }
@@ -37,6 +35,7 @@ pub struct Settings {
     pub faucet_endpoint: String,
     pub bridge_musig2_pubkey: XOnlyPublicKey,
     pub descriptor_db: PathBuf,
+    pub mempool_endpoint: String,
     pub bridge_strata_address: StrataAddress,
     pub linux_seed_file: PathBuf,
     pub network: Network,
@@ -59,7 +58,7 @@ impl Settings {
 
         // create config file if not exists
         let _ = File::create_new(&config_file);
-        let from_file = Config::builder()
+        let from_file: SettingsFromFile = Config::builder()
             .add_source(config::File::from(config_file.clone()))
             .build()
             .map_err(OneOf::new)?
@@ -67,14 +66,11 @@ impl Settings {
             .map_err(OneOf::new)?;
 
         Ok(Settings {
-            esplora: from_file.esplora.unwrap_or(DEFAULT_ESPLORA.to_owned()),
-            strata_endpoint: from_file
-                .strata_endpoint
-                .unwrap_or(DEFAULT_STRATA_ENDPOINT.to_owned()),
+            esplora: from_file.esplora,
+            strata_endpoint: from_file.strata_endpoint,
             data_dir: proj_dirs.data_dir().to_owned(),
-            faucet_endpoint: from_file
-                .faucet_endpoint
-                .unwrap_or(DEFAULT_FAUCET_ENDPOINT.to_owned()),
+            faucet_endpoint: from_file.faucet_endpoint,
+            mempool_endpoint: from_file.mempool_endpoint,
             bridge_musig2_pubkey: XOnlyPublicKey::from_slice(&match from_file.bridge_pubkey {
                 Some(key) => key.0,
                 None => {

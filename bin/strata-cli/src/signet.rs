@@ -20,7 +20,7 @@ use bdk_wallet::{
 use console::{style, Term};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 
-use crate::{constants::DEFAULT_MEMPOOL_ENDPOINT, seed::Seed};
+use crate::{seed::Seed, settings::Settings};
 
 /// Retrieves an estimated fee rate to settle a transaction in `target` blocks
 pub async fn get_fee_rate(
@@ -41,10 +41,10 @@ pub fn log_fee_rate(term: &Term, fr: &FeeRate) {
     ));
 }
 
-pub fn print_explorer_url(txid: &Txid, term: &Term) -> Result<(), io::Error> {
+pub fn print_explorer_url(txid: &Txid, term: &Term, settings: &Settings) -> Result<(), io::Error> {
     term.write_line(&format!(
         "View transaction at {}",
-        style(format!("{DEFAULT_MEMPOOL_ENDPOINT}/tx/{txid}")).blue()
+        style(format!("{}/tx/{txid}", settings.mempool_endpoint)).blue()
     ))
 }
 

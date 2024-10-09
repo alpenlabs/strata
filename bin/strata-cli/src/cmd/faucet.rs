@@ -170,7 +170,11 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
             let _ = print_explorer_url(&Txid::from_str(&body).expect("valid txid"), &term);
         }
         #[cfg(not(feature = "strata_faucet"))]
-        let _ = print_explorer_url(&Txid::from_str(&body).expect("valid txid"), &term);
+        let _ = print_explorer_url(
+            &Txid::from_str(&body).expect("valid txid"),
+            &term,
+            &settings,
+        );
         let _ = term.write_line(&format!("Successful. Claimed in transaction {body}"));
     } else {
         let _ = term.write_line(&format!("Failed: faucet responded with {status}: {body}"));
