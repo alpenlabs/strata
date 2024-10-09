@@ -32,12 +32,14 @@ class BridgeDepositTest(flexitest.Test):
     def do(self, ctx: flexitest.RunContext, evm_addr: str):
         btc = ctx.get_service("bitcoin")
         seq = ctx.get_service("sequencer")
+        print(ROLLUP_PARAMS_FOR_DEPOSIT_TX)
+        deposit_amt = ROLLUP_PARAMS_FOR_DEPOSIT_TX["tx_params"]["deposit"]["deposit_amount"]
 
         seqrpc = seq.create_rpc()
         btcrpc: BitcoindClient = btc.create_rpc()
 
-        # FIXME change this to fetch from the params
-        amount_to_send = ROLLUP_PARAMS_FOR_DEPOSIT_TX["deposit_amount"] / 10**8
+        amount_to_send = deposit_amt / 10**8
+        print(amount_to_send)
         name = ROLLUP_PARAMS_FOR_DEPOSIT_TX["rollup_name"].encode("utf-8").hex()
 
         addr = "bcrt1pzupt5e8eqvt995r57jmmylxlswqfddsscrrq7njygrkhej3e7q2qur0c76"
@@ -79,13 +81,17 @@ class BridgeDepositTest(flexitest.Test):
             timeout=EVM_WAIT_TIME,
         )
 
-        deposit_amount = ROLLUP_PARAMS_FOR_DEPOSIT_TX["deposit_amount"] * SATS_TO_WEI
+        block_num = rethrpc.eth_blockNumber()
+        balance = int(rethrpc.eth_getBalance(f"0x{evm_addr}"), 16)
+        assert balance == deposit_amt * SATS_TO_WEI, f"invalid deposit amount: {balance}"
+
+        wait_until(lambda: rethrpc.eth_blockNumber() > block_num, error_with="not building blocks")
 
         balance = int(rethrpc.eth_getBalance(f"0x{evm_addr}"), 16)
         print(f"Balance after deposit: {balance}")
 
         net_balance = balance - original_balance
-        assert net_balance == deposit_amount, f"invalid deposit amount: {net_balance}"
+        assert net_balance == deposit_amt, f"invalid deposit amount: {net_balance}"
 
         wait_until(
             lambda: int(rethrpc.eth_blockNumber(), base=16) > current_block_num,
@@ -95,6 +101,4 @@ class BridgeDepositTest(flexitest.Test):
 
         balance = int(rethrpc.eth_getBalance(f"0x{evm_addr}"), 16)
         net_balance = balance - original_balance
-        assert (
-            net_balance == deposit_amount
-        ), f"deposit processed multiple times, extra: {balance - original_balance - deposit_amount}"
+        assert balance == deposit_amt * SATS_TO_WEI, f"deposit processed multiple times: {balance}"

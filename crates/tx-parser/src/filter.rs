@@ -2,8 +2,7 @@ use bitcoin::{Block, Transaction};
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::{
     buf::Buf32,
-    params::{OperatorConfig, RollupParams},
-    prelude::DepositTxParams,
+    params::{DepositTxConfig, OperatorConfig, RollupParams},
 };
 use strata_state::{batch::SignedBatchCheckpoint, tx::ProtocolOperation};
 
@@ -11,7 +10,7 @@ use super::messages::ProtocolOpTxRef;
 use crate::{
     deposit::{deposit_request::extract_deposit_request_info, deposit_tx::extract_deposit_info},
     inscription::parse_inscription_data,
-    utils::generate_taproot_address,
+    utils::derive_taproot_address,
 };
 
 /// kind of transactions can be relevant for rollup node to filter
@@ -21,9 +20,9 @@ pub enum TxFilterRule {
     /// InscriptionParser which dictates the structure of inscription.
     RollupInscription(RollupName),
     /// Deposit Request transaction
-    DepositRequest(DepositTxParams),
+    DepositRequest(DepositTxConfig),
     /// Deposit transaction with deposit config and address
-    Deposit(DepositTxParams),
+    Deposit(DepositTxConfig),
 }
 
 type RollupName = String;
@@ -39,14 +38,19 @@ fn get_operator_wallet_pks(params: &RollupParams) -> Vec<Buf32> {
 
 pub fn derive_tx_filter_rules(params: &RollupParams) -> anyhow::Result<Vec<TxFilterRule>> {
     let operator_wallet_pks = get_operator_wallet_pks(params);
-    let address = generate_taproot_address(&operator_wallet_pks, params.network)?;
-    let deposit_provider = params.get_deposit_params(address);
+    let address = derive_taproot_address(&operator_wallet_pks, params.network).unwrap();
+    let deposit_provider = DepositTxConfig {
+        params: params.tx_params.deposit.clone(),
+        addr: address,
+    };
+
     Ok(vec![
         TxFilterRule::RollupInscription(params.rollup_name.clone()),
         TxFilterRule::DepositRequest(deposit_provider.clone()),
-        TxFilterRule::Deposit(deposit_provider),
+        TxFilterRule::Deposit(deposit_provider.clone()),
     ])
 }
+
 /// Filter all the relevant [`Transaction`]s in a block based on given [`TxFilterRule`]s
 pub fn filter_relevant_txs(block: &Block, filters: &[TxFilterRule]) -> Vec<ProtocolOpTxRef> {
     block
@@ -82,10 +86,10 @@ fn check_and_extract_relevant_info(
             None
         }
 
-        TxFilterRule::DepositRequest(config) => extract_deposit_request_info(tx, config)
+        TxFilterRule::DepositRequest(params) => extract_deposit_request_info(tx, params)
             .map(|deposit_req_info| Some(ProtocolOperation::DepositRequest(deposit_req_info)))?,
 
-        TxFilterRule::Deposit(config) => extract_deposit_info(tx, config)
+        TxFilterRule::Deposit(params) => extract_deposit_info(tx, params)
             .map(|deposit_info| Some(ProtocolOperation::Deposit(deposit_info)))?,
     })
 }
@@ -262,11 +266,12 @@ mod test {
     fn test_filter_relevant_txs_deposit() {
         let config = get_deposit_tx_config();
         let ee_addr = vec![1u8; 20]; // Example EVM address
-        let deposit_script = build_test_deposit_script(config.magic_bytes.clone(), ee_addr.clone());
+        let deposit_script =
+            build_test_deposit_script(config.params.magic_bytes.clone(), ee_addr.clone());
 
         let tx = create_transaction_two_outpoints(
-            Amount::from_sat(config.deposit_amount),
-            &config.address.address().script_pubkey(),
+            Amount::from_sat(config.params.deposit_amount),
+            &config.addr.clone().address().script_pubkey(),
             &deposit_script,
         );
 
@@ -286,7 +291,7 @@ mod test {
             assert_eq!(deposit_info.address, ee_addr, "EE address should match");
             assert_eq!(
                 deposit_info.amt,
-                BitcoinAmount::from_sat(config.deposit_amount),
+                BitcoinAmount::from_sat(config.params.deposit_amount),
                 "Deposit amount should match"
             );
         } else {
@@ -298,17 +303,17 @@ mod test {
     fn test_filter_relevant_txs_deposit_request() {
         let mut config = get_deposit_tx_config();
         let extra_amt = 10000;
-        config.deposit_amount += extra_amt;
+        config.params.deposit_amount += extra_amt;
         let dest_addr = vec![2u8; 20]; // Example EVM address
         let dummy_block = [0u8; 32]; // Example dummy block
         let deposit_request_script = build_test_deposit_request_script(
-            config.magic_bytes.clone(),
+            config.params.magic_bytes.clone(),
             dummy_block.to_vec(),
             dest_addr.clone(),
         );
 
         let tx = create_transaction_two_outpoints(
-            Amount::from_sat(config.deposit_amount), // Any amount
+            Amount::from_sat(config.params.deposit_amount), // Any amount
             &test_taproot_addr().address().script_pubkey(),
             &deposit_request_script,
         );
@@ -343,7 +348,7 @@ mod test {
     fn test_filter_relevant_txs_no_deposit() {
         let config = get_deposit_tx_config();
         let irrelevant_tx = create_transaction_two_outpoints(
-            Amount::from_sat(config.deposit_amount),
+            Amount::from_sat(config.params.deposit_amount),
             &test_taproot_addr().address().script_pubkey(),
             &ScriptBuf::new(),
         );
@@ -366,17 +371,17 @@ mod test {
         let dest_addr2 = vec![4u8; 20];
 
         let deposit_script1 =
-            build_test_deposit_script(config.magic_bytes.clone(), dest_addr1.clone());
+            build_test_deposit_script(config.params.magic_bytes.clone(), dest_addr1.clone());
         let deposit_script2 =
-            build_test_deposit_script(config.magic_bytes.clone(), dest_addr2.clone());
+            build_test_deposit_script(config.params.magic_bytes.clone(), dest_addr2.clone());
 
         let tx1 = create_transaction_two_outpoints(
-            Amount::from_sat(config.deposit_amount),
+            Amount::from_sat(config.params.deposit_amount),
             &test_taproot_addr().address().script_pubkey(),
             &deposit_script1,
         );
         let tx2 = create_transaction_two_outpoints(
-            Amount::from_sat(config.deposit_amount),
+            Amount::from_sat(config.params.deposit_amount),
             &test_taproot_addr().address().script_pubkey(),
             &deposit_script2,
         );
@@ -412,7 +417,7 @@ mod test {
                 );
                 assert_eq!(
                     deposit_info.amt,
-                    BitcoinAmount::from_sat(config.deposit_amount),
+                    BitcoinAmount::from_sat(config.params.deposit_amount),
                     "Deposit amount should match for transaction {}",
                     i
                 );

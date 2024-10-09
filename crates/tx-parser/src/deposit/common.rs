@@ -1,5 +1,5 @@
 use bitcoin::script::Instructions;
-use strata_primitives::params::DepositTxParams;
+use strata_primitives::params::DepositTxConfig;
 
 use super::error::DepositParseError;
 use crate::utils::next_bytes;
@@ -12,11 +12,11 @@ pub struct DepositRequestScriptInfo {
 /// check if magic bytes(unique set of bytes used to identify relevant tx) is present or not
 pub fn check_magic_bytes(
     instructions: &mut Instructions,
-    config: &DepositTxParams,
+    config: &DepositTxConfig,
 ) -> Result<(), DepositParseError> {
     // magic bytes
     if let Some(magic_bytes) = next_bytes(instructions) {
-        if magic_bytes != config.magic_bytes {
+        if magic_bytes != config.params.magic_bytes {
             return Err(DepositParseError::MagicBytesMismatch);
         }
         return Ok(());
@@ -28,11 +28,11 @@ pub fn check_magic_bytes(
 /// extracts the Execution environment bytes(most possibly EVM bytes)
 pub fn extract_ee_bytes<'a>(
     instructions: &mut Instructions<'a>,
-    config: &DepositTxParams,
+    config: &DepositTxConfig,
 ) -> Result<&'a [u8], DepositParseError> {
     match next_bytes(instructions) {
         Some(ee_bytes) => {
-            if ee_bytes.len() as u8 != config.address_length {
+            if ee_bytes.len() as u8 != config.params.max_address_length {
                 return Err(DepositParseError::InvalidDestAddress(ee_bytes.len() as u8));
             }
             Ok(ee_bytes)
@@ -48,14 +48,17 @@ mod tests {
         script::{Builder, PushBytesBuf},
     };
 
-    use super::*;
-    use crate::deposit::{common::check_magic_bytes, test_utils::get_deposit_tx_config};
+    use crate::deposit::{
+        common::{check_magic_bytes, extract_ee_bytes},
+        error::DepositParseError,
+        test_utils::get_deposit_tx_config,
+    };
 
     #[test]
     fn test_check_magic_bytes_valid() {
         let config = get_deposit_tx_config();
         let script = Builder::new()
-            .push_slice(PushBytesBuf::try_from(config.magic_bytes.clone()).unwrap())
+            .push_slice(PushBytesBuf::try_from(config.params.magic_bytes.clone()).unwrap())
             .push_opcode(OP_RETURN)
             .into_script();
         let mut instructions = script.instructions();
@@ -92,7 +95,7 @@ mod tests {
     #[test]
     fn test_extract_ee_bytes_valid() {
         let config = get_deposit_tx_config();
-        let ee_bytes = vec![0; config.address_length as usize];
+        let ee_bytes = vec![0; config.params.max_address_length as usize];
         let script = Builder::new()
             .push_slice(PushBytesBuf::try_from(ee_bytes.clone()).unwrap())
             .push_opcode(OP_RETURN)
@@ -107,7 +110,7 @@ mod tests {
     #[test]
     fn test_extract_ee_bytes_invalid_length() {
         let config = get_deposit_tx_config();
-        let ee_bytes = vec![0; (config.address_length as usize) + 1];
+        let ee_bytes = vec![0; (config.params.max_address_length as usize) + 1];
         let script = Builder::new()
             .push_slice(PushBytesBuf::try_from(ee_bytes.clone()).unwrap())
             .push_opcode(OP_RETURN)

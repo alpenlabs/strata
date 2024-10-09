@@ -9,7 +9,10 @@ use strata_primitives::{
     block_credential,
     buf::Buf32,
     operator::OperatorPubkeys,
-    params::{OperatorConfig, Params, ProofPublishMode, RollupParams, SyncParams},
+    params::{
+        DepositTxParams, OperatorConfig, Params, ProofPublishMode, RollupParams, SyncParams,
+        TransactionParams,
+    },
     vk::RollupVerifyingKey,
 };
 use tracing::debug;
@@ -91,8 +94,6 @@ fn gen_params_with_seed(seed: u64) -> Params {
             ),
             l1_reorg_safe_depth: 4,
             target_l2_batch_size: 64,
-            address_length: 20,
-            deposit_amount: 1_000_000_000,
             rollup_vk: RollupVerifyingKey::SP1VerifyingKey(Buf32(
                 "0x00b01ae596b4e51843484ff71ccbd0dd1a030af70b255e6b9aad50b81d81266f"
                     .parse()
@@ -102,6 +103,13 @@ fn gen_params_with_seed(seed: u64) -> Params {
             proof_publish_mode: ProofPublishMode::Strict,
             max_deposits_in_block: 16,
             network: bitcoin::Network::Regtest,
+            tx_params: TransactionParams {
+                deposit: DepositTxParams {
+                    magic_bytes: "strata".to_string().into_bytes().to_vec(),
+                    max_address_length: 20,
+                    deposit_amount: 1_000_000_000,
+                },
+            },
         },
         run: SyncParams {
             l2_blocks_fetch_limit: 1000,

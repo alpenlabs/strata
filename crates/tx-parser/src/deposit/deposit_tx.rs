@@ -2,7 +2,7 @@
 
 use bitcoin::{opcodes::all::OP_RETURN, OutPoint, ScriptBuf, Transaction};
 use strata_bridge_tx_builder::prelude::BRIDGE_DENOMINATION;
-use strata_primitives::{l1::OutputRef, prelude::DepositTxParams};
+use strata_primitives::{l1::OutputRef, params::DepositTxConfig};
 use strata_state::tx::DepositInfo;
 
 use crate::{
@@ -11,7 +11,7 @@ use crate::{
 };
 
 /// Extracts the DepositInfo from the Deposit Transaction
-pub fn extract_deposit_info(tx: &Transaction, config: &DepositTxParams) -> Option<DepositInfo> {
+pub fn extract_deposit_info(tx: &Transaction, config: &DepositTxConfig) -> Option<DepositInfo> {
     // Get the first output (index 0)
     let send_addr_out = tx.output.first()?;
 
@@ -27,7 +27,7 @@ pub fn extract_deposit_info(tx: &Transaction, config: &DepositTxParams) -> Optio
     }
 
     // check if p2tr address matches
-    if send_addr_out.script_pubkey != config.address.address().script_pubkey() {
+    if send_addr_out.script_pubkey != config.addr.address().script_pubkey() {
         return None;
     }
 
@@ -48,7 +48,7 @@ pub fn extract_deposit_info(tx: &Transaction, config: &DepositTxParams) -> Optio
 /// extracts the EE address given that the script is OP_RETURN type and contains the Magic Bytes
 fn parse_deposit_script<'a>(
     script: &'a ScriptBuf,
-    config: &DepositTxParams,
+    config: &DepositTxConfig,
 ) -> Result<&'a [u8], DepositParseError> {
     let mut instructions = script.instructions();
 
@@ -64,7 +64,7 @@ fn parse_deposit_script<'a>(
     assert!(data.len() < 80);
 
     // data has expected magic bytes
-    let magic_bytes = &config.magic_bytes;
+    let magic_bytes = &config.params.magic_bytes;
     let magic_len = magic_bytes.len();
 
     if data.len() < magic_len || &data[..magic_len] != magic_bytes {
@@ -73,7 +73,7 @@ fn parse_deposit_script<'a>(
 
     // configured bytes for address
     let address = &data[magic_len..];
-    if address.len() != config.address_length as usize {
+    if address.len() != config.params.max_address_length as usize {
         // casting is safe as address.len() < data.len() < 80
         return Err(DepositParseError::InvalidDestAddress(address.len() as u8));
     }
@@ -98,14 +98,14 @@ mod tests {
     fn check_deposit_parser() {
         // values for testing
         let config = get_deposit_tx_config();
-        let amt = Amount::from_sat(config.deposit_amount);
+        let amt = Amount::from_sat(config.params.deposit_amount);
         let ee_addr = [1; 20];
 
         let deposit_request_script =
-            build_test_deposit_script(config.magic_bytes, ee_addr.to_vec());
+            build_test_deposit_script(config.params.magic_bytes, ee_addr.to_vec());
 
         let test_transaction = create_transaction_two_outpoints(
-            Amount::from_sat(config.deposit_amount),
+            Amount::from_sat(config.params.deposit_amount),
             &test_taproot_addr().address().script_pubkey(),
             &deposit_request_script,
         );

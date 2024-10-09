@@ -30,10 +30,10 @@ EVM_GENESIS_BLOCK_STATE_ROOT = "0x351714af72d74259f45cd7eab0b04527cd40e74836a45a
 ROLLUP_VK = "0x00b01ae596b4e51843484ff71ccbd0dd1a030af70b255e6b9aad50b81d81266f"
 SEQ_KEY = b"alpen" + b"_1337" * 5 + b"xx"  # must be 32 bytes
 SEQ_PUBKEY = Key(SEQ_KEY.hex()).x_hex
-
+ROLLUP_NAME = "strata"
 # TODO initialize this with the new genesis tool instead of having it hardcoded
 DEFAULT_ROLLUP_PARAMS: dict = {
-    "rollup_name": "strata",
+    "rollup_name": ROLLUP_NAME,
     "block_time": DEFAULT_BLOCK_TIME_SEC * 1000,
     "cred_rule": {
         "schnorr_key": SEQ_PUBKEY,
@@ -44,8 +44,6 @@ DEFAULT_ROLLUP_PARAMS: dict = {
     "evm_genesis_block_state_root": EVM_GENESIS_BLOCK_STATE_ROOT,
     "l1_reorg_safe_depth": 4,
     "target_l2_batch_size": DEFAULT_EPOCH_SLOTS,
-    "address_length": 20,
-    "deposit_amount": 1_000_000_000,
     "rollup_vk": {
         "risc0_verifying_key": ROLLUP_VK,
     },
@@ -56,8 +54,21 @@ DEFAULT_ROLLUP_PARAMS: dict = {
         "timeout": 60 * 10,
     },
     "max_deposits_in_block": 16,
-    "operator_config": {"static": [{"signing_pk": "01" * 32, "wallet_pk": "02" * 32}]},
+    "operator_config": {
+        "static": [
+            {
+                "signing_pk": "0x5eaae68d0681f944a79567bbf96b5deda944d5287d898b744a100487dc28e5d5",
+                "wallet_pk": "0x5276d54e024127b290462c7eda211eb576332fc9a6b9a9479d7d152b5047193a",
+            },
+        ]
+    },
     "network": "regtest",
+    "tx_params": {
+        "deposit": {
+            "magic_bytes": list(ROLLUP_NAME.encode("utf-8")),
+            "max_address_length": 20,
+        }
+    },
 }
 
 FAST_BATCH_ROLLUP_PARAMS = {
@@ -76,8 +87,15 @@ ROLLUP_PARAMS_FOR_DEPOSIT_TX = {
         "static": [
             {
                 "signing_pk": "01" * 32,
-                "wallet_pk": "02b4634c515a62e47b3f3eb62b8a6f6320fdb2baed5f2e6657f472b0f2a33221",
+                "wallet_pk": "0x02b4634c515a62e47b3f3eb62b8a6f6320fdb2baed5f2e6657f472b0f2a33221",
             }
         ]
+    },
+    "tx_params": {
+        "deposit": {
+            "magic_bytes": list(ROLLUP_NAME.encode("utf-8")),
+            "deposit_amount": 1_000_000_000,
+            "max_address_length": 20,
+        }
     },
 }
