@@ -31,7 +31,7 @@ pub const SEED_LEN: usize = 16;
 pub const AES_TAG_LEN: usize = 16;
 
 pub const DEFAULT_NETWORK: Network = Network::Signet;
-pub const BRIDGE_STRATA_ADDRESS: &str = "0x000000000000000000000000000000000B121d9E";
+pub const BRIDGE_STRATA_ADDRESS: &str = "0x5400000000000000000000000000000000000001";
 pub const L2_BLOCK_TIME: Duration = Duration::from_secs(30);
 
 pub const DEFAULT_ESPLORA: &str = "https://esploraapi.devnet-annapurna.stratabtc.org";
