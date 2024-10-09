@@ -32,7 +32,7 @@ pub struct DepositArgs {
     #[argh(positional)]
     strata_address: Option<String>,
 
-    /// override signet fee rate in sat/vbyte. must be >1
+    /// override signet fee rate in sat/vbyte. must be >=1
     #[argh(option)]
     fee_rate: Option<u64>,
 }
