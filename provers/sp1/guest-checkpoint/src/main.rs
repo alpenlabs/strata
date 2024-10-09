@@ -30,7 +30,8 @@ fn main() {
     let l2_batch_pp_digest = Sha256::digest(l2_batch_pp_raw);
     sp1_zkvm::lib::verify::verify_sp1_proof(l2_batch_vk, &l2_batch_pp_digest.into());
 
-    let (output, prev_checkpoint) = process_checkpoint_proof(&l1_batch_pp, &l2_batch_pp);
+    let (output, prev_checkpoint) =
+        process_checkpoint_proof(&l1_batch_pp, &l2_batch_pp, &rollup_params);
 
     if let Some(prev_checkpoint) = prev_checkpoint {
         let (checkpoint, proof) = prev_checkpoint;
