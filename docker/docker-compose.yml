@@ -19,6 +19,7 @@ x-base-bridge-client: &base-bridge-client
     context: ../
     dockerfile: ./docker/bridge-client/Dockerfile
   image: "strata_bridge_client:v0.1.0"
+  restart: always
   environment:
     BTC_URL: "http://bitcoind:18443"
     BTC_USER: rpcuser

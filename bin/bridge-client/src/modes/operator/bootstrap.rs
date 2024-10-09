@@ -65,7 +65,11 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
         BitcoinClient::new(args.btc_url, args.btc_user, args.btc_pass)
             .expect("error creating the bitcoin client"),
     );
+
+    // TODO: make this configurable
+    let request_timeout = Duration::from_secs(5 * 60); // 5 mins
     let l2_rpc_client: L2RpcClient = WsClientBuilder::default()
+        .request_timeout(request_timeout)
         .build(args.rollup_url)
         .await
         .expect("failed to connect to the rollup RPC server");
@@ -156,11 +160,15 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
         Duration::from_millis,
     );
 
-    // TODO: wrap these in `strata-tasks`
+    // TODO: wrap this in `strata-tasks`
     let duty_task = tokio::spawn(async move {
         if let Err(e) = task_manager.start(duty_polling_interval).await {
             error!(error = %e, "could not start task manager");
-        };
+
+            // if the task manager fails, crash and burn this bridge client so that an external
+            // service such as `docker` can restart it.
+            panic!("task manager failed; please check logs for details");
+        }
     });
 
     // Wait for all tasks to run
