@@ -14,28 +14,30 @@ const DERIV_BASE_IDX: u32 = 56;
 const DERIV_OP_IDX: u32 = 20;
 const DERIV_OP_SIGNING_IDX: u32 = 100;
 const DERIV_OP_WALLET_IDX: u32 = 101;
-const OPXPRIV_ENVVAR: &str = "STRATA_OP_XPRIV";
+const OPXPRIV_ENVVAR: &str = "STRATA_OP_ROOT_XPRIV";
 #[allow(unused)] // TODO: uncomment when we need to store the xpriv directly in the wallet.
 const WALLET_NAME: &str = "strata";
 
-/// Resolves a key from ENV vars or CLI.
+/// Resolves the root key from ENV vars or CLI.
 pub(crate) fn resolve_xpriv(cli_arg: Option<String>) -> anyhow::Result<Xpriv> {
     match cli_arg {
+        // FIXME make this not a .expect
         Some(xpriv_str) => Ok(xpriv_str.parse::<Xpriv>().expect("could not parse xpriv")),
 
         None => match env::var(OPXPRIV_ENVVAR) {
+            // FIXME make this not a .expect
             Ok(xpriv_env_str) => Ok(xpriv_env_str
                 .parse::<Xpriv>()
                 .expect("could not parse xpriv")),
-            Err(_) => anyhow::bail!(
-                "please specify either the ENV var {OPXPRIV_ENVVAR} or pass it as a CLI argument"
-            ),
+            Err(_) => {
+                anyhow::bail!("must either set {OPXPRIV_ENVVAR} envvar or pass with `--root-xpriv`")
+            }
         },
     }
 }
 
-/// Derives the signing and wallet xprivs for a Strata bridge client.
-pub(crate) fn derive_op_purpose_xprivs(master: &Xpriv) -> anyhow::Result<(Xpriv, Xpriv)> {
+/// Derives the signing and wallet xprivs for a Strata operator.
+pub(crate) fn derive_op_purpose_xprivs(root: &Xpriv) -> anyhow::Result<(Xpriv, Xpriv)> {
     let signing_path = DerivationPath::master().extend([
         ChildNumber::from_hardened_idx(DERIV_BASE_IDX).unwrap(),
         ChildNumber::from_hardened_idx(DERIV_OP_IDX).unwrap(),
@@ -48,8 +50,8 @@ pub(crate) fn derive_op_purpose_xprivs(master: &Xpriv) -> anyhow::Result<(Xpriv,
         ChildNumber::from_normal_idx(DERIV_OP_WALLET_IDX).unwrap(),
     ]);
 
-    let signing_xpriv = master.derive_priv(bitcoin::secp256k1::SECP256K1, &signing_path)?;
-    let wallet_xpriv = master.derive_priv(bitcoin::secp256k1::SECP256K1, &wallet_path)?;
+    let signing_xpriv = root.derive_priv(bitcoin::secp256k1::SECP256K1, &signing_path)?;
+    let wallet_xpriv = root.derive_priv(bitcoin::secp256k1::SECP256K1, &wallet_path)?;
 
     Ok((signing_xpriv, wallet_xpriv))
 }

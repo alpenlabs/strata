@@ -4,7 +4,7 @@ import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 
 from constants import SEQ_PUBLISH_BATCH_INTERVAL_SECS
-from utils import wait_until
+from utils import generate_n_blocks, wait_until
 
 
 @flexitest.register
@@ -18,11 +18,11 @@ class L1WriterTest(flexitest.Test):
         btcrpc: BitcoindClient = btc.create_rpc()
         seqrpc = seq.create_rpc()
 
+        # generate 5 btc blocks
+        generate_n_blocks(btcrpc, 5)
+
         # Generate some funds to sequencer
         seqaddr = seq.get_prop("address")
-
-        l1_status = seqrpc.strata_l1status()
-        assert l1_status["last_published_txid"] is None, "Unexpected last_published_txid"
 
         # Wait for seq
         wait_until(

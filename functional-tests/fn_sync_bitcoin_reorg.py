@@ -57,6 +57,9 @@ class BitcoinReorgChecksTest(flexitest.Test):
         check_nth_checkpoint_finalized(idx, seqrpc, manual_gen)
         print(f"Pass checkpoint finalization for checkpoint {idx}")
 
+        # TODO remove this after adding a proper config file
+        # We need to wait for the tx to be published to L1
+        time.sleep(0.5)
         # Test reorg, without pruning anything, let mempool and wallet retain the txs
         check_nth_checkpoint_finalized_on_reorg(idx + 1, seq, btc)
 

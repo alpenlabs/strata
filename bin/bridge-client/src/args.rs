@@ -17,9 +17,15 @@ pub(crate) struct Cli {
 
     #[argh(
         option,
-        description = "xpriv to be loaded into the bitcoin wallet using the RPC client (default: read from envvar STRATA_OP_XPRIV)"
+        description = "path to the directory where to store the rocksdb databases (default: $HOME/.local/share/strata/)"
     )]
-    pub xpriv_str: Option<String>,
+    pub datadir: Option<String>,
+
+    #[argh(
+        option,
+        description = "xpriv to be loaded into the bitcoin wallet using the RPC client (default: envvar STRATA_OP_ROOT_XPRIV)"
+    )]
+    pub root_xpriv: Option<String>,
 
     #[argh(
         option,
@@ -30,21 +36,21 @@ pub(crate) struct Cli {
     #[argh(option, description = "port to run the rpc server on (default: 4781)")]
     pub rpc_port: Option<u32>,
 
-    #[argh(option, description = "url for the bitcoin RPC client")]
+    #[argh(option, description = "url for the bitcoin RPC")]
     pub btc_url: String,
 
-    #[argh(option, description = "username for the bitcoin RPC client")]
+    #[argh(option, description = "username for bitcoin RPC")]
     pub btc_user: String,
 
-    #[argh(option, description = "password for the bitcoin RPC client")]
+    #[argh(option, description = "password for bitcoin RPC")]
     pub btc_pass: String,
 
-    #[argh(option, description = "url for the rollup RPC client")]
+    #[argh(option, description = "url for the rollup RPC server")]
     pub rollup_url: String,
 
     #[argh(
         option,
-        description = "bridge duty polling interval in milliseconds (default: rollup block time according to the rollup RPC client)"
+        description = "bridge duty polling interval in milliseconds (default: block time according to rollup RPC)"
     )]
     pub duty_interval: Option<u64>, // default: same as rollup block time
 
@@ -56,13 +62,7 @@ pub(crate) struct Cli {
 
     #[argh(
         option,
-        description = "path to the directory where to store the rocksdb databases (default: $HOME/.local/share/strata/)"
-    )]
-    pub data_dir: Option<String>,
-
-    #[argh(
-        option,
-        description = "retry count for the rocksdb database (default = 3)"
+        description = "retry count for the rocksdb database (default: 3)"
     )]
     pub retry_count: Option<u16>,
 }
