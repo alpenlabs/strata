@@ -77,6 +77,35 @@ impl Password {
             }
         }
     }
+
+    /// Validates the password strength and returns feedback if it's weak.
+    pub fn validate(&self) -> Result<(), String> {
+        let entropy = self.entropy();
+        if entropy.score() <= zxcvbn::Score::Two {
+            let feedback = entropy.feedback();
+            let feedback_message = if let Some(feedback) = feedback {
+                feedback
+                    .warning()
+                    .map(|w| w.to_string())
+                    .unwrap_or_default()
+            } else {
+                "".to_string() // empty string is fine
+            };
+            let mut message = String::new();
+
+            message.push_str(feedback_message.as_str());
+
+            if let Some(feedback) = feedback {
+                message.push_str("Suggestions:\n");
+                for suggestion in feedback.suggestions() {
+                    message.push_str(&format!("- {suggestion}\n"));
+                }
+            }
+
+            return Err(message);
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug)]
