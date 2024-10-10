@@ -1,12 +1,11 @@
 import time
-from typing import List
 
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 
 from constants import DEFAULT_ROLLUP_PARAMS
 from entry import BasicEnvConfig
-from utils import get_logger
+from utils import broadcast_tx, get_logger
 
 
 @flexitest.register
@@ -62,7 +61,7 @@ class BridgeDepositHappyTest(flexitest.Test):
             {addr_1: amount_to_send},
             {"data": f"{magic_bytes}{take_back_leaf_hash}{el_address_1}"},
         ]
-        txid = self.broadcast_tx(btcrpc, outputs, options)
+        txid = broadcast_tx(btcrpc, outputs, options)
         self.logger.debug(f"sent deposit request with txid = {txid} for address {el_address_1}")
         # Now poll for the tx in chain
         tx_published = False
@@ -92,7 +91,7 @@ class BridgeDepositHappyTest(flexitest.Test):
             {addr_2: amount_to_send},
             {"data": f"{magic_bytes}{take_back_leaf_hash}{el_address_2}"},
         ]
-        txid = self.broadcast_tx(btcrpc, outputs, options)
+        txid = broadcast_tx(btcrpc, outputs, options)
         self.logger.debug(f"sent deposit request with txid = {txid} for address {el_address_2}")
         # Now poll for the tx in chain
         tx_published = False
@@ -123,7 +122,7 @@ class BridgeDepositHappyTest(flexitest.Test):
             {addr_1: amount_to_send},
             {"data": f"{magic_bytes}{take_back_leaf_hash}{el_address_1}"},
         ]
-        txid = self.broadcast_tx(btcrpc, outputs, options)
+        txid = broadcast_tx(btcrpc, outputs, options)
         self.logger.debug(f"sent deposit request with txid = {txid} for address {el_address_1}")
         # Now poll for the tx in chain
         tx_published = False
@@ -139,19 +138,3 @@ class BridgeDepositHappyTest(flexitest.Test):
         assert tx_published, "Tx was not published"
         new_balance = int(rethrpc.eth_getBalance(f"0x{el_address_1}"), 16)
         assert new_balance > original_balance_3, "balance did not increase"
-
-    def broadcast_tx(self, btcrpc: BitcoindClient, outputs: List[dict], options: dict) -> str:
-        """
-        Broadcast a transaction to the Bitcoin network.
-        """
-        psbt_result = btcrpc.proxy.walletcreatefundedpsbt([], outputs, 0, options)
-        psbt = psbt_result["psbt"]
-
-        signed_psbt = btcrpc.proxy.walletprocesspsbt(psbt)
-
-        finalized_psbt = btcrpc.proxy.finalizepsbt(signed_psbt["psbt"])
-        deposit_tx = finalized_psbt["hex"]
-
-        txid = btcrpc.sendrawtransaction(deposit_tx).get("txid", "")
-
-        return txid

@@ -6,7 +6,7 @@ from bitcoinlib.services.bitcoind import BitcoindClient
 
 from constants import DEFAULT_ROLLUP_PARAMS, SEQ_PUBLISH_BATCH_INTERVAL_SECS
 from entry import BasicEnvConfig
-from utils import get_logger
+from utils import broadcast_tx, get_logger
 
 
 @flexitest.register
@@ -47,7 +47,7 @@ class BridgeDutiesTest(flexitest.Test):
         txids = []
         for i in range(num_blocks):
             for j in range(num_deposits_per_block):
-                txid = self.broadcast_tx(btcrpc, outputs, options)
+                txid = broadcast_tx(btcrpc, outputs, options)
                 txids.append(txid)
 
                 # add robustness by spreading out requests across blocks
@@ -91,16 +91,3 @@ class BridgeDutiesTest(flexitest.Test):
         assert (
             duties_resp["stop_index"] > start_index
         ), "stop_index must be greater than start_index"
-
-    def broadcast_tx(self, btcrpc: BitcoindClient, outputs: List[dict], options: dict) -> str:
-        psbt_result = btcrpc.proxy.walletcreatefundedpsbt([], outputs, 0, options)
-        psbt = psbt_result["psbt"]
-
-        signed_psbt = btcrpc.proxy.walletprocesspsbt(psbt)
-
-        finalized_psbt = btcrpc.proxy.finalizepsbt(signed_psbt["psbt"])
-        deposit_tx = finalized_psbt["hex"]
-
-        txid = btcrpc.sendrawtransaction(deposit_tx).get("txid", "")
-
-        return txid
