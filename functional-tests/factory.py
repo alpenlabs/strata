@@ -342,17 +342,14 @@ class BridgeClientFactory(flexitest.Factory):
             "STRATA_OP_XPRIV": root_xpriv,
         }
 
-        props = {
-            "id": idx,
-            "rpc_host": rpc_host,
-            "rpc_port": rpc_port
-        }
+        props = {"id": idx, "rpc_host": rpc_host, "rpc_port": rpc_port}
         rpc_url = f"ws://localhost:{rpc_port}"
 
         svc = flexitest.service.ProcService(props, cmd, stdout=logfile)
         svc.start()
         _inject_service_create_rpc(svc, rpc_url, name)
         return svc
+
 
 def _inject_service_create_rpc(svc: flexitest.service.ProcService, rpc_url: str, name: str):
     """
