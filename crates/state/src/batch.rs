@@ -35,6 +35,10 @@ impl BatchCheckpoint {
         &self.bootstrap
     }
 
+    pub fn proof_output(&self) -> CheckpointProofOutput {
+        CheckpointProofOutput::new(self.batch_info().clone(), self.bootstrap_state().clone())
+    }
+
     pub fn proof(&self) -> &Proof {
         &self.proof
     }
@@ -70,9 +74,9 @@ impl SignedBatchCheckpoint {
         &self.inner
     }
 
-    pub fn verify_sig(&self, pub_key: Buf32) -> bool {
+    pub fn verify_sig(&self, pub_key: &Buf32) -> bool {
         let msg = self.checkpoint().get_sighash();
-        verify_schnorr_sig(&self.signature, &msg, &pub_key)
+        verify_schnorr_sig(&self.signature, &msg, pub_key)
     }
 }
 
@@ -232,6 +236,21 @@ impl BootstrapState {
             start_l2_height,
             initial_l2_state,
             total_acc_pow,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, BorshDeserialize, BorshSerialize)]
+pub struct CheckpointProofOutput {
+    pub batch_info: BatchInfo,
+    pub bootstrap_state: BootstrapState,
+}
+
+impl CheckpointProofOutput {
+    pub fn new(batch_info: BatchInfo, bootstrap_state: BootstrapState) -> CheckpointProofOutput {
+        Self {
+            batch_info,
+            bootstrap_state,
         }
     }
 }

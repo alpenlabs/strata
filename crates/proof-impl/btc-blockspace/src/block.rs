@@ -37,6 +37,21 @@ pub fn check_merkle_root(block: &Block) -> bool {
     }
 }
 
+/// Computes the transaction witness root.
+///
+/// Equivalent to [`witness_root`](Block::witness_root)
+pub fn compute_witness_root(block: &Block) -> Option<Buf32> {
+    let hashes = block.txdata.iter().enumerate().map(|(i, t)| {
+        if i == 0 {
+            // Replace the first hash with zeroes.
+            Buf32::zero()
+        } else {
+            compute_wtxid(t)
+        }
+    });
+    calculate_root(hashes)
+}
+
 /// Computes the witness commitment for the block's transaction list.
 ///
 /// Equivalent to [`compute_witness_commitment`](Block::compute_witness_commitment)
@@ -53,7 +68,7 @@ pub fn compute_witness_commitment(
 }
 
 /// Computes the block witness root from corresponding proof in [`L1Tx`]
-pub fn compute_witness_root(l1_tx: &L1Tx) -> Buf32 {
+pub fn compute_witness_root_from_l1_tx(l1_tx: &L1Tx) -> Buf32 {
     let tx: Transaction = consensus::deserialize(l1_tx.tx_data()).unwrap();
 
     // `cur_hash` represents the intermediate hash at each step. After all cohashes are processed
@@ -76,8 +91,19 @@ pub fn compute_witness_root(l1_tx: &L1Tx) -> Buf32 {
     Buf32::from(cur_hash)
 }
 
-/// Checks if witness commitment in coinbase matches the corresponding [`L1Tx`].
-pub fn check_witness_commitment(block: &Block, l1_tx: &L1Tx) -> bool {
+/// Checks if witness commitment in coinbase matches the transaction list.
+///
+/// Equivalent to [`check_witness_commitment`](Block::check_witness_commitment)
+pub fn check_witness_commitment(block: &Block) -> bool {
+    // Witness commitment is optional if there are no transactions using SegWit in the block.
+    if block
+        .txdata
+        .iter()
+        .all(|t| t.input.iter().all(|i| i.witness.is_empty()))
+    {
+        return true;
+    }
+
     if block.txdata.is_empty() {
         return false;
     }
@@ -107,7 +133,51 @@ pub fn check_witness_commitment(block: &Block, l1_tx: &L1Tx) -> bool {
                 .unwrap();
         // Witness reserved value is in coinbase input witness.
         let witness_vec: Vec<_> = coinbase.input[0].witness.iter().collect();
-        let witness_root = compute_witness_root(l1_tx);
+        if witness_vec.len() == 1 && witness_vec[0].len() == 32 {
+            if let Some(witness_root) = compute_witness_root(block) {
+                return commitment
+                    == compute_witness_commitment(
+                        &WitnessMerkleNode::from_byte_array(*witness_root.as_ref()),
+                        witness_vec[0],
+                    );
+            }
+        }
+    }
+    false
+}
+
+/// Checks if witness commitment in coinbase matches the corresponding [`L1Tx`].
+pub fn check_witness_commitment_for_l1_tx(block: &Block, l1_tx: &L1Tx) -> bool {
+    if block.txdata.is_empty() {
+        return false;
+    }
+
+    let coinbase = &block.txdata[0];
+    if !coinbase.is_coinbase() {
+        return false;
+    }
+
+    // The commitment is recorded in a scriptPubKey of the coinbase transaction. It must be at least
+    // 38 bytes, with the first 6-byte of 0x6a24aa21a9ed, that is:
+    //
+    // 1-byte - OP_RETURN (0x6a)
+    // 1-byte - Push the following 36 bytes (0x24)
+    // 4-byte - Commitment header (0xaa21a9ed)
+    // 32-byte - Commitment hash: Double-SHA256(witness root hash|witness reserved value)
+    const MAGIC: [u8; 6] = [0x6a, 0x24, 0xaa, 0x21, 0xa9, 0xed];
+
+    // Commitment is in the last output that starts with magic bytes.
+    if let Some(pos) = coinbase
+        .output
+        .iter()
+        .rposition(|o| o.script_pubkey.len() >= 38 && o.script_pubkey.as_bytes()[0..6] == MAGIC)
+    {
+        let commitment =
+            WitnessCommitment::from_slice(&coinbase.output[pos].script_pubkey.as_bytes()[6..38])
+                .unwrap();
+        // Witness reserved value is in coinbase input witness.
+        let witness_vec: Vec<_> = coinbase.input[0].witness.iter().collect();
+        let witness_root = compute_witness_root_from_l1_tx(l1_tx);
         if witness_vec.len() == 1 && witness_vec[0].len() == 32 {
             return commitment
                 == compute_witness_commitment(
@@ -134,7 +204,10 @@ mod tests {
     use strata_test_utils::{bitcoin::get_btc_mainnet_block, ArbitraryGenerator};
 
     use super::compute_merkle_root;
-    use crate::block::{check_pow, check_witness_commitment, compute_witness_root};
+    use crate::block::{
+        check_merkle_root, check_pow, check_witness_commitment, check_witness_commitment_for_l1_tx,
+        compute_witness_root, compute_witness_root_from_l1_tx,
+    };
 
     #[test]
     fn test_tx_root() {
@@ -147,6 +220,15 @@ mod tests {
 
     #[test]
     fn test_wtx_root() {
+        let block = get_btc_mainnet_block();
+        assert_eq!(
+            block.witness_root().unwrap(),
+            WitnessMerkleNode::from_byte_array(*compute_witness_root(&block).unwrap().as_ref())
+        )
+    }
+
+    #[test]
+    fn test_wtx_root_with_l1tx() {
         let block = get_btc_mainnet_block();
 
         // Note: This takes longer than 60s
@@ -163,17 +245,23 @@ mod tests {
         let parsed_tx: ProtocolOperation = ArbitraryGenerator::new().generate();
         let r = rand::thread_rng().gen_range(1..block.txdata.len()) as u32;
         let l1_tx = generate_l1_tx(&block, r, parsed_tx);
-        assert!(check_witness_commitment(&block, &l1_tx));
+        assert!(check_witness_commitment_for_l1_tx(&block, &l1_tx));
 
         assert_eq!(
             block.witness_root().unwrap(),
-            WitnessMerkleNode::from_byte_array(*compute_witness_root(&l1_tx).as_ref())
+            WitnessMerkleNode::from_byte_array(*compute_witness_root_from_l1_tx(&l1_tx).as_ref())
         )
     }
 
     #[test]
     fn test_block() {
         let block = get_btc_mainnet_block();
+
+        assert!(block.check_merkle_root());
+        assert!(check_merkle_root(&block));
+
+        assert!(block.check_witness_commitment());
+        assert!(check_witness_commitment(&block));
 
         assert!(block.header.validate_pow(block.header.target()).is_ok());
         assert!(check_pow(&block.header));

@@ -145,7 +145,7 @@ fn check_for_da_batch(
 
     let sig_verified_checkpoints = signed_checkpts.filter_map(|(signed_checkpoint, tx)| {
         if let Some(seq_pubkey) = seq_pubkey {
-            if !signed_checkpoint.verify_sig(seq_pubkey.into()) {
+            if !signed_checkpoint.verify_sig(&seq_pubkey.into()) {
                 error!(
                     ?tx,
                     ?signed_checkpoint,
@@ -180,7 +180,7 @@ pub fn verify_proof(
         return Ok(());
     }
 
-    let public_params_raw = borsh::to_vec(&checkpoint).unwrap();
+    let public_params_raw = borsh::to_vec(&checkpoint.proof_output()).unwrap();
 
     // NOTE/TODO: this should also verify that this checkpoint is based on top of some previous
     // checkpoint

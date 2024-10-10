@@ -16,7 +16,7 @@ mod test {
         let params = gen_params();
         let rollup_params = params.rollup();
         let l1_start_height = (rollup_params.genesis_l1_height + 1) as u32;
-        let l1_end_height = l1_start_height + 2;
+        let l1_end_height = l1_start_height + 1;
 
         let prover_options = ProverOptions {
             use_mock_prover: false,

@@ -10,7 +10,7 @@ mod test {
     use crate::helpers::{BtcBlockProofGenerator, ProofGenerator};
 
     #[test]
-    fn test_btc_blockspace_code_trace_generation() {
+    fn test_btc_blockspace_code_proof_generation() {
         sp1_sdk::utils::setup_logger();
         let btc_chain = get_btc_chain();
         let block = btc_chain.get_block(40321);
@@ -27,5 +27,14 @@ mod test {
 
         let _: BlockspaceProofOutput = SP1Verifier::extract_borsh_public_output(&proof)
             .expect("Failed to extract public outputs");
+    }
+
+    #[test]
+    fn test_btc_blockspace_code_trace_generation() {
+        sp1_sdk::utils::setup_logger();
+        let btc_chain = get_btc_chain();
+        let block = btc_chain.get_block(40321);
+
+        BtcBlockProofGenerator::new().simulate(block).unwrap();
     }
 }

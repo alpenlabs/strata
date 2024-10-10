@@ -29,7 +29,7 @@ fn verify_l2_block(
 ) {
     // Assert that the block has been signed by the designated signer
     assert!(
-        check_block_credential(block.header(), chain_params),
+        check_block_credential(block.header(), &chain_params.cred_rule),
         "Block credential verification failed"
     );
 
