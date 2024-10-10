@@ -10,33 +10,29 @@ use console::Term;
 use indicatif::ProgressBar;
 
 use crate::{
-    constants::{BRIDGE_OUT_AMOUNT, NETWORK},
-    seed::Seed,
-    settings::Settings,
-    signet::SignetWallet,
-    strata::StrataWallet,
-    taproot::ExtractP2trPubkey,
+    constants::BRIDGE_OUT_AMOUNT, seed::Seed, settings::Settings, signet::SignetWallet,
+    strata::StrataWallet, taproot::ExtractP2trPubkey,
 };
 
-/// Bridge 10 BTC from Strata to signet
+/// Withdraw 10 BTC from Strata to signet
 #[derive(FromArgs, PartialEq, Debug)]
-#[argh(subcommand, name = "bridge-out")]
-pub struct BridgeOutArgs {
+#[argh(subcommand, name = "withdraw")]
+pub struct WithdrawArgs {
     /// the signet address to send funds to. defaults to a new internal wallet address
     #[argh(positional)]
     p2tr_address: Option<String>,
 }
 
-pub async fn bridge_out(args: BridgeOutArgs, seed: Seed, settings: Settings) {
+pub async fn withdraw(args: WithdrawArgs, seed: Seed, settings: Settings) {
     let address = args.p2tr_address.map(|a| {
         Address::from_str(&a)
             .expect("valid address")
-            .require_network(NETWORK)
+            .require_network(settings.network)
             .expect("correct network")
     });
 
-    let mut l1w = SignetWallet::new(&seed, NETWORK).unwrap();
-    let l2w = StrataWallet::new(&seed, &settings.l2_http_endpoint).unwrap();
+    let mut l1w = SignetWallet::new(&seed, settings.network).unwrap();
+    let l2w = StrataWallet::new(&seed, &settings.strata_endpoint).unwrap();
 
     let address = match address {
         Some(a) => a,

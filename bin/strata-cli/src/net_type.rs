@@ -3,6 +3,7 @@ use std::str::FromStr;
 use console::Term;
 
 /// Represents a type of network, either Alpen's signet or Strata
+#[derive(PartialEq)]
 pub enum NetworkType {
     Signet,
     Strata,

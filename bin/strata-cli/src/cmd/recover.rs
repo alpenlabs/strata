@@ -6,22 +6,20 @@ use bdk_wallet::{
 use console::{style, Term};
 
 use crate::{
-    constants::NETWORK,
     recovery::DescriptorRecovery,
     seed::Seed,
     settings::Settings,
     signet::{get_fee_rate, EsploraClient, SignetWallet},
 };
 
-/// Runs any background tasks manually. Currently performs recovery of old
-/// bridge in transactions
+/// Attempt recovery of old deposit transactions
 #[derive(FromArgs, PartialEq, Debug)]
-#[argh(subcommand, name = "refresh")]
-pub struct RefreshArgs {}
+#[argh(subcommand, name = "recover")]
+pub struct RecoverArgs {}
 
-pub async fn refresh(seed: Seed, settings: Settings, esplora: EsploraClient) {
+pub async fn recover(seed: Seed, settings: Settings, esplora: EsploraClient) {
     let term = Term::stdout();
-    let mut l1w = SignetWallet::new(&seed, NETWORK).unwrap();
+    let mut l1w = SignetWallet::new(&seed, settings.network).unwrap();
     l1w.sync(&esplora).await.unwrap();
 
     let _ = term.write_line("Opening descriptor recovery");
@@ -48,11 +46,11 @@ pub async fn refresh(seed: Seed, settings: Settings, esplora: EsploraClient) {
     for desc in descs {
         let desc = desc
             .clone()
-            .into_wallet_descriptor(l1w.secp_ctx(), NETWORK)
+            .into_wallet_descriptor(l1w.secp_ctx(), settings.network)
             .expect("valid descriptor");
 
         let mut recovery_wallet = Wallet::create_single(desc)
-            .network(NETWORK)
+            .network(settings.network)
             .create_wallet_no_persist()
             .expect("valid wallet");
 
@@ -73,7 +71,7 @@ pub async fn refresh(seed: Seed, settings: Settings, esplora: EsploraClient) {
 
         let recover_to = l1w.reveal_next_address(KeychainKind::External).address;
         let _ = term.write_line(&format!(
-            "Recovering a bridge-in transaction from address {} to {}",
+            "Recovering a deposit transaction from address {} to {}",
             style(address).yellow(),
             style(&recover_to).yellow()
         ));

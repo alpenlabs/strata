@@ -6,7 +6,6 @@ use argh::FromArgs;
 use console::Term;
 
 use crate::{
-    constants::NETWORK,
     net_type::{net_type_or_exit, NetworkType},
     seed::Seed,
     settings::Settings,
@@ -28,7 +27,7 @@ pub async fn balance(args: BalanceArgs, seed: Seed, settings: Settings, esplora:
     let network_type = net_type_or_exit(&args.network_type, &term);
 
     if let NetworkType::Signet = network_type {
-        let mut l1w = SignetWallet::new(&seed, NETWORK).unwrap();
+        let mut l1w = SignetWallet::new(&seed, settings.network).unwrap();
         l1w.sync(&esplora).await.unwrap();
         let balance = l1w.balance();
         let _ = term.write_line(&format!("Total: {}", balance.total()));
@@ -42,7 +41,7 @@ pub async fn balance(args: BalanceArgs, seed: Seed, settings: Settings, esplora:
     }
 
     if let NetworkType::Strata = network_type {
-        let l2w = StrataWallet::new(&seed, &settings.l2_http_endpoint).unwrap();
+        let l2w = StrataWallet::new(&seed, &settings.strata_endpoint).unwrap();
         let _ = term.write_line("Getting balance...");
         let balance = l2w.get_balance(l2w.default_signer_address()).await.unwrap();
         // 1 BTC = 1 ETH

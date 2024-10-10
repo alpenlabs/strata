@@ -21,7 +21,7 @@ use strata_rpc_types::RpcServerError;
 use strata_state::{bridge_state::DepositState, chain_state::ChainState, tx::ProtocolOperation};
 use tracing::{debug, error};
 
-/// The `vout` corresponding to the bridge-in related Taproot address on the Deposit Request
+/// The `vout` corresponding to the deposit related Taproot address on the Deposit Request
 /// Transaction.
 ///
 /// This is always going to be the first [`OutPoint`].
