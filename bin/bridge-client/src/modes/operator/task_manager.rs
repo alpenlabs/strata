@@ -18,6 +18,8 @@ use strata_storage::ops::{bridge_duty::BridgeDutyOps, bridge_duty_index::BridgeD
 use tokio::{task::JoinSet, time::sleep};
 use tracing::{error, info, trace, warn};
 
+use super::config::TaskConfig;
+
 pub(super) struct TaskManager<L2Client, TxBuildContext, Bcast>
 where
     L2Client: StrataApiClient + Sync + Send,
@@ -28,7 +30,7 @@ where
     pub(super) broadcaster: Arc<Bcast>,
     pub(super) bridge_duty_db_ops: Arc<BridgeDutyOps>,
     pub(super) bridge_duty_idx_db_ops: Arc<BridgeDutyIndexOps>,
-    pub(super) max_retry_count: u32,
+    pub(super) config: TaskConfig,
 }
 
 impl<L2Client, TxBuildContext, Bcast> TaskManager<L2Client, TxBuildContext, Bcast>
@@ -50,7 +52,7 @@ where
                 let exec_handler = self.exec_handler.clone();
                 let bridge_duty_ops = self.bridge_duty_db_ops.clone();
                 let broadcaster = self.broadcaster.clone();
-                let max_retry_count = self.max_retry_count;
+                let max_retry_count = self.config.max_retry_count;
                 handles.spawn(async move {
                     process_duty(
                         exec_handler,
