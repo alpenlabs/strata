@@ -1,8 +1,8 @@
 import time
 
 import flexitest
-from entry import HubNetworkEnvConfig
 
+from entry import HubNetworkEnvConfig
 from utils import (
     wait_until,
 )
@@ -10,7 +10,9 @@ from utils import (
 
 @flexitest.register
 class FullNodeSyncTest(flexitest.Test):
-    """This tests checks if full node syncs with sequencer and what happens when sequencer/full node goes down"""
+    """This test checks if full node syncs with sequencer
+    and what happens when sequencer/full node goes down
+    """
 
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env(HubNetworkEnvConfig(101))

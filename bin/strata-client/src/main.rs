@@ -175,7 +175,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
             let rpc_client = sync_client(sequencer_rpc);
             let download_batch_size = parse_env_or(SYNC_BATCH_SIZE_ENVVAR, 10);
-            let sync_peer = RpcSyncPeer::new(rpc_client, 10);
+            let sync_peer = RpcSyncPeer::new(rpc_client, download_batch_size);
             let l2_sync_context = L2SyncContext::new(
                 sync_peer,
                 ctx.l2_block_manager.clone(),
