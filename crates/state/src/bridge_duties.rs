@@ -106,10 +106,22 @@ pub enum BridgeDutyStatus {
 
     /// The duty could not be executed.
     ///
-    /// Holds the error message as a [`String`] for context.
+    /// Holds the error message as a [`String`] for context and the number of retries for a
+    /// particular duty.
     // TODO: this should hold `strata-bridge-exec::ExecError` instead but that requires
     // implementing `BorshSerialize` and `BorshDeserialize`.
-    Failed(String),
+    Failed {
+        /// The error message.
+        error_msg: String,
+
+        /// The number of times a duty has been retried.
+        num_retries: u32,
+    },
+
+    /// The duty could not be executed even after repeated tries.
+    ///
+    /// Holds the error message encountered during the last execution.
+    Discarded(String),
 }
 
 impl Default for BridgeDutyStatus {

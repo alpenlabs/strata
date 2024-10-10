@@ -14,8 +14,11 @@ if [ ! -f "$KEYFILE" ]; then
 fi
 
 XPRIV_STR=$(cat $KEYFILE | tr -d '\n')
+
+# default values taken from the codebase (keep in sync).
 RPC_HOST=${RPC_HOST:-127.0.0.1}
 RPC_PORT=${RPC_PORT:-4781}
+MAX_DUTY_RETRIES=${MAX_DUTY_RETRIES:-100}
 
 # delayed start to allow other containers to spin up first
 # this is not enough for rollup genesis to be triggered
@@ -32,4 +35,5 @@ strata-bridge-client operator \
   --btc-user $BTC_USER \
   --btc-pass $BTC_PASS \
   --rollup-url $ROLLUP_URL \
+  --max-duty-retries $MAX_DUTY_RETRIES \
   --data-dir $DATADIR $@
