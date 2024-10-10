@@ -1,7 +1,6 @@
 use argh::FromArgs;
 use console::Term;
 use rand::rngs::OsRng;
-use zxcvbn::Score;
 
 use crate::seed::{password::Password, EncryptedSeedPersister, Seed};
 
@@ -13,15 +12,9 @@ pub struct ChangePwdArgs {}
 pub async fn change_pwd(_args: ChangePwdArgs, seed: Seed, persister: impl EncryptedSeedPersister) {
     let term = Term::stdout();
     let mut new_pw = Password::read(true).unwrap();
-    let entropy = new_pw.entropy();
-    if entropy.score() <= Score::Two {
-        let _ = term.write_line(
-            format!(
-                "Password is weak. {}",
-                entropy.feedback().expect("No feedback")
-            )
-            .as_str(),
-        );
+    let password_validation: Result<(), String> = new_pw.validate();
+    if let Err(feedback) = password_validation {
+        let _ = term.write_line(&format!("Password is weak. {}", feedback));
     }
     let encrypted_seed = seed.encrypt(&mut new_pw, &mut OsRng).unwrap();
     persister.save(&encrypted_seed).unwrap();
