@@ -883,10 +883,10 @@ mod tests {
     use arbitrary::{Arbitrary, Unstructured};
     use bitcoin::{
         hashes::Hash,
-        key::{Keypair, Secp256k1},
+        key::Keypair,
         opcodes::all::OP_CHECKSIG,
         script::Builder,
-        secp256k1::{All, SecretKey},
+        secp256k1::SecretKey,
         taproot::{ControlBlock, LeafVersion, TaprootBuilder, TaprootMerkleBranch},
         Address, Amount, Network, ScriptBuf, TapNodeHash, TxOut, XOnlyPublicKey,
     };
@@ -1058,9 +1058,8 @@ mod tests {
 
     #[test]
     fn bitcoin_addr_to_taproot_pubkey_conversion_works() {
-        let secp = Secp256k1::new();
         let network = Network::Bitcoin;
-        let (address, _) = get_taproot_address(&secp, network);
+        let (address, _) = get_taproot_address(network);
 
         let taproot_pubkey = XOnlyPk::from_address(&address);
 
@@ -1105,19 +1104,16 @@ mod tests {
         BitcoinAmount::from_int_btc(bitcoins);
     }
 
-    fn get_taproot_address(
-        secp: &Secp256k1<All>,
-        network: Network,
-    ) -> (BitcoinAddress, Option<TapNodeHash>) {
-        let internal_pubkey = get_random_pubkey_from_slice(secp, &[0x12; 32]);
+    fn get_taproot_address(network: Network) -> (BitcoinAddress, Option<TapNodeHash>) {
+        let internal_pubkey = get_random_pubkey_from_slice(&[0x12; 32]);
 
-        let pk1 = get_random_pubkey_from_slice(secp, &[0x02; 32]);
+        let pk1 = get_random_pubkey_from_slice(&[0x02; 32]);
 
         let mut script1 = ScriptBuf::new();
         script1.push_slice(pk1.serialize());
         script1.push_opcode(OP_CHECKSIG);
 
-        let pk2 = get_random_pubkey_from_slice(secp, &[0x05; 32]);
+        let pk2 = get_random_pubkey_from_slice(&[0x05; 32]);
 
         let mut script2 = ScriptBuf::new();
         script2.push_slice(pk2.serialize());
@@ -1129,10 +1125,12 @@ mod tests {
             .add_leaf(1, script2)
             .unwrap();
 
-        let tree_info = taproot_builder.finalize(secp, internal_pubkey).unwrap();
+        let tree_info = taproot_builder
+            .finalize(SECP256K1, internal_pubkey)
+            .unwrap();
         let merkle_root = tree_info.merkle_root();
 
-        let taproot_address = Address::p2tr(secp, internal_pubkey, merkle_root, network);
+        let taproot_address = Address::p2tr(SECP256K1, internal_pubkey, merkle_root, network);
 
         (
             BitcoinAddress::parse(&taproot_address.to_string(), network).unwrap(),
@@ -1306,9 +1304,9 @@ mod tests {
         assert_eq!(bitcoin_tx_out.0.script_pubkey, deserialized.0.script_pubkey);
     }
 
-    fn get_random_pubkey_from_slice(secp: &Secp256k1<All>, buf: &[u8]) -> XOnlyPublicKey {
+    fn get_random_pubkey_from_slice(buf: &[u8]) -> XOnlyPublicKey {
         let sk = SecretKey::from_slice(buf).unwrap();
-        let keypair = Keypair::from_secret_key(secp, &sk);
+        let keypair = Keypair::from_secret_key(SECP256K1, &sk);
         let (pk, _) = XOnlyPublicKey::from_keypair(&keypair);
 
         pk

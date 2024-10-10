@@ -9,11 +9,11 @@ use bitcoin::{
         OP_TRUE,
     },
     script::{Builder, PushBytesBuf},
-    secp256k1::{PublicKey, XOnlyPublicKey},
+    secp256k1::{PublicKey, XOnlyPublicKey, SECP256K1},
     taproot::{TaprootBuilder, TaprootSpendInfo},
     transaction, Address, Amount, Network, OutPoint, ScriptBuf, Transaction, TxIn, TxOut, Witness,
 };
-use musig2::{self, secp256k1::SECP256K1, KeyAggContext};
+use musig2::KeyAggContext;
 use strata_primitives::bridge::PublickeyTable;
 
 use super::{

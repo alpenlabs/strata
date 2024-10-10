@@ -7,6 +7,7 @@ use argh::FromArgs;
 use bitcoin::{
     base58,
     bip32::{ChildNumber, DerivationPath, Xpriv, Xpub},
+    secp256k1::SECP256K1,
     Network,
 };
 use rand::{rngs::OsRng, CryptoRng, RngCore};
@@ -275,7 +276,7 @@ fn exec_genseqpubkey(cmd: SubcGenSeqPubkey, _ctx: &mut CmdContext) -> anyhow::Re
     };
 
     let seq_xpriv = derive_seq_xpriv(&xpriv)?;
-    let seq_xpub = Xpub::from_priv(bitcoin::secp256k1::SECP256K1, &seq_xpriv);
+    let seq_xpub = Xpub::from_priv(SECP256K1, &seq_xpriv);
     let raw_buf = seq_xpub.to_x_only_pub().serialize();
     let s = base58::encode_check(&raw_buf);
 
@@ -304,7 +305,7 @@ fn exec_genopxpub(cmd: SubcGenOpXpub, _ctx: &mut CmdContext) -> anyhow::Result<(
     };
 
     let op_xpriv = derive_op_root_xpub(&xpriv)?;
-    let op_xpub = Xpub::from_priv(bitcoin::secp256k1::SECP256K1, &op_xpriv);
+    let op_xpub = Xpub::from_priv(SECP256K1, &op_xpriv);
     let raw_buf = op_xpub.encode();
     let s = base58::encode_check(&raw_buf);
 
@@ -432,7 +433,7 @@ fn derive_strata_scheme_xpriv(master: &Xpriv, last: u32) -> anyhow::Result<Xpriv
         ChildNumber::from_hardened_idx(DERIV_BASE_IDX).unwrap(),
         ChildNumber::from_hardened_idx(last).unwrap(),
     ]);
-    Ok(master.derive_priv(bitcoin::secp256k1::SECP256K1, &derivation_path)?)
+    Ok(master.derive_priv(SECP256K1, &derivation_path)?)
 }
 
 /// Derives the sequencer xpriv.
@@ -454,12 +455,8 @@ fn derive_op_purpose_xpubs(op_xpub: &Xpub) -> (Xpub, Xpub) {
     let wallet_path = DerivationPath::master()
         .extend([ChildNumber::from_normal_idx(DERIV_OP_WALLET_IDX).unwrap()]);
 
-    let signing_xpub = op_xpub
-        .derive_pub(bitcoin::secp256k1::SECP256K1, &signing_path)
-        .unwrap();
-    let wallet_xpub = op_xpub
-        .derive_pub(bitcoin::secp256k1::SECP256K1, &wallet_path)
-        .unwrap();
+    let signing_xpub = op_xpub.derive_pub(SECP256K1, &signing_path).unwrap();
+    let wallet_xpub = op_xpub.derive_pub(SECP256K1, &wallet_path).unwrap();
 
     (signing_xpub, wallet_xpub)
 }

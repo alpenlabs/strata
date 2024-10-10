@@ -11,10 +11,11 @@ use bdk_wallet::{
 use bip39::{Language, Mnemonic};
 use console::Term;
 use dialoguer::{Confirm, Input};
-use password::{IncorrectPassword, Password};
+use password::{HashVersion, IncorrectPassword, Password};
 use rand::{thread_rng, CryptoRng, RngCore};
 use sha2::{Digest, Sha256};
 use terrors::OneOf;
+use zxcvbn::Score;
 
 use crate::constants::{AES_NONCE_LEN, AES_TAG_LEN, PW_SALT_LEN, SEED_LEN};
 
@@ -58,7 +59,10 @@ impl Seed {
         rng.fill_bytes(&mut buf[..PW_SALT_LEN + AES_NONCE_LEN]);
 
         let seed_encryption_key = password
-            .seed_encryption_key(&buf[..PW_SALT_LEN].try_into().expect("cannot fail"))
+            .seed_encryption_key(
+                &buf[..PW_SALT_LEN].try_into().expect("cannot fail"),
+                HashVersion::V0,
+            )
             .map_err(OneOf::new)?;
 
         let (salt_and_nonce, rest) = buf.split_at_mut(PW_SALT_LEN + AES_NONCE_LEN);
@@ -113,7 +117,10 @@ impl EncryptedSeed {
         password: &mut Password,
     ) -> Result<Seed, OneOf<(argon2::Error, aes_gcm_siv::Error)>> {
         let seed_encryption_key = password
-            .seed_encryption_key(&self.0[..PW_SALT_LEN].try_into().expect("cannot fail"))
+            .seed_encryption_key(
+                &self.0[..PW_SALT_LEN].try_into().expect("cannot fail"),
+                HashVersion::V0,
+            )
             .map_err(OneOf::new)?;
 
         let mut cipher =
@@ -190,6 +197,17 @@ pub fn load_or_create(
         };
 
         let mut password = Password::read(true).map_err(OneOf::new)?;
+        let entropy = password.entropy();
+        let _ = term.write_line(format!("Password strength (Overall strength score from 0-4, where anything below 3 is too weak): {}", entropy.score()).as_str());
+        if entropy.score() <= Score::Two {
+            let _ = term.write_line(
+                entropy
+                    .feedback()
+                    .expect("No feedback")
+                    .to_string()
+                    .as_str(),
+            );
+        }
         let encrypted_seed = match seed.encrypt(&mut password, &mut thread_rng()) {
             Ok(es) => es,
             Err(e) => {

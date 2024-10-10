@@ -1,8 +1,8 @@
 use std::{sync::LazyLock, time::Duration};
 
 use bdk_wallet::bitcoin::{
-    key::{Parity, Secp256k1},
-    secp256k1::{PublicKey, SecretKey},
+    key::Parity,
+    secp256k1::{PublicKey, SecretKey, SECP256K1},
     Amount, Network, XOnlyPublicKey,
 };
 use shrex::hex;
@@ -60,7 +60,7 @@ pub static UNSPENDABLE: LazyLock<XOnlyPublicKey> = LazyLock::new(|| {
     .expect("valid r");
 
     // Calculate rG
-    let r_g = r.public_key(&Secp256k1::new());
+    let r_g = r.public_key(SECP256K1);
 
     // Step 3: Combine H_point with rG to create the final public key: P = H + rG
     let combined_point = h_point.combine(&r_g).expect("Failed to combine points");
