@@ -5,7 +5,7 @@ from bitcoinlib.services.bitcoind import BitcoindClient
 from flexitest.service import Service
 
 import net_settings
-from constants import FAST_BATCH_ROLLUP_PARAMS
+from constants import FAST_BATCH_ROLLUP_PARAMS, MAX_HORIZON_POLL_INTERVAL_SECS
 from entry import BasicEnvConfig
 from utils import (
     ManualGenBlocksConfig,
@@ -57,6 +57,7 @@ class BitcoinReorgChecksTest(flexitest.Test):
         check_nth_checkpoint_finalized(idx, seqrpc, manual_gen)
         print(f"Pass checkpoint finalization for checkpoint {idx}")
 
+        time.sleep(MAX_HORIZON_POLL_INTERVAL_SECS * 2)
         # Test reorg, without pruning anything, let mempool and wallet retain the txs
         check_nth_checkpoint_finalized_on_reorg(idx + 1, seq, btc)
 
