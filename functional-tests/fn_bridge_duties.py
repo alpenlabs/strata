@@ -10,7 +10,11 @@ from utils import get_logger
 
 
 @flexitest.register
-class BridgeDepositTest(flexitest.Test):
+class BridgeDutiesTest(flexitest.Test):
+    """
+    Test that the sequencer can fetch bridge duties correctly.
+    """
+
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env(BasicEnvConfig(101))
         self.logger = get_logger("getBridgeDuties")
