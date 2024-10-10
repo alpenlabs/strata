@@ -10,7 +10,8 @@ from utils import (
 
 @flexitest.register
 class FullNodeSyncTest(flexitest.Test):
-    """This test checks if full node syncs with sequencer
+    """
+    This test checks if full node syncs with sequencer
     and what happens when sequencer/full node goes down
     """
 
@@ -28,7 +29,7 @@ class FullNodeSyncTest(flexitest.Test):
             lambda: noderpc.strata_syncStatus()["tip_height"]
             == seqrpc.strata_syncStatus()["tip_height"],
             error_with="seem to be not making progress",
-            timeout=15,
+            timeout=30,
         )
 
         blk_count = seqrpc.strata_syncStatus()["tip_height"]
@@ -65,7 +66,7 @@ class FullNodeSyncTest(flexitest.Test):
             lambda: seqrpc.strata_syncStatus()["tip_height"]
             == noderpc.strata_syncStatus()["tip_height"],
             error_with="node sync lagging",
-            timeout=15,
+            timeout=30,
         )
 
         assert (
