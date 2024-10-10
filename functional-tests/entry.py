@@ -4,16 +4,12 @@ import os
 import sys
 import time
 from math import ceil
-from typing import Optional, TypedDict
+from typing import Optional
 
 import flexitest
-import web3
-import web3.middleware
-from bitcoinlib.services.bitcoind import BitcoindClient
 
-import net_settings
-import seqrpc
 import factory
+import net_settings
 from constants import *
 from utils import *
 
@@ -115,7 +111,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
         for i in range(self.n_operators):
             xpriv_path = params_gen_data["opseedpaths"][i]
             xpriv = None
-            with open(xpriv_path, "r") as f:
+            with open(xpriv_path) as f:
                 xpriv = f.read().strip()
             seq_url = sequencer.get_prop("rpc_url")
             br = bridge_fac.create_operator(xpriv, seq_url, bitcoind_config)
@@ -243,7 +239,7 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
         for i in range(self.n_operators):
             xpriv_path = params_gen_data["opseedpaths"][i]
             xpriv = None
-            with open(xpriv_path, "r") as f:
+            with open(xpriv_path) as f:
                 xpriv = f.read().strip()
             seq_url = sequencer.get_prop("rpc_url")
             br = bridge_fac.create_operator(xpriv, seq_url, bitcoind_config)

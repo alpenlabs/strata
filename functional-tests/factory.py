@@ -1,5 +1,4 @@
 import os
-from math import ceil
 from typing import Optional, TypedDict
 
 import flexitest
@@ -8,7 +7,6 @@ import web3.middleware
 from bitcoinlib.services.bitcoind import BitcoindClient
 
 import seqrpc
-import net_settings
 from constants import *
 from utils import *
 
@@ -338,6 +336,8 @@ class BridgeClientFactory(flexitest.Factory):
         # fmt: on
 
         # TODO add a way to expose this
+        # TODO remove this after adding a proper config file
+        # ruff: noqa: F841
         envvars = {
             "STRATA_OP_XPRIV": root_xpriv,
         }
