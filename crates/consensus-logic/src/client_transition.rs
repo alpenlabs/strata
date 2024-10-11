@@ -168,7 +168,7 @@ pub fn process_event<D: Database>(
                     checkpoints
                         .iter()
                         .map(|x| {
-                            L1CheckPoint::new(
+                            L1Checkpoint::new(
                                 x.batch_info().clone(),
                                 x.bootstrap_state().clone(),
                                 !x.proof().is_empty(),

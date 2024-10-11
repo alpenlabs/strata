@@ -5,6 +5,7 @@
 
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
+use serde::{Deserialize, Serialize};
 use strata_primitives::buf::Buf32;
 
 use crate::{
@@ -19,7 +20,9 @@ use crate::{
 /// This is updated when we see a consensus-relevant message.  This is L2 blocks
 /// but also L1 blocks being published with relevant things in them, and
 /// various other events.
-#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize)]
+#[derive(
+    Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize, Deserialize, Serialize,
+)]
 pub struct ClientState {
     /// If we are after genesis.
     pub(super) chain_active: bool,
@@ -110,7 +113,9 @@ impl ClientState {
 
 /// Relates to our view of the L2 chain, does not exist before genesis.
 // TODO maybe include tip height and finalized height?  or their headers?
-#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
+#[derive(
+    Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
+)]
 pub struct SyncState {
     /// Height of last L2 block we've chosen as the current tip.
     pub(super) tip_height: u64,
@@ -163,7 +168,9 @@ impl SyncState {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
+#[derive(
+    Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
+)]
 pub struct LocalL1State {
     /// Local sequence of blocks that should reorg blocks in the chainstate.
     ///
@@ -176,10 +183,10 @@ pub struct LocalL1State {
     pub(super) next_expected_block: u64,
 
     /// Last finalized checkpoint
-    pub(super) last_finalized_checkpoint: Option<L1CheckPoint>,
+    pub(super) last_finalized_checkpoint: Option<L1Checkpoint>,
 
     /// Checkpoints that are in L1 but yet to be finalized.
-    pub(super) verified_checkpoints: Vec<L1CheckPoint>,
+    pub(super) verified_checkpoints: Vec<L1Checkpoint>,
 
     /// This state is used to verify the `next_expected_block`
     pub(super) header_verification_state: Option<HeaderVerificationState>,
@@ -240,11 +247,11 @@ impl LocalL1State {
         self.local_unaccepted_blocks().last()
     }
 
-    pub fn last_finalized_checkpoint(&self) -> Option<&L1CheckPoint> {
+    pub fn last_finalized_checkpoint(&self) -> Option<&L1Checkpoint> {
         self.last_finalized_checkpoint.as_ref()
     }
 
-    pub fn verified_checkpoints(&self) -> &[L1CheckPoint] {
+    pub fn verified_checkpoints(&self) -> &[L1Checkpoint] {
         &self.verified_checkpoints
     }
 
@@ -254,7 +261,7 @@ impl LocalL1State {
             .any(|cp| cp.height <= height)
     }
 
-    pub fn get_last_verified_checkpoint_before(&self, height: u64) -> Option<&L1CheckPoint> {
+    pub fn get_last_verified_checkpoint_before(&self, height: u64) -> Option<&L1Checkpoint> {
         self.verified_checkpoints
             .iter()
             .take_while(|cp| cp.height <= height)
@@ -276,19 +283,25 @@ impl LocalL1State {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
-pub struct L1CheckPoint {
+#[derive(
+    Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
+)]
+pub struct L1Checkpoint {
     /// The inner checkpoint batch info
     pub batch_info: BatchInfo,
+
     /// The inner checkpoint batch info
+    // TODO why is this called bootstrap state?
     pub bootstrap_state: BootstrapState,
+
     /// If the checkpoint included proof
     pub is_proved: bool,
+
     /// L1 block height it appears in
     pub height: u64,
 }
 
-impl L1CheckPoint {
+impl L1Checkpoint {
     pub fn new(
         batch_info: BatchInfo,
         bootstrap_state: BootstrapState,

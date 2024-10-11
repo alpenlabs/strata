@@ -3,18 +3,21 @@
 
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
+use serde::{Deserialize, Serialize};
 use tracing::*;
 
 use crate::{
     batch::BatchCheckpoint,
-    client_state::{ClientState, L1CheckPoint, SyncState},
+    client_state::{ClientState, L1Checkpoint, SyncState},
     id::L2BlockId,
     l1::{HeaderVerificationState, L1BlockId},
 };
 
 /// Output of a consensus state transition.  Both the consensus state writes and
 /// sync actions.
-#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
+#[derive(
+    Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
+)]
 pub struct ClientUpdateOutput {
     writes: Vec<ClientStateWrite>,
     actions: Vec<SyncAction>,
@@ -41,7 +44,9 @@ impl ClientUpdateOutput {
 /// Describes possible writes to client state that we can make.  We use this
 /// instead of directly modifying the client state to reduce the volume of data
 /// that we have to clone and save to disk with each sync event.
-#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
+#[derive(
+    Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
+)]
 pub enum ClientStateWrite {
     /// Completely replace the full state with a new instance.
     Replace(Box<ClientState>),
@@ -66,7 +71,7 @@ pub enum ClientStateWrite {
     UpdateBuried(u64),
 
     /// Update the checkpoints
-    CheckpointsReceived(Vec<L1CheckPoint>),
+    CheckpointsReceived(Vec<L1Checkpoint>),
 
     /// The previously confirmed checkpoint is finalized at given l1 height
     CheckpointFinalized(u64),
@@ -77,7 +82,9 @@ pub enum ClientStateWrite {
 
 /// Actions the client state machine directs the node to take to update its own
 /// bookkeeping.  These should not be able to fail.
-#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
+#[derive(
+    Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
+)]
 pub enum SyncAction {
     /// Extends our externally-facing tip to a new block ID.  This might trigger
     /// a reorg of some unfinalized blocks.  We probably won't roll this block

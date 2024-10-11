@@ -1,5 +1,6 @@
 import json
 
+import requests
 from websockets.sync.client import connect as wsconnect
 
 
@@ -37,6 +38,21 @@ def _send_single_ws_request(url: str, request: str) -> str:
         return w.recv()
 
 
+def _send_http_request(url: str, request: str) -> str:
+    h = {"Content-Type": "application/json"}
+    res = requests.post(url, headers=h, data=request)
+    return res.text
+
+
+def _dispatch_request(url: str, request: str) -> str:
+    if url.startswith("http"):
+        return _send_http_request(url, request)
+    elif url.startswith("ws"):
+        return _send_single_ws_request(url, request)
+    else:
+        raise ValueError(f"unsupported protocol in url '{url}'")
+
+
 class JsonrpcClient:
     def __init__(self, url: str):
         self.url = url
@@ -57,7 +73,7 @@ class JsonrpcClient:
         self._do_pre_call_check(method)
         req = _make_request(method, self.req_idx, args)
         self.req_idx += 1
-        resp = _send_single_ws_request(self.url, req)
+        resp = _dispatch_request(self.url, req)
         return _handle_response(resp)
 
     def __getattr__(self, name: str):
