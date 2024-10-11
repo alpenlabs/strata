@@ -12758,6 +12758,7 @@ dependencies = [
  "futures",
  "rand 0.8.5",
  "secp256k1",
+ "serde",
  "strata-btcio",
  "strata-chaintsn",
  "strata-crypto",

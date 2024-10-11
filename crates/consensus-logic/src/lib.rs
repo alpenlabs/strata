@@ -9,6 +9,7 @@ pub mod fork_choice_manager;
 pub mod genesis;
 pub mod l1_handler;
 pub mod message;
+pub mod precondition;
 pub mod reorg;
 pub mod state_tracker;
 pub mod sync_manager;
