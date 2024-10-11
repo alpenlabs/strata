@@ -66,21 +66,19 @@ fn merkle_root_r(hashes: &mut [Buf32]) -> Buf32 {
 #[cfg(test)]
 mod tests {
     use bitcoin::{hashes::Hash, TxMerkleNode};
-    use rand::Rng;
+    use rand::{rngs::OsRng, Rng};
     use strata_primitives::buf::Buf32;
 
     use super::calculate_root;
 
     #[test]
     fn test_merkle_root() {
-        let mut rng = rand::thread_rng();
-
-        let n = rng.gen_range(1..1_000);
+        let n = OsRng.gen_range(1..1_000);
         let mut btc_hashes = Vec::with_capacity(n);
         let mut hashes = Vec::with_capacity(n);
 
         for _ in 0..n {
-            let random_bytes: [u8; 32] = rng.gen();
+            let random_bytes: [u8; 32] = OsRng.gen();
             btc_hashes.push(TxMerkleNode::from_byte_array(random_bytes));
             let hash = Buf32::from(random_bytes);
             hashes.push(hash);

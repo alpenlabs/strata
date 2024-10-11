@@ -11,6 +11,7 @@ use bitcoin::{
 };
 use bitcoind::BitcoinD;
 use common::bridge::{setup, BridgeDuty, User, MIN_MINER_REWARD_CONFS};
+use rand::rngs::OsRng;
 use strata_bridge_tx_builder::prelude::{
     create_taproot_addr, create_tx, create_tx_ins, create_tx_outs, get_aggregated_pubkey,
     CooperativeWithdrawalInfo, SpendPath, BRIDGE_DENOMINATION,
@@ -47,7 +48,7 @@ async fn withdrawal_flow() {
 
     event!(Level::INFO, event = "created user to initiate withdrawal", user_x_only_pk = ?user_x_only_pk);
 
-    let assigned_operator_idx = rand::thread_rng().gen_range(0..num_operators) as OperatorIdx;
+    let assigned_operator_idx = OsRng.gen_range(0..num_operators) as OperatorIdx;
     event!(Level::INFO, event = "assigning withdrawal", operator_idx = %assigned_operator_idx);
 
     let withdrawal_info =

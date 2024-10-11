@@ -403,7 +403,7 @@ fn to_bridge_withdrawal_intent(
 
 #[cfg(test)]
 mod tests {
-    use rand::Rng;
+    use rand::{rngs::OsRng, Rng};
     use reth_primitives::{revm_primitives::FixedBytes, Bloom, Bytes, U256};
     use reth_rpc_types::{engine::ForkchoiceUpdated, ExecutionPayloadV1};
     use strata_eectl::{errors::EngineResult, messages::PayloadEnv};
@@ -419,8 +419,6 @@ mod tests {
     }
 
     fn random_execution_payload_v1() -> ExecutionPayloadV1 {
-        let mut rng = rand::thread_rng();
-
         ExecutionPayloadV1 {
             parent_hash: B256::random(),
             fee_recipient: Address::random(),
@@ -428,10 +426,10 @@ mod tests {
             receipts_root: B256::random(),
             logs_bloom: Bloom::random(),
             prev_randao: B256::random(),
-            block_number: rng.gen(),
+            block_number: OsRng.gen(),
             gas_limit: 200_000u64,
             gas_used: 10_000u64,
-            timestamp: rng.gen(),
+            timestamp: OsRng.gen(),
             extra_data: Bytes::new(),
             base_fee_per_gas: U256::from(50),
             block_hash: B256::random(),

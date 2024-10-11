@@ -229,6 +229,7 @@ impl L1DataProvider for L1Db {
 #[cfg(test)]
 mod tests {
     use bitcoin::key::rand::{self, Rng};
+    use rand::rngs::OsRng;
     use strata_primitives::l1::L1TxProof;
     use strata_state::tx::ProtocolOperation;
     use strata_test_utils::ArbitraryGenerator;
@@ -536,7 +537,7 @@ mod tests {
             l1_txs.push(l1_tx);
         }
 
-        let offset = rand::thread_rng().gen_range(0..total_num_blocks);
+        let offset = OsRng.gen_range(0..total_num_blocks);
         let expected_num_blocks = total_num_blocks - offset;
         let (actual, latest_idx) = db.get_txs_from(offset as u64).unwrap();
 
