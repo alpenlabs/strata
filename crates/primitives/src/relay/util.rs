@@ -83,11 +83,9 @@ pub fn compute_pubkey_for_privkey(sk: &Buf32) -> Buf32 {
 /// Generates a signature for the message.
 #[cfg(all(feature = "std", feature = "rand"))]
 pub fn sign_msg_hash(sk: &Buf32, msg_hash: &Buf32) -> Buf64 {
-    let mut rng = OsRng;
-
     let keypair = Keypair::from_secret_key(SECP256K1, &SecretKey::from_slice(sk.as_ref()).unwrap());
     let msg = Message::from_digest(*msg_hash.as_ref());
-    let sig = SECP256K1.sign_schnorr_with_rng(&msg, &keypair, &mut rng);
+    let sig = SECP256K1.sign_schnorr_with_rng(&msg, &keypair, &mut OsRng);
 
     Buf64::from(*sig.as_ref())
 }
