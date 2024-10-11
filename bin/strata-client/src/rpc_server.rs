@@ -43,6 +43,8 @@ use strata_state::{
     header::L2Header,
     id::L2BlockId,
     l1::L1BlockId,
+    operation::ClientUpdateOutput,
+    sync_event::SyncEvent,
 };
 use strata_status::StatusRx;
 use strata_storage::L2BlockManager;
