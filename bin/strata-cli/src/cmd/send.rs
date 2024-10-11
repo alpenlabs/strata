@@ -11,6 +11,7 @@ use bdk_wallet::bitcoin::{Address, Amount};
 use console::Term;
 
 use crate::{
+    constants::SATS_TO_WEI,
     net_type::{net_type_or_exit, NetworkType},
     seed::Seed,
     settings::Settings,
@@ -72,8 +73,7 @@ pub async fn send(args: SendArgs, seed: Seed, settings: Settings, esplora: Esplo
             let address = StrataAddress::from_str(&args.address).expect("valid address");
             let tx = TransactionRequest::default()
                 .with_to(address)
-                // 1 btc == 1 "eth" => 1 sat = 1e10 "wei"
-                .with_value(U256::from(args.amount * 10u64.pow(10)));
+                .with_value(U256::from(args.amount as u128 * SATS_TO_WEI));
             let res = l2w
                 .send_transaction(tx)
                 .await
@@ -82,5 +82,9 @@ pub async fn send(args: SendArgs, seed: Seed, settings: Settings, esplora: Esplo
         }
     };
 
-    let _ = term.write_line(&format!("Sent {} to {}", args.amount, args.address,));
+    let _ = term.write_line(&format!(
+        "Sent {} to {}",
+        Amount::from_sat(args.amount),
+        args.address,
+    ));
 }

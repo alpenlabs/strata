@@ -29,15 +29,14 @@ impl HashVersion {
 
 impl Password {
     pub fn read(new: bool) -> Result<Self, dialoguer::Error> {
-        let mut input = InputPassword::new();
+        let mut input = InputPassword::new().allow_empty_password(true);
         if new {
             input = input
                 .with_prompt("Create a new password (leave empty for no password, dangerous!)")
                 .with_confirmation(
                     "Confirm password (leave empty for no password, dangerous!)",
                     "Passwords didn't match",
-                )
-                .allow_empty_password(true);
+                );
         } else {
             input = input.with_prompt("Enter your password");
         }

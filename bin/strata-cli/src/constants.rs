@@ -1,5 +1,6 @@
 use std::{sync::LazyLock, time::Duration};
 
+use alloy::consensus::constants::ETH_TO_WEI;
 use bdk_wallet::bitcoin::{
     key::Parity,
     secp256k1::{PublicKey, SecretKey, SECP256K1},
@@ -14,12 +15,17 @@ pub const RECOVER_DELAY: u32 = 1008;
 /// reorgs that may happen at the recovery height.
 pub const RECOVER_AT_DELAY: u32 = RECOVER_DELAY + 10;
 
+pub const RECOVERY_DESC_CLEANUP_DELAY: u32 = 100;
+
 /// 10 BTC + 0.01 to cover fees in the following transaction where the operator spends it into the
 /// federation.
 pub const BRIDGE_IN_AMOUNT: Amount = Amount::from_sat(1_001_000_000);
 
 /// Bridge outs are enforced to be exactly 10 BTC
 pub const BRIDGE_OUT_AMOUNT: Amount = Amount::from_int_btc(10);
+
+pub const BTC_TO_WEI: u128 = ETH_TO_WEI;
+pub const SATS_TO_WEI: u128 = BTC_TO_WEI / 100_000_000;
 
 /// Length of salt used for password hashing
 pub const PW_SALT_LEN: usize = 16;

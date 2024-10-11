@@ -3,9 +3,11 @@ use alloy::{
     providers::{Provider, WalletProvider},
 };
 use argh::FromArgs;
+use bdk_wallet::bitcoin::Amount;
 use console::Term;
 
 use crate::{
+    constants::SATS_TO_WEI,
     net_type::{net_type_or_exit, NetworkType},
     seed::Seed,
     settings::Settings,
@@ -44,8 +46,11 @@ pub async fn balance(args: BalanceArgs, seed: Seed, settings: Settings, esplora:
         let l2w = StrataWallet::new(&seed, &settings.strata_endpoint).unwrap();
         let _ = term.write_line("Getting balance...");
         let balance = l2w.get_balance(l2w.default_signer_address()).await.unwrap();
-        // 1 BTC = 1 ETH
-        let balance_in_btc = balance / U256::from(10u64.pow(18));
-        let _ = term.write_line(&format!("\nTotal: {} BTC", balance_in_btc));
+        let balance = Amount::from_sat(
+            (balance / U256::from(SATS_TO_WEI))
+                .try_into()
+                .expect("valid amount"),
+        );
+        let _ = term.write_line(&format!("\nTotal: {}", balance));
     }
 }

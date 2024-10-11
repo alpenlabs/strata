@@ -64,7 +64,7 @@ impl Settings {
         create_dir_all(proj_dirs.data_dir()).map_err(OneOf::new)?;
 
         // create config file if not exists
-        let _ = File::create_new(&config_file);
+        let _ = File::create_new(config_file);
         let from_file: SettingsFromFile = Config::builder()
             .add_source(config::File::from(config_file))
             .build()

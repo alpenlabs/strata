@@ -10,8 +10,12 @@ use console::Term;
 use indicatif::ProgressBar;
 
 use crate::{
-    constants::BRIDGE_OUT_AMOUNT, seed::Seed, settings::Settings, signet::SignetWallet,
-    strata::StrataWallet, taproot::ExtractP2trPubkey,
+    constants::{BRIDGE_OUT_AMOUNT, SATS_TO_WEI},
+    seed::Seed,
+    settings::Settings,
+    signet::SignetWallet,
+    strata::StrataWallet,
+    taproot::ExtractP2trPubkey,
 };
 
 /// Withdraw 10 BTC from Strata to signet
@@ -52,7 +56,7 @@ pub async fn withdraw(args: WithdrawArgs, seed: Seed, settings: Settings) {
     let tx = l2w
         .transaction_request()
         .with_to(settings.bridge_strata_address)
-        .with_value(U256::from(BRIDGE_OUT_AMOUNT.to_sat() * 1u64.pow(10)))
+        .with_value(U256::from(BRIDGE_OUT_AMOUNT.to_sat() as u128 * SATS_TO_WEI))
         .input(TransactionInput::new(
             address
                 .extract_p2tr_pubkey()

@@ -47,7 +47,7 @@ async fn main() {
     let esplora = EsploraClient::new(&settings.esplora).expect("valid esplora url");
 
     match cmd {
-        Commands::Recover(_) => recover(seed, settings, esplora).await,
+        Commands::Recover(args) => recover(args, seed, settings, esplora).await,
         Commands::Drain(args) => drain(args, seed, settings, esplora).await,
         Commands::Balance(args) => balance(args, seed, settings, esplora).await,
         Commands::Backup(args) => backup(args, seed).await,
