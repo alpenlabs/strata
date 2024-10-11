@@ -1,5 +1,6 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
+use serde::{Deserialize, Serialize};
 use strata_crypto::verify_schnorr_sig;
 use strata_primitives::buf::{Buf32, Buf64};
 use strata_zkvm::Proof;
@@ -8,12 +9,16 @@ use crate::id::L2BlockId;
 
 /// Public parameters for batch proof to be posted to DA.
 /// Will be updated as prover specs evolve.
-#[derive(Clone, Debug, PartialEq, Eq, BorshDeserialize, BorshSerialize, Arbitrary)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
+)]
 pub struct BatchCheckpoint {
     /// Information regarding the current batch checkpoint
     batch_info: BatchInfo,
+
     /// Bootstrap info based on which the checkpoint transition and proof is verified
     bootstrap: BootstrapState,
+
     /// Proof for the batch obtained from prover manager
     proof: Proof,
 }
@@ -82,28 +87,37 @@ impl From<SignedBatchCheckpoint> for BatchCheckpoint {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
+#[derive(
+    Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
+)]
 pub struct BatchInfo {
     /// The index of the checkpoint
     pub idx: u64,
+
     /// L1 height range(inclusive) the checkpoint covers
     pub l1_range: (u64, u64),
+
     /// L2 height range(inclusive) the checkpoint covers
     pub l2_range: (u64, u64),
+
     /// The inclusive hash range of `HeaderVerificationState` for L1 blocks.
     /// This represents the transition of L1 state from the starting state to the
     /// ending state. The hash is computed via
     /// [`super::l1::HeaderVerificationState::compute_hash`].
     pub l1_transition: (Buf32, Buf32),
+
     /// The inclusive hash range of `ChainState` for L2 blocks.
     /// This represents the transition of L2 state from the starting state to the
     /// ending state. The state root is computed via
     /// [`super::chain_state::ChainState::compute_state_root`].
     pub l2_transition: (Buf32, Buf32),
+
     /// The last L2 block upto which this checkpoint covers since the previous checkpoint
     pub l2_blockid: L2BlockId,
+
     /// PoW transition in the given `l1_range`
     pub l1_pow_transition: (u128, u128),
+
     /// Commitment of the `RollupParams` calculated by
     /// [`strata_primitives::params::RollupParams::compute_hash`]
     pub rollup_params_commitment: Buf32,
@@ -206,10 +220,13 @@ impl BatchInfo {
 ///
 /// TODO: This needs to be replaced with GenesisState if we prove each Checkpoint
 /// recursively. Using a BootstrapState is a temporary solution
-#[derive(Clone, Debug, PartialEq, Eq, BorshDeserialize, BorshSerialize, Arbitrary)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
+)]
 pub struct BootstrapState {
     pub idx: u64,
     pub start_l1_height: u64,
+    // TODO is this a blkid?
     pub initial_l1_state: Buf32,
     pub start_l2_height: u64,
     pub initial_l2_state: Buf32,

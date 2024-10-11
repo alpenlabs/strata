@@ -43,6 +43,8 @@ use strata_state::{
     header::L2Header,
     id::L2BlockId,
     l1::L1BlockId,
+    operation::ClientUpdateOutput,
+    sync_event::SyncEvent,
 };
 use strata_status::StatusRx;
 use strata_storage::L2BlockManager;
@@ -588,6 +590,21 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
         }
 
         Ok(L2BlockStatus::Unknown)
+    }
+
+    async fn get_sync_event(&self, idx: u64) -> RpcResult<Option<SyncEvent>> {
+        // TODO
+        Ok(None)
+    }
+
+    async fn get_last_sync_event_idx(&self) -> RpcResult<u64> {
+        // TODO
+        Ok(0)
+    }
+
+    async fn get_client_update_output(&self, idx: u64) -> RpcResult<Option<ClientUpdateOutput>> {
+        // TODO
+        Ok(None)
     }
 }
 

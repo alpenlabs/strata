@@ -28,7 +28,18 @@ use crate::l1::{params::BtcParams, utils::compute_block_hash};
 ///    validating that the new target was accurately derived from the epoch timestamps.
 ///
 /// Ref: [A light introduction to ZeroSync](https://geometry.xyz/notebook/A-light-introduction-to-ZeroSync)
-#[derive(Debug, Clone, Default, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
+#[derive(
+    Clone,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    Arbitrary,
+    BorshSerialize,
+    BorshDeserialize,
+    Deserialize,
+    Serialize,
+)]
 pub struct HeaderVerificationState {
     /// [Block number](bitcoin::Block::bip34_block_height) of the last verified block
     pub last_verified_block_num: u32,
@@ -59,9 +70,9 @@ pub struct HeaderVerificationState {
     pub last_11_blocks_timestamps: TimestampStore,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
 /// Summary of the HeaderVerificationState that is propagated to the CheckpointProof as public
 /// output
+#[derive(Clone, Debug, BorshSerialize, BorshDeserialize, Deserialize, Serialize)]
 pub struct HeaderVerificationStateSnapshot {
     /// Hash of the [`HeaderVerificationState`]
     pub hash: Buf32,
