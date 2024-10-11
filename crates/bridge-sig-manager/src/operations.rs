@@ -167,6 +167,7 @@ mod tests {
         Amount, Network, OutPoint, Sequence, Txid, Witness,
     };
     use musig2::{PubNonce, SecNonce};
+    use rand::rngs::OsRng;
     use strata_bridge_tx_builder::prelude::{create_taproot_addr, SpendPath};
     use strata_primitives::bridge::{Musig2PartialSig, OperatorIdx};
     use strata_test_utils::bridge::{
@@ -406,7 +407,7 @@ mod tests {
         // check in reverse (or some permutation)
         for sk in sks.iter() {
             let mut nonce_seed = [0u8; 32];
-            rand::rngs::OsRng.fill_bytes(&mut nonce_seed);
+            OsRng.fill_bytes(&mut nonce_seed);
 
             let sec_nonce = SecNonce::build(nonce_seed)
                 .with_seckey(*sk)

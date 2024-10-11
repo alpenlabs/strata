@@ -14,7 +14,7 @@ use bitcoin::{
     Address, Amount, Network, Psbt, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Witness,
 };
 use musig2::{KeyAggContext, SecNonce};
-use rand::{Rng, RngCore};
+use rand::{rngs::OsRng, Rng, RngCore};
 use strata_db::stubs::bridge::StubTxStateDb;
 use strata_primitives::{
     bridge::{OperatorIdx, PublickeyTable, TxSigningData},
@@ -31,7 +31,7 @@ pub fn generate_keypairs(count: usize) -> (Vec<PublicKey>, Vec<SecretKey>) {
     let mut pubkeys_set: HashSet<PublicKey> = HashSet::new();
 
     while pubkeys_set.len() != count {
-        let sk = SecretKey::new(&mut rand::thread_rng());
+        let sk = SecretKey::new(&mut OsRng);
         let keypair = Keypair::from_secret_key(SECP256K1, &sk);
         let pubkey = PublicKey::from_keypair(&keypair);
 
@@ -183,7 +183,7 @@ pub fn generate_sec_nonce(
     let aggregated_pubkey: PublicKey = key_agg_ctx.aggregated_pubkey();
 
     let mut nonce_seed = [0u8; 32];
-    rand::rngs::OsRng.fill_bytes(&mut nonce_seed);
+    OsRng.fill_bytes(&mut nonce_seed);
 
     let sec_nonce = SecNonce::build(nonce_seed)
         .with_seckey(seckey)
@@ -198,7 +198,7 @@ pub fn generate_sec_nonce(
 /// This is used to generate random order for indices in a list (for example, list of pubkeys,
 /// nonces, etc.)
 pub fn permute<T: Clone>(list: &mut [T]) {
-    let num_permutations = rand::thread_rng().gen_range(0..list.len());
+    let num_permutations = OsRng.gen_range(0..list.len());
 
     generate_permutation(list, num_permutations);
 }

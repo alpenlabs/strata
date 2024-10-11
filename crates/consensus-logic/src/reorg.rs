@@ -125,17 +125,15 @@ pub fn compute_reorg(
 
 #[cfg(test)]
 mod tests {
-    use rand::RngCore;
+    use rand::{rngs::OsRng, RngCore};
     use strata_state::id::L2BlockId;
 
     use super::{compute_reorg, Reorg};
     use crate::unfinalized_tracker;
 
     fn rand_blkid() -> L2BlockId {
-        use rand::rngs::OsRng;
-        let mut rng = OsRng;
         let mut buf = [0; 32];
-        rng.fill_bytes(&mut buf);
+        OsRng.fill_bytes(&mut buf);
         L2BlockId::from(strata_primitives::buf::Buf32::from(buf))
     }
 

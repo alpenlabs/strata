@@ -105,7 +105,7 @@ mod test {
         Address, Amount, Block, BlockHash, CompactTarget, Network, ScriptBuf, TapNodeHash,
         Transaction, TxMerkleNode, TxOut,
     };
-    use rand::RngCore;
+    use rand::{rngs::OsRng, RngCore};
     use strata_btcio::test_utils::{
         build_reveal_transaction_test, generate_inscription_script_test,
     };
@@ -179,7 +179,7 @@ mod test {
 
         // Create controlblock
         let mut rand_bytes = [0; 32];
-        rand::thread_rng().fill_bytes(&mut rand_bytes);
+        OsRng.fill_bytes(&mut rand_bytes);
         let key_pair = UntweakedKeypair::from_seckey_slice(SECP256K1, &rand_bytes).unwrap();
         let public_key = XOnlyPublicKey::from_keypair(&key_pair).0;
         let nodehash: [TapNodeHash; 0] = [];
