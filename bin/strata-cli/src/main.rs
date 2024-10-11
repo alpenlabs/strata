@@ -23,17 +23,18 @@ use signet::{set_data_dir, EsploraClient};
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     let TopLevel { cmd } = argh::from_env();
+
+    if let Commands::Config(args) = cmd {
+        config(args).await;
+        return;
+    }
+
     let settings = Settings::load().unwrap();
 
     #[cfg(not(target_os = "linux"))]
     let persister = KeychainPersister;
     #[cfg(target_os = "linux")]
     let persister = FilePersister::new(settings.linux_seed_file.clone());
-
-    if let Commands::Config(args) = cmd {
-        config(args, settings).await;
-        return;
-    }
 
     if let Commands::Reset(args) = cmd {
         reset(args, persister, settings).await;

@@ -3,6 +3,7 @@ use std::{
     io,
     path::PathBuf,
     str::FromStr,
+    sync::LazyLock,
 };
 
 use alloy::primitives::Address as StrataAddress;
@@ -42,14 +43,20 @@ pub struct Settings {
     pub config_file: PathBuf,
 }
 
+pub static PROJ_DIRS: LazyLock<ProjectDirs> = LazyLock::new(|| {
+    ProjectDirs::from("io", "alpenlabs", "strata").expect("project dir should be available")
+});
+
+pub static CONFIG_FILE: LazyLock<PathBuf> =
+    LazyLock::new(|| match std::env::var("CLI_CONFIG").ok() {
+        Some(path) => PathBuf::from_str(&path).expect("valid config path"),
+        None => PROJ_DIRS.config_dir().to_owned().join("config.toml"),
+    });
+
 impl Settings {
     pub fn load() -> Result<Self, OneOf<(io::Error, config::ConfigError)>> {
-        let proj_dirs = ProjectDirs::from("io", "alpenlabs", "strata")
-            .expect("project dir should be available");
-        let config_file = match std::env::var("CLI_CONFIG").ok() {
-            Some(path) => PathBuf::from_str(&path).expect("valid config path"),
-            None => proj_dirs.config_dir().to_owned().join("config.toml"),
-        };
+        let proj_dirs = &PROJ_DIRS;
+        let config_file = CONFIG_FILE.as_path();
         let descriptor_file = proj_dirs.data_dir().to_owned().join("descriptors");
         let linux_seed_file = proj_dirs.data_dir().to_owned().join("seed");
 
@@ -59,7 +66,7 @@ impl Settings {
         // create config file if not exists
         let _ = File::create_new(&config_file);
         let from_file: SettingsFromFile = Config::builder()
-            .add_source(config::File::from(config_file.clone()))
+            .add_source(config::File::from(config_file))
             .build()
             .map_err(OneOf::new)?
             .try_deserialize::<SettingsFromFile>()
@@ -80,7 +87,7 @@ impl Settings {
                 }
             })
             .expect("valid length"),
-            config_file,
+            config_file: CONFIG_FILE.clone(),
             network: from_file.network.unwrap_or(DEFAULT_NETWORK),
             descriptor_db: descriptor_file,
             bridge_strata_address: StrataAddress::from_str(BRIDGE_STRATA_ADDRESS)
