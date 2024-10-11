@@ -14,7 +14,7 @@ use bitcoin::{
     Address, Amount, Network, Psbt, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Witness,
 };
 use musig2::{KeyAggContext, SecNonce};
-use rand::{rngs::OsRng, Rng, RngCore};
+use rand::{rngs::OsRng, seq::SliceRandom, RngCore};
 use strata_db::stubs::bridge::StubTxStateDb;
 use strata_primitives::{
     bridge::{OperatorIdx, PublickeyTable, TxSigningData},
@@ -194,28 +194,9 @@ pub fn generate_sec_nonce(
     sec_nonce
 }
 
-/// Permute a list by successively swapping positions in the subslice 0..n, where n <= list.len().
-/// This is used to generate random order for indices in a list (for example, list of pubkeys,
-/// nonces, etc.)
+/// Shuffle a list using a secure random number generator.
+/// This is just a trivial wrapper around `rand` functionality.
+/// It only exists to simplify imports and allow for easier refactoring.
 pub fn permute<T: Clone>(list: &mut [T]) {
-    let num_permutations = OsRng.gen_range(0..list.len());
-
-    generate_permutation(list, num_permutations);
-}
-
-fn generate_permutation<T: Clone>(list: &mut [T], n: usize) {
-    if n == 1 {
-        return;
-    }
-
-    for i in 0..n {
-        generate_permutation(list, n - 1);
-
-        // Swap elements based on whether n is even or odd
-        if n % 2 == 0 {
-            list.swap(i, n - 1);
-        } else {
-            list.swap(0, n - 1);
-        }
-    }
+    list.shuffle(&mut OsRng);
 }
