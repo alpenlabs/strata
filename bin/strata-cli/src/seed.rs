@@ -12,10 +12,9 @@ use bip39::{Language, Mnemonic};
 use console::Term;
 use dialoguer::{Confirm, Input};
 use password::{HashVersion, IncorrectPassword, Password};
-use rand::{thread_rng, Rng, RngCore};
+use rand::{rngs::OsRng, CryptoRng, RngCore};
 use sha2::{Digest, Sha256};
 use terrors::OneOf;
-use zxcvbn::Score;
 
 use crate::constants::{AES_NONCE_LEN, AES_TAG_LEN, PW_SALT_LEN, SEED_LEN};
 
@@ -31,8 +30,10 @@ impl BaseWallet {
 pub struct Seed([u8; SEED_LEN]);
 
 impl Seed {
-    fn gen(rng: &mut impl Rng) -> Self {
-        Self(rng.gen())
+    fn gen<R: CryptoRng + RngCore>(rng: &mut R) -> Self {
+        let mut bytes = [0u8; SEED_LEN];
+        rng.fill_bytes(&mut bytes);
+        Self(bytes)
     }
 
     pub fn print_mnemonic(&self, language: Language) {
@@ -48,10 +49,10 @@ impl Seed {
         hasher.finalize().into()
     }
 
-    pub fn encrypt(
+    pub fn encrypt<R: CryptoRng + RngCore>(
         &self,
         password: &mut Password,
-        rng: &mut impl RngCore,
+        rng: &mut R,
     ) -> Result<EncryptedSeed, OneOf<(argon2::Error, aes_gcm_siv::Error)>> {
         let mut buf = [0u8; EncryptedSeed::LEN];
         rng.fill_bytes(&mut buf[..PW_SALT_LEN + AES_NONCE_LEN]);
@@ -191,22 +192,15 @@ pub fn load_or_create(
             }
         } else {
             let _ = term.write_line("Creating new wallet");
-            Seed::gen(&mut thread_rng())
+            Seed::gen(&mut OsRng)
         };
 
         let mut password = Password::read(true).map_err(OneOf::new)?;
-        let entropy = password.entropy();
-        let _ = term.write_line(format!("Password strength (Overall strength score from 0-4, where anything below 3 is too weak): {}", entropy.score()).as_str());
-        if entropy.score() <= Score::Two {
-            let _ = term.write_line(
-                entropy
-                    .feedback()
-                    .expect("No feedback")
-                    .to_string()
-                    .as_str(),
-            );
-        }
-        let encrypted_seed = match seed.encrypt(&mut password, &mut thread_rng()) {
+        let password_validation: Result<(), String> = password.validate();
+        if let Err(feedback) = password_validation {
+            let _ = term.write_line(&format!("Password is weak. {}", feedback));
+        };
+        let encrypted_seed = match seed.encrypt(&mut password, &mut OsRng) {
             Ok(es) => es,
             Err(e) => {
                 let narrowed = e.narrow::<aes_gcm_siv::Error, _>();
