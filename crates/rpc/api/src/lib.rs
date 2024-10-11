@@ -8,7 +8,9 @@ use strata_rpc_types::{
     BridgeDuties, ExecUpdate, HexBytes, HexBytes32, L2BlockStatus, NodeSyncStatus,
     RpcCheckpointInfo,
 };
-use strata_state::{bridge_state::DepositEntry, id::L2BlockId};
+use strata_state::{
+    bridge_state::DepositEntry, id::L2BlockId, operation::ClientUpdateOutput, sync_event::SyncEvent,
+};
 
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "strata"))]
 #[cfg_attr(feature = "client", rpc(server, client, namespace = "strata"))]
@@ -107,6 +109,18 @@ pub trait StrataApi {
     /// last finalized block are also finalized
     #[method(name = "getL2BlockStatus")]
     async fn get_l2_block_status(&self, block_height: u64) -> RpcResult<L2BlockStatus>;
+
+    /// Gets the sync event by index, if it exists.
+    #[method(name = "getSyncEvent")]
+    async fn get_sync_event(&self, idx: u64) -> RpcResult<Option<SyncEvent>>;
+
+    /// Gets the index of the last written sync event.
+    #[method(name = "getLastSyncEventIdx")]
+    async fn get_last_sync_event_idx(&self) -> RpcResult<u64>;
+
+    /// Gets the client update output produced as a result of the sync event idx given.
+    #[method(name = "getClientUpdateOutput")]
+    async fn get_client_update_output(&self, idx: u64) -> RpcResult<Option<ClientUpdateOutput>>;
 }
 
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "strataadmin"))]

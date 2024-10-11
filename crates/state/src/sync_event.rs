@@ -1,5 +1,6 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     batch::BatchCheckpoint,
@@ -8,7 +9,9 @@ use crate::{
 };
 
 /// Sync event that updates our consensus state.
-#[derive(Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize, Deserialize, Serialize,
+)]
 pub enum SyncEvent {
     /// We've observed a valid L1 block.
     L1Block(u64, L1BlockId),

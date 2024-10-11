@@ -2,7 +2,9 @@ use core::fmt;
 
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
+use serde::{Deserialize, Serialize};
 use strata_primitives::buf::Buf32;
+
 /// ID of an L1 block, usually the hash of its header.
 #[derive(
     Copy,
@@ -12,10 +14,12 @@ use strata_primitives::buf::Buf32;
     Ord,
     PartialOrd,
     Hash,
+    Default,
+    Arbitrary,
     BorshSerialize,
     BorshDeserialize,
-    Arbitrary,
-    Default,
+    Deserialize,
+    Serialize,
 )]
 pub struct L1BlockId(Buf32);
 
