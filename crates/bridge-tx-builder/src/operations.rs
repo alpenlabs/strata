@@ -246,6 +246,7 @@ mod tests {
         key::Keypair,
         secp256k1::{rand, SecretKey},
     };
+    use rand::rngs::OsRng;
 
     use super::*;
 
@@ -281,7 +282,7 @@ mod tests {
             "should work if the number of scripts is not an exact power of 2"
         );
 
-        let secret_key = SecretKey::new(&mut rand::thread_rng());
+        let secret_key = SecretKey::new(&mut OsRng);
         let keypair = Keypair::from_secret_key(SECP256K1, &secret_key);
         let (x_only_public_key, _) = XOnlyPublicKey::from_keypair(&keypair);
 

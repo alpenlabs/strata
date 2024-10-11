@@ -13,7 +13,7 @@ use bdk_wallet::{
     miniscript::{descriptor::DescriptorKeyParseError, Descriptor},
     template::DescriptorTemplateOut,
 };
-use rand::{thread_rng, Rng};
+use rand::{rngs::OsRng, RngCore};
 use sha2::{Digest, Sha256};
 use terrors::OneOf;
 use tokio::io::AsyncReadExt;
@@ -101,7 +101,8 @@ impl DescriptorRecovery {
             bytes.extend_from_slice(&net);
         }
 
-        let nonce = Nonce::from(thread_rng().gen::<[u8; 12]>());
+        let mut nonce = Nonce::default();
+        OsRng.fill_bytes(&mut nonce);
 
         // encrypted_bytes | tag (16 bytes) | nonce (12 bytes)
         self.cipher

@@ -24,7 +24,7 @@ use bitcoin::{
     Address, Amount, Network, OutPoint, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Txid,
     Witness,
 };
-use rand::RngCore;
+use rand::{rngs::OsRng, RngCore};
 use strata_state::tx::InscriptionData;
 use strata_tx_parser::inscription::{BATCH_DATA_TAG, ROLLUP_NAME_TAG, VERSION_TAG};
 use thiserror::Error;
@@ -402,8 +402,8 @@ pub fn generate_key_pair(
     secp256k1: &Secp256k1<secp256k1::All>,
 ) -> Result<UntweakedKeypair, anyhow::Error> {
     let mut rand_bytes = [0; 32];
-    rand::thread_rng().fill_bytes(&mut rand_bytes);
-    Ok(UntweakedKeypair::from_seckey_slice(secp256k1, &rand_bytes)?)
+    OsRng.fill_bytes(&mut rand_bytes);
+    Ok(UntweakedKeypair::from_seckey_slice(SECP256K1, &rand_bytes)?)
 }
 
 /// Builds reveal script such that it contains opcodes for verifying the internal key as well as the
@@ -465,7 +465,7 @@ fn sign_reveal_transaction(
     )?;
 
     let mut randbytes = [0; 32];
-    rand::thread_rng().fill_bytes(&mut randbytes);
+    OsRng.fill_bytes(&mut randbytes);
 
     let signature = secp256k1.sign_schnorr_with_aux_rand(
         &secp256k1::Message::from_digest_slice(signature_hash.as_byte_array())?,

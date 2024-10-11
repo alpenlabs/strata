@@ -277,7 +277,7 @@ impl From<HexChar> for char {
 
 #[cfg(test)]
 mod tests {
-    use rand::{thread_rng, Rng};
+    use rand::{rngs::OsRng, Rng};
 
     use super::*;
 
@@ -306,7 +306,7 @@ mod tests {
 
     #[test]
     fn e2e() {
-        let buf: [u8; 32] = thread_rng().gen();
+        let buf: [u8; 32] = OsRng.gen();
         let string = encode(&buf);
         let mut debuf = [0u8; 32];
         assert!(decode(&string, &mut debuf).is_ok());

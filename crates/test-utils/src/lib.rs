@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use arbitrary::{Arbitrary, Unstructured};
-use rand::RngCore;
+use rand::{rngs::OsRng, RngCore};
 
 pub mod bitcoin;
 pub mod bridge;
@@ -27,9 +27,8 @@ impl ArbitraryGenerator {
     }
 
     pub fn new_with_size(n: usize) -> Self {
-        let mut rng = rand::thread_rng();
         let mut buf = vec![0; n];
-        rng.fill_bytes(&mut buf); // 128 wasn't enough
+        OsRng.fill_bytes(&mut buf); // 128 wasn't enough
         let off = AtomicUsize::new(0);
         ArbitraryGenerator { buf, off }
     }

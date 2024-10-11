@@ -137,6 +137,7 @@ pub fn verify_bridge_msg_sig(
 
 #[cfg(test)]
 mod tests {
+    use rand::rngs::OsRng;
     use strata_test_utils::ArbitraryGenerator;
 
     use super::*;
@@ -198,7 +199,7 @@ mod tests {
         let txid: BitcoinTxid = generator.generate();
         let scope = Scope::V0PubNonce(txid);
         let payload: Musig2PubNonce = generator.generate();
-        let keypair = Keypair::new(SECP256K1, &mut rand::thread_rng());
+        let keypair = Keypair::new(SECP256K1, &mut OsRng);
         let msg_signer = MessageSigner::new(0, keypair.secret_key().into());
 
         let signed_message = msg_signer
