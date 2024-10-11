@@ -16,7 +16,7 @@ use strata_consensus_logic::{
     checkpoint::CheckpointHandle, l1_handler::verify_proof, sync_manager::SyncManager,
 };
 use strata_db::{
-    traits::{ChainstateProvider, Database, L1DataProvider, L2DataProvider},
+    traits::*,
     types::{CheckpointProvingStatus, L1TxEntry, L1TxStatus},
 };
 use strata_primitives::{
@@ -593,18 +593,47 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
     }
 
     async fn get_sync_event(&self, idx: u64) -> RpcResult<Option<SyncEvent>> {
-        // TODO
-        Ok(None)
+        let db = self.database.clone();
+
+        let ev: Option<SyncEvent> = wait_blocking("fetch_sync_event", move || {
+            Ok(db.sync_event_provider().get_sync_event(idx)?)
+        })
+        .await?;
+
+        Ok(ev)
     }
 
     async fn get_last_sync_event_idx(&self) -> RpcResult<u64> {
-        // TODO
-        Ok(0)
+        let db = self.database.clone();
+
+        let last = wait_blocking("fetch_last_sync_event_idx", move || {
+            Ok(db.sync_event_provider().get_last_idx()?)
+        })
+        .await?;
+
+        // FIXME returning MAX if we haven't produced one yet, should figure
+        // something else out
+        Ok(last.unwrap_or(u64::MAX))
     }
 
     async fn get_client_update_output(&self, idx: u64) -> RpcResult<Option<ClientUpdateOutput>> {
-        // TODO
-        Ok(None)
+        let db = self.database.clone();
+
+        let res = wait_blocking("fetch_client_update_output", move || {
+            let prov = db.client_state_provider();
+
+            let w = prov.get_client_state_writes(idx)?;
+            let a = prov.get_client_update_actions(idx)?;
+
+            match (w, a) {
+                (Some(w), Some(a)) => Ok(Some(ClientUpdateOutput::new(w, a))),
+                // normally this is just that they're both missing
+                _ => Ok(None),
+            }
+        })
+        .await?;
+
+        Ok(res)
     }
 }
 
