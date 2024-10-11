@@ -25,6 +25,7 @@ bitcoin.workspace = true
 borsh.workspace = true
 futures.workspace = true
 secp256k1 = { workspace = true, features = ["rand-std"] }
+serde.workspace = true
 thiserror.workspace = true
 threadpool.workspace = true
 tokio.workspace = true
