@@ -19,13 +19,15 @@ x-base-bridge-client: &base-bridge-client
     context: ../
     dockerfile: ./docker/bridge-client/Dockerfile
   image: "strata_bridge_client:v0.1.0"
+  restart: always
   environment:
     BTC_URL: "http://bitcoind:18443"
     BTC_USER: rpcuser
     BTC_PASS: rpcpassword
     RPC_HOST: "0.0.0.0"
     RPC_PORT: 4781 # default
-    ROLLUP_URL: "http://sequencer:8432"
+    ROLLUP_URL: "ws://sequencer:8432"
+    MAX_DUTY_RETRIES: 3 # for local environments
     DATADIR: .data # default
   networks:
     - strata_network
