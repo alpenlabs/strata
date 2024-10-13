@@ -13,10 +13,12 @@ use strata_tasks::TaskExecutor;
 use tokio::sync::{broadcast, mpsc};
 
 use crate::{
-    ctl::CsmController,
+    csm::{
+        ctl::CsmController,
+        message::{ClientUpdateNotif, CsmMessage, ForkChoiceMessage},
+        worker,
+    },
     fork_choice_manager,
-    message::{ClientUpdateNotif, CsmMessage, ForkChoiceMessage},
-    worker,
 };
 
 /// Handle to the core pipeline tasks.
