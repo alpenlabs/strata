@@ -5,7 +5,7 @@ use strata_state::sync_event::SyncEvent;
 use tokio::sync::{mpsc, oneshot};
 use tracing::*;
 
-use crate::message::CsmMessage;
+use super::message::CsmMessage;
 
 /// Controller handle for the consensus state machine.  Used to submit new sync
 /// events for persistence and processing.

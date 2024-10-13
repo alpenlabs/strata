@@ -25,7 +25,7 @@ use strata_zkvm::ZKVMVerifier;
 use tokio::sync::mpsc;
 use tracing::*;
 
-use crate::ctl::CsmController;
+use crate::csm::ctl::CsmController;
 
 /// Consumes L1 events and reflects them in the database.
 pub fn bitcoin_data_handler_task<D: Database + Send + Sync + 'static>(

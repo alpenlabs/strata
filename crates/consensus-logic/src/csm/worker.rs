@@ -15,12 +15,11 @@ use strata_tasks::ShutdownGuard;
 use tokio::sync::{broadcast, mpsc};
 use tracing::*;
 
-use crate::{
-    errors::Error,
-    genesis,
+use super::{
     message::{ClientUpdateNotif, CsmMessage, ForkChoiceMessage},
     state_tracker,
 };
+use crate::{errors::Error, genesis};
 
 /// Mutable worker state that we modify in the consensus worker task.
 ///
