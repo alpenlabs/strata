@@ -1,5 +1,7 @@
 //! Consensus logic worker task.
 
+// TODO massively refactor this module
+
 use std::sync::Arc;
 
 use strata_db::{
@@ -130,9 +132,9 @@ pub fn client_worker_task<D: Database, E: ExecEngineCtl>(
     Ok(())
 }
 
-fn process_msg<D: Database, E: ExecEngineCtl>(
+fn process_msg<D: Database>(
     state: &mut WorkerState<D>,
-    engine: &E,
+    engine: &impl ExecEngineCtl,
     msg: &CsmMessage,
     status_rx: Arc<StatusTx>,
     fcm_msg_tx: &mpsc::Sender<ForkChoiceMessage>,
@@ -159,98 +161,37 @@ fn process_msg<D: Database, E: ExecEngineCtl>(
     }
 }
 
-fn handle_sync_event<D: Database, E: ExecEngineCtl>(
+fn handle_sync_event<D: Database>(
     state: &mut WorkerState<D>,
-    engine: &E,
+    engine: &impl ExecEngineCtl,
     ev_idx: u64,
     status_tx: Arc<StatusTx>,
     fcm_msg_tx: &mpsc::Sender<ForkChoiceMessage>,
 ) -> anyhow::Result<()> {
+    // Fetch the sync event so that we can debug print it.
+    // FIXME make it so we don't have to fetch it again here
+    let ev_prov = state.database.sync_event_provider();
+    let Some(ev) = ev_prov.get_sync_event(ev_idx)? else {
+        error!(%ev_idx, "tried to process missing sync event, aborting handle_sync_event!");
+        return Ok(());
+    };
+
+    // TODO demote to trace after we figure out the current issues
+    debug!(%ev_idx, %ev, "handling sync event");
+
     // Perform the main step of deciding what the output we're operating on.
     let (outp, new_state) = state.state_tracker.advance_consensus_state(ev_idx)?;
     let outp = Arc::new(outp);
 
+    // Apply the actions produced from the state transition.
     for action in outp.actions() {
-        match action {
-            SyncAction::UpdateTip(blkid) => {
-                // Tell the EL that this block does indeed look good.
-                debug!(?blkid, "updating EL safe block");
-                engine.update_safe_block(*blkid)?;
-
-                // TODO update the tip we report in RPCs and whatnot
-            }
-
-            SyncAction::MarkInvalid(blkid) => {
-                // TODO not sure what this should entail yet
-                warn!(?blkid, "marking block invalid!");
-                state
-                    .l2_block_manager
-                    .put_block_status_blocking(blkid, BlockStatus::Invalid)?;
-            }
-
-            SyncAction::FinalizeBlock(blkid) => {
-                // For the fork choice manager this gets picked up later.  We don't have
-                // to do anything here *necessarily*.
-                // TODO we should probably emit a state checkpoint here if we
-                // aren't already
-                info!(?blkid, "finalizing block");
-                engine.update_finalized_block(*blkid)?;
-            }
-
-            SyncAction::L2Genesis(l1blkid) => {
-                info!(%l1blkid, "sync action to do genesis");
-
-                // TODO: use l1blkid during chain state genesis ?
-
-                genesis::init_genesis_chainstate(&state.params, state.database.as_ref()).map_err(
-                    |err| {
-                        error!(err = %err, "failed to compute chain genesis");
-                        Error::GenesisFailed(err.to_string())
-                    },
-                )?;
-            }
-
-            SyncAction::WriteCheckpoints(_height, checkpoints) => {
-                for c in checkpoints.iter() {
-                    let idx = c.batch_info().idx();
-                    let pstatus = CheckpointProvingStatus::ProofReady;
-                    let cstatus = CheckpointConfStatus::Confirmed;
-                    let entry = CheckpointEntry::new(
-                        c.batch_info().clone(),
-                        c.bootstrap_state().clone(),
-                        c.proof().clone(),
-                        pstatus,
-                        cstatus,
-                    );
-
-                    // Store
-                    state.checkpoint_db().put_checkpoint_blocking(idx, entry)?;
-                }
-            }
-            SyncAction::FinalizeCheckpoints(_height, checkpoints) => {
-                for c in checkpoints.iter() {
-                    let idx = c.batch_info().idx();
-                    let pstatus = CheckpointProvingStatus::ProofReady;
-                    let cstatus = CheckpointConfStatus::Finalized;
-                    let entry = CheckpointEntry::new(
-                        c.batch_info().clone(),
-                        c.bootstrap_state().clone(),
-                        c.proof().clone(),
-                        pstatus,
-                        cstatus,
-                    );
-
-                    // Update
-                    state.checkpoint_db().put_checkpoint_blocking(idx, entry)?;
-                }
-            }
-        }
+        apply_action(action.clone(), state, engine)?;
     }
 
     // Make sure that the new state index is set as expected.
     assert_eq!(state.state_tracker.cur_state_idx(), ev_idx);
 
-    // Write the state checkpoint on interval.
+    // Write the client state checkpoint periodically based on the event idx..
     if ev_idx % state.params.run.client_checkpoint_interval as u64 == 0 {
         let css = state.database.client_state_store();
         css.write_client_state_checkpoint(ev_idx, new_state.as_ref().clone())?;
@@ -271,10 +212,94 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
     let _ = status_tx.csm.send(status);
     let _ = status_tx.cl.send(client_state);
 
-    debug!(?new_state, "Sending client update notif");
+    trace!(?new_state, "sending client update notif");
     let update = ClientUpdateNotif::new(ev_idx, outp, new_state);
     if state.cupdate_tx.send(Arc::new(update)).is_err() {
         warn!(%ev_idx, "failed to send broadcast for new CSM update");
+    }
+
+    Ok(())
+}
+
+fn apply_action<D: Database>(
+    action: SyncAction,
+    state: &mut WorkerState<D>,
+    engine: &impl ExecEngineCtl,
+) -> anyhow::Result<()> {
+    match action {
+        SyncAction::UpdateTip(blkid) => {
+            // Tell the EL that this block does indeed look good.
+            debug!(?blkid, "updating EL safe block");
+            engine.update_safe_block(blkid)?;
+
+            // TODO update the tip we report in RPCs and whatnot
+        }
+
+        SyncAction::MarkInvalid(blkid) => {
+            // TODO not sure what this should entail yet
+            warn!(?blkid, "marking block invalid!");
+            state
+                .l2_block_manager
+                .put_block_status_blocking(&blkid, BlockStatus::Invalid)?;
+        }
+
+        SyncAction::FinalizeBlock(blkid) => {
+            // For the fork choice manager this gets picked up later.  We don't have
+            // to do anything here *necessarily*.
+            // TODO we should probably emit a state checkpoint here if we
+            // aren't already
+            info!(?blkid, "finalizing block");
+            engine.update_finalized_block(blkid)?;
+        }
+
+        SyncAction::L2Genesis(l1blkid) => {
+            info!(%l1blkid, "sync action to do genesis");
+
+            // TODO: use l1blkid during chain state genesis ?
+
+            genesis::init_genesis_chainstate(&state.params, state.database.as_ref()).map_err(
+                |err| {
+                    error!(err = %err, "failed to compute chain genesis");
+                    Error::GenesisFailed(err.to_string())
+                },
+            )?;
+        }
+
+        SyncAction::WriteCheckpoints(_height, checkpoints) => {
+            for c in checkpoints.iter() {
+                let idx = c.batch_info().idx();
+                let pstatus = CheckpointProvingStatus::ProofReady;
+                let cstatus = CheckpointConfStatus::Confirmed;
+                let entry = CheckpointEntry::new(
+                    c.batch_info().clone(),
+                    c.bootstrap_state().clone(),
+                    c.proof().clone(),
+                    pstatus,
+                    cstatus,
+                );
+
+                // Store
+                state.checkpoint_db().put_checkpoint_blocking(idx, entry)?;
+            }
+        }
+
+        SyncAction::FinalizeCheckpoints(_height, checkpoints) => {
+            for c in checkpoints.iter() {
+                let idx = c.batch_info().idx();
+                let pstatus = CheckpointProvingStatus::ProofReady;
+                let cstatus = CheckpointConfStatus::Finalized;
+                let entry = CheckpointEntry::new(
+                    c.batch_info().clone(),
+                    c.bootstrap_state().clone(),
+                    c.proof().clone(),
+                    pstatus,
+                    cstatus,
+                );
+
+                // Update
+                state.checkpoint_db().put_checkpoint_blocking(idx, entry)?;
+            }
+        }
     }
 
     Ok(())
