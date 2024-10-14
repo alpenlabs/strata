@@ -56,7 +56,7 @@ pub fn init(config: LoggerConfig) {
         let tp = opentelemetry_otlp::new_pipeline()
             .tracing()
             .with_exporter(exporter)
-            .install_batch(opentelemetry_sdk::runtime::TokioCurrentThread)
+            .install_batch(opentelemetry_sdk::runtime::Tokio)
             .expect("init: opentelemetry");
 
         let tt = tp.tracer("strata-log");
