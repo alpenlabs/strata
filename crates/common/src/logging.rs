@@ -1,6 +1,7 @@
+use opentelemetry::trace::TracerProvider;
 use opentelemetry_otlp::WithExportConfig;
 use tracing::*;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Layer};
 
 pub struct LoggerConfig {
     whoami: String,
@@ -16,17 +17,15 @@ impl LoggerConfig {
     }
 }
 
+/// Initializes the logging subsystem with the provided config.
 pub fn init(config: LoggerConfig) {
     let filt = tracing_subscriber::EnvFilter::from_default_env();
 
-    let mut loggers: Vec<Box<dyn tracing::Subscriber>> = Vec::new();
+    // TODO switch to using subscribers everywhere instead of layers
+    //let mut loggers: Vec<Box<dyn tracing::Subscriber + 'static>> = Vec::new();
 
     // Stdout logging.
-    let stdout_sub = tracing_subscriber::fmt()
-        .compact()
-        .with_env_filter(filt)
-        .finish();
-    //loggers.push(Box::new(stdout_sub));
+    let stdout_sub = tracing_subscriber::fmt::layer().compact().with_filter(filt);
 
     // OpenTelemetry output.
     if let Some(otel_url) = &config.otel_url {
@@ -34,18 +33,30 @@ pub fn init(config: LoggerConfig) {
             .tonic()
             .with_endpoint(otel_url);
 
-        let tracer = opentelemetry_otlp::new_pipeline()
+        let tp = opentelemetry_otlp::new_pipeline()
             .tracing()
             .with_exporter(exporter)
             .install_batch(opentelemetry_sdk::runtime::TokioCurrentThread)
             .expect("init: opentelemetry");
 
-        // TODO
+        let tt = tp.tracer("strata-log");
 
-        let otel_sub = tracing_opentelemetry::OpenTelemetryLayer::new(tracer);
+        let otel_sub = tracing_opentelemetry::layer().with_tracer(tt);
 
-        //loggers.append(Box::new(stdout_sub));
+        tracing_subscriber::registry()
+            .with(stdout_sub)
+            .with(otel_sub)
+            .init();
+    } else {
+        tracing_subscriber::registry().with(stdout_sub).init();
     }
 
     info!(whoami = %config.whoami, "logging started");
+}
+
+/// Shuts down the logging subsystem, flushing files as needed and tearing down
+/// resources.
+pub fn finalize() {
+    info!("shutting down logging");
+    // TODO
 }

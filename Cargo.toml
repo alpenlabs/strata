@@ -48,8 +48,9 @@ members = [
   "bin/bridge-client",
   "bin/datatool",
   "bin/strata-cli",
-  "bin/prover-client",
+  "bin/strata-client",
   "bin/strata-reth",
+  "bin/prover-client",
 
   # integration tests
   "tests",
@@ -207,11 +208,11 @@ tempfile = "3.10.1"
 terrors = "0.3.0"
 thiserror = "1.0"
 threadpool = "1.8"
-tokio = { version = "1.39", features = ["full"] }
+tokio = { version = "1.*", features = ["full"] }
 toml = "0.5"
 tower = "0.4"
-tracing = "0.1.40"
-tracing-opentelemetry = "0.26"
+tracing = "0.1"
+tracing-opentelemetry = "0.27"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 uuid = { version = "1.0", features = ["v4", "serde"] }
 
