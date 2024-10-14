@@ -71,7 +71,20 @@ fn main() -> anyhow::Result<()> {
 }
 
 fn main_inner(args: Args) -> anyhow::Result<()> {
-    logging::init();
+    // Init logging before we do anything.
+    let mut lconfig = logging::LoggerConfig::with_base_name("strata-client");
+
+    let otlp_url = logging::get_otlp_url_from_env();
+    if let Some(url) = &otlp_url {
+        lconfig.set_otlp_url(url.clone());
+    }
+
+    logging::init(lconfig);
+
+    // Print this late.
+    if let Some(url) = &otlp_url {
+        info!(%url, "using OpenTelemetry tracing output");
+    }
 
     let config = get_config(args.clone())?;
 

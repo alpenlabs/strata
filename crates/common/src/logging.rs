@@ -1,7 +1,12 @@
+use std::env;
+
 use opentelemetry::trace::TracerProvider;
 use opentelemetry_otlp::WithExportConfig;
 use tracing::*;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Layer};
+
+pub const OTLP_URL_ENVVAR: &str = "STRATA_OTLP_URL";
+pub const SVC_LABEL_ENVVAR: &str = "STRATA_SVC_LABEL";
 
 pub struct LoggerConfig {
     whoami: String,
@@ -9,11 +14,26 @@ pub struct LoggerConfig {
 }
 
 impl LoggerConfig {
+    /// Creates a new empty instance with whoami set.
     pub fn new(whoami: String) -> Self {
         Self {
             whoami,
             otel_url: None,
         }
+    }
+
+    pub fn with_base_name(s: &str) -> Self {
+        Self::new(get_whoami_string(s))
+    }
+
+    pub fn set_otlp_url(&mut self, url: String) {
+        self.otel_url = Some(url);
+    }
+}
+
+impl Default for LoggerConfig {
+    fn default() -> Self {
+        Self::with_base_name("(strata-service)")
     }
 }
 
@@ -59,4 +79,23 @@ pub fn init(config: LoggerConfig) {
 pub fn finalize() {
     info!("shutting down logging");
     // TODO
+}
+
+/// Gets the OTLP URL from the standard envvar.
+pub fn get_otlp_url_from_env() -> Option<String> {
+    env::var(OTLP_URL_ENVVAR).ok()
+}
+
+/// Gets the service label from the standard envvar, which should be included
+/// in the whoami string.
+pub fn get_service_label_from_env() -> Option<String> {
+    env::var(SVC_LABEL_ENVVAR).ok()
+}
+
+/// Computes a standard whoami string.
+pub fn get_whoami_string(base: &str) -> String {
+    match get_service_label_from_env() {
+        Some(label) => format!("{base}%{label}"),
+        None => format!("{base}"),
+    }
 }
