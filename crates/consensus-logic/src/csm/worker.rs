@@ -2,7 +2,7 @@
 
 // TODO massively refactor this module
 
-use std::sync::Arc;
+use std::{sync::Arc, thread};
 
 use strata_db::{
     traits::*,
@@ -14,10 +14,14 @@ use strata_state::{client_state::ClientState, csm_status::CsmStatus, operation::
 use strata_status::StatusTx;
 use strata_storage::{managers::checkpoint::CheckpointDbManager, L2BlockManager};
 use strata_tasks::ShutdownGuard;
-use tokio::sync::{broadcast, mpsc};
+use tokio::{
+    sync::{broadcast, mpsc},
+    time,
+};
 use tracing::*;
 
 use super::{
+    config::CsmExecConfig,
     message::{ClientUpdateNotif, CsmMessage, ForkChoiceMessage},
     state_tracker,
 };
@@ -31,6 +35,9 @@ use crate::{errors::Error, genesis};
 pub struct WorkerState<D: Database> {
     /// Consensus parameters.
     params: Arc<Params>,
+
+    /// CSM worker config, *not* params.
+    config: CsmExecConfig,
 
     /// Underlying database hierarchy that writes ultimately end up on.
     // TODO should we move this out?
@@ -68,8 +75,17 @@ impl<D: Database> WorkerState<D> {
             Arc::new(cur_state),
         );
 
+        // TODO make configurable
+        let config = CsmExecConfig {
+            retry_base_dur: time::Duration::from_millis(1000),
+            // These settings makes the last retry delay be 6 seconds.
+            retry_cnt_max: 20,
+            retry_backoff_mult: 1120,
+        };
+
         Ok(Self {
             params,
+            config,
             database,
             l2_block_manager,
             state_tracker,
@@ -101,7 +117,7 @@ pub fn client_worker_task<D: Database, E: ExecEngineCtl>(
     mut state: WorkerState<D>,
     engine: Arc<E>,
     mut msg_rx: mpsc::Receiver<CsmMessage>,
-    status_rx: Arc<StatusTx>,
+    status_tx: Arc<StatusTx>,
     fcm_msg_tx: mpsc::Sender<ForkChoiceMessage>,
 ) -> Result<(), Error> {
     // Send a message off to the forkchoice manager that we're resuming.
@@ -115,10 +131,12 @@ pub fn client_worker_task<D: Database, E: ExecEngineCtl>(
             &mut state,
             engine.as_ref(),
             &msg,
-            status_rx.clone(),
+            &status_tx,
             &fcm_msg_tx,
+            &shutdown,
         ) {
-            error!(err = %e, ?msg, "failed to process sync message, skipping");
+            error!(err = %e, ?msg, "failed to process sync message, aborting!");
+            break;
         }
 
         if shutdown.should_shutdown() {
@@ -136,8 +154,9 @@ fn process_msg<D: Database>(
     state: &mut WorkerState<D>,
     engine: &impl ExecEngineCtl,
     msg: &CsmMessage,
-    status_rx: Arc<StatusTx>,
+    status_rx: &Arc<StatusTx>,
     fcm_msg_tx: &mpsc::Sender<ForkChoiceMessage>,
+    shutdown: &ShutdownGuard,
 ) -> anyhow::Result<()> {
     match msg {
         CsmMessage::EventInput(idx) => {
@@ -150,23 +169,27 @@ fn process_msg<D: Database>(
                 warn!(%missed_ev_cnt, "applying missed sync events");
                 for ev_idx in next_exp_idx..*idx {
                     trace!(%ev_idx, "running missed sync event");
-                    handle_sync_event(state, engine, ev_idx, status_rx.clone(), fcm_msg_tx)?;
+                    handle_sync_event_with_retry(
+                        state, engine, ev_idx, status_rx, fcm_msg_tx, shutdown,
+                    )?;
                 }
             }
 
-            // TODO ensure correct event index ordering
-            handle_sync_event(state, engine, *idx, status_rx, fcm_msg_tx)?;
+            handle_sync_event_with_retry(state, engine, *idx, status_rx, fcm_msg_tx, shutdown)?;
             Ok(())
         }
     }
 }
 
-fn handle_sync_event<D: Database>(
+/// Repeatedly calls `handle_sync_event`, retrying on failure, up to a limit
+/// after which we return with the most recent error.
+fn handle_sync_event_with_retry<D: Database>(
     state: &mut WorkerState<D>,
     engine: &impl ExecEngineCtl,
     ev_idx: u64,
-    status_tx: Arc<StatusTx>,
+    status_tx: &Arc<StatusTx>,
     fcm_msg_tx: &mpsc::Sender<ForkChoiceMessage>,
+    shutdown: &ShutdownGuard,
 ) -> anyhow::Result<()> {
     // Fetch the sync event so that we can debug print it.
     // FIXME make it so we don't have to fetch it again here
@@ -176,9 +199,51 @@ fn handle_sync_event<D: Database>(
         return Ok(());
     };
 
-    // TODO demote to trace after we figure out the current issues
-    debug!(%ev_idx, %ev, "handling sync event");
+    let span = debug_span!("sync-event", %ev_idx, %ev);
+    let _g = span.enter();
 
+    let mut tries = 0;
+    let mut wait_dur = state.config.retry_base_dur;
+
+    loop {
+        tries += 1;
+
+        // TODO demote to trace after we figure out the current issues
+        debug!("trying sync event");
+
+        let Err(e) = handle_sync_event(state, engine, ev_idx, status_tx, fcm_msg_tx) else {
+            // Happy case, we want this to happen.
+            trace!("completed sync event");
+            break;
+        };
+
+        // If we hit the try limit, abort.
+        if tries > state.config.retry_cnt_max {
+            error!(err = %e, %tries, "failed to exec sync event, hit tries limit, aborting");
+            return Err(e);
+        }
+
+        // Sleep and increase the wait dur.
+        error!(err = %e, %tries, "failed to exec sync event, retrying...");
+        thread::sleep(wait_dur);
+        wait_dur = state.config.compute_retry_backoff(wait_dur);
+
+        if shutdown.should_shutdown() {
+            warn!("received shutdown signal");
+            break;
+        }
+    }
+
+    Ok(())
+}
+
+fn handle_sync_event<D: Database>(
+    state: &mut WorkerState<D>,
+    engine: &impl ExecEngineCtl,
+    ev_idx: u64,
+    status_tx: &Arc<StatusTx>,
+    fcm_msg_tx: &mpsc::Sender<ForkChoiceMessage>,
+) -> anyhow::Result<()> {
     // Perform the main step of deciding what the output we're operating on.
     let (outp, new_state) = state.state_tracker.advance_consensus_state(ev_idx)?;
     let outp = Arc::new(outp);
@@ -201,9 +266,10 @@ fn handle_sync_event<D: Database>(
     // be consolidated).
     let fcm_msg = ForkChoiceMessage::NewState(new_state.clone(), outp.clone());
     if fcm_msg_tx.blocking_send(fcm_msg).is_err() {
-        error!(%ev_idx, "failed to submit new CSM state to FCM");
+        error!("failed to submit new CSM state to FCM");
     }
 
+    // FIXME clean this up
     let mut status = CsmStatus::default();
     status.set_last_sync_ev_idx(ev_idx);
     status.update_from_client_state(new_state.as_ref());
@@ -215,7 +281,7 @@ fn handle_sync_event<D: Database>(
     trace!(?new_state, "sending client update notif");
     let update = ClientUpdateNotif::new(ev_idx, outp, new_state);
     if state.cupdate_tx.send(Arc::new(update)).is_err() {
-        warn!(%ev_idx, "failed to send broadcast for new CSM update");
+        warn!("failed to send broadcast for new CSM update");
     }
 
     Ok(())
