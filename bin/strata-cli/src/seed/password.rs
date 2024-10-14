@@ -6,7 +6,6 @@ use super::PW_SALT_LEN;
 
 pub struct Password {
     inner: String,
-    seed_encryption_key: Option<[u8; 32]>,
 }
 
 pub enum HashVersion {
@@ -43,10 +42,7 @@ impl Password {
 
         let password = input.interact()?;
 
-        Ok(Self {
-            inner: password,
-            seed_encryption_key: None,
-        })
+        Ok(Self { inner: password })
     }
 
     /// Returns the password entropy.
@@ -58,23 +54,17 @@ impl Password {
         &mut self,
         salt: &[u8; PW_SALT_LEN],
         version: HashVersion,
-    ) -> Result<&[u8; 32], argon2::Error> {
-        match self.seed_encryption_key {
-            Some(ref key) => Ok(key),
-            None => {
-                let mut sek = [0u8; 32];
-                let (algo, ver, params) = version.params();
-                if !self.inner.is_empty() {
-                    Argon2::new(algo, ver, params.expect("valid params")).hash_password_into(
-                        self.inner.as_bytes(),
-                        salt,
-                        &mut sek,
-                    )?;
-                }
-                self.seed_encryption_key = Some(sek);
-                self.seed_encryption_key(salt, version)
-            }
+    ) -> Result<[u8; 32], argon2::Error> {
+        let mut sek = [0u8; 32];
+        let (algo, ver, params) = version.params();
+        if !self.inner.is_empty() {
+            Argon2::new(algo, ver, params.expect("valid params")).hash_password_into(
+                self.inner.as_bytes(),
+                salt,
+                &mut sek,
+            )?;
         }
+        Ok(sek)
     }
 }
 
