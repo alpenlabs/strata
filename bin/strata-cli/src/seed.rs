@@ -43,7 +43,7 @@ impl Seed {
     }
 
     pub fn descriptor_recovery_key(&self) -> [u8; 32] {
-        let mut hasher = Sha256::new();
+        let mut hasher = <Sha256 as Digest>::new(); // this is to appease the analyzer
         hasher.update(b"alpen labs strata descriptor recovery file 2024");
         hasher.update(self.0);
         hasher.finalize().into()
@@ -94,7 +94,7 @@ impl Seed {
 
     pub fn strata_wallet(&self) -> EthereumWallet {
         let l2_private_bytes = {
-            let mut hasher = Sha256::new();
+            let mut hasher = <Sha256 as Digest>::new(); // this is to appease the analyzer
             hasher.update(b"alpen labs strata l2 wallet 2024");
             hasher.update(self.0);
             hasher.finalize()
