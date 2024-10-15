@@ -1,7 +1,8 @@
 use std::env;
 
-use opentelemetry::trace::TracerProvider;
+use opentelemetry::{trace::TracerProvider, KeyValue};
 use opentelemetry_otlp::WithExportConfig;
+use opentelemetry_sdk::Resource;
 use tracing::*;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Layer};
 
@@ -49,6 +50,11 @@ pub fn init(config: LoggerConfig) {
 
     // OpenTelemetry output.
     if let Some(otel_url) = &config.otel_url {
+        let trace_config =
+            opentelemetry_sdk::trace::Config::default().with_resource(Resource::new(vec![
+                KeyValue::new("service.name", config.whoami.clone()),
+            ]));
+
         let exporter = opentelemetry_otlp::new_exporter()
             .tonic()
             .with_endpoint(otel_url);
@@ -56,6 +62,7 @@ pub fn init(config: LoggerConfig) {
         let tp = opentelemetry_otlp::new_pipeline()
             .tracing()
             .with_exporter(exporter)
+            .with_trace_config(trace_config)
             .install_batch(opentelemetry_sdk::runtime::Tokio)
             .expect("init: opentelemetry");
 
@@ -96,6 +103,7 @@ pub fn get_service_label_from_env() -> Option<String> {
 pub fn get_whoami_string(base: &str) -> String {
     match get_service_label_from_env() {
         Some(label) => format!("{base}%{label}"),
-        None => format!("{base}"),
+        // Clippy is mad at me about this being `format!`.
+        None => base.to_owned(),
     }
 }
