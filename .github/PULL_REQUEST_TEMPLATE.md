@@ -15,6 +15,7 @@ Select the type of change your PR introduces (put an `x` in all that apply):-
 -   [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
 -   [ ] Documentation update
 -   [ ] Refactor
+-   [ ] New or updated tests
 
 ## Checklist
 
