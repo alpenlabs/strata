@@ -38,7 +38,7 @@ impl DescriptorRecovery {
         let db_key = {
             let mut key = Vec::from(recover_at.to_be_bytes());
             // this will actually write the private key inside the descriptor so we hash it
-            let mut hasher = Sha256::new();
+            let mut hasher = <Sha256 as Digest>::new(); // this is to appease the analyzer
             hasher.update(desc_string.as_bytes());
             key.extend_from_slice(hasher.finalize().as_ref());
             key
