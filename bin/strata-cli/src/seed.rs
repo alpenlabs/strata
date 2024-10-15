@@ -265,8 +265,24 @@ pub mod password;
 #[cfg(test)]
 mod test {
     use rand::rngs::OsRng;
+    use sha2::digest::generic_array::GenericArray;
 
     use super::*;
+
+    #[test]
+    // Sanity check on private key construction
+    fn invalid_keys() {
+        // The key can't be zero
+        assert!(PrivateKeySigner::from_field_bytes(GenericArray::from_slice(&[0u8; 32])).is_err());
+
+        // The key can be within the group order
+        assert!(PrivateKeySigner::from_field_bytes(GenericArray::from_slice(&[1u8; 32])).is_ok());
+
+        // The key can't exceed the group order
+        assert!(
+            PrivateKeySigner::from_field_bytes(GenericArray::from_slice(&[u8::MAX; 32])).is_err()
+        );
+    }
 
     #[test]
     // Test valid seed encryption and decryption
