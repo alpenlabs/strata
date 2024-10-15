@@ -10,7 +10,7 @@ use crate::{
     recovery::DescriptorRecovery,
     seed::Seed,
     settings::Settings,
-    signet::{fee_rate_or_crash, log_fee_rate, EsploraClient, SignetWallet},
+    signet::{get_fee_rate, log_fee_rate, EsploraClient, SignetWallet},
 };
 
 /// Attempt recovery of old deposit transactions
@@ -43,7 +43,9 @@ pub async fn recover(args: RecoverArgs, seed: Seed, settings: Settings, esplora:
         return;
     }
 
-    let fee_rate = fee_rate_or_crash(args.fee_rate, &esplora).await;
+    let fee_rate = get_fee_rate(args.fee_rate, &esplora, 1)
+        .await
+        .expect("valid fee rate");
     log_fee_rate(&term, &fee_rate);
 
     for (key, desc) in descs {

@@ -22,18 +22,6 @@ use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 
 use crate::{seed::Seed, settings::Settings};
 
-/// Retrieves an estimated fee rate to settle a transaction in `target` blocks
-pub async fn get_fee_rate(
-    target: u16,
-    esplora_client: &AsyncClient,
-) -> Result<Option<FeeRate>, esplora_client::Error> {
-    Ok(esplora_client
-        .get_fee_estimates()
-        .await
-        .map(|frs| frs.get(&target).cloned())?
-        .and_then(|fr| FeeRate::from_sat_per_vb(fr as u64)))
-}
-
 pub fn log_fee_rate(term: &Term, fr: &FeeRate) {
     let _ = term.write_line(&format!(
         "Using {} as feerate",
@@ -48,13 +36,36 @@ pub fn print_explorer_url(txid: &Txid, term: &Term, settings: &Settings) -> Resu
     ))
 }
 
-pub async fn fee_rate_or_crash(user_provided: Option<u64>, esplora: &EsploraClient) -> FeeRate {
-    match user_provided.and_then(FeeRate::from_sat_per_vb) {
-        Some(fr) => fr,
-        None => get_fee_rate(1, esplora)
+#[derive(Debug)]
+pub enum FeeRateError {
+    InvalidDueToOverflow,
+    BelowBroadcastMin,
+    /// Esplora didn't have a fee for the requested target
+    FeeMissing,
+    EsploraError(esplora_client::Error),
+}
+
+pub async fn get_fee_rate(
+    user_provided: Option<u64>,
+    esplora: &EsploraClient,
+    target: u16,
+) -> Result<FeeRate, FeeRateError> {
+    let fee_rate = if let Some(fr) = user_provided {
+        FeeRate::from_sat_per_vb(fr).ok_or(FeeRateError::InvalidDueToOverflow)?
+    } else {
+        esplora
+            .get_fee_estimates()
             .await
-            .expect("esplora API should return fee rates")
-            .expect("esplora API should give us a valid fee rate"),
+            .map(|frs| frs.get(&target).cloned())
+            .map_err(FeeRateError::EsploraError)?
+            .and_then(|fr| FeeRate::from_sat_per_vb(fr as u64))
+            .ok_or(FeeRateError::FeeMissing)?
+    };
+
+    if fee_rate < FeeRate::BROADCAST_MIN {
+        Err(FeeRateError::BelowBroadcastMin)
+    } else {
+        Ok(fee_rate)
     }
 }
 

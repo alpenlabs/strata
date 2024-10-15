@@ -11,7 +11,7 @@ use console::{style, Term};
 use crate::{
     seed::Seed,
     settings::Settings,
-    signet::{fee_rate_or_crash, log_fee_rate, print_explorer_url, EsploraClient, SignetWallet},
+    signet::{get_fee_rate, log_fee_rate, print_explorer_url, EsploraClient, SignetWallet},
     strata::StrataWallet,
 };
 
@@ -68,7 +68,9 @@ pub async fn drain(
                     .to_string(),
             );
         }
-        let fr = fee_rate_or_crash(fee_rate, &esplora).await;
+        let fr = get_fee_rate(fee_rate, &esplora, 1)
+            .await
+            .expect("valid fee rate");
         log_fee_rate(&term, &fr);
 
         let mut psbt = l1w
