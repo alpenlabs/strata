@@ -29,6 +29,13 @@ impl HashVersion {
 }
 
 impl Password {
+    /// Constructs a password from a string. (The complexity of the password is not checked.)
+    pub fn new(password: String) -> Self {
+        Self { inner: password }
+    }
+
+    /// Constructs a password from user interaction. (The complexity of the password is not
+    /// checked.)
     pub fn read(new: bool) -> Result<Self, dialoguer::Error> {
         let mut input = InputPassword::new().allow_empty_password(true);
         if new {
@@ -44,7 +51,7 @@ impl Password {
 
         let password = input.interact()?;
 
-        Ok(Self { inner: password })
+        Ok(Self::new(password))
     }
 
     /// Returns the password entropy.
@@ -52,6 +59,7 @@ impl Password {
         zxcvbn(self.inner.as_str(), &[])
     }
 
+    /// Derives a seed encryption key from a password.
     pub fn seed_encryption_key(
         &mut self,
         salt: &[u8; PW_SALT_LEN],
