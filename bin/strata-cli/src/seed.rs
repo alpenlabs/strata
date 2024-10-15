@@ -15,6 +15,7 @@ use password::{HashVersion, IncorrectPassword, Password};
 use rand::{rngs::OsRng, CryptoRng, RngCore};
 use sha2::{Digest, Sha256};
 use terrors::OneOf;
+use zeroize::Zeroizing;
 
 use crate::constants::{AES_NONCE_LEN, AES_TAG_LEN, PW_SALT_LEN, SEED_LEN};
 
@@ -27,25 +28,25 @@ impl BaseWallet {
 }
 
 #[derive(Clone)]
-pub struct Seed([u8; SEED_LEN]);
+pub struct Seed(Zeroizing<[u8; SEED_LEN]>);
 
 impl Seed {
     fn gen<R: CryptoRng + RngCore>(rng: &mut R) -> Self {
-        let mut bytes = [0u8; SEED_LEN];
-        rng.fill_bytes(&mut bytes);
+        let mut bytes = Zeroizing::new([0u8; SEED_LEN]);
+        rng.fill_bytes(bytes.as_mut());
         Self(bytes)
     }
 
     pub fn print_mnemonic(&self, language: Language) {
         let term = Term::stdout();
-        let mnemonic = Mnemonic::from_entropy_in(language, &self.0).expect("valid entropy");
+        let mnemonic = Mnemonic::from_entropy_in(language, self.0.as_ref()).expect("valid entropy");
         let _ = term.write_line(&mnemonic.to_string());
     }
 
     pub fn descriptor_recovery_key(&self) -> [u8; 32] {
         let mut hasher = <Sha256 as Digest>::new(); // this is to appease the analyzer
         hasher.update(b"alpen labs strata descriptor recovery file 2024");
-        hasher.update(self.0);
+        hasher.update(self.0.as_slice());
         hasher.finalize().into()
     }
 
@@ -66,7 +67,7 @@ impl Seed {
 
         let (salt_and_nonce, rest) = buf.split_at_mut(PW_SALT_LEN + AES_NONCE_LEN);
         let (seed, _) = rest.split_at_mut(SEED_LEN);
-        seed.copy_from_slice(&self.0);
+        seed.copy_from_slice(self.0.as_ref());
 
         let mut cipher = Aes256GcmSiv::new_from_slice(seed_encryption_key.as_ref())
             .expect("should be correct key size");
@@ -79,7 +80,7 @@ impl Seed {
     }
 
     pub fn signet_wallet(&self) -> BaseWallet {
-        let rootpriv = Xpriv::new_master(Network::Signet, &self.0).expect("valid xpriv");
+        let rootpriv = Xpriv::new_master(Network::Signet, self.0.as_ref()).expect("valid xpriv");
         let base_desc = format!("tr({}/86h/0h/0h", rootpriv);
         let external_desc = format!("{base_desc}/0/*)");
         let internal_desc = format!("{base_desc}/1/*)");
@@ -96,7 +97,7 @@ impl Seed {
         let l2_private_bytes = {
             let mut hasher = <Sha256 as Digest>::new(); // this is to appease the analyzer
             hasher.update(b"alpen labs strata l2 wallet 2024");
-            hasher.update(self.0);
+            hasher.update(self.0.as_slice());
             hasher.finalize()
         };
 
@@ -125,15 +126,18 @@ impl EncryptedSeed {
         let mut cipher = Aes256GcmSiv::new_from_slice(seed_encryption_key.as_ref())
             .expect("should be correct key size");
         let (salt_and_nonce, rest) = self.0.split_at_mut(PW_SALT_LEN + AES_NONCE_LEN);
-        let (seed, tag) = rest.split_at_mut(SEED_LEN);
+        let (encrypted_seed, tag) = rest.split_at_mut(SEED_LEN);
         let tag = Tag::from_slice(tag);
         let nonce = Nonce::from_slice(&salt_and_nonce[PW_SALT_LEN..]);
 
+        let mut seed = Zeroizing::new([0u8; SEED_LEN]);
+        seed.copy_from_slice(encrypted_seed);
+
         cipher
-            .decrypt_in_place_detached(nonce, &[], seed, tag)
+            .decrypt_in_place_detached(nonce, &[], seed.as_mut(), tag)
             .map_err(OneOf::new)?;
 
-        Ok(Seed(unsafe { *(seed.as_ptr() as *const [_; SEED_LEN]) }))
+        Ok(Seed(seed))
     }
 }
 
@@ -186,7 +190,7 @@ pub fn load_or_create(
                     let _ = term.write_line("incorrect entropy length");
                     continue;
                 }
-                let mut buf = [0u8; SEED_LEN];
+                let mut buf = Zeroizing::new([0u8; SEED_LEN]);
                 buf.copy_from_slice(&entropy);
                 break Seed(buf);
             }
