@@ -69,7 +69,7 @@ impl Seed {
         seed.copy_from_slice(&self.0);
 
         let mut cipher =
-            Aes256GcmSiv::new_from_slice(seed_encryption_key).expect("should be correct key size");
+            Aes256GcmSiv::new_from_slice(&seed_encryption_key).expect("should be correct key size");
         let nonce = Nonce::from_slice(&salt_and_nonce[PW_SALT_LEN..]);
         let tag = cipher
             .encrypt_in_place_detached(nonce, &[], seed)
@@ -123,7 +123,7 @@ impl EncryptedSeed {
             .map_err(OneOf::new)?;
 
         let mut cipher =
-            Aes256GcmSiv::new_from_slice(seed_encryption_key).expect("should be correct key size");
+            Aes256GcmSiv::new_from_slice(&seed_encryption_key).expect("should be correct key size");
         let (salt_and_nonce, rest) = self.0.split_at_mut(PW_SALT_LEN + AES_NONCE_LEN);
         let (seed, tag) = rest.split_at_mut(SEED_LEN);
         let tag = Tag::from_slice(tag);

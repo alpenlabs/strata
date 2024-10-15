@@ -15,6 +15,7 @@ use bdk_wallet::{
 };
 use rand::{rngs::OsRng, RngCore};
 use sha2::{Digest, Sha256};
+use sled::IVec;
 use terrors::OneOf;
 use tokio::io::AsyncReadExt;
 
@@ -128,11 +129,11 @@ impl DescriptorRecovery {
     pub async fn read_descs_after_block(
         &mut self,
         height: u32,
-    ) -> Result<Vec<DescriptorTemplateOut>, OneOf<ReadDescsAfterError>> {
+    ) -> Result<Vec<(IVec, DescriptorTemplateOut)>, OneOf<ReadDescsAfterError>> {
         let after_height = self.db.range(height.to_be_bytes()..);
         let mut descs = vec![];
         for desc_entry in after_height {
-            let mut raw = desc_entry.map_err(OneOf::new)?.1;
+            let (key, mut raw) = desc_entry.map_err(OneOf::new)?;
             if raw.len() <= 12 + 16 {
                 return Err(OneOf::new(EntryTooShort { length: raw.len() }));
             }
@@ -199,9 +200,13 @@ impl DescriptorRecovery {
                 networks.insert(network);
             }
 
-            descs.push((desc, keymap, networks));
+            descs.push((key, (desc, keymap, networks)));
         }
         Ok(descs)
+    }
+
+    pub fn remove<K: AsRef<[u8]>>(&self, key: K) -> sled::Result<Option<sled::IVec>> {
+        self.db.remove(key)
     }
 }
 

@@ -4,7 +4,8 @@ use dialoguer::Confirm;
 
 use crate::{seed::EncryptedSeedPersister, settings::Settings};
 
-/// Prints a BIP39 mnemonic encoding the internal wallet's seed bytes
+/// DANGER: resets the CLI completely, destroying all keys and databases.
+/// Keeps config.
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "reset")]
 pub struct ResetArgs {

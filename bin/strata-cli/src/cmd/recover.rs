@@ -6,22 +6,25 @@ use bdk_wallet::{
 use console::{style, Term};
 
 use crate::{
-    constants::NETWORK,
+    constants::RECOVERY_DESC_CLEANUP_DELAY,
     recovery::DescriptorRecovery,
     seed::Seed,
     settings::Settings,
-    signet::{get_fee_rate, EsploraClient, SignetWallet},
+    signet::{get_fee_rate, log_fee_rate, EsploraClient, SignetWallet},
 };
 
-/// Runs any background tasks manually. Currently performs recovery of old
-/// bridge in transactions
+/// Attempt recovery of old deposit transactions
 #[derive(FromArgs, PartialEq, Debug)]
-#[argh(subcommand, name = "refresh")]
-pub struct RefreshArgs {}
+#[argh(subcommand, name = "recover")]
+pub struct RecoverArgs {
+    /// override signet fee rate in sat/vbyte. must be >=1
+    #[argh(option)]
+    fee_rate: Option<u64>,
+}
 
-pub async fn refresh(seed: Seed, settings: Settings, esplora: EsploraClient) {
+pub async fn recover(args: RecoverArgs, seed: Seed, settings: Settings, esplora: EsploraClient) {
     let term = Term::stdout();
-    let mut l1w = SignetWallet::new(&seed, NETWORK).unwrap();
+    let mut l1w = SignetWallet::new(&seed, settings.network).unwrap();
     l1w.sync(&esplora).await.unwrap();
 
     let _ = term.write_line("Opening descriptor recovery");
@@ -40,19 +43,19 @@ pub async fn refresh(seed: Seed, settings: Settings, esplora: EsploraClient) {
         return;
     }
 
-    let fee_rate = get_fee_rate(1, &esplora)
+    let fee_rate = get_fee_rate(args.fee_rate, &esplora, 1)
         .await
-        .expect("request should succeed")
-        .expect("valid target");
+        .expect("valid fee rate");
+    log_fee_rate(&term, &fee_rate);
 
-    for desc in descs {
+    for (key, desc) in descs {
         let desc = desc
             .clone()
-            .into_wallet_descriptor(l1w.secp_ctx(), NETWORK)
+            .into_wallet_descriptor(l1w.secp_ctx(), settings.network)
             .expect("valid descriptor");
 
         let mut recovery_wallet = Wallet::create_single(desc)
-            .network(NETWORK)
+            .network(settings.network)
             .create_wallet_no_persist()
             .expect("valid wallet");
 
@@ -64,6 +67,14 @@ pub async fn refresh(seed: Seed, settings: Settings, esplora: EsploraClient) {
         let needs_recovery = recovery_wallet.balance().confirmed > Amount::ZERO;
 
         if !needs_recovery {
+            assert!(key.len() > 4);
+            let desc_height = u32::from_be_bytes(unsafe { *(key[..4].as_ptr() as *const [_; 4]) });
+            if desc_height + RECOVERY_DESC_CLEANUP_DELAY > current_height {
+                descriptor_file.remove(key).expect("removal should succeed");
+                let _ = term.write_line(&format!(
+                    "removed old, already claimed descriptor due for recovery at {desc_height}"
+                ));
+            }
             continue;
         }
 
@@ -73,7 +84,7 @@ pub async fn refresh(seed: Seed, settings: Settings, esplora: EsploraClient) {
 
         let recover_to = l1w.reveal_next_address(KeychainKind::External).address;
         let _ = term.write_line(&format!(
-            "Recovering a bridge-in transaction from address {} to {}",
+            "Recovering a deposit transaction from address {} to {}",
             style(address).yellow(),
             style(&recover_to).yellow()
         ));

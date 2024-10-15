@@ -1,5 +1,6 @@
 use std::{
     cell::RefCell,
+    collections::BTreeSet,
     io,
     ops::{Deref, DerefMut},
     path::{Path, PathBuf},
@@ -12,32 +13,60 @@ use bdk_esplora::{
     EsploraAsyncExt,
 };
 use bdk_wallet::{
-    bitcoin::{FeeRate, Network},
+    bitcoin::{FeeRate, Network, Txid},
     rusqlite::{self, Connection},
-    ChangeSet, PersistedWallet, WalletPersister,
+    ChangeSet, KeychainKind, PersistedWallet, WalletPersister,
 };
 use console::{style, Term};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 
-use crate::seed::Seed;
-
-/// Retrieves an estimated fee rate to settle a transaction in `target` blocks
-pub async fn get_fee_rate(
-    target: u16,
-    esplora_client: &AsyncClient,
-) -> Result<Option<FeeRate>, esplora_client::Error> {
-    Ok(esplora_client
-        .get_fee_estimates()
-        .await
-        .map(|frs| frs.get(&target).cloned())?
-        .and_then(|fr| FeeRate::from_sat_per_vb(fr as u64)))
-}
+use crate::{seed::Seed, settings::Settings};
 
 pub fn log_fee_rate(term: &Term, fr: &FeeRate) {
     let _ = term.write_line(&format!(
         "Using {} as feerate",
-        style(format!("~{} sat/vb", fr.to_sat_per_vb_ceil())).green(),
+        style(format!("{} sat/vb", fr.to_sat_per_vb_ceil())).green(),
     ));
+}
+
+pub fn print_explorer_url(txid: &Txid, term: &Term, settings: &Settings) -> Result<(), io::Error> {
+    term.write_line(&format!(
+        "View transaction at {}",
+        style(format!("{}/tx/{txid}", settings.mempool_endpoint)).blue()
+    ))
+}
+
+#[derive(Debug)]
+pub enum FeeRateError {
+    InvalidDueToOverflow,
+    BelowBroadcastMin,
+    /// Esplora didn't have a fee for the requested target
+    FeeMissing,
+    EsploraError(esplora_client::Error),
+}
+
+pub async fn get_fee_rate(
+    user_provided: Option<u64>,
+    esplora: &EsploraClient,
+    target: u16,
+) -> Result<FeeRate, FeeRateError> {
+    let fee_rate = if let Some(fr) = user_provided {
+        FeeRate::from_sat_per_vb(fr).ok_or(FeeRateError::InvalidDueToOverflow)?
+    } else {
+        esplora
+            .get_fee_estimates()
+            .await
+            .map(|frs| frs.get(&target).cloned())
+            .map_err(FeeRateError::EsploraError)?
+            .and_then(|fr| FeeRate::from_sat_per_vb(fr as u64))
+            .ok_or(FeeRateError::FeeMissing)?
+    };
+
+    if fee_rate < FeeRate::BROADCAST_MIN {
+        Err(FeeRateError::BelowBroadcastMin)
+    } else {
+        Ok(fee_rate)
+    }
 }
 
 #[derive(Clone)]
@@ -138,10 +167,39 @@ impl SignetWallet {
         ops2.finish();
         spks2.finish();
         txids2.finish();
+        let _ = term.write_line("Persisting updates");
         self.apply_update(update)
             .expect("should be able to connect to db");
         self.persist().expect("persist should work");
         let _ = term.write_line("Wallet synced");
+        Ok(())
+    }
+
+    pub async fn scan(
+        &mut self,
+        esplora_client: &AsyncClient,
+    ) -> Result<(), Box<esplora_client::Error>> {
+        let bar = ProgressBar::new_spinner();
+        let bar2 = bar.clone();
+        let req = self
+            .start_full_scan()
+            .inspect({
+                let mut once = BTreeSet::<KeychainKind>::new();
+                move |keychain, spk_i, script| {
+                    if once.insert(keychain) {
+                        bar2.println(format!("\nScanning keychain [{:?}]", keychain));
+                    }
+                    bar2.println(format!("- idx {spk_i}: {script}"));
+                }
+            })
+            .build();
+
+        let update = esplora_client.full_scan(req, 5, 3).await?;
+        bar.set_message("Persisting updates");
+        self.apply_update(update)
+            .expect("should be able to connect to db");
+        self.persist().expect("persist should work");
+        bar.finish_with_message("Scan complete");
         Ok(())
     }
 

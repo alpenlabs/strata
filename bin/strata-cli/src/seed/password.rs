@@ -1,12 +1,13 @@
 use argon2::{Algorithm, Argon2, Params, Version};
 use dialoguer::Password as InputPassword;
+use zeroize::ZeroizeOnDrop;
 use zxcvbn::{zxcvbn, Entropy};
 
 use super::PW_SALT_LEN;
 
+#[derive(ZeroizeOnDrop)]
 pub struct Password {
     inner: String,
-    seed_encryption_key: Option<[u8; 32]>,
 }
 
 pub enum HashVersion {
@@ -29,25 +30,21 @@ impl HashVersion {
 
 impl Password {
     pub fn read(new: bool) -> Result<Self, dialoguer::Error> {
-        let mut input = InputPassword::new();
+        let mut input = InputPassword::new().allow_empty_password(true);
         if new {
             input = input
                 .with_prompt("Create a new password (leave empty for no password, dangerous!)")
                 .with_confirmation(
                     "Confirm password (leave empty for no password, dangerous!)",
                     "Passwords didn't match",
-                )
-                .allow_empty_password(true);
+                );
         } else {
             input = input.with_prompt("Enter your password");
         }
 
         let password = input.interact()?;
 
-        Ok(Self {
-            inner: password,
-            seed_encryption_key: None,
-        })
+        Ok(Self { inner: password })
     }
 
     /// Returns the password entropy.
@@ -59,23 +56,15 @@ impl Password {
         &mut self,
         salt: &[u8; PW_SALT_LEN],
         version: HashVersion,
-    ) -> Result<&[u8; 32], argon2::Error> {
-        match self.seed_encryption_key {
-            Some(ref key) => Ok(key),
-            None => {
-                let mut sek = [0u8; 32];
-                let (algo, ver, params) = version.params();
-                if !self.inner.is_empty() {
-                    Argon2::new(algo, ver, params.expect("valid params")).hash_password_into(
-                        self.inner.as_bytes(),
-                        salt,
-                        &mut sek,
-                    )?;
-                }
-                self.seed_encryption_key = Some(sek);
-                self.seed_encryption_key(salt, version)
-            }
-        }
+    ) -> Result<[u8; 32], argon2::Error> {
+        let mut sek = [0u8; 32];
+        let (algo, ver, params) = version.params();
+        Argon2::new(algo, ver, params.expect("valid params")).hash_password_into(
+            self.inner.as_bytes(),
+            salt,
+            &mut sek,
+        )?;
+        Ok(sek)
     }
 
     /// Validates the password strength and returns feedback if it's weak.

@@ -4,7 +4,6 @@ use bdk_wallet::KeychainKind;
 use console::Term;
 
 use crate::{
-    constants::NETWORK,
     net_type::{net_type_or_exit, NetworkType},
     seed::Seed,
     settings::Settings,
@@ -27,7 +26,7 @@ pub async fn receive(args: ReceiveArgs, seed: Seed, settings: Settings, esplora:
 
     let address = match network_type {
         NetworkType::Signet => {
-            let mut l1w = SignetWallet::new(&seed, NETWORK).unwrap();
+            let mut l1w = SignetWallet::new(&seed, settings.network).unwrap();
             let _ = term.write_line("Syncing signet wallet");
             l1w.sync(&esplora).await.unwrap();
             let _ = term.write_line("Wallet synced");
@@ -36,7 +35,7 @@ pub async fn receive(args: ReceiveArgs, seed: Seed, settings: Settings, esplora:
             address_info.address.to_string()
         }
         NetworkType::Strata => {
-            let l2w = StrataWallet::new(&seed, &settings.l2_http_endpoint).unwrap();
+            let l2w = StrataWallet::new(&seed, &settings.strata_endpoint).unwrap();
             l2w.default_signer_address().to_string()
         }
     };
