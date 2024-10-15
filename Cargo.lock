@@ -12686,6 +12686,7 @@ dependencies = [
  "strata-bridge-tx-builder",
  "terrors",
  "tokio",
+ "zeroize",
  "zxcvbn",
 ]
 

@@ -1,9 +1,11 @@
 use argon2::{Algorithm, Argon2, Params, Version};
 use dialoguer::Password as InputPassword;
+use zeroize::ZeroizeOnDrop;
 use zxcvbn::{zxcvbn, Entropy};
 
 use super::PW_SALT_LEN;
 
+#[derive(ZeroizeOnDrop)]
 pub struct Password {
     inner: String,
 }
@@ -57,13 +59,11 @@ impl Password {
     ) -> Result<[u8; 32], argon2::Error> {
         let mut sek = [0u8; 32];
         let (algo, ver, params) = version.params();
-        if !self.inner.is_empty() {
-            Argon2::new(algo, ver, params.expect("valid params")).hash_password_into(
-                self.inner.as_bytes(),
-                salt,
-                &mut sek,
-            )?;
-        }
+        Argon2::new(algo, ver, params.expect("valid params")).hash_password_into(
+            self.inner.as_bytes(),
+            salt,
+            &mut sek,
+        )?;
         Ok(sek)
     }
 }
