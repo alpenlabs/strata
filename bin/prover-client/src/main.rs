@@ -34,7 +34,9 @@ mod task;
 
 #[tokio::main]
 async fn main() {
-    logging::init();
+    logging::init(logging::LoggerConfig::with_base_name(
+        "strata-prover-client",
+    ));
     info!("Running strata prover client in dev mode");
 
     let args: Args = argh::from_env();
