@@ -218,7 +218,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_extract_deposit_requests() {
-        logging::init();
+        // FIXME this is absurd, why are we doing this here?
+        logging::init(logging::LoggerConfig::with_base_name("strata-client-tests"));
 
         let (mock_db, db_config) =
             get_rocksdb_tmp_instance().expect("should be able to get tmp rocksdb instance");
