@@ -261,3 +261,102 @@ mod keychain;
 pub use keychain::*;
 
 pub mod password;
+
+#[cfg(test)]
+mod test {
+    use rand::rngs::OsRng;
+    use sha2::digest::generic_array::GenericArray;
+
+    use super::*;
+
+    #[test]
+    // Sanity check on private key construction
+    fn invalid_keys() {
+        // The key can't be zero
+        assert!(PrivateKeySigner::from_field_bytes(GenericArray::from_slice(&[0u8; 32])).is_err());
+
+        // The key can be within the group order
+        assert!(PrivateKeySigner::from_field_bytes(GenericArray::from_slice(&[1u8; 32])).is_ok());
+
+        // The key can't exceed the group order
+        assert!(
+            PrivateKeySigner::from_field_bytes(GenericArray::from_slice(&[u8::MAX; 32])).is_err()
+        );
+    }
+
+    #[test]
+    // Test valid seed encryption and decryption
+    fn seed_encrypt_decrypt() {
+        let mut password = Password::new(String::from("swordfish"));
+        let seed = Seed::gen(&mut OsRng);
+
+        let encrypted_seed = seed.encrypt(&mut password, &mut OsRng).unwrap();
+        let decrypted_seed = encrypted_seed.decrypt(&mut password).unwrap();
+
+        assert_eq!(seed.0, decrypted_seed.0);
+    }
+
+    #[test]
+    // Using an evil password fails decryption
+    fn evil_password() {
+        let mut password = Password::new(String::from("swordfish"));
+        let mut evil_password = Password::new(String::from("evil"));
+        let seed = Seed::gen(&mut OsRng);
+
+        let encrypted_seed = seed.encrypt(&mut password, &mut OsRng).unwrap();
+
+        assert!(encrypted_seed.decrypt(&mut evil_password).is_err());
+    }
+
+    #[test]
+    // Using an evil salt fails decryption
+    fn evil_salt() {
+        let mut password = Password::new(String::from("swordfish"));
+        let seed = Seed::gen(&mut OsRng);
+
+        let mut encrypted_seed = seed.encrypt(&mut password, &mut OsRng).unwrap();
+        let index = 0;
+        encrypted_seed.0[index] = !encrypted_seed.0[index];
+
+        assert!(encrypted_seed.decrypt(&mut password).is_err());
+    }
+
+    #[test]
+    // Using an evil nonce fails decryption
+    fn evil_nonce() {
+        let mut password = Password::new(String::from("swordfish"));
+        let seed = Seed::gen(&mut OsRng);
+
+        let mut encrypted_seed = seed.encrypt(&mut password, &mut OsRng).unwrap();
+        let index = PW_SALT_LEN;
+        encrypted_seed.0[index] = !encrypted_seed.0[index];
+
+        assert!(encrypted_seed.decrypt(&mut password).is_err());
+    }
+
+    #[test]
+    // Using an evil seed fails decryption
+    fn evil_seed() {
+        let mut password = Password::new(String::from("swordfish"));
+        let seed = Seed::gen(&mut OsRng);
+
+        let mut encrypted_seed = seed.encrypt(&mut password, &mut OsRng).unwrap();
+        let index = PW_SALT_LEN + AES_NONCE_LEN;
+        encrypted_seed.0[index] = !encrypted_seed.0[index];
+
+        assert!(encrypted_seed.decrypt(&mut password).is_err());
+    }
+
+    #[test]
+    // Using an evil tag fails decryption
+    fn evil_tag() {
+        let mut password = Password::new(String::from("swordfish"));
+        let seed = Seed::gen(&mut OsRng);
+
+        let mut encrypted_seed = seed.encrypt(&mut password, &mut OsRng).unwrap();
+        let index = PW_SALT_LEN + AES_NONCE_LEN + SEED_LEN;
+        encrypted_seed.0[index] = !encrypted_seed.0[index];
+
+        assert!(encrypted_seed.decrypt(&mut password).is_err());
+    }
+}
