@@ -1,6 +1,6 @@
 use argon2::{Algorithm, Argon2, Params, Version};
 use dialoguer::Password as InputPassword;
-use zeroize::ZeroizeOnDrop;
+use zeroize::{ZeroizeOnDrop, Zeroizing};
 use zxcvbn::{zxcvbn, Entropy};
 
 use super::PW_SALT_LEN;
@@ -56,13 +56,13 @@ impl Password {
         &mut self,
         salt: &[u8; PW_SALT_LEN],
         version: HashVersion,
-    ) -> Result<[u8; 32], argon2::Error> {
-        let mut sek = [0u8; 32];
+    ) -> Result<Zeroizing<[u8; 32]>, argon2::Error> {
+        let mut sek = Zeroizing::new([0u8; 32]);
         let (algo, ver, params) = version.params();
         Argon2::new(algo, ver, params.expect("valid params")).hash_password_into(
             self.inner.as_bytes(),
             salt,
-            &mut sek,
+            sek.as_mut(),
         )?;
         Ok(sek)
     }
