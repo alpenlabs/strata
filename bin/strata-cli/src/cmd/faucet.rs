@@ -167,7 +167,11 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
     if status == StatusCode::OK {
         #[cfg(feature = "strata_faucet")]
         if network_type == NetworkType::Signet {
-            let _ = print_explorer_url(&Txid::from_str(&body).expect("valid txid"), &term);
+            let _ = print_explorer_url(
+                &Txid::from_str(&body).expect("valid txid"),
+                &term,
+                &settings,
+            );
         }
         #[cfg(not(feature = "strata_faucet"))]
         let _ = print_explorer_url(
