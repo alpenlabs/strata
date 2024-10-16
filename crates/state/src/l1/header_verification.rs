@@ -237,7 +237,16 @@ impl HeaderVerificationState {
         new_self
     }
 
-    pub fn compute_snapshot(&self) -> HeaderVerificationStateSnapshot {
+    // Need to improve upon this?
+    pub fn compute_initial_snapshot(&self) -> HeaderVerificationStateSnapshot {
+        HeaderVerificationStateSnapshot {
+            hash: self.compute_hash().unwrap(),
+            block_num: self.last_verified_block_num as u64 + 1, // because inclusive
+            acc_pow: self.total_accumulated_pow,
+        }
+    }
+
+    pub fn compute_final_snapshot(&self) -> HeaderVerificationStateSnapshot {
         HeaderVerificationStateSnapshot {
             hash: self.compute_hash().unwrap(),
             block_num: self.last_verified_block_num as u64,
@@ -257,7 +266,7 @@ impl HeaderVerificationState {
         cur.write_all(&self.total_accumulated_pow.to_be_bytes())?;
 
         let mut serialized_timestamps = [0u8; 11 * 4];
-        for (i, &timestamp) in self.last_11_blocks_timestamps.timestamps.iter().enumerate() {
+        for (i, &timestamp) in self.last_11_blocks_timestamps.buffer.iter().enumerate() {
             serialized_timestamps[i * 4..(i + 1) * 4].copy_from_slice(&timestamp.to_be_bytes());
         }
 
