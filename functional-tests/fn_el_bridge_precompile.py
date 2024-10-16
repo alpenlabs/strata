@@ -1,11 +1,20 @@
 import os
-import time
 
 import flexitest
+from bitcoinlib.services.bitcoind import BitcoindClient
 from web3 import Web3
 from web3._utils.events import get_event_data
 
-from constants import PRECOMPILE_BRIDGEOUT_ADDRESS
+from constants import (
+    PRECOMPILE_BRIDGEOUT_ADDRESS,
+    ROLLUP_PARAMS_FOR_DEPOSIT_TX,
+    SEQ_PUBLISH_BATCH_INTERVAL_SECS,
+)
+from entry import BasicEnvConfig
+from utils import wait_until
+
+EVM_WAIT_TIME = 2
+SATS_TO_WEI = 10**10
 
 withdrawal_intent_event_abi = {
     "anonymous": False,
@@ -20,14 +29,21 @@ event_signature_text = "WithdrawalIntentEvent(uint64,bytes32)"
 
 
 @flexitest.register
-class ElBridgePrecompileTest(flexitest.Test):
+class BridgeDepositTest(flexitest.Test):
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env("basic")
+        ctx.set_env(BasicEnvConfig(101, rollup_params=ROLLUP_PARAMS_FOR_DEPOSIT_TX))
 
     def main(self, ctx: flexitest.RunContext):
-        print("SKIPPING TEST fn_el_bridge_precompile")
-        return True
+        evm_addr = "deedf001900dca3ebeefdeadf001900dca3ebeef"
+        self.do_deposit(ctx, evm_addr)
+        self.do_withdrawal_precompile_call(ctx)
 
+        # edge case where bridge out precompile address has balance
+        evm_addr = PRECOMPILE_BRIDGEOUT_ADDRESS.lstrip("0x")
+        self.do_deposit(ctx, evm_addr)
+        self.do_withdrawal_precompile_call(ctx)
+
+    def do_withdrawal_precompile_call(self, ctx: flexitest.RunContext):
         reth = ctx.get_service("reth")
         web3: Web3 = reth.create_web3()
 
@@ -35,7 +51,7 @@ class ElBridgePrecompileTest(flexitest.Test):
         dest = web3.to_checksum_address(PRECOMPILE_BRIDGEOUT_ADDRESS)
         # 64 bytes
         dest_pk = os.urandom(32).hex()
-        print(dest_pk)
+        print("dest_pk", dest_pk)
 
         assert web3.is_connected(), "cannot connect to reth"
 
@@ -43,7 +59,7 @@ class ElBridgePrecompileTest(flexitest.Test):
         original_bridge_balance = web3.eth.get_balance(dest)
         original_source_balance = web3.eth.get_balance(source)
 
-        assert original_bridge_balance == 0
+        # assert original_bridge_balance == 0
 
         # 10 rollup btc as wei
         to_transfer_wei = 10_000_000_000_000_000_000
@@ -57,12 +73,9 @@ class ElBridgePrecompileTest(flexitest.Test):
                 "data": dest_pk,
             }
         )
-        print(txid.to_0x_hex())
+        print("txid", txid.to_0x_hex())
 
-        # build block
-        time.sleep(2)
-
-        receipt = web3.eth.get_transaction_receipt(txid)
+        receipt = web3.eth.wait_for_transaction_receipt(txid, timeout=5)
 
         assert receipt.status == 1, "precompile transaction failed"
         assert len(receipt.logs) == 1, "no logs or invalid logs"
@@ -84,8 +97,77 @@ class ElBridgePrecompileTest(flexitest.Test):
         final_source_balance = web3.eth.get_balance(source)
 
         assert original_block_no < final_block_no, "not building blocks"
-        assert final_bridge_balance == 0, "bridge out funds not burned"
+        assert final_bridge_balance == original_bridge_balance, "bridge out funds not burned"
         total_gas_price = receipt.gasUsed * receipt.effectiveGasPrice
         assert (
             final_source_balance == original_source_balance - to_transfer_wei - total_gas_price
         ), "final balance incorrect"
+
+    def do_deposit(self, ctx: flexitest.RunContext, evm_addr: str):
+        btc = ctx.get_service("bitcoin")
+        seq = ctx.get_service("sequencer")
+
+        seqrpc = seq.create_rpc()
+        btcrpc: BitcoindClient = btc.create_rpc()
+
+        amount_to_send = ROLLUP_PARAMS_FOR_DEPOSIT_TX["deposit_amount"] / 10**8
+        name = ROLLUP_PARAMS_FOR_DEPOSIT_TX["rollup_name"].encode("utf-8").hex()
+
+        addr = "bcrt1pzupt5e8eqvt995r57jmmylxlswqfddsscrrq7njygrkhej3e7q2qur0c76"
+        outputs = [{addr: amount_to_send}, {"data": f"{name}{evm_addr}"}]
+
+        options = {"changePosition": 2}
+
+        psbt_result = btcrpc.proxy.walletcreatefundedpsbt([], outputs, 0, options)
+        psbt = psbt_result["psbt"]
+
+        signed_psbt = btcrpc.proxy.walletprocesspsbt(psbt)
+
+        finalized_psbt = btcrpc.proxy.finalizepsbt(signed_psbt["psbt"])
+        deposit_tx = finalized_psbt["hex"]
+
+        original_num_deposits = len(seqrpc.strata_getCurrentDeposits())
+        print(f"Original deposit count: {original_num_deposits}")
+
+        reth = ctx.get_service("reth")
+        rethrpc = reth.create_rpc()
+
+        original_balance = int(rethrpc.eth_getBalance(f"0x{evm_addr}"), 16)
+        print(f"Balance before deposit: {original_balance}")
+
+        print("Deposit Tx:", btcrpc.sendrawtransaction(deposit_tx))
+        # check if we are getting deposits
+        wait_until(
+            lambda: len(seqrpc.strata_getCurrentDeposits()) > original_num_deposits,
+            error_with="seem not be getting deposits",
+            timeout=SEQ_PUBLISH_BATCH_INTERVAL_SECS,
+        )
+
+        current_block_num = int(rethrpc.eth_blockNumber(), base=16)
+        print(f"Current reth block num: {current_block_num}")
+
+        wait_until(
+            lambda: int(rethrpc.eth_getBalance(f"0x{evm_addr}"), 16) > original_balance,
+            error_with="eth balance did not update",
+            timeout=EVM_WAIT_TIME,
+        )
+
+        deposit_amount = ROLLUP_PARAMS_FOR_DEPOSIT_TX["deposit_amount"] * SATS_TO_WEI
+
+        balance = int(rethrpc.eth_getBalance(f"0x{evm_addr}"), 16)
+        print(f"Balance after deposit: {balance}")
+
+        net_balance = balance - original_balance
+        assert net_balance == deposit_amount, f"invalid deposit amount: {net_balance}"
+
+        wait_until(
+            lambda: int(rethrpc.eth_blockNumber(), base=16) > current_block_num,
+            error_with="not building blocks",
+            timeout=EVM_WAIT_TIME * 2,
+        )
+
+        balance = int(rethrpc.eth_getBalance(f"0x{evm_addr}"), 16)
+        net_balance = balance - original_balance
+        assert (
+            net_balance == deposit_amount
+        ), f"deposit processed multiple times, extra: {balance - original_balance - deposit_amount}"

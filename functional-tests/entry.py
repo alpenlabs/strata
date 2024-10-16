@@ -3,8 +3,9 @@ import json
 import os
 import sys
 import time
+from itertools import islice
 from math import ceil
-from typing import Optional, TypedDict
+from typing import List, Optional, TypedDict
 
 import flexitest
 import web3
@@ -527,11 +528,20 @@ def main(argv):
 
     datadir_root = flexitest.create_datadir_in_workspace(os.path.join(test_dir, DD_ROOT))
 
-    btc_fac = BitcoinFactory([12300 + i for i in range(30)])
-    seq_fac = StrataFactory([12400 + i for i in range(30)])
-    fullnode_fac = FullNodeFactory([12500 + i for i in range(30)])
-    reth_fac = RethFactory([12600 + i for i in range(20 * 3)])
-    prover_client_fac = ProverClientFactory([12700 + i for i in range(20 * 3)])
+    # FIXME/FIX flexitest: add global port pool
+    port_gen = (pn for pn in range(12300, 65535))
+    # adjust based on number of tests run in parallel
+    max_test_instances = 30
+
+    def gen_port_range(multiplier: int = 1) -> List[int]:
+        # max_test_instances * number of next_port() calls in factory per service
+        return list(islice(port_gen, max_test_instances * multiplier))
+
+    btc_fac = BitcoinFactory(gen_port_range(2))
+    seq_fac = StrataFactory(gen_port_range())
+    fullnode_fac = FullNodeFactory(gen_port_range())
+    reth_fac = RethFactory(gen_port_range(4))
+    prover_client_fac = ProverClientFactory(gen_port_range())
 
     factories = {
         "bitcoin": btc_fac,
