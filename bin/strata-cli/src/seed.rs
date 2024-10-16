@@ -270,18 +270,36 @@ mod test {
     use super::*;
 
     #[test]
-    // Sanity check on private key construction
-    fn invalid_keys() {
-        // The key can't be zero
+    // Sanity checks on curve scalar construction, to ensure proper rejection
+    // This treats zero as invalid (for ECDSA reasons)
+    fn scalar_sanity_checks() {
+        // This is the (big-endian) order of the `secp256k1` curve group
+        // You can find it in, for example, section 2.4.1 of https://www.secg.org/sec2-v2.pdf
+        let mut order: [u8; 32] = [
+            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+            0xFF, 0xFE, 0xBA, 0xAE, 0xDC, 0xE6, 0xAF, 0x48, 0xA0, 0x3B, 0xBF, 0xD2, 0x5E, 0x8C,
+            0xD0, 0x36, 0x41, 0x41,
+        ];
+
+        // The scalar can't be zero
         assert!(PrivateKeySigner::from_field_bytes(GenericArray::from_slice(&[0u8; 32])).is_err());
 
-        // The key can be within the group order
+        // The scalar can be well within the group order
         assert!(PrivateKeySigner::from_field_bytes(GenericArray::from_slice(&[1u8; 32])).is_ok());
 
-        // The key can't exceed the group order
+        // The scalar can't equal the group order
+        assert!(PrivateKeySigner::from_field_bytes(GenericArray::from_slice(&order)).is_err());
+
+        // The scalar can't exceed the group order
+        order[31] = 0x42;
+        assert!(PrivateKeySigner::from_field_bytes(GenericArray::from_slice(&order)).is_err());
         assert!(
             PrivateKeySigner::from_field_bytes(GenericArray::from_slice(&[u8::MAX; 32])).is_err()
         );
+
+        // The scalar can be _just_ under the group order
+        order[31] = 0x40;
+        assert!(PrivateKeySigner::from_field_bytes(GenericArray::from_slice(&order)).is_ok());
     }
 
     #[test]
