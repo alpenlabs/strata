@@ -668,7 +668,7 @@ impl Agent {
 }
 
 pub(crate) async fn setup(num_operators: usize) -> (Arc<Mutex<BitcoinD>>, BridgeFederation) {
-    logging::init();
+    logging::init(logging::LoggerConfig::with_base_name("bridge-tests"));
 
     let span = span!(Level::INFO, "setup federation");
     let _guard = span.enter();
