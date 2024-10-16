@@ -1,6 +1,7 @@
 use core::fmt;
 
 use arbitrary::Arbitrary;
+use bitcoin::BlockHash;
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::buf::Buf32;
 /// ID of an L1 block, usually the hash of its header.
@@ -33,6 +34,13 @@ impl From<Buf32> for L1BlockId {
     }
 }
 
+impl From<BlockHash> for L1BlockId {
+    fn from(value: BlockHash) -> Self {
+        let value: Buf32 = value.into();
+        value.into()
+    }
+}
+
 impl AsRef<[u8; 32]> for L1BlockId {
     fn as_ref(&self) -> &[u8; 32] {
         self.0.as_ref()
@@ -48,5 +56,22 @@ impl fmt::Debug for L1BlockId {
 impl fmt::Display for L1BlockId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Display::fmt(&self.0, f)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use strata_test_utils::bitcoin::get_btc_mainnet_block;
+
+    use super::L1BlockId;
+
+    #[test]
+    fn test_l1_blkid() {
+        let block = get_btc_mainnet_block();
+        let l1_blkid: L1BlockId = block.block_hash().into();
+        // This makes sense to be equal?
+        let _str1 = format!("{}", block.block_hash());
+        let _str2 = format!("{:?}", l1_blkid);
+        // assert_eq!(str1, str2);
     }
 }

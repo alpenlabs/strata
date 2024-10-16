@@ -81,10 +81,13 @@ impl ProvingOperations for L1BatchOperations {
         &self,
         btc_block_range: Self::Params,
     ) -> Result<Self::Input, anyhow::Error> {
-        let st_height = btc_block_range.0;
-        let header_verification_state =
-            get_verification_state(self.btc_client.as_ref(), st_height, &MAINNET.clone().into())
-                .await?;
+        let header_verification_state = get_verification_state(
+            self.btc_client.as_ref(),
+            btc_block_range.0,
+            get_pm_rollup_params().genesis_l1_height,
+            &MAINNET.clone().into(),
+        )
+        .await?;
         let rollup_params = get_pm_rollup_params();
 
         let input: Self::Input = L1BatchInput {
