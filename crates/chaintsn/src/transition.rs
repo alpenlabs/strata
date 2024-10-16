@@ -336,14 +336,11 @@ fn process_deposit_updates(
     Ok(())
 }
 
-/// Wrapper to safely(?) select a random operator index.
+/// Wrapper to safely select a random operator index using wide reduction
+/// This will return a deterministically-random index in the range `[0, num)`
 fn next_rand_op_pos(rng: &mut SlotRng, num: u32) -> u32 {
-    // This feels kinda weird.
-    const MASK: u32 = u32::wrapping_sub(0, 1);
-    assert_eq!(MASK.count_ones(), u32::BITS, "mask computed incorrectly");
-
-    let r = rng.next_u32();
-    (r & MASK) % num
+    // This won't meaningfully truncate since `num` is `u32`
+    (rng.next_word() % (num as u64)) as u32
 }
 
 #[cfg(test)]
@@ -364,8 +361,22 @@ mod tests {
     };
     use strata_test_utils::{l2::gen_params, ArbitraryGenerator};
 
-    use super::process_block;
-    use crate::transition::process_l1_view_update;
+    use super::{next_rand_op_pos, process_block};
+    use crate::{slot_rng::SlotRng, transition::process_l1_view_update};
+
+    #[test]
+    // Confirm that operator index sampling is deterministic and in bounds
+    fn deterministic_index_sampling() {
+        let num = 123;
+        let mut rng = SlotRng::new_seeded([1u8; 32]);
+        let mut same_rng = SlotRng::new_seeded([1u8; 32]);
+
+        let index = next_rand_op_pos(&mut rng, num);
+        let same_index = next_rand_op_pos(&mut same_rng, num);
+
+        assert_eq!(index, same_index);
+        assert!(index < num);
+    }
 
     #[test]
     fn test_process_l1_view_update_with_deposit_update_tx() {
