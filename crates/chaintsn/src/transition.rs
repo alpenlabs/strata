@@ -341,11 +341,12 @@ fn process_deposit_updates(
 /// This will return a deterministically-random index in the range `[0, num)`
 fn next_rand_op_pos(rng: &mut SlotRng, num: u32) -> u32 {
     // This won't meaningfully truncate since `num` is `u32`
-    (rng.next_word() % (num as u64)) as u32
+    (rng.next_u64() % (num as u64)) as u32
 }
 
 #[cfg(test)]
 mod tests {
+    use rand_core::SeedableRng;
     use strata_primitives::{buf::Buf32, l1::BitcoinAmount, params::OperatorConfig};
     use strata_state::{
         block::{ExecSegment, L1Segment, L2BlockBody},
@@ -369,8 +370,8 @@ mod tests {
     // Confirm that operator index sampling is deterministic and in bounds
     fn deterministic_index_sampling() {
         let num = 123;
-        let mut rng = SlotRng::new_seeded([1u8; 32]);
-        let mut same_rng = SlotRng::new_seeded([1u8; 32]);
+        let mut rng = SlotRng::from_seed([1u8; 32]);
+        let mut same_rng = SlotRng::from_seed([1u8; 32]);
 
         let index = next_rand_op_pos(&mut rng, num);
         let same_index = next_rand_op_pos(&mut same_rng, num);
