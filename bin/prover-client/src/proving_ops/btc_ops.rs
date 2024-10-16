@@ -97,7 +97,7 @@ fn gen_params_with_seed(seed: u64) -> Params {
             address_length: 20,
             deposit_amount: 1_000_000_000,
             rollup_vk: RollupVerifyingKey::SP1VerifyingKey(Buf32(
-                "0x0055041ccd102ed3fc51ecec79bb752e77606643e86ecac388e8ea3aedbf414e"
+                "0x00b042bf75b5b7b521f33209923fbad39d229b26773a90f5b1dec12fd12619dc"
                     .parse()
                     .unwrap(),
             )),
@@ -120,4 +120,18 @@ pub fn make_dummy_operator_pubkeys_with_seed(seed: u64) -> OperatorPubkeys {
     let sk = SecretKey::new(&mut rng);
     let (pk, _) = sk.x_only_public_key(&secp);
     OperatorPubkeys::new(pk.into(), pk.into())
+}
+
+#[cfg(test)]
+mod test {
+    use super::gen_params_with_seed;
+
+    #[test]
+    fn simple() {
+        let params = gen_params_with_seed(0);
+        println!("got the params {:#?}", params);
+
+        let params_hash = params.rollup().compute_hash();
+        println!("got the rollup params hash {:#?}", params_hash)
+    }
 }

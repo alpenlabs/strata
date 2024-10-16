@@ -10,7 +10,10 @@ fn main() {
         "At least one CL proof is required for aggregation"
     );
 
-    let cl_proof_pp_start = read_and_validate_next_proof();
+    // TODO: Do this in better
+    let mut cl_proof_pp_start = read_and_validate_next_proof();
+    cl_proof_pp_start.initial_snapshot.slot += 1;
+
     let mut cl_proof_pp_prev = cl_proof_pp_start.clone();
     let mut acc_deposits = cl_proof_pp_start.deposits.clone();
 
