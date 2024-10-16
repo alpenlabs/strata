@@ -133,3 +133,146 @@ async fn run_rpc_server(
     rpc_server::start(&rpc_impl, rpc_url, enable_dev_rpc).await?;
     anyhow::Ok(())
 }
+
+#[cfg(test)]
+mod test {
+    use sp1_sdk::SP1ProofWithPublicValues;
+    use strata_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
+    use strata_proofimpl_checkpoint::L2BatchProofOutput;
+    use strata_proofimpl_evm_ee_stf::ELProofPublicParams;
+    use strata_proofimpl_l1_batch::L1BatchProofOutput;
+    use strata_sp1_adapter::SP1Verifier;
+    use strata_state::{
+        batch::{BatchCheckpoint, CheckpointProofOutput},
+        l1::{get_btc_params, HeaderVerificationState},
+    };
+    use strata_zkvm::{Proof, ZKVMVerifier};
+
+    #[test]
+    fn test_batch_checkpoint() {
+        let batch_checkpoint_raw =
+            include_bytes!("../../../functional-tests/sp1_batch_checkpoint.bin");
+        let batch_checkpoint: BatchCheckpoint = borsh::from_slice(batch_checkpoint_raw).unwrap();
+        // println!("batch_checkpoint {:?}", batch_checkpoint);
+        println!("batch_checkpoint pp {:?}", batch_checkpoint.proof_output());
+
+        let ckp_proof_raw = include_bytes!(
+            "../../../functional-tests/proofrequest_01jaamw46dfvhrhvzaea8py6nw.cs_proof"
+        );
+        let proof = Proof::new(ckp_proof_raw.to_vec());
+        let ckp_pp: CheckpointProofOutput =
+            SP1Verifier::extract_borsh_public_output(&proof).unwrap();
+
+        println!("got the proof pp {:?}", ckp_pp);
+
+        let btc_block_proof_501 = Proof::new(
+            include_bytes!(
+                "../../../functional-tests/proofrequest_01jaammsjqfvhrrcfr6pnbtync.c_proof"
+            )
+            .to_vec(),
+        );
+        let btc_block_proof_501_pp: BlockspaceProofOutput =
+            SP1Verifier::extract_borsh_public_output(&btc_block_proof_501).unwrap();
+
+        let btc_block_proof_502 = Proof::new(
+            include_bytes!(
+                "../../../functional-tests/proofrequest_01jaammszjeykt0z68qvsfmarv.c_proof"
+            )
+            .to_vec(),
+        );
+        let btc_block_proof_502_pp: BlockspaceProofOutput =
+            SP1Verifier::extract_borsh_public_output(&btc_block_proof_502).unwrap();
+
+        let btc_block_proof_503 = Proof::new(
+            include_bytes!(
+                "../../../functional-tests/proofrequest_01jaammt27eyksdxg3bw2h940t.c_proof"
+            )
+            .to_vec(),
+        );
+        let btc_block_proof_503_pp: BlockspaceProofOutput =
+            SP1Verifier::extract_borsh_public_output(&btc_block_proof_503).unwrap();
+
+        let btc_block_proof_504 = Proof::new(
+            include_bytes!(
+                "../../../functional-tests/proofrequest_01jaammsxxeykt8h6t4af7sh3m.c_proof"
+            )
+            .to_vec(),
+        );
+        let btc_block_proof_504_pp: BlockspaceProofOutput =
+            SP1Verifier::extract_borsh_public_output(&btc_block_proof_504).unwrap();
+
+        let l1_batch_proof = Proof::new(
+            include_bytes!(
+                "../../../functional-tests/proofrequest_01jaamq3n7eykrekn60bjdf98n.c_proof"
+            )
+            .to_vec(),
+        );
+        let l1_batch_pp: L1BatchProofOutput =
+            SP1Verifier::extract_borsh_public_output(&l1_batch_proof).unwrap();
+        println!("{:?}", l1_batch_pp);
+
+        let btc_block_proof_2 = Proof::new(
+            include_bytes!(
+                "../../../functional-tests/proofrequest_01jaammtheeykv7p82mpxnxrtp.c_proof"
+            )
+            .to_vec(),
+        );
+        let btc_block_proof_2_pp: ELProofPublicParams =
+            SP1Verifier::extract_public_output(&btc_block_proof_2).unwrap();
+        println!("EL");
+
+        let cl_block_proof = Proof::new(
+            include_bytes!(
+                "../../../functional-tests/proofrequest_01jaamt3vjfvhsgmfvapntqw70.c_proof"
+            )
+            .to_vec(),
+        );
+        let cl_block_proof_pp: L2BatchProofOutput =
+            SP1Verifier::extract_borsh_public_output(&cl_block_proof).unwrap();
+
+        let l2_batch_proof = Proof::new(
+            include_bytes!(
+                "../../../functional-tests/proofrequest_01jaamqk0hemqs6s3jx46avt3h.c_proof"
+            )
+            .to_vec(),
+        );
+        let l2_batch_proof_pp: L2BatchProofOutput =
+            SP1Verifier::extract_borsh_public_output(&l2_batch_proof).unwrap();
+
+        let l1_batch_pp: SP1ProofWithPublicValues =
+            bincode::deserialize(l1_batch_proof.as_bytes()).unwrap();
+        let mut header_vs: HeaderVerificationState =
+            borsh::from_slice(&l1_batch_pp.stdin.buffer[1]).unwrap();
+        let params = get_btc_params();
+
+        println!("{:?}", header_vs.compute_initial_snapshot());
+        println!("{:?}", header_vs.compute_final_snapshot());
+        header_vs.check_and_update_continuity(
+            &bitcoin::consensus::deserialize(&btc_block_proof_501_pp.header_raw).unwrap(),
+            &params,
+        );
+        println!("{:?}", header_vs.compute_initial_snapshot());
+        println!("{:?}", header_vs.compute_final_snapshot());
+
+        header_vs.check_and_update_continuity(
+            &bitcoin::consensus::deserialize(&btc_block_proof_502_pp.header_raw).unwrap(),
+            &params,
+        );
+        println!("{:?}", header_vs.compute_initial_snapshot());
+        println!("{:?}", header_vs.compute_final_snapshot());
+
+        header_vs.check_and_update_continuity(
+            &bitcoin::consensus::deserialize(&btc_block_proof_503_pp.header_raw).unwrap(),
+            &params,
+        );
+        println!("{:?}", header_vs.compute_initial_snapshot());
+        println!("{:?}", header_vs.compute_final_snapshot());
+
+        header_vs.check_and_update_continuity(
+            &bitcoin::consensus::deserialize(&btc_block_proof_504_pp.header_raw).unwrap(),
+            &params,
+        );
+        println!("{:?}", header_vs.compute_initial_snapshot());
+        println!("{:?}", header_vs.compute_final_snapshot());
+    }
+}
