@@ -1,7 +1,7 @@
 //! This crate implements the aggregation of consecutive L1 blocks to form a single proof
 
 use borsh::{BorshDeserialize, BorshSerialize};
-use strata_primitives::buf::Buf32;
+use strata_primitives::{buf::Buf32, params::RollupParams};
 use strata_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
 use strata_state::{
     batch::BatchCheckpoint,
@@ -9,10 +9,11 @@ use strata_state::{
     tx::DepositInfo,
 };
 
-#[derive(Debug, BorshSerialize, BorshDeserialize)]
+#[derive(Debug)]
 pub struct L1BatchProofInput {
     pub batch: Vec<BlockspaceProofOutput>,
     pub state: HeaderVerificationState,
+    pub rollup_params: RollupParams,
 }
 
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
@@ -36,7 +37,7 @@ pub fn process_batch_proof(input: L1BatchProofInput) -> L1BatchProofOutput {
     let params = get_btc_params();
 
     assert!(!input.batch.is_empty());
-    let rollup_params_commitment = input.batch[0].rollup_params_commitment;
+    let tx_filters_commitment = input.batch[0].tx_filters_commitment;
 
     let mut deposits = Vec::new();
     let mut prev_checkpoint = None;
@@ -45,10 +46,7 @@ pub fn process_batch_proof(input: L1BatchProofInput) -> L1BatchProofOutput {
         state.check_and_update_full(&header, &params);
         deposits.extend(blockspace.deposits);
         prev_checkpoint = prev_checkpoint.or(blockspace.prev_checkpoint);
-        assert_eq!(
-            blockspace.rollup_params_commitment,
-            rollup_params_commitment
-        );
+        assert_eq!(blockspace.tx_filters_commitment, tx_filters_commitment);
     }
     let final_snapshot = state.compute_snapshot();
 
@@ -57,6 +55,6 @@ pub fn process_batch_proof(input: L1BatchProofInput) -> L1BatchProofOutput {
         prev_checkpoint,
         initial_snapshot,
         final_snapshot,
-        rollup_params_commitment,
+        rollup_params_commitment: tx_filters_commitment,
     }
 }

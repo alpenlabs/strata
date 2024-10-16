@@ -72,6 +72,9 @@ pub fn gen_l2_chain(parent: Option<SignedL2BlockHeader>, blocks_num: usize) -> V
 
 pub fn gen_params_with_seed(seed: u64) -> Params {
     let opkeys = make_dummy_operator_pubkeys_with_seed(seed);
+    let opkeys1 = make_dummy_operator_pubkeys_with_seed(2);
+    let opkeys2 = make_dummy_operator_pubkeys_with_seed(3);
+    let opkeys3 = make_dummy_operator_pubkeys_with_seed(4);
     Params {
         rollup: RollupParams {
             rollup_name: "strata".to_string(),
@@ -79,7 +82,7 @@ pub fn gen_params_with_seed(seed: u64) -> Params {
             cred_rule: block_credential::CredRule::Unchecked,
             horizon_l1_height: 40318,
             genesis_l1_height: 40320, // we have mainnet blocks from this height test-utils
-            operator_config: OperatorConfig::Static(vec![opkeys]),
+            operator_config: OperatorConfig::Static(vec![opkeys, opkeys1, opkeys2, opkeys3]),
             evm_genesis_block_hash: Buf32(
                 "0x37ad61cff1367467a98cf7c54c4ac99e989f1fbb1bc1e646235e90c065c565ba"
                     .parse()

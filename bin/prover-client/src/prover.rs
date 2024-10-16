@@ -110,13 +110,15 @@ where
             Vm::Input::new().write(&el_input)?.build()?
         }
 
-        ZKVMInput::BtcBlock(block, rollup_params) => Vm::Input::new()
-            .write(&rollup_params)?
+        ZKVMInput::BtcBlock(block, cred_rule, tx_filters) => Vm::Input::new()
+            .write(&cred_rule)?
             .write_serialized(&bitcoin::consensus::serialize(&block))?
+            .write_borsh(&tx_filters)?
             .build()?,
 
         ZKVMInput::L1Batch(l1_batch_input) => {
             let mut input_builder = Vm::Input::new();
+            input_builder.write(&l1_batch_input.rollup_params)?;
             input_builder.write_borsh(&l1_batch_input.header_verification_state)?;
             input_builder.write(&l1_batch_input.btc_task_ids.len())?;
             // Write each proof input
@@ -171,7 +173,7 @@ where
     };
 
     let (proof, vk) = vm.prove(zkvm_input)?;
-    let agg_input = ProofWithVkey::new(proof, vk);
+    let agg_input = ProofWithVkey::new(proof.into(), vk);
     Ok(agg_input)
 }
 
@@ -303,7 +305,7 @@ where
     fn save_proof_to_db(&self, task_id: Uuid, proof: &Proof) -> Result<(), anyhow::Error> {
         self.db
             .prover_store()
-            .insert_new_task_entry(*task_id.as_bytes(), proof.into())?;
+            .insert_new_task_entry(*task_id.as_bytes(), proof.as_bytes().to_vec())?;
         Ok(())
     }
 
@@ -315,7 +317,7 @@ where
             .prover_provider()
             .get_task_entry_by_id(*task_id.as_bytes())?;
         match proof_entry {
-            Some(raw_proof) => Ok(Proof::new(raw_proof)),
+            Some(raw_proof) => Ok(bincode::deserialize(&raw_proof)?),
             None => Err(anyhow::anyhow!("Proof not found for {:?}", task_id)),
         }
     }

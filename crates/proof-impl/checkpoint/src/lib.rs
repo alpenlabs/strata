@@ -3,10 +3,10 @@
 //! chain and that all L1-L2 transactions were processed.
 
 use borsh::{BorshDeserialize, BorshSerialize};
-use strata_primitives::buf::Buf32;
+use strata_primitives::{buf::Buf32, params::RollupParams};
 use strata_proofimpl_l1_batch::L1BatchProofOutput;
 use strata_state::{
-    batch::{BatchInfo, BootstrapState},
+    batch::{BatchInfo, CheckpointProofOutput},
     id::L2BlockId,
     tx::DepositInfo,
 };
@@ -44,43 +44,29 @@ pub struct CheckpointProofInput {
     pub vk: Vec<u8>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, BorshDeserialize, BorshSerialize)]
-pub struct CheckpointProofOutput {
-    pub info: BatchInfo,
-    pub bootstrap_state: BootstrapState,
-    pub rollup_params_commitment: Buf32,
-}
-
-impl CheckpointProofOutput {
-    pub fn new(
-        info: BatchInfo,
-        bootstrap: BootstrapState,
-        rollup_params_commitment: Buf32,
-    ) -> CheckpointProofOutput {
-        Self {
-            info,
-            bootstrap_state: bootstrap,
-            rollup_params_commitment,
-        }
-    }
-}
-
 pub fn process_checkpoint_proof(
     l1_batch_output: &L1BatchProofOutput,
     l2_batch_output: &L2BatchProofOutput,
+    rollup_params: &RollupParams,
 ) -> (
     CheckpointProofOutput,
     Option<(CheckpointProofOutput, Proof)>,
 ) {
     assert_eq!(
-        l1_batch_output.deposits, l2_batch_output.deposits,
-        "Deposits mismatch between L1 and L2"
-    );
-
-    assert_eq!(
         l1_batch_output.rollup_params_commitment(),
         l2_batch_output.rollup_params_commitment(),
         "Rollup params mismatch between L1 and L2"
+    );
+
+    assert_eq!(
+        rollup_params.compute_hash(),
+        l1_batch_output.rollup_params_commitment(),
+        "Rollup params mismatch checkpoint and batches"
+    );
+
+    assert_eq!(
+        l1_batch_output.deposits, l2_batch_output.deposits,
+        "Deposits mismatch between L1 and L2"
     );
 
     // Create BatchInfo based on `l1_batch` and `l2_batch`
@@ -138,7 +124,6 @@ pub fn process_checkpoint_proof(
                 let prev_checkpoint_output = CheckpointProofOutput::new(
                     prev_checkpoint.batch_info().clone(),
                     bootstrap.clone(),
-                    l1_batch_output.rollup_params_commitment,
                 );
                 let prev_checkpoint_proof = prev_checkpoint.proof().clone();
                 (
@@ -148,10 +133,6 @@ pub fn process_checkpoint_proof(
             }
         }
     };
-    let output = CheckpointProofOutput::new(
-        batch_info,
-        bootstrap,
-        l1_batch_output.rollup_params_commitment,
-    );
+    let output = CheckpointProofOutput::new(batch_info, bootstrap);
     (output, opt_prev_output)
 }
