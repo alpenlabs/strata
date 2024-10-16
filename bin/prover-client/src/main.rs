@@ -105,14 +105,14 @@ async fn main() {
     tokio::spawn(async move { prover_manager.run().await });
 
     // run checkpoint runner
-    // tokio::spawn(async move {
-    //     start_checkpoints_task(
-    //         cl_client.clone(),
-    //         checkpoint_dispatcher.clone(),
-    //         task_tracker.clone(),
-    //     )
-    //     .await
-    // });
+    tokio::spawn(async move {
+        start_checkpoints_task(
+            cl_client.clone(),
+            checkpoint_dispatcher.clone(),
+            task_tracker.clone(),
+        )
+        .await
+    });
 
     // Run prover manager in dev mode or runner mode
     if args.enable_dev_rpcs {
@@ -132,4 +132,30 @@ async fn run_rpc_server(
     let rpc_impl = ProverClientRpc::new(rpc_context);
     rpc_server::start(&rpc_impl, rpc_url, enable_dev_rpc).await?;
     anyhow::Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    use sp1_sdk::SP1ProofWithPublicValues;
+    use strata_sp1_adapter::SP1Verifier;
+    use strata_state::batch::{BatchCheckpoint, CheckpointProofOutput};
+    use strata_zkvm::{Proof, ZKVMVerifier};
+
+    #[test]
+    fn test_batch_checkpoint() {
+        let batch_checkpoint_raw =
+            include_bytes!("../../../functional-tests/sp1_batch_checkpoint.bin");
+        let batch_checkpoint: BatchCheckpoint = borsh::from_slice(batch_checkpoint_raw).unwrap();
+        // println!("batch_checkpoint {:?}", batch_checkpoint);
+        println!("batch_checkpoint pp {:?}", batch_checkpoint.proof_output());
+
+        let ckp_proof_raw = include_bytes!(
+            "../../../functional-tests/proofrequest_01jaamw46dfvhrhvzaea8py6nw.cs_proof"
+        );
+        let proof = Proof::new(ckp_proof_raw.to_vec());
+        let ckp_pp: CheckpointProofOutput =
+            SP1Verifier::extract_borsh_public_output(&proof).unwrap();
+
+        println!("got the proof pp {:?}", ckp_pp)
+    }
 }
