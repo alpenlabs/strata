@@ -33,7 +33,7 @@ impl L1BatchProofOutput {
 
 pub fn process_batch_proof(input: L1BatchProofInput) -> L1BatchProofOutput {
     let mut state = input.state;
-    let initial_snapshot = state.compute_snapshot();
+    let initial_snapshot = state.compute_initial_snapshot();
     let params = get_btc_params();
 
     assert!(!input.batch.is_empty());
@@ -48,7 +48,7 @@ pub fn process_batch_proof(input: L1BatchProofInput) -> L1BatchProofOutput {
         prev_checkpoint = prev_checkpoint.or(blockspace.prev_checkpoint);
         assert_eq!(blockspace.tx_filters_commitment, tx_filters_commitment);
     }
-    let final_snapshot = state.compute_snapshot();
+    let final_snapshot = state.compute_final_snapshot();
 
     L1BatchProofOutput {
         deposits,

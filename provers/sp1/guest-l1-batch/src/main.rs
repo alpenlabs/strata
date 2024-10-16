@@ -21,7 +21,7 @@ fn main() {
     let tx_filters = derive_tx_filter_rules(&rollup_params).unwrap();
     let tx_filters_commitment = compute_borsh_hash(&tx_filters);
 
-    let initial_snapshot = state.compute_snapshot();
+    let initial_snapshot = state.compute_initial_snapshot();
     let mut deposits = Vec::new();
     let mut prev_checkpoint = None;
 
@@ -43,7 +43,7 @@ fn main() {
         assert_eq!(blkpo.tx_filters_commitment, tx_filters_commitment);
         assert_eq!(blkpo.cred_rule, rollup_params.cred_rule);
     }
-    let final_snapshot = state.compute_snapshot();
+    let final_snapshot = state.compute_final_snapshot();
 
     let output = L1BatchProofOutput {
         deposits,
