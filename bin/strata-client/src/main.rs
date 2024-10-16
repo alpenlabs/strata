@@ -2,6 +2,7 @@ use std::{str::FromStr, sync::Arc, time::Duration};
 
 use bitcoin::{hashes::Hash, Address, BlockHash};
 use config::{ClientMode, Config, SequencerConfig};
+use el_sync::sync_chainstate_to_el;
 use jsonrpsee::Methods;
 use rpc_client::sync_client;
 use strata_bridge_relay::relayer::RelayerHandle;
@@ -44,6 +45,7 @@ use crate::{args::Args, helpers::*};
 
 mod args;
 mod config;
+mod el_sync;
 mod errors;
 mod extractor;
 mod helpers;
@@ -272,8 +274,8 @@ fn do_startup_checks(
         }
         Ok(false) => {
             // Current chain tip tip block is not known by the EL.
-            // TODO: Try to sync EL using existing block payloads from DB.
-            anyhow::bail!("missing expected evm block, block_id = {}", chain_tip);
+            warn!("missing expected evm block, block_id = {}", chain_tip);
+            sync_chainstate_to_el(database, engine)?;
         }
         Err(error) => {
             // Likely network issue
