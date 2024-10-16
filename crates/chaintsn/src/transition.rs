@@ -6,6 +6,7 @@ use std::{cmp::max, collections::HashMap};
 
 use bitcoin::{OutPoint, Transaction};
 use borsh::BorshDeserialize;
+use rand_core::{RngCore, SeedableRng};
 use strata_primitives::{
     l1::{BitcoinAmount, L1TxRef, OutputRef},
     params::RollupParams,
@@ -69,7 +70,7 @@ pub fn process_block(
 fn compute_init_slot_rng(state: &StateCache) -> SlotRng {
     // Just take the last block's slot.
     let blkid_buf = *state.state().chain_tip_blockid().as_ref();
-    SlotRng::new_seeded(blkid_buf)
+    SlotRng::from_seed(blkid_buf)
 }
 
 /// Update our view of the L1 state, playing out downstream changes from that.
