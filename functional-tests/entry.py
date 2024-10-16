@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import json
 import os
+import shutil
 import sys
 import time
 from itertools import islice
@@ -271,8 +272,25 @@ class RethFactory(flexitest.Factory):
             w3.middleware_onion.add(web3.middleware.SignAndSendRawMiddlewareBuilder.build(account))
             return w3
 
+        def snapshot_dir_path(idx: int):
+            return os.path.join(ctx.envdd_path, f"reth.{id}.{idx}")
+
+        def _snapshot_datadir(idx: int):
+            snapshot_dir = snapshot_dir_path(idx)
+            os.makedirs(snapshot_dir, exist_ok=True)
+            shutil.copytree(datadir, snapshot_dir, dirs_exist_ok=True)
+
+        def _restore_snapshot(idx: int):
+            assert not svc.is_started(), "Should call restore only when service is stopped"
+            snapshot_dir = snapshot_dir_path(idx)
+            assert os.path.exists(snapshot_dir)
+            shutil.rmtree(datadir)
+            os.rename(snapshot_dir, datadir)
+
         svc.create_rpc = _create_rpc
         svc.create_web3 = _create_web3
+        svc.snapshot_datadir = _snapshot_datadir
+        svc.restore_snapshot = _restore_snapshot
 
         return svc
 
