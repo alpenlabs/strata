@@ -1,70 +1,123 @@
-//! Deterministic and non-cryptographically-secure RNG for use when picking
-//! stuff in the CL STF.
+//! Deterministic cryptographically-secure PRNG for use when picking stuff in the CL STF.
 //!
-//! This uses `ChaCha8Rng` from the `rand_chacha` crate.
+//! This uses `ChaCha12Rng` from the `rand_chacha` crate.
 
-use rand_core::{RngCore, SeedableRng};
+use rand_chacha::ChaCha12Rng;
+use rand_core::{CryptoRng, RngCore, SeedableRng};
 
-/// RNG used within the scope of a block's slot processing.
+/// Deterministic CSPRNG used within the scope of a block's slot processing.
+/// WARNING: This is _not_ suitable for use cases like key generation!
 pub struct SlotRng {
-    // This uses the 64-bit version so that we don't have to keep around 128
-    // bits of state data.  Probably isn't a significant improvement to
-    // performance, but it's nice.
-    rng: rand_chacha::ChaCha8Rng,
+    rng: rand_chacha::ChaCha12Rng,
 }
 
-impl SlotRng {
-    pub fn new_seeded(seed: [u8; 32]) -> Self {
+impl CryptoRng for SlotRng {}
+
+impl SeedableRng for SlotRng {
+    type Seed = [u8; 32];
+
+    fn from_seed(seed: Self::Seed) -> Self {
         Self {
-            rng: rand_chacha::ChaCha8Rng::from_seed(seed),
+            rng: ChaCha12Rng::from_seed(seed),
         }
     }
+}
 
-    /// Generates the next 64-bit word from the RNG.
-    pub fn next_word(&mut self) -> u64 {
+impl RngCore for SlotRng {
+    fn next_u32(&mut self) -> u32 {
+        self.rng.next_u32()
+    }
+
+    fn next_u64(&mut self) -> u64 {
         self.rng.next_u64()
     }
 
-    /// Returns a randomly generates array of bytes.  For types smaller than 8
-    /// bytes, it may be better to call `.next_word()` and bitmask the result.
-    pub fn next_arr<const N: usize>(&mut self) -> [u8; N] {
-        const BYTES_PER_WORD: usize = 8;
-        let words = N / BYTES_PER_WORD;
-
-        let mut buf = [0; N];
-
-        // Copy directly most of the bytes.  For types smaller than a word this
-        // loop doesn't actually run, it might be better to call `.next_word()`
-        // directly and bitmask it.
-        for i in 0..words {
-            let target_start = i * BYTES_PER_WORD;
-            let target_end = target_start + BYTES_PER_WORD;
-            let vb = self.next_word().to_be_bytes();
-            buf[target_start..target_end].copy_from_slice(&vb);
-        }
-
-        // Then copy in a partial word if it's not a multiple of 8.  Throwing
-        // away any entropy we generate that would be over the end of the buffer.
-        let extra_bytes = N % BYTES_PER_WORD;
-        if extra_bytes > 0 {
-            let target_start = words * BYTES_PER_WORD;
-            let target_end = target_start + extra_bytes;
-            let vb = self.next_word().to_be_bytes();
-            buf[target_start..target_end].copy_from_slice(&vb[..extra_bytes]);
-        }
-
-        buf
+    fn fill_bytes(&mut self, dest: &mut [u8]) {
+        self.rng.fill_bytes(dest);
     }
 
-    /// Returns a pseudorandom u8.
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core::Error> {
+        self.rng.try_fill_bytes(dest)
+    }
+}
+
+impl SlotRng {
+    /// Returns a randomly-generated array of bytes.
+    pub fn next_arr<const N: usize>(&mut self) -> [u8; N] {
+        let mut arr = [0u8; N];
+        self.fill_bytes(&mut arr);
+
+        arr
+    }
+
+    /// Returns a pseudorandom `u8`.
     pub fn next_u8(&mut self) -> u8 {
-        let byte = self.next_word();
+        let byte = self.next_u32();
         (byte & 0xff) as u8
     }
+}
 
-    /// Returns a pseudorandom u32.
-    pub fn next_u32(&mut self) -> u32 {
-        let word = self.next_word();
-        (word & 0xffffffff) as u32
+#[cfg(test)]
+mod test {
+    use bitcoin::key::rand::Rng;
+
+    use super::*;
+
+    #[test]
+    // Identical seeds should yield identical outputs
+    fn test_identical() {
+        assert_eq!(
+            SlotRng::from_seed([0u8; 32]).next_u32(),
+            SlotRng::from_seed([0u8; 32]).next_u32()
+        );
+    }
+
+    #[test]
+    // Distinct seeds should yield distinct outputs
+    fn test_unique() {
+        assert_ne!(
+            SlotRng::from_seed([0u8; 32]).next_u32(),
+            SlotRng::from_seed([1u8; 32]).next_u32()
+        );
+    }
+
+    #[test]
+    // Arrays should be filled with data correctly
+    fn test_array() {
+        // Generate and return a random array
+        let next_arr = SlotRng::from_seed([1u8; 32]).next_arr::<32>();
+
+        // Generate the same array using `RngCore` functionality
+        let mut rng = SlotRng::from_seed([1u8; 32]);
+        let mut fill_arr = [0u8; 32];
+        rng.fill(&mut fill_arr);
+
+        // They should match and contain fresh data
+        assert_eq!(next_arr, fill_arr);
+        assert_ne!(fill_arr, [0u8; 32]);
+    }
+
+    #[test]
+    // Generation of a `u8` should be correct
+    fn test_u8() {
+        // Generate a `u8` on its own
+        let standalone_u8 = SlotRng::from_seed([1u8; 32]).next_u8();
+
+        // Generate a `u8` from an array
+        let arr_u8 = SlotRng::from_seed([1u8; 32]).next_arr::<1>()[0];
+
+        assert_eq!(standalone_u8, arr_u8);
+    }
+
+    #[test]
+    // Generation of `u32` and `u64` should be bitwise consistent
+    fn test_u32_u64() {
+        // Generate a `u32` on its own
+        let standalone_u32 = SlotRng::from_seed([2u8; 32]).next_u32();
+
+        // Generate a `u32` by masking a `u64`
+        let masked_u32 = (SlotRng::from_seed([2u8; 32]).next_u64() & 0xFFFF_FFFFu64) as u32;
+
+        assert_eq!(standalone_u32, masked_u32);
     }
 }
