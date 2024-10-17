@@ -55,6 +55,7 @@ members = [
 
   # integration tests
   "tests",
+  "crates/util/python-utils",
 ]
 
 default-members = [

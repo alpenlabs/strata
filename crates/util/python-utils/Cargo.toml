@@ -1,0 +1,33 @@
+[package]
+name = "strata-python-utils"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "strata_utils"
+# "cdylib" is necessary to produce a shared library for Python to import from.
+#
+# Downstream Rust code (including code in `bin/`, `examples/`, and `tests/`) will not be able
+# to `use foo;` unless the "rlib" or "lib" crate type is also included, e.g.:
+# crate-type = ["cdylib", "rlib"]
+crate-type = ["cdylib"]
+
+[dependencies]
+bdk_bitcoind_rpc = "0.16.0"
+# TODO: once bdk_wallet 1.0 is released, update this and don't change!
+bdk_wallet = "1.0.0-beta.5"
+# "abi3-py310" tells pyo3 (and maturin) to build using the stable ABI with minimum Python version 3.10
+musig2.workspace = true
+pyo3 = { version = "0.22.4", features = ["extension-module", "abi3-py310"] }
+reth-primitives.workspace = true
+
+# Internal crates
+shrex = { version = "0.1.0", path = "../shrex", features = ["serde"] }
+
+[dev-dependencies]
+anyhow.workspace = true
+bitcoind.workspace = true
+tokio.workspace = true
+
+# Internal crates
+strata-btcio.workspace = true

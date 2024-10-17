@@ -11,7 +11,8 @@ use bitcoin::{
     script::{Builder, PushBytesBuf},
     secp256k1::{PublicKey, XOnlyPublicKey, SECP256K1},
     taproot::{TaprootBuilder, TaprootSpendInfo},
-    transaction, Address, Amount, Network, OutPoint, ScriptBuf, Transaction, TxIn, TxOut, Witness,
+    transaction, Address, Amount, Network, OutPoint, ScriptBuf, Sequence, Transaction, TxIn, TxOut,
+    Witness,
 };
 use musig2::KeyAggContext;
 use strata_primitives::bridge::PublickeyTable;
@@ -218,7 +219,7 @@ pub fn create_tx_ins(utxos: impl IntoIterator<Item = OutPoint>) -> Vec<TxIn> {
     for utxo in utxos {
         tx_ins.push(TxIn {
             previous_output: utxo,
-            sequence: bitcoin::transaction::Sequence::ENABLE_RBF_NO_LOCKTIME,
+            sequence: Sequence::ENABLE_RBF_NO_LOCKTIME,
             script_sig: ScriptBuf::default(),
             witness: Witness::new(),
         });

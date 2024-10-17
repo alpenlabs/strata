@@ -5,7 +5,7 @@ import subprocess
 import time
 from dataclasses import dataclass
 from threading import Thread
-from typing import Any, Callable, Optional, TypeVar
+from typing import Any, Callable, List, Optional, TypeVar
 
 from bitcoinlib.services.bitcoind import BitcoindClient
 
@@ -382,3 +382,20 @@ def generate_simple_params(
     params = generate_params(settings, seqkey, opxpubs)
     print("Params", params)
     return {"params": params, "opseedpaths": opseedpaths}
+
+
+def broadcast_tx(btcrpc: BitcoindClient, outputs: List[dict], options: dict) -> str:
+    """
+    Broadcast a transaction to the Bitcoin network.
+    """
+    psbt_result = btcrpc.proxy.walletcreatefundedpsbt([], outputs, 0, options)
+    psbt = psbt_result["psbt"]
+
+    signed_psbt = btcrpc.proxy.walletprocesspsbt(psbt)
+
+    finalized_psbt = btcrpc.proxy.finalizepsbt(signed_psbt["psbt"])
+    deposit_tx = finalized_psbt["hex"]
+
+    txid = btcrpc.sendrawtransaction(deposit_tx).get("txid", "")
+
+    return txid

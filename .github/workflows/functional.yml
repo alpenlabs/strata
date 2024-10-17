@@ -21,25 +21,34 @@ jobs:
 
       - name: Set up Python
         uses: actions/setup-python@v5
+        id: setup-python
         with:
           python-version: "^3.10" # Keep in sync with `pyproject.toml`
 
-      - name: Install Poetry
-        run: |
-          curl -sSL https://install.python-poetry.org | python -
-          echo "${HOME}/.local/bin" >> $GITHUB_PATH
+      - name: Install poetry
+        uses: snok/install-poetry@v1
+        with:
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v4
+        with:
+          path: functional-tests/.venv
+          key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
 
-      - name: Configure Poetry to create the virtual environment inside the project
-        run: poetry config virtualenvs.in-project true
-
-      - name: Install python dependencies
-        run: cd functional-tests && poetry install --no-root && cd -
+      - name: Install dependencies
+        working-directory: functional-tests
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --no-root --no-interaction
 
       - name: Check formatting
-        run: cd functional-tests && poetry run ruff format --check && cd -
+        working-directory: functional-tests
+        run: poetry run ruff format --check
 
       - name: Lint
-        run: cd functional-tests && poetry run ruff check && cd -
+        working-directory: functional-tests
+        run: poetry run ruff check
 
   run:
     name: Run functional tests
@@ -68,19 +77,26 @@ jobs:
 
       - name: Set up Python
         uses: actions/setup-python@v5
+        id: setup-python
         with:
           python-version: "^3.10" # Keep in sync with `pyproject.toml`
 
-      - name: Install Poetry
-        run: |
-          curl -sSL https://install.python-poetry.org | python -
-          echo "${HOME}/.local/bin" >> $GITHUB_PATH
+      - name: Install poetry
+        uses: snok/install-poetry@v1
+        with:
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v4
+        with:
+          path: functional-tests/.venv
+          key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
 
-      - name: Configure Poetry to create the virtual environment inside the project
-        run: poetry config virtualenvs.in-project true
-
-      - name: Install python dependencies
-        run: cd functional-tests && poetry install --no-root && cd -
+      - name: Install dependencies
+        working-directory: functional-tests
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --no-root --no-interaction
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@nightly
