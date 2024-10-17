@@ -13,6 +13,7 @@ use crate::proving_ops::{
 pub type ProofWithVkey = AggregationInput;
 
 #[derive(Debug, Clone)]
+#[allow(clippy::large_enum_variant)]
 pub enum ZKVMInput {
     BtcBlock(Block, CredRule, Vec<TxFilterRule>),
     ElBlock(WitnessData),
