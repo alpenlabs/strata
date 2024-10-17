@@ -21,6 +21,7 @@ from constants import (
     DD_ROOT,
     DEFAULT_ROLLUP_PARAMS,
     FAST_BATCH_ROLLUP_PARAMS,
+    PROVER_ROLLUP_PARAMS,
     SEQ_KEY,
 )
 from utils import generate_blocks, generate_jwt_secret
@@ -574,7 +575,9 @@ def main(argv):
         "premined_blocks": BasicEnvConfig(101),
         "fast_batches": BasicEnvConfig(101, rollup_params=FAST_BATCH_ROLLUP_PARAMS),
         "hub1": HubNetworkEnvConfig(),
-        "prover": BasicEnvConfig(101, enable_prover_client=True),
+        "prover": BasicEnvConfig(
+            101, rollup_params=PROVER_ROLLUP_PARAMS, enable_prover_client=True
+        ),
     }
 
     rt = flexitest.TestRuntime(global_envs, datadir_root, factories)

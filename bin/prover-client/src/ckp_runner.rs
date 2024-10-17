@@ -139,7 +139,6 @@ async fn check_and_submit_proof(
                             error!("Failed to submit checkpoint proof: {}", e);
                         }
                     }
-                    assert_eq!(1, 2);
                 }
                 None => {
                     warn!(
