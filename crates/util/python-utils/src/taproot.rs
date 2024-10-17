@@ -6,9 +6,10 @@ use bdk_bitcoind_rpc::{
 };
 use bdk_wallet::{
     bitcoin::{
-        consensus::serialize, key::Parity, Address, AddressType, FeeRate, Transaction,
+        consensus::serialize, key::Parity, Address, AddressType, FeeRate, PublicKey, Transaction,
         XOnlyPublicKey,
     },
+    miniscript::ToPublicKey,
     KeychainKind, Wallet,
 };
 use musig2::KeyAggContext;
@@ -17,7 +18,7 @@ use pyo3::prelude::*;
 use crate::{
     constants::{CHANGE_DESCRIPTOR, DESCRIPTOR, NETWORK},
     error::Error,
-    parse::parse_xonly_pk,
+    parse::{parse_pk, parse_xonly_pk},
 };
 
 /// Extracts the public key from a Taproot address.
@@ -102,7 +103,7 @@ pub(crate) fn musig_aggregate_pks_inner(pks: Vec<XOnlyPublicKey>) -> Result<XOnl
 
 /// Gets a (receiving/external) address from the wallet at the given `index`.
 #[pyfunction]
-pub(crate) fn get_address(index: u32) -> Result<String, Error> {
+pub(crate) fn get_address(index: u32) -> PyResult<String> {
     let wallet = taproot_wallet()?;
     let address = wallet
         .peek_address(KeychainKind::External, index)
@@ -113,7 +114,7 @@ pub(crate) fn get_address(index: u32) -> Result<String, Error> {
 
 /// Gets a (change/internal) address from the wallet at a given `index`.
 #[pyfunction]
-pub(crate) fn get_change_address(index: u32) -> Result<String, Error> {
+pub(crate) fn get_change_address(index: u32) -> PyResult<String> {
     let wallet = taproot_wallet()?;
     let address = wallet
         .peek_address(KeychainKind::Internal, index)
@@ -128,12 +129,38 @@ pub(crate) fn get_change_address(index: u32) -> Result<String, Error> {
 ///
 /// These should all be X-only public keys.
 #[pyfunction]
-pub(crate) fn musig_aggregate_pks(pks: Vec<String>) -> Result<String, Error> {
+pub(crate) fn musig_aggregate_pks(pks: Vec<String>) -> PyResult<String> {
     let pks = pks
         .into_iter()
         .map(|pk| parse_xonly_pk(&pk).map_err(|_| Error::XOnlyPublicKey))
         .collect::<Result<Vec<_>, _>>()?;
     Ok(musig_aggregate_pks_inner(pks)?.to_string())
+}
+
+/// Converts a [`PublicKey`] to an [`XOnlyPublicKey`].
+///
+/// # Note
+///
+/// This only works for even keys (i.e. starts with `"02"`) and will return an error otherwise.
+#[pyfunction]
+pub(crate) fn convert_to_xonly_pk(pk: String) -> PyResult<String> {
+    let pk = parse_pk(&pk)?;
+    let x_only_pk = convert_to_xonly_pk_inner(pk)?;
+    Ok(x_only_pk.to_string())
+}
+
+/// Converts a [`PublicKey`] to an [`XOnlyPublicKey`].
+///
+/// # Note
+///
+/// This only works for even keys (i.e. starts with `"02"`) and will return an error otherwise.
+fn convert_to_xonly_pk_inner(pk: PublicKey) -> Result<XOnlyPublicKey, Error> {
+    // assert that the first byte is 0x02 as string.
+    if !pk.to_string().starts_with("02") {
+        return Err(Error::PublicKey);
+    }
+    let x_only_pk = pk.to_x_only_pubkey();
+    Ok(x_only_pk)
 }
 
 /// Extract the [`XOnlyPublicKey`] from a Taproot `address`.
@@ -142,7 +169,7 @@ pub(crate) fn musig_aggregate_pks(pks: Vec<String>) -> Result<String, Error> {
 ///
 /// This assumes that the caller has verified the `address`.
 #[pyfunction]
-pub(crate) fn extract_p2tr_pubkey(address: String) -> Result<String, Error> {
+pub(crate) fn extract_p2tr_pubkey(address: String) -> PyResult<String> {
     let address = &address
         .parse::<Address<_>>()
         .map_err(|_| Error::NotTaprootAddress)?
@@ -231,7 +258,7 @@ pub(crate) fn drain_wallet(
     bitcoind_url: String,
     bitcoind_user: String,
     bitcoind_password: String,
-) -> Result<Vec<u8>, Error> {
+) -> PyResult<Vec<u8>> {
     let signed_tx =
         drain_wallet_inner(&address, &bitcoind_url, &bitcoind_user, &bitcoind_password)?;
 
@@ -294,5 +321,17 @@ mod tests {
         let aggregated_pk = musig_aggregate_pks_inner(pks.to_vec()).unwrap().to_string();
         let expected = "85eb6101982e142dba553cae437d08a82880fe9a22889c997f8e415a61b7a2d5";
         assert_eq!(aggregated_pk, expected);
+    }
+
+    #[test]
+    fn convert_to_xonly_pk_inner() {
+        let even_pk = "02f3b071c064f115ca762ed88c3efd1927ea657c7949698b77255ea25751331f0b"
+            .parse::<PublicKey>()
+            .unwrap();
+        let odd_pk = "03204ea8bc3425b2cbc9cb20617f67dc6b202467591d0b26d059e370b71ee392eb"
+            .parse::<PublicKey>()
+            .unwrap();
+        assert!(super::convert_to_xonly_pk_inner(even_pk).is_ok());
+        assert!(super::convert_to_xonly_pk_inner(odd_pk).is_err());
     }
 }
