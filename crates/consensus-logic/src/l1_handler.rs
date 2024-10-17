@@ -202,19 +202,19 @@ pub fn verify_proof(
     // checkpoint
 
     let sp1_proof = checkpoint.proof();
-    let sp1_proof_pp_ser: Vec<u8> = SP1Verifier::extract_borsh_public_output(sp1_proof).unwrap();
-    let obtained_public_params: CheckpointProofOutput =
-        borsh::from_slice(&sp1_proof_pp_ser).unwrap();
-    let expected_public_params: CheckpointProofOutput = checkpoint.proof_output();
-
     save_as_bin(
         "sp1_proof.bin".to_string(),
         borsh::to_vec(&sp1_proof).unwrap(),
     );
+
+    let expected_public_params: CheckpointProofOutput = checkpoint.proof_output();
     save_as_bin(
         "expected.bin".to_string(),
         borsh::to_vec(&expected_public_params).unwrap(),
     );
+
+    let obtained_public_params: CheckpointProofOutput =
+        SP1Verifier::extract_borsh_public_output(sp1_proof).unwrap();
     save_as_bin(
         "obtained.bin".to_string(),
         borsh::to_vec(&obtained_public_params).unwrap(),
@@ -229,7 +229,10 @@ pub fn verify_proof(
         }
     });
     match res {
-        Ok(Ok(())) => Ok(()),
+        Ok(Ok(())) => {
+            println!("\n*\nProof verification worked\n*\n");
+            Ok(())
+        }
         Ok(Err(e)) => Err(e),
         Err(_) => Err(anyhow!("Unexpected error occurred while verifying proof")),
     }
