@@ -25,6 +25,7 @@ use crate::{
 /// # Arguments
 ///
 /// - `el_address`: Execution layer address of the account that will receive the funds.
+/// - `musig_bridge_pk`: MuSig bridge X-only public key.
 /// - `bitcoind_url`: URL of the `bitcoind` instance.
 /// - `bitcoind_user`: Username for the `bitcoind` instance.
 /// - `bitcoind_password`: Password for the `bitcoind` instance.
@@ -56,6 +57,7 @@ pub(crate) fn deposit_request_transaction(
 /// # Arguments
 ///
 /// - `el_address`: Execution layer address of the account that will receive the funds.
+/// - `musig_bridge_pk`: MuSig bridge X-only public key.
 /// - `bitcoind_url`: URL of the `bitcoind` instance.
 /// - `bitcoind_user`: Username for the `bitcoind` instance.
 /// - `bitcoind_password`: Password for the `bitcoind` instance.
