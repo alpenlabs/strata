@@ -11,7 +11,8 @@ use strata_state::{
 };
 use tracing::*;
 
-use crate::{client_transition, errors::Error};
+use super::client_transition;
+use crate::errors::Error;
 
 pub struct StateTracker<D: Database> {
     params: Arc<Params>,
