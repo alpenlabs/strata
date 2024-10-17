@@ -35,7 +35,6 @@ pub fn process_event<D: Database>(
 
     match ev {
         SyncEvent::L1Block(height, l1blkid) => {
-            debug!(%height, "Received L1Block");
             // If the block is before the horizon we don't care about it.
             if *height < params.rollup().horizon_l1_height {
                 #[cfg(test)]
@@ -53,24 +52,21 @@ pub fn process_event<D: Database>(
                 .ok_or(Error::MissingL1BlockHeight(*height))?;
 
             let l1v = state.l1_view();
-            let tip_height = l1v.tip_height();
             let l1_vs = state.l1_view().tip_verification_state();
 
             // Do the consensus checks
             if let Some(l1_vs) = l1_vs {
                 let l1_vs_height = l1_vs.last_verified_block_num as u64;
-                debug!(%height, %l1_vs_height, %tip_height, "Updating HeaderVerificationState");
                 let mut updated_l1vs = l1_vs.clone();
-                if l1_vs_height < *height {
-                    for h in (l1_vs_height + 1..=*height) {
-                        let block_mf = l1prov
-                            .get_block_manifest(h)?
-                            .ok_or(Error::MissingL1BlockHeight(h))?;
-                        let header: Header =
-                            bitcoin::consensus::deserialize(block_mf.header()).unwrap();
-                        updated_l1vs = updated_l1vs
-                            .check_and_update_continuity_new(&header, &get_btc_params());
-                    }
+
+                for block_height in (l1_vs_height + 1..=*height) {
+                    let block_mf = l1prov
+                        .get_block_manifest(block_height)?
+                        .ok_or(Error::MissingL1BlockHeight(block_height))?;
+                    let header: Header =
+                        bitcoin::consensus::deserialize(block_mf.header()).unwrap();
+                    updated_l1vs =
+                        updated_l1vs.check_and_update_continuity_new(&header, &get_btc_params());
                 }
                 writes.push(ClientStateWrite::UpdateVerificationState(updated_l1vs))
             }

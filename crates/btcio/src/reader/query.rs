@@ -317,14 +317,21 @@ pub async fn get_verification_state(
         }
     }
 
-    let head = if height < genesis_height {
+    // Calculate the 'head' index for the ring buffer based on the current block height.
+    // The 'head' represents the position in the buffer where the next timestamp will be inserted.
+
+    // If the current height is less than the genesis height, we haven't started processing blocks
+    // yet. In this case, set 'head' to 0.
+    let head = if height <= genesis_height {
         0
     } else {
+        // Calculate the 'head' index using the formula:
+        // (current height + buffer size - 1 - genesis height) % buffer size
+        // This ensures the 'head' points to the correct position in the ring buffer.
         (height + 10 - genesis_height) % 11
     };
 
     let last_11_blocks_timestamps = TimestampStore::new_with_head(timestamps, head as usize);
-    debug!(?last_11_blocks_timestamps, "timestamps");
 
     let l1_blkid: L1BlockId = vb.header.block_hash().into();
 
@@ -336,7 +343,7 @@ pub async fn get_verification_state(
         total_accumulated_pow: 0u128,
         last_11_blocks_timestamps,
     };
-    info!(?header_vs, "HeaderVerificationState");
+    trace!(%height, ?header_vs, "HeaderVerificationState");
 
     Ok(header_vs)
 }
