@@ -185,7 +185,7 @@ impl CheckpointEntry {
         Self::new(
             info,
             bootstrap,
-            Proof::new(vec![]),
+            Proof::default(),
             CheckpointProvingStatus::PendingProof,
             CheckpointConfStatus::Pending,
         )

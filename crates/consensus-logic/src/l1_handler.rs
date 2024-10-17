@@ -145,7 +145,7 @@ fn check_for_da_batch(
 
     let sig_verified_checkpoints = signed_checkpts.filter_map(|(signed_checkpoint, tx)| {
         if let Some(seq_pubkey) = seq_pubkey {
-            if !signed_checkpoint.verify_sig(seq_pubkey.into()) {
+            if !signed_checkpoint.verify_sig(&seq_pubkey.into()) {
                 error!(
                     ?tx,
                     ?signed_checkpoint,
@@ -180,7 +180,7 @@ pub fn verify_proof(
         return Ok(());
     }
 
-    let public_params_raw = borsh::to_vec(&checkpoint).unwrap();
+    let public_params_raw = borsh::to_vec(&checkpoint.proof_output()).unwrap();
 
     // NOTE/TODO: this should also verify that this checkpoint is based on top of some previous
     // checkpoint
@@ -193,7 +193,10 @@ pub fn verify_proof(
         }
     });
     match res {
-        Ok(Ok(())) => Ok(()),
+        Ok(Ok(())) => {
+            println!("\n*\nProof verification worked\n*\n");
+            Ok(())
+        }
         Ok(Err(e)) => Err(e),
         Err(_) => Err(anyhow!("Unexpected error occurred while verifying proof")),
     }
@@ -202,7 +205,7 @@ pub fn verify_proof(
 /// Given a block, generates a manifest of the parts we care about that we can
 /// store in the database.
 fn generate_block_manifest(block: &Block) -> L1BlockManifest {
-    let blockid = Buf32::from(block.block_hash().to_raw_hash().to_byte_array());
+    let blockid = block.block_hash().into();
     let root = block
         .witness_root()
         .map(|x| x.to_byte_array())

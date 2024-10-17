@@ -5,9 +5,9 @@ use std::{
 };
 
 use anyhow::bail;
-use bitcoin::{hashes::Hash, BlockHash};
+use bitcoin::BlockHash;
 use strata_db::traits::Database;
-use strata_primitives::{buf::Buf32, params::Params};
+use strata_primitives::params::Params;
 use strata_state::l1::{
     get_btc_params, get_difficulty_adjustment_height, BtcParams, HeaderVerificationState,
     L1BlockId, TimestampStore,
@@ -260,8 +260,12 @@ async fn fetch_and_process_block(
 
     if height == genesis_threshold {
         info!(%height, %genesis_ht, "time for genesis");
+        // Since we assume the genesis block is already verified and valid,
+        // we need to set the HeaderVerificationState for the block immediately
+        // following the genesis. This is why we use `genesis_ht + 1` to start
+        // verifying from the block after genesis.
         let l1_verification_state =
-            get_verification_state(client, genesis_ht + 1, &get_btc_params()).await?;
+            get_verification_state(client, genesis_ht + 1, genesis_ht, &get_btc_params()).await?;
         if let Err(e) = event_tx
             .send(L1Event::GenesisVerificationState(
                 height,
@@ -289,6 +293,7 @@ async fn fetch_and_process_block(
 pub async fn get_verification_state(
     client: &impl Reader,
     height: u64,
+    genesis_height: u64,
     params: &BtcParams,
 ) -> anyhow::Result<HeaderVerificationState> {
     // Get the difficulty adjustment block just before `block_height`
@@ -311,16 +316,27 @@ pub async fn get_verification_state(
             timestamps[i] = 0;
         }
     }
-    let last_11_blocks_timestamps = TimestampStore::new(timestamps);
 
-    let l1_blkid: L1BlockId =
-        Buf32::from(vb.header.block_hash().as_raw_hash().to_byte_array()).into();
-    Ok(HeaderVerificationState {
+    let head = if height < genesis_height {
+        0
+    } else {
+        (height + 10 - genesis_height) % 11
+    };
+
+    let last_11_blocks_timestamps = TimestampStore::new_with_head(timestamps, head as usize);
+    debug!(?last_11_blocks_timestamps, "timestamps");
+
+    let l1_blkid: L1BlockId = vb.header.block_hash().into();
+
+    let header_vs = HeaderVerificationState {
         last_verified_block_num: vh as u32,
         last_verified_block_hash: l1_blkid,
         next_block_target: vb.header.target().to_compact_lossy().to_consensus(),
         interval_start_timestamp: b1.header.time,
         total_accumulated_pow: 0u128,
         last_11_blocks_timestamps,
-    })
+    };
+    info!(?header_vs, "HeaderVerificationState");
+
+    Ok(header_vs)
 }

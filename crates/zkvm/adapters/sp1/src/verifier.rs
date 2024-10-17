@@ -1,4 +1,4 @@
-use anyhow::{Context, Ok, Result};
+use anyhow::{ensure, Context, Ok, Result};
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::to_vec;
 use snark_bn254_verifier::Groth16Verifier;
@@ -46,8 +46,29 @@ impl ZKVMVerifier for SP1Verifier {
         Ok(())
     }
 
-    fn verify_groth16(proof: &Proof, vkey_hash: &[u8], committed_values_raw: &[u8]) -> Result<()> {
+    fn verify_groth16(
+        raw_sp1_proof: &Proof,
+        vkey_hash: &[u8],
+        committed_values_raw: &[u8],
+    ) -> Result<()> {
         let vk = GROTH16_VK_BYTES;
+
+        let sp1_proof: SP1ProofWithPublicValues = bincode::deserialize(raw_sp1_proof.as_bytes())
+            .context("Failed to deserialize SP1 Groth16 proof")?;
+
+        let sp1_groth16_proof_bytes = hex::decode(
+            &sp1_proof
+                .proof
+                .try_as_groth_16()
+                .context("Failed to convert proof to Groth16")?
+                .raw_proof,
+        )
+        .context("Failed to decode Groth16 proof")?;
+
+        ensure!(
+            sp1_proof.public_values.as_slice() == committed_values_raw,
+            "Mismatch public values"
+        );
 
         // Convert vkey_hash to Fr, mapping the error to anyhow::Error
         let vkey_hash_fr = Fr::from_slice(vkey_hash)
@@ -65,7 +86,7 @@ impl ZKVMVerifier for SP1Verifier {
 
         // Perform the Groth16 verification, mapping any error to anyhow::Error
         let verification_result = Groth16Verifier::verify(
-            proof.as_bytes(),
+            &sp1_groth16_proof_bytes,
             vk,
             &[vkey_hash_fr, committed_values_digest_fr],
         )
@@ -101,24 +122,18 @@ mod tests {
 
     use num_bigint::BigUint;
     use num_traits::Num;
+    use strata_zkvm::ProofWithMetadata;
 
     use super::*;
 
     #[test]
     fn test_groth16_verification() {
+        let expected_output: u32 = 1;
         let vk = "0x00b01ae596b4e51843484ff71ccbd0dd1a030af70b255e6b9aad50b81d81266f";
 
-        let raw_groth16_proof = include_bytes!("../tests/proofs/proof-groth16.bin");
-        let proof: SP1ProofWithPublicValues =
-            bincode::deserialize(raw_groth16_proof).expect("Failed to deserialize Groth16 proof");
-
-        let groth16_proof_bytes = proof
-            .proof
-            .try_as_groth_16()
-            .expect("Failed to convert proof to Groth16")
-            .raw_proof;
-        let groth16_proof =
-            Proof::new(hex::decode(&groth16_proof_bytes).expect("Failed to decode Groth16 proof"));
+        let raw_proof = include_bytes!("../tests/proofs/proof-groth16.bin");
+        let proof: ProofWithMetadata =
+            bincode::deserialize(raw_proof).expect("Failed to deserialize Groth16 proof");
 
         let vkey_hash = BigUint::from_str_radix(
             vk.strip_prefix("0x").expect("vkey should start with '0x'"),
@@ -128,9 +143,9 @@ mod tests {
         .to_bytes_be();
 
         assert!(SP1Verifier::verify_groth16(
-            &groth16_proof,
+            proof.proof(),
             &vkey_hash,
-            proof.public_values.as_slice()
+            &expected_output.to_le_bytes()
         )
         .is_ok());
     }

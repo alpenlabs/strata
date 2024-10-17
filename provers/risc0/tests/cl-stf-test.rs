@@ -33,7 +33,7 @@ mod test {
 
         let (proof, _) = prover.prove(input).expect("Failed to generate proof");
 
-        let new_state_ser = Risc0Verifier::extract_public_output::<Vec<u8>>(&proof)
+        let new_state_ser = Risc0Verifier::extract_public_output::<Vec<u8>>(proof.proof())
             .expect("Failed to extract public outputs");
 
         let _new_state: ChainState = borsh::from_slice(&new_state_ser).unwrap();

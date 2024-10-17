@@ -6,12 +6,13 @@ use musig2::secp256k1::SecretKey;
 use rand::{rngs::StdRng, SeedableRng};
 use strata_btcio::rpc::{traits::Reader, BitcoinClient};
 use strata_primitives::{
-    block_credential,
+    block_credential::{self, CredRule},
     buf::Buf32,
     operator::OperatorPubkeys,
     params::{OperatorConfig, Params, ProofPublishMode, RollupParams, SyncParams},
     vk::RollupVerifyingKey,
 };
+use strata_tx_parser::filter::{derive_tx_filter_rules, TxFilterRule};
 use tracing::debug;
 use uuid::Uuid;
 
@@ -37,7 +38,7 @@ impl BtcOperations {
 
 #[async_trait]
 impl ProvingOperations for BtcOperations {
-    type Input = (Block, RollupParams);
+    type Input = (Block, Vec<TxFilterRule>, CredRule);
     type Params = u64; // params is the block height
 
     fn proving_task_type(&self) -> ProvingTaskType {
@@ -48,7 +49,9 @@ impl ProvingOperations for BtcOperations {
         debug!(%block_num, "Fetching BTC block input");
         let block = self.btc_client.get_block_at(block_num).await?;
         debug!("Fetched BTC block {}", block_num);
-        Ok((block, get_pm_rollup_params()))
+        let tx_filters = derive_tx_filter_rules(&get_pm_rollup_params())?;
+        let cred_rule = get_pm_rollup_params().cred_rule;
+        Ok((block, tx_filters, cred_rule))
     }
 
     async fn append_task(
@@ -56,8 +59,8 @@ impl ProvingOperations for BtcOperations {
         task_tracker: Arc<TaskTracker>,
         input: Self::Input,
     ) -> Result<Uuid, ProvingTaskError> {
-        let (block, rollup_params) = input;
-        let prover_input = ZKVMInput::BtcBlock(block, rollup_params);
+        let (block, tx_filters, cred_rule) = input;
+        let prover_input = ZKVMInput::BtcBlock(block, cred_rule, tx_filters);
         let task_id = task_tracker.create_task(prover_input, vec![]).await;
         Ok(task_id)
     }
@@ -77,7 +80,7 @@ fn gen_params_with_seed(seed: u64) -> Params {
             block_time: 1000,
             cred_rule: block_credential::CredRule::Unchecked,
             horizon_l1_height: 3,
-            genesis_l1_height: 5, // we have mainnet blocks from this height test-utils
+            genesis_l1_height: 500, // we have mainnet blocks from this height test-utils
             operator_config: OperatorConfig::Static(vec![opkeys]),
             evm_genesis_block_hash: Buf32(
                 "0x37ad61cff1367467a98cf7c54c4ac99e989f1fbb1bc1e646235e90c065c565ba"
@@ -94,7 +97,7 @@ fn gen_params_with_seed(seed: u64) -> Params {
             address_length: 20,
             deposit_amount: 1_000_000_000,
             rollup_vk: RollupVerifyingKey::SP1VerifyingKey(Buf32(
-                "0x00b01ae596b4e51843484ff71ccbd0dd1a030af70b255e6b9aad50b81d81266f"
+                "0x00d952e267176e21519a9a00aeb2c54d08fe6c9928fcea2173a8ef3eb60b6681"
                     .parse()
                     .unwrap(),
             )),
@@ -117,4 +120,18 @@ pub fn make_dummy_operator_pubkeys_with_seed(seed: u64) -> OperatorPubkeys {
     let sk = SecretKey::new(&mut rng);
     let (pk, _) = sk.x_only_public_key(&secp);
     OperatorPubkeys::new(pk.into(), pk.into())
+}
+
+#[cfg(test)]
+mod test {
+    use super::gen_params_with_seed;
+
+    #[test]
+    fn simple() {
+        let params = gen_params_with_seed(0);
+        println!("got the params {:#?}", params);
+
+        let params_hash = params.rollup().compute_hash();
+        println!("got the rollup params hash {:#?}", params_hash)
+    }
 }
