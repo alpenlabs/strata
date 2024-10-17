@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use async_trait::async_trait;
 use bitcoin::{
     bip32::Xpriv,
@@ -8,15 +6,14 @@ use bitcoin::{
     taproot::ControlBlock,
     Address, Amount, Block, BlockHash, Network, ScriptBuf, SignedAmount, Transaction, Txid, Work,
 };
-use bitcoind_json_rpc_types::v26::GetBlockchainInfo;
 use strata_state::tx::InscriptionData;
 
 use crate::{
     rpc::{
         traits::{Broadcaster, Reader, Signer, Wallet},
         types::{
-            GetTransaction, ImportDescriptor, ImportDescriptorResult, ListTransactions,
-            ListUnspent, SignRawTransactionWithWallet,
+            GetBlockchainInfo, GetTransaction, ImportDescriptor, ImportDescriptorResult,
+            ListTransactions, ListUnspent, SignRawTransactionWithWallet,
         },
         ClientResult,
     },
@@ -94,8 +91,6 @@ impl Reader for TestBitcoinClient {
             prune_height: None,
             automatic_pruning: None,
             prune_target_size: None,
-            softforks: BTreeMap::new(),
-            warnings: "".to_string(),
         })
     }
 
