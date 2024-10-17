@@ -84,6 +84,14 @@ impl ZKVMVerifier for Risc0Verifier {
         let public_params_raw = proof.journal.bytes;
         Ok(borsh::from_slice(&public_params_raw).unwrap())
     }
+
+    fn verify_groth16_raw(
+        _proof: &Proof,
+        _verification_key: &[u8],
+        _public_params_raw: &[u8],
+    ) -> anyhow::Result<()> {
+        todo!()
+    }
 }
 
 #[cfg(test)]

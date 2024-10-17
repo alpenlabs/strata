@@ -101,7 +101,7 @@ fn gen_params_with_seed(seed: u64) -> Params {
             address_length: 20,
             deposit_amount: 1_000_000_000,
             rollup_vk: RollupVerifyingKey::SP1VerifyingKey(Buf32(
-                "0x00d952e267176e21519a9a00aeb2c54d08fe6c9928fcea2173a8ef3eb60b6681"
+                "0x002ce6e3b3da9226dcfd184d51d085b799b4071db31a1313092b22318b314e16"
                     .parse()
                     .unwrap(),
             )),
