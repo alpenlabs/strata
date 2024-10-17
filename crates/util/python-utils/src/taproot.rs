@@ -5,7 +5,10 @@ use bdk_bitcoind_rpc::{
     Emitter,
 };
 use bdk_wallet::{
-    bitcoin::{key::Parity, Address, AddressType, XOnlyPublicKey},
+    bitcoin::{
+        consensus::serialize, key::Parity, Address, AddressType, FeeRate, Transaction,
+        XOnlyPublicKey,
+    },
     KeychainKind, Wallet,
 };
 use musig2::KeyAggContext;
@@ -146,6 +149,94 @@ pub(crate) fn extract_p2tr_pubkey(address: String) -> Result<String, Error> {
         .assume_checked();
     let pk = address.extract_p2tr_pubkey()?;
     Ok(pk.to_string())
+}
+
+/// Drains the wallet to the given `address`.
+///
+/// # Arguments
+///
+/// - `address`: Bitcoin address to drain the wallet to.
+/// - `bitcoind_url`: URL of the `bitcoind` instance.
+/// - `bitcoind_user`: Username for the `bitcoind` instance.
+/// - `bitcoind_password`: Password for the `bitcoind` instance.
+///
+/// # Returns
+///
+/// A signed (with the `private_key`) and serialized transaction.
+///
+/// # Note
+///
+/// This is a good way to empty the wallet in order to test different addresses.
+fn drain_wallet_inner(
+    address: &str,
+    bitcoind_url: &str,
+    bitcoind_user: &str,
+    bitcoind_password: &str,
+) -> Result<Transaction, Error> {
+    let mut wallet = taproot_wallet()?;
+    let address = address
+        .parse::<Address<_>>()
+        .map_err(|_| Error::BitcoinAddress)?
+        .assume_checked();
+
+    // Instantiate the BitcoinD client
+    let client = new_client(
+        bitcoind_url,
+        None,
+        Some(bitcoind_user),
+        Some(bitcoind_password),
+    )?;
+
+    // For regtest 2 sat/vbyte is enough
+    let fee_rate = FeeRate::from_sat_per_vb(2).expect("valid fee rate");
+
+    // Before signing the transaction, we need to sync the wallet with bitcoind
+    sync_wallet(&mut wallet, client)?;
+
+    let mut psbt = wallet
+        .build_tx()
+        .drain_wallet()
+        .drain_to(address.script_pubkey())
+        .fee_rate(fee_rate)
+        .clone()
+        .finish()
+        .expect("valid psbt");
+    wallet
+        .sign(&mut psbt, Default::default())
+        .expect("valid psbt");
+
+    let tx = psbt.extract_tx().expect("valid tx");
+    Ok(tx)
+}
+
+/// Drains the wallet to the given `address`.
+///
+/// # Arguments
+///
+/// - `address`: Bitcoin address to drain the wallet to.
+/// - `bitcoind_url`: URL of the `bitcoind` instance.
+/// - `bitcoind_user`: Username for the `bitcoind` instance.
+/// - `bitcoind_password`: Password for the `bitcoind` instance.
+///
+/// # Returns
+///
+/// A signed (with the `private_key`) and serialized transaction.
+///
+/// # Note
+///
+/// This is a good way to empty the wallet in order to test different addresses.
+#[pyfunction]
+pub(crate) fn drain_wallet(
+    address: String,
+    bitcoind_url: String,
+    bitcoind_user: String,
+    bitcoind_password: String,
+) -> Result<Vec<u8>, Error> {
+    let signed_tx =
+        drain_wallet_inner(&address, &bitcoind_url, &bitcoind_user, &bitcoind_password)?;
+
+    let signed_tx = serialize(&signed_tx);
+    Ok(signed_tx)
 }
 
 #[cfg(test)]
