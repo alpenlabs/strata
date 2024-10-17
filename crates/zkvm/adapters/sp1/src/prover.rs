@@ -88,15 +88,18 @@ impl ZKVMHost for SP1Host {
             let remote_id =
                 block_on(network_prover.request_proof(&self.elf, prover_input.clone(), mode))?;
 
-            let proof_data: SP1ProofWithPublicValues =
+            // The `stdin` field is unused in the Proof use case. Clearing it to conserve storage.
+            let mut sp1_proof_data: SP1ProofWithPublicValues =
                 block_on(network_prover.wait_proof(&remote_id, None))?;
+            sp1_proof_data.stdin = Default::default();
 
-            let filename: String = format!("{}.{}proof", remote_id, self.prover_options);
-            let mut file = File::create(filename).unwrap();
-            file.write_all(&bincode::serialize(&proof_data).unwrap())
-                .unwrap();
+            // FIXME: Temp saving of proof logs
+            // let filename: String = format!("{}.{}proof", remote_id, self.prover_options);
+            // let mut file = File::create(filename).unwrap();
+            // file.write_all(&bincode::serialize(&sp1_proof_data).unwrap())
+            //     .unwrap();
 
-            (Some(remote_id), proof_data)
+            (Some(remote_id), sp1_proof_data)
         } else {
             let proof_data = prover.run()?;
             (None, proof_data)
