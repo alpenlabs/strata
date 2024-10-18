@@ -202,6 +202,7 @@ pub fn verify_proof(
         RollupVerifyingKey::SP1VerifyingKey(vk) => {
             println!("abishek p4");
             SP1Verifier::verify_groth16_raw(proof, vk.as_ref(), &public_params_raw)
+            // SP1Verifier::verify_groth16(proof, vk.as_ref(), &public_params_raw)
         }
     });
     println!("abishek got the verification res {:?} ", res);

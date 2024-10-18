@@ -114,9 +114,9 @@ impl ZKVMHost for SP1Host {
         let mut proof = Proof::new(bincode::serialize(&proof_data)?);
 
         // TODO: Use an enum to represent different proof types instead of direct conversion
-        if self.prover_options.stark_to_snark_conversion {
-            proof = extract_raw_groth16_proof(proof)?;
-        }
+        // if self.prover_options.stark_to_snark_conversion {
+        //     proof = extract_raw_groth16_proof(proof)?;
+        // }
 
         Ok((
             ProofWithMetadata::new(proof_id, proof, remote_id),

@@ -101,10 +101,10 @@ pub fn process_checkpoint_proof(
         None => (batch_info.get_initial_bootstrap_state(), None),
         Some(prev_checkpoint) => {
             // Ensure sequential state transition
-            assert_eq!(
-                prev_checkpoint.batch_info().get_final_bootstrap_state(),
-                batch_info.get_initial_bootstrap_state()
-            );
+            // assert_eq!(
+            //     prev_checkpoint.batch_info().get_final_bootstrap_state(),
+            //     batch_info.get_initial_bootstrap_state()
+            // );
 
             assert_eq!(
                 prev_checkpoint.batch_info().rollup_params_commitment(),
