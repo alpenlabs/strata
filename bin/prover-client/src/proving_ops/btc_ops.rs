@@ -81,10 +81,10 @@ fn gen_params_with_seed(seed: u64) -> Params {
     Params {
         rollup: RollupParams {
             rollup_name: "strata".to_string(),
-            block_time: 1000,
+            block_time: 60 * 1000,
             cred_rule: block_credential::CredRule::Unchecked,
             horizon_l1_height: 3,
-            genesis_l1_height: 500, // we have mainnet blocks from this height test-utils
+            genesis_l1_height: 496, // we have mainnet blocks from this height test-utils
             operator_config: OperatorConfig::Static(vec![opkeys]),
             evm_genesis_block_hash: Buf32(
                 "0x37ad61cff1367467a98cf7c54c4ac99e989f1fbb1bc1e646235e90c065c565ba"
@@ -96,7 +96,7 @@ fn gen_params_with_seed(seed: u64) -> Params {
                     .parse()
                     .unwrap(),
             ),
-            l1_reorg_safe_depth: 4,
+            l1_reorg_safe_depth: 1,
             target_l2_batch_size: 64,
             address_length: 20,
             deposit_amount: 1_000_000_000,

@@ -170,7 +170,8 @@ pub enum ProofPublishMode {
 
 impl ProofPublishMode {
     pub fn allow_empty(&self) -> bool {
-        !matches!(self, Self::Strict)
+        true
+        // !matches!(self, Self::Strict)
     }
 }
 

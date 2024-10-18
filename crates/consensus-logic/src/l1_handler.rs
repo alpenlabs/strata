@@ -186,6 +186,10 @@ pub fn verify_proof(
 
     println!("abishek p2");
 
+    println!(
+        "Got the checkpoint.proof_output() {:?}",
+        checkpoint.proof_output()
+    );
     let public_params_raw = borsh::to_vec(&checkpoint.proof_output()).unwrap();
     println!("abishek p3");
 

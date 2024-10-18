@@ -6,7 +6,8 @@ DD_ROOT = "_dd"
 # keep in sync with `strata-consensus-logic::genesis::MAX_HORIZON_POLL_INTERVAL`
 MAX_HORIZON_POLL_INTERVAL_SECS = 1
 SEQ_SLACK_TIME_SECS = 2  # to account for thread sync and startup times
-BLOCK_GENERATION_INTERVAL_SECS = 0.5
+BLOCK_GENERATION_INTERVAL_SECS = 60
+# BLOCK_GENERATION_INTERVAL_SECS = 0.5
 SEQ_PUBLISH_BATCH_INTERVAL_SECS = 5
 
 # Error codes
@@ -34,7 +35,7 @@ DEFAULT_ROLLUP_PARAMS: dict = {
     "genesis_l1_height": 5,
     "evm_genesis_block_hash": EVM_GENESIS_BLOCK_STATE_HASH,
     "evm_genesis_block_state_root": EVM_GENESIS_BLOCK_STATE_ROOT,
-    "l1_reorg_safe_depth": 4,
+    "l1_reorg_safe_depth": 1,
     "target_l2_batch_size": 64,
     "address_length": 20,
     "deposit_amount": 1_000_000_000,
@@ -76,8 +77,9 @@ ROLLUP_PARAMS_FOR_DEPOSIT_TX = {
 
 PROVER_ROLLUP_PARAMS = {
     **DEFAULT_ROLLUP_PARAMS,
+    "block_time": 60 * 1000,
     "proof_publish_mode": "strict",
-    "genesis_l1_height": 500,
+    "genesis_l1_height": 496,
     "cred_rule": "unchecked",
     "operator_config": {
         "static": [
