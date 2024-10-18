@@ -68,14 +68,20 @@ impl BtcChainSegment {
         return self.custom_blocks.get(&height).unwrap();
     }
 
-    /// Retrieves the timestamps of a specified number of blocks from a given height in a
-    /// descending order.
-    pub fn get_last_timestamps(&self, from: u32, count: u32) -> Vec<u32> {
-        let mut timestamps = Vec::with_capacity(count as usize);
-        for i in (0..count).rev() {
-            let h = self.get_header(from - i);
-            timestamps.push(h.time)
+    /// Retrieves the timestamps of `N` blocks from a given height
+    pub fn get_last_timestamps<const N: usize>(&self, from: u32) -> [u32; N] {
+        let mut timestamps = [0u32; N];
+
+        for (i, timestamp) in timestamps.iter_mut().enumerate() {
+            if from >= i as u32 {
+                let height_to_fetch = from - i as u32;
+                let block_header = self.get_header(height_to_fetch);
+                *timestamp = block_header.time;
+            } else {
+                *timestamp = 0;
+            }
         }
+
         timestamps
     }
 
@@ -91,8 +97,9 @@ impl BtcChainSegment {
         let vh = block_height - 1; // verified_height
 
         // Fetch the previous timestamps of block from `vh`
-        // This fetches timestamps of `vh`, `vh-1`, `vh-2`, ...
-        let initial_timestamps: [u32; 11] = self.get_last_timestamps(vh, 11).try_into().unwrap();
+        // This fetches timestamps of `vh-10`,`vh-9`, ... `vh-1`, `vh`
+        const N: usize = 11;
+        let initial_timestamps = self.get_last_timestamps::<N>(block_height - N as u32);
         let last_11_blocks_timestamps = TimestampStore::new(initial_timestamps);
 
         let last_verified_block_hash: L1BlockId = Buf32::from(
