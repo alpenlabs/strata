@@ -306,6 +306,7 @@ class ProverClientFactory(flexitest.Factory):
         bitcoind_config: BitcoinRpcConfig,
         sequencer_url: str,
         reth_url: str,
+        custom_rollup_params: Optional[dict],
         ctx: flexitest.EnvContext,
     ):
         datadir = ctx.make_service_dir("prover_client")
@@ -326,6 +327,14 @@ class ProverClientFactory(flexitest.Factory):
         ]
         # fmt: on
         props = {"rpc_port": rpc_port}
+
+        rollup_params_file = os.path.join(datadir, "rollup_params.json")
+        rollup_params = custom_rollup_params if custom_rollup_params else DEFAULT_ROLLUP_PARAMS
+
+        with open(rollup_params_file, "w") as f:
+            json.dump(rollup_params, f)
+
+        cmd.extend(["--rollup-params", rollup_params_file])
 
         svc = flexitest.service.ProcService(props, cmd, stdout=logfile)
         svc.start()
@@ -429,6 +438,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
                 bitcoind_config,
                 f"http://localhost:{seq_port}",
                 f"http://localhost:{reth_rpc_http_port}",
+                self.rollup_params,
             )
             svcs["prover_client"] = prover_client
 

@@ -25,7 +25,6 @@ use crate::{
         tasks_scheduler::{ProofProcessingStatus, ProofSubmissionStatus, WitnessSubmissionStatus},
         vms::{ProofVm, ZkVMManager},
     },
-    proving_ops::btc_ops::get_pm_rollup_params,
 };
 
 #[derive(Debug, Clone)]
@@ -130,7 +129,7 @@ where
         }
 
         ZKVMInput::ClBlock(cl_proof_input) => Vm::Input::new()
-            .write(&get_pm_rollup_params())?
+            .write(&cl_proof_input.rollup_params)?
             .write_serialized(&cl_proof_input.cl_raw_witness)?
             .write_proof(
                 cl_proof_input
@@ -164,7 +163,7 @@ where
                 .ok_or_else(|| anyhow::anyhow!("L2 Batch Proof Not Ready"))?;
 
             let mut input_builder = Vm::Input::new();
-            input_builder.write(&get_pm_rollup_params())?;
+            input_builder.write(&checkpoint_input.rollup_params)?;
             input_builder.write_proof(l1_batch_proof)?;
             input_builder.write_proof(l2_batch_proof)?;
 
