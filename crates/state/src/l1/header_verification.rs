@@ -157,8 +157,7 @@ impl HeaderVerificationState {
 
     pub fn check_and_update_full(&mut self, header: &Header, params: &BtcParams) {
         // Check continuity
-        let prev_blockhash: L1BlockId =
-            Buf32::from(header.prev_blockhash.as_raw_hash().to_byte_array()).into();
+        let prev_blockhash: L1BlockId = header.prev_blockhash.into();
         assert_eq!(prev_blockhash, self.last_verified_block_hash,);
 
         let block_hash_raw = compute_block_hash(header);
@@ -190,9 +189,8 @@ impl HeaderVerificationState {
     // TODO: add errors
     pub fn check_and_update_continuity(&mut self, header: &Header, params: &BtcParams) {
         // Check continuity
-        let prev_blockhash: L1BlockId =
-            Buf32::from(header.prev_blockhash.as_raw_hash().to_byte_array()).into();
-        assert_eq!(prev_blockhash, self.last_verified_block_hash,);
+        let prev_blockhash: L1BlockId = header.prev_blockhash.into();
+        assert_eq!(prev_blockhash, self.last_verified_block_hash);
 
         let block_hash_raw = compute_block_hash(header);
 
@@ -212,32 +210,20 @@ impl HeaderVerificationState {
     // TODO: add errors
     pub fn check_and_update_continuity_new(&self, header: &Header, params: &BtcParams) -> Self {
         let mut new_self = self.clone();
-
-        // TODO: skipping this for now
-        // Check continuity
-        // assert_eq!(
-        //     Buf32::from(header.prev_blockhash.as_raw_hash().to_byte_array()),
-        //     new_self.last_verified_block_hash,
-        // );
-
-        let block_hash_raw = compute_block_hash(header);
-
-        // Increase the last verified block number by 1
-        new_self.last_verified_block_num += 1;
-
-        // Set the header block hash as the last verified block hash
-        new_self.last_verified_block_hash = block_hash_raw.into();
-
-        // Update the timestamps
-        new_self.update_timestamps(header.time, params);
-
-        // Update the total accumulated PoW
-        new_self.total_accumulated_pow += header.difficulty(params.inner());
-
+        new_self.check_and_update_continuity(header, params);
         new_self
     }
 
-    pub fn compute_snapshot(&self) -> HeaderVerificationStateSnapshot {
+    // Need to improve upon this?
+    pub fn compute_initial_snapshot(&self) -> HeaderVerificationStateSnapshot {
+        HeaderVerificationStateSnapshot {
+            hash: self.compute_hash().unwrap(),
+            block_num: self.last_verified_block_num as u64 + 1, // because inclusive
+            acc_pow: self.total_accumulated_pow,
+        }
+    }
+
+    pub fn compute_final_snapshot(&self) -> HeaderVerificationStateSnapshot {
         HeaderVerificationStateSnapshot {
             hash: self.compute_hash().unwrap(),
             block_num: self.last_verified_block_num as u64,
@@ -257,7 +243,7 @@ impl HeaderVerificationState {
         cur.write_all(&self.total_accumulated_pow.to_be_bytes())?;
 
         let mut serialized_timestamps = [0u8; 11 * 4];
-        for (i, &timestamp) in self.last_11_blocks_timestamps.timestamps.iter().enumerate() {
+        for (i, &timestamp) in self.last_11_blocks_timestamps.buffer.iter().enumerate() {
             serialized_timestamps[i * 4..(i + 1) * 4].copy_from_slice(&timestamp.to_be_bytes());
         }
 
@@ -300,6 +286,30 @@ mod tests {
         for header_idx in r1..chain.end {
             verification_state
                 .check_and_update_full(&chain.get_header(header_idx), &MAINNET.clone().into())
+        }
+    }
+
+    #[test]
+    fn test_continuity() {
+        let chain = get_btc_chain();
+        let btc_params: BtcParams = MAINNET.clone().into();
+        let h1 = get_difficulty_adjustment_height(1, chain.start, &btc_params);
+        let r1 = rand::thread_rng().gen_range(h1..chain.end);
+        let mut verification_state = chain.get_verification_state(r1, &MAINNET.clone().into());
+
+        for header_idx in r1..chain.end {
+            let new_state = verification_state.check_and_update_continuity_new(
+                &chain.get_header(header_idx),
+                &MAINNET.clone().into(),
+            );
+            verification_state.check_and_update_continuity(
+                &chain.get_header(header_idx),
+                &MAINNET.clone().into(),
+            );
+            assert_eq!(
+                new_state.compute_hash().unwrap(),
+                verification_state.compute_hash().unwrap()
+            );
         }
     }
 

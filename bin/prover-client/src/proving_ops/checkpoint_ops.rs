@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use jsonrpsee::{core::client::ClientT, http_client::HttpClient, rpc_params};
+use strata_primitives::params::RollupParams;
 use strata_rpc_types::RpcCheckpointInfo;
 use tracing::debug;
 use uuid::Uuid;
@@ -22,6 +23,7 @@ pub struct CheckpointOperations {
     cl_client: HttpClient,
     l1_batch_dispatcher: Arc<TaskDispatcher<L1BatchOperations>>,
     l2_batch_dispatcher: Arc<TaskDispatcher<L2BatchOperations>>,
+    rollup_params: Arc<RollupParams>,
 }
 
 impl CheckpointOperations {
@@ -30,11 +32,13 @@ impl CheckpointOperations {
         cl_client: HttpClient,
         l1_batch_dispatcher: Arc<TaskDispatcher<L1BatchOperations>>,
         l2_batch_dispatcher: Arc<TaskDispatcher<L2BatchOperations>>,
+        rollup_params: Arc<RollupParams>,
     ) -> Self {
         Self {
             cl_client,
             l1_batch_dispatcher,
             l2_batch_dispatcher,
+            rollup_params,
         }
     }
 }
@@ -46,16 +50,18 @@ pub struct CheckpointInput {
     pub l2_batch_id: Uuid,
     pub l1_batch_proof: Option<ProofWithVkey>,
     pub l2_batch_proof: Option<ProofWithVkey>,
+    pub rollup_params: RollupParams,
 }
 
 impl CheckpointInput {
-    pub fn get_default_input(rpc_ckp_info: RpcCheckpointInfo) -> Self {
+    pub fn get_default_input(rpc_ckp_info: RpcCheckpointInfo, rollup_params: RollupParams) -> Self {
         Self {
             info: rpc_ckp_info,
             l1_batch_id: Uuid::nil(),
             l2_batch_id: Uuid::nil(),
             l1_batch_proof: None,
             l2_batch_proof: None,
+            rollup_params,
         }
     }
 }
@@ -110,7 +116,10 @@ impl ProvingOperations for CheckpointOperations {
             CheckpointOpsParam::Manual(ckp_info) => ckp_info,
         };
 
-        Ok(CheckpointInput::get_default_input(rpc_ckp_info))
+        Ok(CheckpointInput::get_default_input(
+            rpc_ckp_info,
+            (*self.rollup_params).clone(),
+        ))
     }
 
     async fn append_task(
