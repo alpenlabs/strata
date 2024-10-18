@@ -86,6 +86,7 @@ impl ZKVMVerifier for SP1Verifier {
         vkey_hash: &[u8],
         committed_values_raw: &[u8],
     ) -> Result<()> {
+        println!("abishek verify_groth16_raw was called");
         // Convert vkey_hash to Fr, mapping the error to anyhow::Error
         let vkey_hash_fr = Fr::from_slice(vkey_hash)
             .map_err(|e| anyhow::anyhow!(e))
@@ -110,8 +111,10 @@ impl ZKVMVerifier for SP1Verifier {
         .context("Groth16 verification failed")?;
 
         if verification_result {
+            println!("abishek verify_groth16_raw was passed");
             Ok(())
         } else {
+            println!("abishek verify_groth16_raw was failed");
             Err(anyhow::anyhow!("Groth16 proof verification returned false"))
         }
     }

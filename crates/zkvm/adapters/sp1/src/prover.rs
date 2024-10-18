@@ -1,4 +1,4 @@
-use std::{fs::File, io::Write, sync::Arc};
+use std::sync::Arc;
 
 use anyhow::Ok;
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -11,7 +11,10 @@ use strata_zkvm::{
     Proof, ProofWithMetadata, ProverOptions, VerificationKey, ZKVMHost, ZKVMInputBuilder,
 };
 
-use crate::{input::SP1ProofInputBuilder, utils::get_proving_keys};
+use crate::{
+    input::SP1ProofInputBuilder,
+    utils::{extract_raw_groth16_proof, get_proving_keys},
+};
 
 /// A host for the `SP1` zkVM that stores the guest program in ELF format.
 /// The `SP1Host` is responsible for program execution and proving
@@ -94,6 +97,7 @@ impl ZKVMHost for SP1Host {
             sp1_proof_data.stdin = Default::default();
 
             // FIXME: Temp saving of proof logs
+            // use std::{fs::File, io::Write, sync::Arc};
             // let filename: String = format!("{}.{}proof", remote_id, self.prover_options);
             // let mut file = File::create(filename).unwrap();
             // file.write_all(&bincode::serialize(&sp1_proof_data).unwrap())
@@ -107,7 +111,12 @@ impl ZKVMHost for SP1Host {
 
         // Proof serialization
         let verification_key = bincode::serialize(&self.vkey)?;
-        let proof = Proof::new(bincode::serialize(&proof_data)?);
+        let mut proof = Proof::new(bincode::serialize(&proof_data)?);
+
+        // TODO: Use an enum to represent different proof types instead of direct conversion
+        if self.prover_options.stark_to_snark_conversion {
+            proof = extract_raw_groth16_proof(proof)?;
+        }
 
         Ok((
             ProofWithMetadata::new(proof_id, proof, remote_id),

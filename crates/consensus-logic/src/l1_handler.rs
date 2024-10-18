@@ -175,6 +175,8 @@ pub fn verify_proof(
     let checkpoint_idx = checkpoint.batch_info().idx();
     let proof = checkpoint.proof();
 
+    println!("abishek p1");
+
     // FIXME: we are accepting empty proofs for now (devnet) to reduce dependency on the prover
     // infra.
     if rollup_params.proof_publish_mode.allow_empty() && proof.is_empty() {
@@ -182,7 +184,10 @@ pub fn verify_proof(
         return Ok(());
     }
 
+    println!("abishek p2");
+
     let public_params_raw = borsh::to_vec(&checkpoint.proof_output()).unwrap();
+    println!("abishek p3");
 
     // NOTE/TODO: this should also verify that this checkpoint is based on top of some previous
     // checkpoint
@@ -191,9 +196,11 @@ pub fn verify_proof(
             Risc0Verifier::verify_groth16(proof, vk.as_ref(), &public_params_raw)
         }
         RollupVerifyingKey::SP1VerifyingKey(vk) => {
-            SP1Verifier::verify_groth16(proof, vk.as_ref(), &public_params_raw)
+            println!("abishek p4");
+            SP1Verifier::verify_groth16_raw(proof, vk.as_ref(), &public_params_raw)
         }
     });
+    println!("abishek got the verification res {:?} ", res);
     match res {
         Ok(Ok(())) => {
             info!(%checkpoint_idx, "Checkpoint proof successfully verified");
