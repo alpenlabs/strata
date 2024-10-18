@@ -203,9 +203,9 @@ impl BatchInfo {
     pub fn get_final_bootstrap_state(&self) -> BootstrapState {
         BootstrapState::new(
             self.idx,
-            self.l1_range.1,
+            self.l1_range.1 + 1, // because each batch is inclusive
             self.l1_transition.1,
-            self.l2_range.1,
+            self.l2_range.1 + 1, // because each batch is inclusive
             self.l2_transition.1,
             self.l1_pow_transition.1,
         )
