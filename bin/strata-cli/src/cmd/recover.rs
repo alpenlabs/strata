@@ -22,10 +22,11 @@ pub struct RecoverArgs {
     fee_rate: Option<u64>,
 }
 
-pub async fn recover(args: RecoverArgs, seed: Seed, settings: Settings, esplora: EsploraClient) {
+pub async fn recover(args: RecoverArgs, seed: Seed, settings: Settings) {
     let term = Term::stdout();
-    let mut l1w = SignetWallet::new(&seed, settings.network).unwrap();
-    l1w.sync(&esplora).await.unwrap();
+    let mut l1w =
+        SignetWallet::new(&seed, settings.network, settings.sync_backend.clone()).unwrap();
+    l1w.sync().await.unwrap();
 
     let _ = term.write_line("Opening descriptor recovery");
     let mut descriptor_file = DescriptorRecovery::open(&seed, &settings.descriptor_db)

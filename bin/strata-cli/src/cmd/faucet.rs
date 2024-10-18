@@ -136,7 +136,8 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
 
     #[cfg(not(feature = "strata_faucet"))]
     let url = {
-        let mut l1w = SignetWallet::new(&seed, settings.network).unwrap();
+        let mut l1w =
+            SignetWallet::new(&seed, settings.network, settings.sync_backend.clone()).unwrap();
         let address = match args.address {
             None => {
                 let address_info = l1w.reveal_next_address(KeychainKind::External);

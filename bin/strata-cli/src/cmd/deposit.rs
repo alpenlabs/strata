@@ -46,15 +46,15 @@ pub async fn deposit(
     }: DepositArgs,
     seed: Seed,
     settings: Settings,
-    esplora: EsploraClient,
 ) {
     let term = Term::stdout();
     let requested_strata_address =
         strata_address.map(|a| StrataAddress::from_str(&a).expect("bad strata address"));
-    let mut l1w = SignetWallet::new(&seed, settings.network).unwrap();
+    let mut l1w =
+        SignetWallet::new(&seed, settings.network, settings.sync_backend.clone()).unwrap();
     let l2w = StrataWallet::new(&seed, &settings.strata_endpoint).unwrap();
 
-    l1w.sync(&esplora).await.unwrap();
+    l1w.sync().await.unwrap();
     let recovery_address = l1w.reveal_next_address(KeychainKind::External).address;
     l1w.persist().unwrap();
 

@@ -3,10 +3,11 @@ use std::{
     io,
     path::PathBuf,
     str::FromStr,
-    sync::LazyLock,
+    sync::{Arc, LazyLock},
 };
 
 use alloy::primitives::Address as StrataAddress;
+use bdk_bitcoind_rpc::bitcoincore_rpc::{Auth, Client};
 use bdk_wallet::bitcoin::{Network, XOnlyPublicKey};
 use config::Config;
 use directories::ProjectDirs;
@@ -14,11 +15,18 @@ use serde::{Deserialize, Serialize};
 use shrex::{decode, Hex};
 use terrors::OneOf;
 
-use crate::constants::{BRIDGE_MUSIG2_PUBKEY, BRIDGE_STRATA_ADDRESS, DEFAULT_NETWORK};
+use crate::{
+    constants::{BRIDGE_MUSIG2_PUBKEY, BRIDGE_STRATA_ADDRESS, DEFAULT_NETWORK},
+    signet::{EsploraClient, SyncBackend},
+};
 
 #[derive(Serialize, Deserialize)]
 pub struct SettingsFromFile {
-    pub esplora: String,
+    pub esplora: Option<String>,
+    pub bitcoind_rpc_user: Option<String>,
+    pub bitcoind_rpc_pw: Option<String>,
+    pub bitcoind_rpc_cookie: Option<PathBuf>,
+    pub bitcoind_rpc_endpoint: Option<String>,
     pub strata_endpoint: String,
     pub faucet_endpoint: String,
     pub mempool_endpoint: String,
@@ -28,9 +36,9 @@ pub struct SettingsFromFile {
 
 /// Settings struct filled with either config values or
 /// opinionated defaults
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Debug)]
 pub struct Settings {
-    pub esplora: String,
+    pub esplora: Option<String>,
     pub strata_endpoint: String,
     pub data_dir: PathBuf,
     pub faucet_endpoint: String,
@@ -41,6 +49,7 @@ pub struct Settings {
     pub linux_seed_file: PathBuf,
     pub network: Network,
     pub config_file: PathBuf,
+    pub sync_backend: Arc<SyncBackend>,
 }
 
 pub static PROJ_DIRS: LazyLock<ProjectDirs> = LazyLock::new(|| {
@@ -72,6 +81,26 @@ impl Settings {
             .try_deserialize::<SettingsFromFile>()
             .map_err(OneOf::new)?;
 
+        let sync_backend = match (
+            from_file.esplora.clone(),
+            from_file.bitcoind_rpc_user,
+            from_file.bitcoind_rpc_pw,
+            from_file.bitcoind_rpc_cookie,
+            from_file.bitcoind_rpc_endpoint,
+        ) {
+            (Some(url), None, None, None, None) => {
+                SyncBackend::Esplora(EsploraClient::new(&url).expect("valid esplora url"))
+            }
+            (None, Some(user), Some(pw), None, Some(url)) => SyncBackend::BitcoinCore(
+                Client::new(&url, Auth::UserPass(user, pw)).expect("valid bitcoin core client"),
+            ),
+            (None, None, None, Some(cookie_file), Some(url)) => SyncBackend::BitcoinCore(
+                Client::new(&url, Auth::CookieFile(cookie_file))
+                    .expect("valid bitcoin core client"),
+            ),
+            _ => panic!("invalid config for signet - configure for esplora or bitcoind"),
+        };
+
         Ok(Settings {
             esplora: from_file.esplora,
             strata_endpoint: from_file.strata_endpoint,
@@ -93,6 +122,7 @@ impl Settings {
             bridge_strata_address: StrataAddress::from_str(BRIDGE_STRATA_ADDRESS)
                 .expect("valid strata address"),
             linux_seed_file,
+            sync_backend: sync_backend.into(),
         })
     }
 }

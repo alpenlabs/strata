@@ -40,7 +40,7 @@ pub struct SendArgs {
     fee_rate: Option<u64>,
 }
 
-pub async fn send(args: SendArgs, seed: Seed, settings: Settings, esplora: EsploraClient) {
+pub async fn send(args: SendArgs, seed: Seed, settings: Settings) {
     let term = Term::stdout();
     let network_type = net_type_or_exit(&args.network_type, &term);
 
@@ -51,8 +51,9 @@ pub async fn send(args: SendArgs, seed: Seed, settings: Settings, esplora: Esplo
                 .expect("valid address")
                 .require_network(settings.network)
                 .expect("correct network");
-            let mut l1w = SignetWallet::new(&seed, settings.network).expect("valid wallet");
-            l1w.sync(&esplora).await.unwrap();
+            let mut l1w = SignetWallet::new(&seed, settings.network, settings.sync_backend.clone())
+                .expect("valid wallet");
+            l1w.sync().await.unwrap();
             let fee_rate = get_fee_rate(args.fee_rate, &esplora, 1)
                 .await
                 .expect("valid fee rate");

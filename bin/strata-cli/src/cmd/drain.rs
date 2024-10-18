@@ -42,7 +42,6 @@ pub async fn drain(
     }: DrainArgs,
     seed: Seed,
     settings: Settings,
-    esplora: EsploraClient,
 ) {
     let term = Term::stdout();
     if strata_address.is_none() && signet_address.is_none() {
@@ -59,8 +58,9 @@ pub async fn drain(
         strata_address.map(|a| StrataAddress::from_str(&a).expect("valid Strata address"));
 
     if let Some(address) = signet_address {
-        let mut l1w = SignetWallet::new(&seed, settings.network).unwrap();
-        l1w.sync(&esplora).await.unwrap();
+        let mut l1w =
+            SignetWallet::new(&seed, settings.network, settings.sync_backend.clone()).unwrap();
+        l1w.sync().await.unwrap();
         let balance = l1w.balance();
         if balance.untrusted_pending > Amount::ZERO {
             let _ = term.write_line(

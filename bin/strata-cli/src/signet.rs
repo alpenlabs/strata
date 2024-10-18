@@ -1,24 +1,27 @@
 use std::{
     cell::RefCell,
     collections::BTreeSet,
-    io,
+    io::{self},
     ops::{Deref, DerefMut},
     path::{Path, PathBuf},
     rc::Rc,
-    sync::OnceLock,
+    sync::{Arc, OnceLock},
+    time::{Duration, Instant},
 };
 
+use bdk_bitcoind_rpc::{bitcoincore_rpc, Emitter};
 use bdk_esplora::{
     esplora_client::{self, AsyncClient},
     EsploraAsyncExt,
 };
 use bdk_wallet::{
-    bitcoin::{FeeRate, Network, Txid},
+    bitcoin::{Block, FeeRate, Network, Transaction, Txid},
     rusqlite::{self, Connection},
     ChangeSet, KeychainKind, PersistedWallet, WalletPersister,
 };
 use console::{style, Term};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use tokio::sync::mpsc;
 
 use crate::{seed::Seed, settings::Settings};
 
@@ -69,7 +72,7 @@ pub async fn get_fee_rate(
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct EsploraClient(AsyncClient);
 
 impl DerefMut for EsploraClient {
@@ -94,9 +97,18 @@ impl EsploraClient {
     }
 }
 
-/// A wrapper around BDK's wallet with some custom logic
 #[derive(Debug)]
-pub struct SignetWallet(PersistedWallet<Persister>);
+pub enum SyncBackend {
+    Esplora(EsploraClient),
+    BitcoinCore(bitcoincore_rpc::Client),
+}
+
+#[derive(Debug)]
+/// A wrapper around BDK's wallet with some custom logic
+pub struct SignetWallet {
+    wallet: PersistedWallet<Persister>,
+    sync_backend: Arc<SyncBackend>,
+}
 
 impl SignetWallet {
     fn db_path(wallet: &str, data_dir: &Path) -> PathBuf {
@@ -107,10 +119,11 @@ impl SignetWallet {
         Connection::open(Self::db_path("default", data_dir))
     }
 
-    pub fn new(seed: &Seed, network: Network) -> io::Result<Self> {
+    pub fn new(seed: &Seed, network: Network, sync_backend: Arc<SyncBackend>) -> io::Result<Self> {
         let (load, create) = seed.signet_wallet().split();
-        Ok(Self(
-            load.check_network(network)
+        Ok(Self {
+            wallet: load
+                .check_network(network)
                 .load_wallet(&mut Persister)
                 .expect("should be able to load wallet")
                 .unwrap_or_else(|| {
@@ -119,13 +132,27 @@ impl SignetWallet {
                         .create_wallet(&mut Persister)
                         .expect("wallet creation to succeed")
                 }),
-        ))
+            sync_backend,
+        })
     }
 
-    pub async fn sync(
-        &mut self,
-        esplora_client: &AsyncClient,
-    ) -> Result<(), Box<esplora_client::Error>> {
+    pub async fn sync(&mut self) -> Result<(), Box<esplora_client::Error>> {
+        match *self.sync_backend {
+            SyncBackend::Esplora(_) => self.sync_with_esplora().await,
+            SyncBackend::BitcoinCore(_) => Ok(self
+                .sync_core_inner(self.latest_checkpoint().height())
+                .await),
+        }
+    }
+
+    pub async fn scan(&mut self) -> Result<(), Box<esplora_client::Error>> {
+        match *self.sync_backend {
+            SyncBackend::Esplora(_) => self.scan_with_esplora().await,
+            SyncBackend::BitcoinCore(_) => Ok(self.sync_core_inner(0).await),
+        }
+    }
+
+    async fn sync_with_esplora(&mut self) -> Result<(), Box<esplora_client::Error>> {
         let term = Term::stdout();
         let _ = term.write_line("Syncing wallet...");
         let sty = ProgressStyle::with_template(
@@ -163,7 +190,10 @@ impl SignetWallet {
             })
             .build();
 
-        let update = esplora_client.sync(req, 3).await?;
+        let SyncBackend::Esplora(ref esplora) = *self.sync_backend else {
+            panic!("sync backend wasn't esplora")
+        };
+        let update = esplora.sync(req, 3).await?;
         ops2.finish();
         spks2.finish();
         txids2.finish();
@@ -175,11 +205,9 @@ impl SignetWallet {
         Ok(())
     }
 
-    pub async fn scan(
-        &mut self,
-        esplora_client: &AsyncClient,
-    ) -> Result<(), Box<esplora_client::Error>> {
+    async fn scan_with_esplora(&mut self) -> Result<(), Box<esplora_client::Error>> {
         let bar = ProgressBar::new_spinner();
+        bar.enable_steady_tick(Duration::from_millis(100));
         let bar2 = bar.clone();
         let req = self
             .start_full_scan()
@@ -194,7 +222,10 @@ impl SignetWallet {
             })
             .build();
 
-        let update = esplora_client.full_scan(req, 5, 3).await?;
+        let SyncBackend::Esplora(ref esplora) = *self.sync_backend else {
+            panic!("sync backend wasn't esplora")
+        };
+        let update = esplora.full_scan(req, 5, 3).await?;
         bar.set_message("Persisting updates");
         self.apply_update(update)
             .expect("should be able to connect to db");
@@ -203,22 +234,101 @@ impl SignetWallet {
         Ok(())
     }
 
-    pub fn persist(&mut self) -> Result<bool, rusqlite::Error> {
-        self.0.persist(&mut Persister)
+    async fn sync_core_inner(&mut self, start_height: u32) {
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let tip = self.latest_checkpoint();
+        let bar = ProgressBar::new_spinner().with_style(
+            ProgressStyle::with_template("{spinner} [{elapsed_precise}] {msg}").unwrap(),
+        );
+        bar.enable_steady_tick(Duration::from_millis(100));
+        let bar2 = bar.clone();
+        let mut blocks_scanned = 0;
+        let sync_backend2 = self.sync_backend.clone();
+        std::thread::spawn(move || {
+            let SyncBackend::BitcoinCore(ref client) = *sync_backend2 else {
+                panic!("sync backend wasn't bitcoin core")
+            };
+            let mut emitter = Emitter::new(client, tip, start_height);
+            while let Some(emission) = emitter.next_block().unwrap() {
+                tx.send(Emission::Block(emission))
+                    .expect("block should send");
+            }
+            bar2.println("Scanning mempool");
+            tx.send(Emission::Mempool(emitter.mempool().unwrap()))
+                .expect("mempool should send");
+        });
+
+        let mut mempool_txs_len = 0;
+
+        loop {
+            if let Some(em) = rx.recv().await {
+                match em {
+                    Emission::Block(ev) => {
+                        blocks_scanned += 1;
+                        let height = ev.block_height();
+                        let hash = ev.block_hash();
+                        let connected_to = ev.connected_to();
+                        let start_apply_block = Instant::now();
+                        self.apply_block_connected_to(&ev.block, height, connected_to)
+                            .expect("applying block should succeed");
+                        let elapsed = start_apply_block.elapsed();
+                        bar.println(format!(
+                            "Applied block {} at height {} in {:?}",
+                            hash, height, elapsed
+                        ));
+                        bar.set_message(format!(
+                            "Current height: {}, scanned {} blocks",
+                            height, blocks_scanned
+                        ))
+                    }
+                    Emission::Mempool(txs) => {
+                        bar.println("Scanning mempool");
+                        let apply_start = Instant::now();
+                        mempool_txs_len = txs.len();
+                        self.apply_unconfirmed_txs(txs);
+                        let elapsed = apply_start.elapsed();
+                        bar.println(format!(
+                            "Applied {} unconfirmed transactions in {:?}",
+                            mempool_txs_len, elapsed
+                        ));
+                        break;
+                    }
+                }
+            } else {
+                break;
+            }
+        }
+
+        bar.println("Persisting updates");
+        self.persist().expect("persist to succeed");
+        bar.finish_with_message(format!(
+            "Completed sync. {} new blocks, {} unconfirmed transactions",
+            blocks_scanned, mempool_txs_len
+        ))
     }
+
+    pub fn persist(&mut self) -> Result<bool, rusqlite::Error> {
+        self.wallet.persist(&mut Persister)
+    }
+}
+
+#[derive(Debug)]
+enum Emission {
+    Block(bdk_bitcoind_rpc::BlockEvent<Block>),
+    Mempool(Vec<(Transaction, u64)>),
 }
 
 impl Deref for SignetWallet {
     type Target = PersistedWallet<Persister>;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.wallet
     }
 }
 
 impl DerefMut for SignetWallet {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        &mut self.wallet
     }
 }
 

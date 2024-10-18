@@ -11,7 +11,8 @@ use crate::{
 #[argh(subcommand, name = "scan")]
 pub struct ScanArgs {}
 
-pub async fn scan(_args: ScanArgs, seed: Seed, settings: Settings, esplora: EsploraClient) {
-    let mut l1w = SignetWallet::new(&seed, settings.network).unwrap();
-    l1w.scan(&esplora).await.unwrap();
+pub async fn scan(_args: ScanArgs, seed: Seed, settings: Settings) {
+    let mut l1w =
+        SignetWallet::new(&seed, settings.network, settings.sync_backend.clone()).unwrap();
+    l1w.scan_with_esplora(&esplora).await.unwrap();
 }

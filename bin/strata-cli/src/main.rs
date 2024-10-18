@@ -18,7 +18,7 @@ use seed::FilePersister;
 #[cfg(not(target_os = "linux"))]
 use seed::KeychainPersister;
 use settings::Settings;
-use signet::{set_data_dir, EsploraClient};
+use signet::set_data_dir;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
@@ -44,20 +44,19 @@ async fn main() {
     assert!(set_data_dir(settings.data_dir.clone()));
 
     let seed = seed::load_or_create(&persister).unwrap();
-    let esplora = EsploraClient::new(&settings.esplora).expect("valid esplora url");
 
     match cmd {
-        Commands::Recover(args) => recover(args, seed, settings, esplora).await,
-        Commands::Drain(args) => drain(args, seed, settings, esplora).await,
-        Commands::Balance(args) => balance(args, seed, settings, esplora).await,
+        Commands::Recover(args) => recover(args, seed, settings).await,
+        Commands::Drain(args) => drain(args, seed, settings).await,
+        Commands::Balance(args) => balance(args, seed, settings).await,
         Commands::Backup(args) => backup(args, seed).await,
-        Commands::Deposit(args) => deposit(args, seed, settings, esplora).await,
+        Commands::Deposit(args) => deposit(args, seed, settings).await,
         Commands::Withdraw(args) => withdraw(args, seed, settings).await,
         Commands::Faucet(args) => faucet(args, seed, settings).await,
-        Commands::Send(args) => send(args, seed, settings, esplora).await,
-        Commands::Receive(args) => receive(args, seed, settings, esplora).await,
+        Commands::Send(args) => send(args, seed, settings).await,
+        Commands::Receive(args) => receive(args, seed, settings).await,
         Commands::ChangePwd(args) => change_pwd(args, seed, persister).await,
-        Commands::Scan(args) => scan(args, seed, settings, esplora).await,
+        Commands::Scan(args) => scan(args, seed, settings).await,
         _ => {}
     }
 }
