@@ -115,14 +115,14 @@ async fn main() {
     tokio::spawn(async move { prover_manager.run().await });
 
     // run checkpoint runner
-    // tokio::spawn(async move {
-    //     start_checkpoints_task(
-    //         cl_client.clone(),
-    //         checkpoint_dispatcher.clone(),
-    //         task_tracker.clone(),
-    //     )
-    //     .await
-    // });
+    tokio::spawn(async move {
+        start_checkpoints_task(
+            cl_client.clone(),
+            checkpoint_dispatcher.clone(),
+            task_tracker.clone(),
+        )
+        .await
+    });
 
     // Run prover manager in dev mode or runner mode
     if args.enable_dev_rpcs {
@@ -142,4 +142,52 @@ async fn run_rpc_server(
     let rpc_impl = ProverClientRpc::new(rpc_context);
     rpc_server::start(&rpc_impl, rpc_url, enable_dev_rpc).await?;
     anyhow::Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    use sp1_sdk::SP1Prover;
+    use strata_primitives::params::RollupParams;
+    use strata_proofimpl_l1_batch::L1BatchProofOutput;
+    use strata_sp1_adapter::{SP1Host, SP1ProofInputBuilder, SP1Verifier};
+    use strata_sp1_guest_builder::GUEST_CHECKPOINT_ELF;
+    use strata_zkvm::{AggregationInput, ProverOptions, ZKVMHost, ZKVMInputBuilder, ZKVMVerifier};
+
+    use crate::config::CHECKPOINT_POLL_INTERVAL;
+
+    #[test]
+    fn make_one() {
+        let input = include_bytes!(
+            "../../../functional-tests/witness_5981db93-01a9-4fb8-946c-5caa4cd55d97.bin"
+        );
+
+        let (rollup_params, l1, l2): (RollupParams, AggregationInput, AggregationInput) =
+            bincode::deserialize(input).unwrap();
+
+        let l1_batch_proof = l1.proof();
+        let l1_batch_pp: L1BatchProofOutput =
+            SP1Verifier::extract_borsh_public_output(l1_batch_proof).unwrap();
+        println!(
+            "Is prev proof present {:#?}",
+            l1_batch_pp.prev_checkpoint.is_some()
+        );
+
+        let vm = SP1Host::init(
+            GUEST_CHECKPOINT_ELF.into(),
+            ProverOptions {
+                use_cached_keys: true,
+                enable_compression: true,
+                stark_to_snark_conversion: true,
+                use_mock_prover: false,
+            },
+        );
+
+        let mut input_builder = SP1ProofInputBuilder::new();
+        input_builder.write(&rollup_params).unwrap();
+        input_builder.write_proof(l1).unwrap();
+        input_builder.write_proof(l2).unwrap();
+        let input = input_builder.build().unwrap();
+
+        let proof = vm.prove(input).unwrap();
+    }
 }

@@ -285,7 +285,7 @@ impl Default for ProverOptions {
 /// An input to the aggregation program.
 ///
 /// Consists of a proof and a verification key.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AggregationInput {
     proof: Proof,
     vk: VerificationKey,
