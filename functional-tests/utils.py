@@ -8,6 +8,7 @@ from threading import Thread
 from typing import Any, Callable, List, Optional, TypeVar
 
 from bitcoinlib.services.bitcoind import BitcoindClient
+from strata_utils import convert_to_xonly_pk, musig_aggregate_pks
 
 from constants import *
 
@@ -341,7 +342,7 @@ def generate_params(settings: RollupParamsSettings, seqpubkey: str, oppubkeys: l
         "strata-datatool",
         "-b", "regtest",
         "genparams",
-        "--name", "strata",
+        "--name", "alpenstrata",
         "--block-time", str(settings.block_time_sec),
         "--epoch-slots", str(settings.epoch_slots),
         "--genesis-trigger-height", str(settings.genesis_trigger),
@@ -399,3 +400,24 @@ def broadcast_tx(btcrpc: BitcoindClient, outputs: List[dict], options: dict) -> 
     txid = btcrpc.sendrawtransaction(deposit_tx).get("txid", "")
 
     return txid
+
+
+def get_bridge_pubkey(seqrpc) -> str:
+    """
+    Get the bridge pubkey from the sequencer.
+    """
+    # Wait for seq
+    wait_until(
+        lambda: seqrpc.strata_protocolVersion() is not None,
+        error_with="Sequencer did not start on time",
+    )
+    op_pks = seqrpc.strata_getActiveOperatorChainPubkeySet()
+    print(f"Operator pubkeys: {op_pks}")
+    # This returns a dict with index as key and pubkey as value
+    # Iterate all of them ant then call musig_aggregate_pks
+    # Also since they are full pubkeys, we need to convert them
+    # to X-only pubkeys.
+    op_pks = [op_pks[str(i)] for i in range(len(op_pks))]
+    op_x_only_pks = [convert_to_xonly_pk(pk) for pk in op_pks]
+    agg_pubkey = musig_aggregate_pks(op_x_only_pks)
+    return agg_pubkey
