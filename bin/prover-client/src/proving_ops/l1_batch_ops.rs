@@ -7,10 +7,7 @@ use strata_primitives::params::RollupParams;
 use strata_state::l1::HeaderVerificationState;
 use uuid::Uuid;
 
-use super::{
-    btc_ops::{get_pm_rollup_params, BtcOperations},
-    ops::ProvingOperations,
-};
+use super::{btc_ops::BtcOperations, ops::ProvingOperations};
 use crate::{
     dispatcher::TaskDispatcher,
     errors::{ProvingTaskError, ProvingTaskType},
@@ -23,6 +20,7 @@ use crate::{
 pub struct L1BatchOperations {
     btc_dispatcher: Arc<TaskDispatcher<BtcOperations>>,
     btc_client: Arc<BitcoinClient>,
+    rollup_params: Arc<RollupParams>,
 }
 
 impl L1BatchOperations {
@@ -30,10 +28,12 @@ impl L1BatchOperations {
     pub fn new(
         btc_dispatcher: Arc<TaskDispatcher<BtcOperations>>,
         btc_client: Arc<BitcoinClient>,
+        rollup_params: Arc<RollupParams>,
     ) -> Self {
         Self {
             btc_dispatcher,
             btc_client,
+            rollup_params,
         }
     }
 }
@@ -84,11 +84,11 @@ impl ProvingOperations for L1BatchOperations {
         let header_verification_state = get_verification_state(
             self.btc_client.as_ref(),
             btc_block_range.0,
-            get_pm_rollup_params().genesis_l1_height,
+            self.rollup_params.genesis_l1_height,
             &MAINNET.clone().into(),
         )
         .await?;
-        let rollup_params = get_pm_rollup_params();
+        let rollup_params = (*self.rollup_params).clone();
 
         let input: Self::Input = L1BatchInput {
             btc_block_range,
