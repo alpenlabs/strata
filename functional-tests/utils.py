@@ -342,7 +342,7 @@ def generate_params(settings: RollupParamsSettings, seqpubkey: str, oppubkeys: l
         "strata-datatool",
         "-b", "regtest",
         "genparams",
-        "--name", "strata",
+        "--name", "alpenstrata",
         "--block-time", str(settings.block_time_sec),
         "--epoch-slots", str(settings.epoch_slots),
         "--genesis-trigger-height", str(settings.genesis_trigger),
