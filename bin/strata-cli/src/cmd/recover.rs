@@ -1,5 +1,4 @@
 use argh::FromArgs;
-use bdk_esplora::EsploraAsyncExt;
 use bdk_wallet::{
     bitcoin::Amount, chain::ChainOracle, descriptor::IntoWalletDescriptor, KeychainKind, Wallet,
 };
@@ -10,7 +9,7 @@ use crate::{
     recovery::DescriptorRecovery,
     seed::Seed,
     settings::Settings,
-    signet::{get_fee_rate, log_fee_rate, EsploraClient, SignetWallet},
+    signet::{broadcast_tx, get_fee_rate, log_fee_rate, SignetWallet},
 };
 
 /// Attempt recovery of old deposit transactions
@@ -44,7 +43,7 @@ pub async fn recover(args: RecoverArgs, seed: Seed, settings: Settings) {
         return;
     }
 
-    let fee_rate = get_fee_rate(args.fee_rate, &esplora, 1)
+    let fee_rate = get_fee_rate(args.fee_rate, settings.sync_backend.clone(), 1)
         .await
         .expect("valid fee rate");
     log_fee_rate(&term, &fee_rate);
@@ -104,9 +103,8 @@ pub async fn recover(args: RecoverArgs, seed: Seed, settings: Settings) {
             .expect("valid sign op");
 
         let tx = psbt.extract_tx().unwrap();
-        esplora
-            .broadcast(&tx)
+        broadcast_tx(&tx, settings.sync_backend.clone())
             .await
-            .expect("successful tx broadcast");
+            .expect("broadcast to succeed")
     }
 }

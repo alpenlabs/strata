@@ -21,7 +21,7 @@ use crate::{
     recovery::DescriptorRecovery,
     seed::Seed,
     settings::Settings,
-    signet::{get_fee_rate, log_fee_rate, print_explorer_url, EsploraClient, SignetWallet},
+    signet::{broadcast_tx, get_fee_rate, log_fee_rate, print_explorer_url, SignetWallet},
     strata::StrataWallet,
     taproot::{ExtractP2trPubkey, NotTaprootAddress},
 };
@@ -101,7 +101,7 @@ pub async fn deposit(
         style(bridge_in_address.to_string()).yellow()
     ));
 
-    let fee_rate = get_fee_rate(fee_rate, &esplora, 1)
+    let fee_rate = get_fee_rate(fee_rate, settings.sync_backend.clone(), 1)
         .await
         .expect("valid fee rate");
     log_fee_rate(&term, &fee_rate);
@@ -143,7 +143,9 @@ pub async fn deposit(
 
     let pb = ProgressBar::new_spinner().with_message("Broadcasting transaction");
     pb.enable_steady_tick(Duration::from_millis(100));
-    esplora.broadcast(&tx).await.expect("successful broadcast");
+    broadcast_tx(&tx, settings.sync_backend.clone())
+        .await
+        .expect("successful broadcast");
     let txid = tx.compute_txid();
     pb.finish_with_message(format!("Transaction {} broadcasted", txid));
     let _ = print_explorer_url(&txid, &term, &settings);

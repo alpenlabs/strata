@@ -1,6 +1,7 @@
 use std::{
     cell::RefCell,
     collections::BTreeSet,
+    fmt::Debug,
     io::{self},
     ops::{Deref, DerefMut},
     path::{Path, PathBuf},
@@ -9,18 +10,22 @@ use std::{
     time::{Duration, Instant},
 };
 
-use bdk_bitcoind_rpc::{bitcoincore_rpc, Emitter};
+use bdk_bitcoind_rpc::{
+    bitcoincore_rpc::{self, json::EstimateMode, RpcApi},
+    Emitter,
+};
 use bdk_esplora::{
     esplora_client::{self, AsyncClient},
     EsploraAsyncExt,
 };
 use bdk_wallet::{
-    bitcoin::{Block, FeeRate, Network, Transaction, Txid},
+    bitcoin::{consensus::encode, Block, FeeRate, Network, Transaction, Txid},
     rusqlite::{self, Connection},
     ChangeSet, KeychainKind, PersistedWallet, WalletPersister,
 };
 use console::{style, Term};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use terrors::OneOf;
 use tokio::sync::mpsc;
 
 use crate::{seed::Seed, settings::Settings};
@@ -46,29 +51,69 @@ pub enum FeeRateError {
     /// Esplora didn't have a fee for the requested target
     FeeMissing,
     EsploraError(esplora_client::Error),
+    BitcoinCoreRPCError(bitcoincore_rpc::Error),
 }
 
 pub async fn get_fee_rate(
     user_provided: Option<u64>,
-    esplora: &EsploraClient,
+    backend: Arc<SyncBackend>,
     target: u16,
 ) -> Result<FeeRate, FeeRateError> {
     let fee_rate = if let Some(fr) = user_provided {
         FeeRate::from_sat_per_vb(fr).ok_or(FeeRateError::InvalidDueToOverflow)?
     } else {
-        esplora
-            .get_fee_estimates()
-            .await
-            .map(|frs| frs.get(&target).cloned())
-            .map_err(FeeRateError::EsploraError)?
-            .and_then(|fr| FeeRate::from_sat_per_vb(fr as u64))
-            .ok_or(FeeRateError::FeeMissing)?
+        match *backend {
+            SyncBackend::Esplora(ref esplora) => esplora
+                .get_fee_estimates()
+                .await
+                .map(|frs| frs.get(&target).cloned())
+                .map_err(FeeRateError::EsploraError)?
+                .and_then(|fr| FeeRate::from_sat_per_vb(fr as u64))
+                .ok_or(FeeRateError::FeeMissing)?,
+            SyncBackend::BitcoinCore(_) => {
+                let handle = tokio::task::spawn_blocking(move || {
+                    let SyncBackend::BitcoinCore(ref client) = *backend else {
+                        panic!("sync backend wasn't bitcoin core")
+                    };
+                    client.estimate_smart_fee(target, Some(EstimateMode::Conservative))
+                });
+                let res = handle
+                    .await
+                    .expect("thread should be fine")
+                    .map_err(FeeRateError::BitcoinCoreRPCError)?;
+                let per_vb = (res.fee_rate.expect("fee rate should be present") / 1000).to_sat();
+                FeeRate::from_sat_per_vb(per_vb).ok_or(FeeRateError::InvalidDueToOverflow)?
+            }
+        }
     };
 
     if fee_rate < FeeRate::BROADCAST_MIN {
         Err(FeeRateError::BelowBroadcastMin)
     } else {
         Ok(fee_rate)
+    }
+}
+
+pub async fn broadcast_tx(
+    tx: &Transaction,
+    backend: Arc<SyncBackend>,
+) -> Result<(), OneOf<(esplora_client::Error, bitcoincore_rpc::Error)>> {
+    match *backend {
+        SyncBackend::Esplora(ref client) => Ok(client.broadcast(tx).await.map_err(OneOf::new)?),
+        SyncBackend::BitcoinCore(_) => {
+            let hex = encode::serialize_hex(tx);
+            let handle = tokio::task::spawn_blocking(move || {
+                let SyncBackend::BitcoinCore(ref client) = *backend else {
+                    panic!("sync backend wasn't bitcoin core")
+                };
+                client.send_raw_transaction(hex)
+            });
+            handle
+                .await
+                .expect("thread should be fine")
+                .map_err(OneOf::new)?;
+            Ok(())
+        }
     }
 }
 

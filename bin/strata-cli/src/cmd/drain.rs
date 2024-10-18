@@ -12,7 +12,7 @@ use crate::{
     constants::SATS_TO_WEI,
     seed::Seed,
     settings::Settings,
-    signet::{get_fee_rate, log_fee_rate, print_explorer_url, EsploraClient, SignetWallet},
+    signet::{broadcast_tx, get_fee_rate, log_fee_rate, print_explorer_url, SignetWallet},
     strata::StrataWallet,
 };
 
@@ -69,7 +69,7 @@ pub async fn drain(
                     .to_string(),
             );
         }
-        let fr = get_fee_rate(fee_rate, &esplora, 1)
+        let fr = get_fee_rate(fee_rate, settings.sync_backend.clone(), 1)
             .await
             .expect("valid fee rate");
         log_fee_rate(&term, &fr);
@@ -84,7 +84,9 @@ pub async fn drain(
             .expect("valid transaction");
         l1w.sign(&mut psbt, Default::default()).unwrap();
         let tx = psbt.extract_tx().expect("fully signed tx");
-        esplora.broadcast(&tx).await.unwrap();
+        broadcast_tx(&tx, settings.sync_backend.clone())
+            .await
+            .unwrap();
         let _ = print_explorer_url(&tx.compute_txid(), &term, &settings);
         let _ = term.write_line(&format!("Drained signet wallet to {}", address,));
     }

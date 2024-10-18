@@ -7,7 +7,7 @@ use crate::{
     net_type::{net_type_or_exit, NetworkType},
     seed::Seed,
     settings::Settings,
-    signet::{EsploraClient, SignetWallet},
+    signet::SignetWallet,
     strata::StrataWallet,
 };
 
