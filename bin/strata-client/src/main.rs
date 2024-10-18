@@ -35,7 +35,7 @@ use strata_storage::{
 use strata_sync::{self, L2SyncContext, RpcSyncPeer};
 use strata_tasks::{ShutdownSignal, TaskExecutor, TaskManager};
 use tokio::{
-    runtime::Runtime,
+    runtime::{Handle, Runtime},
     sync::{broadcast, oneshot},
 };
 use tracing::*;
@@ -71,7 +71,15 @@ fn main() -> anyhow::Result<()> {
 }
 
 fn main_inner(args: Args) -> anyhow::Result<()> {
-    logging::init();
+    // Start runtime for async IO tasks.
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .thread_name("strata-rt")
+        .build()
+        .expect("init: build rt");
+
+    // Init the logging before we do anything else.
+    init_logging(runtime.handle());
 
     let config = get_config(args.clone())?;
 
@@ -98,13 +106,6 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     // initialize core databases
     let database = init_core_dbs(rbdb.clone(), ops_config);
 
-    // Start runtime for async IO tasks.
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .thread_name("strata-rt")
-        .build()
-        .expect("init: build rt");
-
     // Init thread pool for batch jobs.
     // TODO switch to num_cpus
     let pool = threadpool::ThreadPool::with_name("strata-pool".to_owned(), 8);
@@ -130,6 +131,8 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         info!("need to init client state!");
         genesis::init_client_state(&params, database.as_ref())?;
     }
+
+    info!("init finished, starting main tasks");
 
     let ctx = start_core_tasks(
         &executor,
@@ -209,6 +212,29 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     info!("exiting");
     Ok(())
+}
+
+/// Sets up the logging system given a handle to a runtime context to possibly
+/// start the OTLP output on.
+fn init_logging(rt: &Handle) {
+    let mut lconfig = logging::LoggerConfig::with_base_name("strata-client");
+
+    // Set the OpenTelemetry URL if set.
+    let otlp_url = logging::get_otlp_url_from_env();
+    if let Some(url) = &otlp_url {
+        lconfig.set_otlp_url(url.clone());
+    }
+
+    {
+        // Need to set the runtime context because of nonsense.
+        let _g = rt.enter();
+        logging::init(lconfig);
+    }
+
+    // Have to log this after we start the logging formally.
+    if let Some(url) = &otlp_url {
+        info!(%url, "using OpenTelemetry tracing output");
+    }
 }
 
 #[derive(Clone)]
