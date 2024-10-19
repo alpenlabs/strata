@@ -51,6 +51,17 @@ impl AsRef<[u8; 32]> for L1BlockId {
     }
 }
 
+// /// Implements same format as [`BlockHash`].
+// /// Ignored for now because this is a breaking change!
+// impl fmt::Debug for L1BlockId {
+//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+//         let reversed_bytes: Vec<u8> = self.0 .0.iter().rev().cloned().collect();
+//         let mut buf = [0; 64];
+//         hex::encode_to_slice(&reversed_bytes, &mut buf).expect("buf: enc hex");
+//         f.write_str(unsafe { str::from_utf8_unchecked(&buf) })
+//     }
+// }
+
 impl fmt::Debug for L1BlockId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(&self.0, f)
@@ -70,12 +81,12 @@ mod tests {
     use super::L1BlockId;
 
     #[test]
+    #[ignore = "breaking change"]
     fn test_l1_blkid() {
         let block = get_btc_mainnet_block();
         let l1_blkid: L1BlockId = block.block_hash().into();
-        // This makes sense to be equal?
-        let _str1 = format!("{}", block.block_hash());
-        let _str2 = format!("{:?}", l1_blkid);
-        // assert_eq!(str1, str2);
+        let str1 = format!("{}", block.block_hash());
+        let str2 = format!("{:?}", l1_blkid);
+        assert_eq!(str1, str2);
     }
 }

@@ -1,4 +1,4 @@
-use std::{fs::File, io::Write, sync::Arc};
+use std::sync::Arc;
 
 use anyhow::Ok;
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -71,7 +71,12 @@ impl ZKVMHost for SP1Host {
         }
 
         let (remote_id, proof_data) = if client.prover.id() == ProverType::Network {
-            println!("Remote prover");
+            // SAFETY: We use `unsafe` to downcast the trait object to `NetworkProver` because
+            // `Prover` doesn't implement `Any`, so we can't use safe downcasting.
+            // Since `client.prover` is initialized as `NetworkProver` when `SP1_PROVER ==
+            // "network"`, this cast is valid in this context. The cast bypasses Rust's
+            // type checks, so we must ensure the environment variable is set correctly
+            // to avoid undefined behavior.
             let network_prover =
                 unsafe { &*(client.prover.as_ref() as *const _ as *const NetworkProver) };
 
@@ -83,7 +88,6 @@ impl ZKVMHost for SP1Host {
                 (true, _) => ProofMode::Compressed,
                 (_, _) => ProofMode::default(),
             };
-            println!("Prover Mode: {:?}", mode);
 
             let remote_id =
                 block_on(network_prover.request_proof(&self.elf, prover_input.clone(), mode))?;
@@ -91,10 +95,11 @@ impl ZKVMHost for SP1Host {
             let proof_data: SP1ProofWithPublicValues =
                 block_on(network_prover.wait_proof(&remote_id, None))?;
 
-            let filename: String = format!("{}.{}proof", remote_id, self.prover_options);
-            let mut file = File::create(filename).unwrap();
-            file.write_all(&bincode::serialize(&proof_data).unwrap())
-                .unwrap();
+            // TODO: move saving proof into prover_options
+            // let filename: String = format!("{}.{}proof", remote_id, self.prover_options);
+            // let mut file = File::create(filename).unwrap();
+            // file.write_all(&bincode::serialize(&proof_data).unwrap())
+            //     .unwrap();
 
             (Some(remote_id), proof_data)
         } else {

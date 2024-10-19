@@ -169,11 +169,11 @@ pub fn verify_proof(
     checkpoint: &BatchCheckpoint,
     rollup_params: &RollupParams,
 ) -> anyhow::Result<()> {
-    debug!(?checkpoint, ?rollup_params, "Verifying checkpoint proof");
-
     let rollup_vk = rollup_params.rollup_vk;
     let checkpoint_idx = checkpoint.batch_info().idx();
     let proof = checkpoint.proof();
+
+    debug!(%checkpoint_idx, "Verifying checkpoint proof");
 
     // FIXME: we are accepting empty proofs for now (devnet) to reduce dependency on the prover
     // infra.
