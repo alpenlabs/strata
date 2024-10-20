@@ -4,8 +4,10 @@ use std::{
     path::PathBuf,
 };
 
+use anyhow::Context;
 use sha2::{Digest, Sha256};
-use sp1_sdk::{ProverClient, SP1ProvingKey, SP1VerifyingKey};
+use sp1_sdk::{ProverClient, SP1ProofWithPublicValues, SP1ProvingKey, SP1VerifyingKey};
+use strata_zkvm::Proof;
 use tracing::{debug, error};
 
 /// Generates or retrieves proving and verifying keys for the given guest code.
@@ -71,4 +73,21 @@ pub fn get_proving_keys(
         // If caching is not used, directly generate keys
         client.setup(guest_code)
     }
+}
+
+/// Extracts the raw Groth16 proof bytes from a given `Proof`.
+pub fn extract_raw_groth16_proof(proof: Proof) -> anyhow::Result<Proof> {
+    let sp1_proof: SP1ProofWithPublicValues = bincode::deserialize(proof.as_bytes())
+        .context("Failed to deserialize SP1 Groth16 proof")?;
+
+    let sp1_groth16_proof_bytes = hex::decode(
+        &sp1_proof
+            .proof
+            .try_as_groth_16()
+            .context("Failed to convert proof to Groth16")?
+            .raw_proof,
+    )
+    .context("Failed to decode Groth16 proof")?;
+
+    Ok(Proof::new(sp1_groth16_proof_bytes))
 }

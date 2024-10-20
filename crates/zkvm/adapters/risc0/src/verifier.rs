@@ -70,6 +70,14 @@ impl ZKVMVerifier for Risc0Verifier {
             .map_err(|e| anyhow::anyhow!("Integrity verification failed: {:?}", e))
     }
 
+    fn verify_groth16_raw(
+        _proof: &Proof,
+        _verification_key: &[u8],
+        _public_params_raw: &[u8],
+    ) -> anyhow::Result<()> {
+        todo!()
+    }
+
     fn extract_public_output<T: serde::Serialize + serde::de::DeserializeOwned>(
         proof: &Proof,
     ) -> anyhow::Result<T> {
