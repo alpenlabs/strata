@@ -31,7 +31,7 @@ def _handle_response(resp_str: str):
 
 
 def _send_single_ws_request(url: str, request: str) -> str:
-    with wsconnect(url) as w:
+    with wsconnect(url, open_timeout=60) as w:
         w.send(request)
         return w.recv()
 

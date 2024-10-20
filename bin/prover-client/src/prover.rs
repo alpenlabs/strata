@@ -301,6 +301,14 @@ where
         }
     }
 
+    pub(crate) fn is_available(&self) -> bool {
+        let prover_state = self.prover_state.read().unwrap();
+        let num_jobs = prover_state.pending_tasks_count;
+        let max = 20;
+
+        num_jobs < max
+    }
+
     fn save_proof_to_db(&self, task_id: Uuid, proof: &Proof) -> Result<(), anyhow::Error> {
         self.db
             .prover_store()
