@@ -11,7 +11,10 @@ use strata_zkvm::{
     Proof, ProofWithMetadata, ProverOptions, VerificationKey, ZKVMHost, ZKVMInputBuilder,
 };
 
-use crate::{input::SP1ProofInputBuilder, utils::get_proving_keys};
+use crate::{
+    input::SP1ProofInputBuilder,
+    utils::{extract_raw_groth16_proof, get_proving_keys},
+};
 
 /// A host for the `SP1` zkVM that stores the guest program in ELF format.
 /// The `SP1Host` is responsible for program execution and proving
@@ -70,7 +73,7 @@ impl ZKVMHost for SP1Host {
             prover = prover.groth16();
         }
 
-        let (remote_id, proof_data) = if client.prover.id() == ProverType::Network {
+        let (remote_id, mut proof_data) = if client.prover.id() == ProverType::Network {
             // SAFETY: We use `unsafe` to downcast the trait object to `NetworkProver` because
             // `Prover` doesn't implement `Any`, so we can't use safe downcasting.
             // Since `client.prover` is initialized as `NetworkProver` when `SP1_PROVER ==
@@ -107,9 +110,17 @@ impl ZKVMHost for SP1Host {
             (None, proof_data)
         };
 
+        // The `stdin` field is unused in the Proof use case. Clearing it to conserve storage.
+        proof_data.stdin = Default::default();
+
         // Proof serialization
         let verification_key = bincode::serialize(&self.vkey)?;
-        let proof = Proof::new(bincode::serialize(&proof_data)?);
+        let mut proof = Proof::new(bincode::serialize(&proof_data)?);
+
+        // TODO: Use an enum to represent different proof types instead of direct conversion
+        if self.prover_options.stark_to_snark_conversion {
+            proof = extract_raw_groth16_proof(proof)?;
+        }
 
         Ok((
             ProofWithMetadata::new(proof_id, proof, remote_id),

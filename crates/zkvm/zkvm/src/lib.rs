@@ -253,6 +253,13 @@ pub trait ZKVMVerifier {
         public_params_raw: &[u8],
     ) -> anyhow::Result<()>;
 
+    /// Verifies the raw groth16 proof
+    fn verify_groth16_raw(
+        proof: &Proof,
+        verification_key: &[u8],
+        public_params_raw: &[u8],
+    ) -> anyhow::Result<()>;
+
     /// Extracts the public output from the given proof using standard `serde`
     /// serialization/deserialization.
     fn extract_public_output<T: Serialize + DeserializeOwned>(proof: &Proof) -> anyhow::Result<T>;
@@ -278,7 +285,7 @@ impl Default for ProverOptions {
 /// An input to the aggregation program.
 ///
 /// Consists of a proof and a verification key.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AggregationInput {
     proof: Proof,
     vk: VerificationKey,

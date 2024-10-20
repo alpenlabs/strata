@@ -191,7 +191,7 @@ pub fn verify_proof(
             Risc0Verifier::verify_groth16(proof, vk.as_ref(), &public_params_raw)
         }
         RollupVerifyingKey::SP1VerifyingKey(vk) => {
-            SP1Verifier::verify_groth16(proof, vk.as_ref(), &public_params_raw)
+            SP1Verifier::verify_groth16_raw(proof, vk.as_ref(), &public_params_raw)
         }
     });
     match res {
