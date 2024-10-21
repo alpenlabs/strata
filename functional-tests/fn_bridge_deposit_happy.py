@@ -34,6 +34,8 @@ class BridgeDepositHappyTest(flexitest.Test):
 
         addr_1 = get_address(0)
         addr_2 = get_address(1)
+        addr_3 = get_address(2)
+        addr_4 = get_address(3)
 
         # 1st deposit
         n_deposits_pre_1 = len(seqrpc.strata_getCurrentDeposits())
@@ -50,6 +52,22 @@ class BridgeDepositHappyTest(flexitest.Test):
         n_deposits_post_2 = len(seqrpc.strata_getCurrentDeposits())
         self.logger.debug(f"Current deposits: {n_deposits_post_2}")
         assert n_deposits_post_2 == n_deposits_pre_2 + 1
+
+        # 3rd deposit, now to a previously used address
+        n_deposits_pre_3 = len(seqrpc.strata_getCurrentDeposits())
+        self.logger.debug(f"Current deposits: {n_deposits_pre_3}")
+        assert self.test_deposit(ctx, addr_3, el_address_1, new_address=False)
+        n_deposits_post_3 = len(seqrpc.strata_getCurrentDeposits())
+        self.logger.debug(f"Current deposits: {n_deposits_post_3}")
+        assert n_deposits_post_3 == n_deposits_pre_3 + 1
+
+        # 4th deposit, now to a previously used address
+        n_deposits_pre_4 = len(seqrpc.strata_getCurrentDeposits())
+        self.logger.debug(f"Current deposits: {n_deposits_pre_4}")
+        assert self.test_deposit(ctx, addr_4, el_address_2, new_address=False)
+        n_deposits_post_4 = len(seqrpc.strata_getCurrentDeposits())
+        self.logger.debug(f"Current deposits: {n_deposits_post_4}")
+        assert n_deposits_post_4 == n_deposits_pre_4 + 1
 
     def make_drt(self, ctx: flexitest.RunContext, el_address, musig_bridge_pk):
         """
@@ -107,7 +125,9 @@ class BridgeDepositHappyTest(flexitest.Test):
 
         return txid
 
-    def test_deposit(self, ctx: flexitest.RunContext, address: str, el_address: str):
+    def test_deposit(
+        self, ctx: flexitest.RunContext, address: str, el_address: str, new_address=True
+    ):
         """
         Test depositing funds into the bridge and verifying the corresponding increase in balance
         on the Strata side.
@@ -143,7 +163,10 @@ class BridgeDepositHappyTest(flexitest.Test):
         # Make sure that the el_address has zero balance
         original_balance = int(rethrpc.eth_getBalance(f"0x{el_address}"), 16)
         self.logger.debug(f"Balance before deposit (EL address): {original_balance}")
-        assert original_balance == 0, "balance is not zero"
+        if new_address:
+            assert original_balance == 0, "balance is not zero"
+        else:
+            assert original_balance > 0, "balance is zero"
 
         # Generate Plenty of BTC to address
         btcrpc.proxy.generatetoaddress(102, address)
@@ -157,7 +180,7 @@ class BridgeDepositHappyTest(flexitest.Test):
         assert new_balance > original_balance, "balance did not increase"
 
         # Make sure that the balance is 10 BTC in Strata "wei"
-        expected_balance = rollup_deposit_amount * (10**10)
+        expected_balance = rollup_deposit_amount * (10**10) * (2 if not new_address else 1)
         assert new_balance == expected_balance, "balance is not the default rollup_deposit_amount"
 
         # Drain wallet back to sequencer so that we cannot use address 1 or change anymore
