@@ -65,6 +65,8 @@ impl<D: Database> StateTracker<D> {
             .get_sync_event(ev_idx)?
             .ok_or(Error::MissingSyncEvent(ev_idx))?;
 
+        debug!(?ev, "Processing event");
+
         // Compute the state transition.
         let outp = client_transition::process_event(&self.cur_state, &ev, db, &self.params)?;
 

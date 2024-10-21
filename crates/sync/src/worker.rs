@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use futures::StreamExt;
 use strata_consensus_logic::{csm::message::ForkChoiceMessage, sync_manager::SyncManager};
@@ -131,8 +131,6 @@ async fn sync_blocks_by_range<T: SyncClient>(
 
     while let Some(block) = blockstream.next().await {
         handle_new_block(state, context, block).await?;
-        // HACK: remove throttle after fixing fcm - csm channel deadlock
-        tokio::time::sleep(Duration::from_millis(10)).await;
     }
 
     Ok(())
