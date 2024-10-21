@@ -191,12 +191,6 @@ fn process_early_fcm_msg(msg: ForkChoiceMessage) -> Option<Arc<ClientState>> {
             }
         }
 
-        ForkChoiceMessage::NewState(state, _) => {
-            if state.is_chain_active() && state.sync().is_some() {
-                return Some(state);
-            }
-        }
-
         ForkChoiceMessage::NewBlock(blkid) => {
             error!(blkid = ?blkid, "got unexpected early FCM new block message");
         }
@@ -363,11 +357,6 @@ fn process_fc_message<D: Database, E: ExecEngineCtl>(
     match msg {
         ForkChoiceMessage::CsmResume(_) => {
             warn!("got unexpected late CSM resume message, ignoring");
-        }
-
-        ForkChoiceMessage::NewState(cs, output) => {
-            // NOTE: this might not be needed
-            handle_new_state(fcm_state, cs.as_ref(), output.as_ref())?;
         }
 
         ForkChoiceMessage::NewBlock(blkid) => {
