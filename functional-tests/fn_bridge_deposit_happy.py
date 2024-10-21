@@ -4,6 +4,7 @@ import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 from strata_utils import deposit_request_transaction, drain_wallet, get_address
 
+from constants import DEFAULT_ROLLUP_PARAMS
 from entry import BasicEnvConfig
 from utils import get_bridge_pubkey, get_logger
 
@@ -25,61 +26,14 @@ class BridgeDepositHappyTest(flexitest.Test):
         self.logger = get_logger("BridgeDepositHappyTest")
 
     def main(self, ctx: flexitest.RunContext):
-        btc = ctx.get_service("bitcoin")
-        seq = ctx.get_service("sequencer")
-        reth = ctx.get_service("reth")
-
         el_address_1 = "deadf001900dca3ebeefdeadf001900dca3ebeef"
         el_address_2 = "deedf001900dca3ebeefdeadf001900dca3ebeef"
-        self.logger.debug(f"EL address 1: {el_address_1}")
-        self.logger.debug(f"EL address 2: {el_address_2}")
 
-        seqrpc = seq.create_rpc()
-        btcrpc: BitcoindClient = btc.create_rpc()
-        rethrpc = reth.create_rpc()
-
-        btc_url = btcrpc.base_url
-        btc_user = btc.props["rpc_user"]
-        btc_password = btc.props["rpc_password"]
-
-        self.logger.debug(f"BTC URL: {btc_url}")
-        self.logger.debug(f"BTC user: {btc_user}")
-        self.logger.debug(f"BTC password: {btc_password}")
-
-        # Get operators pubkey and musig2 aggregates it
-        bridge_pk = get_bridge_pubkey(seqrpc)
-        print(f"Bridge pubkey: {bridge_pk}")
-
-        seq_addr = seq.get_prop("address")
         addr_1 = get_address(0)
         addr_2 = get_address(1)
-        self.logger.debug(f"Sequencer Address: {seq_addr}")
-        self.logger.debug(f"Address 1: {addr_1}")
-        self.logger.debug(f"Address 2: {addr_2}")
 
-        # Generate Plenty of BTC to address 1
-        original_balance = int(rethrpc.eth_getBalance(f"0x{el_address_1}"), 16)
-        self.logger.debug(f"Balance before deposit (EL address 1): {original_balance}")
-        btcrpc.proxy.generatetoaddress(102, addr_1)[0]
-        # Send DRT from Address 1 to EL Address 1
-        self.make_drt(ctx, el_address_1, bridge_pk)
-        new_balance = int(rethrpc.eth_getBalance(f"0x{el_address_1}"), 16)
-        self.logger.debug(f"Balance after deposit (EL address 1): {new_balance}")
-        assert new_balance > original_balance, "balance did not increase"
-        # Drain wallet back to sequencer so that we cannot use address 1 or change anymore
-        self.drain_wallet(ctx)
-
-        # Generate Plenty of BTC to address 2
-        original_balance = int(rethrpc.eth_getBalance(f"0x{el_address_2}"), 16)
-        self.logger.debug(f"Balance before deposit (EL address 2): {original_balance}")
-        btcrpc.proxy.generatetoaddress(102, addr_2)[0]
-        # Send DRT from Address 2 to EL Address 2
-        self.make_drt(ctx, el_address_2, bridge_pk)
-        new_balance = int(rethrpc.eth_getBalance(f"0x{el_address_2}"), 16)
-        self.logger.debug(f"Balance after deposit (EL address 2): {new_balance}")
-        assert new_balance > original_balance, "balance did not increase"
-        # Drain wallet back to sequencer so that we cannot use address 1 or change anymore
-        self.drain_wallet(ctx)
+        assert self.test_deposit(ctx, addr_1, el_address_1)
+        assert self.test_deposit(ctx, addr_2, el_address_2)
 
     def make_drt(self, ctx: flexitest.RunContext, el_address, musig_bridge_pk):
         """
@@ -136,3 +90,60 @@ class BridgeDepositHappyTest(flexitest.Test):
         self.logger.debug(f"drained wallet back to sequencer, txid: {txid}")
 
         return txid
+
+    def test_deposit(self, ctx: flexitest.RunContext, address: str, el_address: str):
+        """
+        Test depositing funds into the bridge and verifying the corresponding increase in balance
+        on the Strata side.
+        """
+        rollup_deposit_amount = DEFAULT_ROLLUP_PARAMS["deposit_amount"]
+
+        btc = ctx.get_service("bitcoin")
+        seq = ctx.get_service("sequencer")
+        reth = ctx.get_service("reth")
+
+        self.logger.debug(f"EL address: {el_address}")
+
+        seqrpc = seq.create_rpc()
+        btcrpc: BitcoindClient = btc.create_rpc()
+        rethrpc = reth.create_rpc()
+
+        btc_url = btcrpc.base_url
+        btc_user = btc.props["rpc_user"]
+        btc_password = btc.props["rpc_password"]
+
+        self.logger.debug(f"BTC URL: {btc_url}")
+        self.logger.debug(f"BTC user: {btc_user}")
+        self.logger.debug(f"BTC password: {btc_password}")
+
+        # Get operators pubkey and musig2 aggregates it
+        bridge_pk = get_bridge_pubkey(seqrpc)
+        print(f"Bridge pubkey: {bridge_pk}")
+
+        seq_addr = seq.get_prop("address")
+        self.logger.debug(f"Sequencer Address: {seq_addr}")
+        self.logger.debug(f"Address: {address}")
+
+        # Make sure that the el_address has zero balance
+        original_balance = int(rethrpc.eth_getBalance(f"0x{el_address}"), 16)
+        self.logger.debug(f"Balance before deposit (EL address): {original_balance}")
+        assert original_balance == 0, "balance is not zero"
+
+        # Generate Plenty of BTC to address
+        btcrpc.proxy.generatetoaddress(102, address)
+
+        # Send DRT from Address 1 to EL Address 1
+        self.make_drt(ctx, el_address, bridge_pk)
+
+        # Make sure that the balance has increased
+        new_balance = int(rethrpc.eth_getBalance(f"0x{el_address}"), 16)
+        self.logger.debug(f"Balance after deposit (EL address): {new_balance}")
+        assert new_balance > original_balance, "balance did not increase"
+
+        # Make sure that the balance is 10 BTC in Strata "wei"
+        expected_balance = rollup_deposit_amount * (10**10)
+        assert new_balance == expected_balance, "balance is not the default rollup_deposit_amount"
+
+        # Drain wallet back to sequencer so that we cannot use address 1 or change anymore
+        self.drain_wallet(ctx)
+        return True
