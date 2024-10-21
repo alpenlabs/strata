@@ -14,8 +14,11 @@ use proving_ops::{
 use rpc_server::{ProverClientRpc, RpcContext};
 use strata_btcio::rpc::BitcoinClient;
 use strata_common::logging;
-use strata_sp1_adapter::SP1Host;
-use strata_zkvm::ProverOptions;
+use strata_primitives::{params::RollupParams, vk::RollupVerifyingKey};
+use strata_proofimpl_checkpoint::{process_checkpoint_proof, L2BatchProofOutput};
+use strata_proofimpl_l1_batch::L1BatchProofOutput;
+use strata_sp1_adapter::{SP1Host, SP1Verifier};
+use strata_zkvm::{AggregationInput, ProverOptions, ZKVMVerifier};
 use task::TaskTracker;
 use tracing::{debug, info};
 
@@ -115,14 +118,14 @@ async fn main() {
     tokio::spawn(async move { prover_manager.run().await });
 
     // run checkpoint runner
-    // tokio::spawn(async move {
-    //     start_checkpoints_task(
-    //         cl_client.clone(),
-    //         checkpoint_dispatcher.clone(),
-    //         task_tracker.clone(),
-    //     )
-    //     .await
-    // });
+    tokio::spawn(async move {
+        start_checkpoints_task(
+            cl_client.clone(),
+            checkpoint_dispatcher.clone(),
+            task_tracker.clone(),
+        )
+        .await
+    });
 
     // Run prover manager in dev mode or runner mode
     if args.enable_dev_rpcs {
@@ -142,4 +145,94 @@ async fn run_rpc_server(
     let rpc_impl = ProverClientRpc::new(rpc_context);
     rpc_server::start(&rpc_impl, rpc_url, enable_dev_rpc).await?;
     anyhow::Ok(())
+}
+
+#[test]
+fn make_one() {
+    // CKP 1 here
+    let input = include_bytes!(
+        "../../../functional-tests/witness_e9dd53fe-1e05-4f6a-818e-5c87c7186487.bin"
+    );
+
+    let (rollup_params, l1, l2): (RollupParams, AggregationInput, AggregationInput) =
+        bincode::deserialize(input).unwrap();
+
+    let l1_batch_proof = l1.proof();
+    let l1_batch_pp: L1BatchProofOutput =
+        SP1Verifier::extract_borsh_public_output(l1_batch_proof).unwrap();
+
+    let l2_batch_proof = l2.proof();
+    let l2_batch_pp: L2BatchProofOutput =
+        SP1Verifier::extract_borsh_public_output(l2_batch_proof).unwrap();
+
+    let (output, prev_checkpoint) =
+        process_checkpoint_proof(&l1_batch_pp, &l2_batch_pp, &rollup_params);
+
+    if let Some(prev_checkpoint) = prev_checkpoint {
+        let (checkpoint, proof) = prev_checkpoint;
+        let rollup_vk = match rollup_params.rollup_vk() {
+            RollupVerifyingKey::SP1VerifyingKey(sp1_vk) => sp1_vk,
+            _ => panic!("Need SP1VerifyingKey"),
+        };
+        SP1Verifier::verify_groth16_raw(
+            &proof,
+            rollup_vk.as_bytes(),
+            &borsh::to_vec(&checkpoint).unwrap(),
+            // &bincode::serialize(&borsh::to_vec(&checkpoint).unwrap()).unwrap(),
+        )
+        .unwrap();
+    }
+
+    // println!(
+    //     "Is prev proof present {:?}",
+    //     l1_batch_pp.prev_checkpoint.clone().unwrap().batch_info()
+    // );
+    // println!(
+    //     "Is prev proof present {:?}",
+    //     l1_batch_pp.prev_checkpoint.unwrap().bootstrap_state()
+    // );
+
+    // // CKP 0 here
+    // let input = include_bytes!(
+    //     "../../../functional-tests/witness_b3920c9a-a0ec-42ae-8e08-c432ccdd6e77.bin" /*
+    // "../../../functional-tests/witness_5981db93-01a9-4fb8-946c-5caa4cd55d97.bin" */
+    // );
+
+    // let pp = include_bytes!("../proof_public_param.bin");
+    // let pp: CheckpointProofOutput = borsh::from_slice(pp).unwrap();
+    // println!("Obt pp: {:?}", pp);
+
+    // let pp: CheckpointProofOutput =
+    //     SP1Verifier::extract_borsh_public_output(proof.0.proof()).unwrap();
+
+    // let (rollup_params, l1, l2): (RollupParams, AggregationInput, AggregationInput) =
+    //     bincode::deserialize(input).unwrap();
+
+    // let vm = SP1Host::init(
+    //     GUEST_CHECKPOINT_ELF.into(),
+    //     ProverOptions {
+    //         use_cached_keys: true,
+    //         enable_compression: true,
+    //         stark_to_snark_conversion: true,
+    //         use_mock_prover: false,
+    //     },
+    // );
+
+    // let mut input_builder = SP1ProofInputBuilder::new();
+    // input_builder.write(&rollup_params).unwrap();
+    // input_builder.write_proof(l1).unwrap();
+    // input_builder.write_proof(l2).unwrap();
+    // let input = input_builder.build().unwrap();
+
+    // let proof = vm.prove(input).unwrap();
+    // let pp: CheckpointProofOutput =
+    //     SP1Verifier::extract_borsh_public_output(proof.0.proof()).unwrap();
+    // println!("Obt pp: {:?}", pp);
+    // let pp_ser = borsh::to_vec(&pp).unwrap();
+
+    // use std::{fs::File, io::Write};
+    // let filename = "proof_public_param.bin".to_string();
+    // let mut file = File::create(filename).unwrap();
+    // file.write_all(&pp_ser).unwrap();
+    println!("******************");
 }

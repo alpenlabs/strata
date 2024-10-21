@@ -100,18 +100,20 @@ pub fn process_checkpoint_proof(
         // Genesis batch: initialize with initial bootstrap state
         None => (batch_info.get_initial_bootstrap_state(), None),
         Some(prev_checkpoint) => {
+            batch_info.idx = prev_checkpoint.batch_info().idx;
+
             // Ensure sequential state transition
             assert_eq!(
                 prev_checkpoint.batch_info().get_final_bootstrap_state(),
                 batch_info.get_initial_bootstrap_state()
             );
 
+            batch_info.idx += 1;
+
             assert_eq!(
                 prev_checkpoint.batch_info().rollup_params_commitment(),
                 batch_info.rollup_params_commitment()
             );
-
-            batch_info.idx = prev_checkpoint.batch_info().idx + 1;
 
             // If there exist proof for the prev_batch, use the prev_batch bootstrap state, else set
             // the current batch initial info as bootstrap
