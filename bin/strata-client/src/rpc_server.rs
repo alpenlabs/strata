@@ -94,7 +94,7 @@ impl<D: Database + Sync + Send + 'static> StrataRpcImpl<D> {
 
     /// Gets a ref to the current client state as of the last update.
     async fn get_client_state(&self) -> ClientState {
-        self.sync_manager.status_rx().cl.borrow().clone()
+        self.sync_manager.status_rx().cl().borrow().clone()
     }
 
     /// Gets a clone of the current client state and fetches the chainstate that
@@ -155,7 +155,7 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
     }
 
     async fn get_l1_status(&self) -> RpcResult<L1Status> {
-        Ok(self.status_rx.l1.borrow().clone())
+        Ok(self.status_rx.l1().borrow().clone())
     }
 
     async fn get_l1_connection_status(&self) -> RpcResult<bool> {
@@ -409,7 +409,7 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
 
     async fn sync_status(&self) -> RpcResult<NodeSyncStatus> {
         let sync = {
-            let cl = self.status_rx.cl.borrow();
+            let cl = self.status_rx.cl().borrow();
             cl.sync().ok_or(Error::ClientNotStarted)?.clone()
         };
         Ok(NodeSyncStatus {
@@ -506,7 +506,7 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
         // deposits/withdrawals).
 
         let l1_db_provider = self.database.l1_provider();
-        let network = self.status_rx.l1.borrow().network;
+        let network = self.status_rx.l1().borrow().network;
 
         let (deposit_duties, latest_index) =
             extract_deposit_requests(l1_db_provider, start_index, network).await?;

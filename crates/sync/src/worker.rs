@@ -1,7 +1,6 @@
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use futures::StreamExt;
-use strata_common::env::parse_env_or;
 use strata_consensus_logic::{message::ForkChoiceMessage, sync_manager::SyncManager};
 use strata_state::{
     block::L2BlockBundle, client_state::SyncState, header::L2Header, id::L2BlockId,
@@ -13,9 +12,6 @@ use crate::{
     state::{self, L2SyncState},
     L2SyncError, SyncClient,
 };
-
-// HACK: remove throttle after fixing fcm - csm channel deadlock
-const SYNC_THROTTLE_MS_ENVVAR: &str = "SYNC_THROTTLE_MS";
 
 pub struct L2SyncContext<T: SyncClient> {
     client: T,
@@ -130,15 +126,11 @@ async fn sync_blocks_by_range<T: SyncClient>(
         "syncing blocks by range"
     );
 
-    let throttle_sleep_ms = parse_env_or(SYNC_THROTTLE_MS_ENVVAR, 10);
-
     let blockstream = context.client.get_blocks_range(start_height, end_height);
     let mut blockstream = Box::pin(blockstream);
 
     while let Some(block) = blockstream.next().await {
         handle_new_block(state, context, block).await?;
-        // HACK: remove throttle after fixing fcm - csm channel deadlock
-        tokio::time::sleep(Duration::from_millis(throttle_sleep_ms)).await;
     }
 
     Ok(())

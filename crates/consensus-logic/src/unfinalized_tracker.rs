@@ -141,6 +141,14 @@ impl UnfinalizedBlockTracker {
             return Err(ChainTipError::MissingBlock(*blkid));
         }
 
+        if *blkid == self.finalized_tip {
+            return Ok(FinalizeReport {
+                prev_tip: *blkid,
+                finalized: vec![*blkid],
+                rejected: Vec::new(),
+            });
+        }
+
         let mut finalized = vec![];
         let mut at = *blkid;
 
@@ -156,6 +164,7 @@ impl UnfinalizedBlockTracker {
         let mut to_evict = vec![];
 
         // Walk down from the parent of blkid and find the chains that needs to be evicted
+
         let mut at = self.pending_table.get(blkid).unwrap().parent;
         loop {
             let ent = self.pending_table.get(&at).unwrap();

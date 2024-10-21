@@ -379,7 +379,7 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
             let target_slot = data.target_slot();
             let parent = data.parent();
 
-            let client_state = sync_manager.status_rx().cl.borrow().clone();
+            let client_state = sync_manager.status_rx().cl().borrow().clone();
 
             let l1_view = client_state.l1_view();
 

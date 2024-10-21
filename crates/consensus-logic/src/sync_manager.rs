@@ -114,6 +114,7 @@ pub fn start_sync_tasks<
     let fcm_engine = engine.clone();
     let fcm_csm_controller = csm_controller.clone();
     let fcm_params = params.clone();
+    let status_rx = status_bundle.1.clone();
     executor.spawn_critical("fork_choice_manager::tracker_task", |shutdown| {
         // TODO this should be simplified into a builder or something
         fork_choice_manager::tracker_task(
@@ -124,6 +125,7 @@ pub fn start_sync_tasks<
             fcm_rx,
             fcm_csm_controller,
             fcm_params,
+            status_rx,
         )
     });
 
@@ -137,19 +139,11 @@ pub fn start_sync_tasks<
     )?;
 
     let csm_engine = engine.clone();
-    let csm_fcm_tx = fcm_tx.clone();
 
     let status_tx = status_bundle.0.clone();
     executor.spawn_critical("client_worker_task", |shutdown| {
-        worker::client_worker_task(
-            shutdown,
-            client_worker_state,
-            csm_engine,
-            csm_rx,
-            status_tx,
-            csm_fcm_tx,
-        )
-        .map_err(Into::into)
+        worker::client_worker_task(shutdown, client_worker_state, csm_engine, csm_rx, status_tx)
+            .map_err(Into::into)
     });
 
     Ok(SyncManager {
