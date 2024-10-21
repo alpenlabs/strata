@@ -26,14 +26,30 @@ class BridgeDepositHappyTest(flexitest.Test):
         self.logger = get_logger("BridgeDepositHappyTest")
 
     def main(self, ctx: flexitest.RunContext):
+        seq = ctx.get_service("sequencer")
+        seqrpc = seq.create_rpc()
+
         el_address_1 = "deadf001900dca3ebeefdeadf001900dca3ebeef"
         el_address_2 = "deedf001900dca3ebeefdeadf001900dca3ebeef"
 
         addr_1 = get_address(0)
         addr_2 = get_address(1)
 
+        # 1st deposit
+        n_deposits_pre_1 = len(seqrpc.strata_getCurrentDeposits())
+        self.logger.debug(f"Current deposits: {n_deposits_pre_1}")
         assert self.test_deposit(ctx, addr_1, el_address_1)
+        n_deposits_post_1 = len(seqrpc.strata_getCurrentDeposits())
+        self.logger.debug(f"Current deposits: {n_deposits_post_1}")
+        assert n_deposits_post_1 == n_deposits_pre_1 + 1
+
+        # 2nd deposit
+        n_deposits_pre_2 = len(seqrpc.strata_getCurrentDeposits())
+        self.logger.debug(f"Current deposits: {n_deposits_pre_2}")
         assert self.test_deposit(ctx, addr_2, el_address_2)
+        n_deposits_post_2 = len(seqrpc.strata_getCurrentDeposits())
+        self.logger.debug(f"Current deposits: {n_deposits_post_2}")
+        assert n_deposits_post_2 == n_deposits_pre_2 + 1
 
     def make_drt(self, ctx: flexitest.RunContext, el_address, musig_bridge_pk):
         """
@@ -118,7 +134,7 @@ class BridgeDepositHappyTest(flexitest.Test):
 
         # Get operators pubkey and musig2 aggregates it
         bridge_pk = get_bridge_pubkey(seqrpc)
-        print(f"Bridge pubkey: {bridge_pk}")
+        self.logger.debug(f"Bridge pubkey: {bridge_pk}")
 
         seq_addr = seq.get_prop("address")
         self.logger.debug(f"Sequencer Address: {seq_addr}")
