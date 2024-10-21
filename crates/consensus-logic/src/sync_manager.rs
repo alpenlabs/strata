@@ -114,6 +114,7 @@ pub fn start_sync_tasks<
     let fcm_engine = engine.clone();
     let fcm_csm_controller = csm_controller.clone();
     let fcm_params = params.clone();
+    let crx_clone = cupdate_tx.subscribe();
     executor.spawn_critical("fork_choice_manager::tracker_task", |shutdown| {
         // TODO this should be simplified into a builder or something
         fork_choice_manager::tracker_task(
@@ -124,6 +125,7 @@ pub fn start_sync_tasks<
             fcm_rx,
             fcm_csm_controller,
             fcm_params,
+            crx_clone,
         )
     });
 

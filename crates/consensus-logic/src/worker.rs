@@ -110,13 +110,7 @@ pub fn client_worker_task<D: Database, E: ExecEngineCtl>(
         .is_ok());
 
     while let Some(msg) = msg_rx.blocking_recv() {
-        if let Err(e) = process_msg(
-            &mut state,
-            engine.as_ref(),
-            &msg,
-            status_rx.clone(),
-            &fcm_msg_tx,
-        ) {
+        if let Err(e) = process_msg(&mut state, engine.as_ref(), &msg, status_rx.clone()) {
             error!(err = %e, ?msg, "failed to process sync message, skipping");
         }
 
@@ -136,7 +130,6 @@ fn process_msg<D: Database, E: ExecEngineCtl>(
     engine: &E,
     msg: &CsmMessage,
     status_rx: Arc<StatusTx>,
-    fcm_msg_tx: &mpsc::Sender<ForkChoiceMessage>,
 ) -> anyhow::Result<()> {
     match msg {
         CsmMessage::EventInput(idx) => {
@@ -149,12 +142,12 @@ fn process_msg<D: Database, E: ExecEngineCtl>(
                 warn!(%missed_ev_cnt, "applying missed sync events");
                 for ev_idx in next_exp_idx..*idx {
                     trace!(%ev_idx, "running missed sync event");
-                    handle_sync_event(state, engine, ev_idx, status_rx.clone(), fcm_msg_tx)?;
+                    handle_sync_event(state, engine, ev_idx, status_rx.clone())?;
                 }
             }
 
             // TODO ensure correct event index ordering
-            handle_sync_event(state, engine, *idx, status_rx, fcm_msg_tx)?;
+            handle_sync_event(state, engine, *idx, status_rx)?;
             Ok(())
         }
     }
@@ -165,7 +158,6 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
     engine: &E,
     ev_idx: u64,
     status_tx: Arc<StatusTx>,
-    fcm_msg_tx: &mpsc::Sender<ForkChoiceMessage>,
 ) -> anyhow::Result<()> {
     // Perform the main step of deciding what the output we're operating on.
     let (outp, new_state) = state.state_tracker.advance_consensus_state(ev_idx)?;
@@ -255,13 +247,6 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
     if ev_idx % state.params.run.client_checkpoint_interval as u64 == 0 {
         let css = state.database.client_state_store();
         css.write_client_state_checkpoint(ev_idx, new_state.as_ref().clone())?;
-    }
-
-    // Broadcast the update to all the different things listening (which should
-    // be consolidated).
-    let fcm_msg = ForkChoiceMessage::NewState(new_state.clone(), outp.clone());
-    if fcm_msg_tx.blocking_send(fcm_msg).is_err() {
-        error!(%ev_idx, "failed to submit new CSM state to FCM");
     }
 
     let mut status = CsmStatus::default();
