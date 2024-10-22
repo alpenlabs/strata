@@ -47,9 +47,7 @@ class BridgeDepositTest(flexitest.Test):
         time.sleep(60)
 
         # Dispatch the prover task
-        # task_id = prover_client_rpc.dev_strata_proveCLBlock(block_num)
-        # task_id = prover_client_rpc.dev_strata_proveELBlock(block_num)
-        task_id = prover_client_rpc.dev_strata_proveL2Batch(block_num)
+        task_id = prover_client_rpc.dev_strata_proveCLBlock(block_num)
         print("got the task id: {}", task_id)
         assert task_id is not None
 

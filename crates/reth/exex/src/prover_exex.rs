@@ -110,7 +110,6 @@ fn extract_zkvm_input<Node: FullNodeComponents>(
         .block_by_hash(block_id)?
         .ok_or(eyre!("Failed to get current block"))?;
     let current_block_idx = current_block.number;
-    let current_state_root = current_block.state_root.clone();
     let withdrawals = current_block
         .clone()
         .withdrawals
@@ -198,7 +197,6 @@ fn extract_zkvm_input<Node: FullNodeComponents>(
         // NOTE: using default to save prover cost.
         // Will need to revisit if BLOCKHASH opcode operation is a blocker
         ancestor_headers: Default::default(),
-        expected_root: current_state_root,
     };
 
     Ok(input)
