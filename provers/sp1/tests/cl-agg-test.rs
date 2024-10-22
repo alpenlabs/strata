@@ -26,7 +26,7 @@ mod test {
 
         let (proof, _) = cl_agg_prover.get_proof(&(1, 3), &prover_options).unwrap();
 
-        let _: L2BatchProofOutput = SP1Verifier::extract_borsh_public_output(&proof)
+        let _: L2BatchProofOutput = SP1Verifier::extract_borsh_public_output(proof.proof())
             .expect("Failed to extract public outputs");
     }
 }

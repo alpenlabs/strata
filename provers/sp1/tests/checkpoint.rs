@@ -2,8 +2,8 @@ mod helpers;
 #[cfg(all(feature = "prover", not(debug_assertions)))]
 mod test {
 
-    use strata_proofimpl_checkpoint::CheckpointProofOutput;
     use strata_sp1_adapter::SP1Verifier;
+    use strata_state::batch::CheckpointProofOutput;
     use strata_test_utils::l2::gen_params;
     use strata_zkvm::{ProverOptions, ZKVMVerifier};
 
@@ -42,13 +42,9 @@ mod test {
         let prover_options = ProverOptions {
             use_mock_prover: false,
             enable_compression: true,
+            stark_to_snark_conversion: false,
             use_cached_keys: true,
         };
-
-        let (l1_batch_proof, l1_batch_vk) = l1_batch_prover
-            .get_proof(&(l1_start_height, l1_end_height), &prover_options)
-            .unwrap();
-        let l1_batch_proof_agg_input = AggregationInput::new(l1_batch_proof, l1_batch_vk);
 
         let (prover, input) =
             get_checkpoint_prover_and_input().expect("Failed to get checkpoint input");
@@ -57,8 +53,9 @@ mod test {
             .get_proof(&input, &prover_options)
             .expect("Failed to generate proof");
 
-        let _output: CheckpointProofOutput = SP1Verifier::extract_borsh_public_output(&proof)
-            .expect("Failed to extract public outputs");
+        let _output: CheckpointProofOutput =
+            SP1Verifier::extract_borsh_public_output(proof.proof())
+                .expect("Failed to extract public outputs");
     }
 
     #[test]
