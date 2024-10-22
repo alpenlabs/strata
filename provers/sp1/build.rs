@@ -7,11 +7,9 @@ use std::{
 };
 
 #[cfg(not(debug_assertions))]
-use sp1_helper::build_program;
+use sp1_build;
 #[cfg(not(debug_assertions))]
 use sp1_sdk::{HashableKey, MockProver, Prover};
-#[cfg(not(debug_assertions))]
-const RISC_V_COMPILER: &str = "/opt/riscv/bin/riscv-none-elf-gcc";
 
 const EVM_EE_STF: &str = "guest-evm-ee-stf";
 const CL_STF: &str = "guest-cl-stf";
@@ -129,11 +127,23 @@ fn get_output_dir() -> PathBuf {
 
 #[cfg(not(debug_assertions))]
 fn generate_elf_contents_and_vk_hash(program: &str) -> (Vec<u8>, [u32; 8], String) {
-    // Setup compiler
-    env::set_var("CC_riscv32im_succinct_zkvm_elf", RISC_V_COMPILER);
+    #[cfg(feature = "docker-build")]
+    {
+        let args = sp1_build::BuildArgs {
+            docker: true,
+            workspace_directory: Some("../../..".to_owned()),
+            ..Default::default()
+        };
+        sp1_build::build_program_with_args(program, args);
+    }
 
-    // Ensure the vks.rs is in place before building the program
-    build_program(program);
+    #[cfg(not(feature = "docker-build"))]
+    {
+        // Setup compiler
+        const RISC_V_COMPILER: &str = "/opt/riscv/bin/riscv-none-elf-gcc";
+        env::set_var("CC_riscv32im_succinct_zkvm_elf", RISC_V_COMPILER);
+        sp1_build::build_program(program);
+    }
 
     let elf_path = format!("{}/elf/riscv32im-succinct-zkvm-elf", program);
 
