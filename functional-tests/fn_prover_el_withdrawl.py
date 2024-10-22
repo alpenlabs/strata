@@ -37,45 +37,9 @@ class BridgeDepositTest(flexitest.Test):
         # ctx.set_env(BasicEnvConfig(101, rollup_params=ROLLUP_PARAMS_FOR_DEPOSIT_TX))
 
     def main(self, ctx: flexitest.RunContext):
-        # evm_addr = "deedf001900dca3ebeefdeadf001900dca3ebeef"
-        # self.do_deposit(ctx, evm_addr)
-        # block_num = self.do_withdrawal_precompile_call(ctx)
-        # reth = ctx.get_service("reth")
-
-        # Find the block with the deposit
-        reth = ctx.get_service("reth")
-        rethrpc = reth.create_rpc()
-
-        # Web3 init
-        web3: Web3 = reth.create_web3()
-        dest = web3.to_checksum_address("0x0000000000000000000000000000000000000001")
-        basefee_address = web3.to_checksum_address("5400000000000000000000000000000000000010")
-        beneficiary_address = web3.to_checksum_address("5400000000000000000000000000000000000011")
-        source = web3.address
-
-        to_transfer = 1_000_000_000_000_000_000
-        txid = web3.eth.send_transaction(
-            {"to": dest, "value": hex(to_transfer), "gas": hex(100000), "from": source}
-        )
-
-        receipt = web3.eth.wait_for_transaction_receipt(txid, timeout=5)
-        block_num = receipt.blockNumber
-        blockhash = rethrpc.eth_getBlockByNumber(hex(block_num), False)["hash"]
-
-        print(f"we will be proving el block {block_num} having the hash {blockhash}")
-        print(
-            "full block looks like",
-            rethrpc.eth_getBlockByNumber(hex(block_num), False)["stateRoot"],
-        )
-
-        # Assert the witness is generated
-        witness_data = rethrpc.strataee_getBlockWitness(blockhash, True)
-        assert witness_data is not None, "non empty witness"
-
-        import json
-
-        with open("data.json", "w") as file:
-            json.dump(witness_data, file)
+        evm_addr = "deedf001900dca3ebeefdeadf001900dca3ebeef"
+        self.do_deposit(ctx, evm_addr)
+        block_num = self.do_withdrawal_precompile_call(ctx)
 
         # Init the prover client
         prover_client = ctx.get_service("prover_client")
@@ -83,8 +47,8 @@ class BridgeDepositTest(flexitest.Test):
         time.sleep(60)
 
         # Dispatch the prover task
-        # task_id = prover_client_rpc.dev_strata_proveCLBlock(block_num)
-        task_id = prover_client_rpc.dev_strata_proveELBlock(block_num)
+        task_id = prover_client_rpc.dev_strata_proveCLBlock(block_num)
+        # task_id = prover_client_rpc.dev_strata_proveELBlock(block_num)
         print("got the task id: {}", task_id)
         assert task_id is not None
 
