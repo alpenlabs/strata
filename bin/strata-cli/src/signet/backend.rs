@@ -1,5 +1,6 @@
 use std::{
     collections::BTreeSet,
+    marker::Send,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -162,12 +163,9 @@ impl SignetBackend {
         bar.enable_steady_tick(Duration::from_millis(100));
         let bar2 = bar.clone();
         let mut blocks_scanned = 0;
-        let backend = self.0.clone();
-        std::thread::spawn(move || {
-            let SignetBackendInner::BitcoinCore(ref client) = *backend else {
-                panic!("sync backend wasn't bitcoin core")
-            };
-            let mut emitter = Emitter::new(client, tip, start_height);
+
+        self.spawn_bitcoin_core(move |c| {
+            let mut emitter = Emitter::new(c, tip, start_height);
             while let Some(emission) = emitter.next_block().unwrap() {
                 tx.send(Emission::Block(emission))
                     .expect("block should send");
@@ -175,7 +173,10 @@ impl SignetBackend {
             bar2.println("Scanning mempool");
             tx.send(Emission::Mempool(emitter.mempool().unwrap()))
                 .expect("mempool should send");
-        });
+            Ok(())
+        })
+        .await
+        .unwrap();
 
         let mut mempool_txs_len = 0;
 
@@ -234,17 +235,11 @@ impl SignetBackend {
 
             SignetBackendInner::BitcoinCore(_) => {
                 let hex = encode::serialize_hex(tx);
-                let backend = self.0.clone();
-                let handle = tokio::task::spawn_blocking(move || {
-                    let SignetBackendInner::BitcoinCore(ref client) = *backend else {
-                        panic!("sync backend wasn't bitcoin core")
-                    };
-                    client.send_raw_transaction(hex)
-                });
-                handle
+
+                self.spawn_bitcoin_core(move |c| c.send_raw_transaction(hex))
                     .await
-                    .expect("thread should be fine")
                     .map_err(OneOf::new)?;
+
                 Ok(())
             }
         }
@@ -255,33 +250,34 @@ impl SignetBackend {
         fallback_in_sats: Option<u64>,
         target: u16,
     ) -> Result<FeeRate, FeeRateError> {
-        let fee_rate = if let Some(fr) = fallback_in_sats {
-            FeeRate::from_sat_per_vb(fr).ok_or(FeeRateError::InvalidDueToOverflow)?
-        } else {
-            match *self.0 {
-                SignetBackendInner::Esplora(ref esplora) => esplora
-                    .get_fee_estimates()
-                    .await
-                    .map(|frs| frs.get(&target).cloned())
-                    .map_err(FeeRateError::EsploraError)?
-                    .and_then(|fr| FeeRate::from_sat_per_vb(fr as u64))
-                    .unwrap_or(FeeRate::BROADCAST_MIN),
+        let fee_rate = match (fallback_in_sats, &*self.0) {
+            (Some(fr), _) => {
+                FeeRate::from_sat_per_vb(fr).ok_or(FeeRateError::InvalidDueToOverflow)?
+            }
 
-                SignetBackendInner::BitcoinCore(_) => {
-                    let backend = self.0.clone();
-                    let handle = tokio::task::spawn_blocking(move || {
-                        let SignetBackendInner::BitcoinCore(ref client) = *backend else {
-                            panic!("sync backend wasn't bitcoin core")
-                        };
-                        client.estimate_smart_fee(target, Some(EstimateMode::Conservative))
-                    });
-                    let res = handle
-                        .await
-                        .expect("thread should be fine")
-                        .map_err(FeeRateError::BitcoinCoreRPCError)?;
-                    let per_vb =
-                        (res.fee_rate.expect("fee rate should be present") / 1000).to_sat();
-                    FeeRate::from_sat_per_vb(per_vb).ok_or(FeeRateError::InvalidDueToOverflow)?
+            (_, SignetBackendInner::Esplora(esplora)) => esplora
+                .get_fee_estimates()
+                .await
+                .map(|frs| frs.get(&target).cloned())
+                .map_err(FeeRateError::EsploraError)?
+                .and_then(|fr| FeeRate::from_sat_per_vb(fr as u64))
+                .unwrap_or(FeeRate::BROADCAST_MIN),
+
+            (_, SignetBackendInner::BitcoinCore(_)) => {
+                let res = self
+                    .spawn_bitcoin_core(move |c| {
+                        c.estimate_smart_fee(target, Some(EstimateMode::Conservative))
+                    })
+                    .await
+                    .map_err(FeeRateError::BitcoinCoreRPCError)?;
+
+                match res.fee_rate {
+                    Some(btc_per_kb) => {
+                        let per_vb = (btc_per_kb / 1000).to_sat();
+                        FeeRate::from_sat_per_vb(per_vb)
+                            .ok_or(FeeRateError::InvalidDueToOverflow)?
+                    }
+                    None => FeeRate::BROADCAST_MIN,
                 }
             }
         };
@@ -292,11 +288,28 @@ impl SignetBackend {
             Ok(fee_rate)
         }
     }
+
+    async fn spawn_bitcoin_core<T, F>(&self, func: F) -> Result<T, bitcoincore_rpc::Error>
+    where
+        T: Send + 'static,
+        F: FnOnce(&bitcoincore_rpc::Client) -> Result<T, bitcoincore_rpc::Error> + Send + 'static,
+    {
+        let backend = self.0.clone();
+        let handle = tokio::task::spawn_blocking(move || {
+            let SignetBackendInner::BitcoinCore(ref client) = *backend else {
+                unreachable!()
+            };
+            func(client)
+        });
+        handle.await.expect("thread should be fine")
+    }
 }
 
 #[derive(Debug)]
 pub enum FeeRateError {
     InvalidDueToOverflow,
+    /// The fee obtained, either from a backend or provided by the user, was
+    /// below bitcoin's minimum fee rate
     BelowBroadcastMin,
     /// Esplora didn't have a fee for the requested target
     FeeMissing,
