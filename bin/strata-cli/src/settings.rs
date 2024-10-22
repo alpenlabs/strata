@@ -3,7 +3,7 @@ use std::{
     io,
     path::PathBuf,
     str::FromStr,
-    sync::{Arc, LazyLock},
+    sync::LazyLock,
 };
 
 use alloy::primitives::Address as StrataAddress;
@@ -17,7 +17,7 @@ use terrors::OneOf;
 
 use crate::{
     constants::{BRIDGE_MUSIG2_PUBKEY, BRIDGE_STRATA_ADDRESS, DEFAULT_NETWORK},
-    signet::{EsploraClient, SyncBackend},
+    signet::{backend::SignetBackend, EsploraClient},
 };
 
 #[derive(Serialize, Deserialize)]
@@ -49,7 +49,7 @@ pub struct Settings {
     pub linux_seed_file: PathBuf,
     pub network: Network,
     pub config_file: PathBuf,
-    pub sync_backend: Arc<SyncBackend>,
+    pub signet_backend: SignetBackend,
 }
 
 pub static PROJ_DIRS: LazyLock<ProjectDirs> = LazyLock::new(|| {
@@ -89,15 +89,18 @@ impl Settings {
             from_file.bitcoind_rpc_endpoint,
         ) {
             (Some(url), None, None, None, None) => {
-                SyncBackend::Esplora(EsploraClient::new(&url).expect("valid esplora url"))
+                EsploraClient::new(&url).expect("valid esplora url").into()
             }
-            (None, Some(user), Some(pw), None, Some(url)) => SyncBackend::BitcoinCore(
-                Client::new(&url, Auth::UserPass(user, pw)).expect("valid bitcoin core client"),
-            ),
-            (None, None, None, Some(cookie_file), Some(url)) => SyncBackend::BitcoinCore(
+            (None, Some(user), Some(pw), None, Some(url)) => {
+                Client::new(&url, Auth::UserPass(user, pw))
+                    .expect("valid bitcoin core client")
+                    .into()
+            }
+            (None, None, None, Some(cookie_file), Some(url)) => {
                 Client::new(&url, Auth::CookieFile(cookie_file))
-                    .expect("valid bitcoin core client"),
-            ),
+                    .expect("valid bitcoin core client")
+                    .into()
+            }
             _ => panic!("invalid config for signet - configure for esplora or bitcoind"),
         };
 
@@ -122,7 +125,7 @@ impl Settings {
             bridge_strata_address: StrataAddress::from_str(BRIDGE_STRATA_ADDRESS)
                 .expect("valid strata address"),
             linux_seed_file,
-            sync_backend: sync_backend.into(),
+            signet_backend: sync_backend,
         })
     }
 }

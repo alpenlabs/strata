@@ -30,7 +30,7 @@ pub async fn balance(args: BalanceArgs, seed: Seed, settings: Settings) {
 
     if let NetworkType::Signet = network_type {
         let mut l1w =
-            SignetWallet::new(&seed, settings.network, settings.sync_backend.clone()).unwrap();
+            SignetWallet::new(&seed, settings.network, settings.signet_backend.clone()).unwrap();
         l1w.sync().await.unwrap();
         let balance = l1w.balance();
         let _ = term.write_line(&format!("Total: {}", balance.total()));

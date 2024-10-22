@@ -9,6 +9,6 @@ pub struct ScanArgs {}
 
 pub async fn scan(_args: ScanArgs, seed: Seed, settings: Settings) {
     let mut l1w =
-        SignetWallet::new(&seed, settings.network, settings.sync_backend.clone()).unwrap();
+        SignetWallet::new(&seed, settings.network, settings.signet_backend.clone()).unwrap();
     l1w.scan().await.unwrap();
 }

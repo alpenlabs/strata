@@ -9,7 +9,7 @@ use crate::{
     recovery::DescriptorRecovery,
     seed::Seed,
     settings::Settings,
-    signet::{broadcast_tx, get_fee_rate, log_fee_rate, SignetWallet},
+    signet::{log_fee_rate, SignetWallet},
 };
 
 /// Attempt recovery of old deposit transactions
@@ -24,7 +24,7 @@ pub struct RecoverArgs {
 pub async fn recover(args: RecoverArgs, seed: Seed, settings: Settings) {
     let term = Term::stdout();
     let mut l1w =
-        SignetWallet::new(&seed, settings.network, settings.sync_backend.clone()).unwrap();
+        SignetWallet::new(&seed, settings.network, settings.signet_backend.clone()).unwrap();
     l1w.sync().await.unwrap();
 
     let _ = term.write_line("Opening descriptor recovery");
@@ -43,7 +43,9 @@ pub async fn recover(args: RecoverArgs, seed: Seed, settings: Settings) {
         return;
     }
 
-    let fee_rate = get_fee_rate(args.fee_rate, settings.sync_backend.clone(), 1)
+    let fee_rate = settings
+        .signet_backend
+        .get_fee_rate(args.fee_rate, 1)
         .await
         .expect("valid fee rate");
     log_fee_rate(&term, &fee_rate);
@@ -61,9 +63,11 @@ pub async fn recover(args: RecoverArgs, seed: Seed, settings: Settings) {
 
         // reveal the address for the wallet so we can sync it
         let address = recovery_wallet.reveal_next_address(KeychainKind::External);
-        let req = recovery_wallet.start_sync_with_revealed_spks().build();
-        let update = esplora.sync(req, 3).await.unwrap();
-        recovery_wallet.apply_update(update).unwrap();
+        settings
+            .signet_backend
+            .sync_wallet(&mut recovery_wallet)
+            .await
+            .expect("successful recovery wallet sync");
         let needs_recovery = recovery_wallet.balance().confirmed > Amount::ZERO;
 
         if !needs_recovery {
@@ -103,7 +107,9 @@ pub async fn recover(args: RecoverArgs, seed: Seed, settings: Settings) {
             .expect("valid sign op");
 
         let tx = psbt.extract_tx().unwrap();
-        broadcast_tx(&tx, settings.sync_backend.clone())
+        settings
+            .signet_backend
+            .broadcast_tx(&tx)
             .await
             .expect("broadcast to succeed")
     }

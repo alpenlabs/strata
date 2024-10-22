@@ -15,7 +15,7 @@ use crate::{
     net_type::{net_type_or_exit, NetworkType},
     seed::Seed,
     settings::Settings,
-    signet::{broadcast_tx, get_fee_rate, log_fee_rate, print_explorer_url, SignetWallet},
+    signet::{log_fee_rate, print_explorer_url, SignetWallet},
     strata::StrataWallet,
 };
 
@@ -51,10 +51,13 @@ pub async fn send(args: SendArgs, seed: Seed, settings: Settings) {
                 .expect("valid address")
                 .require_network(settings.network)
                 .expect("correct network");
-            let mut l1w = SignetWallet::new(&seed, settings.network, settings.sync_backend.clone())
-                .expect("valid wallet");
+            let mut l1w =
+                SignetWallet::new(&seed, settings.network, settings.signet_backend.clone())
+                    .expect("valid wallet");
             l1w.sync().await.unwrap();
-            let fee_rate = get_fee_rate(args.fee_rate, settings.sync_backend.clone(), 1)
+            let fee_rate = settings
+                .signet_backend
+                .get_fee_rate(args.fee_rate, 1)
                 .await
                 .expect("valid fee rate");
             log_fee_rate(&term, &fee_rate);
@@ -68,7 +71,9 @@ pub async fn send(args: SendArgs, seed: Seed, settings: Settings) {
             l1w.sign(&mut psbt, Default::default())
                 .expect("signable psbt");
             let tx = psbt.extract_tx().expect("signed tx");
-            broadcast_tx(&tx, settings.sync_backend.clone())
+            settings
+                .signet_backend
+                .broadcast_tx(&tx)
                 .await
                 .expect("successful broadcast");
             let _ = print_explorer_url(&tx.compute_txid(), &term, &settings);

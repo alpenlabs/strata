@@ -18,7 +18,7 @@ use seed::FilePersister;
 #[cfg(not(target_os = "linux"))]
 use seed::KeychainPersister;
 use settings::Settings;
-use signet::set_data_dir;
+use signet::persist::set_data_dir;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
