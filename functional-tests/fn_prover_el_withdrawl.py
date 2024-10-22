@@ -11,7 +11,6 @@ from constants import (
     ROLLUP_PARAMS_FOR_DEPOSIT_TX,
     SEQ_PUBLISH_BATCH_INTERVAL_SECS,
 )
-from entry import BasicEnvConfig
 from utils import wait_for_proof_with_time_out, wait_until
 
 EVM_WAIT_TIME = 2

@@ -162,19 +162,6 @@ where
                 .l2_batch_proof
                 .ok_or_else(|| anyhow::anyhow!("L2 Batch Proof Not Ready"))?;
 
-            // TODO: Remove
-            let ips = (
-                checkpoint_input.rollup_params.clone(),
-                l1_batch_proof.clone(),
-                l2_batch_proof.clone(),
-            );
-            let res = bincode::serialize(&ips).unwrap();
-            let current_time = Uuid::new_v4().to_string();
-            use std::{fs::File, io::Write};
-            let filename = format!("witness_{}.bin", current_time);
-            let mut file = File::create(filename).unwrap();
-            file.write_all(&res).unwrap();
-
             let mut input_builder = Vm::Input::new();
             input_builder.write(&checkpoint_input.rollup_params)?;
             input_builder.write_proof(l1_batch_proof)?;

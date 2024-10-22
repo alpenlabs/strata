@@ -1,17 +1,12 @@
-import os
 import time
 
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
-from web3 import Web3
-from web3._utils.events import get_event_data
 
 from constants import (
-    PRECOMPILE_BRIDGEOUT_ADDRESS,
     ROLLUP_PARAMS_FOR_DEPOSIT_TX,
     SEQ_PUBLISH_BATCH_INTERVAL_SECS,
 )
-from entry import BasicEnvConfig
 from utils import wait_for_proof_with_time_out, wait_until
 
 EVM_WAIT_TIME = 2
@@ -33,8 +28,6 @@ event_signature_text = "WithdrawalIntentEvent(uint64,bytes32)"
 class BridgeDepositTest(flexitest.Test):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("prover")
-        # ctx.set_env("prover")
-        # ctx.set_env(BasicEnvConfig(101, rollup_params=ROLLUP_PARAMS_FOR_DEPOSIT_TX))
 
     def main(self, ctx: flexitest.RunContext):
         evm_addr = "deedf001900dca3ebeefdeadf001900dca3ebeef"
@@ -42,43 +35,25 @@ class BridgeDepositTest(flexitest.Test):
         btc = ctx.get_service("bitcoin")
         btcrpc: BitcoindClient = btc.create_rpc()
 
-        seq = ctx.get_service("sequencer")
-        seqrpc = seq.create_rpc()
-
-        l1_height_1 = btcrpc.getblock(btcrpc.proxy.getbestblockhash())["height"]
-        print("l1_height before ", l1_height_1)
-
-        block_num_l2, deposit_txn_id = self.do_deposit(ctx, evm_addr)
-        print("deposit happended in EL block num ", block_num_l2)
-
-        txinfo = btcrpc.proxy.gettransaction(deposit_txn_id)
-        deposit_txn_block_num = txinfo["blockheight"]
-        print("txn info", deposit_txn_block_num)
-
-        l1_height_2 = btcrpc.getblock(btcrpc.proxy.getbestblockhash())["height"]
-        print("l1_height after ", l1_height_2)
-
-        # seqrpc = seqrpc.strata_getCLBlockWitness(block_num)
-        # print(seqrpc)
+        # Do deposit and collet the L1 and L2 where the deposit transaction was included
+        l2_block_num, l1_deposit_txn_id = self.do_deposit(ctx, evm_addr)
+        l1_deposit_txn_block_info = btcrpc.proxy.gettransaction(l1_deposit_txn_id)
+        deposit_txn_block_num = l1_deposit_txn_block_info["blockheight"]
 
         # Init the prover client
         prover_client = ctx.get_service("prover_client")
         prover_client_rpc = prover_client.create_rpc()
         time.sleep(60)
 
-        # # Dispatch the prover task
+        # Dispatch the prover task
+        # Proving task with with few L1 and L2 blocks including the deposit transaction
         l1_range = (deposit_txn_block_num - 1, deposit_txn_block_num + 1)
-        l2_range = (block_num_l2 - 1, block_num_l2 + 1)
-        # l2_range = (1, block_num + 1)
-        # task_id = prover_client_rpc.dev_strata_proveCheckpointRaw(0, l1_range, l2_range)
-        # # task_id = prover_client_rpc.dev_strata_proveCLBlock(block_num)
-        # task_id = prover_client_rpc.dev_strata_proveBtcBlock(deposit_txn_block_num)
+        l2_range = (l2_block_num - 1, l2_block_num + 1)
         task_id = prover_client_rpc.dev_strata_proveCheckpointRaw(0, l1_range, l2_range)
-        print("got the task id: {}", task_id)
-        print("got the expected l1 range")
+        print("got proving task_id ", task_id)
         assert task_id is not None
 
-        time_out = 100 * 60
+        time_out = 30 * 60
         wait_for_proof_with_time_out(prover_client_rpc, task_id, time_out=time_out)
 
     def do_deposit(self, ctx: flexitest.RunContext, evm_addr: str):
@@ -151,16 +126,12 @@ class BridgeDepositTest(flexitest.Test):
             net_balance == deposit_amount
         ), f"deposit processed multiple times, extra: {balance - original_balance - deposit_amount}"
 
+        # Scan the L2 blocks where the deposits were included
         start_block = 1
-        end_block = int(rethrpc.eth_blockNumber(), base=16)
-
-        print(
-            f"searching the blocks {start_block} to {end_block}",
-        )
-        for block_num in range(start_block, end_block + 1):
+        end_block = int(rethrpc.eth_blockNumber(), base=16) + 1
+        for block_num in range(start_block, end_block):
             block = rethrpc.eth_getBlockByNumber(hex(block_num), False)
             withdrawals = block.get("withdrawals", None)
-            print(block_num, withdrawals)
             if withdrawals is not None and len(withdrawals) != 0:
                 return block_num, btc_txn_id
 
