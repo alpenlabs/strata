@@ -1,8 +1,9 @@
 use bitcoin::{
-    absolute::Height, address::NetworkUnchecked, consensus, Address, Amount, BlockHash,
-    SignedAmount, Transaction, Txid,
+    absolute::Height,
+    address::{self, NetworkUnchecked},
+    consensus::{self, encode},
+    Address, Amount, Block, BlockHash, SignedAmount, Transaction, Txid,
 };
-use bitcoind_json_rpc_types::v26::GetTransactionDetail;
 use serde::{
     de::{self, IntoDeserializer, Visitor},
     Deserialize, Deserializer, Serialize,
@@ -78,6 +79,118 @@ pub struct GetBlockchainInfo {
     pub prune_target_size: Option<u64>,
 }
 
+/// Result of JSON-RPC method `getblock` with verbosity set to 0.
+///
+/// A string that is serialized, hex-encoded data for block 'hash'.
+///
+/// Method call: `getblock "blockhash" ( verbosity )`
+#[derive(Clone, PartialEq, Debug, Deserialize, Serialize)]
+pub struct GetBlockVerbosityZero(pub String);
+
+impl GetBlockVerbosityZero {
+    /// Converts json straight to a [`Block`].
+    pub fn block(self) -> Result<Block, encode::FromHexError> {
+        let block: Block = encode::deserialize_hex(&self.0)?;
+        Ok(block)
+    }
+}
+
+/// Result of JSON-RPC method `getblock` with verbosity set to 1.
+#[derive(Clone, PartialEq, Debug, Deserialize, Serialize)]
+pub struct GetBlockVerbosityOne {
+    /// The block hash (same as provided) in RPC call.
+    pub hash: String,
+    /// The number of confirmations, or -1 if the block is not on the main chain.
+    pub confirmations: i32,
+    /// The block size.
+    pub size: usize,
+    /// The block size excluding witness data.
+    #[serde(rename = "strippedsize")]
+    pub stripped_size: Option<usize>,
+    /// The block weight as defined in BIP-141.
+    pub weight: u64,
+    /// The block height or index.
+    pub height: usize,
+    /// The block version.
+    pub version: i32,
+    /// The block version formatted in hexadecimal.
+    #[serde(rename = "versionHex")]
+    pub version_hex: String,
+    /// The merkle root
+    #[serde(rename = "merkleroot")]
+    pub merkle_root: String,
+    /// The transaction ids
+    pub tx: Vec<String>,
+    /// The block time expressed in UNIX epoch time.
+    pub time: usize,
+    /// The median block time expressed in UNIX epoch time.
+    #[serde(rename = "mediantime")]
+    pub median_time: Option<usize>,
+    /// The nonce
+    pub nonce: u32,
+    /// The bits.
+    pub bits: String,
+    /// The difficulty.
+    pub difficulty: f64,
+    /// Expected number of hashes required to produce the chain up to this block (in hex).
+    #[serde(rename = "chainwork")]
+    pub chain_work: String,
+    /// The number of transactions in the block.
+    #[serde(rename = "nTx")]
+    pub n_tx: u32,
+    /// The hash of the previous block (if available).
+    #[serde(rename = "previousblockhash")]
+    pub previous_block_hash: Option<String>,
+    /// The hash of the next block (if available).
+    #[serde(rename = "nextblockhash")]
+    pub next_block_hash: Option<String>,
+}
+
+/// Result of JSON-RPC method `gettxout`.
+///
+/// # Note
+///
+/// This assumes that the UTXOs are present in the underlying Bitcoin
+/// client's wallet.
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+pub struct GetTransactionDetail {
+    pub address: String,
+    pub category: GetTransactionDetailCategory,
+    pub amount: f64,
+    pub label: Option<String>,
+    pub vout: u32,
+    pub fee: Option<f64>,
+    pub abandoned: Option<bool>,
+}
+
+/// Enum to represent the category of a transaction.
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum GetTransactionDetailCategory {
+    Send,
+    Receive,
+    Generate,
+    Immature,
+    Orphan,
+}
+
+/// Result of the JSON-RPC method `getnewaddress`.
+///
+/// # Note
+///
+/// This assumes that the UTXOs are present in the underlying Bitcoin
+/// client's wallet.
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+pub struct GetNewAddress(pub String);
+
+impl GetNewAddress {
+    /// Converts json straight to a [`Address`].
+    pub fn address(self) -> Result<Address<NetworkUnchecked>, address::ParseError> {
+        let address = self.0.parse::<Address<_>>()?;
+        Ok(address)
+    }
+}
+
 /// Models the result of JSON-RPC method `listunspent`.
 ///
 /// # Note
@@ -88,8 +201,6 @@ pub struct GetBlockchainInfo {
 /// Careful with the amount field. It is a [`SignedAmount`], hence can be negative.
 /// Negative amounts for the [`TransactionCategory::Send`], and is positive
 /// for all other categories.
-///
-/// We can upstream this to [`bitcoind_json_rpc_types`].
 #[derive(Clone, Debug, PartialEq, Deserialize)]
 pub struct GetTransaction {
     /// The signed amount in BTC.
@@ -140,8 +251,6 @@ impl GetTransaction {
 ///
 /// This assumes that the UTXOs are present in the underlying Bitcoin
 /// client's wallet.
-///
-/// We can upstream this to [`bitcoind_json_rpc_types`].
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct ListUnspent {
     /// The transaction id.
@@ -183,8 +292,6 @@ pub struct ListUnspent {
 /// Careful with the amount field. It is a [`SignedAmount`], hence can be negative.
 /// Negative amounts for the [`TransactionCategory::Send`], and is positive
 /// for all other categories.
-///
-/// We can upstream this to [`bitcoind_json_rpc_types`].
 #[derive(Clone, Debug, PartialEq, Deserialize)]
 pub struct ListTransactions {
     /// The Bitcoin address.
@@ -216,8 +323,6 @@ pub struct ListTransactions {
 ///
 /// This assumes that the transactions are present in the underlying Bitcoin
 /// client's wallet.
-///
-/// We can upstream this to [`bitcoind_json_rpc_types`].
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct SignRawTransactionWithWallet {
     /// The Transaction ID.
