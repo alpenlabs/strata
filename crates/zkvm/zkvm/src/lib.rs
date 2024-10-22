@@ -72,7 +72,9 @@ pub struct ProofWithMetadata {
     /// and fixed program, meaning that for the same inputs and program, the `id` will always
     /// remain the same.
     id: String,
+
     proof: Proof,
+
     /// An optional identifier that uniquely identifies the proof on a remote server. Unlike `id`,
     /// this field might vary for the same input and program depending on the context, such as
     /// server-side processes or external systems. If the proof is generated locally and not

@@ -3,6 +3,8 @@ use std::{
     sync::{Arc, RwLock},
 };
 
+use bincode::deserialize;
+use bitcoin::consensus;
 use strata_db::traits::{ProverDataProvider, ProverDataStore, ProverDatabase};
 use strata_proofimpl_evm_ee_stf::ELProofInput;
 use strata_rocksdb::{
@@ -105,13 +107,13 @@ where
 {
     let zkvm_input = match zkvm_input {
         ZKVMInput::ElBlock(el_input) => {
-            let el_input: ELProofInput = bincode::deserialize(&el_input.data)?;
+            let el_input: ELProofInput = deserialize(&el_input.data)?;
             Vm::Input::new().write(&el_input)?.build()?
         }
 
         ZKVMInput::BtcBlock(block, cred_rule, tx_filters) => Vm::Input::new()
             .write(&cred_rule)?
-            .write_serialized(&bitcoin::consensus::serialize(&block))?
+            .write_serialized(&consensus::serialize(&block))?
             .write_borsh(&tx_filters)?
             .build()?,
 
@@ -316,7 +318,7 @@ where
             .prover_provider()
             .get_task_entry_by_id(*task_id.as_bytes())?;
         match proof_entry {
-            Some(raw_proof) => Ok(bincode::deserialize(&raw_proof)?),
+            Some(raw_proof) => Ok(deserialize(&raw_proof)?),
             None => Err(anyhow::anyhow!("Proof not found for {:?}", task_id)),
         }
     }

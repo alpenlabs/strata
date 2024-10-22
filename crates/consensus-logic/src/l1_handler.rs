@@ -195,7 +195,7 @@ pub fn verify_proof(
         }
     });
     match res {
-        Ok(Ok(())) => {
+        Ok(Ok(_)) => {
             info!(%checkpoint_idx, "Checkpoint proof successfully verified");
             Ok(())
         }

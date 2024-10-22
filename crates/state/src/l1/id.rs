@@ -61,7 +61,6 @@ impl AsRef<[u8; 32]> for L1BlockId {
 //         f.write_str(unsafe { str::from_utf8_unchecked(&buf) })
 //     }
 // }
-
 impl fmt::Debug for L1BlockId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(&self.0, f)

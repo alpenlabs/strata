@@ -1,8 +1,8 @@
 //! Core logic of the Bitcoin Blockspace proof that will be proven
 
-use bitcoin::Block;
+use bitcoin::{consensus, Block};
 use borsh::{BorshDeserialize, BorshSerialize};
-use strata_primitives::{block_credential::CredRule, buf::Buf32};
+use strata_primitives::{block_credential::CredRule, buf::Buf32, hash};
 use strata_state::{batch::BatchCheckpoint, tx::DepositInfo};
 use strata_tx_parser::filter::TxFilterRule;
 
@@ -25,7 +25,7 @@ pub fn process_blockspace_proof(
     cred_rule: &CredRule,
     serialized_tx_filters: &[u8],
 ) -> BlockspaceProofOutput {
-    let block: Block = bitcoin::consensus::deserialize(serialized_block).unwrap();
+    let block: Block = consensus::deserialize(serialized_block).unwrap();
 
     assert!(check_merkle_root(&block));
     assert!(check_witness_commitment(&block));
@@ -33,10 +33,10 @@ pub fn process_blockspace_proof(
     let tx_filters: Vec<TxFilterRule> = borsh::from_slice(serialized_tx_filters).unwrap();
 
     let (deposits, prev_checkpoint) = extract_relevant_info(&block, &tx_filters, cred_rule);
-    let tx_filters_commitment = strata_primitives::hash::raw(serialized_tx_filters);
+    let tx_filters_commitment = hash::raw(serialized_tx_filters);
 
     BlockspaceProofOutput {
-        header_raw: bitcoin::consensus::serialize(&block.header),
+        header_raw: consensus::serialize(&block.header),
         deposits,
         prev_checkpoint,
         tx_filters_commitment,
@@ -49,7 +49,7 @@ mod tests {
     use strata_test_utils::{bitcoin::get_btc_chain, l2::gen_params};
     use strata_tx_parser::filter::derive_tx_filter_rules;
 
-    use super::process_blockspace_proof;
+    use super::{consensus, process_blockspace_proof};
     #[test]
     fn test_process_blockspace_proof() {
         let params = gen_params();
@@ -58,7 +58,7 @@ mod tests {
         let serialized_tx_filters = borsh::to_vec(&tx_filters).unwrap();
 
         let btc_block = get_btc_chain().get_block(40321).clone();
-        let serialized_btc_block = bitcoin::consensus::serialize(&btc_block);
+        let serialized_btc_block = consensus::serialize(&btc_block);
 
         let _ = process_blockspace_proof(
             &serialized_btc_block,

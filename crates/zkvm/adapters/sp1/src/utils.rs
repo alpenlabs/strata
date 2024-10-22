@@ -75,7 +75,7 @@ pub fn get_proving_keys(
     }
 }
 
-/// Extracts the raw Groth16 proof bytes from a given `Proof`.
+/// Extracts the raw Groth16 proof bytes from a given [`Proof`].
 pub fn extract_raw_groth16_proof(proof: Proof) -> anyhow::Result<Proof> {
     let sp1_proof: SP1ProofWithPublicValues = bincode::deserialize(proof.as_bytes())
         .context("Failed to deserialize SP1 Groth16 proof")?;

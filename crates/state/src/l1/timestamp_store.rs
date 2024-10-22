@@ -2,8 +2,16 @@ use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
+/// The number of timestamps stored in the buffer.
+/// We use a fixed-size array of 11 elements because, according to Bitcoin consensus rules,
+/// we need to check that a block's timestamp is not lower than the median of the last eleven
+/// blocks' timestamps.
 const N: usize = 11;
-const MID: usize = N / 2;
+
+/// The middle index for selecting the median timestamp.
+/// Since N is odd, the median is the element at index 5 (the 6th element)
+/// after the timestamps are sorted.
+const MID: usize = 5;
 
 #[derive(
     Debug,
@@ -19,7 +27,6 @@ const MID: usize = N / 2;
 )]
 /// A fixed-size ring buffer that stores timestamps.
 /// It overwrites the oldest timestamps when new ones are inserted.
-
 pub struct TimestampStore {
     /// The fixed-size array that holds the timestamps.
     pub buffer: [u32; N],

@@ -1,4 +1,5 @@
 use anyhow::{ensure, Context, Ok, Result};
+use bincode::deserialize;
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::to_vec;
 use snark_bn254_verifier::Groth16Verifier;
@@ -17,8 +18,8 @@ pub const GROTH16_VK_BYTES: &[u8] = include_bytes!("groth16_vk.bin");
 
 impl ZKVMVerifier for SP1Verifier {
     fn verify(verification_key: &VerificationKey, proof: &Proof) -> anyhow::Result<()> {
-        let proof: SP1ProofWithPublicValues = bincode::deserialize(proof.as_bytes())?;
-        let vkey: SP1VerifyingKey = bincode::deserialize(&verification_key.0)?;
+        let proof: SP1ProofWithPublicValues = deserialize(proof.as_bytes())?;
+        let vkey: SP1VerifyingKey = deserialize(&verification_key.0)?;
 
         let client = ProverClient::new();
         client.verify(&proof, &vkey)?;
@@ -31,8 +32,8 @@ impl ZKVMVerifier for SP1Verifier {
         public_params: T,
         proof: &Proof,
     ) -> anyhow::Result<()> {
-        let mut proof: SP1ProofWithPublicValues = bincode::deserialize(proof.as_bytes())?;
-        let vkey: SP1VerifyingKey = bincode::deserialize(&verification_key.0)?;
+        let mut proof: SP1ProofWithPublicValues = deserialize(proof.as_bytes())?;
+        let vkey: SP1VerifyingKey = deserialize(&verification_key.0)?;
 
         let client = ProverClient::new();
         client.verify(&proof, &vkey)?;
@@ -53,7 +54,7 @@ impl ZKVMVerifier for SP1Verifier {
         vkey_hash: &[u8],
         committed_values_raw: &[u8],
     ) -> Result<()> {
-        let sp1_proof: SP1ProofWithPublicValues = bincode::deserialize(raw_sp1_proof.as_bytes())
+        let sp1_proof: SP1ProofWithPublicValues = deserialize(raw_sp1_proof.as_bytes())
             .context("Failed to deserialize SP1 Groth16 proof")?;
 
         let raw_proof = extract_raw_groth16_proof(raw_sp1_proof.clone())?;
@@ -105,7 +106,7 @@ impl ZKVMVerifier for SP1Verifier {
     }
 
     fn extract_public_output<T: Serialize + DeserializeOwned>(proof: &Proof) -> anyhow::Result<T> {
-        let mut proof: SP1ProofWithPublicValues = bincode::deserialize(proof.as_bytes())?;
+        let mut proof: SP1ProofWithPublicValues = deserialize(proof.as_bytes())?;
         let public_params: T = proof.public_values.read();
         Ok(public_params)
     }
@@ -113,7 +114,7 @@ impl ZKVMVerifier for SP1Verifier {
     fn extract_borsh_public_output<T: borsh::BorshSerialize + borsh::BorshDeserialize>(
         proof: &Proof,
     ) -> anyhow::Result<T> {
-        let proof: SP1ProofWithPublicValues = bincode::deserialize(proof.as_bytes())?;
+        let proof: SP1ProofWithPublicValues = deserialize(proof.as_bytes())?;
         let buffer = proof.public_values.as_slice();
         let output: T = borsh::from_slice(buffer)?;
         Ok(output)
@@ -137,7 +138,7 @@ mod tests {
 
         let raw_proof = include_bytes!("../tests/proofs/proof-groth16.bin");
         let proof: ProofWithMetadata =
-            bincode::deserialize(raw_proof).expect("Failed to deserialize Groth16 proof");
+            deserialize(raw_proof).expect("Failed to deserialize Groth16 proof");
 
         let vkey_hash = BigUint::from_str_radix(
             vk.strip_prefix("0x").expect("vkey should start with '0x'"),

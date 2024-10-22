@@ -3,7 +3,7 @@
 
 use std::cmp::min;
 
-use bitcoin::block::Header;
+use bitcoin::{block::Header, consensus::deserialize};
 use strata_db::traits::{
     ChainstateProvider, Database, L1DataProvider, L2DataProvider, L2DataStore,
 };
@@ -63,8 +63,7 @@ pub fn process_event<D: Database>(
                     let block_mf = l1prov
                         .get_block_manifest(block_height)?
                         .ok_or(Error::MissingL1BlockHeight(block_height))?;
-                    let header: Header =
-                        bitcoin::consensus::deserialize(block_mf.header()).unwrap();
+                    let header: Header = deserialize(block_mf.header()).unwrap();
                     updated_l1vs =
                         updated_l1vs.check_and_update_continuity_new(&header, &get_btc_params());
                 }
