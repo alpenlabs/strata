@@ -17,9 +17,11 @@ fn main() {
     let el_pp_raw = sp1_zkvm::io::read_vec();
     let el_pp_raw_digest = Sha256::digest(&el_pp_raw);
     sp1_zkvm::lib::verify::verify_sp1_proof(el_vkey, &el_pp_raw_digest.into());
+
+    // Parse proof public params
     let el_pp_deserialized: ELProofPublicParams = bincode::deserialize(&el_pp_raw).unwrap();
 
-    let new_state = verify_and_transition(
+    let (new_state, deposits) = verify_and_transition(
         prev_state.clone(),
         block,
         el_pp_deserialized,
@@ -39,8 +41,7 @@ fn main() {
     };
 
     let cl_stf_public_params = L2BatchProofOutput {
-        // TODO: Accumulate the deposits
-        deposits: Vec::new(),
+        deposits,
         final_snapshot,
         initial_snapshot,
         rollup_params_commitment: rollup_params.compute_hash(),

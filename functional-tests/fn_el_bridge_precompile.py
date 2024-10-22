@@ -45,6 +45,10 @@ class BridgeDepositTest(flexitest.Test):
         block_num = self.do_withdrawal_precompile_call(ctx)
         print("got the block num ", block_num)
 
+        import time
+
+        time.sleep(60)
+
     def do_withdrawal_precompile_call(self, ctx: flexitest.RunContext):
         reth = ctx.get_service("reth")
         web3: Web3 = reth.create_web3()
