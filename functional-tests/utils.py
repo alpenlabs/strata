@@ -253,7 +253,7 @@ def wait_for_proof_with_time_out(prover_client_rpc, task_id, time_out=3600):
             print(f"Completed the proof generation for {task_id}")
             break
 
-        time.sleep(2)
+        time.sleep(15)
         elapsed_time = time.time() - start_time  # Calculate elapsed time
         if elapsed_time >= time_out:
             raise TimeoutError(f"Operation timed out after {time_out} seconds.")

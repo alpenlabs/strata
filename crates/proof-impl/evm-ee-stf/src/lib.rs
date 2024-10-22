@@ -87,6 +87,9 @@ pub struct ELProofInput {
 
     /// A list of withdrawals to process.
     pub withdrawals: Vec<Withdrawal>,
+
+    // TEMP
+    pub expected_root: FixedBytes<32>,
 }
 
 /// Executes the block with the given input and EVM configuration, returning public parameters.
@@ -96,6 +99,7 @@ pub fn process_block_transaction(
 ) -> ELProofPublicParams {
     // Calculate the previous block hash
     let previous_block_hash = B256::from(keccak(alloy_rlp::encode(input.parent_header.clone())));
+    let expected_root = input.expected_root.clone();
 
     // Initialize the in-memory database
     let db = match InMemoryDB::initialize(&mut input) {
@@ -124,6 +128,8 @@ pub fn process_block_transaction(
     let withdrawal_intents =
         collect_withdrawal_intents(receipts.into_iter().map(|el| Some(el.receipt)))
             .collect::<Vec<_>>();
+
+    assert!(expected_root == block_header.state_root);
 
     // Construct the public parameters for the proof
     ELProofPublicParams {

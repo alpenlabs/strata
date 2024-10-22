@@ -1,11 +1,17 @@
 //! This crate implements the proof of the chain state transition function (STF) for L2 blocks,
 //! verifying the correct state transitions as new L2 blocks are processed.
 
-use strata_primitives::{buf::Buf32, evm_exec::create_evm_extra_payload, params::RollupParams};
+use strata_primitives::{
+    buf::Buf32,
+    evm_exec::create_evm_extra_payload,
+    l1::{BitcoinAmount, XOnlyPk},
+    params::RollupParams,
+};
 use strata_proofimpl_evm_ee_stf::ELProofPublicParams;
 use strata_state::{
     block::ExecSegment,
     block_validation::{check_block_credential, validate_block_segments},
+    bridge_ops,
     exec_update::{ExecUpdate, UpdateInput, UpdateOutput},
 };
 pub use strata_state::{block::L2Block, chain_state::ChainState, state_op::StateCache};
@@ -55,7 +61,19 @@ pub fn reconstruct_exec_segment(el_proof_pp: &ELProofPublicParams) -> ExecSegmen
         create_evm_extra_payload(Buf32(el_proof_pp.new_blockhash)),
     );
 
-    let update_output = UpdateOutput::new_from_state(Buf32(el_proof_pp.new_state_root));
+    let withdrawals = el_proof_pp
+        .withdrawal_intents
+        .iter()
+        .map(|intent| {
+            bridge_ops::WithdrawalIntent::new(
+                BitcoinAmount::from_sat(intent.amt),
+                XOnlyPk::new(Buf32(intent.dest_pk)),
+            )
+        })
+        .collect::<Vec<_>>();
+
+    let update_output = UpdateOutput::new_from_state(Buf32(el_proof_pp.new_state_root))
+        .with_withdrawals(withdrawals);
     let exec_update = ExecUpdate::new(update_input, update_output);
 
     ExecSegment::new(exec_update)
