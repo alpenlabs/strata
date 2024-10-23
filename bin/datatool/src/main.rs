@@ -477,7 +477,7 @@ pub struct ParamsConfig {
 }
 
 // TODO convert this to also initialize the sync params
-fn construct_params(config: ParamsConfig) -> strata_primitives::params::RollupParams {
+fn construct_params(config: ParamsConfig) -> RollupParams {
     let cr = config
         .seqkey
         .map(block_credential::CredRule::SchnorrKey)

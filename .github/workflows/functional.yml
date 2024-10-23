@@ -38,7 +38,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: functional-tests
-        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        #if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true' # this was giving issues in cache
         run: poetry install --no-root --no-interaction
 
       - name: Check formatting
@@ -94,7 +94,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: functional-tests
-        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        #if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true' # this was giving issues in cache
         run: poetry install --no-root --no-interaction
 
       - name: Set up Rust
