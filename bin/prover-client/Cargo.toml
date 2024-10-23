@@ -9,28 +9,28 @@ path = "src/main.rs"
 required-features = ["prover"]
 
 [dependencies]
-strata-btcio = { workspace = true }
-strata-common = { workspace = true }
-strata-db = { workspace = true }
-strata-primitives = { workspace = true }
-strata-proofimpl-btc-blockspace = { workspace = true }
-strata-proofimpl-checkpoint = { workspace = true }
-strata-proofimpl-evm-ee-stf = { workspace = true }
-strata-proofimpl-l1-batch = { workspace = true }
-strata-prover-client-rpc-api = { workspace = true }
-strata-rocksdb = { workspace = true }
-strata-rpc-types = { workspace = true }
+strata-btcio.workspace = true
+strata-common.workspace = true
+strata-db.workspace = true
+strata-primitives.workspace = true
+strata-proofimpl-btc-blockspace.workspace = true
+strata-proofimpl-checkpoint.workspace = true
+strata-proofimpl-evm-ee-stf.workspace = true
+strata-proofimpl-l1-batch.workspace = true
+strata-prover-client-rpc-api.workspace = true
+strata-rocksdb.workspace = true
+strata-rpc-types.workspace = true
 strata-sp1-adapter = { workspace = true, features = ["prover"] }
 strata-sp1-guest-builder = { path = "../../provers/sp1" }
-strata-state = { workspace = true }
-strata-zkvm = { workspace = true }
+strata-state.workspace = true
+strata-zkvm.workspace = true
 
-anyhow = { workspace = true }
-argh = { workspace = true }
-async-trait = { workspace = true }
-bincode = { workspace = true }
+anyhow.workspace = true
+argh.workspace = true
+async-trait.workspace = true
+bincode.workspace = true
 bitcoin = { workspace = true, features = ["rand-std"] }
-borsh = { workspace = true }
+borsh.workspace = true
 hex.workspace = true
 jsonrpsee = { workspace = true, features = ["http-client"] }
 musig2.workspace = true
@@ -38,17 +38,17 @@ num-bigint = "0.4.6"
 num-traits = "0.2.19"
 rand.workspace = true
 rayon = "1.8.0"
-reth-rpc-types = { workspace = true }
-rockbound = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
+reth-rpc-types.workspace = true
+rockbound.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 sp1-sdk = "2.0.0"
-strata-tx-parser = { workspace = true }
-thiserror = { workspace = true }
-tokio = { workspace = true }
-tracing = { workspace = true }
+strata-tx-parser.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
-uuid = { workspace = true }
+uuid.workspace = true
 
 [features]
 prover = []
