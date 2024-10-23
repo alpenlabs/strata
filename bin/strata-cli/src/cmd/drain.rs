@@ -12,7 +12,7 @@ use crate::{
     constants::SATS_TO_WEI,
     seed::Seed,
     settings::Settings,
-    signet::{get_fee_rate, log_fee_rate, print_explorer_url, EsploraClient, SignetWallet},
+    signet::{log_fee_rate, print_explorer_url, SignetWallet},
     strata::StrataWallet,
 };
 
@@ -42,7 +42,6 @@ pub async fn drain(
     }: DrainArgs,
     seed: Seed,
     settings: Settings,
-    esplora: EsploraClient,
 ) {
     let term = Term::stdout();
     if strata_address.is_none() && signet_address.is_none() {
@@ -59,8 +58,9 @@ pub async fn drain(
         strata_address.map(|a| StrataAddress::from_str(&a).expect("valid Strata address"));
 
     if let Some(address) = signet_address {
-        let mut l1w = SignetWallet::new(&seed, settings.network).unwrap();
-        l1w.sync(&esplora).await.unwrap();
+        let mut l1w =
+            SignetWallet::new(&seed, settings.network, settings.signet_backend.clone()).unwrap();
+        l1w.sync().await.unwrap();
         let balance = l1w.balance();
         if balance.untrusted_pending > Amount::ZERO {
             let _ = term.write_line(
@@ -69,7 +69,9 @@ pub async fn drain(
                     .to_string(),
             );
         }
-        let fr = get_fee_rate(fee_rate, &esplora, 1)
+        let fr = settings
+            .signet_backend
+            .get_fee_rate(fee_rate, 1)
             .await
             .expect("valid fee rate");
         log_fee_rate(&term, &fr);
@@ -84,7 +86,7 @@ pub async fn drain(
             .expect("valid transaction");
         l1w.sign(&mut psbt, Default::default()).unwrap();
         let tx = psbt.extract_tx().expect("fully signed tx");
-        esplora.broadcast(&tx).await.unwrap();
+        settings.signet_backend.broadcast_tx(&tx).await.unwrap();
         let _ = print_explorer_url(&tx.compute_txid(), &term, &settings);
         let _ = term.write_line(&format!("Drained signet wallet to {}", address,));
     }
