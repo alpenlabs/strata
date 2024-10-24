@@ -1,7 +1,9 @@
+// TODO clean up this module
+
 use std::sync::Arc;
 
 use strata_btcio::{reader::query::bitcoin_data_reader_task, rpc::traits::Reader};
-use strata_consensus_logic::{ctl::CsmController, l1_handler::bitcoin_data_handler_task};
+use strata_consensus_logic::{csm::ctl::CsmController, l1_handler::bitcoin_data_handler_task};
 use strata_db::traits::{Database, L1DataProvider};
 use strata_primitives::params::Params;
 use strata_status::StatusTx;

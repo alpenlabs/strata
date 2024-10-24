@@ -19,7 +19,9 @@ use tokio::sync::mpsc;
 use tracing::*;
 
 use crate::{
-    ctl::CsmController, errors::*, message::ForkChoiceMessage, reorg, unfinalized_tracker,
+    csm::{ctl::CsmController, message::ForkChoiceMessage},
+    errors::*,
+    reorg, unfinalized_tracker,
     unfinalized_tracker::UnfinalizedBlockTracker,
 };
 
