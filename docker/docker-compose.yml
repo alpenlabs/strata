@@ -47,8 +47,9 @@ services:
       # - ./configs/jwt.seq.hex:/app/jwt.hex
     command:
       - "--enable-witness-gen"
+      - "--custom-chain dev"
     ports:
-      # - 8551:8551
+      - 8551:8551
       - 8545:8545
       - 8546:8546
 
@@ -119,6 +120,7 @@ services:
       BITCOIND_RPC_USER: rpcuser
       BITCOIND_RPC_PASSWORD: rpcpassword
       BITCOIND_WALLET: default
+      GENERATE_BLOCKS: 1 # if env is set then blocks are generated. the number is number of seconds between L1 blocks
     container_name: strata_bitcoind
     volumes:
       - ./.data/data-bitcoind:/root/.bitcoin/
@@ -144,6 +146,16 @@ services:
       - ./.data/bridge-client-2:/app/.data
     ports:
       - 4782:4781
+
+  prover-client:
+    build:
+      context: ../
+      dockerfile: ./docker/prover-client/Dockerfile
+    image: "strata_prover_client:v0.1.0"
+    ports:
+      - "9851:9851"
+    networks:
+      - strata_network
 
 networks:
   strata_network:
