@@ -110,7 +110,6 @@ fn extract_zkvm_input<Node: FullNodeComponents>(
         .block_by_hash(block_id)?
         .ok_or(eyre!("Failed to get current block"))?;
     let current_block_idx = current_block.number;
-
     let withdrawals = current_block
         .clone()
         .withdrawals

@@ -3,6 +3,7 @@ use std::sync::Arc;
 use anyhow::Context;
 use async_trait::async_trait;
 use jsonrpsee::{core::client::ClientT, http_client::HttpClient, rpc_params};
+use strata_primitives::params::RollupParams;
 use tracing::debug;
 use uuid::Uuid;
 
@@ -19,14 +20,20 @@ use crate::{
 pub struct ClOperations {
     cl_client: HttpClient,
     el_dispatcher: Arc<TaskDispatcher<ElOperations>>,
+    rollup_params: Arc<RollupParams>,
 }
 
 impl ClOperations {
     /// Creates a new CL operations instance.
-    pub fn new(cl_client: HttpClient, el_dispatcher: Arc<TaskDispatcher<ElOperations>>) -> Self {
+    pub fn new(
+        cl_client: HttpClient,
+        el_dispatcher: Arc<TaskDispatcher<ElOperations>>,
+        rollup_params: Arc<RollupParams>,
+    ) -> Self {
         Self {
             cl_client,
             el_dispatcher,
+            rollup_params,
         }
     }
 }
@@ -35,6 +42,7 @@ impl ClOperations {
 pub struct CLProverInput {
     pub block_num: u64,
     pub cl_raw_witness: Vec<u8>,
+    pub rollup_params: RollupParams,
     pub el_proof: Option<ProofWithVkey>,
 }
 
@@ -60,6 +68,7 @@ impl ProvingOperations for ClOperations {
             block_num,
             cl_raw_witness,
             el_proof: None,
+            rollup_params: (*self.rollup_params).clone(),
         })
     }
 

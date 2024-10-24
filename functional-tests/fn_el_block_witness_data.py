@@ -37,8 +37,6 @@ class ElBlockWitnessDataGenerationTest(flexitest.Test):
         witness_data = rethrpc.strataee_getBlockWitness(blockhash, True)
         assert witness_data is not None, "non empty witness"
 
-        print(witness_data)
-
 
 def get_contract():
     compiled_sol = compile_source(

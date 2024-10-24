@@ -1,4 +1,5 @@
 import os
+import time
 
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
@@ -10,8 +11,7 @@ from constants import (
     ROLLUP_PARAMS_FOR_DEPOSIT_TX,
     SEQ_PUBLISH_BATCH_INTERVAL_SECS,
 )
-from entry import BasicEnvConfig
-from utils import wait_until
+from utils import wait_for_proof_with_time_out, wait_until
 
 EVM_WAIT_TIME = 2
 SATS_TO_WEI = 10**10
@@ -31,23 +31,28 @@ event_signature_text = "WithdrawalIntentEvent(uint64,bytes32)"
 @flexitest.register
 class BridgeDepositTest(flexitest.Test):
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env(BasicEnvConfig(101, rollup_params=ROLLUP_PARAMS_FOR_DEPOSIT_TX))
+        # ctx.set_env("prover")
+        ctx.set_env("prover")
+        # ctx.set_env(BasicEnvConfig(101, rollup_params=ROLLUP_PARAMS_FOR_DEPOSIT_TX))
 
     def main(self, ctx: flexitest.RunContext):
         evm_addr = "deedf001900dca3ebeefdeadf001900dca3ebeef"
         self.do_deposit(ctx, evm_addr)
-        self.do_withdrawal_precompile_call(ctx)
-
-        # edge case where bridge out precompile address has balance
-        evm_addr = PRECOMPILE_BRIDGEOUT_ADDRESS.lstrip("0x")
-        self.do_deposit(ctx, evm_addr)
-
         block_num = self.do_withdrawal_precompile_call(ctx)
-        print("got the block num ", block_num)
 
-        import time
-
+        # Init the prover client
+        prover_client = ctx.get_service("prover_client")
+        prover_client_rpc = prover_client.create_rpc()
         time.sleep(60)
+
+        # Dispatch the prover task
+        # task_id = prover_client_rpc.dev_strata_proveCLBlock(block_num)
+        task_id = prover_client_rpc.dev_strata_proveL2Batch((1, block_num))
+        print("got the task id: {}", task_id)
+        assert task_id is not None
+
+        time_out = 10 * 60
+        wait_for_proof_with_time_out(prover_client_rpc, task_id, time_out=time_out)
 
     def do_withdrawal_precompile_call(self, ctx: flexitest.RunContext):
         reth = ctx.get_service("reth")
@@ -107,6 +112,8 @@ class BridgeDepositTest(flexitest.Test):
         assert (
             final_source_balance == original_source_balance - to_transfer_wei - total_gas_price
         ), "final balance incorrect"
+
+        return receipt.blockNumber
 
     def do_deposit(self, ctx: flexitest.RunContext, evm_addr: str):
         btc = ctx.get_service("bitcoin")

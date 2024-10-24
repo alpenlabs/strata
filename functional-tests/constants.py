@@ -19,7 +19,7 @@ PRECOMPILE_BRIDGEOUT_ADDRESS = "0x5400000000000000000000000000000000000001"
 # magic values
 EVM_GENESIS_BLOCK_STATE_HASH = "0x37ad61cff1367467a98cf7c54c4ac99e989f1fbb1bc1e646235e90c065c565ba"
 EVM_GENESIS_BLOCK_STATE_ROOT = "0x351714af72d74259f45cd7eab0b04527cd40e74836a45abcae50f92d919d988f"
-ROLLUP_VK = "0x00b01ae596b4e51843484ff71ccbd0dd1a030af70b255e6b9aad50b81d81266f"
+ROLLUP_VK = "0x000790761b53d26cc7920b6562ac0315ea81a33f15ee6cbe5d5fb504f48c7481"
 SEQ_KEY = b"alpen" + b"_1337" * 5 + b"xx"  # must be 32 bytes
 SEQ_PUBKEY = Key(SEQ_KEY.hex()).x_hex
 
@@ -39,7 +39,7 @@ DEFAULT_ROLLUP_PARAMS: dict = {
     "address_length": 20,
     "deposit_amount": 1_000_000_000,
     "rollup_vk": {
-        "risc0_verifying_key": ROLLUP_VK,
+        "s_p1_verifying_key": ROLLUP_VK,
     },
     "dispatch_assignment_dur": 64,
     "proof_publish_mode": {
@@ -60,6 +60,21 @@ FAST_BATCH_ROLLUP_PARAMS = {
 
 # static operator config with pregenerated 100 blocks for deposit transaction
 ROLLUP_PARAMS_FOR_DEPOSIT_TX = {
+    **DEFAULT_ROLLUP_PARAMS,
+    "horizon_l1_height": 4,
+    "target_l2_batch_size": 100,
+    "genesis_l1_height": 102,
+    "operator_config": {
+        "static": [
+            {
+                "signing_pk": "01" * 32,
+                "wallet_pk": "02b4634c515a62e47b3f3eb62b8a6f6320fdb2baed5f2e6657f472b0f2a33221",
+            }
+        ]
+    },
+}
+
+PROVER_ROLLUP_PARAMS = {
     **DEFAULT_ROLLUP_PARAMS,
     "horizon_l1_height": 4,
     "target_l2_batch_size": 100,

@@ -752,6 +752,7 @@ impl StrataSequencerApiServer for SequencerServerImpl {
         entry.proving_status = CheckpointProvingStatus::ProofReady;
 
         let checkpoint = entry.clone().into_batch_checkpoint();
+
         verify_proof(&checkpoint, self.params.rollup())
             .map_err(|e| Error::InvalidProof(idx, e.to_string()))?;
 

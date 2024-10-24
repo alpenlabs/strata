@@ -23,7 +23,7 @@ mod test {
             .prove(prover_input)
             .expect("Failed to generate proof");
 
-        Risc0Verifier::extract_public_output::<ELProofPublicParams>(&proof)
+        Risc0Verifier::extract_public_output::<ELProofPublicParams>(proof.proof())
             .expect("Failed to extract public outputs");
     }
 }
