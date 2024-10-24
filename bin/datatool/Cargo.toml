@@ -10,7 +10,7 @@ path = "src/main.rs"
 [dependencies]
 strata-primitives.workspace = true
 strata-sp1-guest-builder = { path = "../../provers/sp1", features = [
-    "docker-build",
+  "docker-build",
 ] }
 
 anyhow.workspace = true
