@@ -424,7 +424,8 @@ mod test {
 
     #[tokio::test()]
     async fn client_works() {
-        logging::init();
+        logging::init(logging::LoggerConfig::with_base_name("btcio-tests"));
+
         // setting the ENV variable `BITCOIN_XPRIV_RETRIEVABLE` to retrieve the xpriv
         set_var("BITCOIN_XPRIV_RETRIEVABLE", "true");
         let bitcoind = BitcoinD::from_downloaded().unwrap();
