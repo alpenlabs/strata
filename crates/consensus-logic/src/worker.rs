@@ -129,7 +129,7 @@ fn process_msg<D: Database, E: ExecEngineCtl>(
     state: &mut WorkerState<D>,
     engine: &E,
     msg: &CsmMessage,
-    status_rx: Arc<StatusTx>,
+    status_tx: Arc<StatusTx>,
 ) -> anyhow::Result<()> {
     match msg {
         CsmMessage::EventInput(idx) => {
@@ -142,12 +142,12 @@ fn process_msg<D: Database, E: ExecEngineCtl>(
                 warn!(%missed_ev_cnt, "applying missed sync events");
                 for ev_idx in next_exp_idx..*idx {
                     trace!(%ev_idx, "running missed sync event");
-                    handle_sync_event(state, engine, ev_idx, status_rx.clone())?;
+                    handle_sync_event(state, engine, ev_idx, status_tx.as_ref())?;
                 }
             }
 
             // TODO ensure correct event index ordering
-            handle_sync_event(state, engine, *idx, status_rx)?;
+            handle_sync_event(state, engine, *idx, status_tx.as_ref())?;
             Ok(())
         }
     }
@@ -157,7 +157,7 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
     state: &mut WorkerState<D>,
     engine: &E,
     ev_idx: u64,
-    status_tx: Arc<StatusTx>,
+    status_tx: &StatusTx,
 ) -> anyhow::Result<()> {
     // Perform the main step of deciding what the output we're operating on.
     let (outp, new_state) = state.state_tracker.advance_consensus_state(ev_idx)?;
