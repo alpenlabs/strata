@@ -4,7 +4,7 @@ mod test {
     use strata_primitives::buf::Buf32;
     use strata_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
     use strata_proofimpl_checkpoint::{ChainStateSnapshot, L2BatchProofOutput};
-    use strata_proofimpl_l1_batch::{L1BatchProofInput, L1BatchProofOutput};
+    use strata_proofimpl_l1_batch::L1BatchProofOutput;
     use strata_risc0_adapter::{Risc0Verifier, RiscZeroHost, RiscZeroProofInputBuilder};
     use strata_risc0_guest_builder::{
         GUEST_RISC0_BTC_BLOCKSPACE_ELF, GUEST_RISC0_BTC_BLOCKSPACE_ID, GUEST_RISC0_CHECKPOINT_ELF,
@@ -19,12 +19,12 @@ mod test {
         l2::get_genesis_chainstate,
     };
     use strata_zkvm::{
-        AggregationInput, Proof, ProverOptions, VerificationKey, ZKVMHost, ZKVMInputBuilder,
-        ZKVMVerifier,
+        AggregationInput, ProofWithMetadata, ProverOptions, VerificationKey, ZKVMHost,
+        ZKVMInputBuilder, ZKVMVerifier,
     };
 
     // TODO: handle this repeat
-    fn get_l1_batch_output_and_proof() -> (L1BatchProofOutput, Proof) {
+    fn get_l1_batch_output_and_proof() -> (L1BatchProofOutput, ProofWithMetadata) {
         let mainnet_blocks: Vec<(u32, String)> = vec![
             (40321, "0100000045720d24eae33ade0d10397a2e02989edef834701b965a9b161e864500000000993239a44a83d5c427fd3d7902789ea1a4d66a37d5848c7477a7cf47c2b071cd7690784b5746651c3af7ca030101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff08045746651c02db00ffffffff0100f2052a01000000434104c9f513361104db6a84fb6d5b364ba57a27cd19bd051239bf750d8999c6b437220df8fea6b932a248df3cad1fdebb501791e02b7b893a44718d696542ba92a0acac00000000".to_owned()),
         ];
@@ -41,7 +41,6 @@ mod test {
             prover_options,
         );
 
-        let btc_chain = get_btc_chain();
         let btc_blockspace_elf_id: Vec<u8> = GUEST_RISC0_BTC_BLOCKSPACE_ID
             .iter()
             .flat_map(|&x| x.to_le_bytes())
@@ -64,13 +63,13 @@ mod test {
                 .prove(inner_prover_input)
                 .expect("Failed to generate proof");
 
-            let raw_output = Risc0Verifier::extract_public_output::<Vec<u8>>(&proof)
+            let raw_output = Risc0Verifier::extract_public_output::<Vec<u8>>(proof.proof())
                 .expect("Failed to extract public outputs");
             let output: BlockspaceProofOutput = borsh::from_slice(&raw_output).unwrap();
 
             prover_input
                 .write_proof(AggregationInput::new(
-                    proof,
+                    proof.into(),
                     VerificationKey::new(btc_blockspace_elf_id.clone()),
                 ))
                 .unwrap();
@@ -78,17 +77,12 @@ mod test {
         }
 
         let prover = RiscZeroHost::init(GUEST_RISC0_L1_BATCH_ELF.into(), prover_options);
-        let input = L1BatchProofInput {
-            batch: blockspace_outputs,
-            state: btc_chain.get_verification_state(40321, &MAINNET.clone().into()),
-        };
-
-        let prover_input = prover_input.write_borsh(&input).unwrap().build().unwrap();
+        let prover_input = prover_input.build().unwrap();
         let (proof, _) = prover
             .prove(prover_input)
             .expect("Failed to generate proof");
 
-        let output_raw = Risc0Verifier::extract_public_output::<Vec<u8>>(&proof)
+        let output_raw = Risc0Verifier::extract_public_output::<Vec<u8>>(proof.proof())
             .expect("Failed to extract public outputs");
         let output: L1BatchProofOutput = borsh::from_slice(&output_raw).unwrap();
 
@@ -164,7 +158,7 @@ mod test {
             .flat_map(|&x| x.to_le_bytes())
             .collect();
         let l1_batch_proof_input = AggregationInput::new(
-            l1_batch_proof,
+            l1_batch_proof.into(),
             VerificationKey::new(l1_batch_image_id.clone()),
         );
 
@@ -184,7 +178,7 @@ mod test {
             .prove(prover_input)
             .expect("Failed to generate proof");
 
-        let output_raw = Risc0Verifier::extract_public_output::<Vec<u8>>(&proof)
+        let output_raw = Risc0Verifier::extract_public_output::<Vec<u8>>(proof.proof())
             .expect("Failed to extract public outputs");
         let _: BatchInfo = borsh::from_slice(&output_raw).unwrap();
     }

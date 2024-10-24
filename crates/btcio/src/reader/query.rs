@@ -5,9 +5,9 @@ use std::{
 };
 
 use anyhow::bail;
-use bitcoin::{hashes::Hash, BlockHash};
+use bitcoin::BlockHash;
 use strata_db::traits::Database;
-use strata_primitives::{buf::Buf32, params::Params};
+use strata_primitives::params::Params;
 use strata_state::l1::{
     get_btc_params, get_difficulty_adjustment_height, BtcParams, HeaderVerificationState,
     L1BlockId, TimestampStore,
@@ -260,8 +260,12 @@ async fn fetch_and_process_block(
 
     if height == genesis_threshold {
         info!(%height, %genesis_ht, "time for genesis");
+        // Since we assume the genesis block is already verified and valid,
+        // we need to set the HeaderVerificationState for the block immediately
+        // following the genesis. This is why we use `genesis_ht + 1` to start
+        // verifying from the block after genesis.
         let l1_verification_state =
-            get_verification_state(client, genesis_ht + 1, &get_btc_params()).await?;
+            get_verification_state(client, genesis_ht + 1, genesis_ht, &get_btc_params()).await?;
         if let Err(e) = event_tx
             .send(L1Event::GenesisVerificationState(
                 height,
@@ -289,6 +293,7 @@ async fn fetch_and_process_block(
 pub async fn get_verification_state(
     client: &impl Reader,
     height: u64,
+    genesis_height: u64,
     params: &BtcParams,
 ) -> anyhow::Result<HeaderVerificationState> {
     // Get the difficulty adjustment block just before `block_height`
@@ -299,28 +304,129 @@ pub async fn get_verification_state(
     let vh = height - 1; // verified_height
     let vb = client.get_block_at(vh).await?; // verified_block
 
-    // Fetch the previous timestamps of block from `vh`
-    // This fetches timestamps of `vh`, `vh-1`, `vh-2`, ...
     const N: usize = 11;
-    let mut timestamps: [u32; 11] = [0u32; 11];
-    for i in (0..N).rev() {
-        if vh > i as u64 {
-            let h = client.get_block_at(vh - i as u64).await?;
-            timestamps[i] = h.header.time;
+    let mut timestamps: [u32; N] = [0u32; N];
+
+    // Fetch the previous timestamps of block from `vh`
+    // This fetches timestamps of `vh-10`,`vh-9`, ... `vh-1`, `vh`
+    for i in 0..N {
+        if vh >= i as u64 {
+            let height_to_fetch = vh - i as u64;
+            let h = client.get_block_at(height_to_fetch).await?;
+            timestamps[N - 1 - i] = h.header.time;
         } else {
-            timestamps[i] = 0;
+            // No more blocks to fetch; the rest remain zero
+            timestamps[N - 1 - i] = 0;
         }
     }
-    let last_11_blocks_timestamps = TimestampStore::new(timestamps);
 
-    let l1_blkid: L1BlockId =
-        Buf32::from(vb.header.block_hash().as_raw_hash().to_byte_array()).into();
-    Ok(HeaderVerificationState {
+    // Calculate the 'head' index for the ring buffer based on the current block height.
+    // The 'head' represents the position in the buffer where the next timestamp will be inserted.
+
+    // If the current height is less than the genesis height, we haven't started processing blocks
+    // yet. In this case, set 'head' to 0.
+    let head = if height <= genesis_height {
+        0
+    } else {
+        // Calculate the 'head' index using the formula:
+        // (current height + buffer size - 1 - genesis height) % buffer size
+        // This ensures the 'head' points to the correct position in the ring buffer.
+        (height + N as u64 - 1 - genesis_height) % N as u64
+    };
+
+    let last_11_blocks_timestamps = TimestampStore::new_with_head(timestamps, head as usize);
+
+    let l1_blkid: L1BlockId = vb.header.block_hash().into();
+
+    let header_vs = HeaderVerificationState {
         last_verified_block_num: vh as u32,
         last_verified_block_hash: l1_blkid,
         next_block_target: vb.header.target().to_compact_lossy().to_consensus(),
         interval_start_timestamp: b1.header.time,
         total_accumulated_pow: 0u128,
         last_11_blocks_timestamps,
-    })
+    };
+    trace!(%height, ?header_vs, "HeaderVerificationState");
+
+    Ok(header_vs)
+}
+
+#[cfg(test)]
+mod tests {
+
+    use bitcoin::Address;
+    use bitcoind::{bitcoincore_rpc::RpcApi, BitcoinD};
+
+    use super::*;
+    use crate::rpc::BitcoinClient;
+
+    /// Get the authentication credentials for a given `bitcoind` instance.
+    fn get_auth(bitcoind: &BitcoinD) -> (String, String) {
+        let params = &bitcoind.params;
+        let cookie_values = params.get_cookie_values().unwrap().unwrap();
+        (cookie_values.user, cookie_values.password)
+    }
+
+    /// Mine a number of blocks of a given size `count`, which may be specified to a given coinbase
+    /// `address`.
+    pub fn mine_blocks(
+        bitcoind: &BitcoinD,
+        count: usize,
+        address: Option<Address>,
+    ) -> anyhow::Result<Vec<BlockHash>> {
+        let coinbase_address = match address {
+            Some(address) => address,
+            None => bitcoind
+                .client
+                .get_new_address(None, None)?
+                .assume_checked(),
+        };
+        let block_hashes = bitcoind
+            .client
+            .generate_to_address(count as _, &coinbase_address)?;
+        Ok(block_hashes)
+    }
+
+    async fn test_for_genesis_height(
+        genesis_height: u64,
+        client: &impl Reader,
+        params: &BtcParams,
+    ) {
+        let len = 5;
+        let mut header_vs =
+            get_verification_state(client, genesis_height + 1, genesis_height, params)
+                .await
+                .unwrap();
+
+        for height in genesis_height + 1..genesis_height + len {
+            let block = client.get_block_at(height).await.unwrap();
+            header_vs.check_and_update_continuity(&block.header, params);
+        }
+
+        let new_header_vs =
+            get_verification_state(client, genesis_height + len, genesis_height, params)
+                .await
+                .unwrap();
+
+        assert_eq!(header_vs, new_header_vs);
+    }
+
+    #[tokio::test()]
+    async fn test_header_verification_state() {
+        // setting the ENV variable `BITCOIN_XPRIV_RETRIEVABLE` to retrieve the xpriv
+        std::env::set_var("BITCOIN_XPRIV_RETRIEVABLE", "true");
+        let bitcoind = BitcoinD::from_downloaded().unwrap();
+        let url = bitcoind.rpc_url();
+        let (user, password) = get_auth(&bitcoind);
+        let client = BitcoinClient::new(url, user, password).unwrap();
+
+        let _ = mine_blocks(&bitcoind, 105, None).unwrap();
+        let params = get_btc_params();
+
+        test_for_genesis_height(1, &client, &params).await;
+        test_for_genesis_height(5, &client, &params).await;
+        test_for_genesis_height(10, &client, &params).await;
+        test_for_genesis_height(15, &client, &params).await;
+        test_for_genesis_height(100, &client, &params).await;
+    }
 }

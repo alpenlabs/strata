@@ -27,6 +27,7 @@ pub async fn start_checkpoints_task(
 ) {
     info!("Checkpoint runner started");
     let mut to_fetch_idx = 0;
+    let mut current_ckpt_idx = 0;
     let mut ticker = interval(Duration::from_secs(CHECKPOINT_POLL_INTERVAL));
     let mut current_task_id = Uuid::default();
 
@@ -42,6 +43,7 @@ pub async fn start_checkpoints_task(
             {
                 Ok(task_id) => {
                     current_task_id = task_id;
+                    current_ckpt_idx = new_checkpoint_idx;
                     to_fetch_idx = new_checkpoint_idx + 1;
                 }
                 Err(_) => {
@@ -55,7 +57,7 @@ pub async fn start_checkpoints_task(
 
         if current_task_id != Uuid::default() {
             check_and_submit_proof(
-                to_fetch_idx,
+                current_ckpt_idx,
                 &sequencer_client,
                 &task_tracker,
                 &mut current_task_id,
@@ -64,7 +66,6 @@ pub async fn start_checkpoints_task(
         }
     }
 }
-
 async fn fetch_latest_checkpoint_index(
     sequencer_client: &HttpClient,
     current_checkpoint_idx: u64,
