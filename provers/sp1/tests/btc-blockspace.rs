@@ -25,7 +25,7 @@ mod test {
             .get_proof(block, &prover_options)
             .unwrap();
 
-        let _: BlockspaceProofOutput = SP1Verifier::extract_borsh_public_output(&proof)
+        let _: BlockspaceProofOutput = SP1Verifier::extract_borsh_public_output(proof.proof())
             .expect("Failed to extract public outputs");
     }
 

@@ -12015,8 +12015,7 @@ dependencies = [
 [[package]]
 name = "sp1-build"
 version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8216e07a9c463c6ee091cdc817cfc10c25446cfd4d020812818177e0a3d1c943"
+source = "git+https://github.com/alpenlabs/sp1.git?branch=feat/docker-optional-workspace#f85472f35e9429e2e5b3a1de3c32f04d83e71bc6"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -12159,15 +12158,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.109",
-]
-
-[[package]]
-name = "sp1-helper"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f08124c62d09764810783355cff518477e3f36c8e83343623859afeca6f3eeb"
-dependencies = [
- "sp1-build",
 ]
 
 [[package]]
@@ -13421,7 +13411,7 @@ dependencies = [
  "num-bigint 0.4.6",
  "num-traits",
  "serde_json",
- "sp1-helper",
+ "sp1-build",
  "sp1-sdk",
  "strata-primitives",
  "strata-proofimpl-btc-blockspace",

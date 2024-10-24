@@ -23,7 +23,7 @@ mod test {
 
         let (proof, _) = el_prover.get_proof(&height, &prover_ops).unwrap();
 
-        let _ = SP1Verifier::extract_public_output::<ELProofPublicParams>(&proof)
+        let _ = SP1Verifier::extract_public_output::<ELProofPublicParams>(proof.proof())
             .expect("Failed to extract public outputs");
     }
 }

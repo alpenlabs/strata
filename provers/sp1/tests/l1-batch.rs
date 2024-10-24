@@ -30,7 +30,7 @@ mod test {
             .get_proof(&(l1_start_height, l1_end_height), &prover_options)
             .unwrap();
 
-        let _: L1BatchProofOutput = SP1Verifier::extract_borsh_public_output(&proof)
+        let _: L1BatchProofOutput = SP1Verifier::extract_borsh_public_output(proof.proof())
             .expect("Failed to extract public outputs");
     }
 }
