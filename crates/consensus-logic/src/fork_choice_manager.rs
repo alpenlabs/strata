@@ -1,6 +1,6 @@
 //! Fork choice manager. Used to talk to the EL and pick the new fork choice.
 
-use std::sync::Arc;
+use std::{ops::Deref, sync::Arc};
 
 use strata_chaintsn::transition::process_block;
 use strata_db::{
@@ -11,16 +11,20 @@ use strata_eectl::{engine::ExecEngineCtl, messages::ExecPayloadData};
 use strata_primitives::params::Params;
 use strata_state::{
     block::L2BlockBundle, block_validation::validate_block_segments, client_state::ClientState,
-    operation::SyncAction, prelude::*, state_op::StateCache, sync_event::SyncEvent,
+    prelude::*, state_op::StateCache, sync_event::SyncEvent,
 };
+use strata_status::StatusRx;
 use strata_storage::L2BlockManager;
 use strata_tasks::ShutdownGuard;
 use tokio::sync::mpsc;
 use tracing::*;
 
 use crate::{
-    ctl::CsmController, errors::*, message::ForkChoiceMessage, reorg, unfinalized_tracker,
-    unfinalized_tracker::UnfinalizedBlockTracker,
+    ctl::CsmController,
+    errors::*,
+    message::ForkChoiceMessage,
+    reorg,
+    unfinalized_tracker::{self, UnfinalizedBlockTracker},
 };
 
 /// Tracks the parts of the chain that haven't been finalized on-chain yet.
@@ -180,12 +184,6 @@ fn process_early_fcm_msg(msg: ForkChoiceMessage) -> Option<Arc<ClientState>> {
             }
         }
 
-        ForkChoiceMessage::NewState(state, _) => {
-            if state.is_chain_active() && state.sync().is_some() {
-                return Some(state);
-            }
-        }
-
         ForkChoiceMessage::NewBlock(blkid) => {
             error!(blkid = ?blkid, "got unexpected early FCM new block message");
         }
@@ -228,6 +226,7 @@ fn determine_start_tip(
     Ok((*best, best_height))
 }
 
+#[allow(clippy::too_many_arguments)]
 /// Main tracker task that takes a ready fork choice manager and some IO stuff.
 pub fn tracker_task<D: Database, E: ExecEngineCtl>(
     shutdown: ShutdownGuard,
@@ -237,6 +236,7 @@ pub fn tracker_task<D: Database, E: ExecEngineCtl>(
     mut fcm_rx: mpsc::Receiver<ForkChoiceMessage>,
     csm_controller: Arc<CsmController>,
     params: Arc<Params>,
+    status_rx: Arc<StatusRx>,
 ) -> anyhow::Result<()> {
     // Wait until the CSM gives us a state we can start from.
     info!("waiting for CSM ready");
@@ -273,9 +273,14 @@ pub fn tracker_task<D: Database, E: ExecEngineCtl>(
     };
     info!(%finalized_blockid, "forkchoice manager started");
 
-    if let Err(e) =
-        forkchoice_manager_task_inner(&shutdown, fcm, engine.as_ref(), fcm_rx, &csm_controller)
-    {
+    if let Err(e) = forkchoice_manager_task_inner(
+        &shutdown,
+        fcm,
+        engine.as_ref(),
+        fcm_rx,
+        &csm_controller,
+        status_rx,
+    ) {
         error!(err = ?e, "tracker aborted");
         return Err(e);
     }
@@ -285,25 +290,35 @@ pub fn tracker_task<D: Database, E: ExecEngineCtl>(
 
 fn forkchoice_manager_task_inner<D: Database, E: ExecEngineCtl>(
     shutdown: &ShutdownGuard,
-    mut state: ForkChoiceManager<D>,
+    mut fcm_state: ForkChoiceManager<D>,
     engine: &E,
     mut fcm_rx: mpsc::Receiver<ForkChoiceMessage>,
     csm_ctl: &CsmController,
+    status_rx: Arc<StatusRx>,
 ) -> anyhow::Result<()> {
+    let mut last_ev_idx = 0;
     loop {
         if shutdown.should_shutdown() {
             warn!("received shutdown signal");
             break;
         }
-
         let Some(m) = fcm_rx.blocking_recv() else {
             break;
         };
 
-        // TODO decide when errors are actually failures vs when they're okay
-        process_fc_message(m, &mut state, engine, csm_ctl)?;
-    }
+        let csmdata = status_rx.csm.borrow();
+        // Update the status if there's a new state i.e there's a new event
+        if csmdata.last_sync_ev_idx > last_ev_idx {
+            let cstate = status_rx.cl.borrow();
+            let cstate = cstate.deref();
+            handle_new_state(&mut fcm_state, cstate)?;
 
+            last_ev_idx = csmdata.last_sync_ev_idx;
+        }
+
+        // TODO decide when errors are actually failures vs when they're okay
+        process_fc_message(m, &mut fcm_state, engine, csm_ctl)?;
+    }
     Ok(())
 }
 
@@ -316,28 +331,6 @@ fn process_fc_message<D: Database, E: ExecEngineCtl>(
     match msg {
         ForkChoiceMessage::CsmResume(_) => {
             warn!("got unexpected late CSM resume message, ignoring");
-        }
-
-        ForkChoiceMessage::NewState(cs, output) => {
-            let sync = cs.sync().expect("fcm: client state missing sync data");
-
-            let csm_tip = sync.chain_tip_blkid();
-            debug!(?csm_tip, "got new CSM state");
-
-            // Update the new state.
-            fcm_state.cur_csm_state = cs;
-
-            // TODO use output actions to clear out dangling states now
-            for act in output.actions() {
-                if let SyncAction::FinalizeBlock(blkid) = act {
-                    let fin_report = fcm_state.chain_tracker.update_finalized_tip(blkid)?;
-                    info!(?blkid, ?fin_report, "finalized block")
-                    // TODO do something with the finalization report
-                }
-            }
-
-            // TODO recheck every remaining block's validity using the new state
-            // starting from the bottom up, putting into a new chain tracker
         }
 
         ForkChoiceMessage::NewBlock(blkid) => {
@@ -439,6 +432,31 @@ fn process_fc_message<D: Database, E: ExecEngineCtl>(
         }
     }
 
+    Ok(())
+}
+
+fn handle_new_state<D: Database>(
+    fcm_state: &mut ForkChoiceManager<D>,
+    cs: &ClientState,
+) -> anyhow::Result<()> {
+    let sync = cs.sync().expect("fcm: client state missing sync data");
+
+    let csm_tip = sync.chain_tip_blkid();
+    debug!(?csm_tip, "got new CSM state");
+
+    // Update the new state.
+    fcm_state.cur_csm_state = Arc::new(cs.clone());
+
+    if let Some(sync) = cs.sync() {
+        let blkid = sync.finalized_blkid();
+        let fin_report = fcm_state.chain_tracker.update_finalized_tip(blkid)?;
+        info!(?blkid, "updated finalized tip");
+        trace!(?fin_report, "finalization report");
+        // TODO do something with the finalization report
+    }
+
+    // TODO recheck every remaining block's validity using the new state
+    // starting from the bottom up, putting into a new chain tracker
     Ok(())
 }
 
