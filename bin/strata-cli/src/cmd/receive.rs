@@ -7,7 +7,7 @@ use crate::{
     net_type::{net_type_or_exit, NetworkType},
     seed::Seed,
     settings::Settings,
-    signet::{persist::WalletPersistWrapper, SignetWallet},
+    signet::SignetWallet,
     strata::StrataWallet,
 };
 
@@ -33,7 +33,7 @@ pub async fn receive(args: ReceiveArgs, seed: Seed, settings: Settings) {
             l1w.sync().await.unwrap();
             let _ = term.write_line("Wallet synced");
             let address_info = l1w.reveal_next_address(KeychainKind::External);
-            WalletPersistWrapper::persist(&mut l1w).unwrap();
+            l1w.persist().unwrap();
             address_info.address.to_string()
         }
         NetworkType::Strata => {

@@ -45,7 +45,7 @@ pub async fn recover(args: RecoverArgs, seed: Seed, settings: Settings) {
 
     let fee_rate = settings
         .signet_backend
-        .get_fee_rate(args.fee_rate, 1)
+        .get_fee_rate(1)
         .await
         .expect("valid fee rate");
     log_fee_rate(&term, &fee_rate);

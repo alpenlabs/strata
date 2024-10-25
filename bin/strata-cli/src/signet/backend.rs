@@ -1,10 +1,12 @@
 use std::{
     collections::BTreeSet,
+    fmt::Debug,
     marker::Send,
     sync::Arc,
     time::{Duration, Instant},
 };
 
+use async_trait::async_trait;
 use bdk_bitcoind_rpc::{
     bitcoincore_rpc::{self, json::EstimateMode, RpcApi},
     Emitter,
@@ -19,55 +21,56 @@ use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use terrors::OneOf;
 use tokio::sync::mpsc;
 
-use super::{persist::WalletPersistWrapper, EsploraClient};
+use super::EsploraClient;
+
+macro_rules! boxed_err {
+    ($name:ident) => {
+        impl std::ops::Deref for $name {
+            type Target = dyn Debug;
+
+            fn deref(&self) -> &Self::Target {
+                self.0.as_ref()
+            }
+        }
+
+        impl From<Box<dyn Debug>> for $name {
+            fn from(err: Box<dyn Debug>) -> Self {
+                Self(err)
+            }
+        }
+    };
+}
 
 #[derive(Debug)]
-enum SignetBackendInner {
-    Esplora(EsploraClient),
-    BitcoinCore(bitcoincore_rpc::Client),
-}
+pub struct SyncError(Box<dyn Debug>);
+boxed_err!(SyncError);
 
-#[derive(Debug, Clone)]
-pub struct SignetBackend(Arc<SignetBackendInner>);
+#[derive(Debug)]
+pub struct ScanError(Box<dyn Debug>);
+boxed_err!(ScanError);
 
-impl From<EsploraClient> for SignetBackend {
-    fn from(value: EsploraClient) -> Self {
-        SignetBackend(SignetBackendInner::Esplora(value).into())
-    }
-}
+#[derive(Debug)]
+pub struct BroadcastTxError(Box<dyn Debug>);
+boxed_err!(BroadcastTxError);
 
-impl From<bitcoincore_rpc::Client> for SignetBackend {
-    fn from(value: bitcoincore_rpc::Client) -> Self {
-        SignetBackend(SignetBackendInner::BitcoinCore(value).into())
-    }
-}
+#[derive(Debug)]
+pub struct GetFeeRateError(Box<dyn Debug>);
+boxed_err!(GetFeeRateError);
 
-impl SignetBackend {
-    pub async fn sync_wallet(&self, wallet: &mut Wallet) -> Result<(), Box<esplora_client::Error>> {
-        match *self.0 {
-            SignetBackendInner::Esplora(_) => self.sync_with_esplora(wallet).await,
-            SignetBackendInner::BitcoinCore(_) => {
-                let start_height = wallet.latest_checkpoint().height();
-                self.sync_with_core(wallet, start_height).await;
-                Ok(())
-            }
-        }
-    }
-
-    pub async fn scan_wallet(&self, wallet: &mut Wallet) -> Result<(), Box<esplora_client::Error>> {
-        match *self.0 {
-            SignetBackendInner::Esplora(_) => self.scan_with_esplora(wallet).await,
-            SignetBackendInner::BitcoinCore(_) => {
-                self.sync_with_core(wallet, 0).await;
-                Ok(())
-            }
-        }
-    }
-
-    async fn sync_with_esplora(
+#[async_trait]
+pub trait SignetBackend: Debug {
+    async fn sync_wallet(&self, wallet: &mut Wallet) -> Result<(), SyncError>;
+    async fn scan_wallet(&self, wallet: &mut Wallet) -> Result<(), ScanError>;
+    async fn broadcast_tx(&self, tx: &Transaction) -> Result<(), BroadcastTxError>;
+    async fn get_fee_rate(
         &self,
-        wallet: &mut Wallet,
-    ) -> Result<(), Box<esplora_client::Error>> {
+        target: u16,
+    ) -> Result<FeeRate, OneOf<(InvalidFee, GetFeeRateError)>>;
+}
+
+#[async_trait]
+impl SignetBackend for EsploraClient {
+    async fn sync_wallet(&self, wallet: &mut Wallet) -> Result<(), SyncError> {
         let term = Term::stdout();
         let _ = term.write_line("Syncing wallet...");
         let sty = ProgressStyle::with_template(
@@ -105,26 +108,22 @@ impl SignetBackend {
             })
             .build();
 
-        let SignetBackendInner::Esplora(ref esplora) = *self.0 else {
-            panic!("sync backend wasn't esplora")
-        };
-        let update = esplora.sync(req, 3).await?;
+        let update = self
+            .sync(req, 3)
+            .await
+            .map_err(|e| Box::new(e) as Box<dyn Debug>)?;
         ops2.finish();
         spks2.finish();
         txids2.finish();
-        let _ = term.write_line("Persisting updates");
+        let _ = term.write_line("Updating wallet");
         wallet
             .apply_update(update)
             .expect("should be able to connect to db");
-        wallet.persist().expect("persist should work");
         let _ = term.write_line("Wallet synced");
         Ok(())
     }
 
-    async fn scan_with_esplora(
-        &self,
-        wallet: &mut Wallet,
-    ) -> Result<(), Box<esplora_client::Error>> {
+    async fn scan_wallet(&self, wallet: &mut Wallet) -> Result<(), ScanError> {
         let bar = ProgressBar::new_spinner();
         bar.enable_steady_tick(Duration::from_millis(100));
         let bar2 = bar.clone();
@@ -141,169 +140,186 @@ impl SignetBackend {
             })
             .build();
 
-        let SignetBackendInner::Esplora(ref esplora) = *self.0 else {
-            panic!("sync backend wasn't esplora")
-        };
-        let update = esplora.full_scan(req, 5, 3).await?;
+        let update = self
+            .full_scan(req, 5, 3)
+            .await
+            .map_err(|e| Box::new(e) as Box<dyn Debug>)?;
         bar.set_message("Persisting updates");
         wallet
             .apply_update(update)
             .expect("should be able to connect to db");
-        wallet.persist().expect("persist should work");
         bar.finish_with_message("Scan complete");
         Ok(())
     }
 
-    async fn sync_with_core(&self, wallet: &mut Wallet, start_height: u32) {
-        let (tx, mut rx) = mpsc::unbounded_channel();
-        let tip = wallet.latest_checkpoint();
-        let bar = ProgressBar::new_spinner().with_style(
-            ProgressStyle::with_template("{spinner} [{elapsed_precise}] {msg}").unwrap(),
-        );
-        bar.enable_steady_tick(Duration::from_millis(100));
-        let bar2 = bar.clone();
-        let mut blocks_scanned = 0;
-
-        self.spawn_bitcoin_core(move |c| {
-            let mut emitter = Emitter::new(c, tip, start_height);
-            while let Some(emission) = emitter.next_block().unwrap() {
-                tx.send(Emission::Block(emission))
-                    .expect("block should send");
-            }
-            bar2.println("Scanning mempool");
-            tx.send(Emission::Mempool(emitter.mempool().unwrap()))
-                .expect("mempool should send");
-            Ok(())
-        })
-        .await
-        .unwrap();
-
-        let mut mempool_txs_len = 0;
-
-        while let Some(em) = rx.recv().await {
-            match em {
-                Emission::Block(ev) => {
-                    blocks_scanned += 1;
-                    let height = ev.block_height();
-                    let hash = ev.block_hash();
-                    let connected_to = ev.connected_to();
-                    let start_apply_block = Instant::now();
-                    wallet
-                        .apply_block_connected_to(&ev.block, height, connected_to)
-                        .expect("applying block should succeed");
-                    let elapsed = start_apply_block.elapsed();
-                    bar.println(format!(
-                        "Applied block {} at height {} in {:?}",
-                        hash, height, elapsed
-                    ));
-                    bar.set_message(format!(
-                        "Current height: {}, scanned {} blocks",
-                        height, blocks_scanned
-                    ))
-                }
-                Emission::Mempool(txs) => {
-                    bar.println("Scanning mempool");
-                    let apply_start = Instant::now();
-                    mempool_txs_len = txs.len();
-                    wallet.apply_unconfirmed_txs(txs);
-                    let elapsed = apply_start.elapsed();
-                    bar.println(format!(
-                        "Applied {} unconfirmed transactions in {:?}",
-                        mempool_txs_len, elapsed
-                    ));
-                    break;
-                }
-            }
-        }
-
-        bar.println("Persisting updates");
-        wallet.persist().expect("persist to succeed");
-        bar.finish_with_message(format!(
-            "Completed sync. {} new blocks, {} unconfirmed transactions",
-            blocks_scanned, mempool_txs_len
-        ))
+    async fn broadcast_tx(&self, tx: &Transaction) -> Result<(), BroadcastTxError> {
+        self.broadcast(tx)
+            .await
+            .map_err(|e| (Box::new(e) as Box<dyn Debug>).into())
     }
 
-    pub async fn broadcast_tx(
+    async fn get_fee_rate(
         &self,
-        tx: &Transaction,
-    ) -> Result<(), OneOf<(esplora_client::Error, bitcoincore_rpc::Error)>> {
-        match *self.0 {
-            SignetBackendInner::Esplora(ref client) => {
-                Ok(client.broadcast(tx).await.map_err(OneOf::new)?)
-            }
-
-            SignetBackendInner::BitcoinCore(_) => {
-                let hex = encode::serialize_hex(tx);
-
-                self.spawn_bitcoin_core(move |c| c.send_raw_transaction(hex))
-                    .await
-                    .map_err(OneOf::new)?;
-
-                Ok(())
-            }
-        }
-    }
-
-    pub async fn get_fee_rate(
-        &self,
-        fallback_in_sats: Option<u64>,
         target: u16,
-    ) -> Result<FeeRate, FeeRateError> {
-        let fee_rate = match (fallback_in_sats, &*self.0) {
-            (Some(fr), _) => {
-                FeeRate::from_sat_per_vb(fr).ok_or(FeeRateError::InvalidDueToOverflow)?
-            }
-
-            (_, SignetBackendInner::Esplora(esplora)) => esplora
-                .get_fee_estimates()
-                .await
-                .map(|frs| frs.get(&target).cloned())
-                .map_err(FeeRateError::EsploraError)?
-                .and_then(|fr| FeeRate::from_sat_per_vb(fr as u64))
-                .unwrap_or(FeeRate::BROADCAST_MIN),
-
-            (_, SignetBackendInner::BitcoinCore(_)) => {
-                let res = self
-                    .spawn_bitcoin_core(move |c| {
-                        c.estimate_smart_fee(target, Some(EstimateMode::Conservative))
-                    })
-                    .await
-                    .map_err(FeeRateError::BitcoinCoreRPCError)?;
-
-                match res.fee_rate {
-                    Some(btc_per_kb) => {
-                        let per_vb = (btc_per_kb / 1000).to_sat();
-                        FeeRate::from_sat_per_vb(per_vb)
-                            .ok_or(FeeRateError::InvalidDueToOverflow)?
-                    }
-                    None => FeeRate::BROADCAST_MIN,
-                }
-            }
-        };
-
-        if fee_rate < FeeRate::BROADCAST_MIN {
-            Err(FeeRateError::BelowBroadcastMin)
-        } else {
-            Ok(fee_rate)
+    ) -> Result<FeeRate, OneOf<(InvalidFee, GetFeeRateError)>> {
+        match self
+            .get_fee_estimates()
+            .await
+            .map(|frs| frs.get(&target).cloned())
+            .map_err(|e| GetFeeRateError(Box::new(e) as Box<dyn Debug>))
+            .map_err(OneOf::new)?
+            .and_then(|fr| FeeRate::from_sat_per_vb(fr as u64))
+        {
+            Some(fr) => Ok(fr),
+            None => Err(OneOf::new(InvalidFee)),
         }
-    }
-
-    async fn spawn_bitcoin_core<T, F>(&self, func: F) -> Result<T, bitcoincore_rpc::Error>
-    where
-        T: Send + 'static,
-        F: FnOnce(&bitcoincore_rpc::Client) -> Result<T, bitcoincore_rpc::Error> + Send + 'static,
-    {
-        let backend = self.0.clone();
-        let handle = tokio::task::spawn_blocking(move || {
-            let SignetBackendInner::BitcoinCore(ref client) = *backend else {
-                unreachable!()
-            };
-            func(client)
-        });
-        handle.await.expect("thread should be fine")
     }
 }
+
+#[async_trait]
+impl SignetBackend for Arc<bitcoincore_rpc::Client> {
+    async fn sync_wallet(&self, wallet: &mut Wallet) -> Result<(), SyncError> {
+        sync_wallet_with_core(self.clone(), wallet, false)
+            .await
+            .map_err(|e| (Box::new(e) as Box<dyn Debug>).into())
+    }
+
+    async fn scan_wallet(&self, wallet: &mut Wallet) -> Result<(), ScanError> {
+        sync_wallet_with_core(self.clone(), wallet, true)
+            .await
+            .map_err(|e| (Box::new(e) as Box<dyn Debug>).into())
+    }
+
+    async fn broadcast_tx(&self, tx: &Transaction) -> Result<(), BroadcastTxError> {
+        let hex = encode::serialize_hex(tx);
+
+        spawn_bitcoin_core(self.clone(), move |c| c.send_raw_transaction(hex))
+            .await
+            .map_err(|e| BroadcastTxError(Box::new(e) as Box<dyn Debug>))?;
+        Ok(())
+    }
+
+    async fn get_fee_rate(
+        &self,
+        target: u16,
+    ) -> Result<FeeRate, OneOf<(InvalidFee, GetFeeRateError)>> {
+        let res = spawn_bitcoin_core(self.clone(), move |c| {
+            c.estimate_smart_fee(target, Some(EstimateMode::Conservative))
+        })
+        .await
+        .map_err(|e| GetFeeRateError(Box::new(e) as Box<dyn Debug>))
+        .map_err(OneOf::new)?;
+
+        res.fee_rate
+            .and_then(|fr| {
+                let per_vb = (fr / 1000).to_sat();
+                FeeRate::from_sat_per_vb(per_vb)
+            })
+            .ok_or(OneOf::new(InvalidFee))
+    }
+}
+
+async fn spawn_bitcoin_core<T, F>(
+    client: Arc<bitcoincore_rpc::Client>,
+    func: F,
+) -> Result<T, bitcoincore_rpc::Error>
+where
+    T: Send + 'static,
+    F: FnOnce(&bitcoincore_rpc::Client) -> Result<T, bitcoincore_rpc::Error> + Send + 'static,
+{
+    let handle = tokio::task::spawn_blocking(move || func(&client));
+    handle.await.expect("thread should be fine")
+}
+
+async fn sync_wallet_with_core(
+    client: Arc<bitcoincore_rpc::Client>,
+    wallet: &mut Wallet,
+    should_scan: bool,
+) -> Result<(), bitcoincore_rpc::Error> {
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    let last_cp = wallet.latest_checkpoint();
+    let bar = ProgressBar::new_spinner()
+        .with_style(ProgressStyle::with_template("{spinner} [{elapsed_precise}] {msg}").unwrap());
+    bar.enable_steady_tick(Duration::from_millis(100));
+    let bar2 = bar.clone();
+    let mut blocks_scanned = 0;
+
+    let start_height = match should_scan {
+        true => 0,
+        false => last_cp.height(),
+    };
+
+    let mut handle = Box::pin(spawn_bitcoin_core(client.clone(), move |client| {
+        let mut emitter = Emitter::new(client, last_cp, start_height);
+        while let Some(emission) = emitter.next_block().unwrap() {
+            tx.send(Emission::Block(emission))
+                .expect("block should send");
+        }
+        bar2.println("Scanning mempool");
+        tx.send(Emission::Mempool(emitter.mempool().unwrap()))
+            .expect("mempool should send");
+        Ok(())
+    }));
+
+    let mempool_txs_len = &mut 0usize;
+    loop {
+        tokio::select! {
+            biased;
+            Err(e) = handle.as_mut() => return Err(e),
+            Some(em) = rx.recv() => {
+                match em {
+                    Emission::Block(ev) => {
+                        blocks_scanned += 1;
+                        let height = ev.block_height();
+                        let hash = ev.block_hash();
+                        let connected_to = ev.connected_to();
+                        let start_apply_block = Instant::now();
+                        wallet
+                            .apply_block_connected_to(&ev.block, height, connected_to)
+                            .expect("applying block should succeed");
+                        let elapsed = start_apply_block.elapsed();
+                        bar.println(format!(
+                            "Applied block {} at height {} in {:?}",
+                            hash, height, elapsed
+                        ));
+                        bar.set_message(format!(
+                            "Current height: {}, scanned {} blocks",
+                            height, blocks_scanned
+                        ))
+                    }
+                    Emission::Mempool(txs) => {
+                        bar.println("Scanning mempool");
+                        let apply_start = Instant::now();
+                        *mempool_txs_len = txs.len();
+                        wallet.apply_unconfirmed_txs(txs);
+                        let elapsed = apply_start.elapsed();
+                        bar.println(format!(
+                            "Applied {} unconfirmed transactions in {:?}",
+                            mempool_txs_len, elapsed
+                        ));
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    bar.println("Persisting updates");
+    bar.finish_with_message(format!(
+        "Completed sync. {} new blocks, {} unconfirmed transactions",
+        blocks_scanned, mempool_txs_len
+    ));
+    Ok(())
+}
+
+#[derive(Debug)]
+pub struct InvalidFee;
+
+#[derive(Debug)]
+struct BelowBroadcastMin;
+
+#[derive(Debug)]
+struct FeeMissing;
 
 #[derive(Debug)]
 pub enum FeeRateError {

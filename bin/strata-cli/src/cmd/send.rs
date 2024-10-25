@@ -57,7 +57,7 @@ pub async fn send(args: SendArgs, seed: Seed, settings: Settings) {
             l1w.sync().await.unwrap();
             let fee_rate = settings
                 .signet_backend
-                .get_fee_rate(args.fee_rate, 1)
+                .get_fee_rate(1)
                 .await
                 .expect("valid fee rate");
             log_fee_rate(&term, &fee_rate);

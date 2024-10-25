@@ -3,7 +3,7 @@ use std::{
     io,
     path::PathBuf,
     str::FromStr,
-    sync::LazyLock,
+    sync::{Arc, LazyLock},
 };
 
 use alloy::primitives::Address as StrataAddress;
@@ -49,7 +49,7 @@ pub struct Settings {
     pub linux_seed_file: PathBuf,
     pub network: Network,
     pub config_file: PathBuf,
-    pub signet_backend: SignetBackend,
+    pub signet_backend: Arc<dyn SignetBackend>,
 }
 
 pub static PROJ_DIRS: LazyLock<ProjectDirs> = LazyLock::new(|| {
@@ -81,7 +81,7 @@ impl Settings {
             .try_deserialize::<SettingsFromFile>()
             .map_err(OneOf::new)?;
 
-        let sync_backend = match (
+        let sync_backend: Arc<dyn SignetBackend> = match (
             from_file.esplora.clone(),
             from_file.bitcoind_rpc_user,
             from_file.bitcoind_rpc_pw,
@@ -89,18 +89,15 @@ impl Settings {
             from_file.bitcoind_rpc_endpoint,
         ) {
             (Some(url), None, None, None, None) => {
-                EsploraClient::new(&url).expect("valid esplora url").into()
+                Arc::new(EsploraClient::new(&url).expect("valid esplora url"))
             }
-            (None, Some(user), Some(pw), None, Some(url)) => {
-                Client::new(&url, Auth::UserPass(user, pw))
-                    .expect("valid bitcoin core client")
-                    .into()
-            }
-            (None, None, None, Some(cookie_file), Some(url)) => {
+            (None, Some(user), Some(pw), None, Some(url)) => Arc::new(Arc::new(
+                Client::new(&url, Auth::UserPass(user, pw)).expect("valid bitcoin core client"),
+            )),
+            (None, None, None, Some(cookie_file), Some(url)) => Arc::new(Arc::new(
                 Client::new(&url, Auth::CookieFile(cookie_file))
-                    .expect("valid bitcoin core client")
-                    .into()
-            }
+                    .expect("valid bitcoin core client"),
+            )),
             _ => panic!("invalid config for signet - configure for esplora or bitcoind"),
         };
 

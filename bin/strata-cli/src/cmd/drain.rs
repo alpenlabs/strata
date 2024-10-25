@@ -71,7 +71,7 @@ pub async fn drain(
         }
         let fr = settings
             .signet_backend
-            .get_fee_rate(fee_rate, 1)
+            .get_fee_rate(1)
             .await
             .expect("valid fee rate");
         log_fee_rate(&term, &fr);

@@ -13,7 +13,7 @@ use crate::{
     constants::{BRIDGE_OUT_AMOUNT, SATS_TO_WEI},
     seed::Seed,
     settings::Settings,
-    signet::{persist::WalletPersistWrapper, SignetWallet},
+    signet::SignetWallet,
     strata::StrataWallet,
     taproot::ExtractP2trPubkey,
 };
@@ -43,7 +43,7 @@ pub async fn withdraw(args: WithdrawArgs, seed: Seed, settings: Settings) {
         Some(a) => a,
         None => {
             let info = l1w.reveal_next_address(KeychainKind::External);
-            WalletPersistWrapper::persist(&mut l1w).unwrap();
+            l1w.persist().unwrap();
             info.address
         }
     };

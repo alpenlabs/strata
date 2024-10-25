@@ -2,12 +2,14 @@ pub mod backend;
 pub mod persist;
 
 use std::{
+    fmt::Debug,
     io::{self},
     ops::{Deref, DerefMut},
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
-use backend::SignetBackend;
+use backend::{ScanError, SignetBackend, SyncError};
 use bdk_esplora::esplora_client::{self, AsyncClient};
 use bdk_wallet::{
     bitcoin::{FeeRate, Network, Txid},
@@ -16,6 +18,7 @@ use bdk_wallet::{
 };
 use console::{style, Term};
 use persist::Persister;
+use terrors::OneOf;
 
 use crate::{seed::Seed, settings::Settings};
 
@@ -62,7 +65,7 @@ impl EsploraClient {
 /// A wrapper around BDK's wallet with some custom logic
 pub struct SignetWallet {
     wallet: PersistedWallet<Persister>,
-    sync_backend: SignetBackend,
+    sync_backend: Arc<dyn SignetBackend>,
 }
 
 impl SignetWallet {
@@ -74,7 +77,11 @@ impl SignetWallet {
         Connection::open(Self::db_path("default", data_dir))
     }
 
-    pub fn new(seed: &Seed, network: Network, sync_backend: SignetBackend) -> io::Result<Self> {
+    pub fn new(
+        seed: &Seed,
+        network: Network,
+        sync_backend: Arc<dyn SignetBackend>,
+    ) -> io::Result<Self> {
         let (load, create) = seed.signet_wallet().split();
         Ok(Self {
             wallet: load
@@ -91,11 +98,25 @@ impl SignetWallet {
         })
     }
 
-    pub async fn sync(&mut self) -> Result<(), Box<esplora_client::Error>> {
-        self.sync_backend.sync_wallet(&mut self.wallet).await
+    pub async fn sync(&mut self) -> Result<(), OneOf<(SyncError, rusqlite::Error)>> {
+        self.sync_backend
+            .sync_wallet(&mut self.wallet)
+            .await
+            .map_err(OneOf::new)?;
+        self.persist().map_err(OneOf::new)?;
+        Ok(())
     }
-    pub async fn scan(&mut self) -> Result<(), Box<esplora_client::Error>> {
-        self.sync_backend.scan_wallet(&mut self.wallet).await
+    pub async fn scan(&mut self) -> Result<(), OneOf<(ScanError, rusqlite::Error)>> {
+        self.sync_backend
+            .scan_wallet(&mut self.wallet)
+            .await
+            .map_err(OneOf::new)?;
+        self.persist().map_err(OneOf::new)?;
+        Ok(())
+    }
+
+    pub fn persist(&mut self) -> Result<bool, rusqlite::Error> {
+        self.wallet.persist(&mut Persister)
     }
 }
 

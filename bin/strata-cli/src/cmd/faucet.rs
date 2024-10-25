@@ -23,7 +23,7 @@ use crate::{
 use crate::{
     seed::Seed,
     settings::Settings,
-    signet::{persist::WalletPersistWrapper, print_explorer_url, SignetWallet},
+    signet::{print_explorer_url, SignetWallet},
 };
 
 /// Request some bitcoin from the faucet
@@ -95,7 +95,9 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
     #[cfg(feature = "strata_faucet")]
     let url = match network_type {
         NetworkType::Signet => {
-            let mut l1w = SignetWallet::new(&seed, settings.network).unwrap();
+            let mut l1w =
+                SignetWallet::new(&seed, settings.network, settings.signet_backend.clone())
+                    .unwrap();
             let address = match args.address {
                 None => {
                     let address_info = l1w.reveal_next_address(KeychainKind::External);
@@ -141,7 +143,7 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
         let address = match args.address {
             None => {
                 let address_info = l1w.reveal_next_address(KeychainKind::External);
-                WalletPersistWrapper::persist(&mut l1w).unwrap();
+                l1w.persist().unwrap();
                 address_info.address
             }
             Some(address) => {

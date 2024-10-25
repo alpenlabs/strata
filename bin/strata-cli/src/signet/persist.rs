@@ -2,32 +2,10 @@ use std::{cell::RefCell, path::PathBuf, rc::Rc, sync::OnceLock};
 
 use bdk_wallet::{
     rusqlite::{self, Connection},
-    ChangeSet, PersistedWallet, Wallet, WalletPersister,
+    ChangeSet, WalletPersister,
 };
 
 use crate::signet::SignetWallet;
-
-pub trait WalletPersistWrapper {
-    fn persist(&mut self) -> Result<bool, rusqlite::Error>;
-}
-
-impl WalletPersistWrapper for PersistedWallet<Persister> {
-    fn persist(&mut self) -> Result<bool, rusqlite::Error> {
-        self.persist(&mut Persister)
-    }
-}
-
-impl WalletPersistWrapper for SignetWallet {
-    fn persist(&mut self) -> Result<bool, rusqlite::Error> {
-        WalletPersistWrapper::persist(&mut self.wallet)
-    }
-}
-
-impl WalletPersistWrapper for Wallet {
-    fn persist(&mut self) -> Result<bool, rusqlite::Error> {
-        Ok(true)
-    }
-}
 
 /// Wrapper around the built-in rusqlite db that allows [`PersistedWallet`] to be
 /// shared across multiple threads by lazily initializing per core connections

@@ -21,7 +21,7 @@ use crate::{
     recovery::DescriptorRecovery,
     seed::Seed,
     settings::Settings,
-    signet::{log_fee_rate, persist::WalletPersistWrapper, print_explorer_url, SignetWallet},
+    signet::{log_fee_rate, print_explorer_url, SignetWallet},
     strata::StrataWallet,
     taproot::{ExtractP2trPubkey, NotTaprootAddress},
 };
@@ -56,7 +56,7 @@ pub async fn deposit(
 
     l1w.sync().await.unwrap();
     let recovery_address = l1w.reveal_next_address(KeychainKind::External).address;
-    WalletPersistWrapper::persist(&mut l1w).unwrap();
+    l1w.persist().unwrap();
 
     let strata_address = requested_strata_address.unwrap_or(l2w.default_signer_address());
     let _ = term.write_line(&format!(
@@ -103,7 +103,7 @@ pub async fn deposit(
 
     let fee_rate = settings
         .signet_backend
-        .get_fee_rate(fee_rate, 1)
+        .get_fee_rate(1)
         .await
         .expect("valid fee rate");
     log_fee_rate(&term, &fee_rate);
