@@ -31,9 +31,9 @@ use super::{
 };
 use crate::{
     checkpoint::CheckpointHandle,
+    csm::message::{ClientUpdateNotif, ForkChoiceMessage},
     duty::checkpoint::check_and_get_batch_checkpoint,
     errors::Error,
-    message::{ClientUpdateNotif, ForkChoiceMessage},
     sync_manager::SyncManager,
 };
 

@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use futures::StreamExt;
-use strata_consensus_logic::{message::ForkChoiceMessage, sync_manager::SyncManager};
+use strata_consensus_logic::{csm::message::ForkChoiceMessage, sync_manager::SyncManager};
 use strata_state::{
     block::L2BlockBundle, client_state::SyncState, header::L2Header, id::L2BlockId,
 };

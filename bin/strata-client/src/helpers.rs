@@ -12,8 +12,8 @@ use reth_rpc_types::engine::JwtSecret;
 use rockbound::{rocksdb, OptimisticTransactionDB};
 use strata_btcio::rpc::{traits::Wallet, BitcoinClient};
 use strata_consensus_logic::{
+    csm::state_tracker,
     duty::types::{Identity, IdentityData, IdentityKey},
-    state_tracker,
 };
 use strata_db::{database::CommonDatabase, traits::Database};
 use strata_evmexec::{engine::RpcExecEngineCtl, fork_choice_state_initial, EngineRpcClient};
