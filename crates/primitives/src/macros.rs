@@ -34,12 +34,31 @@ macro_rules! impl_buf {
             }
         }
 
-        impl Into<[u8; $len]> for $name {
-            fn into(self) -> [u8; $len] {
-                self.0
+        impl<'a> From<&'a [u8; $len]> for $name {
+            fn from(data: &'a [u8; $len]) -> Self {
+                Self(*data)
+            }
+        }
+
+        // Conditionally implement Default
+        impl Default for $name {
+            fn default() -> Self {
+                Self([0; $len])
             }
         }
 
         // Add any other common impls here if needed.
     };
 }
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Buf20([u8; 20]);
+impl_buf!(Buf20, 20);
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Buf32([u8; 32]);
+impl_buf!(Buf32, 32);
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Buf64([u8; 64]);
+impl_buf!(Buf64, 64);
