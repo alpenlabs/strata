@@ -1,5 +1,3 @@
-// TODO clean up this module
-
 use std::sync::Arc;
 
 use strata_btcio::{reader::query::bitcoin_data_reader_task, rpc::traits::Reader};

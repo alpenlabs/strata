@@ -2,7 +2,9 @@ use std::time;
 
 const RETRY_BACKOFF_BASE: u32 = 1024;
 
-/// Run-time config for CSM executor.  This is *not* like system params.
+/// Run-time config for CSM executor.
+///
+/// This is *not* like system params.
 pub struct CsmExecConfig {
     /// Base retry duration, which is increases exponentially for each retry.
     pub retry_base_dur: time::Duration,

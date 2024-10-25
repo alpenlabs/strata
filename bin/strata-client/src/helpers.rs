@@ -1,5 +1,3 @@
-// TODO clean up this module
-
 use std::{fs, path::Path, sync::Arc, time::Duration};
 
 use anyhow::Context;
