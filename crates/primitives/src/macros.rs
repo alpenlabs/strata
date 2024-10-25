@@ -34,13 +34,18 @@ macro_rules! impl_buf {
             }
         }
 
+        impl From<$name> for [u8; $len] {
+            fn from(buf: $name) -> Self {
+                buf.0
+            }
+        }
+
         impl<'a> From<&'a [u8; $len]> for $name {
             fn from(data: &'a [u8; $len]) -> Self {
                 Self(*data)
             }
         }
 
-        // Conditionally implement Default
         impl Default for $name {
             fn default() -> Self {
                 Self([0; $len])
@@ -62,3 +67,42 @@ impl_buf!(Buf32, 32);
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Buf64([u8; 64]);
 impl_buf!(Buf64, 64);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_from_array() {
+        let arr = [1; 20];
+        let buf: Buf20 = Buf20::from(arr);
+        assert_eq!(buf.as_slice(), &arr);
+    }
+
+    #[test]
+    fn test_from_array_ref() {
+        let arr = [2; 20];
+        let buf: Buf20 = Buf20::from(&arr);
+        assert_eq!(buf.as_slice(), &arr);
+    }
+
+    #[test]
+    fn test_as_ref_dereference() {
+        let buf = Buf20::new([4; 20]);
+        let arr: [u8; 20] = buf.as_ref().try_into().unwrap();
+        assert_eq!(arr, [4; 20]);
+    }
+
+    #[test]
+    fn test_default() {
+        let buf = Buf20::default();
+        assert_eq!(buf.as_slice(), &[0; 20]);
+    }
+
+    #[test]
+    fn test_from_into_array() {
+        let buf = Buf20::new([5; 20]);
+        let arr: [u8; 20] = buf.into();
+        assert_eq!(arr, [5; 20]);
+    }
+}
