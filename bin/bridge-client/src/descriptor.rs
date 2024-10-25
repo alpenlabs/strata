@@ -146,7 +146,9 @@ mod tests {
 
     #[tokio::test]
     async fn bitcoind_import_descriptors() {
-        logging::init();
+        logging::init(logging::LoggerConfig::with_base_name(
+            "bridge-client-descriptor-tests",
+        ));
         let bitcoind = BitcoinD::from_downloaded().unwrap();
         let url = bitcoind.rpc_url();
         let (user, password) = get_auth(&bitcoind);
