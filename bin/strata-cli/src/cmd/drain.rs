@@ -12,7 +12,7 @@ use crate::{
     constants::SATS_TO_WEI,
     seed::Seed,
     settings::Settings,
-    signet::{log_fee_rate, print_explorer_url, SignetWallet},
+    signet::{get_fee_rate, log_fee_rate, print_explorer_url, SignetWallet},
     strata::StrataWallet,
 };
 
@@ -69,18 +69,14 @@ pub async fn drain(
                     .to_string(),
             );
         }
-        let fr = settings
-            .signet_backend
-            .get_fee_rate(1)
-            .await
-            .expect("valid fee rate");
-        log_fee_rate(&term, &fr);
+        let fee_rate = get_fee_rate(fee_rate, settings.signet_backend.as_ref()).await;
+        log_fee_rate(&term, &fee_rate);
 
         let mut psbt = l1w
             .build_tx()
             .drain_wallet()
             .drain_to(address.script_pubkey())
-            .fee_rate(fr)
+            .fee_rate(fee_rate)
             .clone()
             .finish()
             .expect("valid transaction");

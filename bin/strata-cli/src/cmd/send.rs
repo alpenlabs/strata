@@ -15,7 +15,7 @@ use crate::{
     net_type::{net_type_or_exit, NetworkType},
     seed::Seed,
     settings::Settings,
-    signet::{log_fee_rate, print_explorer_url, SignetWallet},
+    signet::{get_fee_rate, log_fee_rate, print_explorer_url, SignetWallet},
     strata::StrataWallet,
 };
 
@@ -55,11 +55,7 @@ pub async fn send(args: SendArgs, seed: Seed, settings: Settings) {
                 SignetWallet::new(&seed, settings.network, settings.signet_backend.clone())
                     .expect("valid wallet");
             l1w.sync().await.unwrap();
-            let fee_rate = settings
-                .signet_backend
-                .get_fee_rate(1)
-                .await
-                .expect("valid fee rate");
+            let fee_rate = get_fee_rate(args.fee_rate, settings.signet_backend.as_ref()).await;
             log_fee_rate(&term, &fee_rate);
             let mut psbt = l1w
                 .build_tx()

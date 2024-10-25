@@ -9,7 +9,7 @@ use crate::{
     recovery::DescriptorRecovery,
     seed::Seed,
     settings::Settings,
-    signet::{log_fee_rate, SignetWallet},
+    signet::{get_fee_rate, log_fee_rate, sync_wallet, SignetWallet},
 };
 
 /// Attempt recovery of old deposit transactions
@@ -43,11 +43,7 @@ pub async fn recover(args: RecoverArgs, seed: Seed, settings: Settings) {
         return;
     }
 
-    let fee_rate = settings
-        .signet_backend
-        .get_fee_rate(1)
-        .await
-        .expect("valid fee rate");
+    let fee_rate = get_fee_rate(args.fee_rate, settings.signet_backend.as_ref()).await;
     log_fee_rate(&term, &fee_rate);
 
     for (key, desc) in descs {
@@ -63,9 +59,7 @@ pub async fn recover(args: RecoverArgs, seed: Seed, settings: Settings) {
 
         // reveal the address for the wallet so we can sync it
         let address = recovery_wallet.reveal_next_address(KeychainKind::External);
-        settings
-            .signet_backend
-            .sync_wallet(&mut recovery_wallet)
+        sync_wallet(&mut recovery_wallet, settings.signet_backend.clone())
             .await
             .expect("successful recovery wallet sync");
         let needs_recovery = recovery_wallet.balance().confirmed > Amount::ZERO;

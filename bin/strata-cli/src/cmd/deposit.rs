@@ -21,7 +21,7 @@ use crate::{
     recovery::DescriptorRecovery,
     seed::Seed,
     settings::Settings,
-    signet::{log_fee_rate, print_explorer_url, SignetWallet},
+    signet::{get_fee_rate, log_fee_rate, print_explorer_url, SignetWallet},
     strata::StrataWallet,
     taproot::{ExtractP2trPubkey, NotTaprootAddress},
 };
@@ -101,11 +101,7 @@ pub async fn deposit(
         style(bridge_in_address.to_string()).yellow()
     ));
 
-    let fee_rate = settings
-        .signet_backend
-        .get_fee_rate(1)
-        .await
-        .expect("valid fee rate");
+    let fee_rate = get_fee_rate(fee_rate, settings.signet_backend.as_ref()).await;
     log_fee_rate(&term, &fee_rate);
 
     const MBL: usize = MAGIC_BYTES.len();

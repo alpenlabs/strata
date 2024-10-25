@@ -9,68 +9,99 @@ use std::{
 use async_trait::async_trait;
 use bdk_bitcoind_rpc::{
     bitcoincore_rpc::{self, json::EstimateMode, RpcApi},
-    Emitter,
+    BlockEvent, Emitter,
 };
-use bdk_esplora::{esplora_client, EsploraAsyncExt};
+use bdk_esplora::EsploraAsyncExt;
 use bdk_wallet::{
     bitcoin::{consensus::encode, Block, FeeRate, Transaction},
-    KeychainKind, Wallet,
+    chain::{
+        spk_client::{FullScanRequestBuilder, FullScanResult, SyncRequestBuilder, SyncResult},
+        CheckPoint,
+    },
+    KeychainKind,
 };
 use console::Term;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use terrors::OneOf;
-use tokio::sync::mpsc;
+use tokio::sync::mpsc::UnboundedSender;
 
 use super::EsploraClient;
 
 macro_rules! boxed_err {
     ($name:ident) => {
         impl std::ops::Deref for $name {
-            type Target = dyn Debug;
+            type Target = BoxedInner;
 
             fn deref(&self) -> &Self::Target {
                 self.0.as_ref()
             }
         }
 
-        impl From<Box<dyn Debug>> for $name {
-            fn from(err: Box<dyn Debug>) -> Self {
+        impl From<BoxedErr> for $name {
+            fn from(err: BoxedErr) -> Self {
                 Self(err)
             }
         }
     };
 }
 
+type BoxedInner = dyn Debug + Send + Sync;
+type BoxedErr = Box<BoxedInner>;
+
 #[derive(Debug)]
-pub struct SyncError(Box<dyn Debug>);
+pub struct SyncError(BoxedErr);
 boxed_err!(SyncError);
 
 #[derive(Debug)]
-pub struct ScanError(Box<dyn Debug>);
+pub struct ScanError(BoxedErr);
 boxed_err!(ScanError);
 
 #[derive(Debug)]
-pub struct BroadcastTxError(Box<dyn Debug>);
+pub struct BroadcastTxError(BoxedErr);
 boxed_err!(BroadcastTxError);
 
 #[derive(Debug)]
-pub struct GetFeeRateError(Box<dyn Debug>);
+pub struct GetFeeRateError(BoxedErr);
 boxed_err!(GetFeeRateError);
 
+pub enum WalletUpdate {
+    SpkSync(SyncResult),
+    SpkScan(FullScanResult<KeychainKind>),
+    NewBlock(BlockEvent<Block>),
+    MempoolTxs(Vec<(Transaction, u64)>),
+}
+
+pub type UpdateSender = UnboundedSender<WalletUpdate>;
+
 #[async_trait]
-pub trait SignetBackend: Debug {
-    async fn sync_wallet(&self, wallet: &mut Wallet) -> Result<(), SyncError>;
-    async fn scan_wallet(&self, wallet: &mut Wallet) -> Result<(), ScanError>;
+pub trait SignetBackend: Debug + Send + Sync {
+    async fn sync_wallet(
+        &self,
+        req: SyncRequestBuilder<(KeychainKind, u32)>,
+        last_cp: CheckPoint,
+        send_update: UpdateSender,
+    ) -> Result<(), SyncError>;
+    async fn scan_wallet(
+        &self,
+        req: FullScanRequestBuilder<KeychainKind>,
+        last_cp: CheckPoint,
+        send_update: UpdateSender,
+    ) -> Result<(), ScanError>;
     async fn broadcast_tx(&self, tx: &Transaction) -> Result<(), BroadcastTxError>;
     async fn get_fee_rate(
         &self,
         target: u16,
-    ) -> Result<FeeRate, OneOf<(InvalidFee, GetFeeRateError)>>;
+    ) -> Result<Option<FeeRate>, OneOf<(InvalidFee, GetFeeRateError)>>;
 }
 
 #[async_trait]
 impl SignetBackend for EsploraClient {
-    async fn sync_wallet(&self, wallet: &mut Wallet) -> Result<(), SyncError> {
+    async fn sync_wallet(
+        &self,
+        req: SyncRequestBuilder<(KeychainKind, u32)>,
+        _last_cp: CheckPoint,
+        send_update: UpdateSender,
+    ) -> Result<(), SyncError> {
         let term = Term::stdout();
         let _ = term.write_line("Syncing wallet...");
         let sty = ProgressStyle::with_template(
@@ -95,8 +126,7 @@ impl SignetBackend for EsploraClient {
         txids.set_style(sty.clone());
         txids.set_message("transactions");
         let txids2 = txids.clone();
-        let req = wallet
-            .start_sync_with_revealed_spks()
+        let req = req
             .inspect(move |item, progress| {
                 let _ = bar.println(format!("{item}"));
                 ops.set_length(progress.total_outpoints() as u64);
@@ -111,24 +141,26 @@ impl SignetBackend for EsploraClient {
         let update = self
             .sync(req, 3)
             .await
-            .map_err(|e| Box::new(e) as Box<dyn Debug>)?;
+            .map_err(|e| Box::new(e) as BoxedErr)?;
         ops2.finish();
         spks2.finish();
         txids2.finish();
         let _ = term.write_line("Updating wallet");
-        wallet
-            .apply_update(update)
-            .expect("should be able to connect to db");
+        send_update.send(WalletUpdate::SpkSync(update)).unwrap();
         let _ = term.write_line("Wallet synced");
         Ok(())
     }
 
-    async fn scan_wallet(&self, wallet: &mut Wallet) -> Result<(), ScanError> {
+    async fn scan_wallet(
+        &self,
+        req: FullScanRequestBuilder<KeychainKind>,
+        _last_cp: CheckPoint,
+        send_update: UpdateSender,
+    ) -> Result<(), ScanError> {
         let bar = ProgressBar::new_spinner();
         bar.enable_steady_tick(Duration::from_millis(100));
         let bar2 = bar.clone();
-        let req = wallet
-            .start_full_scan()
+        let req = req
             .inspect({
                 let mut once = BTreeSet::<KeychainKind>::new();
                 move |keychain, spk_i, script| {
@@ -143,11 +175,9 @@ impl SignetBackend for EsploraClient {
         let update = self
             .full_scan(req, 5, 3)
             .await
-            .map_err(|e| Box::new(e) as Box<dyn Debug>)?;
+            .map_err(|e| Box::new(e) as BoxedErr)?;
         bar.set_message("Persisting updates");
-        wallet
-            .apply_update(update)
-            .expect("should be able to connect to db");
+        send_update.send(WalletUpdate::SpkScan(update)).unwrap();
         bar.finish_with_message("Scan complete");
         Ok(())
     }
@@ -155,39 +185,51 @@ impl SignetBackend for EsploraClient {
     async fn broadcast_tx(&self, tx: &Transaction) -> Result<(), BroadcastTxError> {
         self.broadcast(tx)
             .await
-            .map_err(|e| (Box::new(e) as Box<dyn Debug>).into())
+            .map_err(|e| (Box::new(e) as BoxedErr).into())
     }
 
     async fn get_fee_rate(
         &self,
         target: u16,
-    ) -> Result<FeeRate, OneOf<(InvalidFee, GetFeeRateError)>> {
+    ) -> Result<Option<FeeRate>, OneOf<(InvalidFee, GetFeeRateError)>> {
         match self
             .get_fee_estimates()
             .await
-            .map(|frs| frs.get(&target).cloned())
-            .map_err(|e| GetFeeRateError(Box::new(e) as Box<dyn Debug>))
+            .map_err(|e| GetFeeRateError(Box::new(e) as BoxedErr))
             .map_err(OneOf::new)?
-            .and_then(|fr| FeeRate::from_sat_per_vb(fr as u64))
+            .get(&target)
+            .cloned()
         {
-            Some(fr) => Ok(fr),
-            None => Err(OneOf::new(InvalidFee)),
+            Some(fr) => Ok(Some(
+                FeeRate::from_sat_per_vb(fr as u64).ok_or(OneOf::new(InvalidFee))?,
+            )),
+            None => Ok(None),
         }
     }
 }
 
 #[async_trait]
 impl SignetBackend for Arc<bitcoincore_rpc::Client> {
-    async fn sync_wallet(&self, wallet: &mut Wallet) -> Result<(), SyncError> {
-        sync_wallet_with_core(self.clone(), wallet, false)
+    async fn sync_wallet(
+        &self,
+        _req: SyncRequestBuilder<(KeychainKind, u32)>,
+        last_cp: CheckPoint,
+        send_update: UpdateSender,
+    ) -> Result<(), SyncError> {
+        sync_wallet_with_core(self.clone(), last_cp, false, send_update)
             .await
-            .map_err(|e| (Box::new(e) as Box<dyn Debug>).into())
+            .map_err(|e| (Box::new(e) as BoxedErr).into())
     }
 
-    async fn scan_wallet(&self, wallet: &mut Wallet) -> Result<(), ScanError> {
-        sync_wallet_with_core(self.clone(), wallet, true)
+    async fn scan_wallet(
+        &self,
+        _req: FullScanRequestBuilder<KeychainKind>,
+        last_cp: CheckPoint,
+        send_update: UpdateSender,
+    ) -> Result<(), ScanError> {
+        sync_wallet_with_core(self.clone(), last_cp, true, send_update)
             .await
-            .map_err(|e| (Box::new(e) as Box<dyn Debug>).into())
+            .map_err(|e| (Box::new(e) as BoxedErr).into())
     }
 
     async fn broadcast_tx(&self, tx: &Transaction) -> Result<(), BroadcastTxError> {
@@ -195,27 +237,27 @@ impl SignetBackend for Arc<bitcoincore_rpc::Client> {
 
         spawn_bitcoin_core(self.clone(), move |c| c.send_raw_transaction(hex))
             .await
-            .map_err(|e| BroadcastTxError(Box::new(e) as Box<dyn Debug>))?;
+            .map_err(|e| BroadcastTxError(Box::new(e) as BoxedErr))?;
         Ok(())
     }
 
     async fn get_fee_rate(
         &self,
         target: u16,
-    ) -> Result<FeeRate, OneOf<(InvalidFee, GetFeeRateError)>> {
+    ) -> Result<Option<FeeRate>, OneOf<(InvalidFee, GetFeeRateError)>> {
         let res = spawn_bitcoin_core(self.clone(), move |c| {
             c.estimate_smart_fee(target, Some(EstimateMode::Conservative))
         })
         .await
-        .map_err(|e| GetFeeRateError(Box::new(e) as Box<dyn Debug>))
+        .map_err(|e| GetFeeRateError(Box::new(e) as BoxedErr))
         .map_err(OneOf::new)?;
 
-        res.fee_rate
-            .and_then(|fr| {
-                let per_vb = (fr / 1000).to_sat();
-                FeeRate::from_sat_per_vb(per_vb)
-            })
-            .ok_or(OneOf::new(InvalidFee))
+        match res.fee_rate {
+            Some(per_kw) => Ok(Some(
+                FeeRate::from_sat_per_vb((per_kw / 1000).to_sat()).ok_or(OneOf::new(InvalidFee))?,
+            )),
+            None => Ok(None),
+        }
     }
 }
 
@@ -233,108 +275,54 @@ where
 
 async fn sync_wallet_with_core(
     client: Arc<bitcoincore_rpc::Client>,
-    wallet: &mut Wallet,
+    last_cp: CheckPoint,
     should_scan: bool,
+    send_update: UpdateSender,
 ) -> Result<(), bitcoincore_rpc::Error> {
-    let (tx, mut rx) = mpsc::unbounded_channel();
-    let last_cp = wallet.latest_checkpoint();
     let bar = ProgressBar::new_spinner()
         .with_style(ProgressStyle::with_template("{spinner} [{elapsed_precise}] {msg}").unwrap());
     bar.enable_steady_tick(Duration::from_millis(100));
     let bar2 = bar.clone();
-    let mut blocks_scanned = 0;
 
     let start_height = match should_scan {
         true => 0,
         false => last_cp.height(),
     };
 
-    let mut handle = Box::pin(spawn_bitcoin_core(client.clone(), move |client| {
+    let mut blocks_scanned = 0;
+
+    spawn_bitcoin_core(client.clone(), move |client| {
         let mut emitter = Emitter::new(client, last_cp, start_height);
-        while let Some(emission) = emitter.next_block().unwrap() {
-            tx.send(Emission::Block(emission))
-                .expect("block should send");
+        while let Some(ev) = emitter.next_block().unwrap() {
+            blocks_scanned += 1;
+            let height = ev.block_height();
+            let hash = ev.block_hash();
+            let start_apply_block = Instant::now();
+            send_update.send(WalletUpdate::NewBlock(ev)).unwrap();
+            let elapsed = start_apply_block.elapsed();
+            bar2.println(format!(
+                "Applied block {} at height {} in {:?}",
+                hash, height, elapsed
+            ));
+            bar2.set_message(format!(
+                "Current height: {}, scanned {} blocks",
+                height, blocks_scanned
+            ));
         }
         bar2.println("Scanning mempool");
-        tx.send(Emission::Mempool(emitter.mempool().unwrap()))
-            .expect("mempool should send");
+        let mempool = emitter.mempool().unwrap();
+        let txs_len = mempool.len();
+        let apply_start = Instant::now();
+        send_update.send(WalletUpdate::MempoolTxs(mempool)).unwrap();
+        let elapsed = apply_start.elapsed();
+        bar.println(format!(
+            "Applied {} unconfirmed transactions in {:?}",
+            txs_len, elapsed
+        ));
         Ok(())
-    }));
-
-    let mempool_txs_len = &mut 0usize;
-    loop {
-        tokio::select! {
-            biased;
-            Err(e) = handle.as_mut() => return Err(e),
-            Some(em) = rx.recv() => {
-                match em {
-                    Emission::Block(ev) => {
-                        blocks_scanned += 1;
-                        let height = ev.block_height();
-                        let hash = ev.block_hash();
-                        let connected_to = ev.connected_to();
-                        let start_apply_block = Instant::now();
-                        wallet
-                            .apply_block_connected_to(&ev.block, height, connected_to)
-                            .expect("applying block should succeed");
-                        let elapsed = start_apply_block.elapsed();
-                        bar.println(format!(
-                            "Applied block {} at height {} in {:?}",
-                            hash, height, elapsed
-                        ));
-                        bar.set_message(format!(
-                            "Current height: {}, scanned {} blocks",
-                            height, blocks_scanned
-                        ))
-                    }
-                    Emission::Mempool(txs) => {
-                        bar.println("Scanning mempool");
-                        let apply_start = Instant::now();
-                        *mempool_txs_len = txs.len();
-                        wallet.apply_unconfirmed_txs(txs);
-                        let elapsed = apply_start.elapsed();
-                        bar.println(format!(
-                            "Applied {} unconfirmed transactions in {:?}",
-                            mempool_txs_len, elapsed
-                        ));
-                        break;
-                    }
-                }
-            }
-        }
-    }
-
-    bar.println("Persisting updates");
-    bar.finish_with_message(format!(
-        "Completed sync. {} new blocks, {} unconfirmed transactions",
-        blocks_scanned, mempool_txs_len
-    ));
-    Ok(())
+    })
+    .await
 }
 
 #[derive(Debug)]
 pub struct InvalidFee;
-
-#[derive(Debug)]
-struct BelowBroadcastMin;
-
-#[derive(Debug)]
-struct FeeMissing;
-
-#[derive(Debug)]
-pub enum FeeRateError {
-    InvalidDueToOverflow,
-    /// The fee obtained, either from a backend or provided by the user, was
-    /// below bitcoin's minimum fee rate
-    BelowBroadcastMin,
-    /// Esplora didn't have a fee for the requested target
-    FeeMissing,
-    EsploraError(esplora_client::Error),
-    BitcoinCoreRPCError(bitcoincore_rpc::Error),
-}
-
-#[derive(Debug)]
-enum Emission {
-    Block(bdk_bitcoind_rpc::BlockEvent<Block>),
-    Mempool(Vec<(Transaction, u64)>),
-}

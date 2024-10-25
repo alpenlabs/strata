@@ -9,16 +9,17 @@ use std::{
     sync::Arc,
 };
 
-use backend::{ScanError, SignetBackend, SyncError};
+use backend::{ScanError, SignetBackend, SyncError, WalletUpdate};
 use bdk_esplora::esplora_client::{self, AsyncClient};
 use bdk_wallet::{
     bitcoin::{FeeRate, Network, Txid},
     rusqlite::{self, Connection},
-    PersistedWallet,
+    PersistedWallet, Wallet,
 };
 use console::{style, Term};
 use persist::Persister;
 use terrors::OneOf;
+use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver};
 
 use crate::{seed::Seed, settings::Settings};
 
@@ -27,6 +28,20 @@ pub fn log_fee_rate(term: &Term, fr: &FeeRate) {
         "Using {} as feerate",
         style(format!("{} sat/vb", fr.to_sat_per_vb_ceil())).green(),
     ));
+}
+
+pub async fn get_fee_rate(
+    user_provided_sats_per_vb: Option<u64>,
+    signet_backend: &dyn SignetBackend,
+) -> FeeRate {
+    match user_provided_sats_per_vb {
+        Some(fr) => FeeRate::from_sat_per_vb(fr).expect("valid fee rate"),
+        None => signet_backend
+            .get_fee_rate(1)
+            .await
+            .expect("valid fee rate")
+            .unwrap_or(FeeRate::BROADCAST_MIN),
+    }
 }
 
 pub fn print_explorer_url(txid: &Txid, term: &Term, settings: &Settings) -> Result<(), io::Error> {
@@ -99,24 +114,80 @@ impl SignetWallet {
     }
 
     pub async fn sync(&mut self) -> Result<(), OneOf<(SyncError, rusqlite::Error)>> {
-        self.sync_backend
-            .sync_wallet(&mut self.wallet)
-            .await
-            .map_err(OneOf::new)?;
+        sync_wallet(&mut self.wallet, self.sync_backend.clone()).await?;
         self.persist().map_err(OneOf::new)?;
         Ok(())
     }
+
     pub async fn scan(&mut self) -> Result<(), OneOf<(ScanError, rusqlite::Error)>> {
-        self.sync_backend
-            .scan_wallet(&mut self.wallet)
-            .await
-            .map_err(OneOf::new)?;
+        scan_wallet(&mut self.wallet, self.sync_backend.clone()).await?;
         self.persist().map_err(OneOf::new)?;
         Ok(())
     }
 
     pub fn persist(&mut self) -> Result<bool, rusqlite::Error> {
         self.wallet.persist(&mut Persister)
+    }
+}
+
+pub async fn scan_wallet(
+    wallet: &mut Wallet,
+    sync_backend: Arc<dyn SignetBackend>,
+) -> Result<(), OneOf<(ScanError, rusqlite::Error)>> {
+    let req = wallet.start_full_scan();
+    let last_cp = wallet.latest_checkpoint();
+    let (tx, rx) = unbounded_channel();
+
+    let handle = tokio::spawn(async move { sync_backend.scan_wallet(req, last_cp, tx).await });
+
+    apply_update_stream(wallet, rx).await;
+
+    handle
+        .await
+        .expect("thread to be fine")
+        .map_err(OneOf::new)?;
+
+    Ok(())
+}
+
+pub async fn sync_wallet(
+    wallet: &mut Wallet,
+    sync_backend: Arc<dyn SignetBackend>,
+) -> Result<(), OneOf<(SyncError, rusqlite::Error)>> {
+    let req = wallet.start_sync_with_revealed_spks();
+    let last_cp = wallet.latest_checkpoint();
+    let (tx, rx) = unbounded_channel();
+
+    let handle = tokio::spawn(async move { sync_backend.sync_wallet(req, last_cp, tx).await });
+
+    apply_update_stream(wallet, rx).await;
+
+    handle
+        .await
+        .expect("thread to be fine")
+        .map_err(OneOf::new)?;
+
+    Ok(())
+}
+
+async fn apply_update_stream(wallet: &mut Wallet, mut rx: UnboundedReceiver<WalletUpdate>) {
+    while let Some(update) = rx.recv().await {
+        match update {
+            WalletUpdate::SpkSync(update) => {
+                wallet.apply_update(update).expect("update to connect")
+            }
+            WalletUpdate::SpkScan(update) => {
+                wallet.apply_update(update).expect("update to connect")
+            }
+            WalletUpdate::NewBlock(ev) => {
+                let height = ev.block_height();
+                let connected_to = ev.connected_to();
+                wallet
+                    .apply_block_connected_to(&ev.block, height, connected_to)
+                    .expect("block to be added")
+            }
+            WalletUpdate::MempoolTxs(txs) => wallet.apply_unconfirmed_txs(txs),
+        }
     }
 }
 
