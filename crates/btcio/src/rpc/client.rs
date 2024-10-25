@@ -11,7 +11,6 @@ use bitcoin::{
     bip32::Xpriv, consensus::encode::serialize_hex, Address, Block, BlockHash, Network,
     Transaction, Txid,
 };
-use bitcoind_json_rpc_types::v26::{GetBlockVerbosityZero, GetNewAddress};
 use reqwest::{
     header::{HeaderMap, AUTHORIZATION, CONTENT_TYPE},
     Client,
@@ -28,8 +27,9 @@ use crate::rpc::{
     error::{BitcoinRpcError, ClientError},
     traits::{Broadcaster, Reader, Signer, Wallet},
     types::{
-        CreateWallet, GetBlockchainInfo, GetTransaction, ImportDescriptor, ImportDescriptorResult,
-        ListDescriptors, ListTransactions, ListUnspent, SignRawTransactionWithWallet,
+        CreateWallet, GetBlockVerbosityZero, GetBlockchainInfo, GetNewAddress, GetTransaction,
+        ImportDescriptor, ImportDescriptorResult, ListDescriptors, ListTransactions, ListUnspent,
+        SignRawTransactionWithWallet,
     },
 };
 
@@ -424,7 +424,8 @@ mod test {
 
     #[tokio::test()]
     async fn client_works() {
-        logging::init();
+        logging::init(logging::LoggerConfig::with_base_name("btcio-tests"));
+
         // setting the ENV variable `BITCOIN_XPRIV_RETRIEVABLE` to retrieve the xpriv
         set_var("BITCOIN_XPRIV_RETRIEVABLE", "true");
         let bitcoind = BitcoinD::from_downloaded().unwrap();
