@@ -33,4 +33,4 @@ Alternatively, instead of passing `-f`, you can pass `-E` and define either
 
 ## Correct Setup for VerifyingKey
 To ensure the RollupParams contain the correct verifying key, you must run the binary in release mode. This is necessary because the SP1 build process requires release mode for proper functioning.
-Before proceeding, make sure that you have SP1 correctly set up by following the installation instructions provided [here](https://docs.succinct.xyz/getting-started/install.html). Additionally, refer to the [common errors section](https://docs.succinct.xyz/developers/common-issues.html#c-binding-errors) here to troubleshoot any issues, especially C binding errors.
+Before proceeding, make sure that you have docker running.
