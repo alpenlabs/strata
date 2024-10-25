@@ -52,3 +52,4 @@ uuid.workspace = true
 
 [features]
 prover = []
+docker-build = ["strata-sp1-guest-builder/docker-build"]

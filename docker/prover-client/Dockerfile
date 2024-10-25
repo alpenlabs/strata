@@ -11,26 +11,32 @@ RUN apt-get update && apt-get -y upgrade && apt-get install -y \
     ca-certificates \
     clang \
     libssl-dev \
-    pkg-config \
     git \
     dialog \
     xz-utils \
     build-essential \
     curl \
     libclang-dev \
-    apt clean && rm -rf /var/lib/apt/lists/*
+ && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # setup sp1up
-RUN curl -fsSL --proto'=https' --tlsv1.2 https://sp1.succinct.xyz | bash && ~/.sp1/bin/sp1up --c-toolchain
+RUN curl -fsSL --proto https --tlsv1.2 https://sp1.succinct.xyz | bash && ~/.sp1/bin/sp1up --c-toolchain
 ENV PATH="/root/.sp1/bin:$PATH"
+
 # check sp1 is setup properly
 RUN cargo prove --version
 RUN RUSTUP_TOOLCHAIN=succinct cargo --version
 
-# install riscv toolchain and move to opt
-RUN curl -fsSLO --proto'=https' --tlsv1.2 "https://github.com/xpack-dev-tools/riscv-none-elf-gcc-xpack/releases/download/v14.2.0-2/xpack-riscv-none-elf-gcc-14.2.0-2-linux-x64.tar.gz"
-RUN tar xzvf xpack-riscv-none-elf-gcc-14.2.0-2-linux-x64.tar.gz && mv xpack-riscv-none-elf-gcc-14.2.0-2/ riscv/
-RUN mv riscv/ /opt
+# Install Docker client
+RUN apt-get update && apt-get install -y \
+    docker.io \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Check Docker version
+RUN docker --version
+# Start the Docker daemon
+# RUN systemctl enable docker
+# RUN systemctl start docker
 
 COPY . .
 
@@ -38,8 +44,7 @@ COPY . .
 RUN --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,sharing=private,target=/app/target \
-    cargo build --release --bin strata-prover-client --features="prover"
-
+    cargo build --release --bin strata-prover-client --features="prover docker-build"
 
 RUN --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/usr/local/cargo/registry \
