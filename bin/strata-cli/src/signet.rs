@@ -40,8 +40,6 @@ pub fn print_explorer_url(txid: &Txid, term: &Term, settings: &Settings) -> Resu
 pub enum FeeRateError {
     InvalidDueToOverflow,
     BelowBroadcastMin,
-    /// Esplora didn't have a fee for the requested target
-    FeeMissing,
     EsploraError(esplora_client::Error),
 }
 
@@ -59,7 +57,7 @@ pub async fn get_fee_rate(
             .map(|frs| frs.get(&target).cloned())
             .map_err(FeeRateError::EsploraError)?
             .and_then(|fr| FeeRate::from_sat_per_vb(fr as u64))
-            .ok_or(FeeRateError::FeeMissing)?
+            .unwrap_or(FeeRate::BROADCAST_MIN)
     };
 
     if fee_rate < FeeRate::BROADCAST_MIN {
