@@ -1,0 +1,28 @@
+[client]
+rpc_host = "0.0.0.0"
+rpc_port = 8432
+l2_blocks_fetch_limit = 1_000
+datadir = "data"
+db_retry_count = 5
+sequencer_rpc = "OVERRIDE"
+
+[bitcoind_rpc]
+rpc_url = "signet:38332"
+rpc_user = "rpcuser"
+rpc_password = "rpcpass"
+network = "signet"
+
+[sync]
+l1_follow_distance = 6
+max_reorg_depth = 4
+client_poll_dur_ms = 2000
+client_checkpoint_interval = 20
+
+[exec.reth]
+rpc_url = "strata-reth:8551"
+secret = "configs/jwt.hex"
+
+[relayer]
+refresh_interval = 10
+stale_duration = 10
+relay_misc = true
