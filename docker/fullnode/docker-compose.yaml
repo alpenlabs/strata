@@ -16,8 +16,8 @@ services:
     volumes:
       - .data/signet:/root/.bitcoin
     ports:
-      - "38332:38332"
-      - "38333:38333"
+      - "127.0.0.1:38332:38332"
+      - "127.0.0.1:38333:38333"
 
   # Strata Reth Service
   strata-reth:
@@ -34,7 +34,7 @@ services:
       - .data/reth:/app/reth
       - ./configs:/app/configs
     ports:
-      - "8545:8545"
+      - "127.0.0.1:8545:8545"
 
   # Strata Client Service
   strata-client:
@@ -62,4 +62,4 @@ services:
       - .data/client:/app/data
       - ./configs:/app/configs
     ports:
-      - "8432:8432"
+      - "127.0.0.1:8432:8432"
