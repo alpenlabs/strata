@@ -27,16 +27,6 @@ ENV PATH="/root/.sp1/bin:$PATH"
 RUN cargo prove --version
 RUN RUSTUP_TOOLCHAIN=succinct cargo --version
 
-# Install Docker client
-RUN apt-get update && apt-get install -y \
-    docker.io \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# Check Docker version
-RUN docker --version
-# Start the Docker daemon
-# RUN systemctl enable docker
-# RUN systemctl start docker
 
 COPY . .
 

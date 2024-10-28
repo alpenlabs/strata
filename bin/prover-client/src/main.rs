@@ -24,6 +24,7 @@ mod ckp_runner;
 mod config;
 mod db;
 mod dispatcher;
+mod elf;
 mod errors;
 mod manager;
 mod primitives;

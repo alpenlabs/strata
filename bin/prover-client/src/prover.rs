@@ -11,6 +11,7 @@ use strata_rocksdb::{
     prover::db::{ProofDb, ProverDB},
     DbOpsConfig,
 };
+#[cfg(feature = "prover-dev")]
 use strata_sp1_guest_builder::{
     GUEST_BTC_BLOCKSPACE_ELF, GUEST_CHECKPOINT_ELF, GUEST_CL_AGG_ELF, GUEST_CL_STF_ELF,
     GUEST_EVM_EE_STF_ELF, GUEST_L1_BATCH_ELF,
@@ -19,6 +20,11 @@ use strata_zkvm::{Proof, ProverOptions, ZKVMHost, ZKVMInputBuilder};
 use tracing::{error, info};
 use uuid::Uuid;
 
+#[cfg(not(feature = "prover-dev"))]
+use crate::elf::{
+    GUEST_BTC_BLOCKSPACE_ELF, GUEST_CHECKPOINT_ELF, GUEST_CL_AGG_ELF, GUEST_CL_STF_ELF,
+    GUEST_EVM_EE_STF_ELF, GUEST_L1_BATCH_ELF,
+};
 use crate::{
     config::NUM_PROVER_WORKERS,
     db::open_rocksdb_database,

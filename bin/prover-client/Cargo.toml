@@ -21,7 +21,7 @@ strata-prover-client-rpc-api.workspace = true
 strata-rocksdb.workspace = true
 strata-rpc-types.workspace = true
 strata-sp1-adapter = { workspace = true, features = ["prover"] }
-strata-sp1-guest-builder = { path = "../../provers/sp1" }
+strata-sp1-guest-builder = { path = "../../provers/sp1", optional = true }
 strata-state.workspace = true
 strata-zkvm.workspace = true
 
@@ -52,4 +52,4 @@ uuid.workspace = true
 
 [features]
 prover = []
-docker-build = ["strata-sp1-guest-builder/docker-build"]
+prover-dev = ["strata-sp1-guest-builder"]

@@ -3,6 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use anyhow::Context;
 use argh::FromArgs;
 use bitcoin::{
     base58,
@@ -17,7 +18,10 @@ use strata_primitives::{
     params::{ProofPublishMode, RollupParams},
     vk::RollupVerifyingKey,
 };
-use strata_sp1_guest_builder::GUEST_CHECKPOINT_ELF_STR;
+use strata_sp1_guest_builder::{
+    GUEST_BTC_BLOCKSPACE_ELF, GUEST_CHECKPOINT_ELF, GUEST_CHECKPOINT_ELF_STR, GUEST_CL_AGG_ELF,
+    GUEST_CL_STF_ELF, GUEST_EVM_EE_STF_ELF, GUEST_L1_BATCH_ELF,
+};
 
 // TODO move some of these into a keyderiv crate
 const DERIV_BASE_IDX: u32 = 56;
@@ -199,6 +203,9 @@ pub struct SubcGenParams {
         description = "permit blank proofs after timeout in millis (default strict)"
     )]
     proof_timeout: Option<u32>,
+
+    #[argh(option, description = "file to save the generated ELF")]
+    elf_path: Option<PathBuf>,
 }
 
 pub struct CmdContext {
@@ -230,6 +237,35 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     };
 
     exec_subc(args.subc, &mut ctx)?;
+
+    Ok(())
+}
+
+fn save_elf(path: PathBuf) -> anyhow::Result<()> {
+    let constants = [
+        ("GUEST_CHECKPOINT_ELF", GUEST_CHECKPOINT_ELF),
+        ("GUEST_L1_BATCH_ELF", GUEST_L1_BATCH_ELF),
+        ("GUEST_BTC_BLOCKSPACE_ELF", GUEST_BTC_BLOCKSPACE_ELF),
+        ("GUEST_CL_AGG_ELF", GUEST_CL_AGG_ELF),
+        ("GUEST_CL_STF_ELF", GUEST_CL_STF_ELF),
+        ("GUEST_EVM_EE_STF_ELF", GUEST_EVM_EE_STF_ELF),
+    ];
+
+    let mut elf_file_content = String::new();
+
+    for (name, data) in &constants {
+        elf_file_content.push_str(&format!(
+            r#"
+        pub const {}: &[u8] = &{:?};
+        "#,
+            name, data
+        ));
+    }
+
+    // Write the accumulated content to the specified file path
+    fs::write(&path, elf_file_content)
+        .with_context(|| format!("Failed to write Rust file to {:?}", path))?;
+
     Ok(())
 }
 
@@ -340,6 +376,10 @@ fn exec_genparams(cmd: SubcGenParams, ctx: &mut CmdContext) -> anyhow::Result<()
 
             opkeys.push(parse_xpub(l)?);
         }
+    }
+
+    if let Some(elf_path) = cmd.elf_path {
+        save_elf(elf_path)?
     }
 
     for k in cmd.opkey {
