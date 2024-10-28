@@ -14,6 +14,7 @@ use bitcoin::{
     script::PushBytesBuf,
     secp256k1::{
         self, constants::SCHNORR_SIGNATURE_SIZE, schnorr::Signature, Secp256k1, XOnlyPublicKey,
+        SECP256K1,
     },
     sighash::{Prevouts, SighashCache},
     taproot::{
@@ -94,7 +95,7 @@ pub fn create_inscription_transactions(
 ) -> Result<(Transaction, Transaction), InscriptionError> {
     // Create commit key
     let secp256k1 = Secp256k1::new();
-    let key_pair = generate_key_pair(&secp256k1)?;
+    let key_pair = generate_key_pair()?;
     let public_key = XOnlyPublicKey::from_keypair(&key_pair).0;
 
     let insc_data = InscriptionData::new(write_intent.to_vec());
@@ -398,9 +399,7 @@ pub fn build_reveal_transaction(
     Ok(tx)
 }
 
-pub fn generate_key_pair(
-    secp256k1: &Secp256k1<secp256k1::All>,
-) -> Result<UntweakedKeypair, anyhow::Error> {
+pub fn generate_key_pair() -> Result<UntweakedKeypair, anyhow::Error> {
     let mut rand_bytes = [0; 32];
     OsRng.fill_bytes(&mut rand_bytes);
     Ok(UntweakedKeypair::from_seckey_slice(SECP256K1, &rand_bytes)?)
