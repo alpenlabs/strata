@@ -35,7 +35,8 @@ pub async fn withdraw(args: WithdrawArgs, seed: Seed, settings: Settings) {
             .expect("correct network")
     });
 
-    let mut l1w = SignetWallet::new(&seed, settings.network).unwrap();
+    let mut l1w =
+        SignetWallet::new(&seed, settings.network, settings.signet_backend.clone()).unwrap();
     let l2w = StrataWallet::new(&seed, &settings.strata_endpoint).unwrap();
 
     let address = match address {
