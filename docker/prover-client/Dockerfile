@@ -27,14 +27,13 @@ ENV PATH="/root/.sp1/bin:$PATH"
 RUN cargo prove --version
 RUN RUSTUP_TOOLCHAIN=succinct cargo --version
 
-
 COPY . .
 
 # Build dependencies in release mode
 RUN --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,sharing=private,target=/app/target \
-    cargo build --release --bin strata-prover-client --features="prover docker-build"
+    cargo build --release --bin strata-prover-client --features="prover"
 
 RUN --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/usr/local/cargo/registry \
