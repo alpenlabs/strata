@@ -7,10 +7,10 @@ use bdk_wallet::{
 
 use crate::signet::SignetWallet;
 
-/// Wrapper around the built-in rusqlite db that allows [`PersistedWallet`] to be
-/// shared across multiple threads by lazily initializing per core connections
-/// to the sqlite db and keeping them in local thread storage instead of sharing
-/// the connection across cores.
+/// Wrapper around the built-in rusqlite db that allows
+/// [`PersistedWallet`](crate::signet::PersistedWallet) to be shared across multiple threads by
+/// lazily initializing per core connections to the sqlite db and keeping them in local thread
+/// storage instead of sharing the connection across cores.
 ///
 /// WARNING: [`set_data_dir`] **MUST** be called and set before using [`Persister`].
 #[derive(Debug)]
