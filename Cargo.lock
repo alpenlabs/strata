@@ -12837,6 +12837,8 @@ dependencies = [
  "alloy",
  "argh",
  "argon2",
+ "async-trait",
+ "bdk_bitcoind_rpc",
  "bdk_esplora",
  "bdk_wallet",
  "bip39",

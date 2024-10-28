@@ -21,7 +21,7 @@ use crate::{
     recovery::DescriptorRecovery,
     seed::Seed,
     settings::Settings,
-    signet::{get_fee_rate, log_fee_rate, print_explorer_url, EsploraClient, SignetWallet},
+    signet::{get_fee_rate, log_fee_rate, print_explorer_url, SignetWallet},
     strata::StrataWallet,
     taproot::{ExtractP2trPubkey, NotTaprootAddress},
 };
@@ -46,15 +46,15 @@ pub async fn deposit(
     }: DepositArgs,
     seed: Seed,
     settings: Settings,
-    esplora: EsploraClient,
 ) {
     let term = Term::stdout();
     let requested_strata_address =
         strata_address.map(|a| StrataAddress::from_str(&a).expect("bad strata address"));
-    let mut l1w = SignetWallet::new(&seed, settings.network).unwrap();
+    let mut l1w =
+        SignetWallet::new(&seed, settings.network, settings.signet_backend.clone()).unwrap();
     let l2w = StrataWallet::new(&seed, &settings.strata_endpoint).unwrap();
 
-    l1w.sync(&esplora).await.unwrap();
+    l1w.sync().await.unwrap();
     let recovery_address = l1w.reveal_next_address(KeychainKind::External).address;
     l1w.persist().unwrap();
 
@@ -101,9 +101,7 @@ pub async fn deposit(
         style(bridge_in_address.to_string()).yellow()
     ));
 
-    let fee_rate = get_fee_rate(fee_rate, &esplora, 1)
-        .await
-        .expect("valid fee rate");
+    let fee_rate = get_fee_rate(fee_rate, settings.signet_backend.as_ref()).await;
     log_fee_rate(&term, &fee_rate);
 
     const MBL: usize = MAGIC_BYTES.len();
@@ -143,7 +141,11 @@ pub async fn deposit(
 
     let pb = ProgressBar::new_spinner().with_message("Broadcasting transaction");
     pb.enable_steady_tick(Duration::from_millis(100));
-    esplora.broadcast(&tx).await.expect("successful broadcast");
+    settings
+        .signet_backend
+        .broadcast_tx(&tx)
+        .await
+        .expect("successful broadcast");
     let txid = tx.compute_txid();
     pb.finish_with_message(format!("Transaction {} broadcasted", txid));
     let _ = print_explorer_url(&txid, &term, &settings);
