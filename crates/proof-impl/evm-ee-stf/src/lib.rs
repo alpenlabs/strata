@@ -43,7 +43,7 @@ pub struct ELProofPublicParams {
     pub new_state_root: FixedBytes<32>,
     pub txn_root: FixedBytes<32>,
     pub withdrawal_intents: Vec<WithdrawalIntent>,
-    pub deposits_txns_root: FixedBytes<32>,
+    pub deposit_requests: Vec<Withdrawal>,
 }
 
 /// Necessary information to prove the execution of the RETH block.
@@ -97,6 +97,9 @@ pub fn process_block_transaction(
     // Calculate the previous block hash
     let previous_block_hash = B256::from(keccak(alloy_rlp::encode(input.parent_header.clone())));
 
+    // Deposit requests are processed and forwarded as public parameters for verification on the CL
+    let deposit_requests = input.withdrawals.clone();
+
     // Initialize the in-memory database
     let db = match InMemoryDB::initialize(&mut input) {
         Ok(database) => database,
@@ -132,7 +135,7 @@ pub fn process_block_transaction(
         new_state_root: block_header.state_root,
         prev_blockhash: previous_block_hash,
         txn_root: block_header.transactions_root,
-        deposits_txns_root: block_header.withdrawals_root.unwrap_or_default(),
+        deposit_requests,
         withdrawal_intents,
     }
 }
