@@ -1913,6 +1913,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8c3c1a368f70d6cf7302d78f8f7093da241fb8e8807c05cc9e51a125895a6d5b"
 
 [[package]]
+name = "bdk_bitcoind_rpc"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "577233392985869b7b5d9e0eae638c5112c48d5edc07422de0e0726c15144e92"
+dependencies = [
+ "bdk_core",
+ "bitcoin",
+ "bitcoincore-rpc",
+]
+
+[[package]]
 name = "bdk_chain"
 version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
