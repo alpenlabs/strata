@@ -1,12 +1,18 @@
 //! This crate implements the proof of the chain state transition function (STF) for L2 blocks,
 //! verifying the correct state transitions as new L2 blocks are processed.
 
-use strata_primitives::{buf::Buf32, evm_exec::create_evm_extra_payload, params::RollupParams};
+use strata_primitives::{
+    buf::Buf32,
+    evm_exec::create_evm_extra_payload,
+    l1::{BitcoinAmount, XOnlyPk},
+    params::RollupParams,
+};
 use strata_proofimpl_evm_ee_stf::ELProofPublicParams;
 use strata_state::{
     block::ExecSegment,
     block_validation::{check_block_credential, validate_block_segments},
-    exec_update::{ExecUpdate, UpdateInput, UpdateOutput},
+    bridge_ops,
+    exec_update::{ELDepositData, ExecUpdate, Op, UpdateInput, UpdateOutput},
 };
 pub use strata_state::{block::L2Block, chain_state::ChainState, state_op::StateCache};
 
@@ -16,9 +22,11 @@ pub fn verify_and_transition(
     new_l2_block: L2Block,
     el_proof_pp: ELProofPublicParams,
     rollup_params: &RollupParams,
-) -> ChainState {
-    verify_l2_block(&new_l2_block, &el_proof_pp, rollup_params);
-    apply_state_transition(prev_chstate, &new_l2_block, rollup_params)
+) -> (ChainState, Vec<ELDepositData>) {
+    let deposit_datas = verify_l2_block(&new_l2_block, &el_proof_pp, rollup_params);
+    let new_state = apply_state_transition(prev_chstate, &new_l2_block, rollup_params);
+
+    (new_state, deposit_datas)
 }
 
 /// Verifies the L2 block.
@@ -26,7 +34,7 @@ fn verify_l2_block(
     block: &L2Block,
     el_proof_pp: &ELProofPublicParams,
     chain_params: &RollupParams,
-) {
+) -> Vec<ELDepositData> {
     // Assert that the block has been signed by the designated signer
     assert!(
         check_block_credential(block.header(), &chain_params.cred_rule),
@@ -40,25 +48,57 @@ fn verify_l2_block(
     );
 
     // Verify proof public params matches the exec segment
-    let proof_exec_segment = reconstruct_exec_segment(el_proof_pp);
+    let (proof_exec_segment, el_deposit_data) = reconstruct_exec_segment(el_proof_pp);
     let block_exec_segment = block.body().exec_segment().clone();
     assert_eq!(proof_exec_segment, block_exec_segment);
+
+    el_deposit_data
 }
 
 /// Generates an execution segment from the given ELProof public parameters.
-pub fn reconstruct_exec_segment(el_proof_pp: &ELProofPublicParams) -> ExecSegment {
-    // create_evm_extra_payload
+pub fn reconstruct_exec_segment(
+    el_proof_pp: &ELProofPublicParams,
+) -> (ExecSegment, Vec<ELDepositData>) {
+    let withdrawals = el_proof_pp
+        .withdrawal_intents
+        .iter()
+        .map(|intent| {
+            bridge_ops::WithdrawalIntent::new(
+                BitcoinAmount::from_sat(intent.amt),
+                XOnlyPk::new(Buf32(intent.dest_pk)),
+            )
+        })
+        .collect::<Vec<_>>();
+
+    let el_deposit_data: Vec<ELDepositData> = el_proof_pp
+        .deposit_requests
+        .iter()
+        .map(|deposit_request| {
+            ELDepositData::new(
+                deposit_request.index,
+                gwei_to_sats(deposit_request.amount),
+                deposit_request.address.as_slice().to_vec(),
+            )
+        })
+        .collect();
+
+    let applied_ops = el_deposit_data
+        .iter()
+        .map(|deposit_data| Op::Deposit(deposit_data.clone()))
+        .collect();
+
     let update_input = UpdateInput::new(
         el_proof_pp.block_idx,
-        Vec::new(),
+        applied_ops,
         Buf32(el_proof_pp.txn_root),
         create_evm_extra_payload(Buf32(el_proof_pp.new_blockhash)),
     );
 
-    let update_output = UpdateOutput::new_from_state(Buf32(el_proof_pp.new_state_root));
+    let update_output = UpdateOutput::new_from_state(Buf32(el_proof_pp.new_state_root))
+        .with_withdrawals(withdrawals);
     let exec_update = ExecUpdate::new(update_input, update_output);
 
-    ExecSegment::new(exec_update)
+    (ExecSegment::new(exec_update), el_deposit_data)
 }
 
 /// Applies a state transition for a given L2 block.
@@ -78,4 +118,9 @@ fn apply_state_transition(
     .expect("Failed to process the L2 block");
 
     state_cache.state().to_owned()
+}
+
+const fn gwei_to_sats(gwei: u64) -> u64 {
+    // 1 BTC = 10^8 sats = 10^9 gwei
+    gwei / 10
 }

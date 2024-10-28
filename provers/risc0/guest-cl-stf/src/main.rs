@@ -1,54 +1,126 @@
-use risc0_zkvm::guest::env;
+//! This crate implements the proof of the chain state transition function (STF) for L2 blocks,
+//! verifying the correct state transitions as new L2 blocks are processed.
+
 use strata_primitives::{
-    block_credential,
     buf::Buf32,
-    params::{Params, RollupParams, SyncParams},
-    vk::RollupVerifyingKey,
+    evm_exec::create_evm_extra_payload,
+    l1::{BitcoinAmount, XOnlyPk},
+    params::RollupParams,
 };
-use strata_proofimpl_cl_stf::{verify_and_transition, ChainState, L2Block};
+use strata_proofimpl_evm_ee_stf::ELProofPublicParams;
+use strata_state::{
+    block::ExecSegment,
+    block_validation::{check_block_credential, validate_block_segments},
+    bridge_ops,
+    exec_update::{ELDepositData, ExecUpdate, Op, UpdateInput, UpdateOutput},
+};
+pub use strata_state::{block::L2Block, chain_state::ChainState, state_op::StateCache};
 
-fn main() {
-    let params = get_rollup_params();
-    let input: Vec<u8> = env::read();
-    let (prev_state, block): (ChainState, L2Block) = borsh::from_slice(&input).unwrap();
+/// Verifies an L2 block and applies the chain state transition if the block is valid.
+pub fn verify_and_transition(
+    prev_chstate: ChainState,
+    new_l2_block: L2Block,
+    el_proof_pp: ELProofPublicParams,
+    rollup_params: &RollupParams,
+) -> (ChainState, Vec<ELDepositData>) {
+    let deposit_datas = verify_l2_block(&new_l2_block, &el_proof_pp, rollup_params);
+    let new_state = apply_state_transition(prev_chstate, &new_l2_block, rollup_params);
 
-    let new_state = verify_and_transition(prev_state, block, params);
-    env::commit(&borsh::to_vec(&new_state).unwrap());
+    (new_state, deposit_datas)
 }
 
-// TODO: Should be read from config file and evaluated on compile time
-fn get_rollup_params() -> Params {
-    Params {
-        rollup: RollupParams {
-            rollup_name: "strata".to_string(),
-            block_time: 1000,
-            cred_rule: block_credential::CredRule::Unchecked,
-            horizon_l1_height: 3,
-            genesis_l1_height: 5,
-            evm_genesis_block_hash: Buf32(
-                "0x37ad61cff1367467a98cf7c54c4ac99e989f1fbb1bc1e646235e90c065c565ba"
-                    .parse()
-                    .unwrap(),
-            ),
-            evm_genesis_block_state_root: Buf32(
-                "0x351714af72d74259f45cd7eab0b04527cd40e74836a45abcae50f92d919d988f"
-                    .parse()
-                    .unwrap(),
-            ),
-            l1_reorg_safe_depth: 5,
-            target_l2_batch_size: 64,
-            address_length: 20,
-            deposit_amount: 1_000_000_000,
-            rollup_vk: RollupVerifyingKey::Risc0VerifyingKey(Buf32(
-                "0x00b01ae596b4e51843484ff71ccbd0dd1a030af70b255e6b9aad50b81d81266f"
-                    .parse()
-                    .unwrap(),
-            )),
-        },
-        run: SyncParams {
-            l2_blocks_fetch_limit: 1000,
-            l1_follow_distance: 3,
-            client_checkpoint_interval: 10,
-        },
-    }
+/// Verifies the L2 block.
+fn verify_l2_block(
+    block: &L2Block,
+    el_proof_pp: &ELProofPublicParams,
+    chain_params: &RollupParams,
+) -> Vec<ELDepositData> {
+    // Assert that the block has been signed by the designated signer
+    assert!(
+        check_block_credential(block.header(), &chain_params.cred_rule),
+        "Block credential verification failed"
+    );
+
+    // Assert that the block body and header are consistent
+    assert!(
+        validate_block_segments(block),
+        "Block credential verification failed"
+    );
+
+    // Verify proof public params matches the exec segment
+    let (proof_exec_segment, el_deposit_data) = reconstruct_exec_segment(el_proof_pp);
+    let block_exec_segment = block.body().exec_segment().clone();
+    assert_eq!(proof_exec_segment, block_exec_segment);
+
+    el_deposit_data
+}
+
+/// Generates an execution segment from the given ELProof public parameters.
+pub fn reconstruct_exec_segment(
+    el_proof_pp: &ELProofPublicParams,
+) -> (ExecSegment, Vec<ELDepositData>) {
+    let withdrawals = el_proof_pp
+        .withdrawal_intents
+        .iter()
+        .map(|intent| {
+            bridge_ops::WithdrawalIntent::new(
+                BitcoinAmount::from_sat(intent.amt),
+                XOnlyPk::new(Buf32(intent.dest_pk)),
+            )
+        })
+        .collect::<Vec<_>>();
+
+    let el_deposit_data: Vec<ELDepositData> = el_proof_pp
+        .deposit_requests
+        .iter()
+        .map(|deposit_request| {
+            ELDepositData::new(
+                deposit_request.index,
+                gwei_to_sats(deposit_request.amount),
+                deposit_request.address.as_slice().to_vec(),
+            )
+        })
+        .collect();
+
+    let applied_ops = el_deposit_data
+        .iter()
+        .map(|deposit_data| Op::Deposit(deposit_data.clone()))
+        .collect();
+
+    let update_input = UpdateInput::new(
+        el_proof_pp.block_idx,
+        applied_ops,
+        Buf32(el_proof_pp.txn_root),
+        create_evm_extra_payload(Buf32(el_proof_pp.new_blockhash)),
+    );
+
+    let update_output = UpdateOutput::new_from_state(Buf32(el_proof_pp.new_state_root))
+        .with_withdrawals(withdrawals);
+    let exec_update = ExecUpdate::new(update_input, update_output);
+
+    (ExecSegment::new(exec_update), el_deposit_data)
+}
+
+/// Applies a state transition for a given L2 block.
+fn apply_state_transition(
+    prev_chstate: ChainState,
+    new_l2_block: &L2Block,
+    chain_params: &RollupParams,
+) -> ChainState {
+    let mut state_cache = StateCache::new(prev_chstate);
+
+    strata_chaintsn::transition::process_block(
+        &mut state_cache,
+        new_l2_block.header(),
+        new_l2_block.body(),
+        chain_params,
+    )
+    .expect("Failed to process the L2 block");
+
+    state_cache.state().to_owned()
+}
+
+const fn gwei_to_sats(gwei: u64) -> u64 {
+    // 1 BTC = 10^8 sats = 10^9 gwei
+    gwei / 10
 }

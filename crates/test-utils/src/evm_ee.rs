@@ -101,7 +101,7 @@ impl L2Segment {
         for height in 1..=end_height {
             let el_proof_in = evm_segment.get_input(&height);
             let el_proof_out = evm_segment.get_output(&height);
-            let evm_ee_segment = reconstruct_exec_segment(el_proof_out);
+            let (evm_ee_segment, _) = reconstruct_exec_segment(el_proof_out);
             let l1_segment = L1Segment::new_empty();
             let body = L2BlockBody::new(l1_segment, evm_ee_segment);
 
