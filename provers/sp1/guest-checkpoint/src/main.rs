@@ -38,7 +38,7 @@ fn main() {
         assert!(verify_groth16(
             &proof,
             rollup_vk.as_bytes(),
-            &bincode::serialize(&borsh::to_vec(&checkpoint).unwrap()).unwrap(),
+            &borsh::to_vec(&checkpoint).unwrap(),
         ));
     }
 
