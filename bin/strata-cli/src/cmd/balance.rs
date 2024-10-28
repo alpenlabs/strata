@@ -11,7 +11,7 @@ use crate::{
     net_type::{net_type_or_exit, NetworkType},
     seed::Seed,
     settings::Settings,
-    signet::{EsploraClient, SignetWallet},
+    signet::SignetWallet,
     strata::StrataWallet,
 };
 
@@ -24,13 +24,14 @@ pub struct BalanceArgs {
     network_type: String,
 }
 
-pub async fn balance(args: BalanceArgs, seed: Seed, settings: Settings, esplora: EsploraClient) {
+pub async fn balance(args: BalanceArgs, seed: Seed, settings: Settings) {
     let term = Term::stdout();
     let network_type = net_type_or_exit(&args.network_type, &term);
 
     if let NetworkType::Signet = network_type {
-        let mut l1w = SignetWallet::new(&seed, settings.network).unwrap();
-        l1w.sync(&esplora).await.unwrap();
+        let mut l1w =
+            SignetWallet::new(&seed, settings.network, settings.signet_backend.clone()).unwrap();
+        l1w.sync().await.unwrap();
         let balance = l1w.balance();
         let _ = term.write_line(&format!("Total: {}", balance.total()));
         let _ = term.write_line(&format!("  Confirmed: {}", balance.confirmed));

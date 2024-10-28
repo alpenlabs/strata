@@ -7,7 +7,7 @@ use crate::{
     net_type::{net_type_or_exit, NetworkType},
     seed::Seed,
     settings::Settings,
-    signet::{EsploraClient, SignetWallet},
+    signet::SignetWallet,
     strata::StrataWallet,
 };
 
@@ -20,15 +20,17 @@ pub struct ReceiveArgs {
     network_type: String,
 }
 
-pub async fn receive(args: ReceiveArgs, seed: Seed, settings: Settings, esplora: EsploraClient) {
+pub async fn receive(args: ReceiveArgs, seed: Seed, settings: Settings) {
     let term = Term::stdout();
     let network_type = net_type_or_exit(&args.network_type, &term);
 
     let address = match network_type {
         NetworkType::Signet => {
-            let mut l1w = SignetWallet::new(&seed, settings.network).unwrap();
+            let mut l1w =
+                SignetWallet::new(&seed, settings.network, settings.signet_backend.clone())
+                    .unwrap();
             let _ = term.write_line("Syncing signet wallet");
-            l1w.sync(&esplora).await.unwrap();
+            l1w.sync().await.unwrap();
             let _ = term.write_line("Wallet synced");
             let address_info = l1w.reveal_next_address(KeychainKind::External);
             l1w.persist().unwrap();
