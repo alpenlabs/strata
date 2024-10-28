@@ -11,7 +11,6 @@ use bitcoin::{
     bip32::Xpriv, consensus::encode::serialize_hex, Address, Block, BlockHash, Network,
     Transaction, Txid,
 };
-use bitcoind_json_rpc_types::v26::{GetBlockVerbosityZero, GetBlockchainInfo, GetNewAddress};
 use reqwest::{
     header::{HeaderMap, AUTHORIZATION, CONTENT_TYPE},
     Client,
@@ -28,8 +27,9 @@ use crate::rpc::{
     error::{BitcoinRpcError, ClientError},
     traits::{Broadcaster, Reader, Signer, Wallet},
     types::{
-        CreateWallet, GetTransaction, ImportDescriptor, ImportDescriptorResult, ListDescriptors,
-        ListTransactions, ListUnspent, SignRawTransactionWithWallet,
+        CreateWallet, GetBlockVerbosityZero, GetBlockchainInfo, GetNewAddress, GetTransaction,
+        ImportDescriptor, ImportDescriptorResult, ListDescriptors, ListTransactions, ListUnspent,
+        SignRawTransactionWithWallet,
     },
 };
 

@@ -13,8 +13,9 @@ use bdk_wallet::{
     miniscript::{descriptor::DescriptorKeyParseError, Descriptor},
     template::DescriptorTemplateOut,
 };
-use rand::{thread_rng, Rng};
+use rand::{rngs::OsRng, RngCore};
 use sha2::{Digest, Sha256};
+use sled::IVec;
 use terrors::OneOf;
 use tokio::io::AsyncReadExt;
 
@@ -37,7 +38,7 @@ impl DescriptorRecovery {
         let db_key = {
             let mut key = Vec::from(recover_at.to_be_bytes());
             // this will actually write the private key inside the descriptor so we hash it
-            let mut hasher = Sha256::new();
+            let mut hasher = <Sha256 as Digest>::new(); // this is to appease the analyzer
             hasher.update(desc_string.as_bytes());
             key.extend_from_slice(hasher.finalize().as_ref());
             key
@@ -101,7 +102,8 @@ impl DescriptorRecovery {
             bytes.extend_from_slice(&net);
         }
 
-        let nonce = Nonce::from(thread_rng().gen::<[u8; 12]>());
+        let mut nonce = Nonce::default();
+        OsRng.fill_bytes(&mut nonce);
 
         // encrypted_bytes | tag (16 bytes) | nonce (12 bytes)
         self.cipher
@@ -127,11 +129,11 @@ impl DescriptorRecovery {
     pub async fn read_descs_after_block(
         &mut self,
         height: u32,
-    ) -> Result<Vec<DescriptorTemplateOut>, OneOf<ReadDescsAfterError>> {
+    ) -> Result<Vec<(IVec, DescriptorTemplateOut)>, OneOf<ReadDescsAfterError>> {
         let after_height = self.db.range(height.to_be_bytes()..);
         let mut descs = vec![];
         for desc_entry in after_height {
-            let mut raw = desc_entry.map_err(OneOf::new)?.1;
+            let (key, mut raw) = desc_entry.map_err(OneOf::new)?;
             if raw.len() <= 12 + 16 {
                 return Err(OneOf::new(EntryTooShort { length: raw.len() }));
             }
@@ -198,9 +200,13 @@ impl DescriptorRecovery {
                 networks.insert(network);
             }
 
-            descs.push((desc, keymap, networks));
+            descs.push((key, (desc, keymap, networks)));
         }
         Ok(descs)
+    }
+
+    pub fn remove<K: AsRef<[u8]>>(&self, key: K) -> sled::Result<Option<sled::IVec>> {
+        self.db.remove(key)
     }
 }
 

@@ -269,7 +269,7 @@ pub fn get_difficulty_adjustment_height(idx: u32, start: u32, params: &BtcParams
 #[cfg(test)]
 mod tests {
     use bitcoin::params::MAINNET;
-    use rand::Rng;
+    use rand::{rngs::OsRng, Rng};
     use strata_test_utils::bitcoin::get_btc_chain;
 
     use super::*;
@@ -280,7 +280,7 @@ mod tests {
         // TODO: figure out why passing btc_params to `check_and_update_full` doesn't work
         let btc_params: BtcParams = MAINNET.clone().into();
         let h1 = get_difficulty_adjustment_height(1, chain.start, &btc_params);
-        let r1 = rand::thread_rng().gen_range(h1..chain.end);
+        let r1 = OsRng.gen_range(h1..chain.end);
         let mut verification_state = chain.get_verification_state(r1, &MAINNET.clone().into());
 
         for header_idx in r1..chain.end {
@@ -316,7 +316,7 @@ mod tests {
     #[test]
     fn test_get_difficulty_adjustment_height() {
         let start = 0;
-        let idx = rand::thread_rng().gen_range(1..1000);
+        let idx = OsRng.gen_range(1..1000);
         let h = get_difficulty_adjustment_height(idx, start, &MAINNET.clone().into());
         assert_eq!(h, MAINNET.difficulty_adjustment_interval() as u32 * idx);
     }

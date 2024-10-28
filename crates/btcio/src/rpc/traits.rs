@@ -1,12 +1,11 @@
 use async_trait::async_trait;
 use bitcoin::{bip32::Xpriv, Address, Block, BlockHash, Network, Transaction, Txid};
-use bitcoind_json_rpc_types::v26::GetBlockchainInfo;
 
 use crate::rpc::{
     client::ClientResult,
     types::{
-        GetTransaction, ImportDescriptor, ImportDescriptorResult, ListTransactions, ListUnspent,
-        SignRawTransactionWithWallet,
+        GetBlockchainInfo, GetTransaction, ImportDescriptor, ImportDescriptorResult,
+        ListTransactions, ListUnspent, SignRawTransactionWithWallet,
     },
 };
 

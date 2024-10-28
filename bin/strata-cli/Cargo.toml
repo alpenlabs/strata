@@ -3,6 +3,9 @@ edition = "2021"
 name = "strata-cli"
 version = "0.1.0"
 
+[features]
+strata_faucet = []
+
 [[bin]]
 name = "strata"
 path = "src/main.rs"
@@ -20,6 +23,8 @@ alloy = { version = "0.3.5", features = [
 ] }
 argh.workspace = true
 argon2 = "0.5.3"
+async-trait.workspace = true
+bdk_bitcoind_rpc = "0.16.0"
 bdk_esplora = { version = "0.19.0", features = [
   "async-https",
   "async-https-rustls",
@@ -42,6 +47,8 @@ sled = "0.34.7"
 strata-bridge-tx-builder.workspace = true
 terrors.workspace = true
 tokio.workspace = true
+zeroize = { version = "1.8.1", features = ["derive"] }
+zxcvbn = "3.1.0"
 
 # sha2 fails to compile on windows with the "asm" feature
 [target.'cfg(not(target_os = "windows"))'.dependencies]

@@ -21,7 +21,7 @@ use strata_rpc_types::RpcServerError;
 use strata_state::{bridge_state::DepositState, chain_state::ChainState, tx::ProtocolOperation};
 use tracing::{debug, error};
 
-/// The `vout` corresponding to the bridge-in related Taproot address on the Deposit Request
+/// The `vout` corresponding to the deposit related Taproot address on the Deposit Request
 /// Transaction.
 ///
 /// This is always going to be the first [`OutPoint`].
@@ -189,6 +189,7 @@ mod tests {
         transaction::Version,
         ScriptBuf, Sequence, TxIn, TxOut, Witness,
     };
+    use rand::rngs::OsRng;
     use strata_bridge_tx_builder::prelude::{create_taproot_addr, SpendPath};
     use strata_common::logging;
     use strata_db::traits::L1DataStore;
@@ -341,14 +342,14 @@ mod tests {
             "num_blocks and max_tx_per_block must be at least 1"
         );
 
-        let random_block = rand::thread_rng().gen_range(1..num_blocks);
+        let random_block = OsRng.gen_range(1..num_blocks);
 
         let mut num_valid_duties = 0;
         for idx in 0..num_blocks {
-            let num_txs = rand::thread_rng().gen_range(1..max_txs_per_block);
+            let num_txs = OsRng.gen_range(1..max_txs_per_block);
 
             let known_tx_idx = if idx == random_block {
-                Some(rand::thread_rng().gen_range(0..num_txs))
+                Some(OsRng.gen_range(0..num_txs))
             } else {
                 None
             };
@@ -485,7 +486,7 @@ mod tests {
 
         // true => tx invalid
         // false => script_pubkey in tx output invalid
-        let tx_invalid: bool = rand::thread_rng().gen_bool(0.5);
+        let tx_invalid: bool = OsRng.gen_bool(0.5);
 
         if tx_invalid {
             let mut random_tx: Vec<u8> = arb.generate();
@@ -575,9 +576,7 @@ mod tests {
             break;
         }
 
-        let mut rng = rand::thread_rng();
-
-        let random_assignee = rng.gen_range(0..operators.len());
+        let random_assignee = OsRng.gen_range(0..operators.len());
         let random_assignee = operators[random_assignee];
 
         let mut dispatched_deposits = vec![];
@@ -590,7 +589,7 @@ mod tests {
             deposits_table.add_deposits(&tx_ref, &operators, amt);
 
             // dispatch about half of the deposits
-            let should_dispatch = rng.gen_bool(0.5);
+            let should_dispatch = OsRng.gen_bool(0.5);
             if should_dispatch.not() {
                 continue;
             }
@@ -619,7 +618,7 @@ mod tests {
             "some deposits should have been randomly dispatched"
         );
 
-        let needle_index = rand::thread_rng().gen_range(0..dispatched_deposits.len());
+        let needle_index = OsRng.gen_range(0..dispatched_deposits.len());
 
         let needle = dispatched_deposits
             .get(needle_index)

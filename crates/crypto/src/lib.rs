@@ -36,23 +36,21 @@ pub fn verify_schnorr_sig(sig: &Buf64, msg: &Buf32, pk: &Buf32) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use rand::Rng;
-    use secp256k1::{Secp256k1, SecretKey};
+    use rand::{rngs::OsRng, Rng};
+    use secp256k1::{SecretKey, SECP256K1};
     use strata_primitives::buf::Buf32;
 
     use super::{sign_schnorr_sig, verify_schnorr_sig};
 
     #[test]
     fn test_schnorr_signature_pass() {
-        let secp = Secp256k1::new();
-        let mut rng = rand::thread_rng();
-        let msg: [u8; 32] = [(); 32].map(|_| rng.gen());
+        let msg: [u8; 32] = [(); 32].map(|_| OsRng.gen());
 
         let mut mod_msg = msg;
         mod_msg.swap(1, 2);
 
-        let sk = SecretKey::new(&mut rng);
-        let (pk, _) = sk.x_only_public_key(&secp);
+        let sk = SecretKey::new(&mut OsRng);
+        let (pk, _) = sk.x_only_public_key(SECP256K1);
 
         let msg = Buf32::from(msg);
         let sk = Buf32::from(*sk.as_ref());

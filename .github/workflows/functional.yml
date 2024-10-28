@@ -8,7 +8,6 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-
 jobs:
   lint:
     name: Lint test files
@@ -55,11 +54,11 @@ jobs:
 
       - name: Install bitcoind
         env:
-          BITCOIND_VERSION: "27.0"
+          BITCOIND_VERSION: "28.0"
           BITCOIND_ARCH: "x86_64-linux-gnu"
-          SHASUM: "2a6974c5486f528793c79d42694b5987401e4a43c97f62b1383abf35bcee44a8"
+          SHASUM: "7fe294b02b25b51acb8e8e0a0eb5af6bbafa7cd0c5b0e5fcbb61263104a82fbc"
         run: |
-          wget -q "https://bitcoin.org/bin/bitcoin-core-${{ env.BITCOIND_VERSION }}/bitcoin-${{ env.BITCOIND_VERSION }}-${{ env.BITCOIND_ARCH }}.tar.gz"
+          curl -fsSLO --proto "=https" --tlsv1.2 "https://bitcoincore.org/bin/bitcoin-core-${{ env.BITCOIND_VERSION }}/bitcoin-${{ env.BITCOIND_VERSION }}-${{ env.BITCOIND_ARCH }}.tar.gz"
           sha256sum -c <<< "$SHASUM bitcoin-${{ env.BITCOIND_VERSION }}-${{ env.BITCOIND_ARCH }}.tar.gz"
           tar xzf "bitcoin-${{ env.BITCOIND_VERSION }}-${{ env.BITCOIND_ARCH }}.tar.gz"
           sudo install -m 0755 -t /usr/local/bin bitcoin-${{ env.BITCOIND_VERSION }}/bin/*
