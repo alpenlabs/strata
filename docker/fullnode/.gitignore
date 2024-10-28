@@ -1,0 +1,4 @@
+.data
+.env
+**/jwt.hex
+**/params.json
