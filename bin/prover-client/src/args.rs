@@ -49,6 +49,13 @@ pub struct Args {
 
     #[argh(option, description = "enable prover client dev rpc", default = "true")]
     pub enable_dev_rpcs: bool,
+
+    #[argh(
+        option,
+        description = "enable prover client checkpoint runner",
+        default = "true"
+    )]
+    pub enable_checkpoint_runner: bool,
 }
 
 impl Args {

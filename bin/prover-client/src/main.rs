@@ -24,6 +24,7 @@ mod ckp_runner;
 mod config;
 mod db;
 mod dispatcher;
+mod elf;
 mod errors;
 mod manager;
 mod primitives;
@@ -115,14 +116,16 @@ async fn main() {
     tokio::spawn(async move { prover_manager.run().await });
 
     // run checkpoint runner
-    tokio::spawn(async move {
-        start_checkpoints_task(
-            cl_client.clone(),
-            checkpoint_dispatcher.clone(),
-            task_tracker.clone(),
-        )
-        .await
-    });
+    if args.enable_checkpoint_runner {
+        tokio::spawn(async move {
+            start_checkpoints_task(
+                cl_client.clone(),
+                checkpoint_dispatcher.clone(),
+                task_tracker.clone(),
+            )
+            .await
+        });
+    }
 
     // Run prover manager in dev mode or runner mode
     if args.enable_dev_rpcs {
