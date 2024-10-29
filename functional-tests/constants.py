@@ -74,17 +74,5 @@ ROLLUP_PARAMS_FOR_DEPOSIT_TX = {
     },
 }
 
-PROVER_ROLLUP_PARAMS = {
-    **DEFAULT_ROLLUP_PARAMS,
-    "proof_publish_mode": "strict",
-    "genesis_l1_height": 500,
-    "cred_rule": "unchecked",
-    "operator_config": {
-        "static": [
-            {
-                "signing_pk": "1ea7f6c7a924a1e722c09301a826cfd95b21b23a294cec5da3c0b5908e62e0c7",
-                "wallet_pk": "1ea7f6c7a924a1e722c09301a826cfd95b21b23a294cec5da3c0b5908e62e0c7",
-            }
-        ]
-    },
-}
+
+PROVER_ROLLUP_PARAMS = {**ROLLUP_PARAMS_FOR_DEPOSIT_TX}
