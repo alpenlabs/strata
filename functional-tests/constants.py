@@ -75,17 +75,4 @@ ROLLUP_PARAMS_FOR_DEPOSIT_TX = {
 }
 
 
-PROVER_ROLLUP_PARAMS = {
-    **DEFAULT_ROLLUP_PARAMS,
-    "horizon_l1_height": 4,
-    "target_l2_batch_size": 100,
-    "genesis_l1_height": 102,
-    "operator_config": {
-        "static": [
-            {
-                "signing_pk": "01" * 32,
-                "wallet_pk": "02b4634c515a62e47b3f3eb62b8a6f6320fdb2baed5f2e6657f472b0f2a33221",
-            }
-        ]
-    },
-}
+PROVER_ROLLUP_PARAMS = {**ROLLUP_PARAMS_FOR_DEPOSIT_TX}
