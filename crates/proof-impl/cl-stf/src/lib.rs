@@ -10,7 +10,7 @@ use strata_primitives::{
 use strata_proofimpl_evm_ee_stf::ELProofPublicParams;
 use strata_state::{
     block::ExecSegment,
-    block_validation::{check_block_credential, validate_block_segments},
+    block_validation::validate_block_segments,
     bridge_ops,
     exec_update::{ELDepositData, ExecUpdate, Op, UpdateInput, UpdateOutput},
 };
@@ -23,24 +23,14 @@ pub fn verify_and_transition(
     el_proof_pp: ELProofPublicParams,
     rollup_params: &RollupParams,
 ) -> (ChainState, Vec<ELDepositData>) {
-    let deposit_datas = verify_l2_block(&new_l2_block, &el_proof_pp, rollup_params);
+    let deposit_datas = verify_l2_block(&new_l2_block, &el_proof_pp);
     let new_state = apply_state_transition(prev_chstate, &new_l2_block, rollup_params);
 
     (new_state, deposit_datas)
 }
 
 /// Verifies the L2 block.
-fn verify_l2_block(
-    block: &L2Block,
-    el_proof_pp: &ELProofPublicParams,
-    chain_params: &RollupParams,
-) -> Vec<ELDepositData> {
-    // Assert that the block has been signed by the designated signer
-    assert!(
-        check_block_credential(block.header(), &chain_params.cred_rule),
-        "Block credential verification failed"
-    );
-
+fn verify_l2_block(block: &L2Block, el_proof_pp: &ELProofPublicParams) -> Vec<ELDepositData> {
     // Assert that the block body and header are consistent
     assert!(
         validate_block_segments(block),

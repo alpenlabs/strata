@@ -35,7 +35,7 @@ class BridgeDepositTest(flexitest.Test):
         btc = ctx.get_service("bitcoin")
         btcrpc: BitcoindClient = btc.create_rpc()
 
-        # Do deposit and collet the L1 and L2 where the deposit transaction was included
+        # Do deposit and collect the L1 and L2 where the deposit transaction was included
         l2_block_num, l1_deposit_txn_id = self.do_deposit(ctx, evm_addr)
         l1_deposit_txn_block_info = btcrpc.proxy.gettransaction(l1_deposit_txn_id)
         deposit_txn_block_num = l1_deposit_txn_block_info["blockheight"]
