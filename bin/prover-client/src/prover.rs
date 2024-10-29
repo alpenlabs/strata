@@ -26,7 +26,7 @@ use crate::elf::{
     GUEST_EVM_EE_STF_ELF, GUEST_L1_BATCH_ELF,
 };
 use crate::{
-    config::NUM_PROVER_WORKERS,
+    config::{MAX_PARALLEL_PROVING_INSTANCES, NUM_PROVER_WORKERS},
     db::open_rocksdb_database,
     primitives::{
         prover_input::{ProofWithVkey, ZKVMInput},
@@ -307,6 +307,16 @@ where
             Some(ProvingTaskState::Err(e)) => Err(anyhow::anyhow!(e.to_string())),
             None => Err(anyhow::anyhow!("Missing witness for: {:?}", task_id)),
         }
+    }
+
+    pub(crate) fn is_available(&self) -> bool {
+        let prover_state = self
+            .prover_state
+            .read()
+            .expect("Failed to acquire write lock");
+        let num_jobs = prover_state.pending_tasks_count;
+
+        num_jobs < MAX_PARALLEL_PROVING_INSTANCES
     }
 
     fn save_proof_to_db(&self, task_id: Uuid, proof: &Proof) -> Result<(), anyhow::Error> {

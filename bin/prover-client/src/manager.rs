@@ -51,6 +51,10 @@ where
             .await;
 
         for task in pending_tasks {
+            if !self.prover.is_available() {
+                info!("Prover manager occupied skipping this turn..");
+                break;
+            }
             self.prover.submit_witness(task.id, task.prover_input);
             if self.prover.start_proving(task.id).is_err() {
                 self.task_tracker

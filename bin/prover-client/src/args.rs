@@ -53,7 +53,7 @@ pub struct Args {
     #[argh(
         option,
         description = "enable prover client checkpoint runner",
-        default = "true"
+        default = "false"
     )]
     pub enable_checkpoint_runner: bool,
 }
