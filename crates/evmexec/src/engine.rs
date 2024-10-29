@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use bitcoin::{hashes::Hash, Txid};
 use futures::future::TryFutureExt;
 use reth_primitives::{Address, B256};
 use reth_rpc_types::{
@@ -13,10 +14,7 @@ use strata_eectl::{
     errors::{EngineError, EngineResult},
     messages::{ExecPayloadData, PayloadEnv},
 };
-use strata_primitives::{
-    buf::Buf32,
-    l1::{BitcoinAmount, XOnlyPk},
-};
+use strata_primitives::l1::{BitcoinAmount, OutputRef};
 use strata_reth_evm::constants::COINBASE_ADDRESS;
 use strata_reth_node::{
     ExecutionPayloadFieldV2, StrataExecutionPayloadEnvelopeV2, StrataPayloadAttributes,
@@ -397,8 +395,11 @@ struct ForkchoiceStatePartial {
 fn to_bridge_withdrawal_intent(
     rpc_withdrawal_intent: strata_reth_node::WithdrawalIntent,
 ) -> bridge_ops::WithdrawalIntent {
-    let strata_reth_node::WithdrawalIntent { amt, dest_pk } = rpc_withdrawal_intent;
-    bridge_ops::WithdrawalIntent::new(BitcoinAmount::from_sat(amt), XOnlyPk::new(Buf32(dest_pk)))
+    let strata_reth_node::WithdrawalIntent { amt, txid, vout } = rpc_withdrawal_intent;
+    bridge_ops::WithdrawalIntent::new(
+        BitcoinAmount::from_sat(amt),
+        OutputRef::new(Txid::from_byte_array(txid.into()), vout),
+    )
 }
 
 #[cfg(test)]

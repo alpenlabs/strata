@@ -1,7 +1,7 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 
 use alloy_sol_types::sol;
-use reth_primitives::B256;
+use reth_primitives::revm_primitives::FixedBytes;
 use serde::{Deserialize, Serialize};
 
 /// Type for withdrawal_intents in rpc.
@@ -12,16 +12,21 @@ pub struct WithdrawalIntent {
     /// Amount to be withdrawn in sats.
     pub amt: u64,
 
-    /// Destination public key for the withdrawal
-    pub dest_pk: B256,
+    /// Referenced transaction's txid.
+    pub txid: FixedBytes<32>,
+
+    /// Index of referenced output in transaction's vout.
+    pub vout: u32,
 }
 
 sol! {
     #[allow(missing_docs)]
     event WithdrawalIntentEvent(
-        /// Withdrawal amount in sats
+        /// Withdrawal amount in sats.
         uint64 amount,
-        /// 32 bytes pubkey for withdrawal address in L1
-        bytes32 dest_pk,
+        /// Referenced transaction's txid.
+        bytes32 txid,
+        /// Index of referenced output in transaction's vout.
+        uint32 vout,
     );
 }

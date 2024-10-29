@@ -16,7 +16,10 @@ use bitcoin::{
 use jsonrpsee::core::RpcResult;
 use strata_bridge_tx_builder::prelude::{CooperativeWithdrawalInfo, DepositInfo};
 use strata_db::traits::L1DataProvider;
-use strata_primitives::l1::BitcoinAddress;
+use strata_primitives::{
+    buf::Buf32,
+    l1::{BitcoinAddress, XOnlyPk},
+};
 use strata_rpc_types::RpcServerError;
 use strata_state::{bridge_state::DepositState, chain_state::ChainState, tx::ProtocolOperation};
 use tracing::{debug, error};
@@ -150,18 +153,20 @@ pub(super) fn extract_withdrawal_infos(
     let withdrawal_infos = deposits.filter_map(|deposit| {
         if let DepositState::Dispatched(dispatched_state) = deposit.deposit_state() {
             let deposit_outpoint = deposit.output().outpoint();
-            let user_pk = dispatched_state
+            let _input_outpoint = dispatched_state
                 .cmd()
                 .withdraw_outputs()
                 .first()
                 .expect("there should be a withdraw output in a dispatched deposit")
-                .dest_addr();
+                .input_utxo()
+                .outpoint();
             let assigned_operator_idx = dispatched_state.assignee();
             let exec_deadline = dispatched_state.exec_deadline();
 
             let withdrawal_info = CooperativeWithdrawalInfo::new(
                 *deposit_outpoint,
-                *user_pk,
+                // FIXME: new withdrawal structure
+                XOnlyPk::new(Buf32::zero()),
                 assigned_operator_idx,
                 exec_deadline,
             );
@@ -187,9 +192,10 @@ mod tests {
         script::Builder,
         taproot::LeafVersion,
         transaction::Version,
-        ScriptBuf, Sequence, TxIn, TxOut, Witness,
+        ScriptBuf, Sequence, TxIn, TxOut, Txid, Witness,
     };
     use rand::rngs::OsRng;
+    use reth_primitives::revm_primitives::FixedBytes;
     use strata_bridge_tx_builder::prelude::{create_taproot_addr, SpendPath};
     use strata_common::logging;
     use strata_db::traits::L1DataStore;
@@ -303,11 +309,12 @@ mod tests {
                 .withdraw_outputs()
                 .first()
                 .expect("should have at least one `WithdrawOutput");
-            let user_pk = withdraw_output.dest_addr();
+            let _input_outpoint = withdraw_output.input_utxo().outpoint();
 
             let expected_info = CooperativeWithdrawalInfo::new(
                 *needle.output().outpoint(),
-                *user_pk,
+                // FIXME: new withdrawal structure
+                XOnlyPk::new(Buf32::zero()),
                 dispatched_state.assignee(),
                 dispatched_state.exec_deadline(),
             );
@@ -597,10 +604,13 @@ mod tests {
             num_dispatched += 1;
 
             let random_buf: Buf32 = arb.generate();
-            let dest_addr = XOnlyPk::new(random_buf);
+            let input_utxo = OutputRef::new(
+                Txid::from_byte_array(FixedBytes::<32>::from(random_buf).into()),
+                0,
+            );
 
             let dispatched_state = DepositState::Dispatched(DispatchedState::new(
-                DispatchCommand::new(vec![WithdrawOutput::new(dest_addr, amt)]),
+                DispatchCommand::new(vec![WithdrawOutput::new(input_utxo, amt)]),
                 random_assignee,
                 0,
             ));

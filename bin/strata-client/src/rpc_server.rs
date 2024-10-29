@@ -317,7 +317,7 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
                     .output()
                     .withdrawals()
                     .iter()
-                    .map(|intent| WithdrawalIntent::new(*intent.amt(), *intent.dest_pk()))
+                    .map(|intent| WithdrawalIntent::new(*intent.amt(), intent.input_utxo().clone()))
                     .collect();
 
                 let da_blobs = exec_update

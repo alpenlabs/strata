@@ -1,10 +1,11 @@
 //! This crate implements the proof of the chain state transition function (STF) for L2 blocks,
 //! verifying the correct state transitions as new L2 blocks are processed.
 
+use bitcoin::{hashes::Hash, Txid};
 use strata_primitives::{
     buf::Buf32,
     evm_exec::create_evm_extra_payload,
-    l1::{BitcoinAmount, XOnlyPk},
+    l1::{BitcoinAmount, OutputRef},
     params::RollupParams,
 };
 use strata_proofimpl_evm_ee_stf::ELProofPublicParams;
@@ -65,7 +66,7 @@ pub fn reconstruct_exec_segment(
         .map(|intent| {
             bridge_ops::WithdrawalIntent::new(
                 BitcoinAmount::from_sat(intent.amt),
-                XOnlyPk::new(Buf32(intent.dest_pk)),
+                OutputRef::new(Txid::from_byte_array(intent.txid.into()), intent.vout),
             )
         })
         .collect::<Vec<_>>();

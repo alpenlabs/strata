@@ -14,6 +14,7 @@ strata-storage.workspace = true
 
 anyhow.workspace = true
 arbitrary.workspace = true
+bitcoin.workspace = true
 borsh.workspace = true
 futures.workspace = true
 http.workspace = true
