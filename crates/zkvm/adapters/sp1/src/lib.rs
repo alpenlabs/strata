@@ -9,3 +9,6 @@ pub use input::SP1ProofInputBuilder;
 
 mod verifier;
 pub use verifier::SP1Verifier;
+
+mod zkvm_sp1;
+pub use zkvm_sp1::ZkVmSp1;
