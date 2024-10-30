@@ -9,3 +9,6 @@ pub use prover::RiscZeroHost;
 
 mod verifier;
 pub use verifier::Risc0Verifier;
+
+mod zkvm_risc0;
+pub use zkvm_risc0::ZkVmRisc0;

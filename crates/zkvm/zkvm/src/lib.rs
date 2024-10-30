@@ -204,3 +204,57 @@ impl AggregationInput {
         &self.vk
     }
 }
+
+/// A trait representing a Zero-Knowledge Virtual Machine (ZkVM) interface.
+/// Provides methods for reading inputs, committing outputs, and verifying proofs
+/// within the ZkVM environment.
+pub trait ZkVm {
+    /// Reads a serialized object from the guest code, deserializing it using Serde.
+    ///
+    /// The input is expected to be written with [`ZKVMInputBuilder::write`].
+    fn read<T: DeserializeOwned>(&self) -> T;
+
+    /// Reads a serialized byte slice from the guest code.
+    ///
+    /// The input is expected to be written with [`ZKVMInputBuilder::write_serialized`].
+    fn read_slice(&self) -> Vec<u8>;
+
+    /// Reads a Borsh-serialized object from the guest code.
+    ///
+    /// The input is expected to be written with [`ZKVMInputBuilder::write_borsh`].
+    fn read_borsh<T: BorshSerialize + BorshDeserialize>(&self) -> T;
+    /// Commits a Serde-serializable object to the public values stream.
+    ///
+    /// Values that are committed can be proven as public parameters.
+    fn commit<T: Serialize>(&self, output: &T);
+
+    /// Commits a pre-serialized byte slice to the public values stream.
+    ///
+    /// This method is intended for cases where the data has already been serialized
+    /// outside of the ZkVM's standard serialization methods. It allows you to provide
+    /// serialized outputs directly, bypassing any further serialization.
+    fn commit_slice(&self, raw_output: &[u8]);
+    /// Commits a Borsh-serializable object to the public values stream.
+    ///
+    /// Values that are committed can be proven as public parameters.
+    fn commit_borsh<T: BorshSerialize + BorshDeserialize>(&self, output: &T);
+    /// Verifies a proof generated with the ZkVM.
+    ///
+    /// This method checks the validity of the proof against the provided verification key digest
+    /// and public values. It will panic if the proof fails to verify.
+    fn verify_proof(&self, vk_digest: &[u32; 8], public_values: &[u8]);
+    /// Verifies a Groth16 proof.
+    ///
+    /// # Parameters
+    ///
+    /// * `proof`: A byte slice containing the serialized proof. (TODO: Change `proof: &[u8]` to a
+    ///   `Proof` type.)
+    /// * `verification_key`: A byte slice containing the serialized verification key.
+    /// * `public_params_raw`: A byte slice containing the serialized public parameters.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` if the proof verifies successfully, or an `anyhow::Error` if verification
+    /// fails.
+    fn verify_groth16(&self, proof: &[u8], verification_key: &[u8], public_params_raw: &[u8]);
+}
