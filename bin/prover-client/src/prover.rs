@@ -26,7 +26,7 @@ use crate::elf::{
     GUEST_EVM_EE_STF_ELF, GUEST_L1_BATCH_ELF,
 };
 use crate::{
-    config::{MAX_PARALLEL_PROVING_INSTANCES, NUM_PROVER_WORKERS},
+    config::{NUM_PROVER_WORKERS},
     db::open_rocksdb_database,
     primitives::{
         prover_input::{ProofWithVkey, ZKVMInput},
@@ -104,6 +104,7 @@ where
     db: ProverDB,
     pool: rayon::ThreadPool,
     vm_manager: ZkVMManager<Vm>,
+    max_instances: usize,
 }
 
 fn make_proof<Vm>(zkvm_input: ZKVMInput, vm: Vm) -> Result<ProofWithVkey, anyhow::Error>
@@ -188,7 +189,7 @@ impl<Vm: ZKVMHost> Prover<Vm>
 where
     Vm: ZKVMHost,
 {
-    pub(crate) fn new(prover_config: ProverOptions) -> Self {
+    pub(crate) fn new(prover_config: ProverOptions, max_instances: usize) -> Self {
         let rbdb = open_rocksdb_database().unwrap();
         let db_ops = DbOpsConfig { retry_count: 3 };
         let db = ProofDb::new(rbdb, db_ops);
@@ -213,6 +214,7 @@ where
             })),
             db: ProverDB::new(Arc::new(db)),
             vm_manager: zkvm_manager,
+            max_instances,
         }
     }
 
@@ -316,7 +318,7 @@ where
             .expect("Failed to acquire write lock");
         let num_jobs = prover_state.pending_tasks_count;
 
-        num_jobs < MAX_PARALLEL_PROVING_INSTANCES
+        num_jobs < self.max_instances
     }
 
     fn save_proof_to_db(&self, task_id: Uuid, proof: &Proof) -> Result<(), anyhow::Error> {

@@ -5,6 +5,7 @@ use strata_primitives::params::RollupParams;
 
 pub(super) const DEV_RPC_PORT: usize = 4844;
 pub(super) const DEV_RPC_URL: &str = "0.0.0.0";
+pub(super) const MAX_PARALLEL_PROVING_INSTANCES: usize = 25;
 
 /// Command-line arguments
 #[derive(Debug, FromArgs)]
@@ -56,6 +57,13 @@ pub struct Args {
         default = "false"
     )]
     pub enable_checkpoint_runner: bool,
+
+    #[argh(
+        option,
+        description = "max numer of prover instances",
+        default = "MAX_PARALLEL_PROVING_INSTANCES"
+    )]
+    pub num_prover_instances: usize,
 }
 
 impl Args {

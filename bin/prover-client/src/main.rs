@@ -109,8 +109,11 @@ async fn main() {
         enable_compression: true,
         ..Default::default()
     };
-    let prover_manager: ProverManager<SP1Host> =
-        ProverManager::new(task_tracker.clone(), prover_options);
+    let prover_manager: ProverManager<SP1Host> = ProverManager::new(
+        task_tracker.clone(),
+        prover_options,
+        args.num_prover_instances,
+    );
 
     // run prover manager in background
     tokio::spawn(async move { prover_manager.run().await });
