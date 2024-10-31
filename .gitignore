@@ -256,6 +256,11 @@ seq_key.bin
 provers/**/vks.rs
 
 # Prover generated files
+provers/**/*.elf
+provers/**/*.pk
+provers/**/*.vk
+provers/**/*.id
+
 proving_keys/
 provers/test-util/el/el_proofs/
 provers/test-util/cl/cl_proofs/
