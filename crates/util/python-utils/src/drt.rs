@@ -118,7 +118,7 @@ fn deposit_request_transaction_inner(
     let fee_rate = FeeRate::from_sat_per_vb(2).expect("valid fee rate");
 
     // Before signing the transaction, we need to sync the wallet with bitcoind
-    sync_wallet(&mut wallet, client)?;
+    sync_wallet(&mut wallet, &client)?;
 
     let mut psbt = wallet
         .build_tx()

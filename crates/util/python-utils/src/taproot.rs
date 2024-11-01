@@ -78,9 +78,9 @@ pub(crate) fn bridge_wallet(
 /// # Note
 ///
 /// This function should be only used with Regtest.
-pub(crate) fn sync_wallet(wallet: &mut Wallet, rpc_client: Client) -> Result<(), Error> {
+pub(crate) fn sync_wallet(wallet: &mut Wallet, rpc_client: &Client) -> Result<(), Error> {
     let wallet_tip = wallet.latest_checkpoint();
-    let mut emitter = Emitter::new(&rpc_client, wallet_tip, 0);
+    let mut emitter = Emitter::new(rpc_client, wallet_tip, 0);
     while let Some(block) = emitter.next_block().expect("valid block") {
         let height = block.block_height();
         let connected_to = block.connected_to();
@@ -239,7 +239,7 @@ fn drain_wallet_inner(
     let fee_rate = FeeRate::from_sat_per_vb(2).expect("valid fee rate");
 
     // Before signing the transaction, we need to sync the wallet with bitcoind
-    sync_wallet(&mut wallet, client)?;
+    sync_wallet(&mut wallet, &client)?;
 
     let mut psbt = wallet
         .build_tx()
