@@ -122,7 +122,7 @@ pub(crate) fn musig_aggregate_pks_inner(pks: Vec<XOnlyPublicKey>) -> Result<XOnl
     Ok(key_agg_ctx.aggregated_pubkey())
 }
 
-/// Gets a (receiving/external) address from the wallet at the given `index`.
+/// Gets a (receiving/external) address from the [`taproot_wallet`] at the given `index`.
 #[pyfunction]
 pub(crate) fn get_address(index: u32) -> PyResult<String> {
     let wallet = taproot_wallet()?;

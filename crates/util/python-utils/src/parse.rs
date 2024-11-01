@@ -32,6 +32,7 @@ pub(super) fn parse_address(address: &str) -> Result<Address, Error> {
 }
 
 /// Parses an [`OutPoint`] from a string.
+#[allow(dead_code)] // This might be useful in the future
 pub(crate) fn parse_outpoint(outpoint: &str) -> Result<OutPoint, Error> {
     let parts: Vec<&str> = outpoint.split(':').collect();
     if parts.len() != 2 {
