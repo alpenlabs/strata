@@ -13116,7 +13116,9 @@ dependencies = [
  "reth-primitives",
  "shrex",
  "strata-btcio",
+ "strata-common",
  "tokio",
+ "tracing",
 ]
 
 [[package]]

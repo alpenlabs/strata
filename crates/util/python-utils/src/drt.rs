@@ -20,7 +20,7 @@ use crate::{
     taproot::{new_client, sync_wallet, taproot_wallet, ExtractP2trPubkey},
 };
 
-/// Generates a Deposit Request transaction (DRT).
+/// Generates a deposit request transaction (DRT).
 ///
 /// # Arguments
 ///
@@ -52,7 +52,7 @@ pub(crate) fn deposit_request_transaction(
     Ok(signed_tx)
 }
 
-/// Generates a Deposit Request transaction (DRT).
+/// Generates a deposit request transaction (DRT).
 ///
 /// # Arguments
 ///
@@ -182,6 +182,7 @@ mod tests {
     use bdk_wallet::KeychainKind;
     use bitcoind::{bitcoincore_rpc::RpcApi, BitcoinD};
     use strata_btcio::rpc::{traits::Broadcaster, BitcoinClient};
+    use strata_common::logging;
 
     use super::*;
     use crate::taproot::taproot_wallet;
@@ -217,8 +218,10 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test()]
+    #[tokio::test]
     async fn drt_mempool_accept() {
+        logging::init(logging::LoggerConfig::with_base_name("drt-tests"));
+
         let bitcoind = BitcoinD::from_downloaded().unwrap();
         let url = bitcoind.rpc_url();
         let (user, password) = get_auth(&bitcoind);
