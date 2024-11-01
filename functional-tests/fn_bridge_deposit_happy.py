@@ -35,12 +35,15 @@ class BridgeDepositHappyTest(flexitest.Test):
 
         # 1st deposit
         self.test_deposit(ctx, addr_1, el_address_1)
+        time.sleep(0.5)
 
         # 2nd deposit
         self.test_deposit(ctx, addr_2, el_address_2)
+        time.sleep(0.5)
 
         # 3rd deposit, now to a previously used address
         self.test_deposit(ctx, addr_3, el_address_1, new_address=False)
+        time.sleep(0.5)
 
         return True
 
@@ -159,6 +162,7 @@ class BridgeDepositHappyTest(flexitest.Test):
         assert n_deposits_post == n_deposits_pre + 1, "deposit was not registered"
 
         # Make sure that the balance has increased
+        time.sleep(0.5)
         new_balance = int(rethrpc.eth_getBalance(f"0x{el_address}"), 16)
         self.logger.debug(f"Balance after deposit (EL address): {new_balance}")
         assert new_balance > original_balance, "balance did not increase"
