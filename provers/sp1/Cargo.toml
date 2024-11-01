@@ -9,8 +9,10 @@ strata-sp1-adapter = { path = "../../crates/zkvm/adapters/sp1", features = [
 ], optional = true }
 
 [build-dependencies]
-sp1-helper = "2.0.0"
-sp1-sdk = "2.0.0"
+bincode.workspace = true
+sha2.workspace = true
+sp1-helper = "3.0.0"
+sp1-sdk = "3.0.0"
 
 [dev-dependencies]
 anyhow.workspace = true
@@ -21,7 +23,7 @@ hex.workspace = true
 num-bigint = "0.4.6"
 num-traits = "0.2.19"
 serde_json.workspace = true
-sp1-sdk = "2.0.0"
+sp1-sdk = "3.0.0"
 strata-primitives.workspace = true
 strata-proofimpl-btc-blockspace.workspace = true
 strata-proofimpl-checkpoint.workspace = true
