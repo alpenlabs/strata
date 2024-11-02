@@ -5,5 +5,5 @@ edition = "2021"
 
 [dependencies]
 borsh.workspace = true
-strata-zkvm.workspace = true
 strata-proofimpl-cl-stf.workspace = true
+strata-zkvm.workspace = true

@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use sp1_sdk::Prover;
-use strata_proofimpl_checkpoint::L2BatchProofOutput;
+use strata_proofimpl_cl_stf::L2BatchProofOutput;
 use strata_sp1_adapter::{SP1Host, SP1ProofInputBuilder, SP1Verifier};
 use strata_sp1_guest_builder::GUEST_CL_AGG_ELF;
 use strata_zkvm::{

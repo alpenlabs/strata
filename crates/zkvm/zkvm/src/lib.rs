@@ -276,12 +276,12 @@ pub trait ZkVm {
     /// Serde.
     ///
     /// This function is meant to read the committed output of another guest function
-    /// that was written with [`commit`].
+    /// that was written with [`ZkVm::commit`].
     /// It then verifies the proof against the given verification key digest.
     ///
-    /// This is equivalent to calling [`read`] and [`verify_proof`], but avoids double serialization
-    /// and deserialization. The function will panic if the proof fails to verify.
-    fn read_verfied<T: DeserializeOwned>(&self, vk_digest: &[u32; 8]) -> T {
+    /// This is equivalent to calling [`ZkVm::read`] and [`ZkVm::verify_proof`], but avoids double
+    /// serialization and deserialization. The function will panic if the proof fails to verify.
+    fn read_verified<T: DeserializeOwned>(&self, vk_digest: &[u32; 8]) -> T {
         let public_values_raw = self.read_slice();
         self.verify_proof(vk_digest, &public_values_raw);
         bincode::deserialize(&public_values_raw).expect("failed bincode deserialization")
@@ -290,12 +290,13 @@ pub trait ZkVm {
     /// Reads and verifies a committed output from another guest function, deserializing it using
     /// Borsh.
     ///
-    /// This function is similar to [`read_verified`], but is intended for guest commitments
-    /// committed via [`commit_borsh`]. The output is expected to be Borsh-serializable.
+    /// This function is similar to [`ZkVm::read_verified`], but is intended for guest commitments
+    /// committed via [`ZkVm::commit_borsh`]. The output is expected to be Borsh-serializable.
     /// It then verifies the proof using the internal verification key context.
     ///
-    /// This is equivalent to calling [`read_borsh`] and [`verify_proof`], but avoids double
-    /// serialization and deserialization. The function will panic if the proof fails to verify.
+    /// This is equivalent to calling [`ZkVm::read_borsh`] and [`ZkVm::verify_proof`], but avoids
+    /// double serialization and deserialization. The function will panic if the proof fails to
+    /// verify.
     fn read_verified_borsh<T: BorshSerialize + BorshDeserialize>(&self, vk_digest: &[u32; 8]) -> T {
         let public_values_raw = self.read_slice();
         self.verify_proof(vk_digest, &public_values_raw);

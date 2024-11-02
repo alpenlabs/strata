@@ -1,15 +1,8 @@
-use anyhow::Context;
 use serde::{de::DeserializeOwned, Serialize};
 use sha2::{Digest, Sha256};
-use snark_bn254_verifier::Groth16Verifier;
-use sp1_primitives::io::SP1PublicValues;
+use sp1_verifier::{Groth16Verifier, GROTH16_VK_BYTES};
 use sp1_zkvm::{io, lib::verify::verify_sp1_proof};
 use strata_zkvm::ZkVm;
-use substrate_bn::Fr;
-
-// Copied from ~/.sp1/circuits/v2.0.0/groth16_vk.bin
-// This is same for all the SP1 programs that uses v2.0.0
-pub const GROTH16_VK_BYTES: &[u8] = include_bytes!("groth16_vk.bin");
 
 pub struct ZkVmSp1;
 
@@ -41,32 +34,14 @@ impl ZkVm for ZkVmSp1 {
         verification_key: &[u8],
         public_params_raw: &[u8],
     ) -> anyhow::Result<()> {
-        let vk = GROTH16_VK_BYTES;
+        let vk_hash_str = hex::encode(verification_key);
+        let vk_hash_str = format!("0x{}", vk_hash_str);
 
-        // Convert vkey_hash to Fr, mapping the error to anyhow::Error
-        let vkey_hash_fr = Fr::from_slice(verification_key)
-            .map_err(|e| anyhow::anyhow!(e))
-            .context("Unable to convert vkey_hash to Fr")?;
-
-        let committed_values_digest = SP1PublicValues::from(public_params_raw)
-            .hash_bn254()
-            .to_bytes_be();
-
-        // Convert committed_values_digest to Fr, mapping the error to anyhow::Error
-        let committed_values_digest_fr = Fr::from_slice(&committed_values_digest)
-            .map_err(|e| anyhow::anyhow!(e))
-            .context("Unable to convert committed_values_digest to Fr")?;
-
-        // Perform the Groth16 verification, mapping any error to anyhow::Error
-        let verification_result =
-            Groth16Verifier::verify(proof, vk, &[vkey_hash_fr, committed_values_digest_fr])
-                .map_err(|e| anyhow::anyhow!(e))
-                .context("Groth16 verification failed")?;
-
-        if verification_result {
-            Ok(())
-        } else {
-            Err(anyhow::anyhow!("Groth16 proof verification returned false"))
-        }
+        // TODO: optimization
+        // Groth16Verifier internally again decodes the hex encoded vkey_hash, which can be avoided
+        // Skipped for now because `load_groth16_proof_from_bytes` is not available outside of the
+        // crate
+        Groth16Verifier::verify(proof, public_params_raw, &vk_hash_str, &GROTH16_VK_BYTES)
+            .map_err(anyhow::Error::from)
     }
 }
