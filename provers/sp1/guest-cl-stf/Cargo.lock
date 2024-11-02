@@ -93,7 +93,7 @@ dependencies = [
  "bytes",
  "cfg-if",
  "const-hex",
- "derive_more",
+ "derive_more 0.99.18",
  "getrandom",
  "hex-literal",
  "itoa",
@@ -236,7 +236,7 @@ checksum = "03704f265cbbb943b117ecb5055fd46e8f41e7dc8a58b1aed20bcd40ace38c15"
 dependencies = [
  "alloy-primitives",
  "alloy-rlp",
- "derive_more",
+ "derive_more 0.99.18",
  "hashbrown",
  "nybbles",
  "serde",
@@ -613,6 +613,20 @@ name = "bytemuck"
 version = "1.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94bbb0ad554ad961ddc5da507a12a29b14e4ae5bda06b19f575a3e6079d2e2ae"
+dependencies = [
+ "bytemuck_derive",
+]
+
+[[package]]
+name = "bytemuck_derive"
+version = "1.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bcfcc3cd946cb52f0bbfdbbcfa2f4e24f75ebb6c0e1002f7c25904fada18b9ec"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.79",
+]
 
 [[package]]
 name = "byteorder"
@@ -822,6 +836,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "derive_more"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4a9b99b9cbbe49445b21764dc0625032a89b145a2642e67603e1c936f5458d05"
+dependencies = [
+ "derive_more-impl",
+]
+
+[[package]]
+name = "derive_more-impl"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cb7330aeadfbe296029522e6c40f315320aba36fc43a5b3632f3795348f3bd22"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.79",
+]
+
+[[package]]
 name = "digest"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -879,7 +913,7 @@ dependencies = [
  "elliptic-curve",
  "hex-literal",
  "signature",
- "sp1-lib",
+ "sp1-lib 3.1.0",
  "spki",
 ]
 
@@ -1042,15 +1076,8 @@ dependencies = [
 name = "guest-sp1-cl-stf"
 version = "0.1.0"
 dependencies = [
- "bincode",
- "bitcoin",
- "borsh",
- "sha2",
- "sp1-zkvm",
- "strata-primitives",
- "strata-proofimpl-checkpoint",
  "strata-proofimpl-cl-stf",
- "strata-proofimpl-evm-ee-stf",
+ "strata-sp1-adapter",
 ]
 
 [[package]]
@@ -1823,7 +1850,7 @@ dependencies = [
  "alloy-primitives",
  "alloy-rlp",
  "bytes",
- "derive_more",
+ "derive_more 0.99.18",
  "k256",
  "once_cell",
  "rayon",
@@ -1849,7 +1876,7 @@ dependencies = [
  "alloy-rlp",
  "byteorder",
  "bytes",
- "derive_more",
+ "derive_more 0.99.18",
  "modular-bitfield",
  "reth-codecs",
  "revm-primitives",
@@ -1863,7 +1890,7 @@ version = "1.0.3"
 source = "git+https://github.com/alpenlabs/reth.git?rev=v1.0.3-alpen.1#dde184f56591d0afa5516bd942368349c4704579"
 dependencies = [
  "alloy-primitives",
- "derive_more",
+ "derive_more 0.99.18",
  "serde",
  "strum",
 ]
@@ -1879,7 +1906,7 @@ dependencies = [
  "alloy-rlp",
  "alloy-trie",
  "bytes",
- "derive_more",
+ "derive_more 0.99.18",
  "itertools 0.13.0",
  "nybbles",
  "reth-codecs",
@@ -1929,7 +1956,7 @@ dependencies = [
  "ripemd",
  "secp256k1",
  "sha2",
- "substrate-bn",
+ "substrate-bn 0.6.0",
 ]
 
 [[package]]
@@ -2088,6 +2115,30 @@ name = "ryu"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f3cb5ba0dc43242ce17de99c180e96db90b235b8a9fdc9543c96d2209116bd9f"
+
+[[package]]
+name = "scale-info"
+version = "2.11.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1aa7ffc1c0ef49b0452c6e2986abf2b07743320641ffd5fc63d552458e3b779b"
+dependencies = [
+ "cfg-if",
+ "derive_more 1.0.0",
+ "parity-scale-codec",
+ "scale-info-derive",
+]
+
+[[package]]
+name = "scale-info-derive"
+version = "2.11.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "46385cc24172cf615450267463f937c10072516359b3ff1cb24228a4a08bf951"
+dependencies = [
+ "proc-macro-crate",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.79",
+]
 
 [[package]]
 name = "sec1"
@@ -2266,6 +2317,44 @@ dependencies = [
 ]
 
 [[package]]
+name = "snark-bn254-verifier"
+version = "1.0.2"
+source = "git+https://github.com/succinctlabs/snark-bn254-verifier.git?branch=bhargav/groth16-verf#6e8c1b423b5572c48131ca10b426fb59b6845c02"
+dependencies = [
+ "lazy_static",
+ "num-bigint",
+ "num-traits",
+ "rand",
+ "sha2",
+ "substrate-bn 0.7.0",
+ "thiserror",
+]
+
+[[package]]
+name = "snowbridge-amcl"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "460a9ed63cdf03c1b9847e8a12a5f5ba19c4efd5869e4a737e05be25d7c427e5"
+dependencies = [
+ "parity-scale-codec",
+ "scale-info",
+]
+
+[[package]]
+name = "sp1-lib"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bea7811abd2d3a991007fcb284f41152840b8388c171288d0c52c6793956609c"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "cfg-if",
+ "hex",
+ "serde",
+ "snowbridge-amcl",
+]
+
+[[package]]
 name = "sp1-lib"
 version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2307,7 +2396,7 @@ dependencies = [
  "p3-field",
  "rand",
  "sha2",
- "sp1-lib",
+ "sp1-lib 3.1.0",
  "sp1-primitives",
 ]
 
@@ -2403,49 +2492,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "strata-proofimpl-btc-blockspace"
-version = "0.1.0"
-dependencies = [
- "bitcoin",
- "borsh",
- "serde",
- "sha2",
- "strata-bridge-tx-builder",
- "strata-primitives",
- "strata-state",
- "strata-tx-parser",
- "strata-zkvm",
-]
-
-[[package]]
-name = "strata-proofimpl-checkpoint"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bitcoin",
- "borsh",
- "ethnum",
- "serde",
- "serde_json",
- "strata-primitives",
- "strata-proofimpl-btc-blockspace",
- "strata-proofimpl-l1-batch",
- "strata-state",
- "strata-zkvm",
-]
-
-[[package]]
 name = "strata-proofimpl-cl-stf"
 version = "0.1.0"
 dependencies = [
+ "bincode",
  "borsh",
  "serde",
  "strata-chaintsn",
  "strata-crypto",
  "strata-primitives",
- "strata-proofimpl-checkpoint",
  "strata-proofimpl-evm-ee-stf",
  "strata-state",
+ "strata-zkvm",
  "thiserror",
 ]
 
@@ -2471,22 +2529,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "strata-proofimpl-l1-batch"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bitcoin",
- "borsh",
- "ethnum",
- "serde",
- "serde_json",
- "strata-primitives",
- "strata-proofimpl-btc-blockspace",
- "strata-state",
- "strata-zkvm",
-]
-
-[[package]]
 name = "strata-reth-evm"
 version = "0.1.0"
 dependencies = [
@@ -2507,6 +2549,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "strata-sp1-adapter"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "borsh",
+ "hex",
+ "num-bigint",
+ "num-traits",
+ "serde",
+ "serde_json",
+ "sha2",
+ "snark-bn254-verifier",
+ "sp1-primitives",
+ "sp1-zkvm",
+ "strata-zkvm",
+ "substrate-bn 0.7.0",
+ "tracing",
+]
+
+[[package]]
 name = "strata-state"
 version = "0.1.0"
 dependencies = [
@@ -2523,23 +2586,6 @@ dependencies = [
  "strata-crypto",
  "strata-primitives",
  "strata-zkvm",
- "tracing",
-]
-
-[[package]]
-name = "strata-tx-parser"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "arbitrary",
- "bitcoin",
- "borsh",
- "hex",
- "musig2",
- "strata-bridge-tx-builder",
- "strata-primitives",
- "strata-state",
- "thiserror",
  "tracing",
 ]
 
@@ -2586,6 +2632,22 @@ dependencies = [
  "lazy_static",
  "rand",
  "rustc-hex",
+]
+
+[[package]]
+name = "substrate-bn"
+version = "0.7.0"
+source = "git+https://github.com/sp1-patches/bn?branch=patch-v0.7.0#2f5d4394b28550e47b16b061372832cba6d2dcf6"
+dependencies = [
+ "bytemuck",
+ "byteorder",
+ "cfg-if",
+ "crunchy",
+ "lazy_static",
+ "num-bigint",
+ "rand",
+ "rustc-hex",
+ "sp1-lib 1.2.0",
 ]
 
 [[package]]

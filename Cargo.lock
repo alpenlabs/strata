@@ -12950,6 +12950,7 @@ dependencies = [
  "serde_json",
  "strata-primitives",
  "strata-proofimpl-btc-blockspace",
+ "strata-proofimpl-cl-stf",
  "strata-proofimpl-l1-batch",
  "strata-state",
  "strata-test-utils",
@@ -12960,15 +12961,16 @@ dependencies = [
 name = "strata-proofimpl-cl-stf"
 version = "0.1.0"
 dependencies = [
+ "bincode",
  "borsh",
  "serde",
  "strata-chaintsn",
  "strata-crypto",
  "strata-primitives",
- "strata-proofimpl-checkpoint",
  "strata-proofimpl-evm-ee-stf",
  "strata-state",
  "strata-test-utils",
+ "strata-zkvm",
  "thiserror",
 ]
 
