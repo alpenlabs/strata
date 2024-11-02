@@ -4,34 +4,10 @@
 
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::buf::Buf32;
+use strata_proofimpl_cl_stf::L2BatchProofOutput;
 use strata_proofimpl_l1_batch::L1BatchProofOutput;
-use strata_state::{
-    batch::{BatchInfo, BootstrapState},
-    id::L2BlockId,
-    tx::DepositInfo,
-};
+use strata_state::batch::{BatchInfo, BootstrapState};
 use strata_zkvm::Proof;
-
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
-pub struct ChainStateSnapshot {
-    pub hash: Buf32,
-    pub slot: u64,
-    pub l2_blockid: L2BlockId,
-}
-
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
-pub struct L2BatchProofOutput {
-    pub deposits: Vec<DepositInfo>,
-    pub initial_snapshot: ChainStateSnapshot,
-    pub final_snapshot: ChainStateSnapshot,
-    pub rollup_params_commitment: Buf32,
-}
-
-impl L2BatchProofOutput {
-    pub fn rollup_params_commitment(&self) -> Buf32 {
-        self.rollup_params_commitment
-    }
-}
 
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct CheckpointProofInput {
