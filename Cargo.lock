@@ -12958,6 +12958,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "strata-proofimpl-cl-agg"
+version = "0.1.0"
+dependencies = [
+ "borsh",
+ "strata-proofimpl-cl-stf",
+ "strata-zkvm",
+]
+
+[[package]]
 name = "strata-proofimpl-cl-stf"
 version = "0.1.0"
 dependencies = [
