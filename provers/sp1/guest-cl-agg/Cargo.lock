@@ -2412,6 +2412,7 @@ dependencies = [
  "strata-primitives",
  "strata-state",
  "strata-tx-parser",
+ "strata-zkvm",
 ]
 
 [[package]]
