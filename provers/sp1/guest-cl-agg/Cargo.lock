@@ -2464,6 +2464,7 @@ dependencies = [
  "serde",
  "strata-reth-evm",
  "strata-reth-primitives",
+ "strata-zkvm",
  "thiserror",
 ]
 

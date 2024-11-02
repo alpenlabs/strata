@@ -22,6 +22,7 @@ rlp = "0.5.2"
 serde.workspace = true
 strata-reth-evm.workspace = true
 strata-reth-primitives.workspace = true
+strata-zkvm.workspace = true
 thiserror = "1.0"
 
 [dev-dependencies]
