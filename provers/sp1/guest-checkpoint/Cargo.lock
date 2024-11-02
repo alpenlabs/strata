@@ -1056,20 +1056,8 @@ dependencies = [
 name = "guest-sp1-checkpoint"
 version = "0.1.0"
 dependencies = [
- "bincode",
- "bitcoin",
- "borsh",
- "sha2",
- "snark-bn254-verifier",
- "sp1-primitives",
- "sp1-zkvm",
- "strata-primitives",
- "strata-proofimpl-btc-blockspace",
  "strata-proofimpl-checkpoint",
- "strata-proofimpl-l1-batch",
- "strata-state",
- "strata-zkvm",
- "substrate-bn 0.7.0",
+ "strata-sp1-adapter",
 ]
 
 [[package]]
@@ -2317,7 +2305,7 @@ dependencies = [
 [[package]]
 name = "snark-bn254-verifier"
 version = "1.0.2"
-source = "git+https://github.com/succinctlabs/snark-bn254-verifier.git#2c4782fb8c11ae90798cd2fc713101a19f677564"
+source = "git+https://github.com/succinctlabs/snark-bn254-verifier.git?branch=bhargav/groth16-verf#6e8c1b423b5572c48131ca10b426fb59b6845c02"
 dependencies = [
  "lazy_static",
  "num-bigint",
@@ -2593,6 +2581,27 @@ dependencies = [
  "alloy-sol-types",
  "reth-primitives",
  "serde",
+]
+
+[[package]]
+name = "strata-sp1-adapter"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "borsh",
+ "hex",
+ "num-bigint",
+ "num-traits",
+ "serde",
+ "serde_json",
+ "sha2",
+ "snark-bn254-verifier",
+ "sp1-primitives",
+ "sp1-zkvm",
+ "strata-zkvm",
+ "substrate-bn 0.7.0",
+ "tracing",
 ]
 
 [[package]]
