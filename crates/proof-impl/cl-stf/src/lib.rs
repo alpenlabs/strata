@@ -110,7 +110,7 @@ pub fn process_cl_stf(zkvm: &impl ZkVm, el_vkey: &[u32; 8]) {
     let (prev_state, block): (ChainState, L2Block) = zkvm.read_borsh();
 
     // Read the EL proof output
-    let el_pp_deserialized: ELProofPublicParams = zkvm.read_verfied(el_vkey);
+    let el_pp_deserialized: ELProofPublicParams = zkvm.read_verified(el_vkey);
 
     let new_state = verify_and_transition(
         prev_state.clone(),

@@ -11,11 +11,10 @@ strata-proofimpl-evm-ee-stf.workspace = true
 strata-state.workspace = true
 strata-zkvm.workspace = true
 
-borsh.workspace = true
 bincode.workspace = true
+borsh.workspace = true
 serde.workspace = true
 thiserror.workspace = true
-
 
 [dev-dependencies]
 strata-test-utils.workspace = true

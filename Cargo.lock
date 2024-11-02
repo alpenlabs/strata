@@ -11943,6 +11943,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b6b67fb9a61334225b5b790716f609cd58395f895b3fe8b328786812a40bc3b"
 
 [[package]]
+name = "snark-bn254-verifier"
+version = "1.0.2"
+source = "git+https://github.com/succinctlabs/snark-bn254-verifier.git?branch=bhargav/groth16-verf#6e8c1b423b5572c48131ca10b426fb59b6845c02"
+dependencies = [
+ "lazy_static",
+ "num-bigint 0.4.6",
+ "num-traits",
+ "rand 0.8.5",
+ "sha2 0.10.8",
+ "substrate-bn 0.7.0",
+ "thiserror",
+]
+
+[[package]]
 name = "snowbridge-amcl"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12126,12 +12140,16 @@ dependencies = [
 
 [[package]]
 name = "sp1-lib"
-version = "3.1.0"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "14deb700469a37ec075bcf88dac3815b026dd9c4b9cb175980826f1fbb2e4e80"
+checksum = "bea7811abd2d3a991007fcb284f41152840b8388c171288d0c52c6793956609c"
 dependencies = [
+ "anyhow",
  "bincode",
+ "cfg-if",
+ "hex",
  "serde",
+ "snowbridge-amcl",
 ]
 
 [[package]]
@@ -12410,6 +12428,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "sp1-verifier"
+version = "3.0.0"
+source = "git+https://github.com/succinctlabs/sp1?rev=2c7868364cb832531e8cafd258aa06fbab079459#2c7868364cb832531e8cafd258aa06fbab079459"
+dependencies = [
+ "hex",
+ "lazy_static",
+ "sha2 0.10.8",
+ "substrate-bn 0.6.0 (git+https://github.com/sp1-patches/bn?tag=substrate_bn-v0.6.0-patch-v2)",
+ "thiserror-no-std",
+]
+
+[[package]]
 name = "sp1-zkvm"
 version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12425,18 +12455,6 @@ dependencies = [
  "sha2 0.10.8",
  "sp1-lib 3.1.0",
  "sp1-primitives",
-]
-
-[[package]]
-name = "sp1-verifier"
-version = "3.0.0"
-source = "git+https://github.com/succinctlabs/sp1?rev=2c7868364cb832531e8cafd258aa06fbab079459#2c7868364cb832531e8cafd258aa06fbab079459"
-dependencies = [
- "hex",
- "lazy_static",
- "sha2 0.10.8",
- "substrate-bn 0.6.0 (git+https://github.com/sp1-patches/bn?tag=substrate_bn-v0.6.0-patch-v2)",
- "thiserror-no-std",
 ]
 
 [[package]]
@@ -13261,6 +13279,7 @@ dependencies = [
  "strata-primitives",
  "strata-proofimpl-btc-blockspace",
  "strata-proofimpl-checkpoint",
+ "strata-proofimpl-cl-stf",
  "strata-proofimpl-evm-ee-stf",
  "strata-proofimpl-l1-batch",
  "strata-risc0-adapter",
@@ -13345,8 +13364,8 @@ dependencies = [
  "sp1-primitives",
  "sp1-sdk",
  "sp1-verifier",
- "strata-primitives",
  "sp1-zkvm",
+ "strata-primitives",
  "strata-zkvm",
  "tracing",
 ]
@@ -13567,6 +13586,22 @@ dependencies = [
 name = "substrate-bn"
 version = "0.6.0"
 source = "git+https://github.com/sp1-patches/bn?tag=substrate_bn-v0.6.0-patch-v2#8ef05d3969312eca34fa9f1f566a469022badda6"
+dependencies = [
+ "bytemuck",
+ "byteorder",
+ "cfg-if",
+ "crunchy",
+ "lazy_static",
+ "num-bigint 0.4.6",
+ "rand 0.8.5",
+ "rustc-hex",
+ "sp1-lib 3.1.0",
+]
+
+[[package]]
+name = "substrate-bn"
+version = "0.7.0"
+source = "git+https://github.com/sp1-patches/bn?branch=patch-v0.7.0#2f5d4394b28550e47b16b061372832cba6d2dcf6"
 dependencies = [
  "bytemuck",
  "byteorder",

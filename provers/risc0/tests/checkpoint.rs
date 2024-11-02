@@ -3,7 +3,7 @@ mod test {
     use bitcoin::params::MAINNET;
     use strata_primitives::buf::Buf32;
     use strata_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
-    use strata_proofimpl_checkpoint::{ChainStateSnapshot, L2BatchProofOutput};
+    use strata_proofimpl_cl_stf::{ChainStateSnapshot, L2BatchProofOutput};
     use strata_proofimpl_l1_batch::{L1BatchProofInput, L1BatchProofOutput};
     use strata_risc0_adapter::{Risc0Verifier, RiscZeroHost, RiscZeroProofInputBuilder};
     use strata_risc0_guest_builder::{
