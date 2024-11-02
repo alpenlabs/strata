@@ -3,11 +3,11 @@
 //! chain and that all L1-L2 transactions were processed.
 
 use borsh::{BorshDeserialize, BorshSerialize};
-use strata_primitives::buf::Buf32;
+use strata_primitives::{buf::Buf32, params::RollupParams, vk::RollupVerifyingKey};
 use strata_proofimpl_cl_stf::L2BatchProofOutput;
 use strata_proofimpl_l1_batch::L1BatchProofOutput;
 use strata_state::batch::{BatchInfo, BootstrapState};
-use strata_zkvm::Proof;
+use strata_zkvm::{Proof, ZkVm};
 
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct CheckpointProofInput {
@@ -130,4 +130,39 @@ pub fn process_checkpoint_proof(
         l1_batch_output.rollup_params_commitment,
     );
     (output, opt_prev_output)
+}
+
+pub fn process_checkpoint_proof_outer(
+    zkvm: &impl ZkVm,
+    l1_batch_vk: &[u32; 8],
+    l2_batch_vk: &[u32; 8],
+) {
+    let rollup_params: RollupParams = zkvm.read();
+    let rollup_vk = match rollup_params.rollup_vk() {
+        RollupVerifyingKey::SP1VerifyingKey(sp1_vk) => sp1_vk,
+        _ => panic!("Need SP1VerifyingKey"),
+    };
+
+    // verify l1 proof
+    let l1_batch_pp = zkvm.read_borsh();
+    zkvm.verify_proof(l1_batch_vk, &borsh::to_vec(&l1_batch_pp).unwrap()); // TODO: avoid double serialization/deserialization
+
+    // verify l2 proof
+    let l2_batch_pp = zkvm.read_borsh();
+    zkvm.verify_proof(l2_batch_vk, &borsh::to_vec(&l2_batch_pp).unwrap()); // TODO: avoid double serialization/deserialization
+
+    let (output, prev_checkpoint) = process_checkpoint_proof(&l1_batch_pp, &l2_batch_pp);
+
+    if let Some(prev_checkpoint) = prev_checkpoint {
+        let (checkpoint, proof) = prev_checkpoint;
+        assert!(zkvm
+            .verify_groth16(
+                proof.as_bytes(),
+                rollup_vk.as_bytes(),
+                &borsh::to_vec(&checkpoint).unwrap(),
+            )
+            .is_ok());
+    }
+
+    zkvm.commit_borsh(&output);
 }
