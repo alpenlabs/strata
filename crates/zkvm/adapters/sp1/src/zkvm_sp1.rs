@@ -1,5 +1,4 @@
 use anyhow::Context;
-use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{de::DeserializeOwned, Serialize};
 use sha2::{Digest, Sha256};
 use snark_bn254_verifier::Groth16Verifier;
@@ -19,21 +18,12 @@ impl ZkVm for ZkVmSp1 {
         io::read()
     }
 
-    fn read_borsh<T: BorshSerialize + BorshDeserialize>(&self) -> T {
-        let borsh_serialized = io::read_vec();
-        borsh::from_slice(&borsh_serialized).expect("failed borsh deserialization")
-    }
-
     fn read_slice(&self) -> Vec<u8> {
         io::read_vec()
     }
 
     fn commit<T: Serialize>(&self, output: &T) {
         io::commit(&output);
-    }
-
-    fn commit_borsh<T: BorshSerialize + BorshDeserialize>(&self, output: &T) {
-        io::commit_slice(&borsh::to_vec(output).expect("failed borsh serialization"));
     }
 
     fn commit_slice(&self, output_raw: &[u8]) {

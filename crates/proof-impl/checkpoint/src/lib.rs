@@ -144,12 +144,8 @@ pub fn process_checkpoint_proof_outer(
     };
 
     // verify l1 proof
-    let l1_batch_pp = zkvm.read_borsh();
-    zkvm.verify_proof(l1_batch_vk, &borsh::to_vec(&l1_batch_pp).unwrap()); // TODO: avoid double serialization/deserialization
-
-    // verify l2 proof
-    let l2_batch_pp = zkvm.read_borsh();
-    zkvm.verify_proof(l2_batch_vk, &borsh::to_vec(&l2_batch_pp).unwrap()); // TODO: avoid double serialization/deserialization
+    let l1_batch_pp = zkvm.read_verified_borsh(l1_batch_vk);
+    let l2_batch_pp = zkvm.read_verified_borsh(l2_batch_vk);
 
     let (output, prev_checkpoint) = process_checkpoint_proof(&l1_batch_pp, &l2_batch_pp);
 

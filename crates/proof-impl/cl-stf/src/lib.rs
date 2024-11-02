@@ -109,10 +109,8 @@ pub fn process_cl_stf(zkvm: &impl ZkVm, el_vkey: &[u32; 8]) {
     let rollup_params: RollupParams = zkvm.read();
     let (prev_state, block): (ChainState, L2Block) = zkvm.read_borsh();
 
-    // Verify the EL proof
-    let el_pp_raw = zkvm.read_slice();
-    zkvm.verify_proof(el_vkey, &el_pp_raw);
-    let el_pp_deserialized: ELProofPublicParams = bincode::deserialize(&el_pp_raw).unwrap();
+    // Read the EL proof output
+    let el_pp_deserialized: ELProofPublicParams = zkvm.read_verfied(el_vkey);
 
     let new_state = verify_and_transition(
         prev_state.clone(),

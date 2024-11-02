@@ -13517,6 +13517,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "arbitrary",
+ "bincode",
  "borsh",
  "serde",
 ]
