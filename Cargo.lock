@@ -13327,6 +13327,8 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.8",
+ "snark-bn254-verifier",
+ "sp1-primitives",
  "sp1-sdk",
  "sp1-verifier",
  "strata-primitives",
