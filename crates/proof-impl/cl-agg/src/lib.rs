@@ -8,14 +8,14 @@ pub fn process_cl_agg(zkvm: &impl ZkVm, cl_stf_vk: &[u32; 8]) {
         "At least one CL proof is required for aggregation"
     );
 
-    let cl_proof_pp_start = read_and_validate_next_proof(zkvm, cl_stf_vk);
+    let cl_proof_pp_start: L2BatchProofOutput = zkvm.read_verified_borsh(cl_stf_vk);
     let mut cl_proof_pp_prev = cl_proof_pp_start.clone();
     let mut acc_deposits = cl_proof_pp_start.deposits.clone();
 
     let rollup_params_commitment = cl_proof_pp_start.rollup_params_commitment();
 
     for _ in 0..(num_agg_inputs - 1) {
-        let next_proof_pp = read_and_validate_next_proof(zkvm, cl_stf_vk);
+        let next_proof_pp = zkvm.read_verified_borsh(cl_stf_vk);
         validate_proof_consistency(&cl_proof_pp_prev, &next_proof_pp);
         assert_eq!(
             rollup_params_commitment,
@@ -35,12 +35,6 @@ pub fn process_cl_agg(zkvm: &impl ZkVm, cl_stf_vk: &[u32; 8]) {
     };
 
     zkvm.commit_borsh(&public_params);
-}
-
-fn read_and_validate_next_proof(zkvm: &impl ZkVm, cl_block_vkey: &[u32; 8]) -> L2BatchProofOutput {
-    let cl_proof_pp_raw = zkvm.read_slice();
-    zkvm.verify_proof(cl_block_vkey, &cl_proof_pp_raw);
-    borsh::from_slice(&cl_proof_pp_raw).unwrap()
 }
 
 fn validate_proof_consistency(

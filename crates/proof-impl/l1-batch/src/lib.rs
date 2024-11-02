@@ -44,10 +44,7 @@ pub fn process_l1_batch_proof(zkvm: &impl ZkVm, btc_blockspace_vk: &[u32; 8]) {
     let mut rollup_params_commitment = None;
 
     for _ in 0..num_inputs {
-        let blkpo_raw = zkvm.read_slice();
-        zkvm.verify_proof(btc_blockspace_vk, &blkpo_raw);
-
-        let blkpo: BlockspaceProofOutput = borsh::from_slice(&blkpo_raw).unwrap();
+        let blkpo: BlockspaceProofOutput = zkvm.read_verified_borsh(btc_blockspace_vk);
         let header: Header = deserialize(&blkpo.header_raw).unwrap();
 
         state.check_and_update_continuity(&header, &get_btc_params());

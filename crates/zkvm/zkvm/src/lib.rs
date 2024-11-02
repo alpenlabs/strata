@@ -219,11 +219,6 @@ pub trait ZkVm {
     /// The input is expected to be written with [`ZKVMInputBuilder::write_serialized`].
     fn read_slice(&self) -> Vec<u8>;
 
-    /// Reads a Borsh-serialized object from the guest code.
-    ///
-    /// The input is expected to be written with [`ZKVMInputBuilder::write_borsh`].
-    fn read_borsh<T: BorshSerialize + BorshDeserialize>(&self) -> T;
-
     /// Commits a Serde-serializable object to the public values stream.
     ///
     /// Values that are committed can be proven as public parameters.
@@ -235,11 +230,6 @@ pub trait ZkVm {
     /// outside of the ZkVM's standard serialization methods. It allows you to provide
     /// serialized outputs directly, bypassing any further serialization.
     fn commit_slice(&self, raw_output: &[u8]);
-
-    /// Commits a Borsh-serializable object to the public values stream.
-    ///
-    /// Values that are committed can be proven as public parameters.
-    fn commit_borsh<T: BorshSerialize + BorshDeserialize>(&self, output: &T);
 
     /// Verifies a proof generated with the ZkVM.
     ///
@@ -266,4 +256,49 @@ pub trait ZkVm {
         verification_key: &[u8],
         public_params_raw: &[u8],
     ) -> anyhow::Result<()>;
+
+    /// Reads a Borsh-serialized object from the guest code.
+    ///
+    /// The input is expected to be written with [`ZKVMInputBuilder::write_borsh`].
+    fn read_borsh<T: BorshSerialize + BorshDeserialize>(&self) -> T {
+        let slice = self.read_slice();
+        borsh::from_slice(&slice).expect("borsh serialization failed")
+    }
+
+    /// Commits a Borsh-serializable object to the public values stream.
+    ///
+    /// Values that are committed can be proven as public parameters.
+    fn commit_borsh<T: BorshSerialize + BorshDeserialize>(&self, output: &T) {
+        self.commit_slice(&borsh::to_vec(output).expect("failed borsh serialization"));
+    }
+
+    /// Reads and verifies a committed output from another guest function, deserializing it using
+    /// Serde.
+    ///
+    /// This function is meant to read the committed output of another guest function
+    /// that was written with [`commit`].
+    /// It then verifies the proof against the given verification key digest.
+    ///
+    /// This is equivalent to calling [`read`] and [`verify_proof`], but avoids double serialization
+    /// and deserialization. The function will panic if the proof fails to verify.
+    fn read_verfied<T: DeserializeOwned>(&self, vk_digest: &[u32; 8]) -> T {
+        let public_values_raw = self.read_slice();
+        self.verify_proof(vk_digest, &public_values_raw);
+        bincode::deserialize(&public_values_raw).expect("failed bincode deserialization")
+    }
+
+    /// Reads and verifies a committed output from another guest function, deserializing it using
+    /// Borsh.
+    ///
+    /// This function is similar to [`read_verified`], but is intended for guest commitments
+    /// committed via [`commit_borsh`]. The output is expected to be Borsh-serializable.
+    /// It then verifies the proof using the internal verification key context.
+    ///
+    /// This is equivalent to calling [`read_borsh`] and [`verify_proof`], but avoids double
+    /// serialization and deserialization. The function will panic if the proof fails to verify.
+    fn read_verified_borsh<T: BorshSerialize + BorshDeserialize>(&self, vk_digest: &[u32; 8]) -> T {
+        let public_values_raw = self.read_slice();
+        self.verify_proof(vk_digest, &public_values_raw);
+        borsh::from_slice(&public_values_raw).expect("failed borsh deserialization")
+    }
 }

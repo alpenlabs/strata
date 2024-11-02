@@ -1,5 +1,4 @@
 use anyhow::ensure;
-use borsh::{BorshDeserialize, BorshSerialize};
 use risc0_zkvm::{guest::env, Groth16Receipt, MaybePruned, ReceiptClaim};
 use serde::{de::DeserializeOwned, Serialize};
 use sha2::Digest;
@@ -12,13 +11,6 @@ impl ZkVm for ZkVmRisc0 {
         env::read()
     }
 
-    fn read_borsh<T: BorshSerialize + BorshDeserialize>(&self) -> T {
-        let len: u32 = env::read();
-        let mut slice = vec![0u8; len as usize];
-        env::read_slice(&mut slice);
-        borsh::from_slice(&slice).expect("failed borsh deserialization")
-    }
-
     fn read_slice(&self) -> Vec<u8> {
         let len: u32 = env::read();
         let mut slice = vec![0u8; len as usize];
@@ -28,10 +20,6 @@ impl ZkVm for ZkVmRisc0 {
 
     fn commit<T: Serialize>(&self, output: &T) {
         env::write(output);
-    }
-
-    fn commit_borsh<T: BorshSerialize + BorshDeserialize>(&self, output: &T) {
-        env::commit_slice(&borsh::to_vec(&output).expect("failed borsh serialization"));
     }
 
     fn commit_slice(&self, output_raw: &[u8]) {
