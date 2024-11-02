@@ -12992,6 +12992,7 @@ dependencies = [
  "serde_json",
  "strata-reth-evm",
  "strata-reth-primitives",
+ "strata-zkvm",
  "thiserror",
 ]
 

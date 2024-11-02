@@ -27,12 +27,19 @@ use processor::{EvmConfig, EvmProcessor};
 use reth_primitives::{
     alloy_primitives::FixedBytes, Address, Bytes, Header, TransactionSignedNoHash, Withdrawal, B256,
 };
-use revm::InMemoryDB;
+use revm::{primitives::SpecId, InMemoryDB};
 use serde::{Deserialize, Serialize};
 use strata_reth_evm::collect_withdrawal_intents;
 use strata_reth_primitives::WithdrawalIntent;
+use strata_zkvm::ZkVm;
 
 use crate::mpt::{MptNode, StorageEntry};
+
+// TODO: Read the evm config from the genesis config. This should be done in compile time.
+const EVM_CONFIG: EvmConfig = EvmConfig {
+    chain_id: 12345,
+    spec_id: SpecId::SHANGHAI,
+};
 
 /// Public Parameters that proof asserts
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -135,6 +142,12 @@ pub fn process_block_transaction(
         deposits_txns_root: block_header.withdrawals_root.unwrap_or_default(),
         withdrawal_intents,
     }
+}
+
+pub fn process_block_transaction_outer(zkvm: &impl ZkVm) {
+    let input: ELProofInput = zkvm.read();
+    let public_params = process_block_transaction(input, EVM_CONFIG);
+    zkvm.commit(&public_params);
 }
 
 #[cfg(test)]
