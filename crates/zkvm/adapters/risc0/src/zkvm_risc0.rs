@@ -8,41 +8,42 @@ use strata_zkvm::ZkVm;
 pub struct ZkVmRisc0;
 
 impl ZkVm for ZkVmRisc0 {
-    fn read<T: DeserializeOwned>() -> T {
+    fn read<T: DeserializeOwned>(&self) -> T {
         env::read()
     }
 
-    fn read_borsh<T: BorshSerialize + BorshDeserialize>() -> T {
+    fn read_borsh<T: BorshSerialize + BorshDeserialize>(&self) -> T {
         let len: u32 = env::read();
         let mut slice = vec![0u8; len as usize];
         env::read_slice(&mut slice);
         borsh::from_slice(&slice).expect("failed borsh deserialization")
     }
 
-    fn read_slice() -> Vec<u8> {
+    fn read_slice(&self) -> Vec<u8> {
         let len: u32 = env::read();
         let mut slice = vec![0u8; len as usize];
         env::read_slice(&mut slice);
         slice
     }
 
-    fn write<T: Serialize>(output: &T) {
+    fn commit<T: Serialize>(&self, output: &T) {
         env::write(output);
     }
 
-    fn write_borsh<T: BorshSerialize + BorshDeserialize>(output: &T) {
+    fn commit_borsh<T: BorshSerialize + BorshDeserialize>(&self, output: &T) {
         env::commit_slice(&borsh::to_vec(&output).expect("failed borsh serialization"));
     }
 
-    fn write_slice(output_raw: &[u8]) {
+    fn commit_slice(&self, output_raw: &[u8]) {
         env::write_slice(output_raw);
     }
 
-    fn verify_proof(vk_digest: &[u32; 8], public_values: &[u8]) {
+    fn verify_proof(&self, vk_digest: &[u32; 8], public_values: &[u8]) {
         env::verify(*vk_digest, public_values).expect("verification failed")
     }
 
     fn verify_groth16(
+        &self,
         proof: &[u8],
         verification_key: &[u8],
         public_params_raw: &[u8],

@@ -223,6 +223,7 @@ pub trait ZkVm {
     ///
     /// The input is expected to be written with [`ZKVMInputBuilder::write_borsh`].
     fn read_borsh<T: BorshSerialize + BorshDeserialize>(&self) -> T;
+
     /// Commits a Serde-serializable object to the public values stream.
     ///
     /// Values that are committed can be proven as public parameters.
@@ -234,15 +235,18 @@ pub trait ZkVm {
     /// outside of the ZkVM's standard serialization methods. It allows you to provide
     /// serialized outputs directly, bypassing any further serialization.
     fn commit_slice(&self, raw_output: &[u8]);
+
     /// Commits a Borsh-serializable object to the public values stream.
     ///
     /// Values that are committed can be proven as public parameters.
     fn commit_borsh<T: BorshSerialize + BorshDeserialize>(&self, output: &T);
+
     /// Verifies a proof generated with the ZkVM.
     ///
     /// This method checks the validity of the proof against the provided verification key digest
     /// and public values. It will panic if the proof fails to verify.
     fn verify_proof(&self, vk_digest: &[u32; 8], public_values: &[u8]);
+
     /// Verifies a Groth16 proof.
     ///
     /// # Parameters
@@ -256,5 +260,10 @@ pub trait ZkVm {
     ///
     /// Returns `Ok(())` if the proof verifies successfully, or an `anyhow::Error` if verification
     /// fails.
-    fn verify_groth16(&self, proof: &[u8], verification_key: &[u8], public_params_raw: &[u8]);
+    fn verify_groth16(
+        &self,
+        proof: &[u8],
+        verification_key: &[u8],
+        public_params_raw: &[u8],
+    ) -> anyhow::Result<()>;
 }

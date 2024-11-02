@@ -3,47 +3,50 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{de::DeserializeOwned, Serialize};
 use sha2::{Digest, Sha256};
 use snark_bn254_verifier::Groth16Verifier;
-use sp1_sdk::SP1PublicValues;
+use sp1_primitives::io::SP1PublicValues;
 use sp1_zkvm::{io, lib::verify::verify_sp1_proof};
 use strata_zkvm::ZkVm;
 use substrate_bn::Fr;
 
-use crate::verifier::GROTH16_VK_BYTES;
+// Copied from ~/.sp1/circuits/v2.0.0/groth16_vk.bin
+// This is same for all the SP1 programs that uses v2.0.0
+pub const GROTH16_VK_BYTES: &[u8] = include_bytes!("groth16_vk.bin");
 
 pub struct ZkVmSp1;
 
 impl ZkVm for ZkVmSp1 {
-    fn read<T: DeserializeOwned>() -> T {
+    fn read<T: DeserializeOwned>(&self) -> T {
         io::read()
     }
 
-    fn read_borsh<T: BorshSerialize + BorshDeserialize>() -> T {
+    fn read_borsh<T: BorshSerialize + BorshDeserialize>(&self) -> T {
         let borsh_serialized = io::read_vec();
         borsh::from_slice(&borsh_serialized).expect("failed borsh deserialization")
     }
 
-    fn read_slice() -> Vec<u8> {
+    fn read_slice(&self) -> Vec<u8> {
         io::read_vec()
     }
 
-    fn write<T: Serialize>(output: &T) {
+    fn commit<T: Serialize>(&self, output: &T) {
         io::commit(&output);
     }
 
-    fn write_borsh<T: BorshSerialize + BorshDeserialize>(output: &T) {
-        io::commit(&borsh::to_vec(output).expect("failed borsh serialization"));
+    fn commit_borsh<T: BorshSerialize + BorshDeserialize>(&self, output: &T) {
+        io::commit_slice(&borsh::to_vec(output).expect("failed borsh serialization"));
     }
 
-    fn write_slice(output_raw: &[u8]) {
+    fn commit_slice(&self, output_raw: &[u8]) {
         io::commit_slice(output_raw);
     }
 
-    fn verify_proof(vk_digest: &[u32; 8], public_values: &[u8]) {
+    fn verify_proof(&self, vk_digest: &[u32; 8], public_values: &[u8]) {
         let pv_digest = Sha256::digest(public_values);
         verify_sp1_proof(vk_digest, &pv_digest.into())
     }
 
     fn verify_groth16(
+        &self,
         proof: &[u8],
         verification_key: &[u8],
         public_params_raw: &[u8],
