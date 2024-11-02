@@ -18,7 +18,7 @@ use strata_primitives::{
     params::{ProofPublishMode, RollupParams},
     vk::RollupVerifyingKey,
 };
-use strata_sp1_guest_builder::GUEST_CHECKPOINT_ELF_STR;
+use strata_sp1_guest_builder::GUEST_CHECKPOINT_VK_HASH_STR;
 
 // TODO move some of these into a keyderiv crate
 const DERIV_BASE_IDX: u32 = 56;
@@ -362,7 +362,7 @@ fn exec_genparams(cmd: SubcGenParams, ctx: &mut CmdContext) -> anyhow::Result<()
         .unwrap_or(1_000_000_000);
 
     // Parse the checkpoint verification key.
-    let rollup_vk = Buf32(GUEST_CHECKPOINT_ELF_STR.parse().unwrap());
+    let rollup_vk = Buf32(GUEST_CHECKPOINT_VK_HASH_STR.parse().unwrap());
 
     let config = ParamsConfig {
         name: cmd.name.unwrap_or_else(|| "strata-testnet".to_string()),

@@ -185,12 +185,12 @@ where
         let db = ProofDb::new(rbdb, db_ops);
 
         let mut zkvm_manager: ZkVMManager<Vm> = ZkVMManager::new(prover_config);
-        zkvm_manager.add_vm(ProofVm::BtcProving, GUEST_BTC_BLOCKSPACE_ELF.into());
-        zkvm_manager.add_vm(ProofVm::L1Batch, GUEST_L1_BATCH_ELF.into());
-        zkvm_manager.add_vm(ProofVm::ELProving, GUEST_EVM_EE_STF_ELF.into());
-        zkvm_manager.add_vm(ProofVm::CLProving, GUEST_CL_STF_ELF.into());
-        zkvm_manager.add_vm(ProofVm::CLAggregation, GUEST_CL_AGG_ELF.into());
-        zkvm_manager.add_vm(ProofVm::Checkpoint, GUEST_CHECKPOINT_ELF.into());
+        zkvm_manager.add_vm(ProofVm::BtcProving, GUEST_BTC_BLOCKSPACE_ELF.clone());
+        zkvm_manager.add_vm(ProofVm::L1Batch, GUEST_L1_BATCH_ELF.clone());
+        zkvm_manager.add_vm(ProofVm::ELProving, GUEST_EVM_EE_STF_ELF.clone());
+        zkvm_manager.add_vm(ProofVm::CLProving, GUEST_CL_STF_ELF.clone());
+        zkvm_manager.add_vm(ProofVm::CLAggregation, GUEST_CL_AGG_ELF.clone());
+        zkvm_manager.add_vm(ProofVm::Checkpoint, GUEST_CHECKPOINT_ELF.clone());
 
         Self {
             pool: rayon::ThreadPoolBuilder::new()

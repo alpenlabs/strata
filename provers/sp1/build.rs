@@ -43,9 +43,6 @@ fn main() {
         CHECKPOINT,
     ];
 
-    // String to accumulate the contents of methods.rs file
-    let mut methods_file_content = String::new();
-
     // HashSet to keep track of programs that have been built
     let mut built_programs = HashSet::new();
 
@@ -69,17 +66,28 @@ fn main() {
         );
     }
 
+    // String to accumulate the contents of methods.rs file
+    // Start with the necessary use statements
+    let mut methods_file_content = String::from(
+        r#"
+use once_cell::sync::Lazy;
+use std::fs;
+"#,
+    );
+
     // Write the methods.rs file with ELF contents and VK hashes
-    for (elf_name, (elf_contents, vk_hash_u32, vk_hash_str)) in &results {
-        let elf_name_id = format!("{}_ID", elf_name);
-        let elf_name_str = format!("{}_STR", elf_name);
+    for (program_name, (vk_hash_u32, vk_hash_str)) in &results {
+        let program_name_upper = program_name.to_uppercase().replace("-", "_");
+        let base_path = format!("../../../../../../provers/sp1/{0}/cache/{0}", program_name);
         methods_file_content.push_str(&format!(
             r#"
-pub const {}: &[u8] = &{:?};
-pub const {}: &[u32] = &{:?};
-pub const {}: &str = "{}";
+pub static {0}_ELF: Lazy<Vec<u8>> = Lazy::new(||{{ fs::read("{1}.elf").expect("Cannot find ELF") }});
+pub static {0}_PK: Lazy<Vec<u8>> = Lazy::new(||{{ fs::read("{1}.pk").expect("Cannot find PK") }});
+pub static {0}_VK: Lazy<Vec<u8>> = Lazy::new(||{{ fs::read("{1}.vk").expect("Cannot find VK") }});
+pub const {0}_VK_HASH_U32: &[u32] = &{2:?};
+pub const {0}_VK_HASH_STR: &str = "{3}";
 "#,
-            elf_name, elf_contents, elf_name_id, vk_hash_u32, elf_name_str, vk_hash_str
+            program_name_upper, base_path, vk_hash_u32, vk_hash_str
         ));
     }
 
@@ -100,7 +108,7 @@ fn build_program_with_dependencies(
     program: &str,
     dependencies: &HashMap<&str, Vec<&str>>,
     built_programs: &mut HashSet<String>,
-    results: &mut HashMap<String, (Vec<u8>, [u32; 8], String)>,
+    results: &mut HashMap<String, ([u32; 8], String)>,
     vk_hashes: &mut HashMap<String, [u32; 8]>,
 ) {
     // If the program has already been built, return early
@@ -135,17 +143,11 @@ fn build_program_with_dependencies(
         }
     }
 
-    // Now build the current program
-    let elf_name = format!("{}_ELF", program.to_uppercase().replace("-", "_"));
-
     // Build the program and generate ELF contents and VK hash
-    let (elf_contents, vk_hash_u32, vk_hash_str) = generate_elf_contents_and_vk_hash(program);
+    let (vk_hash_u32, vk_hash_str) = generate_elf_contents_and_vk_hash(program);
 
     // Store the results
-    results.insert(
-        elf_name.clone(),
-        (elf_contents.clone(), vk_hash_u32, vk_hash_str),
-    );
+    results.insert(program.to_string(), (vk_hash_u32, vk_hash_str));
     vk_hashes.insert(program.to_string(), vk_hash_u32);
     built_programs.insert(program.to_string());
 }
@@ -176,7 +178,7 @@ fn is_cache_valid(expected_id: &[u8; 32], paths: &[PathBuf; 4]) -> bool {
 
 /// Ensures the cache is valid and returns the ELF contents and SP1 Verifying Key.
 #[cfg(not(debug_assertions))]
-fn ensure_cache_validity(program: &str) -> Result<(Vec<u8>, SP1VerifyingKey), String> {
+fn ensure_cache_validity(program: &str) -> Result<SP1VerifyingKey, String> {
     let cache_dir = format!("{}/cache", program);
     let paths = ["elf", "id", "vk", "pk"]
         .map(|file| Path::new(&cache_dir).join(format!("{}.{}", program, file)));
@@ -200,24 +202,20 @@ fn ensure_cache_validity(program: &str) -> Result<(Vec<u8>, SP1VerifyingKey), St
         fs::write(&paths[3], serialize(&pk).expect("PK serialization failed"))
             .map_err(|e| format!("Failed to write PK file {}: {}", paths[3].display(), e))?;
 
-        Ok((elf, vk))
+        Ok(vk)
     } else {
         // Cache is valid, read the VK
         let serialized_vk = fs::read(&paths[2])
             .map_err(|e| format!("Failed to read VK file {}: {}", paths[2].display(), e))?;
         let vk: SP1VerifyingKey =
             deserialize(&serialized_vk).map_err(|e| format!("VK deserialization failed: {}", e))?;
-        Ok((elf, vk))
+        Ok(vk)
     }
 }
 
 /// Generates the ELF contents and VK hash for a given program.
 #[cfg(not(debug_assertions))]
-fn generate_elf_contents_and_vk_hash(program: &str) -> (Vec<u8>, [u32; 8], String) {
-    // Setup compiler
-    const RISC_V_COMPILER: &str = "/opt/riscv/bin/riscv-none-elf-gcc";
-    env::set_var("CC_riscv32im_succinct_zkvm_elf", RISC_V_COMPILER);
-
+fn generate_elf_contents_and_vk_hash(program: &str) -> ([u32; 8], String) {
     let build_args = BuildArgs {
         elf_name: format!("{}.elf", program),
         output_directory: "cache".to_owned(),
@@ -228,15 +226,14 @@ fn generate_elf_contents_and_vk_hash(program: &str) -> (Vec<u8>, [u32; 8], Strin
     build_program_with_args(program, build_args);
 
     // Now, ensure cache validity
-    let (elf, vk) = ensure_cache_validity(program)
+    let vk = ensure_cache_validity(program)
         .expect("Failed to ensure cache validity after building program");
-    (elf, vk.hash_u32(), vk.bytes32())
+    (vk.hash_u32(), vk.bytes32())
 }
 
 #[cfg(debug_assertions)]
-fn generate_elf_contents_and_vk_hash(_program: &str) -> (Vec<u8>, [u32; 8], String) {
+fn generate_elf_contents_and_vk_hash(_program: &str) -> ([u32; 8], String) {
     (
-        Vec::new(),
         [0u32; 8],
         "0x0000000000000000000000000000000000000000000000000000000000000000".to_owned(),
     )
