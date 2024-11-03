@@ -65,6 +65,6 @@ impl ProofGenerator<u64> for ClProofGenerator {
     }
 
     fn get_elf(&self) -> &[u8] {
-        GUEST_CL_STF_ELF
+        &GUEST_CL_STF_ELF
     }
 }

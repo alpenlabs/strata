@@ -45,6 +45,6 @@ impl ProofGenerator<Block> for BtcBlockProofGenerator {
     }
 
     fn get_elf(&self) -> &[u8] {
-        GUEST_BTC_BLOCKSPACE_ELF
+        &GUEST_BTC_BLOCKSPACE_ELF
     }
 }

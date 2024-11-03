@@ -46,6 +46,6 @@ impl ProofGenerator<u64> for ElProofGenerator {
     }
 
     fn get_elf(&self) -> &[u8] {
-        GUEST_EVM_EE_STF_ELF
+        &GUEST_EVM_EE_STF_ELF
     }
 }
