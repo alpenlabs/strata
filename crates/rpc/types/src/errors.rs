@@ -27,6 +27,9 @@ pub enum RpcServerError {
     #[error("tried to call chain-related method before rollup genesis")]
     BeforeGenesis,
 
+    #[error("tried to call checkpoint-related method before first checkpoint")]
+    BeforeCheckpoint,
+
     #[error("unknown idx {0}")]
     UnknownIdx(u32),
 
@@ -76,6 +79,7 @@ impl RpcServerError {
             Self::Db(_) => -32605,
             Self::ClientNotStarted => -32606,
             Self::BeforeGenesis => -32607,
+            Self::BeforeCheckpoint => -32613,
             Self::FetchLimitReached(_, _) => -32608,
             Self::UnknownIdx(_) => -32608,
             Self::MissingL1BlockManifest(_) => -32609,

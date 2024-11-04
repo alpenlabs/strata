@@ -130,6 +130,30 @@ impl<D: Database + Sync + Send + 'static> StrataRpcImpl<D> {
 
         Ok((cs, Some(chs)))
     }
+
+    async fn get_last_checkpoint_chainstate(&self) -> Result<Arc<ChainState>, Error> {
+        let cs = self.get_client_state().await;
+
+        let Some(last_checkpoint) = cs.l1_view().last_finalized_checkpoint() else {
+            return Err(Error::BeforeCheckpoint);
+        };
+        let (_, l2_blockidx) = last_checkpoint.batch_info.l2_range;
+
+        // in current implementation, chainstate idx == l2 block idx
+        let idx = l2_blockidx;
+
+        let db = self.database.clone();
+
+        wait_blocking("load_checkpoint_chainstate", move || {
+            let chainstate_prov = db.chain_state_provider();
+            let chainstate = chainstate_prov
+                .get_toplevel_state(idx)?
+                .ok_or(Error::MissingChainstate(idx))?;
+
+            Ok(Arc::new(chainstate))
+        })
+        .await
+    }
 }
 
 fn conv_blk_header_to_rpc(blk_header: &impl L2Header) -> BlockHeader {
@@ -513,14 +537,18 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
 
         let deposit_duties = deposit_duties.map(BridgeDuty::from);
 
-        let (_, current_states) = self.get_cur_states().await?;
-        let chain_state = current_states.ok_or(Error::BeforeGenesis)?;
-
-        let withdrawal_duties = extract_withdrawal_infos(&chain_state).map(BridgeDuty::from);
+        // withdrawal duties should only be generated from finalized checkpoint states
+        let withdrawal_duties = match self.get_last_checkpoint_chainstate().await {
+            Ok(chainstate) => Ok(extract_withdrawal_infos(&chainstate)
+                .map(BridgeDuty::from)
+                .collect()),
+            Err(Error::BeforeCheckpoint) => Ok(Vec::new()),
+            Err(err) => Err(err),
+        }?;
 
         let mut duties = vec![];
         duties.extend(deposit_duties);
-        duties.extend(withdrawal_duties);
+        duties.extend(withdrawal_duties.into_iter());
 
         info!(%operator_idx, %start_index, "dispatching duties");
         Ok(BridgeDuties {

@@ -72,6 +72,10 @@ ROLLUP_PARAMS_FOR_DEPOSIT_TX = {
             }
         ]
     },
+    "proof_publish_mode": {
+        # use an empty proof in batch after this many seconds of not receiving a proof
+        "timeout": 5,
+    },
 }
 
 PROVER_ROLLUP_PARAMS = {
