@@ -12,7 +12,7 @@ strata-eectl.workspace = true
 strata-primitives.workspace = true
 strata-risc0-adapter.workspace = true
 strata-rpc-types.workspace = true
-strata-sp1-adapter = { workspace = true, features = ["prover"] }
+strata-sp1-adapter = { workspace = true, features = ["zkvm"] }
 strata-state.workspace = true
 strata-status.workspace = true
 strata-storage.workspace = true

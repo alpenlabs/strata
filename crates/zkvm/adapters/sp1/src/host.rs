@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
 use anyhow::Ok;
-use sp1_sdk::{ProverClient, SP1ProvingKey, SP1VerifyingKey};
+use serde::{de::DeserializeOwned, Serialize};
+use sp1_sdk::{ProverClient, SP1ProofWithPublicValues, SP1ProvingKey, SP1VerifyingKey};
 use strata_zkvm::{Proof, ProverOptions, VerificationKey, ZkVmHost, ZkVmInputBuilder};
 
 use crate::{input::SP1ProofInputBuilder, utils::get_proving_keys};
@@ -70,20 +71,40 @@ impl ZkVmHost for SP1Host {
         let verification_key = bincode::serialize(&self.vkey).unwrap();
         VerificationKey::new(verification_key)
     }
+
+    fn verify(verification_key: &VerificationKey, proof: &Proof) -> anyhow::Result<()> {
+        let proof: SP1ProofWithPublicValues = bincode::deserialize(proof.as_bytes())?;
+        let vkey: SP1VerifyingKey = bincode::deserialize(&verification_key.0)?;
+
+        let client = ProverClient::new();
+        client.verify(&proof, &vkey)?;
+
+        Ok(())
+    }
+
+    fn extract_public_output<T: Serialize + DeserializeOwned>(proof: &Proof) -> anyhow::Result<T> {
+        let mut proof: SP1ProofWithPublicValues = bincode::deserialize(proof.as_bytes())?;
+        let public_params: T = proof.public_values.read();
+        Ok(public_params)
+    }
+
+    fn extract_raw_public_output(proof: &Proof) -> anyhow::Result<Vec<u8>> {
+        let proof: SP1ProofWithPublicValues = bincode::deserialize(proof.as_bytes())?;
+        Ok(proof.public_values.as_slice().to_vec())
+    }
 }
 
 // NOTE: SP1 prover runs in release mode only; therefore run the tests on release mode only
 #[cfg(test)]
-#[cfg(not(debug_assertions))]
+// #[cfg(not(debug_assertions))]
 mod tests {
 
     use std::{fs::File, io::Write};
 
     use sp1_sdk::{HashableKey, SP1VerifyingKey};
-    use strata_zkvm::ZkVmVerifier;
+    use strata_zkvm::ZkVmHost;
 
     use super::*;
-    use crate::SP1Verifier;
 
     // Adding compiled guest code `TEST_ELF` to save the build time
     // #![no_main]
@@ -99,7 +120,7 @@ mod tests {
         let input: u32 = 1;
 
         let mut prover_input_builder = SP1ProofInputBuilder::new();
-        prover_input_builder.write(&input).unwrap();
+        prover_input_builder.write_serde(&input).unwrap();
         let prover_input = prover_input_builder.build().unwrap();
 
         // assert proof generation works
@@ -107,31 +128,14 @@ mod tests {
         let (proof, vk) = zkvm.prove(prover_input).expect("Failed to generate proof");
 
         // assert proof verification works
-        SP1Verifier::verify(&vk, &proof).expect("Proof verification failed");
+        SP1Host::verify(&vk, &proof).expect("Proof verification failed");
 
         // assert public outputs extraction from proof  works
-        let out: u32 = SP1Verifier::extract_public_output(&proof).expect(
+        let out: u32 = SP1Host::extract_public_output(&proof).expect(
             "Failed to extract public
     outputs",
         );
         assert_eq!(input, out)
-    }
-
-    #[test]
-    fn test_mock_prover_with_public_param() {
-        let input: u32 = 1;
-
-        let mut prover_input_builder = SP1ProofInputBuilder::new();
-        prover_input_builder.write(&input).unwrap();
-        let prover_input = prover_input_builder.build().unwrap();
-
-        // assert proof generation works
-        let zkvm = SP1Host::init(TEST_ELF.to_vec(), ProverOptions::default());
-        let (proof, vk) = zkvm.prove(prover_input).expect("Failed to generate proof");
-
-        // assert proof verification works
-        SP1Verifier::verify_with_public_params(&vk, input, &proof)
-            .expect("Proof verification failed");
     }
 
     #[test]
@@ -141,7 +145,7 @@ mod tests {
         let input: u32 = 1;
 
         let prover_input = SP1ProofInputBuilder::new()
-            .write(&input)
+            .write_serde(&input)
             .unwrap()
             .build()
             .unwrap();

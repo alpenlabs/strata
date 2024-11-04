@@ -1,7 +1,7 @@
 #[cfg(feature = "prover")]
-mod prover;
+mod host;
 #[cfg(feature = "prover")]
-pub use prover::SP1Host;
+pub use host::SP1Host;
 
 #[cfg(feature = "prover")]
 mod input;
@@ -9,11 +9,6 @@ mod input;
 mod utils;
 #[cfg(feature = "prover")]
 pub use input::SP1ProofInputBuilder;
-
-#[cfg(feature = "prover")]
-mod verifier;
-#[cfg(feature = "prover")]
-pub use verifier::SP1Verifier;
 
 #[cfg(feature = "zkvm")]
 mod env;

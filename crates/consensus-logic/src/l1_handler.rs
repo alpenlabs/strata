@@ -15,13 +15,13 @@ use strata_primitives::{
     params::{Params, RollupParams},
     vk::RollupVerifyingKey,
 };
-use strata_risc0_adapter::Risc0Verifier;
-use strata_sp1_adapter::SP1Verifier;
+use strata_risc0_adapter::Risc0ZkVmEnv;
+use strata_sp1_adapter::Sp1ZkVmEnv;
 use strata_state::{
     batch::BatchCheckpoint, l1::L1Tx, sync_event::SyncEvent, tx::ProtocolOperation,
 };
 use strata_tx_parser::messages::{BlockData, L1Event};
-use strata_zkvm::ZkVmVerifier;
+use strata_zkvm::ZkVmEnv;
 use tokio::sync::mpsc;
 use tracing::*;
 
@@ -186,10 +186,10 @@ pub fn verify_proof(
     // checkpoint
     let res = panic::catch_unwind(|| match rollup_vk {
         RollupVerifyingKey::Risc0VerifyingKey(vk) => {
-            Risc0Verifier::verify_groth16(proof, vk.as_ref(), &public_params_raw)
+            Risc0ZkVmEnv.verify_groth16_proof(proof.as_bytes(), vk.as_ref(), &public_params_raw)
         }
         RollupVerifyingKey::SP1VerifyingKey(vk) => {
-            SP1Verifier::verify_groth16(proof, vk.as_ref(), &public_params_raw)
+            Sp1ZkVmEnv.verify_groth16_proof(proof.as_bytes(), vk.as_ref(), &public_params_raw)
         }
     });
     match res {
