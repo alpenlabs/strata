@@ -18,6 +18,7 @@
 pub mod db;
 pub mod mpt;
 pub mod processor;
+pub mod prover;
 
 use std::collections::HashMap;
 

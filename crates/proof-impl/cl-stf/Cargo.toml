@@ -11,6 +11,7 @@ strata-proofimpl-evm-ee-stf.workspace = true
 strata-state.workspace = true
 strata-zkvm.workspace = true
 
+anyhow.workspace = true
 bincode.workspace = true
 borsh.workspace = true
 serde.workspace = true

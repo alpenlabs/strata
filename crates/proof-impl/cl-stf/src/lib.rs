@@ -1,6 +1,8 @@
 //! This crate implements the proof of the chain state transition function (STF) for L2 blocks,
 //! verifying the correct state transitions as new L2 blocks are processed.
 
+pub mod prover;
+
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::{buf::Buf32, evm_exec::create_evm_extra_payload, params::RollupParams};
 use strata_proofimpl_evm_ee_stf::ELProofPublicParams;
