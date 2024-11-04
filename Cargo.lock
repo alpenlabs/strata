@@ -13022,6 +13022,7 @@ dependencies = [
 name = "strata-proofimpl-btc-blockspace"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "bitcoin",
  "borsh",
  "hex",
@@ -13060,6 +13061,7 @@ dependencies = [
 name = "strata-proofimpl-cl-agg"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "borsh",
  "strata-proofimpl-cl-stf",
  "strata-zkvm",
@@ -13069,6 +13071,7 @@ dependencies = [
 name = "strata-proofimpl-cl-stf"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "bincode",
  "borsh",
  "serde",

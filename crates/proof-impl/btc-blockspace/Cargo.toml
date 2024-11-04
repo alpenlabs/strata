@@ -4,6 +4,7 @@ name = "strata-proofimpl-btc-blockspace"
 version = "0.1.0"
 
 [dependencies]
+anyhow.workspace = true
 bitcoin = { workspace = true, features = ["serde"] }
 borsh.workspace = true
 serde = { workspace = true, features = ["derive"] }
