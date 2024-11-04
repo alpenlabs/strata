@@ -22,6 +22,7 @@ DEFAULT_EPOCH_SLOTS = 64
 DEFAULT_GENESIS_TRIGGER_HT = 5
 DEFAULT_OPERATOR_CNT = 2
 DEFAULT_PROOF_TIMEOUT = 5  # Secs
+DEFAULT_TAKEBACK_TIMEOUT = 1008  # Blocks (1 week)
 
 # magic values
 # TODO Remove every single one of these
