@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use strata_zkvm::{ProverOptions, ZkVmHost};
+use strata_zkvm::ZkVmHost;
 use tokio::time::{sleep, Duration};
 use tracing::info;
 
@@ -24,10 +24,10 @@ impl<Vm> ProverManager<Vm>
 where
     Vm: ZkVmHost,
 {
-    pub fn new(task_tracker: Arc<TaskTracker>, prover_options: ProverOptions) -> Self {
+    pub fn new(task_tracker: Arc<TaskTracker>) -> Self {
         Self {
             task_tracker,
-            prover: Prover::new(prover_options),
+            prover: Prover::new(),
         }
     }
 

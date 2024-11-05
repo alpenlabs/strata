@@ -1,6 +1,6 @@
 use std::{collections::HashMap, hash::Hash};
 
-use strata_zkvm::{ProverOptions, ZkVmHost};
+use strata_zkvm::ZkVmHost;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ProofVm {
@@ -14,27 +14,17 @@ pub enum ProofVm {
 
 pub struct ZkVMManager<Vm: ZkVmHost> {
     vms: HashMap<ProofVm, Vm>,
-    prover_config: ProverOptions,
 }
 
 impl<Vm: ZkVmHost> ZkVMManager<Vm> {
-    pub fn new(prover_config: ProverOptions) -> Self {
+    pub fn new() -> Self {
         Self {
             vms: HashMap::new(),
-            prover_config,
         }
     }
 
     pub fn add_vm(&mut self, proof_vm: ProofVm, init_vector: Vec<u8>) {
-        let prover_config = if proof_vm == ProofVm::Checkpoint {
-            let mut config = self.prover_config;
-            config.stark_to_snark_conversion = true;
-            config
-        } else {
-            self.prover_config
-        };
-        self.vms
-            .insert(proof_vm, Vm::init(init_vector, prover_config));
+        self.vms.insert(proof_vm, Vm::init(&init_vector));
     }
 
     pub fn get(&self, proof_vm: &ProofVm) -> Option<Vm> {

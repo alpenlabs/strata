@@ -1,17 +1,14 @@
 use borsh::BorshDeserialize;
 use serde::{de::DeserializeOwned, Serialize};
 
-use crate::{
-    input::ZkVmInputBuilder, proof::Proof, prover::ProverOptions, verifier::VerificationKey,
-    ProofType,
-};
+use crate::{input::ZkVmInputBuilder, proof::Proof, verifier::VerificationKey, ProofType};
 
 /// A trait implemented by the prover ("host") of a zkVM program.
 pub trait ZkVmHost: Send + Sync + Clone {
     type Input<'a>: ZkVmInputBuilder<'a>;
 
     /// Initializes the ZkVm with the provided ELF program and prover configuration.
-    fn init(guest_code: Vec<u8>, prover_options: ProverOptions) -> Self;
+    fn init(guest_code: &[u8]) -> Self;
 
     /// Executes the guest code within the VM, generating and returning the validity proof.
     // TODO: Consider using custom error types instead of a generic error to capture the different
