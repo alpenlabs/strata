@@ -78,7 +78,14 @@ use std::fs;
     // Write the methods.rs file with ELF contents and VK hashes
     for (program_name, (vk_hash_u32, vk_hash_str)) in &results {
         let program_name_upper = program_name.to_uppercase().replace("-", "_");
-        let base_path = format!("../../../../../../provers/sp1/{0}/cache/{0}", program_name);
+        let base_path = Path::new(program_name)
+            .canonicalize()
+            .expect("Cache directory not found");
+        let base_path_str = base_path
+            .to_str()
+            .expect("Failed to convert path to string");
+
+        let full_path_str = format!("{}/cache/{}", base_path_str, program_name);
         methods_file_content.push_str(&format!(
             r#"
 pub static {0}_ELF: Lazy<Vec<u8>> = Lazy::new(||{{ fs::read("{1}.elf").expect("Cannot find ELF") }});
@@ -87,7 +94,7 @@ pub static {0}_VK: Lazy<Vec<u8>> = Lazy::new(||{{ fs::read("{1}.vk").expect("Can
 pub const {0}_VK_HASH_U32: &[u32] = &{2:?};
 pub const {0}_VK_HASH_STR: &str = "{3}";
 "#,
-            program_name_upper, base_path, vk_hash_u32, vk_hash_str
+            program_name_upper, full_path_str, vk_hash_u32, vk_hash_str
         ));
     }
 
