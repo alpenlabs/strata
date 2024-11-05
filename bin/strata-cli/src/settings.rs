@@ -29,7 +29,7 @@ pub struct SettingsFromFile {
     pub bitcoind_rpc_endpoint: Option<String>,
     pub strata_endpoint: String,
     pub faucet_endpoint: String,
-    pub mempool_space_endpoint: Option<String>,
+    pub mempool_endpoint: Option<String>,
     pub blockscout_endpoint: Option<String>,
     pub bridge_pubkey: Option<Hex<[u8; 32]>>,
     pub network: Option<Network>,
@@ -118,7 +118,7 @@ impl Settings {
             })
             .expect("valid length"),
             descriptor_db: descriptor_file,
-            mempool_space_endpoint: from_file.mempool_space_endpoint,
+            mempool_space_endpoint: from_file.mempool_endpoint,
             blockscout_endpoint: from_file.blockscout_endpoint,
             bridge_strata_address: StrataAddress::from_str(BRIDGE_STRATA_ADDRESS)
                 .expect("valid strata address"),
