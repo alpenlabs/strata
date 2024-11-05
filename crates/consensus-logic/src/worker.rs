@@ -213,6 +213,8 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
 
             SyncAction::WriteCheckpoints(_height, checkpoints) => {
                 for c in checkpoints.iter() {
+                    let commitment_info = &c.commitment;
+                    let c = &c.batch_checkpoint;
                     let idx = c.batch_info().idx();
                     let pstatus = CheckpointProvingStatus::ProofReady;
                     let cstatus = CheckpointConfStatus::Confirmed;
@@ -222,14 +224,18 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
                         c.proof().clone(),
                         pstatus,
                         cstatus,
+                        Some(commitment_info.clone().into()),
                     );
 
                     // Store
                     state.checkpoint_db().put_checkpoint_blocking(idx, entry)?;
                 }
             }
+            // FIXME: never called
             SyncAction::FinalizeCheckpoints(_height, checkpoints) => {
                 for c in checkpoints.iter() {
+                    let commitment_info = &c.commitment;
+                    let c = &c.batch_checkpoint;
                     let idx = c.batch_info().idx();
                     let pstatus = CheckpointProvingStatus::ProofReady;
                     let cstatus = CheckpointConfStatus::Finalized;
@@ -239,6 +245,7 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
                         c.proof().clone(),
                         pstatus,
                         cstatus,
+                        Some(commitment_info.clone().into()),
                     );
 
                     // Update

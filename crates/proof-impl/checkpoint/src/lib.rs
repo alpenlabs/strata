@@ -86,6 +86,7 @@ pub fn process_checkpoint_proof(
             l2_batch_output.final_snapshot.hash,
         ),
         l2_batch_output.final_snapshot.l2_blockid,
+        l1_batch_output.final_snapshot.hash.into(),
         (
             l1_batch_output.initial_snapshot.acc_pow,
             l1_batch_output.final_snapshot.acc_pow,

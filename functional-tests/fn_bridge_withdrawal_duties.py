@@ -47,7 +47,7 @@ class BridgeDepositTest(flexitest.Test):
 
         web3.eth.wait_for_transaction_receipt(last_txid, timeout=5)
 
-        # NOTE: this test might be flaky if new checkpoint is already generated at this point 
+        # NOTE: this test might be flaky if new checkpoint is already generated at this point
         duties_resp = seqrpc.strata_getBridgeDuties(operator_idx, start_index)
         assert (
             len(duties_resp["duties"]) == 0

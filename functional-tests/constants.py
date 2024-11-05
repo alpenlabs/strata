@@ -92,3 +92,12 @@ PROVER_ROLLUP_PARAMS = {
         ]
     },
 }
+
+FAST_CHECKPOINT_ROLLUP_PARAMS = {
+    **DEFAULT_ROLLUP_PARAMS,
+    "l1_reorg_safe_depth": 2,
+    "proof_publish_mode": {
+        # use an empty proof in batch after this many seconds of not receiving a proof
+        "timeout": 4,
+    },
+}

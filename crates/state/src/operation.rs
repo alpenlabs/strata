@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use tracing::*;
 
 use crate::{
-    batch::BatchCheckpoint,
+    batch::BatchCheckpointWithCommitment,
     client_state::{ClientState, L1Checkpoint, SyncState},
     id::L2BlockId,
     l1::{HeaderVerificationState, L1BlockId},
@@ -105,11 +105,10 @@ pub enum SyncAction {
     L2Genesis(L1BlockId),
 
     /// Indicates to the worker to write the checkpoints to checkpoint db
-    WriteCheckpoints(u64, Vec<BatchCheckpoint>),
-
+    WriteCheckpoints(u64, Vec<BatchCheckpointWithCommitment>),
     /// Indicates the worker to write the checkpoints to checkpoint db that appear in given L1
     /// height
-    FinalizeCheckpoints(u64, Vec<BatchCheckpoint>),
+    FinalizeCheckpoints(u64, Vec<BatchCheckpointWithCommitment>),
 }
 
 /// Applies client state writes to a target state.

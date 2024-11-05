@@ -8,7 +8,7 @@ use bitcoin::{
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use strata_primitives::buf::Buf32;
-use strata_state::batch::{BatchCheckpoint, BatchInfo, BootstrapState};
+use strata_state::batch::{BatchCheckpoint, BatchInfo, BootstrapState, CommitmentInfo};
 use strata_zkvm::Proof;
 
 /// Represents data for a blob we're still planning to inscribe.
@@ -157,6 +157,9 @@ pub struct CheckpointEntry {
 
     /// Confirmation Status
     pub confirmation_status: CheckpointConfStatus,
+
+    /// checkpoint txn info
+    pub commitment: Option<CheckpointCommitment>,
 }
 
 impl CheckpointEntry {
@@ -166,6 +169,7 @@ impl CheckpointEntry {
         proof: Proof,
         proving_status: CheckpointProvingStatus,
         confirmation_status: CheckpointConfStatus,
+        commitment: Option<CheckpointCommitment>,
     ) -> Self {
         Self {
             batch_info,
@@ -173,6 +177,7 @@ impl CheckpointEntry {
             proof,
             proving_status,
             confirmation_status,
+            commitment,
         }
     }
 
@@ -188,6 +193,7 @@ impl CheckpointEntry {
             Proof::default(),
             CheckpointProvingStatus::PendingProof,
             CheckpointConfStatus::Pending,
+            None,
         )
     }
 
@@ -223,6 +229,23 @@ pub enum CheckpointConfStatus {
     Confirmed,
     /// Finalized on L1
     Finalized,
+}
+
+#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
+pub struct CheckpointCommitment {
+    pub blockhash: Buf32,
+    pub txid: Buf32,
+    pub wtxid: Buf32,
+}
+
+impl From<CommitmentInfo> for CheckpointCommitment {
+    fn from(value: CommitmentInfo) -> Self {
+        Self {
+            blockhash: value.blockhash,
+            txid: value.txid,
+            wtxid: value.wtxid,
+        }
+    }
 }
 
 #[cfg(test)]

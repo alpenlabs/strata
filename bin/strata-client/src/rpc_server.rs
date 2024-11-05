@@ -32,7 +32,6 @@ use strata_rpc_types::{
 };
 use strata_rpc_utils::to_jsonrpsee_error;
 use strata_state::{
-    batch::BatchCheckpoint,
     block::L2BlockBundle,
     bridge_duties::BridgeDuty,
     bridge_ops::WithdrawalIntent,
@@ -586,18 +585,29 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
             .get_checkpoint(idx)
             .await
             .map_err(|e| Error::Other(e.to_string()))?;
-        let batch_comm: Option<BatchCheckpoint> = entry.map(Into::into);
-        Ok(batch_comm.map(|bc| bc.batch_info().clone().into()))
+
+        Ok(entry.map(Into::into))
     }
 
-    async fn get_latest_checkpoint_index(&self) -> RpcResult<Option<u64>> {
-        let idx = self
-            .checkpoint_handle
-            .get_last_checkpoint_idx()
-            .await
-            .map_err(|e| Error::Other(e.to_string()))?;
+    async fn get_latest_checkpoint_index(&self, finalized: Option<bool>) -> RpcResult<Option<u64>> {
+        let finalized = finalized.unwrap_or(false);
+        if finalized {
+            // get last finalized checkpoint index from state
+            let (client_state, _) = self.get_cur_states().await?;
+            Ok(client_state
+                .l1_view()
+                .last_finalized_checkpoint()
+                .map(|checkpoint| checkpoint.batch_info.idx()))
+        } else {
+            // get latest checkpoint index from db
+            let idx = self
+                .checkpoint_handle
+                .get_last_checkpoint_idx()
+                .await
+                .map_err(|e| Error::Other(e.to_string()))?;
 
-        return Ok(idx);
+            Ok(idx)
+        }
     }
 
     async fn get_l2_block_status(&self, block_height: u64) -> RpcResult<L2BlockStatus> {
