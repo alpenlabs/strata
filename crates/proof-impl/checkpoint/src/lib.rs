@@ -9,7 +9,8 @@ use strata_proofimpl_l1_batch::L1BatchProofOutput;
 use strata_state::batch::{BatchInfo, BootstrapState};
 use strata_zkvm::{Proof, ZkVmEnv};
 
-mod prover;
+pub mod prover;
+pub mod verifier;
 
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct CheckpointProofInput {
