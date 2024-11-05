@@ -2,6 +2,7 @@ use strata_proofimpl_cl_stf::L2BatchProofOutput;
 use strata_zkvm::ZkVmEnv;
 
 mod prover;
+pub use prover::*;
 
 pub fn process_cl_agg(zkvm: &impl ZkVmEnv, cl_stf_vk: &[u32; 8]) {
     let num_agg_inputs: u32 = zkvm.read_serde();

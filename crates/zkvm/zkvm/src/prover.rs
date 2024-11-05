@@ -12,12 +12,12 @@ pub trait ZkVmProver {
         B: ZkVmInputBuilder<'a>;
 
     /// Processes the proof to produce the final output.
-    fn process_output<H>(proof: &Proof) -> anyhow::Result<Self::Output>
+    fn process_output<H>(proof: &Proof, host: &H) -> anyhow::Result<Self::Output>
     where
         H: ZkVmHost;
 
     /// Proves the computation using any zkVM host.
-    fn prove<'a, H, V>(input: &'a Self::Input, host: &H) -> anyhow::Result<(Proof, Self::Output)>
+    fn prove<'a, H>(input: &'a Self::Input, host: &H) -> anyhow::Result<(Proof, Self::Output)>
     where
         H: ZkVmHost,
         H::Input<'a>: ZkVmInputBuilder<'a>,
@@ -29,7 +29,7 @@ pub trait ZkVmProver {
         let (proof, _) = host.prove(zkvm_input, Self::proof_type())?;
 
         // Process and return the output using the verifier.
-        let output = Self::process_output::<H>(&proof)?;
+        let output = Self::process_output(&proof, host)?;
 
         Ok((proof, output))
     }

@@ -13,17 +13,8 @@ mod test {
         sp1_sdk::utils::setup_logger();
         let height = 1;
 
-        let prover_ops = ProverOptions {
-            enable_compression: true,
-            stark_to_snark_conversion: false,
-            use_mock_prover: true,
-            use_cached_keys: true,
-        };
         let el_prover = ElProofGenerator::new();
 
-        let (proof, _) = el_prover.get_proof(&height, &prover_ops).unwrap();
-
-        let _ = SP1Verifier::extract_public_output::<ELProofPublicParams>(&proof)
-            .expect("Failed to extract public outputs");
+        let _ = el_prover.get_proof(&height).unwrap();
     }
 }

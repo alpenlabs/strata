@@ -86,6 +86,7 @@ strata-mmr = { path = "crates/util/mmr" }
 strata-primitives = { path = "crates/primitives" }
 strata-proofimpl-btc-blockspace = { path = "crates/proof-impl/btc-blockspace" }
 strata-proofimpl-checkpoint = { path = "crates/proof-impl/checkpoint" }
+strata-proofimpl-cl-agg = { path = "crates/proof-impl/cl-agg" }
 strata-proofimpl-cl-stf = { path = "crates/proof-impl/cl-stf" }
 strata-proofimpl-evm-ee-stf = { path = "crates/proof-impl/evm-ee-stf" }
 strata-proofimpl-l1-batch = { path = "crates/proof-impl/l1-batch" }

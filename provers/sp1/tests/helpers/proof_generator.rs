@@ -1,19 +1,25 @@
 use std::{fs, path::PathBuf};
 
 use anyhow::Result;
-use sp1_sdk::{HashableKey, Prover};
-use strata_zkvm::{Proof, ProofType, VerificationKey};
+use sp1_sdk::{HashableKey, Prover, SP1VerifyingKey};
+use strata_primitives::buf;
+use strata_zkvm::{Proof, ProofType, VerificationKey, ZkVmHost, ZkVmProver};
 
-pub trait ProofGenerator<T> {
+pub trait ProofGenerator<T, P: ZkVmProver> {
     /// Generates a proof based on the input.
-    fn gen_proof(&self, input: &T, proof_type: &ProofType) -> Result<(Proof, VerificationKey)>;
+    fn get_input(&self, input: &T) -> Result<P::Input>;
+
+    fn get_host(&self) -> impl ZkVmHost;
+
+    /// Generates a proof based on the input.
+    fn gen_proof(&self, input: &T) -> Result<(Proof, P::Output)>;
 
     /// Generates a unique proof ID based on the input.
     /// The proof ID will be the hash of the input and potentially other unique identifiers.
     fn get_proof_id(&self, input: &T) -> String;
 
     /// Retrieves a proof from cache or generates it if not found.
-    fn get_proof(&self, input: &T, proof_type: &ProofType) -> Result<(Proof, VerificationKey)> {
+    fn get_proof(&self, input: &T) -> Result<(Proof, P::Output)> {
         let elf = self.get_elf();
 
         // 1. Create the unique proof ID
@@ -28,22 +34,24 @@ pub trait ProofGenerator<T> {
         // 2. Check if the proof file exists
         if proof_file.exists() {
             println!("Proof found in cache, returning the cached proof...",);
-            let proof_res = read_proof_from_file(&proof_file)?;
-            verify_proof(&proof_res.0, elf)?;
-            return Ok(proof_res);
+            let proof = read_proof_from_file(&proof_file)?;
+            let host = self.get_host();
+            verify_proof(&proof, host.get_verification_key())?;
+            let output = P::process_output(&proof, &host)?;
+            return Ok((proof, output));
         }
 
         // 3. Generate the proof
         println!("Proof not found in cache, generating proof...");
-        let proof_res = self.gen_proof(input, proof_type)?;
+        let (proof, output) = self.gen_proof(input)?;
 
         // Verify the proof
-        verify_proof(&proof_res.0, self.get_elf())?;
+        verify_proof(&proof, self.get_host().get_verification_key())?;
 
         // Save the proof to cache
-        write_proof_to_file(&proof_res, &proof_file)?;
+        write_proof_to_file(&proof, &proof_file)?;
 
-        Ok(proof_res)
+        Ok((proof, output))
     }
 
     /// Returns the ELF binary (used for verification).
@@ -60,7 +68,7 @@ fn get_cache_dir() -> std::path::PathBuf {
 }
 
 /// Reads a proof from a file.
-fn read_proof_from_file(proof_file: &std::path::Path) -> Result<(Proof, VerificationKey)> {
+fn read_proof_from_file(proof_file: &std::path::Path) -> Result<Proof> {
     use std::{fs::File, io::Read};
 
     use anyhow::Context;
@@ -72,22 +80,14 @@ fn read_proof_from_file(proof_file: &std::path::Path) -> Result<(Proof, Verifica
     file.read_to_end(&mut buffer)
         .context("Failed to read proof file")?;
 
-    let proof = bincode::deserialize(&buffer).context("Failed to deserialize proof")?;
-
-    Ok(proof)
+    Ok(Proof::new(buffer))
 }
 
 /// Writes a proof to a file.
-fn write_proof_to_file(
-    proof_res: &(Proof, VerificationKey),
-    proof_file: &std::path::Path,
-) -> Result<()> {
+fn write_proof_to_file(proof: &Proof, proof_file: &std::path::Path) -> Result<()> {
     use std::{fs::File, io::Write};
 
     use anyhow::Context;
-
-    let serialized_proof =
-        bincode::serialize(proof_res).context("Failed to serialize proof for writing")?;
 
     let cache_dir = get_cache_dir();
     if !cache_dir.exists() {
@@ -97,23 +97,24 @@ fn write_proof_to_file(
     let mut file = File::create(proof_file)
         .with_context(|| format!("Failed to create proof file {:?}", proof_file))?;
 
-    file.write_all(&serialized_proof)
+    file.write_all(proof.as_bytes())
         .context("Failed to write proof to file")?;
 
     Ok(())
 }
 
 /// Verifies a proof independently.
-fn verify_proof(proof: &Proof, elf: &[u8]) -> Result<()> {
+fn verify_proof(proof: &Proof, verifying_key: VerificationKey) -> Result<()> {
     use anyhow::Context;
     use sp1_sdk::{MockProver, SP1ProofWithPublicValues};
 
     let client = MockProver::new();
     let sp1_proof: SP1ProofWithPublicValues =
         bincode::deserialize(proof.as_bytes()).context("Failed to deserialize SP1 proof")?;
-    let (_, vk) = client.setup(elf);
+    let sp1_verifying_key: SP1VerifyingKey =
+        bincode::deserialize(verifying_key.as_bytes()).expect("sp1 vk deser");
     client
-        .verify(&sp1_proof, &vk)
+        .verify(&sp1_proof, &sp1_verifying_key)
         .context("Independent proof verification failed")?;
     Ok(())
 }
