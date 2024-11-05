@@ -130,11 +130,11 @@ impl<D: Database + Sync + Send + 'static> StrataRpcImpl<D> {
         Ok((cs, Some(chs)))
     }
 
-    async fn get_last_checkpoint_chainstate(&self) -> Result<Arc<ChainState>, Error> {
+    async fn get_last_checkpoint_chainstate(&self) -> Result<Option<Arc<ChainState>>, Error> {
         let cs = self.get_client_state().await;
 
         let Some(last_checkpoint) = cs.l1_view().last_finalized_checkpoint() else {
-            return Err(Error::BeforeCheckpoint);
+            return Ok(None);
         };
         let (_, l2_blockidx) = last_checkpoint.batch_info.l2_range;
 
@@ -149,7 +149,7 @@ impl<D: Database + Sync + Send + 'static> StrataRpcImpl<D> {
                 .get_toplevel_state(idx)?
                 .ok_or(Error::MissingChainstate(idx))?;
 
-            Ok(Arc::new(chainstate))
+            Ok(Some(Arc::new(chainstate)))
         })
         .await
     }
@@ -537,13 +537,18 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
         let deposit_duties = deposit_duties.map(BridgeDuty::from);
 
         // withdrawal duties should only be generated from finalized checkpoint states
-        let withdrawal_duties = match self.get_last_checkpoint_chainstate().await {
-            Ok(chainstate) => Ok(extract_withdrawal_infos(&chainstate)
-                .map(BridgeDuty::from)
-                .collect()),
-            Err(Error::BeforeCheckpoint) => Ok(Vec::new()),
-            Err(err) => Err(err),
-        }?;
+        let withdrawal_duties =
+            self.get_last_checkpoint_chainstate()
+                .await
+                .map(|chainstate_opt| {
+                    chainstate_opt
+                        .map(|chainstate| {
+                            extract_withdrawal_infos(&chainstate)
+                                .map(BridgeDuty::from)
+                                .collect::<Vec<_>>()
+                        })
+                        .unwrap_or_default()
+                })?;
 
         let mut duties = vec![];
         duties.extend(deposit_duties);
