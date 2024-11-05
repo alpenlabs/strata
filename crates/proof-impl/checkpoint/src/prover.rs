@@ -6,11 +6,11 @@ use strata_zkvm::{AggregationInput, Proof, VerificationKey, ZkVmProver};
 use crate::CheckpointProofOutput;
 
 pub struct CheckpointProverInput {
-    rollup_params: RollupParams,
-    l1_batch: (Proof, L1BatchProofOutput),
-    l2_batch: (Proof, L2BatchProofOutput),
-    l1_batch_vk: VerificationKey,
-    l2_batch_vk: VerificationKey,
+    pub rollup_params: RollupParams,
+    pub l1_batch: (Proof, L1BatchProofOutput),
+    pub l2_batch: (Proof, L2BatchProofOutput),
+    pub l1_batch_vk: VerificationKey,
+    pub l2_batch_vk: VerificationKey,
 }
 
 pub struct CheckpointProver;
