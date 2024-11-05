@@ -36,7 +36,7 @@ impl ZkVmProver for ClStfProver {
             .build()
     }
 
-    fn process_output<H>(proof: &Proof) -> anyhow::Result<Self::Output>
+    fn process_output<H>(proof: &Proof, _host: &H) -> anyhow::Result<Self::Output>
     where
         H: strata_zkvm::ZkVmHost,
     {

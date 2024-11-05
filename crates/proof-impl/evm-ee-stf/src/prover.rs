@@ -19,7 +19,7 @@ impl ZkVmProver for EvmEeProver {
         B::new().write_serde(input)?.build()
     }
 
-    fn process_output<H>(proof: &strata_zkvm::Proof) -> anyhow::Result<Self::Output>
+    fn process_output<H>(proof: &strata_zkvm::Proof, _host: &H) -> anyhow::Result<Self::Output>
     where
         H: strata_zkvm::ZkVmHost,
     {

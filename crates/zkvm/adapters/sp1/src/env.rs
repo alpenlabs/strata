@@ -25,7 +25,7 @@ impl ZkVmEnv for Sp1ZkVmEnv {
 
     fn verify_native_proof(&self, vk_digest: &[u32; 8], public_values: &[u8]) {
         let pv_digest = Sha256::digest(public_values);
-        verify_sp1_proof(vk_digest, &pv_digest.into())
+        verify_sp1_proof(vk_digest, &pv_digest.into());
     }
 
     fn verify_groth16_proof(

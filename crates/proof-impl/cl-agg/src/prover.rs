@@ -2,8 +2,8 @@ use strata_proofimpl_cl_stf::L2BatchProofOutput;
 use strata_zkvm::{AggregationInput, Proof, VerificationKey, ZkVmProver};
 
 pub struct ClAggInput {
-    batch: Vec<(Proof, L2BatchProofOutput)>,
-    cl_stf_vk: VerificationKey,
+    pub batch: Vec<(Proof, L2BatchProofOutput)>,
+    pub cl_stf_vk: VerificationKey,
 }
 
 pub struct ClAggProver;
@@ -34,7 +34,7 @@ impl ZkVmProver for ClAggProver {
         input_builder.build()
     }
 
-    fn process_output<H>(proof: &Proof) -> anyhow::Result<Self::Output>
+    fn process_output<H>(proof: &Proof, _host: &H) -> anyhow::Result<Self::Output>
     where
         H: strata_zkvm::ZkVmHost,
     {

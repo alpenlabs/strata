@@ -27,7 +27,7 @@ impl ZkVmProver for BtcBlockspaceProver {
         Ok(zkvm_input)
     }
 
-    fn process_output<H>(proof: &Proof) -> anyhow::Result<Self::Output>
+    fn process_output<H>(proof: &Proof, _host: &H) -> anyhow::Result<Self::Output>
     where
         H: ZkVmHost,
     {

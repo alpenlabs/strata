@@ -4,3 +4,4 @@ mod logic;
 mod prover;
 
 pub use logic::*;
+pub use prover::*;
