@@ -12,8 +12,8 @@ use crate::{
     constants::SATS_TO_WEI,
     seed::Seed,
     settings::Settings,
-    signet::{get_fee_rate, log_fee_rate, print_explorer_url, SignetWallet},
-    strata::StrataWallet,
+    signet::{get_fee_rate, log_fee_rate, print_bitcoin_explorer_url, SignetWallet},
+    strata::{print_strata_explorer_url, StrataWallet},
 };
 
 /// Drains the internal wallet to the provided
@@ -83,7 +83,7 @@ pub async fn drain(
         l1w.sign(&mut psbt, Default::default()).unwrap();
         let tx = psbt.extract_tx().expect("fully signed tx");
         settings.signet_backend.broadcast_tx(&tx).await.unwrap();
-        let _ = print_explorer_url(&tx.compute_txid(), &term, &settings);
+        let _ = print_bitcoin_explorer_url(&tx.compute_txid(), &term, &settings);
         let _ = term.write_line(&format!("Drained signet wallet to {}", address,));
     }
 
@@ -108,7 +108,9 @@ pub async fn drain(
 
         let tx = l2w.transaction_request().to(address).value(max_send_amount);
 
-        let _ = l2w.send_transaction(tx).await.unwrap();
+        let res = l2w.send_transaction(tx).await.unwrap();
+
+        let _ = print_strata_explorer_url(res.tx_hash(), &term, &settings);
 
         let _ = term.write_line(&format!(
             "Drained {} from Strata wallet to {}",
