@@ -29,7 +29,8 @@ pub struct SettingsFromFile {
     pub bitcoind_rpc_endpoint: Option<String>,
     pub strata_endpoint: String,
     pub faucet_endpoint: String,
-    pub mempool_endpoint: String,
+    pub mempool_space_endpoint: Option<String>,
+    pub blockscout_endpoint: Option<String>,
     pub bridge_pubkey: Option<Hex<[u8; 32]>>,
     pub network: Option<Network>,
 }
@@ -44,7 +45,8 @@ pub struct Settings {
     pub faucet_endpoint: String,
     pub bridge_musig2_pubkey: XOnlyPublicKey,
     pub descriptor_db: PathBuf,
-    pub mempool_endpoint: String,
+    pub mempool_space_endpoint: Option<String>,
+    pub blockscout_endpoint: Option<String>,
     pub bridge_strata_address: StrataAddress,
     pub linux_seed_file: PathBuf,
     pub network: Network,
@@ -106,7 +108,6 @@ impl Settings {
             strata_endpoint: from_file.strata_endpoint,
             data_dir: proj_dirs.data_dir().to_owned(),
             faucet_endpoint: from_file.faucet_endpoint,
-            mempool_endpoint: from_file.mempool_endpoint,
             bridge_musig2_pubkey: XOnlyPublicKey::from_slice(&match from_file.bridge_pubkey {
                 Some(key) => key.0,
                 None => {
@@ -116,12 +117,14 @@ impl Settings {
                 }
             })
             .expect("valid length"),
-            config_file: CONFIG_FILE.clone(),
-            network: from_file.network.unwrap_or(DEFAULT_NETWORK),
             descriptor_db: descriptor_file,
+            mempool_space_endpoint: from_file.mempool_space_endpoint,
+            blockscout_endpoint: from_file.blockscout_endpoint,
             bridge_strata_address: StrataAddress::from_str(BRIDGE_STRATA_ADDRESS)
                 .expect("valid strata address"),
             linux_seed_file,
+            network: from_file.network.unwrap_or(DEFAULT_NETWORK),
+            config_file: CONFIG_FILE.clone(),
             signet_backend: sync_backend,
         })
     }

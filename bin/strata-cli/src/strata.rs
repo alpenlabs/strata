@@ -1,7 +1,11 @@
-use std::ops::{Deref, DerefMut};
+use std::{
+    io,
+    ops::{Deref, DerefMut},
+};
 
 use alloy::{
     network::{Ethereum, EthereumWallet},
+    primitives::TxHash,
     providers::{
         fillers::{
             BlobGasFiller, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller,
@@ -11,8 +15,23 @@ use alloy::{
     },
     transports::http::{Client, Http},
 };
+use console::{style, Term};
 
-use crate::seed::Seed;
+use crate::{seed::Seed, settings::Settings};
+
+pub fn print_strata_explorer_url(
+    txid: &TxHash,
+    term: &Term,
+    settings: &Settings,
+) -> Result<(), io::Error> {
+    term.write_line(&match settings.blockscout_endpoint {
+        Some(ref url) => format!(
+            "View transaction at {}",
+            style(format!("{url}/tx/{txid}")).blue()
+        ),
+        None => format!("Transaction ID: {txid}"),
+    })
+}
 
 // alloy moment 💀
 type Provider = FillProvider<
