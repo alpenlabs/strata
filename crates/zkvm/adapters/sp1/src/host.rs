@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::Ok;
 use serde::{de::DeserializeOwned, Serialize};
 use sp1_sdk::{ProverClient, SP1ProofWithPublicValues, SP1ProvingKey, SP1VerifyingKey};
-use strata_zkvm::{Proof, ProverOptions, VerificationKey, ZkVmHost, ZkVmInputBuilder};
+use strata_zkvm::{Proof, ProofType, ProverOptions, VerificationKey, ZkVmHost, ZkVmInputBuilder};
 
 use crate::{input::SP1ProofInputBuilder, utils::get_proving_keys};
 
@@ -35,6 +35,7 @@ impl ZkVmHost for SP1Host {
     fn prove<'a>(
         &self,
         prover_input: <Self::Input<'a> as ZkVmInputBuilder<'a>>::Input,
+        proof_type: ProofType,
     ) -> anyhow::Result<(Proof, VerificationKey)> {
         // Init the prover
         if self.prover_options.use_mock_prover {
@@ -48,12 +49,11 @@ impl ZkVmHost for SP1Host {
 
         // Start proving
         let mut prover = client.prove(&self.proving_key, prover_input);
-        if self.prover_options.enable_compression {
-            prover = prover.compressed();
-        }
-        if self.prover_options.stark_to_snark_conversion {
-            prover = prover.groth16();
-        }
+        prover = match proof_type {
+            ProofType::Compressed => prover.compressed(),
+            ProofType::Core => prover.core(),
+            ProofType::Groth16 => prover.groth16(),
+        };
 
         let proof = prover.run()?;
 
@@ -99,7 +99,7 @@ mod tests {
     use std::{fs::File, io::Write};
 
     use sp1_sdk::{HashableKey, SP1VerifyingKey};
-    use strata_zkvm::ZkVmVerifier;
+    use strata_zkvm::{ProofType, ZkVmHost};
 
     use super::*;
     use crate::SP1Verifier;
@@ -123,7 +123,9 @@ mod tests {
 
         // assert proof generation works
         let zkvm = SP1Host::init(TEST_ELF.to_vec(), ProverOptions::default());
-        let (proof, vk) = zkvm.prove(prover_input).expect("Failed to generate proof");
+        let (proof, vk) = zkvm
+            .prove(prover_input, ProofType::Core)
+            .expect("Failed to generate proof");
 
         // assert proof verification works
         SP1Verifier::verify(&vk, &proof).expect("Proof verification failed");
@@ -171,11 +173,14 @@ mod tests {
             use_mock_prover: false,
             stark_to_snark_conversion: true,
             use_cached_keys: true,
+            proof_type: ProofType::Core,
         };
         let zkvm = SP1Host::init(TEST_ELF.to_vec(), prover_options);
 
         // assert proof generation works
-        let (proof, vk) = zkvm.prove(prover_input).expect("Failed to generate proof");
+        let (proof, vk) = zkvm
+            .prove(prover_input, ProofType::Groth16)
+            .expect("Failed to generate proof");
 
         let vk: SP1VerifyingKey = bincode::deserialize(vk.as_bytes()).unwrap();
 

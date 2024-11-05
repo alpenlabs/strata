@@ -1,4 +1,4 @@
-use strata_zkvm::ZkVmProver;
+use strata_zkvm::{ProofType, ZkVmProver};
 
 use crate::{ELProofInput, ELProofPublicParams};
 
@@ -7,6 +7,10 @@ pub struct EvmEeProver;
 impl ZkVmProver for EvmEeProver {
     type Input = ELProofInput;
     type Output = ELProofPublicParams;
+
+    fn proof_type() -> ProofType {
+        ProofType::Compressed
+    }
 
     fn prepare_input<'a, B>(input: &'a Self::Input) -> anyhow::Result<B::Input>
     where
@@ -19,6 +23,6 @@ impl ZkVmProver for EvmEeProver {
     where
         H: strata_zkvm::ZkVmHost,
     {
-        H::extract_public_output(proof)
+        H::extract_serde_public_output(proof)
     }
 }

@@ -2164,6 +2164,7 @@ dependencies = [
 name = "strata-proofimpl-btc-blockspace"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "bitcoin",
  "borsh",
  "serde",

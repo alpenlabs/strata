@@ -1,6 +1,6 @@
 use risc0_zkvm::{compute_image_id, default_prover, sha::Digest, ProverOpts, Receipt};
 use serde::{de::DeserializeOwned, Serialize};
-use strata_zkvm::{Proof, ProverOptions, VerificationKey, ZkVmHost, ZkVmInputBuilder};
+use strata_zkvm::{Proof, ProofType, ProverOptions, VerificationKey, ZkVmHost, ZkVmInputBuilder};
 
 use crate::input::Risc0ProofInputBuilder;
 
@@ -12,18 +12,6 @@ pub struct Risc0Host {
     elf: Vec<u8>,
     id: Digest,
     prover_options: ProverOptions,
-}
-
-impl Risc0Host {
-    pub(crate) fn determine_prover_options(&self) -> ProverOpts {
-        if self.prover_options.stark_to_snark_conversion {
-            ProverOpts::groth16()
-        } else if self.prover_options.enable_compression {
-            ProverOpts::succinct()
-        } else {
-            ProverOpts::default()
-        }
-    }
 }
 
 impl ZkVmHost for Risc0Host {
@@ -42,13 +30,19 @@ impl ZkVmHost for Risc0Host {
     fn prove<'a>(
         &self,
         prover_input: <Self::Input<'a> as ZkVmInputBuilder<'a>>::Input,
+        proof_type: ProofType,
     ) -> anyhow::Result<(Proof, VerificationKey)> {
         if self.prover_options.use_mock_prover {
             std::env::set_var("RISC0_DEV_MODE", "true");
         }
 
         // Setup the prover
-        let opts = self.determine_prover_options();
+        let opts = match proof_type {
+            ProofType::Core => ProverOpts::default(),
+            ProofType::Compressed => ProverOpts::succinct(),
+            ProofType::Groth16 => ProverOpts::groth16(),
+        };
+
         // let prover = get_prover_server(&opts)?;
         let prover = default_prover();
 
@@ -125,7 +119,9 @@ mod tests {
         let zkvm_input = zkvm_input_builder.build().unwrap();
 
         // assert proof generation works
-        let (proof, vk) = zkvm.prove(zkvm_input).expect("Failed to generate proof");
+        let (proof, vk) = zkvm
+            .prove(zkvm_input, ProofType::Core)
+            .expect("Failed to generate proof");
 
         // assert proof verification works
         Risc0Verifier::verify(&vk, &proof).expect("Proof verification failed");
@@ -147,7 +143,9 @@ mod tests {
         let zkvm_input = zkvm_input_builder.build().unwrap();
 
         // assert proof generation works
-        let (proof, vk) = zkvm.prove(zkvm_input).expect("Failed to generate proof");
+        let (proof, vk) = zkvm
+            .prove(zkvm_input, ProofType::Core)
+            .expect("Failed to generate proof");
 
         // assert proof verification works
         Risc0Verifier::verify_with_public_params(&vk, input, &proof)
@@ -170,6 +168,7 @@ mod tests {
             use_mock_prover: false,
             stark_to_snark_conversion: true,
             use_cached_keys: true,
+            proof_type: ProofType::Core,
         };
 
         let zkvm = Risc0Host::init(TEST_ELF.to_vec(), prover_options);
@@ -182,7 +181,9 @@ mod tests {
             .unwrap();
 
         // assert proof generation works
-        let (proof, vk) = zkvm.prove(zkvm_input).expect("Failed to generate proof");
+        let (proof, vk) = zkvm
+            .prove(zkvm_input, ProofType::Groth16)
+            .expect("Failed to generate proof");
 
         let expected_vk = vec![
             48, 77, 52, 1, 100, 95, 109, 135, 223, 56, 83, 146, 244, 21, 237, 63, 198, 105, 2, 75,

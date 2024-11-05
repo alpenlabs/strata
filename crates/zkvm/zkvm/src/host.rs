@@ -1,7 +1,10 @@
 use borsh::BorshDeserialize;
 use serde::{de::DeserializeOwned, Serialize};
 
-use crate::{Proof, ProverOptions, VerificationKey, ZkVmInputBuilder};
+use crate::{
+    input::ZkVmInputBuilder, proof::Proof, prover::ProverOptions, verifier::VerificationKey,
+    ProofType,
+};
 
 /// A trait implemented by the prover ("host") of a zkVM program.
 pub trait ZkVmHost: Send + Sync + Clone + 'static {
@@ -16,6 +19,7 @@ pub trait ZkVmHost: Send + Sync + Clone + 'static {
     fn prove<'a>(
         &self,
         input: <Self::Input<'a> as ZkVmInputBuilder<'a>>::Input,
+        proof_type: ProofType,
     ) -> anyhow::Result<(Proof, VerificationKey)>;
 
     /// Extracts the raw public output from the given proof
