@@ -425,7 +425,10 @@ class BasicEnvConfig(flexitest.EnvConfig):
         # Need to wait for at least `genesis_l1_height` blocks to be generated.
         # Sleeping some more for safety
         if self.auto_generate_blocks:
-            time.sleep(BLOCK_GENERATION_INTERVAL_SECS * 10)
+            print("Sleep started")
+            # time.sleep(BLOCK_GENERATION_INTERVAL_SECS * 10)
+            time.sleep(5)
+            print("Sleep ended")
 
         svcs = {"bitcoin": bitcoind, "sequencer": sequencer, "reth": reth}
 

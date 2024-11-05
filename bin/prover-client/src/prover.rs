@@ -26,7 +26,7 @@ use crate::elf::{
     GUEST_EVM_EE_STF_ELF, GUEST_L1_BATCH_ELF,
 };
 use crate::{
-    config::{NUM_PROVER_WORKERS},
+    config::NUM_PROVER_WORKERS,
     db::open_rocksdb_database,
     primitives::{
         prover_input::{ProofWithVkey, ZKVMInput},

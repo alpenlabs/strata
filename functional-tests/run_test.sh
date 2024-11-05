@@ -17,7 +17,8 @@ if [ ! -z $PROVER_TEST ]; then
 	export PATH=$(realpath ../target/release/):$PATH
 else
     echo "Running on seq mode"
-    cargo build
+    cargo build -F "prover"
+    # cargo build
 fi
 
 poetry run python entry.py $@

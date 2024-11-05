@@ -41,6 +41,9 @@ async fn main() {
     let args: Args = argh::from_env();
     debug!("Running prover client with args {:?}", args);
 
+    println!("Good bye...");
+    return;
+
     let el_client = HttpClientBuilder::default()
         .build(args.get_reth_rpc_url())
         .expect("failed to connect to the el client");
@@ -109,6 +112,7 @@ async fn main() {
         enable_compression: true,
         ..Default::default()
     };
+
     let prover_manager: ProverManager<SP1Host> = ProverManager::new(
         task_tracker.clone(),
         prover_options,

@@ -6,8 +6,12 @@ DD_ROOT = "_dd"
 # keep in sync with `strata-consensus-logic::genesis::MAX_HORIZON_POLL_INTERVAL`
 MAX_HORIZON_POLL_INTERVAL_SECS = 1
 SEQ_SLACK_TIME_SECS = 2  # to account for thread sync and startup times
-BLOCK_GENERATION_INTERVAL_SECS = 0.5
 SEQ_PUBLISH_BATCH_INTERVAL_SECS = 5
+BLOCK_GENERATION_INTERVAL_SECS = 30  # sec BTC
+SEQ_BLOCK_TIME = 30  # sec
+
+BLOCK_GENERATION_INTERVAL_SECS = 3  # sec BTC
+SEQ_BLOCK_TIME = 3  # sec
 
 # Error codes
 ERROR_PROOF_ALREADY_CREATED = -32611
@@ -26,15 +30,15 @@ SEQ_PUBKEY = Key(SEQ_KEY.hex()).x_hex
 # TODO initialize this with the new genesis tool instead of having it hardcoded
 DEFAULT_ROLLUP_PARAMS: dict = {
     "rollup_name": "strata",
-    "block_time": 1000,
+    "block_time": SEQ_BLOCK_TIME * 1000,
     "cred_rule": {
         "schnorr_key": SEQ_PUBKEY,
     },
-    "horizon_l1_height": 3,
-    "genesis_l1_height": 5,
+    "horizon_l1_height": 200,
+    "genesis_l1_height": 203,
     "evm_genesis_block_hash": EVM_GENESIS_BLOCK_STATE_HASH,
     "evm_genesis_block_state_root": EVM_GENESIS_BLOCK_STATE_ROOT,
-    "l1_reorg_safe_depth": 4,
+    "l1_reorg_safe_depth": 1,
     "target_l2_batch_size": 64,
     "address_length": 20,
     "deposit_amount": 1_000_000_000,
@@ -61,9 +65,9 @@ FAST_BATCH_ROLLUP_PARAMS = {
 # static operator config with pregenerated 100 blocks for deposit transaction
 ROLLUP_PARAMS_FOR_DEPOSIT_TX = {
     **DEFAULT_ROLLUP_PARAMS,
-    "horizon_l1_height": 4,
     "target_l2_batch_size": 100,
-    "genesis_l1_height": 102,
+    "horizon_l1_height": 490,
+    "genesis_l1_height": 493,
     "operator_config": {
         "static": [
             {
@@ -75,4 +79,6 @@ ROLLUP_PARAMS_FOR_DEPOSIT_TX = {
 }
 
 
-PROVER_ROLLUP_PARAMS = {**ROLLUP_PARAMS_FOR_DEPOSIT_TX}
+PROVER_ROLLUP_PARAMS = {
+    **ROLLUP_PARAMS_FOR_DEPOSIT_TX,
+}

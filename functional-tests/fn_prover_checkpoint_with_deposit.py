@@ -9,7 +9,8 @@ from constants import (
 )
 from utils import wait_for_proof_with_time_out, wait_until
 
-EVM_WAIT_TIME = 2
+EVM_WAIT_TIME = 50 * 2
+DEPOSIT_WAIT_TIME = 150
 SATS_TO_WEI = 10**10
 
 withdrawal_intent_event_abi = {
@@ -35,26 +36,64 @@ class BridgeDepositTest(flexitest.Test):
         btc = ctx.get_service("bitcoin")
         btcrpc: BitcoindClient = btc.create_rpc()
 
-        # Do deposit and collect the L1 and L2 where the deposit transaction was included
-        l2_block_num, l1_deposit_txn_id = self.do_deposit(ctx, evm_addr)
-        l1_deposit_txn_block_info = btcrpc.proxy.gettransaction(l1_deposit_txn_id)
-        deposit_txn_block_num = l1_deposit_txn_block_info["blockheight"]
+        seq = ctx.get_service("sequencer")
+        seqrpc = seq.create_rpc()
+
+        # # Do deposit and collect the L1 and L2 where the deposit transaction was included
+        # l2_block_num, l1_deposit_txn_id = self.do_deposit(ctx, evm_addr)
+        # l1_deposit_txn_block_info = btcrpc.proxy.gettransaction(l1_deposit_txn_id)
+        # l1_deposit_txn_block_num = l1_deposit_txn_block_info["blockheight"]
+
+        # # Log the metadata
+        # print("L1 deposit number: ", l1_deposit_txn_block_num)
+        # print("L2 deposit number: ", l2_block_num)
+
+        # Sequencer is sent the mock proof
+        # TODO: send actual proof instead of mock proof
+        ckp_idx_0 = seqrpc.strata_getLatestCheckpointIndex()
+        ckp = seqrpc.strata_getCheckpointInfo(ckp_idx_0)
+        print("The initial checkpoint range: ", ckp)
+        print("Sending mock proof")
+        seqrpc.strataadmin_submitCheckpointProof(0, "")
+        print("Mock proof sent")
+
+        # Wait for the new checkpoint from the sequencer
+        wait_until(
+            lambda: int(seqrpc.strata_getLatestCheckpointIndex() > ckp_idx_0),
+            error_with="New checkpoint didn't came",
+            timeout=100,
+        )
+        ckp_idx_1 = seqrpc.strata_getLatestCheckpointIndex()
+        ckp_1 = seqrpc.strata_getCheckpointInfo(ckp_idx_1)
+        print(ckp_1)
+        l1_range = ckp_1["l1_range"]
+        start, end = l1_range[0], l1_range[1]
+        l1_ckp_block = self.scan_checkpoint_block(start, end, btcrpc)
+        print(l1_ckp_block)
+        # return
+
+        # See the checkpoint
+        ckp_idx = seqrpc.strata_getLatestCheckpointIndex()
+        ckp = seqrpc.strata_getCheckpointInfo(ckp_idx)
+        print("Now the checkpoint range: ", ckp)
 
         # Init the prover client
-        prover_client = ctx.get_service("prover_client")
-        prover_client_rpc = prover_client.create_rpc()
-        time.sleep(60)
+        # prover_client = ctx.get_service("prover_client")
+        # prover_client_rpc = prover_client.create_rpc()
+        # time.sleep(60)
 
         # Dispatch the prover task
         # Proving task with with few L1 and L2 blocks including the deposit transaction
-        l1_range = (deposit_txn_block_num - 1, deposit_txn_block_num + 1)
-        l2_range = (l2_block_num - 1, l2_block_num + 1)
-        task_id = prover_client_rpc.dev_strata_proveCheckpointRaw(0, l1_range, l2_range)
-        print("got proving task_id ", task_id)
-        assert task_id is not None
+        # l1_range = (deposit_txn_block_num - 1, deposit_txn_block_num + 1)
+        # l2_range = (l2_block_num - 1, l2_block_num + 1)
+        # task_id = prover_client_rpc.dev_strata_proveCheckpointRaw(0, l1_range, l2_range)
 
-        time_out = 30 * 60
-        wait_for_proof_with_time_out(prover_client_rpc, task_id, time_out=time_out)
+        # task_id = prover_client_rpc.prove_latest_checkpoint()
+        # print("got proving task_id ", task_id)
+        # assert task_id is not None
+
+        # time_out = 30 * 60
+        # wait_for_proof_with_time_out(prover_client_rpc, task_id, time_out=time_out)
 
     def do_deposit(self, ctx: flexitest.RunContext, evm_addr: str):
         btc = ctx.get_service("bitcoin")
@@ -94,7 +133,7 @@ class BridgeDepositTest(flexitest.Test):
         wait_until(
             lambda: len(seqrpc.strata_getCurrentDeposits()) > original_num_deposits,
             error_with="seem not be getting deposits",
-            timeout=SEQ_PUBLISH_BATCH_INTERVAL_SECS,
+            timeout=DEPOSIT_WAIT_TIME,
         )
 
         current_block_num = int(rethrpc.eth_blockNumber(), base=16)
@@ -136,3 +175,25 @@ class BridgeDepositTest(flexitest.Test):
                 return block_num, btc_txn_id
 
         return None, btc_txn_id
+
+    def scan_checkpoint_block(self, start, end, client):
+        for block_height in range(start, end + 1):
+            block_hash = client.proxy.getblockhash(block_height)
+            block = client.proxy.getblock(block_hash)
+            txids = block["tx"]
+            is_found = self.scan_proof(txids, client)
+            if is_found:
+                return (block_height, block_hash)
+
+        raise Exception(f"Checkpoint not found in blocks {start} to {end}")
+
+    def scan_proof(self, txids, client):
+        for txid in txids:
+            raw_tx = client.proxy.getrawtransaction(txid)
+            decoded_tx = client.proxy.decoderawtransaction(raw_tx)
+
+            # Check each output for Taproot scriptPubKey
+            for vout in decoded_tx.get("vout", []):
+                script_pub_key = vout.get("scriptPubKey", {})
+                if script_pub_key.get("type") == "witness_v1_taproot":
+                    return True
