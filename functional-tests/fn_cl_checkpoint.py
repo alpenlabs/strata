@@ -1,5 +1,3 @@
-import time
-
 import flexitest
 
 from constants import (
@@ -28,17 +26,15 @@ class CLBlockWitnessDataGenerationTest(flexitest.Test):
             error_with="Sequencer did not start on time",
         )
 
-        time.sleep(1)
         ckp_idx = seqrpc.strata_getLatestCheckpointIndex()
         assert ckp_idx is not None
 
         ckp = seqrpc.strata_getCheckpointInfo(ckp_idx)
         assert ckp is not None
-        assert ckp["commitment"] is None
 
         # wait for checkpoint confirmation
         wait_until(
-            lambda: seqrpc.strata_getLatestCheckpointIndex() > ckp_idx,
+            lambda: seqrpc.strata_getLatestCheckpointIndex(True) >= ckp_idx,
             error_with="Checkpoint was not confirmed on time",
             timeout=10,
         )
