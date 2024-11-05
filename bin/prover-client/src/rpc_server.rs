@@ -180,6 +180,8 @@ impl StrataProverClientApiServer for ProverClientRpc {
             l1_range,
             l2_range,
             l2_blockid: Default::default(),
+            l1_blockid: Default::default(),
+            commitment: None,
         };
 
         let task_id = self

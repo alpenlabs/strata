@@ -32,7 +32,6 @@ use strata_rpc_types::{
 };
 use strata_rpc_utils::to_jsonrpsee_error;
 use strata_state::{
-    batch::BatchCheckpoint,
     block::L2BlockBundle,
     bridge_duties::BridgeDuty,
     bridge_ops::WithdrawalIntent,
@@ -129,6 +128,30 @@ impl<D: Database + Sync + Send + 'static> StrataRpcImpl<D> {
         .await?;
 
         Ok((cs, Some(chs)))
+    }
+
+    async fn get_last_checkpoint_chainstate(&self) -> Result<Option<Arc<ChainState>>, Error> {
+        let cs = self.get_client_state().await;
+
+        let Some(last_checkpoint) = cs.l1_view().last_finalized_checkpoint() else {
+            return Ok(None);
+        };
+        let (_, l2_blockidx) = last_checkpoint.batch_info.l2_range;
+
+        // in current implementation, chainstate idx == l2 block idx
+        let idx = l2_blockidx;
+
+        let db = self.database.clone();
+
+        wait_blocking("load_checkpoint_chainstate", move || {
+            let chainstate_prov = db.chain_state_provider();
+            let chainstate = chainstate_prov
+                .get_toplevel_state(idx)?
+                .ok_or(Error::MissingChainstate(idx))?;
+
+            Ok(Some(Arc::new(chainstate)))
+        })
+        .await
     }
 }
 
@@ -513,14 +536,23 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
 
         let deposit_duties = deposit_duties.map(BridgeDuty::from);
 
-        let (_, current_states) = self.get_cur_states().await?;
-        let chain_state = current_states.ok_or(Error::BeforeGenesis)?;
-
-        let withdrawal_duties = extract_withdrawal_infos(&chain_state).map(BridgeDuty::from);
+        // withdrawal duties should only be generated from finalized checkpoint states
+        let withdrawal_duties =
+            self.get_last_checkpoint_chainstate()
+                .await
+                .map(|chainstate_opt| {
+                    chainstate_opt
+                        .map(|chainstate| {
+                            extract_withdrawal_infos(&chainstate)
+                                .map(BridgeDuty::from)
+                                .collect::<Vec<_>>()
+                        })
+                        .unwrap_or_default()
+                })?;
 
         let mut duties = vec![];
         duties.extend(deposit_duties);
-        duties.extend(withdrawal_duties);
+        duties.extend(withdrawal_duties.into_iter());
 
         info!(%operator_idx, %start_index, "dispatching duties");
         Ok(BridgeDuties {
@@ -558,18 +590,29 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
             .get_checkpoint(idx)
             .await
             .map_err(|e| Error::Other(e.to_string()))?;
-        let batch_comm: Option<BatchCheckpoint> = entry.map(Into::into);
-        Ok(batch_comm.map(|bc| bc.batch_info().clone().into()))
+
+        Ok(entry.map(Into::into))
     }
 
-    async fn get_latest_checkpoint_index(&self) -> RpcResult<Option<u64>> {
-        let idx = self
-            .checkpoint_handle
-            .get_last_checkpoint_idx()
-            .await
-            .map_err(|e| Error::Other(e.to_string()))?;
+    async fn get_latest_checkpoint_index(&self, finalized: Option<bool>) -> RpcResult<Option<u64>> {
+        let finalized = finalized.unwrap_or(false);
+        if finalized {
+            // get last finalized checkpoint index from state
+            let (client_state, _) = self.get_cur_states().await?;
+            Ok(client_state
+                .l1_view()
+                .last_finalized_checkpoint()
+                .map(|checkpoint| checkpoint.batch_info.idx()))
+        } else {
+            // get latest checkpoint index from db
+            let idx = self
+                .checkpoint_handle
+                .get_last_checkpoint_idx()
+                .await
+                .map_err(|e| Error::Other(e.to_string()))?;
 
-        return Ok(idx);
+            Ok(idx)
+        }
     }
 
     async fn get_l2_block_status(&self, block_height: u64) -> RpcResult<L2BlockStatus> {

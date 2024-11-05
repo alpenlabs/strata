@@ -18,7 +18,10 @@ use strata_primitives::{
 use strata_risc0_adapter::Risc0Verifier;
 use strata_sp1_adapter::SP1Verifier;
 use strata_state::{
-    batch::BatchCheckpoint, l1::L1Tx, sync_event::SyncEvent, tx::ProtocolOperation,
+    batch::{BatchCheckpoint, BatchCheckpointWithCommitment, CommitmentInfo},
+    l1::L1Tx,
+    sync_event::SyncEvent,
+    tx::ProtocolOperation,
 };
 use strata_tx_parser::messages::{BlockData, L1Event};
 use strata_zkvm::ZKVMVerifier;
@@ -130,7 +133,7 @@ where
 fn check_for_da_batch(
     blockdata: &BlockData,
     seq_pubkey: Option<XOnlyPublicKey>,
-) -> Vec<BatchCheckpoint> {
+) -> Vec<BatchCheckpointWithCommitment> {
     let protocol_ops_txs = blockdata.protocol_ops_txs();
 
     let signed_checkpts = protocol_ops_txs
@@ -155,7 +158,16 @@ fn check_for_da_batch(
             }
         }
         let checkpoint: BatchCheckpoint = signed_checkpoint.clone().into();
-        Some(checkpoint)
+
+        let blockhash = Buf32::from(*blockdata.block().block_hash().as_byte_array());
+        let txid = Buf32::from(*tx.compute_txid().as_byte_array());
+        let wtxid = Buf32::from(*tx.compute_wtxid().as_byte_array());
+        let commitment_info = CommitmentInfo::new(blockhash, txid, wtxid);
+
+        Some(BatchCheckpointWithCommitment::new(
+            checkpoint,
+            commitment_info,
+        ))
     });
     sig_verified_checkpoints.collect()
 }

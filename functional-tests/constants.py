@@ -72,6 +72,10 @@ ROLLUP_PARAMS_FOR_DEPOSIT_TX = {
             }
         ]
     },
+    "proof_publish_mode": {
+        # use an empty proof in batch after this many seconds of not receiving a proof
+        "timeout": 5,
+    },
 }
 
 PROVER_ROLLUP_PARAMS = {
@@ -86,5 +90,14 @@ PROVER_ROLLUP_PARAMS = {
                 "wallet_pk": "1ea7f6c7a924a1e722c09301a826cfd95b21b23a294cec5da3c0b5908e62e0c7",
             }
         ]
+    },
+}
+
+FAST_CHECKPOINT_ROLLUP_PARAMS = {
+    **DEFAULT_ROLLUP_PARAMS,
+    "l1_reorg_safe_depth": 2,
+    "proof_publish_mode": {
+        # use an empty proof in batch after this many seconds of not receiving a proof
+        "timeout": 4,
     },
 }
