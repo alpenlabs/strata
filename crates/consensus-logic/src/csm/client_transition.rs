@@ -7,7 +7,7 @@ use bitcoin::block::Header;
 use strata_db::traits::{ChainstateDatabase, Database, L1Database, L2BlockDatabase};
 use strata_primitives::prelude::*;
 use strata_state::{
-    batch::{BatchCheckpoint, BatchInfo},
+    batch::{BatchCheckpoint, BatchCheckpointWithCommitment, BatchInfo},
     block,
     client_state::*,
     header::L2Header,
@@ -166,11 +166,13 @@ pub fn process_event<D: Database>(
                     writes.push(ClientStateWrite::CheckpointsReceived(
                         proof_verified_checkpoints
                             .iter()
-                            .map(|x| {
+                            .map(|batch_checkpoint_with_commitment| {
+                                let batch_checkpoint =
+                                    &batch_checkpoint_with_commitment.batch_checkpoint;
                                 L1Checkpoint::new(
-                                    x.batch_info().clone(),
-                                    x.bootstrap_state().clone(),
-                                    !x.proof().is_empty(),
+                                    batch_checkpoint.batch_info().clone(),
+                                    batch_checkpoint.bootstrap_state().clone(),
+                                    !batch_checkpoint.proof().is_empty(),
                                     *height,
                                 )
                             })
@@ -384,7 +386,7 @@ fn find_l1_height_for_l2_blockid(
 /// # Arguments
 ///
 /// * `state` - The client's current state, which provides the L1 view and pending checkpoints.
-/// * `checkpoints` - A slice of [`BatchCheckpoint`]s to be filtered.
+/// * `checkpoints` - A slice of [`BatchCheckpointWithCommitment`]s to be filtered.
 /// * `params` - Parameters required for verifying checkpoint proofs.
 ///
 /// # Returns
@@ -393,9 +395,9 @@ fn find_l1_height_for_l2_blockid(
 /// one.
 pub fn filter_verified_checkpoints(
     state: &ClientState,
-    checkpoints: &[BatchCheckpoint],
+    checkpoints: &[BatchCheckpointWithCommitment],
     params: &RollupParams,
-) -> Vec<BatchCheckpoint> {
+) -> Vec<BatchCheckpointWithCommitment> {
     let l1_view = state.l1_view();
     let last_verified = l1_view.verified_checkpoints().last();
     let last_finalized = l1_view.last_finalized_checkpoint();
@@ -411,14 +413,14 @@ pub fn filter_verified_checkpoints(
     let mut result_checkpoints = Vec::new();
 
     for checkpoint in checkpoints {
-        let curr_idx = checkpoint.batch_info().idx;
+        let curr_idx = checkpoint.batch_checkpoint.batch_info().idx;
         if curr_idx != expected_idx {
             warn!(%expected_idx, %curr_idx, "Received invalid checkpoint idx, ignoring.");
             continue;
         }
-        if expected_idx == 0 && verify_proof(checkpoint, params).is_ok() {
+        if expected_idx == 0 && verify_proof(&checkpoint.batch_checkpoint, params).is_ok() {
             result_checkpoints.push(checkpoint.clone());
-            last_valid_checkpoint = Some(checkpoint.batch_info());
+            last_valid_checkpoint = Some(checkpoint.batch_checkpoint.batch_info());
         } else if expected_idx == 0 {
             warn!(%expected_idx, "Received invalid checkpoint proof, ignoring.");
         } else {
@@ -428,20 +430,20 @@ pub fn filter_verified_checkpoints(
             let last_l2_tsn = last_valid_checkpoint
                 .expect("There should be a last_valid_checkpoint")
                 .l2_transition;
-            let l1_tsn = checkpoint.batch_info().l1_transition;
-            let l2_tsn = checkpoint.batch_info().l2_transition;
+            let l1_tsn = checkpoint.batch_checkpoint.batch_info().l1_transition;
+            let l2_tsn = checkpoint.batch_checkpoint.batch_info().l2_transition;
 
-            if l1_tsn.0 != last_l1_tsn.1 {
+            if l1_tsn.0 == last_l1_tsn.1 {
                 warn!(obtained = ?l1_tsn.0, expected = ?last_l1_tsn.1, "Received invalid checkpoint l1 transition, ignoring.");
                 continue;
             }
-            if l2_tsn.0 != last_l2_tsn.1 {
+            if l2_tsn.0 == last_l2_tsn.1 {
                 warn!(obtained = ?l2_tsn.0, expected = ?last_l2_tsn.1, "Received invalid checkpoint l2 transition, ignoring.");
                 continue;
             }
-            if verify_proof(checkpoint, params).is_ok() {
+            if verify_proof(&checkpoint.batch_checkpoint, params).is_ok() {
                 result_checkpoints.push(checkpoint.clone());
-                last_valid_checkpoint = Some(checkpoint.batch_info());
+                last_valid_checkpoint = Some(checkpoint.batch_checkpoint.batch_info());
             } else {
                 warn!(%expected_idx, "Received invalid checkpoint proof, ignoring.");
                 continue;

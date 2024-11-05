@@ -1,7 +1,6 @@
-import time
-
 import flexitest
 
+import net_settings
 import testenv
 from utils import wait_until
 
@@ -11,7 +10,10 @@ REORG_DEPTH = 3
 @flexitest.register
 class CLBlockWitnessDataGenerationTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env("basic")
+        fast_batch_settings = net_settings.get_fast_batch_settings()
+        ctx.set_env(
+            testenv.BasicEnvConfig(pre_generate_blocks=101, rollup_settings=fast_batch_settings)
+        )
 
     def main(self, ctx: flexitest.RunContext):
         seq = ctx.get_service("sequencer")
@@ -23,9 +25,19 @@ class CLBlockWitnessDataGenerationTest(testenv.StrataTester):
             error_with="Sequencer did not start on time",
         )
 
-        time.sleep(1)
         ckp_idx = seqrpc.strata_getLatestCheckpointIndex()
         assert ckp_idx is not None
 
         ckp = seqrpc.strata_getCheckpointInfo(ckp_idx)
         assert ckp is not None
+
+        # wait for checkpoint confirmation
+        wait_until(
+            lambda: seqrpc.strata_getLatestCheckpointIndex(True) >= ckp_idx,
+            error_with="Checkpoint was not confirmed on time",
+            timeout=10,
+        )
+        ckp = seqrpc.strata_getCheckpointInfo(ckp_idx)
+        # print(ckp)
+        assert ckp is not None
+        assert ckp["commitment"] is not None
