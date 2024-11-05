@@ -14,7 +14,7 @@ use crate::{
     seed::Seed,
     settings::Settings,
     signet::SignetWallet,
-    strata::StrataWallet,
+    strata::{print_strata_explorer_url, StrataWallet},
     taproot::ExtractP2trPubkey,
 };
 
@@ -69,6 +69,6 @@ pub async fn withdraw(args: WithdrawArgs, seed: Seed, settings: Settings) {
     let pb = ProgressBar::new_spinner().with_message("Broadcasting transaction");
     pb.enable_steady_tick(Duration::from_millis(100));
     let res = l2w.send_transaction(tx).await.unwrap();
-    let txid = res.tx_hash();
-    pb.finish_with_message(format!("Broadcast successful. Txid: {}", txid));
+    pb.finish_with_message("Broadcast successful");
+    let _ = print_strata_explorer_url(res.tx_hash(), &term, &settings);
 }

@@ -44,11 +44,18 @@ pub async fn get_fee_rate(
     }
 }
 
-pub fn print_explorer_url(txid: &Txid, term: &Term, settings: &Settings) -> Result<(), io::Error> {
-    term.write_line(&format!(
-        "View transaction at {}",
-        style(format!("{}/tx/{txid}", settings.mempool_endpoint)).blue()
-    ))
+pub fn print_bitcoin_explorer_url(
+    txid: &Txid,
+    term: &Term,
+    settings: &Settings,
+) -> Result<(), io::Error> {
+    term.write_line(&match settings.mempool_space_endpoint {
+        Some(ref url) => format!(
+            "View transaction at {}",
+            style(format!("{url}/tx/{txid}")).blue()
+        ),
+        None => format!("Transaction ID: {txid}"),
+    })
 }
 
 #[derive(Clone, Debug)]

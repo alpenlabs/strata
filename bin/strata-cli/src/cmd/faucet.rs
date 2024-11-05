@@ -23,7 +23,7 @@ use crate::{
 use crate::{
     seed::Seed,
     settings::Settings,
-    signet::{print_explorer_url, SignetWallet},
+    signet::{print_bitcoin_explorer_url, SignetWallet},
 };
 
 /// Request some bitcoin from the faucet
@@ -170,14 +170,14 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
     if status == StatusCode::OK {
         #[cfg(feature = "strata_faucet")]
         if network_type == NetworkType::Signet {
-            let _ = print_explorer_url(
+            let _ = print_bitcoin_explorer_url(
                 &Txid::from_str(&body).expect("valid txid"),
                 &term,
                 &settings,
             );
         }
         #[cfg(not(feature = "strata_faucet"))]
-        let _ = print_explorer_url(
+        let _ = print_bitcoin_explorer_url(
             &Txid::from_str(&body).expect("valid txid"),
             &term,
             &settings,
