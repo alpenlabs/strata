@@ -18,6 +18,10 @@ impl ZkVmProver for ClStfProver {
     type Input = ClStfInput;
     type Output = L2BatchProofOutput;
 
+    fn proof_type() -> strata_zkvm::ProofType {
+        strata_zkvm::ProofType::Compressed
+    }
+
     fn prepare_input<'a, B>(input: &'a Self::Input) -> anyhow::Result<B::Input>
     where
         B: strata_zkvm::ZkVmInputBuilder<'a>,

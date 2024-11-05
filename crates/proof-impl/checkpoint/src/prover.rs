@@ -19,6 +19,10 @@ impl ZkVmProver for CheckpointProver {
     type Input = CheckpointProverInput;
     type Output = CheckpointProofOutput;
 
+    fn proof_type() -> strata_zkvm::ProofType {
+        strata_zkvm::ProofType::Groth16
+    }
+
     fn prepare_input<'a, B>(input: &'a Self::Input) -> anyhow::Result<B::Input>
     where
         B: strata_zkvm::ZkVmInputBuilder<'a>,

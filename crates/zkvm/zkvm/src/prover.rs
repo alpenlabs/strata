@@ -1,10 +1,12 @@
 use core::fmt;
 
-use crate::{host::ZkVmHost, input::ZkVmInputBuilder, proof::Proof};
+use crate::{host::ZkVmHost, input::ZkVmInputBuilder, proof::Proof, ProofType};
 
 pub trait ZkVmProver {
     type Input;
     type Output;
+
+    fn proof_type() -> ProofType;
 
     /// Prepares the input for the zkVM.
     fn prepare_input<'a, B>(input: &'a Self::Input) -> anyhow::Result<B::Input>
@@ -26,7 +28,7 @@ pub trait ZkVmProver {
         let zkvm_input = Self::prepare_input::<H::Input<'a>>(input)?;
 
         // Use the host to prove.
-        let (proof, _) = host.prove(zkvm_input)?;
+        let (proof, _) = host.prove(zkvm_input, Self::proof_type())?;
 
         // Process and return the output using the verifier.
         let output = Self::process_output::<H>(&proof)?;
@@ -42,6 +44,7 @@ pub struct ProverOptions {
     pub use_mock_prover: bool,
     pub stark_to_snark_conversion: bool,
     pub use_cached_keys: bool,
+    pub proof_type: ProofType,
 }
 
 // Compact representation of the prover options
@@ -80,6 +83,7 @@ impl Default for ProverOptions {
             use_mock_prover: true,
             stark_to_snark_conversion: false,
             use_cached_keys: true,
+            proof_type: ProofType::Core,
         }
     }
 }

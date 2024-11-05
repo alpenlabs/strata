@@ -58,3 +58,10 @@ impl AggregationInput {
         &self.vk
     }
 }
+
+#[derive(Debug, Clone, Copy)]
+pub enum ProofType {
+    Groth16,
+    Core,
+    Compressed,
+}
