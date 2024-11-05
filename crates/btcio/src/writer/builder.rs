@@ -33,6 +33,7 @@ use tracing::trace;
 
 use crate::{
     rpc::{
+        error::ClientError,
         traits::{Reader, Signer, Wallet},
         types::ListUnspent,
     },
@@ -50,6 +51,9 @@ pub enum InscriptionError {
 
     #[error("Error building taproot")]
     Taproot(#[from] TaprootBuilderError),
+
+    #[error("Sign error: {0}")]
+    SigningFailed(#[from] ClientError),
 
     #[error("{0}")]
     Other(#[from] anyhow::Error),

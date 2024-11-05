@@ -38,5 +38,5 @@ tracing.workspace = true
 
 [features]
 default = ["prover"]
-prover = ["dep:strata-sp1-adapter"]
 docker-build = []
+prover = ["dep:strata-sp1-adapter"]

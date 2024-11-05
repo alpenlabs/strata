@@ -4,6 +4,7 @@ use strata_db::{
     traits::SequencerDatabase,
     types::{BlobEntry, BlobL1Status, L1TxStatus},
 };
+use strata_primitives::buf::Buf32;
 use strata_state::da_blob::{BlobDest, BlobIntent};
 use strata_status::StatusTx;
 use strata_storage::ops::inscription::{Context, InscriptionDataOps};
@@ -17,6 +18,9 @@ use crate::{
     status::{apply_status_updates, L1StatusUpdate},
     writer::{builder::InscriptionError, signer::create_and_sign_blob_inscriptions},
 };
+
+const SIGN_MAX_RETRIES: u8 = 3;
+const BASE_SIGN_DELAY: u64 = 3; // Seconds
 
 /// A handle to the Inscription task.
 pub struct InscriptionHandle {
@@ -130,8 +134,10 @@ fn get_next_blobidx_to_watch(insc_ops: &InscriptionDataOps) -> anyhow::Result<u6
 }
 
 /// Watches for inscription transactions status in bitcoin. Note that this watches for each
-/// inscription until it is confirmed
-/// Watches for inscription transactions status in the Bitcoin blockchain.
+/// inscription until it is confirmed.
+/// Watches for inscription transactions status in the Bitcoin blockchain. The current design is to
+/// watch for inscriptions serially i.e. next inscription is not processed unless the current one is
+/// confirmed to bitcoin.
 ///
 /// # Note
 ///
@@ -159,7 +165,7 @@ pub async fn watcher_task(
                 // entry
                 BlobL1Status::Unsigned | BlobL1Status::NeedsResign => {
                     debug!(?blobentry.status, %curr_blobidx, "Processing unsigned blobentry");
-                    match create_and_sign_blob_inscriptions(
+                    match create_and_sign_blob_inscriptions_with_retries(
                         &blobentry,
                         &broadcast_handle,
                         bitcoin_client.clone(),
@@ -231,6 +237,33 @@ pub async fn watcher_task(
             info!(%curr_blobidx, "Waiting for blobentry to be present in db");
         }
     }
+}
+
+async fn create_and_sign_blob_inscriptions_with_retries(
+    blobentry: &BlobEntry,
+    broadcast_handle: &L1BroadcastHandle,
+    client: Arc<impl Reader + Wallet + Signer>,
+    config: &WriterConfig,
+) -> Result<(Buf32, Buf32), InscriptionError> {
+    let mut retries = 0;
+    let mut delay = BASE_SIGN_DELAY;
+    while retries <= SIGN_MAX_RETRIES {
+        match create_and_sign_blob_inscriptions(blobentry, broadcast_handle, client.clone(), config)
+            .await
+        {
+            Ok(d) => return Ok(d),
+            Err(err) => {
+                warn!(%err, commit_txid = %blobentry.commit_txid, "Error creating and signing blob, retrying");
+            }
+        }
+        retries += 1;
+        tokio::time::sleep(Duration::new(delay, 0)).await;
+        delay <<= 1;
+    }
+    error!(commit_txid = %blobentry.commit_txid, "Max retries exceeded while creating and signing blob");
+    Err(InscriptionError::Other(anyhow::anyhow!(
+        "Max retries exceeded while creating and signing blob"
+    )))
 }
 
 async fn update_l1_status(
