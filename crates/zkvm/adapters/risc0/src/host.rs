@@ -1,6 +1,6 @@
 use risc0_zkvm::{compute_image_id, default_prover, sha::Digest, ProverOpts, Receipt};
 use serde::{de::DeserializeOwned, Serialize};
-use strata_zkvm::{Proof, ProofType, ProverOptions, VerificationKey, ZkVmHost, ZkVmInputBuilder};
+use strata_zkvm::{Proof, ProofType, VerificationKey, ZkVmHost, ZkVmInputBuilder};
 
 use crate::input::Risc0ProofInputBuilder;
 
@@ -11,19 +11,17 @@ use crate::input::Risc0ProofInputBuilder;
 pub struct Risc0Host {
     elf: Vec<u8>,
     id: Digest,
-    prover_options: ProverOptions,
 }
 
 impl ZkVmHost for Risc0Host {
     type Input<'a> = Risc0ProofInputBuilder<'a>;
 
-    fn init(guest_code: Vec<u8>, prover_options: ProverOptions) -> Self {
-        let id = compute_image_id(&guest_code).expect("invalid elf");
+    fn init(guest_code: &[u8]) -> Self {
+        let id = compute_image_id(guest_code).expect("invalid elf");
 
         Risc0Host {
-            elf: guest_code,
             id,
-            prover_options,
+            elf: guest_code.to_vec(),
         }
     }
 
@@ -32,10 +30,6 @@ impl ZkVmHost for Risc0Host {
         prover_input: <Self::Input<'a> as ZkVmInputBuilder<'a>>::Input,
         proof_type: ProofType,
     ) -> anyhow::Result<(Proof, VerificationKey)> {
-        if self.prover_options.use_mock_prover {
-            std::env::set_var("RISC0_DEV_MODE", "true");
-        }
-
         // Setup the prover
         let opts = match proof_type {
             ProofType::Core => ProverOpts::default(),
@@ -111,7 +105,7 @@ mod tests {
     #[test]
     fn test_mock_prover() {
         let input: u32 = 1;
-        let zkvm = Risc0Host::init(TEST_ELF.to_vec(), ProverOptions::default());
+        let zkvm = Risc0Host::init(TEST_ELF);
 
         // prepare input
         let mut zkvm_input_builder = Risc0ProofInputBuilder::new();
@@ -135,7 +129,7 @@ mod tests {
     #[test]
     fn test_mock_prover_with_public_param() {
         let input: u32 = 1;
-        let zkvm = Risc0Host::init(TEST_ELF.to_vec(), ProverOptions::default());
+        let zkvm = Risc0Host::init(TEST_ELF);
 
         // prepare input
         let mut zkvm_input_builder = Risc0ProofInputBuilder::new();
@@ -143,13 +137,19 @@ mod tests {
         let zkvm_input = zkvm_input_builder.build().unwrap();
 
         // assert proof generation works
-        let (proof, vk) = zkvm
+        let (proof, _) = zkvm
             .prove(zkvm_input, ProofType::Core)
             .expect("Failed to generate proof");
 
         // assert proof verification works
-        Risc0Verifier::verify_with_public_params(&vk, input, &proof)
-            .expect("Proof verification failed");
+        zkvm.verify(&proof).expect("Proof verification failed");
+
+        // assert public outputs extraction from proof  works
+        let out: u32 = Risc0Host::extract_serde_public_output(&proof).expect(
+            "Failed to extract public
+outputs",
+        );
+        assert_eq!(input, out)
     }
 
     #[test]
@@ -162,16 +162,7 @@ mod tests {
 
         let input: u32 = 1;
 
-        // Prover Options to generate Groth16 proof
-        let prover_options = ProverOptions {
-            enable_compression: false,
-            use_mock_prover: false,
-            stark_to_snark_conversion: true,
-            use_cached_keys: true,
-            proof_type: ProofType::Core,
-        };
-
-        let zkvm = Risc0Host::init(TEST_ELF.to_vec(), prover_options);
+        let zkvm = Risc0Host::init(TEST_ELF);
 
         // prepare input
         let zkvm_input = Risc0ProofInputBuilder::new()

@@ -4,7 +4,7 @@ use strata_proofimpl_cl_stf::L2BatchProofOutput;
 use strata_sp1_adapter::{SP1Host, SP1ProofInputBuilder, SP1Verifier};
 use strata_sp1_guest_builder::GUEST_CL_AGG_ELF;
 use strata_zkvm::{
-    AggregationInput, Proof, ProverOptions, VerificationKey, ZkVmHost, ZkVmInputBuilder,
+    AggregationInput, Proof, ProofType, VerificationKey, ZkVmHost, ZkVmInputBuilder,
     ZkVmVerifier,
 };
 
@@ -24,21 +24,19 @@ impl ProofGenerator<(u64, u64)> for L2BatchProofGenerator {
     fn gen_proof(
         &self,
         heights: &(u64, u64),
-        prover_options: &ProverOptions,
+        proof_type: &ProofType,
     ) -> Result<(Proof, VerificationKey)> {
         let (start_height, end_height) = *heights;
         let mut agg_proof_inputs: Vec<AggregationInput> = Vec::new();
 
         for block_num in start_height..=end_height {
-            let (proof, vk) = self
-                .cl_proof_generator
-                .get_proof(&block_num, prover_options)?;
+            let (proof, vk) = self.cl_proof_generator.get_proof(&block_num, proof_type)?;
 
             let _output: L2BatchProofOutput = SP1Verifier::extract_borsh_public_output(&proof)?;
             agg_proof_inputs.push(AggregationInput::new(proof, vk));
         }
 
-        let prover = SP1Host::init(GUEST_CL_AGG_ELF.clone(), *prover_options);
+        let prover = SP1Host::init(self.get_elf());
 
         let mut prover_input_builder = SP1ProofInputBuilder::new();
         let len = (end_height - start_height) as usize + 1; // inclusive
@@ -51,7 +49,7 @@ impl ProofGenerator<(u64, u64)> for L2BatchProofGenerator {
         let prover_input = prover_input_builder.build()?;
 
         let proof = prover
-            .prove(prover_input)
+            .prove(prover_input, *proof_type)
             .context("Failed to generate L2 batch proof")?;
 
         Ok(proof)

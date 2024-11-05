@@ -4,11 +4,11 @@ use anyhow::{Context, Result};
 use bitcoin::block;
 use sp1_sdk::Prover;
 use strata_sp1_adapter::{SP1Host, SP1ProofInputBuilder};
-use strata_sp1_guest_builder::GUEST_CL_STF_ELF;
+use strata_sp1_guest_builder::{GUEST_CL_STF_ELF, GUEST_CL_STF_PK, GUEST_CL_STF_VK};
 use strata_state::header::L2Header;
 use strata_test_utils::{evm_ee::L2Segment, l2::gen_params};
 use strata_zkvm::{
-    AggregationInput, Proof, ProverOptions, VerificationKey, ZkVmHost, ZkVmInputBuilder,
+    AggregationInput, Proof, ProofType, VerificationKey, ZkVmHost, ZkVmInputBuilder,
 };
 
 use crate::helpers::{el::ElProofGenerator, proof_generator::ProofGenerator};
@@ -27,12 +27,10 @@ impl ProofGenerator<u64> for ClProofGenerator {
     fn gen_proof(
         &self,
         block_num: &u64,
-        prover_options: &ProverOptions,
+        proof_type: &ProofType,
     ) -> Result<(Proof, VerificationKey)> {
         // Generate EL proof required for aggregation
-        let (el_proof, vk) = self
-            .el_proof_generator
-            .get_proof(block_num, prover_options)?;
+        let (el_proof, vk) = self.el_proof_generator.get_proof(block_num, proof_type)?;
 
         let agg_input = AggregationInput::new(el_proof, vk);
 
@@ -45,7 +43,7 @@ impl ProofGenerator<u64> for ClProofGenerator {
         let pre_state = l2_segment.get_pre_state(*block_num);
 
         // Generate CL proof
-        let prover = SP1Host::init(self.get_elf().into(), *prover_options);
+        let prover = SP1Host::init(self.get_elf());
 
         let proof_input = SP1ProofInputBuilder::new()
             .write_serde(rollup_params)?
@@ -54,7 +52,7 @@ impl ProofGenerator<u64> for ClProofGenerator {
             .build()?;
 
         let proof = prover
-            .prove(proof_input)
+            .prove(proof_input, *proof_type)
             .context("Failed to generate CL proof")?;
 
         Ok(proof)

@@ -2,26 +2,25 @@ use std::{fs, path::PathBuf};
 
 use anyhow::Result;
 use sp1_sdk::{HashableKey, Prover};
-use strata_zkvm::{Proof, ProverOptions, VerificationKey};
+use strata_zkvm::{Proof, ProofType, VerificationKey};
 
 pub trait ProofGenerator<T> {
     /// Generates a proof based on the input.
-    fn gen_proof(&self, input: &T, options: &ProverOptions) -> Result<(Proof, VerificationKey)>;
+    fn gen_proof(&self, input: &T, proof_type: &ProofType) -> Result<(Proof, VerificationKey)>;
 
     /// Generates a unique proof ID based on the input.
     /// The proof ID will be the hash of the input and potentially other unique identifiers.
     fn get_proof_id(&self, input: &T) -> String;
 
     /// Retrieves a proof from cache or generates it if not found.
-    fn get_proof(&self, input: &T, options: &ProverOptions) -> Result<(Proof, VerificationKey)> {
+    fn get_proof(&self, input: &T, proof_type: &ProofType) -> Result<(Proof, VerificationKey)> {
         let elf = self.get_elf();
 
         // 1. Create the unique proof ID
         let proof_id = format!(
-            "{}_{}.{}proof",
+            "{}_{}.proof",
             self.get_proof_id(input),
             short_program_id(elf),
-            options
         );
         println!("Getting proof for {}", proof_id);
         let proof_file = get_cache_dir().join(proof_id);
@@ -36,7 +35,7 @@ pub trait ProofGenerator<T> {
 
         // 3. Generate the proof
         println!("Proof not found in cache, generating proof...");
-        let proof_res = self.gen_proof(input, options)?;
+        let proof_res = self.gen_proof(input, proof_type)?;
 
         // Verify the proof
         verify_proof(&proof_res.0, self.get_elf())?;

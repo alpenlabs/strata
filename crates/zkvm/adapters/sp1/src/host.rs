@@ -1,34 +1,35 @@
-use std::sync::Arc;
-
 use anyhow::Ok;
 use serde::{de::DeserializeOwned, Serialize};
 use sp1_sdk::{ProverClient, SP1ProofWithPublicValues, SP1ProvingKey, SP1VerifyingKey};
-use strata_zkvm::{Proof, ProofType, ProverOptions, VerificationKey, ZkVmHost, ZkVmInputBuilder};
+use strata_zkvm::{Proof, ProofType, VerificationKey, ZkVmHost, ZkVmInputBuilder};
 
-use crate::{input::SP1ProofInputBuilder, utils::get_proving_keys};
+use crate::input::SP1ProofInputBuilder;
 
 /// A host for the `SP1` zkVM that stores the guest program in ELF format.
 /// The `SP1Host` is responsible for program execution and proving
 #[derive(Clone)]
 pub struct SP1Host {
-    prover_options: ProverOptions,
     proving_key: SP1ProvingKey,
-    prover_client: Arc<ProverClient>,
-    vkey: SP1VerifyingKey,
+    verifying_key: SP1VerifyingKey,
+}
+
+impl SP1Host {
+    pub fn new(proving_key: SP1ProvingKey, verifying_key: SP1VerifyingKey) -> Self {
+        Self {
+            proving_key,
+            verifying_key,
+        }
+    }
 }
 
 impl ZkVmHost for SP1Host {
     type Input<'a> = SP1ProofInputBuilder;
-    fn init(guest_code: Vec<u8>, prover_options: ProverOptions) -> Self {
-        let prover_client = ProverClient::new();
-        let (proving_key, vkey) =
-            get_proving_keys(&prover_client, &guest_code, prover_options.use_cached_keys);
-
-        SP1Host {
-            prover_options,
-            prover_client: Arc::new(prover_client),
+    fn init(guest_code: &[u8]) -> Self {
+        let client = ProverClient::new();
+        let (proving_key, verifying_key) = client.setup(guest_code);
+        Self {
             proving_key,
-            vkey,
+            verifying_key,
         }
     }
 
@@ -37,15 +38,7 @@ impl ZkVmHost for SP1Host {
         prover_input: <Self::Input<'a> as ZkVmInputBuilder<'a>>::Input,
         proof_type: ProofType,
     ) -> anyhow::Result<(Proof, VerificationKey)> {
-        // Init the prover
-        if self.prover_options.use_mock_prover {
-            std::env::set_var("SP1_PROVER", "mock");
-            let mock_proof = Proof::new(vec![]);
-            let mock_vk = VerificationKey::new(vec![]);
-            return Ok((mock_proof, mock_vk));
-        }
-
-        let client = self.prover_client.clone();
+        let client = ProverClient::new();
 
         // Start proving
         let mut prover = client.prove(&self.proving_key, prover_input);
@@ -77,7 +70,7 @@ impl ZkVmHost for SP1Host {
     }
 
     fn get_verification_key(&self) -> VerificationKey {
-        let verification_key = bincode::serialize(&self.vkey).unwrap();
+        let verification_key = bincode::serialize(&self.verifying_key).unwrap();
         VerificationKey::new(verification_key)
     }
 
@@ -85,7 +78,7 @@ impl ZkVmHost for SP1Host {
         let proof: SP1ProofWithPublicValues = bincode::deserialize(proof.as_bytes())?;
 
         let client = ProverClient::new();
-        client.verify(&proof, &self.vkey)?;
+        client.verify(&proof, &self.verifying_key)?;
 
         Ok(())
     }
@@ -122,7 +115,7 @@ mod tests {
         let prover_input = prover_input_builder.build().unwrap();
 
         // assert proof generation works
-        let zkvm = SP1Host::init(TEST_ELF.to_vec(), ProverOptions::default());
+        let zkvm = SP1Host::init(TEST_ELF);
         let (proof, vk) = zkvm
             .prove(prover_input, ProofType::Core)
             .expect("Failed to generate proof");
@@ -167,15 +160,7 @@ mod tests {
             .build()
             .unwrap();
 
-        // Prover Options to generate Groth16 proof
-        let prover_options = ProverOptions {
-            enable_compression: false,
-            use_mock_prover: false,
-            stark_to_snark_conversion: true,
-            use_cached_keys: true,
-            proof_type: ProofType::Core,
-        };
-        let zkvm = SP1Host::init(TEST_ELF.to_vec(), prover_options);
+        let zkvm = SP1Host::init(TEST_ELF);
 
         // assert proof generation works
         let (proof, vk) = zkvm

@@ -15,7 +15,6 @@ use rpc_server::{ProverClientRpc, RpcContext};
 use strata_btcio::rpc::BitcoinClient;
 use strata_common::logging;
 use strata_sp1_adapter::SP1Host;
-use strata_zkvm::ProverOptions;
 use task::TaskTracker;
 use tracing::{debug, info};
 
@@ -95,13 +94,7 @@ async fn main() {
         checkpoint_dispatcher.clone(),
     );
 
-    let prover_options = ProverOptions {
-        use_mock_prover: false,
-        enable_compression: true,
-        ..Default::default()
-    };
-    let prover_manager: ProverManager<SP1Host> =
-        ProverManager::new(task_tracker.clone(), prover_options);
+    let prover_manager: ProverManager<SP1Host> = ProverManager::new(task_tracker.clone());
 
     // run prover manager in background
     tokio::spawn(async move { prover_manager.run().await });
