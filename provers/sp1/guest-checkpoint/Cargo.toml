@@ -11,8 +11,8 @@ bitcoin = "0.32.1"
 borsh = { version = "1.5.0", features = ["derive"] }
 sha2 = "0.10.8"
 snark-bn254-verifier = { git = "https://github.com/succinctlabs/snark-bn254-verifier.git" } # Note: This is unstable
-sp1-core-machine = "2.0.0"
-sp1-zkvm = { version = "2.0.0", features = ["verify"] }
+sp1-primitives = "3.0.0"
+sp1-zkvm = { version = "3.0.0", features = ["verify"] }
 strata-primitives = { path = "../../../crates/primitives" }
 strata-proofimpl-btc-blockspace = { path = "../../../crates/proof-impl/btc-blockspace" }
 strata-proofimpl-checkpoint = { path = "../../../crates/proof-impl/checkpoint" }

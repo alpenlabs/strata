@@ -40,7 +40,7 @@ impl<'a> ZKVMInputBuilder<'a> for SP1ProofInputBuilder {
         // inside SP1 itself.
         match proof.proof {
             SP1Proof::Compressed(compressed_proof) => {
-                self.0.write_proof(compressed_proof, vkey.vk);
+                self.0.write_proof(*compressed_proof, vkey.vk);
             }
             _ => return Err(anyhow::anyhow!("can only handle compressed proofs")),
         }

@@ -163,7 +163,7 @@ mod tests {
         // Note: For the fixed ELF and fixed SP1 version, the vk is fixed
         assert_eq!(
             vk.bytes32(),
-            "0x00b01ae596b4e51843484ff71ccbd0dd1a030af70b255e6b9aad50b81d81266f"
+            "0x00efb1120491119751e75bc55bc95b64d33f973ecf68fcf5cbff08506c5788f9"
         );
 
         let filename = "proof-groth16.bin";

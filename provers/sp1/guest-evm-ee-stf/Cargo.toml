@@ -7,7 +7,7 @@ version = "0.1.0"
 
 [dependencies]
 revm = { version = "12.1.0", default-features = false }
-sp1-zkvm = "2.0.0"
+sp1-zkvm = "3.0.0"
 strata-proofimpl-evm-ee-stf = { path = "../../../crates/proof-impl/evm-ee-stf" }
 
 [patch.crates-io]
