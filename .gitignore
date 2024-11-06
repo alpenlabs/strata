@@ -260,6 +260,7 @@ provers/**/*.elf
 provers/**/*.pk
 provers/**/*.vk
 provers/**/*.id
+provers/**/*.proof
 
 proving_keys/
 provers/test-util/el/el_proofs/

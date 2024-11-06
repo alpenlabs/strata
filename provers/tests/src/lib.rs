@@ -8,7 +8,6 @@ mod l2_batch;
 mod proof_generator;
 
 pub use btc::BtcBlockProofGenerator;
-pub use checkpoint::{CheckpointBatchInfo, CheckpointProofGenerator};
 pub use cl::ClProofGenerator;
 pub use el::ElProofGenerator;
 pub use l1_batch::L1BatchProofGenerator;

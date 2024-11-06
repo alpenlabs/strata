@@ -13626,33 +13626,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "strata-zkvm-tests"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bincode",
- "bitcoin",
- "borsh",
- "hex",
- "serde_json",
- "strata-primitives",
- "strata-proofimpl-btc-blockspace",
- "strata-proofimpl-checkpoint",
- "strata-proofimpl-cl-agg",
- "strata-proofimpl-cl-stf",
- "strata-proofimpl-evm-ee-stf",
- "strata-proofimpl-l1-batch",
- "strata-risc0-adapter",
- "strata-risc0-guest-builder",
- "strata-sp1-adapter",
- "strata-sp1-guest-builder",
- "strata-state",
- "strata-test-utils",
- "strata-zkvm",
- "tempfile",
-]
-
-[[package]]
 name = "strsim"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

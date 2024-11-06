@@ -17,7 +17,7 @@ use strata_zkvm::{
 };
 
 use super::L2BatchProofGenerator;
-use crate::helpers::{el::ElProofGenerator, proof_generator::ProofGenerator};
+use crate::{el::ElProofGenerator, proof_generator::ProofGenerator};
 
 pub struct ClProofGenerator {
     pub el_proof_generator: ElProofGenerator,
