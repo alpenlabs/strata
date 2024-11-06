@@ -57,6 +57,7 @@ members = [
   # integration tests
   "tests",
   "crates/util/python-utils",
+  "crates/zkvm/adapters/native",
 ]
 
 default-members = [
