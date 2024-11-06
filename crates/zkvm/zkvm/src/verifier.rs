@@ -10,11 +10,7 @@ pub trait ZkVmVerifier {
 
     fn get_raw_public_output(output: &Self::Output) -> anyhow::Result<Vec<u8>>;
 
-    fn verify<H>(
-        proof: &Proof,
-        verification_key: &VerificationKey,
-        public_params: &Self::Output,
-    ) -> anyhow::Result<()>
+    fn verify<H>(proof: &Proof, public_params: &Self::Output, host: &H) -> anyhow::Result<()>
     where
         H: ZkVmHost,
     {
@@ -24,7 +20,7 @@ pub trait ZkVmVerifier {
             proof_raw_output == expected_raw_output,
             "public parameters mismatch"
         );
-        H::verify(verification_key, proof)
+        host.verify(proof)
     }
 
     /// Processes the proof to produce the final output.

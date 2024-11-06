@@ -34,7 +34,7 @@ pub trait ProofGenerator<T, P: ZkVmProver> {
             println!("Proof found in cache, returning the cached proof...",);
             let proof = read_proof_from_file(&proof_file)?;
             let host = self.get_host();
-            verify_proof(&proof, host.get_verification_key())?;
+            verify_proof(&proof, &host)?;
             let output = P::process_output(&proof, &host)?;
             return Ok((proof, output));
         }
@@ -44,7 +44,7 @@ pub trait ProofGenerator<T, P: ZkVmProver> {
         let (proof, output) = self.gen_proof(input)?;
 
         // Verify the proof
-        verify_proof(&proof, self.get_host().get_verification_key())?;
+        verify_proof(&proof, &self.get_host())?;
 
         // Save the proof to cache
         write_proof_to_file(&proof, &proof_file)?;
@@ -104,17 +104,6 @@ fn write_proof_to_file(proof: &Proof, proof_file: &std::path::Path) -> Result<()
 }
 
 /// Verifies a proof independently.
-fn verify_proof(proof: &Proof, verifying_key: VerificationKey) -> Result<()> {
-    use anyhow::Context;
-    use sp1_sdk::{MockProver, SP1ProofWithPublicValues};
-
-    let client = MockProver::new();
-    let sp1_proof: SP1ProofWithPublicValues =
-        bincode::deserialize(proof.as_bytes()).context("Failed to deserialize SP1 proof")?;
-    let sp1_verifying_key: SP1VerifyingKey =
-        bincode::deserialize(verifying_key.as_bytes()).expect("sp1 vk deser");
-    client
-        .verify(&sp1_proof, &sp1_verifying_key)
-        .context("Independent proof verification failed")?;
-    Ok(())
+fn verify_proof(proof: &Proof, host: &impl ZkVmHost) -> Result<()> {
+    host.verify(proof)
 }

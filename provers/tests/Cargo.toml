@@ -1,0 +1,32 @@
+[package]
+name = "strata-zkvm-tests"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow.workspace = true
+bincode.workspace = true
+bitcoin.workspace = true
+borsh.workspace = true
+hex.workspace = true
+num-bigint = "0.4.6"
+num-traits = "0.2.19"
+serde_json.workspace = true
+sp1-sdk = { version = "3.0.0", optional = true }
+strata-primitives.workspace = true
+strata-proofimpl-btc-blockspace.workspace = true
+strata-proofimpl-checkpoint.workspace = true
+strata-proofimpl-cl-agg.workspace = true
+strata-proofimpl-cl-stf.workspace = true
+strata-proofimpl-evm-ee-stf.workspace = true
+strata-proofimpl-l1-batch.workspace = true
+strata-sp1-adapter = { workspace = true, optional = true }
+strata-sp1-guest-builder = { path = "../sp1", optional = true }
+strata-state.workspace = true
+strata-test-utils.workspace = true
+strata-zkvm.workspace = true
+tempfile.workspace = true
+
+[features]
+sp1 = ["strata-sp1-adapter", "strata-sp1-guest-builder", "sp1-sdk"]
+default = ["sp1"]

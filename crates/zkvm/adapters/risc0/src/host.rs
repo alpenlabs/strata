@@ -1,4 +1,4 @@
-use risc0_zkvm::{compute_image_id, default_prover, ProverOpts, Receipt};
+use risc0_zkvm::{compute_image_id, default_prover, sha::Digest, ProverOpts, Receipt};
 use serde::de::DeserializeOwned;
 use strata_zkvm::{Proof, ProofType, VerificationKey, ZkVmHost, ZkVmInputBuilder};
 
@@ -10,14 +10,17 @@ use crate::input::Risc0ProofInputBuilder;
 #[derive(Clone)]
 pub struct Risc0Host {
     elf: Vec<u8>,
+    id: Digest,
 }
 
 impl ZkVmHost for Risc0Host {
     type Input<'a> = Risc0ProofInputBuilder<'a>;
 
     fn init(guest_code: &[u8]) -> Self {
+        let id = compute_image_id(guest_code).expect("invalid elf");
         Risc0Host {
             elf: guest_code.to_vec(),
+            id,
         }
     }
 
@@ -36,10 +39,6 @@ impl ZkVmHost for Risc0Host {
         // let prover = get_prover_server(&opts)?;
         let prover = default_prover();
 
-        // Setup verification key
-        let program_id = compute_image_id(&self.elf)?;
-        let verification_key = bincode::serialize(&program_id)?;
-
         // Generate the session
         // let mut exec = ExecutorImpl::from_elf(prover_input, &self.elf)?;
         // let session = exec.run()?;
@@ -51,19 +50,17 @@ impl ZkVmHost for Risc0Host {
 
         // Proof serialization
         let serialized_proof = bincode::serialize(&proof_info.receipt)?;
-        Ok((
-            Proof::new(serialized_proof),
-            VerificationKey(verification_key),
-        ))
+        Ok((Proof::new(serialized_proof), self.get_verification_key()))
     }
 
     fn get_verification_key(&self) -> VerificationKey {
-        todo!()
+        VerificationKey(self.id.as_bytes().to_vec())
     }
 
-    fn verify(verification_key: &VerificationKey, proof: &Proof) -> anyhow::Result<()> {
+    fn verify(&self, proof: &Proof) -> anyhow::Result<()> {
         let receipt: Receipt = bincode::deserialize(proof.as_bytes())?;
-        let vk: risc0_zkvm::sha::Digest = bincode::deserialize(&verification_key.0)?;
+        // TODO: maybe cache this?
+        let vk = compute_image_id(&self.elf)?;
         receipt.verify(vk)?;
         Ok(())
     }
@@ -73,7 +70,7 @@ impl ZkVmHost for Risc0Host {
     }
     fn extract_raw_public_output(proof: &Proof) -> anyhow::Result<Vec<u8>> {
         let receipt: Receipt = bincode::deserialize(proof.as_bytes())?;
-        Ok(receipt.journal.decode()?)
+        Ok(receipt.journal.bytes)
     }
 }
 
@@ -103,12 +100,12 @@ mod tests {
         let zkvm_input = zkvm_input_builder.build().unwrap();
 
         // assert proof generation works
-        let (proof, vk) = zkvm
+        let (proof, _) = zkvm
             .prove(zkvm_input, ProofType::Core)
             .expect("Failed to generate proof");
 
         // assert proof verification works
-        Risc0Host::verify(&vk, &proof).expect("Proof verification failed");
+        zkvm.verify(&proof).expect("Proof verification failed");
 
         // assert public outputs extraction from proof  works
         let out: u32 = Risc0Host::extract_public_output(&proof).expect(

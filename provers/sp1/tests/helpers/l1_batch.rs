@@ -1,6 +1,5 @@
 use anyhow::{Context, Result};
 use bitcoin::params::MAINNET;
-use sp1_sdk::{Prover, SP1ProvingKey, SP1VerifyingKey};
 use strata_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
 use strata_proofimpl_l1_batch::{L1BatchProofInput, L1BatchProofOutput, L1BatchProver};
 use strata_sp1_adapter::{SP1Host, SP1ProofInputBuilder};
@@ -61,11 +60,7 @@ impl ProofGenerator<(u32, u32), L1BatchProver> for L1BatchProofGenerator {
     }
 
     fn get_host(&self) -> impl ZkVmHost {
-        let proving_key: SP1ProvingKey =
-            bincode::deserialize(&GUEST_L1_BATCH_PK).expect("borsh serialization vk");
-        let verifying_key: SP1VerifyingKey =
-            bincode::deserialize(&GUEST_L1_BATCH_VK).expect("borsh serialization vk");
-        SP1Host::new(proving_key, verifying_key)
+        SP1Host::new_from_bytes(&GUEST_L1_BATCH_PK, &GUEST_L1_BATCH_VK)
     }
 
     fn get_elf(&self) -> &[u8] {
@@ -74,5 +69,28 @@ impl ProofGenerator<(u32, u32), L1BatchProver> for L1BatchProofGenerator {
 
     fn get_short_program_id(&self) -> String {
         GUEST_L1_BATCH_VK_HASH_STR.to_string().split_off(58)
+    }
+}
+
+// #[cfg(all(feature = "prover", not(debug_assertions)))]
+mod test {
+    use strata_test_utils::l2::gen_params;
+
+    use crate::{BtcBlockProofGenerator, L1BatchProofGenerator, ProofGenerator};
+
+    #[test]
+    fn test_l1_batch_code_trace_generation() {
+        #[cfg(feature = "sp1")]
+        sp1_sdk::utils::setup_logger();
+
+        let params = gen_params();
+        let rollup_params = params.rollup();
+        let l1_start_height = (rollup_params.genesis_l1_height + 1) as u32;
+        let l1_end_height = l1_start_height + 2;
+
+        let btc_proof_generator = BtcBlockProofGenerator::new();
+        let _ = L1BatchProofGenerator::new(btc_proof_generator)
+            .get_proof(&(l1_start_height, l1_end_height))
+            .unwrap();
     }
 }

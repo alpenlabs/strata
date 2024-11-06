@@ -2,7 +2,6 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use bitcoin::block;
-use sp1_sdk::{Prover, SP1ProvingKey, SP1VerifyingKey};
 use strata_proofimpl_cl_stf::{
     prover::{ClStfInput, ClStfProver},
     L2BatchProofOutput,
@@ -63,11 +62,7 @@ impl ProofGenerator<u64, ClStfProver> for ClProofGenerator {
     }
 
     fn get_host(&self) -> impl ZkVmHost {
-        let proving_key: SP1ProvingKey =
-            bincode::deserialize(&GUEST_CL_STF_PK).expect("borsh serialization vk");
-        let verifying_key: SP1VerifyingKey =
-            bincode::deserialize(&GUEST_CL_STF_VK).expect("borsh serialization vk");
-        SP1Host::new(proving_key, verifying_key)
+        SP1Host::new_from_bytes(&GUEST_CL_STF_PK, &GUEST_CL_STF_VK)
     }
 
     fn get_elf(&self) -> &[u8] {
