@@ -4,7 +4,9 @@ use sp1_sdk::{Prover, SP1ProvingKey, SP1VerifyingKey};
 use strata_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
 use strata_proofimpl_l1_batch::{L1BatchProofInput, L1BatchProofOutput, L1BatchProver};
 use strata_sp1_adapter::{SP1Host, SP1ProofInputBuilder};
-use strata_sp1_guest_builder::{GUEST_L1_BATCH_ELF, GUEST_L1_BATCH_PK, GUEST_L1_BATCH_VK};
+use strata_sp1_guest_builder::{
+    GUEST_L1_BATCH_ELF, GUEST_L1_BATCH_PK, GUEST_L1_BATCH_VK, GUEST_L1_BATCH_VK_HASH_STR,
+};
 use strata_test_utils::bitcoin::get_btc_chain;
 use strata_zkvm::{
     AggregationInput, Proof, ProofType, VerificationKey, ZkVmHost, ZkVmInputBuilder, ZkVmProver,
@@ -68,5 +70,9 @@ impl ProofGenerator<(u32, u32), L1BatchProver> for L1BatchProofGenerator {
 
     fn get_elf(&self) -> &[u8] {
         &GUEST_L1_BATCH_ELF
+    }
+
+    fn get_short_program_id(&self) -> String {
+        GUEST_L1_BATCH_VK_HASH_STR.to_string().split_off(58)
     }
 }

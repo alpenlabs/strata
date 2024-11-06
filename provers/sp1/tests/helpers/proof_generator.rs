@@ -20,13 +20,11 @@ pub trait ProofGenerator<T, P: ZkVmProver> {
 
     /// Retrieves a proof from cache or generates it if not found.
     fn get_proof(&self, input: &T) -> Result<(Proof, P::Output)> {
-        let elf = self.get_elf();
-
         // 1. Create the unique proof ID
         let proof_id = format!(
             "{}_{}.proof",
             self.get_proof_id(input),
-            short_program_id(elf),
+            self.get_short_program_id(),
         );
         println!("Getting proof for {}", proof_id);
         let proof_file = get_cache_dir().join(proof_id);
@@ -56,6 +54,8 @@ pub trait ProofGenerator<T, P: ZkVmProver> {
 
     /// Returns the ELF binary (used for verification).
     fn get_elf(&self) -> &[u8];
+
+    fn get_short_program_id(&self) -> String;
 
     // Simulate the proof. This is different than running the in the MOCK_PROVER mode
     // fn simulate(&self, input: T) -> U
@@ -117,11 +117,4 @@ fn verify_proof(proof: &Proof, verifying_key: VerificationKey) -> Result<()> {
         .verify(&sp1_proof, &sp1_verifying_key)
         .context("Independent proof verification failed")?;
     Ok(())
-}
-
-fn short_program_id(elf: &[u8]) -> String {
-    use sp1_sdk::{MockProver, SP1ProofWithPublicValues};
-    let client = MockProver::new();
-    let (_, vk) = client.setup(elf);
-    vk.bytes32().split_off(58)
 }

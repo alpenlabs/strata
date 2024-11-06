@@ -3,7 +3,9 @@ use sp1_sdk::{Prover, SP1ProvingKey, SP1VerifyingKey};
 use strata_proofimpl_cl_agg::{ClAggInput, ClAggProver};
 use strata_proofimpl_cl_stf::L2BatchProofOutput;
 use strata_sp1_adapter::{SP1Host, SP1ProofInputBuilder};
-use strata_sp1_guest_builder::{GUEST_CL_AGG_ELF, GUEST_CL_AGG_PK, GUEST_CL_AGG_VK};
+use strata_sp1_guest_builder::{
+    GUEST_CL_AGG_ELF, GUEST_CL_AGG_PK, GUEST_CL_AGG_VK, GUEST_CL_AGG_VK_HASH_STR,
+};
 use strata_zkvm::{
     AggregationInput, Proof, ProofType, VerificationKey, ZkVmHost, ZkVmInputBuilder, ZkVmProver,
 };
@@ -55,5 +57,9 @@ impl ProofGenerator<(u64, u64), ClAggProver> for L2BatchProofGenerator {
 
     fn get_elf(&self) -> &[u8] {
         &GUEST_CL_AGG_ELF
+    }
+
+    fn get_short_program_id(&self) -> String {
+        GUEST_CL_AGG_VK_HASH_STR.to_string().split_off(58)
     }
 }
