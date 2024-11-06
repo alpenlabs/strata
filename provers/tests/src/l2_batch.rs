@@ -9,7 +9,7 @@ use strata_zkvm::{
     AggregationInput, Proof, ProofType, VerificationKey, ZkVmHost, ZkVmInputBuilder, ZkVmProver,
 };
 
-use crate::helpers::{cl::ClProofGenerator, proof_generator::ProofGenerator};
+use crate::{cl::ClProofGenerator, proof_generator::ProofGenerator};
 
 pub struct L2BatchProofGenerator {
     cl_proof_generator: ClProofGenerator,
@@ -66,6 +66,22 @@ mod test {
 
     #[test]
     fn test_cl_agg_guest_code_trace_generation() {
+        let el_prover = ElProofGenerator::new();
+        let cl_prover = ClProofGenerator::new(el_prover);
+        let cl_agg_prover = L2BatchProofGenerator::new(cl_prover);
+
+        let _ = cl_agg_prover.get_proof(&(1, 3)).unwrap();
+    }
+}
+
+// #[cfg(all(feature = "prover", not(debug_assertions)))]
+mod test {
+    use crate::{ClProofGenerator, ElProofGenerator, L2BatchProofGenerator, ProofGenerator};
+
+    #[test]
+    fn test_cl_agg_guest_code_trace_generation() {
+        sp1_sdk::utils::setup_logger();
+
         let el_prover = ElProofGenerator::new();
         let cl_prover = ClProofGenerator::new(el_prover);
         let cl_agg_prover = L2BatchProofGenerator::new(cl_prover);

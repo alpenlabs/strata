@@ -14,9 +14,15 @@ use strata_sp1_guest_builder::{
 use strata_test_utils::l2::gen_params;
 use strata_zkvm::{Proof, ProofType, VerificationKey, ZkVmHost, ZkVmInputBuilder, ZkVmProver};
 
-use crate::helpers::proof_generator::ProofGenerator;
+use crate::proof_generator::ProofGenerator;
 
 pub struct BtcBlockProofGenerator;
+
+impl Default for BtcBlockProofGenerator {
+    fn default() -> Self {
+        BtcBlockProofGenerator::new()
+    }
+}
 
 impl BtcBlockProofGenerator {
     pub fn new() -> Self {
@@ -67,6 +73,22 @@ mod test {
 
     #[test]
     fn test_btc_blockspace_code_trace_generation() {
+        let btc_chain = get_btc_chain();
+        let block = btc_chain.get_block(40321);
+
+        let _ = BtcBlockProofGenerator::new().get_proof(block).unwrap();
+    }
+}
+
+// #[cfg(all(feature = "prover", not(debug_assertions)))]
+mod test {
+    use strata_test_utils::bitcoin::get_btc_chain;
+
+    use super::*;
+
+    #[test]
+    fn test_btc_blockspace_code_trace_generation() {
+        sp1_sdk::utils::setup_logger();
         let btc_chain = get_btc_chain();
         let block = btc_chain.get_block(40321);
 

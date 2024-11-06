@@ -44,6 +44,7 @@ members = [
   "crates/vtxjmt",
   "provers/risc0",
   "provers/sp1",
+  "provers/tests",
 
   # binaries listed separately
   "bin/bridge-client",

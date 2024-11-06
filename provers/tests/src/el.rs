@@ -9,9 +9,15 @@ use strata_sp1_guest_builder::{
 use strata_test_utils::evm_ee::EvmSegment;
 use strata_zkvm::{Proof, ProofType, VerificationKey, ZkVmHost, ZkVmInputBuilder, ZkVmProver};
 
-use crate::helpers::proof_generator::ProofGenerator;
+use crate::proof_generator::ProofGenerator;
 
 pub struct ElProofGenerator;
+
+impl Default for ElProofGenerator {
+    fn default() -> Self {
+        ElProofGenerator::new()
+    }
+}
 
 impl ElProofGenerator {
     pub fn new() -> Self {
