@@ -17,7 +17,7 @@ use musig2::KeyAggContext;
 use pyo3::prelude::*;
 
 use crate::{
-    constants::{CHANGE_DESCRIPTOR, DESCRIPTOR, NETWORK},
+    constants::{CHANGE_DESCRIPTOR, DESCRIPTOR, NETWORK, UNSPENDABLE},
     drt::bridge_in_descriptor,
     error::Error,
     parse::{parse_pk, parse_xonly_pk},
@@ -40,6 +40,15 @@ impl ExtractP2trPubkey for Address {
 
         Ok(XOnlyPublicKey::from_slice(&script_pubkey.as_bytes()[2..]).expect("valid pub key"))
     }
+}
+
+/// Unspendabled Taproot address.
+///
+/// This is based on the [`UNSPENDABLE`] public key.
+#[pyfunction]
+pub fn unspendable_address() -> String {
+    let address = Address::p2tr(SECP256K1, *UNSPENDABLE, None, NETWORK);
+    address.to_string()
 }
 
 /// A simple Taproot-enable wallet.
@@ -310,6 +319,15 @@ mod tests {
         ))
         .unwrap();
         assert_eq!(pk, expected);
+    }
+
+    #[test]
+    fn unspendable_address() {
+        let address = super::unspendable_address();
+        assert_eq!(
+            address,
+            "bcrt1plh4vmrc7ejjt66d8rj5nx8hsvslw9ps9rp3a0v7kzq37ekt5lggskf39fp"
+        );
     }
 
     #[test]
