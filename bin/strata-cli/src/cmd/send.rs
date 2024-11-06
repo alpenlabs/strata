@@ -15,8 +15,8 @@ use crate::{
     net_type::{net_type_or_exit, NetworkType},
     seed::Seed,
     settings::Settings,
-    signet::{get_fee_rate, log_fee_rate, print_explorer_url, SignetWallet},
-    strata::StrataWallet,
+    signet::{get_fee_rate, log_fee_rate, print_bitcoin_explorer_url, SignetWallet},
+    strata::{print_strata_explorer_url, StrataWallet},
 };
 
 /// Send some bitcoin from the internal wallet.
@@ -72,7 +72,7 @@ pub async fn send(args: SendArgs, seed: Seed, settings: Settings) {
                 .broadcast_tx(&tx)
                 .await
                 .expect("successful broadcast");
-            let _ = print_explorer_url(&tx.compute_txid(), &term, &settings);
+            let _ = print_bitcoin_explorer_url(&tx.compute_txid(), &term, &settings);
         }
         NetworkType::Strata => {
             let l2w = StrataWallet::new(&seed, &settings.strata_endpoint).expect("valid wallet");
@@ -84,7 +84,7 @@ pub async fn send(args: SendArgs, seed: Seed, settings: Settings) {
                 .send_transaction(tx)
                 .await
                 .expect("successful broadcast");
-            let _ = term.write_line(&format!("Transaction {} sent", res.tx_hash()));
+            let _ = print_strata_explorer_url(res.tx_hash(), &term, &settings);
         }
     };
 
