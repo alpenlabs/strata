@@ -5,7 +5,9 @@ use strata_proofimpl_checkpoint::{
     CheckpointProofInput, CheckpointProofOutput,
 };
 use strata_sp1_adapter::SP1Host;
-use strata_sp1_guest_builder::{GUEST_CHECKPOINT_ELF, GUEST_CHECKPOINT_PK, GUEST_CHECKPOINT_VK};
+use strata_sp1_guest_builder::{
+    GUEST_CHECKPOINT_ELF, GUEST_CHECKPOINT_PK, GUEST_CHECKPOINT_VK, GUEST_CHECKPOINT_VK_HASH_STR,
+};
 use strata_test_utils::l2::gen_params;
 use strata_zkvm::{Proof, ZkVmHost, ZkVmProver};
 
@@ -94,5 +96,9 @@ impl ProofGenerator<CheckpointBatchInfo, CheckpointProver> for CheckpointProofGe
 
     fn get_elf(&self) -> &[u8] {
         &GUEST_CHECKPOINT_ELF
+    }
+
+    fn get_short_program_id(&self) -> String {
+        GUEST_CHECKPOINT_VK_HASH_STR.to_string().split_off(58)
     }
 }

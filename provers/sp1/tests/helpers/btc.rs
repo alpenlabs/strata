@@ -10,6 +10,7 @@ use strata_proofimpl_btc_blockspace::{
 use strata_sp1_adapter::{SP1Host, SP1ProofInputBuilder};
 use strata_sp1_guest_builder::{
     GUEST_BTC_BLOCKSPACE_ELF, GUEST_BTC_BLOCKSPACE_PK, GUEST_BTC_BLOCKSPACE_VK,
+    GUEST_BTC_BLOCKSPACE_VK_HASH_STR,
 };
 use strata_test_utils::l2::gen_params;
 use strata_zkvm::{Proof, ProofType, VerificationKey, ZkVmHost, ZkVmInputBuilder, ZkVmProver};
@@ -55,5 +56,9 @@ impl ProofGenerator<Block, BtcBlockspaceProver> for BtcBlockProofGenerator {
 
     fn get_elf(&self) -> &[u8] {
         &GUEST_BTC_BLOCKSPACE_ELF
+    }
+
+    fn get_short_program_id(&self) -> String {
+        GUEST_BTC_BLOCKSPACE_VK_HASH_STR.to_string().split_off(58)
     }
 }

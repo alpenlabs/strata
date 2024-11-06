@@ -8,7 +8,9 @@ use strata_proofimpl_cl_stf::{
     L2BatchProofOutput,
 };
 use strata_sp1_adapter::{SP1Host, SP1ProofInputBuilder};
-use strata_sp1_guest_builder::{GUEST_CL_STF_ELF, GUEST_CL_STF_PK, GUEST_CL_STF_VK};
+use strata_sp1_guest_builder::{
+    GUEST_CL_STF_ELF, GUEST_CL_STF_PK, GUEST_CL_STF_VK, GUEST_CL_STF_VK_HASH_STR,
+};
 use strata_state::header::L2Header;
 use strata_test_utils::{evm_ee::L2Segment, l2::gen_params};
 use strata_zkvm::{
@@ -70,5 +72,9 @@ impl ProofGenerator<u64, ClStfProver> for ClProofGenerator {
 
     fn get_elf(&self) -> &[u8] {
         &GUEST_CL_STF_ELF
+    }
+
+    fn get_short_program_id(&self) -> String {
+        GUEST_CL_STF_VK_HASH_STR.to_string().split_off(58)
     }
 }
