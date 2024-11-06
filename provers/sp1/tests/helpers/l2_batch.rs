@@ -1,5 +1,4 @@
 use anyhow::{Context, Result};
-use sp1_sdk::{Prover, SP1ProvingKey, SP1VerifyingKey};
 use strata_proofimpl_cl_agg::{ClAggInput, ClAggProver};
 use strata_proofimpl_cl_stf::L2BatchProofOutput;
 use strata_sp1_adapter::{SP1Host, SP1ProofInputBuilder};
@@ -48,11 +47,7 @@ impl ProofGenerator<(u64, u64), ClAggProver> for L2BatchProofGenerator {
     }
 
     fn get_host(&self) -> impl ZkVmHost {
-        let proving_key: SP1ProvingKey =
-            bincode::deserialize(&GUEST_CL_AGG_PK).expect("borsh serialization vk");
-        let verifying_key: SP1VerifyingKey =
-            bincode::deserialize(&GUEST_CL_AGG_VK).expect("borsh serialization vk");
-        SP1Host::new(proving_key, verifying_key)
+        SP1Host::new_from_bytes(&GUEST_CL_AGG_PK, &GUEST_CL_AGG_VK)
     }
 
     fn get_elf(&self) -> &[u8] {
@@ -61,5 +56,22 @@ impl ProofGenerator<(u64, u64), ClAggProver> for L2BatchProofGenerator {
 
     fn get_short_program_id(&self) -> String {
         GUEST_CL_AGG_VK_HASH_STR.to_string().split_off(58)
+    }
+}
+
+// #[cfg(all(feature = "prover", not(debug_assertions)))]
+mod test {
+    use crate::{ClProofGenerator, ElProofGenerator, L2BatchProofGenerator, ProofGenerator};
+
+    #[test]
+    fn test_cl_agg_guest_code_trace_generation() {
+        #[cfg(feature = "sp1")]
+        sp1_sdk::utils::setup_logger();
+
+        let el_prover = ElProofGenerator::new();
+        let cl_prover = ClProofGenerator::new(el_prover);
+        let cl_agg_prover = L2BatchProofGenerator::new(cl_prover);
+
+        let _ = cl_agg_prover.get_proof(&(1, 3)).unwrap();
     }
 }

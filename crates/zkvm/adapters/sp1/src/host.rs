@@ -20,6 +20,14 @@ impl SP1Host {
             verifying_key,
         }
     }
+
+    pub fn new_from_bytes(proving_key_bytes: &[u8], verifying_key_bytes: &[u8]) -> Self {
+        let proving_key: SP1ProvingKey =
+            bincode::deserialize(proving_key_bytes).expect("invalid sp1 pk bytes");
+        let verifying_key: SP1VerifyingKey =
+            bincode::deserialize(verifying_key_bytes).expect("invalid sp1 vk bytes");
+        SP1Host::new(proving_key, verifying_key)
+    }
 }
 
 impl ZkVmHost for SP1Host {
@@ -116,12 +124,12 @@ mod tests {
 
         // assert proof generation works
         let zkvm = SP1Host::init(TEST_ELF);
-        let (proof, vk) = zkvm
+        let (proof, _) = zkvm
             .prove(prover_input, ProofType::Core)
             .expect("Failed to generate proof");
 
         // assert proof verification works
-        SP1Verifier::verify(&vk, &proof).expect("Proof verification failed");
+        zkvm.verify(&proof).expect("Proof verification failed");
 
         // assert public outputs extraction from proof  works
         let out: u32 = SP1Verifier::extract_public_output(&proof).expect(

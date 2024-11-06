@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
-use sp1_sdk::{Prover, SP1ProvingKey, SP1VerifyingKey};
 use strata_proofimpl_evm_ee_stf::{prover::EvmEeProver, ELProofInput, ELProofPublicParams};
 use strata_sp1_adapter::{SP1Host, SP1ProofInputBuilder};
 use strata_sp1_guest_builder::{
@@ -40,11 +39,7 @@ impl ProofGenerator<u64, EvmEeProver> for ElProofGenerator {
     }
 
     fn get_host(&self) -> impl ZkVmHost {
-        let proving_key: SP1ProvingKey =
-            bincode::deserialize(&GUEST_EVM_EE_STF_PK).expect("borsh serialization vk");
-        let verifying_key: SP1VerifyingKey =
-            bincode::deserialize(&GUEST_EVM_EE_STF_VK).expect("borsh serialization vk");
-        SP1Host::new(proving_key, verifying_key)
+        SP1Host::new_from_bytes(&GUEST_EVM_EE_STF_PK, &GUEST_EVM_EE_STF_VK)
     }
 
     fn get_elf(&self) -> &[u8] {
