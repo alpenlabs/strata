@@ -101,8 +101,8 @@ impl<D: Database> StateTracker<D> {
 ///
 /// # Parameters
 ///
-/// - `cs_db`: An implementation of the [`ClientStateDb`] trait, used for retrieving checkpoint and
-///   state data.
+/// - `cs_db`: An implementation of the [`ClientStateDatabase`] trait, used for retrieving
+///   checkpoint and state data.
 /// - `idx`: The index from which to replay state writes, starting from the last checkpoint.
 pub fn reconstruct_cur_state(
     cs_db: &impl ClientStateDatabase,
@@ -136,7 +136,7 @@ pub fn reconstruct_cur_state(
 ///
 /// # Parameters
 ///
-/// - `cs_db`: anything that implements the [`ClientStateDb`] trait.
+/// - `cs_db`: anything that implements the [`ClientStateDatabase`] trait.
 /// - `idx`: index to look ahead from.
 pub fn reconstruct_state(
     cs_db: &impl ClientStateDatabase,
