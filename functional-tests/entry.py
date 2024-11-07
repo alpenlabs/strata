@@ -21,7 +21,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
         rollup_settings: Optional[RollupParamsSettings] = None,
         auto_generate_blocks: bool = True,
         enable_prover_client: bool = False,
-        n_operators: int = 2,
+        n_operators: int = 3,
     ):
         super().__init__()
         self.pre_generate_blocks = pre_generate_blocks
@@ -43,6 +43,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
         settings = self.rollup_settings or RollupParamsSettings.new_default()
         params_gen_data = generate_simple_params(initdir, settings, self.n_operators)
         params = params_gen_data["params"]
+
         # TODO also grab operator keys and launch operators
 
         # reth needs some time to startup, start it first
@@ -102,7 +103,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
         # Need to wait for at least `genesis_l1_height` blocks to be generated.
         # Sleeping some more for safety
         if self.auto_generate_blocks:
-            time.sleep(BLOCK_GENERATION_INTERVAL_SECS * 10)
+            time.sleep(5)
 
         svcs["sequencer"] = sequencer
         svcs["reth"] = reth

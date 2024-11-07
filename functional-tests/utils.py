@@ -374,10 +374,19 @@ def generate_simple_params(
     """
     seqseedpath = os.path.join(base_path, "seqkey.bin")
     opseedpaths = [os.path.join(base_path, "opkey%s.bin") % i for i in range(operator_cnt)]
+    # print("opseedpaths :", opseedpaths)
     for p in [seqseedpath] + opseedpaths:
         generate_seed_at(p)
 
     seqkey = generate_seqpubkey_from_seed(seqseedpath)
+
+    print("Seed paths were:", opseedpaths)
+    opseedpaths = [
+        "/Users/abishekbashyal/Desktop/strata/keys/operator1.bin",
+        "/Users/abishekbashyal/Desktop/strata/keys/operator2.bin",
+        "/Users/abishekbashyal/Desktop/strata/keys/operator3.bin",
+    ]
+    print("Modified paths were:", opseedpaths)
     opxpubs = [generate_opxpub_from_seed(p) for p in opseedpaths]
 
     params = generate_params(settings, seqkey, opxpubs)

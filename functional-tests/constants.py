@@ -7,6 +7,7 @@ DD_ROOT = "_dd"
 MAX_HORIZON_POLL_INTERVAL_SECS = 1
 SEQ_SLACK_TIME_SECS = 2  # to account for thread sync and startup times
 BLOCK_GENERATION_INTERVAL_SECS = 0.5
+# BLOCK_GENERATION_INTERVAL_SECS = 10
 SEQ_PUBLISH_BATCH_INTERVAL_SECS = 5
 
 # Error codes
@@ -56,7 +57,22 @@ DEFAULT_ROLLUP_PARAMS: dict = {
         "timeout": 60 * 10,
     },
     "max_deposits_in_block": 16,
-    "operator_config": {"static": [{"signing_pk": "01" * 32, "wallet_pk": "02" * 32}]},
+    "operator_config": {
+        "static": [
+            {
+                "signing_pk": "0x8d86834e6fdb45ba6b7ffd067a27b9e1d67778047581d7ef757ed9e0fa474000",
+                "wallet_pk": "0xd678aa2ad5e4f2174025aa7f77cd43ee662ccd94499982d0c322a73d1ffecd79",
+            },
+            {
+                "signing_pk": "0x0abb00b8b17e2798ddebd0ccbb858b6f624a1ff7d93ec15baa8a7be3f136474d",
+                "wallet_pk": "0x175cb26def00eaef40650c9d611be6750fb577a10ce1f8f85e2b28c346db89f6",
+            },
+            {
+                "signing_pk": "0x2a4b743dc2393a6ee038350a6ef3a55741e6c78ac6491478d832f4e2a23aa6be",
+                "wallet_pk": "0x01a4a0e8d1ae4b10b8dc230d5c330e48940587998b94f76a5e2e73d1444d4afb",
+            },
+        ]
+    },
     "network": "regtest",
 }
 

@@ -516,7 +516,7 @@ fn construct_params(config: ParamsConfig) -> RollupParams {
                 .unwrap(),
         ),
         // TODO make configurable
-        l1_reorg_safe_depth: 4,
+        l1_reorg_safe_depth: 1,
         target_l2_batch_size: config.epoch_slots as u64,
         address_length: 20,
         deposit_amount: config.deposit_sats,
