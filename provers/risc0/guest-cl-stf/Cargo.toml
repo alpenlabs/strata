@@ -6,7 +6,5 @@ version = "0.1.0"
 [workspace]
 
 [dependencies]
-borsh = { version = "1.5.0", features = ["derive"] }
-risc0-zkvm = { version = "1.1.2", default-features = false, features = ['std'] }
-strata-primitives = { path = "../../../crates/primitives" }
 strata-proofimpl-cl-stf = { path = "../../../crates/proof-impl/cl-stf" }
+strata-risc0-adapter = { path = "../../../crates/zkvm/adapters/risc0" }
