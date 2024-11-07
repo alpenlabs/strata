@@ -13,5 +13,5 @@ fn main() {
     // Handle the block validation
     let public_params = process_block_transaction(input, EVM_CONFIG);
 
-    sp1_zkvm::io::commit(&public_params);
+    sp1_zkvm::io::commit_slice(&public_params);
 }

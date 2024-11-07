@@ -1,11 +1,16 @@
 import time
+import os
 
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
+from web3 import Web3
+from web3._utils.events import get_event_data
+
 
 from constants import (
     ROLLUP_PARAMS_FOR_DEPOSIT_TX,
     SEQ_PUBLISH_BATCH_INTERVAL_SECS,
+    PRECOMPILE_BRIDGEOUT_ADDRESS,
 )
 from utils import wait_for_proof_with_time_out, wait_until
 
@@ -39,24 +44,27 @@ class BridgeDepositTest(flexitest.Test):
         seq = ctx.get_service("sequencer")
         seqrpc = seq.create_rpc()
 
-        # # Do deposit and collect the L1 and L2 where the deposit transaction was included
-        # l2_block_num, l1_deposit_txn_id = self.do_deposit(ctx, evm_addr)
-        # l1_deposit_txn_block_info = btcrpc.proxy.gettransaction(l1_deposit_txn_id)
-        # l1_deposit_txn_block_num = l1_deposit_txn_block_info["blockheight"]
+        """
+        Depostis and withdrwals happens here
+        """
+        # Do deposit and collect the L1 and L2 where the deposit transaction was included
+        l2_block_num, l1_deposit_txn_id = self.do_deposit(ctx, evm_addr)
+        block_num_withdrawl = self.do_withdrawal_precompile_call(ctx)
+        l1_deposit_txn_block_info = btcrpc.proxy.gettransaction(l1_deposit_txn_id)
+        l1_deposit_txn_block_num = l1_deposit_txn_block_info["blockheight"]
+        # Log the metadata
+        print("Depost: L1 number: ", l1_deposit_txn_block_num, " L2 deposit number: ", l2_block_num)
+        print("Withdrawl: L2 ", block_num_withdrawl)
 
-        # # Log the metadata
-        # print("L1 deposit number: ", l1_deposit_txn_block_num)
-        # print("L2 deposit number: ", l2_block_num)
-
-        # Sequencer is sent the mock proof
-        # TODO: send actual proof instead of mock proof
+        """
+        Send the first checkpoint proof
+        """
         ckp_idx_0 = seqrpc.strata_getLatestCheckpointIndex()
         ckp = seqrpc.strata_getCheckpointInfo(ckp_idx_0)
         print("The initial checkpoint range: ", ckp)
         print("Sending mock proof")
         seqrpc.strataadmin_submitCheckpointProof(0, "")
         print("Mock proof sent")
-
         # Wait for the new checkpoint from the sequencer
         wait_until(
             lambda: int(seqrpc.strata_getLatestCheckpointIndex() > ckp_idx_0),
@@ -65,17 +73,39 @@ class BridgeDepositTest(flexitest.Test):
         )
         ckp_idx_1 = seqrpc.strata_getLatestCheckpointIndex()
         ckp_1 = seqrpc.strata_getCheckpointInfo(ckp_idx_1)
-        print(ckp_1)
         l1_range = ckp_1["l1_range"]
         start, end = l1_range[0], l1_range[1]
         l1_ckp_block = self.scan_checkpoint_block(start, end, btcrpc)
-        print(l1_ckp_block)
-        # return
+        print(f"Ckp {ckp_idx_0}: {ckp} was settled in the block {l1_ckp_block}\n")
 
-        # See the checkpoint
-        ckp_idx = seqrpc.strata_getLatestCheckpointIndex()
-        ckp = seqrpc.strata_getCheckpointInfo(ckp_idx)
-        print("Now the checkpoint range: ", ckp)
+        """
+        Send the second checkpoint proof
+        """
+        print("Sending mock proof")
+        seqrpc.strataadmin_submitCheckpointProof(1, "")
+        print("Mock proof sent")
+        # Wait for the new checkpoint from the sequencer
+        wait_until(
+            lambda: int(seqrpc.strata_getLatestCheckpointIndex() > ckp_idx_1),
+            error_with="New checkpoint didn't came",
+            timeout=100,
+        )
+        ckp_idx_2 = seqrpc.strata_getLatestCheckpointIndex()
+        ckp_2 = seqrpc.strata_getCheckpointInfo(ckp_idx_2)
+
+        l1_range = ckp_2["l1_range"]
+        start, end = l1_range[0], l1_range[1]
+        l1_ckp_block = self.scan_checkpoint_block(start, end, btcrpc)
+        print(f"Ckp {ckp_idx_1}: {ckp_1} was settled in the block {l1_ckp_block}\n")
+
+        """
+        Get the chainstate
+        """
+        time.sleep(10)
+        end_block = ckp_1["l2_range"][1] + 1
+        chain_state = seqrpc.strata_getCLBlockWitness(end_block)
+        assert chain_state is not None
+        print(chain_state)
 
         # Init the prover client
         # prover_client = ctx.get_service("prover_client")
@@ -176,14 +206,82 @@ class BridgeDepositTest(flexitest.Test):
 
         return None, btc_txn_id
 
+    def do_withdrawal_precompile_call(self, ctx: flexitest.RunContext):
+        reth = ctx.get_service("reth")
+        web3: Web3 = reth.create_web3()
+
+        source = web3.address
+        dest = web3.to_checksum_address(PRECOMPILE_BRIDGEOUT_ADDRESS)
+        # 64 bytes
+        dest_pk = os.urandom(32).hex()
+        print("dest_pk", dest_pk)
+
+        assert web3.is_connected(), "cannot connect to reth"
+
+        original_block_no = web3.eth.block_number
+        original_bridge_balance = web3.eth.get_balance(dest)
+        original_source_balance = web3.eth.get_balance(source)
+
+        # assert original_bridge_balance == 0
+
+        # 10 rollup btc as wei
+        to_transfer_wei = 10_000_000_000_000_000_000
+
+        txid = web3.eth.send_transaction(
+            {
+                "to": dest,
+                "value": hex(to_transfer_wei),
+                "gas": hex(100000),
+                "from": source,
+                "data": dest_pk,
+            }
+        )
+
+        receipt = web3.eth.wait_for_transaction_receipt(txid, timeout=5)
+
+        assert receipt.status == 1, "precompile transaction failed"
+        assert len(receipt.logs) == 1, "no logs or invalid logs"
+
+        event_signature_hash = web3.keccak(text=event_signature_text).hex()
+        log = receipt.logs[0]
+        assert web3.to_checksum_address(log.address) == dest
+        assert log.topics[0].hex() == event_signature_hash
+        event_data = get_event_data(web3.codec, withdrawal_intent_event_abi, log)
+
+        # 1 rollup btc = 10**18 wei
+        to_transfer_sats = to_transfer_wei // 10_000_000_000
+
+        assert event_data.args.amount == to_transfer_sats
+        assert event_data.args.dest_pk.hex() == dest_pk
+
+        final_block_no = web3.eth.block_number
+        final_bridge_balance = web3.eth.get_balance(dest)
+        final_source_balance = web3.eth.get_balance(source)
+
+        assert original_block_no < final_block_no, "not building blocks"
+        assert final_bridge_balance == original_bridge_balance, "bridge out funds not burned"
+        total_gas_price = receipt.gasUsed * receipt.effectiveGasPrice
+        assert (
+            final_source_balance == original_source_balance - to_transfer_wei - total_gas_price
+        ), "final balance incorrect"
+
+        return receipt.blockNumber
+
     def scan_checkpoint_block(self, start, end, client):
+        is_found = False
+        g_block_height, g_block_hash = None, None
+
         for block_height in range(start, end + 1):
             block_hash = client.proxy.getblockhash(block_height)
             block = client.proxy.getblock(block_hash)
             txids = block["tx"]
-            is_found = self.scan_proof(txids, client)
-            if is_found:
-                return (block_height, block_hash)
+            if self.scan_proof(txids, client):
+                is_found = True
+                g_block_height = block_height
+                g_block_hash = block_hash
+
+        if is_found:
+            return (g_block_height, g_block_hash)
 
         raise Exception(f"Checkpoint not found in blocks {start} to {end}")
 
