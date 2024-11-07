@@ -7,18 +7,19 @@ use strata_state::{
     batch::BatchCheckpoint,
     tx::{DepositInfo, ProtocolOperation},
 };
-use strata_tx_parser::filter::{derive_tx_filter_rules, filter_relevant_txs};
+use strata_tx_parser::filter::{filter_protocol_op_tx_refs, TxFilterConfig};
 
 pub fn extract_relevant_info(
     block: &Block,
     rollup_params: &RollupParams,
 ) -> (Vec<DepositInfo>, Option<BatchCheckpoint>) {
-    let filters = derive_tx_filter_rules(rollup_params).expect("derive tx-filter rules");
+    let filter_config =
+        TxFilterConfig::from_rollup_params(rollup_params).expect("derive tx-filter config");
 
     let mut deposits = Vec::new();
     let mut prev_checkpoint = None;
 
-    let relevant_txs = filter_relevant_txs(block, &filters);
+    let relevant_txs = filter_protocol_op_tx_refs(block, filter_config);
 
     for tx in relevant_txs {
         match tx.proto_op() {

@@ -14,7 +14,7 @@ use strata_state::l1::{
 };
 use strata_status::StatusTx;
 use strata_tx_parser::{
-    filter::{derive_tx_filter_rules, filter_relevant_txs, TxFilterRule},
+    filter::{filter_protocol_op_tx_refs, TxFilterConfig},
     messages::{BlockData, L1Event},
 };
 use tokio::sync::mpsc;
@@ -70,13 +70,9 @@ async fn do_reader_task(
         let cur_best_height = state.best_block_idx();
         let poll_span = debug_span!("l1poll", %cur_best_height);
 
-        // Maybe this should be called outside loop?
-        let filters = derive_tx_filter_rules(config.params.rollup())?;
-
         if let Err(err) = poll_for_new_blocks(
             client,
             event_tx,
-            &filters,
             &mut state,
             &mut status_updates,
             config.params.as_ref(),
@@ -148,7 +144,6 @@ async fn init_reader_state(
 async fn poll_for_new_blocks(
     client: &impl Reader,
     event_tx: &mpsc::Sender<L1Event>,
-    filters: &[TxFilterRule],
     state: &mut ReaderState,
     status_updates: &mut Vec<L1StatusUpdate>,
     params: &Params,
@@ -193,7 +188,6 @@ async fn poll_for_new_blocks(
             event_tx,
             state,
             status_updates,
-            filters,
             params,
         )
         .await
@@ -238,13 +232,13 @@ async fn fetch_and_process_block(
     event_tx: &mpsc::Sender<L1Event>,
     state: &mut ReaderState,
     status_updates: &mut Vec<L1StatusUpdate>,
-    filters: &[TxFilterRule],
     params: &Params,
 ) -> anyhow::Result<BlockHash> {
     let block = client.get_block_at(height).await?;
     let txs = block.txdata.len();
 
-    let filtered_txs = filter_relevant_txs(&block, filters);
+    let filter_config = TxFilterConfig::from_rollup_params(params.rollup())?;
+    let filtered_txs = filter_protocol_op_tx_refs(&block, filter_config);
     let block_data = BlockData::new(height, block, filtered_txs);
     let l1blkid = block_data.block().block_hash();
     trace!(%height, %l1blkid, %txs, "fetched block from client");

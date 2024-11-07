@@ -2,6 +2,7 @@ use bitcoin::{Block, Transaction};
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::{
     buf::Buf32,
+    l1::BitcoinAddress,
     params::{OperatorConfig, RollupParams},
     prelude::DepositTxParams,
 };
@@ -24,6 +25,77 @@ pub enum TxFilterRule {
     DepositRequest(DepositTxParams),
     /// Deposit transaction with deposit config and address
     Deposit(DepositTxParams),
+    /// Addresses that are spent to
+    SpentToAddrs(Vec<BitcoinAddress>),
+    /// Blob ids that are expected
+    BlobIds(Vec<Buf32>),
+    /// Outpoints
+    Outpoints(Vec<(Buf32, u32)>),
+}
+
+#[derive(Clone, Debug)]
+pub struct TxFilterConfig {
+    /// For checkpoint update inscriptions.
+    rollup_name: RollupName,
+
+    /// For addresses that we expect spends to.
+    expected_addrs: Vec<BitcoinAddress>,
+
+    /// For blobs we expect to be written.
+    expected_blobs: Vec<Buf32>,
+
+    /// For deposits that might be spent from.
+    expected_outpoints: Vec<(Buf32, u32)>,
+    // eventually, in future version
+    // For bridge V1 deposits that do bitmap flagging for the multisig addr.
+    // operator_key_tbl: PublickeyTable,
+    /// EE addr length
+    ee_addr_len: u8,
+
+    /// Deposit denomination
+    deposit_denomination: u64, // sats
+
+    /// Operators addr
+    operator_addr: BitcoinAddress,
+}
+
+impl TxFilterConfig {
+    pub fn from_rollup_params(rollup_params: &RollupParams) -> anyhow::Result<Self> {
+        let operator_wallet_pks = get_operator_wallet_pks(rollup_params);
+        let address = generate_taproot_address(&operator_wallet_pks, rollup_params.network)?;
+
+        let rollup_name = rollup_params.rollup_name.clone();
+        let expected_blobs = Vec::new(); // TODO: this should come from chainstate
+        let expected_addrs = vec![address.clone()];
+        let expected_outpoints = Vec::new();
+
+        Ok(Self {
+            rollup_name,
+            expected_blobs,
+            expected_addrs,
+            expected_outpoints,
+            ee_addr_len: rollup_params.address_length,
+            deposit_denomination: rollup_params.deposit_amount,
+            operator_addr: address,
+        })
+    }
+
+    pub fn into_rules(self) -> Vec<TxFilterRule> {
+        let deposit_params = DepositTxParams {
+            magic_bytes: self.rollup_name.clone().into_bytes().to_vec(),
+            address_length: self.ee_addr_len,
+            deposit_amount: self.deposit_denomination,
+            address: self.operator_addr,
+        };
+        vec![
+            TxFilterRule::RollupInscription(self.rollup_name.clone()),
+            TxFilterRule::SpentToAddrs(self.expected_addrs),
+            TxFilterRule::BlobIds(self.expected_blobs),
+            TxFilterRule::Outpoints(self.expected_outpoints),
+            TxFilterRule::Deposit(deposit_params.clone()),
+            TxFilterRule::DepositRequest(deposit_params),
+        ]
+    }
 }
 
 type RollupName = String;
@@ -47,14 +119,20 @@ pub fn derive_tx_filter_rules(params: &RollupParams) -> anyhow::Result<Vec<TxFil
         TxFilterRule::Deposit(deposit_provider),
     ])
 }
-/// Filter all the relevant [`Transaction`]s in a block based on given [`TxFilterRule`]s
-pub fn filter_relevant_txs(block: &Block, filters: &[TxFilterRule]) -> Vec<ProtocolOpTxRef> {
+
+/// Filter protocol operatios as refs from relevant [`Transaction`]s in a block based on given
+/// [`TxFilterRule`]s
+pub fn filter_protocol_op_tx_refs(
+    block: &Block,
+    filter_config: TxFilterConfig,
+) -> Vec<ProtocolOpTxRef> {
+    let filter_rules = filter_config.into_rules();
     block
         .txdata
         .iter()
         .enumerate()
         .filter_map(|(i, tx)| {
-            check_and_extract_relevant_info(tx, filters)
+            extract_protocol_op(tx, &filter_rules)
                 .map(|relevant_tx| ProtocolOpTxRef::new(i as u32, relevant_tx))
         })
         .collect()
@@ -62,31 +140,24 @@ pub fn filter_relevant_txs(block: &Block, filters: &[TxFilterRule]) -> Vec<Proto
 
 ///  if a [`Transaction`] is relevant based on given [`RelevantTxType`]s then we extract relevant
 ///  info
-fn check_and_extract_relevant_info(
-    tx: &Transaction,
-    filters: &[TxFilterRule],
-) -> Option<ProtocolOperation> {
+fn extract_protocol_op(tx: &Transaction, filters: &[TxFilterRule]) -> Option<ProtocolOperation> {
     filters.iter().find_map(|rel_type| match rel_type {
-        TxFilterRule::RollupInscription(name) => {
-            if !tx.input.is_empty() {
-                if let Some(scr) = tx.input[0].witness.tapscript() {
-                    if let Ok(inscription_data) = parse_inscription_data(&scr.into(), name) {
-                        if let Ok(signed_batch) = borsh::from_slice::<SignedBatchCheckpoint>(
-                            inscription_data.batch_data(),
-                        ) {
-                            return Some(ProtocolOperation::RollupInscription(signed_batch));
-                        }
-                    }
-                }
-            }
-            None
-        }
+        TxFilterRule::RollupInscription(name) => tx.input.first().and_then(|inp| {
+            inp.witness
+                .tapscript()
+                .and_then(|scr| parse_inscription_data(&scr.into(), name).ok())
+                .and_then(|data| borsh::from_slice::<SignedBatchCheckpoint>(data.batch_data()).ok())
+                .map(ProtocolOperation::RollupInscription)
+        }),
 
         TxFilterRule::DepositRequest(config) => extract_deposit_request_info(tx, config)
             .map(|deposit_req_info| Some(ProtocolOperation::DepositRequest(deposit_req_info)))?,
 
         TxFilterRule::Deposit(config) => extract_deposit_info(tx, config)
             .map(|deposit_info| Some(ProtocolOperation::Deposit(deposit_info)))?,
+
+        // TODO: add others
+        _ => None,
     })
 }
 
@@ -121,7 +192,7 @@ mod test {
             build_test_deposit_request_script, build_test_deposit_script,
             create_transaction_two_outpoints, get_deposit_tx_config, test_taproot_addr,
         },
-        filter::{filter_relevant_txs, TxFilterRule},
+        filter::{filter_protocol_op_tx_refs, TxFilterRule},
     };
 
     const OTHER_ADDR: &str = "bcrt1q6u6qyya3sryhh42lahtnz2m7zuufe7dlt8j0j5";
@@ -206,7 +277,7 @@ mod test {
         let block = create_test_block(vec![tx]);
 
         let txids: Vec<u32> =
-            filter_relevant_txs(&block, &[TxFilterRule::RollupInscription(rollup_name)])
+            filter_protocol_op_tx_refs(&block, &[TxFilterRule::RollupInscription(rollup_name)])
                 .iter()
                 .map(|op_refs| op_refs.index())
                 .collect();
@@ -217,7 +288,7 @@ mod test {
         let rollup_name = "TestRollup".to_string();
         let tx = create_inscription_tx(rollup_name.clone());
         let block = create_test_block(vec![tx]);
-        let result = filter_relevant_txs(
+        let result = filter_protocol_op_tx_refs(
             &block,
             &[TxFilterRule::RollupInscription("invalid_name".to_string())],
         );
@@ -232,7 +303,7 @@ mod test {
         let rollup_name = "alpenstrata".to_string();
 
         let txids: Vec<u32> =
-            filter_relevant_txs(&block, &[TxFilterRule::RollupInscription(rollup_name)])
+            filter_protocol_op_tx_refs(&block, &[TxFilterRule::RollupInscription(rollup_name)])
                 .iter()
                 .map(|op_refs| op_refs.index())
                 .collect();
@@ -248,7 +319,7 @@ mod test {
         let block = create_test_block(vec![tx1, tx2, tx3]);
 
         let txids: Vec<u32> =
-            filter_relevant_txs(&block, &[TxFilterRule::RollupInscription(rollup_name)])
+            filter_protocol_op_tx_refs(&block, &[TxFilterRule::RollupInscription(rollup_name)])
                 .iter()
                 .map(|op_refs| op_refs.index())
                 .collect();
@@ -272,7 +343,7 @@ mod test {
         let block = create_test_block(vec![tx]);
 
         let filters = vec![TxFilterRule::Deposit(config.clone())];
-        let result = filter_relevant_txs(&block, &filters);
+        let result = filter_protocol_op_tx_refs(&block, &filters);
 
         assert_eq!(result.len(), 1, "Should find one relevant transaction");
         assert_eq!(
@@ -315,7 +386,7 @@ mod test {
         let block = create_test_block(vec![tx]);
 
         let relevant_types = vec![TxFilterRule::DepositRequest(config.clone())];
-        let result = filter_relevant_txs(&block, &relevant_types);
+        let result = filter_protocol_op_tx_refs(&block, &relevant_types);
 
         assert_eq!(result.len(), 1, "Should find one relevant transaction");
         assert_eq!(
@@ -350,7 +421,7 @@ mod test {
         let block = create_test_block(vec![irrelevant_tx]);
 
         let relevant_types = vec![TxFilterRule::Deposit(config)];
-        let result = filter_relevant_txs(&block, &relevant_types);
+        let result = filter_protocol_op_tx_refs(&block, &relevant_types);
 
         assert!(
             result.is_empty(),
@@ -383,7 +454,7 @@ mod test {
         let block = create_test_block(vec![tx1, tx2]);
 
         let relevant_types = vec![TxFilterRule::Deposit(config.clone())];
-        let result = filter_relevant_txs(&block, &relevant_types);
+        let result = filter_protocol_op_tx_refs(&block, &relevant_types);
 
         assert_eq!(result.len(), 2, "Should find two relevant transactions");
         assert_eq!(
