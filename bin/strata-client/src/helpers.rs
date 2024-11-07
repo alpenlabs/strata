@@ -22,7 +22,7 @@ use strata_primitives::{
     params::{Params, RollupParams},
 };
 use strata_rocksdb::{
-    broadcaster::db::BroadcastDatabase, l2::db::L2Db, sequencer::db::SequencerDB, ChainStateDb,
+    broadcaster::db::BroadcastDb, l2::db::L2Db, sequencer::db::SequencerDB, ChainStateDb,
     ClientStateDb, DbOpsConfig, L1BroadcastDb, L1Db, RBCheckpointDB, RBSeqBlobDb, SyncEventDb,
 };
 use strata_rpc_types::L1Status;
@@ -60,9 +60,9 @@ pub fn init_core_dbs(rbdb: Arc<OptimisticTransactionDB>, ops_config: DbOpsConfig
 pub fn init_broadcaster_database(
     rbdb: Arc<OptimisticTransactionDB>,
     ops_config: DbOpsConfig,
-) -> Arc<BroadcastDatabase> {
+) -> Arc<BroadcastDb> {
     let l1_broadcast_db = L1BroadcastDb::new(rbdb.clone(), ops_config);
-    BroadcastDatabase::new(l1_broadcast_db.into()).into()
+    BroadcastDb::new(l1_broadcast_db.into()).into()
 }
 
 pub fn init_sequencer_database(

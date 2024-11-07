@@ -148,8 +148,8 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     info!(?blkid, "finished building new block");
 
     // Store the block in the database.
-    let l2store = database.l2_db();
-    l2store.put_block_data(final_bundle)?;
+    let l2_db = database.l2_db();
+    l2_db.put_block_data(final_bundle)?;
     debug!(?blkid, "wrote block to datastore");
 
     // TODO should we actually return the bundle here?

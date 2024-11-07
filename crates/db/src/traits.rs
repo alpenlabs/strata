@@ -223,25 +223,36 @@ pub trait ChainStateDatabase {
     fn get_toplevel_state(&self, idx: u64) -> DbResult<Option<ChainState>>;
 }
 
+/// Db trait for Checkpoint data
+pub trait CheckpointDatabase {
+    /// Get a [`CheckpointEntry`] by it's index
+    fn get_batch_checkpoint(&self, batchidx: u64) -> DbResult<Option<CheckpointEntry>>;
+
+    /// Get last batch index
+    fn get_last_batch_idx(&self) -> DbResult<Option<u64>>;
+
+    /// Store a [`CheckpointEntry`]
+    ///
+    /// `batchidx` for the Checkpoint is expected to increase monotonically and
+    /// correspond to the value of [`strata_state::chain_state::ChainState::epoch`].
+    fn put_batch_checkpoint(&self, batchidx: u64, entry: CheckpointEntry) -> DbResult<()>;
+}
+
 /// NOTE: We might have to merge this with the [`Database`]
 /// A trait encapsulating provider and store traits to interact with the underlying database for
 /// [`BlobEntry`]
 pub trait SequencerDatabase {
-    type BlobStore: BlobStore;
-    type BlobProvider: BlobProvider;
+    type BlobDB: BlobDatabase;
 
-    fn blob_store(&self) -> &Arc<Self::BlobStore>;
-    fn blob_provider(&self) -> &Arc<Self::BlobProvider>;
+    fn blob_db(&self) -> &Arc<Self::BlobDB>;
 }
 
-/// A trait encapsulating  store traits to create/update [`BlobEntry`] in the database
-pub trait BlobStore {
+/// A trait encapsulating provider and store traits to create/update [`BlobEntry`] in the database
+/// and to fetch [`BlobEntry`] and indices from the database
+pub trait BlobDatabase {
     /// Store the [`BlobEntry`].
     fn put_blob_entry(&self, blobid: Buf32, blobentry: BlobEntry) -> DbResult<()>;
-}
 
-/// A trait encapsulating  provider traits to fetch [`BlobEntry`] and indices from the database
-pub trait BlobProvider {
     /// Get a [`BlobEntry`] by its hash
     fn get_blob_by_id(&self, id: Buf32) -> DbResult<Option<BlobEntry>>;
 
@@ -254,14 +265,12 @@ pub trait BlobProvider {
 
 /// A trait providing access to both prover data store and prover data provider.
 pub trait ProverDatabase {
-    type ProverStore: ProverDataStore;
-    type ProverProv: ProverDataProvider;
+    type ProverTaskDB: ProverTaskDatabase;
 
-    fn prover_store(&self) -> &Arc<Self::ProverStore>;
-    fn prover_provider(&self) -> &Arc<Self::ProverProv>;
+    fn prover_task_db(&self) -> &Arc<Self::ProverTaskDB>;
 }
 
-pub trait ProverDataStore {
+pub trait ProverTaskDatabase {
     /// Adds a new txentry to database
     fn insert_new_task_entry(&self, txid: [u8; 16], txentry: Vec<u8>) -> DbResult<u64>;
 
@@ -270,10 +279,7 @@ pub trait ProverDataStore {
 
     /// Updates an existing txentry
     fn update_task_entry(&self, idx: u64, txentry: Vec<u8>) -> DbResult<()>;
-}
 
-/// All methods related to fetching [`Vec<u8>`]s and indices in the database
-pub trait ProverDataProvider {
     /// Fetch [`Vec<u8>`] from db
     fn get_task_entry_by_id(&self, txid: [u8; 16]) -> DbResult<Option<Vec<u8>>>;
 
@@ -287,20 +293,16 @@ pub trait ProverDataProvider {
     fn get_task_entry(&self, idx: u64) -> DbResult<Option<Vec<u8>>>;
 }
 
+pub trait BroadcastDatabase {
+    type L1BroadcastDB: L1BroadcastDatabase;
+
+    /// Return a reference to the L1 broadcast db implementation
+    fn l1_broadcast_db(&self) -> &Arc<Self::L1BroadcastDB>;
+}
+
 /// A trait encapsulating the provider and store traits for interacting with the broadcast
 /// transactions([`L1TxEntry`]), their indices and ids
 pub trait L1BroadcastDatabase {
-    type BroadcastStore: L1BroadcastStore;
-    type BroadcastProvider: L1BroadcastProvider;
-
-    /// Return a reference to the store implementation
-    fn broadcast_store(&self) -> &Arc<Self::BroadcastStore>;
-    /// Return a reference to the provider implementation
-    fn broadcast_provider(&self) -> &Arc<Self::BroadcastProvider>;
-}
-
-/// All methods related to storing/updating [`L1TxEntry`]s in the database
-pub trait L1BroadcastStore {
     /// Updates/Inserts a txentry to database. Returns Some(idx) if newly inserted else None
     fn put_tx_entry(&self, txid: Buf32, txentry: L1TxEntry) -> DbResult<Option<u64>>;
 
@@ -308,10 +310,7 @@ pub trait L1BroadcastStore {
     fn put_tx_entry_by_idx(&self, idx: u64, txentry: L1TxEntry) -> DbResult<()>;
 
     // TODO: possibly add delete as well
-}
 
-/// All methods related to fetching [`L1TxEntry`]s and indices in the database
-pub trait L1BroadcastProvider {
     /// Fetch [`L1TxEntry`] from db
     fn get_tx_entry_by_id(&self, txid: Buf32) -> DbResult<Option<L1TxEntry>>;
 
@@ -376,19 +375,4 @@ pub trait BridgeDutyIndexDatabase {
     ///
     /// This is done in response to the response received from the full node's RPC.
     fn set_index(&self, index: u64) -> DbResult<()>;
-}
-
-/// Db trait for Checkpoint data
-pub trait CheckpointDatabase {
-    /// Get a [`CheckpointEntry`] by it's index
-    fn get_batch_checkpoint(&self, batchidx: u64) -> DbResult<Option<CheckpointEntry>>;
-
-    /// Get last batch index
-    fn get_last_batch_idx(&self) -> DbResult<Option<u64>>;
-
-    /// Store a [`CheckpointEntry`]
-    ///
-    /// `batchidx` for the Checkpoint is expected to increase monotonically and
-    /// correspond to the value of [`strata_state::chain_state::ChainState::epoch`].
-    fn put_batch_checkpoint(&self, batchidx: u64, entry: CheckpointEntry) -> DbResult<()>;
 }

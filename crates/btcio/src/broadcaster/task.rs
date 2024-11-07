@@ -182,9 +182,9 @@ async fn handle_entry(
 #[cfg(test)]
 mod test {
     use bitcoin::{consensus, Transaction};
-    use strata_db::traits::L1BroadcastDatabase;
+    use strata_db::traits::BroadcastDatabase;
     use strata_rocksdb::{
-        broadcaster::db::{BroadcastDatabase, L1BroadcastDb},
+        broadcaster::db::{BroadcastDb, L1BroadcastDb},
         test_utils::get_rocksdb_tmp_instance,
     };
     use strata_storage::ops::l1tx_broadcast::Context;
@@ -193,10 +193,10 @@ mod test {
     use super::*;
     use crate::test_utils::{TestBitcoinClient, SOME_TX};
 
-    fn get_db() -> Arc<impl L1BroadcastDatabase> {
+    fn get_db() -> Arc<impl BroadcastDatabase> {
         let (db, dbops) = get_rocksdb_tmp_instance().unwrap();
         let bcastdb = Arc::new(L1BroadcastDb::new(db, dbops));
-        Arc::new(BroadcastDatabase::new(bcastdb))
+        Arc::new(BroadcastDb::new(bcastdb))
     }
 
     fn get_ops() -> Arc<BroadcastDbOps> {

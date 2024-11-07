@@ -3,7 +3,7 @@ use std::sync::Arc;
 use rockbound::{OptimisticTransactionDB, SchemaDBOperationsExt};
 use strata_db::{
     errors::DbError,
-    traits::{BlobProvider, BlobStore, SequencerDatabase},
+    traits::{BlobDatabase, SequencerDatabase},
     types::BlobEntry,
     DbResult,
 };
@@ -27,7 +27,7 @@ impl RBSeqBlobDb {
     }
 }
 
-impl BlobStore for RBSeqBlobDb {
+impl BlobDatabase for RBSeqBlobDb {
     fn put_blob_entry(&self, blob_hash: Buf32, blob: BlobEntry) -> DbResult<()> {
         self.db
             .with_optimistic_txn(
@@ -47,9 +47,7 @@ impl BlobStore for RBSeqBlobDb {
             )
             .map_err(|e| DbError::TransactionError(e.to_string()))
     }
-}
 
-impl BlobProvider for RBSeqBlobDb {
     fn get_blob_by_id(&self, id: Buf32) -> DbResult<Option<BlobEntry>> {
         Ok(self.db.get::<SeqBlobSchema>(&id)?)
     }
@@ -73,15 +71,10 @@ impl<D> SequencerDB<D> {
     }
 }
 
-impl<B: BlobStore + BlobProvider> SequencerDatabase for SequencerDB<B> {
-    type BlobStore = B;
-    type BlobProvider = B;
+impl<B: BlobDatabase> SequencerDatabase for SequencerDB<B> {
+    type BlobDB = B;
 
-    fn blob_store(&self) -> &Arc<Self::BlobStore> {
-        &self.db
-    }
-
-    fn blob_provider(&self) -> &Arc<Self::BlobProvider> {
+    fn blob_db(&self) -> &Arc<Self::BlobDB> {
         &self.db
     }
 }
@@ -89,7 +82,7 @@ impl<B: BlobStore + BlobProvider> SequencerDatabase for SequencerDB<B> {
 #[cfg(feature = "test_utils")]
 #[cfg(test)]
 mod tests {
-    use strata_db::traits::{BlobProvider, BlobStore};
+    use strata_db::traits::BlobDatabase;
     use strata_primitives::buf::Buf32;
     use strata_test_utils::ArbitraryGenerator;
     use test;

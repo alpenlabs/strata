@@ -25,7 +25,7 @@ use strata_eectl::engine::ExecEngineCtl;
 use strata_evmexec::{engine::RpcExecEngineCtl, EngineRpcClient};
 use strata_primitives::params::{Params, SyncParams};
 use strata_rocksdb::{
-    broadcaster::db::BroadcastDatabase, sequencer::db::SequencerDB, DbOpsConfig, RBSeqBlobDb,
+    broadcaster::db::BroadcastDb, sequencer::db::SequencerDB, DbOpsConfig, RBSeqBlobDb,
 };
 use strata_rpc_api::{StrataAdminApiServer, StrataApiServer, StrataSequencerApiServer};
 use strata_status::{StatusRx, StatusTx};
@@ -494,7 +494,7 @@ fn start_sequencer_tasks(
 }
 
 fn start_broadcaster_tasks(
-    broadcast_database: Arc<BroadcastDatabase>,
+    broadcast_database: Arc<BroadcastDb>,
     pool: threadpool::ThreadPool,
     executor: &TaskExecutor,
     bitcoin_client: Arc<BitcoinClient>,

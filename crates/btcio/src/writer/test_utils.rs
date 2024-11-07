@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 use bitcoin::{Address, Network};
-use strata_db::{traits::L1BroadcastDatabase, types::L1TxEntry};
+use strata_db::{traits::BroadcastDatabase, types::L1TxEntry};
 use strata_rocksdb::{
-    broadcaster::db::BroadcastDatabase, sequencer::db::SequencerDB,
-    test_utils::get_rocksdb_tmp_instance, L1BroadcastDb, RBSeqBlobDb,
+    broadcaster::db::BroadcastDb, sequencer::db::SequencerDB, test_utils::get_rocksdb_tmp_instance,
+    L1BroadcastDb, RBSeqBlobDb,
 };
 use strata_storage::ops::{
     inscription::{Context, InscriptionDataOps},
@@ -32,10 +32,10 @@ pub fn get_inscription_ops() -> Arc<InscriptionDataOps> {
 }
 
 /// Returns `Arc` of `BroadcastDatabase` for testing
-pub fn get_broadcast_db() -> Arc<impl L1BroadcastDatabase> {
+pub fn get_broadcast_db() -> Arc<impl BroadcastDatabase> {
     let (db, dbops) = get_rocksdb_tmp_instance().unwrap();
     let bcastdb = Arc::new(L1BroadcastDb::new(db, dbops));
-    Arc::new(BroadcastDatabase::new(bcastdb))
+    Arc::new(BroadcastDb::new(bcastdb))
 }
 
 /// Returns `Arc` of `L1BroadcastHandle` for testing

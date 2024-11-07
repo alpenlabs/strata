@@ -44,8 +44,8 @@ pub fn process_event<D: Database>(
 
             // FIXME this doesn't do any SPV checks to make sure we only go to
             // a longer chain, it just does it unconditionally
-            let l1prov = database.l1_db();
-            let block_mf = l1prov
+            let l1_db = database.l1_db();
+            let block_mf = l1_db
                 .get_block_manifest(*height)?
                 .ok_or(Error::MissingL1BlockHeight(*height))?;
 
@@ -58,7 +58,7 @@ pub fn process_event<D: Database>(
                 let mut updated_l1vs = l1_vs.clone();
                 if l1_vs_height < l1v.tip_height() {
                     for height in (l1_vs_height..l1v.tip_height()) {
-                        let block_mf = l1prov
+                        let block_mf = l1_db
                             .get_block_manifest(height)?
                             .ok_or(Error::MissingL1BlockHeight(height))?;
                         let header: Header =
@@ -76,7 +76,7 @@ pub fn process_event<D: Database>(
             if next_exp_height > params.rollup().horizon_l1_height {
                 // TODO check that the new block we're trying to add has the same parent as the tip
                 // block
-                let cur_tip_block = l1prov
+                let cur_tip_block = l1_db
                     .get_block_manifest(cur_seen_tip_height)?
                     .ok_or(Error::MissingL1BlockHeight(cur_seen_tip_height))?;
             }
@@ -138,7 +138,7 @@ pub fn process_event<D: Database>(
         }
 
         SyncEvent::L1Revert(to_height) => {
-            let l1prov = database.l1_db();
+            let l1_db = database.l1_db();
 
             let buried = state.l1_view().buried_l1_height();
             if *to_height < buried {
@@ -155,7 +155,7 @@ pub fn process_event<D: Database>(
             if let Some(ss) = state.sync() {
                 // TODO load it up and figure out what's there, see if we have to
                 // load the state updates from L1 or something
-                let l2prov = database.l2_db();
+                let l2_db = database.l2_db();
 
                 let proof_verified_checkpoints =
                     filter_verified_checkpoints(state, checkpoints, params.rollup());
@@ -188,8 +188,8 @@ pub fn process_event<D: Database>(
 
         SyncEvent::NewTipBlock(blkid) => {
             debug!(?blkid, "Received NewTipBlock");
-            let l2prov = database.l2_db();
-            let block = l2prov
+            let l2_db = database.l2_db();
+            let block = l2_db
                 .get_block_data(*blkid)?
                 .ok_or(Error::MissingL2Block(*blkid))?;
 

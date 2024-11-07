@@ -258,8 +258,8 @@ fn handle_sync_event<D: Database>(
 
     // Write the client state checkpoint periodically based on the event idx..
     if ev_idx % state.params.run.client_checkpoint_interval as u64 == 0 {
-        let css = state.database.client_state_db();
-        css.write_client_state_checkpoint(ev_idx, new_state.as_ref().clone())?;
+        let client_state_db = state.database.client_state_db();
+        client_state_db.write_client_state_checkpoint(ev_idx, new_state.as_ref().clone())?;
     }
 
     // Broadcast the update to all the different things listening (which should

@@ -620,12 +620,12 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
         let db = self.database.clone();
 
         let res = wait_blocking("fetch_client_update_output", move || {
-            let prov = db.client_state_db();
+            let client_state_db = db.client_state_db();
 
-            let w = prov.get_client_state_writes(idx)?;
-            let a = prov.get_client_update_actions(idx)?;
+            let writes = client_state_db.get_client_state_writes(idx)?;
+            let actions = client_state_db.get_client_update_actions(idx)?;
 
-            match (w, a) {
+            match (writes, actions) {
                 (Some(w), Some(a)) => Ok(Some(ClientUpdateOutput::new(w, a))),
                 // normally this is just that they're both missing
                 _ => Ok(None),
