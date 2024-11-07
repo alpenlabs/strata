@@ -34,7 +34,7 @@ impl ProofGenerator<(u32, u32)> for L1BatchProofGenerator {
         let (start_height, end_height) = *heights;
         let btc_chain = get_btc_chain();
 
-        let prover = SP1Host::init(GUEST_L1_BATCH_ELF.into(), *prover_options);
+        let prover = SP1Host::init(GUEST_L1_BATCH_ELF.clone(), *prover_options);
 
         let state = btc_chain.get_verification_state(start_height, &MAINNET.clone().into());
         let mut input_builder = SP1ProofInputBuilder::new();
@@ -64,6 +64,6 @@ impl ProofGenerator<(u32, u32)> for L1BatchProofGenerator {
     }
 
     fn get_elf(&self) -> &[u8] {
-        GUEST_L1_BATCH_ELF
+        &GUEST_L1_BATCH_ELF
     }
 }

@@ -38,7 +38,7 @@ impl ProofGenerator<(u64, u64)> for L2BatchProofGenerator {
             agg_proof_inputs.push(AggregationInput::new(proof, vk));
         }
 
-        let prover = SP1Host::init(GUEST_CL_AGG_ELF.into(), *prover_options);
+        let prover = SP1Host::init(GUEST_CL_AGG_ELF.clone(), *prover_options);
 
         let mut prover_input_builder = SP1ProofInputBuilder::new();
         let len = (end_height - start_height) as usize + 1; // inclusive
@@ -63,6 +63,6 @@ impl ProofGenerator<(u64, u64)> for L2BatchProofGenerator {
     }
 
     fn get_elf(&self) -> &[u8] {
-        GUEST_CL_AGG_ELF
+        &GUEST_CL_AGG_ELF
     }
 }
