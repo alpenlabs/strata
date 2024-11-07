@@ -9,7 +9,7 @@ pub struct NativeHost<F>
 where
     F: Fn(&NativeMachine) -> anyhow::Result<()> + Send + Sync + 'static,
 {
-    process_proof: Arc<F>,
+    pub process_proof: Arc<F>,
 }
 
 impl<F> Clone for NativeHost<F>

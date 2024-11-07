@@ -15,6 +15,7 @@ members = [
   "crates/primitives",
   "crates/zkvm/adapters/risc0",
   "crates/zkvm/adapters/sp1",
+  "crates/zkvm/adapters/native",
   "crates/proof-impl/btc-blockspace",
   "crates/proof-impl/checkpoint",
   "crates/proof-impl/cl-agg",
@@ -57,7 +58,6 @@ members = [
   # integration tests
   "tests",
   "crates/util/python-utils",
-  "crates/zkvm/adapters/native",
 ]
 
 default-members = [
@@ -84,6 +84,7 @@ strata-crypto = { path = "crates/crypto", default-features = false }
 strata-db = { path = "crates/db" }
 strata-eectl = { path = "crates/eectl" }
 strata-evmexec = { path = "crates/evmexec" }
+strata-native-zkvm-adapter = { path = "crates/zkvm/adapters/native" }
 strata-mmr = { path = "crates/util/mmr" }
 strata-primitives = { path = "crates/primitives" }
 strata-proofimpl-btc-blockspace = { path = "crates/proof-impl/btc-blockspace" }
