@@ -7,7 +7,9 @@ version = "0.1.0"
 
 [dependencies]
 strata-proofimpl-l1-batch = { path = "../../../crates/proof-impl/l1-batch" }
-strata-sp1-adapter = { path = "../../../crates/zkvm/adapters/sp1" }
+strata-sp1-adapter = { path = "../../../crates/zkvm/adapters/sp1", features = [
+  "zkvm",
+] }
 
 
 [patch.crates-io]

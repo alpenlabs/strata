@@ -7,7 +7,9 @@ version = "0.1.0"
 
 [dependencies]
 strata-proofimpl-evm-ee-stf = { path = "../../../crates/proof-impl/evm-ee-stf" }
-strata-sp1-adapter = { path = "../../../crates/zkvm/adapters/sp1" }
+strata-sp1-adapter = { path = "../../../crates/zkvm/adapters/sp1", features = [
+  "zkvm",
+] }
 
 [patch.crates-io]
 secp256k1 = { git = "https://github.com/sp1-patches/rust-secp256k1", branch = "patch-secp256k1-v0.29.1" }
