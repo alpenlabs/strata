@@ -11943,20 +11943,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b6b67fb9a61334225b5b790716f609cd58395f895b3fe8b328786812a40bc3b"
 
 [[package]]
-name = "snark-bn254-verifier"
-version = "1.0.2"
-source = "git+https://github.com/succinctlabs/snark-bn254-verifier.git?branch=bhargav/groth16-verf#6e8c1b423b5572c48131ca10b426fb59b6845c02"
-dependencies = [
- "lazy_static",
- "num-bigint 0.4.6",
- "num-traits",
- "rand 0.8.5",
- "sha2 0.10.8",
- "substrate-bn 0.7.0",
- "thiserror",
-]
-
-[[package]]
 name = "snowbridge-amcl"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12136,20 +12122,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "60b67bf2005eea5b8871e347690e2ce45c68822dbb57dea584dca9edd02bc2cc"
 dependencies = [
  "sp1-build",
-]
-
-[[package]]
-name = "sp1-lib"
-version = "1.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bea7811abd2d3a991007fcb284f41152840b8388c171288d0c52c6793956609c"
-dependencies = [
- "anyhow",
- "bincode",
- "cfg-if",
- "hex",
- "serde",
- "snowbridge-amcl",
 ]
 
 [[package]]
@@ -12453,7 +12425,7 @@ dependencies = [
  "p3-field",
  "rand 0.8.5",
  "sha2 0.10.8",
- "sp1-lib 3.1.0",
+ "sp1-lib",
  "sp1-primitives",
 ]
 
@@ -13360,7 +13332,6 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.8",
- "snark-bn254-verifier",
  "sp1-primitives",
  "sp1-sdk",
  "sp1-verifier",
@@ -13595,23 +13566,7 @@ dependencies = [
  "num-bigint 0.4.6",
  "rand 0.8.5",
  "rustc-hex",
- "sp1-lib 3.1.0",
-]
-
-[[package]]
-name = "substrate-bn"
-version = "0.7.0"
-source = "git+https://github.com/sp1-patches/bn?branch=patch-v0.7.0#2f5d4394b28550e47b16b061372832cba6d2dcf6"
-dependencies = [
- "bytemuck",
- "byteorder",
- "cfg-if",
- "crunchy",
- "lazy_static",
- "num-bigint 0.4.6",
- "rand 0.8.5",
- "rustc-hex",
- "sp1-lib 1.2.0",
+ "sp1-lib",
 ]
 
 [[package]]
