@@ -45,7 +45,7 @@ impl StubChainstateDb {
     }
 }
 
-impl ChainstateStore for StubChainstateDb {
+impl ChainStateDatabase for StubChainstateDb {
     fn write_genesis_state(&self, toplevel: &ChainState) -> DbResult<()> {
         let mut st = self.state.lock();
         st.toplevels.insert(0, toplevel.clone());
@@ -132,9 +132,7 @@ impl ChainstateStore for StubChainstateDb {
 
         Ok(())
     }
-}
 
-impl ChainstateProvider for StubChainstateDb {
     fn get_last_state_idx(&self) -> DbResult<u64> {
         let st = self.state.lock();
         Ok(st.find_last_write_batch())

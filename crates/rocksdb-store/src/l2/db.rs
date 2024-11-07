@@ -3,7 +3,7 @@ use std::sync::Arc;
 use rockbound::{OptimisticTransactionDB, SchemaBatch, SchemaDBOperationsExt};
 use strata_db::{
     errors::DbError,
-    traits::{BlockStatus, L2DataProvider, L2DataStore},
+    traits::{BlockStatus, L2Database},
     DbResult,
 };
 use strata_state::{block::L2BlockBundle, prelude::*};
@@ -22,7 +22,7 @@ impl L2Db {
     }
 }
 
-impl L2DataStore for L2Db {
+impl L2Database for L2Db {
     fn put_block_data(&self, bundle: L2BlockBundle) -> DbResult<()> {
         let block_id = bundle.block().header().get_blockid();
 
@@ -91,9 +91,7 @@ impl L2DataStore for L2Db {
 
         Ok(())
     }
-}
 
-impl L2DataProvider for L2Db {
     fn get_block_data(&self, id: L2BlockId) -> DbResult<Option<L2BlockBundle>> {
         Ok(self.db.get::<L2BlockSchema>(&id)?)
     }

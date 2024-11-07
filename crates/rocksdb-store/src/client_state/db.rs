@@ -37,7 +37,7 @@ impl ClientStateDb {
     }
 }
 
-impl ClientStateStore for ClientStateDb {
+impl ClientStateDatabase for ClientStateDb {
     fn write_client_update_output(&self, idx: u64, output: ClientUpdateOutput) -> DbResult<()> {
         let expected_idx = match self.get_last_idx::<ClientUpdateOutputSchema>()? {
             Some(last_idx) => last_idx + 1,
@@ -62,9 +62,7 @@ impl ClientStateStore for ClientStateDb {
         self.db.put::<ClientStateSchema>(&idx, &state)?;
         Ok(())
     }
-}
 
-impl ClientStateProvider for ClientStateDb {
     fn get_last_write_idx(&self) -> DbResult<u64> {
         match self.get_last_idx::<ClientUpdateOutputSchema>()? {
             Some(idx) => Ok(idx),

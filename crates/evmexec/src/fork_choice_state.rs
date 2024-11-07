@@ -5,7 +5,7 @@ use reth_primitives::B256;
 use reth_rpc_types::engine::ForkchoiceState;
 use strata_db::{
     errors::DbError,
-    traits::{ClientStateProvider, Database, L2DataProvider},
+    traits::{ClientStateDatabase, Database, L2Database},
 };
 use strata_primitives::params::RollupParams;
 use strata_state::{block::L2BlockBundle, client_state::ClientState, id::L2BlockId};
@@ -50,7 +50,7 @@ fn get_block_hash(l2_block: L2BlockBundle) -> Result<B256> {
 }
 
 fn get_last_checkpoint_state<D: Database>(db: &D) -> Result<Option<ClientState>> {
-    let last_checkpoint_idx = db.client_state_provider().get_last_checkpoint_idx();
+    let last_checkpoint_idx = db.client_state_db().get_last_checkpoint_idx();
 
     if let Err(DbError::NotBootstrapped) = last_checkpoint_idx {
         // before genesis block ready; use hardcoded genesis state
@@ -58,7 +58,7 @@ fn get_last_checkpoint_state<D: Database>(db: &D) -> Result<Option<ClientState>>
     }
 
     last_checkpoint_idx
-        .and_then(|ckpt_idx| db.client_state_provider().get_state_checkpoint(ckpt_idx))
+        .and_then(|ckpt_idx| db.client_state_db().get_state_checkpoint(ckpt_idx))
         .context("Failed to get last checkpoint state")
 }
 
@@ -67,7 +67,7 @@ fn get_block_hash_by_id<D: Database>(
     block_id: Option<&L2BlockId>,
 ) -> anyhow::Result<Option<B256>> {
     block_id
-        .and_then(|id| db.l2_provider().get_block_data(*id).transpose())
+        .and_then(|id| db.l2_db().get_block_data(*id).transpose())
         .transpose()
         .context("Failed to get block data")?
         .map(get_block_hash)

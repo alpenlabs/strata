@@ -18,7 +18,7 @@ use strata_consensus_logic::{
     sync_manager::{self, SyncManager},
 };
 use strata_db::{
-    traits::{ChainstateProvider, Database},
+    traits::{ChainStateDatabase, Database},
     DbError,
 };
 use strata_eectl::engine::ExecEngineCtl;
@@ -257,8 +257,8 @@ fn do_startup_checks(
     bitcoin_client: &impl Reader,
     runtime: &Runtime,
 ) -> anyhow::Result<()> {
-    let chain_state_prov = database.chain_state_provider();
-    let last_state_idx = match chain_state_prov.get_last_state_idx() {
+    let chain_state_db = database.chain_state_db();
+    let last_state_idx = match chain_state_db.get_last_state_idx() {
         Ok(idx) => idx,
         Err(DbError::NotBootstrapped) => {
             // genesis is not done
@@ -267,7 +267,7 @@ fn do_startup_checks(
         }
         err => err?,
     };
-    let Some(last_chain_state) = chain_state_prov.get_toplevel_state(last_state_idx)? else {
+    let Some(last_chain_state) = chain_state_db.get_toplevel_state(last_state_idx)? else {
         anyhow::bail!(format!("Missing chain state idx: {}", last_state_idx));
     };
 

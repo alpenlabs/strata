@@ -4,9 +4,7 @@
 use std::cmp::min;
 
 use bitcoin::block::Header;
-use strata_db::traits::{
-    ChainstateProvider, Database, L1DataProvider, L2DataProvider, L2DataStore,
-};
+use strata_db::traits::{ChainStateDatabase, Database, L1Database, L2Database};
 use strata_primitives::prelude::*;
 use strata_state::{
     batch::{BatchCheckpoint, BatchInfo},
@@ -46,7 +44,7 @@ pub fn process_event<D: Database>(
 
             // FIXME this doesn't do any SPV checks to make sure we only go to
             // a longer chain, it just does it unconditionally
-            let l1prov = database.l1_provider();
+            let l1prov = database.l1_db();
             let block_mf = l1prov
                 .get_block_manifest(*height)?
                 .ok_or(Error::MissingL1BlockHeight(*height))?;
@@ -140,7 +138,7 @@ pub fn process_event<D: Database>(
         }
 
         SyncEvent::L1Revert(to_height) => {
-            let l1prov = database.l1_provider();
+            let l1prov = database.l1_db();
 
             let buried = state.l1_view().buried_l1_height();
             if *to_height < buried {
@@ -157,7 +155,7 @@ pub fn process_event<D: Database>(
             if let Some(ss) = state.sync() {
                 // TODO load it up and figure out what's there, see if we have to
                 // load the state updates from L1 or something
-                let l2prov = database.l2_provider();
+                let l2prov = database.l2_db();
 
                 let proof_verified_checkpoints =
                     filter_verified_checkpoints(state, checkpoints, params.rollup());
@@ -190,15 +188,15 @@ pub fn process_event<D: Database>(
 
         SyncEvent::NewTipBlock(blkid) => {
             debug!(?blkid, "Received NewTipBlock");
-            let l2prov = database.l2_provider();
+            let l2prov = database.l2_db();
             let block = l2prov
                 .get_block_data(*blkid)?
                 .ok_or(Error::MissingL2Block(*blkid))?;
 
             // TODO: get chainstate idx from blkid OR pass correct idx in sync event
             let block_idx = block.header().blockidx();
-            let chainstate_provider = database.chain_state_provider();
-            let chainstate = chainstate_provider
+            let chainstate_db = database.chain_state_db();
+            let chainstate = chainstate_db
                 .get_toplevel_state(block_idx)?
                 .ok_or(Error::MissingIdxChainstate(block_idx))?;
 
@@ -342,7 +340,7 @@ pub fn filter_verified_checkpoints(
 #[cfg(test)]
 mod tests {
     use bitcoin::params::MAINNET;
-    use strata_db::traits::L1DataStore;
+    use strata_db::traits::L1Database;
     use strata_primitives::{block_credential, l1::L1BlockManifest};
     use strata_rocksdb::test_utils::get_common_db;
     use strata_state::{l1::L1BlockId, operation};
@@ -374,9 +372,9 @@ mod tests {
         let l1_verification_state =
             chain.get_verification_state(genesis as u32 + 1, &MAINNET.clone().into());
 
+        let l1_db = database.l1_db();
         for (i, b) in l1_chain.iter().enumerate() {
-            let l1_store = database.l1_store();
-            l1_store
+            l1_db
                 .put_block_data(i as u64 + horizon, b.clone(), Vec::new())
                 .expect("test: insert blocks");
         }
@@ -575,7 +573,7 @@ mod tests {
 
         let l1_block: L1BlockManifest = ArbitraryGenerator::new().generate();
         database
-            .l1_store()
+            .l1_db()
             .put_block_data(height, l1_block.clone(), vec![])
             .unwrap();
 

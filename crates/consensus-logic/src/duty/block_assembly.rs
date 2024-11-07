@@ -6,8 +6,7 @@ use std::{sync::Arc, thread, time};
 use bitcoin::Transaction;
 use strata_crypto::sign_schnorr_sig;
 use strata_db::traits::{
-    ChainstateProvider, ChainstateStore, ClientStateProvider, Database, L1DataProvider,
-    L2DataProvider, L2DataStore,
+    ChainStateDatabase, ClientStateDatabase, Database, L1Database, L2Database,
 };
 use strata_eectl::{
     engine::{ExecEngineCtl, PayloadStatus},
@@ -55,16 +54,15 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     params: &Arc<Params>,
 ) -> Result<Option<(L2BlockId, L2Block)>, Error> {
     debug!("preparing block");
-    let l1_prov = database.l1_provider();
-    let l2_prov = database.l2_provider();
-    let cs_prov = database.client_state_provider();
-    let chs_prov = database.chain_state_provider();
-    let chs_store = database.chain_state_store();
+    let l1_db = database.l1_db();
+    let l2_db = database.l2_db();
+    let cs_db = database.client_state_db();
+    let chs_db = database.chain_state_db();
 
     // Check the block we were supposed to build isn't already in the database,
     // if so then just republish that.  This checks that there just if we have a
     // block at that height, which for now is the same thing.
-    let blocks_at_slot = l2_prov.get_blocks_at_height(slot)?;
+    let blocks_at_slot = l2_db.get_blocks_at_height(slot)?;
     if !blocks_at_slot.is_empty() {
         // FIXME Should we be more verbose about this?
         warn!(%slot, "was turn to propose block, but found block in database already");
@@ -74,7 +72,7 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     // Figure out some general data about the slot and the previous state.
     let ts = now_millis();
 
-    let prev_block = l2_prov
+    let prev_block = l2_db
         .get_block_data(prev_block_id)?
         .ok_or(Error::MissingL2Block(prev_block_id))?;
 
@@ -98,7 +96,7 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     // TODO make this get the prev block slot from somewhere more reliable in
     // case we skip slots
     let prev_slot = prev_block.header().blockidx();
-    let prev_chstate = chs_prov
+    let prev_chstate = chs_db
         .get_toplevel_state(prev_slot)?
         .ok_or(Error::MissingBlockChainstate(prev_block_id))?;
 
@@ -112,7 +110,7 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     let l1_seg = prepare_l1_segment(
         l1_state,
         &prev_chstate,
-        l1_prov.as_ref(),
+        l1_db.as_ref(),
         MAX_L1_ENTRIES_PER_BLOCK,
         params.rollup(),
     )?;
@@ -150,7 +148,7 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     info!(?blkid, "finished building new block");
 
     // Store the block in the database.
-    let l2store = database.l2_store();
+    let l2store = database.l2_db();
     l2store.put_block_data(final_bundle)?;
     debug!(?blkid, "wrote block to datastore");
 
@@ -161,7 +159,7 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
 fn prepare_l1_segment(
     local_l1_state: &LocalL1State,
     prev_chstate: &ChainState,
-    l1_prov: &impl L1DataProvider,
+    l1_db: &impl L1Database,
     max_l1_entries: usize,
     params: &RollupParams,
 ) -> Result<L1Segment, Error> {
@@ -174,8 +172,8 @@ fn prepare_l1_segment(
     if maturation_queue_size == 0 {
         let mut payloads = Vec::new();
         for (h, _b) in unacc_blocks.iter().take(max_l1_entries) {
-            let rec = load_header_record(*h, l1_prov)?;
-            let deposit_update_tx = fetch_deposit_update_txs(*h, l1_prov)?;
+            let rec = load_header_record(*h, l1_db)?;
+            let deposit_update_tx = fetch_deposit_update_txs(*h, l1_db)?;
             payloads.push(
                 L1HeaderPayload::new(*h, rec)
                     .with_deposit_update_txs(deposit_update_tx)
@@ -218,8 +216,8 @@ fn prepare_l1_segment(
     // Load the blocks.
     let mut payloads = Vec::new();
     for (h, _b) in fresh_blocks {
-        let rec = load_header_record(*h, l1_prov)?;
-        let deposit_update_tx = fetch_deposit_update_txs(*h, l1_prov)?;
+        let rec = load_header_record(*h, l1_db)?;
+        let deposit_update_tx = fetch_deposit_update_txs(*h, l1_db)?;
         payloads.push(
             L1HeaderPayload::new(*h, rec)
                 .with_deposit_update_txs(deposit_update_tx)
@@ -234,8 +232,8 @@ fn prepare_l1_segment(
     Ok(L1Segment::new(payloads))
 }
 
-fn load_header_record(h: u64, l1_prov: &impl L1DataProvider) -> Result<L1HeaderRecord, Error> {
-    let mf = l1_prov
+fn load_header_record(h: u64, l1_db: &impl L1Database) -> Result<L1HeaderRecord, Error> {
+    let mf = l1_db
         .get_block_manifest(h)?
         .ok_or(Error::MissingL1BlockHeight(h))?;
     // TODO need to include tx root proof we can verify
@@ -247,15 +245,15 @@ fn load_header_record(h: u64, l1_prov: &impl L1DataProvider) -> Result<L1HeaderR
 
 fn fetch_deposit_update_txs(
     h: u64,
-    l1_prov: &impl L1DataProvider,
+    l1_db: &impl L1Database,
 ) -> Result<Vec<DepositUpdateTx>, Error> {
-    let relevant_tx_ref = l1_prov
+    let relevant_tx_ref = l1_db
         .get_block_txs(h)?
         .ok_or(Error::MissingL1BlockHeight(h))?;
 
     let mut deposit_update_txs = Vec::new();
     for tx_ref in relevant_tx_ref {
-        let tx = l1_prov.get_tx(tx_ref)?.ok_or(Error::MissingL1Tx)?;
+        let tx = l1_db.get_tx(tx_ref)?.ok_or(Error::MissingL1Tx)?;
 
         if let Deposit(dep) = tx.protocol_operation() {
             deposit_update_txs.push(DepositUpdateTx::new(tx, tx_ref.position()));

@@ -33,8 +33,8 @@ fn get_batch_checkpoint<D: Database>(
     context: &Context<D>,
     idx: u64,
 ) -> DbResult<Option<CheckpointEntry>> {
-    let checkpt_prov = context.db.checkpoint_provider();
-    checkpt_prov.get_batch_checkpoint(idx)
+    let checkpoint_db = context.db.checkpoint_db();
+    checkpoint_db.get_batch_checkpoint(idx)
 }
 
 fn put_batch_checkpoint<D: Database>(
@@ -42,11 +42,11 @@ fn put_batch_checkpoint<D: Database>(
     idx: u64,
     entry: CheckpointEntry,
 ) -> DbResult<()> {
-    let checkpt_store = context.db.checkpoint_store();
-    checkpt_store.put_batch_checkpoint(idx, entry)
+    let checkpoint_db = context.db.checkpoint_db();
+    checkpoint_db.put_batch_checkpoint(idx, entry)
 }
 
 fn get_last_checkpoint_idx<D: Database>(context: &Context<D>) -> DbResult<Option<u64>> {
-    let checkpt_prov = context.db.checkpoint_provider();
-    checkpt_prov.get_last_batch_idx()
+    let checkpoint_db = context.db.checkpoint_db();
+    checkpoint_db.get_last_batch_idx()
 }

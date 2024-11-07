@@ -1,11 +1,7 @@
 use std::sync::Arc;
 
 use rockbound::{OptimisticTransactionDB, SchemaBatch, SchemaDBOperationsExt};
-use strata_db::{
-    errors::DbError,
-    traits::{SyncEventProvider, SyncEventStore},
-    DbResult,
-};
+use strata_db::{errors::DbError, traits::SyncEventDatabase, DbResult};
 use strata_state::sync_event::SyncEvent;
 
 use super::schemas::{SyncEventSchema, SyncEventWithTimestamp};
@@ -36,7 +32,7 @@ impl SyncEventDb {
     }
 }
 
-impl SyncEventStore for SyncEventDb {
+impl SyncEventDatabase for SyncEventDb {
     fn write_sync_event(&self, ev: SyncEvent) -> DbResult<u64> {
         self.db
             .with_optimistic_txn(
@@ -93,9 +89,7 @@ impl SyncEventStore for SyncEventDb {
         self.db.write_schemas(batch)?;
         Ok(())
     }
-}
 
-impl SyncEventProvider for SyncEventDb {
     fn get_last_idx(&self) -> DbResult<Option<u64>> {
         self.get_last_key()
     }

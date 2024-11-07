@@ -33,26 +33,26 @@ inst_ops! {
 }
 
 fn get_block<D: Database>(context: &Context<D>, id: L2BlockId) -> DbResult<Option<L2BlockBundle>> {
-    let l2_prov = context.db.l2_provider();
-    l2_prov.get_block_data(id)
+    let l2_db = context.db.l2_db();
+    l2_db.get_block_data(id)
 }
 
 fn get_blocks_at_height<D: Database>(context: &Context<D>, h: u64) -> DbResult<Vec<L2BlockId>> {
-    let l2_prov = context.db.l2_provider();
-    l2_prov.get_blocks_at_height(h)
+    let l2_db = context.db.l2_db();
+    l2_db.get_blocks_at_height(h)
 }
 
 fn get_block_status<D: Database>(
     context: &Context<D>,
     id: L2BlockId,
 ) -> DbResult<Option<BlockStatus>> {
-    let l2_prov = context.db.l2_provider();
-    l2_prov.get_block_status(id)
+    let l2_db = context.db.l2_db();
+    l2_db.get_block_status(id)
 }
 
 fn put_block<D: Database>(context: &Context<D>, block: L2BlockBundle) -> DbResult<()> {
-    let l2_store = context.db.l2_store();
-    l2_store.put_block_data(block)
+    let l2_db = context.db.l2_db();
+    l2_db.put_block_data(block)
 }
 
 fn put_block_status<D: Database>(
@@ -60,6 +60,6 @@ fn put_block_status<D: Database>(
     id: L2BlockId,
     status: BlockStatus,
 ) -> DbResult<()> {
-    let l2_store = context.db.l2_store();
-    l2_store.set_block_status(id, status)
+    let l2_db = context.db.l2_db();
+    l2_db.set_block_status(id, status)
 }

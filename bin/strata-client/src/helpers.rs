@@ -211,8 +211,8 @@ where
     D: Database + Send + Sync + 'static,
 {
     // init client state
-    let cs_prov = database.client_state_provider().as_ref();
-    let (cur_state_idx, cur_state) = state_tracker::reconstruct_cur_state(cs_prov)?;
+    let cs_db = database.client_state_db().as_ref();
+    let (cur_state_idx, cur_state) = state_tracker::reconstruct_cur_state(cs_db)?;
 
     // init the CsmStatus
     let mut status = CsmStatus::default();

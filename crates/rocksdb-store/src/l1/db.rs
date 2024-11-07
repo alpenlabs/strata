@@ -41,7 +41,7 @@ impl L1Db {
     }
 }
 
-impl L1DataStore for L1Db {
+impl L1Database for L1Db {
     fn put_block_data(&self, idx: u64, mf: L1BlockManifest, txs: Vec<L1Tx>) -> DbResult<()> {
         // If there is latest block then expect the idx to be 1 greater than the block number, else
         // allow arbitrary block number to be inserted
@@ -105,15 +105,7 @@ impl L1DataStore for L1Db {
         self.db.write_schemas(batch)?;
         Ok(())
     }
-}
 
-// Note: Ideally Data Provider should ensure it has only read-only db access,
-// this isn't really doable since we're usually opening the database here in
-// conjunction with a store instance so we just have to be good about ourselves.
-//
-// TODO add a test that ensures all the functions still behave as expected when
-// opened in read-only mode
-impl L1DataProvider for L1Db {
     fn get_tx(&self, tx_ref: L1TxRef) -> DbResult<Option<L1Tx>> {
         let (block_height, txindex) = tx_ref.into();
         let tx = self

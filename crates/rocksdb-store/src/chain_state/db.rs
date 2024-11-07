@@ -29,7 +29,7 @@ impl ChainStateDb {
     }
 }
 
-impl ChainstateProvider for ChainStateDb {
+impl ChainStateDatabase for ChainStateDb {
     fn get_earliest_state_idx(&self) -> DbResult<u64> {
         match self.get_first_idx()? {
             Some(idx) => Ok(idx),
@@ -55,9 +55,7 @@ impl ChainstateProvider for ChainStateDb {
     ) -> DbResult<Option<strata_state::chain_state::ChainState>> {
         Ok(self.db.get::<ChainStateSchema>(&idx)?)
     }
-}
 
-impl ChainstateStore for ChainStateDb {
     fn write_genesis_state(
         &self,
         toplevel: &strata_state::chain_state::ChainState,

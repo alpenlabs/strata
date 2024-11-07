@@ -54,10 +54,10 @@ use tracing::*;
 use crate::extractor::{extract_deposit_requests, extract_withdrawal_infos};
 
 fn fetch_l2blk<D: Database + Sync + Send + 'static>(
-    l2_prov: &Arc<<D as Database>::L2DataProv>,
+    l2_db: &Arc<<D as Database>::L2DB>,
     blkid: L2BlockId,
 ) -> Result<L2BlockBundle, Error> {
-    l2_prov
+    l2_db
         .get_block_data(blkid)
         .map_err(Error::Db)?
         .ok_or(Error::MissingL2Block(blkid))
@@ -113,14 +113,14 @@ impl<D: Database + Sync + Send + 'static> StrataRpcImpl<D> {
         let chs = wait_blocking("load_chainstate", move || {
             // FIXME this is horrible, the sync state should have the block
             // number in it somewhere
-            let l2_prov = db.l2_provider();
-            let tip_block = l2_prov
+            let l2_db = db.l2_db();
+            let tip_block = l2_db
                 .get_block_data(tip_blkid)?
                 .ok_or(Error::MissingL2Block(tip_blkid))?;
             let idx = tip_block.header().blockidx();
 
-            let chs_prov = db.chain_state_provider();
-            let toplevel_st = chs_prov
+            let chs_db = db.chain_state_db();
+            let toplevel_st = chs_db
                 .get_toplevel_state(idx)?
                 .ok_or(Error::MissingChainstate(idx))?;
 
@@ -165,7 +165,7 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
     async fn get_l1_block_hash(&self, height: u64) -> RpcResult<Option<String>> {
         let db = self.database.clone();
         let blk_manifest = wait_blocking("l1_block_manifest", move || {
-            db.l1_provider()
+            db.l1_db()
                 .get_block_manifest(height)
                 .map_err(|_| Error::MissingL1BlockManifest(height))
         })
@@ -197,8 +197,8 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
         // FIXME error handling
         let db = self.database.clone();
         let slot: u64 = wait_blocking("load_cur_block", move || {
-            let l2_prov = db.l2_provider();
-            l2_prov
+            let l2_db = db.l2_db();
+            l2_db
                 .get_block_data(chain_tip)
                 .map(|b| b.map(|b| b.header().blockidx()).unwrap_or(u64::MAX))
                 .map_err(Error::from)
@@ -230,12 +230,12 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
         }
 
         let blk_headers = wait_blocking("block_headers", move || {
-            let l2_prov = db.l2_provider();
+            let l2_db = db.l2_db();
             let mut output = Vec::new();
             let mut cur_blkid = tip_blkid;
 
             while output.len() < count as usize {
-                let l2_blk = fetch_l2blk::<D>(l2_prov, cur_blkid)?;
+                let l2_blk = fetch_l2blk::<D>(l2_db, cur_blkid)?;
                 output.push(conv_blk_header_to_rpc(l2_blk.header()));
                 cur_blkid = *l2_blk.header().parent();
                 if l2_blk.header().blockidx() == 0 || Buf32::from(cur_blkid).is_zero() {
@@ -259,20 +259,20 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
         let db = self.database.clone();
 
         let blk_header = wait_blocking("block_at_idx", move || {
-            let l2_prov = db.l2_provider();
+            let l2_db = db.l2_db();
             // check the tip idx
-            let tip_idx = fetch_l2blk::<D>(l2_prov, tip_blkid)?.header().blockidx();
+            let tip_idx = fetch_l2blk::<D>(l2_db, tip_blkid)?.header().blockidx();
 
             if idx > tip_idx {
                 return Ok(None);
             }
 
-            l2_prov
+            l2_db
                 .get_blocks_at_height(idx)
                 .map_err(Error::Db)?
                 .iter()
                 .map(|blkid| {
-                    let l2_blk = fetch_l2blk::<D>(l2_prov, *blkid)?;
+                    let l2_blk = fetch_l2blk::<D>(l2_db, *blkid)?;
 
                     Ok(Some(conv_blk_header_to_rpc(l2_blk.block().header())))
                 })
@@ -288,9 +288,9 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
         // let blkid = L2BlockId::from(Buf32::from(blkid.0));
 
         Ok(wait_blocking("fetch_block", move || {
-            let l2_prov = db.l2_provider();
+            let l2_db = db.l2_db();
 
-            fetch_l2blk::<D>(l2_prov, blkid)
+            fetch_l2blk::<D>(l2_db, blkid)
         })
         .await
         .map(|blk| conv_blk_header_to_rpc(blk.header()))
@@ -302,9 +302,9 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
         // let blkid = L2BlockId::from(Buf32::from(blkid.0));
 
         let l2_blk = wait_blocking("fetch_block", move || {
-            let l2_prov = db.l2_provider();
+            let l2_db = db.l2_db();
 
-            fetch_l2blk::<D>(l2_prov, blkid)
+            fetch_l2blk::<D>(l2_db, blkid)
         })
         .await
         .ok();
@@ -348,7 +348,7 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
         let blk_ids: Vec<L2BlockId> = wait_blocking("l2_blockid", move || {
             blk_manifest_db
                 .clone()
-                .l2_provider()
+                .l2_db()
                 .get_blocks_at_height(idx)
                 .map_err(Error::Db)
         })
@@ -362,16 +362,16 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
 
         let l2_blk_db = self.database.clone();
         let l2_blk_bundle = wait_blocking("l2_block", move || {
-            let l2_prov = l2_blk_db.l2_provider();
-            fetch_l2blk::<D>(l2_prov, blkid).map_err(|_| Error::MissingL2Block(blkid))
+            let l2_db = l2_blk_db.l2_db();
+            fetch_l2blk::<D>(l2_db, blkid).map_err(|_| Error::MissingL2Block(blkid))
         })
         .await?;
 
         let chain_state_db = self.database.clone();
         let chain_state = wait_blocking("l2_chain_state", move || {
-            let cs_provider = chain_state_db.chain_state_provider();
+            let chs_db = chain_state_db.chain_state_db();
 
-            cs_provider
+            chs_db
                 .get_toplevel_state(idx - 1)
                 .map_err(Error::Db)?
                 .ok_or(Error::MissingChainstate(idx - 1))
@@ -505,11 +505,11 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
         // call takes a lot of time (for example, when there are hundreds of thousands of
         // deposits/withdrawals).
 
-        let l1_db_provider = self.database.l1_provider();
+        let l1_db = self.database.l1_db();
         let network = self.status_rx.l1.borrow().network;
 
         let (deposit_duties, latest_index) =
-            extract_deposit_requests(l1_db_provider, start_index, network).await?;
+            extract_deposit_requests(l1_db, start_index, network).await?;
 
         let deposit_duties = deposit_duties.map(BridgeDuty::from);
 
@@ -596,7 +596,7 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
         let db = self.database.clone();
 
         let ev: Option<SyncEvent> = wait_blocking("fetch_sync_event", move || {
-            Ok(db.sync_event_provider().get_sync_event(idx)?)
+            Ok(db.sync_event_db().get_sync_event(idx)?)
         })
         .await?;
 
@@ -607,7 +607,7 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
         let db = self.database.clone();
 
         let last = wait_blocking("fetch_last_sync_event_idx", move || {
-            Ok(db.sync_event_provider().get_last_idx()?)
+            Ok(db.sync_event_db().get_last_idx()?)
         })
         .await?;
 
@@ -620,7 +620,7 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
         let db = self.database.clone();
 
         let res = wait_blocking("fetch_client_update_output", move || {
-            let prov = db.client_state_provider();
+            let prov = db.client_state_db();
 
             let w = prov.get_client_state_writes(idx)?;
             let a = prov.get_client_update_actions(idx)?;

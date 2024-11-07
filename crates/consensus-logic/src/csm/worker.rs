@@ -66,8 +66,8 @@ impl<D: Database> WorkerState<D> {
         cupdate_tx: broadcast::Sender<Arc<ClientUpdateNotif>>,
         checkpoint_manager: Arc<CheckpointDbManager>,
     ) -> anyhow::Result<Self> {
-        let cs_prov = database.client_state_provider().as_ref();
-        let (cur_state_idx, cur_state) = state_tracker::reconstruct_cur_state(cs_prov)?;
+        let client_state_db = database.client_state_db().as_ref();
+        let (cur_state_idx, cur_state) = state_tracker::reconstruct_cur_state(client_state_db)?;
         let state_tracker = state_tracker::StateTracker::new(
             params.clone(),
             database.clone(),
@@ -193,8 +193,8 @@ fn handle_sync_event_with_retry<D: Database>(
 ) -> anyhow::Result<()> {
     // Fetch the sync event so that we can debug print it.
     // FIXME make it so we don't have to fetch it again here
-    let ev_prov = state.database.sync_event_provider();
-    let Some(ev) = ev_prov.get_sync_event(ev_idx)? else {
+    let sync_event_db = state.database.sync_event_db();
+    let Some(ev) = sync_event_db.get_sync_event(ev_idx)? else {
         error!(%ev_idx, "tried to process missing sync event, aborting handle_sync_event!");
         return Ok(());
     };
@@ -258,7 +258,7 @@ fn handle_sync_event<D: Database>(
 
     // Write the client state checkpoint periodically based on the event idx..
     if ev_idx % state.params.run.client_checkpoint_interval as u64 == 0 {
-        let css = state.database.client_state_store();
+        let css = state.database.client_state_db();
         css.write_client_state_checkpoint(ev_idx, new_state.as_ref().clone())?;
     }
 

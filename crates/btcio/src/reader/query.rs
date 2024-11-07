@@ -33,7 +33,7 @@ pub async fn bitcoin_data_reader_task<D: Database + 'static>(
     target_next_block: u64,
     config: Arc<ReaderConfig>,
     status_rx: Arc<StatusTx>,
-    _chstate_prov: Arc<D::ChainStateProvider>,
+    _chstate_db: Arc<D::ChainStateDB>,
 ) -> anyhow::Result<()> {
     do_reader_task(
         client.as_ref(),
