@@ -8,7 +8,7 @@ pub trait ZkVmHost: Send + Sync + Clone {
     type Input<'a>: ZkVmInputBuilder<'a>;
 
     /// Initializes the ZkVm with the provided ELF program and prover configuration.
-    fn init(guest_code: &[u8]) -> Self;
+    // fn init(guest_code: &[u8]) -> Self;
 
     /// Executes the guest code within the VM, generating and returning the validity proof.
     // TODO: Consider using custom error types instead of a generic error to capture the different
