@@ -29,11 +29,8 @@ impl SP1Host {
             bincode::deserialize(verifying_key_bytes).expect("invalid sp1 vk bytes");
         SP1Host::new(proving_key, verifying_key)
     }
-}
 
-impl ZkVmHost for SP1Host {
-    type Input<'a> = SP1ProofInputBuilder;
-    fn init(guest_code: &[u8]) -> Self {
+    pub fn init(guest_code: &[u8]) -> Self {
         let client = ProverClient::new();
         let (proving_key, verifying_key) = client.setup(guest_code);
         Self {
@@ -41,7 +38,10 @@ impl ZkVmHost for SP1Host {
             verifying_key,
         }
     }
+}
 
+impl ZkVmHost for SP1Host {
+    type Input<'a> = SP1ProofInputBuilder;
     fn prove<'a>(
         &self,
         prover_input: <Self::Input<'a> as ZkVmInputBuilder<'a>>::Input,

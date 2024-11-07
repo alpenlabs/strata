@@ -15,17 +15,18 @@ pub struct Risc0Host {
     id: Digest,
 }
 
-impl ZkVmHost for Risc0Host {
-    type Input<'a> = Risc0ProofInputBuilder<'a>;
-
-    fn init(guest_code: &[u8]) -> Self {
+impl Risc0Host {
+    pub fn init(guest_code: &[u8]) -> Self {
         let id = compute_image_id(guest_code).expect("invalid elf");
-
         Risc0Host {
-            id,
             elf: guest_code.to_vec(),
+            id,
         }
     }
+}
+
+impl ZkVmHost for Risc0Host {
+    type Input<'a> = Risc0ProofInputBuilder<'a>;
 
     fn prove<'a>(
         &self,
