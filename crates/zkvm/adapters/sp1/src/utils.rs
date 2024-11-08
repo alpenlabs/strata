@@ -80,14 +80,5 @@ pub fn extract_raw_groth16_proof(proof: Proof) -> anyhow::Result<Proof> {
     let sp1_proof: SP1ProofWithPublicValues = bincode::deserialize(proof.as_bytes())
         .context("Failed to deserialize SP1 Groth16 proof")?;
 
-    let sp1_groth16_proof_bytes = hex::decode(
-        &sp1_proof
-            .proof
-            .try_as_groth_16()
-            .context("Failed to convert proof to Groth16")?
-            .raw_proof,
-    )
-    .context("Failed to decode Groth16 proof")?;
-
-    Ok(Proof::new(sp1_groth16_proof_bytes))
+    Ok(Proof::new(sp1_proof.bytes()))
 }

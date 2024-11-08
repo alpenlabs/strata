@@ -9,9 +9,9 @@ strata-sp1-adapter = { path = "../../crates/zkvm/adapters/sp1", features = [
 ], optional = true }
 
 [build-dependencies]
-sp1-sdk = "2.0.0"
+sp1-sdk = "3.0.0"
 # Using a fork until required change is upstreamed via [PR](https://github.com/succinctlabs/sp1/pull/1690)
-sp1-build = { git = "https://github.com/alpenlabs/sp1.git", branch = "feat/docker-optional-workspace" }
+sp1-build = { git = "https://github.com/alpenlabs/sp1.git", branch = "feat/docker-optional-workspace-dev" }
 
 [dev-dependencies]
 anyhow.workspace = true
@@ -22,7 +22,7 @@ hex.workspace = true
 num-bigint = "0.4.6"
 num-traits = "0.2.19"
 serde_json.workspace = true
-sp1-sdk = "2.0.0"
+sp1-sdk = "3.0.0"
 strata-primitives.workspace = true
 strata-proofimpl-btc-blockspace.workspace = true
 strata-proofimpl-checkpoint.workspace = true

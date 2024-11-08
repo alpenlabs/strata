@@ -4,8 +4,8 @@ use anyhow::Ok;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::de::DeserializeOwned;
 use sp1_sdk::{
-    block_on, proto::network::ProofMode, provers::ProverType, HashableKey, NetworkProver,
-    ProverClient, SP1ProofWithPublicValues, SP1ProvingKey, SP1VerifyingKey,
+    block_on, network::proto::network::ProofMode, provers::ProverType, HashableKey,
+    NetworkProverV1, ProverClient, SP1ProofWithPublicValues, SP1ProvingKey, SP1VerifyingKey,
 };
 use strata_zkvm::{
     Proof, ProofWithMetadata, ProverOptions, VerificationKey, ZKVMHost, ZKVMInputBuilder,
@@ -81,7 +81,7 @@ impl ZKVMHost for SP1Host {
             // type checks, so we must ensure the environment variable is set correctly
             // to avoid undefined behavior.
             let network_prover =
-                unsafe { &*(client.prover.as_ref() as *const _ as *const NetworkProver) };
+                unsafe { &*(client.prover.as_ref() as *const _ as *const NetworkProverV1) };
 
             let mode = match (
                 self.prover_options.enable_compression,
@@ -272,7 +272,7 @@ mod tests {
         // Note: For the fixed ELF and fixed SP1 version, the vk is fixed
         assert_eq!(
             vk.bytes32(),
-            "0x00b01ae596b4e51843484ff71ccbd0dd1a030af70b255e6b9aad50b81d81266f"
+            "0x00efb1120491119751e75bc55bc95b64d33f973ecf68fcf5cbff08506c5788f9"
         );
 
         let filename = "./tests/proofs/proof-groth16.bin";
