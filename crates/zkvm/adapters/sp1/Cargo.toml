@@ -8,16 +8,13 @@ anyhow.workspace = true
 bincode.workspace = true
 borsh.workspace = true
 hex.workspace = true
-num-bigint = "0.4.6"
-num-traits = "0.2.19"
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
-snark-bn254-verifier = { git = "https://github.com/succinctlabs/snark-bn254-verifier.git", branch = "bhargav/groth16-verf" } # Note: This is unstable
-sp1-sdk = "2.0.0"
+sp1-sdk = "3.0.0"
+sp1-verifier = { git = "https://github.com/succinctlabs/sp1", rev = "2c7868364cb832531e8cafd258aa06fbab079459" } # Note: On new SP1 version, this will be available via SDK 
 strata-primitives.workspace = true
 strata-zkvm.workspace = true
-substrate-bn = { git = "https://github.com/sp1-patches/bn", branch = "patch-v0.7.0" }
 tracing.workspace = true
 
 [features]

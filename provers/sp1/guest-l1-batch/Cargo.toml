@@ -10,7 +10,7 @@ bincode = "1.3.3"
 bitcoin = "0.32.1"
 borsh = { version = "1.5.0", features = ["derive"] }
 sha2 = "0.10.8"
-sp1-zkvm = { version = "2.0.0", features = ["verify"] }
+sp1-zkvm = { version = "3.0.0", features = ["verify"] }
 strata-primitives = { path = "../../../crates/primitives" }
 strata-proofimpl-btc-blockspace = { path = "../../../crates/proof-impl/btc-blockspace" }
 strata-proofimpl-l1-batch = { path = "../../../crates/proof-impl/l1-batch" }
