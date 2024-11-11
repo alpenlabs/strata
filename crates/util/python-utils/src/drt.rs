@@ -104,7 +104,7 @@ fn deposit_request_transaction_inner(
     op_return_data[MBL + TNHL..].copy_from_slice(el_address.as_slice());
 
     // For regtest 2 sat/vbyte is enough
-    let fee_rate = FeeRate::from_sat_per_vb(2).expect("valid fee rate");
+    let fee_rate = FeeRate::from_sat_per_vb_unchecked(2);
 
     // Before signing the transaction, we need to sync the wallet with bitcoind
     sync_wallet(&mut wallet, &client)?;
@@ -193,7 +193,7 @@ fn spend_recovery_path_inner(
     let mut wallet = recovery_wallet(musig_bridge_pk)?;
 
     // For regtest 2 sat/vbyte is enough
-    let fee_rate = FeeRate::from_sat_per_vb(2).expect("valid fee rate");
+    let fee_rate = FeeRate::from_sat_per_vb_unchecked(2);
 
     // Instantiate the BitcoinD client
     let client = new_client(
