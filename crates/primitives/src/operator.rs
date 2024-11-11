@@ -1,6 +1,7 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
+// FOO
 use super::bridge::OperatorIdx;
 use crate::prelude::Buf32;
 
