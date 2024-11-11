@@ -101,7 +101,7 @@ pub(crate) fn sync_wallet(wallet: &mut Wallet, rpc_client: &Client) -> Result<()
 }
 
 /// Creates a new `bitcoind` RPC client.
-pub(crate) fn new_client(
+pub(crate) fn new_bitcoind_client(
     url: &str,
     rpc_cookie: Option<&PathBuf>,
     rpc_user: Option<&str>,
@@ -237,7 +237,7 @@ fn drain_wallet_inner(
         .assume_checked();
 
     // Instantiate the BitcoinD client
-    let client = new_client(
+    let client = new_bitcoind_client(
         bitcoind_url,
         None,
         Some(bitcoind_user),

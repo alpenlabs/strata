@@ -16,7 +16,7 @@ use crate::{
     constants::{BRIDGE_IN_AMOUNT, MAGIC_BYTES, NETWORK, RECOVER_DELAY, UNSPENDABLE, XPRIV},
     error::Error,
     parse::{parse_address, parse_el_address, parse_xonly_pk},
-    taproot::{bridge_wallet, new_client, sync_wallet, taproot_wallet, ExtractP2trPubkey},
+    taproot::{bridge_wallet, new_bitcoind_client, sync_wallet, taproot_wallet, ExtractP2trPubkey},
 };
 
 /// Generates a deposit request transaction (DRT).
@@ -76,7 +76,7 @@ fn deposit_request_transaction_inner(
     let musig_bridge_pk = parse_xonly_pk(musig_bridge_pk)?;
 
     // Instantiate the BitcoinD client
-    let client = new_client(
+    let client = new_bitcoind_client(
         bitcoind_url,
         None,
         Some(bitcoind_user),
@@ -196,7 +196,7 @@ fn spend_recovery_path_inner(
     let fee_rate = FeeRate::from_sat_per_vb_unchecked(2);
 
     // Instantiate the BitcoinD client
-    let client = new_client(
+    let client = new_bitcoind_client(
         bitcoind_url,
         None,
         Some(bitcoind_user),
@@ -403,8 +403,8 @@ mod tests {
         let url = bitcoind.rpc_url();
         let (user, password) = get_auth(&bitcoind);
         let client = BitcoinClient::new(url.clone(), user.clone(), password.clone()).unwrap();
-        let wallet_client =
-            new_client(&url, None, Some(&user), Some(&password)).expect("valid wallet client");
+        let wallet_client = new_bitcoind_client(&url, None, Some(&user), Some(&password))
+            .expect("valid wallet client");
 
         // Get the taproot wallet.
         let mut wallet = taproot_wallet().unwrap();
