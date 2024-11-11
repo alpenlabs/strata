@@ -7,10 +7,9 @@ from strata_utils import (
     get_address,
     get_recovery_address,
     take_back_transaction,
-    unspendable_address,
 )
 
-from constants import DEFAULT_TAKEBACK_TIMEOUT
+from constants import DEFAULT_TAKEBACK_TIMEOUT, UNSPENDABLE_ADDRESS
 from entry import BasicEnvConfig
 from utils import get_bridge_pubkey, get_logger
 
@@ -55,7 +54,6 @@ class BridgeDepositReclaimTest(flexitest.Test):
         addr = get_address(0)
         change_addr = btcrpc.proxy.getnewaddress()
         recovery_addr = get_recovery_address(0, bridge_pk)
-        unspendable_addr = unspendable_address()
 
         # Generate Plenty of BTC to address for the DRT
         self.logger.debug(f"Generating 102 blocks to address: {addr}")
@@ -89,7 +87,7 @@ class BridgeDepositReclaimTest(flexitest.Test):
         self.logger.debug(f"Generating {DEFAULT_TAKEBACK_TIMEOUT} blocks in {chunks} chunks")
         for i in range(chunks):
             self.logger.debug(f"Generating {blocks_to_generate} blocks in chunk {i+1}/{chunks}")
-            btcrpc.proxy.generatetoaddress(blocks_to_generate, unspendable_addr)
+            btcrpc.proxy.generatetoaddress(blocks_to_generate, UNSPENDABLE_ADDRESS)
 
         # wait up a little bit
         time.sleep(1)
@@ -104,7 +102,7 @@ class BridgeDepositReclaimTest(flexitest.Test):
         txid = btcrpc.proxy.sendrawtransaction(take_back_tx)
         self.logger.debug(f"sent take back tx with txid = {txid} for address {el_address}")
         # this transaction is not in the bitcoind wallet, so we cannot use gettransaction
-        btcrpc.proxy.generatetoaddress(1, unspendable_addr)
+        btcrpc.proxy.generatetoaddress(1, UNSPENDABLE_ADDRESS)
         time.sleep(1)
 
         rpc_transaction = btcrpc.proxy.gettransaction(txid)
@@ -161,6 +159,3 @@ class BridgeDepositReclaimTest(flexitest.Test):
             time.sleep(3)
 
         return txid
-
-    def reclaim_deposit(self, ctx: flexitest.RunContext, txid_drt, maturity=0):
-        return True

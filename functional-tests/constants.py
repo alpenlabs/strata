@@ -16,6 +16,10 @@ ERROR_CHECKPOINT_DOESNOT_EXIST = -32610
 # custom precompiles
 PRECOMPILE_BRIDGEOUT_ADDRESS = "0x5400000000000000000000000000000000000001"
 
+# Unspendable address
+# Taken from python-strata-utils:
+UNSPENDABLE_ADDRESS = "bcrt1plh4vmrc7ejjt66d8rj5nx8hsvslw9ps9rp3a0v7kzq37ekt5lggskf39fp"
+
 # Network times and stuff
 DEFAULT_BLOCK_TIME_SEC = 1
 DEFAULT_EPOCH_SLOTS = 64

@@ -68,3 +68,19 @@ pub(crate) static DESCRIPTOR: LazyLock<&'static str> =
 /// The Taproot-enable wallet's internal descriptor.
 pub(crate) static CHANGE_DESCRIPTOR: LazyLock<&'static str> =
     LazyLock::new(|| Box::leak(format!("tr({XPRIV}/86'/1'/0'/1/*)").into_boxed_str()));
+
+#[cfg(test)]
+mod tests {
+    use bdk_wallet::bitcoin::Address;
+
+    use super::*;
+
+    #[test]
+    fn unspendable() {
+        let unspendable_address = Address::p2tr(SECP256K1, *UNSPENDABLE, None, NETWORK);
+        assert_eq!(
+            unspendable_address.to_string(),
+            "bcrt1plh4vmrc7ejjt66d8rj5nx8hsvslw9ps9rp3a0v7kzq37ekt5lggskf39fp"
+        );
+    }
+}
