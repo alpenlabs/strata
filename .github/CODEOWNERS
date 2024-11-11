@@ -1,0 +1,64 @@
+# Order is important; the last matching pattern takes the most precedence.
+
+.github/           @alpenlabs/admins             # only admins should own the CODEOWNERS
+.gitignore         @alpenlabs/admins
+
+# CI/Local ENV
+.github/workflows/     @alpenlabs/ci
+.github/actions/       @alpenlabs/ci
+.github/dependabot.yml @alpenlabs/ci
+Makefile               @alpenlabs/rust @alpenlabs/ci @alpenlabs/bin
+codecov.yml            @alpenlabs/ci
+contrib/               @alpenlabs/ci   @alpenlabs/bin
+tests/                 @alpenlabs/rust @alpenlabs/ci
+
+# Libs
+# Note that the globbing here is to future-proof against new crates
+/crates/             @alpenlabs/rust    # fallback catch all
+/crates/bridge*/     @alpenlabs/bridge
+/crates/btc*/        @alpenlabs/btc
+/crates/common/      @alpenlabs/rust
+/crates/chaintsn/    @alpenlabs/rust
+/crates/consensus*/  @alpenlabs/chain-core
+/crates/db/          @alpenlabs/database
+/crates/eectl/       @alpenlabs/evm
+/crates/evm*/        @alpenlabs/evm
+/crates/primitives/  @alpenlabs/crypto @alpenlabs/rust
+/crates/crypto/      @alpenlabs/crypto @alpenlabs/rust
+/crates/proof*/      @alpenlabs/prover
+/crates/reth/        @alpenlabs/evm
+/crates/rocksdb*/    @alpenlabs/database
+/crates/rpc/         @alpenlabs/chain-core @alpenlabs/btc
+/crates/state/       @alpenlabs/chain-core
+/crates/status/      @alpenlabs/chain-core
+/crates/storage/     @alpenlabs/chain-core
+/crates/sync/        @alpenlabs/chain-core
+/crates/tasks/       @alpenlabs/chain-core
+/crates/test-utils/  @alpenlabs/rust @alpenlabs/ci
+/crates/util*/       @alpenlabs/rust
+/crates/tx-parser/   @alpenlabs/rust @alpenlabs/btc
+/crates/*jmt*/       @alpenlabs/database
+/crates/zkvm/        @alpenlabs/prover
+/prover/             @alpenlabs/prover
+
+# Binaries/CLIs
+bin/                @alpenlabs/bin                   # catch all
+bin/bridge-client/  @alpenlabs/bin @alpenlabs/bridge
+bin/prover*/        @alpenlabs/bin @alpenlabs/prover
+bin/strata-reth/    @alpenlabs/bin @alpenlabs/evm
+
+# Functional tests
+functional-tests/             @alpenlabs/python               # catch all
+functional-tests/fn_*.py      @alpenlabs/python @alpenlabs/ci
+functional-tests/constants.py @alpenlabs/python @alpenlabs/ci
+functional-tests/entry.py     @alpenlabs/python @alpenlabs/ci
+
+# Docker/Containers
+**/Docker*         @alpenlabs/docker
+docker/            @alpenlabs/docker
+
+# Dependencies and metadata
+**/Cargo.toml      @alpenlabs/dependencies       # dependencies and metadata
+**/Cargo.lock      @alpenlabs/dependencies       # updates
+.config/           @alpenlabs/rust @alpenlabs/ci # config for rustdev and CI
+**/*.toml          @alpenlabs/rust               # config files
