@@ -1,4 +1,5 @@
 # Order is important; the last matching pattern takes the most precedence.
+# Foo
 
 .github/           @alpenlabs/admins             # only admins should own the CODEOWNERS
 .gitignore         @alpenlabs/admins
