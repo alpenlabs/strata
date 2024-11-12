@@ -5,7 +5,6 @@ import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 
 from constants import DEFAULT_ROLLUP_PARAMS, SEQ_PUBLISH_BATCH_INTERVAL_SECS
-from entry import BasicEnvConfig
 from utils import broadcast_tx, get_logger
 from strata_utils import get_address
 
@@ -17,7 +16,7 @@ class BridgeDutiesTest(flexitest.Test):
     """
 
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env(BasicEnvConfig(101))
+        ctx.set_env("basic")
         self.logger = get_logger("getBridgeDuties")
 
     def main(self, ctx: flexitest.RunContext):
@@ -32,7 +31,8 @@ class BridgeDutiesTest(flexitest.Test):
         sats_per_btc = 10**8
         amount_to_send = DEFAULT_ROLLUP_PARAMS["deposit_amount"] / sats_per_btc + fees_in_btc
 
-        el_address = "deadf001900dca3ebeefdeadf001900dca3ebeef"
+        el_address = "deada001900dca3ebeefdeadf001900dca3ebeef"
+        el_address_bytes = list(bytes.fromhex(el_address))
         take_back_leaf_hash = "02" * 32
         magic_bytes = DEFAULT_ROLLUP_PARAMS["rollup_name"].encode("utf-8").hex()
         outputs = [
@@ -63,6 +63,8 @@ class BridgeDutiesTest(flexitest.Test):
         )
         duties_resp = seqrpc.strata_getBridgeDuties(operator_idx, start_index)
         duties: List = duties_resp["duties"]
+        # Filter out the duties unrelated to other than the el_address.
+        duties = list(filter(lambda d: d["payload"]["el_address"] == el_address_bytes, duties))
 
         expected_duties = []
         for txid in txids:
@@ -70,7 +72,7 @@ class BridgeDutiesTest(flexitest.Test):
                 "type": "SignDeposit",
                 "payload": {
                     "deposit_request_outpoint": f"{txid}:0",
-                    "el_address": list(bytes.fromhex(el_address)),
+                    "el_address": el_address_bytes,
                     "total_amount": amount_to_send * sats_per_btc,
                     "take_back_leaf_hash": take_back_leaf_hash,
                     "original_taproot_addr": {"network": "regtest", "address": addr},

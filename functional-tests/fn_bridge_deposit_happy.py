@@ -5,7 +5,6 @@ from bitcoinlib.services.bitcoind import BitcoindClient
 from strata_utils import deposit_request_transaction, drain_wallet, get_address
 
 from constants import DEFAULT_ROLLUP_PARAMS
-from entry import BasicEnvConfig
 from utils import get_bridge_pubkey, get_logger
 
 
@@ -22,7 +21,7 @@ class BridgeDepositHappyTest(flexitest.Test):
     """
 
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env(BasicEnvConfig(pre_generate_blocks=101))
+        ctx.set_env("basic")
         self.logger = get_logger("BridgeDepositHappyTest")
 
     def main(self, ctx: flexitest.RunContext):
