@@ -52,15 +52,15 @@ pub struct ChainState {
 // It should be replaced once we swap out ChainState's type definitions with SSZ type definitions
 // which defines all of this more rigorously
 #[derive(BorshSerialize)]
-struct HashedChainState {
-    last_block: Buf32,
-    slot: u64,
-    epoch: u64,
-    l1_state_hash: Buf32,
-    pending_withdraws_hash: Buf32,
-    exec_env_hash: Buf32,
-    operators_hash: Buf32,
-    deposits_hash: Buf32,
+pub struct HashedChainState {
+    pub last_block: Buf32,
+    pub slot: u64,
+    pub epoch: u64,
+    pub l1_state_hash: Buf32,
+    pub pending_withdraws_hash: Buf32,
+    pub exec_env_hash: Buf32,
+    pub operators_hash: Buf32,
+    pub deposits_hash: Buf32,
 }
 
 impl ChainState {
@@ -97,7 +97,11 @@ impl ChainState {
     /// Computes a commitment to a the chainstate.  This is super expensive
     /// because it does a bunch of hashing.
     pub fn compute_state_root(&self) -> Buf32 {
-        let hashed_state = HashedChainState {
+        compute_borsh_hash(&self.hashed_chain_state())
+    }
+
+    pub fn hashed_chain_state(&self) -> HashedChainState {
+        HashedChainState {
             last_block: self.last_block.into(),
             slot: self.slot,
             epoch: self.epoch,
@@ -106,8 +110,7 @@ impl ChainState {
             exec_env_hash: compute_borsh_hash(&self.exec_env_state),
             operators_hash: compute_borsh_hash(&self.operator_table),
             deposits_hash: compute_borsh_hash(&self.deposits_table),
-        };
-        compute_borsh_hash(&hashed_state)
+        }
     }
 
     pub fn operator_table(&self) -> &OperatorTable {
