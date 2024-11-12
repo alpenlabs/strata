@@ -23,7 +23,7 @@ services:
   strata-reth:
     build:
       context: ../../
-      dockerfile: ./docker/client/Dockerfile
+      dockerfile: ./docker/reth/Dockerfile
     image: public.ecr.aws/s6b4k6i9/strata_reth:devnet
     environment:
       JWTSECRET: configs/jwt.hex
@@ -39,8 +39,8 @@ services:
   # Strata Client Service
   strata-client:
     build:
-      context: ../
-      dockerfile: ./docker/bridge-client/Dockerfile
+      context: ../../
+      dockerfile: ./docker/client/Dockerfile
     image: public.ecr.aws/s6b4k6i9/strata_client:devnet
     depends_on:
       - signet
