@@ -6,7 +6,6 @@ from bitcoinlib.services.bitcoind import BitcoindClient
 
 from constants import DEFAULT_ROLLUP_PARAMS, SEQ_PUBLISH_BATCH_INTERVAL_SECS
 from utils import broadcast_tx, get_logger
-from strata_utils import get_address
 
 
 @flexitest.register
@@ -26,12 +25,12 @@ class BridgeDutiesTest(flexitest.Test):
         seqrpc = seq.create_rpc()
         btcrpc: BitcoindClient = btc.create_rpc()
 
-        addr = get_address(0)
+        addr = ctx.env.gen_funded_btc_address()
         fees_in_btc = 0.01
         sats_per_btc = 10**8
         amount_to_send = DEFAULT_ROLLUP_PARAMS["deposit_amount"] / sats_per_btc + fees_in_btc
 
-        el_address = "deada001900dca3ebeefdeadf001900dca3ebeef"
+        el_address = ctx.env.gen_el_address()
         el_address_bytes = list(bytes.fromhex(el_address))
         take_back_leaf_hash = "02" * 32
         magic_bytes = DEFAULT_ROLLUP_PARAMS["rollup_name"].encode("utf-8").hex()

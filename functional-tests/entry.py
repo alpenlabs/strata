@@ -12,6 +12,39 @@ import factory
 import net_settings
 from constants import *
 from utils import *
+from strata_utils import get_address
+
+
+class BasicLiveEnv(flexitest.LiveEnv):
+    """
+    A common thin layer for all instances of the Environments.
+    """
+
+    def __init__(self, srvs):
+        super().__init__(srvs)
+        self._el_address_gen = (
+            "deada00{:04X}dca3ebeefdeadf001900dca3ebeef".format(x) for x in range(16**4)
+        )
+        self._btc_address_idx = 0
+    
+    def gen_el_address(self) -> str:
+        """
+        Generates a unique EL address to be used across tests.
+        """
+        return next(self._el_address_gen)
+
+    def gen_funded_btc_address(self) -> str | List[str]:
+        """
+        Generates a unique bitcoin taproot addresses that is funded with some BTC.
+        """
+        brpc: BitcoindClient = self.svcs["bitcoin"].create_rpc()
+
+        tr_addr: str = get_address(self._btc_address_idx)
+        self._btc_address_idx += 1
+        # 101 to make sure the maturation case is covered when
+        # the Environment is started with no blocks pre-generated.
+        brpc.proxy.generatetoaddress(101, tr_addr)
+        return tr_addr
 
 
 class BasicEnvConfig(flexitest.EnvConfig):
@@ -130,7 +163,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
             )
             svcs["prover_client"] = prover_client
 
-        return flexitest.LiveEnv(svcs)
+        return BasicLiveEnv(svcs)
 
 
 class HubNetworkEnvConfig(flexitest.EnvConfig):
@@ -246,7 +279,7 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
             name = f"bridge.{i}"
             svcs[name] = br
 
-        return flexitest.LiveEnv(svcs)
+        return BasicLiveEnv(svcs)
 
 
 def main(argv):
