@@ -1,0 +1,1 @@
+//! Chainstate manager types.
