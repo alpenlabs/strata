@@ -2,7 +2,7 @@ import time
 
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
-from strata_utils import deposit_request_transaction, drain_wallet, get_address
+from strata_utils import deposit_request_transaction, drain_wallet
 
 from constants import DEFAULT_ROLLUP_PARAMS
 from utils import get_bridge_pubkey, get_logger
@@ -25,12 +25,12 @@ class BridgeDepositHappyTest(flexitest.Test):
         self.logger = get_logger("BridgeDepositHappyTest")
 
     def main(self, ctx: flexitest.RunContext):
-        el_address_1 = "deadf001900dca3ebeefdeadf001900dca3ebeef"
-        el_address_2 = "deedf001900dca3ebeefdeadf001900dca3ebeef"
+        el_address_1 = ctx.env.gen_el_address()
+        el_address_2 = ctx.env.gen_el_address()
 
-        addr_1 = get_address(0)
-        addr_2 = get_address(1)
-        addr_3 = get_address(2)
+        addr_1 = ctx.env.gen_funded_btc_address()
+        addr_2 = ctx.env.gen_funded_btc_address()
+        addr_3 = ctx.env.gen_funded_btc_address()
 
         # 1st deposit
         self.test_deposit(ctx, addr_1, el_address_1)

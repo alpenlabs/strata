@@ -28,7 +28,7 @@ class BridgeDepositReclaimTest(flexitest.Test):
     """
 
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env(BasicEnvConfig(pre_generate_blocks=101))
+        ctx.set_env("basic")
         self.logger = get_logger("BridgeDepositReclaimTest")
 
     def main(self, ctx: flexitest.RunContext):
