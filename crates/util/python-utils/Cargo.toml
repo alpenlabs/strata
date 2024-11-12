@@ -1,6 +1,6 @@
 [package]
 name = "strata-python-utils"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 
 [lib]
@@ -31,6 +31,8 @@ pyo3-build-config = "0.22.5"
 anyhow.workspace = true
 bitcoind.workspace = true
 tokio.workspace = true
+tracing.workspace = true
 
 # Internal crates
 strata-btcio.workspace = true
+strata-common.workspace = true

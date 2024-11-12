@@ -13104,7 +13104,7 @@ dependencies = [
 
 [[package]]
 name = "strata-python-utils"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "bdk_bitcoind_rpc",
@@ -13116,7 +13116,9 @@ dependencies = [
  "reth-primitives",
  "shrex",
  "strata-btcio",
+ "strata-common",
  "tokio",
+ "tracing",
 ]
 
 [[package]]

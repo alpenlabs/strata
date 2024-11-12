@@ -6,9 +6,10 @@ use bdk_bitcoind_rpc::{
 };
 use bdk_wallet::{
     bitcoin::{
-        consensus::serialize, key::Parity, Address, AddressType, FeeRate, PublicKey, Transaction,
-        XOnlyPublicKey,
+        consensus::serialize, key::Parity, secp256k1::SECP256K1, Address, AddressType, FeeRate,
+        PublicKey, Transaction, XOnlyPublicKey,
     },
+    descriptor::IntoWalletDescriptor,
     miniscript::ToPublicKey,
     KeychainKind, Wallet,
 };
@@ -16,7 +17,8 @@ use musig2::KeyAggContext;
 use pyo3::prelude::*;
 
 use crate::{
-    constants::{CHANGE_DESCRIPTOR, DESCRIPTOR, NETWORK},
+    constants::{CHANGE_DESCRIPTOR, DESCRIPTOR, NETWORK, UNSPENDABLE},
+    drt::bridge_in_descriptor,
     error::Error,
     parse::{parse_pk, parse_xonly_pk},
 };
@@ -40,6 +42,15 @@ impl ExtractP2trPubkey for Address {
     }
 }
 
+/// Unspendabled Taproot address.
+///
+/// This is based on the [`UNSPENDABLE`] public key.
+#[pyfunction]
+pub fn unspendable_address() -> String {
+    let address = Address::p2tr(SECP256K1, *UNSPENDABLE, None, NETWORK);
+    address.to_string()
+}
+
 /// A simple Taproot-enable wallet.
 ///
 /// # Note
@@ -52,14 +63,33 @@ pub(crate) fn taproot_wallet() -> Result<Wallet, Error> {
         .map_err(|_| Error::Wallet))?
 }
 
+/// The bridge wallet used to get the recovery path of the deposit request transaction (DRT).
+pub(crate) fn bridge_wallet(
+    bridge_pubkey: XOnlyPublicKey,
+    recovery_address: Address,
+) -> Result<Wallet, Error> {
+    let (bridge_in_desc, _) =
+        bridge_in_descriptor(bridge_pubkey, recovery_address).expect("valid bridge in descriptor");
+
+    let desc = bridge_in_desc
+        .clone()
+        .into_wallet_descriptor(SECP256K1, NETWORK)
+        .expect("valid descriptor");
+
+    Ok(Wallet::create_single(desc.clone())
+        .network(NETWORK)
+        .create_wallet_no_persist()
+        .map_err(|_| Error::Wallet))?
+}
+
 /// Syncs a wallet with the network using `bitcoind` as the backend.
 ///
 /// # Note
 ///
 /// This function should be only used with Regtest.
-pub(crate) fn sync_wallet(wallet: &mut Wallet, rpc_client: Client) -> Result<(), Error> {
+pub(crate) fn sync_wallet(wallet: &mut Wallet, rpc_client: &Client) -> Result<(), Error> {
     let wallet_tip = wallet.latest_checkpoint();
-    let mut emitter = Emitter::new(&rpc_client, wallet_tip, 0);
+    let mut emitter = Emitter::new(rpc_client, wallet_tip, 0);
     while let Some(block) = emitter.next_block().expect("valid block") {
         let height = block.block_height();
         let connected_to = block.connected_to();
@@ -71,7 +101,7 @@ pub(crate) fn sync_wallet(wallet: &mut Wallet, rpc_client: Client) -> Result<(),
 }
 
 /// Creates a new `bitcoind` RPC client.
-pub(crate) fn new_client(
+pub(crate) fn new_bitcoind_client(
     url: &str,
     rpc_cookie: Option<&PathBuf>,
     rpc_user: Option<&str>,
@@ -101,7 +131,7 @@ pub(crate) fn musig_aggregate_pks_inner(pks: Vec<XOnlyPublicKey>) -> Result<XOnl
     Ok(key_agg_ctx.aggregated_pubkey())
 }
 
-/// Gets a (receiving/external) address from the wallet at the given `index`.
+/// Gets a (receiving/external) address from the [`taproot_wallet`] at the given `index`.
 #[pyfunction]
 pub(crate) fn get_address(index: u32) -> PyResult<String> {
     let wallet = taproot_wallet()?;
@@ -207,7 +237,7 @@ fn drain_wallet_inner(
         .assume_checked();
 
     // Instantiate the BitcoinD client
-    let client = new_client(
+    let client = new_bitcoind_client(
         bitcoind_url,
         None,
         Some(bitcoind_user),
@@ -218,7 +248,7 @@ fn drain_wallet_inner(
     let fee_rate = FeeRate::from_sat_per_vb(2).expect("valid fee rate");
 
     // Before signing the transaction, we need to sync the wallet with bitcoind
-    sync_wallet(&mut wallet, client)?;
+    sync_wallet(&mut wallet, &client)?;
 
     let mut psbt = wallet
         .build_tx()
@@ -292,6 +322,15 @@ mod tests {
     }
 
     #[test]
+    fn unspendable_address() {
+        let address = super::unspendable_address();
+        assert_eq!(
+            address,
+            "bcrt1plh4vmrc7ejjt66d8rj5nx8hsvslw9ps9rp3a0v7kzq37ekt5lggskf39fp"
+        );
+    }
+
+    #[test]
     fn taproot_wallet() {
         let mut wallet = super::taproot_wallet().unwrap();
 
@@ -306,6 +345,27 @@ mod tests {
             .to_string();
         let expected = "bcrt1pz449kexzydh2kaypatup5ultru3ej284t6eguhnkn6wkhswt0l7q3a7j76";
         assert_eq!(change_address, expected);
+    }
+
+    #[test]
+    fn bridge_wallet() {
+        let bridge_pubkey = XOnlyPublicKey::from_slice(&hex!(
+            "be27fa8b1f5278faf82cab8da23e8761f8f9bd5d5ebebbb37e0e12a70d92dd16"
+        ))
+        .unwrap();
+
+        let recovery_address = "bcrt1pz449kexzydh2kaypatup5ultru3ej284t6eguhnkn6wkhswt0l7q3a7j76"
+            .parse::<Address<_>>()
+            .unwrap()
+            .assume_checked();
+
+        let mut wallet = super::bridge_wallet(bridge_pubkey, recovery_address).unwrap();
+
+        let address = wallet
+            .reveal_next_address(KeychainKind::External)
+            .to_string();
+        let expected = "bcrt1p5xnureuyyffay9w3atdfpwn3f9pgjskrk3gjscvf6rtp6ljvannqvrem7v";
+        assert_eq!(address, expected);
     }
 
     #[test]

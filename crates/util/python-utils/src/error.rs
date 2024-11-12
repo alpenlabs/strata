@@ -15,6 +15,9 @@ pub(crate) enum Error {
     /// Invalid PublicKey
     PublicKey,
 
+    /// Invalid Outpoint.
+    OutPoint,
+
     /// Not a Taproot address.
     NotTaprootAddress,
 
@@ -40,6 +43,7 @@ impl From<Error> for PyErr {
                 PyErr::new::<PyTypeError, _>("Invalid X-only public key".to_owned())
             }
             Error::PublicKey => PyErr::new::<PyTypeError, _>("Invalid public key".to_owned()),
+            Error::OutPoint => PyErr::new::<PyTypeError, _>("Invalid outpoint".to_owned()),
             Error::NotTaprootAddress => {
                 PyErr::new::<PyTypeError, _>("Not a P2TR address".to_owned())
             }

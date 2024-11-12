@@ -22,7 +22,7 @@ class BridgeDepositHappyTest(flexitest.Test):
     """
 
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env(BasicEnvConfig(101))
+        ctx.set_env(BasicEnvConfig(pre_generate_blocks=101))
         self.logger = get_logger("BridgeDepositHappyTest")
 
     def main(self, ctx: flexitest.RunContext):
