@@ -2,6 +2,7 @@ pub mod bridge;
 pub mod bridge_duty;
 pub mod bridge_duty_index;
 pub mod bridge_relay;
+pub mod chainstate;
 pub mod checkpoint;
 pub mod inscription;
 pub mod l1tx_broadcast;
