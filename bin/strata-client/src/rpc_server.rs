@@ -11,7 +11,9 @@ use bitcoin::{
 use futures::TryFutureExt;
 use jsonrpsee::core::RpcResult;
 use strata_bridge_relay::relayer::RelayerHandle;
-use strata_btcio::{broadcaster::L1BroadcastHandle, writer::InscriptionHandle};
+use strata_btcio::{
+    broadcaster::L1BroadcastHandle, rpc::traits::Reader, writer::InscriptionHandle,
+};
 use strata_consensus_logic::{
     checkpoint::CheckpointHandle, l1_handler::verify_proof, sync_manager::SyncManager,
 };
@@ -775,5 +777,11 @@ impl StrataSequencerApiServer for SequencerServerImpl {
             .get_tx_status(id)
             .await
             .map_err(|e| Error::Other(e.to_string()))?)
+    }
+
+    #[doc = " Invalidates a block by its hash."]
+    async fn invalidate_block(&self, block_hash: HexBytes) -> RpcResult<()> {
+        let block_hash = hex::encode(block_hash.0);
+        todo!();
     }
 }

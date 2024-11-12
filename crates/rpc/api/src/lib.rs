@@ -153,4 +153,8 @@ pub trait StrataSequencerApi {
 
     #[method(name = "strata_getTxStatus")]
     async fn get_tx_status(&self, txid: HexBytes32) -> RpcResult<Option<L1TxStatus>>;
+
+    /// Invalidates a block by its hash.
+    #[method(name = "strataadmin_invalidateBlock")]
+    async fn invalidate_block(&self, block_hash: HexBytes) -> RpcResult<()>;
 }
