@@ -51,16 +51,16 @@ pub struct Chainstate {
 // TODO: FIXME: Note that this is used as a temporary solution for the state root calculation
 // It should be replaced once we swap out Chainstate's type definitions with SSZ type definitions
 // which defines all of this more rigorously
-#[derive(BorshSerialize)]
-struct HashedChainstate {
-    last_block: Buf32,
-    slot: u64,
-    epoch: u64,
-    l1_state_hash: Buf32,
-    pending_withdraws_hash: Buf32,
-    exec_env_hash: Buf32,
-    operators_hash: Buf32,
-    deposits_hash: Buf32,
+#[derive(BorshSerialize, Clone, Copy)]
+pub struct HashedChainState {
+    pub last_block: Buf32,
+    pub slot: u64,
+    pub epoch: u64,
+    pub l1_state_hash: Buf32,
+    pub pending_withdraws_hash: Buf32,
+    pub exec_env_hash: Buf32,
+    pub operators_hash: Buf32,
+    pub deposits_hash: Buf32,
 }
 
 impl Chainstate {
