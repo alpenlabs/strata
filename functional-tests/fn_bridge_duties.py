@@ -7,6 +7,7 @@ from bitcoinlib.services.bitcoind import BitcoindClient
 from constants import DEFAULT_ROLLUP_PARAMS, SEQ_PUBLISH_BATCH_INTERVAL_SECS
 from entry import BasicEnvConfig
 from utils import broadcast_tx, get_logger
+from strata_utils import get_address
 
 
 @flexitest.register
@@ -26,7 +27,7 @@ class BridgeDutiesTest(flexitest.Test):
         seqrpc = seq.create_rpc()
         btcrpc: BitcoindClient = btc.create_rpc()
 
-        addr = btcrpc.proxy.getnewaddress("", "bech32m")
+        addr = get_address(0)
         fees_in_btc = 0.01
         sats_per_btc = 10**8
         amount_to_send = DEFAULT_ROLLUP_PARAMS["deposit_amount"] / sats_per_btc + fees_in_btc
@@ -52,8 +53,6 @@ class BridgeDutiesTest(flexitest.Test):
 
                 # add robustness by spreading out requests across blocks
                 self.logger.debug(f"sent deposit request #{j} with txid = {txid} to block #{i}")
-
-            btcrpc.proxy.generatetoaddress(1, addr)
 
         time.sleep(SEQ_PUBLISH_BATCH_INTERVAL_SECS)
 
