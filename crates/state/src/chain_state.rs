@@ -51,7 +51,7 @@ pub struct ChainState {
 // TODO: FIXME: Note that this is used as a temporary solution for the state root calculation
 // It should be replaced once we swap out ChainState's type definitions with SSZ type definitions
 // which defines all of this more rigorously
-#[derive(BorshSerialize, Clone, Copy)]
+#[derive(BorshSerialize, BorshDeserialize, Clone, Copy)]
 pub struct HashedChainState {
     pub last_block: Buf32,
     pub slot: u64,
