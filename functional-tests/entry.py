@@ -7,12 +7,12 @@ from math import ceil
 from typing import Optional
 
 import flexitest
+from strata_utils import get_address
 
 import factory
 import net_settings
 from constants import *
 from utils import *
-from strata_utils import get_address
 
 
 class BasicLiveEnv(flexitest.LiveEnv):
@@ -26,7 +26,7 @@ class BasicLiveEnv(flexitest.LiveEnv):
             "deada00{:04X}dca3ebeefdeadf001900dca3ebeef".format(x) for x in range(16**4)
         )
         self._btc_address_idx = 0
-    
+
     def gen_el_address(self) -> str:
         """
         Generates a unique EL address to be used across tests.
