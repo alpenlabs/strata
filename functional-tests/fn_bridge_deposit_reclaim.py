@@ -91,7 +91,7 @@ class BridgeDepositReclaimTest(flexitest.Test):
         # DRT same block
         txid_drt = self.make_drt(ctx, el_address, bridge_pk, maturity=0)
         self.logger.debug(f"Deposit Request Transaction: {txid_drt}")
-        time.sleep(0.5)
+        time.sleep(1)
 
         # Now we need to generate a bunch of blocks
         # since they will be able to spend the DRT output.
