@@ -204,7 +204,7 @@ pub fn process_event<D: Database>(
 
             debug!(?chainstate, "Chainstate for new tip block");
             // height of last matured L1 block in chain state
-            let chs_last_buried = chainstate.l1_view().safe_height().saturating_sub(1);
+            let chs_last_buried = chainstate.epoch_state().safe_block_idx().saturating_sub(1);
             // buried height in client state
             let cls_last_buried = state.l1_view().buried_l1_height();
 
