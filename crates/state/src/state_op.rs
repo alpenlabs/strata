@@ -13,7 +13,7 @@ use tracing::*;
 use crate::{
     bridge_ops::{DepositIntent, WithdrawalIntent},
     bridge_state::{DepositState, DispatchCommand, DispatchedState},
-    chain_state::Chainstate,
+    chain_state::{Chainstate, EpochState},
     header::L2Header,
     id::L2BlockId,
     l1::{self, L1MaturationEntry},
@@ -21,7 +21,7 @@ use crate::{
 };
 
 #[derive(Clone, Debug, PartialEq, BorshDeserialize, BorshSerialize)]
-pub enum StateOp {
+enum StateOp {
     /// Replace the chain state with something completely different.
     Replace(Box<Chainstate>),
 
@@ -58,20 +58,22 @@ pub enum StateOp {
 /// Collection of writes we're making to the state.
 #[derive(Clone, Debug, PartialEq, BorshDeserialize, BorshSerialize)]
 pub struct WriteBatch {
+    new_toplevel_chain_state: Chainstate,
+    new_toplevel_epoch_state: Option<EpochState>,
     ops: Vec<StateOp>,
 }
 
 impl WriteBatch {
-    pub fn new(ops: Vec<StateOp>) -> Self {
-        Self { ops }
+    pub fn new(tl_chs: Chainstate, tl_es: Option<EpochState>, ops: Vec<StateOp>) -> Self {
+        Self {
+            new_toplevel_chain_state: tl_chs,
+            new_toplevel_epoch_state: tl_es,
+            ops,
+        }
     }
 
     pub fn new_replace(new_state: Chainstate) -> Self {
-        Self::new(vec![StateOp::Replace(Box::new(new_state))])
-    }
-
-    pub fn new_empty() -> Self {
-        Self::new(Vec::new())
+        Self::new(new_state, None, Vec::new())
     }
 }
 
@@ -102,7 +104,7 @@ fn apply_op_to_chainstate(op: &StateOp, state: &mut Chainstate) {
 
         StateOp::RevertL1Height(to_height) => {
             debug!(%to_height, "Obtained RevertL1Height Operation");
-            let mqueue = &mut state.l1_state.maturation_queue;
+            /*let mqueue = &mut state.l1_state.maturation_queue;
             let back_idx = mqueue.back_idx().expect("stateop: maturation queue empty");
 
             // Do some bookkeeping to make sure it's safe to do this.
@@ -119,16 +121,16 @@ fn apply_op_to_chainstate(op: &StateOp, state: &mut Chainstate) {
             for _ in 0..n_drop {
                 // This expect should never trigger.
                 mqueue.pop_back().expect("stateop: unable to revert more");
-            }
+            }*/
         }
 
         StateOp::AcceptL1Block(entry) => {
-            let mqueue = &mut state.l1_state.maturation_queue;
-            mqueue.push_back(entry.clone());
+            /*let mqueue = &mut state.l1_state.maturation_queue;
+            mqueue.push_back(entry.clone());*/
         }
 
         StateOp::MatureL1Block(maturing_idx) => {
-            let operators: Vec<_> = state.operator_table().indices().collect();
+            /*let operators: Vec<_> = state.operator_table().indices().collect();
             let mqueue = &mut state.l1_state.maturation_queue;
             let deposits = state.exec_env_state.pending_deposits_mut();
 
@@ -153,7 +155,7 @@ fn apply_op_to_chainstate(op: &StateOp, state: &mut Chainstate) {
                         .add_deposits(&deposit_info.outpoint, &operators, amt)
                 }
             }
-            state.l1_state.safe_block = header_record;
+            state.l1_state.safe_block = header_record;*/
         }
 
         StateOp::SubmitWithdrawal(withdrawal) => {
@@ -180,7 +182,7 @@ fn apply_op_to_chainstate(op: &StateOp, state: &mut Chainstate) {
         }
 
         StateOp::CreateOperator(spk, wpk) => {
-            state.operator_table.insert(*spk, *wpk);
+            //state.operator_table.insert(*spk, *wpk);
         }
 
         StateOp::DispatchWithdrawal(deposit_idx, op_idx, cmd, exec_height) => {
@@ -217,32 +219,41 @@ fn apply_op_to_chainstate(op: &StateOp, state: &mut Chainstate) {
 /// be made generic over a state provider that exposes access to that and then
 /// the `WriteBatch` will include writes that can be made to that.
 pub struct StateCache {
-    original_state: Chainstate,
-    state: Chainstate,
+    original_ch_state: Chainstate,
+    original_epoch_state: EpochState,
+    new_ch_state: Chainstate,
+    new_epoch_state: Option<EpochState>,
     write_ops: Vec<StateOp>,
 }
 
 impl StateCache {
-    pub fn new(state: Chainstate) -> Self {
+    pub fn new(ch_state: Chainstate, epoch_state: EpochState) -> Self {
         Self {
-            original_state: state.clone(),
-            state,
+            original_ch_state: ch_state.clone(),
+            original_epoch_state: epoch_state.clone(),
+            new_ch_state: ch_state,
+            new_epoch_state: None,
             write_ops: Vec::new(),
         }
     }
 
     pub fn state(&self) -> &Chainstate {
-        &self.state
+        &self.new_ch_state
     }
 
     pub fn original_state(&self) -> &Chainstate {
-        &self.original_state
+        &self.original_ch_state
     }
 
     /// Finalizes the changes made to the state, exporting it and a write batch
     /// that can be applied to the previous state to produce it.
     pub fn finalize(self) -> (Chainstate, WriteBatch) {
-        (self.state, WriteBatch::new(self.write_ops))
+        let wb = WriteBatch::new(
+            self.new_ch_state.clone(),
+            self.new_epoch_state,
+            self.write_ops,
+        );
+        (self.new_ch_state, wb)
     }
 
     /// Returns if the state cache is empty, meaning that no writes have been
@@ -255,7 +266,7 @@ impl StateCache {
     /// list.
     fn merge_ops(&mut self, ops: impl Iterator<Item = StateOp>) {
         for op in ops {
-            apply_op_to_chainstate(&op, &mut self.state);
+            apply_op_to_chainstate(&op, &mut self.new_ch_state);
             self.write_ops.push(op);
         }
     }
