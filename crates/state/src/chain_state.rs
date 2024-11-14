@@ -7,7 +7,6 @@ use crate::{
     bridge_state::{self, DepositsTable, OperatorTable},
     exec_env::{self, ExecEnvState},
     genesis::GenesisStateData,
-    l1::{self, L1ViewState},
     prelude::*,
     state_queue,
 };
@@ -31,8 +30,9 @@ pub struct Chainstate {
     /// checkpoint 0, moving us into checkpoint period 1.
     pub(crate) epoch: u64,
 
-    /// Rollup's view of L1 state.
-    pub(crate) l1_state: l1::L1ViewState,
+    /// Epoch-level state that we only change as of the last block of an epoch.
+    // TODO this might be reworked to be managed separately
+    pub(crate) epoch_state: EpochState,
 
     /// Pending withdrawals that have been initiated but haven't been sent out.
     pub(crate) pending_withdraws: StateQueue<bridge_ops::WithdrawalIntent>,
@@ -40,28 +40,22 @@ pub struct Chainstate {
     /// Execution environment state.  This is just for the single EE we support
     /// right now.
     pub(crate) exec_env_state: exec_env::ExecEnvState,
-
-    /// Operator table we store registered operators for.
-    pub(crate) operator_table: bridge_state::OperatorTable,
-
-    /// Deposits table tracking each deposit's state.
-    pub(crate) deposits_table: bridge_state::DepositsTable,
 }
 
-/// Hashed Chain State. This is used to compute the state root of the [`Chainstate`]
+/// Toplevel hash commitment structure for chain state.
+///
+/// Used transiently to compute the state root of the [`ChainState`].
 // TODO: FIXME: Note that this is used as a temporary solution for the state root calculation
 // It should be replaced once we swap out Chainstate's type definitions with SSZ type definitions
 // which defines all of this more rigorously
 #[derive(BorshSerialize, BorshDeserialize, Clone, Copy)]
-pub struct HashedChainState {
-    pub last_block: Buf32,
-    pub slot: u64,
-    pub epoch: u64,
-    pub l1_state_hash: Buf32,
-    pub pending_withdraws_hash: Buf32,
-    pub exec_env_hash: Buf32,
-    pub operators_hash: Buf32,
-    pub deposits_hash: Buf32,
+struct HashedChainstate {
+    last_block: Buf32,
+    slot: u64,
+    epoch: u64,
+    epoch_state: Buf32,
+    pending_withdraws_hash: Buf32,
+    exec_env_hash: Buf32,
 }
 
 impl Chainstate {
@@ -71,11 +65,9 @@ impl Chainstate {
             last_block: gdata.genesis_blkid(),
             slot: 0,
             epoch: 0,
-            l1_state: gdata.l1_state().clone(),
+            epoch_state: EpochState::from_genesis(gdata),
             pending_withdraws: StateQueue::new_empty(),
             exec_env_state: gdata.exec_state().clone(),
-            operator_table: gdata.operator_table().clone(),
-            deposits_table: bridge_state::DepositsTable::new_empty(),
         }
     }
 
@@ -91,10 +83,6 @@ impl Chainstate {
         self.last_block
     }
 
-    pub fn l1_view(&self) -> &L1ViewState {
-        &self.l1_state
-    }
-
     pub fn epoch(&self) -> u64 {
         self.epoch
     }
@@ -106,11 +94,9 @@ impl Chainstate {
             last_block: self.last_block.into(),
             slot: self.slot,
             epoch: self.epoch,
-            l1_state_hash: compute_borsh_hash(&self.l1_state),
+            epoch_state: compute_borsh_hash(&self.epoch_state),
             pending_withdraws_hash: compute_borsh_hash(&self.pending_withdraws),
             exec_env_hash: compute_borsh_hash(&self.exec_env_state),
-            operators_hash: compute_borsh_hash(&self.operator_table),
-            deposits_hash: compute_borsh_hash(&self.deposits_table),
         };
         compute_borsh_hash(&hashed_state)
     }
@@ -124,15 +110,15 @@ impl Chainstate {
     }
 
     pub fn operator_table(&self) -> &OperatorTable {
-        &self.operator_table
+        &self.epoch_state.operator_table
     }
 
     pub fn deposits_table(&self) -> &DepositsTable {
-        &self.deposits_table
+        &self.epoch_state.deposits_table
     }
 
     pub fn deposits_table_mut(&mut self) -> &mut DepositsTable {
-        &mut self.deposits_table
+        &mut self.epoch_state.deposits_table
     }
 
     pub fn exec_env_state(&self) -> &ExecEnvState {
@@ -154,6 +140,47 @@ impl<'a> Arbitrary<'a> for Chainstate {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         let gdata = GenesisStateData::arbitrary(u)?;
         Ok(Self::from_genesis(&gdata))
+    }
+}
+
+/// Toplevel epoch state that only changes as of the last block of the epoch.
+#[derive(Clone, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
+pub struct EpochState {
+    /// Last L1 block ID that we've processed.
+    pub(crate) last_l1_blockid: L1BlockId,
+
+    /// Last L1 block number that we've processed.
+    pub(crate) last_l1_block_idx: u64,
+
+    /// Blkid of the last block in the previous epoch (which would be
+    /// `cur_epoch - 1`).
+    pub(crate) last_epoch_final_block: L2BlockId,
+
+    /// Operator table we store registered operators for.
+    pub(crate) operator_table: bridge_state::OperatorTable,
+
+    /// Deposits table tracking each deposit's state.
+    pub(crate) deposits_table: bridge_state::DepositsTable,
+}
+
+impl EpochState {
+    pub fn from_genesis(gd: &GenesisStateData) -> Self {
+        Self {
+            last_l1_blockid: *gd.l1_state().safe_block().blkid(),
+            // FIXME make this accurately reflect the epoch level state
+            last_l1_block_idx: 0,
+            last_epoch_final_block: Buf32::zero().into(),
+            operator_table: gd.operator_table().clone(),
+            deposits_table: bridge_state::DepositsTable::new_empty(),
+        }
+    }
+
+    /// Returns if we're in the genesis epoch.  This is identified by the "last
+    /// epoch's" final block being the zero blkid.
+    pub fn is_genesis_epoch(&self) -> bool {
+        // FIXME maybe this should have a `.is_zero()`?
+        let b: Buf32 = self.last_epoch_final_block.into();
+        b.is_zero()
     }
 }
 
