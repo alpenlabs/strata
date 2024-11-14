@@ -245,6 +245,28 @@ impl StateCache {
         &self.original_ch_state
     }
 
+    /// Returns a ref to the current epoch-level state.
+    pub fn epoch_state(&self) -> &EpochState {
+        if let Some(s) = &self.new_epoch_state {
+            s
+        } else {
+            &self.original_epoch_state
+        }
+    }
+
+    /// Returns a mut ref to the epoch state, cloning if we haven't made a write
+    /// yet.
+    // TODO should this not happen automatically so that we don't try to edit
+    // the epoch state?
+    fn epoch_state_mut(&mut self) -> &mut EpochState {
+        self.new_epoch_state = Some(self.original_epoch_state.clone());
+        self.new_epoch_state.as_mut().unwrap()
+    }
+
+    pub fn l1_safe_height(&self) -> u64 {
+        self.epoch_state().last_l1_block_idx
+    }
+
     /// Finalizes the changes made to the state, exporting it and a write batch
     /// that can be applied to the previous state to produce it.
     pub fn finalize(self) -> (Chainstate, WriteBatch) {

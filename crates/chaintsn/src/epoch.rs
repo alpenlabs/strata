@@ -3,8 +3,13 @@
 use rand_core::{RngCore, SeedableRng};
 use strata_primitives::params::RollupParams;
 use strata_state::{
-    block::L1Segment, bridge_ops::WithdrawalIntent, bridge_state::*, id::L2BlockId, l1::L1BlockId,
+    block::L1Segment,
+    bridge_ops::{DepositIntent, WithdrawalIntent},
+    bridge_state::*,
+    id::L2BlockId,
+    l1::{L1BlockId, L1MaturationEntry},
     state_op::*,
+    tx::ProtocolOperation,
 };
 
 use crate::{errors::TsnError, slot_rng::SlotRng};
@@ -26,10 +31,10 @@ pub fn process_epoch(
     params: &RollupParams,
 ) -> Result<(), TsnError> {
     // FIXME make this actually init correctly
-    let mut rng = SlotRng::from_seed(epoch_data.final_l1_blockid.into());
+    let mut rng = SlotRng::from_seed(*epoch_data.final_l1_blockid.as_ref());
 
     // Assign withdrawals to deposits.
-    process_l1_view_update(state, &mut rng, params)?;
+    process_l1_view_update(state, &epoch_data.l1_segment, params)?;
     process_deposit_updates(state, &mut rng, params)?;
 
     Ok(())
@@ -41,56 +46,39 @@ fn process_l1_view_update(
     l1seg: &L1Segment,
     params: &RollupParams,
 ) -> Result<(), TsnError> {
-    let l1v = state.state().l1_view();
     // Accept new blocks, comparing the tip against the current to figure out if
     // we need to do a reorg.
     // FIXME this should actually check PoW, it just does it based on block heights
     if !l1seg.new_payloads().is_empty() {
-        let l1v = state.state().l1_view();
-
         // Validate the new blocks actually extend the tip.  This is what we have to tweak to make
         // more complicated to check the PoW.
         let new_tip_block = l1seg.new_payloads().last().unwrap();
         let new_tip_height = new_tip_block.idx();
         let first_new_block_height = new_tip_height - l1seg.new_payloads().len() as u64 + 1;
-        let implied_pivot_height = first_new_block_height - 1;
-        let cur_tip_height = l1v.tip_height();
-        let cur_safe_height = l1v.safe_height();
+        let cur_safe_height = state.l1_safe_height();
 
         // Check that the new chain is actually longer, if it's shorter then we didn't do anything.
         // TODO This probably needs to be adjusted for PoW.
-        if new_tip_height < cur_tip_height {
+        if new_tip_height < cur_safe_height {
             return Err(TsnError::L1SegNotExtend);
         }
 
-        // Now make sure that the block hashes all connect up sensibly.
-        let pivot_idx = implied_pivot_height;
-        let pivot_blkid = l1v
-            .maturation_queue()
-            .get_absolute(pivot_idx)
-            .map(|b| b.blkid())
-            .unwrap_or_else(|| l1v.safe_block().blkid());
-        check_chain_integrity(pivot_idx, pivot_blkid, l1seg.new_payloads())?;
-
-        // Okay now that we've figured that out, let's actually how to actually do the reorg.
-        if pivot_idx > params.horizon_l1_height && pivot_idx < cur_tip_height {
-            state.revert_l1_view_to(pivot_idx);
-        }
-
-        let maturation_threshold = params.l1_reorg_safe_depth as u64;
+        // TODO make sure that the block hashes all connect up sensibly.
 
         for e in l1seg.new_payloads() {
-            let ment = L1MaturationEntry::from(e.clone());
-            state.apply_l1_block_entry(ment.clone());
-        }
+            // TODO maybe consolidate these to have ops for each tx
 
-        let new_matured_l1_height = max(
-            new_tip_height.saturating_sub(maturation_threshold),
-            cur_safe_height,
-        );
+            for tx in e.deposit_update_txs() {
+                if let ProtocolOperation::Deposit(deposit_info) = tx.tx().protocol_operation() {
+                    let intent = DepositIntent::new(deposit_info.amt, deposit_info.address.clone());
+                    // TODO Include the deposit intent.
+                    // TODO Create deposit entry.
+                }
+            }
 
-        for idx in (cur_safe_height..=new_matured_l1_height) {
-            state.mature_l1_block(idx);
+            for tx in e.da_txs() {
+                // TODO make all this work
+            }
         }
     }
 
@@ -116,7 +104,7 @@ fn process_deposit_updates(
     // This determines how long we'll keep trying to service a withdrawal before
     // updating it or doing something else with it.  This is also what we use
     // when we decide to reset an assignment.
-    let cur_block_height = state.state().l1_view().safe_height();
+    let cur_block_height = state.l1_safe_height();
     let new_exec_height = cur_block_height as u32 + params.dispatch_assignment_dur;
 
     // Sequence in which we assign the operators to the deposits.  This is kinda

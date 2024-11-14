@@ -36,6 +36,7 @@ use crate::{
 /// This operates on a state cache that's expected to be empty, panics
 /// otherwise.  Does not check the `state_root` in the header for correctness,
 /// so that can be unset so it can be use during block assembly.
+// TODO include epoch state arg
 pub fn process_block(
     state: &mut StateCache,
     header: &impl L2Header,
@@ -54,7 +55,6 @@ pub fn process_block(
     state.set_cur_header(header);
 
     // Go through each stage and play out the operations it has.
-    process_l1_view_update(state, body.l1_segment(), params)?;
     process_execution_update(state, body.exec_segment().update())?;
 
     Ok(())
@@ -69,44 +69,6 @@ fn compute_init_slot_rng(state: &StateCache) -> SlotRng {
     // Just take the last block's slot.
     let blkid_buf = *state.state().chain_tip_blockid().as_ref();
     SlotRng::from_seed(blkid_buf)
-}
-
-/// Checks the attested block IDs and parent blkid connections in new blocks.
-// TODO unit tests
-fn check_chain_integrity(
-    pivot_idx: u64,
-    pivot_blkid: &L1BlockId,
-    new_blocks: &[l1::L1HeaderPayload],
-) -> Result<(), TsnError> {
-    // Iterate over all the blocks in the new list and make sure they match.
-    for (i, e) in new_blocks.iter().enumerate() {
-        let h = e.idx();
-        assert_eq!(pivot_idx + 1 + i as u64, h);
-
-        // Make sure the hash matches.
-        let computed_id = L1BlockId::compute_from_header_buf(e.header_buf());
-        let attested_id = e.record().blkid();
-        if computed_id != *attested_id {
-            return Err(TsnError::L1BlockIdMismatch(h, *attested_id, computed_id));
-        }
-
-        // Make sure matches parent.
-        // TODO FIXME I think my impl for parent_blkid is incorrect, fix this later
-        /*let blk_parent = e.record().parent_blkid();
-        if i == 0 {
-            if blk_parent != *pivot_blkid {
-                return Err(TsnError::L1BlockParentMismatch(h, blk_parent, *pivot_blkid));
-            }
-        } else {
-            let parent_payload = &new_blocks[i - 1];
-            let parent_id = parent_payload.record().blkid();
-            if blk_parent != *parent_id {
-                return Err(TsnError::L1BlockParentMismatch(h, blk_parent, *parent_id));
-            }
-        }*/
-    }
-
-    Ok(())
 }
 
 /// Process an execution update, to change an exec env state.

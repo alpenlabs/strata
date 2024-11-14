@@ -256,7 +256,7 @@ fn do_startup_checks(
 
     // Check that we can connect to bitcoin client and block we believe to be matured in L1 is
     // actually present
-    let safe_l1blockid = last_chain_state.l1_view().safe_block().blkid();
+    let safe_l1blockid = last_chain_state.epoch_state().safe_block_blkid();
     let block_hash = BlockHash::from_slice(safe_l1blockid.as_ref())?;
 
     match handle.block_on(bitcoin_client.get_block(&block_hash)) {

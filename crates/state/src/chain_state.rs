@@ -42,22 +42,6 @@ pub struct Chainstate {
     pub(crate) exec_env_state: exec_env::ExecEnvState,
 }
 
-/// Toplevel hash commitment structure for chain state.
-///
-/// Used transiently to compute the state root of the [`ChainState`].
-// TODO: FIXME: Note that this is used as a temporary solution for the state root calculation
-// It should be replaced once we swap out Chainstate's type definitions with SSZ type definitions
-// which defines all of this more rigorously
-#[derive(BorshSerialize, BorshDeserialize, Clone, Copy)]
-struct HashedChainstate {
-    last_block: Buf32,
-    slot: u64,
-    epoch: u64,
-    epoch_state: Buf32,
-    pending_withdraws_hash: Buf32,
-    exec_env_hash: Buf32,
-}
-
 impl Chainstate {
     // TODO remove genesis blkid since apparently we don't need it anymore
     pub fn from_genesis(gdata: &GenesisStateData) -> Self {
@@ -87,18 +71,8 @@ impl Chainstate {
         self.epoch
     }
 
-    /// Computes a commitment to a the chainstate.  This is super expensive
-    /// because it does a bunch of hashing.
-    pub fn compute_state_root(&self) -> Buf32 {
-        let hashed_state = HashedChainState {
-            last_block: self.last_block.into(),
-            slot: self.slot,
-            epoch: self.epoch,
-            epoch_state: compute_borsh_hash(&self.epoch_state),
-            pending_withdraws_hash: compute_borsh_hash(&self.pending_withdraws),
-            exec_env_hash: compute_borsh_hash(&self.exec_env_state),
-        };
-        compute_borsh_hash(&hashed_state)
+    pub fn epoch_state(&self) -> &EpochState {
+        &self.epoch_state
     }
 
     pub fn pending_withdrawals(&self) -> &[WithdrawalIntent] {
@@ -124,6 +98,20 @@ impl Chainstate {
     pub fn exec_env_state(&self) -> &ExecEnvState {
         &self.exec_env_state
     }
+
+    /// Computes a commitment to a the chainstate.  This is super expensive
+    /// because it does a bunch of hashing.
+    pub fn compute_state_root(&self) -> Buf32 {
+        let hashed_state = HashedChainState {
+            last_block: self.last_block.into(),
+            slot: self.slot,
+            epoch: self.epoch,
+            epoch_state: compute_borsh_hash(&self.epoch_state),
+            pending_withdraws_hash: compute_borsh_hash(&self.pending_withdraws),
+            exec_env_hash: compute_borsh_hash(&self.exec_env_state),
+        };
+        compute_borsh_hash(&hashed_state)
+    }
 }
 
 // NOTE: This is a helper setter that is supposed to be used only in tests.
@@ -143,11 +131,27 @@ impl<'a> Arbitrary<'a> for Chainstate {
     }
 }
 
+/// Toplevel hash commitment structure for chain state.
+///
+/// Used transiently to compute the state root of the [`ChainState`].
+// TODO: FIXME: Note that this is used as a temporary solution for the state root calculation
+// It should be replaced once we swap out ChainState's type definitions with SSZ type definitions
+// which defines all of this more rigorously
+#[derive(BorshSerialize)]
+struct HashedChainState {
+    last_block: Buf32,
+    slot: u64,
+    epoch: u64,
+    epoch_state: Buf32,
+    pending_withdraws_hash: Buf32,
+    exec_env_hash: Buf32,
+}
+
 /// Toplevel epoch state that only changes as of the last block of the epoch.
 #[derive(Clone, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
 pub struct EpochState {
     /// Last L1 block ID that we've processed.
-    pub(crate) last_l1_blockid: L1BlockId,
+    pub(crate) last_l1_blkid: L1BlockId,
 
     /// Last L1 block number that we've processed.
     pub(crate) last_l1_block_idx: u64,
@@ -166,13 +170,21 @@ pub struct EpochState {
 impl EpochState {
     pub fn from_genesis(gd: &GenesisStateData) -> Self {
         Self {
-            last_l1_blockid: *gd.l1_state().safe_block().blkid(),
+            last_l1_blkid: *gd.l1_state().safe_block().blkid(),
             // FIXME make this accurately reflect the epoch level state
             last_l1_block_idx: 0,
             last_epoch_final_block: Buf32::zero().into(),
             operator_table: gd.operator_table().clone(),
             deposits_table: bridge_state::DepositsTable::new_empty(),
         }
+    }
+
+    pub fn safe_block_blkid(&self) -> &L1BlockId {
+        &self.last_l1_blkid
+    }
+
+    pub fn safe_block_idx(&self) -> u64 {
+        self.last_l1_block_idx
     }
 
     /// Returns if we're in the genesis epoch.  This is identified by the "last
