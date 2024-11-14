@@ -89,8 +89,12 @@ clean-cargo: ## cargo clean
 clean-docker-data: ## Remove docker data files inside /docker/.data
 	rm -rf $(DOCKER_DIR)/$(DOCKER_DATADIR) 2>/dev/null
 
+.PHONY: clean-poetry
+clean-poetry: ## Remove poetry virtual environment
+	cd $(FUNCTIONAL_TESTS_DIR) && rm -rf .venv 2>/dev/null
+
 .PHONY: clean
-clean: clean-dd clean-docker-data clean-cargo ## clean functional tests directory, cargo clean, clean docker data
+clean: clean-dd clean-docker-data clean-cargo clean-poetry ## clean functional tests directory, cargo clean, clean docker data, clean poetry virtual environment
 	@echo "\n\033[36m======== CLEAN_COMPLETE ========\033[0m\n"
 
 .PHONY: docker-up
