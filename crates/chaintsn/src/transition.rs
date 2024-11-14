@@ -227,7 +227,7 @@ mod tests {
     };
     use strata_test_utils::{l2::gen_params, ArbitraryGenerator};
 
-    use super::{next_rand_op_pos, process_block};
+    use super::process_block;
     use crate::{slot_rng::SlotRng, transition::process_l1_view_update};
 
     #[test]
