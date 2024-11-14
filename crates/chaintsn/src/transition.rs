@@ -71,68 +71,6 @@ fn compute_init_slot_rng(state: &StateCache) -> SlotRng {
     SlotRng::from_seed(blkid_buf)
 }
 
-/// Update our view of the L1 state, playing out downstream changes from that.
-fn process_l1_view_update(
-    state: &mut StateCache,
-    l1seg: &L1Segment,
-    params: &RollupParams,
-) -> Result<(), TsnError> {
-    let l1v = state.state().l1_view();
-    // Accept new blocks, comparing the tip against the current to figure out if
-    // we need to do a reorg.
-    // FIXME this should actually check PoW, it just does it based on block heights
-    if !l1seg.new_payloads().is_empty() {
-        let l1v = state.state().l1_view();
-
-        // Validate the new blocks actually extend the tip.  This is what we have to tweak to make
-        // more complicated to check the PoW.
-        let new_tip_block = l1seg.new_payloads().last().unwrap();
-        let new_tip_height = new_tip_block.idx();
-        let first_new_block_height = new_tip_height - l1seg.new_payloads().len() as u64 + 1;
-        let implied_pivot_height = first_new_block_height - 1;
-        let cur_tip_height = l1v.tip_height();
-        let cur_safe_height = l1v.safe_height();
-
-        // Check that the new chain is actually longer, if it's shorter then we didn't do anything.
-        // TODO This probably needs to be adjusted for PoW.
-        if new_tip_height < cur_tip_height {
-            return Err(TsnError::L1SegNotExtend);
-        }
-
-        // Now make sure that the block hashes all connect up sensibly.
-        let pivot_idx = implied_pivot_height;
-        let pivot_blkid = l1v
-            .maturation_queue()
-            .get_absolute(pivot_idx)
-            .map(|b| b.blkid())
-            .unwrap_or_else(|| l1v.safe_block().blkid());
-        check_chain_integrity(pivot_idx, pivot_blkid, l1seg.new_payloads())?;
-
-        // Okay now that we've figured that out, let's actually how to actually do the reorg.
-        if pivot_idx > params.horizon_l1_height && pivot_idx < cur_tip_height {
-            state.revert_l1_view_to(pivot_idx);
-        }
-
-        let maturation_threshold = params.l1_reorg_safe_depth as u64;
-
-        for e in l1seg.new_payloads() {
-            let ment = L1MaturationEntry::from(e.clone());
-            state.apply_l1_block_entry(ment.clone());
-        }
-
-        let new_matured_l1_height = max(
-            new_tip_height.saturating_sub(maturation_threshold),
-            cur_safe_height,
-        );
-
-        for idx in (cur_safe_height..=new_matured_l1_height) {
-            state.mature_l1_block(idx);
-        }
-    }
-
-    Ok(())
-}
-
 /// Checks the attested block IDs and parent blkid connections in new blocks.
 // TODO unit tests
 fn check_chain_integrity(
