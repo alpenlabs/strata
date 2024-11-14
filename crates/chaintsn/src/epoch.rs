@@ -25,8 +25,7 @@ pub fn process_epoch(
     let mut rng = SlotRng::from_seed([0; 32]);
 
     // Assign withdrawals to deposits.
-    let ready_withdrawals = Vec::new();
-    process_deposit_updates(state, &ready_withdrawals, &mut rng, params)?;
+    process_deposit_updates(state, &mut rng, params)?;
 
     Ok(())
 }
@@ -39,7 +38,6 @@ pub fn process_epoch(
 /// * Cleans up deposits that have been handled and can be removed.
 fn process_deposit_updates(
     state: &mut StateCache,
-    ready_withdrawals: &[WithdrawalIntent],
     rng: &mut SlotRng,
     params: &RollupParams,
 ) -> Result<(), TsnError> {
@@ -75,7 +73,8 @@ fn process_deposit_updates(
         return Err(TsnError::NoOperators);
     }
 
-    let ops_seq = (0..ready_withdrawals.len())
+    let ready_withdrawals_cnt = state.state().pending_withdrawals().len() as u64;
+    let ops_seq = (0..ready_withdrawals_cnt)
         .map(|_| next_rand_op_pos(rng, num_operators))
         .collect::<Vec<_>>();
 
@@ -90,7 +89,10 @@ fn process_deposit_updates(
             .expect("chaintsn: inconsistent state");
         let deposit_idx = ent.idx();
 
-        let have_ready_intent = next_intent_to_assign < ready_withdrawals.len();
+        let next_intent_idx =
+            state.state().pending_withdrawals_queue().base_idx() + next_intent_to_assign;
+
+        let have_ready_intent = next_intent_to_assign < ready_withdrawals_cnt;
 
         match ent.deposit_state() {
             DepositState::Created(_) => {
@@ -100,8 +102,12 @@ fn process_deposit_updates(
             DepositState::Accepted => {
                 // If we have an intent to assign, we can dispatch it to this deposit.
                 if have_ready_intent {
-                    let intent = &ready_withdrawals[next_intent_to_assign];
-                    let op_idx = ops_seq[next_intent_to_assign % ops_seq.len()];
+                    let intent = &state
+                        .state()
+                        .pending_withdrawals_queue()
+                        .get_absolute(next_intent_idx)
+                        .expect("chaintsn: inconsistent state");
+                    let op_idx = ops_seq[next_intent_idx as usize % ops_seq.len()];
 
                     let outp = WithdrawOutput::new(*intent.dest_pk(), *intent.amt());
                     let cmd = DispatchCommand::new(vec![outp]);
@@ -155,7 +161,7 @@ fn process_deposit_updates(
     // Sanity check.  For devnet this should never fail since we should never be
     // able to withdraw more than was deposited, so we should never run out of
     // deposits to assign withdrawals to.
-    if next_intent_to_assign != ready_withdrawals.len() {
+    if next_intent_to_assign != ready_withdrawals_cnt {
         return Err(TsnError::InsufficientDepositsForIntents);
     }
 
