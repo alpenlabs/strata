@@ -13,12 +13,12 @@ pub(crate) mod rpc_server;
 
 use args::{Cli, OperationMode};
 use modes::{challenger, operator};
-use strata_common::logging;
+use strata_common::logging::{self, LoggerConfig};
 use tracing::info;
 
 #[tokio::main]
 async fn main() {
-    logging::init();
+    logging::init(LoggerConfig::with_base_name("strata-bridge-client"));
 
     let cli_args: Cli = argh::from_env();
 
