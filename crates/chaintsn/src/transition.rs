@@ -55,9 +55,7 @@ pub fn process_block(
 
     // Go through each stage and play out the operations it has.
     process_l1_view_update(state, body.l1_segment(), params)?;
-    let ready_withdrawals = process_execution_update(state, body.exec_segment().update())?;
-
-    // TODO put ready_withdrawals into the state
+    process_execution_update(state, body.exec_segment().update())?;
 
     Ok(())
 }
@@ -178,20 +176,15 @@ fn check_chain_integrity(
 /// This is meant to be kinda generic so we can reuse it across multiple exec
 /// envs if we decide to go in that direction.
 ///
-/// Note: As this is currently written, it assumes that the withdrawal state is
-/// correct, which means that the sequencer kinda just gets to decide what the
-/// withdrawals are.  Fortunately this is fine for now, since we're relying on
-/// operators to also check all the parts of the state transition themselves,
-/// including the EL payload itself.
-///
-/// Note: Currently this returns a ref to the withdrawal intents passed in the
-/// exec update, but really it might need to be a ref into the state cache.
-/// This will probably be substantially refactored in the future though.
+/// This also writes any withdrawals that are ready into the pending withdrawals
+/// queue, which will be assigned to deposits at the end of the epoch.
 fn process_execution_update<'u>(
     state: &mut StateCache,
     update: &'u exec_update::ExecUpdate,
-) -> Result<&'u [WithdrawalIntent], TsnError> {
-    // for all the ops, corresponding to DepositIntent, remove those DepositIntent the ExecEnvState
+) -> Result<(), TsnError> {
+    // for all the ops, corresponding to DepositIntent , remove those DepositIntent the ExecEnvState
+    let deposits = state.state().exec_env_state().pending_deposits();
+
     let applied_ops = update.input().applied_ops();
 
     let applied_deposit_intent_idx = applied_ops
@@ -202,11 +195,17 @@ fn process_execution_update<'u>(
         })
         .max();
 
+    // Consume new deposits.
     if let Some(intent_idx) = applied_deposit_intent_idx {
         state.consume_deposit_intent(intent_idx);
     }
 
-    Ok(update.output().withdrawals())
+    // Process withdrawals.
+    for w in update.output().withdrawals() {
+        state.submit_withdrawal(w.clone());
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

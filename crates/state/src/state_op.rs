@@ -11,7 +11,7 @@ use strata_primitives::{
 use tracing::*;
 
 use crate::{
-    bridge_ops::DepositIntent,
+    bridge_ops::{DepositIntent, WithdrawalIntent},
     bridge_state::{DepositState, DispatchCommand, DispatchedState},
     chain_state::Chainstate,
     header::L2Header,
@@ -38,6 +38,9 @@ pub enum StateOp {
     /// Matures the next L1 block, whose idx must match the one specified here
     /// as a sanity check.
     MatureL1Block(u64),
+
+    /// An intention to do a withdrawal.
+    SubmitWithdrawal(WithdrawalIntent),
 
     /// Remove deposit Intent
     ConsumeDepositIntent(u64),
@@ -151,6 +154,11 @@ fn apply_op_to_chainstate(op: &StateOp, state: &mut Chainstate) {
                 }
             }
             state.l1_state.safe_block = header_record;
+        }
+
+        StateOp::SubmitWithdrawal(withdrawal) => {
+            let withdrawals = &mut state.pending_withdraws;
+            withdrawals.push_back(withdrawal.clone());
         }
 
         StateOp::ConsumeDepositIntent(to_drop_idx) => {
@@ -288,6 +296,11 @@ impl StateCache {
     /// remove matured block from maturation entry
     pub fn mature_l1_block(&mut self, idx: u64) {
         self.merge_op(StateOp::MatureL1Block(idx));
+    }
+
+    /// Writes a withdrawal to the pending withdrawals queue.
+    pub fn submit_withdrawal(&mut self, wi: WithdrawalIntent) {
+        self.merge_op(StateOp::SubmitWithdrawal(wi));
     }
 
     pub fn assign_withdrawal_command(

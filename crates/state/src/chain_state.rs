@@ -3,12 +3,13 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::{buf::Buf32, hash::compute_borsh_hash};
 
 use crate::{
-    bridge_ops,
+    bridge_ops::{self, WithdrawalIntent},
     bridge_state::{self, DepositsTable, OperatorTable},
     exec_env::{self, ExecEnvState},
     genesis::GenesisStateData,
     l1::{self, L1ViewState},
     prelude::*,
+    state_queue,
 };
 
 /// L2 blockchain state.  This is the state computed as a function of a
@@ -112,6 +113,14 @@ impl Chainstate {
             deposits_hash: compute_borsh_hash(&self.deposits_table),
         };
         compute_borsh_hash(&hashed_state)
+    }
+
+    pub fn pending_withdrawals(&self) -> &[WithdrawalIntent] {
+        self.pending_withdraws.entries()
+    }
+
+    pub fn pending_withdrawals_queue(&self) -> &state_queue::StateQueue<WithdrawalIntent> {
+        &self.pending_withdraws
     }
 
     pub fn operator_table(&self) -> &OperatorTable {
