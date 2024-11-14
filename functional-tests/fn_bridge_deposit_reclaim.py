@@ -74,7 +74,6 @@ class BridgeDepositReclaimTest(flexitest.Test):
 
         # Kill the operator so the bridge does not process the DRT transaction
         bridge_operator.stop()
-        seq.stop()  # FIXME: Don't know why we need to stop the sequencer as well
         self.logger.debug("Bridge operators stopped")
 
         # Now we need to generate a bunch of blocks
@@ -90,7 +89,7 @@ class BridgeDepositReclaimTest(flexitest.Test):
             btcrpc.proxy.generatetoaddress(blocks_to_generate, UNSPENDABLE_ADDRESS)
 
         # wait up a little bit
-        time.sleep(1)
+        time.sleep(0.25)
 
         # Spend the take back path
         take_back_tx = bytes(
@@ -103,7 +102,6 @@ class BridgeDepositReclaimTest(flexitest.Test):
         self.logger.debug(f"sent take back tx with txid = {txid} for address {el_address}")
         # this transaction is not in the bitcoind wallet, so we cannot use gettransaction
         btcrpc.proxy.generatetoaddress(1, UNSPENDABLE_ADDRESS)
-        time.sleep(1)
 
         rpc_transaction = btcrpc.proxy.gettransaction(txid)
         assert rpc_transaction["confirmations"] > 0, "transaction is not confirmed"
@@ -114,9 +112,7 @@ class BridgeDepositReclaimTest(flexitest.Test):
 
         assert balance == 0, "EVM balance is not zero"
 
-        # Restart the bridge operator
-        seq.start()  # FIXME: Don't know why we need to stop the sequencer as well
-        bridge_operator.start()
+        # We don't need to restart the bridge operator
 
         return True
 
