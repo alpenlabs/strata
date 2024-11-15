@@ -17,6 +17,7 @@ use crate::{
     header::L2Header,
     id::L2BlockId,
     l1::{self, L1MaturationEntry},
+    prelude::StateQueue,
     tx::ProtocolOperation::Deposit,
 };
 
@@ -98,8 +99,7 @@ fn apply_op_to_chainstate(op: &StateOp, state: &mut Chainstate) {
         StateOp::Replace(new_state) => *state = new_state.as_ref().clone(),
 
         StateOp::SetSlotAndTipBlock(slot, last_block) => {
-            state.slot = *slot;
-            state.last_block = *last_block;
+            // TODO remove
         }
 
         StateOp::RevertL1Height(to_height) => {
@@ -159,55 +159,23 @@ fn apply_op_to_chainstate(op: &StateOp, state: &mut Chainstate) {
         }
 
         StateOp::SubmitWithdrawal(withdrawal) => {
-            let withdrawals = &mut state.pending_withdraws;
-            withdrawals.push_back(withdrawal.clone());
+            // TODO remove
         }
 
         StateOp::ConsumeDepositIntent(to_drop_idx) => {
-            let deposits = state.exec_env_state.pending_deposits_mut();
-
-            let front_idx = deposits
-                .front_idx()
-                .expect("stateop: empty deposit intent queue");
-
-            // deposit intent indices processed sequentially, without any gaps
-            let to_drop_count = to_drop_idx
-                .checked_sub(front_idx) // ensures to_drop_idx >= front_idx
-                .expect("stateop: unable to consume deposit intent")
-                + 1;
-
-            deposits
-                .pop_front_n_vec(to_drop_count as usize) // ensures to_drop_idx < front_idx + len
-                .expect("stateop: unable to consume deposit intent");
+            // TODO remove
         }
 
         StateOp::CreateOperator(spk, wpk) => {
-            //state.operator_table.insert(*spk, *wpk);
+            // TODO remove
         }
 
         StateOp::DispatchWithdrawal(deposit_idx, op_idx, cmd, exec_height) => {
-            let deposit_ent = state
-                .deposits_table_mut()
-                .get_deposit_mut(*deposit_idx)
-                .expect("stateop: missing deposit idx");
-
-            let state =
-                DepositState::Dispatched(DispatchedState::new(cmd.clone(), *op_idx, *exec_height));
-            deposit_ent.set_state(state);
+            // TODO remove
         }
 
         StateOp::ResetDepositAssignee(deposit_idx, op_idx, exec_height) => {
-            let deposit_ent = state
-                .deposits_table_mut()
-                .get_deposit_mut(*deposit_idx)
-                .expect("stateop: missing deposit idx");
-
-            if let DepositState::Dispatched(dstate) = deposit_ent.deposit_state_mut() {
-                dstate.set_assignee(*op_idx);
-                dstate.set_exec_deadline(*exec_height);
-            } else {
-                panic!("stateop: unexpected deposit state");
-            };
+            // TODO remove
         }
     }
 }
@@ -227,10 +195,11 @@ pub struct StateCache {
 }
 
 impl StateCache {
-    pub fn new(ch_state: Chainstate, epoch_state: EpochState) -> Self {
+    pub fn new(ch_state: ChainState) -> Self {
+        let es = ch_state.epoch_state().clone();
         Self {
             original_ch_state: ch_state.clone(),
-            original_epoch_state: epoch_state.clone(),
+            original_epoch_state: es,
             new_ch_state: ch_state,
             new_epoch_state: None,
             write_ops: Vec::new(),
@@ -300,20 +269,34 @@ impl StateCache {
 
     /// Sets the current slot in the state.
     pub fn set_cur_header(&mut self, header: &impl L2Header) {
-        self.merge_op(StateOp::SetSlotAndTipBlock(
-            header.blockidx(),
-            header.get_blockid(),
-        ));
+        self.new_ch_state.slot = header.blockidx();
+        self.new_ch_state.last_block = header.get_blockid();
     }
 
     /// remove a deposit intent from the pending deposits queue.
     pub fn consume_deposit_intent(&mut self, idx: u64) {
-        self.merge_op(StateOp::ConsumeDepositIntent(idx));
+        let deposits = self.new_ch_state.exec_env_state.pending_deposits_mut();
+
+        let front_idx = deposits
+            .front_idx()
+            .expect("stateop: empty deposit intent queue");
+
+        // deposit intent indices processed sequentially, without any gaps
+        let to_drop_count = idx
+            .checked_sub(front_idx) // ensures to_drop_idx >= front_idx
+            .expect("stateop: unable to consume deposit intent")
+            + 1;
+
+        deposits
+            .pop_front_n_vec(to_drop_count as usize) // ensures to_drop_idx < front_idx + len
+            .expect("stateop: unable to consume deposit intent");
     }
 
     /// Inserts a new operator with the specified pubkeys into the operator table.
     pub fn insert_operator(&mut self, signing_pk: Buf32, wallet_pk: Buf32) {
-        self.merge_op(StateOp::CreateOperator(signing_pk, wallet_pk));
+        self.epoch_state_mut()
+            .operator_table
+            .insert(signing_pk, wallet_pk);
     }
 
     /// L1 revert
@@ -333,7 +316,8 @@ impl StateCache {
 
     /// Writes a withdrawal to the pending withdrawals queue.
     pub fn submit_withdrawal(&mut self, wi: WithdrawalIntent) {
-        self.merge_op(StateOp::SubmitWithdrawal(wi));
+        let withdrawals = &mut self.new_ch_state.pending_withdraws;
+        withdrawals.push_back(wi);
     }
 
     pub fn assign_withdrawal_command(
@@ -343,12 +327,15 @@ impl StateCache {
         cmd: DispatchCommand,
         exec_height: BitcoinBlockHeight,
     ) {
-        self.merge_op(StateOp::DispatchWithdrawal(
-            deposit_idx,
-            operator_idx,
-            cmd,
-            exec_height,
-        ));
+        let deposit_ent = self
+            .new_ch_state
+            .deposits_table_mut()
+            .get_deposit_mut(deposit_idx)
+            .expect("stateop: missing deposit idx");
+
+        let state =
+            DepositState::Dispatched(DispatchedState::new(cmd.clone(), operator_idx, exec_height));
+        deposit_ent.set_state(state);
     }
 
     pub fn reset_deposit_assignee(
@@ -357,11 +344,17 @@ impl StateCache {
         operator_idx: OperatorIdx,
         new_exec_height: BitcoinBlockHeight,
     ) {
-        self.merge_op(StateOp::ResetDepositAssignee(
-            deposit_idx,
-            operator_idx,
-            new_exec_height,
-        ));
+        let deposit_ent = self
+            .epoch_state_mut()
+            .get_deposit_mut(deposit_idx)
+            .expect("stateop: missing deposit idx");
+
+        if let DepositState::Dispatched(dstate) = deposit_ent.deposit_state_mut() {
+            dstate.set_assignee(operator_idx);
+            dstate.set_exec_deadline(new_exec_height);
+        } else {
+            panic!("stateop: unexpected deposit state");
+        };
     }
 
     // TODO add more manipulator functions

@@ -4,7 +4,7 @@ use strata_primitives::{buf::Buf32, hash::compute_borsh_hash};
 
 use crate::{
     bridge_ops::{self, WithdrawalIntent},
-    bridge_state::{self, DepositsTable, OperatorTable},
+    bridge_state::{self, DepositEntry, DepositsTable, OperatorTable},
     exec_env::{self, ExecEnvState},
     genesis::GenesisStateData,
     prelude::*,
@@ -185,6 +185,10 @@ impl EpochState {
 
     pub fn safe_block_idx(&self) -> u64 {
         self.last_l1_block_idx
+    }
+
+    pub fn get_deposit_mut(&mut self, idx: u32) -> Option<&mut DepositEntry> {
+        self.deposits_table.get_deposit_mut(idx)
     }
 
     /// Returns if we're in the genesis epoch.  This is identified by the "last
