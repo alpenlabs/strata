@@ -2,7 +2,7 @@ x-base-client: &base-client
   build:
     context: ../
     dockerfile: ./docker/client/Dockerfile
-  image: "strata_client:v0.1.0"
+  image: "strata_client:poc0.1.0"
   networks:
     - strata_network
 
@@ -10,7 +10,7 @@ x-base-reth: &base-reth
   build:
     context: ../
     dockerfile: ./docker/reth/Dockerfile
-  image: "strata_reth:v0.1.0"
+  image: "strata_reth:poc0.1.0"
   networks:
     - strata_network
 
@@ -18,8 +18,8 @@ x-base-bridge-client: &base-bridge-client
   build:
     context: ../
     dockerfile: ./docker/bridge-client/Dockerfile
-  image: "strata_bridge_client:v0.1.0"
-  restart: always
+  image: "strata_bridge_client:poc0.1.0"
+  # restart: always
   environment:
     BTC_URL: "http://bitcoind:18443"
     BTC_USER: rpcuser
@@ -44,7 +44,7 @@ services:
       - ./.data/data-reth:/app/reth
       - ./configs:/app/configs
       # - ./configs/p2p.seq.hex:/app/p2p.hex
-      # - ./configs/jwt.seq.hex:/app/jwt.hex
+      - ./configs/jwt.hex:/app/jwt.hex
     command:
       - "--enable-witness-gen"
       - "--custom-chain dev"
@@ -53,24 +53,24 @@ services:
       - 8545:8545
       - 8546:8546
 
-  reth-fn:
-    <<: *base-reth
-    container_name: strata_reth_fn
-    environment:
-      JWTSECRET: "configs/jwt.fn.hex"
-    command:
-      - "--sequencer-http"
-      - "http://strata_reth:8545"
-
-    volumes:
-      - ./.data/data-reth-fn:/app/reth
-      - ./configs:/app/configs
-      # - ./configs/p2p.fn.hex:/app/p2p.hex
-      # - ./configs/jwt.fn.hex:/app/jwt.hex
-    ports:
-      # - 8561:8551
-      - 8555:8545
-      - 8556:8546
+  # reth-fn:
+  #   <<: *base-reth
+  #   container_name: strata_reth_fn
+  #   environment:
+  #     JWTSECRET: "configs/jwt.fn.hex"
+  #   command:
+  #     - "--sequencer-http"
+  #     - "http://strata_reth:8545"
+  #
+  #   volumes:
+  #     - ./.data/data-reth-fn:/app/reth
+  #     - ./configs:/app/configs
+  #     # - ./configs/p2p.fn.hex:/app/p2p.hex
+  #     # - ./configs/jwt.fn.hex:/app/jwt.hex
+  #   ports:
+  #     # - 8561:8551
+  #     - 8555:8545
+  #     - 8556:8546
 
   sequencer:
     <<: *base-client
@@ -84,78 +84,83 @@ services:
       - ./.data/data-sequencer:/app/data
       - ./configs:/app/configs
       # - ./configs/config.seq.toml:/app/config.toml
+      # - ./configs/params.json:/app/params.json
       # - ./configs/params.devnet.json:/app/params.json
-      # - ./configs/sequencer.key:/app/sequencer.key
-      # - ./configs/jwt.seq.hex:/app/jwt.hex
+      - ./configs/sequencer.key.hex:/app/sequencer.key
+      - ./configs/jwt.hex:/app/jwt.hex
     depends_on:
       - bitcoind
       - reth
 
-  fullnode:
-    <<: *base-client
-    container_name: strata_fullnode
-    ports:
-      - 8433:8432
-    environment:
-      CONFIG_PATH: "configs/config.fn.toml"
-      PARAM_PATH: "configs/params.json"
-    volumes:
-      - ./.data/data-fullnode:/app/data
-      - ./configs:/app/configs
-      # - ./configs/params.json:/app/params.json
-      # - ./configs/jwt.fn.hex:/app/jwt.hex
-      # need to wait for sequencer to start
-    entrypoint: /bin/sh -c "sleep 10 && /app/entrypoint.sh \"$@\"" --
-    depends_on:
-      - bitcoind
-      - reth-fn
-      - sequencer
+  # fullnode:
+  #   <<: *base-client
+  #   container_name: strata_fullnode
+  #   ports:
+  #     - 8433:8432
+  #   environment:
+  #     CONFIG_PATH: "configs/config.fn.toml"
+  #     PARAM_PATH: "configs/params.json"
+  #   volumes:
+  #     - ./.data/data-fullnode:/app/data
+  #     - ./configs:/app/configs
+  #     # - ./configs/params.json:/app/params.json
+  #     # - ./configs/jwt.fn.hex:/app/jwt.hex
+  #     # need to wait for sequencer to start
+  #   entrypoint: /bin/sh -c "sleep 10 && /app/entrypoint.sh \"$@\"" --
+  #   depends_on:
+  #     - bitcoind
+  #     - reth-fn
+  #     - sequencer
 
   bitcoind:
     build:
       context: ./bitcoind/
-    image: "strata_bitcoind:v0.1.0"
+    image: "strata_bitcoind:poc0.1.0"
     environment:
       RPC_ALLOW_IP: "0.0.0.0/0"
       BITCOIND_RPC_USER: rpcuser
       BITCOIND_RPC_PASSWORD: rpcpassword
       BITCOIND_WALLET: default
-      GENERATE_BLOCKS: 1 # if env is set then blocks are generated. the number is number of seconds between L1 blocks
+      BRIDGE_WALLET_1: bridge_0
+      BRIDGE_WALLET_2: bridge_1
+      BRIDGE_WALLET_3: bridge_2
+      GENERATE_BLOCKS: 4 # if env is set then blocks are generated. the number is number of seconds between L1 blocks / 4
     container_name: strata_bitcoind
     volumes:
       - ./.data/data-bitcoind:/root/.bitcoin/
+      - ./bitcoind/entrypoint.sh:/app/entrypoint.sh
     ports:
       - "18443:18443"
     networks:
       - strata_network
 
-  bridge-client-1:
-    <<: *base-bridge-client
-    container_name: bridge-client-1
-    volumes:
-      - ./configs/operator1.bin:/app/.secrets/xpriv.bin
-      - ./.data/bridge-client-1:/app/.data
-    ports:
-      - 4781:4781
+  # bridge-client-1:
+  #   <<: *base-bridge-client
+  #   container_name: bridge-client-1
+  #   volumes:
+  #     - ./configs/operator1.bin:/app/.secrets/xpriv.bin
+  #     - ./.data/bridge-client-1:/app/.data
+  #   ports:
+  #     - 4781:4781
+  #
+  # bridge-client-2:
+  #   <<: *base-bridge-client
+  #   container_name: bridge-client-2
+  #   volumes:
+  #     - ./configs/operator2.bin:/app/.secrets/xpriv.bin
+  #     - ./.data/bridge-client-2:/app/.data
+  #   ports:
+  #     - 4782:4781
 
-  bridge-client-2:
-    <<: *base-bridge-client
-    container_name: bridge-client-2
-    volumes:
-      - ./configs/operator2.bin:/app/.secrets/xpriv.bin
-      - ./.data/bridge-client-2:/app/.data
-    ports:
-      - 4782:4781
-
-  prover-client:
-    build:
-      context: ../
-      dockerfile: ./docker/prover-client/Dockerfile
-    image: "strata_prover_client:v0.1.0"
-    ports:
-      - "9851:9851"
-    networks:
-      - strata_network
+  # prover-client:
+  #   build:
+  #     context: ../
+  #     dockerfile: ./docker/prover-client/Dockerfile
+  #   image: "strata_prover_client:poc0.1.0"
+  #   ports:
+  #     - "9851:9851"
+  #   networks:
+  #     - strata_network
 
 networks:
   strata_network:
