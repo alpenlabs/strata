@@ -44,15 +44,13 @@ COPY --from=build /usr/local/bin/bitcoin-cli /usr/local/bin/bitcoin-cli
 # Create a directory for Bitcoin data
 RUN mkdir -p /root/.bitcoin
 
-# Copy entrypoint and helper scripts
-COPY entrypoint.sh entrypoint.sh
 COPY bcli.sh bcli.sh
 
-RUN chmod +x /app/entrypoint.sh && \
-    chmod +x /app/bcli.sh
+RUN chmod +x /app/bcli.sh
 
 # Expose necessary ports
 EXPOSE 18443 18444
 
 # Set the entrypoint script
+# this should be mounted so that we can set args more easily.
 ENTRYPOINT ["/app/entrypoint.sh"]

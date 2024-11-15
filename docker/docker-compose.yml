@@ -2,7 +2,7 @@ x-base-client: &base-client
   build:
     context: ../
     dockerfile: ./docker/client/Dockerfile
-  image: "strata_client:v0.1.0"
+  image: "strata_client:poc0.1.0"
   networks:
     - strata_network
 
@@ -10,7 +10,7 @@ x-base-reth: &base-reth
   build:
     context: ../
     dockerfile: ./docker/reth/Dockerfile
-  image: "strata_reth:v0.1.0"
+  image: "strata_reth:poc0.1.0"
   networks:
     - strata_network
 
@@ -42,7 +42,7 @@ services:
       - ./.data/data-reth:/app/reth
       - ./configs:/app/configs
       # - ./configs/p2p.seq.hex:/app/p2p.hex
-      # - ./configs/jwt.seq.hex:/app/jwt.hex
+      - ./configs/jwt.hex:/app/jwt.hex
     command:
       - "--enable-witness-gen"
     ports:
@@ -81,9 +81,10 @@ services:
       - ./.data/data-sequencer:/app/data
       - ./configs:/app/configs
       # - ./configs/config.seq.toml:/app/config.toml
+      # - ./configs/params.json:/app/params.json
       # - ./configs/params.devnet.json:/app/params.json
-      # - ./configs/sequencer.key:/app/sequencer.key
-      # - ./configs/jwt.seq.hex:/app/jwt.hex
+      - ./configs/sequencer.key.hex:/app/sequencer.key
+      - ./configs/jwt.hex:/app/jwt.hex
     depends_on:
       - bitcoind
       - reth
@@ -117,9 +118,14 @@ services:
       BITCOIND_RPC_USER: rpcuser
       BITCOIND_RPC_PASSWORD: rpcpassword
       BITCOIND_WALLET: default
+      BRIDGE_WALLET_1: bridge_0
+      BRIDGE_WALLET_2: bridge_1
+      BRIDGE_WALLET_3: bridge_2
+      GENERATE_BLOCKS: 4 # if env is set then blocks are generated. the number is number of seconds between L1 blocks / 4
     container_name: strata_bitcoind
     volumes:
       - ./.data/data-bitcoind:/root/.bitcoin/
+      - ./bitcoind/entrypoint.sh:/app/entrypoint.sh
     ports:
       - "18443:18443"
     networks:
