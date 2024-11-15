@@ -6,7 +6,10 @@ mod error;
 mod parse;
 mod taproot;
 
-use drt::{deposit_request_transaction, get_recovery_address, take_back_transaction};
+use drt::{
+    deposit_request_transaction, get_balance, get_balance_recovery, get_recovery_address,
+    take_back_transaction,
+};
 use taproot::{
     convert_to_xonly_pk, drain_wallet, extract_p2tr_pubkey, get_address, get_change_address,
     musig_aggregate_pks, unspendable_address,
@@ -27,6 +30,8 @@ fn strata_utils(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(convert_to_xonly_pk, m)?)?;
     m.add_function(wrap_pyfunction!(take_back_transaction, m)?)?;
     m.add_function(wrap_pyfunction!(get_recovery_address, m)?)?;
+    m.add_function(wrap_pyfunction!(get_balance, m)?)?;
+    m.add_function(wrap_pyfunction!(get_balance_recovery, m)?)?;
 
     Ok(())
 }

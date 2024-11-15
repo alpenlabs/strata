@@ -324,14 +324,149 @@ pub(crate) fn get_recovery_address(index: u32, musig_bridge_pk: String) -> PyRes
     Ok(address)
 }
 
+/// Gets the balance for a specific [`Address`] from the taproot wallet.
+///
+/// # Returns
+///
+/// The balance in satoshis where 1 BTC = 100_000_000 satoshis.
+#[pyfunction]
+pub(crate) fn get_balance(
+    address: String,
+    bitcoind_url: String,
+    bitcoind_user: String,
+    bitcoind_password: String,
+) -> PyResult<u64> {
+    let balance = get_balance_inner(&address, &bitcoind_url, &bitcoind_user, &bitcoind_password)?;
+    Ok(balance)
+}
+
+/// Gets the balance for a specific [`Address`] from the taproot wallet.
+///
+/// # Returns
+///
+/// The balance in satoshis where 1 BTC = 100_000_000 satoshis.
+pub(crate) fn get_balance_inner(
+    address: &str,
+    bitcoind_url: &str,
+    bitcoind_user: &str,
+    bitcoind_password: &str,
+) -> Result<u64, Error> {
+    // Parse stuff
+    let address = address
+        .parse::<Address<_>>()
+        .map_err(|_| Error::BitcoinAddress)?
+        .assume_checked();
+
+    // Get the wallet
+    let mut wallet = taproot_wallet()?;
+
+    // Instantiate the BitcoinD client
+    let client = new_bitcoind_client(
+        bitcoind_url,
+        None,
+        Some(bitcoind_user),
+        Some(bitcoind_password),
+    )?;
+    sync_wallet(&mut wallet, &client)?;
+
+    let balance = wallet
+        .list_unspent()
+        .filter_map(|utxo| {
+            if utxo.txout.script_pubkey == address.script_pubkey() {
+                Some(utxo.txout.value.to_sat())
+            } else {
+                None
+            }
+        })
+        .sum();
+
+    Ok(balance)
+}
+
+/// Gets the balance for a specific [`Address`] from the recovery wallet.
+///
+/// The recovery wallet is the wallet that is used to recover
+/// the funds from an unprocessed deposit request transaction (DRT)
+/// after the [`RECOVERY_DELAY`] has passed.
+///
+/// # Returns
+///
+/// The balance in satoshis where 1 BTC = 100_000_000 satoshis.
+#[pyfunction]
+pub(crate) fn get_balance_recovery(
+    address: String,
+    musig_bridge_pk: String,
+    bitcoind_url: String,
+    bitcoind_user: String,
+    bitcoind_password: String,
+) -> PyResult<u64> {
+    let balance = get_balance_recovery_inner(
+        &address,
+        &musig_bridge_pk,
+        &bitcoind_url,
+        &bitcoind_user,
+        &bitcoind_password,
+    )?;
+    Ok(balance)
+}
+
+/// Gets the balance for a specific [`Address`] from the recovery wallet.
+///
+/// The recovery wallet is the wallet that is used to recover
+/// the funds from an unprocessed deposit request transaction (DRT)
+/// after the [`RECOVERY_DELAY`] has passed.
+///
+/// # Returns
+///
+/// The balance in satoshis where 1 BTC = 100_000_000 satoshis.
+pub(crate) fn get_balance_recovery_inner(
+    address: &str,
+    musig_bridge_pk: &str,
+    bitcoind_url: &str,
+    bitcoind_user: &str,
+    bitcoind_password: &str,
+) -> Result<u64, Error> {
+    // Parse stuff
+    let address = address
+        .parse::<Address<_>>()
+        .map_err(|_| Error::BitcoinAddress)?
+        .assume_checked();
+    let musig_bridge_pk = parse_xonly_pk(musig_bridge_pk)?;
+
+    // Get the wallet
+    let mut wallet = recovery_wallet(musig_bridge_pk)?;
+
+    // Instantiate the BitcoinD client
+    let client = new_bitcoind_client(
+        bitcoind_url,
+        None,
+        Some(bitcoind_user),
+        Some(bitcoind_password),
+    )?;
+    sync_wallet(&mut wallet, &client)?;
+
+    let balance = wallet
+        .list_unspent()
+        .filter_map(|utxo| {
+            if utxo.txout.script_pubkey == address.script_pubkey() {
+                Some(utxo.txout.value.to_sat())
+            } else {
+                None
+            }
+        })
+        .sum();
+
+    Ok(balance)
+}
+
 #[cfg(test)]
 mod tests {
-    use bdk_wallet::{KeychainKind, LocalOutput};
+    use bdk_wallet::{bitcoin::Amount, KeychainKind, LocalOutput};
     use bitcoind::{bitcoincore_rpc::RpcApi, BitcoinD};
     use strata_btcio::rpc::{traits::Broadcaster, BitcoinClient};
     use strata_common::logging;
     use tokio::time::{sleep, Duration};
-    use tracing::{debug, trace};
+    use tracing::{debug, info, trace};
 
     use super::*;
     use crate::taproot::taproot_wallet;
@@ -413,7 +548,7 @@ mod tests {
         let change_address = wallet.reveal_next_address(KeychainKind::Internal).address;
         debug!(%change_address, "wallet change address");
 
-        // Get the recocery wallet.
+        // Get the recovery wallet.
         let musig_bridge_pk = parse_xonly_pk(MUSIG_BRIDGE_PK).unwrap();
         debug!(?musig_bridge_pk, "musig bridge pk");
         let mut recovery_wallet = recovery_wallet(musig_bridge_pk).unwrap();
@@ -480,5 +615,189 @@ mod tests {
             .to_string();
         let expected_address = "bcrt1p5wh09dkrfmr44zq85y55x92f5zjhkj2l0kvepd3fskw6aj8tch5q8t44sr";
         assert_eq!(address, expected_address);
+    }
+
+    #[tokio::test]
+    async fn get_balance() {
+        logging::init(logging::LoggerConfig::with_base_name("balance-tests"));
+
+        let bitcoind = BitcoinD::from_downloaded().unwrap();
+        let url = bitcoind.rpc_url();
+        let (user, password) = get_auth(&bitcoind);
+        let client = BitcoinClient::new(url.clone(), user.clone(), password.clone()).unwrap();
+        let wallet_client = new_bitcoind_client(&url, None, Some(&user), Some(&password))
+            .expect("valid wallet client");
+
+        let mut wallet = super::taproot_wallet().unwrap();
+        let address = wallet.reveal_next_address(KeychainKind::External).address;
+        debug!(%address, "wallet receiving address");
+        let change_address = wallet.reveal_next_address(KeychainKind::Internal).address;
+        debug!(%change_address, "wallet change address");
+
+        // Mine and get the last UTXO which should have 50 BTC.
+        mine_blocks(&bitcoind, 1, Some(address.clone())).unwrap();
+        mine_blocks(&bitcoind, 100, None).unwrap();
+        debug!("mined 101 blocks");
+
+        // Sleep for a while to let the transactions propagate.
+        sleep(Duration::from_millis(200)).await;
+
+        // Sync the wallet
+        sync_wallet(&mut wallet, &wallet_client).unwrap();
+        debug!("wallet synced with bitcoind");
+
+        // Getting the balances
+        let balance_address =
+            super::get_balance_inner(&address.to_string(), &url, &user, &password)
+                .expect("valid balance");
+        info!(%balance_address, "before: balance address");
+        let change_balance_address =
+            super::get_balance_inner(&change_address.to_string(), &url, &user, &password)
+                .expect("valid balance");
+        info!(%change_balance_address, "before: change balance address");
+
+        // Send 10 BTC to the change address
+        let amount = Amount::from_btc(10.0).unwrap();
+        let mut psbt = wallet
+            .build_tx()
+            .add_recipient(change_address.script_pubkey(), amount)
+            .fee_rate(FeeRate::from_sat_per_vb_unchecked(2))
+            .clone()
+            .finish()
+            .unwrap();
+        wallet.sign(&mut psbt, Default::default()).unwrap();
+        let signed_tx = psbt.extract_tx().unwrap();
+        trace!(?signed_tx, "signed drt tx");
+        let txid = client.send_raw_transaction(&signed_tx).await.unwrap();
+        debug!(%txid, "sent tx");
+
+        // Mine the transaction
+        mine_blocks(&bitcoind, 1, None).unwrap();
+
+        // Sleep for a while to let the transactions propagate.
+        sleep(Duration::from_millis(200)).await;
+
+        // Getting the balances
+        let balance_address =
+            super::get_balance_inner(&address.to_string(), &url, &user, &password)
+                .expect("valid balance");
+        info!(%balance_address, "after: balance address");
+        let change_balance_address =
+            super::get_balance_inner(&change_address.to_string(), &url, &user, &password)
+                .expect("valid balance");
+        info!(%change_balance_address, "after: change balance address");
+
+        assert!(balance_address < 50_000_000);
+        assert!(change_balance_address > 10_000_000);
+    }
+
+    #[tokio::test]
+    async fn get_balance_recovery() {
+        logging::init(logging::LoggerConfig::with_base_name(
+            "recovery-balance-tests",
+        ));
+
+        let bitcoind = BitcoinD::from_downloaded().unwrap();
+        let url = bitcoind.rpc_url();
+        let (user, password) = get_auth(&bitcoind);
+        let client = BitcoinClient::new(url.clone(), user.clone(), password.clone()).unwrap();
+        let wallet_client = new_bitcoind_client(&url, None, Some(&user), Some(&password))
+            .expect("valid wallet client");
+
+        // Get the taproot wallet.
+        let mut wallet = taproot_wallet().unwrap();
+        let address = wallet.reveal_next_address(KeychainKind::External).address;
+        debug!(%address, "wallet receiving address");
+        let change_address = wallet.reveal_next_address(KeychainKind::Internal).address;
+        debug!(%change_address, "wallet change address");
+
+        // Get the recovery wallet.
+        let musig_bridge_pk = parse_xonly_pk(MUSIG_BRIDGE_PK).unwrap();
+        debug!(?musig_bridge_pk, "musig bridge pk");
+        let mut recovery_wallet = recovery_wallet(musig_bridge_pk).unwrap();
+        let recovery_address = recovery_wallet
+            .reveal_next_address(KeychainKind::External)
+            .address;
+        debug!(%recovery_address, "recovery address");
+
+        // Mine and get the last UTXO which should have 50 BTC.
+        mine_blocks(&bitcoind, 101, Some(address)).unwrap();
+        debug!("mined 101 blocks");
+
+        // Mine one block to the recovery address so that it has fees for the recovery path.
+        mine_blocks(&bitcoind, 1, Some(recovery_address.clone())).unwrap();
+
+        // Sleep for a while to let the transactions propagate.
+        sleep(Duration::from_millis(200)).await;
+
+        sync_wallet(&mut wallet, &wallet_client).unwrap();
+        debug!("wallet synced with bitcoind");
+        let wallet_utxos = wallet.list_unspent().collect::<Vec<LocalOutput>>();
+        trace!(?wallet_utxos, "wallet utxos");
+        let coinbase_utxo = wallet_utxos.first().unwrap();
+        trace!(?coinbase_utxo, "coinbase utxo");
+        let coinbase_outpoint = coinbase_utxo.outpoint.to_string();
+        trace!(%coinbase_outpoint, "coinbase outpoint");
+
+        let signed_tx =
+            deposit_request_transaction_inner(EL_ADDRESS, MUSIG_BRIDGE_PK, &url, &user, &password)
+                .unwrap();
+        trace!(?signed_tx, "signed drt tx");
+
+        // Getting the balance pre-DRT
+        let balance_recovery_address = super::get_balance_recovery_inner(
+            &recovery_address.to_string(),
+            &musig_bridge_pk.to_string(),
+            &url,
+            &user,
+            &password,
+        )
+        .expect("valid balance");
+        info!(%balance_recovery_address, "before: balance address");
+        assert_eq!(
+            balance_recovery_address,
+            Amount::from_btc(50.0).unwrap().to_sat()
+        );
+
+        let txid = client.send_raw_transaction(&signed_tx).await.unwrap();
+        debug!(%txid, "sent drt tx");
+
+        // Mine blocks enough for the spending policy (1008 blocks).
+        // Need to break this into chunks to avoid bitcoind crashing.
+        let blocks_for_maturity = RECOVER_DELAY;
+        let chunks = 8u32;
+        let chunk_size = blocks_for_maturity / chunks;
+        for _ in 0..chunks {
+            mine_blocks(&bitcoind, chunk_size as _, None).unwrap();
+        }
+
+        let recovery_tx = spend_recovery_path_inner(
+            change_address.to_string().as_str(),
+            MUSIG_BRIDGE_PK,
+            &url,
+            &user,
+            &password,
+        )
+        .unwrap();
+        let txid = client.send_raw_transaction(&recovery_tx).await.unwrap();
+        debug!(%txid, "sent recovery tx");
+
+        // Mine the transaction
+        mine_blocks(&bitcoind, 1, None).unwrap();
+
+        // Sleep for a while to let the transactions propagate.
+        sleep(Duration::from_millis(200)).await;
+
+        // Getting the balance post-DRT
+        let balance_recovery_address = super::get_balance_recovery_inner(
+            &recovery_address.to_string(),
+            &musig_bridge_pk.to_string(),
+            &url,
+            &user,
+            &password,
+        )
+        .expect("valid balance");
+        info!(%balance_recovery_address, "after: balance address");
+        assert!(balance_recovery_address < Amount::from_btc(50.0).unwrap().to_sat());
     }
 }

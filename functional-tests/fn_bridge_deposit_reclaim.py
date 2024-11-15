@@ -55,6 +55,11 @@ class BridgeDepositReclaimTest(flexitest.Test):
         change_addr = btcrpc.proxy.getnewaddress()
         recovery_addr = get_recovery_address(0, bridge_pk)
 
+        # First let's see if the EVM side has no funds
+        # Make sure that the el_address has zero balance
+        balance = int(rethrpc.eth_getBalance(f"0x{el_address}"), 16)
+        assert balance == 0, "EVM balance is not zero"
+
         # Generate Plenty of BTC to address for the DRT
         self.logger.debug(f"Generating 102 blocks to address: {addr}")
         btcrpc.proxy.generatetoaddress(102, addr)
@@ -102,6 +107,7 @@ class BridgeDepositReclaimTest(flexitest.Test):
         self.logger.debug(f"sent take back tx with txid = {txid} for address {el_address}")
         # this transaction is not in the bitcoind wallet, so we cannot use gettransaction
         btcrpc.proxy.generatetoaddress(1, UNSPENDABLE_ADDRESS)
+        time.sleep(1)
 
         rpc_transaction = btcrpc.proxy.gettransaction(txid)
         assert rpc_transaction["confirmations"] > 0, "transaction is not confirmed"
@@ -109,10 +115,10 @@ class BridgeDepositReclaimTest(flexitest.Test):
         # Now let's see if the EVM side has no funds
         # Make sure that the el_address has zero balance
         balance = int(rethrpc.eth_getBalance(f"0x{el_address}"), 16)
-
         assert balance == 0, "EVM balance is not zero"
 
-        # We don't need to restart the bridge operator
+        # Restart the bridge operator
+        bridge_operator.start()
 
         return True
 

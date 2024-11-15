@@ -1896,7 +1896,7 @@ sqlcipher = ["sqlcipher3_binary"]
 
 [[package]]
 name = "strata_utils"
-version = "0.3.0"
+version = "0.4.0"
 description = ""
 optional = false
 python-versions = "*"
