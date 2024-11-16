@@ -12834,6 +12834,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "arbitrary",
+ "bitcoin",
  "borsh",
  "futures",
  "http 1.1.0",
@@ -12945,6 +12946,7 @@ dependencies = [
 name = "strata-proofimpl-cl-stf"
 version = "0.1.0"
 dependencies = [
+ "bitcoin",
  "borsh",
  "serde",
  "strata-chaintsn",

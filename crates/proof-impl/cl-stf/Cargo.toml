@@ -11,6 +11,7 @@ strata-proofimpl-checkpoint.workspace = true
 strata-proofimpl-evm-ee-stf.workspace = true
 strata-state.workspace = true
 
+bitcoin.workspace = true
 borsh.workspace = true
 serde.workspace = true
 thiserror.workspace = true

@@ -20,12 +20,13 @@ withdrawal_intent_event_abi = {
     "anonymous": False,
     "inputs": [
         {"indexed": False, "internalType": "uint64", "name": "amount", "type": "uint64"},
-        {"indexed": False, "internalType": "bytes", "name": "dest_pk", "type": "bytes32"},
+        {"indexed": False, "internalType": "bytes", "name": "txid", "type": "bytes32"},
+        {"indexed": False, "internalType": "uint32", "name": "vout", "type": "uint32"},
     ],
     "name": "WithdrawalIntentEvent",
     "type": "event",
 }
-event_signature_text = "WithdrawalIntentEvent(uint64,bytes32)"
+event_signature_text = "WithdrawalIntentEvent(uint64,bytes32,uint32)"
 
 
 @flexitest.register
@@ -50,8 +51,11 @@ class BridgeDepositTest(flexitest.Test):
         source = web3.address
         dest = web3.to_checksum_address(PRECOMPILE_BRIDGEOUT_ADDRESS)
         # 64 bytes
-        dest_pk = os.urandom(32).hex()
-        print("dest_pk", dest_pk)
+        input_txid = os.urandom(32).hex()
+        input_vout_hex = os.urandom(4).hex()
+        input_vout_int = int(input_vout_hex, 16)
+        calldata = input_txid + input_vout_hex
+        print("calldata", calldata)
 
         assert web3.is_connected(), "cannot connect to reth"
 
@@ -70,7 +74,7 @@ class BridgeDepositTest(flexitest.Test):
                 "value": hex(to_transfer_wei),
                 "gas": hex(100000),
                 "from": source,
-                "data": dest_pk,
+                "data": calldata,
             }
         )
         print("txid", txid.to_0x_hex())
@@ -90,7 +94,8 @@ class BridgeDepositTest(flexitest.Test):
         to_transfer_sats = to_transfer_wei // 10_000_000_000
 
         assert event_data.args.amount == to_transfer_sats
-        assert event_data.args.dest_pk.hex() == dest_pk
+        assert event_data.args.txid.hex() == input_txid
+        assert event_data.args.vout == input_vout_int
 
         final_block_no = web3.eth.block_number
         final_bridge_balance = web3.eth.get_balance(dest)
