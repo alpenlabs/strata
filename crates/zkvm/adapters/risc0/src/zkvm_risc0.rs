@@ -19,15 +19,16 @@ impl ZkVm for ZkVmRisc0 {
     }
 
     fn commit<T: Serialize>(&self, output: &T) {
-        env::write(output);
+        env::commit(output);
     }
 
     fn commit_slice(&self, output_raw: &[u8]) {
-        env::write_slice(output_raw);
+        env::commit_slice(output_raw);
     }
 
-    fn verify_proof(&self, vk_digest: &[u32; 8], public_values: &[u8]) {
-        env::verify(*vk_digest, public_values).expect("verification failed")
+    fn verify_proof(&self, _vk_digest: &[u32; 8], public_values: &[u8]) {
+        let vk: [u32; 8] = env::read();
+        env::verify(vk, public_values).expect("verification failed")
     }
 
     fn verify_groth16(
