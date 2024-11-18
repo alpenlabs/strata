@@ -72,7 +72,8 @@ impl ProofGenerator<(u32, u32), L1BatchProver> for L1BatchProofGenerator {
     }
 }
 
-// #[cfg(all(feature = "prover", not(debug_assertions)))]
+#[cfg(test)]
+#[cfg(all(feature = "sp1", not(debug_assertions)))]
 mod test {
     use strata_test_utils::l2::gen_params;
 

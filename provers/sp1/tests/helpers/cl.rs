@@ -73,3 +73,19 @@ impl ProofGenerator<u64, ClStfProver> for ClProofGenerator {
         GUEST_CL_STF_VK_HASH_STR.to_string().split_off(58)
     }
 }
+
+#[cfg(test)]
+#[cfg(all(feature = "sp1", not(debug_assertions)))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_cl_stf_guest_code_trace_generation() {
+        let height = 1;
+
+        let el_prover = ElProofGenerator::new();
+        let cl_prover = ClProofGenerator::new(el_prover);
+
+        let _ = cl_prover.get_proof(&height).unwrap();
+    }
+}

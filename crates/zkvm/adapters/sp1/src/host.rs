@@ -96,7 +96,7 @@ impl ZkVmHost for SP1Host {
 
 // NOTE: SP1 prover runs in release mode only; therefore run the tests on release mode only
 #[cfg(test)]
-// #[cfg(not(debug_assertions))]
+#[cfg(not(debug_assertions))]
 mod tests {
 
     use std::{fs::File, io::Write};

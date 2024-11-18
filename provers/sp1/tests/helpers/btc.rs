@@ -58,7 +58,8 @@ impl ProofGenerator<Block, BtcBlockspaceProver> for BtcBlockProofGenerator {
     }
 }
 
-// #[cfg(all(feature = "prover", not(debug_assertions)))]
+#[cfg(test)]
+#[cfg(all(feature = "sp1", not(debug_assertions)))]
 mod test {
     use strata_test_utils::bitcoin::get_btc_chain;
 

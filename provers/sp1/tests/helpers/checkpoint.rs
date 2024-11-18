@@ -87,22 +87,21 @@ impl ProofGenerator<CheckpointBatchInfo, CheckpointProver> for CheckpointProofGe
         )
     }
 
-    #[cfg(feature = "sp1")]
     fn get_host(&self) -> impl ZkVmHost {
         SP1Host::new_from_bytes(&GUEST_CHECKPOINT_PK, &GUEST_CHECKPOINT_VK)
     }
 
-    #[cfg(feature = "sp1")]
     fn get_elf(&self) -> &[u8] {
         &GUEST_CHECKPOINT_ELF
     }
 
-    #[cfg(feature = "sp1")]
     fn get_short_program_id(&self) -> String {
         GUEST_CHECKPOINT_VK_HASH_STR.to_string().split_off(58)
     }
 }
 
+#[cfg(test)]
+#[cfg(all(feature = "sp1", not(debug_assertions)))]
 mod test {
 
     use strata_test_utils::l2::gen_params;

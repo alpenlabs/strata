@@ -50,3 +50,17 @@ impl ProofGenerator<u64, EvmEeProver> for ElProofGenerator {
         GUEST_EVM_EE_STF_VK_HASH_STR.to_string().split_off(58)
     }
 }
+
+#[cfg(test)]
+#[cfg(all(feature = "sp1", not(debug_assertions)))]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_evm_ee_guest_code_trace_generation() {
+        let height = 1;
+
+        let el_prover = ElProofGenerator::new();
+
+        let _ = el_prover.get_proof(&height).unwrap();
+    }
+}
