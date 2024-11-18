@@ -59,7 +59,8 @@ impl ProofGenerator<(u64, u64), ClAggProver> for L2BatchProofGenerator {
     }
 }
 
-// #[cfg(all(feature = "prover", not(debug_assertions)))]
+#[cfg(test)]
+#[cfg(all(feature = "sp1", not(debug_assertions)))]
 mod test {
     use crate::{ClProofGenerator, ElProofGenerator, L2BatchProofGenerator, ProofGenerator};
 
