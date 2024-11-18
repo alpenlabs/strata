@@ -31,15 +31,17 @@ impl<'a> ZKVMInputBuilder<'a> for RiscZeroProofInputBuilder<'a> {
     fn write_proof(&mut self, item: strata_zkvm::AggregationInput) -> anyhow::Result<&mut Self> {
         // Learn more about assumption and proof compositions at https://dev.risczero.com/api/zkvm/composition
         let receipt: Receipt = bincode::deserialize(item.proof().as_bytes())?;
-        let vk: Digest = bincode::deserialize(item.vk().as_bytes())?;
-
-        // `add_assumption` makes the receipt to be verified available to the prover.
-        self.0.add_assumption(receipt);
+        let vk: Digest = item.vk().as_bytes().try_into()?;
 
         // Write the verification key of the program that'll be proven in the guest.
         // Note: The vkey is written here so we don't have to hardcode it in guest code.
         // TODO: This should be fixed once the guest code is finalized
+        self.write_serialized(&receipt.journal.bytes)?;
         self.0.write(&vk)?;
+
+        // `add_assumption` makes the receipt to be verified available to the prover.
+        self.0.add_assumption(receipt.clone());
+
         Ok(self)
     }
 
