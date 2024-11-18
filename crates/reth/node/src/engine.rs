@@ -1,14 +1,7 @@
-use reth_chainspec::ChainSpec;
-use reth_node_api::{
-    payload::{
-        EngineApiMessageVersion, EngineObjectValidationError, PayloadOrAttributes, PayloadTypes,
-    },
-    validate_version_specific_fields, EngineTypes,
+use alloy_rpc_types::engine::{
+    ExecutionPayloadEnvelopeV3, ExecutionPayloadEnvelopeV4, ExecutionPayloadV1,
 };
-use reth_rpc_types::{
-    engine::{ExecutionPayloadEnvelopeV3, ExecutionPayloadEnvelopeV4},
-    ExecutionPayloadV1,
-};
+use reth_node_api::{payload::PayloadTypes, EngineTypes};
 use serde::{Deserialize, Serialize};
 
 use super::payload::{
@@ -32,12 +25,4 @@ impl EngineTypes for StrataEngineTypes {
     type ExecutionPayloadV2 = StrataExecutionPayloadEnvelopeV2;
     type ExecutionPayloadV3 = ExecutionPayloadEnvelopeV3;
     type ExecutionPayloadV4 = ExecutionPayloadEnvelopeV4;
-
-    fn validate_version_specific_fields(
-        chain_spec: &ChainSpec,
-        version: EngineApiMessageVersion,
-        payload_or_attrs: PayloadOrAttributes<'_, StrataPayloadAttributes>,
-    ) -> Result<(), EngineObjectValidationError> {
-        validate_version_specific_fields(chain_spec, version, payload_or_attrs)
-    }
 }

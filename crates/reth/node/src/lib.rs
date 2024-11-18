@@ -5,6 +5,7 @@ mod evm;
 mod node;
 mod payload;
 mod payload_builder;
+mod validator;
 
 pub use engine::StrataEngineTypes;
 pub use node::StrataEthereumNode;

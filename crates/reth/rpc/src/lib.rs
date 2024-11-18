@@ -3,7 +3,7 @@
 mod rpc;
 
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
-use reth_primitives::B256;
+use reth_primitives::revm_primitives::alloy_primitives::B256;
 pub use rpc::StrataRPC;
 use serde::{Deserialize, Serialize};
 use strata_proofimpl_evm_ee_stf::ELProofInput;

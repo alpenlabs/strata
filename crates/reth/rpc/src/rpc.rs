@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use jsonrpsee::core::RpcResult;
-use reth_primitives::B256;
+use reth_primitives::revm_primitives::alloy_primitives::B256;
 use strata_reth_db::WitnessProvider;
 use strata_rpc_utils::to_jsonrpsee_error;
 

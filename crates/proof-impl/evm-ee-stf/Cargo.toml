@@ -4,18 +4,18 @@ name = "strata-proofimpl-evm-ee-stf"
 version = "0.1.0"
 
 [dependencies]
-alloy-eips = { version = "0.2", default-features = false }
+alloy-eips.workspace = true
 alloy-rlp = { version = "0.3.4", default-features = false }
 alloy-rlp-derive = { version = "0.3", default-features = false }
-alloy-rpc-types = { workspace = true, default-features = false, features = [
-  "eth",
-] }
+alloy-rpc-types.workspace = true
+alloy-rpc-types-eth.workspace = true
+alloy-primitives = { workspace = true, features = ["rand", "rlp", "map-foldhash"] }
 anyhow.workspace = true
 k256 = { version = "=0.13.3", features = [
   "std",
   "ecdsa",
 ], default-features = false }
-reth-primitives = { workspace = true, default-features = false }
+reth-primitives.workspace = true
 reth-trie-common.workspace = true
 revm.workspace = true
 rlp = "0.5.2"

@@ -1,10 +1,10 @@
 use std::array::TryFromSliceError;
 
-use revm::{ContextStatefulPrecompile, Database};
-use revm_primitives::{
-    Bytes, FixedBytes, Log, LogData, PrecompileError, PrecompileErrors, PrecompileOutput,
-    PrecompileResult, U256,
+use revm::{
+    primitives::{PrecompileError, PrecompileErrors, PrecompileOutput, PrecompileResult},
+    ContextStatefulPrecompile, Database,
 };
+use revm_primitives::{Bytes, FixedBytes, Log, LogData, U256};
 use strata_reth_primitives::WithdrawalIntentEvent;
 
 pub use crate::constants::BRIDGEOUT_ADDRESS;
@@ -68,7 +68,7 @@ impl<DB: Database> ContextStatefulPrecompile<DB> for BridgeoutPrecompile {
         });
 
         // Burn value sent to bridge by adjusting the account balance of bridge precompile
-        let (account, _) = evmctx
+        let mut account = evmctx
             .load_account(BRIDGEOUT_ADDRESS)
             // Error case should never occur
             .map_err(|_| PrecompileErrors::Fatal {

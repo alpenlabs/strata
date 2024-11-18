@@ -1,4 +1,4 @@
-use revm_primitives::{address, Address, U256};
+use revm::primitives::{address, Address, U256};
 
 use crate::utils::{u256_from, WEI_PER_BTC};
 

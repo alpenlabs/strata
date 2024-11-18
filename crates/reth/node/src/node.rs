@@ -2,7 +2,8 @@ use reth::builder::{
     components::{ComponentsBuilder, ExecutorBuilder},
     BuilderContext, Node,
 };
-use reth_node_api::{FullNodeTypes, NodeTypes};
+use reth_chainspec::ChainSpec;
+use reth_node_api::{FullNodeTypes, NodeTypes, NodeTypesWithEngine};
 use reth_node_ethereum::{
     node::{EthereumAddOns, EthereumConsensusBuilder, EthereumNetworkBuilder, EthereumPoolBuilder},
     EthExecutorProvider,
@@ -10,6 +11,7 @@ use reth_node_ethereum::{
 
 use crate::{
     engine::StrataEngineTypes, evm::StrataEvmConfig, payload_builder::StrataPayloadServiceBuilder,
+    validator::StrataEngineValidatorBuilder,
 };
 
 #[derive(Debug, Clone, Default)]
@@ -19,6 +21,11 @@ pub struct StrataEthereumNode;
 /// Configure the node types
 impl NodeTypes for StrataEthereumNode {
     type Primitives = ();
+    type ChainSpec = ChainSpec;
+}
+
+/// Configure the node types with the custom engine types
+impl NodeTypesWithEngine for StrataEthereumNode {
     // use the custom engine types
     type Engine = StrataEngineTypes;
 }
@@ -28,7 +35,7 @@ impl NodeTypes for StrataEthereumNode {
 /// This provides a preset configuration for the node
 impl<N> Node<N> for StrataEthereumNode
 where
-    N: FullNodeTypes<Engine = StrataEngineTypes>,
+    N: FullNodeTypes<Types: NodeTypesWithEngine<Engine = StrataEngineTypes, ChainSpec = ChainSpec>>,
 {
     type ComponentsBuilder = ComponentsBuilder<
         N,
@@ -37,6 +44,7 @@ where
         EthereumNetworkBuilder,
         StrataExecutorBuilder,
         EthereumConsensusBuilder,
+        StrataEngineValidatorBuilder,
     >;
     type AddOns = EthereumAddOns;
 
@@ -48,6 +56,11 @@ where
             .network(EthereumNetworkBuilder::default())
             .executor(StrataExecutorBuilder::default())
             .consensus(EthereumConsensusBuilder::default())
+            .engine_validator(StrataEngineValidatorBuilder::default())
+    }
+
+    fn add_ons(&self) -> Self::AddOns {
+        EthereumAddOns::default()
     }
 }
 
@@ -58,7 +71,7 @@ pub struct StrataExecutorBuilder;
 
 impl<Node> ExecutorBuilder<Node> for StrataExecutorBuilder
 where
-    Node: FullNodeTypes,
+    Node: FullNodeTypes<Types: NodeTypes<ChainSpec = ChainSpec>>,
 {
     type EVM = StrataEvmConfig;
     type Executor = EthExecutorProvider<Self::EVM>;
@@ -68,8 +81,8 @@ where
         ctx: &BuilderContext<Node>,
     ) -> eyre::Result<(Self::EVM, Self::Executor)> {
         Ok((
-            StrataEvmConfig::default(),
-            EthExecutorProvider::new(ctx.chain_spec(), StrataEvmConfig::default()),
+            StrataEvmConfig::new(ctx.chain_spec()),
+            EthExecutorProvider::new(ctx.chain_spec(), StrataEvmConfig::new(ctx.chain_spec())),
         ))
     }
 }

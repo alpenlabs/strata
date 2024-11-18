@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
+use alloy_rpc_types::engine::ForkchoiceState;
 use anyhow::{Context, Result};
-use reth_primitives::B256;
-use reth_rpc_types::engine::ForkchoiceState;
+use reth_primitives::revm_primitives::B256;
 use strata_db::{
     errors::DbError,
     traits::{ClientStateDatabase, Database, L2BlockDatabase},

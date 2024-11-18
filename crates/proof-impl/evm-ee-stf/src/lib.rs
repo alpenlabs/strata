@@ -25,7 +25,8 @@ use db::InMemoryDBHelper;
 use mpt::keccak;
 use processor::{EvmConfig, EvmProcessor};
 use reth_primitives::{
-    alloy_primitives::FixedBytes, Address, Bytes, Header, TransactionSignedNoHash, Withdrawal, B256,
+    revm_primitives::alloy_primitives::{Address, Bytes, FixedBytes, B256},
+    Header, TransactionSignedNoHash, Withdrawal,
 };
 use revm::{primitives::SpecId, InMemoryDB};
 use serde::{Deserialize, Serialize};

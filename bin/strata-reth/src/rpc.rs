@@ -4,9 +4,7 @@ use std::sync::{atomic::AtomicUsize, Arc};
 
 use jsonrpsee_types::error::{ErrorObject, INTERNAL_ERROR_CODE};
 use reqwest::Client;
-use reth_rpc_eth_api::RawTransactionForwarder;
-use reth_rpc_eth_types::error::{EthApiError, EthResult};
-use reth_rpc_types::ToRpcError;
+use reth_rpc_eth_types::error::{EthApiError, ToRpcError};
 
 /// Error type when interacting with the Sequencer
 #[derive(Debug, thiserror::Error)]
@@ -78,7 +76,7 @@ impl SequencerClient {
         let body = serde_json::to_string(&serde_json::json!({
             "jsonrpc": "2.0",
             "method": "eth_sendRawTransaction",
-            "params": [format!("0x{}", reth_primitives::hex::encode(tx))],
+            "params": [format!("0x{}", reth_primitives::revm_primitives::alloy_primitives::hex::encode(tx))],
             "id": self.next_request_id()
         }))
         .map_err(|_| {
@@ -104,14 +102,6 @@ impl SequencerClient {
             })
             .map_err(SequencerRpcError::HttpError)?;
 
-        Ok(())
-    }
-}
-
-#[async_trait::async_trait]
-impl RawTransactionForwarder for SequencerClient {
-    async fn forward_raw_transaction(&self, tx: &[u8]) -> EthResult<()> {
-        Self::forward_raw_transaction(self, tx).await?;
         Ok(())
     }
 }

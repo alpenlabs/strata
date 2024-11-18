@@ -11,7 +11,7 @@ use bitcoin::{
     BlockHash, Txid,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
-use reth_primitives::alloy_primitives::FixedBytes;
+use reth_primitives::revm_primitives::alloy_primitives::FixedBytes;
 use secp256k1::SecretKey;
 use serde::{Deserialize, Serialize};
 

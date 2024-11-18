@@ -1,22 +1,18 @@
 use std::convert::Infallible;
 
-use reth::rpc::compat::engine::payload::block_to_payload_v2;
-use reth_chainspec::ChainSpec;
-use reth_node_api::{
-    payload::{EngineApiMessageVersion, EngineObjectValidationError},
-    validate_version_specific_fields, BuiltPayload, PayloadAttributes, PayloadBuilderAttributes,
+use alloy_rpc_types::{
+    engine::{
+        ExecutionPayloadEnvelopeV3, ExecutionPayloadEnvelopeV4, ExecutionPayloadV1,
+        ExecutionPayloadV2, PayloadAttributes as EthPayloadAttributes, PayloadId,
+    },
+    Withdrawal,
 };
+use reth::rpc::compat::engine::payload::block_to_payload_v2;
+use reth_node_api::{BuiltPayload, PayloadAttributes, PayloadBuilderAttributes};
 use reth_payload_builder::{EthBuiltPayload, EthPayloadBuilderAttributes};
 use reth_primitives::{
-    revm_primitives::{BlockEnv, CfgEnvWithHandlerCfg},
-    Address, Header, SealedBlock, Withdrawals, B256, U256,
-};
-use reth_rpc_types::{
-    engine::{
-        ExecutionPayloadEnvelopeV3, ExecutionPayloadEnvelopeV4,
-        PayloadAttributes as EthPayloadAttributes, PayloadId,
-    },
-    ExecutionPayloadV1, ExecutionPayloadV2, Withdrawal,
+    revm_primitives::alloy_primitives::{Address, B256, U256},
+    SealedBlock, Withdrawals,
 };
 use serde::{Deserialize, Serialize};
 use strata_reth_primitives::WithdrawalIntent;
@@ -49,16 +45,6 @@ impl PayloadAttributes for StrataPayloadAttributes {
 
     fn parent_beacon_block_root(&self) -> Option<B256> {
         self.inner.parent_beacon_block_root()
-    }
-
-    fn ensure_well_formed_attributes(
-        &self,
-        chain_spec: &ChainSpec,
-        version: EngineApiMessageVersion,
-    ) -> Result<(), EngineObjectValidationError> {
-        validate_version_specific_fields(chain_spec, version, self.into())?;
-
-        Ok(())
     }
 }
 
@@ -103,14 +89,6 @@ impl PayloadBuilderAttributes for StrataPayloadBuilderAttributes {
 
     fn withdrawals(&self) -> &Withdrawals {
         &self.0.withdrawals
-    }
-
-    fn cfg_and_block_env(
-        &self,
-        chain_spec: &ChainSpec,
-        parent: &Header,
-    ) -> (CfgEnvWithHandlerCfg, BlockEnv) {
-        self.0.cfg_and_block_env(chain_spec, parent)
     }
 }
 

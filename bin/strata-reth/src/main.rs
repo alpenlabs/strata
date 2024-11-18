@@ -3,15 +3,16 @@ mod rpc;
 
 use std::{fs, future::Future, path::PathBuf, sync::Arc};
 
+use alloy_genesis::Genesis;
 use clap::Parser;
 use reth::{
-    args::{utils::chain_help, LogArgs},
+    args::LogArgs,
     builder::{NodeBuilder, WithLaunchContext},
     CliRunner,
 };
 use reth_chainspec::ChainSpec;
+use reth_cli::chainspec::ChainSpecParser;
 use reth_cli_commands::node::NodeCommand;
-use reth_primitives::Genesis;
 use strata_reth_db::rocksdb::WitnessDB;
 use strata_reth_exex::ProverWitnessGenerator;
 use strata_reth_node::StrataEthereumNode;
@@ -29,7 +30,7 @@ fn main() {
         std::env::set_var("RUST_BACKTRACE", "1");
     }
 
-    let mut command = NodeCommand::<AdditionalConfig>::parse();
+    let mut command = NodeCommand::<StrataChainSpecParser, AdditionalConfig>::parse();
 
     // use provided alpen chain spec
     command.chain = command.ext.custom_chain.clone();
@@ -62,12 +63,17 @@ fn main() {
                 ctx.modules.merge_configured(rpc.into_rpc())?;
             }
 
-            if let Some(sequencer_http) = sequencer_http {
-                // register sequencer tx forwarder
-                ctx.registry.set_eth_raw_transaction_forwarder(Arc::new(
-                    rpc::SequencerClient::new(sequencer_http),
-                ));
-            }
+            // TODO transaction forwarder trait is no longer available!
+            // It seems the way to go is to implement proper add-ons.
+            // WORK IN PROGRESS, I've commented it out to test the build.
+
+            //if let Some(sequencer_http) = sequencer_http {
+            //    // register sequencer tx forwarder
+            //    ctx.registry
+            //        .set_eth_raw_transaction_forwarder(Arc::new(rpc::SequencerClient::new(
+            //            sequencer_http,
+            //        )));
+            //}
             Ok(())
         });
 
@@ -92,7 +98,6 @@ pub struct AdditionalConfig {
     #[arg(
         long,
         value_name = "CHAIN_OR_PATH",
-        long_help = chain_help(),
         default_value = "devnet",
         value_parser = chain_value_parser,
         required = false,
@@ -105,6 +110,21 @@ pub struct AdditionalConfig {
     /// Rpc of sequener's reth node to forward transactions to.
     #[arg(long, required = false)]
     pub sequencer_http: Option<String>,
+}
+
+#[derive(Debug, Clone, Default)]
+#[non_exhaustive]
+pub struct StrataChainSpecParser;
+
+impl ChainSpecParser for StrataChainSpecParser {
+    type ChainSpec = ChainSpec;
+
+    // TODO: clarify what are the supported chains.
+    const SUPPORTED_CHAINS: &'static [&'static str] = &["dev", "devnet", "default"];
+
+    fn parse(s: &str) -> eyre::Result<Arc<Self::ChainSpec>> {
+        chain_value_parser(s)
+    }
 }
 
 pub fn chain_value_parser(s: &str) -> eyre::Result<Arc<ChainSpec>, eyre::Error> {
@@ -142,9 +162,15 @@ fn parse_chain_spec(chain_json: &str) -> eyre::Result<Arc<ChainSpec>> {
 
 /// Run node with logging
 /// based on reth::cli::Cli::run
-fn run<L, Fut>(mut command: NodeCommand<AdditionalConfig>, launcher: L) -> eyre::Result<()>
+fn run<L, Fut>(
+    mut command: NodeCommand<StrataChainSpecParser, AdditionalConfig>,
+    launcher: L,
+) -> eyre::Result<()>
 where
-    L: FnOnce(WithLaunchContext<NodeBuilder<Arc<reth_db::DatabaseEnv>>>, AdditionalConfig) -> Fut,
+    L: FnOnce(
+        WithLaunchContext<NodeBuilder<Arc<reth_db::DatabaseEnv>, ChainSpec>>,
+        AdditionalConfig,
+    ) -> Fut,
     Fut: Future<Output = eyre::Result<()>>,
 {
     command.ext.logs.log_file_directory = command

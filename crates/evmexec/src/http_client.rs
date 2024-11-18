@@ -1,15 +1,15 @@
 use std::sync::Arc;
 
-use jsonrpsee::http_client::{transport::HttpBackend, HttpClient, HttpClientBuilder};
-#[cfg(test)]
-use mockall::automock;
-use reth_primitives::{Block, BlockHash};
-use reth_rpc_api::{EngineApiClient, EthApiClient};
-use reth_rpc_layer::{AuthClientLayer, AuthClientService};
-use reth_rpc_types::engine::{
+use alloy_rpc_types::engine::{
     ExecutionPayloadBodiesV1, ExecutionPayloadInputV2, ForkchoiceState, ForkchoiceUpdated,
     JwtSecret, PayloadId,
 };
+use jsonrpsee::http_client::{transport::HttpBackend, HttpClient, HttpClientBuilder};
+#[cfg(test)]
+use mockall::automock;
+use reth_primitives::{revm_primitives::alloy_primitives::BlockHash, Block};
+use reth_rpc_api::{EngineApiClient, EthApiClient};
+use reth_rpc_layer::{AuthClientLayer, AuthClientService};
 use strata_reth_node::{
     StrataEngineTypes, StrataExecutionPayloadEnvelopeV2, StrataPayloadAttributes,
 };
@@ -42,7 +42,7 @@ pub trait EngineRpc {
     async fn new_payload_v2(
         &self,
         payload: ExecutionPayloadInputV2,
-    ) -> RpcResult<reth_rpc_types::engine::PayloadStatus>;
+    ) -> RpcResult<alloy_rpc_types::engine::PayloadStatus>;
 
     async fn get_payload_bodies_by_hash_v1(
         &self,
@@ -88,7 +88,7 @@ impl EngineRpc for EngineRpcClient {
     async fn new_payload_v2(
         &self,
         payload: ExecutionPayloadInputV2,
-    ) -> RpcResult<reth_rpc_types::engine::PayloadStatus> {
+    ) -> RpcResult<alloy_rpc_types::engine::PayloadStatus> {
         <HttpClient<AuthClientService<HttpBackend>> as EngineApiClient<StrataEngineTypes>>::new_payload_v2(&self.client, payload).await
     }
 
@@ -100,8 +100,13 @@ impl EngineRpc for EngineRpcClient {
     }
 
     async fn block_by_hash(&self, block_hash: BlockHash) -> RpcResult<Option<Block>> {
-        let block = self.client.block_by_hash(block_hash, true).await?;
+        // TODO HELP REQUIRED: reth_primitives::alloy_compat has this conversion in place.
+        // the feature alloy-compat is enabled, but somehow it doesn't work.
+        // N.B. I've commented it out to validate the build is working.
 
-        Ok(block.map(|rich_block| rich_block.inner.try_into().unwrap()))
+        //let block: Option<alloy_rpc_types::Block<_>> =
+        //    self.client.block_by_hash(block_hash, true).await?;
+        //Ok(block.map(|rpc_block| std::convert::Into::<reth_primitives::Block>::into(block)))
+        Ok(None)
     }
 }

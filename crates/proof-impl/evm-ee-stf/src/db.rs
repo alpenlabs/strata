@@ -18,12 +18,13 @@
 
 use std::collections::hash_map::Entry;
 
-use anyhow::{anyhow, Result};
 // use hashbrown::hash_map::Entry;
-use reth_primitives::{Address, Bytes, B256, U256};
+use alloy_primitives::map::HashMap;
+use anyhow::{anyhow, Result};
+use reth_primitives::revm_primitives::alloy_primitives::{Address, Bytes, B256, U256};
 use revm::{
     db::{AccountState, DbAccount, InMemoryDB},
-    primitives::{AccountInfo, Bytecode, HashMap},
+    primitives::{AccountInfo, Bytecode},
 };
 
 use crate::{
@@ -61,7 +62,10 @@ impl InMemoryDBHelper for InMemoryDB {
             .collect();
 
         // For each account, load the information into the database.
-        let mut accounts = HashMap::with_capacity(input.parent_storage.len());
+        let mut accounts = HashMap::with_capacity_and_hasher(
+            input.parent_storage.len(),
+            alloy_primitives::map::DefaultHashBuilder::default(),
+        );
         for (address, (storage_trie, slots)) in &mut input.parent_storage {
             let state_account = input
                 .parent_state_trie
@@ -84,7 +88,10 @@ impl InMemoryDBHelper for InMemoryDB {
                 Bytecode::new_raw(bytes)
             };
 
-            let mut storage = HashMap::with_capacity(slots.len());
+            let mut storage = HashMap::with_capacity_and_hasher(
+                slots.len(),
+                alloy_primitives::map::DefaultHashBuilder::default(),
+            );
             for slot in slots {
                 let value: U256 = storage_trie
                     .get_rlp(&keccak(slot.to_be_bytes::<32>()))?
@@ -106,7 +113,10 @@ impl InMemoryDBHelper for InMemoryDB {
         }
 
         // Insert ancestor headers into the database.
-        let mut block_hashes = HashMap::with_capacity(input.ancestor_headers.len() + 1);
+        let mut block_hashes = HashMap::with_capacity_and_hasher(
+            input.ancestor_headers.len() + 1,
+            alloy_primitives::map::DefaultHashBuilder::default(),
+        );
         block_hashes.insert(
             U256::from(input.parent_header.number),
             input.parent_header.hash_slow(),
@@ -162,7 +172,7 @@ impl InMemoryDBHelper for InMemoryDB {
     }
 
     fn storage_keys(&self) -> HashMap<Address, Vec<U256>> {
-        let mut out = HashMap::new();
+        let mut out = HashMap::with_hasher(alloy_primitives::map::DefaultHashBuilder::default());
         for (address, account) in &self.accounts {
             out.insert(*address, account.storage.keys().cloned().collect());
         }

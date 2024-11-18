@@ -3,10 +3,9 @@ use std::{
     collections::{HashMap, HashSet},
 };
 
-use reth_primitives::{
-    revm_primitives::{AccountInfo, Bytecode},
-    ruint::Uint,
-    Address, Bytes, B256, U256,
+use reth_primitives::revm_primitives::{
+    alloy_primitives::{ruint::Uint, Address, Bytes, B256, U256},
+    AccountInfo, Bytecode,
 };
 use reth_provider::{errors::db::DatabaseError, AccountReader, ProviderError, StateProvider};
 use reth_revm::DatabaseRef;

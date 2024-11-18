@@ -38,7 +38,7 @@ num-bigint = "0.4.6"
 num-traits = "0.2.19"
 rand.workspace = true
 rayon = "1.8.0"
-reth-rpc-types = { workspace = true }
+alloy-rpc-types = { workspace = true }
 rockbound = { workspace = true }
 serde = { workspace = true }
 sp1-sdk = "3.0.0"

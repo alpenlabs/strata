@@ -22,9 +22,11 @@ use alloy_rlp::BufMut;
 use anyhow::anyhow;
 use reth_primitives::{
     constants::{GWEI_TO_WEI, MAXIMUM_EXTRA_DATA_SIZE, MINIMUM_GAS_LIMIT},
-    revm_primitives::Account,
-    Address, Bloom, Header, Receipt, ReceiptWithBloom, Transaction, TransactionSigned,
-    TxKind as TransactionKind, U256,
+    revm_primitives::{
+        alloy_primitives::{Address, Bloom, TxKind as TransactionKind, U256},
+        Account,
+    },
+    Header, Receipt, ReceiptWithBloom, Transaction, TransactionSigned,
 };
 use reth_trie_common::root::ordered_trie_root_with_encoder;
 use revm::{
@@ -406,7 +408,12 @@ where
     account.info.balance = account.info.balance.checked_add(amount_wei).unwrap();
     account.mark_touch();
     // Commit changes to database
-    db.commit([(address, account)].into());
+    let mut ch = std::collections::HashMap::with_capacity_and_hasher(
+        1,
+        alloy_primitives::map::DefaultHashBuilder::default(),
+    );
+    ch.insert(address, account);
+    db.commit(ch);
 
     Ok(())
 }

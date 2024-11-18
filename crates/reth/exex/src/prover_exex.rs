@@ -1,18 +1,20 @@
 use std::{collections::HashMap, sync::Arc};
 
+// use reth_execution_types::BlockExecutionInput;
 use alloy_rpc_types::EIP1186AccountProofResponse;
 use eyre::eyre;
+use futures_util::TryStreamExt;
 use reth_evm::execute::{BlockExecutionInput, BlockExecutorProvider, Executor};
-// use reth_execution_types::BlockExecutionInput;
 use reth_exex::{ExExContext, ExExEvent};
 use reth_node_api::FullNodeComponents;
-use reth_primitives::{Address, BlockWithSenders, TransactionSignedNoHash, B256};
-use reth_provider::{BlockReader, Chain, ExecutionOutcome, StateProviderFactory};
-use reth_revm::{
-    db::{BundleState, CacheDB},
-    primitives::FixedBytes,
+use reth_primitives::{
+    revm_primitives::alloy_primitives::{Address, B256},
+    BlockNumHash, BlockWithSenders, TransactionSignedNoHash,
 };
+use reth_provider::{BlockReader, Chain, ExecutionOutcome, StateProviderFactory};
+use reth_revm::{db::CacheDB, primitives::FixedBytes};
 use reth_rpc_types_compat::proof::from_primitive_account_proof;
+use reth_trie::{HashedPostState, TrieInput};
 use strata_proofimpl_evm_ee_stf::{mpt::proofs_to_tries, ELProofInput};
 use strata_reth_db::WitnessStore;
 use tracing::{debug, error};
@@ -32,7 +34,7 @@ impl<Node: FullNodeComponents, S: WitnessStore + Clone> ProverWitnessGenerator<N
         Self { ctx, db }
     }
 
-    fn commit(&mut self, chain: &Chain) -> eyre::Result<Option<u64>> {
+    fn commit(&mut self, chain: &Chain) -> eyre::Result<Option<BlockNumHash>> {
         let mut finished_height = None;
         let blocks = chain.blocks();
         let bundles = chain.range().filter_map(|block_number| {
@@ -54,7 +56,7 @@ impl<Node: FullNodeComponents, S: WitnessStore + Clone> ProverWitnessGenerator<N
                 break;
             }
 
-            finished_height = Some(outcome.first_block())
+            finished_height = Some(BlockNumHash::new(outcome.first_block(), block_hash))
         }
 
         Ok(finished_height)
@@ -62,7 +64,7 @@ impl<Node: FullNodeComponents, S: WitnessStore + Clone> ProverWitnessGenerator<N
 
     pub async fn start(mut self) -> eyre::Result<()> {
         debug!("start prover witness generator");
-        while let Some(notification) = self.ctx.notifications.recv().await {
+        while let Some(notification) = self.ctx.notifications.try_next().await? {
             if let Some(committed_chain) = notification.committed_chain() {
                 let finished_height = self.commit(&committed_chain)?;
                 if let Some(finished_height) = finished_height {
@@ -109,6 +111,7 @@ fn extract_zkvm_input<Node: FullNodeComponents>(
     let current_block_idx = current_block.number;
 
     let withdrawals = current_block
+        .body
         .clone()
         .withdrawals
         .unwrap_or_default()
@@ -133,15 +136,13 @@ fn extract_zkvm_input<Node: FullNodeComponents>(
 
     let current_block_txns = current_block
         .body
-        .clone()
+        .blob_transactions()
         .into_iter()
+        .cloned()
         .map(TransactionSignedNoHash::from)
         .collect::<Vec<TransactionSignedNoHash>>();
 
     let prev_state_root = prev_block.state_root;
-
-    // Apply empty bundle state over previous block state
-    let previous_bundle_state = BundleState::default();
 
     let mut parent_proofs: HashMap<Address, EIP1186AccountProofResponse> = HashMap::new();
     let mut current_proofs: HashMap<Address, EIP1186AccountProofResponse> = HashMap::new();
@@ -154,7 +155,12 @@ fn extract_zkvm_input<Node: FullNodeComponents>(
             .map(|el| B256::from_slice(el.as_le_slice()))
             .collect();
 
-        let proof = previous_provider.proof(&previous_bundle_state, *accessed_address, &slots)?;
+        // Apply empty bundle state over previous block state.
+        let proof = previous_provider.proof(
+            TrieInput::from_state(HashedPostState::from_bundle_state([])),
+            *accessed_address,
+            &slots,
+        )?;
         let proof = from_primitive_account_proof(proof);
 
         parent_proofs.insert(*accessed_address, proof);
@@ -167,7 +173,11 @@ fn extract_zkvm_input<Node: FullNodeComponents>(
             .map(|el| B256::from_slice(el.as_le_slice()))
             .collect();
 
-        let proof = previous_provider.proof(&exec_outcome.bundle, *accessed_address, &slots)?;
+        let proof = previous_provider.proof(
+            TrieInput::from_state(exec_outcome.hash_state_slow()),
+            *accessed_address,
+            &slots,
+        )?;
         let proof = from_primitive_account_proof(proof);
 
         current_proofs.insert(*accessed_address, proof);

@@ -28,12 +28,9 @@ use std::collections::HashMap;
 
 use alloy_rlp::Encodable;
 use alloy_rlp_derive::{RlpDecodable, RlpEncodable, RlpMaxEncodedLen};
-use alloy_rpc_types::EIP1186AccountProofResponse;
+use alloy_rpc_types_eth::EIP1186AccountProofResponse;
 use anyhow::{Context, Result};
-use reth_primitives::{
-    alloy_primitives::{b256, TxNumber, B256, U256},
-    Address,
-};
+use reth_primitives::revm_primitives::alloy_primitives::{b256, Address, TxNumber, B256, U256};
 use rlp::{Decodable, DecoderError, Prototype, Rlp};
 use serde::{Deserialize, Serialize};
 use thiserror::Error as ThisError;
@@ -125,7 +122,7 @@ pub const KECCAK_EMPTY: B256 =
 pub fn keccak(data: impl AsRef<[u8]>) -> [u8; 32] {
     // TODO: Remove this benchmarking code once performance testing is complete.
     // std::hint::black_box(sha2::Sha256::digest(&data));
-    *reth_primitives::alloy_primitives::utils::keccak256(data)
+    *reth_primitives::revm_primitives::alloy_primitives::utils::keccak256(data)
 }
 
 /// Represents the root node of a sparse Merkle Patricia Trie.
