@@ -345,6 +345,7 @@ fn start_core_tasks(
     // Start the sync manager.
     let sync_manager: Arc<_> = sync_manager::start_sync_tasks(
         executor,
+        runtime,
         database.clone(),
         l2_block_manager.clone(),
         engine.clone(),

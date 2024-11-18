@@ -2,7 +2,6 @@
 edition = "2021"
 name = "strata-python-utils"
 version = "0.4.0"
-edition = "2021"
 
 [lib]
 name = "strata_utils"

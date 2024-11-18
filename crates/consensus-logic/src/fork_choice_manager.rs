@@ -13,10 +13,13 @@ use strata_state::{
     block::L2BlockBundle, block_validation::validate_block_segments, client_state::ClientState,
     prelude::*, state_op::StateCache, sync_event::SyncEvent,
 };
-use strata_status::StatusRx;
+use strata_status::StatusTx;
 use strata_storage::L2BlockManager;
 use strata_tasks::ShutdownGuard;
-use tokio::sync::mpsc;
+use tokio::{
+    runtime::Handle,
+    sync::{mpsc, watch},
+};
 use tracing::*;
 
 use crate::{
@@ -190,15 +193,30 @@ fn determine_start_tip(
 /// Main tracker task that takes a ready fork choice manager and some IO stuff.
 pub fn tracker_task<D: Database, E: ExecEngineCtl>(
     shutdown: ShutdownGuard,
+    handle: Handle,
     database: Arc<D>,
     l2_block_manager: Arc<L2BlockManager>,
     engine: Arc<E>,
     fcm_rx: mpsc::Receiver<ForkChoiceMessage>,
     csm_ctl: Arc<CsmController>,
     params: Arc<Params>,
-    status_rx: Arc<StatusRx>,
+    status_tx: Arc<StatusTx>,
 ) -> anyhow::Result<()> {
-    let init_state = status_rx.wait_until_genesis();
+    let mut cl_rx = status_tx.cl.subscribe();
+
+    info!("waiting for genesis");
+    let init_state = handle.block_on(async {
+        loop {
+            let c = cl_rx.changed().await;
+            if c.is_err() {
+                return Err(anyhow::anyhow!("ClientState update sender dropped"));
+            }
+            let st = cl_rx.borrow();
+            if st.has_genesis_occured() {
+                return Ok(st.clone());
+            }
+        }
+    })?;
     let init_state = Arc::new(init_state);
 
     // we should have the finalized tips in state at this point
@@ -225,9 +243,15 @@ pub fn tracker_task<D: Database, E: ExecEngineCtl>(
     };
     info!(%finalized_blockid, "forkchoice manager started");
 
-    if let Err(e) =
-        forkchoice_manager_task_inner(&shutdown, fcm, engine.as_ref(), fcm_rx, &csm_ctl, status_rx)
-    {
+    if let Err(e) = forkchoice_manager_task_inner(
+        &shutdown,
+        handle,
+        fcm,
+        engine.as_ref(),
+        fcm_rx,
+        &csm_ctl,
+        status_tx,
+    ) {
         error!(err = ?e, "tracker aborted");
         return Err(e);
     }
@@ -235,38 +259,67 @@ pub fn tracker_task<D: Database, E: ExecEngineCtl>(
     Ok(())
 }
 
+#[allow(clippy::large_enum_variant)]
+enum FcmEvent {
+    NewFcmMsg(ForkChoiceMessage),
+    NewStateUpdate(ClientState),
+    Abort,
+}
+
 fn forkchoice_manager_task_inner<D: Database, E: ExecEngineCtl>(
     shutdown: &ShutdownGuard,
+    handle: Handle,
     mut fcm_state: ForkChoiceManager<D>,
     engine: &E,
     mut fcm_rx: mpsc::Receiver<ForkChoiceMessage>,
     csm_ctl: &CsmController,
-    status_rx: Arc<StatusRx>,
+    status_tx: Arc<StatusTx>,
 ) -> anyhow::Result<()> {
-    let mut last_ev_idx = 0;
+    let mut cl_rx = status_tx.cl.subscribe();
     loop {
         if shutdown.should_shutdown() {
-            warn!("received shutdown signal");
+            warn!("fcm task received shutdown signal");
             break;
         }
-        let Some(m) = fcm_rx.blocking_recv() else {
-            break;
-        };
 
-        let last_sync_ev_idx = status_rx.csm().borrow().last_sync_ev_idx;
-        // Update the status if there's a new state i.e there's a new event
-        if last_sync_ev_idx > last_ev_idx {
-            // NOTE: beware of the status_rx.cl().borrow()'s scope. Since the watch channel is being
-            // written to in the process_fc_message below, if the borrow's scope is not narrowed, it
-            // will cause deadlock.
-            handle_new_state(&mut fcm_state, &status_rx.cl().borrow())?;
-            last_ev_idx = last_sync_ev_idx;
-        }
+        let fcm_ev = wait_for_fcm_event(&handle, &mut fcm_rx, &mut cl_rx);
 
-        // TODO decide when errors are actually failures vs when they're okay
-        process_fc_message(m, &mut fcm_state, engine, csm_ctl)?;
+        match fcm_ev {
+            FcmEvent::NewFcmMsg(m) => process_fc_message(m, &mut fcm_state, engine, csm_ctl),
+            FcmEvent::NewStateUpdate(st) => handle_new_state(&mut fcm_state, st),
+            FcmEvent::Abort => break,
+        }?;
     }
+    info!("Exiting fork_choice_manager task");
     Ok(())
+}
+
+fn wait_for_fcm_event(
+    handle: &Handle,
+    fcm_rx: &mut mpsc::Receiver<ForkChoiceMessage>,
+    cl_rx: &mut watch::Receiver<ClientState>,
+) -> FcmEvent {
+    handle.block_on(async {
+        tokio::select! {
+            m = fcm_rx.recv() => {
+                match m {
+                    Some(msg) => FcmEvent::NewFcmMsg(msg),
+                    None => {
+                        warn!("Fcm channel closed");
+                        FcmEvent::Abort
+                    }
+                }
+            }
+            c = cl_rx.changed() => {
+                if c.is_err() {
+                    warn!("ClientState update sender closed");
+                    FcmEvent::Abort
+                } else {
+                    FcmEvent::NewStateUpdate(cl_rx.borrow().clone())
+                }
+            }
+        }
+    })
 }
 
 fn process_fc_message<D: Database, E: ExecEngineCtl>(
@@ -380,23 +433,24 @@ fn process_fc_message<D: Database, E: ExecEngineCtl>(
 
 fn handle_new_state<D: Database>(
     fcm_state: &mut ForkChoiceManager<D>,
-    cs: &ClientState,
+    cs: ClientState,
 ) -> anyhow::Result<()> {
-    let sync = cs.sync().expect("fcm: client state missing sync data");
+    let sync = cs
+        .sync()
+        .expect("fcm: client state missing sync data")
+        .clone();
 
     let csm_tip = sync.chain_tip_blkid();
     debug!(?csm_tip, "got new CSM state");
 
     // Update the new state.
-    fcm_state.cur_csm_state = Arc::new(cs.clone());
+    fcm_state.cur_csm_state = Arc::new(cs);
 
-    if let Some(sync) = cs.sync() {
-        let blkid = sync.finalized_blkid();
-        let fin_report = fcm_state.chain_tracker.update_finalized_tip(blkid)?;
-        info!(?blkid, "updated finalized tip");
-        trace!(?fin_report, "finalization report");
-        // TODO do something with the finalization report
-    }
+    let blkid = sync.finalized_blkid();
+    let fin_report = fcm_state.chain_tracker.update_finalized_tip(blkid)?;
+    info!(?blkid, "updated finalized tip");
+    trace!(?fin_report, "finalization report");
+    // TODO do something with the finalization report
 
     // TODO recheck every remaining block's validity using the new state
     // starting from the bottom up, putting into a new chain tracker

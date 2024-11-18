@@ -1,9 +1,5 @@
 //! Manages and updates unified status bundles
-use std::{
-    sync::{Arc, Condvar, Mutex},
-    thread,
-    time::Duration,
-};
+use std::sync::Arc;
 
 use strata_rpc_types::L1Status;
 use strata_state::{chain_state::Chainstate, client_state::ClientState, csm_status::CsmStatus};
@@ -20,15 +16,12 @@ pub enum StatusError {
     Other(String),
 }
 
-const GENESIS_CHECK_INTERVAL: u64 = 10; // Millis
-
 /// Bundle wrapper for Status receiver
 pub struct StatusRx {
     csm: watch::Receiver<CsmStatus>,
     cl: watch::Receiver<ClientState>,
     l1: watch::Receiver<L1Status>,
-    chs: watch::Receiver<Option<ChainState>>,
-    condvar_pair: Arc<(Mutex<bool>, Condvar)>,
+    chs: watch::Receiver<Option<Chainstate>>,
 }
 
 impl StatusRx {
@@ -36,35 +29,9 @@ impl StatusRx {
         csm: watch::Receiver<CsmStatus>,
         cl: watch::Receiver<ClientState>,
         l1: watch::Receiver<L1Status>,
-        chs: watch::Receiver<Option<ChainState>>,
+        chs: watch::Receiver<Option<Chainstate>>,
     ) -> Self {
-        let condvar_pair = Arc::new((Mutex::new(true), Condvar::new()));
-        let pair_clone = condvar_pair.clone();
-        let cl_clone = cl.clone();
-
-        let status_rx = Self {
-            csm,
-            cl,
-            l1,
-            chs,
-            condvar_pair,
-        };
-
-        // Spawn a thread that waits for genesis and notifies condvar. This will be used for
-        // waiting until genesis by calling `wait_until_genesis` method below.
-        thread::spawn(move || loop {
-            let cstate = cl_clone.borrow();
-            if cstate.has_genesis_occured() {
-                let (lock, cvar) = &*pair_clone;
-                let mut pending = lock.lock().unwrap();
-                *pending = false;
-                cvar.notify_one();
-                break;
-            }
-            thread::sleep(Duration::from_millis(GENESIS_CHECK_INTERVAL));
-        });
-
-        status_rx
+        Self { csm, cl, l1, chs }
     }
 
     pub fn csm(&self) -> &watch::Receiver<CsmStatus> {
@@ -79,22 +46,8 @@ impl StatusRx {
         &self.l1
     }
 
-    pub fn chs(&self) -> &watch::Receiver<Option<ChainState>> {
+    pub fn chs(&self) -> &watch::Receiver<Option<Chainstate>> {
         &self.chs
-    }
-
-    pub fn wait_until_genesis(&self) -> ClientState {
-        let cstate = self.cl.borrow().clone();
-        if cstate.has_genesis_occured() {
-            return cstate;
-        }
-
-        let (lock, cvar) = &*self.condvar_pair;
-        let _guard = cvar
-            .wait_while(lock.lock().unwrap(), |pending| *pending)
-            .unwrap();
-
-        self.cl.borrow().clone()
     }
 }
 
