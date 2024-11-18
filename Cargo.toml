@@ -158,34 +158,34 @@ reqwest = { version = "0.12.7", default-features = false, features = [
   "zstd",
   "json",
 ] }
-reth = { git = "https://github.com/alpenlabs/reth.git", rev = "v1.0.3-alpen.1" }
-reth-basic-payload-builder = { git = "https://github.com/alpenlabs/reth.git", rev = "v1.0.3-alpen.1" }
-reth-chainspec = { git = "https://github.com/alpenlabs/reth.git", rev = "v1.0.3-alpen.1" }
-reth-cli-commands = { git = "https://github.com/alpenlabs/reth.git", rev = "v1.0.3-alpen.1" }
-reth-cli-util = { git = "https://github.com/alpenlabs/reth.git", rev = "v1.0.3-alpen.1" }
-reth-db = { git = "https://github.com/alpenlabs/reth.git", rev = "v1.0.3-alpen.1" }
-reth-errors = { git = "https://github.com/alpenlabs/reth.git", rev = "v1.0.3-alpen.1" }
-reth-ethereum-payload-builder = { git = "https://github.com/alpenlabs/reth.git", rev = "v1.0.3-alpen.1" }
-reth-evm = { git = "https://github.com/alpenlabs/reth.git", rev = "v1.0.3-alpen.1" }
-reth-evm-ethereum = { git = "https://github.com/alpenlabs/reth.git", rev = "v1.0.3-alpen.1" }
-reth-exex = { git = "https://github.com/alpenlabs/reth.git", rev = "v1.0.3-alpen.1" }
-reth-ipc = { git = "https://github.com/alpenlabs/reth.git", rev = "v1.0.3-alpen.1" }
-reth-node-api = { git = "https://github.com/alpenlabs/reth.git", rev = "v1.0.3-alpen.1" }
-reth-node-ethereum = { git = "https://github.com/alpenlabs/reth.git", rev = "v1.0.3-alpen.1" }
-reth-payload-builder = { git = "https://github.com/alpenlabs/reth.git", rev = "v1.0.3-alpen.1" }
-reth-primitives = { git = "https://github.com/alpenlabs/reth.git", rev = "v1.0.3-alpen.1", default-features = false, features = [
+reth = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
+reth-basic-payload-builder = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
+reth-chainspec = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
+reth-cli-commands = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
+reth-cli-util = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
+reth-db = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
+reth-errors = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
+reth-ethereum-payload-builder = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
+reth-evm = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
+reth-evm-ethereum = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
+reth-exex = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
+reth-ipc = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
+reth-node-api = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
+reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
+reth-payload-builder = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
+reth-primitives = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3", default-features = false, features = [
   "std",
 ] }
-reth-provider = { git = "https://github.com/alpenlabs/reth.git", rev = "v1.0.3-alpen.1" }
-reth-revm = { git = "https://github.com/alpenlabs/reth.git", rev = "v1.0.3-alpen.1" }
-reth-rpc = { git = "https://github.com/alpenlabs/reth.git", rev = "v1.0.3-alpen.1" }
-reth-rpc-api = { git = "https://github.com/alpenlabs/reth.git", rev = "v1.0.3-alpen.1" }
-reth-rpc-eth-api = { git = "https://github.com/alpenlabs/reth.git", rev = "v1.0.3-alpen.1" }
-reth-rpc-eth-types = { git = "https://github.com/alpenlabs/reth.git", rev = "v1.0.3-alpen.1" }
-reth-rpc-layer = { git = "https://github.com/alpenlabs/reth.git", rev = "v1.0.3-alpen.1" }
-reth-rpc-types = { git = "https://github.com/alpenlabs/reth.git", rev = "v1.0.3-alpen.1" }
-reth-rpc-types-compat = { git = "https://github.com/alpenlabs/reth.git", rev = "v1.0.3-alpen.1" }
-reth-trie-common = { git = "https://github.com/alpenlabs/reth.git", rev = "v1.0.3-alpen.1" }
+reth-provider = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
+reth-revm = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
+reth-rpc = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
+reth-rpc-api = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
+reth-rpc-eth-api = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
+reth-rpc-eth-types = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
+reth-rpc-layer = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
+reth-rpc-types = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
+reth-rpc-types-compat = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
+reth-trie-common = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
 revm = { version = "12.1.0", features = [
   "std",
   "secp256k1",

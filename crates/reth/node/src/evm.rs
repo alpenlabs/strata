@@ -54,7 +54,7 @@ impl ConfigureEvmEnv for StrataEvmConfig {
 impl ConfigureEvm for StrataEvmConfig {
     type DefaultExternalContext<'a> = ();
 
-    fn evm<DB: Database>(&self, db: DB) -> Evm<'_, Self::DefaultExternalContext<'_>, DB> {
+    fn evm<'a, DB: Database + 'a>(&self, db: DB) -> Evm<'a, Self::DefaultExternalContext<'a>, DB> {
         EvmBuilder::default()
             .with_db(db)
             // add additional precompiles
@@ -62,7 +62,7 @@ impl ConfigureEvm for StrataEvmConfig {
             .build()
     }
 
-    fn evm_with_inspector<DB, I>(&self, db: DB, inspector: I) -> Evm<'_, I, DB>
+    fn evm_with_inspector<'a, DB, I>(&self, db: DB, inspector: I) -> Evm<'a, I, DB>
     where
         DB: Database,
         I: GetInspector<DB>,
@@ -75,6 +75,4 @@ impl ConfigureEvm for StrataEvmConfig {
             .append_handler_register(inspector_handle_register)
             .build()
     }
-
-    fn default_external_context<'a>(&self) -> Self::DefaultExternalContext<'a> {}
 }

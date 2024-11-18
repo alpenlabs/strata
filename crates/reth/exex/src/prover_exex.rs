@@ -2,14 +2,12 @@ use std::{collections::HashMap, sync::Arc};
 
 use alloy_rpc_types::EIP1186AccountProofResponse;
 use eyre::eyre;
-use reth_evm::execute::{BlockExecutorProvider, Executor};
+use reth_evm::execute::{BlockExecutionInput, BlockExecutorProvider, Executor};
 // use reth_execution_types::BlockExecutionInput;
 use reth_exex::{ExExContext, ExExEvent};
 use reth_node_api::FullNodeComponents;
 use reth_primitives::{Address, BlockWithSenders, TransactionSignedNoHash, B256};
-use reth_provider::{
-    BlockExecutionInput, BlockReader, Chain, ExecutionOutcome, StateProviderFactory,
-};
+use reth_provider::{BlockReader, Chain, ExecutionOutcome, StateProviderFactory};
 use reth_revm::{
     db::{BundleState, CacheDB},
     primitives::FixedBytes,
