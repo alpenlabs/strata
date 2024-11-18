@@ -46,6 +46,7 @@ impl ZkVmHost for SP1Host {
         prover_input: <Self::Input<'a> as ZkVmInputBuilder<'a>>::Input,
         proof_type: ProofType,
     ) -> anyhow::Result<(Proof, VerificationKey)> {
+        sp1_sdk::utils::setup_logger();
         let client = ProverClient::new();
 
         // Start proving

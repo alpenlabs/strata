@@ -1,7 +1,6 @@
 use std::{fs, path::PathBuf};
 
 use anyhow::Result;
-use sp1_sdk::{HashableKey, Prover, SP1VerifyingKey};
 use strata_primitives::buf;
 use strata_zkvm::{Proof, ProofType, VerificationKey, ZkVmHost, ZkVmProver};
 

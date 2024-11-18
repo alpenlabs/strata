@@ -81,9 +81,6 @@ mod test {
 
     #[test]
     fn test_l1_batch_code_trace_generation() {
-        #[cfg(feature = "sp1")]
-        sp1_sdk::utils::setup_logger();
-
         let params = gen_params();
         let rollup_params = params.rollup();
         let l1_start_height = (rollup_params.genesis_l1_height + 1) as u32;
