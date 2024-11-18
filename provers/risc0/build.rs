@@ -23,6 +23,9 @@ fn main() {
             pub const GUEST_RISC0_CL_STF_ELF: &[u8] = &[];
             pub const GUEST_RISC0_CL_STF_ID: &[u8] = &[];
 
+            pub const GUEST_RISC0_CL_AGG_ELF: &[u8] = &[];
+            pub const GUEST_RISC0_CL_AGG_ID: &[u32; 8] = &[0u32; 8];
+
             pub const GUEST_RISC0_BTC_BLOCKSPACE_ELF: &[u8] = &[];
             pub const GUEST_RISC0_BTC_BLOCKSPACE_ID: &[u8] = &[];
 
