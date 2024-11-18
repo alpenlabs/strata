@@ -2121,7 +2121,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3198c06247e8d4ad0d1312591edf049b0de4ddffa9fecb625c318fd67db8639b"
 dependencies = [
  "aurora-engine-modexp",
- "blst",
  "c-kzg",
  "cfg-if",
  "k256",
@@ -2648,6 +2647,7 @@ dependencies = [
 name = "strata-proofimpl-cl-agg"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "borsh",
  "strata-proofimpl-cl-stf",
  "strata-zkvm",
@@ -2657,6 +2657,7 @@ dependencies = [
 name = "strata-proofimpl-cl-stf"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "bincode",
  "borsh",
  "serde",

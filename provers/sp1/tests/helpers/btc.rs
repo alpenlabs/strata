@@ -67,8 +67,6 @@ mod test {
 
     #[test]
     fn test_btc_blockspace_code_trace_generation() {
-        #[cfg(feature = "sp1")]
-        sp1_sdk::utils::setup_logger();
         let btc_chain = get_btc_chain();
         let block = btc_chain.get_block(40321);
 

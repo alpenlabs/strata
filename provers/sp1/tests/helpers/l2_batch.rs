@@ -66,9 +66,6 @@ mod test {
 
     #[test]
     fn test_cl_agg_guest_code_trace_generation() {
-        #[cfg(feature = "sp1")]
-        sp1_sdk::utils::setup_logger();
-
         let el_prover = ElProofGenerator::new();
         let cl_prover = ClProofGenerator::new(el_prover);
         let cl_agg_prover = L2BatchProofGenerator::new(cl_prover);
