@@ -10,7 +10,7 @@ use super::{btc_ops::BtcOperations, ops::ProvingOperations};
 use crate::{
     dispatcher::TaskDispatcher,
     errors::{ProvingTaskError, ProvingTaskType},
-    primitives::prover_input::{ProofWithVkey, ZKVMInput},
+    primitives::prover_input::{ProofWithVkey, ZkVmInput},
     task::TaskTracker,
 };
 
@@ -111,7 +111,7 @@ impl ProvingOperations for L1BatchOperations {
 
         // Create the l1_batch task with dependencies on btc tasks
         let task_id = task_tracker
-            .create_task(ZKVMInput::L1Batch(input), dependencies)
+            .create_task(ZkVmInput::L1Batch(input), dependencies)
             .await;
         Ok(task_id)
     }

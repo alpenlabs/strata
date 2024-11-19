@@ -6,7 +6,7 @@ use strata_proofimpl_evm_ee_stf::ELProofInput;
 use strata_sp1_adapter::{SP1Host, SP1ProofInputBuilder};
 use strata_sp1_guest_builder::GUEST_EVM_EE_STF_ELF;
 use strata_test_utils::evm_ee::EvmSegment;
-use strata_zkvm::{Proof, ProverOptions, VerificationKey, ZKVMHost, ZKVMInputBuilder};
+use strata_zkvm::{Proof, ProverOptions, VerificationKey, ZkVmHost, ZkVmInputBuilder};
 
 use crate::helpers::proof_generator::ProofGenerator;
 

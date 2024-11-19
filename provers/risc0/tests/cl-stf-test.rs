@@ -1,10 +1,10 @@
 #[cfg(feature = "prover")]
 #[cfg(all(feature = "prover", not(debug_assertions)))]
 mod test {
-    use strata_risc0_adapter::{Risc0Verifier, RiscZeroHost, RiscZeroProofInputBuilder};
+    use strata_risc0_adapter::{Risc0Host, Risc0ProofInputBuilder, Risc0Verifier};
     use strata_risc0_guest_builder::GUEST_RISC0_CL_STF_ELF;
     use strata_state::{block::L2Block, chain_state::ChainState};
-    use strata_zkvm::{ZKVMHost, ZKVMInputBuilder, ZKVMVerifier};
+    use strata_zkvm::{ZkVmHost, ZkVmInputBuilder, ZkVmVerifier};
 
     fn get_prover_input() -> (ChainState, L2Block) {
         let prev_state_data: &[u8] =
@@ -22,10 +22,10 @@ mod test {
     fn test_reth_stf_guest_code_trace_generation() {
         let input = get_prover_input();
 
-        let prover = RiscZeroHost::init(GUEST_RISC0_CL_STF_ELF.into(), Default::default());
+        let prover = Risc0Host::init(GUEST_RISC0_CL_STF_ELF.into(), Default::default());
 
         // TODO: handle this properly
-        let input = RiscZeroProofInputBuilder::new()
+        let input = Risc0ProofInputBuilder::new()
             .write_borsh(&input)
             .unwrap()
             .build()

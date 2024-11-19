@@ -6,7 +6,7 @@ use sp1_sdk::Prover;
 use strata_sp1_adapter::{SP1Host, SP1ProofInputBuilder};
 use strata_sp1_guest_builder::GUEST_BTC_BLOCKSPACE_ELF;
 use strata_test_utils::l2::gen_params;
-use strata_zkvm::{Proof, ProverOptions, VerificationKey, ZKVMHost, ZKVMInputBuilder};
+use strata_zkvm::{Proof, ProverOptions, VerificationKey, ZkVmHost, ZkVmInputBuilder};
 
 use crate::helpers::proof_generator::ProofGenerator;
 

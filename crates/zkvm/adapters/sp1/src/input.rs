@@ -1,11 +1,11 @@
 use anyhow::Ok;
 use sp1_sdk::{SP1Proof, SP1ProofWithPublicValues, SP1Stdin, SP1VerifyingKey};
-use strata_zkvm::{AggregationInput, ZKVMInputBuilder};
+use strata_zkvm::{AggregationInput, ZkVmInputBuilder};
 
 // A wrapper around SP1Stdin
 pub struct SP1ProofInputBuilder(SP1Stdin);
 
-impl<'a> ZKVMInputBuilder<'a> for SP1ProofInputBuilder {
+impl<'a> ZkVmInputBuilder<'a> for SP1ProofInputBuilder {
     type Input = SP1Stdin;
     fn new() -> SP1ProofInputBuilder {
         SP1ProofInputBuilder(SP1Stdin::new())

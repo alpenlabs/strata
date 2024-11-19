@@ -4,8 +4,8 @@ use strata_proofimpl_cl_stf::L2BatchProofOutput;
 use strata_sp1_adapter::{SP1Host, SP1ProofInputBuilder, SP1Verifier};
 use strata_sp1_guest_builder::GUEST_CL_AGG_ELF;
 use strata_zkvm::{
-    AggregationInput, Proof, ProverOptions, VerificationKey, ZKVMHost, ZKVMInputBuilder,
-    ZKVMVerifier,
+    AggregationInput, Proof, ProverOptions, VerificationKey, ZkVmHost, ZkVmInputBuilder,
+    ZkVmVerifier,
 };
 
 use crate::helpers::{cl::ClProofGenerator, proof_generator::ProofGenerator};

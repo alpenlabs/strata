@@ -7,8 +7,8 @@ use strata_sp1_adapter::{SP1Host, SP1ProofInputBuilder};
 use strata_sp1_guest_builder::GUEST_L1_BATCH_ELF;
 use strata_test_utils::bitcoin::get_btc_chain;
 use strata_zkvm::{
-    AggregationInput, Proof, ProverOptions, VerificationKey, ZKVMHost, ZKVMInputBuilder,
-    ZKVMVerifier,
+    AggregationInput, Proof, ProverOptions, VerificationKey, ZkVmHost, ZkVmInputBuilder,
+    ZkVmVerifier,
 };
 
 use crate::helpers::{btc::BtcBlockProofGenerator, proof_generator::ProofGenerator};

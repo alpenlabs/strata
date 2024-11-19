@@ -12,7 +12,7 @@ use crate::proving_ops::{
 pub type ProofWithVkey = AggregationInput;
 
 #[derive(Debug, Clone)]
-pub enum ZKVMInput {
+pub enum ZkVmInput {
     BtcBlock(Block, RollupParams),
     ElBlock(WitnessData),
     ClBlock(CLProverInput),
@@ -21,15 +21,15 @@ pub enum ZKVMInput {
     Checkpoint(CheckpointInput),
 }
 
-impl ZKVMInput {
+impl ZkVmInput {
     pub fn proof_vm_id(&self) -> ProofVm {
         match self {
-            ZKVMInput::BtcBlock(_, _) => ProofVm::BtcProving,
-            ZKVMInput::ElBlock(_) => ProofVm::ELProving,
-            ZKVMInput::ClBlock(_) => ProofVm::CLProving,
-            ZKVMInput::L1Batch(_) => ProofVm::L1Batch,
-            ZKVMInput::L2Batch(_) => ProofVm::CLAggregation,
-            ZKVMInput::Checkpoint(_) => ProofVm::Checkpoint,
+            ZkVmInput::BtcBlock(_, _) => ProofVm::BtcProving,
+            ZkVmInput::ElBlock(_) => ProofVm::ELProving,
+            ZkVmInput::ClBlock(_) => ProofVm::CLProving,
+            ZkVmInput::L1Batch(_) => ProofVm::L1Batch,
+            ZkVmInput::L2Batch(_) => ProofVm::CLAggregation,
+            ZkVmInput::Checkpoint(_) => ProofVm::Checkpoint,
         }
     }
 }

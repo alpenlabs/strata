@@ -16,6 +16,6 @@ mod verifier;
 pub use verifier::SP1Verifier;
 
 #[cfg(feature = "zkvm")]
-mod zkvm_sp1;
+mod env;
 #[cfg(feature = "zkvm")]
-pub use zkvm_sp1::ZkVmSp1;
+pub use env::Sp1ZkVmEnv;
