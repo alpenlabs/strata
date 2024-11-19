@@ -1,7 +1,13 @@
 use anyhow::{Context, Result};
 use strata_proofimpl_cl_agg::{ClAggInput, ClAggProver};
 use strata_proofimpl_cl_stf::L2BatchProofOutput;
+#[cfg(feature = "risc0")]
+use strata_risc0_adapter::{Risc0Host, Risc0ProofInputBuilder};
+#[cfg(feature = "risc0")]
+use strata_risc0_guest_builder::{GUEST_RISC0_CL_AGG_ELF, GUEST_RISC0_CL_AGG_ID};
+#[cfg(feature = "sp1")]
 use strata_sp1_adapter::{SP1Host, SP1ProofInputBuilder};
+#[cfg(feature = "sp1")]
 use strata_sp1_guest_builder::{
     GUEST_CL_AGG_ELF, GUEST_CL_AGG_PK, GUEST_CL_AGG_VK, GUEST_CL_AGG_VK_HASH_STR,
 };
@@ -47,41 +53,37 @@ impl ProofGenerator<(u64, u64), ClAggProver> for L2BatchProofGenerator {
     }
 
     fn get_host(&self) -> impl ZkVmHost {
+        #[cfg(feature = "risc0")]
+        return Risc0Host::init(GUEST_RISC0_CL_AGG_ELF);
+
+        #[cfg(feature = "sp1")]
         SP1Host::new_from_bytes(&GUEST_CL_AGG_PK, &GUEST_CL_AGG_VK)
     }
 
     fn get_elf(&self) -> &[u8] {
+        #[cfg(feature = "risc0")]
+        return &GUEST_RISC0_CL_AGG_ELF;
+
+        #[cfg(feature = "sp1")]
         &GUEST_CL_AGG_ELF
     }
 
     fn get_short_program_id(&self) -> String {
+        #[cfg(feature = "risc0")]
+        return hex::encode(GUEST_RISC0_CL_AGG_ID[0].to_le_bytes());
+
+        #[cfg(feature = "sp1")]
         GUEST_CL_AGG_VK_HASH_STR.to_string().split_off(58)
     }
 }
 
 #[cfg(test)]
-#[cfg(all(feature = "sp1", not(debug_assertions)))]
+// #[cfg(all(feature = "sp1", not(debug_assertions)))]
 mod test {
     use crate::{ClProofGenerator, ElProofGenerator, L2BatchProofGenerator, ProofGenerator};
 
     #[test]
     fn test_cl_agg_guest_code_trace_generation() {
-        let el_prover = ElProofGenerator::new();
-        let cl_prover = ClProofGenerator::new(el_prover);
-        let cl_agg_prover = L2BatchProofGenerator::new(cl_prover);
-
-        let _ = cl_agg_prover.get_proof(&(1, 3)).unwrap();
-    }
-}
-
-// #[cfg(all(feature = "prover", not(debug_assertions)))]
-mod test {
-    use crate::{ClProofGenerator, ElProofGenerator, L2BatchProofGenerator, ProofGenerator};
-
-    #[test]
-    fn test_cl_agg_guest_code_trace_generation() {
-        sp1_sdk::utils::setup_logger();
-
         let el_prover = ElProofGenerator::new();
         let cl_prover = ClProofGenerator::new(el_prover);
         let cl_agg_prover = L2BatchProofGenerator::new(cl_prover);

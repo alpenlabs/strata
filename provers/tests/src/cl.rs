@@ -6,7 +6,13 @@ use strata_proofimpl_cl_stf::{
     prover::{ClStfInput, ClStfProver},
     L2BatchProofOutput,
 };
+#[cfg(feature = "risc0")]
+use strata_risc0_adapter::{Risc0Host, Risc0ProofInputBuilder};
+#[cfg(feature = "risc0")]
+use strata_risc0_guest_builder::{GUEST_RISC0_CL_STF_ELF, GUEST_RISC0_CL_STF_ID};
+#[cfg(feature = "sp1")]
 use strata_sp1_adapter::{SP1Host, SP1ProofInputBuilder};
+#[cfg(feature = "sp1")]
 use strata_sp1_guest_builder::{
     GUEST_CL_STF_ELF, GUEST_CL_STF_PK, GUEST_CL_STF_VK, GUEST_CL_STF_VK_HASH_STR,
 };
@@ -62,20 +68,32 @@ impl ProofGenerator<u64, ClStfProver> for ClProofGenerator {
     }
 
     fn get_host(&self) -> impl ZkVmHost {
+        #[cfg(feature = "risc0")]
+        return Risc0Host::init(&GUEST_RISC0_CL_STF_ELF);
+
+        #[cfg(feature = "sp1")]
         SP1Host::new_from_bytes(&GUEST_CL_STF_PK, &GUEST_CL_STF_VK)
     }
 
     fn get_elf(&self) -> &[u8] {
+        #[cfg(feature = "risc0")]
+        return &GUEST_RISC0_CL_STF_ELF;
+
+        #[cfg(feature = "sp1")]
         &GUEST_CL_STF_ELF
     }
 
     fn get_short_program_id(&self) -> String {
+        #[cfg(feature = "risc0")]
+        return hex::encode(GUEST_RISC0_CL_STF_ID[0].to_le_bytes());
+
+        #[cfg(feature = "sp1")]
         GUEST_CL_STF_VK_HASH_STR.to_string().split_off(58)
     }
 }
 
 #[cfg(test)]
-#[cfg(all(feature = "sp1", not(debug_assertions)))]
+// #[cfg(all(feature = "sp1", not(debug_assertions)))]
 mod tests {
     use super::*;
 

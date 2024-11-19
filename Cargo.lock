@@ -13816,6 +13816,8 @@ dependencies = [
  "strata-proofimpl-cl-stf",
  "strata-proofimpl-evm-ee-stf",
  "strata-proofimpl-l1-batch",
+ "strata-risc0-adapter",
+ "strata-risc0-guest-builder",
  "strata-sp1-adapter",
  "strata-sp1-guest-builder",
  "strata-state",
