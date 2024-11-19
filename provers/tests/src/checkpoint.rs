@@ -3,6 +3,10 @@ use strata_proofimpl_checkpoint::{
     prover::{CheckpointProver, CheckpointProverInput},
     CheckpointProofInput, CheckpointProofOutput,
 };
+#[cfg(feature = "risc0")]
+use strata_risc0_adapter::{Risc0Host, Risc0ProofInputBuilder};
+#[cfg(feature = "risc0")]
+use strata_risc0_guest_builder::{GUEST_RISC0_CHECKPOINT_ELF, GUEST_RISC0_CHECKPOINT_ID};
 #[cfg(feature = "sp1")]
 use strata_sp1_adapter::SP1Host;
 #[cfg(feature = "sp1")]
@@ -88,20 +92,32 @@ impl ProofGenerator<CheckpointBatchInfo, CheckpointProver> for CheckpointProofGe
     }
 
     fn get_host(&self) -> impl ZkVmHost {
+        #[cfg(feature = "risc0")]
+        return Risc0Host::init(&GUEST_RISC0_CHECKPOINT_ELF);
+
+        #[cfg(feature = "sp1")]
         SP1Host::new_from_bytes(&GUEST_CHECKPOINT_PK, &GUEST_CHECKPOINT_VK)
     }
 
     fn get_elf(&self) -> &[u8] {
+        #[cfg(feature = "risc0")]
+        return &GUEST_RISC0_CHECKPOINT_ELF;
+
+        #[cfg(feature = "sp1")]
         &GUEST_CHECKPOINT_ELF
     }
 
     fn get_short_program_id(&self) -> String {
+        #[cfg(feature = "risc0")]
+        return hex::encode(GUEST_RISC0_CHECKPOINT_ID[0].to_le_bytes());
+
+        #[cfg(feature = "sp1")]
         GUEST_CHECKPOINT_VK_HASH_STR.to_string().split_off(58)
     }
 }
 
 #[cfg(test)]
-#[cfg(all(feature = "sp1", not(debug_assertions)))]
+// #[cfg(all(feature = "sp1", not(debug_assertions)))]
 mod test {
 
     use strata_test_utils::l2::gen_params;
@@ -111,43 +127,6 @@ mod test {
 
     #[test]
     fn test_checkpoint_proof() {
-        let params = gen_params();
-        let rollup_params = params.rollup();
-        let l1_start_height = (rollup_params.genesis_l1_height + 1) as u32;
-        let l1_end_height = l1_start_height + 2;
-
-        let l2_start_height = 1;
-        let l2_end_height = 3;
-
-        let btc_prover = BtcBlockProofGenerator::new();
-        let l1_batch_prover = L1BatchProofGenerator::new(btc_prover);
-        let el_prover = ElProofGenerator::new();
-        let cl_prover = ClProofGenerator::new(el_prover);
-        let l2_batch_prover = L2BatchProofGenerator::new(cl_prover);
-        let checkpoint_prover = CheckpointProofGenerator::new(l1_batch_prover, l2_batch_prover);
-
-        let prover_input = CheckpointBatchInfo {
-            l1_range: (l1_start_height.into(), l1_end_height.into()),
-            l2_range: (l2_start_height, l2_end_height),
-        };
-
-        let _ = checkpoint_prover
-            .get_proof(&prover_input)
-            .expect("Failed to generate proof");
-    }
-}
-
-mod test {
-
-    use strata_test_utils::l2::gen_params;
-
-    use super::*;
-    use crate::{BtcBlockProofGenerator, ClProofGenerator, ElProofGenerator};
-
-    #[test]
-    fn test_checkpoint_proof() {
-        sp1_sdk::utils::setup_logger();
-
         let params = gen_params();
         let rollup_params = params.rollup();
         let l1_start_height = (rollup_params.genesis_l1_height + 1) as u32;

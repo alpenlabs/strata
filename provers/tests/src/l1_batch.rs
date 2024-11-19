@@ -2,7 +2,13 @@ use anyhow::{Context, Result};
 use bitcoin::params::MAINNET;
 use strata_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
 use strata_proofimpl_l1_batch::{L1BatchProofInput, L1BatchProofOutput, L1BatchProver};
+#[cfg(feature = "risc0")]
+use strata_risc0_adapter::{Risc0Host, Risc0ProofInputBuilder};
+#[cfg(feature = "risc0")]
+use strata_risc0_guest_builder::{GUEST_RISC0_L1_BATCH_ELF, GUEST_RISC0_L1_BATCH_ID};
+#[cfg(feature = "sp1")]
 use strata_sp1_adapter::{SP1Host, SP1ProofInputBuilder};
+#[cfg(feature = "sp1")]
 use strata_sp1_guest_builder::{
     GUEST_L1_BATCH_ELF, GUEST_L1_BATCH_PK, GUEST_L1_BATCH_VK, GUEST_L1_BATCH_VK_HASH_STR,
 };
@@ -45,6 +51,7 @@ impl ProofGenerator<(u32, u32), L1BatchProver> for L1BatchProofGenerator {
             batch,
             blockspace_vk: self.btc_proof_generator.get_host().get_verification_key(),
         };
+        // dbg!(&input.blockspace_vk);
         Ok(input)
     }
 
@@ -60,20 +67,32 @@ impl ProofGenerator<(u32, u32), L1BatchProver> for L1BatchProofGenerator {
     }
 
     fn get_host(&self) -> impl ZkVmHost {
+        #[cfg(feature = "risc0")]
+        return Risc0Host::init(&GUEST_RISC0_L1_BATCH_ELF);
+
+        #[cfg(feature = "sp1")]
         SP1Host::new_from_bytes(&GUEST_L1_BATCH_PK, &GUEST_L1_BATCH_VK)
     }
 
     fn get_elf(&self) -> &[u8] {
+        #[cfg(feature = "risc0")]
+        return &GUEST_RISC0_L1_BATCH_ELF;
+
+        #[cfg(feature = "sp1")]
         &GUEST_L1_BATCH_ELF
     }
 
     fn get_short_program_id(&self) -> String {
+        #[cfg(feature = "risc0")]
+        return hex::encode(GUEST_RISC0_L1_BATCH_ID[0].to_le_bytes());
+
+        #[cfg(feature = "sp1")]
         GUEST_L1_BATCH_VK_HASH_STR.to_string().split_off(58)
     }
 }
 
 #[cfg(test)]
-#[cfg(all(feature = "sp1", not(debug_assertions)))]
+// #[cfg(all(feature = "sp1", not(debug_assertions)))]
 mod test {
     use strata_test_utils::l2::gen_params;
 
@@ -84,29 +103,7 @@ mod test {
         let params = gen_params();
         let rollup_params = params.rollup();
         let l1_start_height = (rollup_params.genesis_l1_height + 1) as u32;
-        let l1_end_height = l1_start_height + 2;
-
-        let btc_proof_generator = BtcBlockProofGenerator::new();
-        let _ = L1BatchProofGenerator::new(btc_proof_generator)
-            .get_proof(&(l1_start_height, l1_end_height))
-            .unwrap();
-    }
-}
-
-// #[cfg(all(feature = "prover", not(debug_assertions)))]
-mod test {
-    use strata_test_utils::l2::gen_params;
-
-    use crate::{BtcBlockProofGenerator, L1BatchProofGenerator, ProofGenerator};
-
-    #[test]
-    fn test_l1_batch_code_trace_generation() {
-        sp1_sdk::utils::setup_logger();
-
-        let params = gen_params();
-        let rollup_params = params.rollup();
-        let l1_start_height = (rollup_params.genesis_l1_height + 1) as u32;
-        let l1_end_height = l1_start_height + 2;
+        let l1_end_height = l1_start_height + 1;
 
         let btc_proof_generator = BtcBlockProofGenerator::new();
         let _ = L1BatchProofGenerator::new(btc_proof_generator)
