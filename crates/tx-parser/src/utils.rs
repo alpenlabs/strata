@@ -7,7 +7,11 @@ use bitcoin::{
     Address, Network, Opcode, XOnlyPublicKey,
 };
 use musig2::KeyAggContext;
-use strata_primitives::{buf::Buf32, l1::BitcoinAddress};
+use strata_primitives::{
+    buf::Buf32,
+    l1::BitcoinAddress,
+    params::{OperatorConfig, RollupParams},
+};
 
 /// Extract next instruction and try to parse it as an opcode
 pub fn next_op(instructions: &mut Instructions<'_>) -> Option<Opcode> {
@@ -79,4 +83,13 @@ pub fn generate_taproot_address(
     let addr = BitcoinAddress::parse(&addr.to_string(), network)?;
 
     Ok(addr)
+}
+
+/// Reads the operator wallet public keys from Rollup params. Returns None if
+/// not yet bootstrapped
+/// FIXME: This is only for devnet as these pks have to be read from the chain state
+pub fn get_operator_wallet_pks(params: &RollupParams) -> Vec<Buf32> {
+    let OperatorConfig::Static(operator_table) = &params.operator_config;
+
+    operator_table.iter().map(|op| *op.wallet_pk()).collect()
 }

@@ -89,7 +89,7 @@ mod tests {
     use crate::deposit::{
         deposit_tx::extract_deposit_info,
         test_utils::{
-            build_test_deposit_script, create_transaction_two_outpoints, get_deposit_tx_config,
+            build_test_deposit_script, create_test_deposit_tx, get_deposit_tx_config,
             test_taproot_addr,
         },
     };
@@ -104,7 +104,7 @@ mod tests {
         let deposit_request_script =
             build_test_deposit_script(config.magic_bytes, ee_addr.to_vec());
 
-        let test_transaction = create_transaction_two_outpoints(
+        let test_transaction = create_test_deposit_tx(
             Amount::from_sat(config.deposit_amount),
             &test_taproot_addr().address().script_pubkey(),
             &deposit_request_script,

@@ -6,15 +6,15 @@ use bitcoin::{
     hashes::Hash,
     Block, Transaction,
 };
-use strata_primitives::{buf::Buf32, l1::L1BlockManifest, params::OperatorConfig};
+use strata_primitives::{buf::Buf32, l1::L1BlockManifest};
 use strata_state::l1::{
     get_difficulty_adjustment_height, BtcParams, HeaderVerificationState, L1BlockId, TimestampStore,
 };
-use strata_tx_parser::{filter::TxFilterRule, utils::generate_taproot_address};
+use strata_tx_parser::filter::TxFilterConfig;
 
 use crate::{l2::gen_params, ArbitraryGenerator};
 
-pub fn get_test_bitcoin_txns() -> Vec<Transaction> {
+pub fn get_test_bitcoin_txs() -> Vec<Transaction> {
     let t1 = "0200000000010176f29f18c5fc677ad6dd6c9309f6b9112f83cb95889af21da4be7fbfe22d1d220000000000fdffffff0300e1f505000000002200203946555814a18ccc94ef4991fb6af45278425e6a0a2cfc2bf4cf9c47515c56ff0000000000000000176a1500e0e78c8201d91f362c2ad3bb6f8e6f31349454663b1010240100000022512012d77c9ae5fdca5a3ab0b17a29b683fd2690f5ad56f6057a000ec42081ac89dc0247304402205de15fbfb413505a3563608dad6a73eb271b4006a4156eeb62d1eacca5efa10b02201eb71b975304f3cbdc664c6dd1c07b93ac826603309b3258cb92cfd201bb8792012102f55f96fd587a706a7b5e7312c4e9d755a65b3dad9945d65598bca34c9e961db400000000";
     let t2 = "02000000000101f4f2e8830d2948b5e980e739e61b23f048d03d4af81588bf5da4618406c495aa0000000000fdffffff02969e0700000000002200203946555814a18ccc94ef4991fb6af45278425e6a0a2cfc2bf4cf9c47515c56ff60f59000000000001600148d0499ec043b1921a608d24690b061196e57c927040047304402203875f7b610f8783d5f5c163118eeec1a23473dd33b53c8ea584c7d28a82b209b022034b6814344b79826a348e23cc19ff06ed2df23850b889557552e376bf9e32c560147304402200f647dad3c137ff98d7da7a302345c82a57116a3d0e6a3719293bbb421cb0abe02201c04a1e808f5bab3595f77985af91aeaf61e9e042c9ac97d696e0f4b020cb54b0169522102dba8352965522ff44538dde37d793b3b4ece54e07759ade5f648aa396165d2962103c0683712773b725e7fe4809cbc90c9e0b890c45e5e24a852a4c472d1b6e9fd482103bf56f172d0631a7f8ae3ef648ad43a816ad01de4137ba89ebc33a2da8c48531553ae00000000";
     let t3 = "02000000000101f4f2e8830d2948b5e980e739e61b23f048d03d4af81588bf5da4618406c495aa0200000000ffffffff0380969800000000002200203946555814a18ccc94ef4991fb6af45278425e6a0a2cfc2bf4cf9c47515c56ff0000000000000000176a15006e1a916a60b93a545f2370f2a36d2f807fb3d675588b693a000000001600149fafc79c72d1c4d917a360f32bdc68755402ef670247304402203c813ad8918366ce872642368b57b78e78e03b1a1eafe16ec8f3c9268b4fc050022018affe880963f18bfc0338f1e54c970185aa90f8c36a52ac935fe76cb885d726012102fa9b81d082a98a46d0857d62e6c9afe9e1bf40f9f0cbf361b96241c9d6fb064b00000000";
@@ -172,23 +172,7 @@ pub fn get_btc_chain() -> BtcChainSegment {
     }
 }
 
-pub fn get_tx_filters() -> Vec<TxFilterRule> {
+pub fn get_test_tx_filter_config() -> TxFilterConfig {
     let config = gen_params();
-
-    let operator_config = config.rollup().operator_config.clone();
-    let OperatorConfig::Static(operator_pubkeys) = operator_config;
-
-    let operator_pubkeys = operator_pubkeys
-        .iter()
-        .map(|op| *op.wallet_pk())
-        .collect::<Vec<Buf32>>();
-
-    let addr = generate_taproot_address(&operator_pubkeys, bitcoin::Network::Regtest)
-        .expect("taproot address");
-    let deposit_tx_params = config.rollup().get_deposit_params(addr);
-
-    vec![
-        TxFilterRule::Deposit(deposit_tx_params),
-        TxFilterRule::RollupInscription(config.rollup().rollup_name.clone()),
-    ]
+    TxFilterConfig::from_rollup_params(config.rollup()).expect("can't derive filter config")
 }

@@ -107,7 +107,7 @@ mod tests {
     use bitcoin::hashes::Hash;
     use strata_db::{traits::L1BroadcastDatabase, types::L1TxStatus};
     use strata_primitives::buf::Buf32;
-    use strata_test_utils::bitcoin::get_test_bitcoin_txns;
+    use strata_test_utils::bitcoin::get_test_bitcoin_txs;
 
     use super::*;
     use crate::test_utils::get_rocksdb_tmp_instance;
@@ -118,7 +118,7 @@ mod tests {
     }
 
     fn generate_l1_tx_entry() -> (Buf32, L1TxEntry) {
-        let txns = get_test_bitcoin_txns();
+        let txns = get_test_bitcoin_txs();
         let txid = txns[0].compute_txid().as_raw_hash().to_byte_array().into();
         let txentry = L1TxEntry::from_tx(&txns[0]);
         (txid, txentry)

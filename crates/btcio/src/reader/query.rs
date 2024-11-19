@@ -14,7 +14,8 @@ use strata_state::l1::{
 };
 use strata_status::StatusTx;
 use strata_tx_parser::{
-    filter::{filter_protocol_op_tx_refs, TxFilterConfig},
+    filter::filter_protocol_op_tx_refs,
+    filter_types::TxFilterConfig,
     messages::{BlockData, L1Event},
 };
 use tokio::sync::mpsc;
