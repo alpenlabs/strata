@@ -114,8 +114,8 @@ pub trait SyncEventDatabase {
 /// Db for client state updates and checkpoints.
 pub trait ClientStateDatabase {
     /// Writes a new consensus output for a given input index.  These input
-    /// indexes correspond to indexes in [``SyncEventDb``] and
-    /// [``SyncEventDb``].  Will error if `idx - 1` does not exist (unless
+    /// indexes correspond to indexes in [``SyncEventDatabase``] and
+    /// [``SyncEventDatabase``].  Will error if `idx - 1` does not exist (unless
     /// `idx` is 0) or if trying to overwrite a state, as this is almost
     /// certainly a bug.
     fn write_client_update_output(&self, idx: u64, output: ClientUpdateOutput) -> DbResult<()>;
@@ -368,7 +368,7 @@ pub trait BridgeDutyDatabase {
 pub trait BridgeDutyIndexDatabase {
     /// Get the checkpoint upto which the duties have been fetched.
     ///
-    /// This checkpoint is the same as the index in [`L1Db`].
+    /// This checkpoint is the same as the index in [`L1Database`].
     fn get_index(&self) -> DbResult<Option<u64>>;
 
     /// Set the checkpoint to a new value.
