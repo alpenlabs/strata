@@ -99,14 +99,6 @@ impl ProofGenerator<CheckpointBatchInfo, CheckpointProver> for CheckpointProofGe
         SP1Host::new_from_bytes(&GUEST_CHECKPOINT_PK, &GUEST_CHECKPOINT_VK)
     }
 
-    fn get_elf(&self) -> &[u8] {
-        #[cfg(feature = "risc0")]
-        return &GUEST_RISC0_CHECKPOINT_ELF;
-
-        #[cfg(feature = "sp1")]
-        &GUEST_CHECKPOINT_ELF
-    }
-
     fn get_short_program_id(&self) -> String {
         #[cfg(feature = "risc0")]
         return hex::encode(GUEST_RISC0_CHECKPOINT_ID[0].to_le_bytes());

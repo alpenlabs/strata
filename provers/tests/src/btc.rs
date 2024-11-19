@@ -65,14 +65,6 @@ impl ProofGenerator<Block, BtcBlockspaceProver> for BtcBlockProofGenerator {
         return SP1Host::new_from_bytes(&GUEST_BTC_BLOCKSPACE_PK, &GUEST_BTC_BLOCKSPACE_VK);
     }
 
-    fn get_elf(&self) -> &[u8] {
-        #[cfg(feature = "sp1")]
-        return &GUEST_BTC_BLOCKSPACE_ELF;
-
-        #[cfg(feature = "risc0")]
-        return &GUEST_RISC0_BTC_BLOCKSPACE_ELF;
-    }
-
     fn get_short_program_id(&self) -> String {
         #[cfg(feature = "sp1")]
         return GUEST_BTC_BLOCKSPACE_VK_HASH_STR.to_string().split_off(58);

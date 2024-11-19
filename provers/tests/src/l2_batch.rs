@@ -60,14 +60,6 @@ impl ProofGenerator<(u64, u64), ClAggProver> for L2BatchProofGenerator {
         SP1Host::new_from_bytes(&GUEST_CL_AGG_PK, &GUEST_CL_AGG_VK)
     }
 
-    fn get_elf(&self) -> &[u8] {
-        #[cfg(feature = "risc0")]
-        return &GUEST_RISC0_CL_AGG_ELF;
-
-        #[cfg(feature = "sp1")]
-        &GUEST_CL_AGG_ELF
-    }
-
     fn get_short_program_id(&self) -> String {
         #[cfg(feature = "risc0")]
         return hex::encode(GUEST_RISC0_CL_AGG_ID[0].to_le_bytes());
