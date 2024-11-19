@@ -5,7 +5,7 @@ use tracing::info;
 use uuid::Uuid;
 
 use crate::primitives::{
-    prover_input::{ProofWithVkey, ZKVMInput},
+    prover_input::{ProofWithVkey, ZkVmInput},
     tasks_scheduler::{ProvingTask, ProvingTaskStatus},
 };
 
@@ -28,7 +28,7 @@ impl TaskTracker {
         tasks.clear();
     }
 
-    pub async fn create_task(&self, prover_input: ZKVMInput, dependencies: Vec<Uuid>) -> Uuid {
+    pub async fn create_task(&self, prover_input: ZkVmInput, dependencies: Vec<Uuid>) -> Uuid {
         let task_id = Uuid::new_v4();
         let status = if dependencies.is_empty() {
             ProvingTaskStatus::Pending
@@ -131,18 +131,18 @@ impl TaskTracker {
 
 /// Updates the current task's `prover_input` by incorporating the proof from a dependent task.
 fn update_prover_input_with_proof(
-    prover_input: &mut ZKVMInput,
+    prover_input: &mut ZkVmInput,
     task_id: Uuid,
     proof: ProofWithVkey,
 ) {
     match prover_input {
-        ZKVMInput::L1Batch(ref mut btc_batch_input) => {
+        ZkVmInput::L1Batch(ref mut btc_batch_input) => {
             btc_batch_input.insert_proof(task_id, proof);
         }
-        ZKVMInput::L2Batch(ref mut l2_batch_input) => {
+        ZkVmInput::L2Batch(ref mut l2_batch_input) => {
             l2_batch_input.insert_proof(task_id, proof);
         }
-        ZKVMInput::Checkpoint(ref mut input) => {
+        ZkVmInput::Checkpoint(ref mut input) => {
             if input.l1_batch_id == task_id {
                 input.l1_batch_proof = Some(proof.clone());
             }
@@ -150,7 +150,7 @@ fn update_prover_input_with_proof(
                 input.l2_batch_proof = Some(proof);
             }
         }
-        ZKVMInput::ClBlock(ref mut input) => {
+        ZkVmInput::ClBlock(ref mut input) => {
             input.el_proof = Some(proof);
         }
         _ => {}

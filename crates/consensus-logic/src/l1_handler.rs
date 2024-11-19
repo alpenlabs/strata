@@ -21,7 +21,7 @@ use strata_state::{
     batch::BatchCheckpoint, l1::L1Tx, sync_event::SyncEvent, tx::ProtocolOperation,
 };
 use strata_tx_parser::messages::{BlockData, L1Event};
-use strata_zkvm::ZKVMVerifier;
+use strata_zkvm::ZkVmVerifier;
 use tokio::sync::mpsc;
 use tracing::*;
 

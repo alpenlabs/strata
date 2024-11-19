@@ -8,7 +8,7 @@ use strata_sp1_guest_builder::GUEST_CL_STF_ELF;
 use strata_state::header::L2Header;
 use strata_test_utils::{evm_ee::L2Segment, l2::gen_params};
 use strata_zkvm::{
-    AggregationInput, Proof, ProverOptions, VerificationKey, ZKVMHost, ZKVMInputBuilder,
+    AggregationInput, Proof, ProverOptions, VerificationKey, ZkVmHost, ZkVmInputBuilder,
 };
 
 use crate::helpers::{el::ElProofGenerator, proof_generator::ProofGenerator};

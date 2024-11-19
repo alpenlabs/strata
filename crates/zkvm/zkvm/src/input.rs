@@ -1,8 +1,8 @@
 use crate::AggregationInput;
 
-/// A trait for managing inputs to a ZKVM prover. This trait provides methods for
+/// A trait for managing inputs to a ZkVm prover. This trait provides methods for
 /// adding inputs in various formats to be used during the proof generation process.
-pub trait ZKVMInputBuilder<'a> {
+pub trait ZkVmInputBuilder<'a> {
     type Input;
 
     /// Creates a new instance of the `ProverInputs` struct.

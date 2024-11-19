@@ -3,12 +3,12 @@ mod input;
 #[cfg(feature = "prover")]
 mod prover;
 #[cfg(feature = "prover")]
-pub use input::RiscZeroProofInputBuilder;
+pub use input::Risc0ProofInputBuilder;
 #[cfg(feature = "prover")]
-pub use prover::RiscZeroHost;
+pub use prover::Risc0Host;
 
 mod verifier;
 pub use verifier::Risc0Verifier;
 
-mod zkvm_risc0;
-pub use zkvm_risc0::ZkVmRisc0;
+mod env;
+pub use env::Risc0ZkVmEnv;

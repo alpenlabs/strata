@@ -107,7 +107,7 @@ fn apply_state_transition(
 
 pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8]) {
     let rollup_params: RollupParams = zkvm.read_serde();
-    let (prev_state, block): (ChainState, L2Block) = zkvm.read_borsh();
+    let (prev_state, block): (Chainstate, L2Block) = zkvm.read_borsh();
 
     // Read the EL proof output
     let el_pp_deserialized: ELProofPublicParams = zkvm.read_verified_serde(el_vkey);

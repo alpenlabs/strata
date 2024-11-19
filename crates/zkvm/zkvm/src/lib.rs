@@ -2,10 +2,12 @@ mod env;
 mod host;
 mod input;
 mod proof;
-mod verifer;
+mod prover;
+mod verifier;
 
 pub use env::*;
 pub use host::*;
 pub use input::*;
 pub use proof::*;
-pub use verifer::*;
+pub use prover::*;
+pub use verifier::*;

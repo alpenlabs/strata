@@ -4,9 +4,9 @@ use sp1_verifier::{Groth16Verifier, GROTH16_VK_BYTES};
 use sp1_zkvm::{io, lib::verify::verify_sp1_proof};
 use strata_zkvm::ZkVmEnv;
 
-pub struct ZkVmSp1;
+pub struct Sp1ZkVmEnv;
 
-impl ZkVmEnv for ZkVmSp1 {
+impl ZkVmEnv for Sp1ZkVmEnv {
     fn read_serde<T: DeserializeOwned>(&self) -> T {
         io::read()
     }

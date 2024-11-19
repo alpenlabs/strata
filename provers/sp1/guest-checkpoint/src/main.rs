@@ -1,11 +1,11 @@
 use strata_proofimpl_checkpoint::process_checkpoint_proof_outer;
-use strata_sp1_adapter::ZkVmSp1;
+use strata_sp1_adapter::Sp1ZkVmEnv;
 
 mod vks;
 
 fn main() {
     process_checkpoint_proof_outer(
-        &ZkVmSp1,
+        &Sp1ZkVmEnv,
         vks::GUEST_L1_BATCH_ELF_ID,
         vks::GUEST_CL_AGG_ELF_ID,
     )

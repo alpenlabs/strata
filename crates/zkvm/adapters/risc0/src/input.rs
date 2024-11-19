@@ -1,9 +1,9 @@
 use risc0_zkvm::{sha::Digest, ExecutorEnv, ExecutorEnvBuilder, Receipt};
-use strata_zkvm::ZKVMInputBuilder;
+use strata_zkvm::ZkVmInputBuilder;
 
-pub struct RiscZeroProofInputBuilder<'a>(ExecutorEnvBuilder<'a>);
+pub struct Risc0ProofInputBuilder<'a>(ExecutorEnvBuilder<'a>);
 
-impl<'a> ZKVMInputBuilder<'a> for RiscZeroProofInputBuilder<'a> {
+impl<'a> ZkVmInputBuilder<'a> for Risc0ProofInputBuilder<'a> {
     type Input = ExecutorEnv<'a>;
 
     fn new() -> Self {

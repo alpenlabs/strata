@@ -4,9 +4,9 @@ use serde::{de::DeserializeOwned, Serialize};
 use sha2::Digest;
 use strata_zkvm::ZkVmEnv;
 
-pub struct ZkVmRisc0;
+pub struct Risc0ZkVmEnv;
 
-impl ZkVmEnv for ZkVmRisc0 {
+impl ZkVmEnv for Risc0ZkVmEnv {
     fn read_buf(&self) -> Vec<u8> {
         let len: u32 = env::read();
         let mut slice = vec![0u8; len as usize];

@@ -4,7 +4,7 @@ mod helpers;
 mod test {
     use strata_proofimpl_evm_ee_stf::ELProofPublicParams;
     use strata_sp1_adapter::SP1Verifier;
-    use strata_zkvm::{ProverOptions, ZKVMVerifier};
+    use strata_zkvm::{ProverOptions, ZkVmVerifier};
 
     use crate::helpers::{ElProofGenerator, ProofGenerator};
 

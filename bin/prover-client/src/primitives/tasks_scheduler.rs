@@ -3,7 +3,7 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use super::prover_input::{ProofWithVkey, ZKVMInput};
+use super::prover_input::{ProofWithVkey, ZkVmInput};
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum WitnessSubmissionStatus {
@@ -56,7 +56,7 @@ impl fmt::Display for ProvingTaskStatus {
 #[derive(Debug, Clone)]
 pub struct ProvingTask {
     pub id: Uuid,
-    pub prover_input: ZKVMInput,
+    pub prover_input: ZkVmInput,
     pub status: ProvingTaskStatus,
     pub dependencies: Vec<Uuid>,
     pub proof: Option<ProofWithVkey>,

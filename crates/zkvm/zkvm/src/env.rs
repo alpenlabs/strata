@@ -7,17 +7,19 @@ use serde::{de::DeserializeOwned, Serialize};
 pub trait ZkVmEnv {
     /// Reads a serialized byte buffer from the guest code.
     ///
-    /// The input is expected to be written with [`ZKVMInputBuilder::write_buf`].
+    /// The input is expected to be written with [`write_buf`](crate::ZkVmInputBuilder::write_buf).
     fn read_buf(&self) -> Vec<u8>;
 
     /// Reads a serialized object from the guest code, deserializing it using Serde.
     ///
-    /// The input is expected to be written with [`ZKVMInputBuilder::write_serde`].
+    /// The input is expected to be written with
+    /// [`write_serde`](crate::ZkVmInputBuilder::write_serde).
     fn read_serde<T: DeserializeOwned>(&self) -> T;
 
     /// Reads a Borsh-serialized object from the guest code.
     ///
-    /// The input is expected to be written with [`ZKVMInputBuilder::write_borsh`].
+    /// The input is expected to be written with
+    /// [`write_borsh`](`crate::ZkVmInputBuilder::write_borsh).
     fn read_borsh<T: BorshDeserialize>(&self) -> T {
         let buf = self.read_buf();
         borsh::from_slice(&buf).expect("borsh serialization failed")

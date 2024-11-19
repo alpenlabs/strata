@@ -6,7 +6,7 @@ mod test {
     use strata_sp1_adapter::{SP1Host, SP1ProofInputBuilder, SP1Verifier};
     use strata_sp1_guest_builder::GUEST_CHECKPOINT_ELF;
     use strata_test_utils::l2::gen_params;
-    use strata_zkvm::{AggregationInput, ProverOptions, ZKVMHost, ZKVMInputBuilder, ZKVMVerifier};
+    use strata_zkvm::{AggregationInput, ProverOptions, ZkVmHost, ZkVmInputBuilder, ZkVmVerifier};
 
     use crate::helpers::{
         BtcBlockProofGenerator, ClProofGenerator, ElProofGenerator, L1BatchProofGenerator,
