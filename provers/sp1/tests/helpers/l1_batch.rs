@@ -41,7 +41,7 @@ impl ProofGenerator<(u32, u32)> for L1BatchProofGenerator {
         input_builder.write_borsh(&state)?;
 
         let len: u32 = end_height - start_height + 1; // because inclusive
-        input_builder.write(&len)?;
+        input_builder.write_serde(&len)?;
 
         for height in start_height..=end_height {
             let block = btc_chain.get_block(height);

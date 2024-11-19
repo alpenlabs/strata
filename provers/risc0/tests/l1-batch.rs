@@ -44,7 +44,7 @@ mod test {
             let blockspace_input = RiscZeroProofInputBuilder::new()
                 .write_borsh(&filters)
                 .unwrap()
-                .write_serialized(&block_bytes)
+                .write_buf(&block_bytes)
                 .unwrap()
                 .build()
                 .unwrap();

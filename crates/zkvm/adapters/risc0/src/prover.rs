@@ -97,7 +97,7 @@ mod tests {
 
         // prepare input
         let mut zkvm_input_builder = RiscZeroProofInputBuilder::new();
-        zkvm_input_builder.write(&input).unwrap();
+        zkvm_input_builder.write_serde(&input).unwrap();
         let zkvm_input = zkvm_input_builder.build().unwrap();
 
         // assert proof generation works
@@ -119,7 +119,7 @@ mod tests {
 
         // prepare input
         let mut zkvm_input_builder = RiscZeroProofInputBuilder::new();
-        zkvm_input_builder.write(&input).unwrap();
+        zkvm_input_builder.write_serde(&input).unwrap();
         let zkvm_input = zkvm_input_builder.build().unwrap();
 
         // assert proof generation works
@@ -152,7 +152,7 @@ mod tests {
 
         // prepare input
         let zkvm_input = RiscZeroProofInputBuilder::new()
-            .write(&input)
+            .write_serde(&input)
             .unwrap()
             .build()
             .unwrap();

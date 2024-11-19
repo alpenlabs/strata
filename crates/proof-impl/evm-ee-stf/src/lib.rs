@@ -31,7 +31,7 @@ use revm::{primitives::SpecId, InMemoryDB};
 use serde::{Deserialize, Serialize};
 use strata_reth_evm::collect_withdrawal_intents;
 use strata_reth_primitives::WithdrawalIntent;
-use strata_zkvm::ZkVm;
+use strata_zkvm::ZkVmEnv;
 
 use crate::mpt::{MptNode, StorageEntry};
 
@@ -144,10 +144,10 @@ pub fn process_block_transaction(
     }
 }
 
-pub fn process_block_transaction_outer(zkvm: &impl ZkVm) {
-    let input: ELProofInput = zkvm.read();
+pub fn process_block_transaction_outer(zkvm: &impl ZkVmEnv) {
+    let input: ELProofInput = zkvm.read_serde();
     let public_params = process_block_transaction(input, EVM_CONFIG);
-    zkvm.commit(&public_params);
+    zkvm.commit_serde(&public_params);
 }
 
 #[cfg(test)]

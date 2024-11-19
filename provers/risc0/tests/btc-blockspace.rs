@@ -18,7 +18,7 @@ mod test {
         let input = RiscZeroProofInputBuilder::new()
             .write_borsh(&filters)
             .unwrap()
-            .write_serialized(&serialized_block)
+            .write_buf(&serialized_block)
             .unwrap()
             .build()
             .unwrap();

@@ -31,8 +31,8 @@ impl ProofGenerator<Block> for BtcBlockProofGenerator {
         let serialized_block = serialize(block);
 
         let input = SP1ProofInputBuilder::new()
-            .write(rollup_params)?
-            .write_serialized(&serialized_block)?
+            .write_serde(rollup_params)?
+            .write_buf(&serialized_block)?
             .build()?;
 
         let proof_res = prover.prove(input).context("Failed to generate proof")?;

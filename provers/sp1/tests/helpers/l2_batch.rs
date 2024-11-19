@@ -42,7 +42,7 @@ impl ProofGenerator<(u64, u64)> for L2BatchProofGenerator {
 
         let mut prover_input_builder = SP1ProofInputBuilder::new();
         let len = (end_height - start_height) as usize + 1; // inclusive
-        prover_input_builder.write(&len)?;
+        prover_input_builder.write_serde(&len)?;
 
         for agg_proof in agg_proof_inputs {
             prover_input_builder.write_proof(agg_proof)?;
