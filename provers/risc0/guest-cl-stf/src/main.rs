@@ -5,12 +5,12 @@ use strata_primitives::{
     params::{Params, RollupParams, SyncParams},
     vk::RollupVerifyingKey,
 };
-use strata_proofimpl_cl_stf::{verify_and_transition, ChainState, L2Block};
+use strata_proofimpl_cl_stf::{verify_and_transition, Chainstate, L2Block};
 
 fn main() {
     let params = get_rollup_params();
     let input: Vec<u8> = env::read();
-    let (prev_state, block): (ChainState, L2Block) = borsh::from_slice(&input).unwrap();
+    let (prev_state, block): (Chainstate, L2Block) = borsh::from_slice(&input).unwrap();
 
     let new_state = verify_and_transition(prev_state, block, params);
     env::commit(&borsh::to_vec(&new_state).unwrap());

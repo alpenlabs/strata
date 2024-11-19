@@ -18,7 +18,7 @@ use strata_bridge_tx_builder::prelude::{CooperativeWithdrawalInfo, DepositInfo};
 use strata_db::traits::L1Database;
 use strata_primitives::l1::BitcoinAddress;
 use strata_rpc_types::RpcServerError;
-use strata_state::{bridge_state::DepositState, chain_state::ChainState, tx::ProtocolOperation};
+use strata_state::{bridge_state::DepositState, chain_state::Chainstate, tx::ProtocolOperation};
 use tracing::{debug, error};
 
 /// The `vout` corresponding to the deposit related Taproot address on the Deposit Request
@@ -142,7 +142,7 @@ pub(super) async fn extract_deposit_requests<L1DB: L1Database>(
 /// [`OperatorIdx`](strata_primitives::bridge::OperatorIdx) to be passed in as a withdrawal
 /// duty is relevant for all operators for now.
 pub(super) fn extract_withdrawal_infos(
-    chain_state: &Arc<ChainState>,
+    chain_state: &Arc<Chainstate>,
 ) -> impl Iterator<Item = CooperativeWithdrawalInfo> + '_ {
     let deposits_table = chain_state.deposits_table();
     let deposits = deposits_table.deposits();
@@ -547,7 +547,7 @@ mod tests {
     /// * a random [`DepositEntry`] that has been dispatched.
     fn generate_empty_chain_state_with_deposits(
         num_deposits: usize,
-    ) -> (ChainState, usize, DepositEntry) {
+    ) -> (Chainstate, usize, DepositEntry) {
         let l1_block_id = L1BlockId::from(Buf32::zero());
         let safe_block = L1HeaderRecord::new(l1_block_id, vec![], Buf32::zero());
         let l1_state = L1ViewState::new_at_horizon(0, safe_block);
@@ -560,7 +560,7 @@ mod tests {
         let l2_block_id = L2BlockId::from(Buf32::zero());
         let gdata = GenesisStateData::new(l2_block_id, l1_state, operator_table, exec_state);
 
-        let mut empty_chain_state = ChainState::from_genesis(&gdata);
+        let mut empty_chain_state = Chainstate::from_genesis(&gdata);
 
         let empty_deposits = empty_chain_state.deposits_table_mut();
         let mut deposits_table = DepositsTable::new_empty();

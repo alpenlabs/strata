@@ -22,7 +22,7 @@ use strata_primitives::{
     params::{Params, RollupParams},
 };
 use strata_rocksdb::{
-    broadcaster::db::BroadcastDb, l2::db::L2Db, sequencer::db::SequencerDB, ChainStateDb,
+    broadcaster::db::BroadcastDb, l2::db::L2Db, sequencer::db::SequencerDB, ChainstateDb,
     ClientStateDb, DbOpsConfig, L1BroadcastDb, L1Db, RBCheckpointDB, RBSeqBlobDb, SyncEventDb,
 };
 use strata_rpc_types::L1Status;
@@ -35,7 +35,7 @@ use tracing::*;
 use crate::{args::Args, config::Config, errors::InitError, keyderiv, network};
 
 pub type CommonDb =
-    CommonDatabase<L1Db, L2Db, SyncEventDb, ClientStateDb, ChainStateDb, RBCheckpointDB>;
+    CommonDatabase<L1Db, L2Db, SyncEventDb, ClientStateDb, ChainstateDb, RBCheckpointDB>;
 
 pub fn init_core_dbs(rbdb: Arc<OptimisticTransactionDB>, ops_config: DbOpsConfig) -> Arc<CommonDb> {
     // Initialize databases.
@@ -43,7 +43,7 @@ pub fn init_core_dbs(rbdb: Arc<OptimisticTransactionDB>, ops_config: DbOpsConfig
     let l2_db: Arc<_> = L2Db::new(rbdb.clone(), ops_config).into();
     let sync_ev_db: Arc<_> = strata_rocksdb::SyncEventDb::new(rbdb.clone(), ops_config).into();
     let clientstate_db: Arc<_> = ClientStateDb::new(rbdb.clone(), ops_config).into();
-    let chainstate_db: Arc<_> = ChainStateDb::new(rbdb.clone(), ops_config).into();
+    let chainstate_db: Arc<_> = ChainstateDb::new(rbdb.clone(), ops_config).into();
     let checkpoint_db: Arc<_> = RBCheckpointDB::new(rbdb.clone(), ops_config).into();
     let database = CommonDatabase::new(
         l1_db,

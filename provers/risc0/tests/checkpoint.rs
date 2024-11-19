@@ -3,7 +3,7 @@ mod test {
     use bitcoin::params::MAINNET;
     use strata_primitives::buf::Buf32;
     use strata_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
-    use strata_proofimpl_checkpoint::{ChainStateSnapshot, L2BatchProofOutput};
+    use strata_proofimpl_checkpoint::{ChainstateSnapshot, L2BatchProofOutput};
     use strata_proofimpl_l1_batch::{L1BatchProofInput, L1BatchProofOutput};
     use strata_risc0_adapter::{Risc0Verifier, RiscZeroHost, RiscZeroProofInputBuilder};
     use strata_risc0_guest_builder::{
@@ -12,7 +12,7 @@ mod test {
     };
     use strata_state::{
         batch::{BatchInfo, BootstrapState},
-        chain_state::ChainState,
+        chain_state::Chainstate,
     };
     use strata_test_utils::{
         bitcoin::{get_btc_chain, get_tx_filters},
@@ -106,8 +106,8 @@ mod test {
     //     }
     // }
 
-    fn l2_snapshot(state: &ChainState) -> ChainStateSnapshot {
-        ChainStateSnapshot {
+    fn l2_snapshot(state: &Chainstate) -> ChainstateSnapshot {
+        ChainstateSnapshot {
             slot: state.chain_tip_slot(),
             hash: state.compute_state_root(),
             l2_blockid: state.chain_tip_blockid(),

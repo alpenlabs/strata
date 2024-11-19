@@ -6,7 +6,7 @@ use std::{sync::Arc, thread, time};
 use bitcoin::Transaction;
 use strata_crypto::sign_schnorr_sig;
 use strata_db::traits::{
-    ChainStateDatabase, ClientStateDatabase, Database, L1Database, L2Database,
+    ChainstateDatabase, ClientStateDatabase, Database, L1Database, L2BlockDatabase,
 };
 use strata_eectl::{
     engine::{ExecEngineCtl, PayloadStatus},
@@ -20,7 +20,7 @@ use strata_primitives::{
 use strata_state::{
     block::{ExecSegment, L1Segment, L2BlockAccessory, L2BlockBundle},
     bridge_ops::DepositIntent,
-    chain_state::ChainState,
+    chain_state::Chainstate,
     client_state::{ClientState, LocalL1State},
     exec_update::{
         construct_ops_from_deposit_intents, ELDepositData, ExecUpdate, Op, UpdateOutput,
@@ -158,7 +158,7 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
 
 fn prepare_l1_segment(
     local_l1_state: &LocalL1State,
-    prev_chstate: &ChainState,
+    prev_chstate: &Chainstate,
     l1_db: &impl L1Database,
     max_l1_entries: usize,
     params: &RollupParams,
@@ -338,7 +338,7 @@ fn prepare_exec_data<E: ExecEngineCtl>(
     timestamp: u64,
     prev_l2_blkid: L2BlockId,
     prev_global_sr: Buf32,
-    prev_chstate: &ChainState,
+    prev_chstate: &Chainstate,
     safe_l1_block: Buf32,
     engine: &E,
     params: &RollupParams,
@@ -407,11 +407,11 @@ fn poll_status_loop<E: ExecEngineCtl>(
 
 // TODO do we want to do this here?
 fn compute_post_state(
-    prev_chstate: ChainState,
+    prev_chstate: Chainstate,
     header: &impl L2Header,
     body: &L2BlockBody,
     params: &Arc<Params>,
-) -> Result<(ChainState, WriteBatch), Error> {
+) -> Result<(Chainstate, WriteBatch), Error> {
     let mut state_cache = StateCache::new(prev_chstate);
     strata_chaintsn::transition::process_block(&mut state_cache, header, body, params.rollup())?;
     let (post_state, wb) = state_cache.finalize();

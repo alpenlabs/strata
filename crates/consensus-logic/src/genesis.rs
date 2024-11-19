@@ -8,7 +8,7 @@ use strata_primitives::{
 use strata_state::{
     block::{ExecSegment, L1Segment, L2BlockAccessory, L2BlockBundle},
     bridge_state::OperatorTable,
-    chain_state::ChainState,
+    chain_state::Chainstate,
     client_state::ClientState,
     exec_env::ExecEnvState,
     exec_update::{ExecUpdate, UpdateInput, UpdateOutput},
@@ -145,7 +145,7 @@ pub fn make_genesis_chainstate(
     gblock: &L2BlockBundle,
     pregenesis_mfs: Vec<L1BlockManifest>,
     params: &Params,
-) -> ChainState {
+) -> Chainstate {
     let genesis_blkid = gblock.header().get_blockid();
 
     let geui = gblock.exec_segment().update().input();
@@ -158,7 +158,7 @@ pub fn make_genesis_chainstate(
 
     let optbl = construct_operator_table(&params.rollup().operator_config);
     let gdata = GenesisStateData::new(genesis_blkid, l1vs, optbl, gees);
-    ChainState::from_genesis(&gdata)
+    Chainstate::from_genesis(&gdata)
 }
 
 /// Check if the database needs to have client init done to it.

@@ -133,7 +133,7 @@ fn update_tracker(
     ident: &Identity,
     l2_block_manager: &L2BlockManager,
     params: &Params,
-    chs_db: &impl ChainStateDatabase,
+    chs_db: &impl ChainstateDatabase,
     rollup_params_commitment: Buf32,
 ) -> Result<(), Error> {
     let Some(ss) = state.sync() else {

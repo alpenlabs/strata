@@ -2,7 +2,7 @@ use std::{collections::HashMap, path::PathBuf};
 
 use strata_consensus_logic::genesis::make_genesis_block;
 use strata_primitives::buf::{Buf32, Buf64};
-use strata_proofimpl_cl_stf::{reconstruct_exec_segment, ChainState, StateCache};
+use strata_proofimpl_cl_stf::{reconstruct_exec_segment, Chainstate, StateCache};
 use strata_proofimpl_evm_ee_stf::{
     process_block_transaction, processor::EvmConfig, ELProofInput, ELProofPublicParams,
 };
@@ -76,8 +76,8 @@ impl EvmSegment {
 /// the block processing for testing STF proofs.
 pub struct L2Segment {
     blocks: HashMap<u64, L2Block>,
-    pre_states: HashMap<u64, ChainState>,
-    post_states: HashMap<u64, ChainState>,
+    pre_states: HashMap<u64, Chainstate>,
+    post_states: HashMap<u64, Chainstate>,
 }
 
 impl L2Segment {
@@ -160,19 +160,19 @@ impl L2Segment {
         self.blocks.get(&height).expect("Not block found at height")
     }
 
-    /// Retrieves the pre-state ChainState for the given block height.
+    /// Retrieves the pre-state Chainstate for the given block height.
     ///
     /// Panics if no pre-state is found for the specified height.
-    pub fn get_pre_state(&self, height: u64) -> &ChainState {
+    pub fn get_pre_state(&self, height: u64) -> &Chainstate {
         self.pre_states
             .get(&height)
             .expect("Not chain state found at height")
     }
 
-    /// Retrieves the post-state ChainState for the given block height.
+    /// Retrieves the post-state Chainstate for the given block height.
     ///
     /// Panics if no post-state is found for the specified height.
-    pub fn get_post_state(&self, height: u64) -> &ChainState {
+    pub fn get_post_state(&self, height: u64) -> &Chainstate {
         self.post_states
             .get(&height)
             .expect("Not chain state found at height")

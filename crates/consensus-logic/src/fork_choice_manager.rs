@@ -5,7 +5,7 @@ use std::sync::Arc;
 use strata_chaintsn::transition::process_block;
 use strata_db::{
     errors::DbError,
-    traits::{BlockStatus, ChainStateDatabase, Database},
+    traits::{BlockStatus, ChainstateDatabase, Database},
 };
 use strata_eectl::{engine::ExecEngineCtl, messages::ExecPayloadData};
 use strata_primitives::params::Params;

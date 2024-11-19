@@ -4,32 +4,32 @@ use rockbound::{OptimisticTransactionDB, SchemaBatch, SchemaDBOperationsExt};
 use strata_db::{errors::DbError, traits::*, DbResult};
 use strata_state::state_op;
 
-use super::schemas::{ChainStateSchema, WriteBatchSchema};
+use super::schemas::{ChainstateSchema, WriteBatchSchema};
 use crate::{
     utils::{get_first_idx, get_last_idx},
     DbOpsConfig,
 };
 
-pub struct ChainStateDb {
+pub struct ChainstateDb {
     db: Arc<OptimisticTransactionDB>,
     _ops: DbOpsConfig,
 }
 
-impl ChainStateDb {
+impl ChainstateDb {
     pub fn new(db: Arc<OptimisticTransactionDB>, ops: DbOpsConfig) -> Self {
         Self { db, _ops: ops }
     }
 
     fn get_first_idx(&self) -> DbResult<Option<u64>> {
-        get_first_idx::<ChainStateSchema>(&self.db)
+        get_first_idx::<ChainstateSchema>(&self.db)
     }
 
     fn get_last_idx(&self) -> DbResult<Option<u64>> {
-        get_last_idx::<ChainStateSchema>(&self.db)
+        get_last_idx::<ChainstateSchema>(&self.db)
     }
 }
 
-impl ChainStateDatabase for ChainStateDb {
+impl ChainstateDatabase for ChainstateDb {
     fn get_earliest_state_idx(&self) -> DbResult<u64> {
         match self.get_first_idx()? {
             Some(idx) => Ok(idx),
@@ -52,19 +52,19 @@ impl ChainStateDatabase for ChainStateDb {
     fn get_toplevel_state(
         &self,
         idx: u64,
-    ) -> DbResult<Option<strata_state::chain_state::ChainState>> {
-        Ok(self.db.get::<ChainStateSchema>(&idx)?)
+    ) -> DbResult<Option<strata_state::chain_state::Chainstate>> {
+        Ok(self.db.get::<ChainstateSchema>(&idx)?)
     }
 
     fn write_genesis_state(
         &self,
-        toplevel: &strata_state::chain_state::ChainState,
+        toplevel: &strata_state::chain_state::Chainstate,
     ) -> DbResult<()> {
         let genesis_key = 0;
         if self.get_first_idx()?.is_some() || self.get_last_idx()?.is_some() {
             return Err(DbError::OverwriteStateUpdate(genesis_key));
         }
-        self.db.put::<ChainStateSchema>(&genesis_key, toplevel)?;
+        self.db.put::<ChainstateSchema>(&genesis_key, toplevel)?;
         Ok(())
     }
 
@@ -78,15 +78,15 @@ impl ChainStateDatabase for ChainStateDb {
         }
 
         let pre_state_idx = idx - 1;
-        let pre_state = match self.db.get::<ChainStateSchema>(&pre_state_idx)? {
+        let pre_state = match self.db.get::<ChainstateSchema>(&pre_state_idx)? {
             Some(state) => state,
-            None => return Err(DbError::OooInsert("ChainState", idx)),
+            None => return Err(DbError::OooInsert("Chainstate", idx)),
         };
         let post_state = state_op::apply_write_batch_to_chainstate(pre_state, batch);
 
         let mut write_batch = SchemaBatch::new();
         write_batch.put::<WriteBatchSchema>(&idx, batch)?;
-        write_batch.put::<ChainStateSchema>(&idx, &post_state)?;
+        write_batch.put::<ChainstateSchema>(&idx, &post_state)?;
         self.db.write_schemas(write_batch)?;
 
         Ok(())
@@ -104,7 +104,7 @@ impl ChainStateDatabase for ChainStateDb {
 
         let mut del_batch = SchemaBatch::new();
         for idx in first_idx..before_idx {
-            del_batch.delete::<ChainStateSchema>(&idx)?;
+            del_batch.delete::<ChainstateSchema>(&idx)?;
             del_batch.delete::<WriteBatchSchema>(&idx)?;
         }
         self.db.write_schemas(del_batch)?;
@@ -132,7 +132,7 @@ impl ChainStateDatabase for ChainStateDb {
 
         let mut del_batch = SchemaBatch::new();
         for idx in new_tip_idx + 1..=last_idx {
-            del_batch.delete::<ChainStateSchema>(&idx)?;
+            del_batch.delete::<ChainstateSchema>(&idx)?;
             del_batch.delete::<WriteBatchSchema>(&idx)?;
         }
         self.db.write_schemas(del_batch)?;
@@ -144,20 +144,20 @@ impl ChainStateDatabase for ChainStateDb {
 #[cfg(test)]
 mod tests {
     use state_op::WriteBatch;
-    use strata_state::chain_state::ChainState;
+    use strata_state::chain_state::Chainstate;
     use strata_test_utils::ArbitraryGenerator;
 
     use super::*;
     use crate::test_utils::get_rocksdb_tmp_instance;
 
-    fn setup_db() -> ChainStateDb {
+    fn setup_db() -> ChainstateDb {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-        ChainStateDb::new(db, db_ops)
+        ChainstateDb::new(db, db_ops)
     }
 
     #[test]
     fn test_write_genesis_state() {
-        let genesis_state: ChainState = ArbitraryGenerator::new().generate();
+        let genesis_state: Chainstate = ArbitraryGenerator::new().generate();
         let db = setup_db();
 
         let res = db.get_earliest_state_idx();
@@ -185,9 +185,9 @@ mod tests {
         let batch = WriteBatch::new_empty();
 
         let res = db.write_state_update(1, &batch);
-        assert!(res.is_err_and(|x| matches!(x, DbError::OooInsert("ChainState", 1))));
+        assert!(res.is_err_and(|x| matches!(x, DbError::OooInsert("Chainstate", 1))));
 
-        let genesis_state: ChainState = ArbitraryGenerator::new().generate();
+        let genesis_state: Chainstate = ArbitraryGenerator::new().generate();
         db.write_genesis_state(&genesis_state).unwrap();
 
         let res = db.write_state_update(1, &batch);
@@ -200,13 +200,13 @@ mod tests {
         assert!(res.is_err_and(|x| matches!(x, DbError::OverwriteStateUpdate(2))));
 
         let res = db.write_state_update(4, &batch);
-        assert!(res.is_err_and(|x| matches!(x, DbError::OooInsert("ChainState", 4))));
+        assert!(res.is_err_and(|x| matches!(x, DbError::OooInsert("Chainstate", 4))));
     }
 
     #[test]
     fn test_get_toplevel_state() {
         let db = setup_db();
-        let genesis_state: ChainState = ArbitraryGenerator::new().generate();
+        let genesis_state: Chainstate = ArbitraryGenerator::new().generate();
         let batch = WriteBatch::new_empty();
 
         db.write_genesis_state(&genesis_state).unwrap();
@@ -220,7 +220,7 @@ mod tests {
     #[test]
     fn test_get_earliest_and_last_state_idx() {
         let db = setup_db();
-        let genesis_state: ChainState = ArbitraryGenerator::new().generate();
+        let genesis_state: Chainstate = ArbitraryGenerator::new().generate();
         let batch = WriteBatch::new_empty();
 
         db.write_genesis_state(&genesis_state).unwrap();
@@ -234,7 +234,7 @@ mod tests {
     #[test]
     fn test_purge() {
         let db = setup_db();
-        let genesis_state: ChainState = ArbitraryGenerator::new().generate();
+        let genesis_state: Chainstate = ArbitraryGenerator::new().generate();
         let batch = WriteBatch::new_empty();
 
         db.write_genesis_state(&genesis_state).unwrap();
@@ -271,7 +271,7 @@ mod tests {
     #[test]
     fn test_rollback() {
         let db = setup_db();
-        let genesis_state: ChainState = ArbitraryGenerator::new().generate();
+        let genesis_state: Chainstate = ArbitraryGenerator::new().generate();
         let batch = WriteBatch::new_empty();
 
         db.write_genesis_state(&genesis_state).unwrap();
@@ -317,7 +317,7 @@ mod tests {
     #[test]
     fn test_purge_and_rollback() {
         let db = setup_db();
-        let genesis_state: ChainState = ArbitraryGenerator::new().generate();
+        let genesis_state: Chainstate = ArbitraryGenerator::new().generate();
         let batch = WriteBatch::new_empty();
 
         db.write_genesis_state(&genesis_state).unwrap();

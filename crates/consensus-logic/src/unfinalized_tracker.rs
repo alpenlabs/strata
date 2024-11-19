@@ -341,7 +341,7 @@ impl FinalizeReport {
 mod tests {
     use std::collections::HashSet;
 
-    use strata_db::traits::{BlockStatus, Database, L2Database};
+    use strata_db::traits::{BlockStatus, Database, L2BlockDatabase};
     use strata_rocksdb::test_utils::get_common_db;
     use strata_state::{header::L2Header, id::L2BlockId};
     use strata_storage::L2BlockManager;
@@ -349,7 +349,7 @@ mod tests {
 
     use crate::unfinalized_tracker;
 
-    fn setup_test_chain(l2_db: &impl L2Database) -> [L2BlockId; 7] {
+    fn setup_test_chain(l2_db: &impl L2BlockDatabase) -> [L2BlockId; 7] {
         // Chain A: g -> a1 -> a2 -> a3
         // Chain B: g -> a1 -> b2 -> b3
         // Chain C: g -> c1

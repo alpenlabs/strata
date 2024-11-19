@@ -13,7 +13,7 @@ use tracing::*;
 use crate::{
     bridge_ops::DepositIntent,
     bridge_state::{DepositState, DispatchCommand, DispatchedState},
-    chain_state::ChainState,
+    chain_state::Chainstate,
     header::L2Header,
     id::L2BlockId,
     l1::{self, L1MaturationEntry},
@@ -23,7 +23,7 @@ use crate::{
 #[derive(Clone, Debug, PartialEq, BorshDeserialize, BorshSerialize)]
 pub enum StateOp {
     /// Replace the chain state with something completely different.
-    Replace(Box<ChainState>),
+    Replace(Box<Chainstate>),
 
     /// Sets the current slot.
     SetSlotAndTipBlock(u64, L2BlockId),
@@ -63,7 +63,7 @@ impl WriteBatch {
         Self { ops }
     }
 
-    pub fn new_replace(new_state: ChainState) -> Self {
+    pub fn new_replace(new_state: Chainstate) -> Self {
         Self::new(vec![StateOp::Replace(Box::new(new_state))])
     }
 
@@ -78,9 +78,9 @@ impl WriteBatch {
 ///
 /// This must succeed.  Pancis if it does not.
 pub fn apply_write_batch_to_chainstate(
-    mut chainstate: ChainState,
+    mut chainstate: Chainstate,
     batch: &WriteBatch,
-) -> ChainState {
+) -> Chainstate {
     for op in &batch.ops {
         apply_op_to_chainstate(op, &mut chainstate);
     }
@@ -88,7 +88,7 @@ pub fn apply_write_batch_to_chainstate(
     chainstate
 }
 
-fn apply_op_to_chainstate(op: &StateOp, state: &mut ChainState) {
+fn apply_op_to_chainstate(op: &StateOp, state: &mut Chainstate) {
     match op {
         StateOp::Replace(new_state) => *state = new_state.as_ref().clone(),
 
@@ -209,13 +209,13 @@ fn apply_op_to_chainstate(op: &StateOp, state: &mut ChainState) {
 /// be made generic over a state provider that exposes access to that and then
 /// the `WriteBatch` will include writes that can be made to that.
 pub struct StateCache {
-    original_state: ChainState,
-    state: ChainState,
+    original_state: Chainstate,
+    state: Chainstate,
     write_ops: Vec<StateOp>,
 }
 
 impl StateCache {
-    pub fn new(state: ChainState) -> Self {
+    pub fn new(state: Chainstate) -> Self {
         Self {
             original_state: state.clone(),
             state,
@@ -223,17 +223,17 @@ impl StateCache {
         }
     }
 
-    pub fn state(&self) -> &ChainState {
+    pub fn state(&self) -> &Chainstate {
         &self.state
     }
 
-    pub fn original_state(&self) -> &ChainState {
+    pub fn original_state(&self) -> &Chainstate {
         &self.original_state
     }
 
     /// Finalizes the changes made to the state, exporting it and a write batch
     /// that can be applied to the previous state to produce it.
-    pub fn finalize(self) -> (ChainState, WriteBatch) {
+    pub fn finalize(self) -> (Chainstate, WriteBatch) {
         (self.state, WriteBatch::new(self.write_ops))
     }
 

@@ -16,7 +16,7 @@ use crate::{
 ///
 /// This corresponds to the beacon chain state.
 #[derive(Clone, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
-pub struct ChainState {
+pub struct Chainstate {
     /// Most recent seen block.
     pub(crate) last_block: L2BlockId,
 
@@ -47,12 +47,12 @@ pub struct ChainState {
     pub(crate) deposits_table: bridge_state::DepositsTable,
 }
 
-/// Hashed Chain State. This is used to compute the state root of the [`ChainState`]
+/// Hashed Chain State. This is used to compute the state root of the [`Chainstate`]
 // TODO: FIXME: Note that this is used as a temporary solution for the state root calculation
-// It should be replaced once we swap out ChainState's type definitions with SSZ type definitions
+// It should be replaced once we swap out Chainstate's type definitions with SSZ type definitions
 // which defines all of this more rigorously
 #[derive(BorshSerialize)]
-struct HashedChainState {
+struct HashedChainstate {
     last_block: Buf32,
     slot: u64,
     epoch: u64,
@@ -63,7 +63,7 @@ struct HashedChainState {
     deposits_hash: Buf32,
 }
 
-impl ChainState {
+impl Chainstate {
     // TODO remove genesis blkid since apparently we don't need it anymore
     pub fn from_genesis(gdata: &GenesisStateData) -> Self {
         Self {
@@ -97,7 +97,7 @@ impl ChainState {
     /// Computes a commitment to a the chainstate.  This is super expensive
     /// because it does a bunch of hashing.
     pub fn compute_state_root(&self) -> Buf32 {
-        let hashed_state = HashedChainState {
+        let hashed_state = HashedChainstate {
             last_block: self.last_block.into(),
             slot: self.slot,
             epoch: self.epoch,
@@ -127,7 +127,7 @@ impl ChainState {
     }
 }
 
-impl<'a> Arbitrary<'a> for ChainState {
+impl<'a> Arbitrary<'a> for Chainstate {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         let gdata = GenesisStateData::arbitrary(u)?;
         Ok(Self::from_genesis(&gdata))
@@ -146,7 +146,7 @@ mod tests {
     /*#[test]
     fn test_state_root_calc() {
         let mut u = Unstructured::new(&[12u8; 50]);
-        let state = ChainState::arbitrary(&mut u).unwrap();
+        let state = Chainstate::arbitrary(&mut u).unwrap();
         let root = state.state_root();
 
         let expected = Buf32::from([

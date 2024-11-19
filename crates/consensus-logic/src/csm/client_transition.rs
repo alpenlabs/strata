@@ -4,7 +4,7 @@
 use std::cmp::min;
 
 use bitcoin::block::Header;
-use strata_db::traits::{ChainStateDatabase, Database, L1Database, L2Database};
+use strata_db::traits::{ChainstateDatabase, Database, L1Database, L2BlockDatabase};
 use strata_primitives::prelude::*;
 use strata_state::{
     batch::{BatchCheckpoint, BatchInfo},

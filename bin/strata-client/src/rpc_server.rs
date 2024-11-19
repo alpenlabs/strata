@@ -37,7 +37,7 @@ use strata_state::{
     bridge_duties::BridgeDuty,
     bridge_ops::WithdrawalIntent,
     bridge_state::DepositEntry,
-    chain_state::ChainState,
+    chain_state::Chainstate,
     client_state::ClientState,
     da_blob::{BlobDest, BlobIntent},
     header::L2Header,
@@ -99,7 +99,7 @@ impl<D: Database + Sync + Send + 'static> StrataRpcImpl<D> {
 
     /// Gets a clone of the current client state and fetches the chainstate that
     /// of the L2 block that it considers the tip state.
-    async fn get_cur_states(&self) -> Result<(ClientState, Option<Arc<ChainState>>), Error> {
+    async fn get_cur_states(&self) -> Result<(ClientState, Option<Arc<Chainstate>>), Error> {
         let cs = self.get_client_state().await;
 
         if cs.sync().is_none() {

@@ -1,4 +1,4 @@
-use strata_db::traits::ChainStateDatabase;
+use strata_db::traits::ChainstateDatabase;
 use strata_primitives::{buf::Buf32, params::Params};
 use strata_state::{batch::BatchInfo, client_state::ClientState, id::L2BlockId};
 use tracing::*;
@@ -11,7 +11,7 @@ pub fn extract_duties(
     state: &ClientState,
     _ident: &Identity,
     _params: &Params,
-    chs_db: &impl ChainStateDatabase,
+    chs_db: &impl ChainstateDatabase,
     rollup_params_commitment: Buf32,
 ) -> Result<Vec<Duty>, Error> {
     // If a sync state isn't present then we probably don't have anything we
@@ -43,7 +43,7 @@ fn extract_batch_duties(
     state: &ClientState,
     tip_height: u64,
     tip_id: L2BlockId,
-    chs_db: &impl ChainStateDatabase,
+    chs_db: &impl ChainstateDatabase,
     rollup_params_commitment: Buf32,
 ) -> Result<Vec<Duty>, Error> {
     if !state.is_chain_active() {

@@ -2,7 +2,7 @@
 use std::sync::Arc;
 
 use strata_rpc_types::L1Status;
-use strata_state::{chain_state::ChainState, client_state::ClientState, csm_status::CsmStatus};
+use strata_state::{chain_state::Chainstate, client_state::ClientState, csm_status::CsmStatus};
 use thiserror::Error;
 use tokio::sync::watch;
 use tracing::warn;
@@ -21,11 +21,11 @@ pub struct StatusRx {
     pub csm: watch::Receiver<CsmStatus>,
     pub cl: watch::Receiver<ClientState>,
     pub l1: watch::Receiver<L1Status>,
-    pub chs: watch::Receiver<Option<ChainState>>,
+    pub chs: watch::Receiver<Option<Chainstate>>,
 }
 
 impl StatusTx {
-    pub fn update_chain_state(&self, post_state: &ChainState) {
+    pub fn update_chain_state(&self, post_state: &Chainstate) {
         if self.chs.send(Some(post_state.clone())).is_err() {
             warn!("chain state receiver dropped");
         }
@@ -55,7 +55,7 @@ pub struct StatusTx {
     pub csm: watch::Sender<CsmStatus>,
     pub cl: watch::Sender<ClientState>,
     pub l1: watch::Sender<L1Status>,
-    pub chs: watch::Sender<Option<ChainState>>,
+    pub chs: watch::Sender<Option<Chainstate>>,
 }
 
 /// initializes the StatusRx and StatusTx watch channel wrapper

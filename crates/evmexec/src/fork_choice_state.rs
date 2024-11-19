@@ -5,7 +5,7 @@ use reth_primitives::B256;
 use reth_rpc_types::engine::ForkchoiceState;
 use strata_db::{
     errors::DbError,
-    traits::{ClientStateDatabase, Database, L2Database},
+    traits::{ClientStateDatabase, Database, L2BlockDatabase},
 };
 use strata_primitives::params::RollupParams;
 use strata_state::{block::L2BlockBundle, client_state::ClientState, id::L2BlockId};

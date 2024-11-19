@@ -7,7 +7,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use strata_mmr::CompactMmr;
 use strata_primitives::{l1::*, prelude::*};
 use strata_state::{
-    block::L2BlockBundle, bridge_duties::BridgeDutyStatus, chain_state::ChainState,
+    block::L2BlockBundle, bridge_duties::BridgeDutyStatus, chain_state::Chainstate,
     client_state::ClientState, l1::L1Tx, operation::*, prelude::*, state_op::WriteBatch,
     sync_event::SyncEvent,
 };
@@ -23,17 +23,17 @@ use crate::{
 /// to use behavior that crosses different interfaces.
 pub trait Database {
     type L1DB: L1Database + Send + Sync;
-    type L2DB: L2Database + Send + Sync;
+    type L2DB: L2BlockDatabase + Send + Sync;
     type SyncEventDB: SyncEventDatabase + Send + Sync;
     type ClientStateDB: ClientStateDatabase + Send + Sync;
-    type ChainStateDB: ChainStateDatabase + Send + Sync;
+    type ChainstateDB: ChainstateDatabase + Send + Sync;
     type CheckpointDB: CheckpointDatabase + Send + Sync;
 
     fn l1_db(&self) -> &Arc<Self::L1DB>;
     fn l2_db(&self) -> &Arc<Self::L2DB>;
     fn sync_event_db(&self) -> &Arc<Self::SyncEventDB>;
     fn client_state_db(&self) -> &Arc<Self::ClientStateDB>;
-    fn chain_state_db(&self) -> &Arc<Self::ChainStateDB>;
+    fn chain_state_db(&self) -> &Arc<Self::ChainstateDB>;
     fn checkpoint_db(&self) -> &Arc<Self::CheckpointDB>;
 }
 
@@ -149,7 +149,7 @@ pub trait ClientStateDatabase {
 
 /// L2 data store for CL blocks.  Does not store anything about what we think
 /// the L2 chain tip is, that's controlled by the consensus state.
-pub trait L2Database {
+pub trait L2BlockDatabase {
     /// Stores an L2 block, does not care about the block height of the L2
     /// block.  Also sets the block's status to "unchecked".
     fn put_block_data(&self, block: L2BlockBundle) -> DbResult<()>;
@@ -194,9 +194,9 @@ pub enum BlockStatus {
 /// like that in the future without *too* much extra effort.  We decide new
 /// states by providing the database with a generic "write batch" and offloading
 /// the effort of deciding how to compute that write batch to the database impl.
-pub trait ChainStateDatabase {
+pub trait ChainstateDatabase {
     /// Writes the genesis chainstate at index 0.
-    fn write_genesis_state(&self, toplevel: &ChainState) -> DbResult<()>;
+    fn write_genesis_state(&self, toplevel: &Chainstate) -> DbResult<()>;
 
     /// Stores a write batch in the database, possibly computing that state
     /// under the hood from the writes.  Will not overwrite existing data,
@@ -220,7 +220,7 @@ pub trait ChainStateDatabase {
     fn get_writes_at(&self, idx: u64) -> DbResult<Option<WriteBatch>>;
 
     /// Gets the toplevel chain state at a particular block index (height).
-    fn get_toplevel_state(&self, idx: u64) -> DbResult<Option<ChainState>>;
+    fn get_toplevel_state(&self, idx: u64) -> DbResult<Option<Chainstate>>;
 }
 
 /// Db trait for Checkpoint data
@@ -234,7 +234,7 @@ pub trait CheckpointDatabase {
     /// Store a [`CheckpointEntry`]
     ///
     /// `batchidx` for the Checkpoint is expected to increase monotonically and
-    /// correspond to the value of [`strata_state::chain_state::ChainState::epoch`].
+    /// correspond to the value of [`strata_state::chain_state::Chainstate::epoch`].
     fn put_batch_checkpoint(&self, batchidx: u64, entry: CheckpointEntry) -> DbResult<()>;
 }
 

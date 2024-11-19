@@ -12,7 +12,7 @@ use strata_primitives::{
 };
 use strata_state::{
     block::{L2Block, L2BlockAccessory, L2BlockBody, L2BlockBundle},
-    chain_state::ChainState,
+    chain_state::Chainstate,
     client_state::ClientState,
     header::{L2BlockHeader, L2Header, SignedL2BlockHeader},
 };
@@ -135,7 +135,7 @@ pub fn make_dummy_operator_pubkeys_with_seed(seed: u64) -> OperatorPubkeys {
     OperatorPubkeys::new(pk.into(), pk.into())
 }
 
-pub fn get_genesis_chainstate() -> ChainState {
+pub fn get_genesis_chainstate() -> Chainstate {
     let params = gen_params();
     // Build the genesis block and genesis consensus states.
     let gblock = make_genesis_block(&params);

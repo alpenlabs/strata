@@ -18,7 +18,7 @@ use strata_consensus_logic::{
     sync_manager::{self, SyncManager},
 };
 use strata_db::{
-    traits::{ChainStateDatabase, Database},
+    traits::{ChainstateDatabase, Database},
     DbError,
 };
 use strata_eectl::engine::ExecEngineCtl;
