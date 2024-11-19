@@ -107,18 +107,18 @@ where
     let zkvm_input = match zkvm_input {
         ZKVMInput::ElBlock(el_input) => {
             let el_input: ELProofInput = bincode::deserialize(&el_input.data)?;
-            Vm::Input::new().write(&el_input)?.build()?
+            Vm::Input::new().write_serde(&el_input)?.build()?
         }
 
         ZKVMInput::BtcBlock(block, rollup_params) => Vm::Input::new()
-            .write(&rollup_params)?
-            .write_serialized(&bitcoin::consensus::serialize(&block))?
+            .write_serde(&rollup_params)?
+            .write_buf(&bitcoin::consensus::serialize(&block))?
             .build()?,
 
         ZKVMInput::L1Batch(l1_batch_input) => {
             let mut input_builder = Vm::Input::new();
             input_builder.write_borsh(&l1_batch_input.header_verification_state)?;
-            input_builder.write(&l1_batch_input.btc_task_ids.len())?;
+            input_builder.write_serde(&l1_batch_input.btc_task_ids.len())?;
             // Write each proof input
             for proof_input in l1_batch_input.get_proofs() {
                 input_builder.write_proof(proof_input)?;
@@ -128,8 +128,8 @@ where
         }
 
         ZKVMInput::ClBlock(cl_proof_input) => Vm::Input::new()
-            .write(&get_pm_rollup_params())?
-            .write_serialized(&cl_proof_input.cl_raw_witness)?
+            .write_serde(&get_pm_rollup_params())?
+            .write_buf(&cl_proof_input.cl_raw_witness)?
             .write_proof(
                 cl_proof_input
                     .el_proof
@@ -142,7 +142,7 @@ where
 
             // Write the number of task IDs
             let task_count = l2_batch_input.cl_task_ids.len();
-            input_builder.write(&task_count)?;
+            input_builder.write_serde(&task_count)?;
 
             // Write each proof input
             for proof_input in l2_batch_input.get_proofs() {
@@ -162,7 +162,7 @@ where
                 .ok_or_else(|| anyhow::anyhow!("L2 Batch Proof Not Ready"))?;
 
             let mut input_builder = Vm::Input::new();
-            input_builder.write(&get_pm_rollup_params())?;
+            input_builder.write_serde(&get_pm_rollup_params())?;
             input_builder.write_proof(l1_batch_proof)?;
             input_builder.write_proof(l2_batch_proof)?;
 

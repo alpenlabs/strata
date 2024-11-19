@@ -12,7 +12,7 @@ use strata_state::{
     tx::DepositInfo,
 };
 pub use strata_state::{block::L2Block, chain_state::Chainstate, state_op::StateCache};
-use strata_zkvm::ZkVm;
+use strata_zkvm::ZkVmEnv;
 
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
 pub struct ChainStateSnapshot {
@@ -105,12 +105,12 @@ fn apply_state_transition(
     state_cache.state().to_owned()
 }
 
-pub fn process_cl_stf(zkvm: &impl ZkVm, el_vkey: &[u32; 8]) {
-    let rollup_params: RollupParams = zkvm.read();
+pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8]) {
+    let rollup_params: RollupParams = zkvm.read_serde();
     let (prev_state, block): (ChainState, L2Block) = zkvm.read_borsh();
 
     // Read the EL proof output
-    let el_pp_deserialized: ELProofPublicParams = zkvm.read_verified(el_vkey);
+    let el_pp_deserialized: ELProofPublicParams = zkvm.read_verified_serde(el_vkey);
 
     let new_state = verify_and_transition(
         prev_state.clone(),

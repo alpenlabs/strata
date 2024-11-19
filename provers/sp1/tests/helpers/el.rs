@@ -31,7 +31,7 @@ impl ProofGenerator<u64> for ElProofGenerator {
             .clone();
 
         let proof_input = SP1ProofInputBuilder::new()
-            .write(&el_proof_input)?
+            .write_serde(&el_proof_input)?
             .build()?;
 
         let proof = prover

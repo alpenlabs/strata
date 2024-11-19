@@ -11,17 +11,17 @@ impl<'a> ZKVMInputBuilder<'a> for RiscZeroProofInputBuilder<'a> {
         Self(env_builder)
     }
 
-    fn write<T: serde::Serialize>(&mut self, item: &T) -> anyhow::Result<&mut Self> {
+    fn write_serde<T: serde::Serialize>(&mut self, item: &T) -> anyhow::Result<&mut Self> {
         self.0.write(item)?;
         Ok(self)
     }
 
     fn write_borsh<T: borsh::BorshSerialize>(&mut self, item: &T) -> anyhow::Result<&mut Self> {
         let slice = borsh::to_vec(item)?;
-        self.write_serialized(&slice)
+        self.write_buf(&slice)
     }
 
-    fn write_serialized(&mut self, item: &[u8]) -> anyhow::Result<&mut Self> {
+    fn write_buf(&mut self, item: &[u8]) -> anyhow::Result<&mut Self> {
         let len = item.len() as u32;
         self.0.write(&len)?;
         self.0.write_slice(item);
@@ -36,7 +36,7 @@ impl<'a> ZKVMInputBuilder<'a> for RiscZeroProofInputBuilder<'a> {
         // Write the verification key of the program that'll be proven in the guest.
         // Note: The vkey is written here so we don't have to hardcode it in guest code.
         // TODO: This should be fixed once the guest code is finalized
-        self.write_serialized(&receipt.journal.bytes)?;
+        self.write_buf(&receipt.journal.bytes)?;
         self.0.write(&vk)?;
 
         // `add_assumption` makes the receipt to be verified available to the prover.

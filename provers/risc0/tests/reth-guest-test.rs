@@ -14,7 +14,7 @@ mod test {
         let prover = RiscZeroHost::init(GUEST_RISC0_EVM_EE_STF_ELF.into(), Default::default());
 
         let prover_input = RiscZeroProofInputBuilder::new()
-            .write(&input)
+            .write_serde(&input)
             .unwrap()
             .build()
             .unwrap();

@@ -7,7 +7,7 @@ use strata_primitives::{buf::Buf32, params::RollupParams, vk::RollupVerifyingKey
 use strata_proofimpl_cl_stf::L2BatchProofOutput;
 use strata_proofimpl_l1_batch::L1BatchProofOutput;
 use strata_state::batch::{BatchInfo, BootstrapState};
-use strata_zkvm::{Proof, ZkVm};
+use strata_zkvm::{Proof, ZkVmEnv};
 
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct CheckpointProofInput {
@@ -133,11 +133,11 @@ pub fn process_checkpoint_proof(
 }
 
 pub fn process_checkpoint_proof_outer(
-    zkvm: &impl ZkVm,
+    zkvm: &impl ZkVmEnv,
     l1_batch_vk: &[u32; 8],
     l2_batch_vk: &[u32; 8],
 ) {
-    let rollup_params: RollupParams = zkvm.read();
+    let rollup_params: RollupParams = zkvm.read_serde();
     let rollup_vk = match rollup_params.rollup_vk() {
         RollupVerifyingKey::SP1VerifyingKey(sp1_vk) => sp1_vk,
         _ => panic!("Need SP1VerifyingKey"),
@@ -152,7 +152,7 @@ pub fn process_checkpoint_proof_outer(
     if let Some(prev_checkpoint) = prev_checkpoint {
         let (checkpoint, proof) = prev_checkpoint;
         assert!(zkvm
-            .verify_groth16(
+            .verify_groth16_proof(
                 proof.as_bytes(),
                 rollup_vk.as_bytes(),
                 &borsh::to_vec(&checkpoint).unwrap(),

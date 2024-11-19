@@ -9,7 +9,7 @@ use strata_state::{
     l1::{get_btc_params, HeaderVerificationState, HeaderVerificationStateSnapshot},
     tx::DepositInfo,
 };
-use strata_zkvm::ZkVm;
+use strata_zkvm::ZkVmEnv;
 
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct L1BatchProofInput {
@@ -32,10 +32,10 @@ impl L1BatchProofOutput {
     }
 }
 
-pub fn process_l1_batch_proof(zkvm: &impl ZkVm, btc_blockspace_vk: &[u32; 8]) {
+pub fn process_l1_batch_proof(zkvm: &impl ZkVmEnv, btc_blockspace_vk: &[u32; 8]) {
     let mut state: HeaderVerificationState = zkvm.read_borsh();
 
-    let num_inputs: u32 = zkvm.read();
+    let num_inputs: u32 = zkvm.read_serde();
     assert!(num_inputs > 0);
 
     let initial_snapshot = state.compute_snapshot();
