@@ -6,9 +6,9 @@ version = "0.1.0"
 [workspace]
 
 [dependencies]
+risc0-zkvm = { version = "1.1.2", features = ["getrandom"] }
 strata-proofimpl-btc-blockspace = { path = "../../../crates/proof-impl/btc-blockspace" }
 strata-risc0-adapter = { path = "../../../crates/zkvm/adapters/risc0" }
-risc0-zkvm = { version = "1.1.2", features = ["getrandom"] }
 
 [patch.crates-io]
 sha2 = { git = "https://github.com/risc0/RustCrypto-hashes", tag = "sha2-v0.10.8-risczero.0" }

@@ -16,10 +16,10 @@ sp1-sdk = "3.0.0"
 strata-primitives.workspace = true
 strata-proofimpl-btc-blockspace.workspace = true
 strata-proofimpl-checkpoint.workspace = true
+strata-proofimpl-cl-agg.workspace = true
 strata-proofimpl-cl-stf.workspace = true
 strata-proofimpl-evm-ee-stf.workspace = true
 strata-proofimpl-l1-batch.workspace = true
-strata-proofimpl-cl-agg.workspace = true
 strata-state.workspace = true
 strata-test-utils.workspace = true
 strata-zkvm.workspace = true
@@ -27,21 +27,21 @@ tempfile.workspace = true
 
 # sp1
 strata-sp1-adapter = { workspace = true, optional = true, features = [
-    "prover",
+  "prover",
 ] }
 strata-sp1-guest-builder = { path = "../sp1", optional = true, features = [
-    "prover",
+  "prover",
 ] }
 
 # risc0
 strata-risc0-adapter = { workspace = true, optional = true, features = [
-    "prover",
+  "prover",
 ] }
 strata-risc0-guest-builder = { path = "../risc0", optional = true, features = [
-    "prover",
+  "prover",
 ] }
 
 [features]
 sp1 = ["strata-sp1-adapter", "strata-sp1-guest-builder"]
 risc0 = ["strata-risc0-adapter", "strata-risc0-guest-builder"]
-default = ["risc0"]
+default = ["sp1"]
