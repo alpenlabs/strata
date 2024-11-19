@@ -51,9 +51,6 @@ pub trait ProofGenerator<T, P: ZkVmProver> {
         Ok((proof, output))
     }
 
-    /// Returns the ELF binary (used for verification).
-    fn get_elf(&self) -> &[u8];
-
     fn get_short_program_id(&self) -> String;
 
     // Simulate the proof. This is different than running the in the MOCK_PROVER mode
