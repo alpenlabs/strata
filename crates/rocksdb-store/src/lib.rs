@@ -21,7 +21,7 @@ pub const ROCKSDB_NAME: &str = "strata";
 
 pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
     SequenceSchema::COLUMN_FAMILY_NAME,
-    ChainStateSchema::COLUMN_FAMILY_NAME,
+    ChainstateSchema::COLUMN_FAMILY_NAME,
     ClientUpdateOutputSchema::COLUMN_FAMILY_NAME,
     ClientStateSchema::COLUMN_FAMILY_NAME,
     L1BlockSchema::COLUMN_FAMILY_NAME,
@@ -69,7 +69,7 @@ pub use bridge_relay::db::BridgeMsgDb;
 use bridge_relay::schemas::*;
 pub use broadcaster::db::L1BroadcastDb;
 use broadcaster::schemas::{BcastL1TxIdSchema, BcastL1TxSchema};
-pub use chain_state::db::ChainStateDb;
+pub use chain_state::db::ChainstateDb;
 pub use checkpoint::db::RBCheckpointDB;
 use checkpoint::schemas::BatchCheckpointSchema;
 pub use client_state::db::ClientStateDb;
@@ -81,7 +81,7 @@ use sequencer::schemas::{SeqBlobIdSchema, SeqBlobSchema};
 pub use sync_event::db::SyncEventDb;
 
 use crate::{
-    chain_state::schemas::{ChainStateSchema, WriteBatchSchema},
+    chain_state::schemas::{ChainstateSchema, WriteBatchSchema},
     client_state::schemas::{ClientStateSchema, ClientUpdateOutputSchema},
     l1::schemas::{L1BlockSchema, MmrSchema, TxnSchema},
     sequence::SequenceSchema,

@@ -7,7 +7,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use strata_mmr::CompactMmr;
 use strata_primitives::{l1::*, prelude::*};
 use strata_state::{
-    block::L2BlockBundle, bridge_duties::BridgeDutyStatus, chain_state::ChainState,
+    block::L2BlockBundle, bridge_duties::BridgeDutyStatus, chain_state::Chainstate,
     client_state::ClientState, l1::L1Tx, operation::*, prelude::*, state_op::WriteBatch,
     sync_event::SyncEvent,
 };
@@ -22,35 +22,23 @@ use crate::{
 /// parameterizing them over each individual trait gets cumbersome or if we need
 /// to use behavior that crosses different interfaces.
 pub trait Database {
-    type L1DataStore: L1DataStore + Send + Sync;
-    type L1Provider: L1DataProvider + Send + Sync;
-    type L2DataStore: L2DataStore + Send + Sync;
-    type L2DataProv: L2DataProvider + Send + Sync;
-    type SyncEventStore: SyncEventStore + Send + Sync;
-    type SyncEventProvider: SyncEventProvider + Send + Sync;
-    type ClientStateStore: ClientStateStore + Send + Sync;
-    type ClientStateProvider: ClientStateProvider + Send + Sync;
-    type ChainStateStore: ChainstateStore + Send + Sync;
-    type ChainStateProvider: ChainstateProvider + Send + Sync;
-    type CheckpointStore: CheckpointStore + Send + Sync;
-    type CheckpointProvider: CheckpointProvider + Send + Sync;
+    type L1DB: L1Database + Send + Sync;
+    type L2DB: L2BlockDatabase + Send + Sync;
+    type SyncEventDB: SyncEventDatabase + Send + Sync;
+    type ClientStateDB: ClientStateDatabase + Send + Sync;
+    type ChainstateDB: ChainstateDatabase + Send + Sync;
+    type CheckpointDB: CheckpointDatabase + Send + Sync;
 
-    fn l1_store(&self) -> &Arc<Self::L1DataStore>;
-    fn l1_provider(&self) -> &Arc<Self::L1Provider>;
-    fn l2_store(&self) -> &Arc<Self::L2DataStore>;
-    fn l2_provider(&self) -> &Arc<Self::L2DataProv>;
-    fn sync_event_store(&self) -> &Arc<Self::SyncEventStore>;
-    fn sync_event_provider(&self) -> &Arc<Self::SyncEventProvider>;
-    fn client_state_store(&self) -> &Arc<Self::ClientStateStore>;
-    fn client_state_provider(&self) -> &Arc<Self::ClientStateProvider>;
-    fn chain_state_store(&self) -> &Arc<Self::ChainStateStore>;
-    fn chain_state_provider(&self) -> &Arc<Self::ChainStateProvider>;
-    fn checkpoint_store(&self) -> &Arc<Self::CheckpointStore>;
-    fn checkpoint_provider(&self) -> &Arc<Self::CheckpointProvider>;
+    fn l1_db(&self) -> &Arc<Self::L1DB>;
+    fn l2_db(&self) -> &Arc<Self::L2DB>;
+    fn sync_event_db(&self) -> &Arc<Self::SyncEventDB>;
+    fn client_state_db(&self) -> &Arc<Self::ClientStateDB>;
+    fn chain_state_db(&self) -> &Arc<Self::ChainstateDB>;
+    fn checkpoint_db(&self) -> &Arc<Self::CheckpointDB>;
 }
 
-/// Storage interface to control our view of L1 data.
-pub trait L1DataStore {
+/// Database interface to control our view of L1 data.
+pub trait L1Database {
     /// Atomically extends the chain with a new block, providing the manifest
     /// and a list of transactions we find relevant.  Returns error if
     /// provided out-of-order.
@@ -66,10 +54,7 @@ pub trait L1DataStore {
     fn revert_to_height(&self, idx: u64) -> DbResult<()>;
 
     // TODO DA scraping storage
-}
 
-/// Provider interface to view L1 data.
-pub trait L1DataProvider {
     /// Gets the current chain tip index.
     fn get_chain_tip(&self) -> DbResult<Option<u64>>;
 
@@ -105,8 +90,9 @@ pub trait L1DataProvider {
     // TODO DA queries
 }
 
-/// Store to write new sync events.
-pub trait SyncEventStore {
+/// Provider and store to write and query sync events.  This does not provide notifications, that
+/// should be handled at a higher level.
+pub trait SyncEventDatabase {
     /// Atomically writes a new sync event, returning its index.
     fn write_sync_event(&self, ev: SyncEvent) -> DbResult<u64>;
 
@@ -114,11 +100,7 @@ pub trait SyncEventStore {
     /// interval.  This should only be used for deeply buried events where we'll
     /// never need to look at them again.
     fn clear_sync_event(&self, start_idx: u64, end_idx: u64) -> DbResult<()>;
-}
 
-/// Provider to query sync events.  This does not provide notifications, that
-/// should be handled at a higher level.
-pub trait SyncEventProvider {
     /// Returns the index of the most recently written sync event.
     fn get_last_idx(&self) -> DbResult<Option<u64>>;
 
@@ -129,11 +111,11 @@ pub trait SyncEventProvider {
     fn get_event_timestamp(&self, idx: u64) -> DbResult<Option<u64>>;
 }
 
-/// Writes client state updates and checkpoints.
-pub trait ClientStateStore {
+/// Db for client state updates and checkpoints.
+pub trait ClientStateDatabase {
     /// Writes a new consensus output for a given input index.  These input
-    /// indexes correspond to indexes in [``SyncEventStore``] and
-    /// [``SyncEventProvider``].  Will error if `idx - 1` does not exist (unless
+    /// indexes correspond to indexes in [``SyncEventDatabase``] and
+    /// [``SyncEventDatabase``].  Will error if `idx - 1` does not exist (unless
     /// `idx` is 0) or if trying to overwrite a state, as this is almost
     /// certainly a bug.
     fn write_client_update_output(&self, idx: u64, output: ClientUpdateOutput) -> DbResult<()>;
@@ -141,10 +123,7 @@ pub trait ClientStateStore {
     /// Writes a new consensus checkpoint that we can cheaply resume from.  Will
     /// error if trying to overwrite a state.
     fn write_client_state_checkpoint(&self, idx: u64, state: ClientState) -> DbResult<()>;
-}
 
-/// Provides client state writes and checkpoints.
-pub trait ClientStateProvider {
     /// Gets the idx of the last written state.  Or returns error if a bootstrap
     /// state has not been written yet.
     fn get_last_write_idx(&self) -> DbResult<u64>;
@@ -170,7 +149,7 @@ pub trait ClientStateProvider {
 
 /// L2 data store for CL blocks.  Does not store anything about what we think
 /// the L2 chain tip is, that's controlled by the consensus state.
-pub trait L2DataStore {
+pub trait L2BlockDatabase {
     /// Stores an L2 block, does not care about the block height of the L2
     /// block.  Also sets the block's status to "unchecked".
     fn put_block_data(&self, block: L2BlockBundle) -> DbResult<()>;
@@ -182,10 +161,7 @@ pub trait L2DataStore {
 
     /// Sets the block's validity status.
     fn set_block_status(&self, id: L2BlockId, status: BlockStatus) -> DbResult<()>;
-}
 
-/// Data provider for L2 blocks.
-pub trait L2DataProvider {
     /// Gets the L2 block by its ID, if we have it.
     fn get_block_data(&self, id: L2BlockId) -> DbResult<Option<L2BlockBundle>>;
 
@@ -212,15 +188,15 @@ pub enum BlockStatus {
     Invalid,
 }
 
-/// Write trait for the (consensus layer) chain state database.  For now we only
+/// Db trait for the (consensus layer) chain state database.  For now we only
 /// have a modestly sized "toplevel" chain state and no "large" state like the
 /// EL does.  This trait is designed to permit a change to storing larger state
 /// like that in the future without *too* much extra effort.  We decide new
 /// states by providing the database with a generic "write batch" and offloading
 /// the effort of deciding how to compute that write batch to the database impl.
-pub trait ChainstateStore {
+pub trait ChainstateDatabase {
     /// Writes the genesis chainstate at index 0.
-    fn write_genesis_state(&self, toplevel: &ChainState) -> DbResult<()>;
+    fn write_genesis_state(&self, toplevel: &Chainstate) -> DbResult<()>;
 
     /// Stores a write batch in the database, possibly computing that state
     /// under the hood from the writes.  Will not overwrite existing data,
@@ -232,11 +208,7 @@ pub trait ChainstateStore {
 
     /// Rolls back any writes and state checkpoints after a specified block.
     fn rollback_writes_to(&self, new_tip_idx: u64) -> DbResult<()>;
-}
 
-/// Read trait corresponding to [``ChainstateStore``].  See that trait's doc for
-/// design explanation.
-pub trait ChainstateProvider {
     /// Gets the last written state.
     fn get_last_state_idx(&self) -> DbResult<u64>;
 
@@ -248,28 +220,39 @@ pub trait ChainstateProvider {
     fn get_writes_at(&self, idx: u64) -> DbResult<Option<WriteBatch>>;
 
     /// Gets the toplevel chain state at a particular block index (height).
-    fn get_toplevel_state(&self, idx: u64) -> DbResult<Option<ChainState>>;
+    fn get_toplevel_state(&self, idx: u64) -> DbResult<Option<Chainstate>>;
+}
+
+/// Db trait for Checkpoint data
+pub trait CheckpointDatabase {
+    /// Get a [`CheckpointEntry`] by it's index
+    fn get_batch_checkpoint(&self, batchidx: u64) -> DbResult<Option<CheckpointEntry>>;
+
+    /// Get last batch index
+    fn get_last_batch_idx(&self) -> DbResult<Option<u64>>;
+
+    /// Store a [`CheckpointEntry`]
+    ///
+    /// `batchidx` for the Checkpoint is expected to increase monotonically and
+    /// correspond to the value of [`strata_state::chain_state::Chainstate::epoch`].
+    fn put_batch_checkpoint(&self, batchidx: u64, entry: CheckpointEntry) -> DbResult<()>;
 }
 
 /// NOTE: We might have to merge this with the [`Database`]
 /// A trait encapsulating provider and store traits to interact with the underlying database for
 /// [`BlobEntry`]
 pub trait SequencerDatabase {
-    type BlobStore: BlobStore;
-    type BlobProvider: BlobProvider;
+    type BlobDB: BlobDatabase;
 
-    fn blob_store(&self) -> &Arc<Self::BlobStore>;
-    fn blob_provider(&self) -> &Arc<Self::BlobProvider>;
+    fn blob_db(&self) -> &Arc<Self::BlobDB>;
 }
 
-/// A trait encapsulating  store traits to create/update [`BlobEntry`] in the database
-pub trait BlobStore {
+/// A trait encapsulating provider and store traits to create/update [`BlobEntry`] in the database
+/// and to fetch [`BlobEntry`] and indices from the database
+pub trait BlobDatabase {
     /// Store the [`BlobEntry`].
     fn put_blob_entry(&self, blobid: Buf32, blobentry: BlobEntry) -> DbResult<()>;
-}
 
-/// A trait encapsulating  provider traits to fetch [`BlobEntry`] and indices from the database
-pub trait BlobProvider {
     /// Get a [`BlobEntry`] by its hash
     fn get_blob_by_id(&self, id: Buf32) -> DbResult<Option<BlobEntry>>;
 
@@ -282,14 +265,12 @@ pub trait BlobProvider {
 
 /// A trait providing access to both prover data store and prover data provider.
 pub trait ProverDatabase {
-    type ProverStore: ProverDataStore;
-    type ProverProv: ProverDataProvider;
+    type ProverTaskDB: ProverTaskDatabase;
 
-    fn prover_store(&self) -> &Arc<Self::ProverStore>;
-    fn prover_provider(&self) -> &Arc<Self::ProverProv>;
+    fn prover_task_db(&self) -> &Arc<Self::ProverTaskDB>;
 }
 
-pub trait ProverDataStore {
+pub trait ProverTaskDatabase {
     /// Adds a new txentry to database
     fn insert_new_task_entry(&self, txid: [u8; 16], txentry: Vec<u8>) -> DbResult<u64>;
 
@@ -298,10 +279,7 @@ pub trait ProverDataStore {
 
     /// Updates an existing txentry
     fn update_task_entry(&self, idx: u64, txentry: Vec<u8>) -> DbResult<()>;
-}
 
-/// All methods related to fetching [`Vec<u8>`]s and indices in the database
-pub trait ProverDataProvider {
     /// Fetch [`Vec<u8>`] from db
     fn get_task_entry_by_id(&self, txid: [u8; 16]) -> DbResult<Option<Vec<u8>>>;
 
@@ -315,20 +293,16 @@ pub trait ProverDataProvider {
     fn get_task_entry(&self, idx: u64) -> DbResult<Option<Vec<u8>>>;
 }
 
+pub trait BroadcastDatabase {
+    type L1BroadcastDB: L1BroadcastDatabase;
+
+    /// Return a reference to the L1 broadcast db implementation
+    fn l1_broadcast_db(&self) -> &Arc<Self::L1BroadcastDB>;
+}
+
 /// A trait encapsulating the provider and store traits for interacting with the broadcast
 /// transactions([`L1TxEntry`]), their indices and ids
 pub trait L1BroadcastDatabase {
-    type BroadcastStore: L1BroadcastStore;
-    type BroadcastProvider: L1BroadcastProvider;
-
-    /// Return a reference to the store implementation
-    fn broadcast_store(&self) -> &Arc<Self::BroadcastStore>;
-    /// Return a reference to the provider implementation
-    fn broadcast_provider(&self) -> &Arc<Self::BroadcastProvider>;
-}
-
-/// All methods related to storing/updating [`L1TxEntry`]s in the database
-pub trait L1BroadcastStore {
     /// Updates/Inserts a txentry to database. Returns Some(idx) if newly inserted else None
     fn put_tx_entry(&self, txid: Buf32, txentry: L1TxEntry) -> DbResult<Option<u64>>;
 
@@ -336,10 +310,7 @@ pub trait L1BroadcastStore {
     fn put_tx_entry_by_idx(&self, idx: u64, txentry: L1TxEntry) -> DbResult<()>;
 
     // TODO: possibly add delete as well
-}
 
-/// All methods related to fetching [`L1TxEntry`]s and indices in the database
-pub trait L1BroadcastProvider {
     /// Fetch [`L1TxEntry`] from db
     fn get_tx_entry_by_id(&self, txid: Buf32) -> DbResult<Option<L1TxEntry>>;
 
@@ -397,29 +368,11 @@ pub trait BridgeDutyDatabase {
 pub trait BridgeDutyIndexDatabase {
     /// Get the checkpoint upto which the duties have been fetched.
     ///
-    /// This checkpoint is the same as the index in [`L1DataStore`].
+    /// This checkpoint is the same as the index in [`L1Database`].
     fn get_index(&self) -> DbResult<Option<u64>>;
 
     /// Set the checkpoint to a new value.
     ///
     /// This is done in response to the response received from the full node's RPC.
     fn set_index(&self, index: u64) -> DbResult<()>;
-}
-
-/// Provider for Checkpoint data
-pub trait CheckpointProvider {
-    /// Get a [`CheckpointEntry`] by it's index
-    fn get_batch_checkpoint(&self, batchidx: u64) -> DbResult<Option<CheckpointEntry>>;
-
-    /// Get last batch index
-    fn get_last_batch_idx(&self) -> DbResult<Option<u64>>;
-}
-
-/// Store for Checkpoint data
-pub trait CheckpointStore {
-    /// Store a [`CheckpointEntry`]
-    ///
-    /// `batchidx` for the Checkpoint is expected to increase monotonically and
-    /// correspond to the value of [`strata_state::chain_state::ChainState::epoch`].
-    fn put_batch_checkpoint(&self, batchidx: u64, entry: CheckpointEntry) -> DbResult<()>;
 }

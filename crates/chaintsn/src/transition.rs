@@ -351,7 +351,7 @@ mod tests {
     use strata_state::{
         block::{ExecSegment, L1Segment, L2BlockBody},
         bridge_state::OperatorTable,
-        chain_state::ChainState,
+        chain_state::Chainstate,
         exec_env::ExecEnvState,
         exec_update::{ExecUpdate, UpdateInput, UpdateOutput},
         genesis::GenesisStateData,
@@ -382,7 +382,7 @@ mod tests {
 
     #[test]
     fn test_process_l1_view_update_with_deposit_update_tx() {
-        let mut chs: ChainState = ArbitraryGenerator::new().generate();
+        let mut chs: Chainstate = ArbitraryGenerator::new().generate();
         // get the l1 view state of the chain state
         let params = gen_params();
         let header_record = chs.l1_view();
@@ -434,7 +434,7 @@ mod tests {
 
     #[test]
     fn test_process_l1_view_update_with_empty_payload() {
-        let chs: ChainState = ArbitraryGenerator::new().generate();
+        let chs: Chainstate = ArbitraryGenerator::new().generate();
         let params = gen_params();
 
         let mut state_cache = StateCache::new(chs.clone());
@@ -451,7 +451,7 @@ mod tests {
 
     #[test]
     fn test_process_l1_view_update_maturation_check() {
-        let mut chs: ChainState = ArbitraryGenerator::new().generate();
+        let mut chs: Chainstate = ArbitraryGenerator::new().generate();
         let params = gen_params();
         let header_record = chs.l1_view();
         let old_safe_height = header_record.safe_height();

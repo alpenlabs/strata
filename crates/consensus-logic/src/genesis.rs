@@ -8,7 +8,7 @@ use strata_primitives::{
 use strata_state::{
     block::{ExecSegment, L1Segment, L2BlockAccessory, L2BlockBundle},
     bridge_state::OperatorTable,
-    chain_state::ChainState,
+    chain_state::Chainstate,
     client_state::ClientState,
     exec_env::ExecEnvState,
     exec_update::{ExecUpdate, UpdateInput, UpdateOutput},
@@ -32,8 +32,8 @@ pub fn init_client_state(params: &Params, database: &impl Database) -> anyhow::R
     );
 
     // Write the state into the database.
-    let cs_store = database.client_state_store();
-    cs_store.write_client_state_checkpoint(0, init_state)?;
+    let cs_db = database.client_state_db();
+    cs_db.write_client_state_checkpoint(0, init_state)?;
 
     Ok(())
 }
@@ -55,9 +55,9 @@ pub fn init_genesis_chainstate(
     let genesis_blk_height = params.rollup.genesis_l1_height;
 
     // Query the pre-genesis blocks we need before we do anything else.
-    let l1_prov = database.l1_provider();
+    let l1_db = database.l1_db();
     let pregenesis_mfs =
-        load_pre_genesis_l1_manifests(l1_prov.as_ref(), horizon_blk_height, genesis_blk_height)?;
+        load_pre_genesis_l1_manifests(l1_db.as_ref(), horizon_blk_height, genesis_blk_height)?;
 
     // Build the genesis block and genesis consensus states.
     let gblock = make_genesis_block(params);
@@ -66,10 +66,10 @@ pub fn init_genesis_chainstate(
     let genesis_blkid = gblock.header().get_blockid();
 
     // Now insert things into the database.
-    let chs_store = database.chain_state_store();
-    let l2store = database.l2_store();
-    chs_store.write_genesis_state(&gchstate)?;
-    l2store.put_block_data(gblock)?;
+    let chs_db = database.chain_state_db();
+    let l2_db = database.l2_db();
+    chs_db.write_genesis_state(&gchstate)?;
+    l2_db.put_block_data(gblock)?;
 
     // TODO make ^this be atomic so we can't accidentally not write both, or
     // make it so we can overwrite the genesis chainstate if there's no other
@@ -86,13 +86,13 @@ pub fn construct_operator_table(opconfig: &OperatorConfig) -> OperatorTable {
 }
 
 fn load_pre_genesis_l1_manifests(
-    l1_prov: &impl L1DataProvider,
+    l1_db: &impl L1Database,
     horizon_height: u64,
     genesis_height: u64,
 ) -> anyhow::Result<Vec<L1BlockManifest>> {
     let mut manifests = Vec::new();
     for height in horizon_height..=genesis_height {
-        let Some(mf) = l1_prov.get_block_manifest(height)? else {
+        let Some(mf) = l1_db.get_block_manifest(height)? else {
             return Err(Error::MissingL1BlockHeight(height).into());
         };
 
@@ -145,7 +145,7 @@ pub fn make_genesis_chainstate(
     gblock: &L2BlockBundle,
     pregenesis_mfs: Vec<L1BlockManifest>,
     params: &Params,
-) -> ChainState {
+) -> Chainstate {
     let genesis_blkid = gblock.header().get_blockid();
 
     let geui = gblock.exec_segment().update().input();
@@ -158,16 +158,16 @@ pub fn make_genesis_chainstate(
 
     let optbl = construct_operator_table(&params.rollup().operator_config);
     let gdata = GenesisStateData::new(genesis_blkid, l1vs, optbl, gees);
-    ChainState::from_genesis(&gdata)
+    Chainstate::from_genesis(&gdata)
 }
 
 /// Check if the database needs to have client init done to it.
 pub fn check_needs_client_init(database: &impl Database) -> anyhow::Result<bool> {
-    let cs_prov = database.client_state_provider();
+    let cs_db = database.client_state_db();
 
     // Check if we've written any genesis state checkpoint.  These we perform a
     // bit more carefully and check errors more granularly.
-    match cs_prov.get_last_checkpoint_idx() {
+    match cs_db.get_last_checkpoint_idx() {
         Ok(_) => {}
         Err(DbError::NotBootstrapped) => return Ok(true),
 
@@ -179,10 +179,10 @@ pub fn check_needs_client_init(database: &impl Database) -> anyhow::Result<bool>
 }
 
 pub fn check_needs_genesis(database: &impl Database) -> anyhow::Result<bool> {
-    let l2_prov = database.l2_provider();
+    let l2_db = database.l2_db();
 
     // Check if there's any genesis block written.
-    match l2_prov.get_blocks_at_height(0) {
+    match l2_db.get_blocks_at_height(0) {
         Ok(blkids) => Ok(blkids.is_empty()),
 
         Err(DbError::NotBootstrapped) => Ok(true),

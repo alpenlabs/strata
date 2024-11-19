@@ -5,7 +5,7 @@ use rockbound::{
 };
 use strata_db::{
     errors::DbError,
-    traits::{ProverDataProvider, ProverDataStore, ProverDatabase},
+    traits::{ProverDatabase, ProverTaskDatabase},
     DbResult,
 };
 
@@ -23,7 +23,7 @@ impl ProofDb {
     }
 }
 
-impl ProverDataStore for ProofDb {
+impl ProverTaskDatabase for ProofDb {
     fn insert_new_task_entry(&self, taskid: [u8; 16], taskentry: Vec<u8>) -> DbResult<u64> {
         self.db
             .with_optimistic_txn(TransactionRetry::Count(self.ops.retry_count), |tx| {
@@ -65,9 +65,7 @@ impl ProverDataStore for ProofDb {
             })
             .map_err(|e| DbError::TransactionError(e.to_string()))
     }
-}
 
-impl ProverDataProvider for ProofDb {
     fn get_task_entry_by_id(&self, taskid: [u8; 16]) -> DbResult<Option<Vec<u8>>> {
         Ok(self.db.get::<ProverTaskSchema>(&taskid)?)
     }
@@ -102,21 +100,16 @@ impl ProverDB {
 }
 
 impl ProverDatabase for ProverDB {
-    type ProverStore = ProofDb;
-    type ProverProv = ProofDb;
+    type ProverTaskDB = ProofDb;
 
-    fn prover_store(&self) -> &Arc<Self::ProverStore> {
-        &self.db
-    }
-
-    fn prover_provider(&self) -> &Arc<Self::ProverProv> {
+    fn prover_task_db(&self) -> &Arc<Self::ProverTaskDB> {
         &self.db
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use strata_db::traits::{ProverDataProvider, ProverDataStore};
+    use strata_db::traits::ProverTaskDatabase;
 
     use super::*;
     use crate::test_utils::get_rocksdb_tmp_instance_for_prover;

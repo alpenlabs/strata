@@ -1,11 +1,7 @@
 use std::sync::Arc;
 
 use rockbound::{OptimisticTransactionDB, SchemaDBOperationsExt};
-use strata_db::{
-    traits::{CheckpointProvider, CheckpointStore},
-    types::CheckpointEntry,
-    DbResult,
-};
+use strata_db::{traits::CheckpointDatabase, types::CheckpointEntry, DbResult};
 
 use super::schemas::BatchCheckpointSchema;
 use crate::DbOpsConfig;
@@ -26,7 +22,7 @@ impl RBCheckpointDB {
     }
 }
 
-impl CheckpointStore for RBCheckpointDB {
+impl CheckpointDatabase for RBCheckpointDB {
     fn put_batch_checkpoint(
         &self,
         batchidx: u64,
@@ -36,9 +32,7 @@ impl CheckpointStore for RBCheckpointDB {
             .db
             .put::<BatchCheckpointSchema>(&batchidx, &batch_checkpoint)?)
     }
-}
 
-impl CheckpointProvider for RBCheckpointDB {
     fn get_batch_checkpoint(&self, batchidx: u64) -> DbResult<Option<CheckpointEntry>> {
         Ok(self.db.get::<BatchCheckpointSchema>(&batchidx)?)
     }

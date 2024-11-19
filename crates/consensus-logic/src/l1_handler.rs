@@ -7,7 +7,7 @@ use bitcoin::{
     Block, Wtxid,
 };
 use secp256k1::XOnlyPublicKey;
-use strata_db::traits::{Database, L1DataStore};
+use strata_db::traits::{Database, L1Database};
 use strata_primitives::{
     block_credential::CredRule,
     buf::Buf32,
@@ -29,7 +29,7 @@ use crate::csm::ctl::CsmController;
 
 /// Consumes L1 events and reflects them in the database.
 pub fn bitcoin_data_handler_task<D: Database + Send + Sync + 'static>(
-    l1db: Arc<D::L1DataStore>,
+    l1db: Arc<D::L1DB>,
     csm_ctl: Arc<CsmController>,
     mut event_rx: mpsc::Receiver<L1Event>,
     params: Arc<Params>,
@@ -65,7 +65,7 @@ fn handle_bitcoin_event<L1D>(
     seq_pubkey: Option<XOnlyPublicKey>,
 ) -> anyhow::Result<()>
 where
-    L1D: L1DataStore + Sync + Send + 'static,
+    L1D: L1Database + Sync + Send + 'static,
 {
     match event {
         L1Event::RevertTo(revert_blk_num) => {

@@ -1,4 +1,4 @@
-use strata_db::traits::ChainstateProvider;
+use strata_db::traits::ChainstateDatabase;
 use strata_primitives::{buf::Buf32, params::Params};
 use strata_state::{batch::BatchInfo, client_state::ClientState, id::L2BlockId};
 use tracing::*;
@@ -11,7 +11,7 @@ pub fn extract_duties(
     state: &ClientState,
     _ident: &Identity,
     _params: &Params,
-    chs_provider: &impl ChainstateProvider,
+    chs_db: &impl ChainstateDatabase,
     rollup_params_commitment: Buf32,
 ) -> Result<Vec<Duty>, Error> {
     // If a sync state isn't present then we probably don't have anything we
@@ -32,7 +32,7 @@ pub fn extract_duties(
         state,
         tip_height,
         tip_blkid,
-        chs_provider,
+        chs_db,
         rollup_params_commitment,
     )?);
 
@@ -43,7 +43,7 @@ fn extract_batch_duties(
     state: &ClientState,
     tip_height: u64,
     tip_id: L2BlockId,
-    chs_provider: &impl ChainstateProvider,
+    chs_db: &impl ChainstateDatabase,
     rollup_params_commitment: Buf32,
 ) -> Result<Vec<Duty>, Error> {
     if !state.is_chain_active() {
@@ -84,12 +84,12 @@ fn extract_batch_duties(
             // Start from first non-genesis l2 block height
             let l2_range = (1, tip_height);
 
-            let initial_chain_state = chs_provider
+            let initial_chain_state = chs_db
                 .get_toplevel_state(0)?
                 .ok_or(Error::MissingIdxChainstate(0))?;
             let initial_chain_state_root = initial_chain_state.compute_state_root();
 
-            let current_chain_state = chs_provider
+            let current_chain_state = chs_db
                 .get_toplevel_state(tip_height)?
                 .ok_or(Error::MissingIdxChainstate(0))?;
             let current_chain_state_root = current_chain_state.compute_state_root();
@@ -124,7 +124,7 @@ fn extract_batch_duties(
             // Also, rather than tip heights, we might need to limit the max range a prover will be
             // proving
             let l2_range = (checkpoint.l2_range.1 + 1, tip_height);
-            let current_chain_state = chs_provider
+            let current_chain_state = chs_db
                 .get_toplevel_state(tip_height)?
                 .ok_or(Error::MissingIdxChainstate(0))?;
             let current_chain_state_root = current_chain_state.compute_state_root();

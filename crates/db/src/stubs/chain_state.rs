@@ -1,14 +1,14 @@
 use std::collections::*;
 
 use parking_lot::Mutex;
-use strata_state::{chain_state::ChainState, state_op, state_op::WriteBatch};
+use strata_state::{chain_state::Chainstate, state_op, state_op::WriteBatch};
 use tracing::*;
 
 use crate::{errors::DbError, traits::*, DbResult};
 
 struct InnerState {
     write_batches: BTreeMap<u64, WriteBatch>,
-    toplevels: BTreeMap<u64, ChainState>,
+    toplevels: BTreeMap<u64, Chainstate>,
 }
 
 impl InnerState {
@@ -45,8 +45,8 @@ impl StubChainstateDb {
     }
 }
 
-impl ChainstateStore for StubChainstateDb {
-    fn write_genesis_state(&self, toplevel: &ChainState) -> DbResult<()> {
+impl ChainstateDatabase for StubChainstateDb {
+    fn write_genesis_state(&self, toplevel: &Chainstate) -> DbResult<()> {
         let mut st = self.state.lock();
         st.toplevels.insert(0, toplevel.clone());
         Ok(())
@@ -132,9 +132,7 @@ impl ChainstateStore for StubChainstateDb {
 
         Ok(())
     }
-}
 
-impl ChainstateProvider for StubChainstateDb {
     fn get_last_state_idx(&self) -> DbResult<u64> {
         let st = self.state.lock();
         Ok(st.find_last_write_batch())
@@ -158,7 +156,7 @@ impl ChainstateProvider for StubChainstateDb {
     fn get_toplevel_state(
         &self,
         idx: u64,
-    ) -> DbResult<Option<strata_state::chain_state::ChainState>> {
+    ) -> DbResult<Option<strata_state::chain_state::Chainstate>> {
         let st = self.state.lock();
         Ok(st.toplevels.get(&idx).cloned())
     }

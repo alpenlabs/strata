@@ -5,7 +5,7 @@ use rockbound::{
 };
 use strata_db::{
     errors::DbError,
-    traits::{L1BroadcastDatabase, L1BroadcastProvider, L1BroadcastStore},
+    traits::{self, L1BroadcastDatabase},
     types::L1TxEntry,
     DbResult,
 };
@@ -25,7 +25,7 @@ impl L1BroadcastDb {
     }
 }
 
-impl L1BroadcastStore for L1BroadcastDb {
+impl L1BroadcastDatabase for L1BroadcastDb {
     fn put_tx_entry(&self, txid: Buf32, txentry: L1TxEntry) -> DbResult<Option<u64>> {
         self.db
             .with_optimistic_txn(
@@ -58,9 +58,7 @@ impl L1BroadcastStore for L1BroadcastDb {
             })
             .map_err(|e| DbError::TransactionError(e.to_string()))
     }
-}
 
-impl L1BroadcastProvider for L1BroadcastDb {
     fn get_tx_entry_by_id(&self, txid: Buf32) -> DbResult<Option<L1TxEntry>> {
         Ok(self.db.get::<BcastL1TxSchema>(&txid)?)
     }
@@ -86,25 +84,20 @@ impl L1BroadcastProvider for L1BroadcastDb {
     }
 }
 
-pub struct BroadcastDatabase {
+pub struct BroadcastDb {
     l1_broadcast_db: Arc<L1BroadcastDb>,
 }
 
-impl BroadcastDatabase {
+impl BroadcastDb {
     pub fn new(l1_broadcast_db: Arc<L1BroadcastDb>) -> Self {
         Self { l1_broadcast_db }
     }
 }
 
-impl L1BroadcastDatabase for BroadcastDatabase {
-    type BroadcastStore = L1BroadcastDb;
-    type BroadcastProvider = L1BroadcastDb;
+impl traits::BroadcastDatabase for BroadcastDb {
+    type L1BroadcastDB = L1BroadcastDb;
 
-    fn broadcast_store(&self) -> &Arc<Self::BroadcastStore> {
-        &self.l1_broadcast_db
-    }
-
-    fn broadcast_provider(&self) -> &Arc<Self::BroadcastProvider> {
+    fn l1_broadcast_db(&self) -> &Arc<Self::L1BroadcastDB> {
         &self.l1_broadcast_db
     }
 }
@@ -112,10 +105,7 @@ impl L1BroadcastDatabase for BroadcastDatabase {
 #[cfg(test)]
 mod tests {
     use bitcoin::hashes::Hash;
-    use strata_db::{
-        traits::{L1BroadcastProvider, L1BroadcastStore},
-        types::L1TxStatus,
-    };
+    use strata_db::{traits::L1BroadcastDatabase, types::L1TxStatus};
     use strata_primitives::buf::Buf32;
     use strata_test_utils::bitcoin::get_test_bitcoin_txns;
 

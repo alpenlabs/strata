@@ -32,7 +32,7 @@ impl StubL2Db {
     }
 }
 
-impl L2DataStore for StubL2Db {
+impl L2BlockDatabase for StubL2Db {
     fn put_block_data(&self, bundle: L2BlockBundle) -> DbResult<()> {
         let blkid = bundle.block().header().get_blockid();
         let idx = bundle.block().header().blockidx();
@@ -60,9 +60,7 @@ impl L2DataStore for StubL2Db {
         tbl.insert(id, status);
         Ok(())
     }
-}
 
-impl L2DataProvider for StubL2Db {
     fn get_block_data(&self, id: L2BlockId) -> DbResult<Option<L2BlockBundle>> {
         let tbl = self.blocks.lock();
         Ok(tbl.get(&id).cloned())

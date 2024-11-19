@@ -8,15 +8,15 @@ use strata_state::{
     block_validation::{check_block_credential, validate_block_segments},
     exec_update::{ExecUpdate, UpdateInput, UpdateOutput},
 };
-pub use strata_state::{block::L2Block, chain_state::ChainState, state_op::StateCache};
+pub use strata_state::{block::L2Block, chain_state::Chainstate, state_op::StateCache};
 
 /// Verifies an L2 block and applies the chain state transition if the block is valid.
 pub fn verify_and_transition(
-    prev_chstate: ChainState,
+    prev_chstate: Chainstate,
     new_l2_block: L2Block,
     el_proof_pp: ELProofPublicParams,
     rollup_params: &RollupParams,
-) -> ChainState {
+) -> Chainstate {
     verify_l2_block(&new_l2_block, &el_proof_pp, rollup_params);
     apply_state_transition(prev_chstate, &new_l2_block, rollup_params)
 }
@@ -63,10 +63,10 @@ pub fn reconstruct_exec_segment(el_proof_pp: &ELProofPublicParams) -> ExecSegmen
 
 /// Applies a state transition for a given L2 block.
 fn apply_state_transition(
-    prev_chstate: ChainState,
+    prev_chstate: Chainstate,
     new_l2_block: &L2Block,
     chain_params: &RollupParams,
-) -> ChainState {
+) -> Chainstate {
     let mut state_cache = StateCache::new(prev_chstate);
 
     strata_chaintsn::transition::process_block(

@@ -106,10 +106,10 @@ pub struct BatchInfo {
     /// [`super::l1::HeaderVerificationState::compute_hash`].
     pub l1_transition: (Buf32, Buf32),
 
-    /// The inclusive hash range of `ChainState` for L2 blocks.
+    /// The inclusive hash range of `Chainstate` for L2 blocks.
     /// This represents the transition of L2 state from the starting state to the
     /// ending state. The state root is computed via
-    /// [`super::chain_state::ChainState::compute_state_root`].
+    /// [`super::chain_state::Chainstate::compute_state_root`].
     pub l2_transition: (Buf32, Buf32),
 
     /// The last L2 block upto which this checkpoint covers since the previous checkpoint

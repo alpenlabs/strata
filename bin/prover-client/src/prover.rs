@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use strata_db::traits::{ProverDataProvider, ProverDataStore, ProverDatabase};
+use strata_db::traits::{ProverDatabase, ProverTaskDatabase};
 use strata_proofimpl_evm_ee_stf::ELProofInput;
 use strata_rocksdb::{
     prover::db::{ProofDb, ProverDB},
@@ -302,7 +302,7 @@ where
 
     fn save_proof_to_db(&self, task_id: Uuid, proof: &Proof) -> Result<(), anyhow::Error> {
         self.db
-            .prover_store()
+            .prover_task_db()
             .insert_new_task_entry(*task_id.as_bytes(), proof.into())?;
         Ok(())
     }
@@ -312,7 +312,7 @@ where
     fn read_proof_from_db(&self, task_id: Uuid) -> Result<Proof, anyhow::Error> {
         let proof_entry = self
             .db
-            .prover_provider()
+            .prover_task_db()
             .get_task_entry_by_id(*task_id.as_bytes())?;
         match proof_entry {
             Some(raw_proof) => Ok(Proof::new(raw_proof)),

@@ -1,7 +1,7 @@
 use sha2::{Digest, Sha256};
 use strata_primitives::params::RollupParams;
-use strata_proofimpl_checkpoint::{ChainStateSnapshot, L2BatchProofOutput};
-use strata_proofimpl_cl_stf::{verify_and_transition, ChainState, L2Block};
+use strata_proofimpl_checkpoint::{ChainstateSnapshot, L2BatchProofOutput};
+use strata_proofimpl_cl_stf::{verify_and_transition, Chainstate, L2Block};
 use strata_proofimpl_evm_ee_stf::ELProofPublicParams;
 
 mod vks;
@@ -10,7 +10,7 @@ fn main() {
     let rollup_params: RollupParams = sp1_zkvm::io::read();
 
     let input_raw = sp1_zkvm::io::read_vec();
-    let (prev_state, block): (ChainState, L2Block) = borsh::from_slice(&input_raw).unwrap();
+    let (prev_state, block): (Chainstate, L2Block) = borsh::from_slice(&input_raw).unwrap();
 
     // Verify the EL proof
     let el_vkey = vks::GUEST_EVM_EE_STF_ELF_ID;
@@ -26,13 +26,13 @@ fn main() {
         &rollup_params,
     );
 
-    let initial_snapshot = ChainStateSnapshot {
+    let initial_snapshot = ChainstateSnapshot {
         hash: prev_state.compute_state_root(),
         slot: prev_state.chain_tip_slot(),
         l2_blockid: prev_state.chain_tip_blockid(),
     };
 
-    let final_snapshot = ChainStateSnapshot {
+    let final_snapshot = ChainstateSnapshot {
         hash: new_state.compute_state_root(),
         slot: new_state.chain_tip_slot(),
         l2_blockid: new_state.chain_tip_blockid(),

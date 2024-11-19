@@ -18,14 +18,14 @@ use strata_consensus_logic::{
     sync_manager::{self, SyncManager},
 };
 use strata_db::{
-    traits::{ChainstateProvider, Database},
+    traits::{ChainstateDatabase, Database},
     DbError,
 };
 use strata_eectl::engine::ExecEngineCtl;
 use strata_evmexec::{engine::RpcExecEngineCtl, EngineRpcClient};
 use strata_primitives::params::{Params, SyncParams};
 use strata_rocksdb::{
-    broadcaster::db::BroadcastDatabase, sequencer::db::SequencerDB, DbOpsConfig, RBSeqBlobDb,
+    broadcaster::db::BroadcastDb, sequencer::db::SequencerDB, DbOpsConfig, RBSeqBlobDb,
 };
 use strata_rpc_api::{StrataAdminApiServer, StrataApiServer, StrataSequencerApiServer};
 use strata_status::{StatusRx, StatusTx};
@@ -257,8 +257,8 @@ fn do_startup_checks(
     bitcoin_client: &impl Reader,
     runtime: &Runtime,
 ) -> anyhow::Result<()> {
-    let chain_state_prov = database.chain_state_provider();
-    let last_state_idx = match chain_state_prov.get_last_state_idx() {
+    let chain_state_db = database.chain_state_db();
+    let last_state_idx = match chain_state_db.get_last_state_idx() {
         Ok(idx) => idx,
         Err(DbError::NotBootstrapped) => {
             // genesis is not done
@@ -267,7 +267,7 @@ fn do_startup_checks(
         }
         err => err?,
     };
-    let Some(last_chain_state) = chain_state_prov.get_toplevel_state(last_state_idx)? else {
+    let Some(last_chain_state) = chain_state_db.get_toplevel_state(last_state_idx)? else {
         anyhow::bail!(format!("Missing chain state idx: {}", last_state_idx));
     };
 
@@ -494,7 +494,7 @@ fn start_sequencer_tasks(
 }
 
 fn start_broadcaster_tasks(
-    broadcast_database: Arc<BroadcastDatabase>,
+    broadcast_database: Arc<BroadcastDb>,
     pool: threadpool::ThreadPool,
     executor: &TaskExecutor,
     bitcoin_client: Arc<BitcoinClient>,

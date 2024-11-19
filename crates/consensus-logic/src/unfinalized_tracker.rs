@@ -341,7 +341,7 @@ impl FinalizeReport {
 mod tests {
     use std::collections::HashSet;
 
-    use strata_db::traits::{BlockStatus, Database, L2DataStore};
+    use strata_db::traits::{BlockStatus, Database, L2BlockDatabase};
     use strata_rocksdb::test_utils::get_common_db;
     use strata_state::{header::L2Header, id::L2BlockId};
     use strata_storage::L2BlockManager;
@@ -349,7 +349,7 @@ mod tests {
 
     use crate::unfinalized_tracker;
 
-    fn setup_test_chain(l2_prov: &impl L2DataStore) -> [L2BlockId; 7] {
+    fn setup_test_chain(l2_db: &impl L2BlockDatabase) -> [L2BlockId; 7] {
         // Chain A: g -> a1 -> a2 -> a3
         // Chain B: g -> a1 -> b2 -> b3
         // Chain C: g -> c1
@@ -376,10 +376,8 @@ mod tests {
             .chain(c_chain.clone())
         {
             let blockid = b.header().get_blockid();
-            l2_prov.put_block_data(b).unwrap();
-            l2_prov
-                .set_block_status(blockid, BlockStatus::Valid)
-                .unwrap();
+            l2_db.put_block_data(b).unwrap();
+            l2_db.set_block_status(blockid, BlockStatus::Valid).unwrap();
         }
 
         [
@@ -423,9 +421,9 @@ mod tests {
     #[test]
     fn test_load_unfinalized_blocks() {
         let db = get_common_db();
-        let l2_prov = db.l2_provider();
+        let l2_db = db.l2_db();
 
-        let [g, a1, c1, a2, b2, a3, b3] = setup_test_chain(l2_prov.as_ref());
+        let [g, a1, c1, a2, b2, a3, b3] = setup_test_chain(l2_db.as_ref());
 
         // Init the chain tracker from the state we figured out.
         let mut chain_tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(g);
@@ -470,9 +468,9 @@ mod tests {
     #[test]
     fn test_get_descendants() {
         let db = get_common_db();
-        let l2_prov = db.l2_provider();
+        let l2_db = db.l2_db();
 
-        let [g, a1, c1, a2, b2, a3, b3] = setup_test_chain(l2_prov.as_ref());
+        let [g, a1, c1, a2, b2, a3, b3] = setup_test_chain(l2_db.as_ref());
 
         // Init the chain tracker from the state we figured out.
         let mut chain_tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(g);
@@ -508,9 +506,9 @@ mod tests {
     #[test]
     fn test_update_finalized_tip() {
         let db = get_common_db();
-        let l2_prov = db.l2_provider();
+        let l2_db = db.l2_db();
 
-        let [g, a1, c1, a2, b2, a3, b3] = setup_test_chain(l2_prov.as_ref());
+        let [g, a1, c1, a2, b2, a3, b3] = setup_test_chain(l2_db.as_ref());
 
         let pool = threadpool::ThreadPool::new(1);
         let blk_manager = L2BlockManager::new(pool, db);

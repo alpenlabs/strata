@@ -103,8 +103,8 @@ fn make_write_event_shim<D: Database + Sync + Send + 'static>(
         let (resp_tx, resp_rx) = oneshot::channel();
 
         pool.execute(move || {
-            let se_store = db.sync_event_store();
-            let res = se_store.write_sync_event(ev);
+            let sync_event_db = db.sync_event_db();
+            let res = sync_event_db.write_sync_event(ev);
             if resp_tx.send(res).is_err() {
                 warn!("failed to submit event");
             }

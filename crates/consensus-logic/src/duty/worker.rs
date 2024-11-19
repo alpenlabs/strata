@@ -69,8 +69,8 @@ fn duty_tracker_task_inner(
 ) -> Result<(), Error> {
     let mut duties_tracker = types::DutyTracker::new_empty();
 
-    let idx = database.client_state_provider().get_last_checkpoint_idx()?;
-    let last_checkpoint_state = database.client_state_provider().get_state_checkpoint(idx)?;
+    let idx = database.client_state_db().get_last_checkpoint_idx()?;
+    let last_checkpoint_state = database.client_state_db().get_state_checkpoint(idx)?;
     let last_finalized_blk = match last_checkpoint_state {
         Some(state) => state.sync().map(|sync| *sync.finalized_blkid()),
         None => None,
@@ -109,7 +109,7 @@ fn duty_tracker_task_inner(
             &ident,
             l2_block_manager,
             params,
-            &**database.chain_state_provider(),
+            &**database.chain_state_db(),
             rollup_params_commitment,
         ) {
             error!(err = %e, "failed to update duties tracker");
@@ -133,7 +133,7 @@ fn update_tracker(
     ident: &Identity,
     l2_block_manager: &L2BlockManager,
     params: &Params,
-    chs_provider: &impl ChainstateProvider,
+    chs_db: &impl ChainstateDatabase,
     rollup_params_commitment: Buf32,
 ) -> Result<(), Error> {
     let Some(ss) = state.sync() else {
@@ -141,7 +141,7 @@ fn update_tracker(
     };
 
     let new_duties =
-        extractor::extract_duties(state, ident, params, chs_provider, rollup_params_commitment)?;
+        extractor::extract_duties(state, ident, params, chs_db, rollup_params_commitment)?;
 
     info!(new_duties = ?new_duties, "new duties");
 

@@ -3,16 +3,16 @@
 mod test {
     use strata_risc0_adapter::{Risc0Verifier, RiscZeroHost, RiscZeroProofInputBuilder};
     use strata_risc0_guest_builder::GUEST_RISC0_CL_STF_ELF;
-    use strata_state::{block::L2Block, chain_state::ChainState};
+    use strata_state::{block::L2Block, chain_state::Chainstate};
     use strata_zkvm::{ZKVMHost, ZKVMInputBuilder, ZKVMVerifier};
 
-    fn get_prover_input() -> (ChainState, L2Block) {
+    fn get_prover_input() -> (Chainstate, L2Block) {
         let prev_state_data: &[u8] =
             include_bytes!("../../test-util/cl_stfs/slot-1/prev_chstate.borsh");
         let new_block_data: &[u8] =
             include_bytes!("../../test-util/cl_stfs/slot-1/final_block.borsh");
 
-        let prev_state: ChainState = borsh::from_slice(prev_state_data).unwrap();
+        let prev_state: Chainstate = borsh::from_slice(prev_state_data).unwrap();
         let block: L2Block = borsh::from_slice(new_block_data).unwrap();
 
         (prev_state, block)
@@ -36,6 +36,6 @@ mod test {
         let new_state_ser = Risc0Verifier::extract_public_output::<Vec<u8>>(&proof)
             .expect("Failed to extract public outputs");
 
-        let _new_state: ChainState = borsh::from_slice(&new_state_ser).unwrap();
+        let _new_state: Chainstate = borsh::from_slice(&new_state_ser).unwrap();
     }
 }

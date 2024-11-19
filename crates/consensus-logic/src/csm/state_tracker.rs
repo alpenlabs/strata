@@ -59,9 +59,9 @@ impl<D: Database> StateTracker<D> {
 
         // Load the event from the database.
         let db = self.database.as_ref();
-        let ev_prov = db.sync_event_provider();
-        let cs_store = db.client_state_store();
-        let ev = ev_prov
+        let sync_event_db = db.sync_event_db();
+        let client_state_db = db.client_state_db();
+        let ev = sync_event_db
             .get_sync_event(ev_idx)?
             .ok_or(Error::MissingSyncEvent(ev_idx))?;
 
@@ -79,16 +79,16 @@ impl<D: Database> StateTracker<D> {
 
         // Store the outputs.
         // TODO ideally avoid clone
-        cs_store.write_client_update_output(ev_idx, outp.clone())?;
+        client_state_db.write_client_update_output(ev_idx, outp.clone())?;
 
         Ok((outp, self.cur_state.clone()))
     }
 
     /// Writes the current state to the database as a new checkpoint.
     pub fn store_checkpoint(&self) -> anyhow::Result<()> {
-        let cs_store = self.database.client_state_store();
+        let client_state_db = self.database.client_state_db();
         let state = self.cur_state.as_ref().clone(); // TODO avoid clone
-        cs_store.write_client_state_checkpoint(self.cur_state_idx, state)?;
+        client_state_db.write_client_state_checkpoint(self.cur_state_idx, state)?;
         Ok(())
     }
 }
@@ -101,27 +101,27 @@ impl<D: Database> StateTracker<D> {
 ///
 /// # Parameters
 ///
-/// - `cs_prov`: An implementation of the [`ClientStateProvider`] trait, used for retrieving
+/// - `cs_db`: An implementation of the [`ClientStateDatabase`] trait, used for retrieving
 ///   checkpoint and state data.
 /// - `idx`: The index from which to replay state writes, starting from the last checkpoint.
 pub fn reconstruct_cur_state(
-    cs_prov: &impl ClientStateProvider,
+    cs_db: &impl ClientStateDatabase,
 ) -> anyhow::Result<(u64, ClientState)> {
-    let last_ckpt_idx = cs_prov.get_last_checkpoint_idx()?;
+    let last_ckpt_idx = cs_db.get_last_checkpoint_idx()?;
 
     // genesis state.
     if last_ckpt_idx == 0 {
         debug!("starting from init state");
-        let state = cs_prov
+        let state = cs_db
             .get_state_checkpoint(0)?
             .ok_or(Error::MissingCheckpoint(0))?;
         return Ok((0, state));
     }
 
     // If we're not in genesis, then we probably have to replay some writes.
-    let last_write_idx = cs_prov.get_last_write_idx()?;
+    let last_write_idx = cs_db.get_last_write_idx()?;
 
-    let state = reconstruct_state(cs_prov, last_write_idx)?;
+    let state = reconstruct_state(cs_db, last_write_idx)?;
 
     Ok((last_write_idx, state))
 }
@@ -136,13 +136,13 @@ pub fn reconstruct_cur_state(
 ///
 /// # Parameters
 ///
-/// - `cs_prov`: anything that implements the [`ClientStateProvider`] trait.
+/// - `cs_db`: anything that implements the [`ClientStateDatabase`] trait.
 /// - `idx`: index to look ahead from.
 pub fn reconstruct_state(
-    cs_prov: &impl ClientStateProvider,
+    cs_db: &impl ClientStateDatabase,
     idx: u64,
 ) -> anyhow::Result<ClientState> {
-    match cs_prov.get_state_checkpoint(idx)? {
+    match cs_db.get_state_checkpoint(idx)? {
         Some(cl) => {
             // if the checkpoint was created at the idx itself, return the checkpoint
             debug!(%idx, "no writes to replay");
@@ -150,10 +150,10 @@ pub fn reconstruct_state(
         }
         None => {
             // get the previously written checkpoint
-            let prev_ckpt_idx = cs_prov.get_prev_checkpoint_at(idx)?;
+            let prev_ckpt_idx = cs_db.get_prev_checkpoint_at(idx)?;
 
             // get the previous checkpoint Client State
-            let mut state = cs_prov
+            let mut state = cs_db
                 .get_state_checkpoint(prev_ckpt_idx)?
                 .ok_or(Error::MissingCheckpoint(idx))?;
 
@@ -162,7 +162,7 @@ pub fn reconstruct_state(
             debug!(%prev_ckpt_idx, %idx, "reconstructing state from checkpoint");
 
             for i in write_replay_start..=idx {
-                let writes = cs_prov
+                let writes = cs_db
                     .get_client_state_writes(i)?
                     .ok_or(Error::MissingConsensusWrites(i))?;
                 operation::apply_writes_to_state(&mut state, writes.into_iter());
@@ -175,7 +175,7 @@ pub fn reconstruct_state(
 
 #[cfg(test)]
 mod tests {
-    use strata_db::traits::{ClientStateStore, Database};
+    use strata_db::traits::{ClientStateDatabase, Database};
     use strata_rocksdb::test_utils::get_common_db;
     use strata_state::{
         block::L2Block,
@@ -190,8 +190,7 @@ mod tests {
     #[test]
     fn test_reconstruct_state() {
         let database = get_common_db();
-        let cl_store_db = database.client_state_store();
-        let cl_provider_db = database.client_state_provider();
+        let client_state_db = database.client_state_db();
         let state: ClientState = ArbitraryGenerator::new().generate();
 
         let mut client_state_list = vec![state.clone()];
@@ -217,16 +216,16 @@ mod tests {
             apply_writes_to_state(&mut state, client_writes);
             client_state_list.push(state.clone());
 
-            let _ = cl_store_db.write_client_update_output(idx, output);
+            let _ = client_state_db.write_client_update_output(idx, output);
             // write clientState checkpoint for indices that are multiples of 4
             if idx % 4 == 0 {
-                let _ = cl_store_db.write_client_state_checkpoint(idx, state);
+                let _ = client_state_db.write_client_state_checkpoint(idx, state);
             }
         }
         // for the 13th, 14th, 15th state, we require fetching the 12th index ClientState and
         // applying the writes.
         for i in 13..17 {
-            let client_state = reconstruct_state(cl_provider_db.as_ref(), i).unwrap();
+            let client_state = reconstruct_state(client_state_db.as_ref(), i).unwrap();
             assert_eq!(client_state_list[(i + 1) as usize], client_state);
         }
     }

@@ -5,7 +5,7 @@ use std::sync::Arc;
 use strata_chaintsn::transition::process_block;
 use strata_db::{
     errors::DbError,
-    traits::{BlockStatus, ChainstateProvider, ChainstateStore, Database},
+    traits::{BlockStatus, ChainstateDatabase, Database},
 };
 use strata_eectl::{engine::ExecEngineCtl, messages::ExecPayloadData};
 use strata_primitives::params::Params;
@@ -519,8 +519,7 @@ fn apply_tip_update<D: Database>(
     reorg: &reorg::Reorg,
     fc_manager: &mut ForkChoiceManager<D>,
 ) -> anyhow::Result<()> {
-    let chs_store = fc_manager.database.chain_state_store();
-    let chs_prov = fc_manager.database.chain_state_provider();
+    let chs_db = fc_manager.database.chain_state_db();
 
     // See if we need to roll back recent changes.
     let pivot_blkid = reorg.pivot();
@@ -528,7 +527,7 @@ fn apply_tip_update<D: Database>(
 
     // Load the post-state of the pivot block as the block to start computing
     // blocks going forwards with.
-    let mut pre_state = chs_prov
+    let mut pre_state = chs_db
         .get_toplevel_state(pivot_idx)?
         .ok_or(Error::MissingIdxChainstate(pivot_idx))?;
 
@@ -570,14 +569,14 @@ fn apply_tip_update<D: Database>(
     // compute new states.
     if pivot_idx < fc_manager.cur_index {
         debug!(?pivot_blkid, %pivot_idx, "rolling back chainstate");
-        chs_store.rollback_writes_to(pivot_idx)?;
+        chs_db.rollback_writes_to(pivot_idx)?;
     }
 
     // Now that we've verified the new chain is really valid, we can go and
     // apply the changes to commit to the new chain.
     for (idx, blkid, writes) in updates {
         debug!(?blkid, "applying CL state update");
-        chs_store.write_state_update(idx, &writes)?;
+        chs_db.write_state_update(idx, &writes)?;
         fc_manager.cur_best_block = *blkid;
         fc_manager.cur_index = idx;
     }

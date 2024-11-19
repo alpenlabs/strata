@@ -13,7 +13,7 @@ use strata_state::{
 use strata_zkvm::Proof;
 
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
-pub struct ChainStateSnapshot {
+pub struct ChainstateSnapshot {
     pub hash: Buf32,
     pub slot: u64,
     pub l2_blockid: L2BlockId,
@@ -22,8 +22,8 @@ pub struct ChainStateSnapshot {
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
 pub struct L2BatchProofOutput {
     pub deposits: Vec<DepositInfo>,
-    pub initial_snapshot: ChainStateSnapshot,
-    pub final_snapshot: ChainStateSnapshot,
+    pub initial_snapshot: ChainstateSnapshot,
+    pub final_snapshot: ChainstateSnapshot,
     pub rollup_params_commitment: Buf32,
 }
 

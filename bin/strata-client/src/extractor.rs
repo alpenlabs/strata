@@ -15,10 +15,10 @@ use bitcoin::{
 };
 use jsonrpsee::core::RpcResult;
 use strata_bridge_tx_builder::prelude::{CooperativeWithdrawalInfo, DepositInfo};
-use strata_db::traits::L1DataProvider;
+use strata_db::traits::L1Database;
 use strata_primitives::l1::BitcoinAddress;
 use strata_rpc_types::RpcServerError;
-use strata_state::{bridge_state::DepositState, chain_state::ChainState, tx::ProtocolOperation};
+use strata_state::{bridge_state::DepositState, chain_state::Chainstate, tx::ProtocolOperation};
 use tracing::{debug, error};
 
 /// The `vout` corresponding to the deposit related Taproot address on the Deposit Request
@@ -27,7 +27,7 @@ use tracing::{debug, error};
 /// This is always going to be the first [`OutPoint`].
 pub const DEPOSIT_REQUEST_VOUT: u32 = 0;
 
-/// Extract the deposit duties from the [`L1DataProvider`] starting from a given block height.
+/// Extract the deposit duties from the [`L1Database`] starting from a given block height.
 ///
 /// This duty will be the same for every operator (for now). So, an
 /// [`OperatorIdx`](strata_primitives::bridge::OperatorIdx) need not be passed as a
@@ -41,12 +41,12 @@ pub const DEPOSIT_REQUEST_VOUT: u32 = 0;
 /// # Errors
 ///
 /// If there is an issue accessing entries from the database.
-pub(super) async fn extract_deposit_requests<Provider: L1DataProvider>(
-    l1_data_provider: &Arc<Provider>,
+pub(super) async fn extract_deposit_requests<L1DB: L1Database>(
+    l1_db: &Arc<L1DB>,
     block_height: u64,
     network: Network,
 ) -> RpcResult<(impl Iterator<Item = DepositInfo>, u64)> {
-    let (l1_txs, latest_idx) = l1_data_provider
+    let (l1_txs, latest_idx) = l1_db
         .get_txs_from(block_height)
         .map_err(RpcServerError::Db)?;
 
@@ -60,8 +60,8 @@ pub(super) async fn extract_deposit_requests<Provider: L1DataProvider>(
             // The sequencer/full node operator _does_ care about this though. So, we log the
             // error instead.
             let err = tx.unwrap_err();
-            error!(%block_height, ?err, "failed to decode raw tx bytes in L1DataStore");
-            debug!(%block_height, ?err, ?l1_tx, "failed to decode raw tx bytes in L1DataStore");
+            error!(%block_height, ?err, "failed to decode raw tx bytes in L1Database");
+            debug!(%block_height, ?err, ?l1_tx, "failed to decode raw tx bytes in L1Database");
 
             return None;
         }
@@ -98,9 +98,9 @@ pub(super) async fn extract_deposit_requests<Provider: L1DataProvider>(
                 ?network,
                 %block_height,
                 ?err,
-                "invalid script pubkey output at index 0 in L1DataStore"
+                "invalid script pubkey output at index 0 in L1Database"
             );
-            debug!(%block_height, ?err, ?l1_tx, "invalid script pubkey output at index 0 in L1DataStore");
+            debug!(%block_height, ?err, ?l1_tx, "invalid script pubkey output at index 0 in L1Database");
 
             return None;
         }
@@ -142,7 +142,7 @@ pub(super) async fn extract_deposit_requests<Provider: L1DataProvider>(
 /// [`OperatorIdx`](strata_primitives::bridge::OperatorIdx) to be passed in as a withdrawal
 /// duty is relevant for all operators for now.
 pub(super) fn extract_withdrawal_infos(
-    chain_state: &Arc<ChainState>,
+    chain_state: &Arc<Chainstate>,
 ) -> impl Iterator<Item = CooperativeWithdrawalInfo> + '_ {
     let deposits_table = chain_state.deposits_table();
     let deposits = deposits_table.deposits();
@@ -192,7 +192,7 @@ mod tests {
     use rand::rngs::OsRng;
     use strata_bridge_tx_builder::prelude::{create_taproot_addr, SpendPath};
     use strata_common::logging;
-    use strata_db::traits::L1DataStore;
+    use strata_db::traits::L1Database;
     use strata_mmr::CompactMmr;
     use strata_primitives::{
         bridge::OperatorIdx,
@@ -331,7 +331,7 @@ mod tests {
     /// # Returns
     ///
     /// The number of valid deposit request transactions inserted into the db.
-    async fn populate_db<Store: L1DataStore>(
+    async fn populate_db<Store: L1Database>(
         l1_db: &Arc<Store>,
         num_blocks: usize,
         max_txs_per_block: usize,
@@ -384,7 +384,7 @@ mod tests {
             let res = l1_db.put_block_data(idx, mf.clone(), txs.clone());
             assert!(
                 res.is_ok(),
-                "should be able to put block data into the L1Db"
+                "should be able to put block data into the L1Database"
             );
 
             // Insert mmr data
@@ -547,7 +547,7 @@ mod tests {
     /// * a random [`DepositEntry`] that has been dispatched.
     fn generate_empty_chain_state_with_deposits(
         num_deposits: usize,
-    ) -> (ChainState, usize, DepositEntry) {
+    ) -> (Chainstate, usize, DepositEntry) {
         let l1_block_id = L1BlockId::from(Buf32::zero());
         let safe_block = L1HeaderRecord::new(l1_block_id, vec![], Buf32::zero());
         let l1_state = L1ViewState::new_at_horizon(0, safe_block);
@@ -560,7 +560,7 @@ mod tests {
         let l2_block_id = L2BlockId::from(Buf32::zero());
         let gdata = GenesisStateData::new(l2_block_id, l1_state, operator_table, exec_state);
 
-        let mut empty_chain_state = ChainState::from_genesis(&gdata);
+        let mut empty_chain_state = Chainstate::from_genesis(&gdata);
 
         let empty_deposits = empty_chain_state.deposits_table_mut();
         let mut deposits_table = DepositsTable::new_empty();
