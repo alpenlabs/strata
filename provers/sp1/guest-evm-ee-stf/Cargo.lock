@@ -1833,7 +1833,7 @@ checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
 [[package]]
 name = "reth-codecs"
 version = "1.0.3"
-source = "git+https://github.com/alpenlabs/reth.git?rev=v1.0.3-alpen.1#dde184f56591d0afa5516bd942368349c4704579"
+source = "git+https://github.com/paradigmxyz/reth.git?rev=v1.0.3#390f30aadebcdd509e72cc04327c3b854de076a6"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -1849,7 +1849,7 @@ dependencies = [
 [[package]]
 name = "reth-codecs-derive"
 version = "1.0.3"
-source = "git+https://github.com/alpenlabs/reth.git?rev=v1.0.3-alpen.1#dde184f56591d0afa5516bd942368349c4704579"
+source = "git+https://github.com/paradigmxyz/reth.git?rev=v1.0.3#390f30aadebcdd509e72cc04327c3b854de076a6"
 dependencies = [
  "convert_case 0.6.0",
  "proc-macro2",
@@ -1860,7 +1860,7 @@ dependencies = [
 [[package]]
 name = "reth-ethereum-forks"
 version = "1.0.3"
-source = "git+https://github.com/alpenlabs/reth.git?rev=v1.0.3-alpen.1#dde184f56591d0afa5516bd942368349c4704579"
+source = "git+https://github.com/paradigmxyz/reth.git?rev=v1.0.3#390f30aadebcdd509e72cc04327c3b854de076a6"
 dependencies = [
  "alloy-chains",
  "alloy-primitives 0.7.7",
@@ -1877,7 +1877,7 @@ dependencies = [
 [[package]]
 name = "reth-primitives"
 version = "1.0.3"
-source = "git+https://github.com/alpenlabs/reth.git?rev=v1.0.3-alpen.1#dde184f56591d0afa5516bd942368349c4704579"
+source = "git+https://github.com/paradigmxyz/reth.git?rev=v1.0.3#390f30aadebcdd509e72cc04327c3b854de076a6"
 dependencies = [
  "alloy-eips",
  "alloy-genesis",
@@ -1885,7 +1885,6 @@ dependencies = [
  "alloy-rlp",
  "bytes",
  "derive_more 0.99.18",
- "k256",
  "once_cell",
  "rayon",
  "reth-ethereum-forks",
@@ -1901,7 +1900,7 @@ dependencies = [
 [[package]]
 name = "reth-primitives-traits"
 version = "1.0.3"
-source = "git+https://github.com/alpenlabs/reth.git?rev=v1.0.3-alpen.1#dde184f56591d0afa5516bd942368349c4704579"
+source = "git+https://github.com/paradigmxyz/reth.git?rev=v1.0.3#390f30aadebcdd509e72cc04327c3b854de076a6"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -1921,7 +1920,7 @@ dependencies = [
 [[package]]
 name = "reth-static-file-types"
 version = "1.0.3"
-source = "git+https://github.com/alpenlabs/reth.git?rev=v1.0.3-alpen.1#dde184f56591d0afa5516bd942368349c4704579"
+source = "git+https://github.com/paradigmxyz/reth.git?rev=v1.0.3#390f30aadebcdd509e72cc04327c3b854de076a6"
 dependencies = [
  "alloy-primitives 0.7.7",
  "derive_more 0.99.18",
@@ -1932,7 +1931,7 @@ dependencies = [
 [[package]]
 name = "reth-trie-common"
 version = "1.0.3"
-source = "git+https://github.com/alpenlabs/reth.git?rev=v1.0.3-alpen.1#dde184f56591d0afa5516bd942368349c4704579"
+source = "git+https://github.com/paradigmxyz/reth.git?rev=v1.0.3#390f30aadebcdd509e72cc04327c3b854de076a6"
 dependencies = [
  "alloy-consensus",
  "alloy-genesis",
@@ -1981,7 +1980,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ef55228211251d7b6c7707c3ee13bb70dea4d2fd81ec4034521e4fe31010b2ea"
 dependencies = [
  "aurora-engine-modexp",
- "blst",
  "c-kzg",
  "cfg-if",
  "k256",

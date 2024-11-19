@@ -11,7 +11,7 @@ use strata_risc0_guest_builder::{GUEST_RISC0_CHECKPOINT_ELF, GUEST_RISC0_CHECKPO
 use strata_sp1_adapter::SP1Host;
 #[cfg(feature = "sp1")]
 use strata_sp1_guest_builder::{
-    GUEST_CHECKPOINT_ELF, GUEST_CHECKPOINT_PK, GUEST_CHECKPOINT_VK, GUEST_CHECKPOINT_VK_HASH_STR,
+    GUEST_CHECKPOINT_PK, GUEST_CHECKPOINT_VK, GUEST_CHECKPOINT_VK_HASH_STR,
 };
 use strata_test_utils::l2::gen_params;
 use strata_zkvm::{Proof, ZkVmHost, ZkVmProver};
@@ -93,23 +93,35 @@ impl ProofGenerator<CheckpointBatchInfo, CheckpointProver> for CheckpointProofGe
 
     fn get_host(&self) -> impl ZkVmHost {
         #[cfg(feature = "risc0")]
-        return Risc0Host::init(&GUEST_RISC0_CHECKPOINT_ELF);
+        {
+            // If both features are enabled, prioritize 'risc0'
+            Risc0Host::init(GUEST_RISC0_CHECKPOINT_ELF)
+        }
 
-        #[cfg(feature = "sp1")]
-        SP1Host::new_from_bytes(&GUEST_CHECKPOINT_PK, &GUEST_CHECKPOINT_VK)
+        #[cfg(all(feature = "sp1", not(feature = "risc0")))]
+        {
+            // Only use 'sp1' if 'risc0' is not enabled
+            return SP1Host::new_from_bytes(&GUEST_CHECKPOINT_PK, &GUEST_CHECKPOINT_VK);
+        }
     }
 
     fn get_short_program_id(&self) -> String {
         #[cfg(feature = "risc0")]
-        return hex::encode(GUEST_RISC0_CHECKPOINT_ID[0].to_le_bytes());
-
-        #[cfg(feature = "sp1")]
-        GUEST_CHECKPOINT_VK_HASH_STR.to_string().split_off(58)
+        {
+            // If both features are enabled, prioritize 'risc0'
+            hex::encode(GUEST_RISC0_CHECKPOINT_ID[0].to_le_bytes())
+        }
+        #[cfg(all(feature = "sp1", not(feature = "risc0")))]
+        {
+            // Only use 'sp1' if 'risc0' is not enabled
+            GUEST_CHECKPOINT_VK_HASH_STR.to_string().split_off(58)
+        }
     }
 }
 
+// Run test if any of sp1 or risc0 feature is enabled and the test is being run in release mode
 #[cfg(test)]
-// #[cfg(all(feature = "sp1", not(debug_assertions)))]
+#[cfg(all(any(feature = "sp1", feature = "risc0"), not(debug_assertions)))]
 mod test {
 
     use strata_test_utils::l2::gen_params;

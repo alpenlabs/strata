@@ -59,23 +59,35 @@ impl ProofGenerator<Block, BtcBlockspaceProver> for BtcBlockProofGenerator {
 
     fn get_host(&self) -> impl ZkVmHost {
         #[cfg(feature = "risc0")]
-        return Risc0Host::init(&GUEST_RISC0_BTC_BLOCKSPACE_ELF);
+        {
+            // If both features are enabled, prioritize 'risc0'
+            Risc0Host::init(GUEST_RISC0_BTC_BLOCKSPACE_ELF)
+        }
 
-        #[cfg(feature = "sp1")]
-        return SP1Host::new_from_bytes(&GUEST_BTC_BLOCKSPACE_PK, &GUEST_BTC_BLOCKSPACE_VK);
+        #[cfg(all(feature = "sp1", not(feature = "risc0")))]
+        {
+            // Only use 'sp1' if 'risc0' is not enabled
+            return SP1Host::new_from_bytes(&GUEST_BTC_BLOCKSPACE_PK, &GUEST_BTC_BLOCKSPACE_VK);
+        }
     }
 
     fn get_short_program_id(&self) -> String {
-        #[cfg(feature = "sp1")]
-        return GUEST_BTC_BLOCKSPACE_VK_HASH_STR.to_string().split_off(58);
-
         #[cfg(feature = "risc0")]
-        return hex::encode(GUEST_RISC0_BTC_BLOCKSPACE_ID[0].to_le_bytes());
+        {
+            // If both features are enabled, prioritize 'risc0'
+            hex::encode(GUEST_RISC0_BTC_BLOCKSPACE_ID[0].to_le_bytes())
+        }
+        #[cfg(all(feature = "sp1", not(feature = "risc0")))]
+        {
+            // Only use 'sp1' if 'risc0' is not enabled
+            GUEST_BTC_BLOCKSPACE_VK_HASH_STR.to_string().split_off(58)
+        }
     }
 }
 
+// Run test if any of sp1 or risc0 feature is enabled and the test is being run in release mode
 #[cfg(test)]
-// #[cfg(all(feature = "sp1", not(debug_assertions)))]
+#[cfg(all(any(feature = "sp1", feature = "risc0"), not(debug_assertions)))]
 mod test {
     use strata_test_utils::bitcoin::get_btc_chain;
 
