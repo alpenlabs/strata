@@ -3,10 +3,7 @@ use std::str::FromStr;
 #[cfg(feature = "strata_faucet")]
 use alloy::{primitives::Address as StrataAddress, providers::WalletProvider};
 use argh::FromArgs;
-use bdk_wallet::{
-    bitcoin::{Address, Txid},
-    KeychainKind,
-};
+use bdk_wallet::{bitcoin::Address, KeychainKind};
 use console::Term;
 use indicatif::ProgressBar;
 use rand::{distributions::uniform::SampleRange, rngs::OsRng};
@@ -20,11 +17,7 @@ use crate::{
     net_type::{net_type_or_exit, NetworkType},
     strata::StrataWallet,
 };
-use crate::{
-    seed::Seed,
-    settings::Settings,
-    signet::{print_bitcoin_explorer_url, SignetWallet},
-};
+use crate::{seed::Seed, settings::Settings, signet::SignetWallet};
 
 /// Request some bitcoin from the faucet
 #[derive(FromArgs, PartialEq, Debug)]
@@ -168,21 +161,9 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
     let status = res.status();
     let body = res.text().await.expect("invalid response");
     if status == StatusCode::OK {
-        #[cfg(feature = "strata_faucet")]
-        if network_type == NetworkType::Signet {
-            let _ = print_bitcoin_explorer_url(
-                &Txid::from_str(&body).expect("valid txid"),
-                &term,
-                &settings,
-            );
-        }
-        #[cfg(not(feature = "strata_faucet"))]
-        let _ = print_bitcoin_explorer_url(
-            &Txid::from_str(&body).expect("valid txid"),
-            &term,
-            &settings,
+        let _ = term.write_line(
+            "Successful queued request for signet bitcoin. It should arrive in your wallet soon.",
         );
-        let _ = term.write_line(&format!("Successful. Claimed in transaction {body}"));
     } else {
         let _ = term.write_line(&format!("Failed: faucet responded with {status}: {body}"));
     }
