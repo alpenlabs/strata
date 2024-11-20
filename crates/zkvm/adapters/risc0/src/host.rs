@@ -1,3 +1,6 @@
+use std::fmt;
+
+use hex::encode;
 use risc0_zkvm::{compute_image_id, default_prover, sha::Digest, ProverOpts, Receipt};
 use serde::{de::DeserializeOwned, Serialize};
 use strata_zkvm::{
@@ -99,6 +102,12 @@ impl ZkVmHost for Risc0Host {
             .verify(self.id)
             .map_err(|e| ZkVmError::ProofVerificationError(e.to_string()))?;
         Ok(())
+    }
+}
+
+impl fmt::Display for Risc0Host {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "risc0_{}", encode(self.id.as_bytes()))
     }
 }
 

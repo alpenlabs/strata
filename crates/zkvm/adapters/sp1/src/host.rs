@@ -1,5 +1,9 @@
+use std::fmt;
+
 use serde::{de::DeserializeOwned, Serialize};
-use sp1_sdk::{ProverClient, SP1ProofWithPublicValues, SP1ProvingKey, SP1VerifyingKey};
+use sp1_sdk::{
+    HashableKey, ProverClient, SP1ProofWithPublicValues, SP1ProvingKey, SP1VerifyingKey,
+};
 use strata_zkvm::{
     Proof, ProofType, VerificationKey, ZkVmError, ZkVmHost, ZkVmInputBuilder, ZkVmResult,
 };
@@ -100,6 +104,12 @@ impl ZkVmHost for SP1Host {
             .map_err(|e| ZkVmError::ProofVerificationError(e.to_string()))?;
 
         Ok(())
+    }
+}
+
+impl fmt::Display for SP1Host {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "sp1_{}", self.verifying_key.bytes32())
     }
 }
 
