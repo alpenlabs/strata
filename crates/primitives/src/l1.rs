@@ -237,7 +237,7 @@ pub struct L1Status {
 /// some useful traits on it such as [`serde::Deserialize`], [`borsh::BorshSerialize`] and
 /// [`borsh::BorshDeserialize`].
 // TODO: implement [`arbitrary::Arbitrary`]?
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Eq)]
 pub struct BitcoinAddress {
     /// The [`bitcoin::Network`] that this address is valid in.
     network: Network,
@@ -349,6 +349,14 @@ impl BorshDeserialize for BitcoinAddress {
             })?;
 
         Ok(BitcoinAddress { address, network })
+    }
+}
+
+impl PartialEq for BitcoinAddress {
+    fn eq(&self, other: &Self) -> bool {
+        self.address
+            .script_pubkey()
+            .eq(&other.address.script_pubkey())
     }
 }
 

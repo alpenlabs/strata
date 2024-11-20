@@ -14,7 +14,7 @@ pub fn extract_relevant_info(
     rollup_params: &RollupParams,
 ) -> (Vec<DepositInfo>, Option<BatchCheckpoint>) {
     let filter_config =
-        TxFilterConfig::from_rollup_params(rollup_params).expect("derive tx-filter config");
+        TxFilterConfig::derive_from(rollup_params).expect("derive tx-filter config");
 
     let mut deposits = Vec::new();
     let mut prev_checkpoint = None;
@@ -26,7 +26,7 @@ pub fn extract_relevant_info(
             ProtocolOperation::Deposit(deposit_info) => {
                 deposits.push(deposit_info.clone());
             }
-            ProtocolOperation::RollupInscription(signed_batch) => {
+            ProtocolOperation::Checkpoint(signed_batch) => {
                 if let CredRule::SchnorrKey(pub_key) = rollup_params.cred_rule {
                     assert!(signed_batch.verify_sig(pub_key));
                 }

@@ -37,8 +37,8 @@ fn extract_protocol_op(
     filter_conf: &TxFilterConfig,
 ) -> Option<ProtocolOperation> {
     // Currently all we have are inscription txs and txs spent to operator addrs
-    parse_inscription(tx, filter_conf)
-        .map(ProtocolOperation::RollupInscription)
+    parse_inscription_checkpoint(tx, filter_conf)
+        .map(ProtocolOperation::Checkpoint)
         .or_else(|| parse_deposit(tx, filter_conf).map(ProtocolOperation::Deposit))
         .or_else(|| parse_deposit_request(tx, filter_conf).map(ProtocolOperation::DepositRequest))
 }
@@ -52,10 +52,10 @@ fn _parse_spent_to(tx: &Transaction, filter_conf: &TxFilterConfig) -> Option<Pro
         .iter()
         .filter_map(|op| {
             filter_conf
-                .expected_script_pubkeys
-                .binary_search_by_key(&op.script_pubkey, |e| e.script.clone())
+                .expected_addrs
+                .binary_search_by_key(&op.script_pubkey, |e| e.address().script_pubkey())
                 .ok()
-                .and_then(|idx| filter_conf.expected_script_pubkeys.get(idx))
+                .and_then(|idx| filter_conf.expected_addrs.get(idx))
         })
         .next();
     // TODO: complete this when we figure out what kind of protocol ops can be generated from
@@ -79,7 +79,7 @@ fn parse_deposit(tx: &Transaction, filter_conf: &TxFilterConfig) -> Option<Depos
 /// checkpoint inscription.
 // TODO: we need to change inscription structure and possibly have inscriptions for checkpoints and
 // DA separately
-fn parse_inscription(
+fn parse_inscription_checkpoint(
     tx: &Transaction,
     filter_conf: &TxFilterConfig,
 ) -> Option<SignedBatchCheckpoint> {
@@ -131,7 +131,7 @@ mod test {
     /// Helper function to create filter config
     fn create_tx_filter_config() -> TxFilterConfig {
         let params = gen_params();
-        TxFilterConfig::from_rollup_params(params.rollup()).expect("can't get filter config")
+        TxFilterConfig::derive_from(params.rollup()).expect("can't get filter config")
     }
 
     /// Helper function to create a test transaction with given txid and outputs

@@ -174,5 +174,5 @@ pub fn get_btc_chain() -> BtcChainSegment {
 
 pub fn get_test_tx_filter_config() -> TxFilterConfig {
     let config = gen_params();
-    TxFilterConfig::from_rollup_params(config.rollup()).expect("can't derive filter config")
+    TxFilterConfig::derive_from(config.rollup()).expect("can't derive filter config")
 }
