@@ -70,8 +70,10 @@ fn apply_state_transition(
     prev_chstate: Chainstate,
     new_l2_block: &L2Block,
     chain_params: &RollupParams,
-) -> Chainstate {
-    let mut state_cache = StateCache::new(prev_chstate);
+) -> ChainState {
+    // TODO make this passed in by arg
+    let epoch_state = prev_chstate.epoch_state().clone();
+    let mut state_cache = StateCache::new(prev_chstate, epoch_state);
 
     strata_chaintsn::transition::process_block(
         &mut state_cache,
