@@ -24,6 +24,7 @@ mod ckp_runner;
 mod config;
 mod db;
 mod dispatcher;
+mod elf;
 mod errors;
 mod manager;
 mod primitives;
@@ -59,20 +60,29 @@ async fn main() {
         .expect("failed to connect to the btc client"),
     );
 
+    let rollup_params = Arc::new(args.resolve_and_validate_rollup_params().unwrap());
     let task_tracker = Arc::new(TaskTracker::new());
 
     // Create L1 operations
-    let btc_ops = BtcOperations::new(btc_client.clone());
+    let btc_ops = BtcOperations::new(btc_client.clone(), rollup_params.clone());
     let btc_dispatcher = TaskDispatcher::new(btc_ops, task_tracker.clone());
 
     // Create EL  operations
     let el_ops = ElOperations::new(el_client.clone());
     let el_dispatcher = TaskDispatcher::new(el_ops, task_tracker.clone());
 
-    let cl_ops = ClOperations::new(cl_client.clone(), Arc::new(el_dispatcher.clone()));
+    let cl_ops = ClOperations::new(
+        cl_client.clone(),
+        Arc::new(el_dispatcher.clone()),
+        rollup_params.clone(),
+    );
     let cl_dispatcher = TaskDispatcher::new(cl_ops, task_tracker.clone());
 
-    let l1_batch_ops = L1BatchOperations::new(Arc::new(btc_dispatcher.clone()), btc_client.clone());
+    let l1_batch_ops = L1BatchOperations::new(
+        Arc::new(btc_dispatcher.clone()),
+        btc_client.clone(),
+        rollup_params.clone(),
+    );
     let l1_batch_dispatcher = TaskDispatcher::new(l1_batch_ops, task_tracker.clone());
 
     let l2_batch_ops = L2BatchOperations::new(Arc::new(cl_dispatcher.clone()).clone());
@@ -82,6 +92,7 @@ async fn main() {
         cl_client.clone(),
         Arc::new(l1_batch_dispatcher.clone()),
         Arc::new(l2_batch_dispatcher.clone()),
+        rollup_params.clone(),
     );
 
     let checkpoint_dispatcher = TaskDispatcher::new(checkpoint_ops, task_tracker.clone());
@@ -107,14 +118,16 @@ async fn main() {
     tokio::spawn(async move { prover_manager.run().await });
 
     // run checkpoint runner
-    tokio::spawn(async move {
-        start_checkpoints_task(
-            cl_client.clone(),
-            checkpoint_dispatcher.clone(),
-            task_tracker.clone(),
-        )
-        .await
-    });
+    if args.enable_checkpoint_runner {
+        tokio::spawn(async move {
+            start_checkpoints_task(
+                cl_client.clone(),
+                checkpoint_dispatcher.clone(),
+                task_tracker.clone(),
+            )
+            .await
+        });
+    }
 
     // Run prover manager in dev mode or runner mode
     if args.enable_dev_rpcs {

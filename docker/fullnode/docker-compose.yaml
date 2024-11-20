@@ -1,0 +1,65 @@
+services:
+  # Signet Service
+  signet:
+    # built from https://github.com/alpenlabs/bitcoin_signet
+    image: public.ecr.aws/s6b4k6i9/strata/signet:devnet
+    environment:
+      MINERENABLED: "0"
+      BLOCKPRODUCTIONDELAY: "30"
+      RPCUSER: "rpcuser"
+      RPCPASSWORD: "rpcpass"
+      BITCOIND_WALLET: default
+      SIGNETCHALLENGE: ${SIGNETCHALLENGE:?}
+      UACOMMENT: ${UACOMMENT:?}
+      NBITS: ${NBITS:?}
+      ADDNODE: ${ADDNODE:?}
+    volumes:
+      - .data/signet:/root/.bitcoin
+    ports:
+      - "127.0.0.1:38332:38332"
+      - "127.0.0.1:38333:38333"
+
+  # Strata Reth Service
+  strata-reth:
+    build:
+      context: ../../
+      dockerfile: ./docker/reth/Dockerfile
+    image: public.ecr.aws/s6b4k6i9/strata_reth:devnet
+    environment:
+      JWTSECRET: configs/jwt.hex
+    command:
+      - "--sequencer-http"
+      - "${SEQUENCER_HTTP:?}"
+    volumes:
+      - .data/reth:/app/reth
+      - ./configs:/app/configs
+    ports:
+      - "127.0.0.1:8545:8545"
+
+  # Strata Client Service
+  strata-client:
+    build:
+      context: ../../
+      dockerfile: ./docker/client/Dockerfile
+    image: public.ecr.aws/s6b4k6i9/strata_client:devnet
+    depends_on:
+      - signet
+      - strata-reth
+    environment:
+      CONFIG_PATH: configs/config.toml
+      PARAM_PATH: configs/params.json
+      SYNC_BATCH_SIZE: 50
+      SYNC_THROTTLE_MS: 15
+      CSM_QUEUE_SIZE: 100000
+      FCM_QUEUE_SIZE: 100000
+      RUST_LOG: "info,strata_sync=debug"
+    entrypoint: >
+      /bin/sh -c "sleep 10 && /app/entrypoint.sh \"$@\"" --
+    command:
+      - "--sequencer-rpc"
+      - "${SEQUENCER_RPC:?}"
+    volumes:
+      - .data/client:/app/data
+      - ./configs:/app/configs
+    ports:
+      - "127.0.0.1:8432:8432"

@@ -3,15 +3,21 @@
 import os
 import sys
 import time
+from itertools import islice
 from math import ceil
-from typing import Optional
+from typing import List, Optional
 
 import flexitest
 
 import factory
 import net_settings
 from constants import *
+from constants import (
+    BLOCK_GENERATION_INTERVAL_SECS,
+    DD_ROOT,
+)
 from utils import *
+from utils import generate_blocks, generate_jwt_secret
 
 
 class BasicEnvConfig(flexitest.EnvConfig):
@@ -127,6 +133,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
                 bitcoind_config,
                 f"http://localhost:{seq_port}",
                 f"http://localhost:{reth_rpc_http_port}",
+                self.rollup_params,
             )
             svcs["prover_client"] = prover_client
 
@@ -218,7 +225,7 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
             "reth_secret_path": reth_secret_path,
         }
 
-        sequencer_rpc = f"ws://localhost:{sequencer.get_prop('rpc_port')}"
+        sequencer_rpc = f"http://localhost:{sequencer.get_prop('rpc_port')}"
 
         fullnode = fn_fac.create_fullnode(
             bitcoind_config,
@@ -265,12 +272,21 @@ def main(argv):
 
     datadir_root = flexitest.create_datadir_in_workspace(os.path.join(test_dir, DD_ROOT))
 
-    btc_fac = factory.BitcoinFactory([12300 + i for i in range(30)])
-    seq_fac = factory.StrataFactory([12400 + i for i in range(30)])
-    fullnode_fac = factory.FullNodeFactory([12500 + i for i in range(30)])
-    reth_fac = factory.RethFactory([12600 + i for i in range(20 * 3)])
-    prover_client_fac = factory.ProverClientFactory([12700 + i for i in range(20 * 3)])
-    bridge_client_fac = factory.BridgeClientFactory([12800 + i for i in range(30)])
+    # FIXME/FIX flexitest: add global port pool
+    port_gen = (pn for pn in range(12300, 65535))
+    # adjust based on number of tests run in parallel
+    max_test_instances = 30
+
+    def gen_port_range(multiplier: int = 1) -> List[int]:
+        # max_test_instances * number of next_port() calls in factory per service
+        return list(islice(port_gen, max_test_instances * multiplier))
+
+    btc_fac = factory.BitcoinFactory(gen_port_range(2))
+    seq_fac = factory.StrataFactory(gen_port_range())
+    fullnode_fac = factory.FullNodeFactory(gen_port_range())
+    reth_fac = factory.RethFactory(gen_port_range(4))
+    prover_client_fac = factory.ProverClientFactory(gen_port_range())
+    bridge_client_fac = factory.BridgeClientFactory(gen_port_range())
 
     factories = {
         "bitcoin": btc_fac,

@@ -56,4 +56,7 @@ pub struct Args {
 
     #[argh(option, description = "database retry count")]
     pub db_retry_count: Option<u16>,
+
+    #[argh(switch, description = "enable admin rpc")]
+    pub enable_admin_rpc: bool,
 }

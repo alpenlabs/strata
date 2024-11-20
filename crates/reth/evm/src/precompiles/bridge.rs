@@ -75,7 +75,10 @@ impl<DB: Database> ContextStatefulPrecompile<DB> for BridgeoutPrecompile {
                 msg: "Failed to load BRIDGEOUT_ADDRESS account".into(),
             })?;
 
-        account.info.balance = U256::ZERO;
+        // NOTE: account balance will always be greater or equal to value sent in tx
+        let new_balance = account.info.balance.saturating_sub(withdrawal_amount);
+
+        account.info.balance = new_balance;
 
         // TODO: Properly calculate and deduct gas for the bridge out operation
         let gas_cost = 0;

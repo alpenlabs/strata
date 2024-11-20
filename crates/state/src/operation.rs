@@ -143,9 +143,11 @@ pub fn apply_writes_to_state(
             }
 
             RollbackL1BlocksTo(height) => {
+                debug!(?height, "received RollbackL1BlocksTo");
                 let l1v = state.l1_view_mut();
                 let buried_height = l1v.buried_l1_height();
 
+                debug!(?l1v, "Reverting from");
                 if height < buried_height {
                     error!(%height, %buried_height, "unable to roll back past buried height");
                     panic!("operation: emitted invalid write");
@@ -159,12 +161,14 @@ pub fn apply_writes_to_state(
                     rollbacked_l1_vs.last_verified_block_num = height as u32;
                     rollbacked_l1_vs.last_verified_block_hash =
                         l1v.local_unaccepted_blocks[new_unacc_len];
+                    l1v.header_verification_state = Some(rollbacked_l1_vs);
                 }
                 l1v.local_unaccepted_blocks.truncate(new_unacc_len);
 
                 // Keep pending checkpoints whose l1 height is less than or equal to rollback height
                 l1v.verified_checkpoints
                     .retain(|ckpt| ckpt.height <= height);
+                debug!(?l1v, "Reverted to");
             }
 
             AcceptL1Block(l1blkid) => {

@@ -8,12 +8,13 @@ use bitcoin::{
 use rand::{rngs::StdRng, SeedableRng};
 use strata_btcio::rpc::{traits::Reader, BitcoinClient};
 use strata_primitives::{
-    block_credential,
+    block_credential::{self, CredRule},
     buf::Buf32,
     operator::OperatorPubkeys,
     params::{OperatorConfig, Params, ProofPublishMode, RollupParams, SyncParams},
     vk::RollupVerifyingKey,
 };
+use strata_tx_parser::filter::{derive_tx_filter_rules, TxFilterRule};
 use tracing::debug;
 use uuid::Uuid;
 
@@ -27,19 +28,23 @@ use crate::{
 /// Operations required for BTC block proving tasks.
 #[derive(Debug, Clone)]
 pub struct BtcOperations {
+    rollup_params: Arc<RollupParams>,
     btc_client: Arc<BitcoinClient>,
 }
 
 impl BtcOperations {
     /// Creates a new BTC operations instance.
-    pub fn new(btc_client: Arc<BitcoinClient>) -> Self {
-        Self { btc_client }
+    pub fn new(btc_client: Arc<BitcoinClient>, rollup_params: Arc<RollupParams>) -> Self {
+        Self {
+            btc_client,
+            rollup_params,
+        }
     }
 }
 
 #[async_trait]
 impl ProvingOperations for BtcOperations {
-    type Input = (Block, RollupParams);
+    type Input = (Block, Vec<TxFilterRule>, CredRule);
     type Params = u64; // params is the block height
 
     fn proving_task_type(&self) -> ProvingTaskType {
@@ -50,7 +55,9 @@ impl ProvingOperations for BtcOperations {
         debug!(%block_num, "Fetching BTC block input");
         let block = self.btc_client.get_block_at(block_num).await?;
         debug!("Fetched BTC block {}", block_num);
-        Ok((block, get_pm_rollup_params()))
+        let tx_filters = derive_tx_filter_rules(&self.rollup_params)?;
+        let cred_rule = &self.rollup_params.cred_rule;
+        Ok((block, tx_filters, cred_rule.clone()))
     }
 
     async fn append_task(
@@ -58,12 +65,14 @@ impl ProvingOperations for BtcOperations {
         task_tracker: Arc<TaskTracker>,
         input: Self::Input,
     ) -> Result<Uuid, ProvingTaskError> {
-        let (block, rollup_params) = input;
-        let prover_input = ZKVMInput::BtcBlock(block, rollup_params);
+        let (block, tx_filters, cred_rule) = input;
+        let prover_input = ZKVMInput::BtcBlock(block, cred_rule, tx_filters);
         let task_id = task_tracker.create_task(prover_input, vec![]).await;
         Ok(task_id)
     }
 }
+
+#[allow(dead_code)]
 
 // TODO: Move from manual param generation to importing params from the file
 pub fn get_pm_rollup_params() -> RollupParams {

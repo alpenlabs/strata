@@ -206,8 +206,8 @@
     "params": {
         "block_idx": 2,
         "prev_blockhash": "0x4648c427c6c7ffa89ce722b936b16c7538f57ad0494e6473a114374b94f46a99",
-        "new_blockhash": "0xdb7ee5704316ffb8f4e0ff03dc92b8b2a85e3335f26fcdc24745782499bbe03b",
-        "new_state_root": "0xcf4cc4f5e65dda69ee3a27a16628fca82da737f878e8b48d86757b22ec7f361e",
+        "new_blockhash": "0x4967af403d1861e1fde1ac0325b0d2492f2ae36ce59e66f6f9e90e5656d7bc0f",
+        "new_state_root": "0xa5382a7dc0d397aea8f5025aa2d002dffb5e5e71083d55a2e63f5ef0cbd8c004",
         "txn_root": "0x37739b0921c22213f67943f480a8860575c6eb567bd110436237fe9a0e0db57a",
         "withdrawal_intents": [
             {
@@ -215,6 +215,7 @@
                 "dest_pk": "0xffab0d5c1a6a719fb807387792d63c7f30f6c8205e4150e0267ec95774106d53"
             }
         ],
-        "deposits_txns_root": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"
+        "deposits_txns_root": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+        "deposit_requests": []
     }
 }

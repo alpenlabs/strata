@@ -15,3 +15,6 @@
 ///
 /// At the moment, the threadpool is only used for channel-based db operations.
 pub(super) const DB_THREAD_COUNT: usize = 2 + 1 + 2;
+
+/// The default number of retries afforded to each duty execution.
+pub(super) const DEFAULT_DUTY_RETRY_COUNT: u32 = 100;

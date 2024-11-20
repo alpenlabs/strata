@@ -2,6 +2,7 @@ use std::{str::FromStr, sync::Arc, time::Duration};
 
 use bitcoin::{hashes::Hash, Address, BlockHash};
 use config::{ClientMode, Config, SequencerConfig};
+use el_sync::sync_chainstate_to_el;
 use jsonrpsee::Methods;
 use rpc_client::sync_client;
 use strata_bridge_relay::relayer::RelayerHandle;
@@ -10,7 +11,7 @@ use strata_btcio::{
     rpc::{traits::Reader, BitcoinClient},
     writer::{config::WriterConfig, start_inscription_task},
 };
-use strata_common::logging;
+use strata_common::{env::parse_env_or, logging};
 use strata_consensus_logic::{
     checkpoint::CheckpointHandle,
     duty::{types::DutyBatch, worker as duty_worker},
@@ -44,6 +45,7 @@ use crate::{args::Args, helpers::*};
 
 mod args;
 mod config;
+mod el_sync;
 mod errors;
 mod extractor;
 mod helpers;
@@ -56,6 +58,7 @@ mod rpc_server;
 // TODO: this might need to come from config.
 const BITCOIN_POLL_INTERVAL: u64 = 200; // millis
 const SEQ_ADDR_GENERATION_TIMEOUT: u64 = 10; // seconds
+const SYNC_BATCH_SIZE_ENVVAR: &str = "SYNC_BATCH_SIZE";
 
 fn main() -> anyhow::Result<()> {
     let args: Args = argh::from_env();
@@ -176,8 +179,9 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             let sequencer_rpc = &fullnode_config.sequencer_rpc;
             info!(?sequencer_rpc, "initing fullnode task");
 
-            let rpc_client = runtime.block_on(sync_client(sequencer_rpc));
-            let sync_peer = RpcSyncPeer::new(rpc_client, 10);
+            let rpc_client = sync_client(sequencer_rpc);
+            let download_batch_size = parse_env_or(SYNC_BATCH_SIZE_ENVVAR, 10);
+            let sync_peer = RpcSyncPeer::new(rpc_client, download_batch_size);
             let l2_sync_context = L2SyncContext::new(
                 sync_peer,
                 ctx.l2_block_manager.clone(),
@@ -202,6 +206,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             ctx,
             task_manager.shutdown_signal(),
             config,
+            args,
             checkpoint_handle,
             methods,
         ),
@@ -296,8 +301,8 @@ fn do_startup_checks(
         }
         Ok(false) => {
             // Current chain tip tip block is not known by the EL.
-            // TODO: Try to sync EL using existing block payloads from DB.
-            anyhow::bail!("missing expected evm block, block_id = {}", chain_tip);
+            warn!("missing expected evm block, block_id = {}", chain_tip);
+            sync_chainstate_to_el(database, engine)?;
         }
         Err(error) => {
             // Likely network issue
@@ -513,6 +518,7 @@ async fn start_rpc(
     ctx: CoreContext,
     shutdown_signal: ShutdownSignal,
     config: Config,
+    args: Args,
     checkpoint_handle: Arc<CheckpointHandle>,
     mut methods: Methods,
 ) -> anyhow::Result<()> {
@@ -538,8 +544,10 @@ async fn start_rpc(
     );
     methods.merge(strata_rpc.into_rpc())?;
 
-    let admin_rpc = rpc_server::AdminServerImpl::new(stop_tx);
-    methods.merge(admin_rpc.into_rpc())?;
+    if args.enable_admin_rpc {
+        let admin_rpc = rpc_server::AdminServerImpl::new(stop_tx);
+        methods.merge(admin_rpc.into_rpc())?;
+    }
 
     let rpc_host = config.client.rpc_host;
     let rpc_port = config.client.rpc_port;

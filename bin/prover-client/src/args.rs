@@ -1,4 +1,7 @@
+use std::{fs, path::PathBuf};
+
 use argh::FromArgs;
+use strata_primitives::params::RollupParams;
 
 pub(super) const DEV_RPC_PORT: usize = 4844;
 pub(super) const DEV_RPC_URL: &str = "0.0.0.0";
@@ -41,8 +44,18 @@ pub struct Args {
     #[argh(option, description = "bitcoind RPC password")]
     pub bitcoind_password: String,
 
+    #[argh(option, short = 'p', description = "custom rollup config path")]
+    pub rollup_params: PathBuf,
+
     #[argh(option, description = "enable prover client dev rpc", default = "true")]
     pub enable_dev_rpcs: bool,
+
+    #[argh(
+        option,
+        description = "enable prover client checkpoint runner",
+        default = "false"
+    )]
+    pub enable_checkpoint_runner: bool,
 }
 
 impl Args {
@@ -65,5 +78,14 @@ impl Args {
 
     pub fn get_btc_rpc_url(&self) -> String {
         format!("http://{}", self.bitcoind_url)
+    }
+
+    /// Resolves the rollup params file to use, from a path, and validates
+    /// it to ensure it passes sanity checks.
+    pub fn resolve_and_validate_rollup_params(&self) -> anyhow::Result<RollupParams> {
+        let json = fs::read_to_string(&self.rollup_params)?;
+        let rollup_params = serde_json::from_str::<RollupParams>(&json)?;
+        rollup_params.check_well_formed()?;
+        Ok(rollup_params)
     }
 }

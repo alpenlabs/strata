@@ -33,13 +33,8 @@ pub async fn create_and_sign_blob_inscriptions(
 
     let ctxid = commit.compute_txid();
     debug!(commit_txid = ?ctxid, "Signing commit transaction");
-    let signed_commit = client
-        .sign_raw_transaction_with_wallet(&commit)
-        .await
-        .expect("could not sign commit tx")
-        .hex;
-
-    let signed_commit: Transaction = consensus::encode::deserialize_hex(&signed_commit)
+    let signed_tx_raw = client.sign_raw_transaction_with_wallet(&commit).await?.hex;
+    let signed_commit: Transaction = consensus::encode::deserialize_hex(&signed_tx_raw)
         .expect("could not deserialize transaction");
     let cid: Buf32 = signed_commit.compute_txid().into();
     let rid: Buf32 = reveal.compute_txid().into();

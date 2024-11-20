@@ -1,8 +1,7 @@
-use jsonrpsee::{core::client::async_client::Client, ws_client::WsClientBuilder};
+use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
 
-pub async fn sync_client(url: &str) -> Client {
-    WsClientBuilder::default()
+pub fn sync_client(url: &str) -> HttpClient {
+    HttpClientBuilder::default()
         .build(url)
-        .await
         .expect("Failed to connect to the RPC server")
 }

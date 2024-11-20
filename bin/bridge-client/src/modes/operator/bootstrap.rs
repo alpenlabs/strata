@@ -30,6 +30,7 @@ use crate::{
     constants::{DEFAULT_RPC_HOST, DEFAULT_RPC_PORT, ROCKSDB_RETRY_COUNT},
     db::open_rocksdb_database,
     descriptor::{derive_op_purpose_xprivs, resolve_xpriv},
+    modes::operator::config::TaskConfig,
     rpc_server::{self, BridgeRpc},
 };
 
@@ -62,7 +63,11 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
         BitcoinClient::new(args.btc_url, args.btc_user, args.btc_pass)
             .expect("error creating the bitcoin client"),
     );
+
+    // TODO: make this configurable
+    let request_timeout = Duration::from_secs(5 * 60); // 5 mins
     let l2_rpc_client: L2RpcClient = WsClientBuilder::default()
+        .request_timeout(request_timeout)
         .build(args.rollup_url)
         .await
         .expect("failed to connect to the rollup RPC server");
@@ -116,6 +121,9 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
         }
     });
 
+    // should not have to call this if `message_interval` and `duty_interval` are set from the
+    // command-line but since this value is used in both places and the RPC call is simple, this
+    // overhead should be fine.
     let rollup_block_time = l2_rpc_client
         .block_time()
         .await
@@ -136,11 +144,13 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
         msg_polling_interval,
     };
 
+    let task_config = TaskConfig::new(args.max_duty_retries);
     let task_manager = TaskManager {
         exec_handler: Arc::new(exec_handler),
         broadcaster: l1_rpc_client,
         bridge_duty_db_ops,
         bridge_duty_idx_db_ops,
+        config: task_config,
     };
 
     let duty_polling_interval = args.duty_interval.map_or(
@@ -148,11 +158,15 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
         Duration::from_millis,
     );
 
-    // TODO: wrap these in `strata-tasks`
+    // TODO: wrap this in `strata-tasks`
     let duty_task = tokio::spawn(async move {
         if let Err(e) = task_manager.start(duty_polling_interval).await {
             error!(error = %e, "could not start task manager");
-        };
+
+            // if the task manager fails, crash and burn this bridge client so that an external
+            // service such as `docker` can restart it.
+            panic!("task manager failed; please check logs for details");
+        }
     });
 
     // Wait for all tasks to run

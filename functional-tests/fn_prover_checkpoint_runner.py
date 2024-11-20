@@ -15,5 +15,5 @@ class ProverClientTest(flexitest.Test):
         # Test on with the latest checkpoint
         print("Waiting for checkpoint runner")
 
-        time_out = 10 * 60
+        time_out = 30 * 60
         time.sleep(time_out)

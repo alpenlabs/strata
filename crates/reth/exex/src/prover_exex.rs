@@ -43,8 +43,9 @@ impl<Node: FullNodeComponents, S: WitnessStore + Clone> ProverWitnessGenerator<N
         });
 
         for (block_hash, outcome) in bundles {
-            #[cfg(debug_assertions)]
-            assert!(outcome.len() == 1, "should only contain single block");
+            // FIXME: ensure witness generation works with multiple blocks in exex chain
+            // #[cfg(debug_assertions)]
+            // assert!(outcome.len() == 1, "should only contain single block");
 
             let prover_input = extract_zkvm_input(block_hash, &self.ctx, &outcome)?;
 

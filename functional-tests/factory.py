@@ -1,4 +1,5 @@
 import os
+import shutil
 from typing import Optional, TypedDict
 
 import flexitest
@@ -252,8 +253,25 @@ class RethFactory(flexitest.Factory):
             w3.middleware_onion.add(web3.middleware.SignAndSendRawMiddlewareBuilder.build(account))
             return w3
 
+        def snapshot_dir_path(idx: int):
+            return os.path.join(ctx.envdd_path, f"reth.{id}.{idx}")
+
+        def _snapshot_datadir(idx: int):
+            snapshot_dir = snapshot_dir_path(idx)
+            os.makedirs(snapshot_dir, exist_ok=True)
+            shutil.copytree(datadir, snapshot_dir, dirs_exist_ok=True)
+
+        def _restore_snapshot(idx: int):
+            assert not svc.is_started(), "Should call restore only when service is stopped"
+            snapshot_dir = snapshot_dir_path(idx)
+            assert os.path.exists(snapshot_dir)
+            shutil.rmtree(datadir)
+            os.rename(snapshot_dir, datadir)
+
         _inject_service_create_rpc(svc, ethrpc_url, name)
         svc.create_web3 = _create_web3
+        svc.snapshot_datadir = _snapshot_datadir
+        svc.restore_snapshot = _restore_snapshot
 
         return svc
 
@@ -268,6 +286,7 @@ class ProverClientFactory(flexitest.Factory):
         bitcoind_config: BitcoinRpcConfig,
         sequencer_url: str,
         reth_url: str,
+        rollup_params: str,
         ctx: flexitest.EnvContext,
     ):
         datadir = ctx.make_service_dir("prover_client")
@@ -288,6 +307,12 @@ class ProverClientFactory(flexitest.Factory):
         ]
         # fmt: on
         props = {"rpc_port": rpc_port}
+
+        rollup_params_file = os.path.join(datadir, "rollup_params.json")
+        with open(rollup_params_file, "w") as f:
+            f.write(rollup_params)
+
+        cmd.extend(["--rollup-params", rollup_params_file])
 
         svc = flexitest.service.ProcService(props, cmd, stdout=logfile)
         svc.start()

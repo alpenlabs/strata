@@ -27,7 +27,7 @@ pub fn extract_relevant_info(
             }
             ProtocolOperation::RollupInscription(signed_batch) => {
                 if let CredRule::SchnorrKey(pub_key) = rollup_params.cred_rule {
-                    assert!(signed_batch.verify_sig(pub_key));
+                    assert!(signed_batch.verify_sig(&pub_key));
                 }
                 let batch: BatchCheckpoint = signed_batch.clone().into();
                 // Note: This assumes we will have one proper update

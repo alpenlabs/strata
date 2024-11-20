@@ -3,12 +3,15 @@ use std::{
     sync::{Arc, RwLock},
 };
 
+use bincode::deserialize;
+use bitcoin::consensus;
 use strata_db::traits::{ProverDatabase, ProverTaskDatabase};
 use strata_proofimpl_evm_ee_stf::ELProofInput;
 use strata_rocksdb::{
     prover::db::{ProofDb, ProverDB},
     DbOpsConfig,
 };
+#[cfg(feature = "prover-dev")]
 use strata_sp1_guest_builder::{
     GUEST_BTC_BLOCKSPACE_ELF, GUEST_CHECKPOINT_ELF, GUEST_CL_AGG_ELF, GUEST_CL_STF_ELF,
     GUEST_EVM_EE_STF_ELF, GUEST_L1_BATCH_ELF,
@@ -17,15 +20,19 @@ use strata_zkvm::{Proof, ProverOptions, ZKVMHost, ZKVMInputBuilder};
 use tracing::{error, info};
 use uuid::Uuid;
 
+#[cfg(not(feature = "prover-dev"))]
+use crate::elf::{
+    GUEST_BTC_BLOCKSPACE_ELF, GUEST_CHECKPOINT_ELF, GUEST_CL_AGG_ELF, GUEST_CL_STF_ELF,
+    GUEST_EVM_EE_STF_ELF, GUEST_L1_BATCH_ELF,
+};
 use crate::{
-    config::NUM_PROVER_WORKERS,
+    config::{MAX_PARALLEL_PROVING_INSTANCES, NUM_PROVER_WORKERS},
     db::open_rocksdb_database,
     primitives::{
         prover_input::{ProofWithVkey, ZKVMInput},
         tasks_scheduler::{ProofProcessingStatus, ProofSubmissionStatus, WitnessSubmissionStatus},
         vms::{ProofVm, ZkVMManager},
     },
-    proving_ops::btc_ops::get_pm_rollup_params,
 };
 
 #[derive(Debug, Clone)]
@@ -106,17 +113,19 @@ where
 {
     let zkvm_input = match zkvm_input {
         ZKVMInput::ElBlock(el_input) => {
-            let el_input: ELProofInput = bincode::deserialize(&el_input.data)?;
+            let el_input: ELProofInput = deserialize(&el_input.data)?;
             Vm::Input::new().write(&el_input)?.build()?
         }
 
-        ZKVMInput::BtcBlock(block, rollup_params) => Vm::Input::new()
-            .write(&rollup_params)?
-            .write_serialized(&bitcoin::consensus::serialize(&block))?
+        ZKVMInput::BtcBlock(block, cred_rule, tx_filters) => Vm::Input::new()
+            .write(&cred_rule)?
+            .write_serialized(&consensus::serialize(&block))?
+            .write_borsh(&tx_filters)?
             .build()?,
 
         ZKVMInput::L1Batch(l1_batch_input) => {
             let mut input_builder = Vm::Input::new();
+            input_builder.write(&l1_batch_input.rollup_params)?;
             input_builder.write_borsh(&l1_batch_input.header_verification_state)?;
             input_builder.write(&l1_batch_input.btc_task_ids.len())?;
             // Write each proof input
@@ -128,7 +137,7 @@ where
         }
 
         ZKVMInput::ClBlock(cl_proof_input) => Vm::Input::new()
-            .write(&get_pm_rollup_params())?
+            .write(&cl_proof_input.rollup_params)?
             .write_serialized(&cl_proof_input.cl_raw_witness)?
             .write_proof(
                 cl_proof_input
@@ -162,7 +171,7 @@ where
                 .ok_or_else(|| anyhow::anyhow!("L2 Batch Proof Not Ready"))?;
 
             let mut input_builder = Vm::Input::new();
-            input_builder.write(&get_pm_rollup_params())?;
+            input_builder.write(&checkpoint_input.rollup_params)?;
             input_builder.write_proof(l1_batch_proof)?;
             input_builder.write_proof(l2_batch_proof)?;
 
@@ -300,6 +309,16 @@ where
         }
     }
 
+    pub(crate) fn is_available(&self) -> bool {
+        let prover_state = self
+            .prover_state
+            .read()
+            .expect("Failed to acquire write lock");
+        let num_jobs = prover_state.pending_tasks_count;
+
+        num_jobs < MAX_PARALLEL_PROVING_INSTANCES
+    }
+
     fn save_proof_to_db(&self, task_id: Uuid, proof: &Proof) -> Result<(), anyhow::Error> {
         self.db
             .prover_task_db()
@@ -315,7 +334,7 @@ where
             .prover_task_db()
             .get_task_entry_by_id(*task_id.as_bytes())?;
         match proof_entry {
-            Some(raw_proof) => Ok(Proof::new(raw_proof)),
+            Some(raw_proof) => Ok(deserialize(&raw_proof)?),
             None => Err(anyhow::anyhow!("Proof not found for {:?}", task_id)),
         }
     }

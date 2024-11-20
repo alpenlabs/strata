@@ -3,6 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 use async_trait::async_trait;
 use bitcoin::params::MAINNET;
 use strata_btcio::{reader::query::get_verification_state, rpc::BitcoinClient};
+use strata_primitives::params::RollupParams;
 use strata_state::l1::HeaderVerificationState;
 use uuid::Uuid;
 
@@ -19,6 +20,7 @@ use crate::{
 pub struct L1BatchOperations {
     btc_dispatcher: Arc<TaskDispatcher<BtcOperations>>,
     btc_client: Arc<BitcoinClient>,
+    rollup_params: Arc<RollupParams>,
 }
 
 impl L1BatchOperations {
@@ -26,10 +28,12 @@ impl L1BatchOperations {
     pub fn new(
         btc_dispatcher: Arc<TaskDispatcher<BtcOperations>>,
         btc_client: Arc<BitcoinClient>,
+        rollup_params: Arc<RollupParams>,
     ) -> Self {
         Self {
             btc_dispatcher,
             btc_client,
+            rollup_params,
         }
     }
 }
@@ -40,6 +44,7 @@ pub struct L1BatchInput {
     pub btc_task_ids: HashMap<Uuid, u64>,
     pub proofs: HashMap<u64, ProofWithVkey>,
     pub header_verification_state: HeaderVerificationState,
+    pub rollup_params: RollupParams,
 }
 
 impl L1BatchInput {
@@ -76,16 +81,21 @@ impl ProvingOperations for L1BatchOperations {
         &self,
         btc_block_range: Self::Params,
     ) -> Result<Self::Input, anyhow::Error> {
-        let st_height = btc_block_range.0;
-        let header_verification_state =
-            get_verification_state(self.btc_client.as_ref(), st_height, &MAINNET.clone().into())
-                .await?;
+        let header_verification_state = get_verification_state(
+            self.btc_client.as_ref(),
+            btc_block_range.0,
+            self.rollup_params.genesis_l1_height,
+            &MAINNET.clone().into(),
+        )
+        .await?;
+        let rollup_params = (*self.rollup_params).clone();
 
         let input: Self::Input = L1BatchInput {
             btc_block_range,
             btc_task_ids: HashMap::new(),
             proofs: HashMap::new(),
             header_verification_state,
+            rollup_params,
         };
         Ok(input)
     }

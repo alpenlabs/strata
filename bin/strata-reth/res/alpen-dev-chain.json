@@ -16,7 +16,7 @@
     "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
     "config": {
         "ethash": {},
-        "chainId": 12345,
+        "chainId": 8091,
         "homesteadBlock": 0,
         "eip150Block": 0,
         "eip155Block": 0,
