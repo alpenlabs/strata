@@ -37,6 +37,7 @@ pub fn process_cl_agg(zkvm: &impl ZkVmEnv, cl_stf_vk: &[u32; 8]) {
     zkvm.commit_borsh(&public_params);
 }
 
+#[inline]
 fn validate_proof_consistency(
     current_proof_cs_snap: &L2BatchProofOutput,
     next_proof_cs_snap: &L2BatchProofOutput,
