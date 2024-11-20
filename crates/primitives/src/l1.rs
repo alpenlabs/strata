@@ -360,6 +360,20 @@ impl PartialEq for BitcoinAddress {
     }
 }
 
+impl PartialOrd for BitcoinAddress {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for BitcoinAddress {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.address
+            .script_pubkey()
+            .cmp(&other.address.script_pubkey())
+    }
+}
+
 /// A wrapper for bitcoin amount in sats similar to the implementation in [`bitcoin::Amount`].
 ///
 /// NOTE: This wrapper has been created so that we can implement `Borsh*` traits on it.

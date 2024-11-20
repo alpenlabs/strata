@@ -3,6 +3,7 @@ use strata_primitives::{
     buf::Buf32,
     l1::BitcoinAddress,
     params::{DepositTxParams, RollupParams},
+    sorted_vec::SortedVec,
 };
 
 use crate::utils::{generate_taproot_address, get_operator_wallet_pks};
@@ -13,14 +14,13 @@ pub struct TxFilterConfig {
     pub rollup_name: String,
 
     /// For addresses that we expect spends to.
-    // TODO: ensure sorted vec, possibly by having a separate SortedVec type
-    pub expected_addrs: Vec<BitcoinAddress>,
+    pub expected_addrs: SortedVec<BitcoinAddress>,
 
     /// For blobs we expect to be written.
-    pub expected_blobs: Vec<Buf32>,
+    pub expected_blobs: SortedVec<Buf32>,
 
     /// For deposits that might be spent from.
-    pub expected_outpoints: Vec<Outpoint>,
+    pub expected_outpoints: SortedVec<Outpoint>,
 
     /// Deposit config that defines the structure we expect in the utxo
     pub deposit_config: DepositTxParams,
@@ -33,9 +33,9 @@ impl TxFilterConfig {
         let address = generate_taproot_address(&operator_wallet_pks, rollup_params.network)?;
 
         let rollup_name = rollup_params.rollup_name.clone();
-        let expected_blobs = Vec::new(); // TODO: this should come from chainstate
-        let expected_addrs = vec![address.clone()];
-        let expected_outpoints = Vec::new();
+        let expected_blobs = SortedVec::new(); // TODO: this should come from chainstate
+        let expected_addrs = SortedVec::from(vec![address.clone()]);
+        let expected_outpoints = SortedVec::new();
 
         let deposit_config = DepositTxParams {
             magic_bytes: rollup_name.clone().into_bytes(),
@@ -54,7 +54,7 @@ impl TxFilterConfig {
 }
 
 /// Outpoint of a bitcoin tx
-#[derive(Clone, Debug, BorshSerialize, BorshDeserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, BorshSerialize, BorshDeserialize)]
 pub struct Outpoint {
     pub txid: Buf32,
     pub vout: u32,

@@ -36,7 +36,7 @@ fn extract_protocol_op(
     tx: &Transaction,
     filter_conf: &TxFilterConfig,
 ) -> Option<ProtocolOperation> {
-    // Currently all we have are inscription txs and txs spent to operator addrs
+    // Currently all we have are inscription txs, deposits and deposit requests
     parse_inscription_checkpoint(tx, filter_conf)
         .map(ProtocolOperation::Checkpoint)
         .or_else(|| parse_deposit(tx, filter_conf).map(ProtocolOperation::Deposit))
@@ -53,6 +53,7 @@ fn _parse_spent_to(tx: &Transaction, filter_conf: &TxFilterConfig) -> Option<Pro
         .filter_map(|op| {
             filter_conf
                 .expected_addrs
+                .as_slice()
                 .binary_search_by_key(&op.script_pubkey, |e| e.address().script_pubkey())
                 .ok()
                 .and_then(|idx| filter_conf.expected_addrs.get(idx))

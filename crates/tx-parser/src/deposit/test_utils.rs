@@ -45,8 +45,6 @@ pub fn create_test_deposit_tx(
         witness: Witness::new(),
     }];
 
-    println!("deposit tx addr: {:?}", addr_script);
-
     // Construct the outputs
     let outputs = vec![
         TxOut {

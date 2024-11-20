@@ -71,12 +71,7 @@ async fn do_reader_task<R: Reader>(
 
     let poll_dur = Duration::from_millis(ctx.config.client_poll_dur_ms as u64);
 
-    let mut state = init_reader_state(
-        target_next_block,
-        ctx.config.max_reorg_depth as usize * 2,
-        ctx.client.as_ref(),
-    )
-    .await?;
+    let mut state = init_reader_state(&ctx, target_next_block).await?;
     let best_blkid = state.best_block();
     info!(%best_blkid, "initialized L1 reader state");
 
@@ -118,19 +113,21 @@ async fn do_reader_task<R: Reader>(
 }
 
 /// Inits the reader state by trying to backfill blocks up to a target height.
-async fn init_reader_state(
+async fn init_reader_state<R: Reader>(
+    ctx: &ReaderContext<R>,
     target_next_block: u64,
-    lookback: usize,
-    client: &impl Reader,
 ) -> anyhow::Result<ReaderState> {
     // Init the reader state using the blockid we were given, fill in a few blocks back.
     debug!(%target_next_block, "initializing reader state");
     let mut init_queue = VecDeque::new();
 
+    let lookback = ctx.config.max_reorg_depth as usize * 2;
+    let client = ctx.client.as_ref();
+    let horz_height = ctx.config.params.rollup().horizon_l1_height as i64;
+
     // Do some math to figure out where our start and end are.
-    // TODO something screwed up with bookkeeping here
     let chain_info = client.get_blockchain_info().await?;
-    let start_height = i64::max(target_next_block as i64 - lookback as i64, 0) as u64;
+    let start_height = i64::max(target_next_block as i64 - lookback as i64, horz_height) as u64;
     let end_height = u64::min(target_next_block - 1, chain_info.blocks);
     debug!(%start_height, %end_height, "queried L1 client, have init range");
 
