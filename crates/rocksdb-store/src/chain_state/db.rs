@@ -182,7 +182,8 @@ mod tests {
     #[test]
     fn test_write_state_update() {
         let db = setup_db();
-        let batch = WriteBatch::new_empty();
+        let genesis_state: ChainState = ArbitraryGenerator::new().generate();
+        let batch = WriteBatch::new_toplevel_only(genesis_state.clone());
 
         let res = db.write_state_update(1, &batch);
         assert!(res.is_err_and(|x| matches!(x, DbError::OooInsert("Chainstate", 1))));
@@ -206,8 +207,9 @@ mod tests {
     #[test]
     fn test_get_toplevel_state() {
         let db = setup_db();
-        let genesis_state: Chainstate = ArbitraryGenerator::new().generate();
-        let batch = WriteBatch::new_empty();
+
+        let genesis_state: ChainState = ArbitraryGenerator::new().generate();
+        let batch = WriteBatch::new_toplevel_only(genesis_state.clone());
 
         db.write_genesis_state(&genesis_state).unwrap();
         for i in 1..=5 {
@@ -220,8 +222,9 @@ mod tests {
     #[test]
     fn test_get_earliest_and_last_state_idx() {
         let db = setup_db();
-        let genesis_state: Chainstate = ArbitraryGenerator::new().generate();
-        let batch = WriteBatch::new_empty();
+
+        let genesis_state: ChainState = ArbitraryGenerator::new().generate();
+        let batch = WriteBatch::new_toplevel_only(genesis_state.clone());
 
         db.write_genesis_state(&genesis_state).unwrap();
         for i in 1..=5 {
@@ -234,8 +237,9 @@ mod tests {
     #[test]
     fn test_purge() {
         let db = setup_db();
-        let genesis_state: Chainstate = ArbitraryGenerator::new().generate();
-        let batch = WriteBatch::new_empty();
+
+        let genesis_state: ChainState = ArbitraryGenerator::new().generate();
+        let batch = WriteBatch::new_toplevel_only(genesis_state.clone());
 
         db.write_genesis_state(&genesis_state).unwrap();
         for i in 1..=5 {
@@ -271,8 +275,9 @@ mod tests {
     #[test]
     fn test_rollback() {
         let db = setup_db();
-        let genesis_state: Chainstate = ArbitraryGenerator::new().generate();
-        let batch = WriteBatch::new_empty();
+
+        let genesis_state: ChainState = ArbitraryGenerator::new().generate();
+        let batch = WriteBatch::new_toplevel_only(genesis_state.clone());
 
         db.write_genesis_state(&genesis_state).unwrap();
         for i in 1..=5 {
@@ -317,8 +322,9 @@ mod tests {
     #[test]
     fn test_purge_and_rollback() {
         let db = setup_db();
-        let genesis_state: Chainstate = ArbitraryGenerator::new().generate();
-        let batch = WriteBatch::new_empty();
+
+        let genesis_state: ChainState = ArbitraryGenerator::new().generate();
+        let batch = WriteBatch::new_toplevel_only(genesis_state.clone());
 
         db.write_genesis_state(&genesis_state).unwrap();
         for i in 1..=5 {

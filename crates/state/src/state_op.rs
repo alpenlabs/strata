@@ -73,6 +73,11 @@ impl WriteBatch {
         }
     }
 
+    pub fn new_toplevel_only(tl_chs: Chainstate) -> Self {
+        Self::new(tl_chs, None, Vec::new())
+    }
+
+    #[deprecated(note = "use `new_toplevel_only`, replace doesn't make sense as a concept now")]
     pub fn new_replace(new_state: Chainstate) -> Self {
         Self::new(new_state, None, Vec::new())
     }
@@ -195,11 +200,10 @@ pub struct StateCache {
 }
 
 impl StateCache {
-    pub fn new(ch_state: ChainState) -> Self {
-        let es = ch_state.epoch_state().clone();
+    pub fn new(ch_state: Chainstate, epoch_state: EpochState) -> Self {
         Self {
             original_ch_state: ch_state.clone(),
-            original_epoch_state: es,
+            original_epoch_state: epoch_state,
             new_ch_state: ch_state,
             new_epoch_state: None,
             write_ops: Vec::new(),
@@ -230,6 +234,11 @@ impl StateCache {
     fn epoch_state_mut(&mut self) -> &mut EpochState {
         self.new_epoch_state = Some(self.original_epoch_state.clone());
         self.new_epoch_state.as_mut().unwrap()
+    }
+
+    /// Returns if there have probably been changes to the epoch-level state.
+    pub fn is_epoch_state_dirty(&self) -> bool {
+        self.new_epoch_state.is_some()
     }
 
     pub fn l1_safe_height(&self) -> u64 {

@@ -113,7 +113,8 @@ impl L2Segment {
             let fake_header = L2BlockHeader::new(slot, ts, prev_block_id, &body, Buf32::zero());
 
             let pre_state = prev_chainstate.clone();
-            let mut state_cache = StateCache::new(pre_state.clone());
+            let epoch_state = pre_state.epoch_state().clone(); // TODO refactor
+            let mut state_cache = StateCache::new(pre_state.clone(), epoch_state);
             strata_chaintsn::transition::process_block(
                 &mut state_cache,
                 &fake_header,
@@ -129,7 +130,8 @@ impl L2Segment {
             let block = L2Block::new(signed_header, body);
 
             // Note: We need to do this double as of now.
-            let mut state_cache = StateCache::new(pre_state.clone());
+            let epoch_state = pre_state.epoch_state().clone(); // TODO refactor
+            let mut state_cache = StateCache::new(pre_state.clone(), epoch_state);
             strata_chaintsn::transition::process_block(
                 &mut state_cache,
                 block.header(),

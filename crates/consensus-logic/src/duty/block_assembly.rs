@@ -165,8 +165,8 @@ fn prepare_l1_segment(
     // We don't have to worry about reorgs now, just shove it all in.
     let mut payloads = Vec::new();
     for (h, _b) in unacc_blocks.iter().take(max_l1_entries) {
-        let rec = load_header_record(*h, l1_prov)?;
-        let deposit_update_tx = fetch_deposit_update_txs(*h, l1_prov)?;
+        let rec = load_header_record(*h, l1_db)?;
+        let deposit_update_tx = fetch_deposit_update_txs(*h, l1_db)?;
         payloads.push(
             L1HeaderPayload::new(*h, rec)
                 .with_deposit_update_txs(deposit_update_tx)
@@ -287,13 +287,8 @@ fn prepare_exec_data<E: ExecEngineCtl>(
     timestamp: u64,
     prev_l2_blkid: L2BlockId,
     prev_global_sr: Buf32,
-<<<<<<< HEAD
     prev_chstate: &Chainstate,
-    safe_l1_block: Buf32,
-=======
-    prev_chstate: &ChainState,
     safe_l1_block: L1BlockId,
->>>>>>> 1773c2b9 (misc: reworked epoch state relationships some more)
     engine: &E,
     params: &RollupParams,
 ) -> Result<(ExecSegment, L2BlockAccessory), Error> {
@@ -367,15 +362,10 @@ fn compute_post_state(
     header: &impl L2Header,
     body: &L2BlockBody,
     params: &Arc<Params>,
-<<<<<<< HEAD
 ) -> Result<(Chainstate, WriteBatch), Error> {
-    let mut state_cache = StateCache::new(prev_chstate);
-=======
-) -> Result<(ChainState, WriteBatch), Error> {
     // FIXME epoch state bookkeeping
     let epoch_state = prev_chstate.epoch_state().clone();
     let mut state_cache = StateCache::new(prev_chstate, epoch_state);
->>>>>>> 1773c2b9 (misc: reworked epoch state relationships some more)
     strata_chaintsn::transition::process_block(&mut state_cache, header, body, params.rollup())?;
     let (post_state, wb) = state_cache.finalize();
     Ok((post_state, wb))
