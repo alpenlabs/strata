@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use strata_zkvm::ZkVmHost;
 use tokio::time::{sleep, Duration};
 use tracing::info;
 
@@ -12,18 +11,12 @@ use crate::{
 };
 
 /// Manages proof generation tasks, including processing and tracking task statuses.
-pub struct ProverManager<Vm>
-where
-    Vm: ZkVmHost + 'static,
-{
+pub struct ProverManager {
     task_tracker: Arc<TaskTracker>,
-    prover: Prover<Vm>,
+    prover: Prover,
 }
 
-impl<Vm> ProverManager<Vm>
-where
-    Vm: ZkVmHost,
-{
+impl ProverManager {
     pub fn new(task_tracker: Arc<TaskTracker>) -> Self {
         Self {
             task_tracker,
