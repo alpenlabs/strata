@@ -25,6 +25,7 @@ strata-sp1-guest-builder = { path = "../../provers/sp1" }
 strata-state = { workspace = true }
 strata-zkvm = { workspace = true }
 
+alloy-rpc-types = { workspace = true }
 anyhow.workspace = true
 argh.workspace = true
 async-trait.workspace = true
@@ -38,7 +39,6 @@ num-bigint = "0.4.6"
 num-traits = "0.2.19"
 rand.workspace = true
 rayon = "1.8.0"
-alloy-rpc-types = { workspace = true }
 rockbound = { workspace = true }
 serde = { workspace = true }
 sp1-sdk = "3.0.0"

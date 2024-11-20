@@ -13338,6 +13338,7 @@ dependencies = [
  "async-trait",
  "clap",
  "eyre",
+ "hex",
  "jsonrpsee-types",
  "reqwest 0.12.7",
  "reth",

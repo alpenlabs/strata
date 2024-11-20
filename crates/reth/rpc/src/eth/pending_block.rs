@@ -1,4 +1,4 @@
-//! Loads OP pending block for a RPC response.
+//! Loads Strata pending block for a RPC response.
 
 use reth_chainspec::{ChainSpec, EthereumHardforks};
 use reth_evm::ConfigureEvm;

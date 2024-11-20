@@ -13,9 +13,10 @@ rust.unused_must_use = "deny"
 rustdoc.all = "warn"
 
 [dependencies]
+strata-state.workspace = true
+
 bitcoin.workspace = true
 jsonrpsee = { workspace = true, features = ["server", "macros"] }
-strata-state.workspace = true
 
 [features]
 client = ["jsonrpsee/client"]

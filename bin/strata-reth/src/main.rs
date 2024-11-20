@@ -113,8 +113,7 @@ pub struct StrataChainSpecParser;
 impl ChainSpecParser for StrataChainSpecParser {
     type ChainSpec = ChainSpec;
 
-    // TODO: clarify what are the supported chains.
-    const SUPPORTED_CHAINS: &'static [&'static str] = &["dev", "devnet", "default"];
+    const SUPPORTED_CHAINS: &'static [&'static str] = &["dev", "devnet"];
 
     fn parse(s: &str) -> eyre::Result<Arc<Self::ChainSpec>> {
         chain_value_parser(s)

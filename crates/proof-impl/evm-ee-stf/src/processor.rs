@@ -18,6 +18,7 @@
 use std::{mem, mem::take};
 
 use alloy_eips::eip1559::BaseFeeParams;
+use alloy_primitives::map::DefaultHashBuilder;
 use alloy_rlp::BufMut;
 use anyhow::anyhow;
 use reth_primitives::{
@@ -408,12 +409,10 @@ where
     account.info.balance = account.info.balance.checked_add(amount_wei).unwrap();
     account.mark_touch();
     // Commit changes to database
-    let mut ch = std::collections::HashMap::with_capacity_and_hasher(
-        1,
-        alloy_primitives::map::DefaultHashBuilder::default(),
+
+    db.commit(
+        std::collections::HashMap::<_, _, DefaultHashBuilder>::from_iter([(address, account)]),
     );
-    ch.insert(address, account);
-    db.commit(ch);
 
     Ok(())
 }

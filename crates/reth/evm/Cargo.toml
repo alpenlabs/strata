@@ -4,8 +4,9 @@ name = "strata-reth-evm"
 version = "0.1.0"
 
 [dependencies]
+strata-reth-primitives.workspace = true
+
 alloy-sol-types.workspace = true
 reth-primitives.workspace = true
 revm.workspace = true
 revm-primitives.workspace = true
-strata-reth-primitives.workspace = true

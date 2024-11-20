@@ -29,6 +29,7 @@ strata-tasks.workspace = true
 strata-tx-parser.workspace = true
 strata-zkvm.workspace = true
 
+alloy-rpc-types.workspace = true
 anyhow.workspace = true
 argh.workspace = true
 async-trait.workspace = true
@@ -42,7 +43,6 @@ parking_lot.workspace = true
 reth-ipc.workspace = true
 reth-primitives.workspace = true
 reth-rpc-api.workspace = true
-alloy-rpc-types.workspace = true
 rockbound.workspace = true
 serde.workspace = true
 serde_json.workspace = true

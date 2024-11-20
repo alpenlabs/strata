@@ -8,9 +8,17 @@ name = "strata-reth"
 path = "src/main.rs"
 
 [dependencies]
+strata-reth-db.workspace = true
+strata-reth-exex.workspace = true
+strata-reth-node.workspace = true
+strata-reth-rpc.workspace = true
+
+alloy-genesis.workspace = true
+alloy-rpc-types.workspace = true
 async-trait.workspace = true
 clap.workspace = true
 eyre.workspace = true
+hex.workspace = true
 jsonrpsee-types.workspace = true
 reqwest.workspace = true
 reth.workspace = true
@@ -23,14 +31,8 @@ reth-primitives.workspace = true
 reth-provider.workspace = true
 reth-rpc-eth-api.workspace = true
 reth-rpc-eth-types.workspace = true
-alloy-rpc-types.workspace = true
-alloy-genesis.workspace = true
 rockbound.workspace = true
 serde_json.workspace = true
 shellexpand = "3.0.0"
-strata-reth-db.workspace = true
-strata-reth-exex.workspace = true
-strata-reth-node.workspace = true
-strata-reth-rpc.workspace = true
 thiserror.workspace = true
 tracing.workspace = true

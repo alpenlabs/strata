@@ -1,4 +1,4 @@
-//! Loads and formats OP transaction RPC response.
+//! Loads and formats Strata transaction RPC response.
 
 use alloy_primitives::{Bytes, B256};
 use reth_node_api::FullNodeComponents;
@@ -33,7 +33,7 @@ where
         let pool_transaction =
             <Self::Pool as TransactionPool>::Transaction::from_pooled(recovered.into());
 
-        // On optimism, transactions are forwarded directly to the sequencer to be included in
+        // On Strata, transactions are forwarded directly to the sequencer to be included in
         // blocks that it builds.
         if let Some(client) = self.raw_tx_forwarder().as_ref() {
             tracing::debug!( target: "rpc::eth",  "forwarding raw transaction to");

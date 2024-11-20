@@ -19,7 +19,7 @@
 use std::collections::hash_map::Entry;
 
 // use hashbrown::hash_map::Entry;
-use alloy_primitives::map::HashMap;
+use alloy_primitives::map::{DefaultHashBuilder, HashMap};
 use anyhow::{anyhow, Result};
 use reth_primitives::revm_primitives::alloy_primitives::{Address, Bytes, B256, U256};
 use revm::{
@@ -64,7 +64,7 @@ impl InMemoryDBHelper for InMemoryDB {
         // For each account, load the information into the database.
         let mut accounts = HashMap::with_capacity_and_hasher(
             input.parent_storage.len(),
-            alloy_primitives::map::DefaultHashBuilder::default(),
+            DefaultHashBuilder::default(),
         );
         for (address, (storage_trie, slots)) in &mut input.parent_storage {
             let state_account = input
@@ -88,10 +88,8 @@ impl InMemoryDBHelper for InMemoryDB {
                 Bytecode::new_raw(bytes)
             };
 
-            let mut storage = HashMap::with_capacity_and_hasher(
-                slots.len(),
-                alloy_primitives::map::DefaultHashBuilder::default(),
-            );
+            let mut storage =
+                HashMap::with_capacity_and_hasher(slots.len(), DefaultHashBuilder::default());
             for slot in slots {
                 let value: U256 = storage_trie
                     .get_rlp(&keccak(slot.to_be_bytes::<32>()))?
@@ -115,7 +113,7 @@ impl InMemoryDBHelper for InMemoryDB {
         // Insert ancestor headers into the database.
         let mut block_hashes = HashMap::with_capacity_and_hasher(
             input.ancestor_headers.len() + 1,
-            alloy_primitives::map::DefaultHashBuilder::default(),
+            DefaultHashBuilder::default(),
         );
         block_hashes.insert(
             U256::from(input.parent_header.number),
