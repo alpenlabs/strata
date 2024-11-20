@@ -28,7 +28,7 @@ impl<'a> ZkVmInputBuilder<'a> for NativeMachineInputBuilder {
 
     fn write_proof(&mut self, item: strata_zkvm::AggregationInput) -> anyhow::Result<&mut Self> {
         // TODO: figure this out
-        self.write_buf(&[1])
+        self.write_buf(item.proof().as_bytes())
     }
 
     fn build(&mut self) -> anyhow::Result<Self::Input> {

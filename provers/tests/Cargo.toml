@@ -23,6 +23,7 @@ strata-proofimpl-l1-batch.workspace = true
 strata-state.workspace = true
 strata-test-utils.workspace = true
 strata-zkvm.workspace = true
+strata-native-zkvm-adapter.workspace = true
 tempfile.workspace = true
 
 # sp1
@@ -44,4 +45,4 @@ strata-risc0-guest-builder = { path = "../risc0", optional = true, features = [
 [features]
 sp1 = ["strata-sp1-adapter", "strata-sp1-guest-builder"]
 risc0 = ["strata-risc0-adapter", "strata-risc0-guest-builder"]
-default = ["sp1"]
+default = []

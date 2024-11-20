@@ -2,14 +2,6 @@ use anyhow::{Context, Result};
 use bitcoin::params::MAINNET;
 use strata_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
 use strata_proofimpl_l1_batch::{L1BatchProofInput, L1BatchProofOutput, L1BatchProver};
-#[cfg(feature = "risc0")]
-use strata_risc0_adapter::{Risc0Host, Risc0ProofInputBuilder};
-#[cfg(feature = "risc0")]
-use strata_risc0_guest_builder::{GUEST_RISC0_L1_BATCH_ELF, GUEST_RISC0_L1_BATCH_ID};
-#[cfg(feature = "sp1")]
-use strata_sp1_adapter::{SP1Host, SP1ProofInputBuilder};
-#[cfg(feature = "sp1")]
-use strata_sp1_guest_builder::{GUEST_L1_BATCH_PK, GUEST_L1_BATCH_VK, GUEST_L1_BATCH_VK_HASH_STR};
 use strata_test_utils::bitcoin::get_btc_chain;
 use strata_zkvm::{
     AggregationInput, Proof, ProofType, VerificationKey, ZkVmHost, ZkVmInputBuilder, ZkVmProver,
@@ -64,37 +56,50 @@ impl ProofGenerator<(u32, u32), L1BatchProver> for L1BatchProofGenerator {
         format!("l1_batch_{}_{}", start_height, end_height)
     }
 
+    // Use the default host when:
+    // 1. Both risc0 and sp1 is enabled
+    // 2. Neither risc0 nor sp1 is enabled
+    #[cfg(any(
+        all(feature = "risc0", feature = "sp1"),
+        not(any(feature = "risc0", feature = "sp1"))
+    ))]
     fn get_host(&self) -> impl ZkVmHost {
-        #[cfg(feature = "risc0")]
-        {
-            // If both features are enabled, prioritize 'risc0'
-            Risc0Host::init(GUEST_RISC0_L1_BATCH_ELF)
-        }
+        use std::sync::Arc;
 
-        #[cfg(all(feature = "sp1", not(feature = "risc0")))]
-        {
-            // Only use 'sp1' if 'risc0' is not enabled
-            return SP1Host::new_from_bytes(&GUEST_L1_BATCH_PK, &GUEST_L1_BATCH_VK);
+        use strata_native_zkvm_adapter::{NativeHost, NativeMachine};
+        use strata_proofimpl_l1_batch::process_l1_batch_proof;
+        use strata_zkvm::ZkVmEnv;
+        NativeHost {
+            process_proof: Arc::new(move |zkvm: &NativeMachine| {
+                process_l1_batch_proof(zkvm, &[0u32; 8]);
+                Ok(())
+            }),
         }
     }
 
-    fn get_short_program_id(&self) -> String {
-        #[cfg(feature = "risc0")]
-        {
-            // If both features are enabled, prioritize 'risc0'
-            hex::encode(GUEST_RISC0_L1_BATCH_ID[0].to_le_bytes())
-        }
-        #[cfg(all(feature = "sp1", not(feature = "risc0")))]
-        {
-            // Only use 'sp1' if 'risc0' is not enabled
-            GUEST_L1_BATCH_VK_HASH_STR.to_string().split_off(58)
-        }
+    // Only 'risc0' is enabled
+    #[cfg(feature = "risc0")]
+    #[cfg(not(feature = "sp1"))]
+    fn get_host(&self) -> impl ZkVmHost {
+        use strata_risc0_adapter::{Risc0Host, Risc0ProofInputBuilder};
+        use strata_risc0_guest_builder::GUEST_RISC0_L1_BATCH_ELF;
+
+        Risc0Host::init(GUEST_RISC0_L1_BATCH_ELF)
+    }
+
+    // Only 'sp1' is enabled
+    #[cfg(feature = "sp1")]
+    #[cfg(not(feature = "risc0"))]
+    fn get_host(&self) -> impl ZkVmHost {
+        use strata_sp1_adapter::{SP1Host, SP1ProofInputBuilder};
+        use strata_sp1_guest_builder::{GUEST_L1_BATCH_PK, GUEST_L1_BATCH_VK};
+
+        return SP1Host::new_from_bytes(&GUEST_L1_BATCH_PK, &GUEST_L1_BATCH_VK);
     }
 }
 
 // Run test if any of sp1 or risc0 feature is enabled and the test is being run in release mode
 #[cfg(test)]
-#[cfg(all(any(feature = "sp1", feature = "risc0"), not(debug_assertions)))]
 mod test {
     use strata_test_utils::l2::gen_params;
 

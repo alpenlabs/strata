@@ -20,11 +20,7 @@ pub trait ProofGenerator<T, P: ZkVmProver> {
     /// Retrieves a proof from cache or generates it if not found.
     fn get_proof(&self, input: &T) -> Result<(Proof, P::Output)> {
         // 1. Create the unique proof ID
-        let proof_id = format!(
-            "{}_{}.proof",
-            self.get_proof_id(input),
-            self.get_short_program_id(),
-        );
+        let proof_id = format!("{}_{}.proof", self.get_proof_id(input), self.get_host());
         println!("Getting proof for {}", proof_id);
         let proof_file = get_cache_dir().join(proof_id);
 
@@ -50,8 +46,6 @@ pub trait ProofGenerator<T, P: ZkVmProver> {
 
         Ok((proof, output))
     }
-
-    fn get_short_program_id(&self) -> String;
 
     // Simulate the proof. This is different than running the in the MOCK_PROVER mode
     // fn simulate(&self, input: T) -> U
