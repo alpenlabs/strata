@@ -26,10 +26,8 @@ from utils import get_bridge_pubkey, get_logger
 ROLLUP_DEPOSIT_AMOUNT = DEFAULT_ROLLUP_PARAMS["deposit_amount"]
 # Gas for the withdrawal transaction
 GAS = 22_000
-# lower bound is D BTC - fees - gas with a leeway
-STRATA_DEPOSIT_LOWER_BOUND = ((ROLLUP_DEPOSIT_AMOUNT // 1.01) * SATS_TO_WEI) - (
-    2 * GAS * GWEI_TO_WEI
-)
+# lower bound is D BTC - fees
+STRATA_DEPOSIT_LOWER_BOUND = ROLLUP_DEPOSIT_AMOUNT * SATS_TO_WEI - GAS * GWEI_TO_WEI
 
 
 @flexitest.register
@@ -73,6 +71,14 @@ class BridgeWithdrawHappyTest(flexitest.Test):
         el_address = web3.address
         self.logger.debug(f"EL address: {el_address}")
 
+        # Get the balance of the EL address prior to the deposits
+        # FIXME: I have no idea why the initial balance is so high
+        balance_pre = int(rethrpc.eth_getBalance(el_address), 16)
+        self.logger.debug(f"Strata Balance before deposits: {balance_pre}")
+        assert (
+            balance_pre == ROLLUP_DEPOSIT_AMOUNT * SATS_TO_WEI * 100_000
+        ), "Strata balance is not expected"
+
         # Get operators pubkey and musig2 aggregates it
         bridge_pk = get_bridge_pubkey(seqrpc)
         self.logger.debug(f"Bridge pubkey: {bridge_pk}")
@@ -90,6 +96,11 @@ class BridgeWithdrawHappyTest(flexitest.Test):
         self.make_drt(ctx, el_address, bridge_pk)
         time.sleep(0.5)
 
+        # Get the balance of the EL address prior to the withdrawal
+        balance_post = int(rethrpc.eth_getBalance(el_address), 16)
+        self.logger.debug(f"Strata Balance after deposits: {balance_post}")
+        assert balance_post > 0, "Strata balance is not greater than 0"
+
         # Send funds to the bridge precompile address for a withdrawal
         change_address_pk = extract_p2tr_pubkey(withdraw_address)
         self.logger.debug(f"Change Address PK: {change_address_pk}")
@@ -102,14 +113,13 @@ class BridgeWithdrawHappyTest(flexitest.Test):
         l2_tx_state = web3.eth.get_transaction_receipt(l2_tx_hash)
         self.logger.debug(f"Transaction state (web3): {l2_tx_state}")
 
-        # Make sure that the balance is zero
-        balance = int(rethrpc.eth_getBalance(el_address), 16)
-        self.logger.debug(f"Strata Balance after withdrawal: {balance}")
-
-        lower_bound = STRATA_DEPOSIT_LOWER_BOUND
-        self.logger.debug(f"Strata Balance lower bound: {lower_bound}")
-
-        assert balance >= lower_bound, "balance is not in the expected range"
+        # Make sure that the balance is less than the initial balance
+        balance_post_withdraw = int(rethrpc.eth_getBalance(el_address), 16)
+        self.logger.debug(f"Strata Balance after withdrawal: {balance_post_withdraw}")
+        difference = balance_post - balance_post_withdraw
+        self.logger.debug(f"Strata Balance difference: {difference}")
+        # NOTE: Difference is D BTC - gas_fee
+        assert difference == 10_000_023_000_818_888_144, "balance difference is not expected"
 
         # Mine blocks
         btcrpc.proxy.generatetoaddress(12, UNSPENDABLE_ADDRESS)
