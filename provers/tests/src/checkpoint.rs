@@ -2,16 +2,6 @@ use strata_proofimpl_checkpoint::{
     prover::{CheckpointProver, CheckpointProverInput},
     CheckpointProofInput, CheckpointProofOutput,
 };
-#[cfg(feature = "risc0")]
-use strata_risc0_adapter::{Risc0Host, Risc0ProofInputBuilder};
-#[cfg(feature = "risc0")]
-use strata_risc0_guest_builder::{GUEST_RISC0_CHECKPOINT_ELF, GUEST_RISC0_CHECKPOINT_ID};
-#[cfg(feature = "sp1")]
-use strata_sp1_adapter::SP1Host;
-#[cfg(feature = "sp1")]
-use strata_sp1_guest_builder::{
-    GUEST_CHECKPOINT_PK, GUEST_CHECKPOINT_VK, GUEST_CHECKPOINT_VK_HASH_STR,
-};
 use strata_test_utils::l2::gen_params;
 use strata_zkvm::{Proof, ZkVmHost, ZkVmProver, ZkVmResult};
 
@@ -90,37 +80,49 @@ impl ProofGenerator<CheckpointBatchInfo, CheckpointProver> for CheckpointProofGe
         )
     }
 
+    // Use the default host when:
+    // 1. Both risc0 and sp1 is enabled
+    // 2. Neither risc0 nor sp1 is enabled
+    #[cfg(any(
+        all(feature = "risc0", feature = "sp1"),
+        not(any(feature = "risc0", feature = "sp1"))
+    ))]
     fn get_host(&self) -> impl ZkVmHost {
-        #[cfg(feature = "risc0")]
-        {
-            // If both features are enabled, prioritize 'risc0'
-            Risc0Host::init(GUEST_RISC0_CHECKPOINT_ELF)
-        }
+        use std::sync::Arc;
 
-        #[cfg(all(feature = "sp1", not(feature = "risc0")))]
-        {
-            // Only use 'sp1' if 'risc0' is not enabled
-            return SP1Host::new_from_bytes(&GUEST_CHECKPOINT_PK, &GUEST_CHECKPOINT_VK);
+        use strata_native_zkvm_adapter::{NativeHost, NativeMachine};
+        use strata_proofimpl_checkpoint::process_checkpoint_proof_outer;
+        use strata_zkvm::ZkVmEnv;
+        NativeHost {
+            process_proof: Arc::new(move |zkvm: &NativeMachine| {
+                process_checkpoint_proof_outer(zkvm, &[0u32; 8], &[0u32; 8]);
+                Ok(())
+            }),
         }
     }
 
-    fn get_short_program_id(&self) -> String {
-        #[cfg(feature = "risc0")]
-        {
-            // If both features are enabled, prioritize 'risc0'
-            hex::encode(GUEST_RISC0_CHECKPOINT_ID[0].to_le_bytes())
-        }
-        #[cfg(all(feature = "sp1", not(feature = "risc0")))]
-        {
-            // Only use 'sp1' if 'risc0' is not enabled
-            GUEST_CHECKPOINT_VK_HASH_STR.to_string().split_off(58)
-        }
+    // Only 'risc0' is enabled
+    #[cfg(feature = "risc0")]
+    #[cfg(not(feature = "sp1"))]
+    fn get_host(&self) -> impl ZkVmHost {
+        use strata_risc0_adapter::{Risc0Host, Risc0ProofInputBuilder};
+        use strata_risc0_guest_builder::GUEST_RISC0_CHECKPOINT_ELF;
+
+        Risc0Host::init(GUEST_RISC0_CHECKPOINT_ELF)
+    }
+
+    // Only 'sp1' is enabled
+    #[cfg(feature = "sp1")]
+    #[cfg(not(feature = "risc0"))]
+    fn get_host(&self) -> impl ZkVmHost {
+        use strata_sp1_adapter::SP1Host;
+        use strata_sp1_guest_builder::{GUEST_CHECKPOINT_PK, GUEST_CHECKPOINT_VK};
+
+        SP1Host::new_from_bytes(&GUEST_CHECKPOINT_PK, &GUEST_CHECKPOINT_VK)
     }
 }
 
-// Run test if any of sp1 or risc0 feature is enabled and the test is being run in release mode
 #[cfg(test)]
-#[cfg(all(any(feature = "sp1", feature = "risc0"), not(debug_assertions)))]
 mod test {
 
     use strata_test_utils::l2::gen_params;
