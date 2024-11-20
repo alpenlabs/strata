@@ -12,7 +12,7 @@ use strata_risc0_adapter::Risc0Host;
 #[cfg(feature = "sp1")]
 use strata_sp1_adapter::SP1Host;
 use strata_test_utils::l2::gen_params;
-use strata_zkvm::{Proof, ZkVmHost, ZkVmProver};
+use strata_zkvm::{ProofWithInfo, ZkVmHost, ZkVmProver};
 
 use crate::proof_generator::ProofGenerator;
 
@@ -37,7 +37,7 @@ impl<H: ZkVmHost> ProofGenerator<Block, BtcBlockspaceProver> for BtcBlockProofGe
         Ok(input)
     }
 
-    fn gen_proof(&self, block: &Block) -> Result<(Proof, BlockspaceProofOutput)> {
+    fn gen_proof(&self, block: &Block) -> Result<(ProofWithInfo, BlockspaceProofOutput)> {
         let host = self.get_host();
         let input = self.get_input(block)?;
         BtcBlockspaceProver::prove(&input, &host)

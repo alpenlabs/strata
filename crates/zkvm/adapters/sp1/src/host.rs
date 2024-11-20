@@ -1,11 +1,13 @@
-use std::fmt;
+use std::{fmt, time::Instant};
 
 use anyhow::Ok;
 use serde::{de::DeserializeOwned, Serialize};
 use sp1_sdk::{
     HashableKey, ProverClient, SP1ProofWithPublicValues, SP1ProvingKey, SP1VerifyingKey,
 };
-use strata_zkvm::{Proof, ProofType, VerificationKey, ZkVmHost, ZkVmInputBuilder};
+use strata_zkvm::{
+    Proof, ProofInfo, ProofType, ProofWithInfo, VerificationKey, ZkVmHost, ZkVmInputBuilder,
+};
 
 use crate::input::SP1ProofInputBuilder;
 
@@ -46,9 +48,13 @@ impl ZkVmHost for SP1Host {
         &self,
         prover_input: <Self::Input<'a> as ZkVmInputBuilder<'a>>::Input,
         proof_type: ProofType,
-    ) -> anyhow::Result<(Proof, VerificationKey)> {
+    ) -> anyhow::Result<ProofWithInfo> {
+        let start = Instant::now();
+
         sp1_sdk::utils::setup_logger();
         let client = ProverClient::new();
+
+        let (_, report) = client.execute(&self.elf, prover_input.clone()).run()?;
 
         // Start proving
         let mut prover = client.prove(&self.proving_key, prover_input);
@@ -62,12 +68,10 @@ impl ZkVmHost for SP1Host {
 
         // Proof serialization
         let serialized_proof = bincode::serialize(&proof)?;
-        let verification_key = bincode::serialize(&self.verifying_key)?;
+        let proof = Proof::new(serialized_proof);
 
-        Ok((
-            Proof::new(serialized_proof),
-            VerificationKey(verification_key),
-        ))
+        let info = ProofInfo::new(report.total_instruction_count(), start.elapsed());
+        Ok(ProofWithInfo::new(proof, info))
     }
 
     fn get_verification_key(&self) -> VerificationKey {

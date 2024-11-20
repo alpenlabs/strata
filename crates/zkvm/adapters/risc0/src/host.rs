@@ -1,9 +1,11 @@
-use std::fmt;
+use std::{fmt, time::Instant};
 
 use hex::encode;
 use risc0_zkvm::{compute_image_id, default_prover, sha::Digest, ProverOpts, Receipt};
 use serde::de::DeserializeOwned;
-use strata_zkvm::{Proof, ProofType, VerificationKey, ZkVmHost, ZkVmInputBuilder};
+use strata_zkvm::{
+    Proof, ProofInfo, ProofType, ProofWithInfo, VerificationKey, ZkVmHost, ZkVmInputBuilder,
+};
 
 use crate::input::Risc0ProofInputBuilder;
 
@@ -33,7 +35,9 @@ impl ZkVmHost for Risc0Host {
         &self,
         prover_input: <Self::Input<'a> as ZkVmInputBuilder<'a>>::Input,
         proof_type: ProofType,
-    ) -> anyhow::Result<(Proof, VerificationKey)> {
+    ) -> anyhow::Result<ProofWithInfo> {
+        let start = Instant::now();
+
         // Setup the prover
         let opts = match proof_type {
             ProofType::Core => ProverOpts::default(),
@@ -55,7 +59,11 @@ impl ZkVmHost for Risc0Host {
 
         // Proof serialization
         let serialized_proof = bincode::serialize(&proof_info.receipt)?;
-        Ok((Proof::new(serialized_proof), self.get_verification_key()))
+
+        let proof = Proof::new(serialized_proof);
+        let info = ProofInfo::new(proof_info.stats.total_cycles, start.elapsed());
+
+        Ok(ProofWithInfo::new(proof, info))
     }
 
     fn get_verification_key(&self) -> VerificationKey {
@@ -111,15 +119,16 @@ mod tests {
         let zkvm_input = zkvm_input_builder.build().unwrap();
 
         // assert proof generation works
-        let (proof, _) = zkvm
+        let proof_info = zkvm
             .prove(zkvm_input, ProofType::Core)
             .expect("Failed to generate proof");
+        let proof = proof_info.proof();
 
         // assert proof verification works
-        zkvm.verify(&proof).expect("Proof verification failed");
+        zkvm.verify(proof).expect("Proof verification failed");
 
         // assert public outputs extraction from proof  works
-        let out: u32 = Risc0Host::extract_public_output(&proof).expect(
+        let out: u32 = Risc0Host::extract_public_output(proof).expect(
             "Failed to extract public
 outputs",
         );
@@ -146,7 +155,7 @@ outputs",
             .unwrap();
 
         // assert proof generation works
-        let (proof, vk) = zkvm
+        let proof_info = zkvm
             .prove(zkvm_input, ProofType::Groth16)
             .expect("Failed to generate proof");
 
@@ -157,8 +166,8 @@ outputs",
 
         let filename = "proof-groth16.bin";
         let mut file = File::create(filename).unwrap();
-        file.write_all(proof.as_bytes()).unwrap();
+        file.write_all(proof_info.proof().as_bytes()).unwrap();
 
-        assert_eq!(vk.as_bytes(), expected_vk);
+        assert_eq!(zkvm.get_verification_key().as_bytes(), expected_vk);
     }
 }

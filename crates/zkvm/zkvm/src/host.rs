@@ -3,7 +3,9 @@ use std::fmt::Display;
 use borsh::BorshDeserialize;
 use serde::{de::DeserializeOwned, Serialize};
 
-use crate::{input::ZkVmInputBuilder, proof::Proof, verifier::VerificationKey, ProofType};
+use crate::{
+    input::ZkVmInputBuilder, proof::Proof, verifier::VerificationKey, ProofType, ProofWithInfo,
+};
 
 /// A trait implemented by the prover ("host") of a zkVM program.
 pub trait ZkVmHost: Send + Sync + Clone + Display {
@@ -19,7 +21,7 @@ pub trait ZkVmHost: Send + Sync + Clone + Display {
         &self,
         input: <Self::Input<'a> as ZkVmInputBuilder<'a>>::Input,
         proof_type: ProofType,
-    ) -> anyhow::Result<(Proof, VerificationKey)>;
+    ) -> anyhow::Result<ProofWithInfo>;
 
     /// Reuturns the Verification key for the loaded ELF program
     fn get_verification_key(&self) -> VerificationKey;

@@ -8,7 +8,7 @@ use strata_risc0_adapter::Risc0Host;
 #[cfg(feature = "sp1")]
 use strata_sp1_adapter::SP1Host;
 use strata_test_utils::evm_ee::EvmSegment;
-use strata_zkvm::{Proof, ZkVmHost, ZkVmProver};
+use strata_zkvm::{ProofWithInfo, ZkVmHost, ZkVmProver};
 
 use crate::proof_generator::ProofGenerator;
 
@@ -30,7 +30,7 @@ impl<H: ZkVmHost> ProofGenerator<u64, EvmEeProver> for ElProofGenerator<H> {
         Ok(input)
     }
 
-    fn gen_proof(&self, block_num: &u64) -> Result<(Proof, ELProofPublicParams)> {
+    fn gen_proof(&self, block_num: &u64) -> Result<(ProofWithInfo, ELProofPublicParams)> {
         let host = self.get_host();
 
         let input = self.get_input(block_num)?;
@@ -87,7 +87,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(any(feature = "risc0", feature = "sp1")))]
     fn test_native() {
         test_proof(get_native_host());
     }

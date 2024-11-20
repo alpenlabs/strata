@@ -6,7 +6,7 @@ use strata_proofimpl_cl_stf::L2BatchProofOutput;
 use strata_risc0_adapter::Risc0Host;
 #[cfg(feature = "sp1")]
 use strata_sp1_adapter::SP1Host;
-use strata_zkvm::{Proof, ZkVmHost, ZkVmProver};
+use strata_zkvm::{ProofWithInfo, ZkVmHost, ZkVmProver};
 
 use crate::{cl::ClProofGenerator, proof_generator::ProofGenerator};
 
@@ -38,7 +38,7 @@ impl<H: ZkVmHost> ProofGenerator<(u64, u64), ClAggProver> for L2BatchProofGenera
         Ok(ClAggInput { batch, cl_stf_vk })
     }
 
-    fn gen_proof(&self, heights: &(u64, u64)) -> Result<(Proof, L2BatchProofOutput)> {
+    fn gen_proof(&self, heights: &(u64, u64)) -> Result<(ProofWithInfo, L2BatchProofOutput)> {
         let input = self.get_input(heights)?;
         let host = self.get_host();
         ClAggProver::prove(&input, &host)
@@ -97,7 +97,6 @@ mod test {
     }
 
     #[test]
-    #[cfg(not(any(feature = "risc0", feature = "sp1")))]
     fn test_native() {
         test_proof(
             get_native_host(),

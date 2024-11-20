@@ -9,7 +9,7 @@ use strata_risc0_adapter::Risc0Host;
 #[cfg(feature = "sp1")]
 use strata_sp1_adapter::SP1Host;
 use strata_test_utils::bitcoin::get_btc_chain;
-use strata_zkvm::{Proof, ZkVmHost, ZkVmProver};
+use strata_zkvm::{ProofWithInfo, ZkVmHost, ZkVmProver};
 
 use crate::{btc::BtcBlockProofGenerator, proof_generator::ProofGenerator};
 
@@ -51,7 +51,7 @@ impl<H: ZkVmHost> ProofGenerator<(u32, u32), L1BatchProver> for L1BatchProofGene
         Ok(input)
     }
 
-    fn gen_proof(&self, heights: &(u32, u32)) -> Result<(Proof, L1BatchProofOutput)> {
+    fn gen_proof(&self, heights: &(u32, u32)) -> Result<(ProofWithInfo, L1BatchProofOutput)> {
         let input = self.get_input(heights)?;
         let host = self.get_host();
         L1BatchProver::prove(&input, &host)
@@ -87,9 +87,9 @@ pub fn get_risc0_host() -> Risc0Host {
 
 #[cfg(feature = "sp1")]
 pub fn get_sp1_host() -> SP1Host {
-    use strata_sp1_guest_builder::{GUEST_L1_BATCH_PK, GUEST_L1_BATCH_VK};
+    use strata_sp1_guest_builder::{GUEST_L1_BATCH_ELF, GUEST_L1_BATCH_PK, GUEST_L1_BATCH_VK};
 
-    SP1Host::new_from_bytes(&GUEST_L1_BATCH_PK, &GUEST_L1_BATCH_VK)
+    SP1Host::new_from_bytes(&GUEST_L1_BATCH_ELF, &GUEST_L1_BATCH_PK, &GUEST_L1_BATCH_VK)
 }
 
 #[cfg(test)]
@@ -115,7 +115,6 @@ mod test {
     }
 
     #[test]
-    #[cfg(not(any(feature = "risc0", feature = "sp1")))]
     fn test_native() {
         test_proof(get_native_host(), btc::get_native_host());
     }

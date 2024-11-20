@@ -1,7 +1,7 @@
 use std::{fs, path::PathBuf};
 
 use anyhow::Result;
-use strata_zkvm::{Proof, ZkVmHost, ZkVmProver};
+use strata_zkvm::{Proof, ProofWithInfo, ZkVmHost, ZkVmProver};
 
 pub trait ProofGenerator<T, P: ZkVmProver> {
     /// Generates a proof based on the input.
@@ -10,7 +10,7 @@ pub trait ProofGenerator<T, P: ZkVmProver> {
     fn get_host(&self) -> impl ZkVmHost;
 
     /// Generates a proof based on the input.
-    fn gen_proof(&self, input: &T) -> Result<(Proof, P::Output)>;
+    fn gen_proof(&self, input: &T) -> Result<(ProofWithInfo, P::Output)>;
 
     /// Generates a unique proof ID based on the input.
     /// The proof ID will be the hash of the input and potentially other unique identifiers.
@@ -35,15 +35,17 @@ pub trait ProofGenerator<T, P: ZkVmProver> {
 
         // 3. Generate the proof
         println!("Proof not found in cache, generating proof...");
-        let (proof, output) = self.gen_proof(input)?;
+        let (proof_with_info, output) = self.gen_proof(input)?;
+
+        let proof = proof_with_info.proof();
 
         // Verify the proof
-        verify_proof(&proof, &self.get_host())?;
+        verify_proof(proof, &self.get_host())?;
 
         // Save the proof to cache
-        write_proof_to_file(&proof, &proof_file)?;
+        write_proof_to_file(proof, &proof_file)?;
 
-        Ok((proof, output))
+        Ok((proof.clone(), output))
     }
 
     // Simulate the proof. This is different than running the in the MOCK_PROVER mode

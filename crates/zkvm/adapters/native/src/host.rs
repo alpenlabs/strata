@@ -1,6 +1,8 @@
-use std::{fmt, sync::Arc};
+use std::{fmt, sync::Arc, time::Instant};
 
-use strata_zkvm::{Proof, ProofType, VerificationKey, ZkVmHost, ZkVmInputBuilder};
+use strata_zkvm::{
+    Proof, ProofInfo, ProofType, ProofWithInfo, VerificationKey, ZkVmHost, ZkVmInputBuilder,
+};
 
 use crate::{input::NativeMachineInputBuilder, zkvm::NativeMachine};
 
@@ -18,7 +20,9 @@ impl ZkVmHost for NativeHost {
         &self,
         prover_input: <Self::Input<'a> as ZkVmInputBuilder<'a>>::Input,
         _proof_type: ProofType,
-    ) -> anyhow::Result<(Proof, VerificationKey)> {
+    ) -> anyhow::Result<ProofWithInfo> {
+        let start = Instant::now();
+
         (self.process_proof)(&prover_input)?;
         let output_ref = prover_input.output.borrow();
 
@@ -27,7 +31,11 @@ impl ZkVmHost for NativeHost {
         } else {
             output_ref[0].clone()
         };
-        Ok((Proof::new(output), VerificationKey(vec![])))
+
+        let proof = Proof::new(output);
+        let info = ProofInfo::new(0, start.elapsed());
+
+        Ok(ProofWithInfo::new(proof, info))
     }
 
     fn get_verification_key(&self) -> VerificationKey {

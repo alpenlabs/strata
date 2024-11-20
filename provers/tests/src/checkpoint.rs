@@ -12,7 +12,7 @@ use strata_risc0_adapter::Risc0Host;
 #[cfg(feature = "sp1")]
 use strata_sp1_adapter::SP1Host;
 use strata_test_utils::l2::gen_params;
-use strata_zkvm::{Proof, ZkVmHost, ZkVmProver};
+use strata_zkvm::{ProofWithInfo, ZkVmHost, ZkVmProver};
 
 use crate::{
     l1_batch::L1BatchProofGenerator, l2_batch::L2BatchProofGenerator,
@@ -82,7 +82,7 @@ impl<H: ZkVmHost> ProofGenerator<CheckpointBatchInfo, CheckpointProver>
     fn gen_proof(
         &self,
         batch_info: &CheckpointBatchInfo,
-    ) -> Result<(Proof, CheckpointProofOutput)> {
+    ) -> Result<(ProofWithInfo, CheckpointProofOutput)> {
         let host = self.get_host();
         let input = self.get_input(batch_info)?;
         CheckpointProver::prove(&input, &host)
@@ -179,7 +179,6 @@ mod test {
     }
 
     #[test]
-    #[cfg(not(any(feature = "risc0", feature = "sp1")))]
     fn test_native() {
         test_proof(
             get_native_host(),

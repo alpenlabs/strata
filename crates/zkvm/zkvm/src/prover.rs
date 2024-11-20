@@ -1,6 +1,6 @@
-use crate::{host::ZkVmHost, input::ZkVmInputBuilder, proof::Proof, ProofType};
+use crate::{host::ZkVmHost, input::ZkVmInputBuilder, proof::Proof, ProofType, ProofWithInfo};
 
-pub trait ZkVmProver {
+pub trait ZkVmProver: Sized {
     type Input;
     type Output;
 
@@ -17,7 +17,10 @@ pub trait ZkVmProver {
         H: ZkVmHost;
 
     /// Proves the computation using any zkVM host.
-    fn prove<'a, H>(input: &'a Self::Input, host: &H) -> anyhow::Result<(Proof, Self::Output)>
+    fn prove<'a, H>(
+        input: &'a Self::Input,
+        host: &H,
+    ) -> anyhow::Result<(ProofWithInfo, Self::Output)>
     where
         H: ZkVmHost,
         H::Input<'a>: ZkVmInputBuilder<'a>,
@@ -26,10 +29,10 @@ pub trait ZkVmProver {
         let zkvm_input = Self::prepare_input::<H::Input<'a>>(input)?;
 
         // Use the host to prove.
-        let (proof, _) = host.prove(zkvm_input, Self::proof_type())?;
+        let proof = host.prove(zkvm_input, Self::proof_type())?;
 
         // Process and return the output using the verifier.
-        let output = Self::process_output(&proof, host)?;
+        let output = Self::process_output(proof.proof(), host)?;
 
         Ok((proof, output))
     }

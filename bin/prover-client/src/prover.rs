@@ -180,8 +180,8 @@ where
         }
     };
 
-    let (proof, vk) = vm.prove(zkvm_input, proof_type)?;
-    let agg_input = ProofWithVkey::new(proof, vk);
+    let proof_with_info = vm.prove(zkvm_input, proof_type)?;
+    let agg_input = ProofWithVkey::new(proof_with_info.proof, vm.get_verification_key());
     Ok(agg_input)
 }
 

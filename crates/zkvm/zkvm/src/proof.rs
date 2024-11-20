@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
@@ -64,4 +66,43 @@ pub enum ProofType {
     Groth16,
     Core,
     Compressed,
+}
+
+#[derive(Debug, Clone)]
+pub struct ProofWithInfo {
+    pub proof: Proof,
+    pub info: ProofInfo,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct ProofInfo {
+    cycle_count: u64,
+    duration: Duration,
+}
+
+impl ProofInfo {
+    pub fn new(cycle_count: u64, duration: Duration) -> Self {
+        Self {
+            cycle_count,
+            duration,
+        }
+    }
+}
+
+impl ProofWithInfo {
+    pub fn new(proof: Proof, info: ProofInfo) -> Self {
+        Self { proof, info }
+    }
+
+    pub fn proof(&self) -> &Proof {
+        &self.proof
+    }
+
+    pub fn cycle_count(&self) -> u64 {
+        self.info.cycle_count
+    }
+
+    pub fn duration(&self) -> Duration {
+        self.info.duration
+    }
 }
