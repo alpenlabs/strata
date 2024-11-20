@@ -21,15 +21,17 @@ pub mod processor;
 
 use std::collections::HashMap;
 
+use alloy_consensus::{serde_bincode_compat, Header};
 use db::InMemoryDBHelper;
 use mpt::keccak;
 use processor::{EvmConfig, EvmProcessor};
 use reth_primitives::{
     revm_primitives::alloy_primitives::{Address, Bytes, FixedBytes, B256},
-    Header, TransactionSignedNoHash, Withdrawal,
+    TransactionSignedNoHash, Withdrawal,
 };
 use revm::{primitives::SpecId, InMemoryDB};
 use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 use strata_reth_evm::collect_withdrawal_intents;
 use strata_reth_primitives::WithdrawalIntent;
 use strata_zkvm::ZkVmEnv;
@@ -54,10 +56,14 @@ pub struct ELProofPublicParams {
     pub deposits_txns_root: FixedBytes<32>,
 }
 
+#[serde_as]
 /// Necessary information to prove the execution of the RETH block.
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ELProofInput {
     /// The Keccak 256-bit hash of the parent block's header, in its entirety.
+    /// N.B. The reason serde_bincode_compat is necessary:
+    /// `[serde_bincode_compat]`(alloy_consensus::serde_bincode_compat)
+    #[serde_as(as = "serde_bincode_compat::Header")]
     pub parent_header: Header,
 
     /// The 160-bit address to which all fees collected from the successful mining of this block
@@ -153,8 +159,6 @@ pub fn process_block_transaction_outer(zkvm: &impl ZkVmEnv) {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
-
     use revm::primitives::SpecId;
 
     use super::*;
@@ -169,14 +173,30 @@ mod tests {
         params: ELProofPublicParams,
     }
 
-    #[test]
-    fn block_stf_test() {
+    fn get_mock_data() -> TestData {
         let json_content = std::fs::read_to_string(
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test_data/witness_params.json"),
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("test_data/witness_params.json"),
         )
         .expect("Failed to read the blob data file");
 
-        let test_data: TestData = serde_json::from_str(&json_content).expect("failed");
+        serde_json::from_str(&json_content).expect("Valid json")
+    }
+
+    #[test]
+    fn basic_serde() {
+        // Checks that serialization and deserialization actually works.
+        let test_data = get_mock_data();
+
+        let s = bincode::serialize(&test_data.witness).unwrap();
+        let d: ELProofInput = bincode::deserialize(&s[..]).unwrap();
+        assert_eq!(d, test_data.witness);
+    }
+
+    #[test]
+    fn block_stf_test() {
+        let test_data = get_mock_data();
+
         let input = test_data.witness;
         let op = process_block_transaction(input, EVM_CONFIG);
 

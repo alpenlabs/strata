@@ -13217,6 +13217,7 @@ dependencies = [
 name = "strata-proofimpl-evm-ee-stf"
 version = "0.1.0"
 dependencies = [
+ "alloy-consensus 0.4.2",
  "alloy-eips 0.4.2",
  "alloy-primitives 0.8.12",
  "alloy-rlp",
@@ -13233,6 +13234,7 @@ dependencies = [
  "rlp",
  "serde",
  "serde_json",
+ "serde_with",
  "strata-reth-evm",
  "strata-reth-primitives",
  "strata-zkvm",
