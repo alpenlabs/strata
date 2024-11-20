@@ -7,8 +7,7 @@ use reth_node_api::{
     EngineTypes, EngineValidator, FullNodeTypes, NodeTypesWithEngine, PayloadOrAttributes,
 };
 
-use super::payload::StrataPayloadAttributes;
-use crate::StrataEngineTypes;
+use crate::{StrataEngineTypes, StrataPayloadAttributes};
 
 /// Strata engine validator
 #[derive(Debug, Clone)]

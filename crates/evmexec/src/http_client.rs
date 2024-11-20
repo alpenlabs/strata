@@ -1,8 +1,11 @@
 use std::sync::Arc;
 
-use alloy_rpc_types::engine::{
-    ExecutionPayloadBodiesV1, ExecutionPayloadInputV2, ForkchoiceState, ForkchoiceUpdated,
-    JwtSecret, PayloadId,
+use alloy_rpc_types::{
+    engine::{
+        ExecutionPayloadBodiesV1, ExecutionPayloadInputV2, ForkchoiceState, ForkchoiceUpdated,
+        JwtSecret, PayloadId,
+    },
+    serde_helpers::WithOtherFields,
 };
 use jsonrpsee::http_client::{transport::HttpBackend, HttpClient, HttpClientBuilder};
 #[cfg(test)]
@@ -100,13 +103,13 @@ impl EngineRpc for EngineRpcClient {
     }
 
     async fn block_by_hash(&self, block_hash: BlockHash) -> RpcResult<Option<Block>> {
-        // TODO HELP REQUIRED: reth_primitives::alloy_compat has this conversion in place.
-        // the feature alloy-compat is enabled, but somehow it doesn't work.
-        // N.B. I've commented it out to validate the build is working.
+        let block = <HttpClient<AuthClientService<HttpBackend>> as EthApiClient<
+            alloy_rpc_types::Transaction,
+            alloy_rpc_types::Block<WithOtherFields<alloy_rpc_types::Transaction>>,
+            alloy_rpc_types::Receipt,
+        >>::block_by_hash(&self.client, block_hash, true)
+        .await?;
 
-        //let block: Option<alloy_rpc_types::Block<_>> =
-        //    self.client.block_by_hash(block_hash, true).await?;
-        //Ok(block.map(|rpc_block| std::convert::Into::<reth_primitives::Block>::into(block)))
-        Ok(None)
+        Ok(block.map(|b| b.try_into().unwrap()))
     }
 }

@@ -13443,6 +13443,7 @@ dependencies = [
  "serde",
  "strata-reth-evm",
  "strata-reth-primitives",
+ "strata-reth-rpc",
  "tracing",
 ]
 
@@ -13459,16 +13460,42 @@ dependencies = [
 name = "strata-reth-rpc"
 version = "0.1.0"
 dependencies = [
+ "alloy-eips 0.4.2",
+ "alloy-network 0.4.2",
+ "alloy-primitives 0.8.7",
+ "alloy-rpc-types 0.4.2",
+ "alloy-rpc-types-eth 0.4.2",
  "bincode",
+ "derive_more 1.0.0",
  "eyre",
  "hex",
  "jsonrpsee",
+ "jsonrpsee-types",
+ "parking_lot 0.12.3",
+ "reqwest 0.12.7",
+ "reth-chainspec",
+ "reth-ethereum-forks",
+ "reth-evm",
+ "reth-network-api",
+ "reth-node-api",
+ "reth-node-builder",
  "reth-primitives",
+ "reth-provider",
+ "reth-rpc",
+ "reth-rpc-eth-api",
+ "reth-rpc-eth-types",
+ "reth-rpc-server-types",
+ "reth-tasks",
+ "reth-transaction-pool",
+ "revm",
  "serde",
+ "serde_json",
  "strata-proofimpl-evm-ee-stf",
  "strata-reth-db",
  "strata-rpc-utils",
+ "thiserror",
  "tokio",
+ "tracing",
 ]
 
 [[package]]

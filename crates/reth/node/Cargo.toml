@@ -24,4 +24,5 @@ revm-primitives.workspace = true
 serde.workspace = true
 strata-reth-evm.workspace = true
 strata-reth-primitives.workspace = true
+strata-reth-rpc.workspace = true
 tracing.workspace = true

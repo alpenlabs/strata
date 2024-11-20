@@ -16,7 +16,7 @@ use reth_cli_commands::node::NodeCommand;
 use strata_reth_db::rocksdb::WitnessDB;
 use strata_reth_exex::ProverWitnessGenerator;
 use strata_reth_node::StrataEthereumNode;
-use strata_reth_rpc::{StrataRPC, StrataRpcApiServer};
+use strata_reth_rpc::{SequencerClient, StrataRPC, StrataRpcApiServer};
 use tracing::info;
 
 const DEFAULT_CHAIN_SPEC: &str = include_str!("../res/devnet-chain.json");
@@ -63,17 +63,11 @@ fn main() {
                 ctx.modules.merge_configured(rpc.into_rpc())?;
             }
 
-            // TODO transaction forwarder trait is no longer available!
-            // It seems the way to go is to implement proper add-ons.
-            // WORK IN PROGRESS, I've commented it out to test the build.
-
-            //if let Some(sequencer_http) = sequencer_http {
-            //    // register sequencer tx forwarder
-            //    ctx.registry
-            //        .set_eth_raw_transaction_forwarder(Arc::new(rpc::SequencerClient::new(
-            //            sequencer_http,
-            //        )));
-            //}
+            if let Some(sequencer_http) = sequencer_http {
+                ctx.registry
+                    .eth_api()
+                    .set_sequencer_client(SequencerClient::new(sequencer_http))?;
+            }
             Ok(())
         });
 
