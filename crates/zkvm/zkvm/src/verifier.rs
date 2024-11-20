@@ -41,7 +41,7 @@ pub trait ZkVmVerifier {
 #[derive(
     Debug, Clone, Serialize, Deserialize, BorshSerialize, BorshDeserialize, PartialEq, Eq, Arbitrary,
 )]
-pub struct VerificationKey(pub Vec<u8>);
+pub struct VerificationKey(Vec<u8>);
 
 impl VerificationKey {
     pub fn new(data: Vec<u8>) -> Self {

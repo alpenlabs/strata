@@ -8,7 +8,7 @@ pub struct Risc0Verifier;
 impl ZkVmVerifier for Risc0Verifier {
     fn verify(verification_key: &VerificationKey, proof: &Proof) -> anyhow::Result<()> {
         let receipt: Receipt = bincode::deserialize(proof.as_bytes())?;
-        let vk: risc0_zkvm::sha::Digest = bincode::deserialize(&verification_key.0)?;
+        let vk: risc0_zkvm::sha::Digest = bincode::deserialize(verification_key.as_bytes())?;
         receipt.verify(vk)?;
         Ok(())
     }
@@ -19,7 +19,7 @@ impl ZkVmVerifier for Risc0Verifier {
         proof: &Proof,
     ) -> anyhow::Result<()> {
         let receipt: Receipt = bincode::deserialize(proof.as_bytes())?;
-        let vk: risc0_zkvm::sha::Digest = bincode::deserialize(&verification_key.0)?;
+        let vk: risc0_zkvm::sha::Digest = bincode::deserialize(verification_key.as_bytes())?;
         receipt.verify(vk)?;
 
         let actual_public_parameter: T = receipt.journal.decode()?;

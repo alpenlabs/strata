@@ -11,7 +11,7 @@ pub struct SP1Verifier;
 impl ZkVmVerifier for SP1Verifier {
     fn verify(verification_key: &VerificationKey, proof: &Proof) -> anyhow::Result<()> {
         let proof: SP1ProofWithPublicValues = bincode::deserialize(proof.as_bytes())?;
-        let vkey: SP1VerifyingKey = bincode::deserialize(&verification_key.0)?;
+        let vkey: SP1VerifyingKey = bincode::deserialize(verification_key.as_bytes())?;
 
         let client = ProverClient::new();
         client.verify(&proof, &vkey)?;
@@ -25,7 +25,7 @@ impl ZkVmVerifier for SP1Verifier {
         proof: &Proof,
     ) -> anyhow::Result<()> {
         let mut proof: SP1ProofWithPublicValues = bincode::deserialize(proof.as_bytes())?;
-        let vkey: SP1VerifyingKey = bincode::deserialize(&verification_key.0)?;
+        let vkey: SP1VerifyingKey = bincode::deserialize(verification_key.as_bytes())?;
 
         let client = ProverClient::new();
         client.verify(&proof, &vkey)?;

@@ -58,12 +58,8 @@ impl ZkVmHost for SP1Host {
 
         // Proof serialization
         let serialized_proof = bincode::serialize(&proof)?;
-        let verification_key = bincode::serialize(&self.vkey)?;
 
-        Ok((
-            Proof::new(serialized_proof),
-            VerificationKey(verification_key),
-        ))
+        Ok((Proof::new(serialized_proof), self.get_verification_key()))
     }
 
     fn get_verification_key(&self) -> VerificationKey {

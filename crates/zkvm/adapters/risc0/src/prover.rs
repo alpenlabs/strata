@@ -64,7 +64,7 @@ impl ZkVmHost for Risc0Host {
         let serialized_proof = bincode::serialize(&proof_info.receipt)?;
         Ok((
             Proof::new(serialized_proof),
-            VerificationKey(verification_key),
+            VerificationKey::new(verification_key),
         ))
     }
 
