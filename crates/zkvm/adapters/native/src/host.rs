@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{fmt, sync::Arc};
 
 use strata_zkvm::{Proof, ProofType, VerificationKey, ZkVmHost, ZkVmInputBuilder};
 
@@ -49,9 +49,7 @@ where
         VerificationKey::new(vec![])
     }
 
-    fn extract_borsh_public_output<T: borsh::BorshSerialize + borsh::BorshDeserialize>(
-        proof: &Proof,
-    ) -> anyhow::Result<T> {
+    fn extract_borsh_public_output<T: borsh::BorshDeserialize>(proof: &Proof) -> anyhow::Result<T> {
         Ok(borsh::from_slice(proof.as_bytes()).expect("ser"))
     }
 
@@ -67,5 +65,13 @@ where
 
     fn verify(&self, _proof: &Proof) -> anyhow::Result<()> {
         Ok(())
+    }
+}
+impl<F> fmt::Display for NativeHost<F>
+where
+    F: Fn(&NativeMachine) -> anyhow::Result<()> + Send + Sync + 'static,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "native")
     }
 }

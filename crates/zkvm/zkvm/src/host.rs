@@ -1,10 +1,12 @@
+use std::fmt::Display;
+
 use borsh::BorshDeserialize;
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{input::ZkVmInputBuilder, proof::Proof, verifier::VerificationKey, ProofType};
 
 /// A trait implemented by the prover ("host") of a zkVM program.
-pub trait ZkVmHost: Send + Sync + Clone {
+pub trait ZkVmHost: Send + Sync + Clone + Display {
     type Input<'a>: ZkVmInputBuilder<'a>;
 
     /// Initializes the ZkVm with the provided ELF program and prover configuration.

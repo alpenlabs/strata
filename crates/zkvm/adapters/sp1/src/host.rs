@@ -1,6 +1,10 @@
+use std::fmt;
+
 use anyhow::Ok;
 use serde::{de::DeserializeOwned, Serialize};
-use sp1_sdk::{ProverClient, SP1ProofWithPublicValues, SP1ProvingKey, SP1VerifyingKey};
+use sp1_sdk::{
+    HashableKey, ProverClient, SP1ProofWithPublicValues, SP1ProvingKey, SP1VerifyingKey,
+};
 use strata_zkvm::{Proof, ProofType, VerificationKey, ZkVmHost, ZkVmInputBuilder};
 
 use crate::input::SP1ProofInputBuilder;
@@ -92,6 +96,12 @@ impl ZkVmHost for SP1Host {
     fn extract_raw_public_output(proof: &Proof) -> anyhow::Result<Vec<u8>> {
         let proof: SP1ProofWithPublicValues = bincode::deserialize(proof.as_bytes())?;
         Ok(proof.public_values.as_slice().to_vec())
+    }
+}
+
+impl fmt::Display for SP1Host {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "sp1_{}", self.verifying_key.bytes32())
     }
 }
 

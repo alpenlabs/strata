@@ -1,3 +1,6 @@
+use std::fmt;
+
+use hex::encode;
 use risc0_zkvm::{compute_image_id, default_prover, sha::Digest, ProverOpts, Receipt};
 use serde::de::DeserializeOwned;
 use strata_zkvm::{Proof, ProofType, VerificationKey, ZkVmHost, ZkVmInputBuilder};
@@ -73,6 +76,12 @@ impl ZkVmHost for Risc0Host {
     fn extract_raw_public_output(proof: &Proof) -> anyhow::Result<Vec<u8>> {
         let receipt: Receipt = bincode::deserialize(proof.as_bytes())?;
         Ok(receipt.journal.bytes)
+    }
+}
+
+impl fmt::Display for Risc0Host {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "risc0_{}", encode(self.id.as_bytes()))
     }
 }
 

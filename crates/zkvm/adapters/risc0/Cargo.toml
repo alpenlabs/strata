@@ -7,6 +7,7 @@ version = "0.1.0"
 anyhow.workspace = true
 bincode.workspace = true
 borsh.workspace = true
+hex.workspace = true
 risc0-zkvm = "1.1.2"
 serde.workspace = true
 serde_json.workspace = true
