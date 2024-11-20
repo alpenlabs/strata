@@ -161,9 +161,7 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
     let status = res.status();
     let body = res.text().await.expect("invalid response");
     if status == StatusCode::OK {
-        let _ = term.write_line(&format!(
-            "Successful. Check your balance with `strata balance`"
-        ));
+        let _ = term.write_line("Successful. Check your balance with `strata balance`");
     } else {
         let _ = term.write_line(&format!("Failed: faucet responded with {status}: {body}"));
     }
