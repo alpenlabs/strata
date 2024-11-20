@@ -1,24 +1,29 @@
-use anyhow::Context;
-use strata_proofimpl_cl_agg::{ClAggInput, ClAggProver};
+use strata_native_zkvm_adapter::NativeHost;
+use strata_proofimpl_cl_agg::{process_cl_agg, ClAggInput, ClAggProver};
 use strata_proofimpl_cl_stf::L2BatchProofOutput;
-use strata_zkvm::{
-    AggregationInput, Proof, ProofType, VerificationKey, ZkVmHost, ZkVmInputBuilder, ZkVmProver,
-    ZkVmResult,
-};
+#[cfg(feature = "risc0")]
+use strata_risc0_adapter::Risc0Host;
+#[cfg(feature = "sp1")]
+use strata_sp1_adapter::SP1Host;
+use strata_zkvm::{Proof, ZkVmHost, ZkVmProver, ZkVmResult};
 
 use crate::{cl::ClProofGenerator, proof_generator::ProofGenerator};
 
-pub struct L2BatchProofGenerator {
-    cl_proof_generator: ClProofGenerator,
+pub struct L2BatchProofGenerator<H: ZkVmHost> {
+    cl_proof_generator: ClProofGenerator<H>,
+    host: H,
 }
 
-impl L2BatchProofGenerator {
-    pub fn new(cl_proof_generator: ClProofGenerator) -> Self {
-        Self { cl_proof_generator }
+impl<H: ZkVmHost> L2BatchProofGenerator<H> {
+    pub fn new(cl_proof_generator: ClProofGenerator<H>, host: H) -> Self {
+        Self {
+            cl_proof_generator,
+            host,
+        }
     }
 }
 
-impl ProofGenerator<(u64, u64), ClAggProver> for L2BatchProofGenerator {
+impl<H: ZkVmHost> ProofGenerator<(u64, u64), ClAggProver> for L2BatchProofGenerator<H> {
     fn get_input(&self, heights: &(u64, u64)) -> ZkVmResult<ClAggInput> {
         let (start_height, end_height) = *heights;
         let mut batch = Vec::new();
@@ -43,59 +48,72 @@ impl ProofGenerator<(u64, u64), ClAggProver> for L2BatchProofGenerator {
         format!("l2_batch_{}_{}", start_height, end_height)
     }
 
-    // Use the default host when:
-    // 1. Both risc0 and sp1 is enabled
-    // 2. Neither risc0 nor sp1 is enabled
-    #[cfg(any(
-        all(feature = "risc0", feature = "sp1"),
-        not(any(feature = "risc0", feature = "sp1"))
-    ))]
     fn get_host(&self) -> impl ZkVmHost {
-        use std::sync::Arc;
-
-        use strata_native_zkvm_adapter::{NativeHost, NativeMachine};
-        use strata_proofimpl_cl_agg::process_cl_agg;
-        use strata_zkvm::ZkVmEnv;
-        NativeHost {
-            process_proof: Arc::new(move |zkvm: &NativeMachine| {
-                process_cl_agg(zkvm, &[0u32; 8]);
-                Ok(())
-            }),
-        }
+        self.host.clone()
     }
+}
 
-    // Only 'risc0' is enabled
-    #[cfg(feature = "risc0")]
-    #[cfg(not(feature = "sp1"))]
-    fn get_host(&self) -> impl ZkVmHost {
-        use strata_risc0_adapter::{Risc0Host, Risc0ProofInputBuilder};
-        use strata_risc0_guest_builder::GUEST_RISC0_CL_AGG_ELF;
+pub fn get_native_host() -> NativeHost {
+    use std::sync::Arc;
 
-        Risc0Host::init(GUEST_RISC0_CL_AGG_ELF)
+    use strata_native_zkvm_adapter::{NativeHost, NativeMachine};
+    NativeHost {
+        process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
+            process_cl_agg(zkvm, &[0u32; 8]);
+            Ok(())
+        })),
     }
+}
 
-    // Only 'sp1' is enabled
-    #[cfg(feature = "sp1")]
-    #[cfg(not(feature = "risc0"))]
-    fn get_host(&self) -> impl ZkVmHost {
-        use strata_sp1_adapter::{SP1Host, SP1ProofInputBuilder};
-        use strata_sp1_guest_builder::{GUEST_CL_AGG_PK, GUEST_CL_AGG_VK};
+#[cfg(feature = "risc0")]
+pub fn get_risc0_host() -> Risc0Host {
+    use strata_risc0_guest_builder::GUEST_RISC0_CL_AGG_ELF;
 
-        return SP1Host::new_from_bytes(&GUEST_CL_AGG_PK, &GUEST_CL_AGG_VK);
-    }
+    Risc0Host::init(GUEST_RISC0_CL_AGG_ELF)
+}
+
+#[cfg(feature = "sp1")]
+pub fn get_sp1_host() -> SP1Host {
+    use strata_sp1_guest_builder::{GUEST_CL_AGG_PK, GUEST_CL_AGG_VK};
+
+    SP1Host::new_from_bytes(&GUEST_CL_AGG_PK, &GUEST_CL_AGG_VK)
 }
 
 // Run test if any of sp1 or risc0 feature is enabled and the test is being run in release mode
 #[cfg(test)]
 mod test {
-    use crate::{ClProofGenerator, ElProofGenerator, L2BatchProofGenerator, ProofGenerator};
+    use strata_zkvm::ZkVmHost;
 
-    #[test]
-    fn test_cl_agg_guest_code_trace_generation() {
-        let el_prover = ElProofGenerator::new();
-        let cl_prover = ClProofGenerator::new(el_prover);
-        let cl_agg_prover = L2BatchProofGenerator::new(cl_prover);
+    use super::*;
+    use crate::{cl, el};
+
+    fn test_proof<H: ZkVmHost>(l2_batch_host: H, el_host: H, cl_host: H) {
+        let el_prover = el::ElProofGenerator::new(el_host);
+        let cl_prover = ClProofGenerator::new(el_prover, cl_host);
+        let cl_agg_prover = L2BatchProofGenerator::new(cl_prover, l2_batch_host);
 
         let _ = cl_agg_prover.get_proof(&(1, 3)).unwrap();
+    }
+
+    #[test]
+    #[cfg(not(any(feature = "risc0", feature = "sp1")))]
+    fn test_native() {
+        test_proof(
+            get_native_host(),
+            el::get_native_host(),
+            cl::get_native_host(),
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "risc0")]
+    fn test_risc0() {
+        test_proof(get_risc0_host(), el::get_risc0_host(), cl::get_risc0_host());
+    }
+
+    #[test]
+    #[cfg(feature = "sp1")]
+    fn test_sp1() {
+        test_proof(get_sp1_host(), el::get_sp1_host(), cl::get_sp1_host());
     }
 }

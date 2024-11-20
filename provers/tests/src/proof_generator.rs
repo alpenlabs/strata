@@ -1,8 +1,7 @@
 use std::{fs, path::PathBuf};
 
 use anyhow::Result;
-use strata_primitives::buf;
-use strata_zkvm::{Proof, ProofType, VerificationKey, ZkVmError, ZkVmHost, ZkVmProver, ZkVmResult};
+use strata_zkvm::{Proof, ZkVmError, ZkVmHost, ZkVmProver, ZkVmResult};
 
 pub trait ProofGenerator<T, P: ZkVmProver> {
     /// Generates a proof based on the input.
