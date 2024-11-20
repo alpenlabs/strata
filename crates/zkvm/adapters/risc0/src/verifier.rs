@@ -70,7 +70,7 @@ impl ZkVmVerifier for Risc0Verifier {
             .map_err(|e| anyhow::anyhow!("Integrity verification failed: {:?}", e))
     }
 
-    fn extract_public_output<T: serde::Serialize + serde::de::DeserializeOwned>(
+    fn extract_serde_public_output<T: serde::Serialize + serde::de::DeserializeOwned>(
         proof: &Proof,
     ) -> anyhow::Result<T> {
         let receipt: Receipt = bincode::deserialize(proof.as_bytes())?;

@@ -26,7 +26,9 @@ pub trait ZkVmVerifier {
 
     /// Extracts the public output from the given proof using standard `serde`
     /// serialization/deserialization.
-    fn extract_public_output<T: Serialize + DeserializeOwned>(proof: &Proof) -> anyhow::Result<T>;
+    fn extract_serde_public_output<T: Serialize + DeserializeOwned>(
+        proof: &Proof,
+    ) -> anyhow::Result<T>;
 
     /// Extracts the public output from the given proof assuming the data was serialized using
     /// Borsh.

@@ -53,7 +53,7 @@ mod test {
                 .prove(blockspace_input)
                 .expect("Failed to generate proof");
 
-            let output_raw = Risc0Verifier::extract_public_output::<Vec<u8>>(&proof)
+            let output_raw = Risc0Verifier::extract_serde_public_output::<Vec<u8>>(&proof)
                 .expect("Failed to extract public outputs");
             let output: BlockspaceProofOutput = borsh::from_slice(&output_raw).unwrap();
 
@@ -78,7 +78,7 @@ mod test {
             .prove(l1_batch_input)
             .expect("Failed to generate proof");
 
-        let output_raw = Risc0Verifier::extract_public_output::<Vec<u8>>(&proof)
+        let output_raw = Risc0Verifier::extract_serde_public_output::<Vec<u8>>(&proof)
             .expect("Failed to extract public outputs");
         let _: L1BatchProofOutput = borsh::from_slice(&output_raw).unwrap();
     }

@@ -107,8 +107,8 @@ mod tests {
         Risc0Verifier::verify(&vk, &proof).expect("Proof verification failed");
 
         // assert public outputs extraction from proof  works
-        let out: u32 =
-            Risc0Verifier::extract_public_output(&proof).expect("Failed to extract public outputs");
+        let out: u32 = Risc0Verifier::extract_serde_public_output(&proof)
+            .expect("Failed to extract public outputs");
         assert_eq!(input, out)
     }
 

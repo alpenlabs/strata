@@ -26,7 +26,7 @@ mod test {
         let (proof, _) = prover.prove(input).expect("Failed to generate proof");
 
         // TODO: add `extract_public_output_borsh` function to Verifier
-        let raw_output = Risc0Verifier::extract_public_output::<Vec<u8>>(&proof)
+        let raw_output = Risc0Verifier::extract_serde_public_output::<Vec<u8>>(&proof)
             .expect("Failed to extract public outputs");
 
         let _: BlockspaceProofOutput = borsh::from_slice(&raw_output).unwrap();

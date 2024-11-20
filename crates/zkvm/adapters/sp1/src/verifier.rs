@@ -58,7 +58,9 @@ impl ZkVmVerifier for SP1Verifier {
         .map_err(anyhow::Error::from)
     }
 
-    fn extract_public_output<T: Serialize + DeserializeOwned>(proof: &Proof) -> anyhow::Result<T> {
+    fn extract_serde_public_output<T: Serialize + DeserializeOwned>(
+        proof: &Proof,
+    ) -> anyhow::Result<T> {
         let mut proof: SP1ProofWithPublicValues = bincode::deserialize(proof.as_bytes())?;
         let public_params: T = proof.public_values.read();
         Ok(public_params)
