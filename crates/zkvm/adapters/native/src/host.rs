@@ -4,29 +4,14 @@ use strata_zkvm::{Proof, ProofType, VerificationKey, ZkVmHost, ZkVmInputBuilder}
 
 use crate::{input::NativeMachineInputBuilder, zkvm::NativeMachine};
 
-#[derive(Debug)]
-pub struct NativeHost<F>
-where
-    F: Fn(&NativeMachine) -> anyhow::Result<()> + Send + Sync + 'static,
-{
-    pub process_proof: Arc<F>,
+type ProcessProofFn = dyn Fn(&NativeMachine) -> anyhow::Result<()> + Send + Sync;
+
+#[derive(Clone)]
+pub struct NativeHost {
+    pub process_proof: Arc<Box<ProcessProofFn>>,
 }
 
-impl<F> Clone for NativeHost<F>
-where
-    F: Fn(&NativeMachine) -> anyhow::Result<()> + Send + Sync + 'static,
-{
-    fn clone(&self) -> Self {
-        Self {
-            process_proof: Arc::clone(&self.process_proof),
-        }
-    }
-}
-
-impl<F> ZkVmHost for NativeHost<F>
-where
-    F: Fn(&NativeMachine) -> anyhow::Result<()> + Send + Sync + 'static,
-{
+impl ZkVmHost for NativeHost {
     type Input<'a> = NativeMachineInputBuilder;
 
     fn prove<'a>(
@@ -67,10 +52,7 @@ where
         Ok(())
     }
 }
-impl<F> fmt::Display for NativeHost<F>
-where
-    F: Fn(&NativeMachine) -> anyhow::Result<()> + Send + Sync + 'static,
-{
+impl fmt::Display for NativeHost {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "native")
     }
