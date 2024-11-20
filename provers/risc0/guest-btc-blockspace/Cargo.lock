@@ -3327,6 +3327,7 @@ dependencies = [
  "anyhow",
  "bincode",
  "borsh",
+ "hex",
  "risc0-zkvm",
  "serde",
  "serde_json",

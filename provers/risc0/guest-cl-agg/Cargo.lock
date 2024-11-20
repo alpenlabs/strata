@@ -2866,7 +2866,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ef55228211251d7b6c7707c3ee13bb70dea4d2fd81ec4034521e4fe31010b2ea"
 dependencies = [
  "aurora-engine-modexp",
- "blst",
  "c-kzg",
  "cfg-if",
  "k256",
@@ -3683,6 +3682,7 @@ dependencies = [
  "anyhow",
  "bincode",
  "borsh",
+ "hex",
  "risc0-zkvm",
  "serde",
  "serde_json",
