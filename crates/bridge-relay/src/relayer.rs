@@ -83,7 +83,7 @@ impl RelayerState {
             // Otherwise it's better for network health to relay them
             // unconditionally.
             // TODO make it configurable if we relay or not without chainstate?
-            let chs_state = self.status_rx.chs.borrow().clone();
+            let chs_state = self.status_rx.chs().borrow().clone();
             if let Some(chs_state) = chs_state {
                 let sig_res = strata_primitives::relay::util::verify_bridge_msg_sig(
                     &message,

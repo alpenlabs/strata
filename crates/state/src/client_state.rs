@@ -72,6 +72,10 @@ impl ClientState {
         self.sync_state.as_ref()
     }
 
+    pub fn has_genesis_occured(&self) -> bool {
+        self.chain_active && self.sync().is_some()
+    }
+
     /// Returns a ref to the local L1 view.
     pub fn l1_view(&self) -> &LocalL1State {
         &self.local_l1_view

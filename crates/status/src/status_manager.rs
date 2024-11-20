@@ -18,10 +18,37 @@ pub enum StatusError {
 
 /// Bundle wrapper for Status receiver
 pub struct StatusRx {
-    pub csm: watch::Receiver<CsmStatus>,
-    pub cl: watch::Receiver<ClientState>,
-    pub l1: watch::Receiver<L1Status>,
-    pub chs: watch::Receiver<Option<Chainstate>>,
+    csm: watch::Receiver<CsmStatus>,
+    cl: watch::Receiver<ClientState>,
+    l1: watch::Receiver<L1Status>,
+    chs: watch::Receiver<Option<Chainstate>>,
+}
+
+impl StatusRx {
+    pub fn new(
+        csm: watch::Receiver<CsmStatus>,
+        cl: watch::Receiver<ClientState>,
+        l1: watch::Receiver<L1Status>,
+        chs: watch::Receiver<Option<Chainstate>>,
+    ) -> Self {
+        Self { csm, cl, l1, chs }
+    }
+
+    pub fn csm(&self) -> &watch::Receiver<CsmStatus> {
+        &self.csm
+    }
+
+    pub fn cl(&self) -> &watch::Receiver<ClientState> {
+        &self.cl
+    }
+
+    pub fn l1(&self) -> &watch::Receiver<L1Status> {
+        &self.l1
+    }
+
+    pub fn chs(&self) -> &watch::Receiver<Option<Chainstate>> {
+        &self.chs
+    }
 }
 
 impl StatusTx {
@@ -76,11 +103,6 @@ pub fn create_status_channel(
             l1: l1_tx,
             chs: chs_tx,
         }),
-        Arc::new(StatusRx {
-            csm: csm_rx,
-            cl: cl_rx,
-            l1: l1_rx,
-            chs: chs_rx,
-        }),
+        Arc::new(StatusRx::new(csm_rx, cl_rx, l1_rx, chs_rx)),
     )
 }
