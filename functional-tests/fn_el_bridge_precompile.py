@@ -2,6 +2,7 @@ import os
 
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
+from strata_utils import deposit_request_transaction, get_address
 from web3 import Web3
 from web3._utils.events import get_event_data
 
@@ -11,7 +12,7 @@ from constants import (
     SEQ_PUBLISH_BATCH_INTERVAL_SECS,
 )
 from entry import BasicEnvConfig
-from utils import wait_until
+from utils import RollupParamsSettings, get_bridge_pubkey, get_logger, wait_until
 
 EVM_WAIT_TIME = 2
 SATS_TO_WEI = 10**10
@@ -31,10 +32,15 @@ event_signature_text = "WithdrawalIntentEvent(uint64,bytes32)"
 @flexitest.register
 class BridgeDepositTest(flexitest.Test):
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env(BasicEnvConfig(101, rollup_params=ROLLUP_PARAMS_FOR_DEPOSIT_TX))
+        rollup_settings = RollupParamsSettings.new_default()
+        rollup_settings.block_time_sec = 1
+
+        ctx.set_env(BasicEnvConfig(1))
+        self.logger = get_logger("BridgeDepositTest")
 
     def main(self, ctx: flexitest.RunContext):
         evm_addr = "deedf001900dca3ebeefdeadf001900dca3ebeef"
+
         self.do_deposit(ctx, evm_addr)
         self.do_withdrawal_precompile_call(ctx)
 
@@ -51,7 +57,7 @@ class BridgeDepositTest(flexitest.Test):
         dest = web3.to_checksum_address(PRECOMPILE_BRIDGEOUT_ADDRESS)
         # 64 bytes
         dest_pk = os.urandom(32).hex()
-        print("dest_pk", dest_pk)
+        self.logger.debug(f"dest_pk: {dest_pk}")
 
         assert web3.is_connected(), "cannot connect to reth"
 
@@ -73,7 +79,7 @@ class BridgeDepositTest(flexitest.Test):
                 "data": dest_pk,
             }
         )
-        print("txid", txid.to_0x_hex())
+        self.logger.debug(f"txid: {txid.to_0x_hex()}")
 
         receipt = web3.eth.wait_for_transaction_receipt(txid, timeout=5)
 
@@ -103,48 +109,65 @@ class BridgeDepositTest(flexitest.Test):
             final_source_balance == original_source_balance - to_transfer_wei - total_gas_price
         ), "final balance incorrect"
 
+    def make_drt(self, ctx: flexitest.RunContext, el_address, musig_bridge_pk):
+        """
+        Deposit Request Transaction
+        """
+        # Get relevant data
+        btc = ctx.get_service("bitcoin")
+        btcrpc: BitcoindClient = btc.create_rpc()
+        btc_url = btcrpc.base_url
+        btc_user = btc.props["rpc_user"]
+        btc_password = btc.props["rpc_password"]
+
+        # Create the deposit request transaction
+        tx = bytes(
+            deposit_request_transaction(
+                el_address, musig_bridge_pk, btc_url, btc_user, btc_password
+            )
+        ).hex()
+        self.logger.debug(f"Deposit request tx: {tx}")
+
+        # Send the transaction to the Bitcoin network
+        txid = btcrpc.proxy.sendrawtransaction(tx)
+        self.logger.debug(f"sent deposit request with txid = {txid} for address {el_address}")
+        # this transaction is not in the bitcoind wallet, so we cannot use gettransaction
+
     def do_deposit(self, ctx: flexitest.RunContext, evm_addr: str):
         btc = ctx.get_service("bitcoin")
         seq = ctx.get_service("sequencer")
 
-        seqrpc = seq.create_rpc()
         btcrpc: BitcoindClient = btc.create_rpc()
+        seqrpc = seq.create_rpc()
 
-        amount_to_send = ROLLUP_PARAMS_FOR_DEPOSIT_TX["deposit_amount"] / 10**8
-        name = ROLLUP_PARAMS_FOR_DEPOSIT_TX["rollup_name"].encode("utf-8").hex()
-
-        addr = "bcrt1pzupt5e8eqvt995r57jmmylxlswqfddsscrrq7njygrkhej3e7q2qur0c76"
-        outputs = [{addr: amount_to_send}, {"data": f"{name}{evm_addr}"}]
-
-        options = {"changePosition": 2}
-
-        psbt_result = btcrpc.proxy.walletcreatefundedpsbt([], outputs, 0, options)
-        psbt = psbt_result["psbt"]
-
-        signed_psbt = btcrpc.proxy.walletprocesspsbt(psbt)
-
-        finalized_psbt = btcrpc.proxy.finalizepsbt(signed_psbt["psbt"])
-        deposit_tx = finalized_psbt["hex"]
+        # Get operators pubkey and musig2 aggregates it
+        bridge_pk = get_bridge_pubkey(seqrpc)
+        self.logger.debug(f"Bridge pubkey: {bridge_pk}")
 
         original_num_deposits = len(seqrpc.strata_getCurrentDeposits())
-        print(f"Original deposit count: {original_num_deposits}")
+        self.logger.debug(f"Original deposit count: {original_num_deposits}")
 
         reth = ctx.get_service("reth")
         rethrpc = reth.create_rpc()
 
         original_balance = int(rethrpc.eth_getBalance(f"0x{evm_addr}"), 16)
-        print(f"Balance before deposit: {original_balance}")
+        self.logger.debug(f"Balance before deposit: {original_balance}")
 
-        print("Deposit Tx:", btcrpc.sendrawtransaction(deposit_tx))
+        # ensure there are funds for drt in wallet
+        wallet_address = get_address(0)
+        btcrpc.proxy.generatetoaddress(102, wallet_address)
+
+        self.make_drt(ctx, evm_addr, bridge_pk)
+
         # check if we are getting deposits
         wait_until(
             lambda: len(seqrpc.strata_getCurrentDeposits()) > original_num_deposits,
             error_with="seem not be getting deposits",
-            timeout=SEQ_PUBLISH_BATCH_INTERVAL_SECS,
+            timeout=SEQ_PUBLISH_BATCH_INTERVAL_SECS * 2,
         )
 
         current_block_num = int(rethrpc.eth_blockNumber(), base=16)
-        print(f"Current reth block num: {current_block_num}")
+        self.logger.debug(f"Current reth block num: {current_block_num}")
 
         wait_until(
             lambda: int(rethrpc.eth_getBalance(f"0x{evm_addr}"), 16) > original_balance,
@@ -155,7 +178,7 @@ class BridgeDepositTest(flexitest.Test):
         deposit_amount = ROLLUP_PARAMS_FOR_DEPOSIT_TX["deposit_amount"] * SATS_TO_WEI
 
         balance = int(rethrpc.eth_getBalance(f"0x{evm_addr}"), 16)
-        print(f"Balance after deposit: {balance}")
+        self.logger.debug(f"Balance after deposit: {balance}")
 
         net_balance = balance - original_balance
         assert net_balance == deposit_amount, f"invalid deposit amount: {net_balance}"

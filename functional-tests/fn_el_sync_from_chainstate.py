@@ -1,9 +1,7 @@
 import flexitest
 from web3 import Web3
 
-from constants import (
-    FAST_BATCH_ROLLUP_PARAMS,
-)
+import net_settings
 from entry import BasicEnvConfig
 from utils import (
     wait_until,
@@ -30,7 +28,7 @@ class ELSyncFromChainstate(flexitest.Test):
     """This tests sync when el is missing blocks"""
 
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env(BasicEnvConfig(101, rollup_params=FAST_BATCH_ROLLUP_PARAMS))
+        ctx.set_env(BasicEnvConfig(101, rollup_settings=net_settings.get_fast_batch_settings()))
 
     def main(self, ctx: flexitest.RunContext):
         try:
