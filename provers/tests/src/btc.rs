@@ -70,9 +70,15 @@ pub fn get_risc0_host() -> Risc0Host {
 
 #[cfg(feature = "sp1")]
 pub fn get_sp1_host() -> SP1Host {
-    use strata_sp1_guest_builder::{GUEST_BTC_BLOCKSPACE_PK, GUEST_BTC_BLOCKSPACE_VK};
+    use strata_sp1_guest_builder::{
+        GUEST_BTC_BLOCKSPACE_ELF, GUEST_BTC_BLOCKSPACE_PK, GUEST_BTC_BLOCKSPACE_VK,
+    };
 
-    SP1Host::new_from_bytes(&GUEST_BTC_BLOCKSPACE_PK, &GUEST_BTC_BLOCKSPACE_VK)
+    SP1Host::new_from_bytes(
+        &GUEST_BTC_BLOCKSPACE_ELF,
+        &GUEST_BTC_BLOCKSPACE_PK,
+        &GUEST_BTC_BLOCKSPACE_VK,
+    )
 }
 
 #[cfg(test)]

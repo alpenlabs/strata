@@ -120,9 +120,15 @@ fn get_risc0_host() -> Risc0Host {
 
 #[cfg(feature = "sp1")]
 fn get_sp1_host() -> SP1Host {
-    use strata_sp1_guest_builder::{GUEST_CHECKPOINT_PK, GUEST_CHECKPOINT_VK};
+    use strata_sp1_guest_builder::{
+        GUEST_CHECKPOINT_ELF, GUEST_CHECKPOINT_PK, GUEST_CHECKPOINT_VK,
+    };
 
-    SP1Host::new_from_bytes(&GUEST_CHECKPOINT_PK, &GUEST_CHECKPOINT_VK)
+    SP1Host::new_from_bytes(
+        &GUEST_CHECKPOINT_ELF,
+        &GUEST_CHECKPOINT_PK,
+        &GUEST_CHECKPOINT_VK,
+    )
 }
 
 #[cfg(test)]

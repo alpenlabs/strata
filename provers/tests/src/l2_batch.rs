@@ -75,9 +75,9 @@ pub fn get_risc0_host() -> Risc0Host {
 
 #[cfg(feature = "sp1")]
 pub fn get_sp1_host() -> SP1Host {
-    use strata_sp1_guest_builder::{GUEST_CL_AGG_PK, GUEST_CL_AGG_VK};
+    use strata_sp1_guest_builder::{GUEST_CL_AGG_ELF, GUEST_CL_AGG_PK, GUEST_CL_AGG_VK};
 
-    SP1Host::new_from_bytes(&GUEST_CL_AGG_PK, &GUEST_CL_AGG_VK)
+    SP1Host::new_from_bytes(&GUEST_CL_AGG_ELF, &GUEST_CL_AGG_PK, &GUEST_CL_AGG_VK)
 }
 
 // Run test if any of sp1 or risc0 feature is enabled and the test is being run in release mode
