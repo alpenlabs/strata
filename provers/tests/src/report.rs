@@ -79,6 +79,7 @@ mod test {
     #[test]
     #[cfg(feature = "risc0")]
     fn test_risc0() {
+        std::env::set_var("RISC0_DEV_MODE", "true");
         test_summary(
             checkpoint::get_risc0_host(),
             btc::get_risc0_host(),
