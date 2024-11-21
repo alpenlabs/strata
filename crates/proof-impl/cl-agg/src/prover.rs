@@ -2,7 +2,7 @@ use strata_proofimpl_cl_stf::L2BatchProofOutput;
 use strata_zkvm::{AggregationInput, Proof, VerificationKey, ZkVmProver};
 
 pub struct ClAggInput {
-    pub batch: Vec<(Proof, L2BatchProofOutput)>,
+    pub batch: Vec<Proof>,
     pub cl_stf_vk: VerificationKey,
 }
 
@@ -28,7 +28,7 @@ impl ZkVmProver for ClAggProver {
         let mut input_builder = B::new();
         input_builder.write_serde(&len)?;
 
-        for (proof, _) in &input.batch {
+        for proof in &input.batch {
             input_builder.write_proof(AggregationInput::new(
                 proof.clone(),
                 input.cl_stf_vk.clone(),

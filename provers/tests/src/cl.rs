@@ -5,7 +5,6 @@ use strata_native_zkvm_adapter::{NativeHost, NativeMachine};
 use strata_proofimpl_cl_stf::{
     process_cl_stf,
     prover::{ClStfInput, ClStfProver},
-    L2BatchProofOutput,
 };
 #[cfg(feature = "risc0")]
 use strata_risc0_adapter::Risc0Host;
@@ -33,7 +32,7 @@ impl<H: ZkVmHost> ClProofGenerator<H> {
 impl<H: ZkVmHost> ProofGenerator<u64, ClStfProver> for ClProofGenerator<H> {
     fn get_input(&self, block_num: &u64) -> Result<ClStfInput> {
         // Generate EL proof required for aggregation
-        let (el_proof, _) = self.el_proof_generator.get_proof(block_num)?;
+        let el_proof = self.el_proof_generator.get_proof(block_num)?;
 
         // Read CL witness data
         let params = gen_params();
@@ -52,7 +51,7 @@ impl<H: ZkVmHost> ProofGenerator<u64, ClStfProver> for ClProofGenerator<H> {
         })
     }
 
-    fn gen_proof(&self, block_num: &u64) -> Result<(ProofWithInfo, L2BatchProofOutput)> {
+    fn gen_proof(&self, block_num: &u64) -> Result<ProofWithInfo> {
         let host = self.get_host();
         let input = self.get_input(block_num)?;
         ClStfProver::prove(&input, &host)

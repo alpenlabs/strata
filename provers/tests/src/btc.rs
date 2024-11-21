@@ -4,7 +4,7 @@ use anyhow::Result;
 use bitcoin::Block;
 use strata_native_zkvm_adapter::{NativeHost, NativeMachine};
 use strata_proofimpl_btc_blockspace::{
-    logic::{process_blockspace_proof_outer, BlockspaceProofInput, BlockspaceProofOutput},
+    logic::{process_blockspace_proof_outer, BlockspaceProofInput},
     prover::BtcBlockspaceProver,
 };
 #[cfg(feature = "risc0")]
@@ -37,7 +37,7 @@ impl<H: ZkVmHost> ProofGenerator<Block, BtcBlockspaceProver> for BtcBlockProofGe
         Ok(input)
     }
 
-    fn gen_proof(&self, block: &Block) -> Result<(ProofWithInfo, BlockspaceProofOutput)> {
+    fn gen_proof(&self, block: &Block) -> Result<ProofWithInfo> {
         let host = self.get_host();
         let input = self.get_input(block)?;
         BtcBlockspaceProver::prove(&input, &host)

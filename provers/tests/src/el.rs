@@ -1,7 +1,7 @@
 use anyhow::Result;
 use strata_native_zkvm_adapter::{NativeHost, NativeMachine};
 use strata_proofimpl_evm_ee_stf::{
-    process_block_transaction_outer, prover::EvmEeProver, ELProofInput, ELProofPublicParams,
+    process_block_transaction_outer, prover::EvmEeProver, ELProofInput,
 };
 #[cfg(feature = "risc0")]
 use strata_risc0_adapter::Risc0Host;
@@ -30,7 +30,7 @@ impl<H: ZkVmHost> ProofGenerator<u64, EvmEeProver> for ElProofGenerator<H> {
         Ok(input)
     }
 
-    fn gen_proof(&self, block_num: &u64) -> Result<(ProofWithInfo, ELProofPublicParams)> {
+    fn gen_proof(&self, block_num: &u64) -> Result<ProofWithInfo> {
         let host = self.get_host();
 
         let input = self.get_input(block_num)?;

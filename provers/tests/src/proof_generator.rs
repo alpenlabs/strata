@@ -10,14 +10,14 @@ pub trait ProofGenerator<T, P: ZkVmProver> {
     fn get_host(&self) -> impl ZkVmHost;
 
     /// Generates a proof based on the input.
-    fn gen_proof(&self, input: &T) -> Result<(ProofWithInfo, P::Output)>;
+    fn gen_proof(&self, input: &T) -> Result<ProofWithInfo>;
 
     /// Generates a unique proof ID based on the input.
     /// The proof ID will be the hash of the input and potentially other unique identifiers.
     fn get_proof_id(&self, input: &T) -> String;
 
     /// Retrieves a proof from cache or generates it if not found.
-    fn get_proof(&self, input: &T) -> Result<(Proof, P::Output)> {
+    fn get_proof(&self, input: &T) -> Result<Proof> {
         // 1. Create the unique proof ID
         let proof_id = format!("{}_{}.proof", self.get_proof_id(input), self.get_host());
         println!("Getting proof for {}", proof_id);
@@ -29,13 +29,12 @@ pub trait ProofGenerator<T, P: ZkVmProver> {
             let proof = read_proof_from_file(&proof_file)?;
             let host = self.get_host();
             verify_proof(&proof, &host)?;
-            let output = P::process_output(&proof, &host)?;
-            return Ok((proof, output));
+            return Ok(proof);
         }
 
         // 3. Generate the proof
         println!("Proof not found in cache, generating proof...");
-        let (proof_with_info, output) = self.gen_proof(input)?;
+        let proof_with_info = self.gen_proof(input)?;
 
         let proof = proof_with_info.proof();
 
@@ -45,7 +44,7 @@ pub trait ProofGenerator<T, P: ZkVmProver> {
         // Save the proof to cache
         write_proof_to_file(proof, &proof_file)?;
 
-        Ok((proof.clone(), output))
+        Ok(proof.clone())
     }
 
     // Simulate the proof. This is different than running the in the MOCK_PROVER mode

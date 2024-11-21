@@ -19,10 +19,7 @@ pub trait ZkVmProver: Sized {
         H: ZkVmHost;
 
     /// Proves the computation using any zkVM host.
-    fn prove<'a, H>(
-        input: &'a Self::Input,
-        host: &H,
-    ) -> anyhow::Result<(ProofWithInfo, Self::Output)>
+    fn prove<'a, H>(input: &'a Self::Input, host: &H) -> anyhow::Result<ProofWithInfo>
     where
         H: ZkVmHost,
         H::Input<'a>: ZkVmInputBuilder<'a>,
@@ -33,9 +30,9 @@ pub trait ZkVmProver: Sized {
         // Use the host to prove.
         let proof = host.prove(zkvm_input, Self::proof_type())?;
 
-        // Process and return the output using the verifier.
-        let output = Self::process_output(proof.proof(), host)?;
+        // Process to check if the output is of the expected type
+        let _output = Self::process_output(proof.proof(), host)?;
 
-        Ok((proof, output))
+        Ok(proof)
     }
 }

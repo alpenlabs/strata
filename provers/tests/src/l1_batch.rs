@@ -1,9 +1,7 @@
 use anyhow::Result;
 use bitcoin::params::MAINNET;
 use strata_native_zkvm_adapter::{NativeHost, NativeMachine};
-use strata_proofimpl_l1_batch::{
-    process_l1_batch_proof, L1BatchProofInput, L1BatchProofOutput, L1BatchProver,
-};
+use strata_proofimpl_l1_batch::{process_l1_batch_proof, L1BatchProofInput, L1BatchProver};
 #[cfg(feature = "risc0")]
 use strata_risc0_adapter::Risc0Host;
 #[cfg(feature = "sp1")]
@@ -51,7 +49,7 @@ impl<H: ZkVmHost> ProofGenerator<(u32, u32), L1BatchProver> for L1BatchProofGene
         Ok(input)
     }
 
-    fn gen_proof(&self, heights: &(u32, u32)) -> Result<(ProofWithInfo, L1BatchProofOutput)> {
+    fn gen_proof(&self, heights: &(u32, u32)) -> Result<ProofWithInfo> {
         let input = self.get_input(heights)?;
         let host = self.get_host();
         L1BatchProver::prove(&input, &host)

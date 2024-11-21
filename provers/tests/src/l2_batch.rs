@@ -1,7 +1,6 @@
 use anyhow::Result;
 use strata_native_zkvm_adapter::NativeHost;
 use strata_proofimpl_cl_agg::{process_cl_agg, ClAggInput, ClAggProver};
-use strata_proofimpl_cl_stf::L2BatchProofOutput;
 #[cfg(feature = "risc0")]
 use strata_risc0_adapter::Risc0Host;
 #[cfg(feature = "sp1")]
@@ -38,7 +37,7 @@ impl<H: ZkVmHost> ProofGenerator<(u64, u64), ClAggProver> for L2BatchProofGenera
         Ok(ClAggInput { batch, cl_stf_vk })
     }
 
-    fn gen_proof(&self, heights: &(u64, u64)) -> Result<(ProofWithInfo, L2BatchProofOutput)> {
+    fn gen_proof(&self, heights: &(u64, u64)) -> Result<ProofWithInfo> {
         let input = self.get_input(heights)?;
         let host = self.get_host();
         ClAggProver::prove(&input, &host)

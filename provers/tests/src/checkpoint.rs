@@ -5,7 +5,6 @@ use strata_native_zkvm_adapter::{NativeHost, NativeMachine};
 use strata_proofimpl_checkpoint::{
     process_checkpoint_proof_outer,
     prover::{CheckpointProver, CheckpointProverInput},
-    CheckpointProofOutput,
 };
 #[cfg(feature = "risc0")]
 use strata_risc0_adapter::Risc0Host;
@@ -79,10 +78,7 @@ impl<H: ZkVmHost> ProofGenerator<CheckpointBatchInfo, CheckpointProver>
         Ok(input)
     }
 
-    fn gen_proof(
-        &self,
-        batch_info: &CheckpointBatchInfo,
-    ) -> Result<(ProofWithInfo, CheckpointProofOutput)> {
+    fn gen_proof(&self, batch_info: &CheckpointBatchInfo) -> Result<ProofWithInfo> {
         let host = self.get_host();
         let input = self.get_input(batch_info)?;
         CheckpointProver::prove(&input, &host)
