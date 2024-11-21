@@ -15,8 +15,8 @@ use crate::{
     net_type::{net_type_or_exit, NetworkType},
     seed::Seed,
     settings::Settings,
-    signet::{get_fee_rate, log_fee_rate, print_bitcoin_explorer_url, SignetWallet},
-    strata::{print_strata_explorer_url, StrataWallet},
+    signet::{get_fee_rate, log_fee_rate, SignetWallet},
+    strata::StrataWallet,
 };
 
 /// Send some bitcoin from the internal wallet.

@@ -14,7 +14,7 @@ use crate::{
     seed::Seed,
     settings::Settings,
     signet::SignetWallet,
-    strata::{print_strata_explorer_url, StrataWallet},
+    strata::StrataWallet,
     taproot::ExtractP2trPubkey,
 };
 

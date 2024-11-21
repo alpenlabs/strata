@@ -12,8 +12,8 @@ use crate::{
     constants::SATS_TO_WEI,
     seed::Seed,
     settings::Settings,
-    signet::{get_fee_rate, log_fee_rate, print_bitcoin_explorer_url, SignetWallet},
-    strata::{print_strata_explorer_url, StrataWallet},
+    signet::{get_fee_rate, log_fee_rate, SignetWallet},
+    strata::StrataWallet,
 };
 
 /// Drains the internal wallet to the provided

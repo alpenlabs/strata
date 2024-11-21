@@ -18,10 +18,11 @@ use crate::{
     constants::{
         BRIDGE_IN_AMOUNT, RECOVER_AT_DELAY, RECOVER_DELAY, SIGNET_BLOCK_TIME, UNSPENDABLE,
     },
+    link::{pretty_txid, Link},
     recovery::DescriptorRecovery,
     seed::Seed,
     settings::Settings,
-    signet::{get_fee_rate, log_fee_rate, print_bitcoin_explorer_url, SignetWallet},
+    signet::{get_fee_rate, log_fee_rate, SignetWallet},
     strata::StrataWallet,
     taproot::{ExtractP2trPubkey, NotTaprootAddress},
 };
@@ -147,8 +148,10 @@ pub async fn deposit(
         .await
         .expect("successful broadcast");
     let txid = tx.compute_txid();
-    pb.finish_with_message(format!("Transaction {} broadcasted", txid));
-    let _ = print_bitcoin_explorer_url(&txid, &term, &settings);
+    pb.finish_with_message(pretty_txid(
+        (&txid).into(),
+        &settings.mempool_space_endpoint,
+    ));
     let _ = term.write_line(&format!(
         "Expect transaction confirmation in ~{:?}. Funds will take longer than this to be available on Strata.",
         SIGNET_BLOCK_TIME
