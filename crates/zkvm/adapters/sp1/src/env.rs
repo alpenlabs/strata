@@ -1,7 +1,10 @@
 use serde::{de::DeserializeOwned, Serialize};
+#[cfg(not(feature = "mock"))]
 use sha2::{Digest, Sha256};
 use sp1_verifier::{Groth16Verifier, GROTH16_VK_BYTES};
-use sp1_zkvm::{io, lib::verify::verify_sp1_proof};
+use sp1_zkvm::io;
+#[cfg(not(feature = "mock"))]
+use sp1_zkvm::lib::verify::verify_sp1_proof;
 use strata_zkvm::ZkVmEnv;
 
 pub struct Sp1ZkVmEnv;
@@ -23,10 +26,14 @@ impl ZkVmEnv for Sp1ZkVmEnv {
         io::commit_slice(output_raw);
     }
 
+    #[cfg(not(feature = "mock"))]
     fn verify_native_proof(&self, vk_digest: &[u32; 8], public_values: &[u8]) {
         let pv_digest = Sha256::digest(public_values);
         verify_sp1_proof(vk_digest, &pv_digest.into());
     }
+
+    #[cfg(feature = "mock")]
+    fn verify_native_proof(&self, _vk_digest: &[u32; 8], _public_values: &[u8]) {}
 
     fn verify_groth16_proof(
         &self,

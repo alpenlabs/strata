@@ -223,9 +223,21 @@ fn ensure_cache_validity(program: &str) -> Result<SP1VerifyingKey, String> {
 /// Generates the ELF contents and VK hash for a given program.
 #[cfg(not(debug_assertions))]
 fn generate_elf_contents_and_vk_hash(program: &str) -> ([u32; 8], String) {
+    let features = {
+        #[cfg(feature = "mock")]
+        {
+            vec!["mock".to_string()]
+        }
+        #[cfg(not(feature = "mock"))]
+        {
+            vec![]
+        }
+    };
+
     let build_args = BuildArgs {
         elf_name: format!("{}.elf", program),
         output_directory: "cache".to_owned(),
+        features,
         ..Default::default()
     };
 

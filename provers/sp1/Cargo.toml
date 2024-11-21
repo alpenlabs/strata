@@ -39,4 +39,5 @@ tempfile.workspace = true
 
 [features]
 default = ["prover"]
-prover = ["dep:strata-sp1-adapter"]
+prover = ["strata-sp1-adapter"]
+mock = []
