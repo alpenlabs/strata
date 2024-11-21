@@ -47,6 +47,10 @@ impl ZkVmHost for SP1Host {
         prover_input: <Self::Input<'a> as ZkVmInputBuilder<'a>>::Input,
         proof_type: ProofType,
     ) -> anyhow::Result<(Proof, ProofInfo)> {
+        #[cfg(feature = "mock")]
+        {
+            std::env::set_var("SP1_PROVER", "mock");
+        }
         let start = Instant::now();
 
         sp1_sdk::utils::setup_logger();

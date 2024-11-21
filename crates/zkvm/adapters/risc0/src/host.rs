@@ -34,6 +34,11 @@ impl ZkVmHost for Risc0Host {
         prover_input: <Self::Input<'a> as ZkVmInputBuilder<'a>>::Input,
         proof_type: ProofType,
     ) -> anyhow::Result<(Proof, ProofInfo)> {
+        #[cfg(feature = "mock")]
+        {
+            std::env::set_var("RISC0_DEV_MODE", "true");
+        }
+
         let start = Instant::now();
 
         // Setup the prover

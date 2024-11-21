@@ -13,6 +13,7 @@ num-bigint = "0.4.6"
 num-traits = "0.2.19"
 serde_json.workspace = true
 sp1-sdk = "3.0.0"
+strata-native-zkvm-adapter.workspace = true
 strata-primitives.workspace = true
 strata-proofimpl-btc-blockspace.workspace = true
 strata-proofimpl-checkpoint.workspace = true
@@ -23,7 +24,6 @@ strata-proofimpl-l1-batch.workspace = true
 strata-state.workspace = true
 strata-test-utils.workspace = true
 strata-zkvm.workspace = true
-strata-native-zkvm-adapter.workspace = true
 tempfile.workspace = true
 
 # sp1
@@ -46,4 +46,8 @@ strata-risc0-guest-builder = { path = "../risc0", optional = true, features = [
 default = []
 risc0 = ["strata-risc0-adapter", "strata-risc0-guest-builder"]
 sp1 = ["strata-sp1-adapter", "strata-sp1-guest-builder"]
-mock = ["strata-sp1-guest-builder/mock"]
+mock = [
+  "strata-sp1-guest-builder/mock",
+  "strata-sp1-adapter/mock",
+  "strata-risc0-adapter/mock",
+]
