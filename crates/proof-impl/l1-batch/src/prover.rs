@@ -22,6 +22,10 @@ impl ZkVmProver for L1BatchProver {
         strata_zkvm::ProofType::Compressed
     }
 
+    fn proof_name() -> String {
+        "L1 Batch".to_string()
+    }
+
     fn prepare_input<'a, B>(input: &'a Self::Input) -> anyhow::Result<B::Input>
     where
         B: strata_zkvm::ZkVmInputBuilder<'a>,

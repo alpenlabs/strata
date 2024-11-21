@@ -13,6 +13,10 @@ impl ZkVmProver for BtcBlockspaceProver {
         ProofType::Compressed
     }
 
+    fn proof_name() -> String {
+        "BTC Blockspace".to_string()
+    }
+
     /// Prepares the input for the zkVM.
     fn prepare_input<'a, B>(input: &'a Self::Input) -> anyhow::Result<B::Input>
     where

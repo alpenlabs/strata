@@ -16,6 +16,10 @@ impl ZkVmProver for ClAggProver {
         strata_zkvm::ProofType::Compressed
     }
 
+    fn proof_name() -> String {
+        "CL Agg".to_owned()
+    }
+
     fn prepare_input<'a, B>(input: &'a Self::Input) -> anyhow::Result<B::Input>
     where
         B: strata_zkvm::ZkVmInputBuilder<'a>,

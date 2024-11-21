@@ -23,6 +23,10 @@ impl ZkVmProver for CheckpointProver {
         strata_zkvm::ProofType::Groth16
     }
 
+    fn proof_name() -> String {
+        "Checkpoint".to_string()
+    }
+
     fn prepare_input<'a, B>(input: &'a Self::Input) -> anyhow::Result<B::Input>
     where
         B: strata_zkvm::ZkVmInputBuilder<'a>,

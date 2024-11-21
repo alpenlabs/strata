@@ -12,6 +12,10 @@ impl ZkVmProver for EvmEeProver {
         ProofType::Compressed
     }
 
+    fn proof_name() -> String {
+        "EVM EE STF".to_string()
+    }
+
     fn prepare_input<'a, B>(input: &'a Self::Input) -> anyhow::Result<B::Input>
     where
         B: strata_zkvm::ZkVmInputBuilder<'a>,

@@ -6,6 +6,8 @@ pub trait ZkVmProver: Sized {
 
     fn proof_type() -> ProofType;
 
+    fn proof_name() -> String;
+
     /// Prepares the input for the zkVM.
     fn prepare_input<'a, B>(input: &'a Self::Input) -> anyhow::Result<B::Input>
     where
