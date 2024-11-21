@@ -22,7 +22,7 @@ impl ZkVmProver for L1BatchProver {
     }
 
     fn proof_name() -> String {
-        "L1 Batch".to_string()
+        "L1_Batch".to_string()
     }
 
     fn prepare_input<'a, B>(input: &'a Self::Input) -> anyhow::Result<B::Input>

@@ -17,7 +17,7 @@ impl ZkVmProver for ClAggProver {
     }
 
     fn proof_name() -> String {
-        "CL Agg".to_owned()
+        "CL_Agg".to_owned()
     }
 
     fn prepare_input<'a, B>(input: &'a Self::Input) -> anyhow::Result<B::Input>

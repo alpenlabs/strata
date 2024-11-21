@@ -14,7 +14,7 @@ impl ZkVmProver for BtcBlockspaceProver {
     }
 
     fn proof_name() -> String {
-        "BTC Blockspace".to_string()
+        "BTC_Blockspace".to_string()
     }
 
     /// Prepares the input for the zkVM.

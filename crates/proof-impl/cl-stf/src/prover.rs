@@ -23,7 +23,7 @@ impl ZkVmProver for ClStfProver {
     }
 
     fn proof_name() -> String {
-        "CL STF".to_string()
+        "CL_STF".to_string()
     }
 
     fn prepare_input<'a, B>(input: &'a Self::Input) -> anyhow::Result<B::Input>

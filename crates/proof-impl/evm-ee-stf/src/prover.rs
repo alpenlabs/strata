@@ -13,7 +13,7 @@ impl ZkVmProver for EvmEeProver {
     }
 
     fn proof_name() -> String {
-        "EVM EE STF".to_string()
+        "EVM_EE_STF".to_string()
     }
 
     fn prepare_input<'a, B>(input: &'a Self::Input) -> anyhow::Result<B::Input>
