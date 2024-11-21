@@ -56,13 +56,13 @@ impl<H: ZkVmHost> ProofGenerator<CheckpointBatchInfo, CheckpointProver>
 
         let l1_batch = self
             .l1_batch_prover
-            .get_proof(&(l1_start_height as u32, l1_end_height as u32))
-            .unwrap();
+            .get_proof(&(l1_start_height as u32, l1_end_height as u32))?
+            .proof;
 
         let l2_batch = self
             .l2_batch_prover
-            .get_proof(&(l2_start_height, l2_end_height))
-            .unwrap();
+            .get_proof(&(l2_start_height, l2_end_height))?
+            .proof;
 
         let l1_batch_vk = self.l1_batch_prover.get_host().get_verification_key();
         let l2_batch_vk = self.l2_batch_prover.get_host().get_verification_key();

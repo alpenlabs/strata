@@ -37,7 +37,7 @@ impl<H: ZkVmHost> ProofGenerator<(u32, u32), L1BatchProver> for L1BatchProofGene
         for height in start_height..=end_height {
             let block = btc_chain.get_block(height);
             let btc_proof = self.btc_proof_generator.get_proof(block)?;
-            batch.push(btc_proof);
+            batch.push(btc_proof.proof);
         }
 
         let input = L1BatchProofInput {

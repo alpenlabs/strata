@@ -30,7 +30,7 @@ impl<H: ZkVmHost> ProofGenerator<(u64, u64), ClAggProver> for L2BatchProofGenera
 
         for block_num in start_height..=end_height {
             let cl_proof = self.cl_proof_generator.get_proof(&block_num)?;
-            batch.push(cl_proof);
+            batch.push(cl_proof.proof);
         }
 
         let cl_stf_vk = self.cl_proof_generator.get_host().get_verification_key();

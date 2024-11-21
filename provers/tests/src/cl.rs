@@ -46,7 +46,7 @@ impl<H: ZkVmHost> ProofGenerator<u64, ClStfProver> for ClProofGenerator<H> {
             rollup_params: rollup_params.clone(),
             pre_state: pre_state.clone(),
             l2_block: l2_block.clone(),
-            evm_ee_proof: el_proof,
+            evm_ee_proof: el_proof.proof,
             evm_ee_vk: self.el_proof_generator.get_host().get_verification_key(),
         })
     }
@@ -102,8 +102,6 @@ mod tests {
 
     #[test]
     fn test_native() {
-        use crate::el;
-
         test_proof(get_native_host(), el::get_native_host());
     }
 

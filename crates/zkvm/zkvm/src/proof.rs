@@ -1,5 +1,10 @@
-use std::time::Duration;
+use std::{
+    fs::{self, File},
+    path::Path,
+    time::Duration,
+};
 
+use anyhow::Result;
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
@@ -68,13 +73,13 @@ pub enum ProofType {
     Compressed,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProofWithInfo {
     pub proof: Proof,
     pub info: ProofInfo,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct ProofInfo {
     cycle_count: u64,
     duration: Duration,
@@ -104,5 +109,22 @@ impl ProofWithInfo {
 
     pub fn duration(&self) -> Duration {
         self.info.duration
+    }
+
+    /// Saves the proof to a path.
+    pub fn save(&self, path: impl AsRef<Path>) -> Result<()> {
+        let path = path.as_ref();
+        if let Some(parent) = path.parent() {
+            // Create the parent directories if they don't exist
+            fs::create_dir_all(parent)?;
+        }
+        bincode::serialize_into(File::create(path).expect("failed to open file"), self)
+            .map_err(Into::into)
+    }
+
+    /// Loads a proof from a path.
+    pub fn load(path: impl AsRef<Path>) -> Result<Self> {
+        bincode::deserialize_from(File::open(path).expect("failed to open file"))
+            .map_err(Into::into)
     }
 }
