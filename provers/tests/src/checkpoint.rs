@@ -14,6 +14,7 @@ use strata_test_utils::l2::gen_params;
 use strata_zkvm::{ProofWithInfo, ZkVmHost, ZkVmProver};
 
 use crate::{
+    btc::BtcBlockProofGenerator, cl::ClProofGenerator, el::ElProofGenerator,
     l1_batch::L1BatchProofGenerator, l2_batch::L2BatchProofGenerator,
     proof_generator::ProofGenerator,
 };
@@ -127,52 +128,45 @@ pub fn get_sp1_host() -> SP1Host {
     )
 }
 
+pub fn test_proof<H: ZkVmHost>(
+    checkpoint_host: H,
+    btc_host: H,
+    l1_batch_host: H,
+    el_host: H,
+    cl_host: H,
+    cl_agg_host: H,
+) {
+    let params = gen_params();
+    let rollup_params = params.rollup();
+    let l1_start_height = (rollup_params.genesis_l1_height + 1) as u32;
+    let l1_end_height = l1_start_height + 2;
+
+    let l2_start_height = 1;
+    let l2_end_height = 3;
+
+    let btc_prover = BtcBlockProofGenerator::new(btc_host);
+    let l1_batch_prover = L1BatchProofGenerator::new(btc_prover, l1_batch_host);
+    let el_prover = ElProofGenerator::new(el_host);
+    let cl_prover = ClProofGenerator::new(el_prover, cl_host);
+    let l2_batch_prover = L2BatchProofGenerator::new(cl_prover, cl_agg_host);
+    let checkpoint_prover =
+        CheckpointProofGenerator::new(l1_batch_prover, l2_batch_prover, checkpoint_host);
+
+    let prover_input = CheckpointBatchInfo {
+        l1_range: (l1_start_height.into(), l1_end_height.into()),
+        l2_range: (l2_start_height, l2_end_height),
+    };
+
+    let _ = checkpoint_prover
+        .get_proof(&prover_input)
+        .expect("Failed to generate proof");
+}
+
 #[cfg(test)]
 mod test {
 
-    use strata_test_utils::l2::gen_params;
-
     use super::*;
-    use crate::{
-        btc::{self, BtcBlockProofGenerator},
-        cl::{self, ClProofGenerator},
-        el::{self, ElProofGenerator},
-        l1_batch, l2_batch,
-    };
-
-    fn test_proof<H: ZkVmHost>(
-        checkpoint_host: H,
-        btc_host: H,
-        l1_batch_host: H,
-        el_host: H,
-        cl_host: H,
-        cl_agg_host: H,
-    ) {
-        let params = gen_params();
-        let rollup_params = params.rollup();
-        let l1_start_height = (rollup_params.genesis_l1_height + 1) as u32;
-        let l1_end_height = l1_start_height + 2;
-
-        let l2_start_height = 1;
-        let l2_end_height = 3;
-
-        let btc_prover = BtcBlockProofGenerator::new(btc_host);
-        let l1_batch_prover = L1BatchProofGenerator::new(btc_prover, l1_batch_host);
-        let el_prover = ElProofGenerator::new(el_host);
-        let cl_prover = ClProofGenerator::new(el_prover, cl_host);
-        let l2_batch_prover = L2BatchProofGenerator::new(cl_prover, cl_agg_host);
-        let checkpoint_prover =
-            CheckpointProofGenerator::new(l1_batch_prover, l2_batch_prover, checkpoint_host);
-
-        let prover_input = CheckpointBatchInfo {
-            l1_range: (l1_start_height.into(), l1_end_height.into()),
-            l2_range: (l2_start_height, l2_end_height),
-        };
-
-        let _ = checkpoint_prover
-            .get_proof(&prover_input)
-            .expect("Failed to generate proof");
-    }
+    use crate::{btc, cl, el, l1_batch, l2_batch};
 
     #[test]
     fn test_native() {
