@@ -2,9 +2,10 @@ use std::sync::LazyLock;
 
 use bdk_wallet::bitcoin::{
     key::Parity,
-    secp256k1::{PublicKey, SecretKey, SECP256K1},
+    secp256k1::{PublicKey, SecretKey},
     Amount, Network, XOnlyPublicKey,
 };
+use secp256k1::SECP256K1;
 use shrex::hex;
 
 /// Magic bytes to add to the metadata output in transactions to help identify them.

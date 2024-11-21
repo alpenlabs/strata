@@ -13324,6 +13324,7 @@ dependencies = [
  "pyo3",
  "pyo3-build-config",
  "reth-primitives",
+ "secp256k1",
  "shrex",
  "strata-btcio",
  "strata-common",

@@ -6,8 +6,8 @@ use bdk_bitcoind_rpc::{
 };
 use bdk_wallet::{
     bitcoin::{
-        consensus::serialize, key::Parity, secp256k1::SECP256K1, Address, AddressType, FeeRate,
-        PublicKey, Transaction, XOnlyPublicKey,
+        consensus::serialize, key::Parity, Address, AddressType, FeeRate, PublicKey, Transaction,
+        XOnlyPublicKey,
     },
     descriptor::IntoWalletDescriptor,
     miniscript::ToPublicKey,
@@ -15,6 +15,7 @@ use bdk_wallet::{
 };
 use musig2::KeyAggContext;
 use pyo3::prelude::*;
+use secp256k1::SECP256K1;
 
 use crate::{
     constants::{CHANGE_DESCRIPTOR, DESCRIPTOR, NETWORK, UNSPENDABLE},
