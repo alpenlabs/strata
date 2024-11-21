@@ -28,11 +28,11 @@ pub trait ZkVmProver: Sized {
         let zkvm_input = Self::prepare_input::<H::Input<'a>>(input)?;
 
         // Use the host to prove.
-        let proof = host.prove(zkvm_input, Self::proof_type())?;
+        let (proof, info) = host.prove(zkvm_input, Self::proof_type())?;
 
         // Process to check if the output is of the expected type
-        let _output = Self::process_output(proof.proof(), host)?;
+        let _output = Self::process_output(&proof, host)?;
 
-        Ok(proof)
+        Ok(ProofWithInfo::new(Self::proof_name(), proof, info))
     }
 }

@@ -73,12 +73,6 @@ pub enum ProofType {
     Compressed,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProofWithInfo {
-    pub proof: Proof,
-    pub info: ProofInfo,
-}
-
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct ProofInfo {
     cycle_count: u64,
@@ -94,9 +88,16 @@ impl ProofInfo {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProofWithInfo {
+    pub name: String,
+    pub proof: Proof,
+    pub info: ProofInfo,
+}
+
 impl ProofWithInfo {
-    pub fn new(proof: Proof, info: ProofInfo) -> Self {
-        Self { proof, info }
+    pub fn new(name: String, proof: Proof, info: ProofInfo) -> Self {
+        Self { name, proof, info }
     }
 
     pub fn proof(&self) -> &Proof {

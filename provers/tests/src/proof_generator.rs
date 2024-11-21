@@ -24,17 +24,14 @@ pub trait ProofGenerator<T, P: ZkVmProver> {
         let proof_file = get_cache_dir().join(proof_id);
 
         // 2. Check if the proof file exists
-        if proof_file.exists() {
+        let proof = if proof_file.exists() {
             println!("Proof found in cache, returning the cached proof...",);
-            let proof = ProofWithInfo::load(proof_file)?;
-            let host = self.get_host();
-            verify_proof(proof.proof(), &host)?;
-            return Ok(proof);
-        }
-
-        // 3. Generate the proof
-        println!("Proof not found in cache, generating proof...");
-        let proof = self.gen_proof(input)?;
+            ProofWithInfo::load(&proof_file)?
+        } else {
+            // 3. Generate the proof
+            println!("Proof not found in cache, generating proof...");
+            self.gen_proof(input)?
+        };
 
         // Verify the proof
         verify_proof(proof.proof(), &self.get_host())?;

@@ -5,9 +5,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use sp1_sdk::{
     HashableKey, ProverClient, SP1ProofWithPublicValues, SP1ProvingKey, SP1VerifyingKey,
 };
-use strata_zkvm::{
-    Proof, ProofInfo, ProofType, ProofWithInfo, VerificationKey, ZkVmHost, ZkVmInputBuilder,
-};
+use strata_zkvm::{Proof, ProofInfo, ProofType, VerificationKey, ZkVmHost, ZkVmInputBuilder};
 
 use crate::input::SP1ProofInputBuilder;
 
@@ -48,7 +46,7 @@ impl ZkVmHost for SP1Host {
         &self,
         prover_input: <Self::Input<'a> as ZkVmInputBuilder<'a>>::Input,
         proof_type: ProofType,
-    ) -> anyhow::Result<ProofWithInfo> {
+    ) -> anyhow::Result<(Proof, ProofInfo)> {
         let start = Instant::now();
 
         sp1_sdk::utils::setup_logger();
@@ -69,9 +67,9 @@ impl ZkVmHost for SP1Host {
         // Proof serialization
         let serialized_proof = bincode::serialize(&proof)?;
         let proof = Proof::new(serialized_proof);
-
         let info = ProofInfo::new(report.total_instruction_count(), start.elapsed());
-        Ok(ProofWithInfo::new(proof, info))
+
+        Ok((proof, info))
     }
 
     fn get_verification_key(&self) -> VerificationKey {
