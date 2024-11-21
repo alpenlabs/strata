@@ -13466,7 +13466,7 @@ version = "0.1.0"
 dependencies = [
  "alloy-eips 0.4.2",
  "alloy-network 0.4.2",
- "alloy-primitives 0.8.7",
+ "alloy-primitives 0.8.12",
  "alloy-rpc-types 0.4.2",
  "alloy-rpc-types-eth 0.4.2",
  "bincode",
