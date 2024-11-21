@@ -16,11 +16,11 @@ brew install bitcoin
 
 ```bash
 # for Linux (x86_64)
-curl -fsSLO --proto "=https" --tlsv1.2 https://bitcoin.org/bin/bitcoin-core-27.0/bitcoin-27.0-x86_64-linux-gnu.tar.gz
-tar xzf bitcoin-27.0-x86_64-linux-gnu.tar.gz
-sudo install -m 0755 -t /usr/local/bin bitcoin-27.0/bin/*
-# remove unarchived files, as we just copied it to /bin
-rm -rf bitcoin-27.0
+curl -fsSLO --proto "=https" --tlsv1.2 https://bitcoincore.org/bin/bitcoin-core-28.0/bitcoin-28.0-x86_64-linux-gnu.tar.gz
+tar xzf bitcoin-28.0-x86_64-linux-gnu.tar.gz
+sudo install -m 0755 -t /usr/local/bin bitcoin-28.0/bin/*
+# remove the files, as we just copied it to /bin
+rm -rf bitcoin-28.0 bitcoin-28.0-x86_64-linux-gnu.tar.gz
 ```
 
 ```bash
@@ -30,11 +30,12 @@ bitcoind --version
 
 ### Poetry
 
-> **_Note:_** Make sure you have installed Python 3.10 or higher.
+> [!NOTE]
+> Make sure you have installed Python 3.10 or higher.
 
 We use Poetry for managing the test dependencies.
 
-First, install the _poetry_:
+First, install the `poetry`:
 
 ```bash
 # install via apt
@@ -47,7 +48,7 @@ pipx install poetry
 brew install poetry
 ```
 
-Check, that the _poetry_ is installed:
+Check, that the `poetry` is installed:
 ```bash
 poetry --version
 ```

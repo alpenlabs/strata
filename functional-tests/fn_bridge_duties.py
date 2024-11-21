@@ -63,7 +63,7 @@ class BridgeDutiesTest(flexitest.Test):
         duties_resp = seqrpc.strata_getBridgeDuties(operator_idx, start_index)
         duties: List = duties_resp["duties"]
         # Filter out the duties unrelated to other than the el_address.
-        duties = list(filter(lambda d: d["payload"]["el_address"] == el_address_bytes, duties))
+        duties = [d for d in duties if d["payload"]["el_address"] == el_address_bytes]
 
         expected_duties = []
         for txid in txids:

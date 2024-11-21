@@ -23,7 +23,7 @@ class BasicLiveEnv(flexitest.LiveEnv):
     def __init__(self, srvs):
         super().__init__(srvs)
         self._el_address_gen = (
-            "deada00{:04X}dca3ebeefdeadf001900dca3ebeef".format(x) for x in range(16**4)
+            f"deada00{x:04X}dca3ebeefdeadf001900dca3ebeef" for x in range(16**4)
         )
         self._btc_address_idx = 0
 
@@ -37,13 +37,13 @@ class BasicLiveEnv(flexitest.LiveEnv):
         """
         Generates a unique bitcoin taproot addresses that is funded with some BTC.
         """
-        brpc: BitcoindClient = self.svcs["bitcoin"].create_rpc()
+        btcrpc: BitcoindClient = self.svcs["bitcoin"].create_rpc()
 
         tr_addr: str = get_address(self._btc_address_idx)
         self._btc_address_idx += 1
         # 101 to make sure the maturation case is covered when
         # the Environment is started with no blocks pre-generated.
-        brpc.proxy.generatetoaddress(101, tr_addr)
+        btcrpc.proxy.generatetoaddress(101, tr_addr)
         return tr_addr
 
 
