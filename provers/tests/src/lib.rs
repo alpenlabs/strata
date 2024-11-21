@@ -5,3 +5,4 @@ pub mod el;
 pub mod l1_batch;
 pub mod l2_batch;
 pub mod proof_generator;
+pub mod report;

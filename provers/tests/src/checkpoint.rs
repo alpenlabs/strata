@@ -98,7 +98,7 @@ impl<H: ZkVmHost> ProofGenerator<CheckpointBatchInfo, CheckpointProver>
     }
 }
 
-fn get_native_host() -> NativeHost {
+pub fn get_native_host() -> NativeHost {
     NativeHost {
         process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
             process_checkpoint_proof_outer(zkvm, &[0u32; 8], &[0u32; 8]);
@@ -108,14 +108,14 @@ fn get_native_host() -> NativeHost {
 }
 
 #[cfg(feature = "risc0")]
-fn get_risc0_host() -> Risc0Host {
+pub fn get_risc0_host() -> Risc0Host {
     use strata_risc0_guest_builder::GUEST_RISC0_CHECKPOINT_ELF;
 
     Risc0Host::init(GUEST_RISC0_CHECKPOINT_ELF)
 }
 
 #[cfg(feature = "sp1")]
-fn get_sp1_host() -> SP1Host {
+pub fn get_sp1_host() -> SP1Host {
     use strata_sp1_guest_builder::{
         GUEST_CHECKPOINT_ELF, GUEST_CHECKPOINT_PK, GUEST_CHECKPOINT_VK,
     };

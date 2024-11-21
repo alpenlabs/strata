@@ -129,3 +129,27 @@ impl ProofWithInfo {
             .map_err(Into::into)
     }
 }
+
+#[derive(Debug)]
+pub struct ProofSummary {
+    pub name: String,
+    pub info: ProofInfo,
+}
+
+impl From<ProofWithInfo> for ProofSummary {
+    fn from(proof_with_info: ProofWithInfo) -> Self {
+        ProofSummary {
+            name: proof_with_info.name,
+            info: proof_with_info.info,
+        }
+    }
+}
+
+impl From<&ProofWithInfo> for ProofSummary {
+    fn from(proof_with_info: &ProofWithInfo) -> Self {
+        ProofSummary {
+            name: proof_with_info.name.clone(),
+            info: proof_with_info.info,
+        }
+    }
+}
