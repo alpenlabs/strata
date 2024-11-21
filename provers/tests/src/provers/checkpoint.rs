@@ -1,22 +1,11 @@
-use std::sync::Arc;
-
 use anyhow::Result;
-use strata_native_zkvm_adapter::{NativeHost, NativeMachine};
-use strata_proofimpl_checkpoint::{
-    process_checkpoint_proof_outer,
-    prover::{CheckpointProver, CheckpointProverInput},
-};
-#[cfg(feature = "risc0")]
-use strata_risc0_adapter::Risc0Host;
-#[cfg(feature = "sp1")]
-use strata_sp1_adapter::SP1Host;
+use strata_proofimpl_checkpoint::prover::{CheckpointProver, CheckpointProverInput};
 use strata_test_utils::l2::gen_params;
 use strata_zkvm::{ProofWithInfo, ZkVmHost, ZkVmProver};
 
-use crate::{
+use super::{
     btc::BtcBlockProofGenerator, cl::ClProofGenerator, el::ElProofGenerator,
-    l1_batch::L1BatchProofGenerator, l2_batch::L2BatchProofGenerator,
-    proof_generator::ProofGenerator,
+    l1_batch::L1BatchProofGenerator, l2_batch::L2BatchProofGenerator, ProofGenerator,
 };
 
 pub struct CheckpointProofGenerator<H: ZkVmHost> {
@@ -99,35 +88,6 @@ impl<H: ZkVmHost> ProofGenerator<CheckpointBatchInfo, CheckpointProver>
     }
 }
 
-pub fn get_native_host() -> NativeHost {
-    NativeHost {
-        process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
-            process_checkpoint_proof_outer(zkvm, &[0u32; 8], &[0u32; 8]);
-            Ok(())
-        })),
-    }
-}
-
-#[cfg(feature = "risc0")]
-pub fn get_risc0_host() -> Risc0Host {
-    use strata_risc0_guest_builder::GUEST_RISC0_CHECKPOINT_ELF;
-
-    Risc0Host::init(GUEST_RISC0_CHECKPOINT_ELF)
-}
-
-#[cfg(feature = "sp1")]
-pub fn get_sp1_host() -> SP1Host {
-    use strata_sp1_guest_builder::{
-        GUEST_CHECKPOINT_ELF, GUEST_CHECKPOINT_PK, GUEST_CHECKPOINT_VK,
-    };
-
-    SP1Host::new_from_bytes(
-        &GUEST_CHECKPOINT_ELF,
-        &GUEST_CHECKPOINT_PK,
-        &GUEST_CHECKPOINT_VK,
-    )
-}
-
 pub fn test_proof<H: ZkVmHost>(
     checkpoint_host: H,
     btc_host: H,
@@ -166,43 +126,49 @@ pub fn test_proof<H: ZkVmHost>(
 mod test {
 
     use super::*;
-    use crate::{btc, cl, el, l1_batch, l2_batch};
 
     #[test]
     fn test_native() {
+        use crate::hosts::native::{
+            btc_blockspace, checkpoint, cl_agg, cl_stf, evm_ee_stf, l1_batch,
+        };
         test_proof(
-            get_native_host(),
-            btc::get_native_host(),
-            l1_batch::get_native_host(),
-            el::get_native_host(),
-            cl::get_native_host(),
-            l2_batch::get_native_host(),
+            checkpoint(),
+            btc_blockspace(),
+            l1_batch(),
+            evm_ee_stf(),
+            cl_stf(),
+            cl_agg(),
         );
     }
 
     #[test]
     #[cfg(feature = "risc0")]
     fn test_risc0() {
+        use crate::hosts::risc0::{
+            btc_blockspace, checkpoint, cl_agg, cl_stf, evm_ee_stf, l1_batch,
+        };
         test_proof(
-            get_risc0_host(),
-            btc::get_risc0_host(),
-            l1_batch::get_risc0_host(),
-            el::get_risc0_host(),
-            cl::get_risc0_host(),
-            l2_batch::get_risc0_host(),
+            checkpoint(),
+            btc_blockspace(),
+            l1_batch(),
+            evm_ee_stf(),
+            cl_stf(),
+            cl_agg(),
         );
     }
 
     #[test]
     #[cfg(feature = "sp1")]
     fn test_sp1() {
+        use crate::hosts::sp1::{btc_blockspace, checkpoint, cl_agg, cl_stf, evm_ee_stf, l1_batch};
         test_proof(
-            get_sp1_host(),
-            btc::get_sp1_host(),
-            l1_batch::get_sp1_host(),
-            el::get_sp1_host(),
-            cl::get_sp1_host(),
-            l2_batch::get_sp1_host(),
+            checkpoint(),
+            btc_blockspace(),
+            l1_batch(),
+            evm_ee_stf(),
+            cl_stf(),
+            cl_agg(),
         );
     }
 }

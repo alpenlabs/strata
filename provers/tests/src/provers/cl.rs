@@ -1,19 +1,9 @@
-use std::sync::Arc;
-
 use anyhow::Result;
-use strata_native_zkvm_adapter::{NativeHost, NativeMachine};
-use strata_proofimpl_cl_stf::{
-    process_cl_stf,
-    prover::{ClStfInput, ClStfProver},
-};
-#[cfg(feature = "risc0")]
-use strata_risc0_adapter::Risc0Host;
-#[cfg(feature = "sp1")]
-use strata_sp1_adapter::SP1Host;
+use strata_proofimpl_cl_stf::prover::{ClStfInput, ClStfProver};
 use strata_test_utils::{evm_ee::L2Segment, l2::gen_params};
 use strata_zkvm::{ProofWithInfo, ZkVmHost, ZkVmProver};
 
-use crate::{el::ElProofGenerator, proof_generator::ProofGenerator};
+use super::{el::ElProofGenerator, ProofGenerator};
 
 pub struct ClProofGenerator<H: ZkVmHost> {
     pub el_proof_generator: ElProofGenerator<H>,
@@ -66,31 +56,9 @@ impl<H: ZkVmHost> ProofGenerator<u64, ClStfProver> for ClProofGenerator<H> {
     }
 }
 
-pub fn get_native_host() -> NativeHost {
-    NativeHost {
-        process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
-            process_cl_stf(zkvm, &[0u32; 8]);
-            Ok(())
-        })),
-    }
-}
-
-#[cfg(feature = "risc0")]
-pub fn get_risc0_host() -> Risc0Host {
-    use strata_risc0_guest_builder::GUEST_RISC0_CL_STF_ELF;
-    Risc0Host::init(GUEST_RISC0_CL_STF_ELF)
-}
-
-#[cfg(feature = "sp1")]
-pub fn get_sp1_host() -> SP1Host {
-    use strata_sp1_guest_builder::{GUEST_CL_STF_ELF, GUEST_CL_STF_PK, GUEST_CL_STF_VK};
-    SP1Host::new_from_bytes(&GUEST_CL_STF_ELF, &GUEST_CL_STF_PK, &GUEST_CL_STF_VK)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::el;
 
     fn test_proof<H: ZkVmHost>(cl_host: H, el_host: H) {
         let height = 1;
@@ -101,19 +69,23 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(any(feature = "risc0", feature = "sp1")))]
     fn test_native() {
-        test_proof(get_native_host(), el::get_native_host());
+        use crate::hosts::native::{cl_stf, evm_ee_stf};
+        test_proof(cl_stf(), evm_ee_stf());
     }
 
     #[test]
     #[cfg(feature = "risc0")]
     fn test_risc0() {
-        test_proof(get_risc0_host(), el::get_risc0_host());
+        use crate::hosts::risc0::{cl_stf, evm_ee_stf};
+        test_proof(cl_stf(), evm_ee_stf());
     }
 
     #[test]
     #[cfg(feature = "sp1")]
     fn test_sp1() {
-        test_proof(get_sp1_host(), el::get_sp1_host());
+        use crate::hosts::sp1::{cl_stf, evm_ee_stf};
+        test_proof(cl_stf(), evm_ee_stf());
     }
 }

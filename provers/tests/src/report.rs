@@ -2,7 +2,7 @@ use std::fs;
 
 use strata_zkvm::{ProofSummary, ProofWithInfo, ZkVmHost};
 
-use crate::proof_generator::get_cache_dir;
+use crate::provers::get_cache_dir;
 
 fn find_proof_and_extract_summary(host: String) -> ProofSummary {
     let entries = fs::read_dir(get_cache_dir()).expect("Failed to read cache directory");
@@ -35,7 +35,7 @@ fn get_summary<H: ZkVmHost>(hosts: Vec<&H>) {
 mod test {
 
     use super::*;
-    use crate::{btc, checkpoint, cl, el, l1_batch, l2_batch};
+    use crate::provers::checkpoint;
 
     pub fn test_summary<H: ZkVmHost>(
         checkpoint_host: H,
@@ -65,41 +65,48 @@ mod test {
     }
 
     #[test]
+    #[cfg(not(any(feature = "risc0", feature = "sp1")))]
     fn test_native() {
+        use crate::hosts::native::{
+            btc_blockspace, checkpoint, cl_agg, cl_stf, evm_ee_stf, l1_batch,
+        };
         test_summary(
-            checkpoint::get_native_host(),
-            btc::get_native_host(),
-            l1_batch::get_native_host(),
-            el::get_native_host(),
-            cl::get_native_host(),
-            l2_batch::get_native_host(),
+            checkpoint(),
+            btc_blockspace(),
+            l1_batch(),
+            evm_ee_stf(),
+            cl_stf(),
+            cl_agg(),
         );
     }
 
     #[test]
     #[cfg(feature = "risc0")]
     fn test_risc0() {
-        std::env::set_var("RISC0_DEV_MODE", "true");
+        use crate::hosts::risc0::{
+            btc_blockspace, checkpoint, cl_agg, cl_stf, evm_ee_stf, l1_batch,
+        };
         test_summary(
-            checkpoint::get_risc0_host(),
-            btc::get_risc0_host(),
-            l1_batch::get_risc0_host(),
-            el::get_risc0_host(),
-            cl::get_risc0_host(),
-            l2_batch::get_risc0_host(),
+            checkpoint(),
+            btc_blockspace(),
+            l1_batch(),
+            evm_ee_stf(),
+            cl_stf(),
+            cl_agg(),
         );
     }
 
     #[test]
     #[cfg(feature = "sp1")]
     fn test_sp1() {
+        use crate::hosts::sp1::{btc_blockspace, checkpoint, cl_agg, cl_stf, evm_ee_stf, l1_batch};
         test_summary(
-            checkpoint::get_sp1_host(),
-            btc::get_sp1_host(),
-            l1_batch::get_sp1_host(),
-            el::get_sp1_host(),
-            cl::get_sp1_host(),
-            l2_batch::get_sp1_host(),
+            checkpoint(),
+            btc_blockspace(),
+            l1_batch(),
+            evm_ee_stf(),
+            cl_stf(),
+            cl_agg(),
         );
     }
 }

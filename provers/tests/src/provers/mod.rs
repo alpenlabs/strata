@@ -3,6 +3,13 @@ use std::path::PathBuf;
 use anyhow::Result;
 use strata_zkvm::{Proof, ProofWithInfo, ZkVmHost, ZkVmProver};
 
+pub mod btc;
+pub mod checkpoint;
+pub mod cl;
+pub mod el;
+pub mod l1_batch;
+pub mod l2_batch;
+
 pub trait ProofGenerator<T, P: ZkVmProver> {
     /// Generates a proof based on the input.
     fn get_input(&self, input: &T) -> Result<P::Input>;

@@ -1,15 +1,10 @@
 use anyhow::Result;
 use bitcoin::params::MAINNET;
-use strata_native_zkvm_adapter::{NativeHost, NativeMachine};
-use strata_proofimpl_l1_batch::{process_l1_batch_proof, L1BatchProofInput, L1BatchProver};
-#[cfg(feature = "risc0")]
-use strata_risc0_adapter::Risc0Host;
-#[cfg(feature = "sp1")]
-use strata_sp1_adapter::SP1Host;
+use strata_proofimpl_l1_batch::{L1BatchProofInput, L1BatchProver};
 use strata_test_utils::bitcoin::get_btc_chain;
 use strata_zkvm::{ProofWithInfo, ZkVmHost, ZkVmProver};
 
-use crate::{btc::BtcBlockProofGenerator, proof_generator::ProofGenerator};
+use super::{btc::BtcBlockProofGenerator, ProofGenerator};
 
 pub struct L1BatchProofGenerator<H: ZkVmHost> {
     btc_proof_generator: BtcBlockProofGenerator<H>,
@@ -65,38 +60,12 @@ impl<H: ZkVmHost> ProofGenerator<(u32, u32), L1BatchProver> for L1BatchProofGene
     }
 }
 
-pub fn get_native_host() -> NativeHost {
-    use std::sync::Arc;
-
-    NativeHost {
-        process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
-            process_l1_batch_proof(zkvm, &[0u32; 8]);
-            Ok(())
-        })),
-    }
-}
-
-#[cfg(feature = "risc0")]
-pub fn get_risc0_host() -> Risc0Host {
-    use strata_risc0_guest_builder::GUEST_RISC0_L1_BATCH_ELF;
-
-    Risc0Host::init(GUEST_RISC0_L1_BATCH_ELF)
-}
-
-#[cfg(feature = "sp1")]
-pub fn get_sp1_host() -> SP1Host {
-    use strata_sp1_guest_builder::{GUEST_L1_BATCH_ELF, GUEST_L1_BATCH_PK, GUEST_L1_BATCH_VK};
-
-    SP1Host::new_from_bytes(&GUEST_L1_BATCH_ELF, &GUEST_L1_BATCH_PK, &GUEST_L1_BATCH_VK)
-}
-
 #[cfg(test)]
 mod test {
     use strata_test_utils::l2::gen_params;
     use strata_zkvm::ZkVmHost;
 
     use super::*;
-    use crate::btc;
 
     fn test_proof<H: ZkVmHost>(l1_batch_host: H, btc_blockspace_host: H) {
         let params = gen_params();
@@ -113,19 +82,23 @@ mod test {
     }
 
     #[test]
+    #[cfg(not(any(feature = "risc0", feature = "sp1")))]
     fn test_native() {
-        test_proof(get_native_host(), btc::get_native_host());
+        use crate::hosts::native::{btc_blockspace, l1_batch};
+        test_proof(l1_batch(), btc_blockspace());
     }
 
     #[test]
     #[cfg(feature = "risc0")]
     fn test_risc0() {
-        test_proof(get_risc0_host(), btc::get_risc0_host());
+        use crate::hosts::risc0::{btc_blockspace, l1_batch};
+        test_proof(l1_batch(), btc_blockspace());
     }
 
     #[test]
     #[cfg(feature = "sp1")]
     fn test_sp1() {
-        test_proof(get_sp1_host(), btc::get_sp1_host());
+        use crate::hosts::sp1::{btc_blockspace, l1_batch};
+        test_proof(l1_batch(), btc_blockspace());
     }
 }
