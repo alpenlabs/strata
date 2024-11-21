@@ -8,11 +8,10 @@ mod block;
 mod call;
 mod pending_block;
 
-use std::{fmt, sync::Arc};
+use std::{fmt, ops::Deref, sync::Arc};
 
 use alloy_network::AnyNetwork;
 use alloy_primitives::U256;
-use derive_more::Deref;
 use reth_chainspec::EthereumHardforks;
 use reth_evm::ConfigureEvm;
 use reth_network_api::NetworkInfo;
@@ -59,14 +58,21 @@ pub type EthApiNodeBackend<N> = EthApiInner<
 ///
 /// This type implements the [`FullEthApi`](reth_rpc_eth_api::helpers::FullEthApi) by implemented
 /// all the `Eth` helper traits and prerequisite traits.
-#[derive(Clone, Deref)]
+#[derive(Clone)]
 pub struct StrataEthApi<N: FullNodeComponents> {
     /// Gateway to node's core components.
-    #[deref]
     inner: Arc<EthApiNodeBackend<N>>,
     /// Sequencer client, configured to forward submitted transactions to sequencer of given OP
     /// network.
     sequencer_client: Arc<OnceCell<SequencerClient>>,
+}
+
+impl<N: FullNodeComponents> Deref for StrataEthApi<N> {
+    type Target = EthApiNodeBackend<N>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
 }
 
 impl<N: FullNodeComponents> StrataEthApi<N> {

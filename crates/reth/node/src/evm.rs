@@ -91,7 +91,5 @@ impl ConfigureEvm for StrataEvmConfig {
     }
 
     #[doc = " Provides the default external context."]
-    fn default_external_context<'a>(&self) -> Self::DefaultExternalContext<'a> {
-        todo!()
-    }
+    fn default_external_context<'a>(&self) -> Self::DefaultExternalContext<'a> {}
 }

@@ -1,8 +1,10 @@
 use std::io;
 
+use bitcoin::secp256k1::{
+    schnorr::Signature, Keypair, Message, SecretKey, XOnlyPublicKey, SECP256K1,
+};
 use borsh::BorshSerialize;
 use rand::rngs::OsRng;
-use secp256k1::{schnorr::Signature, Keypair, Message, SecretKey, XOnlyPublicKey, SECP256K1};
 use thiserror::Error;
 
 use super::types::{BridgeMessage, Scope};

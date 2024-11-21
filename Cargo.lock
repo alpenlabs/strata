@@ -13470,7 +13470,6 @@ dependencies = [
  "alloy-rpc-types 0.4.2",
  "alloy-rpc-types-eth 0.4.2",
  "bincode",
- "derive_more 1.0.0",
  "eyre",
  "hex",
  "jsonrpsee",

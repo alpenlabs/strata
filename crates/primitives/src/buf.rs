@@ -7,12 +7,11 @@ use std::{
 use arbitrary::Arbitrary;
 use bitcoin::{
     hashes::Hash,
-    secp256k1::{schnorr, XOnlyPublicKey},
+    secp256k1::{schnorr, SecretKey, XOnlyPublicKey},
     BlockHash, Txid,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 use reth_primitives::revm_primitives::alloy_primitives::FixedBytes;
-use secp256k1::SecretKey;
 use serde::{Deserialize, Serialize};
 
 use crate::errors::ParseError;

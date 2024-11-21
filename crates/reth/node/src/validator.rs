@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use reth::builder::{components::EngineValidatorBuilder, BuilderContext};
 use reth_chainspec::ChainSpec;
 use reth_node_api::{
@@ -12,7 +10,7 @@ use crate::{StrataEngineTypes, StrataPayloadAttributes};
 /// Strata engine validator
 #[derive(Debug, Clone)]
 pub struct StrataEngineValidator {
-    chain_spec: Arc<ChainSpec>,
+    chain_spec: ChainSpec,
 }
 
 impl<T> EngineValidator<T> for StrataEngineValidator
@@ -51,7 +49,7 @@ where
 
     async fn build_validator(self, ctx: &BuilderContext<N>) -> eyre::Result<Self::Validator> {
         Ok(StrataEngineValidator {
-            chain_spec: ctx.chain_spec(),
+            chain_spec: std::sync::Arc::unwrap_or_clone(ctx.chain_spec()),
         })
     }
 }

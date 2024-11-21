@@ -188,7 +188,6 @@ borsh = { version = "1.5.0", features = ["derive"] }
 bytes = "1.6.0"
 chrono = "0.4.38"
 clap = "4"
-derive_more = { version = "1", features = ["full"] }
 digest = "0.10"
 ethnum = "1.5.0"
 eyre = "0.6"

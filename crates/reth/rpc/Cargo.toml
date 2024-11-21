@@ -14,7 +14,6 @@ alloy-primitives.workspace = true
 alloy-rpc-types.workspace = true
 alloy-rpc-types-eth.workspace = true
 bincode.workspace = true
-derive_more.workspace = true
 eyre.workspace = true
 hex.workspace = true
 jsonrpsee = { workspace = true, features = ["server", "macros"] }

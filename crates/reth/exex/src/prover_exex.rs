@@ -1,6 +1,5 @@
 use std::{collections::HashMap, sync::Arc};
 
-// use reth_execution_types::BlockExecutionInput;
 use alloy_rpc_types::EIP1186AccountProofResponse;
 use eyre::eyre;
 use futures_util::TryStreamExt;
