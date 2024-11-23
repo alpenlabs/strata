@@ -187,6 +187,10 @@ impl EpochState {
         self.last_l1_block_idx
     }
 
+    pub fn get_deposit(&self, idx: u32) -> Option<&DepositEntry> {
+        self.deposits_table.get_deposit(idx)
+    }
+
     pub fn get_deposit_mut(&mut self, idx: u32) -> Option<&mut DepositEntry> {
         self.deposits_table.get_deposit_mut(idx)
     }
@@ -197,6 +201,11 @@ impl EpochState {
         // FIXME maybe this should have a `.is_zero()`?
         let b: Buf32 = self.last_epoch_final_block.into();
         b.is_zero()
+    }
+
+    /// Returns a ref to the operator table.
+    pub fn operator_table(&self) -> &bridge_state::OperatorTable {
+        &self.operator_table
     }
 }
 
