@@ -20,14 +20,13 @@ use crate::{
     hosts::sp1,
     primitives::{
         prover_input::ZkVmInput,
-        tasks_scheduler::{
-            ProofProcessingStatus, ProofSubmissionStatus, ProvingTask, ProvingTaskStatus,
-            WitnessSubmissionStatus,
-        },
         vms::{ProofVm, ZkVMManager},
     },
     prove::make_proof,
-    state::{ProverState, ProvingTaskState},
+    state::{
+        ProofProcessingStatus, ProofSubmissionStatus, ProverState, ProvingTask, ProvingTaskState,
+        ProvingTaskStatus, WitnessSubmissionStatus,
+    },
     task::TaskTracker,
 };
 

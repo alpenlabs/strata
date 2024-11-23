@@ -4,9 +4,9 @@ use tokio::sync::Mutex;
 use tracing::info;
 use uuid::Uuid;
 
-use crate::primitives::{
-    prover_input::{ProofWithVkey, ZkVmInput},
-    tasks_scheduler::{ProvingTask, ProvingTaskStatus},
+use crate::{
+    primitives::prover_input::{ProofWithVkey, ZkVmInput},
+    state::{ProvingTask, ProvingTaskStatus},
 };
 
 /// The `TaskTracker` manages the lifecycle of proving tasks. It provides functionality

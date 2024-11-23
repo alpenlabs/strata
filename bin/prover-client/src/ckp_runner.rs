@@ -13,8 +13,8 @@ use uuid::Uuid;
 use crate::{
     config::CHECKPOINT_POLL_INTERVAL,
     dispatcher::TaskDispatcher,
-    primitives::tasks_scheduler::ProvingTaskStatus,
     proving_ops::checkpoint_ops::{CheckpointOperations, CheckpointOpsParam},
+    state::ProvingTaskStatus,
     task::TaskTracker,
 };
 
