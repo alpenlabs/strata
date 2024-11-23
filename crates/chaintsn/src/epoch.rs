@@ -53,6 +53,7 @@ fn process_l1_view_update(
         // Validate the new blocks actually extend the tip.  This is what we have to tweak to make
         // more complicated to check the PoW.
         let new_tip_block = l1seg.new_payloads().last().unwrap();
+        let new_tip_blkid = new_tip_block.record().blkid();
         let new_tip_height = new_tip_block.idx();
         let first_new_block_height = new_tip_height - l1seg.new_payloads().len() as u64 + 1;
         let cur_safe_height = state.l1_safe_height();
@@ -65,14 +66,23 @@ fn process_l1_view_update(
 
         // TODO make sure that the block hashes all connect up sensibly.
 
+        // Collect the indexes of current operators.
+        let op_idxs: Vec<_> = state.epoch_state().operator_table().indices().collect();
+
         for e in l1seg.new_payloads() {
             // TODO maybe consolidate these to have ops for each tx
 
             for tx in e.deposit_update_txs() {
                 if let ProtocolOperation::Deposit(deposit_info) = tx.tx().protocol_operation() {
                     let intent = DepositIntent::new(deposit_info.amt, deposit_info.address.clone());
-                    // TODO Include the deposit intent.
-                    // TODO Create deposit entry.
+
+                    state.create_new_deposit_entry(
+                        &deposit_info.outpoint,
+                        &op_idxs,
+                        deposit_info.amt,
+                    );
+
+                    state.submit_ee_deposit_intent(intent);
                 }
             }
 
@@ -80,6 +90,9 @@ fn process_l1_view_update(
                 // TODO make all this work
             }
         }
+
+        // Finally set the new height correctly.
+        state.set_safe_l1_tip(*new_tip_blkid, new_tip_height);
     }
 
     Ok(())
@@ -308,18 +321,14 @@ mod tests {
                 })
                 .collect();
 
-        let mut l1_segment = L1Segment::new(new_payloads_with_deposit_update_tx);
+        let l1_segment = L1Segment::new(new_payloads_with_deposit_update_tx);
 
-        let view_update = process_l1_view_update(&mut state_cache, &l1_segment, params.rollup());
-        assert_eq!(
-            state_cache
-                .state()
-                .deposits_table()
-                .get_deposit(0)
-                .unwrap()
-                .amt(),
-            amt
-        );
+        process_l1_view_update(&mut state_cache, &l1_segment, params.rollup())
+            .expect("chaintsn: process_l1_view_update");
+        let new_epoch_state = state_cache.epoch_state();
+        eprintln!("NEW EPOCH STATE: {new_epoch_state:#?}");
+
+        assert_eq!(new_epoch_state.get_deposit(0).unwrap().amt(), amt);
     }
 
     #[test]
@@ -341,20 +350,21 @@ mod tests {
     }
 
     #[test]
-    fn test_process_l1_view_update_maturation_check() {
+    fn test_process_l1_view_update() {
         let mut chs: ChainState = ArbitraryGenerator::new().generate();
         let params = gen_params();
         //let header_record = chs.l1_view();
         let old_safe_height = chs.epoch_state().safe_block_idx();
-        let to_mature_blk_num = 10;
+        let new_blocks_cnt = 10;
 
         let epoch_state = chs.epoch_state().clone();
         let mut state_cache = StateCache::new(chs, epoch_state);
-        //let maturation_queue_len = state_cache.state().l1_view().maturation_queue().len() as u64;
 
         // Simulate L1 payloads that have matured
-        let new_payloads_matured: Vec<L1HeaderPayload> = (1..params.rollup().l1_reorg_safe_depth
-            + to_mature_blk_num)
+        let blocks_range_start = old_safe_height + 1;
+        let blocks_range_end = blocks_range_start + new_blocks_cnt;
+        eprintln!("old_safe_height {old_safe_height}\nblocks_range_end {blocks_range_end}");
+        let new_payloads: Vec<L1HeaderPayload> = (blocks_range_start..blocks_range_end)
             .map(|idx| {
                 let record = ArbitraryGenerator::new_with_size(1 << 15).generate();
                 L1HeaderPayload::new(old_safe_height + idx as u64, record)
@@ -363,7 +373,9 @@ mod tests {
             })
             .collect();
 
-        let mut l1_segment = L1Segment::new(new_payloads_matured.clone());
+        assert_eq!(new_payloads.len() as u64, blocks_range_end - 1);
+
+        let mut l1_segment = L1Segment::new(new_payloads.clone());
 
         // Process the L1 view update for matured blocks
         let result = process_l1_view_update(&mut state_cache, &l1_segment, params.rollup());
@@ -371,6 +383,6 @@ mod tests {
 
         // Check that blocks were matured
         let new_safe_height = state_cache.epoch_state().safe_block_idx();
-        assert_eq!(new_safe_height, old_safe_height + to_mature_blk_num as u64);
+        assert_eq!(new_safe_height, old_safe_height + new_blocks_cnt as u64);
     }
 }
