@@ -7,6 +7,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::{
     bridge::{BitcoinBlockHeight, OperatorIdx},
     buf::Buf32,
+    l1::{BitcoinAmount, OutputRef},
 };
 use tracing::*;
 
@@ -17,7 +18,7 @@ use crate::{
     header::L2Header,
     id::L2BlockId,
     l1::{self, L1MaturationEntry},
-    prelude::StateQueue,
+    prelude::{L1BlockId, StateQueue},
     tx::ProtocolOperation::Deposit,
 };
 
@@ -232,7 +233,9 @@ impl StateCache {
     // TODO should this not happen automatically so that we don't try to edit
     // the epoch state?
     fn epoch_state_mut(&mut self) -> &mut EpochState {
-        self.new_epoch_state = Some(self.original_epoch_state.clone());
+        if self.new_epoch_state.is_none() {
+            self.new_epoch_state = Some(self.original_epoch_state.clone());
+        }
         self.new_epoch_state.as_mut().unwrap()
     }
 
@@ -319,8 +322,32 @@ impl StateCache {
     }
 
     /// remove matured block from maturation entry
-    pub fn mature_l1_block(&mut self, idx: u64) {
+    fn mature_l1_block(&mut self, idx: u64) {
         self.merge_op(StateOp::MatureL1Block(idx));
+    }
+
+    pub fn set_safe_l1_tip(&mut self, blkid: L1BlockId, idx: u64) {
+        let es = self.epoch_state_mut();
+        es.last_l1_blkid = blkid;
+        es.last_l1_block_idx = idx;
+    }
+
+    /// Creates a new deposit entry in the epoch state's deposit table.
+    pub fn create_new_deposit_entry(
+        &mut self,
+        output: &OutputRef,
+        operators: &[OperatorIdx],
+        amt: BitcoinAmount,
+    ) {
+        let es = self.epoch_state_mut();
+        es.deposits_table.add_deposits(output, operators, amt);
+    }
+
+    /// Creates a new deposit intent ideally to be processed in the next update
+    /// for the EE.
+    pub fn submit_ee_deposit_intent(&mut self, di: DepositIntent) {
+        let pending_deposits = self.new_ch_state.exec_env_state.pending_deposits_mut();
+        pending_deposits.push_back(di);
     }
 
     /// Writes a withdrawal to the pending withdrawals queue.
