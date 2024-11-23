@@ -34,14 +34,14 @@ pub fn process_epoch(
     let mut rng = SlotRng::from_seed(*epoch_data.final_l2_blockid.as_ref());
 
     // Assign withdrawals to deposits.
-    process_l1_view_update(state, &epoch_data.l1_segment, params)?;
+    process_l1_segment(state, &epoch_data.l1_segment, params)?;
     process_deposit_updates(state, &mut rng, params)?;
 
     Ok(())
 }
 
 /// Update our view of the L1 state, playing out downstream changes from that.
-fn process_l1_view_update(
+fn process_l1_segment(
     state: &mut StateCache,
     l1seg: &L1Segment,
     params: &RollupParams,
@@ -323,7 +323,7 @@ mod tests {
 
         let l1_segment = L1Segment::new(new_payloads_with_deposit_update_tx);
 
-        process_l1_view_update(&mut state_cache, &l1_segment, params.rollup())
+        process_l1_segment(&mut state_cache, &l1_segment, params.rollup())
             .expect("chaintsn: process_l1_view_update");
         let new_epoch_state = state_cache.epoch_state();
         eprintln!("NEW EPOCH STATE: {new_epoch_state:#?}");
@@ -344,7 +344,7 @@ mod tests {
 
         // let previous_maturation_queue =
         // Process the empty payload
-        let result = process_l1_view_update(&mut state_cache, &l1_segment, params.rollup());
+        let result = process_l1_segment(&mut state_cache, &l1_segment, params.rollup());
         assert_eq!(state_cache.state(), &chs);
         assert!(result.is_ok());
     }
@@ -378,7 +378,7 @@ mod tests {
         let mut l1_segment = L1Segment::new(new_payloads.clone());
 
         // Process the L1 view update for matured blocks
-        let result = process_l1_view_update(&mut state_cache, &l1_segment, params.rollup());
+        let result = process_l1_segment(&mut state_cache, &l1_segment, params.rollup());
         assert!(result.is_ok());
 
         // Check that blocks were matured
