@@ -241,7 +241,7 @@ rocksdb_prover/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 .idea/
 
-# ZKVM ELF
+# ZkVm ELF
 elf
 
 # macOS specific files

@@ -17,6 +17,7 @@ members = [
   "crates/zkvm/adapters/sp1",
   "crates/proof-impl/btc-blockspace",
   "crates/proof-impl/checkpoint",
+  "crates/proof-impl/cl-agg",
   "crates/proof-impl/cl-stf",
   "crates/proof-impl/evm-ee-stf",
   "crates/proof-impl/l1-batch",

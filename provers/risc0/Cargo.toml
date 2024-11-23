@@ -4,7 +4,7 @@ name = "strata-risc0-guest-builder"
 version = "0.1.0"
 
 [dependencies]
-risc0-zkvm = "1.0.5"
+risc0-zkvm = "1.1.2"
 strata-risc0-adapter = { path = "../../crates/zkvm/adapters/risc0", features = [
   "prover",
 ], optional = true }
@@ -19,6 +19,7 @@ rand.workspace = true
 strata-chaintsn.workspace = true
 strata-primitives.workspace = true
 strata-proofimpl-btc-blockspace.workspace = true
+strata-proofimpl-cl-stf.workspace = true
 strata-proofimpl-checkpoint.workspace = true
 strata-proofimpl-evm-ee-stf.workspace = true
 strata-proofimpl-l1-batch.workspace = true
@@ -27,14 +28,16 @@ strata-test-utils.workspace = true
 strata-zkvm.workspace = true
 
 [build-dependencies]
-risc0-build = "1.0.5"
+risc0-build = "1.1.2"
 
 [package.metadata.risc0]
 methods = [
   "guest-evm-ee-stf",
   "guest-cl-stf",
+  "guest-cl-agg",
   "guest-btc-blockspace",
   "guest-l1-batch",
+  "guest-checkpoint",
 ]
 
 [features]

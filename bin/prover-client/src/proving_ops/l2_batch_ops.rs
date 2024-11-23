@@ -7,7 +7,7 @@ use super::{cl_ops::ClOperations, ops::ProvingOperations};
 use crate::{
     dispatcher::TaskDispatcher,
     errors::{ProvingTaskError, ProvingTaskType},
-    primitives::prover_input::{ProofWithVkey, ZKVMInput},
+    primitives::prover_input::{ProofWithVkey, ZkVmInput},
     task::TaskTracker,
 };
 
@@ -98,7 +98,7 @@ impl ProvingOperations for L2BatchOperations {
 
         // Create the l2_batch task with dependencies on CL tasks
         let task_id = task_tracker
-            .create_task(ZKVMInput::L2Batch(input), dependencies)
+            .create_task(ZkVmInput::L2Batch(input), dependencies)
             .await;
         Ok(task_id)
     }

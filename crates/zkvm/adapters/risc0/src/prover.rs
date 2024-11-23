@@ -1,18 +1,18 @@
 use risc0_zkvm::{compute_image_id, default_prover, ProverOpts};
-use strata_zkvm::{Proof, ProverOptions, VerificationKey, ZKVMHost, ZKVMInputBuilder};
+use strata_zkvm::{Proof, ProverOptions, VerificationKey, ZkVmHost, ZkVmInputBuilder};
 
-use crate::input::RiscZeroProofInputBuilder;
+use crate::input::Risc0ProofInputBuilder;
 
-/// A host for the `RiscZero` zkVM that stores the guest program in ELF format
-/// The `RiscZeroHost` is responsible for program execution and proving
+/// A host for the `Risc0` zkVM that stores the guest program in ELF format
+/// The `Risc0Host` is responsible for program execution and proving
 
 #[derive(Clone)]
-pub struct RiscZeroHost {
+pub struct Risc0Host {
     elf: Vec<u8>,
     prover_options: ProverOptions,
 }
 
-impl RiscZeroHost {
+impl Risc0Host {
     pub(crate) fn determine_prover_options(&self) -> ProverOpts {
         if self.prover_options.stark_to_snark_conversion {
             ProverOpts::groth16()
@@ -24,11 +24,11 @@ impl RiscZeroHost {
     }
 }
 
-impl ZKVMHost for RiscZeroHost {
-    type Input<'a> = RiscZeroProofInputBuilder<'a>;
+impl ZkVmHost for Risc0Host {
+    type Input<'a> = Risc0ProofInputBuilder<'a>;
 
     fn init(guest_code: Vec<u8>, prover_options: ProverOptions) -> Self {
-        RiscZeroHost {
+        Risc0Host {
             elf: guest_code,
             prover_options,
         }
@@ -36,7 +36,7 @@ impl ZKVMHost for RiscZeroHost {
 
     fn prove<'a>(
         &self,
-        prover_input: <Self::Input<'a> as ZKVMInputBuilder<'a>>::Input,
+        prover_input: <Self::Input<'a> as ZkVmInputBuilder<'a>>::Input,
     ) -> anyhow::Result<(Proof, VerificationKey)> {
         if self.prover_options.use_mock_prover {
             std::env::set_var("RISC0_DEV_MODE", "true");
@@ -64,7 +64,7 @@ impl ZKVMHost for RiscZeroHost {
         let serialized_proof = bincode::serialize(&proof_info.receipt)?;
         Ok((
             Proof::new(serialized_proof),
-            VerificationKey(verification_key),
+            VerificationKey::new(verification_key),
         ))
     }
 
@@ -77,10 +77,10 @@ impl ZKVMHost for RiscZeroHost {
 mod tests {
     use std::{fs::File, io::Write};
 
-    use strata_zkvm::ZKVMVerifier;
+    use strata_zkvm::ZkVmVerifier;
 
     use super::*;
-    use crate::{Risc0Verifier, RiscZeroProofInputBuilder};
+    use crate::{Risc0ProofInputBuilder, Risc0Verifier};
 
     // Adding compiled guest code `TEST_ELF` to save the build time
     // use risc0_zkvm::guest::env;
@@ -93,11 +93,11 @@ mod tests {
     #[test]
     fn test_mock_prover() {
         let input: u32 = 1;
-        let zkvm = RiscZeroHost::init(TEST_ELF.to_vec(), ProverOptions::default());
+        let zkvm = Risc0Host::init(TEST_ELF.to_vec(), ProverOptions::default());
 
         // prepare input
-        let mut zkvm_input_builder = RiscZeroProofInputBuilder::new();
-        zkvm_input_builder.write(&input).unwrap();
+        let mut zkvm_input_builder = Risc0ProofInputBuilder::new();
+        zkvm_input_builder.write_serde(&input).unwrap();
         let zkvm_input = zkvm_input_builder.build().unwrap();
 
         // assert proof generation works
@@ -107,19 +107,19 @@ mod tests {
         Risc0Verifier::verify(&vk, &proof).expect("Proof verification failed");
 
         // assert public outputs extraction from proof  works
-        let out: u32 =
-            Risc0Verifier::extract_public_output(&proof).expect("Failed to extract public outputs");
+        let out: u32 = Risc0Verifier::extract_serde_public_output(&proof)
+            .expect("Failed to extract public outputs");
         assert_eq!(input, out)
     }
 
     #[test]
     fn test_mock_prover_with_public_param() {
         let input: u32 = 1;
-        let zkvm = RiscZeroHost::init(TEST_ELF.to_vec(), ProverOptions::default());
+        let zkvm = Risc0Host::init(TEST_ELF.to_vec(), ProverOptions::default());
 
         // prepare input
-        let mut zkvm_input_builder = RiscZeroProofInputBuilder::new();
-        zkvm_input_builder.write(&input).unwrap();
+        let mut zkvm_input_builder = Risc0ProofInputBuilder::new();
+        zkvm_input_builder.write_serde(&input).unwrap();
         let zkvm_input = zkvm_input_builder.build().unwrap();
 
         // assert proof generation works
@@ -148,11 +148,11 @@ mod tests {
             use_cached_keys: true,
         };
 
-        let zkvm = RiscZeroHost::init(TEST_ELF.to_vec(), prover_options);
+        let zkvm = Risc0Host::init(TEST_ELF.to_vec(), prover_options);
 
         // prepare input
-        let zkvm_input = RiscZeroProofInputBuilder::new()
-            .write(&input)
+        let zkvm_input = Risc0ProofInputBuilder::new()
+            .write_serde(&input)
             .unwrap()
             .build()
             .unwrap();

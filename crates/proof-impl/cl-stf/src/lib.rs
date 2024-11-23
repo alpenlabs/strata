@@ -1,14 +1,39 @@
 //! This crate implements the proof of the chain state transition function (STF) for L2 blocks,
 //! verifying the correct state transitions as new L2 blocks are processed.
 
+use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::{buf::Buf32, evm_exec::create_evm_extra_payload, params::RollupParams};
 use strata_proofimpl_evm_ee_stf::ELProofPublicParams;
 use strata_state::{
     block::ExecSegment,
     block_validation::{check_block_credential, validate_block_segments},
     exec_update::{ExecUpdate, UpdateInput, UpdateOutput},
+    id::L2BlockId,
+    tx::DepositInfo,
 };
 pub use strata_state::{block::L2Block, chain_state::Chainstate, state_op::StateCache};
+use strata_zkvm::ZkVmEnv;
+
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+pub struct ChainStateSnapshot {
+    pub hash: Buf32,
+    pub slot: u64,
+    pub l2_blockid: L2BlockId,
+}
+
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+pub struct L2BatchProofOutput {
+    pub deposits: Vec<DepositInfo>,
+    pub initial_snapshot: ChainStateSnapshot,
+    pub final_snapshot: ChainStateSnapshot,
+    pub rollup_params_commitment: Buf32,
+}
+
+impl L2BatchProofOutput {
+    pub fn rollup_params_commitment(&self) -> Buf32 {
+        self.rollup_params_commitment
+    }
+}
 
 /// Verifies an L2 block and applies the chain state transition if the block is valid.
 pub fn verify_and_transition(
@@ -78,4 +103,41 @@ fn apply_state_transition(
     .expect("Failed to process the L2 block");
 
     state_cache.state().to_owned()
+}
+
+pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8]) {
+    let rollup_params: RollupParams = zkvm.read_serde();
+    let (prev_state, block): (Chainstate, L2Block) = zkvm.read_borsh();
+
+    // Read the EL proof output
+    let el_pp_deserialized: ELProofPublicParams = zkvm.read_verified_serde(el_vkey);
+
+    let new_state = verify_and_transition(
+        prev_state.clone(),
+        block,
+        el_pp_deserialized,
+        &rollup_params,
+    );
+
+    let initial_snapshot = ChainStateSnapshot {
+        hash: prev_state.compute_state_root(),
+        slot: prev_state.chain_tip_slot(),
+        l2_blockid: prev_state.chain_tip_blockid(),
+    };
+
+    let final_snapshot = ChainStateSnapshot {
+        hash: new_state.compute_state_root(),
+        slot: new_state.chain_tip_slot(),
+        l2_blockid: new_state.chain_tip_blockid(),
+    };
+
+    let cl_stf_public_params = L2BatchProofOutput {
+        // TODO: Accumulate the deposits
+        deposits: Vec::new(),
+        final_snapshot,
+        initial_snapshot,
+        rollup_params_commitment: rollup_params.compute_hash(),
+    };
+
+    zkvm.commit_borsh(&cl_stf_public_params);
 }

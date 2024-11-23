@@ -5,7 +5,7 @@ mod test {
     use strata_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
     use strata_sp1_adapter::SP1Verifier;
     use strata_test_utils::bitcoin::get_btc_chain;
-    use strata_zkvm::{ProverOptions, ZKVMVerifier};
+    use strata_zkvm::{ProverOptions, ZkVmVerifier};
 
     use crate::helpers::{BtcBlockProofGenerator, ProofGenerator};
 

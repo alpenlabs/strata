@@ -13,7 +13,7 @@ use strata_sp1_guest_builder::{
     GUEST_BTC_BLOCKSPACE_ELF, GUEST_CHECKPOINT_ELF, GUEST_CL_AGG_ELF, GUEST_CL_STF_ELF,
     GUEST_EVM_EE_STF_ELF, GUEST_L1_BATCH_ELF,
 };
-use strata_zkvm::{Proof, ProverOptions, ZKVMHost, ZKVMInputBuilder};
+use strata_zkvm::{Proof, ProverOptions, ZkVmHost, ZkVmInputBuilder};
 use tracing::{error, info};
 use uuid::Uuid;
 
@@ -21,7 +21,7 @@ use crate::{
     config::NUM_PROVER_WORKERS,
     db::open_rocksdb_database,
     primitives::{
-        prover_input::{ProofWithVkey, ZKVMInput},
+        prover_input::{ProofWithVkey, ZkVmInput},
         tasks_scheduler::{ProofProcessingStatus, ProofSubmissionStatus, WitnessSubmissionStatus},
         vms::{ProofVm, ZkVMManager},
     },
@@ -31,7 +31,7 @@ use crate::{
 #[derive(Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
 enum ProvingTaskState {
-    WitnessSubmitted(ZKVMInput),
+    WitnessSubmitted(ZkVmInput),
     ProvingInProgress,
     Proved(ProofWithVkey),
     Err(String),
@@ -91,7 +91,7 @@ impl ProverState {
 // the prover will reject new jobs.
 pub(crate) struct Prover<Vm>
 where
-    Vm: ZKVMHost + 'static,
+    Vm: ZkVmHost + 'static,
 {
     prover_state: Arc<RwLock<ProverState>>,
     db: ProverDB,
@@ -99,26 +99,26 @@ where
     vm_manager: ZkVMManager<Vm>,
 }
 
-fn make_proof<Vm>(zkvm_input: ZKVMInput, vm: Vm) -> Result<ProofWithVkey, anyhow::Error>
+fn make_proof<Vm>(zkvm_input: ZkVmInput, vm: Vm) -> Result<ProofWithVkey, anyhow::Error>
 where
-    Vm: ZKVMHost + 'static,
-    for<'a> Vm::Input<'a>: ZKVMInputBuilder<'a>,
+    Vm: ZkVmHost + 'static,
+    for<'a> Vm::Input<'a>: ZkVmInputBuilder<'a>,
 {
     let zkvm_input = match zkvm_input {
-        ZKVMInput::ElBlock(el_input) => {
+        ZkVmInput::ElBlock(el_input) => {
             let el_input: ELProofInput = bincode::deserialize(&el_input.data)?;
-            Vm::Input::new().write(&el_input)?.build()?
+            Vm::Input::new().write_serde(&el_input)?.build()?
         }
 
-        ZKVMInput::BtcBlock(block, rollup_params) => Vm::Input::new()
-            .write(&rollup_params)?
-            .write_serialized(&bitcoin::consensus::serialize(&block))?
+        ZkVmInput::BtcBlock(block, rollup_params) => Vm::Input::new()
+            .write_serde(&rollup_params)?
+            .write_buf(&bitcoin::consensus::serialize(&block))?
             .build()?,
 
-        ZKVMInput::L1Batch(l1_batch_input) => {
+        ZkVmInput::L1Batch(l1_batch_input) => {
             let mut input_builder = Vm::Input::new();
             input_builder.write_borsh(&l1_batch_input.header_verification_state)?;
-            input_builder.write(&l1_batch_input.btc_task_ids.len())?;
+            input_builder.write_serde(&l1_batch_input.btc_task_ids.len())?;
             // Write each proof input
             for proof_input in l1_batch_input.get_proofs() {
                 input_builder.write_proof(proof_input)?;
@@ -127,9 +127,9 @@ where
             input_builder.build()?
         }
 
-        ZKVMInput::ClBlock(cl_proof_input) => Vm::Input::new()
-            .write(&get_pm_rollup_params())?
-            .write_serialized(&cl_proof_input.cl_raw_witness)?
+        ZkVmInput::ClBlock(cl_proof_input) => Vm::Input::new()
+            .write_serde(&get_pm_rollup_params())?
+            .write_buf(&cl_proof_input.cl_raw_witness)?
             .write_proof(
                 cl_proof_input
                     .el_proof
@@ -137,12 +137,12 @@ where
             )?
             .build()?,
 
-        ZKVMInput::L2Batch(l2_batch_input) => {
+        ZkVmInput::L2Batch(l2_batch_input) => {
             let mut input_builder = Vm::Input::new();
 
             // Write the number of task IDs
             let task_count = l2_batch_input.cl_task_ids.len();
-            input_builder.write(&task_count)?;
+            input_builder.write_serde(&task_count)?;
 
             // Write each proof input
             for proof_input in l2_batch_input.get_proofs() {
@@ -152,7 +152,7 @@ where
             input_builder.build()?
         }
 
-        ZKVMInput::Checkpoint(checkpoint_input) => {
+        ZkVmInput::Checkpoint(checkpoint_input) => {
             let l1_batch_proof = checkpoint_input
                 .l1_batch_proof
                 .ok_or_else(|| anyhow::anyhow!("L1 Batch Proof Not Ready"))?;
@@ -162,7 +162,7 @@ where
                 .ok_or_else(|| anyhow::anyhow!("L2 Batch Proof Not Ready"))?;
 
             let mut input_builder = Vm::Input::new();
-            input_builder.write(&get_pm_rollup_params())?;
+            input_builder.write_serde(&get_pm_rollup_params())?;
             input_builder.write_proof(l1_batch_proof)?;
             input_builder.write_proof(l2_batch_proof)?;
 
@@ -175,9 +175,9 @@ where
     Ok(agg_input)
 }
 
-impl<Vm: ZKVMHost> Prover<Vm>
+impl<Vm: ZkVmHost> Prover<Vm>
 where
-    Vm: ZKVMHost,
+    Vm: ZkVmHost,
 {
     pub(crate) fn new(prover_config: ProverOptions) -> Self {
         let rbdb = open_rocksdb_database().unwrap();
@@ -210,7 +210,7 @@ where
     pub(crate) fn submit_witness(
         &self,
         task_id: Uuid,
-        state_transition_data: ZKVMInput,
+        state_transition_data: ZkVmInput,
     ) -> WitnessSubmissionStatus {
         let data = ProvingTaskState::WitnessSubmitted(state_transition_data);
 

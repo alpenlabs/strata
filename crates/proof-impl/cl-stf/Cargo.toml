@@ -7,14 +7,14 @@ version = "0.1.0"
 strata-chaintsn.workspace = true
 strata-crypto.workspace = true
 strata-primitives.workspace = true
-strata-proofimpl-checkpoint.workspace = true
 strata-proofimpl-evm-ee-stf.workspace = true
 strata-state.workspace = true
+strata-zkvm.workspace = true
 
+bincode.workspace = true
 borsh.workspace = true
 serde.workspace = true
 thiserror.workspace = true
-
 
 [dev-dependencies]
 strata-test-utils.workspace = true

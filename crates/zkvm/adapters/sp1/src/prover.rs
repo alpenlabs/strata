@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use anyhow::Ok;
 use sp1_sdk::{ProverClient, SP1ProvingKey, SP1VerifyingKey};
-use strata_zkvm::{Proof, ProverOptions, VerificationKey, ZKVMHost, ZKVMInputBuilder};
+use strata_zkvm::{Proof, ProverOptions, VerificationKey, ZkVmHost, ZkVmInputBuilder};
 
 use crate::{input::SP1ProofInputBuilder, utils::get_proving_keys};
 
@@ -16,7 +16,7 @@ pub struct SP1Host {
     vkey: SP1VerifyingKey,
 }
 
-impl ZKVMHost for SP1Host {
+impl ZkVmHost for SP1Host {
     type Input<'a> = SP1ProofInputBuilder;
     fn init(guest_code: Vec<u8>, prover_options: ProverOptions) -> Self {
         let prover_client = ProverClient::new();
@@ -33,7 +33,7 @@ impl ZKVMHost for SP1Host {
 
     fn prove<'a>(
         &self,
-        prover_input: <Self::Input<'a> as ZKVMInputBuilder<'a>>::Input,
+        prover_input: <Self::Input<'a> as ZkVmInputBuilder<'a>>::Input,
     ) -> anyhow::Result<(Proof, VerificationKey)> {
         // Init the prover
         if self.prover_options.use_mock_prover {
@@ -58,12 +58,8 @@ impl ZKVMHost for SP1Host {
 
         // Proof serialization
         let serialized_proof = bincode::serialize(&proof)?;
-        let verification_key = bincode::serialize(&self.vkey)?;
 
-        Ok((
-            Proof::new(serialized_proof),
-            VerificationKey(verification_key),
-        ))
+        Ok((Proof::new(serialized_proof), self.get_verification_key()))
     }
 
     fn get_verification_key(&self) -> VerificationKey {
@@ -80,7 +76,7 @@ mod tests {
     use std::{fs::File, io::Write};
 
     use sp1_sdk::{HashableKey, SP1VerifyingKey};
-    use strata_zkvm::ZKVMVerifier;
+    use strata_zkvm::ZkVmVerifier;
 
     use super::*;
     use crate::SP1Verifier;

@@ -1,6 +1,6 @@
 use std::{collections::HashMap, hash::Hash};
 
-use strata_zkvm::{ProverOptions, ZKVMHost};
+use strata_zkvm::{ProverOptions, ZkVmHost};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ProofVm {
@@ -12,12 +12,12 @@ pub enum ProofVm {
     Checkpoint,
 }
 
-pub struct ZkVMManager<Vm: ZKVMHost> {
+pub struct ZkVMManager<Vm: ZkVmHost> {
     vms: HashMap<ProofVm, Vm>,
     prover_config: ProverOptions,
 }
 
-impl<Vm: ZKVMHost> ZkVMManager<Vm> {
+impl<Vm: ZkVmHost> ZkVMManager<Vm> {
     pub fn new(prover_config: ProverOptions) -> Self {
         Self {
             vms: HashMap::new(),

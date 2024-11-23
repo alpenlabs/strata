@@ -3,35 +3,11 @@
 //! chain and that all L1-L2 transactions were processed.
 
 use borsh::{BorshDeserialize, BorshSerialize};
-use strata_primitives::buf::Buf32;
+use strata_primitives::{buf::Buf32, params::RollupParams, vk::RollupVerifyingKey};
+use strata_proofimpl_cl_stf::L2BatchProofOutput;
 use strata_proofimpl_l1_batch::L1BatchProofOutput;
-use strata_state::{
-    batch::{BatchInfo, BootstrapState},
-    id::L2BlockId,
-    tx::DepositInfo,
-};
-use strata_zkvm::Proof;
-
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
-pub struct ChainstateSnapshot {
-    pub hash: Buf32,
-    pub slot: u64,
-    pub l2_blockid: L2BlockId,
-}
-
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
-pub struct L2BatchProofOutput {
-    pub deposits: Vec<DepositInfo>,
-    pub initial_snapshot: ChainstateSnapshot,
-    pub final_snapshot: ChainstateSnapshot,
-    pub rollup_params_commitment: Buf32,
-}
-
-impl L2BatchProofOutput {
-    pub fn rollup_params_commitment(&self) -> Buf32 {
-        self.rollup_params_commitment
-    }
-}
+use strata_state::batch::{BatchInfo, BootstrapState};
+use strata_zkvm::{Proof, ZkVmEnv};
 
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct CheckpointProofInput {
@@ -154,4 +130,35 @@ pub fn process_checkpoint_proof(
         l1_batch_output.rollup_params_commitment,
     );
     (output, opt_prev_output)
+}
+
+pub fn process_checkpoint_proof_outer(
+    zkvm: &impl ZkVmEnv,
+    l1_batch_vk: &[u32; 8],
+    l2_batch_vk: &[u32; 8],
+) {
+    let rollup_params: RollupParams = zkvm.read_serde();
+    let rollup_vk = match rollup_params.rollup_vk() {
+        RollupVerifyingKey::SP1VerifyingKey(sp1_vk) => sp1_vk,
+        _ => panic!("Need SP1VerifyingKey"),
+    };
+
+    // verify l1 proof
+    let l1_batch_pp = zkvm.read_verified_borsh(l1_batch_vk);
+    let l2_batch_pp = zkvm.read_verified_borsh(l2_batch_vk);
+
+    let (output, prev_checkpoint) = process_checkpoint_proof(&l1_batch_pp, &l2_batch_pp);
+
+    if let Some(prev_checkpoint) = prev_checkpoint {
+        let (checkpoint, proof) = prev_checkpoint;
+        assert!(zkvm
+            .verify_groth16_proof(
+                proof.as_bytes(),
+                rollup_vk.as_bytes(),
+                &borsh::to_vec(&checkpoint).unwrap(),
+            )
+            .is_ok());
+    }
+
+    zkvm.commit_borsh(&output);
 }

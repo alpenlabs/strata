@@ -7,8 +7,8 @@ use strata_sp1_adapter::{SP1Host, SP1ProofInputBuilder};
 use strata_sp1_guest_builder::GUEST_L1_BATCH_ELF;
 use strata_test_utils::bitcoin::get_btc_chain;
 use strata_zkvm::{
-    AggregationInput, Proof, ProverOptions, VerificationKey, ZKVMHost, ZKVMInputBuilder,
-    ZKVMVerifier,
+    AggregationInput, Proof, ProverOptions, VerificationKey, ZkVmHost, ZkVmInputBuilder,
+    ZkVmVerifier,
 };
 
 use crate::helpers::{btc::BtcBlockProofGenerator, proof_generator::ProofGenerator};
@@ -41,7 +41,7 @@ impl ProofGenerator<(u32, u32)> for L1BatchProofGenerator {
         input_builder.write_borsh(&state)?;
 
         let len: u32 = end_height - start_height + 1; // because inclusive
-        input_builder.write(&len)?;
+        input_builder.write_serde(&len)?;
 
         for height in start_height..=end_height {
             let block = btc_chain.get_block(height);

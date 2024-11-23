@@ -12,7 +12,7 @@ use super::{
 use crate::{
     dispatcher::TaskDispatcher,
     errors::{ProvingTaskError, ProvingTaskType},
-    primitives::prover_input::{ProofWithVkey, ZKVMInput},
+    primitives::prover_input::{ProofWithVkey, ZkVmInput},
     task::TaskTracker,
 };
 
@@ -135,7 +135,7 @@ impl ProvingOperations for CheckpointOperations {
         // Create the checkpoitn task with dependencies on both l1_batch and l2_batch
         let task_id = task_tracker
             .create_task(
-                ZKVMInput::Checkpoint(input),
+                ZkVmInput::Checkpoint(input),
                 vec![l1_batch_task_id, l2_batch_task_id],
             )
             .await;

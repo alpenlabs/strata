@@ -1,11 +1,11 @@
 use anyhow::{Context, Result};
 use sp1_sdk::Prover;
-use strata_proofimpl_checkpoint::L2BatchProofOutput;
+use strata_proofimpl_cl_stf::L2BatchProofOutput;
 use strata_sp1_adapter::{SP1Host, SP1ProofInputBuilder, SP1Verifier};
 use strata_sp1_guest_builder::GUEST_CL_AGG_ELF;
 use strata_zkvm::{
-    AggregationInput, Proof, ProverOptions, VerificationKey, ZKVMHost, ZKVMInputBuilder,
-    ZKVMVerifier,
+    AggregationInput, Proof, ProverOptions, VerificationKey, ZkVmHost, ZkVmInputBuilder,
+    ZkVmVerifier,
 };
 
 use crate::helpers::{cl::ClProofGenerator, proof_generator::ProofGenerator};
@@ -42,7 +42,7 @@ impl ProofGenerator<(u64, u64)> for L2BatchProofGenerator {
 
         let mut prover_input_builder = SP1ProofInputBuilder::new();
         let len = (end_height - start_height) as usize + 1; // inclusive
-        prover_input_builder.write(&len)?;
+        prover_input_builder.write_serde(&len)?;
 
         for agg_proof in agg_proof_inputs {
             prover_input_builder.write_proof(agg_proof)?;

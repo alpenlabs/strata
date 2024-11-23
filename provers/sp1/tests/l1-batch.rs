@@ -5,7 +5,7 @@ mod test {
     use strata_proofimpl_l1_batch::L1BatchProofOutput;
     use strata_sp1_adapter::SP1Verifier;
     use strata_test_utils::l2::gen_params;
-    use strata_zkvm::{ProverOptions, ZKVMVerifier};
+    use strata_zkvm::{ProverOptions, ZkVmVerifier};
 
     use crate::helpers::{BtcBlockProofGenerator, L1BatchProofGenerator, ProofGenerator};
 

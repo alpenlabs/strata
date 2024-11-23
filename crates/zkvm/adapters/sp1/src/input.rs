@@ -1,27 +1,27 @@
 use anyhow::Ok;
 use sp1_sdk::{SP1Proof, SP1ProofWithPublicValues, SP1Stdin, SP1VerifyingKey};
-use strata_zkvm::{AggregationInput, ZKVMInputBuilder};
+use strata_zkvm::{AggregationInput, ZkVmInputBuilder};
 
 // A wrapper around SP1Stdin
 pub struct SP1ProofInputBuilder(SP1Stdin);
 
-impl<'a> ZKVMInputBuilder<'a> for SP1ProofInputBuilder {
+impl<'a> ZkVmInputBuilder<'a> for SP1ProofInputBuilder {
     type Input = SP1Stdin;
     fn new() -> SP1ProofInputBuilder {
         SP1ProofInputBuilder(SP1Stdin::new())
     }
 
-    fn write<T: serde::Serialize>(&mut self, item: &T) -> anyhow::Result<&mut Self> {
+    fn write_serde<T: serde::Serialize>(&mut self, item: &T) -> anyhow::Result<&mut Self> {
         self.0.write(item);
         Ok(self)
     }
 
     fn write_borsh<T: borsh::BorshSerialize>(&mut self, item: &T) -> anyhow::Result<&mut Self> {
         let slice = borsh::to_vec(item)?;
-        self.write_serialized(&slice)
+        self.write_buf(&slice)
     }
 
-    fn write_serialized(&mut self, item: &[u8]) -> anyhow::Result<&mut Self> {
+    fn write_buf(&mut self, item: &[u8]) -> anyhow::Result<&mut Self> {
         self.0.write_slice(item);
         Ok(self)
     }

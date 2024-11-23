@@ -3,9 +3,9 @@ mod test {
     use bitcoin::params::MAINNET;
     use strata_primitives::buf::Buf32;
     use strata_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
-    use strata_proofimpl_checkpoint::{ChainstateSnapshot, L2BatchProofOutput};
+    use strata_proofimpl_cl_stf::{ChainStateSnapshot, L2BatchProofOutput};
     use strata_proofimpl_l1_batch::{L1BatchProofInput, L1BatchProofOutput};
-    use strata_risc0_adapter::{Risc0Verifier, RiscZeroHost, RiscZeroProofInputBuilder};
+    use strata_risc0_adapter::{Risc0Host, Risc0ProofInputBuilder, Risc0Verifier};
     use strata_risc0_guest_builder::{
         GUEST_RISC0_BTC_BLOCKSPACE_ELF, GUEST_RISC0_BTC_BLOCKSPACE_ID, GUEST_RISC0_CHECKPOINT_ELF,
         GUEST_RISC0_L1_BATCH_ELF, GUEST_RISC0_L1_BATCH_ID,
@@ -19,8 +19,8 @@ mod test {
         l2::get_genesis_chainstate,
     };
     use strata_zkvm::{
-        AggregationInput, Proof, ProverOptions, VerificationKey, ZKVMHost, ZKVMInputBuilder,
-        ZKVMVerifier,
+        AggregationInput, Proof, ProverOptions, VerificationKey, ZkVmHost, ZkVmInputBuilder,
+        ZkVmVerifier,
     };
 
     // TODO: handle this repeat
@@ -35,7 +35,7 @@ mod test {
             enable_compression: false,
             use_cached_keys: true,
         };
-        let prover = RiscZeroHost::init(
+        let prover = Risc0Host::init(
             GUEST_RISC0_BTC_BLOCKSPACE_ELF.into(),
             // Default::default(),
             prover_options,
@@ -48,14 +48,14 @@ mod test {
             .collect();
 
         let mut blockspace_outputs = Vec::new();
-        let mut prover_input = RiscZeroProofInputBuilder::new();
+        let mut prover_input = Risc0ProofInputBuilder::new();
         for (_, raw_block) in mainnet_blocks {
             let block_bytes = hex::decode(&raw_block).unwrap();
             let filters = get_tx_filters();
-            let inner_prover_input = RiscZeroProofInputBuilder::new()
+            let inner_prover_input = Risc0ProofInputBuilder::new()
                 .write_borsh(&filters)
                 .unwrap()
-                .write_serialized(&block_bytes)
+                .write_buf(&block_bytes)
                 .unwrap()
                 .build()
                 .unwrap();
@@ -64,7 +64,7 @@ mod test {
                 .prove(inner_prover_input)
                 .expect("Failed to generate proof");
 
-            let raw_output = Risc0Verifier::extract_public_output::<Vec<u8>>(&proof)
+            let raw_output = Risc0Verifier::extract_serde_public_output::<Vec<u8>>(&proof)
                 .expect("Failed to extract public outputs");
             let output: BlockspaceProofOutput = borsh::from_slice(&raw_output).unwrap();
 
@@ -77,7 +77,7 @@ mod test {
             blockspace_outputs.push(output);
         }
 
-        let prover = RiscZeroHost::init(GUEST_RISC0_L1_BATCH_ELF.into(), prover_options);
+        let prover = Risc0Host::init(GUEST_RISC0_L1_BATCH_ELF.into(), prover_options);
         let input = L1BatchProofInput {
             batch: blockspace_outputs,
             state: btc_chain.get_verification_state(40321, &MAINNET.clone().into()),
@@ -88,7 +88,7 @@ mod test {
             .prove(prover_input)
             .expect("Failed to generate proof");
 
-        let output_raw = Risc0Verifier::extract_public_output::<Vec<u8>>(&proof)
+        let output_raw = Risc0Verifier::extract_serde_public_output::<Vec<u8>>(&proof)
             .expect("Failed to extract public outputs");
         let output: L1BatchProofOutput = borsh::from_slice(&output_raw).unwrap();
 
@@ -106,8 +106,8 @@ mod test {
     //     }
     // }
 
-    fn l2_snapshot(state: &Chainstate) -> ChainstateSnapshot {
-        ChainstateSnapshot {
+    fn l2_snapshot(state: &Chainstate) -> ChainStateSnapshot {
+        ChainStateSnapshot {
             slot: state.chain_tip_slot(),
             hash: state.compute_state_root(),
             l2_blockid: state.chain_tip_blockid(),
@@ -157,7 +157,7 @@ mod test {
             enable_compression: false,
             use_cached_keys: true,
         };
-        let prover = RiscZeroHost::init(GUEST_RISC0_CHECKPOINT_ELF.into(), prover_options);
+        let prover = Risc0Host::init(GUEST_RISC0_CHECKPOINT_ELF.into(), prover_options);
 
         let l1_batch_image_id: Vec<u8> = GUEST_RISC0_L1_BATCH_ID
             .iter()
@@ -168,12 +168,12 @@ mod test {
             VerificationKey::new(l1_batch_image_id.clone()),
         );
 
-        let prover_input = RiscZeroProofInputBuilder::new()
+        let prover_input = Risc0ProofInputBuilder::new()
             .write_borsh(&l1_batch)
             .unwrap()
-            .write_serialized(&borsh::to_vec(&l2_batch).unwrap())
+            .write_buf(&borsh::to_vec(&l2_batch).unwrap())
             .unwrap()
-            .write_serialized(&borsh::to_vec(&bootstrap_checkpoint).unwrap())
+            .write_buf(&borsh::to_vec(&bootstrap_checkpoint).unwrap())
             .unwrap()
             .write_proof(l1_batch_proof_input)
             .unwrap()
@@ -184,7 +184,7 @@ mod test {
             .prove(prover_input)
             .expect("Failed to generate proof");
 
-        let output_raw = Risc0Verifier::extract_public_output::<Vec<u8>>(&proof)
+        let output_raw = Risc0Verifier::extract_serde_public_output::<Vec<u8>>(&proof)
             .expect("Failed to extract public outputs");
         let _: BatchInfo = borsh::from_slice(&output_raw).unwrap();
     }

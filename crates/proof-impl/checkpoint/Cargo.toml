@@ -12,6 +12,7 @@ serde.workspace = true
 serde_json = "1.0.127"
 strata-primitives.workspace = true
 strata-proofimpl-btc-blockspace.workspace = true
+strata-proofimpl-cl-stf.workspace = true
 strata-proofimpl-l1-batch.workspace = true
 strata-state.workspace = true
 strata-zkvm.workspace = true

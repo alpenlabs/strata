@@ -1,5 +1,6 @@
 //! This crate implements the aggregation of consecutive L1 blocks to form a single proof
 
+use bitcoin::{block::Header, consensus::deserialize};
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::buf::Buf32;
 use strata_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
@@ -8,6 +9,7 @@ use strata_state::{
     l1::{get_btc_params, HeaderVerificationState, HeaderVerificationStateSnapshot},
     tx::DepositInfo,
 };
+use strata_zkvm::ZkVmEnv;
 
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct L1BatchProofInput {
@@ -30,33 +32,41 @@ impl L1BatchProofOutput {
     }
 }
 
-pub fn process_batch_proof(input: L1BatchProofInput) -> L1BatchProofOutput {
-    let mut state = input.state;
+pub fn process_l1_batch_proof(zkvm: &impl ZkVmEnv, btc_blockspace_vk: &[u32; 8]) {
+    let mut state: HeaderVerificationState = zkvm.read_borsh();
+
+    let num_inputs: u32 = zkvm.read_serde();
+    assert!(num_inputs > 0);
+
     let initial_snapshot = state.compute_snapshot();
-    let params = get_btc_params();
-
-    assert!(!input.batch.is_empty());
-    let rollup_params_commitment = input.batch[0].rollup_params_commitment;
-
     let mut deposits = Vec::new();
     let mut prev_checkpoint = None;
-    for blockspace in input.batch {
-        let header = bitcoin::consensus::deserialize(&blockspace.header_raw).unwrap();
-        state.check_and_update_full(&header, &params);
-        deposits.extend(blockspace.deposits);
-        prev_checkpoint = prev_checkpoint.or(blockspace.prev_checkpoint);
-        assert_eq!(
-            blockspace.rollup_params_commitment,
-            rollup_params_commitment
-        );
+    let mut rollup_params_commitment = None;
+
+    for _ in 0..num_inputs {
+        let blkpo: BlockspaceProofOutput = zkvm.read_verified_borsh(btc_blockspace_vk);
+        let header: Header = deserialize(&blkpo.header_raw).unwrap();
+
+        state.check_and_update_continuity(&header, &get_btc_params());
+        deposits.extend(blkpo.deposits);
+        prev_checkpoint = prev_checkpoint.or(blkpo.prev_checkpoint);
+
+        // Ensure that the rollup parameters used are same for all blocks
+        if let Some(filters_comm) = rollup_params_commitment {
+            assert_eq!(blkpo.rollup_params_commitment, filters_comm);
+        } else {
+            rollup_params_commitment = Some(blkpo.rollup_params_commitment);
+        }
     }
     let final_snapshot = state.compute_snapshot();
 
-    L1BatchProofOutput {
+    let output = L1BatchProofOutput {
         deposits,
         prev_checkpoint,
         initial_snapshot,
         final_snapshot,
-        rollup_params_commitment,
-    }
+        rollup_params_commitment: rollup_params_commitment.unwrap(),
+    };
+
+    zkvm.commit_borsh(&output);
 }

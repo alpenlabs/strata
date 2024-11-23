@@ -1,9 +1,10 @@
 //! Core logic of the Bitcoin Blockspace proof that will be proven
 
-use bitcoin::Block;
+use bitcoin::{consensus::deserialize, Block};
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::{buf::Buf32, params::RollupParams};
 use strata_state::{batch::BatchCheckpoint, tx::DepositInfo};
+use strata_zkvm::ZkVmEnv;
 
 use crate::{block::check_merkle_root, filter::extract_relevant_info};
 
@@ -39,6 +40,18 @@ pub fn process_blockspace_proof(input: &BlockspaceProofInput) -> BlockspaceProof
         prev_checkpoint,
         rollup_params_commitment,
     }
+}
+
+pub fn process_blockspace_proof_outer(zkvm: &impl ZkVmEnv) {
+    let rollup_params: RollupParams = zkvm.read_serde();
+    let serialized_block = zkvm.read_buf();
+    let block: Block = deserialize(&serialized_block).unwrap();
+    let input = BlockspaceProofInput {
+        block,
+        rollup_params,
+    };
+    let output = process_blockspace_proof(&input);
+    zkvm.commit_borsh(&output);
 }
 
 #[cfg(test)]

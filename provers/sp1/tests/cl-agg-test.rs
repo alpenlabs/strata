@@ -3,7 +3,7 @@ mod helpers;
 mod test {
     use strata_proofimpl_checkpoint::L2BatchProofOutput;
     use strata_sp1_adapter::SP1Verifier;
-    use strata_zkvm::{ProverOptions, ZKVMVerifier};
+    use strata_zkvm::{ProverOptions, ZkVmVerifier};
 
     use crate::helpers::{
         ClProofGenerator, ElProofGenerator, L2BatchProofGenerator, ProofGenerator,
