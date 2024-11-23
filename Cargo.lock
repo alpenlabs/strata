@@ -13170,6 +13170,8 @@ dependencies = [
  "strata-primitives",
  "strata-proofimpl-btc-blockspace",
  "strata-proofimpl-checkpoint",
+ "strata-proofimpl-cl-agg",
+ "strata-proofimpl-cl-stf",
  "strata-proofimpl-evm-ee-stf",
  "strata-proofimpl-l1-batch",
  "strata-prover-client-rpc-api",

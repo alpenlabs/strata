@@ -1,6 +1,13 @@
 use std::{collections::HashMap, fmt};
 
 use serde::{Deserialize, Serialize};
+use strata_proofimpl_btc_blockspace::prover::BtcBlockspaceProver;
+use strata_proofimpl_checkpoint::prover::CheckpointProver;
+use strata_proofimpl_cl_agg::ClAggProver;
+use strata_proofimpl_cl_stf::prover::ClStfProver;
+use strata_proofimpl_evm_ee_stf::prover::EvmEeProver;
+use strata_proofimpl_l1_batch::L1BatchProver;
+use strata_zkvm::Proof;
 use tracing::{error, info};
 use uuid::Uuid;
 
@@ -120,4 +127,30 @@ pub struct ProvingTask {
     pub status: ProvingTaskStatus,
     pub dependencies: Vec<Uuid>,
     pub proof: Option<ProofWithVkey>,
+}
+
+pub struct ProvingTask2 {
+    pub id: Uuid,
+    pub status: ProvingTaskStatus2,
+    pub op: ProvingOp,
+}
+
+type ProofId = String;
+
+pub enum ProvingTaskStatus2 {
+    WaitingForDependencies(Vec<Uuid>),
+    Pending(ZkVmInput),
+    WitnessSubmitted(ProofId),
+    ProvingInProgress(ProofId),
+    Completed(Proof),
+    Failed,
+}
+
+pub enum ProvingOp {
+    BtcBlockspaceProver,
+    L1BatchProver,
+    EvmEeProver,
+    ClStfProver,
+    ClAggProver,
+    CheckpointProver,
 }
