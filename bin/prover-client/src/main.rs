@@ -31,6 +31,7 @@ mod proving_ops;
 mod rpc_server;
 mod state;
 mod task;
+mod task2;
 
 #[tokio::main]
 async fn main() {

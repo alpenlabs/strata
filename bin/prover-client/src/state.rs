@@ -129,6 +129,7 @@ pub struct ProvingTask {
     pub proof: Option<ProofWithVkey>,
 }
 
+#[derive(Debug, Clone)]
 pub struct ProvingTask2 {
     pub id: Uuid,
     pub status: ProvingTaskStatus2,
@@ -137,15 +138,17 @@ pub struct ProvingTask2 {
 
 type ProofId = String;
 
+#[derive(Debug, Clone)]
 pub enum ProvingTaskStatus2 {
     WaitingForDependencies(Vec<Uuid>),
     Pending(ZkVmInput),
     WitnessSubmitted(ProofId),
     ProvingInProgress(ProofId),
-    Completed(Proof),
+    Completed(ProofWithVkey),
     Failed,
 }
 
+#[derive(Debug, Clone)]
 pub enum ProvingOp {
     BtcBlockspaceProver,
     L1BatchProver,
