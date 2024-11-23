@@ -25,7 +25,7 @@ mod dispatcher;
 mod errors;
 mod manager;
 mod primitives;
-mod prover;
+mod prove;
 mod proving_ops;
 mod rpc_server;
 mod state;
