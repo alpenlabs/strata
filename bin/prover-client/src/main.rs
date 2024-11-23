@@ -28,6 +28,7 @@ mod primitives;
 mod prover;
 mod proving_ops;
 mod rpc_server;
+mod state;
 mod task;
 
 #[tokio::main]

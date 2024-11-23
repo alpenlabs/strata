@@ -1,5 +1,5 @@
 use std::{
-    collections::{hash_map::Entry, HashMap},
+    collections::hash_map::Entry,
     sync::{Arc, RwLock},
 };
 
@@ -18,7 +18,6 @@ use strata_sp1_guest_builder::{
     GUEST_L1_BATCH_PK, GUEST_L1_BATCH_VK,
 };
 use strata_zkvm::{Proof, ProofType, ZkVmHost, ZkVmInputBuilder};
-use tracing::{error, info};
 use uuid::Uuid;
 
 use crate::{
@@ -30,66 +29,8 @@ use crate::{
         vms::{ProofVm, ZkVMManager},
     },
     proving_ops::btc_ops::get_pm_rollup_params,
+    state::{ProverState, ProvingTaskState},
 };
-
-#[derive(Debug, Clone)]
-#[allow(clippy::large_enum_variant)]
-enum ProvingTaskState {
-    WitnessSubmitted(ZkVmInput),
-    ProvingInProgress,
-    Proved(ProofWithVkey),
-    Err(String),
-}
-
-/// Represents the internal state of the prover, tracking the status of ongoing proving tasks and
-/// the total count of pending tasks.
-struct ProverState {
-    tasks_status: HashMap<Uuid, ProvingTaskState>,
-    pending_tasks_count: usize,
-}
-
-impl ProverState {
-    fn remove(&mut self, task_id: &Uuid) -> Option<ProvingTaskState> {
-        self.tasks_status.remove(task_id)
-    }
-
-    fn set_to_proving(&mut self, task_id: Uuid) -> Option<ProvingTaskState> {
-        self.tasks_status
-            .insert(task_id, ProvingTaskState::ProvingInProgress)
-    }
-
-    fn set_status(
-        &mut self,
-        task_id: Uuid,
-        proof: Result<ProofWithVkey, anyhow::Error>,
-    ) -> Option<ProvingTaskState> {
-        match proof {
-            Ok(p) => {
-                info!("Completed proving task {:?}", task_id);
-                self.tasks_status
-                    .insert(task_id, ProvingTaskState::Proved(p))
-            }
-            Err(e) => {
-                error!("Error proving {:?} {:?}", task_id, e);
-                self.tasks_status
-                    .insert(task_id, ProvingTaskState::Err(e.to_string()))
-            }
-        }
-    }
-
-    fn get_prover_status(&self, task_id: Uuid) -> Option<&ProvingTaskState> {
-        self.tasks_status.get(&task_id)
-    }
-
-    fn inc_task_count(&mut self) {
-        self.pending_tasks_count += 1;
-    }
-
-    fn dec_task_count(&mut self) {
-        assert!(self.pending_tasks_count > 0);
-        self.pending_tasks_count -= 1;
-    }
-}
 
 // A prover that generates proofs in parallel using a thread pool. If the pool is saturated,
 // the prover will reject new jobs.
