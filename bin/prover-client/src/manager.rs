@@ -9,13 +9,6 @@ use strata_rocksdb::{
     DbOpsConfig,
 };
 use strata_sp1_adapter::SP1Host;
-use strata_sp1_guest_builder::{
-    GUEST_BTC_BLOCKSPACE_ELF, GUEST_BTC_BLOCKSPACE_PK, GUEST_BTC_BLOCKSPACE_VK,
-    GUEST_CHECKPOINT_ELF, GUEST_CHECKPOINT_PK, GUEST_CHECKPOINT_VK, GUEST_CL_AGG_ELF,
-    GUEST_CL_AGG_PK, GUEST_CL_AGG_VK, GUEST_CL_STF_ELF, GUEST_CL_STF_PK, GUEST_CL_STF_VK,
-    GUEST_EVM_EE_STF_ELF, GUEST_EVM_EE_STF_PK, GUEST_EVM_EE_STF_VK, GUEST_L1_BATCH_ELF,
-    GUEST_L1_BATCH_PK, GUEST_L1_BATCH_VK,
-};
 use strata_zkvm::Proof;
 use tokio::time::{sleep, Duration};
 use tracing::info;
@@ -24,6 +17,7 @@ use uuid::Uuid;
 use crate::{
     config::{NUM_PROVER_WORKERS, PROVER_MANAGER_INTERVAL},
     db::open_rocksdb_database,
+    hosts::sp1,
     primitives::{
         prover_input::ZkVmInput,
         tasks_scheduler::{
@@ -53,42 +47,12 @@ impl ProverManager {
         let db = ProofDb::new(rbdb, db_ops);
 
         let mut zkvm_manager = ZkVMManager::new();
-        zkvm_manager.add_vm(
-            ProofVm::BtcProving,
-            SP1Host::new_from_bytes(
-                &GUEST_BTC_BLOCKSPACE_ELF,
-                &GUEST_BTC_BLOCKSPACE_PK,
-                &GUEST_BTC_BLOCKSPACE_VK,
-            ),
-        );
-        zkvm_manager.add_vm(
-            ProofVm::L1Batch,
-            SP1Host::new_from_bytes(&GUEST_L1_BATCH_ELF, &GUEST_L1_BATCH_PK, &GUEST_L1_BATCH_VK),
-        );
-        zkvm_manager.add_vm(
-            ProofVm::ELProving,
-            SP1Host::new_from_bytes(
-                &GUEST_EVM_EE_STF_ELF,
-                &GUEST_EVM_EE_STF_PK,
-                &GUEST_EVM_EE_STF_VK,
-            ),
-        );
-        zkvm_manager.add_vm(
-            ProofVm::CLProving,
-            SP1Host::new_from_bytes(&GUEST_CL_STF_ELF, &GUEST_CL_STF_PK, &GUEST_CL_STF_VK),
-        );
-        zkvm_manager.add_vm(
-            ProofVm::CLAggregation,
-            SP1Host::new_from_bytes(&GUEST_CL_AGG_ELF, &GUEST_CL_AGG_PK, &GUEST_CL_AGG_VK),
-        );
-        zkvm_manager.add_vm(
-            ProofVm::Checkpoint,
-            SP1Host::new_from_bytes(
-                &GUEST_CHECKPOINT_ELF,
-                &GUEST_CHECKPOINT_PK,
-                &GUEST_CHECKPOINT_VK,
-            ),
-        );
+        zkvm_manager.add_vm(ProofVm::BtcProving, sp1::btc_blockspace());
+        zkvm_manager.add_vm(ProofVm::L1Batch, sp1::l1_batch());
+        zkvm_manager.add_vm(ProofVm::ELProving, sp1::evm_ee_stf());
+        zkvm_manager.add_vm(ProofVm::CLProving, sp1::cl_stf());
+        zkvm_manager.add_vm(ProofVm::CLAggregation, sp1::cl_agg());
+        zkvm_manager.add_vm(ProofVm::Checkpoint, sp1::checkpoint());
 
         Self {
             pool: rayon::ThreadPoolBuilder::new()
