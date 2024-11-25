@@ -55,6 +55,12 @@ DEFAULT_ROLLUP_PARAMS: dict = {
     "target_l2_batch_size": DEFAULT_EPOCH_SLOTS,
     "address_length": 20,
     "deposit_amount": 1_000_000_000,
+    # 5% according to `OPERATOR_FEE` in `bridge-tx-builder/src/constants.rs
+    "operator_fee": 50_000_000,
+    # ANYONE_CAN_SPEND_OUTPUT_VALUE (330) in `bridge-tx-builder/src/constants.rs`
+    # + 5.5 sats/vB (200 vbytes) according to `MIN_RELAY_FEE`
+    # in `bridge-tx-builder/src/constants.rs`
+    "withdraw_extra_fee": int(330 + 5.5 * 200),
     "rollup_vk": {
         "risc0_verifying_key": ROLLUP_VK,
     },
