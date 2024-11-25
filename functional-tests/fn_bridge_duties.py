@@ -1,5 +1,4 @@
 import time
-from typing import List
 
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
@@ -25,7 +24,7 @@ class BridgeDutiesTest(flexitest.Test):
         seqrpc = seq.create_rpc()
         btcrpc: BitcoindClient = btc.create_rpc()
 
-        addr = ctx.env.gen_funded_btc_address()
+        addr = ctx.env.gen_ext_btc_address()
         fees_in_btc = 0.01
         sats_per_btc = 10**8
         amount_to_send = DEFAULT_ROLLUP_PARAMS["deposit_amount"] / sats_per_btc + fees_in_btc
@@ -61,7 +60,7 @@ class BridgeDutiesTest(flexitest.Test):
             f"getting bridge duties for operator_idx: {operator_idx} from index: {start_index}"
         )
         duties_resp = seqrpc.strata_getBridgeDuties(operator_idx, start_index)
-        duties: List = duties_resp["duties"]
+        duties: list = duties_resp["duties"]
         # Filter out the duties unrelated to other than the el_address.
         duties = [d for d in duties if d["payload"]["el_address"] == el_address_bytes]
 

@@ -21,13 +21,14 @@ class BasicLiveEnv(flexitest.LiveEnv):
     A common thin layer for all instances of the Environments.
     """
 
-    def __init__(self, srvs):
+    def __init__(self, srvs, bridge_pk):
         super().__init__(srvs)
         self._el_address_gen = (
             f"deada00{x:04X}dca3ebeefdeadf001900dca3ebeef" for x in range(16**4)
         )
         self._ext_btc_addr_idx = 0
         self._rec_btc_addr_idx = 0
+        self._bridge_pk = bridge_pk
 
     def gen_el_address(self) -> str:
         """
@@ -49,7 +50,7 @@ class BasicLiveEnv(flexitest.LiveEnv):
         Generates a unique bitcoin (recovery) taproot addresses that is funded with some BTC.
         """
 
-        rec_tr_addr: str = get_address(self._rec_btc_addr_idx)
+        rec_tr_addr: str = get_recovery_address(self._rec_btc_addr_idx, self._bridge_pk)
         self._rec_btc_addr_idx += 1
         return rec_tr_addr
 
@@ -85,9 +86,13 @@ class BasicEnvConfig(flexitest.EnvConfig):
         settings = self.rollup_settings or RollupParamsSettings.new_default()
         params_gen_data = generate_simple_params(initdir, settings, self.n_operators)
         params = params_gen_data["params"]
-
         # Instantiaze the generated rollup config so it's convenient to work with.
         rollup_cfg = RollupConfig.model_validate_json(params)
+
+        # Construct the bridge pubkey from the config.
+        # Technically, we could use utils::get_bridge_pubkey, but this makes sequencer
+        # a dependency of pre-funding logic and just complicates the env setup.
+        bridge_pk = get_bridge_pubkey_from_cfg(rollup_cfg)
         # TODO also grab operator keys and launch operators
 
         # reth needs some time to startup, start it first
@@ -139,10 +144,6 @@ class BasicEnvConfig(flexitest.EnvConfig):
                 self.pre_generate_blocks -= batch_size
 
             if self.pre_fund_addrs:
-                # Construct the bridge pubkey from the config.
-                # Technically, we could use utils::get_bridge_pubkey, but this makes sequencer
-                # a dependency of pre-funding logic and just complicates the env setup.
-                bridge_pk = get_bridge_pubkey_from_cfg(rollup_cfg)
                 # Send funds for btc external and recovery addresses used in the test logic.
                 # Generate one more block so the transaction is on the blockchain.
                 brpc.proxy.sendmany(
@@ -204,7 +205,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
             )
             svcs["prover_client"] = prover_client
 
-        return BasicLiveEnv(svcs)
+        return BasicLiveEnv(svcs, bridge_pk)
 
 
 class HubNetworkEnvConfig(flexitest.EnvConfig):
@@ -233,6 +234,13 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
         settings = self.rollup_settings or RollupParamsSettings.new_default()
         params_gen_data = generate_simple_params(initdir, settings, self.n_operators)
         params = params_gen_data["params"]
+        # Instantiaze the generated rollup config so it's convenient to work with.
+        rollup_cfg = RollupConfig.model_validate_json(params)
+
+        # Construct the bridge pubkey from the config.
+        # Technically, we could use utils::get_bridge_pubkey, but this makes sequencer
+        # a dependency of pre-funding logic and just complicates the env setup.
+        bridge_pk = get_bridge_pubkey_from_cfg(rollup_cfg)
         # TODO also grab operator keys and launch operators
 
         # reth needs some time to startup, start it first
@@ -320,7 +328,7 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
             name = f"bridge.{i}"
             svcs[name] = br
 
-        return BasicLiveEnv(svcs)
+        return BasicLiveEnv(svcs, bridge_pk)
 
 
 def main(argv):
