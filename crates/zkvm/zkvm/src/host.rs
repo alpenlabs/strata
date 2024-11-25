@@ -1,7 +1,7 @@
 use borsh::BorshDeserialize;
 use serde::{de::DeserializeOwned, Serialize};
 
-use crate::{input::ZkVmInputBuilder, proof::Proof, verifier::VerificationKey, ProofType};
+use crate::{input::ZkVmInputBuilder, proof::Proof, ProofType, VerificationKey};
 
 /// A trait implemented by the prover ("host") of a zkVM program.
 pub trait ZkVmHost: Send + Sync + Clone + 'static {

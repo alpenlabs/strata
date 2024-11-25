@@ -15,5 +15,5 @@ strata-zkvm.workspace = true
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [features]
-default = ["prover"]
+default = []
 prover = []

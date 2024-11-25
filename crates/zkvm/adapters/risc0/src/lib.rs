@@ -8,7 +8,7 @@ pub use host::Risc0Host;
 pub use input::Risc0ProofInputBuilder;
 
 mod verifier;
-pub use verifier::Risc0Verifier;
+pub use verifier::*;
 
 mod env;
 pub use env::Risc0ZkVmEnv;

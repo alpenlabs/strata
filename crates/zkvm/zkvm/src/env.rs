@@ -1,6 +1,8 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{de::DeserializeOwned, Serialize};
 
+use crate::Proof;
+
 /// A trait representing a Zero-Knowledge Virtual Machine (ZkVM) interface.
 /// Provides methods for reading inputs, committing outputs, and verifying proofs
 /// within the ZkVM environment.
@@ -54,21 +56,17 @@ pub trait ZkVmEnv {
     ///
     /// # Parameters
     ///
-    /// * `proof`: A byte slice containing the serialized proof. (TODO: Change `proof: &[u8]` to a
-    ///   `Proof` type.)
+    /// * `proof`: [Proof](crate::Proof)
     /// * `verification_key`: A byte slice containing the serialized verification key.
     /// * `public_params_raw`: A byte slice containing the serialized public parameters.
     ///
-    /// # Returns
-    ///
-    /// Returns `Ok(())` if the proof verifies successfully, or an `anyhow::Error` if verification
-    /// fails.
+    /// It will panic if the proof fails to verify.
     fn verify_groth16_proof(
         &self,
-        proof: &[u8],
+        proof: &Proof,
         verification_key: &[u8],
         public_params_raw: &[u8],
-    ) -> anyhow::Result<()>;
+    );
 
     /// Reads and verifies a committed output from another guest function.
     ///

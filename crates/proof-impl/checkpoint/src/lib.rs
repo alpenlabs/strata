@@ -10,7 +10,6 @@ use strata_state::batch::{BatchInfo, BootstrapState};
 use strata_zkvm::{Proof, ZkVmEnv};
 
 pub mod prover;
-pub mod verifier;
 
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct CheckpointProofInput {
@@ -154,13 +153,11 @@ pub fn process_checkpoint_proof_outer(
 
     if let Some(prev_checkpoint) = prev_checkpoint {
         let (checkpoint, proof) = prev_checkpoint;
-        assert!(zkvm
-            .verify_groth16_proof(
-                proof.as_bytes(),
-                rollup_vk.as_bytes(),
-                &borsh::to_vec(&checkpoint).unwrap(),
-            )
-            .is_ok());
+        zkvm.verify_groth16_proof(
+            &proof,
+            rollup_vk.as_bytes(),
+            &borsh::to_vec(&checkpoint).unwrap(),
+        );
     }
 
     zkvm.commit_borsh(&output);

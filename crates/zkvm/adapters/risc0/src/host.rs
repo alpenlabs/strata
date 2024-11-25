@@ -79,7 +79,6 @@ impl ZkVmHost for Risc0Host {
 
     fn verify(&self, proof: &Proof) -> anyhow::Result<()> {
         let receipt: Receipt = bincode::deserialize(proof.as_bytes())?;
-        // TODO: maybe cache this?
         receipt.verify(self.id)?;
         Ok(())
     }
@@ -89,10 +88,8 @@ impl ZkVmHost for Risc0Host {
 mod tests {
     use std::{fs::File, io::Write};
 
-    use strata_zkvm::ZkVmVerifier;
-
     use super::*;
-    use crate::{Risc0ProofInputBuilder, Risc0Verifier};
+    use crate::Risc0ProofInputBuilder;
 
     // Adding compiled guest code `TEST_ELF` to save the build time
     // use risc0_zkvm::guest::env;
@@ -105,7 +102,7 @@ mod tests {
     #[test]
     fn test_mock_prover() {
         let input: u32 = 1;
-        let zkvm = Risc0Host::init(TEST_ELF);
+        let host = Risc0Host::init(TEST_ELF);
 
         // prepare input
         let mut zkvm_input_builder = Risc0ProofInputBuilder::new();
@@ -113,15 +110,15 @@ mod tests {
         let zkvm_input = zkvm_input_builder.build().unwrap();
 
         // assert proof generation works
-        let (proof, vk) = zkvm
+        let (proof, _) = host
             .prove(zkvm_input, ProofType::Core)
             .expect("Failed to generate proof");
 
         // assert proof verification works
-        Risc0Verifier::verify(&vk, &proof).expect("Proof verification failed");
+        host.verify(&proof).expect("Proof verification failed");
 
         // assert public outputs extraction from proof  works
-        let out: u32 = Risc0Verifier::extract_serde_public_output(&proof)
+        let out: u32 = Risc0Host::extract_serde_public_output(&proof)
             .expect("Failed to extract public outputs");
         assert_eq!(input, out)
     }
