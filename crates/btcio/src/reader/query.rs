@@ -6,7 +6,6 @@ use std::{
 
 use anyhow::bail;
 use bitcoin::{hashes::Hash, BlockHash};
-use strata_db::traits::Database;
 use strata_primitives::buf::Buf32;
 use strata_state::l1::{
     get_btc_params, get_difficulty_adjustment_height, BtcParams, HeaderVerificationState,
@@ -27,9 +26,6 @@ use crate::{
     status::{apply_status_updates, L1StatusUpdate},
 };
 
-// FIXME: remove this when there's actually a chainstate manager
-type ChainstateManager = ();
-
 struct ReaderContext<R: Reader> {
     /// Bitcoin reader client
     client: Arc<R>,
@@ -39,26 +35,21 @@ struct ReaderContext<R: Reader> {
     config: Arc<ReaderConfig>,
     /// Status transmitter
     status_tx: Arc<StatusTx>,
-    /// Chainstate manager
-    chainstate_mgr: ChainstateManager, // TODO: actual type
 }
 
 // TODO: remove this
-pub async fn bitcoin_data_reader_task<D: Database + 'static>(
+pub async fn bitcoin_data_reader_task(
     client: Arc<impl Reader>,
     event_tx: mpsc::Sender<L1Event>,
     target_next_block: u64,
     config: Arc<ReaderConfig>,
     status_tx: Arc<StatusTx>,
-    // TODO: replace this with actual chainstate manager
-    _chainstate_mgr: Arc<D::ChainstateDB>,
 ) -> anyhow::Result<()> {
     let ctx = ReaderContext {
         client,
         event_tx,
         config,
         status_tx,
-        chainstate_mgr: (), // TODO: actual type
     };
     do_reader_task(ctx, target_next_block).await
 }

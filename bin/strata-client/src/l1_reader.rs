@@ -33,17 +33,15 @@ where
         .unwrap_or(params.rollup().horizon_l1_height);
 
     let reader_config = Arc::new(config.get_reader_config(params.clone()));
-    let chs_db = db.chain_state_db().clone();
 
     executor.spawn_critical_async(
         "bitcoin_data_reader_task",
-        bitcoin_data_reader_task::<D>(
+        bitcoin_data_reader_task(
             rpc_client,
             ev_tx,
             target_next_block,
             reader_config,
             status_rx.clone(),
-            chs_db,
         ),
     );
 
