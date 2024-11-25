@@ -887,12 +887,11 @@ mod tests {
         key::Keypair,
         opcodes::all::OP_CHECKSIG,
         script::Builder,
-        secp256k1::SecretKey,
+        secp256k1::{Parity, SecretKey, SECP256K1},
         taproot::{ControlBlock, LeafVersion, TaprootBuilder, TaprootMerkleBranch},
         Address, Amount, Network, ScriptBuf, TapNodeHash, TxOut, XOnlyPublicKey,
     };
     use rand::{rngs::OsRng, Rng};
-    use secp256k1::{Parity, SECP256K1};
     use strata_test_utils::ArbitraryGenerator;
 
     use super::{

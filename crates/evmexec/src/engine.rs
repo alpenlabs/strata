@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
-use futures::future::TryFutureExt;
-use reth_primitives::{Address, B256};
-use reth_rpc_types::{
+use alloy_rpc_types::{
     engine::{
         ExecutionPayloadInputV2, ForkchoiceState, PayloadAttributes, PayloadId, PayloadStatusEnum,
     },
     Withdrawal,
 };
+use futures::future::TryFutureExt;
+use reth_primitives::revm_primitives::{Address, B256};
 use strata_eectl::{
     engine::{BlockStatus, ExecEngineCtl, PayloadStatus},
     errors::{EngineError, EngineResult},
@@ -403,9 +403,9 @@ fn to_bridge_withdrawal_intent(
 
 #[cfg(test)]
 mod tests {
+    use alloy_rpc_types::engine::{ExecutionPayloadV1, ForkchoiceUpdated};
     use rand::{rngs::OsRng, Rng};
-    use reth_primitives::{revm_primitives::FixedBytes, Bloom, Bytes, U256};
-    use reth_rpc_types::{engine::ForkchoiceUpdated, ExecutionPayloadV1};
+    use reth_primitives::revm_primitives::{alloy_primitives::Bloom, Bytes, FixedBytes, U256};
     use strata_eectl::{errors::EngineResult, messages::PayloadEnv};
     use strata_primitives::buf::Buf32;
     use strata_reth_node::{ExecutionPayloadEnvelopeV2, ExecutionPayloadFieldV2};
@@ -600,7 +600,7 @@ mod tests {
         );
 
         mock_client.expect_new_payload_v2().returning(move |_| {
-            Ok(reth_rpc_types::engine::PayloadStatus {
+            Ok(alloy_rpc_types::engine::PayloadStatus {
                 status: PayloadStatusEnum::Valid,
                 latest_valid_hash: None,
             })

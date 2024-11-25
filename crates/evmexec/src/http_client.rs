@@ -1,15 +1,18 @@
 use std::sync::Arc;
 
+use alloy_rpc_types::{
+    engine::{
+        ExecutionPayloadBodiesV1, ExecutionPayloadInputV2, ForkchoiceState, ForkchoiceUpdated,
+        JwtSecret, PayloadId,
+    },
+    serde_helpers::WithOtherFields,
+};
 use jsonrpsee::http_client::{transport::HttpBackend, HttpClient, HttpClientBuilder};
 #[cfg(test)]
 use mockall::automock;
-use reth_primitives::{Block, BlockHash};
+use reth_primitives::{revm_primitives::alloy_primitives::BlockHash, Block};
 use reth_rpc_api::{EngineApiClient, EthApiClient};
 use reth_rpc_layer::{AuthClientLayer, AuthClientService};
-use reth_rpc_types::engine::{
-    ExecutionPayloadBodiesV1, ExecutionPayloadInputV2, ForkchoiceState, ForkchoiceUpdated,
-    JwtSecret, PayloadId,
-};
 use strata_reth_node::{
     StrataEngineTypes, StrataExecutionPayloadEnvelopeV2, StrataPayloadAttributes,
 };
@@ -42,7 +45,7 @@ pub trait EngineRpc {
     async fn new_payload_v2(
         &self,
         payload: ExecutionPayloadInputV2,
-    ) -> RpcResult<reth_rpc_types::engine::PayloadStatus>;
+    ) -> RpcResult<alloy_rpc_types::engine::PayloadStatus>;
 
     async fn get_payload_bodies_by_hash_v1(
         &self,
@@ -88,7 +91,7 @@ impl EngineRpc for EngineRpcClient {
     async fn new_payload_v2(
         &self,
         payload: ExecutionPayloadInputV2,
-    ) -> RpcResult<reth_rpc_types::engine::PayloadStatus> {
+    ) -> RpcResult<alloy_rpc_types::engine::PayloadStatus> {
         <HttpClient<AuthClientService<HttpBackend>> as EngineApiClient<StrataEngineTypes>>::new_payload_v2(&self.client, payload).await
     }
 
@@ -100,8 +103,13 @@ impl EngineRpc for EngineRpcClient {
     }
 
     async fn block_by_hash(&self, block_hash: BlockHash) -> RpcResult<Option<Block>> {
-        let block = self.client.block_by_hash(block_hash, true).await?;
+        let block = <HttpClient<AuthClientService<HttpBackend>> as EthApiClient<
+            alloy_rpc_types::Transaction,
+            alloy_rpc_types::Block<WithOtherFields<alloy_rpc_types::Transaction>>,
+            alloy_rpc_types::Receipt,
+        >>::block_by_hash(&self.client, block_hash, true)
+        .await?;
 
-        Ok(block.map(|rich_block| rich_block.inner.try_into().unwrap()))
+        Ok(block.map(|b| b.try_into().unwrap()))
     }
 }

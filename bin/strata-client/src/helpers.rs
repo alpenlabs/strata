@@ -1,5 +1,6 @@
 use std::{fs, path::Path, sync::Arc, time::Duration};
 
+use alloy_rpc_types::engine::JwtSecret;
 use anyhow::Context;
 use bitcoin::{
     base58,
@@ -8,7 +9,6 @@ use bitcoin::{
     Address, Network,
 };
 use format_serde_error::SerdeError;
-use reth_rpc_types::engine::JwtSecret;
 use rockbound::{rocksdb, OptimisticTransactionDB};
 use strata_btcio::rpc::{traits::Wallet, BitcoinClient};
 use strata_consensus_logic::{

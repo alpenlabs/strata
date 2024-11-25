@@ -1,7 +1,7 @@
+use alloy_rpc_types::engine::ExecutionPayloadV1;
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
-use reth_primitives::B256;
-use reth_rpc_types::ExecutionPayloadV1;
+use reth_primitives::revm_primitives::B256;
 use reth_rpc_types_compat::engine::try_payload_v1_to_block;
 use strata_primitives::{
     buf::{Buf20, Buf32},

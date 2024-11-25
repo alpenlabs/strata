@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use reth_primitives::B256;
+use reth_primitives::revm_primitives::alloy_primitives::B256;
 use rockbound::{SchemaDBOperations, SchemaDBOperationsExt};
 use strata_proofimpl_evm_ee_stf::ELProofInput;
 

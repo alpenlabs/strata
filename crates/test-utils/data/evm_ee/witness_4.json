@@ -14,7 +14,7 @@
     "gas_used": 0,
     "timestamp": 1728049635,
     "mix_hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
-    "nonce": 0,
+    "nonce": "0x0000000000000000",
     "base_fee_per_gas": 669921875,
     "blob_gas_used": null,
     "excess_blob_gas": null,

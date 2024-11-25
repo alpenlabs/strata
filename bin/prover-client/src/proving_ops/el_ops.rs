@@ -1,9 +1,8 @@
 use std::sync::Arc;
 
-use anyhow::Context;
+use alloy_rpc_types::Block;
 use async_trait::async_trait;
 use jsonrpsee::{core::client::ClientT, http_client::HttpClient, rpc_params};
-use reth_rpc_types::Block;
 use strata_proofimpl_evm_ee_stf::ELProofInput;
 use tracing::debug;
 use uuid::Uuid;
@@ -48,7 +47,7 @@ impl ProvingOperations for ElOperations {
                 rpc_params![format!("0x{:x}", block_num), false],
             )
             .await?;
-        let block_hash = block.header.hash.context("Block hash missing")?;
+        let block_hash = block.header.hash;
         let witness: ELProofInput = self
             .el_client
             .request("strataee_getBlockWitness", rpc_params![block_hash, true])

@@ -1,7 +1,10 @@
 use std::sync::Arc;
 
-use revm::{handler::register::EvmHandler, Context, ContextPrecompile, Database};
-use revm_primitives::{Address, EVMError, SpecId, U256};
+use revm::{
+    handler::register::EvmHandler,
+    primitives::{Address, EVMError, SpecId, U256},
+    Context, ContextPrecompile, Database,
+};
 
 use crate::constants::{BASEFEE_ADDRESS, FIXED_WITHDRAWAL_WEI};
 
@@ -49,7 +52,7 @@ fn update_account_balance<EXT, DB: Database>(
     address: Address,
     update: BalanceUpdate,
 ) -> Result<(), EVMError<DB::Error>> {
-    let (account, _) = context.evm.load_account(address)?;
+    let mut account = context.evm.load_account(address)?;
 
     let balance = account.info.balance;
     let new_balance = match update {
