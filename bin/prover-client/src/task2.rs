@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use crate::{
     primitives::prover_input::{ProofWithVkey, ZkVmInput},
-    state::{ProvingOp, ProvingTask2, ProvingTaskStatus2},
+    state::{ProvingInfo, ProvingTask2, ProvingTaskStatus2},
 };
 
 /// The `TaskTracker` manages the lifecycle of proving tasks. It provides functionality
@@ -28,22 +28,12 @@ impl TaskTracker2 {
         tasks.clear();
     }
 
-    pub async fn create_task(
-        &self,
-        prover_input: ZkVmInput,
-        dependencies: Vec<Uuid>,
-        op: ProvingOp,
-    ) -> Uuid {
+    pub async fn create_task(&self, info: ProvingInfo, status: ProvingTaskStatus2) -> Uuid {
         let task_id = Uuid::new_v4();
-        let status = if dependencies.is_empty() {
-            ProvingTaskStatus2::Pending(prover_input)
-        } else {
-            ProvingTaskStatus2::WaitingForDependencies(dependencies)
-        };
         let task = ProvingTask2 {
             id: task_id,
             status,
-            op,
+            info,
         };
         let mut tasks = self.tasks.lock().await;
         tasks.insert(task_id, task);
@@ -126,7 +116,7 @@ impl TaskTracker2 {
         let mut pending_tasks = vec![];
         for task in tasks.values() {
             match task.status {
-                ProvingTaskStatus2::Pending(_) => pending_tasks.push(task.clone()),
+                ProvingTaskStatus2::Pending => pending_tasks.push(task.clone()),
                 _ => {}
             };
         }

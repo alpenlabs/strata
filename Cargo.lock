@@ -13407,9 +13407,11 @@ dependencies = [
  "strata-primitives",
  "strata-state",
  "strata-test-utils",
+ "strata-zkvm",
  "tempfile",
  "thiserror",
  "tracing",
+ "uuid 1.10.0",
 ]
 
 [[package]]

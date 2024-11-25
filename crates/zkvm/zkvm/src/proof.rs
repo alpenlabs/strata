@@ -1,7 +1,6 @@
 use std::{
     fs::{self, File},
     path::Path,
-    time::Duration,
 };
 
 use anyhow::Result;
@@ -73,14 +72,16 @@ pub enum ProofType {
     Compressed,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Serialize, Deserialize, BorshSerialize, BorshDeserialize,
+)]
 pub struct ProofInfo {
     cycle_count: u64,
-    duration: Duration,
+    duration: u128,
 }
 
 impl ProofInfo {
-    pub fn new(cycle_count: u64, duration: Duration) -> Self {
+    pub fn new(cycle_count: u64, duration: u128) -> Self {
         Self {
             cycle_count,
             duration,
@@ -88,7 +89,7 @@ impl ProofInfo {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
 pub struct ProofWithInfo {
     pub name: String,
     pub proof: Proof,
@@ -108,7 +109,7 @@ impl ProofWithInfo {
         self.info.cycle_count
     }
 
-    pub fn duration(&self) -> Duration {
+    pub fn duration(&self) -> u128 {
         self.info.duration
     }
 

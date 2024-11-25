@@ -26,6 +26,7 @@ mod errors;
 mod hosts;
 mod manager;
 mod primitives;
+mod proof_generators;
 mod prove;
 mod proving_ops;
 mod rpc_server;

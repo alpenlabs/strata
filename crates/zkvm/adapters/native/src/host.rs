@@ -31,7 +31,7 @@ impl ZkVmHost for NativeHost {
         };
 
         let proof = Proof::new(output);
-        let info = ProofInfo::new(0, start.elapsed());
+        let info = ProofInfo::new(0, start.elapsed().as_micros());
 
         Ok((proof, info))
     }

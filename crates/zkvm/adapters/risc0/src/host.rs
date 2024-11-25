@@ -64,7 +64,7 @@ impl ZkVmHost for Risc0Host {
         let serialized_proof = bincode::serialize(&proof_info.receipt)?;
 
         let proof = Proof::new(serialized_proof);
-        let info = ProofInfo::new(proof_info.stats.total_cycles, start.elapsed());
+        let info = ProofInfo::new(proof_info.stats.total_cycles, start.elapsed().as_micros());
 
         Ok((proof, info))
     }

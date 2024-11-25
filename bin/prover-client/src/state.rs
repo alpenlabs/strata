@@ -1,17 +1,16 @@
 use std::{collections::HashMap, fmt};
 
 use serde::{Deserialize, Serialize};
-use strata_proofimpl_btc_blockspace::prover::BtcBlockspaceProver;
-use strata_proofimpl_checkpoint::prover::CheckpointProver;
-use strata_proofimpl_cl_agg::ClAggProver;
-use strata_proofimpl_cl_stf::prover::ClStfProver;
-use strata_proofimpl_evm_ee_stf::prover::EvmEeProver;
-use strata_proofimpl_l1_batch::L1BatchProver;
-use strata_zkvm::Proof;
 use tracing::{error, info};
 use uuid::Uuid;
 
-use crate::primitives::prover_input::{ProofWithVkey, ZkVmInput};
+use crate::{
+    primitives::prover_input::{ProofWithVkey, ZkVmInput},
+    proof_generators::{
+        btc_ops::{BtcBlockspaceId, BtcBlockspaceProofGenerator},
+        l1_batch_ops::{L1BatchIntermediateInput, L1BatchProofGenerator},
+    },
+};
 
 #[derive(Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
@@ -133,7 +132,7 @@ pub struct ProvingTask {
 pub struct ProvingTask2 {
     pub id: Uuid,
     pub status: ProvingTaskStatus2,
-    pub op: ProvingOp,
+    pub info: ProvingInfo,
 }
 
 type ProofId = String;
@@ -141,7 +140,7 @@ type ProofId = String;
 #[derive(Debug, Clone)]
 pub enum ProvingTaskStatus2 {
     WaitingForDependencies(Vec<Uuid>),
-    Pending(ZkVmInput),
+    Pending,
     WitnessSubmitted(ProofId),
     ProvingInProgress(ProofId),
     Completed(ProofWithVkey),
@@ -149,11 +148,11 @@ pub enum ProvingTaskStatus2 {
 }
 
 #[derive(Debug, Clone)]
-pub enum ProvingOp {
-    BtcBlockspaceProver,
-    L1BatchProver,
-    EvmEeProver,
-    ClStfProver,
-    ClAggProver,
-    CheckpointProver,
+pub enum ProvingInfo {
+    BtcBlockspace(BtcBlockspaceProofGenerator, BtcBlockspaceId),
+    L1Batch(L1BatchProofGenerator, L1BatchIntermediateInput),
+    // EvmEeProver,
+    // ClStfProver,
+    // ClAggProver,
+    // CheckpointProver,
 }

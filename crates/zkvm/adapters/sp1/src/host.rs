@@ -71,7 +71,10 @@ impl ZkVmHost for SP1Host {
         // Proof serialization
         let serialized_proof = bincode::serialize(&proof)?;
         let proof = Proof::new(serialized_proof);
-        let info = ProofInfo::new(report.total_instruction_count(), start.elapsed());
+        let info = ProofInfo::new(
+            report.total_instruction_count(),
+            start.elapsed().as_micros(),
+        );
 
         Ok((proof, info))
     }

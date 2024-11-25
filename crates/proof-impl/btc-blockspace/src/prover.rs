@@ -3,6 +3,7 @@ use strata_zkvm::{Proof, ProofType, ZkVmHost, ZkVmInputBuilder, ZkVmProver};
 
 use crate::logic::{BlockspaceProofInput, BlockspaceProofOutput};
 
+#[derive(Debug, Clone)]
 pub struct BtcBlockspaceProver;
 
 impl ZkVmProver for BtcBlockspaceProver {
