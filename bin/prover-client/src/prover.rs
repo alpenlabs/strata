@@ -99,7 +99,7 @@ where
     vm_manager: ZkVMManager<Vm>,
 }
 
-fn make_proof<Vm>(zkvm_input: ZkVmInput, vm: Vm) -> Result<ProofWithVkey, anyhow::Error>
+fn make_proof<Vm>(zkvm_input: ZkVmInput, vm: &'static Vm) -> Result<ProofWithVkey, anyhow::Error>
 where
     Vm: ZkVmHost + 'static,
     for<'a> Vm::Input<'a>: ZkVmInputBuilder<'a>,
@@ -244,11 +244,14 @@ where
                 // Initiate a new proving job only if the prover is not busy.
                 prover_state.set_to_proving(task_id);
                 let proof_vm = witness.proof_vm_id();
-                let vm = self.vm_manager.get(&proof_vm).unwrap().clone();
+                let vm = self
+                    .vm_manager
+                    .get(&proof_vm)
+                    .expect("Unable to find the vm");
 
                 self.pool.spawn(move || {
                     tracing::info_span!("prover_worker").in_scope(|| {
-                        let proof = make_proof(witness, vm.clone());
+                        let proof = make_proof(witness, vm);
                         let mut prover_state =
                             prover_state_clone.write().expect("Lock was poisoned");
                         prover_state.set_status(task_id, proof);

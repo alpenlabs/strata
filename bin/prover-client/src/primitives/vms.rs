@@ -13,7 +13,7 @@ pub enum ProofVm {
 }
 
 pub struct ZkVMManager<Vm: ZkVmHost> {
-    vms: HashMap<ProofVm, Vm>,
+    vms: HashMap<ProofVm, &'static Vm>,
     prover_config: ProverOptions,
 }
 
@@ -33,11 +33,15 @@ impl<Vm: ZkVmHost> ZkVMManager<Vm> {
         } else {
             self.prover_config
         };
-        self.vms
-            .insert(proof_vm, Vm::init(init_vector, prover_config));
+
+        // The `Vm` is expected to live for the lifetime of the ProverManager, ensuring the same
+        // instance is reused to prove the same guest program
+        let vm = Box::new(Vm::init(init_vector, prover_config));
+        let static_vm: &'static Vm = Box::leak(vm);
+        self.vms.insert(proof_vm, static_vm);
     }
 
-    pub fn get(&self, proof_vm: &ProofVm) -> Option<Vm> {
-        self.vms.get(proof_vm).cloned()
+    pub fn get(&self, proof_vm: &ProofVm) -> Option<&'static Vm> {
+        self.vms.get(proof_vm).map(|v| &**v)
     }
 }
