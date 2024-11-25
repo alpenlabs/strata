@@ -27,10 +27,9 @@ where
 
     // TODO switch to checking the L1 tip in the consensus/client state
     let l1_db = db.l1_db().clone();
-    let target_next_block = l1_db
-        .get_chain_tip()?
-        .map(|i| i + 1)
-        .unwrap_or(params.rollup().horizon_l1_height);
+    let horz_height = params.rollup().horizon_l1_height;
+    let target_next_block = l1_db.get_chain_tip()?.map(|i| i + 1).unwrap_or(horz_height);
+    assert!(target_next_block >= horz_height);
 
     let reader_config = Arc::new(config.get_reader_config(params.clone()));
 

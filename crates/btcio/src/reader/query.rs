@@ -37,7 +37,6 @@ struct ReaderContext<R: Reader> {
     status_tx: Arc<StatusTx>,
 }
 
-// TODO: remove this
 pub async fn bitcoin_data_reader_task(
     client: Arc<impl Reader>,
     event_tx: mpsc::Sender<L1Event>,
@@ -114,12 +113,18 @@ async fn init_reader_state<R: Reader>(
 
     let lookback = ctx.config.max_reorg_depth as usize * 2;
     let client = ctx.client.as_ref();
-    let horz_height = ctx.config.params.rollup().horizon_l1_height as i64;
+    let hor_height = ctx.config.params.rollup().horizon_l1_height;
+    let pre_hor = hor_height.saturating_sub(1);
+    let target = target_next_block as i64;
 
     // Do some math to figure out where our start and end are.
     let chain_info = client.get_blockchain_info().await?;
-    let start_height = i64::max(target_next_block as i64 - lookback as i64, horz_height) as u64;
-    let end_height = u64::min(target_next_block - 1, chain_info.blocks);
+    let start_height = (target - lookback as i64)
+        .max(pre_hor as i64)
+        .min(chain_info.blocks as i64) as u64;
+    let end_height = chain_info
+        .blocks
+        .min(pre_hor.max(target_next_block.saturating_sub(1)));
     debug!(%start_height, %end_height, "queried L1 client, have init range");
 
     // Loop through the range we've determined to be okay and pull the blocks we want to look back

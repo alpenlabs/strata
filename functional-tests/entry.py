@@ -380,7 +380,9 @@ def main(argv):
         # Devnet production env
         "devnet": BasicEnvConfig(101, custom_chain="devnet"),
         "fast_batches": BasicEnvConfig(101, rollup_settings=net_settings.get_fast_batch_settings()),
-        "hub1": HubNetworkEnvConfig(),
+        "hub1": HubNetworkEnvConfig(
+            2
+        ),  # TODO: Need to generate at least horizon blocks, based on params
         "prover": BasicEnvConfig(101, enable_prover_client=True),
     }
 
