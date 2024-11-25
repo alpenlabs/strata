@@ -1,4 +1,5 @@
-use risc0_zkvm::{compute_image_id, default_prover, ProverOpts};
+use risc0_zkvm::{compute_image_id, default_prover, sha::Digest, ProverOpts, Receipt};
+use serde::{de::DeserializeOwned, Serialize};
 use strata_zkvm::{Proof, ProverOptions, VerificationKey, ZkVmHost, ZkVmInputBuilder};
 
 use crate::input::Risc0ProofInputBuilder;
@@ -9,6 +10,7 @@ use crate::input::Risc0ProofInputBuilder;
 #[derive(Clone)]
 pub struct Risc0Host {
     elf: Vec<u8>,
+    id: Digest,
     prover_options: ProverOptions,
 }
 
@@ -28,8 +30,11 @@ impl ZkVmHost for Risc0Host {
     type Input<'a> = Risc0ProofInputBuilder<'a>;
 
     fn init(guest_code: Vec<u8>, prover_options: ProverOptions) -> Self {
+        let id = compute_image_id(&guest_code).expect("invalid elf");
+
         Risc0Host {
             elf: guest_code,
+            id,
             prover_options,
         }
     }
@@ -68,8 +73,27 @@ impl ZkVmHost for Risc0Host {
         ))
     }
 
+    fn extract_raw_public_output(proof: &Proof) -> anyhow::Result<Vec<u8>> {
+        let receipt: Receipt = bincode::deserialize(proof.as_bytes())?;
+        Ok(receipt.journal.bytes)
+    }
+
+    fn extract_serde_public_output<T: Serialize + DeserializeOwned>(
+        proof: &Proof,
+    ) -> anyhow::Result<T> {
+        let receipt: Receipt = bincode::deserialize(proof.as_bytes())?;
+        Ok(receipt.journal.decode()?)
+    }
+
     fn get_verification_key(&self) -> VerificationKey {
-        todo!()
+        VerificationKey::new(self.id.as_bytes().to_vec())
+    }
+
+    fn verify(&self, proof: &Proof) -> anyhow::Result<()> {
+        let receipt: Receipt = bincode::deserialize(proof.as_bytes())?;
+        // TODO: maybe cache this?
+        receipt.verify(self.id)?;
+        Ok(())
     }
 }
 

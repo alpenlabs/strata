@@ -1,7 +1,7 @@
 #[cfg(feature = "prover")]
-mod prover;
+mod host;
 #[cfg(feature = "prover")]
-pub use prover::SP1Host;
+pub use host::SP1Host;
 
 #[cfg(feature = "prover")]
 mod input;

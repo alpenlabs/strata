@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
 use anyhow::Ok;
-use sp1_sdk::{ProverClient, SP1ProvingKey, SP1VerifyingKey};
+use serde::{de::DeserializeOwned, Serialize};
+use sp1_sdk::{ProverClient, SP1ProofWithPublicValues, SP1ProvingKey, SP1VerifyingKey};
 use strata_zkvm::{Proof, ProverOptions, VerificationKey, ZkVmHost, ZkVmInputBuilder};
 
 use crate::{input::SP1ProofInputBuilder, utils::get_proving_keys};
@@ -62,9 +63,31 @@ impl ZkVmHost for SP1Host {
         Ok((Proof::new(serialized_proof), self.get_verification_key()))
     }
 
+    fn extract_raw_public_output(proof: &Proof) -> anyhow::Result<Vec<u8>> {
+        let proof: SP1ProofWithPublicValues = bincode::deserialize(proof.as_bytes())?;
+        Ok(proof.public_values.as_slice().to_vec())
+    }
+
+    fn extract_serde_public_output<T: Serialize + DeserializeOwned>(
+        proof: &Proof,
+    ) -> anyhow::Result<T> {
+        let mut proof: SP1ProofWithPublicValues = bincode::deserialize(proof.as_bytes())?;
+        let public_params: T = proof.public_values.read();
+        Ok(public_params)
+    }
+
     fn get_verification_key(&self) -> VerificationKey {
         let verification_key = bincode::serialize(&self.vkey).unwrap();
         VerificationKey::new(verification_key)
+    }
+
+    fn verify(&self, proof: &Proof) -> anyhow::Result<()> {
+        let proof: SP1ProofWithPublicValues = bincode::deserialize(proof.as_bytes())?;
+
+        let client = ProverClient::new();
+        client.verify(&proof, &self.vkey)?;
+
+        Ok(())
     }
 }
 
