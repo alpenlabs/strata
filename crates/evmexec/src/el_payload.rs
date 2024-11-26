@@ -60,7 +60,7 @@ pub fn make_update_input_from_payload_and_ops(
     Ok(UpdateInput::new(
         evm_block.number,
         ops.to_vec(),
-        Buf32(evm_block.transactions_root),
+        Buf32(*evm_block.transactions_root),
         extra_payload,
     ))
 }
@@ -93,19 +93,20 @@ impl From<ExecutionPayloadV1> for ElPayload {
 impl From<ElPayload> for ExecutionPayloadV1 {
     fn from(val: ElPayload) -> Self {
         ExecutionPayloadV1 {
-            parent_hash: val.parent_hash.0,
+            parent_hash: val.parent_hash.0.into(),
             fee_recipient: val.fee_recipient.0.into(),
-            state_root: val.state_root.0,
-            receipts_root: val.receipts_root.0,
+            state_root: val.state_root.0.into(),
+            receipts_root: val.receipts_root.0.into(),
             logs_bloom: val.logs_bloom.into(),
-            prev_randao: val.prev_randao.0,
+            prev_randao: val.prev_randao.0.into(),
             block_number: val.block_number,
             gas_limit: val.gas_limit,
             gas_used: val.gas_used,
             timestamp: val.timestamp,
             extra_data: val.extra_data.into(),
-            base_fee_per_gas: val.base_fee_per_gas.0.into(),
-            block_hash: val.block_hash.0,
+            base_fee_per_gas: reth_primitives::revm_primitives::FixedBytes(val.base_fee_per_gas.0)
+                .into(),
+            block_hash: val.block_hash.0.into(),
             transactions: val
                 .transactions
                 .into_iter()

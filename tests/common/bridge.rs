@@ -535,7 +535,7 @@ impl Agent {
 
         let x_only_pk = XOnlyPublicKey::from_slice(script_pubkey).unwrap();
 
-        let x_only_pk = Buf32(x_only_pk.serialize().into());
+        let x_only_pk = Buf32(x_only_pk.serialize());
 
         XOnlyPk::new(x_only_pk)
     }
@@ -808,7 +808,7 @@ pub(crate) fn create_drt_taproot_output(
 
     // in actual DRT, this will be the take-back leaf.
     // for testing, this could be any script as we only care about its hash.
-    let el_address = Buf20::default().0 .0;
+    let el_address = Buf20::default().0;
     let op_return_script = metadata_script(&el_address[..].try_into().unwrap());
     let op_return_script_hash = TapNodeHash::from_script(&op_return_script, LeafVersion::TapScript);
 

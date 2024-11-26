@@ -362,7 +362,7 @@ fn exec_genparams(cmd: SubcGenParams, ctx: &mut CmdContext) -> anyhow::Result<()
         .unwrap_or(1_000_000_000);
 
     // Parse the checkpoint verification key.
-    let rollup_vk = Buf32(GUEST_CHECKPOINT_VK_HASH_STR.parse().unwrap());
+    let rollup_vk: Buf32 = GUEST_CHECKPOINT_VK_HASH_STR.parse().unwrap();
 
     let config = ParamsConfig {
         name: cmd.name.unwrap_or_else(|| "strata-testnet".to_string()),
@@ -505,16 +505,14 @@ fn construct_params(config: ParamsConfig) -> RollupParams {
         genesis_l1_height: config.genesis_trigger,
         operator_config: strata_primitives::params::OperatorConfig::Static(opkeys),
         // TODO make configurable
-        evm_genesis_block_hash: Buf32(
+        evm_genesis_block_hash:
             "0x37ad61cff1367467a98cf7c54c4ac99e989f1fbb1bc1e646235e90c065c565ba"
                 .parse()
                 .unwrap(),
-        ),
-        evm_genesis_block_state_root: Buf32(
+        evm_genesis_block_state_root:
             "0x351714af72d74259f45cd7eab0b04527cd40e74836a45abcae50f92d919d988f"
                 .parse()
                 .unwrap(),
-        ),
         // TODO make configurable
         l1_reorg_safe_depth: 4,
         target_l2_batch_size: config.epoch_slots as u64,

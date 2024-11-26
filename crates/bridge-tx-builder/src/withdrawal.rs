@@ -206,9 +206,7 @@ mod tests {
             "use separate indexes for user and assigned operator"
         );
 
-        let user_pk = XOnlyPk::new(Buf32(
-            pubkeys[user_index].x_only_public_key().0.serialize().into(),
-        ));
+        let user_pk = XOnlyPk::new(Buf32(pubkeys[user_index].x_only_public_key().0.serialize()));
 
         let assigned_operator_idx = assigned_operator_idx as OperatorIdx;
 
@@ -306,9 +304,7 @@ mod tests {
             "use separate indexes for user and assigned operator"
         );
 
-        let user_pk = XOnlyPk::new(Buf32(
-            pubkeys[user_index].x_only_public_key().0.serialize().into(),
-        ));
+        let user_pk = XOnlyPk::new(Buf32(pubkeys[user_index].x_only_public_key().0.serialize()));
         let assigned_operator_idx = assigned_operator_idx as OperatorIdx;
 
         let withdrawal_info =
@@ -347,9 +343,7 @@ mod tests {
             "use separate indexes for user and assigned operator"
         );
 
-        let user_pk = XOnlyPk::new(Buf32(
-            pubkeys[user_index].x_only_public_key().0.serialize().into(),
-        ));
+        let user_pk = XOnlyPk::new(Buf32(pubkeys[user_index].x_only_public_key().0.serialize()));
         let assigned_operator_idx = assigned_operator_idx as OperatorIdx;
 
         let withdrawal_info =

@@ -44,7 +44,7 @@ pub fn get_cohashes_from_wtxids(wtxids: &[Wtxid], index: u32) -> (Vec<Buf32>, Bu
         };
 
         let item = curr_level[proof_item_index as usize];
-        proof.push(Buf32(item.into()));
+        proof.push(Buf32(item));
 
         // construct pairwise hash
         curr_level = curr_level
@@ -61,7 +61,7 @@ pub fn get_cohashes_from_wtxids(wtxids: &[Wtxid], index: u32) -> (Vec<Buf32>, Bu
             .collect::<Vec<_>>();
         curr_index >>= 1;
     }
-    (proof, Buf32(curr_level[0].into()))
+    (proof, Buf32(curr_level[0]))
 }
 
 /// Temporary schnorr keypair.

@@ -305,7 +305,7 @@ fn get_cohashes_from_wtxids(wtxids: &[Wtxid], index: u32) -> (Vec<Buf32>, Buf32)
         };
 
         let item = curr_level[proof_item_index as usize];
-        proof.push(Buf32(item.into()));
+        proof.push(item.into());
 
         // construct pairwise hash
         curr_level = curr_level
@@ -322,5 +322,5 @@ fn get_cohashes_from_wtxids(wtxids: &[Wtxid], index: u32) -> (Vec<Buf32>, Buf32)
             .collect::<Vec<_>>();
         curr_index >>= 1;
     }
-    (proof, Buf32(curr_level[0].into()))
+    (proof, curr_level[0].into())
 }

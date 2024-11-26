@@ -398,7 +398,7 @@ fn to_bridge_withdrawal_intent(
     rpc_withdrawal_intent: strata_reth_node::WithdrawalIntent,
 ) -> bridge_ops::WithdrawalIntent {
     let strata_reth_node::WithdrawalIntent { amt, dest_pk } = rpc_withdrawal_intent;
-    bridge_ops::WithdrawalIntent::new(BitcoinAmount::from_sat(amt), XOnlyPk::new(Buf32(dest_pk)))
+    bridge_ops::WithdrawalIntent::new(BitcoinAmount::from_sat(amt), XOnlyPk::new(Buf32(*dest_pk)))
 }
 
 #[cfg(test)]
@@ -529,8 +529,8 @@ mod tests {
 
         let timestamp = 0;
         let el_ops = vec![];
-        let safe_l1_block = Buf32(FixedBytes::<32>::random());
-        let prev_l2_block = Buf32(FixedBytes::<32>::random()).into();
+        let safe_l1_block = FixedBytes::<32>::random().into();
+        let prev_l2_block = Buf32(FixedBytes::<32>::random().into()).into();
 
         let payload_env = PayloadEnv::new(timestamp, prev_l2_block, safe_l1_block, el_ops);
 
@@ -573,7 +573,7 @@ mod tests {
         let fcs = ForkchoiceState::default();
 
         let el_payload = ElPayload {
-            base_fee_per_gas: Buf32(U256::from(10).into()),
+            base_fee_per_gas: FixedBytes::<32>::from(U256::from(10)).into(),
             parent_hash: Default::default(),
             fee_recipient: Default::default(),
             state_root: Default::default(),

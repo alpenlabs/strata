@@ -5,7 +5,7 @@ use rand::{rngs::StdRng, SeedableRng};
 use strata_consensus_logic::genesis::{make_genesis_block, make_genesis_chainstate};
 use strata_primitives::{
     block_credential,
-    buf::{Buf32, Buf64},
+    buf::Buf64,
     operator::OperatorPubkeys,
     params::{OperatorConfig, Params, ProofPublishMode, RollupParams, SyncParams},
     vk::RollupVerifyingKey,
@@ -79,25 +79,23 @@ pub fn gen_params_with_seed(seed: u64) -> Params {
             horizon_l1_height: 40318,
             genesis_l1_height: 40320, // we have mainnet blocks from this height test-utils
             operator_config: OperatorConfig::Static(vec![opkeys]),
-            evm_genesis_block_hash: Buf32(
+            evm_genesis_block_hash:
                 "0x37ad61cff1367467a98cf7c54c4ac99e989f1fbb1bc1e646235e90c065c565ba"
                     .parse()
                     .unwrap(),
-            ),
-            evm_genesis_block_state_root: Buf32(
+            evm_genesis_block_state_root:
                 "0x351714af72d74259f45cd7eab0b04527cd40e74836a45abcae50f92d919d988f"
                     .parse()
                     .unwrap(),
-            ),
             l1_reorg_safe_depth: 3,
             target_l2_batch_size: 64,
             address_length: 20,
             deposit_amount: 1_000_000_000,
-            rollup_vk: RollupVerifyingKey::SP1VerifyingKey(Buf32(
+            rollup_vk: RollupVerifyingKey::SP1VerifyingKey(
                 "0x00b01ae596b4e51843484ff71ccbd0dd1a030af70b255e6b9aad50b81d81266f"
                     .parse()
                     .unwrap(),
-            )),
+            ),
             dispatch_assignment_dur: 64,
             proof_publish_mode: ProofPublishMode::Strict,
             max_deposits_in_block: 16,
