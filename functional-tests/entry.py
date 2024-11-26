@@ -64,6 +64,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
         enable_prover_client: bool = False,
         pre_fund_addrs: bool = True,
         n_operators: int = 2,
+        message_interval: int = DEFAULT_ROLLUP_PARAMS["message_interval"],
     ):
         super().__init__()
         self.pre_generate_blocks = pre_generate_blocks
@@ -72,6 +73,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
         self.enable_prover_client = enable_prover_client
         self.pre_fund_addrs = pre_fund_addrs
         self.n_operators = n_operators
+        self.message_interval = message_interval
 
     def init(self, ctx: flexitest.EnvContext) -> flexitest.LiveEnv:
         btc_fac = ctx.get_factory("bitcoin")
@@ -189,7 +191,9 @@ class BasicEnvConfig(flexitest.EnvConfig):
             with open(xpriv_path) as f:
                 xpriv = f.read().strip()
             seq_url = sequencer.get_prop("rpc_url")
-            br = bridge_fac.create_operator(xpriv, seq_url, bitcoind_config)
+            br = bridge_fac.create_operator(
+                xpriv, seq_url, bitcoind_config, message_interval=self.message_interval
+            )
             name = f"bridge.{i}"
             svcs[name] = br
 
