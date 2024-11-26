@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use anyhow::{Context, Result};
+use anyhow::Context;
 use strata_proofimpl_evm_ee_stf::{prover::EvmEeProver, ELProofInput, ELProofPublicParams};
 #[cfg(feature = "risc0")]
 use strata_risc0_adapter::{Risc0Host, Risc0ProofInputBuilder};
@@ -13,7 +13,9 @@ use strata_sp1_guest_builder::{
     GUEST_EVM_EE_STF_PK, GUEST_EVM_EE_STF_VK, GUEST_EVM_EE_STF_VK_HASH_STR,
 };
 use strata_test_utils::evm_ee::EvmSegment;
-use strata_zkvm::{Proof, ProofType, VerificationKey, ZkVmHost, ZkVmInputBuilder, ZkVmProver};
+use strata_zkvm::{
+    Proof, ProofType, VerificationKey, ZkVmHost, ZkVmInputBuilder, ZkVmProver, ZkVmResult,
+};
 
 use crate::proof_generator::ProofGenerator;
 
@@ -32,14 +34,14 @@ impl ElProofGenerator {
 }
 
 impl ProofGenerator<u64, EvmEeProver> for ElProofGenerator {
-    fn get_input(&self, block_num: &u64) -> Result<ELProofInput> {
+    fn get_input(&self, block_num: &u64) -> ZkVmResult<ELProofInput> {
         let input = EvmSegment::initialize_from_saved_ee_data(*block_num, *block_num)
             .get_input(block_num)
             .clone();
         Ok(input)
     }
 
-    fn gen_proof(&self, block_num: &u64) -> Result<(Proof, ELProofPublicParams)> {
+    fn gen_proof(&self, block_num: &u64) -> ZkVmResult<(Proof, ELProofPublicParams)> {
         let host = self.get_host();
 
         let input = self.get_input(block_num)?;

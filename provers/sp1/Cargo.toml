@@ -15,28 +15,6 @@ sha2.workspace = true
 sp1-helper = "3.0.0"
 sp1-sdk = "3.0.0"
 
-[dev-dependencies]
-anyhow.workspace = true
-bincode.workspace = true
-bitcoin.workspace = true
-borsh.workspace = true
-hex.workspace = true
-num-bigint = "0.4.6"
-num-traits = "0.2.19"
-serde_json.workspace = true
-sp1-sdk = "3.0.0"
-strata-primitives.workspace = true
-strata-proofimpl-btc-blockspace.workspace = true
-strata-proofimpl-checkpoint.workspace = true
-strata-proofimpl-cl-stf.workspace = true
-strata-proofimpl-evm-ee-stf.workspace = true
-strata-proofimpl-l1-batch.workspace = true
-strata-proofimpl-cl-agg.workspace = true
-strata-state.workspace = true
-strata-test-utils.workspace = true
-strata-zkvm.workspace = true
-tempfile.workspace = true
-
 [features]
 default = ["prover"]
 prover = ["dep:strata-sp1-adapter"]

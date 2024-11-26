@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::Context;
 use strata_proofimpl_cl_agg::{ClAggInput, ClAggProver};
 use strata_proofimpl_cl_stf::L2BatchProofOutput;
 #[cfg(feature = "risc0")]
@@ -11,6 +11,7 @@ use strata_sp1_adapter::{SP1Host, SP1ProofInputBuilder};
 use strata_sp1_guest_builder::{GUEST_CL_AGG_PK, GUEST_CL_AGG_VK, GUEST_CL_AGG_VK_HASH_STR};
 use strata_zkvm::{
     AggregationInput, Proof, ProofType, VerificationKey, ZkVmHost, ZkVmInputBuilder, ZkVmProver,
+    ZkVmResult,
 };
 
 use crate::{cl::ClProofGenerator, proof_generator::ProofGenerator};
@@ -26,7 +27,7 @@ impl L2BatchProofGenerator {
 }
 
 impl ProofGenerator<(u64, u64), ClAggProver> for L2BatchProofGenerator {
-    fn get_input(&self, heights: &(u64, u64)) -> Result<ClAggInput> {
+    fn get_input(&self, heights: &(u64, u64)) -> ZkVmResult<ClAggInput> {
         let (start_height, end_height) = *heights;
         let mut batch = Vec::new();
 
@@ -39,7 +40,7 @@ impl ProofGenerator<(u64, u64), ClAggProver> for L2BatchProofGenerator {
         Ok(ClAggInput { batch, cl_stf_vk })
     }
 
-    fn gen_proof(&self, heights: &(u64, u64)) -> Result<(Proof, L2BatchProofOutput)> {
+    fn gen_proof(&self, heights: &(u64, u64)) -> ZkVmResult<(Proof, L2BatchProofOutput)> {
         let input = self.get_input(heights)?;
         let host = self.get_host();
         ClAggProver::prove(&input, &host)

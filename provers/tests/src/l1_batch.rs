@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::Context;
 use bitcoin::params::MAINNET;
 use strata_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
 use strata_proofimpl_l1_batch::{L1BatchProofInput, L1BatchProofOutput, L1BatchProver};
@@ -13,6 +13,7 @@ use strata_sp1_guest_builder::{GUEST_L1_BATCH_PK, GUEST_L1_BATCH_VK, GUEST_L1_BA
 use strata_test_utils::bitcoin::get_btc_chain;
 use strata_zkvm::{
     AggregationInput, Proof, ProofType, VerificationKey, ZkVmHost, ZkVmInputBuilder, ZkVmProver,
+    ZkVmResult,
 };
 
 use crate::{btc::BtcBlockProofGenerator, proof_generator::ProofGenerator};
@@ -30,7 +31,7 @@ impl L1BatchProofGenerator {
 }
 
 impl ProofGenerator<(u32, u32), L1BatchProver> for L1BatchProofGenerator {
-    fn get_input(&self, heights: &(u32, u32)) -> Result<L1BatchProofInput> {
+    fn get_input(&self, heights: &(u32, u32)) -> ZkVmResult<L1BatchProofInput> {
         let (start_height, end_height) = *heights;
 
         let btc_chain = get_btc_chain();
@@ -53,7 +54,7 @@ impl ProofGenerator<(u32, u32), L1BatchProver> for L1BatchProofGenerator {
         Ok(input)
     }
 
-    fn gen_proof(&self, heights: &(u32, u32)) -> Result<(Proof, L1BatchProofOutput)> {
+    fn gen_proof(&self, heights: &(u32, u32)) -> ZkVmResult<(Proof, L1BatchProofOutput)> {
         let input = self.get_input(heights)?;
         let host = self.get_host();
         L1BatchProver::prove(&input, &host)

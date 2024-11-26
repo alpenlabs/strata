@@ -2,23 +2,23 @@ use std::{fs, path::PathBuf};
 
 use anyhow::Result;
 use strata_primitives::buf;
-use strata_zkvm::{Proof, ProofType, VerificationKey, ZkVmHost, ZkVmProver};
+use strata_zkvm::{Proof, ProofType, VerificationKey, ZkVmError, ZkVmHost, ZkVmProver, ZkVmResult};
 
 pub trait ProofGenerator<T, P: ZkVmProver> {
     /// Generates a proof based on the input.
-    fn get_input(&self, input: &T) -> Result<P::Input>;
+    fn get_input(&self, input: &T) -> ZkVmResult<P::Input>;
 
     fn get_host(&self) -> impl ZkVmHost;
 
     /// Generates a proof based on the input.
-    fn gen_proof(&self, input: &T) -> Result<(Proof, P::Output)>;
+    fn gen_proof(&self, input: &T) -> ZkVmResult<(Proof, P::Output)>;
 
     /// Generates a unique proof ID based on the input.
     /// The proof ID will be the hash of the input and potentially other unique identifiers.
     fn get_proof_id(&self, input: &T) -> String;
 
     /// Retrieves a proof from cache or generates it if not found.
-    fn get_proof(&self, input: &T) -> Result<(Proof, P::Output)> {
+    fn get_proof(&self, input: &T) -> ZkVmResult<(Proof, P::Output)> {
         // 1. Create the unique proof ID
         let proof_id = format!(
             "{}_{}.proof",
@@ -31,7 +31,8 @@ pub trait ProofGenerator<T, P: ZkVmProver> {
         // 2. Check if the proof file exists
         if proof_file.exists() {
             println!("Proof found in cache, returning the cached proof...",);
-            let proof = read_proof_from_file(&proof_file)?;
+            let proof = read_proof_from_file(&proof_file)
+                .map_err(|e| ZkVmError::InputError(e.to_string()))?;
             let host = self.get_host();
             verify_proof(&proof, &host)?;
             let output = P::process_output(&proof, &host)?;
@@ -46,7 +47,7 @@ pub trait ProofGenerator<T, P: ZkVmProver> {
         verify_proof(&proof, &self.get_host())?;
 
         // Save the proof to cache
-        write_proof_to_file(&proof, &proof_file)?;
+        write_proof_to_file(&proof, &proof_file).unwrap();
 
         Ok((proof, output))
     }
@@ -100,6 +101,6 @@ fn write_proof_to_file(proof: &Proof, proof_file: &std::path::Path) -> Result<()
 }
 
 /// Verifies a proof independently.
-fn verify_proof(proof: &Proof, host: &impl ZkVmHost) -> Result<()> {
+fn verify_proof(proof: &Proof, host: &impl ZkVmHost) -> ZkVmResult<()> {
     host.verify(proof)
 }

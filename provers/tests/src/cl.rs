@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result};
+use anyhow::Context;
 use bitcoin::block;
 use strata_proofimpl_cl_stf::{
     prover::{ClStfInput, ClStfProver},
@@ -18,6 +18,7 @@ use strata_state::header::L2Header;
 use strata_test_utils::{evm_ee::L2Segment, l2::gen_params};
 use strata_zkvm::{
     AggregationInput, Proof, ProofType, VerificationKey, ZkVmHost, ZkVmInputBuilder, ZkVmProver,
+    ZkVmResult,
 };
 
 use super::L2BatchProofGenerator;
@@ -34,7 +35,7 @@ impl ClProofGenerator {
 }
 
 impl ProofGenerator<u64, ClStfProver> for ClProofGenerator {
-    fn get_input(&self, block_num: &u64) -> Result<ClStfInput> {
+    fn get_input(&self, block_num: &u64) -> ZkVmResult<ClStfInput> {
         // Generate EL proof required for aggregation
         let (el_proof, _) = self.el_proof_generator.get_proof(block_num)?;
 
@@ -55,7 +56,7 @@ impl ProofGenerator<u64, ClStfProver> for ClProofGenerator {
         })
     }
 
-    fn gen_proof(&self, block_num: &u64) -> Result<(Proof, L2BatchProofOutput)> {
+    fn gen_proof(&self, block_num: &u64) -> ZkVmResult<(Proof, L2BatchProofOutput)> {
         let host = self.get_host();
         let input = self.get_input(block_num)?;
         ClStfProver::prove(&input, &host)

@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use anyhow::{Context, Result};
+use anyhow::Context;
 use bitcoin::{consensus::serialize, Block};
 use strata_proofimpl_btc_blockspace::{
     logic::{BlockspaceProofInput, BlockspaceProofOutput},
@@ -18,7 +18,9 @@ use strata_sp1_guest_builder::{
     GUEST_BTC_BLOCKSPACE_VK_HASH_STR,
 };
 use strata_test_utils::l2::gen_params;
-use strata_zkvm::{Proof, ProofType, VerificationKey, ZkVmHost, ZkVmInputBuilder, ZkVmProver};
+use strata_zkvm::{
+    Proof, ProofType, VerificationKey, ZkVmHost, ZkVmInputBuilder, ZkVmProver, ZkVmResult,
+};
 
 use crate::proof_generator::ProofGenerator;
 
@@ -37,7 +39,7 @@ impl BtcBlockProofGenerator {
 }
 
 impl ProofGenerator<Block, BtcBlockspaceProver> for BtcBlockProofGenerator {
-    fn get_input(&self, block: &Block) -> Result<BlockspaceProofInput> {
+    fn get_input(&self, block: &Block) -> ZkVmResult<BlockspaceProofInput> {
         let params = gen_params();
         let rollup_params = params.rollup();
         let input = BlockspaceProofInput {
@@ -47,7 +49,7 @@ impl ProofGenerator<Block, BtcBlockspaceProver> for BtcBlockProofGenerator {
         Ok(input)
     }
 
-    fn gen_proof(&self, block: &Block) -> Result<(Proof, BlockspaceProofOutput)> {
+    fn gen_proof(&self, block: &Block) -> ZkVmResult<(Proof, BlockspaceProofOutput)> {
         let host = self.get_host();
         let input = self.get_input(block)?;
         BtcBlockspaceProver::prove(&input, &host)

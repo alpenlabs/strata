@@ -130,11 +130,7 @@ alloy-rpc-types-eth = { version = "0.4.2", default-features = false, features = 
 ] }
 alloy-serde = { version = "0.4.2", default-features = false }
 alloy-sol-types = "0.8.0"
-revm = { version = "14.0.3", features = [
-  "std",
-  "secp256k1",
-  "blst",
-], default-features = false }
+revm = { version = "14.0.3", features = ["std"], default-features = false }
 revm-primitives = { version = "10.0.0", features = [
   "std",
 ], default-features = false }
@@ -224,42 +220,6 @@ reqwest = { version = "0.12.7", default-features = false, features = [
   "zstd",
   "json",
 ] }
-reth = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
-reth-basic-payload-builder = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
-reth-chainspec = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
-reth-cli-commands = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
-reth-cli-util = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
-reth-db = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
-reth-errors = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
-reth-ethereum-payload-builder = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
-reth-evm = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
-reth-evm-ethereum = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
-reth-exex = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
-reth-ipc = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
-reth-node-api = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
-reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
-reth-payload-builder = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
-reth-primitives = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3", default-features = false, features = [
-  "std",
-] }
-reth-provider = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
-reth-revm = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
-reth-rpc = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
-reth-rpc-api = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
-reth-rpc-eth-api = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
-reth-rpc-eth-types = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
-reth-rpc-layer = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
-reth-rpc-types = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
-reth-rpc-types-compat = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
-reth-trie-common = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.0.3" }
-revm = { version = "12.1.0", features = [
-  "std",
-  # "secp256k1",
-  # "blst",
-], default-features = false }
-revm-primitives = { version = "7.1.0", features = [
-  "std",
-], default-features = false }
 rockbound = { git = "https://github.com/alpenlabs/rockbound", rev = "v2.0.1-alpen.2" }
 secp256k1 = { version = "0.29.1", features = ["global-context", "std"] }
 serde = { version = "1.0", features = ["derive"] }

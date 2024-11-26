@@ -1,4 +1,3 @@
-use anyhow::Result;
 use strata_proofimpl_checkpoint::{
     prover::{CheckpointProver, CheckpointProverInput},
     CheckpointProofInput, CheckpointProofOutput,
@@ -14,7 +13,7 @@ use strata_sp1_guest_builder::{
     GUEST_CHECKPOINT_PK, GUEST_CHECKPOINT_VK, GUEST_CHECKPOINT_VK_HASH_STR,
 };
 use strata_test_utils::l2::gen_params;
-use strata_zkvm::{Proof, ZkVmHost, ZkVmProver};
+use strata_zkvm::{Proof, ZkVmHost, ZkVmProver, ZkVmResult};
 
 use super::{l2_batch, L1BatchProofGenerator, L2BatchProofGenerator, ProofGenerator};
 
@@ -42,7 +41,7 @@ pub struct CheckpointBatchInfo {
 }
 
 impl ProofGenerator<CheckpointBatchInfo, CheckpointProver> for CheckpointProofGenerator {
-    fn get_input(&self, batch_info: &CheckpointBatchInfo) -> Result<CheckpointProverInput> {
+    fn get_input(&self, batch_info: &CheckpointBatchInfo) -> ZkVmResult<CheckpointProverInput> {
         let params = gen_params();
         let rollup_params = params.rollup();
 
@@ -76,7 +75,7 @@ impl ProofGenerator<CheckpointBatchInfo, CheckpointProver> for CheckpointProofGe
     fn gen_proof(
         &self,
         batch_info: &CheckpointBatchInfo,
-    ) -> Result<(Proof, CheckpointProofOutput)> {
+    ) -> ZkVmResult<(Proof, CheckpointProofOutput)> {
         let host = self.get_host();
         let input = self.get_input(batch_info)?;
         CheckpointProver::prove(&input, &host)
