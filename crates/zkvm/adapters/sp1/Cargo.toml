@@ -4,10 +4,6 @@ name = "strata-sp1-adapter"
 version = "0.1.0"
 
 [dependencies]
-strata-primitives.workspace = true
-strata-zkvm.workspace = true
-
-anyhow.workspace = true
 bincode.workspace = true
 borsh.workspace = true
 hex.workspace = true

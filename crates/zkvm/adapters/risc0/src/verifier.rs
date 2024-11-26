@@ -1,18 +1,16 @@
-use anyhow::ensure;
 use risc0_zkvm::{Groth16Receipt, MaybePruned, ReceiptClaim};
 use sha2::Digest;
-use strata_zkvm::Proof;
+use strata_zkvm::{Proof, ZkVmError, ZkVmResult};
 
 pub fn verify_groth16(
     proof: &Proof,
     verification_key: &[u8],
     public_params_raw: &[u8],
-) -> anyhow::Result<()> {
+) -> ZkVmResult<()> {
     // Ensure the verification key is exactly 32 bytes long
-    ensure!(
-        verification_key.len() == 32,
-        "Verification key must be exactly 32 bytes"
-    );
+    if verification_key.len() != 32 {
+        return Err(ZkVmError::InvalidVerificationKey);
+    }
 
     let public_params_hash: [u8; 32] = sha2::Sha256::digest(public_params_raw).into();
     let public_params_digest = risc0_zkvm::sha::Digest::from_bytes(public_params_hash);
@@ -34,10 +32,10 @@ pub fn verify_groth16(
         public_params_digest,    // This is not actually used underneath
     );
 
-    // Map the verification error to anyhow::Result and return the result
+    // Map the verification error to ZkVmResult and return the result
     receipt
         .verify_integrity()
-        .map_err(|e| anyhow::anyhow!("Integrity verification failed: {:?}", e))
+        .map_err(|e| strata_zkvm::ZkVmError::ProofVerificationError(e.to_string()))
 }
 
 #[cfg(test)]

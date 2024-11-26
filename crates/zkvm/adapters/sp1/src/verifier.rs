@@ -1,8 +1,7 @@
-use anyhow::Result;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use sp1_verifier::{Groth16Verifier, GROTH16_VK_BYTES};
-use strata_zkvm::Proof;
+use strata_zkvm::{Proof, ZkVmError, ZkVmResult};
 
 /// Verification Key required to verify proof generated from `ZKVMHost`
 #[derive(Debug, Clone, Serialize, Deserialize, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
@@ -18,7 +17,11 @@ impl VerificationKey {
     }
 }
 
-pub fn verify_groth16(proof: &Proof, vkey_hash: &[u8], committed_values_raw: &[u8]) -> Result<()> {
+pub fn verify_groth16(
+    proof: &Proof,
+    vkey_hash: &[u8],
+    committed_values_raw: &[u8],
+) -> ZkVmResult<()> {
     let vk_hash_str = hex::encode(vkey_hash);
     let vk_hash_str = format!("0x{}", vk_hash_str);
 
@@ -32,7 +35,7 @@ pub fn verify_groth16(proof: &Proof, vkey_hash: &[u8], committed_values_raw: &[u
         &vk_hash_str,
         &GROTH16_VK_BYTES,
     )
-    .map_err(anyhow::Error::from)
+    .map_err(|e| ZkVmError::ProofVerificationError(e.to_string()))
 }
 
 // NOTE: SP1 prover runs in release mode only; therefore run the tests on release mode only

@@ -24,7 +24,7 @@ pub trait ZkVmEnv {
     /// [`write_borsh`](`crate::ZkVmInputBuilder::write_borsh).
     fn read_borsh<T: BorshDeserialize>(&self) -> T {
         let buf = self.read_buf();
-        borsh::from_slice(&buf).expect("borsh serialization failed")
+        borsh::from_slice(&buf).expect("borsh deserialization failed")
     }
 
     /// Commits a pre-serialized buffer to the public values stream.
@@ -43,7 +43,7 @@ pub trait ZkVmEnv {
     ///
     /// Values that are committed can be proven as public parameters.
     fn commit_borsh<T: BorshSerialize>(&self, output: &T) {
-        self.commit_buf(&borsh::to_vec(output).expect("failed borsh serialization"));
+        self.commit_buf(&borsh::to_vec(output).expect("borsh serialization failed"));
     }
 
     /// Verifies a proof generated with the ZkVM.

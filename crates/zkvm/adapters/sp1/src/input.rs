@@ -1,6 +1,5 @@
-use anyhow::Ok;
 use sp1_sdk::{SP1Proof, SP1ProofWithPublicValues, SP1Stdin, SP1VerifyingKey};
-use strata_zkvm::{AggregationInput, ZkVmInputBuilder};
+use strata_zkvm::{AggregationInput, ZkVmError, ZkVmInputBuilder, ZkVmResult};
 
 // A wrapper around SP1Stdin
 pub struct SP1ProofInputBuilder(SP1Stdin);
@@ -11,22 +10,22 @@ impl<'a> ZkVmInputBuilder<'a> for SP1ProofInputBuilder {
         SP1ProofInputBuilder(SP1Stdin::new())
     }
 
-    fn write_serde<T: serde::Serialize>(&mut self, item: &T) -> anyhow::Result<&mut Self> {
+    fn write_serde<T: serde::Serialize>(&mut self, item: &T) -> ZkVmResult<&mut Self> {
         self.0.write(item);
         Ok(self)
     }
 
-    fn write_borsh<T: borsh::BorshSerialize>(&mut self, item: &T) -> anyhow::Result<&mut Self> {
+    fn write_borsh<T: borsh::BorshSerialize>(&mut self, item: &T) -> ZkVmResult<&mut Self> {
         let slice = borsh::to_vec(item)?;
         self.write_buf(&slice)
     }
 
-    fn write_buf(&mut self, item: &[u8]) -> anyhow::Result<&mut Self> {
+    fn write_buf(&mut self, item: &[u8]) -> ZkVmResult<&mut Self> {
         self.0.write_slice(item);
         Ok(self)
     }
 
-    fn write_proof(&mut self, item: AggregationInput) -> anyhow::Result<&mut Self> {
+    fn write_proof(&mut self, item: AggregationInput) -> ZkVmResult<&mut Self> {
         let proof: SP1ProofWithPublicValues = bincode::deserialize(item.proof().as_bytes())?;
         let vkey: SP1VerifyingKey = bincode::deserialize(item.vk().as_bytes())?;
 
@@ -42,13 +41,17 @@ impl<'a> ZkVmInputBuilder<'a> for SP1ProofInputBuilder {
             SP1Proof::Compressed(compressed_proof) => {
                 self.0.write_proof(*compressed_proof, vkey.vk);
             }
-            _ => return Err(anyhow::anyhow!("can only handle compressed proofs")),
+            _ => {
+                return Err(ZkVmError::InputError(
+                    "SP1 can only handle compressed proof".to_string(),
+                ))
+            }
         }
 
         Ok(self)
     }
 
-    fn build(&mut self) -> anyhow::Result<Self::Input> {
-        anyhow::Ok(self.0.clone())
+    fn build(&mut self) -> ZkVmResult<Self::Input> {
+        Ok(self.0.clone())
     }
 }

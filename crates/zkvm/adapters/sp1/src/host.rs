@@ -1,7 +1,8 @@
-use anyhow::Ok;
 use serde::{de::DeserializeOwned, Serialize};
 use sp1_sdk::{ProverClient, SP1ProofWithPublicValues, SP1ProvingKey, SP1VerifyingKey};
-use strata_zkvm::{Proof, ProofType, VerificationKey, ZkVmHost, ZkVmInputBuilder};
+use strata_zkvm::{
+    Proof, ProofType, VerificationKey, ZkVmError, ZkVmHost, ZkVmInputBuilder, ZkVmResult,
+};
 
 use crate::input::SP1ProofInputBuilder;
 
@@ -45,7 +46,7 @@ impl ZkVmHost for SP1Host {
         &self,
         prover_input: <Self::Input<'a> as ZkVmInputBuilder<'a>>::Input,
         proof_type: ProofType,
-    ) -> anyhow::Result<(Proof, VerificationKey)> {
+    ) -> ZkVmResult<(Proof, VerificationKey)> {
         sp1_sdk::utils::setup_logger();
         let client = ProverClient::new();
 
@@ -57,7 +58,9 @@ impl ZkVmHost for SP1Host {
             ProofType::Groth16 => prover.groth16(),
         };
 
-        let proof = prover.run()?;
+        let proof = prover
+            .run()
+            .map_err(|e| ZkVmError::ProofGenerationError(e.to_string()))?;
 
         // Proof serialization
         let serialized_proof = bincode::serialize(&proof)?;
@@ -65,14 +68,14 @@ impl ZkVmHost for SP1Host {
         Ok((Proof::new(serialized_proof), self.get_verification_key()))
     }
 
-    fn extract_raw_public_output(proof: &Proof) -> anyhow::Result<Vec<u8>> {
+    fn extract_raw_public_output(proof: &Proof) -> Result<Vec<u8>, ZkVmError> {
         let proof: SP1ProofWithPublicValues = bincode::deserialize(proof.as_bytes())?;
         Ok(proof.public_values.as_slice().to_vec())
     }
 
     fn extract_serde_public_output<T: Serialize + DeserializeOwned>(
         proof: &Proof,
-    ) -> anyhow::Result<T> {
+    ) -> ZkVmResult<T> {
         let mut proof: SP1ProofWithPublicValues = bincode::deserialize(proof.as_bytes())?;
         let public_params: T = proof.public_values.read();
         Ok(public_params)
@@ -83,11 +86,13 @@ impl ZkVmHost for SP1Host {
         VerificationKey::new(verification_key)
     }
 
-    fn verify(&self, proof: &Proof) -> anyhow::Result<()> {
+    fn verify(&self, proof: &Proof) -> ZkVmResult<()> {
         let proof: SP1ProofWithPublicValues = bincode::deserialize(proof.as_bytes())?;
 
         let client = ProverClient::new();
-        client.verify(&proof, &self.verifying_key)?;
+        client
+            .verify(&proof, &self.verifying_key)
+            .map_err(|e| ZkVmError::ProofVerificationError(e.to_string()))?;
 
         Ok(())
     }

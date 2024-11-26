@@ -1,6 +1,8 @@
 use risc0_zkvm::{compute_image_id, default_prover, sha::Digest, ProverOpts, Receipt};
 use serde::{de::DeserializeOwned, Serialize};
-use strata_zkvm::{Proof, ProofType, VerificationKey, ZkVmHost, ZkVmInputBuilder};
+use strata_zkvm::{
+    Proof, ProofType, VerificationKey, ZkVmError, ZkVmHost, ZkVmInputBuilder, ZkVmResult,
+};
 
 use crate::input::Risc0ProofInputBuilder;
 
@@ -29,7 +31,7 @@ impl ZkVmHost for Risc0Host {
         &self,
         prover_input: <Self::Input<'a> as ZkVmInputBuilder<'a>>::Input,
         proof_type: ProofType,
-    ) -> anyhow::Result<(Proof, VerificationKey)> {
+    ) -> ZkVmResult<(Proof, VerificationKey)> {
         // Setup the prover
         let opts = match proof_type {
             ProofType::Core => ProverOpts::default(),
@@ -41,7 +43,8 @@ impl ZkVmHost for Risc0Host {
         let prover = default_prover();
 
         // Setup verification key
-        let program_id = compute_image_id(&self.elf)?;
+        let program_id =
+            compute_image_id(&self.elf).map_err(|e| ZkVmError::InvalidELF(e.to_string()))?;
         let verification_key = bincode::serialize(&program_id)?;
 
         // Generate the session
@@ -51,7 +54,9 @@ impl ZkVmHost for Risc0Host {
         // Generate the proof
         // let ctx = VerifierContext::default();
         // let proof_info = prover.prove_session(&ctx, &session)?;
-        let proof_info = prover.prove_with_opts(prover_input, &self.elf, &opts)?;
+        let proof_info = prover
+            .prove_with_opts(prover_input, &self.elf, &opts)
+            .map_err(|e| ZkVmError::ProofGenerationError(e.to_string()))?;
 
         // Proof serialization
         let serialized_proof = bincode::serialize(&proof_info.receipt)?;
@@ -61,25 +66,32 @@ impl ZkVmHost for Risc0Host {
         ))
     }
 
-    fn extract_raw_public_output(proof: &Proof) -> anyhow::Result<Vec<u8>> {
+    fn extract_raw_public_output(proof: &Proof) -> ZkVmResult<Vec<u8>> {
         let receipt: Receipt = bincode::deserialize(proof.as_bytes())?;
         Ok(receipt.journal.bytes)
     }
 
     fn extract_serde_public_output<T: Serialize + DeserializeOwned>(
         proof: &Proof,
-    ) -> anyhow::Result<T> {
+    ) -> ZkVmResult<T> {
         let receipt: Receipt = bincode::deserialize(proof.as_bytes())?;
-        Ok(receipt.journal.decode()?)
+        receipt
+            .journal
+            .decode()
+            .map_err(|e| ZkVmError::DeserializationError {
+                source: strata_zkvm::DeserializationErrorSource::Serde(e.to_string()),
+            })
     }
 
     fn get_verification_key(&self) -> VerificationKey {
         VerificationKey::new(self.id.as_bytes().to_vec())
     }
 
-    fn verify(&self, proof: &Proof) -> anyhow::Result<()> {
+    fn verify(&self, proof: &Proof) -> ZkVmResult<()> {
         let receipt: Receipt = bincode::deserialize(proof.as_bytes())?;
-        receipt.verify(self.id)?;
+        receipt
+            .verify(self.id)
+            .map_err(|e| ZkVmError::ProofVerificationError(e.to_string()))?;
         Ok(())
     }
 }
