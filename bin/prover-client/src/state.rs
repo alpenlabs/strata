@@ -1,14 +1,19 @@
-use std::{collections::HashMap, fmt};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt,
+};
 
 use serde::{Deserialize, Serialize};
+use strata_primitives::vk::StrataProofId;
 use tracing::{error, info};
 use uuid::Uuid;
 
 use crate::{
     primitives::prover_input::{ProofWithVkey, ZkVmInput},
     proof_generators::{
-        btc_ops::{BtcBlockspaceId, BtcBlockspaceProofGenerator},
-        l1_batch_ops::{L1BatchIntermediateInput, L1BatchProofGenerator},
+        btc_ops::BtcBlockspaceProofGenerator,
+        ProofGenerator,
+        // l1_batch_ops::{L1BatchIntermediateInput, L1BatchProofGenerator},
     },
 };
 
@@ -130,29 +135,29 @@ pub struct ProvingTask {
 
 #[derive(Debug, Clone)]
 pub struct ProvingTask2 {
-    pub id: Uuid,
+    pub proof_id: StrataProofId,
     pub status: ProvingTaskStatus2,
-    pub info: ProvingInfo,
+}
+
+impl ProvingTask2 {
+    pub fn new(proof_id: StrataProofId, dependencies: Vec<Uuid>) -> Self {
+        let status = if dependencies.len() > 0 {
+            ProvingTaskStatus2::WaitingForDependencies(HashSet::from_iter(dependencies.into_iter()))
+        } else {
+            ProvingTaskStatus2::Pending
+        };
+        Self { proof_id, status }
+    }
 }
 
 type ProofId = String;
 
 #[derive(Debug, Clone)]
 pub enum ProvingTaskStatus2 {
-    WaitingForDependencies(Vec<Uuid>),
+    WaitingForDependencies(HashSet<Uuid>),
     Pending,
     WitnessSubmitted(ProofId),
     ProvingInProgress(ProofId),
-    Completed(ProofWithVkey),
+    Completed,
     Failed,
-}
-
-#[derive(Debug, Clone)]
-pub enum ProvingInfo {
-    BtcBlockspace(BtcBlockspaceProofGenerator, BtcBlockspaceId),
-    L1Batch(L1BatchProofGenerator, L1BatchIntermediateInput),
-    // EvmEeProver,
-    // ClStfProver,
-    // ClAggProver,
-    // CheckpointProver,
 }

@@ -18,6 +18,9 @@ pub enum ProvingTaskError {
 
     #[error("Failed to create dependency task: {0}")]
     DependencyTaskCreation(String),
+
+    #[error("Invalid input: {0}")]
+    InvalidInput(String),
 }
 
 // Define ProvingTaskType enum to represent EL and CL

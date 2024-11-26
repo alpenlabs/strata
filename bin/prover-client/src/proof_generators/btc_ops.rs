@@ -1,8 +1,10 @@
-use std::sync::Arc;
+use std::{borrow::Borrow, sync::Arc};
 
+use anyhow::anyhow;
 use bitcoin::secp256k1::{SecretKey, SECP256K1};
 use rand::{rngs::StdRng, SeedableRng};
 use strata_btcio::rpc::{traits::Reader, BitcoinClient};
+use strata_db::traits::{ProverDataProvider, ProverDataStore, ProverDatabase};
 use strata_primitives::{
     block_credential,
     buf::Buf32,
@@ -15,11 +17,7 @@ use strata_rocksdb::prover::db::ProverDB;
 use uuid::Uuid;
 
 use super::ProofGenerator;
-use crate::{
-    errors::ProvingTaskError,
-    state::{ProvingInfo, ProvingTask2},
-    task2::TaskTracker2,
-};
+use crate::{errors::ProvingTaskError, state::ProvingTask2, task2::TaskTracker2};
 
 /// Operations required for BTC block proving tasks.
 #[derive(Debug, Clone)]
@@ -40,21 +38,25 @@ impl ProofGenerator for BtcBlockspaceProofGenerator {
     async fn create_task(
         &self,
         id: StrataProofId,
-        db: ProverDB,
+        db: &ProverDB,
         task_tracker: Arc<TaskTracker2>,
     ) -> Result<Uuid, ProvingTaskError> {
-        let status = crate::state::ProvingTaskStatus2::Pending;
-        let info = ProvingInfo::BtcBlockspace(self.clone(), id);
-        let task_id = task_tracker.create_task(info, status).await;
-        Ok(task_tracker.create_task(info, status).await)
+        let task = ProvingTask2::new(id.clone(), vec![]);
+        let task_id = task_tracker.insert_task(task).await;
+        db.prover_store().insert_task(task_id, id);
+        Ok(task_id)
     }
 
     async fn fetch_input(
         &self,
-        id: BtcBlockspaceId,
-        _db: ProverDB,
+        id: StrataProofId,
+        db: &ProverDB,
     ) -> Result<<Self::Prover as strata_zkvm::ZkVmProver>::Input, anyhow::Error> {
-        let block = self.btc_client.get_block_at(id).await?;
+        let height = match id {
+            StrataProofId::BtcBlockspace(height) => height,
+            _ => return Err(anyhow!("invalid input")),
+        };
+        let block = self.btc_client.get_block_at(height).await?;
         let rollup_params = get_pm_rollup_params();
         Ok(BlockspaceProofInput {
             block,

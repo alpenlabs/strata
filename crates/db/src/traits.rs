@@ -304,6 +304,8 @@ pub trait ProverDataStore {
     fn insert_proof(&self, proof_id: StrataProofId, proof: ProofWithInfo) -> DbResult<()>;
 
     fn insert_dependencies(&self, task_id: Uuid, dependencies: Vec<Uuid>) -> DbResult<()>;
+
+    fn insert_task(&self, task_id: Uuid, proof_id: StrataProofId) -> DbResult<()>;
 }
 
 /// All methods related to fetching [`Vec<u8>`]s and indices in the database

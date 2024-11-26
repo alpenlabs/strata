@@ -9,7 +9,7 @@ use strata_db::{
     DbResult,
 };
 
-use super::schemas::{ProofDependenciesSchema, ProverTaskIdSchema, ProverTaskSchema};
+use super::schemas::{ProverTaskIdSchema, ProverTaskSchema};
 use crate::{sequence::get_next_id, DbOpsConfig};
 
 pub struct ProofDb {
@@ -78,6 +78,14 @@ impl ProverDataStore for ProofDb {
         &self,
         _proof_id: strata_primitives::vk::StrataProofId,
         _proof: strata_zkvm::ProofWithInfo,
+    ) -> DbResult<()> {
+        todo!()
+    }
+
+    fn insert_task(
+        &self,
+        _task_id: uuid::Uuid,
+        _proof_id: strata_primitives::vk::StrataProofId,
     ) -> DbResult<()> {
         todo!()
     }

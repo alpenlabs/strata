@@ -11,7 +11,7 @@ pub mod btc_ops;
 // pub mod checkpoint_ops;
 // pub mod cl_ops;
 // pub mod el_ops;
-// pub mod l1_batch_ops;
+pub mod l1_batch_ops;
 // pub mod l2_batch_ops;
 
 pub trait ProofGenerator {
@@ -20,13 +20,13 @@ pub trait ProofGenerator {
     async fn create_task(
         &self,
         id: StrataProofId,
-        db: ProverDB,
+        db: &ProverDB,
         task_tracker: Arc<TaskTracker2>,
     ) -> Result<Uuid, ProvingTaskError>;
 
     async fn fetch_input(
         &self,
-        id: Self::Id,
-        db: ProverDB,
+        task_id: StrataProofId,
+        db: &ProverDB,
     ) -> Result<<Self::Prover as ZkVmProver>::Input, anyhow::Error>;
 }
