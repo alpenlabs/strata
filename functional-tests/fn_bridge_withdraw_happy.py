@@ -45,7 +45,6 @@ class BridgeWithdrawHappyTest(flexitest.Test):
         ctx.set_env(BasicEnvConfig(pre_generate_blocks=101))
         self.logger = get_logger("BridgeWithdrawHappyTest")
 
-    # TODO: This needs refactoring to be more clear
     def main(self, ctx: flexitest.RunContext):
         address = get_address(0)
         withdraw_address = get_address(1)
