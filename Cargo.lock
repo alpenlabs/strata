@@ -13153,7 +13153,6 @@ dependencies = [
 name = "strata-proofimpl-btc-blockspace"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "bitcoin",
  "borsh",
  "hex",
@@ -13172,7 +13171,6 @@ dependencies = [
 name = "strata-proofimpl-checkpoint"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "bitcoin",
  "borsh",
  "ethnum",
@@ -13192,7 +13190,6 @@ dependencies = [
 name = "strata-proofimpl-cl-agg"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "borsh",
  "strata-proofimpl-cl-stf",
  "strata-zkvm",
@@ -13202,10 +13199,7 @@ dependencies = [
 name = "strata-proofimpl-cl-stf"
 version = "0.1.0"
 dependencies = [
- "anyhow",
- "bincode",
  "borsh",
- "serde",
  "strata-chaintsn",
  "strata-crypto",
  "strata-primitives",
@@ -13213,7 +13207,6 @@ dependencies = [
  "strata-state",
  "strata-test-utils",
  "strata-zkvm",
- "thiserror",
 ]
 
 [[package]]
@@ -13248,13 +13241,11 @@ dependencies = [
 name = "strata-proofimpl-l1-batch"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "bitcoin",
  "borsh",
  "ethnum",
  "rand",
  "serde",
- "serde_json",
  "strata-primitives",
  "strata-proofimpl-btc-blockspace",
  "strata-state",

@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-anyhow.workspace = true
 borsh.workspace = true
 strata-proofimpl-cl-stf.workspace = true
 strata-zkvm.workspace = true

@@ -1,7 +1,7 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
 use strata_state::l1::HeaderVerificationState;
-use strata_zkvm::{AggregationInput, Proof, VerificationKey, ZkVmProver};
+use strata_zkvm::{AggregationInput, Proof, VerificationKey, ZkVmProver, ZkVmResult};
 
 use crate::logic::L1BatchProofOutput;
 
@@ -22,7 +22,7 @@ impl ZkVmProver for L1BatchProver {
         strata_zkvm::ProofType::Compressed
     }
 
-    fn prepare_input<'a, B>(input: &'a Self::Input) -> anyhow::Result<B::Input>
+    fn prepare_input<'a, B>(input: &'a Self::Input) -> ZkVmResult<B::Input>
     where
         B: strata_zkvm::ZkVmInputBuilder<'a>,
     {
@@ -42,7 +42,7 @@ impl ZkVmProver for L1BatchProver {
         input_builder.build()
     }
 
-    fn process_output<H>(proof: &Proof, _host: &H) -> anyhow::Result<Self::Output>
+    fn process_output<H>(proof: &Proof, _host: &H) -> ZkVmResult<Self::Output>
     where
         H: strata_zkvm::ZkVmHost,
     {
