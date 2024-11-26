@@ -11,7 +11,6 @@ from strata_utils import (
 from web3 import Web3
 
 from constants import (
-    DEFAULT_BLOCK_TIME_SEC,
     DEFAULT_ROLLUP_PARAMS,
     PRECOMPILE_BRIDGEOUT_ADDRESS,
     SATS_TO_WEI,
@@ -118,7 +117,9 @@ class BridgeWithdrawHappyTest(flexitest.Test):
         # NOTE: we need 2 deposits to make sure we have funds for gas
         self.make_drt(ctx, el_address, bridge_pk)
         self.make_drt(ctx, el_address, bridge_pk)
-        wait_until(lambda: int(rethrpc.eth_getBalance(el_address), 16) > 0)
+        wait_until(
+            lambda: int(rethrpc.eth_getBalance(el_address), 16) == 2 * DEPOSIT_AMOUNT * SATS_TO_WEI
+        )
 
         # Get the balance of the EL address after the deposits
         balance = int(rethrpc.eth_getBalance(el_address), 16)
@@ -134,7 +135,7 @@ class BridgeWithdrawHappyTest(flexitest.Test):
         self.logger.debug(f"Sent withdrawal transaction with hash: {l2_tx_hash}")
 
         # Wait for the withdrawal to be processed
-        time.sleep(DEFAULT_BLOCK_TIME_SEC * 2)
+        wait_until(lambda: web3.eth.get_transaction_receipt(l2_tx_hash))
         tx_receipt = web3.eth.get_transaction_receipt(l2_tx_hash)
         self.logger.debug(f"Transaction receipt: {tx_receipt}")
         total_gas_used = tx_receipt["gasUsed"] * tx_receipt["effectiveGasPrice"]
@@ -149,7 +150,7 @@ class BridgeWithdrawHappyTest(flexitest.Test):
 
         # Mine blocks
         btcrpc.proxy.generatetoaddress(12, UNSPENDABLE_ADDRESS)
-        time.sleep(1)
+        wait_until(lambda: get_balance(withdraw_address, btc_url, btc_user, btc_password) > 0)
 
         # Make sure that the balance in the BTC wallet is D BTC - operator's fees
         btc_balance = get_balance(withdraw_address, btc_url, btc_user, btc_password)
