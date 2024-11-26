@@ -1,4 +1,3 @@
-use serde::{de::Error as SerdeDeError, ser::Error as SerdeSerError};
 use thiserror::Error;
 
 pub type ZkVmResult<T> = Result<T, ZkVmError>;
@@ -84,42 +83,6 @@ pub enum DeserializationErrorSource {
     /// Other deserialization errors
     #[error("Other deserialization error: {0}")]
     Other(String),
-}
-
-/// Trait for converting Serde serialization errors
-pub trait SerdeSerErrorConvert {
-    /// Convert the Serde serialization error to ZkVmError
-    fn to_zkvm_error(self) -> ZkVmError;
-}
-
-/// Trait for converting Serde deserialization errors
-pub trait SerdeDeErrorConvert {
-    /// Convert the Serde deserialization error to ZkVmError
-    fn to_zkvm_error(self) -> ZkVmError;
-}
-
-// Implement conversion traits for any Serde serializer error
-impl<E> SerdeSerErrorConvert for E
-where
-    E: SerdeSerError,
-{
-    fn to_zkvm_error(self) -> ZkVmError {
-        ZkVmError::SerializationError {
-            source: SerializationErrorSource::Serde(self.to_string()),
-        }
-    }
-}
-
-// Implement conversion traits for any Serde deserializer error
-impl<E> SerdeDeErrorConvert for E
-where
-    E: SerdeDeError,
-{
-    fn to_zkvm_error(self) -> ZkVmError {
-        ZkVmError::DeserializationError {
-            source: DeserializationErrorSource::Serde(self.to_string()),
-        }
-    }
 }
 
 impl From<borsh::io::Error> for ZkVmError {

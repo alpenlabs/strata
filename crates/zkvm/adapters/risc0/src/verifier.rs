@@ -11,13 +11,11 @@ pub fn verify_groth16(
     if verification_key.len() != 32 {
         return Err(ZkVmError::InvalidVerificationKey);
     }
+    let mut vkey = [0u8; 32];
+    vkey.copy_from_slice(verification_key);
 
     let public_params_hash: [u8; 32] = sha2::Sha256::digest(public_params_raw).into();
     let public_params_digest = risc0_zkvm::sha::Digest::from_bytes(public_params_hash);
-
-    // TODO: throw error if verification_key.len() != 32
-    let mut vkey = [0u8; 32];
-    vkey.copy_from_slice(verification_key);
 
     let claim = ReceiptClaim::ok(
         risc0_zkvm::sha::Digest::from_bytes(vkey),
