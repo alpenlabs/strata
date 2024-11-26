@@ -10,6 +10,8 @@ strata-primitives.workspace = true
 strata-state.workspace = true
 strata-zkvm.workspace = true
 
+uuid = { workspace = true, features = ["borsh"] }
+
 anyhow.workspace = true
 arbitrary.workspace = true
 bincode.workspace = true
@@ -20,8 +22,6 @@ rockbound.workspace = true
 tempfile = { workspace = true, optional = true }
 thiserror.workspace = true
 tracing.workspace = true
-uuid.workspace = true
-
 [dev-dependencies]
 strata-test-utils.workspace = true
 

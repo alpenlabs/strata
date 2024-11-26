@@ -9,7 +9,7 @@ use strata_db::{
     DbResult,
 };
 
-use super::schemas::{ProverTaskIdSchema, ProverTaskSchema};
+use super::schemas::{ProofDependenciesSchema, ProverTaskIdSchema, ProverTaskSchema};
 use crate::{sequence::get_next_id, DbOpsConfig};
 
 pub struct ProofDb {
@@ -65,6 +65,22 @@ impl ProverDataStore for ProofDb {
             })
             .map_err(|e| DbError::TransactionError(e.to_string()))
     }
+
+    fn insert_dependencies(
+        &self,
+        _task_id: uuid::Uuid,
+        _dependencies: Vec<uuid::Uuid>,
+    ) -> DbResult<()> {
+        todo!()
+    }
+
+    fn insert_proof(
+        &self,
+        _proof_id: strata_primitives::vk::StrataProofId,
+        _proof: strata_zkvm::ProofWithInfo,
+    ) -> DbResult<()> {
+        todo!()
+    }
 }
 
 impl ProverDataProvider for ProofDb {
@@ -88,6 +104,17 @@ impl ProverDataProvider for ProofDb {
         } else {
             Err(DbError::EntryAlreadyExists)
         }
+    }
+
+    fn get_dependencies(&self, _task_id: uuid::Uuid) -> DbResult<Option<Vec<uuid::Uuid>>> {
+        todo!()
+    }
+
+    fn get_proof(
+        &self,
+        _proof_id: strata_primitives::vk::StrataProofId,
+    ) -> DbResult<Option<strata_zkvm::ProofWithInfo>> {
+        todo!()
     }
 }
 

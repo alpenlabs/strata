@@ -12,6 +12,7 @@ pub enum RollupVerifyingKey {
     Risc0VerifyingKey(Buf32),
 }
 
+// TODO: move this somewhere else?
 #[derive(Clone, Debug, PartialEq, BorshSerialize, BorshDeserialize)]
 pub enum StrataProofId {
     BtcBlockspace(u64),

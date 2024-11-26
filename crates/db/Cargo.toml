@@ -20,6 +20,7 @@ parking_lot.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
+uuid.workspace = true
 
 [features]
 default = []

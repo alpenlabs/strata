@@ -10,10 +10,26 @@ use crate::{
 // todo: use proper types after they are defined on state crate
 define_table_with_seek_key_codec!(
     /// A table to store idx-> task id mapping
-    (ProverTaskIdSchema) Uuid => StrataProofId
+    (ProverTaskIdSchema) u64 => [u8; 16]
 );
 
 define_table_with_default_codec!(
     /// A table to store task id-> proof bytes mapping
-    (ProverTaskSchema) Uuid => ProofWithInfo
+    (ProverTaskSchema) [u8; 16] => Vec<u8>
+);
+
+// todo: use proper types after they are defined on state crate
+define_table_with_seek_key_codec!(
+    /// A table to store task id -> StrataProofId
+    (ProofIdSchema) Uuid => StrataProofId
+);
+
+define_table_with_default_codec!(
+    /// A table to store task id > ProofWithInfo
+    (ProverInfoSchema) Uuid => ProofWithInfo
+);
+
+define_table_with_default_codec!(
+    /// A table to store task id and it's dependencies
+    (ProofDependenciesSchema) Uuid => Vec<Uuid>
 );

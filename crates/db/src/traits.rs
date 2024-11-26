@@ -5,12 +5,14 @@ use std::sync::Arc;
 
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_mmr::CompactMmr;
-use strata_primitives::{l1::*, prelude::*};
+use strata_primitives::{l1::*, prelude::*, vk::StrataProofId};
 use strata_state::{
     block::L2BlockBundle, bridge_duties::BridgeDutyStatus, chain_state::ChainState,
     client_state::ClientState, l1::L1Tx, operation::*, prelude::*, state_op::WriteBatch,
     sync_event::SyncEvent,
 };
+use strata_zkvm::ProofWithInfo;
+use uuid::Uuid;
 
 use crate::{
     entities::bridge_tx_state::BridgeTxState,
@@ -298,6 +300,10 @@ pub trait ProverDataStore {
 
     /// Updates an existing txentry
     fn update_task_entry(&self, idx: u64, txentry: Vec<u8>) -> DbResult<()>;
+
+    fn insert_proof(&self, proof_id: StrataProofId, proof: ProofWithInfo) -> DbResult<()>;
+
+    fn insert_dependencies(&self, task_id: Uuid, dependencies: Vec<Uuid>) -> DbResult<()>;
 }
 
 /// All methods related to fetching [`Vec<u8>`]s and indices in the database
@@ -313,6 +319,10 @@ pub trait ProverDataProvider {
 
     /// get txentry by idx
     fn get_task_entry(&self, idx: u64) -> DbResult<Option<Vec<u8>>>;
+
+    fn get_proof(&self, proof_id: StrataProofId) -> DbResult<Option<ProofWithInfo>>;
+
+    fn get_dependencies(&self, task_id: Uuid) -> DbResult<Option<Vec<Uuid>>>;
 }
 
 /// A trait encapsulating the provider and store traits for interacting with the broadcast
