@@ -25,7 +25,7 @@ pub mod internal {
                 }
 
                 pub fn is_zero(&self) -> bool {
-                    *self.as_ref() == [0; $len]
+                    self.0.iter().all(|v| *v == 0)
                 }
             }
 
