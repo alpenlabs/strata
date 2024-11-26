@@ -1,11 +1,9 @@
 import time
-from typing import List
 
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 
 from constants import DEFAULT_ROLLUP_PARAMS, SEQ_PUBLISH_BATCH_INTERVAL_SECS
-from entry import BasicEnvConfig
 from utils import broadcast_tx, get_logger
 
 
@@ -16,7 +14,7 @@ class BridgeDutiesTest(flexitest.Test):
     """
 
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env(BasicEnvConfig(101))
+        ctx.set_env("basic")
         self.logger = get_logger("getBridgeDuties")
 
     def main(self, ctx: flexitest.RunContext):
@@ -26,12 +24,13 @@ class BridgeDutiesTest(flexitest.Test):
         seqrpc = seq.create_rpc()
         btcrpc: BitcoindClient = btc.create_rpc()
 
-        addr = btcrpc.proxy.getnewaddress("", "bech32m")
+        addr = ctx.env.gen_ext_btc_address()
         fees_in_btc = 0.01
         sats_per_btc = 10**8
         amount_to_send = DEFAULT_ROLLUP_PARAMS["deposit_amount"] / sats_per_btc + fees_in_btc
 
-        el_address = "deadf001900dca3ebeefdeadf001900dca3ebeef"
+        el_address = ctx.env.gen_el_address()
+        el_address_bytes = list(bytes.fromhex(el_address))
         take_back_leaf_hash = "02" * 32
         magic_bytes = DEFAULT_ROLLUP_PARAMS["rollup_name"].encode("utf-8").hex()
         outputs = [
@@ -53,8 +52,6 @@ class BridgeDutiesTest(flexitest.Test):
                 # add robustness by spreading out requests across blocks
                 self.logger.debug(f"sent deposit request #{j} with txid = {txid} to block #{i}")
 
-            btcrpc.proxy.generatetoaddress(1, addr)
-
         time.sleep(SEQ_PUBLISH_BATCH_INTERVAL_SECS)
 
         operator_idx = 0
@@ -63,7 +60,9 @@ class BridgeDutiesTest(flexitest.Test):
             f"getting bridge duties for operator_idx: {operator_idx} from index: {start_index}"
         )
         duties_resp = seqrpc.strata_getBridgeDuties(operator_idx, start_index)
-        duties: List = duties_resp["duties"]
+        duties: list = duties_resp["duties"]
+        # Filter out the duties unrelated to other than the el_address.
+        duties = [d for d in duties if d["payload"]["el_address"] == el_address_bytes]
 
         expected_duties = []
         for txid in txids:
@@ -71,7 +70,7 @@ class BridgeDutiesTest(flexitest.Test):
                 "type": "SignDeposit",
                 "payload": {
                     "deposit_request_outpoint": f"{txid}:0",
-                    "el_address": list(bytes.fromhex(el_address)),
+                    "el_address": el_address_bytes,
                     "total_amount": amount_to_send * sats_per_btc,
                     "take_back_leaf_hash": take_back_leaf_hash,
                     "original_taproot_addr": {"network": "regtest", "address": addr},

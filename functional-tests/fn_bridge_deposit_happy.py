@@ -2,10 +2,9 @@ import time
 
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
-from strata_utils import deposit_request_transaction, drain_wallet, get_address
+from strata_utils import deposit_request_transaction, drain_wallet
 
 from constants import DEFAULT_ROLLUP_PARAMS
-from entry import BasicEnvConfig
 from utils import get_bridge_pubkey, get_logger
 
 
@@ -22,16 +21,16 @@ class BridgeDepositHappyTest(flexitest.Test):
     """
 
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env(BasicEnvConfig(pre_generate_blocks=101))
+        ctx.set_env("basic")
         self.logger = get_logger("BridgeDepositHappyTest")
 
     def main(self, ctx: flexitest.RunContext):
-        el_address_1 = "deadf001900dca3ebeefdeadf001900dca3ebeef"
-        el_address_2 = "deedf001900dca3ebeefdeadf001900dca3ebeef"
+        el_address_1 = ctx.env.gen_el_address()
+        el_address_2 = ctx.env.gen_el_address()
 
-        addr_1 = get_address(0)
-        addr_2 = get_address(1)
-        addr_3 = get_address(2)
+        addr_1 = ctx.env.gen_ext_btc_address()
+        addr_2 = ctx.env.gen_ext_btc_address()
+        addr_3 = ctx.env.gen_ext_btc_address()
 
         # 1st deposit
         self.test_deposit(ctx, addr_1, el_address_1)
@@ -150,9 +149,6 @@ class BridgeDepositHappyTest(flexitest.Test):
         else:
             assert original_balance > 0, "balance is zero"
 
-        # Generate Plenty of BTC to address
-        btcrpc.proxy.generatetoaddress(102, address)
-
         # Send DRT from Address 1 to EL Address 1
         self.make_drt(ctx, el_address, bridge_pk)
         # Make sure that the n_deposits is correct
@@ -171,6 +167,3 @@ class BridgeDepositHappyTest(flexitest.Test):
         assert new_balance - original_balance == rollup_deposit_amount * (
             10**10
         ), "balance is not the default rollup_deposit_amount"
-
-        # Drain wallet back to sequencer so that we cannot use address 1 or change anymore
-        self.drain_wallet(ctx)

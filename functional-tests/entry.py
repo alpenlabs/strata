@@ -7,11 +7,52 @@ from math import ceil
 from typing import Optional
 
 import flexitest
+from strata_utils import get_address, get_recovery_address
 
 import factory
 import net_settings
 from constants import *
+from rollup_params_cfg import RollupConfig
 from utils import *
+
+
+class BasicLiveEnv(flexitest.LiveEnv):
+    """
+    A common thin layer for all instances of the Environments.
+    """
+
+    def __init__(self, srvs, bridge_pk):
+        super().__init__(srvs)
+        self._el_address_gen = (
+            f"deada00{x:04X}dca3ebeefdeadf001900dca3ebeef" for x in range(16**4)
+        )
+        self._ext_btc_addr_idx = 0
+        self._rec_btc_addr_idx = 0
+        self._bridge_pk = bridge_pk
+
+    def gen_el_address(self) -> str:
+        """
+        Generates a unique EL address to be used across tests.
+        """
+        return next(self._el_address_gen)
+
+    def gen_ext_btc_address(self) -> str | List[str]:
+        """
+        Generates a unique bitcoin (external) taproot addresses that is funded with some BTC.
+        """
+
+        tr_addr: str = get_address(self._ext_btc_addr_idx)
+        self._ext_btc_addr_idx += 1
+        return tr_addr
+
+    def gen_rec_btc_address(self) -> str | List[str]:
+        """
+        Generates a unique bitcoin (recovery) taproot addresses that is funded with some BTC.
+        """
+
+        rec_tr_addr: str = get_recovery_address(self._rec_btc_addr_idx, self._bridge_pk)
+        self._rec_btc_addr_idx += 1
+        return rec_tr_addr
 
 
 class BasicEnvConfig(flexitest.EnvConfig):
@@ -21,6 +62,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
         rollup_settings: Optional[RollupParamsSettings] = None,
         auto_generate_blocks: bool = True,
         enable_prover_client: bool = False,
+        pre_fund_addrs: bool = True,
         n_operators: int = 2,
     ):
         super().__init__()
@@ -28,6 +70,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
         self.rollup_settings = rollup_settings
         self.auto_generate_blocks = auto_generate_blocks
         self.enable_prover_client = enable_prover_client
+        self.pre_fund_addrs = pre_fund_addrs
         self.n_operators = n_operators
 
     def init(self, ctx: flexitest.EnvContext) -> flexitest.LiveEnv:
@@ -43,6 +86,13 @@ class BasicEnvConfig(flexitest.EnvConfig):
         settings = self.rollup_settings or RollupParamsSettings.new_default()
         params_gen_data = generate_simple_params(initdir, settings, self.n_operators)
         params = params_gen_data["params"]
+        # Instantiaze the generated rollup config so it's convenient to work with.
+        rollup_cfg = RollupConfig.model_validate_json(params)
+
+        # Construct the bridge pubkey from the config.
+        # Technically, we could use utils::get_bridge_pubkey, but this makes sequencer
+        # a dependency of pre-funding logic and just complicates the env setup.
+        bridge_pk = get_bridge_pubkey_from_cfg(rollup_cfg)
         # TODO also grab operator keys and launch operators
 
         # reth needs some time to startup, start it first
@@ -64,21 +114,46 @@ class BasicEnvConfig(flexitest.EnvConfig):
         brpc.proxy.createwallet(walletname)
         seqaddr = brpc.proxy.getnewaddress()
 
-        chunk_size = 500
-        while self.pre_generate_blocks > 0:
-            batch_size = min(self.pre_generate_blocks, 1000)
+        if self.pre_generate_blocks > 0:
+            if self.pre_fund_addrs:
+                # Since the pre-funding is enabled, we have to ensure the amount of pre-generated
+                # blocks is enough to deal with the coinbase maturation.
+                # Also, leave a log-message to indicate that the setup is little inconsistent.
+                if self.pre_generate_blocks < 101:
+                    print(
+                        "Env setup: pre_fund_addrs is enabled, specify pre_generate_blocks >= 101."
+                    )
+                    self.pre_generate_blocks = 101
 
-            # generate blocks in chunks to avoid timeout
-            num_chunks = ceil(batch_size / chunk_size)
-            for i in range(0, batch_size, chunk_size):
-                chunk = int(i / chunk_size) + 1
-                num_blocks = int(min(chunk_size, batch_size - (chunk - 1) * chunk_size))
-                chunk = f"{chunk}/{num_chunks}"
+            chunk_size = 500
+            while self.pre_generate_blocks > 0:
+                batch_size = min(self.pre_generate_blocks, 1000)
 
-                print(f"Pre generating {num_blocks} blocks to address {seqaddr}; chunk = {chunk}")
-                brpc.proxy.generatetoaddress(chunk_size, seqaddr)
+                # generate blocks in chunks to avoid timeout
+                num_chunks = ceil(batch_size / chunk_size)
+                for i in range(0, batch_size, chunk_size):
+                    chunk = int(i / chunk_size) + 1
+                    num_blocks = int(min(chunk_size, batch_size - (chunk - 1) * chunk_size))
+                    chunk = f"{chunk}/{num_chunks}"
 
-            self.pre_generate_blocks -= batch_size
+                    print(
+                        f"Pre generating {num_blocks} blocks to address {seqaddr}; chunk = {chunk}"
+                    )
+                    brpc.proxy.generatetoaddress(chunk_size, seqaddr)
+
+                self.pre_generate_blocks -= batch_size
+
+            if self.pre_fund_addrs:
+                # Send funds for btc external and recovery addresses used in the test logic.
+                # Generate one more block so the transaction is on the blockchain.
+                brpc.proxy.sendmany(
+                    "",
+                    {
+                        get_recovery_address(i, bridge_pk) if i < 100 else get_address(i - 100): 50
+                        for i in range(200)
+                    },
+                )
+                brpc.proxy.generatetoaddress(1, seqaddr)
 
         # generate blocks every 500 millis
         if self.auto_generate_blocks:
@@ -130,7 +205,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
             )
             svcs["prover_client"] = prover_client
 
-        return flexitest.LiveEnv(svcs)
+        return BasicLiveEnv(svcs, bridge_pk)
 
 
 class HubNetworkEnvConfig(flexitest.EnvConfig):
@@ -159,6 +234,13 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
         settings = self.rollup_settings or RollupParamsSettings.new_default()
         params_gen_data = generate_simple_params(initdir, settings, self.n_operators)
         params = params_gen_data["params"]
+        # Instantiaze the generated rollup config so it's convenient to work with.
+        rollup_cfg = RollupConfig.model_validate_json(params)
+
+        # Construct the bridge pubkey from the config.
+        # Technically, we could use utils::get_bridge_pubkey, but this makes sequencer
+        # a dependency of pre-funding logic and just complicates the env setup.
+        bridge_pk = get_bridge_pubkey_from_cfg(rollup_cfg)
         # TODO also grab operator keys and launch operators
 
         # reth needs some time to startup, start it first
@@ -246,7 +328,7 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
             name = f"bridge.{i}"
             svcs[name] = br
 
-        return flexitest.LiveEnv(svcs)
+        return BasicLiveEnv(svcs, bridge_pk)
 
 
 def main(argv):
@@ -258,7 +340,7 @@ def main(argv):
     # Filter the prover test files if not present in argv
     if len(argv) > 1:
         # Run the specific test file passed as the first argument (without .py extension)
-        tests = [str(argv[1]).removesuffix(".py")]
+        tests = [str(tst).removesuffix(".py") for tst in argv[1:]]
     else:
         # Run all tests, excluding those containing "fn_prover", unless explicitly passed in argv
         tests = [test for test in all_tests if "fn_prover" not in test or test in argv]
